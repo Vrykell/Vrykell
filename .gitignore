@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+/tmp/
+.vite/
+debug-*.*
+test-*.*
+package-lock.json
