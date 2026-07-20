@@ -16,9 +16,11 @@ export function useTerminal({ containerRef, sessionId }: UseTerminalOptions) {
   const fitAddonRef = useRef<FitAddon | null>(null);
   const searchAddonRef = useRef<SearchAddon | null>(null);
   const disposersRef = useRef<Array<() => void>>([]);
-  const settings = useTerminalStore((s) => s.settings);
+  // Extract only terminal-relevant settings to avoid unnecessary
+  // terminal recreation when non-terminal settings change
+  const terminalSettings = useTerminalStore((s) => s.settings.terminal);
 
-  // Initialize xterm.js instance
+  // Initialize xterm.js instance (runs once per mount)
   const initTerminal = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -30,11 +32,11 @@ export function useTerminal({ containerRef, sessionId }: UseTerminalOptions) {
     container.innerHTML = '';
 
     const term = new Terminal({
-      fontSize: settings.terminal.fontSize,
-      fontFamily: settings.terminal.fontFamily,
-      cursorStyle: settings.terminal.cursorStyle,
-      cursorBlink: settings.terminal.cursorBlink,
-      scrollback: settings.terminal.scrollback,
+      fontSize: terminalSettings.fontSize,
+      fontFamily: terminalSettings.fontFamily,
+      cursorStyle: terminalSettings.cursorStyle,
+      cursorBlink: terminalSettings.cursorBlink,
+      scrollback: terminalSettings.scrollback,
       allowProposedApi: true,
       allowTransparency: true,
       theme: {
@@ -97,7 +99,7 @@ export function useTerminal({ containerRef, sessionId }: UseTerminalOptions) {
       resizeObserver.disconnect();
       term.dispose();
     };
-  }, [containerRef, settings]);
+  }, [containerRef, terminalSettings]);
 
   // Connect terminal input to PTY
   useEffect(() => {

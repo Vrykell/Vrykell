@@ -1,11 +1,28 @@
 /**
  * ELECTRON API PRELUDE
  *
- * In Electron 32+, the built-in electron module is handled by Electron's
- * own module loader. The npm electron package's index.js no longer tries
- * to detect the runtime (it just returns the binary path). This prelude
- * is a no-op for Electron 32+ but kept for compatibility.
+ * Fixes require('electron') in CJS compiled code to return the real
+ * Electron API instead of the npm package's binary path string.
+ *
+ * Strategy: The ESM main-wrapper.mjs imports the real API via
+ * `import { app } from 'electron/main'` and stores it on globalThis.
+ * This prelude intercepts CJS require('electron') and returns the
+ * cached API from globalThis.
  */
 
-// No patching needed for Electron 32+
-// Electron's Module._load natively intercepts require('electron')
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const Module = require('module') as any;
+
+if (process.versions?.electron) {
+  const originalLoad = Module._load;
+
+  Module._load = function (request: string, parent: any, isMain: boolean) {
+    if (
+      (request === 'electron' || request.startsWith('electron/')) &&
+      (globalThis as any).__ELECTRON_API__
+    ) {
+      return (globalThis as any).__ELECTRON_API__;
+    }
+    return originalLoad.apply(Module, arguments as any);
+  };
+}

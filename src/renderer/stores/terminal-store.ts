@@ -30,6 +30,7 @@ interface TerminalStore {
   clearOutputs: (sessionId: string) => void;
 
   addAIMessage: (msg: Message) => void;
+  appendToLastMessage: (chunk: string) => void;
   setAIStreaming: (v: boolean) => void;
   clearAIMessages: () => void;
 
@@ -89,6 +90,16 @@ export const useTerminalStore = create<TerminalStore>((set) => ({
 
   addAIMessage: (msg) =>
     set((s) => ({ aiMessages: [...s.aiMessages, msg] })),
+
+  appendToLastMessage: (chunk) =>
+    set((s) => {
+      const msgs = [...s.aiMessages];
+      if (msgs.length > 0) {
+        const last = msgs[msgs.length - 1];
+        msgs[msgs.length - 1] = { ...last, content: last.content + chunk };
+      }
+      return { aiMessages: msgs };
+    }),
 
   setAIStreaming: (v) => set({ aiStreaming: v }),
 

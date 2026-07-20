@@ -30,23 +30,33 @@ const App: React.FC = () => {
     return () => disposer?.();
   }, [updateSessionTitle]);
 
-  // Listen for AI responses
+  // Listen for AI responses (streaming — append chunks to last message)
   useEffect(() => {
+    let streamingMessageId: string | null = null;
+
     const disposer = window.electronAPI?.onAIResponse((data: any) => {
       if (data.chunk) {
         setAIStreaming(true);
-        addAIMessage({
-          id: Date.now().toString(),
-          role: 'assistant',
-          content: data.chunk,
-          timestamp: Date.now(),
-        });
+        if (!streamingMessageId) {
+          streamingMessageId = Date.now().toString();
+          addAIMessage({
+            id: streamingMessageId,
+            role: 'assistant',
+            content: data.chunk,
+            timestamp: Date.now(),
+          });
+        } else {
+          // Append chunk to existing streaming message
+          useTerminalStore.getState().appendToLastMessage(data.chunk);
+        }
       }
       if (data.done) {
         setAIStreaming(false);
+        streamingMessageId = null;
       }
       if (data.error) {
         setAIStreaming(false);
+        streamingMessageId = null;
         addAIMessage({
           id: Date.now().toString(),
           role: 'assistant',

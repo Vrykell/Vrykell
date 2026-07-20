@@ -6,7 +6,6 @@ import { SessionInfo, SessionOptions, SSHConnectOptions } from '../shared/types'
 interface ManagedSession {
   info: SessionInfo;
   process: pty.IPty;
-  buffer: Buffer[];  // ring buffer for inactive sessions
 }
 
 export class PtyManager extends EventEmitter implements ISessionBackend {
@@ -41,16 +40,13 @@ export class PtyManager extends EventEmitter implements ISessionBackend {
     const managed: ManagedSession = {
       info: session,
       process: ptyProcess,
-      buffer: [],
     };
 
-    // Forward PTY output
+    // Forward PTY output + detect title changes (OSC 0/2)
     ptyProcess.onData((data: string) => {
       this.emit('output', id, Buffer.from(data, 'utf-8'));
-    });
 
-    // Detect title changes (OSC 0 and OSC 2)
-    ptyProcess.onData((data: string) => {
+      // Detect terminal title changes via OSC sequences
       const titleMatch = data.match(/\x1b\][02];([^\x07\x1b]+)/);
       if (titleMatch) {
         managed.info.title = titleMatch[1];
