@@ -36,7 +36,7 @@ export function registerIpcHandlers(
     return session;
   });
 
-  ipcMain.on(IPC_PTY_WRITE, (_event, sessionId: string, data: Uint8Array) => {
+  ipcMain.on(IPC_PTY_WRITE, (_event, sessionId: string, data: string) => {
     ptyManager.writeToSession(sessionId, data);
   });
 
@@ -69,7 +69,7 @@ export function registerIpcHandlers(
   // ── AI ───────────────────────────────────────────────
 
   ipcMain.handle(IPC_AI_CHAT, async (_event, messages: Message[]) => {
-    aiBridge.chat(messages);
+    return aiBridge.chat(messages);
   });
 
   ipcMain.on(IPC_AI_ABORT, () => {
@@ -89,7 +89,7 @@ export function registerIpcHandlers(
 
   // ── PTY Output Forwarding ───────────────────────────
 
-  ptyManager.onOutput((sessionId: string, data: Uint8Array) => {
+  ptyManager.onOutput((sessionId: string, data: string) => {
     send(IPC_PTY_OUTPUT, { sessionId, data });
   });
 

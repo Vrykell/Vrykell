@@ -15,7 +15,6 @@ export function useTerminal({ containerRef, sessionId }: UseTerminalOptions) {
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const searchAddonRef = useRef<SearchAddon | null>(null);
-  const disposersRef = useRef<Array<() => void>>([]);
   // Extract only terminal-relevant settings to avoid unnecessary
   // terminal recreation when non-terminal settings change
   const terminalSettings = useTerminalStore((s) => s.settings.terminal);
@@ -25,11 +24,11 @@ export function useTerminal({ containerRef, sessionId }: UseTerminalOptions) {
     const container = containerRef.current;
     if (!container) return;
 
-    // Clean up previous instance
+    // Clean up previous instance (xterm.dispose() handles its own DOM cleanup)
     if (terminalRef.current) {
       terminalRef.current.dispose();
+      terminalRef.current = null;
     }
-    container.innerHTML = '';
 
     const term = new Terminal({
       fontSize: terminalSettings.fontSize,
@@ -83,7 +82,14 @@ export function useTerminal({ containerRef, sessionId }: UseTerminalOptions) {
     }
 
     term.open(container);
-    fitAddon.fit();
+
+    // Defer the initial fit until the browser has laid out the container.
+    requestAnimationFrame(() => {
+      try {
+        fitAddon.fit();
+        term.focus();
+      } catch { /* container may be gone */ }
+    });
 
     terminalRef.current = term;
     fitAddonRef.current = fitAddon;
@@ -91,7 +97,7 @@ export function useTerminal({ containerRef, sessionId }: UseTerminalOptions) {
 
     // Handle resize
     const resizeObserver = new ResizeObserver(() => {
-      fitAddon.fit();
+      try { fitAddon.fit(); } catch { /* terminal may be disposed */ }
     });
     resizeObserver.observe(container);
 
@@ -113,7 +119,7 @@ export function useTerminal({ containerRef, sessionId }: UseTerminalOptions) {
     // Listen for PTY output
     const outputDisposer = window.electronAPI?.onPTYOutput(({ sessionId: sid, data }) => {
       if (sid === sessionId && terminalRef.current) {
-        terminalRef.current.write(new Uint8Array(data));
+        terminalRef.current.write(data);
       }
     });
 

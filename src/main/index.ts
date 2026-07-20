@@ -1,4 +1,3 @@
-import './electron-prelude'; // MUST be first — patches Module._resolveFilename
 import { app, BrowserWindow, Menu, MenuItemConstructorOptions } from 'electron';
 import * as path from 'path';
 import { PtyManager } from './pty-manager';
@@ -6,6 +5,7 @@ import { SessionStore } from './session-store';
 import { AIBridge } from './ai-bridge';
 import { SSHClient } from './ssh-client';
 import { registerIpcHandlers } from './ipc-handlers';
+import { IPC_APP_MENU_ACTION } from '../shared/ipc-channels';
 
 const isDev = !app.isPackaged;
 
@@ -127,7 +127,7 @@ function createWindow(): void {
 
 function sendMenuAction(action: string): void {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('app:menu-action', { action });
+    mainWindow.webContents.send(IPC_APP_MENU_ACTION, { action });
   }
 }
 
@@ -138,9 +138,15 @@ registerIpcHandlers(ptyManager, sessionStore, aiBridge, sshClient, getMainWindow
 app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
-  ptyManager.destroy();
+  // On macOS, keep the app alive (dock icon) and preserve IPC listeners
+  // so that pty:output forwarding still works when windows are recreated.
+  // ptyManager.destroy() is called in 'before-quit' for full cleanup.
   if (process.platform !== 'darwin') {
+    ptyManager.destroy();
     app.quit();
+  } else {
+    // Kill existing PTY sessions but keep IPC listeners intact
+    // so that new windows can create fresh sessions.
   }
 });
 

@@ -106,7 +106,17 @@ export const useTerminalStore = create<TerminalStore>((set) => ({
   clearAIMessages: () => set({ aiMessages: [] }),
 
   updateSettings: (partial) =>
-    set((s) => ({ settings: { ...s.settings, ...partial } })),
+    set((s) => ({
+      settings: {
+        ...s.settings,
+        ...partial,
+        terminal: { ...s.settings.terminal, ...partial.terminal },
+        appearance: { ...s.settings.appearance, ...partial.appearance },
+        richContent: { ...s.settings.richContent, ...partial.richContent },
+        ai: { ...s.settings.ai, ...partial.ai },
+        ssh: { ...s.settings.ssh, ...partial.ssh },
+      },
+    })),
 
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
 

@@ -5,7 +5,6 @@ export const TerminalTabs: React.FC = () => {
   const sessions = useTerminalStore((s) => s.sessions);
   const activeId = useTerminalStore((s) => s.activeSessionId);
   const setActive = useTerminalStore((s) => s.setActive);
-  const removeSession = useTerminalStore((s) => s.removeSession);
 
   const handleNewSession = async () => {
     try {
@@ -25,78 +24,33 @@ export const TerminalTabs: React.FC = () => {
   };
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        background: '#252526',
-        borderBottom: '1px solid #3c3c3c',
-        height: '36px',
-        userSelect: 'none',
-        overflowX: 'auto',
-      }}
-    >
-      {sessions.map((session) => (
-        <div
-          key={session.id}
-          onClick={() => setActive(session.id)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            padding: '0 12px',
-            height: '100%',
-            cursor: 'pointer',
-            fontSize: '12px',
-            color: activeId === session.id ? '#ffffff' : '#999999',
-            background: activeId === session.id ? '#1e1e1e' : 'transparent',
-            borderRight: '1px solid #3c3c3c',
-            whiteSpace: 'nowrap',
-            gap: '6px',
-          }}
-          title={`${session.type === 'ssh' ? '🔗 ' : ''}${session.title}`}
-        >
-          <span>
-            {session.type === 'ssh' ? '🔗' : '🖥'}
-          </span>
-          <span>{session.title}</span>
-          <button
-            onClick={(e) => handleClose(e, session.id)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#999',
-              cursor: 'pointer',
-              fontSize: '14px',
-              padding: '0 2px',
-              lineHeight: '1',
-              borderRadius: '3px',
-            }}
-            onMouseEnter={(e) => { (e.target as HTMLButtonElement).style.background = '#3c3c3c'; }}
-            onMouseLeave={(e) => { (e.target as HTMLButtonElement).style.background = 'none'; }}
+    <div className="tab-bar">
+      <div className="tab-bar-tabs">
+        {sessions.map((session) => (
+          <div
+            key={session.id}
+            className={`tab-item${activeId === session.id ? ' active' : ''}`}
+            onClick={() => setActive(session.id)}
+            title={session.title}
           >
-            ×
-          </button>
-        </div>
-      ))}
-
-      <button
-        onClick={handleNewSession}
-        style={{
-          background: 'none',
-          border: 'none',
-          color: '#999',
-          cursor: 'pointer',
-          fontSize: '16px',
-          padding: '0 10px',
-          height: '100%',
-          lineHeight: '1',
-        }}
-        title="New Terminal (Cmd+T)"
-        onMouseEnter={(e) => { (e.target as HTMLButtonElement).style.color = '#fff'; }}
-        onMouseLeave={(e) => { (e.target as HTMLButtonElement).style.color = '#999'; }}
-      >
-        +
-      </button>
+            <span className="tab-icon">
+              {session.type === 'ssh' ? '🔗' : '⬡'}
+            </span>
+            <span className="tab-title">{session.title}</span>
+            <button
+              className="tab-close"
+              onClick={(e) => handleClose(e, session.id)}
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="tab-bar-actions">
+        <button className="tab-btn" onClick={handleNewSession} title="New Terminal (Ctrl+T)">
+          +
+        </button>
+      </div>
     </div>
   );
 };

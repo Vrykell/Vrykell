@@ -13,7 +13,7 @@ export interface ISessionBackend {
   closeSession(id: string): Promise<void>;
 
   /** Write data to a session's stdin */
-  writeToSession(id: string, data: Uint8Array): void;
+  writeToSession(id: string, data: string): void;
 
   /** Resize a session's PTY */
   resizeSession(id: string, cols: number, rows: number): void;
@@ -25,7 +25,7 @@ export interface ISessionBackend {
   connectSSH(opts: SSHConnectOptions): Promise<SessionInfo>;
 
   /** Register callback for session output */
-  onOutput(callback: (sessionId: string, data: Uint8Array) => void): void;
+  onOutput(callback: (sessionId: string, data: string) => void): void;
 
   /** Register callback for session exit */
   onExit(callback: (sessionId: string, exitCode: number) => void): void;

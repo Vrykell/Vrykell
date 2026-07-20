@@ -2,7 +2,7 @@
   "name": "ai-terminal",
   "version": "0.1.0",
   "description": "AI-Native Terminal Emulator with rich content rendering",
-  "main": "main-wrapper.mjs",
+  "main": "dist/main/main/index.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
     "dev:renderer": "vite",
@@ -38,6 +38,14 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
-    "electron": "^43.1.0"
+    "@electron/rebuild": "^4.2.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "concurrently": "^10.0.3",
+    "electron": "^43.1.1",
+    "node-addon-api": "^8.9.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.5"
   }
 }

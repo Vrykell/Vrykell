@@ -17,12 +17,13 @@
 | 阶段 | 文件 | 状态 |
 |------|------|------|
 | Phase 1 — 核心终端 | [phase-1-core-terminal.md](phases/phase-1-core-terminal.md) | ⚠️ 代码完成，Electron require 阻塞级 Bug（影响 28~32） |
-| Phase 2 — 富内容渲染 | — | 🚧 可并行开发（不依赖 Electron 运行时） |
+| Phase 2 — 富内容渲染 | [phase-2-rich-content.md](phases/phase-2-rich-content.md) | 🚧 核心检测+渲染完成，in-terminal decorations 待开发 |
 | Phase 3 — AI 集成 | — | ⏳ 计划中 |
 | Phase 4 — 远程功能 | — | ⏳ 计划中 |
 | Phase 5 — 打包发布 | — | ⏳ 计划中 |
 
 ### 参考资料
+- [代码审查报告 2026-07-20](reference/code-review-2026-07-20.md) — 全面代码审查，含 Bug 清单和重构建议
 - [Electron require 问题详解](reference/electron-require-issue.md) — 根因、版本对比、调试记录
 - [模块解析深度分析](reference/module-resolution-deep-dive.md) — 入口链、包装器演进、文件职责、代码规范
 - [项目记忆](reference/project-memory.md)

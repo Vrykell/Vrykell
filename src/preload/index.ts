@@ -17,8 +17,7 @@ const electronAPI = {
   // ── PTY ──────────────────────────────────────────────
   createPTY: (opts: SessionOptions) => ipcRenderer.invoke(IPC_PTY_CREATE, opts),
   writeToPTY: (sessionId: string, data: string) => {
-    const buf = new TextEncoder().encode(data);
-    ipcRenderer.send(IPC_PTY_WRITE, sessionId, buf);
+    ipcRenderer.send(IPC_PTY_WRITE, sessionId, data);
   },
   resizePTY: (sessionId: string, cols: number, rows: number) => {
     ipcRenderer.send(IPC_PTY_RESIZE, sessionId, cols, rows);
@@ -37,7 +36,7 @@ const electronAPI = {
   saveSettings: (settings: unknown) => ipcRenderer.invoke(IPC_SETTINGS_SAVE, settings),
 
   // ── Event listeners (each returns a cleanup function) ─
-  onPTYOutput: (cb: (data: { sessionId: string; data: ArrayBuffer }) => void): (() => void) => {
+  onPTYOutput: (cb: (data: { sessionId: string; data: string }) => void): (() => void) => {
     const handler = (_event: Electron.IpcRendererEvent, data: any): void => { cb(data); };
     ipcRenderer.on(IPC_PTY_OUTPUT, handler);
     return () => { ipcRenderer.removeListener(IPC_PTY_OUTPUT, handler); };

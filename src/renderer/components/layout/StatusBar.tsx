@@ -7,30 +7,17 @@ export const StatusBar: React.FC = () => {
   const activeSession = sessions.find((s) => s.id === activeId);
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        height: '24px',
-        padding: '0 12px',
-        background: '#007acc',
-        color: '#ffffff',
-        fontSize: '12px',
-        userSelect: 'none',
-      }}
-    >
-      <div style={{ display: 'flex', gap: '16px' }}>
-        <span>AI Terminal v0.1.0</span>
-        {activeSession && (
-          <>
-            <span>{activeSession.type === 'ssh' ? 'SSH' : 'Local'}</span>
-            <span>{activeSession.cols}×{activeSession.rows}</span>
-          </>
-        )}
+    <div className="status-bar">
+      <div className="status-bar-left">
+        <div className="status-item">
+          <span className={`status-dot ${activeSession?.type || 'local'}`} />
+          <span>{activeSession?.type === 'ssh' ? 'SSH' : 'Local'}</span>
+        </div>
+        <span>{activeSession ? `${activeSession.cols}×${activeSession.rows}` : '—'}</span>
       </div>
-      <div>
+      <div className="status-bar-right">
         <span>{sessions.length} session{sessions.length !== 1 ? 's' : ''}</span>
+        <span className="status-version">AI Terminal v0.1.0</span>
       </div>
     </div>
   );
