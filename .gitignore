@@ -5,3 +5,4 @@ dist/
 /tmp/
 .vite/
 src-tauri/target/
+src-tauri/gen/
