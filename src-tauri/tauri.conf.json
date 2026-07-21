@@ -5,7 +5,7 @@
   "identifier": "com.ai-terminal.app",
   "build": {
     "frontendDist": "../dist/renderer",
-    "devUrl": "http://localhost:5173",
+    "devUrl": "http://localhost:1420",
     "beforeDevCommand": "npm run dev:renderer",
     "beforeBuildCommand": "npm run build:renderer"
   },
@@ -18,13 +18,11 @@
         "height": 800,
         "minWidth": 600,
         "minHeight": 400,
-        "center": true,
-        "titleBarStyle": "Overlay",
-        "hiddenTitle": true
+        "center": true
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' https://api.anthropic.com"
+      "csp": null
     }
   },
   "bundle": {

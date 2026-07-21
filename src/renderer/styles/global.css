@@ -124,11 +124,10 @@ body {
   display: flex;
   align-items: center;
   height: 38px;
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-subtle);
+  background: #1a1a1f;
+  border-bottom: 1px solid #333;
   padding: 0 6px;
   gap: 2px;
-  -webkit-app-region: drag;
   flex-shrink: 0;
 }
 
@@ -737,12 +736,4 @@ body {
 
 .xterm .xterm-viewport {
   scroll-behavior: auto;
-}
-
-/* macOS drag region */
-.drag-region {
-  -webkit-app-region: drag;
-}
-.no-drag {
-  -webkit-app-region: no-drag;
 }

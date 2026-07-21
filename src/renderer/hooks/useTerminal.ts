@@ -104,7 +104,35 @@ export function useTerminal({ containerRef, sessionId }: UseTerminalOptions) {
     };
   }, [containerRef, terminalSettings]);
 
-  // Connect terminal input to PTY
+  // Keep sessionId in a ref so event listeners always have latest value
+  const sessionIdRef = useRef<string | null>(sessionId);
+  sessionIdRef.current = sessionId;
+
+  // Set up PTY I/O event listeners ONCE (global listeners, filter by sessionId)
+  useEffect(() => {
+    const term = terminalRef.current;
+    if (!term) return;
+
+    const unlisteners: Array<() => void> = [];
+
+    // PTY output — listen globally, write when sessionId matches
+    onPTYOutput(({ sessionId: sid, data }) => {
+      if (sid === sessionIdRef.current && terminalRef.current) {
+        terminalRef.current.write(data);
+      }
+    }).then(fn => unlisteners.push(fn));
+
+    // PTY exit — listen globally
+    onPTYExit(({ sessionId: sid, exitCode }) => {
+      if (sid === sessionIdRef.current && terminalRef.current) {
+        terminalRef.current.write(`\r\n\x1b[31m[Process exited with code: ${exitCode}]\x1b[0m\r\n`);
+      }
+    }).then(fn => unlisteners.push(fn));
+
+    return () => unlisteners.forEach(fn => fn());
+  }, []); // set up once, never re-create
+
+  // Wire terminal input → PTY (depends on sessionId)
   useEffect(() => {
     const term = terminalRef.current;
     if (!term || !sessionId) return;
@@ -113,30 +141,10 @@ export function useTerminal({ containerRef, sessionId }: UseTerminalOptions) {
       writeToPTY(sessionId, data).catch(() => {});
     });
 
-    // Listen for PTY output (Tauri event — returns Promise<UnlistenFn>)
-    let outputUnlisten: (() => void) | null = null;
-    onPTYOutput(({ sessionId: sid, data }) => {
-      if (sid === sessionId && terminalRef.current) {
-        terminalRef.current.write(data);
-      }
-    }).then(fn => { outputUnlisten = fn; });
-
-    // Listen for exit
-    let exitUnlisten: (() => void) | null = null;
-    onPTYExit(({ sessionId: sid, exitCode }) => {
-      if (sid === sessionId && terminalRef.current) {
-        terminalRef.current.write(`\r\n\x1b[31m[Process exited with code: ${exitCode}]\x1b[0m\r\n`);
-      }
-    }).then(fn => { exitUnlisten = fn; });
-
-    return () => {
-      onDataDisposer?.dispose();
-      outputUnlisten?.();
-      exitUnlisten?.();
-    };
+    return () => onDataDisposer.dispose();
   }, [sessionId]);
 
-  // Resize PTY when terminal resizes
+  // Wire terminal resize → PTY resize (depends on sessionId)
   useEffect(() => {
     const term = terminalRef.current;
     if (!term || !sessionId) return;

@@ -109,7 +109,7 @@ export interface AppSettings {
 export const DEFAULT_SETTINGS: AppSettings = {
   terminal: {
     fontSize: 14,
-    fontFamily: "'JetBrains Mono', 'Fira Code', Menlo, monospace",
+    fontFamily: "Menlo, 'DejaVu Sans Mono', 'Courier New', monospace",
     cursorStyle: 'block',
     cursorBlink: true,
     scrollback: 10000,

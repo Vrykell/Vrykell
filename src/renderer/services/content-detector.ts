@@ -2,6 +2,28 @@ import { DetectedBlock, RichContentType } from '../../shared/types';
 
 /**
  * Scans terminal output text for rich content patterns.
+ *
+ * Important: terminal output contains ANSI escape sequences (colors, cursor
+ * movement, etc.) which must be stripped BEFORE pattern matching, otherwise
+ * they can trigger false positives (e.g. OSC codes, SGR parameters).
+ */
+
+/** Strip ANSI escape sequences from text before content detection */
+function stripAnsi(text: string): string {
+  // Remove CSI sequences: ESC [ ... m (SGR), ESC [ ... J/K/h/l etc.
+  // Remove OSC sequences: ESC ] ... BEL or ESC ] ... ESC \
+  // Remove DCS/other: ESC P ... ESC \ or ESC _ ... ESC \
+  return text
+    .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')   // CSI sequences
+    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '') // OSC sequences
+    .replace(/\x1b[PX^_][^\x1b]*\x1b\\/g, '') // DCS/PM/APC sequences
+    .replace(/\x1b[()*+][0-9A-Z]/g, '')        // Character set selection
+    .replace(/\x1b[=>]/g, '')                   // Application keypad
+    .replace(/\x1b\][02];[^\x07\x1b]*(?:\x07|\x1b\\)/g, ''); // Title OSC
+}
+
+/**
+ * Scans terminal output text for rich content patterns.
  * Phase 2: detects LaTeX, code blocks, Markdown tables, and URLs.
  *
  * Run this in a Web Worker for large outputs to avoid blocking the main thread.
@@ -43,8 +65,10 @@ export interface DetectionResult {
  * First checks for explicit OSC AI markers, then falls back to auto-detection.
  */
 export function detectRichContent(text: string): DetectionResult {
+  // Strip ANSI escape sequences first to prevent false positives
+  const cleanText = stripAnsi(text);
   const blocks: DetectedBlock[] = [];
-  let cleanedText = text;
+  let cleanedText = cleanText;
 
   // Layer 1: Explicit OSC AI markers (from AI tools)
   const oscBlocks = extractOscMarkers(text);
@@ -74,8 +98,9 @@ export function detectRichContent(text: string): DetectionResult {
  * Suitable for debounced real-time scanning.
  */
 export function detectFirstBlock(text: string): DetectedBlock | null {
+  const cleanText = stripAnsi(text);
   // Check OSC markers first
-  const oscMatch = OSC_AI_MARKER_RE.exec(text);
+  const oscMatch = OSC_AI_MARKER_RE.exec(cleanText);
   OSC_AI_MARKER_RE.lastIndex = 0;
   if (oscMatch) {
     return {

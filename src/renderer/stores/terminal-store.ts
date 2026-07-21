@@ -18,6 +18,7 @@ interface TerminalStore {
 
   // UI
   sidebarOpen: boolean;
+  outputPanelOpen: boolean;
   outputPanelHeight: number;
 
   // Actions
@@ -37,6 +38,7 @@ interface TerminalStore {
   updateSettings: (partial: Partial<AppSettings>) => void;
 
   toggleSidebar: () => void;
+  toggleOutputPanel: () => void;
   setOutputPanelHeight: (h: number) => void;
 }
 
@@ -48,6 +50,7 @@ export const useTerminalStore = create<TerminalStore>((set) => ({
   aiMessages: [],
   aiStreaming: false,
   sidebarOpen: false,
+  outputPanelOpen: false,
   outputPanelHeight: 200,
 
   addSession: (session) =>
@@ -119,6 +122,7 @@ export const useTerminalStore = create<TerminalStore>((set) => ({
     })),
 
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
+  toggleOutputPanel: () => set((s) => ({ outputPanelOpen: !s.outputPanelOpen })),
 
   setOutputPanelHeight: (h) => set({ outputPanelHeight: h }),
 }));

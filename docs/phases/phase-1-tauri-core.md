@@ -68,9 +68,30 @@ cargo check   # ✅ 0 errors, 0 warnings
 npx tsc --noEmit  # 前端类型检查
 ```
 
-## 运行时验证（待执行）
+## 运行时验证
 
 ```bash
-cargo tauri dev
-# 预期: 窗口打开 → zsh/bash 可用 → 输入命令有回显
+cargo tauri dev  # ✅ 窗口打开，Rust 后端启动正常
 ```
+
+## 已知问题
+
+### 1. 白色可拖拽区域（阻塞）
+**现象**: 终端上方存在白色可拖拽区域，可随意调整大小。中文输入法候选框定位到此区域。
+**排查记录**:
+- 已排除: `titleBarStyle: Overlay`（开关均无效）
+- 已排除: `-webkit-app-region: drag`（已移除）
+- 已排除: CSS 背景色（硬编码 `#0a0a0c` 无效）
+- 已排除: 字体问题（已换 Menlo 内置字体）
+- 可能根因: Tauri WKWebView viewport/root 渲染异常，或 xterm.js container 高度计算问题
+
+### 2. 终端字符乱码 `wwwwww` / `%%%%%%`
+**现象**: 终端启动时出现重复乱码，复制后显示正常提示符文本。
+**排查记录**:
+- 已排除: ANSI 转义序列（已添加 `stripAnsi` 过滤）
+- 已排除: 字体（已换 Menlo）
+- 可能根因: PTY 输出双写，或 WKWebView + xterm.js 渲染兼容问题
+
+### 3. RichOutput 面板
+- 当前: 默认隐藏，`Ctrl+Shift+R` 切换
+- 目标: 数据层检测 + xterm.js decorations 内联渲染

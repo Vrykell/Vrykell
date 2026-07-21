@@ -6,9 +6,13 @@ export const TerminalTabs: React.FC = () => {
   const sessions = useTerminalStore((s) => s.sessions);
   const activeId = useTerminalStore((s) => s.activeSessionId);
   const setActive = useTerminalStore((s) => s.setActive);
+  const addSession = useTerminalStore((s) => s.addSession);
 
   const handleNewSession = async () => {
-    try { await createPTY({}); } catch (err) { console.error('Failed to create session:', err); }
+    try {
+      const session = await createPTY({});
+      addSession(session);
+    } catch (err) { console.error('Failed to create session:', err); }
   };
 
   const handleClose = async (e: React.MouseEvent, id: string) => {
