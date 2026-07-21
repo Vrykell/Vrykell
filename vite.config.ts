@@ -18,5 +18,8 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    strictPort: true,
+    // Allow Tauri dev server to connect
+    host: '127.0.0.1',
   },
 });

@@ -1,0 +1,79 @@
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+/// Session type discriminator — matches shared/types.ts SessionType
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum SessionType {
+    Local,
+    Ssh,
+}
+
+/// Session metadata — mirrors shared/types.ts SessionInfo
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionInfo {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub session_type: SessionType,
+    pub title: String,
+    pub cwd: Option<String>,
+    pub shell: Option<String>,
+    pub cols: u16,
+    pub rows: u16,
+    #[serde(rename = "createdAt")]
+    pub created_at: u64,
+    pub host: Option<String>,
+    pub username: Option<String>,
+}
+
+/// Session creation options — mirrors shared/types.ts SessionOptions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionOptions {
+    pub shell: Option<String>,
+    pub cwd: Option<String>,
+    pub cols: Option<u16>,
+    pub rows: Option<u16>,
+}
+
+/// In-memory session store. Phase 4: add disk persistence.
+pub struct SessionStore {
+    sessions: HashMap<String, SessionInfo>,
+    counter: u32,
+}
+
+impl SessionStore {
+    pub fn new() -> Self {
+        Self {
+            sessions: HashMap::new(),
+            counter: 0,
+        }
+    }
+
+    pub fn add(&mut self, mut session: SessionInfo) {
+        self.counter += 1;
+        if session.id.is_empty() {
+            session.id = format!("local-{}-{}", self.counter, std::time::UNIX_EPOCH.elapsed().unwrap().as_millis());
+        }
+        self.sessions.insert(session.id.clone(), session);
+    }
+
+    pub fn remove(&mut self, id: &str) {
+        self.sessions.remove(id);
+    }
+
+    pub fn get(&self, id: &str) -> Option<&SessionInfo> {
+        self.sessions.get(id)
+    }
+
+    pub fn list(&self) -> Vec<SessionInfo> {
+        self.sessions.values().cloned().collect()
+    }
+
+    pub fn update_title(&mut self, id: &str, title: &str) {
+        if let Some(s) = self.sessions.get_mut(id) {
+            s.title = title.to_string();
+        }
+    }
+}

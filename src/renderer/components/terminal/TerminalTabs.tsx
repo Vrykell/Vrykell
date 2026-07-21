@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTerminalStore } from '../../stores/terminal-store';
+import { createPTY, closePTY } from '../../../api';
 
 export const TerminalTabs: React.FC = () => {
   const sessions = useTerminalStore((s) => s.sessions);
@@ -7,20 +8,12 @@ export const TerminalTabs: React.FC = () => {
   const setActive = useTerminalStore((s) => s.setActive);
 
   const handleNewSession = async () => {
-    try {
-      await window.electronAPI?.createPTY({});
-    } catch (err) {
-      console.error('Failed to create session:', err);
-    }
+    try { await createPTY({}); } catch (err) { console.error('Failed to create session:', err); }
   };
 
   const handleClose = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    try {
-      await window.electronAPI?.closePTY(id);
-    } catch (err) {
-      console.error('Failed to close session:', err);
-    }
+    try { await closePTY(id); } catch (err) { console.error('Failed to close session:', err); }
   };
 
   return (

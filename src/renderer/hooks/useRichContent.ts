@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useTerminalStore } from '../stores/terminal-store';
 import { detectRichContent } from '../services/content-detector';
 import { RichOutputItem, DetectedBlock } from '../../shared/types';
+import { onPTYOutput } from '../../api';
 
 const DETECTION_DEBOUNCE_MS = 300;
 const MAX_BUFFER_SIZE = 50000; // ~50KB of text before trimming
@@ -19,7 +20,9 @@ export function useRichContent(sessionId: string | null): void {
   const appendOutput = useTerminalStore((s) => s.appendOutput);
 
   useEffect(() => {
-    const disposer = window.electronAPI?.onPTYOutput(({ sessionId: sid, data }) => {
+    let unlisten: (() => void) | null = null;
+
+    onPTYOutput(({ sessionId: sid, data }) => {
       if (!sessionId || sid !== sessionId) return;
 
       // data is now a plain string from IPC
@@ -43,10 +46,9 @@ export function useRichContent(sessionId: string | null): void {
       timerRef.current[sid] = setTimeout(() => {
         processBuffer(sid);
       }, DETECTION_DEBOUNCE_MS);
-    });
+    }).then(fn => { unlisten = fn; });
 
-    return () => {
-      disposer?.();
+    return () => { unlisten?.();
       // Clear timers
       Object.values(timerRef.current).forEach(clearTimeout);
       timerRef.current = {};

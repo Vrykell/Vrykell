@@ -6,6 +6,12 @@ import { AIChatPanel } from './components/ai/AIChatPanel';
 import { StatusBar } from './components/layout/StatusBar';
 import { useTerminalStore } from './stores/terminal-store';
 import { useRichContent } from './hooks/useRichContent';
+import {
+  createPTY, closePTY,
+  onSessionCreated, onSessionClosed, onPTYExit,
+  onPTYTitleChange, onAIResponse, onMenuAction,
+} from '../../api';
+import type { UnlistenFn } from '@tauri-apps/api/event';
 
 const App: React.FC = () => {
   const activeSessionId = useTerminalStore((s) => s.activeSessionId);
@@ -19,100 +25,58 @@ const App: React.FC = () => {
   // Monitor terminal output for rich content detection
   useRichContent(activeSessionId);
 
-  // Listen for session creation events
+  // Set up all Tauri event listeners once
   useEffect(() => {
-    const disposer = window.electronAPI?.onSessionCreated((session) => {
-      addSession(session);
-    });
-    return () => disposer?.();
-  }, [addSession]);
+    const unlisteners: UnlistenFn[] = [];
 
-  // Listen for session close events
-  useEffect(() => {
-    const disposer = window.electronAPI?.onSessionClosed(({ sessionId }) => {
-      removeSession(sessionId);
-    });
-    return () => disposer?.();
-  }, [removeSession]);
+    onSessionCreated((session) => addSession(session))
+      .then(fn => unlisteners.push(fn));
 
-  // Also remove from store on PTY exit
-  useEffect(() => {
-    const disposer = window.electronAPI?.onPTYExit(({ sessionId }) => {
-      removeSession(sessionId);
-    });
-    return () => disposer?.();
-  }, [removeSession]);
+    onSessionClosed(({ sessionId }) => removeSession(sessionId))
+      .then(fn => unlisteners.push(fn));
 
-  // Listen for title changes
-  useEffect(() => {
-    const disposer = window.electronAPI?.onPTYTitleChange(({ sessionId, title }) => {
-      updateSessionTitle(sessionId, title);
-    });
-    return () => disposer?.();
-  }, [updateSessionTitle]);
+    onPTYExit(({ sessionId }) => removeSession(sessionId))
+      .then(fn => unlisteners.push(fn));
 
-  // Listen for AI responses (streaming — append chunks to last message)
-  useEffect(() => {
+    onPTYTitleChange(({ sessionId, title }) => updateSessionTitle(sessionId, title))
+      .then(fn => unlisteners.push(fn));
+
+    // AI responses
     let streamingMessageId: string | null = null;
-
-    const disposer = window.electronAPI?.onAIResponse((data: any) => {
+    onAIResponse((data: any) => {
       if (data.chunk) {
-        // If we weren't streaming, this is a new response — always start fresh
-        if (!useTerminalStore.getState().aiStreaming) {
-          streamingMessageId = null;
-        }
+        if (!useTerminalStore.getState().aiStreaming) streamingMessageId = null;
         if (!streamingMessageId) {
           streamingMessageId = Date.now().toString();
-          addAIMessage({
-            id: streamingMessageId,
-            role: 'assistant',
-            content: data.chunk,
-            timestamp: Date.now(),
-          });
+          addAIMessage({ id: streamingMessageId, role: 'assistant', content: data.chunk, timestamp: Date.now() });
         } else {
-          // Append chunk to existing streaming message
           useTerminalStore.getState().appendToLastMessage(data.chunk);
         }
         setAIStreaming(true);
       }
-      if (data.done) {
-        setAIStreaming(false);
-        streamingMessageId = null;
-      }
+      if (data.done) { setAIStreaming(false); streamingMessageId = null; }
       if (data.error) {
-        setAIStreaming(false);
-        streamingMessageId = null;
-        addAIMessage({
-          id: Date.now().toString(),
-          role: 'assistant',
-          content: `Error: ${data.error}`,
-          timestamp: Date.now(),
-        });
+        setAIStreaming(false); streamingMessageId = null;
+        addAIMessage({ id: Date.now().toString(), role: 'assistant', content: `Error: ${data.error}`, timestamp: Date.now() });
       }
-    });
-    return () => disposer?.();
-  }, [addAIMessage, setAIStreaming]);
+    }).then(fn => unlisteners.push(fn));
 
-  // Listen for menu actions
-  useEffect(() => {
-    const disposer = window.electronAPI?.onMenuAction(({ action }) => {
-      switch (action) {
-        case 'new-tab':
-        case 'new-local-session':
-          window.electronAPI?.createPTY({}).catch((err) => console.error('createPTY failed:', err));
-          break;
-        case 'toggle-ai-panel':
-          useTerminalStore.getState().toggleSidebar();
-          break;
+    // Menu actions
+    onMenuAction(({ action }) => {
+      if (action === 'new-tab' || action === 'new-local-session') {
+        createPTY({}).catch(err => console.error('createPTY failed:', err));
+      } else if (action === 'toggle-ai-panel') {
+        useTerminalStore.getState().toggleSidebar();
       }
-    });
-    return () => disposer?.();
-  }, []);
+    }).then(fn => unlisteners.push(fn));
+
+    return () => { unlisteners.forEach(fn => fn()); };
+  }, []); // mount once
 
   // Auto-create first session
   useEffect(() => {
     if (sessions.length === 0) {
-      window.electronAPI?.createPTY({}).catch((err) => console.error('createPTY failed:', err));
+      createPTY({}).catch(err => console.error('createPTY failed:', err));
     }
   }, [sessions.length]);
 
@@ -121,20 +85,9 @@ const App: React.FC = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey) {
         switch (e.key) {
-          case 't':
-            e.preventDefault();
-            window.electronAPI?.createPTY({}).catch((err) => console.error('createPTY failed:', err));
-            break;
-          case 'w':
-            e.preventDefault();
-            if (activeSessionId) {
-              window.electronAPI?.closePTY(activeSessionId).catch((err) => console.error('closePTY failed:', err));
-            }
-            break;
-          case 'j':
-            e.preventDefault();
-            useTerminalStore.getState().toggleSidebar();
-            break;
+          case 't': e.preventDefault(); createPTY({}).catch(() => {}); break;
+          case 'w': e.preventDefault(); if (activeSessionId) closePTY(activeSessionId).catch(() => {}); break;
+          case 'j': e.preventDefault(); useTerminalStore.getState().toggleSidebar(); break;
         }
       }
     };

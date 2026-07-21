@@ -1,10 +1,10 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { Terminal } from '@xterm/xterm';
-import { WebglAddon } from '@xterm/addon-webgl';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { useTerminalStore } from '../stores/terminal-store';
+import { writeToPTY, resizePTY, onPTYOutput, onPTYExit } from '../../api';
 
 interface UseTerminalOptions {
   containerRef: React.RefObject<HTMLDivElement | null>;
@@ -72,14 +72,11 @@ export function useTerminal({ containerRef, sessionId }: UseTerminalOptions) {
     term.loadAddon(unicodeAddon);
     term.unicode.activeVersion = '11';
 
-    // Try WebGL first, fall back to DOM renderer
-    try {
-      const webglAddon = new WebglAddon();
-      term.loadAddon(webglAddon);
-    } catch {
-      // Plain DOM renderer as fallback (still performant for most cases)
-      console.warn('WebGL not available, using DOM renderer');
-    }
+    // NOTE: Tauri on macOS uses WKWebView (Safari), which has known rendering
+    // issues with xterm.js WebGL addon. DOM renderer is the safe default.
+    // On Windows (WebView2) and Linux (WebKitGTK), WebGL works correctly.
+    // To enable WebGL: install @xterm/addon-webgl and uncomment below.
+    // try { term.loadAddon(new WebglAddon()); } catch { /* DOM fallback */ }
 
     term.open(container);
 
@@ -113,27 +110,29 @@ export function useTerminal({ containerRef, sessionId }: UseTerminalOptions) {
     if (!term || !sessionId) return;
 
     const onDataDisposer = term.onData((data) => {
-      window.electronAPI?.writeToPTY(sessionId, data);
+      writeToPTY(sessionId, data).catch(() => {});
     });
 
-    // Listen for PTY output
-    const outputDisposer = window.electronAPI?.onPTYOutput(({ sessionId: sid, data }) => {
+    // Listen for PTY output (Tauri event — returns Promise<UnlistenFn>)
+    let outputUnlisten: (() => void) | null = null;
+    onPTYOutput(({ sessionId: sid, data }) => {
       if (sid === sessionId && terminalRef.current) {
         terminalRef.current.write(data);
       }
-    });
+    }).then(fn => { outputUnlisten = fn; });
 
     // Listen for exit
-    const exitDisposer = window.electronAPI?.onPTYExit(({ sessionId: sid, exitCode }) => {
+    let exitUnlisten: (() => void) | null = null;
+    onPTYExit(({ sessionId: sid, exitCode }) => {
       if (sid === sessionId && terminalRef.current) {
         terminalRef.current.write(`\r\n\x1b[31m[Process exited with code: ${exitCode}]\x1b[0m\r\n`);
       }
-    });
+    }).then(fn => { exitUnlisten = fn; });
 
     return () => {
       onDataDisposer?.dispose();
-      outputDisposer?.();
-      exitDisposer?.();
+      outputUnlisten?.();
+      exitUnlisten?.();
     };
   }, [sessionId]);
 
@@ -143,7 +142,7 @@ export function useTerminal({ containerRef, sessionId }: UseTerminalOptions) {
     if (!term || !sessionId) return;
 
     const resizeHandler = term.onResize(({ cols, rows }) => {
-      window.electronAPI?.resizePTY(sessionId, cols, rows);
+      resizePTY(sessionId, cols, rows).catch(() => {});
     });
 
     return () => resizeHandler.dispose();
