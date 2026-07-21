@@ -1,11 +1,10 @@
 /**
  * Tauri API Bridge
  *
- * Replaces Electron's preload/contextBridge. Uses @tauri-apps/api invoke
- * for request-response and listen() for server-push events.
+ * Uses @tauri-apps/api invoke for request-response (Rust commands)
+ * and listen() for server-push events (PTY output streaming).
  *
- * Interface is intentionally similar to the old ElectronAPI so downstream
- * component changes are minimal.
+ * Interface mirrors the old ElectronAPI for minimal downstream changes.
  */
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
@@ -35,7 +34,7 @@ export function closePTY(sessionId: string): Promise<void> {
 }
 
 // ── Event Listeners (Backend → Renderer) ───────────────────────
-// Each returns an UnlistenFn for cleanup (equivalent to Electron's disposer)
+// Each returns Promise<UnlistenFn> for cleanup in useEffect return
 
 export function onPTYOutput(
   cb: (data: { sessionId: string; data: string }) => void,

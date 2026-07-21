@@ -2,8 +2,8 @@ import { SessionInfo, SessionOptions, SSHConnectOptions } from './types';
 
 /**
  * Abstract interface for the session backend.
- * Electron implements this with node-pty + MessagePort.
- * Can be swapped for Tauri (portable-pty + Tauri IPC) without touching the UI.
+ * Tauri implementation: Rust portable-pty + Tauri IPC.
+ * Formerly: Electron node-pty + MessagePort (migrated due to require('electron') bug).
  */
 export interface ISessionBackend {
   /** Create a new local PTY session */
