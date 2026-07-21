@@ -10,7 +10,7 @@ import {
   createPTY, closePTY,
   onSessionCreated, onSessionClosed, onPTYExit,
   onPTYTitleChange, onAIResponse, onMenuAction,
-} from '../../api';
+} from '../api';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 
 const App: React.FC = () => {
