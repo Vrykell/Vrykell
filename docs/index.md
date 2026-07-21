@@ -11,58 +11,48 @@
 ## 文档索引
 
 ### 总体规划
-- [迁移计划](~/.claude/plans/plan-md-swift-brook.md) — Electron → Tauri 迁移方案，5 阶段实现
+- [完整实现计划](plan.md) — 架构设计、技术决策、数据流、IPC 协议、5 阶段计划
 
 ### 各阶段报告
-| 阶段 | 内容 | 状态 |
+| 阶段 | 文件 | 状态 |
 |------|------|------|
-| Phase 1 — 核心终端 | 本地 PTY + 标签页 | 🚧 Tauri 迁移完成，待运行时验证 |
-| Phase 2 — 富内容渲染 | LaTeX/Markdown/代码高亮 | 🚧 核心检测+渲染完成 |
-| Phase 3 — AI 集成 | Claude API 对话面板 | ⏳ 计划中 |
-| Phase 4 — 远程功能 | SSH + 会话持久化 + 分屏 | ⏳ 计划中 |
-| Phase 5 — 打包发布 | 三平台安装包 + 自动更新 | ⏳ 计划中 |
+| Phase 1 — 核心终端 | [phase-1-tauri-core.md](phases/phase-1-tauri-core.md) | 🚧 Rust 编译通过，待运行时验证 |
+| Phase 2 — 富内容渲染 | [phase-2-rich-content.md](phases/phase-2-rich-content.md) | 🚧 核心检测+渲染完成 |
+| Phase 3 — AI 集成 | — | ⏳ 计划中 |
+| Phase 4 — 远程功能 | — | ⏳ 计划中 |
+| Phase 5 — 打包发布 | — | ⏳ 计划中 |
 
 ---
 
 ## 快速开始
 
 ```bash
-# 安装依赖
-npm install
-
-# 开发模式（启动 Rust 后端 + Vite dev server + 窗口）
-cargo tauri dev
-
-# 生产构建
-cargo tauri build
+npm install           # 前端依赖
+cargo tauri dev       # 开发模式（Rust 编译 + Vite HMR + 窗口）
+cargo tauri build     # 生产构建
 ```
 
 ## 项目结构
 
 ```
 ai-terminal/
-├── src-tauri/                # Rust 后端
-│   ├── src/
-│   │   ├── main.rs           # Tauri 入口
-│   │   ├── lib.rs            # 命令注册 + Builder 配置
-│   │   ├── pty.rs            # PTY 管理器 (portable-pty)
-│   │   ├── session.rs        # 会话状态管理
-│   │   └── commands.rs       # Tauri IPC 命令
-│   ├── Cargo.toml
-│   └── tauri.conf.json       # Tauri 窗口/安全/打包配置
-│
+├── src-tauri/            # Rust 后端 (portable-pty + Tauri IPC)
+│   └── src/              # pty.rs, session.rs, commands.rs
 ├── src/
-│   ├── api/                  # Tauri 桥接层
-│   │   └── index.ts          # invoke/listen 封装
-│   ├── renderer/             # React 前端
-│   │   ├── components/       # terminal/ output/ ai/ layout/
-│   │   ├── hooks/            # useTerminal, useRichContent
-│   │   ├── services/         # content-detector
-│   │   └── stores/           # Zustand store
-│   └── shared/               # 共享类型 + IPC 通道 + 协议
-│
-├── docs/                     # 文档
-├── package.json
-├── tsconfig.json
-└── vite.config.ts
+│   ├── api/              # Tauri invoke/listen 桥接
+│   ├── renderer/         # React 前端 (xterm.js, KaTeX, Shiki)
+│   │   ├── components/   # terminal, output, ai, layout
+│   │   ├── hooks/        # useTerminal, useRichContent
+│   │   ├── services/     # content-detector
+│   │   └── stores/       # Zustand store
+│   └── shared/           # 类型, IPC 通道, 协议, 接口
+└── docs/                 # 文档
 ```
+
+## 架构要点
+
+- **后端 (Rust)**: `portable-pty` 管理 PTY 进程，`#[tauri::command]` 暴露 IPC
+- **前端 (React)**: xterm.js DOM 渲染器，KaTeX/Shiki/marked 富内容渲染
+- **IPC**: Tauri invoke (请求-响应) + event emit/listen (服务端推送)
+- **状态管理**: Zustand store (sessions, richOutputs, settings, aiMessages)
+- **内容检测**: 双层策略 — OSC 转义序列显式标记 + 正则自动检测
