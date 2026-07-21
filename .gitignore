@@ -4,8 +4,4 @@ dist/
 *.log
 /tmp/
 .vite/
-debug-*.*
-test-*.*
-package-lock.json
-src-tauri/target/
 src-tauri/target/

@@ -1,8 +1,8 @@
 # AI Terminal
 
-面向 AI 时代的桌面终端模拟器 — 支持 LaTeX 渲染、Markdown 渲染、代码语法高亮，内嵌 AI 对话面板。
+面向 AI 时代的桌面终端模拟器 — 支持 LaTeX/Markdown/代码高亮渲染，内嵌 AI 对话面板。
 
-**技术栈**: Electron 28 + React 18 + TypeScript + xterm.js 5 + KaTeX + Shiki
+**技术栈**: Tauri v2 + Rust + React 18 + TypeScript + xterm.js 5 + KaTeX + Shiki + Zustand
 
 **平台**: macOS / Windows / Linux
 
@@ -10,44 +10,46 @@
 
 | 阶段 | 状态 | 说明 |
 |------|------|------|
-| Phase 1 — 核心终端 | ✅ 完成 | 本地 PTY、标签页、IPC 通信 |
+| Phase 1 — 核心终端 | 🚧 Tauri 迁移完成 | 本地 PTY、标签页、Rust 后端编译通过 ✅ |
 | Phase 2 — 富内容渲染 | 🚧 开发中 | LaTeX/Markdown/代码高亮检测与渲染 |
-| Phase 3 — AI 集成 | ⏳ 待开始 | Claude API 对话面板、命令建议、SDK |
+| Phase 3 — AI 集成 | ⏳ 待开始 | Claude API 对话面板、命令建议 |
 | Phase 4 — 远程功能 | ⏳ 待开始 | SSH 连接、会话持久化、分屏 |
-| Phase 5 — 打包发布 | ⏳ 待开始 | 三平台安装包、自动更新、文档 |
+| Phase 5 — 打包发布 | ⏳ 待开始 | 三平台安装包、自动更新 |
 
 ## 快速开始
 
 ```bash
-# 安装依赖
+# 安装前端依赖
 npm install
 
-# 开发模式
-npm run dev:main       # 编译主进程
-npm run dev:renderer   # 启动 Vite dev server
-npm start              # 启动 Electron
+# 开发模式（Rust 编译 + Vite HMR + 窗口）
+cargo tauri dev
 
 # 生产构建
-npm run build
-npm run package
+cargo tauri build
 ```
 
 ## 项目结构
 
 ```
+src-tauri/         # Rust 后端 (portable-pty + tokio)
+  └── src/
+      ├── pty.rs        # PTY 管理器
+      ├── session.rs    # 会话存储
+      └── commands.rs   # Tauri IPC 命令
+
 src/
-├── main/          # Electron 主进程（PTY、IPC、窗口管理）
-├── preload/       # contextBridge 安全 API
-├── renderer/      # React UI（xterm.js 终端、组件）
-├── shared/        # 共享类型、协议定义
-└── sdk/           # AI 工具集成 SDK
+├── api/           # Tauri invoke/listen 桥接
+├── renderer/      # React 前端 (xterm.js, KaTeX, Shiki)
+│   ├── components/ # terminal/ output/ ai/ layout/
+│   ├── hooks/      # useTerminal, useRichContent
+│   ├── services/   # content-detector
+│   └── stores/     # Zustand store
+└── shared/        # 类型定义, IPC 通道, 富内容协议
 ```
 
 ## 文档
 
-完整文档在 [`docs/`](docs/) 目录中：
-
-- [文档首页](docs/index.md) — 完整索引
-- [完整实现计划](docs/plan.md) — 5 阶段架构设计
-- [Phase 1 完成报告](docs/phases/phase-1-core-terminal.md) — 详细文件清单、IPC 协议、数据流
-- [Electron 28 兼容性问题](docs/reference/electron-require-issue.md) — 已知问题与解决方案
+- [文档首页](docs/index.md)
+- [Phase 1 (Tauri)](docs/phases/phase-1-tauri-core.md)
+- [迁移计划](~/.claude/plans/plan-md-swift-brook.md)
