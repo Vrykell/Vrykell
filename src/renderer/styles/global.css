@@ -116,6 +116,21 @@ body {
   flex: 1;
   overflow: hidden;
   min-width: 0;
+  position: relative;
+}
+
+.rich-output-toggle {
+  position: absolute;
+  bottom: 4px;
+  right: 8px;
+  background: #333;
+  color: #999;
+  border: none;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0.6;
 }
 
 /* ═══ Tab Bar ═════════════════════════════════════════════ */
@@ -261,6 +276,25 @@ body {
 
 .terminal-container .xterm {
   padding: 6px 8px;
+}
+
+/* WKWebView fix: xterm.js helper elements render visibly in Safari/WebKit.
+   The textarea (keyboard capture) must stay in DOM but be invisible.
+   Char-measure elements must stay dimensioned but not paint. */
+.xterm-helper-textarea {
+  opacity: 0 !important;
+  background: transparent !important;
+  resize: none !important;
+}
+.xterm-char-measure-element {
+  position: fixed !important;
+  left: -9999px !important;
+  top: -9999px !important;
+}
+.xterm-width-cache-measure-container {
+  position: fixed !important;
+  left: -9999px !important;
+  top: -9999px !important;
 }
 
 .terminal-container .xterm-viewport::-webkit-scrollbar {

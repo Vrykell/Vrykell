@@ -24,74 +24,56 @@ const App: React.FC = () => {
   const updateSessionTitle = useTerminalStore((s) => s.updateSessionTitle);
   const removeSession = useTerminalStore((s) => s.removeSession);
 
-  // Monitor terminal output for rich content detection
   useRichContent(activeSessionId);
 
-  // Set up all Tauri event listeners once
+  // Helper: create PTY and add to store
+  const createAndAddSession = () =>
+    createPTY({}).then(s => addSession(s)).catch(err => console.error('createPTY failed:', err));
+
+  // Set up all Tauri event listeners once on mount
   useEffect(() => {
     const unlisteners: UnlistenFn[] = [];
 
-    onSessionCreated((session) => addSession(session))
-      .then(fn => unlisteners.push(fn));
+    onSessionCreated(s => addSession(s)).then(fn => unlisteners.push(fn));
+    onSessionClosed(({ sessionId }) => removeSession(sessionId)).then(fn => unlisteners.push(fn));
+    onPTYExit(({ sessionId }) => removeSession(sessionId)).then(fn => unlisteners.push(fn));
+    onPTYTitleChange(({ sessionId, title }) => updateSessionTitle(sessionId, title)).then(fn => unlisteners.push(fn));
+    onMenuAction(({ action }) => {
+      if (action === 'new-tab' || action === 'new-local-session') createAndAddSession();
+      else if (action === 'toggle-ai-panel') useTerminalStore.getState().toggleSidebar();
+    }).then(fn => unlisteners.push(fn));
 
-    onSessionClosed(({ sessionId }) => removeSession(sessionId))
-      .then(fn => unlisteners.push(fn));
-
-    onPTYExit(({ sessionId }) => removeSession(sessionId))
-      .then(fn => unlisteners.push(fn));
-
-    onPTYTitleChange(({ sessionId, title }) => updateSessionTitle(sessionId, title))
-      .then(fn => unlisteners.push(fn));
-
-    // AI responses
-    let streamingMessageId: string | null = null;
+    // AI streaming handler
+    let streamingId: string | null = null;
     onAIResponse((data: any) => {
+      const store = useTerminalStore.getState();
       if (data.chunk) {
-        if (!useTerminalStore.getState().aiStreaming) streamingMessageId = null;
-        if (!streamingMessageId) {
-          streamingMessageId = Date.now().toString();
-          addAIMessage({ id: streamingMessageId, role: 'assistant', content: data.chunk, timestamp: Date.now() });
-        } else {
-          useTerminalStore.getState().appendToLastMessage(data.chunk);
-        }
+        if (!store.aiStreaming) streamingId = null;
+        if (!streamingId) { streamingId = Date.now().toString(); addAIMessage({ id: streamingId, role: 'assistant', content: data.chunk, timestamp: Date.now() }); }
+        else store.appendToLastMessage(data.chunk);
         setAIStreaming(true);
       }
-      if (data.done) { setAIStreaming(false); streamingMessageId = null; }
-      if (data.error) {
-        setAIStreaming(false); streamingMessageId = null;
-        addAIMessage({ id: Date.now().toString(), role: 'assistant', content: `Error: ${data.error}`, timestamp: Date.now() });
-      }
+      if (data.done) { setAIStreaming(false); streamingId = null; }
+      if (data.error) { setAIStreaming(false); streamingId = null; addAIMessage({ id: Date.now().toString(), role: 'assistant', content: `Error: ${data.error}`, timestamp: Date.now() }); }
     }).then(fn => unlisteners.push(fn));
 
-    // Menu actions
-    onMenuAction(({ action }) => {
-      if (action === 'new-tab' || action === 'new-local-session') {
-        createPTY({}).then(s => addSession(s)).catch(err => console.error('createPTY failed:', err));
-      } else if (action === 'toggle-ai-panel') {
-        useTerminalStore.getState().toggleSidebar();
-      }
-    }).then(fn => unlisteners.push(fn));
-
-    return () => { unlisteners.forEach(fn => fn()); };
-  }, []); // mount once
+    return () => unlisteners.forEach(fn => fn());
+  }, []);
 
   // Auto-create first session
   useEffect(() => {
-    if (sessions.length === 0) {
-      createPTY({}).then(s => addSession(s)).catch(err => console.error('createPTY failed:', err));
-    }
-  }, [sessions.length, addSession]);
+    if (sessions.length === 0) createAndAddSession();
+  }, [sessions.length]);
 
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey) {
-        switch (e.key) {
-          case 't': e.preventDefault(); createPTY({}).then(s => addSession(s)).catch(() => {}); break;
-          case 'w': e.preventDefault(); if (activeSessionId) closePTY(activeSessionId).catch(() => {}); break;
-          case 'j': e.preventDefault(); useTerminalStore.getState().toggleSidebar(); break;
-          case 'r': if (e.shiftKey) { e.preventDefault(); useTerminalStore.getState().toggleOutputPanel(); } break;
-        }
+      if (!(e.metaKey || e.ctrlKey)) return;
+      switch (e.key) {
+        case 't': e.preventDefault(); createAndAddSession(); break;
+        case 'w': e.preventDefault(); if (activeSessionId) closePTY(activeSessionId).catch(() => {}); break;
+        case 'j': e.preventDefault(); useTerminalStore.getState().toggleSidebar(); break;
+        case 'r': if (e.shiftKey) { e.preventDefault(); toggleOutputPanel(); } break;
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -101,31 +83,18 @@ const App: React.FC = () => {
   return (
     <div className="app-shell">
       <TerminalTabs />
-
       <div className="app-main">
-        <div className="app-terminal-area" style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
-          <div style={{ flex: 1, overflow: 'hidden' }}>
-            <TerminalView sessionId={activeSessionId} />
-          </div>
+        <div className="app-terminal-area">
+          <TerminalView sessionId={activeSessionId} />
           {outputPanelOpen && <RichOutput />}
           {!outputPanelOpen && (
-            <button
-              onClick={toggleOutputPanel}
-              title="Toggle Rich Output (Ctrl+Shift+R)"
-              style={{
-                position: 'absolute', bottom: 4, right: 8,
-                background: '#333', color: '#999', border: 'none',
-                borderRadius: 4, padding: '2px 8px', fontSize: 11,
-                cursor: 'pointer', opacity: 0.6,
-              }}
-            >
+            <button className="rich-output-toggle" onClick={toggleOutputPanel} title="Toggle Rich Output (Ctrl+Shift+R)">
               📄 Rich Output
             </button>
           )}
         </div>
         <AIChatPanel />
       </div>
-
       <StatusBar />
     </div>
   );
