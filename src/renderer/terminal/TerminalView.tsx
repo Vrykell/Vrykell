@@ -4,6 +4,16 @@ import { TerminalBuffer, TerminalLine } from './buffer';
 const LINE_HEIGHT = 16;
 const OVERSCAN = 15;
 
+/** Join cells in [start, end) into a string, skipping wide continuations. */
+function collectText(cells: TerminalLine['cells'], start: number, end: number): string {
+  let s = '';
+  for (let i = start; i < end; i++) {
+    const c = i < cells.length ? cells[i] : { char: ' ' };
+    if (!c.wide) s += c.char;
+  }
+  return s;
+}
+
 // ── Line renderer ──
 // Memoized with a custom comparator: re-renders when the line was touched
 // (line.dirty === true) OR cursor state changed.  In-place buffer mutations
@@ -24,37 +34,78 @@ const L = memo(
     const end = cursor ? Math.max(cells.length, cx + 1) : cells.length;
     const cursorCol = cursor && cells[cx]?.wide && cx > 0 ? cx - 1 : cx;
     const spans: React.ReactNode[] = [];
-    for (let i = 0; i < end; i++) {
-      const c = i < cells.length ? cells[i] : { char: ' ' };
-      if (c.wide) continue;
-      spans.push(
-        <span
-          key={i}
-          style={{
-            color: cursor && i === cursorCol ? '#000' : c.fg || '#d4d4d4',
-            backgroundColor: cursor && i === cursorCol ? '#fff' : c.bg || undefined,
-            fontWeight: c.bold ? 'bold' : undefined,
-            fontStyle: c.italic ? 'italic' : undefined,
-            textDecoration: c.underline ? 'underline' : undefined,
-          }}>{c.char}</span>,
-      );
+    // Merge consecutive cells with identical visual style into a single
+    // text run — collapses ~6000 spans into ~50-200, drastically reducing
+    // DOM weight without affecting the underlying cell grid model.
+    let runStart = 0;
+    while (runStart < end) {
+      // Skip wide-continuation cells (they are part of the previous CJK char).
+      if (cells[runStart]?.wide) { runStart++; continue; }
+      const base = cells[runStart] ?? { char: ' ' };
+      let runEnd = runStart + 1;
+      while (runEnd < end) {
+        const nc = cells[runEnd];
+        if (!nc || nc.wide) break;
+        if (
+          (nc.fg || undefined) !== (base.fg || undefined) ||
+          (nc.bg || undefined) !== (base.bg || undefined) ||
+          (nc.bold || false) !== (base.bold || false) ||
+          (nc.italic || false) !== (base.italic || false) ||
+          (nc.underline || false) !== (base.underline || false)
+        ) break;
+        runEnd++;
+      }
+      const runStyle = {
+        color: base.fg || '#d4d4d4',
+        backgroundColor: base.bg || undefined,
+        fontWeight: base.bold ? 'bold' : undefined,
+        fontStyle: base.italic ? 'italic' : undefined,
+        textDecoration: base.underline ? 'underline' : undefined,
+      };
+      const cursorStyle = {
+        color: base.bg || '#1e1e1e',
+        backgroundColor: base.fg || '#d4d4d4',
+        fontWeight: base.bold ? 'bold' : undefined,
+        fontStyle: base.italic ? 'italic' : undefined,
+        textDecoration: base.underline ? 'underline' : undefined,
+        animation: 'terminal-cursor-blink 1s step-end infinite' as const,
+      };
+
+      // If the cursor falls inside this run we split it into three parts:
+      // text before, the cursor char, text after.  This prevents a whole
+      // block of text from blinking when only one cell is the cursor.
+      if (cursor && cursorCol >= runStart && cursorCol < runEnd) {
+        // Before cursor
+        const before = collectText(cells, runStart, cursorCol);
+        if (before) spans.push(<span key={`${runStart}a`} style={runStyle}>{before}</span>);
+        // Cursor char
+        const cursorChar = (cells[cursorCol] ?? { char: ' ' }).char;
+        spans.push(<span key={`${runStart}b`} style={{ ...cursorStyle }}>{cursorChar}</span>);
+        // After cursor
+        const after = collectText(cells, cursorCol + 1, runEnd);
+        if (after) spans.push(<span key={`${runStart}c`} style={runStyle}>{after}</span>);
+      } else {
+        const text = collectText(cells, runStart, runEnd);
+        if (text) spans.push(<span key={runStart} style={runStyle}>{text}</span>);
+      }
+      runStart = runEnd;
     }
     // Once rendered, the line is clean until the next write touches it.
     useEffect(() => { line.dirty = false; });
     return (
-      <div style={{
-        whiteSpace: 'pre',
-        fontFamily: 'Menlo,monospace',
-        fontSize: 14,
-        lineHeight: `${LINE_HEIGHT}px`,
-        height: LINE_HEIGHT,
-      }}>
+      <div
+        style={{
+          whiteSpace: 'pre',
+          fontFamily: 'Menlo,monospace',
+          fontSize: 14,
+          lineHeight: `${LINE_HEIGHT}px`,
+          height: LINE_HEIGHT,
+        }}
+      >
         {spans}
       </div>
     );
   },
-  // Comparator: skip render ONLY when the line hasn't been touched AND
-  // cursor state is unchanged.
   (prev, next) =>
     prev.line === next.line &&
     !next.line.dirty &&
@@ -76,10 +127,6 @@ export const DomTerminalView: React.FC<{
   const containerHRef = useRef(0);
   const scrollTopRef = useRef(0);
   const pinnedRef = useRef(true);
-  // Tick bumps when scroll or resize happens — triggers re-render for
-  // visible-range recalculation.  Using a counter rather than storing
-  // raw pixel values in state avoids a class of flicker where two
-  // renders disagree on spacer height.
   const [tick, setTick] = useState(0);
 
   // Measure viewport height
@@ -89,7 +136,7 @@ export const DomTerminalView: React.FC<{
     containerHRef.current = el.clientHeight;
     const ro = new ResizeObserver(([entry]) => {
       containerHRef.current = entry.contentRect.height;
-      setTick(t => t + 1);
+      setTick((t) => t + 1);
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -108,11 +155,9 @@ export const DomTerminalView: React.FC<{
     const cursorY = buffer.cy * LINE_HEIGHT;
 
     if (buffer.cy >= buffer.lines.length - 1) {
-      // Follow streaming / shell output at the bottom.
       scrollTopRef.current = el.scrollHeight;
       el.scrollTop = el.scrollHeight;
     } else {
-      // TUI mode — keep cursor on screen.
       const visTop = el.scrollTop;
       const visBot = visTop + h - LINE_HEIGHT;
       if (cursorY < visTop || cursorY > visBot) {
@@ -129,21 +174,15 @@ export const DomTerminalView: React.FC<{
     scrollTopRef.current = el.scrollTop;
     pinnedRef.current =
       el.scrollTop + el.clientHeight >= el.scrollHeight - LINE_HEIGHT * 2;
-    setTick(t => t + 1);
+    setTick((t) => t + 1);
   }, []);
 
   const focusTextarea = () => textareaRef.current?.focus();
 
   // ── Visible-range calculation ──────────────────────────────────────────────
-  // Read scrollTop from ref (always current, zero-lag) rather than React state
-  // (one-frame-behind).
   const totalLines = buffer.lines.length;
   const effectiveH = containerHRef.current || buffer.rows * LINE_HEIGHT;
   const maxScroll = Math.max(0, totalLines * LINE_HEIGHT - effectiveH);
-
-  // If pinned, use the "scrolled to bottom" position so that the FIRST render
-  // of a version change already has the correct spacers.  The useLayoutEffect
-  // above sets the DOM scrollTop to the same value — no visual jump.
   const scrollTop = pinnedRef.current
     ? maxScroll
     : Math.min(scrollTopRef.current, maxScroll);
@@ -178,7 +217,7 @@ export const DomTerminalView: React.FC<{
         flex: 1,
         background: '#1e1e1e',
         overflowY: 'auto',
-        overflowAnchor: 'none', // stop browser scroll-anchoring from fighting us
+        overflowAnchor: 'none',
         outline: 'none',
         position: 'relative',
         willChange: 'transform',

@@ -55,7 +55,7 @@ function xterm256ToHex(n: number): string {
 export class TerminalBuffer {
   lines: TerminalLine[] = [{ cells: [], dirty: false }];
   cx = 0; cy = 0; cols = 80; rows = 24; version = 0;
-  private fg?: string; private bg?: string; private bold=false; private italic=false; private underline=false;
+  private fg?: string; private bg?: string; private bold=false; private italic=false; private underline=false; private inverse=false;
   private savedCx=0; private savedCy=0;
   // Buffer for partial escape sequences that span across PTY read chunks.
   // When a CSI/OSC/DCS/ESC sequence is split mid-sequence, we save the
@@ -205,7 +205,7 @@ export class TerminalBuffer {
   // ═══ SGR ═════════════════════════════════════════
 
   private sgr(p: number[]): void {
-    if (p.length === 0 || (p.length === 1 && p[0] === 0)) { this.fg=undefined; this.bg=undefined; this.bold=false; this.italic=false; this.underline=false; return; }
+    if (p.length === 0 || (p.length === 1 && p[0] === 0)) { this.fg=undefined; this.bg=undefined; this.bold=false; this.italic=false; this.underline=false; this.inverse=false; return; }
     for (let i = 0; i < p.length; i++) {
       const v = p[i];
       if (v === 0) { this.fg=undefined; this.bg=undefined; this.bold=false; this.italic=false; this.underline=false; }
@@ -215,6 +215,8 @@ export class TerminalBuffer {
       else if (v === 22) this.bold = false;
       else if (v === 23) this.italic = false;
       else if (v === 24) this.underline = false;
+      else if (v === 7) this.inverse = true;
+      else if (v === 27) this.inverse = false;
       else if (v === 39) this.fg = undefined;
       else if (v === 49) this.bg = undefined;
       else if (v === 38) {
@@ -259,9 +261,18 @@ export class TerminalBuffer {
     const ln = this.line();
     while (ln.cells.length <= this.cx + w - 1) ln.cells.push({ char: ' ' });
 
-    ln.cells[this.cx] = { char: ch, fg: this.fg, bg: this.bg, bold: this.bold, italic: this.italic, underline: this.underline };
+    // When fg/bg are undefined they mean "terminal default".  SGR 7
+    // (inverse) must swap the EFFECTIVE colours, so resolve defaults
+    // before the swap — otherwise two undefineds stay invisible.
+    const DEF_FG = '#d4d4d4';
+    const DEF_BG = '#1e1e1e';
+    const effFg = this.fg || DEF_FG;
+    const effBg = this.bg || DEF_BG;
+    const cellFg = this.inverse ? effBg : this.fg;
+    const cellBg = this.inverse ? effFg : this.bg;
+    ln.cells[this.cx] = { char: ch, fg: cellFg, bg: cellBg, bold: this.bold, italic: this.italic, underline: this.underline };
     ln.dirty = true;
-    if (w === 2) ln.cells[this.cx + 1] = { char: '', wide: true, fg: this.fg, bg: this.bg };
+    if (w === 2) ln.cells[this.cx + 1] = { char: '', wide: true, fg: cellFg, bg: cellBg };
 
     if (this.cx + w >= this.cols) {
       if (this.autoWrap) this.pendingWrap = true;

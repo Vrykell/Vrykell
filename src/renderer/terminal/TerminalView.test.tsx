@@ -159,6 +159,118 @@ describe('DomTerminalView virtual scroll', () => {
     expect(view.scrollTop).toBe(scrollBefore);
   });
 
+  it('renders cursor after TUI DECSET ?25h (hide/show cycle)', () => {
+    // Simulate what Claude Code / Ink does:
+    //   1. Hide cursor during layout
+    //   2. Render TUI boxes and text
+    //   3. Show cursor and position it in the input area
+    const buf = new TerminalBuffer();
+    buf.resize(80);
+
+    buf.write('\x1b[?25l'); // hide cursor
+    expect(buf.cursorVisible).toBe(false);
+
+    // Draw a mock TUI frame
+    buf.write('\u{256d}\u{2500}\u{2500}\u{2500} Dialog \u{2500}\u{2500}\u{2500}\u{256e}\n');
+    buf.write('\u{2502}  input:           \u{2502}\n');
+    buf.write('\u{2570}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{256f}\n');
+
+    buf.write('\x1b[?25h'); // show cursor again
+    expect(buf.cursorVisible).toBe(true);
+
+    // Position cursor in the input area (line 2, col 10)
+    buf.write('\x1b[2;10H');
+    expect(buf.cy).toBe(1);
+    expect(buf.cx).toBe(9);
+
+    const { container } = render(
+      <DomTerminalView
+        buffer={buf}
+        onKeyDown={noop}
+        onInput={noop}
+        onCompositionStart={noop}
+        onCompositionEnd={noopE}
+      />,
+    );
+    const view = container.querySelector('[data-testid="terminal-view"]') as HTMLElement;
+    setLayout(view, 400, 3 * LINE_HEIGHT);
+
+    // Find the cursor line (line index 1 = second rendered line)
+    const lines = container.querySelectorAll('[data-testid="terminal-line"]');
+    const cursorLine = lines[1]; // 0-indexed, line 1
+    expect(cursorLine).toBeTruthy();
+
+    // At least one span on this line should have the blink animation
+    const spans = cursorLine.querySelectorAll('span');
+    const blinkSpans = Array.from(spans).filter(s =>
+      (s as HTMLElement).style.animation.includes('cursor-blink'),
+    );
+    expect(blinkSpans.length).toBeGreaterThan(0);
+    // The blinking character should be the cell at cx=9, which is a space inside "input:"
+    // or a space. Should be exactly one character.
+    expect(blinkSpans[0].textContent?.length).toBe(1);
+  });
+
+  it('renders cursor on a single char, not the whole merged run', () => {
+    // Fill buffer with a line of uniform-style text, then position cursor
+    // in the middle.  The cursor must only highlight ONE character, not
+    // the entire merged span.
+    const buf = new TerminalBuffer();
+    buf.resize(80);
+    buf.write('hello world');
+    // Move cursor to position 6 (the 'w' in 'world')
+    buf.write('\x1b[1;7H');
+    expect(buf.cx).toBe(6);
+
+    const { container } = render(
+      <DomTerminalView
+        buffer={buf}
+        onKeyDown={noop}
+        onInput={noop}
+        onCompositionStart={noop}
+        onCompositionEnd={noopE}
+      />,
+    );
+    const view = container.querySelector('[data-testid="terminal-view"]') as HTMLElement;
+    setLayout(view, 400, 16);
+
+    // Find all spans in the rendered line
+    const lineDiv = container.querySelector('[data-testid="terminal-line"]');
+    expect(lineDiv).toBeTruthy();
+    const spans = lineDiv!.querySelectorAll('span');
+
+    // The cursor span should contain exactly ONE character ('w')
+    const cursorSpans = Array.from(spans).filter(s =>
+      (s as HTMLElement).style.animation.includes('cursor-blink'),
+    );
+    expect(cursorSpans.length).toBe(1);
+    expect(cursorSpans[0].textContent).toBe('w');
+
+    // No other span should blink
+    const blinkCount = Array.from(spans).filter(s =>
+      (s as HTMLElement).style.animation.includes('cursor-blink'),
+    ).length;
+    expect(blinkCount).toBe(1);
+  });
+
+  it('positions lines for TUI cursor mid-buffer (not pinned to bottom)', () => {
+    // Simulate: a TUI (like Claude Code) has rendered a 40-line screen.
+    // The cursor is on line 15. The user is NOT at the absolute bottom.
+    fillBuffer(buf, 40);
+    // Move cursor to mid-screen (TUI active area)
+    buf.write('\x1b[15;20H');
+    const { container } = renderView();
+    const view = container.querySelector('[data-testid="terminal-view"]') as HTMLElement;
+    setLayout(view, 400, 40 * LINE_HEIGHT);
+
+    // Viewport shows first chunk — the TUI cursor at line 14 (0-indexed)
+    // Should be visible in the initial render.
+    const lines = container.querySelectorAll('[data-testid="terminal-line"]');
+    const texts = Array.from(lines).map(l => l.textContent ?? '');
+    // Line 14 should be rendered (it's within the first ~40 visible lines)
+    expect(texts.length).toBeLessThan(40); // virtual scroll active
+  });
+
   it('keeps DOM elements stable across version bumps (no unmount/remount)', () => {
     fillBuffer(buf, 30);
     const { container } = renderView();

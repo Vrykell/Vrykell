@@ -740,11 +740,10 @@ body {
   animation: fadeIn var(--duration-normal) var(--ease-out);
 }
 
-/* ═══ xterm.js Overrides ══════════════════════════════════ */
+/* ═══ Terminal cursor blink ════════════════════════════════ */
 
-.xterm {
-  padding: 4px 8px !important;
+@keyframes terminal-cursor-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
 }
-
-.xterm .xterm-viewport {
 

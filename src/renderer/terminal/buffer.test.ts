@@ -244,6 +244,42 @@ describe('SGR extended colours', () => {
     expect(buf.lines[0].cells[1].bg).toBe('#ff0000'); // BG not reset yet
   });
 
+  it('SGR 7 with default colors produces visible dark-on-light block', () => {
+    // The Claude/Ink cursor pattern: \x1b[7m \x1b[27m (inverted space).
+    // When both fg and bg are default (undefined), inverse must resolve
+    // the terminal defaults before swapping — otherwise undefined↔undefined
+    // is invisible.
+    const buf = new TerminalBuffer();
+    buf.write('\x1b[7m \x1b[27m');
+    const c = buf.lines[0].cells[0];
+    // fg should be the dark background (#1e1e1e)
+    expect(c.fg).toBe('#1e1e1e');
+    // bg should be the light foreground (#d4d4d4)
+    expect(c.bg).toBe('#d4d4d4');
+  });
+
+  it('inverts explicit fg/bg with SGR 7', () => {
+    const buf = new TerminalBuffer();
+    buf.write('\x1b[31m\x1b[48;5;21m'); // red fg, blue bg
+    buf.write('\x1b[7mX');
+    expect(buf.lines[0].cells[0].fg).toBe('#0000ff');   // blue (was bg)
+    expect(buf.lines[0].cells[0].bg).toBe('#cd3131');   // red (was fg)
+    buf.write('\x1b[27mY');
+    expect(buf.lines[0].cells[1].fg).toBe('#cd3131');   // normal fg
+    expect(buf.lines[0].cells[1].bg).toBe('#0000ff');   // normal bg
+  });
+
+  it('SGR 0 clears inverse', () => {
+    const buf = new TerminalBuffer();
+    // SGR 31: fg=red, bg=none. SGR 7: swap defaults → X: dark fg on red bg
+    buf.write('\x1b[31m\x1b[7mX\x1b[0mY');
+    expect(buf.lines[0].cells[0].fg).toBe('#1e1e1e'); // default bg → fg
+    expect(buf.lines[0].cells[0].bg).toBe('#cd3131'); // red fg → bg
+    // SGR 0 clears everything → Y gets defaults
+    expect(buf.lines[0].cells[1].fg).toBeUndefined();
+    expect(buf.lines[0].cells[1].bg).toBeUndefined();
+  });
+
   it('resets bold/italic/underline with 22/23/24', () => {
     const buf = new TerminalBuffer();
     buf.write('\x1b[1;3;4mX\x1b[22mY');
