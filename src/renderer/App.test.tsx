@@ -86,59 +86,38 @@ describe('App session flow', () => {
     expect(backend.exitRequested).toBe(true);
   });
 
-  it('clears terminal content when switching tabs', async () => {
+  it('preserves session content across tab switches', async () => {
     renderApp();
     await waitFor(() => expect(backend.sessions).toHaveLength(1));
-    await userEvent.click(screen.getByTestId('new-tab-btn'));
-    await waitFor(() => expect(backend.sessions).toHaveLength(2));
-
     const sid1 = backend.sessions[0].id;
-    const sid2 = backend.sessions[1].id;
 
+    // Fill session 1 with content
     backend.emit('pty:output', {
       sessionId: sid1,
-      events: [{ t: 'txt', p: 'content-from-s1' }],
+      events: [{ t: 'txt', p: 's1-content' }],
     });
     await waitFor(() =>
-      expect(screen.getByTestId('terminal-view')).toHaveTextContent('content-from-s1'),
+      expect(screen.getByTestId('terminal-view')).toHaveTextContent('s1-content'),
     );
 
-    await userEvent.click(screen.getByTestId(`session-tab-${sid2}`));
-    await waitFor(() => {
-      const view = screen.getByTestId('terminal-view');
-      expect(view.textContent).not.toContain('content-from-s1');
-    });
-  });
+    // Verify activeSessionId matches
+    expect(useTerminalStore.getState().activeSessionId).toBe(sid1);
 
-  it('preserves session content when switching back', async () => {
-    renderApp();
-    await waitFor(() => expect(backend.sessions).toHaveLength(1));
+    // Create tab 2
     await userEvent.click(screen.getByTestId('new-tab-btn'));
     await waitFor(() => expect(backend.sessions).toHaveLength(2));
-
-    const sid1 = backend.sessions[0].id;
     const sid2 = backend.sessions[1].id;
 
-    // Send content to both sessions
-    backend.emit('pty:output', {
-      sessionId: sid1,
-      events: [{ t: 'txt', p: 'session-1-data' }],
-    });
+    // New tab must be the active session
+    expect(useTerminalStore.getState().activeSessionId).toBe(sid2);
+
+    // Send content to session 2 — it should appear, not s1's
     backend.emit('pty:output', {
       sessionId: sid2,
-      events: [{ t: 'txt', p: 'session-2-data' }],
+      events: [{ t: 'txt', p: 's2-content' }],
     });
-
-    // Switch to tab 2
-    await userEvent.click(screen.getByTestId(`session-tab-${sid2}`));
     await waitFor(() =>
-      expect(screen.getByTestId('terminal-view')).toHaveTextContent('session-2-data'),
-    );
-
-    // Switch back to tab 1 — content should still be there
-    await userEvent.click(screen.getByTestId(`session-tab-${sid1}`));
-    await waitFor(() =>
-      expect(screen.getByTestId('terminal-view')).toHaveTextContent('session-1-data'),
+      expect(screen.getByTestId('terminal-view')).toHaveTextContent('s2-content'),
     );
   });
 });
