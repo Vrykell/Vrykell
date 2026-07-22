@@ -72,12 +72,19 @@ export class TerminalBuffer {
       case 0x48: this.cy = Math.max(0,(p[0]||1)-1); this.cx=(p[1]||1)-1; break; // H CUP
       case 0x4a: // J ED
         if ((p[0]||0) === 2) { this.lines = [{ cells: [], dirty: false }]; this.cx=0; this.cy=0; }
-        else if ((p[0]||0) === 0) { this.lines = this.lines.slice(0, this.cy+1); this.line().cells=this.line().cells.slice(0,this.cx); }
+        else if ((p[0]||0) === 0) {
+          // Erase from cursor to end: clear current line from cx, clear all lines below
+          const ln = this.line(); ln.cells = ln.cells.slice(0, this.cx); ln.dirty = true;
+          for (let y = this.cy + 1; y < this.lines.length; y++) { this.lines[y].cells = []; this.lines[y].dirty = true; }
+        }
         break;
-      case 0x4b: // K EL
-        if ((p[0]||0) === 0) this.line().cells = this.line().cells.slice(0, this.cx);
-        else if ((p[0]||0) === 2) this.line().cells = [];
+      case 0x4b: { // K EL
+        const ln = this.line();
+        if ((p[0]||0) === 0) ln.cells = ln.cells.slice(0, this.cx);
+        else if ((p[0]||0) === 2) ln.cells = [];
+        ln.dirty = true;
         break;
+      }
       case 0x73: this.savedCx=this.cx; this.savedCy=this.cy; break;    // s save
       case 0x75: this.cx=this.savedCx; this.cy=this.savedCy; break;    // u restore
       case 0x64: this.cy = (p[0]||1)-1; break;                          // d VPA
