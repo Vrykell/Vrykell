@@ -137,49 +137,69 @@ export class TerminalBuffer {
   }
 
   // ═══ CSI ═════════════════════════════════════════
+  // Dispatch table: final byte → handler(this, params[]).
+  // To add a new CSI command, add an entry here — no need to touch the parser.
+  // Cursor-moving commands must set this.pendingWrap = false.
+  // prettier-ignore
+  private static CSI: Record<number, (b: TerminalBuffer, p: number[]) => void> = {
+    // ── SGR (Select Graphic Rendition) ─────────────────────────
+    0x6d /* m */: (b, p) => b.sgr(p),
+
+    // ── Cursor movement ────────────────────────────────────────
+    0x41 /* A — CUU */: (b, p) => { b.cy = Math.max(0, b.cy - (p[0] || 1)); b.pendingWrap = false; },
+    0x42 /* B — CUD */: (b, p) => { b.cy = Math.min(9999, b.cy + (p[0] || 1)); b.pendingWrap = false; },
+    0x43 /* C — CUF */: (b, p) => { b.cx = Math.min(b.cols - 1, b.cx + (p[0] || 1)); b.pendingWrap = false; },
+    0x44 /* D — CUB */: (b, p) => { b.cx = Math.max(0, b.cx - (p[0] || 1)); b.pendingWrap = false; },
+    0x48 /* H — CUP */: (b, p) => { b.cy = Math.max(0, (p[0] || 1) - 1); b.cx = (p[1] || 1) - 1; b.pendingWrap = false; },
+    0x47 /* G — CHA */: (b, p) => { b.cx = (p[0] || 1) - 1; b.pendingWrap = false; },
+    0x64 /* d — VPA */: (b, p) => { b.cy = (p[0] || 1) - 1; b.pendingWrap = false; },
+
+    // ── Cursor save / restore ──────────────────────────────────
+    0x73 /* s */: (b, _p) => { b.savedCx = b.cx; b.savedCy = b.cy; },
+    0x75 /* u */: (b, _p) => { b.cx = b.savedCx; b.cy = b.savedCy; b.pendingWrap = false; },
+
+    // ── Erase ──────────────────────────────────────────────────
+    0x4a /* J — ED */: (b, p) => {
+      if ((p[0] || 0) === 2) { b.lines = [{ cells: [], dirty: false }]; b.cx = 0; b.cy = 0; }
+      else if ((p[0] || 0) === 0) {
+        const ln = b.line(); ln.cells = ln.cells.slice(0, b.cx); ln.dirty = true;
+        for (let y = b.cy + 1; y < b.lines.length; y++) { b.lines[y].cells = []; b.lines[y].dirty = true; }
+      }
+    },
+    0x4b /* K — EL */: (b, p) => {
+      const ln = b.line();
+      if ((p[0] || 0) === 0) ln.cells = ln.cells.slice(0, b.cx);
+      else if ((p[0] || 0) === 2) ln.cells = [];
+      ln.dirty = true;
+    },
+  };
+
+  // ── DEC private modes (CSI ? … h / CSI ? … l) ──────────────
+  // prettier-ignore
+  private static DEC: Record<number, (b: TerminalBuffer, set: boolean) => void> = {
+    25: (b, v) => { b.cursorVisible = v; },           // DECTCEM — cursor visibility
+    7:  (b, v) => { b.autoWrap = v; if (!v) b.pendingWrap = false; },  // DECAWM — autowrap
+    1049: (_b, _v) => {},                             // alt-screen (no-op)
+    2004: (_b, _v) => {},                             // bracketed paste (no-op)
+  };
 
   private csi(seq: string): void {
-    const f = seq.charCodeAt(seq.length - 1);        // final byte
-    const body = seq.slice(2, -1);                     // between ESC[ and final
+    const f = seq.charCodeAt(seq.length - 1);
+    const body = seq.slice(2, -1);
     const isPrivate = body.startsWith('?');
     const clean = isPrivate ? body.slice(1) : body;
     const p = clean ? clean.split(';').map(v => parseInt(v) || 0) : [];
 
-    // DEC private modes — set/reset
     if (isPrivate) {
-      if (f === 0x68) { for (const n of p) { if (n===25) this.cursorVisible=true; if (n===1049) {} if (n===7) this.autoWrap=true; } } // h
-      if (f === 0x6c) { for (const n of p) { if (n===25) this.cursorVisible=false; if (n===1049) {} if (n===7) { this.autoWrap=false; this.pendingWrap=false; } } } // l
+      const set = f === 0x68 /* h */;
+      const unset = f === 0x6c /* l */;
+      if (!set && !unset) return;
+      for (const n of p) { const handler = TerminalBuffer.DEC[n]; if (handler) handler(this, set); }
       return;
     }
 
-    // Cursor-moving CSI cancels a pending wrap (SGR/ED/EL do not)
-    switch (f) {
-      case 0x6d: this.sgr(p); break;                                    // m SGR
-      case 0x41: this.cy = Math.max(0, this.cy - (p[0]||1)); this.pendingWrap=false; break;    // A up
-      case 0x42: this.cy = Math.min(9999, this.cy + (p[0]||1)); this.pendingWrap=false; break; // B down
-      case 0x43: this.cx = Math.min(this.cols-1, this.cx + (p[0]||1)); this.pendingWrap=false; break; // C right
-      case 0x44: this.cx = Math.max(0, this.cx - (p[0]||1)); this.pendingWrap=false; break;    // D left
-      case 0x48: this.cy = Math.max(0,(p[0]||1)-1); this.cx=(p[1]||1)-1; this.pendingWrap=false; break; // H CUP
-      case 0x4a: // J ED
-        if ((p[0]||0) === 2) { this.lines = [{ cells: [], dirty: false }]; this.cx=0; this.cy=0; }
-        else if ((p[0]||0) === 0) {
-          // Erase from cursor to end: clear current line from cx, clear all lines below
-          const ln = this.line(); ln.cells = ln.cells.slice(0, this.cx); ln.dirty = true;
-          for (let y = this.cy + 1; y < this.lines.length; y++) { this.lines[y].cells = []; this.lines[y].dirty = true; }
-        }
-        break;
-      case 0x4b: { // K EL
-        const ln = this.line();
-        if ((p[0]||0) === 0) ln.cells = ln.cells.slice(0, this.cx);
-        else if ((p[0]||0) === 2) ln.cells = [];
-        ln.dirty = true;
-        break;
-      }
-      case 0x73: this.savedCx=this.cx; this.savedCy=this.cy; break;    // s save
-      case 0x75: this.cx=this.savedCx; this.cy=this.savedCy; this.pendingWrap=false; break;    // u restore
-      case 0x64: this.cy = (p[0]||1)-1; this.pendingWrap=false; break;                          // d VPA
-      case 0x47: this.cx = (p[0]||1)-1; this.pendingWrap=false; break;                          // G CHA
-    }
+    const handler = TerminalBuffer.CSI[f];
+    if (handler) handler(this, p);
   }
 
   // ═══ SGR ═════════════════════════════════════════
