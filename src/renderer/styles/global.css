@@ -274,41 +274,19 @@ body {
   background: var(--bg-root);
 }
 
+.terminal-container {
+  overflow: hidden;
+  /* Prevent WKWebView from intercepting scroll events */
+  -webkit-overflow-scrolling: touch;
+}
+
 .terminal-container .xterm {
   padding: 6px 8px;
 }
 
 /* WKWebView fix: xterm.js helper elements render visibly in Safari/WebKit.
-   The textarea (keyboard capture) must stay in DOM but be invisible.
-   Char-measure elements must stay dimensioned but not paint. */
-.xterm-helper-textarea {
-  opacity: 0 !important;
-  background: transparent !important;
-  resize: none !important;
-}
-.xterm-char-measure-element {
-  position: fixed !important;
-  left: -9999px !important;
-  top: -9999px !important;
-}
-.xterm-width-cache-measure-container {
-  position: fixed !important;
-  left: -9999px !important;
-  top: -9999px !important;
-}
-
-.terminal-container .xterm-viewport::-webkit-scrollbar {
-  width: 6px;
-}
-
-.terminal-container .xterm-viewport::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.terminal-container .xterm-viewport::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
-  border-radius: 3px;
-}
+   - helper-textarea: must stay in DOM for keyboard capture, just make invisible
+   - char-measure: used for glyph metrics, must stay sized but off-screen
 
 /* ═══ Rich Output Panel ═══════════════════════════════════ */
 
@@ -769,5 +747,4 @@ body {
 }
 
 .xterm .xterm-viewport {
-  scroll-behavior: auto;
 }

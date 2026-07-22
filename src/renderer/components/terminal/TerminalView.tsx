@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
-import { useTerminal } from '../../hooks/useTerminal';
+import { DomTerminalView } from '../../terminal/TerminalView';
+import { useDomTerminal } from '../../terminal/useDomTerminal';
 
 interface TerminalViewProps {
   sessionId: string | null;
@@ -7,24 +8,24 @@ interface TerminalViewProps {
 
 export const TerminalView: React.FC<TerminalViewProps> = ({ sessionId }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const { initTerminal, terminal } = useTerminal({ containerRef, sessionId });
+  const { buffer, handleKeyDown, resizeBuffer } = useDomTerminal({ sessionId });
 
+  // Resize buffer when container width changes
   useEffect(() => {
-    const cleanup = initTerminal();
-    return cleanup;
-  }, [initTerminal]);
+    const el = containerRef.current;
+    if (!el) return;
 
-  // Focus terminal when clicking the container area
-  const handleContainerClick = () => {
-    terminal.current?.focus();
-  };
+    const observer = new ResizeObserver(() => {
+      const cols = Math.floor(el.clientWidth / 8.4); // approximate monospace char width
+      if (cols > 0) resizeBuffer(cols);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [resizeBuffer]);
 
   return (
-    <div className="terminal-container" onClick={handleContainerClick}>
-      <div
-        ref={containerRef}
-        style={{ width: '100%', height: '100%' }}
-      />
+    <div ref={containerRef} style={{ flex: 1, overflow: 'hidden' }}>
+      <DomTerminalView buffer={buffer} onKeyDown={handleKeyDown} />
     </div>
   );
 };
