@@ -77,3 +77,55 @@ impl SessionStore {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample(id: &str) -> SessionInfo {
+        SessionInfo {
+            id: id.to_string(),
+            session_type: SessionType::Local,
+            title: "bash".to_string(),
+            cwd: None,
+            shell: None,
+            cols: 80,
+            rows: 24,
+            created_at: 0,
+            host: None,
+            username: None,
+        }
+    }
+
+    #[test]
+    fn add_generates_id_when_empty() {
+        let mut store = SessionStore::new();
+        let s = sample("");
+        store.add(s);
+        assert!(!store.list()[0].id.is_empty());
+    }
+
+    #[test]
+    fn list_returns_all_sessions() {
+        let mut store = SessionStore::new();
+        store.add(sample("a"));
+        store.add(sample("b"));
+        assert_eq!(store.list().len(), 2);
+    }
+
+    #[test]
+    fn remove_deletes_session() {
+        let mut store = SessionStore::new();
+        store.add(sample("a"));
+        store.remove("a");
+        assert!(store.get("a").is_none());
+    }
+
+    #[test]
+    fn update_title_changes_title() {
+        let mut store = SessionStore::new();
+        store.add(sample("a"));
+        store.update_title("a", "zsh");
+        assert_eq!(store.get("a").unwrap().title, "zsh");
+    }
+}

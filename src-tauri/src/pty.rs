@@ -1,4 +1,4 @@
-use portable_pty::{native_pty_system, CommandBuilder, Child, PtySize};
+use portable_pty::{native_pty_system, CommandBuilder, Child, MasterPty, PtySize};
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
@@ -44,11 +44,12 @@ pub struct TitleChangePayload {
     pub title: String,
 }
 
-/// Managed PTY session — metadata + shared child + stdin writer
+/// Managed PTY session — metadata + shared child + stdin writer + master for resize
 struct ManagedSession {
     info: SessionInfo,
     child: Arc<Mutex<Box<dyn Child + Send + Sync>>>,
     writer: Box<dyn Write + Send>,
+    master: Arc<Mutex<Box<dyn MasterPty + Send>>>,
 }
 
 /// PTY Manager — spawns shells, routes I/O, manages lifecycle.
@@ -130,7 +131,7 @@ impl PtyManager {
             .spawn_command(cmd)
             .map_err(|e| format!("Failed to spawn shell: {}", e))?;
 
-        drop(pair.slave); // master is all we need
+        drop(pair.slave); // master is all we need, but we must move master before drop
 
         // Build session info
         let mut store = self.store.lock().map_err(|e| e.to_string())?;
@@ -175,13 +176,18 @@ impl PtyManager {
         let writer = pair.master.take_writer()
             .map_err(|e| format!("Failed to take writer: {}", e))?;
 
-        // Store session with writer
+        // Keep master for resize operations
+        let master: Box<dyn MasterPty + Send> = pair.master;
+        let master_arc: Arc<Mutex<Box<dyn MasterPty + Send>>> = Arc::new(Mutex::new(master));
+
+        // Store session with writer and master
         {
             let mut sessions = self.sessions.lock().map_err(|e| e.to_string())?;
             sessions.insert(id.clone(), ManagedSession {
                 info: session.clone(),
                 child: child_arc.clone(),
                 writer,
+                master: master_arc.clone(),
             });
         }
 
@@ -243,13 +249,35 @@ impl PtyManager {
         }
     }
 
-    /// Resize a session's PTY. Requires access to the master — stored separately.
-    pub fn resize_session(&self, _id: &str, _cols: u16, _rows: u16) -> Result<(), String> {
-        // Resize requires access to the MasterPty, which we don't store in the simplified
-        // ManagedSession (we only store the writer). For Phase 1, this is acceptable as
-        // resize happens via xterm.js ResizeObserver → Tauri command.
-        // TODO: store a resize-capable handle (Arc<Mutex<Box<dyn MasterPty>>>)
-        Ok(())
+    /// Resize a session's PTY using the stored master.
+    pub fn resize_session(&self, id: &str, cols: u16, rows: u16) -> Result<(), String> {
+        let sessions = self.sessions.lock().map_err(|e| e.to_string())?;
+        if let Some(session) = sessions.get(id) {
+            let master = session.master.lock().map_err(|e| e.to_string())?;
+            master
+                .resize(PtySize {
+                    rows,
+                    cols,
+                    pixel_width: 0,
+                    pixel_height: 0,
+                })
+                .map_err(|e| format!("Resize failed: {}", e))?;
+
+            // Update stored metadata
+            drop(master);
+            drop(sessions);
+            if let Ok(mut store) = self.store.lock() {
+                if let Some(mut info) = store.get(id).cloned() {
+                    info.cols = cols;
+                    info.rows = rows;
+                    store.remove(id);
+                    store.add(info);
+                }
+            }
+            Ok(())
+        } else {
+            Err(format!("Session {} not found", id))
+        }
     }
 
     /// Close a session — kill the child process.
@@ -301,4 +329,30 @@ fn detect_osc_title(data: &str) -> Option<String> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn detect_osc_title_bel() {
+        assert_eq!(
+            detect_osc_title("\x1b]0;my title\x07"),
+            Some("my title".to_string())
+        );
+    }
+
+    #[test]
+    fn detect_osc_title_st() {
+        assert_eq!(
+            detect_osc_title("\x1b]2;other title\x1b\\"),
+            Some("other title".to_string())
+        );
+    }
+
+    #[test]
+    fn detect_osc_title_returns_none_when_missing() {
+        assert_eq!(detect_osc_title("hello world"), None);
+    }
 }

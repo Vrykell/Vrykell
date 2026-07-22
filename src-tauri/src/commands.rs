@@ -3,10 +3,12 @@ use tauri::State;
 
 use crate::pty::PtyManager;
 use crate::session::{SessionInfo, SessionOptions};
+use crate::settings::{AppSettings, SettingsManager};
 
 /// Shared application state managed by Tauri.
 pub struct AppState {
     pub pty_manager: PtyManager,
+    pub settings: SettingsManager,
 }
 
 /// Create a new PTY terminal session.
@@ -66,4 +68,23 @@ pub fn list_pty(
 ) -> Result<Vec<SessionInfo>, String> {
     let state = state.lock().map_err(|e| e.to_string())?;
     Ok(state.pty_manager.list_sessions())
+}
+
+/// Load application settings.
+#[tauri::command]
+pub fn load_settings(
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<AppSettings, String> {
+    let state = state.lock().map_err(|e| e.to_string())?;
+    state.settings.load()
+}
+
+/// Save application settings.
+#[tauri::command]
+pub fn save_settings(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    settings: AppSettings,
+) -> Result<(), String> {
+    let state = state.lock().map_err(|e| e.to_string())?;
+    state.settings.save(&settings)
 }

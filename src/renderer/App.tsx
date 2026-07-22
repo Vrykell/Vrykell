@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { TerminalView } from './components/terminal/TerminalView';
 import { TerminalTabs } from './components/terminal/TerminalTabs';
 import { RichOutput } from './components/output/RichOutput';
@@ -60,9 +60,13 @@ const App: React.FC = () => {
     return () => unlisteners.forEach(fn => fn());
   }, []);
 
-  // Auto-create first session
+  // Auto-create first session on startup only (not after the user closes the last tab)
+  const didInitRef = useRef(false);
   useEffect(() => {
-    if (sessions.length === 0) createAndAddSession();
+    if (!didInitRef.current && sessions.length === 0) {
+      didInitRef.current = true;
+      createAndAddSession();
+    }
   }, [sessions.length]);
 
   // Keyboard shortcuts

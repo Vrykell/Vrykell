@@ -21,11 +21,12 @@ export const TerminalTabs: React.FC = () => {
   };
 
   return (
-    <div className="tab-bar">
+    <div className="tab-bar" data-testid="terminal-tabs">
       <div className="tab-bar-tabs">
         {sessions.map((session) => (
           <div
             key={session.id}
+            data-testid={`session-tab-${session.id}`}
             className={`tab-item${activeId === session.id ? ' active' : ''}`}
             onClick={() => setActive(session.id)}
             title={session.title}
@@ -35,6 +36,7 @@ export const TerminalTabs: React.FC = () => {
             </span>
             <span className="tab-title">{session.title}</span>
             <button
+              data-testid={`close-btn-${session.id}`}
               className="tab-close"
               onClick={(e) => handleClose(e, session.id)}
             >
@@ -44,7 +46,7 @@ export const TerminalTabs: React.FC = () => {
         ))}
       </div>
       <div className="tab-bar-actions">
-        <button className="tab-btn" onClick={handleNewSession} title="New Terminal (Ctrl+T)">
+        <button data-testid="new-tab-btn" className="tab-btn" onClick={handleNewSession} title="New Terminal (Ctrl+T)">
           +
         </button>
       </div>

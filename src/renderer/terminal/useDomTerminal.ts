@@ -3,29 +3,30 @@ import { TerminalBuffer } from './buffer';
 import { writeToPTY, onPTYOutput, onPTYExit } from '../../api';
 
 export function useDomTerminal(sessionId: string | null) {
-  const buf = useRef(new TerminalBuffer(80)).current;
+  const buf = useRef(new TerminalBuffer()).current;
   const [, bump] = useState(0);
   const sid = useRef(sessionId);
   sid.current = sessionId;
 
   useEffect(() => {
+    if (!sessionId) return;
     let cancelled = false;
     const un: Array<() => void> = [];
 
-    onPTYOutput(({ data }) => {
-      if (cancelled) return;
+    onPTYOutput(({ sessionId: sid, data }) => {
+      if (cancelled || sid !== sessionId) return;
       buf.write(data);
       bump(n => n + 1);
     }).then(fn => { if (!cancelled) un.push(fn); else fn(); });
 
-    onPTYExit(({ exitCode }) => {
-      if (cancelled) return;
+    onPTYExit(({ sessionId: sid, exitCode }) => {
+      if (cancelled || sid !== sessionId) return;
       buf.write(`\x1b[31m[exit ${exitCode}]\x1b[0m\r\n`);
       bump(n => n + 1);
     }).then(fn => { if (!cancelled) un.push(fn); else fn(); });
 
     return () => { cancelled = true; un.forEach(f => f()); };
-  }, []);
+  }, [sessionId]);
 
   const onKeyDown = useCallback((e: React.KeyboardEvent) => {
     const s = sid.current;

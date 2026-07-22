@@ -5,7 +5,7 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "outDir": "dist/renderer",
     "rootDir": "src",
-    "types": ["vite/client"]
+    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"]
   },
   "include": ["src/renderer/**/*", "src/shared/**/*", "src/api/**/*"]
 }

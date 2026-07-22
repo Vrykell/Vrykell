@@ -9,8 +9,17 @@ export class TerminalBuffer {
   cx = 0; cy = 0; cols = 80; rows = 24; version = 0;
   private fg?: string; private bg?: string; private bold=false; private italic=false; private underline=false;
   private savedCx=0; private savedCy=0;
+  // Buffer for partial escape sequences that span across PTY read chunks.
+  // When a CSI/OSC/DCS/ESC sequence is split mid-sequence, we save the
+  // incomplete prefix here and prepend it to the next write() call.
+  // Fixes: leaked characters (like '%') from split OSC title sequences.
+  private pending = '';
 
   write(data: string): void {
+    // Prepend any partial sequence from the previous chunk
+    data = this.pending + data;
+    this.pending = '';
+
     let i = 0;
     while (i < data.length) {
       const c = data.charCodeAt(i);
@@ -19,26 +28,58 @@ export class TerminalBuffer {
       if (c === 0x1b && i + 1 < data.length) {
         const start = i; i++;
         const next = data[i];
-        if (next === '[') { // CSI
+        if (next === '[') { // CSI — params/intermediates then final byte 0x40–0x7E
           i++;
+          let complete = false;
           while (i < data.length) {
             const fc = data.charCodeAt(i);
-            if (fc >= 0x40 && fc <= 0x7e) { this.csi(data.slice(start, i + 1)); i++; break; }
+            if (fc >= 0x40 && fc <= 0x7e) { this.csi(data.slice(start, i + 1)); i++; complete = true; break; }
             i++;
           }
-        } else if (next === ']') { // OSC — skip to BEL/ST
+          // If we never found a final byte, this CSI is split across chunks
+          if (!complete) { this.pending = data.slice(start); return; }
+          continue;
+        } else if (next === ']') { // OSC — terminated by BEL or ST (ESC \)
           i++;
           while (i < data.length && data.charCodeAt(i) !== 0x07 && data[i] !== '\x1b') i++;
-          if (i < data.length) i++;
-        } else { i++; } // simple ESC
+          if (i >= data.length) {
+            // OSC not terminated — save for next chunk
+            this.pending = data.slice(start);
+            return;
+          }
+          if (data.charCodeAt(i) === 0x07) { i++; }          // BEL — skip it
+          else if (data[i] === '\x1b') {
+            if (i + 1 >= data.length) {
+              // ESC at end of chunk — might be start of ST, save for next chunk
+              this.pending = data.slice(start);
+              return;
+            }
+            if (data[i + 1] === '\\') { i += 2; }            // ST — skip ESC \
+            // else: ESC ends the OSC AND starts the next escape sequence —
+            // leave i pointing at the ESC so the main loop re-parses it.
+          }
+          continue;
+        } else if (next === 'P' || next === 'X' || next === '^' || next === '_') { // DCS/SOS/PM/APC — skip to ST (ESC \)
+          i++;
+          let complete = false;
+          while (i < data.length) {
+            if (data[i] === '\x1b' && i + 1 < data.length && data[i + 1] === '\\') { i += 2; complete = true; break; }
+            i++;
+          }
+          if (!complete) { this.pending = data.slice(start); return; }
+          continue;
+        } else { i++; } // simple ESC (e.g. ESC Z, ESC c)
         continue;
       }
 
-      // Control chars
-      if (c === 0x0d) { this.cx = 0; i++; continue; }
-      if (c === 0x0a) { this.lf(); i++; continue; }
-      if (c === 0x08) { if (this.cx > 0) this.cx--; i++; continue; }
-      if (c === 0x09) { this.cx = (Math.floor(this.cx/8)+1)*8; i++; continue; }
+      // Lone ESC at end of chunk — save for next chunk
+      if (c === 0x1b) { this.pending = data.slice(i); return; }
+
+      // Control chars — all cursor movement cancels a pending wrap
+      if (c === 0x0d) { this.cx = 0; this.pendingWrap = false; i++; continue; }
+      if (c === 0x0a) { this.pendingWrap = false; this.lf(); i++; continue; }
+      if (c === 0x08) { this.pendingWrap = false; if (this.cx > 0) this.cx--; i++; continue; }
+      if (c === 0x09) { this.pendingWrap = false; this.cx = Math.min(this.cols-1, (Math.floor(this.cx/8)+1)*8); i++; continue; }
       if (c < 0x20) { i++; continue; }
 
       // Printable character
@@ -58,18 +99,19 @@ export class TerminalBuffer {
 
     // DEC private modes — set/reset
     if (isPrivate) {
-      if (f === 0x68) { for (const n of p) { if (n===25) this.cursorVisible=true; if (n===1049) {} } } // h
-      if (f === 0x6c) { for (const n of p) { if (n===25) this.cursorVisible=false; if (n===1049) {} } } // l
+      if (f === 0x68) { for (const n of p) { if (n===25) this.cursorVisible=true; if (n===1049) {} if (n===7) this.autoWrap=true; } } // h
+      if (f === 0x6c) { for (const n of p) { if (n===25) this.cursorVisible=false; if (n===1049) {} if (n===7) { this.autoWrap=false; this.pendingWrap=false; } } } // l
       return;
     }
 
+    // Cursor-moving CSI cancels a pending wrap (SGR/ED/EL do not)
     switch (f) {
       case 0x6d: this.sgr(p); break;                                    // m SGR
-      case 0x41: this.cy = Math.max(0, this.cy - (p[0]||1)); break;    // A up
-      case 0x42: this.cy = Math.min(9999, this.cy + (p[0]||1)); break; // B down
-      case 0x43: this.cx = Math.min(this.cols-1, this.cx + (p[0]||1)); break; // C right
-      case 0x44: this.cx = Math.max(0, this.cx - (p[0]||1)); break;    // D left
-      case 0x48: this.cy = Math.max(0,(p[0]||1)-1); this.cx=(p[1]||1)-1; break; // H CUP
+      case 0x41: this.cy = Math.max(0, this.cy - (p[0]||1)); this.pendingWrap=false; break;    // A up
+      case 0x42: this.cy = Math.min(9999, this.cy + (p[0]||1)); this.pendingWrap=false; break; // B down
+      case 0x43: this.cx = Math.min(this.cols-1, this.cx + (p[0]||1)); this.pendingWrap=false; break; // C right
+      case 0x44: this.cx = Math.max(0, this.cx - (p[0]||1)); this.pendingWrap=false; break;    // D left
+      case 0x48: this.cy = Math.max(0,(p[0]||1)-1); this.cx=(p[1]||1)-1; this.pendingWrap=false; break; // H CUP
       case 0x4a: // J ED
         if ((p[0]||0) === 2) { this.lines = [{ cells: [], dirty: false }]; this.cx=0; this.cy=0; }
         else if ((p[0]||0) === 0) {
@@ -86,9 +128,9 @@ export class TerminalBuffer {
         break;
       }
       case 0x73: this.savedCx=this.cx; this.savedCy=this.cy; break;    // s save
-      case 0x75: this.cx=this.savedCx; this.cy=this.savedCy; break;    // u restore
-      case 0x64: this.cy = (p[0]||1)-1; break;                          // d VPA
-      case 0x47: this.cx = (p[0]||1)-1; break;                          // G CHA
+      case 0x75: this.cx=this.savedCx; this.cy=this.savedCy; this.pendingWrap=false; break;    // u restore
+      case 0x64: this.cy = (p[0]||1)-1; this.pendingWrap=false; break;                          // d VPA
+      case 0x47: this.cx = (p[0]||1)-1; this.pendingWrap=false; break;                          // G CHA
     }
   }
 
@@ -109,13 +151,27 @@ export class TerminalBuffer {
 
   // ═══ Character output ═════════════════════════════
 
+  // Deferred-wrap (pending-wrap) semantics, like xterm's automatic margins:
+  // writing a character into the last column does NOT immediately wrap.
+  // The cursor stays on the last column with pendingWrap set; the wrap only
+  // happens when the NEXT printable character arrives. CR/LF/cursor movement
+  // cancels the pending wrap. This is what zsh's PROMPT_SP relies on to
+  // erase its '%' EOL marker by overwriting it with the prompt.
+  private pendingWrap = false;
+  private autoWrap = true;  // DECAWM (?7), default on
+
   private putChar(ch: string): void {
+    if (this.pendingWrap) { this.cx = 0; this.lf(); this.pendingWrap = false; }
     const ln = this.line();
     while (ln.cells.length <= this.cx) ln.cells.push({ char: ' ' });
     ln.cells[this.cx] = { char: ch, fg: this.fg, bg: this.bg, bold: this.bold, italic: this.italic, underline: this.underline };
     ln.dirty = true;
-    this.cx++;
-    if (this.cx >= this.cols) { this.cx = 0; this.lf(); }
+    if (this.cx === this.cols - 1) {
+      if (this.autoWrap) this.pendingWrap = true;  // wrap deferred until next char
+      // else: autowrap off — cursor stays on last column
+    } else {
+      this.cx++;
+    }
   }
 
   private line(): TerminalLine {
@@ -125,7 +181,7 @@ export class TerminalBuffer {
 
   private lf(): void { this.cy++; this.line(); }
 
-  resize(cols: number): void { if (cols > 10) this.cols = cols; }
-  clear(): void { this.lines = [{ cells: [], dirty: false }]; this.cx=0; this.cy=0; this.version++; }
+  resize(cols: number): void { if (cols > 10) { this.cols = cols; this.pendingWrap = false; } }
+  clear(): void { this.lines = [{ cells: [], dirty: false }]; this.cx=0; this.cy=0; this.pendingWrap=false; this.version++; }
   cursorVisible = true;
 }
