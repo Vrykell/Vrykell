@@ -1,8 +1,56 @@
-export interface Cell { char: string; fg?: string; bg?: string; bold?: boolean; italic?: boolean; underline?: boolean; }
+export interface Cell { char: string; fg?: string; bg?: string; bold?: boolean; italic?: boolean; underline?: boolean; /** true when this cell is the second half of a fullwidth character */ wide?: boolean; }
 export interface TerminalLine { cells: Cell[]; dirty: boolean; }
 
 const FG: Record<number,string>={30:'#000',31:'#cd3131',32:'#0dbc79',33:'#e5e510',34:'#2472c8',35:'#bc3fbc',36:'#11a8cd',37:'#e5e5e5',90:'#666',91:'#f14c4c',92:'#23d18b',93:'#f5f543',94:'#3b8eea',95:'#d670d6',96:'#29b8db',97:'#fff'};
 const BG: Record<number,string>={40:'#000',41:'#cd3131',42:'#0dbc79',43:'#e5e510',44:'#2472c8',45:'#bc3fbc',46:'#11a8cd',47:'#e5e5e5'};
+
+/** Return the display width of a code-point (1 or 2).  Based on Unicode East Asian Width. */
+function charWidth(code: number): number {
+  if (code < 0x20) return 0;              // control
+  if (code < 0x7f) return 1;              // ASCII
+  if (code < 0xa0) return 0;              // C1
+  // Wide CJK ranges (subset covering the most common scripts)
+  if (code >= 0x1100 && code <= 0x115f) return 2;  // Hangul Jamo
+  if (code >= 0x2329 && code <= 0x232a) return 2;  // Misc Technical
+  if (code >= 0x2e80 && code <= 0x303e) return 2;  // CJK Radicals / Kangxi / Ideographic Desc / CJK Symbols / Kana iter marks / Bopomofo / Hangul Compat Jamo / Kanbun / Bopomofo Ext
+  if (code >= 0x3040 && code <= 0x33bf) return 2;  // Hiragana / Katakana / Bopomofo / Hangul Compat / CJK Misc / Enclosed CJK / CJK Compat / Yi / Hangul Syllables
+  if (code >= 0x3400 && code <= 0x4dbf) return 2;  // CJK Unified Ideographs Ext A
+  if (code >= 0x4e00 && code <= 0xa4cf) return 2;  // CJK Unified Ideographs / Yi
+  if (code >= 0xa960 && code <= 0xa97f) return 2;  // Hangul Jamo Extended-A
+  if (code >= 0xac00 && code <= 0xd7a3) return 2;  // Hangul Syllables
+  if (code >= 0xf900 && code <= 0xfaff) return 2;  // CJK Compatibility Ideographs
+  if (code >= 0xfe10 && code <= 0xfe19) return 2;  // Vertical forms
+  if (code >= 0xfe30 && code <= 0xfe6f) return 2;  // CJK Compatibility Forms / Small Form Variants
+  if (code >= 0xff01 && code <= 0xff60) return 2;  // Fullwidth Forms
+  if (code >= 0xffe0 && code <= 0xffe6) return 2;  // Fullwidth Signs
+  if (code >= 0x1f300 && code <= 0x1f64f) return 2; // Emoticons / Misc Symbols
+  if (code >= 0x1f680 && code <= 0x1f6ff) return 2; // Transport / Map Symbols
+  if (code >= 0x1f900 && code <= 0x1f9ff) return 2; // Supplemental Symbols
+  if (code >= 0x20000 && code <= 0x2ffff) return 2; // CJK Ext B+
+  if (code >= 0x30000 && code <= 0x3ffff) return 2; // CJK Ext G+
+  return 1;
+}
+
+/** Convert an xterm 256-color index to a hex colour string. */
+function xterm256ToHex(n: number): string {
+  if (n < 16) {
+    const code = n < 8 ? 30 + n : 90 + (n - 8);
+    return FG[code]!;
+  }
+  if (n < 232) {
+    // 6x6x6 RGB cube
+    const idx = n - 16;
+    const r = Math.floor(idx / 36);
+    const g = Math.floor((idx % 36) / 6);
+    const b = idx % 6;
+    const toHex = (v: number) => (v === 0 ? '00' : (v * 40 + 55).toString(16).padStart(2, '0'));
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  }
+  // Grayscale ramp (232-255)
+  const L = (n - 232) * 10 + 8;
+  const h = L.toString(16).padStart(2, '0');
+  return `#${h}${h}${h}`;
+}
 
 export class TerminalBuffer {
   lines: TerminalLine[] = [{ cells: [], dirty: false }];
@@ -144,6 +192,27 @@ export class TerminalBuffer {
       else if (v === 1) this.bold = true;
       else if (v === 3) this.italic = true;
       else if (v === 4) this.underline = true;
+      else if (v === 22) this.bold = false;
+      else if (v === 23) this.italic = false;
+      else if (v === 24) this.underline = false;
+      else if (v === 39) this.fg = undefined;
+      else if (v === 49) this.bg = undefined;
+      else if (v === 38) {
+        // Extended foreground: 38;5;N (256-color) or 38;2;R;G;B (truecolor)
+        if (i + 2 < p.length) {
+          if (p[i + 1] === 5) { this.fg = xterm256ToHex(p[i + 2]); i += 2; }
+          else if (p[i + 1] === 2 && i + 4 < p.length) { this.fg = `#${p[i+2].toString(16).padStart(2,'0')}${p[i+3].toString(16).padStart(2,'0')}${p[i+4].toString(16).padStart(2,'0')}`; i += 4; }
+          else { i += 2; } // skip unrecognized sub-params
+        }
+      }
+      else if (v === 48) {
+        // Extended background: 48;5;N (256-color) or 48;2;R;G;B (truecolor)
+        if (i + 2 < p.length) {
+          if (p[i + 1] === 5) { this.bg = xterm256ToHex(p[i + 2]); i += 2; }
+          else if (p[i + 1] === 2 && i + 4 < p.length) { this.bg = `#${p[i+2].toString(16).padStart(2,'0')}${p[i+3].toString(16).padStart(2,'0')}${p[i+4].toString(16).padStart(2,'0')}`; i += 4; }
+          else { i += 2; }
+        }
+      }
       else if (FG[v]) this.fg = FG[v];
       else if (BG[v]) this.bg = BG[v];
     }
@@ -161,16 +230,24 @@ export class TerminalBuffer {
   private autoWrap = true;  // DECAWM (?7), default on
 
   private putChar(ch: string): void {
+    const w = charWidth(ch.codePointAt(0) ?? 0);
+    if (w === 0) return;         // control char — shouldn't reach here
+    if (w === 2 && this.cx >= this.cols - 1) { this.cx = 0; this.lf(); } // won't fit → wrap
+
     if (this.pendingWrap) { this.cx = 0; this.lf(); this.pendingWrap = false; }
+
     const ln = this.line();
-    while (ln.cells.length <= this.cx) ln.cells.push({ char: ' ' });
+    while (ln.cells.length <= this.cx + w - 1) ln.cells.push({ char: ' ' });
+
     ln.cells[this.cx] = { char: ch, fg: this.fg, bg: this.bg, bold: this.bold, italic: this.italic, underline: this.underline };
     ln.dirty = true;
-    if (this.cx === this.cols - 1) {
-      if (this.autoWrap) this.pendingWrap = true;  // wrap deferred until next char
-      // else: autowrap off — cursor stays on last column
+    if (w === 2) ln.cells[this.cx + 1] = { char: '', wide: true, fg: this.fg, bg: this.bg };
+
+    if (this.cx + w >= this.cols) {
+      if (this.autoWrap) this.pendingWrap = true;
+      this.cx = this.cols - 1;  // stay on last column (deferred-wrap)
     } else {
-      this.cx++;
+      this.cx += w;
     }
   }
 
