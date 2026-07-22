@@ -121,7 +121,8 @@ export const DomTerminalView: React.FC<{
   onInput: (e: React.FormEvent<HTMLTextAreaElement>) => void;
   onCompositionStart: () => void;
   onCompositionEnd: (e: React.CompositionEvent<HTMLTextAreaElement>) => void;
-}> = ({ buffer, onKeyDown, onInput, onCompositionStart, onCompositionEnd }) => {
+  onResize?: (pxWidth: number, pxHeight: number) => void;
+}> = ({ buffer, onKeyDown, onInput, onCompositionStart, onCompositionEnd, onResize }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerHRef = useRef(0);
@@ -137,27 +138,34 @@ export const DomTerminalView: React.FC<{
     const ro = new ResizeObserver(([entry]) => {
       containerHRef.current = entry.contentRect.height;
       setTick((t) => t + 1);
+      onResize?.(entry.contentRect.width, entry.contentRect.height);
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
-  // Auto-scroll when the user is pinned:
-  //   • Cursor at bottom → follow output (scroll to absolute bottom).
-  //   • Cursor elsewhere (TUI: Claude Code, vim, …) → keep it inside the
-  //     viewport so the blinking cursor stays visible.
-  //   • Not pinned (user scrolled up) → do nothing.
+  const prevLineCountRef = useRef(buffer.lines.length);
+
+  // Auto-scroll logic:
+  //   • New lines arrived AND cursor is at bottom → scroll to follow output.
+  //   • Cursor moved off-screen in a TUI → bring it back into view.
+  //   • Character writes (no new lines) → NEVER auto-scroll, even if near bottom.
   useLayoutEffect(() => {
-    if (!pinnedRef.current) return;
     const el = containerRef.current;
     if (!el) return;
     const h = containerHRef.current || buffer.rows * LINE_HEIGHT;
     const cursorY = buffer.cy * LINE_HEIGHT;
+    const lineCount = buffer.lines.length;
+    const linesAdded = lineCount > prevLineCountRef.current;
+    prevLineCountRef.current = lineCount;
 
-    if (buffer.cy >= buffer.lines.length - 1) {
+    if (linesAdded && buffer.cy >= lineCount - 1 && pinnedRef.current) {
+      // New output arrived while user is following the bottom — stay at bottom.
       scrollTopRef.current = el.scrollHeight;
       el.scrollTop = el.scrollHeight;
-    } else {
+    } else if (pinnedRef.current) {
+      // User hasn't scrolled away — keep cursor in viewport if it moved
+      // (important for TUIs that reposition the cursor within the screen).
       const visTop = el.scrollTop;
       const visBot = visTop + h - LINE_HEIGHT;
       if (cursorY < visTop || cursorY > visBot) {
@@ -173,7 +181,7 @@ export const DomTerminalView: React.FC<{
     if (!el) return;
     scrollTopRef.current = el.scrollTop;
     pinnedRef.current =
-      el.scrollTop + el.clientHeight >= el.scrollHeight - LINE_HEIGHT * 2;
+      el.scrollTop + el.clientHeight >= el.scrollHeight - LINE_HEIGHT * 5;
     setTick((t) => t + 1);
   }, []);
 
@@ -183,7 +191,12 @@ export const DomTerminalView: React.FC<{
   const totalLines = buffer.lines.length;
   const effectiveH = containerHRef.current || buffer.rows * LINE_HEIGHT;
   const maxScroll = Math.max(0, totalLines * LINE_HEIGHT - effectiveH);
-  const scrollTop = pinnedRef.current
+  // If the user is near the bottom (within 5 lines), treat as "at bottom"
+  // for visible-range calculation so new output doesn't cause a visual jump.
+  const nearBottom =
+    pinnedRef.current ||
+    scrollTopRef.current + effectiveH >= totalLines * LINE_HEIGHT - LINE_HEIGHT * 5;
+  const scrollTop = nearBottom
     ? maxScroll
     : Math.min(scrollTopRef.current, maxScroll);
 
@@ -197,7 +210,7 @@ export const DomTerminalView: React.FC<{
   for (let i = startIdx; i < endIdx; i++) {
     const line = buffer.lines[i];
     visible.push(
-      <div key={i} data-testid="terminal-line" style={{ contentVisibility: 'auto', contain: 'layout style paint' }}>
+      <div key={i} data-testid="terminal-line" style={{ contentVisibility: 'auto' }}>
         <L
           line={line}
           cursor={buffer.cursorVisible && i === buffer.cy}

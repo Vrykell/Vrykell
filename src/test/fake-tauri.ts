@@ -1,7 +1,7 @@
 import type { SessionInfo, SessionOptions } from '../shared/types';
 
 export type EventMap = {
-  'pty:output': { sessionId: string; data: string };
+  'pty:output': { sessionId: string; events: { t: string; p?: unknown }[] };
   'pty:exit': { sessionId: string; exitCode: number };
   'pty:title-change': { sessionId: string; title: string };
   'session:created': { session: SessionInfo };
@@ -21,6 +21,7 @@ export class FakeTauriBackend {
     Record<keyof EventMap, Array<(payload: any) => void>>
   > = {};
   nextId = 1;
+  exitRequested = false;
   customInvoke?: InvokeHandler;
 
   /** Install as the active mock. Call before importing modules that use @tauri-apps/api. */
@@ -47,8 +48,9 @@ export class FakeTauriBackend {
   }
 
   write(id: string, data: string): void {
-    // Echo back for simple integration tests
-    this.emit('pty:output', { sessionId: id, data });
+    // Wrap raw text as structured txt events for the new event pipeline.
+    // Buffer's applyEvents processes these directly with zero string parsing.
+    this.emit('pty:output', { sessionId: id, events: [{ t: 'txt', p: data }] });
   }
 
   close(id: string): void {
@@ -79,6 +81,9 @@ export class FakeTauriBackend {
         return;
       case 'list_pty':
         return this.sessions;
+      case 'exit_app':
+        this.exitRequested = true;
+        return;
       default:
         throw new Error(`Unknown command: ${cmd}`);
     }

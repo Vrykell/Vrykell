@@ -1,9 +1,27 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { TerminalBuffer } from './buffer';
-import { writeToPTY, onPTYOutput, onPTYExit } from '../../api';
+import { resizePTY, writeToPTY, onPTYOutput, onPTYExit } from '../../api';
+
+const CHAR_WIDTH = 8.4; // approximate px width of one monospace char at 14px
+const LINE_HEIGHT = 16;
+
+// Buffer cache — one TerminalBuffer per session, survives tab switches.
+const bufferCache = new Map<string, TerminalBuffer>();
+function getBuffer(sid: string): TerminalBuffer {
+  let b = bufferCache.get(sid);
+  if (!b) { b = new TerminalBuffer(); bufferCache.set(sid, b); }
+  return b;
+}
 
 export function useDomTerminal(sessionId: string | null) {
-  const buf = useRef(new TerminalBuffer()).current;
+  const bufRef = useRef<TerminalBuffer>(null!);
+  if (sessionId) {
+    const b = getBuffer(sessionId);
+    if (bufRef.current !== b) bufRef.current = b;
+  } else if (!bufRef.current) {
+    bufRef.current = new TerminalBuffer();
+  }
+  const buf = bufRef.current;
   const [, bump] = useState(0);
   const sid = useRef(sessionId);
   sid.current = sessionId;
@@ -27,14 +45,17 @@ export function useDomTerminal(sessionId: string | null) {
   // keystrokes to the PTY.
   const composing = useRef(false);
 
+  // Trigger a render when switching tabs so the cached buffer is shown.
+  useEffect(() => { if (sessionId) scheduleRender(); }, [sessionId]);
+
   useEffect(() => {
     if (!sessionId) return;
     let cancelled = false;
     const un: Array<() => void> = [];
 
-    onPTYOutput(({ sessionId: sid, data }) => {
+    onPTYOutput(({ sessionId: sid, events }) => {
       if (cancelled || sid !== sessionId) return;
-      buf.write(data);
+      buf.applyEvents(events);
       scheduleRender();
     }).then(fn => { if (!cancelled) un.push(fn); else fn(); });
 
@@ -88,5 +109,19 @@ export function useDomTerminal(sessionId: string | null) {
     });
   }, []);
 
-  return { buffer: buf, onKeyDown, onInput, onCompositionStart, onCompositionEnd };
+  // Notify PTY of terminal dimensions when the container resizes.
+  const onResize = useCallback(
+    (pxWidth: number, pxHeight: number) => {
+      const s = sid.current;
+      if (!s) return;
+      const cols = Math.max(10, Math.floor(pxWidth / CHAR_WIDTH));
+      const rows = Math.max(4, Math.floor(pxHeight / LINE_HEIGHT));
+      buf.resize(cols);
+      buf.rows = rows;
+      resizePTY(s, cols, rows).catch(() => {});
+    },
+    [],
+  );
+
+  return { buffer: buf, onKeyDown, onInput, onCompositionStart, onCompositionEnd, onResize };
 }

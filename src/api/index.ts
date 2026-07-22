@@ -9,6 +9,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { SessionInfo, SessionOptions } from '../shared/types';
+import type { TerminalEvent } from '../shared/terminal-events';
 
 // ── PTY Commands (Renderer → Backend) ──────────────────────────
 
@@ -37,9 +38,9 @@ export function closePTY(sessionId: string): Promise<void> {
 // Each returns Promise<UnlistenFn> for cleanup in useEffect return
 
 export function onPTYOutput(
-  cb: (data: { sessionId: string; data: string }) => void,
+  cb: (data: { sessionId: string; events: TerminalEvent[] }) => void,
 ): Promise<UnlistenFn> {
-  return listen<{ sessionId: string; data: string }>('pty:output', (event) => {
+  return listen<{ sessionId: string; events: TerminalEvent[] }>('pty:output', (event) => {
     cb(event.payload);
   });
 }
@@ -107,4 +108,8 @@ export function loadSettings(): Promise<unknown> {
 
 export function saveSettings(settings: unknown): Promise<void> {
   return invoke('save_settings', { settings });
+}
+
+export function exitApp(): Promise<void> {
+  return invoke('exit_app');
 }

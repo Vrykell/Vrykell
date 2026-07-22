@@ -4,6 +4,7 @@ mod commands;
 mod pty;
 mod session;
 mod settings;
+mod terminal_parser;
 
 use commands::AppState;
 use session::SessionStore;
@@ -35,6 +36,7 @@ pub fn run() {
             commands::resize_pty,
             commands::close_pty,
             commands::list_pty,
+            commands::exit_app,
             commands::load_settings,
             commands::save_settings,
         ])

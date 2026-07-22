@@ -22,11 +22,14 @@ export function useRichContent(sessionId: string | null): void {
   useEffect(() => {
     let unlisten: (() => void) | null = null;
 
-    onPTYOutput(({ sessionId: sid, data }) => {
+    onPTYOutput(({ sessionId: sid, events }) => {
       if (!sessionId || sid !== sessionId) return;
 
-      // data is now a plain string from IPC
-      const text: string = typeof data === 'string' ? data : String(data);
+      // Collect text from structured events (the Rust parser already stripped ANSI).
+      const text = events
+        .filter((ev: { t: string }) => ev.t === 'txt')
+        .map((ev: { p?: string }) => ev.p ?? '')
+        .join('');
 
       // Append to buffer
       if (!bufferRef.current[sid]) {

@@ -30,7 +30,7 @@ describe('useRichContent integration', () => {
     render(<Wrapper sessionId="s1" />);
     backend.emit('pty:output', {
       sessionId: 's1',
-      data: '```ts\nconst x = 1;\n```',
+      events: [{ t: 'txt', p: '```ts\nconst x = 1;\n```' }],
     });
     await waitFor(() => {
       expect(useTerminalStore.getState().richOutputs.s1?.length).toBeGreaterThan(0);
@@ -44,7 +44,7 @@ describe('useRichContent integration', () => {
     render(<Wrapper sessionId="s1" />);
     backend.emit('pty:output', {
       sessionId: 's2',
-      data: '$$x$$',
+      events: [{ t: 'txt', p: '$$x$$' }],
     });
     await new Promise((r) => setTimeout(r, 400));
     expect(useTerminalStore.getState().richOutputs.s2).toBeFalsy();

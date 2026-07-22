@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 import { TerminalView } from './components/terminal/TerminalView';
 import { TerminalTabs } from './components/terminal/TerminalTabs';
 import { RichOutput } from './components/output/RichOutput';
@@ -10,7 +9,7 @@ import { useTerminalStore } from './stores/terminal-store';
 import { t } from './i18n';
 import { useRichContent } from './hooks/useRichContent';
 import {
-  createPTY, closePTY,
+  createPTY, closePTY, exitApp,
   onSessionCreated, onSessionClosed, onPTYExit,
   onPTYTitleChange, onAIResponse, onMenuAction,
 } from '../api';
@@ -63,19 +62,14 @@ const App: React.FC = () => {
     return () => unlisteners.forEach(fn => fn());
   }, []);
 
-  // Auto-create first session on startup
+  // Auto-create first session on startup; show exit dialog when last closed.
   const didInitRef = useRef(false);
   useEffect(() => {
-    if (!didInitRef.current && sessions.length === 0) {
+    if (sessions.length > 0) return;
+    if (!didInitRef.current) {
       didInitRef.current = true;
       createAndAddSession();
-    }
-  }, [sessions.length]);
-
-  // When the user closes the last tab, show exit confirmation instead of
-  // auto-creating or leaving an empty window.
-  useEffect(() => {
-    if (didInitRef.current && sessions.length === 0) {
+    } else {
       setShowExitDialog(true);
     }
   }, [sessions.length]);
@@ -121,11 +115,7 @@ const App: React.FC = () => {
         confirmLabel={t.exit.confirm}
         cancelLabel={t.exit.cancel}
         danger
-        onConfirm={() => {
-          const w = getCurrentWindow();
-          // destroy() bypasses the closeRequested event that the backend doesn't handle.
-          w.destroy().catch(() => w.close());
-        }}
+        onConfirm={() => exitApp().catch(() => window.close())}
         onCancel={() => { setShowExitDialog(false); createAndAddSession(); }}
       />
     </>

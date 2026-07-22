@@ -79,6 +79,12 @@ pub fn load_settings(
     state.settings.load()
 }
 
+/// Exit the application immediately.
+#[tauri::command]
+pub fn exit_app() {
+  std::process::exit(0);
+}
+
 /// Save application settings.
 #[tauri::command]
 pub fn save_settings(

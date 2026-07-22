@@ -1,3 +1,5 @@
+import type { TerminalEvent } from '../../shared/terminal-events';
+
 export interface Cell { char: string; fg?: string; bg?: string; bold?: boolean; italic?: boolean; underline?: boolean; /** true when this cell is the second half of a fullwidth character */ wide?: boolean; }
 export interface TerminalLine { cells: Cell[]; dirty: boolean; }
 
@@ -283,6 +285,52 @@ export class TerminalBuffer {
       if (this.savedCy > 0) this.savedCy--;
     }
     this.line(); // ensure line at cy exists
+  }
+
+  // ── Typed event API (used by the Rust parser pipeline) ─────────────────────
+
+  applyEvents(events: TerminalEvent[]): void {
+    for (const ev of events) {
+      switch (ev.t) {
+        case 'txt': for (let i = 0; i < ev.p.length; i++) this.putChar(ev.p[i]); break;
+        case 'cr': this.cx = 0; this.pendingWrap = false; break;
+        case 'lf': this.pendingWrap = false; this.lf(); break;
+        case 'bs': this.pendingWrap = false; if (this.cx > 0) this.cx--; break;
+        case 'tab': this.pendingWrap = false; this.cx = Math.min(this.cols - 1, (Math.floor(this.cx / 8) + 1) * 8); break;
+        case 'A': this.cy = Math.max(0, this.cy - ev.p); this.pendingWrap = false; break;
+        case 'B': this.cy = Math.min(9999, this.cy + ev.p); this.pendingWrap = false; break;
+        case 'C': this.cx = Math.min(this.cols - 1, this.cx + ev.p); this.pendingWrap = false; break;
+        case 'D': this.cx = Math.max(0, this.cx - ev.p); this.pendingWrap = false; break;
+        case 'H': this.cy = Math.max(0, ev.p[0] - 1); this.cx = ev.p[1] - 1; this.pendingWrap = false; break;
+        case 'G': this.cx = ev.p - 1; this.pendingWrap = false; break;
+        case 'd': this.cy = ev.p - 1; this.pendingWrap = false; break;
+        case 's': this.savedCx = this.cx; this.savedCy = this.cy; break;
+        case 'u': this.cx = this.savedCx; this.cy = this.savedCy; this.pendingWrap = false; break;
+        case 'J': {
+          if (ev.p === 2) { this.lines = [{ cells: [], dirty: false }]; this.cx = 0; this.cy = 0; }
+          else if (ev.p === 0) {
+            const ln = this.line(); ln.cells = ln.cells.slice(0, this.cx); ln.dirty = true;
+            for (let y = this.cy + 1; y < this.lines.length; y++) { this.lines[y].cells = []; this.lines[y].dirty = true; }
+          }
+          break;
+        }
+        case 'K': {
+          const ln = this.line();
+          if (ev.p === 0) ln.cells = ln.cells.slice(0, this.cx);
+          else if (ev.p === 2) ln.cells = [];
+          ln.dirty = true;
+          break;
+        }
+        case 'm': this.sgr(ev.p); break;
+        case 'dec': {
+          const h = TerminalBuffer.DEC[ev.p[0]];
+          if (h) h(this, ev.p[1]);
+          break;
+        }
+        case 'osc': break; // title — handled by the PTY listener in useDomTerminal
+      }
+    }
+    this.version++;
   }
 
   resize(cols: number): void { if (cols > 10) { this.cols = cols; this.pendingWrap = false; } }

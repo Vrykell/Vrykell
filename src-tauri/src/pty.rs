@@ -5,13 +5,15 @@ use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 
 use crate::session::{SessionInfo, SessionOptions, SessionStore, SessionType};
+use crate::terminal_parser::{TerminalEvent, TerminalParser};
 
-/// Payload emitted from Rust to frontend for PTY output
+/// Payload emitted from Rust to frontend for PTY output.
+/// Events are pre-parsed escape sequences — the frontend no longer parses raw bytes.
 #[derive(Clone, serde::Serialize)]
 pub struct PtyOutputPayload {
     #[serde(rename = "sessionId")]
     pub session_id: String,
-    pub data: String,
+    pub events: Vec<TerminalEvent>,
 }
 
 /// Payload for PTY exit event
@@ -199,34 +201,36 @@ impl PtyManager {
         let thread_child = child_arc.clone();
 
         std::thread::spawn(move || {
-            let mut buf = [0u8; 4096];
+            let mut read_buf = [0u8; 4096];
+            let mut parser = TerminalParser::new();
             loop {
-                match reader.read(&mut buf) {
+                match reader.read(&mut read_buf) {
                     Ok(0) => {
-                        // EOF — process exited
                         let exit_code = thread_child.lock().ok()
                             .and_then(|mut c| c.try_wait().ok().flatten())
                             .map(|s| s.exit_code())
                             .unwrap_or(0) as i32;
-
                         let _ = handle.emit("pty:exit", PtyExitPayload {
                             session_id: sid.clone(), exit_code,
                         });
-
                         if let Ok(mut s) = session_store.lock() { s.remove(&sid); }
                         let _ = session_map.lock().map(|mut s| s.remove(&sid));
                         break;
                     }
                     Ok(n) => {
-                        let data = String::from_utf8_lossy(&buf[..n]).to_string();
-                        if let Some(title) = detect_osc_title(&data) {
-                            let _ = handle.emit("pty:title-change", TitleChangePayload {
-                                session_id: sid.clone(), title: title.clone(),
-                            });
-                            if let Ok(mut s) = session_store.lock() { s.update_title(&sid, &title); }
+                        parser.push(&read_buf[..n]);
+                        let events = parser.take_events();
+                        if events.is_empty() { continue; }
+                        for ev in &events {
+                            if let TerminalEvent::OscTitle(ref title) = ev {
+                                let _ = handle.emit("pty:title-change", TitleChangePayload {
+                                    session_id: sid.clone(), title: title.clone(),
+                                });
+                                if let Ok(mut s) = session_store.lock() { s.update_title(&sid, title); }
+                            }
                         }
                         let _ = handle.emit("pty:output", PtyOutputPayload {
-                            session_id: sid.clone(), data,
+                            session_id: sid.clone(), events,
                         });
                     }
                     Err(_) => break,
@@ -300,59 +304,4 @@ impl PtyManager {
     }
 }
 
-/// Detect OSC 0/2 title change sequences in terminal output.
-/// Pattern: ESC ] 0/2 ; title BEL or ESC \
-fn detect_osc_title(data: &str) -> Option<String> {
-    // Match OSC 0;title or OSC 2;title followed by BEL (\x07) or ST (\x1b\\)
-    let bytes = data.as_bytes();
-    let len = bytes.len();
 
-    for i in 0..len.saturating_sub(3) {
-        // Look for ESC ]
-        if bytes[i] == 0x1b && bytes[i + 1] == b']' {
-            if bytes[i + 2] == b'0' || bytes[i + 2] == b'2' {
-                if bytes[i + 3] == b';' {
-                    // Find the end (BEL 0x07 or ST 0x1b 0x5c)
-                    let start = i + 4;
-                    for j in start..len {
-                        if bytes[j] == 0x07 || (bytes[j] == 0x1b && j + 1 < len && bytes[j + 1] == 0x5c) {
-                            let end = j;
-                            let title = String::from_utf8_lossy(&bytes[start..end]).to_string();
-                            if !title.is_empty() {
-                                return Some(title);
-                            }
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    None
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn detect_osc_title_bel() {
-        assert_eq!(
-            detect_osc_title("\x1b]0;my title\x07"),
-            Some("my title".to_string())
-        );
-    }
-
-    #[test]
-    fn detect_osc_title_st() {
-        assert_eq!(
-            detect_osc_title("\x1b]2;other title\x1b\\"),
-            Some("other title".to_string())
-        );
-    }
-
-    #[test]
-    fn detect_osc_title_returns_none_when_missing() {
-        assert_eq!(detect_osc_title("hello world"), None);
-    }
-}

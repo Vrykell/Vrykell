@@ -77,8 +77,8 @@ describe('useDomTerminal integration', () => {
     render(<TestApp sessionId="s1" />);
     const view = screen.getByTestId('terminal-view');
 
-    backend.emit('pty:output', { sessionId: 's2', data: 'wrong' });
-    backend.emit('pty:output', { sessionId: 's1', data: 'right' });
+    backend.emit('pty:output', { sessionId: 's2', events: [{ t: 'txt', p: 'wrong' }] });
+    backend.emit('pty:output', { sessionId: 's1', events: [{ t: 'txt', p: 'right' }] });
 
     await waitFor(() => expect(view).toHaveTextContent('right'));
     expect(view).not.toHaveTextContent('wrong');
@@ -88,12 +88,12 @@ describe('useDomTerminal integration', () => {
     const { rerender } = render(<TestApp sessionId="s1" />);
     const view = screen.getByTestId('terminal-view');
 
-    backend.emit('pty:output', { sessionId: 's1', data: 'first' });
+    backend.emit('pty:output', { sessionId: 's1', events: [{ t: 'txt', p: 'first' }] });
     await waitFor(() => expect(view).toHaveTextContent('first'));
 
     rerender(<TestApp sessionId="s2" />);
-    backend.emit('pty:output', { sessionId: 's1', data: 'old' });
-    backend.emit('pty:output', { sessionId: 's2', data: 'new' });
+    backend.emit('pty:output', { sessionId: 's1', events: [{ t: 'txt', p: 'old' }] });
+    backend.emit('pty:output', { sessionId: 's2', events: [{ t: 'txt', p: 'new' }] });
 
     await waitFor(() => expect(view).toHaveTextContent('new'));
     expect(view).not.toHaveTextContent('old');

@@ -12,6 +12,7 @@ export const TerminalTabs: React.FC = () => {
     try {
       const session = await createPTY({});
       addSession(session);
+      setActive(session.id);
     } catch (err) { console.error('Failed to create session:', err); }
   };
 
