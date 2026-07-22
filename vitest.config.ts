@@ -4,6 +4,9 @@ import { resolve } from 'path';
 
 export default defineConfig({
   plugins: [react()],
+  define: {
+    'import.meta.env.VITE_LOCALE': JSON.stringify(process.env.VITE_LOCALE || 'en'),
+  },
   test: {
     environment: 'jsdom',
     globals: true,

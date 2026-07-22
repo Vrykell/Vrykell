@@ -197,7 +197,7 @@ export const DomTerminalView: React.FC<{
   for (let i = startIdx; i < endIdx; i++) {
     const line = buffer.lines[i];
     visible.push(
-      <div key={i} data-testid="terminal-line">
+      <div key={i} data-testid="terminal-line" style={{ contentVisibility: 'auto', contain: 'layout style paint' }}>
         <L
           line={line}
           cursor={buffer.cursorVisible && i === buffer.cy}
@@ -220,7 +220,10 @@ export const DomTerminalView: React.FC<{
         overflowAnchor: 'none',
         outline: 'none',
         position: 'relative',
-        willChange: 'transform',
+        // GPU compositing: own layer, no full-page repaints on scroll/content updates.
+        willChange: 'scroll-position',
+        contain: 'layout style paint',  // NOT "strict" — we need size to grow with content
+        transform: 'translateZ(0)',
       }}
     >
       {/* Hidden textarea — IME + keyboard proxy */}

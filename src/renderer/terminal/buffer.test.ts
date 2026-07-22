@@ -131,6 +131,21 @@ describe('TerminalBuffer', () => {
     expect(buf.cursorVisible).toBe(true);
   });
 
+  it('trims scrollback beyond max lines', () => {
+    const buf = new TerminalBuffer();
+    // Write 10 lines — fills buffer
+    for (let i = 0; i < 10; i++) buf.write(`line ${i}\n`);
+    expect(buf.lines.length).toBeGreaterThanOrEqual(10);
+    // Clear and write more than maxLines
+    buf.clear();
+    buf.maxLines = 10;
+    for (let i = 0; i < 15; i++) buf.write(`X${i}\n`);
+    // Should have trimmed to ~10 lines
+    expect(buf.lines.length).toBeLessThanOrEqual(11);
+    // cy should still be at the bottom (last line)
+    expect(buf.lines[buf.cy]).toBeTruthy();
+  });
+
   it('clears via clear()', () => {
     const buf = new TerminalBuffer();
     buf.write('abc');

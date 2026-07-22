@@ -1,10 +1,13 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { TerminalView } from './components/terminal/TerminalView';
 import { TerminalTabs } from './components/terminal/TerminalTabs';
 import { RichOutput } from './components/output/RichOutput';
 import { AIChatPanel } from './components/ai/AIChatPanel';
 import { StatusBar } from './components/layout/StatusBar';
+import { ConfirmDialog } from './components/common/ConfirmDialog';
 import { useTerminalStore } from './stores/terminal-store';
+import { t } from './i18n';
 import { useRichContent } from './hooks/useRichContent';
 import {
   createPTY, closePTY,
@@ -24,13 +27,14 @@ const App: React.FC = () => {
   const updateSessionTitle = useTerminalStore((s) => s.updateSessionTitle);
   const removeSession = useTerminalStore((s) => s.removeSession);
 
+  const [showExitDialog, setShowExitDialog] = useState(false);
+
   useRichContent(activeSessionId);
 
-  // Helper: create PTY and add to store
   const createAndAddSession = () =>
     createPTY({}).then(s => addSession(s)).catch(err => console.error('createPTY failed:', err));
 
-  // Set up all Tauri event listeners once on mount
+  // Tauri event listeners
   useEffect(() => {
     const unlisteners: UnlistenFn[] = [];
 
@@ -43,7 +47,6 @@ const App: React.FC = () => {
       else if (action === 'toggle-ai-panel') useTerminalStore.getState().toggleSidebar();
     }).then(fn => unlisteners.push(fn));
 
-    // AI streaming handler
     let streamingId: string | null = null;
     onAIResponse((data: any) => {
       const store = useTerminalStore.getState();
@@ -60,12 +63,20 @@ const App: React.FC = () => {
     return () => unlisteners.forEach(fn => fn());
   }, []);
 
-  // Auto-create first session on startup only (not after the user closes the last tab)
+  // Auto-create first session on startup
   const didInitRef = useRef(false);
   useEffect(() => {
     if (!didInitRef.current && sessions.length === 0) {
       didInitRef.current = true;
       createAndAddSession();
+    }
+  }, [sessions.length]);
+
+  // When the user closes the last tab, show exit confirmation instead of
+  // auto-creating or leaving an empty window.
+  useEffect(() => {
+    if (didInitRef.current && sessions.length === 0) {
+      setShowExitDialog(true);
     }
   }, [sessions.length]);
 
@@ -85,22 +96,39 @@ const App: React.FC = () => {
   }, [activeSessionId]);
 
   return (
-    <div className="app-shell">
-      <TerminalTabs />
-      <div className="app-main">
-        <div className="app-terminal-area">
-          <TerminalView sessionId={activeSessionId} />
-          {outputPanelOpen && <RichOutput />}
-          {!outputPanelOpen && (
-            <button className="rich-output-toggle" onClick={toggleOutputPanel} title="Toggle Rich Output (Ctrl+Shift+R)">
-              📄 Rich Output
-            </button>
-          )}
+    <>
+      <div className="app-shell">
+        <TerminalTabs />
+        <div className="app-main">
+          <div className="app-terminal-area">
+            <TerminalView sessionId={activeSessionId} />
+            {outputPanelOpen && <RichOutput />}
+            {!outputPanelOpen && (
+              <button className="rich-output-toggle" onClick={toggleOutputPanel} title="Toggle Rich Output (Ctrl+Shift+R)">
+                📄 Rich Output
+              </button>
+            )}
+          </div>
+          <AIChatPanel />
         </div>
-        <AIChatPanel />
+        <StatusBar />
       </div>
-      <StatusBar />
-    </div>
+
+      <ConfirmDialog
+        open={showExitDialog}
+        title={t.exit.title}
+        message={t.exit.message}
+        confirmLabel={t.exit.confirm}
+        cancelLabel={t.exit.cancel}
+        danger
+        onConfirm={() => {
+          const w = getCurrentWindow();
+          // destroy() bypasses the closeRequested event that the backend doesn't handle.
+          w.destroy().catch(() => w.close());
+        }}
+        onCancel={() => { setShowExitDialog(false); createAndAddSession(); }}
+      />
+    </>
   );
 };
 
