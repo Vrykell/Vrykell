@@ -265,7 +265,7 @@ describe('Claude Code real UI output', () => {
   it('parses live claude output with no escape residue or garbled text', () => {
     const buf = new TerminalBuffer();
     buf.resize(100);
-    const data = readFileSync(resolve(__dirname, 'claude-ui.fixture.bin'), 'utf-8');
+    const data = readFileSync(resolve(__dirname, '../../test/fixtures/claude-ui.fixture.bin'), 'utf-8');
 
     // Write in 4KB chunks to exercise the split-escape buffering code paths
     for (let i = 0; i < data.length; i += 4096) {

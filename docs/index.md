@@ -2,7 +2,7 @@
 
 面向 AI 时代的桌面终端模拟器。支持 LaTeX/Markdown/代码高亮渲染，内嵌 AI 对话面板。
 
-**技术栈**: Tauri v2 + Rust + React 18 + TypeScript + xterm.js 5 + KaTeX + Shiki + Zustand
+**技术栈**: Tauri v2 (Rust + portable-pty) + React 18 + TypeScript + 自研 DOM 终端 + KaTeX + Shiki + Zustand
 
 **平台**: macOS / Windows / Linux
 
