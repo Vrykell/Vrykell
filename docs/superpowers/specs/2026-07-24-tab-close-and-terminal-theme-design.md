@@ -2,7 +2,7 @@
 
 **Date**: 2026-07-24
 **Branch**: `fix/tab-close-and-terminal-theme`
-**Status**: Approved
+**Status**: ✅ Implemented (commits 29f5d41 → f865d06)
 
 ---
 
