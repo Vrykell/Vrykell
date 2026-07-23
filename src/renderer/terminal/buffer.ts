@@ -180,8 +180,8 @@ export class TerminalBuffer {
     0x42 /* B */: (b, p) => { b.cy = Math.min(9999, b.cy + (p[0] || 1)); b.pendingWrap = false; },
     0x43 /* C */: (b, p) => { b.cx = Math.min(b.cols - 1, b.cx + (p[0] || 1)); b.pendingWrap = false; },
     0x44 /* D */: (b, p) => { b.cx = Math.max(0, b.cx - (p[0] || 1)); b.pendingWrap = false; },
-    0x48 /* H */: (b, p) => { b.cy = Math.max(0, (p[0] || 1) - 1); b.cx = (p[1] || 1) - 1; b.pendingWrap = false; },
-    0x47 /* G */: (b, p) => { b.cx = (p[0] || 1) - 1; b.pendingWrap = false; },
+    0x48 /* H */: (b, p) => { b.cy = Math.max(0, (p[0] || 1) - 1); b.cx = Math.min(b.cols - 1, (p[1] || 1) - 1); b.pendingWrap = false; },
+    0x47 /* G */: (b, p) => { b.cx = Math.min(b.cols - 1, (p[0] || 1) - 1); b.pendingWrap = false; },
     0x64 /* d */: (b, p) => { b.cy = (p[0] || 1) - 1; b.pendingWrap = false; },
     0x73 /* s */: (b, _p) => { b.savedCx = b.cx; b.savedCy = b.cy; },
     0x75 /* u */: (b, _p) => { b.cx = b.savedCx; b.cy = b.savedCy; b.pendingWrap = false; },
@@ -301,8 +301,8 @@ export class TerminalBuffer {
         case 'B': this.cy = Math.min(9999, this.cy + ev.p); this.pendingWrap = false; break;
         case 'C': this.cx = Math.min(this.cols - 1, this.cx + ev.p); this.pendingWrap = false; break;
         case 'D': this.cx = Math.max(0, this.cx - ev.p); this.pendingWrap = false; break;
-        case 'H': this.cy = Math.max(0, ev.p[0] - 1); this.cx = ev.p[1] - 1; this.pendingWrap = false; break;
-        case 'G': this.cx = ev.p - 1; this.pendingWrap = false; break;
+        case 'H': this.cy = Math.max(0, ev.p[0] - 1); this.cx = Math.min(this.cols - 1, ev.p[1] - 1); this.pendingWrap = false; break;
+        case 'G': this.cx = Math.min(this.cols - 1, ev.p - 1); this.pendingWrap = false; break;
         case 'd': this.cy = ev.p - 1; this.pendingWrap = false; break;
         case 's': this.savedCx = this.cx; this.savedCy = this.cy; break;
         case 'u': this.cx = this.savedCx; this.cy = this.savedCy; this.pendingWrap = false; break;
