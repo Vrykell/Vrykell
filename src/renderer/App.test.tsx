@@ -56,25 +56,28 @@ describe('App session flow', () => {
     await waitFor(() => expect(screen.getByTestId(`session-tab-${sid}`)).toHaveTextContent('zsh'));
   });
 
-  it('shows exit dialog when last tab is closed', async () => {
+  it('shows exit dialog directly when closing the last tab (single confirmation)', async () => {
     renderApp();
     await waitFor(() => expect(backend.sessions).toHaveLength(1));
     const sid = backend.sessions[0].id;
     await userEvent.click(screen.getByTestId(`close-btn-${sid}`));
-    await userEvent.click(screen.getByText('Force Close'));
-    await waitFor(() => expect(backend.sessions).toHaveLength(0));
+    // One dialog only: the exit dialog. No intermediate "Force Close" step,
+    // and the session stays alive until the user confirms app exit.
     await waitFor(() => expect(screen.getByText('Close AI Terminal')).toBeInTheDocument());
+    expect(screen.queryByText('Force Close')).not.toBeInTheDocument();
+    expect(backend.sessions).toHaveLength(1);
   });
 
-  it('cancels exit → creates a new session', async () => {
+  it('cancelling exit keeps the existing session alive', async () => {
     renderApp();
     await waitFor(() => expect(backend.sessions).toHaveLength(1));
     const sid = backend.sessions[0].id;
     await userEvent.click(screen.getByTestId(`close-btn-${sid}`));
-    await userEvent.click(screen.getByText('Force Close'));
-    await waitFor(() => expect(backend.sessions).toHaveLength(0));
+    await waitFor(() => expect(screen.getByText('Close AI Terminal')).toBeInTheDocument());
     await userEvent.click(screen.getByText('Keep Session'));
-    await waitFor(() => expect(backend.sessions).toHaveLength(1));
+    await waitFor(() => expect(screen.queryByText('Close AI Terminal')).not.toBeInTheDocument());
+    expect(backend.sessions).toHaveLength(1);
+    expect(backend.sessions[0].id).toBe(sid);
     expect(backend.exitRequested).toBe(false);
   });
 
@@ -83,10 +86,35 @@ describe('App session flow', () => {
     await waitFor(() => expect(backend.sessions).toHaveLength(1));
     const sid = backend.sessions[0].id;
     await userEvent.click(screen.getByTestId(`close-btn-${sid}`));
-    await userEvent.click(screen.getByText('Force Close'));
-    await waitFor(() => expect(backend.sessions).toHaveLength(0));
+    await waitFor(() => expect(screen.getByText('Close AI Terminal')).toBeInTheDocument());
     await userEvent.click(screen.getByText('Close App'));
     expect(backend.exitRequested).toBe(true);
+  });
+
+  it('shows force-close confirmation when closing one of multiple tabs', async () => {
+    renderApp();
+    await waitFor(() => expect(backend.sessions).toHaveLength(1));
+    await userEvent.click(screen.getByTestId('new-tab-btn'));
+    await waitFor(() => expect(backend.sessions).toHaveLength(2));
+    const sid = backend.sessions[0].id;
+    await userEvent.click(screen.getByTestId(`close-btn-${sid}`));
+    await waitFor(() => expect(screen.getByText('Force Close')).toBeInTheDocument());
+    expect(screen.queryByText('Close AI Terminal')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByText('Force Close'));
+    await waitFor(() => expect(backend.sessions).toHaveLength(1));
+  });
+
+  it('recreates a session when cancelling exit after the last shell exits on its own', async () => {
+    renderApp();
+    await waitFor(() => expect(backend.sessions).toHaveLength(1));
+    const sid = backend.sessions[0].id;
+    backend.emit('pty:exit', { sessionId: sid, exitCode: 0 });
+    backend.sessions = []; // shell exited — backend no longer tracks it
+    await waitFor(() => expect(useTerminalStore.getState().sessions).toHaveLength(0));
+    await waitFor(() => expect(screen.getByText('Close AI Terminal')).toBeInTheDocument());
+    await userEvent.click(screen.getByText('Keep Session'));
+    await waitFor(() => expect(backend.sessions).toHaveLength(1));
+    expect(backend.exitRequested).toBe(false);
   });
 
   it('preserves session content across tab switches', async () => {

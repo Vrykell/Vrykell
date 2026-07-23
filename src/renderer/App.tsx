@@ -30,6 +30,16 @@ const App: React.FC = () => {
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [closingId, setClosingId] = useState<string | null>(null);
 
+  // Closing the LAST tab goes straight to the exit dialog — showing the
+  // force-close dialog first would make the user confirm twice.
+  const requestCloseTab = (id: string) => {
+    if (useTerminalStore.getState().sessions.length <= 1) {
+      setShowExitDialog(true);
+    } else {
+      setClosingId(id);
+    }
+  };
+
   useRichContent(activeSessionId);
 
   // Estimate dimensions for initial PTY so it doesn't render at default
@@ -92,7 +102,7 @@ const App: React.FC = () => {
       if (!(e.metaKey || e.ctrlKey)) return;
       switch (e.key) {
         case 't': e.preventDefault(); createAndAddSession(); break;
-        case 'w': e.preventDefault(); if (activeSessionId) setClosingId(activeSessionId); break;
+        case 'w': e.preventDefault(); if (activeSessionId) requestCloseTab(activeSessionId); break;
         case 'j': e.preventDefault(); useTerminalStore.getState().toggleSidebar(); break;
         case 'r': if (e.shiftKey) { e.preventDefault(); toggleOutputPanel(); } break;
       }
@@ -104,7 +114,7 @@ const App: React.FC = () => {
   return (
     <>
       <div className="app-shell">
-        <TerminalTabs onCloseTab={(id) => setClosingId(id)} />
+        <TerminalTabs onCloseTab={requestCloseTab} />
         <div className="app-main">
           <div className="app-terminal-area">
             <TerminalView sessionId={activeSessionId} />
@@ -128,7 +138,13 @@ const App: React.FC = () => {
         cancelLabel={t.exit.cancel}
         danger
         onConfirm={() => exitApp().catch(() => window.close())}
-        onCancel={() => { setShowExitDialog(false); createAndAddSession(); }}
+        onCancel={() => {
+          setShowExitDialog(false);
+          // Dialog reached via last-tab close: the session is still alive,
+          // so cancel simply dismisses. Only recreate when the last shell
+          // already exited on its own (sessions is empty).
+          if (useTerminalStore.getState().sessions.length === 0) createAndAddSession();
+        }}
       />
 
       <ConfirmDialog
