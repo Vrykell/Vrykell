@@ -133,6 +133,43 @@ export class TerminalBuffer {
   private autoWrap = true;
   cursorVisible = true;
 
+  // ── Alternate screen (DEC 1047/1048/1049) ──────────────────────────────
+  // Full-screen programs (vim, htop, Claude Code) draw into a separate
+  // buffer so the shell's scrollback stays clean and is restored on exit.
+  // Without this, TUI frames pollute the main scrollback permanently.
+  altActive = false;
+  private mainLines: TerminalLine[] | null = null;
+  private altLines: TerminalLine[] | null = null;
+
+  /** DEC 1047h / 1049h — switch to the alternate screen. */
+  private enterAlt(clear: boolean, saveCursor: boolean): void {
+    if (this.altActive) {
+      // Re-entry while already in alt (nested TUI): just clear if asked.
+      if (clear) { this.lines = [{ cells: [], dirty: false }]; this.cx = 0; this.cy = 0; this.pendingWrap = false; }
+      return;
+    }
+    this.mainLines = this.lines;
+    if (saveCursor) { this.savedCx = this.cx; this.savedCy = this.cy; }
+    this.lines = (!clear && this.altLines) ? this.altLines : [{ cells: [], dirty: false }];
+    this.altLines = null; // now the live array
+    this.cx = 0; this.cy = 0; this.pendingWrap = false;
+    this.altActive = true;
+  }
+
+  /** DEC 1047l / 1049l — switch back to the main screen. */
+  private exitAlt(restoreCursor: boolean): void {
+    if (!this.altActive) return;
+    this.altLines = this.lines;
+    this.lines = this.mainLines ?? [{ cells: [], dirty: false }];
+    this.mainLines = null;
+    if (restoreCursor) {
+      this.cx = Math.min(this.savedCx, this.cols - 1);
+      this.cy = this.savedCy;
+    }
+    this.pendingWrap = false;
+    this.altActive = false;
+  }
+
   // ── Main entry ─────────────────────────────────────────────────────────────
 
   write(data: string): void {
@@ -252,7 +289,12 @@ export class TerminalBuffer {
   private static DEC: Record<number, (b: TerminalBuffer, set: boolean) => void> = {
     25: (b, v) => { b.cursorVisible = v; },
     7:  (b, v) => { b.autoWrap = v; if (!v) b.pendingWrap = false; },
-    1049: (_b, _v) => {},
+    1047: (b, v) => { if (v) b.enterAlt(false, false); else b.exitAlt(false); },
+    1048: (b, v) => { // DECSC/DECRC — shares the saved-cursor slot with CSI s/u
+      if (v) { b.savedCx = b.cx; b.savedCy = b.cy; }
+      else { b.cx = Math.min(b.savedCx, b.cols - 1); b.cy = b.savedCy; b.pendingWrap = false; }
+    },
+    1049: (b, v) => { if (v) b.enterAlt(true, true); else b.exitAlt(true); },
     2004: (_b, _v) => {},
   };
 
@@ -330,7 +372,8 @@ export class TerminalBuffer {
     if (this.lines.length >= this.maxLines) {
       this.lines.shift(); // drop oldest line
       this.cy--;          // cy moves up since we removed from front
-      if (this.savedCy > 0) this.savedCy--;
+      // savedCy indexes the MAIN buffer — trimming alt lines must not shift it
+      if (!this.altActive && this.savedCy > 0) this.savedCy--;
     }
     this.line(); // ensure line at cy exists
   }

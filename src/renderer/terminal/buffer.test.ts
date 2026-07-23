@@ -399,3 +399,86 @@ describe('Claude Code real UI output', () => {
     expect(goldBorders.length).toBeGreaterThan(0);
   });
 });
+
+describe('alternate screen (DEC 1047/1048/1049)', () => {
+  const text = (buf: TerminalBuffer) =>
+    buf.lines.map((l) => l.cells.map((c) => c.char).join('')).join('\n');
+
+  it('1049h switches to a blank alt screen, saving main content and cursor', () => {
+    const buf = new TerminalBuffer();
+    buf.write('shell-output\r\nprompt$ ');
+    buf.write('\x1b[?1049h');
+    expect(buf.altActive).toBe(true);
+    expect(buf.lines).toHaveLength(1);
+    expect(buf.lines[0].cells).toHaveLength(0); // blank alt
+    expect(buf.cx).toBe(0);
+    expect(buf.cy).toBe(0);
+  });
+
+  it('1049l restores main content and cursor position, hiding TUI frames', () => {
+    const buf = new TerminalBuffer();
+    buf.write('line1\r\nline2');
+    buf.write('\x1b[?1049h');
+    buf.write('TUI FRAME');
+    buf.write('\x1b[?1049l');
+    expect(buf.altActive).toBe(false);
+    expect(text(buf)).toContain('line1');
+    expect(text(buf)).toContain('line2');
+    expect(text(buf)).not.toContain('TUI FRAME');
+    expect(buf.cx).toBe(5); // after "line2"
+    expect(buf.cy).toBe(1);
+  });
+
+  it('1049h clears previous alt content on re-entry', () => {
+    const buf = new TerminalBuffer();
+    buf.write('main');
+    buf.write('\x1b[?1049h');
+    buf.write('old-tui');
+    buf.write('\x1b[?1049l');
+    buf.write('\x1b[?1049h');
+    expect(text(buf)).not.toContain('old-tui');
+  });
+
+  it('1047 toggles preserve alt content and do not touch the saved cursor', () => {
+    const buf = new TerminalBuffer();
+    buf.write('main');
+    buf.write('\x1b[?1047h');
+    buf.write('tui-stays');
+    buf.write('\x1b[?1047l');
+    expect(text(buf)).toContain('main');
+    buf.write('\x1b[?1047h');
+    expect(text(buf)).toContain('tui-stays'); // preserved across 1047 toggles
+  });
+
+  it('1049l outside alt screen is a no-op', () => {
+    const buf = new TerminalBuffer();
+    buf.write('abc');
+    buf.write('\x1b[?1049l');
+    expect(buf.altActive).toBe(false);
+    expect(buf.lines[0].cells.map((c) => c.char).join('')).toBe('abc');
+    expect(buf.cx).toBe(3);
+  });
+
+  it('scrollback trim inside alt screen does not shift the saved main cursor row', () => {
+    const buf = new TerminalBuffer();
+    buf.maxLines = 5;
+    buf.write('a\r\nb\r\nc'); // cy = 2
+    buf.write('\x1b[?1049h'); // saves main cursor (cy=2)
+    buf.write('1\n2\n3\n4\n5\n6\n7\n8'); // forces trims inside alt
+    buf.write('\x1b[?1049l');
+    expect(buf.cy).toBe(2); // restored exactly, not shifted by alt trims
+    expect(text(buf)).toContain('c');
+  });
+
+  it('works through the typed event pipeline (applyEvents dec)', () => {
+    const buf = new TerminalBuffer();
+    buf.applyEvents([{ t: 'txt', p: 'shell' }]);
+    buf.applyEvents([{ t: 'dec', p: [1049, true] }]);
+    expect(buf.altActive).toBe(true);
+    buf.applyEvents([{ t: 'txt', p: 'TUI' }]);
+    buf.applyEvents([{ t: 'dec', p: [1049, false] }]);
+    expect(buf.altActive).toBe(false);
+    expect(text(buf)).toContain('shell');
+    expect(text(buf)).not.toContain('TUI');
+  });
+});
