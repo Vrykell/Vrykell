@@ -152,6 +152,15 @@ export const DomTerminalView: React.FC<{
     containerHRef.current = el.clientHeight;
     const ro = new ResizeObserver(([entry]) => {
       containerHRef.current = entry.contentRect.height;
+      // When the container grows, maxScroll shrinks — but the DOM element's
+      // actual scrollTop stays at its old (larger) value while the render
+      // computes slices from the new maxScroll.  That desync leaves stale
+      // content visible at the bottom.  Re-pin the DOM scroll position here
+      // so the viewport and the rendered slice stay aligned.
+      if (pinnedRef.current) {
+        el.scrollTop = el.scrollHeight;
+        scrollTopRef.current = el.scrollTop;
+      }
       setTick((t) => t + 1);
       onResizeRef.current?.(entry.contentRect.width, entry.contentRect.height);
     });
