@@ -25,20 +25,20 @@ const L = memo(
     line,
     cursor,
     cx,
-    cols,
   }: {
     line: TerminalLine;
     cursor: boolean;
     cx: number;
-    cols: number;
+    /** cols is NO LONGER used for rendering — the line div's background fills
+     *  the remaining horizontal space naturally (block element, 100% width).
+     *  This means L components do NOT re-render on resize, eliminating the
+     *  primary source of resize lag. */
   }) {
     const cells = line.cells;
-    // Render all the way to `cols` so every line fills the full terminal
-    // width, not just up to the last non-empty cell.  Without this, lines
-    // are only as wide as their content — short prompts leave empty space
-    // on the right that never gets the terminal background colour.
+    // Render only up to the last meaningful cell; the div's background
+    // colour fills any remaining space to the right edge of the terminal.
     const contentEnd = cursor ? Math.max(cells.length, cx + 1) : cells.length;
-    const end = Math.max(contentEnd, cols);
+    const end = contentEnd;
     const cursorCol = cursor && cells[cx]?.wide && cx > 0 ? cx - 1 : cx;
     const spans: React.ReactNode[] = [];
     // Merge consecutive cells with identical visual style into a single
@@ -62,9 +62,11 @@ const L = memo(
         ) break;
         runEnd++;
       }
+      // Explicit default background so the line-div's bg (#1e1e1e) never
+      // bleeds through spans that have a non-default colour set by SGR.
       const runStyle = {
         color: base.fg || '#d4d4d4',
-        backgroundColor: base.bg || undefined,
+        backgroundColor: base.bg || '#1e1e1e',
         fontWeight: base.bold ? 'bold' : undefined,
         fontStyle: base.italic ? 'italic' : undefined,
         textDecoration: base.underline ? 'underline' : undefined,
@@ -107,6 +109,7 @@ const L = memo(
           fontSize: 14,
           lineHeight: `${LINE_HEIGHT}px`,
           height: LINE_HEIGHT,
+          backgroundColor: '#1e1e1e',
         }}
       >
         {spans}
@@ -117,8 +120,7 @@ const L = memo(
     prev.line === next.line &&
     !next.line.dirty &&
     prev.cursor === next.cursor &&
-    prev.cx === next.cx &&
-    prev.cols === next.cols,
+    prev.cx === next.cx,
 );
 
 // ── Virtual-scrolled terminal view ────────────────────────────────────────────
@@ -228,7 +230,6 @@ export const DomTerminalView: React.FC<{
           line={line}
           cursor={buffer.cursorVisible && i === buffer.cy}
           cx={buffer.cx}
-          cols={buffer.cols}
         />
       </div>,
     );

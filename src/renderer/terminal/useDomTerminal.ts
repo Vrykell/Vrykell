@@ -148,15 +148,10 @@ export function useDomTerminal(sessionId: string | null) {
   }, []);
 
   // Notify PTY of terminal dimensions when the container resizes.
-  // The FIRST resize fires immediately so the buffer and PTY start in sync.
-  // Subsequent resizes (window drag) are debounced at 150 ms so the buffer
-  // and PTY stay in sync — ResizeObserver fires on every pixel change and
-  // sends dozens of resizePTY calls per second otherwise.  The PTY (Claude /
-  // shell) keeps rendering at the old width while the buffer already has the
-  // new width — stale CHA-positioned events get clamped, producing scattered
-  // text that persists even after the drag stops.
-  const resizeTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  const hasResizedRef = useRef(false);
+  // Both buffer and PTY are updated immediately on every pixel change
+  // so the terminal feels responsive during window drag.  SIGWINCH is
+  // cheap — modern PTYs handle it efficiently, and TUI frameworks
+  // (Claude / vim) re-render fast enough for smooth 60 fps resizing.
   // NOT memoized: must not capture `buf` from a stale closure (e.g. the
   // temporary buffer created when sessionId was null on first render).
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -165,24 +160,9 @@ export function useDomTerminal(sessionId: string | null) {
     if (!s) return;
     const cols = Math.max(10, Math.floor(pxWidth / getCharWidth()));
     const rows = Math.max(4, Math.floor(pxHeight / LINE_HEIGHT));
-
-    if (!hasResizedRef.current) {
-      // First call — apply immediately so initial cols are correct.
-      hasResizedRef.current = true;
-      buf.resize(cols);
-      buf.rows = rows;
-      resizePTY(s, cols, rows).catch(() => {});
-      return;
-    }
-
-    // Subsequent calls (drag resize) — debounce to keep buffer + PTY in sync.
-    if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
-    resizeTimerRef.current = setTimeout(() => {
-      resizeTimerRef.current = undefined;
-      buf.resize(cols);
-      buf.rows = rows;
-      resizePTY(s, cols, rows).catch(() => {});
-    }, 150);
+    buf.resize(cols);
+    buf.rows = rows;
+    resizePTY(s, cols, rows).catch(() => {});
   }
 
   return { buffer: buf, onKeyDown, onInput, onCompositionStart, onCompositionEnd, onResize };
