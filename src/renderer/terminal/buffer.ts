@@ -29,12 +29,62 @@ const X256: string[] = [];
 }
 
 // ── Char width ───────────────────────────────────────────────────────────────
+// Widths follow string-width/wcwidth semantics so our column accounting
+// matches what TUI frameworks (Ink, etc.) compute.  Two consequences of
+// getting this wrong: zero-width modifiers (VS16, ZWJ) used to occupy a
+// cell and render as "?" garbage, and emoji counted as 1 column vs the
+// TUI's 2 shifted every subsequent cell on the line, producing phantom
+// wrapped lines that the TUI's erase-lines repaint could never clear.
 function charWidth(code: number): number {
-  if (code < 0x20) return 0;
-  if (code < 0x7f) return 1;
-  if (code < 0xa0) return 0;
-  if (code >= 0x1100 && code <= 0x115f) return 2;
-  if (code >= 0x2329 && code <= 0x232a) return 2;
+  // ── Zero-width ─────────────────────────────────────────────────────────
+  if (code < 0x20) return 0;                        // C0 controls
+  if (code >= 0x7f && code < 0xa0) return 0;        // DEL + C1
+  if (code >= 0x0300 && code <= 0x036f) return 0;   // combining diacriticals
+  if (code >= 0x20d0 && code <= 0x20f0) return 0;   // combining marks for symbols
+  if (code >= 0x200b && code <= 0x200f) return 0;   // ZWSP/ZWNJ/ZWJ/LRM/RLM
+  if (code >= 0x202a && code <= 0x202e) return 0;   // bidi embedding/override
+  if (code >= 0x2060 && code <= 0x2064) return 0;   // word joiner, invisible ops
+  if (code === 0xfeff) return 0;                    // BOM / ZWNBSP
+  if (code >= 0xfe00 && code <= 0xfe0f) return 0;   // variation selectors 1-16
+  if (code >= 0xe0020 && code <= 0xe007f) return 0; // tag characters
+  if (code >= 0xe0100 && code <= 0xe01ef) return 0; // variation selectors 17-256
+  if (code < 0x1100) return 1;
+  // ── Wide (2 columns) ───────────────────────────────────────────────────
+  if (code <= 0x115f) return 2;                     // Hangul Jamo
+  if (code >= 0x231a && code <= 0x231b) return 2;   // ⌚⌛
+  if (code >= 0x2329 && code <= 0x232a) return 2;   // 〈〉
+  if (code >= 0x23e9 && code <= 0x23ec) return 2;   // ⏩..⏬
+  if (code === 0x23f0 || code === 0x23f3) return 2; // ⏰⏳
+  if (code >= 0x23f8 && code <= 0x23fa) return 2;   // ⏸⏹⏺
+  if (code === 0x25fd || code === 0x25fe) return 2; // ◽◾
+  if (code === 0x2614 || code === 0x2615) return 2; // ☔☕
+  if (code >= 0x2648 && code <= 0x2653) return 2;   // zodiac
+  if (code === 0x267f) return 2;                    // ♿
+  if (code === 0x2693) return 2;                    // ⚓
+  if (code === 0x26a1) return 2;                    // ⚡
+  if (code === 0x26aa || code === 0x26ab) return 2; // ⚪⚫
+  if (code === 0x26bd || code === 0x26be) return 2; // ⚽⚾
+  if (code === 0x26c4 || code === 0x26c5) return 2; // ⛄⛅
+  if (code === 0x26ce) return 2;                    // ⛎
+  if (code === 0x26d4) return 2;                    // ⛔
+  if (code === 0x26ea) return 2;                    // ⛪
+  if (code >= 0x26f2 && code <= 0x26f3) return 2;   // ⛲⛳
+  if (code === 0x26f5) return 2;                    // ⛵
+  if (code === 0x26fa) return 2;                    // ⛺
+  if (code === 0x26fd) return 2;                    // ⛽
+  if (code === 0x2705) return 2;                    // ✅
+  if (code >= 0x270a && code <= 0x270b) return 2;   // ✊✋
+  if (code === 0x2728) return 2;                    // ✨
+  if (code === 0x274c) return 2;                    // ❌
+  if (code === 0x274e) return 2;                    // ❎
+  if (code >= 0x2753 && code <= 0x2755) return 2;   // ❓❔❕
+  if (code === 0x2757) return 2;                    // ❗
+  if (code >= 0x2795 && code <= 0x2797) return 2;   // ➕➖➗
+  if (code === 0x27b0) return 2;                    // ➰
+  if (code === 0x27bf) return 2;                    // ➿
+  if (code === 0x2b1b || code === 0x2b1c) return 2; // ⬛⬜
+  if (code === 0x2b50) return 2;                    // ⭐
+  if (code === 0x2b55) return 2;                    // ⭕
   if (code >= 0x2e80 && code <= 0x303e) return 2;
   if (code >= 0x3040 && code <= 0x33bf) return 2;
   if (code >= 0x3400 && code <= 0x4dbf) return 2;
@@ -46,9 +96,7 @@ function charWidth(code: number): number {
   if (code >= 0xfe30 && code <= 0xfe6f) return 2;
   if (code >= 0xff01 && code <= 0xff60) return 2;
   if (code >= 0xffe0 && code <= 0xffe6) return 2;
-  if (code >= 0x1f300 && code <= 0x1f64f) return 2;
-  if (code >= 0x1f680 && code <= 0x1f6ff) return 2;
-  if (code >= 0x1f900 && code <= 0x1f9ff) return 2;
+  if (code >= 0x1f000 && code <= 0x1faff) return 2; // all emoji blocks
   if (code >= 0x20000 && code <= 0x2ffff) return 2;
   if (code >= 0x30000 && code <= 0x3ffff) return 2;
   return 1;

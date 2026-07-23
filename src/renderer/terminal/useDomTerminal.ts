@@ -1,6 +1,7 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { TerminalBuffer } from './buffer';
 import { resizePTY, writeToPTY, onPTYOutput, onPTYExit } from '../../api';
+import { useTerminalStore } from '../stores/terminal-store';
 
 const LINE_HEIGHT = 16;
 
@@ -34,7 +35,8 @@ const bufferCache = new Map<string, TerminalBuffer>();
 
 /** Estimate terminal columns from window dimensions (mirrors App.tsx calculation). */
 function estimateCols(): number {
-  return Math.max(10, Math.floor((window.innerWidth - 390) / getCharWidth()));
+  const sidebarW = useTerminalStore.getState().sidebarOpen ? 390 : 20;
+  return Math.max(10, Math.floor((window.innerWidth - sidebarW) / getCharWidth()));
 }
 
 function getBuffer(sid: string): TerminalBuffer {

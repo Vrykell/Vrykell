@@ -12,6 +12,33 @@ describe('TerminalBuffer', () => {
     expect(buf.lines[0].cells.map((c) => c.char).join('')).toBe('hello');
   });
 
+  it('treats variation selectors and ZWJ as zero-width (no garbage cells)', () => {
+    const buf = new TerminalBuffer();
+    buf.write('a\u{2728}\u{FE0F}b'); // a + ✨(2 cols) + VS16(0) + b
+    expect(buf.cx).toBe(4); // 1 + 2 + 0 + 1
+    const cells = buf.lines[0].cells;
+    expect(cells[0].char).toBe('a');
+    expect(cells[1].char).toBe('\u{2728}');
+    expect(cells[2].wide).toBe(true); // continuation of the wide emoji
+    expect(cells[3].char).toBe('b');
+    // VS16 must NOT occupy a cell (it previously rendered as "?" garbage)
+    expect(cells.some((c) => c.char === '\u{FE0F}')).toBe(false);
+
+    const zwj = new TerminalBuffer();
+    zwj.write('x\u{200D}y'); // ZWJ between letters takes no column
+    expect(zwj.cx).toBe(2);
+  });
+
+  it('counts emoji-presentation characters as double width (matches string-width)', () => {
+    const buf = new TerminalBuffer();
+    buf.write('\u{23F8}\u{2728}\u{2B50}'); // ⏸ ✨ ⭐ — 2 cols each
+    expect(buf.cx).toBe(6);
+    // Ambiguous non-emoji symbols stay single width
+    const b2 = new TerminalBuffer();
+    b2.write('\u{29C9}\u{25CF}'); // ⧉ ● — 1 col each
+    expect(b2.cx).toBe(2);
+  });
+
   it('handles CR/LF/BS/TAB', () => {
     const buf = new TerminalBuffer();
     buf.write('a\nb\nc'); // LF moves down but does NOT reset cx
