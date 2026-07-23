@@ -10,6 +10,12 @@ export interface LocaleDict {
     confirm: string;              // "close app" button
     cancel: string;               // "keep session" button
   };
+  closeTab: {
+    title: string;
+    message: string;
+    confirm: string;
+    cancel: string;
+  };
   status: {
     sessions: string;             // "{count} session" / "{count} sessions"
     local: string;                // connection type label

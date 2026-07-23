@@ -12,6 +12,13 @@ const en: LocaleDict = {
     confirm: 'Close App',
     cancel: 'Keep Session',
   },
+  closeTab: {
+    title: 'Close Terminal',
+    message:
+      'A program is running in this terminal. Closing it will terminate the process.\nAre you sure?',
+    confirm: 'Force Close',
+    cancel: 'Cancel',
+  },
   status: {
     sessions: '{count} session',
     local: 'Local',

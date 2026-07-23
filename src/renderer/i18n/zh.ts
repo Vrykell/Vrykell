@@ -11,6 +11,12 @@ const zh: LocaleDict = {
     confirm: '退出程序',
     cancel: '保留会话',
   },
+  closeTab: {
+    title: '关闭终端',
+    message: '该终端中有正在运行的程序，关闭将强制终止。\n确定要关闭吗？',
+    confirm: '强制关闭',
+    cancel: '取消',
+  },
   status: {
     sessions: '{count} 个会话',
     local: '本地',
