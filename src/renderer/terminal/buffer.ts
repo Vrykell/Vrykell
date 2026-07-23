@@ -297,13 +297,15 @@ export class TerminalBuffer {
         case 'lf': this.pendingWrap = false; this.lf(); break;
         case 'bs': this.pendingWrap = false; if (this.cx > 0) this.cx--; break;
         case 'tab': this.pendingWrap = false; this.cx = Math.min(this.cols - 1, (Math.floor(this.cx / 8) + 1) * 8); break;
-        case 'A': this.cy = Math.max(0, this.cy - ev.p); this.pendingWrap = false; break;
-        case 'B': this.cy = Math.min(9999, this.cy + ev.p); this.pendingWrap = false; break;
-        case 'C': this.cx = Math.min(this.cols - 1, this.cx + ev.p); this.pendingWrap = false; break;
-        case 'D': this.cx = Math.max(0, this.cx - ev.p); this.pendingWrap = false; break;
-        case 'H': this.cy = Math.max(0, ev.p[0] - 1); this.cx = Math.min(this.cols - 1, ev.p[1] - 1); this.pendingWrap = false; break;
-        case 'G': this.cx = Math.min(this.cols - 1, ev.p - 1); this.pendingWrap = false; break;
-        case 'd': this.cy = ev.p - 1; this.pendingWrap = false; break;
+        // CSI cursor movement: params of 0 mean "default to 1" per ECMA-48.
+        // The Rust parser emits 0 for empty/unspecified params via parse_csi.
+        case 'A': this.cy = Math.max(0, this.cy - (ev.p || 1)); this.pendingWrap = false; break;
+        case 'B': this.cy = Math.min(9999, this.cy + (ev.p || 1)); this.pendingWrap = false; break;
+        case 'C': this.cx = Math.min(this.cols - 1, this.cx + (ev.p || 1)); this.pendingWrap = false; break;
+        case 'D': this.cx = Math.max(0, this.cx - (ev.p || 1)); this.pendingWrap = false; break;
+        case 'H': this.cy = Math.max(0, (ev.p[0] || 1) - 1); this.cx = Math.min(this.cols - 1, (ev.p[1] || 1) - 1); this.pendingWrap = false; break;
+        case 'G': this.cx = Math.min(this.cols - 1, (ev.p || 1) - 1); this.pendingWrap = false; break;
+        case 'd': this.cy = (ev.p || 1) - 1; this.pendingWrap = false; break;
         case 's': this.savedCx = this.cx; this.savedCy = this.cy; break;
         case 'u': this.cx = this.savedCx; this.cy = this.savedCy; this.pendingWrap = false; break;
         case 'J': {

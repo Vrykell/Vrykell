@@ -2,14 +2,52 @@ import { useRef, useEffect, useCallback, useState } from 'react';
 import { TerminalBuffer } from './buffer';
 import { resizePTY, writeToPTY, onPTYOutput, onPTYExit } from '../../api';
 
-const CHAR_WIDTH = 8.4; // approximate px width of one monospace char at 14px
 const LINE_HEIGHT = 16;
+
+// ── Character width measurement ──────────────────────────────────────────
+// Hardcoding 8.4 px is inaccurate — Menlo 14 px renders at ~7.8–8.0 px
+// depending on OS, browser, and subpixel rendering.  A 0.4 px error × 100
+// columns = 40 px of wasted (or overflowing) space.  Measure once at boot.
+
+let _charWidth = 0;
+
+export function getCharWidth(): number {
+  if (_charWidth > 0) return _charWidth;
+
+  // Measure actual monospace character advance by rendering a 100-char
+  // run of 'X' in a 1 s timeout guard — the measurement itself is instant
+  // but we need a DOM context, so the first caller after mount wins.
+  const el = document.createElement('span');
+  el.style.cssText =
+    'position:absolute;visibility:hidden;font-family:Menlo,monospace;font-size:14px;white-space:pre;';
+  el.textContent = 'X'.repeat(100);
+  document.body.appendChild(el);
+  const measured = el.getBoundingClientRect().width / 100;
+  document.body.removeChild(el);
+
+  _charWidth = measured > 1 ? measured : 8.4; // fallback if measurement fails
+  return _charWidth;
+}
 
 // Buffer cache — one TerminalBuffer per session, survives tab switches.
 const bufferCache = new Map<string, TerminalBuffer>();
+
+/** Estimate terminal columns from window dimensions (mirrors App.tsx calculation). */
+function estimateCols(): number {
+  return Math.max(10, Math.floor((window.innerWidth - 390) / getCharWidth()));
+}
+
 function getBuffer(sid: string): TerminalBuffer {
   let b = bufferCache.get(sid);
-  if (!b) { b = new TerminalBuffer(); bufferCache.set(sid, b); }
+  if (!b) {
+    b = new TerminalBuffer();
+    // Initialize buffer cols from window dimensions so it matches the PTY
+    // BEFORE any pty:output events are processed.  Without this, the
+    // default 80 cols persists until the ResizeObserver fires, and any
+    // PTY output that arrives in between is processed at the wrong width.
+    b.resize(estimateCols());
+    bufferCache.set(sid, b);
+  }
   return b;
 }
 
@@ -110,18 +148,42 @@ export function useDomTerminal(sessionId: string | null) {
   }, []);
 
   // Notify PTY of terminal dimensions when the container resizes.
-  const onResize = useCallback(
-    (pxWidth: number, pxHeight: number) => {
-      const s = sid.current;
-      if (!s) return;
-      const cols = Math.max(10, Math.floor(pxWidth / CHAR_WIDTH));
-      const rows = Math.max(4, Math.floor(pxHeight / LINE_HEIGHT));
+  // The FIRST resize fires immediately so the buffer and PTY start in sync.
+  // Subsequent resizes (window drag) are debounced at 150 ms so the buffer
+  // and PTY stay in sync — ResizeObserver fires on every pixel change and
+  // sends dozens of resizePTY calls per second otherwise.  The PTY (Claude /
+  // shell) keeps rendering at the old width while the buffer already has the
+  // new width — stale CHA-positioned events get clamped, producing scattered
+  // text that persists even after the drag stops.
+  const resizeTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const hasResizedRef = useRef(false);
+  // NOT memoized: must not capture `buf` from a stale closure (e.g. the
+  // temporary buffer created when sessionId was null on first render).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  function onResize(pxWidth: number, pxHeight: number) {
+    const s = sid.current;
+    if (!s) return;
+    const cols = Math.max(10, Math.floor(pxWidth / getCharWidth()));
+    const rows = Math.max(4, Math.floor(pxHeight / LINE_HEIGHT));
+
+    if (!hasResizedRef.current) {
+      // First call — apply immediately so initial cols are correct.
+      hasResizedRef.current = true;
       buf.resize(cols);
       buf.rows = rows;
       resizePTY(s, cols, rows).catch(() => {});
-    },
-    [],
-  );
+      return;
+    }
+
+    // Subsequent calls (drag resize) — debounce to keep buffer + PTY in sync.
+    if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
+    resizeTimerRef.current = setTimeout(() => {
+      resizeTimerRef.current = undefined;
+      buf.resize(cols);
+      buf.rows = rows;
+      resizePTY(s, cols, rows).catch(() => {});
+    }, 150);
+  }
 
   return { buffer: buf, onKeyDown, onInput, onCompositionStart, onCompositionEnd, onResize };
 }

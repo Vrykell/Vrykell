@@ -234,18 +234,24 @@ impl TerminalParser {
             return;
         }
 
+        // Per ECMA-48, a missing or 0 parameter for cursor movement commands
+        // defaults to 1.  parse_csi pushes 0 for empty params (§3.1 of this file),
+        // so we must translate 0→1 here.  (SGR m, EraseDisplay J, EraseLine K
+        // treat 0 as a meaningful value and keep it as-is.)
+        let default1 = |n: u16| if n == 0 { 1 } else { n };
+
         match final_byte {
             b'm' => self.events.push(TerminalEvent::Sgr(p)),
-            b'A' => self.events.push(TerminalEvent::Cuu(p.first().copied().unwrap_or(1))),
-            b'B' => self.events.push(TerminalEvent::Cud(p.first().copied().unwrap_or(1))),
-            b'C' => self.events.push(TerminalEvent::Cuf(p.first().copied().unwrap_or(1))),
-            b'D' => self.events.push(TerminalEvent::Cub(p.first().copied().unwrap_or(1))),
+            b'A' => self.events.push(TerminalEvent::Cuu(default1(p.first().copied().unwrap_or(1)))),
+            b'B' => self.events.push(TerminalEvent::Cud(default1(p.first().copied().unwrap_or(1)))),
+            b'C' => self.events.push(TerminalEvent::Cuf(default1(p.first().copied().unwrap_or(1)))),
+            b'D' => self.events.push(TerminalEvent::Cub(default1(p.first().copied().unwrap_or(1)))),
             b'H' => self.events.push(TerminalEvent::Cup(
-                p.first().copied().unwrap_or(1),
-                p.get(1).copied().unwrap_or(1),
+                default1(p.first().copied().unwrap_or(1)),
+                default1(p.get(1).copied().unwrap_or(1)),
             )),
-            b'G' => self.events.push(TerminalEvent::Cha(p.first().copied().unwrap_or(1))),
-            b'd' => self.events.push(TerminalEvent::Vpa(p.first().copied().unwrap_or(1))),
+            b'G' => self.events.push(TerminalEvent::Cha(default1(p.first().copied().unwrap_or(1)))),
+            b'd' => self.events.push(TerminalEvent::Vpa(default1(p.first().copied().unwrap_or(1)))),
             b's' => self.events.push(TerminalEvent::SaveCursor),
             b'u' => self.events.push(TerminalEvent::RestoreCursor),
             b'J' => self.events.push(TerminalEvent::EraseDisplay(p.first().copied().unwrap_or(0) as u8)),
@@ -287,6 +293,42 @@ mod tests {
     fn csi_cursor() {
         let e = events(b"\x1b[10;20H");
         assert!(matches!(&e[0], TerminalEvent::Cup(10, 20)));
+    }
+
+    /// Bare CSI sequences (no params) must default to 1, not 0.
+    #[test]
+    fn bare_csi_defaults() {
+        // \x1b[H → cursor home: row 1, col 1
+        let e = events(b"\x1b[H");
+        assert!(matches!(&e[0], TerminalEvent::Cup(1, 1)),
+                "bare CUP should default to (1,1), got {:?}", &e[0]);
+
+        // \x1b[G → CHA to column 1
+        let e = events(b"\x1b[G");
+        assert!(matches!(&e[0], TerminalEvent::Cha(1)),
+                "bare CHA should default to 1, got {:?}", &e[0]);
+
+        // \x1b[A → Cuu 1
+        let e = events(b"\x1b[A");
+        assert!(matches!(&e[0], TerminalEvent::Cuu(1)),
+                "bare CUU should default to 1, got {:?}", &e[0]);
+
+        // \x1b[B → Cud 1
+        let e = events(b"\x1b[B");
+        assert!(matches!(&e[0], TerminalEvent::Cud(1)));
+
+        // \x1b[C → Cuf 1
+        let e = events(b"\x1b[C");
+        assert!(matches!(&e[0], TerminalEvent::Cuf(1)));
+
+        // \x1b[D → Cub 1
+        let e = events(b"\x1b[D");
+        assert!(matches!(&e[0], TerminalEvent::Cub(1)));
+
+        // \x1b[d → Vpa 1
+        let e = events(b"\x1b[d");
+        assert!(matches!(&e[0], TerminalEvent::Vpa(1)),
+                "bare VPA should default to 1, got {:?}", &e[0]);
     }
 
     #[test]

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { TerminalView } from './components/terminal/TerminalView';
+import { getCharWidth } from './terminal/useDomTerminal';
 import { TerminalTabs } from './components/terminal/TerminalTabs';
 import { RichOutput } from './components/output/RichOutput';
 import { AIChatPanel } from './components/ai/AIChatPanel';
@@ -36,7 +37,7 @@ const App: React.FC = () => {
   const createAndAddSession = () => {
     const terminalW = window.innerWidth - 390; // sidebar + scrollbar
     const terminalH = window.innerHeight - 100; // tab bar + status bar
-    const cols = Math.max(10, Math.floor(terminalW / 8.4));
+    const cols = Math.max(10, Math.floor(terminalW / getCharWidth()));
     const rows = Math.max(4, Math.floor(terminalH / 16));
     return createPTY({ cols, rows })
       .then(s => addSession(s))

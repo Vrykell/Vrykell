@@ -25,13 +25,20 @@ const L = memo(
     line,
     cursor,
     cx,
+    cols,
   }: {
     line: TerminalLine;
     cursor: boolean;
     cx: number;
+    cols: number;
   }) {
     const cells = line.cells;
-    const end = cursor ? Math.max(cells.length, cx + 1) : cells.length;
+    // Render all the way to `cols` so every line fills the full terminal
+    // width, not just up to the last non-empty cell.  Without this, lines
+    // are only as wide as their content — short prompts leave empty space
+    // on the right that never gets the terminal background colour.
+    const contentEnd = cursor ? Math.max(cells.length, cx + 1) : cells.length;
+    const end = Math.max(contentEnd, cols);
     const cursorCol = cursor && cells[cx]?.wide && cx > 0 ? cx - 1 : cx;
     const spans: React.ReactNode[] = [];
     // Merge consecutive cells with identical visual style into a single
@@ -110,7 +117,8 @@ const L = memo(
     prev.line === next.line &&
     !next.line.dirty &&
     prev.cursor === next.cursor &&
-    prev.cx === next.cx,
+    prev.cx === next.cx &&
+    prev.cols === next.cols,
 );
 
 // ── Virtual-scrolled terminal view ────────────────────────────────────────────
@@ -130,6 +138,11 @@ export const DomTerminalView: React.FC<{
   const pinnedRef = useRef(true);
   const [tick, setTick] = useState(0);
 
+  // Keep a mutable ref to the latest onResize so the ResizeObserver
+  // (created once, empty deps) never calls a stale closure.
+  const onResizeRef = useRef(onResize);
+  onResizeRef.current = onResize;
+
   // Measure viewport height
   useEffect(() => {
     const el = containerRef.current;
@@ -138,7 +151,7 @@ export const DomTerminalView: React.FC<{
     const ro = new ResizeObserver(([entry]) => {
       containerHRef.current = entry.contentRect.height;
       setTick((t) => t + 1);
-      onResize?.(entry.contentRect.width, entry.contentRect.height);
+      onResizeRef.current?.(entry.contentRect.width, entry.contentRect.height);
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -215,6 +228,7 @@ export const DomTerminalView: React.FC<{
           line={line}
           cursor={buffer.cursorVisible && i === buffer.cy}
           cx={buffer.cx}
+          cols={buffer.cols}
         />
       </div>,
     );
