@@ -229,9 +229,15 @@ impl PtyManager {
                                 if let Ok(mut s) = session_store.lock() { s.update_title(&sid, title); }
                             }
                         }
-                        let _ = handle.emit("pty:output", PtyOutputPayload {
-                            session_id: sid.clone(), events,
-                        });
+                        // Split large event batches to avoid hitting Tauri IPC size limits.
+                        // Claude TUI renders can produce 500+ events per frame; sending them
+                        // all in one JSON array risks truncation.
+                        for chunk in events.chunks(128) {
+                            let _ = handle.emit("pty:output", PtyOutputPayload {
+                                session_id: sid.clone(),
+                                events: chunk.to_vec(),
+                            });
+                        }
                     }
                     Err(_) => break,
                 }

@@ -318,4 +318,49 @@ mod tests {
         let e = events(b"\x1b]0;hello\x07");
         assert!(matches!(&e[0], TerminalEvent::OscTitle(t) if t == "hello"));
     }
+
+    /// Claude TUI-like output: long text line with box-drawing + SGR + CUP.
+    /// Must NOT produce scattered single-character lines.
+    #[test]
+    fn long_text_with_escape_sequences() {
+        // Simulate: Claude outputs a long safety-check message with SGR codes.
+        let input = b"\x1b[38;5;220m\x1b[1mAccessing\x1b[12Gworkspace:\x1b[22m\x1b[39m\r\n\r\n\x1b[2G\x1b[1m/Users/wuzhe\x1b[22m\r\n\r\n\x1b[2GQuick\x1b[8Gsafety\x1b[15Gcheck:\x1b[22GIs\x1b[25Gthis\x1b[30Ga\x1b[32Gproject\x1b[40Gyou\x1b[44Gcreated\x1b[52Gor\x1b[55Gone\x1b[59Gyou\x1b[63Gtrust?\x1b[70G(Like\x1b[76Gyour\x1b[81Gown\x1b[85Gcode,\x1b[91Ga\r\n";
+        let e = events(input);
+
+        // All Text events should contain their characters without extra newlines
+        for ev in &e {
+            if let TerminalEvent::Text(ref t) = ev {
+                assert!(!t.contains('\n'), "Text event contains newline: {:?}", t);
+                assert!(!t.contains('\r'), "Text event contains CR: {:?}", t);
+                // No single-char Text events that would cause vertical scatter
+                if t.len() == 1 && t.chars().next().unwrap().is_alphabetic() {
+                    // Single alpha chars are suspicious — print for debugging
+                    eprintln!("Single-char Text event: {:?}", t);
+                }
+            }
+        }
+
+        // Should have Text, Sgr, Cr, Lf, CUP events — not just garbage
+        let text_count = e.iter().filter(|ev| matches!(ev, TerminalEvent::Text(_))).count();
+        assert!(text_count > 3, "Expected multiple Text events, got {}", text_count);
+    }
+
+    /// Newlines inside text must be split into Text + Lf events.
+    #[test]
+    fn embedded_newline_in_text() {
+        let input = b"hello\nworld\n";
+        let e = events(input);
+        // Should be: Text("hello"), Lf, Text("world"), Lf
+        assert!(matches!(&e[0], TerminalEvent::Text(t) if t == "hello"));
+        assert!(matches!(&e[1], TerminalEvent::Lf));
+        assert!(matches!(&e[2], TerminalEvent::Text(t) if t == "world"));
+        assert!(matches!(&e[3], TerminalEvent::Lf));
+    }
+
+    /// CSI CUP positions beyond current width — should still be emitted correctly.
+    #[test]
+    fn cup_beyond_width() {
+        let e = events(b"\x1b[10;200H");
+        assert!(matches!(&e[0], TerminalEvent::Cup(10, 200)));
+    }
 }
