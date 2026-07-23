@@ -1,5 +1,18 @@
 # AI Terminal — 完整实现计划
 
+> **⚠️ 更新说明（2026-07-24）**: 本文档是最初的总体规划，其中部分内容已随实现演进发生变化。
+> 与现状的主要差异：
+> 1. **终端引擎已从 xterm.js 改为自研 DOM 终端**（`src/renderer/terminal/`: `buffer.ts` / `useDomTerminal.ts` / `TerminalView.tsx`）。
+>    原因是 macOS WKWebView 下 xterm.js 出现渲染乱码与布局异常等兼容问题（见 Phase 1 报告"已知问题"）。
+> 2. **ANSI 解析移至 Rust 侧**：`src-tauri/src/terminal_parser.rs` 把 PTY 字节流解析为结构化 `TerminalEvent`
+>    （serde `{t, p}` 格式，对应 `src/shared/terminal-events.ts`），前端不再接收原始转义序列。
+> 3. **IPC 命令已扩展**：新增 `load_settings` / `save_settings` / `exit_app`（设置持久化见 `settings.rs`）。
+> 4. `pty:output` 事件 payload 为 `{sessionId, events: TerminalEvent[], cols?, rows?}`，
+>    事件附带产生时的终端尺寸，前端按该尺寸应用后再处理后续 resize。
+> 5. 已新增：i18n（中/英）、关闭标签确认对话框（强制终止前台程序）、最后一个标签关闭时单一退出对话框、纯黑终端主题。
+>
+> 文中其余架构设计（富内容协议、检测管线、状态管理、阶段划分）仍然有效。
+
 ## 项目背景
 
 传统终端只能渲染纯文本——无法显示 LaTeX 数学公式、语法高亮的代码块、或 AI 工具日益输出
@@ -237,14 +250,17 @@ RichOutput 面板渲染
 | `create_pty` | shell?, cwd?, cols?, rows? | SessionInfo | 新建标签 / 自动创建 |
 | `write_pty` | sessionId, data: string | () | 用户按键（高频） |
 | `resize_pty` | sessionId, cols, rows | () | 窗口/容器大小变更 |
-| `close_pty` | sessionId | () | 关闭标签 |
+| `close_pty` | sessionId | () | 关闭标签（强制 kill 子进程） |
 | `list_pty` | — | SessionInfo[] | 获取会话列表 |
+| `load_settings` | — | AppSettings | 加载设置（app_data_dir 持久化） |
+| `save_settings` | settings | () | 保存设置 |
+| `exit_app` | — | () | 退出应用（最后一个标签关闭时） |
 
 ### 后端 → 前端（Tauri events）
 
 | 事件 | Payload | 触发时机 |
 |------|---------|---------|
-| `pty:output` | `{sessionId, data: string}` | Shell stdout/stderr（高频） |
+| `pty:output` | `{sessionId, events: TerminalEvent[], cols?, rows?}` | Shell stdout/stderr 经 Rust 解析后的结构化事件流（高频） |
 | `pty:exit` | `{sessionId, exitCode: number}` | Shell 进程退出 |
 | `pty:title-change` | `{sessionId, title: string}` | OSC 0/2 标题变更 |
 | `session:created` | `{session: SessionInfo}` | 新会话创建 |

@@ -16,11 +16,17 @@
 ### 各阶段报告
 | 阶段 | 文件 | 状态 |
 |------|------|------|
-| Phase 1 — 核心终端 | [phase-1-tauri-core.md](phases/phase-1-tauri-core.md) | 🚧 Rust 编译通过，待运行时验证 |
+| Phase 1 — 核心终端 | [phase-1-tauri-core.md](phases/phase-1-tauri-core.md) | ✅ 完成（含自研 DOM 终端重写与后续修复） |
 | Phase 2 — 富内容渲染 | [phase-2-rich-content.md](phases/phase-2-rich-content.md) | 🚧 核心检测+渲染完成 |
 | Phase 3 — AI 集成 | — | ⏳ 计划中 |
 | Phase 4 — 远程功能 | — | ⏳ 计划中 |
 | Phase 5 — 打包发布 | — | ⏳ 计划中 |
+
+### 专题设计文档（superpowers）
+| 文档 | 说明 | 状态 |
+|------|------|------|
+| [tab-close-and-terminal-theme 设计](superpowers/specs/2026-07-24-tab-close-and-terminal-theme-design.md) | 关闭标签确认对话框 + 强制终止子进程 + 纯黑终端主题 | ✅ 已实现 |
+| [tab-close-and-terminal-theme 实施计划](superpowers/plans/2026-07-24-tab-close-and-terminal-theme.md) | 上述设计的任务拆解 | ✅ 已执行 |
 
 ---
 
@@ -28,8 +34,11 @@
 
 ```bash
 npm install           # 前端依赖
-cargo tauri dev       # 开发模式（Rust 编译 + Vite HMR + 窗口）
-cargo tauri build     # 生产构建
+npm run dev           # 开发模式（cargo tauri dev：Rust 编译 + Vite HMR + 窗口）
+npm run build         # 生产构建
+npm test              # Vitest 单元/组件测试
+npm run test:rust     # Rust 后端测试
+npm run test:e2e      # Playwright E2E
 ```
 
 ## 项目结构
@@ -37,22 +46,29 @@ cargo tauri build     # 生产构建
 ```
 ai-terminal/
 ├── src-tauri/            # Rust 后端 (portable-pty + Tauri IPC)
-│   └── src/              # pty.rs, session.rs, commands.rs
+│   └── src/              # pty.rs, session.rs, commands.rs, settings.rs,
+│                         # terminal_parser.rs (ANSI → 结构化 TerminalEvent)
 ├── src/
 │   ├── api/              # Tauri invoke/listen 桥接
-│   ├── renderer/         # React 前端 (xterm.js, KaTeX, Shiki)
-│   │   ├── components/   # terminal, output, ai, layout
-│   │   ├── hooks/        # useTerminal, useRichContent
+│   ├── renderer/         # React 前端
+│   │   ├── terminal/     # 自研 DOM 终端: buffer.ts / useDomTerminal.ts / TerminalView.tsx
+│   │   ├── components/   # terminal, output, ai, layout, common(ConfirmDialog)
+│   │   ├── hooks/        # useRichContent
+│   │   ├── i18n/         # 中英文案 (en/zh)
 │   │   ├── services/     # content-detector
 │   │   └── stores/       # Zustand store
-│   └── shared/           # 类型, IPC 通道, 协议, 接口
+│   ├── shared/           # 类型, 富内容协议, TerminalEvent 类型
+│   └── test/             # fake-tauri 测试桩
+├── e2e/                  # Playwright E2E 测试
 └── docs/                 # 文档
 ```
 
 ## 架构要点
 
-- **后端 (Rust)**: `portable-pty` 管理 PTY 进程，`#[tauri::command]` 暴露 IPC
-- **前端 (React)**: xterm.js DOM 渲染器，KaTeX/Shiki/marked 富内容渲染
-- **IPC**: Tauri invoke (请求-响应) + event emit/listen (服务端推送)
+- **后端 (Rust)**: `portable-pty` 管理 PTY 进程；`terminal_parser.rs` 将 ANSI 字节流解析为**结构化终端事件**（`TerminalEvent`，serde 序列化为 `{t, p}`），经 `pty:output` 事件批量推送；关闭会话时强制 `child.kill()` 终止前台程序
+- **前端 (React)**: 自研 DOM 终端 — `TerminalBuffer` 单元格网格 + auto-wrap/CJK 宽字符处理；`useDomTerminal` 键盘与 IME 输入；`DomTerminalView` 虚拟滚动渲染；KaTeX/Shiki/marked 富内容渲染
+- **IPC**: Tauri invoke（8 个命令：create/write/resize/close/list_pty + load/save_settings + exit_app）+ event 推送
 - **状态管理**: Zustand store (sessions, richOutputs, settings, aiMessages)
 - **内容检测**: 双层策略 — OSC 转义序列显式标记 + 正则自动检测
+- **主题**: 纯黑背景 `#000000` + 亮白前景 `#f0f0f0`，CSS 变量驱动（`--terminal-bg` 等）
+- **i18n**: 中/英文案（`src/renderer/i18n/`），含关闭标签/退出确认对话框文案
