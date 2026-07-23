@@ -65,15 +65,15 @@ const L = memo(
       // Explicit default background so the line-div's bg (#1e1e1e) never
       // bleeds through spans that have a non-default colour set by SGR.
       const runStyle = {
-        color: base.fg || '#d4d4d4',
-        backgroundColor: base.bg || '#1e1e1e',
+        color: base.fg || '#f0f0f0',
+        backgroundColor: base.bg || '#000000',
         fontWeight: base.bold ? 'bold' : undefined,
         fontStyle: base.italic ? 'italic' : undefined,
         textDecoration: base.underline ? 'underline' : undefined,
       };
       const cursorStyle = {
-        color: base.bg || '#1e1e1e',
-        backgroundColor: base.fg || '#d4d4d4',
+        color: base.bg || '#000000',
+        backgroundColor: base.fg || '#f0f0f0',
         fontWeight: base.bold ? 'bold' : undefined,
         fontStyle: base.italic ? 'italic' : undefined,
         textDecoration: base.underline ? 'underline' : undefined,
@@ -109,7 +109,7 @@ const L = memo(
           fontSize: 14,
           lineHeight: `${LINE_HEIGHT}px`,
           height: LINE_HEIGHT,
-          backgroundColor: '#1e1e1e',
+          backgroundColor: '#000000',
         }}
       >
         {spans}
@@ -243,7 +243,7 @@ export const DomTerminalView: React.FC<{
       onScroll={onScroll}
       style={{
         flex: 1,
-        background: '#1e1e1e',
+        background: '#000000',
         overflowY: 'auto',
         overflowAnchor: 'none',
         outline: 'none',

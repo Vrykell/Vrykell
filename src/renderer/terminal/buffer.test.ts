@@ -267,10 +267,10 @@ describe('SGR extended colours', () => {
     const buf = new TerminalBuffer();
     buf.write('\x1b[7m \x1b[27m');
     const c = buf.lines[0].cells[0];
-    // fg should be the dark background (#1e1e1e)
-    expect(c.fg).toBe('#1e1e1e');
-    // bg should be the light foreground (#d4d4d4)
-    expect(c.bg).toBe('#d4d4d4');
+    // fg should be the dark background (#000000)
+    expect(c.fg).toBe('#000000');
+    // bg should be the light foreground (#f0f0f0)
+    expect(c.bg).toBe('#f0f0f0');
   });
 
   it('inverts explicit fg/bg with SGR 7', () => {
@@ -288,7 +288,7 @@ describe('SGR extended colours', () => {
     const buf = new TerminalBuffer();
     // SGR 31: fg=red, bg=none. SGR 7: swap defaults → X: dark fg on red bg
     buf.write('\x1b[31m\x1b[7mX\x1b[0mY');
-    expect(buf.lines[0].cells[0].fg).toBe('#1e1e1e'); // default bg → fg
+    expect(buf.lines[0].cells[0].fg).toBe('#000000'); // default bg → fg
     expect(buf.lines[0].cells[0].bg).toBe('#cd3131'); // red fg → bg
     // SGR 0 clears everything → Y gets defaults
     expect(buf.lines[0].cells[1].fg).toBeUndefined();

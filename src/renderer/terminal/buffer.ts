@@ -5,10 +5,10 @@ export interface TerminalLine { cells: Cell[]; dirty: boolean; }
 
 // ── Static color tables ──────────────────────────────────────────────────────
 
-const FG: Record<number,string>={30:'#000',31:'#cd3131',32:'#0dbc79',33:'#e5e510',34:'#2472c8',35:'#bc3fbc',36:'#11a8cd',37:'#e5e5e5',90:'#666',91:'#f14c4c',92:'#23d18b',93:'#f5f543',94:'#3b8eea',95:'#d670d6',96:'#29b8db',97:'#fff'};
-const BG: Record<number,string>={40:'#000',41:'#cd3131',42:'#0dbc79',43:'#e5e510',44:'#2472c8',45:'#bc3fbc',46:'#11a8cd',47:'#e5e5e5'};
-const DEF_FG = '#d4d4d4';
-const DEF_BG = '#1e1e1e';
+const FG: Record<number,string>={30:'#000',31:'#cd3131',32:'#0dbc79',33:'#e5e510',34:'#2472c8',35:'#bc3fbc',36:'#11a8cd',37:'#f0f0f0',90:'#888',91:'#f14c4c',92:'#23d18b',93:'#f5f543',94:'#3b8eea',95:'#d670d6',96:'#29b8db',97:'#fff'};
+const BG: Record<number,string>={40:'#000',41:'#cd3131',42:'#0dbc79',43:'#e5e510',44:'#2472c8',45:'#bc3fbc',46:'#11a8cd',47:'#f0f0f0'};
+const DEF_FG = '#f0f0f0';
+const DEF_BG = '#000000';
 
 // Pre-computed 256-color palette (computed once, cached for the process lifetime).
 const X256: string[] = [];

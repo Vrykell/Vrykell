@@ -26,6 +26,12 @@
   --border-default: rgba(255, 255, 255, 0.09);
   --border-strong: rgba(255, 255, 255, 0.14);
 
+  /* Terminal */
+  --terminal-bg: #000000;
+  --terminal-fg: #f0f0f0;
+  --terminal-cursor: #f0f0f0;
+  --terminal-selection: rgba(255, 255, 255, 0.2);
+
   /* Semantic */
   --red: #f14c4c;
   --green: #23d18b;
@@ -282,6 +288,16 @@ body {
 
 .terminal-container .xterm {
   padding: 6px 8px;
+}
+
+/* CRT vignette — subtle dark edge glow for classic terminal depth */
+.terminal-container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.4);
+  z-index: 1;
 }
 
 /* WKWebView fix: xterm.js helper elements render visibly in Safari/WebKit.
