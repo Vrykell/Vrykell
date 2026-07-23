@@ -1,5 +1,7 @@
 # Tab Close Confirmation & Classic Pure-Black Terminal — Implementation Plan
 
+> **Status: ✅ 已完成（2026-07-24）** — 全部 4 个任务已提交（commits 29f5d41, 2d307fc, 2ce4ca3, ce511ec, f865d06），另有 2 个后续 resize 修复（9966540, 1be4bdb）。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Fix tab-close so foreground programs are force-killed with a confirmation dialog, and restyle the terminal with pure black background + bright white text.
@@ -27,7 +29,7 @@
 **Interfaces:**
 - Produces: `PtyManager::close_session` now force-kills child before dropping, causing read-loop to get EOF and trigger cleanup
 
-- [ ] **Step 1: Add child.kill() before drop in close_session**
+- [x] **Step 1: Add child.kill() before drop in close_session**
 
 Replace lines 293-303 in `src-tauri/src/pty.rs`:
 
@@ -53,12 +55,12 @@ Replace lines 293-303 in `src-tauri/src/pty.rs`:
     }
 ```
 
-- [ ] **Step 2: Build Rust backend to verify it compiles**
+- [x] **Step 2: Build Rust backend to verify it compiles**
 
 Run: `cd src-tauri && cargo check 2>&1`
 Expected: exits 0, no errors
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src-tauri/src/pty.rs
@@ -77,7 +79,7 @@ git commit -m "fix(pty): force-kill child process when closing session"
 **Interfaces:**
 - Produces: `LocaleDict.closeTab` with `title`, `message`, `confirm`, `cancel` keys
 
-- [ ] **Step 1: Add closeTab to LocaleDict type**
+- [x] **Step 1: Add closeTab to LocaleDict type**
 
 In `src/renderer/i18n/types.ts`, add `closeTab` block after `exit` (line 13):
 
@@ -111,7 +113,7 @@ export interface LocaleDict {
 }
 ```
 
-- [ ] **Step 2: Add English strings**
+- [x] **Step 2: Add English strings**
 
 In `src/renderer/i18n/en.ts`, add `closeTab` block after `exit` (line 14):
 
@@ -147,7 +149,7 @@ const en: LocaleDict = {
 };
 ```
 
-- [ ] **Step 3: Add Chinese strings**
+- [x] **Step 3: Add Chinese strings**
 
 In `src/renderer/i18n/zh.ts`, add `closeTab` block after `exit` (line 13):
 
@@ -181,12 +183,12 @@ const zh: LocaleDict = {
 };
 ```
 
-- [ ] **Step 4: Build to verify TypeScript compiles**
+- [x] **Step 4: Build to verify TypeScript compiles**
 
 Run: `cd /Users/wuzhe/ai-terminal && npx tsc --noEmit 2>&1 | head -20`
 Expected: exit 0, no errors
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/renderer/i18n/types.ts src/renderer/i18n/en.ts src/renderer/i18n/zh.ts
@@ -205,7 +207,7 @@ git commit -m "feat(i18n): add closeTab confirmation dialog strings"
 - Consumes: `LocaleDict.closeTab` from Task 2, `ConfirmDialog` component, `closePTY` from API
 - Produces: `TerminalTabs` accepts `onCloseTab: (id: string) => void` prop instead of calling `closePTY` directly; App manages closingId state and renders ConfirmDialog
 
-- [ ] **Step 1: Simplify TerminalTabs — accept onCloseTab prop**
+- [x] **Step 1: Simplify TerminalTabs — accept onCloseTab prop**
 
 Replace `src/renderer/components/terminal/TerminalTabs.tsx` entirely:
 
@@ -277,7 +279,7 @@ Key changes from original:
 - Removed `closePTY` import
 - `handleClose` now calls `onCloseTab(id)` instead of `closePTY(id)` directly
 
-- [ ] **Step 2: Update App.tsx — add closingId state, pass onCloseTab, wire Ctrl+W**
+- [x] **Step 2: Update App.tsx — add closingId state, pass onCloseTab, wire Ctrl+W**
 
 In `src/renderer/App.tsx`, make these three edits:
 
@@ -340,17 +342,17 @@ Add right before the closing `</>` fragment:
 />
 ```
 
-- [ ] **Step 3: Build to verify TypeScript compiles**
+- [x] **Step 3: Build to verify TypeScript compiles**
 
 Run: `cd /Users/wuzhe/ai-terminal && npx tsc --noEmit 2>&1 | head -20`
 Expected: exit 0, no errors
 
-- [ ] **Step 4: Run existing tests to ensure no regressions**
+- [x] **Step 4: Run existing tests to ensure no regressions**
 
 Run: `cd /Users/wuzhe/ai-terminal && npx vitest run 2>&1 | tail -20`
 Expected: all tests pass (none should break since we only changed close flow, and tests don't test tab close)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/renderer/components/terminal/TerminalTabs.tsx src/renderer/App.tsx
@@ -370,7 +372,7 @@ git commit -m "feat(ui): add close-tab confirmation dialog with force-kill warni
 - Consumes: None (standalone visual change)
 - Produces: Terminal renders with `#000000` background, `#f0f0f0` foreground
 
-- [ ] **Step 1: Update color constants in buffer.ts**
+- [x] **Step 1: Update color constants in buffer.ts**
 
 In `src/renderer/terminal/buffer.ts`, replace lines 8-11:
 
@@ -397,7 +399,7 @@ Changes:
 - `DEF_FG`: `#d4d4d4` → `#f0f0f0`
 - `DEF_BG`: `#1e1e1e` → `#000000`
 
-- [ ] **Step 2: Update hardcoded colors in TerminalView.tsx**
+- [x] **Step 2: Update hardcoded colors in TerminalView.tsx**
 
 In `src/renderer/terminal/TerminalView.tsx`, make these replacements:
 
@@ -449,7 +451,7 @@ With:
 background: '#000000',
 ```
 
-- [ ] **Step 3: Add terminal CSS variables and CRT vignette to global.css**
+- [x] **Step 3: Add terminal CSS variables and CRT vignette to global.css**
 
 **Edit A — Add terminal color variables to `:root` (after line 33, before `--red`):**
 
@@ -479,7 +481,7 @@ After the `.terminal-container .xterm` block (line 285), add:
 }
 ```
 
-- [ ] **Step 4: Build and run tests to verify**
+- [x] **Step 4: Build and run tests to verify**
 
 Run: `cd /Users/wuzhe/ai-terminal && npx tsc --noEmit 2>&1 | head -20`
 Expected: exit 0
@@ -487,7 +489,7 @@ Expected: exit 0
 Run: `cd /Users/wuzhe/ai-terminal && npx vitest run 2>&1 | tail -20`
 Expected: all tests pass (color changes don't affect test assertions)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/renderer/terminal/buffer.ts src/renderer/terminal/TerminalView.tsx src/renderer/styles/global.css

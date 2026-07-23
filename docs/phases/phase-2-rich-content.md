@@ -1,7 +1,11 @@
 # Phase 2: Rich Content Rendering — Progress Report
 
-**日期**: 2026-07-20
+**日期**: 2026-07-20（2026-07-24 更新）
 **状态**: 🚧 核心检测与渲染完成，in-terminal decorations 待开发
+
+> **更新说明（2026-07-24）**: 终端引擎已从 xterm.js 替换为自研 DOM 终端
+> （`src/renderer/terminal/`），下文"待开发"中的 xterm.js Decorations 方案相应过时，
+> 内联渲染将基于自研 `TerminalBuffer` / `DomTerminalView` 实现，思路（decoration 叠加、LRU 上限）不变。
 
 ---
 
