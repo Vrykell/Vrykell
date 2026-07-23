@@ -130,26 +130,18 @@ export const DomTerminalView: React.FC<{
   const pinnedRef = useRef(true);
   const [tick, setTick] = useState(0);
 
-  // Measure viewport height; debounce PTY resize to avoid flooding
-  // the shell with SIGWINCH during a window drag.
+  // Measure viewport height
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     containerHRef.current = el.clientHeight;
-    let resizeTimer: ReturnType<typeof setTimeout>;
     const ro = new ResizeObserver(([entry]) => {
       containerHRef.current = entry.contentRect.height;
       setTick((t) => t + 1);
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => {
-        onResize?.(entry.contentRect.width, entry.contentRect.height);
-      }, 200);
+      onResize?.(entry.contentRect.width, entry.contentRect.height);
     });
     ro.observe(el);
-    return () => {
-      ro.disconnect();
-      clearTimeout(resizeTimer);
-    };
+    return () => ro.disconnect();
   }, []);
 
   const prevLineCountRef = useRef(buffer.lines.length);
