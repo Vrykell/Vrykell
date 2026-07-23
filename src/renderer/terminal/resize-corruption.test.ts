@@ -245,7 +245,6 @@ describe('Resize corruption — stale events at wrong width', () => {
     buf.resize(100);
     buf.applyEvents(makeTuiRender(100, 3));
     const lines100 = snapshot(buf);
-    const lineCount100 = lines100.length;
 
     // Clear and start fresh at narrower width
     buf.clear();
@@ -257,8 +256,10 @@ describe('Resize corruption — stale events at wrong width', () => {
     const has100ColHeader = lines40.some(l => l.includes('100 cols'));
     expect(has100ColHeader).toBe(false);
 
-    // More lines at 40 cols (content wraps more)
-    expect(lines40.length).toBeGreaterThan(lineCount100);
+    // More content lines at 40 cols (the header wraps).  Compare non-blank
+    // lines only — the screen model always reports scrollback + rows lines.
+    const nonBlank = (ls: string[]) => ls.filter(l => l.trim().length > 0);
+    expect(nonBlank(lines40).length).toBeGreaterThan(nonBlank(lines100).length);
   });
 
   // ──────────────────────────────────────────────────────────────────────────

@@ -119,55 +119,124 @@ function parseCsiParams(data: string, pos: number, end: number): [number[], numb
 }
 
 // ── Terminal buffer ──────────────────────────────────────────────────────────
+//
+// VT screen model: a fixed-height SCREEN (exactly `rows` lines) plus a
+// capped SCROLLBACK above it.  The cursor is screen-relative (0..rows-1).
+// LF on the bottom row scrolls: the top screen line moves into scrollback
+// (main screen) or is discarded (the alternate screen has no scrollback).
+//
+// The previous model was a single ever-growing lines array with an absolute
+// cursor — CUP addressed scrollback instead of the screen, and there was no
+// bottom-edge scroll semantics, so any TUI using absolute positioning or
+// scroll-based erasing desynced its line accounting from ours, which was
+// the root cause of the recurring residual-artifact bugs.
 
 export class TerminalBuffer {
-  lines: TerminalLine[] = [{ cells: [], dirty: false }];
-  cx = 0; cy = 0; cols = 80; rows = 24; version = 0;
-  // Scrollback: cap at 5000 lines to prevent unbounded memory growth.
-  // Lines beyond this are trimmed from the front, shifting cy accordingly.
+  cx = 0;
+  cols = 80; rows = 24; version = 0;
+  /** Scrollback cap (main screen only). Alt-screen scroll-offs are discarded. */
   maxLines = 5000;
+  cursorVisible = true;
+  altActive = false;
+
+  private screen: TerminalLine[];
+  private scrollback: TerminalLine[] = [];
+  private _cy = 0; // cursor row, RELATIVE TO SCREEN
+  private _linesCache: TerminalLine[] | null = null;
+
   private fg?: string; private bg?: string; private bold=false; private italic=false; private underline=false; private inverse=false;
-  private savedCx=0; private savedCy=0;
+  private savedCx=0; private savedCy=0; // screen-relative — immune to scrollback trims
   private pending = ''; // split-sequence buffer
   private pendingWrap = false;
   private autoWrap = true;
-  cursorVisible = true;
+
+  // ── Alternate screen storage (DEC 1047/1048/1049) ──────────────────────
+  private mainScreen: TerminalLine[] | null = null;
+  private altScreen: TerminalLine[] | null = null;
+
+  constructor() {
+    this.screen = TerminalBuffer.blankRows(this.rows);
+  }
+
+  // ── Renderer-facing view ─────────────────────────────────────────────────
+  // The renderer works with one combined array: scrollback lines followed by
+  // screen lines.  Cached until the next structural change (scroll, resize,
+  // ED, alt switch) — cell-level mutations share line references.
+
+  get lines(): TerminalLine[] {
+    if (!this._linesCache) this._linesCache = this.scrollback.concat(this.screen);
+    return this._linesCache;
+  }
+
+  /** Absolute cursor row within `lines` (scrollback.length + screen row). */
+  get cy(): number {
+    return this.scrollback.length + this._cy;
+  }
+
+  private static blankRow(): TerminalLine { return { cells: [], dirty: false }; }
+  private static blankRows(n: number): TerminalLine[] {
+    return Array.from({ length: n }, () => TerminalBuffer.blankRow());
+  }
+  private static isBlank(l: TerminalLine): boolean {
+    return l.cells.every((c) => c.char === ' ');
+  }
 
   // ── Alternate screen (DEC 1047/1048/1049) ──────────────────────────────
   // Full-screen programs (vim, htop, Claude Code) draw into a separate
-  // buffer so the shell's scrollback stays clean and is restored on exit.
-  // Without this, TUI frames pollute the main scrollback permanently.
-  altActive = false;
-  private mainLines: TerminalLine[] | null = null;
-  private altLines: TerminalLine[] | null = null;
+  // screen so the shell's scrollback stays clean and is restored on exit.
 
   /** DEC 1047h / 1049h — switch to the alternate screen. */
   private enterAlt(clear: boolean, saveCursor: boolean): void {
     if (this.altActive) {
       // Re-entry while already in alt (nested TUI): just clear if asked.
-      if (clear) { this.lines = [{ cells: [], dirty: false }]; this.cx = 0; this.cy = 0; this.pendingWrap = false; }
+      if (clear) {
+        this.screen = TerminalBuffer.blankRows(this.rows);
+        this.cx = 0; this._cy = 0; this.pendingWrap = false;
+        this._linesCache = null;
+      }
       return;
     }
-    this.mainLines = this.lines;
-    if (saveCursor) { this.savedCx = this.cx; this.savedCy = this.cy; }
-    this.lines = (!clear && this.altLines) ? this.altLines : [{ cells: [], dirty: false }];
-    this.altLines = null; // now the live array
-    this.cx = 0; this.cy = 0; this.pendingWrap = false;
+    this.mainScreen = this.screen;
+    if (saveCursor) { this.savedCx = this.cx; this.savedCy = this._cy; }
+    this.screen = (!clear && this.altScreen) ? this.altScreen : TerminalBuffer.blankRows(this.rows);
+    this.altScreen = null; // now the live screen
+    this.cx = 0; this._cy = 0; this.pendingWrap = false;
     this.altActive = true;
+    this._linesCache = null;
   }
 
   /** DEC 1047l / 1049l — switch back to the main screen. */
   private exitAlt(restoreCursor: boolean): void {
     if (!this.altActive) return;
-    this.altLines = this.lines;
-    this.lines = this.mainLines ?? [{ cells: [], dirty: false }];
-    this.mainLines = null;
+    this.altScreen = this.screen;
+    this.screen = this.mainScreen ?? TerminalBuffer.blankRows(this.rows);
+    this.mainScreen = null;
+    // The window may have been resized while in alt — normalize the main
+    // screen back to `rows` lines (grow pulls scrollback back down, shrink
+    // pushes top lines up), adjusting the saved cursor row to match.
+    while (this.screen.length < this.rows) {
+      if (this.scrollback.length > 0) {
+        this.screen.unshift(this.scrollback.pop()!);
+        if (restoreCursor) this.savedCy++;
+      } else {
+        this.screen.push(TerminalBuffer.blankRow());
+      }
+    }
+    while (this.screen.length > this.rows) {
+      const top = this.screen.shift()!;
+      this.scrollback.push(top);
+      if (this.scrollback.length > this.maxLines) this.scrollback.shift();
+      if (restoreCursor && this.savedCy > 0) this.savedCy--;
+    }
     if (restoreCursor) {
       this.cx = Math.min(this.savedCx, this.cols - 1);
-      this.cy = this.savedCy;
+      this._cy = Math.min(this.savedCy, this.rows - 1);
+    } else {
+      this._cy = Math.min(this._cy, this.rows - 1);
     }
     this.pendingWrap = false;
     this.altActive = false;
+    this._linesCache = null;
   }
 
   // ── Main entry ─────────────────────────────────────────────────────────────
@@ -261,22 +330,16 @@ export class TerminalBuffer {
   // prettier-ignore
   private static CSI: Record<number, (b: TerminalBuffer, p: number[]) => void> = {
     0x6d /* m */: (b, p) => b.sgr(p),
-    0x41 /* A */: (b, p) => { b.cy = Math.max(0, b.cy - (p[0] || 1)); b.pendingWrap = false; },
-    0x42 /* B */: (b, p) => { b.cy = Math.min(9999, b.cy + (p[0] || 1)); b.pendingWrap = false; },
+    0x41 /* A */: (b, p) => { b._cy = Math.max(0, b._cy - (p[0] || 1)); b.pendingWrap = false; },
+    0x42 /* B */: (b, p) => { b._cy = Math.min(b.rows - 1, b._cy + (p[0] || 1)); b.pendingWrap = false; },
     0x43 /* C */: (b, p) => { b.cx = Math.min(b.cols - 1, b.cx + (p[0] || 1)); b.pendingWrap = false; },
     0x44 /* D */: (b, p) => { b.cx = Math.max(0, b.cx - (p[0] || 1)); b.pendingWrap = false; },
-    0x48 /* H */: (b, p) => { b.cy = Math.max(0, (p[0] || 1) - 1); b.cx = Math.min(b.cols - 1, (p[1] || 1) - 1); b.pendingWrap = false; },
+    0x48 /* H */: (b, p) => { b._cy = Math.min(b.rows - 1, Math.max(0, (p[0] || 1) - 1)); b.cx = Math.min(b.cols - 1, (p[1] || 1) - 1); b.pendingWrap = false; },
     0x47 /* G */: (b, p) => { b.cx = Math.min(b.cols - 1, (p[0] || 1) - 1); b.pendingWrap = false; },
-    0x64 /* d */: (b, p) => { b.cy = (p[0] || 1) - 1; b.pendingWrap = false; },
-    0x73 /* s */: (b, _p) => { b.savedCx = b.cx; b.savedCy = b.cy; },
-    0x75 /* u */: (b, _p) => { b.cx = b.savedCx; b.cy = b.savedCy; b.pendingWrap = false; },
-    0x4a /* J */: (b, p) => {
-      if ((p[0] || 0) === 2) { b.lines = [{ cells: [], dirty: false }]; b.cx = 0; b.cy = 0; }
-      else if ((p[0] || 0) === 0) {
-        const ln = b.line(); ln.cells = ln.cells.slice(0, b.cx); ln.dirty = true;
-        for (let y = b.cy + 1; y < b.lines.length; y++) { b.lines[y].cells = []; b.lines[y].dirty = true; }
-      }
-    },
+    0x64 /* d */: (b, p) => { b._cy = Math.min(b.rows - 1, Math.max(0, (p[0] || 1) - 1)); b.pendingWrap = false; },
+    0x73 /* s */: (b, _p) => { b.savedCx = b.cx; b.savedCy = b._cy; },
+    0x75 /* u */: (b, _p) => { b.cx = b.savedCx; b._cy = Math.min(b.savedCy, b.rows - 1); b.pendingWrap = false; },
+    0x4a /* J */: (b, p) => b.ed(p[0] || 0),
     0x4b /* K */: (b, p) => {
       const ln = b.line();
       if ((p[0] || 0) === 0) ln.cells = ln.cells.slice(0, b.cx);
@@ -291,8 +354,8 @@ export class TerminalBuffer {
     7:  (b, v) => { b.autoWrap = v; if (!v) b.pendingWrap = false; },
     1047: (b, v) => { if (v) b.enterAlt(false, false); else b.exitAlt(false); },
     1048: (b, v) => { // DECSC/DECRC — shares the saved-cursor slot with CSI s/u
-      if (v) { b.savedCx = b.cx; b.savedCy = b.cy; }
-      else { b.cx = Math.min(b.savedCx, b.cols - 1); b.cy = b.savedCy; b.pendingWrap = false; }
+      if (v) { b.savedCx = b.cx; b.savedCy = b._cy; }
+      else { b.cx = Math.min(b.savedCx, b.cols - 1); b._cy = Math.min(b.savedCy, b.rows - 1); b.pendingWrap = false; }
     },
     1049: (b, v) => { if (v) b.enterAlt(true, true); else b.exitAlt(true); },
     2004: (_b, _v) => {},
@@ -334,6 +397,30 @@ export class TerminalBuffer {
     }
   }
 
+  // ── Erase in display (ED) ────────────────────────────────────────────────
+
+  private ed(mode: number): void {
+    if (mode === 2) {
+      // Clear the whole screen (scrollback preserved — that's ED 3's job).
+      this.screen = TerminalBuffer.blankRows(this.rows);
+      this.cx = 0; this._cy = 0; this.pendingWrap = false;
+      this._linesCache = null;
+    } else if (mode === 3) {
+      // xterm extension: clear scrollback.
+      this.scrollback = [];
+      this._linesCache = null;
+    } else if (mode === 0) {
+      // Clear from cursor to END OF SCREEN (not scrollback).
+      const ln = this.line();
+      ln.cells = ln.cells.slice(0, this.cx);
+      ln.dirty = true;
+      for (let y = this._cy + 1; y < this.screen.length; y++) {
+        this.screen[y].cells = [];
+        this.screen[y].dirty = true;
+      }
+    }
+  }
+
   // ── Char output ────────────────────────────────────────────────────────────
 
   private putChar(ch: string): void {
@@ -363,19 +450,24 @@ export class TerminalBuffer {
   }
 
   private line(): TerminalLine {
-    while (this.lines.length <= this.cy) this.lines.push({ cells: [], dirty: false });
-    return this.lines[this.cy];
+    return this.screen[this._cy];
   }
 
   private lf(): void {
-    this.cy++;
-    if (this.lines.length >= this.maxLines) {
-      this.lines.shift(); // drop oldest line
-      this.cy--;          // cy moves up since we removed from front
-      // savedCy indexes the MAIN buffer — trimming alt lines must not shift it
-      if (!this.altActive && this.savedCy > 0) this.savedCy--;
+    if (this._cy >= this.rows - 1) this.scrollUp();
+    else this._cy++;
+  }
+
+  /** Bottom-edge scroll: the top screen line leaves the screen. */
+  private scrollUp(): void {
+    const top = this.screen.shift()!;
+    if (!this.altActive) {
+      this.scrollback.push(top);
+      if (this.scrollback.length > this.maxLines) this.scrollback.shift();
     }
-    this.line(); // ensure line at cy exists
+    // Alt screen: no scrollback — the scrolled-off line is discarded.
+    this.screen.push(TerminalBuffer.blankRow());
+    this._linesCache = null;
   }
 
   // ── Typed event API (used by the Rust parser pipeline) ─────────────────────
@@ -390,23 +482,16 @@ export class TerminalBuffer {
         case 'tab': this.pendingWrap = false; this.cx = Math.min(this.cols - 1, (Math.floor(this.cx / 8) + 1) * 8); break;
         // CSI cursor movement: params of 0 mean "default to 1" per ECMA-48.
         // The Rust parser emits 0 for empty/unspecified params via parse_csi.
-        case 'A': this.cy = Math.max(0, this.cy - (ev.p || 1)); this.pendingWrap = false; break;
-        case 'B': this.cy = Math.min(9999, this.cy + (ev.p || 1)); this.pendingWrap = false; break;
+        case 'A': this._cy = Math.max(0, this._cy - (ev.p || 1)); this.pendingWrap = false; break;
+        case 'B': this._cy = Math.min(this.rows - 1, this._cy + (ev.p || 1)); this.pendingWrap = false; break;
         case 'C': this.cx = Math.min(this.cols - 1, this.cx + (ev.p || 1)); this.pendingWrap = false; break;
         case 'D': this.cx = Math.max(0, this.cx - (ev.p || 1)); this.pendingWrap = false; break;
-        case 'H': this.cy = Math.max(0, (ev.p[0] || 1) - 1); this.cx = Math.min(this.cols - 1, (ev.p[1] || 1) - 1); this.pendingWrap = false; break;
+        case 'H': this._cy = Math.min(this.rows - 1, Math.max(0, (ev.p[0] || 1) - 1)); this.cx = Math.min(this.cols - 1, (ev.p[1] || 1) - 1); this.pendingWrap = false; break;
         case 'G': this.cx = Math.min(this.cols - 1, (ev.p || 1) - 1); this.pendingWrap = false; break;
-        case 'd': this.cy = (ev.p || 1) - 1; this.pendingWrap = false; break;
-        case 's': this.savedCx = this.cx; this.savedCy = this.cy; break;
-        case 'u': this.cx = this.savedCx; this.cy = this.savedCy; this.pendingWrap = false; break;
-        case 'J': {
-          if (ev.p === 2) { this.lines = [{ cells: [], dirty: false }]; this.cx = 0; this.cy = 0; }
-          else if (ev.p === 0) {
-            const ln = this.line(); ln.cells = ln.cells.slice(0, this.cx); ln.dirty = true;
-            for (let y = this.cy + 1; y < this.lines.length; y++) { this.lines[y].cells = []; this.lines[y].dirty = true; }
-          }
-          break;
-        }
+        case 'd': this._cy = Math.min(this.rows - 1, Math.max(0, (ev.p || 1) - 1)); this.pendingWrap = false; break;
+        case 's': this.savedCx = this.cx; this.savedCy = this._cy; break;
+        case 'u': this.cx = this.savedCx; this._cy = Math.min(this.savedCy, this.rows - 1); this.pendingWrap = false; break;
+        case 'J': this.ed(ev.p); break;
         case 'K': {
           const ln = this.line();
           if (ev.p === 0) ln.cells = ln.cells.slice(0, this.cx);
@@ -427,5 +512,58 @@ export class TerminalBuffer {
   }
 
   resize(cols: number): void { if (cols >= 10) { this.cols = cols; this.cx = Math.min(this.cx, cols - 1); this.pendingWrap = false; } }
-  clear(): void { this.lines = [{ cells: [], dirty: false }]; this.cx=0; this.cy=0; this.pendingWrap=false; this.version++; }
+
+  /**
+   * Change the screen height.  Shrinking moves lines above the cursor into
+   * scrollback (main) or discards them (alt) — blank padding below the
+   * cursor is dropped first since it's invisible anyway.  Growing pulls
+   * lines back down from scrollback, then pads with blanks.  The cursor
+   * line stays on screen throughout.
+   */
+  setRows(newRows: number): void {
+    if (newRows < 4) newRows = 4;
+    if (newRows === this.rows) return;
+    if (newRows < this.rows) {
+      let excess = this.rows - newRows;
+      while (excess > 0 && this.screen.length - 1 > this._cy && TerminalBuffer.isBlank(this.screen[this.screen.length - 1])) {
+        this.screen.pop();
+        excess--;
+      }
+      while (excess > 0 && this.screen.length > 1) {
+        const top = this.screen.shift()!;
+        if (!this.altActive) {
+          this.scrollback.push(top);
+          if (this.scrollback.length > this.maxLines) this.scrollback.shift();
+        }
+        if (this._cy > 0) this._cy--;
+        excess--;
+      }
+    } else {
+      let deficit = newRows - this.rows;
+      while (deficit > 0 && !this.altActive && this.scrollback.length > 0) {
+        this.screen.unshift(this.scrollback.pop()!);
+        this._cy++;
+        deficit--;
+      }
+      while (deficit > 0) {
+        this.screen.push(TerminalBuffer.blankRow());
+        deficit--;
+      }
+    }
+    // Normalize to exactly newRows lines (guards against pathological states)
+    while (this.screen.length < newRows) this.screen.push(TerminalBuffer.blankRow());
+    if (this.screen.length > newRows) this.screen.length = newRows;
+    this.rows = newRows;
+    this._cy = Math.min(this._cy, newRows - 1);
+    this._linesCache = null;
+    this.version++;
+  }
+
+  clear(): void {
+    this.screen = TerminalBuffer.blankRows(this.rows);
+    this.scrollback = [];
+    this.cx = 0; this._cy = 0; this.pendingWrap = false;
+    this._linesCache = null;
+    this.version++;
+  }
 }

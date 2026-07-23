@@ -101,7 +101,7 @@ export function useDomTerminal(sessionId: string | null) {
       // never wrapped at the new width — that mismatch caused wrapped-line
       // divergence and stale residual characters at the bottom of TUI frames.
       if (typeof cols === 'number' && cols >= 10 && cols !== buf.cols) buf.resize(cols);
-      if (typeof rows === 'number' && rows >= 4) buf.rows = rows;
+      if (typeof rows === 'number' && rows >= 4 && rows !== buf.rows) buf.setRows(rows);
       buf.applyEvents(events);
       scheduleRender();
     }).then(fn => { if (!cancelled) un.push(fn); else fn(); });
