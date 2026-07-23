@@ -61,6 +61,7 @@ describe('App session flow', () => {
     await waitFor(() => expect(backend.sessions).toHaveLength(1));
     const sid = backend.sessions[0].id;
     await userEvent.click(screen.getByTestId(`close-btn-${sid}`));
+    await userEvent.click(screen.getByText('Force Close'));
     await waitFor(() => expect(backend.sessions).toHaveLength(0));
     await waitFor(() => expect(screen.getByText('Close AI Terminal')).toBeInTheDocument());
   });
@@ -70,6 +71,7 @@ describe('App session flow', () => {
     await waitFor(() => expect(backend.sessions).toHaveLength(1));
     const sid = backend.sessions[0].id;
     await userEvent.click(screen.getByTestId(`close-btn-${sid}`));
+    await userEvent.click(screen.getByText('Force Close'));
     await waitFor(() => expect(backend.sessions).toHaveLength(0));
     await userEvent.click(screen.getByText('Keep Session'));
     await waitFor(() => expect(backend.sessions).toHaveLength(1));
@@ -81,6 +83,7 @@ describe('App session flow', () => {
     await waitFor(() => expect(backend.sessions).toHaveLength(1));
     const sid = backend.sessions[0].id;
     await userEvent.click(screen.getByTestId(`close-btn-${sid}`));
+    await userEvent.click(screen.getByText('Force Close'));
     await waitFor(() => expect(backend.sessions).toHaveLength(0));
     await userEvent.click(screen.getByText('Close App'));
     expect(backend.exitRequested).toBe(true);

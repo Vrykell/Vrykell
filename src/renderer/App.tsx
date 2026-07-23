@@ -28,6 +28,7 @@ const App: React.FC = () => {
   const removeSession = useTerminalStore((s) => s.removeSession);
 
   const [showExitDialog, setShowExitDialog] = useState(false);
+  const [closingId, setClosingId] = useState<string | null>(null);
 
   useRichContent(activeSessionId);
 
@@ -91,7 +92,7 @@ const App: React.FC = () => {
       if (!(e.metaKey || e.ctrlKey)) return;
       switch (e.key) {
         case 't': e.preventDefault(); createAndAddSession(); break;
-        case 'w': e.preventDefault(); if (activeSessionId) closePTY(activeSessionId).catch(() => {}); break;
+        case 'w': e.preventDefault(); if (activeSessionId) setClosingId(activeSessionId); break;
         case 'j': e.preventDefault(); useTerminalStore.getState().toggleSidebar(); break;
         case 'r': if (e.shiftKey) { e.preventDefault(); toggleOutputPanel(); } break;
       }
@@ -103,7 +104,7 @@ const App: React.FC = () => {
   return (
     <>
       <div className="app-shell">
-        <TerminalTabs />
+        <TerminalTabs onCloseTab={(id) => setClosingId(id)} />
         <div className="app-main">
           <div className="app-terminal-area">
             <TerminalView sessionId={activeSessionId} />
@@ -128,6 +129,22 @@ const App: React.FC = () => {
         danger
         onConfirm={() => exitApp().catch(() => window.close())}
         onCancel={() => { setShowExitDialog(false); createAndAddSession(); }}
+      />
+
+      <ConfirmDialog
+        open={closingId !== null}
+        title={t.closeTab.title}
+        message={t.closeTab.message}
+        confirmLabel={t.closeTab.confirm}
+        cancelLabel={t.closeTab.cancel}
+        danger
+        onConfirm={() => {
+          if (closingId) {
+            closePTY(closingId).catch(() => {});
+            setClosingId(null);
+          }
+        }}
+        onCancel={() => setClosingId(null)}
       />
     </>
   );

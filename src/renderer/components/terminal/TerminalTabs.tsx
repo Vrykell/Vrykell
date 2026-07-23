@@ -1,8 +1,12 @@
 import React from 'react';
 import { useTerminalStore } from '../../stores/terminal-store';
-import { createPTY, closePTY } from '../../../api';
+import { createPTY } from '../../../api';
 
-export const TerminalTabs: React.FC = () => {
+interface Props {
+  onCloseTab: (id: string) => void;
+}
+
+export const TerminalTabs: React.FC<Props> = ({ onCloseTab }) => {
   const sessions = useTerminalStore((s) => s.sessions);
   const activeId = useTerminalStore((s) => s.activeSessionId);
   const setActive = useTerminalStore((s) => s.setActive);
@@ -16,9 +20,9 @@ export const TerminalTabs: React.FC = () => {
     } catch (err) { console.error('Failed to create session:', err); }
   };
 
-  const handleClose = async (e: React.MouseEvent, id: string) => {
+  const handleClose = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    try { await closePTY(id); } catch (err) { console.error('Failed to close session:', err); }
+    onCloseTab(id);
   };
 
   return (
