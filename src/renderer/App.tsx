@@ -30,8 +30,18 @@ const App: React.FC = () => {
 
   useRichContent(activeSessionId);
 
-  const createAndAddSession = () =>
-    createPTY({}).then(s => addSession(s)).catch(err => console.error('createPTY failed:', err));
+  // Estimate dimensions for initial PTY so it doesn't render at default
+  // 80×24 when the actual display area is narrower (due to AI sidebar).
+  // The ResizeObserver will fine-tune dimensions after mount.
+  const createAndAddSession = () => {
+    const terminalW = window.innerWidth - 390; // sidebar + scrollbar
+    const terminalH = window.innerHeight - 100; // tab bar + status bar
+    const cols = Math.max(10, Math.floor(terminalW / 8.4));
+    const rows = Math.max(4, Math.floor(terminalH / 16));
+    return createPTY({ cols, rows })
+      .then(s => addSession(s))
+      .catch(err => console.error('createPTY failed:', err));
+  };
 
   // Tauri event listeners
   useEffect(() => {
