@@ -335,6 +335,6 @@ export class TerminalBuffer {
     this.version++;
   }
 
-  resize(cols: number): void { if (cols > 10) { this.cols = cols; this.cx = Math.min(this.cx, cols - 1); this.pendingWrap = false; } }
+  resize(cols: number): void { if (cols >= 10) { this.cols = cols; this.cx = Math.min(this.cx, cols - 1); this.pendingWrap = false; } }
   clear(): void { this.lines = [{ cells: [], dirty: false }]; this.cx=0; this.cy=0; this.pendingWrap=false; this.version++; }
 }

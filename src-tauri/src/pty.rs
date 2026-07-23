@@ -1,6 +1,7 @@
 use portable_pty::{native_pty_system, CommandBuilder, Child, MasterPty, PtySize};
 use std::collections::HashMap;
 use std::io::{Read, Write};
+use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 
@@ -9,11 +10,19 @@ use crate::terminal_parser::{TerminalEvent, TerminalParser};
 
 /// Payload emitted from Rust to frontend for PTY output.
 /// Events are pre-parsed escape sequences — the frontend no longer parses raw bytes.
+///
+/// `cols`/`rows` tag the batch with the PTY dimensions in effect when the
+/// bytes were read.  The frontend resizes its buffer to these values BEFORE
+/// applying the events, so output generated at the old width during a window
+/// drag is never interpreted at the new width (which caused wrapped-line
+/// divergence and stale residual characters at the bottom of TUI frames).
 #[derive(Clone, serde::Serialize)]
 pub struct PtyOutputPayload {
     #[serde(rename = "sessionId")]
     pub session_id: String,
     pub events: Vec<TerminalEvent>,
+    pub cols: u16,
+    pub rows: u16,
 }
 
 /// Payload for PTY exit event
@@ -52,6 +61,10 @@ struct ManagedSession {
     child: Arc<Mutex<Box<dyn Child + Send + Sync>>>,
     writer: Box<dyn Write + Send>,
     master: Arc<Mutex<Box<dyn MasterPty + Send>>>,
+    /// Current PTY dimensions, shared with the reader thread so every
+    /// emitted output batch can be tagged with the dims it was generated at.
+    cols: Arc<AtomicU16>,
+    rows: Arc<AtomicU16>,
 }
 
 /// PTY Manager — spawns shells, routes I/O, manages lifecycle.
@@ -182,6 +195,10 @@ impl PtyManager {
         let master: Box<dyn MasterPty + Send> = pair.master;
         let master_arc: Arc<Mutex<Box<dyn MasterPty + Send>>> = Arc::new(Mutex::new(master));
 
+        // Shared dimension tags for output batches (see PtyOutputPayload docs)
+        let cols_atomic = Arc::new(AtomicU16::new(cols));
+        let rows_atomic = Arc::new(AtomicU16::new(rows));
+
         // Store session with writer and master
         {
             let mut sessions = self.sessions.lock().map_err(|e| e.to_string())?;
@@ -190,6 +207,8 @@ impl PtyManager {
                 child: child_arc.clone(),
                 writer,
                 master: master_arc.clone(),
+                cols: cols_atomic.clone(),
+                rows: rows_atomic.clone(),
             });
         }
 
@@ -199,6 +218,8 @@ impl PtyManager {
         let session_store = self.store.clone();
         let session_map = self.sessions.clone();
         let thread_child = child_arc.clone();
+        let thread_cols = cols_atomic.clone();
+        let thread_rows = rows_atomic.clone();
 
         std::thread::spawn(move || {
             let mut read_buf = [0u8; 4096];
@@ -232,10 +253,14 @@ impl PtyManager {
                         // Split large event batches to avoid hitting Tauri IPC size limits.
                         // Claude TUI renders can produce 500+ events per frame; sending them
                         // all in one JSON array risks truncation.
+                        let cur_cols = thread_cols.load(Ordering::Relaxed);
+                        let cur_rows = thread_rows.load(Ordering::Relaxed);
                         for chunk in events.chunks(128) {
                             let _ = handle.emit("pty:output", PtyOutputPayload {
                                 session_id: sid.clone(),
                                 events: chunk.to_vec(),
+                                cols: cur_cols,
+                                rows: cur_rows,
                             });
                         }
                     }
@@ -272,6 +297,11 @@ impl PtyManager {
                     pixel_height: 0,
                 })
                 .map_err(|e| format!("Resize failed: {}", e))?;
+
+            // Update the shared dimension tags AFTER the PTY resize succeeded,
+            // so batches read before SIGWINCH keep their old-width tag.
+            session.cols.store(cols, Ordering::Relaxed);
+            session.rows.store(rows, Ordering::Relaxed);
 
             // Update stored metadata
             drop(master);

@@ -99,6 +99,38 @@ describe('useDomTerminal integration', () => {
     expect(view).not.toHaveTextContent('old');
   });
 
+  it('applies each output batch at its tagged dimensions (resize race fix)', async () => {
+    // Unique session id → fresh buffer (the module-level buffer cache
+    // persists across tests in this file).
+    render(<TestApp sessionId="s-tags" />);
+
+    // Batch tagged cols=40: 40 chars must fit on ONE line — even though a
+    // narrower resize may already have happened on the window side.
+    // (cr+lf moves to a fresh line so the next batch's cx clamp can't
+    // overwrite this line's tail — mirroring how a TUI repaints on SIGWINCH.)
+    backend.emit('pty:output', {
+      sessionId: 's-tags',
+      events: [{ t: 'txt', p: 'x'.repeat(40) }, { t: 'cr' }, { t: 'lf' }],
+      cols: 40,
+      rows: 24,
+    });
+    // Batch tagged cols=20: the next 40 chars wrap to TWO 20-char lines.
+    backend.emit('pty:output', {
+      sessionId: 's-tags',
+      events: [{ t: 'txt', p: 'y'.repeat(40) }],
+      cols: 20,
+      rows: 24,
+    });
+
+    await waitFor(() => {
+      const texts = screen
+        .getAllByTestId('terminal-line')
+        .map((l) => l.textContent || '')
+        .filter((t) => t.includes('x') || t.includes('y'));
+      expect(texts).toEqual(['x'.repeat(40), 'y'.repeat(20), 'y'.repeat(20)]);
+    });
+  });
+
   it('renders exit message for matching session', async () => {
     render(<TestApp sessionId="s1" />);
     const view = screen.getByTestId('terminal-view');

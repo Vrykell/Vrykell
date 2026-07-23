@@ -104,7 +104,7 @@ describe('TerminalBuffer', () => {
 
   it('defers wrap at last column', () => {
     const buf = new TerminalBuffer();
-    buf.resize(11); // resize() requires cols > 10
+    buf.resize(11); // resize() requires cols >= 10
     buf.write('1234567890x'); // 11th char lands on last column (index 10)
     expect(buf.cx).toBe(10);
     expect(buf.pendingWrap).toBe(true);

@@ -91,8 +91,15 @@ export function useDomTerminal(sessionId: string | null) {
     let cancelled = false;
     const un: Array<() => void> = [];
 
-    onPTYOutput(({ sessionId: sid, events }) => {
+    onPTYOutput(({ sessionId: sid, events, cols, rows }) => {
       if (cancelled || sid !== sessionId) return;
+      // Each batch is tagged with the PTY dimensions in effect when the
+      // bytes were read (Rust side).  Resize the buffer to the tag BEFORE
+      // applying events so output generated at the old width mid-drag is
+      // never wrapped at the new width — that mismatch caused wrapped-line
+      // divergence and stale residual characters at the bottom of TUI frames.
+      if (typeof cols === 'number' && cols >= 10 && cols !== buf.cols) buf.resize(cols);
+      if (typeof rows === 'number' && rows >= 4) buf.rows = rows;
       buf.applyEvents(events);
       scheduleRender();
     }).then(fn => { if (!cancelled) un.push(fn); else fn(); });
@@ -148,10 +155,12 @@ export function useDomTerminal(sessionId: string | null) {
   }, []);
 
   // Notify PTY of terminal dimensions when the container resizes.
-  // Both buffer and PTY are updated immediately on every pixel change
-  // so the terminal feels responsive during window drag.  SIGWINCH is
-  // cheap — modern PTYs handle it efficiently, and TUI frameworks
-  // (Claude / vim) re-render fast enough for smooth 60 fps resizing.
+  // The BUFFER is deliberately NOT resized here: output batches are tagged
+  // with the dimensions they were generated at (see the onPTYOutput handler),
+  // and the buffer resizes to each batch's tag right before applying it.
+  // Resizing the buffer immediately would let in-flight old-width events be
+  // applied at the new width, which is the root cause of resize-time
+  // residual characters.
   // NOT memoized: must not capture `buf` from a stale closure (e.g. the
   // temporary buffer created when sessionId was null on first render).
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -160,8 +169,6 @@ export function useDomTerminal(sessionId: string | null) {
     if (!s) return;
     const cols = Math.max(10, Math.floor(pxWidth / getCharWidth()));
     const rows = Math.max(4, Math.floor(pxHeight / LINE_HEIGHT));
-    buf.resize(cols);
-    buf.rows = rows;
     resizePTY(s, cols, rows).catch(() => {});
   }
 

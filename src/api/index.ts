@@ -38,9 +38,9 @@ export function closePTY(sessionId: string): Promise<void> {
 // Each returns Promise<UnlistenFn> for cleanup in useEffect return
 
 export function onPTYOutput(
-  cb: (data: { sessionId: string; events: TerminalEvent[] }) => void,
+  cb: (data: { sessionId: string; events: TerminalEvent[]; cols?: number; rows?: number }) => void,
 ): Promise<UnlistenFn> {
-  return listen<{ sessionId: string; events: TerminalEvent[] }>('pty:output', (event) => {
+  return listen<{ sessionId: string; events: TerminalEvent[]; cols?: number; rows?: number }>('pty:output', (event) => {
     cb(event.payload);
   });
 }

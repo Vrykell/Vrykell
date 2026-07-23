@@ -111,7 +111,10 @@ describe('Terminal resize', () => {
   // ── D: Resize with CJK characters ──────────────────────────────────────
 
   it('CJK chars at boundary survive resize', () => {
-    buf.resize(10);
+    // 12 (not 10): at exactly cols=10, writing 10 columns of content leaves
+    // the cursor clamped at cols-1 with pendingWrap (standard terminal
+    // semantics), which is not what this test exercises.
+    buf.resize(12);
 
     // Write 你好 at columns 8-9 (fits exactly at 2-wide each)
     buf.write('123456\u{4f60}\u{597d}'); // 6 ascii + 你(2) + 好(2) = 10 cols

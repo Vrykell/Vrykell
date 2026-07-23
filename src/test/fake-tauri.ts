@@ -1,7 +1,7 @@
 import type { SessionInfo, SessionOptions } from '../shared/types';
 
 export type EventMap = {
-  'pty:output': { sessionId: string; events: { t: string; p?: unknown }[] };
+  'pty:output': { sessionId: string; events: { t: string; p?: unknown }[]; cols?: number; rows?: number };
   'pty:exit': { sessionId: string; exitCode: number };
   'pty:title-change': { sessionId: string; title: string };
   'session:created': { session: SessionInfo };
