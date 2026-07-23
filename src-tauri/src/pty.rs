@@ -294,7 +294,15 @@ impl PtyManager {
     pub fn close_session(&self, id: &str) -> Result<(), String> {
         let mut sessions = self.sessions.lock().map_err(|e| e.to_string())?;
         if let Some(session) = sessions.remove(id) {
-            // Killing the child will cause the read loop to get EOF and clean up
+            // Explicitly kill the child process so foreground programs
+            // (vim, top, htop, etc.) are terminated immediately.  The
+            // read-loop thread will get EOF on the reader and run its
+            // cleanup path (emit pty:exit, remove from session store).
+            if let Ok(mut child) = session.child.lock() {
+                let _ = child.kill();
+            }
+            // Dropping session closes the writer and master PTY sides;
+            // the read-loop thread holds the reader clone and will get EOF.
             drop(session);
             Ok(())
         } else {
