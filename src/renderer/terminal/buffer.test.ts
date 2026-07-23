@@ -92,8 +92,9 @@ describe('TerminalBuffer', () => {
     const buf = new TerminalBuffer();
     buf.write('line1\nline2\nline3');
     buf.write('\x1b[2J');
-    expect(buf.lines.length).toBe(1);
-    expect(buf.lines[0].cells.length).toBe(0);
+    // Screen model: ED 2 replaces the screen with `rows` blank lines
+    expect(buf.lines.length).toBe(buf.rows);
+    expect(buf.lines.every((l) => l.cells.length === 0)).toBe(true);
     expect(buf.cx).toBe(0);
     expect(buf.cy).toBe(0);
   });
@@ -160,16 +161,12 @@ describe('TerminalBuffer', () => {
 
   it('trims scrollback beyond max lines', () => {
     const buf = new TerminalBuffer();
-    // Write 10 lines — fills buffer
-    for (let i = 0; i < 10; i++) buf.write(`line ${i}\n`);
-    expect(buf.lines.length).toBeGreaterThanOrEqual(10);
-    // Clear and write more than maxLines
-    buf.clear();
+    buf.setRows(5);
     buf.maxLines = 10;
+    // 15 lines of output on a 5-row screen: 11 lines scroll off the top,
+    // scrollback is capped at 10, screen holds the last 5.
     for (let i = 0; i < 15; i++) buf.write(`X${i}\n`);
-    // Should have trimmed to ~10 lines
-    expect(buf.lines.length).toBeLessThanOrEqual(11);
-    // cy should still be at the bottom (last line)
+    expect(buf.lines.length).toBe(15);
     expect(buf.lines[buf.cy]).toBeTruthy();
   });
 
@@ -177,7 +174,7 @@ describe('TerminalBuffer', () => {
     const buf = new TerminalBuffer();
     buf.write('abc');
     buf.clear();
-    expect(buf.lines.length).toBe(1);
+    expect(buf.lines.length).toBe(buf.rows);
     expect(buf.lines[0].cells.length).toBe(0);
     expect(buf.cx).toBe(0);
   });
@@ -409,8 +406,8 @@ describe('alternate screen (DEC 1047/1048/1049)', () => {
     buf.write('shell-output\r\nprompt$ ');
     buf.write('\x1b[?1049h');
     expect(buf.altActive).toBe(true);
-    expect(buf.lines).toHaveLength(1);
-    expect(buf.lines[0].cells).toHaveLength(0); // blank alt
+    expect(buf.lines).toHaveLength(buf.rows); // blank screen = rows empty lines
+    expect(buf.lines.every((l) => l.cells.length === 0)).toBe(true);
     expect(buf.cx).toBe(0);
     expect(buf.cy).toBe(0);
   });
@@ -480,5 +477,75 @@ describe('alternate screen (DEC 1047/1048/1049)', () => {
     expect(buf.altActive).toBe(false);
     expect(text(buf)).toContain('shell');
     expect(text(buf)).not.toContain('TUI');
+  });
+});
+
+describe('VT screen model semantics', () => {
+  it('CUP addresses the screen, not the scrollback', () => {
+    const buf = new TerminalBuffer();
+    buf.setRows(5);
+    for (let i = 0; i < 10; i++) buf.write(`L${i}\n`); // 6 lines scroll off
+    // scrollback: L0..L5, screen: L6..L9 + blank
+    buf.write('\x1b[1;1H'); // CUP home = SCREEN row 0, not scrollback line 0
+    buf.write('X');
+    expect(buf.lines[0].cells[0].char).toBe('L');    // scrollback untouched
+    expect(buf.lines[6].cells[0].char).toBe('X');    // screen top got X
+    expect(buf.cy).toBe(6);                          // absolute cy = screen top
+  });
+
+  it('LF on the bottom row scrolls the top screen line into scrollback', () => {
+    const buf = new TerminalBuffer();
+    buf.setRows(3);
+    buf.write('a\r\nb\r\nc\r\nd'); // writing d forces one scroll
+    expect(buf.lines.map((l) => l.cells[0]?.char)).toEqual(['a', 'b', 'c', 'd']);
+    expect(buf.cy).toBe(3); // scrollback(1) + screen row 2
+  });
+
+  it('CUD clamps to the bottom of the screen', () => {
+    const buf = new TerminalBuffer();
+    buf.setRows(5);
+    buf.write('\x1b[999B');
+    expect(buf.cy).toBe(4);
+  });
+
+  it('ED 0 clears to end of screen but preserves scrollback', () => {
+    const buf = new TerminalBuffer();
+    buf.setRows(4);
+    buf.write('a\r\nb\r\nc\r\nd\r\ne'); // scrollback=[a], screen=[b,c,d,e]
+    buf.write('\x1b[1;1H\x1b[J'); // home + ED 0
+    expect(buf.lines[0].cells[0].char).toBe('a'); // scrollback intact
+    const screenText = buf.lines.slice(1).map((l) => l.cells.map((c) => c.char).join(''));
+    expect(screenText.every((t) => t === '')).toBe(true);
+  });
+
+  it('setRows shrink moves top lines to scrollback, grow pulls them back', () => {
+    const buf = new TerminalBuffer();
+    buf.setRows(6);
+    buf.write('a\r\nb\r\nc\r\nd\r\ne'); // screen: a..e + blank, cursor on row 4 (e)
+    const chars = () => buf.lines.map((l) => l.cells[0]?.char ?? ' ');
+    buf.setRows(4);
+    // 2 lines must go: the blank row below the cursor is dropped first
+    // (invisible), then 'a' moves from the top into scrollback.
+    expect(chars()).toEqual(['a', 'b', 'c', 'd', 'e']);
+    expect(buf.cy).toBe(4); // scrollback(1) + screen row 3
+    buf.setRows(6);
+    // Growing pulls 'a' back from scrollback, then pads one blank row
+    expect(chars()).toEqual(['a', 'b', 'c', 'd', 'e', ' ']);
+    expect(buf.cy).toBe(4);
+  });
+
+  it('resizing inside alt screen discards top lines; main restores on exit', () => {
+    const buf = new TerminalBuffer();
+    buf.setRows(5);
+    buf.write('m1\r\nm2');
+    buf.write('\x1b[?1049h');
+    buf.write('t1\r\nt2\r\nt3\r\nt4\r\n'); // cursor on bottom row
+    buf.setRows(4); // alt shrink: bottom row is the cursor's, so t1 is discarded (alt has no scrollback)
+    const altText = buf.lines.map((l) => l.cells.map((c) => c.char).join('')).join('|');
+    expect(altText).not.toContain('t1');
+    buf.write('\x1b[?1049l');
+    const mainText = buf.lines.map((l) => l.cells.map((c) => c.char).join('')).join('|');
+    expect(mainText).toContain('m1');
+    expect(mainText).toContain('m2');
   });
 });
