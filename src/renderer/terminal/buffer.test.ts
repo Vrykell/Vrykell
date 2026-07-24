@@ -582,3 +582,21 @@ describe('parser edge cases (write path)', () => {
     expect(buf.lines[0].cells.map((c) => c.char).join('')).toBe('ABZ');
   });
 });
+
+describe('string-width@7 authoritative widths', () => {
+  // Measured against the real string-width package (Ink's column accounting)
+  it('counts BMP emoji as 2 columns: ▶ ◀ ⚠ © ® ™', () => {
+    const buf = new TerminalBuffer();
+    buf.write('\u{25B6}\u{25C0}\u{26A0}\u{A9}\u{AE}\u{2122}'); // ▶◀⚠©®™
+    expect(buf.cx).toBe(12); // 6 chars × 2 cols
+    // wide continuation cells follow each primary cell
+    expect(buf.lines[0].cells[1].wide).toBe(true);
+    expect(buf.lines[0].cells[3].wide).toBe(true);
+  });
+
+  it('keeps non-emoji symbols at 1 column: ❯ ● ⧉ ← · ✘ ✦', () => {
+    const buf = new TerminalBuffer();
+    buf.write('\u{276F}\u{25CF}\u{29C9}\u{2190}\u{B7}\u{2718}\u{2726}');
+    expect(buf.cx).toBe(7);
+  });
+});
