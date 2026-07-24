@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useLayoutEffect, useState, useCallback, memo } from 'react';
 import { TerminalBuffer, TerminalLine } from './buffer';
+import { getCharWidth } from './useDomTerminal';
 
 const LINE_HEIGHT = 16;
 const OVERSCAN = 15;
@@ -211,6 +212,17 @@ export const DomTerminalView: React.FC<{
 
   const focusTextarea = () => textareaRef.current?.focus();
 
+  // Position the hidden textarea so IME composition windows follow the TUI
+  // cursor.  If the textarea stays at (0,0) the IME draws its candidate box
+  // and inline pre-edit text at the wrong location, producing a "second
+  // cursor" effect during CJK input.
+  const charW = getCharWidth();
+  const cursorLine = buffer.lines[buffer.cy];
+  const cursorCol =
+    cursorLine?.cells[buffer.cx]?.wide && buffer.cx > 0 ? buffer.cx - 1 : buffer.cx;
+  const textareaLeft = cursorCol * charW;
+  const textareaBottom = (buffer.lines.length - 1 - buffer.cy) * LINE_HEIGHT;
+
   // ── Visible-range calculation ──────────────────────────────────────────────
   const totalLines = buffer.lines.length;
   const effectiveH = containerHRef.current || buffer.rows * LINE_HEIGHT;
@@ -279,8 +291,8 @@ export const DomTerminalView: React.FC<{
         onCompositionEnd={onCompositionEnd}
         style={{
           position: 'absolute',
-          left: 0,
-          bottom: 0,
+          left: textareaLeft,
+          bottom: textareaBottom,
           width: '1ch',
           height: '1em',
           opacity: 0,

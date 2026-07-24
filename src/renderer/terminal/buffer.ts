@@ -83,6 +83,7 @@ function charWidth(code: number): number {
   if (code === 0x2626) return 2;
   if (code === 0x262a) return 2;
   if (code >= 0x262e && code <= 0x262f) return 2;
+  if (code >= 0x2630 && code <= 0x2637) return 2;   // trigrams (hamburger/loading icons)
   if (code >= 0x2638 && code <= 0x263a) return 2;
   if (code === 0x2640 || code === 0x2642) return 2;
   if (code >= 0x2648 && code <= 0x2653) return 2;
@@ -92,6 +93,7 @@ function charWidth(code: number): number {
   if (code === 0x2668) return 2;
   if (code === 0x267b) return 2;
   if (code >= 0x267e && code <= 0x267f) return 2;
+  if (code >= 0x268a && code <= 0x268f) return 2;   // yijing monograms/digrams
   if (code >= 0x2692 && code <= 0x2697) return 2;
   if (code === 0x2699) return 2;
   if (code >= 0x269b && code <= 0x269c) return 2;
@@ -139,7 +141,9 @@ function charWidth(code: number): number {
   if (code >= 0x2329 && code <= 0x232a) return 2;   // 〈〉
   if (code >= 0x2e80 && code <= 0x303e) return 2;
   if (code >= 0x3040 && code <= 0x33bf) return 2;
+  if (code >= 0x33c0 && code <= 0x33ff) return 2;   // CJK compatibility squared abbreviations
   if (code >= 0x3400 && code <= 0x4dbf) return 2;
+  if (code >= 0x4dc0 && code <= 0x4dff) return 2;   // yijing hexagrams
   if (code >= 0x4e00 && code <= 0xa4cf) return 2;
   if (code >= 0xa960 && code <= 0xa97f) return 2;
   if (code >= 0xac00 && code <= 0xd7a3) return 2;
@@ -190,6 +194,10 @@ export class TerminalBuffer {
   maxLines = 5000;
   cursorVisible = true;
   altActive = false;
+
+  /** Flight recorder: last N applied events with cursor state for forensics. */
+  eventLog: string[] = [];
+  private static MAX_EVENT_LOG = 200;
 
   private screen: TerminalLine[];
   private scrollback: TerminalLine[] = [];
@@ -566,6 +574,7 @@ export class TerminalBuffer {
 
   applyEvents(events: TerminalEvent[]): void {
     for (const ev of events) {
+      const before = `cx=${this.cx} cy=${this.cy}`;
       switch (ev.t) {
         case 'txt': for (let i = 0; i < ev.p.length; i++) this.putChar(ev.p[i]); break;
         case 'cr': this.cx = 0; this.pendingWrap = false; break;
@@ -599,6 +608,9 @@ export class TerminalBuffer {
         }
         case 'osc': break; // title — handled by the PTY listener in useDomTerminal
       }
+      const entry = `${ev.t}${ev.p !== undefined ? ':' + (Array.isArray(ev.p) ? ev.p.join(';') : ev.p) : ''} ${before} -> cx=${this.cx} cy=${this.cy}`;
+      this.eventLog.push(entry);
+      if (this.eventLog.length > TerminalBuffer.MAX_EVENT_LOG) this.eventLog.shift();
     }
     this.version++;
   }

@@ -192,8 +192,25 @@ impl TerminalParser {
 
         // Flush remaining text.
         if text_start < pos {
-            let text = String::from_utf8_lossy(&buf[text_start..]).into_owned();
-            if !text.is_empty() { self.events.push(TerminalEvent::Text(text)); }
+            let text_bytes = &buf[text_start..];
+            match std::str::from_utf8(text_bytes) {
+                Ok(s) => {
+                    if !s.is_empty() { self.events.push(TerminalEvent::Text(s.to_owned())); }
+                }
+                Err(e) => {
+                    // Incomplete UTF-8 sequence at the end of the PTY chunk.
+                    // Emit only the valid prefix and keep the trailing bytes
+                    // in pending so they are completed by the next chunk.
+                    // Without this, a multi-byte character split across read()
+                    // boundaries becomes '�' and shifts every subsequent cell.
+                    let valid = e.valid_up_to();
+                    if valid > 0 {
+                        let text = String::from_utf8_lossy(&text_bytes[..valid]).into_owned();
+                        if !text.is_empty() { self.events.push(TerminalEvent::Text(text)); }
+                    }
+                    self.pending = text_bytes[valid..].to_vec();
+                }
+            }
         }
     }
 
@@ -476,6 +493,37 @@ mod tests {
         let e = events(b"\x1b7\x1b[r\x1b8");
         assert!(matches!(&e[0], TerminalEvent::SaveCursor));
         assert!(matches!(&e[1], TerminalEvent::RestoreCursor));
+    }
+
+    /// Multi-byte UTF-8 characters split across PTY read boundaries must not
+    /// become replacement characters ('�') — that shifts column accounting.
+    #[test]
+    fn utf8_split_across_chunks() {
+        let mut p = TerminalParser::new();
+        // ─ (U+2500) is encoded as E2 94 80
+        p.push(b"\xE2\x94");
+        assert!(p.take_events().is_empty()); // incomplete sequence stays pending
+        p.push(b"\x80");
+        let e = p.take_events();
+        assert_eq!(e.len(), 1);
+        assert!(matches!(&e[0], TerminalEvent::Text(t) if t == "\u{2500}"));
+    }
+
+    /// A long box-drawing border must survive arbitrary chunk boundaries.
+    #[test]
+    fn utf8_box_drawing_across_many_chunks() {
+        let mut p = TerminalParser::new();
+        let border = "\u{2500}".repeat(100); // 100 box-drawing chars
+        let bytes = border.as_bytes();
+        for chunk in bytes.chunks(7) { // 7 bytes crosses many UTF-8 boundaries
+            p.push(chunk);
+        }
+        let e = p.take_events();
+        let text: String = e.iter().filter_map(|ev| match ev {
+            TerminalEvent::Text(t) => Some(t.as_str()),
+            _ => None,
+        }).collect();
+        assert_eq!(text, border, "UTF-8 border corrupted across chunk boundaries");
     }
 
     /// ITU-style colon sub-params are treated like semicolons so that
