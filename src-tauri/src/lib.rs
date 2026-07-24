@@ -34,6 +34,7 @@ pub fn run() {
             commands::resize_pty,
             commands::close_pty,
             commands::list_pty,
+            commands::has_foreground_process,
             commands::exit_app,
             commands::load_settings,
             commands::save_settings,

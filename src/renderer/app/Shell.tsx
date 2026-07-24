@@ -6,7 +6,7 @@ import { StatusBar } from '../components/layout/StatusBar';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { useTerminalStore } from '@renderer/stores/terminal-store';
 import { t } from '../i18n';
-import { closePTY, exitApp } from '../../api';
+import { closePTY, exitApp, hasForegroundProcess } from '../../api';
 import { useSessionLifecycle } from './hooks/useSessionLifecycle';
 import { useBackendEvents } from './hooks/useBackendEvents';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
@@ -30,11 +30,22 @@ export const Shell: React.FC = () => {
 
   // Closing the LAST tab goes straight to the exit dialog — showing the
   // force-close dialog first would make the user confirm twice.
-  const requestCloseTab = (id: string) => {
-    if (useTerminalStore.getState().sessions.length <= 1) {
-      setShowExitDialog(true);
-    } else {
+  // In both cases the confirmation is skipped when the session's shell is
+  // idle (no foreground process): nothing would be lost by closing.
+  const requestCloseTab = async (id: string) => {
+    const isLastTab = useTerminalStore.getState().sessions.length <= 1;
+    // Safe default: if we can't determine process state, ask.
+    const busy = await hasForegroundProcess(id).catch(() => true);
+    if (isLastTab) {
+      if (busy) {
+        setShowExitDialog(true);
+      } else {
+        exitApp().catch(() => window.close());
+      }
+    } else if (busy) {
       setClosingId(id);
+    } else {
+      closePTY(id).catch(() => {});
     }
   };
 

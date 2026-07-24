@@ -23,6 +23,14 @@ export class FakeTauriBackend {
   nextId = 1;
   exitRequested = false;
   customInvoke?: InvokeHandler;
+  /** Sessions with a simulated running foreground process (vim, top, ...). */
+  busySessions = new Set<string>();
+
+  /** Mark whether a session has a foreground process running. */
+  setBusy(id: string, busy = true): void {
+    if (busy) this.busySessions.add(id);
+    else this.busySessions.delete(id);
+  }
 
   /** Install as the active mock. Call before importing modules that use @tauri-apps/api. */
   install() {
@@ -81,6 +89,8 @@ export class FakeTauriBackend {
         return;
       case 'list_pty':
         return this.sessions;
+      case 'has_foreground_process':
+        return this.busySessions.has(args!.sessionId as string);
       case 'exit_app':
         this.exitRequested = true;
         return;
