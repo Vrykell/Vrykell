@@ -52,19 +52,17 @@ npm run test:e2e      # Playwright E2E
 ```
 ai-terminal/
 ├── src-tauri/            # Rust 后端 (portable-pty + Tauri IPC)
-│   └── src/              # pty.rs, session.rs, commands.rs, settings.rs,
-│                         # terminal_parser.rs (ANSI → 结构化 TerminalEvent)
+│   └── src/              # app/(commands,state) · core/(models,store,settings)
+│                         # · pty/(manager,session,parser,events)
 ├── src/
-│   ├── api/              # Tauri invoke/listen 桥接
-│   ├── renderer/         # React 前端
-│   │   ├── terminal/     # 自研 DOM 终端: buffer.ts / useDomTerminal.ts / TerminalView.tsx
-│   │   ├── components/   # terminal, output, ai, layout, common(ConfirmDialog)
-│   │   ├── hooks/        # useRichContent
-│   │   ├── i18n/         # 中英文案 (en/zh)
-│   │   ├── services/     # content-detector
-│   │   └── stores/       # Zustand store
-│   ├── shared/           # 类型, 富内容协议, TerminalEvent 类型
-│   └── test/             # fake-tauri 测试桩
+│   ├── api/              # Tauri 桥接（core/events/settings 分域）
+│   ├── renderer/         # React 前端（feature-based）
+│   │   ├── features/     # terminal(engine+ui) · rich-content(pipeline+ui) · ai(ui)
+│   │   ├── components/   # 跨 feature 共享（common, layout）
+│   │   ├── stores/       # Zustand root-store + slices/
+│   │   └── i18n/         # 中英文案 (en/zh)
+│   ├── shared/           # types/ · protocol/ · terminal/（前后端协议）
+│   └── test/             # fake-tauri 测试桩 + fixtures/
 ├── e2e/                  # Playwright E2E 测试
 └── docs/                 # 文档
 ```

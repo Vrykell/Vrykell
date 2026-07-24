@@ -7,7 +7,7 @@
  * write() method to eliminate that variable.
  */
 import * as fs from 'node:fs';
-import { TerminalBuffer } from '../../src/renderer/terminal/buffer';
+import { TerminalBuffer } from '../../src/renderer/features/terminal/engine/buffer';
 
 function assert(cond: boolean, msg: string) {
   if (!cond) { console.error('FAIL:', msg); process.exit(1); }
