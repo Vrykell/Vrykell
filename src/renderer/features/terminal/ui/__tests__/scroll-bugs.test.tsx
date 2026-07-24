@@ -108,4 +108,81 @@ describe('Scroll persistence', () => {
       expect(view.scrollTop).toBe(bottomPos);
     }
   });
+
+  it('renders from the actual scroll position when unpinned', () => {
+    // An unpinned user reading history must get the exact slice for their
+    // scrollTop — never a snapped/clamped range.
+    // ('\r\n' so text line N lives at buffer index N.)
+    for (let i = 0; i < 200; i++) buf.write(`line ${i}\r\n`);
+
+    const { container } = renderTerm();
+    const view = container.querySelector('[data-testid="terminal-view"]') as HTMLElement;
+    const totalH = 200 * LINE_HEIGHT;
+    const viewportH = 400;
+    setLayout(view, viewportH, totalH);
+
+    // Scroll 10 lines above the bottom (outside the 5-line pinned zone).
+    const pos = totalH - viewportH - LINE_HEIGHT * 10;
+    Object.defineProperty(view, 'scrollTop', { value: pos, writable: true, configurable: true });
+    act(() => { fireEvent.scroll(view); });
+
+    // The re-rendered slice starts at floor(scrollTop / LINE_HEIGHT) - OVERSCAN.
+    const expectedStart = Math.floor(pos / LINE_HEIGHT) - 15; // OVERSCAN
+    const first = container.querySelector('[data-testid="terminal-line"]');
+    expect(first?.textContent).toContain(`line ${expectedStart}`);
+    expect(view.scrollTop).toBe(pos);
+  });
+
+  it('reverts a browser-initiated downward scroll right after input', () => {
+    // While scrolled up reading history, typing makes the browser scroll the
+    // off-screen hidden textarea (positioned at the cursor, near the bottom)
+    // into view. That jump is not user intent and must be undone.
+    for (let i = 0; i < 200; i++) buf.write(`line ${i}\n`);
+
+    const { container } = renderTerm();
+    const view = container.querySelector('[data-testid="terminal-view"]') as HTMLElement;
+    const textarea = container.querySelector('[data-testid="terminal-textarea"]') as HTMLElement;
+    const totalH = 200 * LINE_HEIGHT;
+    const viewportH = 400;
+    setLayout(view, viewportH, totalH);
+
+    // User scrolls up 50 lines to read history.
+    const readPos = totalH - viewportH - LINE_HEIGHT * 50;
+    Object.defineProperty(view, 'scrollTop', { value: readPos, writable: true, configurable: true });
+    act(() => { fireEvent.scroll(view); });
+
+    // User types a character (arms the input guard)…
+    fireEvent.keyDown(textarea, { key: 'a' });
+
+    // …and the browser yanks the container down to reveal the textarea.
+    Object.defineProperty(view, 'scrollTop', { value: totalH - viewportH, writable: true, configurable: true });
+    act(() => { fireEvent.scroll(view); });
+
+    // The guard restored the reading position.
+    expect(view.scrollTop).toBe(readPos);
+  });
+
+  it('honors an upward scroll right after input (reading further back)', () => {
+    for (let i = 0; i < 200; i++) buf.write(`line ${i}\n`);
+
+    const { container } = renderTerm();
+    const view = container.querySelector('[data-testid="terminal-view"]') as HTMLElement;
+    const textarea = container.querySelector('[data-testid="terminal-textarea"]') as HTMLElement;
+    const totalH = 200 * LINE_HEIGHT;
+    const viewportH = 400;
+    setLayout(view, viewportH, totalH);
+
+    const readPos = totalH - viewportH - LINE_HEIGHT * 50;
+    Object.defineProperty(view, 'scrollTop', { value: readPos, writable: true, configurable: true });
+    act(() => { fireEvent.scroll(view); });
+
+    fireEvent.keyDown(textarea, { key: 'a' });
+
+    // The user immediately keeps scrolling UP — always legitimate.
+    const higherPos = readPos - LINE_HEIGHT * 10;
+    Object.defineProperty(view, 'scrollTop', { value: higherPos, writable: true, configurable: true });
+    act(() => { fireEvent.scroll(view); });
+
+    expect(view.scrollTop).toBe(higherPos);
+  });
 });
