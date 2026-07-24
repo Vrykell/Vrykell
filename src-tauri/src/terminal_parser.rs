@@ -161,6 +161,22 @@ impl TerminalParser {
                                 return;
                             }
                         }
+                        // DECSC / DECRC (ESC 7 / ESC 8) — same semantics as CSI s/u.
+                        b'7' => { self.events.push(TerminalEvent::SaveCursor); pos += 1; }
+                        b'8' => { self.events.push(TerminalEvent::RestoreCursor); pos += 1; }
+                        // Charset designation (ESC ( B, ESC ( 0, …) and DEC
+                        // special sequences (ESC # 8) take a FINAL byte after
+                        // the designator.  Skip BOTH bytes — previously only
+                        // the designator was skipped and the final byte (e.g.
+                        // 'B') leaked into the text stream as garbage.
+                        b'(' | b')' | b'*' | b'+' | b'#' => {
+                            if pos + 2 < len {
+                                pos += 2;
+                            } else {
+                                self.pending = buf[pos..].to_vec();
+                                return;
+                            }
+                        }
                         _ => { pos += 1; } // simple ESC
                     }
                 }
@@ -208,7 +224,23 @@ impl TerminalParser {
         let is_private = params.first() == Some(&b'?');
         let param_slice = if is_private { &params[1..] } else { params };
 
-        // Parse semicolon-separated integers.
+        // xterm private sequences use `>`, `<`, `=` as the first param byte:
+        //   CSI > ... m   modifyOtherKeys
+        //   CSI < u       kitty keyboard protocol pop
+        //   CSI > u       kitty keyboard protocol push
+        //   CSI = ...     other private protocols
+        // They are NOT the standard sequence with the same final byte —
+        // previously CSI > 4 m was misread as SGR(4) (underline everything)
+        // and CSI < u as RestoreCursor (cursor teleported mid-frame, which
+        // is what scattered TUI frames and spawned phantom cursors).
+        let first = params.first().copied().unwrap_or(0);
+        if first == b'>' || first == b'<' || first == b'=' {
+            return;
+        }
+
+        // Parse semicolon-separated integers.  Colons (ITU-style sub-params,
+        // e.g. SGR 38:5:220) are treated like semicolons — for color
+        // sequences this yields exactly the params the semicolon form would.
         let mut p: Vec<u16> = Vec::with_capacity(4);
         let mut n: u16 = 0;
         let mut has_digit = false;
@@ -216,7 +248,7 @@ impl TerminalParser {
             if b.is_ascii_digit() {
                 n = n.saturating_mul(10).saturating_add((b - b'0') as u16);
                 has_digit = true;
-            } else if b == b';' {
+            } else if b == b';' || b == b':' {
                 p.push(n);
                 n = 0;
                 has_digit = false;
@@ -404,5 +436,54 @@ mod tests {
     fn cup_beyond_width() {
         let e = events(b"\x1b[10;200H");
         assert!(matches!(&e[0], TerminalEvent::Cup(10, 200)));
+    }
+
+    /// ESC ( B (charset designation) must skip BOTH bytes — the final 'B'
+    /// must not leak into the text stream.
+    #[test]
+    fn charset_designation_does_not_leak_final_byte() {
+        let e = events(b"\x1b(Bhello\x1b(0world");
+        let text: String = e.iter().filter_map(|ev| match ev {
+            TerminalEvent::Text(t) => Some(t.as_str()),
+            _ => None,
+        }).collect();
+        assert_eq!(text, "helloworld", "charset final byte leaked as text: {:?}", text);
+    }
+
+    /// xterm private CSI (`>`, `<`, `=` prefix) must be ignored, NOT
+    /// reinterpreted as the standard sequence with the same final byte.
+    #[test]
+    fn xterm_private_csi_is_ignored() {
+        // CSI > 4 m (modifyOtherKeys) must NOT become SGR(4)
+        let e = events(b"\x1b[>4mX");
+        assert!(e.iter().all(|ev| !matches!(ev, TerminalEvent::Sgr(_))),
+                "modifyOtherKeys leaked as SGR: {:?}", e);
+
+        // CSI < u (kitty keyboard pop) must NOT become RestoreCursor
+        let e = events(b"\x1b[<uX");
+        assert!(e.iter().all(|ev| !matches!(ev, TerminalEvent::RestoreCursor)),
+                "kitty keyboard pop leaked as RestoreCursor: {:?}", e);
+
+        // CSI > u (kitty keyboard push) must NOT become RestoreCursor either
+        let e = events(b"\x1b[>uX");
+        assert!(e.iter().all(|ev| !matches!(ev, TerminalEvent::RestoreCursor)),
+                "kitty keyboard push leaked as RestoreCursor: {:?}", e);
+    }
+
+    /// ESC 7 / ESC 8 are DECSC / DECRC — same as CSI s / CSI u.
+    #[test]
+    fn esc7_esc8_are_decsc_decrc() {
+        let e = events(b"\x1b7\x1b[r\x1b8");
+        assert!(matches!(&e[0], TerminalEvent::SaveCursor));
+        assert!(matches!(&e[1], TerminalEvent::RestoreCursor));
+    }
+
+    /// ITU-style colon sub-params are treated like semicolons so that
+    /// SGR 38:5:220 resolves identically to 38;5;220.
+    #[test]
+    fn colon_sgr_params() {
+        let e = events(b"\x1b[38:5:220m");
+        assert!(matches!(&e[0], TerminalEvent::Sgr(p) if p == &[38, 5, 220]),
+                "colon SGR misparsed: {:?}", &e[0]);
     }
 }

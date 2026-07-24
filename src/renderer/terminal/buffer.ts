@@ -289,6 +289,17 @@ export class TerminalBuffer {
           if (!complete) { this.pending = data.slice(start); return; }
           continue;
         }
+        // DECSC / DECRC (ESC 7 / ESC 8) — same semantics as CSI s / CSI u.
+        if (next === '7') { this.savedCx = this.cx; this.savedCy = this._cy; i++; continue; }
+        if (next === '8') { this.cx = Math.min(this.savedCx, this.cols - 1); this._cy = Math.min(this.savedCy, this.rows - 1); this.pendingWrap = false; i++; continue; }
+        // Charset designation (ESC ( B, ESC ( 0, …) and DEC specials (ESC # 8):
+        // a FINAL byte follows the designator — skip both, otherwise the
+        // final byte (e.g. 'B') leaks into the text stream as garbage.
+        if (next === '(' || next === ')' || next === '*' || next === '+' || next === '#') {
+          if (i + 1 >= len) { this.pending = data.slice(start); return; }
+          i += 2;
+          continue;
+        }
         i++; // simple ESC
         continue;
       }
@@ -310,7 +321,12 @@ export class TerminalBuffer {
   // ── CSI handler — final byte f, params in data[pos..end) ───────────────────
 
   private doCsi(f: number, data: string, pos: number, end: number): void {
-    const isPrivate = data.charCodeAt(pos) === 0x3f /* ? */;
+    const firstByte = data.charCodeAt(pos);
+    const isPrivate = firstByte === 0x3f /* ? */;
+    // xterm private sequences (`>`, `<`, `=` prefix — e.g. CSI > 4 m
+    // modifyOtherKeys, CSI < u kitty keyboard) must be IGNORED, not
+    // reinterpreted as the standard sequence with the same final byte.
+    if (firstByte === 0x3e /* > */ || firstByte === 0x3c /* < */ || firstByte === 0x3d /* = */) return;
     const pStart = isPrivate ? pos + 1 : pos;
     const [p] = parseCsiParams(data, pStart, end);
 
