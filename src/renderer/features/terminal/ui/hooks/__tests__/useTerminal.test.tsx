@@ -127,7 +127,15 @@ describe('useDomTerminal integration', () => {
         .getAllByTestId('terminal-line')
         .map((l) => l.textContent || '')
         .filter((t) => t.includes('x') || t.includes('y'));
-      expect(texts).toEqual(['x'.repeat(40), 'y'.repeat(20), 'y'.repeat(20)]);
+      // With resize reflow the 40-col x-line is REWRAPPED to two 20-col
+      // lines when the 20-col batch arrives — content preserved, history
+      // reflowed (iTerm2-style). The y's follow on two wrapped lines.
+      expect(texts).toEqual([
+        'x'.repeat(20),
+        'x'.repeat(20),
+        'y'.repeat(20),
+        'y'.repeat(20),
+      ]);
     });
   });
 

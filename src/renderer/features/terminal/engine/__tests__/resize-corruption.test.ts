@@ -224,13 +224,16 @@ describe('Resize corruption — stale events at wrong width', () => {
     buf.applyEvents(makeTuiRender(currentWidth, 3));
 
     const lines = snapshot(buf);
+    // Reflow may push older frames into scrollback — only the VISIBLE
+    // SCREEN (last `rows` lines) must reflect the final render.
+    const screen = lines.slice(-buf.rows);
     // Final header should show last width
-    const header = lines.find(l => l.includes('TUI at'));
+    const header = screen.find(l => l.includes('TUI at'));
     expect(header).toBeDefined();
     if (header) expect(header).toContain(`${currentWidth} cols`);
 
-    // No single-char scattered lines
-    const scattered = lines.filter(l => {
+    // No single-char scattered lines on the visible screen
+    const scattered = screen.filter(l => {
       const visible = l.replace(/\s/g, '');
       return visible.length === 1 && l.length > 20;
     });
@@ -305,12 +308,12 @@ describe('Resize corruption — stale events at wrong width', () => {
       { t: 'txt', p: 'Y' },
     ]);
 
-    // The 'Y' should be at column 39 (0-indexed), row 4 (0-indexed)
+    // Reflow may shift rows when the X-line rewraps — the invariant that
+    // matters is the COLUMN: Y must land at clamped col 39 (cols - 1).
     const lines = snapshot(buf);
-    const line4 = lines[4];
-    expect(line4).toBeDefined();
-    const yPos = line4.indexOf('Y');
-    expect(yPos).toBe(39); // clamped from 59 to 39
+    const yLine = lines.find(l => l.includes('Y'));
+    expect(yLine).toBeDefined();
+    expect(yLine!.indexOf('Y')).toBe(39); // clamped from 59 to 39
   });
 
   // ──────────────────────────────────────────────────────────────────────────

@@ -149,3 +149,93 @@ describe('Terminal resize', () => {
     expect(result.trim()).toBe('A'.repeat(90));
   });
 });
+
+describe('resize reflow (soft-wrap rewrapping)', () => {
+  let buf: TerminalBuffer;
+
+  beforeEach(() => {
+    buf = new TerminalBuffer();
+  });
+
+  const text = (buf: TerminalBuffer) =>
+    buf.lines.map((l) => l.cells.map((c) => c.char).join('')).join('\n');
+
+  it('rewraps a soft-wrapped line when narrowing', () => {
+    buf.resize(80);
+    buf.write('X'.repeat(150)); // 80 + 70 across two soft-wrapped lines
+    expect(buf.lines[1].wrapped).toBe(true);
+
+    buf.resize(40);
+    expect(lineText(buf, 0)).toBe('X'.repeat(40));
+    expect(lineText(buf, 1)).toBe('X'.repeat(40));
+    expect(lineText(buf, 2)).toBe('X'.repeat(40));
+    expect(lineText(buf, 3)).toBe('X'.repeat(30));
+    expect(buf.lines[1].wrapped).toBe(true);
+    expect(buf.lines[3].wrapped).toBe(true);
+  });
+
+  it('rejoins soft-wrapped lines when widening', () => {
+    buf.resize(40);
+    buf.write('Y'.repeat(100)); // 40 + 40 + 20
+    buf.resize(80);
+    expect(lineText(buf, 0)).toBe('Y'.repeat(80));
+    expect(lineText(buf, 1)).toBe('Y'.repeat(20));
+    expect(lineText(buf, 2)).toBe('');
+  });
+
+  it('preserves hard newlines', () => {
+    buf.resize(80);
+    buf.write('aaa\r\nbbb');
+    buf.resize(40);
+    expect(lineText(buf, 0)).toBe('aaa');
+    expect(lineText(buf, 1)).toBe('bbb');
+    expect(buf.lines[1].wrapped).toBeFalsy();
+  });
+
+  it('reflows scrollback, not just the visible screen', () => {
+    buf.resize(80);
+    buf.write('S'.repeat(150) + '\r\n'); // long line destined for scrollback
+    for (let i = 0; i < buf.rows + 5; i++) buf.write(`filler-${i}\r\n`);
+    expect(buf.lines.length).toBeGreaterThan(buf.rows);
+
+    buf.resize(40);
+    const all = text(buf);
+    expect(all).toContain('S'.repeat(40));
+    expect(buf.lines.length).toBeGreaterThan(buf.rows); // still scrolled
+    // The S-run is now 4 visual lines; all S content preserved.
+    expect((all.match(/S/g) ?? []).length).toBe(150);
+  });
+
+  it('never splits a wide (CJK) character across the new boundary', () => {
+    buf.resize(40);
+    buf.write('你'.repeat(25)); // 50 cols worth: 20 on line 0, 5 on line 1
+    buf.resize(30);
+    const all = text(buf);
+    expect((all.match(/你/g) ?? []).length).toBe(25);
+    for (const line of buf.lines) {
+      line.cells.forEach((c, i) => {
+        if (c.wide) expect(line.cells[i - 1]?.char).toBe('你');
+      });
+    }
+  });
+
+  it('keeps the cursor on its logical position after reflow', () => {
+    buf.resize(80);
+    buf.write('prompt$ ' + 'Z'.repeat(100)); // 8 + 100 = 108 cols: 80 + 28
+    expect(buf.cx).toBe(28);
+    buf.resize(40);
+    expect(buf.cx).toBe(108 % 40); // 28
+    expect(buf.cy).toBe(Math.floor(108 / 40)); // 2
+    expect(lineText(buf, buf.cy)).toBe('Z'.repeat(28));
+  });
+
+  it('round-trips narrow → wide → narrow without losing content', () => {
+    buf.resize(80);
+    const msg = 'The quick brown fox jumps over the lazy dog. '.repeat(6); // 270 chars
+    buf.write(msg);
+    buf.resize(40);
+    buf.resize(80);
+    const joined = buf.lines.map((l) => l.cells.map((c) => c.char).join('')).join('');
+    expect(joined.startsWith(msg)).toBe(true);
+  });
+});
