@@ -48,43 +48,95 @@ function charWidth(code: number): number {
   if (code >= 0xfe00 && code <= 0xfe0f) return 0;   // variation selectors 1-16
   if (code >= 0xe0020 && code <= 0xe007f) return 0; // tag characters
   if (code >= 0xe0100 && code <= 0xe01ef) return 0; // variation selectors 17-256
+  // These two emoji are BELOW the narrow-CJK cutoff — string-width counts
+  // them 2, so they must be checked before the < 0x1100 early return.
+  if (code === 0xa9 || code === 0xae) return 2;    // © ®
   if (code < 0x1100) return 1;
   // ── Wide (2 columns) ───────────────────────────────────────────────────
   if (code <= 0x115f) return 2;                     // Hangul Jamo
-  if (code >= 0x231a && code <= 0x231b) return 2;   // ⌚⌛
+  // BMP emoji — authoritative list measured against string-width@7 (the
+  // exact package Ink/Claude Code uses for column accounting).  Every
+  // codepoint here returns 2 from string-width; matching it is what keeps
+  // our line-length accounting identical to the TUI's and prevents phantom
+  // wraps.  (Notable: © ® ™ ▶ ◀ ⚠ ✨ ⏸ all count 2.)
+  if (code === 0x203c || code === 0x2049) return 2;
+  if (code === 0x2122 || code === 0x2139) return 2;
+  if (code >= 0x2194 && code <= 0x2199) return 2;
+  if (code >= 0x21a9 && code <= 0x21aa) return 2;
+  if (code >= 0x231a && code <= 0x231b) return 2;
+  if (code === 0x2328) return 2;
+  if (code === 0x23cf) return 2;
+  if (code >= 0x23e9 && code <= 0x23f3) return 2;
+  if (code >= 0x23f8 && code <= 0x23fa) return 2;
+  if (code === 0x24c2) return 2;
+  if (code >= 0x25aa && code <= 0x25ab) return 2;
+  if (code === 0x25b6 || code === 0x25c0) return 2;
+  if (code >= 0x25fb && code <= 0x25fe) return 2;
+  if (code >= 0x2600 && code <= 0x2604) return 2;
+  if (code === 0x260e) return 2;
+  if (code === 0x2611) return 2;
+  if (code >= 0x2614 && code <= 0x2615) return 2;
+  if (code === 0x2618) return 2;
+  if (code === 0x261d) return 2;
+  if (code === 0x2620) return 2;
+  if (code >= 0x2622 && code <= 0x2623) return 2;
+  if (code === 0x2626) return 2;
+  if (code === 0x262a) return 2;
+  if (code >= 0x262e && code <= 0x262f) return 2;
+  if (code >= 0x2638 && code <= 0x263a) return 2;
+  if (code === 0x2640 || code === 0x2642) return 2;
+  if (code >= 0x2648 && code <= 0x2653) return 2;
+  if (code === 0x265f || code === 0x2660) return 2;
+  if (code === 0x2663) return 2;
+  if (code >= 0x2665 && code <= 0x2666) return 2;
+  if (code === 0x2668) return 2;
+  if (code === 0x267b) return 2;
+  if (code >= 0x267e && code <= 0x267f) return 2;
+  if (code >= 0x2692 && code <= 0x2697) return 2;
+  if (code === 0x2699) return 2;
+  if (code >= 0x269b && code <= 0x269c) return 2;
+  if (code >= 0x26a0 && code <= 0x26a1) return 2;
+  if (code === 0x26a7) return 2;
+  if (code >= 0x26aa && code <= 0x26ab) return 2;
+  if (code >= 0x26b0 && code <= 0x26b1) return 2;
+  if (code >= 0x26bd && code <= 0x26be) return 2;
+  if (code >= 0x26c4 && code <= 0x26c5) return 2;
+  if (code === 0x26c8) return 2;
+  if (code === 0x26ce || code === 0x26cf) return 2;
+  if (code === 0x26d1) return 2;
+  if (code >= 0x26d3 && code <= 0x26d4) return 2;
+  if (code >= 0x26e9 && code <= 0x26ea) return 2;
+  if (code >= 0x26f0 && code <= 0x26f5) return 2;
+  if (code >= 0x26f7 && code <= 0x26fa) return 2;
+  if (code === 0x26fd) return 2;
+  if (code === 0x2702) return 2;
+  if (code === 0x2705) return 2;
+  if (code >= 0x2708 && code <= 0x270d) return 2;
+  if (code === 0x270f) return 2;
+  if (code === 0x2712) return 2;
+  if (code === 0x2714) return 2;
+  if (code === 0x2716) return 2;
+  if (code === 0x271d) return 2;
+  if (code === 0x2721) return 2;
+  if (code === 0x2728) return 2;
+  if (code >= 0x2733 && code <= 0x2734) return 2;
+  if (code === 0x2744) return 2;
+  if (code === 0x2747) return 2;
+  if (code === 0x274c) return 2;
+  if (code === 0x274e) return 2;
+  if (code >= 0x2753 && code <= 0x2755) return 2;
+  if (code === 0x2757) return 2;
+  if (code >= 0x2763 && code <= 0x2764) return 2;
+  if (code >= 0x2795 && code <= 0x2797) return 2;
+  if (code === 0x27a1) return 2;
+  if (code === 0x27b0) return 2;
+  if (code === 0x27bf) return 2;
+  if (code >= 0x2934 && code <= 0x2935) return 2;
+  if (code >= 0x2b05 && code <= 0x2b07) return 2;
+  if (code === 0x2b1b || code === 0x2b1c) return 2;
+  if (code === 0x2b50) return 2;
+  if (code === 0x2b55) return 2;
   if (code >= 0x2329 && code <= 0x232a) return 2;   // 〈〉
-  if (code >= 0x23e9 && code <= 0x23ec) return 2;   // ⏩..⏬
-  if (code === 0x23f0 || code === 0x23f3) return 2; // ⏰⏳
-  if (code >= 0x23f8 && code <= 0x23fa) return 2;   // ⏸⏹⏺
-  if (code === 0x25fd || code === 0x25fe) return 2; // ◽◾
-  if (code === 0x2614 || code === 0x2615) return 2; // ☔☕
-  if (code >= 0x2648 && code <= 0x2653) return 2;   // zodiac
-  if (code === 0x267f) return 2;                    // ♿
-  if (code === 0x2693) return 2;                    // ⚓
-  if (code === 0x26a1) return 2;                    // ⚡
-  if (code === 0x26aa || code === 0x26ab) return 2; // ⚪⚫
-  if (code === 0x26bd || code === 0x26be) return 2; // ⚽⚾
-  if (code === 0x26c4 || code === 0x26c5) return 2; // ⛄⛅
-  if (code === 0x26ce) return 2;                    // ⛎
-  if (code === 0x26d4) return 2;                    // ⛔
-  if (code === 0x26ea) return 2;                    // ⛪
-  if (code >= 0x26f2 && code <= 0x26f3) return 2;   // ⛲⛳
-  if (code === 0x26f5) return 2;                    // ⛵
-  if (code === 0x26fa) return 2;                    // ⛺
-  if (code === 0x26fd) return 2;                    // ⛽
-  if (code === 0x2705) return 2;                    // ✅
-  if (code >= 0x270a && code <= 0x270b) return 2;   // ✊✋
-  if (code === 0x2728) return 2;                    // ✨
-  if (code === 0x274c) return 2;                    // ❌
-  if (code === 0x274e) return 2;                    // ❎
-  if (code >= 0x2753 && code <= 0x2755) return 2;   // ❓❔❕
-  if (code === 0x2757) return 2;                    // ❗
-  if (code >= 0x2795 && code <= 0x2797) return 2;   // ➕➖➗
-  if (code === 0x27b0) return 2;                    // ➰
-  if (code === 0x27bf) return 2;                    // ➿
-  if (code === 0x2b1b || code === 0x2b1c) return 2; // ⬛⬜
-  if (code === 0x2b50) return 2;                    // ⭐
-  if (code === 0x2b55) return 2;                    // ⭕
   if (code >= 0x2e80 && code <= 0x303e) return 2;
   if (code >= 0x3040 && code <= 0x33bf) return 2;
   if (code >= 0x3400 && code <= 0x4dbf) return 2;
@@ -439,11 +491,35 @@ export class TerminalBuffer {
 
   // ── Char output ────────────────────────────────────────────────────────────
 
+  /**
+   * Dev-mode wrap forensics: TUI frames should NEVER auto-wrap (Ink pads
+   * lines to exactly `cols`).  A wrap inside the alt screen means our
+   * width accounting disagreed with the app by ≥1 column — the phantom
+   * line that follows is what splits cursors and leaves residue.  Each
+   * wrap logs the offending line's text + codepoints so the mismatching
+   * character can be identified from a bug report.
+   */
+  wrapLog: string[] = [];
+  private static MAX_WRAP_LOG = 50;
+
   private putChar(ch: string): void {
     const w = charWidth(ch.codePointAt(0) ?? 0);
     if (w === 0) return;
     if (w === 2 && this.cx >= this.cols - 1) { this.cx = 0; this.lf(); }
-    if (this.pendingWrap) { this.cx = 0; this.lf(); this.pendingWrap = false; }
+    if (this.pendingWrap) {
+      if (this.altActive) {
+        const ln = this.line();
+        const tail = ln.cells.slice(-12).map((c) => {
+          const cp = c.char.codePointAt(0) ?? 0;
+          return c.wide ? '<cont>' : `U+${cp.toString(16)}'${c.char}'`;
+        });
+        const entry = `wrap@cy=${this._cy} cols=${this.cols} tail=[${tail.join(' ')}] next=U+${(ch.codePointAt(0) ?? 0).toString(16)}'${ch}'`;
+        this.wrapLog.push(entry);
+        if (this.wrapLog.length > TerminalBuffer.MAX_WRAP_LOG) this.wrapLog.shift();
+        if (typeof console !== 'undefined') console.warn('[terminal-wrap]', entry);
+      }
+      this.cx = 0; this.lf(); this.pendingWrap = false;
+    }
 
     const ln = this.line();
     while (ln.cells.length <= this.cx + w - 1) ln.cells.push({ char: ' ' });
