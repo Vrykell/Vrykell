@@ -6,7 +6,7 @@
  * Rust parser → structured events → applyEvents pipeline.
  */
 import * as pty from 'node-pty';
-import { TerminalBuffer } from '../../src/renderer/terminal/buffer';
+import { TerminalBuffer } from '../../src/renderer/features/terminal/engine/buffer';
 
 // Minimal re-implementation of the Rust parser's output format
 interface TerminalEvent {

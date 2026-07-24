@@ -1,14 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { TerminalView } from './components/terminal/TerminalView';
-import { getCharWidth } from './terminal/useDomTerminal';
-import { TerminalTabs } from './components/terminal/TerminalTabs';
-import { RichOutput } from './components/output/RichOutput';
-import { AIChatPanel } from './components/ai/AIChatPanel';
+import { TerminalView } from './features/terminal/ui/TerminalView';
+import { getCharWidth } from './features/terminal/engine/char-width';
+import { TerminalTabs } from './features/terminal/ui/TerminalTabs';
+import { RichOutput } from './features/rich-content/ui/RichOutput';
+import { AIChatPanel } from './features/ai/ui/AIChatPanel';
 import { StatusBar } from './components/layout/StatusBar';
 import { ConfirmDialog } from './components/common/ConfirmDialog';
 import { useTerminalStore } from './stores/terminal-store';
 import { t } from './i18n';
-import { useRichContent } from './hooks/useRichContent';
+import { useRichContent } from './features/rich-content/ui/hooks/useRichContent';
 import {
   createPTY, closePTY, exitApp,
   onSessionCreated, onSessionClosed, onPTYExit,

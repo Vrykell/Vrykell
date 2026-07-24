@@ -1,21 +1,22 @@
 #![allow(dead_code)] // Phase 1-4 placeholders
 
-mod commands;
+mod app;
+mod core;
 mod pty;
-mod session;
-mod settings;
-mod terminal_parser;
 
-use commands::AppState;
-use session::SessionStore;
-use settings::SettingsManager;
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
+
+use app::commands;
+use app::state::AppState;
+use core::settings::SettingsManager;
+use core::store::SessionStore;
+use pty::manager::PtyManager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let store = Arc::new(Mutex::new(SessionStore::new()));
-    let pty_manager = pty::PtyManager::new(store);
+    let pty_manager = PtyManager::new(store);
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -23,10 +24,7 @@ pub fn run() {
             let data_dir = app.path().app_data_dir()
                 .map_err(|e| e.to_string())?;
             let settings = SettingsManager::new(data_dir);
-            let state = Arc::new(Mutex::new(AppState {
-                pty_manager,
-                settings,
-            }));
+            let state = AppState::new(pty_manager, settings);
             app.manage(state);
             Ok(())
         })

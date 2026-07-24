@@ -1,4 +1,4 @@
-import type { SessionInfo, SessionOptions } from '../shared/types';
+import type { SessionInfo, SessionOptions } from '../shared/types/index';
 
 export type EventMap = {
   'pty:output': { sessionId: string; events: { t: string; p?: unknown }[]; cols?: number; rows?: number };

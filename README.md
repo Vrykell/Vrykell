@@ -49,26 +49,32 @@ npm run build
 src-tauri/             # Rust 后端 (portable-pty + tokio)
   └── src/
       ├── main.rs              # Tauri 入口
-      ├── lib.rs               # 命令注册 + Builder 配置
-      ├── pty.rs               # PTY 管理器（spawn/写入/读取/resize/强制终止）
-      ├── session.rs           # 会话存储
-      ├── commands.rs          # Tauri IPC 命令（8 个）
-      ├── settings.rs          # 应用设置持久化（app_data_dir）
-      └── terminal_parser.rs   # ANSI 解析器 → 结构化 TerminalEvent
+      ├── lib.rs               # 模块树 + Builder 配置
+      ├── app/                 # Tauri 应用层（commands.rs IPC 命令 / state.rs AppState）
+      ├── core/                # 核心域（models.rs 会话模型 / store.rs 会话存储 / settings.rs 设置持久化）
+      └── pty/                 # PTY 子系统（manager.rs 生命周期 / session.rs 会话句柄 /
+                               #   parser.rs ANSI → 结构化 TerminalEvent / events.rs 事件载荷）
 
 src/
-├── api/               # Tauri invoke/listen 桥接
-├── renderer/          # React 前端
-│   ├── terminal/      # 自研 DOM 终端（buffer.ts 缓冲, useDomTerminal.ts 输入/渲染,
-│   │                  #   TerminalView.tsx 虚拟滚动视图）
-│   ├── components/    # terminal/ output/ ai/ layout/ common(ConfirmDialog)
-│   ├── hooks/         # useRichContent
+├── api/               # Tauri invoke/listen 桥接（core/events/settings 分域，index 统一导出）
+├── renderer/          # React 前端（feature-based 组织）
+│   ├── features/
+│   │   ├── terminal/        # 自研 DOM 终端
+│   │   │   ├── engine/      #   纯 VT 引擎：buffer.ts（screen+scrollback 状态机）、char-width.ts
+│   │   │   └── ui/          #   TerminalView.tsx（虚拟滚动）、TerminalTabs.tsx、hooks/useTerminal.ts
+│   │   ├── rich-content/    # 富内容渲染
+│   │   │   ├── pipeline/    #   detector.ts 内容检测 + renderers/（Latex/Markdown/Code）
+│   │   │   └── ui/          #   RichOutput.tsx 面板 + hooks/useRichContent.ts
+│   │   └── ai/              # AI 对话面板（Phase 3）
+│   ├── components/    # 跨 feature 共享组件（common/ConfirmDialog, layout/StatusBar）
+│   ├── stores/        # Zustand：root-store.ts 组合 slices/（session/rich-content/settings/ai/ui）
 │   ├── i18n/          # 中英文案 (en/zh)
-│   ├── services/      # content-detector
-│   ├── stores/        # Zustand store
 │   └── styles/        # global.css（CSS 变量主题）
-├── shared/            # 类型定义, 富内容协议, TerminalEvent 类型
-└── test/              # fake-tauri 测试桩、测试 setup
+├── shared/            # 前后端共享协议
+│   ├── types/         #   按域拆分（session/settings/rich-content/ai，index 统一导出）
+│   ├── protocol/      #   OSC 6969 AI 富内容标记协议
+│   └── terminal/      #   TerminalEvent 类型（镜像 Rust 端）
+└── test/              # fake-tauri 测试桩、setup、fixtures/
 
 e2e/                   # Playwright E2E（含真实 Claude 进程 resize 集成测试）
 scripts/               # capture-resize.mjs 等调试脚本

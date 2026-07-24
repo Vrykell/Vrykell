@@ -2,7 +2,7 @@
 
 > 版本：v1.0  
 > 日期：2026-07-24  
-> 约束：**本方案不修改任何业务源代码**，仅作为目录与模块边界的重构蓝图。  
+> 状态：✅ **已执行**（分支 `refactor/project-structure`，8 阶段全部完成，`cargo test` 21 通过 / Vitest 140 通过 / E2E smoke+repro 通过）  
 > 配套文档：[architecture.md](../architecture.md)
 
 ---

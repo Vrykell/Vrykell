@@ -5,7 +5,7 @@
  * Run with: npx tsx e2e/specs/resize-claude.spec.ts
  */
 import * as pty from 'node-pty';
-import { TerminalBuffer } from '../../src/renderer/terminal/buffer';
+import { TerminalBuffer } from '../../src/renderer/features/terminal/engine/buffer';
 
 const CHAR_W = 8.4; // approximate
 const LINE_H = 16;
