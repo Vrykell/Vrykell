@@ -24,3 +24,7 @@ export function resizePTY(sessionId: string, cols: number, rows: number): Promis
 export function closePTY(sessionId: string): Promise<void> {
   return invoke('close_pty', { sessionId });
 }
+
+export function hasForegroundProcess(sessionId: string): Promise<boolean> {
+  return invoke('has_foreground_process', { sessionId });
+}
