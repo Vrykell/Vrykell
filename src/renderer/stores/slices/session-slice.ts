@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { SessionInfo } from '../../../shared/types/index';
+import { SessionInfo } from '@shared/types';
 
 export interface SessionSlice {
   sessions: SessionInfo[];

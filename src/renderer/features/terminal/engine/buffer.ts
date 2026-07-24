@@ -1,4 +1,4 @@
-import type { TerminalEvent } from '../../shared/terminal/events';
+import type { TerminalEvent } from '@shared/terminal/events';
 
 export interface Cell { char: string; fg?: string; bg?: string; bold?: boolean; italic?: boolean; underline?: boolean; /** true when this cell is the second half of a fullwidth character */ wide?: boolean; }
 export interface TerminalLine { cells: Cell[]; dirty: boolean; }

@@ -15,12 +15,14 @@ export default defineConfig({
     alias: {
       '@shared': resolve(__dirname, 'src/shared'),
       '@renderer': resolve(__dirname, 'src/renderer'),
+      '@api': resolve(__dirname, 'src/api'),
     },
   },
   resolve: {
     alias: {
       '@shared': resolve(__dirname, 'src/shared'),
       '@renderer': resolve(__dirname, 'src/renderer'),
+      '@api': resolve(__dirname, 'src/api'),
     },
   },
 });

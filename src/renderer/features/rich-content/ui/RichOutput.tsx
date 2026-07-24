@@ -1,6 +1,6 @@
 import React from 'react';
-import { useTerminalStore } from '../../../stores/terminal-store';
-import { RichOutputItem } from '../../../../shared/types/index';
+import { useTerminalStore } from '@renderer/stores/terminal-store';
+import { RichOutputItem } from '@shared/types';
 import { LatexRenderer } from '../pipeline/renderers/Latex';
 import { MarkdownRenderer } from '../pipeline/renderers/Markdown';
 import { CodeBlock } from '../pipeline/renderers/Code';

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { SessionInfo } from '../../shared/types/index';
+import { SessionInfo } from '@shared/types';
 import { createSessionSlice, SessionSlice } from './slices/session-slice';
 import { createRichContentSlice, RichContentSlice } from './slices/rich-content-slice';
 import { createSettingsSlice, SettingsSlice } from './slices/settings-slice';

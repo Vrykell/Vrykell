@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { useTerminalStore } from '../../../../stores/terminal-store';
+import { useTerminalStore } from '@renderer/stores/terminal-store';
 import { detectRichContent } from '../../pipeline/detector';
-import { RichOutputItem, DetectedBlock } from '../../../../../shared/types/index';
-import { onPTYOutput } from '../../../../../api';
+import { RichOutputItem, DetectedBlock } from '@shared/types';
+import { onPTYOutput } from '@api';
 
 const DETECTION_DEBOUNCE_MS = 300;
 const MAX_BUFFER_SIZE = 50000; // ~50KB of text before trimming

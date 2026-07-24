@@ -1,5 +1,5 @@
 import React from 'react';
-import { useTerminalStore } from '../../stores/terminal-store';
+import { useTerminalStore } from '@renderer/stores/terminal-store';
 
 export const StatusBar: React.FC = () => {
   const sessions = useTerminalStore((s) => s.sessions);

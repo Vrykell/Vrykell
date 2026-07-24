@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useTerminalStore } from '../terminal-store';
-import type { SessionInfo } from '../../../shared/types/index';
+import type { SessionInfo } from '@shared/types';
 
 describe('terminal store', () => {
   beforeEach(() => {

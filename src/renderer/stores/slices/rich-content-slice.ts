@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { RichOutputItem } from '../../../shared/types/index';
+import { RichOutputItem } from '@shared/types';
 
 export interface RichContentSlice {
   richOutputs: Record<string, RichOutputItem[]>;

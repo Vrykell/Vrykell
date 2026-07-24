@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { Message } from '../../../shared/types/index';
+import { Message } from '@shared/types';
 
 export interface AISlice {
   aiMessages: Message[];
