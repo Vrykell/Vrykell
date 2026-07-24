@@ -88,6 +88,13 @@ export function useDomTerminal(sessionId: string | null) {
   // Trigger a render when switching tabs so the cached buffer is shown.
   useEffect(() => { if (sessionId) scheduleRender(); }, [sessionId]);
 
+  // Expose the active buffer for forensics (DevTools: terminalBuffer.wrapLog).
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).terminalBuffer = buf;
+    }
+  }, [buf]);
+
   useEffect(() => {
     if (!sessionId) return;
     let cancelled = false;

@@ -318,6 +318,46 @@ describe('DomTerminalView virtual scroll', () => {
     expect(lastLineText).toContain('line 79');
   });
 
+  it('positions hidden textarea at the TUI cursor for IME alignment', () => {
+    const buf = new TerminalBuffer();
+    buf.resize(80);
+    buf.write('hello');
+    // Cursor is now at column 5 on the first (and only) line.
+    const { container } = render(
+      <DomTerminalView
+        buffer={buf}
+        onKeyDown={noop}
+        onInput={noop}
+        onCompositionStart={noop}
+        onCompositionEnd={noopE}
+        onResize={noopR}
+      />,
+    );
+    const textarea = container.querySelector('textarea') as HTMLElement;
+    expect(textarea).toBeTruthy();
+    // getCharWidth falls back to 8.4 in jsdom; left should be 5 * 8.4 = 42px.
+    expect(parseFloat(textarea.style.left)).toBeCloseTo(5 * 8.4, 0);
+    // Cursor is on line 0 (top of the 24-row screen), so bottom is near the
+    // container bottom: (rows - 1 - cy) * LINE_HEIGHT.
+    expect(parseFloat(textarea.style.bottom)).toBe((buf.rows - 1) * LINE_HEIGHT);
+
+    // Move cursor to column 10 and re-render.
+    buf.write('\x1b[1;11H');
+    const { container: c2 } = render(
+      <DomTerminalView
+        buffer={buf}
+        onKeyDown={noop}
+        onInput={noop}
+        onCompositionStart={noop}
+        onCompositionEnd={noopE}
+        onResize={noopR}
+      />,
+    );
+    const ta2 = c2.querySelector('textarea') as HTMLElement;
+    expect(parseFloat(ta2.style.left)).toBeCloseTo(10 * 8.4, 0);
+    expect(parseFloat(ta2.style.bottom)).toBe((buf.rows - 1) * LINE_HEIGHT);
+  });
+
   it('positions lines for TUI cursor mid-buffer (not pinned to bottom)', () => {
     // Simulate: a TUI (like Claude Code) has rendered a 40-line screen.
     // The cursor is on line 15. The user is NOT at the absolute bottom.

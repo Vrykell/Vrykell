@@ -48,7 +48,9 @@ function handleInvoke(ws: WebSocket, id: string, cmd: string, args: any) {
       const cols = args?.cols || 80;
       const rows = args?.rows || 24;
       const sid = `e2e-${nextId++}`;
-      const proc = pty.spawn(shell, [], {
+      // Spawn login shells with no rc files for deterministic E2E output
+      const noRc = /zsh$/.test(shell) ? ['-f'] : /bash$/.test(shell) ? ['--noprofile', '--norc'] : [];
+      const proc = pty.spawn(shell, noRc, {
         name: 'xterm-256color',
         cwd,
         env: process.env as { [key: string]: string },
@@ -57,7 +59,10 @@ function handleInvoke(ws: WebSocket, id: string, cmd: string, args: any) {
       });
       sessions.set(sid, { pty: proc, shell });
       proc.onData((data) => {
-        send(ws, { event: 'pty:output', payload: { sessionId: sid, data } });
+        // Tag each batch with the CURRENT PTY dims, mirroring the Rust
+        // backend, so the frontend applies output at the width it was
+        // generated at (resize-race fix).
+        send(ws, { event: 'pty:output', payload: { sessionId: sid, data, cols: proc.cols, rows: proc.rows } });
       });
       proc.onExit(({ exitCode }) => {
         send(ws, { event: 'pty:exit', payload: { sessionId: sid, exitCode: exitCode ?? 0 } });

@@ -599,4 +599,10 @@ describe('string-width@7 authoritative widths', () => {
     buf.write('\u{276F}\u{25CF}\u{29C9}\u{2190}\u{B7}\u{2718}\u{2726}');
     expect(buf.cx).toBe(7);
   });
+
+  it('counts missing BMP emoji ranges as 2 columns: ☰-☷ ⚊-⚏ ㏀-㏿ ䷀-䷿', () => {
+    const buf = new TerminalBuffer();
+    buf.write('\u{2630}\u{2637}\u{268A}\u{268F}\u{33C0}\u{33FF}\u{4DC0}\u{4DFF}');
+    expect(buf.cx).toBe(16); // 8 chars × 2 cols
+  });
 });
