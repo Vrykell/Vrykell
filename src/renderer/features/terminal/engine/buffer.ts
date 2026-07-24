@@ -1,7 +1,7 @@
 import type { TerminalEvent } from '@shared/terminal/events';
 
 export interface Cell { char: string; fg?: string; bg?: string; bold?: boolean; italic?: boolean; underline?: boolean; /** true when this cell is the second half of a fullwidth character */ wide?: boolean; }
-export interface TerminalLine { cells: Cell[]; dirty: boolean; }
+export interface TerminalLine { cells: Cell[]; dirty: boolean; /** true when this line is a soft-wrap continuation of the previous line (auto-wrap, not a hard newline) — used by resize reflow */ wrapped?: boolean; }
 
 // ── Static color tables ──────────────────────────────────────────────────────
 
@@ -419,7 +419,7 @@ export class TerminalBuffer {
     0x4b /* K */: (b, p) => {
       const ln = b.line();
       if ((p[0] || 0) === 0) ln.cells = ln.cells.slice(0, b.cx);
-      else if ((p[0] || 0) === 2) ln.cells = [];
+      else if ((p[0] || 0) === 2) { ln.cells = []; ln.wrapped = false; }
       ln.dirty = true;
     },
   };
@@ -492,6 +492,7 @@ export class TerminalBuffer {
       ln.dirty = true;
       for (let y = this._cy + 1; y < this.screen.length; y++) {
         this.screen[y].cells = [];
+        this.screen[y].wrapped = false;
         this.screen[y].dirty = true;
       }
     }
@@ -513,7 +514,7 @@ export class TerminalBuffer {
   private putChar(ch: string): void {
     const w = charWidth(ch.codePointAt(0) ?? 0);
     if (w === 0) return;
-    if (w === 2 && this.cx >= this.cols - 1) { this.cx = 0; this.lf(); }
+    if (w === 2 && this.cx >= this.cols - 1) { this.cx = 0; this.lf(); this.line().wrapped = true; }
     if (this.pendingWrap) {
       if (this.altActive) {
         const ln = this.line();
@@ -527,6 +528,7 @@ export class TerminalBuffer {
         if (typeof console !== 'undefined') console.warn('[terminal-wrap]', entry);
       }
       this.cx = 0; this.lf(); this.pendingWrap = false;
+      this.line().wrapped = true; // soft wrap — the new line continues the previous one
     }
 
     const ln = this.line();
@@ -596,7 +598,7 @@ export class TerminalBuffer {
         case 'K': {
           const ln = this.line();
           if (ev.p === 0) ln.cells = ln.cells.slice(0, this.cx);
-          else if (ev.p === 2) ln.cells = [];
+          else if (ev.p === 2) { ln.cells = []; ln.wrapped = false; }
           ln.dirty = true;
           break;
         }
@@ -615,7 +617,142 @@ export class TerminalBuffer {
     this.version++;
   }
 
-  resize(cols: number): void { if (cols >= 10) { this.cols = cols; this.cx = Math.min(this.cx, cols - 1); this.pendingWrap = false; } }
+  /**
+   * Change the column width, REFLOWING the main buffer (scrollback +
+   * screen) like iTerm2/xterm: soft-wrapped line runs (lines marked
+   * `wrapped`) are re-wrapped to the new width, hard newlines are
+   * preserved.  The alternate screen is NOT reflowed — fullscreen apps
+   * repaint themselves on SIGWINCH — but the saved main buffer IS, so
+   * it's already correct when the TUI exits.
+   */
+  resize(cols: number): void {
+    if (cols < 10 || cols === this.cols) return;
+    this.cols = cols;
+    this.pendingWrap = false;
+
+    if (this.altActive) {
+      this.cx = Math.min(this.cx, cols - 1);
+      if (this.mainScreen) {
+        const mainLen = this.mainScreen.length;
+        const out = this.reflowChains(this.scrollback.concat(this.mainScreen), cols);
+        const take = Math.min(mainLen, out.length);
+        this.mainScreen = out.slice(out.length - take);
+        this.scrollback = out.slice(0, out.length - take);
+        this.capScrollback();
+        this._linesCache = null;
+      }
+      return;
+    }
+
+    const combined = this.scrollback.concat(this.screen);
+    const cursorAbs = this.scrollback.length + this._cy;
+
+    // Cursor's logical cell offset within its wrapped chain.
+    let chainStart = cursorAbs;
+    while (chainStart > 0 && combined[chainStart].wrapped) chainStart--;
+    let logicalIdx = this.cx;
+    for (let i = chainStart; i < cursorAbs; i++) {
+      logicalIdx += combined[i].cells.length;
+    }
+
+    let newCursorRow = 0;
+    let newCx = 0;
+    const out = this.reflowChains(combined, cols, cursorAbs, logicalIdx, (row, cx) => {
+      newCursorRow = row;
+      newCx = cx;
+    });
+
+    // Reflowing narrower grows content DOWNWARD: drop trailing blank lines
+    // below the cursor first; only push top lines into scrollback when the
+    // screen is genuinely full.
+    let excess = out.length - this.rows;
+    while (excess > 0 && out.length - 1 > newCursorRow && TerminalBuffer.isBlank(out[out.length - 1])) {
+      out.pop();
+      excess--;
+    }
+    const scrollbackLen = Math.max(0, out.length - this.rows);
+    this.scrollback = out.slice(0, scrollbackLen);
+    this.capScrollback();
+    this.screen = out.slice(scrollbackLen);
+    while (this.screen.length < this.rows) this.screen.push(TerminalBuffer.blankRow());
+
+    this._cy = Math.max(0, Math.min(newCursorRow - scrollbackLen, this.rows - 1));
+    this.cx = newCx;
+    // If the cursor now sits at the end of a full line, the next write wraps.
+    this.pendingWrap =
+      this.cx === cols - 1 &&
+      TerminalBuffer.trimmedCells(this.line().cells).length >= cols;
+    this._linesCache = null;
+  }
+
+  private capScrollback(): void {
+    while (this.scrollback.length > this.maxLines) this.scrollback.shift();
+  }
+
+  /**
+   * Rewrap `lines` to `cols`.  Lines flagged `wrapped` are joined with
+   * their predecessors into logical lines, then re-chunked.  Cells are
+   * joined verbatim (trailing blanks are real written content, not
+   * padding — wrapped segments are exactly full-width by construction).
+   * When `cursorAbs`/`logicalIdx` are given, `onCursor` reports the
+   * cursor's new absolute row/column within the returned array.
+   */
+  private reflowChains(
+    lines: TerminalLine[],
+    cols: number,
+    cursorAbs = -1,
+    logicalIdx = 0,
+    onCursor?: (row: number, cx: number) => void,
+  ): TerminalLine[] {
+    const out: TerminalLine[] = [];
+    let i = 0;
+    while (i < lines.length) {
+      let j = i + 1;
+      while (j < lines.length && lines[j].wrapped) j++;
+      const joined: Cell[] = [];
+      for (let k = i; k < j; k++) joined.push(...lines[k].cells);
+      const chunks = TerminalBuffer.chunkCells(joined, cols);
+      if (cursorAbs >= i && cursorAbs < j && onCursor) {
+        // The cursor may sit on unwritten padding past the content — keep
+        // its column (a shell prompt redraw relies on it) but cap the row
+        // to the chain's last chunk.
+        let row = Math.floor(logicalIdx / cols);
+        if (row >= chunks.length) row = chunks.length - 1;
+        onCursor(out.length + row, logicalIdx % cols);
+      }
+      out.push(...chunks);
+      i = j;
+    }
+    return out;
+  }
+
+  /** Cells without trailing unstyled blanks (padding added by old wraps). */
+  private static trimmedCells(cells: Cell[]): Cell[] {
+    let end = cells.length;
+    while (end > 0 && cells[end - 1].char === ' ' && !cells[end - 1].bg && !cells[end - 1].wide) end--;
+    return end === cells.length ? cells : cells.slice(0, end);
+  }
+
+  /** Split a logical line's cells into cols-wide lines, never splitting a
+   *  wide (CJK) character across the boundary. */
+  private static chunkCells(cells: Cell[], cols: number): TerminalLine[] {
+    if (cells.length === 0) return [{ cells: [], dirty: true }];
+    const out: TerminalLine[] = [];
+    let i = 0;
+    while (i < cells.length) {
+      let take = Math.min(cols, cells.length - i);
+      // The cell AFTER the chunk being a wide continuation means the chunk's
+      // last cell is its lead half — move it to the next chunk.
+      if (take > 1 && i + take < cells.length && cells[i + take].wide) take--;
+      out.push({
+        cells: cells.slice(i, i + take),
+        dirty: true,
+        wrapped: out.length > 0 ? true : undefined,
+      });
+      i += take;
+    }
+    return out;
+  }
 
   /**
    * Change the screen height.  Shrinking moves lines above the cursor into
