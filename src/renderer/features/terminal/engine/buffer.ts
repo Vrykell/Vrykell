@@ -224,13 +224,20 @@ export class TerminalBuffer {
   // ED, alt switch) — cell-level mutations share line references.
 
   get lines(): TerminalLine[] {
-    if (!this._linesCache) this._linesCache = this.scrollback.concat(this.screen);
+    if (!this._linesCache) {
+      // While the alternate screen is active the main scrollback is hidden:
+      // a fullscreen TUI owns the whole viewport (xterm semantics), and shell
+      // history must not peek through above it.
+      this._linesCache = this.altActive
+        ? this.screen.slice()
+        : this.scrollback.concat(this.screen);
+    }
     return this._linesCache;
   }
 
   /** Absolute cursor row within `lines` (scrollback.length + screen row). */
   get cy(): number {
-    return this.scrollback.length + this._cy;
+    return this.altActive ? this._cy : this.scrollback.length + this._cy;
   }
 
   private static blankRow(): TerminalLine { return { cells: [], dirty: false }; }
