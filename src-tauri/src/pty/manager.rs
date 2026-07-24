@@ -284,11 +284,86 @@ impl PtyManager {
         }
     }
 
+    /// Check whether the session has a running foreground process beyond the
+    /// shell itself (vim, ssh, top, a build, etc.). Used at tab-close time to
+    /// decide whether a confirmation dialog is needed.
+    ///
+    /// Heuristic: if the shell process has any child processes, something is
+    /// running under it. An idle shell sitting at a prompt has no children.
+    /// Returns `Ok(false)` when the session or its pid is gone (nothing left
+    /// to protect).
+    pub fn has_foreground_process(&self, id: &str) -> Result<bool, String> {
+        let sessions = self.sessions.lock().map_err(|e| e.to_string())?;
+        match sessions.get(id) {
+            Some(session) => {
+                let pid = session
+                    .child
+                    .lock()
+                    .ok()
+                    .and_then(|c| c.process_id());
+                Ok(pid.map(shell_has_children).unwrap_or(false))
+            }
+            None => Ok(false),
+        }
+    }
+
     /// List all active sessions.
     pub fn list_sessions(&self) -> Vec<SessionInfo> {
         self.store.lock()
             .map(|s| s.list())
             .unwrap_or_default()
+    }
+}
+
+/// Does the process with `pid` have any child processes?
+/// Portable across macOS/Linux: `ps -axo pid=,ppid=` uses only BSD+SYSV
+/// common options (BSD `ps` has no `--ppid`). A dead/unknown pid yields
+/// no matching rows.
+#[cfg(unix)]
+fn shell_has_children(pid: u32) -> bool {
+    let target = pid.to_string();
+    std::process::Command::new("ps")
+        .args(["-axo", "pid=,ppid="])
+        .output()
+        .map(|out| {
+            String::from_utf8_lossy(&out.stdout)
+                .lines()
+                .any(|line| {
+                    let mut cols = line.split_whitespace();
+                    cols.next(); // child pid
+                    cols.next() == Some(target.as_str())
+                })
+        })
+        .unwrap_or(false)
+}
+
+#[cfg(not(unix))]
+fn shell_has_children(_pid: u32) -> bool {
+    // Windows: no simple ps equivalent; conservatively report "nothing
+    // running" so tabs close without confirmation (current behavior there).
+    false
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::shell_has_children;
+
+    #[test]
+    fn detects_child_processes() {
+        let mut child = std::process::Command::new("sleep")
+            .arg("30")
+            .spawn()
+            .expect("spawn sleep");
+        let own_pid = std::process::id();
+        assert!(shell_has_children(own_pid));
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+
+    #[test]
+    fn no_children_for_bogus_pid() {
+        // A pid that (almost certainly) doesn't exist has no children.
+        assert!(!shell_has_children(4_000_000));
     }
 }
 
