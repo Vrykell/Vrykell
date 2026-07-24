@@ -337,9 +337,9 @@ describe('DomTerminalView virtual scroll', () => {
     expect(textarea).toBeTruthy();
     // getCharWidth falls back to 8.4 in jsdom; left should be 5 * 8.4 = 42px.
     expect(parseFloat(textarea.style.left)).toBeCloseTo(5 * 8.4, 0);
-    // Cursor is on line 0 (top of the 24-row screen), so bottom is near the
-    // container bottom: (rows - 1 - cy) * LINE_HEIGHT.
-    expect(parseFloat(textarea.style.bottom)).toBe((buf.rows - 1) * LINE_HEIGHT);
+    // The textarea lives outside the scroller at the cursor's VIEWPORT
+    // coordinates: cursor on line 0, viewport at top → top = 0.
+    expect(parseFloat(textarea.style.top)).toBe(0);
 
     // Move cursor to column 10 and re-render.
     buf.write('\x1b[1;11H');
@@ -355,7 +355,7 @@ describe('DomTerminalView virtual scroll', () => {
     );
     const ta2 = c2.querySelector('textarea') as HTMLElement;
     expect(parseFloat(ta2.style.left)).toBeCloseTo(10 * 8.4, 0);
-    expect(parseFloat(ta2.style.bottom)).toBe((buf.rows - 1) * LINE_HEIGHT);
+    expect(parseFloat(ta2.style.top)).toBe(0);
   });
 
   it('positions lines for TUI cursor mid-buffer (not pinned to bottom)', () => {
