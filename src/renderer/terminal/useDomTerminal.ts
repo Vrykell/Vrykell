@@ -93,7 +93,8 @@ export function useDomTerminal(sessionId: string | null) {
     let cancelled = false;
     const un: Array<() => void> = [];
 
-    onPTYOutput(({ sessionId: sid, events, cols, rows }) => {
+    onPTYOutput((payload) => {
+      const { sessionId: sid, events, cols, rows } = payload;
       if (cancelled || sid !== sessionId) return;
       // Each batch is tagged with the PTY dimensions in effect when the
       // bytes were read (Rust side).  Resize the buffer to the tag BEFORE
@@ -102,7 +103,12 @@ export function useDomTerminal(sessionId: string | null) {
       // divergence and stale residual characters at the bottom of TUI frames.
       if (typeof cols === 'number' && cols >= 10 && cols !== buf.cols) buf.resize(cols);
       if (typeof rows === 'number' && rows >= 4 && rows !== buf.rows) buf.setRows(rows);
-      buf.applyEvents(events);
+      if (Array.isArray(events)) {
+        buf.applyEvents(events);
+      } else if (typeof (payload as { data?: unknown }).data === 'string') {
+        // E2E bridge (node-pty) sends raw PTY bytes instead of parsed events
+        buf.write((payload as unknown as { data: string }).data);
+      }
       scheduleRender();
     }).then(fn => { if (!cancelled) un.push(fn); else fn(); });
 

@@ -549,3 +549,36 @@ describe('VT screen model semantics', () => {
     expect(mainText).toContain('m2');
   });
 });
+
+describe('parser edge cases (write path)', () => {
+  it('charset designation ESC ( B does not leak B as text', () => {
+    const buf = new TerminalBuffer();
+    buf.write('\x1b(Bhello\x1b(0world');
+    const text = buf.lines[0].cells.map((c) => c.char).join('');
+    expect(text).toBe('helloworld');
+  });
+
+  it('xterm private CSI (>4m, <u) is ignored, not reinterpreted', () => {
+    const buf = new TerminalBuffer();
+    buf.write('\x1b[>4mX'); // modifyOtherKeys — must NOT underline
+    expect(buf.lines[0].cells[0].char).toBe('X');
+    expect(buf.lines[0].cells[0].underline).toBe(false);
+
+    const b2 = new TerminalBuffer();
+    b2.write('AB');
+    b2.write('\x1b[<uC'); // kitty pop — must NOT restore cursor to (0,0)
+    expect(b2.lines[0].cells.map((c) => c.char).join('')).toBe('ABC');
+    expect(b2.cx).toBe(3);
+  });
+
+  it('ESC 7 / ESC 8 save and restore cursor (DECSC/DECRC)', () => {
+    const buf = new TerminalBuffer();
+    buf.write('AB');
+    buf.write('\x1b7'); // save at cx=2
+    buf.write('\x1b[5C'); // move right 5
+    buf.write('\x1b8'); // restore
+    expect(buf.cx).toBe(2);
+    buf.write('Z');
+    expect(buf.lines[0].cells.map((c) => c.char).join('')).toBe('ABZ');
+  });
+});
