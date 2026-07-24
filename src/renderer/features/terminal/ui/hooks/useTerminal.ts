@@ -1,8 +1,8 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { TerminalBuffer } from '../../engine/buffer';
 import { getCharWidth } from '../../engine/char-width';
-import { resizePTY, writeToPTY, onPTYOutput, onPTYExit } from '../../../../../api';
-import { useTerminalStore } from '../../../../stores/terminal-store';
+import { resizePTY, writeToPTY, onPTYOutput, onPTYExit } from '@api';
+import { useTerminalStore } from '@renderer/stores/terminal-store';
 
 const LINE_HEIGHT = 16;
 

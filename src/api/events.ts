@@ -2,8 +2,8 @@
  * Backend → Renderer event listeners
  */
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import type { SessionInfo } from '../shared/types/index';
-import type { TerminalEvent } from '../shared/terminal/events';
+import type { SessionInfo } from '@shared/types';
+import type { TerminalEvent } from '@shared/terminal/events';
 
 export function onPTYOutput(
   cb: (data: { sessionId: string; events: TerminalEvent[]; cols?: number; rows?: number }) => void,

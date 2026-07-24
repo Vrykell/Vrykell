@@ -5,7 +5,14 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "outDir": "dist/renderer",
     "rootDir": "src",
-    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"]
+    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["src/shared/*"],
+      "@renderer/*": ["src/renderer/*"],
+      "@api/*": ["src/api/*"],
+      "@api": ["src/api/index.ts"]
+    }
   },
   "include": ["src/renderer/**/*", "src/shared/**/*", "src/api/**/*"]
 }

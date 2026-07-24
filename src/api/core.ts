@@ -2,7 +2,7 @@
  * PTY / Session commands (Renderer → Backend)
  */
 import { invoke } from '@tauri-apps/api/core';
-import type { SessionInfo, SessionOptions } from '../shared/types/index';
+import type { SessionInfo, SessionOptions } from '@shared/types';
 
 export function createPTY(opts: SessionOptions): Promise<SessionInfo> {
   return invoke('create_pty', {

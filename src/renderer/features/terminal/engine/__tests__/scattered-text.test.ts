@@ -15,7 +15,7 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TerminalBuffer } from '../buffer';
-import type { TerminalEvent } from '../../../../../shared/terminal/events';
+import type { TerminalEvent } from '@shared/terminal/events';
 
 function lineStr(buf: TerminalBuffer, idx: number): string {
   return buf.lines[idx]?.cells.map(c => c.char).join('') ?? '';

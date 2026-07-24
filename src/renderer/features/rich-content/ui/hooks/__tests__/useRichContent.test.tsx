@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
 import { useRichContent } from '../useRichContent';
-import { useTerminalStore } from '../../../../../stores/terminal-store';
+import { useTerminalStore } from '@renderer/stores/terminal-store';
 import { FakeTauriBackend } from '../../../../../../test/fake-tauri';
 
 vi.mock('@tauri-apps/api/core');

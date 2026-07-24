@@ -1,6 +1,6 @@
 import React from 'react';
-import { useTerminalStore } from '../../../stores/terminal-store';
-import { createPTY } from '../../../../api';
+import { useTerminalStore } from '@renderer/stores/terminal-store';
+import { createPTY } from '@api';
 
 interface Props {
   onCloseTab: (id: string) => void;

@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { AppSettings, DEFAULT_SETTINGS } from '../../../shared/types/index';
+import { AppSettings, DEFAULT_SETTINGS } from '@shared/types';
 
 export interface SettingsSlice {
   settings: AppSettings;

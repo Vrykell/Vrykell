@@ -1,4 +1,4 @@
-import { DetectedBlock, RichContentType } from '../../../../shared/types/index';
+import { DetectedBlock, RichContentType } from '@shared/types';
 
 /**
  * Scans terminal output text for rich content patterns.
