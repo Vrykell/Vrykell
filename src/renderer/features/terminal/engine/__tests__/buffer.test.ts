@@ -436,6 +436,34 @@ describe('alternate screen (DEC 1047/1048/1049)', () => {
     expect(text(buf)).not.toContain('old-tui');
   });
 
+  it('hides main scrollback while the alt screen is active', () => {
+    const buf = new TerminalBuffer();
+    // Overflow the screen so the main scrollback is non-empty.
+    for (let i = 0; i < buf.rows + 10; i++) buf.write(`history-${i}\r\n`);
+    expect(buf.lines.length).toBeGreaterThan(buf.rows);
+
+    buf.write('\x1b[?1049h');
+    // Fullscreen TUI owns the whole viewport — no history peeking through.
+    expect(buf.lines).toHaveLength(buf.rows);
+    expect(text(buf)).not.toContain('history-');
+
+    buf.write('TUI FRAME');
+    buf.write('\x1b[?1049l');
+    // History comes back, TUI content is gone.
+    expect(buf.lines.length).toBeGreaterThan(buf.rows);
+    expect(text(buf)).toContain('history-');
+    expect(text(buf)).not.toContain('TUI FRAME');
+  });
+
+  it('cy is screen-relative while the alt screen is active', () => {
+    const buf = new TerminalBuffer();
+    for (let i = 0; i < buf.rows + 5; i++) buf.write(`h${i}\r\n`);
+    buf.write('\x1b[?1049h');
+    expect(buf.cy).toBe(0);
+    buf.write('x\r\ny');
+    expect(buf.cy).toBe(1);
+  });
+
   it('1047 toggles preserve alt content and do not touch the saved cursor', () => {
     const buf = new TerminalBuffer();
     buf.write('main');
