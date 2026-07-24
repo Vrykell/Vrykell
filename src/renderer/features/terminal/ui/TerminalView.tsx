@@ -239,7 +239,6 @@ export const DomTerminalView: React.FC<{
   const cursorCol =
     cursorLine?.cells[buffer.cx]?.wide && buffer.cx > 0 ? buffer.cx - 1 : buffer.cx;
   const textareaLeft = cursorCol * charW;
-  const textareaBottom = (buffer.lines.length - 1 - buffer.cy) * LINE_HEIGHT;
 
   // ── Visible-range calculation ──────────────────────────────────────────────
   const totalLines = buffer.lines.length;
@@ -253,6 +252,10 @@ export const DomTerminalView: React.FC<{
   const scrollTop = pinnedRef.current
     ? maxScroll
     : Math.min(scrollTopRef.current, maxScroll);
+
+  // Cursor row in VIEWPORT coordinates for the hidden textarea (negative
+  // when the cursor is scrolled off-screen — nothing can scroll to it).
+  const textareaTop = buffer.cy * LINE_HEIGHT - scrollTop;
 
   const startIdx = Math.max(0, Math.floor(scrollTop / LINE_HEIGHT) - OVERSCAN);
   const visibleCount = Math.ceil(effectiveH / LINE_HEIGHT) + OVERSCAN * 2;
@@ -275,6 +278,7 @@ export const DomTerminalView: React.FC<{
   }
 
   return (
+    <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex' }}>
     <div
       ref={containerRef}
       data-testid="terminal-view"
@@ -293,54 +297,61 @@ export const DomTerminalView: React.FC<{
         transform: 'translateZ(0)',
       }}
     >
-      {/* Hidden textarea — IME + keyboard proxy */}
-      <textarea
-        ref={textareaRef}
-        data-testid="terminal-textarea"
-        autoFocus
-        rows={1}
-        autoComplete="off"
-        autoCorrect="off"
-        autoCapitalize="off"
-        spellCheck={false}
-        onKeyDown={(e) => {
-          // Only keys that echo text / move the caret can trigger the
-          // browser's textarea-reveal scroll — navigation keys must not
-          // arm the guard (PageDown scrolling is legitimate user intent).
-          if (e.key.length === 1 || e.key === 'Enter' || e.key === 'Backspace' || e.key === 'Tab') {
-            lastInputRef.current = Date.now();
-          }
-          onKeyDown(e);
-        }}
-        onInput={(e) => {
-          lastInputRef.current = Date.now();
-          onInput(e);
-        }}
-        onCompositionStart={onCompositionStart}
-        onCompositionEnd={onCompositionEnd}
-        style={{
-          position: 'absolute',
-          left: textareaLeft,
-          bottom: textareaBottom,
-          width: '1ch',
-          height: '1em',
-          opacity: 0,
-          resize: 'none',
-          border: 'none',
-          outline: 'none',
-          caretColor: 'transparent',
-          fontFamily: 'Menlo, monospace',
-          fontSize: 14,
-          lineHeight: `${LINE_HEIGHT}px`,
-          background: 'transparent',
-          color: 'transparent',
-        }}
-      />
-
       {/* Virtual scroll body */}
       <div style={{ height: topSpacerH }} />
       {visible}
       <div style={{ height: bottomSpacerH }} />
+    </div>
+
+    {/* Hidden textarea — IME + keyboard proxy.  Lives OUTSIDE the scroll
+        container: Chromium scrolls the focused caret into view on input,
+        and inside the scroller that fired as an unsolicited viewport jump
+        whenever the user typed while scrolled up.  Here nothing is
+        scrollable, so input can never move the viewport.  Positioned at
+        the cursor's viewport-relative coordinates so the IME candidate
+        window still tracks the cursor. */}
+    <textarea
+      ref={textareaRef}
+      data-testid="terminal-textarea"
+      autoFocus
+      rows={1}
+      autoComplete="off"
+      autoCorrect="off"
+      autoCapitalize="off"
+      spellCheck={false}
+      onKeyDown={(e) => {
+        // Only keys that echo text / move the caret can trigger the
+        // browser's textarea-reveal scroll — navigation keys must not
+        // arm the guard (PageDown scrolling is legitimate user intent).
+        if (e.key.length === 1 || e.key === 'Enter' || e.key === 'Backspace' || e.key === 'Tab') {
+          lastInputRef.current = Date.now();
+        }
+        onKeyDown(e);
+      }}
+      onInput={(e) => {
+        lastInputRef.current = Date.now();
+        onInput(e);
+      }}
+      onCompositionStart={onCompositionStart}
+      onCompositionEnd={onCompositionEnd}
+      style={{
+        position: 'absolute',
+        left: textareaLeft,
+        top: textareaTop,
+        width: '1ch',
+        height: '1em',
+        opacity: 0,
+        resize: 'none',
+        border: 'none',
+        outline: 'none',
+        caretColor: 'transparent',
+        fontFamily: 'Menlo, monospace',
+        fontSize: 14,
+        lineHeight: `${LINE_HEIGHT}px`,
+        background: 'transparent',
+        color: 'transparent',
+      }}
+    />
     </div>
   );
 };
