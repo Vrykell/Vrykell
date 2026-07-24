@@ -56,10 +56,11 @@ describe('App session flow', () => {
     await waitFor(() => expect(screen.getByTestId(`session-tab-${sid}`)).toHaveTextContent('zsh'));
   });
 
-  it('shows exit dialog directly when closing the last tab (single confirmation)', async () => {
+  it('shows exit dialog directly when closing the last tab with a running process (single confirmation)', async () => {
     renderApp();
     await waitFor(() => expect(backend.sessions).toHaveLength(1));
     const sid = backend.sessions[0].id;
+    backend.setBusy(sid);
     await userEvent.click(screen.getByTestId(`close-btn-${sid}`));
     // One dialog only: the exit dialog. No intermediate "Force Close" step,
     // and the session stays alive until the user confirms app exit.
@@ -68,10 +69,20 @@ describe('App session flow', () => {
     expect(backend.sessions).toHaveLength(1);
   });
 
+  it('exits immediately without dialog when closing the last idle tab', async () => {
+    renderApp();
+    await waitFor(() => expect(backend.sessions).toHaveLength(1));
+    const sid = backend.sessions[0].id;
+    await userEvent.click(screen.getByTestId(`close-btn-${sid}`));
+    await waitFor(() => expect(backend.exitRequested).toBe(true));
+    expect(screen.queryByText('Close AI Terminal')).not.toBeInTheDocument();
+  });
+
   it('cancelling exit keeps the existing session alive', async () => {
     renderApp();
     await waitFor(() => expect(backend.sessions).toHaveLength(1));
     const sid = backend.sessions[0].id;
+    backend.setBusy(sid);
     await userEvent.click(screen.getByTestId(`close-btn-${sid}`));
     await waitFor(() => expect(screen.getByText('Close AI Terminal')).toBeInTheDocument());
     await userEvent.click(screen.getByText('Keep Session'));
@@ -85,23 +96,38 @@ describe('App session flow', () => {
     renderApp();
     await waitFor(() => expect(backend.sessions).toHaveLength(1));
     const sid = backend.sessions[0].id;
+    backend.setBusy(sid);
     await userEvent.click(screen.getByTestId(`close-btn-${sid}`));
     await waitFor(() => expect(screen.getByText('Close AI Terminal')).toBeInTheDocument());
     await userEvent.click(screen.getByText('Close App'));
     expect(backend.exitRequested).toBe(true);
   });
 
-  it('shows force-close confirmation when closing one of multiple tabs', async () => {
+  it('shows force-close confirmation when closing one of multiple tabs with a running process', async () => {
+    renderApp();
+    await waitFor(() => expect(backend.sessions).toHaveLength(1));
+    await userEvent.click(screen.getByTestId('new-tab-btn'));
+    await waitFor(() => expect(backend.sessions).toHaveLength(2));
+    const sid = backend.sessions[0].id;
+    backend.setBusy(sid);
+    await userEvent.click(screen.getByTestId(`close-btn-${sid}`));
+    await waitFor(() => expect(screen.getByText('Force Close')).toBeInTheDocument());
+    expect(screen.queryByText('Close AI Terminal')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByText('Force Close'));
+    await waitFor(() => expect(backend.sessions).toHaveLength(1));
+  });
+
+  it('closes an idle tab immediately without confirmation', async () => {
     renderApp();
     await waitFor(() => expect(backend.sessions).toHaveLength(1));
     await userEvent.click(screen.getByTestId('new-tab-btn'));
     await waitFor(() => expect(backend.sessions).toHaveLength(2));
     const sid = backend.sessions[0].id;
     await userEvent.click(screen.getByTestId(`close-btn-${sid}`));
-    await waitFor(() => expect(screen.getByText('Force Close')).toBeInTheDocument());
-    expect(screen.queryByText('Close AI Terminal')).not.toBeInTheDocument();
-    await userEvent.click(screen.getByText('Force Close'));
+    // No dialog; the tab is closed right away.
     await waitFor(() => expect(backend.sessions).toHaveLength(1));
+    expect(screen.queryByText('Force Close')).not.toBeInTheDocument();
+    expect(screen.queryByText('Close AI Terminal')).not.toBeInTheDocument();
   });
 
   it('recreates a session when cancelling exit after the last shell exits on its own', async () => {

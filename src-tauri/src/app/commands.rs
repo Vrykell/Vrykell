@@ -64,6 +64,18 @@ pub fn list_pty(
     Ok(state.pty_manager.list_sessions())
 }
 
+/// Check whether a session has a running foreground process (beyond the
+/// shell itself). Used by the renderer to decide whether closing the tab
+/// needs a confirmation dialog.
+#[tauri::command]
+pub fn has_foreground_process(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    session_id: String,
+) -> Result<bool, String> {
+    let state = state.lock().map_err(|e| e.to_string())?;
+    state.pty_manager.has_foreground_process(&session_id)
+}
+
 /// Load application settings.
 #[tauri::command]
 pub fn load_settings(
