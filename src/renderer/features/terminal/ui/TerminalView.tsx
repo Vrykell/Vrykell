@@ -140,6 +140,10 @@ export const DomTerminalView: React.FC<{
   const containerHRef = useRef(0);
   const scrollTopRef = useRef(0);
   const pinnedRef = useRef(true);
+  /** Timestamp of the last keystroke/input — used to reject the browser's
+   *  "scroll the focused off-screen textarea into view" jump that fires
+   *  right after input while the user is scrolled up reading history. */
+  const lastInputRef = useRef(0);
   const [tick, setTick] = useState(0);
 
   // Keep a mutable ref to the latest onResize so the ResizeObserver
@@ -205,6 +209,19 @@ export const DomTerminalView: React.FC<{
   const onScroll = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
+    // Browser-initiated jump guard: while the user is scrolled up reading
+    // history, typing makes the browser scroll the off-screen hidden
+    // textarea (positioned at the cursor, near the bottom) into view.
+    // That downward scroll is not user intent — undo it.  Upward scrolls
+    // (reading further back) are always honored.
+    if (
+      !pinnedRef.current &&
+      Date.now() - lastInputRef.current < 150 &&
+      el.scrollTop > scrollTopRef.current + LINE_HEIGHT
+    ) {
+      el.scrollTop = scrollTopRef.current;
+      return;
+    }
     scrollTopRef.current = el.scrollTop;
     pinnedRef.current =
       el.scrollTop + el.clientHeight >= el.scrollHeight - LINE_HEIGHT * 5;
@@ -228,12 +245,12 @@ export const DomTerminalView: React.FC<{
   const totalLines = buffer.lines.length;
   const effectiveH = containerHRef.current || buffer.rows * LINE_HEIGHT;
   const maxScroll = Math.max(0, totalLines * LINE_HEIGHT - effectiveH);
-  // If the user is near the bottom (within 5 lines), treat as "at bottom"
-  // for visible-range calculation so new output doesn't cause a visual jump.
-  const nearBottom =
-    pinnedRef.current ||
-    scrollTopRef.current + effectiveH >= totalLines * LINE_HEIGHT - LINE_HEIGHT * 5;
-  const scrollTop = nearBottom
+  // Pinned means "following the bottom" — render the bottom slice directly
+  // (single pass, no blank-frame lag).  When NOT pinned, always render from
+  // the ACTUAL scroll position: the former "nearBottom" clause also snapped
+  // unpinned users within 5 lines of the bottom to maxScroll on any
+  // re-render, teleporting the viewport away from where they were reading.
+  const scrollTop = pinnedRef.current
     ? maxScroll
     : Math.min(scrollTopRef.current, maxScroll);
 
@@ -286,8 +303,19 @@ export const DomTerminalView: React.FC<{
         autoCorrect="off"
         autoCapitalize="off"
         spellCheck={false}
-        onKeyDown={onKeyDown}
-        onInput={onInput}
+        onKeyDown={(e) => {
+          // Only keys that echo text / move the caret can trigger the
+          // browser's textarea-reveal scroll — navigation keys must not
+          // arm the guard (PageDown scrolling is legitimate user intent).
+          if (e.key.length === 1 || e.key === 'Enter' || e.key === 'Backspace' || e.key === 'Tab') {
+            lastInputRef.current = Date.now();
+          }
+          onKeyDown(e);
+        }}
+        onInput={(e) => {
+          lastInputRef.current = Date.now();
+          onInput(e);
+        }}
         onCompositionStart={onCompositionStart}
         onCompositionEnd={onCompositionEnd}
         style={{
