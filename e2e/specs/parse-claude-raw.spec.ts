@@ -14,7 +14,11 @@ function assert(cond: boolean, msg: string) {
   console.log('PASS:', msg);
 }
 
-// Read raw Claude output
+// Read raw Claude output (developer-local capture — skip gracefully when absent)
+if (!fs.existsSync('/tmp/claude-raw.bin')) {
+  console.log('SKIP: /tmp/claude-raw.bin not found (capture real claude output there to enable this check)');
+  process.exit(0);
+}
 const raw = fs.readFileSync('/tmp/claude-raw.bin', 'utf-8');
 console.log(`Raw data: ${raw.length} bytes`);
 

@@ -80,13 +80,15 @@ async function main() {
   );
 
   // No line should have scattered single characters (indicative of cx misalignment)
-  // Pattern: a line with isolated chars separated by many spaces = corruption
-  const scatteredLines = afterLines.filter(l => {
-    const chars = l.replace(/\s/g, '');
-    const spaces = l.replace(/\S/g, '');
-    // If there are only 1-3 chars but 50+ spaces, it's scattered corruption
-    return chars.length > 0 && chars.length < 5 && spaces.length > 30;
-  });
+  // True scatter = ≥2 visible groups split by ≥5-space gaps, one a single char.
+  // Box-drawing frames / padded box content ("│   k3   │") are legitimate.
+  const isScattered = (l: string): boolean => {
+    if (l.length <= 30) return false;
+    const cleaned = l.replace(/[\u2500-\u257F]/g, ' ');
+    const groups = cleaned.split(/ {5,}/).map(g => g.trim()).filter(Boolean);
+    return groups.length >= 2 && groups.some(g => g.length === 1);
+  };
+  const scatteredLines = afterLines.filter(isScattered);
   assert(
     scatteredLines.length === 0,
     `no scattered-character lines after resize (found ${scatteredLines.length})`,
@@ -113,10 +115,7 @@ async function main() {
   );
 
   // No scattered corruption in new lines
-  const newScattered = newLines.filter(l => {
-    const chars = l.replace(/\s/g, '').length;
-    return chars > 0 && chars < 5 && l.length > 40;
-  });
+  const newScattered = newLines.filter(isScattered);
   assert(newScattered.length === 0, 'no scattered lines in new output after narrowing');
 
   proc.kill();
