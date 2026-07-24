@@ -98,6 +98,19 @@ function assert(cond: boolean, msg: string) {
   console.log('PASS:', msg);
 }
 
+/**
+ * True scatter corruption = visible chars split into ≥2 groups by wide
+ * gaps (≥5 spaces) with at least one single-char group ("h    e    l").
+ * Box-drawing frames and padded box content ("│      k3      │") are
+ * legitimate output, NOT corruption — border chars are blanked first.
+ */
+function isScattered(l: string): boolean {
+  if (l.length <= 30) return false;
+  const cleaned = l.replace(/[\u2500-\u257F]/g, ' ');
+  const groups = cleaned.split(/ {5,}/).map(g => g.trim()).filter(Boolean);
+  return groups.length >= 2 && groups.some(g => g.length === 1);
+}
+
 async function main() {
   // Spawn Claude at 80 cols
   const proc = pty.spawn('claude', [], {
@@ -118,10 +131,7 @@ async function main() {
 
   // Check 80-col output
   const lines80 = buf.lines.map(l => l.cells.map(c => c.char).join(''));
-  const scattered80 = lines80.filter(l => {
-    const chars = l.replace(/\s/g, '').length;
-    return chars > 0 && chars < 5 && l.length > 30;
-  });
+  const scattered80 = lines80.filter(isScattered);
   assert(scattered80.length === 0, 'no scattered lines at 80 cols via applyEvents');
 
   // Resize to 120
@@ -130,10 +140,7 @@ async function main() {
   await new Promise(r => setTimeout(r, 3000));
 
   const lines120 = buf.lines.map(l => l.cells.map(c => c.char).join(''));
-  const scattered120 = lines120.filter(l => {
-    const chars = l.replace(/\s/g, '').length;
-    return chars > 0 && chars < 5 && l.length > 30;
-  });
+  const scattered120 = lines120.filter(isScattered);
   assert(scattered120.length === 0, 'no scattered lines at 120 cols via applyEvents');
 
   // Resize to 60
@@ -143,10 +150,7 @@ async function main() {
   await new Promise(r => setTimeout(r, 3000));
 
   const lines60 = buf.lines.map(l => l.cells.map(c => c.char).join(''));
-  const scattered60 = lines60.filter(l => {
-    const chars = l.replace(/\s/g, '').length;
-    return chars > 0 && chars < 5 && l.length > 30;
-  });
+  const scattered60 = lines60.filter(isScattered);
   assert(scattered60.length === 0, 'no scattered lines at 60 cols via applyEvents');
 
   proc.kill();
