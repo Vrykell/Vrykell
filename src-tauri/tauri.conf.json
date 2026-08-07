@@ -1,24 +1,20 @@
 {
-  "$schema": "https://raw.githubusercontent.com/nicedoc/open-source-projects/refs/heads/main/tauri-tauri-conf-schema.json",
-  "productName": "AI Terminal",
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "ai-terminal-v2",
   "version": "0.1.0",
-  "identifier": "com.ai-terminal.app",
+  "identifier": "com.wuzhe.ai-terminal-v2",
   "build": {
-    "frontendDist": "../dist/renderer",
+    "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "npm run dev:renderer",
-    "beforeBuildCommand": "npm run build:renderer"
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
   },
   "app": {
     "windows": [
       {
-        "label": "main",
-        "title": "AI Terminal",
-        "width": 1200,
-        "height": 800,
-        "minWidth": 600,
-        "minHeight": 400,
-        "center": true
+        "title": "ai-terminal-v2",
+        "width": 800,
+        "height": 600
       }
     ],
     "security": {
