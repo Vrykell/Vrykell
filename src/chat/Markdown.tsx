@@ -2,6 +2,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import CommandBlock from './CommandBlock';
 import 'katex/dist/katex.min.css';
 
 // micromark 把单行 `$$E=mc^2$$` 解析为 inlineMath（flow math 要求开界定符后换行），
@@ -39,6 +40,7 @@ export default function Markdown({ content }: { content: string }) {
     <ReactMarkdown
       remarkPlugins={[remarkGfm, remarkMath, remarkStandaloneMathDisplay]}
       rehypePlugins={[rehypeKatex]}
+      components={{ pre: (props) => <CommandBlock {...props} /> }}
     >
       {content}
     </ReactMarkdown>
