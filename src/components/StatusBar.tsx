@@ -1,5 +1,4 @@
-import { useWorkspaceStore } from '../stores/workspace';
-import { useTerminalStore } from '../stores/terminal';
+import { useTerminalStore, getFocusedTerminalId } from '../stores/terminal';
 import { useAiConfigStore } from '../lib/ai';
 
 /**
@@ -7,9 +6,10 @@ import { useAiConfigStore } from '../lib/ai';
  * 仅在底部显示连接状态和模型名，不做多余信息。
  */
 export default function StatusBar() {
-  const activeId = useWorkspaceStore((s) => s.activeId);
-  const hasSession = useTerminalStore((s) => !!s.sessions[activeId]);
-  const dims = useTerminalStore((s) => s.dims[activeId]);
+  useTerminalStore((s) => s.focusedPaneId); // 订阅聚焦切换
+  const termId = getFocusedTerminalId();
+  const hasSession = useTerminalStore((s) => !!s.sessions[termId]);
+  const dims = useTerminalStore((s) => s.dims[termId]);
   const model = useAiConfigStore((s) => s.model);
 
   return (

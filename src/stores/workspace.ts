@@ -10,14 +10,17 @@ import {
 import type { BackendGroupEntry } from '../search/types';
 import { useBlockStore } from './blocks';
 import { useChatStore } from './chat';
-import { useTerminalStore, getFocusedPaneId } from './terminal';
-import { useTerminalLayoutStore } from './terminalLayout';
+import { useTerminalStore, getFocusedTerminalId } from './terminal';
 import type { ShellType } from '../lib/shells';
 import { shellTypeLabel } from '../lib/shells';
+import {
+  leaf, leaves as layoutLeaves, firstLeaf, findLeaf, splitLeaf, removeLeaf, countLeaves,
+  type WindowLayout, type TerminalSpec, type SplitDir,
+} from '../lib/windowLayout';
 
-export type TabKind = 'local' | 'ssh' | 'history' | 'settings';
+export type TabKind = 'session' | 'history' | 'settings';
 
-/** SSH 会话目标（kind=ssh 时的专属字段） */
+/** SSH 会话目标（终端类型=ssh 时的专属字段） */
 export interface SshTabTarget {
   name: string;
   host: string;
@@ -34,20 +37,13 @@ interface TabBase {
   named?: boolean;
 }
 
-/** 真实会话标签（本地/SSH）：可落库、可分组、可进历史 */
-interface SessionTabBase extends TabBase {
-  groupId?: string;
-  cwd?: string;
-}
-
 /**
  * 标签判别联合：
- *  - local / ssh 是真实会话（持久化、可分组、进历史）
+ *  - session 是「窗口」（真实会话容器，可落库、可分组、进历史），持有 1–4 个终端的布局
  *  - history / settings 是临时视图（单例复用，不落库、不可分组）
  */
 export type Tab =
-  | (SessionTabBase & { kind: 'local'; shellType?: ShellType })
-  | (SessionTabBase & { kind: 'ssh'; ssh: SshTabTarget })
+  | (TabBase & { kind: 'session'; groupId?: string; layout: WindowLayout })
   | (TabBase & { kind: 'history' })
   | (TabBase & { kind: 'settings' });
 
@@ -60,8 +56,8 @@ export interface TabGroup {
 export interface AddTabOptions {
   cwd?: string;
   title?: string;
-  /** 默认 'local' */
-  kind?: TabKind;
+  /** 默认 'local'；'history'/'settings' 用于视图标签 */
+  kind?: 'local' | 'ssh' | 'history' | 'settings';
   shellType?: ShellType;
   /** SSH 连接目标（kind='ssh' 时） */
   ssh?: SshTabTarget;
@@ -69,42 +65,47 @@ export interface AddTabOptions {
   groupId?: string;
 }
 
-/** 是否为真实会话（可落库、可分组） */
-export function isSessionTab(tab: Tab): tab is Extract<Tab, { kind: 'local' | 'ssh' }> {
-  return tab.kind === 'local' || tab.kind === 'ssh';
+/** 是否为真实会话窗口（可落库、可分组） */
+export function isSessionTab(tab: Tab): tab is Extract<Tab, { kind: 'session' }> {
+  return tab.kind === 'session';
 }
 
-/** 聚焦 pane 的当前工作目录：主 pane 读 tab.cwd，副 pane 读 paneCwds（回退到 tab.cwd）。 */
+/** 窗口内全部终端 */
+export function terminalsOf(tab: Tab): TerminalSpec[] {
+  return isSessionTab(tab) ? layoutLeaves(tab.layout) : [];
+}
+
+/** 窗口内第一个终端（用于标题/图标等展示） */
+export function firstTerminalOf(tab: Tab): TerminalSpec | null {
+  return isSessionTab(tab) ? firstLeaf(tab.layout) : null;
+}
+
+/** 聚焦终端的当前工作目录（运行时 terminalCwds，回退到终端 spec.cwd）。 */
 export function getFocusedCwd(): string | undefined {
-  const paneId = getFocusedPaneId();
   const ws = useWorkspaceStore.getState();
-  const tab = ws.tabs.find((t) => t.id === paneId);
-  if (tab && isSessionTab(tab)) return tab.cwd;
+  const termId = getFocusedTerminalId();
   const activeTab = ws.tabs.find((t) => t.id === ws.activeId);
-  const base = activeTab && isSessionTab(activeTab) ? activeTab.cwd : undefined;
-  return ws.paneCwds[paneId] ?? base;
+  if (activeTab && isSessionTab(activeTab)) {
+    const spec = layoutLeaves(activeTab.layout).find((t) => t.id === termId);
+    return ws.terminalCwds[termId] ?? spec?.cwd;
+  }
+  return undefined;
 }
 
-/** 把真实会话标签序列化成后端 { kind, payload }；视图标签返回 null。 */
-export function serializeSession(tab: Tab): { kind: 'local' | 'ssh'; payload: string } | null {
-  if (tab.kind === 'ssh') {
-    return {
-      kind: 'ssh',
-      payload: JSON.stringify({
-        ssh: {
-          name: tab.ssh.name,
-          host: tab.ssh.host,
-          user: tab.ssh.user ?? null,
-          port: tab.ssh.port ?? null,
-          connectionId: tab.ssh.connectionId ?? null,
-        },
-      }),
-    };
+/** 把真实会话窗口序列化成后端 { kind, payload }；视图标签返回 null。 */
+export function serializeSession(tab: Tab): { kind: string; payload: string } | null {
+  if (!isSessionTab(tab)) return null;
+  return { kind: 'session', payload: JSON.stringify({ layout: tab.layout }) };
+}
+
+/** 生成窗口内下一个终端的稳定 id（${windowId}#n）。 */
+export function nextTerminalId(windowId: string, layout: WindowLayout): string {
+  let max = -1;
+  for (const t of layoutLeaves(layout)) {
+    const m = /#(\d+)$/.exec(t.id);
+    if (m) max = Math.max(max, parseInt(m[1]!, 10));
   }
-  if (tab.kind === 'local') {
-    return { kind: 'local', payload: JSON.stringify({ shellType: tab.shellType ?? null }) };
-  }
-  return null;
+  return `${windowId}#${max + 1}`;
 }
 
 // 标签 id 跨重启唯一（时间戳前缀 + 自增），避免重启后与历史会话 id 碰撞
@@ -134,13 +135,18 @@ interface WorkspaceState {
   titleFromCommand: (id: string, text: string) => void;
   renameTab: (id: string, title: string) => void;
   undoCloseTab: () => void;
-  /** 更新标签的当前工作目录（从 shell OSC 7 检测） */
-  setTabCwd: (id: string, cwd: string) => void;
-  /** 分屏副 pane 的当前工作目录（keyed by paneId，不落库 —— 副 pane 生命周期随分屏） */
-  paneCwds: Record<string, string>;
-  setPaneCwd: (paneId: string, cwd: string) => void;
-  /** 解除分屏时删除副 pane 的 cwd 残留 */
-  dropPaneCwd: (paneId: string) => void;
+  /** 更新某终端的当前工作目录（从 shell OSC 7 检测），keyed by 终端 id */
+  setTerminalCwd: (terminalId: string, cwd: string) => void;
+  /** 终端运行时 cwd（keyed by 终端 id，不落库） */
+  terminalCwds: Record<string, string>;
+  /** 移除终端时清理其 cwd 残留 */
+  dropTerminalCwd: (terminalId: string) => void;
+  /** 更新窗口的终端布局（分裂/移除/替换/调比例），并持久化 */
+  setWindowLayout: (id: string, layout: WindowLayout) => void;
+  /** 直接分裂聚焦终端（继承类型，跳过落点选择；⌘⇧D 用） */
+  splitFocusedDirect: (dir: SplitDir) => void;
+  /** 关闭聚焦终端；若只剩一个则关闭窗口 */
+  closeFocusedTerminal: () => void;
 
   // ── 分组 ──
   groups: TabGroup[];
@@ -167,57 +173,58 @@ interface WorkspaceState {
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
-  tabs: [{ id: initialTabId, title: DEFAULT_TITLE, kind: 'local' }],
+  tabs: [{ id: initialTabId, title: DEFAULT_TITLE, kind: 'session', layout: leaf({ id: `${initialTabId}#0`, kind: 'local' }) }],
   activeId: initialTabId,
   lastClosed: null,
   groups: [],
-  paneCwds: {},
+  terminalCwds: {},
   addTab: (opts) => {
     const o = opts ?? {};
     const id = nextTabId();
-    const kind: TabKind = o.kind ?? (o.ssh ? 'ssh' : 'local');
+    const isSsh = o.kind === 'ssh' || !!o.ssh;
+    const ssh = isSsh ? (o.ssh ?? { name: DEFAULT_TITLE, host: '' }) : null;
 
     let tab: Tab;
-    if (kind === 'ssh') {
-      const ssh = o.ssh ?? { name: DEFAULT_TITLE, host: '' };
+    if (isSsh) {
+      const term: TerminalSpec = {
+        id: `${id}#0`,
+        kind: 'ssh',
+        cwd: o.cwd,
+        ssh: { name: ssh!.name, host: ssh!.host, user: ssh!.user, port: ssh!.port, connectionId: ssh!.connectionId },
+      };
       tab = {
         id,
-        title: o.title || ssh.name || DEFAULT_TITLE,
-        kind: 'ssh',
-        named: !!o.title || !!ssh.name,
+        title: o.title || ssh!.name || DEFAULT_TITLE,
+        kind: 'session',
+        named: !!o.title || !!ssh!.name,
         groupId: o.groupId,
-        cwd: o.cwd,
-        ssh: { name: ssh.name, host: ssh.host, user: ssh.user, port: ssh.port, connectionId: ssh.connectionId },
+        layout: leaf(term),
       };
-    } else if (kind === 'local') {
-      // 惯用命名范式：shell=类型名；否则「终端」占位，等首条命令改名
+    } else if (o.kind === 'history') {
+      tab = { id, title: HISTORY_TITLE, kind: 'history', named: true };
+    } else if (o.kind === 'settings') {
+      tab = { id, title: SETTINGS_TITLE, kind: 'settings', named: true };
+    } else {
+      const term: TerminalSpec = { id: `${id}#0`, kind: 'local', cwd: o.cwd, shellType: o.shellType };
       tab = {
         id,
         title: o.title || (o.shellType ? shellTypeLabel(o.shellType) : DEFAULT_TITLE),
-        kind: 'local',
+        kind: 'session',
         named: !!o.title,
         groupId: o.groupId,
-        cwd: o.cwd,
-        shellType: o.shellType,
+        layout: leaf(term),
       };
-    } else if (kind === 'history') {
-      tab = { id, title: HISTORY_TITLE, kind: 'history', named: true };
-    } else {
-      tab = { id, title: SETTINGS_TITLE, kind: 'settings', named: true };
     }
 
     set((s) => ({ tabs: [...s.tabs, tab], activeId: id }));
-    // 历史/设置视图不是真实会话，不落库
     if (isSessionTab(tab)) {
       const ser = serializeSession(tab)!;
-      const created = sessionManager.create(id, tab.title, tab.cwd, ser.kind, ser.payload);
-      // 等会话行落库后再设分组，避免 UPDATE 早于 INSERT 导致 group_id 丢失
+      const created = sessionManager.create(id, tab.title, undefined, ser.kind, ser.payload);
       if (tab.groupId) {
         created.then(() => sessionSetGroup(id, tab.groupId ?? null)).catch(() => {});
       }
-      // 新会话自动停靠到第一个空槽位（终端区域最多 4 个）
-      const slot = useTerminalLayoutStore.getState().firstFreeSlot();
-      if (slot !== null) useTerminalLayoutStore.getState().dockTab(id, slot);
+      // 新建终端不默认入布局（用户拖拽决定停靠位置）
+      useTerminalStore.getState().setFocusedPane(firstLeaf(tab.layout).id);
     }
     return id;
   },
@@ -246,8 +253,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     let next = tabs.filter((t) => t.id !== id);
     if (next.length === 0) {
       const newId = nextTabId();
-      next = [{ id: newId, title: DEFAULT_TITLE, kind: 'local' }];
-      sessionManager.create(newId, DEFAULT_TITLE, undefined, 'local', '{}');
+      next = [{ id: newId, title: DEFAULT_TITLE, kind: 'session', layout: leaf({ id: `${newId}#0`, kind: 'local' }) }];
+      sessionManager.create(newId, DEFAULT_TITLE, undefined, 'session', JSON.stringify({ layout: leaf({ id: `${newId}#0`, kind: 'local' }) }));
     }
     set({
       tabs: next,
@@ -256,14 +263,19 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     });
     // 聚焦若属于被关标签则回落到新的活跃标签
     const fp = useTerminalStore.getState().focusedPaneId;
-    if (fp === id) {
-      useTerminalStore.getState().setFocusedPane(activeId === id ? next[Math.max(0, idx - 1)]!.id : activeId);
+    if (fp === id || (isSessionTab(closed) && layoutLeaves(closed.layout).some((t) => t.id === fp))) {
+      const nextTab = next[Math.max(0, idx - 1)]!;
+      useTerminalStore.getState().setFocusedPane(isSessionTab(nextTab) ? firstLeaf(nextTab.layout).id : nextTab.id);
     }
-    // 清理该 tab 在各 store 的 per-tab 数据，否则 blocks/chat/terminal 残留累积
-    useBlockStore.getState().dropTab(id);
-    useChatStore.getState().dropTab(id);
-    useTerminalStore.getState().dropTab(id);
-    useTerminalLayoutStore.getState().undockTab(id);
+    // 清理该 tab 各终端的 per-terminal 数据（blocks/chat/terminal 残留）
+    if (isSessionTab(closed)) {
+      for (const term of layoutLeaves(closed.layout)) {
+        useBlockStore.getState().dropTab(term.id);
+        useTerminalStore.getState().dropTab(term.id);
+        useWorkspaceStore.getState().dropTerminalCwd(term.id);
+      }
+      useChatStore.getState().dropTab(id);
+    }
     // 历史查看页/设置页无后端会话，跳过归档
     if (isSessionTab(closed)) sessionManager.close(id);
     // 关闭标签后若分组变空则直接删除（空分组无意义）
@@ -286,14 +298,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
   activate: (id) => {
     set({ activeId: id });
-    // focusedPaneId 是全局的，切标签后残留上个标签的 pane；统一回落到该标签主 pane
-    useTerminalStore.getState().setFocusedPane(id);
-    // 会话标签若未停靠且有空槽，自动停靠，避免「激活但不可见」
+    // 聚焦回落到该窗口的第一个终端（切窗口后不残留上个窗口的终端聚焦）
     const tab = get().tabs.find((t) => t.id === id);
-    if (tab && isSessionTab(tab) && !useTerminalLayoutStore.getState().isDocked(id)) {
-      const slot = useTerminalLayoutStore.getState().firstFreeSlot();
-      if (slot !== null) useTerminalLayoutStore.getState().dockTab(id, slot);
-    }
+    useTerminalStore.getState().setFocusedPane(tab && isSessionTab(tab) ? firstLeaf(tab.layout).id : id);
   },
   titleFromMessage: (id, text) => {
     const tab = get().tabs.find((t) => t.id === id);
@@ -322,21 +329,57 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (title) useToastStore.getState().addToast(t('toast.renamed', { title }), 'success');
     sessionManager.rename(id, title);
   },
-  setTabCwd: (id, cwd) => {
-    set((s) => ({
-      tabs: s.tabs.map((t) => (t.id === id && isSessionTab(t) ? { ...t, cwd } : t)),
-    }));
+  setTerminalCwd: (terminalId, cwd) => {
+    set((s) => ({ terminalCwds: { ...s.terminalCwds, [terminalId]: cwd } }));
   },
-  setPaneCwd: (paneId, cwd) => {
-    set((s) => ({ paneCwds: { ...s.paneCwds, [paneId]: cwd } }));
-  },
-  dropPaneCwd: (paneId) => {
+  dropTerminalCwd: (terminalId) => {
     set((s) => {
-      if (!(paneId in s.paneCwds)) return s;
-      const paneCwds = { ...s.paneCwds };
-      delete paneCwds[paneId];
-      return { paneCwds };
+      if (!(terminalId in s.terminalCwds)) return s;
+      const terminalCwds = { ...s.terminalCwds };
+      delete terminalCwds[terminalId];
+      return { terminalCwds };
     });
+  },
+  setWindowLayout: (id, layout) => {
+    set((s) => ({
+      tabs: s.tabs.map((t) => (t.id === id && isSessionTab(t) ? { ...t, layout } : t)),
+    }));
+    sessionManager.saveLayout(id, layout);
+  },
+  splitFocusedDirect: (dir) => {
+    const ws = get();
+    const tab = ws.tabs.find((t) => t.id === ws.activeId);
+    if (!tab || !isSessionTab(tab)) return;
+    if (countLeaves(tab.layout) >= 4) {
+      useToastStore.getState().addToast('最多 4 个终端', 'info');
+      return;
+    }
+    const termId = getFocusedTerminalId();
+    const src = findLeaf(tab.layout, termId);
+    if (!src) return;
+    const newId = nextTerminalId(tab.id, tab.layout);
+    const spec: TerminalSpec = {
+      id: newId, kind: src.kind, shellType: src.shellType,
+      ssh: src.ssh ? { ...src.ssh } : undefined, cwd: src.cwd,
+    };
+    const next = splitLeaf(tab.layout, termId, dir, 'second', spec);
+    ws.setWindowLayout(tab.id, next);
+    useTerminalStore.getState().setFocusedPane(newId);
+  },
+  closeFocusedTerminal: () => {
+    const ws = get();
+    const tab = ws.tabs.find((t) => t.id === ws.activeId);
+    if (!tab || !isSessionTab(tab)) return;
+    const termId = getFocusedTerminalId();
+    if (countLeaves(tab.layout) <= 1) {
+      ws.closeTab(tab.id);
+    } else {
+      const next = removeLeaf(tab.layout, termId);
+      if (next) {
+        ws.setWindowLayout(tab.id, next);
+        useTerminalStore.getState().setFocusedPane(firstLeaf(next).id);
+      }
+    }
   },
 
   // ── 分组 ──
@@ -468,7 +511,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
   archiveGroup: async (id) => {
     // 1) 先确保组内会话的 group_id 已落库（此前可能只做了视觉分组）
-    const groupTabs = get().tabs.filter((t) => isSessionTab(t) && t.groupId === id);
+    const groupTabs = get().tabs.filter(isSessionTab).filter((t) => t.groupId === id);
     for (const t of groupTabs) {
       await sessionSetGroup(t.id, id).catch(() => {});
     }
@@ -486,8 +529,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
     if (next.length === 0) {
       const newId = nextTabId();
-      next = [{ id: newId, title: DEFAULT_TITLE, kind: 'local' as const }];
-      sessionManager.create(newId, DEFAULT_TITLE, undefined, 'local', '{}');
+      const layout = leaf({ id: `${newId}#0`, kind: 'local' });
+      next = [{ id: newId, title: DEFAULT_TITLE, kind: 'session' as const, layout }];
+      sessionManager.create(newId, DEFAULT_TITLE, undefined, 'session', JSON.stringify({ layout }));
       nextActive = newId;
     }
     set((s) => ({
@@ -495,10 +539,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       activeId: nextActive,
       groups: s.groups.filter((g) => g.id !== id),
     }));
-    for (const tid of groupTabIds) {
-      useBlockStore.getState().dropTab(tid);
-      useChatStore.getState().dropTab(tid);
-      useTerminalStore.getState().dropTab(tid);
+    for (const t of groupTabs) {
+      for (const term of layoutLeaves(t.layout)) {
+        useBlockStore.getState().dropTab(term.id);
+        useTerminalStore.getState().dropTab(term.id);
+        useWorkspaceStore.getState().dropTerminalCwd(term.id);
+      }
+      useChatStore.getState().dropTab(t.id);
     }
     useToastStore.getState().addToast('分组已归档到会话历史', 'success');
   },

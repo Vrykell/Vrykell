@@ -7,6 +7,11 @@ import * as sessionManager from '../lib/sessionManager';
 import { useWorkspaceStore } from '../stores/workspace';
 import { useToastStore } from './Toast';
 
+/** 判断会话（窗口）是否含 SSH 终端（布局 payload 里出现 kind=ssh）。 */
+function isSshSession(s: BackendSessionEntry): boolean {
+  return s.kind === 'ssh' || (typeof s.payload === 'string' && s.payload.includes('"kind":"ssh"'));
+}
+
 /**
  * SessionHistoryView — 「会话历史查看」标签页内容。
  * 按分组浏览历史会话；分组可「恢复分组」（重建组内全部历史会话为标签页）
@@ -297,10 +302,10 @@ function SessionRow({
       <span style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         width: 24, height: 24, borderRadius: 6, flexShrink: 0,
-        background: s.kind === 'ssh' ? 'var(--accent-warm-dim)' : historical ? 'var(--hover)' : 'var(--success-bg)',
-        color: s.kind === 'ssh' ? 'var(--accent-warm)' : historical ? 'var(--text-muted)' : 'var(--success)',
+        background: isSshSession(s) ? 'var(--accent-warm-dim)' : historical ? 'var(--hover)' : 'var(--success-bg)',
+        color: isSshSession(s) ? 'var(--accent-warm)' : historical ? 'var(--text-muted)' : 'var(--success)',
       }}>
-        {s.kind === 'ssh' ? <Server size={14} /> : historical ? <History size={14} /> : <Monitor size={14} />}
+        {isSshSession(s) ? <Server size={14} /> : historical ? <History size={14} /> : <Monitor size={14} />}
       </span>
       <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
         <span style={{

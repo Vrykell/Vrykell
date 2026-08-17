@@ -13,6 +13,7 @@ import { registerTerminal, unregisterTerminal, useTerminalStore } from '../store
 import { useBlockStore } from '../stores/blocks';
 import { useHistoryStore } from '../stores/history';
 import { useWorkspaceStore } from '../stores/workspace';
+import { leaves as layoutLeaves } from '../lib/windowLayout';
 import * as sessionManager from '../lib/sessionManager';
 import { SessionController } from './pipeline/sessionController';
 import type { TermBlock } from './pipeline/termBlock';
@@ -150,18 +151,12 @@ export function useTerminalSession(
         applyWidth();
       },
       onCwd: (path) => {
-        // 主 pane（paneId === tabId）写 tab.cwd 并持久化；副 pane 只记内存态（生命周期随分屏）
-        if (paneId === tabId) {
-          useWorkspaceStore.getState().setTabCwd(tabId, path);
-          sessionManager.setCwd(tabId, path);
-        } else {
-          useWorkspaceStore.getState().setPaneCwd(paneId, path);
-        }
+        useWorkspaceStore.getState().setTerminalCwd(paneId, path);
       },
       onBlockStart: (block) => {
         sessionManager.record(tabId, paneId, block, 'start');
-        // 惯用命名：首条命令作为标签标题（未定名时）
-        if (block.command) {
+        // 惯用命名：标题跟随「聚焦终端」的首条命令（未定名时）
+        if (block.command && paneId === useTerminalStore.getState().focusedPaneId) {
           useWorkspaceStore.getState().titleFromCommand(tabId, block.command);
         }
       },
@@ -210,12 +205,16 @@ export function useTerminalSession(
 
     // ── PTY 启动 ──
 
+    // 从窗口布局里取该终端的类型/cwd（paneId 即终端 id）
     const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === tabId);
-    const tabCwd = tab && (tab.kind === 'local' || tab.kind === 'ssh') ? tab.cwd : undefined;
-    const spawnOpts = tab?.kind === 'ssh'
-      ? { ssh: { host: tab.ssh.host, user: tab.ssh.user, port: tab.ssh.port } }
-      : tab?.kind === 'local' && tab.shellType
-        ? { shell: tab.shellType }
+    const spec = tab && tab.kind === 'session'
+      ? layoutLeaves(tab.layout).find((t) => t.id === paneId)
+      : undefined;
+    const tabCwd = spec?.cwd;
+    const spawnOpts = spec?.kind === 'ssh'
+      ? { ssh: { host: spec.ssh?.host ?? '', user: spec.ssh?.user, port: spec.ssh?.port } }
+      : spec?.kind === 'local' && spec.shellType
+        ? { shell: spec.shellType }
         : undefined;
     // 分屏 pane 初次挂载时容器可能尚未布局，fit 会算出 0×0；用兜底尺寸先启动，
     // 等 ResizeObserver/就绪后重校到真实尺寸，避免 PTY 以 0×0 启动导致空白。

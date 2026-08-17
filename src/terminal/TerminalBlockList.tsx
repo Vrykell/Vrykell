@@ -26,6 +26,9 @@ import type { TermBlock } from './pipeline/termBlock';
 
 interface Props {
   tabId: string;
+  /** 命令块左右内边距（px），分屏时靠相邻终端一侧减半，让缝隙看起来像一个终端 */
+  insetLeft?: number;
+  insetRight?: number;
 }
 
 /** 从 ANSI CSI 序列剥离（OSC 已在 dispatcher 剥离）。 */
@@ -36,7 +39,7 @@ export function hasVisibleContent(b: TermBlock): boolean {
   return b.status === 'executing' || b.command !== '' || b.outputHtml !== '' || b.outputText !== '';
 }
 
-export default function TerminalBlockList({ tabId }: Props) {
+export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8 }: Props) {
   const blocks = useBlockStore(selectBlocks(tabId));
   const highlightQuery = useSearchHighlightStore((s) => s.query);
   const [menuBlock, setMenuBlock] = useState<{ block: TermBlock; rect: DOMRect } | null>(null);
@@ -85,6 +88,8 @@ export default function TerminalBlockList({ tabId }: Props) {
           key={b.id}
           block={b}
           tabId={tabId}
+          insetLeft={insetLeft}
+          insetRight={insetRight}
           highlightQuery={highlightQuery}
           onMenu={(block, rect) => setMenuBlock({ block, rect })}
         />
@@ -96,6 +101,8 @@ export default function TerminalBlockList({ tabId }: Props) {
           key={b.id}
           block={b}
           tabId={tabId}
+          insetLeft={insetLeft}
+          insetRight={insetRight}
           highlightQuery={highlightQuery}
         />
       ))}
@@ -202,11 +209,15 @@ function highlightCommand(cmd: string): React.ReactNode {
 function BlockItem({
   block,
   tabId,
+  insetLeft,
+  insetRight,
   highlightQuery,
   onMenu,
 }: {
   block: TermBlock;
   tabId: string;
+  insetLeft: number;
+  insetRight: number;
   highlightQuery: string;
   onMenu: (b: TermBlock, rect: DOMRect) => void;
 }) {
@@ -244,7 +255,7 @@ function BlockItem({
   return (
     <div
       style={{
-        margin: '4px 8px 10px',
+        margin: `4px ${insetRight}px 10px ${insetLeft}px`,
         borderRadius: 8,
         background: 'var(--block)',
         border: '1px solid var(--border)',
@@ -342,10 +353,14 @@ function BlockItem({
 function RunningItem({
   block,
   tabId,
+  insetLeft,
+  insetRight,
   highlightQuery,
 }: {
   block: TermBlock;
   tabId: string;
+  insetLeft: number;
+  insetRight: number;
   highlightQuery: string;
 }) {
   const [elapsedNow, setElapsedNow] = useState(
@@ -386,7 +401,7 @@ function RunningItem({
   return (
     <div
       style={{
-        margin: '4px 8px 10px',
+        margin: `4px ${insetRight}px 10px ${insetLeft}px`,
         borderRadius: 8,
         background: 'var(--block)',
         border: '1px solid var(--border)',

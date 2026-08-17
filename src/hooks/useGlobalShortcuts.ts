@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
-import { useWorkspaceStore } from '../stores/workspace';
-import { useTerminalStore, termInstances } from '../stores/terminal';
-import { useTerminalLayoutStore } from '../stores/terminalLayout';
+import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
+import { useTerminalStore, termInstances, getFocusedTerminalId } from '../stores/terminal';
+import { countLeaves, leaves } from '../lib/windowLayout';
 import { useUiStore } from '../stores/ui';
 import { useBlockStore } from '../stores/blocks';
 
@@ -91,24 +91,28 @@ export function useGlobalShortcuts() {
         return;
       }
 
-      // Cmd+] / Cmd+[ 在停靠终端间切换焦点（仅 Cmd，避免 Ctrl+[ = ESC 被劫持）
+      // Cmd+] / Cmd+[ 在当前窗口的终端间切换焦点（仅 Cmd，避免 Ctrl+[ = ESC 被劫持）
       if (e.metaKey && !e.ctrlKey && !e.shiftKey && (e.key === ']' || e.key === '[')) {
         const ws = useWorkspaceStore.getState();
-        const layout = useTerminalLayoutStore.getState();
-        const slots = layout.slots;
-        const occupied = slots.map((t, i) => (t ? i : -1)).filter((i) => i >= 0);
-        if (occupied.length >= 2) {
+        const tab = ws.tabs.find((t) => t.id === ws.activeId);
+        if (tab && isSessionTab(tab) && countLeaves(tab.layout) >= 2) {
           e.preventDefault();
-          const cur = slots.indexOf(ws.activeId);
-          const idx = cur === -1 ? 0 : occupied.indexOf(cur);
-          const next =
-            e.key === ']'
-              ? occupied[(idx + 1) % occupied.length]!
-              : occupied[(idx - 1 + occupied.length) % occupied.length]!;
-          const nextTabId = slots[next];
-          if (nextTabId) ws.activate(nextTabId);
+          const ids = leaves(tab.layout).map((t) => t.id);
+          const cur = getFocusedTerminalId();
+          const idx = Math.max(0, ids.indexOf(cur));
+          const next = e.key === ']'
+            ? ids[(idx + 1) % ids.length]!
+            : ids[(idx - 1 + ids.length) % ids.length]!;
+          useTerminalStore.getState().setFocusedPane(next);
           return;
         }
+      }
+
+      // ⌥⌘D：选择类型后再分裂（混搭 local/ssh）
+      if (e.metaKey && e.altKey && !e.ctrlKey && e.key === 'd') {
+        e.preventDefault();
+        useUiStore.getState().openSplitPicker();
+        return;
       }
 
       if (!e.metaKey && !e.ctrlKey) return;
@@ -116,21 +120,17 @@ export function useGlobalShortcuts() {
       if (e.key === 't') {
         e.preventDefault();
         ws.addTab();
-      } else if (e.key === 'd' || e.key === 'D') {
-        // Cmd+D 把活跃标签停靠到下一个空槽位（仅终端标签）
+      } else if (e.key === 'd') {
+        // Cmd+D 分裂：进入落点选择（新终端继承类型）
         e.preventDefault();
-        const tab = ws.tabs.find((t) => t.id === ws.activeId);
-        if (tab && (tab.kind === 'local' || tab.kind === 'ssh')) {
-          const layout = useTerminalLayoutStore.getState();
-          if (!layout.isDocked(ws.activeId)) {
-            const slot = layout.firstFreeSlot();
-            if (slot !== null) layout.dockTab(ws.activeId, slot);
-          }
-        }
+        useUiStore.getState().beginSplit(null);
+      } else if (e.key === 'D') {
+        // Cmd+Shift+D：直接上下分裂（跳过落点选择）
+        e.preventDefault();
+        ws.splitFocusedDirect('col');
       } else if (e.key === 'w') {
         e.preventDefault();
-        // 关闭当前标签（同时解除其停靠）
-        ws.closeTab(ws.activeId);
+        ws.closeFocusedTerminal();
       } else if (e.key === ',') {
         e.preventDefault();
         useWorkspaceStore.getState().openSettingsTab();

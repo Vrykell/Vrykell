@@ -185,7 +185,9 @@ export const useDockStore = create<DockState>((set) => ({
 
   setPanelWidth: (id, width) => {
     set((s) => {
-      const panelWidths = { ...s.panelWidths, [id]: Math.max(120, Math.min(500, Math.round(width))) };
+      // 上限随窗口收敛：至少给终端留 400px，避免侧栏拖到「覆盖」终端
+      const maxW = Math.max(160, Math.min(500, Math.round(window.innerWidth - 400)));
+      const panelWidths = { ...s.panelWidths, [id]: Math.max(160, Math.min(maxW, Math.round(width))) };
       const next = { ...s, panelWidths };
       saveLayout(next);
       return next;

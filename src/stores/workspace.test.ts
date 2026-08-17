@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useWorkspaceStore, isSessionTab, getFocusedCwd } from './workspace';
+import { useWorkspaceStore, isSessionTab, getFocusedCwd, firstTerminalOf } from './workspace';
 import { useTerminalStore } from './terminal';
+import { leaf } from '../lib/windowLayout';
 
 const initial = useWorkspaceStore.getState();
 
@@ -43,8 +44,8 @@ describe('workspace store', () => {
   it('addTab 支持指定 shell 类型', () => {
     useWorkspaceStore.getState().addTab({ shellType: 'zsh' });
     const t = useWorkspaceStore.getState().tabs[1]!;
-    expect(t.kind).toBe('local');
-    expect(t.kind === 'local' ? t.shellType : undefined).toBe('zsh');
+    expect(t.kind).toBe('session');
+    expect(firstTerminalOf(t)!.shellType).toBe('zsh');
   });
 
   it('addTab 支持 ssh 连接元数据', () => {
@@ -53,11 +54,13 @@ describe('workspace store', () => {
       ssh: { name: '生产服务器', host: 'prod.example.com', user: 'root', port: 22 },
     });
     const t = useWorkspaceStore.getState().tabs[1]!;
-    expect(t.kind).toBe('ssh');
-    expect(t.kind === 'ssh' ? t.ssh.name : undefined).toBe('生产服务器');
-    expect(t.kind === 'ssh' ? t.ssh.host : undefined).toBe('prod.example.com');
-    expect(t.kind === 'ssh' ? t.ssh.user : undefined).toBe('root');
-    expect(t.kind === 'ssh' ? t.ssh.port : undefined).toBe(22);
+    const term = firstTerminalOf(t)!;
+    expect(t.kind).toBe('session');
+    expect(term.kind).toBe('ssh');
+    expect(term.ssh?.name).toBe('生产服务器');
+    expect(term.ssh?.host).toBe('prod.example.com');
+    expect(term.ssh?.user).toBe('root');
+    expect(term.ssh?.port).toBe(22);
   });
 
   it('openHistoryTab 新建历史标签页且不重复创建', () => {
@@ -153,35 +156,25 @@ describe('workspace store', () => {
     expect(s.groups.find((g) => g.id === gid)!.title).toMatch(/^新分组/);
   });
 
-  it('setPaneCwd / dropPaneCwd 管理副 pane 的 cwd', () => {
-    useWorkspaceStore.getState().setPaneCwd('t1#2', '/a');
-    expect(useWorkspaceStore.getState().paneCwds['t1#2']).toBe('/a');
-    useWorkspaceStore.getState().dropPaneCwd('t1#2');
-    expect(useWorkspaceStore.getState().paneCwds['t1#2']).toBeUndefined();
+  it('setTerminalCwd / dropTerminalCwd 管理终端的 cwd', () => {
+    useWorkspaceStore.getState().setTerminalCwd('t1#0', '/a');
+    expect(useWorkspaceStore.getState().terminalCwds['t1#0']).toBe('/a');
+    useWorkspaceStore.getState().dropTerminalCwd('t1#0');
+    expect(useWorkspaceStore.getState().terminalCwds['t1#0']).toBeUndefined();
   });
 
-  it('getFocusedCwd 主 pane 读 tab.cwd，副 pane 读 paneCwds', () => {
+  it('getFocusedCwd 读聚焦终端的 cwd（回退到 spec.cwd）', () => {
     const tabId = useWorkspaceStore.getState().tabs[0]!.id;
-    useWorkspaceStore.getState().setTabCwd(tabId, '/main');
-
-    // 主 pane（focusedPaneId = tabId）
-    useTerminalStore.setState({ focusedPaneId: tabId, sessions: { [tabId]: 's1' } });
+    useWorkspaceStore.getState().setTerminalCwd(`${tabId}#0`, '/main');
+    useTerminalStore.setState({ focusedPaneId: `${tabId}#0`, sessions: { [`${tabId}#0`]: 's1' } });
     expect(getFocusedCwd()).toBe('/main');
-
-    // 副 pane
-    useWorkspaceStore.getState().setPaneCwd(`${tabId}#2`, '/sec');
-    useTerminalStore.setState({
-      focusedPaneId: `${tabId}#2`,
-      sessions: { [tabId]: 's1', [`${tabId}#2`]: 's2' },
-    });
-    expect(getFocusedCwd()).toBe('/sec');
   });
 
   it('pruneEmptyGroups 只删除没有任何标签的空分组', () => {
     useWorkspaceStore.setState({
       tabs: [
-        { id: 't0', title: 'a', kind: 'local', groupId: 'g1' },
-        { id: 't1', title: 'b', kind: 'local' },
+        { id: 't0', title: 'a', kind: 'session', groupId: 'g1', layout: leaf({ id: 't0#0', kind: 'local' }) },
+        { id: 't1', title: 'b', kind: 'session', layout: leaf({ id: 't1#0', kind: 'local' }) },
       ],
       groups: [
         { id: 'g1', title: '一', collapsed: false },

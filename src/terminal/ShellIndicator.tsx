@@ -47,9 +47,11 @@ interface Props {
   connected?: boolean;
   /** 仅显示点 + 名称（无胶囊背景，用于紧凑布局） */
   compact?: boolean;
+  /** 覆盖显示名（终端类型 / SSH 连接名） */
+  label?: string;
 }
 
-export default function ShellIndicator({ shell, connected, compact }: Props) {
+export default function ShellIndicator({ shell, connected, compact, label }: Props) {
   const info = shell ?? { type: 'unknown' as const, label: 'sh' };
   const fg = SHELL_FG[info.type];
   const bg = SHELL_BG[info.type];
@@ -87,7 +89,7 @@ export default function ShellIndicator({ shell, connected, compact }: Props) {
           }}
         />
       )}
-      <span>{info.label}</span>
+      <span>{label ?? info.label}</span>
     </span>
   );
 }
