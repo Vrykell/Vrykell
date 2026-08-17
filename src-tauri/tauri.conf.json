@@ -12,11 +12,16 @@
   "app": {
     "windows": [
       {
-        "title": "ai-terminal-v2",
-        "width": 800,
-        "height": 600
+        "title": "AI Terminal",
+        "width": 1240,
+        "height": 800,
+        "minWidth": 720,
+        "minHeight": 480,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
       }
     ],
+    "macOSPrivateApi": true,
     "security": {
       "csp": null
     }

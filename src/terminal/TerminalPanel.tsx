@@ -1,7 +1,21 @@
 import '@xterm/xterm/css/xterm.css';
-import { useXterm } from './useXterm';
+import { useTerminalSession } from './useTerminalSession';
 
-export default function TerminalPanel({ onReady }: { onReady: (sessionId: string) => void }) {
-  const ref = useXterm(onReady);
-  return <div ref={ref} style={{ width: '100%', height: '100%', padding: 4, background: '#0e0f11' }} />;
+/** TerminalPanel — 单个终端 pane 的 xterm 宿主（classic 主表面 / altScreen 覆盖层）。 */
+export default function TerminalPanel({
+  paneId,
+  tabId,
+  onReady,
+}: {
+  paneId: string;
+  tabId: string;
+  onReady: (sessionId: string) => void;
+}) {
+  const ref = useTerminalSession(paneId, tabId, onReady);
+  return (
+    <div
+      ref={ref}
+      style={{ width: '100%', height: '100%', minHeight: 0, background: 'var(--canvas)' }}
+    />
+  );
 }

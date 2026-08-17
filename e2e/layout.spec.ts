@@ -1,0 +1,83 @@
+import { test, expect } from '@playwright/test';
+import { setupTauriMock } from './tauri-mock';
+
+test.beforeEach(async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+});
+
+test.describe('应用布局', () => {
+  test('TopDock 功能区：标签/资源按钮 + 设置入口', async ({ page }) => {
+    // Dock 按钮存在（可拖拽按钮）
+    await expect(page.locator('[data-dock-btn="tabs"]')).toBeVisible();
+    await expect(page.locator('[data-dock-btn="files"]')).toBeVisible();
+    await expect(page.getByTitle('设置')).toBeVisible();
+  });
+
+  test('文件面板：点击资源按钮后显示目录和文件', async ({ page }) => {
+    // 点击 "资源" dock 按钮打开文件面板
+    await page.locator('[data-dock-btn="files"]').click();
+    await expect(page.getByText('Documents')).toBeVisible({ timeout: 3000 });
+    await expect(page.getByText('notes.txt')).toBeVisible();
+  });
+
+  test('状态栏：shell 状态、尺寸、模型', async ({ page }) => {
+    await expect(page.getByText('shell', { exact: true })).toBeVisible();
+    await expect(page.getByText('gpt-4o-mini')).toBeVisible();
+  });
+
+  test('终端区：xterm 挂载且有底部输入栏', async ({ page }) => {
+    // 新管线默认进入 blockList，xterm 仍挂载但隐藏；底部输入栏应可见
+    await expect(page.locator('.xterm')).toBeAttached();
+    await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
+  });
+
+  test('底部输入栏支持 AI 模式切换', async ({ page }) => {
+    await page.getByTitle(/AI 模式/).click();
+    await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
+    await page.getByTitle(/命令模式/).click();
+    await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
+  });
+
+  test('标签面板：打开面板 → 新建标签 → 切换', async ({ page }) => {
+    // 新标签同样进入 blockList，xterm 挂载但隐藏
+    await expect(page.locator('.xterm')).toBeAttached();
+    // 点击 "标签" dock 按钮打开标签面板
+    await page.locator('[data-dock-btn="tabs"]').click();
+    // 面板内点击顶部新建按钮 → 直接弹出类型选择弹窗（无中间菜单）
+    await page.locator('[data-testid="tab-new-btn"]').click();
+    await page.getByText('Zsh', { exact: true }).click();
+    // 验证两个标签都在面板中可见
+    await expect(page.locator('[data-testid^="tab-row-"]')).toHaveCount(2);
+    // 点击第一个标签切换回去
+    await page.getByText('终端').first().click();
+    await expect(page.locator('[data-testid^="tab-row-"]')).toHaveCount(2);
+  });
+
+  test('文档级滚动已锁定 — html/body overflow 裁剪', async ({ page }) => {
+    const check = () => page.evaluate(() => ({
+      scrollHeight: document.documentElement.scrollHeight,
+      innerHeight: window.innerHeight,
+      scrollY: window.scrollY,
+      bodyOverflow: getComputedStyle(document.body).overflow,
+      htmlOverflow: getComputedStyle(document.documentElement).overflow,
+    }));
+
+    // html/body overflow 应为 hidden
+    let s = await check();
+    expect(s.htmlOverflow).toBe('hidden');
+    expect(s.bodyOverflow).toBe('hidden');
+
+    // 初始文档不可滚动
+    expect(s.scrollHeight).toBeLessThanOrEqual(s.innerHeight + 2);
+    expect(s.scrollY).toBe(0);
+
+    // 打开面板后重新验证
+    await page.locator('[data-dock-btn="tabs"]').click();
+    await page.waitForTimeout(300);
+
+    s = await check();
+    expect(s.scrollY).toBe(0);
+    expect(s.scrollHeight).toBeLessThanOrEqual(s.innerHeight + 2);
+  });
+});

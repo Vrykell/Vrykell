@@ -1,8 +1,34 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import type { DispatchEvent } from '../terminal/pipeline/events';
 
-export function ptySpawn(cols: number, rows: number, cwd?: string): Promise<string> {
-  return invoke('pty_spawn', { cols, rows, cwd: cwd ?? null });
+/** SSH 连接目标（透传给 Rust pty_spawn 的 ssh 参数） */
+export interface SshSpawnTarget {
+  host: string;
+  user?: string;
+  port?: number;
+}
+
+export interface PtySpawnOptions {
+  /** 本地 shell 类型（zsh / bash / powershell / pwsh / cmd），缺省走 $SHELL 探测 */
+  shell?: string;
+  /** SSH 连接目标；与 shell 互斥，优先 SSH */
+  ssh?: SshSpawnTarget | null;
+}
+
+export function ptySpawn(
+  cols: number,
+  rows: number,
+  cwd?: string,
+  opts?: PtySpawnOptions,
+): Promise<string> {
+  return invoke('pty_spawn', {
+    cols,
+    rows,
+    cwd: cwd ?? null,
+    shell: opts?.shell ?? null,
+    ssh: opts?.ssh ?? null,
+  });
 }
 
 export function ptyWrite(id: string, data: string): Promise<void> {
@@ -17,8 +43,10 @@ export function ptyClose(id: string): Promise<void> {
   return invoke('pty_close', { id });
 }
 
-export function onPtyOutput(cb: (id: string, data: string) => void): Promise<UnlistenFn> {
-  return listen<{ id: string; data: string }>('pty-output', (e) => cb(e.payload.id, e.payload.data));
+export function onPtyOutput(cb: (id: string, events: DispatchEvent[]) => void): Promise<UnlistenFn> {
+  return listen<{ id: string; events: DispatchEvent[] }>('pty-output', (e) =>
+    cb(e.payload.id, e.payload.events),
+  );
 }
 
 export function onPtyExit(cb: (id: string) => void): Promise<UnlistenFn> {

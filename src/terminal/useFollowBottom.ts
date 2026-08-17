@@ -1,0 +1,94 @@
+/** useFollowBottom — block 列表贴底跟随（Spec §3 滚动简化，替代 ScrollStateMachine）。 */
+
+import { useCallback, useEffect, useRef } from 'react';
+
+const BOTTOM_THRESHOLD_PX = 32; // ≈2 行
+
+/** paneId → engage() 注册表：共享输入栏提交命令时，按聚焦 pane 复位对应列表的贴底跟随。
+ *  （主列表按 activeId 注册，分屏各 pane 按 paneId 注册。） */
+const engagers = new Map<string, () => void>();
+
+/** 注册一个列表的 engage 回调，返回反注册函数。 */
+export function registerFollowEngager(id: string, engage: () => void): () => void {
+  engagers.set(id, engage);
+  return () => {
+    if (engagers.get(id) === engage) engagers.delete(id);
+  };
+}
+
+/** 复位指定 pane 列表的贴底跟随（提交新命令时调用）。 */
+export function engageFollow(id: string): void {
+  engagers.get(id)?.();
+}
+
+/**
+ * 返回 engage()：强制复位 latch 并立即贴底。
+ * 用户上滚后 latch 脱离（不再跟随），但「提交新命令」是明确的回底意图
+ * （），调用方在提交时调 engage() 复位。
+ *
+ * latch 只应被「用户滚动」杀死。程序化 snap 的 scroll 事件是异步派发的，
+ * 派发时内容可能已增长（submit 后新 block 很快渲染），若按当时位置量 gap
+ * 会误判为上滚 → latch 死亡 → 跟随在输出流中段停摆（「只滚到一半」）。
+ * 因此记录每次 snap 的实际 scrollTop，scroll 事件落在该位置视为自引发。
+ */
+export function useFollowBottom(
+  scrollRef: React.RefObject<HTMLDivElement | null>,
+  deps: unknown[],
+): () => void {
+  const atBottomRef = useRef(true);
+  /** 最近一次 snap 读回的实际 scrollTop（浏览器 clamp 后的值）；-1 = 尚未 snap */
+  const snappedTopRef = useRef(-1);
+
+  const snap = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    snappedTopRef.current = el.scrollTop; // 读回 clamp 后的实际值
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      // 自引发的 scroll 事件（snap 位置）：即使内容已增长也保持贴底
+      if (el.scrollTop === snappedTopRef.current) {
+        atBottomRef.current = true;
+        return;
+      }
+      atBottomRef.current =
+        el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX;
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    // 运行中块的活 xterm 高度直改 DOM（不经 React → deps 不触发）：
+    // 观察内容包装层（TerminalView 的单根 div），latch 在底时持续增长跟随
+    const content = el.firstElementChild;
+    const ro = content
+      ? new ResizeObserver(() => {
+          if (atBottomRef.current) snap();
+        })
+      : null;
+    if (content) ro!.observe(content);
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      ro?.disconnect();
+    };
+    // 滚动容器 div 生命周期与组件一致，只需在挂载时订阅一次。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!atBottomRef.current) return;
+    requestAnimationFrame(() => {
+      // 滚动期间用户可能已上滚，需重新确认贴底状态
+      if (!atBottomRef.current) return;
+      snap();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+
+  return useCallback(() => {
+    atBottomRef.current = true;
+    snap();
+  }, [snap]);
+}

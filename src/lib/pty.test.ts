@@ -15,14 +15,29 @@ describe('pty IPC wrapper', () => {
   it('pty_spawn 传 camelCase 参数并返回 id', async () => {
     invokeMock.mockResolvedValue('sess-1');
     const id = await ptySpawn(80, 24, '/tmp');
-    expect(invokeMock).toHaveBeenCalledWith('pty_spawn', { cols: 80, rows: 24, cwd: '/tmp' });
+    expect(invokeMock).toHaveBeenCalledWith('pty_spawn', { cols: 80, rows: 24, cwd: '/tmp', shell: null, ssh: null });
     expect(id).toBe('sess-1');
   });
 
   it('pty_spawn 缺省 cwd 传 null', async () => {
     invokeMock.mockResolvedValue('sess-2');
     await ptySpawn(120, 40);
-    expect(invokeMock).toHaveBeenCalledWith('pty_spawn', { cols: 120, rows: 40, cwd: null });
+    expect(invokeMock).toHaveBeenCalledWith('pty_spawn', { cols: 120, rows: 40, cwd: null, shell: null, ssh: null });
+  });
+
+  it('pty_spawn 透传 shell 与 ssh 目标', async () => {
+    invokeMock.mockResolvedValue('sess-3');
+    await ptySpawn(80, 24, undefined, {
+      shell: 'zsh',
+      ssh: { host: 'prod.example.com', user: 'root', port: 22 },
+    });
+    expect(invokeMock).toHaveBeenCalledWith('pty_spawn', {
+      cols: 80,
+      rows: 24,
+      cwd: null,
+      shell: 'zsh',
+      ssh: { host: 'prod.example.com', user: 'root', port: 22 },
+    });
   });
 
   it('pty_write/resize/close 映射到对应 command', async () => {
@@ -40,7 +55,8 @@ describe('pty IPC wrapper', () => {
     listenMock.mockResolvedValue(() => {});
     await onPtyOutput(cb);
     const handler = listenMock.mock.calls[0][1];
-    handler({ payload: { id: 's', data: 'hello' } });
-    expect(cb).toHaveBeenCalledWith('s', 'hello');
+    const events = [{ kind: 'data', text: 'hello' }];
+    handler({ payload: { id: 's', events } });
+    expect(cb).toHaveBeenCalledWith('s', events);
   });
 });
