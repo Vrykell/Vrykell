@@ -12,8 +12,8 @@ import { anthropicStream, refreshAiConfig } from './lib/ai';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import { useUiStore } from './stores/ui';
 import { useWorkspaceDirsStore } from './files/workspaceDirs';
-import { useWorkspaceStore, serializeSession } from './stores/workspace';
-import type { TerminalSpec } from './lib/windowLayout';
+import { useWorkspaceStore, serializeSession, isSessionTab } from './stores/workspace';
+import { minTerminalWidth, MIN_PANE_SIZE, type TerminalSpec } from './lib/windowLayout';
 import * as sessionManager from './lib/sessionManager';
 import './search/init'; // 触发所有搜索源自动注册
 
@@ -50,6 +50,11 @@ export default function App() {
   const setGlobalSearchOpen = useUiStore((s) => s.setGlobalSearchOpen);
   const splitPickerOpen = useUiStore((s) => s.splitPickerOpen);
   const closeSplitPicker = useUiStore((s) => s.closeSplitPicker);
+  // 终端区域最小宽度按布局动态计算：单终端就窄，多终端并排才宽
+  const terminalMinWidth = useWorkspaceStore((s) => {
+    const tab = s.tabs.find((t) => t.id === s.activeId);
+    return tab && isSessionTab(tab) ? minTerminalWidth(tab.layout) : MIN_PANE_SIZE;
+  });
 
   const handleSplitPick = (spec: TerminalSpec) => {
     closeSplitPicker();
@@ -69,7 +74,7 @@ export default function App() {
       <TopDock />
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row' }}>
         <SidePanel side="left" />
-        <div style={{ flex: 1, minWidth: 240, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, minWidth: terminalMinWidth, display: 'flex', flexDirection: 'column' }}>
           <TerminalView />
         </div>
         <SidePanel side="right" />

@@ -13,9 +13,9 @@
  */
 
 import { useRef, useCallback, useEffect, useMemo } from 'react';
-import { Bot, Columns2, GitBranch, Zap } from 'lucide-react';
+import { Columns2, GitBranch, X, Zap } from 'lucide-react';
 import { ptyWrite } from '../lib/pty';
-import { useTerminalStore, getRecentOutputFor } from '../stores/terminal';
+import { useTerminalStore } from '../stores/terminal';
 import { useChatStore } from '../stores/chat';
 import { useUiStore } from '../stores/ui';
 import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
@@ -23,7 +23,6 @@ import { leaves as layoutLeaves } from '../lib/windowLayout';
 import { shellTypeLabel } from '../lib/shells';
 import { useBlockStore } from '../stores/blocks';
 import { useInputStore, selectPaneInput } from '../stores/input';
-import { useToastStore } from '../components/Toast';
 import { isInputBoxVisible, getLongRunningHint } from './inputVisibility';
 import { engageFollow } from './useFollowBottom';
 import ShellIndicator from './ShellIndicator';
@@ -31,6 +30,8 @@ import ShellIndicator from './ShellIndicator';
 interface Props {
   /** 该输入栏绑定的 pane（决定读写哪个终端） */
   paneId: string;
+  /** 该 pane 是否为当前聚焦终端（未传时回退到 focusedPaneId 判定） */
+  focused?: boolean;
   isLongRunning?: boolean;
   runningCommand?: string;
   onEndPress?: () => void;
@@ -39,6 +40,7 @@ interface Props {
 
 export default function InputEditor({
   paneId,
+  focused,
   isLongRunning,
   runningCommand,
   onEndPress,
@@ -48,6 +50,8 @@ export default function InputEditor({
   const chatSend = useChatStore((s) => s.send);
 
   const sessions = useTerminalStore((s) => s.sessions);
+  const focusedPaneId = useTerminalStore((s) => s.focusedPaneId);
+  const isFocused = focused ?? paneId === focusedPaneId;
 
   // 每 pane 独立输入态（text + AI 模式）
   const input = useInputStore(selectPaneInput(paneId));
@@ -132,6 +136,13 @@ export default function InputEditor({
     wasVisibleRef.current = visible;
   }, [visible]);
 
+  // 焦点切换（⌘]/⌘[ 或点击 pane）时，把键盘焦点交给新聚焦终端的输入栏
+  const wasFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    if (isFocused && !wasFocusedRef.current && visible) inputRef.current?.focus();
+    wasFocusedRef.current = isFocused;
+  }, [isFocused, visible]);
+
   const resetHeight = useCallback(() => {
     if (inputRef.current) inputRef.current.style.height = 'auto';
   }, []);
@@ -153,35 +164,6 @@ export default function InputEditor({
       console.error('[InputEditor] execute failed:', e);
     }
   }, [text, aiMode, chatSend, paneId, sessions, resetHeight]);
-
-  const sendOutputToAI = useCallback(() => {
-    try {
-      const scene = useTerminalStore.getState().scenes[paneId];
-      let output = '';
-      if (scene === 'classic' || scene === 'altScreen') {
-        // 主 xterm buffer（分屏副 pane 的活终端同样挂在 termInstances[paneId]）
-        output = getRecentOutputFor(paneId, 30);
-      } else {
-        const blocks = useBlockStore.getState().byTab[paneId] ?? [];
-        for (let i = blocks.length - 1; i >= 0; i--) {
-          const t = blocks[i]!.outputText;
-          if (t.trim()) {
-            output = t.split('\n').slice(-30).join('\n');
-            break;
-          }
-        }
-      }
-      if (!output.trim()) {
-        useToastStore.getState().addToast('当前没有可发送的终端输出', 'info');
-        return;
-      }
-      setAiMode(true);
-      chatSend(`\`\`\`\n${output}\n\`\`\``);
-    } catch (e) {
-      console.error('[InputEditor] sendOutputToAI failed:', e);
-      useToastStore.getState().addToast('发送输出给 AI 失败', 'error');
-    }
-  }, [paneId, chatSend, setAiMode]);
 
   // ── 全局 End 键监听 ──
 
@@ -270,7 +252,7 @@ export default function InputEditor({
           userSelect: 'none',
         }}
       >
-        <ShellIndicator connected={hasSession} label={terminalLabel} />
+        <ShellIndicator connected={hasSession} focused={isFocused} label={terminalLabel} />
         <span style={{ color: 'var(--border-strong)', opacity: 0.5, margin: '0 1px' }}>·</span>
         <CurrentDir dir={tabCwd} />
         {recentGitBranch && (
@@ -353,6 +335,7 @@ export default function InputEditor({
           }}
           style={{
             flex: 1,
+            minWidth: 0,
             resize: 'none',
             background: 'transparent',
             border: 'none',
@@ -365,12 +348,12 @@ export default function InputEditor({
           }}
         />
 
-        {/* 操作按钮 — subtle hover effect */}
-        <InputActionBtn title="将终端输出发给 AI 分析" onClick={sendOutputToAI}>
-          <Bot size={13} />
-        </InputActionBtn>
+        {/* 操作按钮 — subtle hover effect：分裂 + 关闭当前终端 */}
         <InputActionBtn title="选择类型分裂" onClick={() => useUiStore.getState().openSplitPicker()}>
           <Columns2 size={13} />
+        </InputActionBtn>
+        <InputActionBtn title="关闭当前终端" onClick={() => useWorkspaceStore.getState().closeTerminal(paneId)}>
+          <X size={13} />
         </InputActionBtn>
       </div>
     </div>

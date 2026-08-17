@@ -53,6 +53,11 @@ export interface Divider {
   rect: Rect;
 }
 
+/** 每个终端（pane）的最小尺寸（px）——动态最小宽度的基准，尽量小以最大化拖动范围。 */
+export const MIN_PANE_SIZE = 135;
+/** 分隔线厚度（px）。 */
+export const DIVIDER_SIZE = 6;
+
 export function leaf(terminal: TerminalSpec): WindowLayout {
   return { type: 'leaf', terminal };
 }
@@ -60,6 +65,20 @@ export function leaf(terminal: TerminalSpec): WindowLayout {
 export function countLeaves(layout: WindowLayout): number {
   if (layout.type === 'leaf') return 1;
   return countLeaves(layout.first) + countLeaves(layout.second);
+}
+
+/** 同一水平行里最多有多少个终端（row 相加、col 取较大），用于按布局动态计算窗口最小宽度。 */
+export function maxRowPanes(layout: WindowLayout): number {
+  if (layout.type === 'leaf') return 1;
+  return layout.dir === 'row'
+    ? maxRowPanes(layout.first) + maxRowPanes(layout.second)
+    : Math.max(maxRowPanes(layout.first), maxRowPanes(layout.second));
+}
+
+/** 窗口（会话容器）的最小宽度：最宽一行 × 每终端最小宽 + 分隔线厚度。 */
+export function minTerminalWidth(layout: WindowLayout): number {
+  const n = maxRowPanes(layout);
+  return n * MIN_PANE_SIZE + (n - 1) * DIVIDER_SIZE;
 }
 
 export function leaves(layout: WindowLayout): TerminalSpec[] {
@@ -176,6 +195,32 @@ export function dropTargets(layout: WindowLayout): DropTarget[] {
     walk(node.second, depth + 1, node.dir);
   };
   walk(layout, 0, null);
+  return targets;
+}
+
+/**
+ * 移动终端的落点：对每个「其它终端」给出上下左右四个边沿落点（吸附式）。
+ * 与分裂（dropTargets）不同：移动时被拖动终端会先移除，落点只面向剩余终端，
+ * 因此不受「深度 ≤ 1」限制，可自由放到任意其它终端的上/下/左/右。
+ */
+export function moveTargets(layout: WindowLayout, dragId: string): DropTarget[] {
+  // 先移除被拖动终端，落点矩形以「移除后的整个容器」为基准，忠实反映最终落位（而非目标终端当前子区域）
+  const remaining = removeLeaf(layout, dragId);
+  if (!remaining) return [];
+  const targets: DropTarget[] = [];
+  for (const { terminalId, rect } of leafRects(remaining)) {
+    for (const dir of ['row', 'col'] as SplitDir[]) {
+      for (const position of ['first', 'second'] as const) {
+        const first = dir === 'row'
+          ? { x: rect.x, y: rect.y, w: rect.w / 2, h: rect.h }
+          : { x: rect.x, y: rect.y, w: rect.w, h: rect.h / 2 };
+        const second = dir === 'row'
+          ? { x: rect.x + rect.w / 2, y: rect.y, w: rect.w / 2, h: rect.h }
+          : { x: rect.x, y: rect.y + rect.h / 2, w: rect.w, h: rect.h / 2 };
+        targets.push({ leafId: terminalId, dir, position, rect: position === 'first' ? first : second });
+      }
+    }
+  }
   return targets;
 }
 

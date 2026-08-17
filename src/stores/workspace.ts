@@ -145,6 +145,8 @@ interface WorkspaceState {
   setWindowLayout: (id: string, layout: WindowLayout) => void;
   /** 直接分裂聚焦终端（继承类型，跳过落点选择；⌘⇧D 用） */
   splitFocusedDirect: (dir: SplitDir) => void;
+  /** 关闭指定终端；若只剩一个则关闭窗口 */
+  closeTerminal: (terminalId: string) => void;
   /** 关闭聚焦终端；若只剩一个则关闭窗口 */
   closeFocusedTerminal: () => void;
 
@@ -366,20 +368,26 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     ws.setWindowLayout(tab.id, next);
     useTerminalStore.getState().setFocusedPane(newId);
   },
-  closeFocusedTerminal: () => {
+  closeTerminal: (terminalId) => {
     const ws = get();
     const tab = ws.tabs.find((t) => t.id === ws.activeId);
     if (!tab || !isSessionTab(tab)) return;
-    const termId = getFocusedTerminalId();
+    if (!layoutLeaves(tab.layout).some((t) => t.id === terminalId)) return;
     if (countLeaves(tab.layout) <= 1) {
       ws.closeTab(tab.id);
-    } else {
-      const next = removeLeaf(tab.layout, termId);
-      if (next) {
-        ws.setWindowLayout(tab.id, next);
-        useTerminalStore.getState().setFocusedPane(firstLeaf(next).id);
-      }
+      return;
     }
+    const next = removeLeaf(tab.layout, terminalId);
+    if (!next) return;
+    ws.setWindowLayout(tab.id, next);
+    // 清理被移除终端的 per-terminal 残留（blocks/PTY 记录/cwd）
+    useBlockStore.getState().dropTab(terminalId);
+    useTerminalStore.getState().dropTab(terminalId);
+    ws.dropTerminalCwd(terminalId);
+    useTerminalStore.getState().setFocusedPane(firstLeaf(next).id);
+  },
+  closeFocusedTerminal: () => {
+    get().closeTerminal(getFocusedTerminalId());
   },
 
   // ── 分组 ──

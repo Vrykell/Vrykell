@@ -8,10 +8,10 @@
  */
 
 import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
-import { ArrowLeft, ArrowRight, ArrowUp, ArrowDown } from 'lucide-react';
 import { useWorkspaceStore, nextTerminalId } from '../stores/workspace';
 import { useTerminalStore } from '../stores/terminal';
 import { useUiStore } from '../stores/ui';
+import { useDockDragStore } from '../stores/dockDrag';
 import { useActiveMessages } from '../stores/chat';
 import { useBlockStore, selectBlocks } from '../stores/blocks';
 import { ptyWrite } from '../lib/pty';
@@ -20,7 +20,8 @@ import { useToastStore } from '../components/Toast';
 import { useFollowBottom, registerFollowEngager, engageFollow } from './useFollowBottom';
 import { useTerminalFocus } from './useTerminalFocus';
 import {
-  leaves as layoutLeaves, firstLeaf, findLeaf, splitLeaf, dropTargets, setRatio,
+  leaves as layoutLeaves, firstLeaf, findLeaf, splitLeaf, removeLeaf, dropTargets, moveTargets,
+  setRatio, MIN_PANE_SIZE, DIVIDER_SIZE,
   type WindowLayout, type TerminalSpec, type DropTarget,
 } from '../lib/windowLayout';
 import InputEditor from './InputEditor';
@@ -45,6 +46,7 @@ export default function TerminalView() {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const splitPlacement = useUiStore((s) => s.splitPlacement);
   const cancelSplit = useUiStore((s) => s.cancelSplit);
+  const draggingId = useDockDragStore((s) => s.draggingTerminalId);
 
   const activeTab = tabs.find((t) => t.id === activeId);
   const isHistoryTab = activeTab?.kind === 'history';
@@ -85,6 +87,17 @@ export default function TerminalView() {
     cancelSplit();
   }, [layout, splitPlacement.spec, activeId, setWindowLayout, setFocusedPane, cancelSplit]);
 
+  const commitMove = useCallback((dragId: string, zone: DropTarget) => {
+    if (!layout) return;
+    if (zone.leafId === dragId) return;
+    const spec = findLeaf(layout, dragId);
+    const removed = removeLeaf(layout, dragId);
+    if (!spec || !removed) return;
+    const next = splitLeaf(removed, zone.leafId, zone.dir, zone.position, spec);
+    setWindowLayout(activeId, next);
+    setFocusedPane(dragId);
+  }, [layout, activeId, setWindowLayout, setFocusedPane]);
+
   return (
     <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
       {isHistoryTab ? (
@@ -92,15 +105,27 @@ export default function TerminalView() {
       ) : isSettingsTab ? (
         <SettingsView />
       ) : isSession && layout ? (
-        <LayoutTree
-          node={layout}
-          windowId={activeId}
-          focusedTermId={focusedTermId}
-          setSession={setSession}
-          setFocusedPane={setFocusedPane}
-          setRatioNode={(aId, bId, r) => setWindowLayout(activeId, setRatio(layout, aId, bId, r))}
-          onPaneContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY }); }}
-        />
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', position: 'relative' }}>
+          <LayoutTree
+            node={layout}
+            windowId={activeId}
+            focusedTermId={focusedTermId}
+            setSession={setSession}
+            setFocusedPane={setFocusedPane}
+            setRatioNode={(aId, bId, r) => setWindowLayout(activeId, setRatio(layout, aId, bId, r))}
+            onPaneContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY }); }}
+          />
+
+          {/* 分裂落点选择覆盖层（相对布局区域定位，忠实反映未来区域） */}
+          {splitPlacement.open && (
+            <PlacementOverlay targets={placementTargets} onPick={commitPlacement} onCancel={cancelSplit} />
+          )}
+
+          {/* 拖动终端调整位置的落点覆盖层 */}
+          {draggingId && (
+            <MoveDragLayer layout={layout} draggingId={draggingId} onCommit={commitMove} />
+          )}
+        </div>
       ) : (
         <LoadingState />
       )}
@@ -133,11 +158,6 @@ export default function TerminalView() {
             { label: '关闭终端', danger: true, onClick: () => useWorkspaceStore.getState().closeFocusedTerminal() },
           ]}
         />
-      )}
-
-      {/* 分裂落点选择覆盖层 */}
-      {splitPlacement.open && (
-        <PlacementOverlay targets={placementTargets} onPick={commitPlacement} onCancel={cancelSplit} />
       )}
     </div>
   );
@@ -210,8 +230,13 @@ function Divider({ dir, onRatio }: { dir: 'row' | 'col'; onRatio: (r: number) =>
     if (!container) return;
     const cRect = container.getBoundingClientRect();
     const move = (ev: MouseEvent) => {
-      const r = isRow ? (ev.clientX - cRect.left) / cRect.width : (ev.clientY - cRect.top) / cRect.height;
-      onRatio(Math.max(0.1, Math.min(0.9, r)));
+      const size = isRow ? cRect.width : cRect.height;
+      const pos = isRow ? (ev.clientX - cRect.left) : (ev.clientY - cRect.top);
+      // 像素级最小尺寸：每侧至少 MIN_PANE_SIZE，避免拖到「覆盖」内容
+      const minRatio = Math.min(0.5, MIN_PANE_SIZE / size);
+      const maxRatio = Math.max(0.5, 1 - MIN_PANE_SIZE / size);
+      const r = Math.max(minRatio, Math.min(maxRatio, pos / size));
+      onRatio(r);
     };
     const up = () => {
       document.removeEventListener('mousemove', move);
@@ -229,8 +254,8 @@ function Divider({ dir, onRatio }: { dir: 'row' | 'col'; onRatio: (r: number) =>
       onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       style={{
         flexShrink: 0,
-        width: isRow ? 6 : 'auto',
-        height: isRow ? 'auto' : 6,
+        width: isRow ? DIVIDER_SIZE : 'auto',
+        height: isRow ? 'auto' : DIVIDER_SIZE,
         cursor: isRow ? 'col-resize' : 'row-resize',
         transition: 'background 0.12s ease',
       }}
@@ -258,11 +283,36 @@ function TerminalPane(props: {
   const showXterm = scene === 'classic' || (scene === 'altScreen' && !altScreenActive);
   const showBlocks = scene === 'blockList';
 
+  // 整个终端表面都可拖（无需把手）：按住超过 5px 阈值即进入拖动调整位置；
+  // 排除输入框/按钮/链接/活终端等交互元素，避免与打字、点击冲突。
+  const onPaneMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('input, textarea, button, a, [contenteditable="true"], .xterm, [data-no-drag]')) return;
+    e.preventDefault();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let started = false;
+    const onMove = (ev: MouseEvent) => {
+      if (started) return;
+      if (Math.abs(ev.clientX - startX) < 5 && Math.abs(ev.clientY - startY) < 5) return;
+      started = true;
+      useDockDragStore.getState().start(terminal.id);
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
+
   return (
     <div
       data-testid={`pane-${terminal.id}`}
       data-focused={focused ? 'true' : 'false'}
       onClick={() => setFocusedPane(terminal.id)}
+      onMouseDown={onPaneMouseDown}
       onContextMenu={(e) => { setFocusedPane(terminal.id); onContextMenu(e); }}
       style={{
         flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column',
@@ -286,10 +336,27 @@ function TerminalPane(props: {
       <div style={{ display: showBlocks ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column' }}>
         <PaneBlockList paneId={terminal.id} insetLeft={inner.left ? 4 : 8} insetRight={inner.right ? 4 : 8} />
       </div>
-      {showBlocks && <PaneInputEditor paneId={terminal.id} />}
+      {showBlocks && <PaneInputEditor paneId={terminal.id} focused={focused} />}
       {scene === 'altScreen' && <TuiBanner tabId={terminal.id} />}
     </div>
   );
+}
+
+/** 根据归一化坐标 (0..1) 挑出光标所在落点：取「深入未来区域最深」者，解决半屏重叠歧义。 */
+function pickDropZone(targets: DropTarget[], nx: number, ny: number): number | null {
+  let best: number | null = null;
+  let bestScore = -Infinity;
+  for (let i = 0; i < targets.length; i++) {
+    const t = targets[i]!;
+    const r = t.rect;
+    if (nx < r.x - 1e-6 || nx > r.x + r.w + 1e-6) continue;
+    if (ny < r.y - 1e-6 || ny > r.y + r.h + 1e-6) continue;
+    const score = t.dir === 'row'
+      ? (t.position === 'first' ? (r.x + r.w) - nx : nx - r.x)
+      : (t.position === 'first' ? (r.y + r.h) - ny : ny - r.y);
+    if (score > bestScore) { bestScore = score; best = i; }
+  }
+  return best;
 }
 
 // ── 分裂落点选择覆盖层 ──
@@ -299,6 +366,8 @@ function PlacementOverlay({ targets, onPick, onCancel }: {
   onPick: (t: DropTarget) => void;
   onCancel: () => void;
 }) {
+  const [hovered, setHovered] = useState<number | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (targets.length === 0) {
       useToastStore.getState().addToast('最多 4 个终端', 'info');
@@ -317,65 +386,112 @@ function PlacementOverlay({ targets, onPick, onCancel }: {
     return () => window.removeEventListener('keydown', onKey, true);
   }, [targets.length, onCancel]);
 
+  const locate = (clientX: number, clientY: number): number | null => {
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect || rect.width === 0 || rect.height === 0) return null;
+    return pickDropZone(targets, (clientX - rect.left) / rect.width, (clientY - rect.top) / rect.height);
+  };
+
   return (
-    <div onClick={onCancel} style={{ position: 'absolute', inset: 0, zIndex: 80, background: 'rgba(0,0,0,0.15)' }}>
-      {/* 完整目标区淡显（不可点） */}
+    <div
+      ref={ref}
+      onClick={(e) => {
+        const idx = locate(e.clientX, e.clientY);
+        if (idx != null) onPick(targets[idx]!);
+        else onCancel();
+      }}
+      onMouseMove={(e) => setHovered(locate(e.clientX, e.clientY))}
+      onMouseLeave={() => setHovered(null)}
+      style={{ position: 'absolute', inset: 0, zIndex: 80 }}
+    >
+      {/* 落点：完整未来区域，悬停时该区域整体微微变灰（如 Windows 吸附预览） */}
       {targets.map((t, i) => (
         <div
-          key={`fg-${i}`}
+          key={i}
+          data-testid={`placement-zone-${i}`}
           style={{
             position: 'absolute',
             left: `${t.rect.x * 100}%`, top: `${t.rect.y * 100}%`,
             width: `${t.rect.w * 100}%`, height: `${t.rect.h * 100}%`,
-            borderRadius: 6, boxSizing: 'border-box',
-            border: '1px dashed var(--accent)', background: 'var(--accent-bg)',
-            opacity: 0.35, pointerEvents: 'none',
+            boxSizing: 'border-box', pointerEvents: 'none',
+            background: hovered === i ? 'rgba(128,128,128,0.18)' : 'transparent',
+            transition: 'background 0.08s ease',
           }}
         />
       ))}
+    </div>
+  );
+}
 
-      {/* 点击条带 + 方向图标 */}
-      {targets.map((t, i) => {
-        // 命中区收缩到「靠新终端那一侧」的边沿条带，避免半屏之间重叠导致无法点击
-        const hit = t.dir === 'row'
-          ? (t.position === 'first'
-              ? { x: t.rect.x, y: t.rect.y, w: t.rect.w * 0.3, h: t.rect.h }
-              : { x: t.rect.x + t.rect.w * 0.7, y: t.rect.y, w: t.rect.w * 0.3, h: t.rect.h })
-          : (t.position === 'first'
-              ? { x: t.rect.x, y: t.rect.y, w: t.rect.w, h: t.rect.h * 0.3 }
-              : { x: t.rect.x, y: t.rect.y + t.rect.h * 0.7, w: t.rect.w, h: t.rect.h * 0.3 });
-        const Icon = t.dir === 'row' ? (t.position === 'first' ? ArrowLeft : ArrowRight) : (t.position === 'first' ? ArrowUp : ArrowDown);
-        return (
-          <div
-            key={i}
-            data-testid={`placement-zone-${i}`}
-            onClick={(e) => { e.stopPropagation(); onPick(t); }}
-            title={t.dir === 'row' ? (t.position === 'first' ? '放到左侧' : '放到右侧') : (t.position === 'first' ? '放到上方' : '放到下方')}
-            style={{
-              position: 'absolute',
-              left: `${hit.x * 100}%`, top: `${hit.y * 100}%`,
-              width: `${hit.w * 100}%`, height: `${hit.h * 100}%`,
-              borderRadius: 6, boxSizing: 'border-box',
-              border: '1px dashed var(--accent)', background: 'var(--accent-bg)',
-              cursor: 'pointer', color: 'var(--accent)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <Icon size={15} />
-          </div>
-        );
-      })}
+// ── 拖动终端调整位置的落点覆盖层 ──
 
-      {/* 提示条 */}
-      <div style={{
-        position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)',
-        padding: '4px 12px', borderRadius: 6, fontSize: 11,
-        background: 'var(--elevated)', border: '1px solid var(--border-strong)',
-        color: 'var(--text-secondary)', boxShadow: 'var(--shadow-lg)',
-        pointerEvents: 'none',
-      }}>
-        点击高亮区域放置新终端 · Esc 取消
-      </div>
+function MoveDragLayer({ layout, draggingId, onCommit }: {
+  layout: WindowLayout;
+  draggingId: string;
+  onCommit: (dragId: string, zone: DropTarget) => void;
+}) {
+  // 可移动落点：对其它每个终端给出上/下/左/右四个边沿落点
+  const targets = useMemo(
+    () => moveTargets(layout, draggingId),
+    [layout, draggingId],
+  );
+  const [hovered, setHovered] = useState<number | null>(null);
+  const hoveredRef = useRef<number | null>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const rect = overlayRef.current?.getBoundingClientRect();
+      let idx: number | null = null;
+      if (rect && rect.width > 0 && rect.height > 0) {
+        idx = pickDropZone(targets, (e.clientX - rect.left) / rect.width, (e.clientY - rect.top) / rect.height);
+      }
+      hoveredRef.current = idx;
+      setHovered(idx);
+    };
+    const onUp = () => {
+      const idx = hoveredRef.current;
+      const zone = idx != null ? targets[idx] : undefined;
+      if (zone) onCommit(draggingId, zone);
+      useDockDragStore.getState().end();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        useDockDragStore.getState().end();
+      }
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      window.removeEventListener('keydown', onKey, true);
+    };
+  }, [targets, draggingId, onCommit]);
+
+  if (targets.length === 0) {
+    // 单终端没有可移动落点，直接结束
+    return null;
+  }
+
+  return (
+    <div ref={overlayRef} style={{ position: 'absolute', inset: 0, zIndex: 79, cursor: 'grabbing' }}>
+      {targets.map((t, i) => (
+        <div
+          key={i}
+          style={{
+            position: 'absolute',
+            left: `${t.rect.x * 100}%`, top: `${t.rect.y * 100}%`,
+            width: `${t.rect.w * 100}%`, height: `${t.rect.h * 100}%`,
+            boxSizing: 'border-box', pointerEvents: 'none',
+            background: hovered === i ? 'rgba(128,128,128,0.18)' : 'transparent',
+            transition: 'background 0.08s ease',
+          }}
+        />
+      ))}
     </div>
   );
 }
@@ -436,13 +552,14 @@ function LoadingState() {
 
 // ── PaneInputEditor（终端 pane 的独立输入栏） ──
 
-function PaneInputEditor({ paneId }: { paneId: string }) {
+function PaneInputEditor({ paneId, focused }: { paneId: string; focused: boolean }) {
   const blocks = useBlockStore(selectBlocks(paneId));
   const hasRunningBlock = blocks.some((b) => b.status === 'executing' && b.wasLongRunning);
   const runningCommand = [...blocks].reverse().find((b) => b.status === 'executing')?.command ?? '';
   return (
     <InputEditor
       paneId={paneId}
+      focused={focused}
       isLongRunning={hasRunningBlock}
       runningCommand={runningCommand}
       onEndPress={() => { engageFollow(paneId); useTerminalStore.getState().setKeyboardTarget('input'); }}
