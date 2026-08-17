@@ -9,19 +9,22 @@ import {
 } from '../lib/tabTypes';
 import { useSshStore, ensureSshLoaded } from '../ssh/store';
 import { useWorkspaceStore } from '../stores/workspace';
+import type { TerminalSpec } from '../lib/windowLayout';
 
 interface Props {
   open: boolean;
   onClose: () => void;
   /** 新建标签归属的分组 id（undefined=未分组） */
   groupId?: string;
+  /** 提供时：选择后不新建标签，而是回调所选终端 spec（分裂/替换终端用） */
+  onPick?: (spec: TerminalSpec) => void;
 }
 
 /**
- * NewTabModal — 新建标签页弹窗（屏幕居中）。
+ * NewTabModal — 新建标签页 / 选择终端类型的弹窗（屏幕居中）。
  * 候选 = 机器可用 shell + 已配置 SSH 连接，按最近打开时间倒序，顶部搜索框过滤。
  */
-export default function NewTabModal({ open, onClose, groupId }: Props) {
+export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
   const [shells, setShells] = useState<ShellOption[]>([]);
@@ -56,30 +59,36 @@ export default function NewTabModal({ open, onClose, groupId }: Props) {
   useEffect(() => setSelected(0), [query]);
 
   const create = useCallback((opt: NewTabOption) => {
-    const ws = useWorkspaceStore.getState();
     if (opt.kind === 'shell') {
       touchRecentOpen(opt.key);
-      ws.addTab({ shellType: opt.shellType, groupId });
+      if (onPick) {
+        onPick({ id: '', kind: 'local', shellType: opt.shellType });
+        onClose();
+        return;
+      }
+      useWorkspaceStore.getState().addTab({ shellType: opt.shellType, groupId });
     } else {
       touchRecentOpen(opt.key);
       void useSshStore.getState().touch(opt.sshId);
       const conn = useSshStore.getState().connections.find((c) => c.id === opt.sshId);
       if (conn) {
-        ws.addTab({
+        if (onPick) {
+          onPick({
+            id: '', kind: 'ssh',
+            ssh: { name: conn.name, host: conn.host, user: conn.user, port: conn.port, connectionId: conn.id },
+          });
+          onClose();
+          return;
+        }
+        useWorkspaceStore.getState().addTab({
           kind: 'ssh',
-          ssh: {
-            name: conn.name,
-            host: conn.host,
-            user: conn.user,
-            port: conn.port,
-            connectionId: conn.id,
-          },
+          ssh: { name: conn.name, host: conn.host, user: conn.user, port: conn.port, connectionId: conn.id },
           groupId,
         });
       }
     }
     onClose();
-  }, [onClose, groupId]);
+  }, [onClose, groupId, onPick]);
 
   const handleKey = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') onClose();

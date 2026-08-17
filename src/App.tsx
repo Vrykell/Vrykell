@@ -6,13 +6,14 @@ import CommandPalette from './components/CommandPalette';
 import ToastContainer from './components/Toast';
 import GlobalSearch from './search/GlobalSearch';
 import TerminalView from './terminal/TerminalView';
+import NewTabModal from './components/NewTabModal';
 import { setDefaultStream } from './stores/chat';
 import { anthropicStream, refreshAiConfig } from './lib/ai';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import { useUiStore } from './stores/ui';
 import { useWorkspaceDirsStore } from './files/workspaceDirs';
-import { useWorkspaceStore } from './stores/workspace';
-import { useTerminalLayoutStore } from './stores/terminalLayout';
+import { useWorkspaceStore, serializeSession } from './stores/workspace';
+import type { TerminalSpec } from './lib/windowLayout';
 import * as sessionManager from './lib/sessionManager';
 import './search/init'; // 触发所有搜索源自动注册
 
@@ -36,13 +37,9 @@ export default function App() {
   useEffect(() => {
     const ws = useWorkspaceStore.getState();
     const initialTab = ws.tabs[0];
-    if (initialTab) sessionManager.create(initialTab.id, initialTab.title);
-    // 停靠布局：剔除重启后已不存在的 tab id，再保证初始标签有槽位显示
-    const layout = useTerminalLayoutStore.getState();
-    const validIds = new Set(ws.tabs.filter((t) => t.kind === 'local' || t.kind === 'ssh').map((t) => t.id));
-    layout.reconcile(validIds);
-    if (useTerminalLayoutStore.getState().slots.every((s) => s === null) && initialTab) {
-      useTerminalLayoutStore.getState().dockTab(initialTab.id, 0);
+    if (initialTab) {
+      const ser = serializeSession(initialTab);
+      if (ser) sessionManager.create(initialTab.id, initialTab.title, undefined, ser.kind, ser.payload);
     }
   }, []);
   useEffect(() => { useWorkspaceDirsStore.getState().load(); }, []);
@@ -51,6 +48,14 @@ export default function App() {
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
   const globalSearchOpen = useUiStore((s) => s.globalSearchOpen);
   const setGlobalSearchOpen = useUiStore((s) => s.setGlobalSearchOpen);
+  const splitPickerOpen = useUiStore((s) => s.splitPickerOpen);
+  const closeSplitPicker = useUiStore((s) => s.closeSplitPicker);
+
+  const handleSplitPick = (spec: TerminalSpec) => {
+    closeSplitPicker();
+    // 选完类型后进入落点选择（在哪分裂）
+    useUiStore.getState().beginSplit(spec);
+  };
 
   return (
     <div style={{
@@ -64,7 +69,7 @@ export default function App() {
       <TopDock />
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row' }}>
         <SidePanel side="left" />
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, minWidth: 240, display: 'flex', flexDirection: 'column' }}>
           <TerminalView />
         </div>
         <SidePanel side="right" />
@@ -72,6 +77,7 @@ export default function App() {
       <StatusBar />
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <GlobalSearch open={globalSearchOpen} onClose={() => setGlobalSearchOpen(false)} />
+      <NewTabModal open={splitPickerOpen} onClose={closeSplitPicker} onPick={handleSplitPick} />
       <ToastContainer />
     </div>
   );

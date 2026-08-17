@@ -13,7 +13,7 @@ describe('CommandBlock', () => {
   beforeEach(() => {
     invokeMock.mockClear();
     const tabId = useWorkspaceStore.getState().activeId;
-    useTerminalStore.setState({ sessions: { [tabId]: 's1' }, dims: {}, visible: true });
+    useTerminalStore.setState({ sessions: { [`${tabId}#0`]: 's1' }, dims: {}, visible: true });
   });
 
   it('bash 代码块带运行按钮，点击写入终端', () => {

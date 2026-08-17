@@ -60,7 +60,7 @@ export default function ResizeHandle({ axis, edge = 'right', onDelta }: ResizeHa
         // 2px 透明线 → hover/拖拽时蓝色全高线
         ...(isX
           ? {
-              [edge === 'right' ? 'right' : 'left']: -2,
+              [edge === 'right' ? 'right' : 'left']: 0,
               top: 0, bottom: 0, width: 8,
               [`border${edge === 'right' ? 'Left' : 'Right'}`]: '2px solid transparent',
               transition: 'border-color 0.15s ease',

@@ -13,11 +13,14 @@
  */
 
 import { useRef, useCallback, useEffect, useMemo } from 'react';
-import { Bot, GitBranch, X, Zap } from 'lucide-react';
+import { Bot, Columns2, GitBranch, Zap } from 'lucide-react';
 import { ptyWrite } from '../lib/pty';
 import { useTerminalStore, getRecentOutputFor } from '../stores/terminal';
 import { useChatStore } from '../stores/chat';
-import { useWorkspaceStore } from '../stores/workspace';
+import { useUiStore } from '../stores/ui';
+import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
+import { leaves as layoutLeaves } from '../lib/windowLayout';
+import { shellTypeLabel } from '../lib/shells';
 import { useBlockStore } from '../stores/blocks';
 import { useInputStore, selectPaneInput } from '../stores/input';
 import { useToastStore } from '../components/Toast';
@@ -43,9 +46,7 @@ export default function InputEditor({
 }: Props) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const chatSend = useChatStore((s) => s.send);
-  const clearTab = useChatStore((s) => s.clearTab);
 
-  const activeId = useWorkspaceStore((s) => s.activeId);
   const sessions = useTerminalStore((s) => s.sessions);
 
   // 每 pane 独立输入态（text + AI 模式）
@@ -69,10 +70,22 @@ export default function InputEditor({
   const setPendingInput = useTerminalStore((s) => s.setPendingInput);
 
   const tabCwd = useWorkspaceStore((s) => {
-    const t = s.tabs.find((x) => x.id === paneId);
-    if (t && (t.kind === 'local' || t.kind === 'ssh')) return t.cwd;
     const at = s.tabs.find((x) => x.id === s.activeId);
-    return s.paneCwds[paneId] ?? (at && (at.kind === 'local' || at.kind === 'ssh') ? at.cwd : undefined);
+    if (at && isSessionTab(at)) {
+      const spec = layoutLeaves(at.layout).find((t) => t.id === paneId);
+      return s.terminalCwds[paneId] ?? spec?.cwd;
+    }
+    return undefined;
+  });
+
+  const terminalLabel = useWorkspaceStore((s) => {
+    const at = s.tabs.find((x) => x.id === s.activeId);
+    if (at && isSessionTab(at)) {
+      const spec = layoutLeaves(at.layout).find((t) => t.id === paneId);
+      if (spec?.kind === 'ssh') return spec.ssh?.name || spec.ssh?.host || 'SSH';
+      return spec?.shellType ? shellTypeLabel(spec.shellType) : '本地';
+    }
+    return undefined;
   });
 
   // 从最近完成的 block 中读取 git 分支信息（聚焦 pane 的块）
@@ -170,16 +183,6 @@ export default function InputEditor({
     }
   }, [paneId, chatSend, setAiMode]);
 
-  const clearChat = useCallback(() => {
-    const msgs = useChatStore.getState().byTab[activeId];
-    if (!msgs || msgs.length === 0) {
-      useToastStore.getState().addToast('当前没有 AI 对话', 'info');
-      return;
-    }
-    clearTab();
-    useToastStore.getState().addToast('已清除 AI 对话', 'success');
-  }, [clearTab, activeId]);
-
   // ── 全局 End 键监听 ──
 
   useEffect(() => {
@@ -267,7 +270,7 @@ export default function InputEditor({
           userSelect: 'none',
         }}
       >
-        <ShellIndicator connected={hasSession} />
+        <ShellIndicator connected={hasSession} label={terminalLabel} />
         <span style={{ color: 'var(--border-strong)', opacity: 0.5, margin: '0 1px' }}>·</span>
         <CurrentDir dir={tabCwd} />
         {recentGitBranch && (
@@ -366,8 +369,8 @@ export default function InputEditor({
         <InputActionBtn title="将终端输出发给 AI 分析" onClick={sendOutputToAI}>
           <Bot size={13} />
         </InputActionBtn>
-        <InputActionBtn title="清除 AI 对话" onClick={clearChat}>
-          <X size={13} />
+        <InputActionBtn title="选择类型分裂" onClick={() => useUiStore.getState().openSplitPicker()}>
+          <Columns2 size={13} />
         </InputActionBtn>
       </div>
     </div>

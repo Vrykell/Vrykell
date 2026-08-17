@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { ptyWrite } from '../lib/pty';
-import { useWorkspaceStore } from './workspace';
+import { useWorkspaceStore, isSessionTab } from './workspace';
+import { leaves as layoutLeaves, firstLeaf } from '../lib/windowLayout';
 import type { Terminal } from '@xterm/xterm';
 import type { Scene } from '../terminal/pipeline/sessionController';
 
@@ -51,21 +52,19 @@ export function getTerminalOutput(tabId: string, startLine: number, endLine: num
   return lines.join('\n');
 }
 
-/** 纯函数：从 focusedPaneId 解析聚焦 pane（校验其属于活跃标签，切标签后不残留）。 */
-export function resolveFocusedPaneId(
-  activeId: string,
-  focusedPaneId: string | null,
-  sessions: Record<string, string>,
-): string {
-  const fp = focusedPaneId;
-  if (fp && (fp === activeId || fp === `${activeId}#2`) && sessions[fp]) return fp;
-  return activeId;
-}
-
-/** 当前聚焦的 paneId：分屏时用 focusedPaneId（校验其属于活跃标签），否则活跃标签 id。 */
-export function getFocusedPaneId(): string {
+/** 当前聚焦的终端 id：优先 focusedPaneId（校验其属于活跃窗口），否则活跃窗口第一个终端。 */
+export function getFocusedTerminalId(): string {
   const ts = useTerminalStore.getState();
-  return resolveFocusedPaneId(useWorkspaceStore.getState().activeId, ts.focusedPaneId, ts.sessions);
+  const ws = useWorkspaceStore.getState();
+  const tab = ws.tabs.find((t) => t.id === ws.activeId);
+  if (tab && isSessionTab(tab)) {
+    const ids = layoutLeaves(tab.layout);
+    if (ts.focusedPaneId && ts.sessions[ts.focusedPaneId] && ids.some((t) => t.id === ts.focusedPaneId)) {
+      return ts.focusedPaneId;
+    }
+    return firstLeaf(tab.layout).id;
+  }
+  return ws.activeId;
 }
 
 /** 读取指定 pane 终端缓冲末尾 maxLines 行（去尾部空行），用于「输出发给 AI」。 */
@@ -84,9 +83,9 @@ export function getRecentOutputFor(paneId: string, maxLines = 30): string {
   return lines.join('\n');
 }
 
-/** 读取活跃标签终端缓冲末尾 maxLines 行（去尾部空行），用于「输出发给 AI」。 */
+/** 读取聚焦终端缓冲末尾 maxLines 行（去尾部空行），用于「输出发给 AI」。 */
 export function getRecentOutput(maxLines = 30): string {
-  return getRecentOutputFor(useWorkspaceStore.getState().activeId, maxLines);
+  return getRecentOutputFor(getFocusedTerminalId(), maxLines);
 }
 
 interface TerminalState {
@@ -149,8 +148,8 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     }),
   toggle: () => set((s) => ({ visible: !s.visible })),
   runInTerminal: (command) => {
-    // 分屏时写聚焦 pane，否则写活跃标签
-    const target = getFocusedPaneId();
+    // 写入聚焦终端的 PTY
+    const target = getFocusedTerminalId();
     const sessionId = get().sessions[target];
     set({ visible: true });
     if (!sessionId) return;

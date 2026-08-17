@@ -5,13 +5,14 @@ import { isMacOS } from './platform';
 export type ShellType = 'zsh' | 'bash' | 'powershell' | 'pwsh' | 'cmd';
 
 /** shell 类型 → 显示名（默认标签标题用）。 */
-export function shellTypeLabel(t: ShellType): string {
+export function shellTypeLabel(t: string): string {
   switch (t) {
     case 'zsh': return 'Zsh';
     case 'bash': return 'Bash';
     case 'powershell': return 'PowerShell';
     case 'pwsh': return 'PowerShell';
     case 'cmd': return 'CMD';
+    default: return t || '终端';
   }
 }
 

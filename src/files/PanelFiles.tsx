@@ -6,8 +6,9 @@ import { ptyWrite } from '../lib/pty';
 import { openFile } from './fileOpen';
 import { fileIcon } from './fileIcon';
 import { useWorkspaceDirsStore } from './workspaceDirs';
-import { useWorkspaceStore } from '../stores/workspace';
-import { useTerminalStore, resolveFocusedPaneId } from '../stores/terminal';
+import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
+import { useTerminalStore } from '../stores/terminal';
+import { leaves as layoutLeaves, firstLeaf } from '../lib/windowLayout';
 import { useToastStore } from '../components/Toast';
 import { flattenVisible, type VisibleRow } from './fileTree';
 import ContextMenu, { type ContextMenuItem } from '../components/ContextMenu';
@@ -26,13 +27,22 @@ type ConfirmState =
  * 活跃标签页为 SSH 连接时切到远程文件浏览，否则走本地文件浏览。
  */
 export default function PanelFiles() {
-  const activeTab = useWorkspaceStore((s) => s.tabs.find((t) => t.id === s.activeId));
+  const tabs = useWorkspaceStore((s) => s.tabs);
+  const activeId = useWorkspaceStore((s) => s.activeId);
+  const focusedPaneId = useTerminalStore((s) => s.focusedPaneId);
+  const sessions = useTerminalStore((s) => s.sessions);
   const sshConnections = useSshStore((s) => s.connections);
   const sshLoaded = useSshStore((s) => s.loaded);
   useEffect(() => { ensureSshLoaded(); }, []);
 
-  if (sshLoaded && activeTab?.kind === 'ssh' && activeTab.ssh.connectionId) {
-    const conn = sshConnections.find((c) => c.id === activeTab.ssh.connectionId);
+  const activeTab = tabs.find((t) => t.id === activeId);
+  const focusedSpec = activeTab && isSessionTab(activeTab)
+    ? layoutLeaves(activeTab.layout).find((t) => t.id === focusedPaneId && sessions[focusedPaneId])
+      ?? firstLeaf(activeTab.layout)
+    : null;
+
+  if (sshLoaded && focusedSpec?.kind === 'ssh' && focusedSpec.ssh?.connectionId) {
+    const conn = sshConnections.find((c) => c.id === focusedSpec.ssh!.connectionId);
     if (conn) return <RemoteFiles conn={conn} />;
   }
   return <LocalFiles />;
@@ -59,16 +69,25 @@ function LocalFiles() {
   const workspaceDirs = useWorkspaceDirsStore();
   const addTab = useWorkspaceStore((s) => s.addTab);
 
-  // ── 跟随聚焦 pane 的 cwd：切标签页 / 分屏切换聚焦 / 终端 cd 都会实时定位 ──
-  const activeId = useWorkspaceStore((s) => s.activeId);
+  // ── 跟随聚焦终端的 cwd：切窗口 / 切换聚焦终端 / 终端 cd 都会实时定位 ──
   const focusedPaneId = useTerminalStore((s) => s.focusedPaneId);
   const sessions = useTerminalStore((s) => s.sessions);
-  const focused = resolveFocusedPaneId(activeId, focusedPaneId, sessions);
-  const activeCwd = useWorkspaceStore((s) => {
-    const t = s.tabs.find((x) => x.id === focused);
-    if (t && (t.kind === 'local' || t.kind === 'ssh')) return t.cwd;
+  const focused = useWorkspaceStore((s) => {
     const at = s.tabs.find((x) => x.id === s.activeId);
-    return s.paneCwds[focused] ?? (at && (at.kind === 'local' || at.kind === 'ssh') ? at.cwd : undefined);
+    if (at && isSessionTab(at)) {
+      const fp = focusedPaneId;
+      if (fp && sessions[fp] && layoutLeaves(at.layout).some((t) => t.id === fp)) return fp;
+      return firstLeaf(at.layout).id;
+    }
+    return s.activeId;
+  });
+  const activeCwd = useWorkspaceStore((s) => {
+    const at = s.tabs.find((x) => x.id === s.activeId);
+    if (at && isSessionTab(at)) {
+      const spec = layoutLeaves(at.layout).find((t) => t.id === focused);
+      return s.terminalCwds[focused] ?? spec?.cwd;
+    }
+    return undefined;
   });
   useEffect(() => {
     setPath(activeCwd ?? null);
@@ -449,7 +468,7 @@ function waitForSession(tabId: string, timeoutMs = 8000): Promise<string | null>
   return new Promise((resolve) => {
     const start = Date.now();
     const check = () => {
-      const sid = useTerminalStore.getState().sessions[tabId];
+      const sid = useTerminalStore.getState().sessions[`${tabId}#0`];
       if (sid) return resolve(sid);
       if (Date.now() - start > timeoutMs) return resolve(null);
       setTimeout(check, 50);

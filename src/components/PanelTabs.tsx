@@ -3,9 +3,7 @@ import {
   History, Plus, Search, Server, Settings, SquareTerminal,
   ChevronRight, Pencil, Archive, Folder, Trash2,
 } from 'lucide-react';
-import { useWorkspaceStore, isSessionTab, type Tab, type TabGroup } from '../stores/workspace';
-import { useTerminalLayoutStore, type Slot } from '../stores/terminalLayout';
-import { useDockDragStore } from '../stores/dockDrag';
+import { useWorkspaceStore, isSessionTab, firstTerminalOf, terminalsOf, type Tab, type TabGroup } from '../stores/workspace';
 import { shellTypeLabel } from '../lib/shells';
 import NewTabModal from './NewTabModal';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
@@ -90,15 +88,9 @@ export default function PanelTabs() {
       if (Math.abs(e.clientX - info.startX) < DRAG_THRESHOLD && Math.abs(e.clientY - info.startY) < DRAG_THRESHOLD) {
         return;
       }
-      const wasActive = dragActiveRef.current;
       dragActiveRef.current = true;
       setDragging(true);
       setDragCursor({ x: e.clientX, y: e.clientY });
-      // 标签拖拽：同步到全局 dockDrag（TerminalView 据此渲染预停靠高亮）
-      if (info.type === 'tab') {
-        if (!wasActive) useDockDragStore.getState().start(info.id, e.clientX, e.clientY);
-        else useDockDragStore.getState().move(e.clientX, e.clientY);
-      }
       const el = document.elementFromPoint(e.clientX, e.clientY);
       const target = computeDropTarget(el);
       dropTargetRef.current = target;
@@ -109,17 +101,7 @@ export default function PanelTabs() {
       if (!info) return;
       const active = dragActiveRef.current;
       const target = dropTargetRef.current;
-      if (active) {
-        // 若松手时悬停在终端停靠区，则停靠该标签，否则侧栏内重排
-        const hoveredSlot = useDockDragStore.getState().hoveredSlot;
-        if (info.type === 'tab' && hoveredSlot !== null) {
-          useTerminalLayoutStore.getState().dockTab(info.id, hoveredSlot as Slot);
-          useWorkspaceStore.getState().activate(info.id);
-        } else {
-          commitDrop(info, target);
-        }
-      }
-      useDockDragStore.getState().end();
+      if (active) commitDrop(info, target);
       dragRef.current = null;
       dropTargetRef.current = null;
       dragActiveRef.current = false;
@@ -548,19 +530,17 @@ function TabRow({
   onContextMenu: (e: React.MouseEvent) => void;
   highlight?: boolean;
 }) {
-  const isSsh = tab.kind === 'ssh';
+  const first = firstTerminalOf(tab);
+  const terms = terminalsOf(tab);
+  const isSsh = first?.kind === 'ssh';
   const Icon = tab.kind === 'history' ? History : tab.kind === 'settings' ? Settings : isSsh ? Server : SquareTerminal;
   const iconColor = isSsh ? 'var(--accent-warm)' : active ? 'var(--accent)' : 'var(--text-secondary)';
   const iconBg = isSsh ? 'var(--accent-warm-dim)' : active ? 'var(--accent-bg)' : 'transparent';
-  const subtitle = tab.kind === 'history'
-    ? '会话历史'
-    : tab.kind === 'settings'
-      ? '设置'
-      : tab.kind === 'ssh'
-        ? (tab.ssh.host || tab.ssh.name)
-        : tab.shellType
-          ? shellTypeLabel(tab.shellType)
-          : '终端';
+  const typeSummary = terms.map((t) =>
+    t.kind === 'ssh' ? (t.ssh?.name || t.ssh?.host || 'SSH') : (t.shellType ? shellTypeLabel(t.shellType) : '本地'),
+  ).join(' + ');
+  // session 标签不再写文字副标题，改用胶囊状态（圆点 + 终端数）
+  const subtitle = tab.kind === 'history' ? '会话历史' : tab.kind === 'settings' ? '设置' : undefined;
 
   // 内外壳两层：外壳（外层容器，idle 透明，hover/选中 5%，与分组容器同色）+ 内壳（内层卡片，idle 透明，hover 5%，选中 10% + 1px 描边，圆角）
   const inGroup = groupId != null;
@@ -638,12 +618,33 @@ function TabRow({
             }}>
               {tab.title}
             </span>
+            {subtitle && (
+              <span style={{
+                fontSize: 11, color: 'var(--text-muted)', lineHeight: '14px',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                fontFamily: 'var(--font-mono)',
+              }}>
+                {subtitle}
+              </span>
+            )}
+          </span>
+        )}
+        {tab.kind === 'session' && (
+          <span
+            title={typeSummary}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              height: 16, padding: '0 6px', flexShrink: 0,
+              borderRadius: 9, background: 'var(--canvas)',
+              border: '1px solid var(--border)', lineHeight: '14px',
+            }}
+          >
             <span style={{
-              fontSize: 11, color: 'var(--text-muted)', lineHeight: '14px',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              fontFamily: 'var(--font-mono)',
-            }}>
-              {subtitle}
+              width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+              background: isSsh ? 'var(--accent-warm)' : 'var(--success)',
+            }} />
+            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+              {terms.length}
             </span>
           </span>
         )}
@@ -684,7 +685,8 @@ function DragGhost({ type, id, tabs, x, y }: {
   y: number;
 }) {
   const tab = type === 'tab' ? tabs.find((t) => t.id === id) : undefined;
-  const isSsh = tab?.kind === 'ssh';
+  const first = tab ? firstTerminalOf(tab) : null;
+  const isSsh = type === 'tab' && first?.kind === 'ssh';
   const Icon = type === 'tab'
     ? (tab?.kind === 'history' ? History : tab?.kind === 'settings' ? Settings : isSsh ? Server : SquareTerminal)
     : Folder;

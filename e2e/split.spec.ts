@@ -7,14 +7,15 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
 });
 
-test.describe('停靠网格', () => {
-  test('两个标签自动停靠为两个 pane，各自有输入栏', async ({ page }) => {
-    await page.keyboard.press('Meta+t'); // 新建第二个标签（自动停靠到下一个空槽）
+test.describe('窗口分裂（二叉分裂树 + 落点选择）', () => {
+  test('⌘D 进入落点选择，点右半屏分裂出两个终端', async ({ page }) => {
+    await page.keyboard.press('Meta+d');
+    // 1 个终端 → 4 个落点（左右上下半屏）
+    await expect(page.getByTestId('placement-zone-1')).toBeVisible();
+    await page.getByTestId('placement-zone-1').click();
     await expect(page.locator('[data-testid^="pane-"]')).toHaveCount(2);
-    await expect(page.locator('.xterm')).toHaveCount(2);
     await expect(page.getByPlaceholder(/输入命令/)).toHaveCount(2);
 
-    // 每个 pane 宿主非零尺寸（否则空白）
     const sizes = await page.evaluate(() =>
       Array.from(document.querySelectorAll('[data-testid^="pane-"]')).map((el) => {
         const r = el.getBoundingClientRect();
@@ -27,41 +28,49 @@ test.describe('停靠网格', () => {
     }
   });
 
-  test('⌘] / ⌘[ 在停靠终端间切换焦点', async ({ page }) => {
+  test('新建终端（新窗口）不自动加入当前窗口布局', async ({ page }) => {
+    await page.keyboard.press('Meta+d');
+    await page.getByTestId('placement-zone-1').click();
+    await expect(page.locator('[data-testid^="pane-"]')).toHaveCount(2);
     await page.keyboard.press('Meta+t');
+    await expect(page.locator('[data-testid^="pane-"]')).toHaveCount(1);
+  });
+
+  test('⌘] / ⌘[ 在当前窗口的终端间切换焦点', async ({ page }) => {
+    await page.keyboard.press('Meta+d');
+    await page.getByTestId('placement-zone-1').click();
     const panes = page.locator('[data-testid^="pane-"]');
-    // 新建标签是活跃标签，停靠在槽位 1（右侧）→ nth(1) 聚焦
+    await expect(panes).toHaveCount(2);
     await expect(panes.nth(1)).toHaveAttribute('data-focused', 'true');
     await expect(panes.nth(0)).toHaveAttribute('data-focused', 'false');
 
     await page.keyboard.press('Meta+]');
     await expect(panes.nth(0)).toHaveAttribute('data-focused', 'true');
-    await expect(panes.nth(1)).toHaveAttribute('data-focused', 'false');
-
     await page.keyboard.press('Meta+[');
     await expect(panes.nth(1)).toHaveAttribute('data-focused', 'true');
-    await expect(panes.nth(0)).toHaveAttribute('data-focused', 'false');
   });
 
-  test('拖拽标签到终端区域显示预停靠高亮并完成停靠', async ({ page }) => {
-    await page.locator('[data-dock-btn="tabs"]').click();
-    await expect(page.locator('[data-testid^="tab-row-"]')).toHaveCount(1);
-    await page.keyboard.press('Meta+t');
-    await expect(page.locator('[data-testid^="tab-row-"]')).toHaveCount(2);
-    // 两个标签已自动停靠 → 2 个 pane
+  test('⌥⌘D 选类型后进入落点选择，分裂出混搭终端', async ({ page }) => {
+    await page.keyboard.press('Meta+Alt+d');
+    await expect(page.getByText('新建标签页')).toBeVisible();
+    await page.getByText('生产服务器').click();
+    // 进入落点选择
+    await expect(page.getByTestId('placement-zone-1')).toBeVisible();
+    await page.getByTestId('placement-zone-1').click();
     await expect(page.locator('[data-testid^="pane-"]')).toHaveCount(2);
+  });
 
-    const tabRow = page.locator('[data-testid^="tab-row-"]').first();
-    const box = await tabRow.boundingBox();
-    const zone = await page.locator('[data-terminal-dock-zone]').boundingBox();
-    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
-    await page.mouse.down();
-    // 拖到终端区域右下象限
-    await page.mouse.move(zone!.x + zone!.width * 0.8, zone!.y + zone!.height * 0.8, { steps: 12 });
-    // 预停靠高亮出现
-    await expect(page.getByTestId('drop-zone-3')).toBeVisible();
-    await page.mouse.up();
-    // 停靠完成：仍是 2 个 pane（位置已调整）
-    await expect(page.locator('[data-testid^="pane-"]')).toHaveCount(2);
+  test('分裂到 4 个终端后不再分裂', async ({ page }) => {
+    // 分裂 3 次到 4 个终端
+    for (let i = 0; i < 3; i++) {
+      await page.keyboard.press('Meta+d');
+      // 选一个可见落点（不同阶段落点数量不同，都点第一个）
+      await page.locator('[data-testid^="placement-zone-"]').first().click();
+    }
+    await expect(page.locator('[data-testid^="pane-"]')).toHaveCount(4);
+    // 再分裂：无落点，应保持 4 个
+    await page.keyboard.press('Meta+d');
+    await expect(page.locator('[data-testid^="placement-zone-"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid^="pane-"]')).toHaveCount(4);
   });
 });

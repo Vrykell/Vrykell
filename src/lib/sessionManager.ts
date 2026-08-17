@@ -7,12 +7,14 @@
 import { useWorkspaceStore, type Tab } from '../stores/workspace';
 import { useBlockStore } from '../stores/blocks';
 import { useChatStore } from '../stores/chat';
+import { leaf, type WindowLayout } from './windowLayout';
 import {
   createSession,
   archiveSession,
   restoreSession,
   updateSessionTitle,
   updateSessionCwd,
+  updateSessionPayload,
   getSession,
   deleteSession,
   recordBlock,
@@ -22,7 +24,6 @@ import {
 } from '../api/session';
 import type { TermBlock } from '../terminal/pipeline/termBlock';
 import type { BackendBlockEntry, BackendSessionEntry } from '../search/types';
-import type { ShellType } from './shells';
 
 /** 恢复会话时用于重建 tab 的元数据（kind/payload 已由后端持久化）。 */
 export interface RestoreMeta {
@@ -30,16 +31,30 @@ export interface RestoreMeta {
   groupId?: string;
 }
 
-/** 解析后端 payload JSON（变体专属字段）。 */
-function parseSessionPayload(payload: string): {
-  shellType?: string | null;
-  ssh?: { name?: string; host?: string; user?: string | null; port?: number | null; connectionId?: string | null };
-} | null {
+/** 解析后端 payload JSON → 窗口布局（兼容旧版 shellType/ssh 单终端 payload）。 */
+function parseLayout(payload: string, sessionId: string): WindowLayout {
   try {
-    return JSON.parse(payload) as ReturnType<typeof parseSessionPayload>;
+    const p = JSON.parse(payload) as {
+      layout?: unknown;
+      shellType?: string;
+      ssh?: { name?: string; host?: string; user?: string | null; port?: number | null; connectionId?: string | null };
+    };
+    if (p.layout && typeof p.layout === 'object' && p.layout !== null) {
+      return p.layout as WindowLayout;
+    }
+    if (p.ssh) {
+      return leaf({
+        id: `${sessionId}#0`, kind: 'ssh',
+        ssh: { name: p.ssh.name ?? '', host: p.ssh.host ?? '', user: p.ssh.user ?? undefined, port: p.ssh.port ?? undefined, connectionId: p.ssh.connectionId ?? undefined },
+      });
+    }
+    if (p.shellType) {
+      return leaf({ id: `${sessionId}#0`, kind: 'local', shellType: p.shellType });
+    }
   } catch {
-    return null;
+    /* fallthrough */
   }
+  return leaf({ id: `${sessionId}#0`, kind: 'local' });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -51,7 +66,7 @@ export async function create(
   tabId: string,
   title: string,
   cwd?: string,
-  kind: 'local' | 'ssh' = 'local',
+  kind = 'session',
   payload = '{}',
 ): Promise<void> {
   try {
@@ -59,6 +74,24 @@ export async function create(
   } catch (e) {
     console.warn('sessionManager.create failed:', e);
   }
+}
+
+/** 布局持久化的去抖计时器（分隔线拖拽会高频调整 ratio）。 */
+const layoutTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+/** 持久化窗口布局到会话 payload（去抖）。 */
+export function saveLayout(tabId: string, layout: WindowLayout): void {
+  const pending = layoutTimers.get(tabId);
+  if (pending) clearTimeout(pending);
+  layoutTimers.set(
+    tabId,
+    setTimeout(() => {
+      layoutTimers.delete(tabId);
+      updateSessionPayload(tabId, JSON.stringify({ layout })).catch((e) => {
+        console.warn('sessionManager.saveLayout failed:', e);
+      });
+    }, 150),
+  );
 }
 
 /** 更新会话当前工作目录（cd 后 OSC 7 上报） */
@@ -94,14 +127,14 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
     console.warn('sessionManager.restore: get_session_blocks failed:', e);
   }
 
-  // 3. 填充 block store（按 pane 归属：pane_id 为 null/主 id → 主 pane；#2 → 副 pane）
+  // 3. 填充 block store（按终端归属：pane_id 为 null/主 id → 首终端 #0；其余原样）
   if (backendBlocks.length > 0) {
     const bs = useBlockStore.getState();
-    // 先清空主/副 pane 的旧数据（避免重复）
     bs.clearBlocks(sessionId);
-    bs.clearBlocks(`${sessionId}#2`);
+    bs.clearBlocks(`${sessionId}#0`);
     for (const b of backendBlocks) {
-      const paneId = b.pane_id ?? sessionId;
+      const rawPane = b.pane_id ?? sessionId;
+      const paneId = rawPane === sessionId ? `${sessionId}#0` : rawPane;
       const status: TermBlock['status'] =
         b.status === 'executing' || b.status === 'running'
           ? 'executing'
@@ -152,38 +185,16 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
   } catch (e) {
     console.warn('sessionManager.restore: get_session failed:', e);
   }
-  const cwd = info?.cwd || undefined;
-  const kind = info?.kind === 'ssh' ? 'ssh' : 'local';
-  const p = parseSessionPayload(info?.payload ?? '{}');
+  const layout = parseLayout(info?.payload ?? '{}', sessionId);
 
-  // 4. 按 kind 重建 tab（追加到末尾），设置为 active；恢复 SSH 身份
-  let tab: Tab;
-  if (kind === 'ssh') {
-    const ssh = p?.ssh ?? {};
-    tab = {
-      id: sessionId,
-      title: title || info?.title || '',
-      kind: 'ssh',
-      groupId: meta?.groupId ?? info?.group_id ?? undefined,
-      cwd,
-      ssh: {
-        name: ssh.name ?? '',
-        host: ssh.host ?? '',
-        user: ssh.user ?? undefined,
-        port: ssh.port ?? undefined,
-        connectionId: ssh.connectionId ?? undefined,
-      },
-    };
-  } else {
-    tab = {
-      id: sessionId,
-      title: title || info?.title || '',
-      kind: 'local',
-      groupId: meta?.groupId ?? info?.group_id ?? undefined,
-      cwd,
-      shellType: (p?.shellType as ShellType | undefined) ?? undefined,
-    };
-  }
+  // 4. 重建窗口 tab（含布局），设置为 active —— 恢复会话 = 恢复窗口布局
+  const tab: Tab = {
+    id: sessionId,
+    title: title || info?.title || '',
+    kind: 'session',
+    groupId: meta?.groupId ?? info?.group_id ?? undefined,
+    layout,
+  };
 
   const ws = useWorkspaceStore.getState();
   if (!ws.tabs.some((t) => t.id === sessionId)) {
@@ -194,7 +205,6 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
   } else {
     ws.activate(sessionId);
   }
-  // 停靠布局由 useTerminalLayoutStore 全局管理（activate 会按需自动停靠）
 }
 
 /** 重命名会话 */
