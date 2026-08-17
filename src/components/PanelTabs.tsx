@@ -1,0 +1,741 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  History, Plus, Search, Server, Settings, SquareTerminal,
+  ChevronRight, Pencil, Archive, Folder, Trash2,
+} from 'lucide-react';
+import { useWorkspaceStore, isSessionTab, type Tab, type TabGroup } from '../stores/workspace';
+import { useTerminalLayoutStore, type Slot } from '../stores/terminalLayout';
+import { useDockDragStore } from '../stores/dockDrag';
+import { shellTypeLabel } from '../lib/shells';
+import NewTabModal from './NewTabModal';
+import ContextMenu, { type ContextMenuItem } from './ContextMenu';
+
+/**
+ * PanelTabs — 标签列表面板（会话管理侧栏）。
+ * 顶部：搜索 + 历史 + 新建（仅「新建终端」）。
+ * 列表：分组 section（可折叠、可拖拽排序）+ 组内标签 + 未分组标签。
+ * 分组通过「右键标签 → 新建分组」创建（默认带走该标签）；空分组会被自动清理。
+ * 拖拽用自定义 mousedown/mousemove/mouseup（同 Dock 按钮），不用 HTML5 DnD。
+ *
+ * 标签采用「外壳 + 内壳」两层：
+ *  - 外壳 = 外层容器背景，与分组容器背景同色（idle 透明，hover/选中 5%）；
+ *  - 内壳 = 内层圆角卡片，idle 透明（与外壳同色看不出区别），悬停 5%、选中 10% + 描边。
+ */
+
+type DropTarget =
+  | { kind: 'tab'; groupId: string | null; beforeTabId: string | null }
+  | { kind: 'group'; groupId: string | null };
+
+const DRAG_THRESHOLD = 4;
+
+function computeDropTarget(el: Element | null): DropTarget | null {
+  if (!el || typeof el.closest !== 'function') return null;
+  const tabEl = el.closest('[data-tab-row-id]');
+  if (tabEl) {
+    return {
+      kind: 'tab',
+      groupId: tabEl.getAttribute('data-tab-group') || null,
+      beforeTabId: tabEl.getAttribute('data-tab-row-id'),
+    };
+  }
+  const groupEl = el.closest('[data-group-id]');
+  if (groupEl) {
+    return { kind: 'group', groupId: groupEl.getAttribute('data-group-id') };
+  }
+  if (el.closest('[data-ungrouped]')) {
+    return { kind: 'group', groupId: null };
+  }
+  return null;
+}
+
+export default function PanelTabs() {
+  const tabs = useWorkspaceStore((s) => s.tabs);
+  const activeId = useWorkspaceStore((s) => s.activeId);
+  const groups = useWorkspaceStore((s) => s.groups);
+  const activate = useWorkspaceStore((s) => s.activate);
+  const closeTab = useWorkspaceStore((s) => s.closeTab);
+  const renameTab = useWorkspaceStore((s) => s.renameTab);
+  const openHistoryTab = useWorkspaceStore((s) => s.openHistoryTab);
+  const loadGroups = useWorkspaceStore((s) => s.loadGroups);
+  const createGroupForTab = useWorkspaceStore((s) => s.createGroupForTab);
+  const renameGroup = useWorkspaceStore((s) => s.renameGroup);
+  const archiveGroup = useWorkspaceStore((s) => s.archiveGroup);
+  const deleteGroup = useWorkspaceStore((s) => s.deleteGroup);
+  const toggleGroupCollapse = useWorkspaceStore((s) => s.toggleGroupCollapse);
+
+  const [query, setQuery] = useState('');
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalGroupId, setModalGroupId] = useState<string | undefined>(undefined);
+  const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null);
+  const [renamingGroupTitle, setRenamingGroupTitle] = useState('');
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; tabId: string } | null>(null);
+
+  // 自定义拖拽
+  const dragRef = useRef<{ type: 'tab' | 'group'; id: string; startX: number; startY: number } | null>(null);
+  const dropTargetRef = useRef<DropTarget | null>(null);
+  const dragActiveRef = useRef(false);
+  const [dragging, setDragging] = useState(false);
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+  const [dragCursor, setDragCursor] = useState<{ x: number; y: number } | null>(null);
+
+  useEffect(() => { loadGroups(); }, [loadGroups]);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const info = dragRef.current;
+      if (!info) return;
+      if (Math.abs(e.clientX - info.startX) < DRAG_THRESHOLD && Math.abs(e.clientY - info.startY) < DRAG_THRESHOLD) {
+        return;
+      }
+      const wasActive = dragActiveRef.current;
+      dragActiveRef.current = true;
+      setDragging(true);
+      setDragCursor({ x: e.clientX, y: e.clientY });
+      // 标签拖拽：同步到全局 dockDrag（TerminalView 据此渲染预停靠高亮）
+      if (info.type === 'tab') {
+        if (!wasActive) useDockDragStore.getState().start(info.id, e.clientX, e.clientY);
+        else useDockDragStore.getState().move(e.clientX, e.clientY);
+      }
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const target = computeDropTarget(el);
+      dropTargetRef.current = target;
+      setDropTarget(target);
+    };
+    const onUp = () => {
+      const info = dragRef.current;
+      if (!info) return;
+      const active = dragActiveRef.current;
+      const target = dropTargetRef.current;
+      if (active) {
+        // 若松手时悬停在终端停靠区，则停靠该标签，否则侧栏内重排
+        const hoveredSlot = useDockDragStore.getState().hoveredSlot;
+        if (info.type === 'tab' && hoveredSlot !== null) {
+          useTerminalLayoutStore.getState().dockTab(info.id, hoveredSlot as Slot);
+          useWorkspaceStore.getState().activate(info.id);
+        } else {
+          commitDrop(info, target);
+        }
+      }
+      useDockDragStore.getState().end();
+      dragRef.current = null;
+      dropTargetRef.current = null;
+      dragActiveRef.current = false;
+      setDragging(false);
+      setDropTarget(null);
+      setDragCursor(null);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    return () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+  }, []);
+
+  const commitDrop = (info: { type: 'tab' | 'group'; id: string }, target: DropTarget | null) => {
+    const ws = useWorkspaceStore.getState();
+    if (info.type === 'tab') {
+      if (!target) {
+        // 拖到侧栏空白区域（不在任何标签/分组上）：组内标签直接脱离分组，自由标签不动
+        const src = ws.tabs.find((t) => t.id === info.id);
+        if (src && isSessionTab(src) && src.groupId) {
+          const scope = ws.tabs.filter((t) => isSessionTab(t) && (t.groupId ?? null) === null);
+          ws.moveTab(info.id, null, scope.length);
+        }
+        return;
+      }
+      if (target.kind === 'tab') {
+        const scope = ws.tabs.filter((t) => isSessionTab(t) && (t.groupId ?? null) === target.groupId);
+        const idx = target.beforeTabId == null ? scope.length : Math.max(0, scope.findIndex((t) => t.id === target.beforeTabId));
+        ws.moveTab(info.id, target.groupId, idx);
+      } else {
+        const scope = ws.tabs.filter((t) => isSessionTab(t) && (t.groupId ?? null) === target.groupId);
+        ws.moveTab(info.id, target.groupId, scope.length);
+      }
+    } else if (info.type === 'group') {
+      if (target && target.kind === 'group') {
+        const gs = ws.groups;
+        const idx = target.groupId == null ? gs.length : gs.findIndex((g) => g.id === target.groupId);
+        ws.moveGroup(info.id, idx);
+      }
+    }
+  };
+
+  const startDrag = (e: React.MouseEvent, type: 'tab' | 'group', id: string) => {
+    // 仅左键拖拽；忽略输入框/按钮
+    if (e.button !== 0) return;
+    if ((e.target as HTMLElement).closest('input,button,[data-no-drag]')) return;
+    dragRef.current = { type, id, startX: e.clientX, startY: e.clientY };
+    dragActiveRef.current = false;
+  };
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return tabs;
+    return tabs.filter((t) => t.title.toLowerCase().includes(q));
+  }, [tabs, query]);
+
+  const groupTabs = (gid: string) => filtered.filter((t) => isSessionTab(t) && t.groupId === gid);
+  const ungroupedTabs = filtered.filter((t) => isSessionTab(t) && !t.groupId);
+  const activeTab = tabs.find((t) => t.id === activeId);
+  const activeGroupId = activeTab && isSessionTab(activeTab) ? activeTab.groupId : undefined;
+
+  const ctxTab = ctxMenu ? tabs.find((t) => t.id === ctxMenu.tabId) : undefined;
+  const ctxItems: ContextMenuItem[] = ctxMenu && ctxTab
+    ? [
+        ...(isSessionTab(ctxTab) && !ctxTab.groupId ? [{
+          label: '新建分组',
+          onClick: () => {
+            // 建组后立即进入重命名（自动聚焦名称输入框）
+            void createGroupForTab(ctxTab.id).then((gid) => {
+              if (!gid) return;
+              const g = useWorkspaceStore.getState().groups.find((x) => x.id === gid);
+              setRenamingGroupId(gid);
+              setRenamingGroupTitle(g?.title ?? '新分组');
+            });
+          },
+        }] : []),
+        { label: '重命名', onClick: () => { setEditId(ctxTab.id); setEditTitle(ctxTab.title); } },
+        { label: '关闭标签', onClick: () => closeTab(ctxTab.id) },
+      ]
+    : [];
+
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', height: '100%',
+      userSelect: 'none', background: 'var(--surface)',
+    }}>
+      {/* 顶栏 */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 4,
+        padding: '6px 8px', borderBottom: '1px solid var(--border)',
+        position: 'relative',
+      }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 5, flex: 1, minWidth: 0,
+          background: 'var(--canvas)', border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-inner)', padding: '0 6px', height: 24,
+        }}>
+          <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="搜索会话…"
+            data-testid="tab-search"
+            style={{
+              flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none',
+              fontSize: 12, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+            }}
+          />
+        </div>
+        <IconBtn title="会话历史" data-testid="tab-history-btn" onClick={openHistoryTab}>
+          <History size={14} />
+        </IconBtn>
+        <IconBtn title="新建终端" data-testid="tab-new-btn" onClick={() => { setModalGroupId(activeGroupId); setModalOpen(true); }}>
+          <Plus size={14} />
+        </IconBtn>
+      </div>
+
+      {/* 列表 */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '0 0 8px' }}>
+        {groups.map((g) => (
+          <GroupSection
+            key={g.id}
+            group={g}
+            tabs={groupTabs(g.id)}
+            activeId={activeId}
+            hoveredId={hoveredId}
+            editId={editId}
+            editTitle={editTitle}
+            setEditTitle={setEditTitle}
+            renamingGroupId={renamingGroupId}
+            renamingGroupTitle={renamingGroupTitle}
+            setRenamingGroupTitle={setRenamingGroupTitle}
+            dropTarget={dropTarget}
+            onActivate={activate}
+            onClose={closeTab}
+            onStartEdit={(id, title) => { setEditId(id); setEditTitle(title); }}
+            onCommitEdit={() => { if (editId) renameTab(editId, editTitle); setEditId(null); }}
+            onCancelEdit={() => setEditId(null)}
+            onHover={(h, id) => setHoveredId(h ? id : null)}
+            onToggleCollapse={() => toggleGroupCollapse(g.id)}
+            onStartRenameGroup={() => { setRenamingGroupId(g.id); setRenamingGroupTitle(g.title); }}
+            onCommitRenameGroup={() => { if (renamingGroupId) renameGroup(renamingGroupId, renamingGroupTitle); setRenamingGroupId(null); }}
+            onDeleteGroup={() => {
+              const hasTabs = groupTabs(g.id).length > 0;
+              if (!hasTabs) { void deleteGroup(g.id, false); return; }
+              const ok = window.confirm(`归档分组「${g.title}」？组内标签将关闭并移入会话历史。`);
+              if (!ok) return;
+              void archiveGroup(g.id);
+            }}
+            onMouseDownTab={(e, tabId) => startDrag(e, 'tab', tabId)}
+            onMouseDownGroup={(e) => startDrag(e, 'group', g.id)}
+            onContextMenuTab={(e, tabId) => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, tabId }); }}
+            onAddTab={() => { setModalGroupId(g.id); setModalOpen(true); }}
+          />
+        ))}
+
+        {ungroupedTabs.length > 0 && (
+          <div data-ungrouped="true" style={{ marginTop: groups.length > 0 ? 6 : 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {groups.length > 0 && (
+              <div style={{ padding: '0 8px 2px', fontSize: 11, color: 'var(--text-muted)' }}>未分组</div>
+            )}
+            {ungroupedTabs.map((t) => (
+              <TabRow
+                key={t.id}
+                tab={t}
+                active={t.id === activeId}
+                hovered={t.id === hoveredId}
+                editing={editId === t.id}
+                editTitle={editTitle}
+                setEditTitle={setEditTitle}
+                groupId={null}
+                onActivate={() => activate(t.id)}
+                onClose={() => closeTab(t.id)}
+                onStartEdit={() => { setEditId(t.id); setEditTitle(t.title); }}
+                onCommitEdit={() => { renameTab(t.id, editTitle); setEditId(null); }}
+                onCancelEdit={() => setEditId(null)}
+                onHover={(h) => setHoveredId(h ? t.id : null)}
+                onMouseDown={(e) => startDrag(e, 'tab', t.id)}
+                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, tabId: t.id }); }}
+                highlight={dropTarget?.kind === 'tab' && dropTarget.groupId === null && dropTarget.beforeTabId === t.id}
+              />
+            ))}
+          </div>
+        )}
+
+        {filtered.length === 0 && (
+          <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>无匹配会话</div>
+        )}
+      </div>
+
+      {/* 右键菜单 */}
+      {ctxMenu && ctxItems.length > 0 && (
+        <ContextMenu
+          anchor={{ x: ctxMenu.x, y: ctxMenu.y }}
+          items={ctxItems}
+          onClose={() => setCtxMenu(null)}
+        />
+      )}
+
+      {/* 拖拽预览：鼠标附近的标签图（无文字） */}
+      {dragging && dragCursor && dragRef.current && (
+        <DragGhost
+          type={dragRef.current.type}
+          id={dragRef.current.id}
+          tabs={tabs}
+          x={dragCursor.x}
+          y={dragCursor.y}
+        />
+      )}
+
+      <NewTabModal open={modalOpen} groupId={modalGroupId} onClose={() => setModalOpen(false)} />
+    </div>
+  );
+}
+
+// ── 分组 section ──
+
+function GroupSection(props: {
+  group: TabGroup;
+  tabs: Tab[];
+  activeId: string;
+  hoveredId: string | null;
+  editId: string | null;
+  editTitle: string;
+  setEditTitle: (v: string) => void;
+  renamingGroupId: string | null;
+  renamingGroupTitle: string;
+  setRenamingGroupTitle: (v: string) => void;
+  dropTarget: DropTarget | null;
+  onActivate: (id: string) => void;
+  onClose: (id: string) => void;
+  onStartEdit: (id: string, title: string) => void;
+  onCommitEdit: () => void;
+  onCancelEdit: () => void;
+  onHover: (h: boolean, id: string) => void;
+  onToggleCollapse: () => void;
+  onStartRenameGroup: () => void;
+  onCommitRenameGroup: () => void;
+  onDeleteGroup: () => void;
+  onMouseDownTab: (e: React.MouseEvent, tabId: string) => void;
+  onMouseDownGroup: (e: React.MouseEvent) => void;
+  onContextMenuTab: (e: React.MouseEvent, tabId: string) => void;
+  onAddTab: () => void;
+}) {
+  const { group, tabs, activeId } = props;
+  const collapsed = group.collapsed;
+  const empty = tabs.length === 0;
+  const groupHighlight = props.dropTarget?.kind === 'group' && props.dropTarget.groupId === group.id;
+  const anyMemberActive = tabs.some((t) => t.id === activeId);
+  return (
+    <div style={{ marginBottom: 4 }}>
+      {/* 分组容器 = 标签的「外壳」：idle 透明，hover 或含活跃标签时显灰（CSS） */}
+      <div
+        className="tab-group-container"
+        data-group-id={group.id}
+        data-group-active={anyMemberActive ? 'true' : 'false'}
+        style={{
+          margin: 0, overflow: 'hidden',
+          boxShadow: groupHighlight ? 'inset 0 0 0 1px var(--accent)' : 'none',
+        }}
+      >
+        {/* 分组头：图标徽章 + 名称 + 副标题 + 折叠 chevron */}
+        <div
+          className="tab-group-header"
+          data-group-header-id={group.id}
+          data-header-selected={(collapsed && anyMemberActive) ? 'true' : 'false'}
+          data-testid={`group-header-${group.id}`}
+          onClick={() => { if (!props.renamingGroupId) props.onToggleCollapse(); }}
+          onDoubleClick={() => {
+            // 双击重命名（两次 click 已把折叠状态抵消回原样）
+            if (props.renamingGroupId !== group.id) props.onStartRenameGroup();
+          }}
+          onMouseDown={props.onMouseDownGroup}
+          title="点击折叠/展开 · 双击重命名 · 拖拽排序"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '6px 8px', minHeight: 40, cursor: 'pointer',
+          }}
+        >
+          <span style={{
+            width: 24, height: 24, borderRadius: 6, flexShrink: 0,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            background: 'var(--hover)', color: 'var(--text-secondary)',
+          }}>
+            <Folder size={14} />
+          </span>
+          {props.renamingGroupId === group.id ? (
+            <input
+              autoFocus
+              value={props.renamingGroupTitle}
+              onChange={(e) => props.setRenamingGroupTitle(e.target.value)}
+              onFocus={(e) => e.currentTarget.select()}
+              onClick={(e) => e.stopPropagation()}
+              onBlur={props.onCommitRenameGroup}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') props.onCommitRenameGroup();
+                else if (e.key === 'Escape') props.setRenamingGroupTitle(group.title);
+              }}
+              style={{
+                flex: 1, background: 'var(--canvas)', border: '1px solid var(--accent)',
+                borderRadius: 3, padding: '1px 4px', fontSize: 13, fontWeight: 600,
+                color: 'var(--text-primary)', outline: 'none',
+              }}
+            />
+          ) : (
+            <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <span style={{
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                fontSize: 13, lineHeight: '18px', fontWeight: 600, color: 'var(--text-primary)',
+              }}>
+                {group.title}
+              </span>
+              <span style={{ fontSize: 10.5, color: 'var(--text-muted)', lineHeight: '14px' }}>
+                {tabs.length} 个标签
+              </span>
+            </span>
+          )}
+          <GroupActions
+            empty={empty}
+            onAdd={props.onAddTab}
+            onRename={props.onStartRenameGroup}
+            onDelete={props.onDeleteGroup}
+          />
+          <ChevronRight
+            size={13}
+            style={{
+              color: 'var(--text-muted)', flexShrink: 0,
+              transition: 'transform 0.12s ease', transform: collapsed ? 'none' : 'rotate(90deg)',
+            }}
+          />
+        </div>
+
+        {/* 展开：组内标签与自由标签同尺寸，靠左缩进 12px 体现层级 */}
+        {!collapsed && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 0 4px' }}>
+            {tabs.map((t) => (
+              <div key={t.id} style={{ padding: '0 4px 0 12px' }}>
+                <TabRow
+                  tab={t}
+                  active={t.id === activeId}
+                  hovered={t.id === props.hoveredId}
+                  editing={props.editId === t.id}
+                  editTitle={props.editTitle}
+                  setEditTitle={props.setEditTitle}
+                  groupId={group.id}
+                  onActivate={() => props.onActivate(t.id)}
+                  onClose={() => props.onClose(t.id)}
+                  onStartEdit={() => props.onStartEdit(t.id, t.title)}
+                  onCommitEdit={props.onCommitEdit}
+                  onCancelEdit={props.onCancelEdit}
+                  onHover={(h) => props.onHover(h, t.id)}
+                  onMouseDown={(e) => props.onMouseDownTab(e, t.id)}
+                  onContextMenu={(e) => props.onContextMenuTab(e, t.id)}
+                  highlight={props.dropTarget?.kind === 'tab' && props.dropTarget.groupId === group.id && props.dropTarget.beforeTabId === t.id}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function GroupActions({ onAdd, onRename, onDelete, empty }: {
+  onAdd: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+  empty: boolean;
+}) {
+  return (
+    <span className="group-actions" style={{ display: 'inline-flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+      <button data-subtle data-no-drag title="在此分组新建终端"
+        onClick={(e) => { e.stopPropagation(); onAdd(); }}
+        style={actionStyle}
+        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}>
+        <Plus size={12} />
+      </button>
+      <button data-subtle data-no-drag title="重命名分组"
+        onClick={(e) => { e.stopPropagation(); onRename(); }}
+        style={actionStyle}
+        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}>
+        <Pencil size={12} />
+      </button>
+      <button data-subtle data-no-drag title={empty ? '删除分组' : '归档分组（移入会话历史）'}
+        onClick={(e) => { e.stopPropagation(); onDelete(); }}
+        style={actionStyle}
+        onMouseEnter={(e) => { e.currentTarget.style.color = empty ? 'var(--error-light)' : 'var(--text-secondary)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}>
+        {empty ? <Trash2 size={12} /> : <Archive size={12} />}
+      </button>
+    </span>
+  );
+}
+
+const actionStyle: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+  width: 18, height: 18, padding: 0, border: 'none', borderRadius: 4,
+  background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+};
+
+// ── 标签行 ──
+
+function TabRow({
+  tab, active, hovered, editing, editTitle, setEditTitle, groupId,
+  onActivate, onClose, onStartEdit, onCommitEdit, onCancelEdit, onHover, onMouseDown, onContextMenu, highlight,
+}: {
+  tab: Tab;
+  active: boolean;
+  hovered: boolean;
+  editing: boolean;
+  editTitle: string;
+  setEditTitle: (v: string) => void;
+  groupId: string | null;
+  onActivate: () => void;
+  onClose: () => void;
+  onStartEdit: () => void;
+  onCommitEdit: () => void;
+  onCancelEdit: () => void;
+  onHover: (h: boolean) => void;
+  onMouseDown: (e: React.MouseEvent) => void;
+  onContextMenu: (e: React.MouseEvent) => void;
+  highlight?: boolean;
+}) {
+  const isSsh = tab.kind === 'ssh';
+  const Icon = tab.kind === 'history' ? History : tab.kind === 'settings' ? Settings : isSsh ? Server : SquareTerminal;
+  const iconColor = isSsh ? 'var(--accent-warm)' : active ? 'var(--accent)' : 'var(--text-secondary)';
+  const iconBg = isSsh ? 'var(--accent-warm-dim)' : active ? 'var(--accent-bg)' : 'transparent';
+  const subtitle = tab.kind === 'history'
+    ? '会话历史'
+    : tab.kind === 'settings'
+      ? '设置'
+      : tab.kind === 'ssh'
+        ? (tab.ssh.host || tab.ssh.name)
+        : tab.shellType
+          ? shellTypeLabel(tab.shellType)
+          : '终端';
+
+  // 内外壳两层：外壳（外层容器，idle 透明，hover/选中 5%，与分组容器同色）+ 内壳（内层卡片，idle 透明，hover 5%，选中 10% + 1px 描边，圆角）
+  const inGroup = groupId != null;
+  const outerBg = (!inGroup && (active || hovered)) ? 'var(--tab-hover)' : 'transparent';
+  let innerBg = 'transparent';
+  let innerBorder = '1px solid transparent';
+  if (highlight) {
+    innerBg = 'var(--tab-hover)';
+    innerBorder = '1px dashed var(--tab-active-border)';
+  } else if (active) {
+    innerBg = 'var(--tab-active)';
+    innerBorder = '1px solid var(--tab-active-border)';
+  } else if (hovered) {
+    innerBg = 'var(--tab-hover)';
+  }
+
+  return (
+    <div
+      onClick={onActivate}
+      onDoubleClick={onStartEdit}
+      onMouseDown={onMouseDown}
+      onContextMenu={onContextMenu}
+      onMouseEnter={() => onHover(true)}
+      onMouseLeave={() => onHover(false)}
+      title={tab.title}
+      data-testid={`tab-row-${tab.id}`}
+      data-tab-row-id={tab.id}
+      data-tab-group={groupId ?? ''}
+      style={{
+        padding: 10,
+        background: outerBg,
+        cursor: 'pointer',
+      }}
+    >
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: 8,
+        borderRadius: 'var(--tab-radius)',
+        background: innerBg,
+        border: innerBorder,
+        color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+        transition: 'background 0.12s ease, border-color 0.12s ease',
+      }}>
+        <span style={{
+          width: 24, height: 24, borderRadius: 6, flexShrink: 0,
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          background: iconBg, color: iconColor,
+        }}>
+          <Icon size={15} />
+        </span>
+        {editing ? (
+          <input
+            autoFocus
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            onFocus={(e) => e.currentTarget.select()}
+            onBlur={onCommitEdit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onCommitEdit();
+              else if (e.key === 'Escape') onCancelEdit();
+            }}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              flex: 1, background: 'var(--canvas)', border: '1px solid var(--accent)',
+              borderRadius: 3, padding: '1px 4px', fontSize: 13,
+              color: 'var(--text-primary)', outline: 'none', fontFamily: 'var(--font-ui)',
+            }}
+          />
+        ) : (
+          <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <span style={{
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              fontSize: 12, lineHeight: '16px',
+              fontWeight: active ? 600 : 500,
+            }}>
+              {tab.title}
+            </span>
+            <span style={{
+              fontSize: 11, color: 'var(--text-muted)', lineHeight: '14px',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              fontFamily: 'var(--font-mono)',
+            }}>
+              {subtitle}
+            </span>
+          </span>
+        )}
+        <span
+          onClick={(e) => { e.stopPropagation(); onClose(); }}
+          title="关闭标签"
+          data-testid={`tab-close-${tab.id}`}
+          data-no-drag
+          style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            width: 18, height: 18, fontSize: 15, cursor: 'pointer', lineHeight: 1,
+            borderRadius: 4, flexShrink: 0,
+            color: 'var(--text-muted)',
+            opacity: (active || hovered) ? 1 : 0,
+            transition: 'opacity 0.12s ease',
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLElement).style.background = 'var(--button-hover)';
+            (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)';
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLElement).style.background = 'transparent';
+            (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)';
+          }}
+        >×</span>
+      </div>
+    </div>
+  );
+}
+
+// ── 拖拽预览（标签图，无文字）──
+
+function DragGhost({ type, id, tabs, x, y }: {
+  type: 'tab' | 'group';
+  id: string;
+  tabs: Tab[];
+  x: number;
+  y: number;
+}) {
+  const tab = type === 'tab' ? tabs.find((t) => t.id === id) : undefined;
+  const isSsh = tab?.kind === 'ssh';
+  const Icon = type === 'tab'
+    ? (tab?.kind === 'history' ? History : tab?.kind === 'settings' ? Settings : isSsh ? Server : SquareTerminal)
+    : Folder;
+  const color = type === 'group' || isSsh ? 'var(--accent-warm)' : 'var(--accent)';
+  return (
+    <div style={{
+      position: 'fixed', left: x, top: y, zIndex: 9999, pointerEvents: 'none',
+      transform: 'translate(-50%, -60%) scale(1.06)',
+      width: 40, height: 26, borderRadius: 7,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'var(--elevated)', border: '1px solid var(--border-strong)',
+      boxShadow: 'var(--shadow-lg)',
+      animation: 'dragGhostIn 0.1s ease',
+    }}>
+      <Icon size={14} style={{ color }} />
+    </div>
+  );
+}
+
+// ── 通用 ──
+
+function IconBtn({
+  title, onClick, children, ...rest
+}: {
+  title: string;
+  onClick: () => void;
+  children: React.ReactNode;
+  [key: string]: unknown;
+}) {
+  return (
+    <button
+      data-subtle
+      title={title}
+      onClick={onClick}
+      {...rest}
+      style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: 24, height: 24, padding: 0, borderRadius: 5,
+        background: 'transparent', border: 'none', color: 'var(--text-muted)',
+        cursor: 'pointer', flexShrink: 0,
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = 'var(--button-hover)';
+        e.currentTarget.style.color = 'var(--text-secondary)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'transparent';
+        e.currentTarget.style.color = 'var(--text-muted)';
+      }}
+    >
+      {children}
+    </button>
+  );
+}

@@ -1,0 +1,87 @@
+import { invoke } from '@tauri-apps/api/core';
+import type { BackendBlockEntry, BackendSessionEntry } from '../search/types';
+
+export function createSession(
+  id: string,
+  title: string,
+  timestamp: number,
+  cwd?: string,
+  kind = 'local',
+  payload = '{}',
+): Promise<void> {
+  return invoke('create_session', { id, title, timestamp, cwd: cwd ?? null, kind, payload });
+}
+
+export function archiveSession(id: string, timestamp: number): Promise<void> {
+  return invoke('archive_session', { id, timestamp });
+}
+
+export function restoreSession(id: string): Promise<void> {
+  return invoke('restore_session', { id });
+}
+
+export function updateSessionTitle(id: string, title: string): Promise<void> {
+  return invoke('update_session_title', { id, title });
+}
+
+export function deleteSession(id: string): Promise<void> {
+  return invoke('delete_session', { id });
+}
+
+export function updateSessionCwd(id: string, cwd: string): Promise<void> {
+  return invoke('update_session_cwd', { id, cwd });
+}
+
+/** 覆盖会话 payload JSON（分屏布局持久化用）。 */
+export function updateSessionPayload(id: string, payload: string): Promise<void> {
+  return invoke('update_session_payload', { id, payload });
+}
+
+export function getSession(id: string): Promise<BackendSessionEntry> {
+  return invoke('get_session', { id });
+}
+
+/** 列出全部会话（活跃 + 历史），按创建时间倒序。 */
+export function listSessions(): Promise<BackendSessionEntry[]> {
+  return invoke('list_sessions');
+}
+
+// ── 块持久化 ──
+
+export function recordBlock(
+  id: string, sessionId: string, paneId: string | null, command: string,
+  outputRaw: string, outputClean: string, exitCode: number | null, status: string,
+  startedAt: number, endedAt: number | null,
+): Promise<void> {
+  return invoke('record_block', {
+    id, sessionId, paneId, command, outputRaw, outputClean, exitCode, status, startedAt, endedAt,
+  });
+}
+
+export function getSessionBlocks(sessionId: string): Promise<BackendBlockEntry[]> {
+  return invoke('get_session_blocks', { sessionId });
+}
+
+/** 持久化单个 block 的折叠/展开状态。 */
+export function setBlockCollapsed(id: string, collapsed: boolean): Promise<void> {
+  return invoke('set_block_collapsed', { id, collapsed });
+}
+
+// ── AI 对话持久化 ──
+
+export interface BackendChatMessage {
+  id: string;
+  role: string;
+  content: string;
+  created_at: number;
+}
+
+export function appendChatMessage(
+  id: string, sessionId: string, role: string, content: string, createdAt: number,
+): Promise<void> {
+  return invoke('append_chat_message', { id, sessionId, role, content, createdAt });
+}
+
+export function listChatMessages(sessionId: string): Promise<BackendChatMessage[]> {
+  return invoke('list_chat_messages', { sessionId });
+}

@@ -1,0 +1,209 @@
+import { test, expect } from '@playwright/test';
+import { setupTauriMock, emitPtyOutput, ptyWrites, ptySignals } from './tauri-mock';
+
+test.describe('命令块（OSC 133）', () => {
+  test('终端运行命令后 block UI 可见', async ({ page }) => {
+    await setupTauriMock(page);
+    await page.goto('/');
+    // 初始 prompt 触发 blockList 场景
+    const input = page.getByPlaceholder(/输入命令/);
+    await expect(input).toBeVisible({ timeout: 5000 });
+
+    await input.fill('echo e2e-block-test');
+    await input.press('Enter');
+
+    // block 中应显示命令文本（无 $ 前缀、加粗）和输出文本
+    await expect(page.getByText('echo e2e-block-test').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('e2e-block-test').first()).toBeVisible({ timeout: 5000 });
+    // 上下文行：退出码 0
+    await expect(page.getByTestId('exit-code').first()).toHaveText('0', { timeout: 5000 });
+  });
+
+  test('无 OSC 133 时保持经典终端模式', async ({ page }) => {
+    // 关闭 shell integration，使 mock 只回普通文本
+    await setupTauriMock(page, { integration: false });
+    await page.goto('/');
+
+    // classic 场景下主 xterm 可见，底部输入栏被 forceHidden
+    await expect(page.locator('.xterm').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByPlaceholder(/输入命令/)).toHaveCount(0);
+
+    // 直接注入普通文本（无 OSC 133）
+    await emitPtyOutput(page, 'echo classic-mode\r\nclassic-mode-output\r\n');
+    await expect(page.getByText('classic-mode-output').first()).toBeVisible({ timeout: 5000 });
+    // 不应出现 block 上下文行的退出码
+    await expect(page.getByTestId('exit-code')).toHaveCount(0);
+  });
+
+  test('进出 altScreen 显示 TUI banner', async ({ page }) => {
+    await setupTauriMock(page);
+    await page.goto('/');
+    const input = page.getByPlaceholder(/输入命令/);
+    await expect(input).toBeVisible({ timeout: 5000 });
+
+    // 通过 PTY 输出直接注入 altScreen 序列
+    await emitPtyOutput(
+      page,
+      '\x1b]133;A\x07' +
+        '\x1b]133;E;dm0=\x07' + // base64('vim')
+        '\x1b]133;C\x07' +
+        '\x1b[?1049h' +
+        'VIM BUFFER',
+    );
+
+    await expect(page.getByText('TUI')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTitle('发送 Ctrl+C')).toBeVisible();
+    // 真实 alt-buffer 应用不提供「退出全屏」（输出只写主 xterm，强制回 blockList 会画面失联）；
+    // esc 仅手动全屏（块卡片进入全屏交互）才有 —— 见 running-term.spec.ts
+    await expect(page.getByTitle('退出全屏')).toHaveCount(0);
+
+    // 真实 alt buffer 应用的内容必须可见（主 xterm 覆盖层，不能被 opacity:0 隐藏）
+    // —— 回归：manualTui 误判曾把 vim 画面盖住，用户看到冻结的块内容。
+    // Playwright 的 toBeVisible 不检查 opacity，需逐层向上查计算样式
+    await expect(page.getByText('VIM BUFFER')).toBeVisible({ timeout: 5000 });
+    const hiddenByAncestor = await page.getByText('VIM BUFFER').evaluate((el) => {
+      let node: HTMLElement | null = el;
+      while (node) {
+        if (getComputedStyle(node).opacity === '0') return true;
+        node = node.parentElement;
+      }
+      return false;
+    });
+    expect(hiddenByAncestor).toBe(false);
+
+    // 键盘必须可达 TUI：altScreen 场景焦点路由到主 xterm，onData → PTY
+    // （回归：Esc 曾被全局快捷键劫持、焦点落在不可见块终端，"无法输入"）
+    // 注意放在按钮点击之前 —— 点击横幅按钮会把焦点从 xterm 抢走
+    const writesBefore = (await ptyWrites(page)).length;
+    await page.keyboard.press('q');
+    await page.keyboard.press('Escape');
+    await expect(async () => {
+      const writes = await ptyWrites(page);
+      expect(writes.length).toBeGreaterThan(writesBefore);
+      expect(writes.slice(writesBefore).join('')).toContain('q');
+    }).toPass({ timeout: 5000 });
+
+    // 升级式结束按钮：首击 SIGTERM → 窗口内再击 SIGKILL
+    await expect(page.getByText('结束', { exact: true })).toBeVisible();
+    await page.getByText('结束', { exact: true }).click();
+    await expect(async () => {
+      expect(await ptySignals(page)).toEqual([{ id: 'e2e-session', sig: 15 }]);
+    }).toPass({ timeout: 5000 });
+    await page.getByText('强杀!', { exact: true }).click();
+    await expect(async () => {
+      expect(await ptySignals(page)).toEqual([
+        { id: 'e2e-session', sig: 15 },
+        { id: 'e2e-session', sig: 9 },
+      ]);
+    }).toPass({ timeout: 5000 });
+
+    // 退出 altScreen
+    await emitPtyOutput(page, '\x1b[?1049l\x1b]133;D;0\x07\x1b]133;A\x07');
+
+    await expect(page.getByText('TUI')).not.toBeVisible({ timeout: 5000 });
+    // 恢复 block 列表后输入栏应重新出现
+    await expect(input).toBeVisible({ timeout: 5000 });
+    // TUI 块快照应含 alt 退出前的最终画面（1049l 瞬间从主 xterm 回填），
+    // 不再只剩「zsh: terminated」之类的 teardown 噪音 —— vi 历史空白回归
+    await expect(page.getByText('VIM BUFFER').first()).toBeVisible({ timeout: 5000 });
+  });
+
+  test('altScreen 中滚轮降级为方向键发给 PTY', async ({ page }) => {
+    await setupTauriMock(page);
+    await page.goto('/');
+    await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
+
+    // 进入 altScreen（应用未开鼠标上报：滚轮应降级为方向键）
+    await emitPtyOutput(
+      page,
+      '\x1b]133;A\x07' +
+        '\x1b]133;E;dm0=\x07' +
+        '\x1b]133;C\x07' +
+        '\x1b[?1049h' +
+        'TUI APP',
+    );
+    await expect(page.getByText('TUI APP')).toBeVisible({ timeout: 5000 });
+
+    // 在可见主 xterm 的中央滚轮（DOM 里还有隐藏的块内 xterm，需 :visible 过滤；
+    // 顶部 29px 是 TUI banner 条，滚轮落在上面不会进 xterm，避开）
+    const box = await page.locator('.xterm:visible').boundingBox();
+    expect(box).not.toBeNull();
+    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+
+    const before = (await ptyWrites(page)).length;
+    await page.mouse.wheel(0, 200);
+    await expect(async () => {
+      const writes = (await ptyWrites(page)).slice(before).join('');
+      expect(writes).toContain('\x1b[B');
+    }).toPass({ timeout: 5000 });
+
+    const beforeUp = (await ptyWrites(page)).length;
+    await page.mouse.wheel(0, -200);
+    await expect(async () => {
+      const writes = (await ptyWrites(page)).slice(beforeUp).join('');
+      expect(writes).toContain('\x1b[A');
+    }).toPass({ timeout: 5000 });
+  });
+
+  test('全局搜索 Cmd+F 打开居中弹窗并聚焦', async ({ page }) => {
+    await setupTauriMock(page);
+    await page.goto('/');
+    await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
+    // TopDock 搜索触发器可见（不再是常驻输入框）
+    const trigger = page.getByTestId('global-search-trigger');
+    await expect(trigger).toBeVisible({ timeout: 3000 });
+    // Cmd+F 打开居中搜索窗并聚焦搜索栏
+    await page.keyboard.press('Meta+f');
+    const searchInput = page.getByPlaceholder(/搜索文件/);
+    await expect(searchInput).toBeVisible({ timeout: 3000 });
+    await expect(searchInput).toBeFocused();
+    // Escape 关闭弹窗
+    await page.keyboard.press('Escape');
+    await expect(searchInput).not.toBeVisible();
+  });
+
+  test('全局搜索筛选面板点击不崩溃', async ({ page }) => {
+    await setupTauriMock(page);
+    await page.goto('/');
+    await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
+    await page.keyboard.press('Meta+f');
+    const searchInput = page.getByPlaceholder(/搜索文件/);
+    await expect(searchInput).toBeVisible({ timeout: 3000 });
+    // 点击筛选按钮 → 打开筛选面板（此前这里条件 hook 导致崩溃）
+    await page.getByTestId('search-filter-button').click();
+    await expect(page.getByText('搜索范围')).toBeVisible({ timeout: 3000 });
+    // 切换一个源后不崩溃，搜索框仍可交互
+    await page.getByText('命令历史').first().click();
+    await expect(searchInput).toBeVisible();
+  });
+
+  test('底部命令输入栏可见', async ({ page }) => {
+    await setupTauriMock(page);
+    await page.goto('/');
+    const cmdInput = page.getByPlaceholder(/输入命令/);
+    await expect(cmdInput).toBeVisible({ timeout: 5000 });
+  });
+
+  test('Cmd+P 打开命令面板', async ({ page }) => {
+    await setupTauriMock(page);
+    await page.goto('/');
+    await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
+    await page.keyboard.press('Meta+p');
+    await expect(page.getByPlaceholder('搜索命令…')).toBeVisible({ timeout: 3000 });
+    await page.keyboard.press('Escape');
+    await expect(page.getByPlaceholder('搜索命令…')).not.toBeVisible();
+  });
+
+  test('Cmd+W 打开命令面板不冲突（p 和 w 区分）', async ({ page }) => {
+    await setupTauriMock(page);
+    await page.goto('/');
+    await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
+    // Cmd+P 打开面板
+    await page.keyboard.press('Meta+p');
+    await expect(page.getByPlaceholder('搜索命令…')).toBeVisible({ timeout: 3000 });
+    await page.keyboard.press('Escape');
+    // Cmd+W 不应打开面板
+    await page.keyboard.press('Meta+w');
+    await expect(page.getByPlaceholder('搜索命令…')).not.toBeVisible();
+  });
+});

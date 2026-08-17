@@ -1,0 +1,68 @@
+interface Props {
+  open: boolean;
+  title: string;
+  message?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  danger?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+/**
+ * ConfirmDialog — 通用二次确认弹窗（删除 / 重命名等不可逆或易误触操作）。
+ * 确定按钮可按 danger 着色。
+ */
+export default function ConfirmDialog({
+  open,
+  title,
+  message,
+  confirmLabel = '确定',
+  cancelLabel = '取消',
+  danger = false,
+  onConfirm,
+  onCancel,
+}: Props) {
+  if (!open) return null;
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9997,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'var(--overlay)',
+      }}
+      onClick={onCancel}
+      data-testid="confirm-dialog"
+    >
+      <div
+        style={{
+          width: 360, background: 'var(--elevated)', border: '1px solid var(--border-strong)',
+          borderRadius: 'var(--radius-block)', boxShadow: 'var(--shadow-lg)', padding: 14,
+          display: 'flex', flexDirection: 'column', gap: 10,
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{title}</div>
+        {message && (
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6, wordBreak: 'break-all' }}>
+            {message}
+          </div>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button onClick={onCancel} data-testid="confirm-cancel" style={{
+            padding: '5px 12px', fontSize: 12, border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-inner)', background: 'transparent',
+            color: 'var(--text-secondary)', cursor: 'pointer',
+          }}>{cancelLabel}</button>
+          <button onClick={onConfirm} data-testid="confirm-ok" style={{
+            padding: '5px 16px', fontSize: 12, border: 'none',
+            borderRadius: 'var(--radius-inner)',
+            background: danger ? 'var(--error)' : 'var(--accent)',
+            color: danger ? '#fff' : '#0d0d0d', cursor: 'pointer',
+          }}>{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+}

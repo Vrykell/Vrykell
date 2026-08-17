@@ -1,0 +1,55 @@
+import { create } from 'zustand';
+
+/**
+ * useInputStore — 输入栏每 pane 独立状态（text + AI/命令模式）。
+ *
+ * 分屏后两个 pane 是独立终端，各自记住草稿与模式；未分屏时 paneId = 标签 id。
+ * 聚焦切换（点击 pane / 切标签）由 InputEditor 按聚焦 pane 读取对应状态。
+ */
+
+export interface PaneInput {
+  text: string;
+  aiMode: boolean;
+}
+
+interface InputState {
+  byPane: Record<string, PaneInput>;
+  setText: (paneId: string, text: string) => void;
+  setAiMode: (paneId: string, aiMode: boolean) => void;
+  clearText: (paneId: string) => void;
+  dropPane: (paneId: string) => void;
+}
+
+const EMPTY: PaneInput = { text: '', aiMode: false };
+
+export const useInputStore = create<InputState>((set) => ({
+  byPane: {},
+
+  setText: (paneId, text) =>
+    set((s) => ({
+      byPane: { ...s.byPane, [paneId]: { ...(s.byPane[paneId] ?? EMPTY), text } },
+    })),
+
+  setAiMode: (paneId, aiMode) =>
+    set((s) => ({
+      byPane: { ...s.byPane, [paneId]: { ...(s.byPane[paneId] ?? EMPTY), aiMode } },
+    })),
+
+  clearText: (paneId) =>
+    set((s) => ({
+      byPane: { ...s.byPane, [paneId]: { ...(s.byPane[paneId] ?? EMPTY), text: '' } },
+    })),
+
+  dropPane: (paneId) =>
+    set((s) => {
+      if (!(paneId in s.byPane)) return s;
+      const byPane = { ...s.byPane };
+      delete byPane[paneId];
+      return { byPane };
+    }),
+}));
+
+/** paneId 的输入状态 selector（缺失时返回稳定 EMPTY，避免无限重渲染）。 */
+export function selectPaneInput(paneId: string) {
+  return (s: InputState): PaneInput => s.byPane[paneId] ?? EMPTY;
+}

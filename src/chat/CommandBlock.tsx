@@ -1,4 +1,5 @@
 import { isValidElement, type ReactNode, type ReactElement } from 'react';
+import { Play } from 'lucide-react';
 import { useTerminalStore } from '../stores/terminal';
 
 const SHELL_LANGS = new Set(['bash', 'sh', 'zsh', 'shell']);
@@ -17,18 +18,46 @@ export default function CommandBlock({ children }: { children?: ReactNode }) {
   const code = extractCode(children);
   const isShell = code ? SHELL_LANGS.has(code.lang) : false;
   return (
-    <div style={{ position: 'relative' }}>
-      <pre style={{ background: '#ffffff0a', borderRadius: 6, padding: 10, overflowX: 'auto' }}>
+    <div style={{
+      position: 'relative',
+      background: 'var(--canvas)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius-inner)',
+      margin: '0.45em 0',
+      overflow: 'hidden',
+    }}>
+      {code && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '3px 10px',
+          borderBottom: '1px solid var(--border)',
+          background: 'var(--command-block-bg)',
+        }}>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+            {code.lang || 'code'}
+          </span>
+          {isShell && (
+            <button
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontSize: 11,
+                padding: '2px 10px',
+                background: 'var(--accent-dim)',
+                border: '1px solid var(--accent-blue-dim)',
+                color: 'var(--accent)',
+              }}
+              onClick={() => runInTerminal(code.text.trim())}
+            >
+              <Play size={10} /> 在终端运行
+            </button>
+          )}
+        </div>
+      )}
+      <pre style={{ margin: 0, padding: '10px 12px', overflowX: 'auto' }}>
         {children}
       </pre>
-      {isShell && code && (
-        <button
-          style={{ position: 'absolute', top: 6, right: 6, fontSize: 12 }}
-          onClick={() => runInTerminal(code.text.trim())}
-        >
-          ▶ 在终端运行
-        </button>
-      )}
     </div>
   );
 }
