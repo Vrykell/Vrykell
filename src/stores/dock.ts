@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { SquareStack, Folder, Server, type LucideIcon } from 'lucide-react';
 import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '../lib/errorHandler';
+import { useWorkspaceStore, isSessionTab } from './workspace';
+import { minTerminalWidth, MIN_PANE_SIZE } from '../lib/windowLayout';
 
 // ── 面板定义（可扩展）──
 
@@ -100,6 +102,13 @@ interface DockState {
   setPanelWidth: (id: string, width: number) => void;
 }
 
+/** 终端区域当前需要保留的最小宽度（按活跃窗口布局动态计算：单终端窄、多终端并排宽）。 */
+function currentTerminalMinWidth(): number {
+  const ws = useWorkspaceStore.getState();
+  const tab = ws.tabs.find((t) => t.id === ws.activeId);
+  return tab && isSessionTab(tab) ? minTerminalWidth(tab.layout) : MIN_PANE_SIZE;
+}
+
 const saved = loadLayout();
 
 export const useDockStore = create<DockState>((set) => ({
@@ -185,8 +194,8 @@ export const useDockStore = create<DockState>((set) => ({
 
   setPanelWidth: (id, width) => {
     set((s) => {
-      // 上限随窗口收敛：至少给终端留 400px，避免侧栏拖到「覆盖」终端
-      const maxW = Math.max(160, Math.min(500, Math.round(window.innerWidth - 400)));
+      // 上限随窗口收敛：至少给终端留足「按布局动态」的最小宽度，避免侧栏拖到「覆盖」终端
+      const maxW = Math.max(160, Math.min(500, Math.round(window.innerWidth - currentTerminalMinWidth())));
       const panelWidths = { ...s.panelWidths, [id]: Math.max(160, Math.min(maxW, Math.round(width))) };
       const next = { ...s, panelWidths };
       saveLayout(next);

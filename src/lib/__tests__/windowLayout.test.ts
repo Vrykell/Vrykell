@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   leaf, splitLeaf, replaceLeaf, removeLeaf, leaves, countLeaves,
-  leafRects, dropTargets, dividers, setRatio, findLeaf, leafDepth,
+  leafRects, dropTargets, moveTargets, dividers, setRatio, findLeaf, leafDepth,
+  maxRowPanes, minTerminalWidth, MIN_PANE_SIZE, DIVIDER_SIZE,
   type TerminalSpec,
 } from '../windowLayout';
 
@@ -89,6 +90,69 @@ describe('windowLayout 停靠落点（与约定一致）', () => {
     l = splitLeaf(l, 'c', 'col', 'second', t('d'));
     expect(countLeaves(l)).toBe(4);
     expect(dropTargets(l).length).toBe(0);
+  });
+});
+
+describe('windowLayout 移动落点', () => {
+  it('moveTargets：单终端无落点（不可移动）', () => {
+    expect(moveTargets(leaf(t('a')), 'a')).toEqual([]);
+  });
+
+  it('moveTargets：2 终端时对另一终端给上下左右 4 个边沿落点', () => {
+    const l = splitLeaf(leaf(t('a')), 'a', 'row', 'second', t('b')); // a | b
+    const d = moveTargets(l, 'a');
+    expect(d.length).toBe(4);
+    expect(d.every((x) => x.leafId === 'b')).toBe(true);
+    const dirs = d.map((x) => `${x.dir}-${x.position}`).sort();
+    expect(dirs).toEqual(['col-first', 'col-second', 'row-first', 'row-second']);
+  });
+
+  it('moveTargets：落点矩形相对整个容器（移动 2 终端 = 对半，而非 1/4）', () => {
+    const l = splitLeaf(leaf(t('a')), 'a', 'row', 'second', t('b')); // a | b
+    const d = moveTargets(l, 'a');
+    for (const x of d) {
+      expect(x.rect.w * x.rect.h).toBeCloseTo(0.5);
+    }
+  });
+
+  it('moveTargets：4 终端时其它 3 个终端各 4 个落点', () => {
+    let l = splitLeaf(leaf(t('a')), 'a', 'row', 'second', t('c'));
+    l = splitLeaf(l, 'a', 'col', 'second', t('b'));
+    l = splitLeaf(l, 'c', 'col', 'second', t('d'));
+    const d = moveTargets(l, 'a');
+    expect(d.length).toBe(12);
+    expect(new Set(d.map((x) => x.leafId))).toEqual(new Set(['b', 'c', 'd']));
+  });
+});
+
+describe('windowLayout 动态最小宽度', () => {
+  it('maxRowPanes：单终端=1，左右=相加，上下=取大', () => {
+    expect(maxRowPanes(leaf(t('a')))).toBe(1);
+    const row = splitLeaf(leaf(t('a')), 'a', 'row', 'second', t('b'));
+    expect(maxRowPanes(row)).toBe(2);
+    const col = splitLeaf(leaf(t('a')), 'a', 'col', 'second', t('b'));
+    expect(maxRowPanes(col)).toBe(1);
+  });
+
+  it('maxRowPanes：2×2 = 2，左 1 + 右上下 2 = 2', () => {
+    let l = splitLeaf(leaf(t('a')), 'a', 'row', 'second', t('c'));
+    l = splitLeaf(l, 'a', 'col', 'second', t('b'));
+    l = splitLeaf(l, 'c', 'col', 'second', t('d'));
+    expect(maxRowPanes(l)).toBe(2);
+    // a | (b / c)：左边 1 个，右边上下堆 2 个，最宽一行 2
+    let m = splitLeaf(leaf(t('a')), 'a', 'row', 'second', t('c'));
+    m = splitLeaf(m, 'c', 'col', 'second', t('b'));
+    expect(maxRowPanes(m)).toBe(2);
+  });
+
+  it('minTerminalWidth：随并排数量线性增长', () => {
+    expect(minTerminalWidth(leaf(t('a')))).toBe(MIN_PANE_SIZE);
+    const row2 = splitLeaf(leaf(t('a')), 'a', 'row', 'second', t('b'));
+    expect(minTerminalWidth(row2)).toBe(MIN_PANE_SIZE * 2 + DIVIDER_SIZE);
+    let four = splitLeaf(leaf(t('a')), 'a', 'row', 'second', t('c'));
+    four = splitLeaf(four, 'a', 'col', 'second', t('b'));
+    four = splitLeaf(four, 'c', 'col', 'second', t('d'));
+    expect(minTerminalWidth(four)).toBe(MIN_PANE_SIZE * 2 + DIVIDER_SIZE);
   });
 });
 

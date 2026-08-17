@@ -635,8 +635,7 @@ function TabRow({
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
               height: 16, padding: '0 6px', flexShrink: 0,
-              borderRadius: 9, background: 'var(--canvas)',
-              border: '1px solid var(--border)', lineHeight: '14px',
+              lineHeight: '14px',
             }}
           >
             <span style={{

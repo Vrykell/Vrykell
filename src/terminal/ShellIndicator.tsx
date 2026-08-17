@@ -45,16 +45,24 @@ interface Props {
   shell?: ShellInfo;
   /** 是否显示连接状态点 */
   connected?: boolean;
+  /** 该终端是否为当前聚焦终端（聚焦态点亮绿灯） */
+  focused?: boolean;
   /** 仅显示点 + 名称（无胶囊背景，用于紧凑布局） */
   compact?: boolean;
   /** 覆盖显示名（终端类型 / SSH 连接名） */
   label?: string;
 }
 
-export default function ShellIndicator({ shell, connected, compact, label }: Props) {
+export default function ShellIndicator({ shell, connected, focused, compact, label }: Props) {
   const info = shell ?? { type: 'unknown' as const, label: 'sh' };
   const fg = SHELL_FG[info.type];
   const bg = SHELL_BG[info.type];
+  // 状态点：未连接=红；已连接且聚焦=绿；已连接未聚焦=灰
+  const dotColor = connected === false
+    ? 'var(--shell-disconnected)'
+    : focused
+      ? 'var(--shell-connected)'
+      : 'var(--text-muted)';
 
   return (
     <span
@@ -84,8 +92,9 @@ export default function ShellIndicator({ shell, connected, compact, label }: Pro
             width: 6,
             height: 6,
             borderRadius: '50%',
-            background: connected ? 'var(--shell-connected)' : 'var(--shell-disconnected)',
+            background: dotColor,
             flexShrink: 0,
+            transition: 'background 0.12s ease',
           }}
         />
       )}
