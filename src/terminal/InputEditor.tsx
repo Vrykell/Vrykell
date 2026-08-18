@@ -409,9 +409,9 @@ function InputActionBtn({
 
 function CurrentDir({ dir }: { dir?: string }) {
   const label = dir
-    ? dir.startsWith('/') && dir.length > 10
-      ? '…' + dir.slice(-9)
-      : dir
+    ? dir.startsWith('/') && dir.length > 20
+      ? '…' + dir.slice(-19)
+      : dir.slice(1)
     : '~/project';
   return (
     <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)' }}>
