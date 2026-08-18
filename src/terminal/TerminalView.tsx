@@ -46,6 +46,8 @@ export default function TerminalView() {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const splitPlacement = useUiStore((s) => s.splitPlacement);
   const cancelSplit = useUiStore((s) => s.cancelSplit);
+  const movePlacement = useUiStore((s) => s.movePlacement);
+  const cancelMove = useUiStore((s) => s.cancelMove);
   const draggingId = useDockDragStore((s) => s.draggingTerminalId);
 
   const activeTab = tabs.find((t) => t.id === activeId);
@@ -73,6 +75,14 @@ export default function TerminalView() {
   const placementTargets = useMemo(
     () => (splitPlacement.open && layout ? dropTargets(layout) : []),
     [splitPlacement.open, layout],
+  );
+
+  // 更换位置落点：对「其它终端」给出上/下/左/右边沿落点（与拖动重排同规则）
+  const movePlacementTargets = useMemo(
+    () => (movePlacement.open && layout && movePlacement.terminalId
+      ? moveTargets(layout, movePlacement.terminalId)
+      : []),
+    [movePlacement, layout],
   );
 
   const commitPlacement = useCallback((zone: DropTarget) => {
@@ -121,6 +131,20 @@ export default function TerminalView() {
             <PlacementOverlay targets={placementTargets} onPick={commitPlacement} onCancel={cancelSplit} />
           )}
 
+          {/* 更换位置落点选择覆盖层（菜单触发，等同拖动重排） */}
+          {movePlacement.open && (
+            <PlacementOverlay
+              targets={movePlacementTargets}
+              emptyMessage="只有一个终端，无法更换位置"
+              onPick={(zone) => {
+                const id = movePlacement.terminalId;
+                if (id) commitMove(id, zone);
+                cancelMove();
+              }}
+              onCancel={cancelMove}
+            />
+          )}
+
           {/* 拖动终端调整位置的落点覆盖层 */}
           {draggingId && (
             <MoveDragLayer layout={layout} draggingId={draggingId} onCommit={commitMove} />
@@ -155,6 +179,7 @@ export default function TerminalView() {
           items={[
             { label: '分裂终端（选位置）', onClick: () => useUiStore.getState().beginSplit(null) },
             { label: '选择类型分裂', onClick: () => useUiStore.getState().openSplitPicker() },
+            { label: '更换位置', onClick: () => useUiStore.getState().beginMove(focusedTermId) },
             { label: '关闭终端', danger: true, onClick: () => useWorkspaceStore.getState().closeFocusedTerminal() },
           ]}
         />
@@ -361,16 +386,17 @@ function pickDropZone(targets: DropTarget[], nx: number, ny: number): number | n
 
 // ── 分裂落点选择覆盖层 ──
 
-function PlacementOverlay({ targets, onPick, onCancel }: {
+function PlacementOverlay({ targets, onPick, onCancel, emptyMessage = '最多 4 个终端' }: {
   targets: DropTarget[];
   onPick: (t: DropTarget) => void;
   onCancel: () => void;
+  emptyMessage?: string;
 }) {
   const [hovered, setHovered] = useState<number | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (targets.length === 0) {
-      useToastStore.getState().addToast('最多 4 个终端', 'info');
+      useToastStore.getState().addToast(emptyMessage, 'info');
       onCancel();
       return;
     }
@@ -384,7 +410,7 @@ function PlacementOverlay({ targets, onPick, onCancel }: {
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [targets.length, onCancel]);
+  }, [targets.length, emptyMessage, onCancel]);
 
   const locate = (clientX: number, clientY: number): number | null => {
     const rect = ref.current?.getBoundingClientRect();

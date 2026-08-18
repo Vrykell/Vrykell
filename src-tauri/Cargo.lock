@@ -4756,6 +4756,7 @@ dependencies = [
  "tauri-plugin-opener",
  "trash",
  "uuid",
+ "winapi",
 ]
 
 [[package]]

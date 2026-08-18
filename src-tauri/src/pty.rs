@@ -72,7 +72,14 @@ struct PtyExit {
     id: String,
 }
 
+/// read 线程 → 主循环的消息（Windows 无 poll，用 channel + recv_timeout 做空闲超时冲刷）。
+enum ReadMsg {
+    Data(Vec<u8>),
+    End,
+}
+
 #[cfg(test)]
+#[allow(dead_code)] // master/child 只被 unix 用例读取，Windows 下保持结构完整
 struct TestSession {
     master: Box<dyn MasterPty + Send>,
     reader: Box<dyn Read + Send>,
@@ -139,7 +146,7 @@ fn build_shell_cmd(
     let integ_dir = shell_integration::integration_dir().ok();
     let requested = shell.as_deref().unwrap_or_default();
 
-    // 2. 显式选择 shell：zsh/bash 注入集成脚本；powershell/pwsh/cmd 无集成，走 classic 回退
+    // 2. 显式选择 shell：zsh/bash/powershell 注入集成脚本；cmd 无集成，走 classic 回退
     match requested {
         "zsh" => {
             let mut cmd = CommandBuilder::new("zsh");
@@ -159,63 +166,83 @@ fn build_shell_cmd(
             return Ok(cmd);
         }
         "powershell" | "pwsh" => {
-            let mut cmd = CommandBuilder::new(if requested == "pwsh" { "pwsh" } else { "powershell" });
-            if let Some(d) = cwd { cmd.cwd(d); }
-            return Ok(cmd);
+            let prog = if requested == "pwsh" { "pwsh" } else { "powershell" };
+            return Ok(powershell_command(prog, &integ_dir, cwd));
         }
         "cmd" => {
-            let mut cmd = CommandBuilder::new("cmd");
-            if let Some(d) = cwd { cmd.cwd(d); }
-            return Ok(cmd);
+            return Ok(cmd_command(cwd));
         }
         _ => {}
     }
 
-    // 3. 未显式选择：沿用 $SHELL 探测（向后兼容）
-    let shell_env = std::env::var("SHELL").unwrap_or_default();
-    if let Some(ref dir) = integ_dir {
-        if shell_env.contains("zsh") {
-            let mut cmd = CommandBuilder::new(&shell_env);
-            cmd.env("ZDOTDIR", dir.join("zsh").to_string_lossy().to_string());
-            if let Some(d) = cwd { cmd.cwd(d); }
-            return Ok(cmd);
-        }
-        // SHELL 指向 bash（Unix / Git Bash 启动），或 Windows 上探测到的 Git Bash
-        let bash = if shell_env.contains("bash") { Some(shell_env.clone()) } else { find_git_bash() };
-        if let Some(bash) = bash {
-            let mut cmd = CommandBuilder::new(&bash);
-            cmd.arg("--rcfile");
-            // Git Bash（MSYS2）可识别 C:/... 正斜杠路径，反斜杠会被当转义
-            cmd.arg(dir.join("bash/rc").to_string_lossy().replace('\\', "/"));
-            if let Some(d) = cwd { cmd.cwd(d); }
-            return Ok(cmd);
+    // 3. 未显式选择：Windows 默认 pwsh → powershell → cmd（不再默认 Git Bash/MINGW64）；
+    //    Unix 沿用 $SHELL 探测。
+    #[cfg(target_os = "windows")]
+    {
+        match default_windows_shell() {
+            "cmd" => return Ok(cmd_command(cwd)),
+            prog => return Ok(powershell_command(prog, &integ_dir, cwd)),
         }
     }
-    // 兜底：不做 shell integration
-    let mut cmd = CommandBuilder::new_default_prog();
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let shell_env = std::env::var("SHELL").unwrap_or_default();
+        if let Some(ref dir) = integ_dir {
+            if shell_env.contains("zsh") {
+                let mut cmd = CommandBuilder::new(&shell_env);
+                cmd.env("ZDOTDIR", dir.join("zsh").to_string_lossy().to_string());
+                if let Some(d) = cwd { cmd.cwd(d); }
+                return Ok(cmd);
+            }
+            if shell_env.contains("bash") {
+                let mut cmd = CommandBuilder::new(&shell_env);
+                cmd.arg("--rcfile");
+                cmd.arg(dir.join("bash/rc").to_string_lossy().replace('\\', "/"));
+                if let Some(d) = cwd { cmd.cwd(d); }
+                return Ok(cmd);
+            }
+        }
+        // 兜底：不做 shell integration
+        let mut cmd = CommandBuilder::new_default_prog();
+        if let Some(d) = cwd { cmd.cwd(d); }
+        Ok(cmd)
+    }
+}
+
+/// 构造 PowerShell / pwsh 启动命令（注入 OSC 133 集成脚本）。
+fn powershell_command(prog: &str, integ_dir: &Option<std::path::PathBuf>, cwd: Option<String>) -> CommandBuilder {
+    let mut cmd = CommandBuilder::new(prog);
+    if let Some(dir) = integ_dir {
+        cmd.arg("-NoLogo");
+        cmd.arg("-NoExit");
+        cmd.arg("-File");
+        cmd.arg(dir.join("powershell").join("profile.ps1").to_string_lossy().to_string());
+    }
     if let Some(d) = cwd { cmd.cwd(d); }
-    Ok(cmd)
+    cmd
 }
 
-/// Windows 上探测 Git Bash 安装位置（SHELL 环境变量通常不存在）。
+/// 构造 cmd 启动命令（无集成）。
+fn cmd_command(cwd: Option<String>) -> CommandBuilder {
+    let mut cmd = CommandBuilder::new("cmd");
+    if let Some(d) = cwd { cmd.cwd(d); }
+    cmd
+}
+
+/// Windows 默认 shell：pwsh → powershell → cmd（进程内缓存，避免每次建终端都 spawn 探测）。
 #[cfg(target_os = "windows")]
-fn find_git_bash() -> Option<String> {
-    let mut candidates: Vec<std::path::PathBuf> = Vec::new();
-    for var in ["ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"] {
-        if let Ok(base) = std::env::var(var) {
-            candidates.push(std::path::PathBuf::from(&base).join(r"Git\bin\bash.exe"));
-            candidates.push(std::path::PathBuf::from(&base).join(r"Programs\Git\bin\bash.exe"));
+fn default_windows_shell() -> &'static str {
+    use std::sync::OnceLock;
+    static DEFAULT: OnceLock<&'static str> = OnceLock::new();
+    DEFAULT.get_or_init(|| {
+        for prog in ["pwsh", "powershell"] {
+            if crate::shells::shell_ok(prog) {
+                return prog;
+            }
         }
-    }
-    candidates
-        .into_iter()
-        .find(|p| p.exists())
-        .map(|p| p.to_string_lossy().to_string())
-}
-
-#[cfg(not(target_os = "windows"))]
-fn find_git_bash() -> Option<String> {
-    None
+        "cmd"
+    })
 }
 
 #[tauri::command]
@@ -232,9 +259,6 @@ pub fn pty_spawn(
     let pair = pty_system
         .openpty(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
         .map_err(|e| e.to_string())?;
-    // Unix 上留一个 master fd 用于 read 线程的 poll 超时冲刷（见下方 flush 逻辑）
-    #[cfg(unix)]
-    let master_fd = pair.master.as_raw_fd();
     let cmd = build_shell_cmd(cwd, shell, ssh)?;
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
     drop(pair.slave);
@@ -249,46 +273,37 @@ pub fn pty_spawn(
 
     let tid = id.clone();
     std::thread::spawn(move || {
-        let mut buf = [0u8; 8192];
+        // 阻塞 read 放独立线程；主循环用 recv_timeout 实现「空闲超时冲刷」。
+        // 否则最后一段输出（如 cmd/PowerShell 的提示符）会卡在 pending 里，
+        // 直到下一次输入/输出才 flush（Windows 上没有 poll，这里统一用 channel）。
+        let (tx, rx) = std::sync::mpsc::channel::<ReadMsg>();
+        std::thread::spawn(move || {
+            let mut buf = [0u8; 8192];
+            loop {
+                match reader.read(&mut buf) {
+                    Ok(0) | Err(_) => {
+                        let _ = tx.send(ReadMsg::End);
+                        break;
+                    }
+                    Ok(n) => {
+                        let _ = tx.send(ReadMsg::Data(buf[..n].to_vec()));
+                    }
+                }
+            }
+        });
+
         let mut decoder = StreamDecoder::new();
         let mut scanner = StreamScanner::new();
         // 输出合批：把高频 read 事件聚成窗口再 emit，避免大输出时 IPC + React 风暴。
-        // 冲刷时机：累积达到阈值 / 距上次冲刷超过 FLUSH_INTERVAL / 读到 EOF 或出错。
+        // 冲刷时机：累积达到阈值 / 距上次冲刷超过 FLUSH_INTERVAL / 空闲超时 / 读到 EOF 或出错。
         // pending 存扫描后的结构化事件，pending_bytes 追踪原始负载字节数作阈值依据。
         let mut pending: Vec<ScanEvent> = Vec::new();
         let mut pending_bytes = 0usize;
         let mut last_flush = std::time::Instant::now();
         loop {
-            // Unix：先 poll master fd，超时（FLUSH_INTERVAL 内无新数据）时冲刷 pending 尾巴，
-            // 否则阻塞 read 会让最后一段输出卡住直到下一条输出才出现。
-            #[cfg(unix)]
-            {
-                let should_flush_tail = match master_fd {
-                    Some(fd) => {
-                        let mut pfd = libc::pollfd { fd, events: libc::POLLIN, revents: 0 };
-                        let rc = unsafe { libc::poll(&mut pfd, 1, FLUSH_INTERVAL.as_millis() as i32) };
-                        // 超时（无新数据）或对端挂起 → 冲刷尾巴；POLLIN 表示有数据，交给下面 read
-                        rc == 0 || (rc > 0 && (pfd.revents & libc::POLLIN) == 0)
-                    }
-                    None => false,
-                };
-                if should_flush_tail && !pending.is_empty() {
-                    flush_output(&app, &tid, &mut pending, &mut pending_bytes);
-                    last_flush = std::time::Instant::now();
-                }
-            }
-
-            match reader.read(&mut buf) {
-                Ok(0) => {
-                    if !pending.is_empty() {
-                        flush_output(&app, &tid, &mut pending, &mut pending_bytes);
-                    }
-                    let _ = app.emit("pty-exit", PtyExit { id: tid.clone() });
-                    reap_session(&app, &tid);
-                    break;
-                }
-                Ok(n) => {
-                    let data = decoder.push(&buf[..n]);
+            match rx.recv_timeout(FLUSH_INTERVAL) {
+                Ok(ReadMsg::Data(bytes)) => {
+                    let data = decoder.push(&bytes);
                     if data.is_empty() {
                         continue; // 不完整尾部，等下次 read
                     }
@@ -303,12 +318,21 @@ pub fn pty_spawn(
                         last_flush = std::time::Instant::now();
                     }
                 }
-                Err(_) => {
+                // EOF / 出错 / 读线程意外断开：冲刷剩余，收敛会话
+                Ok(ReadMsg::End) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
                     if !pending.is_empty() {
                         flush_output(&app, &tid, &mut pending, &mut pending_bytes);
                     }
+                    let _ = app.emit("pty-exit", PtyExit { id: tid.clone() });
                     reap_session(&app, &tid);
                     break;
+                }
+                // 空闲超时（FLUSH_INTERVAL 内无新数据）：冲刷 pending 尾巴，让最后一段输出及时上屏
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    if !pending.is_empty() {
+                        flush_output(&app, &tid, &mut pending, &mut pending_bytes);
+                        last_flush = std::time::Instant::now();
+                    }
                 }
             }
         }
@@ -341,6 +365,10 @@ fn flush_output(
 
 #[tauri::command]
 pub async fn pty_write(state: State<'_, PtyState>, id: String, data: String) -> Result<(), String> {
+    // Windows 控制台 Enter 是 CR(0x0D)；\n(0x0A) 是 Ctrl+J，PSReadLine/cmd 都不当回车，
+    // 前端命令发送统一用 \n，这里归一化成 CR，否则 PowerShell 等收不到回车、命令无响应。
+    #[cfg(windows)]
+    let data = normalize_enter(&data);
     // 只从全局表取 Arc 句柄，不持锁做 IO——写 PTY 可能因前台进程不读 stdin 而阻塞，
     // 若持全局锁会冻结其它会话的 resize/signal/close。
     let session = {
@@ -355,6 +383,12 @@ pub async fn pty_write(state: State<'_, PtyState>, id: String, data: String) -> 
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// Windows：把换行统一成 CR（Enter）。\n 是 Ctrl+J，PSReadLine/cmd 都不认。
+#[cfg(windows)]
+fn normalize_enter(data: &str) -> String {
+    data.replace("\r\n", "\r").replace('\n', "\r")
 }
 
 #[tauri::command]
@@ -377,9 +411,10 @@ pub fn pty_close(state: State<'_, PtyState>, kill: State<'_, KillState>, id: Str
         sessions.remove(&id)
     };
     if let Some(session) = session {
-        // 从表里移除后拿独占 Arc，kill 后必须 wait 回收子进程，否则成为僵尸进程
+        // 从表里移除后拿独占 Arc，kill 后必须 wait 回收子进程，否则成为僵尸进程。
+        // Windows 上连带终结整棵进程树，避免前台应用成为孤儿继续运行。
         let mut s = session.lock().map_err(|e| e.to_string())?;
-        let _ = s.child.kill();
+        kill_child_tree(&mut *s.child);
         let _ = s.child.wait();
     }
     // 同步清理「结束升级」状态，避免长时间使用后无限增长
@@ -438,6 +473,95 @@ fn signal_fg_process_group(
     Ok(())
 }
 
+/// 结束子进程；Windows 上只 TerminateProcess 根 shell 会留下孤儿前台应用，
+/// 因此先按进程树整棵终结，再补一发 child.kill() 兜底（根进程已在树内，幂等）。
+fn kill_child_tree(child: &mut dyn Child) {
+    #[cfg(windows)]
+    if let Some(pid) = child.process_id() {
+        let _ = terminate_process_tree(pid, true);
+    }
+    let _ = child.kill();
+}
+
+/// Windows「结束」首击：向 PTY 输入写入 ETX(0x03)。ConPTY 的输入状态机
+/// 会把 0x03 转成 Ctrl+C 按键（keydown+keyup），由 console host 触发
+/// CTRL_C 处理，等价于用户按下 Ctrl+C——与前端「发送 Ctrl+C」按钮走同一条
+/// writer 路径（见 src/terminal/TerminalView.tsx 的 sendCtrlC）。
+#[cfg(windows)]
+fn send_ctrl_c(writer: &mut dyn Write) -> Result<(), String> {
+    writer.write_all(b"\x03").map_err(|e| e.to_string())?;
+    writer.flush().map_err(|e| e.to_string())
+}
+
+/// Windows 强杀：终结以 root_pid 为根的进程树。
+/// ConPTY 下前台应用是 shell 的后代进程，portable-pty 的 child.kill() 只
+/// TerminateProcess 根进程，会留下孤儿应用；这里用 Toolhelp 快照收集后代，
+/// 从最深的子进程开始逐个 TerminateProcess。
+/// `include_root=false` 时保留根进程（shell）本身——用于「结束前台应用」：
+/// 只杀前台应用子树，外层 shell 存活并在前台退出后重新给出提示符。
+#[cfg(windows)]
+fn terminate_process_tree(root_pid: u32, include_root: bool) -> Result<(), String> {
+    use std::collections::{HashMap, VecDeque};
+    use winapi::shared::minwindef::DWORD;
+    use winapi::um::handleapi::CloseHandle;
+    use winapi::um::processthreadsapi::{OpenProcess, TerminateProcess};
+    use winapi::um::tlhelp32::{
+        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
+    };
+    use winapi::um::winnt::PROCESS_TERMINATE;
+
+    // 快照进程表，构建 ppid -> children 映射
+    let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
+    if snapshot.is_null() {
+        return Err(format!(
+            "CreateToolhelp32Snapshot 失败: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
+    let mut children: HashMap<u32, Vec<u32>> = HashMap::new();
+    let mut entry: PROCESSENTRY32W = unsafe { std::mem::zeroed() };
+    entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as DWORD;
+    let mut ok = unsafe { Process32FirstW(snapshot, &mut entry) };
+    while ok != 0 {
+        children
+            .entry(entry.th32ParentProcessID)
+            .or_default()
+            .push(entry.th32ProcessID);
+        ok = unsafe { Process32NextW(snapshot, &mut entry) };
+    }
+    unsafe { CloseHandle(snapshot) };
+
+    // BFS 收集要杀的进程（root 及全部后代，或仅 root 的后代）；反转后从最深先杀，
+    // 避免父进程先死导致子进程被系统重新挂到别的父进程下而漏杀。
+    let mut pids = Vec::new();
+    let mut queue: VecDeque<u32> = VecDeque::new();
+    if include_root {
+        queue.push_back(root_pid);
+    } else if let Some(kids) = children.get(&root_pid) {
+        queue.extend(kids.iter().copied());
+    }
+    while let Some(pid) = queue.pop_front() {
+        pids.push(pid);
+        if let Some(kids) = children.get(&pid) {
+            queue.extend(kids.iter().copied());
+        }
+    }
+
+    let self_pid = std::process::id();
+    for &pid in pids.iter().rev() {
+        if pid == self_pid {
+            continue; // 防御：绝不杀自己
+        }
+        let handle = unsafe { OpenProcess(PROCESS_TERMINATE, 0, pid) };
+        if handle.is_null() {
+            continue; // 已退出或无权限：尽力而为
+        }
+        unsafe { TerminateProcess(handle, 1) };
+        unsafe { CloseHandle(handle) };
+    }
+    Ok(())
+}
+
 /// 升级式结束的窗口：首次点击后，该时长内再点升级为 SIGKILL。
 const ESCALATE_WINDOW: std::time::Duration = std::time::Duration::from_secs(3);
 
@@ -452,7 +576,8 @@ fn should_escalate(elapsed_since_last: Option<std::time::Duration>) -> bool {
     }
 }
 
-/// 结束 PTY 前台应用（结束按钮）。升级式：首次 SIGTERM，窗口内再点升级 SIGKILL。
+/// 结束 PTY 前台应用（结束按钮）。升级式：首次 SIGTERM（Windows 上为 Ctrl+C），
+/// 窗口内再点升级 SIGKILL（Windows 上为终结整棵进程树）。
 /// 返回本次级别（"term" / "kill"），前端据此切换按钮文案。
 #[tauri::command]
 pub fn pty_kill_foreground(
@@ -464,7 +589,7 @@ pub fn pty_kill_foreground(
         let sessions = state.0.lock().map_err(|e| e.to_string())?;
         sessions.get(&id).cloned().ok_or("session not found")?
     };
-    let session = session.lock().map_err(|e| e.to_string())?;
+    let mut session = session.lock().map_err(|e| e.to_string())?;
 
     let now = std::time::Instant::now();
     let escalate = {
@@ -474,17 +599,36 @@ pub fn pty_kill_foreground(
         esc
     };
 
-    #[cfg(unix)]
-    {
-        let sig = if escalate { libc::SIGKILL } else { libc::SIGTERM };
-        signal_fg_process_group(&*session.master, session.child.process_id(), sig)?;
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = escalate;
-        return Err("当前平台不支持信号结束，请用 Ctrl+C".into());
-    }
+    kill_foreground_impl(&mut session, escalate)?;
     Ok(if escalate { "kill" } else { "term" }.to_string())
+}
+
+/// 平台相关的「结束前台应用」实现：Unix 用信号打到前台进程组。
+#[cfg(unix)]
+fn kill_foreground_impl(session: &mut PtySession, escalate: bool) -> Result<(), String> {
+    let sig = if escalate { libc::SIGKILL } else { libc::SIGTERM };
+    signal_fg_process_group(&*session.master, session.child.process_id(), sig)
+}
+
+/// 平台相关的「结束前台应用」实现：Windows 首击发 Ctrl+C（等价用户按键），
+/// 再击强杀整棵进程树（只杀 shell 会留下孤儿前台应用）。
+#[cfg(windows)]
+fn kill_foreground_impl(session: &mut PtySession, escalate: bool) -> Result<(), String> {
+    if escalate {
+        match session.child.process_id() {
+            // 只杀前台应用子树，保留外层 shell（前台退出后 shell 重新给提示符）
+            Some(pid) => terminate_process_tree(pid, false),
+            None => session.child.kill().map_err(|e| e.to_string()),
+        }
+    } else {
+        send_ctrl_c(&mut *session.writer)
+    }
+}
+
+/// 平台相关的「结束前台应用」实现：其它平台暂无信号机制。
+#[cfg(not(any(unix, windows)))]
+fn kill_foreground_impl(_session: &mut PtySession, _escalate: bool) -> Result<(), String> {
+    Err("当前平台不支持信号结束，请用 Ctrl+C".into())
 }
 
 #[cfg(test)]
@@ -514,6 +658,15 @@ mod tests {
         assert!(!should_escalate(None)); // 首次
         assert!(should_escalate(Some(std::time::Duration::from_secs(2)))); // 3s 内
         assert!(!should_escalate(Some(std::time::Duration::from_secs(4)))); // 超窗口
+    }
+
+    /// Windows：命令发送的 \n 要归一化成 CR（Enter），否则 PSReadLine/cmd 不认。
+    #[cfg(windows)]
+    #[test]
+    fn normalize_enter_converts_newlines_to_cr() {
+        assert_eq!(super::normalize_enter("echo hi\n"), "echo hi\r");
+        assert_eq!(super::normalize_enter("a\r\nb\n"), "a\rb\r");
+        assert_eq!(super::normalize_enter("no-newline"), "no-newline");
     }
 
     /// 多字节 UTF-8 字符跨 read 边界不应产生 U+FFFD。
@@ -623,5 +776,102 @@ mod tests {
             }
         }
         assert!(out.contains("shell-alive"), "shell died, got: {out:?}");
+    }
+
+    /// 快照进程表，返回 ppid 的直接子进程中可执行文件名包含 name_fragment 的 pid。
+    #[cfg(windows)]
+    fn find_descendant_pid(ppid: u32, name_fragment: &str) -> Option<u32> {
+        use winapi::shared::minwindef::DWORD;
+        use winapi::um::handleapi::CloseHandle;
+        use winapi::um::tlhelp32::{
+            CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+            TH32CS_SNAPPROCESS,
+        };
+
+        let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
+        if snapshot.is_null() {
+            return None;
+        }
+        let mut entry: PROCESSENTRY32W = unsafe { std::mem::zeroed() };
+        entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as DWORD;
+        let mut ok = unsafe { Process32FirstW(snapshot, &mut entry) };
+        let mut found = None;
+        while ok != 0 {
+            if entry.th32ParentProcessID == ppid {
+                let name = String::from_utf16_lossy(&entry.szExeFile);
+                if name.to_lowercase().contains(name_fragment) {
+                    found = Some(entry.th32ProcessID);
+                    break;
+                }
+            }
+            ok = unsafe { Process32NextW(snapshot, &mut entry) };
+        }
+        unsafe { CloseHandle(snapshot) };
+        found
+    }
+
+    /// 判断 pid 是否仍在运行（OpenProcess + GetExitCodeProcess == STILL_ACTIVE）。
+    #[cfg(windows)]
+    fn pid_alive(pid: u32) -> bool {
+        use winapi::shared::minwindef::DWORD;
+        use winapi::um::handleapi::CloseHandle;
+        use winapi::um::minwinbase::STILL_ACTIVE;
+        use winapi::um::processthreadsapi::{GetExitCodeProcess, OpenProcess};
+        use winapi::um::winnt::PROCESS_QUERY_LIMITED_INFORMATION;
+
+        let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+        if handle.is_null() {
+            return false;
+        }
+        let mut code: DWORD = 0;
+        let alive = unsafe { GetExitCodeProcess(handle, &mut code) } != 0 && code == STILL_ACTIVE;
+        unsafe { CloseHandle(handle) };
+        alive
+    }
+
+    /// Windows：强杀必须连带终结 shell 的子孙进程（只杀 shell 会留下孤儿前台应用）。
+    #[cfg(windows)]
+    #[test]
+    fn terminate_tree_kills_descendants() {
+        use std::time::{Duration, Instant};
+
+        // cmd -> ping 127.0.0.1 -n 30（约 30s），形成两代进程树
+        let pty_system = native_pty_system();
+        let pair = pty_system
+            .openpty(PtySize { rows: 24, cols: 80, pixel_width: 0, pixel_height: 0 })
+            .map_err(|e| e.to_string())
+            .unwrap();
+        let mut cmd = CommandBuilder::new("cmd");
+        cmd.arg("/c");
+        cmd.arg("ping");
+        cmd.arg("127.0.0.1");
+        cmd.arg("-n");
+        cmd.arg("30");
+        let mut child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string()).unwrap();
+        drop(pair.slave);
+        let shell_pid = child.process_id().expect("shell pid");
+
+        // 等 ping 子进程出现
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let ping_pid = loop {
+            if let Some(pid) = find_descendant_pid(shell_pid, "ping") {
+                break pid;
+            }
+            if Instant::now() >= deadline {
+                panic!("ping 子进程未在 10s 内出现");
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        };
+
+        terminate_process_tree(shell_pid, true).expect("terminate tree");
+
+        // 根与后代都应在数秒内消失
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while (pid_alive(shell_pid) || pid_alive(ping_pid)) && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        assert!(!pid_alive(shell_pid), "shell 仍在运行");
+        assert!(!pid_alive(ping_pid), "ping 仍在运行");
+        let _ = child.wait();
     }
 }

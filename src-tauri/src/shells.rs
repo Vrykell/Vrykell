@@ -14,10 +14,22 @@ pub struct ShellInfo {
     pub default: bool,
 }
 
-/// 探测某程序是否在 PATH 上可用（跑 `--version`，成功即视为可用）。
+/// 探测某程序是否在 PATH 上可用（跑 `--version`，成功即视为可用）。Unix 用。
+#[cfg(not(target_os = "windows"))]
 fn cmd_ok(program: &str) -> bool {
     std::process::Command::new(program)
         .arg("--version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+/// Windows 探测：Windows PowerShell 5.1 不接受 `--version`（那是 pwsh 7+ 的），
+/// 统一走 `-NoProfile -NonInteractive -Command "exit 0"`，5.1 与 pwsh 都支持。
+#[cfg(target_os = "windows")]
+pub(crate) fn shell_ok(program: &str) -> bool {
+    std::process::Command::new(program)
+        .args(["-NoProfile", "-NonInteractive", "-Command", "exit 0"])
         .output()
         .map(|o| o.status.success())
         .unwrap_or(false)
@@ -38,14 +50,15 @@ fn default_shell_id() -> String {
 fn detect_shells() -> Vec<ShellInfo> {
     let mut shells = Vec::new();
     // pwsh（PowerShell Core）优先展示
-    if cmd_ok("pwsh") {
+    if shell_ok("pwsh") {
         shells.push(ShellInfo {
             id: "pwsh".into(),
             label: "PowerShell (pwsh)".into(),
             default: true,
         });
     }
-    if cmd_ok("powershell") {
+    // Windows PowerShell 5.1（内置 powershell.exe）
+    if shell_ok("powershell") {
         shells.push(ShellInfo {
             id: "powershell".into(),
             label: "PowerShell".into(),
