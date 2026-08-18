@@ -55,7 +55,7 @@ export default function BlockOutput({ text, maxHeight, highlight, isHtml: isHtml
         overflow: maxHeight ? 'auto' : undefined,
         // 与 xterm.js 实时渲染保持一致的字体参数
         fontFamily: 'Menlo, Monaco, "Cascadia Code", "JetBrains Mono", "Noto Sans CJK SC", "PingFang SC", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", monospace',
-        fontSize: 13,
+        fontSize: 14,
         lineHeight: 1.4,
         padding: '2px 8px 8px',
         // isHtml 快照已按网格 cols 用 <br> 预分行（每行 ≤ cols 字符）。

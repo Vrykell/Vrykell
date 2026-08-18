@@ -110,7 +110,8 @@ html, body, #root {
   background: var(--canvas);
   color: var(--text-primary);
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: 15px;
+  font-weight: 500;
   line-height: 1.6;
   user-select: none;
   -webkit-user-select: none;

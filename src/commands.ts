@@ -46,9 +46,9 @@ export function searchCommands(query: string): AppCommand[] {
 
 function scaleFont(delta: 1 | -1 | 0) {
   const el = document.documentElement;
-  const cur = parseFloat(el.style.fontSize || '14');
+  const cur = parseFloat(el.style.fontSize || '15');
   let next: number;
-  if (delta === 0) next = 14;
+  if (delta === 0) next = 15;
   else next = Math.max(10, Math.min(18, cur + delta));
   if (delta === 0) el.style.fontSize = '';
   else el.style.fontSize = `${next}px`;
