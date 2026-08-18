@@ -534,8 +534,8 @@ function TabRow({
   const terms = terminalsOf(tab);
   const isSsh = first?.kind === 'ssh';
   const Icon = tab.kind === 'history' ? History : tab.kind === 'settings' ? Settings : isSsh ? Server : SquareTerminal;
-  const iconColor = isSsh ? 'var(--accent-warm)' : active ? 'var(--accent)' : 'var(--text-secondary)';
-  const iconBg = isSsh ? 'var(--accent-warm-dim)' : active ? 'var(--accent-bg)' : 'transparent';
+  const iconColor = active ? 'var(--accent)' : 'var(--text-secondary)';
+  const iconBg = active ? 'var(--accent-bg)' : 'transparent';
   const typeSummary = terms.map((t) =>
     t.kind === 'ssh' ? (t.ssh?.name || t.ssh?.host || 'SSH') : (t.shellType ? shellTypeLabel(t.shellType) : '本地'),
   ).join(' + ');
@@ -640,7 +640,7 @@ function TabRow({
           >
             <span style={{
               width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-              background: isSsh ? 'var(--accent-warm)' : 'var(--success)',
+              background: 'var(--success)',
             }} />
             <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
               {terms.length}
@@ -689,7 +689,7 @@ function DragGhost({ type, id, tabs, x, y }: {
   const Icon = type === 'tab'
     ? (tab?.kind === 'history' ? History : tab?.kind === 'settings' ? Settings : isSsh ? Server : SquareTerminal)
     : Folder;
-  const color = type === 'group' || isSsh ? 'var(--accent-warm)' : 'var(--accent)';
+  const color = type === 'group' ? 'var(--accent-warm)' : 'var(--accent)';
   return (
     <div style={{
       position: 'fixed', left: x, top: y, zIndex: 9999, pointerEvents: 'none',
