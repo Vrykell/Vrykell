@@ -29,7 +29,7 @@ export interface FileOpenConfig {
   remoteTemplates: Record<string, string>;
 }
 
-const STORAGE_KEY = 'ai-terminal-file-open';
+const STORAGE_KEY = 'vrykell-file-open';
 
 export const DEFAULT_CONFIG: FileOpenConfig = {
   defaultEditor: 'vim',

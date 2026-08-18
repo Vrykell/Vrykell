@@ -85,11 +85,11 @@ describe('配置读写', () => {
     expect(loadConfig()).toEqual(DEFAULT_CONFIG);
   });
   it('损坏 JSON 返回默认配置', () => {
-    localStorage.setItem('ai-terminal-file-open', '{bad');
+    localStorage.setItem('vrykell-file-open', '{bad');
     expect(loadConfig()).toEqual(DEFAULT_CONFIG);
   });
   it('空 defaultEditor 回退 vim', () => {
-    localStorage.setItem('ai-terminal-file-open', JSON.stringify({ defaultEditor: '  ', templates: { md: 'code' } }));
+    localStorage.setItem('vrykell-file-open', JSON.stringify({ defaultEditor: '  ', templates: { md: 'code' } }));
     expect(loadConfig()).toEqual({ defaultEditor: 'vim', templates: { md: 'code' }, remoteEditor: 'vim', remoteTemplates: {} });
   });
   it('save/load 往返', () => {

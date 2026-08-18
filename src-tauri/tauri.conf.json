@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "ai-terminal-v2",
+  "productName": "Vrykell",
   "version": "0.1.0",
-  "identifier": "com.wuzhe.ai-terminal-v2",
+  "identifier": "com.vrykell.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "AI Terminal",
+        "title": "Vrykell",
         "width": 1240,
         "height": 800,
         "minWidth": 720,

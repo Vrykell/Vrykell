@@ -48,6 +48,6 @@ describe('history store', () => {
 
   it('历史单一权威在后端：不再写 localStorage', () => {
     useHistoryStore.getState().record('deploy', '/', 0);
-    expect(localStorage.getItem('ai-terminal-cmd-history')).toBeNull();
+    expect(localStorage.getItem('vrykell-cmd-history')).toBeNull();
   });
 });

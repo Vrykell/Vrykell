@@ -1,6 +1,6 @@
 # 安全性审查
 
-> 针对 AI Terminal v2 的一次安全审查。范围：后端 Rust（Tauri 命令、PTY、SSH/SFTP、SQLite、AI HTTP 客户端）、前端 React（IPC 调用、Markdown/HTML 渲染、密钥与配置处理）。
+> 针对 Vrykell 的一次安全审查。范围：后端 Rust（Tauri 命令、PTY、SSH/SFTP、SQLite、AI HTTP 客户端）、前端 React（IPC 调用、Markdown/HTML 渲染、密钥与配置处理）。
 > 威胁模型：本机桌面应用，无远程服务端；主要风险面是「恶意远端（SSH/SFTP/AI 服务）」「恶意文件名/路径」「密钥明文落盘」与「命令注入」。
 
 ---
@@ -13,7 +13,7 @@
 | SFTP 目录下载 `download_dir_recursive` 未校验远端条目名，`..`/含分隔符可路径遍历逃逸下载目录 | 高 | 拒绝 `.`/`..`/含 `/` `\` 的名称 |
 | SSH 用户名为空时默认 `root` 登录 | 高 | 改为报错「用户名不能为空」 |
 | `which_cmd_sync` 命令探测注入 | 高 | 保留白名单（字母数字 + `-._+`），并改用 `/bin/sh` |
-| AI API key 明文写入 `~/.ai-terminal/config.json` 且未收紧权限 | 中 | 写盘后目录 0700、文件 0600 |
+| AI API key 明文写入 `~/.vrykell/config.json` 且未收紧权限 | 中 | 写盘后目录 0700、文件 0600 |
 | `ai_stream` 无超时（网络挂起会无限等待） | 中 | 加 `connect_timeout(15s)` + 总 `timeout(180s)` |
 | SSE 多字节字符跨 chunk 截断乱码（非安全，属健壮性） | 低 | 字节缓冲按 `\n` 切完整行再解码 |
 | 迁移顺序错误导致启动 panic（`no such column: group_id`） | 高（可用性） | 索引创建移到 ALTER 之后 |

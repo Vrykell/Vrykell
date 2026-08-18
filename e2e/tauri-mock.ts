@@ -397,7 +397,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
         emitOutput(data);
       },
     };
-    localStorage.setItem('ai-terminal-api-key', 'sk-e2e-fake');
+    localStorage.setItem('vrykell-api-key', 'sk-e2e-fake');
   }, integration);
 }
 
