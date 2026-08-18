@@ -220,7 +220,7 @@ export function createBlockTerm(
     rows: Math.max(rows || 24, 1),
     scrollback: 5000,
     fontFamily: XTERM_FONT_FAMILY,
-    fontSize: 13,
+    fontSize: 14,
     lineHeight: 1.4,
     cursorBlink: true,
     theme: {

@@ -92,10 +92,10 @@ export function useTerminalSession(
     const term = new Terminal({
       fontFamily:
         'Menlo, Monaco, "Cascadia Code", "JetBrains Mono", "Noto Sans CJK SC", "PingFang SC", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", monospace',
-      fontSize: 13,
+      fontSize: 14,
       cursorBlink: true,
       scrollback: 5000,
-      allowTransparency: true,
+      allowTransparency: false,
       theme: {
         background: cs.getPropertyValue('--xterm-bg').trim() || '#050505',
         cursor: cs.getPropertyValue('--xterm-cursor').trim() || '#e8e8e8',
