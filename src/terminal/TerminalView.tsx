@@ -99,13 +99,13 @@ export default function TerminalView() {
   }, [layout, activeId, setWindowLayout, setFocusedPane]);
 
   return (
-    <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+    <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
       {isHistoryTab ? (
         <SessionHistoryView />
       ) : isSettingsTab ? (
         <SettingsView />
       ) : isSession && layout ? (
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', position: 'relative' }}>
+        <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', position: 'relative' }}>
           <LayoutTree
             node={layout}
             windowId={activeId}
@@ -204,7 +204,7 @@ function LayoutTree(props: {
   const secondInner: InnerEdges = dir === 'row' ? { ...inner, left: true } : { ...inner, top: true };
 
   return (
-    <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: dir === 'row' ? 'row' : 'column', background: 'var(--surface)' }}>
+    <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: dir === 'row' ? 'row' : 'column', background: 'var(--surface)' }}>
       <div style={{ flexBasis: `${ratio * 100}%`, flexGrow: 0, flexShrink: 0, minWidth: 0, minHeight: 0, display: 'flex' }}>
         <LayoutTree node={node.first} windowId={windowId} focusedTermId={focusedTermId} setSession={setSession} setFocusedPane={setFocusedPane} setRatioNode={setRatioNode} onPaneContextMenu={onPaneContextMenu} inner={firstInner} />
       </div>
@@ -327,7 +327,7 @@ function TerminalPane(props: {
     >
       {/* xterm 表面：classic/真实 altScreen 可见，blockList/手动全屏隐藏但保持挂载 */}
       <div style={showXterm
-        ? { flex: 1, minHeight: 0, position: 'relative' }
+        ? { flex: 1, minHeight: 0, position: 'relative', paddingTop: scene === 'altScreen' ? 28 : 0 }
         : { position: 'absolute', inset: 0, opacity: 0, pointerEvents: 'none' }}>
         <TerminalPanel paneId={terminal.id} tabId={windowId} onReady={(sid) => setSession(terminal.id, sid)} />
       </div>

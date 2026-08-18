@@ -302,8 +302,8 @@ function SessionRow({
       <span style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         width: 24, height: 24, borderRadius: 6, flexShrink: 0,
-        background: isSshSession(s) ? 'var(--accent-warm-dim)' : historical ? 'var(--hover)' : 'var(--success-bg)',
-        color: isSshSession(s) ? 'var(--accent-warm)' : historical ? 'var(--text-muted)' : 'var(--success)',
+        background: historical ? 'var(--hover)' : 'var(--success-bg)',
+        color: historical ? 'var(--text-muted)' : 'var(--success)',
       }}>
         {isSshSession(s) ? <Server size={14} /> : historical ? <History size={14} /> : <Monitor size={14} />}
       </span>

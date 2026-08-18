@@ -194,8 +194,16 @@ export const useDockStore = create<DockState>((set) => ({
 
   setPanelWidth: (id, width) => {
     set((s) => {
-      // 上限随窗口收敛：至少给终端留足「按布局动态」的最小宽度，避免侧栏拖到「覆盖」终端
-      const maxW = Math.max(160, Math.min(500, Math.round(window.innerWidth - currentTerminalMinWidth())));
+      // 侧栏最大宽度 = 窗口宽 − 另一侧已占用宽 − 终端最小宽。
+      // 之前这里用 window.innerWidth 且带 500px 硬上限，导致终端最小宽形同虚设、拖拽范围被写死。
+      const side: DockSide = s.leftZone.includes(id) ? 'left' : 'right';
+      const otherPanels = side === 'left' ? s.rightPanels : s.leftPanels;
+      let otherWidth = 0;
+      for (const pid of otherPanels) {
+        otherWidth += s.panelWidths[pid] ?? PANEL_DEFS[pid]?.width ?? 200;
+      }
+      const available = window.innerWidth - otherWidth;
+      const maxW = Math.max(160, Math.round(available - currentTerminalMinWidth()));
       const panelWidths = { ...s.panelWidths, [id]: Math.max(160, Math.min(maxW, Math.round(width))) };
       const next = { ...s, panelWidths };
       saveLayout(next);
