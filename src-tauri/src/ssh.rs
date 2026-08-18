@@ -68,7 +68,7 @@ fn verify_host_key(sess: &Session, host: &str, port: u16) -> Result<(), String> 
             // TOFU：首次连接记录主机密钥
             let fmt = host_key_format(key_type);
             let kh_host = if port == 22 { host.to_string() } else { format!("[{host}]:{port}") };
-            kh.add(&kh_host, key, "ai-terminal", fmt)
+            kh.add(&kh_host, key, "vrykell", fmt)
                 .map_err(|e| format!("记录主机密钥失败：{e}"))?;
             if let Some(dir) = kh_path.parent() {
                 let _ = std::fs::create_dir_all(dir);
@@ -241,11 +241,11 @@ pub async fn ssh_list(
         .map_err(|e| e.to_string())?
 }
 
-/// 本地下载根目录：~/.ai-terminal/downloads
+/// 本地下载根目录：~/.vrykell/downloads
 fn downloads_dir() -> Result<std::path::PathBuf, String> {
     let dir = dirs::home_dir()
         .ok_or("无法定位主目录".to_string())?
-        .join(".ai-terminal")
+        .join(".vrykell")
         .join("downloads");
     std::fs::create_dir_all(&dir).map_err(|e| format!("创建下载目录失败：{e}"))?;
     Ok(dir)
@@ -289,7 +289,7 @@ fn download_dir_recursive(sftp: &Sftp, remote: &Path, local: &Path, depth: u32) 
     Ok(total)
 }
 
-/// 下载远程文件/目录到 ~/.ai-terminal/downloads，返回 (本地路径, 字节数)。
+/// 下载远程文件/目录到 ~/.vrykell/downloads，返回 (本地路径, 字节数)。
 fn ssh_download_sync(conn: &SshConnection, remote_path: &str) -> Result<(String, u64), String> {
     let sess = connect(conn)?;
     let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;

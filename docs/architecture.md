@@ -1,4 +1,4 @@
-# AI Terminal v2 架构
+# Vrykell 架构
 
 > 当前 v2 chat-first 实现（分支 `v2-chat-first`）的实际架构。终端主体把终端输出抽象为**命令块（Block）**，用「StreamDispatcher 同步单趟派发 + SessionController 三场景状态机 + 每 block 单离屏 xterm」组织。
 >

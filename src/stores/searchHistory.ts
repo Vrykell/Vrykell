@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '../lib/errorHandler';
 
-const STORAGE_KEY = 'ai-terminal-search-history';
+const STORAGE_KEY = 'vrykell-search-history';
 const MAX_ITEMS = 20;
 
 function load(): string[] {

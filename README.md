@@ -1,4 +1,4 @@
-# AI Terminal (v2)
+# Vrykell
 
 chat-first 终端。终端是主表面，每个命令渲染为一个**命令块（Block）**；AI 对话（Anthropic BYOK 直连）以内联面板显示在终端上方。
 

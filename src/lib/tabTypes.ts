@@ -27,7 +27,7 @@ export type NewTabOption =
       lastOpenedAt: number;
     };
 
-const RECENT_KEY = 'ai-terminal-tab-type-recent';
+const RECENT_KEY = 'vrykell-tab-type-recent';
 
 export function loadRecentOpen(): Record<string, number> {
   try {

@@ -14,11 +14,11 @@ pub use session::{BlockEntry, ChatMessageEntry, GroupEntry, SessionEntry};
 pub use ssh_connection::SshConnection;
 pub use workspace::WorkspaceEntry;
 
-/// 历史数据库路径：~/.ai-terminal/history.db
+/// 历史数据库路径：~/.vrykell/history.db
 fn db_path() -> PathBuf {
     // Windows 原生环境没有 HOME，不能用 "." 兜底（会写到 cwd）
     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-    let dir = home.join(".ai-terminal");
+    let dir = home.join(".vrykell");
     std::fs::create_dir_all(&dir).ok();
     dir.join("history.db")
 }

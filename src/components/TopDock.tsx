@@ -214,7 +214,7 @@ export default function TopDock() {
         display: 'inline-flex', alignItems: 'center', gap: 4,
         fontSize: 10, color: 'var(--text-muted)', paddingLeft: 6, paddingRight: 2,
       }}>
-        <Terminal size={11} /> AI Terminal
+        <Terminal size={11} /> Vrykell
       </span>
 
       {/* 拖拽跟随光标预览 */}

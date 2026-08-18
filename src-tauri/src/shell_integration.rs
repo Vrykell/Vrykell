@@ -9,7 +9,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-const ZSH_RC: &str = r#"# ai-terminal shell integration (zsh)
+const ZSH_RC: &str = r#"# vrykell shell integration (zsh)
 [[ -f "$HOME/.zshenv" ]] && source "$HOME/.zshenv"
 [[ -f "$HOME/.zprofile" ]] && source "$HOME/.zprofile"
 [[ -f "$HOME/.zshrc" ]] && source "$HOME/.zshrc"
@@ -31,7 +31,7 @@ add-zsh-hook precmd __ait_precmd
 add-zsh-hook preexec __ait_preexec
 "#;
 
-const BASH_RC: &str = r#"# ai-terminal shell integration (bash)
+const BASH_RC: &str = r#"# vrykell shell integration (bash)
 [[ -f "$HOME/.bashrc" ]] && source "$HOME/.bashrc"
 
 __ait_in_prompt=0
@@ -55,12 +55,12 @@ __ait_preexec() {
 trap '__ait_preexec' DEBUG
 "#;
 
-/// 集成脚本根目录（~/.ai-terminal/shell），每次启动重写保证脚本最新。
+/// 集成脚本根目录（~/.vrykell/shell），每次启动重写保证脚本最新。
 pub fn integration_dir() -> Result<PathBuf, String> {
     // 用 dirs::home_dir 而非 HOME 环境变量 —— Windows 原生环境没有 HOME，
     // 从 Git Bash 启动时 HOME 又是 MSYS 路径，都不适合作为 Windows 侧写盘位置。
     let home = dirs::home_dir().ok_or_else(|| "无法定位用户主目录".to_string())?;
-    let dir = PathBuf::from(home).join(".ai-terminal").join("shell");
+    let dir = PathBuf::from(home).join(".vrykell").join("shell");
     fs::create_dir_all(dir.join("zsh")).map_err(|e| e.to_string())?;
     fs::create_dir_all(dir.join("bash")).map_err(|e| e.to_string())?;
     fs::write(dir.join("zsh").join(".zshrc"), ZSH_RC).map_err(|e| e.to_string())?;

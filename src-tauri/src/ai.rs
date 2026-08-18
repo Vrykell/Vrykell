@@ -1,5 +1,5 @@
 //! AI 调用下沉到 Rust：API key / Base URL / 模型存后端（持久化到
-//! ~/.ai-terminal/config.json），不进 webview 的 localStorage。
+//! ~/.vrykell/config.json），不进 webview 的 localStorage。
 //! 前端只负责把消息发来、订阅 `ai-chunk` 事件收流式文本。
 //!
 //! 采用 OpenAI 兼容的 `/chat/completions` 流式协议（可配 Base URL），
@@ -43,7 +43,7 @@ impl Default for AiConfigInner {
 fn config_path() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_default()
-        .join(".ai-terminal")
+        .join(".vrykell")
         .join("config.json")
 }
 
