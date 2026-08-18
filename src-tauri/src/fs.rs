@@ -35,6 +35,50 @@ pub async fn fs_list(path: Option<String>) -> Result<Vec<FsEntry>, String> {
         .map_err(|e| e.to_string())?
 }
 
+/// 列出文件系统根：Windows 返回存在的盘符（C:、D:…），Unix 返回 `/`。
+/// 供文件面板「盘符 / 根」导航——否则只能看 HOME，看不到整个盘。
+fn fs_roots_sync() -> Result<Vec<FsEntry>, String> {
+    let mut entries = Vec::new();
+    #[cfg(target_os = "windows")]
+    {
+        for letter in b'A'..=b'Z' {
+            let drive = format!("{}:\\", letter as char);
+            if std::path::Path::new(&drive).exists() {
+                entries.push(FsEntry {
+                    name: format!("{}:", letter as char),
+                    path: drive,
+                    is_dir: true,
+                });
+            }
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        entries.push(FsEntry {
+            name: "/".into(),
+            path: "/".into(),
+            is_dir: true,
+        });
+    }
+    Ok(entries)
+}
+
+#[tauri::command]
+pub async fn fs_roots() -> Result<Vec<FsEntry>, String> {
+    tauri::async_runtime::spawn_blocking(fs_roots_sync)
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// 返回用户主目录路径（供文件面板做「家目录」快捷跳转）。
+#[tauri::command]
+pub fn fs_home() -> Result<String, String> {
+    dirs::home_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .or_else(|| std::env::var("HOME").ok())
+        .ok_or_else(|| "无法定位用户主目录".to_string())
+}
+
 /// 重命名本地文件/目录：old_path → 同目录 new_name。
 fn fs_rename_sync(old_path: String, new_name: String) -> Result<(), String> {
     // 校验 new_name 为单一 path component，防止 `/`、`..` 等路径遍历逃逸出父目录
@@ -84,7 +128,14 @@ pub(crate) fn which_cmd_sync(cmd: String) -> Result<bool, String> {
     {
         return Ok(false);
     }
-    // 用 /bin/sh 而非硬编码 zsh：无 zsh 的环境（最小 Linux/容器）也能解析用户 PATH
+    // Windows 用 where.exe；Unix 用 /bin/sh（而非硬编码 zsh：无 zsh 的环境
+    // （最小 Linux/容器）也能解析用户 PATH）
+    #[cfg(windows)]
+    let out = std::process::Command::new("where.exe")
+        .arg(&cmd)
+        .output()
+        .map_err(|e| e.to_string())?;
+    #[cfg(not(windows))]
     let out = std::process::Command::new("/bin/sh")
         .args(["-lc", &format!("command -v -- {}", cmd)])
         .output()
@@ -114,9 +165,23 @@ mod tests {
         }
     }
 
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn fs_roots_lists_drives_on_windows() {
+        let roots = super::fs_roots_sync().expect("roots");
+        assert!(!roots.is_empty(), "至少应有 C: 盘");
+        assert!(roots.iter().all(|e| e.is_dir));
+        assert!(roots.iter().any(|e| e.path == "C:\\"));
+    }
+
     #[test]
     fn which_cmd_finds_sh_and_rejects_injection() {
-        assert!(super::which_cmd_sync("sh".to_string()).unwrap());
+        // Windows 用 where.exe 判定（cmd），Unix 用 command -v（sh）
+        #[cfg(windows)]
+        let known = "cmd".to_string();
+        #[cfg(not(windows))]
+        let known = "sh".to_string();
+        assert!(super::which_cmd_sync(known).unwrap());
         assert!(!super::which_cmd_sync("definitely-not-a-cmd-xyz".to_string()).unwrap());
         // 注入式命令名直接判不可用
         assert!(!super::which_cmd_sync("sh; rm -rf /".to_string()).unwrap());

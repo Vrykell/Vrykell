@@ -7,6 +7,12 @@ interface SplitPlacement {
   spec: TerminalSpec | null;
 }
 
+/** 「更换位置」落点选择器：open=true 时把 terminalId 这个终端重排到点选落点。 */
+interface MovePlacement {
+  open: boolean;
+  terminalId: string | null;
+}
+
 interface UiState {
   paletteOpen: boolean;
   setPaletteOpen: (open: boolean) => void;
@@ -20,6 +26,10 @@ interface UiState {
   splitPlacement: SplitPlacement;
   beginSplit: (spec: TerminalSpec | null) => void;
   cancelSplit: () => void;
+  /** 更换位置落点选择器 */
+  movePlacement: MovePlacement;
+  beginMove: (terminalId: string) => void;
+  cancelMove: () => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -33,4 +43,7 @@ export const useUiStore = create<UiState>((set) => ({
   splitPlacement: { open: false, spec: null },
   beginSplit: (spec) => set({ splitPlacement: { open: true, spec: spec ?? null } }),
   cancelSplit: () => set({ splitPlacement: { open: false, spec: null } }),
+  movePlacement: { open: false, terminalId: null },
+  beginMove: (terminalId) => set({ movePlacement: { open: true, terminalId } }),
+  cancelMove: () => set({ movePlacement: { open: false, terminalId: null } }),
 }));

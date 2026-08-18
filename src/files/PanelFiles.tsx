@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Star, Folder, ChevronRight, Download } from 'lucide-react';
 import { openPath } from '@tauri-apps/plugin-opener';
-import { fsList, fsRename, fsDelete, type FsEntry } from './fs';
+import { fsList, fsRoots, fsHome, fsRename, fsDelete, fileOpenWith, type FsEntry } from './fs';
 import { ptyWrite } from '../lib/pty';
 import { openFile } from './fileOpen';
 import { fileIcon } from './fileIcon';
+import { normPath, pathSegments, segmentsToPath, parentOf } from './pathUtils';
 import { useWorkspaceDirsStore } from './workspaceDirs';
 import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
 import { useTerminalStore } from '../stores/terminal';
@@ -59,6 +60,7 @@ export default function PanelFiles() {
  */
 function LocalFiles() {
   const [path, setPath] = useState<string | null>(null);
+  const [homePath, setHomePath] = useState<string | null>(null);
   const [entries, setEntries] = useState<FsEntry[]>([]);
   const [expandedSet, setExpandedSet] = useState<ReadonlySet<string>>(new Set());
   const [childCache, setChildCache] = useState<Record<string, FsEntry[]>>({});
@@ -90,11 +92,17 @@ function LocalFiles() {
     return undefined;
   });
   useEffect(() => {
-    setPath(activeCwd ?? null);
-  }, [focused, activeCwd]);
+    fsHome().then((h) => setHomePath(normPath(h))).catch(() => setHomePath(null));
+  }, []);
 
+  useEffect(() => {
+    setPath(activeCwd ? normPath(activeCwd) : homePath);
+  }, [focused, activeCwd, homePath]);
+
+  // path === null 表示「此电脑」（盘符列表），否则是具体目录
   const load = useCallback((p: string | null) => {
-    fsList(p ?? undefined).then(setEntries).catch(() => setEntries([]));
+    const req = p === null ? fsRoots() : fsList(p);
+    req.then(setEntries).catch(() => setEntries([]));
   }, []);
 
   useEffect(() => { load(path); }, [path, load]);
@@ -121,8 +129,10 @@ function LocalFiles() {
   /** 单击目录：立即展开/收起 */
   const handleDirClick = (entry: FsEntry) => toggleExpand(entry);
 
-  /** 双击目录：进入（此前的两次单击已相互抵消，展开状态不变） */
-  const handleDirDoubleClick = (entry: FsEntry) => setPath(entry.path);
+  /** 双击目录/盘符：进入（此前的两次单击已相互抵消，展开状态不变） */
+  const handleDirDoubleClick = (entry: FsEntry) => {
+    setPath(normPath(entry.path));
+  };
 
   // ── 文件打开：默认新建标签页，在其中的终端编辑器打开（标签页意义已泛化） ──
 
@@ -147,7 +157,7 @@ function LocalFiles() {
     if (!command) return;
 
     // 新建标签页，等 shell 就绪后写入编辑器命令
-    const parentDir = entry.path.replace(/\/[^/]+\/?$/, '') || '/';
+    const parentDir = parentOf(normPath(entry.path)) ?? undefined;
     const tabId = useWorkspaceStore.getState().addTab({ cwd: parentDir, title: entry.name });
     const sid = await waitForSession(tabId);
     if (sid) ptyWrite(sid, command.endsWith('\n') ? command : command + '\n').catch(() => {});
@@ -196,6 +206,13 @@ function LocalFiles() {
         label: '使用系统默认应用打开',
         onClick: () => openPath(entry.path).catch(() => {}),
       });
+      items.push({
+        label: '打开方式…',
+        onClick: () =>
+          fileOpenWith(entry.path).catch((e) =>
+            useToastStore.getState().addToast(String((e as Error)?.message ?? e), 'error'),
+          ),
+      });
     }
 
     items.push({ label: '复制路径', onClick: () => navigator.clipboard.writeText(entry.path) });
@@ -231,12 +248,11 @@ function LocalFiles() {
   const cancelRename = () => setRenameTarget(null);
 
   const goUp = () => {
-    if (!path) return;
-    const parent = path.replace(/\/[^/]+\/?$/, '') || '/';
-    setPath(parent === '/' ? null : parent);
+    if (path === null) return;
+    setPath(parentOf(path));
   };
 
-  const crumbs = path ? path.split('/').filter(Boolean) : [];
+  const crumbs = pathSegments(path ?? '');
 
   return (
     <div style={{
@@ -249,9 +265,9 @@ function LocalFiles() {
         padding: '6px 10px', borderBottom: '1px solid var(--border)',
         fontSize: 11, minHeight: 30,
       }}>
-        <Crumb label="~" onClick={() => setPath(null)} active={!path} />
+        <Crumb label="此电脑" onClick={() => setPath(null)} active={path === null} />
         {crumbs.map((seg, i) => {
-          const full = '/' + crumbs.slice(0, i + 1).join('/');
+          const full = segmentsToPath(crumbs.slice(0, i + 1));
           return (
             <span key={full} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <span style={{ color: 'var(--text-muted)' }}>›</span>
@@ -273,7 +289,7 @@ function LocalFiles() {
         >
           <Download size={11} /> 下载
         </button>
-        {path && (
+        {path !== null && (
           <button onClick={goUp} title="上级目录"
             style={{
               fontSize: 11, padding: '0 4px',

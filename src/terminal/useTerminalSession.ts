@@ -163,6 +163,12 @@ export function useTerminalSession(
       onBlockComplete: (block) => {
         useHistoryStore.getState().record(block.command, block.cwd ?? '', block.exitCode);
         sessionManager.record(tabId, paneId, block, 'complete');
+        // 手动全屏（「进入全屏交互」）的运行块完成时退出全屏，回到块列表
+        const ts = useTerminalStore.getState();
+        if (ts.scenes[paneId] === 'altScreen') {
+          ts.setScene(paneId, 'blockList');
+          ts.setAltScreenActive(false);
+        }
       },
       // altScreen 退出前（1049l 尚未写主 xterm）取 alt buffer 最终画面，回填 TUI 块
       captureMainScreen: () => {

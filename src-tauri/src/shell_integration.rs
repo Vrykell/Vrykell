@@ -55,6 +55,66 @@ __ait_preexec() {
 trap '__ait_preexec' DEBUG
 "#;
 
+/// PowerShell 集成：`prompt` 函数做 precmd（133;D/A/G + OSC 7），
+/// PSReadLine 拦 Enter 做 preexec（133;E/C）。裸 REPL 会照常进入 block 交互模式。
+/// 注意：脚本必须纯 ASCII —— PowerShell 5.1 无 BOM 时按 ANSI 读 .ps1，
+/// 中文字节在中文区域被当 GBK 解析会吞掉换行、破坏脚本。
+const PS_RC: &str = r#"# vrykell shell integration (PowerShell / pwsh)
+
+function Write-VrykellOsc {
+    param([string]$Code, [string]$Payload)
+    [Console]::Out.Write([char]27 + "]" + $Code + ";" + $Payload + [char]7)
+}
+
+function prompt {
+    $esc = [char]27; $bel = [char]7
+
+    # exit code of the previous command (LASTEXITCODE for native commands)
+    $ec = 0
+    if ($null -ne $global:LASTEXITCODE) { $ec = [int]$global:LASTEXITCODE }
+    $global:LASTEXITCODE = $null
+
+    # OSC 7 cwd (backslash -> slash, leading / for file://host/C:/...)
+    $p = ($PWD.Path -replace '\\','/').TrimEnd('/')
+    if ($p -eq '') { $p = '/' }
+    if (-not $p.StartsWith('/')) { $p = '/' + $p }
+    Write-VrykellOsc "7" "file://$env:COMPUTERNAME$p"
+
+    Write-VrykellOsc "133;D" "$ec"
+    Write-VrykellOsc "133;A" ""
+
+    # OSC 133;G git branch
+    $b = & git branch --show-current 2>$null
+    if ($b) {
+        $txt = ($b | Out-String).Trim()
+        if ($txt) {
+            $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($txt))
+            Write-VrykellOsc "133;G" $b64
+        }
+    }
+
+    "PS $($PWD.Path)> "
+}
+
+# Enter hook: emit 133;E (command) then 133;C (preexec)
+if (Get-Command Set-PSReadLineKeyHandler -ErrorAction SilentlyContinue) {
+    Set-PSReadLineKeyHandler -Key Enter -ScriptBlock {
+        $esc = [char]27; $bel = [char]7
+        $line = $null; $cursor = $null
+        [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
+        $trimmed = $line.Trim()
+        if ($trimmed.Length -gt 0) {
+            $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($trimmed))
+            Write-VrykellOsc "133;E" $b64
+            Write-VrykellOsc "133;C" ""
+        }
+        [Microsoft.PowerShell.PSConsoleReadLine]::AcceptLine()
+    }
+}
+
+$global:LASTEXITCODE = $null
+"#;
+
 /// 集成脚本根目录（~/.vrykell/shell），每次启动重写保证脚本最新。
 pub fn integration_dir() -> Result<PathBuf, String> {
     // 用 dirs::home_dir 而非 HOME 环境变量 —— Windows 原生环境没有 HOME，
@@ -63,8 +123,10 @@ pub fn integration_dir() -> Result<PathBuf, String> {
     let dir = PathBuf::from(home).join(".vrykell").join("shell");
     fs::create_dir_all(dir.join("zsh")).map_err(|e| e.to_string())?;
     fs::create_dir_all(dir.join("bash")).map_err(|e| e.to_string())?;
+    fs::create_dir_all(dir.join("powershell")).map_err(|e| e.to_string())?;
     fs::write(dir.join("zsh").join(".zshrc"), ZSH_RC).map_err(|e| e.to_string())?;
     fs::write(dir.join("bash").join("rc"), BASH_RC).map_err(|e| e.to_string())?;
+    fs::write(dir.join("powershell").join("profile.ps1"), PS_RC).map_err(|e| e.to_string())?;
     Ok(dir)
 }
 
@@ -88,9 +150,17 @@ mod tests {
         assert!(bash.contains("133;G;"));
         assert!(bash.contains("7;file://"));
         assert!(bash.contains("PROMPT_COMMAND"));
+        let ps = fs::read_to_string(dir.join("powershell/profile.ps1")).unwrap();
+        assert!(ps.contains("133;A"));
+        assert!(ps.contains("133;C"));
+        assert!(ps.contains("133;D"));
+        assert!(ps.contains("133;E"));
+        assert!(ps.contains("133;G"));
+        assert!(ps.contains("Set-PSReadLineKeyHandler"));
     }
 
-    /// 真起一个 zsh 验证钩子发出 OSC 133 标记。
+    /// 真起一个 zsh 验证钩子发出 OSC 133 标记（zsh 只在 Unix 上可用）。
+    #[cfg(unix)]
     #[test]
     fn zsh_emits_osc133_marks() {
         let dir = integration_dir().unwrap();
@@ -136,5 +206,76 @@ mod tests {
             "未集齐 OSC 标记，输出：{}",
             String::from_utf8_lossy(&out)
         );
+    }
+
+    /// Windows：真起一个 PowerShell 验证集成脚本发出 OSC 133 标记。
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn powershell_emits_osc133_marks() {
+        use std::sync::mpsc;
+        use std::time::{Duration, Instant};
+
+        let dir = integration_dir().unwrap();
+        let pty_system = portable_pty::native_pty_system();
+        let pair = pty_system
+            .openpty(portable_pty::PtySize {
+                rows: 24,
+                cols: 80,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .unwrap();
+        let mut cmd = portable_pty::CommandBuilder::new("powershell");
+        cmd.arg("-NoLogo");
+        cmd.arg("-NoExit");
+        cmd.arg("-File");
+        cmd.arg(dir.join("powershell").join("profile.ps1").to_string_lossy().to_string());
+        let mut child = pair.slave.spawn_command(cmd).unwrap();
+        drop(pair.slave);
+        let mut reader = pair.master.try_clone_reader().unwrap();
+        let mut writer = pair.master.take_writer().unwrap();
+
+        // 后台线程持续读取输出（读是阻塞的，放线程里避免测试卡死）
+        let (tx, rx) = mpsc::channel::<String>();
+        std::thread::spawn(move || {
+            let mut out = Vec::new();
+            let mut buf = [0u8; 4096];
+            loop {
+                match reader.read(&mut buf) {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => {
+                        out.extend_from_slice(&buf[..n]);
+                        let _ = tx.send(String::from_utf8_lossy(&out).to_string());
+                    }
+                }
+            }
+        });
+
+        let deadline = Instant::now() + Duration::from_secs(15);
+        let (mut saw_a, mut saw_c, mut saw_e, mut sent) = (false, false, false, false);
+        let mut last_out = String::new();
+        while Instant::now() < deadline {
+            while let Ok(s) = rx.try_recv() {
+                last_out = s.clone();
+                saw_a |= s.contains("\u{1b}]133;A");
+                saw_c |= s.contains("\u{1b}]133;C");
+                saw_e |= s.contains("\u{1b}]133;E;");
+            }
+            if saw_a && !sent {
+                sent = true;
+                let _ = writer.write_all(b"echo v2psok\r");
+                let _ = writer.flush();
+            }
+            if saw_a && saw_c && saw_e {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+
+        let _ = child.kill();
+        let _ = child.wait();
+        assert!(saw_a, "未收到 133;A（prompt 未发 precmd）。输出片段：{last_out}");
+        assert!(saw_c, "未收到 133;C（Enter 拦截未发 preexec）。输出片段：{last_out}");
+        assert!(saw_e, "未收到 133;E（命令文本未发）。输出片段：{last_out}");
     }
 }

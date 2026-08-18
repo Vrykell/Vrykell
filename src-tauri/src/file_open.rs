@@ -162,6 +162,36 @@ pub async fn file_open(path: String, cfg: FileOpenConfig) -> Result<FileOpenResu
     .map_err(|e| e.to_string())?
 }
 
+/// 用系统「打开方式」对话框打开文件：Windows 弹 OpenAs_RunDLL 选择器，
+/// macOS 在 Finder 中显示该文件（右键即可选应用），Linux 退回默认应用。
+/// 仅发起，不等待用户选择（spawn 后立即返回）。
+#[tauri::command]
+pub fn file_open_with(path: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("rundll32.exe")
+            .args(["shell32.dll,OpenAs_RunDLL", &path])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .args(["-R", &path])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        // Linux 无统一「打开方式」对话框，退回默认应用打开
+        std::process::Command::new("xdg-open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

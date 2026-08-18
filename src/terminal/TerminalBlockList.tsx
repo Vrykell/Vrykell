@@ -266,7 +266,9 @@ function BlockItem({
       onMouseLeave={() => setHovered(false)}
       onContextMenu={(e) => {
         e.preventDefault();
-        onMenu(block, (e.target as HTMLElement).getBoundingClientRect());
+        // 阻止冒泡到 pane 级右键菜单，避免命令块菜单与终端菜单叠加出现
+        e.stopPropagation();
+        onMenu(block, e.currentTarget.getBoundingClientRect());
       }}
     >
       {/* 头部行：折叠 chevron + 加粗命令（行内）+ 右侧退出码/耗时，hover 浮出操作 */}
