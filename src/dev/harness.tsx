@@ -14,6 +14,7 @@ import { createRoot } from 'react-dom/client';
 import '../theme.css';
 import { useTerminalStore } from '../stores/terminal';
 import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
+import { useChatStore } from '../stores/chat';
 import { firstLeaf } from '../lib/windowLayout';
 import InputEditor from '../terminal/InputEditor';
 import PanelChat from '../chat/PanelChat';
@@ -27,6 +28,40 @@ useTerminalStore.setState({
   focusedPaneId: paneId,
   scenes: { [paneId]: 'blockList' },
 });
+
+// ── 全局错误捕获（渲染崩溃会落到这里） ──
+const errors: string[] = [];
+window.addEventListener('error', (e) => errors.push(`error: ${e.message}`));
+window.addEventListener('unhandledrejection', (e) => errors.push(`rejection: ${String(e.reason).slice(0, 300)}`));
+const origConsoleError = console.error.bind(console);
+console.error = (...args: unknown[]) => {
+  errors.push(`console.error: ${args.map((a) => String(a)).join(' ').slice(0, 500)}`);
+  origConsoleError(...args);
+};
+
+// ── 真实流式路径：send + 伪 streamFn 逐字符推流，内容覆盖 LLM 常见脏输出 ──
+const STREAM_ANSWER = [
+  '好的，这个问题分两步：\n\n',
+  '1. 先运行 `$ make test` 确认失败用例，成本约 $5 ~ $10。\n',
+  '2. 再看公式 $\\frac{a}{b}$ 与独立公式：\n\n$$E=mc^2$$\n\n',
+  '```bash\nexport A=$HOME\ngrep -rn "foo_(bar)" ./src | head -5\n```\n\n',
+  '| 列A | 列B |\n| --- | --- |\n| $5 | ~~旧~~ |\n\n',
+  '参考 www.example.com/path?q=1_(2) 与 https://zh.wikipedia.org/wiki/测试_(消歧义)。\n\n',
+  '> 注意：`C:\\Users\\test\\$HOME` 里的反斜杠。完成度 $100\\%$。\n',
+].join('');
+
+function startStreamSimulation() {
+  const streamFn = async (_msgs: Array<{ role: string; content: string }>, onChunk: (t: string) => void) => {
+    let i = 0;
+    while (i < STREAM_ANSWER.length) {
+      const n = 1 + Math.floor(Math.random() * 3); // 1~3 字符随机切片，制造脏中间态
+      onChunk(STREAM_ANSWER.slice(i, i + n));
+      i += n;
+      await new Promise((r) => setTimeout(r, 8));
+    }
+  };
+  void useChatStore.getState().send('为什么构建失败？', { paneId, streamFn });
+}
 
 // ── 测量：textarea → 输入行 → 容器（两个组件的 DOM 深度一致） ──
 function measure(slotId: string) {
@@ -50,10 +85,15 @@ function measure(slotId: string) {
 }
 
 function publish() {
+  const fallbackEls = document.querySelectorAll('#panel-slot .md span, #panel-slot span');
+  const fallbackHit = Array.from(fallbackEls).some((el) => el.textContent?.includes('无法渲染此消息'));
   const out = {
     dpr: window.devicePixelRatio,
     term: measure('term-slot'),
     panel: measure('panel-slot'),
+    streamRenderedText: document.querySelector('#panel-slot .md')?.textContent?.slice(0, 120) ?? null,
+    fallbackVisible: fallbackHit,
+    errors,
   };
   const pre = document.createElement('pre');
   pre.id = 'result';
@@ -88,4 +128,14 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
-setTimeout(publish, 800);
+// 启动流式模拟；流结束后（sendingTab 复位）再发布测量结果
+setTimeout(startStreamSimulation, 300);
+const poll = setInterval(() => {
+  const s = useChatStore.getState();
+  const msgs = s.byTab[tab.id] ?? [];
+  if (msgs.length > 0 && s.sendingTab === null) {
+    clearInterval(poll);
+    setTimeout(publish, 400); // 等最后一帧渲染落地
+  }
+}, 300);
+setTimeout(() => { clearInterval(poll); publish(); }, 30000); // 兜底

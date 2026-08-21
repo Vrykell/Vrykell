@@ -8,7 +8,8 @@ import GlobalSearch from './search/GlobalSearch';
 import TerminalView from './terminal/TerminalView';
 import NewTabModal from './components/NewTabModal';
 import { setDefaultStream } from './stores/chat';
-import { anthropicStream, refreshAiConfig } from './lib/ai';
+import { refreshAiConfig } from './lib/ai';
+import { agentStream } from './agent/agentStream';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import { useUiStore } from './stores/ui';
 import { useWorkspaceDirsStore } from './files/workspaceDirs';
@@ -32,7 +33,7 @@ import './search/init'; // 触发所有搜索源自动注册
  * TopDock 左侧 78px 为 macOS 红绿灯保留空间。
  */
 export default function App() {
-  useEffect(() => setDefaultStream(anthropicStream), []);
+  useEffect(() => setDefaultStream(agentStream), []);
   useEffect(() => { refreshAiConfig(); }, []);
   useEffect(() => {
     const ws = useWorkspaceStore.getState();
