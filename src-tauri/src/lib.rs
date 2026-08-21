@@ -37,6 +37,7 @@ pub fn run() {
         .manage(pty::PtyState::default())
         .manage(history_state)
         .manage(ai::AiConfig::load())
+        .manage(ai::LlmStreamState::default())
         .manage(pty::KillState::default())
         .invoke_handler(tauri::generate_handler![
             greet,
@@ -46,6 +47,13 @@ pub fn run() {
             ai::set_ai_model,
             ai::get_ai_config,
             ai::ai_stream,
+            ai::set_ai_provider,
+            ai::set_provider_key,
+            ai::clear_provider_key,
+            ai::set_tavily_key,
+            ai::clear_tavily_key,
+            ai::llm_stream,
+            ai::llm_abort,
             pty::pty_spawn,
             shells::list_shells,
             ssh::ssh_connections_list,
