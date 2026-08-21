@@ -12,7 +12,7 @@
  *   └──────────────────────────────────────────────┘
  */
 
-import { useRef, useCallback, useEffect, useMemo } from 'react';
+import { useRef, useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { Columns2, GitBranch, X, Zap } from 'lucide-react';
 import { ptyWrite } from '../lib/pty';
 import { useTerminalStore } from '../stores/terminal';
@@ -24,6 +24,7 @@ import { shellTypeLabel } from '../lib/shells';
 import { useBlockStore } from '../stores/blocks';
 import { useInputStore, selectPaneInput } from '../stores/input';
 import { isInputBoxVisible, getLongRunningHint } from './inputVisibility';
+import { agentControl } from '../agent/agentControl';
 import { engageFollow } from './useFollowBottom';
 import ShellIndicator from './ShellIndicator';
 
@@ -103,16 +104,21 @@ export default function InputEditor({
 
   // ── 输入框可见性状态机（§7） ──
 
+  // agent 正在本 pane 执行命令时输入栏保持可见（接通 isAgentInControl 预留位）
+  const isAgentInControl = useSyncExternalStore(agentControl.subscribe, () =>
+    agentControl.isControlled(paneId),
+  );
+
   const visible = useMemo(
     () =>
       isInputBoxVisible({
         isReadOnly: false,
         isAltScreenActive: altScreenActive,
         isLongRunning: isLongRunning ?? false,
-        isAgentInControl: false,
+        isAgentInControl,
         isAgentTaggedIn: false,
       }),
-    [altScreenActive, isLongRunning],
+    [altScreenActive, isLongRunning, isAgentInControl],
   );
 
   // ── 消费 pendingInput ──

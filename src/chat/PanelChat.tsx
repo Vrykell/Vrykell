@@ -36,12 +36,16 @@ export default function PanelChat() {
 
   const exchanges = useMemo(() => toExchanges(messages), [messages]);
 
-  // 新内容（条数变化 / 流式增长）时吸底
-  const lastLen = messages[messages.length - 1]?.content.length ?? 0;
+  // 新内容（条数变化 / 流式增长 / 工具动作增减或状态迁移）时吸底
+  const last = messages[messages.length - 1];
+  const lastLen = last?.content.length ?? 0;
+  const lastToolSig = (last?.parts ?? [])
+    .map((p) => (p.kind === 'tool' ? `${p.tool.toolCallId}:${p.tool.state}` : 't'))
+    .join('|');
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages.length, lastLen]);
+  }, [messages.length, lastLen, lastToolSig]);
 
   /** pane → shell/cwd 分量（prompt 行用）；无 paneId 的旧消息返回 null（归「本窗口」） */
   const paneInfo = (paneId?: string): { shell: string; cwd?: string } | null => {

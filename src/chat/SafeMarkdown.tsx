@@ -10,11 +10,14 @@ import Markdown from './Markdown';
  * 降级策略：渲染失败不吞消息 —— 展示原始文本（等宽、可选中），
  * 并把错误 + 内容摘要打进 console 便于定位。
  */
-export default class SafeMarkdown extends Component<{ content: string }, { error: boolean; content: string }> {
-  state = { error: false, content: this.props.content };
+export default class SafeMarkdown extends Component<{ content: string }, { error: boolean; errorMessage: string; content: string }> {
+  state = { error: false, errorMessage: '', content: this.props.content };
 
-  static getDerivedStateFromError() {
-    return { error: true };
+  static getDerivedStateFromError(error: unknown) {
+    return {
+      error: true,
+      errorMessage: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+    };
   }
 
   componentDidCatch(error: unknown, info: { componentStack?: string }) {
@@ -29,7 +32,9 @@ export default class SafeMarkdown extends Component<{ content: string }, { error
   // 流式中间态可能触发渲染异常（如不完整的数学公式），
   // 内容更新时复位 error —— 否则一次中间态错误会让整条消息永远降级。
   static getDerivedStateFromProps(props: { content: string }, state: { content: string }) {
-    return props.content !== state.content ? { error: false, content: props.content } : null;
+    return props.content !== state.content
+      ? { error: false, errorMessage: '', content: props.content }
+      : null;
   }
 
   // 流式期间父组件每个 chunk 都重渲染；这里只比较 content，避免已完成消息
@@ -43,7 +48,7 @@ export default class SafeMarkdown extends Component<{ content: string }, { error
       return (
         <div>
           <span style={{ color: 'var(--error)', fontStyle: 'italic', fontSize: 11 }}>
-            渲染失败，以下为原文：
+            渲染失败（{this.state.errorMessage}），以下为原文：
           </span>
           <pre
             data-selectable

@@ -2,23 +2,40 @@ import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 import { useWorkspaceStore } from './workspace';
 import { appendChatMessage } from '../api/session';
+import {
+  serializeParts,
+  partsToHistoryText,
+  type MessagePart,
+  type ToolRun,
+} from '../agent/messageParts';
 
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  /**
+   * 渲染增强层（rail 上的文本段/动作条目）。隐形契约：纯文本回答恒为
+   * undefined（AiBlock 据此走 legacy 渲染），唯一物化点 = upsertToolPart。
+   */
+  parts?: MessagePart[];
   /** 来源 pane（分屏时区分对话线；旧持久化消息没有，仅面板可见） */
   paneId?: string;
   /** 发送时间戳（块流内联时与命令块按时间归并） */
   createdAt: number;
   pending?: boolean;
-  /** 流式失败标记（渲染为错误态 gutter） */
+  /** 流式失败标记（渲染为合成错误节点行） */
   error?: boolean;
+}
+
+/** 工具事件回调：run 为 upsert 语义补丁（未定义字段不覆盖既有值） */
+export interface StreamHandlers {
+  onToolEvent?: (run: ToolRun) => void;
 }
 
 export type StreamFn = (
   messages: Array<{ role: string; content: string }>,
   onChunk: (text: string) => void,
+  ctx?: { signal?: AbortSignal; handlers?: StreamHandlers },
 ) => Promise<void>;
 
 export interface SendOptions {
@@ -29,6 +46,9 @@ export interface SendOptions {
 
 let counter = 0;
 const nextId = () => `m${Date.now()}-${counter++}`;
+
+/** 进行中的流式请求（tabId → AbortController），dropTab 时中止防泄漏 */
+const abortControllers = new Map<string, AbortController>();
 
 interface ChatState {
   /** 按标签页隔离的对话记录 */
@@ -41,6 +61,10 @@ interface ChatState {
   appendDraft: (text: string) => void;
   send: (text: string, opts?: SendOptions) => Promise<void>;
   appendChunk: (tabId: string, id: string, chunk: string) => void;
+  /** upsert 一个工具动作 part（惰性物化 parts；合并补丁不丢 startedAt） */
+  upsertToolPart: (tabId: string, id: string, run: ToolRun) => void;
+  /** 中止某 tab 进行中的流式请求（M4 停止按钮复用） */
+  abortStream: (tabId: string) => void;
   /** 清空当前标签页的对话 */
   clearTab: () => void;
   /** 关 tab 时删除该 tab 的对话，避免 per-tab 残留 */
@@ -66,12 +90,55 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return {
         byTab: {
           ...s.byTab,
-          [tabId]: (s.byTab[tabId] ?? []).map((m) =>
-            m.id === id ? { ...m, content: m.content + chunk } : m,
-          ),
+          [tabId]: (s.byTab[tabId] ?? []).map((m) => {
+            if (m.id !== id) return m;
+            const content = m.content + chunk;
+            if (!m.parts) return { ...m, content };
+            // parts 已物化：双写——chunk 追加到末尾 text part（末尾是 tool 则新开一段）
+            const parts = m.parts.slice();
+            const last = parts[parts.length - 1];
+            if (last && last.kind === 'text') {
+              parts[parts.length - 1] = { kind: 'text', text: last.text + chunk };
+            } else {
+              parts.push({ kind: 'text', text: chunk });
+            }
+            return { ...m, content, parts };
+          }),
         },
       };
     }),
+  upsertToolPart: (tabId, id, run) =>
+    set((s) => {
+      if (!(tabId in s.byTab)) return s; // tab 已关闭，丢弃工具事件
+      return {
+        byTab: {
+          ...s.byTab,
+          [tabId]: (s.byTab[tabId] ?? []).map((m) => {
+            if (m.id !== id) return m;
+            // 惰性物化：纯文本回答的首个工具事件到达时，用当前 content 重建首 text part
+            const parts: MessagePart[] =
+              m.parts ?? (m.content ? [{ kind: 'text', text: m.content }] : []);
+            const idx = parts.findIndex(
+              (p) => p.kind === 'tool' && p.tool.toolCallId === run.toolCallId,
+            );
+            if (idx < 0) return { ...m, parts: [...parts, { kind: 'tool', tool: run }] };
+            const existing = parts[idx];
+            if (existing.kind !== 'tool') return m;
+            // 合并补丁：仅覆盖定义了的字段（保住 startedAt 等既有值）
+            const merged: ToolRun = { ...existing.tool };
+            for (const [k, v] of Object.entries(run)) {
+              if (v !== undefined) (merged as unknown as Record<string, unknown>)[k] = v;
+            }
+            const next = parts.slice();
+            next[idx] = { kind: 'tool', tool: merged };
+            return { ...m, parts: next };
+          }),
+        },
+      };
+    }),
+  abortStream: (tabId) => {
+    abortControllers.get(tabId)?.abort();
+  },
   send: async (text, opts) => {
     const tabId = useWorkspaceStore.getState().activeId;
     const trimmed = text.trim();
@@ -85,12 +152,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
       sendingTab: tabId,
       draft: '',
     }));
-    // 持久化用户消息（AI 对话是会话状态的一部分）
-    appendChatMessage(userMsg.id, tabId, userMsg.role, userMsg.content, now).catch(() => {});
+    // 持久化用户消息（AI 对话是会话状态的一部分；用户消息无 parts）
+    appendChatMessage(userMsg.id, tabId, userMsg.role, userMsg.content, now, '').catch(() => {});
     useWorkspaceStore.getState().titleFromMessage(tabId, trimmed);
     const history = (get().byTab[tabId] ?? [])
       .filter((m) => !m.pending)
-      .map((m) => ({ role: m.role, content: m.content }));
+      .map((m) => ({
+        role: m.role,
+        // 助手消息追加单行工具摘要，让后续轮次知道本轮做过什么
+        content:
+          m.role === 'assistant' ? m.content + partsToHistoryText(m.parts) : m.content,
+      }));
 
     // 流式节流：合批 chunk，每 ~50ms flush 一次。否则每个 token 都触发一次
     // setState → 整个消息列表重渲染 → 流式消息整条 Markdown/KaTeX 重解析，
@@ -109,13 +181,30 @@ export const useChatStore = create<ChatState>((set, get) => ({
       if (timer === null) timer = setTimeout(flush, 50);
     };
 
+    const controller = new AbortController();
+    abortControllers.set(tabId, controller);
+
     let failed = false;
     try {
-      await (opts?.streamFn ?? defaultStream)(history, onChunk);
+      await (opts?.streamFn ?? defaultStream)(history, onChunk, {
+        signal: controller.signal,
+        handlers: {
+          // 工具事件直写前先把滞留文本 flush 掉，保证 text/tool 时间序
+          onToolEvent: (run) => {
+            if (timer !== null) {
+              clearTimeout(timer);
+              timer = null;
+            }
+            flush();
+            get().upsertToolPart(tabId, assistantMsg.id, run);
+          },
+        },
+      });
     } catch (err) {
       failed = true;
       pending += `\n\n> 出错了：${err instanceof Error ? err.message : String(err)}`;
     } finally {
+      abortControllers.delete(tabId);
       if (timer !== null) {
         clearTimeout(timer);
         timer = null;
@@ -127,16 +216,42 @@ export const useChatStore = create<ChatState>((set, get) => ({
           sendingTab: null,
           byTab: {
             ...s.byTab,
-            [tabId]: (s.byTab[tabId] ?? []).map((m) =>
-              m.id === assistantMsg.id ? { ...m, pending: false, error: failed || undefined } : m,
-            ),
+            [tabId]: (s.byTab[tabId] ?? []).map((m) => {
+              if (m.id !== assistantMsg.id) return m;
+              let parts = m.parts;
+              if (failed && parts) {
+                // 失败/中止时，未完结的工具动作落 error 终态（节点转红）
+                parts = parts.map((p) =>
+                  p.kind === 'tool' &&
+                  (p.tool.state === 'running' || p.tool.state === 'approval-pending')
+                    ? {
+                        kind: 'tool' as const,
+                        tool: {
+                          ...p.tool,
+                          state: 'error' as const,
+                          endedAt: p.tool.endedAt ?? Date.now(),
+                          error: p.tool.error ?? '对话中断',
+                        },
+                      }
+                    : p,
+                );
+              }
+              return { ...m, pending: false, error: failed || undefined, parts };
+            }),
           },
         };
       });
-      // 持久化助手消息最终内容
+      // 持久化助手消息最终内容 + parts 渲染层
       const assistant = get().byTab[tabId]?.find((m) => m.id === assistantMsg.id);
       if (assistant) {
-        appendChatMessage(assistant.id, tabId, assistant.role, assistant.content, Date.now()).catch(() => {});
+        appendChatMessage(
+          assistant.id,
+          tabId,
+          assistant.role,
+          assistant.content,
+          Date.now(),
+          serializeParts(assistant.parts),
+        ).catch(() => {});
       }
     }
   },
@@ -144,13 +259,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const tabId = useWorkspaceStore.getState().activeId;
     set((s) => ({ byTab: { ...s.byTab, [tabId]: [] } }));
   },
-  dropTab: (tabId) =>
+  dropTab: (tabId) => {
+    abortControllers.get(tabId)?.abort();
+    abortControllers.delete(tabId);
     set((s) => {
       if (!(tabId in s.byTab) && s.sendingTab !== tabId) return s;
       const byTab = { ...s.byTab };
       delete byTab[tabId];
       return { byTab, sendingTab: s.sendingTab === tabId ? null : s.sendingTab };
-    }),
+    });
+  },
 }));
 
 /** 统一接口：将文本发往 AI 对话框（新增消息，不覆盖已有） */
