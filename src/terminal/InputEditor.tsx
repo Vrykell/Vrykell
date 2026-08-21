@@ -154,7 +154,8 @@ export default function InputEditor({
     resetHeight();
     try {
       if (aiMode) {
-        chatSend(cmd);
+        // AI 模式：问题带上本 pane id —— 回答会内联进本 pane 的块流，同时进全局面板
+        chatSend(cmd, { paneId });
       } else {
         const sid = sessions[paneId];
         if (sid) ptyWrite(sid, cmd.endsWith('\n') ? cmd : cmd + '\n').catch(() => {});
@@ -407,7 +408,8 @@ function InputActionBtn({
 
 // ── 工作目录 ──
 
-function CurrentDir({ dir }: { dir?: string }) {
+/** 当前目录标签（mono 11px）；导出给 PanelChat 的 prompt 行复用，保证两处一致 */
+export function CurrentDir({ dir }: { dir?: string }) {
   const label = dir
     ? dir.startsWith('/') && dir.length > 20
       ? '…' + dir.slice(-19)

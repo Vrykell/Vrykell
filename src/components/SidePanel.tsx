@@ -4,6 +4,7 @@ import ResizeHandle from './ResizeHandle';
 import PanelTabs from './PanelTabs';
 import PanelFiles from '../files/PanelFiles';
 import PanelSsh from '../ssh/PanelSsh';
+import PanelChat from '../chat/PanelChat';
 
 interface SidePanelProps {
   side: DockSide;
@@ -13,6 +14,7 @@ const PANEL_COMPONENTS: Record<string, FC> = {
   tabs: PanelTabs,
   files: PanelFiles,
   ssh: PanelSsh,
+  chat: PanelChat,
 };
 
 export default function SidePanel({ side }: SidePanelProps) {

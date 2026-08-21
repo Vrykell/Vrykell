@@ -12,9 +12,12 @@ import {
   Maximize2, RotateCw, Skull, Sparkles, Square, Terminal, X,
 } from 'lucide-react';
 import { useBlockStore, selectBlocks } from '../stores/blocks';
-import { useChatStore } from '../stores/chat';
+import { useChatStore, usePaneMessages } from '../stores/chat';
+import { useChatPanelOpen } from '../stores/dock';
 import { useTerminalStore } from '../stores/terminal';
 import { useSearchHighlightStore } from '../stores/searchHighlight';
+import { toExchanges, mergeFlow } from '../chat/exchanges';
+import AiBlock from '../chat/AiBlock';
 import { ptyWrite } from '../lib/pty';
 import { killForeground } from '../lib/killForeground';
 import { useToastStore } from '../components/Toast';
@@ -43,6 +46,10 @@ export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8
   const blocks = useBlockStore(selectBlocks(tabId));
   const highlightQuery = useSearchHighlightStore((s) => s.query);
   const [menuBlock, setMenuBlock] = useState<{ block: TermBlock; rect: DOMRect } | null>(null);
+  // 该 pane 的 AI 对话线（注意：本组件的 tabId prop 实际是 paneId）
+  const aiMessages = usePaneMessages(tabId);
+  // AI 面板打开时不再内联 —— 回答只在面板显示，避免两处重复
+  const chatPanelOpen = useChatPanelOpen();
 
   // 按新 TermBlock 状态分组；pending 与空块不渲染（底部固定输入栏即提示符，
   // 空占位卡片只是视觉噪音 —— 「最下面有一个空行」）
@@ -55,7 +62,14 @@ export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8
   );
   const running = useMemo(() => blocks.filter((b) => b.status === 'executing'), [blocks]);
 
-  if (completed.length === 0 && running.length === 0) return null;
+  // AI 问答折叠为交换，与已完成命令块按时间归并（渲染层操作，不改管线）
+  const exchanges = useMemo(
+    () => (chatPanelOpen ? [] : toExchanges(aiMessages)),
+    [aiMessages, chatPanelOpen],
+  );
+  const flow = useMemo(() => mergeFlow(completed, exchanges), [completed, exchanges]);
+
+  if (flow.length === 0 && running.length === 0) return null;
 
   const allCollapsed = completed.length > 0 && completed.every((b) => b.collapsed);
 
@@ -82,18 +96,24 @@ export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8
         </div>
       )}
 
-      {/* 已完成块 */}
-      {completed.map((b) => (
-        <BlockItem
-          key={b.id}
-          block={b}
-          tabId={tabId}
-          insetLeft={insetLeft}
-          insetRight={insetRight}
-          highlightQuery={highlightQuery}
-          onMenu={(block, rect) => setMenuBlock({ block, rect })}
-        />
-      ))}
+      {/* 已完成块 + AI 问答（按时间交错） */}
+      {flow.map((item) =>
+        item.type === 'block' ? (
+          <BlockItem
+            key={item.block.id}
+            block={item.block}
+            tabId={tabId}
+            insetLeft={insetLeft}
+            insetRight={insetRight}
+            highlightQuery={highlightQuery}
+            onMenu={(block, rect) => setMenuBlock({ block, rect })}
+          />
+        ) : (
+          <div key={item.exchange.id} style={{ padding: `0 ${insetRight}px 0 ${insetLeft}px` }}>
+            <AiBlock exchange={item.exchange} />
+          </div>
+        ),
+      )}
 
       {/* 运行中块 */}
       {running.map((b) => (
@@ -111,6 +131,7 @@ export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8
       {menuBlock && (
         <BlockMenu
           block={menuBlock.block}
+          paneId={tabId}
           anchor={menuBlock.rect}
           onClose={() => setMenuBlock(null)}
           getOutputText={() =>
@@ -241,8 +262,9 @@ function BlockItem({
 
   const askAI = useCallback(() => {
     const plain = copyOutput.slice(0, 2000);
-    send(`解释:\n\`\`\`\n${block.command}\n${plain}\n\`\`\``);
-  }, [block, copyOutput, send]);
+    // tabId prop 即 paneId：问答内联进本 pane 的块流
+    send(`解释:\n\`\`\`\n${block.command}\n${plain}\n\`\`\``, { paneId: tabId });
+  }, [block, copyOutput, send, tabId]);
 
   const copyCmd = useCallback(
     () => navigator.clipboard.writeText(block.command).catch(() => {}),

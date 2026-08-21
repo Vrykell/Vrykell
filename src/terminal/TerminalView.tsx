@@ -12,8 +12,9 @@ import { useWorkspaceStore, nextTerminalId } from '../stores/workspace';
 import { useTerminalStore } from '../stores/terminal';
 import { useUiStore } from '../stores/ui';
 import { useDockDragStore } from '../stores/dockDrag';
-import { useActiveMessages } from '../stores/chat';
 import { useBlockStore, selectBlocks } from '../stores/blocks';
+import { usePaneMessages } from '../stores/chat';
+import { useChatPanelOpen } from '../stores/dock';
 import { ptyWrite } from '../lib/pty';
 import { killForeground, ESCALATE_WINDOW_MS } from '../lib/killForeground';
 import { useToastStore } from '../components/Toast';
@@ -25,7 +26,6 @@ import {
   type WindowLayout, type TerminalSpec, type DropTarget,
 } from '../lib/windowLayout';
 import InputEditor from './InputEditor';
-import InlineAI from './InlineAI';
 import TerminalBlockList, { hasVisibleContent } from './TerminalBlockList';
 import TerminalPanel from './TerminalPanel';
 import SessionHistoryView from '../components/SessionHistoryView';
@@ -41,8 +41,6 @@ export default function TerminalView() {
   const focusedPaneId = useTerminalStore((s) => s.focusedPaneId);
   const sessions = useTerminalStore((s) => s.sessions);
   const altScreenActive = useTerminalStore((s) => s.altScreenActive);
-  const messages = useActiveMessages();
-  const aiMessagesEnd = useRef<HTMLDivElement>(null);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const splitPlacement = useUiStore((s) => s.splitPlacement);
   const cancelSplit = useUiStore((s) => s.cancelSplit);
@@ -66,10 +64,6 @@ export default function TerminalView() {
   const focusBlocks = useBlockStore(selectBlocks(focusedTermId));
   const hasExecutingBlock = focusBlocks.some((b) => b.status === 'executing');
   useTerminalFocus(scene === 'blockList' && hasExecutingBlock, focusedTermId);
-
-  useEffect(() => {
-    aiMessagesEnd.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length, messages[messages.length - 1]?.content.length]);
 
   // 分裂落点：smart 规则（dropTargets 决定 1→4 半屏 / 2→4 四分之一 / 3→2 半屏 / 4→无）
   const placementTargets = useMemo(
@@ -152,18 +146,6 @@ export default function TerminalView() {
         </div>
       ) : (
         <LoadingState />
-      )}
-
-      {/* AI 对话面板（活跃窗口的 AI 对话，全局显示在布局下方） */}
-      {isSession && (
-        <div style={{
-          maxHeight: messages.length > 0 ? '35%' : '0px',
-          overflow: 'hidden', flexShrink: 0,
-          borderBottom: messages.length > 0 ? '1px solid var(--border)' : 'none',
-          background: 'var(--surface)', transition: 'max-height 0.25s ease, border 0.25s ease',
-        }}>
-          {messages.length > 0 && (<><InlineAI /><div ref={aiMessagesEnd} /></>)}
-        </div>
       )}
 
       {/* 手动全屏宿主（块终端「进入全屏交互」） */}
@@ -612,7 +594,10 @@ function PaneBlockList({ paneId, insetLeft = 8, insetRight = 8 }: { paneId: stri
 
 function PaneEmptyHint({ paneId }: { paneId: string }) {
   const blocks = useBlockStore(selectBlocks(paneId));
-  if (blocks.some(hasVisibleContent)) return null;
+  const aiMessages = usePaneMessages(paneId);
+  const chatPanelOpen = useChatPanelOpen();
+  // AI 面板打开时内联不显示，空态提示也不把面板里的对话算作 pane 内容
+  if (blocks.some(hasVisibleContent) || (!chatPanelOpen && aiMessages.length > 0)) return null;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: '8vh', color: 'var(--text-muted)', fontSize: 12, userSelect: 'none', gap: 6 }}>
       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, color: 'var(--text-muted)', opacity: 0.25, fontWeight: 600, marginBottom: 6 }}>$</div>

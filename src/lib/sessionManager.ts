@@ -167,6 +167,8 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
         id: c.id,
         role: c.role as 'user' | 'assistant',
         content: c.content,
+        // 旧持久化没有 paneId：仅面板可见，不进块流
+        createdAt: c.created_at,
       }));
       useChatStore.setState((s) => ({
         byTab: { ...s.byTab, [sessionId]: msgs },
