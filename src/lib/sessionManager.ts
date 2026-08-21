@@ -7,6 +7,7 @@
 import { useWorkspaceStore, type Tab } from '../stores/workspace';
 import { useBlockStore } from '../stores/blocks';
 import { useChatStore } from '../stores/chat';
+import { deserializeParts } from '../agent/messageParts';
 import { leaf, type WindowLayout } from './windowLayout';
 import {
   createSession,
@@ -167,6 +168,8 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
         id: c.id,
         role: c.role as 'user' | 'assistant',
         content: c.content,
+        // parts 渲染层（'' / 脏数据 → undefined，走 legacy 文本渲染）
+        parts: deserializeParts(c.parts),
         // 旧持久化没有 paneId：仅面板可见，不进块流
         createdAt: c.created_at,
       }));

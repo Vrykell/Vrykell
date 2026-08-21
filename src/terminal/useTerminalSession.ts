@@ -15,6 +15,7 @@ import { useHistoryStore } from '../stores/history';
 import { useWorkspaceStore } from '../stores/workspace';
 import { leaves as layoutLeaves } from '../lib/windowLayout';
 import * as sessionManager from '../lib/sessionManager';
+import { agentControl } from '../agent/agentControl';
 import { SessionController } from './pipeline/sessionController';
 import type { TermBlock } from './pipeline/termBlock';
 import type { UnlistenFn } from '@tauri-apps/api/event';
@@ -23,8 +24,9 @@ import type { UnlistenFn } from '@tauri-apps/api/event';
  * TermBlock UI 投影：剥离 controller 内部字段（outputTerm/earlyBuf 等）。
  * bookmarked 只活在 store（controller 不读回），整体替换数组时按 id 保留，
  * 否则下一次 onBlocksChanged 会把用户的书签冲掉。
+ * agent 标记同理——真源在 agentControl 注册表，投影时按 id 查回。
  */
-function projectBlock(b: TermBlock, bookmarked: boolean, collapsed: boolean): TermBlock {
+function projectBlock(b: TermBlock, bookmarked: boolean, collapsed: boolean, agent: boolean): TermBlock {
   return {
     id: b.id,
     command: b.command,
@@ -37,6 +39,7 @@ function projectBlock(b: TermBlock, bookmarked: boolean, collapsed: boolean): Te
     wasLongRunning: b.wasLongRunning,
     bookmarked: bookmarked || undefined,
     collapsed: collapsed || undefined,
+    agent: agent || undefined,
     outputHtml: b.outputHtml,
     outputText: b.outputText,
     outputRaw: b.outputRaw,
@@ -129,7 +132,9 @@ export function useTerminalSession(
         const collapsedIds = new Set(prev.filter((b) => b.collapsed).map((b) => b.id));
         useBlockStore.getState().setBlocks(
           paneId,
-          controller.blocks.map((b) => projectBlock(b, bookmarkedIds.has(b.id), collapsedIds.has(b.id))),
+          controller.blocks.map((b) =>
+            projectBlock(b, bookmarkedIds.has(b.id), collapsedIds.has(b.id), agentControl.hasBlock(b.id)),
+          ),
         );
       },
       onSceneChanged: (scene) => {

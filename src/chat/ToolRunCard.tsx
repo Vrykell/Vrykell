@@ -1,0 +1,228 @@
+/**
+ * ToolRunCard — 单个工具动作的行内卡片（零浮层）。
+ *
+ * 折叠态 = 单行摘要：动作图标 + 摘要文本 + 右侧状态 chip；
+ * 点击行内展开输出尾部（pre，maxHeight 240，超长截断提示「…仅显示尾部」）。
+ * 展开态是组件内 useState，不进 store。
+ *
+ * run_command 特殊：摘要行下方恒驻一张「内嵌命令块」——输出区样式与终端
+ * 输出块一致（圆角深底 + BlockOutput）。数据源优先活块（agentControl 的
+ * toolCall→block 映射 + blockStore，含 outputHtml 快照），重启后映射丢失
+ * 则降级为工具结果里捕获的输出文本。命令块因此成为回答的一部分，而不是
+ * 时间线上的独立条目。
+ *
+ * 定位约定：本卡根节点是静态流式元素；ToolNode（absolute）与 rail 线段
+ * 都由 AiBlock 的行容器（position:relative; paddingLeft:16）承载。
+ */
+
+import { useState } from 'react';
+import {
+  Brain,
+  Check,
+  FileText,
+  Folder,
+  Globe,
+  Pencil,
+  Search,
+  Terminal,
+  Wrench,
+  X,
+} from 'lucide-react';
+import ToolNode from './ToolNode';
+import BlockOutput from '../terminal/BlockOutput';
+import { useBlockStore } from '../stores/blocks';
+import { agentControl } from '../agent/agentControl';
+import type { ToolRun, ToolRunState } from '../agent/messageParts';
+
+const STATE_CHIP: Record<ToolRunState, { label: string; color: string }> = {
+  running: { label: '执行中', color: 'var(--accent-warm)' },
+  'approval-pending': { label: '等待批准', color: 'var(--accent-warm)' },
+  done: { label: '成功', color: 'var(--success)' },
+  error: { label: '失败', color: 'var(--error)' },
+  denied: { label: '已拒绝', color: 'var(--text-muted)' },
+};
+
+function str(v: unknown): string {
+  return typeof v === 'string' ? v : '';
+}
+
+/** 单行摘要（TOOL_SUMMARY 查表，未知工具 Wrench 兜底） */
+function summarize(run: ToolRun): { icon: React.ReactNode; text: string } {
+  const i = run.input;
+  const s = { size: 11, color: 'var(--text-muted)' } as const;
+  switch (run.toolName) {
+    case 'run_command':
+      return { icon: <Terminal {...s} />, text: `$ ${str(i.command)}` };
+    case 'read_file':
+      return { icon: <FileText {...s} />, text: `读取 ${str(i.path)}` };
+    case 'edit_file':
+      return { icon: <Pencil {...s} />, text: `修改 ${str(i.path)}` };
+    case 'write_file':
+      return { icon: <Pencil {...s} />, text: `写入 ${str(i.path)}` };
+    case 'search_files':
+      return { icon: <Search {...s} />, text: `搜索 ${str(i.query)}` };
+    case 'list_dir':
+      return { icon: <Folder {...s} />, text: `列目录 ${str(i.path)}` };
+    case 'web_search':
+      return { icon: <Globe {...s} />, text: `联网搜索 ${str(i.query)}` };
+    case 'think':
+      return { icon: <Brain {...s} />, text: '思考' };
+    default:
+      return { icon: <Wrench {...s} />, text: run.toolName };
+  }
+}
+
+/** run_command 的 output 是 {ok, exitCode, output} JSON；其余工具原样展示 */
+function expandBody(run: ToolRun): { exitCode?: number; body: string } {
+  const raw = run.error ?? run.output ?? '';
+  if (run.toolName === 'run_command' && run.output && !run.error) {
+    try {
+      const v = JSON.parse(run.output) as { exitCode?: number; output?: string };
+      return { exitCode: v.exitCode, body: v.output ?? '' };
+    } catch {
+      /* fallthrough：按原文展示 */
+    }
+  }
+  return { body: raw };
+}
+
+const BODY_CAP = 6000;
+
+/** run_command 的内嵌命令块：输出区与终端块同款渲染（BlockOutput）。
+ *  活块优先（含 outputHtml 颜色快照）；映射丢失（重启）降级 captured 文本。 */
+function EmbeddedCommandBlock({ run, paneId }: { run: ToolRun; paneId?: string }) {
+  const block = useBlockStore((s) => {
+    const id = agentControl.blockForToolCall(run.toolCallId);
+    if (!id || !paneId) return undefined;
+    return (s.byTab[paneId] ?? []).find((b) => b.id === id);
+  });
+
+  const { body: captured } = expandBody(run);
+  const running = run.state === 'running' || run.state === 'approval-pending';
+
+  let content: React.ReactNode;
+  if (block?.outputHtml) {
+    content = <BlockOutput text={block.outputHtml} isHtml maxHeight={240} />;
+  } else if (block?.outputText) {
+    content = <BlockOutput text={block.outputText} maxHeight={240} />;
+  } else if (run.error) {
+    content = <span style={{ color: 'var(--error-light)' }}>{run.error}</span>;
+  } else if (running && block) {
+    content = <span style={{ color: 'var(--text-muted)' }}>命令执行中…</span>;
+  } else if (captured) {
+    content = <BlockOutput text={captured} maxHeight={240} />;
+  } else if (running) {
+    content = <span style={{ color: 'var(--text-muted)' }}>命令执行中…</span>;
+  } else {
+    content = <span style={{ color: 'var(--text-muted)' }}>（无输出）</span>;
+  }
+
+  return (
+    <div
+      style={{
+        margin: '2px 0 6px',
+        borderRadius: 8,
+        background: 'var(--block)',
+        border: '1px solid var(--border)',
+        overflow: 'hidden',
+        fontFamily: 'var(--font-mono)',
+        fontSize: 11,
+        lineHeight: 1.5,
+      }}
+    >
+      {content}
+    </div>
+  );
+}
+
+export default function ToolRunCard({ run, paneId }: { run: ToolRun; paneId?: string }) {
+  const [open, setOpen] = useState(false);
+  const { icon, text } = summarize(run);
+  const chip = STATE_CHIP[run.state];
+  const { exitCode, body } = expandBody(run);
+  const isCommand = run.toolName === 'run_command';
+  // run_command 的输出由内嵌命令块恒驻展示，不再走点击展开
+  const expandable = !isCommand && body.length > 0;
+  const truncated = body.length > BODY_CAP;
+  const shown = truncated ? body.slice(-BODY_CAP) : body;
+
+  return (
+    <div>
+      {/* 节点压在 rail 上（left:0 = 行容器左缘 = rail），top 对齐摘要首行中心 */}
+      <ToolNode state={run.state} top={12} />
+      {/* 摘要行（点击行内展开） */}
+      <div
+        onClick={() => expandable && setOpen((o) => !o)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '3px 0',
+          cursor: expandable ? 'pointer' : 'default',
+          userSelect: 'none',
+          lineHeight: '18px',
+        }}
+      >
+        {icon}
+        <span
+          style={{
+            flex: 1,
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 11,
+            color: 'var(--text-secondary)',
+          }}
+        >
+          {text}
+        </span>
+        {/* run_command 的 exit 徽标（对齐 BlockItem 模式） */}
+        {isCommand && exitCode != null && (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 2,
+              fontSize: 10,
+              fontFamily: 'var(--font-mono)',
+              color: exitCode === 0 ? 'var(--success)' : 'var(--error)',
+              flexShrink: 0,
+            }}
+          >
+            {exitCode === 0 ? <Check size={10} /> : <X size={10} />}
+            {exitCode}
+          </span>
+        )}
+        <span style={{ fontSize: 10, color: chip.color, flexShrink: 0 }}>{chip.label}</span>
+      </div>
+
+      {/* run_command：内嵌命令块（恒驻） */}
+      {isCommand && <EmbeddedCommandBlock run={run} paneId={paneId} />}
+
+      {/* 其余工具：展开态输出/错误尾部 */}
+      {!isCommand && open && expandable && (
+        <pre
+          style={{
+            margin: '2px 0 6px',
+            padding: '6px 8px',
+            background: 'var(--block)',
+            borderRadius: 4,
+            fontFamily: 'var(--font-mono)',
+            fontSize: 11,
+            lineHeight: 1.5,
+            color: run.state === 'error' ? 'var(--error-light)' : 'var(--text-secondary)',
+            maxHeight: 240,
+            overflow: 'auto',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-all',
+          }}
+        >
+          {truncated ? '…仅显示尾部\n' : ''}
+          {shown}
+        </pre>
+      )}
+    </div>
+  );
+}

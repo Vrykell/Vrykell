@@ -1,5 +1,5 @@
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import remarkGfmSafe from './remarkGfmSafe';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import CommandBlock from './CommandBlock';
@@ -38,7 +38,7 @@ function remarkStandaloneMathDisplay() {
 export default function Markdown({ content }: { content: string }) {
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm, remarkMath, remarkStandaloneMathDisplay]}
+      remarkPlugins={[remarkGfmSafe, remarkMath, remarkStandaloneMathDisplay]}
       // throwOnError: false — AI 回答里的 `$` 片段（如 `$ make test`）常被 remark-math
       // 误判为公式；KaTeX 抛错会击穿 SafeMarkdown。容错模式下原样显示源码。
       rehypePlugins={[[rehypeKatex, { throwOnError: false, errorColor: '#bc362a' }]]}

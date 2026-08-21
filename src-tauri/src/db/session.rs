@@ -40,6 +40,7 @@ impl HistoryDb {
     }
 
     /// 追加/更新一条 AI 对话消息（助手流式完成时按 id 覆盖）。
+    /// parts = 消息 parts 渲染层的 JSON 串（'' = 无，见前端 messageParts.ts）。
     pub fn append_chat_message(
         &self,
         id: &str,
@@ -47,6 +48,7 @@ impl HistoryDb {
         role: &str,
         content: &str,
         created_at: u64,
+        parts: &str,
     ) -> Result<(), String> {
         // 会话行兜底（同 record_block）
         self.conn()
@@ -57,9 +59,9 @@ impl HistoryDb {
             .map_err(|e| e.to_string())?;
         self.conn()
             .execute(
-                "INSERT INTO chat_messages (id, session_id, role, content, created_at) VALUES (?1, ?2, ?3, ?4, ?5)
-                 ON CONFLICT(id) DO UPDATE SET content=excluded.content, created_at=excluded.created_at",
-                params![id, session_id, role, content, created_at as i64],
+                "INSERT INTO chat_messages (id, session_id, role, content, created_at, parts) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                 ON CONFLICT(id) DO UPDATE SET content=excluded.content, created_at=excluded.created_at, parts=excluded.parts",
+                params![id, session_id, role, content, created_at as i64, parts],
             )
             .map_err(|e| e.to_string())?;
         Ok(())
@@ -70,7 +72,7 @@ impl HistoryDb {
         let mut stmt = self
             .conn()
             .prepare(
-                "SELECT id, role, content, created_at FROM chat_messages WHERE session_id = ?1 ORDER BY created_at ASC",
+                "SELECT id, role, content, created_at, parts FROM chat_messages WHERE session_id = ?1 ORDER BY created_at ASC",
             )
             .map_err(|e| e.to_string())?;
         let rows = stmt
@@ -536,6 +538,7 @@ pub struct ChatMessageEntry {
     pub role: String,
     pub content: String,
     pub created_at: u64,
+    pub parts: String,
 }
 
 fn map_chat_message(row: &rusqlite::Row) -> rusqlite::Result<ChatMessageEntry> {
@@ -544,5 +547,6 @@ fn map_chat_message(row: &rusqlite::Row) -> rusqlite::Result<ChatMessageEntry> {
         role: row.get(1)?,
         content: row.get(2)?,
         created_at: row.get::<_, i64>(3)? as u64,
+        parts: row.get(4)?,
     })
 }

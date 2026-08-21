@@ -74,12 +74,14 @@ export interface BackendChatMessage {
   role: string;
   content: string;
   created_at: number;
+  /** 消息 parts 渲染层 JSON（'' = 无/旧数据，见 agent/messageParts.ts） */
+  parts: string;
 }
 
 export function appendChatMessage(
-  id: string, sessionId: string, role: string, content: string, createdAt: number,
+  id: string, sessionId: string, role: string, content: string, createdAt: number, parts: string,
 ): Promise<void> {
-  return invoke('append_chat_message', { id, sessionId, role, content, createdAt });
+  return invoke('append_chat_message', { id, sessionId, role, content, createdAt, parts });
 }
 
 export function listChatMessages(sessionId: string): Promise<BackendChatMessage[]> {

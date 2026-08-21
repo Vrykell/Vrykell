@@ -9,7 +9,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   Bookmark, Check, ChevronDown, ChevronRight, Copy, Ellipsis,
-  Maximize2, RotateCw, Skull, Sparkles, Square, Terminal, X,
+  Maximize2, RotateCw, Skull, Sparkles, Square, Terminal, X, Zap,
 } from 'lucide-react';
 import { useBlockStore, selectBlocks } from '../stores/blocks';
 import { useChatStore, usePaneMessages } from '../stores/chat';
@@ -18,6 +18,7 @@ import { useTerminalStore } from '../stores/terminal';
 import { useSearchHighlightStore } from '../stores/searchHighlight';
 import { toExchanges, mergeFlow } from '../chat/exchanges';
 import AiBlock from '../chat/AiBlock';
+import { agentControl } from '../agent/agentControl';
 import { ptyWrite } from '../lib/pty';
 import { killForeground } from '../lib/killForeground';
 import { useToastStore } from '../components/Toast';
@@ -67,7 +68,14 @@ export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8
     () => (chatPanelOpen ? [] : toExchanges(aiMessages)),
     [aiMessages, chatPanelOpen],
   );
-  const flow = useMemo(() => mergeFlow(completed, exchanges), [completed, exchanges]);
+  // agent 发起的已完成块不独立出现 —— 它们内嵌在回答的 run_command 节点下。
+  // 面板打开时回答不内联，块保持独立渲染（否则会整个不可见）。
+  // 运行中块不过滤：执行期间留在列表底部提供实时输出视图，完成后「对接」进回答。
+  const standalone = useMemo(
+    () => (chatPanelOpen ? completed : completed.filter((b) => !agentControl.hasBlock(b.id))),
+    [completed, chatPanelOpen],
+  );
+  const flow = useMemo(() => mergeFlow(standalone, exchanges), [standalone, exchanges]);
 
   if (flow.length === 0 && running.length === 0) return null;
 
@@ -330,6 +338,7 @@ function BlockItem({
             display: 'inline-flex', gap: 8, alignItems: 'center', flexShrink: 0,
             fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)',
           }}>
+            {block.agent && <Zap size={11} style={{ color: 'var(--accent-warm)' }} aria-label="AI 执行" />}
             {block.bookmarked && <Bookmark size={11} fill="currentColor" />}
             {block.exitCode !== null && (
               <span
@@ -461,6 +470,7 @@ function RunningItem({
           display: 'inline-flex', gap: 8, alignItems: 'center', flexShrink: 0,
           fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)',
         }}>
+          {block.agent && <Zap size={11} style={{ color: 'var(--accent-warm)' }} aria-label="AI 执行" />}
           {elapsedNow && (
             <span style={{ fontVariantNumeric: 'tabular-nums' }}>({elapsedNow})</span>
           )}

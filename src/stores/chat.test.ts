@@ -83,3 +83,110 @@ describe('chat store（按标签隔离）', () => {
     expect(useChatStore.getState().byTab[tabId]![0]!.paneId).toBeUndefined();
   });
 });
+
+describe('chat store v2（parts / 工具事件）', () => {
+  beforeEach(() => {
+    useChatStore.setState(initialChat, true);
+    useWorkspaceStore.setState(initialWs, true);
+  });
+
+  it('纯文本回答 parts 恒为 undefined（legacy 渲染契约）', async () => {
+    const tabId = useWorkspaceStore.getState().activeId;
+    const fake = async (_m: unknown, onChunk: (t: string) => void) => {
+      onChunk('纯文本');
+    };
+    await useChatStore.getState().send('hi', { streamFn: fake });
+    const assistant = useChatStore.getState().byTab[tabId]![1]!;
+    expect(assistant.content).toBe('纯文本');
+    expect(assistant.parts).toBeUndefined();
+  });
+
+  it('onToolEvent 惰性物化 parts，文本/工具保持时间序', async () => {
+    const tabId = useWorkspaceStore.getState().activeId;
+    const fake = async (
+      _m: unknown,
+      onChunk: (t: string) => void,
+      ctx?: { handlers?: { onToolEvent?: (run: never) => void } },
+    ) => {
+      onChunk('先看看');
+      ctx?.handlers?.onToolEvent?.({
+        toolCallId: 't1',
+        toolName: 'run_command',
+        input: { command: 'ls' },
+        state: 'running',
+        startedAt: 100,
+      } as never);
+      onChunk('执行完了');
+      ctx?.handlers?.onToolEvent?.({
+        toolCallId: 't1',
+        toolName: 'run_command',
+        input: { command: 'ls' },
+        state: 'done',
+        output: '{"ok":true}',
+        startedAt: undefined,
+        endedAt: 200,
+      } as never);
+    };
+    await useChatStore.getState().send('跑个命令', { streamFn: fake });
+    const assistant = useChatStore.getState().byTab[tabId]![1]!;
+    expect(assistant.content).toBe('先看看执行完了');
+    const parts = assistant.parts!;
+    expect(parts).toHaveLength(3);
+    expect(parts[0]).toEqual({ kind: 'text', text: '先看看' });
+    expect(parts[2]).toEqual({ kind: 'text', text: '执行完了' });
+    const tool = parts[1]!.kind === 'tool' ? parts[1]!.tool : null;
+    // 合并补丁：startedAt 不被 undefined 覆盖，终态字段落上
+    expect(tool).toMatchObject({ toolCallId: 't1', state: 'done', startedAt: 100, endedAt: 200 });
+  });
+
+  it('流式失败时未完结的工具落 error 终态', async () => {
+    const tabId = useWorkspaceStore.getState().activeId;
+    const fail = async (
+      _m: unknown,
+      _c: (t: string) => void,
+      ctx?: { handlers?: { onToolEvent?: (run: never) => void } },
+    ) => {
+      ctx?.handlers?.onToolEvent?.({
+        toolCallId: 't9',
+        toolName: 'run_command',
+        input: { command: 'rm x' },
+        state: 'running',
+        startedAt: 1,
+      } as never);
+      throw new Error('boom');
+    };
+    await useChatStore.getState().send('hi', { streamFn: fail });
+    const assistant = useChatStore.getState().byTab[tabId]![1]!;
+    expect(assistant.error).toBe(true);
+    const tool = assistant.parts![0]!.kind === 'tool' ? assistant.parts![0]!.tool : null;
+    expect(tool!.state).toBe('error');
+    expect(tool!.endedAt).toBeDefined();
+  });
+
+  it('history 中助手消息追加工具摘要（模型可见本轮动作）', async () => {
+    const tabId = useWorkspaceStore.getState().activeId;
+    const first = async (
+      _m: unknown,
+      _c: (t: string) => void,
+      ctx?: { handlers?: { onToolEvent?: (run: never) => void } },
+    ) => {
+      ctx?.handlers?.onToolEvent?.({
+        toolCallId: 't1',
+        toolName: 'run_command',
+        input: { command: 'ls -la' },
+        state: 'done',
+        startedAt: 1,
+        endedAt: 2,
+      } as never);
+    };
+    await useChatStore.getState().send('第一轮', { streamFn: first });
+    let seen: Array<{ role: string; content: string }> = [];
+    const second = async (msgs: Array<{ role: string; content: string }>) => {
+      seen = msgs;
+    };
+    await useChatStore.getState().send('第二轮', { streamFn: second });
+    const prevAssistant = seen.find((m) => m.role === 'assistant')!;
+    expect(prevAssistant.content).toContain('[执行命令: ls -la → 成功]');
+    expect(tabId).toBeTruthy();
+  });
+});

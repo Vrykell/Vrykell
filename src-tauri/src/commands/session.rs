@@ -137,9 +137,10 @@ pub fn append_chat_message(
     role: String,
     content: String,
     created_at: u64,
+    parts: String,
 ) -> Result<(), String> {
     let db = state.0.lock().map_err(|e| e.to_string())?;
-    db.append_chat_message(&id, &session_id, &role, &content, created_at)
+    db.append_chat_message(&id, &session_id, &role, &content, created_at, &parts)
 }
 
 #[tauri::command]

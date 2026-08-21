@@ -38,7 +38,10 @@ export type FlowItem =
   | { type: 'block'; block: TermBlock; ts: number }
   | { type: 'ai'; exchange: ChatExchange; ts: number };
 
-/** 命令块与 AI 交换按时间戳归并排序（稳定：同时间块在前；无 startedAt 的块视为最早）。 */
+/** 命令块与 AI 交换按时间戳归并排序（稳定：同时间块在前；无 startedAt 的块视为最早）。
+ *
+ *  agent 发起的命令块不进入本流程 —— 调用方（TerminalBlockList）预先过滤，
+ *  它们由 AiBlock 内嵌渲染在 run_command 节点之下，不再是独立时间线条目。 */
 export function mergeFlow(blocks: TermBlock[], exchanges: ChatExchange[]): FlowItem[] {
   const items: FlowItem[] = [
     ...blocks.map((block) => ({ type: 'block' as const, block, ts: block.startedAt ?? 0 })),
