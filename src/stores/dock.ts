@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { SquareStack, Folder, Server, type LucideIcon } from 'lucide-react';
+import { SquareStack, Folder, Server, Sparkles, type LucideIcon } from 'lucide-react';
 import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '../lib/errorHandler';
 import { useWorkspaceStore, isSessionTab } from './workspace';
 import { minTerminalWidth, MIN_PANE_SIZE } from '../lib/windowLayout';
@@ -17,6 +17,7 @@ export const PANEL_DEFS: Record<string, PanelDef> = {
   tabs:  { id: 'tabs',  icon: SquareStack, label: '标签', width: 200 },
   files: { id: 'files', icon: Folder, label: '资源', width: 240 },
   ssh:   { id: 'ssh',   icon: Server, label: 'SSH', width: 260 },
+  chat:  { id: 'chat',  icon: Sparkles, label: 'AI', width: 320 },
 };
 
 export type DockSide = 'left' | 'right';
@@ -110,6 +111,11 @@ function currentTerminalMinWidth(): number {
 }
 
 const saved = loadLayout();
+
+/** AI 面板是否已打开（打开时终端块流不再内联 AI 回答，避免两处重复） */
+export function useChatPanelOpen(): boolean {
+  return useDockStore((s) => s.leftPanels.includes('chat') || s.rightPanels.includes('chat'));
+}
 
 export const useDockStore = create<DockState>((set) => ({
   leftZone: saved.leftZone,

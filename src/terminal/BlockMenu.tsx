@@ -9,6 +9,8 @@ import type { TermBlock } from './pipeline/termBlock';
 
 interface Props {
   block: TermBlock;
+  /** 该块所属 pane（「发给 AI 分析」时作为对话来源，回答内联回本 pane 块流） */
+  paneId: string;
   anchor: DOMRect;
   onClose: () => void;
   getOutputText: () => string;
@@ -45,7 +47,7 @@ function MenuItem({ label, shortcut, onClick }: { label: string; shortcut?: stri
   );
 }
 
-export default function BlockMenu({ block, anchor, onClose, getOutputText }: Props) {
+export default function BlockMenu({ block, paneId, anchor, onClose, getOutputText }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -73,9 +75,10 @@ export default function BlockMenu({ block, anchor, onClose, getOutputText }: Pro
     const output = getOutputText();
     useChatStore.getState().send(
       `分析这条命令的执行结果：\n\`\`\`\n$ ${block.command}\n${output}\n\`\`\``,
+      { paneId },
     );
     onClose();
-  }, [block, getOutputText, onClose]);
+  }, [block, paneId, getOutputText, onClose]);
 
   const duration = block.endedAt && block.startedAt
     ? formatDuration(block.endedAt - block.startedAt)

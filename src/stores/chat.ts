@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useShallow } from 'zustand/react/shallow';
 import { useWorkspaceStore } from './workspace';
 import { appendChatMessage } from '../api/session';
 
@@ -6,13 +7,25 @@ export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  /** 来源 pane（分屏时区分对话线；旧持久化消息没有，仅面板可见） */
+  paneId?: string;
+  /** 发送时间戳（块流内联时与命令块按时间归并） */
+  createdAt: number;
   pending?: boolean;
+  /** 流式失败标记（渲染为错误态 gutter） */
+  error?: boolean;
 }
 
 export type StreamFn = (
   messages: Array<{ role: string; content: string }>,
   onChunk: (text: string) => void,
 ) => Promise<void>;
+
+export interface SendOptions {
+  /** 来源 pane；缺省时为 undefined（仅进面板，不进块流） */
+  paneId?: string;
+  streamFn?: StreamFn;
+}
 
 let counter = 0;
 const nextId = () => `m${Date.now()}-${counter++}`;
@@ -26,7 +39,7 @@ interface ChatState {
   draft: string;
   setDraft: (text: string) => void;
   appendDraft: (text: string) => void;
-  send: (text: string, streamFn?: StreamFn) => Promise<void>;
+  send: (text: string, opts?: SendOptions) => Promise<void>;
   appendChunk: (tabId: string, id: string, chunk: string) => void;
   /** 清空当前标签页的对话 */
   clearTab: () => void;
@@ -59,19 +72,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
         },
       };
     }),
-  send: async (text, streamFn) => {
+  send: async (text, opts) => {
     const tabId = useWorkspaceStore.getState().activeId;
     const trimmed = text.trim();
     if (!trimmed || get().sendingTab) return;
-    const userMsg: ChatMessage = { id: nextId(), role: 'user', content: trimmed };
-    const assistantMsg: ChatMessage = { id: nextId(), role: 'assistant', content: '', pending: true };
+    const now = Date.now();
+    const base = { paneId: opts?.paneId, createdAt: now };
+    const userMsg: ChatMessage = { id: nextId(), role: 'user', content: trimmed, ...base };
+    const assistantMsg: ChatMessage = { id: nextId(), role: 'assistant', content: '', pending: true, ...base };
     set((s) => ({
       byTab: { ...s.byTab, [tabId]: [...(s.byTab[tabId] ?? []), userMsg, assistantMsg] },
       sendingTab: tabId,
       draft: '',
     }));
     // 持久化用户消息（AI 对话是会话状态的一部分）
-    appendChatMessage(userMsg.id, tabId, userMsg.role, userMsg.content, Date.now()).catch(() => {});
+    appendChatMessage(userMsg.id, tabId, userMsg.role, userMsg.content, now).catch(() => {});
     useWorkspaceStore.getState().titleFromMessage(tabId, trimmed);
     const history = (get().byTab[tabId] ?? [])
       .filter((m) => !m.pending)
@@ -94,9 +109,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
       if (timer === null) timer = setTimeout(flush, 50);
     };
 
+    let failed = false;
     try {
-      await (streamFn ?? defaultStream)(history, onChunk);
+      await (opts?.streamFn ?? defaultStream)(history, onChunk);
     } catch (err) {
+      failed = true;
       pending += `\n\n> 出错了：${err instanceof Error ? err.message : String(err)}`;
     } finally {
       if (timer !== null) {
@@ -111,7 +128,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           byTab: {
             ...s.byTab,
             [tabId]: (s.byTab[tabId] ?? []).map((m) =>
-              m.id === assistantMsg.id ? { ...m, pending: false } : m,
+              m.id === assistantMsg.id ? { ...m, pending: false, error: failed || undefined } : m,
             ),
           },
         };
@@ -148,4 +165,15 @@ const EMPTY: ChatMessage[] = [];
 export function useActiveMessages(): ChatMessage[] {
   const activeId = useWorkspaceStore((s) => s.activeId);
   return useChatStore((s) => s.byTab[activeId] ?? EMPTY);
+}
+
+/**
+ * 读取某个 pane 的对话线（块流内联用）。
+ * 无 paneId 的 tab 级旧消息不进块流，只在面板可见。
+ */
+export function usePaneMessages(paneId: string): ChatMessage[] {
+  const activeId = useWorkspaceStore((s) => s.activeId);
+  return useChatStore(
+    useShallow((s) => (s.byTab[activeId] ?? EMPTY).filter((m) => m.paneId === paneId)),
+  );
 }

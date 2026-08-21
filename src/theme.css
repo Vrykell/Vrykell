@@ -140,6 +140,10 @@ button:disabled { opacity: 0.45; cursor: default; }
 .group-actions { opacity: 0; transition: opacity 0.12s ease; }
 [data-group-header-id]:hover .group-actions { opacity: 1; }
 
+/* AI 问答块：hover 时才显示操作按钮（重新提问/复制） */
+.ai-block-actions { opacity: 0; transition: opacity 0.12s ease; }
+.ai-block:hover .ai-block-actions { opacity: 1; }
+
 /* 分组容器/头：idle 全透明，hover/含活跃标签时才显灰 */
 .tab-group-container {
   background: transparent;
