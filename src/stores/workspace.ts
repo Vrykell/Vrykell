@@ -35,6 +35,9 @@ interface TabBase {
   title: string;
   /** 标题是否已定名（true 时不被「首条命令/消息」自动改名） */
   named?: boolean;
+  /** 标题来自自动命名（截断兜底或 AI 智能标题）；手动 renameTab 后为 false/缺省。
+   *  智能标题（M7 autoTitle）只覆盖未定名或自动命名的标签，尊重手动命名 */
+  titleAuto?: boolean;
 }
 
 /**
@@ -133,6 +136,8 @@ interface WorkspaceState {
   titleFromMessage: (id: string, text: string) => void;
   /** 用首条命令命名标签（惯用命名范式）；已定名则不覆盖 */
   titleFromCommand: (id: string, text: string) => void;
+  /** M7 智能标题：只覆盖未定名/自动命名的标题（手动命名不动） */
+  autoTitle: (id: string, title: string) => void;
   renameTab: (id: string, title: string) => void;
   undoCloseTab: () => void;
   /** 更新某终端的当前工作目录（从 shell OSC 7 检测），keyed by 终端 id */
@@ -309,7 +314,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (!tab || tab.named || !isSessionTab(tab)) return;
     const newTitle = text.slice(0, 14) + (text.length > 14 ? '…' : '');
     set((s) => ({
-      tabs: s.tabs.map((t) => (t.id === id ? { ...t, title: newTitle, named: true } : t)),
+      tabs: s.tabs.map((t) => (t.id === id ? { ...t, title: newTitle, named: true, titleAuto: true } : t)),
     }));
     sessionManager.rename(id, newTitle);
   },
@@ -320,13 +325,23 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (!cmd) return;
     const newTitle = cmd.slice(0, 24) + (cmd.length > 24 ? '…' : '');
     set((s) => ({
-      tabs: s.tabs.map((t) => (t.id === id ? { ...t, title: newTitle, named: true } : t)),
+      tabs: s.tabs.map((t) => (t.id === id ? { ...t, title: newTitle, named: true, titleAuto: true } : t)),
     }));
     sessionManager.rename(id, newTitle);
   },
+  autoTitle: (id, title) => {
+    const tab = get().tabs.find((t) => t.id === id);
+    if (!tab || !isSessionTab(tab) || !title) return;
+    // 手动命名（named 且非自动来源）的标题永不被覆盖
+    if (tab.named && !tab.titleAuto) return;
+    set((s) => ({
+      tabs: s.tabs.map((t) => (t.id === id ? { ...t, title, named: true, titleAuto: true } : t)),
+    }));
+    sessionManager.rename(id, title);
+  },
   renameTab: (id, title) => {
     set((s) => ({
-      tabs: s.tabs.map((t) => (t.id === id ? { ...t, title: title || DEFAULT_TITLE, named: true } : t)),
+      tabs: s.tabs.map((t) => (t.id === id ? { ...t, title: title || DEFAULT_TITLE, named: true, titleAuto: false } : t)),
     }));
     if (title) useToastStore.getState().addToast(t('toast.renamed', { title }), 'success');
     sessionManager.rename(id, title);

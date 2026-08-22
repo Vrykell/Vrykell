@@ -238,6 +238,52 @@ pub fn get_ai_config(state: State<'_, AiConfig>) -> AiConfigInfo {
         })
 }
 
+/// Tavily 搜索转发：openai-compatible 无原生搜索能力时的兜底。
+/// key 由 Rust 附加，不进 webview；返回 Tavily 原始 JSON（前端截取展示）。
+#[tauri::command]
+pub async fn tavily_search(
+    state: State<'_, AiConfig>,
+    query: String,
+    max_results: Option<u32>,
+) -> Result<serde_json::Value, String> {
+    let key = {
+        let c = state.0.lock().map_err(|e| e.to_string())?;
+        c.tavily_key
+            .clone()
+            .ok_or_else(|| "尚未配置 Tavily API Key，请先在设置中填入".to_string())?
+    };
+    let q = query.trim().to_string();
+    if q.is_empty() {
+        return Err("搜索词不能为空".to_string());
+    }
+    let client = reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("初始化 HTTP 客户端失败：{e}"))?;
+    let resp = client
+        .post("https://api.tavily.com/search")
+        .json(&serde_json::json!({
+            "api_key": key,
+            "query": q,
+            "max_results": max_results.unwrap_or(5).clamp(1, 8),
+            "include_answer": true,
+        }))
+        .send()
+        .await
+        .map_err(|e| format!("请求 Tavily 失败：{e}"))?;
+    let status = resp.status();
+    let text = resp
+        .text()
+        .await
+        .map_err(|e| format!("读取 Tavily 响应失败：{e}"))?;
+    if !status.is_success() {
+        let cap = text.len().min(300);
+        return Err(format!("Tavily 返回 {status}：{}", &text[..cap]));
+    }
+    serde_json::from_str(&text).map_err(|e| format!("解析 Tavily 响应失败：{e}"))
+}
+
 #[tauri::command]
 pub async fn ai_stream(
     app: AppHandle,

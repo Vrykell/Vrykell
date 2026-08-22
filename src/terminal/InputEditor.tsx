@@ -12,7 +12,7 @@
  *   └──────────────────────────────────────────────┘
  */
 
-import { useRef, useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
+import { useRef, useState, useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { Columns2, GitBranch, X, Zap } from 'lucide-react';
 import { ptyWrite } from '../lib/pty';
 import { useTerminalStore } from '../stores/terminal';
@@ -25,6 +25,8 @@ import { useBlockStore } from '../stores/blocks';
 import { useInputStore, selectPaneInput } from '../stores/input';
 import { isInputBoxVisible, getLongRunningHint } from './inputVisibility';
 import { agentControl } from '../agent/agentControl';
+import { useAgentSettings } from '../agent/agentSettings';
+import { completeCommand } from '../agent/complete';
 import { engageFollow } from './useFollowBottom';
 import ShellIndicator from './ShellIndicator';
 
@@ -152,6 +154,46 @@ export default function InputEditor({
   const resetHeight = useCallback(() => {
     if (inputRef.current) inputRef.current.style.height = 'auto';
   }, []);
+
+  // ── 命令自动补全（M8 ghost text）──
+  // 本地级（历史前缀/路径）零网络始终可用；AI 增强有 key 才叠加。
+  // 输入变化防抖后发请求，seq + AbortController 双保险防止过期建议落地。
+  const completeOn = useAgentSettings((s) => s.completeEnabled);
+  const completeDebounceMs = useAgentSettings((s) => s.completeDebounceMs);
+  const [ghost, setGhost] = useState('');
+  const ghostSeq = useRef(0);
+
+  const clearGhost = useCallback(() => {
+    ghostSeq.current++;
+    setGhost('');
+  }, []);
+
+  useEffect(() => {
+    setGhost('');
+    if (
+      !completeOn ||
+      aiMode ||
+      !isFocused ||
+      !visible ||
+      text.trim().length < 3 ||
+      text.includes('\n')
+    ) {
+      return;
+    }
+    const seq = ++ghostSeq.current;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => {
+      completeCommand(text, { cwd: tabCwd }, ctrl.signal)
+        .then((suffix) => {
+          if (suffix && seq === ghostSeq.current && !ctrl.signal.aborted) setGhost(suffix);
+        })
+        .catch(() => {});
+    }, completeDebounceMs);
+    return () => {
+      ctrl.abort();
+      clearTimeout(timer);
+    };
+  }, [text, aiMode, completeOn, completeDebounceMs, isFocused, visible, tabCwd]);
 
   const execute = useCallback(() => {
     const cmd = text.trim();
@@ -318,42 +360,85 @@ export default function InputEditor({
           {aiMode ? <Zap size={13} /> : '$'}
         </span>
 
-        <textarea
-          ref={inputRef}
-          value={text}
-          placeholder={aiMode ? '自然语言描述你想做什么…' : '输入命令…'}
-          rows={1}
-          onChange={(e) => {
-            setText(e.target.value);
-            e.target.style.height = 'auto';
-            e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              execute();
-            }
-            if (e.key === 'Escape') {
-              if (text) {
-                setText('');
-                resetHeight();
-              } else if (aiMode) setAiMode(false);
-            }
-          }}
-          style={{
-            flex: 1,
-            minWidth: 0,
-            resize: 'none',
-            background: 'transparent',
-            border: 'none',
-            padding: '1px 0',
-            fontSize: 13,
-            fontFamily: 'var(--font-mono)',
-            color: 'var(--text-primary)',
-            lineHeight: '22px',
-            outline: 'none',
-          }}
-        />
+        {/* textarea + ghost overlay（绝对定位同字体同内边距，透明已输入 + muted 建议后缀） */}
+        <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+          <textarea
+            ref={inputRef}
+            value={text}
+            placeholder={aiMode ? '自然语言描述你想做什么…' : '输入命令…'}
+            rows={1}
+            onChange={(e) => {
+              setText(e.target.value);
+              e.target.style.height = 'auto';
+              e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+            }}
+            onKeyDown={(e) => {
+              // Tab 接受建议 / Esc 丢弃建议（优先于清空文本）
+              if (ghost && e.key === 'Tab') {
+                e.preventDefault();
+                setText(text + ghost);
+                clearGhost();
+                const el = inputRef.current;
+                if (el) {
+                  el.style.height = 'auto';
+                  requestAnimationFrame(() => {
+                    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+                  });
+                }
+                return;
+              }
+              if (ghost && e.key === 'Escape') {
+                clearGhost();
+                return;
+              }
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                clearGhost();
+                execute();
+              }
+              if (e.key === 'Escape') {
+                if (text) {
+                  setText('');
+                  resetHeight();
+                } else if (aiMode) setAiMode(false);
+              }
+            }}
+            style={{
+              position: 'relative',
+              zIndex: 1,
+              width: '100%',
+              resize: 'none',
+              background: 'transparent',
+              border: 'none',
+              padding: '1px 0',
+              fontSize: 13,
+              fontFamily: 'var(--font-mono)',
+              color: 'var(--text-primary)',
+              lineHeight: '22px',
+              outline: 'none',
+            }}
+          />
+          {ghost && (
+            <div
+              aria-hidden
+              style={{
+                position: 'absolute',
+                inset: 0,
+                zIndex: 0,
+                pointerEvents: 'none',
+                padding: '1px 0',
+                fontSize: 13,
+                fontFamily: 'var(--font-mono)',
+                lineHeight: '22px',
+                whiteSpace: 'pre-wrap',
+                overflowWrap: 'break-word',
+              }}
+            >
+              <span style={{ color: 'transparent' }}>{text}</span>
+              <span style={{ color: 'var(--text-muted)', opacity: 0.6 }}>{ghost}</span>
+            </div>
+          )}
+        </div>
 
         {/* 操作按钮 — subtle hover effect：分裂 + 关闭当前终端 */}
         <InputActionBtn title="选择类型分裂" onClick={() => useUiStore.getState().openSplitPicker()}>

@@ -76,14 +76,22 @@ export interface BackendChatMessage {
   created_at: number;
   /** 消息 parts 渲染层 JSON（'' = 无/旧数据，见 agent/messageParts.ts） */
   parts: string;
+  /** 附件元数据 JSON（M5，'' = 无/旧数据，见 agent/attachments.ts） */
+  attachments: string;
 }
 
 export function appendChatMessage(
   id: string, sessionId: string, role: string, content: string, createdAt: number, parts: string,
+  attachments = '',
 ): Promise<void> {
-  return invoke('append_chat_message', { id, sessionId, role, content, createdAt, parts });
+  return invoke('append_chat_message', { id, sessionId, role, content, createdAt, parts, attachments });
 }
 
 export function listChatMessages(sessionId: string): Promise<BackendChatMessage[]> {
   return invoke('list_chat_messages', { sessionId });
+}
+
+/** 删除单条 AI 对话消息（M4：重新生成/编辑重发/删除交换）。幂等。 */
+export function deleteChatMessage(id: string): Promise<void> {
+  return invoke('delete_chat_message', { id });
 }

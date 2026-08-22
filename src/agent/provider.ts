@@ -8,6 +8,7 @@
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import type { Tool } from 'ai';
 import { createProxyFetch } from './llmFetch';
 
 export type ProviderKind = 'openai-compatible' | 'anthropic' | 'gemini';
@@ -20,9 +21,13 @@ export interface ChatModelConfig {
 
 let proxyFetch: typeof fetch | null = null;
 
-export function createChatModel(cfg: ChatModelConfig) {
+function getProxyFetch(): typeof fetch {
   proxyFetch ??= createProxyFetch();
-  const fetchImpl = proxyFetch;
+  return proxyFetch;
+}
+
+export function createChatModel(cfg: ChatModelConfig) {
+  const fetchImpl = getProxyFetch();
   switch (cfg.provider) {
     case 'anthropic':
       return createAnthropic({ apiKey: 'proxy-managed', fetch: fetchImpl })(cfg.model);
@@ -35,5 +40,55 @@ export function createChatModel(cfg: ChatModelConfig) {
         apiKey: 'proxy-managed',
         fetch: fetchImpl,
       })(cfg.model);
+  }
+}
+
+/**
+ * 原生联网搜索工具（provider 服务端执行，无本地 execute）。
+ * 返回工具表里的键名 + 工具实例；openai-compatible 无原生能力返回 null
+ * （由调用方用 Tavily 兜底）。anthropic 的键名必须是 web_search，
+ * gemini 必须是 google_search（provider 侧按名字识别）。
+ */
+export function createNativeWebSearchTool(
+  provider: ProviderKind,
+): { name: string; tool: Tool } | null {
+  const fetchImpl = getProxyFetch();
+  switch (provider) {
+    case 'anthropic':
+      return {
+        name: 'web_search',
+        tool: createAnthropic({ apiKey: 'proxy-managed', fetch: fetchImpl }).tools
+          .webSearch_20250305({ maxUses: 5 }) as Tool,
+      };
+    case 'gemini':
+      return {
+        name: 'google_search',
+        tool: createGoogleGenerativeAI({ apiKey: 'proxy-managed', fetch: fetchImpl }).tools
+          .googleSearch({}) as Tool,
+      };
+    default:
+      return null;
+  }
+}
+
+/**
+ * 深思考开关 → streamText providerOptions。
+ * openai-compatible 的键名 = createOpenAICompatible 的 name（'vrykell'），
+ * SDK 会把它合并进请求体；anthropic 开启 thinking 时调用方还需把
+ * maxOutputTokens 抬到 budgetTokens 之上（API 硬性约束）。
+ */
+/** providerOptions 用的 JSON 子集类型（SDK 的 ProviderOptions 未从 'ai' 顶层导出） */
+type Jsonish = string | number | boolean | { [k: string]: Jsonish };
+
+export function deepThinkProviderOptions(
+  provider: ProviderKind,
+): Record<string, Record<string, Jsonish>> {
+  switch (provider) {
+    case 'anthropic':
+      return { anthropic: { thinking: { type: 'enabled', budgetTokens: 8000 } } };
+    case 'gemini':
+      return { google: { thinkingConfig: { thinkingBudget: 8192 } } };
+    default:
+      return { vrykell: { reasoning_effort: 'high' } };
   }
 }

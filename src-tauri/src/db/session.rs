@@ -49,6 +49,7 @@ impl HistoryDb {
         content: &str,
         created_at: u64,
         parts: &str,
+        attachments: &str,
     ) -> Result<(), String> {
         // 会话行兜底（同 record_block）
         self.conn()
@@ -59,9 +60,9 @@ impl HistoryDb {
             .map_err(|e| e.to_string())?;
         self.conn()
             .execute(
-                "INSERT INTO chat_messages (id, session_id, role, content, created_at, parts) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
-                 ON CONFLICT(id) DO UPDATE SET content=excluded.content, created_at=excluded.created_at, parts=excluded.parts",
-                params![id, session_id, role, content, created_at as i64, parts],
+                "INSERT INTO chat_messages (id, session_id, role, content, created_at, parts, attachments) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                 ON CONFLICT(id) DO UPDATE SET content=excluded.content, created_at=excluded.created_at, parts=excluded.parts, attachments=excluded.attachments",
+                params![id, session_id, role, content, created_at as i64, parts, attachments],
             )
             .map_err(|e| e.to_string())?;
         Ok(())
@@ -72,13 +73,22 @@ impl HistoryDb {
         let mut stmt = self
             .conn()
             .prepare(
-                "SELECT id, role, content, created_at, parts FROM chat_messages WHERE session_id = ?1 ORDER BY created_at ASC",
+                "SELECT id, role, content, created_at, parts, attachments FROM chat_messages WHERE session_id = ?1 ORDER BY created_at ASC",
             )
             .map_err(|e| e.to_string())?;
         let rows = stmt
             .query_map(params![session_id], map_chat_message)
             .map_err(|e| e.to_string())?;
         Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    /// 删除单条 AI 对话消息（M4：重新生成/编辑重发/删除交换）。
+    /// 幂等：id 不存在不报错。
+    pub fn delete_chat_message(&self, id: &str) -> Result<(), String> {
+        self.conn()
+            .execute("DELETE FROM chat_messages WHERE id = ?1", params![id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
     }
 
     pub fn restore_session(&self, id: &str) -> Result<(), String> {
@@ -539,6 +549,8 @@ pub struct ChatMessageEntry {
     pub content: String,
     pub created_at: u64,
     pub parts: String,
+    /// 附件元数据 JSON（M5，'' = 无/旧数据）
+    pub attachments: String,
 }
 
 fn map_chat_message(row: &rusqlite::Row) -> rusqlite::Result<ChatMessageEntry> {
@@ -548,5 +560,6 @@ fn map_chat_message(row: &rusqlite::Row) -> rusqlite::Result<ChatMessageEntry> {
         content: row.get(2)?,
         created_at: row.get::<_, i64>(3)? as u64,
         parts: row.get(4)?,
+        attachments: row.get(5)?,
     })
 }

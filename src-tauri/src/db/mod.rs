@@ -141,6 +141,8 @@ fn init_schema(conn: &Connection) -> Result<(), String> {
     let _ = conn.execute_batch("ALTER TABLE blocks ADD COLUMN collapsed INTEGER NOT NULL DEFAULT 0;");
     // 迁移：chat_messages 添加 parts（AI 消息的 parts 渲染层 JSON，'' = 无/旧数据）
     let _ = conn.execute_batch("ALTER TABLE chat_messages ADD COLUMN parts TEXT NOT NULL DEFAULT '';");
+    // 迁移：chat_messages 添加 attachments（用户消息附件元数据 JSON，M5）
+    let _ = conn.execute_batch("ALTER TABLE chat_messages ADD COLUMN attachments TEXT NOT NULL DEFAULT '';");
     // 索引放在迁移之后创建：老库在 ALTER 前还没有 group_id 列
     let _ = conn.execute_batch("CREATE INDEX IF NOT EXISTS idx_sessions_group ON sessions(group_id);");
     Ok(())
@@ -219,7 +221,7 @@ mod tests {
         let db = test_db();
         db.create_session("s1", "标题", 0, "", "local", "{}").unwrap();
         db.record_block("b1", "s1", None, "ls", "o", "o", Some(0), "done", 1, Some(2)).unwrap();
-        db.append_chat_message("m1", "s1", "user", "hi", 1, "").unwrap();
+        db.append_chat_message("m1", "s1", "user", "hi", 1, "", "").unwrap();
         db.delete_session("s1").unwrap();
         assert!(db.get_session_blocks("s1").unwrap().is_empty());
         assert!(db.get_chat_messages("s1").unwrap().is_empty());
@@ -242,10 +244,10 @@ mod tests {
     fn chat_message_append_upserts_and_lists_in_order() {
         let db = test_db();
         db.create_session("s1", "标题", 0, "", "local", "{}").unwrap();
-        db.append_chat_message("m1", "s1", "user", "第一", 1, "").unwrap();
-        db.append_chat_message("m2", "s1", "assistant", "答", 2, "").unwrap();
+        db.append_chat_message("m1", "s1", "user", "第一", 1, "", "").unwrap();
+        db.append_chat_message("m2", "s1", "assistant", "答", 2, "", "").unwrap();
         // 助手流式更新（同 id 覆盖）
-        db.append_chat_message("m2", "s1", "assistant", "答案", 2, "").unwrap();
+        db.append_chat_message("m2", "s1", "assistant", "答案", 2, "", "").unwrap();
         let msgs = db.get_chat_messages("s1").unwrap();
         assert_eq!(msgs.len(), 2);
         assert_eq!(msgs[0].content, "第一");
@@ -259,12 +261,29 @@ mod tests {
         let db = test_db();
         db.create_session("s1", "标题", 0, "", "local", "{}").unwrap();
         let parts = r#"[{"kind":"text","text":"hi"},{"kind":"tool","tool":{"toolCallId":"t1","toolName":"run_command","input":{"command":"ls"},"state":"done","startedAt":1}}]"#;
-        db.append_chat_message("m1", "s1", "assistant", "hi", 1, parts).unwrap();
+        db.append_chat_message("m1", "s1", "assistant", "hi", 1, parts, "").unwrap();
         let msgs = db.get_chat_messages("s1").unwrap();
         assert_eq!(msgs[0].parts, parts);
         // 同 id 覆盖时 parts 同步更新
-        db.append_chat_message("m1", "s1", "assistant", "hi!", 1, "").unwrap();
+        db.append_chat_message("m1", "s1", "assistant", "hi!", 1, "", "").unwrap();
         assert_eq!(db.get_chat_messages("s1").unwrap()[0].parts, "");
+    }
+
+    #[test]
+    fn chat_message_delete_is_idempotent() {
+        let db = test_db();
+        db.create_session("s1", "标题", 0, "", "local", "{}").unwrap();
+        db.append_chat_message("m1", "s1", "user", "问", 1, "", "").unwrap();
+        db.append_chat_message("m2", "s1", "assistant", "答", 2, "", "").unwrap();
+        // 删除其中一条，其余保留且顺序不变
+        db.delete_chat_message("m1").unwrap();
+        let msgs = db.get_chat_messages("s1").unwrap();
+        assert_eq!(msgs.len(), 1);
+        assert_eq!(msgs[0].id, "m2");
+        // 幂等：重复删除 / 删除不存在的 id 均不报错
+        db.delete_chat_message("m1").unwrap();
+        db.delete_chat_message("nope").unwrap();
+        assert_eq!(db.get_chat_messages("s1").unwrap().len(), 1);
     }
 
     #[test]

@@ -1,13 +1,15 @@
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 import { useWorkspaceStore } from './workspace';
-import { appendChatMessage } from '../api/session';
+import { appendChatMessage, deleteChatMessage } from '../api/session';
 import {
   serializeParts,
   partsToHistoryText,
   type MessagePart,
   type ToolRun,
 } from '../agent/messageParts';
+import { denyAllPending } from '../agent/permissions';
+import { serializeAttachments, type AttachmentMeta } from '../agent/attachments';
 
 export interface ChatMessage {
   id: string;
@@ -18,6 +20,8 @@ export interface ChatMessage {
    * undefined（AiBlock 据此走 legacy 渲染），唯一物化点 = upsertToolPart。
    */
   parts?: MessagePart[];
+  /** 用户消息附件（M5）：图片/文件/长文本粘贴，随消息持久化 */
+  attachments?: AttachmentMeta[];
   /** 来源 pane（分屏时区分对话线；旧持久化消息没有，仅面板可见） */
   paneId?: string;
   /** 发送时间戳（块流内联时与命令块按时间归并） */
@@ -33,15 +37,17 @@ export interface StreamHandlers {
 }
 
 export type StreamFn = (
-  messages: Array<{ role: string; content: string }>,
+  messages: Array<{ role: string; content: string; attachments?: AttachmentMeta[] }>,
   onChunk: (text: string) => void,
-  ctx?: { signal?: AbortSignal; handlers?: StreamHandlers },
+  ctx?: { signal?: AbortSignal; tabId?: string; handlers?: StreamHandlers },
 ) => Promise<void>;
 
 export interface SendOptions {
   /** 来源 pane；缺省时为 undefined（仅进面板，不进块流） */
   paneId?: string;
   streamFn?: StreamFn;
+  /** 随消息发送的附件（M5） */
+  attachments?: AttachmentMeta[];
 }
 
 let counter = 0;
@@ -65,6 +71,12 @@ interface ChatState {
   upsertToolPart: (tabId: string, id: string, run: ToolRun) => void;
   /** 中止某 tab 进行中的流式请求（M4 停止按钮复用） */
   abortStream: (tabId: string) => void;
+  /** 重新生成某条提问的回答：删旧回答（内存+DB），原地起新流（M4） */
+  regenerate: (tabId: string, userMsgId: string) => Promise<void>;
+  /** 删除一个交换：提问 + 紧随的回答（内存+DB）（M4） */
+  deleteExchange: (tabId: string, userMsgId: string) => void;
+  /** 编辑重发：提问灌回输入框草稿，删除该条及之后的全部消息（M4） */
+  editResend: (tabId: string, userMsgId: string) => void;
   /** 清空当前标签页的对话 */
   clearTab: () => void;
   /** 关 tab 时删除该 tab 的对话，避免 per-tab 残留 */
@@ -78,7 +90,134 @@ export function setDefaultStream(fn: StreamFn) {
   defaultStream = fn;
 }
 
-export const useChatStore = create<ChatState>((set, get) => ({
+export const useChatStore = create<ChatState>((set, get) => {
+  /**
+   * 流式内核（send/regenerate 共用）：history 取自 store 现状（排除 pending 占位）。
+   * 用户主动 abort 不算错误：保留已生成的部分内容、未完结工具落 error 终态，
+   * 但整条回答不标红、不追加「出错了」文本；立即停止的空壳回答直接移除。
+   */
+  const runAssistant = async (tabId: string, assistantId: string, streamFn?: StreamFn) => {
+    // history 截止到回答占位之前（regenerate 时其后的旧交换不参与本轮上下文）
+    const all = get().byTab[tabId] ?? [];
+    const cut = all.findIndex((m) => m.id === assistantId);
+    const history = (cut >= 0 ? all.slice(0, cut) : all)
+      .filter((m) => !m.pending)
+      .map((m) => ({
+        role: m.role,
+        // 助手消息追加单行工具摘要，让后续轮次知道本轮做过什么
+        content: m.role === 'assistant' ? m.content + partsToHistoryText(m.parts) : m.content,
+        // 附件透传：文本/图片映射由 agentStream 按模型能力展开
+        ...(m.attachments?.length ? { attachments: m.attachments } : {}),
+      }));
+
+    // 流式节流：合批 chunk，每 ~50ms flush 一次。否则每个 token 都触发一次
+    // setState → 整个消息列表重渲染 → 流式消息整条 Markdown/KaTeX 重解析，
+    // 长回复下是 O(n²) 的卡顿源。
+    let pending = '';
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const flush = () => {
+      timer = null;
+      if (pending) {
+        get().appendChunk(tabId, assistantId, pending);
+        pending = '';
+      }
+    };
+    const onChunk = (chunk: string) => {
+      pending += chunk;
+      if (timer === null) timer = setTimeout(flush, 50);
+    };
+
+    const controller = new AbortController();
+    abortControllers.set(tabId, controller);
+
+    let failed = false;
+    try {
+      await (streamFn ?? defaultStream)(history, onChunk, {
+        signal: controller.signal,
+        tabId,
+        handlers: {
+          // 工具事件直写前先把滞留文本 flush 掉，保证 text/tool 时间序
+          onToolEvent: (run) => {
+            if (timer !== null) {
+              clearTimeout(timer);
+              timer = null;
+            }
+            flush();
+            get().upsertToolPart(tabId, assistantId, run);
+          },
+        },
+      });
+    } catch (err) {
+      failed = !controller.signal.aborted;
+      if (failed) pending += `\n\n> 出错了：${err instanceof Error ? err.message : String(err)}`;
+    } finally {
+      abortControllers.delete(tabId);
+      if (timer !== null) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      flush();
+      const interrupted = failed || controller.signal.aborted;
+      // 被 abort 的空壳（立即停止、什么都没生成）直接移除，不留空气泡；
+      // 正常完成的空回答保留占位（向后兼容：持久化/测试都依赖问答成对）
+      const cur = get().byTab[tabId]?.find((m) => m.id === assistantId);
+      if (controller.signal.aborted && cur && !cur.content && !(cur.parts && cur.parts.length)) {
+        set((s) => ({
+          sendingTab: null,
+          byTab: {
+            ...s.byTab,
+            [tabId]: (s.byTab[tabId] ?? []).filter((m) => m.id !== assistantId),
+          },
+        }));
+        return;
+      }
+      set((s) => {
+        if (!(tabId in s.byTab)) return { sendingTab: null }; // tab 已关闭，丢弃收尾写入
+        return {
+          sendingTab: null,
+          byTab: {
+            ...s.byTab,
+            [tabId]: (s.byTab[tabId] ?? []).map((m) => {
+              if (m.id !== assistantId) return m;
+              let parts = m.parts;
+              if (interrupted && parts) {
+                // 失败/中止时，未完结的工具动作落 error 终态（节点转红）
+                parts = parts.map((p) =>
+                  p.kind === 'tool' &&
+                  (p.tool.state === 'running' || p.tool.state === 'approval-pending')
+                    ? {
+                        kind: 'tool' as const,
+                        tool: {
+                          ...p.tool,
+                          state: 'error' as const,
+                          endedAt: p.tool.endedAt ?? Date.now(),
+                          error: p.tool.error ?? (failed ? '对话中断' : '已停止'),
+                        },
+                      }
+                    : p,
+                );
+              }
+              return { ...m, pending: false, error: failed || undefined, parts };
+            }),
+          },
+        };
+      });
+      // 持久化助手消息最终内容 + parts 渲染层
+      const assistant = get().byTab[tabId]?.find((m) => m.id === assistantId);
+      if (assistant) {
+        appendChatMessage(
+          assistant.id,
+          tabId,
+          assistant.role,
+          assistant.content,
+          Date.now(),
+          serializeParts(assistant.parts),
+        ).catch(() => {});
+      }
+    }
+  };
+
+  return {
   byTab: {},
   sendingTab: null,
   draft: '',
@@ -138,14 +277,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }),
   abortStream: (tabId) => {
     abortControllers.get(tabId)?.abort();
+    // M3：挂起的审批 Promise 一律按拒绝放行，防工具 execute 悬挂卡死步进
+    denyAllPending();
   },
   send: async (text, opts) => {
     const tabId = useWorkspaceStore.getState().activeId;
     const trimmed = text.trim();
-    if (!trimmed || get().sendingTab) return;
+    const atts = opts?.attachments?.length ? opts.attachments : undefined;
+    // 空文本但有附件也允许发送（「看看这张图」之外的纯附件场景）
+    if ((!trimmed && !atts) || get().sendingTab) return;
     const now = Date.now();
     const base = { paneId: opts?.paneId, createdAt: now };
-    const userMsg: ChatMessage = { id: nextId(), role: 'user', content: trimmed, ...base };
+    const userMsg: ChatMessage = { id: nextId(), role: 'user', content: trimmed, attachments: atts, ...base };
     const assistantMsg: ChatMessage = { id: nextId(), role: 'assistant', content: '', pending: true, ...base };
     set((s) => ({
       byTab: { ...s.byTab, [tabId]: [...(s.byTab[tabId] ?? []), userMsg, assistantMsg] },
@@ -153,107 +296,69 @@ export const useChatStore = create<ChatState>((set, get) => ({
       draft: '',
     }));
     // 持久化用户消息（AI 对话是会话状态的一部分；用户消息无 parts）
-    appendChatMessage(userMsg.id, tabId, userMsg.role, userMsg.content, now, '').catch(() => {});
+    appendChatMessage(
+      userMsg.id, tabId, userMsg.role, userMsg.content, now, '', serializeAttachments(atts),
+    ).catch(() => {});
     useWorkspaceStore.getState().titleFromMessage(tabId, trimmed);
-    const history = (get().byTab[tabId] ?? [])
-      .filter((m) => !m.pending)
-      .map((m) => ({
-        role: m.role,
-        // 助手消息追加单行工具摘要，让后续轮次知道本轮做过什么
-        content:
-          m.role === 'assistant' ? m.content + partsToHistoryText(m.parts) : m.content,
-      }));
-
-    // 流式节流：合批 chunk，每 ~50ms flush 一次。否则每个 token 都触发一次
-    // setState → 整个消息列表重渲染 → 流式消息整条 Markdown/KaTeX 重解析，
-    // 长回复下是 O(n²) 的卡顿源。
-    let pending = '';
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const flush = () => {
-      timer = null;
-      if (pending) {
-        get().appendChunk(tabId, assistantMsg.id, pending);
-        pending = '';
-      }
+    await runAssistant(tabId, assistantMsg.id, opts?.streamFn);
+  },
+  regenerate: async (tabId, userMsgId) => {
+    if (get().sendingTab) return;
+    const msgs = get().byTab[tabId] ?? [];
+    const idx = msgs.findIndex((m) => m.id === userMsgId);
+    if (idx < 0 || msgs[idx].role !== 'user') return;
+    const question = msgs[idx];
+    const oldAnswer = msgs[idx + 1];
+    const oldAnswerId = oldAnswer?.role === 'assistant' ? oldAnswer.id : null;
+    const assistantMsg: ChatMessage = {
+      id: nextId(),
+      role: 'assistant',
+      content: '',
+      pending: true,
+      paneId: question.paneId,
+      createdAt: Date.now(),
     };
-    const onChunk = (chunk: string) => {
-      pending += chunk;
-      if (timer === null) timer = setTimeout(flush, 50);
-    };
-
-    const controller = new AbortController();
-    abortControllers.set(tabId, controller);
-
-    let failed = false;
-    try {
-      await (opts?.streamFn ?? defaultStream)(history, onChunk, {
-        signal: controller.signal,
-        handlers: {
-          // 工具事件直写前先把滞留文本 flush 掉，保证 text/tool 时间序
-          onToolEvent: (run) => {
-            if (timer !== null) {
-              clearTimeout(timer);
-              timer = null;
-            }
-            flush();
-            get().upsertToolPart(tabId, assistantMsg.id, run);
-          },
-        },
-      });
-    } catch (err) {
-      failed = true;
-      pending += `\n\n> 出错了：${err instanceof Error ? err.message : String(err)}`;
-    } finally {
-      abortControllers.delete(tabId);
-      if (timer !== null) {
-        clearTimeout(timer);
-        timer = null;
-      }
-      flush();
-      set((s) => {
-        if (!(tabId in s.byTab)) return { sendingTab: null }; // tab 已关闭，丢弃收尾写入
-        return {
-          sendingTab: null,
-          byTab: {
-            ...s.byTab,
-            [tabId]: (s.byTab[tabId] ?? []).map((m) => {
-              if (m.id !== assistantMsg.id) return m;
-              let parts = m.parts;
-              if (failed && parts) {
-                // 失败/中止时，未完结的工具动作落 error 终态（节点转红）
-                parts = parts.map((p) =>
-                  p.kind === 'tool' &&
-                  (p.tool.state === 'running' || p.tool.state === 'approval-pending')
-                    ? {
-                        kind: 'tool' as const,
-                        tool: {
-                          ...p.tool,
-                          state: 'error' as const,
-                          endedAt: p.tool.endedAt ?? Date.now(),
-                          error: p.tool.error ?? '对话中断',
-                        },
-                      }
-                    : p,
-                );
-              }
-              return { ...m, pending: false, error: failed || undefined, parts };
-            }),
-          },
-        };
-      });
-      // 持久化助手消息最终内容 + parts 渲染层
-      const assistant = get().byTab[tabId]?.find((m) => m.id === assistantMsg.id);
-      if (assistant) {
-        appendChatMessage(
-          assistant.id,
-          tabId,
-          assistant.role,
-          assistant.content,
-          Date.now(),
-          serializeParts(assistant.parts),
-        ).catch(() => {});
-      }
-    }
+    // 新回答占位替换旧回答（原地），history 随之 = 到该提问为止
+    set((s) => {
+      const cur = s.byTab[tabId] ?? [];
+      const i = cur.findIndex((m) => m.id === userMsgId);
+      if (i < 0) return s;
+      const next = cur.slice();
+      if (oldAnswerId) next.splice(i + 1, 1, assistantMsg);
+      else next.splice(i + 1, 0, assistantMsg);
+      return { byTab: { ...s.byTab, [tabId]: next }, sendingTab: tabId };
+    });
+    if (oldAnswerId) deleteChatMessage(oldAnswerId).catch(() => {});
+    await runAssistant(tabId, assistantMsg.id);
+  },
+  deleteExchange: (tabId, userMsgId) => {
+    if (get().sendingTab) return;
+    const msgs = get().byTab[tabId] ?? [];
+    const idx = msgs.findIndex((m) => m.id === userMsgId);
+    if (idx < 0 || msgs[idx].role !== 'user') return;
+    const ids = [userMsgId];
+    const answer = msgs[idx + 1];
+    if (answer?.role === 'assistant') ids.push(answer.id);
+    set((s) => ({
+      byTab: {
+        ...s.byTab,
+        [tabId]: (s.byTab[tabId] ?? []).filter((m) => !ids.includes(m.id)),
+      },
+    }));
+    for (const id of ids) deleteChatMessage(id).catch(() => {});
+  },
+  editResend: (tabId, userMsgId) => {
+    if (get().sendingTab) return;
+    const msgs = get().byTab[tabId] ?? [];
+    const idx = msgs.findIndex((m) => m.id === userMsgId);
+    if (idx < 0 || msgs[idx].role !== 'user') return;
+    const removed = msgs.slice(idx);
+    // 该条及之后全部删除；提问内容灌回草稿（PanelChat 订阅 draft 灌入输入框）
+    set((s) => ({
+      byTab: { ...s.byTab, [tabId]: (s.byTab[tabId] ?? []).slice(0, idx) },
+      draft: msgs[idx].content,
+    }));
+    for (const m of removed) deleteChatMessage(m.id).catch(() => {});
   },
   clearTab: () => {
     const tabId = useWorkspaceStore.getState().activeId;
@@ -262,6 +367,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   dropTab: (tabId) => {
     abortControllers.get(tabId)?.abort();
     abortControllers.delete(tabId);
+    denyAllPending(); // 同 abortStream：防审批悬挂
     set((s) => {
       if (!(tabId in s.byTab) && s.sendingTab !== tabId) return s;
       const byTab = { ...s.byTab };
@@ -269,7 +375,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return { byTab, sendingTab: s.sendingTab === tabId ? null : s.sendingTab };
     });
   },
-}));
+  };
+});
 
 /** 统一接口：将文本发往 AI 对话框（新增消息，不覆盖已有） */
 export function sendToChat(text: string) {
