@@ -159,7 +159,9 @@ export default function PanelChat() {
   };
 
   // 拖拽：Tauri 默认拦截 OS 拖放，走窗口事件；按坐标限定在面板内才接
+  // （纯浏览器环境——harness 页——无 Tauri internals，直接跳过）
   useEffect(() => {
+    if (!('__TAURI_INTERNALS__' in window)) return;
     let unlisten: (() => void) | undefined;
     getCurrentWindow()
       .onDragDropEvent((e) => {
