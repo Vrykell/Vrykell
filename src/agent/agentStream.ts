@@ -7,12 +7,15 @@
  * agentMode 关闭时 tools=undefined，行为等价 M0 纯文本路径。
  * 网络层走 createChatModel 注入的 Rust 代理 fetch（key 不出 Rust）。
  */
-import { stepCountIs, streamText, type ModelMessage } from 'ai';
+import { stepCountIs, streamText, type ModelMessage, type ToolSet } from 'ai';
 import { invoke } from '@tauri-apps/api/core';
 import type { StreamFn } from '../stores/chat';
-import { createChatModel, type ProviderKind } from './provider';
+import { createChatModel, createNativeWebSearchTool, deepThinkProviderOptions, type ProviderKind } from './provider';
 import { useAgentSettings } from './agentSettings';
+import { attachmentsForModel, supportsVision } from './attachments';
 import { buildTools } from './tools';
+import { buildTavilySearchTool } from './tools/webSearch';
+import { levelOf } from './permissions';
 
 interface AiConfigInfoRust {
   has_key: boolean;
@@ -84,8 +87,33 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     baseUrl: info.base_url,
     model: info.model,
   });
-  const agentMode = useAgentSettings.getState().agentMode;
+  const settings = useAgentSettings.getState();
+  const agentMode = settings.agentMode;
   const emitTool = ctx?.handlers?.onToolEvent;
+
+  // M5 附件：带附件的用户消息展开为多模态 ModelMessage（文本段 + 图片 part），
+  // 非视觉模型的图片在 attachmentsForModel 内降级为占位提示文本
+  const vision = supportsVision(info.provider, info.model);
+  const modelMessages: ModelMessage[] = [];
+  for (const m of messages) {
+    if (m.attachments?.length) {
+      const { text, images } = await attachmentsForModel(m.attachments, vision);
+      const content = [m.content, text].filter(Boolean).join('\n\n');
+      if (images.length > 0) {
+        modelMessages.push({
+          role: 'user',
+          content: [
+            ...(content ? [{ type: 'text' as const, text: content }] : []),
+            ...images.map((image) => ({ type: 'image' as const, image })),
+          ],
+        });
+      } else {
+        modelMessages.push({ role: m.role as 'user' | 'assistant', content });
+      }
+    } else {
+      modelMessages.push(m as ModelMessage);
+    }
+  }
 
   // 工具调用账本：tool-result/tool-error 事件重建完整 ToolRun 需要
   // toolName/input/startedAt（result 部分不一定带回 input）
@@ -94,15 +122,52 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     { toolName: string; input: Record<string, unknown>; startedAt: number }
   >();
 
+  // 工具表：M1-M3 的本地工具 + M6 联网搜索。
+  // 联网优先级：provider 原生（anthropic web_search / gemini google_search，
+  // 服务端执行）→ openai-compatible 用 Tavily 转发兜底。
+  // 权限只到「注册/不注册」一级：原生工具无本地 execute，per-call 审批不适用。
+  const tools: ToolSet = agentMode
+    ? buildTools({
+        signal: ctx?.signal,
+        tabId: ctx?.tabId,
+        // M3 审批状态回写：gate() 在 ask/决定时把 ToolRun 打到
+        // approval-pending / running / denied（含危险命令原因）
+        setToolState: (toolCallId, state, extra) => {
+          const c = calls.get(toolCallId);
+          emitTool?.({
+            toolCallId,
+            toolName: c?.toolName ?? 'unknown',
+            input: c?.input ?? {},
+            startedAt: c?.startedAt ?? Date.now(),
+            state,
+            ...(extra?.danger ? { danger: extra.danger } : {}),
+          });
+        },
+      })
+    : {};
+  if (agentMode && settings.webSearch && levelOf('web_search') !== 'deny') {
+    const native = createNativeWebSearchTool(info.provider);
+    if (native) {
+      tools[native.name] = native.tool;
+    } else if (info.has_tavily_key) {
+      tools.web_search = buildTavilySearchTool({ signal: ctx?.signal, tabId: ctx?.tabId });
+    }
+  }
+  const hasTools = Object.keys(tools).length > 0;
+
   // AI SDK v7 的流不 reject：错误走 onError 回调 + fullStream 的 error part，
   // 迭代静默结束。这里捕获后重抛，维持 chat store「catch → 显示出错了」的行为。
   let streamError: unknown = null;
   const result = streamText({
     model,
-    messages: messages as ModelMessage[],
-    tools: agentMode ? buildTools({ signal: ctx?.signal }) : undefined,
-    stopWhen: agentMode ? stepCountIs(8) : undefined,
+    messages: modelMessages,
+    tools: hasTools ? tools : undefined,
+    stopWhen: hasTools ? stepCountIs(8) : undefined,
     abortSignal: ctx?.signal,
+    // M6 深思考：providerOptions 透传（openai-compatible → reasoning_effort）。
+    // anthropic thinking 要求 maxOutputTokens > budgetTokens(8000)。
+    providerOptions: settings.deepThink ? deepThinkProviderOptions(info.provider) : undefined,
+    maxOutputTokens: settings.deepThink && info.provider === 'anthropic' ? 16000 : undefined,
     onError: ({ error }) => {
       streamError = error;
     },
@@ -139,12 +204,29 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
         const c = calls.get(p.toolCallId);
         const raw = p.output ?? p.result;
         const out = typeof raw === 'string' ? raw : JSON.stringify(raw);
+        // 结构化结果哨兵：denied → 保持灰环（不盖成绿）；ok:false → 红节点
+        let state: 'done' | 'error' | 'denied' = 'done';
+        let error: string | undefined;
+        try {
+          const v: unknown = JSON.parse(out);
+          if (v && typeof v === 'object') {
+            const o = v as { denied?: unknown; ok?: unknown; error?: unknown };
+            if (o.denied === true) state = 'denied';
+            else if (o.ok === false) {
+              state = 'error';
+              error = typeof o.error === 'string' ? o.error : undefined;
+            }
+          }
+        } catch {
+          /* 非 JSON 输出原样按 done 处理 */
+        }
         emitTool?.({
           toolCallId: p.toolCallId,
           toolName: c?.toolName ?? p.toolName ?? 'unknown',
           input: c?.input ?? {},
-          state: 'done',
+          state,
           output: out.length > 8192 ? out.slice(0, 8192) : out,
+          error,
           startedAt: c?.startedAt ?? Date.now(),
           endedAt: Date.now(),
         });

@@ -10,6 +10,7 @@ import NewTabModal from './components/NewTabModal';
 import { setDefaultStream } from './stores/chat';
 import { refreshAiConfig } from './lib/ai';
 import { agentStream } from './agent/agentStream';
+import { initAutoTitle } from './agent/title';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import { useUiStore } from './stores/ui';
 import { useWorkspaceDirsStore } from './files/workspaceDirs';
@@ -35,6 +36,8 @@ import './search/init'; // 触发所有搜索源自动注册
 export default function App() {
   useEffect(() => setDefaultStream(agentStream), []);
   useEffect(() => { refreshAiConfig(); }, []);
+  // M7 智能标题：订阅块/对话活动，内容足够时生成概括性标题
+  useEffect(() => initAutoTitle(), []);
   useEffect(() => {
     const ws = useWorkspaceStore.getState();
     const initialTab = ws.tabs[0];

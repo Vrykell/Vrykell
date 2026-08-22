@@ -138,9 +138,10 @@ pub fn append_chat_message(
     content: String,
     created_at: u64,
     parts: String,
+    attachments: String,
 ) -> Result<(), String> {
     let db = state.0.lock().map_err(|e| e.to_string())?;
-    db.append_chat_message(&id, &session_id, &role, &content, created_at, &parts)
+    db.append_chat_message(&id, &session_id, &role, &content, created_at, &parts, &attachments)
 }
 
 #[tauri::command]
@@ -150,6 +151,16 @@ pub fn list_chat_messages(
 ) -> Result<Vec<ChatMessageEntry>, String> {
     let db = state.0.lock().map_err(|e| e.to_string())?;
     db.get_chat_messages(&session_id)
+}
+
+/// 删除单条 AI 对话消息（M4：重新生成/编辑重发/删除交换）。幂等。
+#[tauri::command]
+pub fn delete_chat_message(
+    state: tauri::State<'_, HistoryState>,
+    id: String,
+) -> Result<(), String> {
+    let db = state.0.lock().map_err(|e| e.to_string())?;
+    db.delete_chat_message(&id)
 }
 
 #[tauri::command]

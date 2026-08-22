@@ -32,6 +32,7 @@ import ToolNode from './ToolNode';
 import BlockOutput from '../terminal/BlockOutput';
 import { useBlockStore } from '../stores/blocks';
 import { agentControl } from '../agent/agentControl';
+import { resolveApproval } from '../agent/permissions';
 import type { ToolRun, ToolRunState } from '../agent/messageParts';
 
 const STATE_CHIP: Record<ToolRunState, { label: string; color: string }> = {
@@ -64,7 +65,10 @@ function summarize(run: ToolRun): { icon: React.ReactNode; text: string } {
     case 'list_dir':
       return { icon: <Folder {...s} />, text: `列目录 ${str(i.path)}` };
     case 'web_search':
-      return { icon: <Globe {...s} />, text: `联网搜索 ${str(i.query)}` };
+      return { icon: <Globe {...s} />, text: `联网搜索 ${str(i.query)}`.trim() };
+    case 'google_search':
+      // gemini 原生搜索：provider 服务端执行，input 通常为空
+      return { icon: <Globe {...s} />, text: `联网搜索 ${str(i.query)}`.trim() };
     case 'think':
       return { icon: <Brain {...s} />, text: '思考' };
     default:
@@ -197,6 +201,42 @@ export default function ToolRunCard({ run, paneId }: { run: ToolRun; paneId?: st
         )}
         <span style={{ fontSize: 10, color: chip.color, flexShrink: 0 }}>{chip.label}</span>
       </div>
+
+      {/* M3 审批行：等待批准时行内三按钮（零浮层），危险命令附原因 */}
+      {run.state === 'approval-pending' && (
+        <div style={{ margin: '2px 0 6px' }}>
+          {run.danger && (
+            <div style={{ fontSize: 11, color: 'var(--accent-warm)', marginBottom: 4 }}>
+              ⚠ {run.danger}，确认后再放行
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              style={{
+                fontSize: 11,
+                padding: '2px 10px',
+                borderColor: 'var(--accent-warm)',
+                color: 'var(--accent-warm)',
+              }}
+              onClick={() => resolveApproval(run.toolCallId, 'once')}
+            >
+              允许一次
+            </button>
+            <button
+              style={{ fontSize: 11, padding: '2px 10px' }}
+              onClick={() => resolveApproval(run.toolCallId, 'session')}
+            >
+              本会话允许
+            </button>
+            <button
+              style={{ fontSize: 11, padding: '2px 10px', color: 'var(--error-light)' }}
+              onClick={() => resolveApproval(run.toolCallId, 'deny')}
+            >
+              拒绝
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* run_command：内嵌命令块（恒驻） */}
       {isCommand && <EmbeddedCommandBlock run={run} paneId={paneId} />}

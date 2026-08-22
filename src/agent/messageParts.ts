@@ -22,6 +22,8 @@ export interface ToolRun {
   /** 结构化结果序列化（≤8KB 截断）；run_command = {ok, exitCode, output} JSON */
   output?: string;
   error?: string;
+  /** 危险命令命中原因（M3 审批卡展示「⚠ …」）；仅 run_command 可能有 */
+  danger?: string;
   startedAt: number;
   endedAt?: number;
 }
@@ -53,6 +55,7 @@ const TOOL_LABEL: Record<string, string> = {
   search_files: '搜索',
   list_dir: '列目录',
   web_search: '联网搜索',
+  google_search: '联网搜索',
   think: '思考',
 };
 

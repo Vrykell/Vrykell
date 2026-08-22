@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useChatStore } from './chat';
+import { useChatStore, setDefaultStream } from './chat';
 import { useWorkspaceStore } from './workspace';
 
 const initialChat = useChatStore.getState();
@@ -188,5 +188,142 @@ describe('chat store v2（parts / 工具事件）', () => {
     const prevAssistant = seen.find((m) => m.role === 'assistant')!;
     expect(prevAssistant.content).toContain('[执行命令: ls -la → 成功]');
     expect(tabId).toBeTruthy();
+  });
+});
+
+describe('chat store M4（停止 / 重新生成 / 编辑重发 / 删除）', () => {
+  beforeEach(() => {
+    useChatStore.setState(initialChat, true);
+    useWorkspaceStore.setState(initialWs, true);
+  });
+
+  it('regenerate：删旧回答、原地起新流，history 截止该提问', async () => {
+    const tabId = useWorkspaceStore.getState().activeId;
+    const first = async (_m: unknown, onChunk: (t: string) => void) => { onChunk('旧答案'); };
+    await useChatStore.getState().send('问题一', { streamFn: first });
+    const userMsgId = useChatStore.getState().byTab[tabId]![0]!.id;
+    const oldAnswerId = useChatStore.getState().byTab[tabId]![1]!.id;
+
+    let seen: Array<{ role: string; content: string }> = [];
+    setDefaultStream(async (msgs, onChunk) => {
+      seen = msgs;
+      onChunk('新答案');
+    });
+    await useChatStore.getState().regenerate(tabId, userMsgId);
+
+    const msgs = useChatStore.getState().byTab[tabId]!;
+    // 仍是两条：旧回答被替换而非追加
+    expect(msgs).toHaveLength(2);
+    expect(msgs[0]).toMatchObject({ id: userMsgId, role: 'user' });
+    expect(msgs[1]).toMatchObject({ role: 'assistant', content: '新答案', pending: false });
+    expect(msgs[1]!.id).not.toBe(oldAnswerId);
+    // history 截止该提问（不含旧回答）
+    expect(seen).toEqual([{ role: 'user', content: '问题一' }]);
+    expect(useChatStore.getState().sendingTab).toBeNull();
+  });
+
+  it('regenerate：多轮历史只取到目标提问为止', async () => {
+    const tabId = useWorkspaceStore.getState().activeId;
+    const mk = (answer: string) => async (_m: unknown, onChunk: (t: string) => void) => { onChunk(answer); };
+    await useChatStore.getState().send('问一', { streamFn: mk('答一') });
+    await useChatStore.getState().send('问二', { streamFn: mk('答二') });
+    const firstUserId = useChatStore.getState().byTab[tabId]![0]!.id;
+
+    let seen: Array<{ role: string; content: string }> = [];
+    setDefaultStream(async (msgs, onChunk) => { seen = msgs; onChunk('重生一'); });
+    await useChatStore.getState().regenerate(tabId, firstUserId);
+
+    // 只替换目标提问的回答；后续交换保留（但不再进入本次 history）
+    const msgs = useChatStore.getState().byTab[tabId]!;
+    expect(msgs.map((m) => m.content)).toEqual(['问一', '重生一', '问二', '答二']);
+    expect(seen).toEqual([{ role: 'user', content: '问一' }]);
+  });
+
+  it('deleteExchange：删除提问 + 紧随的回答，其余交换不动', async () => {
+    const tabId = useWorkspaceStore.getState().activeId;
+    const mk = (answer: string) => async (_m: unknown, onChunk: (t: string) => void) => { onChunk(answer); };
+    await useChatStore.getState().send('问一', { streamFn: mk('答一') });
+    await useChatStore.getState().send('问二', { streamFn: mk('答二') });
+    const firstUserId = useChatStore.getState().byTab[tabId]![0]!.id;
+
+    useChatStore.getState().deleteExchange(tabId, firstUserId);
+    const msgs = useChatStore.getState().byTab[tabId]!;
+    expect(msgs.map((m) => m.content)).toEqual(['问二', '答二']);
+  });
+
+  it('editResend：该条及之后全删，提问灌回草稿', async () => {
+    const tabId = useWorkspaceStore.getState().activeId;
+    const mk = (answer: string) => async (_m: unknown, onChunk: (t: string) => void) => { onChunk(answer); };
+    await useChatStore.getState().send('问一', { streamFn: mk('答一') });
+    await useChatStore.getState().send('问二', { streamFn: mk('答二') });
+    const firstUserId = useChatStore.getState().byTab[tabId]![0]!.id;
+
+    useChatStore.getState().editResend(tabId, firstUserId);
+    expect(useChatStore.getState().byTab[tabId] ?? []).toEqual([]);
+    expect(useChatStore.getState().draft).toBe('问一');
+  });
+
+  it('停止：abort 保留部分内容，不标错不追加错误文本', async () => {
+    const tabId = useWorkspaceStore.getState().activeId;
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    const stopStream = async (
+      _m: unknown,
+      onChunk: (t: string) => void,
+      _ctx?: unknown,
+    ) => {
+      onChunk('半截回答');
+      await gate;
+      throw new Error('aborted');
+    };
+    const p = useChatStore.getState().send('会慢慢说', { streamFn: stopStream });
+    // 等 50ms 合批 flush 落进 store 再停
+    await new Promise((r) => setTimeout(r, 80));
+    useChatStore.getState().abortStream(tabId);
+    release();
+    await p;
+
+    const msgs = useChatStore.getState().byTab[tabId]!;
+    expect(msgs).toHaveLength(2);
+    expect(msgs[1]).toMatchObject({ role: 'assistant', content: '半截回答', pending: false });
+    expect(msgs[1]!.error).toBeUndefined();
+    expect(useChatStore.getState().sendingTab).toBeNull();
+  });
+
+  it('立即停止的空壳回答被移除（不留空气泡）', async () => {
+    const tabId = useWorkspaceStore.getState().activeId;
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    const stopStream = async () => { await gate; throw new Error('aborted'); };
+    const p = useChatStore.getState().send('还没说就停', { streamFn: stopStream });
+    useChatStore.getState().abortStream(tabId);
+    release();
+    await p;
+
+    const msgs = useChatStore.getState().byTab[tabId]!;
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]!.role).toBe('user');
+  });
+
+  it('sendingTab 守卫：流式中 regenerate/deleteExchange/editResend 均为空操作', async () => {
+    const tabId = useWorkspaceStore.getState().activeId;
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    const slow = async (_m: unknown, onChunk: (t: string) => void) => {
+      onChunk('答');
+      await gate;
+    };
+    const p = useChatStore.getState().send('问', { streamFn: slow });
+    const userMsgId = useChatStore.getState().byTab[tabId]![0]!.id;
+
+    useChatStore.getState().deleteExchange(tabId, userMsgId);
+    useChatStore.getState().editResend(tabId, userMsgId);
+    void useChatStore.getState().regenerate(tabId, userMsgId);
+    expect(useChatStore.getState().byTab[tabId]).toHaveLength(2);
+    expect(useChatStore.getState().draft).toBe('');
+
+    useChatStore.getState().abortStream(tabId);
+    release();
+    await p;
   });
 });
