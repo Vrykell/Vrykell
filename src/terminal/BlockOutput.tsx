@@ -50,6 +50,7 @@ export default function BlockOutput({ text, maxHeight, highlight, isHtml: isHtml
 
   return (
     <div
+      data-selectable
       style={{
         maxHeight: maxHeight ? `${maxHeight}px` : undefined,
         overflow: maxHeight ? 'auto' : undefined,

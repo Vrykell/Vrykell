@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUp, Bot, Brain, Globe, Paperclip, Square, Zap } from 'lucide-react';
+import { ArrowUp, Bot, Brain, Globe, Paperclip, ShieldCheck, Square, Zap } from 'lucide-react';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useChatStore, useActiveMessages } from '../stores/chat';
@@ -16,6 +16,7 @@ import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
 import { useTerminalStore } from '../stores/terminal';
 import { useToastStore } from '../components/Toast';
 import { useAgentSettings } from '../agent/agentSettings';
+import { usePermissions } from '../agent/permissions';
 import { setAiModel, useAiConfigStore } from '../lib/ai';
 import ContextMenu from '../components/ContextMenu';
 import {
@@ -33,6 +34,13 @@ import ShellIndicator from '../terminal/ShellIndicator';
 import { CurrentDir } from '../terminal/InputEditor';
 import AiBlock from './AiBlock';
 import { toExchanges, type ChatExchange } from './exchanges';
+
+/** 权限模式循环（状态栏 Shield chip）：标准=逐工具级别；严格=全部逐次问；放行=全部直放行（危险命令仍逐次问） */
+const PERM_MODES = [
+  { id: 'standard', label: '标准', color: 'var(--text-muted)', title: '标准权限：按设置页逐工具级别判定（点击切换）' },
+  { id: 'strict', label: '严格', color: 'var(--accent-warm)', title: '严格权限：所有工具操作逐次询问（点击切换）' },
+  { id: 'relaxed', label: '放行', color: 'var(--error-light)', title: '放行模式：全部工具直接放行，危险命令仍会逐次询问（点击切换）' },
+] as const;
 
 /** 各 provider 的常用模型（快捷下拉；完整自由度在设置页输入） */
 const MODEL_PRESETS: Record<string, string[]> = {
@@ -67,6 +75,8 @@ export default function PanelChat() {
   // 下一条消息起用；模型名写 Rust config）
   const agentSettings = useAgentSettings();
   const aiCfg = useAiConfigStore();
+  const permMode = usePermissions((s) => s.mode);
+  const setPermMode = usePermissions((s) => s.setMode);
   const [modelMenu, setModelMenu] = useState<{ x: number; y: number } | null>(null);
   const searchAvailable = aiCfg.provider !== 'openai-compatible' || aiCfg.hasTavilyKey;
   const toggleSearch = () => {
@@ -261,217 +271,205 @@ export default function PanelChat() {
         )}
       </div>
 
-      {/* 输入栏：与终端 InputEditor 同结构同度量（prompt 行 + ⚡ 输入行） */}
+      {/* 输入卡片：四周留缝 + 圆角（与终端输入栏同语言）；内部 = 附件 chips → 输入行 → 状态栏 */}
       {isSession && (
-        <div style={{
-          flexShrink: 0,
-          borderTop: '1px solid var(--border)',
-          background: 'var(--surface)',
-          padding: '6px 16px 8px',
-        }}>
-          {/* prompt_elements 行：目标 pane 上下文（镜像终端输入栏：shell 胶囊 · cwd | AI 标记） */}
+        <div style={{ flexShrink: 0, padding: '0 10px 10px' }}>
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            minHeight: 22, fontSize: 11, color: 'var(--text-muted)', userSelect: 'none',
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 12,
+            padding: '8px 12px 5px',
+            boxShadow: '0 1px 4px rgba(0, 0, 0, 0.22)',
           }}>
-            <ShellIndicator connected={targetConnected} focused={targetFocused} label={targetInfo?.shell ?? '本地'} />
-            {targetInfo?.cwd && (
-              <>
-                <span style={{ color: 'var(--border-strong)', opacity: 0.5, margin: '0 1px' }}>·</span>
-                <CurrentDir dir={targetInfo.cwd} />
-              </>
+            {/* 附件 chips 行（预览/删除；随发送清空） */}
+            {atts.length > 0 && (
+              <AttachmentChips
+                atts={atts}
+                previewId={previewId}
+                onPreview={(id) => setPreviewId((cur) => (cur === id ? null : id))}
+                onRemove={(id) => {
+                  setAtts((cur) => cur.filter((a) => a.id !== id));
+                  setPreviewId((cur) => (cur === id ? null : cur));
+                }}
+              />
             )}
-            <div style={{ flex: 1 }} />
-            {/* M6 快捷设置：模型下拉 + 联网/深思/Agent */}
-            <button
-              data-subtle
-              title="切换模型（更多在设置页配置）"
-              onClick={(e) => setModelMenu({ x: e.clientX, y: e.clientY })}
-              style={{
-                fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 500,
-                padding: '1px 6px', border: '1px solid var(--border)', borderRadius: 4,
-                background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer',
-                lineHeight: '16px', maxWidth: 110,
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}
-            >
-              {aiCfg.model || '模型'}
-            </button>
-            <QuickToggle
-              icon={Globe}
-              on={agentSettings.webSearch}
-              title={searchAvailable ? '联网搜索' : '联网搜索（需先配置 Tavily Key）'}
-              onClick={toggleSearch}
-            />
-            <QuickToggle
-              icon={Brain}
-              on={agentSettings.deepThink}
-              title="深度思考（reasoning effort）"
-              onClick={() => agentSettings.update({ deepThink: !agentSettings.deepThink })}
-            />
-            <QuickToggle
-              icon={Bot}
-              on={agentSettings.agentMode}
-              title={agentSettings.agentMode ? 'Agent 模式（可使用工具）' : '纯聊天（工具已关闭）'}
-              onClick={() => agentSettings.update({ agentMode: !agentSettings.agentMode })}
-            />
-            {/* 📎 附件（位置对应终端输入栏的操作按钮） */}
-            <button
-              data-subtle
-              title="添加附件（图片 / 文件，也可直接粘贴或拖入）"
-              onClick={() => void pickFiles()}
-              style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                width: 20, height: 20, padding: 0, border: 'none', borderRadius: 3,
-                background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'var(--button-hover)';
-                e.currentTarget.style.color = 'var(--text-secondary)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent';
-                e.currentTarget.style.color = 'var(--text-muted)';
-              }}
-            >
-              <Paperclip size={12} />
-            </button>
-            {/* 静态 AI 标记 — 位置对应终端输入栏的 cmd/AI 模式 pill */}
-            <span style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 10,
-              fontWeight: 500,
-              padding: '1px 8px',
-              border: '1px solid var(--border)',
-              borderRadius: 4,
-              background: 'var(--accent-warm-dim)',
-              color: 'var(--accent-warm)',
-              lineHeight: '16px',
-            }}>
-              AI
-            </span>
-          </div>
 
-          {/* 附件 chips 行（预览/删除；随发送清空） */}
-          {atts.length > 0 && (
-            <AttachmentChips
-              atts={atts}
-              previewId={previewId}
-              onPreview={(id) => setPreviewId((cur) => (cur === id ? null : id))}
-              onRemove={(id) => {
-                setAtts((cur) => cur.filter((a) => a.id !== id));
-                setPreviewId((cur) => (cur === id ? null : cur));
-              }}
-            />
-          )}
+            {/* 输入行：⚡ prompt + textarea + 发送/停止（度量同终端输入栏） */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{
+                minWidth: 16, textAlign: 'center', lineHeight: '24px',
+                color: 'var(--accent-warm)', userSelect: 'none', flexShrink: 0,
+                display: 'inline-flex', justifyContent: 'center',
+              }}>
+                <Zap size={13} />
+              </span>
+              <textarea
+                ref={inputRef}
+                value={text}
+                placeholder="自然语言描述你想做什么…"
+                rows={1}
+                onChange={(e) => {
+                  setText(e.target.value);
+                  e.target.style.height = 'auto';
+                  e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                    e.preventDefault();
+                    submit();
+                  }
+                  if (e.key === 'Escape') setText('');
+                }}
+                onPaste={(e) => {
+                  // 图片/文件粘贴优先；长文本（>500 字）折叠为 chip，不糊进输入框
+                  const files = Array.from(e.clipboardData.files);
+                  if (files.length > 0) {
+                    e.preventDefault();
+                    void addBlobs(files);
+                    return;
+                  }
+                  const t = e.clipboardData.getData('text/plain');
+                  if (t && t.length > LIMITS.pasteFoldChars) {
+                    e.preventDefault();
+                    addAtts([makePasteAttachment(t)]);
+                  }
+                }}
+                style={{
+                  flex: 1, minWidth: 0, resize: 'none',
+                  background: 'transparent', border: 'none', padding: '1px 0',
+                  fontSize: 13, fontFamily: 'var(--font-mono)',
+                  color: 'var(--text-primary)', lineHeight: '22px', outline: 'none',
+                }}
+              />
+              {/* 发送/停止按钮 — 流式中当前 tab 变 ⏹ */}
+              {sendingHere ? (
+                <button
+                  data-subtle
+                  title="停止生成"
+                  onClick={() => abortStream(activeId)}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
+                    background: 'transparent', color: 'var(--accent-warm)', cursor: 'pointer', flexShrink: 0,
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--button-hover)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <Square size={11} fill="currentColor" />
+                </button>
+              ) : (
+                <button
+                  data-subtle
+                  title="发送 (Enter)"
+                  onClick={submit}
+                  disabled={!canSend}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
+                    background: 'transparent',
+                    color: canSend ? 'var(--accent-warm)' : 'var(--text-muted)',
+                    cursor: canSend ? 'pointer' : 'default', flexShrink: 0,
+                  }}
+                  onMouseEnter={(e) => { if (canSend) e.currentTarget.style.background = 'var(--button-hover)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <ArrowUp size={13} />
+                </button>
+              )}
+            </div>
 
-          {/* 输入行：⚡ prompt + textarea + 发送按钮（度量同 InputEditor） */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6 }}>
-            <span style={{
-              minWidth: 16, textAlign: 'center', lineHeight: '24px',
-              color: 'var(--accent-warm)', userSelect: 'none', flexShrink: 0,
-              display: 'inline-flex', justifyContent: 'center',
+            {/* 底部状态栏：目标 pane · 模型 · 权限模式 | 联网 · 深思 · Agent · 📎 */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              minHeight: 22, marginTop: 4, paddingTop: 5,
+              borderTop: '1px solid var(--border)',
+              fontSize: 11, color: 'var(--text-muted)', userSelect: 'none',
             }}>
-              <Zap size={13} />
-            </span>
-            <textarea
-              ref={inputRef}
-              value={text}
-              placeholder="自然语言描述你想做什么…"
-              rows={1}
-              onChange={(e) => {
-                setText(e.target.value);
-                e.target.style.height = 'auto';
-                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                  e.preventDefault();
-                  submit();
-                }
-                if (e.key === 'Escape') setText('');
-              }}
-              onPaste={(e) => {
-                // 图片/文件粘贴优先；长文本（>500 字）折叠为 chip，不糊进输入框
-                const files = Array.from(e.clipboardData.files);
-                if (files.length > 0) {
-                  e.preventDefault();
-                  void addBlobs(files);
-                  return;
-                }
-                const t = e.clipboardData.getData('text/plain');
-                if (t && t.length > LIMITS.pasteFoldChars) {
-                  e.preventDefault();
-                  addAtts([makePasteAttachment(t)]);
-                }
-              }}
-              style={{
-                flex: 1, minWidth: 0, resize: 'none',
-                background: 'transparent', border: 'none', padding: '1px 0',
-                fontSize: 13, fontFamily: 'var(--font-mono)',
-                color: 'var(--text-primary)', lineHeight: '22px', outline: 'none',
-              }}
-            />
-            {/* 发送/停止按钮 — 流式中当前 tab 变 ⏹（位置/尺寸对应终端输入栏操作按钮） */}
-            {sendingHere ? (
+              <ShellIndicator connected={targetConnected} focused={targetFocused} label={targetInfo?.shell ?? '本地'} />
+              {targetInfo?.cwd && (
+                <>
+                  <span style={{ color: 'var(--border-strong)', opacity: 0.5, margin: '0 1px' }}>·</span>
+                  <CurrentDir dir={targetInfo.cwd} />
+                </>
+              )}
+              <div style={{ flex: 1 }} />
+              {/* 模型 chip（快捷下拉，更多在设置页） */}
               <button
                 data-subtle
-                title="停止生成"
-                onClick={() => abortStream(activeId)}
+                title="切换模型（更多在设置页配置）"
+                onClick={(e) => setModelMenu({ x: e.clientX, y: e.clientY })}
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: 24,
-                  height: 24,
-                  padding: 0,
-                  border: 'none',
-                  borderRadius: 4,
-                  background: 'transparent',
-                  color: 'var(--accent-warm)',
-                  cursor: 'pointer',
-                  flexShrink: 0,
+                  fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 500,
+                  padding: '1px 6px', border: '1px solid var(--border)', borderRadius: 4,
+                  background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer',
+                  lineHeight: '16px', maxWidth: 110,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}
+              >
+                {aiCfg.model || '模型'}
+              </button>
+              {/* 权限模式 chip（点击循环 标准→严格→放行） */}
+              {(() => {
+                const idx = PERM_MODES.findIndex((m) => m.id === permMode);
+                const cur = PERM_MODES[idx] ?? PERM_MODES[0]!;
+                const next = PERM_MODES[(idx + 1) % PERM_MODES.length]!;
+                return (
+                  <button
+                    data-subtle
+                    title={cur.title}
+                    onClick={() => setPermMode(next.id)}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 3,
+                      fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 500,
+                      padding: '1px 6px', border: '1px solid var(--border)', borderRadius: 4,
+                      background: 'transparent', color: cur.color, cursor: 'pointer', lineHeight: '16px',
+                    }}
+                  >
+                    <ShieldCheck size={10} />
+                    {cur.label}
+                  </button>
+                );
+              })()}
+              <QuickToggle
+                icon={Globe}
+                on={agentSettings.webSearch}
+                title={searchAvailable ? '联网搜索' : '联网搜索（需先配置 Tavily Key）'}
+                onClick={toggleSearch}
+              />
+              <QuickToggle
+                icon={Brain}
+                on={agentSettings.deepThink}
+                title="深度思考（reasoning effort）"
+                onClick={() => agentSettings.update({ deepThink: !agentSettings.deepThink })}
+              />
+              <QuickToggle
+                icon={Bot}
+                on={agentSettings.agentMode}
+                title={agentSettings.agentMode ? 'Agent 模式（可使用工具）' : '纯聊天（工具已关闭）'}
+                onClick={() => agentSettings.update({ agentMode: !agentSettings.agentMode })}
+              />
+              {/* 📎 附件 */}
+              <button
+                data-subtle
+                title="添加附件（图片 / 文件，也可直接粘贴或拖入）"
+                onClick={() => void pickFiles()}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  width: 20, height: 20, padding: 0, border: 'none', borderRadius: 3,
+                  background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = 'var(--button-hover)';
+                  e.currentTarget.style.color = 'var(--text-secondary)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = 'var(--text-muted)';
                 }}
               >
-                <Square size={11} fill="currentColor" />
+                <Paperclip size={12} />
               </button>
-            ) : (
-            <button
-              data-subtle
-              title="发送 (Enter)"
-              onClick={submit}
-              disabled={!canSend}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 24,
-                height: 24,
-                padding: 0,
-                border: 'none',
-                borderRadius: 4,
-                background: 'transparent',
-                color: canSend ? 'var(--accent-warm)' : 'var(--text-muted)',
-                cursor: canSend ? 'pointer' : 'default',
-                flexShrink: 0,
-              }}
-              onMouseEnter={(e) => {
-                if (!canSend) return;
-                e.currentTarget.style.background = 'var(--button-hover)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent';
-              }}
-            >
-              <ArrowUp size={13} />
-            </button>
-            )}
+            </div>
           </div>
         </div>
       )}

@@ -26,7 +26,9 @@ import { useInputStore, selectPaneInput } from '../stores/input';
 import { isInputBoxVisible, getLongRunningHint } from './inputVisibility';
 import { agentControl } from '../agent/agentControl';
 import { useAgentSettings } from '../agent/agentSettings';
-import { completeCommand } from '../agent/complete';
+import { completeCommand, localComplete } from '../agent/complete';
+import { useHistoryStore } from '../stores/history';
+import { useDockStore } from '../stores/dock';
 import { engageFollow } from './useFollowBottom';
 import ShellIndicator from './ShellIndicator';
 
@@ -157,7 +159,8 @@ export default function InputEditor({
 
   // ── 命令自动补全（M8 ghost text）──
   // 本地级（历史前缀/路径）零网络始终可用；AI 增强有 key 才叠加。
-  // 输入变化防抖后发请求，seq + AbortController 双保险防止过期建议落地。
+  // 本地历史前缀命中是同步即时反馈（零延迟体感）；本地未命中才防抖走路径/AI。
+  // seq + AbortController 双保险防止过期建议落地。
   const completeOn = useAgentSettings((s) => s.completeEnabled);
   const completeDebounceMs = useAgentSettings((s) => s.completeDebounceMs);
   const [ghost, setGhost] = useState('');
@@ -175,9 +178,15 @@ export default function InputEditor({
       aiMode ||
       !isFocused ||
       !visible ||
-      text.trim().length < 3 ||
+      text.trim().length < 2 ||
       text.includes('\n')
     ) {
+      return;
+    }
+    // 本地历史前缀：同步命中立即出 ghost（不等防抖）
+    const local = localComplete(text);
+    if (local) {
+      setGhost(local);
       return;
     }
     const seq = ++ghostSeq.current;
@@ -195,11 +204,50 @@ export default function InputEditor({
     };
   }, [text, aiMode, completeOn, completeDebounceMs, isFocused, visible, tabCwd]);
 
+  // ── ↑/↓ 翻命令历史（cmd 模式、单行时；fish 式按当前前缀过滤） ──
+  // idx=-1 表示未在翻历史；base 记录开始翻之前的草稿，翻到底（ArrowDown 越界）还原
+  const histNav = useRef<{ idx: number; base: string }>({ idx: -1, base: '' });
+  const resetHistNav = useCallback(() => {
+    histNav.current = { idx: -1, base: '' };
+  }, []);
+
+  const navHistory = useCallback(
+    (dir: 1 | -1) => {
+      const entries = useHistoryStore.getState().entries;
+      const nav = histNav.current;
+      const base = nav.idx === -1 ? text : nav.base;
+      const candidates = entries.filter(
+        (e) => e.command.startsWith(base) && e.command.length > base.length,
+      );
+      const next = nav.idx + dir;
+      if (next < -1 || next >= candidates.length) return false;
+      histNav.current = { idx: next, base };
+      setText(next === -1 ? base : candidates[next]!.command);
+      clearGhost();
+      // 光标移到行尾（受控 textarea 更新后光标停在原处）
+      const el = inputRef.current;
+      if (el) {
+        requestAnimationFrame(() => {
+          el.selectionStart = el.selectionEnd = el.value.length;
+        });
+      }
+      return true;
+    },
+    [text, setText, clearGhost],
+  );
+
+  // ── AI 面板开启时锁定 cmd 模式（AI 提问收口到面板；切换按钮显式禁用） ──
+  const chatOpen = useDockStore((s) => s.leftPanels.includes('chat') || s.rightPanels.includes('chat'));
+  useEffect(() => {
+    if (chatOpen && aiMode) setAiMode(false);
+  }, [chatOpen, aiMode, setAiMode]);
+
   const execute = useCallback(() => {
     const cmd = text.trim();
     if (!cmd) return;
     useInputStore.getState().clearText(paneId);
     resetHeight();
+    resetHistNav();
     try {
       if (aiMode) {
         // AI 模式：问题带上本 pane id —— 回答会内联进本 pane 的块流，同时进全局面板
@@ -212,7 +260,7 @@ export default function InputEditor({
     } catch (e) {
       console.error('[InputEditor] execute failed:', e);
     }
-  }, [text, aiMode, chatSend, paneId, sessions, resetHeight]);
+  }, [text, aiMode, chatSend, paneId, sessions, resetHeight, resetHistNav]);
 
   // ── 全局 End 键监听 ──
 
@@ -279,174 +327,202 @@ export default function InputEditor({
     );
   }
 
-  // ── 正常输入栏 ──
+  // ── 正常输入栏（卡片式：四周留缝 + 圆角卡片；prompt 元素下沉为底部状态栏） ──
 
   return (
-    <div
-      style={{
-        borderTop: '1px solid var(--border)',
-        background: 'var(--surface)',
-        padding: '6px 16px 8px',
-      }}
-    >
-      {/* prompt_elements — : shell · CWD · git分支 | mode pill */}
+    <div style={{ padding: '0 10px 10px' }}>
       <div
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          minHeight: 22,
-          fontSize: 11,
-          color: 'var(--text-muted)',
-          userSelect: 'none',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 12,
+          padding: '8px 12px 5px',
+          boxShadow: '0 1px 4px rgba(0, 0, 0, 0.22)',
         }}
       >
-        <ShellIndicator connected={hasSession} focused={isFocused} label={terminalLabel} />
-        <span style={{ color: 'var(--border-strong)', opacity: 0.5, margin: '0 1px' }}>·</span>
-        <CurrentDir dir={tabCwd} />
-        {recentGitBranch && (
-          <>
-            <span style={{ color: 'var(--border-strong)', opacity: 0.5, margin: '0 1px' }}>·</span>
-            <GitBranchLabel branch={recentGitBranch} />
-          </>
-        )}
-        <div style={{ flex: 1 }} />
-        {/* AI / cmd 模式 pill — 切换按钮 */}
-        <button
-          onClick={() => setAiMode(!aiMode)}
+        {/* 输入行 — $/⚡ prompt + textarea + ghost overlay */}
+        <div
           style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 10,
-            fontWeight: 500,
-            padding: '1px 8px',
-            border: '1px solid var(--border)',
-            borderRadius: 4,
-            background: aiMode ? 'var(--accent-warm-dim)' : 'transparent',
-            color: aiMode ? 'var(--accent-warm)' : 'var(--text-muted)',
-            cursor: 'pointer',
-            lineHeight: '16px',
-            transition: 'background 0.12s ease, color 0.12s ease',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
           }}
         >
-          {aiMode ? 'AI' : 'cmd'}
-        </button>
-      </div>
-
-      {/* input_box — $/⚡ prompt + textarea + 操作按钮（prompt_to_editor_padding ≈ 8px） */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-          marginTop: 6,
-        }}
-      >
-        {/* Prompt 字符 — 点击可切换模式 */}
-        <span
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 13,
-            fontWeight: 600,
-            minWidth: 16,
-            textAlign: 'center',
-            color: aiMode ? 'var(--accent-warm)' : 'var(--accent)',
-            userSelect: 'none',
-            lineHeight: '24px',
-            cursor: 'pointer',
-          }}
-          onClick={() => setAiMode(!aiMode)}
-          title={aiMode ? '切回命令模式' : '切换到 AI 模式'}
-        >
-          {aiMode ? <Zap size={13} /> : '$'}
-        </span>
-
-        {/* textarea + ghost overlay（绝对定位同字体同内边距，透明已输入 + muted 建议后缀） */}
-        <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-          <textarea
-            ref={inputRef}
-            value={text}
-            placeholder={aiMode ? '自然语言描述你想做什么…' : '输入命令…'}
-            rows={1}
-            onChange={(e) => {
-              setText(e.target.value);
-              e.target.style.height = 'auto';
-              e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
-            }}
-            onKeyDown={(e) => {
-              // Tab 接受建议 / Esc 丢弃建议（优先于清空文本）
-              if (ghost && e.key === 'Tab') {
-                e.preventDefault();
-                setText(text + ghost);
-                clearGhost();
-                const el = inputRef.current;
-                if (el) {
-                  el.style.height = 'auto';
-                  requestAnimationFrame(() => {
-                    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
-                  });
-                }
-                return;
-              }
-              if (ghost && e.key === 'Escape') {
-                clearGhost();
-                return;
-              }
-              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                clearGhost();
-                execute();
-              }
-              if (e.key === 'Escape') {
-                if (text) {
-                  setText('');
-                  resetHeight();
-                } else if (aiMode) setAiMode(false);
-              }
-            }}
+          {/* Prompt 字符 — 点击切换模式（AI 面板开启时锁定 cmd，显式禁用） */}
+          <span
             style={{
-              position: 'relative',
-              zIndex: 1,
-              width: '100%',
-              resize: 'none',
-              background: 'transparent',
-              border: 'none',
-              padding: '1px 0',
-              fontSize: 13,
               fontFamily: 'var(--font-mono)',
-              color: 'var(--text-primary)',
-              lineHeight: '22px',
-              outline: 'none',
+              fontSize: 13,
+              fontWeight: 600,
+              minWidth: 16,
+              textAlign: 'center',
+              color: aiMode ? 'var(--accent-warm)' : 'var(--accent)',
+              userSelect: 'none',
+              lineHeight: '24px',
+              cursor: chatOpen ? 'not-allowed' : 'pointer',
+              opacity: chatOpen ? 0.45 : 1,
             }}
-          />
-          {ghost && (
-            <div
-              aria-hidden
+            onClick={() => {
+              if (!chatOpen) setAiMode(!aiMode);
+            }}
+            title={
+              chatOpen
+                ? 'AI 对话面板开启中，请在面板中提问'
+                : aiMode
+                  ? '切回命令模式'
+                  : '切换到 AI 模式'
+            }
+          >
+            {aiMode ? <Zap size={13} /> : '$'}
+          </span>
+
+          {/* textarea + ghost overlay（绝对定位同字体同内边距，透明已输入 + muted 建议后缀） */}
+          <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+            <textarea
+              ref={inputRef}
+              value={text}
+              placeholder={aiMode ? '自然语言描述你想做什么…' : '输入命令…'}
+              rows={1}
+              onChange={(e) => {
+                resetHistNav();
+                setText(e.target.value);
+                e.target.style.height = 'auto';
+                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+              }}
+              onKeyDown={(e) => {
+                // ↑/↓ 翻命令历史（cmd 模式 + 单行；fish 式按当前前缀过滤）
+                if (!aiMode && !text.includes('\n') && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+                  if (navHistory(e.key === 'ArrowUp' ? 1 : -1)) {
+                    e.preventDefault();
+                    return;
+                  }
+                }
+                // Tab 接受建议 / Esc 丢弃建议（优先于清空文本）
+                if (ghost && e.key === 'Tab') {
+                  e.preventDefault();
+                  setText(text + ghost);
+                  clearGhost();
+                  resetHistNav();
+                  const el = inputRef.current;
+                  if (el) {
+                    el.style.height = 'auto';
+                    requestAnimationFrame(() => {
+                      el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+                    });
+                  }
+                  return;
+                }
+                if (ghost && e.key === 'Escape') {
+                  clearGhost();
+                  return;
+                }
+                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  clearGhost();
+                  execute();
+                }
+                if (e.key === 'Escape') {
+                  if (text) {
+                    setText('');
+                    resetHeight();
+                  } else if (aiMode && !chatOpen) setAiMode(false);
+                }
+              }}
               style={{
-                position: 'absolute',
-                inset: 0,
-                zIndex: 0,
-                pointerEvents: 'none',
+                position: 'relative',
+                zIndex: 1,
+                width: '100%',
+                resize: 'none',
+                background: 'transparent',
+                border: 'none',
                 padding: '1px 0',
                 fontSize: 13,
                 fontFamily: 'var(--font-mono)',
+                color: 'var(--text-primary)',
                 lineHeight: '22px',
-                whiteSpace: 'pre-wrap',
-                overflowWrap: 'break-word',
+                outline: 'none',
               }}
-            >
-              <span style={{ color: 'transparent' }}>{text}</span>
-              <span style={{ color: 'var(--text-muted)', opacity: 0.6 }}>{ghost}</span>
-            </div>
-          )}
+            />
+            {ghost && (
+              <div
+                aria-hidden
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  zIndex: 0,
+                  pointerEvents: 'none',
+                  padding: '1px 0',
+                  fontSize: 13,
+                  fontFamily: 'var(--font-mono)',
+                  lineHeight: '22px',
+                  whiteSpace: 'pre-wrap',
+                  overflowWrap: 'break-word',
+                }}
+              >
+                <span style={{ color: 'transparent' }}>{text}</span>
+                <span style={{ color: 'var(--text-muted)', opacity: 0.6 }}>{ghost}</span>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* 操作按钮 — subtle hover effect：分裂 + 关闭当前终端 */}
-        <InputActionBtn title="选择类型分裂" onClick={() => useUiStore.getState().openSplitPicker()}>
-          <Columns2 size={13} />
-        </InputActionBtn>
-        <InputActionBtn title="关闭当前终端" onClick={() => useWorkspaceStore.getState().closeTerminal(paneId)}>
-          <X size={13} />
-        </InputActionBtn>
+        {/* 底部状态栏 — shell · CWD · git分支 | cmd/AI pill · 分裂 · 关闭 */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            minHeight: 22,
+            marginTop: 4,
+            paddingTop: 5,
+            borderTop: '1px solid var(--border)',
+            fontSize: 11,
+            color: 'var(--text-muted)',
+            userSelect: 'none',
+          }}
+        >
+          <ShellIndicator connected={hasSession} focused={isFocused} label={terminalLabel} />
+          <span style={{ color: 'var(--border-strong)', opacity: 0.5, margin: '0 1px' }}>·</span>
+          <CurrentDir dir={tabCwd} />
+          {recentGitBranch && (
+            <>
+              <span style={{ color: 'var(--border-strong)', opacity: 0.5, margin: '0 1px' }}>·</span>
+              <GitBranchLabel branch={recentGitBranch} />
+            </>
+          )}
+          <div style={{ flex: 1 }} />
+          {/* AI / cmd 模式 pill（AI 面板开启时锁定 cmd，显式禁用） */}
+          <button
+            onClick={() => {
+              if (!chatOpen) setAiMode(!aiMode);
+            }}
+            title={
+              chatOpen ? 'AI 对话面板开启中，请在面板中提问' : aiMode ? '切回命令模式' : '切换到 AI 模式'
+            }
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 10,
+              fontWeight: 500,
+              padding: '1px 8px',
+              border: '1px solid var(--border)',
+              borderRadius: 4,
+              background: aiMode ? 'var(--accent-warm-dim)' : 'transparent',
+              color: aiMode ? 'var(--accent-warm)' : 'var(--text-muted)',
+              cursor: chatOpen ? 'not-allowed' : 'pointer',
+              opacity: chatOpen ? 0.45 : 1,
+              lineHeight: '16px',
+              transition: 'background 0.12s ease, color 0.12s ease',
+            }}
+          >
+            {aiMode ? 'AI' : 'cmd'}
+          </button>
+          <InputActionBtn title="选择类型分裂" onClick={() => useUiStore.getState().openSplitPicker()}>
+            <Columns2 size={13} />
+          </InputActionBtn>
+          <InputActionBtn title="关闭当前终端" onClick={() => useWorkspaceStore.getState().closeTerminal(paneId)}>
+            <X size={13} />
+          </InputActionBtn>
+        </div>
       </div>
     </div>
   );

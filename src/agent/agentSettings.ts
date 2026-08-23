@@ -37,7 +37,7 @@ export const useAgentSettings = create<AgentSettingsState>()(
       titleModel: '',
       completeEnabled: true,
       completeModel: '',
-      completeDebounceMs: 300,
+      completeDebounceMs: 200,
       update: (patch) => set(patch),
     }),
     { name: 'vrykell-agent-settings' },
