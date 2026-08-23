@@ -348,17 +348,22 @@ export default function InputEditor({
             gap: 4,
           }}
         >
-          {/* Prompt 字符 — 点击切换模式（AI 面板开启时锁定 cmd，显式禁用） */}
+          {/* Prompt 字符 — 点击切换模式（AI 面板开启时锁定 cmd，显式禁用）
+              固定 24px 高 + flex 居中，与 textarea（22px 行高 + 1px 上下 padding）精确对齐 */}
           <span
             style={{
               fontFamily: 'var(--font-mono)',
               fontSize: 13,
               fontWeight: 600,
               minWidth: 16,
-              textAlign: 'center',
+              height: 24,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
               color: aiMode ? 'var(--accent-warm)' : 'var(--accent)',
               userSelect: 'none',
-              lineHeight: '24px',
+              lineHeight: 1,
               cursor: chatOpen ? 'not-allowed' : 'pointer',
               opacity: chatOpen ? 0.45 : 1,
             }}
@@ -376,8 +381,9 @@ export default function InputEditor({
             {aiMode ? <Zap size={13} /> : '$'}
           </span>
 
-          {/* textarea + ghost overlay（绝对定位同字体同内边距，透明已输入 + muted 建议后缀） */}
-          <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+          {/* textarea + ghost overlay（绝对定位同字体同内边距，透明已输入 + muted 建议后缀）
+              display:flex 让 textarea 成为 flex item，消除 inline-block 基线下方空隙（否则容器比 textarea 高 7px） */}
+          <div style={{ position: 'relative', flex: 1, minWidth: 0, display: 'flex' }}>
             <textarea
               ref={inputRef}
               value={text}
@@ -431,7 +437,8 @@ export default function InputEditor({
               style={{
                 position: 'relative',
                 zIndex: 1,
-                width: '100%',
+                flex: 1,
+                minWidth: 0,
                 resize: 'none',
                 background: 'transparent',
                 border: 'none',
