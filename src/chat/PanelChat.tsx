@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUp, Bot, Brain, Globe, Paperclip, ShieldCheck, Square, Zap } from 'lucide-react';
+import { ArrowUp, Bot, Brain, Globe, Paperclip, ShieldAlert, ShieldCheck, ShieldOff, Square, Zap } from 'lucide-react';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useChatStore, useActiveMessages } from '../stores/chat';
@@ -35,11 +35,12 @@ import { CurrentDir } from '../terminal/InputEditor';
 import AiBlock from './AiBlock';
 import { toExchanges, type ChatExchange } from './exchanges';
 
-/** 权限模式循环（状态栏 Shield chip）：标准=逐工具级别；严格=全部逐次问；放行=全部直放行（危险命令仍逐次问） */
+/** 权限模式循环（状态栏 Shield chip）：图标 + 颜色双通道辨识（勾=标准逐工具 / 叹号=严格逐次问 / 斜线=放行直放）
+ *  标准=逐工具级别；严格=全部逐次问；放行=全部直放行（危险命令仍逐次问） */
 const PERM_MODES = [
-  { id: 'standard', label: '标准', color: 'var(--text-muted)', title: '标准权限：按设置页逐工具级别判定（点击切换）' },
-  { id: 'strict', label: '严格', color: 'var(--accent-warm)', title: '严格权限：所有工具操作逐次询问（点击切换）' },
-  { id: 'relaxed', label: '放行', color: 'var(--error-light)', title: '放行模式：全部工具直接放行，危险命令仍会逐次询问（点击切换）' },
+  { id: 'standard', label: '标准', icon: ShieldCheck, color: 'var(--text-muted)', title: '标准权限：按设置页逐工具级别判定（点击切换）' },
+  { id: 'strict', label: '严格', icon: ShieldAlert, color: 'var(--accent-warm)', title: '严格权限：所有工具操作逐次询问（点击切换）' },
+  { id: 'relaxed', label: '放行', icon: ShieldOff, color: 'var(--error-light)', title: '放行模式：全部工具直接放行，危险命令仍会逐次询问（点击切换）' },
 ] as const;
 
 /** 各 provider 的常用模型（快捷下拉；完整自由度在设置页输入） */
@@ -243,10 +244,45 @@ export default function PanelChat() {
         : firstLeaf(activeTab.layout).id)
     : undefined;
 
+  // ── ↑/↓ 翻历史提问（fish 式：以开始翻前的草稿为前缀过滤，最新在前） ──
+  const historyQuestions = useMemo(
+    () =>
+      exchanges
+        .map((ex) => ex.question?.content)
+        .filter((c): c is string => !!c && c.trim().length > 0)
+        .reverse(),
+    [exchanges],
+  );
+  const histNav = useRef<{ idx: number; base: string }>({ idx: -1, base: '' });
+  const resetHistNav = () => {
+    histNav.current = { idx: -1, base: '' };
+  };
+  const navHistory = (dir: 1 | -1) => {
+    const nav = histNav.current;
+    const base = nav.idx === -1 ? text : nav.base;
+    const candidates = historyQuestions.filter(
+      (q) => q.startsWith(base) && q.length > base.length,
+    );
+    const next = nav.idx + dir;
+    if (next < -1 || next >= candidates.length) return false;
+    histNav.current = { idx: next, base };
+    setText(next === -1 ? base : candidates[next]!);
+    const el = inputRef.current;
+    if (el) {
+      requestAnimationFrame(() => {
+        el.selectionStart = el.selectionEnd = el.value.length;
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+      });
+    }
+    return true;
+  };
+
   const submit = () => {
     const q = text.trim();
     if ((!q && atts.length === 0) || sending || !isSession) return;
     setText('');
+    resetHistNav();
     if (inputRef.current) inputRef.current.style.height = 'auto';
     const payload = atts.length > 0 ? atts : undefined;
     setAtts([]);
@@ -262,7 +298,50 @@ export default function PanelChat() {
 
   return (
     <div ref={panelRef} style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-      {/* 转录区：按来源 pane 分段（无独立顶栏，面板身份由 dock 按钮承担） */}
+      {/* 顶栏：会话级 AI 配置（模型 · 联网 · 深思 · Agent），低频、影响后续所有消息，从输入卡抽离避免拥挤 */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 4,
+        padding: '7px 10px 6px',
+        flexShrink: 0, userSelect: 'none',
+      }}>
+        <button
+          data-subtle
+          title="切换模型（更多在设置页配置）"
+          onClick={(e) => setModelMenu({ x: e.clientX, y: e.clientY })}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 500,
+            padding: '2px 8px', border: '1px solid var(--border)', borderRadius: 5,
+            background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer',
+            lineHeight: '16px', maxWidth: 150,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}
+        >
+          {aiCfg.model || '模型'}
+          <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>▾</span>
+        </button>
+        <div style={{ flex: 1 }} />
+        <QuickToggle
+          icon={Globe}
+          on={agentSettings.webSearch}
+          title={searchAvailable ? '联网搜索' : '联网搜索（需先配置 Tavily Key）'}
+          onClick={toggleSearch}
+        />
+        <QuickToggle
+          icon={Brain}
+          on={agentSettings.deepThink}
+          title="深度思考（reasoning effort）"
+          onClick={() => agentSettings.update({ deepThink: !agentSettings.deepThink })}
+        />
+        <QuickToggle
+          icon={Bot}
+          on={agentSettings.agentMode}
+          title={agentSettings.agentMode ? 'Agent 模式（可使用工具）' : '纯聊天（工具已关闭）'}
+          onClick={() => agentSettings.update({ agentMode: !agentSettings.agentMode })}
+        />
+      </div>
+
+      {/* 转录区：按来源 pane 分段 */}
       <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '4px 8px 8px' }}>
         {exchanges.length === 0 ? (
           <EmptyHint isSession={isSession} />
@@ -297,9 +376,9 @@ export default function PanelChat() {
             {/* 输入行：⚡ prompt + textarea + 发送/停止（度量同终端输入栏） */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <span style={{
-                minWidth: 16, textAlign: 'center', lineHeight: '24px',
+                minWidth: 16, height: 24, lineHeight: 1,
                 color: 'var(--accent-warm)', userSelect: 'none', flexShrink: 0,
-                display: 'inline-flex', justifyContent: 'center',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 <Zap size={13} />
               </span>
@@ -309,11 +388,19 @@ export default function PanelChat() {
                 placeholder="自然语言描述你想做什么…"
                 rows={1}
                 onChange={(e) => {
+                  resetHistNav();
                   setText(e.target.value);
                   e.target.style.height = 'auto';
                   e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
                 }}
                 onKeyDown={(e) => {
+                  // ↑/↓ 翻历史提问（单行时；fish 式按当前前缀过滤）
+                  if (!text.includes('\n') && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+                    if (navHistory(e.key === 'ArrowUp' ? 1 : -1)) {
+                      e.preventDefault();
+                      return;
+                    }
+                  }
                   if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                     e.preventDefault();
                     submit();
@@ -378,7 +465,7 @@ export default function PanelChat() {
               )}
             </div>
 
-            {/* 底部状态栏：目标 pane · 模型 · 权限模式 | 联网 · 深思 · Agent · 📎 */}
+            {/* 底部状态栏：目标 pane 上下文 + 权限模式 + 附件（AI 配置已上移到顶栏） */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: 6,
               minHeight: 22, marginTop: 4, paddingTop: 5,
@@ -393,61 +480,33 @@ export default function PanelChat() {
                 </>
               )}
               <div style={{ flex: 1 }} />
-              {/* 模型 chip（快捷下拉，更多在设置页） */}
-              <button
-                data-subtle
-                title="切换模型（更多在设置页配置）"
-                onClick={(e) => setModelMenu({ x: e.clientX, y: e.clientY })}
-                style={{
-                  fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 500,
-                  padding: '1px 6px', border: '1px solid var(--border)', borderRadius: 4,
-                  background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer',
-                  lineHeight: '16px', maxWidth: 110,
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}
-              >
-                {aiCfg.model || '模型'}
-              </button>
-              {/* 权限模式 chip（点击循环 标准→严格→放行） */}
+              {/* 权限模式切换（点击循环 标准→严格→放行）：纯图标 + 三色，与 📎 同尺寸同风格对齐 */}
               {(() => {
                 const idx = PERM_MODES.findIndex((m) => m.id === permMode);
                 const cur = PERM_MODES[idx] ?? PERM_MODES[0]!;
                 const next = PERM_MODES[(idx + 1) % PERM_MODES.length]!;
+                const CurIcon = cur.icon;
                 return (
                   <button
                     data-subtle
                     title={cur.title}
                     onClick={() => setPermMode(next.id)}
                     style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 3,
-                      fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 500,
-                      padding: '1px 6px', border: '1px solid var(--border)', borderRadius: 4,
-                      background: 'transparent', color: cur.color, cursor: 'pointer', lineHeight: '16px',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      width: 20, height: 20, padding: 0, border: 'none', borderRadius: 3,
+                      background: 'transparent', color: cur.color, cursor: 'pointer',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'var(--button-hover)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent';
                     }}
                   >
-                    <ShieldCheck size={10} />
-                    {cur.label}
+                    <CurIcon size={13} />
                   </button>
                 );
               })()}
-              <QuickToggle
-                icon={Globe}
-                on={agentSettings.webSearch}
-                title={searchAvailable ? '联网搜索' : '联网搜索（需先配置 Tavily Key）'}
-                onClick={toggleSearch}
-              />
-              <QuickToggle
-                icon={Brain}
-                on={agentSettings.deepThink}
-                title="深度思考（reasoning effort）"
-                onClick={() => agentSettings.update({ deepThink: !agentSettings.deepThink })}
-              />
-              <QuickToggle
-                icon={Bot}
-                on={agentSettings.agentMode}
-                title={agentSettings.agentMode ? 'Agent 模式（可使用工具）' : '纯聊天（工具已关闭）'}
-                onClick={() => agentSettings.update({ agentMode: !agentSettings.agentMode })}
-              />
               {/* 📎 附件 */}
               <button
                 data-subtle

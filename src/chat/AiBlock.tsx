@@ -49,19 +49,22 @@ function Rail({ bottom }: { bottom: number }) {
   );
 }
 
-/** rail 端点小灰点（6px，区别于 8px 动作节点） */
+/** rail 端点小灰点（6px，区别于 8px 动作节点）。
+ *  top/bottom 均表示「圆心」距顶/距底的距离（与 Rail 的 top/bottom 同语义），
+ *  故用 top-3 / bottom-3 定位盒边、只做水平 translateX 居中，圆心精确落在线端点。 */
 function EndDot({ top, bottom }: { top?: number; bottom?: number }) {
+  const pos = top != null ? { top: top - 3 } : { bottom: (bottom ?? 0) - 3 };
   return (
     <span
       aria-hidden
       style={{
         position: 'absolute',
         left: 0,
-        ...(top != null ? { top } : { bottom }),
+        ...pos,
         width: 6,
         height: 6,
         borderRadius: '50%',
-        transform: 'translate(-50%, -50%)',
+        transform: 'translateX(-50%)',
         background: 'var(--text-muted)',
       }}
     />
