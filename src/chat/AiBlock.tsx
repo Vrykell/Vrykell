@@ -3,17 +3,17 @@
  *
  * AI 不是应用里的聊天机器人，而是会话历史里的一种特殊条目：
  *   问题 = 你敲的一行（⚡ prompt + 等宽字体，与命令同级）
- *   回答 = 时间轴：每个动作（执行命令/读取/修改/搜索…）挂一个 8px 状态
- *          节点 + 摘要卡片；1px 中性细线（rail）从首个动作节点的圆心
- *          出发，连续穿过其后所有内容，末端收在一个终点上 —— 完成时
- *          是 6px 灰色终点节点，出错时是红色错误节点，流式中随内容延伸。
- *          首个动作之前的文本段无线。run_command 节点下内嵌命令输出块。
+ *   回答 = 时间轴：1px 中性细线（rail）常驻——即使没有工具动作、
+ *          仅仅回答了问题也有。细线两端是 6px 灰色小节点（起点/终点），
+ *          中间穿插 8px 动作节点（执行命令/读取/修改/搜索…）+ 摘要卡片；
+ *          出错时末端换成红色错误节点。run_command 节点下可展开命令输出。
  * 节点语义：绿实心=成功 / 红实心=失败 / 暖色描边环脉冲=执行中 /
- *          静态暖色环=等待批准 / 灰环=已拒绝。纯文本不设节点（也无细线）。
+ *          静态暖色环=等待批准 / 灰环=已拒绝。纯文本不设节点。
  *
- * 行结构：回答区每个 part 包一层行容器（position:relative; paddingLeft:16），
- * 行容器左缘即 rail x 坐标；RailSeg（本文件）与 ToolNode（ToolRunCard 内）
- * 都以它为包含块。错误行是合成的末节点（红实心 +「出错了」）。
+ * 行结构：回答容器 position:relative，Rail/EndDot 绝对定位贯穿全容器；
+ * 每个 part 包一层行容器（position:relative; paddingLeft:16），ToolNode
+ * （ToolRunCard 内）以行容器为包含块压在 rail 上。行容器 flow-root 建立
+ * 独立块格式化上下文，阻止子元素 margin 穿透行边界。
  *
  * 同组件服务两个视图：TerminalBlockList（块流内联）与 PanelChat（窗口转录）。
  */
@@ -29,10 +29,10 @@ import ToolRunCard from './ToolRunCard';
 import AttachmentChips from './AttachmentChips';
 import type { ChatExchange } from './exchanges';
 
-/** rail 线段：1px 细线，位于行容器左缘。up/down 控制是否向行首/行尾延伸，
- *  都不延伸时线段收在节点圆心处（即不渲染）。nodeTop = 节点圆心的行内偏移。 */
-function RailSeg({ up, down, nodeTop = 12 }: { up: boolean; down: boolean; nodeTop?: number }) {
-  if (!up && !down) return null;
+/** rail 细线：1px，绝对定位贯穿整个回答容器（top 起于首端灰点圆心，
+ *  bottom 收于末端节点圆心：完成=灰点 / 出错=红节点 / 流式=延伸至底）。
+ *  无论是否有工具动作，只要回答存在细线就存在。 */
+function Rail({ bottom }: { bottom: number }) {
   return (
     <span
       aria-hidden
@@ -41,9 +41,28 @@ function RailSeg({ up, down, nodeTop = 12 }: { up: boolean; down: boolean; nodeT
         left: 0,
         width: 1,
         transform: 'translateX(-50%)',
-        top: up ? 0 : nodeTop,
-        bottom: down ? 0 : nodeTop,
+        top: 6,
+        bottom,
         background: 'var(--border-strong)',
+      }}
+    />
+  );
+}
+
+/** rail 端点小灰点（6px，区别于 8px 动作节点） */
+function EndDot({ top, bottom }: { top?: number; bottom?: number }) {
+  return (
+    <span
+      aria-hidden
+      style={{
+        position: 'absolute',
+        left: 0,
+        ...(top != null ? { top } : { bottom }),
+        width: 6,
+        height: 6,
+        borderRadius: '50%',
+        transform: 'translate(-50%, -50%)',
+        background: 'var(--text-muted)',
       }}
     />
   );
@@ -88,9 +107,8 @@ export default function AiBlock({ exchange }: { exchange: ChatExchange }) {
     if (ok) useChatStore.getState().deleteExchange(useWorkspaceStore.getState().activeId, question.id);
   };
 
-  // 首个动作节点的 part 下标：细线从它的圆心出发，连续穿到回答末尾
+  // 回答 parts（tool part 渲染为 rail 上的动作节点）
   const parts = answer?.parts;
-  const firstNode = (parts ?? []).findIndex((p) => p.kind === 'tool');
 
   return (
     <div className="ai-block" style={{ padding: '4px 0 2px' }}>
@@ -109,6 +127,7 @@ export default function AiBlock({ exchange }: { exchange: ChatExchange }) {
         >
           <Zap size={12} style={{ color: 'var(--accent-warm)', flexShrink: 0, transform: 'translateY(1px)' }} />
           <span
+            data-selectable
             style={{
               flex: 1,
               minWidth: 0,
@@ -149,37 +168,37 @@ export default function AiBlock({ exchange }: { exchange: ChatExchange }) {
         </div>
       )}
 
-      {/* 回答 — 时间轴：节点间细线 + 文本段 + 动作卡片（含内嵌命令块） */}
+      {/* 回答 — 时间轴：rail 常驻（无工具也有细线），两端灰节点，动作节点穿插中间 */}
       {answer && !collapsed && (
         <div
+          data-selectable
           style={{
+            position: 'relative',
             marginLeft: 6,
             marginTop: 2,
+            paddingBottom: !answer.pending && !answer.error ? 8 : 0,
             fontFamily: 'var(--font-ui)',
             fontSize: 12,
             lineHeight: 1.6,
             color: 'var(--text-primary)',
           }}
         >
+          {/* rail 贯穿：起点=首端灰点圆心(6px)，终点=末端节点圆心（完成 4 / 出错 12 / 流式到底） */}
+          <Rail bottom={answer.error ? 12 : answer.pending ? 0 : 4} />
+          <EndDot top={6} />
           {parts
             ? parts.map((p, i) => {
                 if (p.kind === 'tool') {
-                  // 首节点上方无线（线的起点 = 首节点圆心），此后细线连续
-                  // 穿过每一行直到终点节点
                   return (
                     <div key={p.tool.toolCallId} style={ROW}>
-                      <RailSeg up={i > firstNode} down={firstNode >= 0} />
                       <ToolRunCard run={p.tool} paneId={exchange.paneId} />
                     </div>
                   );
                 }
                 if (!p.text) return null;
                 const isLast = i === parts.length - 1;
-                // 首节点之后的文本段细线全高穿过；首节点之前的文本无线
-                const onLine = firstNode >= 0 && i > firstNode;
                 return (
                   <div key={i} style={ROW}>
-                    <RailSeg up={onLine} down={onLine} />
                     <div className="md">
                       <SafeMarkdown content={p.text} />
                       {/* pending 光标落在最后一个 text part 末尾 */}
@@ -188,21 +207,20 @@ export default function AiBlock({ exchange }: { exchange: ChatExchange }) {
                   </div>
                 );
               })
-            : // legacy 渲染（纯文本/旧持久化消息）：无节点无细线，行为零变化
+            : // legacy 渲染（纯文本/旧持久化消息）：行为零变化
               answer.content && (
-                <div style={{ paddingLeft: 16 }} className="md">
+                <div style={ROW} className="md">
                   <SafeMarkdown content={answer.content} />
                   {answer.pending && <PendingCursor />}
                 </div>
               )}
-          {/* 末 part 是 tool 时，pending 光标挂在尾部独立一行，细线继续延伸 */}
+          {/* 末 part 是 tool 时，pending 光标挂在尾部独立一行 */}
           {parts && answer.pending && parts[parts.length - 1]?.kind === 'tool' && (
             <div style={ROW}>
-              <RailSeg up={firstNode >= 0} down={firstNode >= 0} />
               <PendingCursor />
             </div>
           )}
-          {/* 文本错误 = 红色终点节点（细线向上续到它，不再向下） */}
+          {/* 文本错误 = 红色终点节点 */}
           {answer.error && (
             <div
               style={{
@@ -211,35 +229,16 @@ export default function AiBlock({ exchange }: { exchange: ChatExchange }) {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
-                paddingTop: 3,
-                paddingBottom: 3,
+                height: 24,
                 lineHeight: '18px',
               }}
             >
-              <RailSeg up={firstNode >= 0} down={false} />
               <ToolNode state="error" top={12} />
               <span style={{ fontSize: 12, color: 'var(--error)' }}>出错了</span>
             </div>
           )}
-          {/* 回答完成 = 时间轴终点节点（6px 灰点，区别于 8px 动作节点） */}
-          {parts && firstNode >= 0 && !answer.pending && !answer.error && (
-            <div style={{ position: 'relative', height: 8 }}>
-              <RailSeg up down={false} nodeTop={4} />
-              <span
-                aria-hidden
-                style={{
-                  position: 'absolute',
-                  left: 0,
-                  top: 4,
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  background: 'var(--text-muted)',
-                }}
-              />
-            </div>
-          )}
+          {/* 回答完成 = 末端灰点（6px，圆心距容器底 4px，与 Rail bottom 对齐） */}
+          {!answer.pending && !answer.error && <EndDot bottom={4} />}
         </div>
       )}
     </div>

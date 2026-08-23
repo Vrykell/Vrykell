@@ -14,6 +14,7 @@ import { initAutoTitle } from './agent/title';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import { useUiStore } from './stores/ui';
 import { useWorkspaceDirsStore } from './files/workspaceDirs';
+import { useHistoryStore } from './stores/history';
 import { useWorkspaceStore, serializeSession, isSessionTab } from './stores/workspace';
 import { minTerminalWidth, MIN_PANE_SIZE, type TerminalSpec } from './lib/windowLayout';
 import * as sessionManager from './lib/sessionManager';
@@ -47,6 +48,8 @@ export default function App() {
     }
   }, []);
   useEffect(() => { useWorkspaceDirsStore.getState().load(); }, []);
+  // 命令历史热缓存注水：补全与上下键翻历史在重启后立即有料
+  useEffect(() => { void useHistoryStore.getState().hydrate(); }, []);
   useGlobalShortcuts();
   const paletteOpen = useUiStore((s) => s.paletteOpen);
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);

@@ -2,14 +2,10 @@
  * ToolRunCard — 单个工具动作的行内卡片（零浮层）。
  *
  * 折叠态 = 单行摘要：动作图标 + 摘要文本 + 右侧状态 chip；
- * 点击行内展开输出尾部（pre，maxHeight 240，超长截断提示「…仅显示尾部」）。
+ * 点击行内展开（所有工具统一，含 run_command）：
+ *   run_command → 命令输出块（圆角深底 + BlockOutput，与终端输出块同款）
+ *   其余工具   → 输出尾部 pre（maxHeight 240，超长截断提示「…仅显示尾部」）
  * 展开态是组件内 useState，不进 store。
- *
- * run_command 特殊：摘要行下方恒驻一张「内嵌命令块」——输出区样式与终端
- * 输出块一致（圆角深底 + BlockOutput）。数据源优先活块（agentControl 的
- * toolCall→block 映射 + blockStore，含 outputHtml 快照），重启后映射丢失
- * 则降级为工具结果里捕获的输出文本。命令块因此成为回答的一部分，而不是
- * 时间线上的独立条目。
  *
  * 定位约定：本卡根节点是静态流式元素；ToolNode（absolute）与 rail 线段
  * 都由 AiBlock 的行容器（position:relative; paddingLeft:16）承载。
@@ -92,9 +88,9 @@ function expandBody(run: ToolRun): { exitCode?: number; body: string } {
 
 const BODY_CAP = 6000;
 
-/** run_command 的内嵌命令块：输出区与终端块同款渲染（BlockOutput）。
+/** run_command 展开态输出块：圆角深底容器 + BlockOutput（与终端输出块同款）。
  *  活块优先（含 outputHtml 颜色快照）；映射丢失（重启）降级 captured 文本。 */
-function EmbeddedCommandBlock({ run, paneId }: { run: ToolRun; paneId?: string }) {
+function CommandOutputBlock({ run, paneId }: { run: ToolRun; paneId?: string }) {
   const block = useBlockStore((s) => {
     const id = agentControl.blockForToolCall(run.toolCallId);
     if (!id || !paneId) return undefined;
@@ -145,8 +141,8 @@ export default function ToolRunCard({ run, paneId }: { run: ToolRun; paneId?: st
   const chip = STATE_CHIP[run.state];
   const { exitCode, body } = expandBody(run);
   const isCommand = run.toolName === 'run_command';
-  // run_command 的输出由内嵌命令块恒驻展示，不再走点击展开
-  const expandable = !isCommand && body.length > 0;
+  // 所有工具统一为「单行摘要 + 点击行内展开」；run_command 展开态是命令输出块
+  const expandable = isCommand || body.length > 0;
   const truncated = body.length > BODY_CAP;
   const shown = truncated ? body.slice(-BODY_CAP) : body;
 
@@ -238,12 +234,11 @@ export default function ToolRunCard({ run, paneId }: { run: ToolRun; paneId?: st
         </div>
       )}
 
-      {/* run_command：内嵌命令块（恒驻） */}
-      {isCommand && <EmbeddedCommandBlock run={run} paneId={paneId} />}
-
-      {/* 其余工具：展开态输出/错误尾部 */}
-      {!isCommand && open && expandable && (
+      {/* 展开态：run_command = 命令输出块；其余工具 = 输出/错误尾部 pre */}
+      {open && isCommand && <CommandOutputBlock run={run} paneId={paneId} />}
+      {open && !isCommand && expandable && (
         <pre
+          data-selectable
           style={{
             margin: '2px 0 6px',
             padding: '6px 8px',

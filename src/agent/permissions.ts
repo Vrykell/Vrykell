@@ -62,22 +62,34 @@ const DEFAULT_LEVELS: Record<ToolName, ToolLevel> = {
 
 interface PermissionsState {
   levels: Record<string, ToolLevel>;
+  /** 快捷权限模式（状态栏一键切换）：
+   *  standard = 按 levels 逐工具判定（设置页可调）；
+   *  strict   = 全部工具逐次询问；
+   *  relaxed  = 全部放行（危险命令启发式仍逐次询问，不受放行影响）。
+   *  在设置页单独调整某工具级别会回落到 standard。 */
+  mode: 'standard' | 'strict' | 'relaxed';
   setLevel: (tool: ToolName, level: ToolLevel) => void;
+  setMode: (mode: 'standard' | 'strict' | 'relaxed') => void;
 }
 
 export const usePermissions = create<PermissionsState>()(
   persist(
     (set) => ({
       levels: { ...DEFAULT_LEVELS },
+      mode: 'standard',
       setLevel: (tool, level) =>
-        set((s) => ({ levels: { ...s.levels, [tool]: level } })),
+        set((s) => ({ levels: { ...s.levels, [tool]: level }, mode: 'standard' })),
+      setMode: (mode) => set({ mode }),
     }),
     { name: 'vrykell-permissions' },
   ),
 );
 
 export function levelOf(tool: string): ToolLevel {
-  return usePermissions.getState().levels[tool] ?? 'ask';
+  const s = usePermissions.getState();
+  if (s.mode === 'strict') return 'ask';
+  if (s.mode === 'relaxed') return 'allow';
+  return s.levels[tool] ?? 'ask';
 }
 
 // ── 会话授权（内存，重启即失效） ──
