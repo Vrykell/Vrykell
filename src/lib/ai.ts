@@ -7,8 +7,18 @@ import type { ProviderKind } from '../agent/provider';
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_MODEL = 'gpt-4o-mini';
 
-// AI 配置（provider / 各家 key / baseUrl / model）都在 Rust 后端持久化，前端用
-// zustand store 镜像一份供 UI 订阅（状态栏模型名等需要响应式）；key 本身不回显。
+/** 一个可用的模型配置（命名 profile）。API key 按 provider 复用，不做每模型单独 key。 */
+export interface ModelProfile {
+  id: string;
+  name: string;
+  provider: ProviderKind;
+  baseUrl: string;
+  model: string;
+}
+
+// AI 配置（provider / 各家 key / baseUrl / model / 模型列表）都在 Rust 后端持久化，
+// 前端用 zustand store 镜像一份供 UI 订阅（状态栏模型名等需要响应式）；key 本身不回显。
+// provider/baseUrl/model 是「当前生效模型」的镜像字段，方便旧代码与状态栏直接读取。
 interface AiConfigState {
   hasKey: boolean;
   baseUrl: string;
@@ -17,6 +27,10 @@ interface AiConfigState {
   hasAnthropicKey: boolean;
   hasGeminiKey: boolean;
   hasTavilyKey: boolean;
+  /** 多模型列表（命名 profile） */
+  models: ModelProfile[];
+  /** 当前生效模型 id */
+  activeModel: string;
 }
 
 export const useAiConfigStore = create<AiConfigState>(() => ({
@@ -27,7 +41,24 @@ export const useAiConfigStore = create<AiConfigState>(() => ({
   hasAnthropicKey: false,
   hasGeminiKey: false,
   hasTavilyKey: false,
+  models: [],
+  activeModel: '',
 }));
+
+/** 当前生效模型的完整 profile；列表为空时回退到镜像字段（旧配置/未刷新）。 */
+export function activeModelProfile(): ModelProfile {
+  const s = useAiConfigStore.getState();
+  return (
+    s.models.find((m) => m.id === s.activeModel) ??
+    s.models[0] ?? {
+      id: 'default',
+      name: '默认模型',
+      provider: s.provider,
+      baseUrl: s.baseUrl,
+      model: s.model,
+    }
+  );
+}
 
 export function isApiKeyConfigured(): boolean {
   const s = useAiConfigStore.getState();
@@ -57,9 +88,11 @@ interface AiConfigInfoRust {
   has_anthropic_key: boolean;
   has_gemini_key: boolean;
   has_tavily_key: boolean;
+  models: ModelProfile[];
+  active_model: string;
 }
 
-/** 启动时同步一次 Rust 侧配置（provider / 各家 key 是否已配 / baseUrl / model）。 */
+/** 启动时同步一次 Rust 侧配置（provider / 各家 key 是否已配 / baseUrl / model / 模型列表）。 */
 export async function refreshAiConfig(): Promise<void> {
   try {
     const info = await invoke<AiConfigInfoRust>('get_ai_config');
@@ -71,6 +104,8 @@ export async function refreshAiConfig(): Promise<void> {
       hasAnthropicKey: info.has_anthropic_key,
       hasGeminiKey: info.has_gemini_key,
       hasTavilyKey: info.has_tavily_key,
+      models: info.models ?? [],
+      activeModel: info.active_model ?? '',
     });
   } catch {
     // 忽略：后端不可用时保持默认
@@ -106,6 +141,32 @@ export async function setAiModel(model: string): Promise<void> {
 export async function setAiProvider(provider: ProviderKind): Promise<void> {
   await invoke('set_ai_provider', { provider });
   useAiConfigStore.setState({ provider });
+}
+
+/** 一次性替换模型列表 + 当前生效模型（设置页「模型配置」用）。 */
+export async function setAiModels(models: ModelProfile[], activeModel: string): Promise<void> {
+  await invoke('set_ai_models', { models, activeModel });
+  const active = models.find((m) => m.id === activeModel) ?? models[0];
+  useAiConfigStore.setState({
+    models,
+    activeModel,
+    provider: active?.provider ?? 'openai-compatible',
+    baseUrl: active?.baseUrl ?? DEFAULT_BASE_URL,
+    model: active?.model ?? DEFAULT_MODEL,
+  });
+}
+
+/** 切换当前生效模型（按 id）。 */
+export async function setActiveModel(id: string): Promise<void> {
+  await invoke('set_active_model', { id });
+  const s = useAiConfigStore.getState();
+  const active = s.models.find((m) => m.id === id) ?? s.models[0];
+  useAiConfigStore.setState({
+    activeModel: id,
+    provider: active?.provider ?? 'openai-compatible',
+    baseUrl: active?.baseUrl ?? DEFAULT_BASE_URL,
+    model: active?.model ?? DEFAULT_MODEL,
+  });
 }
 
 /** 按 provider 设置 key（'openai-compatible' 等价于 setApiKey） */

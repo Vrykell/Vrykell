@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Search, ChevronRight, Settings, Cpu, FileCode, Palette, Sun, Moon, Plus, X, Keyboard } from 'lucide-react';
 import { loadConfig, saveConfig, type FileOpenConfig } from '../files/fileOpen';
 import {
-  refreshAiConfig, getAiBaseUrl, getModel,
-  setAiBaseUrl, setAiModel,
-  setAiProvider, setProviderKey, clearProviderKey,
+  refreshAiConfig, setAiModels, setActiveModel,
+  setProviderKey, clearProviderKey,
   setTavilyKey, clearTavilyKey, useAiConfigStore,
+  type ModelProfile,
 } from '../lib/ai';
 import type { ProviderKind } from '../agent/provider';
-import { useAgentSettings } from '../agent/agentSettings';
+import { useAgentSettings, type AgentSettings, type ModelBehaviorSettings } from '../agent/agentSettings';
+import Segmented from '../components/Segmented';
 import { useTheme } from '../theme/ThemeProvider';
 import { useToastStore } from '../components/Toast';
 import {
@@ -112,25 +113,16 @@ export default function SettingsView() {
 
   // AI 配置（Rust 后端；store 镜像供响应式订阅，key 只写不回显）
   const aiCfg = useAiConfigStore();
-  const [baseUrl, setBaseUrl] = useState(() => getAiBaseUrl());
-  const [model, setModel] = useState(() => getModel());
-  const [keyDraft, setKeyDraft] = useState('');
   const [tavilyDraft, setTavilyDraft] = useState('');
   const toast = (msg: string, type: 'info' | 'success' | 'error') =>
     useToastStore.getState().addToast(msg, type);
-
-  // AI 行为（M6）：agentSettings 即时生效开关
-  const agentSettings = useAgentSettings();
 
   // AI 权限（M3）：持久化默认级别 + 内存会话授权
   const permLevels = usePermissions((s) => s.levels);
   const setPermLevel = usePermissions((s) => s.setLevel);
 
   useEffect(() => {
-    refreshAiConfig().then(() => {
-      setBaseUrl(getAiBaseUrl());
-      setModel(getModel());
-    });
+    refreshAiConfig();
   }, []);
 
   // 搜索过滤：命中项保留，自动展开其所在组
@@ -159,160 +151,11 @@ export default function SettingsView() {
 
   const renderPage = (): ReactNode => {
     switch (selected) {
-      case 'ai-model': {
-        const provider = aiCfg.provider;
-        const keySet =
-          provider === 'anthropic' ? aiCfg.hasAnthropicKey
-          : provider === 'gemini' ? aiCfg.hasGeminiKey
-          : aiCfg.hasKey;
-        const PROVIDERS: { id: ProviderKind; label: string }[] = [
-          { id: 'openai-compatible', label: 'OpenAI 兼容' },
-          { id: 'anthropic', label: 'Anthropic' },
-          { id: 'gemini', label: 'Gemini' },
-        ];
-        const presets =
-          provider === 'anthropic'
-            ? ['claude-sonnet-5', 'claude-opus-4-1', 'claude-haiku-4-5']
-            : provider === 'gemini'
-              ? ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite']
-              : ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo', 'deepseek-chat', 'deepseek-reasoner', 'qwen-plus', 'qwen-max', 'moonshot-v1-8k', 'moonshot-v1-32k', 'glm-4-plus'];
-        return (
-          <>
-            <Field title="服务商" description="OpenAI 兼容：OpenAI / DeepSeek / 通义 / Moonshot / GLM 等任何兼容端点；Anthropic 与 Gemini 走各自原生协议（联网搜索等原生能力可用）。切换后记得填对应的 Key 与模型。">
-              <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 'var(--radius-inner)', overflow: 'hidden', width: 'fit-content' }}>
-                {PROVIDERS.map((p) => (
-                  <button
-                    key={p.id}
-                    data-subtle
-                    onClick={() => { void setAiProvider(p.id); setKeyDraft(''); }}
-                    style={{
-                      fontSize: 11, padding: '5px 14px', border: 'none', cursor: 'pointer',
-                      background: provider === p.id ? 'var(--accent)' : 'transparent',
-                      color: provider === p.id ? '#0d0d0d' : 'var(--text-secondary)',
-                    }}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            </Field>
-
-            <Field title="API Key" description="当前服务商的鉴权令牌；仅保存在本机后端，界面不回显明文。各家 Key 分别保存，切换服务商互不影响。">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <span style={{
-                  fontSize: 11, padding: '2px 8px', borderRadius: 4,
-                  color: keySet ? 'var(--success)' : 'var(--text-muted)',
-                  background: keySet ? 'var(--success-bg)' : 'var(--hover)',
-                }}>
-                  {keySet ? '已配置' : '未配置'}
-                </span>
-                {keySet && (
-                  <button
-                    onClick={() => clearProviderKey(provider).then(() => toast('已清除 API Key', 'success'))}
-                    style={btnStyle}
-                  >
-                    清除
-                  </button>
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  type="password"
-                  value={keyDraft}
-                  placeholder={keySet ? '输入以覆盖（留空不改动）' : '输入 API Key'}
-                  onChange={(e) => setKeyDraft(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') commitKey(); }}
-                  style={inputStyle}
-                />
-                <button
-                  onClick={commitKey}
-                  style={{ ...btnStyle, background: 'var(--accent)', color: '#0d0d0d', border: 'none', flexShrink: 0 }}
-                >
-                  保存
-                </button>
-              </div>
-            </Field>
-
-            {provider === 'openai-compatible' && (
-              <Field title="服务地址 (Base URL)" description="OpenAI 兼容接口地址，例如 https://api.openai.com/v1、https://api.deepseek.com/v1。">
-                <input
-                  value={baseUrl}
-                  placeholder="https://api.openai.com/v1"
-                  onChange={(e) => setBaseUrl(e.target.value)}
-                  onBlur={() => setAiBaseUrl(baseUrl).catch((e) => toast(String((e as Error)?.message ?? e), 'error'))}
-                  onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-                  style={inputStyle}
-                />
-              </Field>
-            )}
-
-            <Field title="模型" description="模型 ID，取决于所选服务商；可输入任意兼容模型名。">
-              <input
-                value={model}
-                list="model-presets"
-                placeholder="gpt-4o-mini"
-                onChange={(e) => setModel(e.target.value)}
-                onBlur={() => setAiModel(model).catch((e) => toast(String((e as Error)?.message ?? e), 'error'))}
-                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-                style={inputStyle}
-              />
-              <datalist id="model-presets">
-                {presets.map((m) => (
-                  <option key={m} value={m} />
-                ))}
-              </datalist>
-            </Field>
-          </>
-        );
-      }
+      case 'ai-model':
+        return <AiModelPage />;
 
       case 'ai-behavior':
-        return (
-          <>
-            <Field title="Agent 模式" description="开启后 AI 可以调用工具（执行命令、读写文件、搜索等，逐项权限在「AI 权限」页管理）；关闭为纯聊天。聊天面板标题栏也有这个开关。">
-              <Toggle on={agentSettings.agentMode} onChange={(v) => agentSettings.update({ agentMode: v })} />
-            </Field>
-            <Field title="联网搜索" description="Anthropic / Gemini 使用服务商原生搜索；OpenAI 兼容服务走 Tavily 兜底（在「网络搜索」页配置 Key）。">
-              <Toggle on={agentSettings.webSearch} onChange={(v) => agentSettings.update({ webSearch: v })} />
-            </Field>
-            <Field title="深度思考" description="提高推理强度（reasoning effort / thinking budget）；响应更慢，适合复杂问题。">
-              <Toggle on={agentSettings.deepThink} onChange={(v) => agentSettings.update({ deepThink: v })} />
-            </Field>
-            <Field title="智能会话标题" description="内容足够概括时才自动生成标题（不是建会话就生成）；手动改过的名字不会被覆盖。">
-              <Toggle on={agentSettings.autoTitle} onChange={(v) => agentSettings.update({ autoTitle: v })} />
-            </Field>
-            <Field title="标题模型" description="生成标题用的模型；留空 = 沿用聊天模型。">
-              <input
-                value={agentSettings.titleModel}
-                placeholder="沿用聊天模型"
-                onChange={(e) => agentSettings.update({ titleModel: e.target.value })}
-                style={inputStyle}
-              />
-            </Field>
-            <Field title="命令自动补全" description="在终端输入命令时给出补全建议（Tab 接受，Esc 丢弃）；没有配置 AI 时仍有本地历史/路径补全。">
-              <Toggle on={agentSettings.completeEnabled} onChange={(v) => agentSettings.update({ completeEnabled: v })} />
-            </Field>
-            <Field title="补全防抖（毫秒）" description="停顿多久后触发补全；100–2000。">
-              <input
-                type="number"
-                value={agentSettings.completeDebounceMs}
-                onChange={(e) => {
-                  const n = Math.round(Number(e.target.value));
-                  if (Number.isFinite(n)) agentSettings.update({ completeDebounceMs: Math.min(2000, Math.max(100, n)) });
-                }}
-                style={{ ...inputStyle, width: 120 }}
-              />
-            </Field>
-            <Field title="补全模型" description="AI 增强补全用的模型；留空 = 沿用聊天模型。">
-              <input
-                value={agentSettings.completeModel}
-                placeholder="沿用聊天模型"
-                onChange={(e) => agentSettings.update({ completeModel: e.target.value })}
-                style={inputStyle}
-              />
-            </Field>
-          </>
-        );
+        return <AiBehaviorPage />;
 
       case 'ai-web': {
         const mode =
@@ -383,32 +226,18 @@ export default function SettingsView() {
                       <span style={{ flex: 1, fontSize: 12, color: 'var(--text-primary)' }}>
                         {PERM_TOOL_LABEL[name]}
                       </span>
-                      <div
-                        style={{
-                          display: 'flex',
-                          border: '1px solid var(--border)',
-                          borderRadius: 'var(--radius-inner)',
-                          overflow: 'hidden',
-                        }}
-                      >
-                        {(['allow', 'ask', 'deny'] as ToolLevel[]).map((l) => (
-                          <button
-                            key={l}
-                            data-subtle
-                            onClick={() => setPermLevel(name, l)}
-                            style={{
-                              fontSize: 11,
-                              padding: '3px 10px',
-                              border: 'none',
-                              cursor: 'pointer',
-                              background: lv === l ? 'var(--accent)' : 'transparent',
-                              color: lv === l ? '#0d0d0d' : 'var(--text-secondary)',
-                            }}
-                          >
-                            {l === 'allow' ? '允许' : l === 'ask' ? '每次询问' : '禁止'}
-                          </button>
-                        ))}
-                      </div>
+                      <Segmented
+                        size="sm"
+                        options={(
+                          [
+                            ['allow', '允许'],
+                            ['ask', '每次询问'],
+                            ['deny', '禁止'],
+                          ] as const
+                        ).map(([v, label]) => ({ value: v, label }))}
+                        value={lv}
+                        onChange={(v) => setPermLevel(name, v)}
+                      />
                     </div>
                   );
                 })}
@@ -483,14 +312,6 @@ export default function SettingsView() {
         return null;
     }
   };
-
-  function commitKey() {
-    const k = keyDraft.trim();
-    if (!k) return;
-    setProviderKey(aiCfg.provider, k)
-      .then(() => { setKeyDraft(''); toast('已保存 API Key', 'success'); })
-      .catch((e) => toast(String((e as Error)?.message ?? e), 'error'));
-  }
 
   function commitTavilyKey() {
     const k = tavilyDraft.trim();
@@ -627,6 +448,371 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
         }}
       />
     </button>
+  );
+}
+
+// ── 模型配置页（多模型 profile） ──
+
+const PROVIDERS: { id: ProviderKind; label: string }[] = [
+  { id: 'openai-compatible', label: 'OpenAI 兼容' },
+  { id: 'anthropic', label: 'Anthropic' },
+  { id: 'gemini', label: 'Gemini' },
+];
+
+/** 提交模型列表的落库助手（Rust 侧会兜底保证至少一个 + active 有效）。 */
+function commitModels(next: ModelProfile[], activeId: string) {
+  setAiModels(next, activeId).catch((e) =>
+    useToastStore.getState().addToast(String((e as Error)?.message ?? e), 'error'),
+  );
+}
+
+function AiModelPage() {
+  const aiCfg = useAiConfigStore();
+  const [keyDraft, setKeyDraft] = useState('');
+  const provider = aiCfg.provider;
+  const keySet =
+    provider === 'anthropic' ? aiCfg.hasAnthropicKey
+    : provider === 'gemini' ? aiCfg.hasGeminiKey
+    : aiCfg.hasKey;
+  const toast = (msg: string, type: 'info' | 'success' | 'error') =>
+    useToastStore.getState().addToast(msg, type);
+
+  const commitKey = () => {
+    const k = keyDraft.trim();
+    if (!k) return;
+    setProviderKey(provider, k)
+      .then(() => { setKeyDraft(''); toast('已保存 API Key', 'success'); })
+      .catch((e) => toast(String((e as Error)?.message ?? e), 'error'));
+  };
+
+  return (
+    <>
+      <Field
+        title="服务商 API Key"
+        description="Key 按服务商共用：同一服务商下的多个模型复用同一个 Key。仅保存在本机后端，界面不回显明文。此处显示「当前模型」所在服务商。"
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <span style={{
+            fontSize: 11, padding: '2px 8px', borderRadius: 4,
+            color: keySet ? 'var(--success)' : 'var(--text-muted)',
+            background: keySet ? 'var(--success-bg)' : 'var(--hover)',
+          }}>
+            {keySet ? '已配置' : '未配置'}
+          </span>
+          {keySet && (
+            <button
+              onClick={() => clearProviderKey(provider).then(() => toast('已清除 API Key', 'success'))}
+              style={btnStyle}
+            >
+              清除
+            </button>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            type="password"
+            value={keyDraft}
+            placeholder={keySet ? '输入以覆盖（留空不改动）' : '输入 API Key'}
+            onChange={(e) => setKeyDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') commitKey(); }}
+            style={inputStyle}
+          />
+          <button
+            onClick={commitKey}
+            style={{ ...btnStyle, background: 'var(--accent)', color: '#0d0d0d', border: 'none', flexShrink: 0 }}
+          >
+            保存
+          </button>
+        </div>
+      </Field>
+
+      <ModelListField />
+    </>
+  );
+}
+
+function ModelListField() {
+  const models = useAiConfigStore((s) => s.models);
+  const activeId = useAiConfigStore((s) => s.activeModel);
+  const toast = (msg: string, type: 'info' | 'success' | 'error') =>
+    useToastStore.getState().addToast(msg, type);
+
+  const update = (id: string, patch: Partial<ModelProfile>) =>
+    commitModels(models.map((m) => (m.id === id ? { ...m, ...patch } : m)), activeId);
+
+  const remove = (id: string) => {
+    if (models.length <= 1) {
+      toast('至少保留一个模型', 'info');
+      return;
+    }
+    const next = models.filter((m) => m.id !== id);
+    const nextActive = id === activeId ? next[0]!.id : activeId;
+    commitModels(next, nextActive);
+  };
+
+  const add = () => {
+    const id = `m${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
+    commitModels(
+      [
+        ...models,
+        {
+          id,
+          name: `模型 ${models.length + 1}`,
+          provider: 'openai-compatible',
+          baseUrl: 'https://api.openai.com/v1',
+          model: '',
+        },
+      ],
+      activeId,
+    );
+  };
+
+  return (
+    <Field
+      title="模型列表"
+      description="配置多个模型，每个模型独立服务商 / 服务地址 / 模型名；点「设为当前」切换生效。API Key 按服务商共用。"
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {models.map((m) => (
+          <div
+            key={m.id}
+            style={{
+              border: '1px solid var(--border)', borderRadius: 'var(--radius-inner)',
+              padding: '10px 12px', background: 'var(--canvas)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <ModelTextInput
+                value={m.name}
+                placeholder="模型名称"
+                onCommit={(v) => update(m.id, { name: v })}
+                style={{ flex: 1, fontWeight: 600 }}
+              />
+              {m.id === activeId ? (
+                <span style={{
+                  fontSize: 11, padding: '2px 8px', borderRadius: 4, flexShrink: 0,
+                  color: 'var(--success)', background: 'var(--success-bg)',
+                }}>
+                  当前
+                </span>
+              ) : (
+                <button data-subtle onClick={() => void setActiveModel(m.id)} style={btnStyle}>
+                  设为当前
+                </button>
+              )}
+              <button
+                data-subtle
+                onClick={() => remove(m.id)}
+                title="删除模型"
+                style={{
+                  width: 24, height: 24, flexShrink: 0, display: 'inline-flex',
+                  alignItems: 'center', justifyContent: 'center',
+                  border: '1px solid transparent', borderRadius: 4, background: 'transparent',
+                  color: 'var(--text-muted)', cursor: 'pointer',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--error-light)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+              >
+                <X size={13} />
+              </button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+              <Segmented
+                options={PROVIDERS.map((p) => ({ value: p.id, label: p.label }))}
+                value={m.provider}
+                onChange={(v) => update(m.id, { provider: v })}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <ModelTextInput
+                value={m.baseUrl}
+                placeholder="服务地址 (Base URL)"
+                onCommit={(v) => update(m.id, { baseUrl: v })}
+                style={{ flex: 1 }}
+              />
+              <ModelTextInput
+                value={m.model}
+                placeholder="模型 ID"
+                onCommit={(v) => update(m.id, { model: v })}
+                style={{ flex: 1 }}
+              />
+            </div>
+          </div>
+        ))}
+        <button
+          data-subtle
+          onClick={add}
+          style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}
+        >
+          <Plus size={12} /> 添加模型
+        </button>
+      </div>
+    </Field>
+  );
+}
+
+// ── AI 行为页（全局默认 + 每模型覆盖） ──
+
+function AiBehaviorPage() {
+  const models = useAiConfigStore((s) => s.models);
+  const agentSettings = useAgentSettings();
+  const [scope, setScope] = useState<string>('global');
+
+  const isGlobal = scope === 'global';
+  const model = models.find((m) => m.id === scope) ?? null;
+  const eff = agentSettings.resolve(isGlobal ? undefined : scope);
+  const overrideKeys = !isGlobal && model ? Object.keys(agentSettings.overrides[model.id] ?? {}) : [];
+  const hasOverride = overrideKeys.length > 0;
+
+  const update = (patch: Partial<AgentSettings>) => {
+    if (isGlobal) agentSettings.update(patch);
+    else if (model) agentSettings.updateModel(model.id, patch as Partial<ModelBehaviorSettings>);
+  };
+
+  return (
+    <>
+      <Field
+        title="作用域"
+        description="「全局默认」对所有模型生效；选中某个模型可为其单独覆盖行为设置（只覆盖改动项，其余回落全局默认）。"
+      >
+        <Segmented
+          options={[
+            { value: 'global', label: '全局默认' },
+            ...models.map((m) => ({ value: m.id, label: m.name || m.model })),
+          ]}
+          value={scope}
+          onChange={(v) => setScope(v)}
+        />
+      </Field>
+
+      {!isGlobal && model && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '6px 10px', marginBottom: 8, borderRadius: 'var(--radius-inner)',
+          background: hasOverride ? 'var(--accent-warm-dim)' : 'var(--hover)',
+          fontSize: 11, color: hasOverride ? 'var(--accent-warm)' : 'var(--text-muted)',
+        }}>
+          <span>{hasOverride ? `已覆盖 ${overrideKeys.length} 项` : '跟随全局默认'}</span>
+          <div style={{ flex: 1 }} />
+          {hasOverride && (
+            <button data-subtle onClick={() => agentSettings.resetModel(model.id)} style={btnStyle}>
+              重置为全局默认
+            </button>
+          )}
+        </div>
+      )}
+
+      <Field title="Agent 模式" description="开启后 AI 可以调用工具（执行命令、读写文件、搜索等，逐项权限在「AI 权限」页管理）；关闭为纯聊天。">
+        <Toggle on={eff.agentMode} onChange={(v) => update({ agentMode: v })} />
+      </Field>
+      <Field title="联网搜索" description="Anthropic / Gemini 使用服务商原生搜索；OpenAI 兼容服务走 Tavily 兜底（在「网络搜索」页配置 Key）。">
+        <Toggle on={eff.webSearch} onChange={(v) => update({ webSearch: v })} />
+      </Field>
+      <Field title="深度思考" description="提高推理强度（reasoning effort / thinking budget）；响应更慢，适合复杂问题。">
+        <Toggle on={eff.deepThink} onChange={(v) => update({ deepThink: v })} />
+      </Field>
+      <Field title="最大迭代步数" description="Agent 一次回答最多调用多少轮工具；1–20。">
+        <NumberInput value={eff.maxSteps} min={1} max={20} onChange={(v) => update({ maxSteps: v })} />
+      </Field>
+      <Field title="上下文消息数" description="发送给模型的最近消息条数；0 = 不裁剪（全量）。">
+        <NumberInput value={eff.contextMessages} min={0} max={500} onChange={(v) => update({ contextMessages: v })} />
+      </Field>
+      <Field title="回复 Token 上限" description="单次回复的最大 token 数；0 = 使用服务商默认（Anthropic 深度思考时自动抬到 16000）。">
+        <NumberInput value={eff.maxOutputTokens} min={0} max={32768} onChange={(v) => update({ maxOutputTokens: v })} />
+      </Field>
+      <Field title="采样温度" description="控制输出随机性；关闭 = 使用服务商默认。">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Toggle on={eff.temperature != null} onChange={(v) => update({ temperature: v ? 0.7 : null })} />
+          {eff.temperature != null && (
+            <input
+              type="number"
+              step={0.1}
+              min={0}
+              max={2}
+              value={eff.temperature}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                if (Number.isFinite(n)) update({ temperature: Math.min(2, Math.max(0, n)) });
+              }}
+              style={{ ...inputStyle, width: 100 }}
+            />
+          )}
+        </div>
+      </Field>
+
+      {isGlobal && (
+        <>
+          <Field title="智能会话标题" description="内容足够概括时才自动生成标题（不是建会话就生成）；手动改过的名字不会被覆盖。">
+            <Toggle on={eff.autoTitle} onChange={(v) => update({ autoTitle: v })} />
+          </Field>
+          <Field title="标题模型" description="生成标题用的模型；留空 = 沿用聊天模型。">
+            <input
+              value={eff.titleModel}
+              placeholder="沿用聊天模型"
+              onChange={(e) => update({ titleModel: e.target.value })}
+              style={inputStyle}
+            />
+          </Field>
+          <Field title="命令自动补全" description="在终端输入命令时给出补全建议（Tab 接受，Esc 丢弃）；没有配置 AI 时仍有本地历史/路径补全。">
+            <Toggle on={eff.completeEnabled} onChange={(v) => update({ completeEnabled: v })} />
+          </Field>
+          <Field title="补全防抖（毫秒）" description="停顿多久后触发补全；100–2000。">
+            <NumberInput value={eff.completeDebounceMs} min={100} max={2000} onChange={(v) => update({ completeDebounceMs: v })} />
+          </Field>
+          <Field title="补全模型" description="AI 增强补全用的模型；留空 = 沿用聊天模型。">
+            <input
+              value={eff.completeModel}
+              placeholder="沿用聊天模型"
+              onChange={(e) => update({ completeModel: e.target.value })}
+              style={inputStyle}
+            />
+          </Field>
+        </>
+      )}
+    </>
+  );
+}
+
+// ── 模型字段 / 数字输入 ──
+
+function ModelTextInput({ value, onCommit, placeholder, style }: {
+  value: string;
+  onCommit: (v: string) => void;
+  placeholder?: string;
+  style?: React.CSSProperties;
+}) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  return (
+    <input
+      value={draft}
+      placeholder={placeholder}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => { const v = draft.trim(); if (v !== value) onCommit(v); }}
+      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+      style={{ ...inputStyle, ...style }}
+    />
+  );
+}
+
+function NumberInput({ value, onChange, min, max }: {
+  value: number;
+  onChange: (v: number) => void;
+  min: number;
+  max: number;
+}) {
+  return (
+    <input
+      type="number"
+      value={value}
+      min={min}
+      max={max}
+      onChange={(e) => {
+        const n = Math.round(Number(e.target.value));
+        if (Number.isFinite(n)) onChange(Math.min(max, Math.max(min, n)));
+      }}
+      style={{ ...inputStyle, width: 120 }}
+    />
   );
 }
 

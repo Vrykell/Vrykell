@@ -161,8 +161,8 @@ export default function InputEditor({
   // 本地级（历史前缀/路径）零网络始终可用；AI 增强有 key 才叠加。
   // 本地历史前缀命中是同步即时反馈（零延迟体感）；本地未命中才防抖走路径/AI。
   // seq + AbortController 双保险防止过期建议落地。
-  const completeOn = useAgentSettings((s) => s.completeEnabled);
-  const completeDebounceMs = useAgentSettings((s) => s.completeDebounceMs);
+  const completeOn = useAgentSettings((s) => s.global.completeEnabled);
+  const completeDebounceMs = useAgentSettings((s) => s.global.completeDebounceMs);
   const [ghost, setGhost] = useState('');
   const ghostSeq = useRef(0);
 

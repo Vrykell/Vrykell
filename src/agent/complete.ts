@@ -14,7 +14,7 @@ import { generateText } from 'ai';
 import { invoke } from '@tauri-apps/api/core';
 import { createChatModel } from './provider';
 import { useAgentSettings } from './agentSettings';
-import { useAiConfigStore, isApiKeyConfigured } from '../lib/ai';
+import { activeModelProfile, isApiKeyConfigured } from '../lib/ai';
 import { useHistoryStore } from '../stores/history';
 
 export interface CompleteOptions {
@@ -92,14 +92,14 @@ export async function aiComplete(
   signal?: AbortSignal,
 ): Promise<string | null> {
   if (!isApiKeyConfigured()) return null;
-  const settings = useAgentSettings.getState();
-  const cfg = useAiConfigStore.getState();
+  const settings = useAgentSettings.getState().resolve();
+  const active = activeModelProfile();
   const recent = useHistoryStore.getState().entries.slice(0, 5).map((e) => e.command);
   try {
     const model = createChatModel({
-      provider: cfg.provider,
-      baseUrl: cfg.baseUrl,
-      model: settings.completeModel || cfg.model,
+      provider: active.provider,
+      baseUrl: active.baseUrl,
+      model: settings.completeModel || active.model,
     });
     const { text } = await generateText({
       model,

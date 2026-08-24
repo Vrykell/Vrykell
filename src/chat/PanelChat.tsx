@@ -17,7 +17,7 @@ import { useTerminalStore } from '../stores/terminal';
 import { useToastStore } from '../components/Toast';
 import { useAgentSettings } from '../agent/agentSettings';
 import { usePermissions } from '../agent/permissions';
-import { setAiModel, useAiConfigStore } from '../lib/ai';
+import { setAiModel, setActiveModel, useAiConfigStore } from '../lib/ai';
 import ContextMenu from '../components/ContextMenu';
 import {
   LIMITS,
@@ -76,16 +76,19 @@ export default function PanelChat() {
   // 下一条消息起用；模型名写 Rust config）
   const agentSettings = useAgentSettings();
   const aiCfg = useAiConfigStore();
+  const activeModel = useAiConfigStore((s) => s.activeModel);
   const permMode = usePermissions((s) => s.mode);
   const setPermMode = usePermissions((s) => s.setMode);
   const [modelMenu, setModelMenu] = useState<{ x: number; y: number } | null>(null);
+  // 快捷开关作用于「当前模型」的行为覆盖（绑定模型，不污染全局）
+  const eff = agentSettings.resolve(activeModel);
   const searchAvailable = aiCfg.provider !== 'openai-compatible' || aiCfg.hasTavilyKey;
   const toggleSearch = () => {
-    if (!agentSettings.webSearch && !searchAvailable) {
+    if (!eff.webSearch && !searchAvailable) {
       toastErr('当前服务商无原生搜索，请先在「设置 → 网络搜索」配置 Tavily Key');
       return;
     }
-    agentSettings.update({ webSearch: !agentSettings.webSearch });
+    agentSettings.updateModel(activeModel, { webSearch: !eff.webSearch });
   };
 
   // 编辑重发：chat store 的 draft 是单次投递——灌入输入框后立即清掉
@@ -317,27 +320,27 @@ export default function PanelChat() {
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}
         >
-          {aiCfg.model || '模型'}
+          {aiCfg.models.find((m) => m.id === aiCfg.activeModel)?.name || aiCfg.model || '模型'}
           <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>▾</span>
         </button>
         <div style={{ flex: 1 }} />
         <QuickToggle
           icon={Globe}
-          on={agentSettings.webSearch}
+          on={eff.webSearch}
           title={searchAvailable ? '联网搜索' : '联网搜索（需先配置 Tavily Key）'}
           onClick={toggleSearch}
         />
         <QuickToggle
           icon={Brain}
-          on={agentSettings.deepThink}
+          on={eff.deepThink}
           title="深度思考（reasoning effort）"
-          onClick={() => agentSettings.update({ deepThink: !agentSettings.deepThink })}
+          onClick={() => agentSettings.updateModel(activeModel, { deepThink: !eff.deepThink })}
         />
         <QuickToggle
           icon={Bot}
-          on={agentSettings.agentMode}
-          title={agentSettings.agentMode ? 'Agent 模式（可使用工具）' : '纯聊天（工具已关闭）'}
-          onClick={() => agentSettings.update({ agentMode: !agentSettings.agentMode })}
+          on={eff.agentMode}
+          title={eff.agentMode ? 'Agent 模式（可使用工具）' : '纯聊天（工具已关闭）'}
+          onClick={() => agentSettings.updateModel(activeModel, { agentMode: !eff.agentMode })}
         />
       </div>
 
@@ -537,10 +540,17 @@ export default function PanelChat() {
       {modelMenu && (
         <ContextMenu
           anchor={modelMenu}
-          items={(MODEL_PRESETS[aiCfg.provider] ?? []).map((m) => ({
-            label: m === aiCfg.model ? `✓ ${m}` : m,
-            onClick: () => void setAiModel(m),
-          }))}
+          items={
+            aiCfg.models.length > 0
+              ? aiCfg.models.map((m) => ({
+                  label: m.id === aiCfg.activeModel ? `✓ ${m.name || m.model}` : (m.name || m.model),
+                  onClick: () => void setActiveModel(m.id),
+                }))
+              : (MODEL_PRESETS[aiCfg.provider] ?? []).map((m) => ({
+                  label: m === aiCfg.model ? `✓ ${m}` : m,
+                  onClick: () => void setAiModel(m),
+                }))
+          }
           onClose={() => setModelMenu(null)}
         />
       )}

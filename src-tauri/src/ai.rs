@@ -22,6 +22,25 @@ const DEFAULT_PROVIDER: &str = "openai-compatible";
 /// 全局 AI 配置（provider / 各家 key / base_url / model），Mutex 保护 + 落盘持久化。
 pub struct AiConfig(Mutex<AiConfigInner>);
 
+/// 一个可用的模型配置（命名 profile）：独立 provider/base_url/model。
+/// API key 仍按 provider 复用（api_key / anthropic_key / gemini_key）。
+/// 注意：字段序列化为 camelCase（baseUrl），与前端 ModelProfile 对齐。
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelProfile {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub name: String,
+    /// openai-compatible | anthropic | gemini
+    #[serde(default = "default_provider")]
+    pub provider: String,
+    #[serde(default = "default_base_url")]
+    pub base_url: String,
+    #[serde(default = "default_model")]
+    pub model: String,
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 struct AiConfigInner {
     #[serde(default)]
@@ -39,6 +58,12 @@ struct AiConfigInner {
     gemini_key: Option<String>,
     #[serde(default)]
     tavily_key: Option<String>,
+    /// 多模型列表（命名 profile）
+    #[serde(default)]
+    models: Vec<ModelProfile>,
+    /// 当前生效模型 id（对应 models 里某一项）
+    #[serde(default)]
+    active_model: String,
 }
 
 fn default_base_url() -> String {
@@ -61,6 +86,36 @@ impl Default for AiConfigInner {
             anthropic_key: None,
             gemini_key: None,
             tavily_key: None,
+            models: Vec::new(),
+            active_model: String::new(),
+        }
+    }
+}
+
+impl AiConfigInner {
+    /// 从旧单模型字段迁移出首个 model profile，并保证 active_model 有效。
+    fn normalize(&mut self) {
+        if self.models.is_empty() {
+            self.models.push(ModelProfile {
+                id: "default".to_string(),
+                name: "默认模型".to_string(),
+                provider: self.provider.clone(),
+                base_url: self.base_url.clone(),
+                model: self.model.clone(),
+            });
+        }
+        if self.active_model.is_empty() || !self.models.iter().any(|m| m.id == self.active_model) {
+            self.active_model = self.models[0].id.clone();
+        }
+        self.sync_legacy();
+    }
+
+    /// 把 active model 的 provider/base_url/model 同步到旧字段（向后兼容旧命令/旧前端）。
+    fn sync_legacy(&mut self) {
+        if let Some(m) = self.models.iter().find(|m| m.id == self.active_model).cloned() {
+            self.provider = m.provider;
+            self.base_url = m.base_url;
+            self.model = m.model;
         }
     }
 }
@@ -75,10 +130,11 @@ fn config_path() -> PathBuf {
 impl AiConfig {
     /// 启动时从磁盘加载（文件缺失或损坏时回退默认）。
     pub fn load() -> Self {
-        let inner = std::fs::read_to_string(config_path())
+        let mut inner = std::fs::read_to_string(config_path())
             .ok()
             .and_then(|s| serde_json::from_str::<AiConfigInner>(&s).ok())
             .unwrap_or_default();
+        inner.normalize();
         AiConfig(Mutex::new(inner))
     }
 
@@ -114,6 +170,10 @@ pub struct AiConfigInfo {
     pub has_anthropic_key: bool,
     pub has_gemini_key: bool,
     pub has_tavily_key: bool,
+    /// 多模型列表
+    pub models: Vec<ModelProfile>,
+    /// 当前生效模型 id
+    pub active_model: String,
 }
 
 #[derive(Clone, Serialize)]
@@ -155,7 +215,13 @@ pub fn set_ai_base_url(state: State<'_, AiConfig>, base_url: String) {
     if u.is_empty() {
         return;
     }
-    set_field(&state, |c| c.base_url = u);
+    set_field(&state, |c| {
+        c.normalize();
+        if let Some(m) = c.models.iter_mut().find(|m| m.id == c.active_model) {
+            m.base_url = u;
+        }
+        c.sync_legacy();
+    });
 }
 
 #[tauri::command]
@@ -164,7 +230,13 @@ pub fn set_ai_model(state: State<'_, AiConfig>, model: String) {
     if m.is_empty() {
         return;
     }
-    set_field(&state, |c| c.model = m);
+    set_field(&state, |c| {
+        c.normalize();
+        if let Some(active) = c.models.iter_mut().find(|x| x.id == c.active_model) {
+            active.model = m;
+        }
+        c.sync_legacy();
+    });
 }
 
 #[tauri::command]
@@ -173,7 +245,35 @@ pub fn set_ai_provider(state: State<'_, AiConfig>, provider: String) {
     if !matches!(p.as_str(), "openai-compatible" | "anthropic" | "gemini") {
         return;
     }
-    set_field(&state, |c| c.provider = p);
+    set_field(&state, |c| {
+        c.normalize();
+        if let Some(active) = c.models.iter_mut().find(|x| x.id == c.active_model) {
+            active.provider = p;
+        }
+        c.sync_legacy();
+    });
+}
+
+/// 一次性替换整个模型列表 + 当前生效模型。
+#[tauri::command]
+pub fn set_ai_models(state: State<'_, AiConfig>, models: Vec<ModelProfile>, active_model: String) {
+    set_field(&state, |c| {
+        c.models = models;
+        c.active_model = active_model;
+        c.normalize();
+    });
+}
+
+/// 切换当前生效模型（按 id）。
+#[tauri::command]
+pub fn set_active_model(state: State<'_, AiConfig>, id: String) {
+    set_field(&state, |c| {
+        c.normalize();
+        if c.models.iter().any(|m| m.id == id) {
+            c.active_model = id;
+            c.sync_legacy();
+        }
+    });
 }
 
 /// 按 provider 设置 key（openai-compatible 即 api_key）。
@@ -226,8 +326,10 @@ pub fn get_ai_config(state: State<'_, AiConfig>) -> AiConfigInfo {
             has_anthropic_key: c.anthropic_key.is_some(),
             has_gemini_key: c.gemini_key.is_some(),
             has_tavily_key: c.tavily_key.is_some(),
+            models: c.models.clone(),
+            active_model: c.active_model.clone(),
         })
-        .unwrap_or(AiConfigInfo {
+        .unwrap_or_else(|_| AiConfigInfo {
             has_key: false,
             base_url: DEFAULT_BASE_URL.to_string(),
             model: DEFAULT_MODEL.to_string(),
@@ -235,6 +337,8 @@ pub fn get_ai_config(state: State<'_, AiConfig>) -> AiConfigInfo {
             has_anthropic_key: false,
             has_gemini_key: false,
             has_tavily_key: false,
+            models: Vec::new(),
+            active_model: String::new(),
         })
 }
 
@@ -423,6 +527,14 @@ enum ProviderAuth {
     Gemini,
 }
 
+/// 从 base_url 字符串提取 host（失败为空串）。
+fn host_of(base_url: &str) -> String {
+    reqwest::Url::parse(base_url)
+        .ok()
+        .and_then(|u| u.host_str().map(|h| h.to_string()))
+        .unwrap_or_default()
+}
+
 /// 按目标 host 归类 provider 并校验白名单。
 fn classify(url: &str, cfg: &AiConfigInner) -> Result<(reqwest::Url, ProviderAuth), String> {
     let parsed = reqwest::Url::parse(url).map_err(|e| format!("无效 URL：{e}"))?;
@@ -440,11 +552,10 @@ fn classify(url: &str, cfg: &AiConfigInner) -> Result<(reqwest::Url, ProviderAut
     if host == "generativelanguage.googleapis.com" {
         return Ok((parsed, ProviderAuth::Gemini));
     }
-    let base_host = reqwest::Url::parse(&cfg.base_url)
-        .ok()
-        .and_then(|u| u.host_str().map(|h| h.to_string()))
-        .unwrap_or_default();
-    if host == base_host {
+    // openai-compatible：白名单覆盖所有已配置模型的 base_url host（多模型各自可不同端点）
+    let allowed = cfg.models.iter().any(|m| host_of(&m.base_url) == host)
+        || host_of(&cfg.base_url) == host;
+    if allowed {
         Ok((parsed, ProviderAuth::OpenAI))
     } else {
         Err(format!("目标地址 {host} 不在 AI 服务白名单内"))

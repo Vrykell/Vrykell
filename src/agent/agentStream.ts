@@ -25,6 +25,8 @@ interface AiConfigInfoRust {
   has_anthropic_key: boolean;
   has_gemini_key: boolean;
   has_tavily_key: boolean;
+  models: { id: string; name: string; provider: ProviderKind; baseUrl: string; model: string }[];
+  active_model: string;
 }
 
 function hasKeyFor(info: AiConfigInfoRust): boolean {
@@ -87,15 +89,17 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     baseUrl: info.base_url,
     model: info.model,
   });
-  const settings = useAgentSettings.getState();
+  const settings = useAgentSettings.getState().resolve(info.active_model);
   const agentMode = settings.agentMode;
   const emitTool = ctx?.handlers?.onToolEvent;
 
   // M5 附件：带附件的用户消息展开为多模态 ModelMessage（文本段 + 图片 part），
   // 非视觉模型的图片在 attachmentsForModel 内降级为占位提示文本
   const vision = supportsVision(info.provider, info.model);
+  // 上下文裁剪：保留最近 N 条消息（0 = 不裁剪）
+  const trimmed = settings.contextMessages > 0 ? messages.slice(-settings.contextMessages) : messages;
   const modelMessages: ModelMessage[] = [];
-  for (const m of messages) {
+  for (const m of trimmed) {
     if (m.attachments?.length) {
       const { text, images } = await attachmentsForModel(m.attachments, vision);
       const content = [m.content, text].filter(Boolean).join('\n\n');
@@ -162,12 +166,18 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     model,
     messages: modelMessages,
     tools: hasTools ? tools : undefined,
-    stopWhen: hasTools ? stepCountIs(8) : undefined,
+    stopWhen: hasTools ? stepCountIs(Math.max(1, Math.round(settings.maxSteps))) : undefined,
     abortSignal: ctx?.signal,
     // M6 深思考：providerOptions 透传（openai-compatible → reasoning_effort）。
     // anthropic thinking 要求 maxOutputTokens > budgetTokens(8000)。
     providerOptions: settings.deepThink ? deepThinkProviderOptions(info.provider) : undefined,
-    maxOutputTokens: settings.deepThink && info.provider === 'anthropic' ? 16000 : undefined,
+    maxOutputTokens:
+      settings.maxOutputTokens > 0
+        ? settings.maxOutputTokens
+        : settings.deepThink && info.provider === 'anthropic'
+          ? 16000
+          : undefined,
+    temperature: settings.temperature != null ? settings.temperature : undefined,
     onError: ({ error }) => {
       streamError = error;
     },

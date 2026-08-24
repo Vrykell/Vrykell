@@ -15,7 +15,7 @@
 import { generateText } from 'ai';
 import { createChatModel } from './provider';
 import { useAgentSettings } from './agentSettings';
-import { useAiConfigStore, isApiKeyConfigured } from '../lib/ai';
+import { activeModelProfile, isApiKeyConfigured } from '../lib/ai';
 import { useBlockStore } from '../stores/blocks';
 import { useChatStore } from '../stores/chat';
 import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
@@ -60,7 +60,7 @@ export function sanitizeTitle(raw: string): string {
 
 /** 条件判定 + 生成。返回是否落了新标题（测试直接断言）。 */
 export async function maybeAutoTitle(tabId: string, now = Date.now()): Promise<boolean> {
-  const settings = useAgentSettings.getState();
+  const settings = useAgentSettings.getState().resolve();
   if (!settings.autoTitle) return false;
   const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === tabId);
   if (!tab || !isSessionTab(tab)) return false;
@@ -71,11 +71,11 @@ export async function maybeAutoTitle(tabId: string, now = Date.now()): Promise<b
   if (!isApiKeyConfigured()) return false;
   lastAttempt.set(tabId, now);
   try {
-    const cfg = useAiConfigStore.getState();
+    const active = activeModelProfile();
     const model = createChatModel({
-      provider: cfg.provider,
-      baseUrl: cfg.baseUrl,
-      model: settings.titleModel || cfg.model,
+      provider: active.provider,
+      baseUrl: active.baseUrl,
+      model: settings.titleModel || active.model,
     });
     const { text } = await generateText({
       model,

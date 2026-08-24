@@ -1,5 +1,6 @@
 import { useCallback, type FC } from 'react';
 import { useDockStore, type DockSide, PANEL_DEFS } from '../stores/dock';
+import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
 import ResizeHandle from './ResizeHandle';
 import PanelTabs from './PanelTabs';
 import PanelFiles from '../files/PanelFiles';
@@ -20,15 +21,21 @@ const PANEL_COMPONENTS: Record<string, FC> = {
 export default function SidePanel({ side }: SidePanelProps) {
   const leftPanels = useDockStore((s) => s.leftPanels);
   const rightPanels = useDockStore((s) => s.rightPanels);
+  // AI 面板与终端强相关：当前激活标签不是会话（设置/历史）时隐藏，切回会话自动恢复
+  const isSessionActive = useWorkspaceStore((s) => {
+    const tab = s.tabs.find((t) => t.id === s.activeId);
+    return !!tab && isSessionTab(tab);
+  });
 
   const panelIds = side === 'left' ? leftPanels : rightPanels;
   if (panelIds.length === 0) return null;
 
   return (
     <>
-      {panelIds.map((panelId) => (
-        <SinglePanel key={panelId} side={side} panelId={panelId} />
-      ))}
+      {panelIds.map((panelId) => {
+        if (panelId === 'chat' && !isSessionActive) return null;
+        return <SinglePanel key={panelId} side={side} panelId={panelId} />;
+      })}
     </>
   );
 }
@@ -43,9 +50,9 @@ function SinglePanel({ side, panelId }: { side: DockSide; panelId: string }) {
   const width = panelWidths[panelId] || def?.width || 200;
 
   const handleDelta = useCallback((d: number) => {
-    const newW = isLeft ? width + d : width - d;
-    setPanelWidth(panelId, newW);
-  }, [panelId, width, isLeft, setPanelWidth]);
+    // 传增量给 store，由 store 用当前值累加（避免渲染闭包陈旧丢增量）
+    setPanelWidth(panelId, isLeft ? d : -d);
+  }, [panelId, isLeft, setPanelWidth]);
 
   if (!def || !PanelContent) return null;
 

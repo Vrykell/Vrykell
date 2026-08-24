@@ -14,14 +14,14 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import { completeCommand, localComplete, pathComplete, looksLikePath } from './complete';
 import { useHistoryStore } from '../stores/history';
-import { useAgentSettings } from './agentSettings';
+import { useAgentSettings, DEFAULT_AGENT_SETTINGS } from './agentSettings';
 import { useAiConfigStore } from '../lib/ai';
 
 function reset() {
   mockGenerate.mockReset();
   invokeMock.mockReset();
   useHistoryStore.setState({ entries: [] });
-  useAgentSettings.setState({ completeModel: '' });
+  useAgentSettings.setState({ global: { ...DEFAULT_AGENT_SETTINGS, completeModel: '' }, overrides: {} });
   useAiConfigStore.setState({
     hasKey: false,
     provider: 'openai-compatible',
@@ -109,7 +109,7 @@ describe('AI 增强', () => {
   it('completeModel 覆盖聊天模型', async () => {
     reset();
     useAiConfigStore.setState({ hasKey: true, model: 'big-model' });
-    useAgentSettings.setState({ completeModel: 'small-fast' });
+    useAgentSettings.setState({ global: { ...DEFAULT_AGENT_SETTINGS, completeModel: 'small-fast' }, overrides: {} });
     mockGenerate.mockResolvedValue({ text: 'xyz-done' });
     await completeCommand('xyz', {});
     // createChatModel 收到的 model 是 completeModel（经 provider 工厂间接断言：
