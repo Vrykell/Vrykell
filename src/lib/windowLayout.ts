@@ -57,11 +57,6 @@ export interface Divider {
 export const MIN_PANE_SIZE = 135;
 /** 分隔线厚度（px）。 */
 export const DIVIDER_SIZE = 6;
-/**
- * 单例功能页（会话历史 / 设置）的最小宽度。
- * 功能页不支持压缩：其「宽度下限」等于默认宽度，侧栏拖拽不得把它压得更窄。
- */
-export const SINGLETON_MIN_WIDTH = 720;
 
 export function leaf(terminal: TerminalSpec): WindowLayout {
   return { type: 'leaf', terminal };

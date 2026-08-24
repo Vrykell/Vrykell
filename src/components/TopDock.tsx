@@ -5,7 +5,7 @@ import { useDockStore, PANEL_DEFS, type DockSide } from '../stores/dock';
 import DockButton from './DockButton';
 import { ToolbarBtn } from './UiBtn';
 import { useUiStore } from '../stores/ui';
-import { useWorkspaceStore } from '../stores/workspace';
+import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
 import { isMacOS } from '../lib/platform';
 
 /** 按 clientX 判定落在哪个 zone */
@@ -57,6 +57,12 @@ export default function TopDock() {
   const rightPanels = useDockStore((s) => s.rightPanels);
   const moveButton = useDockStore((s) => s.moveButton);
   const togglePanel = useDockStore((s) => s.togglePanel);
+  // AI 面板与终端强相关：非会话标签（设置/历史）时隐藏「AI 进入按钮」。
+  // 这里是条件按钮的统一钩子——以后需要选择性显隐的按钮都从这里过滤。
+  const isSessionActive = useWorkspaceStore((s) => {
+    const tab = s.tabs.find((t) => t.id === s.activeId);
+    return !!tab && isSessionTab(tab);
+  });
 
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const [dragCursor, setDragCursor] = useState<{ x: number; y: number } | null>(null);
@@ -158,10 +164,12 @@ export default function TopDock() {
   function renderZone(zone: DockSide, ids: string[], activePanels: string[]) {
     const ref = zone === 'left' ? leftRef : rightRef;
     const show = dropTarget?.zone === zone;
+    // 条件按钮：非会话标签时隐藏 AI 入口（其它常驻按钮不受影响）
+    const visibleIds = ids.filter((id) => id !== 'chat' || isSessionActive);
 
     return (
       <div ref={ref} style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '0 4px', borderRadius: 5 }}>
-        {ids.map((id, i) => (
+        {visibleIds.map((id, i) => (
           <span key={id} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             {show && dropTarget!.index === i && <DropMarker />}
             <DockButton
@@ -171,7 +179,7 @@ export default function TopDock() {
             />
           </span>
         ))}
-        {show && dropTarget!.index >= ids.length && <DropMarker />}
+        {show && dropTarget!.index >= visibleIds.length && <DropMarker />}
       </div>
     );
   }

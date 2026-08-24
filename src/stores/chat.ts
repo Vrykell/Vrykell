@@ -9,6 +9,7 @@ import {
   type ToolRun,
 } from '../agent/messageParts';
 import { denyAllPending } from '../agent/permissions';
+import { clearCompactionCache } from '../agent/context';
 import { serializeAttachments, type AttachmentMeta } from '../agent/attachments';
 
 export interface ChatMessage {
@@ -368,6 +369,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     abortControllers.get(tabId)?.abort();
     abortControllers.delete(tabId);
     denyAllPending(); // 同 abortStream：防审批悬挂
+    clearCompactionCache(tabId); // 清理该 tab 的上下文摘要缓存
     set((s) => {
       if (!(tabId in s.byTab) && s.sendingTab !== tabId) return s;
       const byTab = { ...s.byTab };
