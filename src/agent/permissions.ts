@@ -47,6 +47,7 @@ export const TOOL_NAMES = [
   'list_dir',
   'search_files',
   'web_search',
+  'web_fetch',
 ] as const;
 export type ToolName = (typeof TOOL_NAMES)[number];
 
@@ -58,6 +59,7 @@ const DEFAULT_LEVELS: Record<ToolName, ToolLevel> = {
   list_dir: 'allow',
   search_files: 'allow',
   web_search: 'allow',
+  web_fetch: 'allow',
 };
 
 interface PermissionsState {

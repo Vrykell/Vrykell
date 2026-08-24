@@ -65,6 +65,8 @@ function summarize(run: ToolRun): { icon: React.ReactNode; text: string } {
     case 'google_search':
       // gemini 原生搜索：provider 服务端执行，input 通常为空
       return { icon: <Globe {...s} />, text: `联网搜索 ${str(i.query)}`.trim() };
+    case 'web_fetch':
+      return { icon: <Globe {...s} />, text: `抓取 ${str(i.url)}` };
     case 'think':
       return { icon: <Brain {...s} />, text: '思考' };
     default:
