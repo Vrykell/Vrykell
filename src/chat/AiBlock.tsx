@@ -179,6 +179,7 @@ export default function AiBlock({ exchange }: { exchange: ChatExchange }) {
             position: 'relative',
             marginLeft: 6,
             marginTop: 2,
+            paddingTop: 6,
             paddingBottom: !answer.pending && !answer.error ? 8 : 0,
             fontFamily: 'var(--font-ui)',
             fontSize: 12,

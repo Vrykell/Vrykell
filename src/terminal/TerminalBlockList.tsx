@@ -313,7 +313,7 @@ function BlockItem({
             cursor: 'pointer', padding: 0, width: 14, flexShrink: 0, display: 'inline-flex' }}>
           {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
         </button>
-        <div style={{
+        <div data-selectable style={{
           flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600,
           fontFamily: 'var(--font-mono)', color: 'var(--text-primary)',
           whiteSpace: 'pre-wrap', wordBreak: 'break-all', userSelect: 'text',
@@ -459,7 +459,7 @@ function RunningItem({
             flexShrink: 0,
           }}
         />
-        <div style={{
+        <div data-selectable style={{
           flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600,
           fontFamily: 'var(--font-mono)', color: 'var(--text-primary)',
           whiteSpace: 'pre-wrap', wordBreak: 'break-all', userSelect: 'text',

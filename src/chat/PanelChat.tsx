@@ -472,7 +472,6 @@ export default function PanelChat() {
             <div style={{
               display: 'flex', alignItems: 'center', gap: 6,
               minHeight: 22, marginTop: 4, paddingTop: 5,
-              borderTop: '1px solid var(--border)',
               fontSize: 11, color: 'var(--text-muted)', userSelect: 'none',
             }}>
               <ShellIndicator connected={targetConnected} focused={targetFocused} label={targetInfo?.shell ?? '本地'} />
@@ -573,7 +572,7 @@ function QuickToggle({ icon: Icon, on, title, onClick }: {
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
-        background: on ? 'var(--accent-warm-dim)' : 'transparent',
+        background: 'transparent',
         color: on ? 'var(--accent-warm)' : 'var(--text-muted)', cursor: 'pointer',
       }}
       onMouseEnter={(e) => {
@@ -581,7 +580,7 @@ function QuickToggle({ icon: Icon, on, title, onClick }: {
         e.currentTarget.style.color = on ? 'var(--accent-warm)' : 'var(--text-secondary)';
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = on ? 'var(--accent-warm-dim)' : 'transparent';
+        e.currentTarget.style.background = 'transparent';
         e.currentTarget.style.color = on ? 'var(--accent-warm)' : 'var(--text-muted)';
       }}
     >

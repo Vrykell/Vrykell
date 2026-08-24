@@ -53,6 +53,7 @@ export default function ContextMenu({ anchor, items, onClose }: Props) {
         <MenuItem
           key={i}
           label={item.label}
+          danger={item.danger}
           onClick={() => { item.onClick(); onClose(); }}
         />
       ))}
