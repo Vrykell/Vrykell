@@ -17,6 +17,7 @@ import { useWorkspaceDirsStore } from './files/workspaceDirs';
 import { useHistoryStore } from './stores/history';
 import { useWorkspaceStore, serializeSession, isSessionTab } from './stores/workspace';
 import { minTerminalWidth, MIN_PANE_SIZE, type TerminalSpec } from './lib/windowLayout';
+import { useTerminalThemeStore } from './theme/terminalTheme';
 import * as sessionManager from './lib/sessionManager';
 import './search/init'; // 触发所有搜索源自动注册
 
@@ -63,6 +64,12 @@ export default function App() {
     return tab && isSessionTab(tab) ? minTerminalWidth(tab.layout) : MIN_PANE_SIZE;
   });
 
+  // 终端主题外观：壁纸（data URL）+ 整个应用统一不透明度
+  const wallpaperDataUrl = useTerminalThemeStore((s) => s.wallpaperDataUrl);
+  const appOpacity = useTerminalThemeStore((s) => s.config.opacity);
+  // 没有壁纸时不应用不透明度，避免纯黑兜底上文字亮度急剧下降
+  const effectiveOpacity = wallpaperDataUrl ? appOpacity : 1;
+
   const handleSplitPick = (spec: TerminalSpec) => {
     closeSplitPicker();
     // 选完类型后进入落点选择（在哪分裂）
@@ -70,27 +77,48 @@ export default function App() {
   };
 
   return (
-    <div style={{
-      height: '100vh',
-      overflow: 'hidden',
-      display: 'flex',
-      flexDirection: 'column',
-      background: 'var(--canvas)',
-      color: 'var(--text-primary)',
-    }}>
-      <TopDock />
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row' }}>
-        <SidePanel side="left" />
-        <div style={{ flex: 1, minWidth: terminalMinWidth, display: 'flex', flexDirection: 'column' }}>
-          <TerminalView />
+    <>
+      {/* 壁纸背景层：固定铺满整窗，位于内容之下 */}
+      <div
+        aria-hidden
+        data-testid="wallpaper-backdrop"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 0,
+          backgroundColor: 'var(--canvas)',
+          backgroundImage: wallpaperDataUrl ? `url("${wallpaperDataUrl}")` : 'none',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }}
+      />
+      {/* 应用内容：作为一个整体统一不透明度，透出壁纸背景层 */}
+      <div style={{
+        position: 'relative',
+        zIndex: 1,
+        height: '100vh',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        background: 'var(--canvas)',
+        color: 'var(--text-primary)',
+        opacity: effectiveOpacity,
+      }}>
+        <TopDock />
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row' }}>
+          <SidePanel side="left" />
+          <div style={{ flex: 1, minWidth: terminalMinWidth, display: 'flex', flexDirection: 'column' }}>
+            <TerminalView />
+          </div>
+          <SidePanel side="right" />
         </div>
-        <SidePanel side="right" />
+        <StatusBar />
+        <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+        <GlobalSearch open={globalSearchOpen} onClose={() => setGlobalSearchOpen(false)} />
+        <NewTabModal open={splitPickerOpen} onClose={closeSplitPicker} onPick={handleSplitPick} />
+        <ToastContainer />
       </div>
-      <StatusBar />
-      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
-      <GlobalSearch open={globalSearchOpen} onClose={() => setGlobalSearchOpen(false)} />
-      <NewTabModal open={splitPickerOpen} onClose={closeSplitPicker} onPick={handleSplitPick} />
-      <ToastContainer />
-    </div>
+    </>
   );
 }

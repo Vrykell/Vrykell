@@ -9,6 +9,8 @@ mod scan;
 mod shell_integration;
 mod shells;
 mod ssh;
+mod theme;
+mod web;
 
 use db::HistoryState;
 use std::sync::Mutex;
@@ -37,6 +39,7 @@ pub fn run() {
         .manage(pty::PtyState::default())
         .manage(history_state)
         .manage(ai::AiConfig::load())
+        .manage(theme::ThemeState::load())
         .manage(ai::LlmStreamState::default())
         .manage(pty::KillState::default())
         .invoke_handler(tauri::generate_handler![
@@ -57,6 +60,14 @@ pub fn run() {
             ai::tavily_search,
             ai::llm_stream,
             ai::llm_abort,
+            theme::get_theme_config,
+            theme::set_theme_config,
+            theme::get_theme_path,
+            theme::theme_export,
+            theme::theme_import,
+            theme::read_image_data_url,
+            web::web_search,
+            web::web_fetch,
             pty::pty_spawn,
             shells::list_shells,
             ssh::ssh_connections_list,

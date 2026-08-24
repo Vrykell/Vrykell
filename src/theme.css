@@ -107,7 +107,6 @@ html, body, #root {
   margin: 0;
   overflow: hidden;
   height: 100%;
-  background: var(--canvas);
   color: var(--text-primary);
   font-family: var(--font-ui);
   font-size: 15px;
@@ -115,6 +114,8 @@ html, body, #root {
   line-height: 1.6;
   user-select: none;
   -webkit-user-select: none;
+  /* 透明：壁纸背景层与内容不透明度由 App.tsx 的 React 层承载，避免 CSS var() url 解析问题 */
+  background: transparent;
 }
 
 /* 仅输入框和码字区允许选中 */

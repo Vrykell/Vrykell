@@ -56,6 +56,7 @@ const TOOL_LABEL: Record<string, string> = {
   list_dir: '列目录',
   web_search: '联网搜索',
   google_search: '联网搜索',
+  web_fetch: '抓取网页',
   think: '思考',
 };
 

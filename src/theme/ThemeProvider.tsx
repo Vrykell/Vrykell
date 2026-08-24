@@ -3,7 +3,8 @@
  * 所有组件通过 useTheme() 获取当前模式和切换函数。
  */
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
-import { applyTheme, getCurrentTheme, type ThemeMode } from './tokens';
+import { getCurrentTheme, type ThemeMode } from './tokens';
+import { applyTerminalTheme, useTerminalThemeStore } from './terminalTheme';
 
 interface ThemeCtx {
   mode: ThemeMode;
@@ -21,7 +22,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [mode, setModeState] = useState<ThemeMode>(() => getCurrentTheme());
 
   useEffect(() => {
-    applyTheme(mode);
+    // 明暗切换：重应用基础 palette + 背景层不透明度 + xterm 主题
+    applyTerminalTheme(useTerminalThemeStore.getState().config, mode);
   }, [mode]);
 
   const toggle = useCallback(() => {

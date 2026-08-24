@@ -331,9 +331,24 @@ export function paletteToCssVars(p: ThemePalette): Record<string, string> {
   };
 }
 
-/** 将 palette 写入 :root，并标记 data-theme */
+// ── 用户主题覆盖（终端主题配置的 vars，叠加在基础 palette 之上） ──
+
+let overrides: Record<string, string> = {};
+
+/** 设置 CSS 变量覆盖表（theme.json 的 vars）。空对象 = 无覆盖。 */
+export function setThemeOverrides(o: Record<string, string>): void {
+  overrides = o ?? {};
+}
+
+/** 读取当前 CSS 变量覆盖表。 */
+export function getThemeOverrides(): Record<string, string> {
+  return overrides;
+}
+
+/** 将 palette（叠加用户覆盖）写入 :root，并标记 data-theme */
 export function applyTheme(mode: ThemeMode): void {
-  const vars = paletteToCssVars(themes[mode]);
+  const base = paletteToCssVars(themes[mode]);
+  const vars = { ...base, ...overrides };
   const root = document.documentElement;
   for (const [k, v] of Object.entries(vars)) {
     root.style.setProperty(k, v);
@@ -343,4 +358,31 @@ export function applyTheme(mode: ThemeMode): void {
 
 export function getCurrentTheme(): ThemeMode {
   return (document.documentElement.dataset.theme as ThemeMode) || 'dark';
+}
+
+/** 将 #rgb / #rrggbb 十六进制颜色转为 rgba() 字符串（alpha 0..1）；解析失败回退黑色。 */
+export function hexToRgba(hex: string, alpha: number): string {
+  let h = hex.trim().replace(/^#/, '');
+  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return `rgba(0, 0, 0, ${alpha})`;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+/** 将任意颜色（hex / rgb() / rgba()）转成带指定 alpha 的 rgba；其它格式原样返回。 */
+export function toRgba(color: string, alpha: number): string {
+  const c = color.trim();
+  if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(c)) {
+    return hexToRgba(c, alpha);
+  }
+  const m = /^rgba?\(\s*([^)]+)\)\s*$/.exec(c);
+  if (m) {
+    const parts = m[1].split(',').map((s) => s.trim());
+    if (parts.length >= 3) {
+      return `rgba(${parts[0]}, ${parts[1]}, ${parts[2]}, ${alpha})`;
+    }
+  }
+  return c;
 }

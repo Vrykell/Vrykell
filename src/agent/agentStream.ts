@@ -16,6 +16,7 @@ import { estimateTokens, planContext, IMAGE_TOKEN_ESTIMATE, type SizedMessage } 
 import { attachmentsForModel, supportsVision } from './attachments';
 import { buildTools } from './tools';
 import { buildTavilySearchTool } from './tools/webSearch';
+import { buildWebSearchTool, buildWebFetchTool } from './tools/webFetch';
 import { levelOf } from './permissions';
 
 interface AiConfigInfoRust {
@@ -169,7 +170,14 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
       tools[native.name] = native.tool;
     } else if (info.has_tavily_key) {
       tools.web_search = buildTavilySearchTool({ signal: ctx?.signal, tabId: ctx?.tabId });
+    } else {
+      // 无 key 兜底：DuckDuckGo HTML 抓取（无需 Tavily/原生搜索）
+      tools.web_search = buildWebSearchTool({ signal: ctx?.signal, tabId: ctx?.tabId });
     }
+  }
+  // webfetch 技能：抓取任意 URL → 可读文本（联网开启即注册）
+  if (agentMode && settings.webSearch && levelOf('web_fetch') !== 'deny') {
+    tools.web_fetch = buildWebFetchTool({ signal: ctx?.signal, tabId: ctx?.tabId });
   }
   const hasTools = Object.keys(tools).length > 0;
 
