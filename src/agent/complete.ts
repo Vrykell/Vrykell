@@ -29,6 +29,22 @@ export function localComplete(prefix: string): string | null {
   return hit ? hit.command.slice(prefix.length) : null;
 }
 
+/** 本地历史前缀匹配的全部候选（同步，最近优先，按后缀去重）；返回后缀数组（无匹配为空数组） */
+export function localCompleteCandidates(prefix: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const e of useHistoryStore.getState().entries) {
+    if (e.command.length > prefix.length && e.command.startsWith(prefix)) {
+      const suffix = e.command.slice(prefix.length);
+      if (!seen.has(suffix)) {
+        seen.add(suffix);
+        out.push(suffix);
+      }
+    }
+  }
+  return out;
+}
+
 /** 末 token 是否为路径形态（绝对 / ./ ../ ~ 或含斜杠） */
 export function looksLikePath(token: string): boolean {
   return (
