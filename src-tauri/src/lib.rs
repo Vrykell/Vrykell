@@ -48,6 +48,8 @@ pub fn run() {
             ai::get_ai_config,
             ai::ai_stream,
             ai::set_ai_provider,
+            ai::set_ai_models,
+            ai::set_active_model,
             ai::set_provider_key,
             ai::clear_provider_key,
             ai::set_tavily_key,

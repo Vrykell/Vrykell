@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { SquareStack, Folder, Server, Sparkles, type LucideIcon } from 'lucide-react';
 import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '../lib/errorHandler';
 import { useWorkspaceStore, isSessionTab } from './workspace';
-import { minTerminalWidth, MIN_PANE_SIZE } from '../lib/windowLayout';
+import { minTerminalWidth, SINGLETON_MIN_WIDTH } from '../lib/windowLayout';
 
 // ── 面板定义（可扩展）──
 
@@ -99,22 +99,32 @@ interface DockState {
   togglePanel: (side: DockSide, id: string) => void;
   /** 确保面板打开（已打开则无操作），自动判定所在侧 */
   openPanel: (id: string) => void;
-  /** 调整面板宽度 */
-  setPanelWidth: (id: string, width: number) => void;
+  /** 调整面板宽度（按增量：正值 = 面板变宽，负值 = 变窄） */
+  setPanelWidth: (id: string, delta: number) => void;
 }
 
-/** 终端区域当前需要保留的最小宽度（按活跃窗口布局动态计算：单终端窄、多终端并排宽）。 */
+/** 每个侧栏面板自身的最小宽度（px）。 */
+const MIN_PANEL_WIDTH = 160;
+
+/** 终端区域当前需要保留的最小宽度（按活跃窗口布局动态计算：单终端窄、多终端并排宽）。
+ *  单例页（历史/设置）不可压缩，宽度下限 = 默认宽度。 */
 function currentTerminalMinWidth(): number {
   const ws = useWorkspaceStore.getState();
   const tab = ws.tabs.find((t) => t.id === ws.activeId);
-  return tab && isSessionTab(tab) ? minTerminalWidth(tab.layout) : MIN_PANE_SIZE;
+  return tab && isSessionTab(tab) ? minTerminalWidth(tab.layout) : SINGLETON_MIN_WIDTH;
 }
 
 const saved = loadLayout();
 
-/** AI 面板是否已打开（打开时终端块流不再内联 AI 回答，避免两处重复） */
+/** AI 面板是否已打开（打开时终端块流不再内联 AI 回答，避免两处重复）。
+ *  AI 面板与终端强相关：无终端会话（设置/历史页）时视为未打开。 */
 export function useChatPanelOpen(): boolean {
-  return useDockStore((s) => s.leftPanels.includes('chat') || s.rightPanels.includes('chat'));
+  const isSessionActive = useWorkspaceStore((s) => {
+    const tab = s.tabs.find((t) => t.id === s.activeId);
+    return !!tab && isSessionTab(tab);
+  });
+  const chatInPanels = useDockStore((s) => s.leftPanels.includes('chat') || s.rightPanels.includes('chat'));
+  return isSessionActive && chatInPanels;
 }
 
 export const useDockStore = create<DockState>((set) => ({
@@ -198,22 +208,27 @@ export const useDockStore = create<DockState>((set) => ({
     });
   },
 
-  setPanelWidth: (id, width) => {
+  setPanelWidth: (id, delta) => {
     set((s) => {
-      // 侧栏最大宽度 = 窗口宽 − 另一侧已占用宽 − 终端最小宽。
-      // 之前这里用 window.innerWidth 且带 500px 硬上限，导致终端最小宽形同虚设、拖拽范围被写死。
-      const side: DockSide = s.leftZone.includes(id) ? 'left' : 'right';
-      const otherPanels = side === 'left' ? s.rightPanels : s.leftPanels;
+      // 用「当前 store 值 + 增量」累加（而非外部传入绝对宽度），消除快速拖动时
+      // 渲染闭包陈旧导致的增量丢失（面板不跟手、终端 flex 反而在变）。
+      const cur = s.panelWidths[id] ?? PANEL_DEFS[id]?.width ?? 200;
+      // 侧栏最大宽度 = 窗口宽 − 其它「所有」面板（左右两侧）已占用宽 − 终端最小宽。
+      // 之前只减对侧面板，同侧多面板时会把最外侧面板挤出/挤没。
+      const allPanels = [...s.leftPanels, ...s.rightPanels];
       let otherWidth = 0;
-      for (const pid of otherPanels) {
+      for (const pid of allPanels) {
+        if (pid === id) continue;
         otherWidth += s.panelWidths[pid] ?? PANEL_DEFS[pid]?.width ?? 200;
       }
       const available = window.innerWidth - otherWidth;
-      const maxW = Math.max(160, Math.round(available - currentTerminalMinWidth()));
-      const panelWidths = { ...s.panelWidths, [id]: Math.max(160, Math.min(maxW, Math.round(width))) };
-      const next = { ...s, panelWidths };
-      saveLayout(next);
-      return next;
+      const maxW = Math.max(MIN_PANEL_WIDTH, Math.round(available - currentTerminalMinWidth()));
+      const next = Math.max(MIN_PANEL_WIDTH, Math.min(maxW, Math.round(cur + delta)));
+      if (next === cur) return {};
+      const panelWidths = { ...s.panelWidths, [id]: next };
+      const full = { ...s, panelWidths };
+      saveLayout(full);
+      return { panelWidths };
     });
   },
 }));

@@ -11,7 +11,7 @@ vi.mock('ai', () => ({ generateText: mockGenerate }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 
 import { maybeAutoTitle, sanitizeTitle, resetTitleState } from './title';
-import { useAgentSettings } from './agentSettings';
+import { useAgentSettings, DEFAULT_AGENT_SETTINGS } from './agentSettings';
 import { useAiConfigStore } from '../lib/ai';
 import { useBlockStore } from '../stores/blocks';
 import { useChatStore } from '../stores/chat';
@@ -32,7 +32,7 @@ function reset() {
   resetTitleState();
   mockGenerate.mockReset();
   mockGenerate.mockResolvedValue({ text: '「Rust 学习笔记」。\n' });
-  useAgentSettings.setState({ autoTitle: true, titleModel: '' });
+  useAgentSettings.setState({ global: { ...DEFAULT_AGENT_SETTINGS, autoTitle: true, titleModel: '' }, overrides: {} });
   useAiConfigStore.setState({
     hasKey: true,
     provider: 'openai-compatible',
@@ -120,7 +120,7 @@ describe('智能标题触发', () => {
 
   it('开关关闭 → 不生成', async () => {
     reset();
-    useAgentSettings.setState({ autoTitle: false });
+    useAgentSettings.setState({ global: { ...DEFAULT_AGENT_SETTINGS, autoTitle: false }, overrides: {} });
     setThreeDoneBlocks('t1');
     expect(await maybeAutoTitle('t1')).toBe(false);
     expect(mockGenerate).not.toHaveBeenCalled();
