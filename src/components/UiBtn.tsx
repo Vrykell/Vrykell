@@ -56,11 +56,14 @@ const inputBtnStyle: CSSProperties = {
 interface MenuItemProps {
   label: string;
   onClick: () => void;
+  danger?: boolean;
 }
 
-export function MenuItem({ label, onClick }: MenuItemProps) {
+export function MenuItem({ label, onClick, danger }: MenuItemProps) {
   return (
-    <button onClick={onClick} style={menuItemStyle}
+    <button
+      onClick={onClick}
+      style={danger ? { ...menuItemStyle, color: 'var(--error)' } : menuItemStyle}
       onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'var(--hover)'; }}
       onMouseLeave={(e) => { (e.target as HTMLElement).style.background = 'transparent'; }}
     >{label}</button>

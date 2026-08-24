@@ -291,11 +291,11 @@ function TerminalPane(props: {
   const showBlocks = scene === 'blockList';
 
   // 整个终端表面都可拖（无需把手）：按住超过 5px 阈值即进入拖动调整位置；
-  // 排除输入框/按钮/链接/活终端等交互元素，避免与打字、点击冲突。
+  // 排除输入框/按钮/链接/活终端/可选中文本等交互元素，避免与打字、点击、选中冲突。
   const onPaneMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
     const target = e.target as HTMLElement;
-    if (target.closest('input, textarea, button, a, [contenteditable="true"], .xterm, [data-no-drag]')) return;
+    if (target.closest('input, textarea, button, a, [contenteditable="true"], .xterm, [data-no-drag], [data-selectable]')) return;
     e.preventDefault();
     const startX = e.clientX;
     const startY = e.clientY;

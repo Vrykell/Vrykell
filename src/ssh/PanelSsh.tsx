@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pencil, Plus, Search, Server } from 'lucide-react';
+import { ask } from '@tauri-apps/plugin-dialog';
 import { ensureSshLoaded, useSshStore } from './store';
 import { useWorkspaceStore } from '../stores/workspace';
 import { useDockStore } from '../stores/dock';
+import ContextMenu from '../components/ContextMenu';
 import type { SshConnection } from './api';
 import SshFormModal from './SshFormModal';
 
@@ -14,10 +16,12 @@ import SshFormModal from './SshFormModal';
 export default function PanelSsh() {
   const connections = useSshStore((s) => s.connections);
   const touch = useSshStore((s) => s.touch);
+  const remove = useSshStore((s) => s.remove);
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<SshConnection | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; conn: SshConnection } | null>(null);
 
   useEffect(() => { ensureSshLoaded(); }, []);
 
@@ -52,6 +56,18 @@ export default function PanelSsh() {
     if (!selected) return;
     setEditing(selected);
     setFormOpen(true);
+  };
+
+  /** 右键菜单：编辑指定连接 */
+  const editConn = (conn: SshConnection) => {
+    setEditing(conn);
+    setFormOpen(true);
+  };
+
+  /** 右键菜单：删除指定连接（二次确认） */
+  const removeConn = async (conn: SshConnection) => {
+    const ok = await ask(`删除 SSH 连接「${conn.name}」？`, { title: '删除', kind: 'warning' });
+    if (ok) void remove(conn.id);
   };
 
   return (
@@ -103,9 +119,15 @@ export default function PanelSsh() {
         ) : filtered.map((c) => (
           <div
             key={c.id}
-            onClick={() => openConnection(c)}
+            onClick={() => setSelectedId(c.id)}
+            onDoubleClick={() => openConnection(c)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setSelectedId(c.id);
+              setMenu({ x: e.clientX, y: e.clientY, conn: c });
+            }}
             data-testid={`ssh-row-${c.id}`}
-            title={`连接到 ${c.host}`}
+            title={`双击连接到 ${c.host}；右键编辑 / 删除`}
             style={{
               display: 'flex', alignItems: 'center', gap: 8,
               padding: '7px 10px', cursor: 'pointer', fontSize: 12,
@@ -139,6 +161,18 @@ export default function PanelSsh() {
           </div>
         ))}
       </div>
+
+      {/* 右键菜单：编辑 / 删除 */}
+      {menu && (
+        <ContextMenu
+          anchor={{ x: menu.x, y: menu.y }}
+          onClose={() => setMenu(null)}
+          items={[
+            { label: '编辑', onClick: () => editConn(menu.conn) },
+            { label: '删除', danger: true, onClick: () => void removeConn(menu.conn) },
+          ]}
+        />
+      )}
 
       <SshFormModal open={formOpen} initial={editing} onClose={() => setFormOpen(false)} />
     </div>
