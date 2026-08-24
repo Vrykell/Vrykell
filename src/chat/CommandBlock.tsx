@@ -55,7 +55,7 @@ export default function CommandBlock({ children }: { children?: ReactNode }) {
           )}
         </div>
       )}
-      <pre style={{ margin: 0, padding: '10px 12px', overflowX: 'auto' }}>
+      <pre style={{ margin: 0, padding: '10px 12px', whiteSpace: 'pre-wrap', overflowWrap: 'break-word' }}>
         {children}
       </pre>
     </div>
