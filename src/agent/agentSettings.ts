@@ -12,6 +12,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+/** 上下文管理策略（code-agent 式） */
+export type ContextStrategy = 'off' | 'window' | 'compact';
+
 /** 可绑定模型的行为设置（每模型可覆盖，反映「这个模型怎么用」） */
 export interface ModelBehaviorSettings {
   /** Agent 模式：开 = 注册全部工具；关 = 纯聊天（零工具） */
@@ -22,8 +25,14 @@ export interface ModelBehaviorSettings {
   deepThink: boolean;
   /** 最大迭代步数（AI SDK stepCountIs；1–20） */
   maxSteps: number;
-  /** 保留最近 N 条消息作为上下文；0 = 不裁剪（全量） */
-  contextMessages: number;
+  /** 上下文策略：off=全量；window=按 token 预算窗口；compact=预算 + 自动摘要压缩 */
+  contextStrategy: ContextStrategy;
+  /** 上下文 token 预算（估算）；0 = 不设限 */
+  contextMaxTokens: number;
+  /** compact 摘要长度上限（token） */
+  contextSummaryTokens: number;
+  /** 单个工具输出截断字符数 */
+  contextToolChars: number;
   /** 回复 token 上限；0 = provider 默认（anthropic 深思时自动抬到 16000） */
   maxOutputTokens: number;
   /** 采样温度；null = provider 默认 */
@@ -57,7 +66,10 @@ export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   completeModel: '',
   completeDebounceMs: 200,
   maxSteps: 8,
-  contextMessages: 0,
+  contextStrategy: 'compact',
+  contextMaxTokens: 24000,
+  contextSummaryTokens: 400,
+  contextToolChars: 8192,
   maxOutputTokens: 0,
   temperature: null,
 };
@@ -105,22 +117,28 @@ export const useAgentSettings = create<AgentSettingsState>()(
     }),
     {
       name: 'vrykell-agent-settings',
-      version: 2,
+      version: 3,
       migrate: (persisted: unknown, version: number) => {
-        // v1 → v2：旧平铺结构 { agentMode, ..., update } 收进 global
-        if (version < 2 && persisted && typeof persisted === 'object') {
-          const old = persisted as Record<string, unknown>;
-          if (!old.global) {
-            const global: AgentSettings = { ...DEFAULT_AGENT_SETTINGS };
-            for (const k of Object.keys(DEFAULT_AGENT_SETTINGS) as (keyof AgentSettings)[]) {
-              if (k in old) {
-                (global as unknown as Record<string, unknown>)[k] = old[k];
-              }
+        // v0/v1（平铺）→ 收进 global；v2（缺新字段）→ 补齐默认值
+        let state: { global: AgentSettings; overrides: Record<string, Partial<ModelBehaviorSettings>> };
+        if (version < 2 && persisted && typeof persisted === 'object' && !(persisted as { global?: unknown }).global) {
+          const flat = persisted as Record<string, unknown>;
+          const global: AgentSettings = { ...DEFAULT_AGENT_SETTINGS };
+          for (const k of Object.keys(DEFAULT_AGENT_SETTINGS) as (keyof AgentSettings)[]) {
+            if (k in flat) {
+              (global as unknown as Record<string, unknown>)[k] = flat[k];
             }
-            return { global, overrides: {} };
           }
+          state = { global, overrides: {} };
+        } else {
+          state = persisted as { global: AgentSettings; overrides: Record<string, Partial<ModelBehaviorSettings>> };
         }
-        return persisted as { global: AgentSettings; overrides: Record<string, Partial<ModelBehaviorSettings>> };
+        // 任意版本 → 补齐 global 缺省字段 + 保证 overrides 存在
+        if (state && typeof state === 'object') {
+          state.global = { ...DEFAULT_AGENT_SETTINGS, ...(state.global ?? {}) };
+          state.overrides = state.overrides ?? {};
+        }
+        return state;
       },
     },
   ),

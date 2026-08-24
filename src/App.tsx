@@ -16,7 +16,7 @@ import { useUiStore } from './stores/ui';
 import { useWorkspaceDirsStore } from './files/workspaceDirs';
 import { useHistoryStore } from './stores/history';
 import { useWorkspaceStore, serializeSession, isSessionTab } from './stores/workspace';
-import { minTerminalWidth, SINGLETON_MIN_WIDTH, type TerminalSpec } from './lib/windowLayout';
+import { minTerminalWidth, MIN_PANE_SIZE, type TerminalSpec } from './lib/windowLayout';
 import * as sessionManager from './lib/sessionManager';
 import './search/init'; // 触发所有搜索源自动注册
 
@@ -57,11 +57,10 @@ export default function App() {
   const setGlobalSearchOpen = useUiStore((s) => s.setGlobalSearchOpen);
   const splitPickerOpen = useUiStore((s) => s.splitPickerOpen);
   const closeSplitPicker = useUiStore((s) => s.closeSplitPicker);
-  // 终端区域最小宽度按布局动态计算：单终端就窄，多终端并排才宽；
-  // 单例页（历史/设置）不可压缩，宽度下限 = 默认宽度。
+  // 终端区域最小宽度按布局动态计算：单终端就窄，多终端并排才宽。
   const terminalMinWidth = useWorkspaceStore((s) => {
     const tab = s.tabs.find((t) => t.id === s.activeId);
-    return tab && isSessionTab(tab) ? minTerminalWidth(tab.layout) : SINGLETON_MIN_WIDTH;
+    return tab && isSessionTab(tab) ? minTerminalWidth(tab.layout) : MIN_PANE_SIZE;
   });
 
   const handleSplitPick = (spec: TerminalSpec) => {

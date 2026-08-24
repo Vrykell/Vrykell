@@ -12,6 +12,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { StreamFn } from '../stores/chat';
 import { createChatModel, createNativeWebSearchTool, deepThinkProviderOptions, type ProviderKind } from './provider';
 import { useAgentSettings } from './agentSettings';
+import { estimateTokens, planContext, IMAGE_TOKEN_ESTIMATE, type SizedMessage } from './context';
 import { attachmentsForModel, supportsVision } from './attachments';
 import { buildTools } from './tools';
 import { buildTavilySearchTool } from './tools/webSearch';
@@ -96,28 +97,41 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   // M5 附件：带附件的用户消息展开为多模态 ModelMessage（文本段 + 图片 part），
   // 非视觉模型的图片在 attachmentsForModel 内降级为占位提示文本
   const vision = supportsVision(info.provider, info.model);
-  // 上下文裁剪：保留最近 N 条消息（0 = 不裁剪）
-  const trimmed = settings.contextMessages > 0 ? messages.slice(-settings.contextMessages) : messages;
-  const modelMessages: ModelMessage[] = [];
-  for (const m of trimmed) {
+  const sized: SizedMessage[] = [];
+  for (const m of messages) {
     if (m.attachments?.length) {
       const { text, images } = await attachmentsForModel(m.attachments, vision);
       const content = [m.content, text].filter(Boolean).join('\n\n');
       if (images.length > 0) {
-        modelMessages.push({
+        const msg: ModelMessage = {
           role: 'user',
           content: [
             ...(content ? [{ type: 'text' as const, text: content }] : []),
             ...images.map((image) => ({ type: 'image' as const, image })),
           ],
-        });
+        };
+        sized.push({ msg, tokens: estimateTokens(content) + images.length * IMAGE_TOKEN_ESTIMATE });
       } else {
-        modelMessages.push({ role: m.role as 'user' | 'assistant', content });
+        sized.push({ msg: { role: m.role as 'user' | 'assistant', content }, tokens: estimateTokens(content) });
       }
     } else {
-      modelMessages.push(m as ModelMessage);
+      sized.push({ msg: m as ModelMessage, tokens: estimateTokens(m.content) });
     }
   }
+
+  // code-agent 式上下文管理：按 token 预算窗口裁剪，compact 策略下把溢出旧消息压缩成摘要
+  const plan = await planContext({
+    sized,
+    strategy: settings.contextStrategy,
+    maxTokens: settings.contextMaxTokens,
+    summaryTokens: settings.contextSummaryTokens,
+    model,
+    tabId: ctx?.tabId,
+    signal: ctx?.signal,
+  });
+  const modelMessages: ModelMessage[] = plan.system
+    ? [{ role: 'system', content: plan.system }, ...plan.messages]
+    : plan.messages;
 
   // 工具调用账本：tool-result/tool-error 事件重建完整 ToolRun 需要
   // toolName/input/startedAt（result 部分不一定带回 input）
@@ -235,7 +249,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
           toolName: c?.toolName ?? p.toolName ?? 'unknown',
           input: c?.input ?? {},
           state,
-          output: out.length > 8192 ? out.slice(0, 8192) : out,
+          output: out.length > settings.contextToolChars ? out.slice(0, settings.contextToolChars) : out,
           error,
           startedAt: c?.startedAt ?? Date.now(),
           endedAt: Date.now(),

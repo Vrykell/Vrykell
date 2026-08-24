@@ -714,8 +714,27 @@ function AiBehaviorPage() {
       <Field title="最大迭代步数" description="Agent 一次回答最多调用多少轮工具；1–20。">
         <NumberInput value={eff.maxSteps} min={1} max={20} onChange={(v) => update({ maxSteps: v })} />
       </Field>
-      <Field title="上下文消息数" description="发送给模型的最近消息条数；0 = 不裁剪（全量）。">
-        <NumberInput value={eff.contextMessages} min={0} max={500} onChange={(v) => update({ contextMessages: v })} />
+      <Field title="上下文策略" description="全量 = 不裁剪；窗口 = 按 token 预算保留最近消息；摘要 = 超预算把旧消息压缩成运行摘要（code-agent 式，会多一次模型调用）。">
+        <Segmented
+          options={[
+            { value: 'off', label: '全量' },
+            { value: 'window', label: '窗口' },
+            { value: 'compact', label: '摘要' },
+          ]}
+          value={eff.contextStrategy}
+          onChange={(v) => update({ contextStrategy: v })}
+        />
+      </Field>
+      <Field title="上下文 Token 预算" description="估算的上下文 token 预算；0 = 不设限。超预算时按上面的策略裁剪或压缩。">
+        <NumberInput value={eff.contextMaxTokens} min={0} max={1000000} onChange={(v) => update({ contextMaxTokens: v })} />
+      </Field>
+      {eff.contextStrategy === 'compact' && (
+        <Field title="摘要长度上限" description="压缩摘要的最大 token 数（compact 策略用）。">
+          <NumberInput value={eff.contextSummaryTokens} min={64} max={8000} onChange={(v) => update({ contextSummaryTokens: v })} />
+        </Field>
+      )}
+      <Field title="工具输出截断" description="单个工具结果的最大字符数，超长截断避免占满上下文。">
+        <NumberInput value={eff.contextToolChars} min={256} max={65536} onChange={(v) => update({ contextToolChars: v })} />
       </Field>
       <Field title="回复 Token 上限" description="单次回复的最大 token 数；0 = 使用服务商默认（Anthropic 深度思考时自动抬到 16000）。">
         <NumberInput value={eff.maxOutputTokens} min={0} max={32768} onChange={(v) => update({ maxOutputTokens: v })} />

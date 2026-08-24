@@ -496,7 +496,7 @@ export default function PanelChat() {
                     onClick={() => setPermMode(next.id)}
                     style={{
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      width: 20, height: 20, padding: 0, border: 'none', borderRadius: 3,
+                      width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
                       background: 'transparent', color: cur.color, cursor: 'pointer',
                     }}
                     onMouseEnter={(e) => {
@@ -517,7 +517,7 @@ export default function PanelChat() {
                 onClick={() => void pickFiles()}
                 style={{
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  width: 20, height: 20, padding: 0, border: 'none', borderRadius: 3,
+                  width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
                   background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
                 }}
                 onMouseEnter={(e) => {
@@ -529,7 +529,7 @@ export default function PanelChat() {
                   e.currentTarget.style.color = 'var(--text-muted)';
                 }}
               >
-                <Paperclip size={12} />
+                <Paperclip size={13} />
               </button>
             </div>
           </div>
@@ -572,7 +572,7 @@ function QuickToggle({ icon: Icon, on, title, onClick }: {
       onClick={onClick}
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 20, height: 20, padding: 0, border: 'none', borderRadius: 3,
+        width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
         background: on ? 'var(--accent-warm-dim)' : 'transparent',
         color: on ? 'var(--accent-warm)' : 'var(--text-muted)', cursor: 'pointer',
       }}
@@ -585,7 +585,7 @@ function QuickToggle({ icon: Icon, on, title, onClick }: {
         e.currentTarget.style.color = on ? 'var(--accent-warm)' : 'var(--text-muted)';
       }}
     >
-      <Icon size={12} />
+      <Icon size={13} />
     </button>
   );
 }

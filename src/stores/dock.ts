@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { SquareStack, Folder, Server, Sparkles, type LucideIcon } from 'lucide-react';
 import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '../lib/errorHandler';
 import { useWorkspaceStore, isSessionTab } from './workspace';
-import { minTerminalWidth, SINGLETON_MIN_WIDTH } from '../lib/windowLayout';
+import { minTerminalWidth, MIN_PANE_SIZE } from '../lib/windowLayout';
 
 // ── 面板定义（可扩展）──
 
@@ -106,12 +106,11 @@ interface DockState {
 /** 每个侧栏面板自身的最小宽度（px）。 */
 const MIN_PANEL_WIDTH = 160;
 
-/** 终端区域当前需要保留的最小宽度（按活跃窗口布局动态计算：单终端窄、多终端并排宽）。
- *  单例页（历史/设置）不可压缩，宽度下限 = 默认宽度。 */
+/** 终端区域当前需要保留的最小宽度（按活跃窗口布局动态计算：单终端窄、多终端并排宽）。 */
 function currentTerminalMinWidth(): number {
   const ws = useWorkspaceStore.getState();
   const tab = ws.tabs.find((t) => t.id === ws.activeId);
-  return tab && isSessionTab(tab) ? minTerminalWidth(tab.layout) : SINGLETON_MIN_WIDTH;
+  return tab && isSessionTab(tab) ? minTerminalWidth(tab.layout) : MIN_PANE_SIZE;
 }
 
 const saved = loadLayout();
