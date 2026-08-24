@@ -20,7 +20,7 @@ export default function CommandBlock({ children }: { children?: ReactNode }) {
   return (
     <div style={{
       position: 'relative',
-      background: 'var(--canvas)',
+      background: 'var(--block)',
       border: '1px solid var(--border)',
       borderRadius: 'var(--radius-inner)',
       margin: '0.45em 0',

@@ -33,7 +33,7 @@ import { useAgentSettings } from '../agent/agentSettings';
 import { usePermissions } from '../agent/permissions';
 import { useAiConfigStore } from '../lib/ai';
 import { LIMITS, importFileAsAttachment, totalSize, type AttachmentMeta } from '../agent/attachments';
-import { completeCommand, localComplete } from '../agent/complete';
+import { completeCommand, localCompleteCandidates } from '../agent/complete';
 import { useHistoryStore } from '../stores/history';
 import { useDockStore } from '../stores/dock';
 import { useToastStore } from '../components/Toast';
@@ -246,15 +246,28 @@ export default function InputEditor({
   const completeOn = useAgentSettings((s) => s.global.completeEnabled);
   const completeDebounceMs = useAgentSettings((s) => s.global.completeDebounceMs);
   const [ghost, setGhost] = useState('');
+  const [ghostCandidates, setGhostCandidates] = useState<string[]>([]);
   const ghostSeq = useRef(0);
+  // 补全循环状态：base = 用户输入的原始前缀；candidates = 候选后缀；idx = 当前已接受下标
+  const completionRef = useRef<{ base: string; candidates: string[]; idx: number } | null>(null);
+  // Tab 提交会改写 text 触发 effect，用此标记跳过当次重算
+  const suppressEffectRef = useRef(false);
 
   const clearGhost = useCallback(() => {
     ghostSeq.current++;
+    completionRef.current = null;
     setGhost('');
+    setGhostCandidates([]);
   }, []);
 
   useEffect(() => {
+    if (suppressEffectRef.current) {
+      suppressEffectRef.current = false;
+      return; // Tab 提交引起的 text 变化，跳过重算
+    }
+    completionRef.current = null; // 用户正常输入，结束补全循环
     setGhost('');
+    setGhostCandidates([]);
     if (
       !completeOn ||
       aiMode ||
@@ -265,10 +278,11 @@ export default function InputEditor({
     ) {
       return;
     }
-    // 本地历史前缀：同步命中立即出 ghost（不等防抖）
-    const local = localComplete(text);
-    if (local) {
-      setGhost(local);
+    // 本地历史前缀：同步命中立即出全部候选 ghost（不等防抖）
+    const locals = localCompleteCandidates(text);
+    if (locals.length > 0) {
+      setGhostCandidates(locals);
+      setGhost(locals[0]!);
       return;
     }
     const seq = ++ghostSeq.current;
@@ -276,7 +290,10 @@ export default function InputEditor({
     const timer = setTimeout(() => {
       completeCommand(text, { cwd: tabCwd }, ctrl.signal)
         .then((suffix) => {
-          if (suffix && seq === ghostSeq.current && !ctrl.signal.aborted) setGhost(suffix);
+          if (suffix && seq === ghostSeq.current && !ctrl.signal.aborted) {
+            setGhostCandidates([suffix]);
+            setGhost(suffix);
+          }
         })
         .catch(() => {});
     }, completeDebounceMs);
@@ -576,12 +593,25 @@ export default function InputEditor({
                     return;
                   }
                 }
-                // Tab 接受建议 / Esc 丢弃建议（优先于清空文本）
-                if (ghost && e.key === 'Tab') {
+                // Tab 接受当前候选；再按 Tab 替换为下一个命令（Shift+Tab 后退）；Esc 丢弃
+                if (e.key === 'Tab' && (ghostCandidates.length > 0 || completionRef.current)) {
                   e.preventDefault();
-                  setText(text + ghost);
-                  clearGhost();
                   resetHistNav();
+                  const cycle = completionRef.current;
+                  if (cycle) {
+                    // 已在循环中：替换为下一个 / 上一个候选
+                    const dir = e.shiftKey ? -1 : 1;
+                    cycle.idx = (cycle.idx + dir + cycle.candidates.length) % cycle.candidates.length;
+                    suppressEffectRef.current = true;
+                    setText(cycle.base + cycle.candidates[cycle.idx]!);
+                  } else {
+                    // 首次 Tab：接受第一个候选，进入循环
+                    completionRef.current = { base: text, candidates: ghostCandidates, idx: 0 };
+                    suppressEffectRef.current = true;
+                    setText(text + ghostCandidates[0]!);
+                    setGhost('');
+                    setGhostCandidates([]);
+                  }
                   const el = inputRef.current;
                   if (el) {
                     el.style.height = 'auto';
@@ -591,20 +621,28 @@ export default function InputEditor({
                   }
                   return;
                 }
-                if (ghost && e.key === 'Escape') {
-                  clearGhost();
-                  return;
+                if (e.key === 'Escape') {
+                  const cycle = completionRef.current;
+                  if (cycle) {
+                    // 补全循环中：Esc 还原到原始前缀
+                    suppressEffectRef.current = true;
+                    setText(cycle.base);
+                    clearGhost();
+                    return;
+                  }
+                  if (ghost) {
+                    clearGhost();
+                    return;
+                  }
+                  if (text) {
+                    setText('');
+                    resetHeight();
+                  } else if (aiMode && !chatOpen) setAiMode(false);
                 }
                 if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault();
                   clearGhost();
                   execute();
-                }
-                if (e.key === 'Escape') {
-                  if (text) {
-                    setText('');
-                    resetHeight();
-                  } else if (aiMode && !chatOpen) setAiMode(false);
                 }
               }}
               style={{
