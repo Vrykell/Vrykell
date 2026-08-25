@@ -13,8 +13,10 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+
+use crate::agent::web::{fetch_public, http_client_impl};
 
 // ── 对外类型 ──
 
@@ -724,6 +726,156 @@ pub async fn find_skill_reference(text: String) -> Option<SkillTrustInfo> {
     None
 }
 
+// ── GitHub 技能市场 ──
+
+/// 市场搜索结果：GitHub 仓库内的一个技能。
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct MarketSkill {
+    pub name: String,
+    pub description: String,
+    /// 仓库内技能目录相对路径（install 用）
+    pub dir: String,
+}
+
+/// 把 "owner/repo" 或完整 GitHub URL 解析成 (owner, repo)。
+fn parse_github_repo(input: &str) -> Result<(String, String), String> {
+    let s = input.trim().trim_end_matches('/');
+    if s.is_empty() {
+        return Err("请输入 GitHub 仓库（owner/repo 或完整 URL）".to_string());
+    }
+    let segs: Vec<&str> = s
+        .split('/')
+        .filter(|x| !x.is_empty() && *x != "https:" && *x != "http:" && *x != "github.com")
+        .collect();
+    if segs.len() < 2 {
+        return Err("无法识别仓库，格式应为 owner/repo".to_string());
+    }
+    let owner = segs[segs.len() - 2].to_string();
+    let repo = segs[segs.len() - 1].to_string();
+    if owner.is_empty() || repo.is_empty() {
+        return Err("无法识别仓库，格式应为 owner/repo".to_string());
+    }
+    Ok((owner, repo))
+}
+
+const GITHUB_API: &str = "https://api.github.com/repos";
+const GITHUB_RAW: &str = "https://raw.githubusercontent.com";
+
+async fn github_tree(owner: &str, repo: &str, client: &reqwest::Client) -> Result<serde_json::Value, String> {
+    let url = format!("{GITHUB_API}/{owner}/{repo}/git/trees/HEAD?recursive=1");
+    let resp = fetch_public(client, &url).await?;
+    if !resp.status().is_success() {
+        return Err(format!("GitHub 返回 {}（仓库可能不存在）", resp.status()));
+    }
+    let body = resp.text().await.map_err(|e| format!("读取响应失败：{e}"))?;
+    serde_json::from_str(&body).map_err(|e| format!("解析 GitHub 响应失败：{e}"))
+}
+
+/// 列出仓库里的技能（含 SKILL.md 的目录，最多 30 个，解析 name/description）。
+#[tauri::command]
+pub async fn market_github_list(repo: String) -> Result<Vec<MarketSkill>, String> {
+    let (owner, name) = parse_github_repo(&repo)?;
+    let client = http_client_impl(false)?;
+    let json = github_tree(&owner, &name, &client).await?;
+    let mut dirs: Vec<String> = Vec::new();
+    let mut seen = HashSet::new();
+    if let Some(entries) = json.get("tree").and_then(|t| t.as_array()) {
+        for e in entries {
+            let path = e.get("path").and_then(|p| p.as_str()).unwrap_or("");
+            let lower = path.to_lowercase();
+            if lower.ends_with("skill.md") || lower.ends_with("skill.md/") {
+                let dir = path.trim_end_matches('/');
+                let dir = &dir[..dir.len().saturating_sub("SKILL.md".len())].trim_end_matches('/');
+                if !dir.is_empty() && seen.insert(dir.to_string()) && dirs.len() < 30 {
+                    dirs.push(dir.to_string());
+                }
+            }
+        }
+    }
+    if dirs.is_empty() {
+        return Err("该仓库未找到 SKILL.md 技能".to_string());
+    }
+    let mut out = Vec::new();
+    for dir in &dirs {
+        let raw_url = format!("{GITHUB_RAW}/{owner}/{name}/HEAD/{dir}/SKILL.md");
+        let Ok(resp) = fetch_public(&client, &raw_url).await else { continue };
+        let Ok(text) = resp.text().await else { continue };
+        let (n, desc, _, _) = parse_skill_md(&text);
+        let fallback = dir.rsplit('/').next().unwrap_or(dir).to_string();
+        out.push(MarketSkill {
+            name: if n.trim().is_empty() { fallback } else { n.trim().to_string() },
+            description: desc,
+            dir: dir.clone(),
+        });
+    }
+    if out.is_empty() {
+        return Err("仓库内 SKILL.md 读取失败".to_string());
+    }
+    Ok(out)
+}
+
+/// 安装仓库内某目录的技能：拉取目录内文件写入技能目录（默认未信任）。
+#[tauri::command]
+pub async fn market_github_install(repo: String, dir: String) -> Result<SkillMeta, String> {
+    let (owner, name) = parse_github_repo(&repo)?;
+    let dir = dir.trim().trim_matches('/').to_string();
+    if dir.is_empty() {
+        return Err("技能目录不能为空".to_string());
+    }
+    let client = http_client_impl(false)?;
+    let json = github_tree(&owner, &name, &client).await?;
+    let prefix = format!("{dir}/");
+    let mut files: Vec<String> = Vec::new();
+    if let Some(entries) = json.get("tree").and_then(|t| t.as_array()) {
+        for e in entries {
+            let path = e.get("path").and_then(|p| p.as_str()).unwrap_or("");
+            let is_dir = e.get("type").and_then(|t| t.as_str()) == Some("tree");
+            if !is_dir && path.starts_with(&prefix) {
+                let rel = path[prefix.len()..].to_string();
+                let base = rel.rsplit('/').next().unwrap_or("").to_string();
+                if !base.starts_with('.') {
+                    files.push(rel);
+                }
+            }
+        }
+    }
+    files.sort();
+    if files.len() > 40 {
+        files.truncate(40);
+    }
+    // 技能名 = 目录名
+    let skill_name = sanitize_name(dir.rsplit('/').next().unwrap_or("skill"));
+    let dst = skills_dir().join(&skill_name);
+    std::fs::create_dir_all(&dst).map_err(|e| format!("创建技能目录失败：{e}"))?;
+    let mut wrote = 0usize;
+    for rel in &files {
+        let raw_url = format!("{GITHUB_RAW}/{owner}/{name}/HEAD/{dir}/{rel}");
+        let Ok(resp) = fetch_public(&client, &raw_url).await else { continue };
+        let Ok(bytes) = resp.bytes().await else { continue };
+        if bytes.len() > 2 * 1024 * 1024 {
+            continue;
+        }
+        let out_path = dst.join(rel);
+        if let Some(parent) = out_path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if std::fs::write(&out_path, &bytes).is_ok() {
+            wrote += 1;
+        }
+    }
+    if wrote == 0 {
+        return Err("技能文件拉取失败".to_string());
+    }
+    upsert_record(&skill_name, |_| SkillRecord {
+        source: format!("GitHub · {owner}/{name}"),
+        trusted: false,
+        enabled: true,
+        content_hash: compute_dir_hash(&dst),
+    });
+    read_skill_meta(&dst).ok_or_else(|| "安装后读取技能失败".to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -758,5 +910,15 @@ mod tests {
         assert!(is_script_path("tools/check.sh"));
         assert!(!is_script_path("references/REFERENCE.md"));
         assert!(!is_script_path("assets/template.txt"));
+    }
+
+    #[test]
+    fn parse_github_repo_accepts_repo_and_url() {
+        assert_eq!(parse_github_repo("anthropics/skills").unwrap(), ("anthropics".to_string(), "skills".to_string()));
+        assert_eq!(
+            parse_github_repo("https://github.com/agentskills/agentskills").unwrap(),
+            ("agentskills".to_string(), "agentskills".to_string())
+        );
+        assert!(parse_github_repo("   ").is_err());
     }
 }

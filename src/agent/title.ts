@@ -25,12 +25,16 @@ export const TITLE_IDLE_MS = 5_000;
 export const TITLE_MIN_DONE_BLOCKS = 3;
 export const TITLE_MIN_ANSWER_CHARS = 50;
 const MAX_TITLE_LEN = 16;
+/** 会话消息数每增长该值，重新智能生成一次标题 */
+export const TITLE_RETITLE_STEP = 30;
 
 const lastAttempt = new Map<string, number>();
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
+/** 各 tab 成功定名时的消息数（规模触发重命名用） */
+const titledCount = new Map<string, number>();
 
-/** 收集生成标题的上下文；信息不充分返回 null（充分性判定也在这里） */
-function gatherContext(tabId: string): { prompt: string } | null {
+/** 收集生成标题的上下文；信息不充分返回 null（充分性判定也在这里）。force=手动重命名时放宽充分性。 */
+function gatherContext(tabId: string, force = false): { prompt: string } | null {
   const blocks = useBlockStore.getState().byTab[tabId] ?? [];
   const doneCmds = blocks
     .filter((b) => (b.status === 'done' || b.status === 'interrupted') && b.command)
@@ -40,7 +44,8 @@ function gatherContext(tabId: string): { prompt: string } | null {
   const firstA = msgs.find(
     (m) => m.role === 'assistant' && !m.pending && m.content.trim().length >= TITLE_MIN_ANSWER_CHARS,
   );
-  if (doneCmds.length < TITLE_MIN_DONE_BLOCKS && !firstA) return null;
+  if (!force && doneCmds.length < TITLE_MIN_DONE_BLOCKS && !firstA) return null;
+  if (force && !doneCmds.length && !firstQ) return null;
   const parts: string[] = [];
   if (doneCmds.length) parts.push('最近执行的命令：\n' + doneCmds.slice(-5).join('\n'));
   if (firstQ) parts.push('用户提问：' + firstQ.content.slice(0, 200));
@@ -58,18 +63,45 @@ export function sanitizeTitle(raw: string): string {
     .trim();
 }
 
-/** 条件判定 + 生成。返回是否落了新标题（测试直接断言）。 */
-export async function maybeAutoTitle(tabId: string, now = Date.now()): Promise<boolean> {
+/** 无 AI 时的启发式标题：首个用户提问的首行，或前几条命令。 */
+export function heuristicTitle(tabId: string): string {
+  const msgs = useChatStore.getState().byTab[tabId] ?? [];
+  const firstQ = msgs.find((m) => m.role === 'user' && m.content.trim());
+  if (firstQ) {
+    const line = firstQ.content.trim().split('\n')[0] ?? '';
+    const t = sanitizeTitle(line);
+    if (t) return t;
+  }
+  const blocks = useBlockStore.getState().byTab[tabId] ?? [];
+  const cmd = blocks.find((b) => b.command);
+  if (cmd) return sanitizeTitle(cmd.command.split(' ').slice(0, 3).join(' '));
+  return '';
+}
+
+/** 条件判定 + 生成。force=true 时无视「已定名」并放宽充分性（手动重命名/规模触发）。 */
+export async function maybeAutoTitle(tabId: string, now = Date.now(), force = false): Promise<boolean> {
   const settings = useAgentSettings.getState().resolve();
   if (!settings.autoTitle) return false;
   const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === tabId);
   if (!tab || !isSessionTab(tab)) return false;
-  if (tab.named && !tab.titleAuto) return false;
+  if (!force && tab.named && !tab.titleAuto) return false;
   if (now - (lastAttempt.get(tabId) ?? -Infinity) < TITLE_COOLDOWN_MS) return false;
-  const ctx = gatherContext(tabId);
+  const ctx = gatherContext(tabId, force);
   if (!ctx) return false;
-  if (!isApiKeyConfigured()) return false;
   lastAttempt.set(tabId, now);
+  const markTitled = () => titledCount.set(tabId, (useChatStore.getState().byTab[tabId] ?? []).length);
+  const applyTitle = (title: string) => {
+    if (force) useWorkspaceStore.getState().renameTab(tabId, title);
+    else useWorkspaceStore.getState().autoTitle(tabId, title);
+  };
+  // 未配置 AI：启发式总结
+  if (!isApiKeyConfigured()) {
+    const title = heuristicTitle(tabId);
+    if (!title) return false;
+    applyTitle(title);
+    markTitled();
+    return true;
+  }
   try {
     const active = activeModelProfile();
     const model = createChatModel({
@@ -86,12 +118,19 @@ export async function maybeAutoTitle(tabId: string, now = Date.now()): Promise<b
     });
     const title = sanitizeTitle(text);
     if (!title) return false;
-    useWorkspaceStore.getState().autoTitle(tabId, title);
+    applyTitle(title);
+    markTitled();
     return true;
   } catch (e) {
     console.warn('[title] 智能标题生成失败:', e);
     return false;
   }
+}
+
+/** 强制重新生成标题（会话右键菜单）：清冷却，无视已定名与充分性，AI 或启发式均可。 */
+export async function regenerateTitle(tabId: string): Promise<boolean> {
+  lastAttempt.delete(tabId);
+  return maybeAutoTitle(tabId, Date.now(), true);
 }
 
 /** 有活动 → 重置 5s 防抖定时器 */
@@ -115,7 +154,16 @@ export function initAutoTitle(): () => void {
   });
   const unChat = useChatStore.subscribe((s, prev) => {
     for (const tabId of Object.keys(s.byTab)) {
-      if (s.byTab[tabId] !== prev.byTab[tabId]) noteActivity(tabId);
+      if (s.byTab[tabId] !== prev.byTab[tabId]) {
+        noteActivity(tabId);
+        // 会话达到一定规模：重新智能生成标题（无 AI 时走启发式）
+        const count = s.byTab[tabId]?.length ?? 0;
+        const last = titledCount.get(tabId) ?? 0;
+        if (count >= TITLE_RETITLE_STEP && count - last >= TITLE_RETITLE_STEP) {
+          clearTimeout(timers.get(tabId));
+          void maybeAutoTitle(tabId, Date.now(), true);
+        }
+      }
     }
   });
   return () => {

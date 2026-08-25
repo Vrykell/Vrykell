@@ -10,7 +10,7 @@ test.describe('chat 对话链路（内联 AI 模式）', () => {
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
 
     // 点击 ⚡ 切换到 AI 模式
-    await page.getByTitle(/切换到 AI 模式/).click();
+    await page.getByRole('button', { name: 'cmd' }).click();
 
     // 输入自然语言并发送
     const input = page.getByPlaceholder(/自然语言描述/);
@@ -28,7 +28,7 @@ test.describe('chat 对话链路（内联 AI 模式）', () => {
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
 
-    await page.getByTitle(/切换到 AI 模式/).click();
+    await page.getByRole('button', { name: 'cmd' }).click();
     const input = page.getByPlaceholder(/自然语言描述/);
     await input.fill('写个公式');
     await input.press('Enter');
@@ -43,7 +43,7 @@ test.describe('chat 对话链路（内联 AI 模式）', () => {
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
 
-    await page.getByTitle(/切换到 AI 模式/).click();
+    await page.getByRole('button', { name: 'cmd' }).click();
     const input = page.getByPlaceholder(/自然语言描述/);
     await input.fill('麦克斯韦方程组');
     await input.press('Enter');
@@ -57,7 +57,7 @@ test.describe('chat 对话链路（内联 AI 模式）', () => {
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
 
-    await page.getByTitle(/切换到 AI 模式/).click();
+    await page.getByRole('button', { name: 'cmd' }).click();
     const input = page.getByPlaceholder(/自然语言描述/);
     await input.fill('测试');
     await input.press('Enter');

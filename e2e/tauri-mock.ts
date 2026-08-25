@@ -4,6 +4,12 @@ export interface TauriMockOptions {
   /** 是否启用 OSC 133 shell integration（默认 true）。
    *  false 时 mock 保持 classic 场景，用于测试无 integration 回退。 */
   integration?: boolean;
+  /** 预置模型列表（默认 2 个：主力模型 + 本地模型） */
+  aiModels?: { id: string; name: string; provider: string; baseUrl: string; model: string }[];
+  /** 当前生效模型 id（默认 '' = 镜像字段） */
+  aiActive?: string;
+  /** 预置技能列表（默认 2 个：写单测 / 旧脚本技能） */
+  skills?: Record<string, unknown>[];
 }
 
 /**
@@ -22,7 +28,17 @@ export interface TauriMockOptions {
  */
 export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
   const integration = opts.integration !== false;
-  await page.addInitScript((enableIntegration) => {
+  const seedModels = opts.aiModels ?? [
+    { id: 'm-main', name: '主力模型', provider: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', model: 'claude-sonnet-5' },
+    { id: 'm-local', name: '本地模型', provider: 'openai-compatible', baseUrl: 'http://127.0.0.1:11434/v1', model: 'qwen2.5' },
+  ];
+  const seedActive = opts.aiActive ?? '';
+  const seedSkills = opts.skills ?? [
+    { name: '写单测', description: '为代码写单元测试', source: 'local', trusted: true, enabled: true, hasScripts: false, modified: false, files: ['SKILL.md'], dir: '/home/e2e/.vrykell/skills/写单测', prompt: '先看代码，再写 vitest 单测。' },
+    { name: '旧脚本技能', description: '遗留技能，含脚本', source: 'market', trusted: false, enabled: false, hasScripts: true, modified: true, files: ['SKILL.md', 'scripts/run.sh', 'references/说明.md'], dir: '/home/e2e/.vrykell/skills/旧脚本技能', prompt: '运行 scripts/run.sh 完成工作。' },
+  ];
+  await page.addInitScript(
+    ({ enableIntegration, models, active, skillsSeed }) => {
     let cbCounter = 0;
     const eventListeners = new Map<string, number>();
     const writes: string[] = [];
@@ -34,10 +50,49 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     const downloads: Record<string, unknown>[] = [];
     const revealed: string[] = [];
     const aiConfig: { hasKey: boolean; baseUrl: string; model: string } = {
-      hasKey: false,
+      hasKey: true,
       baseUrl: 'https://api.openai.com/v1',
       model: 'gpt-4o-mini',
     };
+    // ── AI 多模型配置（设置页「模型配置」读写） ──
+    const aiModels: { id: string; name: string; provider: string; baseUrl: string; model: string }[] = models;
+    let aiActive = active;
+    let aiProvider: string = 'openai-compatible';
+    let aiHasAnthropic = false;
+    let aiHasGemini = false;
+    let aiHasTavily = false;
+    const aiKeyCalls: { provider: string; key?: string }[] = [];
+    const aiModelCalls: { kind: string; models?: unknown[]; active?: string; id?: string }[] = [];
+    // ── 技能系统 ──
+    const skills: Record<string, unknown>[] = skillsSeed;
+    const skillOps: { op: string; name: string; trusted?: boolean | null; enabled?: boolean | null; prompt?: string }[] = [];
+    // ── MCP ──
+    const mcpServers: Record<string, unknown>[] = [
+      { name: '文件系统', command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem'], url: '', env: {}, enabled: true, connected: true, toolCount: 3 },
+    ];
+    const mcpOps: { op: string; name: string; config?: unknown }[] = [];
+    // ── 记忆 ──
+    const memory = { fact: '用户偏好：优先用 Rust。\n项目约定：单测覆盖核心逻辑。', journal: '2025-06-01 修复了工具注册 bug\n2025-06-02 补了 e2e 测试' };
+    const memoryOps: { op: string; content?: string; text?: string }[] = [];
+    // ── 子代理 ──
+    const agents: Record<string, unknown>[] = [
+      { id: 'a1', name: '代码审查员', description: '审查代码质量', prompt: '你是严格的代码审查员。' },
+    ];
+    const agentOps: { op: string; id?: string; agent?: unknown }[] = [];
+    // ── 定时任务 ──
+    const schedules: Record<string, unknown>[] = [
+      { id: 's1', name: '每日巡检', prompt: '检查系统状态并汇报', intervalMinutes: 60, enabled: true, lastRunAt: 0 },
+    ];
+    const scheduleOps: { op: string; id?: string; schedule?: unknown }[] = [];
+    // ── 主题 ──
+    const theme = { opacity: 1, backgroundImage: null, vars: {} as Record<string, string> };
+    // ── 搜索 / 历史 ──
+    const historyEntries: Record<string, unknown>[] = [
+      { command: 'npm run dev', cwd: '/home/e2e/project', timestamp: Date.now() - 1000, exit_code: 0 },
+      { command: 'git status', cwd: '/home/e2e/project', timestamp: Date.now() - 2000, exit_code: 0 },
+      { command: 'echo hello-e2e', cwd: '/home/e2e', timestamp: Date.now() - 3000, exit_code: 0 },
+    ];
+    const searchCalls: { cmd: string; args: Record<string, unknown> }[] = [];
     const sshConnections: Record<string, unknown>[] = [
       { id: 'ssh-1', name: '生产服务器', host: 'prod.example.com', port: 22, user: 'root', password: '', authMethod: 'password', lastOpenedAt: null, hasPassword: true },
     ];
@@ -49,6 +104,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     const sessionPayloads: { id: string; payload: string }[] = [];
     let pendingCmd = '';
     let integrationEnabled = enableIntegration;
+    (window as unknown as Record<string, unknown>).__AI_MODELS__ = aiModels;
     (window as unknown as Record<string, unknown>).__PTY_WRITES__ = writes;
     (window as unknown as Record<string, unknown>).__PTY_SIGNALS__ = signals;
     (window as unknown as Record<string, unknown>).__PTY_RESIZES__ = resizes;
@@ -57,6 +113,19 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     (window as unknown as Record<string, unknown>).__DOWNLOADS__ = downloads;
     (window as unknown as Record<string, unknown>).__REVEALED__ = revealed;
     (window as unknown as Record<string, unknown>).__SESSION_PAYLOADS__ = sessionPayloads;
+    (window as unknown as Record<string, unknown>).__AI_KEY_CALLS__ = aiKeyCalls;
+    (window as unknown as Record<string, unknown>).__AI_MODEL_CALLS__ = aiModelCalls;
+    (window as unknown as Record<string, unknown>).__SKILL_OPS__ = skillOps;
+    (window as unknown as Record<string, unknown>).__MCP_SERVERS__ = mcpServers;
+    (window as unknown as Record<string, unknown>).__MCP_OPS__ = mcpOps;
+    (window as unknown as Record<string, unknown>).__MEMORY__ = memory;
+    (window as unknown as Record<string, unknown>).__MEMORY_OPS__ = memoryOps;
+    (window as unknown as Record<string, unknown>).__AGENTS__ = agents;
+    (window as unknown as Record<string, unknown>).__AGENT_OPS__ = agentOps;
+    (window as unknown as Record<string, unknown>).__SCHEDULES__ = schedules;
+    (window as unknown as Record<string, unknown>).__SCHEDULE_OPS__ = scheduleOps;
+    (window as unknown as Record<string, unknown>).__THEME__ = theme;
+    (window as unknown as Record<string, unknown>).__SEARCH_CALLS__ = searchCalls;
 
     const A = '\x1b]133;A\x07';
     const C = '\x1b]133;C\x07';
@@ -247,8 +316,53 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
               setTimeout(next, 10);
             });
           }
+          case 'llm_stream': {
+            // AI SDK 代理流：后端侧是「按回调 id 推事件」；浏览器 mock 等价于
+            // 调 window[`_${id}`]({ index, message })，Channel 内部按 index 保序 + end 清理。
+            const raw = args.onEvent as unknown;
+            const idStr =
+              typeof raw === 'string' ? raw : ((raw as { toJSON?: () => string })?.toJSON?.() ?? String(raw));
+            const m = /__CHANNEL__:(\d+)/.exec(idStr);
+            const cbId = m ? Number(m[1]) : null;
+            const text = (window as unknown as Record<string, string>).__AI_REPLY__ ?? '';
+            setTimeout(() => {
+              if (cbId === null) return;
+              const win = window as unknown as Record<string, (msg: { index: number; message?: unknown; end?: boolean }) => void>;
+              let idx = 0;
+              const send = (message: unknown) => win[`_${cbId}`]?.({ index: idx++, message });
+              send({ kind: 'started', status: 200, headers: [['content-type', 'text/event-stream']] });
+              const pieces: string[] = [];
+              for (let i = 0; i < text.length; i += 24) pieces.push(text.slice(i, i + 24));
+              const lines = [
+                'data: {"id":"chatcmpl-1","object":"chat.completion.chunk","model":"gpt-4o-mini","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}',
+              ];
+              for (const p of pieces) {
+                lines.push(`data: {"id":"chatcmpl-1","object":"chat.completion.chunk","model":"gpt-4o-mini","choices":[{"index":0,"delta":{"content":${JSON.stringify(p)},"role":"assistant"},"finish_reason":null}]}`);
+              }
+              lines.push('data: {"id":"chatcmpl-1","object":"chat.completion.chunk","model":"gpt-4o-mini","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}');
+              lines.push('data: [DONE]');
+              const body = lines.join('\n\n') + '\n\n';
+              const b64 = btoa(unescape(encodeURIComponent(body)));
+              for (let i = 0; i < b64.length; i += 64) {
+                send({ kind: 'chunk', data: b64.slice(i, i + 64) });
+              }
+              send({ kind: 'done' });
+              win[`_${cbId}`]?.({ index: idx, end: true });
+            }, 10);
+            return new Promise(() => {});
+          }
           case 'get_ai_config':
-            return { has_key: aiConfig.hasKey, base_url: aiConfig.baseUrl, model: aiConfig.model };
+            return {
+              has_key: aiConfig.hasKey,
+              base_url: aiConfig.baseUrl,
+              model: aiConfig.model,
+              provider: aiProvider,
+              has_anthropic_key: aiHasAnthropic,
+              has_gemini_key: aiHasGemini,
+              has_tavily_key: aiHasTavily,
+              models: aiModels,
+              active_model: aiActive,
+            };
           case 'set_ai_key':
             aiConfig.hasKey = true;
             return undefined;
@@ -261,6 +375,244 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
           case 'set_ai_model':
             aiConfig.model = args.model as string;
             return undefined;
+          case 'set_ai_provider':
+            aiProvider = args.provider as string;
+            return undefined;
+          case 'set_ai_models': {
+            aiModels.splice(0, aiModels.length, ...(args.models as typeof aiModels));
+            aiActive = args.activeModel as string;
+            aiModelCalls.push({ kind: 'set_models', models: args.models as unknown[], active: args.activeModel as string });
+            return undefined;
+          }
+          case 'set_active_model': {
+            aiActive = args.id as string;
+            aiModelCalls.push({ kind: 'set_active', id: args.id as string });
+            return undefined;
+          }
+          case 'set_provider_key': {
+            aiKeyCalls.push({ provider: args.provider as string, key: args.key as string });
+            if (args.provider === 'anthropic') aiHasAnthropic = true;
+            else if (args.provider === 'gemini') aiHasGemini = true;
+            else aiConfig.hasKey = true;
+            return undefined;
+          }
+          case 'clear_provider_key': {
+            aiKeyCalls.push({ provider: args.provider as string });
+            if (args.provider === 'anthropic') aiHasAnthropic = false;
+            else if (args.provider === 'gemini') aiHasGemini = false;
+            else aiConfig.hasKey = false;
+            return undefined;
+          }
+          case 'set_tavily_key':
+            aiHasTavily = true;
+            aiKeyCalls.push({ provider: 'tavily', key: args.key as string });
+            return undefined;
+          case 'clear_tavily_key':
+            aiHasTavily = false;
+            return undefined;
+          case 'web_search':
+            searchCalls.push({ cmd: 'web_search', args });
+            return { results: [{ title: 'Rust 官网', url: 'https://www.rust-lang.org', content: 'A language empowering everyone' }] };
+          case 'web_fetch':
+            searchCalls.push({ cmd: 'web_fetch', args });
+            return { title: 'Rust 文档', url: args.url, text: '# 欢迎\n这是抓取到的正文', links: [{ text: '入门', url: 'https://doc.rust-lang.org/book' }] };
+          case 'web_crawl':
+            searchCalls.push({ cmd: 'web_crawl', args });
+            return { pages: [{ title: '首页', url: args.startUrl, text: '爬到的第一页' }], truncated: false };
+          // ── 技能系统 ──
+          case 'list_skills':
+            return skills.map((s) => ({ ...s }));
+          case 'get_skill': {
+            const sk = skills.find((s) => s.name === args.name);
+            if (!sk) throw new Error(`未找到技能「${args.name}」`);
+            return sk;
+          }
+          case 'set_skill_state': {
+            const sk = skills.find((s) => s.name === args.name);
+            if (sk) {
+              if (args.trusted !== null && args.trusted !== undefined) sk.trusted = args.trusted;
+              if (args.enabled !== null && args.enabled !== undefined) sk.enabled = args.enabled;
+            }
+            skillOps.push({ op: 'set_state', name: args.name as string, trusted: args.trusted as boolean | null, enabled: args.enabled as boolean | null });
+            return undefined;
+          }
+          case 'remove_skill': {
+            const i = skills.findIndex((s) => s.name === args.name);
+            if (i >= 0) skills.splice(i, 1);
+            skillOps.push({ op: 'remove', name: args.name as string });
+            return undefined;
+          }
+          case 'install_skill_md': {
+            const meta = { name: args.name, description: args.description, source: 'url', trusted: false, enabled: false, hasScripts: false, modified: false, files: ['SKILL.md'], dir: `/home/e2e/.vrykell/skills/${args.name}`, prompt: args.prompt };
+            const i = skills.findIndex((s) => s.name === args.name);
+            if (i >= 0) skills[i] = meta; else skills.push(meta);
+            skillOps.push({ op: 'install', name: args.name as string, prompt: args.prompt as string });
+            return meta;
+          }
+          case 'read_skill_file':
+            return `# ${args.relativePath}\n这是技能文件 ${args.name} 的内容。`;
+          case 'fetch_skill_registry':
+            return [
+              { name: '远程技能A', description: '来自 URL 的技能', prompt: '步骤…' },
+              { name: '远程技能B', description: '另一个技能', prompt: '步骤…' },
+            ];
+          case 'import_skills_from_path':
+            return [{ name: '导入技能', description: '从目录导入', source: 'local', trusted: false, enabled: false, hasScripts: false, modified: false, files: ['SKILL.md'], dir: args.path, prompt: '导入的正文' }];
+          case 'find_skill_reference':
+            return null;
+          case 'market_github_list':
+            return [
+              { name: 'github-skill-1', dir: 'skills/github-skill-1', description: 'GitHub 操作技能' },
+              { name: 'github-skill-2', dir: 'skills/github-skill-2', description: '第二个仓库技能' },
+            ];
+          case 'market_github_install': {
+            const meta = { name: (args.dir as string).split('/').pop(), description: '来自市场', source: 'market', trusted: false, enabled: false, hasScripts: false, modified: false, files: ['SKILL.md'], dir: `/home/e2e/.vrykell/skills/${(args.dir as string).split('/').pop()}`, prompt: '市场安装的正文' };
+            skills.push(meta);
+            skillOps.push({ op: 'market_install', name: meta.name as string });
+            return meta;
+          }
+          // ── MCP ──
+          case 'mcp_get_servers':
+            return mcpServers.map((s) => ({ ...s }));
+          case 'mcp_save_server': {
+            const cfg = args.config as Record<string, unknown>;
+            const existing = mcpServers.find((s) => s.name === cfg.name);
+            const stored = { ...cfg, connected: existing?.connected ?? false, toolCount: existing?.toolCount ?? 0 };
+            if (existing) Object.assign(existing, stored);
+            else mcpServers.push(stored);
+            mcpOps.push({ op: 'save', name: cfg.name as string, config: cfg });
+            return undefined;
+          }
+          case 'mcp_remove_server': {
+            const i = mcpServers.findIndex((s) => s.name === args.name);
+            if (i >= 0) mcpServers.splice(i, 1);
+            mcpOps.push({ op: 'remove', name: args.name as string });
+            return undefined;
+          }
+          case 'mcp_toggle_server': {
+            const s = mcpServers.find((x) => x.name === args.name);
+            if (s) s.enabled = args.enabled;
+            mcpOps.push({ op: 'toggle', name: args.name as string });
+            return undefined;
+          }
+          case 'mcp_connect': {
+            const s = mcpServers.find((x) => x.name === args.name);
+            if (s) { s.connected = true; s.toolCount = 2; }
+            mcpOps.push({ op: 'connect', name: args.name as string });
+            return undefined;
+          }
+          case 'mcp_disconnect': {
+            const s = mcpServers.find((x) => x.name === args.name);
+            if (s) s.connected = false;
+            mcpOps.push({ op: 'disconnect', name: args.name as string });
+            return undefined;
+          }
+          case 'mcp_list_all_tools':
+            return [{ server: '文件系统', name: 'read_file', description: '读取文件' }];
+          case 'mcp_call_tool':
+            return { ok: true, result: 'mcp 工具结果' };
+          // ── 记忆 ──
+          case 'get_memory':
+            return memory.fact;
+          case 'set_memory':
+            memory.fact = args.content as string;
+            memoryOps.push({ op: 'set', content: args.content as string });
+            return undefined;
+          case 'get_memory_journal':
+            return memory.journal;
+          case 'append_memory_journal':
+            memory.journal = `${memory.journal}\n${args.text}`;
+            memoryOps.push({ op: 'append', text: args.text as string });
+            return undefined;
+          // ── 子代理 ──
+          case 'list_agents':
+            return agents.map((a) => ({ ...a }));
+          case 'save_agent': {
+            const a = args.agent as Record<string, unknown>;
+            const existing = agents.find((x) => x.id === a.id && a.id !== '');
+            const id = (a.id as string) || `a${Date.now().toString(36)}`;
+            const stored = { ...a, id };
+            if (existing) Object.assign(existing, stored); else agents.push(stored);
+            agentOps.push({ op: 'save', id, agent: stored });
+            return undefined;
+          }
+          case 'remove_agent': {
+            const i = agents.findIndex((x) => x.id === args.id);
+            if (i >= 0) agents.splice(i, 1);
+            agentOps.push({ op: 'remove', id: args.id as string });
+            return undefined;
+          }
+          case 'get_agent':
+            return agents.find((x) => x.id === args.nameOrId || x.name === args.nameOrId) ?? { id: 'x', name: args.nameOrId, description: '', prompt: '' };
+          // ── 定时任务 ──
+          case 'list_schedules':
+            return schedules.map((s) => ({ ...s }));
+          case 'save_schedule': {
+            const s = args.schedule as Record<string, unknown>;
+            const existing = schedules.find((x) => x.id === s.id && s.id !== '');
+            const id = (s.id as string) || `s${Date.now().toString(36)}`;
+            const stored = { ...s, id };
+            if (existing) Object.assign(existing, stored); else schedules.push(stored);
+            scheduleOps.push({ op: 'save', id, schedule: stored });
+            return undefined;
+          }
+          case 'remove_schedule': {
+            const i = schedules.findIndex((x) => x.id === args.id);
+            if (i >= 0) schedules.splice(i, 1);
+            scheduleOps.push({ op: 'remove', id: args.id as string });
+            return undefined;
+          }
+          case 'mark_schedule_run': {
+            const s = schedules.find((x) => x.id === args.id);
+            if (s) s.lastRunAt = args.timestamp;
+            return undefined;
+          }
+          // ── 主题 ──
+          case 'get_theme_config':
+            return theme;
+          case 'set_theme_config':
+            Object.assign(theme, args.config);
+            return undefined;
+          case 'theme_export':
+            return undefined;
+          case 'theme_import': {
+            const cfg = args.config ?? theme;
+            Object.assign(theme, cfg);
+            return theme;
+          }
+          case 'get_theme_path':
+            return '/home/e2e/.vrykell/theme.json';
+          // ── 搜索 / 历史 ──
+          case 'search_files':
+            searchCalls.push({ cmd: 'search_files', args });
+            return [{ path: '/home/e2e/project/notes.txt', name: 'notes.txt', is_dir: false, size: 1234, modified: Date.now() - 3600_000, line: null, snippet: null }];
+          case 'search_history':
+            searchCalls.push({ cmd: 'search_history', args });
+            return historyEntries;
+          case 'search_blocks':
+            searchCalls.push({ cmd: 'search_blocks', args });
+            return [{ id: 'b1', session_id: 'hist-1', pane_id: null, command: 'npm run dev', output_raw: 'o', output_clean: 'dev server running', exit_code: 0, status: 'done', started_at: 1, ended_at: 2, collapsed: false }];
+          case 'search_sessions':
+            searchCalls.push({ cmd: 'search_sessions', args });
+            return [{ id: 't1', title: 'npm run dev', status: 'active', created_at: Date.now(), closed_at: null, block_count: 2, cwd: '', group_id: null, sort_order: 0, kind: 'local', payload: '{}' }];
+          case 'get_search_context':
+            return { cwd: args.cwd ?? '/home/e2e' };
+          case 'record_history':
+            historyEntries.unshift({ command: args.command, cwd: args.cwd, timestamp: args.timestamp, exit_code: args.exitCode });
+            return undefined;
+          case 'history_stats':
+            return historyEntries.slice(0, args.topN ?? 20);
+          case 'clear_history':
+            historyEntries.length = 0;
+            return undefined;
+          case 'fs_roots':
+            return [
+              { name: 'Documents', path: '/home/e2e/Documents', is_dir: true },
+              { name: 'Downloads', path: '/home/e2e/Downloads', is_dir: true },
+              { name: 'notes.txt', path: '/home/e2e/notes.txt', is_dir: false },
+            ];
+          case 'fs_home':
+            return '/home/e2e';
           case 'list_shells':
             return [
               { id: 'zsh', label: 'Zsh', default: true },
@@ -398,7 +750,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
       },
     };
     localStorage.setItem('vrykell-api-key', 'sk-e2e-fake');
-  }, integration);
+  }, { enableIntegration: integration, models: seedModels, active: seedActive, skillsSeed: seedSkills });
 }
 
 /** 预置 AI 回复文本：mock 的 ai_stream 会按 chunk 流式 emit ai-chunk 事件。
@@ -456,4 +808,57 @@ export async function emitPtyOutput(page: Page, data: string): Promise<void> {
     const internals = (window as unknown as Record<string, (data: string) => void>).__TAURI_INTERNALS__;
     internals?.emitPtyOutput(d);
   }, data);
+}
+
+/** 读取 set_provider_key / set_tavily_key 调用记录 */
+export function aiKeyCalls(page: Page): Promise<{ provider: string; key?: string }[]> {
+  return page.evaluate(() => (window as unknown as { __AI_KEY_CALLS__: { provider: string; key?: string }[] }).__AI_KEY_CALLS__);
+}
+
+/** 读取 set_ai_models / set_active_model 调用记录 */
+export function aiModelCalls(page: Page): Promise<{ kind: string; models?: unknown[]; active?: string; id?: string }[]> {
+  return page.evaluate(() => (window as unknown as { __AI_MODEL_CALLS__: { kind: string; models?: unknown[]; active?: string; id?: string }[] }).__AI_MODEL_CALLS__);
+}
+
+/** 读取技能操作记录（set_state/remove/install/market_install） */
+export function skillOps(page: Page): Promise<{ op: string; name: string; trusted?: boolean | null; enabled?: boolean | null; prompt?: string }[]> {
+  return page.evaluate(() => (window as unknown as { __SKILL_OPS__: { op: string; name: string; trusted?: boolean | null; enabled?: boolean | null; prompt?: string }[] }).__SKILL_OPS__);
+}
+
+/** 读取 MCP 服务器状态与操作记录 */
+export function mcpServers(page: Page): Promise<Record<string, unknown>[]> {
+  return page.evaluate(() => (window as unknown as { __MCP_SERVERS__: Record<string, unknown>[] }).__MCP_SERVERS__);
+}
+export function mcpOps(page: Page): Promise<{ op: string; name: string; config?: unknown }[]> {
+  return page.evaluate(() => (window as unknown as { __MCP_OPS__: { op: string; name: string; config?: unknown }[] }).__MCP_OPS__);
+}
+
+/** 读取记忆操作记录 */
+export function memoryOps(page: Page): Promise<{ op: string; content?: string; text?: string }[]> {
+  return page.evaluate(() => (window as unknown as { __MEMORY_OPS__: { op: string; content?: string; text?: string }[] }).__MEMORY_OPS__);
+}
+
+/** 读取子代理操作记录 */
+export function agentOps(page: Page): Promise<{ op: string; id?: string; agent?: unknown }[]> {
+  return page.evaluate(() => (window as unknown as { __AGENT_OPS__: { op: string; id?: string; agent?: unknown }[] }).__AGENT_OPS__);
+}
+
+/** 读取定时任务操作记录 */
+export function scheduleOps(page: Page): Promise<{ op: string; id?: string; schedule?: unknown }[]> {
+  return page.evaluate(() => (window as unknown as { __SCHEDULE_OPS__: { op: string; id?: string; schedule?: unknown }[] }).__SCHEDULE_OPS__);
+}
+
+/** 读取搜索 invoke 调用记录 */
+export function searchCalls(page: Page): Promise<{ cmd: string; args: Record<string, unknown> }[]> {
+  return page.evaluate(() => (window as unknown as { __SEARCH_CALLS__: { cmd: string; args: Record<string, unknown> }[] }).__SEARCH_CALLS__);
+}
+
+/** 读取主题配置（get_theme_config / set_theme_config 之后的状态） */
+export function themeConfig(page: Page): Promise<{ opacity: number; backgroundImage: string | null; vars: Record<string, string> }> {
+  return page.evaluate(() => (window as unknown as { __THEME__: { opacity: number; backgroundImage: string | null; vars: Record<string, string> } }).__THEME__);
+}
+
+/** 读取记忆当前内容（FACT） */
+export function memoryFact(page: Page): Promise<string> {
+  return page.evaluate(() => (window as unknown as { __MEMORY__: { fact: string } }).__MEMORY__.fact);
 }

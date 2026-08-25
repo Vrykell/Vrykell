@@ -33,9 +33,9 @@ test.describe('应用布局', () => {
   });
 
   test('底部输入栏支持 AI 模式切换', async ({ page }) => {
-    await page.getByTitle(/AI 模式/).click();
+    await page.getByRole('button', { name: 'cmd' }).click();
     await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
-    await page.getByTitle(/命令模式/).click();
+    await page.getByRole('button', { name: 'AI' }).click();
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   });
 

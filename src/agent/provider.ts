@@ -80,15 +80,18 @@ export function createNativeWebSearchTool(
 /** providerOptions 用的 JSON 子集类型（SDK 的 ProviderOptions 未从 'ai' 顶层导出） */
 type Jsonish = string | number | boolean | { [k: string]: Jsonish };
 
+export type ThinkingLevel = 'low' | 'medium' | 'high';
+
 export function deepThinkProviderOptions(
   provider: ProviderKind,
+  level: ThinkingLevel = 'high',
 ): Record<string, Record<string, Jsonish>> {
   switch (provider) {
     case 'anthropic':
-      return { anthropic: { thinking: { type: 'enabled', budgetTokens: 8000 } } };
+      return { anthropic: { thinking: { type: 'enabled', budgetTokens: level === 'low' ? 4000 : level === 'medium' ? 8000 : 16000 } } };
     case 'gemini':
-      return { google: { thinkingConfig: { thinkingBudget: 8192 } } };
+      return { google: { thinkingConfig: { thinkingBudget: level === 'low' ? 4096 : level === 'medium' ? 8192 : 16384 } } };
     default:
-      return { vrykell: { reasoning_effort: 'high' } };
+      return { vrykell: { reasoning_effort: level } };
   }
 }

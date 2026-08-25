@@ -126,12 +126,22 @@ describe('智能标题触发', () => {
     expect(mockGenerate).not.toHaveBeenCalled();
   });
 
-  it('无 key → 跳过（旧截断兜底已在别处生效）', async () => {
+  it('无 key → 启发式总结（首个提问首行）', async () => {
     reset();
     useAiConfigStore.setState({ hasKey: false });
     setThreeDoneBlocks('t1');
-    expect(await maybeAutoTitle('t1')).toBe(false);
+    useChatStore.setState({
+      byTab: {
+        t1: [
+          { id: 'u1', role: 'user', content: '帮我看看这个报错', createdAt: 1 },
+          { id: 'a1', role: 'assistant', content: 'x'.repeat(60), createdAt: 2 },
+        ],
+      },
+    });
+    expect(await maybeAutoTitle('t1')).toBe(true);
     expect(mockGenerate).not.toHaveBeenCalled();
+    const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === 't1');
+    expect(tab?.title).toContain('帮我看看这个报错');
   });
 
   it('generateText 失败 → false 不抛出，冷却仍计时', async () => {

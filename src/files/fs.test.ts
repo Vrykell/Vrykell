@@ -1,0 +1,29 @@
+/**
+ * fs — 文件系统 invoke 封装透传测试。
+ */
+import { describe, it, expect, vi } from 'vitest';
+const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
+vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
+import { fsList, fsRoots, fsHome, fsRename, fsDelete, fileOpenWith } from './fs';
+
+describe('fs 封装', () => {
+  it('各命令按约定透传', async () => {
+    invokeMock.mockResolvedValueOnce([{ name: 'a', path: '/a', is_dir: false }]);
+    await fsList('/x');
+    expect(invokeMock).toHaveBeenLastCalledWith('fs_list', { path: '/x' });
+    invokeMock.mockResolvedValueOnce([]);
+    await fsList();
+    expect(invokeMock).toHaveBeenLastCalledWith('fs_list', { path: null });
+    await fsRoots();
+    expect(invokeMock).toHaveBeenLastCalledWith('fs_roots');
+    invokeMock.mockResolvedValueOnce('/home/u');
+    await fsHome();
+    expect(invokeMock).toHaveBeenLastCalledWith('fs_home');
+    await fsRename('/a', 'b');
+    expect(invokeMock).toHaveBeenLastCalledWith('fs_rename', { oldPath: '/a', newName: 'b' });
+    await fsDelete('/a');
+    expect(invokeMock).toHaveBeenLastCalledWith('fs_delete', { path: '/a' });
+    await fileOpenWith('/a.txt');
+    expect(invokeMock).toHaveBeenLastCalledWith('file_open_with', { path: '/a.txt' });
+  });
+});

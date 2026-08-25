@@ -27,6 +27,7 @@ import {
   type WindowLayout, type TerminalSpec, type DropTarget,
 } from '../lib/windowLayout';
 import InputEditor from './InputEditor';
+import AiStatusBar from './AiStatusBar';
 import TerminalBlockList, { hasVisibleContent } from './TerminalBlockList';
 import TerminalPanel from './TerminalPanel';
 import SessionHistoryView from '../components/SessionHistoryView';
@@ -338,6 +339,8 @@ function TerminalPane(props: {
       }}
     >
       {/* xterm 表面：classic/真实 altScreen 可见，blockList/手动全屏隐藏但保持挂载 */}
+      {/* AI 状态栏（仅 AI 模式显示，置于页面顶部） */}
+      <AiStatusBar paneId={terminal.id} />
       <div style={showXterm
         ? { flex: 1, minHeight: 0, position: 'relative', paddingTop: scene === 'altScreen' ? 28 : 0 }
         : { position: 'absolute', inset: 0, opacity: 0, pointerEvents: 'none' }}>

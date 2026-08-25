@@ -18,7 +18,7 @@
  * 同组件服务两个视图：TerminalBlockList（块流内联）与 PanelChat（窗口转录）。
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Brain, ChevronRight, Copy, Pencil, RotateCw, Trash2, Zap } from 'lucide-react';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { useChatStore } from '../stores/chat';
@@ -191,7 +191,7 @@ export default function AiBlock({ exchange }: { exchange: ChatExchange }) {
           <Rail bottom={answer.error ? 12 : answer.pending ? 0 : 4} />
           <EndDot top={6} />
           {answer.reasoning && (
-            <ThinkingBlock text={answer.reasoning} />
+            <ThinkingBlock text={answer.reasoning} streaming={answer.pending ?? false} />
           )}
           {parts
             ? parts.map((p, i) => {
@@ -252,10 +252,16 @@ export default function AiBlock({ exchange }: { exchange: ChatExchange }) {
   );
 }
 
-/** 可折叠的「思考」块（默认折叠，点击展开）。 */
-function ThinkingBlock({ text }: { text: string }) {
+/** 可折叠的「思考」块（默认折叠，点击展开；展开时流式自动滚底 + Markdown 渲染）。 */
+function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }) {
   const [open, setOpen] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const preview = text.split('\n').find((l) => l.trim()) ?? '';
+  useEffect(() => {
+    if (open && streaming && bodyRef.current) {
+      bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
+    }
+  }, [text, open, streaming]);
   return (
     <div style={ROW}>
       <button
@@ -289,14 +295,17 @@ function ThinkingBlock({ text }: { text: string }) {
       </button>
       {open && (
         <div
+          ref={bodyRef}
           style={{
             marginTop: 4, marginLeft: 1, padding: '2px 0 2px 12px',
             borderLeft: '2px solid var(--border-strong)',
             fontSize: 11, lineHeight: 1.6, color: 'var(--text-secondary)',
-            whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+            wordBreak: 'break-word', maxHeight: 260, overflowY: 'auto',
           }}
         >
-          {text}
+          <div className="md">
+            <SafeMarkdown content={text} />
+          </div>
         </div>
       )}
     </div>
