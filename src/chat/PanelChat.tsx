@@ -34,6 +34,7 @@ import ShellIndicator from '../terminal/ShellIndicator';
 import { CurrentDir } from '../terminal/InputEditor';
 import AiBlock from './AiBlock';
 import { toExchanges, type ChatExchange } from './exchanges';
+import ContextRing from '../components/ContextRing';
 
 /** 权限模式循环（状态栏 Shield chip）：图标 + 颜色双通道辨识（勾=标准逐工具 / 叹号=严格逐次问 / 斜线=放行直放）
  *  标准=逐工具级别；严格=全部逐次问；放行=全部直放行（危险命令仍逐次问） */
@@ -305,9 +306,10 @@ export default function PanelChat() {
           onClick={(e) => setModelMenu({ x: e.clientX, y: e.clientY })}
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 4,
+            height: 24, boxSizing: 'border-box',
             fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 500,
-            padding: '2px 8px', border: '1px solid var(--border)', borderRadius: 5,
-            background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer',
+            padding: '0 8px', border: '1px solid var(--border)', borderRadius: 5,
+            background: 'var(--canvas)', color: 'var(--text-secondary)', cursor: 'pointer',
             lineHeight: '16px', maxWidth: 150,
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}
@@ -417,6 +419,9 @@ export default function PanelChat() {
                   color: 'var(--text-primary)', lineHeight: '22px', outline: 'none',
                 }}
               />
+              <span style={{ marginRight: 6, display: 'inline-flex', alignItems: 'center' }}>
+                <ContextRing />
+              </span>
               {/* 发送/停止按钮 — 流式中当前 tab 变 ⏹ */}
               {sendingHere ? (
                 <button
@@ -525,8 +530,8 @@ export default function PanelChat() {
       {modelMenu && (
         <ContextMenu
           anchor={modelMenu}
-          items={
-            aiCfg.models.length > 0
+          items={[
+            ...(aiCfg.models.length > 0
               ? aiCfg.models.map((m) => ({
                   label: m.id === aiCfg.activeModel ? `✓ ${m.name || m.model}` : (m.name || m.model),
                   onClick: () => void setActiveModel(m.id),
@@ -534,8 +539,13 @@ export default function PanelChat() {
               : (MODEL_PRESETS[aiCfg.provider] ?? []).map((m) => ({
                   label: m === aiCfg.model ? `✓ ${m}` : m,
                   onClick: () => void setAiModel(m),
-                }))
-          }
+                }))),
+            { label: '─ 思考强度 ─', onClick: () => {} },
+            ...[['low', '低'], ['medium', '中'], ['high', '高'] as const].map(([lv, label]) => ({
+              label: `${eff.thinkingLevel === lv ? '✓ ' : ''}${label}`,
+              onClick: () => agentSettings.updateModel(activeModel, { thinkingLevel: lv as 'low' | 'medium' | 'high' }),
+            })),
+          ]}
           onClose={() => setModelMenu(null)}
         />
       )}

@@ -4,6 +4,8 @@ import {
   ChevronRight, Pencil, Archive, Folder, Trash2,
 } from 'lucide-react';
 import { useWorkspaceStore, isSessionTab, firstTerminalOf, terminalsOf, type Tab, type TabGroup } from '../stores/workspace';
+import { regenerateTitle } from '../agent/title';
+import { useToastStore } from './Toast';
 import { shellTypeLabel } from '../lib/shells';
 import NewTabModal from './NewTabModal';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
@@ -181,6 +183,12 @@ export default function PanelTabs() {
           },
         }] : []),
         { label: '重命名', onClick: () => { setEditId(ctxTab.id); setEditTitle(ctxTab.title); } },
+        { label: '重新生成标题', onClick: () => {
+          useToastStore.getState().addToast('正在重新生成标题…', 'info');
+          void regenerateTitle(ctxTab.id).then((ok) => {
+            if (ok) useToastStore.getState().addToast('标题已更新', 'success');
+          });
+        } },
         { label: '关闭标签', onClick: () => closeTab(ctxTab.id) },
       ]
     : [];

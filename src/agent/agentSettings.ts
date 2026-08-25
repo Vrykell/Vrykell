@@ -22,6 +22,8 @@ export interface ModelBehaviorSettings {
   agentMode: boolean;
   /** 深度思考开关（providerOptions 透传 reasoning_effort / thinking budget） */
   deepThink: boolean;
+  /** 思考强度：low/medium/high（deepThink 开启时生效） */
+  thinkingLevel: 'low' | 'medium' | 'high';
   /** 最大迭代步数（AI SDK stepCountIs；1–100） */
   maxSteps: number;
   /** 上下文策略：off=全量；window=按 token 预算窗口；compact=预算 + 自动摘要压缩 */
@@ -62,6 +64,7 @@ export type AgentSettings = ModelBehaviorSettings & GlobalPrefs;
 export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   agentMode: true,
   deepThink: false,
+  thinkingLevel: 'high',
   autoTitle: true,
   titleModel: '',
   completeEnabled: true,
@@ -134,7 +137,7 @@ export const useAgentSettings = create<AgentSettingsState>()(
     }),
     {
       name: 'vrykell-agent-settings',
-      version: 7,
+      version: 8,
       migrate: (persisted: unknown, version: number) => {
         // v0/v1（平铺）→ 收进 global；v2（缺新字段）→ 补齐默认值
         let state: { global: AgentSettings; overrides: Record<string, Partial<ModelBehaviorSettings>> };

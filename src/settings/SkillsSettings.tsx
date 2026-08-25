@@ -6,22 +6,24 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronRight, Download, FileText, Folder, ShieldAlert, Trash2, X } from 'lucide-react';
+import { ChevronRight, Download, FileText, Folder, ShieldAlert, Store, Trash2, X } from 'lucide-react';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { fileOpenWith } from '../files/fs';
 import {
   listSkills, getSkill, removeSkill, installSkillMd, fetchRemoteSkills, importSkillsFromPath,
-  setSkillState, readSkillFile, type SkillMeta, type SkillDetail, type RemoteSkill,
+  setSkillState, readSkillFile, marketGithubList, marketGithubInstall,
+  type SkillMeta, type SkillDetail, type MarketSkill,
 } from '../agent/skills';
 import { useToastStore } from '../components/Toast';
 
 const toast = (msg: string, type: 'info' | 'success' | 'error') =>
   useToastStore.getState().addToast(msg, type);
 
-/** 预置技能市场（统一协议 vrykell-skills/v1 清单地址，可在输入框里改成任意地址） */
-const MARKETPLACES: { name: string; url: string }[] = [
-  { name: '官方市场', url: 'https://skills.vrykell.dev/marketplace.json' },
-  { name: '社区市场', url: 'https://raw.githubusercontent.com/vrykell/skills/main/marketplace.json' },
+/** 预置技能市场（GitHub 仓库，含 SKILL.md 的常见技能库） */
+const MARKETPLACES: { name: string; repo: string }[] = [
+  { name: 'anthropics/skills', repo: 'anthropics/skills' },
+  { name: 'agentskills/agentskills', repo: 'agentskills/agentskills' },
+  { name: 'magnus919/agent-skills', repo: 'magnus919/agent-skills' },
 ];
 
 // ── 样式 ──
@@ -244,20 +246,20 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
   onClose: () => void;
   onInstalled: () => void;
 }) {
-  const [marketUrl, setMarketUrl] = useState('');
-  const [remote, setRemote] = useState<RemoteSkill[]>([]);
+  const [repo, setRepo] = useState('');
+  const [remote, setRemote] = useState<MarketSkill[]>([]);
   const [browsing, setBrowsing] = useState(false);
   const [installing, setInstalling] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
 
   const browse = async () => {
-    const url = marketUrl.trim();
-    if (!url) return;
+    const r = repo.trim();
+    if (!r) return;
     setBrowsing(true);
     try {
-      const list = await fetchRemoteSkills(url);
+      const list = await marketGithubList(r);
       setRemote(list);
-      if (list.length === 0) toast('市场为空', 'info');
+      if (list.length === 0) toast('仓库中未找到技能', 'info');
     } catch (e) {
       toast(String((e as Error)?.message ?? e), 'error');
     } finally {
@@ -265,10 +267,10 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
     }
   };
 
-  const install = async (r: RemoteSkill) => {
+  const install = async (r: MarketSkill) => {
     setInstalling((s) => new Set(s).add(r.name));
     try {
-      await installSkillMd(r.name, r.description, r.prompt);
+      await marketGithubInstall(repo.trim(), r.dir);
       toast(`已安装 ${r.name}`, 'success');
       onInstalled();
     } catch (e) {
@@ -294,19 +296,23 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-        <select value={marketUrl} onChange={(e) => setMarketUrl(e.target.value)} style={{ ...input, flexShrink: 0, width: 130 }}>
+        <select
+          value={repo}
+          onChange={(e) => setRepo(e.target.value)}
+          style={{ ...input, flexShrink: 0, width: 170, appearance: 'none', cursor: 'pointer' }}
+        >
           <option value="">自定义…</option>
-          {MARKETPLACES.map((m) => <option key={m.name} value={m.url}>{m.name}</option>)}
+          {MARKETPLACES.map((m) => <option key={m.repo} value={m.repo}>{m.name}</option>)}
         </select>
         <input
-          value={marketUrl}
-          placeholder="市场清单 URL"
-          onChange={(e) => setMarketUrl(e.target.value)}
+          value={repo}
+          placeholder="GitHub 仓库，如 anthropics/skills"
+          onChange={(e) => setRepo(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') void browse(); }}
           style={input}
         />
         <button onClick={() => void browse()} disabled={browsing} style={{ ...btn, flexShrink: 0 }}>
-          {browsing ? '浏览中…' : '浏览'}
+          {browsing ? '加载中…' : '浏览'}
         </button>
       </div>
 
@@ -325,7 +331,7 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {remote.length === 0 && !browsing && (
           <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '8px 0' }}>
-            选择市场源并点「浏览」加载技能列表。
+            选择 GitHub 仓库并点「浏览」加载技能列表。
           </div>
         )}
         {visible.map((r) => {
@@ -335,8 +341,7 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12, fontWeight: 600 }}>
                   {r.name}
-                  {r.version ? <span style={{ color: 'var(--text-muted)', fontSize: 11 }}> v{r.version}</span> : null}
-                  {r.author ? <span style={{ color: 'var(--text-muted)', fontSize: 11 }}> · {r.author}</span> : null}
+                  <span style={{ color: 'var(--text-muted)', fontSize: 11 }}> · {r.dir}</span>
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>{r.description || '无描述'}</div>
               </div>
@@ -466,8 +471,8 @@ export default function SkillsSettings() {
         <button onClick={() => void doImportPath(false)} disabled={importing} style={{ ...btn, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
           <Download size={13} /> 导入压缩包
         </button>
-        <button onClick={() => setMarket((v) => !v)} style={{ ...btn, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <Download size={13} /> 市场
+        <button onClick={() => setMarket(true)} style={{ ...btn, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <Store size={13} /> 技能市场
         </button>
       </div>
 

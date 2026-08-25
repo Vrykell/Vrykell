@@ -9,7 +9,7 @@ test.describe('命令块链路', () => {
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
 
     // 切换到 AI 模式
-    await page.getByTitle(/切换到 AI 模式/).click();
+    await page.getByRole('button', { name: 'cmd' }).click();
     const input = page.getByPlaceholder(/自然语言描述/);
     await input.fill('给我个命令');
     await input.press('Enter');
@@ -32,7 +32,7 @@ test.describe('命令块链路', () => {
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
 
-    await page.getByTitle(/切换到 AI 模式/).click();
+    await page.getByRole('button', { name: 'cmd' }).click();
     const input = page.getByPlaceholder(/自然语言描述/);
     await input.fill('写代码');
     await input.press('Enter');

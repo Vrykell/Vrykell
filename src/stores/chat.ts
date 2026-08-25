@@ -39,6 +39,8 @@ export interface StreamHandlers {
   onToolEvent?: (run: ToolRun) => void;
   /** 思考流增量（reasoning-delta）；流式追加到回答的 reasoning 字段 */
   onReasoning?: (chunk: string) => void;
+  /** 上下文占用上报（压缩后自动变小，驱动圆环组件） */
+  onContextUsed?: (used: number, budget: number) => void;
 }
 
 export type StreamFn = (
@@ -66,6 +68,9 @@ interface ChatState {
   byTab: Record<string, ChatMessage[]>;
   /** 正在等待 AI 回复的标签页 id */
   sendingTab: string | null;
+  /** 上下文占用（tabId → 估算 token / 预算）；null=未知 */
+  contextUsed: Record<string, { used: number; budget: number } | null>;
+  setContextUsed: (tabId: string, used: number, budget: number) => void;
   /** 输入框草稿（侧栏可追加内容，如文件路径） */
   draft: string;
   setDraft: (text: string) => void;
@@ -155,6 +160,10 @@ export const useChatStore = create<ChatState>((set, get) => {
           onReasoning: (chunk) => {
             get().appendReasoning(tabId, assistantId, chunk);
           },
+          // 上下文占用：压缩后自动变小，驱动圆环组件
+          onContextUsed: (used, budget) => {
+            get().setContextUsed(tabId, used, budget);
+          },
         },
       });
     } catch (err) {
@@ -230,8 +239,11 @@ export const useChatStore = create<ChatState>((set, get) => {
   return {
   byTab: {},
   sendingTab: null,
+  contextUsed: {},
   draft: '',
   setDraft: (text) => set({ draft: text }),
+  setContextUsed: (tabId, used, budget) =>
+    set((s) => ({ contextUsed: { ...s.contextUsed, [tabId]: { used, budget } } })),
   appendDraft: (text) => set((s) => ({ draft: s.draft ? `${s.draft} ${text}` : text })),
   appendChunk: (tabId, id, chunk) =>
     set((s) => {
@@ -316,6 +328,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       byTab: { ...s.byTab, [tabId]: [...(s.byTab[tabId] ?? []), userMsg, assistantMsg] },
       sendingTab: tabId,
       draft: '',
+      contextUsed: { ...s.contextUsed, [tabId]: null },
     }));
     // 持久化用户消息（AI 对话是会话状态的一部分；用户消息无 parts）
     appendChatMessage(
@@ -424,4 +437,11 @@ export function usePaneMessages(paneId: string): ChatMessage[] {
   return useChatStore(
     useShallow((s) => (s.byTab[activeId] ?? EMPTY).filter((m) => m.paneId === paneId)),
   );
+}
+
+/** 当前活跃标签页的上下文占用（圆环组件用）。 */
+export function useContextUsage(): { used: number | null; budget: number | null } {
+  const activeId = useWorkspaceStore((s) => s.activeId);
+  const ctx = useChatStore((s) => s.contextUsed[activeId]);
+  return ctx ? { used: ctx.used, budget: ctx.budget } : { used: null, budget: null };
 }

@@ -43,6 +43,14 @@ export interface SkillTrustInfo {
   enabled: boolean;
 }
 
+/** GitHub 市场搜索结果。 */
+export interface MarketSkill {
+  name: string;
+  description: string;
+  /** 仓库内技能目录相对路径 */
+  dir: string;
+}
+
 export const listSkills = () => invoke<SkillMeta[]>('list_skills');
 export const getSkill = (name: string) => invoke<SkillDetail>('get_skill', { name });
 export const setSkillState = (name: string, trusted?: boolean, enabled?: boolean) =>
@@ -58,6 +66,12 @@ export const fetchRemoteSkills = (url: string) =>
   invoke<RemoteSkill[]>('fetch_skill_registry', { url });
 export const findSkillReference = (text: string) =>
   invoke<SkillTrustInfo | null>('find_skill_reference', { text });
+
+/** GitHub 市场：列出仓库内的技能。 */
+export const marketGithubList = (repo: string) => invoke<MarketSkill[]>('market_github_list', { repo });
+/** GitHub 市场：安装仓库内某目录的技能。 */
+export const marketGithubInstall = (repo: string, dir: string) =>
+  invoke<SkillMeta>('market_github_install', { repo, dir });
 
 /** 若文本/路径引用的是未信任技能，返回其名称；否则 null。 */
 export async function untrustedSkillFor(text: string): Promise<string | null> {

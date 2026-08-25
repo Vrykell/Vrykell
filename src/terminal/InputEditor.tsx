@@ -14,13 +14,14 @@
 
 import { useRef, useState, useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import {
-  ArrowUp, Bot, Brain, Columns2, GitBranch, Globe, Paperclip,
+  ArrowUp, Columns2, GitBranch, Paperclip,
   ShieldAlert, ShieldCheck, ShieldOff, Square, X, Zap,
 } from 'lucide-react';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { ptyWrite } from '../lib/pty';
 import { useTerminalStore } from '../stores/terminal';
 import { useChatStore } from '../stores/chat';
+import ContextRing from '../components/ContextRing';
 import { useUiStore } from '../stores/ui';
 import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
 import { leaves as layoutLeaves } from '../lib/windowLayout';
@@ -31,8 +32,7 @@ import { isInputBoxVisible, getLongRunningHint } from './inputVisibility';
 import { agentControl } from '../agent/agentControl';
 import { useAgentSettings } from '../agent/agentSettings';
 import { usePermissions } from '../agent/permissions';
-import { useAiConfigStore } from '../lib/ai';
-import { LIMITS, importFileAsAttachment, totalSize, type AttachmentMeta } from '../agent/attachments';
+import { LIMITS, importFileAsAttachment, totalSize, saveBlobAsAttachment, makePasteAttachment, type AttachmentMeta } from '../agent/attachments';
 import { completeCommand, localCompleteCandidates } from '../agent/complete';
 import { useHistoryStore } from '../stores/history';
 import { useDockStore } from '../stores/dock';
@@ -93,10 +93,6 @@ export default function InputEditor({
   const activeId = useWorkspaceStore((s) => s.activeId);
   const sendingHere = sendingTab !== null && sendingTab === activeId;
 
-  const agentSettings = useAgentSettings();
-  const activeModel = useAiConfigStore((s) => s.activeModel);
-  const eff = agentSettings.resolve(activeModel);
-
   const permMode = usePermissions((s) => s.mode);
   const setPermMode = usePermissions((s) => s.setMode);
 
@@ -115,6 +111,30 @@ export default function InputEditor({
       }
       return next;
     });
+  };
+
+  /** 粘贴/拖入的二进制（File）→ base64 → Rust 落盘（同聊天面板） */
+  const addBlobs = async (files: File[]) => {
+    const out: AttachmentMeta[] = [];
+    for (const f of files) {
+      if (f.type.startsWith('image/') && f.size > LIMITS.imageBytes) {
+        toastErr(`图片 ${f.name || '粘贴的图片'} 超过 5MB 上限`);
+        continue;
+      }
+      try {
+        const b64 = await new Promise<string>((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(String(r.result).split(',')[1] ?? '');
+          r.onerror = () => reject(r.error);
+          r.readAsDataURL(f);
+        });
+        const name = f.name || `pasted-${Date.now()}.png`;
+        out.push(await saveBlobAsAttachment(name, f.type || 'application/octet-stream', b64));
+      } catch (e) {
+        toastErr(String((e as Error)?.message ?? e));
+      }
+    }
+    addAtts(out);
   };
 
   /** 📎 选择文件（plugin-dialog 多选 → Rust 导入） */
@@ -431,75 +451,13 @@ export default function InputEditor({
           padding: '8px 12px 5px',
           boxShadow: '0 1px 4px rgba(0, 0, 0, 0.22)',
         }}
+        onDragOver={(e) => { if (aiMode) e.preventDefault(); }}
+        onDrop={(e) => {
+          if (!aiMode) return;
+          e.preventDefault();
+          void addBlobs(Array.from(e.dataTransfer.files));
+        }}
       >
-        {/* AI 快捷工具栏（仅 AI 模式）：联网/深思/Agent 开关 + 权限 + 附件，置于输入内容上方 */}
-        {aiMode && (
-          <div
-            style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              marginBottom: 2, paddingTop: 1, paddingBottom: 5,
-              userSelect: 'none',
-            }}
-          >
-            <QuickToggle
-              icon={Brain}
-              on={eff.deepThink}
-              title="深度思考（reasoning effort）"
-              onClick={() => agentSettings.updateModel(activeModel, { deepThink: !eff.deepThink })}
-            />
-            <QuickToggle
-              icon={Bot}
-              on={eff.agentMode}
-              title={eff.agentMode ? 'Agent 模式（可使用工具）' : '纯聊天（工具已关闭）'}
-              onClick={() => agentSettings.updateModel(activeModel, { agentMode: !eff.agentMode })}
-            />
-            <div style={{ flex: 1 }} />
-            {/* 权限模式切换（点击循环 标准→严格→放行） */}
-            {(() => {
-              const idx = PERM_MODES.findIndex((m) => m.id === permMode);
-              const cur = PERM_MODES[idx] ?? PERM_MODES[0]!;
-              const next = PERM_MODES[(idx + 1) % PERM_MODES.length]!;
-              const CurIcon = cur.icon;
-              return (
-                <button
-                  data-subtle
-                  title={cur.title}
-                  onClick={() => setPermMode(next.id)}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
-                    background: 'transparent', color: cur.color, cursor: 'pointer',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--button-hover)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                >
-                  <CurIcon size={13} />
-                </button>
-              );
-            })()}
-            {/* 📎 附件 */}
-            <button
-              data-subtle
-              title="添加附件（图片 / 文件）"
-              onClick={() => void pickFiles()}
-              style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
-                background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'var(--button-hover)';
-                e.currentTarget.style.color = 'var(--text-secondary)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent';
-                e.currentTarget.style.color = 'var(--text-muted)';
-              }}
-            >
-              <Paperclip size={13} />
-            </button>
-          </div>
-        )}
 
         {/* 附件 chips（仅 AI 模式，随发送清空） */}
         {aiMode && atts.length > 0 && (
@@ -568,6 +526,21 @@ export default function InputEditor({
                 setText(e.target.value);
                 e.target.style.height = 'auto';
                 e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+              }}
+              onPaste={(e) => {
+                // AI 模式：图片/文件粘贴为附件；长文本折叠为 chip
+                if (!aiMode) return;
+                const files = Array.from(e.clipboardData.files);
+                if (files.length > 0) {
+                  e.preventDefault();
+                  void addBlobs(files);
+                  return;
+                }
+                const t = e.clipboardData.getData('text/plain');
+                if (t && t.length > LIMITS.pasteFoldChars) {
+                  e.preventDefault();
+                  addAtts([makePasteAttachment(t)]);
+                }
               }}
               onKeyDown={(e) => {
                 // ↑/↓ 翻命令历史（cmd 模式 + 单行；fish 式按当前前缀过滤）
@@ -667,9 +640,13 @@ export default function InputEditor({
             )}
           </div>
 
-          {/* 发送/停止按钮（仅 AI 模式）：流式中当前 tab 变 ⏹ */}
-          {aiMode &&
-            (sendingHere ? (
+          {/* 上下文占用 + 发送/停止按钮（仅 AI 模式） */}
+          {aiMode && (
+            <>
+              <span style={{ marginRight: 6, display: 'inline-flex', alignItems: 'center' }}>
+                <ContextRing />
+              </span>
+              {sendingHere ? (
               <button
                 data-subtle
                 title="停止生成"
@@ -702,7 +679,9 @@ export default function InputEditor({
               >
                 <ArrowUp size={13} />
               </button>
-            ))}
+            )}
+            </>
+          )}
         </div>
 
         {/* 底部状态栏 — shell · CWD · git分支 | cmd/AI pill · 分裂 · 关闭 */}
@@ -754,58 +733,71 @@ export default function InputEditor({
           >
             {aiMode ? 'AI' : 'cmd'}
           </button>
-          <InputActionBtn title="选择类型分裂" onClick={() => useUiStore.getState().openSplitPicker()}>
-            <Columns2 size={13} />
-          </InputActionBtn>
-          <InputActionBtn title="关闭当前终端" onClick={() => useWorkspaceStore.getState().closeTerminal(paneId)}>
-            <X size={13} />
-          </InputActionBtn>
+          {!aiMode && (
+            <>
+              <InputActionBtn title="选择类型分裂" onClick={() => useUiStore.getState().openSplitPicker()}>
+                <Columns2 size={13} />
+              </InputActionBtn>
+              <InputActionBtn title="关闭当前终端" onClick={() => useWorkspaceStore.getState().closeTerminal(paneId)}>
+                <X size={13} />
+              </InputActionBtn>
+            </>
+          )}
+          {aiMode && (
+            <>
+              {(() => {
+                const idx = PERM_MODES.findIndex((m) => m.id === permMode);
+                const cur = PERM_MODES[idx] ?? PERM_MODES[0]!;
+                const next = PERM_MODES[(idx + 1) % PERM_MODES.length]!;
+                const CurIcon = cur.icon;
+                return (
+                  <button
+                    data-subtle
+                    title={cur.title}
+                    onClick={() => setPermMode(next.id)}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
+                      background: 'transparent', color: cur.color, cursor: 'pointer',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--button-hover)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    <CurIcon size={13} />
+                  </button>
+                );
+              })()}
+              <button
+                data-subtle
+                title="添加附件（图片 / 文件，也可直接粘贴或拖入）"
+                onClick={() => void pickFiles()}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
+                  background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--button-hover)';
+                  e.currentTarget.style.color = 'var(--text-secondary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = 'var(--text-muted)';
+                }}
+              >
+                <Paperclip size={13} />
+              </button>
+            </>
+          )}
         </div>
       </div>
+
     </div>
   );
 }
 
-// ── AI 快捷开关（联网/深思/Agent，与 PanelChat 顶栏同款） ──
-
-function QuickToggle({ icon: Icon, on, title, onClick }: {
-  icon: typeof Globe;
-  on: boolean;
-  title: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      data-subtle
-      title={title}
-      onClick={onClick}
-      style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
-        background: 'transparent',
-        color: on ? 'var(--accent-warm)' : 'var(--text-muted)', cursor: 'pointer',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'var(--button-hover)';
-        e.currentTarget.style.color = on ? 'var(--accent-warm)' : 'var(--text-secondary)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'transparent';
-        e.currentTarget.style.color = on ? 'var(--accent-warm)' : 'var(--text-muted)';
-      }}
-    >
-      <Icon size={13} />
-    </button>
-  );
-}
-
-// ── 操作按钮 ──
-
-function InputActionBtn({
-  title,
-  onClick,
-  children,
-}: {
+/** 输入栏小按钮（状态栏右侧：分裂/关闭） */
+function InputActionBtn({ title, onClick, children }: {
   title: string;
   onClick: () => void;
   children: React.ReactNode;
@@ -816,19 +808,9 @@ function InputActionBtn({
       title={title}
       onClick={onClick}
       style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: 24,
-        height: 24,
-        padding: 0,
-        border: 'none',
-        borderRadius: 4,
-        background: 'transparent',
-        color: 'var(--text-muted)',
-        fontSize: 12,
-        cursor: 'pointer',
-        flexShrink: 0,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
+        background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', flexShrink: 0,
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = 'var(--button-hover)';

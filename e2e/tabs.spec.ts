@@ -11,7 +11,7 @@ test.describe('多标签工作区', () => {
     await page.goto('/');
 
     // 切换到 AI 模式并发消息
-    await page.getByTitle(/AI 模式/).click();
+    await page.getByRole('button', { name: 'cmd' }).click();
     const input = page.getByPlaceholder(/自然语言描述/);
     await input.fill('第一标签的问题');
     await input.press('Enter');

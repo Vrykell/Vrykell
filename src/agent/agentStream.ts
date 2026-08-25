@@ -137,6 +137,15 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   ]
     .filter(Boolean)
     .join('\n\n');
+  // 上下文占用上报：压缩后 kept 变小 → 圆环自动减小
+  if (ctx?.handlers?.onContextUsed) {
+    let used = 0;
+    for (const m of plan.messages) {
+      used += estimateTokens(typeof m.content === 'string' ? m.content : '');
+    }
+    if (systemPrompt) used += estimateTokens(systemPrompt);
+    ctx.handlers.onContextUsed(used, settings.contextMaxTokens > 0 ? settings.contextMaxTokens : 0);
+  }
   const modelMessages: ModelMessage[] = plan.messages;
 
   // 工具调用账本：tool-result/tool-error 事件重建完整 ToolRun 需要
@@ -213,12 +222,12 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     abortSignal: ctx?.signal,
     // M6 深思考：providerOptions 透传（openai-compatible → reasoning_effort）。
     // anthropic thinking 要求 maxOutputTokens > budgetTokens(8000)。
-    providerOptions: settings.deepThink ? deepThinkProviderOptions(info.provider) : undefined,
+    providerOptions: settings.deepThink ? deepThinkProviderOptions(info.provider, settings.thinkingLevel) : undefined,
     maxOutputTokens:
       settings.maxOutputTokens > 0
         ? settings.maxOutputTokens
         : settings.deepThink && info.provider === 'anthropic'
-          ? 16000
+          ? (settings.thinkingLevel === 'low' ? 8000 : settings.thinkingLevel === 'medium' ? 16000 : 32000)
           : undefined,
     temperature: settings.temperature != null ? settings.temperature : undefined,
     onError: ({ error }) => {

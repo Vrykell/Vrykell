@@ -81,6 +81,19 @@ export function AiBehaviorPage() {
       <Field title="深度思考" description="提高推理强度，适合复杂问题。">
         <Toggle on={eff.deepThink} onChange={(v) => update({ deepThink: v })} />
       </Field>
+      {eff.deepThink && (
+        <Field title="思考强度" description="控制推理预算：低更省、高更深入。">
+          <Segmented
+            options={[
+              { value: 'low', label: '低' },
+              { value: 'medium', label: '中' },
+              { value: 'high', label: '高' },
+            ]}
+            value={eff.thinkingLevel ?? 'high'}
+            onChange={(v) => update({ thinkingLevel: v as 'low' | 'medium' | 'high' })}
+          />
+        </Field>
+      )}
       <Field title="最大迭代步数" description="Agent 一次回答最多调用多少轮工具；1–100。">
         <NumberInput value={eff.maxSteps} min={1} max={100} onChange={(v) => update({ maxSteps: v })} />
       </Field>

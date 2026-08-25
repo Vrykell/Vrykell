@@ -82,6 +82,8 @@ pub fn run() {
             agent::agents::save_agent,
             agent::agents::remove_agent,
             agent::agents::get_agent,
+            agent::skills::market_github_list,
+            agent::skills::market_github_install,
             agent::schedules::list_schedules,
             agent::schedules::save_schedule,
             agent::schedules::remove_schedule,
