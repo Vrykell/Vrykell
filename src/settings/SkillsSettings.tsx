@@ -142,7 +142,7 @@ function SkillFileBrowser({ skillName, files }: { skillName: string; files: stri
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-inner)', overflow: 'auto', maxHeight: 180 }}>
+      <div style={{ borderRadius: 'var(--radius-inner)', overflow: 'auto', maxHeight: 180, background: 'var(--canvas)' }}>
         {render(tree, 0)}
       </div>
       {selected && (
@@ -321,7 +321,7 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
           value={query}
           placeholder="搜索技能…"
           onChange={(e) => setQuery(e.target.value)}
-          style={input}
+          style={{ ...input, border: 'none', background: 'transparent' }}
         />
         <span style={{ fontSize: 11, color: 'var(--text-muted)', alignSelf: 'center', flexShrink: 0 }}>
           {remote.length > 0 ? `共 ${remote.length} 个` : ''}
@@ -337,7 +337,7 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
         {visible.map((r) => {
           const installed = metas.some((m) => m.name === r.name);
           return (
-            <div key={r.name} style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-inner)', padding: '8px 12px', background: 'var(--canvas)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div key={r.name} style={{ borderRadius: 'var(--radius-inner)', padding: '8px 12px', background: 'var(--canvas)', display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12, fontWeight: 600 }}>
                   {r.name}
@@ -495,7 +495,7 @@ export default function SkillsSettings() {
           key={m.name}
           onClick={() => void openDetail(m.name)}
           style={{
-            border: '1px solid var(--border)', borderRadius: 'var(--radius-inner)',
+            borderRadius: 'var(--radius-inner)',
             padding: '8px 12px', background: 'var(--canvas)', cursor: 'pointer',
             opacity: m.enabled ? 1 : 0.55,
           }}

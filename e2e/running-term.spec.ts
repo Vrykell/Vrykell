@@ -147,7 +147,7 @@ test('块终端是深色圆角盒子：el 底色 --xterm-bg + 圆角，裁剪落
       cropOnInner: /px$/.test(inner.style.height) && !/px$/.test(el.style.height),
     };
   });
-  expect(probe.innerBg).toBe('rgb(5, 5, 5)'); // --xterm-bg #050505
+  expect(probe.innerBg).toBe('rgb(10, 10, 10)'); // --xterm-bg #0A0A0A
   expect(parseFloat(probe.innerRadius)).toBeGreaterThanOrEqual(6);
   expect(probe.viewportBg).toBe('rgba(0, 0, 0, 0)'); // 滚动条侧条不露 #000
   expect(probe.cropOnInner).toBe(true);

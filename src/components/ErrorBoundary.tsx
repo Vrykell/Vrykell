@@ -111,7 +111,7 @@ function DefaultFallback({
         style={{
           marginTop: 8, padding: '8px 24px', fontSize: 13,
           background: 'var(--accent)', border: 'none', borderRadius: 6,
-          color: '#0d0d0d', cursor: 'pointer',
+          color: 'var(--accent-text)', cursor: 'pointer',
         }}
       >
         重试

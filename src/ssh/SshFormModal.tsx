@@ -235,7 +235,7 @@ export default function SshFormModal({ open, initial, onClose }: Props) {
           <button onClick={doSave} data-testid="ssh-save-btn" style={{
             padding: '6px 16px', fontSize: 12, border: 'none',
             borderRadius: 'var(--radius-inner)', background: 'var(--accent)',
-            color: '#0d0d0d', cursor: 'pointer',
+            color: 'var(--accent-text)', cursor: 'pointer',
           }}>
             保存
           </button>

@@ -132,7 +132,7 @@ export default function ModelPill() {
               cursor: 'pointer',
             }}
           >
-            <Icon size={15} style={{ color: 'var(--accent-warm)', flexShrink: 0 }} />
+            <Icon size={15} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
             <span
               style={{
                 fontSize: 12, fontWeight: 500, color: 'var(--text-primary)',

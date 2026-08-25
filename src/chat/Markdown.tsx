@@ -41,7 +41,7 @@ export default function Markdown({ content }: { content: string }) {
       remarkPlugins={[remarkGfmSafe, remarkMath, remarkStandaloneMathDisplay]}
       // throwOnError: false — AI 回答里的 `$` 片段（如 `$ make test`）常被 remark-math
       // 误判为公式；KaTeX 抛错会击穿 SafeMarkdown。容错模式下原样显示源码。
-      rehypePlugins={[[rehypeKatex, { throwOnError: false, errorColor: '#bc362a' }]]}
+      rehypePlugins={[[rehypeKatex, { throwOnError: false, errorColor: '#C05A4A' }]]}
       components={{ pre: (props) => <CommandBlock {...props} /> }}
     >
       {content}

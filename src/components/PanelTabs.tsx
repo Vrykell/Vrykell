@@ -206,7 +206,7 @@ export default function PanelTabs() {
       }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 5, flex: 1, minWidth: 0,
-          background: 'var(--canvas)', border: '1px solid var(--border)',
+          background: 'var(--canvas)',
           borderRadius: 'var(--radius-inner)', padding: '0 6px', height: 24,
         }}>
           <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
@@ -554,13 +554,10 @@ function TabRow({
   const inGroup = groupId != null;
   const outerBg = (!inGroup && (active || hovered)) ? 'var(--tab-hover)' : 'transparent';
   let innerBg = 'transparent';
-  let innerBorder = '1px solid transparent';
   if (highlight) {
     innerBg = 'var(--tab-hover)';
-    innerBorder = '1px dashed var(--tab-active-border)';
   } else if (active) {
     innerBg = 'var(--tab-active)';
-    innerBorder = '1px solid var(--tab-active-border)';
   } else if (hovered) {
     innerBg = 'var(--tab-hover)';
   }
@@ -588,9 +585,8 @@ function TabRow({
         padding: 8,
         borderRadius: 'var(--tab-radius)',
         background: innerBg,
-        border: innerBorder,
         color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-        transition: 'background 0.12s ease, border-color 0.12s ease',
+        transition: 'background 0.12s ease',
       }}>
         <span style={{
           width: 24, height: 24, borderRadius: 6, flexShrink: 0,

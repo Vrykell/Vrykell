@@ -145,7 +145,7 @@ function AgentCard({ a, onChanged }: { a: AgentDef; onChanged: () => void }) {
     onChanged();
   };
   return (
-    <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-inner)', padding: '10px 12px', background: 'var(--canvas)' }}>
+    <div style={{ borderRadius: 'var(--radius-inner)', padding: '10px 12px', background: 'var(--canvas)' }}>
       <div style={{ display: 'flex', gap: 8 }}>
         <input value={name} placeholder="名称" onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, flex: 1, fontWeight: 600 }} />
         <button onClick={() => void save()} style={btnStyle}>保存</button>
@@ -205,7 +205,7 @@ function ScheduleCard({ s, onChanged }: { s: Schedule; onChanged: () => void }) 
   };
   const nextRun = s.lastRunAt ? s.lastRunAt + s.intervalMinutes * 60_000 : Date.now();
   return (
-    <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-inner)', padding: '10px 12px', background: 'var(--canvas)', opacity: enabled ? 1 : 0.55 }}>
+    <div style={{ borderRadius: 'var(--radius-inner)', padding: '10px 12px', background: 'var(--canvas)', opacity: enabled ? 1 : 0.55 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <input value={name} placeholder="名称" onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, flex: 1, fontWeight: 600 }} />
         <input type="number" min={1} value={interval} onChange={(e) => setIntervalM(Number(e.target.value))} style={{ ...inputStyle, width: 70, flexShrink: 0 }} />

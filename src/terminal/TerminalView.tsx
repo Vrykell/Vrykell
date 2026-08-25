@@ -217,7 +217,7 @@ function LayoutTree(props: {
   const secondInner: InnerEdges = dir === 'row' ? { ...inner, left: true } : { ...inner, top: true };
 
   return (
-    <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: dir === 'row' ? 'row' : 'column', background: 'var(--surface)' }}>
+    <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: dir === 'row' ? 'row' : 'column', background: 'var(--canvas)' }}>
       <div style={{ flexBasis: `${ratio * 100}%`, flexGrow: 0, flexShrink: 0, minWidth: 0, minHeight: 0, display: 'flex' }}>
         <LayoutTree node={node.first} windowId={windowId} focusedTermId={focusedTermId} setSession={setSession} setFocusedPane={setFocusedPane} setRatioNode={setRatioNode} onPaneContextMenu={onPaneContextMenu} inner={firstInner} />
       </div>
@@ -329,7 +329,7 @@ function TerminalPane(props: {
       onContextMenu={(e) => { setFocusedPane(terminal.id); onContextMenu(e); }}
       style={{
         flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column',
-        position: 'relative', background: 'var(--surface)',
+        position: 'relative', background: 'var(--canvas)',
         // 只在「面向其它终端」的边上画线，外缘不画 —— 避免与侧栏的 1px 边框叠加成重线
         borderTop: inner.top ? `1px solid ${focused ? 'var(--border-strong)' : 'var(--border)'}` : 'none',
         borderBottom: inner.bottom ? `1px solid ${focused ? 'var(--border-strong)' : 'var(--border)'}` : 'none',
@@ -591,7 +591,7 @@ function PaneBlockList({ paneId, insetLeft = 8, insetRight = 8 }: { paneId: stri
   const snap = useFollowBottom(scrollRef, [blocks]);
   useEffect(() => registerFollowEngager(paneId, snap), [paneId, snap]);
   return (
-    <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--surface)' }}>
+    <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--canvas)' }}>
       <div style={{ paddingBottom: 8 }}>
         <TerminalBlockList tabId={paneId} insetLeft={insetLeft} insetRight={insetRight} />
         <PaneEmptyHint paneId={paneId} />

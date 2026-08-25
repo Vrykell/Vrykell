@@ -82,7 +82,7 @@ export default function PanelSsh() {
       }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 5, flex: 1, minWidth: 0,
-          background: 'var(--canvas)', border: '1px solid var(--border)',
+          background: 'var(--canvas)',
           borderRadius: 'var(--radius-inner)', padding: '0 6px', height: 24,
         }}>
           <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
