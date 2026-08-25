@@ -35,7 +35,8 @@ test.describe('技能设置页', () => {
     await row.getByRole('button', { name: '信任' }).click();
     await expect(row.getByText('已信任', { exact: true })).toBeVisible();
     await row.getByRole('button', { name: '启用' }).click();
-    await expect(row.getByText('禁用', { exact: true })).toHaveCount(0);
+    // 启用后按钮文本变「禁用」；未信任徽标消失
+    await expect(row.getByRole('button', { name: '禁用' })).toBeVisible();
     const ops = await skillOps(page);
     expect(ops).toContainEqual(expect.objectContaining({ op: 'set_state', name: '旧脚本技能', trusted: true }));
     expect(ops).toContainEqual(expect.objectContaining({ op: 'set_state', name: '旧脚本技能', enabled: true }));
@@ -79,16 +80,18 @@ test.describe('技能设置页', () => {
     await expect(page.getByText('github-skill-1')).toBeVisible({ timeout: 5000 });
     await expect(page.getByText('github-skill-2')).toBeVisible();
     // 安装第一个
-    const item = rowOf('github-skill-1')(page);
-    await item.getByRole('button', { name: '安装' }).click();
+    // 列表第一项的安装按钮即 github-skill-1（列表顺序与 mock 一致）
+    const installBtn = page.locator('section').getByRole('button', { name: '安装' }).first();
+    await installBtn.click();
     await expect(page.getByText('已安装 github-skill-1')).toBeVisible();
-    await expect(item.getByText('已安装', { exact: true })).toBeVisible();
+    await expect(page.locator('section').getByText('已安装', { exact: true }).first()).toBeVisible();
     const ops = await skillOps(page);
     expect(ops).toContainEqual(expect.objectContaining({ op: 'market_install', name: 'github-skill-1' }));
-    // 市场内搜索过滤
+    // 市场内搜索过滤（等安装 toast 消失，避免文本干扰）
+    await expect(page.getByText('已安装 github-skill-1')).toHaveCount(0, { timeout: 5000 });
     await page.getByPlaceholder('搜索技能…').fill('skill-2');
-    await expect(page.getByText('github-skill-1', { exact: true })).toHaveCount(0);
-    await expect(page.getByText('github-skill-2', { exact: true })).toBeVisible();
+    await expect(page.getByText('GitHub 操作技能', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('第二个仓库技能', { exact: true })).toBeVisible();
   });
 
   test('URL 导入：批量安装远程技能', async ({ page }) => {

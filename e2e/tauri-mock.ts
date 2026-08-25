@@ -32,7 +32,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     { id: 'm-main', name: '主力模型', provider: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', model: 'claude-sonnet-5' },
     { id: 'm-local', name: '本地模型', provider: 'openai-compatible', baseUrl: 'http://127.0.0.1:11434/v1', model: 'qwen2.5' },
   ];
-  const seedActive = opts.aiActive ?? '';
+  const seedActive = opts.aiActive ?? 'm-local';
   const seedSkills = opts.skills ?? [
     { name: '写单测', description: '为代码写单元测试', source: 'local', trusted: true, enabled: true, hasScripts: false, modified: false, files: ['SKILL.md'], dir: '/home/e2e/.vrykell/skills/写单测', prompt: '先看代码，再写 vitest 单测。' },
     { name: '旧脚本技能', description: '遗留技能，含脚本', source: 'market', trusted: false, enabled: false, hasScripts: true, modified: true, files: ['SKILL.md', 'scripts/run.sh', 'references/说明.md'], dir: '/home/e2e/.vrykell/skills/旧脚本技能', prompt: '运行 scripts/run.sh 完成工作。' },
@@ -255,6 +255,41 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
       return '';
     }
 
+    function buildOpenAiSse(text: string): string {
+      const pieces: string[] = [];
+      for (let i = 0; i < text.length; i += 24) pieces.push(text.slice(i, i + 24));
+      const lines = [
+        'data: {"id":"chatcmpl-1","object":"chat.completion.chunk","model":"gpt-4o-mini","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}',
+      ];
+      for (const p of pieces) {
+        lines.push(`data: {"id":"chatcmpl-1","object":"chat.completion.chunk","model":"gpt-4o-mini","choices":[{"index":0,"delta":{"content":${JSON.stringify(p)},"role":"assistant"},"finish_reason":null}]}`);
+      }
+      lines.push('data: {"id":"chatcmpl-1","object":"chat.completion.chunk","model":"gpt-4o-mini","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}');
+      lines.push('data: [DONE]');
+      return lines.join('\n\n') + '\n\n';
+    }
+
+    function buildAnthropicSse(text: string): string {
+      const start = {
+        type: 'message_start',
+        message: { id: 'msg_01', type: 'message', role: 'assistant', content: [], model: 'claude-sonnet-5', stop_reason: null, stop_sequence: null, usage: { input_tokens: 10, output_tokens: 1 } },
+      };
+      const blockStart = { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } };
+      const pieces: string[] = [];
+      for (let i = 0; i < text.length; i += 24) pieces.push(text.slice(i, i + 24));
+      const lines = [
+        `event: message_start\ndata: ${JSON.stringify(start)}`,
+        `event: content_block_start\ndata: ${JSON.stringify(blockStart)}`,
+      ];
+      for (const p of pieces) {
+        lines.push(`event: content_block_delta\ndata: ${JSON.stringify({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: p } })}`);
+      }
+      lines.push(`event: content_block_stop\ndata: ${JSON.stringify({ type: 'content_block_stop', index: 0 })}`);
+      lines.push(`event: message_delta\ndata: ${JSON.stringify({ type: 'message_delta', delta: { stop_reason: 'end_turn', stop_sequence: null }, usage: { output_tokens: 20 } })}`);
+      lines.push('event: message_stop\ndata: {"type":"message_stop"}');
+      return lines.join('\n\n') + '\n\n';
+    }
+
     (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {
       metadata: { currentWindow: { label: 'main' }, windows: [{ label: 'main' }] },
       transformCallback: (cb: (r: unknown) => void, once = false) => {
@@ -319,29 +354,37 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
           case 'llm_stream': {
             // AI SDK 代理流：后端侧是「按回调 id 推事件」；浏览器 mock 等价于
             // 调 window[`_${id}`]({ index, message })，Channel 内部按 index 保序 + end 清理。
+            // 按请求 URL 区分 Anthropic / OpenAI 的 SSE 格式。
             const raw = args.onEvent as unknown;
             const idStr =
               typeof raw === 'string' ? raw : ((raw as { toJSON?: () => string })?.toJSON?.() ?? String(raw));
             const m = /__CHANNEL__:(\d+)/.exec(idStr);
             const cbId = m ? Number(m[1]) : null;
             const text = (window as unknown as Record<string, string>).__AI_REPLY__ ?? '';
+            const url = (args.req as { url?: string })?.url ?? '';
+            searchCalls.push({ cmd: 'llm_stream', args: { url, method: (args.req as { method?: string })?.method } });
+            const isAnthropic = /anthropic|\/v1\/messages/.test(url);
+            // generateText 走非流式 JSON；streamText 走 SSE（请求体带 "stream":true）
+            const reqBody = (args.req as { body?: string })?.body ?? '';
+            const wantsStream = /"stream"\s*:\s*true/.test(reqBody);
             setTimeout(() => {
               if (cbId === null) return;
               const win = window as unknown as Record<string, (msg: { index: number; message?: unknown; end?: boolean }) => void>;
               let idx = 0;
               const send = (message: unknown) => win[`_${cbId}`]?.({ index: idx++, message });
-              send({ kind: 'started', status: 200, headers: [['content-type', 'text/event-stream']] });
-              const pieces: string[] = [];
-              for (let i = 0; i < text.length; i += 24) pieces.push(text.slice(i, i + 24));
-              const lines = [
-                'data: {"id":"chatcmpl-1","object":"chat.completion.chunk","model":"gpt-4o-mini","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}',
-              ];
-              for (const p of pieces) {
-                lines.push(`data: {"id":"chatcmpl-1","object":"chat.completion.chunk","model":"gpt-4o-mini","choices":[{"index":0,"delta":{"content":${JSON.stringify(p)},"role":"assistant"},"finish_reason":null}]}`);
+              let body: string;
+              if (!wantsStream) {
+                send({ kind: 'started', status: 200, headers: [['content-type', 'application/json']] });
+                const completion = {
+                  id: 'chatcmpl-1', object: 'chat.completion', model: 'gpt-4o-mini',
+                  choices: [{ index: 0, message: { role: 'assistant', content: text }, finish_reason: 'stop' }],
+                  usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+                };
+                body = JSON.stringify(completion);
+              } else {
+                send({ kind: 'started', status: 200, headers: [['content-type', 'text/event-stream']] });
+                body = isAnthropic ? buildAnthropicSse(text) : buildOpenAiSse(text);
               }
-              lines.push('data: {"id":"chatcmpl-1","object":"chat.completion.chunk","model":"gpt-4o-mini","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}');
-              lines.push('data: [DONE]');
-              const body = lines.join('\n\n') + '\n\n';
               const b64 = btoa(unescape(encodeURIComponent(body)));
               for (let i = 0; i < b64.length; i += 64) {
                 send({ kind: 'chunk', data: b64.slice(i, i + 64) });
@@ -450,7 +493,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             return meta;
           }
           case 'read_skill_file':
-            return `# ${args.relativePath}\n这是技能文件 ${args.name} 的内容。`;
+            return `# ${args.relativePath}\n这是技能文件 ${args.name}/${args.relativePath} 的内容。`;
           case 'fetch_skill_registry':
             return [
               { name: '远程技能A', description: '来自 URL 的技能', prompt: '步骤…' },
@@ -605,6 +648,12 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
           case 'clear_history':
             historyEntries.length = 0;
             return undefined;
+          case 'save_attachment':
+            return { id: `att-${Date.now()}`, name: args.name as string, path: `/home/e2e/.vrykell/attachments/${args.name}`, size: 123, mime: 'image/png' };
+          case 'import_attachment':
+            return { id: `att-${Date.now()}`, name: (args.path as string).split('/').pop() ?? 'file', path: args.path as string, size: 123, mime: 'application/octet-stream' };
+          case 'read_attachment':
+            return 'data:image/png;base64,aW1n';
           case 'fs_roots':
             return [
               { name: 'Documents', path: '/home/e2e/Documents', is_dir: true },

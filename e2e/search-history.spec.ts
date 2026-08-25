@@ -34,6 +34,7 @@ test.describe('全局搜索（Cmd+F）', () => {
   test('搜索触发各来源后端并渲染结果', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
+    await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
     await page.keyboard.press('Meta+f');
     const box = page.getByPlaceholder('搜索文件、命令、设置…');
     await expect(box).toBeVisible({ timeout: 5000 });
@@ -64,7 +65,8 @@ test.describe('命令历史（↑/↓ 翻历史）', () => {
     await expect(input).toHaveValue('git status');
     await input.press('ArrowDown');
     await expect(input).toHaveValue('git st');
-    // Esc 清空
+    // Esc 先清补全 ghost，再按一次清空文本
+    await input.press('Escape');
     await input.press('Escape');
     await expect(input).toHaveValue('');
   });

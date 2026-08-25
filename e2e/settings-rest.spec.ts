@@ -3,7 +3,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { setupTauriMock, themeConfig, aiKeyCalls } from './tauri-mock';
-import { gotoSetting, fieldOf } from './settings';
+import { gotoSetting, fieldOf, rowOf } from './settings';
 
 test.beforeEach(async ({ page }) => {
   await setupTauriMock(page);
@@ -50,7 +50,7 @@ test.describe('打开方式设置页', () => {
     await expect(page.locator('section').getByText('Zsh', { exact: true })).toBeVisible();
     await expect(page.locator('section').getByText('CMD', { exact: true })).toBeVisible();
     // Zsh 行切经典
-    const zshRow = fieldOf(page, '各 Shell 打开模式').locator('div').filter({ hasText: 'Zsh' }).first();
+    const zshRow = rowOf(page, 'Zsh');
     await zshRow.getByRole('button', { name: '经典模式' }).click();
     const saved = await page.evaluate(() => localStorage.getItem('vrykell-agent-settings') ?? '');
     expect(saved).toContain('"zsh":"classic"');
@@ -71,20 +71,20 @@ test.describe('快捷键说明页', () => {
 test.describe('网络搜索页', () => {
   test('搜索方式显示与 Tavily Key 保存/清除', async ({ page }) => {
     await gotoSetting(page, '网络搜索');
-    await expect(page.getByText('DuckDuckGo 兜底')).toBeVisible();
-    await expect(page.getByText('未配置')).toBeVisible();
+    await expect(page.getByText('DuckDuckGo 兜底', { exact: true })).toBeVisible();
+    await expect(page.getByText('未配置', { exact: true })).toBeVisible();
 
     const keyField = fieldOf(page, 'Tavily API Key');
     await keyField.getByPlaceholder(/输入 Tavily API Key/).fill('tv-e2e');
     await keyField.getByRole('button', { name: '保存' }).click();
     await expect(page.getByText('已保存 Tavily Key')).toBeVisible();
-    await expect(page.getByText('已配置')).toBeVisible();
+    await expect(page.getByText('已配置', { exact: true })).toBeVisible();
     const calls = await aiKeyCalls(page);
     expect(calls.some((c) => c.provider === 'tavily' && c.key === 'tv-e2e')).toBe(true);
 
     await keyField.getByRole('button', { name: '清除' }).click();
     await expect(page.getByText('已清除 Tavily Key')).toBeVisible();
-    await expect(keyField.getByText('未配置')).toBeVisible();
+    await expect(keyField.getByText('未配置', { exact: true })).toBeVisible();
   });
 });
 
@@ -92,13 +92,12 @@ test.describe('模型权限页', () => {
   test('工具权限分级切换持久化', async ({ page }) => {
     await gotoSetting(page, '模型权限');
     // 执行终端命令 → 禁止
-    const permField = fieldOf(page, '工具权限');
-    const runRow = permField.locator('div').filter({ hasText: '执行终端命令' }).first();
+    const runRow = rowOf(page, '执行终端命令');
     await runRow.getByRole('button', { name: '禁止' }).click();
     let saved = await page.evaluate(() => localStorage.getItem('vrykell-permissions') ?? '');
     expect(saved).toContain('"run_command":"deny"');
     // 联网搜索 → 每次询问
-    const webRow = permField.locator('div').filter({ hasText: '联网搜索' }).first();
+    const webRow = rowOf(page, '联网搜索');
     await webRow.getByRole('button', { name: '每次询问' }).click();
     saved = await page.evaluate(() => localStorage.getItem('vrykell-permissions') ?? '');
     expect(saved).toContain('"web_search":"ask"');
