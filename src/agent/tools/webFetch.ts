@@ -1,6 +1,6 @@
 /**
  * webFetch — 一等联网工具（与 read_file/edit_file 同级，不依赖「联网搜索」开关）。
- *   - web_search：DuckDuckGo HTML 抓取（联网搜索兜底，受 webSearch 开关控制）。
+ *   - web_search：DuckDuckGo HTML 抓取（联网搜索无 key 兜底）。
  *   - web_fetch：抓取任意 URL → 结构化 Markdown 文本（标题/层级/链接保留结构）。
  *   - web_crawl：从起始 URL 广度优先爬取多页（同域、限深度/页数），逐页结构化。
  *

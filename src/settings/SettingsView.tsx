@@ -12,7 +12,8 @@ import {
 } from '../lib/ai';
 import type { ProviderKind } from '../agent/provider';
 import { useAgentSettings, type AgentSettings, type ModelBehaviorSettings } from '../agent/agentSettings';
-import { useSkills } from '../agent/skills';
+import SkillsSettings from './SkillsSettings';
+import { MemorySettings, AgentsSettings, SchedulesSettings } from './AgentExtrasSettings';
 import {
   listMcpServers, saveMcpServer, removeMcpServer, toggleMcpServer,
   connectMcp, disconnectMcp, type McpServer,
@@ -41,14 +42,18 @@ const PERM_TOOL_LABEL: Record<ToolName, string> = {
   read_terminal: '读取终端画面',
   terminal_keys: '向终端发送按键',
   use_skill: '调用技能',
+  install_skill: '安装技能',
   mcp: 'MCP 服务器工具',
+  memory: '写入记忆',
+  schedule: '管理定时任务',
+  subagent: '委派子代理',
 };
 
 // ── 设置页结构 ──
 // 外层 = 按功能划分的组（大菜单，可展开）；内层 = 细分设置页（小菜单）。
 // 每个设置页内再放多个相关的具体配置项。
 
-type PageId = 'ai-model' | 'ai-behavior' | 'ai-perms' | 'ai-web' | 'ai-skill' | 'ai-mcp' | 'terminal-open' | 'editor-local' | 'editor-remote' | 'appearance-theme' | 'shortcuts';
+type PageId = 'ai-model' | 'ai-behavior' | 'ai-perms' | 'ai-web' | 'ai-skill' | 'ai-mcp' | 'ai-memory' | 'ai-agents' | 'ai-schedules' | 'terminal-open' | 'editor-local' | 'editor-remote' | 'appearance-theme' | 'shortcuts';
 
 interface SettingItem {
   id: PageId;
@@ -67,11 +72,14 @@ const GROUPS: SettingGroup[] = [
     id: 'ai', label: 'AI 模型', icon: Cpu,
     items: [
       { id: 'ai-model', label: '模型配置', keywords: ['ai', 'model', 'api', 'key', 'baseurl', '模型', '密钥', '服务地址', 'provider', '服务商', 'anthropic', 'gemini'] },
-      { id: 'ai-behavior', label: 'AI 行为', keywords: ['agent', '联网', '深思考', '思考', '智能标题', '标题', '自动补全', '补全', '防抖', 'debounce'] },
-      { id: 'ai-perms', label: 'AI 权限', keywords: ['权限', '审批', 'permission', '工具', '许可', '授权', '危险命令'] },
+      { id: 'ai-behavior', label: '模型行为', keywords: ['agent', '联网', '深思考', '思考', '智能标题', '标题', '自动补全', '补全', '防抖', 'debounce'] },
+      { id: 'ai-perms', label: '模型权限', keywords: ['权限', '审批', 'permission', '工具', '许可', '授权', '危险命令'] },
       { id: 'ai-web', label: '网络搜索', keywords: ['tavily', '联网', '搜索', 'web', 'search', 'grounding'] },
-      { id: 'ai-skill', label: '技能（Skills）', keywords: ['技能', 'skill', '能力', '提示词', 'prompt', '自定义', '代理'] },
+      { id: 'ai-skill', label: '技能', keywords: ['技能', 'skill', '能力', '提示词', 'prompt', '自定义', '代理'] },
       { id: 'ai-mcp', label: 'MCP 服务器', keywords: ['mcp', '工具', '服务器', 'server', 'stdio', '协议', '外部工具'] },
+      { id: 'ai-memory', label: '记忆', keywords: ['记忆', 'memory', '长期', '偏好', '约定'] },
+      { id: 'ai-agents', label: '子代理', keywords: ['子代理', 'agent', '多agent', '委派', 'subagent'] },
+      { id: 'ai-schedules', label: '定时任务', keywords: ['定时', '任务', 'schedule', 'cron', '自动'] },
     ],
   },
   {
@@ -183,12 +191,14 @@ export default function SettingsView() {
 
       case 'ai-web': {
         const mode =
-          aiCfg.provider === 'openai-compatible'
-            ? aiCfg.hasTavilyKey ? 'Tavily 兜底（已配置）' : 'Tavily 兜底（未配置 Key，联网不可用）'
-            : '服务商原生搜索（无需 Tavily）';
+          aiCfg.provider !== 'openai-compatible'
+            ? '服务商原生搜索'
+            : aiCfg.hasTavilyKey
+              ? 'Tavily'
+              : 'DuckDuckGo 兜底';
         return (
           <>
-            <Field title="当前搜索方式" description="Anthropic / Gemini 走各自的原生联网搜索，无需额外配置；OpenAI 兼容服务没有原生搜索能力，用 Tavily 兜底。">
+            <Field title="当前搜索方式" description="搜索始终可用，无需配置。">
               <span style={{
                 fontSize: 11, padding: '2px 8px', borderRadius: 4,
                 color: 'var(--text-secondary)', background: 'var(--hover)',
@@ -196,7 +206,7 @@ export default function SettingsView() {
                 {mode}
               </span>
             </Field>
-            <Field title="Tavily API Key" description="仅当服务商为 OpenAI 兼容时需要；从 tavily.com 免费获取。Key 仅存本机后端，界面不回显明文。">
+            <Field title="Tavily API Key" description="可选，配置后搜索质量更好，未配置时用 DuckDuckGo 兜底。">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span style={{
                   fontSize: 11, padding: '2px 8px', borderRadius: 4,
@@ -218,7 +228,7 @@ export default function SettingsView() {
                 <input
                   type="password"
                   value={tavilyDraft}
-                  placeholder={aiCfg.hasTavilyKey ? '输入以覆盖（留空不改动）' : '输入 Tavily API Key'}
+                  placeholder={aiCfg.hasTavilyKey ? '输入以覆盖，留空不改动' : '输入 Tavily API Key'}
                   onChange={(e) => setTavilyDraft(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') commitTavilyKey(); }}
                   style={inputStyle}
@@ -240,7 +250,7 @@ export default function SettingsView() {
           <>
             <Field
               title="工具权限"
-              description="允许 = AI 可直接使用；每次询问 = 在对话里弹审批卡；禁止 = 工具不注册给 AI。危险命令（rm -rf、sudo、pkill 等）无视本表，逐次询问。"
+              description="允许直接使用；每次询问会弹审批；禁止则不注册。危险命令始终逐次询问。"
             >
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {TOOL_NAMES.map((name) => {
@@ -285,10 +295,19 @@ export default function SettingsView() {
         );
 
       case 'ai-skill':
-        return <SkillPage />;
+        return <SkillsSettings />;
 
       case 'ai-mcp':
         return <McpPage />;
+
+      case 'ai-memory':
+        return <MemorySettings />;
+
+      case 'ai-agents':
+        return <AgentsSettings />;
+
+      case 'ai-schedules':
+        return <SchedulesSettings />;
 
       case 'terminal-open':
         return <TerminalOpenPage />;
@@ -545,7 +564,7 @@ function AiModelPage() {
           <input
             type="password"
             value={keyDraft}
-            placeholder={keySet ? '输入以覆盖（留空不改动）' : '输入 API Key'}
+            placeholder={keySet ? '输入以覆盖，留空不改动' : '输入 API Key'}
             onChange={(e) => setKeyDraft(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') commitKey(); }}
             style={inputStyle}
@@ -706,7 +725,7 @@ function AiBehaviorPage() {
     <>
       <Field
         title="作用域"
-        description="「全局默认」对所有模型生效；选中某个模型可为其单独覆盖行为设置（只覆盖改动项，其余回落全局默认）。"
+        description="全局默认对所有模型生效；选中模型可单独覆盖。"
       >
         <Segmented
           options={[
@@ -737,7 +756,7 @@ function AiBehaviorPage() {
 
       <Field
         title="系统提示词"
-        description="定义 AI 助手的角色与行为准则；留空使用内置默认提示词（终端优先助手）。此处随上方作用域生效：全局默认或单个模型覆盖。"
+        description="定义 AI 的角色与行为，留空使用内置默认。"
       >
         <textarea
           value={eff.systemPrompt ?? ''}
@@ -754,19 +773,16 @@ function AiBehaviorPage() {
         />
       </Field>
 
-      <Field title="Agent 模式" description="开启后 AI 可以调用工具（执行命令、读写文件、搜索等，逐项权限在「AI 权限」页管理）；关闭为纯聊天。">
+      <Field title="Agent 模式" description="开启后 AI 可调用工具；关闭则为纯聊天。">
         <Toggle on={eff.agentMode} onChange={(v) => update({ agentMode: v })} />
       </Field>
-      <Field title="联网搜索" description="Anthropic / Gemini 使用服务商原生搜索；OpenAI 兼容服务走 Tavily 兜底（在「网络搜索」页配置 Key）。">
-        <Toggle on={eff.webSearch} onChange={(v) => update({ webSearch: v })} />
-      </Field>
-      <Field title="深度思考" description="提高推理强度（reasoning effort / thinking budget）；响应更慢，适合复杂问题。">
+      <Field title="深度思考" description="提高推理强度，适合复杂问题。">
         <Toggle on={eff.deepThink} onChange={(v) => update({ deepThink: v })} />
       </Field>
       <Field title="最大迭代步数" description="Agent 一次回答最多调用多少轮工具；1–20。">
         <NumberInput value={eff.maxSteps} min={1} max={20} onChange={(v) => update({ maxSteps: v })} />
       </Field>
-      <Field title="上下文策略" description="全量 = 不裁剪；窗口 = 按 token 预算保留最近消息；摘要 = 超预算把旧消息压缩成运行摘要（code-agent 式，会多一次模型调用）。">
+      <Field title="上下文策略" description="全量不裁剪；窗口按预算保留最近消息；摘要压缩旧消息。">
         <Segmented
           options={[
             { value: 'off', label: '全量' },
@@ -781,14 +797,14 @@ function AiBehaviorPage() {
         <NumberInput value={eff.contextMaxTokens} min={0} max={1000000} onChange={(v) => update({ contextMaxTokens: v })} />
       </Field>
       {eff.contextStrategy === 'compact' && (
-        <Field title="摘要长度上限" description="压缩摘要的最大 token 数（compact 策略用）。">
+        <Field title="摘要长度上限" description="压缩摘要的最大 token 数。">
           <NumberInput value={eff.contextSummaryTokens} min={64} max={8000} onChange={(v) => update({ contextSummaryTokens: v })} />
         </Field>
       )}
       <Field title="工具输出截断" description="单个工具结果的最大字符数，超长截断避免占满上下文。">
         <NumberInput value={eff.contextToolChars} min={256} max={65536} onChange={(v) => update({ contextToolChars: v })} />
       </Field>
-      <Field title="回复 Token 上限" description="单次回复的最大 token 数；0 = 使用服务商默认（Anthropic 深度思考时自动抬到 16000）。">
+      <Field title="回复 Token 上限" description="单次回复的最大 token 数，0 为服务商默认。">
         <NumberInput value={eff.maxOutputTokens} min={0} max={32768} onChange={(v) => update({ maxOutputTokens: v })} />
       </Field>
       <Field title="采样温度" description="控制输出随机性；关闭 = 使用服务商默认。">
@@ -813,7 +829,7 @@ function AiBehaviorPage() {
 
       {isGlobal && (
         <>
-          <Field title="智能会话标题" description="内容足够概括时才自动生成标题（不是建会话就生成）；手动改过的名字不会被覆盖。">
+          <Field title="智能会话标题" description="内容足够时自动生成标题，手动改过的名字不覆盖。">
             <Toggle on={eff.autoTitle} onChange={(v) => update({ autoTitle: v })} />
           </Field>
           <Field title="标题模型" description="生成标题用的模型；留空 = 沿用聊天模型。">
@@ -824,10 +840,10 @@ function AiBehaviorPage() {
               style={inputStyle}
             />
           </Field>
-          <Field title="命令自动补全" description="在终端输入命令时给出补全建议（Tab 接受，Esc 丢弃）；没有配置 AI 时仍有本地历史/路径补全。">
+          <Field title="命令自动补全" description="在终端输入命令时给出补全建议，Tab 接受，Esc 丢弃。">
             <Toggle on={eff.completeEnabled} onChange={(v) => update({ completeEnabled: v })} />
           </Field>
-          <Field title="补全防抖（毫秒）" description="停顿多久后触发补全；100–2000。">
+          <Field title="补全防抖" description="触发补全的停顿毫秒数，100–2000。">
             <NumberInput value={eff.completeDebounceMs} min={100} max={2000} onChange={(v) => update({ completeDebounceMs: v })} />
           </Field>
           <Field title="补全模型" description="AI 增强补全用的模型；留空 = 沿用聊天模型。">
@@ -840,89 +856,6 @@ function AiBehaviorPage() {
           </Field>
         </>
       )}
-    </>
-  );
-}
-
-// ── 技能页（Cherry Studio 式：名称 + 描述 + 正文 + 启停） ──
-
-function SkillPage() {
-  const skills = useSkills((s) => s.skills);
-  const add = useSkills((s) => s.add);
-  const update = useSkills((s) => s.update);
-  const remove = useSkills((s) => s.remove);
-  const toggle = useSkills((s) => s.toggle);
-
-  return (
-    <>
-      <Field
-        title="技能（Skills）"
-        description="每个技能 = 名称 + 一句话描述（何时用）+ 完整提示词。启用后，AI 会在系统提示词里看到技能清单，任务匹配时用「调用技能」工具按名加载完整指令再执行。适合沉淀反复使用的操作步骤、领域规范、代码风格等。"
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {skills.length === 0 && (
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 0' }}>
-              还没有技能，点下方「添加技能」创建一个。
-            </div>
-          )}
-          {skills.map((k) => (
-            <div
-              key={k.id}
-              style={{
-                border: '1px solid var(--border)', borderRadius: 'var(--radius-inner)',
-                padding: '10px 12px', background: 'var(--canvas)',
-                opacity: k.enabled ? 1 : 0.55,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input
-                  value={k.name}
-                  placeholder="技能名（如：写单元测试）"
-                  onChange={(e) => update(k.id, { name: e.target.value })}
-                  style={{ ...inputStyle, flex: 1, fontWeight: 600 }}
-                />
-                <Toggle on={k.enabled} onChange={() => toggle(k.id)} />
-                <button
-                  onClick={() => remove(k.id)}
-                  title="删除技能"
-                  style={{
-                    width: 26, height: 26, flexShrink: 0, display: 'inline-flex',
-                    alignItems: 'center', justifyContent: 'center',
-                    border: '1px solid transparent', borderRadius: 4, background: 'transparent',
-                    color: 'var(--text-muted)', cursor: 'pointer',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--error-light)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
-                >
-                  <X size={13} />
-                </button>
-              </div>
-              <input
-                value={k.description}
-                placeholder="一句话描述：何时该用（如：为 Rust 代码编写并运行单元测试）"
-                onChange={(e) => update(k.id, { description: e.target.value })}
-                style={{ ...inputStyle, marginTop: 8 }}
-              />
-              <textarea
-                value={k.prompt}
-                placeholder="完整提示词正文（加载后直接给 AI 照做）"
-                onChange={(e) => update(k.id, { prompt: e.target.value })}
-                rows={5}
-                style={{
-                  ...inputStyle, marginTop: 8, minHeight: 88, resize: 'vertical',
-                  fontFamily: 'var(--font-mono)', lineHeight: 1.55,
-                }}
-              />
-            </div>
-          ))}
-          <button
-            onClick={() => add()}
-            style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}
-          >
-            <Plus size={12} /> 添加技能
-          </button>
-        </div>
-      </Field>
     </>
   );
 }
@@ -1001,7 +934,7 @@ function McpPage() {
   return (
     <Field
       title="MCP 服务器"
-      description="接入外部工具服务器（Model Context Protocol）。本地 stdio 服务器填 command + args（如 npx -y @modelcontextprotocol/server-filesystem）；远程 HTTP/SSE 服务器暂未支持。连接成功后，其工具以 mcp__<服务器>__<工具> 形式注册给 AI（可在「AI 权限」页整体开关）。"
+      description="接入外部工具服务器。本地服务器填 command 与 args，连接后工具即注册给 AI。"
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {servers.length === 0 && (
@@ -1129,26 +1062,26 @@ function McpServerCard({ s, busy, onConnect, onDisconnect, onDelete, onSaved }: 
       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
         <input
           value={command}
-          placeholder="command（如 npx / node / uvx）"
+          placeholder="command，如 npx"
           onChange={(e) => setCommand(e.target.value)}
           style={{ ...inputStyle, flex: 1 }}
         />
         <input
           value={args}
-          placeholder="args（空格分隔）"
+          placeholder="args，空格分隔"
           onChange={(e) => setArgs(e.target.value)}
           style={{ ...inputStyle, flex: 1 }}
         />
       </div>
       <input
         value={url}
-        placeholder="远程 URL（可选，v1 暂未支持）"
+        placeholder="远程 URL，可选"
         onChange={(e) => setUrl(e.target.value)}
         style={{ ...inputStyle, marginTop: 8 }}
       />
       <textarea
         value={env}
-        placeholder={'环境变量（每行 KEY=VALUE）'}
+        placeholder={'环境变量，每行 KEY=VALUE'}
         onChange={(e) => setEnv(e.target.value)}
         rows={3}
         style={{
@@ -1228,7 +1161,7 @@ function TerminalOpenPage() {
 
   return (
     <>
-      <Field title="各 Shell 打开模式" description="经典模式 = 传统 xterm（输出直接进终端，不生成块）；块模式 = 命令块列表视图（chat-first）。SSH 终端恒为经典模式。">
+      <Field title="各 Shell 打开模式" description="经典模式输出直进终端；块模式生成命令块。SSH 恒为经典模式。">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {(Object.keys(SHELL_LABELS) as ShellType[]).map((shell) => (
             <div key={shell} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1363,7 +1296,7 @@ function ThemePage() {
         </div>
       </Field>
 
-      <Field title="应用背景图片" description="选择一张图片作为整个应用的壁纸（cover 居中铺满）。">
+      <Field title="应用背景图片" description="选择一张图片作为应用壁纸。">
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <button onClick={() => void pickBackground()} style={btnStyle}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -1388,7 +1321,7 @@ function ThemePage() {
         )}
       </Field>
 
-      <Field title="主题导入 / 导出" description="把当前主题外观（不透明度、背景图片路径、颜色覆盖）导出为 JSON，或从 JSON 导入。">
+      <Field title="主题导入 / 导出" description="把当前主题外观导出为 JSON，或从 JSON 导入。">
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={() => void doExport()} style={btnStyle}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -1403,7 +1336,7 @@ function ThemePage() {
         </div>
       </Field>
 
-      <Field title="配置文件" description="主题外观持久化在 theme.json。可手动编辑 vars 覆盖任意 CSS 变量（如 --canvas、--xterm-bg），保存后重新加载即生效。">
+      <Field title="配置文件" description="主题外观持久化在 theme.json，可手动编辑 vars 覆盖 CSS 变量。">
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <button onClick={() => void openConfig()} style={btnStyle}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -1433,9 +1366,9 @@ const SHORTCUTS: { keys: string[]; desc: string }[] = [
   { keys: ['⌘⇧T'], desc: '撤销关闭标签' },
   { keys: ['⌘W'], desc: '关闭标签页' },
   { keys: ['⌘1–9'], desc: '切换到第 N 个标签' },
-  { keys: ['⌘D'], desc: '分裂终端（选择落点，继承类型）' },
-  { keys: ['⌘⇧D'], desc: '直接上下分裂（跳过落点选择）' },
-  { keys: ['⌥⌘D'], desc: '选择类型后分裂（混搭 local/ssh）' },
+  { keys: ['⌘D'], desc: '分裂终端，选择落点并继承类型' },
+  { keys: ['⌘⇧D'], desc: '直接上下分裂' },
+  { keys: ['⌥⌘D'], desc: '选择类型后分裂' },
   { keys: ['⌘]', '⌘['], desc: '在窗口内终端间切换焦点' },
   { keys: ['⌘F'], desc: '全局搜索' },
   { keys: ['⌘P'], desc: '命令面板' },
@@ -1447,7 +1380,7 @@ const SHORTCUTS: { keys: string[]; desc: string }[] = [
 
 function ShortcutPage() {
   return (
-    <Field title="快捷键说明" description="当前支持的键盘快捷键（macOS 下 ⌘ = Command）。拖拽侧栏标签到终端区域可停靠/调整位置（最多 2×2 四个终端）。">
+    <Field title="快捷键说明" description="当前支持的键盘快捷键，macOS 下 ⌘ = Command。">
       <div style={{
         display: 'flex', flexDirection: 'column', gap: 4,
         border: '1px solid var(--border)', borderRadius: 'var(--radius-inner)',

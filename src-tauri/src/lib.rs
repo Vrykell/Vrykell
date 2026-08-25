@@ -1,14 +1,18 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+mod agents;
 mod ai;
 mod commands;
 mod db;
 mod fs;
+mod memory;
+mod schedules;
 mod file_open;
 mod mcp;
 mod pty;
 mod scan;
 mod shell_integration;
 mod shells;
+mod skills;
 mod ssh;
 mod theme;
 mod web;
@@ -72,6 +76,26 @@ pub fn run() {
             web::web_fetch,
             web::web_crawl,
             web::fetch_skill_registry,
+            skills::list_skills,
+            skills::get_skill,
+            skills::set_skill_state,
+            skills::read_skill_file,
+            skills::find_skill_reference,
+            skills::remove_skill,
+            skills::install_skill_md,
+            skills::import_skills_from_path,
+            memory::get_memory,
+            memory::set_memory,
+            memory::get_memory_journal,
+            memory::append_memory_journal,
+            agents::list_agents,
+            agents::save_agent,
+            agents::remove_agent,
+            agents::get_agent,
+            schedules::list_schedules,
+            schedules::save_schedule,
+            schedules::remove_schedule,
+            schedules::mark_schedule_run,
             mcp::mcp_get_servers,
             mcp::mcp_save_server,
             mcp::mcp_remove_server,

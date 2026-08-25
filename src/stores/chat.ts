@@ -25,6 +25,8 @@ export interface ChatMessage {
   attachments?: AttachmentMeta[];
   /** 来源 pane（分屏时区分对话线；旧持久化消息没有，仅面板可见） */
   paneId?: string;
+  /** 模型思考过程（reasoning 流）；不持久化，仅会话内存 */
+  reasoning?: string;
   /** 发送时间戳（块流内联时与命令块按时间归并） */
   createdAt: number;
   pending?: boolean;
@@ -35,6 +37,8 @@ export interface ChatMessage {
 /** 工具事件回调：run 为 upsert 语义补丁（未定义字段不覆盖既有值） */
 export interface StreamHandlers {
   onToolEvent?: (run: ToolRun) => void;
+  /** 思考流增量（reasoning-delta）；流式追加到回答的 reasoning 字段 */
+  onReasoning?: (chunk: string) => void;
 }
 
 export type StreamFn = (
@@ -68,6 +72,7 @@ interface ChatState {
   appendDraft: (text: string) => void;
   send: (text: string, opts?: SendOptions) => Promise<void>;
   appendChunk: (tabId: string, id: string, chunk: string) => void;
+  appendReasoning: (tabId: string, id: string, chunk: string) => void;
   /** upsert 一个工具动作 part（惰性物化 parts；合并补丁不丢 startedAt） */
   upsertToolPart: (tabId: string, id: string, run: ToolRun) => void;
   /** 中止某 tab 进行中的流式请求（M4 停止按钮复用） */
@@ -145,6 +150,10 @@ export const useChatStore = create<ChatState>((set, get) => {
             }
             flush();
             get().upsertToolPart(tabId, assistantId, run);
+          },
+          // 思考流：实时追加到回答的 reasoning 字段（AI 面板渲染为可折叠思考块）
+          onReasoning: (chunk) => {
+            get().appendReasoning(tabId, assistantId, chunk);
           },
         },
       });
@@ -244,6 +253,18 @@ export const useChatStore = create<ChatState>((set, get) => {
             }
             return { ...m, content, parts };
           }),
+        },
+      };
+    }),
+  appendReasoning: (tabId, id, chunk) =>
+    set((s) => {
+      if (!(tabId in s.byTab)) return s; // tab 已关闭，丢弃思考流
+      return {
+        byTab: {
+          ...s.byTab,
+          [tabId]: (s.byTab[tabId] ?? []).map((m) =>
+            m.id === id ? { ...m, reasoning: (m.reasoning ?? '') + chunk } : m,
+          ),
         },
       };
     }),

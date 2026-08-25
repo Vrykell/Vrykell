@@ -79,12 +79,100 @@ pub struct WebCrawlResponse {
 }
 
 fn http_client() -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
+    http_client_impl(true)
+}
+
+/// follow_redirects=false 的客户端：重定向由 fetch_public 逐跳校验，防 SSRF。
+fn http_client_impl(follow_redirects: bool) -> Result<reqwest::Client, String> {
+    let mut b = reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(10))
         .timeout(Duration::from_secs(30))
-        .user_agent(USER_AGENT)
-        .build()
-        .map_err(|e| format!("初始化 HTTP 客户端失败：{e}"))
+        .user_agent(USER_AGENT);
+    if !follow_redirects {
+        b = b.redirect(reqwest::redirect::Policy::none());
+    }
+    b.build().map_err(|e| format!("初始化 HTTP 客户端失败：{e}"))
+}
+
+/// 是否为内网/保留地址（SSRF 防护）。
+fn is_private_ip(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v4) => {
+            v4.is_loopback()
+                || v4.is_private()
+                || v4.is_link_local()
+                || v4.is_unspecified()
+                || v4.is_broadcast()
+                || v4.is_documentation()
+                || v4.is_multicast()
+        }
+        std::net::IpAddr::V6(v6) => {
+            v6.is_loopback()
+                || v6.is_unspecified()
+                || v6.is_unique_local()
+                || v6.is_unicast_link_local()
+                || v6.is_multicast()
+        }
+    }
+}
+
+/// 校验 URL 是否指向公网地址（拦截 SSRF：内网/回环/链路本地/账号信息）。
+async fn validate_public_url(url: &str) -> Result<(), String> {
+    let u = url::Url::parse(url).map_err(|e| format!("无效 URL：{e}"))?;
+    let scheme = u.scheme();
+    if scheme != "http" && scheme != "https" {
+        return Err("仅支持 http/https URL".to_string());
+    }
+    if !u.username().is_empty() || u.password().is_some() {
+        return Err("URL 不允许包含账号信息".to_string());
+    }
+    let host = u.host_str().ok_or("URL 缺少主机名")?;
+    if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+        if is_private_ip(ip) {
+            return Err("禁止访问内网地址".to_string());
+        }
+        return Ok(());
+    }
+    let port = u.port().unwrap_or_else(|| if scheme == "https" { 443 } else { 80 });
+    let addrs: Vec<std::net::IpAddr> = tokio::net::lookup_host((host, port))
+        .await
+        .map_err(|e| format!("域名解析失败：{e}"))?
+        .map(|a| a.ip())
+        .collect();
+    if addrs.is_empty() {
+        return Err("域名解析无结果".to_string());
+    }
+    if addrs.iter().any(|ip| is_private_ip(*ip)) {
+        return Err("禁止访问解析到内网的地址".to_string());
+    }
+    Ok(())
+}
+
+/// 逐跳校验重定向的公网抓取（SSRF 防护）。
+async fn fetch_public(client: &reqwest::Client, url: &str) -> Result<reqwest::Response, String> {
+    let mut current = url.to_string();
+    for _ in 0..10 {
+        validate_public_url(&current).await?;
+        let resp = client
+            .get(&current)
+            .send()
+            .await
+            .map_err(|e| format!("请求失败：{e}"))?;
+        if !resp.status().is_redirection() {
+            return Ok(resp);
+        }
+        let loc = resp
+            .headers()
+            .get(reqwest::header::LOCATION)
+            .and_then(|v| v.to_str().ok())
+            .ok_or("重定向响应缺少 Location")?;
+        current = url::Url::parse(&current)
+            .map_err(|e| format!("解析 URL 失败：{e}"))?
+            .join(loc)
+            .map_err(|e| format!("解析重定向失败：{e}"))?
+            .to_string();
+    }
+    Err("重定向次数过多".to_string())
 }
 
 /// 简单 URL 百分号编码（保留 RFC3986 非保留字符，空格 → `+`）。
@@ -420,8 +508,8 @@ pub async fn web_fetch(url: String) -> Result<WebFetchResponse, String> {
     if !(u.starts_with("http://") || u.starts_with("https://")) {
         return Err("仅支持 http/https URL".to_string());
     }
-    let client = http_client()?;
-    let resp = client.get(&u).send().await.map_err(|e| format!("请求失败：{e}"))?;
+    let client = http_client_impl(false)?;
+    let resp = fetch_public(&client, &u).await?;
     let final_url = resp.url().to_string();
     let status = resp.status();
     let content_type = resp
@@ -471,7 +559,7 @@ pub async fn web_crawl(
     let max_pages = max_pages.unwrap_or(10).clamp(1, 30) as usize;
     let max_depth = max_depth.unwrap_or(2).clamp(1, 4) as usize;
     let same_domain = same_domain.unwrap_or(true);
-    let client = http_client()?;
+    let client = http_client_impl(false)?;
 
     let mut pages: Vec<CrawlPage> = Vec::new();
     let mut visited: HashSet<String> = HashSet::new();
@@ -488,9 +576,9 @@ pub async fn web_crawl(
         if !visited.insert(key) {
             continue;
         }
-        let resp = match client.get(&url).send().await {
+        let resp = match fetch_public(&client, &url).await {
             Ok(r) => r,
-            Err(_) => continue, // 单页失败不中断整次爬取
+            Err(_) => continue, // 单页失败/内网拒绝不中断整次爬取
         };
         if !resp.status().is_success() {
             continue;
@@ -593,8 +681,8 @@ pub async fn fetch_skill_registry(url: String) -> Result<Vec<RemoteSkill>, Strin
     if !(u.starts_with("http://") || u.starts_with("https://")) {
         return Err("仅支持 http/https URL".to_string());
     }
-    let client = http_client()?;
-    let resp = client.get(&u).send().await.map_err(|e| format!("请求失败：{e}"))?;
+    let client = http_client_impl(false)?;
+    let resp = fetch_public(&client, &u).await?;
     let status = resp.status();
     let body = resp.text().await.map_err(|e| format!("读取响应失败：{e}"))?;
     if !status.is_success() {
@@ -698,5 +786,18 @@ mod tests {
     fn skill_registry_rejects_unknown_protocol() {
         let m = r#"{ "protocol": "other/v2", "skills": [ { "name": "a", "description": "d", "prompt": "p" } ] }"#;
         assert!(parse_skill_registry(m).unwrap_err().contains("协议"));
+    }
+
+    #[test]
+    fn is_private_ip_blocks_internal_and_allows_public() {
+        assert!(is_private_ip("127.0.0.1".parse().unwrap()));
+        assert!(is_private_ip("192.168.1.1".parse().unwrap()));
+        assert!(is_private_ip("10.0.0.1".parse().unwrap()));
+        assert!(is_private_ip("172.16.0.1".parse().unwrap()));
+        assert!(is_private_ip("169.254.169.254".parse().unwrap()));
+        assert!(is_private_ip("::1".parse().unwrap()));
+        assert!(is_private_ip("fd00::1".parse().unwrap()));
+        assert!(!is_private_ip("8.8.8.8".parse().unwrap()));
+        assert!(!is_private_ip("1.1.1.1".parse().unwrap()));
     }
 }

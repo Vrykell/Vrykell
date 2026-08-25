@@ -94,10 +94,8 @@ export default function InputEditor({
   const sendingHere = sendingTab !== null && sendingTab === activeId;
 
   const agentSettings = useAgentSettings();
-  const aiCfg = useAiConfigStore();
   const activeModel = useAiConfigStore((s) => s.activeModel);
   const eff = agentSettings.resolve(activeModel);
-  const searchAvailable = aiCfg.provider !== 'openai-compatible' || aiCfg.hasTavilyKey;
 
   const permMode = usePermissions((s) => s.mode);
   const setPermMode = usePermissions((s) => s.setMode);
@@ -141,14 +139,6 @@ export default function InputEditor({
     } catch (e) {
       toastErr(String((e as Error)?.message ?? e));
     }
-  };
-
-  const toggleSearch = () => {
-    if (!eff.webSearch && !searchAvailable) {
-      toastErr('当前服务商无原生搜索，请先在「设置 → 网络搜索」配置 Tavily Key');
-      return;
-    }
-    agentSettings.updateModel(activeModel, { webSearch: !eff.webSearch });
   };
 
   const canSendAi = (!!text.trim() || atts.length > 0) && !sendingTab;
@@ -451,12 +441,6 @@ export default function InputEditor({
               userSelect: 'none',
             }}
           >
-            <QuickToggle
-              icon={Globe}
-              on={eff.webSearch}
-              title={searchAvailable ? '联网搜索' : '联网搜索（需先配置 Tavily Key）'}
-              onClick={toggleSearch}
-            />
             <QuickToggle
               icon={Brain}
               on={eff.deepThink}

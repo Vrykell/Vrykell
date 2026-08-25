@@ -18,8 +18,8 @@
  * 同组件服务两个视图：TerminalBlockList（块流内联）与 PanelChat（窗口转录）。
  */
 
-import { useState } from 'react';
-import { Copy, Pencil, RotateCw, Trash2, Zap } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Brain, Copy, Pencil, RotateCw, Trash2, Zap } from 'lucide-react';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { useChatStore } from '../stores/chat';
 import { useWorkspaceStore } from '../stores/workspace';
@@ -190,6 +190,9 @@ export default function AiBlock({ exchange }: { exchange: ChatExchange }) {
           {/* rail 贯穿：起点=首端灰点圆心(6px)，终点=末端节点圆心（完成 4 / 出错 12 / 流式到底） */}
           <Rail bottom={answer.error ? 12 : answer.pending ? 0 : 4} />
           <EndDot top={6} />
+          {answer.reasoning && (
+            <ThinkingBlock text={answer.reasoning} streaming={answer.pending ?? false} />
+          )}
           {parts
             ? parts.map((p, i) => {
                 if (p.kind === 'tool') {
@@ -243,6 +246,44 @@ export default function AiBlock({ exchange }: { exchange: ChatExchange }) {
           )}
           {/* 回答完成 = 末端灰点（6px，圆心距容器底 4px，与 Rail bottom 对齐） */}
           {!answer.pending && !answer.error && <EndDot bottom={4} />}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 可折叠的「思考」块：流式时自动展开，完成后折叠可点开。 */
+function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }) {
+  const [open, setOpen] = useState(streaming);
+  useEffect(() => {
+    if (streaming) setOpen(true);
+  }, [streaming]);
+  return (
+    <div style={ROW}>
+      <button
+        data-subtle
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 5,
+          fontFamily: 'var(--font-ui)', fontSize: 11, fontWeight: 400,
+          padding: '1px 0', border: 'none', background: 'transparent',
+          color: 'var(--text-muted)', cursor: 'pointer',
+        }}
+      >
+        <Brain size={11} />
+        思考过程
+        <span style={{ fontSize: 9, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.12s ease' }}>▸</span>
+      </button>
+      {open && (
+        <div
+          style={{
+            marginTop: 4, padding: '6px 10px',
+            background: 'var(--hover)', borderRadius: 'var(--radius-inner)',
+            fontSize: 11, lineHeight: 1.55, color: 'var(--text-secondary)',
+            whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          }}
+        >
+          {text}
         </div>
       )}
     </div>
