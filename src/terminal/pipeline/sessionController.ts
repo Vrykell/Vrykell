@@ -50,9 +50,11 @@ let nextId = 1;
 
 export class SessionController {
   private _blocks: InternalBlock[] = [];
-  private _scene: Scene = 'classic';
+  private _scene: Scene;
   /** altScreen 进入前的场景（退出时恢复） */
-  private preAltScene: Scene = 'classic';
+  private preAltScene: Scene;
+  /** 是否启用块系统：false = 经典模式（传统终端，输出直进 xterm，不建块） */
+  private blockEnabled: boolean;
   private pendingCommand = '';
   private longRunningTimer: ReturnType<typeof setTimeout> | null = null;
   private _disposed = false;
@@ -65,9 +67,16 @@ export class SessionController {
     private sinks: SessionSinks,
     /** 块内活终端的行数（= 主 xterm/PTY 行数，TUI 几何一致的关键）；缺省 24 */
     private rows = 24,
+    /** 初始场景（终端打开模式：classic 或 blockList）；缺省 classic */
+    initialScene: Scene = 'classic',
+    /** 块系统开关；false = 经典模式（传统终端） */
+    blockEnabled = true,
   ) {
     // tabId 保留给未来调试/持久化使用
     void this.tabId;
+    this._scene = initialScene;
+    this.preAltScene = initialScene;
+    this.blockEnabled = blockEnabled;
   }
 
   get scene(): Scene {
@@ -94,6 +103,13 @@ export class SessionController {
   // ── 事件入口 ──
 
   handleEvents(events: DispatchEvent[]): void {
+    if (!this.blockEnabled) {
+      // 经典模式：传统终端，所有输出直进主 xterm（不建块、不切场景、TUI 由 xterm 原生处理）
+      for (const ev of events) {
+        this.sinks.writeMain(ev.kind === 'data' ? ev.text : ev.raw);
+      }
+      return;
+    }
     for (const ev of events) {
       switch (ev.kind) {
         case 'data':

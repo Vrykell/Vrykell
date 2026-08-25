@@ -262,7 +262,7 @@ function LocalFiles() {
       {/* 面包屑 */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap',
-        padding: '6px 10px', borderBottom: '1px solid var(--border)',
+        padding: '6px 10px',
         fontSize: 11, minHeight: 30,
       }}>
         <Crumb label="此电脑" onClick={() => setPath(null)} active={path === null} />

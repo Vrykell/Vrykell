@@ -8,7 +8,7 @@
  */
 
 import { create } from 'zustand';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import {
   applyTheme,
   getCurrentTheme,
@@ -32,13 +32,41 @@ const DEFAULT_CONFIG: TerminalThemeConfig = {
   vars: {},
 };
 
-/** 本地壁纸路径 → data URL（Tauri webview 不能直接 url() 本地路径）。 */
-async function resolveWallpaperDataUrl(path: string | null): Promise<string | null> {
+// 壁纸 asset URL 的 localStorage 缓存：URL 很小，启动时同步应用，壁纸直接经 asset 协议读本地文件
+const WALLPAPER_CACHE_KEY = 'vrykell-wallpaper-url';
+
+function readCachedWallpaper(): string | null {
+  try {
+    return localStorage.getItem(WALLPAPER_CACHE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function cacheWallpaper(url: string | null): void {
+  try {
+    if (url) localStorage.setItem(WALLPAPER_CACHE_KEY, url);
+    else localStorage.removeItem(WALLPAPER_CACHE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 启动时同步应用上次缓存的壁纸 URL，避免异步加载期间的黑色背景。 */
+export function applyCachedWallpaper(): void {
+  const cached = readCachedWallpaper();
+  if (cached) {
+    useTerminalThemeStore.setState({ wallpaperDataUrl: cached });
+  }
+}
+
+/** 本地壁纸路径 → asset URL（asset 协议直接读本地文件，无需 base64 / IPC 大串传输）。 */
+function resolveWallpaperUrl(path: string | null): string | null {
   if (!path) return null;
   try {
-    return await invoke<string>('read_image_data_url', { path });
+    return convertFileSrc(path);
   } catch (e) {
-    console.warn('[terminalTheme] 读取壁纸失败:', e);
+    console.warn('[terminalTheme] 转换壁纸路径失败:', e);
     return null;
   }
 }
@@ -89,7 +117,8 @@ export const useTerminalThemeStore = create<TerminalThemeState>((set, get) => ({
   load: async () => {
     try {
       const config = await invoke<TerminalThemeConfig>('get_theme_config');
-      const wallpaperDataUrl = await resolveWallpaperDataUrl(config.backgroundImage);
+      const wallpaperDataUrl = resolveWallpaperUrl(config.backgroundImage);
+      cacheWallpaper(wallpaperDataUrl);
       set({ config, loaded: true, wallpaperDataUrl });
       applyTerminalTheme(config);
     } catch {
@@ -103,7 +132,8 @@ export const useTerminalThemeStore = create<TerminalThemeState>((set, get) => ({
     set({ config });
     applyTerminalTheme(config);
     if (config.backgroundImage !== prev.backgroundImage) {
-      const wallpaperDataUrl = await resolveWallpaperDataUrl(config.backgroundImage);
+      const wallpaperDataUrl = resolveWallpaperUrl(config.backgroundImage);
+      cacheWallpaper(wallpaperDataUrl);
       set({ wallpaperDataUrl });
     }
     try {
@@ -119,7 +149,8 @@ export const useTerminalThemeStore = create<TerminalThemeState>((set, get) => ({
 
   importFrom: async (path) => {
     const config = await invoke<TerminalThemeConfig>('theme_import', { path });
-    const wallpaperDataUrl = await resolveWallpaperDataUrl(config.backgroundImage);
+    const wallpaperDataUrl = resolveWallpaperUrl(config.backgroundImage);
+    cacheWallpaper(wallpaperDataUrl);
     set({ config, wallpaperDataUrl });
     applyTerminalTheme(config);
   },

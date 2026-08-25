@@ -48,6 +48,11 @@ export const TOOL_NAMES = [
   'search_files',
   'web_search',
   'web_fetch',
+  'web_crawl',
+  'read_terminal',
+  'terminal_keys',
+  'use_skill',
+  'mcp',
 ] as const;
 export type ToolName = (typeof TOOL_NAMES)[number];
 
@@ -60,6 +65,11 @@ const DEFAULT_LEVELS: Record<ToolName, ToolLevel> = {
   search_files: 'allow',
   web_search: 'allow',
   web_fetch: 'allow',
+  web_crawl: 'allow',
+  read_terminal: 'allow',
+  terminal_keys: 'ask',
+  use_skill: 'allow',
+  mcp: 'allow',
 };
 
 interface PermissionsState {

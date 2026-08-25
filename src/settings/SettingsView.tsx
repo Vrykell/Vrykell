@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Search, ChevronRight, Settings, Cpu, FileCode, Palette, Sun, Moon, Plus, X, Keyboard, Image as ImageIcon, Download, Upload, RefreshCw, FileText, Trash2 } from 'lucide-react';
+import { Search, ChevronRight, Settings, Cpu, FileCode, Palette, Sun, Moon, Plus, X, Keyboard, SquareTerminal, Image as ImageIcon, Download, Upload, RefreshCw, FileText, Trash2 } from 'lucide-react';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { invoke } from '@tauri-apps/api/core';
@@ -12,9 +12,15 @@ import {
 } from '../lib/ai';
 import type { ProviderKind } from '../agent/provider';
 import { useAgentSettings, type AgentSettings, type ModelBehaviorSettings } from '../agent/agentSettings';
+import { useSkills } from '../agent/skills';
+import {
+  listMcpServers, saveMcpServer, removeMcpServer, toggleMcpServer,
+  connectMcp, disconnectMcp, type McpServer,
+} from '../agent/mcp';
 import Segmented from '../components/Segmented';
 import { useTheme } from '../theme/ThemeProvider';
 import { useTerminalThemeStore } from '../theme/terminalTheme';
+import type { ShellType } from '../lib/shells';
 import { useToastStore } from '../components/Toast';
 import {
   usePermissions, clearSessionGrants, TOOL_NAMES,
@@ -31,13 +37,18 @@ const PERM_TOOL_LABEL: Record<ToolName, string> = {
   search_files: '搜索文件',
   web_search: '联网搜索',
   web_fetch: '抓取网页',
+  web_crawl: '爬取多个网页',
+  read_terminal: '读取终端画面',
+  terminal_keys: '向终端发送按键',
+  use_skill: '调用技能',
+  mcp: 'MCP 服务器工具',
 };
 
 // ── 设置页结构 ──
 // 外层 = 按功能划分的组（大菜单，可展开）；内层 = 细分设置页（小菜单）。
 // 每个设置页内再放多个相关的具体配置项。
 
-type PageId = 'ai-model' | 'ai-behavior' | 'ai-perms' | 'ai-web' | 'editor-local' | 'editor-remote' | 'appearance-theme' | 'shortcuts';
+type PageId = 'ai-model' | 'ai-behavior' | 'ai-perms' | 'ai-web' | 'ai-skill' | 'ai-mcp' | 'terminal-open' | 'editor-local' | 'editor-remote' | 'appearance-theme' | 'shortcuts';
 
 interface SettingItem {
   id: PageId;
@@ -59,6 +70,14 @@ const GROUPS: SettingGroup[] = [
       { id: 'ai-behavior', label: 'AI 行为', keywords: ['agent', '联网', '深思考', '思考', '智能标题', '标题', '自动补全', '补全', '防抖', 'debounce'] },
       { id: 'ai-perms', label: 'AI 权限', keywords: ['权限', '审批', 'permission', '工具', '许可', '授权', '危险命令'] },
       { id: 'ai-web', label: '网络搜索', keywords: ['tavily', '联网', '搜索', 'web', 'search', 'grounding'] },
+      { id: 'ai-skill', label: '技能（Skills）', keywords: ['技能', 'skill', '能力', '提示词', 'prompt', '自定义', '代理'] },
+      { id: 'ai-mcp', label: 'MCP 服务器', keywords: ['mcp', '工具', '服务器', 'server', 'stdio', '协议', '外部工具'] },
+    ],
+  },
+  {
+    id: 'terminal', label: '终端', icon: SquareTerminal,
+    items: [
+      { id: 'terminal-open', label: '打开方式', keywords: ['终端', '打开', '模式', '经典', '块', 'block', 'classic', 'terminal'] },
     ],
   },
   {
@@ -264,6 +283,15 @@ export default function SettingsView() {
             </Field>
           </>
         );
+
+      case 'ai-skill':
+        return <SkillPage />;
+
+      case 'ai-mcp':
+        return <McpPage />;
+
+      case 'terminal-open':
+        return <TerminalOpenPage />;
 
       case 'editor-local':
         return (
@@ -707,6 +735,25 @@ function AiBehaviorPage() {
         </div>
       )}
 
+      <Field
+        title="系统提示词"
+        description="定义 AI 助手的角色与行为准则；留空使用内置默认提示词（终端优先助手）。此处随上方作用域生效：全局默认或单个模型覆盖。"
+      >
+        <textarea
+          value={eff.systemPrompt ?? ''}
+          placeholder="留空使用内置默认提示词"
+          onChange={(e) => update({ systemPrompt: e.target.value })}
+          rows={8}
+          style={{
+            ...inputStyle,
+            minHeight: 130,
+            resize: 'vertical',
+            fontFamily: 'var(--font-mono)',
+            lineHeight: 1.6,
+          }}
+        />
+      </Field>
+
       <Field title="Agent 模式" description="开启后 AI 可以调用工具（执行命令、读写文件、搜索等，逐项权限在「AI 权限」页管理）；关闭为纯聊天。">
         <Toggle on={eff.agentMode} onChange={(v) => update({ agentMode: v })} />
       </Field>
@@ -797,6 +844,322 @@ function AiBehaviorPage() {
   );
 }
 
+// ── 技能页（Cherry Studio 式：名称 + 描述 + 正文 + 启停） ──
+
+function SkillPage() {
+  const skills = useSkills((s) => s.skills);
+  const add = useSkills((s) => s.add);
+  const update = useSkills((s) => s.update);
+  const remove = useSkills((s) => s.remove);
+  const toggle = useSkills((s) => s.toggle);
+
+  return (
+    <>
+      <Field
+        title="技能（Skills）"
+        description="每个技能 = 名称 + 一句话描述（何时用）+ 完整提示词。启用后，AI 会在系统提示词里看到技能清单，任务匹配时用「调用技能」工具按名加载完整指令再执行。适合沉淀反复使用的操作步骤、领域规范、代码风格等。"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {skills.length === 0 && (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 0' }}>
+              还没有技能，点下方「添加技能」创建一个。
+            </div>
+          )}
+          {skills.map((k) => (
+            <div
+              key={k.id}
+              style={{
+                border: '1px solid var(--border)', borderRadius: 'var(--radius-inner)',
+                padding: '10px 12px', background: 'var(--canvas)',
+                opacity: k.enabled ? 1 : 0.55,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  value={k.name}
+                  placeholder="技能名（如：写单元测试）"
+                  onChange={(e) => update(k.id, { name: e.target.value })}
+                  style={{ ...inputStyle, flex: 1, fontWeight: 600 }}
+                />
+                <Toggle on={k.enabled} onChange={() => toggle(k.id)} />
+                <button
+                  onClick={() => remove(k.id)}
+                  title="删除技能"
+                  style={{
+                    width: 26, height: 26, flexShrink: 0, display: 'inline-flex',
+                    alignItems: 'center', justifyContent: 'center',
+                    border: '1px solid transparent', borderRadius: 4, background: 'transparent',
+                    color: 'var(--text-muted)', cursor: 'pointer',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--error-light)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+                >
+                  <X size={13} />
+                </button>
+              </div>
+              <input
+                value={k.description}
+                placeholder="一句话描述：何时该用（如：为 Rust 代码编写并运行单元测试）"
+                onChange={(e) => update(k.id, { description: e.target.value })}
+                style={{ ...inputStyle, marginTop: 8 }}
+              />
+              <textarea
+                value={k.prompt}
+                placeholder="完整提示词正文（加载后直接给 AI 照做）"
+                onChange={(e) => update(k.id, { prompt: e.target.value })}
+                rows={5}
+                style={{
+                  ...inputStyle, marginTop: 8, minHeight: 88, resize: 'vertical',
+                  fontFamily: 'var(--font-mono)', lineHeight: 1.55,
+                }}
+              />
+            </div>
+          ))}
+          <button
+            onClick={() => add()}
+            style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}
+          >
+            <Plus size={12} /> 添加技能
+          </button>
+        </div>
+      </Field>
+    </>
+  );
+}
+
+// ── MCP 服务器页 ──
+
+function parseEnvLines(text: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const line of text.split('\n')) {
+    const i = line.indexOf('=');
+    if (i > 0) out[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+  }
+  return out;
+}
+
+function McpPage() {
+  const [servers, setServers] = useState<McpServer[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
+  const toast = (msg: string, type: 'info' | 'success' | 'error') =>
+    useToastStore.getState().addToast(msg, type);
+
+  const refresh = () => {
+    listMcpServers()
+      .then(setServers)
+      .catch((e) => toast(String((e as Error)?.message ?? e), 'error'));
+  };
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  const connect = async (name: string) => {
+    setBusy(name);
+    try {
+      await connectMcp(name);
+      toast(`已连接 ${name}`, 'success');
+    } catch (e) {
+      toast(String((e as Error)?.message ?? e), 'error');
+    } finally {
+      setBusy(null);
+      refresh();
+    }
+  };
+
+  const disconnect = async (name: string) => {
+    setBusy(name);
+    try {
+      await disconnectMcp(name);
+    } catch (e) {
+      toast(String((e as Error)?.message ?? e), 'error');
+    } finally {
+      setBusy(null);
+      refresh();
+    }
+  };
+
+  const del = async (name: string) => {
+    try {
+      await removeMcpServer(name);
+      toast(`已删除 ${name}`, 'success');
+      refresh();
+    } catch (e) {
+      toast(String((e as Error)?.message ?? e), 'error');
+    }
+  };
+
+  const addNew = async () => {
+    const name = `server-${servers.length + 1}`;
+    try {
+      await saveMcpServer({ name, command: '', args: [], env: {}, url: '', enabled: true });
+      refresh();
+    } catch (e) {
+      toast(String((e as Error)?.message ?? e), 'error');
+    }
+  };
+
+  return (
+    <Field
+      title="MCP 服务器"
+      description="接入外部工具服务器（Model Context Protocol）。本地 stdio 服务器填 command + args（如 npx -y @modelcontextprotocol/server-filesystem）；远程 HTTP/SSE 服务器暂未支持。连接成功后，其工具以 mcp__<服务器>__<工具> 形式注册给 AI（可在「AI 权限」页整体开关）。"
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {servers.length === 0 && (
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 0' }}>
+            还没有 MCP 服务器，点下方「添加服务器」创建一个。
+          </div>
+        )}
+        {servers.map((s) => (
+          <McpServerCard
+            key={s.name}
+            s={s}
+            busy={busy === s.name}
+            onConnect={() => connect(s.name)}
+            onDisconnect={() => disconnect(s.name)}
+            onDelete={() => del(s.name)}
+            onSaved={refresh}
+          />
+        ))}
+        <button
+          onClick={() => void addNew()}
+          style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}
+        >
+          <Plus size={12} /> 添加服务器
+        </button>
+      </div>
+    </Field>
+  );
+}
+
+function McpServerCard({ s, busy, onConnect, onDisconnect, onDelete, onSaved }: {
+  s: McpServer;
+  busy: boolean;
+  onConnect: () => void;
+  onDisconnect: () => void;
+  onDelete: () => void;
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState(s.name);
+  const [command, setCommand] = useState(s.command);
+  const [args, setArgs] = useState(s.args.join(' '));
+  const [url, setUrl] = useState(s.url);
+  const [env, setEnv] = useState(Object.entries(s.env).map(([k, v]) => `${k}=${v}`).join('\n'));
+  const [enabled, setEnabled] = useState(s.enabled);
+  const toast = (msg: string, type: 'info' | 'success' | 'error') =>
+    useToastStore.getState().addToast(msg, type);
+
+  const save = async () => {
+    try {
+      await saveMcpServer({
+        name: name.trim(),
+        command: command.trim(),
+        args: args.split(/\s+/).filter(Boolean),
+        env: parseEnvLines(env),
+        url: url.trim(),
+        enabled,
+      });
+      toast('已保存', 'success');
+      onSaved();
+    } catch (e) {
+      toast(String((e as Error)?.message ?? e), 'error');
+    }
+  };
+
+  const toggle = async () => {
+    const next = !enabled;
+    setEnabled(next);
+    try {
+      await toggleMcpServer(s.name, next);
+      onSaved();
+    } catch (e) {
+      toast(String((e as Error)?.message ?? e), 'error');
+    }
+  };
+
+  return (
+    <div
+      style={{
+        border: '1px solid var(--border)', borderRadius: 'var(--radius-inner)',
+        padding: '10px 12px', background: 'var(--canvas)', opacity: enabled ? 1 : 0.6,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <input
+          value={name}
+          placeholder="服务器名"
+          onChange={(e) => setName(e.target.value)}
+          style={{ ...inputStyle, flex: 1, fontWeight: 600 }}
+        />
+        <span style={{
+          fontSize: 11, padding: '2px 8px', borderRadius: 4, flexShrink: 0,
+          color: s.connected ? 'var(--success)' : 'var(--text-muted)',
+          background: s.connected ? 'var(--success-bg)' : 'var(--hover)',
+        }}>
+          {s.connected ? `已连接 · ${s.toolCount} 工具` : '未连接'}
+        </span>
+        <Toggle on={enabled} onChange={() => void toggle()} />
+        <button
+          onClick={() => void save()}
+          disabled={busy}
+          style={{ ...btnStyle, flexShrink: 0 }}
+        >
+          保存
+        </button>
+        {s.connected ? (
+          <button onClick={onDisconnect} disabled={busy} style={{ ...btnStyle, flexShrink: 0 }}>断开</button>
+        ) : (
+          <button onClick={onConnect} disabled={busy} style={{ ...btnStyle, flexShrink: 0 }}>
+            {busy ? '连接中…' : '连接'}
+          </button>
+        )}
+        <button
+          onClick={onDelete}
+          title="删除服务器"
+          style={{
+            width: 26, height: 26, flexShrink: 0, display: 'inline-flex', alignItems: 'center',
+            justifyContent: 'center', border: '1px solid transparent', borderRadius: 4,
+            background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--error-light)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+        >
+          <X size={13} />
+        </button>
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+        <input
+          value={command}
+          placeholder="command（如 npx / node / uvx）"
+          onChange={(e) => setCommand(e.target.value)}
+          style={{ ...inputStyle, flex: 1 }}
+        />
+        <input
+          value={args}
+          placeholder="args（空格分隔）"
+          onChange={(e) => setArgs(e.target.value)}
+          style={{ ...inputStyle, flex: 1 }}
+        />
+      </div>
+      <input
+        value={url}
+        placeholder="远程 URL（可选，v1 暂未支持）"
+        onChange={(e) => setUrl(e.target.value)}
+        style={{ ...inputStyle, marginTop: 8 }}
+      />
+      <textarea
+        value={env}
+        placeholder={'环境变量（每行 KEY=VALUE）'}
+        onChange={(e) => setEnv(e.target.value)}
+        rows={3}
+        style={{
+          ...inputStyle, marginTop: 8, minHeight: 52, resize: 'vertical',
+          fontFamily: 'var(--font-mono)', lineHeight: 1.5,
+        }}
+      />
+    </div>
+  );
+}
+
 // ── 模型字段 / 数字输入 ──
 
 function ModelTextInput({ value, onCommit, placeholder, style }: {
@@ -837,6 +1200,52 @@ function NumberInput({ value, onChange, min, max }: {
       }}
       style={{ ...inputStyle, width: 120 }}
     />
+  );
+}
+
+// ── 终端打开方式页 ──
+
+const OPEN_MODE_OPTIONS = (
+  [
+    ['classic', '经典模式'],
+    ['block', '块模式'],
+  ] as const
+).map(([value, label]) => ({ value, label }));
+
+const SHELL_LABELS: Record<ShellType, string> = {
+  zsh: 'Zsh',
+  bash: 'Bash',
+  powershell: 'PowerShell',
+  pwsh: 'PowerShell',
+  cmd: 'CMD',
+};
+
+function TerminalOpenPage() {
+  const agentSettings = useAgentSettings();
+  const openModeByShell = agentSettings.global.openModeByShell;
+  const setShellMode = (shell: ShellType, mode: 'classic' | 'block') =>
+    agentSettings.update({ openModeByShell: { ...openModeByShell, [shell]: mode } });
+
+  return (
+    <>
+      <Field title="各 Shell 打开模式" description="经典模式 = 传统 xterm（输出直接进终端，不生成块）；块模式 = 命令块列表视图（chat-first）。SSH 终端恒为经典模式。">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {(Object.keys(SHELL_LABELS) as ShellType[]).map((shell) => (
+            <div key={shell} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ width: 110, fontSize: 12, color: 'var(--text-primary)' }}>
+                {SHELL_LABELS[shell]}
+              </span>
+              <Segmented
+                size="sm"
+                options={OPEN_MODE_OPTIONS}
+                value={openModeByShell[shell]}
+                onChange={(v) => setShellMode(shell, v)}
+              />
+            </div>
+          ))}
+        </div>
+      </Field>
+    </>
   );
 }
 

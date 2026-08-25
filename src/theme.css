@@ -242,8 +242,8 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 ::-webkit-scrollbar-track { background: transparent; }
 
-/* xterm 容器与画布对齐 */
-.xterm { padding: 6px 8px; }
+/* xterm 容器贴边：取消全屏终端的边缘内边距 */
+.xterm { padding: 0; }
 
 @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
@@ -257,6 +257,8 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
    卡片内宽略宽 —— 左对齐会把溢出全裁在右侧，TUI 居中布局（claude
    欢迎框等）看起来偏心；flex 居中让两侧对称裁剪 */
 [data-testid="running-term"] .xterm { padding: 4px 8px; display: flex; justify-content: center; }
+/* 手动全屏宿主内：贴边，无内边距（覆盖块内的呼吸边距） */
+[data-testid="tui-fullscreen"] [data-testid="running-term"] .xterm { padding: 0; }
 /* 禁收缩：screen 有显式宽度（cols × 格宽），默认 shrink 会压扁盒子、
    内部绝对定位 canvas 仍从左缘起画，居中失效 */
 [data-testid="running-term"] .xterm-screen { flex-shrink: 0; }

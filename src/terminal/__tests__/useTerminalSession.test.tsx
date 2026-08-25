@@ -83,7 +83,17 @@ globalThis.ResizeObserver = class {
 import { useTerminalSession } from '../useTerminalSession';
 import { useTerminalStore } from '../../stores/terminal';
 import { useBlockStore } from '../../stores/blocks';
+import { useWorkspaceStore } from '../../stores/workspace';
+import { leaf } from '../../lib/windowLayout';
 import { onPtyOutput as mockedOnPtyOutput, ptySpawn as mockedPtySpawn } from '../../lib/pty';
+
+/** 设置一个本地终端 tab，指定打开模式（classic / block） */
+function setTab(openMode: 'classic' | 'block') {
+  useWorkspaceStore.setState({
+    tabs: [{ id: 't1', title: 't', kind: 'session', layout: leaf({ id: 't1', kind: 'local', openMode }) }],
+    activeId: 't1',
+  });
+}
 
 function TestHarness({ tabId, onReady }: { tabId: string; onReady: (sessionId: string) => void }) {
   const ref = useTerminalSession(tabId, tabId, onReady);
@@ -107,9 +117,11 @@ describe('useTerminalSession', () => {
       keyboardTarget: 'input',
     });
     useBlockStore.setState({ byTab: {} });
+    setTab('block');
   });
 
-  it('PTY 输出经管线处理，classic 场景写主 xterm', async () => {
+  it('classic 模式：数据直进主 xterm，不建块', async () => {
+    setTab('classic');
     render(<TestHarness tabId="t1" onReady={() => {}} />);
     await waitFor(() => expect(ptyOutputHandlers.length).toBe(1));
 
@@ -117,15 +129,18 @@ describe('useTerminalSession', () => {
     await waitFor(() => expect(writeMock).toHaveBeenCalledWith('hello'));
   });
 
-  it('收到 OSC 133;A 后 store scene 变为 blockList', async () => {
+  it('block 模式：初始即 blockList，OSC 133;A 建立 block', async () => {
     render(<TestHarness tabId="t1" onReady={() => {}} />);
     await waitFor(() => expect(ptyOutputHandlers.length).toBe(1));
 
+    // 初始场景已为 blockList（打开模式 block）
+    expect(useTerminalStore.getState().scenes['t1']).toBe('blockList');
+
     ptyOutputHandlers[0]!('sess-x', [{ kind: 'osc', code: '133;A', payload: '', raw: '\x1b]133;A\x07' }]);
-    await waitFor(() => expect(useTerminalStore.getState().scenes['t1']).toBe('blockList'));
+    await waitFor(() => expect(useBlockStore.getState().byTab['t1']?.length).toBe(1));
   });
 
-  it('block 结构变化同步到 blockStore', async () => {
+  it('block 模式：block 结构变化同步到 blockStore', async () => {
     render(<TestHarness tabId="t1" onReady={() => {}} />);
     await waitFor(() => expect(ptyOutputHandlers.length).toBe(1));
 

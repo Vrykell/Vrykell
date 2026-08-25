@@ -14,6 +14,9 @@ import { z } from 'zod';
 import { runCommandAndWait } from './runCommand';
 import { buildFileTools } from './files';
 import { buildSearchTools } from './search';
+import { buildTerminalTools } from './terminal';
+import { buildSkillTool } from './skill';
+import { enabledSkills } from '../skills';
 import { gate, levelOf, TOOL_NAMES, type ToolContext, type ToolName } from '../permissions';
 
 export type { ToolContext } from '../permissions';
@@ -26,7 +29,8 @@ export function buildTools(ctx: ToolContext) {
         '命令会显示在终端的输入块中（用户可见）。' +
         '注意：全屏应用（vim/htop 等 altScreen）下会拒绝执行；命令执行中切入全屏界面会立即停止等待；' +
         '无命令块信号的旧 shell 退化为输出快照（无法保证命令真正结束）；' +
-        '默认 120s 超时返回部分输出。交互式/长驻命令（如 dev server、TUI 程序）不要用此工具。',
+        '默认 120s 超时返回部分输出。交互式/长驻命令（如 dev server、TUI 程序）不要用此工具；' +
+        '全屏交互程序（vim/htop）改用 read_terminal + terminal_keys 驱动。',
       inputSchema: z.object({
         command: z.string().describe('要执行的完整 shell 命令（单行）'),
       }),
@@ -38,6 +42,9 @@ export function buildTools(ctx: ToolContext) {
     }),
     ...buildFileTools(ctx),
     ...buildSearchTools(ctx),
+    ...buildTerminalTools(ctx),
+    // use_skill：只在有启用技能时注册（无技能时注册也无意义，还给权限表添噪音）
+    ...(enabledSkills().length > 0 ? buildSkillTool(ctx) : {}),
   } as Record<ToolName, unknown>;
   // deny 级工具不注册（模型根本看不到，比 execute 拒绝更省 token）
   const out: ToolSet = {};
