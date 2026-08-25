@@ -18,8 +18,8 @@
  * 同组件服务两个视图：TerminalBlockList（块流内联）与 PanelChat（窗口转录）。
  */
 
-import { useEffect, useState } from 'react';
-import { Brain, Copy, Pencil, RotateCw, Trash2, Zap } from 'lucide-react';
+import { useState } from 'react';
+import { Brain, ChevronRight, Copy, Pencil, RotateCw, Trash2, Zap } from 'lucide-react';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { useChatStore } from '../stores/chat';
 import { useWorkspaceStore } from '../stores/workspace';
@@ -191,7 +191,7 @@ export default function AiBlock({ exchange }: { exchange: ChatExchange }) {
           <Rail bottom={answer.error ? 12 : answer.pending ? 0 : 4} />
           <EndDot top={6} />
           {answer.reasoning && (
-            <ThinkingBlock text={answer.reasoning} streaming={answer.pending ?? false} />
+            <ThinkingBlock text={answer.reasoning} />
           )}
           {parts
             ? parts.map((p, i) => {
@@ -252,34 +252,47 @@ export default function AiBlock({ exchange }: { exchange: ChatExchange }) {
   );
 }
 
-/** 可折叠的「思考」块：流式时自动展开，完成后折叠可点开。 */
-function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }) {
-  const [open, setOpen] = useState(streaming);
-  useEffect(() => {
-    if (streaming) setOpen(true);
-  }, [streaming]);
+/** 可折叠的「思考」块（默认折叠，点击展开）。 */
+function ThinkingBlock({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const preview = text.split('\n').find((l) => l.trim()) ?? '';
   return (
     <div style={ROW}>
       <button
         data-subtle
         onClick={() => setOpen((o) => !o)}
+        title={open ? '收起思考过程' : '展开思考过程'}
         style={{
-          display: 'inline-flex', alignItems: 'center', gap: 5,
-          fontFamily: 'var(--font-ui)', fontSize: 11, fontWeight: 400,
-          padding: '1px 0', border: 'none', background: 'transparent',
-          color: 'var(--text-muted)', cursor: 'pointer',
+          display: 'inline-flex', alignItems: 'center', gap: 4,
+          fontFamily: 'var(--font-ui)', fontSize: 11,
+          padding: '2px 6px', border: 'none', borderRadius: 4,
+          background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+          maxWidth: '100%',
         }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}
       >
-        <Brain size={11} />
-        思考过程
-        <span style={{ fontSize: 9, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.12s ease' }}>▸</span>
+        <ChevronRight
+          size={11}
+          style={{ color: 'var(--text-muted)', flexShrink: 0, transition: 'transform 0.12s ease', transform: open ? 'rotate(90deg)' : 'none' }}
+        />
+        <Brain size={11} style={{ flexShrink: 0 }} />
+        <span style={{ flexShrink: 0 }}>思考过程</span>
+        {!open && preview && (
+          <span style={{
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            fontSize: 10, color: 'var(--text-muted)', opacity: 0.6, minWidth: 0,
+          }}>
+            {preview}
+          </span>
+        )}
       </button>
       {open && (
         <div
           style={{
-            marginTop: 4, padding: '6px 10px',
-            background: 'var(--hover)', borderRadius: 'var(--radius-inner)',
-            fontSize: 11, lineHeight: 1.55, color: 'var(--text-secondary)',
+            marginTop: 4, marginLeft: 1, padding: '2px 0 2px 12px',
+            borderLeft: '2px solid var(--border-strong)',
+            fontSize: 11, lineHeight: 1.6, color: 'var(--text-secondary)',
             whiteSpace: 'pre-wrap', wordBreak: 'break-word',
           }}
         >

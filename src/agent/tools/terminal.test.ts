@@ -95,6 +95,14 @@ describe('buildTerminalTools', () => {
     expect(r).toEqual({ ok: true, sent: keys.length, scene: 'classic' });
   });
 
+  it('terminal_keys：容错把误写的 \\xNN 转成控制字符（退格/快捷键可用）', async () => {
+    ptyWriteMock.mockResolvedValue(undefined);
+    // 模型误写 JSON 不支持的 \x7f（退格）与 \x03（Ctrl+C）：字面量 \xNN 应被转换后发送
+    const r = await execOf(buildTerminalTools(CTX).terminal_keys)({ keys: 'helo\\x7f\\x03', wait_ms: 0 });
+    expect(ptyWriteMock).toHaveBeenCalledWith('sid1', 'helo\x7f\x03');
+    expect(r).toEqual({ ok: true, sent: 6, scene: 'classic' });
+  });
+
   it('terminal_keys：ptyWrite 报错 → ok:false 不 throw', async () => {
     ptyWriteMock.mockRejectedValue(new Error('pty closed'));
     const r = await execOf(buildTerminalTools(CTX).terminal_keys)({ keys: 'x', wait_ms: 0 });

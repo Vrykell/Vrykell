@@ -71,32 +71,40 @@ export function buildTerminalTools(ctx: ToolContext) {
 
     terminal_keys: tool({
       description:
-        '向当前聚焦终端发送原始按键序列（驱动 vim 等交互式 TUI）。不等待命令完成。' +
-        '控制字符用转义表示：\\u0003=Ctrl+C、\\u0004=Ctrl+D、\\u001b=Esc（vim 退出插入/命令模式）、' +
-        '\\r 或 \\n=回车、\\t=Tab。普通可见字符直接写。' +
-        '典型：用 vim 写文件 = terminal_keys("vi 路径\\r") → read_terminal() 看画面 →' +
+        '向当前聚焦终端发送原始按键序列（驱动 vim、REPL 等交互程序）。不等待命令完成。' +
+        '按键用 JSON 转义表达（合法转义：\\b=退格、\\u0001=Ctrl+A 行首、\\u0003=Ctrl+C、\\u0004=Ctrl+D、' +
+        '\\u0005=Ctrl+E 行尾、\\u0015=Ctrl+U 清空输入行、\\u0017=Ctrl+W 删除前一个词、\\u001a=Ctrl+Z、' +
+        '\\u001b=Esc、\\u001b[A=↑、\\u001b[B=↓、\\u001b[C=→、\\u001b[D=←、\\r=回车、\\t=Tab）。' +
+        '注意：JSON 不支持 \\x 转义，退格必须写 \\b 或 \\u007f，不能用 \\x7f。' +
+        '普通可见字符直接写。若输入有误，用 \\b 退格修正（如 "helo\\b" → "hel"）。' +
+        '典型：vim 写文件 = terminal_keys("vi 路径\\r") → read_terminal() 看画面 →' +
         ' terminal_keys("i") 进插入模式 → terminal_keys("文件内容") →' +
         ' terminal_keys("\\u001b:wq\\r") 保存退出。发送后可用 read_terminal() 核对效果。',
       inputSchema: z.object({
-        keys: z.string().describe('要发送的按键序列；控制字符用 \\uXXXX 转义（如 \\u001b=Esc、\\u0003=Ctrl+C）'),
+        keys: z.string().describe('要发送的按键序列；退格=\\b、Ctrl+C=\\u0003、Esc=\\u001b、↑=\\u001b[A，其余控制字符同理用 \\uXXXX'),
         wait_ms: z.number().int().min(0).max(3000).optional().describe('发送后等待毫秒让画面更新，默认 300'),
       }),
       execute: async ({ keys, wait_ms }, { toolCallId }) => {
         const g = await gate('terminal_keys', { keys }, toolCallId, ctx);
         if (!g.proceed) return g.result;
+        // 容错：模型可能误写 \xNN（JSON 不支持的转义），转为对应控制字符后再发送
+        const normalized = keys.replace(
+          /\\x([0-9a-fA-F]{2})/g,
+          (_, h: string) => String.fromCharCode(parseInt(h, 16)),
+        );
         const paneId = getFocusedTerminalId();
         const sessionId = useTerminalStore.getState().sessions[paneId];
         if (!sessionId) {
           return { ok: false, error: '没有可用的终端会话（请先打开一个终端）' };
         }
         try {
-          await ptyWrite(sessionId, keys);
+          await ptyWrite(sessionId, normalized);
         } catch (e) {
           return { ok: false, error: `写入终端失败: ${e instanceof Error ? e.message : String(e)}` };
         }
         const wait = wait_ms ?? 300;
         if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-        return { ok: true, sent: keys.length, scene: useTerminalStore.getState().scenes[paneId] ?? 'classic' };
+        return { ok: true, sent: normalized.length, scene: useTerminalStore.getState().scenes[paneId] ?? 'classic' };
       },
     }),
   };

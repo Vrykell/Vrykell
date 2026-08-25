@@ -22,7 +22,7 @@ export interface ModelBehaviorSettings {
   agentMode: boolean;
   /** 深度思考开关（providerOptions 透传 reasoning_effort / thinking budget） */
   deepThink: boolean;
-  /** 最大迭代步数（AI SDK stepCountIs；1–20） */
+  /** 最大迭代步数（AI SDK stepCountIs；1–100） */
   maxSteps: number;
   /** 上下文策略：off=全量；window=按 token 预算窗口；compact=预算 + 自动摘要压缩 */
   contextStrategy: ContextStrategy;
@@ -74,7 +74,7 @@ export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
     pwsh: 'block',
     cmd: 'block',
   },
-  maxSteps: 8,
+  maxSteps: 50,
   contextStrategy: 'compact',
   contextMaxTokens: 24000,
   contextSummaryTokens: 400,
@@ -134,7 +134,7 @@ export const useAgentSettings = create<AgentSettingsState>()(
     }),
     {
       name: 'vrykell-agent-settings',
-      version: 6,
+      version: 7,
       migrate: (persisted: unknown, version: number) => {
         // v0/v1（平铺）→ 收进 global；v2（缺新字段）→ 补齐默认值
         let state: { global: AgentSettings; overrides: Record<string, Partial<ModelBehaviorSettings>> };
@@ -154,6 +154,10 @@ export const useAgentSettings = create<AgentSettingsState>()(
         if (state && typeof state === 'object') {
           state.global = { ...DEFAULT_AGENT_SETTINGS, ...(state.global ?? {}) };
           state.overrides = state.overrides ?? {};
+        }
+        // v7：工具调用上限旧默认（<50）抬到 50
+        if (state && typeof state.global.maxSteps === 'number' && state.global.maxSteps < 50) {
+          state.global.maxSteps = 50;
         }
         return state;
       },

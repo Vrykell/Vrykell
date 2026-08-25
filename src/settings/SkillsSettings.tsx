@@ -237,6 +237,124 @@ function SkillDetailPanel({ skill, onClose, onChanged }: {
   );
 }
 
+// ── 技能市场（弹层页面） ──
+
+function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
+  metas: SkillMeta[];
+  onClose: () => void;
+  onInstalled: () => void;
+}) {
+  const [marketUrl, setMarketUrl] = useState('');
+  const [remote, setRemote] = useState<RemoteSkill[]>([]);
+  const [browsing, setBrowsing] = useState(false);
+  const [installing, setInstalling] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState('');
+
+  const browse = async () => {
+    const url = marketUrl.trim();
+    if (!url) return;
+    setBrowsing(true);
+    try {
+      const list = await fetchRemoteSkills(url);
+      setRemote(list);
+      if (list.length === 0) toast('市场为空', 'info');
+    } catch (e) {
+      toast(String((e as Error)?.message ?? e), 'error');
+    } finally {
+      setBrowsing(false);
+    }
+  };
+
+  const install = async (r: RemoteSkill) => {
+    setInstalling((s) => new Set(s).add(r.name));
+    try {
+      await installSkillMd(r.name, r.description, r.prompt);
+      toast(`已安装 ${r.name}`, 'success');
+      onInstalled();
+    } catch (e) {
+      toast(String((e as Error)?.message ?? e), 'error');
+    } finally {
+      setInstalling((s) => { const n = new Set(s); n.delete(r.name); return n; });
+    }
+  };
+
+  const q = query.trim().toLowerCase();
+  const visible = q ? remote.filter((r) => r.name.toLowerCase().includes(q) || (r.description ?? '').toLowerCase().includes(q)) : remote;
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 30, background: 'var(--surface)',
+      display: 'flex', flexDirection: 'column', padding: '14px 18px', overflow: 'hidden',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <button onClick={onClose} style={{ ...btn }}>← 返回</button>
+        <span style={{ fontSize: 14, fontWeight: 600 }}>技能市场</span>
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>第三方技能默认未信任，安装后可查看来源再信任</span>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        <select value={marketUrl} onChange={(e) => setMarketUrl(e.target.value)} style={{ ...input, flexShrink: 0, width: 130 }}>
+          <option value="">自定义…</option>
+          {MARKETPLACES.map((m) => <option key={m.name} value={m.url}>{m.name}</option>)}
+        </select>
+        <input
+          value={marketUrl}
+          placeholder="市场清单 URL"
+          onChange={(e) => setMarketUrl(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') void browse(); }}
+          style={input}
+        />
+        <button onClick={() => void browse()} disabled={browsing} style={{ ...btn, flexShrink: 0 }}>
+          {browsing ? '浏览中…' : '浏览'}
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        <input
+          value={query}
+          placeholder="搜索技能…"
+          onChange={(e) => setQuery(e.target.value)}
+          style={input}
+        />
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', alignSelf: 'center', flexShrink: 0 }}>
+          {remote.length > 0 ? `共 ${remote.length} 个` : ''}
+        </span>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {remote.length === 0 && !browsing && (
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '8px 0' }}>
+            选择市场源并点「浏览」加载技能列表。
+          </div>
+        )}
+        {visible.map((r) => {
+          const installed = metas.some((m) => m.name === r.name);
+          return (
+            <div key={r.name} style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-inner)', padding: '8px 12px', background: 'var(--canvas)', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 600 }}>
+                  {r.name}
+                  {r.version ? <span style={{ color: 'var(--text-muted)', fontSize: 11 }}> v{r.version}</span> : null}
+                  {r.author ? <span style={{ color: 'var(--text-muted)', fontSize: 11 }}> · {r.author}</span> : null}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>{r.description || '无描述'}</div>
+              </div>
+              {installed ? (
+                <span style={{ fontSize: 11, padding: '2px 10px', borderRadius: 4, color: 'var(--success)', background: 'var(--success-bg)', flexShrink: 0 }}>已安装</span>
+              ) : (
+                <button onClick={() => void install(r)} disabled={installing.has(r.name)} style={{ ...btn, flexShrink: 0 }}>
+                  {installing.has(r.name) ? '安装中…' : '安装'}
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── 主页面 ──
 
 export default function SkillsSettings() {
@@ -246,10 +364,6 @@ export default function SkillsSettings() {
   const [importing, setImporting] = useState(false);
   const [warnDismissed, setWarnDismissed] = useState(false);
   const [market, setMarket] = useState(false);
-  const [marketUrl, setMarketUrl] = useState('');
-  const [remote, setRemote] = useState<RemoteSkill[]>([]);
-  const [browsing, setBrowsing] = useState(false);
-  const [installing, setInstalling] = useState<Set<string>>(new Set());
 
   const refresh = () => {
     listSkills().then(setMetas).catch((e) => toast(String((e as Error)?.message ?? e), 'error'));
@@ -313,34 +427,6 @@ export default function SkillsSettings() {
     refresh();
   };
 
-  const browseMarket = async () => {
-    const url = marketUrl.trim();
-    if (!url) return;
-    setBrowsing(true);
-    try {
-      const list = await fetchRemoteSkills(url);
-      setRemote(list);
-      if (list.length === 0) toast('市场为空', 'info');
-    } catch (e) {
-      toast(String((e as Error)?.message ?? e), 'error');
-    } finally {
-      setBrowsing(false);
-    }
-  };
-
-  const installRemote = async (r: RemoteSkill) => {
-    setInstalling((s) => new Set(s).add(r.name));
-    try {
-      await installSkillMd(r.name, r.description, r.prompt);
-      toast(`已安装 ${r.name}`, 'success');
-      refresh();
-    } catch (e) {
-      toast(String((e as Error)?.message ?? e), 'error');
-    } finally {
-      setInstalling((s) => { const n = new Set(s); n.delete(r.name); return n; });
-    }
-  };
-
   return (
     <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 10 }}>
       {!warnDismissed && (
@@ -386,47 +472,11 @@ export default function SkillsSettings() {
       </div>
 
       {market && (
-        <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-inner)', padding: '10px 12px', background: 'var(--canvas)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <select
-              value={marketUrl}
-              onChange={(e) => setMarketUrl(e.target.value)}
-              style={{ ...input, flexShrink: 0, width: 130 }}
-            >
-              <option value="">自定义…</option>
-              {MARKETPLACES.map((m) => <option key={m.name} value={m.url}>{m.name}</option>)}
-            </select>
-            <input
-              value={marketUrl}
-              placeholder="市场清单 URL"
-              onChange={(e) => setMarketUrl(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') void browseMarket(); }}
-              style={input}
-            />
-            <button onClick={() => void browseMarket()} disabled={browsing} style={{ ...btn, flexShrink: 0 }}>
-              {browsing ? '浏览中…' : '浏览'}
-            </button>
-            <button onClick={() => setMarket(false)} style={{ ...btn, flexShrink: 0 }}>收起</button>
-          </div>
-          {remote.map((r) => (
-            <div key={r.name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 600 }}>
-                  {r.name}
-                  {r.version ? <span style={{ color: 'var(--text-muted)', fontSize: 11 }}> v{r.version}</span> : null}
-                  {r.author ? <span style={{ color: 'var(--text-muted)', fontSize: 11 }}> · {r.author}</span> : null}
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.description || '无描述'}</div>
-              </div>
-              <button onClick={() => void installRemote(r)} disabled={installing.has(r.name)} style={{ ...btn, flexShrink: 0 }}>
-                {installing.has(r.name) ? '安装中…' : '安装'}
-              </button>
-            </div>
-          ))}
-          {remote.length === 0 && !browsing && (
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>输入市场清单 URL 后点「浏览」。</div>
-          )}
-        </div>
+        <SkillMarketplacePanel
+          metas={metas}
+          onClose={() => setMarket(false)}
+          onInstalled={refresh}
+        />
       )}
 
       {metas.length === 0 && (
