@@ -88,6 +88,54 @@ export function getRecentOutput(maxLines = 30): string {
   return getRecentOutputFor(getFocusedTerminalId(), maxLines);
 }
 
+/** 实时终端画面（read_terminal 工具用）。 */
+export interface TerminalScreen {
+  scene: Scene;
+  cols: number;
+  rows: number;
+  /** 光标在可见画面内的位置（0-based 行、列）；块列表等无光标场景为 null */
+  cursorY: number | null;
+  cursorX: number | null;
+  /** 可见画面文本（带行号，去尾部空行） */
+  content: string;
+}
+
+/**
+ * 读取指定 pane 主 xterm 当前可见画面（classic / altScreen 场景）。
+ * 覆盖范围 = 当前 viewport（alt buffer 即整个屏幕；normal buffer 为可见视口）。
+ * 无 xterm 实例（如 blockList 下主 xterm 闲置/已卸载）返回 null，调用方自行回退。
+ */
+export function getTerminalScreen(paneId: string): TerminalScreen | null {
+  const ts = useTerminalStore.getState();
+  const scene = ts.scenes[paneId] ?? 'classic';
+  const dims = ts.dims[paneId] ?? { cols: 80, rows: 24 };
+  const term = termInstances.get(paneId);
+  if (!term) return null;
+  const buf = term.buffer.active;
+  const cols = term.cols || dims.cols;
+  const rows = term.rows || dims.rows;
+  // viewportY = 可见区域顶部在 buffer 内的绝对行号；alt buffer 无 scrollback，恒为 0
+  const start = Math.max(0, buf.viewportY);
+  const end = Math.min(buf.length - 1, start + rows - 1);
+  const lines: string[] = [];
+  for (let i = start; i <= end; i++) {
+    const line = buf.getLine(i);
+    lines.push(line ? line.translateToString(true) : '');
+  }
+  while (lines.length > 0 && lines[lines.length - 1]!.trim() === '') lines.pop();
+  const content = lines
+    .map((l, i) => `${String(i + 1).padStart(2, ' ')}│${l}`)
+    .join('\n');
+  return {
+    scene,
+    cols,
+    rows,
+    cursorY: buf.cursorY,
+    cursorX: buf.cursorX,
+    content,
+  };
+}
+
 interface TerminalState {
   /** tabId → PTY session id */
   sessions: Record<string, string>;

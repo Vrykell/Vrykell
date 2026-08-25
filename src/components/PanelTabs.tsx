@@ -193,7 +193,7 @@ export default function PanelTabs() {
       {/* 顶栏 */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 4,
-        padding: '6px 8px', borderBottom: '1px solid var(--border)',
+        padding: '6px 8px',
         position: 'relative',
       }}>
         <div style={{

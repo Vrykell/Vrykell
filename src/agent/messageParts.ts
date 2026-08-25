@@ -57,6 +57,11 @@ const TOOL_LABEL: Record<string, string> = {
   web_search: '联网搜索',
   google_search: '联网搜索',
   web_fetch: '抓取网页',
+  web_crawl: '爬取网页',
+  read_terminal: '读取终端',
+  terminal_keys: '终端按键',
+  use_skill: '调用技能',
+  mcp: 'MCP 工具',
   think: '思考',
 };
 

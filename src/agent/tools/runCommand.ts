@@ -51,7 +51,13 @@ export async function runCommandAndWait(
     return { ok: false, output: '', error: '没有可用的终端会话（请先打开一个终端）' };
   }
   if (ts.scenes[paneId] === 'altScreen') {
-    return { ok: false, output: '', error: '终端正在运行全屏应用（altScreen），拒绝执行' };
+    return {
+      ok: false,
+      output: '',
+      error:
+        '终端正在运行全屏应用（altScreen，如 vim/htop）。run_command 只用于非交互命令；' +
+        '若需驱动这个全屏程序，请改用 read_terminal（看画面）+ terminal_keys（发按键）。',
+    };
   }
 
   const timeoutMs = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -107,8 +113,9 @@ function waitForCompletion(
           ok: false,
           output: '',
           error:
-            '命令切入了全屏交互界面（TUI 模式），agent 无法读取其输出，已停止等待。' +
-            '程序仍在终端中运行，用户可直接在终端里操作。以后请改用非交互式命令（加 --help/--version 等标志或重定向输出）。',
+            '命令切入了全屏交互界面（TUI 模式），run_command 无法读取其输出，已停止等待。' +
+            '程序仍在终端中运行。若需继续操作这个全屏程序，请用 read_terminal（看画面）+' +
+            'terminal_keys（发按键）驱动它，或用非交互式命令（加 --help/--version 等标志或重定向输出）。',
         });
       }
     });

@@ -9,6 +9,7 @@
 
 import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
 import { useWorkspaceStore, nextTerminalId } from '../stores/workspace';
+import { defaultOpenModeForShell } from '../agent/agentSettings';
 import { useTerminalStore } from '../stores/terminal';
 import { useUiStore } from '../stores/ui';
 import { useDockDragStore } from '../stores/dockDrag';
@@ -85,7 +86,11 @@ export default function TerminalView() {
     const base = splitPlacement.spec ?? findLeaf(layout, zone.leafId);
     if (!base) return;
     const newId = nextTerminalId(activeId, layout);
-    const next = splitLeaf(layout, zone.leafId, zone.dir, zone.position, { ...base, id: newId });
+    // 打开模式：继承源模式，未设置则回退：SSH 经典、local 按 shell 类型
+    const openMode = base.openMode ?? (base.kind === 'ssh'
+      ? 'classic'
+      : defaultOpenModeForShell(base.shellType));
+    const next = splitLeaf(layout, zone.leafId, zone.dir, zone.position, { ...base, id: newId, openMode });
     setWindowLayout(activeId, next);
     setFocusedPane(newId);
     cancelSplit();
@@ -148,9 +153,9 @@ export default function TerminalView() {
         <LoadingState />
       )}
 
-      {/* 手动全屏宿主（块终端「进入全屏交互」） */}
+      {/* 手动全屏宿主（块终端「进入全屏交互」）：贴边，无内边距 */}
       {altScreenActive && (
-        <div data-testid="tui-fullscreen" style={{ position: 'absolute', inset: 0, zIndex: 100, background: 'var(--canvas)', padding: '28px 8px 8px' }} />
+        <div data-testid="tui-fullscreen" style={{ position: 'absolute', inset: 0, zIndex: 100, background: 'var(--canvas)' }} />
       )}
 
       {/* 终端区域右键菜单 */}

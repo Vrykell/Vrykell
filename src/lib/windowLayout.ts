@@ -21,6 +21,8 @@ export interface TerminalSpec {
   shellType?: string;
   ssh?: { name: string; host: string; user?: string; port?: number; connectionId?: string };
   cwd?: string;
+  /** 打开模式：classic = 经典 xterm；block = 块列表视图（SSH 恒 classic） */
+  openMode?: 'classic' | 'block';
 }
 
 export type WindowLayout =

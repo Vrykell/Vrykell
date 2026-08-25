@@ -16,8 +16,12 @@ import { estimateTokens, planContext, IMAGE_TOKEN_ESTIMATE, type SizedMessage } 
 import { attachmentsForModel, supportsVision } from './attachments';
 import { buildTools } from './tools';
 import { buildTavilySearchTool } from './tools/webSearch';
-import { buildWebSearchTool, buildWebFetchTool } from './tools/webFetch';
-import { levelOf } from './permissions';
+import { buildWebSearchTool, buildWebFetchTool, buildWebCrawlTool } from './tools/webFetch';
+import { buildSystemPrompt } from './systemPrompt';
+import { buildSkillsContext } from './skills';
+import { listMcpTools, buildMcpTool } from './mcp';
+import { levelOf, type ToolContext } from './permissions';
+import type { ToolRunState } from './messageParts';
 
 interface AiConfigInfoRust {
   has_key: boolean;
@@ -130,9 +134,14 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     tabId: ctx?.tabId,
     signal: ctx?.signal,
   });
-  const modelMessages: ModelMessage[] = plan.system
-    ? [{ role: 'system', content: plan.system }, ...plan.messages]
-    : plan.messages;
+  // 系统提示词：自定义（设置里）优先，否则内置默认；压缩摘要（compact）作为运行上下文追加。
+  // AI SDK v7 默认 allowSystemInMessages=false：system 必须走 instructions 选项，
+  // 不能塞进 messages（否则 provider 校验直接抛 InvalidPromptError）。
+  const skillsContext = buildSkillsContext();
+  const systemPrompt = [buildSystemPrompt(settings.systemPrompt, plan.system), skillsContext]
+    .filter(Boolean)
+    .join('\n\n');
+  const modelMessages: ModelMessage[] = plan.messages;
 
   // 工具调用账本：tool-result/tool-error 事件重建完整 ToolRun 需要
   // toolName/input/startedAt（result 部分不一定带回 input）
@@ -145,25 +154,24 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   // 联网优先级：provider 原生（anthropic web_search / gemini google_search，
   // 服务端执行）→ openai-compatible 用 Tavily 转发兜底。
   // 权限只到「注册/不注册」一级：原生工具无本地 execute，per-call 审批不适用。
-  const tools: ToolSet = agentMode
-    ? buildTools({
-        signal: ctx?.signal,
-        tabId: ctx?.tabId,
-        // M3 审批状态回写：gate() 在 ask/决定时把 ToolRun 打到
-        // approval-pending / running / denied（含危险命令原因）
-        setToolState: (toolCallId, state, extra) => {
-          const c = calls.get(toolCallId);
-          emitTool?.({
-            toolCallId,
-            toolName: c?.toolName ?? 'unknown',
-            input: c?.input ?? {},
-            startedAt: c?.startedAt ?? Date.now(),
-            state,
-            ...(extra?.danger ? { danger: extra.danger } : {}),
-          });
-        },
-      })
-    : {};
+  // M3 审批状态回写：gate() 在 ask/决定时把 ToolRun 打到
+  // approval-pending / running / denied（含危险命令原因）。本地工具与 MCP 工具共用。
+  const toolContext: ToolContext = {
+    signal: ctx?.signal,
+    tabId: ctx?.tabId,
+    setToolState: (toolCallId, state: ToolRunState, extra) => {
+      const c = calls.get(toolCallId);
+      emitTool?.({
+        toolCallId,
+        toolName: c?.toolName ?? 'unknown',
+        input: c?.input ?? {},
+        startedAt: c?.startedAt ?? Date.now(),
+        state,
+        ...(extra?.danger ? { danger: extra.danger } : {}),
+      });
+    },
+  };
+  const tools: ToolSet = agentMode ? buildTools(toolContext) : {};
   if (agentMode && settings.webSearch && levelOf('web_search') !== 'deny') {
     const native = createNativeWebSearchTool(info.provider);
     if (native) {
@@ -175,9 +183,24 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
       tools.web_search = buildWebSearchTool({ signal: ctx?.signal, tabId: ctx?.tabId });
     }
   }
-  // webfetch 技能：抓取任意 URL → 可读文本（联网开启即注册）
-  if (agentMode && settings.webSearch && levelOf('web_fetch') !== 'deny') {
+  // webfetch / web_crawl：一等工具，与 read_file/edit_file 同级 —— 只要 agent 模式
+  // 且未被 deny 就注册（不依赖「联网搜索」开关；开关只控制上面的 web_search）。
+  if (agentMode && levelOf('web_fetch') !== 'deny') {
     tools.web_fetch = buildWebFetchTool({ signal: ctx?.signal, tabId: ctx?.tabId });
+  }
+  if (agentMode && levelOf('web_crawl') !== 'deny') {
+    tools.web_crawl = buildWebCrawlTool({ signal: ctx?.signal, tabId: ctx?.tabId });
+  }
+  // MCP：把已连接服务器暴露的工具包装成 `mcp__<server>__<tool>`。连接失败/无服务器时静默跳过。
+  if (agentMode && levelOf('mcp') !== 'deny') {
+    try {
+      const mcpTools = await listMcpTools();
+      for (const mt of mcpTools) {
+        tools[`mcp__${mt.server}__${mt.name}`] = buildMcpTool(mt, toolContext);
+      }
+    } catch (e) {
+      console.warn('[agentStream] 获取 MCP 工具失败（可能无已连接服务器）:', e);
+    }
   }
   const hasTools = Object.keys(tools).length > 0;
 
@@ -187,6 +210,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   const result = streamText({
     model,
     messages: modelMessages,
+    instructions: systemPrompt || undefined,
     tools: hasTools ? tools : undefined,
     stopWhen: hasTools ? stepCountIs(Math.max(1, Math.round(settings.maxSteps))) : undefined,
     abortSignal: ctx?.signal,

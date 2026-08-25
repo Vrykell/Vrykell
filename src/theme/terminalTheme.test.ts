@@ -1,9 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
-vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
+const { invokeMock, convertFileSrcMock } = vi.hoisted(() => ({
+  invokeMock: vi.fn(),
+  convertFileSrcMock: vi.fn(),
+}));
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: invokeMock,
+  convertFileSrc: convertFileSrcMock,
+}));
 
-import { applyTerminalTheme, useTerminalThemeStore } from './terminalTheme';
+import { applyTerminalTheme, applyCachedWallpaper, useTerminalThemeStore } from './terminalTheme';
 import { setThemeOverrides } from './tokens';
 
 const BASE = { opacity: 1, backgroundImage: null as string | null, vars: {} as Record<string, string> };
@@ -11,17 +17,17 @@ const BASE = { opacity: 1, backgroundImage: null as string | null, vars: {} as R
 describe('terminalTheme store（壁纸解析）', () => {
   beforeEach(() => {
     invokeMock.mockReset();
+    convertFileSrcMock.mockReset();
+    localStorage.clear();
     useTerminalThemeStore.setState({ config: { ...BASE }, wallpaperDataUrl: null, loaded: true });
     setThemeOverrides({});
   });
 
-  it('设置背景图片时把本地路径解析为 data URL 并存入 wallpaperDataUrl', async () => {
-    invokeMock.mockResolvedValue('data:image/png;base64,ZmFrZWltYWdl');
+  it('设置背景图片时把本地路径转为 asset URL 并存入 wallpaperDataUrl', async () => {
+    convertFileSrcMock.mockReturnValue('asset://localhost/%2Ftmp%2Fbg.png');
     await useTerminalThemeStore.getState().update({ backgroundImage: '/tmp/bg.png' });
-    expect(invokeMock).toHaveBeenCalledWith('read_image_data_url', { path: '/tmp/bg.png' });
-    expect(useTerminalThemeStore.getState().wallpaperDataUrl).toBe(
-      'data:image/png;base64,ZmFrZWltYWdl',
-    );
+    expect(convertFileSrcMock).toHaveBeenCalledWith('/tmp/bg.png');
+    expect(useTerminalThemeStore.getState().wallpaperDataUrl).toBe('asset://localhost/%2Ftmp%2Fbg.png');
   });
 
   it('清除背景图片时 wallpaperDataUrl 为 null', async () => {
@@ -29,10 +35,19 @@ describe('terminalTheme store（壁纸解析）', () => {
     expect(useTerminalThemeStore.getState().wallpaperDataUrl).toBe(null);
   });
 
-  it('读取壁纸失败时 wallpaperDataUrl 回退为 null', async () => {
-    invokeMock.mockRejectedValue(new Error('读取失败'));
+  it('转换失败时 wallpaperDataUrl 回退为 null', async () => {
+    convertFileSrcMock.mockImplementation(() => {
+      throw new Error('bad path');
+    });
     await useTerminalThemeStore.getState().update({ backgroundImage: '/tmp/bg.png' });
     expect(useTerminalThemeStore.getState().wallpaperDataUrl).toBe(null);
+  });
+
+  it('applyCachedWallpaper 从缓存同步应用壁纸 URL', () => {
+    localStorage.setItem('vrykell-wallpaper-url', 'asset://localhost/%2Ftmp%2Fbg.png');
+    useTerminalThemeStore.setState({ wallpaperDataUrl: null });
+    applyCachedWallpaper();
+    expect(useTerminalThemeStore.getState().wallpaperDataUrl).toBe('asset://localhost/%2Ftmp%2Fbg.png');
   });
 });
 

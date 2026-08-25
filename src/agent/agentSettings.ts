@@ -11,6 +11,7 @@
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { ShellType } from '../lib/shells';
 
 /** 上下文管理策略（code-agent 式） */
 export type ContextStrategy = 'off' | 'window' | 'compact';
@@ -37,6 +38,8 @@ export interface ModelBehaviorSettings {
   maxOutputTokens: number;
   /** 采样温度；null = provider 默认 */
   temperature: number | null;
+  /** 自定义系统提示词（空 = 使用内置默认提示词） */
+  systemPrompt: string;
 }
 
 /** 全局偏好（应用级，不按模型覆盖） */
@@ -51,6 +54,8 @@ export interface GlobalPrefs {
   completeModel: string;
   /** 补全防抖毫秒 */
   completeDebounceMs: number;
+  /** 各 shell 类型（bash/zsh/powershell/...）的默认打开模式；SSH 恒为经典模式，不在此配置 */
+  openModeByShell: Record<ShellType, 'classic' | 'block'>;
 }
 
 /** 生效设置 = 行为 + 全局偏好 */
@@ -65,6 +70,13 @@ export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   completeEnabled: true,
   completeModel: '',
   completeDebounceMs: 200,
+  openModeByShell: {
+    zsh: 'block',
+    bash: 'block',
+    powershell: 'block',
+    pwsh: 'block',
+    cmd: 'block',
+  },
   maxSteps: 8,
   contextStrategy: 'compact',
   contextMaxTokens: 24000,
@@ -72,6 +84,7 @@ export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   contextToolChars: 8192,
   maxOutputTokens: 0,
   temperature: null,
+  systemPrompt: '',
 };
 
 interface AgentSettingsState {
@@ -85,6 +98,13 @@ interface AgentSettingsState {
   resetModel: (modelId: string) => void;
   /** 合并全局默认 + 模型覆盖得到生效值；不传 modelId = 纯全局 */
   resolve: (modelId?: string) => AgentSettings;
+}
+
+/** 本地终端（shell）的默认打开模式；未知 shell 回退 block。SSH 恒经典，不经过这里。 */
+export function defaultOpenModeForShell(shellType?: string): 'classic' | 'block' {
+  const t = (shellType || 'zsh') as ShellType;
+  const map = useAgentSettings.getState().global.openModeByShell;
+  return (map && map[t]) || 'block';
 }
 
 export const useAgentSettings = create<AgentSettingsState>()(
@@ -117,7 +137,7 @@ export const useAgentSettings = create<AgentSettingsState>()(
     }),
     {
       name: 'vrykell-agent-settings',
-      version: 3,
+      version: 5,
       migrate: (persisted: unknown, version: number) => {
         // v0/v1（平铺）→ 收进 global；v2（缺新字段）→ 补齐默认值
         let state: { global: AgentSettings; overrides: Record<string, Partial<ModelBehaviorSettings>> };

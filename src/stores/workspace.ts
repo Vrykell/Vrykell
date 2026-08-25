@@ -10,6 +10,7 @@ import {
 import type { BackendGroupEntry } from '../search/types';
 import { useBlockStore } from './blocks';
 import { useChatStore } from './chat';
+import { defaultOpenModeForShell } from '../agent/agentSettings';
 import { useTerminalStore, getFocusedTerminalId } from './terminal';
 import type { ShellType } from '../lib/shells';
 import { shellTypeLabel } from '../lib/shells';
@@ -197,6 +198,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         id: `${id}#0`,
         kind: 'ssh',
         cwd: o.cwd,
+        openMode: 'classic', // SSH 恒经典模式
         ssh: { name: ssh!.name, host: ssh!.host, user: ssh!.user, port: ssh!.port, connectionId: ssh!.connectionId },
       };
       tab = {
@@ -212,7 +214,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     } else if (o.kind === 'settings') {
       tab = { id, title: SETTINGS_TITLE, kind: 'settings', named: true };
     } else {
-      const term: TerminalSpec = { id: `${id}#0`, kind: 'local', cwd: o.cwd, shellType: o.shellType };
+      const term: TerminalSpec = {
+        id: `${id}#0`, kind: 'local', cwd: o.cwd, shellType: o.shellType,
+        openMode: defaultOpenModeForShell(o.shellType),
+      };
       tab = {
         id,
         title: o.title || (o.shellType ? shellTypeLabel(o.shellType) : DEFAULT_TITLE),
@@ -378,6 +383,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const spec: TerminalSpec = {
       id: newId, kind: src.kind, shellType: src.shellType,
       ssh: src.ssh ? { ...src.ssh } : undefined, cwd: src.cwd,
+      // 继承源模式；源未设置（老会话）则回退：SSH 经典、local 按 shell 类型
+      openMode: src.openMode ?? (src.kind === 'ssh' ? 'classic' : defaultOpenModeForShell(src.shellType)),
     };
     const next = splitLeaf(tab.layout, termId, dir, 'second', spec);
     ws.setWindowLayout(tab.id, next);

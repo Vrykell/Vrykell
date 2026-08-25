@@ -16,7 +16,9 @@ import { useWorkspaceStore } from '../stores/workspace';
 import { leaves as layoutLeaves } from '../lib/windowLayout';
 import * as sessionManager from '../lib/sessionManager';
 import { agentControl } from '../agent/agentControl';
+import { defaultOpenModeForShell } from '../agent/agentSettings';
 import { SessionController } from './pipeline/sessionController';
+import type { DispatchEvent } from './pipeline/events';
 import type { TermBlock } from './pipeline/termBlock';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 
@@ -115,14 +117,26 @@ export function useTerminalSession(
 
     let sessionId: string | null = null;
     let disposed = false;
+    // spawn 完成前的初始输出缓冲（shell 启动提示符）：拿到 sessionId 后回放，避免丢失
+    let preSession: { id: string; events: DispatchEvent[] }[] = [];
     const unlisteners: UnlistenFn[] = [];
     const pendingUnlisteners: Promise<UnlistenFn>[] = [];
     let focusTimer: ReturnType<typeof setTimeout> | null = null;
 
     // ── 管线：controller（扫描已在 Rust 端完成，这里直接消费事件） ──
 
+    // 从窗口布局取该终端的打开模式（paneId 即终端 id）
+    const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === tabId);
+    const spec = tab && tab.kind === 'session'
+      ? layoutLeaves(tab.layout).find((t) => t.id === paneId)
+      : undefined;
+    // 打开模式：spec.openMode 优先；老会话缺省时 SSH 回退 classic、local 按 shell 类型
+    const openMode = spec?.openMode ?? (spec?.kind === 'ssh' ? 'classic' : defaultOpenModeForShell(spec?.shellType));
+    const blockEnabled = openMode === 'block';
+    const initialScene: 'classic' | 'blockList' = blockEnabled ? 'blockList' : 'classic';
+
     // 场景本地镜像（onSceneChanged 同步）：决定 resize 用全宽还是卡片宽
-    let currentScene: 'classic' | 'blockList' | 'altScreen' = 'classic';
+    let currentScene: 'classic' | 'blockList' | 'altScreen' = initialScene;
     const controller = new SessionController(paneId, term.cols, {      writeMain: (data) => term.write(data),
       getBookmarkedIds: () =>
         new Set((useBlockStore.getState().byTab[paneId] ?? []).filter((b) => b.bookmarked).map((b) => b.id)),
@@ -186,8 +200,18 @@ export function useTerminalSession(
         while (lines.length > 0 && !lines[lines.length - 1]!.trim()) lines.pop();
         return lines.join('\r\n');
       },
-    }, term.rows);
+    }, term.rows, initialScene, blockEnabled);
     sessionControllers.set(paneId, controller);
+    // 初始场景手动落位（无 OSC 133 触发）：
+    // blockList → 清 classic 残留、焦点到输入栏；classic → 焦点到 xterm 直接打字
+    if (initialScene === 'blockList') {
+      useTerminalStore.getState().setScene(paneId, 'blockList');
+      term.reset();
+      useTerminalStore.getState().setKeyboardTarget('input');
+    } else {
+      useTerminalStore.getState().setKeyboardTarget('terminal');
+      focusTimer = setTimeout(() => term.focus(), 50);
+    }
 
     // 会话恢复：restore 已把持久化 block 按 pane 写进 store（在 addTab 之前），
     // 这里播种进 controller，避免首次 onBlocksChanged 用空列表覆盖恢复结果。
@@ -201,6 +225,11 @@ export function useTerminalSession(
     pendingUnlisteners.push(
       onPtyOutput((id, events) => {
         if (disposed) return;
+        if (sessionId === null) {
+          // 尚未拿到 sessionId：先缓冲，等 spawn 完成后回放
+          preSession.push({ id, events });
+          return;
+        }
         if (id === sessionId) {
           controller.handleEvents(events);
         }
@@ -216,11 +245,7 @@ export function useTerminalSession(
 
     // ── PTY 启动 ──
 
-    // 从窗口布局里取该终端的类型/cwd（paneId 即终端 id）
-    const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === tabId);
-    const spec = tab && tab.kind === 'session'
-      ? layoutLeaves(tab.layout).find((t) => t.id === paneId)
-      : undefined;
+    // 类型/cwd 已在 controller 创建前取好（spec）
     const tabCwd = spec?.cwd;
     const spawnOpts = spec?.kind === 'ssh'
       ? { ssh: { host: spec.ssh?.host ?? '', user: spec.ssh?.user, port: spec.ssh?.port } }
@@ -238,6 +263,13 @@ export function useTerminalSession(
           return;
         }
         sessionId = id;
+        // 回放 spawn 完成前缓冲的初始输出（shell 启动提示符）
+        for (const ev of preSession) {
+          if (ev.id === sessionId) {
+            controller.handleEvents(ev.events);
+          }
+        }
+        preSession = [];
         onReadyRef.current(id);
         // PTY 就绪后按真实布局尺寸重校
         requestAnimationFrame(() => {

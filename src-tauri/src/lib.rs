@@ -4,6 +4,7 @@ mod commands;
 mod db;
 mod fs;
 mod file_open;
+mod mcp;
 mod pty;
 mod scan;
 mod shell_integration;
@@ -42,6 +43,7 @@ pub fn run() {
         .manage(theme::ThemeState::load())
         .manage(ai::LlmStreamState::default())
         .manage(pty::KillState::default())
+        .manage(mcp::McpState::default())
         .invoke_handler(tauri::generate_handler![
             greet,
             ai::set_ai_key,
@@ -68,6 +70,16 @@ pub fn run() {
             theme::read_image_data_url,
             web::web_search,
             web::web_fetch,
+            web::web_crawl,
+            web::fetch_skill_registry,
+            mcp::mcp_get_servers,
+            mcp::mcp_save_server,
+            mcp::mcp_remove_server,
+            mcp::mcp_toggle_server,
+            mcp::mcp_connect,
+            mcp::mcp_disconnect,
+            mcp::mcp_list_all_tools,
+            mcp::mcp_call_tool,
             pty::pty_spawn,
             shells::list_shells,
             ssh::ssh_connections_list,
