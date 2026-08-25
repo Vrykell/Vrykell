@@ -55,7 +55,7 @@ export default function Segmented<T extends string>({
               border: 'none',
               cursor: 'pointer',
               background: active ? 'var(--accent)' : 'transparent',
-              color: active ? '#0d0d0d' : 'var(--text-secondary)',
+              color: active ? 'var(--accent-text)' : 'var(--text-secondary)',
               borderTopLeftRadius: first ? innerRadius : 0,
               borderBottomLeftRadius: first ? innerRadius : 0,
               borderTopRightRadius: last ? innerRadius : 0,

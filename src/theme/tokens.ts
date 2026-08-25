@@ -106,168 +106,168 @@ export interface ThemePalette {
 // ── Dark ──
 
 const dark: ThemePalette = {
-  // VSCode Dark+（官方色板）：中深灰背景 + 蓝 accent + 经典 syntax 色
-  canvas: '#0A0A0A',          // 主背景（更黑，侧栏与终端统一）
-  surface: '#0A0A0A',         // 与终端同色
-  block: '#171717',           // 对话框/命令块（亮一档）
-  elevated: '#242424',        // 浮层（再亮一档）
-  hover: 'rgba(255,255,255,0.07)',
-  buttonHover: '#1E1E1E',
+  // 冷调石墨灰底（带一丝蓝，比纯灰更「设计感」），叠壁纸时不显灰扑扑
+  canvas: '#0B0D11',          // 主背景（冷黑，侧栏与终端统一）
+  surface: '#0B0D11',         // 与终端同色
+  block: '#14171C',           // 对话框/命令块（亮一档，冷）
+  elevated: '#1E222A',        // 浮层（再亮一档）
+  hover: 'rgba(255,255,255,0.06)',
+  buttonHover: '#1A1E25',
 
-  border: '#2A2A2A',
-  borderStrong: '#3A3A3A',
-  inputBorder: '#2E2E2E',
+  border: '#242931',
+  borderStrong: '#333A45',
+  inputBorder: 'rgba(255,255,255,0.09)',
 
   // 文字
-  textPrimary: '#E8E8E8',
-  textSecondary: '#ABABAB',
-  textMuted: '#6C6C6C',
+  textPrimary: '#E8EAEF',
+  textSecondary: '#99A1AD',
+  textMuted: '#626B78',
 
-  // 主色：点缀绿（选中/激活态，保证可辨识）
-  accent: '#9AC8A8',
-  accentDim: 'rgba(154,200,168,0.25)',
-  accentText: '#0A0A0A',
+  // 主色：清透青绿（更干净、与冷灰对比清楚）
+  accent: '#57D4C2',
+  accentDim: 'rgba(87,212,194,0.22)',
+  accentText: '#06201C',
 
-  // 信息检索：亮灰绿
-  accentBlue: '#90BF9F',
-  accentBlueDim: 'rgba(144,191,159,0.22)',
-  accentBlueStrong: '#A5CDB0',
+  // 信息检索：冷蓝
+  accentBlue: '#6FB6E8',
+  accentBlueDim: 'rgba(111,182,232,0.20)',
+  accentBlueStrong: '#8FC8EE',
 
-  // AI 语义：更亮的绿
-  accentWarm: '#A8D8B4',
-  accentWarmDim: 'rgba(168,216,180,0.2)',
+  // AI 语义：暖琥珀（与主色冷暖分离，语义清晰）
+  accentWarm: '#E2A878',
+  accentWarmDim: 'rgba(226,168,120,0.18)',
 
   // 用户消息：浅灰
-  accentUser: '#A5A5A5',
-  accentUserDim: 'rgba(165,165,165,0.15)',
+  accentUser: '#9AA1AD',
+  accentUserDim: 'rgba(154,161,173,0.14)',
 
-  // 语义色（VSCode 提示色）
-  success: '#89D185',
-  successDim: 'rgba(137,209,133,0.15)',
-  error: '#F14C4C',
-  errorDim: 'rgba(241,76,76,0.15)',
-  errorLight: '#F48771',
-  warning: '#CCA700',
+  // 语义色
+  success: '#6FCF7C',
+  successDim: 'rgba(111,207,124,0.15)',
+  error: '#F06A6A',
+  errorDim: 'rgba(240,106,106,0.15)',
+  errorLight: '#F0928A',
+  warning: '#E0B34A',
 
-  blockCmdText: '#D4D4D4',
-  blockCmdFailed: '#F48771',
-  blockDivider: 'rgba(255,255,255,0.08)',
+  blockCmdText: '#D6DAE2',
+  blockCmdFailed: '#F0928A',
+  blockDivider: 'rgba(255,255,255,0.07)',
 
-  // 终端语法高亮（VSCode Dark+ 官方 syntax）
-  cmdFlag: '#90BF9F',         // 亮灰绿
-  cmdPath: '#A8D8B4',         // 更亮绿
-  cmdPipe: '#82B091',         // 中灰绿
-  cmdRedirect: '#82B091',
-  cmdString: '#AFC99F',       // 浅绿
+  // 终端语法高亮
+  cmdFlag: '#7FB8E6',         // 冷蓝
+  cmdPath: '#5BD4C2',         // 主色青绿
+  cmdPipe: '#9B8CE8',         // 柔紫
+  cmdRedirect: '#9B8CE8',
+  cmdString: '#D9B98A',       // 暖沙
 
-  searchHighlightBg: 'rgba(144,191,159,0.28)',
+  searchHighlightBg: 'rgba(87,212,194,0.22)',
 
-  shellConnected: '#89D185',
-  shellDisconnected: '#7A7A7A',
+  shellConnected: '#6FCF7C',
+  shellDisconnected: '#6B7280',
 
-  overlay: 'rgba(0,0,0,0.45)',
-  overlayLight: 'rgba(0,0,0,0.32)',
-  shadowSm: '0 2px 12px rgba(0,0,0,0.35)',
-  shadowMd: '0 4px 16px rgba(0,0,0,0.5)',
-  shadowLg: '0 8px 32px rgba(0,0,0,0.6)',
+  overlay: 'rgba(0,0,0,0.55)',
+  overlayLight: 'rgba(0,0,0,0.40)',
+  shadowSm: '0 1px 3px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04)',
+  shadowMd: '0 4px 14px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06)',
+  shadowLg: '0 10px 30px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.06)',
 
-  accentBg: 'rgba(255,255,255,0.06)',
-  accentBgStrong: '#1E1E1E',
-  successBg: 'rgba(137,209,133,0.12)',
-  errorBg: 'rgba(241,76,76,0.12)',
-  errorBadgeBg: 'rgba(241,76,76,0.08)',
+  accentBg: 'rgba(87,212,194,0.08)',
+  accentBgStrong: '#1A2026',
+  successBg: 'rgba(111,207,124,0.10)',
+  errorBg: 'rgba(240,106,106,0.10)',
+  errorBadgeBg: 'rgba(240,106,106,0.08)',
 
-  tuiBanner: '#A8D8B4',
-  codeBg: 'rgba(255,255,255,0.06)',
-  thBg: 'rgba(255,255,255,0.05)',
-  commandBlockBg: 'rgba(255,255,255,0.03)',
-  scrollbarThumb: 'rgba(139,139,139,0.3)',
-  scrollbarThumbHover: 'rgba(139,139,139,0.5)',
-  apiKeyBg: 'rgba(137,209,133,0.1)',
-  apiKeyBorder: 'rgba(137,209,133,0.3)',
+  tuiBanner: '#E2A878',
+  codeBg: 'rgba(255,255,255,0.05)',
+  thBg: 'rgba(255,255,255,0.04)',
+  commandBlockBg: 'rgba(255,255,255,0.025)',
+  scrollbarThumb: 'rgba(255,255,255,0.14)',
+  scrollbarThumbHover: 'rgba(255,255,255,0.22)',
+  apiKeyBg: 'rgba(87,212,194,0.08)',
+  apiKeyBorder: 'rgba(87,212,194,0.28)',
 
-  xtermBg: '#0A0A0A',
-  xtermCursor: '#C8C8C8',
-  xtermSelection: 'rgba(255,255,255,0.16)',
+  xtermBg: '#0B0D11',
+  xtermCursor: '#CFD3DB',
+  xtermSelection: 'rgba(255,255,255,0.18)',
 };
 
 // ── Light ──
 
 const light: ThemePalette = {
-  // VSCode Light+（官方色板）
-  canvas: '#FFFFFF',          // editor.background
-  surface: '#F3F3F3',         // sideBar.background
-  block: '#ECECEC',
-  elevated: '#E4E4E4',
+  // 冷调浅灰底（带一丝蓝），与暗色同构
+  canvas: '#FBFCFD',          // editor.background
+  surface: '#F3F5F7',         // sideBar.background
+  block: '#ECEEF1',
+  elevated: '#E4E7EB',
   hover: 'rgba(0,0,0,0.05)',
-  buttonHover: '#E4E4E4',
+  buttonHover: '#E4E7EB',
 
-  border: '#D4D4D4',
-  borderStrong: '#C0C0C0',
-  inputBorder: '#D4D4D4',
+  border: '#D7DBE0',
+  borderStrong: '#C2C8CF',
+  inputBorder: 'rgba(0,0,0,0.12)',
 
-  textPrimary: '#1F1F1F',
-  textSecondary: '#5D5D5D',
-  textMuted: '#8C8C8C',
+  textPrimary: '#1A1D22',
+  textSecondary: '#545B66',
+  textMuted: '#8A909B',
 
-  accent: '#3F7D54',
-  accentDim: 'rgba(63,125,84,0.15)',
+  accent: '#1E9E8C',
+  accentDim: 'rgba(30,158,140,0.15)',
   accentText: '#FFFFFF',
 
-  accentBlue: '#6FA183',
-  accentBlueDim: 'rgba(111,161,131,0.18)',
-  accentBlueStrong: '#59876B',
+  accentBlue: '#2E7FB8',
+  accentBlueDim: 'rgba(46,127,184,0.16)',
+  accentBlueStrong: '#1E6FA8',
 
-  accentWarm: '#84BF96',
-  accentWarmDim: 'rgba(132,191,150,0.16)',
+  accentWarm: '#C07A2E',
+  accentWarmDim: 'rgba(192,122,46,0.14)',
 
-  accentUser: '#5D5D5D',
-  accentUserDim: 'rgba(93,93,93,0.12)',
+  accentUser: '#545B66',
+  accentUserDim: 'rgba(84,91,102,0.12)',
 
-  success: '#2F8132',
-  successDim: 'rgba(47,129,50,0.12)',
-  error: '#A31515',
-  errorDim: 'rgba(163,21,21,0.1)',
-  errorLight: '#C94F4F',
-  warning: '#795E26',
+  success: '#2F8A3A',
+  successDim: 'rgba(47,138,58,0.12)',
+  error: '#C23A3A',
+  errorDim: 'rgba(194,58,58,0.1)',
+  errorLight: '#D65A5A',
+  warning: '#9A7415',
 
-  blockCmdText: '#3B3B3B',
-  blockCmdFailed: '#C94F4F',
+  blockCmdText: '#33383F',
+  blockCmdFailed: '#D65A5A',
   blockDivider: 'rgba(0,0,0,0.08)',
 
-  cmdFlag: '#6FA183',
-  cmdPath: '#84BF96',
-  cmdPipe: '#59876B',
-  cmdRedirect: '#59876B',
-  cmdString: '#8FAA80',
+  cmdFlag: '#2E7FB8',
+  cmdPath: '#1E9E8C',
+  cmdPipe: '#6B5BB0',
+  cmdRedirect: '#6B5BB0',
+  cmdString: '#A87E3A',
 
-  searchHighlightBg: 'rgba(95,138,111,0.16)',
+  searchHighlightBg: 'rgba(30,158,140,0.16)',
 
-  shellConnected: '#2F8132',
-  shellDisconnected: '#8C8C8C',
+  shellConnected: '#2F8A3A',
+  shellDisconnected: '#8A909B',
 
   overlay: 'rgba(0,0,0,0.15)',
   overlayLight: 'rgba(0,0,0,0.1)',
-  shadowSm: '0 2px 12px rgba(0,0,0,0.08)',
-  shadowMd: '0 4px 16px rgba(0,0,0,0.12)',
-  shadowLg: '0 8px 32px rgba(0,0,0,0.16)',
+  shadowSm: '0 1px 3px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.5)',
+  shadowMd: '0 4px 14px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.6)',
+  shadowLg: '0 10px 30px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.6)',
 
-  accentBg: 'rgba(46,46,46,0.06)',
-  accentBgStrong: '#D8D8D8',
-  successBg: 'rgba(47,129,50,0.08)',
-  errorBg: 'rgba(163,21,21,0.07)',
-  errorBadgeBg: 'rgba(163,21,21,0.05)',
+  accentBg: 'rgba(30,158,140,0.08)',
+  accentBgStrong: '#D8DEE3',
+  successBg: 'rgba(47,138,58,0.08)',
+  errorBg: 'rgba(194,58,58,0.07)',
+  errorBadgeBg: 'rgba(194,58,58,0.05)',
 
-  tuiBanner: '#84BF96',
+  tuiBanner: '#C07A2E',
   codeBg: 'rgba(0,0,0,0.04)',
   thBg: 'rgba(0,0,0,0.03)',
   commandBlockBg: 'rgba(0,0,0,0.02)',
   scrollbarThumb: 'rgba(0,0,0,0.18)',
   scrollbarThumbHover: 'rgba(0,0,0,0.3)',
-  apiKeyBg: 'rgba(26,127,55,0.08)',
-  apiKeyBorder: 'rgba(26,127,55,0.25)',
+  apiKeyBg: 'rgba(30,158,140,0.08)',
+  apiKeyBorder: 'rgba(30,158,140,0.25)',
 
-  xtermBg: '#FFFFFF',
+  xtermBg: '#FBFCFD',
   xtermCursor: '#2E2E2E',
   xtermSelection: 'rgba(46,46,46,0.14)',
 };

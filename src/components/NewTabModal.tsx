@@ -105,6 +105,7 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
         position: 'fixed', inset: 0, zIndex: 9996,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: 'var(--overlay)',
+        animation: 'overlayIn 0.18s var(--ease)',
       }}
       onClick={onClose}
     >
@@ -114,6 +115,7 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
           background: 'var(--elevated)', border: '1px solid var(--border-strong)',
           borderRadius: 'var(--radius-block)', boxShadow: 'var(--shadow-lg)',
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          animation: 'modalIn 0.22s var(--ease-out)',
         }}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKey}

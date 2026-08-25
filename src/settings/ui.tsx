@@ -22,7 +22,7 @@ export const btnStyle: React.CSSProperties = {
 export function Field({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
     <div style={{ marginBottom: 24 }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>{title}</div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2, letterSpacing: '0.01em' }}>{title}</div>
       {description && (
         <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 10 }}>{description}</div>
       )}
@@ -48,8 +48,8 @@ export function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) =
       <span
         style={{
           position: 'absolute', top: 2, left: on ? 17 : 2, width: 15, height: 15,
-          borderRadius: '50%', transition: 'left 0.12s ease',
-          background: on ? '#0d0d0d' : 'var(--text-muted)',
+          borderRadius: '50%', transition: 'left 0.16s var(--ease)',
+          background: on ? 'var(--accent-text)' : 'var(--text-muted)',
         }}
       />
     </button>
