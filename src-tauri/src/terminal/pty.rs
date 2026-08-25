@@ -6,8 +6,8 @@ use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager, State};
 use uuid::Uuid;
 
-use crate::shell_integration;
-use crate::scan::{ScanEvent, StreamScanner};
+use crate::terminal::shell_integration;
+use crate::terminal::scan::{ScanEvent, StreamScanner};
 
 /// 流式 UTF-8 解码器：跨 read 边界缓冲不完整的多字节序列。
 pub struct StreamDecoder {
@@ -237,7 +237,7 @@ fn default_windows_shell() -> &'static str {
     static DEFAULT: OnceLock<&'static str> = OnceLock::new();
     DEFAULT.get_or_init(|| {
         for prog in ["pwsh", "powershell"] {
-            if crate::shells::shell_ok(prog) {
+            if crate::terminal::shells::shell_ok(prog) {
                 return prog;
             }
         }

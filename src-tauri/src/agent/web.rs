@@ -83,7 +83,7 @@ fn http_client() -> Result<reqwest::Client, String> {
 }
 
 /// follow_redirects=false 的客户端：重定向由 fetch_public 逐跳校验，防 SSRF。
-fn http_client_impl(follow_redirects: bool) -> Result<reqwest::Client, String> {
+pub(crate) fn http_client_impl(follow_redirects: bool) -> Result<reqwest::Client, String> {
     let mut b = reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(10))
         .timeout(Duration::from_secs(30))
@@ -149,7 +149,7 @@ async fn validate_public_url(url: &str) -> Result<(), String> {
 }
 
 /// 逐跳校验重定向的公网抓取（SSRF 防护）。
-async fn fetch_public(client: &reqwest::Client, url: &str) -> Result<reqwest::Response, String> {
+pub(crate) async fn fetch_public(client: &reqwest::Client, url: &str) -> Result<reqwest::Response, String> {
     let mut current = url.to_string();
     for _ in 0..10 {
         validate_public_url(&current).await?;

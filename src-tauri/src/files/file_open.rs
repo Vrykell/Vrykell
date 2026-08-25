@@ -156,7 +156,7 @@ where
 pub async fn file_open(path: String, cfg: FileOpenConfig) -> Result<FileOpenResult, String> {
     // which_cmd_sync 会 spawn 登录 shell 解析 PATH，阻塞；放到阻塞线程池避免卡事件循环。
     tauri::async_runtime::spawn_blocking(move || {
-        file_open_sync(&path, &cfg, |c| crate::fs::which_cmd_sync(c.to_string()))
+        file_open_sync(&path, &cfg, |c| crate::files::fs::which_cmd_sync(c.to_string()))
     })
     .await
     .map_err(|e| e.to_string())?
