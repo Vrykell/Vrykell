@@ -132,22 +132,24 @@ export default function ModelPicker({ open, onClose }: { open: boolean; onClose:
 
   return createPortal(
     <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 10000,
-        background: 'rgba(0,0,0,0.45)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
         style={{
-          width: 480, maxWidth: 'calc(100vw - 48px)', maxHeight: 'min(560px, 80vh)',
-          display: 'flex', flexDirection: 'column',
-          background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: 12, boxShadow: 'var(--shadow-lg)', overflow: 'hidden',
+          position: 'fixed', inset: 0, zIndex: 10000,
+          background: 'var(--overlay)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          animation: 'overlayIn 0.18s var(--ease)',
         }}
+        onClick={onClose}
       >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            width: 480, maxWidth: 'calc(100vw - 48px)', maxHeight: 'min(560px, 80vh)',
+            display: 'flex', flexDirection: 'column',
+            background: 'var(--elevated)', border: '1px solid var(--border)',
+            borderRadius: 12, boxShadow: 'var(--shadow-lg)', overflow: 'hidden',
+            animation: 'modalIn 0.22s var(--ease-out)',
+          }}
+        >
         {/* 顶部：标题 + 搜索框 */}
         <div style={{ padding: '14px 16px 10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
@@ -306,7 +308,7 @@ export function ModelScopeBar({
           <div
             style={{
               position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 9999,
-              minWidth: 200, background: 'var(--surface)', border: '1px solid var(--border)',
+              minWidth: 200, background: 'var(--elevated)', border: '1px solid var(--border)',
               borderRadius: 8, boxShadow: 'var(--shadow-md)', padding: '4px',
             }}
           >

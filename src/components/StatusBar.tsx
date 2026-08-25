@@ -22,11 +22,12 @@ export default function StatusBar() {
         padding: '0 12px',
         background: 'var(--surface)',
         borderTop: '1px solid var(--block-divider)',
-        fontSize: 10,
+        fontSize: 11,
         color: 'var(--text-muted)',
         userSelect: 'none',
-        gap: 10,
+        gap: 12,
         fontFamily: 'var(--font-mono)',
+        letterSpacing: '0.02em',
       }}
     >
       {/* 连接状态 */}
@@ -51,7 +52,7 @@ export default function StatusBar() {
 
       <div style={{ flex: 1 }} />
 
-      <span style={{ opacity: 0.6 }}>{model}</span>
+      <span style={{ color: 'var(--text-secondary)' }}>{model}</span>
     </div>
   );
 }

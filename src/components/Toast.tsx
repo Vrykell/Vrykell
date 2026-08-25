@@ -44,12 +44,12 @@ export default function ToastContainer() {
     }}>
       {toasts.map((t) => (
         <div key={t.id} style={{
-          padding: '6px 18px', borderRadius: 6, fontSize: 12,
+          padding: '7px 18px', borderRadius: 8, fontSize: 12.5, letterSpacing: '0.01em',
           background: COLORS[t.type].bg,
           border: `1px solid ${COLORS[t.type].border}`,
           color: 'var(--text-primary)',
-          boxShadow: 'var(--shadow-sm)',
-          animation: 'toastIn 0.2s ease',
+          boxShadow: 'var(--shadow-md)',
+          animation: 'toastIn 0.24s var(--ease)',
         }}>
           {t.message}
         </div>

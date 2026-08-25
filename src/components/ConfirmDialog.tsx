@@ -31,6 +31,7 @@ export default function ConfirmDialog({
         position: 'fixed', inset: 0, zIndex: 9997,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: 'var(--overlay)',
+        animation: 'overlayIn 0.18s var(--ease)',
       }}
       onClick={onCancel}
       data-testid="confirm-dialog"
@@ -40,6 +41,7 @@ export default function ConfirmDialog({
           width: 360, background: 'var(--elevated)', border: '1px solid var(--border-strong)',
           borderRadius: 'var(--radius-block)', boxShadow: 'var(--shadow-lg)', padding: 14,
           display: 'flex', flexDirection: 'column', gap: 10,
+          animation: 'modalIn 0.22s var(--ease-out)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -59,7 +61,7 @@ export default function ConfirmDialog({
             padding: '5px 16px', fontSize: 12, border: 'none',
             borderRadius: 'var(--radius-inner)',
             background: danger ? 'var(--error)' : 'var(--accent)',
-            color: danger ? '#fff' : '#0d0d0d', cursor: 'pointer',
+            color: danger ? '#fff' : 'var(--accent-text)', cursor: 'pointer',
           }}>{confirmLabel}</button>
         </div>
       </div>
