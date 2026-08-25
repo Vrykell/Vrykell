@@ -1,7 +1,7 @@
 # Vrykell 产品开发日志
 
-> 依据 git 历史（238 条提交，2026-07-20 → 2026-08-17）整理。
-> 本项目是一个 **chat-first 终端**：终端是主表面，每个命令渲染为一个**命令块（Block）**，AI 对话（Anthropic BYOK 直连）以内联面板显示在终端上方。
+> 依据 git 历史整理（2026-07-20 → 2026-08-26，当前分支 `dev`）。
+> 本项目是一个 **chat-first 终端**：终端是主表面，每个命令渲染为一个**命令块（Block）**，AI 对话（BYOK 多 provider）以内联 AI 块 + 全局 AI 面板双形态展示，并支持代码代理（工具、权限、Skills、MCP、记忆、调度）。
 
 ---
 
@@ -20,6 +20,9 @@
 | Phase 8 | 08-15 | 性能/内存批量修复 | OSC/CSI、fileOpen、AI 流式下沉 Rust |
 | Phase 9 | 08-15 ~ 08-16 | 企业功能与安全 | SSH、下载、会话历史、分组、代码审计 |
 | Phase 10 | 08-16 ~ 08-17 | 分屏、全局搜索与收尾 | 分屏块列表模型、Cmd+F 搜索、单测补全 |
+| Phase 11 | 08-18 | 品牌与跨平台 | 改名 Vrykell、PowerShell 集成、分屏窗口布局模型 |
+| Phase 12 | 08-21 ~ 08-24 | AI 代理（代码代理） | 工具调用、权限模式、附件、上下文管理、智能标题、消息部件 |
+| Phase 13 | 08-25 ~ 08-26 | 设置体系与模型能力 | Skills/MCP/设置页、多模型管理、ContextRing、e2e 收敛 |
 
 ---
 
@@ -246,9 +249,52 @@
 
 ---
 
+## Phase 11 — 品牌更名与跨平台完善（2026-08-18）
+
+- 项目从「AI Terminal」更名为 **Vrykell**，更新相关文档与配置。
+- **PowerShell 集成**：shell 命令与文件系统处理适配 PowerShell/CMD，shell 类型扩展到 `zsh/bash/powershell/pwsh/cmd`。
+- **分屏窗口布局模型**：TerminalSpec / 分裂树（N/S/E/W），拖拽创建与 ResizeHandle 调整。
+- 终端窗口管理（多标签拖拽恢复）、标签行图标与样式优化、当前目录显示逻辑改善（目录长度限制）、字体大小与样式调整。
+- 拖拽支持需检查 Tauri 内部环境（`is_in_tauri_env`）。
+
+**小结**：品牌定型，跨平台 shell 支持与分屏布局模型落地。
+
+## Phase 12 — AI 代理（代码代理式功能）（2026-08-21 ~ 08-24）
+
+把 AI 从「纯聊天」升级为**代码代理**：工具执行 + 权限 + 上下文治理。
+
+### 代理基建
+- **agentStream**：AI SDK `streamText` 实测路径（stepCountIs 循环 + run_command 工具），取代早期的 anthropic 直连流；**消息部件模型**（`messageParts.ts`：ToolRun 状态、工具节点渲染）。
+- 网络层 `createChatModel` 注入 Rust 代理 fetch（API key 不出 Rust）；多 provider：Anthropic / Gemini / OpenAI 兼容 + Tavily 搜索。
+- **权限模式**：标准/严格/放行 三档（状态栏 Shield chip 循环切换，颜色双通道辨识）。
+- **附件系统**：导入/粘贴/保存附件（按 provider 能力裁剪），LIMITS 与类型提示。
+- **上下文管理**：off/window/compact 三策略 + token 估算（`estimateTokens`）+ 摘要压缩；输入编辑器/终端组件增加权限模式切换。
+- **智能标题**：块/对话活动足够时用 LLM 生成标签标题（`agent/title.ts`，App 启动 `initAutoTitle`）。
+- **工具集**：runCommand、terminal、files、skill、subagent、memory、schedule、webSearch、webFetch、webCrawl（Tavily/内置两类）。
+- 聊天面板增强：inline（AiBlock）+ 面板（PanelChat 会话转录）双形态；模型选择器（ModelPicker/ModelPill）。
+
+### 交互与样式
+- 输入编辑器：历史前缀匹配候选、本地历史补全；代码块样式优化（长内容折行）。
+- 持久化：AI 对话/流式配置增强、attachments/工具运行状态。
+
+**小结**：AI 能力从「问答」升级为「可执行代理」，上下文治理（预算与压缩）与权限分层初步成型。
+
+## Phase 13 — 设置体系、MCP/Skills 与收尾（2026-08-25 ~ 08-26）
+
+- **Skills 管理**：技能列表 + 树 + 详情面板（安装/停用/编辑）、`standardSkills`、skill 工具集成。
+- **MCP 集成**：服务器列表/启停/连接测试/工具枚举（`mcp_save_server` 等命令），工具装配进 agentStream。
+- **设置页体系**：AI 行为、模型配置（每模型覆盖）、MCP 管理、快捷键说明、终端打开模式（每 shell classic/block，SSH 恒经典）、主题自定义（导入导出 + 透明度）。
+- **ContextRing**：上下文用量可视化组件（token 预算环）。
+- 模型能力模型（vision/reasoning/tools/search capabilities）、e2e 初始化逻辑与断言优化。
+- 小修：滚动条悬停显示、错误边界、组件重构。
+
+**小结**：设置从单页演化为多页体系（行为/模型/代理/主题分层），MCP 与 Skills 补全代理生态，功能范围收敛趋于稳定。
+
+---
+
 ## 现状与后续
 
-- **当前架构**（详见 `docs/architecture.md`）：PTY 输出 → StreamDispatcher 同步扫描 → SessionController 三场景状态机（OSC 133 驱动）→ 每 executing block 一个离屏 xterm，完成后提取 outputHtml 快照 → scene 驱动 UI。
-- **技术栈**：Tauri 2（Rust）+ React 19 + TypeScript + Vite；终端 `@xterm/xterm`；状态 zustand；AI `@anthropic-ai/sdk`（BYOK）+ react-markdown + KaTeX；测试 vitest + Playwright。
-- **待办**：按功能清单持续补齐 backlog。
+- **当前架构**（详见 `docs/architecture.md`）：PTY 输出 → **Rust StreamScanner 同步扫描**（`src-tauri/src/terminal/scan.rs`）→ SessionController 三场景状态机（OSC 133 驱动）→ 每 executing block 一个离屏 xterm，完成后提取 outputHtml 快照 → scene 驱动 UI。分屏时每 pane 独立 controller；经典/块两种打开模式可按 shell 配置。
+- **技术栈**：Tauri 2（Rust）+ React 19 + TypeScript + Vite；终端 `@xterm/xterm`；状态 zustand；AI SDK（BYOK 多 provider，Anthropic/Gemini/OpenAI 兼容）+ react-markdown + KaTeX；测试 vitest + Playwright。
+- **待办**：SSH TOFU 用户确认、SSH 密码 Keychain 化（见 `docs/security-review.md`）仍未处理；按功能清单持续补齐 backlog。
 - **合规**：第三方依赖许可说明见 `NOTICE`。

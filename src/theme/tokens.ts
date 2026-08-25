@@ -30,6 +30,8 @@ export interface ThemePalette {
   // 主强调色
   accent: string;
   accentDim: string;
+  /** accent 背景上的文字色（保证对比度） */
+  accentText: string;
 
   // 次强调色（shell 指示器/搜索高亮/InlineAI 前缀 等蓝色场景）
   accentBlue: string;
@@ -104,159 +106,170 @@ export interface ThemePalette {
 // ── Dark ──
 
 const dark: ThemePalette = {
-  canvas: '#050505',
-  surface: '#0d0d0d',
-  block: '#131313',
-  elevated: '#181818',
-  hover: 'rgba(255,255,255,0.06)',
-  buttonHover: '#181818',
+  // VSCode Dark+（官方色板）：中深灰背景 + 蓝 accent + 经典 syntax 色
+  canvas: '#0A0A0A',          // 主背景（更黑，侧栏与终端统一）
+  surface: '#0A0A0A',         // 与终端同色
+  block: '#171717',           // 对话框/命令块（亮一档）
+  elevated: '#242424',        // 浮层（再亮一档）
+  hover: 'rgba(255,255,255,0.07)',
+  buttonHover: '#1E1E1E',
 
-  border: 'rgba(255,255,255,0.08)',
-  borderStrong: 'rgba(255,255,255,0.14)',
-  inputBorder: 'rgba(255,255,255,0.08)',
+  border: '#2A2A2A',
+  borderStrong: '#3A3A3A',
+  inputBorder: '#2E2E2E',
 
-  textPrimary: '#ffffff',
-  textSecondary: '#a0a5b0',
-  textMuted: '#5c6370',
+  // 文字
+  textPrimary: '#E8E8E8',
+  textSecondary: '#ABABAB',
+  textMuted: '#6C6C6C',
 
-  accent: '#ffffff',
-  accentDim: 'rgba(255,255,255,0.12)',
+  // 主色：点缀绿（选中/激活态，保证可辨识）
+  accent: '#9AC8A8',
+  accentDim: 'rgba(154,200,168,0.25)',
+  accentText: '#0A0A0A',
 
-  accentBlue: '#ffffff',
-  accentBlueDim: 'rgba(255,255,255,0.3)',
-  accentBlueStrong: '#ffffff',
+  // 信息检索：亮灰绿
+  accentBlue: '#90BF9F',
+  accentBlueDim: 'rgba(144,191,159,0.22)',
+  accentBlueStrong: '#A5CDB0',
 
-  accentWarm: '#d97757',
-  accentWarmDim: 'rgba(217,119,87,0.25)',
+  // AI 语义：更亮的绿
+  accentWarm: '#A8D8B4',
+  accentWarmDim: 'rgba(168,216,180,0.2)',
 
-  accentUser: '#8b6cff',
-  accentUserDim: 'rgba(139,108,255,0.12)',
+  // 用户消息：浅灰
+  accentUser: '#A5A5A5',
+  accentUserDim: 'rgba(165,165,165,0.15)',
 
-  success: '#1ca05a',
-  successDim: 'rgba(28,160,90,0.13)',
-  error: '#bc362a',
-  errorDim: 'rgba(188,54,42,0.13)',
-  errorLight: '#ff8a8a',
-  warning: '#c28000',
+  // 语义色（VSCode 提示色）
+  success: '#89D185',
+  successDim: 'rgba(137,209,133,0.15)',
+  error: '#F14C4C',
+  errorDim: 'rgba(241,76,76,0.15)',
+  errorLight: '#F48771',
+  warning: '#CCA700',
 
-  blockCmdText: '#c9cdd4',
-  blockCmdFailed: '#ff8a8a',
-  blockDivider: 'rgba(255,255,255,0.06)',
+  blockCmdText: '#D4D4D4',
+  blockCmdFailed: '#F48771',
+  blockDivider: 'rgba(255,255,255,0.08)',
 
-  cmdFlag: '#7ecfff',
-  cmdPath: '#8be0b8',
-  cmdPipe: '#8b6cff',
-  cmdRedirect: '#8b6cff',
-  cmdString: '#e5a050',
+  // 终端语法高亮（VSCode Dark+ 官方 syntax）
+  cmdFlag: '#90BF9F',         // 亮灰绿
+  cmdPath: '#A8D8B4',         // 更亮绿
+  cmdPipe: '#82B091',         // 中灰绿
+  cmdRedirect: '#82B091',
+  cmdString: '#AFC99F',       // 浅绿
 
-  searchHighlightBg: 'rgba(255,255,255,0.3)',
+  searchHighlightBg: 'rgba(144,191,159,0.28)',
 
-  shellConnected: '#4ade80',
-  shellDisconnected: '#6b7280',
+  shellConnected: '#89D185',
+  shellDisconnected: '#7A7A7A',
 
-  overlay: 'rgba(0,0,0,0.35)',
-  overlayLight: 'rgba(0,0,0,0.3)',
-  shadowSm: '0 2px 12px rgba(0,0,0,0.3)',
+  overlay: 'rgba(0,0,0,0.45)',
+  overlayLight: 'rgba(0,0,0,0.32)',
+  shadowSm: '0 2px 12px rgba(0,0,0,0.35)',
   shadowMd: '0 4px 16px rgba(0,0,0,0.5)',
-  shadowLg: '0 8px 32px rgba(0,0,0,0.55)',
+  shadowLg: '0 8px 32px rgba(0,0,0,0.6)',
 
-  accentBg: 'rgba(255,255,255,0.1)',
-  accentBgStrong: '#262626',
-  successBg: 'rgba(28,160,90,0.13)',
-  errorBg: 'rgba(188,54,42,0.13)',
-  errorBadgeBg: 'rgba(188,54,42,0.09)',
+  accentBg: 'rgba(255,255,255,0.06)',
+  accentBgStrong: '#1E1E1E',
+  successBg: 'rgba(137,209,133,0.12)',
+  errorBg: 'rgba(241,76,76,0.12)',
+  errorBadgeBg: 'rgba(241,76,76,0.08)',
 
-  tuiBanner: '#d97757',
-  codeBg: 'rgba(255,255,255,0.07)',
+  tuiBanner: '#A8D8B4',
+  codeBg: 'rgba(255,255,255,0.06)',
   thBg: 'rgba(255,255,255,0.05)',
   commandBlockBg: 'rgba(255,255,255,0.03)',
-  scrollbarThumb: 'rgba(255,255,255,0.12)',
-  scrollbarThumbHover: 'rgba(255,255,255,0.2)',
-  apiKeyBg: 'rgba(210,153,34,0.12)',
-  apiKeyBorder: 'rgba(210,153,34,0.35)',
+  scrollbarThumb: 'rgba(139,139,139,0.3)',
+  scrollbarThumbHover: 'rgba(139,139,139,0.5)',
+  apiKeyBg: 'rgba(137,209,133,0.1)',
+  apiKeyBorder: 'rgba(137,209,133,0.3)',
 
-  xtermBg: '#050505',
-  xtermCursor: '#e8e8e8',
-  xtermSelection: 'rgba(255,255,255,0.25)',
+  xtermBg: '#0A0A0A',
+  xtermCursor: '#C8C8C8',
+  xtermSelection: 'rgba(255,255,255,0.16)',
 };
 
 // ── Light ──
 
 const light: ThemePalette = {
-  canvas: '#ffffff',
-  surface: '#f5f5f5',
-  block: '#eeeeee',
-  elevated: '#e8e8e8',
-  hover: 'rgba(0,0,0,0.04)',
-  buttonHover: '#e8e8e8',
+  // VSCode Light+（官方色板）
+  canvas: '#FFFFFF',          // editor.background
+  surface: '#F3F3F3',         // sideBar.background
+  block: '#ECECEC',
+  elevated: '#E4E4E4',
+  hover: 'rgba(0,0,0,0.05)',
+  buttonHover: '#E4E4E4',
 
-  border: 'rgba(0,0,0,0.08)',
-  borderStrong: 'rgba(0,0,0,0.14)',
-  inputBorder: 'rgba(0,0,0,0.12)',
+  border: '#D4D4D4',
+  borderStrong: '#C0C0C0',
+  inputBorder: '#D4D4D4',
 
-  textPrimary: '#1a1a1a',
-  textSecondary: '#5c6370',
-  textMuted: '#9ca3af',
+  textPrimary: '#1F1F1F',
+  textSecondary: '#5D5D5D',
+  textMuted: '#8C8C8C',
 
-  accent: '#0d7ea8',
-  accentDim: 'rgba(13,126,168,0.12)',
+  accent: '#3F7D54',
+  accentDim: 'rgba(63,125,84,0.15)',
+  accentText: '#FFFFFF',
 
-  accentBlue: '#3b6fdd',
-  accentBlueDim: 'rgba(59,111,221,0.25)',
-  accentBlueStrong: '#3b6fdd',
+  accentBlue: '#6FA183',
+  accentBlueDim: 'rgba(111,161,131,0.18)',
+  accentBlueStrong: '#59876B',
 
-  accentWarm: '#c05620',
-  accentWarmDim: 'rgba(192,86,32,0.18)',
+  accentWarm: '#84BF96',
+  accentWarmDim: 'rgba(132,191,150,0.16)',
 
-  accentUser: '#6c4fd9',
-  accentUserDim: 'rgba(108,79,217,0.1)',
+  accentUser: '#5D5D5D',
+  accentUserDim: 'rgba(93,93,93,0.12)',
 
-  success: '#1a7f4b',
-  successDim: 'rgba(26,127,75,0.1)',
-  error: '#c04040',
-  errorDim: 'rgba(192,64,64,0.1)',
-  errorLight: '#d04040',
-  warning: '#b07800',
+  success: '#2F8132',
+  successDim: 'rgba(47,129,50,0.12)',
+  error: '#A31515',
+  errorDim: 'rgba(163,21,21,0.1)',
+  errorLight: '#C94F4F',
+  warning: '#795E26',
 
-  blockCmdText: '#4b5563',
-  blockCmdFailed: '#d04040',
-  blockDivider: 'rgba(0,0,0,0.06)',
+  blockCmdText: '#3B3B3B',
+  blockCmdFailed: '#C94F4F',
+  blockDivider: 'rgba(0,0,0,0.08)',
 
-  cmdFlag: '#1a6fb5',
-  cmdPath: '#1a7f4b',
-  cmdPipe: '#6c4fd9',
-  cmdRedirect: '#6c4fd9',
-  cmdString: '#c05620',
+  cmdFlag: '#6FA183',
+  cmdPath: '#84BF96',
+  cmdPipe: '#59876B',
+  cmdRedirect: '#59876B',
+  cmdString: '#8FAA80',
 
-  searchHighlightBg: 'rgba(59,111,221,0.25)',
+  searchHighlightBg: 'rgba(95,138,111,0.16)',
 
-  shellConnected: '#22c55e',
-  shellDisconnected: '#9ca3af',
+  shellConnected: '#2F8132',
+  shellDisconnected: '#8C8C8C',
 
   overlay: 'rgba(0,0,0,0.15)',
   overlayLight: 'rgba(0,0,0,0.1)',
   shadowSm: '0 2px 12px rgba(0,0,0,0.08)',
-  shadowMd: '0 4px 16px rgba(0,0,0,0.1)',
-  shadowLg: '0 8px 32px rgba(0,0,0,0.12)',
+  shadowMd: '0 4px 16px rgba(0,0,0,0.12)',
+  shadowLg: '0 8px 32px rgba(0,0,0,0.16)',
 
-  accentBg: 'rgba(13,126,168,0.1)',
-  accentBgStrong: '#e0e0e0',
-  successBg: 'rgba(26,127,75,0.1)',
-  errorBg: 'rgba(192,64,64,0.1)',
-  errorBadgeBg: 'rgba(192,64,64,0.06)',
+  accentBg: 'rgba(46,46,46,0.06)',
+  accentBgStrong: '#D8D8D8',
+  successBg: 'rgba(47,129,50,0.08)',
+  errorBg: 'rgba(163,21,21,0.07)',
+  errorBadgeBg: 'rgba(163,21,21,0.05)',
 
-  tuiBanner: '#c05620',
-  codeBg: 'rgba(0,0,0,0.05)',
+  tuiBanner: '#84BF96',
+  codeBg: 'rgba(0,0,0,0.04)',
   thBg: 'rgba(0,0,0,0.03)',
   commandBlockBg: 'rgba(0,0,0,0.02)',
-  scrollbarThumb: 'rgba(0,0,0,0.15)',
-  scrollbarThumbHover: 'rgba(0,0,0,0.25)',
-  apiKeyBg: 'rgba(210,153,34,0.1)',
-  apiKeyBorder: 'rgba(210,153,34,0.3)',
+  scrollbarThumb: 'rgba(0,0,0,0.18)',
+  scrollbarThumbHover: 'rgba(0,0,0,0.3)',
+  apiKeyBg: 'rgba(26,127,55,0.08)',
+  apiKeyBorder: 'rgba(26,127,55,0.25)',
 
-  xtermBg: '#ffffff',
-  xtermCursor: '#0d7ea8',
-  xtermSelection: 'rgba(13,126,168,0.2)',
+  xtermBg: '#FFFFFF',
+  xtermCursor: '#2E2E2E',
+  xtermSelection: 'rgba(46,46,46,0.14)',
 };
 
 // ── 导出 ──
@@ -282,6 +295,7 @@ export function paletteToCssVars(p: ThemePalette): Record<string, string> {
     '--text-muted': p.textMuted,
     '--accent': p.accent,
     '--accent-dim': p.accentDim,
+    '--accent-text': p.accentText,
     '--accent-blue': p.accentBlue,
     '--accent-blue-dim': p.accentBlueDim,
     '--accent-blue-strong': p.accentBlueStrong,

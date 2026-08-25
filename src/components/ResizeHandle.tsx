@@ -61,7 +61,7 @@ export default function ResizeHandle({ axis, edge = 'right', onDelta }: ResizeHa
         ...(isX
           ? {
               [edge === 'right' ? 'right' : 'left']: 0,
-              top: 0, bottom: 0, width: 8,
+              top: 0, bottom: 0, width: 3,
               [`border${edge === 'right' ? 'Left' : 'Right'}`]: '2px solid transparent',
               transition: 'border-color 0.15s ease',
             }

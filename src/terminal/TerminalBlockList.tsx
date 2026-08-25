@@ -288,7 +288,6 @@ function BlockItem({
         margin: `4px ${insetRight}px 10px ${insetLeft}px`,
         borderRadius: 8,
         background: 'var(--block)',
-        border: '1px solid var(--border)',
         position: 'relative',
         overflow: 'hidden',
       }}
@@ -437,7 +436,6 @@ function RunningItem({
         margin: `4px ${insetRight}px 10px ${insetLeft}px`,
         borderRadius: 8,
         background: 'var(--block)',
-        border: '1px solid var(--border)',
         position: 'relative',
         overflow: 'hidden',
       }}

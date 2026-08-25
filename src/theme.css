@@ -1,44 +1,45 @@
-/* 暗色主题 */
+/* 暗色主题（偏黑灰主背景 + 对话框亮灰 + 偏黑灰主色） */
 :root {
-  /* 背景层（background=#050505 + foreground blend） */
-  --canvas: #050505;
-  --surface: #0d0d0d;         /* surface_1 = bg + 5% white */
-  --block: #131313;           /* surface_2 = bg + 10% white */
-  --elevated: #181818;        /* surface_3 = bg + 15% white */
-  --hover: rgba(255,255,255,0.06);
+  /* 背景层（侧栏与终端统一偏黑灰） */
+  --canvas: #0A0A0A;
+  --surface: #0A0A0A;
+  --block: #171717;
+  --elevated: #242424;
+  --hover: rgba(255,255,255,0.07);
 
   /* 边框与分隔 */
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.14);
+  --border: #2A2A2A;
+  --border-strong: #3A3A3A;
 
   /* 文字 */
-  --text-primary: #ffffff;
-  --text-secondary: #a0a5b0;
-  --text-muted: #5c6370;
+  --text-primary: #E8E8E8;
+  --text-secondary: #ABABAB;
+  --text-muted: #6C6C6C;
 
-  /* 强调色 */
-  --accent: #ffffff;
-  --accent-blue: #ffffff;
-  --accent-blue-dim: rgba(255, 255, 255, 0.3);
-	--accent-blue-strong: #ffffff;
-  --accent-dim: rgba(255, 255, 255, 0.12);
-  --accent-warm: #d97757;
-	--accent-warm-dim: rgba(217, 119, 87, 0.25);
-  --accent-user: #8b6cff;
-  --accent-user-dim: rgba(139, 108, 255, 0.12);
-  --accent-bg: rgba(255, 255, 255, 0.1);
-  --accent-bg-strong: #262626;
-  --success: #1ca05a;
-  --success-bg: rgba(28, 160, 90, 0.13);
-	--success-dim: rgba(28, 160, 90, 0.13);
-  --error: #bc362a;
-  --error-bg: rgba(188, 54, 42, 0.13);
-	--error-dim: rgba(188, 54, 42, 0.13);
-	--error-light: #ff8a8a;
-  --error-badge-bg: rgba(188, 54, 42, 0.09);
-  --warning: #c28000;
+  /* 强调色（主色偏黑灰；点缀低饱和：灰蓝=信息检索、灰紫=AI） */
+  --accent: #9AC8A8;
+  --accent-text: #0A0A0A;
+  --accent-blue: #90BF9F;
+  --accent-blue-dim: rgba(144, 191, 159, 0.22);
+  --accent-blue-strong: #A5CDB0;
+  --accent-dim: rgba(154, 200, 168, 0.25);
+  --accent-warm: #A8D8B4;
+  --accent-warm-dim: rgba(168, 216, 180, 0.2);
+  --accent-user: #A3A3A3;
+  --accent-user-dim: rgba(163, 163, 163, 0.15);
+  --accent-bg: rgba(255, 255, 255, 0.06);
+  --accent-bg-strong: #1E1E1E;
+  --success: #89D185;
+  --success-bg: rgba(137, 209, 133, 0.12);
+  --success-dim: rgba(137, 209, 133, 0.12);
+  --error: #F14C4C;
+  --error-bg: rgba(241, 76, 76, 0.12);
+  --error-dim: rgba(241, 76, 76, 0.12);
+  --error-light: #F48771;
+  --error-badge-bg: rgba(241, 76, 76, 0.08);
+  --warning: #CCA700;
 
-  /* 字体 */
+/* 字体 */
   --font-ui: -apple-system, "SF Pro Text", "PingFang SC", "Segoe UI", sans-serif;
   --font-mono: "SF Mono", Menlo, "JetBrains Mono", monospace;
 
@@ -96,8 +97,8 @@
   --th-bg: rgba(255,255,255,0.05);
 
   /* xterm 专用 */
-  --xterm-bg: #050505;
-  --xterm-cursor: #e8e8e8;
+  --xterm-bg: #0A0A0A;
+  --xterm-cursor: #C8C8C8;
   --xterm-selection: rgba(255, 255, 255, 0.25);
 }
 
@@ -236,11 +237,27 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 .md .katex-display { margin: 0.5em 0; overflow-x: auto; }
 .md .katex { color: var(--text-primary); }
 
-/* 滚动条 */
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
-::-webkit-scrollbar-track { background: transparent; }
+/* ── 滚动条 ──
+ * 默认完全隐藏（不占空间）；鼠标移动到滚动条区域（滚动容器右/下缘 8px，
+ * 由 src/lib/scrollbarHover.ts 坐标检测打上 data-scrollbar-hover 标记）时显示。
+ * 降级：不支持自定义滚动条的环境（@supports 不通过）直接隐藏滚动条，
+ * 滚动功能不受影响。 */
+::-webkit-scrollbar { display: none; width: 0; height: 0; }
+::-webkit-scrollbar-thumb, ::-webkit-scrollbar-track { display: none; }
+* { scrollbar-width: none; -ms-overflow-style: none; }
+
+@supports selector(::-webkit-scrollbar) {
+  [data-scrollbar-hover]::-webkit-scrollbar { display: block; width: 8px; height: 8px; }
+  [data-scrollbar-hover]::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 4px;
+  }
+  [data-scrollbar-hover]::-webkit-scrollbar-track { background: transparent; }
+}
+
+@supports (scrollbar-width: thin) {
+  [data-scrollbar-hover] { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
+}
 
 /* xterm 容器贴边：取消全屏终端的边缘内边距 */
 .xterm { padding: 0; }

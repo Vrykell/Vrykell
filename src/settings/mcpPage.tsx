@@ -178,7 +178,7 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
   return (
     <div
       style={{
-        border: '1px solid var(--border)', borderRadius: 'var(--radius-inner)',
+        borderRadius: 'var(--radius-inner)',
         padding: '10px 12px', background: 'var(--canvas)', opacity: enabled ? 1 : 0.6,
       }}
     >

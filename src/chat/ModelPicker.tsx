@@ -31,7 +31,7 @@ const pill: React.CSSProperties = {
 };
 const pillOn: React.CSSProperties = {
   ...pill,
-  background: 'var(--accent)', borderColor: 'var(--accent)', color: '#0d0d0d',
+  background: 'var(--accent)', borderColor: 'var(--accent)', color: 'var(--accent-text)',
 };
 
 function CapBadge({ on, label }: { on: boolean; label: string }) {
@@ -164,7 +164,7 @@ export default function ModelPicker({ open, onClose }: { open: boolean; onClose:
               <X size={14} />
             </button>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px', background: 'var(--canvas)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderRadius: 8, padding: '6px 10px', background: 'var(--canvas)' }}>
             <Search size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
             <input
               autoFocus
@@ -232,8 +232,8 @@ export default function ModelPicker({ open, onClose }: { open: boolean; onClose:
                   style={{
                     width: 30, height: 30, borderRadius: 8, flexShrink: 0,
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    background: active ? 'var(--accent-warm-dim)' : 'var(--block)',
-                    color: active ? 'var(--accent-warm)' : 'var(--text-muted)',
+                    background: active ? 'var(--hover)' : 'var(--block)',
+                    color: active ? 'var(--text-primary)' : 'var(--text-muted)',
                   }}
                 >
                   <Icon size={15} />
@@ -292,7 +292,7 @@ export function ModelScopeBar({
       >
         {cur?.provider && cur.model ? (() => {
           const Icon = modelIcon(cur.provider, cur.model);
-          return <Icon size={13} style={{ color: 'var(--accent-warm)' }} />;
+          return <Icon size={13} style={{ color: 'var(--text-secondary)' }} />;
         })() : <Bot size={13} style={{ color: 'var(--text-muted)' }} />}
         {cur?.label ?? '全局默认'}
         <ChevronDown size={12} style={{ color: 'var(--text-muted)' }} />
@@ -338,7 +338,7 @@ export function ModelScopeBar({
               >
                 {o.provider && o.model ? (() => {
                   const Icon = modelIcon(o.provider, o.model);
-                  return <Icon size={13} style={{ color: 'var(--accent-warm)' }} />;
+                  return <Icon size={13} style={{ color: 'var(--text-secondary)' }} />;
                 })() : <Bot size={13} style={{ color: 'var(--text-muted)' }} />}
                 <span style={{ flex: 1 }}>{o.label}</span>
                 {o.value === value && <Check size={12} style={{ color: 'var(--accent)' }} />}

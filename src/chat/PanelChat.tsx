@@ -318,8 +318,7 @@ export default function PanelChat() {
       {isSession && (
         <div style={{ flexShrink: 0, padding: '0 10px 10px' }}>
           <div style={{
-            background: 'var(--surface)',
-            border: '1px solid var(--border)',
+            background: 'var(--block)',
             borderRadius: 12,
             padding: '8px 12px 5px',
             boxShadow: '0 1px 4px rgba(0, 0, 0, 0.22)',

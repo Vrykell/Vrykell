@@ -111,7 +111,7 @@ export default function FilterPopover({ open, onClose, counts }: Props) {
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: 10,
-              color: '#0d0d0d',
+              color: 'var(--accent-text)',
               flexShrink: 0,
             }}>
               {isEnabled ? <Check size={10} /> : ''}

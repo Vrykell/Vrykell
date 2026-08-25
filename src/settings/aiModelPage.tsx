@@ -110,7 +110,7 @@ export function AiModelPage() {
           />
           <button
             onClick={commitKey}
-            style={{ ...btnStyle, background: 'var(--accent)', color: '#0d0d0d', border: 'none', flexShrink: 0 }}
+            style={{ ...btnStyle, background: 'var(--accent)', color: 'var(--accent-text)', border: 'none', flexShrink: 0 }}
           >
             保存
           </button>
@@ -180,7 +180,7 @@ function ModelListField() {
           <div
             key={m.id}
             style={{
-              border: '1px solid var(--border)', borderRadius: 'var(--radius-inner)',
+              borderRadius: 'var(--radius-inner)',
               padding: '10px 12px', background: 'var(--canvas)',
             }}
           >
@@ -190,7 +190,7 @@ function ModelListField() {
                 style={{
                   width: 28, height: 28, borderRadius: 7, flexShrink: 0,
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'var(--block)', color: 'var(--accent-warm)',
+                  background: 'var(--block)', color: 'var(--text-secondary)',
                 }}
               >
                 {(() => {

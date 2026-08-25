@@ -397,8 +397,7 @@ export default function InputEditor({
     return (
       <div
         style={{
-          borderTop: '1px solid var(--border)',
-          background: 'var(--surface)',
+          background: 'var(--block)',
           padding: '5px 16px',
           fontSize: 12,
           color: 'var(--text-secondary)',
@@ -445,8 +444,7 @@ export default function InputEditor({
     <div style={{ padding: '0 10px 10px' }}>
       <div
         style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
+          background: 'var(--block)',
           borderRadius: 12,
           padding: '8px 12px 5px',
           boxShadow: '0 1px 4px rgba(0, 0, 0, 0.22)',

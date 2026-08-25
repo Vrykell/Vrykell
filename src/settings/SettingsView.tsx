@@ -211,7 +211,7 @@ export default function SettingsView() {
                 />
                 <button
                   onClick={commitTavilyKey}
-                  style={{ ...btnStyle, background: 'var(--accent)', color: '#0d0d0d', border: 'none', flexShrink: 0 }}
+                  style={{ ...btnStyle, background: 'var(--accent)', color: 'var(--accent-text)', border: 'none', flexShrink: 0 }}
                 >
                   保存
                 </button>
@@ -362,7 +362,7 @@ export default function SettingsView() {
         <div style={{ padding: 8 }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6,
-            padding: '4px 8px', border: '1px solid var(--border)',
+            padding: '4px 8px',
             borderRadius: 'var(--radius-inner)', background: 'var(--canvas)',
           }}>
             <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />

@@ -129,7 +129,7 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
         <div style={{ padding: '8px 16px' }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6,
-            background: 'var(--canvas)', border: '1px solid var(--border)',
+            background: 'var(--canvas)',
             borderRadius: 'var(--radius-inner)', padding: '0 8px', height: 28,
           }}>
             <Search size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />

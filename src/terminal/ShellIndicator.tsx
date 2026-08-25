@@ -22,13 +22,13 @@ export function detectShell(shellPath?: string): ShellInfo {
 
 /** Shell 类型 → 徽章背景色（：淡色胶囊） */
 const SHELL_BG: Record<ShellInfo['type'], string> = {
-  zsh: 'rgba(255,255,255,0.08)',
-  bash: 'rgba(255,255,255,0.08)',
-  fish: 'rgba(255,255,255,0.08)',
-  powershell: 'rgba(255,255,255,0.08)',
-  wsl: 'rgba(217,119,87,0.18)',
-  docker: 'rgba(255,255,255,0.08)',
-  unknown: 'rgba(255,255,255,0.06)',
+  zsh: 'var(--hover)',
+  bash: 'var(--hover)',
+  fish: 'var(--hover)',
+  powershell: 'var(--hover)',
+  wsl: 'var(--accent-warm-dim)',
+  docker: 'var(--hover)',
+  unknown: 'var(--hover)',
 };
 
 const SHELL_FG: Record<ShellInfo['type'], string> = {

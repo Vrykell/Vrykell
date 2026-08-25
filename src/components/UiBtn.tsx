@@ -107,16 +107,16 @@ export function ToolbarBtn({ title, active, onClick, children, attrs }: ToolbarB
       onClick={onClick}
       style={{
         ...toolbarBtnBase,
-        color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-        background: active ? 'var(--accent-bg-strong)' : 'transparent',
+        // 状态用图标颜色表达，不使用背景：默认灰、悬停亮、打开=琥珀金
+        color: active ? 'var(--accent)' : 'var(--text-secondary)',
       }}
       onMouseEnter={(e) => {
         const t = e.currentTarget as HTMLElement;
-        if (!active) t.style.background = 'var(--hover)';
+        t.style.color = active ? 'var(--accent)' : 'var(--text-primary)';
       }}
       onMouseLeave={(e) => {
         const t = e.currentTarget as HTMLElement;
-        if (!active) t.style.background = 'transparent';
+        t.style.color = active ? 'var(--accent)' : 'var(--text-secondary)';
       }}
       {...(attrs ?? {})}
     >{children}</button>
