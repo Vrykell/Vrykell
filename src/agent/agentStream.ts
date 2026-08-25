@@ -18,7 +18,8 @@ import { buildTools } from './tools';
 import { buildTavilySearchTool } from './tools/webSearch';
 import { buildWebSearchTool, buildWebFetchTool, buildWebCrawlTool } from './tools/webFetch';
 import { buildSystemPrompt } from './systemPrompt';
-import { buildSkillsContext } from './skills';
+import { listSkills, buildSkillsContext, availableSkillMetas } from './skills';
+import { getMemory, getMemoryJournal, listAgents } from './platform';
 import { listMcpTools, buildMcpTool } from './mcp';
 import { levelOf, type ToolContext } from './permissions';
 import type { ToolRunState } from './messageParts';
@@ -98,6 +99,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   const settings = useAgentSettings.getState().resolve(info.active_model);
   const agentMode = settings.agentMode;
   const emitTool = ctx?.handlers?.onToolEvent;
+  const emitReasoning = ctx?.handlers?.onReasoning;
 
   // M5 附件：带附件的用户消息展开为多模态 ModelMessage（文本段 + 图片 part），
   // 非视觉模型的图片在 attachmentsForModel 内降级为占位提示文本
@@ -137,8 +139,40 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   // 系统提示词：自定义（设置里）优先，否则内置默认；压缩摘要（compact）作为运行上下文追加。
   // AI SDK v7 默认 allowSystemInMessages=false：system 必须走 instructions 选项，
   // 不能塞进 messages（否则 provider 校验直接抛 InvalidPromptError）。
-  const skillsContext = buildSkillsContext();
-  const systemPrompt = [buildSystemPrompt(settings.systemPrompt, plan.system), skillsContext]
+  let skillsContext = '';
+  try {
+    skillsContext = buildSkillsContext(availableSkillMetas(await listSkills()));
+  } catch {
+    /* 技能目录未就绪或扫描失败：跳过技能清单 */
+  }
+  let memoryContext = '';
+  try {
+    const [fact, journal] = await Promise.all([getMemory(), getMemoryJournal()]);
+    const parts: string[] = [];
+    if (fact.trim()) parts.push(`持久知识：\n${fact}`);
+    const jlines = journal.split('\n').filter(Boolean).slice(-15);
+    if (jlines.length) parts.push(`近期流水：\n${jlines.join('\n')}`);
+    if (parts.length) memoryContext = `长期记忆：\n${parts.join('\n\n')}`;
+  } catch {
+    /* 记忆读取失败：跳过 */
+  }
+  let agentsContext = '';
+  try {
+    const agents = await listAgents();
+    if (agents.length) {
+      agentsContext =
+        '子代理（用 spawn_agent 工具按名委派任务）：\n' +
+        agents.map((a) => `- ${a.name}：${a.description || '无描述'}`).join('\n');
+    }
+  } catch {
+    /* 子代理读取失败：跳过 */
+  }
+  const systemPrompt = [
+    buildSystemPrompt(settings.systemPrompt, plan.system),
+    memoryContext,
+    skillsContext,
+    agentsContext,
+  ]
     .filter(Boolean)
     .join('\n\n');
   const modelMessages: ModelMessage[] = plan.messages;
@@ -172,14 +206,15 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     },
   };
   const tools: ToolSet = agentMode ? buildTools(toolContext) : {};
-  if (agentMode && settings.webSearch && levelOf('web_search') !== 'deny') {
+  // web_search：一等工具，与 web_fetch/web_crawl 同级，无需任何配置即可用。
+  // 优先级：provider 原生 → Tavily（配了 key）→ DuckDuckGo HTML 抓取（无 key 兜底）。
+  if (agentMode && levelOf('web_search') !== 'deny') {
     const native = createNativeWebSearchTool(info.provider);
     if (native) {
       tools[native.name] = native.tool;
     } else if (info.has_tavily_key) {
       tools.web_search = buildTavilySearchTool({ signal: ctx?.signal, tabId: ctx?.tabId });
     } else {
-      // 无 key 兜底：DuckDuckGo HTML 抓取（无需 Tavily/原生搜索）
       tools.web_search = buildWebSearchTool({ signal: ctx?.signal, tabId: ctx?.tabId });
     }
   }
@@ -228,6 +263,11 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
       streamError = error;
     },
   });
+  // 步数上限检测：记录完成步数与最后一步 finishReason，用于在静默截断时标明原因
+  const stepLimit = hasTools ? Math.max(1, Math.round(settings.maxSteps)) : 0;
+  let stepCount = 0;
+  let lastFinishReason: string | undefined;
+
   for await (const part of result.fullStream) {
     switch (part.type) {
       case 'text-delta': {
@@ -235,6 +275,16 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
         const t =
           (part as { text?: string }).text ?? (part as { textDelta?: string }).textDelta ?? '';
         if (t) onChunk(t);
+        break;
+      }
+      case 'reasoning-delta': {
+        const t = (part as { text?: string }).text ?? '';
+        if (t) emitReasoning?.(t);
+        break;
+      }
+      case 'finish-step': {
+        stepCount += 1;
+        lastFinishReason = (part as { finishReason?: string }).finishReason;
         break;
       }
       case 'tool-call': {
@@ -307,8 +357,14 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
         break;
       }
       default:
-        break; // reasoning / step 边界等事件暂不消费
+        break; // start/end/finish 等事件暂不消费
     }
+  }
+  // 达到工具调用上限：streamText 会静默截断（无 finishReason），此处补上失败原因
+  if (streamError == null && stepLimit > 0 && stepCount >= stepLimit && lastFinishReason === 'tool-calls') {
+    onChunk(
+      `\n\n> ⚠️ 已达工具调用上限（${stepLimit} 步），回复可能不完整；可在「AI 行为」页调高最大迭代步数。`,
+    );
   }
   if (streamError != null) {
     console.error('[agentStream] 流式请求失败:', streamError);

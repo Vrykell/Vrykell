@@ -16,6 +16,8 @@ use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
+const MAX_MCP_ARGS_BYTES: usize = 1024 * 1024; // 工具调用参数上限 1MB
+const MAX_MCP_RESULT_CHARS: usize = 256 * 1024; // 工具结果上限 256KB
 
 // ── 配置 ──
 
@@ -313,12 +315,24 @@ pub async fn mcp_save_server(
     config: McpServerConfig,
 ) -> Result<(), String> {
     let mut rt = state.0.lock().await;
-    if config.name.trim().is_empty() {
+    let name = config.name.trim().to_string();
+    if name.is_empty() {
         return Err("服务器名称不能为空".to_string());
     }
+    if name.len() > 80 {
+        return Err("服务器名称过长（≤80 字符）".to_string());
+    }
+    if name.chars().any(|c| c.is_control()) {
+        return Err("服务器名称含非法字符".to_string());
+    }
+    if config.command.trim().is_empty() && config.url.trim().is_empty() {
+        return Err("需要填写 command 或 url".to_string());
+    }
+    if config.command.contains('\0') || config.args.iter().any(|a| a.contains('\0')) {
+        return Err("command/args 含非法字符".to_string());
+    }
     // 配置变更：先断开旧连接，下次按新配置连接
-    rt.connections.remove(&config.name);
-    let name = config.name.trim().to_string();
+    rt.connections.remove(&name);
     let mut cfg = config;
     cfg.name = name.clone();
     let idx = rt.config.servers.iter().position(|s| s.name == name);
@@ -413,7 +427,14 @@ pub async fn mcp_call_tool(
         .connections
         .get_mut(&server)
         .ok_or_else(|| format!("MCP 服务器「{server}」未连接"))?;
-    let raw = conn.call_tool(&tool, args.unwrap_or(serde_json::Value::Object(Default::default()))).await?;
+    let args = args.unwrap_or(serde_json::Value::Object(Default::default()));
+    // 参数体积上限，防止超大 payload 打爆内存/上下文
+    if let Ok(s) = serde_json::to_string(&args) {
+        if s.len() > MAX_MCP_ARGS_BYTES {
+            return Err("MCP 调用参数过大（>1MB）".to_string());
+        }
+    }
+    let raw = conn.call_tool(&tool, args).await?;
     // content 通常是 [{type:"text",text:"..."}]，抽成纯文本；否则原样 JSON
     match raw {
         serde_json::Value::Array(items) => {
@@ -429,7 +450,11 @@ pub async fn mcp_call_tool(
                 })
                 .collect();
             if !texts.is_empty() {
-                Ok(serde_json::Value::String(texts.join("\n")))
+                let mut joined = texts.join("\n");
+                if joined.chars().count() > MAX_MCP_RESULT_CHARS {
+                    joined = joined.chars().take(MAX_MCP_RESULT_CHARS).collect();
+                }
+                Ok(serde_json::Value::String(joined))
             } else {
                 Ok(serde_json::Value::Array(items))
             }

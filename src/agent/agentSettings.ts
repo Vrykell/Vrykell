@@ -20,8 +20,6 @@ export type ContextStrategy = 'off' | 'window' | 'compact';
 export interface ModelBehaviorSettings {
   /** Agent 模式：开 = 注册全部工具；关 = 纯聊天（零工具） */
   agentMode: boolean;
-  /** 联网搜索开关（未配 key/不支持时 UI 置灰） */
-  webSearch: boolean;
   /** 深度思考开关（providerOptions 透传 reasoning_effort / thinking budget） */
   deepThink: boolean;
   /** 最大迭代步数（AI SDK stepCountIs；1–20） */
@@ -63,7 +61,6 @@ export type AgentSettings = ModelBehaviorSettings & GlobalPrefs;
 
 export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   agentMode: true,
-  webSearch: false,
   deepThink: false,
   autoTitle: true,
   titleModel: '',
@@ -137,7 +134,7 @@ export const useAgentSettings = create<AgentSettingsState>()(
     }),
     {
       name: 'vrykell-agent-settings',
-      version: 5,
+      version: 6,
       migrate: (persisted: unknown, version: number) => {
         // v0/v1（平铺）→ 收进 global；v2（缺新字段）→ 补齐默认值
         let state: { global: AgentSettings; overrides: Record<string, Partial<ModelBehaviorSettings>> };

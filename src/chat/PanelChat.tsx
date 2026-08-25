@@ -82,14 +82,6 @@ export default function PanelChat() {
   const [modelMenu, setModelMenu] = useState<{ x: number; y: number } | null>(null);
   // 快捷开关作用于「当前模型」的行为覆盖（绑定模型，不污染全局）
   const eff = agentSettings.resolve(activeModel);
-  const searchAvailable = aiCfg.provider !== 'openai-compatible' || aiCfg.hasTavilyKey;
-  const toggleSearch = () => {
-    if (!eff.webSearch && !searchAvailable) {
-      toastErr('当前服务商无原生搜索，请先在「设置 → 网络搜索」配置 Tavily Key');
-      return;
-    }
-    agentSettings.updateModel(activeModel, { webSearch: !eff.webSearch });
-  };
 
   // 编辑重发：chat store 的 draft 是单次投递——灌入输入框后立即清掉
   const draft = useChatStore((s) => s.draft);
@@ -324,12 +316,6 @@ export default function PanelChat() {
           <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>▾</span>
         </button>
         <div style={{ flex: 1 }} />
-        <QuickToggle
-          icon={Globe}
-          on={eff.webSearch}
-          title={searchAvailable ? '联网搜索' : '联网搜索（需先配置 Tavily Key）'}
-          onClick={toggleSearch}
-        />
         <QuickToggle
           icon={Brain}
           on={eff.deepThink}

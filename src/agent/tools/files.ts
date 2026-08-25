@@ -9,7 +9,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { tool } from 'ai';
 import { z } from 'zod';
-import { gate, type ToolContext } from '../permissions';
+import { gate, ensureSkillAccess, type ToolContext } from '../permissions';
 
 /** invoke 结果统一成结构化结果（约定见 tools/index.ts 头注释） */
 async function call<T>(fn: () => Promise<T>): Promise<{ ok: boolean; result?: string; error?: string }> {
@@ -33,6 +33,8 @@ export function buildFileTools(ctx: ToolContext) {
       execute: async ({ path, max_bytes }, { toolCallId }) => {
         const g = await gate('read_file', { path }, toolCallId, ctx);
         if (!g.proceed) return g.result;
+        const t = await ensureSkillAccess(path, toolCallId, ctx);
+        if (!t.proceed) return { ok: false, denied: true, error: t.error };
         return call(() => invoke<string>('read_file_text', { path, maxBytes: max_bytes ?? null }));
       },
     }),
@@ -48,6 +50,8 @@ export function buildFileTools(ctx: ToolContext) {
       execute: async ({ path, content }, { toolCallId }) => {
         const g = await gate('write_file', { path }, toolCallId, ctx);
         if (!g.proceed) return g.result;
+        const t = await ensureSkillAccess(path, toolCallId, ctx);
+        if (!t.proceed) return { ok: false, denied: true, error: t.error };
         return call(() => invoke<string>('write_file_text', { path, content }));
       },
     }),
@@ -64,6 +68,8 @@ export function buildFileTools(ctx: ToolContext) {
       execute: async ({ path, old_string, new_string }, { toolCallId }) => {
         const g = await gate('edit_file', { path }, toolCallId, ctx);
         if (!g.proceed) return g.result;
+        const t = await ensureSkillAccess(path, toolCallId, ctx);
+        if (!t.proceed) return { ok: false, denied: true, error: t.error };
         return call(() =>
           invoke<string>('edit_file_text', { path, oldString: old_string, newString: new_string }),
         );

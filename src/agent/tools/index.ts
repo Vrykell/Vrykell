@@ -15,9 +15,11 @@ import { runCommandAndWait } from './runCommand';
 import { buildFileTools } from './files';
 import { buildSearchTools } from './search';
 import { buildTerminalTools } from './terminal';
-import { buildSkillTool } from './skill';
-import { enabledSkills } from '../skills';
-import { gate, levelOf, TOOL_NAMES, type ToolContext, type ToolName } from '../permissions';
+import { buildSkillTool, buildInstallSkillTool } from './skill';
+import { buildMemoryTool } from './memory';
+import { buildScheduleTool } from './schedule';
+import { buildSubagentTool } from './subagent';
+import { gate, levelOf, ensureSkillAccess, TOOL_NAMES, type ToolContext } from '../permissions';
 
 export type { ToolContext } from '../permissions';
 
@@ -37,15 +39,20 @@ export function buildTools(ctx: ToolContext) {
       execute: async ({ command }, { abortSignal, toolCallId }) => {
         const g = await gate('run_command', { command }, toolCallId, ctx);
         if (!g.proceed) return g.result;
+        const t = await ensureSkillAccess(command, toolCallId, ctx);
+        if (!t.proceed) return { ok: false, denied: true, error: t.error };
         return runCommandAndWait(command, { signal: abortSignal ?? ctx.signal, toolCallId });
       },
     }),
     ...buildFileTools(ctx),
     ...buildSearchTools(ctx),
     ...buildTerminalTools(ctx),
-    // use_skill：只在有启用技能时注册（无技能时注册也无意义，还给权限表添噪音）
-    ...(enabledSkills().length > 0 ? buildSkillTool(ctx) : {}),
-  } as Record<ToolName, unknown>;
+    ...buildSkillTool(ctx),
+    ...buildInstallSkillTool(ctx),
+    ...buildMemoryTool(ctx),
+    ...buildScheduleTool(ctx),
+    ...buildSubagentTool(ctx),
+  } as Record<string, unknown>;
   // deny 级工具不注册（模型根本看不到，比 execute 拒绝更省 token）
   const out: ToolSet = {};
   for (const name of TOOL_NAMES) {

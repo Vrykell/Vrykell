@@ -19,6 +19,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { ToolRunState } from './messageParts';
+import { untrustedSkillFor, setSkillState } from './skills';
 
 export type ToolLevel = 'allow' | 'ask' | 'deny';
 export type ApprovalDecision = 'once' | 'session' | 'deny';
@@ -52,7 +53,11 @@ export const TOOL_NAMES = [
   'read_terminal',
   'terminal_keys',
   'use_skill',
+  'install_skill',
   'mcp',
+  'memory',
+  'schedule',
+  'subagent',
 ] as const;
 export type ToolName = (typeof TOOL_NAMES)[number];
 
@@ -69,7 +74,11 @@ const DEFAULT_LEVELS: Record<ToolName, ToolLevel> = {
   read_terminal: 'allow',
   terminal_keys: 'ask',
   use_skill: 'allow',
+  install_skill: 'allow',
   mcp: 'allow',
+  memory: 'allow',
+  schedule: 'allow',
+  subagent: 'allow',
 };
 
 interface PermissionsState {
@@ -142,6 +151,50 @@ export function resolveApproval(toolCallId: string, decision: ApprovalDecision) 
 export function denyAllPending() {
   for (const resolve of pending.values()) resolve('deny');
   pending.clear();
+}
+
+/**
+ * 未信任技能的访问确认：agent 要读/写/运行某个未信任技能的文件或脚本时调用。
+ * 复用审批桥（打 approval-pending）；允许则放行（由调用方持久化信任），拒绝则阻断。
+ */
+export async function ensureTrustedSkill(
+  skillName: string,
+  toolCallId: string | undefined,
+  ctx: ToolContext,
+): Promise<{ proceed: boolean; error?: string }> {
+  if (!toolCallId || !ctx.setToolState || !ctx.tabId) {
+    return {
+      proceed: false,
+      error: `当前上下文无法确认信任，已拒绝访问未信任技能「${skillName}」`,
+    };
+  }
+  ctx.setToolState(toolCallId, 'approval-pending', {
+    danger: `信任技能「${skillName}」后可访问其文件与脚本`,
+  });
+  const decision = await requestApproval(toolCallId);
+  if (decision === 'deny') {
+    ctx.setToolState(toolCallId, 'denied');
+    return { proceed: false, error: `未信任技能「${skillName}」，已拒绝访问` };
+  }
+  ctx.setToolState(toolCallId, 'running');
+  return { proceed: true };
+}
+
+/**
+ * 工具执行前检查：文本/路径若引用未信任技能，先弹「信任此技能」确认；
+ * 通过则持久化信任并放行，否则阻断。
+ */
+export async function ensureSkillAccess(
+  text: string,
+  toolCallId: string | undefined,
+  ctx: ToolContext,
+): Promise<{ proceed: boolean; error?: string }> {
+  const name = await untrustedSkillFor(text);
+  if (!name) return { proceed: true };
+  const r = await ensureTrustedSkill(name, toolCallId, ctx);
+  if (!r.proceed) return r;
+  await setSkillState(name, true, undefined).catch(() => {});
+  return { proceed: true };
 }
 
 // ── 危险命令启发式（表驱动；命中即逐次询问，无视任何授权） ──
