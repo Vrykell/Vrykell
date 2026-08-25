@@ -33,7 +33,10 @@ interface AiConfigInfoRust {
   has_anthropic_key: boolean;
   has_gemini_key: boolean;
   has_tavily_key: boolean;
-  models: { id: string; name: string; provider: ProviderKind; baseUrl: string; model: string }[];
+  models: {
+    id: string; name: string; provider: ProviderKind; baseUrl: string; model: string;
+    capabilities?: { vision: boolean; reasoning: boolean; tools: boolean; search: boolean };
+  }[];
   active_model: string;
 }
 
@@ -64,8 +67,11 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   const emitReasoning = ctx?.handlers?.onReasoning;
 
   // M5 附件：带附件的用户消息展开为多模态 ModelMessage（文本段 + 图片 part），
-  // 非视觉模型的图片在 attachmentsForModel 内降级为占位提示文本
-  const vision = supportsVision(info.provider, info.model);
+  // 非视觉模型的图片在 attachmentsForModel 内降级为占位提示文本。
+  // 视觉能力优先取模型探测结果（创建时自动探测），旧数据按名字启发式兜底。
+  const vision =
+    (info.models ?? []).find((m) => m.id === info.active_model)?.capabilities?.vision ??
+    supportsVision(info.provider, info.model);
   const sized: SizedMessage[] = [];
   for (const m of messages) {
     if (m.attachments?.length) {

@@ -41,18 +41,59 @@ test.describe('AI 对话面板', () => {
     await expect(page.getByPlaceholder(/自然语言描述/)).toHaveCount(1); // 终端未进入 AI 模式
   });
 
-  test('模型菜单：切换模型调用 set_active_model，思考强度可选', async ({ page }) => {
+  test('模型选择窗口：搜索过滤 + 能力标签过滤 + 点击选中', async ({ page }) => {
     await boot(page, '好的');
     await page.locator('[data-dock-btn="chat"]').click();
     await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
-    // 打开模型菜单：当前生效的是本地模型（默认种子），菜单里带 ✓
+    // 打开模型选择窗口
     await page.getByTitle('切换模型（更多在设置页配置）').click();
-    await expect(page.getByText('✓ 本地模型')).toBeVisible();
-    await expect(page.getByText('思考强度')).toBeVisible();
-    // 切到主力模型
-    await page.getByRole('button', { name: '主力模型', exact: true }).click();
+    await expect(page.getByText('选择模型', { exact: true })).toBeVisible();
+    await expect(page.getByPlaceholder('搜索模型…')).toBeVisible();
+    // 两个模型列表项（带能力徽标）
+    await expect(page.getByTestId('model-pick-m-main')).toBeVisible();
+    await expect(page.getByTestId('model-pick-m-local')).toBeVisible();
+    await expect(page.getByText('推理', { exact: true }).first()).toBeVisible();
+
+    // 能力标签过滤：点「推理」→ 只剩主力模型
+    await page.getByRole('button', { name: /推理/ }).click();
+    await expect(page.getByTestId('model-pick-m-main')).toBeVisible();
+    await expect(page.getByTestId('model-pick-m-local')).toHaveCount(0);
+    await page.getByRole('button', { name: /推理/ }).click(); // 取消
+
+    // 搜索过滤：按名字
+    await page.getByPlaceholder('搜索模型…').fill('本地');
+    await expect(page.getByTestId('model-pick-m-local')).toBeVisible();
+    await expect(page.getByTestId('model-pick-m-main')).toHaveCount(0);
+    await page.getByPlaceholder('搜索模型…').fill('不存在的模型');
+    await expect(page.getByText('无匹配模型')).toBeVisible();
+
+    // 点击列表项选中模型
+    await page.getByPlaceholder('搜索模型…').fill('');
+    await page.getByTestId('model-pick-m-main').click();
     const calls = await aiModelCalls(page);
     expect(calls.some((c) => c.kind === 'set_active' && c.id === 'm-main')).toBe(true);
+    await expect(page.getByText('已切换到 主力模型')).toBeVisible();
+    // 选中后窗口关闭
+    await expect(page.getByText('选择模型', { exact: true })).toHaveCount(0);
+  });
+
+  test('模型选择窗口：列表项内快速调整思考强度', async ({ page }) => {
+    await boot(page, '好的');
+    await page.locator('[data-dock-btn="chat"]').click();
+    await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
+    await page.getByTitle('切换模型（更多在设置页配置）').click();
+    const row = page.getByTestId('model-pick-m-main');
+    await expect(row).toBeVisible();
+    // 主力模型（推理能力）有思考强度下拉；切到「低」写模型覆盖
+    const select = row.getByTestId('think-level-m-main');
+    await select.selectOption('low');
+    const saved = await page.evaluate(() => localStorage.getItem('vrykell-agent-settings') ?? '');
+    expect(saved).toContain('"thinkingLevel":"low"');
+    // 无推理能力的模型不显示思考强度控件
+    await expect(page.getByTestId('model-pick-m-local').locator('select')).toHaveCount(0);
+    // 关闭窗口
+    await page.keyboard.press('Escape');
+    await expect(page.getByText('选择模型', { exact: true })).toHaveCount(0);
   });
 
   test('深度思考 / Agent 模式开关：切换后写模型覆盖', async ({ page }) => {

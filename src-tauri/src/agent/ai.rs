@@ -25,6 +25,16 @@ pub struct AiConfig(Mutex<AiConfigInner>);
 /// 一个可用的模型配置（命名 profile）：独立 provider/base_url/model。
 /// API key 仍按 provider 复用（api_key / anthropic_key / gemini_key）。
 /// 注意：字段序列化为 camelCase（baseUrl），与前端 ModelProfile 对齐。
+/// 模型能力标记（创建时由前端探测，随 profile 持久化）。
+#[derive(Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ModelCapabilities {
+    pub vision: bool,
+    pub reasoning: bool,
+    pub tools: bool,
+    pub search: bool,
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelProfile {
@@ -39,6 +49,9 @@ pub struct ModelProfile {
     pub base_url: String,
     #[serde(default = "default_model")]
     pub model: String,
+    /// 能力标记（缺省 = 未探测，前端按名字启发式兜底）
+    #[serde(default)]
+    pub capabilities: Option<ModelCapabilities>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -102,6 +115,7 @@ impl AiConfigInner {
                 provider: self.provider.clone(),
                 base_url: self.base_url.clone(),
                 model: self.model.clone(),
+                capabilities: None,
             });
         }
         if self.active_model.is_empty() || !self.models.iter().any(|m| m.id == self.active_model) {

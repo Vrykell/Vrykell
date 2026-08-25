@@ -29,8 +29,8 @@ export interface TauriMockOptions {
 export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
   const integration = opts.integration !== false;
   const seedModels = opts.aiModels ?? [
-    { id: 'm-main', name: '主力模型', provider: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', model: 'claude-sonnet-5' },
-    { id: 'm-local', name: '本地模型', provider: 'openai-compatible', baseUrl: 'http://127.0.0.1:11434/v1', model: 'qwen2.5' },
+    { id: 'm-main', name: '主力模型', provider: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', model: 'claude-sonnet-5', capabilities: { vision: true, reasoning: true, tools: true, search: true } },
+    { id: 'm-local', name: '本地模型', provider: 'openai-compatible', baseUrl: 'http://127.0.0.1:11434/v1', model: 'qwen2.5', capabilities: { vision: false, reasoning: false, tools: true, search: false } },
   ];
   const seedActive = opts.aiActive ?? 'm-local';
   const seedSkills = opts.skills ?? [
