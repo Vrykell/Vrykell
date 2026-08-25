@@ -19,19 +19,30 @@ test.describe('命令块（OSC 133）', () => {
     await expect(page.getByTestId('exit-code').first()).toHaveText('0', { timeout: 5000 });
   });
 
-  test('无 OSC 133 时输出仍落入命令块（无退出码上下文）', async ({ page }) => {
-    // 关闭 shell integration：默认打开模式是块模式，但没有 OSC 133 标记
+  test('无 OSC 133 时：块模式暂存输出；经典打开模式直出 xterm', async ({ page }) => {
+    // 关闭 shell integration：默认打开模式是块模式，输出暂存进 pending 块（不可见）
     await setupTauriMock(page, { integration: false });
     await page.goto('/');
-
-    // 块模式输入栏可见
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
+    await emitPtyOutput(page, 'echo classic-mode\r\nclassic-mode-output\r\n');
+    await page.waitForTimeout(600);
+    // 无 OSC 133 标记 → 无退出码上下文，输出不渲染
+    await expect(page.getByTestId('exit-code')).toHaveCount(0);
+    await expect(page.getByText('classic-mode-output')).toHaveCount(0);
 
-    // 直接注入普通文本（无 OSC 133）：落入 pending 块的孤儿输出
+    // 打开方式设经典模式（zsh）→ 新页面经典终端直出
+    await page.addInitScript(() => {
+      localStorage.setItem('vrykell-agent-settings', JSON.stringify({
+        state: { global: { openModeByShell: { zsh: 'classic' } }, overrides: {} },
+        version: 8,
+      }));
+    });
+    await page.reload();
+    // classic 场景：无底部输入栏，xterm 可见
+    await expect(page.locator('.xterm').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByPlaceholder(/输入命令/)).toHaveCount(0);
     await emitPtyOutput(page, 'echo classic-mode\r\nclassic-mode-output\r\n');
     await expect(page.getByText('classic-mode-output').first()).toBeVisible({ timeout: 5000 });
-    // 不应出现 block 上下文行的退出码（无 OSC 133 D 标记）
-    await expect(page.getByTestId('exit-code')).toHaveCount(0);
   });
 
   test('进出 altScreen 显示 TUI banner', async ({ page }) => {

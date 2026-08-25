@@ -15,7 +15,12 @@ export async function gotoSetting(page: Page, label: string): Promise<void> {
   await expect(page.locator('section').getByText(label, { exact: true }).first()).toBeVisible({ timeout: 3000 });
 }
 
-/** 在设置页内按 Field 标题定位控件容器（标题 + 描述 + 控件） */
+/** 在设置页内按 Field 标题定位控件容器（标题所在的 Field div） */
 export function fieldOf(page: Page, title: string) {
-  return page.locator('section').locator('div').filter({ has: page.getByText(title, { exact: true }) }).first();
+  return page.locator('section').getByText(title, { exact: true }).first().locator('xpath=..');
+}
+
+/** 按行内文本定位一行（文本元素的父级 div） */
+export function rowOf(page: Page, text: string) {
+  return page.locator('section').getByText(text, { exact: true }).first().locator('xpath=..');
 }

@@ -37,12 +37,13 @@ test.describe('模型配置页', () => {
     await expect(nameInputs.nth(0)).toHaveValue('主力模型');
     await expect(nameInputs.nth(1)).toHaveValue('本地模型');
 
-    // 把本地模型设为当前（第二张卡的按钮）
-    const localCard = nameInputs.nth(1).locator('xpath=../..');
-    await localCard.getByRole('button', { name: '设为当前' }).click();
-    await expect(localCard.getByText('当前')).toBeVisible();
+    // 默认生效模型是本地模型（mock 种子），第一张卡有「设为当前」
+    await expect(nameInputs.nth(1).locator('xpath=../..').getByText('当前')).toBeVisible();
+    const mainCard = nameInputs.nth(0).locator('xpath=../..');
+    await mainCard.getByRole('button', { name: '设为当前' }).click();
+    await expect(mainCard.getByText('当前')).toBeVisible();
     const activeCalls = await aiModelCalls(page);
-    expect(activeCalls.some((c) => c.kind === 'set_active' && c.id === 'm-local')).toBe(true);
+    expect(activeCalls.some((c) => c.kind === 'set_active' && c.id === 'm-main')).toBe(true);
 
     // 添加模型 → 第 3 个卡，改名提交
     await page.getByRole('button', { name: /添加模型/ }).click();
