@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useAiConfigStore } from '../lib/ai';
 import { useAgentSettings, type AgentSettings, type ModelBehaviorSettings } from '../agent/agentSettings';
 import Segmented from '../components/Segmented';
+import { ModelScopeBar } from '../chat/ModelPicker';
 import { Field, Toggle, NumberInput, inputStyle, btnStyle } from './ui';
 
 export function AiBehaviorPage() {
@@ -26,16 +27,13 @@ export function AiBehaviorPage() {
   return (
     <>
       <Field
-        title="作用域"
-        description="全局默认对所有模型生效；选中模型可单独覆盖。"
+        title="配置作用域"
+        description="全局默认对所有模型生效；选中某个模型后，下面的设置只对该模型生效。"
       >
-        <Segmented
-          options={[
-            { value: 'global', label: '全局默认' },
-            ...models.map((m) => ({ value: m.id, label: m.name || m.model })),
-          ]}
-          value={scope}
-          onChange={(v) => setScope(v)}
+        <ModelScopeBar
+          options={models.map((m) => ({ value: m.id, label: m.name || m.model, provider: m.provider, model: m.model }))}
+          value={scope === 'global' ? '' : scope}
+          onChange={(v) => setScope(v === '' ? 'global' : v)}
         />
       </Field>
 

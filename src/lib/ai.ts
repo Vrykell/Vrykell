@@ -7,6 +7,8 @@ import type { ProviderKind } from '../agent/provider';
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_MODEL = 'gpt-4o-mini';
 
+import type { ModelCapabilities } from '../agent/capabilities';
+
 /** 一个可用的模型配置（命名 profile）。API key 按 provider 复用，不做每模型单独 key。 */
 export interface ModelProfile {
   id: string;
@@ -14,6 +16,8 @@ export interface ModelProfile {
   provider: ProviderKind;
   baseUrl: string;
   model: string;
+  /** 创建时自动探测的能力（视觉/推理/工具/搜索）；旧数据缺省 */
+  capabilities?: ModelCapabilities;
 }
 
 // AI 配置（provider / 各家 key / baseUrl / model / 模型列表）都在 Rust 后端持久化，

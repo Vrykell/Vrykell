@@ -58,9 +58,12 @@ test.describe('模型行为页', () => {
     expect(saved).toContain('你是 Vrykell 助手。');
   });
 
-  test('每模型覆盖：选中模型后覆盖全局，可重置', async ({ page }) => {
-    // 作用域切到「主力模型」
-    await fieldOf(page, '作用域').getByRole('button', { name: '主力模型' }).click();
+  test('每模型覆盖：模型选择条选中模型后覆盖全局，可重置', async ({ page }) => {
+    // 模型选择条：默认全局默认，点开菜单选「主力模型」
+    const bar = page.getByTestId('model-scope-bar');
+    await expect(bar).toContainText('全局默认');
+    await bar.click();
+    await page.getByRole('button', { name: '主力模型', exact: true }).click();
     await expect(page.getByText('跟随全局默认')).toBeVisible();
     // 关闭该模型的 Agent 模式
     const switches = page.getByRole('switch');

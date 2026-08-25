@@ -44,6 +44,8 @@ function setupInvoke(sseBody: string, status = 200) {
         has_anthropic_key: false,
         has_gemini_key: false,
         has_tavily_key: false,
+        models: [{ id: 'default', name: '默认', provider: 'openai-compatible', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', capabilities: { vision: false, reasoning: false, tools: true, search: false } }],
+        active_model: 'default',
       } as never;
     }
     if (cmd === 'llm_stream') {

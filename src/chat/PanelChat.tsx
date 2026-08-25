@@ -17,8 +17,8 @@ import { useTerminalStore } from '../stores/terminal';
 import { useToastStore } from '../components/Toast';
 import { useAgentSettings } from '../agent/agentSettings';
 import { usePermissions } from '../agent/permissions';
-import { setAiModel, setActiveModel, useAiConfigStore } from '../lib/ai';
-import ContextMenu from '../components/ContextMenu';
+import { useAiConfigStore } from '../lib/ai';
+import ModelPill from './ModelPill';
 import {
   LIMITS,
   importFileAsAttachment,
@@ -45,15 +45,6 @@ const PERM_MODES = [
 ] as const;
 
 /** 各 provider 的常用模型（快捷下拉；完整自由度在设置页输入） */
-const MODEL_PRESETS: Record<string, string[]> = {
-  'openai-compatible': [
-    'gpt-4o-mini', 'gpt-4o', 'deepseek-chat', 'deepseek-reasoner',
-    'qwen-plus', 'glm-4-plus', 'moonshot-v1-8k',
-  ],
-  anthropic: ['claude-sonnet-5', 'claude-opus-4-1', 'claude-haiku-4-5'],
-  gemini: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
-};
-
 export default function PanelChat() {
   const messages = useActiveMessages();
   const send = useChatStore((s) => s.send);
@@ -76,11 +67,9 @@ export default function PanelChat() {
   // M6 快捷设置：模型下拉 + 联网/深思/Agent 开关（agentSettings 即时生效，
   // 下一条消息起用；模型名写 Rust config）
   const agentSettings = useAgentSettings();
-  const aiCfg = useAiConfigStore();
   const activeModel = useAiConfigStore((s) => s.activeModel);
   const permMode = usePermissions((s) => s.mode);
   const setPermMode = usePermissions((s) => s.setMode);
-  const [modelMenu, setModelMenu] = useState<{ x: number; y: number } | null>(null);
   // 快捷开关作用于「当前模型」的行为覆盖（绑定模型，不污染全局）
   const eff = agentSettings.resolve(activeModel);
 
@@ -300,23 +289,7 @@ export default function PanelChat() {
         padding: '7px 10px 6px',
         flexShrink: 0, userSelect: 'none',
       }}>
-        <button
-          data-subtle
-          title="切换模型（更多在设置页配置）"
-          onClick={(e) => setModelMenu({ x: e.clientX, y: e.clientY })}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            height: 24, boxSizing: 'border-box',
-            fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 500,
-            padding: '0 8px', border: '1px solid var(--border)', borderRadius: 5,
-            background: 'var(--canvas)', color: 'var(--text-secondary)', cursor: 'pointer',
-            lineHeight: '16px', maxWidth: 150,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}
-        >
-          {aiCfg.models.find((m) => m.id === aiCfg.activeModel)?.name || aiCfg.model || '模型'}
-          <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>▾</span>
-        </button>
+        <ModelPill />
         <div style={{ flex: 1 }} />
         <QuickToggle
           icon={Brain}
@@ -526,29 +499,7 @@ export default function PanelChat() {
         </div>
       )}
 
-      {/* 模型快捷下拉（ContextMenu 复用，选中即写 Rust config） */}
-      {modelMenu && (
-        <ContextMenu
-          anchor={modelMenu}
-          items={[
-            ...(aiCfg.models.length > 0
-              ? aiCfg.models.map((m) => ({
-                  label: m.id === aiCfg.activeModel ? `✓ ${m.name || m.model}` : (m.name || m.model),
-                  onClick: () => void setActiveModel(m.id),
-                }))
-              : (MODEL_PRESETS[aiCfg.provider] ?? []).map((m) => ({
-                  label: m === aiCfg.model ? `✓ ${m}` : m,
-                  onClick: () => void setAiModel(m),
-                }))),
-            { label: '─ 思考强度 ─', onClick: () => {} },
-            ...[['low', '低'], ['medium', '中'], ['high', '高'] as const].map(([lv, label]) => ({
-              label: `${eff.thinkingLevel === lv ? '✓ ' : ''}${label}`,
-              onClick: () => agentSettings.updateModel(activeModel, { thinkingLevel: lv as 'low' | 'medium' | 'high' }),
-            })),
-          ]}
-          onClose={() => setModelMenu(null)}
-        />
-      )}
+
     </div>
   );
 }

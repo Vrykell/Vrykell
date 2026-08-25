@@ -8,6 +8,8 @@ import {
   type ModelProfile,
 } from '../lib/ai';
 import type { ProviderKind } from '../agent/provider';
+import { detectCapabilities, type ModelCapability } from '../agent/capabilities';
+import { modelIcon, providerLabel } from '../agent/modelIcon';
 import Segmented from '../components/Segmented';
 import { useToastStore } from '../components/Toast';
 import { Field, ModelTextInput, btnStyle, inputStyle } from './ui';
@@ -22,6 +24,36 @@ const PROVIDERS: { id: ProviderKind; label: string }[] = [
 function commitModels(next: ModelProfile[], activeId: string) {
   setAiModels(next, activeId).catch((e) =>
     useToastStore.getState().addToast(String((e as Error)?.message ?? e), 'error'),
+  );
+}
+
+/** 能力徽标行（视觉/推理/工具/搜索，探测结果） */
+function CapChips({ profile }: { profile: ModelProfile }) {
+  const caps = profile.capabilities ?? detectCapabilities(profile.provider, profile.model);
+  return (
+    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+      {(
+        [
+          ['vision', '视觉'],
+          ['reasoning', '推理'],
+          ['tools', '工具'],
+          ['search', '搜索'],
+        ] as [ModelCapability, string][]
+      ).map(([cap, label]) => (
+        <span
+          key={cap}
+          style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 10, lineHeight: '14px', padding: '1px 6px', borderRadius: 4,
+            color: caps[cap] ? 'var(--text-secondary)' : 'var(--text-muted)',
+            background: caps[cap] ? 'var(--hover)' : 'transparent',
+            border: caps[cap] ? 'none' : '1px solid var(--border)',
+          }}
+        >
+          {label}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -97,7 +129,18 @@ function ModelListField() {
     useToastStore.getState().addToast(msg, type);
 
   const update = (id: string, patch: Partial<ModelProfile>) =>
-    commitModels(models.map((m) => (m.id === id ? { ...m, ...patch } : m)), activeId);
+    commitModels(
+      models.map((m) => {
+        if (m.id !== id) return m;
+        const next = { ...m, ...patch };
+        // 模型 ID / 服务商变化时重新探测能力
+        if (patch.model !== undefined || patch.provider !== undefined) {
+          next.capabilities = detectCapabilities(next.provider, next.model);
+        }
+        return next;
+      }),
+      activeId,
+    );
 
   const remove = (id: string) => {
     if (models.length <= 1) {
@@ -120,6 +163,7 @@ function ModelListField() {
           provider: 'openai-compatible',
           baseUrl: 'https://api.openai.com/v1',
           model: '',
+          capabilities: detectCapabilities('openai-compatible', ''),
         },
       ],
       activeId,
@@ -141,6 +185,19 @@ function ModelListField() {
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span
+                title={providerLabel(m.provider)}
+                style={{
+                  width: 28, height: 28, borderRadius: 7, flexShrink: 0,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'var(--block)', color: 'var(--accent-warm)',
+                }}
+              >
+                {(() => {
+                  const Icon = modelIcon(m.provider, m.model);
+                  return <Icon size={14} />;
+                })()}
+              </span>
               <ModelTextInput
                 value={m.name}
                 placeholder="模型名称"
@@ -195,6 +252,9 @@ function ModelListField() {
                 onCommit={(v) => update(m.id, { model: v })}
                 style={{ flex: 1 }}
               />
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <CapChips profile={m} />
             </div>
           </div>
         ))}
