@@ -342,7 +342,7 @@ function TerminalPane(props: {
       {/* AI 状态栏（仅 AI 模式显示，置于页面顶部） */}
       <AiStatusBar paneId={terminal.id} />
       <div style={showXterm
-        // 经典/TUI/SSH：四周 4px 透明边距（透出壁纸/画布），TUI 顶部保留 banner 区
+        // 经典/TUI/SSH：四周 4px 透明边距（透出壁纸/画布），TUI 顶部为工具条让位
         ? { flex: 1, minHeight: 0, position: 'relative', padding: 4, paddingTop: scene === 'altScreen' ? 28 : 4, background: 'transparent' }
         : { position: 'absolute', inset: 0, opacity: 0, pointerEvents: 'none' }}>
         <TerminalPanel paneId={terminal.id} tabId={windowId} onReady={(sid) => setSession(terminal.id, sid)} />
@@ -542,14 +542,14 @@ function TuiBanner({ tabId }: { tabId: string }) {
     }).catch((e) => useToastStore.getState().addToast(String((e as Error)?.message ?? e), 'info'));
   }, [sessions, tabId]);
   return (
-    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 101, padding: '4px 12px', fontSize: 11, fontFamily: 'var(--font-mono)', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)' }}>
+    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 101, padding: '3px 12px', fontSize: 11, fontFamily: 'var(--font-mono)', background: 'transparent', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)' }}>
       <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--accent-warm)', flexShrink: 0 }} />
       <span>TUI{runningCommand ? ` · ${runningCommand}` : ''}</span>
       <div style={{ flex: 1 }} />
-      <span onClick={sendCtrlC} title="发送 Ctrl+C" style={{ fontSize: 10, padding: '1px 6px', border: '1px solid var(--border)', borderRadius: 3, cursor: 'pointer' }}>^C</span>
-      <span onClick={killApp} title="结束前台应用 (SIGTERM)" style={{ fontSize: 10, padding: '1px 6px', border: `1px solid ${killArmed ? 'var(--accent-warm)' : 'var(--border)'}`, borderRadius: 3, cursor: 'pointer', color: killArmed ? 'var(--accent-warm)' : 'var(--text-secondary)' }}>{killArmed ? '强杀!' : '结束'}</span>
+      <span onClick={sendCtrlC} title="发送 Ctrl+C" style={{ fontSize: 10, padding: '2px 6px', borderRadius: 3, cursor: 'pointer' }}>^C</span>
+      <span onClick={killApp} title="结束前台应用 (SIGTERM)" style={{ fontSize: 10, padding: '2px 6px', borderRadius: 3, cursor: 'pointer', color: killArmed ? 'var(--accent-warm)' : 'var(--text-secondary)' }}>{killArmed ? '强杀!' : '结束'}</span>
       {altScreenActive && (
-        <span onClick={() => { setAltScreenActive(false); setScene(tabId, 'blockList'); }} title="退出全屏" style={{ fontSize: 10, padding: '1px 6px', border: '1px solid var(--border)', borderRadius: 3, cursor: 'pointer' }}>esc</span>
+        <span onClick={() => { setAltScreenActive(false); setScene(tabId, 'blockList'); }} title="退出全屏" style={{ fontSize: 10, padding: '2px 6px', borderRadius: 3, cursor: 'pointer' }}>esc</span>
       )}
     </div>
   );
