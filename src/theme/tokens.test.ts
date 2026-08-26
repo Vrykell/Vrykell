@@ -36,12 +36,12 @@ describe('theme overrides', () => {
     applyTheme('dark');
     expect(document.documentElement.style.getPropertyValue('--canvas')).toBe('#ff0000');
     // 未覆盖的变量保持 base
-    expect(document.documentElement.style.getPropertyValue('--surface')).toBe('#0B0D11');
+    expect(document.documentElement.style.getPropertyValue('--surface')).toBe('#0A0A0A');
   });
 
   it('applies base only when overrides empty', () => {
     setThemeOverrides({});
     applyTheme('dark');
-    expect(document.documentElement.style.getPropertyValue('--canvas')).toBe('#0B0D11');
+    expect(document.documentElement.style.getPropertyValue('--canvas')).toBe('#0A0A0A');
   });
 });
