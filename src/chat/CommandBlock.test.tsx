@@ -28,4 +28,16 @@ describe('CommandBlock', () => {
     render(<Markdown content={'```python\nprint(1)\n```'} />);
     expect(screen.queryByText('在终端运行')).toBeNull();
   });
+
+  it('代码块带复制按钮，点击复制内容并切换为已复制', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    render(<Markdown content={'```python\nprint("hi")\n```'} />);
+    fireEvent.click(screen.getByTestId('code-copy-btn'));
+    expect(writeText).toHaveBeenCalledWith('print("hi")\n');
+    await screen.findByText('已复制');
+  });
 });
