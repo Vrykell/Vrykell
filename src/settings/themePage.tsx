@@ -8,7 +8,6 @@ import { openPath } from '@tauri-apps/plugin-opener';
 import { invoke } from '@tauri-apps/api/core';
 import { useTheme } from '../theme/ThemeProvider';
 import { useTerminalThemeStore } from '../theme/terminalTheme';
-import { TEAL_THEME_PRESET } from '../theme/tokens';
 import { useToastStore } from '../components/Toast';
 import { Field, btnStyle } from './ui';
 
@@ -98,36 +97,6 @@ export function ThemePage() {
                 }}
               >
                 <Icon size={14} /> {m === 'dark' ? '深色' : '浅色'}
-              </button>
-            );
-          })}
-        </div>
-      </Field>
-
-      <Field title="预设主题" description="默认主色为中性（不带颜色倾向）。喜欢带色外观可选「青绿」，作为自定义主题持久化保存。">
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {([
-            { key: 'neutral', label: '默认（中性）', vars: {} },
-            { key: 'teal', label: '青绿', vars: TEAL_THEME_PRESET },
-          ] as const).map((p) => {
-            const active = p.key === 'neutral'
-              ? !config.vars || config.vars['--accent'] !== TEAL_THEME_PRESET['--accent']
-              : config.vars['--accent'] === TEAL_THEME_PRESET['--accent'];
-            return (
-              <button
-                key={p.key}
-                onClick={() => void themeUpdate({ vars: { ...p.vars } }).then(() =>
-                  toast(p.key === 'neutral' ? '已切换为默认中性主题' : '已应用青绿自定义主题', 'success'),
-                )}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '10px 16px', fontSize: 12, cursor: 'pointer',
-                  border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-                  borderRadius: 'var(--radius-inner)', background: active ? 'var(--hover)' : 'transparent',
-                  color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-                }}
-              >
-                {p.label}
               </button>
             );
           })}
