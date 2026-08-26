@@ -201,7 +201,7 @@ export default function TopDock() {
         style={{
           position: 'absolute', left: '50%', transform: 'translateX(-50%)',
           display: 'flex', alignItems: 'center', gap: 6,
-          background: 'var(--canvas)', border: '1px solid var(--border)',
+          background: 'var(--block)', border: 'none',
           borderRadius: 6, padding: '0 10px', height: 28, width: 420, maxWidth: '44vw',
           color: 'var(--text-muted)', cursor: 'pointer',
           fontSize: 12, fontFamily: 'var(--font-ui)', textAlign: 'left',
