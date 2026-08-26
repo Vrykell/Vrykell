@@ -8,9 +8,11 @@
 
 use futures_util::StreamExt;
 use regex::Regex;
+use reqwest::dns::{Addrs, Name, Resolve, Resolving};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashSet, VecDeque};
-use std::time::Duration;
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 use url::Url;
 
 const USER_AGENT: &str =
@@ -110,10 +112,22 @@ fn http_client() -> Result<reqwest::Client, String> {
 
 /// follow_redirects=false 的客户端：重定向由 fetch_public 逐跳校验，防 SSRF。
 pub(crate) fn http_client_impl(follow_redirects: bool) -> Result<reqwest::Client, String> {
+    http_client_impl_ext(follow_redirects, true)
+}
+
+/// 受信端点的客户端（技能市场 GitHub API/raw）：仅钉扎不校验内网。
+/// 主机受 is_github_host 白名单约束，无需 DNS 级拦截。
+pub(crate) fn http_client_trusted() -> Result<reqwest::Client, String> {
+    http_client_impl_ext(false, false)
+}
+
+fn http_client_impl_ext(follow_redirects: bool, validate_dns: bool) -> Result<reqwest::Client, String> {
     let mut b = reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(10))
         .timeout(Duration::from_secs(30))
-        .user_agent(USER_AGENT);
+        .user_agent(USER_AGENT)
+        // DNS 钉扎：解析一次并校验/缓存，连接复用同一结果，防 DNS 交替应答（重绑定）
+        .dns_resolver(std::sync::Arc::new(PinnedResolver::new(validate_dns, proxy_hostnames())));
     if !follow_redirects {
         b = b.redirect(reqwest::redirect::Policy::none());
     }
@@ -123,6 +137,88 @@ pub(crate) fn http_client_impl(follow_redirects: bool) -> Result<reqwest::Client
         b = b.proxy(proxy);
     }
     b.build().map_err(|e| format!("初始化 HTTP 客户端失败：{e}"))
+}
+
+/// 环境变量里配置的代理主机（用户信任，不参与内网校验）。
+fn proxy_hostnames() -> HashSet<String> {
+    let mut set = HashSet::new();
+    for k in ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"] {
+        let Some(v) = env_nonempty(k) else { continue };
+        let host = if let Ok(u) = url::Url::parse(&v) {
+            u.host_str().map(|s| s.to_string())
+        } else {
+            // 裸地址 host:port（无 scheme）
+            v.split(':').next().map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
+        };
+        if let Some(h) = host {
+            set.insert(h.to_lowercase());
+        }
+    }
+    set
+}
+
+/// DNS 钉扎解析器：解析一次 → 校验（私网即拒）→ 缓存（TTL 内复用）。
+///
+/// 防 DNS 交替应答（重绑定）攻击：校验时解析到的公网地址被缓存并直接用于连接，
+/// 攻击者在校验通过后把域名切到内网 IP 也无法得逞——连接用的是已验证的缓存结果。
+struct PinnedResolver {
+    cache: std::sync::Arc<Mutex<HashMap<String, (Instant, Vec<std::net::SocketAddr>)>>>,
+    /// 是否校验解析结果（false = 受信端点，仅钉扎）
+    validate: bool,
+    /// 用户配置的代理主机：直连代理本身是用户信任的，不校验
+    trusted_hosts: HashSet<String>,
+}
+
+impl PinnedResolver {
+    fn new(validate: bool, trusted_hosts: HashSet<String>) -> Self {
+        Self {
+            cache: std::sync::Arc::new(Mutex::new(HashMap::new())),
+            validate,
+            trusted_hosts,
+        }
+    }
+}
+
+/// 解析结果校验：任何地址解析到内网即拒（含 IPv4-mapped IPv6）。
+fn validate_resolved(host: &str, addrs: &[std::net::SocketAddr]) -> Result<(), String> {
+    if addrs.is_empty() {
+        return Err("域名解析无结果".to_string());
+    }
+    if addrs.iter().any(|a| is_private_ip(a.ip())) {
+        return Err(format!("禁止访问解析到内网的地址：{host}"));
+    }
+    Ok(())
+}
+
+const DNS_PIN_TTL: Duration = Duration::from_secs(60);
+
+impl Resolve for PinnedResolver {
+    fn resolve(&self, name: Name) -> Resolving {
+        let host = name.as_str().to_lowercase();
+        let trusted = self.trusted_hosts.contains(&host);
+        let validate = self.validate && !trusted;
+        let cache = std::sync::Arc::clone(&self.cache);
+        Box::pin(async move {
+            // 命中未过期缓存 → 直接复用已验证结果（钉扎的核心）
+            {
+                let c = cache.lock().unwrap();
+                if let Some((at, addrs)) = c.get(&host) {
+                    if at.elapsed() < DNS_PIN_TTL {
+                        return Ok(Box::new(addrs.clone().into_iter()) as Addrs);
+                    }
+                }
+            }
+            let addrs: Vec<std::net::SocketAddr> = tokio::net::lookup_host(host.as_str())
+                .await
+                .map_err(|e| format!("域名解析失败：{e}"))?
+                .collect();
+            if validate {
+                validate_resolved(&host, &addrs)?;
+            }
+            cache.lock().unwrap().insert(host.clone(), (Instant::now(), addrs.clone()));
+            Ok(Box::new(addrs.into_iter()) as Addrs)
+        })
+    }
 }
 
 fn env_nonempty(key: &str) -> Option<String> {
@@ -997,6 +1093,21 @@ mod tests {
         assert!(!is_github_host("github.com.evil.com"));
         assert!(!is_github_host("127.0.0.1"));
         assert!(!is_github_host("gitlab.com"));
+    }
+
+    #[test]
+    fn validate_resolved_blocks_private_mixed_and_mapped() {
+        use std::net::SocketAddr;
+        let pub1: SocketAddr = "8.8.8.8:443".parse().unwrap();
+        let priv1: SocketAddr = "127.0.0.1:80".parse().unwrap();
+        let mapped: SocketAddr = "[::ffff:192.168.1.1]:443".parse().unwrap();
+        assert!(validate_resolved("x.com", &[pub1]).is_ok());
+        // 混合公网+内网 → 拒（DNS 交替应答/多记录场景）
+        assert!(validate_resolved("x.com", &[pub1, priv1]).is_err());
+        // IPv4-mapped IPv6 内网 → 拒
+        assert!(validate_resolved("x.com", &[mapped]).is_err());
+        // 空结果 → 拒
+        assert!(validate_resolved("x.com", &[]).is_err());
     }
 
     // 环境变量是进程级状态，串行化避免测试间互相干扰
