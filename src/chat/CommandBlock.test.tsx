@@ -12,6 +12,8 @@ import { useWorkspaceStore } from '../stores/workspace';
 describe('CommandBlock', () => {
   beforeEach(() => {
     invokeMock.mockClear();
+    // 模拟启动后存在活跃标签（store 不再内置初始标签）
+    useWorkspaceStore.getState().addTab({});
     const tabId = useWorkspaceStore.getState().activeId;
     useTerminalStore.setState({ sessions: { [`${tabId}#0`]: 's1' }, dims: {}, visible: true });
   });

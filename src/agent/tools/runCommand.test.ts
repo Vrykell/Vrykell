@@ -20,6 +20,8 @@ const initialTerm = useTerminalStore.getState();
 const initialWs = useWorkspaceStore.getState();
 
 function setupPane(): string {
+  // 模拟启动后存在活跃标签（store 不再内置初始标签）
+  useWorkspaceStore.getState().addTab({});
   const tabId = useWorkspaceStore.getState().activeId;
   const paneId = `${tabId}#0`;
   useTerminalStore.setState((s) => ({ sessions: { ...s.sessions, [paneId]: 'pty-1' } }));

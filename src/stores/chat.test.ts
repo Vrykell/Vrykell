@@ -47,6 +47,8 @@ describe('chat store（按标签隔离）', () => {
   });
 
   it('首条消息自动命名标签', async () => {
+    // 模拟启动后存在一个标签（store 不再内置初始标签）
+    useWorkspaceStore.getState().addTab({});
     const noop = async (_m: unknown, _c: (t: string) => void) => {};
     await useChatStore.getState().send('量子力学是什么', { streamFn: noop });
     expect(useWorkspaceStore.getState().tabs[0]!.title).toBe('量子力学是什么');
@@ -88,6 +90,8 @@ describe('chat store v2（parts / 工具事件）', () => {
   beforeEach(() => {
     useChatStore.setState(initialChat, true);
     useWorkspaceStore.setState(initialWs, true);
+    // 模拟启动后存在活跃标签（store 不再内置初始标签）
+    useWorkspaceStore.getState().addTab({});
   });
 
   it('纯文本回答 parts 恒为 undefined（legacy 渲染契约）', async () => {
@@ -195,6 +199,8 @@ describe('chat store M4（停止 / 重新生成 / 编辑重发 / 删除）', () 
   beforeEach(() => {
     useChatStore.setState(initialChat, true);
     useWorkspaceStore.setState(initialWs, true);
+    // 模拟启动后存在活跃标签（store 不再内置初始标签）
+    useWorkspaceStore.getState().addTab({});
   });
 
   it('regenerate：删旧回答、原地起新流，history 截止该提问', async () => {

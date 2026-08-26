@@ -15,7 +15,8 @@ export default function TerminalPanel({
   return (
     <div
       ref={ref}
-      style={{ width: '100%', height: '100%', minHeight: 0, background: 'var(--canvas)' }}
+      // 背景透明：4px 边距由外层容器透出壁纸/画布（xterm 自身背景由 --xterm-bg 控制）
+      style={{ width: '100%', height: '100%', minHeight: 0, background: 'transparent' }}
     />
   );
 }

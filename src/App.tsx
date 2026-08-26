@@ -11,6 +11,8 @@ import { setDefaultStream } from './stores/chat';
 import { refreshAiConfig } from './lib/ai';
 import { agentStream } from './agent/agentStream';
 import { initAutoTitle } from './agent/title';
+import { listSessions } from './api/session';
+import type { BackendSessionEntry } from './search/types';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import { useUiStore } from './stores/ui';
 import { useWorkspaceDirsStore } from './files/workspaceDirs';
@@ -40,14 +42,37 @@ export default function App() {
   useEffect(() => { refreshAiConfig(); }, []);
   // M7 智能标题：订阅块/对话活动，内容足够时生成概括性标题
   useEffect(() => initAutoTitle(), []);
-  useEffect(() => {
-    const ws = useWorkspaceStore.getState();
-    const initialTab = ws.tabs[0];
-    if (initialTab) {
-      const ser = serializeSession(initialTab);
-      if (ser) sessionManager.create(initialTab.id, initialTab.title, undefined, ser.kind, ser.payload);
+  // 启动会话恢复：优先恢复上次仍处于活跃（未关闭）的会话标签页；
+// 仅当没有可恢复的会话时才创建默认终端（避免默认终端与恢复逻辑竞态）。
+useEffect(() => {
+  void (async () => {
+    const sessions = await listSessions().catch(() => [] as BackendSessionEntry[]);
+    const active = sessions
+      .filter((s) => s.status === 'active')
+      .sort((a, b) => a.sort_order - b.sort_order);
+
+    if (active.length > 0) {
+      // 有可恢复会话：先恢复分组结构（保持组归属与折叠态），再逐个恢复
+      await useWorkspaceStore.getState().loadGroups();
+      for (const s of active) {
+        await sessionManager
+          .restore(s.id, s.title, { groupId: s.group_id ?? undefined })
+          .catch((e) => console.warn('App restore session failed:', s.id, e));
+      }
     }
-  }, []);
+
+    // 无待恢复会话（或全部恢复失败）→ 创建默认终端并持久化为会话记录
+    const ws = useWorkspaceStore.getState();
+    if (ws.tabs.length === 0) {
+      const id = ws.addTab({});
+      const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === id);
+      if (tab) {
+        const ser = serializeSession(tab);
+        if (ser) sessionManager.create(tab.id, tab.title, undefined, ser.kind, ser.payload);
+      }
+    }
+  })();
+}, []);
   useEffect(() => { useWorkspaceDirsStore.getState().load(); }, []);
   // 命令历史热缓存注水：补全与上下键翻历史在重启后立即有料
   useEffect(() => { void useHistoryStore.getState().hydrate(); }, []);

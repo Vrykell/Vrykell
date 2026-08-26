@@ -301,6 +301,14 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 /* xterm 容器贴边：取消全屏终端的边缘内边距 */
 .xterm { padding: 0; }
 
+/* ── xterm(经典/TUI/SSH)滚动条与 block 列表对齐 ──
+ * xterm 6 用 DOM 滚动条(.xterm-scrollable-element > .scrollbar),非原生 webkit 滚动条。
+ * 默认完全隐藏;scrollbarHover.ts 的坐标检测会命中 .xterm-viewport(可滚动容器)并
+ * 打上 data-scrollbar-hover,此时才显示 —— 与 block 列表的滚动条行为一致。
+ * !important 覆盖 xterm 自带的 .visible/.invisible class 控制。 */
+.xterm .xterm-scrollable-element > .scrollbar { opacity: 0 !important; }
+[data-scrollbar-hover] .xterm-scrollable-element > .scrollbar { opacity: 1 !important; }
+
 @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes modalIn { from { opacity: 0; transform: translateY(-8px) scale(0.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }

@@ -27,13 +27,8 @@ pub fn run() {
             db::HistoryDb::open_in_memory()
         }
     };
-    // 启动即把上次异常退出（崩溃/强杀）遗留的 active 会话归档，避免脏 active 数据。
-    // 正常退出已在 RunEvent::Exit 归档，这里幂等兜底。
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or(0);
-    let _ = history_db.archive_all_active_sessions(now);
+    // 不再归档 active 会话：active = 「上次打开未关闭的标签」，启动时由前端恢复；
+    // 仅用户显式关闭标签时才归档为历史（archive_session）。
     let history_state = HistoryState(Mutex::new(history_db));
 
     let app = tauri::Builder::default()
@@ -192,18 +187,6 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    app.run(|app_handle, event| {
-        // 应用退出时把仍在活跃状态的会话标记为历史，避免遗留脏 active 数据
-        if matches!(event, tauri::RunEvent::Exit) {
-            if let Some(state) = app_handle.try_state::<HistoryState>() {
-                if let Ok(db) = state.0.lock() {
-                    let now = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .map(|d| d.as_millis() as u64)
-                        .unwrap_or(0);
-                    let _ = db.archive_all_active_sessions(now);
-                }
-            }
-        }
-    });
+    // 退出时不再归档 active 会话：保留「上次打开未关闭的标签」供下次启动恢复。
+    app.run(|_app_handle, _event| {});
 }

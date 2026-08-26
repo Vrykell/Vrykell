@@ -1,15 +1,55 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Monitor, RotateCcw, History, Trash2, ChevronRight, Folder, Server } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Monitor, RotateCcw, History, Trash2, ChevronRight, Folder, Server, Search, Filter, Check } from 'lucide-react';
 import { listSessions } from '../api/session';
 import { groupsList, groupRestore, groupDeleteWithSessions } from '../api/group';
 import type { BackendSessionEntry, BackendGroupEntry } from '../search/types';
+import { filterSessions, isSshSession, type SessionDateFilter, type SessionTypeFilter } from './sessionFilter';
 import * as sessionManager from '../lib/sessionManager';
 import { useWorkspaceStore } from '../stores/workspace';
 import { useToastStore } from './Toast';
 
-/** 判断会话（窗口）是否含 SSH 终端（布局 payload 里出现 kind=ssh）。 */
-function isSshSession(s: BackendSessionEntry): boolean {
-  return s.kind === 'ssh' || (typeof s.payload === 'string' && s.payload.includes('"kind":"ssh"'));
+const TYPE_OPTIONS: { value: SessionTypeFilter; label: string }[] = [
+  { value: 'all', label: '全部' },
+  { value: 'local', label: '本地' },
+  { value: 'ssh', label: 'SSH' },
+];
+
+const DATE_OPTIONS: { value: SessionDateFilter; label: string }[] = [
+  { value: 'all', label: '全部' },
+  { value: 'today', label: '今天' },
+  { value: '7d', label: '近7天' },
+  { value: '30d', label: '近30天' },
+  { value: '90d', label: '近90天' },
+];
+
+interface SessionFilterState {
+  query: string;
+  type: SessionTypeFilter;
+  date: SessionDateFilter;
+}
+
+/** 筛选状态记忆在 sessionStorage（会话内保留，应用重启后不跨启动持久化）。 */
+const FILTER_KEY = 'vrykell-session-history-filter';
+
+function loadFilter(): SessionFilterState {
+  try {
+    const raw = sessionStorage.getItem(FILTER_KEY);
+    if (raw) {
+      const p = JSON.parse(raw) as Partial<SessionFilterState>;
+      return {
+        query: typeof p.query === 'string' ? p.query : '',
+        type: TYPE_OPTIONS.some((o) => o.value === p.type) ? p.type! : 'all',
+        date: DATE_OPTIONS.some((o) => o.value === p.date) ? p.date! : 'all',
+      };
+    }
+  } catch { /* 缓存损坏/不可用 → 默认 */ }
+  return { query: '', type: 'all', date: 'all' };
+}
+
+function saveFilter(f: SessionFilterState): void {
+  try {
+    sessionStorage.setItem(FILTER_KEY, JSON.stringify(f));
+  } catch { /* 忽略 */ }
 }
 
 /**
@@ -23,6 +63,18 @@ export default function SessionHistoryView() {
   const [loading, setLoading] = useState(true);
   // 历史页分组折叠状态（覆盖后端 collapsed，会话内本地态）
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  // 筛选（搜索 + 类型 + 日期）：记忆在 sessionStorage，跨启动不持久化
+  const [filter, setFilterState] = useState<SessionFilterState>(loadFilter);
+  const [filterMenu, setFilterMenu] = useState<{ x: number; y: number } | null>(null);
+
+  const setFilter = (patch: Partial<SessionFilterState>) => {
+    setFilterState((prev) => {
+      const next = { ...prev, ...patch };
+      saveFilter(next);
+      return next;
+    });
+  };
+  const { query, type: typeFilter, date: dateFilter } = filter;
   // 订阅标签面板的分组状态：归档/恢复分组后自动刷新历史列表
   const activeGroups = useWorkspaceStore((s) => s.groups);
 
@@ -103,7 +155,13 @@ export default function SessionHistoryView() {
   }, [load]);
 
   // 会话历史页只展示「历史（已关闭）」会话；组内/未分组按 sort_order 排序
-  const historical = sessions.filter((s) => s.status === 'historical');
+  const hasFilter = typeFilter !== 'all' || dateFilter !== 'all';
+  const historical = filterSessions(
+    sessions.filter((s) => s.status === 'historical'),
+    query,
+    typeFilter,
+    dateFilter,
+  );
   const groupSessions = (gid: string) =>
     historical.filter((s) => s.group_id === gid).sort((a, b) => a.sort_order - b.sort_order);
   const ungrouped = historical.filter((s) => !s.group_id).sort((a, b) => a.sort_order - b.sort_order);
@@ -113,29 +171,74 @@ export default function SessionHistoryView() {
       flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column',
       background: 'var(--surface)', userSelect: 'none',
     }}>
-      {/* 顶栏 */}
+      {/* 顶栏：标题 + 搜索栏（内置筛选按钮）+ 刷新 */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        padding: '10px 16px', borderBottom: '1px solid var(--border)',
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '8px 16px', borderBottom: '1px solid var(--border)',
         fontSize: 12, color: 'var(--text-secondary)',
       }}>
         <History size={13} />
-        <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>会话历史</span>
-        <span style={{ color: 'var(--text-muted)' }}>· {historical.length} 个会话</span>
-        <div style={{ flex: 1 }} />
+        <span style={{ fontWeight: 600, color: 'var(--text-primary)', flexShrink: 0 }}>会话历史</span>
+        <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>· {historical.length} 个会话</span>
+
+        {/* 搜索栏（含筛选按钮） */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          flex: 1, minWidth: 140,
+          background: 'var(--block)', borderRadius: 6, padding: '0 4px 0 8px', height: 26,
+        }}>
+          <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+          <input
+            value={query}
+            onChange={(e) => setFilter({ query: e.target.value })}
+            placeholder="搜索标题 / SSH 目标…"
+            data-testid="session-filter-input"
+            style={{
+              flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none',
+              fontSize: 12, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+            }}
+          />
+          <button
+            onClick={(e) => {
+              const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              setFilterMenu({ x: r.left, y: r.bottom + 4 });
+            }}
+            title={hasFilter ? '筛选（当前已启用，点击调整）' : '筛选'}
+            data-testid="session-filter-btn"
+            style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: 22, height: 22, padding: 0, border: 'none', borderRadius: 4,
+              background: 'transparent', cursor: 'pointer',
+              color: hasFilter ? 'var(--accent)' : 'var(--text-muted)',
+            }}
+          >
+            <Filter size={13} />
+          </button>
+        </div>
+
         <button
           onClick={load}
           title="刷新"
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 4,
-            fontSize: 11, padding: '2px 8px', border: '1px solid var(--border)',
+            fontSize: 11, padding: '3px 8px', border: '1px solid var(--border)',
             borderRadius: 4, background: 'transparent', color: 'var(--text-secondary)',
-            cursor: 'pointer',
+            cursor: 'pointer', flexShrink: 0,
           }}
         >
           <RotateCcw size={11} /> 刷新
         </button>
       </div>
+
+      {/* 筛选弹层 */}
+      {filterMenu && (
+        <SessionFilterMenu
+          anchor={filterMenu}
+          value={{ type: typeFilter, date: dateFilter }}
+          onChange={setFilter}
+          onClose={() => setFilterMenu(null)}
+        />
+      )}
 
       {/* 列表 */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 8px 8px' }}>
@@ -259,6 +362,87 @@ export default function SessionHistoryView() {
         )}
       </div>
     </div>
+  );
+}
+
+/** 筛选弹层：类型 / 日期 分组单选，点击选项即时生效（点外部或 Esc 关闭）。 */
+function SessionFilterMenu({ anchor, value, onChange, onClose }: {
+  anchor: { x: number; y: number };
+  value: { type: SessionTypeFilter; date: SessionDateFilter };
+  onChange: (patch: Partial<SessionFilterState>) => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    requestAnimationFrame(() => document.addEventListener('mousedown', onDown));
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [onClose]);
+
+  const top = Math.min(anchor.y, window.innerHeight - 190);
+  const left = Math.min(anchor.x, window.innerWidth - 160);
+
+  return (
+    <div
+      ref={ref}
+      data-testid="session-filter-menu"
+      style={{
+        position: 'fixed', zIndex: 9999, top, left, minWidth: 150,
+        background: 'var(--elevated)', border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-inner)', boxShadow: 'var(--shadow-md)',
+        padding: '4px 0', fontSize: 12,
+      }}
+    >
+      <div style={{ padding: '4px 10px 2px', fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.04em' }}>
+        类型
+      </div>
+      {TYPE_OPTIONS.map((o) => {
+        const active = o.value === value.type;
+        return (
+          <FilterOption key={o.value} label={o.label} active={active} onClick={() => onChange({ type: o.value })} />
+        );
+      })}
+      <div style={{ height: 1, background: 'var(--border)', margin: '4px 8px' }} />
+      <div style={{ padding: '4px 10px 2px', fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.04em' }}>
+        日期
+      </div>
+      {DATE_OPTIONS.map((o) => {
+        const active = o.value === value.date;
+        return (
+          <FilterOption key={o.value} label={o.label} active={active} onClick={() => onChange({ date: o.value })} />
+        );
+      })}
+    </div>
+  );
+}
+
+/** 筛选菜单单选行（选中打勾 + 强调色）。 */
+function FilterOption({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+        padding: '5px 10px', border: 'none', background: 'transparent', cursor: 'pointer',
+        color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+        fontSize: 12,
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+    >
+      <span style={{ flex: 1 }}>{label}</span>
+      {active && <Check size={12} style={{ color: 'var(--accent)', flexShrink: 0 }} />}
+    </button>
   );
 }
 

@@ -12,6 +12,44 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('会话历史管理', () => {
+  test('启动时自动恢复上次活跃会话', async ({ page }) => {
+    // mock list_sessions 返回 status=active 的 t1 → 启动后自动恢复为标签
+    // （恢复的标签 id 为 t1，区别于模块级默认标签）
+    await page.locator('[data-dock-btn="tabs"]').click();
+    await expect(page.locator('[data-testid="tab-row-t1"]')).toBeVisible({ timeout: 5000 });
+  });
+
+  test('筛选：搜索框 + 筛选菜单过滤会话，状态同会话内记忆', async ({ page }) => {
+    await openHistory(page);
+    await expect(page.getByText('旧的调试会话')).toBeVisible();
+    // 搜索过滤
+    await page.locator('[data-testid="session-filter-input"]').fill('不存在的会话');
+    await expect(page.getByText('旧的调试会话')).toHaveCount(0);
+    await page.locator('[data-testid="session-filter-input"]').fill('');
+    await expect(page.getByText('旧的调试会话')).toBeVisible();
+    // 筛选菜单：选 SSH（历史会话是 local → 消失）
+    await page.locator('[data-testid="session-filter-btn"]').click();
+    const menu = page.locator('[data-testid="session-filter-menu"]');
+    await menu.getByRole('button', { name: 'SSH' }).click();
+    await expect(page.getByText('旧的调试会话')).toHaveCount(0);
+    // 切回全部（类型组的第一个「全部」）
+    await page.locator('[data-testid="session-filter-btn"]').click();
+    await page.locator('[data-testid="session-filter-menu"]').getByRole('button', { name: '全部' }).first().click();
+    await expect(page.getByText('旧的调试会话')).toBeVisible();
+    // sessionStorage 记忆：刷新页面后筛选状态保留
+    await page.locator('[data-testid="session-filter-btn"]').click();
+    await page.locator('[data-testid="session-filter-menu"]').getByRole('button', { name: 'SSH' }).click();
+    await page.reload();
+    // 幂等打开会话历史页（面板状态可能已被持久化，避免 toggle 关掉它）
+    await expect(page.locator('[data-testid^="tab-row-"]').first()).toBeVisible();
+    if (!(await page.locator('[data-testid="tab-history-btn"]').isVisible().catch(() => false))) {
+      await page.locator('[data-dock-btn="tabs"]').click();
+    }
+    await expect(page.locator('[data-testid="tab-history-btn"]')).toBeVisible({ timeout: 5000 });
+    await page.locator('[data-testid="tab-history-btn"]').click();
+    await expect(page.getByText('旧的调试会话')).toHaveCount(0);
+  });
+
   test('历史会话可删除', async ({ page }) => {
     await openHistory(page);
     await expect(page.getByText('旧的调试会话')).toBeVisible();

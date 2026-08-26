@@ -73,7 +73,8 @@ describe('sessionManager 生命周期', () => {
   });
 
   it('restore：无 blocks/chat 时清空 chat；tab 已存在时 activate', async () => {
-    const sessionId = wsInitial.tabs[0]!.id;
+    // 模拟已有一个活跃标签（store 不再内置初始标签）
+    const sessionId = useWorkspaceStore.getState().addTab({});
     invokeMock.mockResolvedValueOnce(undefined); // restore_session
     invokeMock.mockResolvedValueOnce([]); // blocks
     invokeMock.mockResolvedValueOnce([]); // chat

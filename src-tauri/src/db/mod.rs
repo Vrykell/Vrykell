@@ -258,19 +258,6 @@ mod tests {
     }
 
     #[test]
-    fn archive_all_active_sessions_marks_historical() {
-        let db = test_db();
-        db.create_session("a", "A", 0, "", "local", "{}").unwrap();
-        db.create_session("b", "B", 0, "", "local", "{}").unwrap();
-        db.archive_session("a", 10).unwrap(); // a 已是历史
-        db.archive_all_active_sessions(20).unwrap();
-        let sessions = db.list_sessions().unwrap();
-        for s in sessions {
-            assert_eq!(s.status, "historical");
-        }
-    }
-
-    #[test]
     fn chat_message_append_upserts_and_lists_in_order() {
         let db = test_db();
         db.create_session("s1", "标题", 0, "", "local", "{}").unwrap();
