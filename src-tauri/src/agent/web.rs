@@ -6,6 +6,7 @@
 //! 都走 Rust 的 reqwest 直连，key/令牌不出 webview；结果转结构化文本截断，
 //! 供模型阅读与 ToolRunCard 展开展示。
 
+use futures_util::StreamExt;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashSet, VecDeque};
@@ -19,6 +20,31 @@ const USER_AGENT: &str =
 const FETCH_TEXT_CAP: usize = 24_000;
 /// web_crawl 单页文本截断上限（字符）。
 const CRAWL_PAGE_CAP: usize = 8_000;
+/// 抓取响应体上限（字节）。超出即流式截断丢弃，防恶意/意外大响应耗尽内存。
+const FETCH_BODY_CAP: usize = 10 * 1024 * 1024;
+
+/// 流式读取响应体，超过 max_bytes 即截断（返回 over=true）。
+/// 不得用 `resp.text()/bytes()` 全量读入后再判断——读取阶段就会占满内存。
+pub(crate) async fn read_body_capped(
+    resp: reqwest::Response,
+    max_bytes: usize,
+) -> Result<(Vec<u8>, bool), String> {
+    let mut body = Vec::with_capacity(max_bytes.min(1024 * 1024));
+    let mut stream = resp.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| format!("读取响应失败：{e}"))?;
+        let room = max_bytes.saturating_sub(body.len());
+        if room == 0 {
+            return Ok((body, true));
+        }
+        let take = chunk.len().min(room);
+        body.extend_from_slice(&chunk[..take]);
+        if take < chunk.len() {
+            return Ok((body, true));
+        }
+    }
+    Ok((body, false))
+}
 
 /// 单条搜索/抓取结果。
 #[derive(Serialize, Clone)]
@@ -91,7 +117,85 @@ pub(crate) fn http_client_impl(follow_redirects: bool) -> Result<reqwest::Client
     if !follow_redirects {
         b = b.redirect(reqwest::redirect::Policy::none());
     }
+    // 尊重环境变量代理（HTTPS_PROXY/HTTP_PROXY/ALL_PROXY/NO_PROXY）。
+    // 无代理时返回 None，保持直连。
+    if let Some(proxy) = env_system_proxy() {
+        b = b.proxy(proxy);
+    }
     b.build().map_err(|e| format!("初始化 HTTP 客户端失败：{e}"))
+}
+
+fn env_nonempty(key: &str) -> Option<String> {
+    std::env::var(key)
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+}
+
+/// 从环境变量构建系统代理（与 proxy_configured_for 同一套读取规则）。
+fn env_system_proxy() -> Option<reqwest::Proxy> {
+    let all = env_nonempty("ALL_PROXY").or_else(|| env_nonempty("all_proxy"));
+    let https = env_nonempty("HTTPS_PROXY").or_else(|| env_nonempty("https_proxy")).or_else(|| all.clone());
+    let http = env_nonempty("HTTP_PROXY").or_else(|| env_nonempty("http_proxy")).or_else(|| all.clone());
+    if https.is_none() && http.is_none() {
+        return None;
+    }
+    let proxy = reqwest::Proxy::custom(move |u| match u.scheme() {
+        "https" => https.clone(),
+        _ => http.clone(),
+    });
+    Some(proxy.no_proxy(reqwest::NoProxy::from_env()))
+}
+
+/// 目标 (scheme, host) 是否经由「远端解析」型代理访问（读取环境变量）。
+///
+/// 远端解析型代理（HTTP(S) 正向代理、socks4a/socks5h）接管目标域名解析，
+/// 本地 DNS 结果不代表实际连接目标，SSRF 校验应跳过「本地 DNS → 内网拦截」这一级。
+/// 但 socks4/socks5 由本地解析域名后经隧道连接，连接目标仍是本地解析结果，
+/// 必须保留校验 —— 否则解析到内网的域名会被直接放行。
+///
+/// NO_PROXY 中出现 IP/CIDR 条目时，无法排除「该域名绕过代理直连内网」，
+/// 保守视为直连（保留 DNS 校验），避免 reqwest 与校验逻辑不一致造成绕过。
+fn proxy_does_remote_dns_for(scheme: &str, host: &str) -> bool {
+    let mut keys: Vec<&str> = Vec::new();
+    if scheme.eq_ignore_ascii_case("https") {
+        keys.extend(["HTTPS_PROXY", "https_proxy", "ALL_PROXY", "all_proxy"]);
+    } else {
+        keys.extend(["HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"]);
+    }
+    let Some(proxy) = keys.iter().find_map(|k| env_nonempty(k)) else {
+        return false;
+    };
+    // NO_PROXY：匹配条目（精确/子域/前导点）→ 直连，保留 DNS 校验
+    let no_proxy = std::env::var("NO_PROXY")
+        .or_else(|_| std::env::var("no_proxy"))
+        .unwrap_or_default();
+    if no_proxy.trim() == "*" {
+        return false;
+    }
+    let h = host.to_lowercase();
+    let mut has_ip_entry = false;
+    for e in no_proxy.split(',').map(|s| s.trim().to_lowercase()) {
+        if e.is_empty() {
+            continue;
+        }
+        // IP / CIDR 条目：域名可能解析到这些地址后绕过代理直连 → 保守视为直连
+        if e.parse::<std::net::IpAddr>().is_ok() || e.contains('/') {
+            has_ip_entry = true;
+            continue;
+        }
+        if h == e || h.ends_with(&format!(".{e}")) || (e.starts_with('.') && h.ends_with(&e)) {
+            return false;
+        }
+    }
+    if has_ip_entry {
+        return false;
+    }
+    // 代理类型：仅远端解析型才接管域名
+    let Ok(u) = url::Url::parse(&proxy) else {
+        return true; // 裸地址（host:port）按 HTTP 正向代理处理
+    };
+    matches!(u.scheme(), "http" | "https" | "socks4a" | "socks5h")
 }
 
 /// 是否为内网/保留地址（SSRF 防护）。
@@ -107,6 +211,11 @@ fn is_private_ip(ip: std::net::IpAddr) -> bool {
                 || v4.is_multicast()
         }
         std::net::IpAddr::V6(v6) => {
+            // IPv4-mapped IPv6（::ffff:127.0.0.1 等）：连接实际落到对应 IPv4 地址，
+            // 必须按 IPv4 语义判断，否则可绕过内网拦截
+            if let Some(v4) = v6.to_ipv4_mapped() {
+                return is_private_ip(std::net::IpAddr::V4(v4));
+            }
             v6.is_loopback()
                 || v6.is_unspecified()
                 || v6.is_unique_local()
@@ -127,12 +236,20 @@ async fn validate_public_url(url: &str) -> Result<(), String> {
         return Err("URL 不允许包含账号信息".to_string());
     }
     let host = u.host_str().ok_or("URL 缺少主机名")?;
+    // 字面 IP：无论是否走代理都拦截内网地址（最强的 SSRF 信号，不受 DNS 影响）
     if let Ok(ip) = host.parse::<std::net::IpAddr>() {
         if is_private_ip(ip) {
             return Err("禁止访问内网地址".to_string());
         }
         return Ok(());
     }
+    // 经「远端解析」型代理（http/https 正向、socks4a/socks5h）：域名由代理解析，
+    // 本地 DNS 不代表实际连接目标，按本地解析结果拦截会误伤代理用户，故跳过。
+    // socks4/socks5（本地解析）与直连场景照常校验。
+    if proxy_does_remote_dns_for(scheme, host) {
+        return Ok(());
+    }
+    // 直连：本地 DNS 解析，解析到内网即拦截（防 DNS 重绑定/内网服务探测）
     let port = u.port().unwrap_or_else(|| if scheme == "https" { 443 } else { 80 });
     let addrs: Vec<std::net::IpAddr> = tokio::net::lookup_host((host, port))
         .await
@@ -148,11 +265,18 @@ async fn validate_public_url(url: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// 逐跳校验重定向的公网抓取（SSRF 防护）。
-pub(crate) async fn fetch_public(client: &reqwest::Client, url: &str) -> Result<reqwest::Response, String> {
+/// 逐跳抓取（重定向由调用方传入的校验器把关）。
+async fn fetch_with_validation<F>(
+    client: &reqwest::Client,
+    url: &str,
+    mut validate: F,
+) -> Result<reqwest::Response, String>
+where
+    F: FnMut(&str) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), String>> + Send + '_>>,
+{
     let mut current = url.to_string();
     for _ in 0..10 {
-        validate_public_url(&current).await?;
+        validate(&current).await?;
         let resp = client
             .get(&current)
             .send()
@@ -173,6 +297,44 @@ pub(crate) async fn fetch_public(client: &reqwest::Client, url: &str) -> Result<
             .to_string();
     }
     Err("重定向次数过多".to_string())
+}
+
+/// 逐跳校验重定向的公网抓取（SSRF 防护）。
+pub(crate) async fn fetch_public(client: &reqwest::Client, url: &str) -> Result<reqwest::Response, String> {
+    fetch_with_validation(client, url, |u| Box::pin(validate_public_url(u))).await
+}
+
+/// GitHub 相关域名白名单：unchecked 抓取的第一跳与重定向都只允许落在这些主机。
+fn is_github_host(host: &str) -> bool {
+    let h = host.to_lowercase();
+    [
+        "github.com",
+        "api.github.com",
+        "raw.githubusercontent.com",
+        "objects.githubusercontent.com",
+        "githubusercontent.com",
+    ]
+    .iter()
+    .any(|d| h == *d || h.ends_with(&format!(".{d}")))
+}
+
+/// 不做 SSRF 校验的抓取。仅用于**主机名硬编码**的受信端点（如技能市场的
+/// GitHub API / raw 文件）：用户输入只进入路径段，永远不会成为主机名。
+/// 重定向同样限制在 GitHub 域名内，避免「硬编码主机」承诺被重定向打破。
+/// 用户/LLM 提供的任意 URL 必须走 `fetch_public`。
+pub(crate) async fn fetch_public_unchecked(client: &reqwest::Client, url: &str) -> Result<reqwest::Response, String> {
+    fetch_with_validation(client, url, |u| {
+        Box::pin(async move {
+            let parsed = url::Url::parse(u).map_err(|_| "无效 URL".to_string())?;
+            let host = parsed.host_str().ok_or("URL 缺少主机名")?.to_string();
+            if is_github_host(&host) {
+                Ok(())
+            } else {
+                Err(format!("仅允许访问 GitHub 域名，当前主机：{host}"))
+            }
+        })
+    })
+    .await
 }
 
 /// 简单 URL 百分号编码（保留 RFC3986 非保留字符，空格 → `+`）。
@@ -482,7 +644,13 @@ pub async fn web_search(query: String, max_results: Option<u32>) -> Result<WebSe
         .await
         .map_err(|e| format!("请求 DuckDuckGo 失败：{e}"))?;
     let status = resp.status();
-    let html = resp.text().await.map_err(|e| format!("读取响应失败：{e}"))?;
+    let html = {
+        let (bytes, over) = read_body_capped(resp, FETCH_BODY_CAP).await?;
+        if over {
+            return Err("响应体超过 10MB，已拒绝".to_string());
+        }
+        String::from_utf8_lossy(&bytes).into_owned()
+    };
     if !status.is_success() {
         let cap = html.len().min(300);
         return Err(format!("DuckDuckGo 返回 {status}：{}", &html[..cap]));
@@ -518,7 +686,13 @@ pub async fn web_fetch(url: String) -> Result<WebFetchResponse, String> {
         .and_then(|v| v.to_str().ok())
         .unwrap_or("")
         .to_string();
-    let body = resp.text().await.map_err(|e| format!("读取响应失败：{e}"))?;
+    let body = {
+        let (bytes, over) = read_body_capped(resp, FETCH_BODY_CAP).await?;
+        if over {
+            return Err("响应体超过 10MB，已拒绝".to_string());
+        }
+        String::from_utf8_lossy(&bytes).into_owned()
+    };
     if !status.is_success() {
         let cap = body.len().min(300);
         return Err(format!("返回 {status}：{}", &body[..cap]));
@@ -590,8 +764,8 @@ pub async fn web_crawl(
             .and_then(|v| v.to_str().ok())
             .unwrap_or("")
             .to_string();
-        let body = match resp.text().await {
-            Ok(b) => b,
+        let body = match read_body_capped(resp, FETCH_BODY_CAP).await {
+            Ok((bytes, _over)) => String::from_utf8_lossy(&bytes).into_owned(),
             Err(_) => continue,
         };
         let is_html = content_type.contains("text/html") || body.trim_start().starts_with('<');
@@ -684,7 +858,13 @@ pub async fn fetch_skill_registry(url: String) -> Result<Vec<RemoteSkill>, Strin
     let client = http_client_impl(false)?;
     let resp = fetch_public(&client, &u).await?;
     let status = resp.status();
-    let body = resp.text().await.map_err(|e| format!("读取响应失败：{e}"))?;
+    let body = {
+        let (bytes, over) = read_body_capped(resp, FETCH_BODY_CAP).await?;
+        if over {
+            return Err("响应体超过 10MB，已拒绝".to_string());
+        }
+        String::from_utf8_lossy(&bytes).into_owned()
+    };
     if !status.is_success() {
         let cap = body.len().min(300);
         return Err(format!("返回 {status}：{}", &body[..cap]));
@@ -799,5 +979,80 @@ mod tests {
         assert!(is_private_ip("fd00::1".parse().unwrap()));
         assert!(!is_private_ip("8.8.8.8".parse().unwrap()));
         assert!(!is_private_ip("1.1.1.1".parse().unwrap()));
+        // IPv4-mapped IPv6：实际落到对应 IPv4，必须按 IPv4 语义拦截
+        assert!(is_private_ip("::ffff:127.0.0.1".parse().unwrap()));
+        assert!(is_private_ip("::ffff:192.168.1.1".parse().unwrap()));
+        assert!(is_private_ip("::ffff:169.254.169.254".parse().unwrap()));
+        assert!(!is_private_ip("::ffff:8.8.8.8".parse().unwrap()));
+    }
+
+    #[test]
+    fn github_host_allowlist_matches_only_known_hosts() {
+        assert!(is_github_host("api.github.com"));
+        assert!(is_github_host("raw.githubusercontent.com"));
+        assert!(is_github_host("objects.githubusercontent.com"));
+        assert!(is_github_host("github.com"));
+        assert!(is_github_host("foo.githubusercontent.com"));
+        assert!(!is_github_host("evil.com"));
+        assert!(!is_github_host("github.com.evil.com"));
+        assert!(!is_github_host("127.0.0.1"));
+        assert!(!is_github_host("gitlab.com"));
+    }
+
+    // 环境变量是进程级状态，串行化避免测试间互相干扰
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    #[test]
+    fn proxy_remote_dns_follows_env_no_proxy_and_proxy_type() {
+        let _g = ENV_LOCK.lock().unwrap();
+        // 清空环境
+        for k in ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy", "NO_PROXY", "no_proxy"] {
+            std::env::remove_var(k);
+        }
+
+        // 无代理 → false
+        assert!(!proxy_does_remote_dns_for("https", "github.com"));
+
+        // http/https 正向代理 → 远端解析
+        std::env::set_var("HTTPS_PROXY", "http://127.0.0.1:7890");
+        assert!(proxy_does_remote_dns_for("https", "github.com"));
+        assert!(!proxy_does_remote_dns_for("http", "github.com"));
+
+        // ALL_PROXY 兜底两种 scheme
+        std::env::remove_var("HTTPS_PROXY");
+        std::env::set_var("ALL_PROXY", "http://127.0.0.1:7890");
+        assert!(proxy_does_remote_dns_for("https", "example.com"));
+        assert!(proxy_does_remote_dns_for("http", "example.com"));
+
+        // NO_PROXY 精确域名排除 → 直连，保留校验
+        std::env::set_var("NO_PROXY", "internal.corp,api.github.com");
+        assert!(!proxy_does_remote_dns_for("https", "api.github.com"));
+        assert!(proxy_does_remote_dns_for("https", "github.com"));
+        assert!(!proxy_does_remote_dns_for("https", "internal.corp"));
+
+        // NO_PROXY 通配 `*` 全排除
+        std::env::set_var("NO_PROXY", "*");
+        assert!(!proxy_does_remote_dns_for("https", "github.com"));
+
+        // 子域匹配（前导点）
+        std::env::set_var("NO_PROXY", ".corp.example");
+        assert!(!proxy_does_remote_dns_for("https", "svc.corp.example"));
+        assert!(proxy_does_remote_dns_for("https", "corp.example.com"));
+
+        // NO_PROXY 含 IP/CIDR 条目 → 保守视为直连（无法排除域名解析到这些地址后绕过代理）
+        std::env::set_var("NO_PROXY", "127.0.0.1,192.168.1.0/24");
+        assert!(!proxy_does_remote_dns_for("https", "github.com"));
+
+        // socks5 本地解析 → 保留校验；socks5h 远端解析 → 跳过
+        std::env::remove_var("NO_PROXY");
+        std::env::set_var("ALL_PROXY", "socks5://127.0.0.1:1080");
+        assert!(!proxy_does_remote_dns_for("https", "github.com"));
+        std::env::set_var("ALL_PROXY", "socks5h://127.0.0.1:1080");
+        assert!(proxy_does_remote_dns_for("https", "github.com"));
+
+        // 清理
+        for k in ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy", "NO_PROXY", "no_proxy"] {
+            std::env::remove_var(k);
+        }
     }
 }
