@@ -28,6 +28,9 @@ pub struct HistoryDb {
 }
 
 /// 建表 / 迁移（open 与测试用 in-memory 连接共用）。
+///
+/// 迁移策略：`PRAGMA user_version` 版本化。v0（旧库）逐列检查缺失后补齐；
+/// 任何「补列失败」都会向上报错——不再吞 ALTER 错误碰运气。
 fn init_schema(conn: &Connection) -> Result<(), String> {
     // 开启外键约束，使 blocks.session_id 的 ON DELETE CASCADE 真正生效
     let _ = conn.execute_batch("PRAGMA foreign_keys = ON;");
@@ -77,7 +80,8 @@ fn init_schema(conn: &Connection) -> Result<(), String> {
                 exit_code INTEGER,
                 status TEXT NOT NULL DEFAULT 'running',
                 started_at INTEGER NOT NULL,
-                ended_at INTEGER
+                ended_at INTEGER,
+                collapsed INTEGER NOT NULL DEFAULT 0
             );
             CREATE INDEX IF NOT EXISTS idx_blocks_session ON blocks(session_id);
             CREATE INDEX IF NOT EXISTS idx_blocks_command ON blocks(command);
@@ -105,7 +109,9 @@ fn init_schema(conn: &Connection) -> Result<(), String> {
                 session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
                 role TEXT NOT NULL,
                 content TEXT NOT NULL DEFAULT '',
-                created_at INTEGER NOT NULL
+                created_at INTEGER NOT NULL,
+                parts TEXT NOT NULL DEFAULT '',
+                attachments TEXT NOT NULL DEFAULT ''
             );
             CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id);
 
@@ -123,29 +129,46 @@ fn init_schema(conn: &Connection) -> Result<(), String> {
         )
         .map_err(|e| e.to_string())?;
 
-    // 迁移：为已有数据库添加 output_clean 列
-    let _ = conn.execute_batch("ALTER TABLE blocks ADD COLUMN output_clean TEXT NOT NULL DEFAULT '';");
-    // 迁移：sessions 添加 cwd 列
-    let _ = conn.execute_batch("ALTER TABLE sessions ADD COLUMN cwd TEXT NOT NULL DEFAULT '';");
-    // 迁移：sessions 添加分组/排序列
-    let _ = conn.execute_batch("ALTER TABLE sessions ADD COLUMN group_id TEXT;");
-    let _ = conn.execute_batch("ALTER TABLE sessions ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;");
-    // 迁移：groups 添加 archived 列
-    let _ = conn.execute_batch("ALTER TABLE groups ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;");
-    // 迁移：sessions 添加 kind / payload（会话类型判别 + 变体专属 JSON）
-    let _ = conn.execute_batch("ALTER TABLE sessions ADD COLUMN kind TEXT NOT NULL DEFAULT 'local';");
-    let _ = conn.execute_batch("ALTER TABLE sessions ADD COLUMN payload TEXT NOT NULL DEFAULT '{}';");
-    // 迁移：blocks 添加 pane_id（分屏 pane 归属）
-    let _ = conn.execute_batch("ALTER TABLE blocks ADD COLUMN pane_id TEXT;");
-    // 迁移：blocks 添加 collapsed（命令块折叠/展开状态，会话恢复时回读）
-    let _ = conn.execute_batch("ALTER TABLE blocks ADD COLUMN collapsed INTEGER NOT NULL DEFAULT 0;");
-    // 迁移：chat_messages 添加 parts（AI 消息的 parts 渲染层 JSON，'' = 无/旧数据）
-    let _ = conn.execute_batch("ALTER TABLE chat_messages ADD COLUMN parts TEXT NOT NULL DEFAULT '';");
-    // 迁移：chat_messages 添加 attachments（用户消息附件元数据 JSON，M5）
-    let _ = conn.execute_batch("ALTER TABLE chat_messages ADD COLUMN attachments TEXT NOT NULL DEFAULT '';");
-    // 索引放在迁移之后创建：老库在 ALTER 前还没有 group_id 列
-    let _ = conn.execute_batch("CREATE INDEX IF NOT EXISTS idx_sessions_group ON sessions(group_id);");
+    let version: i64 = conn
+        .query_row("PRAGMA user_version", [], |r| r.get(0))
+        .unwrap_or(0);
+    if version < 1 {
+        // 旧库补齐（新库的 CREATE TABLE 已含全部列，这里逐列检查幂等跳过）
+        ensure_column(conn, "blocks", "output_clean", "ALTER TABLE blocks ADD COLUMN output_clean TEXT NOT NULL DEFAULT '';")?;
+        ensure_column(conn, "sessions", "cwd", "ALTER TABLE sessions ADD COLUMN cwd TEXT NOT NULL DEFAULT '';")?;
+        ensure_column(conn, "sessions", "group_id", "ALTER TABLE sessions ADD COLUMN group_id TEXT;")?;
+        ensure_column(conn, "sessions", "sort_order", "ALTER TABLE sessions ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;")?;
+        ensure_column(conn, "groups", "archived", "ALTER TABLE groups ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;")?;
+        ensure_column(conn, "sessions", "kind", "ALTER TABLE sessions ADD COLUMN kind TEXT NOT NULL DEFAULT 'local';")?;
+        ensure_column(conn, "sessions", "payload", "ALTER TABLE sessions ADD COLUMN payload TEXT NOT NULL DEFAULT '{}';")?;
+        ensure_column(conn, "blocks", "pane_id", "ALTER TABLE blocks ADD COLUMN pane_id TEXT;")?;
+        ensure_column(conn, "blocks", "collapsed", "ALTER TABLE blocks ADD COLUMN collapsed INTEGER NOT NULL DEFAULT 0;")?;
+        ensure_column(conn, "chat_messages", "parts", "ALTER TABLE chat_messages ADD COLUMN parts TEXT NOT NULL DEFAULT '';")?;
+        ensure_column(conn, "chat_messages", "attachments", "ALTER TABLE chat_messages ADD COLUMN attachments TEXT NOT NULL DEFAULT '';")?;
+        conn.execute_batch("PRAGMA user_version = 1;")
+            .map_err(|e| format!("记录迁移版本失败：{e}"))?;
+    }
+    // 索引幂等创建（放在迁移之后：老库在补列前还没有 group_id）
+    conn.execute_batch("CREATE INDEX IF NOT EXISTS idx_sessions_group ON sessions(group_id);")
+        .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+/// 仅当列缺失时执行 ADD COLUMN；已存在则跳过（区分「列已存在」与「真实迁移失败」）。
+fn ensure_column(conn: &Connection, table: &str, column: &str, ddl: &str) -> Result<(), String> {
+    let mut stmt = conn
+        .prepare(&format!("PRAGMA table_info({table})"))
+        .map_err(|e| e.to_string())?;
+    let cols: Vec<String> = stmt
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
+    if cols.iter().any(|c| c == column) {
+        return Ok(());
+    }
+    conn.execute_batch(ddl)
+        .map_err(|e| format!("迁移失败：{table}.{column} —— {e}"))
 }
 
 impl HistoryDb {
@@ -153,6 +176,13 @@ impl HistoryDb {
         let conn = Connection::open(db_path()).map_err(|e| e.to_string())?;
         init_schema(&conn)?;
         Ok(Self { conn })
+    }
+
+    /// 降级打开：磁盘 DB 失败时用内存库兜底（历史功能不可用，应用可继续跑）。
+    pub fn open_in_memory() -> Self {
+        let conn = Connection::open_in_memory().expect("in-memory sqlite 打开失败");
+        init_schema(&conn).expect("in-memory schema 初始化失败");
+        Self { conn }
     }
 
     pub(crate) fn conn(&self) -> &rusqlite::Connection {

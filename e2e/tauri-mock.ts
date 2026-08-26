@@ -693,11 +693,16 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
           case 'ssh_test':
             if (args.host === 'bad.example.com') throw new Error('连接超时');
             return '连接成功';
-          case 'ssh_list':
-            return [
-              { name: 'Documents', path: '/home/root/Documents', is_dir: true },
-              { name: 'app.log', path: '/home/root/app.log', is_dir: false },
-            ];
+          case 'ssh_list': {
+            const base = (args.path as string) || '/home/root';
+            return {
+              base,
+              entries: [
+                { name: 'Documents', path: `${base}/Documents`, is_dir: true },
+                { name: 'app.log', path: `${base}/app.log`, is_dir: false },
+              ],
+            };
+          }
           case 'ssh_download': {
             const name = (args.path as string).split('/').pop() ?? 'file';
             const rec = {

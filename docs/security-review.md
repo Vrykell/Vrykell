@@ -25,6 +25,14 @@
 | **unchecked 抓取重定向无主机限制**（技能市场第一跳硬编码、重定向可逃逸） | 中 | `is_github_host` 白名单，第一跳与重定向都限制在 GitHub 域名 |
 | **zip bomb：体积上限用 zip 头声明值（可虚报）** | 中 | 流式解压按实际写出字节计数，超限即中止 |
 | **known_hosts 并发写互相覆盖** | 中 | `verify_host_key` 读-改-写包在进程级 Mutex 内串行 |
+| **WebView 无 CSP + asset 协议 scope 全开（`$HOME/**`）** | 高 | 设置 CSP（script 仅 self/inline、connect 仅 ipc、img 无远程源、object/frame 全禁）；asset scope 收窄为 `$APPDATA/**`，壁纸文件由 Rust 端按用户选择动态 `allow_file` 授权 |
+| **markdown 远程图片外带/追踪面** | 低 | 图片降级为链接文本（不加载远程图），配合 img-src 无远程源 |
+| **agent 文件工具可读密钥外泄给 LLM（提示注入）** | 高 | `sensitivePathReason` 启发式（.ssh/.aws/.env/config.json 等）→ 无视权限模式强制逐次询问 |
+| **SSH 主机名参数注入（`-oProxyCommand` 等）** | 中 | `validate_ssh_host`：拒绝 `-` 开头 / 含空白的主机 |
+| **SSH 密码明文落 SQLite** | 高 | 密码移入密钥存储（`secret.rs`：macOS 钥匙串 / 平台回退 0600 文件），库内只留脱敏标记；旧库明文自动迁移 |
+| **SSH 首次连接 TOFU 无用户确认** | 高 | 后端不再自动记录：未记录时返回 `HOST_KEY_UNKNOWN:<指纹>`；前端表单弹指纹确认，用户「信任并继续」才写 known_hosts（`ssh_trust_host_key`） |
+| **`HistoryDb::open().expect()` 启动 panic** | 中 | 打开失败降级为内存库（历史不可用，应用继续跑） |
+| **迁移吞 ALTER 错误碰运气** | 中 | `PRAGMA user_version` 版本化 + `ensure_column` 逐列检查，真实迁移失败会报错 |
 | 技能市场 GitHub URL 解析（`/tree/main`、`.git` 后缀误判） | 低 | 改用 `url` crate 标准解析，只取 owner/repo |
 
 前端未发现高危 XSS：AI 输出经 `react-markdown`（未启用 `rehype-raw`）渲染，原始 HTML 会被转义；`BlockOutput` 的 `dangerouslySetInnerHTML` 仅用于渲染**本应用自己从 xterm buffer 生成的** HTML 快照（所有 cell 文本经 `escapeHtml`），非外部输入。
@@ -35,15 +43,12 @@
 
 | 问题 | 严重度 | 说明与建议 |
 |---|---|---|
-| SSH 首次连接 TOFU 无用户确认 | 高 | `ssh.rs::verify_host_key` 首次连接即信任并写入 `~/.ssh/known_hosts`，等于放行首次 MITM。建议：首次连接展示主机指纹要求用户确认后再写入。 |
-| SSH 密码明文存 SQLite（`ssh_connections.password`） | 高 | 建议迁移到 macOS Keychain / Windows DPAPI，SQLite 只存引用。 |
-| `HistoryDb::open().expect()` 启动 panic | 中 | DB 打开失败会直接崩溃；建议 `run()` 里降级为「历史功能不可用」或至少给出可读错误后退出。 |
-| `sessions`/`groups` 迁移用「吞 ALTER 错误」方式碰运气 | 中 | 已能工作，但建议改为 `PRAGMA user_version` 版本化迁移，区分「列已存在」与「真实迁移失败」。 |
+| 直连模式 DNS 钉扎 TTL（300s）到期后重新解析 | 低（残余窗口） | 到期重解析会再次校验，交替应答只能造成"短暂不可用"而非穿透。 |
 | 代理模式下主机名内网防护让渡给代理 | 低（既定设计） | 远端解析型代理接管域名解析，本地无法校验；前提是信任用户自己的代理。字面私网 IP 始终拦截。 |
-| 直连模式 DNS 钉扎 TTL（60s）到期后重新解析 | 低（残余窗口） | 到期重解析会再次校验，交替应答只能造成"短暂不可用"而非穿透；如需零窗口可加长 TTL。 |
+| script-src 含 'unsafe-inline' | 低（dev 兼容） | dev 模式 Vite React refresh 需要内联脚本；若放弃 dev 支持可收严为仅 'self'。 |
 
 ---
 
 ## 结论
 
-本应用为本地桌面工具，攻击面有限；SSRF 面（web 工具 + 技能市场）已通过「DNS 钉扎 + 代理感知 + mapped IPv6 + 响应体上限 + 重定向白名单」系统性加固。主要残留风险集中在 **SSH 信任与凭据存储**（TOFU 确认、密码明文 Keychain 化）两项设计级改动，以及启动/迁移的健壮性。建议优先处理 TOFU 确认与 Keychain 存储。
+本应用为本地桌面工具，攻击面有限且已系统性加固：SSRF（DNS 钉扎 + 代理感知 + mapped IPv6 + 响应体上限 + 重定向白名单）、SSH（TOFU 确认 + 密码 Keychain + known_hosts 锁 + 参数注入）、WebView（CSP + asset scope 收窄 + 零远程资源）、Agent（敏感路径强制询问 + 危险命令启发式 + 权限三档）。当前无高优先级遗留项。

@@ -21,8 +21,10 @@ import { persist } from 'zustand/middleware';
 import type { ToolRunState } from './messageParts';
 import { untrustedSkillFor, setSkillState } from './skills';
 import { dangerousCommandReason } from './dangerousCommands';
+import { sensitivePathReason } from './sensitivePaths';
 
 export { dangerousCommandReason };
+export { sensitivePathReason };
 
 export type ToolLevel = 'allow' | 'ask' | 'deny';
 export type ApprovalDecision = 'once' | 'session' | 'deny';
@@ -225,7 +227,12 @@ export async function gate(
   // 危险命令无视授权逐次询问（ask 之前的短路对 danger 不生效）
   const danger =
     toolName === 'run_command' ? dangerousCommandReason(String(input.command ?? '')) : null;
-  if (!danger && (level === 'allow' || hasSessionGrant(ctx.tabId, toolName))) {
+  // 敏感路径（密钥/凭据文件）同样无视授权逐次询问：防止提示注入诱导读取密钥外泄给 LLM
+  const sensitive =
+    toolName === 'read_file' || toolName === 'write_file' || toolName === 'edit_file'
+      ? sensitivePathReason(String(input.path ?? ''))
+      : null;
+  if (!danger && !sensitive && (level === 'allow' || hasSessionGrant(ctx.tabId, toolName))) {
     return { proceed: true };
   }
   // ask：挂起等审批。无 setToolState/tabId 说明不在交互上下文（如测试），按拒绝处理
@@ -235,7 +242,8 @@ export async function gate(
       result: { ok: false, denied: true, error: '当前上下文无法发起审批，操作被拒绝' },
     };
   }
-  ctx.setToolState(toolCallId, 'approval-pending', danger ? { danger } : undefined);
+  const forcedReason = danger ?? sensitive;
+  ctx.setToolState(toolCallId, 'approval-pending', forcedReason ? { danger: forcedReason } : undefined);
   const decision = await requestApproval(toolCallId);
   if (decision === 'deny') {
     ctx.setToolState(toolCallId, 'denied', danger ? { danger } : undefined);

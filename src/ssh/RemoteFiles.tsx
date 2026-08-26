@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Folder, File, Upload, Download } from 'lucide-react';
+import { Folder, File, MoreHorizontal, LocateFixed } from 'lucide-react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { sshFsList, sshDownload, sshRename, sshDelete, sshUpload } from './api';
 import type { SshFsEntry } from './api';
@@ -12,6 +12,13 @@ import { useToastStore } from '../components/Toast';
 import ContextMenu, { type ContextMenuItem } from '../components/ContextMenu';
 import ConfirmDialog from '../components/ConfirmDialog';
 import DownloadManager from '../downloads/DownloadManager';
+import {
+  useRemotePathStore,
+  normalizeRemotePath,
+  parentOfRemote,
+  sshPaneIdFor,
+  shellQuote,
+} from './remotePath';
 
 /** 待二次确认的操作：重命名（携带新名）或删除。 */
 type RemoteConfirm =
@@ -25,7 +32,9 @@ type RemoteConfirm =
  * 「上传文件夹」递归上传目录、「下载」进入下载管理页。
  */
 export default function RemoteFiles({ conn }: { conn: SshConnection }) {
-  const [path, setPath] = useState<string | null>(null);
+  // 面板路径 = 真实远程绝对路径（存 store 按连接 id）；null = 尚未定位（首次加载 home）
+  const path = useRemotePathStore((s) => s.path[conn.id] ?? null);
+  const setPath = (p: string | null) => useRemotePathStore.getState().set(conn.id, p);
   const [entries, setEntries] = useState<SshFsEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -33,21 +42,27 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
   const [renameTarget, setRenameTarget] = useState<SshFsEntry | null>(null);
   const [confirm, setConfirm] = useState<RemoteConfirm | null>(null);
   const [showDownloads, setShowDownloads] = useState(false);
-  const [uploadMenu, setUploadMenu] = useState<{ x: number; y: number } | null>(null);
+  const [moreMenu, setMoreMenu] = useState<{ x: number; y: number } | null>(null);
 
   const toast = (msg: string, type: 'info' | 'success' | 'error') =>
     useToastStore.getState().addToast(msg, type);
 
-  const load = useCallback(() => {
+  const load = useCallback((p: string | null) => {
     setLoading(true);
     setError(null);
-    sshFsList(conn.id, path ?? undefined)
-      .then(setEntries)
+    sshFsList(conn.id, p ?? undefined)
+      .then((res) => {
+        setEntries(res.entries);
+        // 首次定位：请求 home 后拿到真实路径（如 /home/user），面板不再用 null 表示 home
+        if (p === null && res.base) setPath(normalizeRemotePath(res.base));
+      })
       .catch((e) => setError(String((e as Error)?.message ?? e)))
       .finally(() => setLoading(false));
-  }, [conn.id, path]);
+  }, [conn.id]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(path); }, [load, path]);
+  // 操作后的刷新（重命名/删除/上传）
+  const refresh = () => load(path);
 
   // hooks 之后再做视图切换，避免「条件 hook」导致 React 报错
   if (showDownloads) return <DownloadManager onBack={() => setShowDownloads(false)} />;
@@ -76,7 +91,7 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
     try {
       await sshRename(conn.id, entry.path, newName);
       toast('已重命名', 'success');
-      load();
+      refresh();
     } catch (e) {
       toast(String((e as Error)?.message ?? e), 'error');
     }
@@ -86,7 +101,7 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
     try {
       await sshDelete(conn.id, entry.path);
       toast('已删除', 'success');
-      load();
+      refresh();
     } catch (e) {
       toast(String((e as Error)?.message ?? e), 'error');
     }
@@ -107,7 +122,7 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
       }
     }
     toast(ok === files.length ? `已上传 ${ok} 个文件` : `上传完成：${ok}/${files.length} 成功`, ok === files.length ? 'success' : 'error');
-    load();
+      refresh();
   };
 
   const doUploadDir = async () => {
@@ -118,7 +133,7 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
     try {
       await sshUpload(conn.id, currentDir(), dir);
       toast('已上传文件夹', 'success');
-      load();
+      refresh();
     } catch (e) {
       toast(String((e as Error)?.message ?? e), 'error');
     }
@@ -149,73 +164,90 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
   const cancelRename = () => setRenameTarget(null);
 
   const goUp = () => {
-    if (!path) return;
-    const parent = path.replace(/\/[^/]+\/?$/, '') || '/';
-    setPath(parent === '/' ? null : parent);
+    if (!path || path === '/') return;
+    const p = parentOfRemote(path);
+    if (p) setPath(p);
   };
 
-  const crumbs = path ? path.split('/').filter(Boolean) : [];
+  /** 同步：终端跟随文件管理器 —— 向 SSH 终端发送 cd 到面板当前目录。 */
+  const syncToTerminal = async () => {
+    if (!path) return;
+    const paneId = sshPaneIdFor(conn.id);
+    const sid = paneId ? useTerminalStore.getState().sessions[paneId] : null;
+    if (!sid) { toast('SSH 会话未就绪', 'info'); return; }
+    try {
+      await ptyWrite(sid, `cd ${shellQuote(path)}\r`);
+      toast(`终端已切换到 ${path}`, 'success');
+    } catch (e) {
+      toast(String((e as Error)?.message ?? e), 'error');
+    }
+  };
+
+  // 面包屑：真实路径层级（/ › home › user › …），根是顶层、home 是 /home/user
+  const segs = path ? path.split('/').filter(Boolean) : [];
 
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100%',
       userSelect: 'none', background: 'var(--surface)',
     }}>
-      {/* 面包屑 + 上传 */}
+      {/* 面包屑 + 返回 + 同步 + 更多菜单 */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap',
         padding: '6px 10px',
         fontSize: 11, minHeight: 30,
       }}>
-        <Crumb label="~" onClick={() => setPath(null)} active={!path} />
-        {crumbs.map((seg, i) => {
-          const full = '/' + crumbs.slice(0, i + 1).join('/');
+        <Crumb label="/" onClick={() => setPath('/')} active={path === '/'} />
+        {segs.map((seg, i) => {
+          const full = '/' + segs.slice(0, i + 1).join('/');
           return (
             <span key={full} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <span style={{ color: 'var(--text-muted)' }}>›</span>
-              <Crumb label={seg} onClick={() => setPath(full)} active={i === crumbs.length - 1} />
+              <Crumb label={seg} onClick={() => setPath(full)} active={i === segs.length - 1} />
             </span>
           );
         })}
         <div style={{ flex: 1 }} />
+        {path && path !== '/' && (
+          <button
+            onClick={goUp}
+            title="上级目录"
+            data-testid="remote-up-btn"
+            style={{
+              fontSize: 11, padding: '2px 6px', border: 'none', borderRadius: 4,
+              background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+            }}
+          >
+            ‹ 返回
+          </button>
+        )}
         <button
-          onClick={() => setShowDownloads(true)}
-          title="下载管理"
-          data-testid="remote-downloads-btn"
+          onClick={() => void syncToTerminal()}
+          title="终端切换到当前目录"
+          data-testid="remote-sync-btn"
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 4,
-            fontSize: 11, padding: '2px 8px', border: '1px solid var(--border)',
-            borderRadius: 4, background: 'transparent', color: 'var(--text-secondary)',
-            cursor: 'pointer',
+            fontSize: 11, padding: '2px 8px', border: 'none', borderRadius: 4,
+            background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer',
           }}
         >
-          <Download size={11} /> 下载
+          <LocateFixed size={12} /> 同步
         </button>
         <button
           onClick={(e) => {
             const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-            setUploadMenu({ x: r.left, y: r.bottom + 4 });
+            setMoreMenu({ x: r.left, y: r.bottom + 4 });
           }}
-          title="上传文件或文件夹到当前远程目录"
-          data-testid="remote-upload-btn"
+          title="更多操作"
+          data-testid="remote-more-btn"
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            fontSize: 11, padding: '2px 8px', border: '1px solid var(--border)',
-            borderRadius: 4, background: 'transparent', color: 'var(--text-secondary)',
-            cursor: 'pointer',
+            display: 'inline-flex', alignItems: 'center',
+            fontSize: 11, padding: '2px 6px', border: 'none', borderRadius: 4,
+            background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer',
           }}
         >
-          <Upload size={11} /> 上传
+          <MoreHorizontal size={14} />
         </button>
-        {path && (
-          <button onClick={goUp} title="上级目录"
-            style={{
-              fontSize: 11, padding: '0 4px', border: 'none', background: 'transparent',
-              color: 'var(--text-muted)', cursor: 'pointer',
-            }}>
-            ‹ 返回
-          </button>
-        )}
       </div>
 
       {/* 远程文件列表 */}
@@ -248,14 +280,15 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
         />
       )}
 
-      {uploadMenu && (
+      {moreMenu && (
         <ContextMenu
-          anchor={uploadMenu}
+          anchor={moreMenu}
           items={[
             { label: '上传文件', onClick: doUpload },
             { label: '上传文件夹', onClick: doUploadDir },
+            { label: '下载管理', onClick: () => setShowDownloads(true) },
           ]}
-          onClose={() => setUploadMenu(null)}
+          onClose={() => setMoreMenu(null)}
         />
       )}
 

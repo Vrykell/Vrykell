@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Plug, Trash2 } from 'lucide-react';
-import { newSshId, validateSshConnection, sshTest, type SshConnection, type SshAuthMethod } from './api';
+import { newSshId, validateSshConnection, sshTest, sshTrustHostKey, type SshConnection, type SshAuthMethod } from './api';
 import { useSshStore } from './store';
 import { useToastStore } from '../components/Toast';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 interface Props {
   open: boolean;
@@ -35,6 +36,7 @@ export default function SshFormModal({ open, initial, onClose }: Props) {
   const [password, setPassword] = useState('');
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [pendingTrust, setPendingTrust] = useState<{ host: string; port?: number; fingerprint: string } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -45,6 +47,7 @@ export default function SshFormModal({ open, initial, onClose }: Props) {
     setAuthMethod(initial?.authMethod ?? 'password');
     setPassword(initial?.password ?? '');
     setTestResult(null);
+    setPendingTrust(null);
   }, [open, initial]);
 
   const target = () => ({
@@ -67,9 +70,32 @@ export default function SshFormModal({ open, initial, onClose }: Props) {
       const msg = await sshTest(t);
       setTestResult({ ok: true, msg });
     } catch (e) {
-      setTestResult({ ok: false, msg: String((e as Error)?.message ?? e) });
+      const msg = String((e as Error)?.message ?? e);
+      // 首次连接：主机密钥未记录 → 弹指纹确认，用户信任后再重试
+      if (msg.startsWith('HOST_KEY_UNKNOWN:')) {
+        setPendingTrust({
+          host: t.host,
+          port: t.port,
+          fingerprint: msg.slice('HOST_KEY_UNKNOWN:'.length),
+        });
+      } else {
+        setTestResult({ ok: false, msg });
+      }
     } finally {
       setTesting(false);
+    }
+  };
+
+  const confirmTrust = async () => {
+    if (!pendingTrust) return;
+    try {
+      await sshTrustHostKey(pendingTrust.host, pendingTrust.port);
+      setPendingTrust(null);
+      useToastStore.getState().addToast('已信任该主机，重新测试…', 'info');
+      void doTest();
+    } catch (e) {
+      setPendingTrust(null);
+      setTestResult({ ok: false, msg: String((e as Error)?.message ?? e) });
     }
   };
 
@@ -241,6 +267,17 @@ export default function SshFormModal({ open, initial, onClose }: Props) {
           </button>
         </div>
       </div>
+      {pendingTrust && (
+        <ConfirmDialog
+          open
+          title="首次连接：确认主机指纹"
+          message={`该主机尚未记录到 known_hosts。\n主机指纹：${pendingTrust.fingerprint}\n\n请核对指纹（联系管理员或从已知可信渠道获取）。确认信任后才会建立连接，否则可能遭遇中间人攻击。`}
+          confirmLabel="信任并继续"
+          cancelLabel="取消"
+          onConfirm={() => void confirmTrust()}
+          onCancel={() => setPendingTrust(null)}
+        />
+      )}
     </div>
   );
 }
