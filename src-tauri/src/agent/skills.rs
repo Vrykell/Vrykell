@@ -16,7 +16,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
-use crate::agent::web::{fetch_public_unchecked, http_client_impl, read_body_capped};
+use crate::agent::web::{fetch_public_unchecked, http_client_trusted, read_body_capped};
 
 /// 技能市场 SKILL.md 抓取上限（字节）。
 const MARKET_MD_CAP: usize = 1024 * 1024;
@@ -377,6 +377,7 @@ const MAX_EXTRACTED_SIZE: u64 = 100 * 1024 * 1024;
 const MAX_FILES_COUNT: usize = 2000;
 
 fn extract_zip(path: &Path, dst: &Path) -> Result<(), String> {
+    use std::io::{Read, Write};
     let file = std::fs::File::open(path).map_err(|e| format!("打开压缩包失败：{e}"))?;
     let mut zip = zip::ZipArchive::new(file).map_err(|e| format!("解析压缩包失败：{e}"))?;
     let mut total_size = 0u64;
@@ -394,15 +395,24 @@ fn extract_zip(path: &Path, dst: &Path) -> Result<(), String> {
             if file_count > MAX_FILES_COUNT {
                 return Err("压缩包文件数超限".to_string());
             }
-            total_size += entry.size();
-            if total_size > MAX_EXTRACTED_SIZE {
-                return Err("压缩包解压体积超限".to_string());
-            }
             if let Some(parent) = out_path.parent() {
                 std::fs::create_dir_all(parent).map_err(|e| format!("创建目录失败：{e}"))?;
             }
             let mut outfile = std::fs::File::create(&out_path).map_err(|e| format!("写出文件失败：{e}"))?;
-            std::io::copy(&mut entry, &mut outfile).map_err(|e| format!("解压失败：{e}"))?;
+            // 流式写入并统计实际字节数：zip 头声明的 size 不可信（zip bomb 可虚报），
+            // 必须在读取阶段按实际写出量限制
+            let mut buf = [0u8; 64 * 1024];
+            loop {
+                let n = entry.read(&mut buf).map_err(|e| format!("读取压缩包条目失败：{e}"))?;
+                if n == 0 {
+                    break;
+                }
+                total_size += n as u64;
+                if total_size > MAX_EXTRACTED_SIZE {
+                    return Err("压缩包解压体积超限".to_string());
+                }
+                outfile.write_all(&buf[..n]).map_err(|e| format!("写出文件失败：{e}"))?;
+            }
         }
     }
     Ok(())
@@ -801,7 +811,7 @@ async fn github_tree(owner: &str, repo: &str, client: &reqwest::Client) -> Resul
 #[tauri::command]
 pub async fn market_github_list(repo: String) -> Result<Vec<MarketSkill>, String> {
     let (owner, name) = parse_github_repo(&repo)?;
-    let client = http_client_impl(false)?;
+    let client = http_client_trusted()?;
     let json = github_tree(&owner, &name, &client).await?;
     let mut dirs: Vec<String> = Vec::new();
     let mut seen = HashSet::new();
@@ -850,7 +860,7 @@ pub async fn market_github_install(repo: String, dir: String) -> Result<SkillMet
     if dir.is_empty() {
         return Err("技能目录不能为空".to_string());
     }
-    let client = http_client_impl(false)?;
+    let client = http_client_trusted()?;
     let json = github_tree(&owner, &name, &client).await?;
     let prefix = format!("{dir}/");
     let mut files: Vec<String> = Vec::new();

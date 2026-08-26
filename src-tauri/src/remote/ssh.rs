@@ -51,7 +51,11 @@ fn connect(conn: &SshConnection) -> Result<Session, String> {
 }
 
 /// 主机密钥校验：读 ~/.ssh/known_hosts，首次连接记录（TOFU），之后严格比对。
+/// 整个「读-改-写」在进程级锁内串行，避免多个 SSH 连接并发写互相覆盖。
 fn verify_host_key(sess: &Session, host: &str, port: u16) -> Result<(), String> {
+    static KH_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _guard = KH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
     let (key, key_type) = sess.host_key().ok_or("远端未返回主机密钥".to_string())?;
     let mut kh = sess.known_hosts().map_err(|e| format!("初始化 known_hosts 失败：{e}"))?;
 
