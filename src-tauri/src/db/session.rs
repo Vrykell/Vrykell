@@ -28,17 +28,6 @@ impl HistoryDb {
         Ok(())
     }
 
-    /// 应用退出时把所有活跃会话标记为历史，避免遗留脏的 active 状态。
-    pub fn archive_all_active_sessions(&self, timestamp: u64) -> Result<(), String> {
-        self.conn()
-            .execute(
-                "UPDATE sessions SET status = 'historical', closed_at = ?1 WHERE status = 'active'",
-                params![timestamp as i64],
-            )
-            .map_err(|e| e.to_string())?;
-        Ok(())
-    }
-
     /// 追加/更新一条 AI 对话消息（助手流式完成时按 id 覆盖）。
     /// parts = 消息 parts 渲染层的 JSON 串（'' = 无，见前端 messageParts.ts）。
     pub fn append_chat_message(

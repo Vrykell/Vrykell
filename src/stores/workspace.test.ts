@@ -13,11 +13,17 @@ const initial = useWorkspaceStore.getState();
 describe('workspace store', () => {
   beforeEach(() => {
     useWorkspaceStore.setState(initial, true);
+    // 模拟 App 启动：无恢复会话时创建默认终端（store 本身不再内置初始标签）
+    useWorkspaceStore.getState().addTab({});
     invokeMock.mockReset();
     invokeMock.mockImplementation(() => Promise.reject(new Error('no backend')));
   });
 
-  it('默认有一个活跃标签', () => {
+  it('初始无标签，由启动逻辑创建默认终端', () => {
+    useWorkspaceStore.setState(initial, true);
+    const empty = useWorkspaceStore.getState();
+    expect(empty.tabs).toHaveLength(0);
+    empty.addTab({});
     const s = useWorkspaceStore.getState();
     expect(s.tabs).toHaveLength(1);
     expect(s.activeId).toBe(s.tabs[0]!.id);
@@ -198,6 +204,7 @@ describe('workspace store', () => {
 describe('workspace store 扩展', () => {
   beforeEach(() => {
     useWorkspaceStore.setState(initial, true);
+    useWorkspaceStore.getState().addTab({});
     invokeMock.mockReset();
     invokeMock.mockImplementation(() => Promise.reject(new Error('no backend')));
   });
@@ -455,7 +462,7 @@ describe('workspace store 扩展', () => {
     const ws = useWorkspaceStore.getState();
     useWorkspaceStore.setState({
       groups: [{ id: 'g1', title: '一', collapsed: false }],
-      tabs: initial.tabs.map((t) => (isSessionTab(t) ? { ...t, groupId: 'g1' } : t)),
+      tabs: useWorkspaceStore.getState().tabs.map((t) => (isSessionTab(t) ? { ...t, groupId: 'g1' } : t)),
     });
     await ws.deleteGroup('g1', true);
     expect(useWorkspaceStore.getState().groups).toEqual([]);

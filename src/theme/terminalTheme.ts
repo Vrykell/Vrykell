@@ -71,12 +71,15 @@ function resolveWallpaperUrl(path: string | null): string | null {
   }
 }
 
-/** 重应用所有 xterm 实例的主题（明暗/颜色覆盖变化时同步背景/光标/选区）。 */
+/** 重应用所有 xterm 实例的主题（明暗/颜色覆盖变化时同步背景/光标/选区/滚动条滑块）。 */
 export function reapplyXtermTheme(): void {
   const cs = getComputedStyle(document.documentElement);
   const bg = cs.getPropertyValue('--xterm-bg').trim() || '#050505';
   const cursor = cs.getPropertyValue('--xterm-cursor').trim() || '#e8e8e8';
   const selection = cs.getPropertyValue('--xterm-selection').trim() || 'rgba(255,255,255,0.25)';
+  // 滚动条滑块颜色与 block 列表滚动条(theme.css)一致
+  const thumb = cs.getPropertyValue('--scrollbar-thumb').trim() || 'rgba(255,255,255,0.14)';
+  const thumbHover = cs.getPropertyValue('--scrollbar-thumb-hover').trim() || 'rgba(255,255,255,0.22)';
   for (const t of termInstances.values()) {
     try {
       t.options.theme = {
@@ -84,6 +87,9 @@ export function reapplyXtermTheme(): void {
         background: bg,
         cursor,
         selectionBackground: selection,
+        scrollbarSliderBackground: thumb,
+        scrollbarSliderHoverBackground: thumbHover,
+        scrollbarSliderActiveBackground: thumbHover,
       };
     } catch {
       /* ignore：实例可能正在销毁 */

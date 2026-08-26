@@ -15,6 +15,8 @@ describe('terminal store', () => {
     invokeMock.mockClear();
     useTerminalStore.setState(initialTerm, true);
     useWorkspaceStore.setState(initialWs, true);
+    // 模拟启动后存在活跃标签（store 不再内置初始标签）
+    useWorkspaceStore.getState().addTab({});
   });
 
   it('getFocusedTerminalId 默认返回活跃窗口第一个终端', () => {
@@ -30,6 +32,7 @@ describe('terminal store', () => {
   });
 
   it('无会话时自动展开终端面板且不写入', () => {
+    invokeMock.mockClear(); // beforeEach 的 addTab 会触发 create_session 记录
     useTerminalStore.setState({ visible: false });
     useTerminalStore.getState().runInTerminal('ls');
     expect(useTerminalStore.getState().visible).toBe(true);

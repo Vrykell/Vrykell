@@ -116,7 +116,6 @@ export function nextTerminalId(windowId: string, layout: WindowLayout): string {
 const ID_PREFIX = Date.now().toString(36);
 let counter = 0;
 const nextTabId = () => `t${ID_PREFIX}-${counter++}`;
-const initialTabId = nextTabId();
 const DEFAULT_TITLE = '终端';
 const HISTORY_TITLE = '会话历史';
 const SETTINGS_TITLE = '设置';
@@ -181,8 +180,9 @@ interface WorkspaceState {
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
-  tabs: [{ id: initialTabId, title: DEFAULT_TITLE, kind: 'session', layout: leaf({ id: `${initialTabId}#0`, kind: 'local' }) }],
-  activeId: initialTabId,
+  // 初始无标签：默认终端由 App 启动逻辑创建（优先恢复上次会话，无恢复才创建默认）
+  tabs: [],
+  activeId: '',
   lastClosed: null,
   groups: [],
   terminalCwds: {},
