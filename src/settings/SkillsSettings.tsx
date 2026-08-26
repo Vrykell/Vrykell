@@ -19,11 +19,11 @@ import { useToastStore } from '../components/Toast';
 const toast = (msg: string, type: 'info' | 'success' | 'error') =>
   useToastStore.getState().addToast(msg, type);
 
-/** 预置技能市场（GitHub 仓库，含 SKILL.md 的常见技能库） */
+/** 预置技能市场（GitHub 仓库 URL，含 SKILL.md 的常见技能库） */
 const MARKETPLACES: { name: string; repo: string }[] = [
-  { name: 'anthropics/skills', repo: 'anthropics/skills' },
-  { name: 'agentskills/agentskills', repo: 'agentskills/agentskills' },
-  { name: 'magnus919/agent-skills', repo: 'magnus919/agent-skills' },
+  { name: 'anthropics/skills', repo: 'https://github.com/anthropics/skills' },
+  { name: 'agentskills/agentskills', repo: 'https://github.com/agentskills/agentskills' },
+  { name: 'magnus919/agent-skills', repo: 'https://github.com/magnus919/agent-skills' },
 ];
 
 // ── 样式 ──
@@ -306,7 +306,7 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
         </select>
         <input
           value={repo}
-          placeholder="GitHub 仓库，如 anthropics/skills"
+          placeholder="GitHub 仓库 URL，如 https://github.com/anthropics/skills"
           onChange={(e) => setRepo(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') void browse(); }}
           style={input}

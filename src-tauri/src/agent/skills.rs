@@ -16,7 +16,10 @@ use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
-use crate::agent::web::{fetch_public, http_client_impl};
+use crate::agent::web::{fetch_public_unchecked, http_client_impl, read_body_capped};
+
+/// 技能市场 SKILL.md 抓取上限（字节）。
+const MARKET_MD_CAP: usize = 1024 * 1024;
 
 // ── 对外类型 ──
 
@@ -738,25 +741,46 @@ pub struct MarketSkill {
     pub dir: String,
 }
 
-/// 把 "owner/repo" 或完整 GitHub URL 解析成 (owner, repo)。
+/// 把 GitHub 仓库地址解析成 (owner, repo)。
+/// 支持完整 URL（https://github.com/owner/repo[/tree/branch...]）与 owner/repo 简写。
 fn parse_github_repo(input: &str) -> Result<(String, String), String> {
     let s = input.trim().trim_end_matches('/');
     if s.is_empty() {
-        return Err("请输入 GitHub 仓库（owner/repo 或完整 URL）".to_string());
+        return Err("请输入 GitHub 仓库 URL（如 https://github.com/anthropics/skills）".to_string());
     }
-    let segs: Vec<&str> = s
-        .split('/')
-        .filter(|x| !x.is_empty() && *x != "https:" && *x != "http:" && *x != "github.com")
-        .collect();
-    if segs.len() < 2 {
-        return Err("无法识别仓库，格式应为 owner/repo".to_string());
+
+    // 完整 URL：用标准解析器，避免字符串切割误判分支路径 / 查询参数
+    if s.starts_with("http://") || s.starts_with("https://") {
+        let url = url::Url::parse(s).map_err(|_| "URL 格式无效".to_string())?;
+        let host = url.host_str().unwrap_or("").to_lowercase();
+        if host != "github.com" {
+            return Err(format!("仅支持 github.com 仓库，当前地址：{host}"));
+        }
+        let segs: Vec<&str> = url
+            .path_segments()
+            .map(|it| it.filter(|x| !x.is_empty()).collect())
+            .unwrap_or_default();
+        if segs.len() < 2 {
+            return Err("URL 需包含 owner/repo，如 https://github.com/owner/repo".to_string());
+        }
+        let owner = segs[0].to_string();
+        let repo = segs[1].trim_end_matches(".git").to_string();
+        if owner.is_empty() || repo.is_empty() {
+            return Err("无法识别仓库，格式应为 owner/repo".to_string());
+        }
+        return Ok((owner, repo));
     }
-    let owner = segs[segs.len() - 2].to_string();
-    let repo = segs[segs.len() - 1].to_string();
-    if owner.is_empty() || repo.is_empty() {
-        return Err("无法识别仓库，格式应为 owner/repo".to_string());
+
+    // 兜底：owner/repo 简写（含 .git 后缀）
+    let segs: Vec<&str> = s.split('/').filter(|x| !x.is_empty()).collect();
+    if segs.len() >= 2 {
+        let owner = segs[segs.len() - 2].to_string();
+        let repo = segs[segs.len() - 1].trim_end_matches(".git").to_string();
+        if !owner.is_empty() && !repo.is_empty() {
+            return Ok((owner, repo));
+        }
     }
-    Ok((owner, repo))
+    Err("无法识别仓库，格式应为 https://github.com/owner/repo".to_string())
 }
 
 const GITHUB_API: &str = "https://api.github.com/repos";
@@ -764,7 +788,8 @@ const GITHUB_RAW: &str = "https://raw.githubusercontent.com";
 
 async fn github_tree(owner: &str, repo: &str, client: &reqwest::Client) -> Result<serde_json::Value, String> {
     let url = format!("{GITHUB_API}/{owner}/{repo}/git/trees/HEAD?recursive=1");
-    let resp = fetch_public(client, &url).await?;
+    // 主机为硬编码的 api.github.com（用户输入只进路径段），无需 SSRF 校验
+    let resp = fetch_public_unchecked(client, &url).await?;
     if !resp.status().is_success() {
         return Err(format!("GitHub 返回 {}（仓库可能不存在）", resp.status()));
     }
@@ -799,8 +824,10 @@ pub async fn market_github_list(repo: String) -> Result<Vec<MarketSkill>, String
     let mut out = Vec::new();
     for dir in &dirs {
         let raw_url = format!("{GITHUB_RAW}/{owner}/{name}/HEAD/{dir}/SKILL.md");
-        let Ok(resp) = fetch_public(&client, &raw_url).await else { continue };
-        let Ok(text) = resp.text().await else { continue };
+        // 主机为硬编码的 raw.githubusercontent.com，无需 SSRF 校验
+        let Ok(resp) = fetch_public_unchecked(&client, &raw_url).await else { continue };
+        let Ok((bytes, _over)) = read_body_capped(resp, MARKET_MD_CAP).await else { continue };
+        let text = String::from_utf8_lossy(&bytes).into_owned();
         let (n, desc, _, _) = parse_skill_md(&text);
         let fallback = dir.rsplit('/').next().unwrap_or(dir).to_string();
         out.push(MarketSkill {
@@ -851,9 +878,11 @@ pub async fn market_github_install(repo: String, dir: String) -> Result<SkillMet
     let mut wrote = 0usize;
     for rel in &files {
         let raw_url = format!("{GITHUB_RAW}/{owner}/{name}/HEAD/{dir}/{rel}");
-        let Ok(resp) = fetch_public(&client, &raw_url).await else { continue };
-        let Ok(bytes) = resp.bytes().await else { continue };
-        if bytes.len() > 2 * 1024 * 1024 {
+        // 主机为硬编码的 raw.githubusercontent.com，无需 SSRF 校验
+        let Ok(resp) = fetch_public_unchecked(&client, &raw_url).await else { continue };
+        // 流式截断 2MB，避免先整读大文件占满内存
+        let Ok((bytes, over)) = read_body_capped(resp, 2 * 1024 * 1024).await else { continue };
+        if over {
             continue;
         }
         let out_path = dst.join(rel);
@@ -919,6 +948,24 @@ mod tests {
             parse_github_repo("https://github.com/agentskills/agentskills").unwrap(),
             ("agentskills".to_string(), "agentskills".to_string())
         );
+        // 带分支路径的完整 URL：应只取 owner/repo，忽略 /tree/main 等后续段
+        assert_eq!(
+            parse_github_repo("https://github.com/anthropics/skills/tree/main/docs").unwrap(),
+            ("anthropics".to_string(), "skills".to_string())
+        );
+        // 尾部斜杠与 .git 后缀
+        assert_eq!(
+            parse_github_repo("https://github.com/anthropics/skills.git/").unwrap(),
+            ("anthropics".to_string(), "skills".to_string())
+        );
+        assert_eq!(
+            parse_github_repo("anthropics/skills.git").unwrap(),
+            ("anthropics".to_string(), "skills".to_string())
+        );
+        // 非 github.com 主机拒绝
+        assert!(parse_github_repo("https://gitlab.com/anthropics/skills").is_err());
+        // 无效输入
         assert!(parse_github_repo("   ").is_err());
+        assert!(parse_github_repo("not-a-repo").is_err());
     }
 }
