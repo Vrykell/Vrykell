@@ -22,6 +22,12 @@ export interface SshConnection {
 
 export interface SshFsEntry extends FsEntry {}
 
+/** 目录列表响应：条目 + 实际目录的真实路径（空请求 = 远程 home）。 */
+export interface SshListResponse {
+  entries: SshFsEntry[];
+  base: string;
+}
+
 /** 表单校验：返回错误信息，合法返回 null。 */
 export function validateSshConnection(c: Partial<SshConnection>): string | null {
   if (!c.name || !c.name.trim()) return '请输入连接名';
@@ -67,8 +73,18 @@ export function sshTest(target: {
   });
 }
 
-/** 列出远程目录（按连接 id，密码由后端解析）。 */
-export function sshFsList(id: string, path?: string): Promise<SshFsEntry[]> {
+/** 查询主机指纹与 known_hosts 记录状态（首次连接确认用）。 */
+export function sshHostKeyInfo(host: string, port?: number): Promise<{ fingerprint: string; known: boolean; keyType: string }> {
+  return invoke('ssh_host_key_info', { host, port: port ?? null });
+}
+
+/** 用户确认指纹后记录主机密钥到 known_hosts（幂等）。 */
+export function sshTrustHostKey(host: string, port?: number): Promise<void> {
+  return invoke('ssh_trust_host_key', { host, port: port ?? null });
+}
+
+/** 列出远程目录（按连接 id，密码由后端解析）。返回条目 + 实际目录真实路径。 */
+export function sshFsList(id: string, path?: string): Promise<SshListResponse> {
   return invoke('ssh_list', { id, path: path ?? null });
 }
 

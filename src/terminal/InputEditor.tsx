@@ -366,7 +366,9 @@ export default function InputEditor({
         setPreviewId(null);
       } else {
         const sid = sessions[paneId];
-        if (sid) ptyWrite(sid, cmd.endsWith('\n') ? cmd : cmd + '\n').catch(() => {});
+        if (sid) {
+          ptyWrite(sid, cmd.endsWith('\n') ? cmd : cmd + '\n').catch(() => {});
+        }
         engageFollow(paneId); // 提交新命令 = 明确回底意图
       }
     } catch (e) {

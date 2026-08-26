@@ -127,6 +127,21 @@ pub fn ssh_args(host: &str, user: Option<&str>, port: Option<u16>) -> Vec<String
     args
 }
 
+/// 校验 SSH 目标主机：host 以 `-` 开头会被 ssh 解析为命令行选项
+/// （如 `-oProxyCommand=…`），必须拒绝，防止参数注入。
+fn validate_ssh_host(host: &str) -> Result<(), String> {
+    if host.is_empty() {
+        return Err("SSH 主机不能为空".to_string());
+    }
+    if host.starts_with('-') {
+        return Err("SSH 主机名不能以 - 开头（会被解析为命令行选项）".to_string());
+    }
+    if host.chars().any(char::is_whitespace) {
+        return Err("SSH 主机名不能包含空白字符".to_string());
+    }
+    Ok(())
+}
+
 /// 按用户选择的 shell / ssh 目标构建启动命令，并注入 OSC 133 shell integration。
 fn build_shell_cmd(
     cwd: Option<String>,
@@ -135,6 +150,7 @@ fn build_shell_cmd(
 ) -> Result<CommandBuilder, String> {
     // 1. SSH 连接：直接跑 `ssh [-p port] [user@]host`
     if let Some(target) = ssh {
+        validate_ssh_host(&target.host)?;
         let mut cmd = CommandBuilder::new("ssh");
         for arg in ssh_args(&target.host, target.user.as_deref(), target.port) {
             cmd.arg(arg);

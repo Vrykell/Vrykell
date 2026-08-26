@@ -6,6 +6,7 @@
 //! 终端会话本身仍由前端经 `pty_spawn`（pty.rs）用 `ssh` CLI 拉起（交互式），这里只做非交互式后端操作。
 
 use crate::db::{HistoryState, SshConnection};
+use base64::Engine;
 use serde::Serialize;
 use ssh2::{CheckResult, HostKeyType, KnownHostFileKind, KnownHostKeyFormat, Session, Sftp};
 use std::io::{Read, Write};
@@ -21,15 +22,18 @@ pub struct SshFsEntry {
     pub is_dir: bool,
 }
 
-/// 建立 TCP 连接 + SSH 握手 + 认证，返回已认证的会话。
-fn connect(conn: &SshConnection) -> Result<Session, String> {
+/// 目录列表响应：条目 + 实际目录的真实路径（空请求 = 远程 home）。
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SshListResponse {
+    pub entries: Vec<SshFsEntry>,
+    pub base: String,
+}
+
+/// 建立 TCP 连接 + SSH 握手（不含主机密钥校验与认证）。
+fn tcp_handshake(conn: &SshConnection) -> Result<Session, String> {
     let host = conn.host.as_str();
     let port = conn.port.unwrap_or(22);
-    let user = conn.user.trim();
-    // 用户名为空时直接报错，绝不静默默认 root（误留空表单会以 root 登录）
-    if user.is_empty() {
-        return Err("用户名不能为空".to_string());
-    }
 
     let tcp = TcpStream::connect((host, port))
         .map_err(|e| format!("连接 {host}:{port} 失败：{e}"))?;
@@ -39,10 +43,18 @@ fn connect(conn: &SshConnection) -> Result<Session, String> {
     let mut sess = Session::new().map_err(|e| format!("初始化 SSH 失败：{e}"))?;
     sess.set_tcp_stream(tcp);
     sess.handshake().map_err(|e| format!("SSH 握手失败：{e}"))?;
+    Ok(sess)
+}
 
-    // 主机密钥校验（TOFU：首次记录，之后严格比对，防中间人）
-    verify_host_key(&sess, host, port)?;
-
+/// 建立 TCP 连接 + SSH 握手 + 主机密钥校验 + 认证，返回已认证的会话。
+fn connect(conn: &SshConnection) -> Result<Session, String> {
+    let user = conn.user.trim();
+    // 用户名为空时直接报错，绝不静默默认 root（误留空表单会以 root 登录）
+    if user.is_empty() {
+        return Err("用户名不能为空".to_string());
+    }
+    let sess = tcp_handshake(conn)?;
+    verify_host_key(&sess, &conn.host, conn.port.unwrap_or(22))?;
     authenticate(&sess, conn, user)?;
     if !sess.authenticated() {
         return Err("认证失败".to_string());
@@ -50,9 +62,41 @@ fn connect(conn: &SshConnection) -> Result<Session, String> {
     Ok(sess)
 }
 
-/// 主机密钥校验：读 ~/.ssh/known_hosts，首次连接记录（TOFU），之后严格比对。
+/// 主机指纹（OpenSSH 风格 SHA256:base64）。
+fn fingerprint_of(sess: &Session) -> String {
+    match sess.host_key_hash(ssh2::HashType::Sha256) {
+        Some(hash) => format!("SHA256:{}", base64::engine::general_purpose::STANDARD.encode(hash)),
+        None => "unknown".to_string(),
+    }
+}
+
+/// 主机密钥校验（TOFU）：已记录 → 严格比对；未记录 → **不自动记录**，
+/// 返回 `HOST_KEY_UNKNOWN:<指纹>` 要求用户显式确认后再信任（见 ssh_trust_host_key）。
 /// 整个「读-改-写」在进程级锁内串行，避免多个 SSH 连接并发写互相覆盖。
 fn verify_host_key(sess: &Session, host: &str, port: u16) -> Result<(), String> {
+    static KH_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _guard = KH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
+    let (key, _key_type) = sess.host_key().ok_or("远端未返回主机密钥".to_string())?;
+    let mut kh = sess.known_hosts().map_err(|e| format!("初始化 known_hosts 失败：{e}"))?;
+
+    let kh_path = dirs::home_dir()
+        .map(|h| h.join(".ssh").join("known_hosts"))
+        .unwrap_or_default();
+    if kh_path.exists() {
+        kh.read_file(&kh_path, KnownHostFileKind::OpenSSH).ok();
+    }
+
+    match kh.check_port(host, port, key) {
+        CheckResult::Match => Ok(()),
+        CheckResult::NotFound => Err(format!("HOST_KEY_UNKNOWN:{}", fingerprint_of(sess))),
+        CheckResult::Mismatch => Err(format!("主机密钥不匹配（可能存在中间人攻击）：{host}")),
+        CheckResult::Failure => Err(format!("主机密钥校验失败：{host}")),
+    }
+}
+
+/// 记录主机密钥到 known_hosts（用户显式信任后调用）。
+fn record_host_key(sess: &Session, host: &str, port: u16) -> Result<(), String> {
     static KH_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
     let _guard = KH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
 
@@ -66,24 +110,20 @@ fn verify_host_key(sess: &Session, host: &str, port: u16) -> Result<(), String> 
         kh.read_file(&kh_path, KnownHostFileKind::OpenSSH).ok();
     }
 
-    match kh.check_port(host, port, key) {
-        CheckResult::Match => Ok(()),
-        CheckResult::NotFound => {
-            // TOFU：首次连接记录主机密钥
-            let fmt = host_key_format(key_type);
-            let kh_host = if port == 22 { host.to_string() } else { format!("[{host}]:{port}") };
-            kh.add(&kh_host, key, "vrykell", fmt)
-                .map_err(|e| format!("记录主机密钥失败：{e}"))?;
-            if let Some(dir) = kh_path.parent() {
-                let _ = std::fs::create_dir_all(dir);
-            }
-            kh.write_file(&kh_path, KnownHostFileKind::OpenSSH)
-                .map_err(|e| format!("写入 known_hosts 失败：{e}"))?;
-            Ok(())
-        }
-        CheckResult::Mismatch => Err(format!("主机密钥不匹配（可能存在中间人攻击）：{host}")),
-        CheckResult::Failure => Err(format!("主机密钥校验失败：{host}")),
+    // 已记录且匹配则无需重复写
+    if matches!(kh.check_port(host, port, key), CheckResult::Match) {
+        return Ok(());
     }
+    let fmt = host_key_format(key_type);
+    let kh_host = if port == 22 { host.to_string() } else { format!("[{host}]:{port}") };
+    kh.add(&kh_host, key, "vrykell", fmt)
+        .map_err(|e| format!("记录主机密钥失败：{e}"))?;
+    if let Some(dir) = kh_path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    kh.write_file(&kh_path, KnownHostFileKind::OpenSSH)
+        .map_err(|e| format!("写入 known_hosts 失败：{e}"))?;
+    Ok(())
 }
 
 fn host_key_format(t: HostKeyType) -> KnownHostKeyFormat {
@@ -131,19 +171,16 @@ fn ssh_test_sync(conn: &SshConnection) -> Result<String, String> {
     Ok("连接成功".to_string())
 }
 
-fn ssh_list_sync(conn: &SshConnection, path: Option<String>) -> Result<Vec<SshFsEntry>, String> {
+fn ssh_list_sync(conn: &SshConnection, path: Option<String>) -> Result<SshListResponse, String> {
     let sess = connect(conn)?;
     let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
 
     let dir = path.unwrap_or_default();
-    // 空路径 → 远程 home（SFTP 的当前目录即登录主目录）
-    let base = if dir.is_empty() {
-        sftp.realpath(Path::new("."))
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_else(|_| "/".to_string())
-    } else {
-        dir
-    };
+    // 空路径 → 远程 home（SFTP 的当前目录即登录主目录）；其它路径 realpath 规范化
+    let base = sftp
+        .realpath(Path::new(if dir.is_empty() { "." } else { &dir }))
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| if dir.is_empty() { "/".to_string() } else { dir });
 
     let entries = sftp
         .readdir(Path::new(&base))
@@ -165,7 +202,7 @@ fn ssh_list_sync(conn: &SshConnection, path: Option<String>) -> Result<Vec<SshFs
         });
     }
     result.sort_by(|a, b| b.is_dir.cmp(&a.is_dir).then_with(|| a.name.cmp(&b.name)));
-    Ok(result)
+    Ok(SshListResponse { entries: result, base })
 }
 
 /// 拼接目录路径（去掉重复斜杠）。纯函数，便于单测。
@@ -203,7 +240,82 @@ pub fn ssh_connection_touch(state: State<'_, HistoryState>, id: String) -> Resul
     db.touch_ssh_connection(&id, now)
 }
 
-// ── 连接测试 / 远程目录 ──
+// ── 连接测试 / 主机指纹 / 远程目录 ──
+
+/// 主机密钥信息（用于首次连接确认：展示指纹 + 是否已记录）。
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SshHostKeyInfo {
+    pub fingerprint: String,
+    pub known: bool,
+    pub key_type: String,
+}
+
+/// 查询主机指纹与 known_hosts 记录状态（不做任何写入）。
+#[tauri::command]
+pub async fn ssh_host_key_info(host: String, port: Option<u16>) -> Result<SshHostKeyInfo, String> {
+    let conn = SshConnection {
+        id: String::new(),
+        name: String::new(),
+        host,
+        port,
+        user: String::new(),
+        password: String::new(),
+        auth_method: "password".to_string(),
+        last_opened_at: None,
+        has_password: false,
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        let sess = tcp_handshake(&conn)?;
+        let (_, key_type) = sess.host_key().ok_or("远端未返回主机密钥".to_string())?;
+        Ok(SshHostKeyInfo {
+            fingerprint: fingerprint_of(&sess),
+            known: host_key_known(&sess, &conn.host, conn.port.unwrap_or(22)),
+            key_type: format!("{key_type:?}").to_lowercase(),
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// 用户确认指纹后，记录主机密钥到 known_hosts（幂等）。
+#[tauri::command]
+pub async fn ssh_trust_host_key(host: String, port: Option<u16>) -> Result<(), String> {
+    let conn = SshConnection {
+        id: String::new(),
+        name: String::new(),
+        host,
+        port,
+        user: String::new(),
+        password: String::new(),
+        auth_method: "password".to_string(),
+        last_opened_at: None,
+        has_password: false,
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        let sess = tcp_handshake(&conn)?;
+        record_host_key(&sess, &conn.host, conn.port.unwrap_or(22))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// 查询主机密钥是否已记录（不写入）。
+fn host_key_known(sess: &Session, host: &str, port: u16) -> bool {
+    let Some((key, _)) = sess.host_key() else {
+        return false;
+    };
+    let Ok(mut kh) = sess.known_hosts() else {
+        return false;
+    };
+    let kh_path = dirs::home_dir()
+        .map(|h| h.join(".ssh").join("known_hosts"))
+        .unwrap_or_default();
+    if kh_path.exists() {
+        kh.read_file(&kh_path, KnownHostFileKind::OpenSSH).ok();
+    }
+    matches!(kh.check_port(host, port, key), CheckResult::Match)
+}
 
 /// 测试连接（显式参数，供表单在保存前测试）。
 #[tauri::command]
@@ -229,13 +341,13 @@ pub async fn ssh_test(
         .map_err(|e| e.to_string())?
 }
 
-/// 列出远程目录（按连接 id，密码由后端解析）。
+/// 列出远程目录（按连接 id，密码由后端解析）。返回条目 + 实际目录真实路径。
 #[tauri::command]
 pub async fn ssh_list(
     state: State<'_, HistoryState>,
     id: String,
     path: Option<String>,
-) -> Result<Vec<SshFsEntry>, String> {
+) -> Result<SshListResponse, String> {
     let conn = {
         let db = state.0.lock().map_err(|e| e.to_string())?;
         db.get_ssh_connection(&id)?
@@ -521,12 +633,12 @@ mod tests {
             last_opened_at: None,
             has_password: false,
         };
-        let entries = ssh_list_sync(&conn, None).expect("列出远程 home 失败");
-        println!("SFTP 条目数: {}", entries.len());
-        for e in entries.iter().take(10) {
+        let res = ssh_list_sync(&conn, None).expect("列出远程 home 失败");
+        println!("SFTP 条目数: {}（base={}）", res.entries.len(), res.base);
+        for e in res.entries.iter().take(10) {
             println!("  {}  {}", if e.is_dir { "d" } else { "-" }, e.name);
         }
-        assert!(!entries.is_empty(), "远程 home 不应为空");
+        assert!(!res.entries.is_empty(), "远程 home 不应为空");
         // 下载一个文件验证 ssh_download
         let (local, size) = ssh_download_sync(&conn, "/Users/wuzhe/.DS_Store").expect("下载失败");
         println!("下载到: {local}（{size} 字节）");

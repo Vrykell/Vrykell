@@ -68,8 +68,9 @@ test.describe('SSH 远程连接管理侧栏', () => {
     await page.locator('[data-testid="remote-file-Documents"]').click({ button: 'right' });
     await page.getByRole('button', { name: '下载文件夹到本地' }).click();
     await expect(page.getByText(/已下载到/)).toBeVisible();
-    // 进入下载管理
-    await page.locator('[data-testid="remote-downloads-btn"]').click();
+    // 进入下载管理（⋯ 菜单）
+    await page.locator('[data-testid="remote-more-btn"]').click();
+    await page.getByRole('button', { name: '下载管理' }).click();
     await expect(page.getByText('下载管理')).toBeVisible();
     await expect(page.locator('[data-testid="download-item-Documents"]')).toBeVisible();
     // 定位到系统文件管理器

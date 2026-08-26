@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use tauri::State;
+use tauri::{Manager, State};
 
 /// 终端背景最小不透明度（再低文字几乎不可读）。
 const MIN_OPACITY: f32 = 0.05;
@@ -96,6 +96,16 @@ impl ThemeState {
     }
 }
 
+/// 把壁纸文件加入 asset 协议访问范围（scope 已收窄到 $APPDATA，壁纸可能在任何目录）。
+/// 只有用户明确设置过的壁纸路径才会被授权，WebView 无法读取任意家目录文件。
+fn authorize_wallpaper(app: &tauri::AppHandle, path: Option<&str>) {
+    if let Some(p) = path {
+        if !p.trim().is_empty() {
+            let _ = app.asset_protocol_scope().allow_file(p.trim());
+        }
+    }
+}
+
 #[tauri::command]
 pub fn get_theme_config(state: State<'_, ThemeState>) -> ThemeConfig {
     state
@@ -112,8 +122,13 @@ pub fn get_theme_path() -> String {
 }
 
 #[tauri::command]
-pub fn set_theme_config(state: State<'_, ThemeState>, mut config: ThemeConfig) -> ThemeConfig {
+pub fn set_theme_config(
+    app: tauri::AppHandle,
+    state: State<'_, ThemeState>,
+    mut config: ThemeConfig,
+) -> ThemeConfig {
     config.normalize();
+    authorize_wallpaper(&app, config.background_image.as_deref());
     if let Ok(mut c) = state.0.lock() {
         *c = config.clone();
     }
@@ -132,11 +147,16 @@ pub fn theme_export(state: State<'_, ThemeState>, path: String) -> Result<(), St
 
 /// 从指定 JSON 文件导入主题并保存、返回新配置。
 #[tauri::command]
-pub fn theme_import(state: State<'_, ThemeState>, path: String) -> Result<ThemeConfig, String> {
+pub fn theme_import(
+    app: tauri::AppHandle,
+    state: State<'_, ThemeState>,
+    path: String,
+) -> Result<ThemeConfig, String> {
     let s = std::fs::read_to_string(&path).map_err(|e| format!("读取文件失败：{e}"))?;
     let mut cfg: ThemeConfig =
         serde_json::from_str(&s).map_err(|e| format!("解析主题失败（不是有效的主题 JSON）：{e}"))?;
     cfg.normalize();
+    authorize_wallpaper(&app, cfg.background_image.as_deref());
     if let Ok(mut c) = state.0.lock() {
         *c = cfg.clone();
     }

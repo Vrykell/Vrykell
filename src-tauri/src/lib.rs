@@ -4,6 +4,7 @@ mod commands;
 mod db;
 mod files;
 mod remote;
+mod secret;
 mod terminal;
 mod theme;
 
@@ -18,7 +19,14 @@ fn greet(name: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let history_db = db::HistoryDb::open().expect("failed to open history db");
+    // 打开失败降级为内存库（历史功能不可用），而不是启动即崩溃
+    let history_db = match db::HistoryDb::open() {
+        Ok(db) => db,
+        Err(e) => {
+            eprintln!("[vrykell] 打开历史数据库失败，已降级为内存模式：{e}");
+            db::HistoryDb::open_in_memory()
+        }
+    };
     // 启动即把上次异常退出（崩溃/强杀）遗留的 active 会话归档，避免脏 active 数据。
     // 正常退出已在 RunEvent::Exit 归档，这里幂等兜底。
     let now = std::time::SystemTime::now()
@@ -38,6 +46,18 @@ pub fn run() {
         .manage(agent::ai::LlmStreamState::default())
         .manage(terminal::pty::KillState::default())
         .manage(agent::mcp::McpState::default())
+        // asset 协议 scope 已收窄：启动时把已保存的壁纸文件动态授权
+        .setup(|app| {
+            if let Some(cfg) = app.try_state::<theme::ThemeState>() {
+                let path = cfg.0.lock().ok().map(|c| c.background_image.clone());
+                if let Some(Some(p)) = path {
+                    if !p.trim().is_empty() {
+                        let _ = app.asset_protocol_scope().allow_file(p.trim());
+                    }
+                }
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             greet,
             agent::ai::set_ai_key,
@@ -103,6 +123,8 @@ pub fn run() {
             remote::ssh::ssh_connection_delete,
             remote::ssh::ssh_connection_touch,
             remote::ssh::ssh_test,
+            remote::ssh::ssh_host_key_info,
+            remote::ssh::ssh_trust_host_key,
             remote::ssh::ssh_list,
             remote::ssh::ssh_download,
             remote::ssh::ssh_rename,

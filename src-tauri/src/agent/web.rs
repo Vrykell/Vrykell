@@ -190,7 +190,9 @@ fn validate_resolved(host: &str, addrs: &[std::net::SocketAddr]) -> Result<(), S
     Ok(())
 }
 
-const DNS_PIN_TTL: Duration = Duration::from_secs(60);
+/// DNS 钉扎缓存有效期：期间连接复用已验证的解析结果，交替应答窗口归零。
+/// 到期重新解析仍会再次校验（只会短暂不可用，不会穿透）。
+const DNS_PIN_TTL: Duration = Duration::from_secs(300);
 
 impl Resolve for PinnedResolver {
     fn resolve(&self, name: Name) -> Resolving {
