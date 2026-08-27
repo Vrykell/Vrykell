@@ -314,9 +314,9 @@ export default function PanelChat() {
         )}
       </div>
 
-      {/* 输入卡片：四周留缝 + 圆角（与终端输入栏同语言）；内部 = 附件 chips → 输入行 → 状态栏 */}
+      {/* 输入卡片：外边距与命令块一致（0.45em 0），左右 8px 对齐消息区与终端命令块 */}
       {isSession && (
-        <div style={{ flexShrink: 0, padding: '0 10px 10px' }}>
+        <div style={{ flexShrink: 0, margin: '0.45em 0', padding: '0 8px' }}>
           <div style={{
             background: 'var(--block)',
             borderRadius: 12,

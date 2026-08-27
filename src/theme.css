@@ -307,6 +307,17 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 /* xterm 容器贴边：取消全屏终端的边缘内边距 */
 .xterm { padding: 0; }
 
+/* xterm viewport 默认纯黑 #000：canvas 取整残差（容器宽 − cols×cellWidth）区域
+ * 会显出比终端背景更黑的竖条。统一为终端背景色 --xterm-bg（残差区与终端同色）。
+ * 三层选择器压过 xterm.css 的同特异性规则（xterm.css 晚于本文件加载）。 */
+[data-testid^="pane-"] .xterm .xterm-viewport { background-color: var(--xterm-bg); }
+
+/* 经典/TUI/SSH 主 xterm：canvas 水平居中，消除取整残差（容器宽 - cols×cellWidth）
+ * 左对齐时全部落在右侧造成的「右边距比左边距大」；
+ * .xterm-screen 是 .xterm 的直接子元素，参与 flex；.xterm-viewport 为 absolute 不受影响。 */
+.xterm { display: flex; justify-content: center; }
+.xterm .xterm-screen { flex-shrink: 0; }
+
 /* ── xterm(经典/TUI/SSH)滚动条与 block 列表对齐 ──
  * xterm 6 用 DOM 滚动条(.xterm-scrollable-element > .scrollbar),非原生 webkit 滚动条。
  * 默认完全隐藏;scrollbarHover.ts 的坐标检测会命中 .xterm-viewport(可滚动容器)并

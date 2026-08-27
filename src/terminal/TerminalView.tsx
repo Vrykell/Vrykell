@@ -154,9 +154,9 @@ export default function TerminalView() {
         <LoadingState />
       )}
 
-      {/* 手动全屏宿主（块终端「进入全屏交互」）：贴边，无内边距 */}
+      {/* 手动全屏宿主（块终端「进入全屏交互」）：顶部为透明工具条让位，其余贴边 */}
       {altScreenActive && (
-        <div data-testid="tui-fullscreen" style={{ position: 'absolute', inset: 0, zIndex: 100, background: 'var(--canvas)' }} />
+        <div data-testid="tui-fullscreen" style={{ position: 'absolute', inset: 0, zIndex: 100, background: 'var(--canvas)', paddingTop: 28 }} />
       )}
 
       {/* 终端区域右键菜单 */}
@@ -329,7 +329,10 @@ function TerminalPane(props: {
       onContextMenu={(e) => { setFocusedPane(terminal.id); onContextMenu(e); }}
       style={{
         flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column',
-        position: 'relative', background: 'var(--canvas)',
+        position: 'relative',
+        // 背景 = 终端同款色（--canvas 与 xterm 的 --xterm-bg 同色）：8px 边距与终端融为一体，
+        // 视觉上像是终端的呼吸空间而非缝隙
+        background: 'var(--canvas)',
         // 只在「面向其它终端」的边上画线，外缘不画 —— 避免与侧栏的 1px 边框叠加成重线
         borderTop: inner.top ? `1px solid ${focused ? 'var(--border-strong)' : 'var(--border)'}` : 'none',
         borderBottom: inner.bottom ? `1px solid ${focused ? 'var(--border-strong)' : 'var(--border)'}` : 'none',
@@ -352,7 +355,14 @@ function TerminalPane(props: {
       <div style={{ display: showBlocks ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column' }}>
         <PaneBlockList paneId={terminal.id} insetLeft={inner.left ? 4 : 8} insetRight={inner.right ? 4 : 8} />
       </div>
-      {showBlocks && <PaneInputEditor paneId={terminal.id} focused={focused} />}
+      {showBlocks && (
+        <PaneInputEditor
+          paneId={terminal.id}
+          focused={focused}
+          insetLeft={inner.left ? 4 : 8}
+          insetRight={inner.right ? 4 : 8}
+        />
+      )}
       {scene === 'altScreen' && <TuiBanner tabId={terminal.id} />}
     </div>
   );
@@ -569,7 +579,7 @@ function LoadingState() {
 
 // ── PaneInputEditor（终端 pane 的独立输入栏） ──
 
-function PaneInputEditor({ paneId, focused }: { paneId: string; focused: boolean }) {
+function PaneInputEditor({ paneId, focused, insetLeft = 8, insetRight = 8 }: { paneId: string; focused: boolean; insetLeft?: number; insetRight?: number }) {
   const blocks = useBlockStore(selectBlocks(paneId));
   const hasRunningBlock = blocks.some((b) => b.status === 'executing' && b.wasLongRunning);
   const runningCommand = [...blocks].reverse().find((b) => b.status === 'executing')?.command ?? '';
@@ -577,6 +587,8 @@ function PaneInputEditor({ paneId, focused }: { paneId: string; focused: boolean
     <InputEditor
       paneId={paneId}
       focused={focused}
+      insetLeft={insetLeft}
+      insetRight={insetRight}
       isLongRunning={hasRunningBlock}
       runningCommand={runningCommand}
       onEndPress={() => { engageFollow(paneId); useTerminalStore.getState().setKeyboardTarget('input'); }}
