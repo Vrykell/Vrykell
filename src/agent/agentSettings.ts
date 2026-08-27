@@ -54,8 +54,10 @@ export interface GlobalPrefs {
   completeModel: string;
   /** 补全防抖毫秒 */
   completeDebounceMs: number;
-  /** 各 shell 类型（bash/zsh/powershell/...）的默认打开模式；SSH 恒为经典模式，不在此配置 */
+  /** 各 shell 类型（bash/zsh/powershell/...）的默认打开模式 */
   openModeByShell: Record<ShellType, 'classic' | 'block'>;
+  /** SSH 连接终端的打开模式：block = 向远端注入 shell integration（失败自动回退经典） */
+  sshOpenMode: 'classic' | 'block';
 }
 
 /** 生效设置 = 行为 + 全局偏好 */
@@ -77,6 +79,7 @@ export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
     pwsh: 'block',
     cmd: 'block',
   },
+  sshOpenMode: 'classic',
   maxSteps: 50,
   contextStrategy: 'compact',
   contextMaxTokens: 24000,

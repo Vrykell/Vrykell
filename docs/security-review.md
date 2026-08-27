@@ -29,6 +29,7 @@
 | **markdown 远程图片外带/追踪面** | 低 | 图片降级为链接文本（不加载远程图），配合 img-src 无远程源 |
 | **agent 文件工具可读密钥外泄给 LLM（提示注入）** | 高 | `sensitivePathReason` 启发式（.ssh/.aws/.env/config.json 等）→ 无视权限模式强制逐次询问 |
 | **SSH 主机名参数注入（`-oProxyCommand` 等）** | 中 | `validate_ssh_host`：拒绝 `-` 开头 / 含空白的主机 |
+| **SSH 远端注入脚本被篡改 → 远端任意代码** | 高 | 注入脚本为二进制内静态常量（不落盘、不拼接远端数据），base64 传递；`umask 077 + mktemp` 0600 临时文件防符号链接；传输防篡改依赖 SSH 加密 + OpenSSH 主机密钥 TOFU 确认；兜底 `exec "${SHELL:-sh}" -i` 加引号防词分裂（恶意 `$SHELL` 只会连接失败，绝不执行）；注入失败静默回退经典模式 |
 | **SSH 密码明文落 SQLite** | 高 | 密码移入密钥存储（`secret.rs`：macOS 钥匙串 / 平台回退 0600 文件），库内只留脱敏标记；旧库明文自动迁移 |
 | **SSH 首次连接 TOFU 无用户确认** | 高 | 后端不再自动记录：未记录时返回 `HOST_KEY_UNKNOWN:<指纹>`；前端表单弹指纹确认，用户「信任并继续」才写 known_hosts（`ssh_trust_host_key`） |
 | **`HistoryDb::open().expect()` 启动 panic** | 中 | 打开失败降级为内存库（历史不可用，应用继续跑） |

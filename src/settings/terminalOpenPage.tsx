@@ -24,12 +24,15 @@ const SHELL_LABELS: Record<ShellType, string> = {
 export function TerminalOpenPage() {
   const agentSettings = useAgentSettings();
   const openModeByShell = agentSettings.global.openModeByShell;
+  const sshOpenMode = agentSettings.global.sshOpenMode;
   const setShellMode = (shell: ShellType, mode: 'classic' | 'block') =>
     agentSettings.update({ openModeByShell: { ...openModeByShell, [shell]: mode } });
+  const setSshMode = (mode: 'classic' | 'block') =>
+    agentSettings.update({ sshOpenMode: mode });
 
   return (
     <>
-      <Field title="各 Shell 打开模式" description="经典模式输出直进终端；块模式生成命令块。SSH 恒为经典模式。">
+      <Field title="各 Shell 打开模式" description="经典模式输出直进终端；块模式生成命令块。">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {(Object.keys(SHELL_LABELS) as ShellType[]).map((shell) => (
             <div key={shell} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -44,6 +47,15 @@ export function TerminalOpenPage() {
               />
             </div>
           ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 110, fontSize: 12, color: 'var(--text-primary)' }}>SSH</span>
+            <Segmented
+              size="sm"
+              options={OPEN_MODE_OPTIONS}
+              value={sshOpenMode}
+              onChange={setSshMode}
+            />
+          </div>
         </div>
       </Field>
     </>

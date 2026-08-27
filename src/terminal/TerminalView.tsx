@@ -342,8 +342,8 @@ function TerminalPane(props: {
       {/* AI 状态栏（仅 AI 模式显示，置于页面顶部） */}
       <AiStatusBar paneId={terminal.id} />
       <div style={showXterm
-        // 经典/TUI/SSH：四周 4px 透明边距（透出壁纸/画布），TUI 顶部为工具条让位
-        ? { flex: 1, minHeight: 0, position: 'relative', padding: 4, paddingTop: scene === 'altScreen' ? 28 : 4, background: 'transparent' }
+        // 经典/TUI/SSH：统一 8px 透明边距（透出壁纸/画布）；TUI 顶部为工具条让位
+        ? { flex: 1, minHeight: 0, position: 'relative', padding: 8, paddingTop: scene === 'altScreen' ? 28 : 8, background: 'transparent' }
         : { position: 'absolute', inset: 0, opacity: 0, pointerEvents: 'none' }}>
         <TerminalPanel paneId={terminal.id} tabId={windowId} onReady={(sid) => setSession(terminal.id, sid)} />
       </div>

@@ -7,6 +7,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
+import { DESC_READ_FILE, DESC_WRITE_FILE, DESC_EDIT_FILE } from '../toolTexts';
 import { tool } from 'ai';
 import { z } from 'zod';
 import { gate, ensureSkillAccess, type ToolContext } from '../permissions';
@@ -23,9 +24,7 @@ async function call<T>(fn: () => Promise<T>): Promise<{ ok: boolean; result?: st
 export function buildFileTools(ctx: ToolContext) {
   return {
     read_file: tool({
-      description:
-        '读取文本文件内容（默认上限 256KB，超出截断并标记）。' +
-        '二进制/非 UTF-8 文件会报错。路径用绝对路径。',
+      description: DESC_READ_FILE,
       inputSchema: z.object({
         path: z.string().describe('绝对路径'),
         max_bytes: z.number().optional().describe('读取上限字节数，默认 256KB'),
@@ -40,9 +39,7 @@ export function buildFileTools(ctx: ToolContext) {
     }),
 
     write_file: tool({
-      description:
-        '整文件写入（会覆盖同名文件；覆盖前自动备份到 ~/.vrykell/backups/）。' +
-        '父目录不存在会自动创建。大改动优先用 edit_file 精确替换。',
+      description: DESC_WRITE_FILE,
       inputSchema: z.object({
         path: z.string().describe('绝对路径'),
         content: z.string().describe('完整文件内容'),
@@ -57,9 +54,7 @@ export function buildFileTools(ctx: ToolContext) {
     }),
 
     edit_file: tool({
-      description:
-        '精确字符串替换：old_string 必须在文件中唯一命中，0 处或多处命中都会失败' +
-        '（报错含命中数，补充更多上下文使其唯一后重试）。修改已有文件优先用它而不是 write_file。',
+      description: DESC_EDIT_FILE,
       inputSchema: z.object({
         path: z.string().describe('绝对路径'),
         old_string: z.string().describe('要被替换的原文（须唯一命中，含缩进/换行）'),

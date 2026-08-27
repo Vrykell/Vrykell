@@ -147,13 +147,20 @@ fn build_shell_cmd(
     cwd: Option<String>,
     shell: Option<String>,
     ssh: Option<SshTarget>,
+    open_mode: Option<String>,
 ) -> Result<CommandBuilder, String> {
-    // 1. SSH 连接：直接跑 `ssh [-p port] [user@]host`
+    // 1. SSH 连接：`ssh -t [-p port] [user@]host [<远端注入命令>]`
+    //    -t 强制分配 TTY；打开模式为 block 时附加远端注入命令（OSC 133 shell integration，
+    //    安全性最高版本，注入失败自动回退经典模式）；classic 则不注入（传统交互）。
     if let Some(target) = ssh {
         validate_ssh_host(&target.host)?;
         let mut cmd = CommandBuilder::new("ssh");
+        cmd.arg("-t");
         for arg in ssh_args(&target.host, target.user.as_deref(), target.port) {
             cmd.arg(arg);
+        }
+        if open_mode.as_deref() != Some("classic") {
+            cmd.arg(shell_integration::ssh_remote_command());
         }
         if let Some(d) = cwd { cmd.cwd(d); }
         return Ok(cmd);
@@ -270,12 +277,13 @@ pub fn pty_spawn(
     cwd: Option<String>,
     shell: Option<String>,
     ssh: Option<SshTarget>,
+    open_mode: Option<String>,
 ) -> Result<String, String> {
     let pty_system = native_pty_system();
     let pair = pty_system
         .openpty(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
         .map_err(|e| e.to_string())?;
-    let cmd = build_shell_cmd(cwd, shell, ssh)?;
+    let cmd = build_shell_cmd(cwd, shell, ssh, open_mode)?;
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
     drop(pair.slave);
     let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;

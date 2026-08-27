@@ -8,6 +8,7 @@
  */
 
 import { tool } from 'ai';
+import { DESC_WEB_SEARCH_DDG, DESC_WEB_FETCH, DESC_WEB_CRAWL } from '../toolTexts';
 import { z } from 'zod';
 import { invoke } from '@tauri-apps/api/core';
 import { gate, type ToolContext } from '../permissions';
@@ -75,9 +76,7 @@ function formatFetch(r: WebFetchResponse): string {
 /** web_search 兜底：DuckDuckGo HTML 抓取（无需 API Key）。 */
 export function buildWebSearchTool(ctx: ToolContext) {
   return tool({
-    description:
-      '联网搜索（DuckDuckGo，无需 API Key）。查询最新资讯、文档、报错信息等。' +
-      '返回结果列表（标题/链接/内容节选）。',
+      description: DESC_WEB_SEARCH_DDG,
     inputSchema: z.object({
       query: z.string().describe('搜索词'),
       maxResults: z.number().int().min(1).max(8).optional().describe('结果条数，默认 5'),
@@ -101,9 +100,7 @@ export function buildWebSearchTool(ctx: ToolContext) {
 /** web_fetch：抓取任意 URL → 结构化 Markdown 文本（一等工具）。 */
 export function buildWebFetchTool(ctx: ToolContext) {
   return tool({
-    description:
-      '抓取一个网页 URL，返回结构化文本（标题 + 正文 Markdown，保留标题层级/列表/链接）。' +
-      '用于阅读某篇文档/网页，或对搜索结果里的链接做进一步阅读。纯文本/JSON 接口原样返回。',
+      description: DESC_WEB_FETCH,
     inputSchema: z.object({
       url: z.string().describe('要抓取的完整 URL（含 http/https）'),
     }),
@@ -123,9 +120,7 @@ export function buildWebFetchTool(ctx: ToolContext) {
 /** web_crawl：爬取多页（BFS，同域/限深度/限页数），逐页结构化。 */
 export function buildWebCrawlTool(ctx: ToolContext) {
   return tool({
-    description:
-      '从起始 URL 广度优先爬取多个网页（默认同域、最多 10 页、深度 2），逐页返回结构化文本。' +
-      '用于阅读一个站点的多个相关页面（如文档目录、博客系列）。单页阅读请用 web_fetch。',
+      description: DESC_WEB_CRAWL,
     inputSchema: z.object({
       start_url: z.string().describe('起始 URL（含 http/https）'),
       max_pages: z.number().int().min(1).max(30).optional().describe('最多抓取页数，默认 10'),

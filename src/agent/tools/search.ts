@@ -7,6 +7,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
+import { DESC_LIST_DIR, DESC_SEARCH_FILES } from '../toolTexts';
 import { tool } from 'ai';
 import { z } from 'zod';
 import { gate, type ToolContext } from '../permissions';
@@ -26,7 +27,7 @@ interface FsSearchHit {
 export function buildSearchTools(ctx: ToolContext) {
   return {
     list_dir: tool({
-      description: '列出目录内容（目录在前按名称排序）。路径用绝对路径。',
+      description: DESC_LIST_DIR,
       inputSchema: z.object({
         path: z.string().describe('绝对路径'),
       }),
@@ -46,9 +47,7 @@ export function buildSearchTools(ctx: ToolContext) {
     }),
 
     search_files: tool({
-      description:
-        '递归搜索文件。content=false 按文件名子串匹配；content=true 按文件内容逐行匹配' +
-        '（返回 路径:行号 与预览）。自动跳过 .git/node_modules/target 等目录，结果默认封顶 100 条。',
+      description: DESC_SEARCH_FILES,
       inputSchema: z.object({
         root: z.string().describe('搜索根目录（绝对路径）'),
         query: z.string().describe('搜索词（大小写不敏感子串）'),
