@@ -2,6 +2,7 @@
  * schedule — 定时任务工具：create/list/toggle/remove，让 LLM 自己管理定时任务。
  */
 import { tool } from 'ai';
+import { DESC_SCHEDULE } from '../toolTexts';
 import { z } from 'zod';
 import { listSchedules, saveSchedule, removeSchedule } from '../platform';
 import { gate, type ToolContext } from '../permissions';
@@ -9,8 +10,7 @@ import { gate, type ToolContext } from '../permissions';
 export function buildScheduleTool(ctx: ToolContext) {
   return {
     schedule: tool({
-      description:
-        '定时任务工具。action：create=新建（每隔 N 分钟自动执行提示词）；list=查看全部；toggle=启用/停用；remove=删除。',
+      description: DESC_SCHEDULE,
       inputSchema: z.object({
         action: z.enum(['create', 'list', 'toggle', 'remove']),
         name: z.string().optional().describe('任务名（create/toggle/remove 用）'),

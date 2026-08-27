@@ -14,6 +14,8 @@ export interface PtySpawnOptions {
   shell?: string;
   /** SSH 连接目标；与 shell 互斥，优先 SSH */
   ssh?: SshSpawnTarget | null;
+  /** 打开模式：classic = 不注入；block = SSH 注入远端 shell integration */
+  openMode?: 'classic' | 'block';
 }
 
 export function ptySpawn(
@@ -28,6 +30,7 @@ export function ptySpawn(
     cwd: cwd ?? null,
     shell: opts?.shell ?? null,
     ssh: opts?.ssh ?? null,
+    openMode: opts?.openMode ?? null,
   });
 }
 

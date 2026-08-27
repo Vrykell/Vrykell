@@ -2,6 +2,7 @@
  * subagent — 子代理工具：spawn/create/list/remove，让 LLM 自己调度与扩展子代理。
  */
 import { generateText, tool } from 'ai';
+import { DESC_SUBAGENT } from '../toolTexts';
 import { invoke } from '@tauri-apps/api/core';
 import { z } from 'zod';
 import { createChatModel, type ProviderKind } from '../provider';
@@ -17,9 +18,7 @@ interface AiConfigRust {
 export function buildSubagentTool(ctx: ToolContext) {
   return {
     subagent: tool({
-      description:
-        '子代理工具。action：spawn=把独立子任务委派给某子代理执行并返回结论；' +
-        'create=新建子代理定义（名称/描述/系统提示词）；list=查看全部子代理；remove=删除。',
+      description: DESC_SUBAGENT,
       inputSchema: z.object({
         action: z.enum(['spawn', 'create', 'list', 'remove']),
         agent: z.string().optional().describe('子代理名（spawn/remove 用）'),

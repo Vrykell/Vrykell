@@ -12,6 +12,7 @@
  */
 
 import { tool } from 'ai';
+import { DESC_WEB_SEARCH_TAVILY } from '../toolTexts';
 import { z } from 'zod';
 import { invoke } from '@tauri-apps/api/core';
 import { gate, type ToolContext } from '../permissions';
@@ -31,9 +32,7 @@ const CONTENT_CAP = 300;
 
 export function buildTavilySearchTool(ctx: ToolContext) {
   return tool({
-    description:
-      '联网搜索（Tavily）。查询最新资讯、文档、报错信息等。' +
-      '返回摘要与结果列表（标题/链接/内容节选）。',
+      description: DESC_WEB_SEARCH_TAVILY,
     inputSchema: z.object({
       query: z.string().describe('搜索词'),
       maxResults: z.number().int().min(1).max(8).optional().describe('结果条数，默认 5'),

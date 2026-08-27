@@ -10,6 +10,7 @@ import {
 import type { BackendGroupEntry } from '../search/types';
 import { useBlockStore } from './blocks';
 import { useChatStore } from './chat';
+import { useAgentSettings } from '../agent/agentSettings';
 import { defaultOpenModeForShell } from '../agent/agentSettings';
 import { useTerminalStore, getFocusedTerminalId } from './terminal';
 import type { ShellType } from '../lib/shells';
@@ -198,7 +199,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         id: `${id}#0`,
         kind: 'ssh',
         cwd: o.cwd,
-        openMode: 'classic', // SSH 恒经典模式
+        openMode: useAgentSettings.getState().global.sshOpenMode,
         ssh: { name: ssh!.name, host: ssh!.host, user: ssh!.user, port: ssh!.port, connectionId: ssh!.connectionId },
       };
       tab = {

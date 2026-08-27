@@ -13,6 +13,7 @@
  */
 
 import { tool } from 'ai';
+import { DESC_READ_TERMINAL, DESC_TERMINAL_KEYS } from '../toolTexts';
 import { z } from 'zod';
 import { ptyWrite } from '../../lib/pty';
 import {
@@ -40,11 +41,7 @@ function blockListContent(paneId: string): string {
 export function buildTerminalTools(ctx: ToolContext) {
   return {
     read_terminal: tool({
-      description:
-        '读取当前聚焦终端的实时可见画面（含 vim/less/htop 等全屏 TUI 的 alt buffer 画面）。' +
-        '返回画面文本（带行号）、场景（classic/blockList/altScreen）、尺寸与光标位置。' +
-        '用于：查看终端当前状态、阅读 vim 里的文件内容、确认上一次按键后的效果。' +
-        '注意：块列表场景返回最近命令块的输出尾部；光标只在 classic/altScreen 有意义。',
+      description: DESC_READ_TERMINAL,
       inputSchema: z.object({}),
       execute: async (_args, { toolCallId }) => {
         const g = await gate('read_terminal', {}, toolCallId, ctx);
@@ -70,19 +67,7 @@ export function buildTerminalTools(ctx: ToolContext) {
     }),
 
     terminal_keys: tool({
-      description:
-        '向当前聚焦终端发送原始按键序列（驱动 vim、REPL 等交互程序）。不等待命令完成。' +
-        '按键用转义表达，\\uXXXX 与 \\xNN 均可：\\u0000–\\u001f 对应 Ctrl+对应字符' +
-        '（\\u0001=Ctrl+A、\\u0003=Ctrl+C、\\u0004=Ctrl+D、\\u0005=Ctrl+E、\\u0015=Ctrl+U、' +
-        '\\u0017=Ctrl+W、\\u0018=Ctrl+X、\\u001a=Ctrl+Z）、\\b=退格、\\r=回车、\\t=Tab、\\n=换行、' +
-        '\\e 或 \\u001b=Esc、\\u001b[A=↑、\\u001b[B=↓、\\u001b[C=→、\\u001b[D=←。' +
-        '注意：JSON 不支持 \\x 与 \\e，写它们时要用双反斜杠（如 "\\\\x1b"、"\\\\e"）；' +
-        '转义多写了一层反斜杠（如 "\\\\u0018"、"\\\\b"）也会被自动纠正。' +
-        '若按键串包含无法识别的转义会直接报错，绝不会把转义文本原样发送。' +
-        '普通可见字符直接写。若输入有误，用 \\b 退格修正（如 "helo\\b" → "hel"）。' +
-        '典型：vim 写文件 = terminal_keys("vi 路径\\r") → read_terminal() 看画面 →' +
-        ' terminal_keys("i") 进插入模式 → terminal_keys("文件内容") →' +
-        ' terminal_keys("\\u001b:wq\\r") 保存退出。发送后可用 read_terminal() 核对效果。',
+      description: DESC_TERMINAL_KEYS,
       inputSchema: z.object({
         keys: z.string().describe('要发送的按键序列；退格=\\b、Ctrl+X=\\u0018、Esc=\\e 或 \\u001b、↑=\\u001b[A，其余控制字符同理用 \\uXXXX 或 \\xNN'),
         wait_ms: z.number().int().min(0).max(3000).optional().describe('发送后等待毫秒让画面更新，默认 300'),

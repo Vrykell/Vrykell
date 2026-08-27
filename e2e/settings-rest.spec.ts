@@ -55,6 +55,16 @@ test.describe('打开方式设置页', () => {
     const saved = await page.evaluate(() => localStorage.getItem('vrykell-agent-settings') ?? '');
     expect(saved).toContain('"zsh":"classic"');
   });
+
+  test('SSH 打开方式：默认经典，可切换块模式并持久化', async ({ page }) => {
+    await gotoSetting(page, '打开方式');
+    const sshRow = rowOf(page, 'SSH');
+    // 默认经典
+    await expect(sshRow.getByRole('button', { name: '经典模式' })).toBeVisible();
+    await sshRow.getByRole('button', { name: '块模式' }).click();
+    const saved = await page.evaluate(() => localStorage.getItem('vrykell-agent-settings') ?? '');
+    expect(saved).toContain('"sshOpenMode":"block"');
+  });
 });
 
 test.describe('快捷键说明页', () => {

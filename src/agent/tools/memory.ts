@@ -4,6 +4,7 @@
  *   append=追加一条流水；search=按关键词搜索。
  */
 import { tool } from 'ai';
+import { DESC_MEMORY } from '../toolTexts';
 import { z } from 'zod';
 import { getMemory, setMemory, getMemoryJournal, appendMemoryJournal } from '../platform';
 import { gate, type ToolContext } from '../permissions';
@@ -11,10 +12,7 @@ import { gate, type ToolContext } from '../permissions';
 export function buildMemoryTool(ctx: ToolContext) {
   return {
     memory: tool({
-      description:
-        '长期记忆工具。action 说明：read=读取全部记忆；' +
-        'update=重写持久知识 FACT（用于整理记忆：把流水压缩成结构化要点后整体重写）；' +
-        'append=追加一条流水（临时进展/结论）；search=按关键词在记忆中搜索。',
+      description: DESC_MEMORY,
       inputSchema: z.object({
         action: z.enum(['read', 'update', 'append', 'search']),
         content: z.string().optional().describe('update 时的完整 FACT 内容'),

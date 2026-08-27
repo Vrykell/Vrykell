@@ -6,6 +6,7 @@
 //! - `OSC 133 ; E ; <base64>` 命令文本（preexec，自定义扩展，供历史/块头使用）
 //! - `OSC 133 ; G ; <base64>` git 分支（precmd，自定义扩展）
 
+use base64::Engine;
 use std::fs;
 use std::path::PathBuf;
 
@@ -130,9 +131,70 @@ pub fn integration_dir() -> Result<PathBuf, String> {
     Ok(dir)
 }
 
+/// SSH 远端 shell integration 注入命令（安全性最高版本）。
+///
+/// 作为 `ssh -t host '<此命令>'` 的远程命令执行。安全设计：
+///   1. 脚本内容是编译进二进制的静态常量（ZSH_RC/BASH_RC），base64 编码传递，
+///      不拼接任何远端数据 → 远端无法通过环境/变量影响注入内容；
+///   2. 传输防篡改由 SSH 加密 + 主机密钥校验（OpenSSH TOFU 确认）保证；
+///   3. 远端解码用 `umask 077` + `mktemp` 随机临时文件（防符号链接/目录穿越），
+///      仅当前用户可读写；解码失败静默回退，不污染终端；
+///   4. 按远端 shell 类型（zsh/bash）分支注入，其余环境 `exec "$SHELL" -i`
+///      走经典模式 —— 注入失败也保证交互 shell 可用，不破坏连接。
+pub fn ssh_remote_command() -> String {
+    let zsh_b64 = base64::engine::general_purpose::STANDARD.encode(ZSH_RC);
+    let bash_b64 = base64::engine::general_purpose::STANDARD.encode(BASH_RC);
+    // base64 字符集为 [A-Za-z0-9+/=]，不含单引号/美元符，外层单引号包裹安全。
+    format!(
+        r#"b64d() {{ printf %s "$1" | base64 -d 2>/dev/null || printf %s "$1" | base64 -D 2>/dev/null; }}
+case ${{SHELL##*/}} in
+zsh) d=$(umask 077 && mktemp -d 2>/dev/null) && b64d '{zsh_b64}' > "$d/.zshrc" && ZDOTDIR=$d exec zsh -i 2>/dev/null;;
+bash) f=$(umask 077 && mktemp 2>/dev/null) && b64d '{bash_b64}' > "$f" && exec bash --rcfile "$f" -i 2>/dev/null;;
+esac
+exec "${{SHELL:-sh}}" -i"#
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ssh_remote_command_contains_safe_wrapper_and_decodable_scripts() {
+        let cmd = ssh_remote_command();
+        // 外层包装：按 shell 分支 + 兜底 exec（经典回退）
+        assert!(cmd.contains("SHELL##*/"));
+        assert!(cmd.contains("zsh)"));
+        assert!(cmd.contains("bash)"));
+        assert!(cmd.contains("exec \"${SHELL:-sh}\" -i"));
+        // 安全细节：umask 077 + mktemp + 双 base64 实现 + 静默失败
+        assert!(cmd.contains("umask 077"));
+        assert!(cmd.contains("mktemp"));
+        assert!(cmd.contains("base64 -d"));
+        assert!(cmd.contains("base64 -D"));
+        assert!(cmd.contains("2>/dev/null"));
+        // 无单引号冲突面：外层用单引号包裹 base64，内容不得含单引号
+        for (label, b64) in [("zsh", extract_b64(&cmd, "zsh")), ("bash", extract_b64(&cmd, "bash"))] {
+            assert!(!b64.contains('\''), "{label} base64 不应含单引号");
+            // 解码回原脚本：与本地注入脚本同源（含 OSC 133 标记）
+            use base64::Engine;
+            let script = String::from_utf8(
+                base64::engine::general_purpose::STANDARD.decode(&b64).unwrap(),
+            )
+            .unwrap();
+            assert!(script.contains("133;A"));
+            assert!(script.contains("133;C"));
+        }
+    }
+
+    /// 从远程命令中提取对应 shell 分支的 base64（测试辅助）。
+    fn extract_b64(cmd: &str, shell: &str) -> String {
+        let marker = format!("{shell})");
+        let start = cmd.find(&marker).expect("分支存在");
+        let q1 = cmd[start..].find('\'').expect("分支含 b64") + start + 1;
+        let q2 = cmd[q1..].find('\'').expect("b64 闭合") + q1;
+        cmd[q1..q2].to_string()
+    }
 
     #[test]
     fn writes_integration_scripts() {

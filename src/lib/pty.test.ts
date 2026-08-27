@@ -15,14 +15,14 @@ describe('pty IPC wrapper', () => {
   it('pty_spawn 传 camelCase 参数并返回 id', async () => {
     invokeMock.mockResolvedValue('sess-1');
     const id = await ptySpawn(80, 24, '/tmp');
-    expect(invokeMock).toHaveBeenCalledWith('pty_spawn', { cols: 80, rows: 24, cwd: '/tmp', shell: null, ssh: null });
+    expect(invokeMock).toHaveBeenCalledWith('pty_spawn', { cols: 80, rows: 24, cwd: '/tmp', shell: null, ssh: null, openMode: null });
     expect(id).toBe('sess-1');
   });
 
   it('pty_spawn 缺省 cwd 传 null', async () => {
     invokeMock.mockResolvedValue('sess-2');
     await ptySpawn(120, 40);
-    expect(invokeMock).toHaveBeenCalledWith('pty_spawn', { cols: 120, rows: 40, cwd: null, shell: null, ssh: null });
+    expect(invokeMock).toHaveBeenCalledWith('pty_spawn', { cols: 120, rows: 40, cwd: null, shell: null, ssh: null, openMode: null });
   });
 
   it('pty_spawn 透传 shell 与 ssh 目标', async () => {
@@ -37,6 +37,7 @@ describe('pty IPC wrapper', () => {
       cwd: null,
       shell: 'zsh',
       ssh: { host: 'prod.example.com', user: 'root', port: 22 },
+      openMode: null,
     });
   });
 

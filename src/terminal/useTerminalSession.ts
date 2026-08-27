@@ -248,7 +248,7 @@ export function useTerminalSession(
     // 类型/cwd 已在 controller 创建前取好（spec）
     const tabCwd = spec?.cwd;
     const spawnOpts = spec?.kind === 'ssh'
-      ? { ssh: { host: spec.ssh?.host ?? '', user: spec.ssh?.user, port: spec.ssh?.port } }
+      ? { ssh: { host: spec.ssh?.host ?? '', user: spec.ssh?.user, port: spec.ssh?.port }, openMode }
       : spec?.kind === 'local' && spec.shellType
         ? { shell: spec.shellType }
         : undefined;

@@ -8,6 +8,7 @@
  */
 
 import { tool } from 'ai';
+import { DESC_USE_SKILL, DESC_INSTALL_SKILL } from '../toolTexts';
 import { z } from 'zod';
 import { getSkill, listSkills, installSkillMd } from '../skills';
 import { gate, type ToolContext } from '../permissions';
@@ -15,9 +16,7 @@ import { gate, type ToolContext } from '../permissions';
 export function buildSkillTool(ctx: ToolContext) {
   return {
     use_skill: tool({
-      description:
-        '加载一个可用技能的完整指令。先看系统提示词里的「可用技能」清单，' +
-        '当任务匹配某个技能时按名加载，返回 SKILL.md 正文、技能目录与其中的脚本/参考文件。',
+      description: DESC_USE_SKILL,
       inputSchema: z.object({
         name: z.string().describe('技能名（与系统提示词清单中的名字一致）'),
       }),
@@ -52,10 +51,7 @@ export function buildSkillTool(ctx: ToolContext) {
 export function buildInstallSkillTool(ctx: ToolContext) {
   return {
     install_skill: tool({
-      description:
-        '安装或更新一个技能。当用户要求「添加/做一个…技能」或描述某类可复用操作时，' +
-        '把整理好的技能写入：name（唯一名）、description（一句话说明何时用）、' +
-        'prompt（完整操作步骤正文）。同名技能会覆盖更新。',
+      description: DESC_INSTALL_SKILL,
       inputSchema: z.object({
         name: z.string().describe('技能名，唯一'),
         description: z.string().describe('一句话描述何时该用这个技能'),
