@@ -57,6 +57,9 @@ interface Props {
   runningCommand?: string;
   onEndPress?: () => void;
   forceHidden?: boolean;
+  /** 左右缩进（与命令块一致：内边 4 / 外缘 8） */
+  insetLeft?: number;
+  insetRight?: number;
 }
 
 export default function InputEditor({
@@ -66,6 +69,8 @@ export default function InputEditor({
   runningCommand,
   onEndPress,
   forceHidden,
+  insetLeft = 8,
+  insetRight = 8,
 }: Props) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const chatSend = useChatStore((s) => s.send);
@@ -443,7 +448,7 @@ export default function InputEditor({
   // ── 正常输入栏（卡片式：四周留缝 + 圆角卡片；prompt 元素下沉为底部状态栏） ──
 
   return (
-    <div style={{ padding: '0 10px 10px' }}>
+    <div style={{ margin: '0.45em 0', padding: `0 ${insetRight}px 0 ${insetLeft}px` }}>
       <div
         style={{
           background: 'var(--block)',
