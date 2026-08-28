@@ -187,7 +187,7 @@ export default function TopDock() {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', height: BAR_H, flexShrink: 0,
-      background: 'var(--surface)', borderBottom: '1px solid var(--border)',
+      background: 'var(--surface)', borderBottom: '1px solid var(--block-divider)',
       paddingRight: 6, userSelect: 'none',
       position: 'relative',
     }}>

@@ -99,12 +99,14 @@ interface DockState {
   togglePanel: (side: DockSide, id: string) => void;
   /** 确保面板打开（已打开则无操作），自动判定所在侧 */
   openPanel: (id: string) => void;
-  /** 调整面板宽度（按增量：正值 = 面板变宽，负值 = 变窄） */
+  /** 拖动中调宽：拖到最小宽度下限 → 立即折叠（面板收起，可反向拖回恢复） */
   setPanelWidth: (id: string, delta: number) => void;
+  /** 松手兜底：若仍处于折叠宽度则确认折叠（拖动中已折叠时幂等） */
+  commitPanelWidth: (id: string) => void;
 }
 
 /** 每个侧栏面板自身的最小宽度（px）。 */
-const MIN_PANEL_WIDTH = 160;
+export const MIN_PANEL_WIDTH = 160;
 
 /** 终端区域当前需要保留的最小宽度（按活跃窗口布局动态计算：单终端窄、多终端并排宽）。 */
 function currentTerminalMinWidth(): number {
@@ -212,8 +214,20 @@ export const useDockStore = create<DockState>((set) => ({
       // 用「当前 store 值 + 增量」累加（而非外部传入绝对宽度），消除快速拖动时
       // 渲染闭包陈旧导致的增量丢失（面板不跟手、终端 flex 反而在变）。
       const cur = s.panelWidths[id] ?? PANEL_DEFS[id]?.width ?? 200;
-      // 侧栏最大宽度 = 窗口宽 − 其它「所有」面板（左右两侧）已占用宽 − 终端最小宽。
-      // 之前只减对侧面板，同侧多面板时会把最外侧面板挤出/挤没。
+      const next = Math.round(cur + delta);
+      // 拖到最小宽度下限 → 立即折叠（面板从所在侧移除、收起）；
+      // 松手前反向拖回由 SidePanel 恢复（openPanel + 继续调宽）。
+      if (next <= MIN_PANEL_WIDTH) {
+        const leftPanels = s.leftPanels.includes(id) ? s.leftPanels.filter((p) => p !== id) : s.leftPanels;
+        const rightPanels = s.rightPanels.includes(id) ? s.rightPanels.filter((p) => p !== id) : s.rightPanels;
+        if (leftPanels === s.leftPanels && rightPanels === s.rightPanels) return {};
+        const panelWidths = { ...s.panelWidths, [id]: MIN_PANEL_WIDTH };
+        const patch = { leftPanels, rightPanels, panelWidths };
+        const full: PersistedLayout = { ...s, ...patch };
+        saveLayout(full);
+        return patch as DockState;
+      }
+      // 未到下限：正常调宽（上限受窗口与终端最小宽约束）
       const allPanels = [...s.leftPanels, ...s.rightPanels];
       let otherWidth = 0;
       for (const pid of allPanels) {
@@ -222,12 +236,27 @@ export const useDockStore = create<DockState>((set) => ({
       }
       const available = window.innerWidth - otherWidth;
       const maxW = Math.max(MIN_PANEL_WIDTH, Math.round(available - currentTerminalMinWidth()));
-      const next = Math.max(MIN_PANEL_WIDTH, Math.min(maxW, Math.round(cur + delta)));
-      if (next === cur) return {};
-      const panelWidths = { ...s.panelWidths, [id]: next };
+      const clamped = Math.max(MIN_PANEL_WIDTH, Math.min(maxW, next));
+      if (clamped === cur) return {};
+      const panelWidths = { ...s.panelWidths, [id]: clamped };
       const full = { ...s, panelWidths };
       saveLayout(full);
       return { panelWidths };
+    });
+  },
+
+  commitPanelWidth: (id) => {
+    set((s) => {
+      const cur = s.panelWidths[id] ?? PANEL_DEFS[id]?.width ?? 200;
+      // 松手兜底：宽度 ≤ 最小宽度 → 折叠（拖动中已折叠时幂等）
+      if (cur > MIN_PANEL_WIDTH) return {};
+      const leftPanels = s.leftPanels.includes(id) ? s.leftPanels.filter((p) => p !== id) : s.leftPanels;
+      const rightPanels = s.rightPanels.includes(id) ? s.rightPanels.filter((p) => p !== id) : s.rightPanels;
+      if (leftPanels === s.leftPanels && rightPanels === s.rightPanels) return {};
+      const patch = { leftPanels, rightPanels };
+      const full: PersistedLayout = { ...s, ...patch };
+      saveLayout(full);
+      return patch as DockState;
     });
   },
 }));

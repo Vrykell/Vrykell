@@ -1,5 +1,5 @@
 import { useCallback, type FC } from 'react';
-import { useDockStore, type DockSide, PANEL_DEFS } from '../stores/dock';
+import { useDockStore, PANEL_DEFS, MIN_PANEL_WIDTH, type DockSide } from '../stores/dock';
 import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
 import ResizeHandle from './ResizeHandle';
 import PanelTabs from './PanelTabs';
@@ -42,6 +42,7 @@ export default function SidePanel({ side }: SidePanelProps) {
 
 function SinglePanel({ side, panelId }: { side: DockSide; panelId: string }) {
   const setPanelWidth = useDockStore((s) => s.setPanelWidth);
+  const commitPanelWidth = useDockStore((s) => s.commitPanelWidth);
   const panelWidths = useDockStore((s) => s.panelWidths);
   const isLeft = side === 'left';
 
@@ -49,10 +50,30 @@ function SinglePanel({ side, panelId }: { side: DockSide; panelId: string }) {
   const PanelContent = def ? PANEL_COMPONENTS[panelId] : null;
   const width = panelWidths[panelId] || def?.width || 200;
 
+  // 滞回余量：拖到 ≤160 折叠；反向拖回须超过 160+余量（如 184）才恢复，
+  // 避免回撤一两像素就弹出面板造成抖动。
+  const COLLAPSE_HYSTERESIS = 24;
+
   const handleDelta = useCallback((d: number) => {
-    // 传增量给 store，由 store 用当前值累加（避免渲染闭包陈旧丢增量）
+    // 折叠后反向拖回：先调宽，只有宽度**超过下限 + 滞回余量**才取消折叠（恢复面板）；
+    // 未超过前保持折叠态（避免微动即弹出）。
+    const st = useDockStore.getState();
+    const panels = isLeft ? st.leftPanels : st.rightPanels;
+    if (!panels.includes(panelId)) {
+      setPanelWidth(panelId, isLeft ? d : -d);
+      const cur = useDockStore.getState().panelWidths[panelId] ?? def?.width ?? 200;
+      if (cur > MIN_PANEL_WIDTH + COLLAPSE_HYSTERESIS) {
+        useDockStore.getState().openPanel(panelId);
+      }
+      return;
+    }
     setPanelWidth(panelId, isLeft ? d : -d);
-  }, [panelId, isLeft, setPanelWidth]);
+  }, [panelId, isLeft, setPanelWidth, def?.width]);
+
+  const handleCommit = useCallback(() => {
+    // 松手才判定折叠：拖动过程中不折叠，可来回拖
+    commitPanelWidth(panelId);
+  }, [panelId, commitPanelWidth]);
 
   if (!def || !PanelContent) return null;
 
@@ -62,8 +83,8 @@ function SinglePanel({ side, panelId }: { side: DockSide; panelId: string }) {
       flexShrink: 0,
       minHeight: 0,
       ...(isLeft
-        ? { borderRight: '1px solid var(--border)' }
-        : { borderLeft: '1px solid var(--border)' }),
+        ? { borderRight: '1px solid var(--block-divider)' }
+        : { borderLeft: '1px solid var(--block-divider)' }),
     }}>
       <div style={{
         width,
@@ -78,8 +99,8 @@ function SinglePanel({ side, panelId }: { side: DockSide; panelId: string }) {
         </div>
       </div>
 
-      {/* 拖拽手柄 — 绝对定位覆盖在内边缘，无可见缝隙 */}
-      <ResizeHandle axis="x" edge={isLeft ? 'right' : 'left'} onDelta={handleDelta} />
+      {/* 拖拽手柄 — 绝对定位覆盖在内边缘，无可见缝隙；松手时 commit 折叠判定 */}
+      <ResizeHandle axis="x" edge={isLeft ? 'right' : 'left'} onDelta={handleDelta} onUp={handleCommit} testId={`resize-handle-${panelId}`} />
     </div>
   );
 }

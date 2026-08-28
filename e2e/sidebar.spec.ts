@@ -35,6 +35,49 @@ test.describe('文件面板', () => {
     await expect(page.getByText('Documents')).toBeVisible({ timeout: 3000 });
   });
 
+  test('拖拽到最小宽度立即折叠；松手前可反悔拖回', async ({ page }) => {
+    await expect(page.getByText('Documents')).toBeVisible();
+    // 向右拖手柄 = 面板变窄（files 在右栏，手柄在左缘；默认宽 240 → 下限 160 需拖 80px）
+    const handle = page.locator('[data-testid="resize-handle-files"]');
+    await expect(handle).toBeVisible();
+    const box = await handle.boundingBox();
+    const cy = (box?.y ?? 0) + (box?.height ?? 0) / 2;
+    const cx = (box?.x ?? 0) + (box?.width ?? 0) / 2;
+    await page.mouse.move(cx, cy);
+    await page.mouse.down();
+    // 第 5 步（80px）到下限 → 立即折叠，之后保持收起
+    for (let i = 0; i < 8; i++) {
+      await page.mouse.move(cx + (i + 1) * 16, cy);
+      await page.waitForTimeout(12);
+      if (i >= 5) {
+        await expect(page.getByText('Documents')).toHaveCount(0);
+      }
+    }
+    // 松手前反悔：向左拖回 → 面板恢复
+    for (let i = 0; i < 8; i++) {
+      await page.mouse.move(cx + (8 - i) * 16, cy);
+      await page.waitForTimeout(12);
+    }
+    await expect(page.getByText('Documents')).toBeVisible({ timeout: 3000 });
+    // 松手定局：保持展开
+    await page.mouse.up();
+    await expect(page.getByText('Documents')).toBeVisible();
+    // 再拖到折叠并直接松手 → 折叠保持；点 Dock 按钮恢复
+    // （宽度已变，手柄位置随之移动，需重新定位）
+    const box2 = await handle.boundingBox();
+    const cx2 = (box2?.x ?? 0) + (box2?.width ?? 0) / 2;
+    await page.mouse.move(cx2, cy);
+    await page.mouse.down();
+    for (let i = 0; i < 8; i++) {
+      await page.mouse.move(cx2 + (i + 1) * 16, cy);
+      await page.waitForTimeout(12);
+    }
+    await page.mouse.up();
+    await expect(page.getByText('Documents')).toHaveCount(0);
+    await page.locator('[data-dock-btn="files"]').click();
+    await expect(page.getByText('Documents')).toBeVisible({ timeout: 3000 });
+  });
+
   test('删除文件需二次确认，确认后调用后端删除（回收站）', async ({ page }) => {
     await page.getByText('notes.txt').click({ button: 'right' });
     await page.getByRole('button', { name: '删除' }).click();
