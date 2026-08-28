@@ -27,12 +27,40 @@ describe('dock store', () => {
     expect(st.leftZone).not.toContain('chat');
   });
 
-  it('setPanelWidth 增量调宽并保底', () => {
-    useDockStore.setState({ panelWidths: { chat: 300 } });
+  it('setPanelWidth 拖到下限立即折叠；宽度保持 MIN', () => {
+    useDockStore.setState({ leftZone: ['chat'], leftPanels: ['chat'], panelWidths: { chat: 300 } });
     useDockStore.getState().setPanelWidth('chat', 50);
     expect(useDockStore.getState().panelWidths.chat).toBe(350);
+    // 拖到最小宽度下限 → 立即折叠（面板移除，宽度保持 MIN）
     useDockStore.getState().setPanelWidth('chat', -1000);
-    expect(useDockStore.getState().panelWidths.chat).toBeGreaterThanOrEqual(160);
+    const s = useDockStore.getState();
+    expect(s.leftPanels.includes('chat')).toBe(false);
+    expect(s.panelWidths.chat).toBe(160);
+  });
+
+  it('折叠后拖回（反向调宽 + 恢复面板）不再折叠', () => {
+    useDockStore.setState({ leftZone: ['chat'], leftPanels: ['chat'], panelWidths: { chat: 300 } });
+    useDockStore.getState().setPanelWidth('chat', -1000); // 折叠，宽度 160
+    expect(useDockStore.getState().leftPanels).toEqual([]);
+    // 拖回：SidePanel 层先 openPanel 恢复，再 setPanelWidth 调宽
+    useDockStore.getState().openPanel('chat');
+    useDockStore.getState().setPanelWidth('chat', 100);   // 160 → 260
+    useDockStore.getState().commitPanelWidth('chat');     // 260 > MIN → 不折叠
+    const s = useDockStore.getState();
+    expect(s.leftPanels.includes('chat')).toBe(true);
+    expect(s.panelWidths.chat).toBe(260);
+  });
+
+  it('折叠后 commit 幂等；openPanel 恢复可用宽度', () => {
+    useDockStore.setState({ leftZone: ['chat'], leftPanels: ['chat'], panelWidths: { chat: 280 } });
+    useDockStore.getState().setPanelWidth('chat', -200); // 80 ≤ MIN → 立即折叠
+    expect(useDockStore.getState().leftPanels).toEqual([]);
+    useDockStore.getState().commitPanelWidth('chat');    // 幂等
+    expect(useDockStore.getState().leftPanels).toEqual([]);
+    useDockStore.getState().openPanel('chat');
+    const s = useDockStore.getState();
+    expect(s.leftPanels).toEqual(['chat']);
+    expect(s.panelWidths.chat).toBe(160);
   });
 
   it('moveButton：同侧移动 atIndex 修正（srcIdx < idx → idx-1）', () => {
