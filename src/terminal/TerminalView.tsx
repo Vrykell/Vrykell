@@ -8,7 +8,7 @@
  */
 
 import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
-import { useWorkspaceStore, nextTerminalId } from '../stores/workspace';
+import { useWorkspaceStore, nextTerminalId, type Tab } from '../stores/workspace';
 import { defaultOpenModeForShell } from '../agent/agentSettings';
 import { useTerminalStore } from '../stores/terminal';
 import { useUiStore } from '../stores/ui';
@@ -37,35 +37,97 @@ import ContextMenu from '../components/ContextMenu';
 export default function TerminalView() {
   const tabs = useWorkspaceStore((s) => s.tabs);
   const activeId = useWorkspaceStore((s) => s.activeId);
-  const setWindowLayout = useWorkspaceStore((s) => s.setWindowLayout);
   const setSession = useTerminalStore((s) => s.setSession);
   const setFocusedPane = useTerminalStore((s) => s.setFocusedPane);
   const focusedPaneId = useTerminalStore((s) => s.focusedPaneId);
   const sessions = useTerminalStore((s) => s.sessions);
   const altScreenActive = useTerminalStore((s) => s.altScreenActive);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
-  const splitPlacement = useUiStore((s) => s.splitPlacement);
-  const cancelSplit = useUiStore((s) => s.cancelSplit);
-  const movePlacement = useUiStore((s) => s.movePlacement);
-  const cancelMove = useUiStore((s) => s.cancelMove);
-  const draggingId = useDockDragStore((s) => s.draggingTerminalId);
 
   const activeTab = tabs.find((t) => t.id === activeId);
-  const isHistoryTab = activeTab?.kind === 'history';
-  const isSettingsTab = activeTab?.kind === 'settings';
   const isSession = activeTab?.kind === 'session';
 
-  const layout = isSession ? activeTab!.layout : null;
   const focusedTermId = isSession
     ? (focusedPaneId && sessions[focusedPaneId] && layoutLeaves(activeTab!.layout).some((t) => t.id === focusedPaneId)
         ? focusedPaneId
         : firstLeaf(activeTab!.layout).id)
     : activeId;
 
+  return (
+    <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      {/* 所有 session tab 保持挂载，非活跃 tab 隐藏而非卸载 ——
+          卸载会触发 useTerminalSession cleanup 里的 ptyClose，杀掉运行中的命令。
+          切走再切回时 PTY/块列表/离屏终端全部存活。 */}
+      {tabs.map((tab) => {
+        if (tab.kind === 'session') {
+          return (
+            <SessionTabView
+              key={tab.id}
+              tab={tab}
+              active={tab.id === activeId}
+              setSession={setSession}
+              setFocusedPane={setFocusedPane}
+              onPaneContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY }); }}
+            />
+          );
+        }
+        if (tab.id !== activeId) return null; // history/settings 无 PTY，无需保活
+        return tab.kind === 'history' ? <SessionHistoryView key={tab.id} /> : <SettingsView key={tab.id} />;
+      })}
+
+      {/* 手动全屏宿主（块终端「进入全屏交互」）：顶部为透明工具条让位，其余贴边 */}
+      {altScreenActive && (
+        <div data-testid="tui-fullscreen" style={{ position: 'absolute', inset: 0, zIndex: 100, background: 'var(--canvas)', paddingTop: 28 }} />
+      )}
+
+      {/* 终端区域右键菜单 */}
+      {ctxMenu && (
+        <ContextMenu
+          anchor={ctxMenu}
+          onClose={() => setCtxMenu(null)}
+          items={[
+            { label: '分裂终端（选位置）', onClick: () => useUiStore.getState().beginSplit(null) },
+            { label: '选择类型分裂', onClick: () => useUiStore.getState().openSplitPicker() },
+            { label: '更换位置', onClick: () => useUiStore.getState().beginMove(focusedTermId) },
+            { label: '关闭终端', danger: true, onClick: () => useWorkspaceStore.getState().closeFocusedTerminal() },
+          ]}
+        />
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// 单个 session tab 表面（含布局树 + 分裂/移动覆盖层）
+// ═══════════════════════════════════════════════════════════
+
+function SessionTabView(props: {
+  tab: Extract<Tab, { kind: 'session' }>;
+  active: boolean;
+  setSession: (id: string, sid: string) => void;
+  setFocusedPane: (id: string) => void;
+  onPaneContextMenu: (e: React.MouseEvent) => void;
+}) {
+  const { tab, active, setSession, setFocusedPane, onPaneContextMenu } = props;
+  const windowId = tab.id;
+  const layout = tab.layout;
+  const setWindowLayout = useWorkspaceStore((s) => s.setWindowLayout);
+  const focusedPaneId = useTerminalStore((s) => s.focusedPaneId);
+  const sessions = useTerminalStore((s) => s.sessions);
+  const splitPlacement = useUiStore((s) => s.splitPlacement);
+  const cancelSplit = useUiStore((s) => s.cancelSplit);
+  const movePlacement = useUiStore((s) => s.movePlacement);
+  const cancelMove = useUiStore((s) => s.cancelMove);
+  const draggingId = useDockDragStore((s) => s.draggingTerminalId);
+
+  const focusedTermId = focusedPaneId && sessions[focusedPaneId] && layoutLeaves(layout).some((t) => t.id === focusedPaneId)
+    ? focusedPaneId
+    : firstLeaf(layout).id;
+
   const scene = useTerminalStore((s) => s.scenes[focusedTermId] ?? 'classic');
   const focusBlocks = useBlockStore(selectBlocks(focusedTermId));
   const hasExecutingBlock = focusBlocks.some((b) => b.status === 'executing');
-  useTerminalFocus(scene === 'blockList' && hasExecutingBlock, focusedTermId);
+  useTerminalFocus(active && scene === 'blockList' && hasExecutingBlock, focusedTermId);
 
   // 分裂落点：smart 规则（dropTargets 决定 1→4 半屏 / 2→4 四分之一 / 3→2 半屏 / 4→无）
   const placementTargets = useMemo(
@@ -86,16 +148,16 @@ export default function TerminalView() {
     // 继承类型：优先继承「被分裂的那个终端」（zone.leafId），而非聚焦终端
     const base = splitPlacement.spec ?? findLeaf(layout, zone.leafId);
     if (!base) return;
-    const newId = nextTerminalId(activeId, layout);
+    const newId = nextTerminalId(windowId, layout);
     // 打开模式：继承源模式，未设置则回退：SSH 经典、local 按 shell 类型
     const openMode = base.openMode ?? (base.kind === 'ssh'
       ? 'classic'
       : defaultOpenModeForShell(base.shellType));
     const next = splitLeaf(layout, zone.leafId, zone.dir, zone.position, { ...base, id: newId, openMode });
-    setWindowLayout(activeId, next);
+    setWindowLayout(windowId, next);
     setFocusedPane(newId);
     cancelSplit();
-  }, [layout, splitPlacement.spec, activeId, setWindowLayout, setFocusedPane, cancelSplit]);
+  }, [layout, splitPlacement.spec, windowId, setWindowLayout, setFocusedPane, cancelSplit]);
 
   const commitMove = useCallback((dragId: string, zone: DropTarget) => {
     if (!layout) return;
@@ -104,74 +166,52 @@ export default function TerminalView() {
     const removed = removeLeaf(layout, dragId);
     if (!spec || !removed) return;
     const next = splitLeaf(removed, zone.leafId, zone.dir, zone.position, spec);
-    setWindowLayout(activeId, next);
+    setWindowLayout(windowId, next);
     setFocusedPane(dragId);
-  }, [layout, activeId, setWindowLayout, setFocusedPane]);
+  }, [layout, windowId, setWindowLayout, setFocusedPane]);
 
   return (
-    <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
-      {isHistoryTab ? (
-        <SessionHistoryView />
-      ) : isSettingsTab ? (
-        <SettingsView />
-      ) : isSession && layout ? (
-        <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', position: 'relative' }}>
-          <LayoutTree
-            node={layout}
-            windowId={activeId}
-            focusedTermId={focusedTermId}
-            setSession={setSession}
-            setFocusedPane={setFocusedPane}
-            setRatioNode={(aId, bId, r) => setWindowLayout(activeId, setRatio(layout, aId, bId, r))}
-            onPaneContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY }); }}
-          />
-
-          {/* 分裂落点选择覆盖层（相对布局区域定位，忠实反映未来区域） */}
-          {splitPlacement.open && (
-            <PlacementOverlay targets={placementTargets} onPick={commitPlacement} onCancel={cancelSplit} />
-          )}
-
-          {/* 更换位置落点选择覆盖层（菜单触发，等同拖动重排） */}
-          {movePlacement.open && (
-            <PlacementOverlay
-              targets={movePlacementTargets}
-              emptyMessage="只有一个终端，无法更换位置"
-              onPick={(zone) => {
-                const id = movePlacement.terminalId;
-                if (id) commitMove(id, zone);
-                cancelMove();
-              }}
-              onCancel={cancelMove}
-            />
-          )}
-
-          {/* 拖动终端调整位置的落点覆盖层 */}
-          {draggingId && (
-            <MoveDragLayer layout={layout} draggingId={draggingId} onCommit={commitMove} />
-          )}
-        </div>
-      ) : (
-        <LoadingState />
-      )}
-
-      {/* 手动全屏宿主（块终端「进入全屏交互」）：顶部为透明工具条让位，其余贴边 */}
-      {altScreenActive && (
-        <div data-testid="tui-fullscreen" style={{ position: 'absolute', inset: 0, zIndex: 100, background: 'var(--canvas)', paddingTop: 28 }} />
-      )}
-
-      {/* 终端区域右键菜单 */}
-      {ctxMenu && (
-        <ContextMenu
-          anchor={ctxMenu}
-          onClose={() => setCtxMenu(null)}
-          items={[
-            { label: '分裂终端（选位置）', onClick: () => useUiStore.getState().beginSplit(null) },
-            { label: '选择类型分裂', onClick: () => useUiStore.getState().openSplitPicker() },
-            { label: '更换位置', onClick: () => useUiStore.getState().beginMove(focusedTermId) },
-            { label: '关闭终端', danger: true, onClick: () => useWorkspaceStore.getState().closeFocusedTerminal() },
-          ]}
+    <div style={{
+      position: 'absolute', inset: 0,
+      display: active ? 'flex' : 'none',
+      flexDirection: 'column',
+      background: 'var(--canvas)',
+    }}>
+      <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', position: 'relative' }}>
+        <LayoutTree
+          node={layout}
+          windowId={windowId}
+          focusedTermId={focusedTermId}
+          setSession={setSession}
+          setFocusedPane={setFocusedPane}
+          setRatioNode={(aId, bId, r) => setWindowLayout(windowId, setRatio(layout, aId, bId, r))}
+          onPaneContextMenu={onPaneContextMenu}
         />
-      )}
+
+        {/* 分裂落点选择覆盖层（相对布局区域定位，忠实反映未来区域） */}
+        {active && splitPlacement.open && (
+          <PlacementOverlay targets={placementTargets} onPick={commitPlacement} onCancel={cancelSplit} />
+        )}
+
+        {/* 更换位置落点选择覆盖层（菜单触发，等同拖动重排） */}
+        {active && movePlacement.open && (
+          <PlacementOverlay
+            targets={movePlacementTargets}
+            emptyMessage="只有一个终端，无法更换位置"
+            onPick={(zone) => {
+              const id = movePlacement.terminalId;
+              if (id) commitMove(id, zone);
+              cancelMove();
+            }}
+            onCancel={cancelMove}
+          />
+        )}
+
+        {/* 拖动终端调整位置的落点覆盖层 */}
+        {active && draggingId && (
+          <MoveDragLayer layout={layout} draggingId={draggingId} onCommit={commitMove} />
+        )}
+      </div>
     </div>
   );
 }
@@ -565,19 +605,8 @@ function TuiBanner({ tabId }: { tabId: string }) {
   );
 }
 
-// ── LoadingState ──
-
-function LoadingState() {
-  return (
-    <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--canvas)', color: 'var(--text-muted)', fontSize: 13, userSelect: 'none', gap: 10 }}>
-      <div style={{ width: 24, height: 24, borderRadius: '50%', border: '2px solid var(--border)', borderTopColor: 'var(--accent)', animation: 'spin 0.8s linear infinite' }} />
-      <div style={{ color: 'var(--text-secondary)' }}>正在启动 Shell…</div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
-  );
-}
-
-// ── PaneInputEditor（终端 pane 的独立输入栏） ──
+// ═══════════════════════════════════════════════════════════
+// PaneInputEditor（终端 pane 的独立输入栏） ═══════════════════════════════════════════════════════════
 
 function PaneInputEditor({ paneId, focused, insetLeft = 8, insetRight = 8 }: { paneId: string; focused: boolean; insetLeft?: number; insetRight?: number }) {
   const blocks = useBlockStore(selectBlocks(paneId));

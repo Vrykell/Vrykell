@@ -310,7 +310,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     useToastStore.getState().addToast(t('toast.tabRestored'), 'success');
   },
   activate: (id) => {
+    const prev = get().activeId;
     set({ activeId: id });
+    // 切 tab：重置手动全屏标志（全屏宿主/块终端全屏只属于当前活跃 tab，
+    // 保活后旧 tab 仍挂载，标志残留会让隐藏 tab 的 RunningTerm 误进全屏宿主）
+    if (id !== prev) useTerminalStore.getState().setAltScreenActive(false);
     // 聚焦回落到该窗口的第一个终端（切窗口后不残留上个窗口的终端聚焦）
     const tab = get().tabs.find((t) => t.id === id);
     useTerminalStore.getState().setFocusedPane(tab && isSessionTab(tab) ? firstLeaf(tab.layout).id : id);

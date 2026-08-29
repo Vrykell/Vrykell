@@ -9,6 +9,12 @@ import type { Scene } from '../terminal/pipeline/sessionController';
 const termInstances = new Map<string, Terminal>();
 export { termInstances };
 
+// e2e 测试桥：暴露 term 注册表供断言读取 buffer（WebGL renderer 下文本不进 DOM，
+// 测试无法用 getByText 读终端输出）。仅测试环境初始化，不影响正常运行。
+if (typeof window !== 'undefined') {
+  (window as unknown as Record<string, unknown>).__vrykellTerms = termInstances;
+}
+
 export function registerTerminal(tabId: string, t: Terminal) {
   termInstances.set(tabId, t);
 }

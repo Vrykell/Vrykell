@@ -23,7 +23,7 @@ import { ptyWrite } from '../lib/pty';
 import { killForeground } from '../lib/killForeground';
 import { useToastStore } from '../components/Toast';
 import { fmtDuration } from '../components/UiBtn';
-import { getExecutingTerm, syncTermWidth } from './useTerminalSession';
+import { getExecutingTerm, syncTermWidth, applyCompactCharSize } from './useTerminalSession';
 import BlockMenu from './BlockMenu';
 import BlockOutput from './BlockOutput';
 import type { TermBlock } from './pipeline/termBlock';
@@ -510,6 +510,12 @@ function RunningTerm({ tabId }: { tabId: string }) {
 
     host.appendChild(el);
     if (!term.element) term.open(el); // 重复挂载（StrictMode/切标签返回）只搬 el
+    applyCompactCharSize(term); // 行高压到 fontSize（与主终端一致，半块字符无缝）
+    // e2e 测试桥：块终端 buffer 也进注册表（WebGL 下文本不进 DOM，测试读 buffer 断言）
+    const w = window as unknown as { __vrykellTerms?: Map<string, unknown> };
+    if (w.__vrykellTerms && !w.__vrykellTerms.has(`block:${tabId}`)) {
+      w.__vrykellTerms.set(`block:${tabId}`, term);
+    }
 
     // 高度裁剪：term 行数恒 = 主 xterm/PTY 行数（TUI 几何一致），
     // 短输出裁掉尾部空白行 —— 内容高度 = 最后非空行（含光标行）× 行高。
@@ -519,7 +525,7 @@ function RunningTerm({ tabId }: { tabId: string }) {
       const dims = (term as unknown as {
         _core?: { _renderService?: { dimensions?: { css?: { cell?: { height?: number } } } } };
       })._core?._renderService?.dimensions;
-      return dims?.css?.cell?.height || 13 * 1.4;
+      return dims?.css?.cell?.height || 14;
     };
     const updateHeight = () => {
       const buf = term.buffer.active;

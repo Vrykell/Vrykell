@@ -5,6 +5,7 @@
  * 只有终端模拟器自身能正确处理全部 ANSI 转义。
  */
 import { Terminal } from '@xterm/xterm';
+import { WebglAddon } from '@xterm/addon-webgl';
 import type { IBufferCell } from '@xterm/xterm';
 import { indexToCss } from './blockTypes';
 
@@ -203,8 +204,8 @@ export const XTERM_FONT_FAMILY =
  * 创建时**不 open**（xterm v5 的 write 先于 open 是安全的：解析器与 buffer
  * 是 core 服务，open 只接管 DOM/渲染；xterm-headless 即此用法）。
  * RunningItem 挂载后把 el 移进卡片并 term.open(el)；生命周期归 controller
- * （块完成提取快照后 dispose）。lineHeight 1.4 与完成块 HTML 快照行高一致
- * （18.2px），完成切换无跳动。
+ * （块完成提取快照后 dispose）。lineHeight 1.0 与完成块 HTML 快照行高一致
+ * （14px），完成切换无跳动。
  */
 export function createBlockTerm(
   cols: number,
@@ -221,7 +222,7 @@ export function createBlockTerm(
     scrollback: 5000,
     fontFamily: XTERM_FONT_FAMILY,
     fontSize: 14,
-    lineHeight: 1.4,
+    lineHeight: 1.0,
     cursorBlink: true,
     theme: {
       background: cs.getPropertyValue('--xterm-bg').trim() || '#050505',
@@ -230,6 +231,13 @@ export function createBlockTerm(
       selectionBackground: cs.getPropertyValue('--xterm-selection').trim() || 'rgba(255,255,255,0.25)',
     },
   });
+  // 与主终端一致：WebGL renderer 让半块字符拼接无缝（TUI 图标无横裂缝）；
+  // 无 GPU 时回退 DOM renderer（xterm 内部行为）
+  try {
+    term.loadAddon(new WebglAddon());
+  } catch {
+    // 忽略：回退默认 renderer
+  }
   return {
     term,
     el,

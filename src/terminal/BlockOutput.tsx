@@ -57,7 +57,9 @@ export default function BlockOutput({ text, maxHeight, highlight, isHtml: isHtml
         // 与 xterm.js 实时渲染保持一致的字体参数
         fontFamily: 'Menlo, Monaco, "Cascadia Code", "JetBrains Mono", "Noto Sans CJK SC", "PingFang SC", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", monospace',
         fontSize: 14,
-        lineHeight: 1.4,
+        // 行高 1.0 与活终端一致（applyCompactCharSize 把 xterm 行高压到 fontSize）；
+        // 1.4 时行间留缝，TUI 半块字符（▀▄）拼图会出现分割线
+        lineHeight: 1.0,
         padding: '2px 8px 8px',
         // isHtml 快照已按网格 cols 用 <br> 预分行（每行 ≤ cols 字符）。
         // 卡片内容盒比 cols×ch 略窄（实测 153.6 vs 154），pre-wrap 会在网格行

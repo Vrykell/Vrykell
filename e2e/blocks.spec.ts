@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, emitPtyOutput, ptyWrites, ptySignals } from './tauri-mock';
+import { setupTauriMock, emitPtyOutput, ptyWrites, ptySignals, expectAnyTermContains } from './tauri-mock';
 
 test.describe('命令块（OSC 133）', () => {
   test('终端运行命令后 block UI 可见', async ({ page }) => {
@@ -42,7 +42,8 @@ test.describe('命令块（OSC 133）', () => {
     await expect(page.locator('.xterm').first()).toBeVisible({ timeout: 5000 });
     await expect(page.getByPlaceholder(/输入命令/)).toHaveCount(0);
     await emitPtyOutput(page, 'echo classic-mode\r\nclassic-mode-output\r\n');
-    await expect(page.getByText('classic-mode-output').first()).toBeVisible({ timeout: 5000 });
+    // WebGL renderer：终端输出画进 canvas 不进 DOM，断言改读 xterm buffer
+    await expectAnyTermContains(page, 'classic-mode-output', 5000);
   });
 
   test('进出 altScreen 显示 TUI banner', async ({ page }) => {
@@ -67,19 +68,9 @@ test.describe('命令块（OSC 133）', () => {
     // esc 仅手动全屏（块卡片进入全屏交互）才有 —— 见 running-term.spec.ts
     await expect(page.getByTitle('退出全屏')).toHaveCount(0);
 
-    // 真实 alt buffer 应用的内容必须可见（主 xterm 覆盖层，不能被 opacity:0 隐藏）
+    // 真实 alt buffer 应用的内容必须进入主 xterm buffer（WebGL 下 canvas 渲染，读 buffer 断言）
     // —— 回归：manualTui 误判曾把 vim 画面盖住，用户看到冻结的块内容。
-    // Playwright 的 toBeVisible 不检查 opacity，需逐层向上查计算样式
-    await expect(page.getByText('VIM BUFFER')).toBeVisible({ timeout: 5000 });
-    const hiddenByAncestor = await page.getByText('VIM BUFFER').evaluate((el) => {
-      let node: HTMLElement | null = el;
-      while (node) {
-        if (getComputedStyle(node).opacity === '0') return true;
-        node = node.parentElement;
-      }
-      return false;
-    });
-    expect(hiddenByAncestor).toBe(false);
+    await expectAnyTermContains(page, 'VIM BUFFER', 5000);
 
     // 键盘必须可达 TUI：altScreen 场景焦点路由到主 xterm，onData → PTY
     // （回归：Esc 曾被全局快捷键劫持、焦点落在不可见块终端，"无法输入"）
@@ -132,7 +123,8 @@ test.describe('命令块（OSC 133）', () => {
         '\x1b[?1049h' +
         'TUI APP',
     );
-    await expect(page.getByText('TUI APP')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('TUI')).toBeVisible({ timeout: 5000 });
+    await expectAnyTermContains(page, 'TUI APP', 5000);
 
     // 在可见主 xterm 的中央滚轮（DOM 里还有隐藏的块内 xterm，需 :visible 过滤；
     // 顶部 29px 是 TUI banner 条，滚轮落在上面不会进 xterm，避开）

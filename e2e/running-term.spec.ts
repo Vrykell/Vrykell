@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, emitPtyOutput } from './tauri-mock';
+import { setupTauriMock, emitPtyOutput, expectAnyTermContains } from './tauri-mock';
 
 /**
  * 运行中 block 的活终端：block 卡片直接挂载真实可见的 xterm 实例
@@ -24,9 +24,9 @@ test('运行中 block 挂载可见 xterm，输出实时渲染，完成后换成�
   const host = page.getByTestId('running-term');
   await expect(host.locator('.xterm')).toBeVisible({ timeout: 5000 });
 
-  // PTY 输出实时出现在块终端的行渲染里（无 250ms 快照延迟）
+  // PTY 输出实时出现在块终端的渲染里（WebGL 下读 buffer 断言，无 250ms 快照延迟）
   await emitPtyOutput(page, 'hello world\r\n');
-  await expect(host.locator('.xterm-rows')).toContainText('hello world', { timeout: 3000 });
+  await expectAnyTermContains(page, 'hello world', 3000);
 
   // 块完成（D）：活 xterm 消失，done 块显示静态 HTML 快照
   await emitPtyOutput(page, `\x1b]133;D;0\x07`);
@@ -59,23 +59,21 @@ test('手动全屏：块内活终端搬进全屏宿主，退出后搬回卡片',
   await startRunningBlock(page);
   await emitPtyOutput(page, 'tui-content-line\r\n');
   const cardHost = page.getByTestId('running-term');
-  await expect(cardHost.locator('.xterm-rows')).toContainText('tui-content-line', {
-    timeout: 3000,
-  });
+  await expectAnyTermContains(page, 'tui-content-line', 3000);
 
   // 进入全屏：el 搬进 tui-fullscreen，内容仍在（块路由下主 xterm 是空壳）
   await page.getByTitle('进入全屏交互').click();
   const fs = page.getByTestId('tui-fullscreen');
-  await expect(fs.locator('.xterm-rows')).toContainText('tui-content-line');
+  await expect(fs.locator('.xterm')).toBeVisible();
   await expect(cardHost.locator('.xterm')).toHaveCount(0);
 
   // 全屏中输出继续实时到达
   await emitPtyOutput(page, 'tui-second-line\r\n');
-  await expect(fs.locator('.xterm-rows')).toContainText('tui-second-line');
+  await expectAnyTermContains(page, 'tui-second-line');
 
   // esc 退出全屏 → el 搬回卡片
   await page.getByTitle('退出全屏').click();
-  await expect(cardHost.locator('.xterm-rows')).toContainText('tui-content-line');
+  await expect(cardHost.locator('.xterm')).toBeVisible();
   await expect(page.getByTestId('tui-fullscreen')).toHaveCount(0);
 });
 
@@ -93,7 +91,7 @@ test('卡片内滚轮冒泡到块列表滚动容器（不被块 xterm 吞掉）'
     page,
     Array.from({ length: 40 }, (_, i) => `line-${i}`).join('\r\n') + '\r\n',
   );
-  await expect(host.locator('.xterm-rows')).toContainText('line-39', { timeout: 3000 });
+  await expectAnyTermContains(page, 'line-39', 3000);
 
   const setTop = (top: number) =>
     page.evaluate((t) => {
