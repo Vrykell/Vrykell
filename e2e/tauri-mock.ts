@@ -916,3 +916,68 @@ export function themeConfig(page: Page): Promise<{ opacity: number; backgroundIm
 export function memoryFact(page: Page): Promise<string> {
   return page.evaluate(() => (window as unknown as { __MEMORY__: { fact: string } }).__MEMORY__.fact);
 }
+
+/**
+ * 读取指定 pane 主 xterm 的当前可见画面文本（WebGL renderer 下终端输出不进 DOM，
+ * 测试用 getByText 读不到，改走 __vrykellTerms 注册表读 buffer）。
+ * 返回 null 表示该 pane 无 xterm 实例。
+ */
+export async function readTermScreen(page: Page, paneId: string): Promise<string | null> {
+  return page.evaluate((pid) => {
+    const terms = (window as unknown as Record<string, Map<string, { buffer: { active: { viewportY: number; length: number; cursorY: number; getLine(y: number): { translateToString(t?: boolean): string } | undefined } } }>>).__vrykellTerms;
+    const term = terms?.get(pid);
+    if (!term) return null;
+    const buf = term.buffer.active;
+    const start = Math.max(0, buf.viewportY);
+    const end = Math.min(buf.length - 1, start + 24 - 1);
+    const lines: string[] = [];
+    for (let i = start; i <= end; i++) {
+      const line = buf.getLine(i);
+      lines.push(line ? line.translateToString(true) : '');
+    }
+    while (lines.length > 0 && lines[lines.length - 1]!.trim() === '') lines.pop();
+    return lines.join('\n');
+  }, paneId);
+}
+
+/** 轮询直到 pane 的 xterm buffer 包含指定文本（WebGL 下替代 toContainText）。 */
+export async function expectTermContains(page: Page, paneId: string, text: string, timeout = 5000): Promise<void> {
+  const { expect } = await import('@playwright/test');
+  await expect
+    .poll(() => readTermScreen(page, paneId), { timeout, message: `pane ${paneId} 应包含「${text}」` })
+    .toContain(text);
+}
+
+/** 读取所有已注册 xterm 的画面文本（用于测试不确定 paneId 的场景）。 */
+export async function readAllTermScreens(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const terms = (window as unknown as Record<string, Map<string, { buffer: { active: { viewportY: number; length: number; getLine(y: number): { translateToString(t?: boolean): string } | undefined } } }>>).__vrykellTerms;
+    if (!terms) return [];
+    const out: string[] = [];
+    terms.forEach((term) => {
+      if (!term) return;
+      const buf = term.buffer.active;
+      const start = Math.max(0, buf.viewportY);
+      const end = Math.min(buf.length - 1, start + 24 - 1);
+      const lines: string[] = [];
+      for (let i = start; i <= end; i++) {
+        const line = buf.getLine(i);
+        lines.push(line ? line.translateToString(true) : '');
+      }
+      while (lines.length > 0 && lines[lines.length - 1]!.trim() === '') lines.pop();
+      out.push(lines.join('\n'));
+    });
+    return out;
+  });
+}
+
+/** 轮询直到任一 pane 的 xterm buffer 包含指定文本。 */
+export async function expectAnyTermContains(page: Page, text: string, timeout = 5000): Promise<void> {
+  const { expect } = await import('@playwright/test');
+  await expect
+    .poll(() => readAllTermScreens(page).then((screens) => screens.some((s) => s.includes(text))), {
+      timeout,
+      message: `任一 pane 应包含「${text}」`,
+    })
+    .toBe(true);
+}

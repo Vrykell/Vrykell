@@ -41,9 +41,10 @@ test.describe('窗口分裂（二叉分裂树 + 落点选择）', () => {
   test('新建终端（新窗口）不自动加入当前窗口布局', async ({ page }) => {
     await page.keyboard.press('Meta+d');
     await clickZoneCenter(page, page.getByTestId('placement-zone-1'));
-    await expect(page.locator('[data-testid^="pane-"]')).toHaveCount(2);
+    await expect(page.locator('[data-testid^="pane-"]:visible')).toHaveCount(2);
     await page.keyboard.press('Meta+t');
-    await expect(page.locator('[data-testid^="pane-"]')).toHaveCount(1);
+    // 旧 tab 保活（display:none 而非卸载），只数可见 pane
+    await expect(page.locator('[data-testid^="pane-"]:visible')).toHaveCount(1);
   });
 
   test('⌘] / ⌘[ 在当前窗口的终端间切换焦点', async ({ page }) => {

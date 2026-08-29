@@ -253,6 +253,40 @@ fn cmd_command(cwd: Option<String>) -> CommandBuilder {
     cmd
 }
 
+/// 把常见用户 bin 目录补进 PTY 子进程的 PATH。
+///
+/// GUI 应用（Finder/Dock 启动）的 PATH 只有系统默认值
+/// （/usr/bin:/bin:/usr/sbin:/sbin），不含 /usr/local/bin（brew/手动安装）
+/// 等用户工具目录 —— 终端里跑 opencode/claude/node 等会 command not found，
+/// 且用户 .zshrc 里 `npm config get prefix` 这类依赖也会失败。
+/// 已存在的目录排在系统 PATH 前面（作为种子，最终 PATH 仍由 .zshrc 决定）。
+fn merge_user_bin_paths(cmd: &mut CommandBuilder) {
+    let current = std::env::var("PATH").unwrap_or_default();
+    let home = std::env::var("HOME").unwrap_or_default();
+    let mut merged: Vec<String> = Vec::new();
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut push = |dir: String, merged: &mut Vec<String>, seen: &mut std::collections::HashSet<String>| {
+        if dir.is_empty() || !std::path::Path::new(&dir).is_dir() || seen.contains(&dir) {
+            return;
+        }
+        seen.insert(dir.clone());
+        merged.push(dir);
+    };
+    // 用户 bin 目录优先（GUI 缺的就是这些）；.cargo/bin 由 ~/.zshenv 补，这里兜底
+    for dir in [
+        "/usr/local/bin",
+        "/opt/homebrew/bin",
+        &format!("{home}/.local/bin"),
+        &format!("{home}/.cargo/bin"),
+    ] {
+        push(dir.to_string(), &mut merged, &mut seen);
+    }
+    for dir in current.split(':') {
+        push(dir.to_string(), &mut merged, &mut seen);
+    }
+    cmd.env("PATH", merged.join(":"));
+}
+
 /// Windows 默认 shell：pwsh → powershell → cmd（进程内缓存，避免每次建终端都 spawn 探测）。
 #[cfg(target_os = "windows")]
 fn default_windows_shell() -> &'static str {
@@ -283,7 +317,9 @@ pub fn pty_spawn(
     let pair = pty_system
         .openpty(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
         .map_err(|e| e.to_string())?;
-    let cmd = build_shell_cmd(cwd, shell, ssh, open_mode)?;
+    let mut cmd = build_shell_cmd(cwd, shell, ssh, open_mode)?;
+    // GUI 启动 PATH 缺用户 bin（/usr/local/bin 等），补进子进程（ssh 分支也顺带受益）
+    merge_user_bin_paths(&mut cmd);
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
     drop(pair.slave);
     let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
@@ -691,6 +727,27 @@ mod tests {
         assert_eq!(super::normalize_enter("echo hi\n"), "echo hi\r");
         assert_eq!(super::normalize_enter("a\r\nb\n"), "a\rb\r");
         assert_eq!(super::normalize_enter("no-newline"), "no-newline");
+    }
+
+    /// GUI 启动缺用户 bin 目录：合并后 /usr/local/bin 必须存在且去重。
+    #[cfg(unix)]
+    #[test]
+    fn merge_user_bin_paths_adds_local_bin_and_dedups() {
+        let mut cmd = CommandBuilder::new("zsh");
+        // 模拟 GUI 最小 PATH（Finder/Dock 启动的应用只有系统默认值）
+        std::env::set_var("PATH", "/usr/bin:/bin:/usr/sbin:/sbin");
+        merge_user_bin_paths(&mut cmd);
+        let path = cmd.get_env("PATH").expect("PATH 被设置");
+        let dirs: Vec<&str> = path.to_str().unwrap().split(':').collect();
+        assert!(dirs.contains(&"/usr/local/bin"), "缺 /usr/local/bin: {path:?}");
+        // 用户目录在最前，系统目录在后；无重复
+        assert_eq!(dirs[0], "/usr/local/bin");
+        let mut seen = std::collections::HashSet::new();
+        for d in &dirs {
+            assert!(seen.insert(*d), "PATH 有重复: {d}");
+        }
+        // 继承的 PATH 不丢失
+        assert!(dirs.contains(&"/usr/bin"));
     }
 
     /// 多字节 UTF-8 字符跨 read 边界不应产生 U+FFFD。

@@ -6,6 +6,7 @@
 
 import { useEffect, useRef } from 'react';
 import { Terminal } from '@xterm/xterm';
+import { WebglAddon } from '@xterm/addon-webgl';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { ptySpawn, ptyWrite, ptyResize, ptyClose, onPtyOutput, onPtyExit } from '../lib/pty';
@@ -69,6 +70,48 @@ export function getExecutingTerm(tabId: string) {
  *  RunningTerm 的宿主尺寸变化（卡片出现、滚动条挤占）时回调进来 */
 const widthSyncs = new Map<string, () => void>();
 
+/**
+ * 压缩 xterm 字符高度度量到 fontSize，让行高贴近字形实际高度。
+ *
+ * xterm 6 用字体 fontBoundingBox 度量字符高（Menlo 14px → 16px），而字形
+ * ink 实际只有 ~14px —— 行高虚高，行与行之间留缝，TUI 用半块字符
+ * （▀▄ 拼图标/进度条）时上下行之间出现明显的分割线。把度量压到
+ * fontSize 后行高 ≈ 字形高度，半块字符无缝拼接（iTerm2 同款行高）。
+ *
+ * 实现要点：measure() 会先测出 16px 并 fire onCharSizeChange（renderer
+ * 立即按 16px 重算行高），所以必须**在事件里压回 fontSize 并再次触发
+ * 重算**；只包装 measure 改字段不 fire 的话，下一次 resize/宽度校核的
+ * measure 会把行高永久打回 16px。
+ *
+ * 注意：只能动私有 _core，open 之后调用；xterm 升级时需回归验证。
+ */
+export function applyCompactCharSize(term: Terminal): void {
+  const core = (term as unknown as {
+    _core?: {
+      _charSizeService?: {
+        height?: number;
+        onCharSizeChange?: (cb: () => void) => { dispose(): void };
+        _compactPatched?: boolean;
+      };
+      _renderService?: { handleCharSizeChanged?: () => void };
+    };
+  })._core;
+  const cs = core?._charSizeService;
+  const render = core?._renderService;
+  if (!cs?.onCharSizeChange || !render?.handleCharSizeChanged) return;
+  if (cs._compactPatched) return;
+  cs._compactPatched = true;
+  const fontSize = term.options.fontSize ?? 14;
+  cs.onCharSizeChange(() => {
+    if (cs.height !== fontSize) {
+      cs.height = fontSize;
+      render.handleCharSizeChanged?.();
+    }
+  });
+  cs.height = fontSize;
+  render.handleCharSizeChanged();
+}
+
 /** 触发指定 tab 重新校核 PTY/块终端宽度（无 session 时 no-op） */
 export function syncTermWidth(tabId: string): void {
   widthSyncs.get(tabId)?.();
@@ -110,7 +153,17 @@ export function useTerminalSession(
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.loadAddon(new WebLinksAddon());
+    // WebGL renderer：字形画进 GPU 纹理、按 cell 精确对齐，半块字符（▀▄）
+    // 上下行拼接无缝 —— DOM renderer 的 CSS 行盒按字体 baseline 排布，
+    // 半块字符之间必然留缝（TUI 图标/对话框出现横裂缝）。
+    // 在 WKWebView 无 WebGL 时自动回退 DOM renderer（xterm 内部行为）。
+    try {
+      term.loadAddon(new WebglAddon());
+    } catch {
+      // 忽略：回退默认 DOM renderer（缝隙问题在无 GPU 环境无法根治）
+    }
     term.open(el);
+    applyCompactCharSize(term);
     fit.fit();
     registerTerminal(paneId, term);
     useTerminalStore.getState().setDims(paneId, term.cols, term.rows);
@@ -310,7 +363,8 @@ export function useTerminalSession(
         return true;
       }
       if (!sessionId) return false;
-      const linePx = Math.max(1, (term.options.fontSize ?? 13) * 1.4);
+      // 行高已压到 fontSize（applyCompactCharSize），滚轮按行折算用实际行高
+      const linePx = Math.max(1, (term.options.fontSize ?? 13) * 1.0);
       if (Math.sign(e.deltaY) !== Math.sign(wheelResidual)) wheelResidual = 0;
       wheelResidual += e.deltaY;
       const lines = Math.trunc(wheelResidual / linePx);
