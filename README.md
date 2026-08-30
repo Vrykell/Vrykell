@@ -35,7 +35,7 @@ npm run tauri dev  # 启动完整 Tauri 应用
 npm run build      # tsc + vite build
 npm run test       # vitest run（单测，覆盖率阈值 80/75/80/80）
 npm run test:e2e   # playwright test（e2e，自动起 1421 端口 dev server）
-cargo test         # Rust 后端测试（src-tauri）
+cargo test         # Rust 后端（src-tauri）
 # 提交前全量验证：
 npx tsc --noEmit && npx vitest run && npx playwright test
 ```
