@@ -1,6 +1,6 @@
 # Vrykell 产品开发日志
 
-> 依据 git 历史整理（2026-07-20 → 2026-08-26，当前分支 `dev`）。
+> 依据 git 历史整理（2026-07-20 → 2026-08-30，当前分支 `dev`）。
 > 本项目是一个 **chat-first 终端**：终端是主表面，每个命令渲染为一个**命令块（Block）**，AI 对话（BYOK 多 provider）以内联 AI 块 + 全局 AI 面板双形态展示，并支持代码代理（工具、权限、Skills、MCP、记忆、调度）。
 
 ---
@@ -23,6 +23,7 @@
 | Phase 11 | 08-18 | 品牌与跨平台 | 改名 Vrykell、PowerShell 集成、分屏窗口布局模型 |
 | Phase 12 | 08-21 ~ 08-24 | AI 代理（代码代理） | 工具调用、权限模式、附件、上下文管理、智能标题、消息部件 |
 | Phase 13 | 08-25 ~ 08-26 | 设置体系与模型能力 | Skills/MCP/设置页、多模型管理、ContextRing、e2e 收敛 |
+| Phase 14 | 08-27 ~ 08-30 | 安全加固与体验打磨 | SSH 安全（钥匙串/命令注入防护）、会话历史筛选、面板拖拽折叠、视觉细节 |
 
 ---
 
@@ -290,11 +291,34 @@
 
 **小结**：设置从单页演化为多页体系（行为/模型/代理/主题分层），MCP 与 Skills 补全代理生态，功能范围收敛趋于稳定。
 
+## Phase 14 — 安全加固与体验打磨（2026-08-27 ~ 08-30）
+
+收尾阶段的安全加固与交互/视觉细节打磨，重点在 SSH 凭据安全、面板交互与渲染一致性。
+
+### SSH 与路径安全
+- **SSH 密码入钥匙串**：新增 `secret.rs` 密钥存储（macOS Keychain / 平台回退文件），SSH 密码不再落 SQLite，旧库明文自动迁移，删除连接时同步清理密钥。
+- **命令注入防护**：SSH 主机名校验（防 shell 注入），`sensitivePaths.ts` 敏感路径检查，远端路径工具函数（`remotePath.ts`）与对应单测。
+- SSH 集成增强：shell_integration 补充 PowerShell 支持，工具描述统一收敛到 `toolTexts.ts`。
+
+### 会话历史
+- **会话历史筛选与恢复**：SessionHistoryView 增加筛选（`sessionFilter.ts`）、恢复已归档会话，配套 e2e 与单测。
+
+### 交互与视觉
+- **面板拖拽折叠**：ResizeHandle 支持折叠与反向拖回，松手确认逻辑（Toast 增强）。
+- **代码块复制**：AI 输出代码块一键复制 + 已复制状态；markdown 排版优化。
+- 输入卡片与终端样式微调（边距/背景色/透明度），TUI 工具条样式优化。
+- **行间缝隙修复**：块输出渲染高度对齐（BlockOutput 行高与 xterm 对齐），修复块间 1px 缝隙；PTY 子进程 PATH 合并用户 bin 目录（`merge_user_bin_paths`，GUI 启动时 `/usr/local/bin`、Homebrew 等目录缺失的问题）。
+
+### 文档与测试
+- README 更新 Rust 后端测试说明，security-review.md 补充新审查条目。
+
+**小结**：SSH 凭据安全闭环（钥匙串 + 注入防护 + 迁移），会话历史恢复完整可用，面板交互与渲染细节收敛。
+
 ---
 
 ## 现状与后续
 
 - **当前架构**（详见 `docs/architecture.md`）：PTY 输出 → **Rust StreamScanner 同步扫描**（`src-tauri/src/terminal/scan.rs`）→ SessionController 三场景状态机（OSC 133 驱动）→ 每 executing block 一个离屏 xterm，完成后提取 outputHtml 快照 → scene 驱动 UI。分屏时每 pane 独立 controller；经典/块两种打开模式可按 shell 配置。
 - **技术栈**：Tauri 2（Rust）+ React 19 + TypeScript + Vite；终端 `@xterm/xterm`；状态 zustand；AI SDK（BYOK 多 provider，Anthropic/Gemini/OpenAI 兼容）+ react-markdown + KaTeX；测试 vitest + Playwright。
-- **待办**：SSH TOFU 用户确认、SSH 密码 Keychain 化（见 `docs/security-review.md`）仍未处理；按功能清单持续补齐 backlog。
+- **待办**：SSH TOFU 用户确认（见 `docs/security-review.md`）已实现；按功能清单持续补齐 backlog。
 - **合规**：第三方依赖许可说明见 `NOTICE`。
