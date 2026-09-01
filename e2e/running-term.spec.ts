@@ -67,6 +67,23 @@ test('手动全屏：块内活终端搬进全屏宿主，退出后搬回卡片',
   await expect(fs.locator('.xterm')).toBeVisible();
   await expect(cardHost.locator('.xterm')).toHaveCount(0);
 
+  // 全屏宿主铺满整个终端区：块终端画布应填满宿主内容宽/高，两侧无黑条
+  //（回归：PTY/块终端曾按单 pane 宽换算列数，全屏时画布居中 → 左右露底色）
+  await expect(async () => {
+    const probe = await fs.evaluate((host) => {
+      const screen = host.querySelector<HTMLElement>('.xterm-screen')!;
+      const padTop = parseFloat(host.style.paddingTop) || 0;
+      return {
+        hostW: host.clientWidth,
+        hostH: host.clientHeight - padTop,
+        screenW: screen.getBoundingClientRect().width,
+        screenH: screen.getBoundingClientRect().height,
+      };
+    });
+    expect(probe.screenW).toBeGreaterThanOrEqual(probe.hostW - 10);
+    expect(probe.screenH).toBeGreaterThanOrEqual(probe.hostH - 20);
+  }).toPass({ timeout: 5000 });
+
   // 全屏中输出继续实时到达
   await emitPtyOutput(page, 'tui-second-line\r\n');
   await expectAnyTermContains(page, 'tui-second-line');

@@ -6,7 +6,6 @@ import { applyTheme } from "./theme/tokens";
 import { useTerminalThemeStore, applyCachedWallpaper } from "./theme/terminalTheme";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { installGlobalErrorHandlers } from "./lib/errorHandler";
-import { installScrollbarHover } from "./lib/scrollbarHover";
 import App from "./App";
 import "./theme.css";
 
@@ -19,9 +18,6 @@ void useTerminalThemeStore.getState().load();
 
 // 全局异常捕获（console 输出，不静默吞掉）
 installGlobalErrorHandlers();
-
-// 滚动条区域悬停检测（默认隐藏滚动条，悬停滚动条区域才显示）
-installScrollbarHover();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

@@ -61,13 +61,11 @@ export default function BlockOutput({ text, maxHeight, highlight, isHtml: isHtml
         // 1.4 时行间留缝，TUI 半块字符（▀▄）拼图会出现分割线
         lineHeight: 1.0,
         padding: '2px 8px 8px',
-        // isHtml 快照已按网格 cols 用 <br> 预分行（每行 ≤ cols 字符）。
-        // 卡片内容盒比 cols×ch 略窄（实测 153.6 vs 154），pre-wrap 会在网格行
-        // 中间软换行撕裂 TUI 框线（claude 等满宽输出排版错乱）——
-        // 网格快照禁止软换行，放不下的行横向滚动（同真实终端的裁剪语义）。
-        whiteSpace: isHtml ? 'pre' : 'pre-wrap',
-        wordBreak: isHtml ? undefined : 'break-all',
-        overflowX: isHtml ? 'auto' : undefined,
+        // 统一回流：不论 isHtml 快照还是纯文本，宽度不足时一律折行。
+        // 快照已按网格 cols 用 <br> 预分行，卡片比网格窄时软换行会撕裂
+        // TUI 框线，但横向滚动更割裂 —— 折行保证内容始终完整可见。
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-all',
       }}
     >
       {/* 内层 div 承载 HTML：React 不允许 children 与 dangerouslySetInnerHTML 并存 */}

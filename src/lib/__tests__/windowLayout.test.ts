@@ -3,6 +3,7 @@ import {
   leaf, splitLeaf, replaceLeaf, removeLeaf, leaves, countLeaves,
   leafRects, dropTargets, moveTargets, dividers, setRatio, findLeaf, leafDepth,
   maxRowPanes, minTerminalWidth, MIN_PANE_SIZE, DIVIDER_SIZE,
+  collectLayoutCells,
   type TerminalSpec,
 } from '../windowLayout';
 
@@ -56,6 +57,65 @@ describe('windowLayout 几何', () => {
     const m = new Map(leafRects(l).map((r) => [r.terminalId, r.rect]));
     expect(m.get('b')).toEqual({ x: 0, y: 0, w: 1, h: 0.5 });
     expect(m.get('a')).toEqual({ x: 0, y: 0.5, w: 1, h: 0.5 });
+  });
+
+  it('collectLayoutCells：终端 id 恰好出现一次，几何与 inner 边框正确', () => {
+    // (a | b) / c：上半行分裂 a|b，下半 c（列分裂）
+    const bc = splitLeaf(leaf(t('b')), 'b', 'col', 'second', t('c'), 0.5);
+    const l = splitLeaf(bc, 'b', 'row', 'first', t('a'), 0.5);
+    const cells = collectLayoutCells(l);
+    const byId = new Map(cells.map((c) => [c.terminalId, c]));
+    expect(cells.map((c) => c.terminalId)).toEqual(['a', 'b', 'c']);
+
+    // a 在左上象限，右缘面向 b、底缘面向 c
+    expect(byId.get('a')!.rect).toEqual({ x: 0, y: 0, w: 0.5, h: 0.5 });
+    expect(byId.get('a')!.inner).toEqual({ left: false, right: true, top: false, bottom: true });
+
+    // b 在右上象限，左缘面向 a、底缘面向 c
+    expect(byId.get('b')!.rect).toEqual({ x: 0.5, y: 0, w: 0.5, h: 0.5 });
+    expect(byId.get('b')!.inner).toEqual({ left: true, right: false, top: false, bottom: true });
+
+    // c 占下半全宽，上缘面向 a/b
+    expect(byId.get('c')!.rect).toEqual({ x: 0, y: 0.5, w: 1, h: 0.5 });
+    expect(byId.get('c')!.inner).toEqual({ left: false, right: false, top: true, bottom: false });
+  });
+
+  it('collectLayoutCells：拖动重排后终端 id 集合不变（渲染身份稳定，不重挂）', () => {
+    const bc = splitLeaf(leaf(t('b')), 'b', 'col', 'second', t('c'), 0.5);
+    const before = splitLeaf(bc, 'b', 'row', 'first', t('a'), 0.5);
+    // 模拟拖动 a 到 b 之下：removeLeaf(a) 后把 a 插到 b 的左半屏
+    const removed = removeLeaf(before, 'a')!;
+    const after = splitLeaf(removed, 'b', 'col', 'second', t('a'), 0.5);
+
+    const idsBefore = collectLayoutCells(before).map((c) => c.terminalId).sort();
+    const idsAfter = collectLayoutCells(after).map((c) => c.terminalId).sort();
+    expect(idsAfter).toEqual(idsBefore); // 同一组终端，只是位置/结构变了
+    expect(idsAfter).toEqual(['a', 'b', 'c']);
+  });
+
+  it('dividers：嵌套分隔线携带自身 region（拖拽比例以子区域为准）', () => {
+    // (c | b) / a：c|b 行分裂在上半，a 在下半（根列分裂）
+    const cb = splitLeaf(leaf(t('c')), 'c', 'row', 'second', t('b'), 0.5);
+    const l = splitLeaf(cb, 'c', 'col', 'second', t('a'), 0.5);
+    const ds = dividers(l);
+    expect(ds).toHaveLength(2);
+
+    // 恰有一条根分隔线：region 覆盖全窗口；另一条是嵌套分隔线，region 为真子集
+    const root = ds.find((d) =>
+      d.region.x === 0 && d.region.y === 0 && d.region.w === 1 && d.region.h === 1,
+    );
+    expect(root).toBeDefined();
+    const inner = ds.find((d) => d !== root);
+    expect(inner).toBeDefined();
+    expect(inner!.region.w).toBeLessThan(1);
+
+    // 分隔线 rect 落于自身 region 内
+    for (const d of ds) {
+      expect(d.rect.x).toBeGreaterThanOrEqual(d.region.x - 1e-9);
+      expect(d.rect.y).toBeGreaterThanOrEqual(d.region.y - 1e-9);
+      expect(d.rect.x + d.rect.w).toBeLessThanOrEqual(d.region.x + d.region.w + 1e-9);
+      expect(d.rect.y + d.rect.h).toBeLessThanOrEqual(d.region.y + d.region.h + 1e-9);
+    }
   });
 });
 

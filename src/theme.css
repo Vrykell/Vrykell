@@ -283,26 +283,11 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 .md .katex { color: var(--text-primary); }
 
 /* ── 滚动条 ──
- * 默认完全隐藏（不占空间）；鼠标移动到滚动条区域（滚动容器右/下缘 8px，
- * 由 src/lib/scrollbarHover.ts 坐标检测打上 data-scrollbar-hover 标记）时显示。
- * 降级：不支持自定义滚动条的环境（@supports 不通过）直接隐藏滚动条，
- * 滚动功能不受影响。 */
+ * 全部隐藏、不占空间（滚动功能不受影响）。
+ * 之前「悬停滚动条区域才显示」的交互已移除，统一无滚动条。 */
 ::-webkit-scrollbar { display: none; width: 0; height: 0; }
 ::-webkit-scrollbar-thumb, ::-webkit-scrollbar-track { display: none; }
 * { scrollbar-width: none; -ms-overflow-style: none; }
-
-@supports selector(::-webkit-scrollbar) {
-  [data-scrollbar-hover]::-webkit-scrollbar { display: block; width: 8px; height: 8px; }
-  [data-scrollbar-hover]::-webkit-scrollbar-thumb {
-    background: var(--scrollbar-thumb);
-    border-radius: 4px;
-  }
-  [data-scrollbar-hover]::-webkit-scrollbar-track { background: transparent; }
-}
-
-@supports (scrollbar-width: thin) {
-  [data-scrollbar-hover] { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
-}
 
 /* xterm 容器贴边：取消全屏终端的边缘内边距 */
 .xterm { padding: 0; }
@@ -318,13 +303,9 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 .xterm { display: flex; justify-content: center; }
 .xterm .xterm-screen { flex-shrink: 0; }
 
-/* ── xterm(经典/TUI/SSH)滚动条与 block 列表对齐 ──
- * xterm 6 用 DOM 滚动条(.xterm-scrollable-element > .scrollbar),非原生 webkit 滚动条。
- * 默认完全隐藏;scrollbarHover.ts 的坐标检测会命中 .xterm-viewport(可滚动容器)并
- * 打上 data-scrollbar-hover,此时才显示 —— 与 block 列表的滚动条行为一致。
- * !important 覆盖 xterm 自带的 .visible/.invisible class 控制。 */
+/* xterm 6 用 DOM 滚动条(.xterm-scrollable-element > .scrollbar),非原生 webkit 滚动条。
+ * 统一隐藏，不随悬停显示。 */
 .xterm .xterm-scrollable-element > .scrollbar { opacity: 0 !important; }
-[data-scrollbar-hover] .xterm-scrollable-element > .scrollbar { opacity: 1 !important; }
 
 @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes toastOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(8px); } }

@@ -1,5 +1,5 @@
 /**
- * 滚动条 e2e：默认完全隐藏；鼠标移动到滚动条区域（滚动容器右缘）才显示。
+ * 滚动条 e2e：滚动条一律完全隐藏、不占空间（滚动功能不受影响）。
  */
 import { test, expect } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
@@ -16,7 +16,7 @@ const scrollbarWidth = (page: import('@playwright/test').Page) =>
     return el ? getComputedStyle(el, '::-webkit-scrollbar').width : 'no-el';
   });
 
-test('滚动条：默认隐藏，悬停滚动条区域显示，移开恢复隐藏', async ({ page }) => {
+test('滚动条：始终隐藏，即使鼠标悬停滚动条区域也不显示', async ({ page }) => {
   // 执行多条命令，让终端块列表产生滚动内容
   const input = page.getByPlaceholder(/输入命令/);
   for (let i = 0; i < 12; i++) {
@@ -43,13 +43,9 @@ test('滚动条：默认隐藏，悬停滚动条区域显示，移开恢复隐�
   // 默认隐藏：scrollbar 宽度 0
   expect(await scrollbarWidth(page)).toBe('0px');
 
-  // 鼠标移到滚动条区域（容器右缘）
+  // 鼠标移到滚动条区域（容器右缘），仍不显示
   const box = await page.locator('[data-test-scroller]').boundingBox();
   expect(box).not.toBeNull();
   await page.mouse.move(box!.x + box!.width - 4, box!.y + box!.height / 2);
-  await expect.poll(() => scrollbarWidth(page)).toBe('8px');
-
-  // 移开 → 恢复隐藏
-  await page.mouse.move(box!.x + 20, box!.y + 20);
   await expect.poll(() => scrollbarWidth(page)).toBe('0px');
 });

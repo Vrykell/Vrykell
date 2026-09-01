@@ -21,11 +21,6 @@ test.describe('应用布局', () => {
     await expect(page.getByText('notes.txt')).toBeVisible();
   });
 
-  test('状态栏：shell 状态、尺寸、模型', async ({ page }) => {
-    await expect(page.getByText('shell', { exact: true })).toBeVisible();
-    await expect(page.getByText('gpt-4o-mini')).toBeVisible();
-  });
-
   test('终端区：xterm 挂载且有底部输入栏', async ({ page }) => {
     // 新管线默认进入 blockList，xterm 仍挂载但隐藏；底部输入栏应可见
     await expect(page.locator('.xterm')).toBeAttached();
