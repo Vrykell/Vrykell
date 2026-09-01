@@ -401,12 +401,38 @@ export function useTerminalSession(
       return dims?.css?.cell?.width || 7.8;
     };
 
+    /** 实测行高（渲染服务内部尺寸，与 RunningTerm 的 cellHeight 同源） */
+    const cellHeight = (): number => {
+      const dims = (term as unknown as {
+        _core?: { _renderService?: { dimensions?: { css?: { cell?: { height?: number } } } } };
+      })._core?._renderService?.dimensions;
+      return dims?.css?.cell?.height || 14;
+    };
+
+    /**
+     * 手动全屏宿主：铺满整个终端区（TerminalView inset:0），可能比单 pane 宽/高。
+     * 返回 { w, h } 宿主内容尺寸（px）；非手动全屏时返回 null。
+     */
+    const fullscreenHostSize = (): { w: number; h: number } | null => {
+      const fsHost = document.querySelector<HTMLElement>('[data-testid="tui-fullscreen"]');
+      if (!fsHost) return null;
+      const padTop = parseFloat(fsHost.style.paddingTop) || 0;
+      return { w: fsHost.clientWidth, h: fsHost.clientHeight - padTop };
+    };
+
     /** 当前场景下 PTY/块终端应有的列数 */
     const effectiveCols = (): number => {
       // 以 store 场景为准：手动全屏（「进入全屏交互」）只写 store.scene，不回调
       // onSceneChanged，currentScene 本地镜像仍停在 blockList；若只看它会误走
       // 卡片宽分支、把折叠宿主宽读成 0 → PTY 挤成 2 列（全屏 TUI「宽度极其小」）。
       const scene = useTerminalStore.getState().scenes[paneId] ?? currentScene;
+      // 手动全屏：全屏宿主铺满整个终端区（宽于单 pane），以宿主实测宽换算列数，
+      // 否则 canvas 停在单 pane 宽 → 全屏两侧露出黑色条。
+      if (scene === 'altScreen') {
+        const fs = fullscreenHostSize();
+        if (fs && fs.w > 0) return Math.max(2, Math.floor(fs.w / cellWidth()));
+        return term.cols;
+      }
       if (scene !== 'blockList') return term.cols;
       // 有运行中卡片宿主时实测（自动覆盖滚动条挤占等偏差）；
       // 否则用容器宽 − 卡片常量。宿主 clientWidth 含 .xterm 左右各 8px padding。
@@ -420,6 +446,16 @@ export function useTerminalSession(
       return Math.max(2, Math.min(term.cols, Math.floor(screenPx / cellWidth())));
     };
 
+    /** 当前场景下 PTY/块终端应有的行数（手动全屏以宿主高为准，其余用主 xterm） */
+    const effectiveRows = (): number => {
+      const scene = useTerminalStore.getState().scenes[paneId] ?? currentScene;
+      if (scene === 'altScreen') {
+        const fs = fullscreenHostSize();
+        if (fs && fs.h > 0) return Math.max(1, Math.floor(fs.h / cellHeight()));
+      }
+      return term.rows;
+    };
+
     let widthRaf = 0;
     const applyWidth = () => {
       if (widthRaf) return;
@@ -428,7 +464,7 @@ export function useTerminalSession(
         // 后台标签 display:none 宽度为 0，别把 PTY 挤成 2 列
         if (el.offsetWidth === 0) return;
         const cols = effectiveCols();
-        const rows = term.rows;
+        const rows = effectiveRows();
         if (cols <= 0 || rows <= 0) return;
         if (sessionId) ptyResize(sessionId, cols, rows).catch(() => {});
         controller.resize(cols, rows);

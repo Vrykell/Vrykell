@@ -18,7 +18,7 @@ interface Diag {
   innerWidth: number;
 }
 
-test('满宽 box-drawing 输出在块内不发生网格内软换行', async ({ page }) => {
+test('满宽 box-drawing 输出在块内回流折行，不横向滚动', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   const input = page.getByPlaceholder(/输入命令/);
@@ -45,7 +45,7 @@ test('满宽 box-drawing 输出在块内不发生网格内软换行', async ({ p
     });
   await expect.poll(findOutput).toBeGreaterThan(0);
 
-  const diag = await page.evaluate((): Diag => {
+  const diag = await page.evaluate((): Diag & { scrollWidth: number } => {
     const matches = Array.from(document.querySelectorAll('div')).filter(
       (d) => d.innerHTML.includes('<br>') && d.textContent?.includes('─'.repeat(40)),
     );
@@ -79,15 +79,15 @@ test('满宽 box-drawing 输出在块内不发生网格内软换行', async ({ p
       capacityChars: Math.floor(el.clientWidth / charWidth),
       lineHeightPx,
       innerWidth: window.innerWidth,
+      scrollWidth: el.scrollWidth,
     };
   });
 
   console.log('WIDTH-DIAG', JSON.stringify(diag, null, 2));
 
-  // 网格行不应在显示时被再次软换行：视觉行数必须等于网格行数。
-  // 行高 1.0 下字形 font metrics 有亚像素溢出（fontBoundingBox > 行高），
-  // scrollHeight 会多计 ~0.1 行；软换行则会差 1 行以上 —— 用容差区分。
-  expect(Math.abs(diag.visualLines - diag.gridRows)).toBeLessThan(0.2);
+  // 统一回流：宽行在块内折行，不产生横向滚动（内容不溢出内容盒）。
+  expect(diag.clientWidth).toBeGreaterThan(0);
+  expect(diag.scrollWidth - diag.clientWidth).toBeLessThanOrEqual(1);
 });
 
 test('运行中卡片：PTY/块终端宽度跟随卡片内容宽（右缘不裁剪）', async ({ page }) => {

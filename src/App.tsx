@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import TopDock from './components/TopDock';
 import SidePanel from './components/SidePanel';
-import StatusBar from './components/StatusBar';
 import CommandPalette from './components/CommandPalette';
 import ToastContainer from './components/Toast';
 import GlobalSearch from './search/GlobalSearch';
@@ -31,7 +30,6 @@ import './search/init'; // 触发所有搜索源自动注册
  *   │   ├── SidePanel (left)  — 左侧面板，由 Dock 按钮控制
  *   │   ├── TerminalView      — 终端主区域
  *   │   └── SidePanel (right) — 右侧面板，由 Dock 按钮控制
- *   ├── StatusBar
  *   ├── CommandPalette (overlay)
  *   └── ToastContainer (overlay)
  *
@@ -138,7 +136,6 @@ useEffect(() => {
           </div>
           <SidePanel side="right" />
         </div>
-        <StatusBar />
         <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
         <GlobalSearch open={globalSearchOpen} onClose={() => setGlobalSearchOpen(false)} />
         <NewTabModal open={splitPickerOpen} onClose={closeSplitPicker} onPick={handleSplitPick} />

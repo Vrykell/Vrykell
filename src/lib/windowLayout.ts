@@ -53,6 +53,8 @@ export interface Divider {
   bId: string;
   /** 分隔线位置（相对窗口） */
   rect: Rect;
+  /** 该 split 节点自身占据的区域（相对窗口）—— 嵌套分隔线拖拽比例以它为准 */
+  region: Rect;
 }
 
 /** 每个终端（pane）的最小尺寸（px）——动态最小宽度的基准，尽量小以最大化拖动范围。 */
@@ -237,7 +239,7 @@ export function dividers(layout: WindowLayout): Divider[] {
     const line: Rect = node.dir === 'row'
       ? { x: rect.x + rect.w * r, y: rect.y, w: 0, h: rect.h }
       : { x: rect.x, y: rect.y + rect.h * r, w: rect.w, h: 0 };
-    list.push({ dir: node.dir, ratio: node.ratio, aId, bId, rect: line });
+    list.push({ dir: node.dir, ratio: node.ratio, aId, bId, rect: line, region: rect });
     const r2 = node.dir === 'row'
       ? [
           { x: rect.x, y: rect.y, w: rect.w * r, h: rect.h },
@@ -265,4 +267,39 @@ export function setRatio(root: WindowLayout, aId: string, bId: string, ratio: nu
     first: setRatio(root.first, aId, bId, ratio),
     second: setRatio(root.second, aId, bId, ratio),
   };
+}
+
+/** 终端的几何矩形 + 面向相邻终端的内侧边框标记（左/右/上/下）。 */
+export interface LayoutCell {
+  terminalId: string;
+  rect: Rect;
+  inner: { left: boolean; right: boolean; top: boolean; bottom: boolean };
+}
+
+/**
+ * 布局树遍历收集：返回每个终端的几何矩形（0..1 相对窗口）与内侧边框标记。
+ * 供平面渲染（PaneLayout）一次性绝对定位所有 pane —— 拖动重排只改几何，
+ * 不重挂终端组件（重挂会 ptyClose 杀掉运行中命令）。
+ */
+export function collectLayoutCells(layout: WindowLayout): LayoutCell[] {
+  const out: LayoutCell[] = [];
+  const walk = (node: WindowLayout, rect: Rect, inner: LayoutCell['inner']) => {
+    if (node.type === 'leaf') {
+      out.push({ terminalId: node.terminal.id, rect, inner });
+      return;
+    }
+    const r = Math.max(0.1, Math.min(0.9, node.ratio));
+    const firstInner = node.dir === 'row' ? { ...inner, right: true } : { ...inner, bottom: true };
+    const secondInner = node.dir === 'row' ? { ...inner, left: true } : { ...inner, top: true };
+    const firstRect: Rect = node.dir === 'row'
+      ? { x: rect.x, y: rect.y, w: rect.w * r, h: rect.h }
+      : { x: rect.x, y: rect.y, w: rect.w, h: rect.h * r };
+    const secondRect: Rect = node.dir === 'row'
+      ? { x: rect.x + rect.w * r, y: rect.y, w: rect.w * (1 - r), h: rect.h }
+      : { x: rect.x, y: rect.y + rect.h * r, w: rect.w, h: rect.h * (1 - r) };
+    walk(node.first, firstRect, firstInner);
+    walk(node.second, secondRect, secondInner);
+  };
+  walk(layout, { x: 0, y: 0, w: 1, h: 1 }, { left: false, right: false, top: false, bottom: false });
+  return out;
 }

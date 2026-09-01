@@ -23,8 +23,8 @@ import { useFollowBottom, registerFollowEngager, engageFollow } from './useFollo
 import { useTerminalFocus } from './useTerminalFocus';
 import {
   leaves as layoutLeaves, firstLeaf, findLeaf, splitLeaf, removeLeaf, dropTargets, moveTargets,
-  setRatio, MIN_PANE_SIZE, DIVIDER_SIZE,
-  type WindowLayout, type TerminalSpec, type DropTarget,
+  setRatio, dividers, collectLayoutCells, MIN_PANE_SIZE, DIVIDER_SIZE,
+  type WindowLayout, type TerminalSpec, type DropTarget, type Rect,
 } from '../lib/windowLayout';
 import InputEditor from './InputEditor';
 import AiStatusBar from './AiStatusBar';
@@ -178,8 +178,10 @@ function SessionTabView(props: {
       background: 'var(--canvas)',
     }}>
       <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', position: 'relative' }}>
-        <LayoutTree
-          node={layout}
+        {/* 平面渲染：pane 按终端 id 作 key，绝对定位落位 ——
+            拖动重排只改几何，不重挂 TerminalPane（重挂会 ptyClose 杀掉运行中命令）。 */}
+        <PaneLayout
+          layout={layout}
           windowId={windowId}
           focusedTermId={focusedTermId}
           setSession={setSession}
@@ -217,54 +219,67 @@ function SessionTabView(props: {
 }
 
 // ═══════════════════════════════════════════════════════════
-// 布局树递归渲染
+// 布局平面渲染（PaneLayout）
 // ═══════════════════════════════════════════════════════════
 
 interface InnerEdges { left: boolean; right: boolean; top: boolean; bottom: boolean; }
 
-function LayoutTree(props: {
-  node: WindowLayout;
+/**
+ * PaneLayout — 窗口布局的平面渲染。
+ *
+ * 所有 pane 按终端 id 作 key 一次性绝对定位（百分比几何），而非递归 flex 嵌套。
+ * 拖动终端重排（removeLeaf + splitLeaf）会重构布局树；若用递归渲染，React 按
+ * 位置对账会让 TerminalPane 被复用/重挂，触发 useTerminalSession cleanup 的
+ * ptyClose —— 运行中命令立刻被杀。平面渲染下实例身份 = 终端 id，移动只改样式。
+ */
+function PaneLayout(props: {
+  layout: WindowLayout;
   windowId: string;
   focusedTermId: string;
   setSession: (id: string, sid: string) => void;
   setFocusedPane: (id: string) => void;
   setRatioNode: (aId: string, bId: string, ratio: number) => void;
   onPaneContextMenu: (e: React.MouseEvent) => void;
-  inner?: InnerEdges;
 }) {
-  const { node, windowId, focusedTermId, setSession, setFocusedPane, setRatioNode, onPaneContextMenu } = props;
-  const inner = props.inner ?? { left: false, right: false, top: false, bottom: false };
-
-  if (node.type === 'leaf') {
-    return (
-      <TerminalPane
-        terminal={node.terminal}
-        windowId={windowId}
-        focused={node.terminal.id === focusedTermId}
-        setSession={setSession}
-        setFocusedPane={setFocusedPane}
-        onContextMenu={onPaneContextMenu}
-        inner={inner}
-      />
-    );
-  }
-
-  const dir = node.dir;
-  const ratio = Math.max(0.1, Math.min(0.9, node.ratio));
-  const aId = firstLeaf(node.first).id;
-  const bId = firstLeaf(node.second).id;
-  const firstInner: InnerEdges = dir === 'row' ? { ...inner, right: true } : { ...inner, bottom: true };
-  const secondInner: InnerEdges = dir === 'row' ? { ...inner, left: true } : { ...inner, top: true };
+  const { layout, windowId, focusedTermId, setSession, setFocusedPane, setRatioNode, onPaneContextMenu } = props;
+  const cells = useMemo(() => {
+    const collected = collectLayoutCells(layout);
+    const rects = new Map(collected.map((c) => [c.terminalId, c.rect]));
+    const inners = new Map(collected.map((c) => [c.terminalId, c.inner]));
+    return layoutLeaves(layout).map((t) => ({
+      terminal: t,
+      rect: rects.get(t.id)!,
+      inner: inners.get(t.id)!,
+    }));
+  }, [layout]);
+  const divs = useMemo(() => dividers(layout), [layout]);
 
   return (
-    <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: dir === 'row' ? 'row' : 'column', background: 'var(--canvas)' }}>
-      <div style={{ flexBasis: `${ratio * 100}%`, flexGrow: 0, flexShrink: 0, minWidth: 0, minHeight: 0, display: 'flex' }}>
-        <LayoutTree node={node.first} windowId={windowId} focusedTermId={focusedTermId} setSession={setSession} setFocusedPane={setFocusedPane} setRatioNode={setRatioNode} onPaneContextMenu={onPaneContextMenu} inner={firstInner} />
-      </div>
-      <Divider dir={dir} onRatio={(r) => setRatioNode(aId, bId, r)} />
-      <div style={{ flexGrow: 1, flexBasis: 0, minWidth: 0, minHeight: 0, display: 'flex' }}>
-        <LayoutTree node={node.second} windowId={windowId} focusedTermId={focusedTermId} setSession={setSession} setFocusedPane={setFocusedPane} setRatioNode={setRatioNode} onPaneContextMenu={onPaneContextMenu} inner={secondInner} />
-      </div>
+    <div style={{ position: 'relative', flex: 1, minWidth: 0, minHeight: 0 }}>
+      {cells.map((cell) => (
+        <div
+          key={cell.terminal.id}
+          style={{
+            position: 'absolute',
+            left: `${cell.rect.x * 100}%`, top: `${cell.rect.y * 100}%`,
+            width: `${cell.rect.w * 100}%`, height: `${cell.rect.h * 100}%`,
+            display: 'flex', minWidth: 0, minHeight: 0,
+          }}
+        >
+          <TerminalPane
+            terminal={cell.terminal}
+            windowId={windowId}
+            focused={cell.terminal.id === focusedTermId}
+            setSession={setSession}
+            setFocusedPane={setFocusedPane}
+            onContextMenu={onPaneContextMenu}
+            inner={cell.inner}
+          />
+        </div>
+      ))}
+      {divs.map((d) => (
+        <Divider key={`${d.aId}-${d.bId}`} dir={d.dir} rect={d.rect} region={d.region} onRatio={(r) => setRatioNode(d.aId, d.bId, r)} />
+      ))}
     </div>
   );
 }
@@ -273,7 +288,7 @@ function LayoutTree(props: {
 // 分隔线（拖拽调比例）
 // ═══════════════════════════════════════════════════════════
 
-function Divider({ dir, onRatio }: { dir: 'row' | 'col'; onRatio: (r: number) => void }) {
+function Divider({ dir, rect, region, onRatio }: { dir: 'row' | 'col'; rect: Rect; region: Rect; onRatio: (r: number) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const isRow = dir === 'row';
 
@@ -282,9 +297,14 @@ function Divider({ dir, onRatio }: { dir: 'row' | 'col'; onRatio: (r: number) =>
     const container = ref.current?.parentElement;
     if (!container) return;
     const cRect = container.getBoundingClientRect();
+    // 嵌套分隔线以自身 split 区域（region）为准换算比例，而非整个布局区
+    const regionLeft = cRect.left + region.x * cRect.width;
+    const regionTop = cRect.top + region.y * cRect.height;
+    const regionW = region.w * cRect.width;
+    const regionH = region.h * cRect.height;
     const move = (ev: MouseEvent) => {
-      const size = isRow ? cRect.width : cRect.height;
-      const pos = isRow ? (ev.clientX - cRect.left) : (ev.clientY - cRect.top);
+      const size = isRow ? regionW : regionH;
+      const pos = isRow ? (ev.clientX - regionLeft) : (ev.clientY - regionTop);
       // 像素级最小尺寸：每侧至少 MIN_PANE_SIZE，避免拖到「覆盖」内容
       const minRatio = Math.min(0.5, MIN_PANE_SIZE / size);
       const maxRatio = Math.max(0.5, 1 - MIN_PANE_SIZE / size);
@@ -299,19 +319,33 @@ function Divider({ dir, onRatio }: { dir: 'row' | 'col'; onRatio: (r: number) =>
     document.addEventListener('mouseup', up);
   };
 
+  const style: React.CSSProperties = {
+    position: 'absolute',
+    zIndex: 5,
+    cursor: isRow ? 'col-resize' : 'row-resize',
+    transition: 'background 0.12s ease',
+  };
+  if (isRow) {
+    style.left = `${rect.x * 100}%`;
+    style.top = `${rect.y * 100}%`;
+    style.width = DIVIDER_SIZE;
+    style.height = `${rect.h * 100}%`;
+    style.transform = 'translateX(-50%)';
+  } else {
+    style.left = `${rect.x * 100}%`;
+    style.top = `${rect.y * 100}%`;
+    style.width = `${rect.w * 100}%`;
+    style.height = DIVIDER_SIZE;
+    style.transform = 'translateY(-50%)';
+  }
+
   return (
     <div
       ref={ref}
       onMouseDown={onDown}
       onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--accent-bg)'; }}
       onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-      style={{
-        flexShrink: 0,
-        width: isRow ? DIVIDER_SIZE : 'auto',
-        height: isRow ? 'auto' : DIVIDER_SIZE,
-        cursor: isRow ? 'col-resize' : 'row-resize',
-        transition: 'background 0.12s ease',
-      }}
+      style={style}
     />
   );
 }
@@ -630,7 +664,7 @@ function PaneInputEditor({ paneId, focused, insetLeft = 8, insetRight = 8 }: { p
 function PaneBlockList({ paneId, insetLeft = 8, insetRight = 8 }: { paneId: string; insetLeft?: number; insetRight?: number }) {
   const blocks = useBlockStore(selectBlocks(paneId));
   const scrollRef = useRef<HTMLDivElement>(null);
-  const snap = useFollowBottom(scrollRef, [blocks]);
+  const snap = useFollowBottom(scrollRef, [blocks], paneId);
   useEffect(() => registerFollowEngager(paneId, snap), [paneId, snap]);
   return (
     <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--canvas)' }}>

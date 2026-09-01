@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Star, Folder, ChevronRight, Download } from 'lucide-react';
+import { Star, Folder, ChevronRight, Download, LocateFixed } from 'lucide-react';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { fsList, fsRoots, fsHome, fsRename, fsDelete, fileOpenWith, type FsEntry } from './fs';
 import { ptyWrite } from '../lib/pty';
 import { openFile } from './fileOpen';
 import { fileIcon } from './fileIcon';
 import { normPath, pathSegments, segmentsToPath, parentOf } from './pathUtils';
+import { shellQuote } from '../ssh/remotePath';
 import { useWorkspaceDirsStore } from './workspaceDirs';
 import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
 import { useTerminalStore } from '../stores/terminal';
@@ -252,6 +253,19 @@ function LocalFiles() {
     setPath(parentOf(path));
   };
 
+  /** 同步：终端跟随文件管理器 —— 向聚焦的本地终端发送 cd 到面板当前目录。 */
+  const syncToTerminal = async () => {
+    if (!path) return;
+    const sid = sessions[focused];
+    if (!sid) { useToastStore.getState().addToast('终端会话未就绪', 'info'); return; }
+    try {
+      await ptyWrite(sid, `cd ${shellQuote(path)}\r`);
+      useToastStore.getState().addToast(`终端已切换到 ${path}`, 'success');
+    } catch (e) {
+      useToastStore.getState().addToast(String((e as Error)?.message ?? e), 'error');
+    }
+  };
+
   const crumbs = pathSegments(path ?? '');
 
   return (
@@ -277,6 +291,18 @@ function LocalFiles() {
         })}
         <div style={{ flex: 1 }} />
         <button
+          onClick={() => void syncToTerminal()}
+          title="终端切换到当前目录"
+          data-testid="local-sync-btn"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            fontSize: 11, padding: '2px 8px', border: 'none', borderRadius: 4,
+            background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer',
+          }}
+        >
+          <LocateFixed size={11} /> 同步
+        </button>
+        <button
           onClick={() => setShowDownloads(true)}
           title="下载管理"
           data-testid="local-downloads-btn"
@@ -289,7 +315,8 @@ function LocalFiles() {
         >
           <Download size={11} /> 下载
         </button>
-        {path !== null && (
+        {/* 已在根目录/盘符根时无上级，隐藏返回按钮 */}
+        {path !== null && parentOf(path) !== null && (
           <button onClick={goUp} title="上级目录"
             style={{
               fontSize: 11, padding: '0 4px',

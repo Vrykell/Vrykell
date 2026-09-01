@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef } from 'react';
 
 const BOTTOM_THRESHOLD_PX = 32; // ≈2 行
 
-/** paneId → engage() 注册表：共享输入栏提交命令时，按聚焦 pane 复位对应列表的贴底跟随。
+/** paneId engage() 注册表：共享输入栏提交命令时，按聚焦 pane 复位对应列表的贴底跟随。
  *  （主列表按 activeId 注册，分屏各 pane 按 paneId 注册。） */
 const engagers = new Map<string, () => void>();
 
@@ -22,6 +22,30 @@ export function engageFollow(id: string): void {
 }
 
 /**
+ * 滚动进度记录：滚动时把 scrollTop 存进内存表，pane 重挂载（切场景/布局重排等）
+ * 后恢复，避免用户读到一半的进度被「回到底部」吞掉。
+ */
+const scrollMemory = new Map<string, number>();
+
+/** 保存某 pane 列表的滚动位置。 */
+export function saveScrollPos(key: string, top: number): void {
+  scrollMemory.set(key, top);
+}
+
+/** 读取并消费某 pane 的滚动位置（读后清除，防止陈旧位置在下次重挂载时被误恢复）。 */
+function takeScrollPos(key: string): number | null {
+  const v = scrollMemory.get(key);
+  if (v === undefined) return null;
+  scrollMemory.delete(key);
+  return v;
+}
+
+/** 用户主动贴底（提交新命令/按 End）时清掉记录，避免下次恢复时又被拉回旧位置。 */
+function clearScrollPos(key: string): void {
+  scrollMemory.delete(key);
+}
+
+/**
  * 返回 engage()：强制复位 latch 并立即贴底。
  * 用户上滚后 latch 脱离（不再跟随），但「提交新命令」是明确的回底意图
  * （），调用方在提交时调 engage() 复位。
@@ -30,10 +54,13 @@ export function engageFollow(id: string): void {
  * 派发时内容可能已增长（submit 后新 block 很快渲染），若按当时位置量 gap
  * 会误判为上滚 → latch 死亡 → 跟随在输出流中段停摆（「只滚到一半」）。
  * 因此记录每次 snap 的实际 scrollTop，scroll 事件落在该位置视为自引发。
+ *
+ * persistKey 传入时启用滚动进度记录：滚动位置按 key 持久化，挂载时恢复。
  */
 export function useFollowBottom(
   scrollRef: React.RefObject<HTMLDivElement | null>,
   deps: unknown[],
+  persistKey?: string,
 ): () => void {
   const atBottomRef = useRef(true);
   /** 最近一次 snap 读回的实际 scrollTop（浏览器 clamp 后的值）；-1 = 尚未 snap */
@@ -50,6 +77,16 @@ export function useFollowBottom(
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
+    // 挂载时恢复上次记录的滚动进度；恢复后按实际位置校正 latch，
+    // 避免随后的 snap（content 变化时）把用户又拉回底部。
+    if (persistKey) {
+      const saved = takeScrollPos(persistKey);
+      if (saved != null) {
+        el.scrollTop = saved;
+        atBottomRef.current =
+          el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX;
+      }
+    }
     const onScroll = () => {
       // 自引发的 scroll 事件（snap 位置）：即使内容已增长也保持贴底
       if (el.scrollTop === snappedTopRef.current) {
@@ -58,6 +95,7 @@ export function useFollowBottom(
       }
       atBottomRef.current =
         el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX;
+      if (persistKey) saveScrollPos(persistKey, el.scrollTop);
     };
     el.addEventListener('scroll', onScroll, { passive: true });
     // 运行中块的活 xterm 高度直改 DOM（不经 React → deps 不触发）：
@@ -89,6 +127,7 @@ export function useFollowBottom(
 
   return useCallback(() => {
     atBottomRef.current = true;
+    if (persistKey) clearScrollPos(persistKey);
     snap();
-  }, [snap]);
+  }, [snap, persistKey]);
 }
