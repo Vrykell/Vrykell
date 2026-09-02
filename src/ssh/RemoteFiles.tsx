@@ -191,23 +191,12 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
       display: 'flex', flexDirection: 'column', height: '100%',
       userSelect: 'none', background: 'var(--surface)',
     }}>
-      {/* 面包屑 + 返回 + 同步 + 更多菜单 */}
+      {/* 顶栏：操作按钮 */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap',
+        display: 'flex', alignItems: 'center', gap: 6,
         padding: '6px 10px',
-        fontSize: 11, minHeight: 30,
+        fontSize: 11, minHeight: 30, flexShrink: 0,
       }}>
-        <Crumb label="/" onClick={() => setPath('/')} active={path === '/'} />
-        {segs.map((seg, i) => {
-          const full = '/' + segs.slice(0, i + 1).join('/');
-          return (
-            <span key={full} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <span style={{ color: 'var(--text-muted)' }}>›</span>
-              <Crumb label={seg} onClick={() => setPath(full)} active={i === segs.length - 1} />
-            </span>
-          );
-        })}
-        <div style={{ flex: 1 }} />
         {path && path !== '/' && (
           <button
             onClick={goUp}
@@ -248,6 +237,7 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
         >
           <MoreHorizontal size={14} />
         </button>
+        <div style={{ flex: 1 }} />
       </div>
 
       {/* 远程文件列表 */}
@@ -270,6 +260,25 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
             onContextMenu={onContextMenu}
           />
         ))}
+      </div>
+
+      {/* 底栏：文件路径面包屑 */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap',
+        padding: '5px 10px',
+        fontSize: 11, minHeight: 26, flexShrink: 0,
+        borderTop: '1px solid var(--border)',
+      }}>
+        <Crumb label="/" onClick={() => setPath('/')} active={path === '/'} />
+        {segs.map((seg, i) => {
+          const full = '/' + segs.slice(0, i + 1).join('/');
+          return (
+            <span key={full} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <span style={{ color: 'var(--text-muted)' }}>›</span>
+              <Crumb label={seg} onClick={() => setPath(full)} active={i === segs.length - 1} />
+            </span>
+          );
+        })}
       </div>
 
       {ctxMenu && (

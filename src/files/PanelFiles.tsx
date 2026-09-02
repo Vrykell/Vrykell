@@ -273,23 +273,12 @@ function LocalFiles() {
       display: 'flex', flexDirection: 'column', height: '100%',
       userSelect: 'none', background: 'var(--surface)',
     }}>
-      {/* 面包屑 */}
+      {/* 顶栏：操作按钮 */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap',
+        display: 'flex', alignItems: 'center', gap: 6,
         padding: '6px 10px',
-        fontSize: 11, minHeight: 30,
+        fontSize: 11, minHeight: 30, flexShrink: 0,
       }}>
-        <Crumb label="此电脑" onClick={() => setPath(null)} active={path === null} />
-        {crumbs.map((seg, i) => {
-          const full = segmentsToPath(crumbs.slice(0, i + 1));
-          return (
-            <span key={full} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <span style={{ color: 'var(--text-muted)' }}>›</span>
-              <Crumb label={seg} onClick={() => setPath(full)} active={i === crumbs.length - 1} />
-            </span>
-          );
-        })}
-        <div style={{ flex: 1 }} />
         <button
           onClick={() => void syncToTerminal()}
           title="终端切换到当前目录"
@@ -308,9 +297,8 @@ function LocalFiles() {
           data-testid="local-downloads-btn"
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 4,
-            fontSize: 11, padding: '2px 8px', border: '1px solid var(--border)',
-            borderRadius: 4, background: 'transparent', color: 'var(--text-secondary)',
-            cursor: 'pointer',
+            fontSize: 11, padding: '2px 8px', border: 'none', borderRadius: 4,
+            background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer',
           }}
         >
           <Download size={11} /> 下载
@@ -326,6 +314,7 @@ function LocalFiles() {
             ‹ 返回
           </button>
         )}
+        <div style={{ flex: 1 }} />
       </div>
 
       {/* 文件列表（树形） */}
@@ -351,6 +340,25 @@ function LocalFiles() {
             空目录
           </div>
         )}
+      </div>
+
+      {/* 底栏：文件路径面包屑 */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap',
+        padding: '5px 10px',
+        fontSize: 11, minHeight: 26, flexShrink: 0,
+        borderTop: '1px solid var(--border)',
+      }}>
+        <Crumb label="此电脑" onClick={() => setPath(null)} active={path === null} />
+        {crumbs.map((seg, i) => {
+          const full = segmentsToPath(crumbs.slice(0, i + 1));
+          return (
+            <span key={full} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <span style={{ color: 'var(--text-muted)' }}>›</span>
+              <Crumb label={seg} onClick={() => setPath(full)} active={i === crumbs.length - 1} />
+            </span>
+          );
+        })}
       </div>
 
       {/* 右键菜单 */}
