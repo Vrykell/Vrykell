@@ -85,9 +85,13 @@ test('满宽 box-drawing 输出在块内回流折行，不横向滚动', async (
 
   console.log('WIDTH-DIAG', JSON.stringify(diag, null, 2));
 
-  // 统一回流：宽行在块内折行，不产生横向滚动（内容不溢出内容盒）。
+  // 网格行数与视觉行数 1:1：快照列数按 DOM 实测字符宽换算（与活终端一致），
+  // 结束运行中块时不会因为宽了 ~4% 而折行；也不产生横向滚动。
   expect(diag.clientWidth).toBeGreaterThan(0);
   expect(diag.scrollWidth - diag.clientWidth).toBeLessThanOrEqual(1);
+  // 行高 1.0 下字形 font metrics 有亚像素溢出，scrollHeight 会多计 ~0.1 行；
+  // 折行则会差 1 行以上 —— 用容差区分。
+  expect(Math.abs(diag.visualLines - diag.gridRows)).toBeLessThan(0.2);
 });
 
 test('运行中卡片：PTY/块终端宽度跟随卡片内容宽（右缘不裁剪）', async ({ page }) => {
