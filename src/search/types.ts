@@ -117,6 +117,7 @@ export interface BackendBlockEntry {
   command: string;
   output_raw: string;
   output_clean: string;
+  output_html: string;
   exit_code: number | null;
   status: string;
   started_at: number;
