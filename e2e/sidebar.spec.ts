@@ -58,15 +58,15 @@ test.describe('文件面板', () => {
     const cx = (box?.x ?? 0) + (box?.width ?? 0) / 2;
     await page.mouse.move(cx, cy);
     await page.mouse.down();
-    // 第 5 步（80px）到下限 → 立即折叠，之后保持收起
+    // 第 5 步（80px）到下限 → 立即折叠（内容隐藏但保持挂载，状态不丢），之后保持收起
     for (let i = 0; i < 8; i++) {
       await page.mouse.move(cx + (i + 1) * 16, cy);
       await page.waitForTimeout(12);
       if (i >= 5) {
-        await expect(page.getByText('Documents')).toHaveCount(0);
+        await expect(page.getByText('Documents')).toBeHidden();
       }
     }
-    // 松手前反悔：向左拖回 → 面板恢复
+    // 松手前反悔：向左拖回 → 面板恢复（内容仍是原挂载实例，非重新加载）
     for (let i = 0; i < 8; i++) {
       await page.mouse.move(cx + (8 - i) * 16, cy);
       await page.waitForTimeout(12);
@@ -86,9 +86,35 @@ test.describe('文件面板', () => {
       await page.waitForTimeout(12);
     }
     await page.mouse.up();
-    await expect(page.getByText('Documents')).toHaveCount(0);
+    await expect(page.getByText('Documents')).toBeHidden();
     await page.locator('[data-dock-btn="files"]').click();
     await expect(page.getByText('Documents')).toBeVisible({ timeout: 3000 });
+  });
+
+  test('拖动折叠后反向拖回：面板内部状态不丢失（未重新加载）', async ({ page }) => {
+    // 进入目录（改变面板内部路径状态）
+    await page.getByText('Documents').first().dblclick();
+    await expect(page.locator('[data-testid="local-up-btn"]')).toBeVisible();
+    // 拖到折叠（不松手）
+    const handle = page.locator('[data-testid="resize-handle-files"]');
+    const box = await handle.boundingBox();
+    expect(box).not.toBeNull();
+    const cy = (box!.y ?? 0) + (box!.height ?? 0) / 2;
+    const cx = (box!.x ?? 0) + (box!.width ?? 0) / 2;
+    await page.mouse.move(cx, cy);
+    await page.mouse.down();
+    for (let i = 0; i < 8; i++) {
+      await page.mouse.move(cx + (i + 1) * 16, cy);
+      await page.waitForTimeout(12);
+    }
+    await expect(page.locator('[data-testid="local-up-btn"]')).toBeHidden();
+    // 反向拖回并松手 → 面板恢复，且仍停留在之前进入的目录（状态未丢、未 reload）
+    for (let i = 0; i < 8; i++) {
+      await page.mouse.move(cx + (8 - i) * 16, cy);
+      await page.waitForTimeout(12);
+    }
+    await page.mouse.up();
+    await expect(page.locator('[data-testid="local-up-btn"]')).toBeVisible({ timeout: 3000 });
   });
 
   test('删除文件需二次确认，确认后调用后端删除（回收站）', async ({ page }) => {
