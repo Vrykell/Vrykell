@@ -125,11 +125,21 @@ function LocalFiles() {
       .catch(() => setChildCache((p) => ({ ...p, [entry.path]: [] })));
   }, [childCache]);
 
-  // 底栏面包屑压缩（必须在视图切换的提前返回之前，避免条件 hook）
+  // 顶栏面包屑压缩：不换行，侧栏窄时省略高层级目录（必须在视图切换的提前返回之前）
   const crumbs = pathSegments(path ?? '');
+  const crumbRef = useRef<HTMLDivElement>(null);
+  const [crumbWidth, setCrumbWidth] = useState(0);
+  useEffect(() => {
+    const el = crumbRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setCrumbWidth(el.clientWidth));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [showDownloads]);
+  const maxChars = Math.max(4, Math.floor(crumbWidth / 6.6) - 10);
   const { visible: visibleCrumbs, hiddenCount } = useMemo(
-    () => compactPathSegments(crumbs, (segs) => segmentsToPath(segs)),
-    [crumbs],
+    () => compactPathSegments(crumbs, (segs) => segmentsToPath(segs), maxChars),
+    [crumbs, maxChars],
   );
 
   // hooks 之后再做视图切换，避免「条件 hook」导致 React 报错
@@ -268,7 +278,6 @@ function LocalFiles() {
     if (!sid) { useToastStore.getState().addToast('终端会话未就绪', 'info'); return; }
     try {
       await ptyWrite(sid, `cd ${shellQuote(path)}\r`);
-      useToastStore.getState().addToast(`终端已切换到 ${path}`, 'success');
     } catch (e) {
       useToastStore.getState().addToast(String((e as Error)?.message ?? e), 'error');
     }
@@ -279,37 +288,57 @@ function LocalFiles() {
       display: 'flex', flexDirection: 'column', height: '100%',
       userSelect: 'none', background: 'var(--surface)',
     }}>
-      {/* 顶栏：操作按钮（右对齐，图标样式与其它侧栏统一） */}
+      {/* 顶栏：面包屑（不换行，窄时省略高层级）+ 操作按钮（右对齐） */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 2,
         padding: '6px 8px',
         fontSize: 11, minHeight: 30, flexShrink: 0,
+        whiteSpace: 'nowrap',
       }}>
-        <div style={{ flex: 1 }} />
-        <IconBtn
-          title="终端切换到当前目录"
-          data-testid="local-sync-btn"
-          onClick={() => void syncToTerminal()}
-        >
-          <LocateFixed size={14} />
-        </IconBtn>
-        <IconBtn
-          title="下载管理"
-          data-testid="local-downloads-btn"
-          onClick={() => setShowDownloads(true)}
-        >
-          <Download size={14} />
-        </IconBtn>
-        {/* 已在根目录/盘符根时无上级，隐藏返回按钮 */}
-        {path !== null && parentOf(path) !== null && (
+        <div ref={crumbRef} style={{
+          display: 'flex', alignItems: 'center', gap: 2,
+          flex: 1, minWidth: 0, overflow: 'hidden',
+        }}>
+          <Crumb label="此电脑" onClick={() => setPath(null)} active={path === null} />
+          {hiddenCount > 0 && (
+            <>
+              <span style={{ color: 'var(--text-muted)' }}>›</span>
+              <span title="已省略上级目录" style={{ color: 'var(--text-muted)', letterSpacing: 1 }}>…</span>
+            </>
+          )}
+          {visibleCrumbs.map((c, i) => (
+            <span key={c.full} style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+              <span style={{ color: 'var(--text-muted)' }}>›</span>
+              <Crumb label={c.seg} onClick={() => setPath(c.full)} active={i === visibleCrumbs.length - 1} />
+            </span>
+          ))}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
           <IconBtn
-            title="上级目录"
-            data-testid="local-up-btn"
-            onClick={goUp}
+            title="终端切换到当前目录"
+            data-testid="local-sync-btn"
+            onClick={() => void syncToTerminal()}
           >
-            <ArrowUp size={14} />
+            <LocateFixed size={14} />
           </IconBtn>
-        )}
+          <IconBtn
+            title="下载管理"
+            data-testid="local-downloads-btn"
+            onClick={() => setShowDownloads(true)}
+          >
+            <Download size={14} />
+          </IconBtn>
+          {/* 已在根目录/盘符根时无上级，隐藏返回按钮 */}
+          {path !== null && parentOf(path) !== null && (
+            <IconBtn
+              title="上级目录"
+              data-testid="local-up-btn"
+              onClick={goUp}
+            >
+              <ArrowUp size={14} />
+            </IconBtn>
+          )}
+        </div>
       </div>
 
       {/* 文件列表（树形） */}
@@ -335,27 +364,6 @@ function LocalFiles() {
             空目录
           </div>
         )}
-      </div>
-
-      {/* 底栏：文件路径面包屑（无分隔线；超长路径省略高层级目录） */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap',
-        padding: '5px 10px',
-        fontSize: 11, minHeight: 26, flexShrink: 0,
-      }}>
-        <Crumb label="此电脑" onClick={() => setPath(null)} active={path === null} />
-        {hiddenCount > 0 && (
-          <>
-            <span style={{ color: 'var(--text-muted)' }}>›</span>
-            <span title="已省略上级目录" style={{ color: 'var(--text-muted)', letterSpacing: 1 }}>…</span>
-          </>
-        )}
-        {visibleCrumbs.map((c, i) => (
-          <span key={c.full} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <span style={{ color: 'var(--text-muted)' }}>›</span>
-            <Crumb label={c.seg} onClick={() => setPath(c.full)} active={i === visibleCrumbs.length - 1} />
-          </span>
-        ))}
       </div>
 
       {/* 右键菜单 */}
