@@ -56,6 +56,7 @@ export default function PanelTabs() {
   const activate = useWorkspaceStore((s) => s.activate);
   const closeTab = useWorkspaceStore((s) => s.closeTab);
   const renameTab = useWorkspaceStore((s) => s.renameTab);
+  const duplicateTab = useWorkspaceStore((s) => s.duplicateTab);
   const openHistoryTab = useWorkspaceStore((s) => s.openHistoryTab);
   const loadGroups = useWorkspaceStore((s) => s.loadGroups);
   const createGroupForTab = useWorkspaceStore((s) => s.createGroupForTab);
@@ -190,6 +191,7 @@ export default function PanelTabs() {
             if (ok) useToastStore.getState().addToast('标题已更新', 'success');
           });
         } },
+        { label: '复制会话', onClick: () => duplicateTab(ctxTab.id) },
         { label: '关闭标签', onClick: () => closeTab(ctxTab.id) },
       ]
     : [];
