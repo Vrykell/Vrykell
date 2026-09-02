@@ -84,7 +84,7 @@ export default function DownloadManager({ onBack }: { onBack: () => void }) {
           <button onClick={() => setConfirmClear(true)} data-testid="downloads-clear" title="清空下载历史"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
-              fontSize: 11, padding: '2px 8px', border: '1px solid var(--border)',
+              fontSize: 11, padding: '2px 8px', border: 'none',
               borderRadius: 4, background: 'transparent', color: 'var(--text-secondary)',
               cursor: 'pointer',
             }}>
