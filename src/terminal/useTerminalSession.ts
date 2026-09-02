@@ -22,6 +22,7 @@ import { SessionController } from './pipeline/sessionController';
 import type { DispatchEvent } from './pipeline/events';
 import type { TermBlock } from './pipeline/termBlock';
 import type { UnlistenFn } from '@tauri-apps/api/event';
+import { XTERM_FONT_FAMILY } from './terminalSnapshot';
 
 /**
  * TermBlock UI 投影：剥离 controller 内部字段（outputTerm/earlyBuf 等）。
@@ -409,6 +410,29 @@ export function useTerminalSession(
       return { w: fsHost.clientWidth, h: fsHost.clientHeight - padTop };
     };
 
+    /**
+     * DOM 实测字符宽：活终端画布按 xterm 内部 cellWidth 排布（实测 ≈8.16px），
+     * 而完成块的 HTML 快照用浏览器字体渲染（同字体实测 ≈8.43px，偏宽 ~4%）。
+     * 若按 cellWidth 定列数，快照会比卡片内容宽 → 结束运行中块时即使没调窗宽
+     * 也会折行。统一按 DOM 字符宽换算列数，活终端与完成块宽度一致。
+     * 字体栈取快照渲染同款（XTERM_FONT_FAMILY），一次测量后缓存。
+     */
+    let cachedDomCellWidth = 0;
+    const domCellWidth = (): number => {
+      if (cachedDomCellWidth > 0) return cachedDomCellWidth;
+      const probe = document.createElement('span');
+      probe.style.cssText =
+        'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:pre;line-height:1;';
+      probe.style.fontFamily = XTERM_FONT_FAMILY;
+      probe.style.fontSize = '14px';
+      probe.textContent = 'W'.repeat(100);
+      document.body.appendChild(probe);
+      const w = probe.getBoundingClientRect().width / 100;
+      probe.remove();
+      cachedDomCellWidth = w > 0 ? w : 0;
+      return cachedDomCellWidth || cellWidth();
+    };
+
     /** 当前场景下 PTY/块终端应有的列数 */
     const effectiveCols = (): number => {
       // 以 store 场景为准：手动全屏（「进入全屏交互」）只写 store.scene，不回调
@@ -416,7 +440,8 @@ export function useTerminalSession(
       // 卡片宽分支、把折叠宿主宽读成 0 → PTY 挤成 2 列（全屏 TUI「宽度极其小」）。
       const scene = useTerminalStore.getState().scenes[paneId] ?? currentScene;
       // 手动全屏：全屏宿主铺满整个终端区（宽于单 pane），以宿主实测宽换算列数，
-      // 否则 canvas 停在单 pane 宽 → 全屏两侧露出黑色条。
+      // 否则 canvas 停在单 pane 宽 → 全屏两侧露出黑色条。全屏是纯 canvas 视图
+      //（无 HTML 快照），按 xterm 自身 cellWidth 排布即可铺满。
       if (scene === 'altScreen') {
         const fs = fullscreenHostSize();
         if (fs && fs.w > 0) return Math.max(2, Math.floor(fs.w / cellWidth()));
@@ -432,7 +457,7 @@ export function useTerminalSession(
       // 宿主折叠（display:none / 布局过渡中 clientWidth≈0）→ screenPx≤0，
       // 退回主 xterm 全宽，等宿主落位后 ResizeObserver 再按真实卡片宽校正。
       if (screenPx <= 0) return term.cols;
-      return Math.max(2, Math.min(term.cols, Math.floor(screenPx / cellWidth())));
+      return Math.max(2, Math.min(term.cols, Math.floor(screenPx / domCellWidth())));
     };
 
     /** 当前场景下 PTY/块终端应有的行数（手动全屏以宿主高为准，其余用主 xterm） */
