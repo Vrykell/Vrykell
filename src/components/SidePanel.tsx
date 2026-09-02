@@ -44,6 +44,8 @@ function SinglePanel({ side, panelId }: { side: DockSide; panelId: string }) {
   const setPanelWidth = useDockStore((s) => s.setPanelWidth);
   const commitPanelWidth = useDockStore((s) => s.commitPanelWidth);
   const panelWidths = useDockStore((s) => s.panelWidths);
+  // 拖动中折叠（未松手定局）的面板：内容保持挂载但隐藏，反向拖回时状态无损
+  const collapsed = useDockStore((s) => s.collapsedPanels.includes(panelId));
   const isLeft = side === 'left';
 
   const def = PANEL_DEFS[panelId];
@@ -55,11 +57,12 @@ function SinglePanel({ side, panelId }: { side: DockSide; panelId: string }) {
   const COLLAPSE_HYSTERESIS = 24;
 
   const handleDelta = useCallback((d: number) => {
-    // 折叠后反向拖回：先调宽，只有宽度**超过下限 + 滞回余量**才取消折叠（恢复面板）；
-    // 未超过前保持折叠态（避免微动即弹出）。
     const st = useDockStore.getState();
-    const panels = isLeft ? st.leftPanels : st.rightPanels;
-    if (!panels.includes(panelId)) {
+    // 折叠中（未定局）或已正式下架：先调宽，只有宽度**超过下限 + 滞回余量**
+    // 才取消折叠/恢复面板（未超过前保持隐藏，避免微动即弹出）。
+    const folded = st.collapsedPanels.includes(panelId)
+      || (!st.leftPanels.includes(panelId) && !st.rightPanels.includes(panelId));
+    if (folded) {
       setPanelWidth(panelId, isLeft ? d : -d);
       const cur = useDockStore.getState().panelWidths[panelId] ?? def?.width ?? 200;
       if (cur > MIN_PANEL_WIDTH + COLLAPSE_HYSTERESIS) {
@@ -88,7 +91,7 @@ function SinglePanel({ side, panelId }: { side: DockSide; panelId: string }) {
     }}>
       <div style={{
         width,
-        display: 'flex',
+        display: collapsed ? 'none' : 'flex',
         flexDirection: 'column',
         minHeight: 0,
         height: '100%',
@@ -99,7 +102,7 @@ function SinglePanel({ side, panelId }: { side: DockSide; panelId: string }) {
         </div>
       </div>
 
-      {/* 拖拽手柄 — 绝对定位覆盖在内边缘，无可见缝隙；松手时 commit 折叠判定 */}
+      {/* 拖拽手柄 — 绝对定位覆盖在内边缘，无可见缝隙；折叠中手柄仍在，可反向拖回 */}
       <ResizeHandle axis="x" edge={isLeft ? 'right' : 'left'} onDelta={handleDelta} onUp={handleCommit} testId={`resize-handle-${panelId}`} />
     </div>
   );

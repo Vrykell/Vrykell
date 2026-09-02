@@ -27,36 +27,40 @@ describe('dock store', () => {
     expect(st.leftZone).not.toContain('chat');
   });
 
-  it('setPanelWidth 拖到下限立即折叠；宽度保持 MIN', () => {
+  it('setPanelWidth 拖到下限立即折叠（保持挂载 + 打折叠标记）；宽度保持 MIN', () => {
     useDockStore.setState({ leftZone: ['chat'], leftPanels: ['chat'], panelWidths: { chat: 300 } });
     useDockStore.getState().setPanelWidth('chat', 50);
     expect(useDockStore.getState().panelWidths.chat).toBe(350);
-    // 拖到最小宽度下限 → 立即折叠（面板移除，宽度保持 MIN）
+    // 拖到最小宽度下限 → 折叠：面板不下架（状态不丢），打标记 + 宽度保持 MIN
     useDockStore.getState().setPanelWidth('chat', -1000);
     const s = useDockStore.getState();
-    expect(s.leftPanels.includes('chat')).toBe(false);
+    expect(s.leftPanels.includes('chat')).toBe(true); // 保持挂载（内容状态不丢）
+    expect(s.collapsedPanels).toEqual(['chat']);
     expect(s.panelWidths.chat).toBe(160);
   });
 
   it('折叠后拖回（反向调宽 + 恢复面板）不再折叠', () => {
     useDockStore.setState({ leftZone: ['chat'], leftPanels: ['chat'], panelWidths: { chat: 300 } });
     useDockStore.getState().setPanelWidth('chat', -1000); // 折叠，宽度 160
-    expect(useDockStore.getState().leftPanels).toEqual([]);
+    expect(useDockStore.getState().collapsedPanels).toEqual(['chat']);
     // 拖回：SidePanel 层先 openPanel 恢复，再 setPanelWidth 调宽
     useDockStore.getState().openPanel('chat');
     useDockStore.getState().setPanelWidth('chat', 100);   // 160 → 260
     useDockStore.getState().commitPanelWidth('chat');     // 260 > MIN → 不折叠
     const s = useDockStore.getState();
     expect(s.leftPanels.includes('chat')).toBe(true);
+    expect(s.collapsedPanels).toEqual([]);
     expect(s.panelWidths.chat).toBe(260);
   });
 
-  it('折叠后 commit 幂等；openPanel 恢复可用宽度', () => {
+  it('折叠后松手（commit）正式下架；openPanel 恢复可用宽度', () => {
     useDockStore.setState({ leftZone: ['chat'], leftPanels: ['chat'], panelWidths: { chat: 280 } });
-    useDockStore.getState().setPanelWidth('chat', -200); // 80 ≤ MIN → 立即折叠
+    useDockStore.getState().setPanelWidth('chat', -200); // 80 ≤ MIN → 折叠（保持挂载）
+    expect(useDockStore.getState().leftPanels).toEqual(['chat']);
+    expect(useDockStore.getState().collapsedPanels).toEqual(['chat']);
+    useDockStore.getState().commitPanelWidth('chat');    // 松手定局 → 正式下架
     expect(useDockStore.getState().leftPanels).toEqual([]);
-    useDockStore.getState().commitPanelWidth('chat');    // 幂等
-    expect(useDockStore.getState().leftPanels).toEqual([]);
+    expect(useDockStore.getState().collapsedPanels).toEqual([]);
     useDockStore.getState().openPanel('chat');
     const s = useDockStore.getState();
     expect(s.leftPanels).toEqual(['chat']);

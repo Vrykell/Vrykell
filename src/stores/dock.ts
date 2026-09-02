@@ -94,14 +94,19 @@ interface DockState {
   rightPanels: string[];
   /** 每个面板的用户自定义宽度（px），未设置则用 PANEL_DEFS 默认值 */
   panelWidths: Record<string, number>;
+  /**
+   * 拖动中折叠、尚未松手定局的面板：仍留在 leftPanels/rightPanels 中保持挂载
+   * （内容状态不丢），拖动中隐藏、松手后定局（commit 决定去留）。
+   */
+  collapsedPanels: string[];
 
   moveButton: (id: string, to: DockSide, atIndex?: number) => void;
   togglePanel: (side: DockSide, id: string) => void;
   /** 确保面板打开（已打开则无操作），自动判定所在侧 */
   openPanel: (id: string) => void;
-  /** 拖动中调宽：拖到最小宽度下限 → 立即折叠（面板收起，可反向拖回恢复） */
+  /** 拖动中调宽：拖到最小宽度下限 → 折叠（面板隐藏但保持挂载，可反向拖回恢复） */
   setPanelWidth: (id: string, delta: number) => void;
-  /** 松手兜底：若仍处于折叠宽度则确认折叠（拖动中已折叠时幂等） */
+  /** 松手定局：宽度仍 ≤ 下限 → 正式折叠（下架）；否则恢复展开 */
   commitPanelWidth: (id: string) => void;
 }
 
@@ -128,12 +133,25 @@ export function useChatPanelOpen(): boolean {
   return isSessionActive && chatInPanels;
 }
 
+/** 落盘时把「拖动中折叠」的面板按「已关闭」保存（重启后保持关闭，与旧行为一致）。 */
+function toPersisted(s: DockState): PersistedLayout {
+  const collapsed = new Set(s.collapsedPanels);
+  return {
+    leftZone: s.leftZone,
+    rightZone: s.rightZone,
+    leftPanels: s.leftPanels.filter((p) => !collapsed.has(p)),
+    rightPanels: s.rightPanels.filter((p) => !collapsed.has(p)),
+    panelWidths: s.panelWidths,
+  };
+}
+
 export const useDockStore = create<DockState>((set) => ({
   leftZone: saved.leftZone,
   rightZone: saved.rightZone,
   leftPanels: saved.leftPanels,
   rightPanels: saved.rightPanels,
   panelWidths: saved.panelWidths,
+  collapsedPanels: [],
 
   moveButton: (id, to, atIndex) => {
     set((s) => {
@@ -164,7 +182,7 @@ export const useDockStore = create<DockState>((set) => ({
       const rightPanels = sortByZone(from === 'right' ? s.rightPanels.filter((p) => p !== id) : s.rightPanels, rightZone);
 
       const next = { ...s, leftZone, rightZone, leftPanels, rightPanels };
-      saveLayout(next);
+      saveLayout(toPersisted(next));
       return next;
     });
   },
@@ -174,19 +192,22 @@ export const useDockStore = create<DockState>((set) => ({
       const zone = side === 'left' ? s.leftZone : s.rightZone;
       const panels = side === 'left' ? [...s.leftPanels] : [...s.rightPanels];
       const idx = panels.indexOf(id);
-      if (idx >= 0) {
-        panels.splice(idx, 1); // 已打开 → 关闭
+      const wasCollapsed = s.collapsedPanels.includes(id);
+      if (idx >= 0 && !wasCollapsed) {
+        panels.splice(idx, 1); // 已打开（非折叠）→ 关闭
       } else {
-        // 未打开 → 打开，并按按钮顺序插入（而非打开先后）
-        panels.push(id);
-        const sorted = sortByZone(panels, zone);
-        panels.splice(0, panels.length, ...sorted);
+        // 未打开或处于折叠中 → 打开（并清掉折叠标记）
+        if (idx < 0) {
+          panels.push(id);
+          const sorted = sortByZone(panels, zone);
+          panels.splice(0, panels.length, ...sorted);
+        }
       }
+      const collapsedPanels = s.collapsedPanels.filter((p) => p !== id);
       const patch: Partial<DockState> = side === 'left'
-        ? { leftPanels: panels }
-        : { rightPanels: panels };
-      const full: PersistedLayout = { ...s, ...patch };
-      saveLayout(full);
+        ? { leftPanels: panels, collapsedPanels }
+        : { rightPanels: panels, collapsedPanels };
+      saveLayout(toPersisted({ ...s, ...patch }));
       return patch as DockState;
     });
   },
@@ -196,15 +217,17 @@ export const useDockStore = create<DockState>((set) => ({
       const side: DockSide = s.leftZone.includes(id) ? 'left' : 'right';
       const zone = side === 'left' ? s.leftZone : s.rightZone;
       const panels = side === 'left' ? [...s.leftPanels] : [...s.rightPanels];
-      if (panels.includes(id)) return {};
-      panels.push(id);
-      const sorted = sortByZone(panels, zone);
-      panels.splice(0, panels.length, ...sorted);
+      const collapsedPanels = s.collapsedPanels.filter((p) => p !== id);
+      if (panels.includes(id) && collapsedPanels.length === s.collapsedPanels.length) return {};
+      if (!panels.includes(id)) {
+        panels.push(id);
+        const sorted = sortByZone(panels, zone);
+        panels.splice(0, panels.length, ...sorted);
+      }
       const patch: Partial<DockState> = side === 'left'
-        ? { leftPanels: panels }
-        : { rightPanels: panels };
-      const full: PersistedLayout = { ...s, ...patch };
-      saveLayout(full);
+        ? { leftPanels: panels, collapsedPanels }
+        : { rightPanels: panels, collapsedPanels };
+      saveLayout(toPersisted({ ...s, ...patch }));
       return patch as DockState;
     });
   },
@@ -215,16 +238,16 @@ export const useDockStore = create<DockState>((set) => ({
       // 渲染闭包陈旧导致的增量丢失（面板不跟手、终端 flex 反而在变）。
       const cur = s.panelWidths[id] ?? PANEL_DEFS[id]?.width ?? 200;
       const next = Math.round(cur + delta);
-      // 拖到最小宽度下限 → 立即折叠（面板从所在侧移除、收起）；
-      // 松手前反向拖回由 SidePanel 恢复（openPanel + 继续调宽）。
+      // 拖到最小宽度下限 → 折叠：面板保持挂载（内容状态不丢），仅打折叠标记并隐藏，
+      // 松手前反向拖回可无损恢复；是否真正下架由 commitPanelWidth 松手定局。
       if (next <= MIN_PANEL_WIDTH) {
-        const leftPanels = s.leftPanels.includes(id) ? s.leftPanels.filter((p) => p !== id) : s.leftPanels;
-        const rightPanels = s.rightPanels.includes(id) ? s.rightPanels.filter((p) => p !== id) : s.rightPanels;
-        if (leftPanels === s.leftPanels && rightPanels === s.rightPanels) return {};
+        if (s.collapsedPanels.includes(id) && (s.panelWidths[id] ?? 0) === MIN_PANEL_WIDTH) return {};
+        const collapsedPanels = s.collapsedPanels.includes(id)
+          ? s.collapsedPanels
+          : [...s.collapsedPanels, id];
         const panelWidths = { ...s.panelWidths, [id]: MIN_PANEL_WIDTH };
-        const patch = { leftPanels, rightPanels, panelWidths };
-        const full: PersistedLayout = { ...s, ...patch };
-        saveLayout(full);
+        const patch = { collapsedPanels, panelWidths };
+        saveLayout(toPersisted({ ...s, ...patch }));
         return patch as DockState;
       }
       // 未到下限：正常调宽（上限受窗口与终端最小宽约束）
@@ -237,25 +260,31 @@ export const useDockStore = create<DockState>((set) => ({
       const available = window.innerWidth - otherWidth;
       const maxW = Math.max(MIN_PANEL_WIDTH, Math.round(available - currentTerminalMinWidth()));
       const clamped = Math.max(MIN_PANEL_WIDTH, Math.min(maxW, next));
-      if (clamped === cur) return {};
+      if (clamped === cur && !s.collapsedPanels.includes(id)) return {};
+      const collapsedPanels = s.collapsedPanels.filter((p) => p !== id);
       const panelWidths = { ...s.panelWidths, [id]: clamped };
-      const full = { ...s, panelWidths };
-      saveLayout(full);
-      return { panelWidths };
+      saveLayout(toPersisted({ ...s, panelWidths, collapsedPanels }));
+      return { panelWidths, collapsedPanels };
     });
   },
 
   commitPanelWidth: (id) => {
     set((s) => {
       const cur = s.panelWidths[id] ?? PANEL_DEFS[id]?.width ?? 200;
-      // 松手兜底：宽度 ≤ 最小宽度 → 折叠（拖动中已折叠时幂等）
-      if (cur > MIN_PANEL_WIDTH) return {};
+      const wasCollapsed = s.collapsedPanels.includes(id);
+      if (cur > MIN_PANEL_WIDTH) {
+        // 反悔拖回后松手：仅清掉折叠标记（面板保持展开、状态无损）
+        if (!wasCollapsed) return {};
+        const collapsedPanels = s.collapsedPanels.filter((p) => p !== id);
+        saveLayout(toPersisted({ ...s, collapsedPanels }));
+        return { collapsedPanels };
+      }
+      // 松手时宽度仍 ≤ 下限 → 正式折叠：从面板列表下架（持久化为关闭）
       const leftPanels = s.leftPanels.includes(id) ? s.leftPanels.filter((p) => p !== id) : s.leftPanels;
       const rightPanels = s.rightPanels.includes(id) ? s.rightPanels.filter((p) => p !== id) : s.rightPanels;
-      if (leftPanels === s.leftPanels && rightPanels === s.rightPanels) return {};
-      const patch = { leftPanels, rightPanels };
-      const full: PersistedLayout = { ...s, ...patch };
-      saveLayout(full);
+      const collapsedPanels = s.collapsedPanels.filter((p) => p !== id);
+      const patch = { leftPanels, rightPanels, collapsedPanels };
+      saveLayout(toPersisted({ ...s, ...patch }));
       return patch as DockState;
     });
   },
