@@ -92,15 +92,16 @@ fn disk_space(path: &str) -> (u64, u64) {
 #[cfg(target_os = "windows")]
 fn disk_space(path: &str) -> (u64, u64) {
     use std::os::windows::ffi::OsStrExt;
-    use winapi::um::winbase::GetDiskFreeSpaceExW;
+    use winapi::um::fileapi::GetDiskFreeSpaceExW;
+    use winapi::um::winnt::ULARGE_INTEGER;
     let wide: Vec<u16> = std::ffi::OsStr::new(path).encode_wide().chain(Some(0)).collect();
-    let mut free_bytes_to_caller: u64 = 0;
-    let mut total_bytes: u64 = 0;
-    let mut total_free_bytes: u64 = 0;
+    let mut free_bytes_to_caller = ULARGE_INTEGER::default();
+    let mut total_bytes = ULARGE_INTEGER::default();
+    let mut total_free_bytes = ULARGE_INTEGER::default();
     unsafe {
         GetDiskFreeSpaceExW(wide.as_ptr(), &mut free_bytes_to_caller, &mut total_bytes, &mut total_free_bytes);
     }
-    (total_bytes, free_bytes_to_caller)
+    unsafe { (*total_bytes.QuadPart(), *free_bytes_to_caller.QuadPart()) }
 }
 
 /// 列出磁盘（按磁盘展示「此电脑」）：

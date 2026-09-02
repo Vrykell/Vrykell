@@ -265,7 +265,7 @@ fn merge_user_bin_paths(cmd: &mut CommandBuilder) {
     let home = std::env::var("HOME").unwrap_or_default();
     let mut merged: Vec<String> = Vec::new();
     let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-    let mut push = |dir: String, merged: &mut Vec<String>, seen: &mut std::collections::HashSet<String>| {
+    let push = |dir: String, merged: &mut Vec<String>, seen: &mut std::collections::HashSet<String>| {
         if dir.is_empty() || !std::path::Path::new(&dir).is_dir() || seen.contains(&dir) {
             return;
         }

@@ -1,3 +1,4 @@
+/// <reference types="node" />
 /**
  * 随机压测 Markdown 渲染管线 —— 种子化随机生成"markdown 敏感字符"串，
  * 轰炸 remark-gfm + remark-math + rehype-katex + CommandBlock，抓抛出异常的输入。
