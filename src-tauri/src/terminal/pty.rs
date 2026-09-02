@@ -287,6 +287,18 @@ fn merge_user_bin_paths(cmd: &mut CommandBuilder) {
     cmd.env("PATH", merged.join(":"));
 }
 
+/// GUI（Finder/Dock 启动）的 TERM 通常为空 —— zsh 会退化为 dumb、依赖终端
+/// 能力检测的 TUI（claude 等 truecolor 全屏应用）会因检测失败挂起/黑屏。
+/// 统一补上 xterm-256color + truecolor（用户已显式设置的优先，不改动）。
+fn merge_term_env(cmd: &mut CommandBuilder) {
+    if std::env::var("TERM").map(|v| v.is_empty()).unwrap_or(true) {
+        cmd.env("TERM", "xterm-256color");
+    }
+    if std::env::var("COLORTERM").map(|v| v.is_empty()).unwrap_or(true) {
+        cmd.env("COLORTERM", "truecolor");
+    }
+}
+
 /// Windows 默认 shell：pwsh → powershell → cmd（进程内缓存，避免每次建终端都 spawn 探测）。
 #[cfg(target_os = "windows")]
 fn default_windows_shell() -> &'static str {
@@ -320,6 +332,8 @@ pub fn pty_spawn(
     let mut cmd = build_shell_cmd(cwd, shell, ssh, open_mode)?;
     // GUI 启动 PATH 缺用户 bin（/usr/local/bin 等），补进子进程（ssh 分支也顺带受益）
     merge_user_bin_paths(&mut cmd);
+    // GUI 启动 TERM 为空 → TUI 应用（claude 等）能力检测失败会挂起，补 xterm-256color
+    merge_term_env(&mut cmd);
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
     drop(pair.slave);
     let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
@@ -748,6 +762,24 @@ mod tests {
         }
         // 继承的 PATH 不丢失
         assert!(dirs.contains(&"/usr/bin"));
+    }
+
+    /// GUI 启动 TERM 为空：补 xterm-256color + truecolor；已显式设置时不动。
+    #[test]
+    fn merge_term_env_fills_empty_and_keeps_explicit() {
+        std::env::remove_var("TERM");
+        std::env::remove_var("COLORTERM");
+        let mut cmd = CommandBuilder::new("zsh");
+        merge_term_env(&mut cmd);
+        assert_eq!(cmd.get_env("TERM").unwrap().to_str().unwrap(), "xterm-256color");
+        assert_eq!(cmd.get_env("COLORTERM").unwrap().to_str().unwrap(), "truecolor");
+
+        std::env::set_var("TERM", "screen-256color");
+        std::env::set_var("COLORTERM", "24bit");
+        let mut cmd2 = CommandBuilder::new("zsh");
+        merge_term_env(&mut cmd2);
+        assert_eq!(cmd2.get_env("TERM").unwrap().to_str().unwrap(), "screen-256color");
+        assert_eq!(cmd2.get_env("COLORTERM").unwrap().to_str().unwrap(), "24bit");
     }
 
     /// 多字节 UTF-8 字符跨 read 边界不应产生 U+FFFD。
