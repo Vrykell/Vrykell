@@ -5,6 +5,7 @@ import { ensureSshLoaded, useSshStore } from './store';
 import { useWorkspaceStore } from '../stores/workspace';
 import { useDockStore } from '../stores/dock';
 import ContextMenu from '../components/ContextMenu';
+import { IconBtn } from '../components/UiBtn';
 import type { SshConnection } from './api';
 import SshFormModal from './SshFormModal';
 
@@ -176,43 +177,5 @@ export default function PanelSsh() {
 
       <SshFormModal open={formOpen} initial={editing} onClose={() => setFormOpen(false)} />
     </div>
-  );
-}
-
-function IconBtn({
-  title, onClick, disabled, children, ...rest
-}: {
-  title: string;
-  onClick: () => void;
-  disabled?: boolean;
-  children: React.ReactNode;
-  [key: string]: unknown;
-}) {
-  return (
-    <button
-      data-subtle
-      title={title}
-      onClick={onClick}
-      disabled={disabled}
-      {...rest}
-      style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 24, height: 24, padding: 0, borderRadius: 5,
-        background: 'transparent', border: 'none', color: 'var(--text-muted)',
-        cursor: disabled ? 'default' : 'pointer', flexShrink: 0, opacity: disabled ? 0.4 : 1,
-      }}
-      onMouseEnter={(e) => {
-        if (!disabled) {
-          e.currentTarget.style.background = 'var(--button-hover)';
-          e.currentTarget.style.color = 'var(--text-secondary)';
-        }
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'transparent';
-        e.currentTarget.style.color = 'var(--text-muted)';
-      }}
-    >
-      {children}
-    </button>
   );
 }

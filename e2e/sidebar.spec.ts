@@ -23,7 +23,7 @@ test.describe('文件面板', () => {
     await expect(page.getByText('Documents')).toHaveCount(2);
     // 双击 = 进入文件夹，出现返回按钮
     await page.getByText('Documents').first().dblclick();
-    await expect(page.getByText('‹ 返回')).toBeVisible();
+    await expect(page.locator('[data-testid="local-up-btn"]')).toBeVisible();
   });
 
   test('关闭面板再重新打开', async ({ page }) => {

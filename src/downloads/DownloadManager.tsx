@@ -4,6 +4,7 @@ import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { downloadsList, downloadsClear, type DownloadEntry } from './api';
 import { fileIcon } from '../files/fileIcon';
 import { useToastStore } from '../components/Toast';
+import { IconBtn } from '../components/UiBtn';
 import ConfirmDialog from '../components/ConfirmDialog';
 
 /** 字节数格式化（B/KB/MB/GB/TB）。 */
@@ -66,30 +67,19 @@ export default function DownloadManager({ onBack }: { onBack: () => void }) {
     }}>
       {/* 顶栏 */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        padding: '6px 10px', borderBottom: '1px solid var(--border)',
-        minHeight: 30,
+        display: 'flex', alignItems: 'center', gap: 2,
+        padding: '6px 8px', borderBottom: '1px solid var(--border)',
+        minHeight: 30, flexShrink: 0,
       }}>
-        <button onClick={onBack} data-testid="downloads-back" title="返回文件浏览"
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            fontSize: 11, padding: '2px 6px', border: 'none', background: 'transparent',
-            color: 'var(--text-muted)', cursor: 'pointer',
-          }}>
-          <ArrowLeft size={12} /> 返回
-        </button>
+        <IconBtn title="返回文件浏览" data-testid="downloads-back" onClick={onBack}>
+          <ArrowLeft size={14} />
+        </IconBtn>
         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>下载管理</span>
         <div style={{ flex: 1 }} />
         {items.length > 0 && (
-          <button onClick={() => setConfirmClear(true)} data-testid="downloads-clear" title="清空下载历史"
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              fontSize: 11, padding: '2px 8px', border: 'none',
-              borderRadius: 4, background: 'transparent', color: 'var(--text-secondary)',
-              cursor: 'pointer',
-            }}>
-            <Trash2 size={11} /> 清空
-          </button>
+          <IconBtn title="清空下载历史" data-testid="downloads-clear" onClick={() => setConfirmClear(true)}>
+            <Trash2 size={14} />
+          </IconBtn>
         )}
       </div>
 
