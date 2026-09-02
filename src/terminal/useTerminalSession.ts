@@ -242,17 +242,6 @@ export function useTerminalSession(
           ts.setAltScreenActive(false);
         }
       },
-      // altScreen 退出前（1049l 尚未写主 xterm）取 alt buffer 最终画面，回填 TUI 块
-      captureMainScreen: () => {
-        const buf = term.buffer.active;
-        const lines: string[] = [];
-        for (let i = 0; i < buf.length; i++) {
-          const line = buf.getLine(i);
-          if (line) lines.push(line.translateToString(true));
-        }
-        while (lines.length > 0 && !lines[lines.length - 1]!.trim()) lines.pop();
-        return lines.join('\r\n');
-      },
     }, term.rows, initialScene, blockEnabled);
     sessionControllers.set(paneId, controller);
     // 初始场景手动落位（无 OSC 133 触发）：

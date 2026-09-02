@@ -21,8 +21,6 @@ export interface SessionSinks {
   onCwd(path: string): void;
   onBlockStart(block: TermBlock): void;
   onBlockComplete(block: TermBlock): void;
-  /** 读取主 xterm 当前 buffer 的可见文本（仅在 altScreen 退出前调用，取 TUI 最终画面） */
-  captureMainScreen?(): string;
   /** 读取当前书签块 id 集合（书签状态只活在 store，controller 驱逐块时需反查） */
   getBookmarkedIds?(): Set<string>;
 }
@@ -40,8 +38,6 @@ interface InternalBlock extends TermBlock {
   _prevBaseY: number;
   /** 是否由 OSC 133;A 正常创建（用于决定 earlyBuf 是否含提示符行） */
   _fromA: boolean;
-  /** 执行期间进过 alt buffer（vi/less/htop 等 TUI）——退出 alt 时回填最终画面 */
-  _wasTui?: boolean;
 }
 
 // block id 跨重启唯一（时间戳前缀 + 自增），避免重启后与历史块 id 碰撞
@@ -388,9 +384,7 @@ export class SessionController {
       this.sinks.writeMain(raw);
       return;
     }
-    // 标记属主 block：alt 期间输出只写主 xterm，块内 outputTerm 收不到任何字节
-    const ab = this.activeBlock;
-    if (ab?.status === 'executing') ab._wasTui = true;
+    // alt 期间输出只写主 xterm，块内 outputTerm 收不到任何字节
     this.preAltScene = this._scene;
     this._scene = 'altScreen';
     this.sinks.writeMain(raw); // xterm 自己切 alt buffer
@@ -399,13 +393,6 @@ export class SessionController {
 
   private exitAlt(raw: string): void {
     if (this._scene !== 'altScreen') return;
-    // 1049l 写主 xterm 前抢下 alt buffer 最终画面，回填属主 block ——
-    // 否则 vi 等块历史只剩 teardown 之后的 shell 噪音（job 通知、%），块本身空白
-    const ab = this.activeBlock;
-    if (ab?.status === 'executing' && ab._wasTui && ab.outputTerm) {
-      const frame = this.sinks.captureMainScreen?.();
-      if (frame) ab.outputTerm.write(`\x1b[2m${frame}\x1b[0m\r\n`);
-    }
     this.sinks.writeMain(raw);
     this._scene = this.preAltScene;
     this.sinks.onSceneChanged(this._scene);
