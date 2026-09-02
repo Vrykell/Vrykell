@@ -6,6 +6,7 @@ import {
 import { useWorkspaceStore, isSessionTab, firstTerminalOf, terminalsOf, type Tab, type TabGroup } from '../stores/workspace';
 import { regenerateTitle } from '../agent/title';
 import { useToastStore } from './Toast';
+import { IconBtn } from './UiBtn';
 import { shellTypeLabel } from '../lib/shells';
 import NewTabModal from './NewTabModal';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
@@ -710,37 +711,3 @@ function DragGhost({ type, id, tabs, x, y }: {
 }
 
 // ── 通用 ──
-
-function IconBtn({
-  title, onClick, children, ...rest
-}: {
-  title: string;
-  onClick: () => void;
-  children: React.ReactNode;
-  [key: string]: unknown;
-}) {
-  return (
-    <button
-      data-subtle
-      title={title}
-      onClick={onClick}
-      {...rest}
-      style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 24, height: 24, padding: 0, borderRadius: 5,
-        background: 'transparent', border: 'none', color: 'var(--text-muted)',
-        cursor: 'pointer', flexShrink: 0,
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'var(--button-hover)';
-        e.currentTarget.style.color = 'var(--text-secondary)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'transparent';
-        e.currentTarget.style.color = 'var(--text-muted)';
-      }}
-    >
-      {children}
-    </button>
-  );
-}

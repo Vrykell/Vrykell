@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { Folder, File, MoreHorizontal, LocateFixed } from 'lucide-react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { Folder, File, MoreHorizontal, LocateFixed, ArrowUp } from 'lucide-react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { sshFsList, sshDownload, sshRename, sshDelete, sshUpload } from './api';
 import type { SshFsEntry } from './api';
@@ -9,9 +9,11 @@ import { loadConfig, remoteOpenCommand } from '../files/fileOpen';
 import { useTerminalStore } from '../stores/terminal';
 import { useWorkspaceStore } from '../stores/workspace';
 import { useToastStore } from '../components/Toast';
+import { IconBtn } from '../components/UiBtn';
 import ContextMenu, { type ContextMenuItem } from '../components/ContextMenu';
 import ConfirmDialog from '../components/ConfirmDialog';
 import DownloadManager from '../downloads/DownloadManager';
+import { compactPathSegments } from '../files/pathUtils';
 import {
   useRemotePathStore,
   normalizeRemotePath,
@@ -63,6 +65,13 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
   useEffect(() => { load(path); }, [load, path]);
   // 操作后的刷新（重命名/删除/上传）
   const refresh = () => load(path);
+
+  // 底栏面包屑压缩（必须在视图切换的提前返回之前，避免条件 hook）
+  const segs = path ? path.split('/').filter(Boolean) : [];
+  const { visible: visibleCrumbs, hiddenCount } = useMemo(
+    () => compactPathSegments(segs, (s) => '/' + s.join('/')),
+    [segs],
+  );
 
   // hooks 之后再做视图切换，避免「条件 hook」导致 React 报错
   if (showDownloads) return <DownloadManager onBack={() => setShowDownloads(false)} />;
@@ -184,60 +193,45 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
   };
 
   // 面包屑：真实路径层级（/ › home › user › …），根是顶层、home 是 /home/user
-  const segs = path ? path.split('/').filter(Boolean) : [];
 
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100%',
       userSelect: 'none', background: 'var(--surface)',
     }}>
-      {/* 顶栏：操作按钮 */}
+      {/* 顶栏：操作按钮（右对齐，图标样式与其它侧栏统一） */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        padding: '6px 10px',
+        display: 'flex', alignItems: 'center', gap: 2,
+        padding: '6px 8px',
         fontSize: 11, minHeight: 30, flexShrink: 0,
       }}>
+        <div style={{ flex: 1 }} />
         {path && path !== '/' && (
-          <button
-            onClick={goUp}
+          <IconBtn
             title="上级目录"
             data-testid="remote-up-btn"
-            style={{
-              fontSize: 11, padding: '2px 6px', border: 'none', borderRadius: 4,
-              background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
-            }}
+            onClick={goUp}
           >
-            ‹ 返回
-          </button>
+            <ArrowUp size={14} />
+          </IconBtn>
         )}
-        <button
-          onClick={() => void syncToTerminal()}
+        <IconBtn
           title="终端切换到当前目录"
           data-testid="remote-sync-btn"
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            fontSize: 11, padding: '2px 8px', border: 'none', borderRadius: 4,
-            background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer',
-          }}
+          onClick={() => void syncToTerminal()}
         >
-          <LocateFixed size={12} /> 同步
-        </button>
-        <button
+          <LocateFixed size={14} />
+        </IconBtn>
+        <IconBtn
+          title="更多操作"
+          data-testid="remote-more-btn"
           onClick={(e) => {
             const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
             setMoreMenu({ x: r.left, y: r.bottom + 4 });
           }}
-          title="更多操作"
-          data-testid="remote-more-btn"
-          style={{
-            display: 'inline-flex', alignItems: 'center',
-            fontSize: 11, padding: '2px 6px', border: 'none', borderRadius: 4,
-            background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer',
-          }}
         >
           <MoreHorizontal size={14} />
-        </button>
-        <div style={{ flex: 1 }} />
+        </IconBtn>
       </div>
 
       {/* 远程文件列表 */}
@@ -262,23 +256,25 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
         ))}
       </div>
 
-      {/* 底栏：文件路径面包屑 */}
+      {/* 底栏：文件路径面包屑（无分隔线；超长路径省略高层级目录） */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap',
         padding: '5px 10px',
         fontSize: 11, minHeight: 26, flexShrink: 0,
-        borderTop: '1px solid var(--border)',
       }}>
         <Crumb label="/" onClick={() => setPath('/')} active={path === '/'} />
-        {segs.map((seg, i) => {
-          const full = '/' + segs.slice(0, i + 1).join('/');
-          return (
-            <span key={full} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <span style={{ color: 'var(--text-muted)' }}>›</span>
-              <Crumb label={seg} onClick={() => setPath(full)} active={i === segs.length - 1} />
-            </span>
-          );
-        })}
+        {hiddenCount > 0 && (
+          <>
+            <span style={{ color: 'var(--text-muted)' }}>›</span>
+            <span title="已省略上级目录" style={{ color: 'var(--text-muted)', letterSpacing: 1 }}>…</span>
+          </>
+        )}
+        {visibleCrumbs.map((c, i) => (
+          <span key={c.full} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <span style={{ color: 'var(--text-muted)' }}>›</span>
+            <Crumb label={c.seg} onClick={() => setPath(c.full)} active={i === visibleCrumbs.length - 1} />
+          </span>
+        ))}
       </div>
 
       {ctxMenu && (

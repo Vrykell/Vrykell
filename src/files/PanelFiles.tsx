@@ -1,17 +1,18 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { Star, Folder, ChevronRight, Download, LocateFixed } from 'lucide-react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { Star, Folder, ChevronRight, Download, LocateFixed, ArrowUp } from 'lucide-react';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { fsList, fsRoots, fsHome, fsRename, fsDelete, fileOpenWith, type FsEntry } from './fs';
 import { ptyWrite } from '../lib/pty';
 import { openFile } from './fileOpen';
 import { fileIcon } from './fileIcon';
-import { normPath, pathSegments, segmentsToPath, parentOf } from './pathUtils';
+import { normPath, pathSegments, segmentsToPath, parentOf, compactPathSegments } from './pathUtils';
 import { shellQuote } from '../ssh/remotePath';
 import { useWorkspaceDirsStore } from './workspaceDirs';
 import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
 import { useTerminalStore } from '../stores/terminal';
 import { leaves as layoutLeaves, firstLeaf } from '../lib/windowLayout';
 import { useToastStore } from '../components/Toast';
+import { IconBtn } from '../components/UiBtn';
 import { flattenVisible, type VisibleRow } from './fileTree';
 import ContextMenu, { type ContextMenuItem } from '../components/ContextMenu';
 import { ensureSshLoaded, useSshStore } from '../ssh/store';
@@ -123,6 +124,13 @@ function LocalFiles() {
       .then((children) => setChildCache((p) => ({ ...p, [entry.path]: children })))
       .catch(() => setChildCache((p) => ({ ...p, [entry.path]: [] })));
   }, [childCache]);
+
+  // 底栏面包屑压缩（必须在视图切换的提前返回之前，避免条件 hook）
+  const crumbs = pathSegments(path ?? '');
+  const { visible: visibleCrumbs, hiddenCount } = useMemo(
+    () => compactPathSegments(crumbs, (segs) => segmentsToPath(segs)),
+    [crumbs],
+  );
 
   // hooks 之后再做视图切换，避免「条件 hook」导致 React 报错
   if (showDownloads) return <DownloadManager onBack={() => setShowDownloads(false)} />;
@@ -266,55 +274,42 @@ function LocalFiles() {
     }
   };
 
-  const crumbs = pathSegments(path ?? '');
-
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100%',
       userSelect: 'none', background: 'var(--surface)',
     }}>
-      {/* 顶栏：操作按钮 */}
+      {/* 顶栏：操作按钮（右对齐，图标样式与其它侧栏统一） */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        padding: '6px 10px',
+        display: 'flex', alignItems: 'center', gap: 2,
+        padding: '6px 8px',
         fontSize: 11, minHeight: 30, flexShrink: 0,
       }}>
-        <button
-          onClick={() => void syncToTerminal()}
+        <div style={{ flex: 1 }} />
+        <IconBtn
           title="终端切换到当前目录"
           data-testid="local-sync-btn"
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            fontSize: 11, padding: '2px 8px', border: 'none', borderRadius: 4,
-            background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer',
-          }}
+          onClick={() => void syncToTerminal()}
         >
-          <LocateFixed size={11} /> 同步
-        </button>
-        <button
-          onClick={() => setShowDownloads(true)}
+          <LocateFixed size={14} />
+        </IconBtn>
+        <IconBtn
           title="下载管理"
           data-testid="local-downloads-btn"
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            fontSize: 11, padding: '2px 8px', border: 'none', borderRadius: 4,
-            background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer',
-          }}
+          onClick={() => setShowDownloads(true)}
         >
-          <Download size={11} /> 下载
-        </button>
+          <Download size={14} />
+        </IconBtn>
         {/* 已在根目录/盘符根时无上级，隐藏返回按钮 */}
         {path !== null && parentOf(path) !== null && (
-          <button onClick={goUp} title="上级目录"
-            style={{
-              fontSize: 11, padding: '0 4px',
-              border: 'none', background: 'transparent',
-              color: 'var(--text-muted)', cursor: 'pointer',
-            }}>
-            ‹ 返回
-          </button>
+          <IconBtn
+            title="上级目录"
+            data-testid="local-up-btn"
+            onClick={goUp}
+          >
+            <ArrowUp size={14} />
+          </IconBtn>
         )}
-        <div style={{ flex: 1 }} />
       </div>
 
       {/* 文件列表（树形） */}
@@ -342,23 +337,25 @@ function LocalFiles() {
         )}
       </div>
 
-      {/* 底栏：文件路径面包屑 */}
+      {/* 底栏：文件路径面包屑（无分隔线；超长路径省略高层级目录） */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap',
         padding: '5px 10px',
         fontSize: 11, minHeight: 26, flexShrink: 0,
-        borderTop: '1px solid var(--border)',
       }}>
         <Crumb label="此电脑" onClick={() => setPath(null)} active={path === null} />
-        {crumbs.map((seg, i) => {
-          const full = segmentsToPath(crumbs.slice(0, i + 1));
-          return (
-            <span key={full} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <span style={{ color: 'var(--text-muted)' }}>›</span>
-              <Crumb label={seg} onClick={() => setPath(full)} active={i === crumbs.length - 1} />
-            </span>
-          );
-        })}
+        {hiddenCount > 0 && (
+          <>
+            <span style={{ color: 'var(--text-muted)' }}>›</span>
+            <span title="已省略上级目录" style={{ color: 'var(--text-muted)', letterSpacing: 1 }}>…</span>
+          </>
+        )}
+        {visibleCrumbs.map((c, i) => (
+          <span key={c.full} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <span style={{ color: 'var(--text-muted)' }}>›</span>
+            <Crumb label={c.seg} onClick={() => setPath(c.full)} active={i === visibleCrumbs.length - 1} />
+          </span>
+        ))}
       </div>
 
       {/* 右键菜单 */}
