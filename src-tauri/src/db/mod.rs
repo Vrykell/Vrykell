@@ -77,6 +77,7 @@ fn init_schema(conn: &Connection) -> Result<(), String> {
                 command TEXT NOT NULL DEFAULT '',
                 output_raw TEXT NOT NULL DEFAULT '',
                 output_clean TEXT NOT NULL DEFAULT '',
+                output_html TEXT NOT NULL DEFAULT '',
                 exit_code INTEGER,
                 status TEXT NOT NULL DEFAULT 'running',
                 started_at INTEGER NOT NULL,
@@ -143,6 +144,7 @@ fn init_schema(conn: &Connection) -> Result<(), String> {
         ensure_column(conn, "sessions", "payload", "ALTER TABLE sessions ADD COLUMN payload TEXT NOT NULL DEFAULT '{}';")?;
         ensure_column(conn, "blocks", "pane_id", "ALTER TABLE blocks ADD COLUMN pane_id TEXT;")?;
         ensure_column(conn, "blocks", "collapsed", "ALTER TABLE blocks ADD COLUMN collapsed INTEGER NOT NULL DEFAULT 0;")?;
+        ensure_column(conn, "blocks", "output_html", "ALTER TABLE blocks ADD COLUMN output_html TEXT NOT NULL DEFAULT '';")?;
         ensure_column(conn, "chat_messages", "parts", "ALTER TABLE chat_messages ADD COLUMN parts TEXT NOT NULL DEFAULT '';")?;
         ensure_column(conn, "chat_messages", "attachments", "ALTER TABLE chat_messages ADD COLUMN attachments TEXT NOT NULL DEFAULT '';")?;
         conn.execute_batch("PRAGMA user_version = 1;")
@@ -236,11 +238,12 @@ mod tests {
     fn record_block_persists_even_before_session_created() {
         let db = test_db();
         // 不先 create_session，直接记 block —— 兜底 INSERT OR IGNORE 会话行
-        db.record_block("b1", "t9", None, "ls -la", "out", "out", Some(0), "done", 100, Some(200))
+        db.record_block("b1", "t9", None, "ls -la", "out", "out", "<span>out</span>", Some(0), "done", 100, Some(200))
             .unwrap();
         let blocks = db.get_session_blocks("t9").unwrap();
         assert_eq!(blocks.len(), 1);
         assert_eq!(blocks[0].command, "ls -la");
+        assert_eq!(blocks[0].output_html, "<span>out</span>");
         // list_sessions 的 block_count 也应 > 0
         let sessions = db.list_sessions().unwrap();
         assert!(sessions.iter().any(|s| s.id == "t9" && s.block_count == 1));
@@ -250,7 +253,7 @@ mod tests {
     fn delete_session_cascades_blocks_and_chat() {
         let db = test_db();
         db.create_session("s1", "标题", 0, "", "local", "{}").unwrap();
-        db.record_block("b1", "s1", None, "ls", "o", "o", Some(0), "done", 1, Some(2)).unwrap();
+        db.record_block("b1", "s1", None, "ls", "o", "o", "oh", Some(0), "done", 1, Some(2)).unwrap();
         db.append_chat_message("m1", "s1", "user", "hi", 1, "", "").unwrap();
         db.delete_session("s1").unwrap();
         assert!(db.get_session_blocks("s1").unwrap().is_empty());
@@ -325,7 +328,7 @@ mod tests {
     fn set_block_collapsed_persists_and_reads_back() {
         let db = test_db();
         db.create_session("s1", "t", 0, "", "local", "{}").unwrap();
-        db.record_block("b1", "s1", None, "ls", "o", "o", Some(0), "done", 1, Some(2)).unwrap();
+        db.record_block("b1", "s1", None, "ls", "o", "o", "oh", Some(0), "done", 1, Some(2)).unwrap();
         assert!(!db.get_session_blocks("s1").unwrap()[0].collapsed);
         db.set_block_collapsed("b1", true).unwrap();
         assert!(db.get_session_blocks("s1").unwrap()[0].collapsed);

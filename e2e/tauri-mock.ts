@@ -751,7 +751,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
           }
           case 'get_session_blocks':
             if (args.sessionId === 'hist-1') {
-              return [{ id: 'b1', session_id: 'hist-1', pane_id: null, command: 'ls -la', output_raw: 'o', output_clean: 'total 1', exit_code: 0, status: 'done', started_at: 1, ended_at: 2, collapsed: false }];
+              return [{ id: 'b1', session_id: 'hist-1', pane_id: null, command: 'ls -la', output_raw: 'o', output_clean: 'total 1', output_html: '<span style="color:#4e9a06">total 1</span>', exit_code: 0, status: 'done', started_at: 1, ended_at: 2, collapsed: false }];
             }
             return [];
           case 'update_session_payload':

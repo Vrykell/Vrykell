@@ -50,11 +50,11 @@ export function listSessions(): Promise<BackendSessionEntry[]> {
 
 export function recordBlock(
   id: string, sessionId: string, paneId: string | null, command: string,
-  outputRaw: string, outputClean: string, exitCode: number | null, status: string,
+  outputRaw: string, outputClean: string, outputHtml: string, exitCode: number | null, status: string,
   startedAt: number, endedAt: number | null,
 ): Promise<void> {
   return invoke('record_block', {
-    id, sessionId, paneId, command, outputRaw, outputClean, exitCode, status, startedAt, endedAt,
+    id, sessionId, paneId, command, outputRaw, outputClean, outputHtml, exitCode, status, startedAt, endedAt,
   });
 }
 

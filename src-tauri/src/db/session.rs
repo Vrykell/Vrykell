@@ -162,6 +162,7 @@ impl HistoryDb {
         command: &str,
         output_raw: &str,
         output_clean: &str,
+        output_html: &str,
         exit_code: Option<i32>,
         status: &str,
         started_at: u64,
@@ -177,16 +178,17 @@ impl HistoryDb {
             .map_err(|e| e.to_string())?;
         self.conn()
             .execute(
-                "INSERT INTO blocks (id, session_id, pane_id, command, output_raw, output_clean, exit_code, status, started_at, ended_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                "INSERT INTO blocks (id, session_id, pane_id, command, output_raw, output_clean, output_html, exit_code, status, started_at, ended_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
                  ON CONFLICT(id) DO UPDATE SET
                    command=excluded.command,
                    output_raw=excluded.output_raw,
                    output_clean=excluded.output_clean,
+                   output_html=excluded.output_html,
                    exit_code=excluded.exit_code,
                    status=excluded.status,
                    ended_at=excluded.ended_at",
-                params![id, session_id, pane_id, command, output_raw, output_clean, exit_code, status, started_at as i64, ended_at.map(|v| v as i64)],
+                params![id, session_id, pane_id, command, output_raw, output_clean, output_html, exit_code, status, started_at as i64, ended_at.map(|v| v as i64)],
             )
             .map_err(|e| e.to_string())?;
         Ok(())
@@ -226,7 +228,7 @@ impl HistoryDb {
 
         let limit_idx = params_vec.len() + 1;
         let sql = format!(
-            "SELECT b.id, b.session_id, b.pane_id, b.command, b.output_raw, b.output_clean, b.exit_code,\
+            "SELECT b.id, b.session_id, b.pane_id, b.command, b.output_raw, b.output_clean, b.output_html, b.exit_code,\
                     b.status, b.started_at, b.ended_at, s.title, s.status, b.collapsed \
              FROM blocks b JOIN sessions s ON b.session_id = s.id \
              WHERE {} \
@@ -289,7 +291,7 @@ impl HistoryDb {
         let mut stmt = self
             .conn()
             .prepare(
-                "SELECT b.id, b.session_id, b.pane_id, b.command, b.output_raw, b.output_clean, b.exit_code,\
+                "SELECT b.id, b.session_id, b.pane_id, b.command, b.output_raw, b.output_clean, b.output_html, b.exit_code,\
                         b.status, b.started_at, b.ended_at, s.title, s.status, b.collapsed \
                  FROM blocks b JOIN sessions s ON b.session_id = s.id \
                  WHERE b.session_id = ?1 \
@@ -447,6 +449,7 @@ pub struct BlockEntry {
     pub command: String,
     pub output_raw: String,
     pub output_clean: String,
+    pub output_html: String,
     pub exit_code: Option<i32>,
     pub status: String,
     pub started_at: u64,
@@ -464,13 +467,14 @@ fn map_block_entry(row: &rusqlite::Row) -> rusqlite::Result<BlockEntry> {
         command: row.get(3)?,
         output_raw: row.get(4)?,
         output_clean: row.get(5)?,
-        exit_code: row.get(6)?,
-        status: row.get(7)?,
-        started_at: row.get::<_, i64>(8)? as u64,
-        ended_at: row.get::<_, Option<i64>>(9)?.map(|v| v as u64),
-        session_title: row.get(10)?,
-        session_status: row.get(11)?,
-        collapsed: row.get::<_, i64>(12)? != 0,
+        output_html: row.get(6)?,
+        exit_code: row.get(7)?,
+        status: row.get(8)?,
+        started_at: row.get::<_, i64>(9)? as u64,
+        ended_at: row.get::<_, Option<i64>>(10)?.map(|v| v as u64),
+        session_title: row.get(11)?,
+        session_status: row.get(12)?,
+        collapsed: row.get::<_, i64>(13)? != 0,
     })
 }
 
