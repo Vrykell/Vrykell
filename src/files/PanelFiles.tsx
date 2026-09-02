@@ -479,7 +479,7 @@ function DiskCard({ disk, onOpen }: { disk: DiskEntry; onOpen: () => void }) {
   );
 }
 
-/** 容量占用圆环（与上下文占用圆环同风格）：右侧展示已用百分比。 */
+/** 容量占用圆环（与上下文占用圆环同风格，更粗）：右侧展示，信息靠悬停 title。 */
 function DiskRing({ pct }: { pct: number }) {
   const r = 11;
   const c = 2 * Math.PI * r;
@@ -488,22 +488,16 @@ function DiskRing({ pct }: { pct: number }) {
   const color = pct > 90 ? 'var(--accent-warm)' : 'var(--accent)';
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
-      <circle cx={cx} cy={cx} r={r} fill="none" stroke="var(--border)" strokeWidth="3" />
+      <circle cx={cx} cy={cx} r={r} fill="none" stroke="var(--border)" strokeWidth="4.5" />
       <circle
         cx={cx} cy={cx} r={r} fill="none"
         stroke={color}
-        strokeWidth="3"
+        strokeWidth="4.5"
         strokeDasharray={c}
         strokeDashoffset={c * (1 - pct / 100)}
         strokeLinecap="round"
         transform={`rotate(-90 ${cx} ${cx})`}
       />
-      <text
-        x={cx} y={cx + 1} textAnchor="middle" dominantBaseline="middle"
-        style={{ fontSize: 8.5, fill: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}
-      >
-        {pct}%
-      </text>
     </svg>
   );
 }
