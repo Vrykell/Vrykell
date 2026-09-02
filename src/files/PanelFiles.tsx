@@ -436,26 +436,22 @@ function fmtBytes(bytes: number): string {
   return `${v >= 100 || i === 0 ? Math.round(v) : v.toFixed(1)} ${units[i]}`;
 }
 
-/** 磁盘小卡片：图标 + 名称 + 可用容量 + 容量占用条；单击进入。 */
+/** 磁盘小卡片：图标 + 名称 + 可用容量，右侧容量占用圆环；无底色，单击进入。 */
 function DiskCard({ disk, onOpen }: { disk: DiskEntry; onOpen: () => void }) {
   const total = disk.total_bytes;
   const free = disk.free_bytes;
   const used = total > 0 ? Math.max(0, total - free) : 0;
   const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
-  const full = total > 0 && pct > 90;
   return (
     <div
       onClick={onOpen}
-      title={`${disk.path} · 共 ${fmtBytes(total)}`}
+      title={`${disk.path} · 共 ${fmtBytes(total)} · 已用 ${pct}%`}
       data-testid={`disk-card-${disk.name}`}
       style={{
         display: 'flex', alignItems: 'center', gap: 10,
-        padding: '10px 12px', borderRadius: 8,
-        background: 'var(--block)',
+        padding: '6px 10px', borderRadius: 8,
         cursor: 'pointer', userSelect: 'none',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--button-hover)'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--block)'; }}
     >
       <span style={{
         width: 34, height: 34, borderRadius: 8, flexShrink: 0,
@@ -477,19 +473,38 @@ function DiskCard({ disk, onOpen }: { disk: DiskEntry; onOpen: () => void }) {
         }}>
           {total > 0 ? `${fmtBytes(free)} 可用` : '—'}
         </div>
-        {total > 0 && (
-          <div style={{
-            height: 3, borderRadius: 2, marginTop: 5,
-            background: 'var(--border)', overflow: 'hidden',
-          }}>
-            <div style={{
-              width: `${pct}%`, height: '100%',
-              background: full ? 'var(--accent-warm)' : 'var(--accent)',
-            }} />
-          </div>
-        )}
       </div>
+      {total > 0 && <DiskRing pct={pct} />}
     </div>
+  );
+}
+
+/** 容量占用圆环（与上下文占用圆环同风格）：右侧展示已用百分比。 */
+function DiskRing({ pct }: { pct: number }) {
+  const r = 11;
+  const c = 2 * Math.PI * r;
+  const size = 30;
+  const cx = size / 2;
+  const color = pct > 90 ? 'var(--accent-warm)' : 'var(--accent)';
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
+      <circle cx={cx} cy={cx} r={r} fill="none" stroke="var(--border)" strokeWidth="3" />
+      <circle
+        cx={cx} cy={cx} r={r} fill="none"
+        stroke={color}
+        strokeWidth="3"
+        strokeDasharray={c}
+        strokeDashoffset={c * (1 - pct / 100)}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${cx} ${cx})`}
+      />
+      <text
+        x={cx} y={cx + 1} textAnchor="middle" dominantBaseline="middle"
+        style={{ fontSize: 8.5, fill: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}
+      >
+        {pct}%
+      </text>
+    </svg>
   );
 }
 
