@@ -8,12 +8,15 @@
  * 与 React 无关，便于单测。
  */
 
-/** 归一化分隔符为 `/`，去掉尾部斜杠；`/C:/Users`（OSC 7 的 Windows 盘符形式）→ `C:/Users`。 */
+/** 归一化分隔符为 `/`，去掉尾部斜杠；`/C:/Users`（OSC 7 的 Windows 盘符形式）→ `C:/Users`。
+ *  文件系统根 `/` 必须保留（全剥尾斜杠会把根剥成空串，fs_list('') 会失败）。 */
 export function normPath(p: string): string {
   let s = p.replace(/\\/g, '/').replace(/\/+$/, '');
   // 前导斜杠 + 盘符（/C:/Users）→ 盘符（C:/Users）
   s = s.replace(/^\/([a-zA-Z]):\//, '$1:/');
-  return s.replace(/\/+$/, '');
+  s = s.replace(/\/+$/, '');
+  if (s === '') s = '/'; // 根路径
+  return s;
 }
 
 /** 拆成显示段：`C:/Users/foo` → ['C:', 'Users', 'foo']；`/Users` → ['Users']。 */
