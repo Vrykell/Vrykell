@@ -436,12 +436,11 @@ function fmtBytes(bytes: number): string {
   return `${v >= 100 || i === 0 ? Math.round(v) : v.toFixed(1)} ${units[i]}`;
 }
 
-/** 磁盘小卡片：图标 + 名称 + 可用容量，右侧容量占用圆环；无底色，单击进入。 */
+/** 磁盘小卡片：图标 + 名称 + 可用容量；无底色、无装饰组件，单击进入。 */
 function DiskCard({ disk, onOpen }: { disk: DiskEntry; onOpen: () => void }) {
   const total = disk.total_bytes;
   const free = disk.free_bytes;
-  const used = total > 0 ? Math.max(0, total - free) : 0;
-  const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
+  const pct = total > 0 ? Math.min(100, Math.round(((total - Math.max(0, total - free)) / total) * 100)) : 0;
   return (
     <div
       onClick={onOpen}
@@ -474,31 +473,7 @@ function DiskCard({ disk, onOpen }: { disk: DiskEntry; onOpen: () => void }) {
           {total > 0 ? `${fmtBytes(free)} 可用` : '—'}
         </div>
       </div>
-      {total > 0 && <DiskRing pct={pct} />}
     </div>
-  );
-}
-
-/** 容量占用圆环（与上下文占用圆环同风格，更粗）：右侧展示，信息靠悬停 title。 */
-function DiskRing({ pct }: { pct: number }) {
-  const r = 11;
-  const c = 2 * Math.PI * r;
-  const size = 30;
-  const cx = size / 2;
-  const color = pct > 90 ? 'var(--accent-warm)' : 'var(--accent)';
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
-      <circle cx={cx} cy={cx} r={r} fill="none" stroke="var(--border)" strokeWidth="4.5" />
-      <circle
-        cx={cx} cy={cx} r={r} fill="none"
-        stroke={color}
-        strokeWidth="4.5"
-        strokeDasharray={c}
-        strokeDashoffset={c * (1 - pct / 100)}
-        strokeLinecap="round"
-        transform={`rotate(-90 ${cx} ${cx})`}
-      />
-    </svg>
   );
 }
 
