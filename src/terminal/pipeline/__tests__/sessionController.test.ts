@@ -10,7 +10,6 @@ function wire(tabId = 't1') {
     cwds: [] as string[],
     started: [] as string[],
     completed: [] as string[],
-    frame: '',
   };
   const sinks: SessionSinks = {
     writeMain: (d) => { st.written += d; },
@@ -19,7 +18,6 @@ function wire(tabId = 't1') {
     onCwd: (p) => { st.cwds.push(p); },
     onBlockStart: (b) => { st.started.push(b.command); },
     onBlockComplete: (b) => { st.completed.push(b.command); },
-    captureMainScreen: () => st.frame,
   };
   const ctrl = new SessionController(tabId, 80, sinks);
   const scan = new ScanHelper();
@@ -170,18 +168,15 @@ describe('SessionController', () => {
     expect(ctrl.blocks[0]!.outputText).toBe('done');
   });
 
-  it('TUI 退出 alt：主屏最终画面回填进块（vi 历史不再空白只剩 shell 噪音）', async () => {
-    const { st, ctrl, feed } = wire();
-    st.frame = 'vi line1\r\nvi line2'; // captureMainScreen：1049l 前的 alt buffer 内容
+  it('TUI 退出 alt：全屏画面不进块历史（只留 teardown 后的 shell 噪音）', async () => {
+    const { ctrl, feed } = wire();
     feed(`${A}p$ ${E('vi')}${C}`);
     feed('\x1b[?1049h');
     feed('VI FULLSCREEN'); // alt 期间只进主 xterm
-    feed('\x1b[?1049l');   // 退出瞬间 frame 回填进块 outputTerm
+    feed('\x1b[?1049l');   // 全屏画面不回填进块
     feed(`zsh: terminated  vi\r\n${D(143)}`);
-    await waitFor(() => !!ctrl.blocks[0]?.outputText.includes('vi line2'));
-    expect(ctrl.blocks[0]!.outputText).toContain('vi line1');
-    // teardown 后的 shell 噪音照常记录（与 iTerm2 一致），但画面已在块里
-    expect(ctrl.blocks[0]!.outputText).toContain('zsh: terminated');
+    await waitFor(() => !!ctrl.blocks[0]?.outputText.includes('zsh: terminated'));
+    expect(ctrl.blocks[0]!.outputText).not.toContain('VI FULLSCREEN');
   });
 
   it('classic 模式下 OSC raw 转发主 xterm（OSC 8/52 不失效）', () => {

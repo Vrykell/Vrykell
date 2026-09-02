@@ -104,9 +104,10 @@ test.describe('命令块（OSC 133）', () => {
     await expect(page.getByText('TUI')).not.toBeVisible({ timeout: 5000 });
     // 恢复 block 列表后输入栏应重新出现
     await expect(input).toBeVisible({ timeout: 5000 });
-    // TUI 块快照应含 alt 退出前的最终画面（1049l 瞬间从主 xterm 回填），
-    // 不再只剩「zsh: terminated」之类的 teardown 噪音 —— vi 历史空白回归
-    await expect(page.getByText('VIM BUFFER').first()).toBeVisible({ timeout: 5000 });
+    // 全屏 TUI 画面不进块历史（alt 内容只在主 xterm 实时呈现），
+    // 历史只留 teardown 后的 shell 噪音 —— 全屏应用不应污染命令历史
+    await expect(page.getByTestId('exit-code')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('VIM BUFFER')).toHaveCount(0);
   });
 
   test('altScreen 中滚轮降级为方向键发给 PTY', async ({ page }) => {
