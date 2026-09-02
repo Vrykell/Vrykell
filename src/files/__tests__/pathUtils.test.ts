@@ -17,6 +17,12 @@ describe('pathUtils', () => {
     expect(normPath('/C:/Users/foo')).toBe('C:/Users/foo');
   });
 
+  it('normPath 保留文件系统根（cd / 后文件管理器不显示空目录）', () => {
+    expect(normPath('/')).toBe('/');
+    expect(normPath('//')).toBe('/');
+    expect(normPath('/..')).toBe('/..');
+  });
+
   it('pathSegments 拆盘符与目录', () => {
     expect(pathSegments('C:/Users/foo')).toEqual(['C:', 'Users', 'foo']);
     expect(pathSegments('/Users/foo')).toEqual(['Users', 'foo']);
