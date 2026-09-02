@@ -10,9 +10,17 @@ export function fsList(path?: string): Promise<FsEntry[]> {
   return invoke('fs_list', { path: path ?? null });
 }
 
-/** 列出文件系统根（Windows 盘符 / Unix `/`）。 */
-export function fsRoots(): Promise<FsEntry[]> {
-  return invoke('fs_roots');
+/** 磁盘条目（「此电脑」视图小卡片展示用）。 */
+export interface DiskEntry {
+  name: string;
+  path: string;
+  total_bytes: number;
+  free_bytes: number;
+}
+
+/** 列出磁盘（macOS 根卷+挂载卷 / Windows 盘符），附带容量信息。 */
+export function fsDisks(): Promise<DiskEntry[]> {
+  return invoke('fs_disks');
 }
 
 /** 用户主目录路径。 */

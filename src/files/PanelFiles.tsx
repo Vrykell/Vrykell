@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { Star, Folder, ChevronRight, Download, LocateFixed, ArrowUp } from 'lucide-react';
+import { Star, Folder, ChevronRight, Download, LocateFixed, ArrowUp, HardDrive } from 'lucide-react';
 import { openPath } from '@tauri-apps/plugin-opener';
-import { fsList, fsRoots, fsHome, fsRename, fsDelete, fileOpenWith, type FsEntry } from './fs';
+import { fsList, fsDisks, fsHome, fsRename, fsDelete, fileOpenWith, type FsEntry, type DiskEntry } from './fs';
 import { ptyWrite } from '../lib/pty';
 import { openFile } from './fileOpen';
 import { fileIcon } from './fileIcon';
@@ -101,10 +101,15 @@ function LocalFiles() {
     setPath(activeCwd ? normPath(activeCwd) : homePath);
   }, [focused, activeCwd, homePath]);
 
-  // path === null 表示「此电脑」（盘符列表），否则是具体目录
+  // path === null 表示「此电脑」（磁盘卡片列表），否则是具体目录
+  const [disks, setDisks] = useState<DiskEntry[]>([]);
   const load = useCallback((p: string | null) => {
-    const req = p === null ? fsRoots() : fsList(p);
-    req.then(setEntries).catch(() => setEntries([]));
+    if (p === null) {
+      setEntries([]);
+      fsDisks().then(setDisks).catch(() => setDisks([]));
+      return;
+    }
+    fsList(p).then(setEntries).catch(() => setEntries([]));
   }, []);
 
   useEffect(() => { load(path); }, [path, load]);
@@ -341,28 +346,44 @@ function LocalFiles() {
         </div>
       </div>
 
-      {/* 文件列表（树形） */}
+      {/* 文件列表（树形）/ 此电脑（磁盘卡片） */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
-        {rows.map((row) => (
-          <FileRow
-            key={row.entry.path}
-            row={row}
-            inWorkspace={isWorkspace(row.entry.path)}
-            renaming={renameTarget?.path === row.entry.path}
-            onRenameCommit={requestRename}
-            onRenameCancel={cancelRename}
-            onRowClick={(entry) => entry.is_dir && handleDirClick(entry)}
-            onRowDoubleClick={(entry) =>
-              entry.is_dir ? handleDirDoubleClick(entry) : openFileInTerminal(entry)
-            }
-            onChevronClick={toggleExpand}
-            onContextMenu={handleContextMenu}
-          />
-        ))}
-        {rows.length === 0 && (
-          <div style={{ padding: 16, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
-            空目录
-          </div>
+        {path === null ? (
+          disks.length === 0 ? (
+            <div style={{ padding: 16, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+              正在扫描磁盘…
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 10px' }}>
+              {disks.map((d) => (
+                <DiskCard key={d.path} disk={d} onOpen={() => setPath(d.path)} />
+              ))}
+            </div>
+          )
+        ) : (
+          <>
+            {rows.map((row) => (
+              <FileRow
+                key={row.entry.path}
+                row={row}
+                inWorkspace={isWorkspace(row.entry.path)}
+                renaming={renameTarget?.path === row.entry.path}
+                onRenameCommit={requestRename}
+                onRenameCancel={cancelRename}
+                onRowClick={(entry) => entry.is_dir && handleDirClick(entry)}
+                onRowDoubleClick={(entry) =>
+                  entry.is_dir ? handleDirDoubleClick(entry) : openFileInTerminal(entry)
+                }
+                onChevronClick={toggleExpand}
+                onContextMenu={handleContextMenu}
+              />
+            ))}
+            {rows.length === 0 && (
+              <div style={{ padding: 16, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+                空目录
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -396,6 +417,78 @@ function LocalFiles() {
         }}
         onCancel={() => setConfirm(null)}
       />
+    </div>
+  );
+}
+
+// ── 磁盘卡片（「此电脑」视图） ──
+
+/** 字节数格式化（B/KB/MB/GB/TB）。 */
+function fmtBytes(bytes: number): string {
+  if (!bytes) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let v = bytes;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024;
+    i += 1;
+  }
+  return `${v >= 100 || i === 0 ? Math.round(v) : v.toFixed(1)} ${units[i]}`;
+}
+
+/** 磁盘小卡片：图标 + 名称 + 可用容量 + 容量占用条；单击进入。 */
+function DiskCard({ disk, onOpen }: { disk: DiskEntry; onOpen: () => void }) {
+  const total = disk.total_bytes;
+  const free = disk.free_bytes;
+  const used = total > 0 ? Math.max(0, total - free) : 0;
+  const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
+  const full = total > 0 && pct > 90;
+  return (
+    <div
+      onClick={onOpen}
+      title={`${disk.path} · 共 ${fmtBytes(total)}`}
+      data-testid={`disk-card-${disk.name}`}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '10px 12px', borderRadius: 8,
+        background: 'var(--block)',
+        cursor: 'pointer', userSelect: 'none',
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--button-hover)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--block)'; }}
+    >
+      <span style={{
+        width: 34, height: 34, borderRadius: 8, flexShrink: 0,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        background: 'var(--hover)', color: 'var(--accent)',
+      }}>
+        <HardDrive size={17} />
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontSize: 12, fontWeight: 600, color: 'var(--text-primary)',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {disk.name}
+        </div>
+        <div style={{
+          fontSize: 10.5, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)',
+          marginTop: 1,
+        }}>
+          {total > 0 ? `${fmtBytes(free)} 可用` : '—'}
+        </div>
+        {total > 0 && (
+          <div style={{
+            height: 3, borderRadius: 2, marginTop: 5,
+            background: 'var(--border)', overflow: 'hidden',
+          }}>
+            <div style={{
+              width: `${pct}%`, height: '100%',
+              background: full ? 'var(--accent-warm)' : 'var(--accent)',
+            }} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -130,7 +130,7 @@ pub fn run() {
             terminal::pty::pty_close,
             terminal::pty::pty_kill_foreground,
             files::fs::fs_list,
-            files::fs::fs_roots,
+            files::fs::fs_disks,
             files::fs::fs_home,
             files::fs::fs_rename,
             files::fs::fs_delete,
