@@ -113,6 +113,18 @@ export function nextTerminalId(windowId: string, layout: WindowLayout): string {
   return `${windowId}#${max + 1}`;
 }
 
+/** 克隆布局树，为新窗口重新生成终端 id（${newWindowId}#0/#1/…）。 */
+function cloneLayout(layout: WindowLayout, newWindowId: string): WindowLayout {
+  let n = 0;
+  const clone = (node: WindowLayout): WindowLayout => {
+    if (node.type === 'leaf') {
+      return { ...node, terminal: { ...node.terminal, id: `${newWindowId}#${n++}` } };
+    }
+    return { ...node, first: clone(node.first), second: clone(node.second) };
+  };
+  return clone(layout);
+}
+
 // 标签 id 跨重启唯一（时间戳前缀 + 自增），避免重启后与历史会话 id 碰撞
 const ID_PREFIX = Date.now().toString(36);
 let counter = 0;
@@ -172,6 +184,8 @@ interface WorkspaceState {
   moveGroup: (id: string, toIndex: number) => void;
   /** 拖动标签：移到 targetGroupId（null=未分组）的第 index 位 */
   moveTab: (tabId: string, targetGroupId: string | null, index: number) => void;
+  /** 复制会话：以相同终端配置（类型/SSH 目标/cwd/布局）克隆一个新标签页 */
+  duplicateTab: (tabId: string) => void;
   /** 清理没有任何活跃标签的空分组（空分组无意义，直接删除） */
   pruneEmptyGroups: () => void;
   /** 恢复分组内全部历史会话为标签页 */
@@ -525,6 +539,27 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const ids = next.filter((t) => isSessionTab(t) && (t.groupId ?? null) === targetGroupId).map((t) => t.id);
     sessionsReorder(targetGroupId, ids).catch(() => {});
     get().pruneEmptyGroups();
+  },
+
+  duplicateTab: (tabId) => {
+    const tab = get().tabs.find((t) => t.id === tabId);
+    if (!tab || !isSessionTab(tab)) return;
+    const newId = nextTabId();
+    // 克隆整棵布局（含多终端分屏），终端 id 全部重排，PTY 会话全新
+    const layout = cloneLayout(tab.layout, newId);
+    const newTab: Tab = {
+      id: newId,
+      title: `${tab.title} 副本`,
+      kind: 'session',
+      named: true,
+      groupId: tab.groupId,
+      layout,
+    };
+    set((s) => ({ tabs: [...s.tabs, newTab], activeId: newId }));
+    const ser = serializeSession(newTab)!;
+    sessionManager.create(newId, newTab.title, undefined, ser.kind, ser.payload);
+    if (newTab.groupId) sessionSetGroup(newId, newTab.groupId).catch(() => {});
+    useTerminalStore.getState().setFocusedPane(firstLeaf(layout).id);
   },
 
   pruneEmptyGroups: () => {
