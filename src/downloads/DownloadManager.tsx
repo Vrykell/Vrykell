@@ -68,7 +68,7 @@ export default function DownloadManager({ onBack }: { onBack: () => void }) {
       {/* 顶栏 */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 2,
-        padding: '6px 8px', borderBottom: '1px solid var(--border)',
+        padding: '6px 8px',
         minHeight: 30, flexShrink: 0,
       }}>
         <IconBtn title="返回文件浏览" data-testid="downloads-back" onClick={onBack}>
