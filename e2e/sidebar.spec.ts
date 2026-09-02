@@ -26,6 +26,19 @@ test.describe('文件面板', () => {
     await expect(page.locator('[data-testid="local-up-btn"]')).toBeVisible();
   });
 
+  test('此电脑视图：磁盘以小卡片展示（含容量），点击进入', async ({ page }) => {
+    // 点击面包屑「此电脑」进入磁盘视图
+    await page.getByText('此电脑').click();
+    await expect(page.locator('[data-testid="disk-card-e2e-root"]')).toBeVisible({ timeout: 3000 });
+    await expect(page.locator('[data-testid="disk-card-Backup"]')).toBeVisible();
+    // 卡片展示容量信息（250 GB 可用）
+    await expect(page.getByText('250 GB 可用')).toBeVisible();
+    // 点击磁盘卡片进入该磁盘根目录（文件列表出现）
+    await page.locator('[data-testid="disk-card-e2e-root"]').click();
+    await expect(page.getByText('Documents')).toBeVisible({ timeout: 3000 });
+    await expect(page.locator('[data-testid="disk-card-e2e-root"]')).toHaveCount(0);
+  });
+
   test('关闭面板再重新打开', async ({ page }) => {
     // 关闭面板——再点一次 dock 按钮
     await page.locator('[data-dock-btn="files"]').click();

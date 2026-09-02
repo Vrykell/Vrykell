@@ -777,6 +777,11 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
               { name: 'Downloads', path: '/home/e2e/Downloads', is_dir: true },
               { name: 'notes.txt', path: '/home/e2e/notes.txt', is_dir: false },
             ];
+          case 'fs_disks':
+            return [
+              { name: 'e2e-root', path: '/', total_bytes: 500 * 1024 ** 3, free_bytes: 250 * 1024 ** 3 },
+              { name: 'Backup', path: '/Volumes/Backup', total_bytes: 2 * 1024 ** 4, free_bytes: 1.5 * 1024 ** 4 },
+            ];
           case 'fs_rename':
             fsOps.push({ op: 'rename', path: args.oldPath as string, newName: args.newName as string });
             return undefined;

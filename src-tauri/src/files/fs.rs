@@ -63,9 +63,110 @@ fn fs_roots_sync() -> Result<Vec<FsEntry>, String> {
     Ok(entries)
 }
 
+/// 磁盘条目（「此电脑」视图小卡片展示用）：名称 + 路径 + 容量。
+#[derive(Clone, Serialize)]
+pub struct DiskEntry {
+    pub name: String,
+    pub path: String,
+    pub total_bytes: u64,
+    pub free_bytes: u64,
+}
+
+/// 磁盘剩余/总容量（字节）。取不到时为 (0, 0)（前端隐藏容量条）。
+#[cfg(unix)]
+fn disk_space(path: &str) -> (u64, u64) {
+    use std::ffi::CString;
+    let Ok(c) = CString::new(path) else { return (0, 0) };
+    let mut st: libc::statvfs = unsafe { std::mem::zeroed() };
+    if unsafe { libc::statvfs(c.as_ptr(), &mut st) } != 0 {
+        return (0, 0);
+    }
+    let frsize = if st.f_frsize > 0 { st.f_frsize as u64 } else { st.f_bsize as u64 };
+    (
+        (st.f_blocks as u64).saturating_mul(frsize),
+        (st.f_bavail as u64).saturating_mul(frsize),
+    )
+}
+
+/// Windows 盘符容量（GetDiskFreeSpaceExW）。
+#[cfg(target_os = "windows")]
+fn disk_space(path: &str) -> (u64, u64) {
+    use std::os::windows::ffi::OsStrExt;
+    use winapi::um::winbase::GetDiskFreeSpaceExW;
+    let wide: Vec<u16> = std::ffi::OsStr::new(path).encode_wide().chain(Some(0)).collect();
+    let mut free_bytes_to_caller: u64 = 0;
+    let mut total_bytes: u64 = 0;
+    let mut total_free_bytes: u64 = 0;
+    unsafe {
+        GetDiskFreeSpaceExW(wide.as_ptr(), &mut free_bytes_to_caller, &mut total_bytes, &mut total_free_bytes);
+    }
+    (total_bytes, free_bytes_to_caller)
+}
+
+/// 列出磁盘（按磁盘展示「此电脑」）：
+/// - macOS：根卷（/，显示名取 /Volumes 下的系统盘）+ /Volumes 下其它挂载卷
+/// - Windows：存在的盘符（C:、D:…）
+/// - 其它 Unix：仅根 /
+fn fs_disks_sync() -> Result<Vec<DiskEntry>, String> {
+    let mut disks = Vec::new();
+    #[cfg(target_os = "windows")]
+    {
+        for letter in b'A'..=b'Z' {
+            let drive = format!("{}:\\", letter as char);
+            if std::path::Path::new(&drive).exists() {
+                let (total_bytes, free_bytes) = disk_space(&drive);
+                disks.push(DiskEntry {
+                    name: format!("{}:", letter as char),
+                    path: drive,
+                    total_bytes,
+                    free_bytes,
+                });
+            }
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        // 根卷显示名：/Volumes 里指向 / 的条目（如 Macintosh HD）
+        let root_name = std::fs::read_dir("/Volumes")
+            .ok()
+            .and_then(|rd| {
+                rd.flatten().find_map(|e| {
+                    let ok = std::fs::canonicalize(&e.path())
+                        .map(|t| t == std::path::Path::new("/"))
+                        .unwrap_or(false);
+                    ok.then(|| e.file_name().to_string_lossy().to_string())
+                })
+            })
+            .unwrap_or_else(|| "磁盘".to_string());
+        let (total_bytes, free_bytes) = disk_space("/");
+        disks.push(DiskEntry { name: root_name, path: "/".into(), total_bytes, free_bytes });
+        // 其它挂载卷
+        if let Ok(rd) = std::fs::read_dir("/Volumes") {
+            for entry in rd.flatten() {
+                let path = entry.path();
+                let is_root = std::fs::canonicalize(&path)
+                    .map(|t| t == std::path::Path::new("/"))
+                    .unwrap_or(false);
+                if is_root {
+                    continue;
+                }
+                let p = path.to_string_lossy().to_string();
+                let (total_bytes, free_bytes) = disk_space(&p);
+                disks.push(DiskEntry { name: entry.file_name().to_string_lossy().to_string(), path: p, total_bytes, free_bytes });
+            }
+        }
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let (total_bytes, free_bytes) = disk_space("/");
+        disks.push(DiskEntry { name: "磁盘".into(), path: "/".into(), total_bytes, free_bytes });
+    }
+    Ok(disks)
+}
+
 #[tauri::command]
-pub async fn fs_roots() -> Result<Vec<FsEntry>, String> {
-    tauri::async_runtime::spawn_blocking(fs_roots_sync)
+pub async fn fs_disks() -> Result<Vec<DiskEntry>, String> {
+    tauri::async_runtime::spawn_blocking(fs_disks_sync)
         .await
         .map_err(|e| e.to_string())?
 }
@@ -522,11 +623,25 @@ mod tests {
 
     #[cfg(target_os = "windows")]
     #[test]
-    fn fs_roots_lists_drives_on_windows() {
-        let roots = super::fs_roots_sync().expect("roots");
-        assert!(!roots.is_empty(), "至少应有 C: 盘");
-        assert!(roots.iter().all(|e| e.is_dir));
-        assert!(roots.iter().any(|e| e.path == "C:\\"));
+    fn fs_disks_lists_drives_on_windows() {
+        let disks = super::fs_disks_sync().expect("disks");
+        assert!(!disks.is_empty(), "至少应有 C: 盘");
+        assert!(disks.iter().any(|e| e.path == "C:\\"));
+    }
+
+    #[test]
+    fn fs_disks_returns_at_least_root_on_unix() {
+        #[cfg(windows)]
+        let _ = ();
+        #[cfg(not(windows))]
+        {
+            let disks = super::fs_disks_sync().expect("disks");
+            assert!(disks.iter().any(|e| e.path == "/"), "Unix 应有根卷");
+            // 根卷容量应可读（statvfs），>0 而非全 0
+            let root = disks.iter().find(|e| e.path == "/").unwrap();
+            assert!(root.total_bytes > 0);
+            assert!(root.free_bytes > 0);
+        }
     }
 
     #[test]
