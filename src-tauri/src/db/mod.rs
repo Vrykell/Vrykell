@@ -23,14 +23,34 @@ fn db_path() -> PathBuf {
     dir.join("history.db")
 }
 
+/// 旧库检测：user_version < 2（v0/v1，缺 output_html 等新列）或无法读取 → 需要重置。
+/// 不做逐列迁移 —— 直接删库从零开始，避免旧库 SQL 因缺列静默失败（历史块消失）。
+fn db_needs_reset(path: &std::path::Path) -> bool {
+    if !path.exists() {
+        return false;
+    }
+    let Ok(conn) = Connection::open(path) else { return true };
+    let version: i64 = conn
+        .query_row("PRAGMA user_version", [], |r| r.get(0))
+        .unwrap_or(0);
+    version < 2
+}
+
+/// 删除旧库文件（如有），让 open() 从零建表。
+fn reset_old_db(path: &std::path::Path) {
+    if db_needs_reset(path) {
+        std::fs::remove_file(path).ok();
+    }
+}
+
 pub struct HistoryDb {
     conn: Connection,
 }
 
-/// 建表 / 迁移（open 与测试用 in-memory 连接共用）。
+/// 建表（open 与测试用 in-memory 连接共用）。
 ///
-/// 迁移策略：`PRAGMA user_version` 版本化。v0（旧库）逐列检查缺失后补齐；
-/// 任何「补列失败」都会向上报错——不再吞 ALTER 错误碰运气。
+/// 不做逐列迁移：旧库（v1 及更早）由 HistoryDb::open 的 reset_old_db 整库删除
+/// 后从零重建，新库统一标记 `PRAGMA user_version = 2`。
 fn init_schema(conn: &Connection) -> Result<(), String> {
     // 开启外键约束，使 blocks.session_id 的 ON DELETE CASCADE 真正生效
     let _ = conn.execute_batch("PRAGMA foreign_keys = ON;");
@@ -130,52 +150,21 @@ fn init_schema(conn: &Connection) -> Result<(), String> {
         )
         .map_err(|e| e.to_string())?;
 
-    let version: i64 = conn
-        .query_row("PRAGMA user_version", [], |r| r.get(0))
-        .unwrap_or(0);
-    if version < 1 {
-        // 旧库补齐（新库的 CREATE TABLE 已含全部列，这里逐列检查幂等跳过）
-        ensure_column(conn, "blocks", "output_clean", "ALTER TABLE blocks ADD COLUMN output_clean TEXT NOT NULL DEFAULT '';")?;
-        ensure_column(conn, "sessions", "cwd", "ALTER TABLE sessions ADD COLUMN cwd TEXT NOT NULL DEFAULT '';")?;
-        ensure_column(conn, "sessions", "group_id", "ALTER TABLE sessions ADD COLUMN group_id TEXT;")?;
-        ensure_column(conn, "sessions", "sort_order", "ALTER TABLE sessions ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;")?;
-        ensure_column(conn, "groups", "archived", "ALTER TABLE groups ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;")?;
-        ensure_column(conn, "sessions", "kind", "ALTER TABLE sessions ADD COLUMN kind TEXT NOT NULL DEFAULT 'local';")?;
-        ensure_column(conn, "sessions", "payload", "ALTER TABLE sessions ADD COLUMN payload TEXT NOT NULL DEFAULT '{}';")?;
-        ensure_column(conn, "blocks", "pane_id", "ALTER TABLE blocks ADD COLUMN pane_id TEXT;")?;
-        ensure_column(conn, "blocks", "collapsed", "ALTER TABLE blocks ADD COLUMN collapsed INTEGER NOT NULL DEFAULT 0;")?;
-        ensure_column(conn, "blocks", "output_html", "ALTER TABLE blocks ADD COLUMN output_html TEXT NOT NULL DEFAULT '';")?;
-        ensure_column(conn, "chat_messages", "parts", "ALTER TABLE chat_messages ADD COLUMN parts TEXT NOT NULL DEFAULT '';")?;
-        ensure_column(conn, "chat_messages", "attachments", "ALTER TABLE chat_messages ADD COLUMN attachments TEXT NOT NULL DEFAULT '';")?;
-        conn.execute_batch("PRAGMA user_version = 1;")
-            .map_err(|e| format!("记录迁移版本失败：{e}"))?;
-    }
-    // 索引幂等创建（放在迁移之后：老库在补列前还没有 group_id）
+    // 新库直接标记当前 schema 版本；旧库（v1 及更早）由 open() 检测后整库删除重建
+    conn.execute_batch("PRAGMA user_version = 2;")
+        .map_err(|e| format!("记录 schema 版本失败：{e}"))?;
+    // 索引幂等创建
     conn.execute_batch("CREATE INDEX IF NOT EXISTS idx_sessions_group ON sessions(group_id);")
         .map_err(|e| e.to_string())?;
     Ok(())
 }
 
-/// 仅当列缺失时执行 ADD COLUMN；已存在则跳过（区分「列已存在」与「真实迁移失败」）。
-fn ensure_column(conn: &Connection, table: &str, column: &str, ddl: &str) -> Result<(), String> {
-    let mut stmt = conn
-        .prepare(&format!("PRAGMA table_info({table})"))
-        .map_err(|e| e.to_string())?;
-    let cols: Vec<String> = stmt
-        .query_map([], |row| row.get::<_, String>(1))
-        .map_err(|e| e.to_string())?
-        .filter_map(|r| r.ok())
-        .collect();
-    if cols.iter().any(|c| c == column) {
-        return Ok(());
-    }
-    conn.execute_batch(ddl)
-        .map_err(|e| format!("迁移失败：{table}.{column} —— {e}"))
-}
-
 impl HistoryDb {
     pub fn open() -> Result<Self, String> {
-        let conn = Connection::open(db_path()).map_err(|e| e.to_string())?;
+        let path = db_path();
+        // 旧库（缺新列/版本过旧）不做逐列迁移 —— 直接删除历史从零开始
+        reset_old_db(&path);
+        let conn = Connection::open(path).map_err(|e| e.to_string())?;
         init_schema(&conn)?;
         Ok(Self { conn })
     }
@@ -206,32 +195,58 @@ mod tests {
     }
 
     #[test]
-    fn migration_adds_group_columns_to_existing_sessions() {
-        // 模拟旧库：sessions 只有老列（无 group_id/sort_order）
-        let conn = Connection::open_in_memory().unwrap();
-        conn.execute_batch(
-            "CREATE TABLE sessions (
-                id TEXT PRIMARY KEY,
-                title TEXT NOT NULL DEFAULT '',
-                status TEXT NOT NULL DEFAULT 'active',
-                created_at INTEGER NOT NULL,
-                closed_at INTEGER,
-                cwd TEXT NOT NULL DEFAULT ''
-            );",
-        )
-        .unwrap();
-        // 跑迁移不应 panic，且新列/新表可用
+    fn v1_db_is_detected_and_reset_to_fresh() {
+        // 模拟 v1 旧库：blocks 缺 output_html 列（历史命令块颜色快照缺失的来源）
+        let dir = std::env::temp_dir().join(format!("vrykell-db-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("history.db");
+        let _ = std::fs::remove_file(&path);
+        {
+            let conn = Connection::open(&path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE blocks (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, command TEXT NOT NULL DEFAULT '');
+                 PRAGMA user_version = 1;",
+            )
+            .unwrap();
+        }
+        assert!(db_needs_reset(&path));
+        reset_old_db(&path);
+        assert!(!path.exists(), "旧库应被整库删除");
+        // 从零重建后：blocks 含 output_html，record_block 不再 SQL 失败
+        let conn = Connection::open(&path).unwrap();
         init_schema(&conn).unwrap();
         conn.execute(
-            "INSERT INTO sessions (id, title, status, created_at, cwd, group_id, sort_order) VALUES ('s1','t','active',0,'', NULL, 0)",
+            "INSERT INTO sessions (id, title, status, created_at) VALUES ('s1','t','active',1)",
             [],
         )
         .unwrap();
         conn.execute(
-            "INSERT INTO groups (id, title, sort_order, collapsed, created_at) VALUES ('g1','g',0,0,0)",
+            "INSERT INTO blocks (id, session_id, command, output_html, started_at) VALUES ('b1','s1','ls','<span>x</span>',1)",
             [],
         )
         .unwrap();
+        let html: String = conn
+            .query_row("SELECT output_html FROM blocks WHERE id = 'b1'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(html, "<span>x</span>");
+        let version: i64 = conn
+            .query_row("PRAGMA user_version", [], |r| r.get(0))
+            .unwrap();
+        assert!(version >= 2, "新库应标记当前 schema 版本");
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn fresh_db_does_not_need_reset() {
+        let dir = std::env::temp_dir().join(format!("vrykell-db-test2-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("history.db");
+        let _ = std::fs::remove_file(&path);
+        let conn = Connection::open(&path).unwrap();
+        init_schema(&conn).unwrap();
+        drop(conn);
+        assert!(!db_needs_reset(&path), "新库不应被重置");
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]
