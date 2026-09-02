@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { sanitizeOutputHtml } from '../lib/sanitizeHtml';
 
 export function plainText(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -41,7 +42,9 @@ export default function BlockOutput({ text, maxHeight, highlight, isHtml: isHtml
 
   const content = useMemo(() => {
     if (isHtml) {
-      return highlight ? highlightInHtml(text, highlight) : text;
+      // 落库内容不可信：渲染前再净化一次（防御纵深，覆盖任意来源的 outputHtml）
+      const safe = sanitizeOutputHtml(text);
+      return highlight ? highlightInHtml(safe, highlight) : safe;
     }
     // Plain text fallback
     const escaped = plainText(text);

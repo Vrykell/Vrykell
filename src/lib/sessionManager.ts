@@ -6,6 +6,7 @@
  */
 import { useWorkspaceStore, type Tab } from '../stores/workspace';
 import { useBlockStore } from '../stores/blocks';
+import { sanitizeOutputHtml } from './sanitizeHtml';
 import { useChatStore } from '../stores/chat';
 import { deserializeParts } from '../agent/messageParts';
 import { deserializeAttachments } from '../agent/attachments';
@@ -152,7 +153,8 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
         status,
         wasLongRunning: false,
         collapsed: b.collapsed || undefined,
-        outputHtml: b.output_html || '',
+        // 落库内容不可信（DB 可能被篡改）：取出的 HTML 快照必须先净化再进渲染管线
+        outputHtml: sanitizeOutputHtml(b.output_html || ''),
         outputText: b.output_clean || '',
         outputRaw: b.output_raw,
         linesTruncated: 0,
