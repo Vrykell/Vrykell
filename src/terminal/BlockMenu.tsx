@@ -5,6 +5,7 @@ import { useChatStore } from '../stores/chat';
 import { useWorkspaceStore } from '../stores/workspace';
 import { useBlockStore } from '../stores/blocks';
 import { clearSessionBlocks } from './useTerminalSession';
+import { fmtDuration } from '../components/UiBtn';
 import type { TermBlock } from './pipeline/termBlock';
 
 interface Props {
@@ -34,7 +35,7 @@ function MenuItem({ label, shortcut, onClick }: { label: string; shortcut?: stri
         justifyContent: 'space-between',
         gap: 24,
         color: 'var(--text-primary)',
-        transition: 'background 0.08s ease',
+        transition: 'background var(--dur-fast) var(--ease)',
       }}>
         <span>{label}</span>
         {shortcut && (
@@ -81,7 +82,7 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
   }, [block, paneId, getOutputText, onClose]);
 
   const duration = block.endedAt && block.startedAt
-    ? formatDuration(block.endedAt - block.startedAt)
+    ? fmtDuration(block.endedAt - block.startedAt)
     : '';
 
   const top = Math.min(anchor.bottom + 4, window.innerHeight - 260);
@@ -161,12 +162,4 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
       <MenuItem label="清除所有块" onClick={clearAllBlocks} />
     </div>
   );
-}
-
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-  const m = Math.floor(ms / 60000);
-  const s = Math.floor((ms % 60000) / 1000);
-  return `${m}m ${s}s`;
 }

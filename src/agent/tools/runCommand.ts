@@ -212,7 +212,7 @@ function waitForCompletion(
 
     signal?.addEventListener('abort', () => {
       finish({ ok: false, output: tail(getRecentOutputFor(paneId, 30)), error: '已中止（命令可能仍在终端中运行）' });
-    });
+    }, { once: true });
 
     // 订阅块流：认领新块（打 agent 标记）→ 等终态
     unsub = useBlockStore.subscribe(() => {

@@ -163,7 +163,7 @@ export function ToolbarBtn({ title, active, onClick, children, attrs }: ToolbarB
   );
 }
 
-// ── 时长格式化 ──
+// ── 时长/大小格式化 ──
 
 export function fmtDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
@@ -171,4 +171,17 @@ export function fmtDuration(ms: number): string {
   const m = Math.floor(ms / 60000);
   const s = Math.floor((ms % 60000) / 1000);
   return `${m}m${s}s`;
+}
+
+/** 字节数格式化（B/KB/MB/GB/TB）。 */
+export function fmtSize(bytes: number): string {
+  if (!bytes) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let v = bytes;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024;
+    i += 1;
+  }
+  return `${v >= 100 || i === 0 ? Math.round(v) : v.toFixed(1)} ${units[i]}`;
 }

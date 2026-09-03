@@ -516,7 +516,7 @@ function PlacementOverlay({ targets, onPick, onCancel, emptyMessage = '最多 4 
             width: `${t.rect.w * 100}%`, height: `${t.rect.h * 100}%`,
             boxSizing: 'border-box', pointerEvents: 'none',
             background: hovered === i ? 'rgba(128,128,128,0.18)' : 'transparent',
-            transition: 'background 0.08s ease',
+            transition: 'background var(--dur-fast) var(--ease)',
           }}
         />
       ))}
@@ -589,7 +589,7 @@ function MoveDragLayer({ layout, draggingId, onCommit }: {
             width: `${t.rect.w * 100}%`, height: `${t.rect.h * 100}%`,
             boxSizing: 'border-box', pointerEvents: 'none',
             background: hovered === i ? 'rgba(128,128,128,0.18)' : 'transparent',
-            transition: 'background 0.08s ease',
+            transition: 'background var(--dur-fast) var(--ease)',
           }}
         />
       ))}

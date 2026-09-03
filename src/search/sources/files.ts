@@ -2,13 +2,8 @@ import { FileText } from 'lucide-react';
 import { registerSource } from '../registry';
 import { searchFiles as backendSearchFiles } from '../../api/search';
 import { useWorkspaceDirsStore } from '../../files/workspaceDirs';
+import { fmtSize } from '../../components/UiBtn';
 import type { SearchResult, FileResultData } from '../types';
-
-function fmtSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes}B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
-}
 
 function fmtTimeAgo(ts: number): string {
   const ms = Date.now() - ts;

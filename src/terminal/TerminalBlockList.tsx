@@ -23,6 +23,7 @@ import { ptyWrite } from '../lib/pty';
 import { killForeground } from '../lib/killForeground';
 import { useToastStore } from '../components/Toast';
 import { fmtDuration } from '../components/UiBtn';
+import { getCellMetrics } from '../lib/termMetrics';
 import { getExecutingTerm, syncTermWidth, applyCompactCharSize } from './useTerminalSession';
 import BlockMenu from './BlockMenu';
 import BlockOutput from './BlockOutput';
@@ -521,12 +522,7 @@ function RunningTerm({ tabId }: { tabId: string }) {
     // 短输出裁掉尾部空白行 —— 内容高度 = 最后非空行（含光标行）× 行高。
     // 裁剪设在 el（xterm 外层，overflow:hidden）而非 host：host 的底部
     // padding 需要露出卡片底色作呼吸空间，裁 host 会让黑终端区吃满 padding。
-    const cellHeight = (): number => {
-      const dims = (term as unknown as {
-        _core?: { _renderService?: { dimensions?: { css?: { cell?: { height?: number } } } } };
-      })._core?._renderService?.dimensions;
-      return dims?.css?.cell?.height || 14;
-    };
+    const cellHeight = (): number => getCellMetrics(term).height;
     const updateHeight = () => {
       const buf = term.buffer.active;
       let contentEnd = buf.baseY + buf.cursorY + 1;

@@ -33,12 +33,19 @@ const LEAVE_MS = 200;
 
 /** 把 toast 标记为退场，动画结束后真正移除。 */
 function dismiss(set: (fn: (s: ToastState) => Partial<ToastState>) => void, id: number): void {
-  set((s) => ({ toasts: s.toasts.map((t) => (t.id === id ? { ...t, leaving: true } : t)) }));
-  const timer = setTimeout(() => {
+  // 自动消失路径也要清计时器表（否则手动关闭/悬停暂停后残留）
+  const timer = useToastStore.getState().timers[id];
+  if (timer) clearTimeout(timer);
+  set((s) => {
+    const timers = { ...s.timers };
+    delete timers[id];
+    return { toasts: s.toasts.map((t) => (t.id === id ? { ...t, leaving: true } : t)), timers };
+  });
+  const leaveTimer = setTimeout(() => {
     set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
   }, LEAVE_MS);
   // 退场计时器不挂进 timers（不参与暂停/恢复）
-  void timer;
+  void leaveTimer;
 }
 
 export const useToastStore = create<ToastState>((set) => ({

@@ -61,7 +61,7 @@ export default function ConfirmDialog({
             padding: '5px 16px', fontSize: 12, border: 'none',
             borderRadius: 'var(--radius-inner)',
             background: danger ? 'var(--error)' : 'var(--accent)',
-            color: danger ? '#fff' : 'var(--accent-text)', cursor: 'pointer',
+            color: danger ? 'var(--error-text)' : 'var(--accent-text)', cursor: 'pointer',
           }}>{confirmLabel}</button>
         </div>
       </div>
