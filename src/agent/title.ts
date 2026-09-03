@@ -166,9 +166,27 @@ export function initAutoTitle(): () => void {
       }
     }
   });
+  // 关 tab 时清掉该 tab 的冷却/计数/防抖记录，防 Map 长期累积
+  const unWorkspace = useWorkspaceStore.subscribe((s, prev) => {
+    if (s.tabs === prev.tabs) return;
+    const alive = new Set(s.tabs.map((t) => t.id));
+    for (const tabId of [...lastAttempt.keys()]) {
+      if (!alive.has(tabId)) lastAttempt.delete(tabId);
+    }
+    for (const tabId of [...titledCount.keys()]) {
+      if (!alive.has(tabId)) titledCount.delete(tabId);
+    }
+    for (const tabId of [...timers.keys()]) {
+      if (!alive.has(tabId)) {
+        clearTimeout(timers.get(tabId));
+        timers.delete(tabId);
+      }
+    }
+  });
   return () => {
     unBlocks();
     unChat();
+    unWorkspace();
     for (const t of timers.values()) clearTimeout(t);
     timers.clear();
   };

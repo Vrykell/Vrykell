@@ -33,6 +33,7 @@
   --success-bg: rgba(137, 209, 133, 0.12);
   --success-dim: rgba(137, 209, 133, 0.15);
   --error: #F14C4C;
+  --error-text: #FFFFFF;
   --error-bg: rgba(241, 76, 76, 0.12);
   --error-dim: rgba(241, 76, 76, 0.15);
   --error-light: #F48771;

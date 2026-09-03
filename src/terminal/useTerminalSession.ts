@@ -19,6 +19,7 @@ import * as sessionManager from '../lib/sessionManager';
 import { agentControl } from '../agent/agentControl';
 import { defaultOpenModeForShell } from '../agent/agentSettings';
 import { SessionController } from './pipeline/sessionController';
+import { getCellMetrics } from '../lib/termMetrics';
 import type { DispatchEvent } from './pipeline/events';
 import type { TermBlock } from './pipeline/termBlock';
 import type { UnlistenFn } from '@tauri-apps/api/event';
@@ -384,20 +385,10 @@ export function useTerminalSession(
     // 回到 classic/altScreen 直接恢复。
 
     /** 实测字符宽（渲染服务内部尺寸，与 RunningTerm 的 cellHeight 同源） */
-    const cellWidth = (): number => {
-      const dims = (term as unknown as {
-        _core?: { _renderService?: { dimensions?: { css?: { cell?: { width?: number } } } } };
-      })._core?._renderService?.dimensions;
-      return dims?.css?.cell?.width || 7.8;
-    };
+    const cellWidth = (): number => getCellMetrics(term).width;
 
     /** 实测行高（渲染服务内部尺寸，与 RunningTerm 的 cellHeight 同源） */
-    const cellHeight = (): number => {
-      const dims = (term as unknown as {
-        _core?: { _renderService?: { dimensions?: { css?: { cell?: { height?: number } } } } };
-      })._core?._renderService?.dimensions;
-      return dims?.css?.cell?.height || 14;
-    };
+    const cellHeight = (): number => getCellMetrics(term).height;
 
     /**
      * 手动全屏宿主：铺满整个终端区（TerminalView inset:0），可能比单 pane 宽/高。

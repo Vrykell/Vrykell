@@ -12,7 +12,7 @@ import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
 import { useTerminalStore } from '../stores/terminal';
 import { leaves as layoutLeaves, firstLeaf } from '../lib/windowLayout';
 import { useToastStore } from '../components/Toast';
-import { IconBtn } from '../components/UiBtn';
+import { IconBtn, fmtSize } from '../components/UiBtn';
 import { flattenVisible, type VisibleRow } from './fileTree';
 import ContextMenu, { type ContextMenuItem } from '../components/ContextMenu';
 import { ensureSshLoaded, useSshStore } from '../ssh/store';
@@ -427,19 +427,6 @@ function LocalFiles() {
 
 // ── 磁盘卡片（「此电脑」视图） ──
 
-/** 字节数格式化（B/KB/MB/GB/TB）。 */
-function fmtBytes(bytes: number): string {
-  if (!bytes) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let v = bytes;
-  let i = 0;
-  while (v >= 1024 && i < units.length - 1) {
-    v /= 1024;
-    i += 1;
-  }
-  return `${v >= 100 || i === 0 ? Math.round(v) : v.toFixed(1)} ${units[i]}`;
-}
-
 /** 磁盘小卡片：图标 + 名称 + 可用容量；无底色、无装饰组件，单击进入。 */
 function DiskCard({ disk, onOpen }: { disk: DiskEntry; onOpen: () => void }) {
   const total = disk.total_bytes;
@@ -448,7 +435,7 @@ function DiskCard({ disk, onOpen }: { disk: DiskEntry; onOpen: () => void }) {
   return (
     <div
       onClick={onOpen}
-      title={`${disk.path} · 共 ${fmtBytes(total)} · 已用 ${pct}%`}
+      title={`${disk.path} · 共 ${fmtSize(total)} · 已用 ${pct}%`}
       data-testid={`disk-card-${disk.name}`}
       style={{
         display: 'flex', alignItems: 'center', gap: 10,
@@ -474,7 +461,7 @@ function DiskCard({ disk, onOpen }: { disk: DiskEntry; onOpen: () => void }) {
           fontSize: 10.5, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)',
           marginTop: 1,
         }}>
-          {total > 0 ? `${fmtBytes(free)} 可用` : '—'}
+          {total > 0 ? `${fmtSize(free)} 可用` : '—'}
         </div>
       </div>
     </div>

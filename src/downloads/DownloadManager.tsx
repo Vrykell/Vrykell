@@ -4,21 +4,8 @@ import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { downloadsList, downloadsClear, type DownloadEntry } from './api';
 import { fileIcon } from '../files/fileIcon';
 import { useToastStore } from '../components/Toast';
-import { IconBtn } from '../components/UiBtn';
+import { IconBtn, fmtSize } from '../components/UiBtn';
 import ConfirmDialog from '../components/ConfirmDialog';
-
-/** 字节数格式化（B/KB/MB/GB/TB）。 */
-function fmtSize(bytes: number): string {
-  if (!bytes) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let v = bytes;
-  let i = 0;
-  while (v >= 1024 && i < units.length - 1) {
-    v /= 1024;
-    i += 1;
-  }
-  return `${v >= 100 || i === 0 ? Math.round(v) : v.toFixed(1)} ${units[i]}`;
-}
 
 function fmtTime(ms: number): string {
   const d = new Date(ms);

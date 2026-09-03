@@ -41,7 +41,7 @@ export default function Markdown({ content }: { content: string }) {
       remarkPlugins={[remarkGfmSafe, remarkMath, remarkStandaloneMathDisplay]}
       // throwOnError: false — AI 回答里的 `$` 片段（如 `$ make test`）常被 remark-math
       // 误判为公式；KaTeX 抛错会击穿 SafeMarkdown。容错模式下原样显示源码。
-      rehypePlugins={[[rehypeKatex, { throwOnError: false, errorColor: '#C05A4A' }]]}
+      rehypePlugins={[[rehypeKatex, { throwOnError: false, errorColor: 'var(--error)' }]]}
       components={{
         pre: (props) => <CommandBlock {...props} />,
         // 图片降级为链接文本：不加载远程图片（防追踪/外带，CSP 亦不放行 http(s) 图片源），

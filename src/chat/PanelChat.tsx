@@ -158,7 +158,8 @@ export default function PanelChat() {
   // （纯浏览器环境——harness 页——无 Tauri internals，直接跳过）
   useEffect(() => {
     if (!('__TAURI_INTERNALS__' in window)) return;
-    let unlisten: (() => void) | undefined;
+    // ref 持有 unlisten：promise 在卸载后才 resolve 时，cleanup 仍能取到并解除
+    const unlistenRef: { current: (() => void) | undefined } = { current: undefined };
     getCurrentWindow()
       .onDragDropEvent((e) => {
         if (e.payload.type !== 'drop') return;
@@ -180,9 +181,9 @@ export default function PanelChat() {
           addAtts(out);
         })();
       })
-      .then((u) => { unlisten = u; })
+      .then((u) => { unlistenRef.current = u; })
       .catch(() => {});
-    return () => unlisten?.();
+    return () => unlistenRef.current?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

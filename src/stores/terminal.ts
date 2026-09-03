@@ -22,42 +22,6 @@ export function unregisterTerminal(tabId: string, t: Terminal) {
   if (termInstances.get(tabId) === t) termInstances.delete(tabId);
 }
 
-/** 获取终端的当前 viewportY（滚动位置，行号）。 */
-export function getViewportY(tabId: string): number {
-  const term = termInstances.get(tabId);
-  if (!term) return 0;
-  return term.buffer.active.viewportY;
-}
-
-/** 获取终端的行高（像素），用于 gutter 定位。 */
-export function getLineHeight(tabId: string): number {
-  const term = termInstances.get(tabId);
-  if (!term) return 18;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const dims = (term as any)._core?._renderService?.dimensions;
-  if (dims?.css?.cell?.height) return dims.css.cell.height;
-  try {
-    return Math.round(((term as any).options?.fontSize ?? 13) * 1.3);
-  } catch {
-    return 18;
-  }
-}
-
-/** 从 term buffer 读取指定行范围（绝对行号）的纯文本。 */
-export function getTerminalOutput(tabId: string, startLine: number, endLine: number | null): string {
-  const term = termInstances.get(tabId);
-  if (!term) return '';
-  const buf = term.buffer.active;
-  const end = endLine ?? (buf.baseY + buf.cursorY);
-  const lines: string[] = [];
-  for (let i = startLine; i <= end; i++) {
-    const line = buf.getLine(i);
-    if (line) lines.push(line.translateToString(true));
-  }
-  while (lines.length > 0 && lines[lines.length - 1]!.trim() === '') lines.pop();
-  return lines.join('\n');
-}
-
 /** 当前聚焦的终端 id：优先 focusedPaneId（校验其属于活跃窗口），否则活跃窗口第一个终端。 */
 export function getFocusedTerminalId(): string {
   const ts = useTerminalStore.getState();
