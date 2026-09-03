@@ -248,7 +248,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const ser = serializeSession(tab)!;
       const created = sessionManager.create(id, tab.title, undefined, ser.kind, ser.payload);
       if (tab.groupId) {
-        created.then(() => sessionSetGroup(id, tab.groupId ?? null)).catch(() => {});
+        created.then(() => sessionSetGroup(id, tab.groupId ?? null)).catch((e) =>
+          console.warn('[workspace] 新标签归属分组持久化失败:', e),
+        );
       }
       // 新建终端不默认入布局（用户拖拽决定停靠位置）
       useTerminalStore.getState().setFocusedPane(firstLeaf(tab.layout).id);
@@ -477,13 +479,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const name = title.trim();
     if (!name) return;
     set((s) => ({ groups: s.groups.map((g) => (g.id === id ? { ...g, title: name } : g)) }));
-    groupRename(id, name).catch(() => {});
+    groupRename(id, name).catch((e) =>
+      useToastStore.getState().addToast(`重命名分组保存失败：${String((e as Error)?.message ?? e)}`, 'error'),
+    );
   },
 
   toggleGroupCollapse: (id) => {
     const collapsed = !get().groups.find((g) => g.id === id)?.collapsed;
     set((s) => ({ groups: s.groups.map((g) => (g.id === id ? { ...g, collapsed } : g)) }));
-    groupSetCollapsed(id, collapsed).catch(() => {});
+    groupSetCollapsed(id, collapsed).catch((e) =>
+      useToastStore.getState().addToast(`分组折叠状态保存失败：${String((e as Error)?.message ?? e)}`, 'error'),
+    );
   },
 
   deleteGroup: async (id, withSessions) => {
@@ -509,7 +515,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const [g] = groups.splice(from, 1);
     groups.splice(Math.max(0, Math.min(toIndex, groups.length)), 0, g!);
     set({ groups });
-    groupsReorder(groups.map((x) => x.id)).catch(() => {});
+    groupsReorder(groups.map((x) => x.id)).catch((e) =>
+      useToastStore.getState().addToast(`分组排序保存失败：${String((e as Error)?.message ?? e)}`, 'error'),
+    );
   },
 
   moveTab: (tabId, targetGroupId, index) => {
@@ -535,9 +543,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (!inserted) next.push({ ...tab, groupId: targetGroupId ?? undefined });
     set({ tabs: next });
     // 持久化：真实会话有后端记录
-    sessionSetGroup(tabId, targetGroupId).catch(() => {});
+    sessionSetGroup(tabId, targetGroupId).catch((e) =>
+      useToastStore.getState().addToast(`移动会话保存失败：${String((e as Error)?.message ?? e)}`, 'error'),
+    );
     const ids = next.filter((t) => isSessionTab(t) && (t.groupId ?? null) === targetGroupId).map((t) => t.id);
-    sessionsReorder(targetGroupId, ids).catch(() => {});
+    sessionsReorder(targetGroupId, ids).catch((e) =>
+      useToastStore.getState().addToast(`会话排序保存失败：${String((e as Error)?.message ?? e)}`, 'error'),
+    );
     get().pruneEmptyGroups();
   },
 
@@ -558,7 +570,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set((s) => ({ tabs: [...s.tabs, newTab], activeId: newId }));
     const ser = serializeSession(newTab)!;
     sessionManager.create(newId, newTab.title, undefined, ser.kind, ser.payload);
-    if (newTab.groupId) sessionSetGroup(newId, newTab.groupId).catch(() => {});
+    if (newTab.groupId) sessionSetGroup(newId, newTab.groupId).catch((e) =>
+      console.warn('[workspace] 复制标签归属分组持久化失败:', e),
+    );
     useTerminalStore.getState().setFocusedPane(firstLeaf(layout).id);
   },
 
@@ -569,7 +583,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       .map((g) => g.id);
     if (emptyIds.length === 0) return;
     set((s) => ({ groups: s.groups.filter((g) => !emptyIds.includes(g.id)) }));
-    for (const id of emptyIds) groupDelete(id).catch(() => {});
+    for (const id of emptyIds) groupDelete(id).catch((e) =>
+      console.warn('[workspace] 清理空分组失败:', id, e),
+    );
   },
 
   restoreGroup: async (id) => {
@@ -583,7 +599,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     // 1) 先确保组内会话的 group_id 已落库（此前可能只做了视觉分组）
     const groupTabs = get().tabs.filter(isSessionTab).filter((t) => t.groupId === id);
     for (const t of groupTabs) {
-      await sessionSetGroup(t.id, id).catch(() => {});
+      await sessionSetGroup(t.id, id).catch((e) =>
+        useToastStore.getState().addToast(`归档前保存分组归属失败：${String((e as Error)?.message ?? e)}`, 'error'),
+      );
     }
     // 2) 后端按 group_id 批量归档组内会话 + 标记组为已归档
     await groupArchive(id, Date.now()).catch((e) =>

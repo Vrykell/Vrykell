@@ -184,7 +184,11 @@ function LocalFiles() {
     const parentDir = parentOf(normPath(entry.path)) ?? undefined;
     const tabId = useWorkspaceStore.getState().addTab({ cwd: parentDir, title: entry.name });
     const sid = await waitForSession(tabId);
-    if (sid) ptyWrite(sid, command.endsWith('\n') ? command : command + '\n').catch(() => {});
+    if (sid) {
+      ptyWrite(sid, command.endsWith('\n') ? command : command + '\n').catch(() => {});
+    } else {
+      addToast('终端启动超时，请重试', 'error');
+    }
   };
 
   const rows = flattenVisible(entries, expandedSet, childCache);
