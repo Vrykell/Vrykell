@@ -10,6 +10,7 @@ import { setDefaultStream } from './stores/chat';
 import { refreshAiConfig } from './lib/ai';
 import { agentStream } from './agent/agentStream';
 import { initAutoTitle } from './agent/title';
+import { initScheduleRunner } from './agent/scheduleRunner';
 import { listSessions } from './api/session';
 import type { BackendSessionEntry } from './search/types';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
@@ -40,6 +41,8 @@ export default function App() {
   useEffect(() => { refreshAiConfig(); }, []);
   // M7 智能标题：订阅块/对话活动，内容足够时生成概括性标题
   useEffect(() => initAutoTitle(), []);
+  // 定时任务调度：应用运行期间按间隔触发（曾只活在设置页里，平时不执行）
+  useEffect(() => initScheduleRunner(), []);
   // 启动会话恢复：优先恢复上次仍处于活跃（未关闭）的会话标签页；
 // 仅当没有可恢复的会话时才创建默认终端（避免默认终端与恢复逻辑竞态）。
 useEffect(() => {

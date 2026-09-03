@@ -231,7 +231,7 @@ export const useChatStore = create<ChatState>((set, get) => {
           assistant.content,
           Date.now(),
           serializeParts(assistant.parts),
-        ).catch(() => {});
+        ).catch((e) => console.warn('[chat] 助手消息持久化失败（重启后该轮对话可能丢失）:', e));
       }
     }
   };

@@ -11,10 +11,10 @@ import { createChatModel, type ProviderKind } from '../agent/provider';
 import {
   getMemory, setMemory, getMemoryJournal,
   listAgents, saveAgent, removeAgent, type AgentDef,
-  listSchedules, saveSchedule, removeSchedule, markScheduleRun, type Schedule,
+  listSchedules, saveSchedule, removeSchedule, type Schedule,
 } from '../agent/platform';
 import { useToastStore } from '../components/Toast';
-import { sendToChat } from '../stores/chat';
+import { kickScheduleRunner } from '../agent/scheduleRunner';
 
 const toast = (msg: string, type: 'info' | 'success' | 'error') =>
   useToastStore.getState().addToast(msg, type);
@@ -39,8 +39,8 @@ export function MemorySettings() {
   const [organizing, setOrganizing] = useState(false);
 
   const refresh = () => {
-    getMemory().then(setFact).catch(() => {});
-    getMemoryJournal().then(setJournal).catch(() => {});
+    getMemory().then(setFact).catch((e) => console.warn('[memory] 读取记忆失败:', e));
+    getMemoryJournal().then(setJournal).catch((e) => console.warn('[memory] 读取流水失败:', e));
   };
   useEffect(() => { refresh(); }, []);
 
@@ -54,9 +54,13 @@ export function MemorySettings() {
   };
 
   const clear = async () => {
-    await setMemory('');
-    setFact('');
-    toast('已清空持久知识', 'success');
+    try {
+      await setMemory('');
+      setFact('');
+      toast('已清空持久知识', 'success');
+    } catch (e) {
+      toast(String((e as Error)?.message ?? e), 'error');
+    }
   };
 
   /** 让 AI 把持久知识 + 流水压缩整理成结构化知识 */
@@ -140,9 +144,13 @@ function AgentCard({ a, onChanged }: { a: AgentDef; onChanged: () => void }) {
     }
   };
   const del = async () => {
-    await removeAgent(a.id);
-    toast('已删除', 'success');
-    onChanged();
+    try {
+      await removeAgent(a.id);
+      toast('已删除', 'success');
+      onChanged();
+    } catch (e) {
+      toast(String((e as Error)?.message ?? e), 'error');
+    }
   };
   return (
     <div style={{ borderRadius: 'var(--radius-inner)', padding: '10px 12px', background: 'var(--canvas)' }}>
@@ -161,11 +169,15 @@ function AgentCard({ a, onChanged }: { a: AgentDef; onChanged: () => void }) {
 
 export function AgentsSettings() {
   const [agents, setAgents] = useState<AgentDef[]>([]);
-  const refresh = () => listAgents().then(setAgents).catch(() => {});
+  const refresh = () => listAgents().then(setAgents).catch((e) => console.warn('[agents] 读取子代理失败:', e));
   useEffect(() => { refresh(); }, []);
   const add = async () => {
-    await saveAgent({ id: '', name: `子代理 ${agents.length + 1}`, description: '', prompt: '' });
-    refresh();
+    try {
+      await saveAgent({ id: '', name: `子代理 ${agents.length + 1}`, description: '', prompt: '' });
+      refresh();
+    } catch (e) {
+      toast(String((e as Error)?.message ?? e), 'error');
+    }
   };
   return (
     <>
@@ -199,9 +211,14 @@ function ScheduleCard({ s, onChanged }: { s: Schedule; onChanged: () => void }) 
     }
   };
   const del = async () => {
-    await removeSchedule(s.id);
-    toast('已删除', 'success');
-    onChanged();
+    try {
+      await removeSchedule(s.id);
+      toast('已删除', 'success');
+      onChanged();
+      kickScheduleRunner();
+    } catch (e) {
+      toast(String((e as Error)?.message ?? e), 'error');
+    }
   };
   const nextRun = s.lastRunAt ? s.lastRunAt + s.intervalMinutes * 60_000 : Date.now();
   return (
@@ -227,28 +244,18 @@ function ScheduleCard({ s, onChanged }: { s: Schedule; onChanged: () => void }) 
 
 export function SchedulesSettings() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const refresh = () => listSchedules().then(setSchedules).catch(() => {});
+  // 调度在应用级运行（agent/scheduleRunner.ts，App.tsx 挂载一次）；
+  // 此处只负责展示，保存/删除后踢一次立即检查。
+  const refresh = () => listSchedules().then(setSchedules).catch((e) => console.warn('[schedules] 读取定时任务失败:', e));
   useEffect(() => { refresh(); }, []);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      listSchedules().then((list) => {
-        const now = Date.now();
-        for (const s of list) {
-          if (!s.enabled) continue;
-          if (s.lastRunAt && now - s.lastRunAt < s.intervalMinutes * 60_000) continue;
-          markScheduleRun(s.id, now).catch(() => {});
-          sendToChat(`【定时任务】${s.name}\n${s.prompt}`);
-          refresh();
-        }
-      }).catch(() => {});
-    }, 30_000);
-    return () => clearInterval(timer);
-  }, []);
-
   const add = async () => {
-    await saveSchedule({ id: '', name: `任务 ${schedules.length + 1}`, prompt: '', intervalMinutes: 60, enabled: false, lastRunAt: 0 });
-    refresh();
+    try {
+      await saveSchedule({ id: '', name: `任务 ${schedules.length + 1}`, prompt: '', intervalMinutes: 60, enabled: false, lastRunAt: 0 });
+      refresh();
+    } catch (e) {
+      toast(String((e as Error)?.message ?? e), 'error');
+    }
   };
   return (
     <>

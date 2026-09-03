@@ -21,7 +21,7 @@ export function ThemePage() {
   const [themePath, setThemePath] = useState('');
 
   useEffect(() => {
-    invoke<string>('get_theme_path').then(setThemePath).catch(() => {});
+    invoke<string>('get_theme_path').then(setThemePath).catch((e) => console.warn('[theme] 读取主题路径失败:', e));
   }, []);
 
   const toast = (msg: string, type: 'info' | 'success' | 'error') =>
@@ -40,8 +40,12 @@ export function ThemePage() {
   };
 
   const clearBackground = async () => {
-    await themeUpdate({ backgroundImage: null });
-    toast('已清除背景图片', 'success');
+    try {
+      await themeUpdate({ backgroundImage: null });
+      toast('已清除背景图片', 'success');
+    } catch (e) {
+      toast(String((e as Error)?.message ?? e), 'error');
+    }
   };
 
   const doExport = async () => {
