@@ -30,6 +30,8 @@ impl HistoryDb {
 
     /// 追加/更新一条 AI 对话消息（助手流式完成时按 id 覆盖）。
     /// parts = 消息 parts 渲染层的 JSON 串（'' = 无，见前端 messageParts.ts）。
+    // 参数与前端 IPC 调用契约一一对应，折叠结构体需同步改前端
+    #[allow(clippy::too_many_arguments)]
     pub fn append_chat_message(
         &self,
         id: &str,
@@ -154,6 +156,8 @@ impl HistoryDb {
 
     // ── 块持久化 ──
 
+    // 参数与前端 IPC 调用契约一一对应，折叠结构体需同步改前端
+    #[allow(clippy::too_many_arguments)]
     pub fn record_block(
         &self,
         id: &str,

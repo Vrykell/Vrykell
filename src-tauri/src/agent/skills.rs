@@ -1,7 +1,7 @@
 //! skills — 文件夹式技能系统（对齐 Agent Skills 开放规范 + 主流产品实现）。
 //!
 //! 每个技能是一个目录，含必需的 `SKILL.md`（YAML frontmatter：name/description/allowed-tools
-//! + Markdown 正文），可选的 `scripts/`、`references/`、`assets/`。技能统一放在
+//! 与 Markdown 正文），可选的 `scripts/`、`references/`、`assets/` 等。技能统一放在
 //! `~/.vrykell/skills/<name>/`，索引（来源/信任/启停/内容哈希）存 `~/.vrykell/skill-index.json`。
 //!
 //! 安全模型：

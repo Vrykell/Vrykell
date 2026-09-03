@@ -121,7 +121,7 @@ pub fn integration_dir() -> Result<PathBuf, String> {
     // 用 dirs::home_dir 而非 HOME 环境变量 —— Windows 原生环境没有 HOME，
     // 从 Git Bash 启动时 HOME 又是 MSYS 路径，都不适合作为 Windows 侧写盘位置。
     let home = dirs::home_dir().ok_or_else(|| "无法定位用户主目录".to_string())?;
-    let dir = PathBuf::from(home).join(".vrykell").join("shell");
+    let dir = home.join(".vrykell").join("shell");
     fs::create_dir_all(dir.join("zsh")).map_err(|e| e.to_string())?;
     fs::create_dir_all(dir.join("bash")).map_err(|e| e.to_string())?;
     fs::create_dir_all(dir.join("powershell")).map_err(|e| e.to_string())?;

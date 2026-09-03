@@ -167,7 +167,7 @@ fn match_in_file(path: &std::path::Path, re: &regex::Regex) -> Option<String> {
     if let Some(m) = re.find(&content) {
         let pos = m.start();
         let match_len = m.end() - m.start();
-        let raw_start = if pos > 40 { pos - 40 } else { 0 };
+        let raw_start = pos.saturating_sub(40);
         let raw_end = std::cmp::min(pos + match_len + 40, content.len());
         // 上下文窗口可能落在多字节 UTF-8 中间，先对齐到字符边界避免切片 panic
         let start = content.floor_char_boundary(raw_start);
@@ -221,7 +221,7 @@ fn get_search_context_sync(cwd: Option<String>) -> SearchContext {
     let shell = std::env::var("SHELL")
         .unwrap_or_else(|_| "/bin/zsh".to_string())
         .split('/')
-        .last()
+        .next_back()
         .unwrap_or("zsh")
         .to_string();
 
@@ -287,8 +287,8 @@ fn extract_json_field(json: &str, field: &str) -> Option<String> {
     let after = &json[pos + pattern.len()..];
     let after_colon = after.find(':')?;
     let value_start = &after[after_colon + 1..].trim_start();
-    if value_start.starts_with('"') {
-        let end = value_start[1..].find('"')?;
+    if let Some(stripped) = value_start.strip_prefix('"') {
+        let end = stripped.find('"')?;
         Some(value_start[1..=end].to_string())
     } else {
         None

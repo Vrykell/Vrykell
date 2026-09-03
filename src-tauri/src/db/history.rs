@@ -105,7 +105,7 @@ impl HistoryDb {
         let rows = stmt
             .query_map(params![top_n as i64], map_entry)
             .map_err(|e| e.to_string())?;
-        rows.filter_map(|r| r.ok()).collect::<Vec<_>>().into_iter().map(|r| Ok(r)).collect()
+        Ok(rows.filter_map(|r| r.ok()).collect())
     }
 
     /// 清空命令历史（与前端 in-memory 缓存一致，消除双写漂移）。

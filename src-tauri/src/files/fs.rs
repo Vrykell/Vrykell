@@ -37,7 +37,8 @@ pub async fn fs_list(path: Option<String>) -> Result<Vec<FsEntry>, String> {
 
 /// 列出文件系统根：Windows 返回存在的盘符（C:、D:…），Unix 返回 `/`。
 /// 供文件面板「盘符 / 根」导航——否则只能看 HOME，看不到整个盘。
-fn fs_roots_sync() -> Result<Vec<FsEntry>, String> {
+#[tauri::command]
+pub fn fs_roots() -> Result<Vec<FsEntry>, String> {
     let mut entries = Vec::new();
     #[cfg(target_os = "windows")]
     {
@@ -132,7 +133,7 @@ fn fs_disks_sync() -> Result<Vec<DiskEntry>, String> {
             .ok()
             .and_then(|rd| {
                 rd.flatten().find_map(|e| {
-                    let ok = std::fs::canonicalize(&e.path())
+                    let ok = std::fs::canonicalize(e.path())
                         .map(|t| t == std::path::Path::new("/"))
                         .unwrap_or(false);
                     ok.then(|| e.file_name().to_string_lossy().to_string())
