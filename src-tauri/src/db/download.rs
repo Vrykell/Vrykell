@@ -5,6 +5,8 @@ use serde::Serialize;
 impl HistoryDb {
     // ── 下载历史 ──
 
+    // 参数与前端 IPC 调用契约一一对应，折叠结构体需同步改前端
+    #[allow(clippy::too_many_arguments)]
     pub fn record_download(
         &self,
         name: &str,

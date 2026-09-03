@@ -134,7 +134,7 @@ mod tests {
     /// 无任何 default 标记时，首个 shell 被提升为 default。
     #[test]
     fn first_shell_becomes_default_when_none_marked() {
-        let mut out = vec![
+        let mut out = [
             ShellInfo { id: "zsh".into(), label: "Zsh".into(), default: false },
             ShellInfo { id: "bash".into(), label: "Bash".into(), default: false },
         ];

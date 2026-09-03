@@ -91,6 +91,8 @@ pub fn delete_session(
 }
 
 #[tauri::command]
+// 参数镜像前端 IPC 调用契约（record_block 逐字段传参），折叠结构体需同步改前端
+#[allow(clippy::too_many_arguments)]
 pub fn record_block(
     state: tauri::State<'_, HistoryState>,
     id: String,
@@ -132,6 +134,8 @@ pub fn set_block_collapsed(
 }
 
 #[tauri::command]
+// 参数镜像前端 IPC 调用契约（append_chat_message 逐字段传参），折叠结构体需同步改前端
+#[allow(clippy::too_many_arguments)]
 pub fn append_chat_message(
     state: tauri::State<'_, HistoryState>,
     id: String,

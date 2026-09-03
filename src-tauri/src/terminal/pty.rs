@@ -315,6 +315,8 @@ fn default_windows_shell() -> &'static str {
 }
 
 #[tauri::command]
+// 参数镜像前端 IPC 调用契约（pty_spawn 逐字段传参），折叠结构体需同步改前端
+#[allow(clippy::too_many_arguments)]
 pub fn pty_spawn(
     state: State<'_, PtyState>,
     app: AppHandle,

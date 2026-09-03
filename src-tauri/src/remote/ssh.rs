@@ -157,7 +157,7 @@ fn authenticate(sess: &Session, conn: &SshConnection, user: &str) -> Result<(), 
                 continue;
             }
             let pub_path = priv_path.with_extension("pub");
-            let pub_opt = pub_path.exists().then(|| pub_path.as_path());
+            let pub_opt = pub_path.exists().then_some(pub_path.as_path());
             if sess.userauth_pubkey_file(user, pub_opt, &priv_path, None).is_ok() && sess.authenticated() {
                 return Ok(());
             }

@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct AgentDef {
     pub id: String,
@@ -12,17 +12,6 @@ pub struct AgentDef {
     pub description: String,
     /// 系统提示词（子代理的行为准则）
     pub prompt: String,
-}
-
-impl Default for AgentDef {
-    fn default() -> Self {
-        Self {
-            id: String::new(),
-            name: String::new(),
-            description: String::new(),
-            prompt: String::new(),
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize, Default)]

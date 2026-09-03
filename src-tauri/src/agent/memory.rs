@@ -1,7 +1,8 @@
 //! memory — agent 长期记忆：FACT（持久知识）+ JOURNAL（带时间戳的流水）。
-//!   - `~/.vrykell/memory.md`        ：FACT，agent 用 memory 工具 update 重写（= 记忆整理）
-//!   - `~/.vrykell/memory-journal.md`：JOURNAL，按行追加（时间戳 + 文本）
-//! 每次对话把 FACT 与最近若干条 JOURNAL 注入系统提示词。
+//!
+//! - `~/.vrykell/memory.md`        ：FACT，agent 用 memory 工具 update 重写（= 记忆整理）
+//! - `~/.vrykell/memory-journal.md`：JOURNAL，按行追加（时间戳 + 文本）
+//! - 每次对话把 FACT 与最近若干条 JOURNAL 注入系统提示词。
 
 use std::path::PathBuf;
 

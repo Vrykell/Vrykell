@@ -157,12 +157,15 @@ fn proxy_hostnames() -> HashSet<String> {
     set
 }
 
+/// DNS 钉扎解析缓存：域名 → 已验证的公网地址（TTL 内复用）。
+type DnsCache = std::sync::Arc<Mutex<HashMap<String, (Instant, Vec<std::net::SocketAddr>)>>>;
+
 /// DNS 钉扎解析器：解析一次 → 校验（私网即拒）→ 缓存（TTL 内复用）。
 ///
 /// 防 DNS 交替应答（重绑定）攻击：校验时解析到的公网地址被缓存并直接用于连接，
 /// 攻击者在校验通过后把域名切到内网 IP 也无法得逞——连接用的是已验证的缓存结果。
 struct PinnedResolver {
-    cache: std::sync::Arc<Mutex<HashMap<String, (Instant, Vec<std::net::SocketAddr>)>>>,
+    cache: DnsCache,
     /// 是否校验解析结果（false = 受信端点，仅钉扎）
     validate: bool,
     /// 用户配置的代理主机：直连代理本身是用户信任的，不校验
@@ -898,7 +901,7 @@ pub async fn web_crawl(
 // ── 技能清单（统一协议 vrykell-skills/v1） ──
 
 /// 网络技能清单里的单条技能。
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct RemoteSkill {
     pub name: String,
@@ -906,18 +909,6 @@ pub struct RemoteSkill {
     pub prompt: String,
     pub version: String,
     pub author: String,
-}
-
-impl Default for RemoteSkill {
-    fn default() -> Self {
-        Self {
-            name: String::new(),
-            description: String::new(),
-            prompt: String::new(),
-            version: String::new(),
-            author: String::new(),
-        }
-    }
 }
 
 #[derive(Deserialize, Default)]
