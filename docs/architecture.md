@@ -2,7 +2,7 @@
 
 > 当前 v2 chat-first 实现（分支 `dev`）的实际架构。终端主体把终端输出抽象为**命令块（Block）**，用「Rust StreamScanner 同步扫描 + SessionController 三场景状态机 + 每 block 单离屏 xterm」组织。
 >
-> 本文记录当前实现的实际架构。（最近更新：2026-08-31，扫描已下沉 Rust；分屏、Agent、主题见 §16-§18。）
+> 本文记录当前实现的实际架构。（最近更新：2026-09-02，移除 StatusBar、块颜色快照落库 + HTML 双向净化、磁盘卡片；分屏、Agent、主题见 §16-§18。）
 
 ---
 
@@ -58,7 +58,7 @@ App
 │   ├── SidePanel (left)   — 由 Dock 按钮控制
 │   ├── TerminalView       — 终端主区域（核心）
 │   └── SidePanel (right)  — 由 Dock 按钮控制
-├── StatusBar
+├── StatusBar（已移除，2026-09）
 ├── CommandPalette (overlay)
 ├── ToastContainer (overlay)
 └── ApiKeyField     (fixed 右下角，不在文档流)
@@ -149,7 +149,7 @@ Rust PTY 输出的每个 chunk 不再先写主 xterm 再等 parser 异步回调�
 | `blockList` | 收到首个 `133;A` 后 | `TerminalBlockList` + 底部 `InputEditor` |
 | `altScreen` | 数据段检测到 alt-screen 进入序列 | 主 xterm 覆盖全屏（zIndex 100）+ `TuiBanner` |
 
-`altScreen` 叠加在 `classic` 或 `blockList` 之上；退出 alt-screen 后由 SessionController 恢复前一个场景。输入框可见性由 `inputVisibility.ts` 消费当前 scene 与是否有长运行命令决定（见 §9）。
+`altScreen` 叠加在 `classic` 或 `blockList` 之上；退出 alt-screen 后由 SessionController 恢复前一个场景。全屏应用（vi/htop 等）退出/被杀后 **alt buffer 最终画面不再回填块历史**，块只保留 teardown 后的 shell 噪音。输入框可见性由 `inputVisibility.ts` 消费当前 scene 与是否有长运行命令决定（见 §9）。
 
 ## 7. Block 生命周期状态机
 
@@ -243,13 +243,13 @@ zustand，按域拆分（`src/stores/`）：
 
 | 目录/文件 | 职责 |
 |------|------|
-| `terminal/pty.rs` | `portable-pty` 会话生命周期，命令注册 `pty_spawn/write/resize/close`，事件 `pty-output`/`pty-exit`（含 StreamDecoder + scan.rs 接线） |
+| `terminal/pty.rs` | `portable-pty` 会话生命周期，命令注册 `pty_spawn/write/resize/close`，事件 `pty-output`/`pty-exit`（含 StreamDecoder + scan.rs 接线；GUI 启动 TERM/COLORTERM 为空时补 `xterm-256color` + truecolor） |
 | `terminal/scan.rs` | Rust StreamScanner（字节流同步扫描，见 §5.1） |
 | `terminal/shell_integration.rs` | zsh（ZDOTDIR）/ bash（--rcfile）/ PowerShell 注入 OSC 133/7 的 shell integration 脚本 |
 | `terminal/shells.rs` | shell 类型探测与 list_shells |
-| `db/` | rusqlite 持久化：历史、会话、块、分组、工作区、下载、SSH 连接（`HistoryDb` 分层） |
+| `db/` | rusqlite 持久化：历史、会话、块（含 `output_html` 颜色快照）、分组、工作区、下载、SSH 连接（`HistoryDb` 分层；`user_version<2` 旧库直接重置） |
 | `commands/` | Tauri command 转发层（search/session/group/workspace/download） |
-| `files/` | 文件系统操作（fs、file_open） |
+| `files/` | 文件系统操作（fs、`fs_disks` 磁盘列表、file_open） |
 | `remote/ssh.rs` | SSH/SFTP（connection CRUD、主机指纹 TOFU、SFTP 下载上传） |
 | `agent/` | AI 流式（ai.rs）、Skills、记忆、MCP、调度、web 抓取、自定义 agent |
 | `theme.rs` | 主题配置持久化 |
@@ -291,7 +291,7 @@ T4   渲染帧
 
 | 文件 | 内容 |
 |------|------|
-| `src/App.tsx` | 顶层布局（Dock + SidePanel + TerminalView + StatusBar + 壁纸背景层） |
+| `src/App.tsx` | 顶层布局（Dock + SidePanel + TerminalView + 壁纸背景层） |
 | `src/terminal/TerminalView.tsx` | scene 驱动 UI：loading / classic / blockList / altScreen（含分屏） |
 | `src/terminal/useTerminalSession.ts` | 事件接线 + controller 生命周期 + 主 xterm 生命周期 |
 | `src/terminal/useFollowBottom.ts` | block 列表贴底跟随 hook |
@@ -310,6 +310,7 @@ T4   渲染帧
 | `src/stores/blocks.ts` | 块 store |
 | `src/lib/pty.ts` | Tauri IPC 封装 |
 | `src/lib/sessionManager.ts` | 会话/块持久化编排 |
+| `src/lib/sanitizeHtml.ts` | outputHtml 落库/渲染双向净化（span 白名单 style + br，防注入） |
 | `src/lib/windowLayout.ts` | 分屏布局模型（TerminalSpec / pane 分裂） |
 | `src-tauri/src/terminal/pty.rs` | portable-pty 会话生命周期 + 扫描接线 |
 | `src-tauri/src/terminal/scan.rs` | **Rust StreamScanner**（PTY 字节流同步扫描器） |
