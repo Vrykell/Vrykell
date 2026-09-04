@@ -1,6 +1,6 @@
 # Vrykell 开发规则
 
-> 最后更新: 2026-08-26
+> 最后更新: 2026-09-02
 
 ## 一、代码规范
 
@@ -47,7 +47,7 @@
 
 24. `src/terminal/` — 终端相关组件（Block 列表、输入栏、终端面板、输出渲染、pipeline/）。
 25. `src/stores/` — zustand 状态管理（workspace、terminal、blocks、chat、history、ui、dock、input）。
-26. `src/components/` — 通用 UI 组件（TabBar、Sidebar、StatusBar、CommandPalette、NewTabModal、Toast、ContextRing）。
+26. `src/components/` — 通用 UI 组件（TabBar、Sidebar、CommandPalette、NewTabModal、Toast、ContextRing）。
 27. `src/chat/` — AI 对话渲染（AiBlock、ModelPill、ToolRunCard、Markdown、PanelChat）。
 28. `src/agent/` — AI 代理逻辑（agentStream、工具、权限、Skills、MCP、上下文、记忆、调度、智能标题）。
 29. `src/settings/` — 设置页（行为/模型/MCP/Skills/快捷键/终端打开模式/主题）。
