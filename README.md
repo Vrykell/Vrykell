@@ -19,7 +19,9 @@ chat-first 终端。终端是主表面，每个命令渲染为一个**命令块�
 > **构建依赖**：SSH 远程文件浏览（SFTP）用 `ssh2` crate，需要系统 `libssh2` + `openssl`。
 > macOS 用 Homebrew 安装：
 > ```bash
+
 > brew install libssh2 openssl
+> 
 > ```
 > （`ssh2` 的 `libssh2-sys` 不支持从源码 vendored libssh2，因此这是硬依赖；若要完全免系统依赖，可改用纯 Rust 的 `russh`。）
 
