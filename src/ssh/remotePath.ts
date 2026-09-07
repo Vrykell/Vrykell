@@ -6,9 +6,9 @@
  */
 
 import { create } from 'zustand';
-import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
-import { useTerminalStore } from '../stores/terminal';
-import { leaves } from '../lib/windowLayout';
+import { leaves } from '@/lib/windowLayout';
+import { useTerminalStore } from '@/stores/terminal';
+import { isSessionTab, useWorkspaceStore } from '@/stores/workspace';
 
 interface RemotePathState {
   /** 连接 id → 面板路径；null = 连接 home */

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { invokeMock, listenMock } = vi.hoisted(() => ({
   invokeMock: vi.fn(),
@@ -7,7 +7,26 @@ const { invokeMock, listenMock } = vi.hoisted(() => ({
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 vi.mock('@tauri-apps/api/event', () => ({ listen: listenMock }));
 
-import { anthropicStream, activeModelProfile, isApiKeyConfigured, getModel, getAiBaseUrl, useAiConfigStore, refreshAiConfig, setApiKey, clearApiKey, setAiBaseUrl, setAiModel, setAiProvider, setAiModels, setActiveModel, setProviderKey, clearProviderKey, setTavilyKey, clearTavilyKey } from './ai';
+import {
+  activeModelProfile,
+  anthropicStream,
+  clearApiKey,
+  clearProviderKey,
+  clearTavilyKey,
+  getAiBaseUrl,
+  getModel,
+  isApiKeyConfigured,
+  refreshAiConfig,
+  setActiveModel,
+  setAiBaseUrl,
+  setAiModel,
+  setAiModels,
+  setAiProvider,
+  setApiKey,
+  setProviderKey,
+  setTavilyKey,
+  useAiConfigStore,
+} from '@/lib/ai';
 
 describe('anthropicStream', () => {
   beforeEach(() => {
@@ -36,9 +55,12 @@ describe('anthropicStream', () => {
     const got: string[] = [];
     await anthropicStream([{ role: 'user', content: 'hi' }], (t) => got.push(t));
     expect(got).toEqual(['你好', '！']);
-    expect(invokeMock).toHaveBeenCalledWith('ai_stream', expect.objectContaining({
-      messages: [{ role: 'user', content: 'hi' }],
-    }));
+    expect(invokeMock).toHaveBeenCalledWith(
+      'ai_stream',
+      expect.objectContaining({
+        messages: [{ role: 'user', content: 'hi' }],
+      }),
+    );
   });
 });
 
@@ -48,9 +70,18 @@ describe('ai 镜像函数（新增）', () => {
   });
 
   it('activeModelProfile：优先列表命中，空列表回退镜像字段', () => {
-    useAiConfigStore.setState({ models: [{ id: 'a', name: 'A', provider: 'anthropic', baseUrl: 'u', model: 'm1' }], activeModel: 'a' });
+    useAiConfigStore.setState({
+      models: [{ id: 'a', name: 'A', provider: 'anthropic', baseUrl: 'u', model: 'm1' }],
+      activeModel: 'a',
+    });
     expect(activeModelProfile().model).toBe('m1');
-    useAiConfigStore.setState({ models: [], activeModel: '', provider: 'gemini', baseUrl: 'u2', model: 'm2' });
+    useAiConfigStore.setState({
+      models: [],
+      activeModel: '',
+      provider: 'gemini',
+      baseUrl: 'u2',
+      model: 'm2',
+    });
     expect(activeModelProfile().model).toBe('m2');
   });
 
@@ -88,13 +119,17 @@ describe('ai 镜像函数（新增）', () => {
     expect(isApiKeyConfigured()).toBe(true);
     useAiConfigStore.setState({ hasGeminiKey: false, provider: 'gemini' });
     expect(isApiKeyConfigured()).toBe(false);
-    
   });
 
   it('refreshAiConfig：同步 Rust 配置；后端不可用时保持默认', async () => {
     invokeMock.mockResolvedValue({
-      has_key: true, base_url: 'u', model: 'm', provider: 'anthropic',
-      has_anthropic_key: true, has_gemini_key: false, has_tavily_key: true,
+      has_key: true,
+      base_url: 'u',
+      model: 'm',
+      provider: 'anthropic',
+      has_anthropic_key: true,
+      has_gemini_key: false,
+      has_tavily_key: true,
       models: [{ id: 'x', name: 'X', provider: 'anthropic', baseUrl: 'u', model: 'm' }],
       active_model: 'x',
     });
@@ -112,7 +147,12 @@ describe('ai 镜像函数（新增）', () => {
   });
 
   it('refreshAiConfig：models 缺省时兜底为空数组', async () => {
-    invokeMock.mockResolvedValue({ has_key: false, base_url: 'u', model: 'm', provider: 'openai-compatible' });
+    invokeMock.mockResolvedValue({
+      has_key: false,
+      base_url: 'u',
+      model: 'm',
+      provider: 'openai-compatible',
+    });
     await refreshAiConfig();
     expect(useAiConfigStore.getState().models).toEqual([]);
   });
@@ -140,8 +180,14 @@ describe('ai 镜像函数（新增）', () => {
   });
 
   it('setAiModels：替换列表并同步镜像字段，未命中时回退默认', async () => {
-    await setAiModels([{ id: 'a', name: 'A', provider: 'anthropic', baseUrl: 'u', model: 'm1' }], 'a');
-    expect(invokeMock).toHaveBeenCalledWith('set_ai_models', expect.objectContaining({ activeModel: 'a' }));
+    await setAiModels(
+      [{ id: 'a', name: 'A', provider: 'anthropic', baseUrl: 'u', model: 'm1' }],
+      'a',
+    );
+    expect(invokeMock).toHaveBeenCalledWith(
+      'set_ai_models',
+      expect.objectContaining({ activeModel: 'a' }),
+    );
     const s = useAiConfigStore.getState();
     expect(s.models[0].id).toBe('a');
     expect(s.provider).toBe('anthropic');
@@ -153,7 +199,10 @@ describe('ai 镜像函数（新增）', () => {
   });
 
   it('setActiveModel：切换生效模型，未命中回退默认', async () => {
-    useAiConfigStore.setState({ models: [{ id: 'b', name: 'B', provider: 'gemini', baseUrl: 'u', model: 'g9' }], activeModel: '' });
+    useAiConfigStore.setState({
+      models: [{ id: 'b', name: 'B', provider: 'gemini', baseUrl: 'u', model: 'g9' }],
+      activeModel: '',
+    });
     await setActiveModel('b');
     expect(invokeMock).toHaveBeenCalledWith('set_active_model', { id: 'b' });
     const s = useAiConfigStore.getState();
@@ -169,7 +218,10 @@ describe('ai 镜像函数（新增）', () => {
 
   it('setProviderKey / clearProviderKey：按 provider 分支', async () => {
     await setProviderKey('anthropic', ' key-a ');
-    expect(invokeMock).toHaveBeenCalledWith('set_provider_key', { provider: 'anthropic', key: 'key-a' });
+    expect(invokeMock).toHaveBeenCalledWith('set_provider_key', {
+      provider: 'anthropic',
+      key: 'key-a',
+    });
     expect(useAiConfigStore.getState().hasAnthropicKey).toBe(true);
     await setProviderKey('gemini', 'k');
     expect(useAiConfigStore.getState().hasGeminiKey).toBe(true);

@@ -1,8 +1,8 @@
+import { Folder, type LucideIcon, Server, Sparkles, SquareStack } from 'lucide-react';
 import { create } from 'zustand';
-import { SquareStack, Folder, Server, Sparkles, type LucideIcon } from 'lucide-react';
-import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '../lib/errorHandler';
-import { useWorkspaceStore, isSessionTab } from './workspace';
-import { minTerminalWidth, MIN_PANE_SIZE } from '../lib/windowLayout';
+import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@/lib/errorHandler';
+import { MIN_PANE_SIZE, minTerminalWidth } from '@/lib/windowLayout';
+import { isSessionTab, useWorkspaceStore } from '@/stores/workspace';
 
 // ── 面板定义（可扩展）──
 
@@ -14,10 +14,10 @@ export interface PanelDef {
 }
 
 export const PANEL_DEFS: Record<string, PanelDef> = {
-  tabs:  { id: 'tabs',  icon: SquareStack, label: '标签', width: 200 },
+  tabs: { id: 'tabs', icon: SquareStack, label: '标签', width: 200 },
   files: { id: 'files', icon: Folder, label: '资源', width: 240 },
-  ssh:   { id: 'ssh',   icon: Server, label: 'SSH', width: 260 },
-  chat:  { id: 'chat',  icon: Sparkles, label: 'AI', width: 320 },
+  ssh: { id: 'ssh', icon: Server, label: 'SSH', width: 260 },
+  chat: { id: 'chat', icon: Sparkles, label: 'AI', width: 320 },
 };
 
 export type DockSide = 'left' | 'right';
@@ -37,17 +37,24 @@ function isValidLayout(data: unknown): data is PersistedLayout {
   if (!data || typeof data !== 'object') return false;
   const d = data as Record<string, unknown>;
   return (
-    Array.isArray(d.leftZone) && d.leftZone.every((v: unknown) => typeof v === 'string' && VALID_IDS.includes(v)) &&
-    Array.isArray(d.rightZone) && d.rightZone.every((v: unknown) => typeof v === 'string' && VALID_IDS.includes(v)) &&
-    Array.isArray(d.leftPanels) && d.leftPanels.every((v: unknown) => typeof v === 'string' && VALID_IDS.includes(v)) &&
-    Array.isArray(d.rightPanels) && d.rightPanels.every((v: unknown) => typeof v === 'string' && VALID_IDS.includes(v)) &&
-    typeof d.panelWidths === 'object' && d.panelWidths !== null
+    Array.isArray(d.leftZone) &&
+    d.leftZone.every((v: unknown) => typeof v === 'string' && VALID_IDS.includes(v)) &&
+    Array.isArray(d.rightZone) &&
+    d.rightZone.every((v: unknown) => typeof v === 'string' && VALID_IDS.includes(v)) &&
+    Array.isArray(d.leftPanels) &&
+    d.leftPanels.every((v: unknown) => typeof v === 'string' && VALID_IDS.includes(v)) &&
+    Array.isArray(d.rightPanels) &&
+    d.rightPanels.every((v: unknown) => typeof v === 'string' && VALID_IDS.includes(v)) &&
+    typeof d.panelWidths === 'object' &&
+    d.panelWidths !== null
   );
 }
 
 const DEFAULTS: PersistedLayout = {
-  leftZone: ['tabs', 'ssh'], rightZone: ['files'],
-  leftPanels: [], rightPanels: [],
+  leftZone: ['tabs', 'ssh'],
+  rightZone: ['files'],
+  leftPanels: [],
+  rightPanels: [],
   panelWidths: {},
 };
 
@@ -129,7 +136,9 @@ export function useChatPanelOpen(): boolean {
     const tab = s.tabs.find((t) => t.id === s.activeId);
     return !!tab && isSessionTab(tab);
   });
-  const chatInPanels = useDockStore((s) => s.leftPanels.includes('chat') || s.rightPanels.includes('chat'));
+  const chatInPanels = useDockStore(
+    (s) => s.leftPanels.includes('chat') || s.rightPanels.includes('chat'),
+  );
   return isSessionActive && chatInPanels;
 }
 
@@ -163,7 +172,7 @@ export const useDockStore = create<DockState>((set) => ({
 
       let leftZone = s.leftZone;
       let rightZone = s.rightZone;
-      const targetList = from === to ? fromList : (to === 'left' ? [...leftZone] : [...rightZone]);
+      const targetList = from === to ? fromList : to === 'left' ? [...leftZone] : [...rightZone];
       let idx = atIndex ?? targetList.length;
       if (from === to && srcIdx < idx) idx = Math.max(0, idx - 1);
       idx = Math.max(0, Math.min(idx, targetList.length));
@@ -173,13 +182,24 @@ export const useDockStore = create<DockState>((set) => ({
         if (from === 'left') leftZone = targetList;
         else rightZone = targetList;
       } else {
-        if (to === 'left') { leftZone = targetList; rightZone = fromList; }
-        else { leftZone = fromList; rightZone = targetList; }
+        if (to === 'left') {
+          leftZone = targetList;
+          rightZone = fromList;
+        } else {
+          leftZone = fromList;
+          rightZone = targetList;
+        }
       }
 
       // 面板在 from 侧打开 → 关掉；其余按新按钮顺序重排
-      const leftPanels = sortByZone(from === 'left' ? s.leftPanels.filter((p) => p !== id) : s.leftPanels, leftZone);
-      const rightPanels = sortByZone(from === 'right' ? s.rightPanels.filter((p) => p !== id) : s.rightPanels, rightZone);
+      const leftPanels = sortByZone(
+        from === 'left' ? s.leftPanels.filter((p) => p !== id) : s.leftPanels,
+        leftZone,
+      );
+      const rightPanels = sortByZone(
+        from === 'right' ? s.rightPanels.filter((p) => p !== id) : s.rightPanels,
+        rightZone,
+      );
 
       const next = { ...s, leftZone, rightZone, leftPanels, rightPanels };
       saveLayout(toPersisted(next));
@@ -204,9 +224,10 @@ export const useDockStore = create<DockState>((set) => ({
         }
       }
       const collapsedPanels = s.collapsedPanels.filter((p) => p !== id);
-      const patch: Partial<DockState> = side === 'left'
-        ? { leftPanels: panels, collapsedPanels }
-        : { rightPanels: panels, collapsedPanels };
+      const patch: Partial<DockState> =
+        side === 'left'
+          ? { leftPanels: panels, collapsedPanels }
+          : { rightPanels: panels, collapsedPanels };
       saveLayout(toPersisted({ ...s, ...patch }));
       return patch as DockState;
     });
@@ -224,9 +245,10 @@ export const useDockStore = create<DockState>((set) => ({
         const sorted = sortByZone(panels, zone);
         panels.splice(0, panels.length, ...sorted);
       }
-      const patch: Partial<DockState> = side === 'left'
-        ? { leftPanels: panels, collapsedPanels }
-        : { rightPanels: panels, collapsedPanels };
+      const patch: Partial<DockState> =
+        side === 'left'
+          ? { leftPanels: panels, collapsedPanels }
+          : { rightPanels: panels, collapsedPanels };
       saveLayout(toPersisted({ ...s, ...patch }));
       return patch as DockState;
     });
@@ -241,7 +263,8 @@ export const useDockStore = create<DockState>((set) => ({
       // 拖到最小宽度下限 → 折叠：面板保持挂载（内容状态不丢），仅打折叠标记并隐藏，
       // 松手前反向拖回可无损恢复；是否真正下架由 commitPanelWidth 松手定局。
       if (next <= MIN_PANEL_WIDTH) {
-        if (s.collapsedPanels.includes(id) && (s.panelWidths[id] ?? 0) === MIN_PANEL_WIDTH) return {};
+        if (s.collapsedPanels.includes(id) && (s.panelWidths[id] ?? 0) === MIN_PANEL_WIDTH)
+          return {};
         const collapsedPanels = s.collapsedPanels.includes(id)
           ? s.collapsedPanels
           : [...s.collapsedPanels, id];
@@ -280,8 +303,12 @@ export const useDockStore = create<DockState>((set) => ({
         return { collapsedPanels };
       }
       // 松手时宽度仍 ≤ 下限 → 正式折叠：从面板列表下架（持久化为关闭）
-      const leftPanels = s.leftPanels.includes(id) ? s.leftPanels.filter((p) => p !== id) : s.leftPanels;
-      const rightPanels = s.rightPanels.includes(id) ? s.rightPanels.filter((p) => p !== id) : s.rightPanels;
+      const leftPanels = s.leftPanels.includes(id)
+        ? s.leftPanels.filter((p) => p !== id)
+        : s.leftPanels;
+      const rightPanels = s.rightPanels.includes(id)
+        ? s.rightPanels.filter((p) => p !== id)
+        : s.rightPanels;
       const collapsedPanels = s.collapsedPanels.filter((p) => p !== id);
       const patch = { leftPanels, rightPanels, collapsedPanels };
       saveLayout(toPersisted({ ...s, ...patch }));

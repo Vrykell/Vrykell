@@ -18,13 +18,12 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ToolRunState } from './messageParts';
-import { untrustedSkillFor, setSkillState } from './skills';
-import { dangerousCommandReason } from './dangerousCommands';
-import { sensitivePathReason } from './sensitivePaths';
+import { dangerousCommandReason } from '@/agent/dangerousCommands';
+import type { ToolRunState } from '@/agent/messageParts';
+import { sensitivePathReason } from '@/agent/sensitivePaths';
+import { setSkillState, untrustedSkillFor } from '@/agent/skills';
 
-export { dangerousCommandReason };
-export { sensitivePathReason };
+export { dangerousCommandReason, sensitivePathReason };
 
 export type ToolLevel = 'allow' | 'ask' | 'deny';
 export type ApprovalDecision = 'once' | 'session' | 'deny';
@@ -202,7 +201,6 @@ export async function ensureSkillAccess(
   return { proceed: true };
 }
 
-
 // ── 门控 ──
 
 type GateOutcome = { proceed: true } | { proceed: false; result: GateResult };
@@ -243,7 +241,11 @@ export async function gate(
     };
   }
   const forcedReason = danger ?? sensitive;
-  ctx.setToolState(toolCallId, 'approval-pending', forcedReason ? { danger: forcedReason } : undefined);
+  ctx.setToolState(
+    toolCallId,
+    'approval-pending',
+    forcedReason ? { danger: forcedReason } : undefined,
+  );
   const decision = await requestApproval(toolCallId);
   if (decision === 'deny') {
     ctx.setToolState(toolCallId, 'denied', danger ? { danger } : undefined);

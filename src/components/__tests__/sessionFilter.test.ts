@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { filterSessions, isSshSession, sshTargetOf } from '../sessionFilter';
-import type { BackendSessionEntry } from '../../search/types';
+import { describe, expect, it } from 'vitest';
+import { filterSessions, isSshSession, sshTargetOf } from '@/components/sessionFilter';
+import type { BackendSessionEntry } from '@/search/types';
 
 function mk(over: Partial<BackendSessionEntry>): BackendSessionEntry {
   return {
@@ -25,20 +25,31 @@ describe('isSshSession / sshTargetOf', () => {
   it('识别 kind=ssh 与 payload 中的 ssh 标记', () => {
     expect(isSshSession(mk({ kind: 'ssh' }))).toBe(true);
     // 布局 payload 里的 kind 标记（kind 字段缺失时兜底识别）
-    expect(isSshSession(mk({ kind: 'local', payload: '{"kind":"ssh","ssh":{"host":"h"}}' }))).toBe(true);
+    expect(isSshSession(mk({ kind: 'local', payload: '{"kind":"ssh","ssh":{"host":"h"}}' }))).toBe(
+      true,
+    );
     expect(isSshSession(mk({}))).toBe(false);
   });
 
   it('解析 SSH 目标 user@host', () => {
-    expect(sshTargetOf(mk({ kind: 'ssh', payload: '{"ssh":{"host":"prod.example.com","user":"root"}}' })))
-      .toBe('root@prod.example.com');
+    expect(
+      sshTargetOf(
+        mk({ kind: 'ssh', payload: '{"ssh":{"host":"prod.example.com","user":"root"}}' }),
+      ),
+    ).toBe('root@prod.example.com');
     expect(sshTargetOf(mk({ kind: 'ssh', payload: '{"ssh":{"host":"h"}}' }))).toBe('h');
     expect(sshTargetOf(mk({ kind: 'local' }))).toBeNull();
   });
 });
 
 describe('filterSessions', () => {
-  const ssh = mk({ id: 'ssh-1', title: '生产服务器', kind: 'ssh', payload: '{"ssh":{"host":"prod.example.com","user":"root"}}', closed_at: Date.now() });
+  const ssh = mk({
+    id: 'ssh-1',
+    title: '生产服务器',
+    kind: 'ssh',
+    payload: '{"ssh":{"host":"prod.example.com","user":"root"}}',
+    closed_at: Date.now(),
+  });
   const local = mk({ id: 'local-1', title: 'Zsh', closed_at: Date.now() });
   const oldLocal = mk({ id: 'old-1', title: '老会话', closed_at: Date.now() - 40 * 24 * HOUR });
   const sessions = [ssh, local, oldLocal];

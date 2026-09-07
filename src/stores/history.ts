@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { recordHistory, clearHistory, searchHistory } from '../api/search';
+import { clearHistory, recordHistory, searchHistory } from '@/api/search';
 
 interface HistoryEntry {
   command: string;
@@ -58,7 +58,12 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
       for (const r of rows) {
         if (seen.has(r.command)) continue;
         seen.add(r.command);
-        fresh.push({ command: r.command, cwd: r.cwd, timestamp: r.timestamp, exitCode: r.exit_code });
+        fresh.push({
+          command: r.command,
+          cwd: r.cwd,
+          timestamp: r.timestamp,
+          exitCode: r.exit_code,
+        });
       }
       // 合并：会话内新记录的（record 已置前）优先，后端旧历史补后
       const cur = get().entries;

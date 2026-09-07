@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
-import { SessionController, type SessionSinks } from '../sessionController';
-import { ScanHelper } from './scanHelper';
+import { describe, expect, it, vi } from 'vitest';
+import { ScanHelper } from '@/terminal/pipeline/__tests__/scanHelper';
+import { SessionController, type SessionSinks } from '@/terminal/pipeline/sessionController';
 
 function wire(tabId = 't1') {
   const st = {
@@ -12,12 +12,24 @@ function wire(tabId = 't1') {
     completed: [] as string[],
   };
   const sinks: SessionSinks = {
-    writeMain: (d) => { st.written += d; },
-    onBlocksChanged: () => { st.blocksChanged++; },
-    onSceneChanged: (s) => { st.scenes.push(s); },
-    onCwd: (p) => { st.cwds.push(p); },
-    onBlockStart: (b) => { st.started.push(b.command); },
-    onBlockComplete: (b) => { st.completed.push(b.command); },
+    writeMain: (d) => {
+      st.written += d;
+    },
+    onBlocksChanged: () => {
+      st.blocksChanged++;
+    },
+    onSceneChanged: (s) => {
+      st.scenes.push(s);
+    },
+    onCwd: (p) => {
+      st.cwds.push(p);
+    },
+    onBlockStart: (b) => {
+      st.started.push(b.command);
+    },
+    onBlockComplete: (b) => {
+      st.completed.push(b.command);
+    },
   };
   const ctrl = new SessionController(tabId, 80, sinks);
   const scan = new ScanHelper();
@@ -128,8 +140,8 @@ describe('SessionController', () => {
     const { st, ctrl, feed } = wire();
     feed(`${OSC7('/home/a')}${A}a$ ${E('cd /home/b')}${C}${OSC7('/home/b')}${D(0)}${A}b$ `);
     await waitFor(() => st.completed.length === 1);
-    expect(ctrl.blocks[0]!.cwd).toBe('/home/a');   // 命令执行时的 cwd
-    expect(ctrl.blocks[1]!.cwd).toBe('/home/b');   // 新 pending（当前位置行）
+    expect(ctrl.blocks[0]!.cwd).toBe('/home/a'); // 命令执行时的 cwd
+    expect(ctrl.blocks[1]!.cwd).toBe('/home/b'); // 新 pending（当前位置行）
   });
 
   it('clear() 清空后，后续事件不回填旧 block', async () => {
@@ -173,7 +185,7 @@ describe('SessionController', () => {
     feed(`${A}p$ ${E('vi')}${C}`);
     feed('\x1b[?1049h');
     feed('VI FULLSCREEN'); // alt 期间只进主 xterm
-    feed('\x1b[?1049l');   // 全屏画面不回填进块
+    feed('\x1b[?1049l'); // 全屏画面不回填进块
     feed(`zsh: terminated  vi\r\n${D(143)}`);
     await waitFor(() => !!ctrl.blocks[0]?.outputText.includes('zsh: terminated'));
     expect(ctrl.blocks[0]!.outputText).not.toContain('VI FULLSCREEN');
@@ -211,7 +223,10 @@ describe('SessionController', () => {
     await waitFor(() => {
       if (st.completed.length !== 0) return false;
       if (st.blocksChanged === lastBlocks) stableTicks++;
-      else { stableTicks = 0; lastBlocks = st.blocksChanged; }
+      else {
+        stableTicks = 0;
+        lastBlocks = st.blocksChanged;
+      }
       return stableTicks >= 5;
     });
     expect(st.completed).toEqual([]);

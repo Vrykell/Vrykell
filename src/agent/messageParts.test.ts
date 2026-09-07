@@ -1,13 +1,13 @@
 /**
  * messageParts 纯函数测试：序列化 roundtrip、脏数据兜底、history 摘要格式。
  */
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  serializeParts,
   deserializeParts,
-  partsToHistoryText,
   type MessagePart,
-} from './messageParts';
+  partsToHistoryText,
+  serializeParts,
+} from '@/agent/messageParts';
 
 const sampleParts: MessagePart[] = [
   { kind: 'text', text: '我来看看。' },

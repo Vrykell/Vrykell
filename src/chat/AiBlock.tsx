@@ -18,16 +18,16 @@
  * 同组件服务两个视图：TerminalBlockList（块流内联）与 PanelChat（窗口转录）。
  */
 
-import { useEffect, useRef, useState } from 'react';
-import { Brain, ChevronRight, Copy, Pencil, RotateCw, Trash2, Zap } from 'lucide-react';
 import { ask } from '@tauri-apps/plugin-dialog';
-import { useChatStore } from '../stores/chat';
-import { useWorkspaceStore } from '../stores/workspace';
-import SafeMarkdown from './SafeMarkdown';
-import ToolNode from './ToolNode';
-import ToolRunCard from './ToolRunCard';
-import AttachmentChips from './AttachmentChips';
-import type { ChatExchange } from './exchanges';
+import { Brain, ChevronRight, Copy, Pencil, RotateCw, Trash2, Zap } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import AttachmentChips from '@/chat/AttachmentChips';
+import type { ChatExchange } from '@/chat/exchanges';
+import SafeMarkdown from '@/chat/SafeMarkdown';
+import ToolNode from '@/chat/ToolNode';
+import ToolRunCard from '@/chat/ToolRunCard';
+import { useChatStore } from '@/stores/chat';
+import { useWorkspaceStore } from '@/stores/workspace';
 
 /** rail 细线：1px，绝对定位贯穿整个回答容器（top 起于首端灰点圆心，
  *  bottom 收于末端节点圆心：完成=灰点 / 出错=红节点 / 流式=延伸至底）。
@@ -107,7 +107,8 @@ export default function AiBlock({ exchange }: { exchange: ChatExchange }) {
   const removeExchange = async () => {
     if (!question) return;
     const ok = await ask('删除这条问答？', { title: '删除', kind: 'warning' });
-    if (ok) useChatStore.getState().deleteExchange(useWorkspaceStore.getState().activeId, question.id);
+    if (ok)
+      useChatStore.getState().deleteExchange(useWorkspaceStore.getState().activeId, question.id);
   };
 
   // 回答 parts（tool part 渲染为 rail 上的动作节点）
@@ -128,7 +129,10 @@ export default function AiBlock({ exchange }: { exchange: ChatExchange }) {
             userSelect: 'none',
           }}
         >
-          <Zap size={12} style={{ color: 'var(--accent-warm)', flexShrink: 0, transform: 'translateY(1px)' }} />
+          <Zap
+            size={12}
+            style={{ color: 'var(--accent-warm)', flexShrink: 0, transform: 'translateY(1px)' }}
+          />
           <span
             data-selectable
             style={{
@@ -145,17 +149,28 @@ export default function AiBlock({ exchange }: { exchange: ChatExchange }) {
             {question.content}
           </span>
           {/* hover 动作：重新生成 / 编辑重发 / 删除 / 复制（ai-block:hover 控制显隐） */}
-          <span className="ai-block-actions" style={{ display: 'inline-flex', gap: 2, flexShrink: 0 }}>
+          <span
+            className="ai-block-actions"
+            style={{ display: 'inline-flex', gap: 2, flexShrink: 0 }}
+          >
             {question && !sending && answer && (
-              <ActionBtn title="重新生成" onClick={regenerate}><RotateCw size={11} /></ActionBtn>
+              <ActionBtn title="重新生成" onClick={regenerate}>
+                <RotateCw size={11} />
+              </ActionBtn>
             )}
             {question && !sending && (
-              <ActionBtn title="编辑重发" onClick={() => void editResend()}><Pencil size={11} /></ActionBtn>
+              <ActionBtn title="编辑重发" onClick={() => void editResend()}>
+                <Pencil size={11} />
+              </ActionBtn>
             )}
             {question && !sending && (
-              <ActionBtn title="删除" onClick={() => void removeExchange()}><Trash2 size={11} /></ActionBtn>
+              <ActionBtn title="删除" onClick={() => void removeExchange()}>
+                <Trash2 size={11} />
+              </ActionBtn>
             )}
-            <ActionBtn title="复制" onClick={() => copy(answer?.content || question.content)}><Copy size={11} /></ActionBtn>
+            <ActionBtn title="复制" onClick={() => copy(answer?.content || question.content)}>
+              <Copy size={11} />
+            </ActionBtn>
           </span>
         </div>
       )}
@@ -269,26 +284,51 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
         onClick={() => setOpen((o) => !o)}
         title={open ? '收起思考过程' : '展开思考过程'}
         style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4,
-          fontFamily: 'var(--font-ui)', fontSize: 11,
-          padding: '2px 6px', border: 'none', borderRadius: 4,
-          background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
+          fontFamily: 'var(--font-ui)',
+          fontSize: 11,
+          padding: '2px 6px',
+          border: 'none',
+          borderRadius: 4,
+          background: 'transparent',
+          color: 'var(--text-muted)',
+          cursor: 'pointer',
           maxWidth: '100%',
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = 'var(--hover)';
+          e.currentTarget.style.color = 'var(--text-secondary)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'transparent';
+          e.currentTarget.style.color = 'var(--text-muted)';
+        }}
       >
         <ChevronRight
           size={11}
-          style={{ color: 'var(--text-muted)', flexShrink: 0, transition: 'transform 0.12s ease', transform: open ? 'rotate(90deg)' : 'none' }}
+          style={{
+            color: 'var(--text-muted)',
+            flexShrink: 0,
+            transition: 'transform 0.12s ease',
+            transform: open ? 'rotate(90deg)' : 'none',
+          }}
         />
         <Brain size={11} style={{ flexShrink: 0 }} />
         <span style={{ flexShrink: 0 }}>思考过程</span>
         {!open && preview && (
-          <span style={{
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            fontSize: 10, color: 'var(--text-muted)', opacity: 0.6, minWidth: 0,
-          }}>
+          <span
+            style={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              fontSize: 10,
+              color: 'var(--text-muted)',
+              opacity: 0.6,
+              minWidth: 0,
+            }}
+          >
             {preview}
           </span>
         )}
@@ -297,10 +337,16 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
         <div
           ref={bodyRef}
           style={{
-            marginTop: 4, marginLeft: 1, padding: '2px 0 2px 12px',
+            marginTop: 4,
+            marginLeft: 1,
+            padding: '2px 0 2px 12px',
             borderLeft: '2px solid var(--border-strong)',
-            fontSize: 11, lineHeight: 1.6, color: 'var(--text-secondary)',
-            wordBreak: 'break-word', maxHeight: 260, overflowY: 'auto',
+            fontSize: 11,
+            lineHeight: 1.6,
+            color: 'var(--text-secondary)',
+            wordBreak: 'break-word',
+            maxHeight: 260,
+            overflowY: 'auto',
           }}
         >
           <div className="md">
@@ -327,7 +373,11 @@ function PendingCursor() {
   );
 }
 
-function ActionBtn({ title, onClick, children }: {
+function ActionBtn({
+  title,
+  onClick,
+  children,
+}: {
   title: string;
   onClick: () => void;
   children: React.ReactNode;
@@ -336,7 +386,10 @@ function ActionBtn({ title, onClick, children }: {
     <button
       data-subtle
       title={title}
-      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
       style={{
         display: 'inline-flex',
         alignItems: 'center',

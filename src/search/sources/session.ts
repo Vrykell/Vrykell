@@ -1,7 +1,7 @@
 import { Monitor } from 'lucide-react';
-import { registerSource } from '../registry';
-import type { SearchResult, BackendSessionEntry } from '../types';
-import { searchSessions } from '../../api/search';
+import { searchSessions } from '@/api/search';
+import { registerSource } from '@/search/registry';
+import type { BackendSessionEntry, SearchResult } from '@/search/types';
 
 registerSource({
   id: 'session',
@@ -17,9 +17,10 @@ registerSource({
       id: `session-${s.id}`,
       title: s.title,
       subtitle: `${s.block_count} 个命令块`,
-      detail: s.status === 'historical'
-        ? `已关闭 · ${s.closed_at ? new Date(s.closed_at).toLocaleDateString() : ''}`
-        : '活跃中',
+      detail:
+        s.status === 'historical'
+          ? `已关闭 · ${s.closed_at ? new Date(s.closed_at).toLocaleDateString() : ''}`
+          : '活跃中',
       data: {
         sessionId: s.id,
         title: s.title,

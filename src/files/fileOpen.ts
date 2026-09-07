@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { openPath } from '@tauri-apps/plugin-opener';
-import { safeLocalStorageGet, safeLocalStorageSet } from '../lib/errorHandler';
+import { safeLocalStorageGet, safeLocalStorageSet } from '@/lib/errorHandler';
 
 /**
  * fileOpen — 文件面板的文件打开逻辑。
@@ -109,7 +109,9 @@ function shellQuote(path: string): string {
 /** 按远程模板/远程默认编辑器构造远程打开命令；有 {file} 替换，无则追加引用路径。 */
 export function remoteOpenCommand(cfg: FileOpenConfig, path: string): string {
   const tpl = cfg.remoteTemplates[extOf(path)] ?? cfg.remoteEditor;
-  const cmd = tpl.includes('{file}') ? tpl.replace('{file}', shellQuote(path)) : `${tpl} ${shellQuote(path)}`;
+  const cmd = tpl.includes('{file}')
+    ? tpl.replace('{file}', shellQuote(path))
+    : `${tpl} ${shellQuote(path)}`;
   return cmd.endsWith('\n') ? cmd : `${cmd}\n`;
 }
 

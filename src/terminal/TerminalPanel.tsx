@@ -1,5 +1,5 @@
 import '@xterm/xterm/css/xterm.css';
-import { useTerminalSession } from './useTerminalSession';
+import { useTerminalSession } from '@/terminal/useTerminalSession';
 
 /** TerminalPanel — 单个终端 pane 的 xterm 宿主（classic 主表面 / altScreen 覆盖层）。 */
 export default function TerminalPanel({

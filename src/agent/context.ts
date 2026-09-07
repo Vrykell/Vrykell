@@ -10,7 +10,7 @@
  * 摘要按 tabId 做增量缓存：只有新增溢出的消息才重新摘要，会话内不重复折叠。
  */
 import { generateText, type LanguageModel, type ModelMessage } from 'ai';
-import type { ContextStrategy } from './agentSettings';
+import type { ContextStrategy } from '@/agent/agentSettings';
 
 /** 一张图片的粗略 token 估算（不同模型差异大，这里取 512×512 常见档位） */
 export const IMAGE_TOKEN_ESTIMATE = 1105;
@@ -81,7 +81,9 @@ function messageText(s: SizedMessage): string {
     content = m.content;
   } else if (Array.isArray(m.content)) {
     content = m.content
-      .map((p) => (p && typeof p === 'object' && 'text' in p ? (p as { text: string }).text : '[图片/附件]'))
+      .map((p) =>
+        p && typeof p === 'object' && 'text' in p ? (p as { text: string }).text : '[图片/附件]',
+      )
       .join('\n');
   } else {
     content = '';

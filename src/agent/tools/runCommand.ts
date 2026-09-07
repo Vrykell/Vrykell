@@ -14,14 +14,10 @@
  * 约定：永不 throw —— 返回结构化结果，让模型自我修正。
  */
 
-import { ptyWrite } from '../../lib/pty';
-import {
-  useTerminalStore,
-  getFocusedTerminalId,
-  getRecentOutputFor,
-} from '../../stores/terminal';
-import { useBlockStore } from '../../stores/blocks';
-import { agentControl } from '../agentControl';
+import { agentControl } from '@/agent/agentControl';
+import { ptyWrite } from '@/lib/pty';
+import { useBlockStore } from '@/stores/blocks';
+import { getFocusedTerminalId, getRecentOutputFor, useTerminalStore } from '@/stores/terminal';
 
 export interface RunCommandResult {
   ok: boolean;
@@ -71,7 +67,11 @@ export async function runCommandAndWait(
     await ptyWrite(sessionId, command.endsWith('\n') ? command : command + '\n');
     return await waitForCompletion(paneId, command, t0, opts?.toolCallId, opts?.signal, timeoutMs);
   } catch (e) {
-    return { ok: false, output: '', error: `写入终端失败: ${e instanceof Error ? e.message : String(e)}` };
+    return {
+      ok: false,
+      output: '',
+      error: `写入终端失败: ${e instanceof Error ? e.message : String(e)}`,
+    };
   } finally {
     agentControl.release(paneId);
   }
@@ -207,12 +207,24 @@ function waitForCompletion(
 
     const timeoutTimer = setTimeout(() => {
       const out = getRecentOutputFor(paneId, 30);
-      finish({ ok: false, output: tail(out), error: `执行超时（${Math.round(timeoutMs / 1000)}s），以上为已有输出` });
+      finish({
+        ok: false,
+        output: tail(out),
+        error: `执行超时（${Math.round(timeoutMs / 1000)}s），以上为已有输出`,
+      });
     }, timeoutMs);
 
-    signal?.addEventListener('abort', () => {
-      finish({ ok: false, output: tail(getRecentOutputFor(paneId, 30)), error: '已中止（命令可能仍在终端中运行）' });
-    }, { once: true });
+    signal?.addEventListener(
+      'abort',
+      () => {
+        finish({
+          ok: false,
+          output: tail(getRecentOutputFor(paneId, 30)),
+          error: '已中止（命令可能仍在终端中运行）',
+        });
+      },
+      { once: true },
+    );
 
     // 订阅块流：认领新块（打 agent 标记）→ 等终态
     unsub = useBlockStore.subscribe(() => {

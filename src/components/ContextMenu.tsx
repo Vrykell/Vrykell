@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { MenuItem } from './UiBtn';
+import { MenuItem } from '@/components/UiBtn';
 
 export interface ContextMenuItem {
   label: string;
@@ -54,7 +54,10 @@ export default function ContextMenu({ anchor, items, onClose }: Props) {
           key={i}
           label={item.label}
           danger={item.danger}
-          onClick={() => { item.onClick(); onClose(); }}
+          onClick={() => {
+            item.onClick();
+            onClose();
+          }}
         />
       ))}
     </div>

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/plugin-opener', () => ({ openPath: vi.fn(() => Promise.resolve()) }));
@@ -6,15 +6,15 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import { openPath } from '@tauri-apps/plugin-opener';
 import {
-  parseTemplatesText,
-  serializeTemplates,
-  openFile,
-  loadConfig,
-  saveConfig,
-  SYSTEM_DEFAULT,
   DEFAULT_CONFIG,
   type FileOpenConfig,
-} from '../../files/fileOpen';
+  loadConfig,
+  openFile,
+  parseTemplatesText,
+  SYSTEM_DEFAULT,
+  saveConfig,
+  serializeTemplates,
+} from '@/files/fileOpen';
 
 const cfg = (over: Partial<FileOpenConfig> = {}): FileOpenConfig => ({
   defaultEditor: 'vim',
@@ -89,8 +89,16 @@ describe('配置读写', () => {
     expect(loadConfig()).toEqual(DEFAULT_CONFIG);
   });
   it('空 defaultEditor 回退 vim', () => {
-    localStorage.setItem('vrykell-file-open', JSON.stringify({ defaultEditor: '  ', templates: { md: 'code' } }));
-    expect(loadConfig()).toEqual({ defaultEditor: 'vim', templates: { md: 'code' }, remoteEditor: 'vim', remoteTemplates: {} });
+    localStorage.setItem(
+      'vrykell-file-open',
+      JSON.stringify({ defaultEditor: '  ', templates: { md: 'code' } }),
+    );
+    expect(loadConfig()).toEqual({
+      defaultEditor: 'vim',
+      templates: { md: 'code' },
+      remoteEditor: 'vim',
+      remoteTemplates: {},
+    });
   });
   it('save/load 往返', () => {
     const c = cfg({ defaultEditor: 'emacs', templates: { rs: 'nvim' } });

@@ -2,18 +2,18 @@
  * runCommandAndWait 测试：mock PTY 边界，用真实 blockStore 模拟块生命周期。
  * 覆盖：块模式完成（exitCode + agent 标记）、无会话、altScreen 拒绝、超时。
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../lib/pty', () => ({
   ptyWrite: vi.fn(async () => {}),
 }));
 
-import { runCommandAndWait } from './runCommand';
-import { useBlockStore } from '../../stores/blocks';
-import { useTerminalStore } from '../../stores/terminal';
-import { useWorkspaceStore } from '../../stores/workspace';
-import { agentControl } from '../agentControl';
-import type { TermBlock } from '../../terminal/pipeline/termBlock';
+import { agentControl } from '@/agent/agentControl';
+import { runCommandAndWait } from '@/agent/tools/runCommand';
+import { useBlockStore } from '@/stores/blocks';
+import { useTerminalStore } from '@/stores/terminal';
+import { useWorkspaceStore } from '@/stores/workspace';
+import type { TermBlock } from '@/terminal/pipeline/termBlock';
 
 const initialBlocks = useBlockStore.getState();
 const initialTerm = useTerminalStore.getState();
@@ -156,10 +156,9 @@ describe('runCommandAndWait', () => {
   it('回归：预存在的 pending 提示符块转 executing 后被认领（真实生命周期）', async () => {
     const paneId = setupPane();
     // 提示符绘制时（133;A）就建好的 pending 空块 —— 它是本命令未来的家
-    useBlockStore.getState().addBlock(
-      paneId,
-      mkBlock({ id: 'prompt', command: '', status: 'pending', startedAt: null }),
-    );
+    useBlockStore
+      .getState()
+      .addBlock(paneId, mkBlock({ id: 'prompt', command: '', status: 'pending', startedAt: null }));
     const promise = runCommandAndWait('ls');
     await tick();
     // 写入后：133;E/C 到达，同一块转 executing 并填上命令
@@ -185,10 +184,12 @@ describe('runCommandAndWait', () => {
     vi.useFakeTimers();
     const paneId = setupPane();
     // 用户一小时前手动跑过 ls —— 不能误认成我们的块
-    useBlockStore.getState().addBlock(
-      paneId,
-      mkBlock({ id: 'old', status: 'done', exitCode: 0, startedAt: 1, outputText: 'stale' }),
-    );
+    useBlockStore
+      .getState()
+      .addBlock(
+        paneId,
+        mkBlock({ id: 'old', status: 'done', exitCode: 0, startedAt: 1, outputText: 'stale' }),
+      );
     const promise = runCommandAndWait('ls');
     await vi.advanceTimersByTimeAsync(3000);
     const r = await promise;

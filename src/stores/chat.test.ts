@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { useChatStore, setDefaultStream } from './chat';
-import { useWorkspaceStore } from './workspace';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { setDefaultStream, useChatStore } from '@/stores/chat';
+import { useWorkspaceStore } from '@/stores/workspace';
 
 const initialChat = useChatStore.getState();
 const initialWs = useWorkspaceStore.getState();
@@ -15,7 +15,10 @@ describe('chat store（按标签隔离）', () => {
     const tabId = useWorkspaceStore.getState().activeId;
     const chunks = ['你好', '，世界', '！'];
     const fakeStream = async (_msgs: unknown, onChunk: (t: string) => void) => {
-      for (const c of chunks) { onChunk(c); await Promise.resolve(); }
+      for (const c of chunks) {
+        onChunk(c);
+        await Promise.resolve();
+      }
     };
     await useChatStore.getState().send('打个招呼', { streamFn: fakeStream });
     const msgs = useChatStore.getState().byTab[tabId]!;
@@ -26,7 +29,9 @@ describe('chat store（按标签隔离）', () => {
 
   it('流式失败时助手消息带错误提示', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
-    const failStream = async () => { throw new Error('boom'); };
+    const failStream = async () => {
+      throw new Error('boom');
+    };
     await useChatStore.getState().send('hi', { streamFn: failStream });
     const msgs = useChatStore.getState().byTab[tabId]!;
     expect(msgs[1]!.content).toContain('出错了');
@@ -72,7 +77,9 @@ describe('chat store（按标签隔离）', () => {
     expect(typeof msgs[0]!.createdAt).toBe('number');
     expect(msgs[1]).toMatchObject({ role: 'assistant', paneId: 'pane-1', error: undefined });
 
-    const fail = async () => { throw new Error('boom'); };
+    const fail = async () => {
+      throw new Error('boom');
+    };
     await useChatStore.getState().send('会失败', { streamFn: fail });
     const after = useChatStore.getState().byTab[tabId]!;
     expect(after[after.length - 1]!.error).toBe(true);
@@ -205,7 +212,9 @@ describe('chat store M4（停止 / 重新生成 / 编辑重发 / 删除）', () 
 
   it('regenerate：删旧回答、原地起新流，history 截止该提问', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
-    const first = async (_m: unknown, onChunk: (t: string) => void) => { onChunk('旧答案'); };
+    const first = async (_m: unknown, onChunk: (t: string) => void) => {
+      onChunk('旧答案');
+    };
     await useChatStore.getState().send('问题一', { streamFn: first });
     const userMsgId = useChatStore.getState().byTab[tabId]![0]!.id;
     const oldAnswerId = useChatStore.getState().byTab[tabId]![1]!.id;
@@ -230,13 +239,18 @@ describe('chat store M4（停止 / 重新生成 / 编辑重发 / 删除）', () 
 
   it('regenerate：多轮历史只取到目标提问为止', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
-    const mk = (answer: string) => async (_m: unknown, onChunk: (t: string) => void) => { onChunk(answer); };
+    const mk = (answer: string) => async (_m: unknown, onChunk: (t: string) => void) => {
+      onChunk(answer);
+    };
     await useChatStore.getState().send('问一', { streamFn: mk('答一') });
     await useChatStore.getState().send('问二', { streamFn: mk('答二') });
     const firstUserId = useChatStore.getState().byTab[tabId]![0]!.id;
 
     let seen: Array<{ role: string; content: string }> = [];
-    setDefaultStream(async (msgs, onChunk) => { seen = msgs; onChunk('重生一'); });
+    setDefaultStream(async (msgs, onChunk) => {
+      seen = msgs;
+      onChunk('重生一');
+    });
     await useChatStore.getState().regenerate(tabId, firstUserId);
 
     // 只替换目标提问的回答；后续交换保留（但不再进入本次 history）
@@ -247,7 +261,9 @@ describe('chat store M4（停止 / 重新生成 / 编辑重发 / 删除）', () 
 
   it('deleteExchange：删除提问 + 紧随的回答，其余交换不动', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
-    const mk = (answer: string) => async (_m: unknown, onChunk: (t: string) => void) => { onChunk(answer); };
+    const mk = (answer: string) => async (_m: unknown, onChunk: (t: string) => void) => {
+      onChunk(answer);
+    };
     await useChatStore.getState().send('问一', { streamFn: mk('答一') });
     await useChatStore.getState().send('问二', { streamFn: mk('答二') });
     const firstUserId = useChatStore.getState().byTab[tabId]![0]!.id;
@@ -259,7 +275,9 @@ describe('chat store M4（停止 / 重新生成 / 编辑重发 / 删除）', () 
 
   it('editResend：该条及之后全删，提问灌回草稿', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
-    const mk = (answer: string) => async (_m: unknown, onChunk: (t: string) => void) => { onChunk(answer); };
+    const mk = (answer: string) => async (_m: unknown, onChunk: (t: string) => void) => {
+      onChunk(answer);
+    };
     await useChatStore.getState().send('问一', { streamFn: mk('答一') });
     await useChatStore.getState().send('问二', { streamFn: mk('答二') });
     const firstUserId = useChatStore.getState().byTab[tabId]![0]!.id;
@@ -272,12 +290,10 @@ describe('chat store M4（停止 / 重新生成 / 编辑重发 / 删除）', () 
   it('停止：abort 保留部分内容，不标错不追加错误文本', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
     let release!: () => void;
-    const gate = new Promise<void>((r) => { release = r; });
-    const stopStream = async (
-      _m: unknown,
-      onChunk: (t: string) => void,
-      _ctx?: unknown,
-    ) => {
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const stopStream = async (_m: unknown, onChunk: (t: string) => void, _ctx?: unknown) => {
       onChunk('半截回答');
       await gate;
       throw new Error('aborted');
@@ -299,8 +315,13 @@ describe('chat store M4（停止 / 重新生成 / 编辑重发 / 删除）', () 
   it('立即停止的空壳回答被移除（不留空气泡）', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
     let release!: () => void;
-    const gate = new Promise<void>((r) => { release = r; });
-    const stopStream = async () => { await gate; throw new Error('aborted'); };
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const stopStream = async () => {
+      await gate;
+      throw new Error('aborted');
+    };
     const p = useChatStore.getState().send('还没说就停', { streamFn: stopStream });
     useChatStore.getState().abortStream(tabId);
     release();
@@ -314,7 +335,9 @@ describe('chat store M4（停止 / 重新生成 / 编辑重发 / 删除）', () 
   it('sendingTab 守卫：流式中 regenerate/deleteExchange/editResend 均为空操作', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
     let release!: () => void;
-    const gate = new Promise<void>((r) => { release = r; });
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
     const slow = async (_m: unknown, onChunk: (t: string) => void) => {
       onChunk('答');
       await gate;

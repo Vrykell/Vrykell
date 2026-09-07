@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import Markdown from './Markdown';
+import { describe, expect, it } from 'vitest';
+import Markdown from '@/chat/Markdown';
 
 describe('Markdown', () => {
   it('渲染 GFM 表格', () => {
@@ -25,9 +25,7 @@ describe('Markdown', () => {
   });
 
   it('渲染删除线与任务列表（GFM 重组版功能完好）', () => {
-    const { container } = render(
-      <Markdown content={'~~删掉~~\n\n- [x] 已完成\n- [ ] 待办'} />,
-    );
+    const { container } = render(<Markdown content={'~~删掉~~\n\n- [x] 已完成\n- [ ] 待办'} />);
     expect(container.querySelector('del')).toBeInTheDocument();
     expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(2);
   });

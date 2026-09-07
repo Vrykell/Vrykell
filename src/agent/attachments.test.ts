@@ -3,27 +3,37 @@
  * 注意：不用 beforeEach（本仓库 vitest 4 陷阱，见 files.test.ts 头注释），
  * 各用例自设 mock 实现。
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import {
-  serializeAttachments,
-  deserializeAttachments,
-  supportsVision,
-  attachmentsForModel,
-  makePasteAttachment,
-  totalSize,
-  LIMITS,
   type AttachmentMeta,
-} from './attachments';
+  attachmentsForModel,
+  deserializeAttachments,
+  LIMITS,
+  makePasteAttachment,
+  serializeAttachments,
+  supportsVision,
+  totalSize,
+} from '@/agent/attachments';
 
 const img: AttachmentMeta = {
-  id: 'a1', kind: 'image', name: 'shot.png', mime: 'image/png', size: 1234, blobPath: '/atts/x-shot.png',
+  id: 'a1',
+  kind: 'image',
+  name: 'shot.png',
+  mime: 'image/png',
+  size: 1234,
+  blobPath: '/atts/x-shot.png',
 };
 const file: AttachmentMeta = {
-  id: 'a2', kind: 'file', name: 'log.txt', mime: 'text/plain', size: 11, textContent: 'hello world',
+  id: 'a2',
+  kind: 'file',
+  name: 'log.txt',
+  mime: 'text/plain',
+  size: 11,
+  textContent: 'hello world',
 };
 
 describe('序列化', () => {

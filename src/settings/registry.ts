@@ -1,6 +1,6 @@
-import { isApiKeyConfigured, getModel } from '../lib/ai';
-import { loadConfig, serializeTemplates } from '../files/fileOpen';
-import { useWorkspaceStore } from '../stores/workspace';
+import { loadConfig, serializeTemplates } from '@/files/fileOpen';
+import { getModel, isApiKeyConfigured } from '@/lib/ai';
+import { useWorkspaceStore } from '@/stores/workspace';
 
 /** 设置项定义 — 供全局搜索索引 */
 export interface SettingDef {
@@ -31,9 +31,7 @@ export function getSettings(): SettingDef[] {
 export function searchSettings(query: string): SettingDef[] {
   const lower = query.toLowerCase();
   return _settings.filter(
-    (s) =>
-      s.label.toLowerCase().includes(lower) ||
-      s.desc.toLowerCase().includes(lower),
+    (s) => s.label.toLowerCase().includes(lower) || s.desc.toLowerCase().includes(lower),
   );
 }
 

@@ -4,10 +4,10 @@
  *   append=追加一条流水；search=按关键词搜索。
  */
 import { tool } from 'ai';
-import { DESC_MEMORY } from '../toolTexts';
 import { z } from 'zod';
-import { getMemory, setMemory, getMemoryJournal, appendMemoryJournal } from '../platform';
-import { gate, type ToolContext } from '../permissions';
+import { gate, type ToolContext } from '@/agent/permissions';
+import { appendMemoryJournal, getMemory, getMemoryJournal, setMemory } from '@/agent/platform';
+import { DESC_MEMORY } from '@/agent/toolTexts';
 
 export function buildMemoryTool(ctx: ToolContext) {
   return {

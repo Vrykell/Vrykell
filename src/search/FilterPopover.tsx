@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
 import { Check } from 'lucide-react';
-import type { ResultType } from './types';
-import { getSources, useEnabledSourcesStore, toggleSource } from './registry';
+import { useEffect, useRef } from 'react';
+import { getSources, toggleSource, useEnabledSourcesStore } from '@/search/registry';
+import type { ResultType } from '@/search/types';
 
 interface Props {
   open: boolean;
@@ -64,13 +64,15 @@ export default function FilterPopover({ open, onClose, counts }: Props) {
         zIndex: 200,
       }}
     >
-      <div style={{
-        padding: '6px 12px',
-        fontSize: 11,
-        color: 'var(--text-muted)',
-        borderBottom: '1px solid var(--border)',
-        fontWeight: 600,
-      }}>
+      <div
+        style={{
+          padding: '6px 12px',
+          fontSize: 11,
+          color: 'var(--text-muted)',
+          borderBottom: '1px solid var(--border)',
+          fontWeight: 600,
+        }}
+      >
         搜索范围
       </div>
       {sources.map((s) => {
@@ -101,32 +103,36 @@ export default function FilterPopover({ open, onClose, counts }: Props) {
               (e.target as HTMLElement).style.background = 'transparent';
             }}
           >
-            <span style={{
-              width: 16,
-              height: 16,
-              borderRadius: 3,
-              border: `1.5px solid ${isEnabled ? 'var(--accent)' : 'var(--border)'}`,
-              background: isEnabled ? 'var(--accent)' : 'transparent',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 10,
-              color: 'var(--accent-text)',
-              flexShrink: 0,
-            }}>
+            <span
+              style={{
+                width: 16,
+                height: 16,
+                borderRadius: 3,
+                border: `1.5px solid ${isEnabled ? 'var(--accent)' : 'var(--border)'}`,
+                background: isEnabled ? 'var(--accent)' : 'transparent',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 10,
+                color: 'var(--accent-text)',
+                flexShrink: 0,
+              }}
+            >
               {isEnabled ? <Check size={10} /> : ''}
             </span>
             <span style={{ flex: 1, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
               <s.icon size={12} /> {s.label}
             </span>
             {count !== undefined && count > 0 && (
-              <span style={{
-                fontSize: 10,
-                color: 'var(--text-muted)',
-                background: 'var(--canvas)',
-                padding: '0 6px',
-                borderRadius: 8,
-              }}>
+              <span
+                style={{
+                  fontSize: 10,
+                  color: 'var(--text-muted)',
+                  background: 'var(--canvas)',
+                  padding: '0 6px',
+                  borderRadius: 8,
+                }}
+              >
                 {count}
               </span>
             )}

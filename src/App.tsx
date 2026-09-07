@@ -1,27 +1,27 @@
 import { useEffect } from 'react';
-import TopDock from './components/TopDock';
-import SidePanel from './components/SidePanel';
-import CommandPalette from './components/CommandPalette';
-import ToastContainer from './components/Toast';
-import GlobalSearch from './search/GlobalSearch';
-import TerminalView from './terminal/TerminalView';
-import NewTabModal from './components/NewTabModal';
-import { setDefaultStream } from './stores/chat';
-import { refreshAiConfig } from './lib/ai';
-import { agentStream } from './agent/agentStream';
-import { initAutoTitle } from './agent/title';
-import { initScheduleRunner } from './agent/scheduleRunner';
-import { listSessions } from './api/session';
-import type { BackendSessionEntry } from './search/types';
-import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
-import { useUiStore } from './stores/ui';
-import { useWorkspaceDirsStore } from './files/workspaceDirs';
-import { useHistoryStore } from './stores/history';
-import { useWorkspaceStore, serializeSession, isSessionTab } from './stores/workspace';
-import { minTerminalWidth, MIN_PANE_SIZE, type TerminalSpec } from './lib/windowLayout';
-import { useTerminalThemeStore } from './theme/terminalTheme';
-import * as sessionManager from './lib/sessionManager';
-import './search/init'; // 触发所有搜索源自动注册
+import { agentStream } from '@/agent/agentStream';
+import { initScheduleRunner } from '@/agent/scheduleRunner';
+import { initAutoTitle } from '@/agent/title';
+import { listSessions } from '@/api/session';
+import CommandPalette from '@/components/CommandPalette';
+import NewTabModal from '@/components/NewTabModal';
+import SidePanel from '@/components/SidePanel';
+import ToastContainer from '@/components/Toast';
+import TopDock from '@/components/TopDock';
+import { useWorkspaceDirsStore } from '@/files/workspaceDirs';
+import { useGlobalShortcuts } from '@/hooks/useGlobalShortcuts';
+import { refreshAiConfig } from '@/lib/ai';
+import * as sessionManager from '@/lib/sessionManager';
+import { MIN_PANE_SIZE, minTerminalWidth, type TerminalSpec } from '@/lib/windowLayout';
+import GlobalSearch from '@/search/GlobalSearch';
+import type { BackendSessionEntry } from '@/search/types';
+import { setDefaultStream } from '@/stores/chat';
+import { useHistoryStore } from '@/stores/history';
+import { useUiStore } from '@/stores/ui';
+import { isSessionTab, serializeSession, useWorkspaceStore } from '@/stores/workspace';
+import TerminalView from '@/terminal/TerminalView';
+import { useTerminalThemeStore } from '@/theme/terminalTheme';
+import '@/search/init'; // 触发所有搜索源自动注册
 
 /**
  * App 布局（Dock 功能区系统）：
@@ -38,45 +38,51 @@ import './search/init'; // 触发所有搜索源自动注册
  */
 export default function App() {
   useEffect(() => setDefaultStream(agentStream), []);
-  useEffect(() => { refreshAiConfig(); }, []);
+  useEffect(() => {
+    refreshAiConfig();
+  }, []);
   // M7 智能标题：订阅块/对话活动，内容足够时生成概括性标题
   useEffect(() => initAutoTitle(), []);
   // 定时任务调度：应用运行期间按间隔触发（曾只活在设置页里，平时不执行）
   useEffect(() => initScheduleRunner(), []);
   // 启动会话恢复：优先恢复上次仍处于活跃（未关闭）的会话标签页；
-// 仅当没有可恢复的会话时才创建默认终端（避免默认终端与恢复逻辑竞态）。
-useEffect(() => {
-  void (async () => {
-    const sessions = await listSessions().catch(() => [] as BackendSessionEntry[]);
-    const active = sessions
-      .filter((s) => s.status === 'active')
-      .sort((a, b) => a.sort_order - b.sort_order);
+  // 仅当没有可恢复的会话时才创建默认终端（避免默认终端与恢复逻辑竞态）。
+  useEffect(() => {
+    void (async () => {
+      const sessions = await listSessions().catch(() => [] as BackendSessionEntry[]);
+      const active = sessions
+        .filter((s) => s.status === 'active')
+        .sort((a, b) => a.sort_order - b.sort_order);
 
-    if (active.length > 0) {
-      // 有可恢复会话：先恢复分组结构（保持组归属与折叠态），再逐个恢复
-      await useWorkspaceStore.getState().loadGroups();
-      for (const s of active) {
-        await sessionManager
-          .restore(s.id, s.title, { groupId: s.group_id ?? undefined })
-          .catch((e) => console.warn('App restore session failed:', s.id, e));
+      if (active.length > 0) {
+        // 有可恢复会话：先恢复分组结构（保持组归属与折叠态），再逐个恢复
+        await useWorkspaceStore.getState().loadGroups();
+        for (const s of active) {
+          await sessionManager
+            .restore(s.id, s.title, { groupId: s.group_id ?? undefined })
+            .catch((e) => console.warn('App restore session failed:', s.id, e));
+        }
       }
-    }
 
-    // 无待恢复会话（或全部恢复失败）→ 创建默认终端并持久化为会话记录
-    const ws = useWorkspaceStore.getState();
-    if (ws.tabs.length === 0) {
-      const id = ws.addTab({});
-      const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === id);
-      if (tab) {
-        const ser = serializeSession(tab);
-        if (ser) sessionManager.create(tab.id, tab.title, undefined, ser.kind, ser.payload);
+      // 无待恢复会话（或全部恢复失败）→ 创建默认终端并持久化为会话记录
+      const ws = useWorkspaceStore.getState();
+      if (ws.tabs.length === 0) {
+        const id = ws.addTab({});
+        const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === id);
+        if (tab) {
+          const ser = serializeSession(tab);
+          if (ser) sessionManager.create(tab.id, tab.title, undefined, ser.kind, ser.payload);
+        }
       }
-    }
-  })();
-}, []);
-  useEffect(() => { useWorkspaceDirsStore.getState().load(); }, []);
+    })();
+  }, []);
+  useEffect(() => {
+    useWorkspaceDirsStore.getState().load();
+  }, []);
   // 命令历史热缓存注水：补全与上下键翻历史在重启后立即有料
-  useEffect(() => { void useHistoryStore.getState().hydrate(); }, []);
+  useEffect(() => {
+    void useHistoryStore.getState().hydrate();
+  }, []);
   useGlobalShortcuts();
   const paletteOpen = useUiStore((s) => s.paletteOpen);
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
@@ -120,21 +126,30 @@ useEffect(() => {
         }}
       />
       {/* 应用内容：作为一个整体统一不透明度，透出壁纸背景层 */}
-      <div style={{
-        position: 'relative',
-        zIndex: 1,
-        height: '100vh',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        background: 'var(--canvas)',
-        color: 'var(--text-primary)',
-        opacity: effectiveOpacity,
-      }}>
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          height: '100vh',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          background: 'var(--canvas)',
+          color: 'var(--text-primary)',
+          opacity: effectiveOpacity,
+        }}
+      >
         <TopDock />
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row' }}>
           <SidePanel side="left" />
-          <div style={{ flex: 1, minWidth: terminalMinWidth, display: 'flex', flexDirection: 'column' }}>
+          <div
+            style={{
+              flex: 1,
+              minWidth: terminalMinWidth,
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
             <TerminalView />
           </div>
           <SidePanel side="right" />

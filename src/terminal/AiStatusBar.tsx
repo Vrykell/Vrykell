@@ -3,13 +3,18 @@
  * 模型下拉 · 上下文圆环 · 深思/Agent 开关，与聊天面板顶栏同构。
  */
 import { Bot, Brain, type LucideIcon } from 'lucide-react';
-import { useInputStore, selectPaneInput } from '../stores/input';
-import { useAiConfigStore } from '../lib/ai';
-import { useAgentSettings } from '../agent/agentSettings';
-import ModelPill from '../chat/ModelPill';
-import ContextRing from '../components/ContextRing';
+import { useAgentSettings } from '@/agent/agentSettings';
+import ModelPill from '@/chat/ModelPill';
+import ContextRing from '@/components/ContextRing';
+import { useAiConfigStore } from '@/lib/ai';
+import { selectPaneInput, useInputStore } from '@/stores/input';
 
-function Toggle({ icon: Icon, on, title, onClick }: {
+function Toggle({
+  icon: Icon,
+  on,
+  title,
+  onClick,
+}: {
   icon: LucideIcon;
   on: boolean;
   title: string;
@@ -21,13 +26,24 @@ function Toggle({ icon: Icon, on, title, onClick }: {
       title={title}
       onClick={onClick}
       style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
-        background: 'transparent', color: on ? 'var(--accent-warm)' : 'var(--text-muted)',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 24,
+        height: 24,
+        padding: 0,
+        border: 'none',
+        borderRadius: 4,
+        background: 'transparent',
+        color: on ? 'var(--accent-warm)' : 'var(--text-muted)',
         cursor: 'pointer',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--button-hover)'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = 'var(--button-hover)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'transparent';
+      }}
     >
       <Icon size={13} />
     </button>
@@ -47,8 +63,11 @@ export default function AiStatusBar({ paneId }: { paneId: string }) {
     <div
       data-testid="ai-status-bar"
       style={{
-        display: 'flex', alignItems: 'center', gap: 4,
-        padding: '6px 10px 2px', userSelect: 'none',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4,
+        padding: '6px 10px 2px',
+        userSelect: 'none',
         flexShrink: 0,
       }}
     >
@@ -67,7 +86,6 @@ export default function AiStatusBar({ paneId }: { paneId: string }) {
         title={eff.agentMode ? 'Agent 模式（可使用工具）' : '纯聊天（工具已关闭）'}
         onClick={() => agentSettings.updateModel(activeModel, { agentMode: !eff.agentMode })}
       />
-
     </div>
   );
 }

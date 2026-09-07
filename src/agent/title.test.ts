@@ -4,19 +4,19 @@
  * 模块级 mock 'ai'（generateText）+ '@tauri-apps/api/core'；不用 beforeEach
  * （本仓库 vitest 4 陷阱，见 files.test.ts 头注释），各用例开头调 reset()。
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 const { mockGenerate } = vi.hoisted(() => ({ mockGenerate: vi.fn() }));
 vi.mock('ai', () => ({ generateText: mockGenerate }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 
-import { maybeAutoTitle, sanitizeTitle, resetTitleState } from './title';
-import { useAgentSettings, DEFAULT_AGENT_SETTINGS } from './agentSettings';
-import { useAiConfigStore } from '../lib/ai';
-import { useBlockStore } from '../stores/blocks';
-import { useChatStore } from '../stores/chat';
-import { useWorkspaceStore } from '../stores/workspace';
-import { leaf } from '../lib/windowLayout';
+import { DEFAULT_AGENT_SETTINGS, useAgentSettings } from '@/agent/agentSettings';
+import { maybeAutoTitle, resetTitleState, sanitizeTitle } from '@/agent/title';
+import { useAiConfigStore } from '@/lib/ai';
+import { leaf } from '@/lib/windowLayout';
+import { useBlockStore } from '@/stores/blocks';
+import { useChatStore } from '@/stores/chat';
+import { useWorkspaceStore } from '@/stores/workspace';
 
 function mkTab(id: string, extra: Record<string, unknown> = {}) {
   return {
@@ -32,7 +32,10 @@ function reset() {
   resetTitleState();
   mockGenerate.mockReset();
   mockGenerate.mockResolvedValue({ text: '「Rust 学习笔记」。\n' });
-  useAgentSettings.setState({ global: { ...DEFAULT_AGENT_SETTINGS, autoTitle: true, titleModel: '' }, overrides: {} });
+  useAgentSettings.setState({
+    global: { ...DEFAULT_AGENT_SETTINGS, autoTitle: true, titleModel: '' },
+    overrides: {},
+  });
   useAiConfigStore.setState({
     hasKey: true,
     provider: 'openai-compatible',
@@ -49,7 +52,13 @@ const doneBlock = (id: string, command: string) =>
 
 function setThreeDoneBlocks(tabId: string) {
   useBlockStore.setState({
-    byTab: { [tabId]: [doneBlock('b1', 'git status'), doneBlock('b2', 'cargo test'), doneBlock('b3', 'git push')] },
+    byTab: {
+      [tabId]: [
+        doneBlock('b1', 'git status'),
+        doneBlock('b2', 'cargo test'),
+        doneBlock('b3', 'git push'),
+      ],
+    },
   });
 }
 
@@ -89,7 +98,10 @@ describe('智能标题触发', () => {
 
   it('手动命名的标签不被覆盖', async () => {
     reset();
-    useWorkspaceStore.setState({ tabs: [mkTab('t1', { title: '我的窗口', named: true })], activeId: 't1' });
+    useWorkspaceStore.setState({
+      tabs: [mkTab('t1', { title: '我的窗口', named: true })],
+      activeId: 't1',
+    });
     setThreeDoneBlocks('t1');
     expect(await maybeAutoTitle('t1')).toBe(false);
     expect(mockGenerate).not.toHaveBeenCalled();
@@ -120,7 +132,10 @@ describe('智能标题触发', () => {
 
   it('开关关闭 → 不生成', async () => {
     reset();
-    useAgentSettings.setState({ global: { ...DEFAULT_AGENT_SETTINGS, autoTitle: false }, overrides: {} });
+    useAgentSettings.setState({
+      global: { ...DEFAULT_AGENT_SETTINGS, autoTitle: false },
+      overrides: {},
+    });
     setThreeDoneBlocks('t1');
     expect(await maybeAutoTitle('t1')).toBe(false);
     expect(mockGenerate).not.toHaveBeenCalled();

@@ -1,9 +1,10 @@
 /**
  * fileIcon — 扩展名分类测试。
  */
-import { describe, it, expect } from 'vitest';
-import { fileIcon } from './fileIcon';
+
 import { File, FileArchive, FileCode, FileCog, FileImage, FileText, Folder } from 'lucide-react';
+import { describe, expect, it } from 'vitest';
+import { fileIcon } from '@/files/fileIcon';
 
 describe('fileIcon', () => {
   it('目录恒为 Folder', () => {

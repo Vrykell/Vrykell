@@ -1,4 +1,4 @@
-import type { DispatchEvent } from '../events';
+import type { DispatchEvent } from '@/terminal/pipeline/events';
 
 /**
  * 测试用字节流扫描器 —— 生产路径的扫描已在 Rust 端（src-tauri/src/scan.rs），
@@ -78,7 +78,9 @@ export class ScanHelper {
         const m = ALT_RE.exec(seq);
         if (m) {
           flushData(i);
-          events.push(m[2] === 'h' ? { kind: 'altEnter', raw: seq } : { kind: 'altExit', raw: seq });
+          events.push(
+            m[2] === 'h' ? { kind: 'altEnter', raw: seq } : { kind: 'altExit', raw: seq },
+          );
           textStart = j + 1;
         }
         i = j + 1;

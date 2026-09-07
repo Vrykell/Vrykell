@@ -1,8 +1,8 @@
 /**
  * systemPrompt 测试：自定义优先、默认回退、压缩摘要追加。
  */
-import { describe, it, expect } from 'vitest';
-import { buildSystemPrompt, DEFAULT_SYSTEM_PROMPT } from './systemPrompt';
+import { describe, expect, it } from 'vitest';
+import { buildSystemPrompt, DEFAULT_SYSTEM_PROMPT } from '@/agent/systemPrompt';
 
 describe('buildSystemPrompt', () => {
   it('空自定义 → 内置默认', () => {

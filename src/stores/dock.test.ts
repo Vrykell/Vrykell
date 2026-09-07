@@ -1,8 +1,8 @@
 /**
  * dock — 侧栏面板 store 测试。
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { useDockStore } from './dock';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useDockStore } from '@/stores/dock';
 
 const RESET = { leftZone: [], rightZone: [], leftPanels: [], rightPanels: [], panelWidths: {} };
 beforeEach(() => {
@@ -16,7 +16,10 @@ describe('dock store', () => {
     expect(st.leftPanels.includes('chat') || st.rightPanels.includes('chat')).toBe(true);
     const openSide: 'left' | 'right' = st.leftPanels.includes('chat') ? 'left' : 'right';
     useDockStore.getState().togglePanel(openSide, 'chat');
-    expect(useDockStore.getState().leftPanels.includes('chat') || useDockStore.getState().rightPanels.includes('chat')).toBe(false);
+    expect(
+      useDockStore.getState().leftPanels.includes('chat') ||
+        useDockStore.getState().rightPanels.includes('chat'),
+    ).toBe(false);
   });
 
   it('moveButton 在已有 zone 间移动并带出面板', () => {
@@ -45,8 +48,8 @@ describe('dock store', () => {
     expect(useDockStore.getState().collapsedPanels).toEqual(['chat']);
     // 拖回：SidePanel 层先 openPanel 恢复，再 setPanelWidth 调宽
     useDockStore.getState().openPanel('chat');
-    useDockStore.getState().setPanelWidth('chat', 100);   // 160 → 260
-    useDockStore.getState().commitPanelWidth('chat');     // 260 > MIN → 不折叠
+    useDockStore.getState().setPanelWidth('chat', 100); // 160 → 260
+    useDockStore.getState().commitPanelWidth('chat'); // 260 > MIN → 不折叠
     const s = useDockStore.getState();
     expect(s.leftPanels.includes('chat')).toBe(true);
     expect(s.collapsedPanels).toEqual([]);
@@ -58,7 +61,7 @@ describe('dock store', () => {
     useDockStore.getState().setPanelWidth('chat', -200); // 80 ≤ MIN → 折叠（保持挂载）
     expect(useDockStore.getState().leftPanels).toEqual(['chat']);
     expect(useDockStore.getState().collapsedPanels).toEqual(['chat']);
-    useDockStore.getState().commitPanelWidth('chat');    // 松手定局 → 正式下架
+    useDockStore.getState().commitPanelWidth('chat'); // 松手定局 → 正式下架
     expect(useDockStore.getState().leftPanels).toEqual([]);
     expect(useDockStore.getState().collapsedPanels).toEqual([]);
     useDockStore.getState().openPanel('chat');
@@ -74,12 +77,21 @@ describe('dock store', () => {
   });
 
   it('moveButton：跨侧带 atIndex；打开的面板随按钮关闭', () => {
-    useDockStore.setState({ leftZone: ['tabs', 'ssh'], rightZone: ['files'], rightPanels: ['files'] });
+    useDockStore.setState({
+      leftZone: ['tabs', 'ssh'],
+      rightZone: ['files'],
+      rightPanels: ['files'],
+    });
     useDockStore.getState().moveButton('tabs', 'right', 0);
     expect(useDockStore.getState().rightZone).toEqual(['tabs', 'files']);
     expect(useDockStore.getState().leftZone).toEqual(['ssh']);
     // from 侧打开的面板被关闭
-    useDockStore.setState({ leftZone: ['chat'], leftPanels: ['chat'], rightZone: ['files'], rightPanels: ['files'] });
+    useDockStore.setState({
+      leftZone: ['chat'],
+      leftPanels: ['chat'],
+      rightZone: ['files'],
+      rightPanels: ['files'],
+    });
     useDockStore.getState().moveButton('chat', 'right');
     const s = useDockStore.getState();
     expect(s.leftPanels).toEqual([]);
@@ -136,7 +148,7 @@ describe('dock store', () => {
 describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
   async function freshStore() {
     vi.resetModules();
-    const m = await import('./dock');
+    const m = await import('@/stores/dock');
     return m.useDockStore;
   }
 
@@ -157,11 +169,16 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
   });
 
   it('合法但缺新面板 id 的旧布局：追加到右侧并重排面板', async () => {
-    localStorage.setItem('dock-layout-v3', JSON.stringify({
-      leftZone: ['tabs'], rightZone: [],
-      leftPanels: [], rightPanels: [],
-      panelWidths: {},
-    }));
+    localStorage.setItem(
+      'dock-layout-v3',
+      JSON.stringify({
+        leftZone: ['tabs'],
+        rightZone: [],
+        leftPanels: [],
+        rightPanels: [],
+        panelWidths: {},
+      }),
+    );
     const store = await freshStore();
     const s = store.getState();
     expect(s.leftZone).toEqual(['tabs']);
@@ -170,11 +187,16 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
   });
 
   it('面板顺序对齐按钮顺序', async () => {
-    localStorage.setItem('dock-layout-v3', JSON.stringify({
-      leftZone: ['tabs', 'ssh'], rightZone: ['files'],
-      leftPanels: ['ssh', 'tabs'], rightPanels: ['files'],
-      panelWidths: {},
-    }));
+    localStorage.setItem(
+      'dock-layout-v3',
+      JSON.stringify({
+        leftZone: ['tabs', 'ssh'],
+        rightZone: ['files'],
+        leftPanels: ['ssh', 'tabs'],
+        rightPanels: ['files'],
+        panelWidths: {},
+      }),
+    );
     const store = await freshStore();
     expect(store.getState().leftPanels).toEqual(['tabs', 'ssh']);
   });

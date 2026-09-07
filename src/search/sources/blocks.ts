@@ -1,8 +1,8 @@
 import { SquareTerminal } from 'lucide-react';
-import { registerSource } from '../registry';
-import type { SearchResult, BlockResultData, BackendBlockEntry } from '../types';
-import { searchBlocks } from '../../api/search';
-import { fmtDuration } from '../../components/UiBtn';
+import { searchBlocks } from '@/api/search';
+import { fmtDuration } from '@/components/UiBtn';
+import { registerSource } from '@/search/registry';
+import type { BackendBlockEntry, BlockResultData, SearchResult } from '@/search/types';
 
 /** 去除 ANSI 转义序列，提取纯文本 */
 function stripAnsi(s: string): string {
@@ -49,9 +49,7 @@ registerSource({
     return backend.map((b: BackendBlockEntry) => {
       const cmdMatch = b.command.toLowerCase().includes(query.toLowerCase());
       const displayOutput = b.output_clean || b.output_raw;
-      const snippet = cmdMatch
-        ? undefined
-        : extractSnippet(displayOutput, query.toLowerCase());
+      const snippet = cmdMatch ? undefined : extractSnippet(displayOutput, query.toLowerCase());
 
       return {
         type: 'block',
@@ -66,9 +64,11 @@ registerSource({
           tabId: b.session_id,
           command: b.command,
           exitCode: b.exit_code,
-          status: (b.status === 'executing' || b.status === 'running' ? 'running'
-            : b.exit_code === 0 ? 'completed'
-            : 'failed') as 'running' | 'completed' | 'failed',
+          status: (b.status === 'executing' || b.status === 'running'
+            ? 'running'
+            : b.exit_code === 0
+              ? 'completed'
+              : 'failed') as 'running' | 'completed' | 'failed',
           startLine: 0,
           outputSnippet: snippet,
           startedAt: b.started_at,

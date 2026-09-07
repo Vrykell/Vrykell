@@ -1,24 +1,39 @@
 import { create } from 'zustand';
-import { useToastStore } from '../components/Toast';
-import { t } from '../i18n';
-import * as sessionManager from '../lib/sessionManager';
+import { defaultOpenModeForShell, useAgentSettings } from '@/agent/agentSettings';
 import {
-  groupsList, groupCreate, groupRename, groupSetCollapsed, groupDelete,
-  groupDeleteWithSessions, groupsReorder, sessionSetGroup, sessionsReorder,
-  groupRestore, groupArchive,
-} from '../api/group';
-import type { BackendGroupEntry } from '../search/types';
-import { useBlockStore } from './blocks';
-import { useChatStore } from './chat';
-import { useAgentSettings } from '../agent/agentSettings';
-import { defaultOpenModeForShell } from '../agent/agentSettings';
-import { useTerminalStore, getFocusedTerminalId } from './terminal';
-import type { ShellType } from '../lib/shells';
-import { shellTypeLabel } from '../lib/shells';
+  groupArchive,
+  groupCreate,
+  groupDelete,
+  groupDeleteWithSessions,
+  groupRename,
+  groupRestore,
+  groupSetCollapsed,
+  groupsList,
+  groupsReorder,
+  sessionSetGroup,
+  sessionsReorder,
+} from '@/api/group';
+import { useToastStore } from '@/components/Toast';
+import { t } from '@/i18n';
+import * as sessionManager from '@/lib/sessionManager';
+import type { ShellType } from '@/lib/shells';
+import { shellTypeLabel } from '@/lib/shells';
 import {
-  leaf, leaves as layoutLeaves, firstLeaf, findLeaf, splitLeaf, removeLeaf, countLeaves,
-  type WindowLayout, type TerminalSpec, type SplitDir,
-} from '../lib/windowLayout';
+  countLeaves,
+  findLeaf,
+  firstLeaf,
+  leaves as layoutLeaves,
+  leaf,
+  removeLeaf,
+  type SplitDir,
+  splitLeaf,
+  type TerminalSpec,
+  type WindowLayout,
+} from '@/lib/windowLayout';
+import type { BackendGroupEntry } from '@/search/types';
+import { useBlockStore } from '@/stores/blocks';
+import { useChatStore } from '@/stores/chat';
+import { getFocusedTerminalId, useTerminalStore } from '@/stores/terminal';
 
 export type TabKind = 'session' | 'history' | 'settings';
 
@@ -214,7 +229,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         kind: 'ssh',
         cwd: o.cwd,
         openMode: useAgentSettings.getState().global.sshOpenMode,
-        ssh: { name: ssh!.name, host: ssh!.host, user: ssh!.user, port: ssh!.port, connectionId: ssh!.connectionId },
+        ssh: {
+          name: ssh!.name,
+          host: ssh!.host,
+          user: ssh!.user,
+          port: ssh!.port,
+          connectionId: ssh!.connectionId,
+        },
       };
       tab = {
         id,
@@ -230,7 +251,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       tab = { id, title: SETTINGS_TITLE, kind: 'settings', named: true };
     } else {
       const term: TerminalSpec = {
-        id: `${id}#0`, kind: 'local', cwd: o.cwd, shellType: o.shellType,
+        id: `${id}#0`,
+        kind: 'local',
+        cwd: o.cwd,
+        shellType: o.shellType,
         openMode: defaultOpenModeForShell(o.shellType),
       };
       tab = {
@@ -248,9 +272,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const ser = serializeSession(tab)!;
       const created = sessionManager.create(id, tab.title, undefined, ser.kind, ser.payload);
       if (tab.groupId) {
-        created.then(() => sessionSetGroup(id, tab.groupId ?? null)).catch((e) =>
-          console.warn('[workspace] 新标签归属分组持久化失败:', e),
-        );
+        created
+          .then(() => sessionSetGroup(id, tab.groupId ?? null))
+          .catch((e) => console.warn('[workspace] 新标签归属分组持久化失败:', e));
       }
       // 新建终端不默认入布局（用户拖拽决定停靠位置）
       useTerminalStore.getState().setFocusedPane(firstLeaf(tab.layout).id);
@@ -282,8 +306,21 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     let next = tabs.filter((t) => t.id !== id);
     if (next.length === 0) {
       const newId = nextTabId();
-      next = [{ id: newId, title: DEFAULT_TITLE, kind: 'session', layout: leaf({ id: `${newId}#0`, kind: 'local' }) }];
-      sessionManager.create(newId, DEFAULT_TITLE, undefined, 'session', JSON.stringify({ layout: leaf({ id: `${newId}#0`, kind: 'local' }) }));
+      next = [
+        {
+          id: newId,
+          title: DEFAULT_TITLE,
+          kind: 'session',
+          layout: leaf({ id: `${newId}#0`, kind: 'local' }),
+        },
+      ];
+      sessionManager.create(
+        newId,
+        DEFAULT_TITLE,
+        undefined,
+        'session',
+        JSON.stringify({ layout: leaf({ id: `${newId}#0`, kind: 'local' }) }),
+      );
     }
     set({
       tabs: next,
@@ -292,9 +329,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     });
     // 聚焦若属于被关标签则回落到新的活跃标签
     const fp = useTerminalStore.getState().focusedPaneId;
-    if (fp === id || (isSessionTab(closed) && layoutLeaves(closed.layout).some((t) => t.id === fp))) {
+    if (
+      fp === id ||
+      (isSessionTab(closed) && layoutLeaves(closed.layout).some((t) => t.id === fp))
+    ) {
       const nextTab = next[Math.max(0, idx - 1)]!;
-      useTerminalStore.getState().setFocusedPane(isSessionTab(nextTab) ? firstLeaf(nextTab.layout).id : nextTab.id);
+      useTerminalStore
+        .getState()
+        .setFocusedPane(isSessionTab(nextTab) ? firstLeaf(nextTab.layout).id : nextTab.id);
     }
     // 清理该 tab 各终端的 per-terminal 数据（blocks/chat/terminal 残留）
     if (isSessionTab(closed)) {
@@ -333,14 +375,18 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (id !== prev) useTerminalStore.getState().setAltScreenActive(false);
     // 聚焦回落到该窗口的第一个终端（切窗口后不残留上个窗口的终端聚焦）
     const tab = get().tabs.find((t) => t.id === id);
-    useTerminalStore.getState().setFocusedPane(tab && isSessionTab(tab) ? firstLeaf(tab.layout).id : id);
+    useTerminalStore
+      .getState()
+      .setFocusedPane(tab && isSessionTab(tab) ? firstLeaf(tab.layout).id : id);
   },
   titleFromMessage: (id, text) => {
     const tab = get().tabs.find((t) => t.id === id);
     if (!tab || tab.named || !isSessionTab(tab)) return;
     const newTitle = text.slice(0, 14) + (text.length > 14 ? '…' : '');
     set((s) => ({
-      tabs: s.tabs.map((t) => (t.id === id ? { ...t, title: newTitle, named: true, titleAuto: true } : t)),
+      tabs: s.tabs.map((t) =>
+        t.id === id ? { ...t, title: newTitle, named: true, titleAuto: true } : t,
+      ),
     }));
     sessionManager.rename(id, newTitle);
   },
@@ -351,7 +397,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (!cmd) return;
     const newTitle = cmd.slice(0, 24) + (cmd.length > 24 ? '…' : '');
     set((s) => ({
-      tabs: s.tabs.map((t) => (t.id === id ? { ...t, title: newTitle, named: true, titleAuto: true } : t)),
+      tabs: s.tabs.map((t) =>
+        t.id === id ? { ...t, title: newTitle, named: true, titleAuto: true } : t,
+      ),
     }));
     sessionManager.rename(id, newTitle);
   },
@@ -367,7 +415,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
   renameTab: (id, title) => {
     set((s) => ({
-      tabs: s.tabs.map((t) => (t.id === id ? { ...t, title: title || DEFAULT_TITLE, named: true, titleAuto: false } : t)),
+      tabs: s.tabs.map((t) =>
+        t.id === id ? { ...t, title: title || DEFAULT_TITLE, named: true, titleAuto: false } : t,
+      ),
     }));
     if (title) useToastStore.getState().addToast(t('toast.renamed', { title }), 'success');
     sessionManager.rename(id, title);
@@ -402,10 +452,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (!src) return;
     const newId = nextTerminalId(tab.id, tab.layout);
     const spec: TerminalSpec = {
-      id: newId, kind: src.kind, shellType: src.shellType,
-      ssh: src.ssh ? { ...src.ssh } : undefined, cwd: src.cwd,
+      id: newId,
+      kind: src.kind,
+      shellType: src.shellType,
+      ssh: src.ssh ? { ...src.ssh } : undefined,
+      cwd: src.cwd,
       // 继承源模式；源未设置（老会话）则回退：SSH 经典、local 按 shell 类型
-      openMode: src.openMode ?? (src.kind === 'ssh' ? 'classic' : defaultOpenModeForShell(src.shellType)),
+      openMode:
+        src.openMode ?? (src.kind === 'ssh' ? 'classic' : defaultOpenModeForShell(src.shellType)),
     };
     const next = splitLeaf(tab.layout, termId, dir, 'second', spec);
     ws.setWindowLayout(tab.id, next);
@@ -480,7 +534,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (!name) return;
     set((s) => ({ groups: s.groups.map((g) => (g.id === id ? { ...g, title: name } : g)) }));
     groupRename(id, name).catch((e) =>
-      useToastStore.getState().addToast(`重命名分组保存失败：${String((e as Error)?.message ?? e)}`, 'error'),
+      useToastStore
+        .getState()
+        .addToast(`重命名分组保存失败：${String((e as Error)?.message ?? e)}`, 'error'),
     );
   },
 
@@ -488,7 +544,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const collapsed = !get().groups.find((g) => g.id === id)?.collapsed;
     set((s) => ({ groups: s.groups.map((g) => (g.id === id ? { ...g, collapsed } : g)) }));
     groupSetCollapsed(id, collapsed).catch((e) =>
-      useToastStore.getState().addToast(`分组折叠状态保存失败：${String((e as Error)?.message ?? e)}`, 'error'),
+      useToastStore
+        .getState()
+        .addToast(`分组折叠状态保存失败：${String((e as Error)?.message ?? e)}`, 'error'),
     );
   },
 
@@ -504,7 +562,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
     set((s) => ({
       groups: s.groups.filter((g) => g.id !== id),
-      tabs: s.tabs.map((t) => (isSessionTab(t) && t.groupId === id ? { ...t, groupId: undefined } : t)),
+      tabs: s.tabs.map((t) =>
+        isSessionTab(t) && t.groupId === id ? { ...t, groupId: undefined } : t,
+      ),
     }));
   },
 
@@ -516,7 +576,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     groups.splice(Math.max(0, Math.min(toIndex, groups.length)), 0, g!);
     set({ groups });
     groupsReorder(groups.map((x) => x.id)).catch((e) =>
-      useToastStore.getState().addToast(`分组排序保存失败：${String((e as Error)?.message ?? e)}`, 'error'),
+      useToastStore
+        .getState()
+        .addToast(`分组排序保存失败：${String((e as Error)?.message ?? e)}`, 'error'),
     );
   },
 
@@ -544,11 +606,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set({ tabs: next });
     // 持久化：真实会话有后端记录
     sessionSetGroup(tabId, targetGroupId).catch((e) =>
-      useToastStore.getState().addToast(`移动会话保存失败：${String((e as Error)?.message ?? e)}`, 'error'),
+      useToastStore
+        .getState()
+        .addToast(`移动会话保存失败：${String((e as Error)?.message ?? e)}`, 'error'),
     );
-    const ids = next.filter((t) => isSessionTab(t) && (t.groupId ?? null) === targetGroupId).map((t) => t.id);
+    const ids = next
+      .filter((t) => isSessionTab(t) && (t.groupId ?? null) === targetGroupId)
+      .map((t) => t.id);
     sessionsReorder(targetGroupId, ids).catch((e) =>
-      useToastStore.getState().addToast(`会话排序保存失败：${String((e as Error)?.message ?? e)}`, 'error'),
+      useToastStore
+        .getState()
+        .addToast(`会话排序保存失败：${String((e as Error)?.message ?? e)}`, 'error'),
     );
     get().pruneEmptyGroups();
   },
@@ -570,9 +638,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set((s) => ({ tabs: [...s.tabs, newTab], activeId: newId }));
     const ser = serializeSession(newTab)!;
     sessionManager.create(newId, newTab.title, undefined, ser.kind, ser.payload);
-    if (newTab.groupId) sessionSetGroup(newId, newTab.groupId).catch((e) =>
-      console.warn('[workspace] 复制标签归属分组持久化失败:', e),
-    );
+    if (newTab.groupId)
+      sessionSetGroup(newId, newTab.groupId).catch((e) =>
+        console.warn('[workspace] 复制标签归属分组持久化失败:', e),
+      );
     useTerminalStore.getState().setFocusedPane(firstLeaf(layout).id);
   },
 
@@ -583,9 +652,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       .map((g) => g.id);
     if (emptyIds.length === 0) return;
     set((s) => ({ groups: s.groups.filter((g) => !emptyIds.includes(g.id)) }));
-    for (const id of emptyIds) groupDelete(id).catch((e) =>
-      console.warn('[workspace] 清理空分组失败:', id, e),
-    );
+    for (const id of emptyIds)
+      groupDelete(id).catch((e) => console.warn('[workspace] 清理空分组失败:', id, e));
   },
 
   restoreGroup: async (id) => {
@@ -597,10 +665,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
   archiveGroup: async (id) => {
     // 1) 先确保组内会话的 group_id 已落库（此前可能只做了视觉分组）
-    const groupTabs = get().tabs.filter(isSessionTab).filter((t) => t.groupId === id);
+    const groupTabs = get()
+      .tabs.filter(isSessionTab)
+      .filter((t) => t.groupId === id);
     for (const t of groupTabs) {
       await sessionSetGroup(t.id, id).catch((e) =>
-        useToastStore.getState().addToast(`归档前保存分组归属失败：${String((e as Error)?.message ?? e)}`, 'error'),
+        useToastStore
+          .getState()
+          .addToast(`归档前保存分组归属失败：${String((e as Error)?.message ?? e)}`, 'error'),
       );
     }
     // 2) 后端按 group_id 批量归档组内会话 + 标记组为已归档

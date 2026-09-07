@@ -12,40 +12,73 @@
  *   └──────────────────────────────────────────────┘
  */
 
-import { useRef, useState, useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
-import {
-  ArrowUp, Columns2, GitBranch, Paperclip,
-  ShieldAlert, ShieldCheck, ShieldOff, Square, X, Zap,
-} from 'lucide-react';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
-import { ptyWrite } from '../lib/pty';
-import { useTerminalStore } from '../stores/terminal';
-import { useChatStore } from '../stores/chat';
-import ContextRing from '../components/ContextRing';
-import { useUiStore } from '../stores/ui';
-import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
-import { leaves as layoutLeaves } from '../lib/windowLayout';
-import { shellTypeLabel } from '../lib/shells';
-import { useBlockStore } from '../stores/blocks';
-import { useInputStore, selectPaneInput } from '../stores/input';
-import { isInputBoxVisible, getLongRunningHint } from './inputVisibility';
-import { agentControl } from '../agent/agentControl';
-import { useAgentSettings } from '../agent/agentSettings';
-import { usePermissions } from '../agent/permissions';
-import { LIMITS, importFileAsAttachment, totalSize, saveBlobAsAttachment, makePasteAttachment, type AttachmentMeta } from '../agent/attachments';
-import { completeCommand, localCompleteCandidates } from '../agent/complete';
-import { useHistoryStore } from '../stores/history';
-import { useDockStore } from '../stores/dock';
-import { useToastStore } from '../components/Toast';
-import { engageFollow } from './useFollowBottom';
-import AttachmentChips from '../chat/AttachmentChips';
-import ShellIndicator from './ShellIndicator';
+import {
+  ArrowUp,
+  Columns2,
+  GitBranch,
+  Paperclip,
+  ShieldAlert,
+  ShieldCheck,
+  ShieldOff,
+  Square,
+  X,
+  Zap,
+} from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { agentControl } from '@/agent/agentControl';
+import { useAgentSettings } from '@/agent/agentSettings';
+import {
+  type AttachmentMeta,
+  importFileAsAttachment,
+  LIMITS,
+  makePasteAttachment,
+  saveBlobAsAttachment,
+  totalSize,
+} from '@/agent/attachments';
+import { completeCommand, localCompleteCandidates } from '@/agent/complete';
+import { usePermissions } from '@/agent/permissions';
+import AttachmentChips from '@/chat/AttachmentChips';
+import ContextRing from '@/components/ContextRing';
+import { useToastStore } from '@/components/Toast';
+import { ptyWrite } from '@/lib/pty';
+import { shellTypeLabel } from '@/lib/shells';
+import { leaves as layoutLeaves } from '@/lib/windowLayout';
+import { useBlockStore } from '@/stores/blocks';
+import { useChatStore } from '@/stores/chat';
+import { useDockStore } from '@/stores/dock';
+import { useHistoryStore } from '@/stores/history';
+import { selectPaneInput, useInputStore } from '@/stores/input';
+import { useTerminalStore } from '@/stores/terminal';
+import { useUiStore } from '@/stores/ui';
+import { isSessionTab, useWorkspaceStore } from '@/stores/workspace';
+import { getLongRunningHint, isInputBoxVisible } from '@/terminal/inputVisibility';
+import ShellIndicator from '@/terminal/ShellIndicator';
+import { engageFollow } from '@/terminal/useFollowBottom';
 
 /** 权限模式循环（与 PanelChat 顶栏同款三色 Shield）：标准=逐工具 / 严格=逐次问 / 放行=直放 */
 const PERM_MODES = [
-  { id: 'standard', label: '标准', icon: ShieldCheck, color: 'var(--text-muted)', title: '标准权限：按设置页逐工具级别判定（点击切换）' },
-  { id: 'strict', label: '严格', icon: ShieldAlert, color: 'var(--accent-warm)', title: '严格权限：所有工具操作逐次询问（点击切换）' },
-  { id: 'relaxed', label: '放行', icon: ShieldOff, color: 'var(--error-light)', title: '放行模式：全部工具直接放行，危险命令仍会逐次询问（点击切换）' },
+  {
+    id: 'standard',
+    label: '标准',
+    icon: ShieldCheck,
+    color: 'var(--text-muted)',
+    title: '标准权限：按设置页逐工具级别判定（点击切换）',
+  },
+  {
+    id: 'strict',
+    label: '严格',
+    icon: ShieldAlert,
+    color: 'var(--accent-warm)',
+    title: '严格权限：所有工具操作逐次询问（点击切换）',
+  },
+  {
+    id: 'relaxed',
+    label: '放行',
+    icon: ShieldOff,
+    color: 'var(--error-light)',
+    title: '放行模式：全部工具直接放行，危险命令仍会逐次询问（点击切换）',
+  },
 ] as const;
 
 interface Props {
@@ -83,10 +116,7 @@ export default function InputEditor({
   const input = useInputStore(selectPaneInput(paneId));
   const text = input.text;
   const aiMode = input.aiMode;
-  const setText = useCallback(
-    (t: string) => useInputStore.getState().setText(paneId, t),
-    [paneId],
-  );
+  const setText = useCallback((t: string) => useInputStore.getState().setText(paneId, t), [paneId]);
   const setAiMode = useCallback(
     (m: boolean) => useInputStore.getState().setAiMode(paneId, m),
     [paneId],
@@ -351,7 +381,9 @@ export default function InputEditor({
   );
 
   // ── AI 面板开启时锁定 cmd 模式（AI 提问收口到面板；切换按钮显式禁用） ──
-  const chatOpen = useDockStore((s) => s.leftPanels.includes('chat') || s.rightPanels.includes('chat'));
+  const chatOpen = useDockStore(
+    (s) => s.leftPanels.includes('chat') || s.rightPanels.includes('chat'),
+  );
   useEffect(() => {
     if (chatOpen && aiMode) setAiMode(false);
   }, [chatOpen, aiMode, setAiMode]);
@@ -456,14 +488,15 @@ export default function InputEditor({
           padding: '8px 12px 5px',
           boxShadow: '0 1px 4px rgba(0, 0, 0, 0.22)',
         }}
-        onDragOver={(e) => { if (aiMode) e.preventDefault(); }}
+        onDragOver={(e) => {
+          if (aiMode) e.preventDefault();
+        }}
         onDrop={(e) => {
           if (!aiMode) return;
           e.preventDefault();
           void addBlobs(Array.from(e.dataTransfer.files));
         }}
       >
-
         {/* 附件 chips（仅 AI 模式，随发送清空） */}
         {aiMode && atts.length > 0 && (
           <AttachmentChips
@@ -549,7 +582,11 @@ export default function InputEditor({
               }}
               onKeyDown={(e) => {
                 // ↑/↓ 翻命令历史（cmd 模式 + 单行；fish 式按当前前缀过滤）
-                if (!aiMode && !text.includes('\n') && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+                if (
+                  !aiMode &&
+                  !text.includes('\n') &&
+                  (e.key === 'ArrowUp' || e.key === 'ArrowDown')
+                ) {
                   if (navHistory(e.key === 'ArrowUp' ? 1 : -1)) {
                     e.preventDefault();
                     return;
@@ -563,7 +600,8 @@ export default function InputEditor({
                   if (cycle) {
                     // 已在循环中：替换为下一个 / 上一个候选
                     const dir = e.shiftKey ? -1 : 1;
-                    cycle.idx = (cycle.idx + dir + cycle.candidates.length) % cycle.candidates.length;
+                    cycle.idx =
+                      (cycle.idx + dir + cycle.candidates.length) % cycle.candidates.length;
                     suppressEffectRef.current = true;
                     setText(cycle.base + cycle.candidates[cycle.idx]!);
                   } else {
@@ -652,39 +690,63 @@ export default function InputEditor({
                 <ContextRing />
               </span>
               {sendingHere ? (
-              <button
-                data-subtle
-                title="停止生成"
-                onClick={() => abortStream(activeId)}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
-                  background: 'transparent', color: 'var(--accent-warm)', cursor: 'pointer', flexShrink: 0,
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--button-hover)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-              >
-                <Square size={11} fill="currentColor" />
-              </button>
-            ) : (
-              <button
-                data-subtle
-                title="发送 (Enter)"
-                onClick={execute}
-                disabled={!canSendAi}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
-                  background: 'transparent',
-                  color: canSendAi ? 'var(--accent-warm)' : 'var(--text-muted)',
-                  cursor: canSendAi ? 'pointer' : 'default', flexShrink: 0,
-                }}
-                onMouseEnter={(e) => { if (canSendAi) e.currentTarget.style.background = 'var(--button-hover)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-              >
-                <ArrowUp size={13} />
-              </button>
-            )}
+                <button
+                  data-subtle
+                  title="停止生成"
+                  onClick={() => abortStream(activeId)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 24,
+                    height: 24,
+                    padding: 0,
+                    border: 'none',
+                    borderRadius: 4,
+                    background: 'transparent',
+                    color: 'var(--accent-warm)',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'var(--button-hover)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                  }}
+                >
+                  <Square size={11} fill="currentColor" />
+                </button>
+              ) : (
+                <button
+                  data-subtle
+                  title="发送 (Enter)"
+                  onClick={execute}
+                  disabled={!canSendAi}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 24,
+                    height: 24,
+                    padding: 0,
+                    border: 'none',
+                    borderRadius: 4,
+                    background: 'transparent',
+                    color: canSendAi ? 'var(--accent-warm)' : 'var(--text-muted)',
+                    cursor: canSendAi ? 'pointer' : 'default',
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (canSendAi) e.currentTarget.style.background = 'var(--button-hover)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                  }}
+                >
+                  <ArrowUp size={13} />
+                </button>
+              )}
             </>
           )}
         </div>
@@ -708,7 +770,9 @@ export default function InputEditor({
           <CurrentDir dir={tabCwd} />
           {recentGitBranch && (
             <>
-              <span style={{ color: 'var(--border-strong)', opacity: 0.5, margin: '0 1px' }}>·</span>
+              <span style={{ color: 'var(--border-strong)', opacity: 0.5, margin: '0 1px' }}>
+                ·
+              </span>
               <GitBranchLabel branch={recentGitBranch} />
             </>
           )}
@@ -719,7 +783,11 @@ export default function InputEditor({
               if (!chatOpen) setAiMode(!aiMode);
             }}
             title={
-              chatOpen ? 'AI 对话面板开启中，请在面板中提问' : aiMode ? '切回命令模式' : '切换到 AI 模式'
+              chatOpen
+                ? 'AI 对话面板开启中，请在面板中提问'
+                : aiMode
+                  ? '切回命令模式'
+                  : '切换到 AI 模式'
             }
             style={{
               fontFamily: 'var(--font-mono)',
@@ -740,10 +808,16 @@ export default function InputEditor({
           </button>
           {!aiMode && (
             <>
-              <InputActionBtn title="选择类型分裂" onClick={() => useUiStore.getState().openSplitPicker()}>
+              <InputActionBtn
+                title="选择类型分裂"
+                onClick={() => useUiStore.getState().openSplitPicker()}
+              >
                 <Columns2 size={13} />
               </InputActionBtn>
-              <InputActionBtn title="关闭当前终端" onClick={() => useWorkspaceStore.getState().closeTerminal(paneId)}>
+              <InputActionBtn
+                title="关闭当前终端"
+                onClick={() => useWorkspaceStore.getState().closeTerminal(paneId)}
+              >
                 <X size={13} />
               </InputActionBtn>
             </>
@@ -761,12 +835,24 @@ export default function InputEditor({
                     title={cur.title}
                     onClick={() => setPermMode(next.id)}
                     style={{
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
-                      background: 'transparent', color: cur.color, cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 24,
+                      height: 24,
+                      padding: 0,
+                      border: 'none',
+                      borderRadius: 4,
+                      background: 'transparent',
+                      color: cur.color,
+                      cursor: 'pointer',
                     }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--button-hover)'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'var(--button-hover)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                    }}
                   >
                     <CurIcon size={13} />
                   </button>
@@ -777,9 +863,17 @@ export default function InputEditor({
                 title="添加附件（图片 / 文件，也可直接粘贴或拖入）"
                 onClick={() => void pickFiles()}
                 style={{
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
-                  background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 24,
+                  height: 24,
+                  padding: 0,
+                  border: 'none',
+                  borderRadius: 4,
+                  background: 'transparent',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = 'var(--button-hover)';
@@ -796,13 +890,16 @@ export default function InputEditor({
           )}
         </div>
       </div>
-
     </div>
   );
 }
 
 /** 输入栏小按钮（状态栏右侧：分裂/关闭） */
-function InputActionBtn({ title, onClick, children }: {
+function InputActionBtn({
+  title,
+  onClick,
+  children,
+}: {
   title: string;
   onClick: () => void;
   children: React.ReactNode;
@@ -813,9 +910,18 @@ function InputActionBtn({ title, onClick, children }: {
       title={title}
       onClick={onClick}
       style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
-        background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', flexShrink: 0,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 24,
+        height: 24,
+        padding: 0,
+        border: 'none',
+        borderRadius: 4,
+        background: 'transparent',
+        color: 'var(--text-muted)',
+        cursor: 'pointer',
+        flexShrink: 0,
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = 'var(--button-hover)';

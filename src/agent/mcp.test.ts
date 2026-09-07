@@ -2,13 +2,13 @@
  * mcp 前端工具包装测试：buildMcpTool 描述前缀 + execute 转发 mcp_call_tool
  * （成功透传 / 失败结构化，execute 永不 throw）。不测门控。
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { buildMcpTool, type McpExposedTool } from './mcp';
-import { usePermissions, type ToolContext } from './permissions';
+import { buildMcpTool, type McpExposedTool } from '@/agent/mcp';
+import { type ToolContext, usePermissions } from '@/agent/permissions';
 
 usePermissions.setState({ levels: { mcp: 'allow' } });
 const CTX: ToolContext = {};

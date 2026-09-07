@@ -1,8 +1,13 @@
 /**
  * errorHandler — 全局错误处理与安全解析测试。
  */
-import { describe, it, expect, vi } from 'vitest';
-import { installGlobalErrorHandlers, safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from './errorHandler';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  installGlobalErrorHandlers,
+  safeJsonParse,
+  safeLocalStorageGet,
+  safeLocalStorageSet,
+} from '@/lib/errorHandler';
 
 describe('safeJsonParse / safeLocalStorage', () => {
   it('safeJsonParse 合法/非法/空', () => {
@@ -16,11 +21,15 @@ describe('safeJsonParse / safeLocalStorage', () => {
     expect(safeLocalStorageGet('k')).toBe('v');
     // localStorage 抛错（如被禁用）时返回默认
     const orig = Storage.prototype.setItem;
-    Storage.prototype.setItem = vi.fn(() => { throw new Error('denied'); });
+    Storage.prototype.setItem = vi.fn(() => {
+      throw new Error('denied');
+    });
     expect(safeLocalStorageSet('k', 'v')).toBe(false);
     Storage.prototype.setItem = orig;
     const origGet = Storage.prototype.getItem;
-    Storage.prototype.getItem = vi.fn(() => { throw new Error('denied'); });
+    Storage.prototype.getItem = vi.fn(() => {
+      throw new Error('denied');
+    });
     expect(safeLocalStorageGet('k')).toBeNull();
     Storage.prototype.getItem = origGet;
   });
@@ -45,7 +54,10 @@ describe('installGlobalErrorHandlers', () => {
     // Promise rejection（jsdom 可能缺 PromiseRejectionEvent，兜底用普通 Event）
     const rejEvt =
       typeof PromiseRejectionEvent !== 'undefined'
-        ? new PromiseRejectionEvent('unhandledrejection', { promise: Promise.resolve(), reason: new Error('nope') })
+        ? new PromiseRejectionEvent('unhandledrejection', {
+            promise: Promise.resolve(),
+            reason: new Error('nope'),
+          })
         : new Event('unhandledrejection');
     win.dispatchEvent(rejEvt);
     expect(errSpy).toHaveBeenCalledWith('[global] Unhandled Promise rejection:', expect.anything());

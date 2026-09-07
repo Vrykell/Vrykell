@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { FsEntry } from '../files/fs';
+import type { FsEntry } from '@/files/fs';
 
 /**
  * SSH 连接 API —— 存储与 CRUD 均在后端（SQLite），前端只调用命令。
@@ -74,7 +74,10 @@ export function sshTest(target: {
 }
 
 /** 查询主机指纹与 known_hosts 记录状态（首次连接确认用）。 */
-export function sshHostKeyInfo(host: string, port?: number): Promise<{ fingerprint: string; known: boolean; keyType: string }> {
+export function sshHostKeyInfo(
+  host: string,
+  port?: number,
+): Promise<{ fingerprint: string; known: boolean; keyType: string }> {
   return invoke('ssh_host_key_info', { host, port: port ?? null });
 }
 

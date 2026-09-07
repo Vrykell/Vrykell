@@ -8,9 +8,9 @@
  */
 
 import type { Terminal } from '@xterm/xterm';
-import { createBlockTerm, extractSnapshotFromBuffer } from '../terminalSnapshot';
-import type { DispatchEvent } from './events';
-import type { TermBlock, BlockStatus } from './termBlock';
+import type { DispatchEvent } from '@/terminal/pipeline/events';
+import type { BlockStatus, TermBlock } from '@/terminal/pipeline/termBlock';
+import { createBlockTerm, extractSnapshotFromBuffer } from '@/terminal/terminalSnapshot';
 
 export type Scene = 'classic' | 'blockList' | 'altScreen';
 
@@ -26,8 +26,8 @@ export interface SessionSinks {
 }
 
 const RAW_CAP = 256 * 1024;
-const MAX_FULL_BLOCKS = 200;    // 超出丢弃最老 block 的输出，保留 header
-const MAX_TOTAL_BLOCKS = 500;   // 总块数硬上限（含 header-only），超出丢弃最老非书签块
+const MAX_FULL_BLOCKS = 200; // 超出丢弃最老 block 的输出，保留 header
+const MAX_TOTAL_BLOCKS = 500; // 总块数硬上限（含 header-only），超出丢弃最老非书签块
 
 interface InternalBlock extends TermBlock {
   outputTerm: Terminal | null;
@@ -157,8 +157,13 @@ export class SessionController {
   private handleOsc(code: string, payload: string, raw: string): void {
     // classic/altScreen：OSC raw 转发主 xterm（OSC 8 超链接等不失效）；
     // 但 133/7 是 integration 标记，永不进主 xterm。
-    const isIntegration = code === '133;A' || code === '133;C' || code === '133;D'
-      || code === '133;E' || code === '133;G' || code === '7';
+    const isIntegration =
+      code === '133;A' ||
+      code === '133;C' ||
+      code === '133;D' ||
+      code === '133;E' ||
+      code === '133;G' ||
+      code === '7';
     if (this._scene !== 'blockList' && !isIntegration) {
       this.sinks.writeMain(raw);
       return;
@@ -320,7 +325,10 @@ export class SessionController {
       if (this._disposed) return;
       this.trackTruncation(block);
       if (block.outputTerm) {
-        const snap = extractSnapshotFromBuffer(block.outputTerm.buffer.active, block.outputTerm.cols);
+        const snap = extractSnapshotFromBuffer(
+          block.outputTerm.buffer.active,
+          block.outputTerm.cols,
+        );
         block.outputHtml = snap.html;
         block.outputText = snap.plainText;
         block._outputDispose?.();

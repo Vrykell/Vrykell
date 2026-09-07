@@ -1,26 +1,25 @@
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { Folder, File, MoreHorizontal, LocateFixed, ArrowUp } from 'lucide-react';
 import { open } from '@tauri-apps/plugin-dialog';
-import { sshFsList, sshDownload, sshRename, sshDelete, sshUpload } from './api';
-import type { SshFsEntry } from './api';
-import type { SshConnection } from './api';
-import { ptyWrite } from '../lib/pty';
-import { loadConfig, remoteOpenCommand } from '../files/fileOpen';
-import { useTerminalStore } from '../stores/terminal';
-import { useWorkspaceStore } from '../stores/workspace';
-import { useToastStore } from '../components/Toast';
-import { IconBtn } from '../components/UiBtn';
-import ContextMenu, { type ContextMenuItem } from '../components/ContextMenu';
-import ConfirmDialog from '../components/ConfirmDialog';
-import DownloadManager from '../downloads/DownloadManager';
-import { compactPathSegments } from '../files/pathUtils';
+import { ArrowUp, File, Folder, LocateFixed, MoreHorizontal } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import ConfirmDialog from '@/components/ConfirmDialog';
+import ContextMenu, { type ContextMenuItem } from '@/components/ContextMenu';
+import { useToastStore } from '@/components/Toast';
+import { IconBtn } from '@/components/UiBtn';
+import DownloadManager from '@/downloads/DownloadManager';
+import { loadConfig, remoteOpenCommand } from '@/files/fileOpen';
+import { compactPathSegments } from '@/files/pathUtils';
+import { ptyWrite } from '@/lib/pty';
+import type { SshConnection, SshFsEntry } from '@/ssh/api';
+import { sshDelete, sshDownload, sshFsList, sshRename, sshUpload } from '@/ssh/api';
 import {
-  useRemotePathStore,
   normalizeRemotePath,
   parentOfRemote,
-  sshPaneIdFor,
   shellQuote,
-} from './remotePath';
+  sshPaneIdFor,
+  useRemotePathStore,
+} from '@/ssh/remotePath';
+import { useTerminalStore } from '@/stores/terminal';
+import { useWorkspaceStore } from '@/stores/workspace';
 
 /** 待二次确认的操作：重命名（携带新名）或删除。 */
 type RemoteConfirm =
@@ -49,20 +48,25 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
   const toast = (msg: string, type: 'info' | 'success' | 'error') =>
     useToastStore.getState().addToast(msg, type);
 
-  const load = useCallback((p: string | null) => {
-    setLoading(true);
-    setError(null);
-    sshFsList(conn.id, p ?? undefined)
-      .then((res) => {
-        setEntries(res.entries);
-        // 首次定位：请求 home 后拿到真实路径（如 /home/user），面板不再用 null 表示 home
-        if (p === null && res.base) setPath(normalizeRemotePath(res.base));
-      })
-      .catch((e) => setError(String((e as Error)?.message ?? e)))
-      .finally(() => setLoading(false));
-  }, [conn.id]);
+  const load = useCallback(
+    (p: string | null) => {
+      setLoading(true);
+      setError(null);
+      sshFsList(conn.id, p ?? undefined)
+        .then((res) => {
+          setEntries(res.entries);
+          // 首次定位：请求 home 后拿到真实路径（如 /home/user），面板不再用 null 表示 home
+          if (p === null && res.base) setPath(normalizeRemotePath(res.base));
+        })
+        .catch((e) => setError(String((e as Error)?.message ?? e)))
+        .finally(() => setLoading(false));
+    },
+    [conn.id],
+  );
 
-  useEffect(() => { load(path); }, [load, path]);
+  useEffect(() => {
+    load(path);
+  }, [load, path]);
   // 操作后的刷新（重命名/删除/上传）
   const refresh = () => load(path);
 
@@ -91,7 +95,10 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
   const remoteEdit = (entry: SshFsEntry) => {
     const activeId = useWorkspaceStore.getState().activeId;
     const sid = useTerminalStore.getState().sessions[activeId];
-    if (!sid) { toast('SSH 会话未就绪', 'info'); return; }
+    if (!sid) {
+      toast('SSH 会话未就绪', 'info');
+      return;
+    }
     const command = remoteOpenCommand(loadConfig(), entry.path);
     ptyWrite(sid, command).catch(() => {});
   };
@@ -140,8 +147,11 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
         toast(`${files[i]}：${String((e as Error)?.message ?? e)}`, 'error');
       }
     }
-    toast(ok === files.length ? `已上传 ${ok} 个文件` : `上传完成：${ok}/${files.length} 成功`, ok === files.length ? 'success' : 'error');
-      refresh();
+    toast(
+      ok === files.length ? `已上传 ${ok} 个文件` : `上传完成：${ok}/${files.length} 成功`,
+      ok === files.length ? 'success' : 'error',
+    );
+    refresh();
   };
 
   const doUploadDir = async () => {
@@ -164,11 +174,16 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
   };
 
   const buildMenuItems = (entry: SshFsEntry): ContextMenuItem[] => {
-    const items: ContextMenuItem[] = [
-      { label: '重命名', onClick: () => setRenameTarget(entry) },
-    ];
-    items.push({ label: entry.is_dir ? '下载文件夹到本地' : '下载到本地', onClick: () => doDownload(entry) });
-    items.push({ label: '删除', onClick: () => setConfirm({ kind: 'delete', entry }), danger: true });
+    const items: ContextMenuItem[] = [{ label: '重命名', onClick: () => setRenameTarget(entry) }];
+    items.push({
+      label: entry.is_dir ? '下载文件夹到本地' : '下载到本地',
+      onClick: () => doDownload(entry),
+    });
+    items.push({
+      label: '删除',
+      onClick: () => setConfirm({ kind: 'delete', entry }),
+      danger: true,
+    });
     return items;
   };
 
@@ -193,7 +208,10 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
     if (!path) return;
     const paneId = sshPaneIdFor(conn.id);
     const sid = paneId ? useTerminalStore.getState().sessions[paneId] : null;
-    if (!sid) { toast('SSH 会话未就绪', 'info'); return; }
+    if (!sid) {
+      toast('SSH 会话未就绪', 'info');
+      return;
+    }
     try {
       await ptyWrite(sid, `cd ${shellQuote(path)}\r`);
     } catch (e) {
@@ -204,42 +222,65 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
   // 面包屑：真实路径层级（/ › home › user › …），根是顶层、home 是 /home/user
 
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', height: '100%',
-      userSelect: 'none', background: 'var(--surface)',
-    }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        userSelect: 'none',
+        background: 'var(--surface)',
+      }}
+    >
       {/* 顶栏：面包屑（不换行，窄时省略高层级）+ 操作按钮（右对齐） */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 2,
-        padding: '6px 8px',
-        fontSize: 11, minHeight: 30, flexShrink: 0,
-        whiteSpace: 'nowrap',
-      }}>
-        <div ref={crumbRef} style={{
-          display: 'flex', alignItems: 'center', gap: 2,
-          flex: 1, minWidth: 0, overflow: 'hidden',
-        }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 2,
+          padding: '6px 8px',
+          fontSize: 11,
+          minHeight: 30,
+          flexShrink: 0,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        <div
+          ref={crumbRef}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            flex: 1,
+            minWidth: 0,
+            overflow: 'hidden',
+          }}
+        >
           <Crumb label="/" onClick={() => setPath('/')} active={path === '/'} />
           {hiddenCount > 0 && (
             <>
               <span style={{ color: 'var(--text-muted)' }}>›</span>
-              <span title="已省略上级目录" style={{ color: 'var(--text-muted)', letterSpacing: 1 }}>…</span>
+              <span title="已省略上级目录" style={{ color: 'var(--text-muted)', letterSpacing: 1 }}>
+                …
+              </span>
             </>
           )}
           {visibleCrumbs.map((c, i) => (
-            <span key={c.full} style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+            <span
+              key={c.full}
+              style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}
+            >
               <span style={{ color: 'var(--text-muted)' }}>›</span>
-              <Crumb label={c.seg} onClick={() => setPath(c.full)} active={i === visibleCrumbs.length - 1} />
+              <Crumb
+                label={c.seg}
+                onClick={() => setPath(c.full)}
+                active={i === visibleCrumbs.length - 1}
+              />
             </span>
           ))}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
           {path && path !== '/' && (
-            <IconBtn
-              title="上级目录"
-              data-testid="remote-up-btn"
-              onClick={goUp}
-            >
+            <IconBtn title="上级目录" data-testid="remote-up-btn" onClick={goUp}>
               <ArrowUp size={14} />
             </IconBtn>
           )}
@@ -266,23 +307,37 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
       {/* 远程文件列表 */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
         {loading ? (
-          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>连接中…</div>
+          <div
+            style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}
+          >
+            连接中…
+          </div>
         ) : error ? (
-          <div style={{ padding: 16, fontSize: 12, color: 'var(--error-light)', textAlign: 'center' }}>{error}</div>
+          <div
+            style={{ padding: 16, fontSize: 12, color: 'var(--error-light)', textAlign: 'center' }}
+          >
+            {error}
+          </div>
         ) : entries.length === 0 ? (
-          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>空目录</div>
-        ) : entries.map((e) => (
-          <RemoteRow
-            key={e.path}
-            entry={e}
-            renaming={renameTarget?.path === e.path}
-            onRenameCommit={requestRename}
-            onRenameCancel={cancelRename}
-            onClick={(entry) => entry.is_dir && setPath(entry.path)}
-            onDoubleClick={(entry) => !entry.is_dir && remoteEdit(entry)}
-            onContextMenu={onContextMenu}
-          />
-        ))}
+          <div
+            style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}
+          >
+            空目录
+          </div>
+        ) : (
+          entries.map((e) => (
+            <RemoteRow
+              key={e.path}
+              entry={e}
+              renaming={renameTarget?.path === e.path}
+              onRenameCommit={requestRename}
+              onRenameCancel={cancelRename}
+              onClick={(entry) => entry.is_dir && setPath(entry.path)}
+              onDoubleClick={(entry) => !entry.is_dir && remoteEdit(entry)}
+              onContextMenu={onContextMenu}
+            />
+          ))
+        )}
       </div>
 
       {ctxMenu && (
@@ -373,19 +428,39 @@ function RemoteRow({
       onClick={renaming ? undefined : () => onClick(entry)}
       onDoubleClick={renaming ? undefined : () => onDoubleClick(entry)}
       onContextMenu={renaming ? undefined : (ev) => onContextMenu(ev, entry)}
-      title={renaming
-        ? '输入新名称，回车确认，Esc 取消'
-        : entry.is_dir ? `进入 ${entry.path}` : `双击在终端里编辑 ${entry.path}`}
+      title={
+        renaming
+          ? '输入新名称，回车确认，Esc 取消'
+          : entry.is_dir
+            ? `进入 ${entry.path}`
+            : `双击在终端里编辑 ${entry.path}`
+      }
       data-testid={`remote-file-${entry.name}`}
       style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        padding: '3px 10px', fontSize: 12, cursor: renaming ? 'text' : 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '3px 10px',
+        fontSize: 12,
+        cursor: renaming ? 'text' : 'pointer',
         color: entry.is_dir ? 'var(--text-primary)' : 'var(--text-secondary)',
       }}
-      onMouseEnter={(ev) => { ev.currentTarget.style.background = 'var(--hover)'; }}
-      onMouseLeave={(ev) => { ev.currentTarget.style.background = 'transparent'; }}
+      onMouseEnter={(ev) => {
+        ev.currentTarget.style.background = 'var(--hover)';
+      }}
+      onMouseLeave={(ev) => {
+        ev.currentTarget.style.background = 'transparent';
+      }}
     >
-      <span style={{ width: 18, flexShrink: 0, display: 'inline-flex', justifyContent: 'center', color: 'var(--text-muted)' }}>
+      <span
+        style={{
+          width: 18,
+          flexShrink: 0,
+          display: 'inline-flex',
+          justifyContent: 'center',
+          color: 'var(--text-muted)',
+        }}
+      >
         {entry.is_dir ? <Folder size={13} /> : <File size={13} />}
       </span>
       {renaming ? (
@@ -403,15 +478,27 @@ function RemoteRow({
           onContextMenu={(e) => e.stopPropagation()}
           data-testid="rename-input"
           style={{
-            flex: 1, minWidth: 0,
-            background: 'var(--canvas)', border: '1px solid var(--accent)',
-            borderRadius: 3, padding: '0 4px', fontSize: 12,
-            color: 'var(--text-primary)', fontFamily: 'var(--font-mono)',
+            flex: 1,
+            minWidth: 0,
+            background: 'var(--canvas)',
+            border: '1px solid var(--accent)',
+            borderRadius: 3,
+            padding: '0 4px',
+            fontSize: 12,
+            color: 'var(--text-primary)',
+            fontFamily: 'var(--font-mono)',
             outline: 'none',
           }}
         />
       ) : (
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>
+        <span
+          style={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            fontFamily: 'var(--font-mono)',
+          }}
+        >
           {entry.name}
         </span>
       )}
@@ -419,13 +506,29 @@ function RemoteRow({
   );
 }
 
-function Crumb({ label, onClick, active }: { label: string; onClick: () => void; active: boolean }) {
+function Crumb({
+  label,
+  onClick,
+  active,
+}: {
+  label: string;
+  onClick: () => void;
+  active: boolean;
+}) {
   return (
-    <span onClick={onClick} style={{
-      cursor: 'pointer', padding: '1px 4px', borderRadius: 3,
-      color: active ? 'var(--text-primary)' : 'var(--text-muted)',
-      background: active ? 'var(--hover)' : 'transparent',
-      fontFamily: 'var(--font-mono)', fontSize: 11,
-    }}>{label}</span>
+    <span
+      onClick={onClick}
+      style={{
+        cursor: 'pointer',
+        padding: '1px 4px',
+        borderRadius: 3,
+        color: active ? 'var(--text-primary)' : 'var(--text-muted)',
+        background: active ? 'var(--hover)' : 'transparent',
+        fontFamily: 'var(--font-mono)',
+        fontSize: 11,
+      }}
+    >
+      {label}
+    </span>
   );
 }

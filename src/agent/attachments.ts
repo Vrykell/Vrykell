@@ -16,7 +16,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
-import type { ProviderKind } from './provider';
+import type { ProviderKind } from '@/agent/provider';
 
 export interface AttachmentMeta {
   id: string;
@@ -70,7 +70,11 @@ export async function importFileAsAttachment(path: string): Promise<AttachmentMe
 }
 
 /** 保存粘贴/拖入的二进制（File/Blob 已读成 base64）为附件 */
-export async function saveBlobAsAttachment(name: string, mime: string, base64: string): Promise<AttachmentMeta> {
+export async function saveBlobAsAttachment(
+  name: string,
+  mime: string,
+  base64: string,
+): Promise<AttachmentMeta> {
   const r = await invoke<AttachmentImport>('save_attachment', { name, dataBase64: base64 });
   const meta = importToMeta(r, mime.startsWith('image/') ? 'image' : 'file');
   return { ...meta, mime }; // save 侧 mime 按文件名猜，前端 File.type 更准

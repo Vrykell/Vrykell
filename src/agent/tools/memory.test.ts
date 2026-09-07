@@ -1,16 +1,22 @@
 /**
  * memory 工具（read/update/append/search）测试。
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
-import { buildMemoryTool } from './memory';
-import { usePermissions, type ToolContext } from '../permissions';
+
+import { type ToolContext, usePermissions } from '@/agent/permissions';
+import { buildMemoryTool } from '@/agent/tools/memory';
 
 usePermissions.setState({ levels: { memory: 'allow' } });
 const CTX: ToolContext = {};
 const exec = (args: Record<string, unknown>) =>
-  (buildMemoryTool(CTX).memory as unknown as { execute: (a: unknown, o: unknown) => Promise<unknown> }).execute(args, {});
+  (
+    buildMemoryTool(CTX).memory as unknown as {
+      execute: (a: unknown, o: unknown) => Promise<unknown>;
+    }
+  ).execute(args, {});
 
 describe('memory 工具', () => {
   it('read：拼持久知识 + 流水', async () => {
@@ -37,8 +43,10 @@ describe('memory 工具', () => {
 
   it('search：关键词命中 + 空关键词取最近', async () => {
     invokeMock
-      .mockResolvedValueOnce('FACT A').mockResolvedValueOnce('x\nFACT B\n')
-      .mockResolvedValueOnce('FACT A').mockResolvedValueOnce('x\nFACT B\n');
+      .mockResolvedValueOnce('FACT A')
+      .mockResolvedValueOnce('x\nFACT B\n')
+      .mockResolvedValueOnce('FACT A')
+      .mockResolvedValueOnce('x\nFACT B\n');
     const r = await exec({ action: 'search', query: 'fact' });
     expect(r).toContain('FACT: FACT A');
     const r2 = await exec({ action: 'search', limit: 5 });

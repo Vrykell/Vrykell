@@ -2,11 +2,15 @@
  * aiBehaviorPage — AI 行为设置（全局默认 + 每模型覆盖）。
  */
 import { useState } from 'react';
-import { useAiConfigStore } from '../lib/ai';
-import { useAgentSettings, type AgentSettings, type ModelBehaviorSettings } from '../agent/agentSettings';
-import Segmented from '../components/Segmented';
-import { ModelScopeBar } from '../chat/ModelPicker';
-import { Field, Toggle, NumberInput, inputStyle, btnStyle } from './ui';
+import {
+  type AgentSettings,
+  type ModelBehaviorSettings,
+  useAgentSettings,
+} from '@/agent/agentSettings';
+import { ModelScopeBar } from '@/chat/ModelPicker';
+import Segmented from '@/components/Segmented';
+import { useAiConfigStore } from '@/lib/ai';
+import { btnStyle, Field, inputStyle, NumberInput, Toggle } from '@/settings/ui';
 
 export function AiBehaviorPage() {
   const models = useAiConfigStore((s) => s.models);
@@ -16,7 +20,8 @@ export function AiBehaviorPage() {
   const isGlobal = scope === 'global';
   const model = models.find((m) => m.id === scope) ?? null;
   const eff = agentSettings.resolve(isGlobal ? undefined : scope);
-  const overrideKeys = !isGlobal && model ? Object.keys(agentSettings.overrides[model.id] ?? {}) : [];
+  const overrideKeys =
+    !isGlobal && model ? Object.keys(agentSettings.overrides[model.id] ?? {}) : [];
   const hasOverride = overrideKeys.length > 0;
 
   const update = (patch: Partial<AgentSettings>) => {
@@ -31,19 +36,31 @@ export function AiBehaviorPage() {
         description="全局默认对所有模型生效；选中某个模型后，下面的设置只对该模型生效。"
       >
         <ModelScopeBar
-          options={models.map((m) => ({ value: m.id, label: m.name || m.model, provider: m.provider, model: m.model }))}
+          options={models.map((m) => ({
+            value: m.id,
+            label: m.name || m.model,
+            provider: m.provider,
+            model: m.model,
+          }))}
           value={scope === 'global' ? '' : scope}
           onChange={(v) => setScope(v === '' ? 'global' : v)}
         />
       </Field>
 
       {!isGlobal && model && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '6px 10px', marginBottom: 8, borderRadius: 'var(--radius-inner)',
-          background: hasOverride ? 'var(--accent-warm-dim)' : 'var(--hover)',
-          fontSize: 11, color: hasOverride ? 'var(--accent-warm)' : 'var(--text-muted)',
-        }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '6px 10px',
+            marginBottom: 8,
+            borderRadius: 'var(--radius-inner)',
+            background: hasOverride ? 'var(--accent-warm-dim)' : 'var(--hover)',
+            fontSize: 11,
+            color: hasOverride ? 'var(--accent-warm)' : 'var(--text-muted)',
+          }}
+        >
           <span>{hasOverride ? `已覆盖 ${overrideKeys.length} 项` : '跟随全局默认'}</span>
           <div style={{ flex: 1 }} />
           {hasOverride && (
@@ -54,10 +71,7 @@ export function AiBehaviorPage() {
         </div>
       )}
 
-      <Field
-        title="系统提示词"
-        description="定义 AI 的角色与行为，留空使用内置默认。"
-      >
+      <Field title="系统提示词" description="定义 AI 的角色与行为，留空使用内置默认。">
         <textarea
           value={eff.systemPrompt ?? ''}
           placeholder="留空使用内置默认提示词"
@@ -93,7 +107,12 @@ export function AiBehaviorPage() {
         </Field>
       )}
       <Field title="最大迭代步数" description="Agent 一次回答最多调用多少轮工具；1–100。">
-        <NumberInput value={eff.maxSteps} min={1} max={100} onChange={(v) => update({ maxSteps: v })} />
+        <NumberInput
+          value={eff.maxSteps}
+          min={1}
+          max={100}
+          onChange={(v) => update({ maxSteps: v })}
+        />
       </Field>
       <Field title="上下文策略" description="全量不裁剪；窗口按预算保留最近消息；摘要压缩旧消息。">
         <Segmented
@@ -106,23 +125,49 @@ export function AiBehaviorPage() {
           onChange={(v) => update({ contextStrategy: v })}
         />
       </Field>
-      <Field title="上下文 Token 预算" description="估算的上下文 token 预算；0 = 不设限。超预算时按上面的策略裁剪或压缩。">
-        <NumberInput value={eff.contextMaxTokens} min={0} max={1000000} onChange={(v) => update({ contextMaxTokens: v })} />
+      <Field
+        title="上下文 Token 预算"
+        description="估算的上下文 token 预算；0 = 不设限。超预算时按上面的策略裁剪或压缩。"
+      >
+        <NumberInput
+          value={eff.contextMaxTokens}
+          min={0}
+          max={1000000}
+          onChange={(v) => update({ contextMaxTokens: v })}
+        />
       </Field>
       {eff.contextStrategy === 'compact' && (
         <Field title="摘要长度上限" description="压缩摘要的最大 token 数。">
-          <NumberInput value={eff.contextSummaryTokens} min={64} max={8000} onChange={(v) => update({ contextSummaryTokens: v })} />
+          <NumberInput
+            value={eff.contextSummaryTokens}
+            min={64}
+            max={8000}
+            onChange={(v) => update({ contextSummaryTokens: v })}
+          />
         </Field>
       )}
       <Field title="工具输出截断" description="单个工具结果的最大字符数，超长截断避免占满上下文。">
-        <NumberInput value={eff.contextToolChars} min={256} max={65536} onChange={(v) => update({ contextToolChars: v })} />
+        <NumberInput
+          value={eff.contextToolChars}
+          min={256}
+          max={65536}
+          onChange={(v) => update({ contextToolChars: v })}
+        />
       </Field>
       <Field title="回复 Token 上限" description="单次回复的最大 token 数，0 为服务商默认。">
-        <NumberInput value={eff.maxOutputTokens} min={0} max={32768} onChange={(v) => update({ maxOutputTokens: v })} />
+        <NumberInput
+          value={eff.maxOutputTokens}
+          min={0}
+          max={32768}
+          onChange={(v) => update({ maxOutputTokens: v })}
+        />
       </Field>
       <Field title="采样温度" description="控制输出随机性；关闭 = 使用服务商默认。">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Toggle on={eff.temperature != null} onChange={(v) => update({ temperature: v ? 0.7 : null })} />
+          <Toggle
+            on={eff.temperature != null}
+            onChange={(v) => update({ temperature: v ? 0.7 : null })}
+          />
           {eff.temperature != null && (
             <input
               type="number"
@@ -153,11 +198,19 @@ export function AiBehaviorPage() {
               style={inputStyle}
             />
           </Field>
-          <Field title="命令自动补全" description="在终端输入命令时给出补全建议，Tab 接受，Esc 丢弃。">
+          <Field
+            title="命令自动补全"
+            description="在终端输入命令时给出补全建议，Tab 接受，Esc 丢弃。"
+          >
             <Toggle on={eff.completeEnabled} onChange={(v) => update({ completeEnabled: v })} />
           </Field>
           <Field title="补全防抖" description="触发补全的停顿毫秒数，100–2000。">
-            <NumberInput value={eff.completeDebounceMs} min={100} max={2000} onChange={(v) => update({ completeDebounceMs: v })} />
+            <NumberInput
+              value={eff.completeDebounceMs}
+              min={100}
+              max={2000}
+              onChange={(v) => update({ completeDebounceMs: v })}
+            />
           </Field>
           <Field title="补全模型" description="AI 增强补全用的模型；留空 = 沿用聊天模型。">
             <input

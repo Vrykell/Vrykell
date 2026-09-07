@@ -1,11 +1,13 @@
 /**
  * schedule 工具（create/list/toggle/remove）测试。
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
-import { buildScheduleTool } from './schedule';
-import { usePermissions, type ToolContext } from '../permissions';
+
+import { type ToolContext, usePermissions } from '@/agent/permissions';
+import { buildScheduleTool } from '@/agent/tools/schedule';
 
 usePermissions.setState({ levels: { schedule: 'allow' } });
 const CTX: ToolContext = {};
@@ -15,9 +17,20 @@ beforeEach(() => {
 });
 
 const exec = (args: Record<string, unknown>) =>
-  (buildScheduleTool(CTX).schedule as unknown as { execute: (a: unknown, o: unknown) => Promise<unknown> }).execute(args, {});
+  (
+    buildScheduleTool(CTX).schedule as unknown as {
+      execute: (a: unknown, o: unknown) => Promise<unknown>;
+    }
+  ).execute(args, {});
 
-const S = { id: 's1', name: '巡检', prompt: '检查', intervalMinutes: 60, enabled: false, lastRunAt: 0 };
+const S = {
+  id: 's1',
+  name: '巡检',
+  prompt: '检查',
+  intervalMinutes: 60,
+  enabled: false,
+  lastRunAt: 0,
+};
 
 describe('schedule 工具', () => {
   it('create：缺 name/prompt 报错；成功落库', async () => {
@@ -25,7 +38,12 @@ describe('schedule 工具', () => {
     expect(bad).toEqual({ ok: false, error: 'create 需要 name 与 prompt' });
     invokeMock.mockResolvedValueOnce(undefined);
     const r = await exec({ action: 'create', name: '巡检', prompt: '检查', intervalMinutes: 30 });
-    expect(invokeMock).toHaveBeenLastCalledWith('save_schedule', expect.objectContaining({ schedule: expect.objectContaining({ name: '巡检', intervalMinutes: 30 }) }));
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'save_schedule',
+      expect.objectContaining({
+        schedule: expect.objectContaining({ name: '巡检', intervalMinutes: 30 }),
+      }),
+    );
     expect(r).toEqual({ ok: true, result: '已创建定时任务「巡检」' });
   });
 
@@ -58,7 +76,10 @@ describe('schedule 工具', () => {
   it('toggle 按 id 匹配；未知 action / 后端失败 → 结构化错误', async () => {
     invokeMock.mockResolvedValueOnce([S]);
     invokeMock.mockResolvedValueOnce(undefined);
-    expect(await exec({ action: 'toggle', id: 's1' })).toEqual({ ok: true, result: '已启用「巡检」' });
+    expect(await exec({ action: 'toggle', id: 's1' })).toEqual({
+      ok: true,
+      result: '已启用「巡检」',
+    });
     expect(await exec({ action: 'bogus' as never })).toEqual({ ok: false, error: '未知 action' });
     invokeMock.mockRejectedValueOnce(new Error('db down'));
     expect(await exec({ action: 'list' })).toEqual({ ok: false, error: 'db down' });

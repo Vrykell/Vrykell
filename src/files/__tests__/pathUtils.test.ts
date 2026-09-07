@@ -1,12 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
+  compactPathSegments,
+  isDriveRoot,
   normPath,
+  parentOf,
   pathSegments,
   segmentsToPath,
-  parentOf,
-  isDriveRoot,
-  compactPathSegments,
-} from '../pathUtils';
+} from '@/files/pathUtils';
 
 describe('pathUtils', () => {
   it('normPath 归一化反斜杠并去尾斜杠', () => {

@@ -1,11 +1,20 @@
 /**
  * blocks — 命令块 store 测试。
  */
-import { describe, it, expect } from 'vitest';
-import { useBlockStore, selectBlocks } from './blocks';
+import { describe, expect, it } from 'vitest';
+import { selectBlocks, useBlockStore } from '@/stores/blocks';
 
-const mk = (id: string): any =>
-  ({ id, command: '', status: 'done', exitCode: 0, startedAt: 1, endedAt: 2, cwd: '', outputHtml: '', outputText: '' });
+const mk = (id: string): any => ({
+  id,
+  command: '',
+  status: 'done',
+  exitCode: 0,
+  startedAt: 1,
+  endedAt: 2,
+  cwd: '',
+  outputHtml: '',
+  outputText: '',
+});
 
 describe('blocks store', () => {
   it('addBlock / updateBlock / setBlocks / clearBlocks / dropTab', () => {

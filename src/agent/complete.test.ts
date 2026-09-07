@@ -3,7 +3,7 @@
  * 模块级 mock 'ai' + '@tauri-apps/api/core'；不用 beforeEach（vitest 4 陷阱），
  * 各用例开头调 reset()。
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 const { mockGenerate, invokeMock } = vi.hoisted(() => ({
   mockGenerate: vi.fn(),
@@ -12,16 +12,19 @@ const { mockGenerate, invokeMock } = vi.hoisted(() => ({
 vi.mock('ai', () => ({ generateText: mockGenerate }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { completeCommand, localComplete, pathComplete, looksLikePath } from './complete';
-import { useHistoryStore } from '../stores/history';
-import { useAgentSettings, DEFAULT_AGENT_SETTINGS } from './agentSettings';
-import { useAiConfigStore } from '../lib/ai';
+import { DEFAULT_AGENT_SETTINGS, useAgentSettings } from '@/agent/agentSettings';
+import { completeCommand, localComplete, looksLikePath, pathComplete } from '@/agent/complete';
+import { useAiConfigStore } from '@/lib/ai';
+import { useHistoryStore } from '@/stores/history';
 
 function reset() {
   mockGenerate.mockReset();
   invokeMock.mockReset();
   useHistoryStore.setState({ entries: [] });
-  useAgentSettings.setState({ global: { ...DEFAULT_AGENT_SETTINGS, completeModel: '' }, overrides: {} });
+  useAgentSettings.setState({
+    global: { ...DEFAULT_AGENT_SETTINGS, completeModel: '' },
+    overrides: {},
+  });
   useAiConfigStore.setState({
     hasKey: false,
     provider: 'openai-compatible',
@@ -109,7 +112,10 @@ describe('AI 增强', () => {
   it('completeModel 覆盖聊天模型', async () => {
     reset();
     useAiConfigStore.setState({ hasKey: true, model: 'big-model' });
-    useAgentSettings.setState({ global: { ...DEFAULT_AGENT_SETTINGS, completeModel: 'small-fast' }, overrides: {} });
+    useAgentSettings.setState({
+      global: { ...DEFAULT_AGENT_SETTINGS, completeModel: 'small-fast' },
+      overrides: {},
+    });
     mockGenerate.mockResolvedValue({ text: 'xyz-done' });
     await completeCommand('xyz', {});
     // createChatModel 收到的 model 是 completeModel（经 provider 工厂间接断言：

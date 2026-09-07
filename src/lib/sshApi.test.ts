@@ -1,19 +1,19 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import {
-  validateSshConnection,
-  listSshConnections,
-  saveSshConnection,
   deleteSshConnection,
-  touchSshConnection,
-  sshTest,
-  sshFsList,
-  sshDownload,
+  listSshConnections,
   newSshId,
-} from '../ssh/api';
+  saveSshConnection,
+  sshDownload,
+  sshFsList,
+  sshTest,
+  touchSshConnection,
+  validateSshConnection,
+} from '@/ssh/api';
 
 describe('sshApi', () => {
   beforeEach(() => invokeMock.mockReset());
@@ -33,7 +33,12 @@ describe('sshApi', () => {
     expect(invokeMock).toHaveBeenCalledWith('ssh_connections_list');
 
     const conn = {
-      id: 's1', name: 'n', host: 'h', user: 'root', authMethod: 'password' as const, password: 'p',
+      id: 's1',
+      name: 'n',
+      host: 'h',
+      user: 'root',
+      authMethod: 'password' as const,
+      password: 'p',
     };
     await saveSshConnection(conn);
     expect(invokeMock).toHaveBeenCalledWith('ssh_connection_save', { conn });
@@ -49,7 +54,10 @@ describe('sshApi', () => {
     invokeMock.mockResolvedValue(undefined);
     await sshTest({ host: 'h', port: 2222, user: 'root', password: 'pw' });
     expect(invokeMock).toHaveBeenCalledWith('ssh_test', {
-      host: 'h', port: 2222, user: 'root', password: 'pw',
+      host: 'h',
+      port: 2222,
+      user: 'root',
+      password: 'pw',
     });
 
     await sshFsList('s1', '/home');

@@ -7,15 +7,10 @@
  * 不依赖 CSS var() 的 url 解析，渲染更可靠、可测试。
  */
 
+import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { create } from 'zustand';
-import { invoke, convertFileSrc } from '@tauri-apps/api/core';
-import {
-  applyTheme,
-  getCurrentTheme,
-  setThemeOverrides,
-  type ThemeMode,
-} from './tokens';
-import { termInstances } from '../stores/terminal';
+import { termInstances } from '@/stores/terminal';
+import { applyTheme, getCurrentTheme, setThemeOverrides, type ThemeMode } from '@/theme/tokens';
 
 export interface TerminalThemeConfig {
   /** 应用整体不透明度 0.05..=1.0（1 = 完全不透明） */
@@ -79,7 +74,8 @@ export function reapplyXtermTheme(): void {
   const selection = cs.getPropertyValue('--xterm-selection').trim() || 'rgba(255,255,255,0.25)';
   // 滚动条滑块颜色与 block 列表滚动条(theme.css)一致
   const thumb = cs.getPropertyValue('--scrollbar-thumb').trim() || 'rgba(255,255,255,0.14)';
-  const thumbHover = cs.getPropertyValue('--scrollbar-thumb-hover').trim() || 'rgba(255,255,255,0.22)';
+  const thumbHover =
+    cs.getPropertyValue('--scrollbar-thumb-hover').trim() || 'rgba(255,255,255,0.22)';
   for (const t of termInstances.values()) {
     try {
       t.options.theme = {

@@ -1,12 +1,12 @@
 /**
  * history — 命令历史热缓存 store（record/search/clear/hydrate）。
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { useHistoryStore } from './history';
+import { useHistoryStore } from '@/stores/history';
 
 beforeEach(() => {
   invokeMock.mockReset();
@@ -23,9 +23,14 @@ describe('history store', () => {
     const entries = useHistoryStore.getState().entries;
     expect(entries.map((e) => e.command)).toEqual(['ls', 'pwd']);
     expect(entries[0]!.exitCode).toBe(1);
-    expect(invokeMock).toHaveBeenCalledWith('record_history', expect.objectContaining({
-      command: 'ls', cwd: '/a', exitCode: 1,
-    }));
+    expect(invokeMock).toHaveBeenCalledWith(
+      'record_history',
+      expect.objectContaining({
+        command: 'ls',
+        cwd: '/a',
+        exitCode: 1,
+      }),
+    );
   });
 
   it('search：前缀匹配、大小写不敏感、limit 截断', () => {
@@ -33,7 +38,12 @@ describe('history store', () => {
     s.record('npm run dev', '/a', 0);
     s.record('npm test', '/b', 0);
     s.record('echo hi', '/c', 0);
-    expect(useHistoryStore.getState().search('NPM').map((e) => e.command)).toEqual(['npm test', 'npm run dev']);
+    expect(
+      useHistoryStore
+        .getState()
+        .search('NPM')
+        .map((e) => e.command),
+    ).toEqual(['npm test', 'npm run dev']);
     expect(useHistoryStore.getState().search('npm', 1)).toHaveLength(1);
     expect(useHistoryStore.getState().search('zzz')).toEqual([]);
   });
@@ -57,9 +67,17 @@ describe('history store', () => {
     await useHistoryStore.getState().hydrate();
     const entries = useHistoryStore.getState().entries;
     expect(entries.map((e) => e.command)).toEqual(['fresh', 'old1']);
-    expect(invokeMock).toHaveBeenCalledWith('search_history', { query: '', maxResults: 200, filterExitCode: null, since: null, cwd: null });
+    expect(invokeMock).toHaveBeenCalledWith('search_history', {
+      query: '',
+      maxResults: 200,
+      filterExitCode: null,
+      since: null,
+      cwd: null,
+    });
     // 后端失败静默
-    useHistoryStore.setState({ entries: [{ command: 'keep', cwd: '/a', timestamp: 0, exitCode: null }] });
+    useHistoryStore.setState({
+      entries: [{ command: 'keep', cwd: '/a', timestamp: 0, exitCode: null }],
+    });
     await useHistoryStore.getState().hydrate();
     expect(useHistoryStore.getState().entries[0]!.command).toBe('keep');
   });

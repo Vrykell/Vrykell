@@ -6,28 +6,44 @@
  * cwd/git 不在 block 顶部重复告知（底部输入栏已有 cwd）。
  */
 
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
-  Bookmark, Check, ChevronDown, ChevronRight, Copy, Ellipsis,
-  Maximize2, RotateCw, Skull, Sparkles, Square, Terminal, X, Zap,
+  Bookmark,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  Ellipsis,
+  Maximize2,
+  RotateCw,
+  Skull,
+  Sparkles,
+  Square,
+  Terminal,
+  X,
+  Zap,
 } from 'lucide-react';
-import { useBlockStore, selectBlocks } from '../stores/blocks';
-import { useChatStore, usePaneMessages } from '../stores/chat';
-import { useChatPanelOpen } from '../stores/dock';
-import { useTerminalStore } from '../stores/terminal';
-import { useSearchHighlightStore } from '../stores/searchHighlight';
-import { toExchanges, mergeFlow } from '../chat/exchanges';
-import AiBlock from '../chat/AiBlock';
-import { agentControl } from '../agent/agentControl';
-import { ptyWrite } from '../lib/pty';
-import { killForeground } from '../lib/killForeground';
-import { useToastStore } from '../components/Toast';
-import { fmtDuration } from '../components/UiBtn';
-import { getCellMetrics } from '../lib/termMetrics';
-import { getExecutingTerm, syncTermWidth, applyCompactCharSize } from './useTerminalSession';
-import BlockMenu from './BlockMenu';
-import BlockOutput from './BlockOutput';
-import type { TermBlock } from './pipeline/termBlock';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { agentControl } from '@/agent/agentControl';
+import AiBlock from '@/chat/AiBlock';
+import { mergeFlow, toExchanges } from '@/chat/exchanges';
+import { useToastStore } from '@/components/Toast';
+import { fmtDuration } from '@/components/UiBtn';
+import { killForeground } from '@/lib/killForeground';
+import { ptyWrite } from '@/lib/pty';
+import { getCellMetrics } from '@/lib/termMetrics';
+import { selectBlocks, useBlockStore } from '@/stores/blocks';
+import { useChatStore, usePaneMessages } from '@/stores/chat';
+import { useChatPanelOpen } from '@/stores/dock';
+import { useSearchHighlightStore } from '@/stores/searchHighlight';
+import { useTerminalStore } from '@/stores/terminal';
+import BlockMenu from '@/terminal/BlockMenu';
+import BlockOutput from '@/terminal/BlockOutput';
+import type { TermBlock } from '@/terminal/pipeline/termBlock';
+import {
+  applyCompactCharSize,
+  getExecutingTerm,
+  syncTermWidth,
+} from '@/terminal/useTerminalSession';
 
 interface Props {
   tabId: string;
@@ -144,8 +160,7 @@ export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8
           anchor={menuBlock.rect}
           onClose={() => setMenuBlock(null)}
           getOutputText={() =>
-            menuBlock.block.outputText ||
-            menuBlock.block.outputRaw.replace(ANSI_CSI_RE, '')
+            menuBlock.block.outputText || menuBlock.block.outputRaw.replace(ANSI_CSI_RE, '')
           }
         />
       )}
@@ -155,10 +170,7 @@ export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8
 
 // ══════ 工具：搜索高亮 ══════
 
-function highlightFragments(
-  text: string,
-  query: string,
-): Array<{ text: string; hl: boolean }> {
+function highlightFragments(text: string, query: string): Array<{ text: string; hl: boolean }> {
   if (!query || query.length < 2 || !text) return [{ text, hl: false }];
   const lower = text.toLowerCase();
   const ql = query.toLowerCase();
@@ -209,7 +221,8 @@ function HighlightSpan({ text, query }: { text: string; query: string }) {
 function highlightCommand(cmd: string): React.ReactNode {
   if (!cmd) return cmd;
   // 按 token 分割：flag(--xxx 或 -x)、路径(/xxx/yyy 或 ./xxx)、管道(|)、重定向(>/>>)、引号字符串
-  const pattern = /(--?[a-zA-Z0-9][a-zA-Z0-9_.-]*|\.?\/[\w./-]+|[|&;]|[<>]{1,2}|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g;
+  const pattern =
+    /(--?[a-zA-Z0-9][a-zA-Z0-9_.-]*|\.?\/[\w./-]+|[|&;]|[<>]{1,2}|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g;
   const parts: React.ReactNode[] = [];
   let last = 0;
   let m: RegExpExecArray | null;
@@ -218,7 +231,8 @@ function highlightCommand(cmd: string): React.ReactNode {
     const token = m[0];
     let color = 'var(--block-cmd-text)';
     if (token.startsWith('-')) color = 'var(--cmd-flag)';
-    else if (token.startsWith('/') || token.startsWith('./') || token.startsWith('~/')) color = 'var(--cmd-path)';
+    else if (token.startsWith('/') || token.startsWith('./') || token.startsWith('~/'))
+      color = 'var(--cmd-path)';
     else if (token === '|') color = 'var(--cmd-pipe)';
     else if (token === '>' || token === '>>' || token === '<') color = 'var(--cmd-redirect)';
     else if (token.startsWith('"') || token.startsWith("'")) color = 'var(--cmd-string)';
@@ -261,8 +275,7 @@ function BlockItem({
   const coloredCommand = useMemo(() => highlightCommand(block.command), [block.command]);
 
   // copyOut 优先用 outputText，回退到剥离 CSI 的 outputRaw
-  const copyOutput =
-    block.outputText || block.outputRaw.replace(ANSI_CSI_RE, '');
+  const copyOutput = block.outputText || block.outputRaw.replace(ANSI_CSI_RE, '');
 
   const rerun = useCallback(() => {
     const sid = useTerminalStore.getState().sessions[tabId];
@@ -302,23 +315,51 @@ function BlockItem({
       }}
     >
       {/* 头部行：折叠 chevron + 加粗命令（行内）+ 右侧退出码/耗时，hover 浮出操作 */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        padding: '6px 10px', userSelect: 'none', minHeight: 30,
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '6px 10px',
+          userSelect: 'none',
+          minHeight: 30,
+        }}
+      >
         <button
           onClick={() => useBlockStore.getState().setBlockCollapsed(tabId, block.id, !isCollapsed)}
           title={isCollapsed ? '展开' : '折叠'}
-          style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)',
-            cursor: 'pointer', padding: 0, width: 14, flexShrink: 0, display: 'inline-flex' }}>
+          style={{
+            border: 'none',
+            background: 'transparent',
+            color: 'var(--text-muted)',
+            cursor: 'pointer',
+            padding: 0,
+            width: 14,
+            flexShrink: 0,
+            display: 'inline-flex',
+          }}
+        >
           {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
         </button>
-        <div data-selectable style={{
-          flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600,
-          fontFamily: 'var(--font-mono)', color: 'var(--text-primary)',
-          whiteSpace: 'pre-wrap', wordBreak: 'break-all', userSelect: 'text',
-        }}>
-          {highlightQuery ? <HighlightSpan text={block.command} query={highlightQuery} /> : coloredCommand}
+        <div
+          data-selectable
+          style={{
+            flex: 1,
+            minWidth: 0,
+            fontSize: 13,
+            fontWeight: 600,
+            fontFamily: 'var(--font-mono)',
+            color: 'var(--text-primary)',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-all',
+            userSelect: 'text',
+          }}
+        >
+          {highlightQuery ? (
+            <HighlightSpan text={block.command} query={highlightQuery} />
+          ) : (
+            coloredCommand
+          )}
         </div>
         {hovered ? (
           <span style={{ display: 'inline-flex', gap: 2, flexShrink: 0 }}>
@@ -326,29 +367,45 @@ function BlockItem({
             <BlockToolBtn title="重新运行" onClick={rerun} label={<RotateCw size={12} />} />
             <BlockToolBtn title="复制命令" onClick={copyCmd} label={<Terminal size={12} />} />
             <BlockToolBtn title="复制输出" onClick={copyOut} label={<Copy size={12} />} />
-            <BlockToolBtn title={block.bookmarked ? '取消书签' : '添加书签'}
+            <BlockToolBtn
+              title={block.bookmarked ? '取消书签' : '添加书签'}
               onClick={() => useBlockStore.getState().toggleBookmark(tabId, block.id)}
-              label={<Bookmark size={12} fill={block.bookmarked ? 'currentColor' : 'none'} />} />
-            <BlockToolBtn title="更多操作"
+              label={<Bookmark size={12} fill={block.bookmarked ? 'currentColor' : 'none'} />}
+            />
+            <BlockToolBtn
+              title="更多操作"
               onClick={(e) => onMenu(block, (e.target as HTMLElement).getBoundingClientRect())}
-              label={<Ellipsis size={12} />} />
+              label={<Ellipsis size={12} />}
+            />
           </span>
         ) : (
-          <span style={{
-            display: 'inline-flex', gap: 8, alignItems: 'center', flexShrink: 0,
-            fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)',
-          }}>
-            {block.agent && <Zap size={11} style={{ color: 'var(--accent-warm)' }} aria-label="AI 执行" />}
+          <span
+            style={{
+              display: 'inline-flex',
+              gap: 8,
+              alignItems: 'center',
+              flexShrink: 0,
+              fontSize: 11,
+              fontFamily: 'var(--font-mono)',
+              color: 'var(--text-muted)',
+            }}
+          >
+            {block.agent && (
+              <Zap size={11} style={{ color: 'var(--accent-warm)' }} aria-label="AI 执行" />
+            )}
             {block.bookmarked && <Bookmark size={11} fill="currentColor" />}
             {block.exitCode !== null && (
               <span
                 data-testid="exit-code"
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 2,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 2,
                   color: failed ? 'var(--error)' : 'var(--success)',
                 }}
               >
-                {failed ? <X size={11} /> : <Check size={11} />}{block.exitCode}
+                {failed ? <X size={11} /> : <Check size={11} />}
+                {block.exitCode}
               </span>
             )}
             {duration && <span style={{ fontVariantNumeric: 'tabular-nums' }}>({duration})</span>}
@@ -357,19 +414,16 @@ function BlockItem({
       </div>
 
       {/* 输出：outputHtml 恒为 HTML（可能无 <span），显式 isHtml 分流 */}
-      {!isCollapsed && (block.outputHtml ? (
-        <BlockOutput
-          text={block.outputHtml}
-          isHtml
-          highlight={highlightQuery || undefined}
-        />
-      ) : block.outputText ? (
-        <BlockOutput
-          text={block.outputText}
-          isHtml={false}
-          highlight={highlightQuery || undefined}
-        />
-      ) : null)}
+      {!isCollapsed &&
+        (block.outputHtml ? (
+          <BlockOutput text={block.outputHtml} isHtml highlight={highlightQuery || undefined} />
+        ) : block.outputText ? (
+          <BlockOutput
+            text={block.outputText}
+            isHtml={false}
+            highlight={highlightQuery || undefined}
+          />
+        ) : null)}
 
       {/* 截断提示 */}
       {!isCollapsed && block.linesTruncated > 0 && (
@@ -442,10 +496,16 @@ function RunningItem({
       }}
     >
       {/* 头部行：脉冲点 + 加粗命令 + 耗时/操作按钮 */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        padding: '6px 10px', userSelect: 'none', minHeight: 30,
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '6px 10px',
+          userSelect: 'none',
+          minHeight: 30,
+        }}
+      >
         <span
           style={{
             display: 'inline-block',
@@ -458,23 +518,51 @@ function RunningItem({
             flexShrink: 0,
           }}
         />
-        <div data-selectable style={{
-          flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600,
-          fontFamily: 'var(--font-mono)', color: 'var(--text-primary)',
-          whiteSpace: 'pre-wrap', wordBreak: 'break-all', userSelect: 'text',
-        }}>
-          {highlightQuery ? <HighlightSpan text={block.command} query={highlightQuery} /> : coloredCommand}
-        </div>
-        <span style={{
-          display: 'inline-flex', gap: 8, alignItems: 'center', flexShrink: 0,
-          fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)',
-        }}>
-          {block.agent && <Zap size={11} style={{ color: 'var(--accent-warm)' }} aria-label="AI 执行" />}
-          {elapsedNow && (
-            <span style={{ fontVariantNumeric: 'tabular-nums' }}>({elapsedNow})</span>
+        <div
+          data-selectable
+          style={{
+            flex: 1,
+            minWidth: 0,
+            fontSize: 13,
+            fontWeight: 600,
+            fontFamily: 'var(--font-mono)',
+            color: 'var(--text-primary)',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-all',
+            userSelect: 'text',
+          }}
+        >
+          {highlightQuery ? (
+            <HighlightSpan text={block.command} query={highlightQuery} />
+          ) : (
+            coloredCommand
           )}
-          <BlockToolBtn title="终止命令 (Ctrl+C)" onClick={sendCtrlC} label={<Square size={10} fill="currentColor" />} />
-          <BlockToolBtn title="结束前台应用（SIGTERM；3 秒内再点强杀 SIGKILL）" onClick={killApp} label={<Skull size={11} />} />
+        </div>
+        <span
+          style={{
+            display: 'inline-flex',
+            gap: 8,
+            alignItems: 'center',
+            flexShrink: 0,
+            fontSize: 11,
+            fontFamily: 'var(--font-mono)',
+            color: 'var(--text-muted)',
+          }}
+        >
+          {block.agent && (
+            <Zap size={11} style={{ color: 'var(--accent-warm)' }} aria-label="AI 执行" />
+          )}
+          {elapsedNow && <span style={{ fontVariantNumeric: 'tabular-nums' }}>({elapsedNow})</span>}
+          <BlockToolBtn
+            title="终止命令 (Ctrl+C)"
+            onClick={sendCtrlC}
+            label={<Square size={10} fill="currentColor" />}
+          />
+          <BlockToolBtn
+            title="结束前台应用（SIGTERM；3 秒内再点强杀 SIGKILL）"
+            onClick={killApp}
+            label={<Skull size={11} />}
+          />
           <BlockToolBtn title="进入全屏交互" onClick={enterTui} label={<Maximize2 size={12} />} />
         </span>
       </div>
@@ -554,9 +642,7 @@ function RunningTerm({ tabId }: { tabId: string }) {
       if (sid) ptyWrite(sid, d).catch(() => {});
     });
     // End 保留给「回到输入栏」（InputEditor 全局监听），不进 PTY
-    term.attachCustomKeyEventHandler(
-      (e) => !(e.type === 'keydown' && e.key === 'End'),
-    );
+    term.attachCustomKeyEventHandler((e) => !(e.type === 'keydown' && e.key === 'End'));
     // 滚轮：卡片内不消费 wheel —— return false 让 xterm 跳过自家处理，
     // 事件继续冒泡到块列表的 DOM 滚动容器（否则滚轮落在运行中卡片上时整页滚不动）。
     // 全屏时交回 xterm 默认（normal buffer 滚自己的 scrollback）。

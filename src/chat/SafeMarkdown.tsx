@@ -1,5 +1,5 @@
 import { Component } from 'react';
-import Markdown from './Markdown';
+import Markdown from '@/chat/Markdown';
 
 /**
  * 单条消息的 Markdown 渲染保护。
@@ -10,7 +10,10 @@ import Markdown from './Markdown';
  * 降级策略：渲染失败不吞消息 —— 展示原始文本（等宽、可选中），
  * 并把错误 + 内容摘要打进 console 便于定位。
  */
-export default class SafeMarkdown extends Component<{ content: string }, { error: boolean; errorMessage: string; content: string }> {
+export default class SafeMarkdown extends Component<
+  { content: string },
+  { error: boolean; errorMessage: string; content: string }
+> {
   state = { error: false, errorMessage: '', content: this.props.content };
 
   static getDerivedStateFromError(error: unknown) {
@@ -24,8 +27,10 @@ export default class SafeMarkdown extends Component<{ content: string }, { error
     console.error(
       '[SafeMarkdown] 渲染失败:',
       error,
-      '\n内容摘要:', JSON.stringify(this.props.content.slice(0, 300)),
-      '\n组件栈:', info.componentStack ?? '(无)',
+      '\n内容摘要:',
+      JSON.stringify(this.props.content.slice(0, 300)),
+      '\n组件栈:',
+      info.componentStack ?? '(无)',
     );
   }
 

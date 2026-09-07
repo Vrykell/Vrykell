@@ -7,32 +7,45 @@
  *   分裂用 ⌘D/⌘⇧D（继承类型）、⌥⌘D（选类型）；分隔线拖动调整比例。
  */
 
-import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
-import { useWorkspaceStore, nextTerminalId, type Tab } from '../stores/workspace';
-import { defaultOpenModeForShell } from '../agent/agentSettings';
-import { useTerminalStore } from '../stores/terminal';
-import { useUiStore } from '../stores/ui';
-import { useDockDragStore } from '../stores/dockDrag';
-import { useBlockStore, selectBlocks } from '../stores/blocks';
-import { usePaneMessages } from '../stores/chat';
-import { useChatPanelOpen } from '../stores/dock';
-import { ptyWrite } from '../lib/pty';
-import { killForeground, ESCALATE_WINDOW_MS } from '../lib/killForeground';
-import { useToastStore } from '../components/Toast';
-import { useFollowBottom, registerFollowEngager, engageFollow } from './useFollowBottom';
-import { useTerminalFocus } from './useTerminalFocus';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { defaultOpenModeForShell } from '@/agent/agentSettings';
+import ContextMenu from '@/components/ContextMenu';
+import SessionHistoryView from '@/components/SessionHistoryView';
+import { useToastStore } from '@/components/Toast';
+import { ESCALATE_WINDOW_MS, killForeground } from '@/lib/killForeground';
+import { ptyWrite } from '@/lib/pty';
 import {
-  leaves as layoutLeaves, firstLeaf, findLeaf, splitLeaf, removeLeaf, dropTargets, moveTargets,
-  setRatio, dividers, collectLayoutCells, MIN_PANE_SIZE, DIVIDER_SIZE,
-  type WindowLayout, type TerminalSpec, type DropTarget, type Rect,
-} from '../lib/windowLayout';
-import InputEditor from './InputEditor';
-import AiStatusBar from './AiStatusBar';
-import TerminalBlockList, { hasVisibleContent } from './TerminalBlockList';
-import TerminalPanel from './TerminalPanel';
-import SessionHistoryView from '../components/SessionHistoryView';
-import SettingsView from '../settings/SettingsView';
-import ContextMenu from '../components/ContextMenu';
+  collectLayoutCells,
+  DIVIDER_SIZE,
+  type DropTarget,
+  dividers,
+  dropTargets,
+  findLeaf,
+  firstLeaf,
+  leaves as layoutLeaves,
+  MIN_PANE_SIZE,
+  moveTargets,
+  type Rect,
+  removeLeaf,
+  setRatio,
+  splitLeaf,
+  type TerminalSpec,
+  type WindowLayout,
+} from '@/lib/windowLayout';
+import SettingsView from '@/settings/SettingsView';
+import { selectBlocks, useBlockStore } from '@/stores/blocks';
+import { usePaneMessages } from '@/stores/chat';
+import { useChatPanelOpen } from '@/stores/dock';
+import { useDockDragStore } from '@/stores/dockDrag';
+import { useTerminalStore } from '@/stores/terminal';
+import { useUiStore } from '@/stores/ui';
+import { nextTerminalId, type Tab, useWorkspaceStore } from '@/stores/workspace';
+import AiStatusBar from '@/terminal/AiStatusBar';
+import InputEditor from '@/terminal/InputEditor';
+import TerminalBlockList, { hasVisibleContent } from '@/terminal/TerminalBlockList';
+import TerminalPanel from '@/terminal/TerminalPanel';
+import { engageFollow, registerFollowEngager, useFollowBottom } from '@/terminal/useFollowBottom';
+import { useTerminalFocus } from '@/terminal/useTerminalFocus';
 
 export default function TerminalView() {
   const tabs = useWorkspaceStore((s) => s.tabs);
@@ -48,13 +61,24 @@ export default function TerminalView() {
   const isSession = activeTab?.kind === 'session';
 
   const focusedTermId = isSession
-    ? (focusedPaneId && sessions[focusedPaneId] && layoutLeaves(activeTab!.layout).some((t) => t.id === focusedPaneId)
-        ? focusedPaneId
-        : firstLeaf(activeTab!.layout).id)
+    ? focusedPaneId &&
+      sessions[focusedPaneId] &&
+      layoutLeaves(activeTab!.layout).some((t) => t.id === focusedPaneId)
+      ? focusedPaneId
+      : firstLeaf(activeTab!.layout).id
     : activeId;
 
   return (
-    <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+    <div
+      style={{
+        flex: 1,
+        minWidth: 0,
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'relative',
+      }}
+    >
       {/* 所有 session tab 保持挂载，非活跃 tab 隐藏而非卸载 ——
           卸载会触发 useTerminalSession cleanup 里的 ptyClose，杀掉运行中的命令。
           切走再切回时 PTY/块列表/离屏终端全部存活。 */}
@@ -67,17 +91,33 @@ export default function TerminalView() {
               active={tab.id === activeId}
               setSession={setSession}
               setFocusedPane={setFocusedPane}
-              onPaneContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY }); }}
+              onPaneContextMenu={(e) => {
+                e.preventDefault();
+                setCtxMenu({ x: e.clientX, y: e.clientY });
+              }}
             />
           );
         }
         if (tab.id !== activeId) return null; // history/settings 无 PTY，无需保活
-        return tab.kind === 'history' ? <SessionHistoryView key={tab.id} /> : <SettingsView key={tab.id} />;
+        return tab.kind === 'history' ? (
+          <SessionHistoryView key={tab.id} />
+        ) : (
+          <SettingsView key={tab.id} />
+        );
       })}
 
       {/* 手动全屏宿主（块终端「进入全屏交互」）：顶部为透明工具条让位，其余贴边 */}
       {altScreenActive && (
-        <div data-testid="tui-fullscreen" style={{ position: 'absolute', inset: 0, zIndex: 100, background: 'var(--canvas)', paddingTop: 28 }} />
+        <div
+          data-testid="tui-fullscreen"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 100,
+            background: 'var(--canvas)',
+            paddingTop: 28,
+          }}
+        />
       )}
 
       {/* 终端区域右键菜单 */}
@@ -89,7 +129,11 @@ export default function TerminalView() {
             { label: '分裂终端（选位置）', onClick: () => useUiStore.getState().beginSplit(null) },
             { label: '选择类型分裂', onClick: () => useUiStore.getState().openSplitPicker() },
             { label: '更换位置', onClick: () => useUiStore.getState().beginMove(focusedTermId) },
-            { label: '关闭终端', danger: true, onClick: () => useWorkspaceStore.getState().closeFocusedTerminal() },
+            {
+              label: '关闭终端',
+              danger: true,
+              onClick: () => useWorkspaceStore.getState().closeFocusedTerminal(),
+            },
           ]}
         />
       )}
@@ -120,9 +164,12 @@ function SessionTabView(props: {
   const cancelMove = useUiStore((s) => s.cancelMove);
   const draggingId = useDockDragStore((s) => s.draggingTerminalId);
 
-  const focusedTermId = focusedPaneId && sessions[focusedPaneId] && layoutLeaves(layout).some((t) => t.id === focusedPaneId)
-    ? focusedPaneId
-    : firstLeaf(layout).id;
+  const focusedTermId =
+    focusedPaneId &&
+    sessions[focusedPaneId] &&
+    layoutLeaves(layout).some((t) => t.id === focusedPaneId)
+      ? focusedPaneId
+      : firstLeaf(layout).id;
 
   const scene = useTerminalStore((s) => s.scenes[focusedTermId] ?? 'classic');
   const focusBlocks = useBlockStore(selectBlocks(focusedTermId));
@@ -137,46 +184,60 @@ function SessionTabView(props: {
 
   // 更换位置落点：对「其它终端」给出上/下/左/右边沿落点（与拖动重排同规则）
   const movePlacementTargets = useMemo(
-    () => (movePlacement.open && layout && movePlacement.terminalId
-      ? moveTargets(layout, movePlacement.terminalId)
-      : []),
+    () =>
+      movePlacement.open && layout && movePlacement.terminalId
+        ? moveTargets(layout, movePlacement.terminalId)
+        : [],
     [movePlacement, layout],
   );
 
-  const commitPlacement = useCallback((zone: DropTarget) => {
-    if (!layout) return;
-    // 继承类型：优先继承「被分裂的那个终端」（zone.leafId），而非聚焦终端
-    const base = splitPlacement.spec ?? findLeaf(layout, zone.leafId);
-    if (!base) return;
-    const newId = nextTerminalId(windowId, layout);
-    // 打开模式：继承源模式，未设置则回退：SSH 经典、local 按 shell 类型
-    const openMode = base.openMode ?? (base.kind === 'ssh'
-      ? 'classic'
-      : defaultOpenModeForShell(base.shellType));
-    const next = splitLeaf(layout, zone.leafId, zone.dir, zone.position, { ...base, id: newId, openMode });
-    setWindowLayout(windowId, next);
-    setFocusedPane(newId);
-    cancelSplit();
-  }, [layout, splitPlacement.spec, windowId, setWindowLayout, setFocusedPane, cancelSplit]);
+  const commitPlacement = useCallback(
+    (zone: DropTarget) => {
+      if (!layout) return;
+      // 继承类型：优先继承「被分裂的那个终端」（zone.leafId），而非聚焦终端
+      const base = splitPlacement.spec ?? findLeaf(layout, zone.leafId);
+      if (!base) return;
+      const newId = nextTerminalId(windowId, layout);
+      // 打开模式：继承源模式，未设置则回退：SSH 经典、local 按 shell 类型
+      const openMode =
+        base.openMode ??
+        (base.kind === 'ssh' ? 'classic' : defaultOpenModeForShell(base.shellType));
+      const next = splitLeaf(layout, zone.leafId, zone.dir, zone.position, {
+        ...base,
+        id: newId,
+        openMode,
+      });
+      setWindowLayout(windowId, next);
+      setFocusedPane(newId);
+      cancelSplit();
+    },
+    [layout, splitPlacement.spec, windowId, setWindowLayout, setFocusedPane, cancelSplit],
+  );
 
-  const commitMove = useCallback((dragId: string, zone: DropTarget) => {
-    if (!layout) return;
-    if (zone.leafId === dragId) return;
-    const spec = findLeaf(layout, dragId);
-    const removed = removeLeaf(layout, dragId);
-    if (!spec || !removed) return;
-    const next = splitLeaf(removed, zone.leafId, zone.dir, zone.position, spec);
-    setWindowLayout(windowId, next);
-    setFocusedPane(dragId);
-  }, [layout, windowId, setWindowLayout, setFocusedPane]);
+  const commitMove = useCallback(
+    (dragId: string, zone: DropTarget) => {
+      if (!layout) return;
+      if (zone.leafId === dragId) return;
+      const spec = findLeaf(layout, dragId);
+      const removed = removeLeaf(layout, dragId);
+      if (!spec || !removed) return;
+      const next = splitLeaf(removed, zone.leafId, zone.dir, zone.position, spec);
+      setWindowLayout(windowId, next);
+      setFocusedPane(dragId);
+    },
+    [layout, windowId, setWindowLayout, setFocusedPane],
+  );
 
   return (
-    <div style={{
-      position: 'absolute', inset: 0,
-      display: active ? 'flex' : 'none',
-      flexDirection: 'column',
-      background: 'var(--canvas)',
-    }}>
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        display: active ? 'flex' : 'none',
+        flexDirection: 'column',
+        background: 'var(--canvas)',
+      }}
+    >
       <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', position: 'relative' }}>
         {/* 平面渲染：pane 按终端 id 作 key，绝对定位落位 ——
             拖动重排只改几何，不重挂 TerminalPane（重挂会 ptyClose 杀掉运行中命令）。 */}
@@ -192,7 +253,11 @@ function SessionTabView(props: {
 
         {/* 分裂落点选择覆盖层（相对布局区域定位，忠实反映未来区域） */}
         {active && splitPlacement.open && (
-          <PlacementOverlay targets={placementTargets} onPick={commitPlacement} onCancel={cancelSplit} />
+          <PlacementOverlay
+            targets={placementTargets}
+            onPick={commitPlacement}
+            onCancel={cancelSplit}
+          />
         )}
 
         {/* 更换位置落点选择覆盖层（菜单触发，等同拖动重排） */}
@@ -222,7 +287,12 @@ function SessionTabView(props: {
 // 布局平面渲染（PaneLayout）
 // ═══════════════════════════════════════════════════════════
 
-interface InnerEdges { left: boolean; right: boolean; top: boolean; bottom: boolean; }
+interface InnerEdges {
+  left: boolean;
+  right: boolean;
+  top: boolean;
+  bottom: boolean;
+}
 
 /**
  * PaneLayout — 窗口布局的平面渲染。
@@ -241,7 +311,15 @@ function PaneLayout(props: {
   setRatioNode: (aId: string, bId: string, ratio: number) => void;
   onPaneContextMenu: (e: React.MouseEvent) => void;
 }) {
-  const { layout, windowId, focusedTermId, setSession, setFocusedPane, setRatioNode, onPaneContextMenu } = props;
+  const {
+    layout,
+    windowId,
+    focusedTermId,
+    setSession,
+    setFocusedPane,
+    setRatioNode,
+    onPaneContextMenu,
+  } = props;
   const cells = useMemo(() => {
     const collected = collectLayoutCells(layout);
     const rects = new Map(collected.map((c) => [c.terminalId, c.rect]));
@@ -261,9 +339,13 @@ function PaneLayout(props: {
           key={cell.terminal.id}
           style={{
             position: 'absolute',
-            left: `${cell.rect.x * 100}%`, top: `${cell.rect.y * 100}%`,
-            width: `${cell.rect.w * 100}%`, height: `${cell.rect.h * 100}%`,
-            display: 'flex', minWidth: 0, minHeight: 0,
+            left: `${cell.rect.x * 100}%`,
+            top: `${cell.rect.y * 100}%`,
+            width: `${cell.rect.w * 100}%`,
+            height: `${cell.rect.h * 100}%`,
+            display: 'flex',
+            minWidth: 0,
+            minHeight: 0,
           }}
         >
           <TerminalPane
@@ -278,7 +360,13 @@ function PaneLayout(props: {
         </div>
       ))}
       {divs.map((d) => (
-        <Divider key={`${d.aId}-${d.bId}`} dir={d.dir} rect={d.rect} region={d.region} onRatio={(r) => setRatioNode(d.aId, d.bId, r)} />
+        <Divider
+          key={`${d.aId}-${d.bId}`}
+          dir={d.dir}
+          rect={d.rect}
+          region={d.region}
+          onRatio={(r) => setRatioNode(d.aId, d.bId, r)}
+        />
       ))}
     </div>
   );
@@ -288,7 +376,17 @@ function PaneLayout(props: {
 // 分隔线（拖拽调比例）
 // ═══════════════════════════════════════════════════════════
 
-function Divider({ dir, rect, region, onRatio }: { dir: 'row' | 'col'; rect: Rect; region: Rect; onRatio: (r: number) => void }) {
+function Divider({
+  dir,
+  rect,
+  region,
+  onRatio,
+}: {
+  dir: 'row' | 'col';
+  rect: Rect;
+  region: Rect;
+  onRatio: (r: number) => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const isRow = dir === 'row';
 
@@ -304,7 +402,7 @@ function Divider({ dir, rect, region, onRatio }: { dir: 'row' | 'col'; rect: Rec
     const regionH = region.h * cRect.height;
     const move = (ev: MouseEvent) => {
       const size = isRow ? regionW : regionH;
-      const pos = isRow ? (ev.clientX - regionLeft) : (ev.clientY - regionTop);
+      const pos = isRow ? ev.clientX - regionLeft : ev.clientY - regionTop;
       // 像素级最小尺寸：每侧至少 MIN_PANE_SIZE，避免拖到「覆盖」内容
       const minRatio = Math.min(0.5, MIN_PANE_SIZE / size);
       const maxRatio = Math.max(0.5, 1 - MIN_PANE_SIZE / size);
@@ -343,8 +441,12 @@ function Divider({ dir, rect, region, onRatio }: { dir: 'row' | 'col'; rect: Rec
     <div
       ref={ref}
       onMouseDown={onDown}
-      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--accent-bg)'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = 'var(--accent-bg)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'transparent';
+      }}
       style={style}
     />
   );
@@ -375,7 +477,12 @@ function TerminalPane(props: {
   const onPaneMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
     const target = e.target as HTMLElement;
-    if (target.closest('input, textarea, button, a, [contenteditable="true"], .xterm, [data-no-drag], [data-selectable]')) return;
+    if (
+      target.closest(
+        'input, textarea, button, a, [contenteditable="true"], .xterm, [data-no-drag], [data-selectable]',
+      )
+    )
+      return;
     e.preventDefault();
     const startX = e.clientX;
     const startY = e.clientY;
@@ -400,34 +507,75 @@ function TerminalPane(props: {
       data-focused={focused ? 'true' : 'false'}
       onClick={() => setFocusedPane(terminal.id)}
       onMouseDown={onPaneMouseDown}
-      onContextMenu={(e) => { setFocusedPane(terminal.id); onContextMenu(e); }}
+      onContextMenu={(e) => {
+        setFocusedPane(terminal.id);
+        onContextMenu(e);
+      }}
       style={{
-        flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column',
+        flex: 1,
+        minWidth: 0,
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
         position: 'relative',
         // 背景 = 终端同款色（--canvas 与 xterm 的 --xterm-bg 同色）：8px 边距与终端融为一体，
         // 视觉上像是终端的呼吸空间而非缝隙
         background: 'var(--canvas)',
         // 只在「面向其它终端」的边上画线，外缘不画 —— 避免与侧栏的 1px 边框叠加成重线
-        borderTop: inner.top ? `1px solid ${focused ? 'var(--border-strong)' : 'var(--border)'}` : 'none',
-        borderBottom: inner.bottom ? `1px solid ${focused ? 'var(--border-strong)' : 'var(--border)'}` : 'none',
-        borderLeft: inner.left ? `1px solid ${focused ? 'var(--border-strong)' : 'var(--border)'}` : 'none',
-        borderRight: inner.right ? `1px solid ${focused ? 'var(--border-strong)' : 'var(--border)'}` : 'none',
+        borderTop: inner.top
+          ? `1px solid ${focused ? 'var(--border-strong)' : 'var(--border)'}`
+          : 'none',
+        borderBottom: inner.bottom
+          ? `1px solid ${focused ? 'var(--border-strong)' : 'var(--border)'}`
+          : 'none',
+        borderLeft: inner.left
+          ? `1px solid ${focused ? 'var(--border-strong)' : 'var(--border)'}`
+          : 'none',
+        borderRight: inner.right
+          ? `1px solid ${focused ? 'var(--border-strong)' : 'var(--border)'}`
+          : 'none',
         overflow: 'hidden',
       }}
     >
       {/* xterm 表面：classic/真实 altScreen 可见，blockList/手动全屏隐藏但保持挂载 */}
       {/* AI 状态栏（仅 AI 模式显示，置于页面顶部） */}
       <AiStatusBar paneId={terminal.id} />
-      <div style={showXterm
-        // 经典/TUI/SSH：统一 8px 透明边距（透出壁纸/画布）；TUI 顶部为工具条让位
-        ? { flex: 1, minHeight: 0, position: 'relative', padding: 8, paddingTop: scene === 'altScreen' ? 28 : 8, background: 'transparent' }
-        : { position: 'absolute', inset: 0, opacity: 0, pointerEvents: 'none' }}>
-        <TerminalPanel paneId={terminal.id} tabId={windowId} onReady={(sid) => setSession(terminal.id, sid)} />
+      <div
+        style={
+          showXterm
+            ? // 经典/TUI/SSH：统一 8px 透明边距（透出壁纸/画布）；TUI 顶部为工具条让位
+              {
+                flex: 1,
+                minHeight: 0,
+                position: 'relative',
+                padding: 8,
+                paddingTop: scene === 'altScreen' ? 28 : 8,
+                background: 'transparent',
+              }
+            : { position: 'absolute', inset: 0, opacity: 0, pointerEvents: 'none' }
+        }
+      >
+        <TerminalPanel
+          paneId={terminal.id}
+          tabId={windowId}
+          onReady={(sid) => setSession(terminal.id, sid)}
+        />
       </div>
 
       {/* 块列表：始终挂载（手动全屏时 RunningTerm 需保持存活），blockList 才可见 */}
-      <div style={{ display: showBlocks ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column' }}>
-        <PaneBlockList paneId={terminal.id} insetLeft={inner.left ? 4 : 8} insetRight={inner.right ? 4 : 8} />
+      <div
+        style={{
+          display: showBlocks ? 'flex' : 'none',
+          flex: 1,
+          minHeight: 0,
+          flexDirection: 'column',
+        }}
+      >
+        <PaneBlockList
+          paneId={terminal.id}
+          insetLeft={inner.left ? 4 : 8}
+          insetRight={inner.right ? 4 : 8}
+        />
       </div>
       {showBlocks && (
         <PaneInputEditor
@@ -451,17 +599,30 @@ function pickDropZone(targets: DropTarget[], nx: number, ny: number): number | n
     const r = t.rect;
     if (nx < r.x - 1e-6 || nx > r.x + r.w + 1e-6) continue;
     if (ny < r.y - 1e-6 || ny > r.y + r.h + 1e-6) continue;
-    const score = t.dir === 'row'
-      ? (t.position === 'first' ? (r.x + r.w) - nx : nx - r.x)
-      : (t.position === 'first' ? (r.y + r.h) - ny : ny - r.y);
-    if (score > bestScore) { bestScore = score; best = i; }
+    const score =
+      t.dir === 'row'
+        ? t.position === 'first'
+          ? r.x + r.w - nx
+          : nx - r.x
+        : t.position === 'first'
+          ? r.y + r.h - ny
+          : ny - r.y;
+    if (score > bestScore) {
+      bestScore = score;
+      best = i;
+    }
   }
   return best;
 }
 
 // ── 分裂落点选择覆盖层 ──
 
-function PlacementOverlay({ targets, onPick, onCancel, emptyMessage = '最多 4 个终端' }: {
+function PlacementOverlay({
+  targets,
+  onPick,
+  onCancel,
+  emptyMessage = '最多 4 个终端',
+}: {
   targets: DropTarget[];
   onPick: (t: DropTarget) => void;
   onCancel: () => void;
@@ -490,7 +651,11 @@ function PlacementOverlay({ targets, onPick, onCancel, emptyMessage = '最多 4 
   const locate = (clientX: number, clientY: number): number | null => {
     const rect = ref.current?.getBoundingClientRect();
     if (!rect || rect.width === 0 || rect.height === 0) return null;
-    return pickDropZone(targets, (clientX - rect.left) / rect.width, (clientY - rect.top) / rect.height);
+    return pickDropZone(
+      targets,
+      (clientX - rect.left) / rect.width,
+      (clientY - rect.top) / rect.height,
+    );
   };
 
   return (
@@ -512,9 +677,12 @@ function PlacementOverlay({ targets, onPick, onCancel, emptyMessage = '最多 4 
           data-testid={`placement-zone-${i}`}
           style={{
             position: 'absolute',
-            left: `${t.rect.x * 100}%`, top: `${t.rect.y * 100}%`,
-            width: `${t.rect.w * 100}%`, height: `${t.rect.h * 100}%`,
-            boxSizing: 'border-box', pointerEvents: 'none',
+            left: `${t.rect.x * 100}%`,
+            top: `${t.rect.y * 100}%`,
+            width: `${t.rect.w * 100}%`,
+            height: `${t.rect.h * 100}%`,
+            boxSizing: 'border-box',
+            pointerEvents: 'none',
             background: hovered === i ? 'rgba(128,128,128,0.18)' : 'transparent',
             transition: 'background var(--dur-fast) var(--ease)',
           }}
@@ -526,16 +694,17 @@ function PlacementOverlay({ targets, onPick, onCancel, emptyMessage = '最多 4 
 
 // ── 拖动终端调整位置的落点覆盖层 ──
 
-function MoveDragLayer({ layout, draggingId, onCommit }: {
+function MoveDragLayer({
+  layout,
+  draggingId,
+  onCommit,
+}: {
   layout: WindowLayout;
   draggingId: string;
   onCommit: (dragId: string, zone: DropTarget) => void;
 }) {
   // 可移动落点：对其它每个终端给出上/下/左/右四个边沿落点
-  const targets = useMemo(
-    () => moveTargets(layout, draggingId),
-    [layout, draggingId],
-  );
+  const targets = useMemo(() => moveTargets(layout, draggingId), [layout, draggingId]);
   const [hovered, setHovered] = useState<number | null>(null);
   const hoveredRef = useRef<number | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -545,7 +714,11 @@ function MoveDragLayer({ layout, draggingId, onCommit }: {
       const rect = overlayRef.current?.getBoundingClientRect();
       let idx: number | null = null;
       if (rect && rect.width > 0 && rect.height > 0) {
-        idx = pickDropZone(targets, (e.clientX - rect.left) / rect.width, (e.clientY - rect.top) / rect.height);
+        idx = pickDropZone(
+          targets,
+          (e.clientX - rect.left) / rect.width,
+          (e.clientY - rect.top) / rect.height,
+        );
       }
       hoveredRef.current = idx;
       setHovered(idx);
@@ -579,15 +752,21 @@ function MoveDragLayer({ layout, draggingId, onCommit }: {
   }
 
   return (
-    <div ref={overlayRef} style={{ position: 'absolute', inset: 0, zIndex: 79, cursor: 'grabbing' }}>
+    <div
+      ref={overlayRef}
+      style={{ position: 'absolute', inset: 0, zIndex: 79, cursor: 'grabbing' }}
+    >
       {targets.map((t, i) => (
         <div
           key={i}
           style={{
             position: 'absolute',
-            left: `${t.rect.x * 100}%`, top: `${t.rect.y * 100}%`,
-            width: `${t.rect.w * 100}%`, height: `${t.rect.h * 100}%`,
-            boxSizing: 'border-box', pointerEvents: 'none',
+            left: `${t.rect.x * 100}%`,
+            top: `${t.rect.y * 100}%`,
+            width: `${t.rect.w * 100}%`,
+            height: `${t.rect.h * 100}%`,
+            boxSizing: 'border-box',
+            pointerEvents: 'none',
             background: hovered === i ? 'rgba(128,128,128,0.18)' : 'transparent',
             transition: 'background var(--dur-fast) var(--ease)',
           }}
@@ -607,7 +786,12 @@ function TuiBanner({ tabId }: { tabId: string }) {
   const blocks = useBlockStore(selectBlocks(tabId));
   const [killArmed, setKillArmed] = useState(false);
   const killTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (killTimer.current) clearTimeout(killTimer.current); }, []);
+  useEffect(
+    () => () => {
+      if (killTimer.current) clearTimeout(killTimer.current);
+    },
+    [],
+  );
   const runningCommand = useMemo(() => {
     const running = blocks.filter((b) => b.status === 'executing');
     return running.length > 0 ? running[running.length - 1]!.command : '';
@@ -619,21 +803,77 @@ function TuiBanner({ tabId }: { tabId: string }) {
   const killApp = useCallback(() => {
     const sid = sessions[tabId];
     if (!sid) return;
-    killForeground(sid).then((level) => {
-      if (killTimer.current) clearTimeout(killTimer.current);
-      if (level === 'term') { setKillArmed(true); killTimer.current = setTimeout(() => setKillArmed(false), ESCALATE_WINDOW_MS); }
-      else setKillArmed(false);
-    }).catch((e) => useToastStore.getState().addToast(String((e as Error)?.message ?? e), 'info'));
+    killForeground(sid)
+      .then((level) => {
+        if (killTimer.current) clearTimeout(killTimer.current);
+        if (level === 'term') {
+          setKillArmed(true);
+          killTimer.current = setTimeout(() => setKillArmed(false), ESCALATE_WINDOW_MS);
+        } else setKillArmed(false);
+      })
+      .catch((e) => useToastStore.getState().addToast(String((e as Error)?.message ?? e), 'info'));
   }, [sessions, tabId]);
   return (
-    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 101, padding: '3px 12px', fontSize: 11, fontFamily: 'var(--font-mono)', background: 'transparent', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)' }}>
-      <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--accent-warm)', flexShrink: 0 }} />
+    <div
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 101,
+        padding: '3px 12px',
+        fontSize: 11,
+        fontFamily: 'var(--font-mono)',
+        background: 'transparent',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        color: 'var(--text-secondary)',
+      }}
+    >
+      <span
+        style={{
+          display: 'inline-block',
+          width: 6,
+          height: 6,
+          borderRadius: '50%',
+          background: 'var(--accent-warm)',
+          flexShrink: 0,
+        }}
+      />
       <span>TUI{runningCommand ? ` · ${runningCommand}` : ''}</span>
       <div style={{ flex: 1 }} />
-      <span onClick={sendCtrlC} title="发送 Ctrl+C" style={{ fontSize: 10, padding: '2px 6px', borderRadius: 3, cursor: 'pointer' }}>^C</span>
-      <span onClick={killApp} title="结束前台应用 (SIGTERM)" style={{ fontSize: 10, padding: '2px 6px', borderRadius: 3, cursor: 'pointer', color: killArmed ? 'var(--accent-warm)' : 'var(--text-secondary)' }}>{killArmed ? '强杀!' : '结束'}</span>
+      <span
+        onClick={sendCtrlC}
+        title="发送 Ctrl+C"
+        style={{ fontSize: 10, padding: '2px 6px', borderRadius: 3, cursor: 'pointer' }}
+      >
+        ^C
+      </span>
+      <span
+        onClick={killApp}
+        title="结束前台应用 (SIGTERM)"
+        style={{
+          fontSize: 10,
+          padding: '2px 6px',
+          borderRadius: 3,
+          cursor: 'pointer',
+          color: killArmed ? 'var(--accent-warm)' : 'var(--text-secondary)',
+        }}
+      >
+        {killArmed ? '强杀!' : '结束'}
+      </span>
       {altScreenActive && (
-        <span onClick={() => { setAltScreenActive(false); setScene(tabId, 'blockList'); }} title="退出全屏" style={{ fontSize: 10, padding: '2px 6px', borderRadius: 3, cursor: 'pointer' }}>esc</span>
+        <span
+          onClick={() => {
+            setAltScreenActive(false);
+            setScene(tabId, 'blockList');
+          }}
+          title="退出全屏"
+          style={{ fontSize: 10, padding: '2px 6px', borderRadius: 3, cursor: 'pointer' }}
+        >
+          esc
+        </span>
       )}
     </div>
   );
@@ -642,7 +882,17 @@ function TuiBanner({ tabId }: { tabId: string }) {
 // ═══════════════════════════════════════════════════════════
 // PaneInputEditor（终端 pane 的独立输入栏） ═══════════════════════════════════════════════════════════
 
-function PaneInputEditor({ paneId, focused, insetLeft = 8, insetRight = 8 }: { paneId: string; focused: boolean; insetLeft?: number; insetRight?: number }) {
+function PaneInputEditor({
+  paneId,
+  focused,
+  insetLeft = 8,
+  insetRight = 8,
+}: {
+  paneId: string;
+  focused: boolean;
+  insetLeft?: number;
+  insetRight?: number;
+}) {
   const blocks = useBlockStore(selectBlocks(paneId));
   const hasRunningBlock = blocks.some((b) => b.status === 'executing' && b.wasLongRunning);
   const runningCommand = [...blocks].reverse().find((b) => b.status === 'executing')?.command ?? '';
@@ -654,20 +904,34 @@ function PaneInputEditor({ paneId, focused, insetLeft = 8, insetRight = 8 }: { p
       insetRight={insetRight}
       isLongRunning={hasRunningBlock}
       runningCommand={runningCommand}
-      onEndPress={() => { engageFollow(paneId); useTerminalStore.getState().setKeyboardTarget('input'); }}
+      onEndPress={() => {
+        engageFollow(paneId);
+        useTerminalStore.getState().setKeyboardTarget('input');
+      }}
     />
   );
 }
 
 // ── PaneBlockList / PaneEmptyHint ──
 
-function PaneBlockList({ paneId, insetLeft = 8, insetRight = 8 }: { paneId: string; insetLeft?: number; insetRight?: number }) {
+function PaneBlockList({
+  paneId,
+  insetLeft = 8,
+  insetRight = 8,
+}: {
+  paneId: string;
+  insetLeft?: number;
+  insetRight?: number;
+}) {
   const blocks = useBlockStore(selectBlocks(paneId));
   const scrollRef = useRef<HTMLDivElement>(null);
   const snap = useFollowBottom(scrollRef, [blocks], paneId);
   useEffect(() => registerFollowEngager(paneId, snap), [paneId, snap]);
   return (
-    <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--canvas)' }}>
+    <div
+      ref={scrollRef}
+      style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--canvas)' }}
+    >
       <div style={{ paddingBottom: 8 }}>
         <TerminalBlockList tabId={paneId} insetLeft={insetLeft} insetRight={insetRight} />
         <PaneEmptyHint paneId={paneId} />
@@ -683,10 +947,42 @@ function PaneEmptyHint({ paneId }: { paneId: string }) {
   // AI 面板打开时内联不显示，空态提示也不把面板里的对话算作 pane 内容
   if (blocks.some(hasVisibleContent) || (!chatPanelOpen && aiMessages.length > 0)) return null;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: '8vh', color: 'var(--text-muted)', fontSize: 12, userSelect: 'none', gap: 6 }}>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, color: 'var(--text-muted)', opacity: 0.25, fontWeight: 600, marginBottom: 6 }}>$</div>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingTop: '8vh',
+        color: 'var(--text-muted)',
+        fontSize: 12,
+        userSelect: 'none',
+        gap: 6,
+      }}
+    >
+      <div
+        style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 18,
+          color: 'var(--text-muted)',
+          opacity: 0.25,
+          fontWeight: 600,
+          marginBottom: 6,
+        }}
+      >
+        $
+      </div>
       <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>在下方输入命令</div>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', opacity: 0.6, fontFamily: 'var(--font-mono)' }}>Enter 执行 · Shift+Enter 换行</div>
+      <div
+        style={{
+          fontSize: 11,
+          color: 'var(--text-muted)',
+          opacity: 0.6,
+          fontFamily: 'var(--font-mono)',
+        }}
+      >
+        Enter 执行 · Shift+Enter 换行
+      </div>
     </div>
   );
 }

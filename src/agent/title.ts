@@ -13,12 +13,12 @@
  * workspace.autoTitle（复用 rename 落库路径，named/titleAuto 置位）。
  */
 import { generateText } from 'ai';
-import { createChatModel } from './provider';
-import { useAgentSettings } from './agentSettings';
-import { activeModelProfile, isApiKeyConfigured } from '../lib/ai';
-import { useBlockStore } from '../stores/blocks';
-import { useChatStore } from '../stores/chat';
-import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
+import { useAgentSettings } from '@/agent/agentSettings';
+import { createChatModel } from '@/agent/provider';
+import { activeModelProfile, isApiKeyConfigured } from '@/lib/ai';
+import { useBlockStore } from '@/stores/blocks';
+import { useChatStore } from '@/stores/chat';
+import { isSessionTab, useWorkspaceStore } from '@/stores/workspace';
 
 export const TITLE_COOLDOWN_MS = 60_000;
 export const TITLE_IDLE_MS = 5_000;
@@ -42,7 +42,8 @@ function gatherContext(tabId: string, force = false): { prompt: string } | null 
   const msgs = useChatStore.getState().byTab[tabId] ?? [];
   const firstQ = msgs.find((m) => m.role === 'user' && m.content.trim());
   const firstA = msgs.find(
-    (m) => m.role === 'assistant' && !m.pending && m.content.trim().length >= TITLE_MIN_ANSWER_CHARS,
+    (m) =>
+      m.role === 'assistant' && !m.pending && m.content.trim().length >= TITLE_MIN_ANSWER_CHARS,
   );
   if (!force && doneCmds.length < TITLE_MIN_DONE_BLOCKS && !firstA) return null;
   if (force && !doneCmds.length && !firstQ) return null;
@@ -79,7 +80,11 @@ export function heuristicTitle(tabId: string): string {
 }
 
 /** 条件判定 + 生成。force=true 时无视「已定名」并放宽充分性（手动重命名/规模触发）。 */
-export async function maybeAutoTitle(tabId: string, now = Date.now(), force = false): Promise<boolean> {
+export async function maybeAutoTitle(
+  tabId: string,
+  now = Date.now(),
+  force = false,
+): Promise<boolean> {
   const settings = useAgentSettings.getState().resolve();
   if (!settings.autoTitle) return false;
   const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === tabId);
@@ -89,7 +94,8 @@ export async function maybeAutoTitle(tabId: string, now = Date.now(), force = fa
   const ctx = gatherContext(tabId, force);
   if (!ctx) return false;
   lastAttempt.set(tabId, now);
-  const markTitled = () => titledCount.set(tabId, (useChatStore.getState().byTab[tabId] ?? []).length);
+  const markTitled = () =>
+    titledCount.set(tabId, (useChatStore.getState().byTab[tabId] ?? []).length);
   const applyTitle = (title: string) => {
     if (force) useWorkspaceStore.getState().renameTab(tabId, title);
     else useWorkspaceStore.getState().autoTitle(tabId, title);

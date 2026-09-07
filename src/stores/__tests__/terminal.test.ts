@@ -2,17 +2,25 @@
  * terminal store 的 getTerminalScreen 测试：用假 xterm buffer 验证
  * 可见视口读取（viewportY 偏移、尾部空行裁剪、光标位置、alt buffer 全屏）。
  */
-import { describe, it, expect } from 'vitest';
+
 import type { Terminal } from '@xterm/xterm';
-import { getTerminalScreen, registerTerminal, useTerminalStore } from '../terminal';
+import { describe, expect, it } from 'vitest';
+import { getTerminalScreen, registerTerminal, useTerminalStore } from '@/stores/terminal';
 
 function makeLine(text: string) {
   return { translateToString: () => text };
 }
 
-function fakeTerm(lines: string[], opts: {
-  viewportY?: number; cursorY?: number; cursorX?: number; cols?: number; rows?: number;
-} = {}) {
+function fakeTerm(
+  lines: string[],
+  opts: {
+    viewportY?: number;
+    cursorY?: number;
+    cursorX?: number;
+    cols?: number;
+    rows?: number;
+  } = {},
+) {
   const { viewportY = 0, cursorY = 0, cursorX = 0, cols = 80, rows = 24 } = opts;
   return {
     cols,
@@ -32,7 +40,10 @@ function fakeTerm(lines: string[], opts: {
 describe('getTerminalScreen', () => {
   it('读取可见视口并裁剪尾部空行，带行号', () => {
     useTerminalStore.setState({ scenes: { p1: 'classic' } });
-    registerTerminal('p1', fakeTerm(['hello', 'world', '   '], { cursorY: 1, cursorX: 4, rows: 10 }));
+    registerTerminal(
+      'p1',
+      fakeTerm(['hello', 'world', '   '], { cursorY: 1, cursorX: 4, rows: 10 }),
+    );
 
     const s = getTerminalScreen('p1')!;
     expect(s.scene).toBe('classic');
@@ -45,9 +56,13 @@ describe('getTerminalScreen', () => {
 
   it('viewportY 偏移：只读当前可见的窗口行', () => {
     useTerminalStore.setState({ scenes: { p1: 'classic' } });
-    registerTerminal('p1', fakeTerm(['l0', 'l1', 'l2', 'l3', 'l4', 'l5'], {
-      viewportY: 2, rows: 3,
-    }));
+    registerTerminal(
+      'p1',
+      fakeTerm(['l0', 'l1', 'l2', 'l3', 'l4', 'l5'], {
+        viewportY: 2,
+        rows: 3,
+      }),
+    );
 
     const s = getTerminalScreen('p1')!;
     expect(s.content).toBe(' 1│l2\n 2│l3\n 3│l4');

@@ -4,29 +4,30 @@
  * 所有会话/块的持久化操作都通过此模块，封装后端 invoke + 前端 store 同步。
  * 后续添加会话管理 UI 时，只需接入同一套 API。
  */
-import { useWorkspaceStore, type Tab } from '../stores/workspace';
-import { useBlockStore } from '../stores/blocks';
-import { sanitizeOutputHtml } from './sanitizeHtml';
-import { useChatStore } from '../stores/chat';
-import { deserializeParts } from '../agent/messageParts';
-import { deserializeAttachments } from '../agent/attachments';
-import { leaf, type WindowLayout } from './windowLayout';
+
+import { deserializeAttachments } from '@/agent/attachments';
+import { deserializeParts } from '@/agent/messageParts';
 import {
-  createSession,
   archiveSession,
+  createSession,
+  deleteSession,
+  getSession,
+  getSessionBlocks,
+  listChatMessages,
+  recordBlock,
   restoreSession,
-  updateSessionTitle,
+  setBlockCollapsed,
   updateSessionCwd,
   updateSessionPayload,
-  getSession,
-  deleteSession,
-  recordBlock,
-  getSessionBlocks,
-  setBlockCollapsed,
-  listChatMessages,
-} from '../api/session';
-import type { TermBlock } from '../terminal/pipeline/termBlock';
-import type { BackendBlockEntry, BackendSessionEntry } from '../search/types';
+  updateSessionTitle,
+} from '@/api/session';
+import { sanitizeOutputHtml } from '@/lib/sanitizeHtml';
+import { leaf, type WindowLayout } from '@/lib/windowLayout';
+import type { BackendBlockEntry, BackendSessionEntry } from '@/search/types';
+import { useBlockStore } from '@/stores/blocks';
+import { useChatStore } from '@/stores/chat';
+import { type Tab, useWorkspaceStore } from '@/stores/workspace';
+import type { TermBlock } from '@/terminal/pipeline/termBlock';
 
 /** 恢复会话时用于重建 tab 的元数据（kind/payload 已由后端持久化）。 */
 export interface RestoreMeta {
@@ -40,15 +41,28 @@ function parseLayout(payload: string, sessionId: string): WindowLayout {
     const p = JSON.parse(payload) as {
       layout?: unknown;
       shellType?: string;
-      ssh?: { name?: string; host?: string; user?: string | null; port?: number | null; connectionId?: string | null };
+      ssh?: {
+        name?: string;
+        host?: string;
+        user?: string | null;
+        port?: number | null;
+        connectionId?: string | null;
+      };
     };
     if (p.layout && typeof p.layout === 'object' && p.layout !== null) {
       return p.layout as WindowLayout;
     }
     if (p.ssh) {
       return leaf({
-        id: `${sessionId}#0`, kind: 'ssh',
-        ssh: { name: p.ssh.name ?? '', host: p.ssh.host ?? '', user: p.ssh.user ?? undefined, port: p.ssh.port ?? undefined, connectionId: p.ssh.connectionId ?? undefined },
+        id: `${sessionId}#0`,
+        kind: 'ssh',
+        ssh: {
+          name: p.ssh.name ?? '',
+          host: p.ssh.host ?? '',
+          user: p.ssh.user ?? undefined,
+          port: p.ssh.port ?? undefined,
+          connectionId: p.ssh.connectionId ?? undefined,
+        },
       });
     }
     if (p.shellType) {
@@ -274,14 +288,3 @@ export async function record(
     console.warn('sessionManager.record failed:', e);
   }
 }
-
-// ═══════════════════════════════════════════════════════════════
-// 删除（预留）
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * ⚠ 暂不实现
- * 删除会话及所有关联 block（级联删除）。
- * 若该会话仍有活跃 tab，需先关闭 tab。
- */
-export { };

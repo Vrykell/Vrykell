@@ -7,11 +7,11 @@
  * 都走 Rust 的 web_search / web_fetch / web_crawl 命令（reqwest 直连 + HTML→Markdown）。
  */
 
-import { tool } from 'ai';
-import { DESC_WEB_SEARCH_DDG, DESC_WEB_FETCH, DESC_WEB_CRAWL } from '../toolTexts';
-import { z } from 'zod';
 import { invoke } from '@tauri-apps/api/core';
-import { gate, type ToolContext } from '../permissions';
+import { tool } from 'ai';
+import { z } from 'zod';
+import { gate, type ToolContext } from '@/agent/permissions';
+import { DESC_WEB_CRAWL, DESC_WEB_FETCH, DESC_WEB_SEARCH_DDG } from '@/agent/toolTexts';
 
 interface WebResultItem {
   title?: string;
@@ -68,7 +68,8 @@ function formatFetch(r: WebFetchResponse): string {
   if (r.truncated) body += '\n\n[正文已截断]';
   const links = (r.links ?? []).slice(0, FETCH_LINKS_CAP);
   const linkBlock = links.length
-    ? '\n\n页内链接：\n' + links.map((l, i) => `${i + 1}. ${l.text ?? ''} ${l.url ?? ''}`).join('\n')
+    ? '\n\n页内链接：\n' +
+      links.map((l, i) => `${i + 1}. ${l.text ?? ''} ${l.url ?? ''}`).join('\n')
     : '';
   return head + body + linkBlock;
 }
@@ -76,7 +77,7 @@ function formatFetch(r: WebFetchResponse): string {
 /** web_search 兜底：DuckDuckGo HTML 抓取（无需 API Key）。 */
 export function buildWebSearchTool(ctx: ToolContext) {
   return tool({
-      description: DESC_WEB_SEARCH_DDG,
+    description: DESC_WEB_SEARCH_DDG,
     inputSchema: z.object({
       query: z.string().describe('搜索词'),
       maxResults: z.number().int().min(1).max(8).optional().describe('结果条数，默认 5'),
@@ -100,7 +101,7 @@ export function buildWebSearchTool(ctx: ToolContext) {
 /** web_fetch：抓取任意 URL → 结构化 Markdown 文本（一等工具）。 */
 export function buildWebFetchTool(ctx: ToolContext) {
   return tool({
-      description: DESC_WEB_FETCH,
+    description: DESC_WEB_FETCH,
     inputSchema: z.object({
       url: z.string().describe('要抓取的完整 URL（含 http/https）'),
     }),
@@ -120,7 +121,7 @@ export function buildWebFetchTool(ctx: ToolContext) {
 /** web_crawl：爬取多页（BFS，同域/限深度/限页数），逐页结构化。 */
 export function buildWebCrawlTool(ctx: ToolContext) {
   return tool({
-      description: DESC_WEB_CRAWL,
+    description: DESC_WEB_CRAWL,
     inputSchema: z.object({
       start_url: z.string().describe('起始 URL（含 http/https）'),
       max_pages: z.number().int().min(1).max(30).optional().describe('最多抓取页数，默认 10'),

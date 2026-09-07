@@ -6,17 +6,17 @@
  * 在每个用例内显式复位，不用 beforeEach（本仓库 vitest 4 下 beforeEach
  * 与异步断言组合有坑，见 files.test.ts 头注释）。
  */
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  usePermissions,
+  clearSessionGrants,
+  dangerousCommandReason,
+  denyAllPending,
   gate,
   levelOf,
-  dangerousCommandReason,
   resolveApproval,
-  denyAllPending,
-  clearSessionGrants,
   type ToolContext,
-} from './permissions';
+  usePermissions,
+} from '@/agent/permissions';
 
 const DEFAULTS = {
   run_command: 'ask',
@@ -178,7 +178,11 @@ describe('gate 三层判定', () => {
     denyAllPending();
     const g = await p;
     expect(g.proceed).toBe(false);
-    expect(ctx.states[ctx.states.length - 1]).toEqual({ id: 'tc1', state: 'denied', extra: undefined });
+    expect(ctx.states[ctx.states.length - 1]).toEqual({
+      id: 'tc1',
+      state: 'denied',
+      extra: undefined,
+    });
   });
 
   it('未知工具默认 ask（levelOf 兜底）', () => {

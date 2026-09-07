@@ -1,24 +1,47 @@
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { Star, Folder, ChevronRight, Download, LocateFixed, ArrowUp, HardDrive } from 'lucide-react';
 import { openPath } from '@tauri-apps/plugin-opener';
-import { fsList, fsDisks, fsHome, fsRename, fsDelete, fileOpenWith, type FsEntry, type DiskEntry } from './fs';
-import { ptyWrite } from '../lib/pty';
-import { openFile } from './fileOpen';
-import { fileIcon } from './fileIcon';
-import { normPath, pathSegments, segmentsToPath, parentOf, compactPathSegments } from './pathUtils';
-import { shellQuote } from '../ssh/remotePath';
-import { useWorkspaceDirsStore } from './workspaceDirs';
-import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
-import { useTerminalStore } from '../stores/terminal';
-import { leaves as layoutLeaves, firstLeaf } from '../lib/windowLayout';
-import { useToastStore } from '../components/Toast';
-import { IconBtn, fmtSize } from '../components/UiBtn';
-import { flattenVisible, type VisibleRow } from './fileTree';
-import ContextMenu, { type ContextMenuItem } from '../components/ContextMenu';
-import { ensureSshLoaded, useSshStore } from '../ssh/store';
-import RemoteFiles from '../ssh/RemoteFiles';
-import ConfirmDialog from '../components/ConfirmDialog';
-import DownloadManager from '../downloads/DownloadManager';
+import {
+  ArrowUp,
+  ChevronRight,
+  Download,
+  Folder,
+  HardDrive,
+  LocateFixed,
+  Star,
+} from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import ConfirmDialog from '@/components/ConfirmDialog';
+import ContextMenu, { type ContextMenuItem } from '@/components/ContextMenu';
+import { useToastStore } from '@/components/Toast';
+import { fmtSize, IconBtn } from '@/components/UiBtn';
+import DownloadManager from '@/downloads/DownloadManager';
+import { fileIcon } from '@/files/fileIcon';
+import { openFile } from '@/files/fileOpen';
+import { flattenVisible, type VisibleRow } from '@/files/fileTree';
+import {
+  type DiskEntry,
+  type FsEntry,
+  fileOpenWith,
+  fsDelete,
+  fsDisks,
+  fsHome,
+  fsList,
+  fsRename,
+} from '@/files/fs';
+import {
+  compactPathSegments,
+  normPath,
+  parentOf,
+  pathSegments,
+  segmentsToPath,
+} from '@/files/pathUtils';
+import { useWorkspaceDirsStore } from '@/files/workspaceDirs';
+import { ptyWrite } from '@/lib/pty';
+import { firstLeaf, leaves as layoutLeaves } from '@/lib/windowLayout';
+import RemoteFiles from '@/ssh/RemoteFiles';
+import { shellQuote } from '@/ssh/remotePath';
+import { ensureSshLoaded, useSshStore } from '@/ssh/store';
+import { useTerminalStore } from '@/stores/terminal';
+import { isSessionTab, useWorkspaceStore } from '@/stores/workspace';
 
 /** 待二次确认的操作：重命名（携带新名）或删除。 */
 type ConfirmState =
@@ -36,13 +59,17 @@ export default function PanelFiles() {
   const sessions = useTerminalStore((s) => s.sessions);
   const sshConnections = useSshStore((s) => s.connections);
   const sshLoaded = useSshStore((s) => s.loaded);
-  useEffect(() => { ensureSshLoaded(); }, []);
+  useEffect(() => {
+    ensureSshLoaded();
+  }, []);
 
   const activeTab = tabs.find((t) => t.id === activeId);
-  const focusedSpec = activeTab && isSessionTab(activeTab)
-    ? layoutLeaves(activeTab.layout).find((t) => t.id === focusedPaneId && sessions[focusedPaneId])
-      ?? firstLeaf(activeTab.layout)
-    : null;
+  const focusedSpec =
+    activeTab && isSessionTab(activeTab)
+      ? (layoutLeaves(activeTab.layout).find(
+          (t) => t.id === focusedPaneId && sessions[focusedPaneId],
+        ) ?? firstLeaf(activeTab.layout))
+      : null;
 
   if (sshLoaded && focusedSpec?.kind === 'ssh' && focusedSpec.ssh?.connectionId) {
     const conn = sshConnections.find((c) => c.id === focusedSpec.ssh!.connectionId);
@@ -94,7 +121,9 @@ function LocalFiles() {
     return undefined;
   });
   useEffect(() => {
-    fsHome().then((h) => setHomePath(normPath(h))).catch(() => setHomePath(null));
+    fsHome()
+      .then((h) => setHomePath(normPath(h)))
+      .catch(() => setHomePath(null));
   }, []);
 
   useEffect(() => {
@@ -106,29 +135,38 @@ function LocalFiles() {
   const load = useCallback((p: string | null) => {
     if (p === null) {
       setEntries([]);
-      fsDisks().then(setDisks).catch(() => setDisks([]));
+      fsDisks()
+        .then(setDisks)
+        .catch(() => setDisks([]));
       return;
     }
-    fsList(p).then(setEntries).catch(() => setEntries([]));
+    fsList(p)
+      .then(setEntries)
+      .catch(() => setEntries([]));
   }, []);
 
-  useEffect(() => { load(path); }, [path, load]);
+  useEffect(() => {
+    load(path);
+  }, [path, load]);
 
   // ── 树形展开 ──
 
-  const toggleExpand = useCallback((entry: FsEntry) => {
-    setExpandedSet((prev) => {
-      const next = new Set(prev);
-      if (next.has(entry.path)) next.delete(entry.path);
-      else next.add(entry.path);
-      return next;
-    });
-    // 已缓存则收起再展开不重复请求
-    if (childCache[entry.path]) return;
-    fsList(entry.path)
-      .then((children) => setChildCache((p) => ({ ...p, [entry.path]: children })))
-      .catch(() => setChildCache((p) => ({ ...p, [entry.path]: [] })));
-  }, [childCache]);
+  const toggleExpand = useCallback(
+    (entry: FsEntry) => {
+      setExpandedSet((prev) => {
+        const next = new Set(prev);
+        if (next.has(entry.path)) next.delete(entry.path);
+        else next.add(entry.path);
+        return next;
+      });
+      // 已缓存则收起再展开不重复请求
+      if (childCache[entry.path]) return;
+      fsList(entry.path)
+        .then((children) => setChildCache((p) => ({ ...p, [entry.path]: children })))
+        .catch(() => setChildCache((p) => ({ ...p, [entry.path]: [] })));
+    },
+    [childCache],
+  );
 
   // 顶栏面包屑压缩：不换行，侧栏窄时省略高层级目录（必须在视图切换的提前返回之前）
   const crumbs = pathSegments(path ?? '');
@@ -165,7 +203,9 @@ function LocalFiles() {
     // 先解析编辑器命令（Rust file_open），暂不写任何终端
     let command = '';
     try {
-      const res = await openFile(entry.path, (cmd) => { command = cmd; });
+      const res = await openFile(entry.path, (cmd) => {
+        command = cmd;
+      });
       if (res.via === 'system') {
         // 系统默认应用打开（openFile 内部已 openPath）
         if (res.degraded) addToast('未找到可用的终端编辑器，已用系统默认应用打开', 'info');
@@ -255,13 +295,19 @@ function LocalFiles() {
 
   const doRename = (entry: FsEntry, newName: string) => {
     fsRename(entry.path, newName)
-      .then(() => { useToastStore.getState().addToast('已重命名', 'success'); load(path); })
+      .then(() => {
+        useToastStore.getState().addToast('已重命名', 'success');
+        load(path);
+      })
       .catch((e) => useToastStore.getState().addToast(String((e as Error)?.message ?? e), 'error'));
   };
 
   const doDelete = (entry: FsEntry) => {
     fsDelete(entry.path)
-      .then(() => { useToastStore.getState().addToast('已移入回收站', 'success'); load(path); })
+      .then(() => {
+        useToastStore.getState().addToast('已移入回收站', 'success');
+        load(path);
+      })
       .catch((e) => useToastStore.getState().addToast(String((e as Error)?.message ?? e), 'error'));
   };
 
@@ -284,7 +330,10 @@ function LocalFiles() {
   const syncToTerminal = async () => {
     if (!path) return;
     const sid = sessions[focused];
-    if (!sid) { useToastStore.getState().addToast('终端会话未就绪', 'info'); return; }
+    if (!sid) {
+      useToastStore.getState().addToast('终端会话未就绪', 'info');
+      return;
+    }
     try {
       await ptyWrite(sid, `cd ${shellQuote(path)}\r`);
     } catch (e) {
@@ -293,32 +342,59 @@ function LocalFiles() {
   };
 
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', height: '100%',
-      userSelect: 'none', background: 'var(--surface)',
-    }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        userSelect: 'none',
+        background: 'var(--surface)',
+      }}
+    >
       {/* 顶栏：面包屑（不换行，窄时省略高层级）+ 操作按钮（右对齐） */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 2,
-        padding: '6px 8px',
-        fontSize: 11, minHeight: 30, flexShrink: 0,
-        whiteSpace: 'nowrap',
-      }}>
-        <div ref={crumbRef} style={{
-          display: 'flex', alignItems: 'center', gap: 2,
-          flex: 1, minWidth: 0, overflow: 'hidden',
-        }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 2,
+          padding: '6px 8px',
+          fontSize: 11,
+          minHeight: 30,
+          flexShrink: 0,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        <div
+          ref={crumbRef}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            flex: 1,
+            minWidth: 0,
+            overflow: 'hidden',
+          }}
+        >
           <Crumb label="此电脑" onClick={() => setPath(null)} active={path === null} />
           {hiddenCount > 0 && (
             <>
               <span style={{ color: 'var(--text-muted)' }}>›</span>
-              <span title="已省略上级目录" style={{ color: 'var(--text-muted)', letterSpacing: 1 }}>…</span>
+              <span title="已省略上级目录" style={{ color: 'var(--text-muted)', letterSpacing: 1 }}>
+                …
+              </span>
             </>
           )}
           {visibleCrumbs.map((c, i) => (
-            <span key={c.full} style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+            <span
+              key={c.full}
+              style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}
+            >
               <span style={{ color: 'var(--text-muted)' }}>›</span>
-              <Crumb label={c.seg} onClick={() => setPath(c.full)} active={i === visibleCrumbs.length - 1} />
+              <Crumb
+                label={c.seg}
+                onClick={() => setPath(c.full)}
+                active={i === visibleCrumbs.length - 1}
+              />
             </span>
           ))}
         </div>
@@ -339,11 +415,7 @@ function LocalFiles() {
           </IconBtn>
           {/* 已在根目录/盘符根时无上级，隐藏返回按钮 */}
           {path !== null && parentOf(path) !== null && (
-            <IconBtn
-              title="上级目录"
-              data-testid="local-up-btn"
-              onClick={goUp}
-            >
+            <IconBtn title="上级目录" data-testid="local-up-btn" onClick={goUp}>
               <ArrowUp size={14} />
             </IconBtn>
           )}
@@ -354,7 +426,9 @@ function LocalFiles() {
       <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
         {path === null ? (
           disks.length === 0 ? (
-            <div style={{ padding: 16, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+            <div
+              style={{ padding: 16, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}
+            >
               正在扫描磁盘…
             </div>
           ) : (
@@ -383,7 +457,14 @@ function LocalFiles() {
               />
             ))}
             {rows.length === 0 && (
-              <div style={{ padding: 16, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+              <div
+                style={{
+                  padding: 16,
+                  fontSize: 12,
+                  color: 'var(--text-muted)',
+                  textAlign: 'center',
+                }}
+              >
                 空目录
               </div>
             )}
@@ -431,36 +512,59 @@ function LocalFiles() {
 function DiskCard({ disk, onOpen }: { disk: DiskEntry; onOpen: () => void }) {
   const total = disk.total_bytes;
   const free = disk.free_bytes;
-  const pct = total > 0 ? Math.min(100, Math.round(((total - Math.max(0, total - free)) / total) * 100)) : 0;
+  const pct =
+    total > 0 ? Math.min(100, Math.round(((total - Math.max(0, total - free)) / total) * 100)) : 0;
   return (
     <div
       onClick={onOpen}
       title={`${disk.path} · 共 ${fmtSize(total)} · 已用 ${pct}%`}
       data-testid={`disk-card-${disk.name}`}
       style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        padding: '6px 10px', borderRadius: 8,
-        cursor: 'pointer', userSelect: 'none',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '6px 10px',
+        borderRadius: 8,
+        cursor: 'pointer',
+        userSelect: 'none',
       }}
     >
-      <span style={{
-        width: 34, height: 34, borderRadius: 8, flexShrink: 0,
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        background: 'var(--hover)', color: 'var(--accent)',
-      }}>
+      <span
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 8,
+          flexShrink: 0,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--hover)',
+          color: 'var(--accent)',
+        }}
+      >
         <HardDrive size={17} />
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontSize: 12, fontWeight: 600, color: 'var(--text-primary)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
+        <div
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            color: 'var(--text-primary)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
           {disk.name}
         </div>
-        <div style={{
-          fontSize: 10.5, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)',
-          marginTop: 1,
-        }}>
+        <div
+          style={{
+            fontSize: 10.5,
+            color: 'var(--text-muted)',
+            fontFamily: 'var(--font-mono)',
+            marginTop: 1,
+          }}
+        >
           {total > 0 ? `${fmtSize(free)} 可用` : '—'}
         </div>
       </div>
@@ -519,27 +623,50 @@ function FileRow({
       onClick={renaming ? undefined : () => onRowClick(entry)}
       onDoubleClick={renaming ? undefined : () => onRowDoubleClick(entry)}
       onContextMenu={renaming ? undefined : (e) => onContextMenu(e, entry)}
-      title={renaming
-        ? '输入新名称，回车确认，Esc 取消'
-        : entry.is_dir
-          ? (inWorkspace ? '工作区文件夹 · 单击展开，双击进入' : '单击展开，双击进入')
-          : '双击在终端编辑器中打开'}
+      title={
+        renaming
+          ? '输入新名称，回车确认，Esc 取消'
+          : entry.is_dir
+            ? inWorkspace
+              ? '工作区文件夹 · 单击展开，双击进入'
+              : '单击展开，双击进入'
+            : '双击在终端编辑器中打开'
+      }
       style={{
-        display: 'flex', alignItems: 'center', gap: 4,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4,
         padding: `3px 10px 3px ${4 + depth * 14}px`,
-        fontSize: 12, cursor: renaming ? 'text' : 'pointer',
+        fontSize: 12,
+        cursor: renaming ? 'text' : 'pointer',
         color: entry.is_dir
-          ? (inWorkspace ? 'var(--accent-warm)' : 'var(--text-primary)')
+          ? inWorkspace
+            ? 'var(--accent-warm)'
+            : 'var(--text-primary)'
           : 'var(--text-secondary)',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = 'var(--hover)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'transparent';
+      }}
     >
       {/* 展开 chevron —— 仅目录有；点击立即切换（无单双击歧义） */}
       <span
-        onClick={entry.is_dir && !renaming ? (e) => { e.stopPropagation(); onChevronClick(entry); } : undefined}
+        onClick={
+          entry.is_dir && !renaming
+            ? (e) => {
+                e.stopPropagation();
+                onChevronClick(entry);
+              }
+            : undefined
+        }
         style={{
-          width: 14, flexShrink: 0, display: 'inline-flex', justifyContent: 'center',
+          width: 14,
+          flexShrink: 0,
+          display: 'inline-flex',
+          justifyContent: 'center',
           color: 'var(--text-muted)',
           transition: 'transform 0.12s ease',
           transform: expanded ? 'rotate(90deg)' : 'none',
@@ -567,18 +694,27 @@ function FileRow({
           onContextMenu={(e) => e.stopPropagation()}
           data-testid="rename-input"
           style={{
-            flex: 1, minWidth: 0,
-            background: 'var(--canvas)', border: '1px solid var(--accent)',
-            borderRadius: 3, padding: '0 4px', fontSize: 12,
-            color: 'var(--text-primary)', fontFamily: 'var(--font-mono)',
+            flex: 1,
+            minWidth: 0,
+            background: 'var(--canvas)',
+            border: '1px solid var(--accent)',
+            borderRadius: 3,
+            padding: '0 4px',
+            fontSize: 12,
+            color: 'var(--text-primary)',
+            fontFamily: 'var(--font-mono)',
             outline: 'none',
           }}
         />
       ) : (
-        <span style={{
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          fontFamily: entry.is_dir ? 'var(--font-ui)' : 'var(--font-mono)',
-        }}>
+        <span
+          style={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            fontFamily: entry.is_dir ? 'var(--font-ui)' : 'var(--font-mono)',
+          }}
+        >
           {entry.name}
         </span>
       )}
@@ -603,13 +739,29 @@ function waitForSession(tabId: string, timeoutMs = 8000): Promise<string | null>
 
 // ── 面包屑段 ──
 
-function Crumb({ label, onClick, active }: { label: string; onClick: () => void; active: boolean }) {
+function Crumb({
+  label,
+  onClick,
+  active,
+}: {
+  label: string;
+  onClick: () => void;
+  active: boolean;
+}) {
   return (
-    <span onClick={onClick} style={{
-      cursor: 'pointer', padding: '1px 4px', borderRadius: 3,
-      color: active ? 'var(--text-primary)' : 'var(--text-muted)',
-      background: active ? 'var(--hover)' : 'transparent',
-      fontFamily: 'var(--font-mono)', fontSize: 11,
-    }}>{label}</span>
+    <span
+      onClick={onClick}
+      style={{
+        cursor: 'pointer',
+        padding: '1px 4px',
+        borderRadius: 3,
+        color: active ? 'var(--text-primary)' : 'var(--text-muted)',
+        background: active ? 'var(--hover)' : 'transparent',
+        fontFamily: 'var(--font-mono)',
+        fontSize: 11,
+      }}
+    >
+      {label}
+    </span>
   );
 }

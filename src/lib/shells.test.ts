@@ -1,10 +1,12 @@
 /**
  * shells — shell 类型标签与可用 shell 列表。
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
-import { shellTypeLabel, fallbackShells, getAvailableShells, listShells } from './shells';
+
+import { fallbackShells, getAvailableShells, listShells, shellTypeLabel } from '@/lib/shells';
 
 describe('shells', () => {
   it('shellTypeLabel 映射与兜底', () => {
