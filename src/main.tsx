@@ -7,7 +7,11 @@ import { installGlobalErrorHandlers } from '@/lib/errorHandler';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 import { applyCachedWallpaper, useTerminalThemeStore } from '@/theme/terminalTheme';
 import { applyTheme } from '@/theme/tokens';
-import '@/theme.css';
+import '@/styles/reset.css';
+import '@/styles/tokens.css';
+import '@/styles/base.css';
+import '@/styles/animations.css';
+import '@/styles/xterm.css';
 
 // 首屏同步写入 CSS 变量，避免 FOUC（Flash of Unstyled Content）
 applyTheme((document.documentElement.dataset.theme as 'dark' | 'light') || 'dark');
