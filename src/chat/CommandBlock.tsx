@@ -1,11 +1,11 @@
 import { Check, Copy, Play } from 'lucide-react';
 import { isValidElement, type ReactElement, type ReactNode, useState } from 'react';
 import { useTerminalStore } from '@/stores/terminal';
+import s from './CommandBlock.module.css';
 
 const SHELL_LANGS = new Set(['bash', 'sh', 'zsh', 'shell']);
 
 function extractCode(children: ReactNode): { lang: string; text: string } | null {
-  // ReactMarkdown 的 pre 唯一子节点是 <code className="language-x">text</code>
   if (!isValidElement(children)) return null;
   const code = children as ReactElement<{ className?: string; children?: ReactNode }>;
   const lang = (code.props.className ?? '').replace('language-', '');
@@ -13,7 +13,6 @@ function extractCode(children: ReactNode): { lang: string; text: string } | null
   return { lang, text };
 }
 
-/** 复制文本到剪贴板（navigator.clipboard 优先，WKWebView 受限时回退 execCommand）。 */
 async function copyText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
@@ -50,28 +49,9 @@ export default function CommandBlock({ children }: { children?: ReactNode }) {
   };
 
   return (
-    <div
-      style={{
-        position: 'relative',
-        background: 'var(--block)',
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius-inner)',
-        margin: '0.45em 0',
-        overflow: 'hidden',
-      }}
-    >
+    <div className={s.block}>
       {code && (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 6,
-            padding: '3px 10px',
-            borderBottom: '1px solid var(--border)',
-            background: 'var(--command-block-bg)',
-          }}
-        >
+        <div className={s.header}>
           <span
             style={{
               fontSize: 11,
@@ -100,7 +80,6 @@ export default function CommandBlock({ children }: { children?: ReactNode }) {
                 <Play size={10} /> 在终端运行
               </button>
             )}
-            {/* 复制按钮固定在右上角（最右侧） */}
             <button
               data-testid="code-copy-btn"
               title={copied ? '已复制' : '复制代码'}
