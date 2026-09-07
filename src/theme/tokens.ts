@@ -51,31 +51,31 @@ export interface ThemePalette {
   successDim: string;
   error: string;
   errorDim: string;
-  errorLight: string;   // 失败命令文字等浅红
+  errorLight: string; // 失败命令文字等浅红
   warning: string;
 
   // 命令块文字
-  blockCmdText: string;       // 正常命令文字
-  blockCmdFailed: string;     // 失败命令文字
-  blockDivider: string;       // block 间 1px 分隔线
+  blockCmdText: string; // 正常命令文字
+  blockCmdFailed: string; // 失败命令文字
+  blockDivider: string; // block 间 1px 分隔线
 
   // 命令语法高亮（）
-  cmdFlag: string;            // --flag
-  cmdPath: string;            // /path/to/file
-  cmdPipe: string;            // | pipe
-  cmdRedirect: string;        // > >> redirect
-  cmdString: string;          // "quoted string"
+  cmdFlag: string; // --flag
+  cmdPath: string; // /path/to/file
+  cmdPipe: string; // | pipe
+  cmdRedirect: string; // > >> redirect
+  cmdString: string; // "quoted string"
 
   // 搜索高亮背景
   searchHighlightBg: string;
 
   // 终端/shell 状态点
-  shellConnected: string;     // 绿色圆点
-  shellDisconnected: string;  // 灰色圆点
+  shellConnected: string; // 绿色圆点
+  shellDisconnected: string; // 灰色圆点
 
   // 叠加层 & 阴影
-  overlay: string;        // 模态遮罩
-  overlayLight: string;   // 较浅遮罩（HistoryPanel）
+  overlay: string; // 模态遮罩
+  overlayLight: string; // 较浅遮罩（HistoryPanel）
   shadowSm: string;
   shadowMd: string;
   shadowLg: string;
@@ -85,13 +85,13 @@ export interface ThemePalette {
   accentBgStrong: string; // 激活态更亮的强调背景
   successBg: string;
   errorBg: string;
-  errorBadgeBg: string;       // 失败退出码 badge
+  errorBadgeBg: string; // 失败退出码 badge
 
   // 特殊
   tuiBanner: string;
   codeBg: string;
   thBg: string;
-  commandBlockBg: string;     // CommandBlock 微妙的背景
+  commandBlockBg: string; // CommandBlock 微妙的背景
   scrollbarThumb: string;
   scrollbarThumbHover: string;
   apiKeyBg: string;
@@ -166,9 +166,13 @@ const dark: ThemePalette = {
 
   overlay: 'rgba(0,0,0,0.55)',
   overlayLight: 'rgba(0,0,0,0.32)',
-  shadowSm: '0 1px 3px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04)',
-  shadowMd: '0 4px 14px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06)',
-  shadowLg: '0 10px 30px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.06)',
+  // 阴影分层更细腻：sm 微悬浮、md 面板/浮层、lg 模态/大弹窗，内描边高光增强体积感
+  shadowSm:
+    '0 2px 6px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.04), inset 0 1px 0 rgba(255,255,255,0.06)',
+  shadowMd:
+    '0 8px 24px rgba(0,0,0,0.50), 0 0 0 1px rgba(255,255,255,0.05), inset 0 1px 0 rgba(255,255,255,0.08)',
+  shadowLg:
+    '0 16px 48px rgba(0,0,0,0.60), 0 0 0 1px rgba(255,255,255,0.04), inset 0 1px 0 rgba(255,255,255,0.08)',
 
   accentBg: 'rgba(255,255,255,0.06)',
   accentBgStrong: '#1E1E1E',
@@ -407,7 +411,11 @@ export function getCurrentTheme(): ThemeMode {
 /** 将 #rgb / #rrggbb 十六进制颜色转为 rgba() 字符串（alpha 0..1）；解析失败回退黑色。 */
 export function hexToRgba(hex: string, alpha: number): string {
   let h = hex.trim().replace(/^#/, '');
-  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+  if (h.length === 3)
+    h = h
+      .split('')
+      .map((c) => c + c)
+      .join('');
   if (!/^[0-9a-fA-F]{6}$/.test(h)) return `rgba(0, 0, 0, ${alpha})`;
   const r = parseInt(h.slice(0, 2), 16);
   const g = parseInt(h.slice(2, 4), 16);
