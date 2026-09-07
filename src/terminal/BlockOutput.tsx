@@ -58,7 +58,8 @@ export default function BlockOutput({ text, maxHeight, highlight, isHtml: isHtml
         maxHeight: maxHeight ? `${maxHeight}px` : undefined,
         overflow: maxHeight ? 'auto' : undefined,
         // 与 xterm.js 实时渲染保持一致的字体参数
-        fontFamily: 'Menlo, Monaco, "Cascadia Code", "JetBrains Mono", "Noto Sans CJK SC", "PingFang SC", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", monospace',
+        fontFamily:
+          'Menlo, Monaco, "Cascadia Code", "JetBrains Mono", "Noto Sans CJK SC", "PingFang SC", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", monospace',
         fontSize: 14,
         // 行高 1.0 与活终端一致（applyCompactCharSize 把 xterm 行高压到 fontSize）；
         // 1.4 时行间留缝，TUI 半块字符（▀▄）拼图会出现分割线
@@ -71,7 +72,9 @@ export default function BlockOutput({ text, maxHeight, highlight, isHtml: isHtml
         wordBreak: 'break-all',
       }}
     >
-      {/* 内层 div 承载 HTML：React 不允许 children 与 dangerouslySetInnerHTML 并存 */}
+      {/* 内层 div 承载 HTML：React 不允许 children 与 dangerouslySetInnerHTML 并存。
+          content 为颜色快照 HTML，入库/取出双向经 sanitizeHtml 净化（防注入），属受控场景 */}
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: 内容已经 sanitizeHtml 净化 */}
       {isHtml ? <div dangerouslySetInnerHTML={{ __html: content }} /> : content}
     </div>
   );
