@@ -1,0 +1,112 @@
+/* TopDock 顶栏组件样式模块 */
+
+.bar {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--block-divider);
+  padding-right: 6px;
+  user-select: none;
+  position: relative;
+}
+
+.dragRegion {
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.zone {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 4px;
+  border-radius: 5px;
+}
+
+.btnGroup {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.searchTrigger {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--block);
+  border: none;
+  border-radius: 6px;
+  padding: 0 10px;
+  height: 28px;
+  width: 360px;
+  max-width: 44vw;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: var(--font-ui);
+  text-align: left;
+  transition: background var(--dur-fast) var(--ease);
+}
+.searchTrigger:hover {
+  background: var(--elevated);
+}
+
+.searchText {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.centerDrag {
+  flex: 1;
+  height: 40px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--text-muted);
+  padding-left: 6px;
+  padding-right: 2px;
+}
+
+/* 拖拽插入标记 */
+.dropMarker {
+  width: 4px;
+  height: 20px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  background: var(--accent);
+  box-shadow: 0 0 6px 2px rgba(255, 255, 255, 0.45);
+  margin: 0 3px;
+}
+
+/* 拖拽时光标旁的浮动按钮预览 */
+.dragPreview {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  border-radius: 5px;
+  background: var(--elevated);
+  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 8px rgba(255, 255, 255, 0.25);
+  transform: translate(8px, 8px);
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.92;
+}

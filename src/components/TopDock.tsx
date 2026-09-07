@@ -7,6 +7,7 @@ import { isMacOS } from '@/lib/platform';
 import { type DockSide, PANEL_DEFS, useDockStore } from '@/stores/dock';
 import { useUiStore } from '@/stores/ui';
 import { isSessionTab, useWorkspaceStore } from '@/stores/workspace';
+import s from './TopDock.module.css';
 
 /** 按 clientX 判定落在哪个 zone */
 function hitZone(
@@ -55,7 +56,6 @@ interface DropTarget {
 }
 
 const DRAG_THRESHOLD = 3;
-const BAR_H = 40; // 顶栏整体高度
 
 export default function TopDock() {
   const leftZone = useDockStore((s) => s.leftZone);
@@ -64,8 +64,6 @@ export default function TopDock() {
   const rightPanels = useDockStore((s) => s.rightPanels);
   const moveButton = useDockStore((s) => s.moveButton);
   const togglePanel = useDockStore((s) => s.togglePanel);
-  // AI 面板与终端强相关：非会话标签（设置/历史）时隐藏「AI 进入按钮」。
-  // 这里是条件按钮的统一钩子——以后需要选择性显隐的按钮都从这里过滤。
   const isSessionActive = useWorkspaceStore((s) => {
     const tab = s.tabs.find((t) => t.id === s.activeId);
     return !!tab && isSessionTab(tab);
@@ -73,7 +71,6 @@ export default function TopDock() {
 
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const [dragCursor, setDragCursor] = useState<{ x: number; y: number } | null>(null);
-  // macOS 全屏时红绿灯自动隐藏，无需再预留左侧空间
   const [fullscreen, setFullscreen] = useState(false);
   const dragRef = useRef<DragInfo | null>(null);
   const leftRef = useRef<HTMLDivElement>(null);
@@ -90,7 +87,7 @@ export default function TopDock() {
     try {
       win = getCurrentWindow();
     } catch {
-      return; // 浏览器/非 Tauri 环境无 window API
+      return;
     }
     const sync = async () => {
       try {
@@ -180,16 +177,12 @@ export default function TopDock() {
   function renderZone(zone: DockSide, ids: string[], activePanels: string[]) {
     const ref = zone === 'left' ? leftRef : rightRef;
     const show = dropTarget?.zone === zone;
-    // 条件按钮：非会话标签时隐藏 AI 入口（其它常驻按钮不受影响）
     const visibleIds = ids.filter((id) => id !== 'chat' || isSessionActive);
 
     return (
-      <div
-        ref={ref}
-        style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '0 4px', borderRadius: 5 }}
-      >
+      <div ref={ref} className={s.zone}>
         {visibleIds.map((id, i) => (
-          <span key={id} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <span key={id} className={s.btnGroup}>
             {show && dropTarget!.index === i && <DropMarker />}
             <DockButton
               panelId={id}
@@ -204,74 +197,30 @@ export default function TopDock() {
   }
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        height: BAR_H,
-        flexShrink: 0,
-        background: 'var(--surface)',
-        borderBottom: '1px solid var(--block-divider)',
-        paddingRight: 6,
-        userSelect: 'none',
-        position: 'relative',
-      }}
-    >
-      {/* 左侧窗口拖拽区 — macOS 红绿灯保留空间（全屏时红绿灯隐藏，无需预留；Windows 无需预留） */}
+    <div className={s.bar}>
+      {/* 左侧窗口拖拽区 — macOS 红绿灯保留空间 */}
       <div
         data-tauri-drag-region
-        style={{ width: isMacOS && !fullscreen ? 78 : 0, height: BAR_H, flexShrink: 0 }}
+        className={s.dragRegion}
+        style={{ width: isMacOS && !fullscreen ? 78 : 0 }}
       />
       {renderZone('left', leftZone, leftPanels)}
-      {/* 全局搜索触发器 — 绝对居中，点击打开居中搜索窗 */}
+      {/* 全局搜索触发器 */}
       <button
         data-testid="global-search-trigger"
         onClick={() => useUiStore.getState().setGlobalSearchOpen(true)}
-        style={{
-          position: 'absolute',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          background: 'var(--block)',
-          border: 'none',
-          borderRadius: 6,
-          padding: '0 10px',
-          height: 28,
-          width: 360,
-          maxWidth: '44vw',
-          color: 'var(--text-muted)',
-          cursor: 'pointer',
-          fontSize: 12,
-          fontFamily: 'var(--font-ui)',
-          textAlign: 'left',
-        }}
+        className={s.searchTrigger}
       >
         <Search size={11} style={{ flexShrink: 0 }} />
-        <span
-          style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-        >
-          搜索文件、命令、设置…
-        </span>
+        <span className={s.searchText}>搜索文件、命令、设置…</span>
       </button>
       {/* 中间窗口拖拽区 */}
-      <div data-tauri-drag-region style={{ flex: 1, height: BAR_H }} />
+      <div data-tauri-drag-region className={s.centerDrag} />
       {renderZone('right', rightZone, rightPanels)}
       <ToolbarBtn title="设置（⌘,）" onClick={() => useWorkspaceStore.getState().openSettingsTab()}>
         <Settings size={16} />
       </ToolbarBtn>
-      <span
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 4,
-          fontSize: 10,
-          color: 'var(--text-muted)',
-          paddingLeft: 6,
-          paddingRight: 2,
-        }}
-      >
+      <span className={s.brand}>
         <Terminal size={11} /> Vrykell
       </span>
 
@@ -283,21 +232,9 @@ export default function TopDock() {
   );
 }
 
-/** 拖拽插入标记 — 醒目的蓝色光标线 + 两侧间距 */
+/** 拖拽插入标记 — 醒目的光标线 + 两侧间距 */
 function DropMarker() {
-  return (
-    <div
-      style={{
-        width: 4,
-        height: 20,
-        borderRadius: 2,
-        flexShrink: 0,
-        background: 'var(--accent)',
-        boxShadow: '0 0 6px 2px rgba(255,255,255,0.45)',
-        margin: '0 3px',
-      }}
-    />
-  );
+  return <div className={s.dropMarker} />;
 }
 
 /** 拖拽时光标旁的浮动按钮预览 */
@@ -307,28 +244,7 @@ function DragPreview({ btnId, x, y }: { btnId: string; x: number; y: number }) {
   const Icon = def.icon;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        left: x,
-        top: y,
-        width: 24,
-        height: 24,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        lineHeight: 1,
-        borderRadius: 5,
-        background: 'var(--elevated)',
-        border: '1px solid var(--border-strong)',
-        color: 'var(--text-primary)',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.4), 0 0 8px rgba(255,255,255,0.25)',
-        transform: 'translate(8px, 8px)', // 稍微偏移，不遮挡光标
-        pointerEvents: 'none',
-        zIndex: 9999,
-        opacity: 0.92,
-      }}
-    >
+    <div className={s.dragPreview} style={{ left: x, top: y }}>
       <Icon size={14} />
     </div>
   );
