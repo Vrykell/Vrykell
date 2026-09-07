@@ -1,9 +1,16 @@
-import { useEffect, useState } from 'react';
 import { Loader2, Plug, Trash2 } from 'lucide-react';
-import { newSshId, validateSshConnection, sshTest, sshTrustHostKey, type SshConnection, type SshAuthMethod } from './api';
-import { useSshStore } from './store';
-import { useToastStore } from '../components/Toast';
-import ConfirmDialog from '../components/ConfirmDialog';
+import { useEffect, useState } from 'react';
+import ConfirmDialog from '@/components/ConfirmDialog';
+import { useToastStore } from '@/components/Toast';
+import {
+  newSshId,
+  type SshAuthMethod,
+  type SshConnection,
+  sshTest,
+  sshTrustHostKey,
+  validateSshConnection,
+} from '@/ssh/api';
+import { useSshStore } from '@/ssh/store';
 
 interface Props {
   open: boolean;
@@ -14,10 +21,16 @@ interface Props {
 
 /** 通用字段样式 */
 const field: React.CSSProperties = {
-  display: 'block', width: '100%', marginTop: 4,
-  background: 'var(--canvas)', border: '1px solid var(--border)',
-  borderRadius: 'var(--radius-inner)', padding: '6px 8px', fontSize: 12,
-  color: 'var(--text-primary)', fontFamily: 'var(--font-mono)',
+  display: 'block',
+  width: '100%',
+  marginTop: 4,
+  background: 'var(--canvas)',
+  border: '1px solid var(--border)',
+  borderRadius: 'var(--radius-inner)',
+  padding: '6px 8px',
+  fontSize: 12,
+  color: 'var(--text-primary)',
+  fontFamily: 'var(--font-mono)',
 };
 const label: React.CSSProperties = { fontSize: 11, color: 'var(--text-secondary)' };
 
@@ -36,7 +49,11 @@ export default function SshFormModal({ open, initial, onClose }: Props) {
   const [password, setPassword] = useState('');
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
-  const [pendingTrust, setPendingTrust] = useState<{ host: string; port?: number; fingerprint: string } | null>(null);
+  const [pendingTrust, setPendingTrust] = useState<{
+    host: string;
+    port?: number;
+    fingerprint: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -59,7 +76,10 @@ export default function SshFormModal({ open, initial, onClose }: Props) {
 
   const doTest = async () => {
     const t = target();
-    if (!t.host) { setTestResult({ ok: false, msg: '请先填写主机' }); return; }
+    if (!t.host) {
+      setTestResult({ ok: false, msg: '请先填写主机' });
+      return;
+    }
     if (t.port !== undefined && (!Number.isInteger(t.port) || t.port < 1 || t.port > 65535)) {
       setTestResult({ ok: false, msg: '端口需为 1-65535 的整数' });
       return;
@@ -110,7 +130,10 @@ export default function SshFormModal({ open, initial, onClose }: Props) {
       password: authMethod === 'password' ? password : '',
     };
     const err = validateSshConnection(conn);
-    if (err) { useToastStore.getState().addToast(err, 'error'); return; }
+    if (err) {
+      useToastStore.getState().addToast(err, 'error');
+      return;
+    }
     try {
       await save(conn);
       useToastStore.getState().addToast(initial ? '已更新连接' : '已添加连接', 'success');
@@ -136,18 +159,29 @@ export default function SshFormModal({ open, initial, onClose }: Props) {
   return (
     <div
       style={{
-        position: 'fixed', inset: 0, zIndex: 9996,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9996,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         background: 'var(--overlay)',
       }}
       onClick={onClose}
     >
       <div
         style={{
-          width: 400, maxHeight: '82vh', overflowY: 'auto',
-          background: 'var(--elevated)', border: '1px solid var(--border-strong)',
-          borderRadius: 'var(--radius-block)', boxShadow: 'var(--shadow-lg)',
-          padding: 16, display: 'flex', flexDirection: 'column', gap: 10,
+          width: 400,
+          maxHeight: '82vh',
+          overflowY: 'auto',
+          background: 'var(--elevated)',
+          border: '1px solid var(--border-strong)',
+          borderRadius: 'var(--radius-block)',
+          boxShadow: 'var(--shadow-lg)',
+          padding: 16,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -157,22 +191,46 @@ export default function SshFormModal({ open, initial, onClose }: Props) {
 
         <label style={label}>
           连接名
-          <input value={name} placeholder="生产服务器" onChange={(e) => setName(e.target.value)} style={field} data-testid="ssh-form-name" />
+          <input
+            value={name}
+            placeholder="生产服务器"
+            onChange={(e) => setName(e.target.value)}
+            style={field}
+            data-testid="ssh-form-name"
+          />
         </label>
 
         <label style={label}>
           主机（IP / 域名）
-          <input value={host} placeholder="192.168.1.10" onChange={(e) => setHost(e.target.value)} style={field} data-testid="ssh-form-host" />
+          <input
+            value={host}
+            placeholder="192.168.1.10"
+            onChange={(e) => setHost(e.target.value)}
+            style={field}
+            data-testid="ssh-form-host"
+          />
         </label>
 
         <div style={{ display: 'flex', gap: 8 }}>
           <label style={{ ...label, flex: 1 }}>
             端口
-            <input value={port} placeholder="22" onChange={(e) => setPort(e.target.value)} style={field} data-testid="ssh-form-port" />
+            <input
+              value={port}
+              placeholder="22"
+              onChange={(e) => setPort(e.target.value)}
+              style={field}
+              data-testid="ssh-form-port"
+            />
           </label>
           <label style={{ ...label, flex: 1 }}>
             账户
-            <input value={user} placeholder="root" onChange={(e) => setUser(e.target.value)} style={field} data-testid="ssh-form-user" />
+            <input
+              value={user}
+              placeholder="root"
+              onChange={(e) => setUser(e.target.value)}
+              style={field}
+              data-testid="ssh-form-user"
+            />
           </label>
         </div>
 
@@ -185,7 +243,10 @@ export default function SshFormModal({ open, initial, onClose }: Props) {
                 data-subtle
                 onClick={() => setAuthMethod(m)}
                 style={{
-                  flex: 1, padding: '5px 0', fontSize: 12, borderRadius: 'var(--radius-inner)',
+                  flex: 1,
+                  padding: '5px 0',
+                  fontSize: 12,
+                  borderRadius: 'var(--radius-inner)',
                   border: `1px solid ${authMethod === m ? 'var(--accent)' : 'var(--border)'}`,
                   background: authMethod === m ? 'var(--accent-dim)' : 'transparent',
                   color: authMethod === m ? 'var(--text-primary)' : 'var(--text-secondary)',
@@ -201,7 +262,14 @@ export default function SshFormModal({ open, initial, onClose }: Props) {
         {authMethod === 'password' && (
           <label style={label}>
             密码
-            <input type="password" value={password} placeholder={initial?.hasPassword ? '留空则不修改' : '••••••'} onChange={(e) => setPassword(e.target.value)} style={field} data-testid="ssh-form-password" />
+            <input
+              type="password"
+              value={password}
+              placeholder={initial?.hasPassword ? '留空则不修改' : '••••••'}
+              onChange={(e) => setPassword(e.target.value)}
+              style={field}
+              data-testid="ssh-form-password"
+            />
           </label>
         )}
         {authMethod === 'key' && (
@@ -215,10 +283,17 @@ export default function SshFormModal({ open, initial, onClose }: Props) {
           disabled={testing}
           data-testid="ssh-test-btn"
           style={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            padding: '6px 0', fontSize: 12, border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-inner)', background: 'transparent',
-            color: 'var(--text-secondary)', cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            padding: '6px 0',
+            fontSize: 12,
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-inner)',
+            background: 'transparent',
+            color: 'var(--text-secondary)',
+            cursor: 'pointer',
           }}
         >
           {testing ? <Loader2 size={13} className="spin" /> : <Plug size={13} />}
@@ -226,11 +301,16 @@ export default function SshFormModal({ open, initial, onClose }: Props) {
         </button>
 
         {testResult && (
-          <div style={{
-            fontSize: 12, padding: '6px 8px', borderRadius: 'var(--radius-inner)',
-            color: testResult.ok ? 'var(--success)' : 'var(--error-light)',
-            background: testResult.ok ? 'var(--success-bg)' : 'var(--error-bg)',
-          }} data-testid="ssh-test-result">
+          <div
+            style={{
+              fontSize: 12,
+              padding: '6px 8px',
+              borderRadius: 'var(--radius-inner)',
+              color: testResult.ok ? 'var(--success)' : 'var(--error-light)',
+              background: testResult.ok ? 'var(--success-bg)' : 'var(--error-bg)',
+            }}
+            data-testid="ssh-test-result"
+          >
             {testResult.msg}
           </div>
         )}
@@ -241,28 +321,49 @@ export default function SshFormModal({ open, initial, onClose }: Props) {
               onClick={doDelete}
               data-testid="ssh-delete-btn"
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                padding: '6px 12px', fontSize: 12, border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-inner)', background: 'transparent',
-                color: 'var(--error-light)', cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                padding: '6px 12px',
+                fontSize: 12,
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-inner)',
+                background: 'transparent',
+                color: 'var(--error-light)',
+                cursor: 'pointer',
               }}
             >
               <Trash2 size={12} /> 删除
             </button>
           )}
           <div style={{ flex: 1 }} />
-          <button onClick={onClose} style={{
-            padding: '6px 12px', fontSize: 12, border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-inner)', background: 'transparent',
-            color: 'var(--text-secondary)', cursor: 'pointer',
-          }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '6px 12px',
+              fontSize: 12,
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-inner)',
+              background: 'transparent',
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+            }}
+          >
             取消
           </button>
-          <button onClick={doSave} data-testid="ssh-save-btn" style={{
-            padding: '6px 16px', fontSize: 12, border: 'none',
-            borderRadius: 'var(--radius-inner)', background: 'var(--accent)',
-            color: 'var(--accent-text)', cursor: 'pointer',
-          }}>
+          <button
+            onClick={doSave}
+            data-testid="ssh-save-btn"
+            style={{
+              padding: '6px 16px',
+              fontSize: 12,
+              border: 'none',
+              borderRadius: 'var(--radius-inner)',
+              background: 'var(--accent)',
+              color: 'var(--accent-text)',
+              cursor: 'pointer',
+            }}
+          >
             保存
           </button>
         </div>

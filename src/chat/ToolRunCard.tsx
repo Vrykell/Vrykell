@@ -11,7 +11,6 @@
  * 都由 AiBlock 的行容器（position:relative; paddingLeft:16）承载。
  */
 
-import { useState } from 'react';
 import {
   Brain,
   Check,
@@ -24,12 +23,13 @@ import {
   Wrench,
   X,
 } from 'lucide-react';
-import ToolNode from './ToolNode';
-import BlockOutput from '../terminal/BlockOutput';
-import { useBlockStore } from '../stores/blocks';
-import { agentControl } from '../agent/agentControl';
-import { resolveApproval } from '../agent/permissions';
-import type { ToolRun, ToolRunState } from '../agent/messageParts';
+import { useState } from 'react';
+import { agentControl } from '@/agent/agentControl';
+import type { ToolRun, ToolRunState } from '@/agent/messageParts';
+import { resolveApproval } from '@/agent/permissions';
+import ToolNode from '@/chat/ToolNode';
+import { useBlockStore } from '@/stores/blocks';
+import BlockOutput from '@/terminal/BlockOutput';
 
 const STATE_CHIP: Record<ToolRunState, { label: string; color: string }> = {
   running: { label: '执行中', color: 'var(--accent-warm)' },

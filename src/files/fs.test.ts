@@ -1,10 +1,12 @@
 /**
  * fs — 文件系统 invoke 封装透传测试。
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
-import { fsList, fsDisks, fsHome, fsRename, fsDelete, fileOpenWith } from './fs';
+
+import { fileOpenWith, fsDelete, fsDisks, fsHome, fsList, fsRename } from '@/files/fs';
 
 describe('fs 封装', () => {
   it('各命令按约定透传', async () => {

@@ -1,7 +1,7 @@
 /**
  * shortcutPage — 快捷键说明页。
  */
-import { Field } from './ui';
+import { Field } from '@/settings/ui';
 
 const SHORTCUTS: { keys: string[]; desc: string }[] = [
   { keys: ['⌘T'], desc: '新建标签页' },
@@ -23,16 +23,24 @@ const SHORTCUTS: { keys: string[]; desc: string }[] = [
 export function ShortcutPage() {
   return (
     <Field title="快捷键说明" description="当前支持的键盘快捷键，macOS 下 ⌘ = Command。">
-      <div style={{
-        display: 'flex', flexDirection: 'column', gap: 4,
-        border: '1px solid var(--border)', borderRadius: 'var(--radius-inner)',
-        overflow: 'hidden',
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 4,
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-inner)',
+          overflow: 'hidden',
+        }}
+      >
         {SHORTCUTS.map((s, i) => (
           <div
             key={i}
             style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 16,
               padding: '8px 12px',
               background: i % 2 === 0 ? 'transparent' : 'var(--hover)',
               fontSize: 12,
@@ -44,10 +52,14 @@ export function ShortcutPage() {
                 <kbd
                   key={j}
                   style={{
-                    fontFamily: 'var(--font-mono)', fontSize: 11,
-                    padding: '2px 6px', borderRadius: 4,
-                    background: 'var(--canvas)', border: '1px solid var(--border)',
-                    color: 'var(--text-primary)', whiteSpace: 'nowrap',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 11,
+                    padding: '2px 6px',
+                    borderRadius: 4,
+                    background: 'var(--canvas)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text-primary)',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {k}
@@ -60,4 +72,3 @@ export function ShortcutPage() {
     </Field>
   );
 }
-

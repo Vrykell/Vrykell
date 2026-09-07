@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import type { SearchResult } from './types';
-import { getSources, getEnabledSourceIds } from './registry';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { getEnabledSourceIds, getSources } from '@/search/registry';
+import type { SearchResult } from '@/search/types';
 
 interface SourceState {
   loading: boolean;

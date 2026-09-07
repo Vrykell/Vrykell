@@ -9,20 +9,26 @@
  * 让模型拿到失败信息后自我修正。
  */
 
-import { tool, type ToolSet } from 'ai';
-import { DESC_RUN_COMMAND } from '../toolTexts';
+import { type ToolSet, tool } from 'ai';
 import { z } from 'zod';
-import { runCommandAndWait } from './runCommand';
-import { buildFileTools } from './files';
-import { buildSearchTools } from './search';
-import { buildTerminalTools } from './terminal';
-import { buildSkillTool, buildInstallSkillTool } from './skill';
-import { buildMemoryTool } from './memory';
-import { buildScheduleTool } from './schedule';
-import { buildSubagentTool } from './subagent';
-import { gate, levelOf, ensureSkillAccess, TOOL_NAMES, type ToolContext } from '../permissions';
+import {
+  ensureSkillAccess,
+  gate,
+  levelOf,
+  TOOL_NAMES,
+  type ToolContext,
+} from '@/agent/permissions';
+import { buildFileTools } from '@/agent/tools/files';
+import { buildMemoryTool } from '@/agent/tools/memory';
+import { runCommandAndWait } from '@/agent/tools/runCommand';
+import { buildScheduleTool } from '@/agent/tools/schedule';
+import { buildSearchTools } from '@/agent/tools/search';
+import { buildInstallSkillTool, buildSkillTool } from '@/agent/tools/skill';
+import { buildSubagentTool } from '@/agent/tools/subagent';
+import { buildTerminalTools } from '@/agent/tools/terminal';
+import { DESC_RUN_COMMAND } from '@/agent/toolTexts';
 
-export type { ToolContext } from '../permissions';
+export type { ToolContext } from '@/agent/permissions';
 
 export function buildTools(ctx: ToolContext) {
   const all = {

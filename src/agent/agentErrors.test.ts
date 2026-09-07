@@ -1,8 +1,8 @@
 /**
  * agentErrors — AI SDK 错误拆解测试。
  */
-import { describe, it, expect } from 'vitest';
-import { describeError } from './agentErrors';
+import { describe, expect, it } from 'vitest';
+import { describeError } from '@/agent/agentErrors';
 
 describe('describeError', () => {
   it('普通 Error 取其 message', () => {
@@ -10,14 +10,12 @@ describe('describeError', () => {
   });
 
   it('展开 APICallError：状态码 + 响应体 + cause 链', () => {
-    const err: Error & { statusCode?: number; responseBody?: string; cause?: unknown } = Object.assign(
-      new Error('Failed after 3 attempts'),
-      {
+    const err: Error & { statusCode?: number; responseBody?: string; cause?: unknown } =
+      Object.assign(new Error('Failed after 3 attempts'), {
         statusCode: 401,
         responseBody: '{"error":{"message":"invalid key"}}',
         cause: Object.assign(new Error('上游错误'), { responseBody: 'bad' }),
-      },
-    );
+      });
     const s = describeError(err);
     expect(s).toContain('401');
     expect(s).toContain('invalid key');

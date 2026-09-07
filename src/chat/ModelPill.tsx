@@ -9,12 +9,13 @@
  *
  * 未悬停时胶囊透明无边框，只显示文字与图标；悬停显示背景。
  */
-import { useEffect, useRef, useState } from 'react';
+
 import { Check, ChevronDown, type LucideIcon } from 'lucide-react';
-import { useAiConfigStore } from '../lib/ai';
-import { useAgentSettings } from '../agent/agentSettings';
-import { modelIcon } from '../agent/modelIcon';
-import ModelPicker from './ModelPicker';
+import { useEffect, useRef, useState } from 'react';
+import { useAgentSettings } from '@/agent/agentSettings';
+import { modelIcon } from '@/agent/modelIcon';
+import ModelPicker from '@/chat/ModelPicker';
+import { useAiConfigStore } from '@/lib/ai';
 
 const LEVEL_LABEL: Record<string, string> = { low: '低', medium: '中', high: '高' };
 const LEVELS = ['low', 'medium', 'high'] as const;
@@ -52,10 +53,13 @@ export default function ModelPill() {
       ref={pillRef}
       data-testid="model-pill"
       style={{
-        position: 'relative', flexShrink: 0,
+        position: 'relative',
+        flexShrink: 0,
         width: levelOpen && lockedWidth ? lockedWidth : 'fit-content',
-        height: 30, boxSizing: 'border-box',
-        display: 'flex', alignItems: 'stretch',
+        height: 30,
+        boxSizing: 'border-box',
+        display: 'flex',
+        alignItems: 'stretch',
         borderRadius: 999,
         overflow: levelOpen ? 'visible' : 'hidden',
         background: 'transparent',
@@ -78,10 +82,17 @@ export default function ModelPill() {
           <div
             data-testid="think-level-menu"
             style={{
-              position: 'absolute', top: 0, left: 0, zIndex: 9999,
-              width: '100%', boxSizing: 'border-box',
-              background: 'var(--surface)', border: '1px solid var(--border)',
-              borderRadius: 10, boxShadow: 'var(--shadow-md)', padding: 4,
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              zIndex: 9999,
+              width: '100%',
+              boxSizing: 'border-box',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 10,
+              boxShadow: 'var(--shadow-md)',
+              padding: 4,
             }}
           >
             <div style={{ fontSize: 10, color: 'var(--text-muted)', padding: '4px 8px 2px' }}>
@@ -104,11 +115,19 @@ export default function ModelPill() {
                     if (!on) e.currentTarget.style.background = 'transparent';
                   }}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 6, width: '100%',
-                    height: 30, padding: '0 8px', boxSizing: 'border-box',
-                    fontSize: 12, textAlign: 'left',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    width: '100%',
+                    height: 30,
+                    padding: '0 8px',
+                    boxSizing: 'border-box',
+                    fontSize: 12,
+                    textAlign: 'left',
                     background: on ? 'var(--hover)' : 'transparent',
-                    border: 'none', borderRadius: 6, cursor: 'pointer',
+                    border: 'none',
+                    borderRadius: 6,
+                    cursor: 'pointer',
                     color: on ? 'var(--text-primary)' : 'var(--text-secondary)',
                   }}
                 >
@@ -127,15 +146,22 @@ export default function ModelPill() {
             title="切换模型（更多在设置页配置）"
             onClick={() => setPickerOpen(true)}
             style={{
-              flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 6,
-              padding: '0 10px 0 12px', background: 'transparent', border: 'none',
+              flex: '0 0 auto',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '0 10px 0 12px',
+              background: 'transparent',
+              border: 'none',
               cursor: 'pointer',
             }}
           >
             <Icon size={15} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
             <span
               style={{
-                fontSize: 12, fontWeight: 500, color: 'var(--text-primary)',
+                fontSize: 12,
+                fontWeight: 500,
+                color: 'var(--text-primary)',
                 whiteSpace: 'nowrap',
               }}
             >
@@ -145,7 +171,9 @@ export default function ModelPill() {
           {/* 竖线分隔 */}
           <span
             style={{
-              width: 1, margin: '4px 0', flexShrink: 0,
+              width: 1,
+              margin: '4px 0',
+              flexShrink: 0,
               background: 'var(--border-strong)',
             }}
           />
@@ -158,9 +186,16 @@ export default function ModelPill() {
               setLevelOpen(true);
             }}
             style={{
-              flex: 3, minWidth: 0, display: 'flex', alignItems: 'center',
-              justifyContent: 'center', gap: 3, padding: '0 8px',
-              background: 'transparent', border: 'none', cursor: 'pointer',
+              flex: 3,
+              minWidth: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 3,
+              padding: '0 8px',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
             }}
           >
             <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{levelLabel}</span>

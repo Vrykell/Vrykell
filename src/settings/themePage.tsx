@@ -1,15 +1,25 @@
 /**
  * themePage — 外观主题设置页（明暗/不透明度/壁纸/导入导出）。
  */
-import { useEffect, useState } from 'react';
-import { Sun, Moon, Image as ImageIcon, Download, Upload, RefreshCw, FileText, Trash2 } from 'lucide-react';
+
+import { invoke } from '@tauri-apps/api/core';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
 import { openPath } from '@tauri-apps/plugin-opener';
-import { invoke } from '@tauri-apps/api/core';
-import { useTheme } from '../theme/ThemeProvider';
-import { useTerminalThemeStore } from '../theme/terminalTheme';
-import { useToastStore } from '../components/Toast';
-import { Field, btnStyle } from './ui';
+import {
+  Download,
+  FileText,
+  Image as ImageIcon,
+  Moon,
+  RefreshCw,
+  Sun,
+  Trash2,
+  Upload,
+} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useToastStore } from '@/components/Toast';
+import { btnStyle, Field } from '@/settings/ui';
+import { useTheme } from '@/theme/ThemeProvider';
+import { useTerminalThemeStore } from '@/theme/terminalTheme';
 
 export function ThemePage() {
   const { mode, setMode } = useTheme();
@@ -21,7 +31,9 @@ export function ThemePage() {
   const [themePath, setThemePath] = useState('');
 
   useEffect(() => {
-    invoke<string>('get_theme_path').then(setThemePath).catch((e) => console.warn('[theme] 读取主题路径失败:', e));
+    invoke<string>('get_theme_path')
+      .then(setThemePath)
+      .catch((e) => console.warn('[theme] 读取主题路径失败:', e));
   }, []);
 
   const toast = (msg: string, type: 'info' | 'success' | 'error') =>
@@ -93,10 +105,15 @@ export function ThemePage() {
                 key={m}
                 onClick={() => setMode(m)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '10px 16px', fontSize: 12, cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '10px 16px',
+                  fontSize: 12,
+                  cursor: 'pointer',
                   border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-                  borderRadius: 'var(--radius-inner)', background: active ? 'var(--hover)' : 'transparent',
+                  borderRadius: 'var(--radius-inner)',
+                  background: active ? 'var(--hover)' : 'transparent',
                   color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
                 }}
               >
@@ -118,10 +135,15 @@ export function ThemePage() {
             onChange={(e) => void themeUpdate({ opacity: Number(e.target.value) })}
             style={{ flex: 1, accentColor: 'var(--accent-warm)' }}
           />
-          <span style={{
-            fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)',
-            minWidth: 40, textAlign: 'right',
-          }}>
+          <span
+            style={{
+              fontSize: 12,
+              color: 'var(--text-secondary)',
+              fontFamily: 'var(--font-mono)',
+              minWidth: 40,
+              textAlign: 'right',
+            }}
+          >
             {Math.round(config.opacity * 100)}%
           </span>
         </div>
@@ -143,10 +165,15 @@ export function ThemePage() {
           )}
         </div>
         {config.backgroundImage && (
-          <div style={{
-            marginTop: 8, fontSize: 11, color: 'var(--text-muted)',
-            fontFamily: 'var(--font-mono)', wordBreak: 'break-all',
-          }}>
+          <div
+            style={{
+              marginTop: 8,
+              fontSize: 11,
+              color: 'var(--text-muted)',
+              fontFamily: 'var(--font-mono)',
+              wordBreak: 'break-all',
+            }}
+          >
             {config.backgroundImage}
           </div>
         )}
@@ -167,7 +194,10 @@ export function ThemePage() {
         </div>
       </Field>
 
-      <Field title="配置文件" description="主题外观持久化在 theme.json，可手动编辑 vars 覆盖 CSS 变量。">
+      <Field
+        title="配置文件"
+        description="主题外观持久化在 theme.json，可手动编辑 vars 覆盖 CSS 变量。"
+      >
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <button onClick={() => void openConfig()} style={btnStyle}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -180,7 +210,14 @@ export function ThemePage() {
             </span>
           </button>
           {themePath && (
-            <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}>
+            <span
+              style={{
+                fontSize: 11,
+                color: 'var(--text-muted)',
+                fontFamily: 'var(--font-mono)',
+                wordBreak: 'break-all',
+              }}
+            >
               {themePath}
             </span>
           )}

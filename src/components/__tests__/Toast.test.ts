@@ -1,12 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { useToastStore } from '../Toast';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useToastStore } from '@/components/Toast';
 
 describe('toast store', () => {
   beforeEach(() => {
     useToastStore.setState({ toasts: [], timers: {} });
     vi.useFakeTimers();
   });
-  afterEach(() => { vi.useRealTimers(); });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it('adds and auto-removes toast after duration (leaving → remove)', () => {
     useToastStore.getState().addToast('测试消息');

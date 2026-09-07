@@ -7,23 +7,34 @@
  * agentMode 关闭时 tools=undefined，行为等价 M0 纯文本路径。
  * 网络层走 createChatModel 注入的 Rust 代理 fetch（key 不出 Rust）。
  */
-import { describeError } from './agentErrors';
-import { stepCountIs, streamText, type ModelMessage, type ToolSet } from 'ai';
+
 import { invoke } from '@tauri-apps/api/core';
-import type { StreamFn } from '../stores/chat';
-import { createChatModel, createNativeWebSearchTool, deepThinkProviderOptions, type ProviderKind } from './provider';
-import { useAgentSettings } from './agentSettings';
-import { estimateTokens, planContext, IMAGE_TOKEN_ESTIMATE, type SizedMessage } from './context';
-import { attachmentsForModel, supportsVision } from './attachments';
-import { buildTools } from './tools';
-import { buildTavilySearchTool } from './tools/webSearch';
-import { buildWebSearchTool, buildWebFetchTool, buildWebCrawlTool } from './tools/webFetch';
-import { buildSystemPrompt } from './systemPrompt';
-import { listSkills, buildSkillsContext, availableSkillMetas } from './skills';
-import { getMemory, getMemoryJournal, listAgents } from './platform';
-import { listMcpTools, buildMcpTool } from './mcp';
-import { levelOf, type ToolContext } from './permissions';
-import type { ToolRunState } from './messageParts';
+import { type ModelMessage, stepCountIs, streamText, type ToolSet } from 'ai';
+import { describeError } from '@/agent/agentErrors';
+import { useAgentSettings } from '@/agent/agentSettings';
+import { attachmentsForModel, supportsVision } from '@/agent/attachments';
+import {
+  estimateTokens,
+  IMAGE_TOKEN_ESTIMATE,
+  planContext,
+  type SizedMessage,
+} from '@/agent/context';
+import { buildMcpTool, listMcpTools } from '@/agent/mcp';
+import type { ToolRunState } from '@/agent/messageParts';
+import { levelOf, type ToolContext } from '@/agent/permissions';
+import { getMemory, getMemoryJournal, listAgents } from '@/agent/platform';
+import {
+  createChatModel,
+  createNativeWebSearchTool,
+  deepThinkProviderOptions,
+  type ProviderKind,
+} from '@/agent/provider';
+import { availableSkillMetas, buildSkillsContext, listSkills } from '@/agent/skills';
+import { buildSystemPrompt } from '@/agent/systemPrompt';
+import { buildTools } from '@/agent/tools';
+import { buildWebCrawlTool, buildWebFetchTool, buildWebSearchTool } from '@/agent/tools/webFetch';
+import { buildTavilySearchTool } from '@/agent/tools/webSearch';
+import type { StreamFn } from '@/stores/chat';
 
 interface AiConfigInfoRust {
   has_key: boolean;
@@ -34,7 +45,11 @@ interface AiConfigInfoRust {
   has_gemini_key: boolean;
   has_tavily_key: boolean;
   models: {
-    id: string; name: string; provider: ProviderKind; baseUrl: string; model: string;
+    id: string;
+    name: string;
+    provider: ProviderKind;
+    baseUrl: string;
+    model: string;
     capabilities?: { vision: boolean; reasoning: boolean; tools: boolean; search: boolean };
   }[];
   active_model: string;
@@ -87,7 +102,10 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
         };
         sized.push({ msg, tokens: estimateTokens(content) + images.length * IMAGE_TOKEN_ESTIMATE });
       } else {
-        sized.push({ msg: { role: m.role as 'user' | 'assistant', content }, tokens: estimateTokens(content) });
+        sized.push({
+          msg: { role: m.role as 'user' | 'assistant', content },
+          tokens: estimateTokens(content),
+        });
       }
     } else {
       sized.push({ msg: m as ModelMessage, tokens: estimateTokens(m.content) });
@@ -228,12 +246,18 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     abortSignal: ctx?.signal,
     // M6 深思考：providerOptions 透传（openai-compatible → reasoning_effort）。
     // anthropic thinking 要求 maxOutputTokens > budgetTokens(8000)。
-    providerOptions: settings.deepThink ? deepThinkProviderOptions(info.provider, settings.thinkingLevel) : undefined,
+    providerOptions: settings.deepThink
+      ? deepThinkProviderOptions(info.provider, settings.thinkingLevel)
+      : undefined,
     maxOutputTokens:
       settings.maxOutputTokens > 0
         ? settings.maxOutputTokens
         : settings.deepThink && info.provider === 'anthropic'
-          ? (settings.thinkingLevel === 'low' ? 8000 : settings.thinkingLevel === 'medium' ? 16000 : 32000)
+          ? settings.thinkingLevel === 'low'
+            ? 8000
+            : settings.thinkingLevel === 'medium'
+              ? 16000
+              : 32000
           : undefined,
     temperature: settings.temperature != null ? settings.temperature : undefined,
     onError: ({ error }) => {
@@ -283,7 +307,12 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
         break;
       }
       case 'tool-result': {
-        const p = part as { toolCallId: string; toolName?: string; output?: unknown; result?: unknown };
+        const p = part as {
+          toolCallId: string;
+          toolName?: string;
+          output?: unknown;
+          result?: unknown;
+        };
         const c = calls.get(p.toolCallId);
         const raw = p.output ?? p.result;
         const out = typeof raw === 'string' ? raw : JSON.stringify(raw);
@@ -308,7 +337,8 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
           toolName: c?.toolName ?? p.toolName ?? 'unknown',
           input: c?.input ?? {},
           state,
-          output: out.length > settings.contextToolChars ? out.slice(0, settings.contextToolChars) : out,
+          output:
+            out.length > settings.contextToolChars ? out.slice(0, settings.contextToolChars) : out,
           error,
           startedAt: c?.startedAt ?? Date.now(),
           endedAt: Date.now(),
@@ -338,7 +368,12 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     }
   }
   // 达到工具调用上限：streamText 会静默截断（无 finishReason），此处补上失败原因
-  if (streamError == null && stepLimit > 0 && stepCount >= stepLimit && lastFinishReason === 'tool-calls') {
+  if (
+    streamError == null &&
+    stepLimit > 0 &&
+    stepCount >= stepLimit &&
+    lastFinishReason === 'tool-calls'
+  ) {
     onChunk(
       `\n\n> ⚠️ 已达工具调用上限（${stepLimit} 步），回复可能不完整；可在「AI 行为」页调高最大迭代步数。`,
     );

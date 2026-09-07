@@ -1,8 +1,8 @@
 import ReactMarkdown from 'react-markdown';
-import remarkGfmSafe from './remarkGfmSafe';
-import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import CommandBlock from './CommandBlock';
+import remarkMath from 'remark-math';
+import CommandBlock from '@/chat/CommandBlock';
+import remarkGfmSafe from '@/chat/remarkGfmSafe';
 import 'katex/dist/katex.min.css';
 
 // micromark 把单行 `$$E=mc^2$$` 解析为 inlineMath（flow math 要求开界定符后换行），
@@ -47,7 +47,11 @@ export default function Markdown({ content }: { content: string }) {
         // 图片降级为链接文本：不加载远程图片（防追踪/外带，CSP 亦不放行 http(s) 图片源），
         // 同时避免因 CSP 拦截而裂图
         img: (props) => (
-          <a href={props.src} title={props.alt} style={{ color: 'var(--accent)', textDecoration: 'underline' }}>
+          <a
+            href={props.src}
+            title={props.alt}
+            style={{ color: 'var(--accent)', textDecoration: 'underline' }}
+          >
             {props.alt || props.src}
           </a>
         ),

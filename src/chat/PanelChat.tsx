@@ -7,41 +7,70 @@
  * 发送目标是当前聚焦 pane。
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUp, Bot, Brain, Globe, Paperclip, ShieldAlert, ShieldCheck, ShieldOff, Square, Zap } from 'lucide-react';
-import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { useChatStore, useActiveMessages } from '../stores/chat';
-import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
-import { useTerminalStore } from '../stores/terminal';
-import { useToastStore } from '../components/Toast';
-import { useAgentSettings } from '../agent/agentSettings';
-import { usePermissions } from '../agent/permissions';
-import { useAiConfigStore } from '../lib/ai';
-import ModelPill from './ModelPill';
+import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import {
-  LIMITS,
+  ArrowUp,
+  Bot,
+  Brain,
+  type Globe,
+  Paperclip,
+  ShieldAlert,
+  ShieldCheck,
+  ShieldOff,
+  Square,
+  Zap,
+} from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useAgentSettings } from '@/agent/agentSettings';
+import {
+  type AttachmentMeta,
   importFileAsAttachment,
+  LIMITS,
   makePasteAttachment,
   saveBlobAsAttachment,
   totalSize,
-  type AttachmentMeta,
-} from '../agent/attachments';
-import AttachmentChips from './AttachmentChips';
-import { leaves as layoutLeaves, firstLeaf } from '../lib/windowLayout';
-import { shellTypeLabel } from '../lib/shells';
-import ShellIndicator from '../terminal/ShellIndicator';
-import { CurrentDir } from '../terminal/InputEditor';
-import AiBlock from './AiBlock';
-import { toExchanges, type ChatExchange } from './exchanges';
-import ContextRing from '../components/ContextRing';
+} from '@/agent/attachments';
+import { usePermissions } from '@/agent/permissions';
+import AiBlock from '@/chat/AiBlock';
+import AttachmentChips from '@/chat/AttachmentChips';
+import { type ChatExchange, toExchanges } from '@/chat/exchanges';
+import ModelPill from '@/chat/ModelPill';
+import ContextRing from '@/components/ContextRing';
+import { useToastStore } from '@/components/Toast';
+import { useAiConfigStore } from '@/lib/ai';
+import { shellTypeLabel } from '@/lib/shells';
+import { firstLeaf, leaves as layoutLeaves } from '@/lib/windowLayout';
+import { useActiveMessages, useChatStore } from '@/stores/chat';
+import { useTerminalStore } from '@/stores/terminal';
+import { isSessionTab, useWorkspaceStore } from '@/stores/workspace';
+import { CurrentDir } from '@/terminal/InputEditor';
+import ShellIndicator from '@/terminal/ShellIndicator';
 
 /** 权限模式循环（状态栏 Shield chip）：图标 + 颜色双通道辨识（勾=标准逐工具 / 叹号=严格逐次问 / 斜线=放行直放）
  *  标准=逐工具级别；严格=全部逐次问；放行=全部直放行（危险命令仍逐次问） */
 const PERM_MODES = [
-  { id: 'standard', label: '标准', icon: ShieldCheck, color: 'var(--text-muted)', title: '标准权限：按设置页逐工具级别判定（点击切换）' },
-  { id: 'strict', label: '严格', icon: ShieldAlert, color: 'var(--accent-warm)', title: '严格权限：所有工具操作逐次询问（点击切换）' },
-  { id: 'relaxed', label: '放行', icon: ShieldOff, color: 'var(--error-light)', title: '放行模式：全部工具直接放行，危险命令仍会逐次询问（点击切换）' },
+  {
+    id: 'standard',
+    label: '标准',
+    icon: ShieldCheck,
+    color: 'var(--text-muted)',
+    title: '标准权限：按设置页逐工具级别判定（点击切换）',
+  },
+  {
+    id: 'strict',
+    label: '严格',
+    icon: ShieldAlert,
+    color: 'var(--accent-warm)',
+    title: '严格权限：所有工具操作逐次询问（点击切换）',
+  },
+  {
+    id: 'relaxed',
+    label: '放行',
+    icon: ShieldOff,
+    color: 'var(--error-light)',
+    title: '放行模式：全部工具直接放行，危险命令仍会逐次询问（点击切换）',
+  },
 ] as const;
 
 /** 各 provider 的常用模型（快捷下拉；完整自由度在设置页输入） */
@@ -168,7 +197,8 @@ export default function PanelChat() {
         const r = el.getBoundingClientRect();
         const scale = window.devicePixelRatio || 1;
         const { x, y } = e.payload.position;
-        if (x / scale < r.left || x / scale > r.right || y / scale < r.top || y / scale > r.bottom) return;
+        if (x / scale < r.left || x / scale > r.right || y / scale < r.top || y / scale > r.bottom)
+          return;
         void (async () => {
           const out: AttachmentMeta[] = [];
           for (const p of (e.payload as { paths: string[] }).paths) {
@@ -181,7 +211,9 @@ export default function PanelChat() {
           addAtts(out);
         })();
       })
-      .then((u) => { unlistenRef.current = u; })
+      .then((u) => {
+        unlistenRef.current = u;
+      })
       .catch(() => {});
     return () => unlistenRef.current?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -205,9 +237,12 @@ export default function PanelChat() {
     if (!paneId || !activeTab || !isSessionTab(activeTab)) return null;
     const spec = layoutLeaves(activeTab.layout).find((t) => t.id === paneId);
     if (!spec) return null;
-    const shell = spec.kind === 'ssh'
-      ? spec.ssh?.name || spec.ssh?.host || 'SSH'
-      : spec.shellType ? shellTypeLabel(spec.shellType) : '本地';
+    const shell =
+      spec.kind === 'ssh'
+        ? spec.ssh?.name || spec.ssh?.host || 'SSH'
+        : spec.shellType
+          ? shellTypeLabel(spec.shellType)
+          : '本地';
     return { shell, cwd: cwds[paneId] ?? spec.cwd };
   };
 
@@ -224,11 +259,12 @@ export default function PanelChat() {
   };
 
   // 发送目标 = 当前聚焦 pane（回退到布局第一个 pane）
-  const targetPane = isSession && activeTab && isSessionTab(activeTab)
-    ? (focusedPaneId && layoutLeaves(activeTab.layout).some((t) => t.id === focusedPaneId)
+  const targetPane =
+    isSession && activeTab && isSessionTab(activeTab)
+      ? focusedPaneId && layoutLeaves(activeTab.layout).some((t) => t.id === focusedPaneId)
         ? focusedPaneId
-        : firstLeaf(activeTab.layout).id)
-    : undefined;
+        : firstLeaf(activeTab.layout).id
+      : undefined;
 
   // ── ↑/↓ 翻历史提问（fish 式：以开始翻前的草稿为前缀过滤，最新在前） ──
   const historyQuestions = useMemo(
@@ -246,9 +282,7 @@ export default function PanelChat() {
   const navHistory = (dir: 1 | -1) => {
     const nav = histNav.current;
     const base = nav.idx === -1 ? text : nav.base;
-    const candidates = historyQuestions.filter(
-      (q) => q.startsWith(base) && q.length > base.length,
-    );
+    const candidates = historyQuestions.filter((q) => q.startsWith(base) && q.length > base.length);
     const next = nav.idx + dir;
     if (next < -1 || next >= candidates.length) return false;
     histNav.current = { idx: next, base };
@@ -283,13 +317,21 @@ export default function PanelChat() {
   const canSend = (!!text.trim() || atts.length > 0) && !sending && isSession;
 
   return (
-    <div ref={panelRef} style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+    <div
+      ref={panelRef}
+      style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}
+    >
       {/* 顶栏：会话级 AI 配置（模型 · 联网 · 深思 · Agent），低频、影响后续所有消息，从输入卡抽离避免拥挤 */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 4,
-        padding: '7px 10px 6px',
-        flexShrink: 0, userSelect: 'none',
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          padding: '7px 10px 6px',
+          flexShrink: 0,
+          userSelect: 'none',
+        }}
+      >
         <ModelPill />
         <div style={{ flex: 1 }} />
         <QuickToggle
@@ -307,7 +349,10 @@ export default function PanelChat() {
       </div>
 
       {/* 转录区：按来源 pane 分段 */}
-      <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '4px 8px 8px' }}>
+      <div
+        ref={scrollRef}
+        style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '4px 8px 8px' }}
+      >
         {exchanges.length === 0 ? (
           <EmptyHint isSession={isSession} />
         ) : (
@@ -318,12 +363,14 @@ export default function PanelChat() {
       {/* 输入卡片：外边距与命令块一致（0.45em 0），左右 8px 对齐消息区与终端命令块 */}
       {isSession && (
         <div style={{ flexShrink: 0, margin: '0.45em 0', padding: '0 8px' }}>
-          <div style={{
-            background: 'var(--block)',
-            borderRadius: 12,
-            padding: '8px 12px 5px',
-            boxShadow: '0 1px 4px rgba(0, 0, 0, 0.22)',
-          }}>
+          <div
+            style={{
+              background: 'var(--block)',
+              borderRadius: 12,
+              padding: '8px 12px 5px',
+              boxShadow: '0 1px 4px rgba(0, 0, 0, 0.22)',
+            }}
+          >
             {/* 附件 chips 行（预览/删除；随发送清空） */}
             {atts.length > 0 && (
               <AttachmentChips
@@ -339,11 +386,19 @@ export default function PanelChat() {
 
             {/* 输入行：⚡ prompt + textarea + 发送/停止（度量同终端输入栏） */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{
-                minWidth: 16, height: 24, lineHeight: 1,
-                color: 'var(--accent-warm)', userSelect: 'none', flexShrink: 0,
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              }}>
+              <span
+                style={{
+                  minWidth: 16,
+                  height: 24,
+                  lineHeight: 1,
+                  color: 'var(--accent-warm)',
+                  userSelect: 'none',
+                  flexShrink: 0,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
                 <Zap size={13} />
               </span>
               <textarea
@@ -386,10 +441,17 @@ export default function PanelChat() {
                   }
                 }}
                 style={{
-                  flex: 1, minWidth: 0, resize: 'none',
-                  background: 'transparent', border: 'none', padding: '1px 0',
-                  fontSize: 13, fontFamily: 'var(--font-mono)',
-                  color: 'var(--text-primary)', lineHeight: '22px', outline: 'none',
+                  flex: 1,
+                  minWidth: 0,
+                  resize: 'none',
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '1px 0',
+                  fontSize: 13,
+                  fontFamily: 'var(--font-mono)',
+                  color: 'var(--text-primary)',
+                  lineHeight: '22px',
+                  outline: 'none',
                 }}
               />
               <span style={{ marginRight: 6, display: 'inline-flex', alignItems: 'center' }}>
@@ -402,12 +464,25 @@ export default function PanelChat() {
                   title="停止生成"
                   onClick={() => abortStream(activeId)}
                   style={{
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
-                    background: 'transparent', color: 'var(--accent-warm)', cursor: 'pointer', flexShrink: 0,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 24,
+                    height: 24,
+                    padding: 0,
+                    border: 'none',
+                    borderRadius: 4,
+                    background: 'transparent',
+                    color: 'var(--accent-warm)',
+                    cursor: 'pointer',
+                    flexShrink: 0,
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--button-hover)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'var(--button-hover)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                  }}
                 >
                   <Square size={11} fill="currentColor" />
                 </button>
@@ -418,14 +493,25 @@ export default function PanelChat() {
                   onClick={submit}
                   disabled={!canSend}
                   style={{
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 24,
+                    height: 24,
+                    padding: 0,
+                    border: 'none',
+                    borderRadius: 4,
                     background: 'transparent',
                     color: canSend ? 'var(--accent-warm)' : 'var(--text-muted)',
-                    cursor: canSend ? 'pointer' : 'default', flexShrink: 0,
+                    cursor: canSend ? 'pointer' : 'default',
+                    flexShrink: 0,
                   }}
-                  onMouseEnter={(e) => { if (canSend) e.currentTarget.style.background = 'var(--button-hover)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                  onMouseEnter={(e) => {
+                    if (canSend) e.currentTarget.style.background = 'var(--button-hover)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                  }}
                 >
                   <ArrowUp size={13} />
                 </button>
@@ -433,15 +519,29 @@ export default function PanelChat() {
             </div>
 
             {/* 底部状态栏：目标 pane 上下文 + 权限模式 + 附件（AI 配置已上移到顶栏） */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              minHeight: 22, marginTop: 4, paddingTop: 5,
-              fontSize: 11, color: 'var(--text-muted)', userSelect: 'none',
-            }}>
-              <ShellIndicator connected={targetConnected} focused={targetFocused} label={targetInfo?.shell ?? '本地'} />
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                minHeight: 22,
+                marginTop: 4,
+                paddingTop: 5,
+                fontSize: 11,
+                color: 'var(--text-muted)',
+                userSelect: 'none',
+              }}
+            >
+              <ShellIndicator
+                connected={targetConnected}
+                focused={targetFocused}
+                label={targetInfo?.shell ?? '本地'}
+              />
               {targetInfo?.cwd && (
                 <>
-                  <span style={{ color: 'var(--border-strong)', opacity: 0.5, margin: '0 1px' }}>·</span>
+                  <span style={{ color: 'var(--border-strong)', opacity: 0.5, margin: '0 1px' }}>
+                    ·
+                  </span>
                   <CurrentDir dir={targetInfo.cwd} />
                 </>
               )}
@@ -458,9 +558,17 @@ export default function PanelChat() {
                     title={cur.title}
                     onClick={() => setPermMode(next.id)}
                     style={{
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
-                      background: 'transparent', color: cur.color, cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 24,
+                      height: 24,
+                      padding: 0,
+                      border: 'none',
+                      borderRadius: 4,
+                      background: 'transparent',
+                      color: cur.color,
+                      cursor: 'pointer',
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.background = 'var(--button-hover)';
@@ -479,9 +587,17 @@ export default function PanelChat() {
                 title="添加附件（图片 / 文件，也可直接粘贴或拖入）"
                 onClick={() => void pickFiles()}
                 style={{
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
-                  background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 24,
+                  height: 24,
+                  padding: 0,
+                  border: 'none',
+                  borderRadius: 4,
+                  background: 'transparent',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = 'var(--button-hover)';
@@ -498,14 +614,17 @@ export default function PanelChat() {
           </div>
         </div>
       )}
-
-
     </div>
   );
 }
 
 /** 快捷开关小按钮（prompt 行用，与 📎 同尺寸；开 = 暖色） */
-function QuickToggle({ icon: Icon, on, title, onClick }: {
+function QuickToggle({
+  icon: Icon,
+  on,
+  title,
+  onClick,
+}: {
   icon: typeof Globe;
   on: boolean;
   title: string;
@@ -517,10 +636,17 @@ function QuickToggle({ icon: Icon, on, title, onClick }: {
       title={title}
       onClick={onClick}
       style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 24,
+        height: 24,
+        padding: 0,
+        border: 'none',
+        borderRadius: 4,
         background: 'transparent',
-        color: on ? 'var(--accent-warm)' : 'var(--text-muted)', cursor: 'pointer',
+        color: on ? 'var(--accent-warm)' : 'var(--text-muted)',
+        cursor: 'pointer',
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = 'var(--button-hover)';
@@ -537,7 +663,10 @@ function QuickToggle({ icon: Icon, on, title, onClick }: {
 }
 
 /** 转录：连续同 pane 的交换归一段，段首 mono 标签（样式同面板分组标签） */
-function Transcript({ exchanges, paneLabel }: {
+function Transcript({
+  exchanges,
+  paneLabel,
+}: {
   exchanges: ChatExchange[];
   paneLabel: (paneId?: string) => string;
 }) {
@@ -550,11 +679,18 @@ function Transcript({ exchanges, paneLabel }: {
         return (
           <div key={ex.id}>
             {showTag && (
-              <div style={{
-                fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)',
-                padding: '10px 4px 2px', userSelect: 'none',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>
+              <div
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 11,
+                  color: 'var(--text-muted)',
+                  padding: '10px 4px 2px',
+                  userSelect: 'none',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
                 {paneLabel(ex.paneId)}
               </div>
             )}
@@ -568,9 +704,16 @@ function Transcript({ exchanges, paneLabel }: {
 
 function EmptyHint({ isSession }: { isSession: boolean }) {
   return (
-    <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, userSelect: 'none' }}>
+    <div
+      style={{
+        padding: 16,
+        textAlign: 'center',
+        color: 'var(--text-muted)',
+        fontSize: 12,
+        userSelect: 'none',
+      }}
+    >
       {isSession ? '描述问题，Enter 发送' : '打开一个终端会话开始对话'}
     </div>
   );
 }
-

@@ -1,27 +1,41 @@
 /**
  * api/search — 搜索/历史 API 包装参数测试。
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import {
-  searchFiles, searchHistory, getSearchContext, recordHistory,
-  historyStats, clearHistory, searchBlocks, searchSessions,
-} from './search';
+  clearHistory,
+  getSearchContext,
+  historyStats,
+  recordHistory,
+  searchBlocks,
+  searchFiles,
+  searchHistory,
+  searchSessions,
+} from '@/api/search';
 
 describe('api/search', () => {
   it('searchFiles：默认参数与显式 roots/root', async () => {
     invokeMock.mockResolvedValueOnce([]);
     await searchFiles('q');
     expect(invokeMock).toHaveBeenLastCalledWith('search_files', {
-      query: 'q', maxResults: 50, searchContent: false, root: null, roots: null,
+      query: 'q',
+      maxResults: 50,
+      searchContent: false,
+      root: null,
+      roots: null,
     });
     invokeMock.mockResolvedValueOnce([]);
     await searchFiles('q', 10, true, '/a', ['/b', '/c']);
     expect(invokeMock).toHaveBeenLastCalledWith('search_files', {
-      query: 'q', maxResults: 10, searchContent: true, root: '/a', roots: ['/b', '/c'],
+      query: 'q',
+      maxResults: 10,
+      searchContent: true,
+      root: '/a',
+      roots: ['/b', '/c'],
     });
   });
 
@@ -29,12 +43,20 @@ describe('api/search', () => {
     invokeMock.mockResolvedValueOnce([]);
     await searchHistory('q');
     expect(invokeMock).toHaveBeenLastCalledWith('search_history', {
-      query: 'q', maxResults: 30, filterExitCode: null, since: null, cwd: null,
+      query: 'q',
+      maxResults: 30,
+      filterExitCode: null,
+      since: null,
+      cwd: null,
     });
     invokeMock.mockResolvedValueOnce([]);
     await searchHistory('q', 5, 1, 1000, '/w');
     expect(invokeMock).toHaveBeenLastCalledWith('search_history', {
-      query: 'q', maxResults: 5, filterExitCode: 1, since: 1000, cwd: '/w',
+      query: 'q',
+      maxResults: 5,
+      filterExitCode: 1,
+      since: 1000,
+      cwd: '/w',
     });
   });
 
@@ -48,7 +70,12 @@ describe('api/search', () => {
 
     invokeMock.mockResolvedValueOnce(undefined);
     await recordHistory('echo hi', '/w', 0, 123);
-    expect(invokeMock).toHaveBeenLastCalledWith('record_history', { command: 'echo hi', cwd: '/w', exitCode: 0, timestamp: 123 });
+    expect(invokeMock).toHaveBeenLastCalledWith('record_history', {
+      command: 'echo hi',
+      cwd: '/w',
+      exitCode: 0,
+      timestamp: 123,
+    });
 
     invokeMock.mockResolvedValueOnce([]);
     await historyStats(5);
@@ -60,10 +87,18 @@ describe('api/search', () => {
 
     invokeMock.mockResolvedValueOnce([]);
     await searchBlocks('q');
-    expect(invokeMock).toHaveBeenLastCalledWith('search_blocks', { query: 'q', maxResults: 20, filterSessionStatus: null });
+    expect(invokeMock).toHaveBeenLastCalledWith('search_blocks', {
+      query: 'q',
+      maxResults: 20,
+      filterSessionStatus: null,
+    });
     invokeMock.mockResolvedValueOnce([]);
     await searchBlocks('q', 3, 'historical');
-    expect(invokeMock).toHaveBeenLastCalledWith('search_blocks', { query: 'q', maxResults: 3, filterSessionStatus: 'historical' });
+    expect(invokeMock).toHaveBeenLastCalledWith('search_blocks', {
+      query: 'q',
+      maxResults: 3,
+      filterSessionStatus: 'historical',
+    });
 
     invokeMock.mockResolvedValueOnce([]);
     await searchSessions('q');

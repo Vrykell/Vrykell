@@ -13,16 +13,12 @@
  */
 
 import { tool } from 'ai';
-import { DESC_READ_TERMINAL, DESC_TERMINAL_KEYS } from '../toolTexts';
 import { z } from 'zod';
-import { ptyWrite } from '../../lib/pty';
-import {
-  getFocusedTerminalId,
-  getTerminalScreen,
-  useTerminalStore,
-} from '../../stores/terminal';
-import { useBlockStore } from '../../stores/blocks';
-import { gate, type ToolContext } from '../permissions';
+import { gate, type ToolContext } from '@/agent/permissions';
+import { DESC_READ_TERMINAL, DESC_TERMINAL_KEYS } from '@/agent/toolTexts';
+import { ptyWrite } from '@/lib/pty';
+import { useBlockStore } from '@/stores/blocks';
+import { getFocusedTerminalId, getTerminalScreen, useTerminalStore } from '@/stores/terminal';
 
 const BLOCK_OUTPUT_CAP = 2000;
 const BLOCK_COUNT = 4;
@@ -69,8 +65,18 @@ export function buildTerminalTools(ctx: ToolContext) {
     terminal_keys: tool({
       description: DESC_TERMINAL_KEYS,
       inputSchema: z.object({
-        keys: z.string().describe('要发送的按键序列；退格=\\b、Ctrl+X=\\u0018、Esc=\\e 或 \\u001b、↑=\\u001b[A，其余控制字符同理用 \\uXXXX 或 \\xNN'),
-        wait_ms: z.number().int().min(0).max(3000).optional().describe('发送后等待毫秒让画面更新，默认 300'),
+        keys: z
+          .string()
+          .describe(
+            '要发送的按键序列；退格=\\b、Ctrl+X=\\u0018、Esc=\\e 或 \\u001b、↑=\\u001b[A，其余控制字符同理用 \\uXXXX 或 \\xNN',
+          ),
+        wait_ms: z
+          .number()
+          .int()
+          .min(0)
+          .max(3000)
+          .optional()
+          .describe('发送后等待毫秒让画面更新，默认 300'),
       }),
       execute: async ({ keys, wait_ms }, { toolCallId }) => {
         const g = await gate('terminal_keys', { keys }, toolCallId, ctx);
@@ -94,7 +100,10 @@ export function buildTerminalTools(ctx: ToolContext) {
         try {
           await ptyWrite(sessionId, normalized);
         } catch (e) {
-          return { ok: false, error: `写入终端失败: ${e instanceof Error ? e.message : String(e)}` };
+          return {
+            ok: false,
+            error: `写入终端失败: ${e instanceof Error ? e.message : String(e)}`,
+          };
         }
         const wait = wait_ms ?? 300;
         if (wait > 0) await new Promise((r) => setTimeout(r, wait));

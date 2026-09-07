@@ -4,26 +4,26 @@
  * 主 xterm 只在 classic / altScreen 场景接收数据（blockList 下闲置隐藏）。
  */
 
-import { useEffect, useRef } from 'react';
-import { Terminal } from '@xterm/xterm';
-import { WebglAddon } from '@xterm/addon-webgl';
+import type { UnlistenFn } from '@tauri-apps/api/event';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
-import { ptySpawn, ptyWrite, ptyResize, ptyClose, onPtyOutput, onPtyExit } from '../lib/pty';
-import { registerTerminal, unregisterTerminal, useTerminalStore } from '../stores/terminal';
-import { useBlockStore } from '../stores/blocks';
-import { useHistoryStore } from '../stores/history';
-import { useWorkspaceStore } from '../stores/workspace';
-import { leaves as layoutLeaves } from '../lib/windowLayout';
-import * as sessionManager from '../lib/sessionManager';
-import { agentControl } from '../agent/agentControl';
-import { defaultOpenModeForShell } from '../agent/agentSettings';
-import { SessionController } from './pipeline/sessionController';
-import { getCellMetrics } from '../lib/termMetrics';
-import type { DispatchEvent } from './pipeline/events';
-import type { TermBlock } from './pipeline/termBlock';
-import type { UnlistenFn } from '@tauri-apps/api/event';
-import { XTERM_FONT_FAMILY } from './terminalSnapshot';
+import { WebglAddon } from '@xterm/addon-webgl';
+import { Terminal } from '@xterm/xterm';
+import { useEffect, useRef } from 'react';
+import { agentControl } from '@/agent/agentControl';
+import { defaultOpenModeForShell } from '@/agent/agentSettings';
+import { onPtyExit, onPtyOutput, ptyClose, ptyResize, ptySpawn, ptyWrite } from '@/lib/pty';
+import * as sessionManager from '@/lib/sessionManager';
+import { getCellMetrics } from '@/lib/termMetrics';
+import { leaves as layoutLeaves } from '@/lib/windowLayout';
+import { useBlockStore } from '@/stores/blocks';
+import { useHistoryStore } from '@/stores/history';
+import { registerTerminal, unregisterTerminal, useTerminalStore } from '@/stores/terminal';
+import { useWorkspaceStore } from '@/stores/workspace';
+import type { DispatchEvent } from '@/terminal/pipeline/events';
+import { SessionController } from '@/terminal/pipeline/sessionController';
+import type { TermBlock } from '@/terminal/pipeline/termBlock';
+import { XTERM_FONT_FAMILY } from '@/terminal/terminalSnapshot';
 
 /**
  * TermBlock UI 投影：剥离 controller 内部字段（outputTerm/earlyBuf 等）。
@@ -31,7 +31,12 @@ import { XTERM_FONT_FAMILY } from './terminalSnapshot';
  * 否则下一次 onBlocksChanged 会把用户的书签冲掉。
  * agent 标记同理——真源在 agentControl 注册表，投影时按 id 查回。
  */
-function projectBlock(b: TermBlock, bookmarked: boolean, collapsed: boolean, agent: boolean): TermBlock {
+function projectBlock(
+  b: TermBlock,
+  bookmarked: boolean,
+  collapsed: boolean,
+  agent: boolean,
+): TermBlock {
   return {
     id: b.id,
     command: b.command,
@@ -88,16 +93,18 @@ const widthSyncs = new Map<string, () => void>();
  * 注意：只能动私有 _core，open 之后调用；xterm 升级时需回归验证。
  */
 export function applyCompactCharSize(term: Terminal): void {
-  const core = (term as unknown as {
-    _core?: {
-      _charSizeService?: {
-        height?: number;
-        onCharSizeChange?: (cb: () => void) => { dispose(): void };
-        _compactPatched?: boolean;
+  const core = (
+    term as unknown as {
+      _core?: {
+        _charSizeService?: {
+          height?: number;
+          onCharSizeChange?: (cb: () => void) => { dispose(): void };
+          _compactPatched?: boolean;
+        };
+        _renderService?: { handleCharSizeChanged?: () => void };
       };
-      _renderService?: { handleCharSizeChanged?: () => void };
-    };
-  })._core;
+    }
+  )._core;
   const cs = core?._charSizeService;
   const render = core?._renderService;
   if (!cs?.onCharSizeChange || !render?.handleCharSizeChanged) return;
@@ -149,7 +156,8 @@ export function useTerminalSession(
       theme: {
         background: cs.getPropertyValue('--xterm-bg').trim() || '#050505',
         cursor: cs.getPropertyValue('--xterm-cursor').trim() || '#e8e8e8',
-        selectionBackground: cs.getPropertyValue('--xterm-selection').trim() || 'rgba(255,255,255,0.25)',
+        selectionBackground:
+          cs.getPropertyValue('--xterm-selection').trim() || 'rgba(255,255,255,0.25)',
       },
     });
     const fit = new FitAddon();
@@ -182,69 +190,89 @@ export function useTerminalSession(
 
     // 从窗口布局取该终端的打开模式（paneId 即终端 id）
     const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === tabId);
-    const spec = tab && tab.kind === 'session'
-      ? layoutLeaves(tab.layout).find((t) => t.id === paneId)
-      : undefined;
+    const spec =
+      tab && tab.kind === 'session'
+        ? layoutLeaves(tab.layout).find((t) => t.id === paneId)
+        : undefined;
     // 打开模式：spec.openMode 优先；老会话缺省时 SSH 回退 classic、local 按 shell 类型
-    const openMode = spec?.openMode ?? (spec?.kind === 'ssh' ? 'classic' : defaultOpenModeForShell(spec?.shellType));
+    const openMode =
+      spec?.openMode ??
+      (spec?.kind === 'ssh' ? 'classic' : defaultOpenModeForShell(spec?.shellType));
     const blockEnabled = openMode === 'block';
     const initialScene: 'classic' | 'blockList' = blockEnabled ? 'blockList' : 'classic';
 
     // 场景本地镜像（onSceneChanged 同步）：决定 resize 用全宽还是卡片宽
     let currentScene: 'classic' | 'blockList' | 'altScreen' = initialScene;
-    const controller = new SessionController(paneId, term.cols, {      writeMain: (data) => term.write(data),
-      getBookmarkedIds: () =>
-        new Set((useBlockStore.getState().byTab[paneId] ?? []).filter((b) => b.bookmarked).map((b) => b.id)),
-      onBlocksChanged: () => {
-        const prev = useBlockStore.getState().byTab[paneId] ?? [];
-        const bookmarkedIds = new Set(prev.filter((b) => b.bookmarked).map((b) => b.id));
-        const collapsedIds = new Set(prev.filter((b) => b.collapsed).map((b) => b.id));
-        useBlockStore.getState().setBlocks(
-          paneId,
-          controller.blocks.map((b) =>
-            projectBlock(b, bookmarkedIds.has(b.id), collapsedIds.has(b.id), agentControl.hasBlock(b.id)),
+    const controller = new SessionController(
+      paneId,
+      term.cols,
+      {
+        writeMain: (data) => term.write(data),
+        getBookmarkedIds: () =>
+          new Set(
+            (useBlockStore.getState().byTab[paneId] ?? [])
+              .filter((b) => b.bookmarked)
+              .map((b) => b.id),
           ),
-        );
+        onBlocksChanged: () => {
+          const prev = useBlockStore.getState().byTab[paneId] ?? [];
+          const bookmarkedIds = new Set(prev.filter((b) => b.bookmarked).map((b) => b.id));
+          const collapsedIds = new Set(prev.filter((b) => b.collapsed).map((b) => b.id));
+          useBlockStore.getState().setBlocks(
+            paneId,
+            controller.blocks.map((b) =>
+              projectBlock(
+                b,
+                bookmarkedIds.has(b.id),
+                collapsedIds.has(b.id),
+                agentControl.hasBlock(b.id),
+              ),
+            ),
+          );
+        },
+        onSceneChanged: (scene) => {
+          currentScene = scene;
+          useTerminalStore.getState().setScene(paneId, scene);
+          if (useWorkspaceStore.getState().activeId !== tabId) return;
+          // 注意：真实 altScreen（1049h）不得触碰 altScreenActive ——
+          // 该 flag 仅表示「用户手动全屏块终端」（TerminalBlockList 进入全屏交互），
+          // 误设会让 TerminalView 判定 manualTui，把持有 TUI 输出的主 xterm 用
+          // opacity:0 藏掉，用户看到冻结画面且键盘如无响应。
+          if (scene === 'blockList') {
+            term.reset(); // 清掉 classic 残留
+            useTerminalStore.getState().setKeyboardTarget('input');
+          } else {
+            useTerminalStore.getState().setKeyboardTarget('terminal');
+            focusTimer = setTimeout(() => term.focus(), 50);
+          }
+          // 场景切换改变有效宽度（blockList=卡片宽，其余=全宽），重新校核
+          applyWidth();
+        },
+        onCwd: (path) => {
+          useWorkspaceStore.getState().setTerminalCwd(paneId, path);
+        },
+        onBlockStart: (block) => {
+          sessionManager.record(tabId, paneId, block, 'start');
+          // 惯用命名：标题跟随「聚焦终端」的首条命令（未定名时）
+          if (block.command && paneId === useTerminalStore.getState().focusedPaneId) {
+            useWorkspaceStore.getState().titleFromCommand(tabId, block.command);
+          }
+        },
+        onBlockComplete: (block) => {
+          useHistoryStore.getState().record(block.command, block.cwd ?? '', block.exitCode);
+          sessionManager.record(tabId, paneId, block, 'complete');
+          // 手动全屏（「进入全屏交互」）的运行块完成时退出全屏，回到块列表
+          const ts = useTerminalStore.getState();
+          if (ts.scenes[paneId] === 'altScreen') {
+            ts.setScene(paneId, 'blockList');
+            ts.setAltScreenActive(false);
+          }
+        },
       },
-      onSceneChanged: (scene) => {
-        currentScene = scene;
-        useTerminalStore.getState().setScene(paneId, scene);
-        if (useWorkspaceStore.getState().activeId !== tabId) return;
-        // 注意：真实 altScreen（1049h）不得触碰 altScreenActive ——
-        // 该 flag 仅表示「用户手动全屏块终端」（TerminalBlockList 进入全屏交互），
-        // 误设会让 TerminalView 判定 manualTui，把持有 TUI 输出的主 xterm 用
-        // opacity:0 藏掉，用户看到冻结画面且键盘如无响应。
-        if (scene === 'blockList') {
-          term.reset(); // 清掉 classic 残留
-          useTerminalStore.getState().setKeyboardTarget('input');
-        } else {
-          useTerminalStore.getState().setKeyboardTarget('terminal');
-          focusTimer = setTimeout(() => term.focus(), 50);
-        }
-        // 场景切换改变有效宽度（blockList=卡片宽，其余=全宽），重新校核
-        applyWidth();
-      },
-      onCwd: (path) => {
-        useWorkspaceStore.getState().setTerminalCwd(paneId, path);
-      },
-      onBlockStart: (block) => {
-        sessionManager.record(tabId, paneId, block, 'start');
-        // 惯用命名：标题跟随「聚焦终端」的首条命令（未定名时）
-        if (block.command && paneId === useTerminalStore.getState().focusedPaneId) {
-          useWorkspaceStore.getState().titleFromCommand(tabId, block.command);
-        }
-      },
-      onBlockComplete: (block) => {
-        useHistoryStore.getState().record(block.command, block.cwd ?? '', block.exitCode);
-        sessionManager.record(tabId, paneId, block, 'complete');
-        // 手动全屏（「进入全屏交互」）的运行块完成时退出全屏，回到块列表
-        const ts = useTerminalStore.getState();
-        if (ts.scenes[paneId] === 'altScreen') {
-          ts.setScene(paneId, 'blockList');
-          ts.setAltScreenActive(false);
-        }
-      },
-    }, term.rows, initialScene, blockEnabled);
+      term.rows,
+      initialScene,
+      blockEnabled,
+    );
     sessionControllers.set(paneId, controller);
     // 初始场景手动落位（无 OSC 133 触发）：
     // blockList → 清 classic 残留、焦点到输入栏；classic → 焦点到 xterm 直接打字
@@ -291,11 +319,15 @@ export function useTerminalSession(
 
     // 类型/cwd 已在 controller 创建前取好（spec）
     const tabCwd = spec?.cwd;
-    const spawnOpts = spec?.kind === 'ssh'
-      ? { ssh: { host: spec.ssh?.host ?? '', user: spec.ssh?.user, port: spec.ssh?.port }, openMode }
-      : spec?.kind === 'local' && spec.shellType
-        ? { shell: spec.shellType }
-        : undefined;
+    const spawnOpts =
+      spec?.kind === 'ssh'
+        ? {
+            ssh: { host: spec.ssh?.host ?? '', user: spec.ssh?.user, port: spec.ssh?.port },
+            openMode,
+          }
+        : spec?.kind === 'local' && spec.shellType
+          ? { shell: spec.shellType }
+          : undefined;
     // 分屏 pane 初次挂载时容器可能尚未布局，fit 会算出 0×0；用兜底尺寸先启动，
     // 等 ResizeObserver/就绪后重校到真实尺寸，避免 PTY 以 0×0 启动导致空白。
     const spawnCols = term.cols > 0 ? term.cols : 80;
@@ -442,9 +474,7 @@ export function useTerminalSession(
       // 有运行中卡片宿主时实测（自动覆盖滚动条挤占等偏差）；
       // 否则用容器宽 − 卡片常量。宿主 clientWidth 含 .xterm 左右各 8px padding。
       const host = document.querySelector<HTMLElement>('[data-testid="running-term"]');
-      const screenPx = host
-        ? host.clientWidth - 16
-        : el.offsetWidth - CARD_CHROME_PX;
+      const screenPx = host ? host.clientWidth - 16 : el.offsetWidth - CARD_CHROME_PX;
       // 宿主折叠（display:none / 布局过渡中 clientWidth≈0）→ screenPx≤0，
       // 退回主 xterm 全宽，等宿主落位后 ResizeObserver 再按真实卡片宽校正。
       if (screenPx <= 0) return term.cols;

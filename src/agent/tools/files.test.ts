@@ -2,7 +2,7 @@
  * 文件/搜索工具（M2）测试：mock Tauri invoke 边界，验证结构化结果映射
  * （execute 永不 throw；Err → { ok:false, error }）与输出格式化。
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 // vi.hoisted + 直接引用（对齐 ai.test.ts）。
 // 注意：不要用 beforeEach 清 mock —— 本仓库 vitest 4 环境下 beforeEach 存在时
@@ -11,23 +11,30 @@ import { describe, it, expect, vi } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { buildFileTools } from './files';
-import { buildSearchTools } from './search';
-import { usePermissions, type ToolContext } from '../permissions';
+import { type ToolContext, usePermissions } from '@/agent/permissions';
+import { buildFileTools } from '@/agent/tools/files';
+import { buildSearchTools } from '@/agent/tools/search';
 
 // 本文件测 invoke 参数/结果映射，不测门控（门控见 permissions.test.ts）：
 // 全部工具置 allow，ctx 留空
 usePermissions.setState({
   levels: {
-    run_command: 'allow', read_file: 'allow', write_file: 'allow', edit_file: 'allow',
-    list_dir: 'allow', search_files: 'allow', web_search: 'allow',
+    run_command: 'allow',
+    read_file: 'allow',
+    write_file: 'allow',
+    edit_file: 'allow',
+    list_dir: 'allow',
+    search_files: 'allow',
+    web_search: 'allow',
   },
 });
 const CTX: ToolContext = {};
 
 // AI SDK tool() 包的 execute 签名较繁，这里只关心入参→结果映射；
 // 第二参（{toolCallId, abortSignal}）给空对象即可（gate 在 allow 级不碰它）
-type Exec = (args: Record<string, unknown>) => Promise<{ ok: boolean; result?: string; error?: string }>;
+type Exec = (
+  args: Record<string, unknown>,
+) => Promise<{ ok: boolean; result?: string; error?: string }>;
 const execOf = (t: unknown): Exec => {
   const e = (t as { execute: (a: unknown, o: unknown) => Promise<never> }).execute;
   return (args) => e(args, {});
@@ -37,7 +44,10 @@ describe('buildFileTools', () => {
   it('read_file：透传 path/maxBytes（camelCase），返回内容', async () => {
     invokeMock.mockResolvedValue('file body');
     const r = await execOf(buildFileTools(CTX).read_file)({ path: '/tmp/a.txt', max_bytes: 100 });
-    expect(invokeMock).toHaveBeenCalledWith('read_file_text', { path: '/tmp/a.txt', maxBytes: 100 });
+    expect(invokeMock).toHaveBeenCalledWith('read_file_text', {
+      path: '/tmp/a.txt',
+      maxBytes: 100,
+    });
     expect(r).toEqual({ ok: true, result: 'file body' });
   });
 
@@ -89,7 +99,11 @@ describe('buildSearchTools', () => {
       { path: '/p/a.ts', line: 3, preview: 'const x = 1' },
       { path: '/p/b.ts', line: null, preview: 'b.ts' },
     ]);
-    const r = await execOf(buildSearchTools(CTX).search_files)({ root: '/p', query: 'x', content: true });
+    const r = await execOf(buildSearchTools(CTX).search_files)({
+      root: '/p',
+      query: 'x',
+      content: true,
+    });
     expect(invokeMock).toHaveBeenCalledWith('fs_search', {
       root: '/p',
       query: 'x',

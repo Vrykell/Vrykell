@@ -5,9 +5,9 @@
  * 前端把已连接服务器暴露的工具包装成 AI SDK 工具，命名空间为 `mcp__<server>__<tool>`。
  */
 
-import { tool, jsonSchema } from 'ai';
 import { invoke } from '@tauri-apps/api/core';
-import { gate, type ToolContext } from './permissions';
+import { jsonSchema, tool } from 'ai';
+import { gate, type ToolContext } from '@/agent/permissions';
 
 /** 服务器状态（Rust mcp_get_servers 返回）。 */
 export interface McpServer {
@@ -40,7 +40,8 @@ export interface McpExposedTool {
 }
 
 export const listMcpServers = () => invoke<McpServer[]>('mcp_get_servers');
-export const saveMcpServer = (config: McpServerConfig) => invoke<void>('mcp_save_server', { config });
+export const saveMcpServer = (config: McpServerConfig) =>
+  invoke<void>('mcp_save_server', { config });
 export const removeMcpServer = (name: string) => invoke<void>('mcp_remove_server', { name });
 export const toggleMcpServer = (name: string, enabled: boolean) =>
   invoke<void>('mcp_toggle_server', { name, enabled });

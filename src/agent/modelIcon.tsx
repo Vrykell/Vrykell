@@ -3,10 +3,11 @@
  *
  * 按服务商给主图标，推理型模型叠加专属图标，保证视觉可区分。
  */
-import { Bot, BrainCircuit, Orbit, Sparkles, type LucideIcon } from 'lucide-react';
-import type { ProviderKind } from './provider';
+import { Bot, BrainCircuit, type LucideIcon, Orbit, Sparkles } from 'lucide-react';
+import type { ProviderKind } from '@/agent/provider';
 
-const REASONING_RE = /reasoner|reasoning|thinking|think|o1|o3|o4|gpt-5|deepseek-r1|claude-sonnet|claude-opus|gemini-2\.5-pro|kimi.*thinking/i;
+const REASONING_RE =
+  /reasoner|reasoning|thinking|think|o1|o3|o4|gpt-5|deepseek-r1|claude-sonnet|claude-opus|gemini-2\.5-pro|kimi.*thinking/i;
 
 /** 模型主图标：推理型优先，其次按服务商。 */
 export function modelIcon(provider: ProviderKind, model: string): LucideIcon {

@@ -1,12 +1,12 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
-import { Terminal, Settings, Search } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { useDockStore, PANEL_DEFS, type DockSide } from '../stores/dock';
-import DockButton from './DockButton';
-import { ToolbarBtn } from './UiBtn';
-import { useUiStore } from '../stores/ui';
-import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
-import { isMacOS } from '../lib/platform';
+import { Search, Settings, Terminal } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import DockButton from '@/components/DockButton';
+import { ToolbarBtn } from '@/components/UiBtn';
+import { isMacOS } from '@/lib/platform';
+import { type DockSide, PANEL_DEFS, useDockStore } from '@/stores/dock';
+import { useUiStore } from '@/stores/ui';
+import { isSessionTab, useWorkspaceStore } from '@/stores/workspace';
 
 /** 按 clientX 判定落在哪个 zone */
 function hitZone(
@@ -25,7 +25,7 @@ function hitZone(
   if (leftEl && rightEl) {
     const lr = leftEl.getBoundingClientRect().right;
     const rl = rightEl.getBoundingClientRect().left;
-    return (clientX - lr < rl - clientX) ? 'left' : 'right';
+    return clientX - lr < rl - clientX ? 'left' : 'right';
   }
   return null;
 }
@@ -44,8 +44,15 @@ function insertIndex(zoneEl: HTMLElement, dragId: string, clientX: number): numb
   return idx;
 }
 
-interface DragInfo { btnId: string; zone: DockSide; startX: number }
-interface DropTarget { zone: DockSide; index: number }
+interface DragInfo {
+  btnId: string;
+  zone: DockSide;
+  startX: number;
+}
+interface DropTarget {
+  zone: DockSide;
+  index: number;
+}
 
 const DRAG_THRESHOLD = 3;
 const BAR_H = 40; // 顶栏整体高度
@@ -76,7 +83,10 @@ export default function TopDock() {
     if (!isMacOS) return;
     let disposed = false;
     let unlisten: (() => void) | undefined;
-    let win: { isFullscreen: () => Promise<boolean>; onResized: (cb: () => void) => Promise<() => void> } | null = null;
+    let win: {
+      isFullscreen: () => Promise<boolean>;
+      onResized: (cb: () => void) => Promise<() => void>;
+    } | null = null;
     try {
       win = getCurrentWindow();
     } catch {
@@ -91,8 +101,11 @@ export default function TopDock() {
       }
     };
     sync();
-    win.onResized(() => sync())
-      .then((fn) => { unlisten = fn; })
+    win
+      .onResized(() => sync())
+      .then((fn) => {
+        unlisten = fn;
+      })
       .catch(() => {});
     return () => {
       disposed = true;
@@ -100,10 +113,13 @@ export default function TopDock() {
     };
   }, []);
 
-  const handleBtnMouseDown = useCallback((e: React.MouseEvent, btnId: string) => {
-    const zone: DockSide = leftZone.includes(btnId) ? 'left' : 'right';
-    dragRef.current = { btnId, zone, startX: e.clientX };
-  }, [leftZone]);
+  const handleBtnMouseDown = useCallback(
+    (e: React.MouseEvent, btnId: string) => {
+      const zone: DockSide = leftZone.includes(btnId) ? 'left' : 'right';
+      dragRef.current = { btnId, zone, startX: e.clientX };
+    },
+    [leftZone],
+  );
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
@@ -168,7 +184,10 @@ export default function TopDock() {
     const visibleIds = ids.filter((id) => id !== 'chat' || isSessionActive);
 
     return (
-      <div ref={ref} style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '0 4px', borderRadius: 5 }}>
+      <div
+        ref={ref}
+        style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '0 4px', borderRadius: 5 }}
+      >
         {visibleIds.map((id, i) => (
           <span key={id} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             {show && dropTarget!.index === i && <DropMarker />}
@@ -185,30 +204,54 @@ export default function TopDock() {
   }
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', height: BAR_H, flexShrink: 0,
-      background: 'var(--surface)', borderBottom: '1px solid var(--block-divider)',
-      paddingRight: 6, userSelect: 'none',
-      position: 'relative',
-    }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        height: BAR_H,
+        flexShrink: 0,
+        background: 'var(--surface)',
+        borderBottom: '1px solid var(--block-divider)',
+        paddingRight: 6,
+        userSelect: 'none',
+        position: 'relative',
+      }}
+    >
       {/* 左侧窗口拖拽区 — macOS 红绿灯保留空间（全屏时红绿灯隐藏，无需预留；Windows 无需预留） */}
-      <div data-tauri-drag-region style={{ width: isMacOS && !fullscreen ? 78 : 0, height: BAR_H, flexShrink: 0 }} />
+      <div
+        data-tauri-drag-region
+        style={{ width: isMacOS && !fullscreen ? 78 : 0, height: BAR_H, flexShrink: 0 }}
+      />
       {renderZone('left', leftZone, leftPanels)}
       {/* 全局搜索触发器 — 绝对居中，点击打开居中搜索窗 */}
       <button
         data-testid="global-search-trigger"
         onClick={() => useUiStore.getState().setGlobalSearchOpen(true)}
         style={{
-          position: 'absolute', left: '50%', transform: 'translateX(-50%)',
-          display: 'flex', alignItems: 'center', gap: 6,
-          background: 'var(--block)', border: 'none',
-          borderRadius: 6, padding: '0 10px', height: 28, width: 360, maxWidth: '44vw',
-          color: 'var(--text-muted)', cursor: 'pointer',
-          fontSize: 12, fontFamily: 'var(--font-ui)', textAlign: 'left',
+          position: 'absolute',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          background: 'var(--block)',
+          border: 'none',
+          borderRadius: 6,
+          padding: '0 10px',
+          height: 28,
+          width: 360,
+          maxWidth: '44vw',
+          color: 'var(--text-muted)',
+          cursor: 'pointer',
+          fontSize: 12,
+          fontFamily: 'var(--font-ui)',
+          textAlign: 'left',
         }}
       >
         <Search size={11} style={{ flexShrink: 0 }} />
-        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span
+          style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+        >
           搜索文件、命令、设置…
         </span>
       </button>
@@ -218,20 +261,23 @@ export default function TopDock() {
       <ToolbarBtn title="设置（⌘,）" onClick={() => useWorkspaceStore.getState().openSettingsTab()}>
         <Settings size={16} />
       </ToolbarBtn>
-      <span style={{
-        display: 'inline-flex', alignItems: 'center', gap: 4,
-        fontSize: 10, color: 'var(--text-muted)', paddingLeft: 6, paddingRight: 2,
-      }}>
+      <span
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
+          fontSize: 10,
+          color: 'var(--text-muted)',
+          paddingLeft: 6,
+          paddingRight: 2,
+        }}
+      >
         <Terminal size={11} /> Vrykell
       </span>
 
       {/* 拖拽跟随光标预览 */}
       {dragCursor && dragRef.current && (
-        <DragPreview
-          btnId={dragRef.current.btnId}
-          x={dragCursor.x}
-          y={dragCursor.y}
-        />
+        <DragPreview btnId={dragRef.current.btnId} x={dragCursor.x} y={dragCursor.y} />
       )}
     </div>
   );
@@ -240,12 +286,17 @@ export default function TopDock() {
 /** 拖拽插入标记 — 醒目的蓝色光标线 + 两侧间距 */
 function DropMarker() {
   return (
-    <div style={{
-      width: 4, height: 20, borderRadius: 2, flexShrink: 0,
-      background: 'var(--accent)',
-      boxShadow: '0 0 6px 2px rgba(255,255,255,0.45)',
-      margin: '0 3px',
-    }} />
+    <div
+      style={{
+        width: 4,
+        height: 20,
+        borderRadius: 2,
+        flexShrink: 0,
+        background: 'var(--accent)',
+        boxShadow: '0 0 6px 2px rgba(255,255,255,0.45)',
+        margin: '0 3px',
+      }}
+    />
   );
 }
 
@@ -256,21 +307,28 @@ function DragPreview({ btnId, x, y }: { btnId: string; x: number; y: number }) {
   const Icon = def.icon;
 
   return (
-    <div style={{
-      position: 'fixed', left: x, top: y,
-      width: 24, height: 24,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      lineHeight: 1,
-      borderRadius: 5,
-      background: 'var(--elevated)',
-      border: '1px solid var(--border-strong)',
-      color: 'var(--text-primary)',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.4), 0 0 8px rgba(255,255,255,0.25)',
-      transform: 'translate(8px, 8px)',  // 稍微偏移，不遮挡光标
-      pointerEvents: 'none',
-      zIndex: 9999,
-      opacity: 0.92,
-    }}>
+    <div
+      style={{
+        position: 'fixed',
+        left: x,
+        top: y,
+        width: 24,
+        height: 24,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        lineHeight: 1,
+        borderRadius: 5,
+        background: 'var(--elevated)',
+        border: '1px solid var(--border-strong)',
+        color: 'var(--text-primary)',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.4), 0 0 8px rgba(255,255,255,0.25)',
+        transform: 'translate(8px, 8px)', // 稍微偏移，不遮挡光标
+        pointerEvents: 'none',
+        zIndex: 9999,
+        opacity: 0.92,
+      }}
+    >
       <Icon size={14} />
     </div>
   );

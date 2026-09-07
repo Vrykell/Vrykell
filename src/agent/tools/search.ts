@@ -7,10 +7,10 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
-import { DESC_LIST_DIR, DESC_SEARCH_FILES } from '../toolTexts';
 import { tool } from 'ai';
 import { z } from 'zod';
-import { gate, type ToolContext } from '../permissions';
+import { gate, type ToolContext } from '@/agent/permissions';
+import { DESC_LIST_DIR, DESC_SEARCH_FILES } from '@/agent/toolTexts';
 
 interface FsEntry {
   name: string;
@@ -38,7 +38,8 @@ export function buildSearchTools(ctx: ToolContext) {
           const entries = await invoke<FsEntry[]>('fs_list', { path });
           return {
             ok: true,
-            result: entries.map((e) => `${e.is_dir ? '📁' : '📄'} ${e.name}`).join('\n') || '（空目录）',
+            result:
+              entries.map((e) => `${e.is_dir ? '📁' : '📄'} ${e.name}`).join('\n') || '（空目录）',
           };
         } catch (e) {
           return { ok: false, error: e instanceof Error ? e.message : String(e) };

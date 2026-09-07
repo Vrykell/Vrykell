@@ -1,8 +1,8 @@
 import { create } from 'zustand';
-import type { TermBlock } from '../terminal/pipeline/termBlock';
-import { useToastStore } from '../components/Toast';
-import { t } from '../i18n';
-import * as sessionManager from '../lib/sessionManager';
+import { useToastStore } from '@/components/Toast';
+import { t } from '@/i18n';
+import * as sessionManager from '@/lib/sessionManager';
+import type { TermBlock } from '@/terminal/pipeline/termBlock';
 
 const EMPTY: TermBlock[] = [];
 
@@ -37,15 +37,16 @@ export const useBlockStore = create<BlockState>((set, get) => ({
       const blocks = s.byTab[tabId];
       if (!blocks) return s;
       return {
-        byTab: { ...s.byTab, [tabId]: blocks.map((b) => (b.id === blockId ? { ...b, ...patch } : b)) },
+        byTab: {
+          ...s.byTab,
+          [tabId]: blocks.map((b) => (b.id === blockId ? { ...b, ...patch } : b)),
+        },
       };
     }),
 
-  setBlocks: (tabId, blocks) =>
-    set((s) => ({ byTab: { ...s.byTab, [tabId]: blocks } })),
+  setBlocks: (tabId, blocks) => set((s) => ({ byTab: { ...s.byTab, [tabId]: blocks } })),
 
-  clearBlocks: (tabId) =>
-    set((s) => ({ byTab: { ...s.byTab, [tabId]: [] } })),
+  clearBlocks: (tabId) => set((s) => ({ byTab: { ...s.byTab, [tabId]: [] } })),
 
   dropTab: (tabId) =>
     set((s) => {
@@ -63,11 +64,15 @@ export const useBlockStore = create<BlockState>((set, get) => ({
     set((s) => ({
       byTab: {
         ...s.byTab,
-        [tabId]: (s.byTab[tabId] ?? []).map((b) => (b.id === blockId ? { ...b, bookmarked: newState } : b)),
+        [tabId]: (s.byTab[tabId] ?? []).map((b) =>
+          b.id === blockId ? { ...b, bookmarked: newState } : b,
+        ),
       },
     }));
     // 副作用（toast）放在 set 外，避免 StrictMode 下更新函数重复执行导致重复提示
-    useToastStore.getState().addToast(newState ? t('toast.bookmarked') : t('toast.unbookmarked'), 'success');
+    useToastStore
+      .getState()
+      .addToast(newState ? t('toast.bookmarked') : t('toast.unbookmarked'), 'success');
   },
 
   setBlockCollapsed: (tabId, blockId, collapsed) => {

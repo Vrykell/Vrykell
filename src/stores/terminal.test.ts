@@ -1,11 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 invokeMock.mockResolvedValue(undefined);
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { useTerminalStore, registerTerminal, unregisterTerminal, getRecentOutput, getFocusedTerminalId } from './terminal';
-import { useWorkspaceStore } from './workspace';
+import {
+  getFocusedTerminalId,
+  getRecentOutput,
+  registerTerminal,
+  unregisterTerminal,
+  useTerminalStore,
+} from '@/stores/terminal';
+import { useWorkspaceStore } from '@/stores/workspace';
 
 const initialTerm = useTerminalStore.getState();
 const initialWs = useWorkspaceStore.getState();

@@ -3,21 +3,19 @@
  * 参数传递、结果格式化与错误结构化（execute 永不 throw）。
  * 不用 beforeEach（本仓库 vitest 4 陷阱，见 files.test.ts 头注释）。
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { buildTavilySearchTool, formatResults } from './webSearch';
-import { usePermissions, type ToolContext } from '../permissions';
+import { type ToolContext, usePermissions } from '@/agent/permissions';
+import { buildTavilySearchTool, formatResults } from '@/agent/tools/webSearch';
 
 // 本文件测 invoke 参数/结果映射，不测门控（门控见 permissions.test.ts）
 usePermissions.setState({ levels: { web_search: 'allow' } });
 const CTX: ToolContext = {};
 
-type Exec = (
-  args: Record<string, unknown>,
-) => Promise<string | { ok: boolean; error?: string }>;
+type Exec = (args: Record<string, unknown>) => Promise<string | { ok: boolean; error?: string }>;
 const execOf = (t: unknown): Exec => {
   const e = (t as { execute: (a: unknown, o: unknown) => Promise<never> }).execute;
   return (args) => e(args, {});
@@ -28,7 +26,11 @@ describe('tavily 兜底工具', () => {
     invokeMock.mockResolvedValue({
       answer: 'Rust 是一门系统编程语言',
       results: [
-        { title: 'Rust 官网', url: 'https://www.rust-lang.org', content: 'A language empowering everyone' },
+        {
+          title: 'Rust 官网',
+          url: 'https://www.rust-lang.org',
+          content: 'A language empowering everyone',
+        },
         { title: 'Rust 中文社区', url: 'https://rustcc.cn', content: '社区' },
       ],
     });

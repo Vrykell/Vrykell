@@ -1,12 +1,13 @@
-import { create } from 'zustand';
-import { ptyWrite } from '../lib/pty';
-import { useWorkspaceStore, isSessionTab } from './workspace';
-import { leaves as layoutLeaves, firstLeaf } from '../lib/windowLayout';
 import type { Terminal } from '@xterm/xterm';
-import type { Scene } from '../terminal/pipeline/sessionController';
+import { create } from 'zustand';
+import { ptyWrite } from '@/lib/pty';
+import { firstLeaf, leaves as layoutLeaves } from '@/lib/windowLayout';
+import { isSessionTab, useWorkspaceStore } from '@/stores/workspace';
+import type { Scene } from '@/terminal/pipeline/sessionController';
 
 // 每个标签页一个 xterm 实例（模块级引用，不进 zustand state）
 const termInstances = new Map<string, Terminal>();
+
 export { termInstances };
 
 // e2e 测试桥：暴露 term 注册表供断言读取 buffer（WebGL renderer 下文本不进 DOM，
@@ -29,7 +30,11 @@ export function getFocusedTerminalId(): string {
   const tab = ws.tabs.find((t) => t.id === ws.activeId);
   if (tab && isSessionTab(tab)) {
     const ids = layoutLeaves(tab.layout);
-    if (ts.focusedPaneId && ts.sessions[ts.focusedPaneId] && ids.some((t) => t.id === ts.focusedPaneId)) {
+    if (
+      ts.focusedPaneId &&
+      ts.sessions[ts.focusedPaneId] &&
+      ids.some((t) => t.id === ts.focusedPaneId)
+    ) {
       return ts.focusedPaneId;
     }
     return firstLeaf(tab.layout).id;
@@ -93,9 +98,7 @@ export function getTerminalScreen(paneId: string): TerminalScreen | null {
     lines.push(line ? line.translateToString(true) : '');
   }
   while (lines.length > 0 && lines[lines.length - 1]!.trim() === '') lines.pop();
-  const content = lines
-    .map((l, i) => `${String(i + 1).padStart(2, ' ')}│${l}`)
-    .join('\n');
+  const content = lines.map((l, i) => `${String(i + 1).padStart(2, ' ')}│${l}`).join('\n');
   return {
     scene,
     cols,
@@ -147,12 +150,10 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   setKeyboardTarget: (t) => set({ keyboardTarget: t }),
   focusedPaneId: null,
   setFocusedPane: (paneId) => set({ focusedPaneId: paneId }),
-  setScene: (tabId, scene) =>
-    set((s) => ({ scenes: { ...s.scenes, [tabId]: scene } })),
+  setScene: (tabId, scene) => set((s) => ({ scenes: { ...s.scenes, [tabId]: scene } })),
   setSession: (tabId, sessionId) =>
     set((s) => ({ sessions: { ...s.sessions, [tabId]: sessionId } })),
-  setDims: (tabId, cols, rows) =>
-    set((s) => ({ dims: { ...s.dims, [tabId]: { cols, rows } } })),
+  setDims: (tabId, cols, rows) => set((s) => ({ dims: { ...s.dims, [tabId]: { cols, rows } } })),
   dropTab: (tabId) =>
     set((s) => {
       if (!(tabId in s.sessions) && !(tabId in s.dims) && !(tabId in s.scenes)) return s;

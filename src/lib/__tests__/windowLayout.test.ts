@@ -1,11 +1,25 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  leaf, splitLeaf, replaceLeaf, removeLeaf, leaves, countLeaves,
-  leafRects, dropTargets, moveTargets, dividers, setRatio, findLeaf, leafDepth,
-  maxRowPanes, minTerminalWidth, MIN_PANE_SIZE, DIVIDER_SIZE,
   collectLayoutCells,
+  countLeaves,
+  DIVIDER_SIZE,
+  dividers,
+  dropTargets,
+  findLeaf,
+  leaf,
+  leafDepth,
+  leafRects,
+  leaves,
+  MIN_PANE_SIZE,
+  maxRowPanes,
+  minTerminalWidth,
+  moveTargets,
+  removeLeaf,
+  replaceLeaf,
+  setRatio,
+  splitLeaf,
   type TerminalSpec,
-} from '../windowLayout';
+} from '@/lib/windowLayout';
 
 const t = (id: string, kind: 'local' | 'ssh' = 'local'): TerminalSpec => ({ id, kind });
 
@@ -87,8 +101,12 @@ describe('windowLayout 几何', () => {
     const removed = removeLeaf(before, 'a')!;
     const after = splitLeaf(removed, 'b', 'col', 'second', t('a'), 0.5);
 
-    const idsBefore = collectLayoutCells(before).map((c) => c.terminalId).sort();
-    const idsAfter = collectLayoutCells(after).map((c) => c.terminalId).sort();
+    const idsBefore = collectLayoutCells(before)
+      .map((c) => c.terminalId)
+      .sort();
+    const idsAfter = collectLayoutCells(after)
+      .map((c) => c.terminalId)
+      .sort();
     expect(idsAfter).toEqual(idsBefore); // 同一组终端，只是位置/结构变了
     expect(idsAfter).toEqual(['a', 'b', 'c']);
   });
@@ -101,8 +119,8 @@ describe('windowLayout 几何', () => {
     expect(ds).toHaveLength(2);
 
     // 恰有一条根分隔线：region 覆盖全窗口；另一条是嵌套分隔线，region 为真子集
-    const root = ds.find((d) =>
-      d.region.x === 0 && d.region.y === 0 && d.region.w === 1 && d.region.h === 1,
+    const root = ds.find(
+      (d) => d.region.x === 0 && d.region.y === 0 && d.region.w === 1 && d.region.h === 1,
     );
     expect(root).toBeDefined();
     const inner = ds.find((d) => d !== root);

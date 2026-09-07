@@ -1,7 +1,7 @@
 /**
  * terminalTheme — 主题配置 store（load/update/import/export + 壁纸缓存）。
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { invokeMock, convertFileSrcMock } = vi.hoisted(() => ({
   invokeMock: vi.fn(),
@@ -10,8 +10,11 @@ const { invokeMock, convertFileSrcMock } = vi.hoisted(() => ({
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock, convertFileSrc: convertFileSrcMock }));
 
 import {
-  useTerminalThemeStore, applyCachedWallpaper, reapplyXtermTheme, applyTerminalTheme,
-} from './terminalTheme';
+  applyCachedWallpaper,
+  applyTerminalTheme,
+  reapplyXtermTheme,
+  useTerminalThemeStore,
+} from '@/theme/terminalTheme';
 
 const baseConfig = { opacity: 1, backgroundImage: null, vars: {} };
 
@@ -19,13 +22,21 @@ beforeEach(() => {
   invokeMock.mockReset();
   convertFileSrcMock.mockReset();
   localStorage.removeItem('vrykell-wallpaper-url');
-  useTerminalThemeStore.setState({ config: { ...baseConfig }, loaded: false, wallpaperDataUrl: null });
+  useTerminalThemeStore.setState({
+    config: { ...baseConfig },
+    loaded: false,
+    wallpaperDataUrl: null,
+  });
 });
 
 describe('terminalTheme store', () => {
   it('load：成功应用配置并缓存壁纸 URL', async () => {
     convertFileSrcMock.mockReturnValue('asset:///wall.jpg');
-    invokeMock.mockResolvedValue({ opacity: 0.8, backgroundImage: '/a/wall.jpg', vars: { '--x': '1' } });
+    invokeMock.mockResolvedValue({
+      opacity: 0.8,
+      backgroundImage: '/a/wall.jpg',
+      vars: { '--x': '1' },
+    });
     await useTerminalThemeStore.getState().load();
     const s = useTerminalThemeStore.getState();
     expect(s.loaded).toBe(true);
@@ -56,9 +67,12 @@ describe('terminalTheme store', () => {
     await s.update({ backgroundImage: '/b/new.jpg' });
     expect(useTerminalThemeStore.getState().wallpaperDataUrl).toBe('asset:///new.jpg');
     expect(localStorage.getItem('vrykell-wallpaper-url')).toBe('asset:///new.jpg');
-    expect(invokeMock).toHaveBeenLastCalledWith('set_theme_config', expect.objectContaining({
-      config: expect.objectContaining({ backgroundImage: '/b/new.jpg' }),
-    }));
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'set_theme_config',
+      expect.objectContaining({
+        config: expect.objectContaining({ backgroundImage: '/b/new.jpg' }),
+      }),
+    );
     invokeMock.mockRejectedValueOnce(new Error('boom'));
     await useTerminalThemeStore.getState().update({ opacity: 0.3 });
     expect(useTerminalThemeStore.getState().config.opacity).toBe(0.3);
@@ -87,7 +101,11 @@ describe('terminalTheme store', () => {
 
   it('reapplyXtermTheme / applyTerminalTheme 不抛错', () => {
     expect(() => reapplyXtermTheme()).not.toThrow();
-    expect(() => applyTerminalTheme({ opacity: 1, backgroundImage: null, vars: { '--xterm-bg': '#111' } })).not.toThrow();
-    expect(() => applyTerminalTheme({ opacity: 1, backgroundImage: null, vars: {} }, 'dark')).not.toThrow();
+    expect(() =>
+      applyTerminalTheme({ opacity: 1, backgroundImage: null, vars: { '--xterm-bg': '#111' } }),
+    ).not.toThrow();
+    expect(() =>
+      applyTerminalTheme({ opacity: 1, backgroundImage: null, vars: {} }, 'dark'),
+    ).not.toThrow();
   });
 });

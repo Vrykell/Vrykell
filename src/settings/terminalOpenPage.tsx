@@ -1,10 +1,11 @@
 /**
  * terminalOpenPage — 各 Shell 打开模式设置页。
  */
-import Segmented from '../components/Segmented';
-import { useAgentSettings } from '../agent/agentSettings';
-import type { ShellType } from '../lib/shells';
-import { Field } from './ui';
+
+import { useAgentSettings } from '@/agent/agentSettings';
+import Segmented from '@/components/Segmented';
+import type { ShellType } from '@/lib/shells';
+import { Field } from '@/settings/ui';
 
 const OPEN_MODE_OPTIONS = (
   [
@@ -27,8 +28,7 @@ export function TerminalOpenPage() {
   const sshOpenMode = agentSettings.global.sshOpenMode;
   const setShellMode = (shell: ShellType, mode: 'classic' | 'block') =>
     agentSettings.update({ openModeByShell: { ...openModeByShell, [shell]: mode } });
-  const setSshMode = (mode: 'classic' | 'block') =>
-    agentSettings.update({ sshOpenMode: mode });
+  const setSshMode = (mode: 'classic' | 'block') => agentSettings.update({ sshOpenMode: mode });
 
   return (
     <>

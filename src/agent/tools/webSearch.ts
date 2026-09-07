@@ -11,11 +11,11 @@
  * 失败返回 { ok:false, error } 结构化对象（不 throw，让模型自我修正）。
  */
 
-import { tool } from 'ai';
-import { DESC_WEB_SEARCH_TAVILY } from '../toolTexts';
-import { z } from 'zod';
 import { invoke } from '@tauri-apps/api/core';
-import { gate, type ToolContext } from '../permissions';
+import { tool } from 'ai';
+import { z } from 'zod';
+import { gate, type ToolContext } from '@/agent/permissions';
+import { DESC_WEB_SEARCH_TAVILY } from '@/agent/toolTexts';
 
 interface TavilyResult {
   title?: string;
@@ -32,7 +32,7 @@ const CONTENT_CAP = 300;
 
 export function buildTavilySearchTool(ctx: ToolContext) {
   return tool({
-      description: DESC_WEB_SEARCH_TAVILY,
+    description: DESC_WEB_SEARCH_TAVILY,
     inputSchema: z.object({
       query: z.string().describe('搜索词'),
       maxResults: z.number().int().min(1).max(8).optional().describe('结果条数，默认 5'),

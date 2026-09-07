@@ -1,6 +1,6 @@
-import { safeLocalStorageGet, safeLocalStorageSet } from './errorHandler';
-import type { ShellOption, ShellType } from './shells';
-import type { SshConnection } from '../ssh/api';
+import { safeLocalStorageGet, safeLocalStorageSet } from '@/lib/errorHandler';
+import type { ShellOption, ShellType } from '@/lib/shells';
+import type { SshConnection } from '@/ssh/api';
 
 /**
  * 新建标签页弹窗的候选类型与「最近打开」排序。
@@ -88,7 +88,7 @@ export function buildNewTabOptions(
   // 稳定排序：先按 lastOpenedAt 倒序；同为 0（从未打开）时保持插入顺序
   return opts
     .map((o, i) => ({ o, i }))
-    .sort((a, b) => (b.o.lastOpenedAt - a.o.lastOpenedAt) || (a.i - b.i))
+    .sort((a, b) => b.o.lastOpenedAt - a.o.lastOpenedAt || a.i - b.i)
     .map(({ o }) => o);
 }
 
@@ -97,8 +97,6 @@ export function filterNewTabOptions(opts: NewTabOption[], query: string): NewTab
   const q = query.trim().toLowerCase();
   if (!q) return opts;
   return opts.filter(
-    (o) =>
-      o.label.toLowerCase().includes(q) ||
-      (o.subtitle ?? '').toLowerCase().includes(q),
+    (o) => o.label.toLowerCase().includes(q) || (o.subtitle ?? '').toLowerCase().includes(q),
   );
 }

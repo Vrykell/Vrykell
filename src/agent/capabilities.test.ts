@@ -1,8 +1,8 @@
 /**
  * capabilities — 模型能力探测规则测试。
  */
-import { describe, it, expect } from 'vitest';
-import { detectCapabilities, hasCapability, CAPABILITY_LABELS } from './capabilities';
+import { describe, expect, it } from 'vitest';
+import { CAPABILITY_LABELS, detectCapabilities, hasCapability } from '@/agent/capabilities';
 
 describe('detectCapabilities', () => {
   it('anthropic / gemini：原生视觉与搜索，现代模型有推理', () => {
@@ -48,11 +48,30 @@ describe('detectCapabilities', () => {
   it('hasCapability：profile 缺省时按启发式兜底', () => {
     expect(hasCapability(undefined, 'vision', 'anthropic', 'claude-sonnet-5')).toBe(true);
     expect(hasCapability(undefined, 'search', 'openai-compatible', 'gpt-4o')).toBe(false);
-    expect(hasCapability({ vision: false, reasoning: false, tools: true, search: false }, 'vision', 'anthropic', 'x')).toBe(false);
-    expect(hasCapability({ vision: true, reasoning: false, tools: true, search: false }, 'vision', 'openai-compatible', 'x')).toBe(true);
+    expect(
+      hasCapability(
+        { vision: false, reasoning: false, tools: true, search: false },
+        'vision',
+        'anthropic',
+        'x',
+      ),
+    ).toBe(false);
+    expect(
+      hasCapability(
+        { vision: true, reasoning: false, tools: true, search: false },
+        'vision',
+        'openai-compatible',
+        'x',
+      ),
+    ).toBe(true);
   });
 
   it('标签文案完整', () => {
-    expect(CAPABILITY_LABELS).toEqual({ vision: '视觉', reasoning: '推理', tools: '工具', search: '搜索' });
+    expect(CAPABILITY_LABELS).toEqual({
+      vision: '视觉',
+      reasoning: '推理',
+      tools: '工具',
+      search: '搜索',
+    });
   });
 });

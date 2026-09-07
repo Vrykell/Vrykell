@@ -1,13 +1,16 @@
 /**
  * tools/index — buildTools 组装与 deny 过滤测试。
  */
-import { describe, it, expect } from 'vitest';
-import { buildTools } from './index';
-import { usePermissions } from '../permissions';
+import { describe, expect, it } from 'vitest';
+import { usePermissions } from '@/agent/permissions';
+import { buildTools } from '@/agent/tools/index';
 
 describe('buildTools', () => {
   it('默认注册核心工具；deny 级不注册', () => {
-    usePermissions.setState({ levels: { run_command: 'deny', read_file: 'allow', web_search: 'deny' }, mode: 'standard' });
+    usePermissions.setState({
+      levels: { run_command: 'deny', read_file: 'allow', web_search: 'deny' },
+      mode: 'standard',
+    });
     const tools = buildTools({});
     expect(tools.run_command).toBeUndefined();
     expect(tools.read_file).toBeDefined();

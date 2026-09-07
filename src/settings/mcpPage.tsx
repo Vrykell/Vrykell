@@ -2,14 +2,20 @@
  * mcpPage — MCP 服务器设置页。
  * 「添加服务器」先生成本地草稿卡片，填好 command/url 再保存落库。
  */
-import { useEffect, useState } from 'react';
+
 import { Plus, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import {
-  listMcpServers, saveMcpServer, removeMcpServer, toggleMcpServer,
-  connectMcp, disconnectMcp, type McpServer,
-} from '../agent/mcp';
-import { useToastStore } from '../components/Toast';
-import { Field, Toggle, inputStyle, btnStyle } from './ui';
+  connectMcp,
+  disconnectMcp,
+  listMcpServers,
+  type McpServer,
+  removeMcpServer,
+  saveMcpServer,
+  toggleMcpServer,
+} from '@/agent/mcp';
+import { useToastStore } from '@/components/Toast';
+import { btnStyle, Field, inputStyle, Toggle } from '@/settings/ui';
 
 function parseEnvLines(text: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -104,13 +110,22 @@ export function McpPage() {
             onConnect={() => {}}
             onDisconnect={() => {}}
             onDelete={() => {}}
-            onSaved={() => { dropDraft(k); refresh(); }}
+            onSaved={() => {
+              dropDraft(k);
+              refresh();
+            }}
             onCancel={() => dropDraft(k)}
           />
         ))}
         <button
           onClick={addNew}
-          style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}
+          style={{
+            ...btnStyle,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            alignSelf: 'flex-start',
+          }}
         >
           <Plus size={12} /> 添加服务器
         </button>
@@ -119,7 +134,16 @@ export function McpPage() {
   );
 }
 
-function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSaved, onCancel }: {
+function McpServerCard({
+  s,
+  draft,
+  busy,
+  onConnect,
+  onDisconnect,
+  onDelete,
+  onSaved,
+  onCancel,
+}: {
   s?: McpServer;
   draft?: boolean;
   busy: boolean;
@@ -133,7 +157,13 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
   const [command, setCommand] = useState(s?.command ?? '');
   const [args, setArgs] = useState(s ? s.args.join(' ') : '');
   const [url, setUrl] = useState(s?.url ?? '');
-  const [env, setEnv] = useState(s ? Object.entries(s.env).map(([k, v]) => `${k}=${v}`).join('\n') : '');
+  const [env, setEnv] = useState(
+    s
+      ? Object.entries(s.env)
+          .map(([k, v]) => `${k}=${v}`)
+          .join('\n')
+      : '',
+  );
   const [enabled, setEnabled] = useState(s?.enabled ?? true);
   const toast = (msg: string, type: 'info' | 'success' | 'error') =>
     useToastStore.getState().addToast(msg, type);
@@ -179,7 +209,9 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
     <div
       style={{
         borderRadius: 'var(--radius-inner)',
-        padding: '10px 12px', background: 'var(--canvas)', opacity: enabled ? 1 : 0.6,
+        padding: '10px 12px',
+        background: 'var(--canvas)',
+        opacity: enabled ? 1 : 0.6,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -190,11 +222,16 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
           style={{ ...inputStyle, flex: 1, fontWeight: 600, minWidth: 120 }}
         />
         {s && (
-          <span style={{
-            fontSize: 11, padding: '2px 8px', borderRadius: 4, flexShrink: 0,
-            color: s.connected ? 'var(--success)' : 'var(--text-muted)',
-            background: s.connected ? 'var(--success-bg)' : 'var(--hover)',
-          }}>
+          <span
+            style={{
+              fontSize: 11,
+              padding: '2px 8px',
+              borderRadius: 4,
+              flexShrink: 0,
+              color: s.connected ? 'var(--success)' : 'var(--text-muted)',
+              background: s.connected ? 'var(--success-bg)' : 'var(--hover)',
+            }}
+          >
             {s.connected ? `已连接 · ${s.toolCount} 工具` : '未连接'}
           </span>
         )}
@@ -203,7 +240,9 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
           保存
         </button>
         {s && s.connected && (
-          <button onClick={onDisconnect} disabled={busy} style={{ ...btnStyle, flexShrink: 0 }}>断开</button>
+          <button onClick={onDisconnect} disabled={busy} style={{ ...btnStyle, flexShrink: 0 }}>
+            断开
+          </button>
         )}
         {s && !s.connected && (
           <button onClick={onConnect} disabled={busy} style={{ ...btnStyle, flexShrink: 0 }}>
@@ -211,19 +250,33 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
           </button>
         )}
         {draft && onCancel && (
-          <button onClick={onCancel} style={{ ...btnStyle, flexShrink: 0 }}>取消</button>
+          <button onClick={onCancel} style={{ ...btnStyle, flexShrink: 0 }}>
+            取消
+          </button>
         )}
         {s && (
           <button
             onClick={onDelete}
             title="删除服务器"
             style={{
-              width: 26, height: 26, flexShrink: 0, display: 'inline-flex', alignItems: 'center',
-              justifyContent: 'center', border: '1px solid transparent', borderRadius: 4,
-              background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+              width: 26,
+              height: 26,
+              flexShrink: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '1px solid transparent',
+              borderRadius: 4,
+              background: 'transparent',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--error-light)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = 'var(--error-light)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--text-muted)';
+            }}
           >
             <X size={13} />
           </button>
@@ -255,8 +308,12 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
         onChange={(e) => setEnv(e.target.value)}
         rows={3}
         style={{
-          ...inputStyle, marginTop: 8, minHeight: 52, resize: 'vertical',
-          fontFamily: 'var(--font-mono)', lineHeight: 1.5,
+          ...inputStyle,
+          marginTop: 8,
+          minHeight: 52,
+          resize: 'vertical',
+          fontFamily: 'var(--font-mono)',
+          lineHeight: 1.5,
         }}
       />
     </div>

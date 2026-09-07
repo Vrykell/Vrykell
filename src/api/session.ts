@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { BackendBlockEntry, BackendSessionEntry } from '../search/types';
+import type { BackendBlockEntry, BackendSessionEntry } from '@/search/types';
 
 export function createSession(
   id: string,
@@ -49,12 +49,30 @@ export function listSessions(): Promise<BackendSessionEntry[]> {
 // ── 块持久化 ──
 
 export function recordBlock(
-  id: string, sessionId: string, paneId: string | null, command: string,
-  outputRaw: string, outputClean: string, outputHtml: string, exitCode: number | null, status: string,
-  startedAt: number, endedAt: number | null,
+  id: string,
+  sessionId: string,
+  paneId: string | null,
+  command: string,
+  outputRaw: string,
+  outputClean: string,
+  outputHtml: string,
+  exitCode: number | null,
+  status: string,
+  startedAt: number,
+  endedAt: number | null,
 ): Promise<void> {
   return invoke('record_block', {
-    id, sessionId, paneId, command, outputRaw, outputClean, outputHtml, exitCode, status, startedAt, endedAt,
+    id,
+    sessionId,
+    paneId,
+    command,
+    outputRaw,
+    outputClean,
+    outputHtml,
+    exitCode,
+    status,
+    startedAt,
+    endedAt,
   });
 }
 
@@ -81,10 +99,23 @@ export interface BackendChatMessage {
 }
 
 export function appendChatMessage(
-  id: string, sessionId: string, role: string, content: string, createdAt: number, parts: string,
+  id: string,
+  sessionId: string,
+  role: string,
+  content: string,
+  createdAt: number,
+  parts: string,
   attachments = '',
 ): Promise<void> {
-  return invoke('append_chat_message', { id, sessionId, role, content, createdAt, parts, attachments });
+  return invoke('append_chat_message', {
+    id,
+    sessionId,
+    role,
+    content,
+    createdAt,
+    parts,
+    attachments,
+  });
 }
 
 export function listChatMessages(sessionId: string): Promise<BackendChatMessage[]> {

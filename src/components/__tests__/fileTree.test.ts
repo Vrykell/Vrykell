@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { sortEntries, flattenVisible } from '../../files/fileTree';
-import type { FsEntry } from '../../files/fs';
+import { describe, expect, it } from 'vitest';
+import { flattenVisible, sortEntries } from '@/files/fileTree';
+import type { FsEntry } from '@/files/fs';
 
 const dir = (name: string): FsEntry => ({ name, path: `/root/${name}`, is_dir: true });
 const file = (name: string): FsEntry => ({ name, path: `/root/${name}`, is_dir: false });

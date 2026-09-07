@@ -1,15 +1,31 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  History, Plus, Search, Server, Settings, SquareTerminal,
-  ChevronRight, Pencil, Archive, Folder, Trash2,
+  Archive,
+  ChevronRight,
+  Folder,
+  History,
+  Pencil,
+  Plus,
+  Search,
+  Server,
+  Settings,
+  SquareTerminal,
+  Trash2,
 } from 'lucide-react';
-import { useWorkspaceStore, isSessionTab, firstTerminalOf, terminalsOf, type Tab, type TabGroup } from '../stores/workspace';
-import { regenerateTitle } from '../agent/title';
-import { useToastStore } from './Toast';
-import { IconBtn } from './UiBtn';
-import { shellTypeLabel } from '../lib/shells';
-import NewTabModal from './NewTabModal';
-import ContextMenu, { type ContextMenuItem } from './ContextMenu';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { regenerateTitle } from '@/agent/title';
+import ContextMenu, { type ContextMenuItem } from '@/components/ContextMenu';
+import NewTabModal from '@/components/NewTabModal';
+import { useToastStore } from '@/components/Toast';
+import { IconBtn } from '@/components/UiBtn';
+import { shellTypeLabel } from '@/lib/shells';
+import {
+  firstTerminalOf,
+  isSessionTab,
+  type Tab,
+  type TabGroup,
+  terminalsOf,
+  useWorkspaceStore,
+} from '@/stores/workspace';
 
 /**
  * PanelTabs — 标签列表面板（会话管理侧栏）。
@@ -76,20 +92,30 @@ export default function PanelTabs() {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; tabId: string } | null>(null);
 
   // 自定义拖拽
-  const dragRef = useRef<{ type: 'tab' | 'group'; id: string; startX: number; startY: number } | null>(null);
+  const dragRef = useRef<{
+    type: 'tab' | 'group';
+    id: string;
+    startX: number;
+    startY: number;
+  } | null>(null);
   const dropTargetRef = useRef<DropTarget | null>(null);
   const dragActiveRef = useRef(false);
   const [dragging, setDragging] = useState(false);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const [dragCursor, setDragCursor] = useState<{ x: number; y: number } | null>(null);
 
-  useEffect(() => { loadGroups(); }, [loadGroups]);
+  useEffect(() => {
+    loadGroups();
+  }, [loadGroups]);
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       const info = dragRef.current;
       if (!info) return;
-      if (Math.abs(e.clientX - info.startX) < DRAG_THRESHOLD && Math.abs(e.clientY - info.startY) < DRAG_THRESHOLD) {
+      if (
+        Math.abs(e.clientX - info.startX) < DRAG_THRESHOLD &&
+        Math.abs(e.clientY - info.startY) < DRAG_THRESHOLD
+      ) {
         return;
       }
       dragActiveRef.current = true;
@@ -134,17 +160,28 @@ export default function PanelTabs() {
         return;
       }
       if (target.kind === 'tab') {
-        const scope = ws.tabs.filter((t) => isSessionTab(t) && (t.groupId ?? null) === target.groupId);
-        const idx = target.beforeTabId == null ? scope.length : Math.max(0, scope.findIndex((t) => t.id === target.beforeTabId));
+        const scope = ws.tabs.filter(
+          (t) => isSessionTab(t) && (t.groupId ?? null) === target.groupId,
+        );
+        const idx =
+          target.beforeTabId == null
+            ? scope.length
+            : Math.max(
+                0,
+                scope.findIndex((t) => t.id === target.beforeTabId),
+              );
         ws.moveTab(info.id, target.groupId, idx);
       } else {
-        const scope = ws.tabs.filter((t) => isSessionTab(t) && (t.groupId ?? null) === target.groupId);
+        const scope = ws.tabs.filter(
+          (t) => isSessionTab(t) && (t.groupId ?? null) === target.groupId,
+        );
         ws.moveTab(info.id, target.groupId, scope.length);
       }
     } else if (info.type === 'group') {
       if (target && target.kind === 'group') {
         const gs = ws.groups;
-        const idx = target.groupId == null ? gs.length : gs.findIndex((g) => g.id === target.groupId);
+        const idx =
+          target.groupId == null ? gs.length : gs.findIndex((g) => g.id === target.groupId);
         ws.moveGroup(info.id, idx);
       }
     }
@@ -170,48 +207,79 @@ export default function PanelTabs() {
   const activeGroupId = activeTab && isSessionTab(activeTab) ? activeTab.groupId : undefined;
 
   const ctxTab = ctxMenu ? tabs.find((t) => t.id === ctxMenu.tabId) : undefined;
-  const ctxItems: ContextMenuItem[] = ctxMenu && ctxTab
-    ? [
-        ...(isSessionTab(ctxTab) && !ctxTab.groupId ? [{
-          label: '新建分组',
-          onClick: () => {
-            // 建组后立即进入重命名（自动聚焦名称输入框）
-            void createGroupForTab(ctxTab.id).then((gid) => {
-              if (!gid) return;
-              const g = useWorkspaceStore.getState().groups.find((x) => x.id === gid);
-              setRenamingGroupId(gid);
-              setRenamingGroupTitle(g?.title ?? '新分组');
-            });
+  const ctxItems: ContextMenuItem[] =
+    ctxMenu && ctxTab
+      ? [
+          ...(isSessionTab(ctxTab) && !ctxTab.groupId
+            ? [
+                {
+                  label: '新建分组',
+                  onClick: () => {
+                    // 建组后立即进入重命名（自动聚焦名称输入框）
+                    void createGroupForTab(ctxTab.id).then((gid) => {
+                      if (!gid) return;
+                      const g = useWorkspaceStore.getState().groups.find((x) => x.id === gid);
+                      setRenamingGroupId(gid);
+                      setRenamingGroupTitle(g?.title ?? '新分组');
+                    });
+                  },
+                },
+              ]
+            : []),
+          {
+            label: '重命名',
+            onClick: () => {
+              setEditId(ctxTab.id);
+              setEditTitle(ctxTab.title);
+            },
           },
-        }] : []),
-        { label: '重命名', onClick: () => { setEditId(ctxTab.id); setEditTitle(ctxTab.title); } },
-        { label: '重新生成标题', onClick: () => {
-          useToastStore.getState().addToast('正在重新生成标题…', 'info');
-          void regenerateTitle(ctxTab.id).then((ok) => {
-            if (ok) useToastStore.getState().addToast('标题已更新', 'success');
-          });
-        } },
-        { label: '复制会话', onClick: () => duplicateTab(ctxTab.id) },
-        { label: '关闭标签', onClick: () => closeTab(ctxTab.id) },
-      ]
-    : [];
+          {
+            label: '重新生成标题',
+            onClick: () => {
+              useToastStore.getState().addToast('正在重新生成标题…', 'info');
+              void regenerateTitle(ctxTab.id).then((ok) => {
+                if (ok) useToastStore.getState().addToast('标题已更新', 'success');
+              });
+            },
+          },
+          { label: '复制会话', onClick: () => duplicateTab(ctxTab.id) },
+          { label: '关闭标签', onClick: () => closeTab(ctxTab.id) },
+        ]
+      : [];
 
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', height: '100%',
-      userSelect: 'none', background: 'var(--surface)',
-    }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        userSelect: 'none',
+        background: 'var(--surface)',
+      }}
+    >
       {/* 顶栏 */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 4,
-        padding: '6px 8px',
-        position: 'relative',
-      }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 5, flex: 1, minWidth: 0,
-          background: 'var(--canvas)',
-          borderRadius: 'var(--radius-inner)', padding: '0 6px', height: 24,
-        }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          padding: '6px 8px',
+          position: 'relative',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+            flex: 1,
+            minWidth: 0,
+            background: 'var(--canvas)',
+            borderRadius: 'var(--radius-inner)',
+            padding: '0 6px',
+            height: 24,
+          }}
+        >
           <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           <input
             value={query}
@@ -219,15 +287,28 @@ export default function PanelTabs() {
             placeholder="搜索会话…"
             data-testid="tab-search"
             style={{
-              flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none',
-              fontSize: 12, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+              flex: 1,
+              minWidth: 0,
+              background: 'transparent',
+              border: 'none',
+              outline: 'none',
+              fontSize: 12,
+              color: 'var(--text-primary)',
+              fontFamily: 'var(--font-ui)',
             }}
           />
         </div>
         <IconBtn title="会话历史" data-testid="tab-history-btn" onClick={openHistoryTab}>
           <History size={14} />
         </IconBtn>
-        <IconBtn title="新建终端" data-testid="tab-new-btn" onClick={() => { setModalGroupId(activeGroupId); setModalOpen(true); }}>
+        <IconBtn
+          title="新建终端"
+          data-testid="tab-new-btn"
+          onClick={() => {
+            setModalGroupId(activeGroupId);
+            setModalOpen(true);
+          }}
+        >
           <Plus size={14} />
         </IconBtn>
       </div>
@@ -250,31 +331,63 @@ export default function PanelTabs() {
             dropTarget={dropTarget}
             onActivate={activate}
             onClose={closeTab}
-            onStartEdit={(id, title) => { setEditId(id); setEditTitle(title); }}
-            onCommitEdit={() => { if (editId) renameTab(editId, editTitle); setEditId(null); }}
+            onStartEdit={(id, title) => {
+              setEditId(id);
+              setEditTitle(title);
+            }}
+            onCommitEdit={() => {
+              if (editId) renameTab(editId, editTitle);
+              setEditId(null);
+            }}
             onCancelEdit={() => setEditId(null)}
             onHover={(h, id) => setHoveredId(h ? id : null)}
             onToggleCollapse={() => toggleGroupCollapse(g.id)}
-            onStartRenameGroup={() => { setRenamingGroupId(g.id); setRenamingGroupTitle(g.title); }}
-            onCommitRenameGroup={() => { if (renamingGroupId) renameGroup(renamingGroupId, renamingGroupTitle); setRenamingGroupId(null); }}
+            onStartRenameGroup={() => {
+              setRenamingGroupId(g.id);
+              setRenamingGroupTitle(g.title);
+            }}
+            onCommitRenameGroup={() => {
+              if (renamingGroupId) renameGroup(renamingGroupId, renamingGroupTitle);
+              setRenamingGroupId(null);
+            }}
             onDeleteGroup={() => {
               const hasTabs = groupTabs(g.id).length > 0;
-              if (!hasTabs) { void deleteGroup(g.id, false); return; }
+              if (!hasTabs) {
+                void deleteGroup(g.id, false);
+                return;
+              }
               const ok = window.confirm(`归档分组「${g.title}」？组内标签将关闭并移入会话历史。`);
               if (!ok) return;
               void archiveGroup(g.id);
             }}
             onMouseDownTab={(e, tabId) => startDrag(e, 'tab', tabId)}
             onMouseDownGroup={(e) => startDrag(e, 'group', g.id)}
-            onContextMenuTab={(e, tabId) => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, tabId }); }}
-            onAddTab={() => { setModalGroupId(g.id); setModalOpen(true); }}
+            onContextMenuTab={(e, tabId) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setCtxMenu({ x: e.clientX, y: e.clientY, tabId });
+            }}
+            onAddTab={() => {
+              setModalGroupId(g.id);
+              setModalOpen(true);
+            }}
           />
         ))}
 
         {ungroupedTabs.length > 0 && (
-          <div data-ungrouped="true" style={{ marginTop: groups.length > 0 ? 6 : 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div
+            data-ungrouped="true"
+            style={{
+              marginTop: groups.length > 0 ? 6 : 0,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2,
+            }}
+          >
             {groups.length > 0 && (
-              <div style={{ padding: '0 8px 2px', fontSize: 11, color: 'var(--text-muted)' }}>未分组</div>
+              <div style={{ padding: '0 8px 2px', fontSize: 11, color: 'var(--text-muted)' }}>
+                未分组
+              </div>
             )}
             {ungroupedTabs.map((t) => (
               <TabRow
@@ -288,20 +401,38 @@ export default function PanelTabs() {
                 groupId={null}
                 onActivate={() => activate(t.id)}
                 onClose={() => closeTab(t.id)}
-                onStartEdit={() => { setEditId(t.id); setEditTitle(t.title); }}
-                onCommitEdit={() => { renameTab(t.id, editTitle); setEditId(null); }}
+                onStartEdit={() => {
+                  setEditId(t.id);
+                  setEditTitle(t.title);
+                }}
+                onCommitEdit={() => {
+                  renameTab(t.id, editTitle);
+                  setEditId(null);
+                }}
                 onCancelEdit={() => setEditId(null)}
                 onHover={(h) => setHoveredId(h ? t.id : null)}
                 onMouseDown={(e) => startDrag(e, 'tab', t.id)}
-                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, tabId: t.id }); }}
-                highlight={dropTarget?.kind === 'tab' && dropTarget.groupId === null && dropTarget.beforeTabId === t.id}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setCtxMenu({ x: e.clientX, y: e.clientY, tabId: t.id });
+                }}
+                highlight={
+                  dropTarget?.kind === 'tab' &&
+                  dropTarget.groupId === null &&
+                  dropTarget.beforeTabId === t.id
+                }
               />
             ))}
           </div>
         )}
 
         {filtered.length === 0 && (
-          <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>无匹配会话</div>
+          <div
+            style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}
+          >
+            无匹配会话
+          </div>
         )}
       </div>
 
@@ -362,7 +493,8 @@ function GroupSection(props: {
   const { group, tabs, activeId } = props;
   const collapsed = group.collapsed;
   const empty = tabs.length === 0;
-  const groupHighlight = props.dropTarget?.kind === 'group' && props.dropTarget.groupId === group.id;
+  const groupHighlight =
+    props.dropTarget?.kind === 'group' && props.dropTarget.groupId === group.id;
   const anyMemberActive = tabs.some((t) => t.id === activeId);
   return (
     <div style={{ marginBottom: 4 }}>
@@ -372,7 +504,8 @@ function GroupSection(props: {
         data-group-id={group.id}
         data-group-active={anyMemberActive ? 'true' : 'false'}
         style={{
-          margin: 0, overflow: 'hidden',
+          margin: 0,
+          overflow: 'hidden',
           boxShadow: groupHighlight ? 'inset 0 0 0 1px var(--accent)' : 'none',
         }}
       >
@@ -380,9 +513,11 @@ function GroupSection(props: {
         <div
           className="tab-group-header"
           data-group-header-id={group.id}
-          data-header-selected={(collapsed && anyMemberActive) ? 'true' : 'false'}
+          data-header-selected={collapsed && anyMemberActive ? 'true' : 'false'}
           data-testid={`group-header-${group.id}`}
-          onClick={() => { if (!props.renamingGroupId) props.onToggleCollapse(); }}
+          onClick={() => {
+            if (!props.renamingGroupId) props.onToggleCollapse();
+          }}
           onDoubleClick={() => {
             // 双击重命名（两次 click 已把折叠状态抵消回原样）
             if (props.renamingGroupId !== group.id) props.onStartRenameGroup();
@@ -390,15 +525,27 @@ function GroupSection(props: {
           onMouseDown={props.onMouseDownGroup}
           title="点击折叠/展开 · 双击重命名 · 拖拽排序"
           style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '6px 8px', minHeight: 40, cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '6px 8px',
+            minHeight: 40,
+            cursor: 'pointer',
           }}
         >
-          <span style={{
-            width: 24, height: 24, borderRadius: 6, flexShrink: 0,
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            background: 'var(--hover)', color: 'var(--text-secondary)',
-          }}>
+          <span
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 6,
+              flexShrink: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'var(--hover)',
+              color: 'var(--text-secondary)',
+            }}
+          >
             <Folder size={14} />
           </span>
           {props.renamingGroupId === group.id ? (
@@ -414,17 +561,32 @@ function GroupSection(props: {
                 else if (e.key === 'Escape') props.setRenamingGroupTitle(group.title);
               }}
               style={{
-                flex: 1, background: 'var(--canvas)', border: '1px solid var(--accent)',
-                borderRadius: 3, padding: '1px 4px', fontSize: 13, fontWeight: 600,
-                color: 'var(--text-primary)', outline: 'none',
+                flex: 1,
+                background: 'var(--canvas)',
+                border: '1px solid var(--accent)',
+                borderRadius: 3,
+                padding: '1px 4px',
+                fontSize: 13,
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+                outline: 'none',
               }}
             />
           ) : (
-            <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <span style={{
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                fontSize: 13, lineHeight: '18px', fontWeight: 600, color: 'var(--text-primary)',
-              }}>
+            <span
+              style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}
+            >
+              <span
+                style={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  fontSize: 13,
+                  lineHeight: '18px',
+                  fontWeight: 600,
+                  color: 'var(--text-primary)',
+                }}
+              >
                 {group.title}
               </span>
               <span style={{ fontSize: 10.5, color: 'var(--text-muted)', lineHeight: '14px' }}>
@@ -441,8 +603,10 @@ function GroupSection(props: {
           <ChevronRight
             size={13}
             style={{
-              color: 'var(--text-muted)', flexShrink: 0,
-              transition: 'transform 0.12s ease', transform: collapsed ? 'none' : 'rotate(90deg)',
+              color: 'var(--text-muted)',
+              flexShrink: 0,
+              transition: 'transform 0.12s ease',
+              transform: collapsed ? 'none' : 'rotate(90deg)',
             }}
           />
         </div>
@@ -468,7 +632,11 @@ function GroupSection(props: {
                   onHover={(h) => props.onHover(h, t.id)}
                   onMouseDown={(e) => props.onMouseDownTab(e, t.id)}
                   onContextMenu={(e) => props.onContextMenuTab(e, t.id)}
-                  highlight={props.dropTarget?.kind === 'tab' && props.dropTarget.groupId === group.id && props.dropTarget.beforeTabId === t.id}
+                  highlight={
+                    props.dropTarget?.kind === 'tab' &&
+                    props.dropTarget.groupId === group.id &&
+                    props.dropTarget.beforeTabId === t.id
+                  }
                 />
               </div>
             ))}
@@ -479,33 +647,74 @@ function GroupSection(props: {
   );
 }
 
-function GroupActions({ onAdd, onRename, onDelete, empty }: {
+function GroupActions({
+  onAdd,
+  onRename,
+  onDelete,
+  empty,
+}: {
   onAdd: () => void;
   onRename: () => void;
   onDelete: () => void;
   empty: boolean;
 }) {
   return (
-    <span className="group-actions" style={{ display: 'inline-flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
-      <button data-subtle data-no-drag title="在此分组新建终端"
-        onClick={(e) => { e.stopPropagation(); onAdd(); }}
+    <span
+      className="group-actions"
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 2, flexShrink: 0 }}
+    >
+      <button
+        data-subtle
+        data-no-drag
+        title="在此分组新建终端"
+        onClick={(e) => {
+          e.stopPropagation();
+          onAdd();
+        }}
         style={actionStyle}
-        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}>
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = 'var(--text-secondary)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = 'var(--text-muted)';
+        }}
+      >
         <Plus size={12} />
       </button>
-      <button data-subtle data-no-drag title="重命名分组"
-        onClick={(e) => { e.stopPropagation(); onRename(); }}
+      <button
+        data-subtle
+        data-no-drag
+        title="重命名分组"
+        onClick={(e) => {
+          e.stopPropagation();
+          onRename();
+        }}
         style={actionStyle}
-        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}>
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = 'var(--text-secondary)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = 'var(--text-muted)';
+        }}
+      >
         <Pencil size={12} />
       </button>
-      <button data-subtle data-no-drag title={empty ? '删除分组' : '归档分组（移入会话历史）'}
-        onClick={(e) => { e.stopPropagation(); onDelete(); }}
+      <button
+        data-subtle
+        data-no-drag
+        title={empty ? '删除分组' : '归档分组（移入会话历史）'}
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete();
+        }}
         style={actionStyle}
-        onMouseEnter={(e) => { e.currentTarget.style.color = empty ? 'var(--error-light)' : 'var(--text-secondary)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}>
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = empty ? 'var(--error-light)' : 'var(--text-secondary)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = 'var(--text-muted)';
+        }}
+      >
         {empty ? <Trash2 size={12} /> : <Archive size={12} />}
       </button>
     </span>
@@ -513,16 +722,38 @@ function GroupActions({ onAdd, onRename, onDelete, empty }: {
 }
 
 const actionStyle: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-  width: 18, height: 18, padding: 0, border: 'none', borderRadius: 4,
-  background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: 18,
+  height: 18,
+  padding: 0,
+  border: 'none',
+  borderRadius: 4,
+  background: 'transparent',
+  color: 'var(--text-muted)',
+  cursor: 'pointer',
 };
 
 // ── 标签行 ──
 
 function TabRow({
-  tab, active, hovered, editing, editTitle, setEditTitle, groupId,
-  onActivate, onClose, onStartEdit, onCommitEdit, onCancelEdit, onHover, onMouseDown, onContextMenu, highlight,
+  tab,
+  active,
+  hovered,
+  editing,
+  editTitle,
+  setEditTitle,
+  groupId,
+  onActivate,
+  onClose,
+  onStartEdit,
+  onCommitEdit,
+  onCancelEdit,
+  onHover,
+  onMouseDown,
+  onContextMenu,
+  highlight,
 }: {
   tab: Tab;
   active: boolean;
@@ -544,18 +775,32 @@ function TabRow({
   const first = firstTerminalOf(tab);
   const terms = terminalsOf(tab);
   const isSsh = first?.kind === 'ssh';
-  const Icon = tab.kind === 'history' ? History : tab.kind === 'settings' ? Settings : isSsh ? Server : SquareTerminal;
+  const Icon =
+    tab.kind === 'history'
+      ? History
+      : tab.kind === 'settings'
+        ? Settings
+        : isSsh
+          ? Server
+          : SquareTerminal;
   const iconColor = active ? 'var(--accent)' : 'var(--text-secondary)';
   const iconBg = active ? 'var(--accent-bg)' : 'transparent';
-  const typeSummary = terms.map((t) =>
-    t.kind === 'ssh' ? (t.ssh?.name || t.ssh?.host || 'SSH') : (t.shellType ? shellTypeLabel(t.shellType) : '本地'),
-  ).join(' + ');
+  const typeSummary = terms
+    .map((t) =>
+      t.kind === 'ssh'
+        ? t.ssh?.name || t.ssh?.host || 'SSH'
+        : t.shellType
+          ? shellTypeLabel(t.shellType)
+          : '本地',
+    )
+    .join(' + ');
   // session 标签不再写文字副标题，改用胶囊状态（圆点 + 终端数）
-  const subtitle = tab.kind === 'history' ? '会话历史' : tab.kind === 'settings' ? '设置' : undefined;
+  const subtitle =
+    tab.kind === 'history' ? '会话历史' : tab.kind === 'settings' ? '设置' : undefined;
 
   // 内外壳两层：外壳（外层容器，idle 透明，hover/选中 5%，与分组容器同色）+ 内壳（内层卡片，idle 透明，hover 5%，选中 10% + 1px 描边，圆角）
   const inGroup = groupId != null;
-  const outerBg = (!inGroup && (active || hovered)) ? 'var(--tab-hover)' : 'transparent';
+  const outerBg = !inGroup && (active || hovered) ? 'var(--tab-hover)' : 'transparent';
   let innerBg = 'transparent';
   if (highlight) {
     innerBg = 'var(--tab-hover)';
@@ -583,19 +828,31 @@ function TabRow({
         cursor: 'pointer',
       }}
     >
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        padding: 8,
-        borderRadius: 'var(--tab-radius)',
-        background: innerBg,
-        color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-        transition: 'background 0.12s ease',
-      }}>
-        <span style={{
-          width: 24, height: 24, borderRadius: 6, flexShrink: 0,
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          background: iconBg, color: iconColor,
-        }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: 8,
+          borderRadius: 'var(--tab-radius)',
+          background: innerBg,
+          color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+          transition: 'background 0.12s ease',
+        }}
+      >
+        <span
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: 6,
+            flexShrink: 0,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: iconBg,
+            color: iconColor,
+          }}
+        >
           <Icon size={15} />
         </span>
         {editing ? (
@@ -611,26 +868,43 @@ function TabRow({
             }}
             onClick={(e) => e.stopPropagation()}
             style={{
-              flex: 1, background: 'var(--canvas)', border: '1px solid var(--accent)',
-              borderRadius: 3, padding: '1px 4px', fontSize: 13,
-              color: 'var(--text-primary)', outline: 'none', fontFamily: 'var(--font-ui)',
+              flex: 1,
+              background: 'var(--canvas)',
+              border: '1px solid var(--accent)',
+              borderRadius: 3,
+              padding: '1px 4px',
+              fontSize: 13,
+              color: 'var(--text-primary)',
+              outline: 'none',
+              fontFamily: 'var(--font-ui)',
             }}
           />
         ) : (
           <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <span style={{
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              fontSize: 12, lineHeight: '16px',
-              fontWeight: active ? 600 : 500,
-            }}>
+            <span
+              style={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                fontSize: 12,
+                lineHeight: '16px',
+                fontWeight: active ? 600 : 500,
+              }}
+            >
               {tab.title}
             </span>
             {subtitle && (
-              <span style={{
-                fontSize: 11, color: 'var(--text-muted)', lineHeight: '14px',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                fontFamily: 'var(--font-mono)',
-              }}>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: 'var(--text-muted)',
+                  lineHeight: '14px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  fontFamily: 'var(--font-mono)',
+                }}
+              >
                 {subtitle}
               </span>
             )}
@@ -640,31 +914,57 @@ function TabRow({
           <span
             title={typeSummary}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              height: 16, padding: '0 6px', flexShrink: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              height: 16,
+              padding: '0 6px',
+              flexShrink: 0,
               lineHeight: '14px',
             }}
           >
-            <span style={{
-              width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-              background: 'var(--success)',
-            }} />
-            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                flexShrink: 0,
+                background: 'var(--success)',
+              }}
+            />
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                color: 'var(--text-secondary)',
+                fontFamily: 'var(--font-mono)',
+              }}
+            >
               {terms.length}
             </span>
           </span>
         )}
         <span
-          onClick={(e) => { e.stopPropagation(); onClose(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
           title="关闭标签"
           data-testid={`tab-close-${tab.id}`}
           data-no-drag
           style={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: 18, height: 18, fontSize: 15, cursor: 'pointer', lineHeight: 1,
-            borderRadius: 4, flexShrink: 0,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 18,
+            height: 18,
+            fontSize: 15,
+            cursor: 'pointer',
+            lineHeight: 1,
+            borderRadius: 4,
+            flexShrink: 0,
             color: 'var(--text-muted)',
-            opacity: (active || hovered) ? 1 : 0,
+            opacity: active || hovered ? 1 : 0,
             transition: 'opacity 0.12s ease',
           }}
           onMouseEnter={(e) => {
@@ -675,7 +975,9 @@ function TabRow({
             (e.currentTarget as HTMLElement).style.background = 'transparent';
             (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)';
           }}
-        >×</span>
+        >
+          ×
+        </span>
       </div>
     </div>
   );
@@ -683,7 +985,13 @@ function TabRow({
 
 // ── 拖拽预览（标签图，无文字）──
 
-function DragGhost({ type, id, tabs, x, y }: {
+function DragGhost({
+  type,
+  id,
+  tabs,
+  x,
+  y,
+}: {
   type: 'tab' | 'group';
   id: string;
   tabs: Tab[];
@@ -693,20 +1001,38 @@ function DragGhost({ type, id, tabs, x, y }: {
   const tab = type === 'tab' ? tabs.find((t) => t.id === id) : undefined;
   const first = tab ? firstTerminalOf(tab) : null;
   const isSsh = type === 'tab' && first?.kind === 'ssh';
-  const Icon = type === 'tab'
-    ? (tab?.kind === 'history' ? History : tab?.kind === 'settings' ? Settings : isSsh ? Server : SquareTerminal)
-    : Folder;
+  const Icon =
+    type === 'tab'
+      ? tab?.kind === 'history'
+        ? History
+        : tab?.kind === 'settings'
+          ? Settings
+          : isSsh
+            ? Server
+            : SquareTerminal
+      : Folder;
   const color = type === 'group' ? 'var(--accent-warm)' : 'var(--accent)';
   return (
-    <div style={{
-      position: 'fixed', left: x, top: y, zIndex: 9999, pointerEvents: 'none',
-      transform: 'translate(-50%, -60%) scale(1.06)',
-      width: 40, height: 26, borderRadius: 7,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'var(--elevated)', border: '1px solid var(--border-strong)',
-      boxShadow: 'var(--shadow-lg)',
-      animation: 'dragGhostIn 0.1s ease',
-    }}>
+    <div
+      style={{
+        position: 'fixed',
+        left: x,
+        top: y,
+        zIndex: 9999,
+        pointerEvents: 'none',
+        transform: 'translate(-50%, -60%) scale(1.06)',
+        width: 40,
+        height: 26,
+        borderRadius: 7,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'var(--elevated)',
+        border: '1px solid var(--border-strong)',
+        boxShadow: 'var(--shadow-lg)',
+        animation: 'dragGhostIn 0.1s ease',
+      }}
+    >
       <Icon size={14} style={{ color }} />
     </div>
   );

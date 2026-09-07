@@ -1,8 +1,11 @@
 import { invoke } from '@tauri-apps/api/core';
 import type {
-  BackendHistoryEntry, BackendFileMatch, BackendSearchContext,
-  BackendBlockEntry, BackendSessionEntry,
-} from '../search/types';
+  BackendBlockEntry,
+  BackendFileMatch,
+  BackendHistoryEntry,
+  BackendSearchContext,
+  BackendSessionEntry,
+} from '@/search/types';
 
 /** 搜索文件系统 */
 export function searchFiles(
@@ -65,10 +68,14 @@ export function clearHistory(): Promise<void> {
 
 /** 按关键词搜索命令块（联表 sessions 拿标题/状态） */
 export function searchBlocks(
-  query: string, maxResults = 20, filterSessionStatus?: string | null,
+  query: string,
+  maxResults = 20,
+  filterSessionStatus?: string | null,
 ): Promise<BackendBlockEntry[]> {
   return invoke('search_blocks', {
-    query, maxResults, filterSessionStatus: filterSessionStatus ?? null,
+    query,
+    maxResults,
+    filterSessionStatus: filterSessionStatus ?? null,
   });
 }
 

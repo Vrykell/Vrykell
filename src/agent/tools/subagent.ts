@@ -1,13 +1,14 @@
 /**
  * subagent — 子代理工具：spawn/create/list/remove，让 LLM 自己调度与扩展子代理。
  */
-import { generateText, tool } from 'ai';
-import { DESC_SUBAGENT } from '../toolTexts';
+
 import { invoke } from '@tauri-apps/api/core';
+import { generateText, tool } from 'ai';
 import { z } from 'zod';
-import { createChatModel, type ProviderKind } from '../provider';
-import { listAgents, saveAgent, removeAgent, getAgent } from '../platform';
-import { gate, type ToolContext } from '../permissions';
+import { gate, type ToolContext } from '@/agent/permissions';
+import { getAgent, listAgents, removeAgent, saveAgent } from '@/agent/platform';
+import { createChatModel, type ProviderKind } from '@/agent/provider';
+import { DESC_SUBAGENT } from '@/agent/toolTexts';
 
 interface AiConfigRust {
   base_url: string;
@@ -38,8 +39,14 @@ export function buildSubagentTool(ctx: ToolContext) {
               return list.map((a) => `- ${a.name}：${a.description || '无描述'}`).join('\n');
             }
             case 'create': {
-              if (!args.name?.trim() || !args.prompt?.trim()) return { ok: false, error: 'create 需要 name 与 prompt' };
-              await saveAgent({ id: '', name: args.name.trim(), description: args.description ?? '', prompt: args.prompt });
+              if (!args.name?.trim() || !args.prompt?.trim())
+                return { ok: false, error: 'create 需要 name 与 prompt' };
+              await saveAgent({
+                id: '',
+                name: args.name.trim(),
+                description: args.description ?? '',
+                prompt: args.prompt,
+              });
               return { ok: true, result: `已创建子代理「${args.name.trim()}」` };
             }
             case 'remove': {
@@ -50,10 +57,15 @@ export function buildSubagentTool(ctx: ToolContext) {
               return { ok: true, result: `已删除「${a.name}」` };
             }
             case 'spawn': {
-              if (!args.agent || !args.task?.trim()) return { ok: false, error: 'spawn 需要 agent 与 task' };
+              if (!args.agent || !args.task?.trim())
+                return { ok: false, error: 'spawn 需要 agent 与 task' };
               const def = await getAgent(args.agent);
               const info = await invoke<AiConfigRust>('get_ai_config');
-              const model = createChatModel({ provider: info.provider, baseUrl: info.base_url, model: info.model });
+              const model = createChatModel({
+                provider: info.provider,
+                baseUrl: info.base_url,
+                model: info.model,
+              });
               const { text } = await generateText({
                 model,
                 system: def.prompt,

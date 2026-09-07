@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import type { DispatchEvent } from '../terminal/pipeline/events';
+import type { DispatchEvent } from '@/terminal/pipeline/events';
 
 /** SSH 连接目标（透传给 Rust pty_spawn 的 ssh 参数） */
 export interface SshSpawnTarget {
@@ -46,7 +46,9 @@ export function ptyClose(id: string): Promise<void> {
   return invoke('pty_close', { id });
 }
 
-export function onPtyOutput(cb: (id: string, events: DispatchEvent[]) => void): Promise<UnlistenFn> {
+export function onPtyOutput(
+  cb: (id: string, events: DispatchEvent[]) => void,
+): Promise<UnlistenFn> {
   return listen<{ id: string; events: DispatchEvent[] }>('pty-output', (e) =>
     cb(e.payload.id, e.payload.events),
   );

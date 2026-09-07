@@ -1,8 +1,13 @@
 /**
  * agentSettings — 全局/模型覆盖/迁移测试。
  */
-import { describe, it, expect, beforeEach } from 'vitest';
-import { useAgentSettings, defaultOpenModeForShell, DEFAULT_AGENT_SETTINGS, type AgentSettings } from './agentSettings';
+import { beforeEach, describe, expect, it } from 'vitest';
+import {
+  type AgentSettings,
+  DEFAULT_AGENT_SETTINGS,
+  defaultOpenModeForShell,
+  useAgentSettings,
+} from '@/agent/agentSettings';
 
 beforeEach(() => {
   useAgentSettings.setState({ global: { ...DEFAULT_AGENT_SETTINGS }, overrides: {} });
@@ -23,11 +28,23 @@ describe('agentSettings', () => {
   it('resetModel 清覆盖', () => {
     useAgentSettings.getState().updateModel('m1', { maxSteps: 5 });
     useAgentSettings.getState().resetModel('m1');
-    expect(useAgentSettings.getState().resolve('m1').maxSteps).toBe(DEFAULT_AGENT_SETTINGS.maxSteps);
+    expect(useAgentSettings.getState().resolve('m1').maxSteps).toBe(
+      DEFAULT_AGENT_SETTINGS.maxSteps,
+    );
   });
 
   it('defaultOpenModeForShell：按 shell 返回，未知回退 block', () => {
-    useAgentSettings.getState().update({ openModeByShell: { zsh: 'classic', bash: 'block', powershell: 'block', pwsh: 'block', cmd: 'block' } });
+    useAgentSettings
+      .getState()
+      .update({
+        openModeByShell: {
+          zsh: 'classic',
+          bash: 'block',
+          powershell: 'block',
+          pwsh: 'block',
+          cmd: 'block',
+        },
+      });
     expect(defaultOpenModeForShell('zsh')).toBe('classic');
     expect(defaultOpenModeForShell('bash')).toBe('block');
     expect(defaultOpenModeForShell('weird-shell')).toBe('block');
@@ -51,7 +68,8 @@ describe('agentSettings', () => {
   it('migrate：v1 平铺结构收进 global，maxSteps<50 抬到 50', () => {
     const migrate = useAgentSettings.persist.getOptions().migrate!;
     const out = migrate({ agentMode: false, deepThink: true, maxSteps: 3 } as never, 1) as {
-      global: AgentSettings; overrides: Record<string, unknown>;
+      global: AgentSettings;
+      overrides: Record<string, unknown>;
     };
     expect(out.global.agentMode).toBe(false);
     expect(out.global.deepThink).toBe(true);
@@ -64,7 +82,8 @@ describe('agentSettings', () => {
   it('migrate：结构化数据补齐缺省字段与 overrides', () => {
     const migrate = useAgentSettings.persist.getOptions().migrate!;
     const out = migrate({ global: { maxSteps: 60 } } as never, 8) as {
-      global: AgentSettings; overrides: Record<string, unknown>;
+      global: AgentSettings;
+      overrides: Record<string, unknown>;
     };
     expect(out.global.maxSteps).toBe(60);
     expect(out.global.agentMode).toBe(true);

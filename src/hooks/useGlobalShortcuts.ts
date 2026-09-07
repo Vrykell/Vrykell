@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
-import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
-import { useTerminalStore, termInstances, getFocusedTerminalId } from '../stores/terminal';
-import { countLeaves, leaves } from '../lib/windowLayout';
-import { useUiStore } from '../stores/ui';
-import { useBlockStore } from '../stores/blocks';
+import { countLeaves, leaves } from '@/lib/windowLayout';
+import { useBlockStore } from '@/stores/blocks';
+import { getFocusedTerminalId, termInstances, useTerminalStore } from '@/stores/terminal';
+import { useUiStore } from '@/stores/ui';
+import { isSessionTab, useWorkspaceStore } from '@/stores/workspace';
 
 /**
  * 全局快捷键：
@@ -28,7 +28,11 @@ function scaleFontSize(delta: 1 | -1 | 0) {
 
   // 同步所有 xterm 实例的字号
   for (const t of termInstances.values()) {
-    try { t.options.fontSize = next; } catch { /* ignore */ }
+    try {
+      t.options.fontSize = next;
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -100,9 +104,10 @@ export function useGlobalShortcuts() {
           const ids = leaves(tab.layout).map((t) => t.id);
           const cur = getFocusedTerminalId();
           const idx = Math.max(0, ids.indexOf(cur));
-          const next = e.key === ']'
-            ? ids[(idx + 1) % ids.length]!
-            : ids[(idx - 1 + ids.length) % ids.length]!;
+          const next =
+            e.key === ']'
+              ? ids[(idx + 1) % ids.length]!
+              : ids[(idx - 1 + ids.length) % ids.length]!;
           useTerminalStore.getState().setFocusedPane(next);
           return;
         }

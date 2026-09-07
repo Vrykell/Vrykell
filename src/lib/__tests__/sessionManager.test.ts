@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { invoke } from '@tauri-apps/api/core';
-import * as sessionManager from '../sessionManager';
-import { useWorkspaceStore, isSessionTab, firstTerminalOf } from '../../stores/workspace';
-import { useBlockStore } from '../../stores/blocks';
-import { leaves } from '../windowLayout';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as sessionManager from '@/lib/sessionManager';
+import { leaves } from '@/lib/windowLayout';
+import { useBlockStore } from '@/stores/blocks';
+import { firstTerminalOf, isSessionTab, useWorkspaceStore } from '@/stores/workspace';
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 
@@ -12,18 +12,31 @@ const initialWorkspace = useWorkspaceStore.getState();
 
 function mockSession(overrides: Record<string, unknown>) {
   return {
-    id: 's1', title: 't', status: 'active', created_at: 0, closed_at: null,
-    block_count: 0, cwd: '', group_id: null, sort_order: 0,
-    kind: 'session', payload: '{}', ...overrides,
+    id: 's1',
+    title: 't',
+    status: 'active',
+    created_at: 0,
+    closed_at: null,
+    block_count: 0,
+    cwd: '',
+    group_id: null,
+    sort_order: 0,
+    kind: 'session',
+    payload: '{}',
+    ...overrides,
   };
 }
 
 function defaultInvoke(cmd: string): unknown {
   switch (cmd) {
-    case 'get_session_blocks': return [];
-    case 'list_chat_messages': return [];
-    case 'restore_session': return undefined;
-    default: return undefined;
+    case 'get_session_blocks':
+      return [];
+    case 'list_chat_messages':
+      return [];
+    case 'restore_session':
+      return undefined;
+    default:
+      return undefined;
   }
 }
 
@@ -37,10 +50,22 @@ beforeEach(() => {
 describe('sessionManager.restore（窗口布局）', () => {
   it('从旧 ssh payload 恢复含 SSH 终端的窗口', async () => {
     const session = mockSession({
-      id: 'ssh-1', title: '生产服务器', kind: 'ssh',
-      payload: JSON.stringify({ ssh: { name: '生产服务器', host: 'prod.example.com', user: 'root', port: 22, connectionId: 'c1' } }),
+      id: 'ssh-1',
+      title: '生产服务器',
+      kind: 'ssh',
+      payload: JSON.stringify({
+        ssh: {
+          name: '生产服务器',
+          host: 'prod.example.com',
+          user: 'root',
+          port: 22,
+          connectionId: 'c1',
+        },
+      }),
     });
-    mockedInvoke.mockImplementation(async (cmd: string) => (cmd === 'get_session' ? session : defaultInvoke(cmd)));
+    mockedInvoke.mockImplementation(async (cmd: string) =>
+      cmd === 'get_session' ? session : defaultInvoke(cmd),
+    );
 
     await sessionManager.restore('ssh-1', '生产服务器');
     const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === 'ssh-1')!;
@@ -53,8 +78,15 @@ describe('sessionManager.restore（窗口布局）', () => {
   });
 
   it('从旧 shellType payload 恢复本地终端窗口', async () => {
-    const session = mockSession({ id: 'local-1', title: 'Zsh', kind: 'local', payload: JSON.stringify({ shellType: 'zsh' }) });
-    mockedInvoke.mockImplementation(async (cmd: string) => (cmd === 'get_session' ? session : defaultInvoke(cmd)));
+    const session = mockSession({
+      id: 'local-1',
+      title: 'Zsh',
+      kind: 'local',
+      payload: JSON.stringify({ shellType: 'zsh' }),
+    });
+    mockedInvoke.mockImplementation(async (cmd: string) =>
+      cmd === 'get_session' ? session : defaultInvoke(cmd),
+    );
 
     await sessionManager.restore('local-1', 'Zsh');
     const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === 'local-1')!;
@@ -64,21 +96,36 @@ describe('sessionManager.restore（窗口布局）', () => {
 
   it('从 layout payload 恢复窗口布局（多终端）', async () => {
     const layout = {
-      type: 'split', dir: 'row', ratio: 0.4,
+      type: 'split',
+      dir: 'row',
+      ratio: 0.4,
       first: { type: 'leaf', terminal: { id: 's#0', kind: 'local', shellType: 'zsh' } },
-      second: { type: 'leaf', terminal: { id: 's#1', kind: 'ssh', ssh: { name: 'x', host: 'h', user: 'u' } } },
+      second: {
+        type: 'leaf',
+        terminal: { id: 's#1', kind: 'ssh', ssh: { name: 'x', host: 'h', user: 'u' } },
+      },
     };
     const session = mockSession({ id: 's', kind: 'session', payload: JSON.stringify({ layout }) });
-    mockedInvoke.mockImplementation(async (cmd: string) => (cmd === 'get_session' ? session : defaultInvoke(cmd)));
+    mockedInvoke.mockImplementation(async (cmd: string) =>
+      cmd === 'get_session' ? session : defaultInvoke(cmd),
+    );
 
     await sessionManager.restore('s', 's');
     const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === 's')!;
-    expect(leaves(tab.kind === 'session' ? tab.layout : { type: 'leaf', terminal: { id: 'x', kind: 'local' } })).toHaveLength(2);
+    expect(
+      leaves(
+        tab.kind === 'session'
+          ? tab.layout
+          : { type: 'leaf', terminal: { id: 'x', kind: 'local' } },
+      ),
+    ).toHaveLength(2);
   });
 
   it('meta.groupId 覆盖后端 group_id', async () => {
     const session = mockSession({ id: 'g-tab', group_id: null, payload: '{}' });
-    mockedInvoke.mockImplementation(async (cmd: string) => (cmd === 'get_session' ? session : defaultInvoke(cmd)));
+    mockedInvoke.mockImplementation(async (cmd: string) =>
+      cmd === 'get_session' ? session : defaultInvoke(cmd),
+    );
     await sessionManager.restore('g-tab', 't', { groupId: 'g1' });
     const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === 'g-tab')!;
     expect(isSessionTab(tab) && tab.groupId).toBe('g1');
@@ -86,7 +133,9 @@ describe('sessionManager.restore（窗口布局）', () => {
 
   it('payload 损坏时降级为单本地终端', async () => {
     const session = mockSession({ id: 'bad', payload: 'not-json' });
-    mockedInvoke.mockImplementation(async (cmd: string) => (cmd === 'get_session' ? session : defaultInvoke(cmd)));
+    mockedInvoke.mockImplementation(async (cmd: string) =>
+      cmd === 'get_session' ? session : defaultInvoke(cmd),
+    );
     await sessionManager.restore('bad', 'bad');
     const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === 'bad')!;
     expect(tab.kind).toBe('session');
@@ -102,11 +151,18 @@ describe('addTab 持久化 kind + payload', () => {
       return undefined;
     });
 
-    useWorkspaceStore.getState().addTab({ kind: 'ssh', ssh: { name: 'prod', host: 'prod.example.com', user: 'root', port: 22, connectionId: 'c1' } });
+    useWorkspaceStore
+      .getState()
+      .addTab({
+        kind: 'ssh',
+        ssh: { name: 'prod', host: 'prod.example.com', user: 'root', port: 22, connectionId: 'c1' },
+      });
     const create = calls.find((c) => c.cmd === 'create_session');
     expect(create).toBeTruthy();
     expect(create!.args.kind).toBe('session');
-    const payload = JSON.parse(create!.args.payload as string) as { layout: { terminal: { ssh: Record<string, unknown> } } };
+    const payload = JSON.parse(create!.args.payload as string) as {
+      layout: { terminal: { ssh: Record<string, unknown> } };
+    };
     expect(payload.layout.terminal.ssh.host).toBe('prod.example.com');
     expect('password' in payload.layout.terminal.ssh).toBe(false);
   });
@@ -120,7 +176,9 @@ describe('addTab 持久化 kind + payload', () => {
     useWorkspaceStore.getState().addTab({ shellType: 'zsh' });
     const create = calls.find((c) => c.cmd === 'create_session');
     expect(create!.args.kind).toBe('session');
-    const payload = JSON.parse(create!.args.payload as string) as { layout: { terminal: { shellType: string } } };
+    const payload = JSON.parse(create!.args.payload as string) as {
+      layout: { terminal: { shellType: string } };
+    };
     expect(payload.layout.terminal.shellType).toBe('zsh');
   });
 

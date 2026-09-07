@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { isMacOS } from './platform';
+import { isMacOS } from '@/lib/platform';
 
 /** 本地 shell 类型标识 */
 export type ShellType = 'zsh' | 'bash' | 'powershell' | 'pwsh' | 'cmd';
@@ -7,12 +7,18 @@ export type ShellType = 'zsh' | 'bash' | 'powershell' | 'pwsh' | 'cmd';
 /** shell 类型 → 显示名（默认标签标题用）。 */
 export function shellTypeLabel(t: string): string {
   switch (t) {
-    case 'zsh': return 'Zsh';
-    case 'bash': return 'Bash';
-    case 'powershell': return 'PowerShell';
-    case 'pwsh': return 'PowerShell';
-    case 'cmd': return 'CMD';
-    default: return t || '终端';
+    case 'zsh':
+      return 'Zsh';
+    case 'bash':
+      return 'Bash';
+    case 'powershell':
+      return 'PowerShell';
+    case 'pwsh':
+      return 'PowerShell';
+    case 'cmd':
+      return 'CMD';
+    default:
+      return t || '终端';
   }
 }
 

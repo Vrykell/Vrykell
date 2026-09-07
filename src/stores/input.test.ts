@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { useInputStore, selectPaneInput } from './input';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { selectPaneInput, useInputStore } from '@/stores/input';
 
 const initial = useInputStore.getState();
 

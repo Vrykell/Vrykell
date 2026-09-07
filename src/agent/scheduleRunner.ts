@@ -4,8 +4,8 @@
  * 之前调度轮询写在设置页组件里，用户不开设置页时任务永远不会触发；
  * 提升到这里后，应用运行期间每 30s 检查一次所有启用的定时任务。
  */
-import { listSchedules, markScheduleRun } from './platform';
-import { sendToChat } from '../stores/chat';
+import { listSchedules, markScheduleRun } from '@/agent/platform';
+import { sendToChat } from '@/stores/chat';
 
 const POLL_MS = 30_000;
 

@@ -1,7 +1,7 @@
 import { Settings } from 'lucide-react';
-import { registerSource } from '../registry';
-import { searchSettings } from '../../settings/registry';
-import type { SearchResult, SettingResultData } from '../types';
+import { registerSource } from '@/search/registry';
+import type { SearchResult, SettingResultData } from '@/search/types';
+import { searchSettings } from '@/settings/registry';
 
 registerSource({
   id: 'setting',

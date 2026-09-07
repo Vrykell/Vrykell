@@ -1,6 +1,6 @@
-import { isValidElement, useState, type ReactNode, type ReactElement } from 'react';
-import { Play, Copy, Check } from 'lucide-react';
-import { useTerminalStore } from '../stores/terminal';
+import { Check, Copy, Play } from 'lucide-react';
+import { isValidElement, type ReactElement, type ReactNode, useState } from 'react';
+import { useTerminalStore } from '@/stores/terminal';
 
 const SHELL_LANGS = new Set(['bash', 'sh', 'zsh', 'shell']);
 
@@ -50,32 +50,45 @@ export default function CommandBlock({ children }: { children?: ReactNode }) {
   };
 
   return (
-    <div style={{
-      position: 'relative',
-      background: 'var(--block)',
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--radius-inner)',
-      margin: '0.45em 0',
-      overflow: 'hidden',
-    }}>
+    <div
+      style={{
+        position: 'relative',
+        background: 'var(--block)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-inner)',
+        margin: '0.45em 0',
+        overflow: 'hidden',
+      }}
+    >
       {code && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 6,
-          padding: '3px 10px',
-          borderBottom: '1px solid var(--border)',
-          background: 'var(--command-block-bg)',
-        }}>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 6,
+            padding: '3px 10px',
+            borderBottom: '1px solid var(--border)',
+            background: 'var(--command-block-bg)',
+          }}
+        >
+          <span
+            style={{
+              fontSize: 11,
+              color: 'var(--text-muted)',
+              fontFamily: 'var(--font-mono)',
+              flexShrink: 0,
+            }}
+          >
             {code.lang || 'code'}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
             {isShell && (
               <button
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
                   fontSize: 11,
                   padding: '2px 10px',
                   background: 'var(--accent-dim)',
@@ -93,12 +106,22 @@ export default function CommandBlock({ children }: { children?: ReactNode }) {
               title={copied ? '已复制' : '复制代码'}
               onClick={() => void copy()}
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                fontSize: 11, padding: '2px 8px', border: 'none',
-                background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                fontSize: 11,
+                padding: '2px 8px',
+                border: 'none',
+                background: 'transparent',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
               }}
             >
-              {copied ? <Check size={10} style={{ color: 'var(--success)' }} /> : <Copy size={10} />}
+              {copied ? (
+                <Check size={10} style={{ color: 'var(--success)' }} />
+              ) : (
+                <Copy size={10} />
+              )}
               {copied ? '已复制' : '复制'}
             </button>
           </div>

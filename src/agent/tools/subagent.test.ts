@@ -1,11 +1,13 @@
 /**
  * subagent 工具（spawn/create/list/remove）测试。
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
-import { buildSubagentTool } from './subagent';
-import { usePermissions, type ToolContext } from '../permissions';
+
+import { type ToolContext, usePermissions } from '@/agent/permissions';
+import { buildSubagentTool } from '@/agent/tools/subagent';
 
 usePermissions.setState({ levels: { subagent: 'allow' } });
 const CTX: ToolContext = {};
@@ -15,11 +17,17 @@ beforeEach(() => {
 });
 
 const exec = (args: Record<string, unknown>) =>
-  (buildSubagentTool(CTX).subagent as unknown as { execute: (a: unknown, o: unknown) => Promise<unknown> }).execute(args, {});
+  (
+    buildSubagentTool(CTX).subagent as unknown as {
+      execute: (a: unknown, o: unknown) => Promise<unknown>;
+    }
+  ).execute(args, {});
 
 describe('subagent 工具', () => {
   it('list：格式化 / 空列表', async () => {
-    invokeMock.mockResolvedValueOnce([{ id: 'a', name: '审查', description: '审查代码', prompt: 'p' }]);
+    invokeMock.mockResolvedValueOnce([
+      { id: 'a', name: '审查', description: '审查代码', prompt: 'p' },
+    ]);
     const r = await exec({ action: 'list' });
     expect(r).toContain('审查');
     invokeMock.mockResolvedValueOnce([]);
@@ -40,17 +48,35 @@ describe('subagent 工具', () => {
     const r = await exec({ action: 'remove', agent: '审查' });
     expect(r).toEqual({ ok: true, result: '已删除「审查」' });
     invokeMock.mockResolvedValueOnce([]);
-    expect(await exec({ action: 'remove', agent: 'x' })).toEqual({ ok: false, error: '未找到子代理（用 list 查）' });
+    expect(await exec({ action: 'remove', agent: 'x' })).toEqual({
+      ok: false,
+      error: '未找到子代理（用 list 查）',
+    });
   });
 
   it('spawn：缺 agent/task 报错', async () => {
-    expect(await exec({ action: 'spawn' })).toEqual({ ok: false, error: 'spawn 需要 agent 与 task' });
-    expect(await exec({ action: 'spawn', agent: 'a' })).toEqual({ ok: false, error: 'spawn 需要 agent 与 task' });
+    expect(await exec({ action: 'spawn' })).toEqual({
+      ok: false,
+      error: 'spawn 需要 agent 与 task',
+    });
+    expect(await exec({ action: 'spawn', agent: 'a' })).toEqual({
+      ok: false,
+      error: 'spawn 需要 agent 与 task',
+    });
   });
 
   it('spawn：读取定义与配置后执行（生成失败 → 结构化错误，不 throw）', async () => {
-    invokeMock.mockResolvedValueOnce({ id: 'a', name: '审查', description: '', prompt: '你是审查员' }); // get_agent
-    invokeMock.mockResolvedValueOnce({ provider: 'openai-compatible', base_url: 'http://127.0.0.1:9', model: 'm' }); // get_ai_config
+    invokeMock.mockResolvedValueOnce({
+      id: 'a',
+      name: '审查',
+      description: '',
+      prompt: '你是审查员',
+    }); // get_agent
+    invokeMock.mockResolvedValueOnce({
+      provider: 'openai-compatible',
+      base_url: 'http://127.0.0.1:9',
+      model: 'm',
+    }); // get_ai_config
     const r = await exec({ action: 'spawn', agent: '审查', task: '审查这段代码' });
     expect(invokeMock).toHaveBeenCalledWith('get_agent', { nameOrId: '审查' });
     expect(r).toEqual({ ok: false, error: expect.any(String) });
@@ -61,7 +87,10 @@ describe('subagent 工具', () => {
     invokeMock.mockRejectedValueOnce(new Error('db down'));
     expect(await exec({ action: 'list' })).toEqual({ ok: false, error: 'db down' });
     invokeMock.mockRejectedValueOnce(new Error('db down'));
-    expect(await exec({ action: 'create', name: 'n', prompt: 'p' })).toEqual({ ok: false, error: 'db down' });
+    expect(await exec({ action: 'create', name: 'n', prompt: 'p' })).toEqual({
+      ok: false,
+      error: 'db down',
+    });
   });
 
   it('门控拒绝时直接返回门控结果', async () => {

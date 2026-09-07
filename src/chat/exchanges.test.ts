@@ -1,10 +1,19 @@
-import { describe, it, expect } from 'vitest';
-import { toExchanges, mergeFlow } from './exchanges';
-import type { ChatMessage } from '../stores/chat';
-import type { TermBlock } from '../terminal/pipeline/termBlock';
+import { describe, expect, it } from 'vitest';
+import { mergeFlow, toExchanges } from '@/chat/exchanges';
+import type { ChatMessage } from '@/stores/chat';
+import type { TermBlock } from '@/terminal/pipeline/termBlock';
 
-const msg = (id: string, role: 'user' | 'assistant', createdAt: number, extra: Partial<ChatMessage> = {}): ChatMessage => ({
-  id, role, content: `${role}-${id}`, createdAt, ...extra,
+const msg = (
+  id: string,
+  role: 'user' | 'assistant',
+  createdAt: number,
+  extra: Partial<ChatMessage> = {},
+): ChatMessage => ({
+  id,
+  role,
+  content: `${role}-${id}`,
+  createdAt,
+  ...extra,
 });
 
 const block = (id: string, startedAt: number): TermBlock => ({
@@ -32,8 +41,10 @@ describe('toExchanges', () => {
 
   it('连续多个问答各自成交换', () => {
     const ex = toExchanges([
-      msg('q1', 'user', 1), msg('a1', 'assistant', 2),
-      msg('q2', 'user', 3), msg('a2', 'assistant', 4),
+      msg('q1', 'user', 1),
+      msg('a1', 'assistant', 2),
+      msg('q2', 'user', 3),
+      msg('a2', 'assistant', 4),
     ]);
     expect(ex.map((e) => e.id)).toEqual(['q1', 'q2']);
   });
@@ -53,9 +64,16 @@ describe('toExchanges', () => {
 
 describe('mergeFlow', () => {
   it('块与 AI 交换按时间戳交错归并', () => {
-    const exchanges = toExchanges([msg('q1', 'user', 150, { paneId: 'p1' }), msg('a1', 'assistant', 160)]);
+    const exchanges = toExchanges([
+      msg('q1', 'user', 150, { paneId: 'p1' }),
+      msg('a1', 'assistant', 160),
+    ]);
     const flow = mergeFlow([block('b1', 100), block('b2', 200)], exchanges);
-    expect(flow.map((f) => (f.type === 'block' ? f.block.id : f.exchange.id))).toEqual(['b1', 'q1', 'b2']);
+    expect(flow.map((f) => (f.type === 'block' ? f.block.id : f.exchange.id))).toEqual([
+      'b1',
+      'q1',
+      'b2',
+    ]);
     expect(flow[1]).toMatchObject({ type: 'ai', ts: 150 });
   });
 

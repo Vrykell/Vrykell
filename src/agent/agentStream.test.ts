@@ -3,7 +3,7 @@
  * 只 mock Tauri IPC 边界（invoke/Channel），投递罐头 OpenAI SSE 字节流。
  * 验证 v7 API 用法与适配器组装是否正确。
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@tauri-apps/api/core', () => {
   class MockChannel {
@@ -15,8 +15,8 @@ vi.mock('@tauri-apps/api/core', () => {
   };
 });
 
-import { invoke, Channel } from '@tauri-apps/api/core';
-import { agentStream } from './agentStream';
+import { type Channel, invoke } from '@tauri-apps/api/core';
+import { agentStream } from '@/agent/agentStream';
 
 const mockInvoke = vi.mocked(invoke);
 
@@ -44,7 +44,16 @@ function setupInvoke(sseBody: string, status = 200) {
         has_anthropic_key: false,
         has_gemini_key: false,
         has_tavily_key: false,
-        models: [{ id: 'default', name: '默认', provider: 'openai-compatible', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', capabilities: { vision: false, reasoning: false, tools: true, search: false } }],
+        models: [
+          {
+            id: 'default',
+            name: '默认',
+            provider: 'openai-compatible',
+            baseUrl: 'https://api.openai.com/v1',
+            model: 'gpt-4o-mini',
+            capabilities: { vision: false, reasoning: false, tools: true, search: false },
+          },
+        ],
         active_model: 'default',
       } as never;
     }

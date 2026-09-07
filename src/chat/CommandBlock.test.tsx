@@ -1,13 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 invokeMock.mockResolvedValue(undefined);
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import Markdown from './Markdown';
-import { useTerminalStore } from '../stores/terminal';
-import { useWorkspaceStore } from '../stores/workspace';
+import Markdown from '@/chat/Markdown';
+import { useTerminalStore } from '@/stores/terminal';
+import { useWorkspaceStore } from '@/stores/workspace';
 
 describe('CommandBlock', () => {
   beforeEach(() => {

@@ -3,13 +3,14 @@
  * 模块级 mock 'ai'（generateText），不用 beforeEach（本仓库 vitest 4 陷阱），
  * 各用例开头调 reset()。
  */
-import { describe, it, expect, vi } from 'vitest';
+
 import type { LanguageModel, ModelMessage } from 'ai';
+import { describe, expect, it, vi } from 'vitest';
 
 const { mockGenerate } = vi.hoisted(() => ({ mockGenerate: vi.fn() }));
 vi.mock('ai', () => ({ generateText: mockGenerate }));
 
-import { estimateTokens, planContext, type SizedMessage } from './context';
+import { estimateTokens, planContext, type SizedMessage } from '@/agent/context';
 
 const model = {} as LanguageModel;
 
@@ -35,7 +36,10 @@ describe('planContext：off / window', () => {
     reset();
     const r = await planContext({
       sized: [mk('user', 'a', 5), mk('assistant', 'b', 5), mk('user', 'c', 5)],
-      strategy: 'off', maxTokens: 1, summaryTokens: 100, model,
+      strategy: 'off',
+      maxTokens: 1,
+      summaryTokens: 100,
+      model,
     });
     expect(r.system).toBeUndefined();
     expect(r.messages).toHaveLength(3);
@@ -45,7 +49,10 @@ describe('planContext：off / window', () => {
     reset();
     const r = await planContext({
       sized: [mk('user', 'a', 5), mk('assistant', 'b', 5), mk('user', 'c', 5)],
-      strategy: 'window', maxTokens: 12, summaryTokens: 100, model,
+      strategy: 'window',
+      maxTokens: 12,
+      summaryTokens: 100,
+      model,
     });
     expect(r.system).toBeUndefined();
     expect(r.messages).toHaveLength(2); // 5+5 放得下，三条放不下
@@ -55,7 +62,10 @@ describe('planContext：off / window', () => {
     reset();
     const r = await planContext({
       sized: [mk('user', 'a', 5), mk('user', 'current', 100)],
-      strategy: 'window', maxTokens: 10, summaryTokens: 100, model,
+      strategy: 'window',
+      maxTokens: 10,
+      summaryTokens: 100,
+      model,
     });
     expect(r.messages).toHaveLength(1);
     const only = r.messages[0] as { content: string };
@@ -69,7 +79,11 @@ describe('planContext：compact 摘要压缩', () => {
     mockGenerate.mockResolvedValue({ text: '摘要内容' });
     const r = await planContext({
       sized: [mk('user', 'a', 5), mk('assistant', 'b', 5), mk('user', 'c', 5)],
-      strategy: 'compact', maxTokens: 12, summaryTokens: 100, model, tabId: 't1',
+      strategy: 'compact',
+      maxTokens: 12,
+      summaryTokens: 100,
+      model,
+      tabId: 't1',
     });
     expect(mockGenerate).toHaveBeenCalledTimes(1);
     expect(r.system).toBe('摘要内容');
@@ -79,9 +93,20 @@ describe('planContext：compact 摘要压缩', () => {
   it('增量缓存：新增溢出只摘要增量，不重复折叠旧内容', async () => {
     reset();
     mockGenerate.mockResolvedValueOnce({ text: '摘要1' });
-    const base = [mk('user', 'a', 5), mk('assistant', 'b', 5), mk('user', 'c', 5), mk('assistant', 'd', 5), mk('user', 'e', 5)];
+    const base = [
+      mk('user', 'a', 5),
+      mk('assistant', 'b', 5),
+      mk('user', 'c', 5),
+      mk('assistant', 'd', 5),
+      mk('user', 'e', 5),
+    ];
     const r1 = await planContext({
-      sized: base, strategy: 'compact', maxTokens: 12, summaryTokens: 100, model, tabId: 't-inc',
+      sized: base,
+      strategy: 'compact',
+      maxTokens: 12,
+      summaryTokens: 100,
+      model,
+      tabId: 't-inc',
     });
     expect(r1.system).toBe('摘要1');
     expect(mockGenerate).toHaveBeenCalledTimes(1);
@@ -89,7 +114,12 @@ describe('planContext：compact 摘要压缩', () => {
     mockGenerate.mockResolvedValueOnce({ text: '摘要2' });
     const grown = [...base, mk('user', 'f', 5)];
     const r2 = await planContext({
-      sized: grown, strategy: 'compact', maxTokens: 12, summaryTokens: 100, model, tabId: 't-inc',
+      sized: grown,
+      strategy: 'compact',
+      maxTokens: 12,
+      summaryTokens: 100,
+      model,
+      tabId: 't-inc',
     });
     expect(r2.system).toBe('摘要2');
     expect(mockGenerate).toHaveBeenCalledTimes(2); // 只摘要新增的 1 条
@@ -101,7 +131,11 @@ describe('planContext：compact 摘要压缩', () => {
     const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const r = await planContext({
       sized: [mk('user', 'a', 5), mk('assistant', 'b', 5), mk('user', 'c', 5)],
-      strategy: 'compact', maxTokens: 12, summaryTokens: 100, model, tabId: 't-fail',
+      strategy: 'compact',
+      maxTokens: 12,
+      summaryTokens: 100,
+      model,
+      tabId: 't-fail',
     });
     spy.mockRestore();
     expect(r.system).toBeUndefined();

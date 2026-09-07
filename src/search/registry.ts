@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { SearchSource, ResultType } from './types';
+import type { ResultType, SearchSource } from '@/search/types';
 
 const sources = new Map<ResultType, SearchSource>();
 

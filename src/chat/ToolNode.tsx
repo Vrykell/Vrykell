@@ -14,7 +14,7 @@
  */
 
 import type { CSSProperties } from 'react';
-import type { ToolRunState } from '../agent/messageParts';
+import type { ToolRunState } from '@/agent/messageParts';
 
 const STATE_STYLE: Record<ToolRunState, CSSProperties> = {
   running: { border: '1.5px solid var(--accent-warm)', animation: 'pulse 1s infinite' },

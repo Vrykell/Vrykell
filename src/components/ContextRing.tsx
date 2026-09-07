@@ -1,7 +1,7 @@
 /**
  * ContextRing — 上下文占用圆环（估算 token / 预算）。压缩完成时数值变小，圆环自动减少。
  */
-import { useContextUsage } from '../stores/chat';
+import { useContextUsage } from '@/stores/chat';
 
 export default function ContextRing() {
   const { used, budget } = useContextUsage();
@@ -20,7 +20,10 @@ export default function ContextRing() {
       <title>{`上下文 ${Math.round(pct * 100)}%（${Math.round(used / 1000)}k / ${Math.round(budget / 1000)}k token）`}</title>
       <circle cx="9" cy="9" r={r} fill="none" stroke="var(--border)" strokeWidth="2.5" />
       <circle
-        cx="9" cy="9" r={r} fill="none"
+        cx="9"
+        cy="9"
+        r={r}
+        fill="none"
         stroke={color}
         strokeWidth="2.5"
         strokeDasharray={c}

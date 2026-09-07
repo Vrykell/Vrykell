@@ -11,7 +11,7 @@
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ShellType } from '../lib/shells';
+import type { ShellType } from '@/lib/shells';
 
 /** 上下文管理策略（code-agent 式） */
 export type ContextStrategy = 'off' | 'window' | 'compact';
@@ -143,8 +143,16 @@ export const useAgentSettings = create<AgentSettingsState>()(
       version: 8,
       migrate: (persisted: unknown, version: number) => {
         // v0/v1（平铺）→ 收进 global；v2（缺新字段）→ 补齐默认值
-        let state: { global: AgentSettings; overrides: Record<string, Partial<ModelBehaviorSettings>> };
-        if (version < 2 && persisted && typeof persisted === 'object' && !(persisted as { global?: unknown }).global) {
+        let state: {
+          global: AgentSettings;
+          overrides: Record<string, Partial<ModelBehaviorSettings>>;
+        };
+        if (
+          version < 2 &&
+          persisted &&
+          typeof persisted === 'object' &&
+          !(persisted as { global?: unknown }).global
+        ) {
           const flat = persisted as Record<string, unknown>;
           const global: AgentSettings = { ...DEFAULT_AGENT_SETTINGS };
           for (const k of Object.keys(DEFAULT_AGENT_SETTINGS) as (keyof AgentSettings)[]) {
@@ -154,7 +162,10 @@ export const useAgentSettings = create<AgentSettingsState>()(
           }
           state = { global, overrides: {} };
         } else {
-          state = persisted as { global: AgentSettings; overrides: Record<string, Partial<ModelBehaviorSettings>> };
+          state = persisted as {
+            global: AgentSettings;
+            overrides: Record<string, Partial<ModelBehaviorSettings>>;
+          };
         }
         // 任意版本 → 补齐 global 缺省字段 + 保证 overrides 存在
         if (state && typeof state === 'object') {

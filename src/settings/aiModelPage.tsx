@@ -1,18 +1,23 @@
 /**
  * aiModelPage — 模型配置页（API Key + 模型列表）。
  */
-import { useState } from 'react';
+
 import { Plus, X } from 'lucide-react';
+import { useState } from 'react';
+import { detectCapabilities, type ModelCapability } from '@/agent/capabilities';
+import { modelIcon, providerLabel } from '@/agent/modelIcon';
+import type { ProviderKind } from '@/agent/provider';
+import Segmented from '@/components/Segmented';
+import { useToastStore } from '@/components/Toast';
 import {
-  setProviderKey, clearProviderKey, setAiModels, setActiveModel, useAiConfigStore,
+  clearProviderKey,
   type ModelProfile,
-} from '../lib/ai';
-import type { ProviderKind } from '../agent/provider';
-import { detectCapabilities, type ModelCapability } from '../agent/capabilities';
-import { modelIcon, providerLabel } from '../agent/modelIcon';
-import Segmented from '../components/Segmented';
-import { useToastStore } from '../components/Toast';
-import { Field, ModelTextInput, btnStyle, inputStyle } from './ui';
+  setActiveModel,
+  setAiModels,
+  setProviderKey,
+  useAiConfigStore,
+} from '@/lib/ai';
+import { btnStyle, Field, inputStyle, ModelTextInput } from '@/settings/ui';
 
 const PROVIDERS: { id: ProviderKind; label: string }[] = [
   { id: 'openai-compatible', label: 'OpenAI 兼容' },
@@ -43,8 +48,13 @@ function CapChips({ profile }: { profile: ModelProfile }) {
         <span
           key={cap}
           style={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 10, lineHeight: '14px', padding: '1px 6px', borderRadius: 4,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 10,
+            lineHeight: '14px',
+            padding: '1px 6px',
+            borderRadius: 4,
             color: caps[cap] ? 'var(--text-secondary)' : 'var(--text-muted)',
             background: caps[cap] ? 'var(--hover)' : 'transparent',
             border: caps[cap] ? 'none' : '1px solid var(--border)',
@@ -62,9 +72,11 @@ export function AiModelPage() {
   const [keyDraft, setKeyDraft] = useState('');
   const provider = aiCfg.provider;
   const keySet =
-    provider === 'anthropic' ? aiCfg.hasAnthropicKey
-    : provider === 'gemini' ? aiCfg.hasGeminiKey
-    : aiCfg.hasKey;
+    provider === 'anthropic'
+      ? aiCfg.hasAnthropicKey
+      : provider === 'gemini'
+        ? aiCfg.hasGeminiKey
+        : aiCfg.hasKey;
   const toast = (msg: string, type: 'info' | 'success' | 'error') =>
     useToastStore.getState().addToast(msg, type);
 
@@ -72,7 +84,10 @@ export function AiModelPage() {
     const k = keyDraft.trim();
     if (!k) return;
     setProviderKey(provider, k)
-      .then(() => { setKeyDraft(''); toast('已保存 API Key', 'success'); })
+      .then(() => {
+        setKeyDraft('');
+        toast('已保存 API Key', 'success');
+      })
       .catch((e) => toast(String((e as Error)?.message ?? e), 'error'));
   };
 
@@ -83,16 +98,22 @@ export function AiModelPage() {
         description="Key 按服务商共用：同一服务商下的多个模型复用同一个 Key。仅保存在本机后端，界面不回显明文。此处显示「当前模型」所在服务商。"
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <span style={{
-            fontSize: 11, padding: '2px 8px', borderRadius: 4,
-            color: keySet ? 'var(--success)' : 'var(--text-muted)',
-            background: keySet ? 'var(--success-bg)' : 'var(--hover)',
-          }}>
+          <span
+            style={{
+              fontSize: 11,
+              padding: '2px 8px',
+              borderRadius: 4,
+              color: keySet ? 'var(--success)' : 'var(--text-muted)',
+              background: keySet ? 'var(--success-bg)' : 'var(--hover)',
+            }}
+          >
             {keySet ? '已配置' : '未配置'}
           </span>
           {keySet && (
             <button
-              onClick={() => clearProviderKey(provider).then(() => toast('已清除 API Key', 'success'))}
+              onClick={() =>
+                clearProviderKey(provider).then(() => toast('已清除 API Key', 'success'))
+              }
               style={btnStyle}
             >
               清除
@@ -105,12 +126,20 @@ export function AiModelPage() {
             value={keyDraft}
             placeholder={keySet ? '输入以覆盖，留空不改动' : '输入 API Key'}
             onChange={(e) => setKeyDraft(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') commitKey(); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitKey();
+            }}
             style={inputStyle}
           />
           <button
             onClick={commitKey}
-            style={{ ...btnStyle, background: 'var(--accent)', color: 'var(--accent-text)', border: 'none', flexShrink: 0 }}
+            style={{
+              ...btnStyle,
+              background: 'var(--accent)',
+              color: 'var(--accent-text)',
+              border: 'none',
+              flexShrink: 0,
+            }}
           >
             保存
           </button>
@@ -181,16 +210,23 @@ function ModelListField() {
             key={m.id}
             style={{
               borderRadius: 'var(--radius-inner)',
-              padding: '10px 12px', background: 'var(--canvas)',
+              padding: '10px 12px',
+              background: 'var(--canvas)',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span
                 title={providerLabel(m.provider)}
                 style={{
-                  width: 28, height: 28, borderRadius: 7, flexShrink: 0,
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'var(--block)', color: 'var(--text-secondary)',
+                  width: 28,
+                  height: 28,
+                  borderRadius: 7,
+                  flexShrink: 0,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'var(--block)',
+                  color: 'var(--text-secondary)',
                 }}
               >
                 {(() => {
@@ -205,10 +241,16 @@ function ModelListField() {
                 style={{ flex: 1, fontWeight: 600 }}
               />
               {m.id === activeId ? (
-                <span style={{
-                  fontSize: 11, padding: '2px 8px', borderRadius: 4, flexShrink: 0,
-                  color: 'var(--success)', background: 'var(--success-bg)',
-                }}>
+                <span
+                  style={{
+                    fontSize: 11,
+                    padding: '2px 8px',
+                    borderRadius: 4,
+                    flexShrink: 0,
+                    color: 'var(--success)',
+                    background: 'var(--success-bg)',
+                  }}
+                >
                   当前
                 </span>
               ) : (
@@ -221,13 +263,24 @@ function ModelListField() {
                 onClick={() => remove(m.id)}
                 title="删除模型"
                 style={{
-                  width: 24, height: 24, flexShrink: 0, display: 'inline-flex',
-                  alignItems: 'center', justifyContent: 'center',
-                  border: '1px solid transparent', borderRadius: 4, background: 'transparent',
-                  color: 'var(--text-muted)', cursor: 'pointer',
+                  width: 24,
+                  height: 24,
+                  flexShrink: 0,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1px solid transparent',
+                  borderRadius: 4,
+                  background: 'transparent',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--error-light)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = 'var(--error-light)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--text-muted)';
+                }}
               >
                 <X size={13} />
               </button>
@@ -261,7 +314,13 @@ function ModelListField() {
         <button
           data-subtle
           onClick={add}
-          style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}
+          style={{
+            ...btnStyle,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            alignSelf: 'flex-start',
+          }}
         >
           <Plus size={12} /> 添加模型
         </button>

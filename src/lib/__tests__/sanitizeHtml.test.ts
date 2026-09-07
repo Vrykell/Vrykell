@@ -1,9 +1,10 @@
-import { describe, it, expect } from 'vitest';
-import { sanitizeOutputHtml } from '../sanitizeHtml';
+import { describe, expect, it } from 'vitest';
+import { sanitizeOutputHtml } from '@/lib/sanitizeHtml';
 
 describe('sanitizeOutputHtml', () => {
   it('保留生成器的 span + 安全 style + br 结构', () => {
-    const html = '<span style="color:#cc0000">红</span><br><span style="font-weight:bold;display:inline-block;width:2ch">字</span>';
+    const html =
+      '<span style="color:#cc0000">红</span><br><span style="font-weight:bold;display:inline-block;width:2ch">字</span>';
     expect(sanitizeOutputHtml(html)).toBe(
       '<span style="color:#cc0000">红</span><br><span style="font-weight:bold;display:inline-block;width:2ch">字</span>',
     );
@@ -25,13 +26,15 @@ describe('sanitizeOutputHtml', () => {
   });
 
   it('style 白名单之外的属性被拒绝（含危险值）', () => {
-    const html = '<span style="color:red;position:fixed;background:url(javascript:alert(1));width:2ch">t</span>';
+    const html =
+      '<span style="color:red;position:fixed;background:url(javascript:alert(1));width:2ch">t</span>';
     // position 不在白名单、background 值含 url() → 都被丢弃
     expect(sanitizeOutputHtml(html)).toBe('<span style="color:red;width:2ch">t</span>');
   });
 
   it('嵌套危险标签整体降级为文本', () => {
-    const html = '<span>a</span><div><script>evil()</script><span style="color:#00f">b</span></div>';
+    const html =
+      '<span>a</span><div><script>evil()</script><span style="color:#00f">b</span></div>';
     const out = sanitizeOutputHtml(html);
     expect(out).toContain('<span>a</span>');
     expect(out).toContain('evil()');

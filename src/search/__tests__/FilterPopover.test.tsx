@@ -1,8 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { Terminal, FileText } from 'lucide-react';
-import FilterPopover from '../FilterPopover';
-import { registerSource } from '../registry';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { FileText, Terminal } from 'lucide-react';
+import { describe, expect, it, vi } from 'vitest';
+import FilterPopover from '@/search/FilterPopover';
+import { registerSource } from '@/search/registry';
 
 // 注册两个假源（避免 import search/init 拉入后端 invoke）
 registerSource({ id: 'history', label: '命令历史', icon: Terminal, search: async () => [] });

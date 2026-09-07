@@ -1,11 +1,11 @@
 import { create } from 'zustand';
 import {
-  listSshConnections,
-  saveSshConnection,
   deleteSshConnection,
-  touchSshConnection,
+  listSshConnections,
   type SshConnection,
-} from './api';
+  saveSshConnection,
+  touchSshConnection,
+} from '@/ssh/api';
 
 /**
  * SSH 连接 store —— 后端 SQLite 的响应式投影。

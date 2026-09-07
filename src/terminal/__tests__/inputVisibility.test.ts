@@ -2,9 +2,9 @@
  * inputVisibility.test.ts — 输入框可见性状态机测试（对应文档 §7）。
  */
 
-import { describe, it, expect } from 'vitest';
-import { isInputBoxVisible, getLongRunningHint } from '../inputVisibility';
-import type { InputVisibilityContext } from '../inputVisibility';
+import { describe, expect, it } from 'vitest';
+import type { InputVisibilityContext } from '@/terminal/inputVisibility';
+import { getLongRunningHint, isInputBoxVisible } from '@/terminal/inputVisibility';
 
 function ctx(overrides: Partial<InputVisibilityContext> = {}): InputVisibilityContext {
   return {
@@ -35,15 +35,11 @@ describe('isInputBoxVisible', () => {
   });
 
   it('长运行 + agent 控制 → 可见', () => {
-    expect(
-      isInputBoxVisible(ctx({ isLongRunning: true, isAgentInControl: true })),
-    ).toBe(true);
+    expect(isInputBoxVisible(ctx({ isLongRunning: true, isAgentInControl: true }))).toBe(true);
   });
 
   it('长运行 + agent tagged → 可见', () => {
-    expect(
-      isInputBoxVisible(ctx({ isLongRunning: true, isAgentTaggedIn: true })),
-    ).toBe(true);
+    expect(isInputBoxVisible(ctx({ isLongRunning: true, isAgentTaggedIn: true }))).toBe(true);
   });
 
   it('只读优先级高于其他 → 始终隐藏', () => {
@@ -51,11 +47,7 @@ describe('isInputBoxVisible', () => {
   });
 
   it('TUI 优先级高于 agent → 隐藏', () => {
-    expect(
-      isInputBoxVisible(
-        ctx({ isAltScreenActive: true, isAgentInControl: true }),
-      ),
-    ).toBe(false);
+    expect(isInputBoxVisible(ctx({ isAltScreenActive: true, isAgentInControl: true }))).toBe(false);
   });
 });
 

@@ -1,15 +1,17 @@
 /**
  * webFetch — web_search/web_fetch/web_crawl 工具测试（参数透传 + 格式化 + 失败结构化）。
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { buildWebSearchTool, buildWebFetchTool, buildWebCrawlTool } from './webFetch';
-import { usePermissions, type ToolContext } from '../permissions';
+import { type ToolContext, usePermissions } from '@/agent/permissions';
+import { buildWebCrawlTool, buildWebFetchTool, buildWebSearchTool } from '@/agent/tools/webFetch';
 
-usePermissions.setState({ levels: { web_search: 'allow', web_fetch: 'allow', web_crawl: 'allow' } });
+usePermissions.setState({
+  levels: { web_search: 'allow', web_fetch: 'allow', web_crawl: 'allow' },
+});
 const CTX: ToolContext = {};
 
 beforeEach(() => {
@@ -52,7 +54,9 @@ describe('web_search 工具', () => {
     const r = await execOf(buildWebSearchTool(CTX))({ query: 'q' });
     expect(invokeMock).not.toHaveBeenCalled();
     expect(r).toBeDefined();
-    usePermissions.setState({ levels: { web_search: 'allow', web_fetch: 'allow', web_crawl: 'allow' } });
+    usePermissions.setState({
+      levels: { web_search: 'allow', web_fetch: 'allow', web_crawl: 'allow' },
+    });
   });
 });
 
@@ -60,7 +64,11 @@ describe('web_fetch 工具', () => {
   it('完整响应：标题/来源/正文/截断标记/页内链接（上限 10 条）', async () => {
     const links = Array.from({ length: 15 }, (_, i) => ({ text: `L${i}`, url: `https://l/${i}` }));
     invokeMock.mockResolvedValue({
-      title: '文档', url: 'https://doc', text: '正文', truncated: true, links,
+      title: '文档',
+      url: 'https://doc',
+      text: '正文',
+      truncated: true,
+      links,
     });
     const r = (await execOf(buildWebFetchTool(CTX))({ url: 'https://doc' })) as string;
     expect(invokeMock).toHaveBeenCalledWith('web_fetch', { url: 'https://doc' });
@@ -93,7 +101,10 @@ describe('web_crawl 工具', () => {
     });
     const r = (await execOf(buildWebCrawlTool(CTX))({ start_url: 'https://s' })) as string;
     expect(invokeMock).toHaveBeenCalledWith('web_crawl', {
-      startUrl: 'https://s', maxPages: null, maxDepth: null, sameDomain: true,
+      startUrl: 'https://s',
+      maxPages: null,
+      maxDepth: null,
+      sameDomain: true,
     });
     expect(r).toContain('[1/2] 标题：首页');
     expect(r).toContain('URL：https://s/p2');
@@ -105,9 +116,17 @@ describe('web_crawl 工具', () => {
     const empty = (await execOf(buildWebCrawlTool(CTX))({ start_url: 'https://s' })) as string;
     expect(empty).toContain('未爬取到任何页面');
     invokeMock.mockResolvedValueOnce({ pages: [{ title: 'p' }] });
-    await execOf(buildWebCrawlTool(CTX))({ start_url: 'https://s', max_pages: 3, max_depth: 1, same_domain: false });
+    await execOf(buildWebCrawlTool(CTX))({
+      start_url: 'https://s',
+      max_pages: 3,
+      max_depth: 1,
+      same_domain: false,
+    });
     expect(invokeMock).toHaveBeenLastCalledWith('web_crawl', {
-      startUrl: 'https://s', maxPages: 3, maxDepth: 1, sameDomain: false,
+      startUrl: 'https://s',
+      maxPages: 3,
+      maxDepth: 1,
+      sameDomain: false,
     });
     invokeMock.mockRejectedValueOnce(new Error('SSRF 拦截'));
     const fail = await execOf(buildWebCrawlTool(CTX))({ start_url: 'https://s' });

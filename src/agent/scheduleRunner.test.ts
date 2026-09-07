@@ -1,16 +1,25 @@
 /**
  * scheduleRunner — 定时任务调度器测试。
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { useChatStore } from '../stores/chat';
-import { kickScheduleRunner, initScheduleRunner } from './scheduleRunner';
-import type { Schedule } from './platform';
+import type { Schedule } from '@/agent/platform';
+import { initScheduleRunner, kickScheduleRunner } from '@/agent/scheduleRunner';
+import { useChatStore } from '@/stores/chat';
 
 function makeSchedule(over: Partial<Schedule> = {}): Schedule {
-  return { id: 's1', name: '任务', prompt: '提示词', intervalMinutes: 60, enabled: true, lastRunAt: 0, ...over };
+  return {
+    id: 's1',
+    name: '任务',
+    prompt: '提示词',
+    intervalMinutes: 60,
+    enabled: true,
+    lastRunAt: 0,
+    ...over,
+  };
 }
 
 /** tick 是异步链（list → markRun → send），冲刷足够多的微任务轮次 */
@@ -19,7 +28,9 @@ async function flush(): Promise<void> {
 }
 
 function sentMessages(): unknown[] {
-  return Object.values(useChatStore.getState().byTab).flat().filter((m) => m.role === 'user');
+  return Object.values(useChatStore.getState().byTab)
+    .flat()
+    .filter((m) => m.role === 'user');
 }
 
 describe('scheduleRunner', () => {
@@ -36,7 +47,10 @@ describe('scheduleRunner', () => {
     invokeMock.mockResolvedValue([makeSchedule()]);
     kickScheduleRunner();
     await flush();
-    expect(invokeMock).toHaveBeenCalledWith('mark_schedule_run', { id: 's1', at: expect.any(Number) });
+    expect(invokeMock).toHaveBeenCalledWith('mark_schedule_run', {
+      id: 's1',
+      at: expect.any(Number),
+    });
     const sent = sentMessages();
     expect(sent).toHaveLength(1);
     expect(String((sent[0] as { content: string }).content)).toContain('【定时任务】任务');

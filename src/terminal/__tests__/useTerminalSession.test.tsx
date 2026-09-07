@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   writeMock,
@@ -35,7 +35,9 @@ vi.mock('@xterm/xterm', () => ({
     focus() {}
     attachCustomKeyEventHandler() {}
     attachCustomWheelEventHandler() {}
-    getSelection() { return ''; }
+    getSelection() {
+      return '';
+    }
     onData(h: (d: string) => void) {
       onDataHandlers.push(h);
       return { dispose() {} };
@@ -45,7 +47,11 @@ vi.mock('@xterm/xterm', () => ({
     }
   },
 }));
-vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit() {} } }));
+vi.mock('@xterm/addon-fit', () => ({
+  FitAddon: class {
+    fit() {}
+  },
+}));
 vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: class {} }));
 
 invokeMock.mockResolvedValue('sess-x');
@@ -80,17 +86,24 @@ globalThis.ResizeObserver = class {
   disconnect() {}
 } as unknown as typeof ResizeObserver;
 
-import { useTerminalSession } from '../useTerminalSession';
-import { useTerminalStore } from '../../stores/terminal';
-import { useBlockStore } from '../../stores/blocks';
-import { useWorkspaceStore } from '../../stores/workspace';
-import { leaf } from '../../lib/windowLayout';
-import { onPtyOutput as mockedOnPtyOutput, ptySpawn as mockedPtySpawn } from '../../lib/pty';
+import { onPtyOutput as mockedOnPtyOutput, ptySpawn as mockedPtySpawn } from '@/lib/pty';
+import { leaf } from '@/lib/windowLayout';
+import { useBlockStore } from '@/stores/blocks';
+import { useTerminalStore } from '@/stores/terminal';
+import { useWorkspaceStore } from '@/stores/workspace';
+import { useTerminalSession } from '@/terminal/useTerminalSession';
 
 /** 设置一个本地终端 tab，指定打开模式（classic / block） */
 function setTab(openMode: 'classic' | 'block') {
   useWorkspaceStore.setState({
-    tabs: [{ id: 't1', title: 't', kind: 'session', layout: leaf({ id: 't1', kind: 'local', openMode }) }],
+    tabs: [
+      {
+        id: 't1',
+        title: 't',
+        kind: 'session',
+        layout: leaf({ id: 't1', kind: 'local', openMode }),
+      },
+    ],
     activeId: 't1',
   });
 }
@@ -136,7 +149,9 @@ describe('useTerminalSession', () => {
     // 初始场景已为 blockList（打开模式 block）
     expect(useTerminalStore.getState().scenes['t1']).toBe('blockList');
 
-    ptyOutputHandlers[0]!('sess-x', [{ kind: 'osc', code: '133;A', payload: '', raw: '\x1b]133;A\x07' }]);
+    ptyOutputHandlers[0]!('sess-x', [
+      { kind: 'osc', code: '133;A', payload: '', raw: '\x1b]133;A\x07' },
+    ]);
     await waitFor(() => expect(useBlockStore.getState().byTab['t1']?.length).toBe(1));
   });
 
@@ -144,7 +159,9 @@ describe('useTerminalSession', () => {
     render(<TestHarness tabId="t1" onReady={() => {}} />);
     await waitFor(() => expect(ptyOutputHandlers.length).toBe(1));
 
-    ptyOutputHandlers[0]!('sess-x', [{ kind: 'osc', code: '133;A', payload: '', raw: '\x1b]133;A\x07' }]);
+    ptyOutputHandlers[0]!('sess-x', [
+      { kind: 'osc', code: '133;A', payload: '', raw: '\x1b]133;A\x07' },
+    ]);
     await waitFor(() => expect(useBlockStore.getState().byTab['t1']?.length).toBe(1));
   });
 

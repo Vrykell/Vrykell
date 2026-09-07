@@ -5,11 +5,12 @@
  * 真实 API key 由 Rust 附加，这里的 apiKey 占位值不会出现在网络请求里
  * （Rust 侧会丢弃并替换认证头）。
  */
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
+
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { Tool } from 'ai';
-import { createProxyFetch } from './llmFetch';
+import { createProxyFetch } from '@/agent/llmFetch';
 
 export type ProviderKind = 'openai-compatible' | 'anthropic' | 'gemini';
 
@@ -57,14 +58,18 @@ export function createNativeWebSearchTool(
     case 'anthropic':
       return {
         name: 'web_search',
-        tool: createAnthropic({ apiKey: 'proxy-managed', fetch: fetchImpl }).tools
-          .webSearch_20250305({ maxUses: 5 }) as Tool,
+        tool: createAnthropic({
+          apiKey: 'proxy-managed',
+          fetch: fetchImpl,
+        }).tools.webSearch_20250305({ maxUses: 5 }) as Tool,
       };
     case 'gemini':
       return {
         name: 'google_search',
-        tool: createGoogleGenerativeAI({ apiKey: 'proxy-managed', fetch: fetchImpl }).tools
-          .googleSearch({}) as Tool,
+        tool: createGoogleGenerativeAI({
+          apiKey: 'proxy-managed',
+          fetch: fetchImpl,
+        }).tools.googleSearch({}) as Tool,
       };
     default:
       return null;
@@ -88,9 +93,22 @@ export function deepThinkProviderOptions(
 ): Record<string, Record<string, Jsonish>> {
   switch (provider) {
     case 'anthropic':
-      return { anthropic: { thinking: { type: 'enabled', budgetTokens: level === 'low' ? 4000 : level === 'medium' ? 8000 : 16000 } } };
+      return {
+        anthropic: {
+          thinking: {
+            type: 'enabled',
+            budgetTokens: level === 'low' ? 4000 : level === 'medium' ? 8000 : 16000,
+          },
+        },
+      };
     case 'gemini':
-      return { google: { thinkingConfig: { thinkingBudget: level === 'low' ? 4096 : level === 'medium' ? 8192 : 16384 } } };
+      return {
+        google: {
+          thinkingConfig: {
+            thinkingBudget: level === 'low' ? 4096 : level === 'medium' ? 8192 : 16384,
+          },
+        },
+      };
     default:
       return { vrykell: { reasoning_effort: level } };
   }

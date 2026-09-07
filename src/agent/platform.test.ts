@@ -1,14 +1,25 @@
 /**
  * platform — 记忆/子代理/定时任务 invoke 封装透传测试。
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
+
 import {
-  getMemory, setMemory, getMemoryJournal, appendMemoryJournal,
-  listAgents, saveAgent, removeAgent, getAgent,
-  listSchedules, saveSchedule, removeSchedule, markScheduleRun,
-} from './platform';
+  appendMemoryJournal,
+  getAgent,
+  getMemory,
+  getMemoryJournal,
+  listAgents,
+  listSchedules,
+  markScheduleRun,
+  removeAgent,
+  removeSchedule,
+  saveAgent,
+  saveSchedule,
+  setMemory,
+} from '@/agent/platform';
 
 describe('platform invoke 封装', () => {
   it('记忆命令透传', async () => {
@@ -28,7 +39,9 @@ describe('platform invoke 封装', () => {
     await listAgents();
     expect(invokeMock).toHaveBeenLastCalledWith('list_agents');
     await saveAgent({ id: '', name: 'n', description: 'd', prompt: 'p' });
-    expect(invokeMock).toHaveBeenLastCalledWith('save_agent', { agent: { id: '', name: 'n', description: 'd', prompt: 'p' } });
+    expect(invokeMock).toHaveBeenLastCalledWith('save_agent', {
+      agent: { id: '', name: 'n', description: 'd', prompt: 'p' },
+    });
     await removeAgent('a');
     expect(invokeMock).toHaveBeenLastCalledWith('remove_agent', { id: 'a' });
     await getAgent('n');
@@ -36,7 +49,14 @@ describe('platform invoke 封装', () => {
   });
 
   it('定时任务命令透传', async () => {
-    const s = { id: 's1', name: 't', prompt: 'p', intervalMinutes: 60, enabled: true, lastRunAt: 0 };
+    const s = {
+      id: 's1',
+      name: 't',
+      prompt: 'p',
+      intervalMinutes: 60,
+      enabled: true,
+      lastRunAt: 0,
+    };
     invokeMock.mockResolvedValueOnce([s]);
     await listSchedules();
     expect(invokeMock).toHaveBeenLastCalledWith('list_schedules');

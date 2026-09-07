@@ -4,21 +4,22 @@
  * anser/正则无法处理光标移动、清屏、\r 覆盖写入等序列，
  * 只有终端模拟器自身能正确处理全部 ANSI 转义。
  */
-import { Terminal } from '@xterm/xterm';
+
 import { WebglAddon } from '@xterm/addon-webgl';
 import type { IBufferCell } from '@xterm/xterm';
-import { indexToCss } from './blockTypes';
+import { Terminal } from '@xterm/xterm';
+import { indexToCss } from '@/terminal/blockTypes';
 
 function getFgCss(cell: IBufferCell): string | null {
   if (cell.isFgDefault()) return null;
-  if (cell.isFgRGB())     return rgbToCss(cell.getFgColor());
+  if (cell.isFgRGB()) return rgbToCss(cell.getFgColor());
   if (cell.isFgPalette()) return indexToCss(cell.getFgColor());
   return null;
 }
 
 function getBgCss(cell: IBufferCell): string | null {
   if (cell.isBgDefault()) return null;
-  if (cell.isBgRGB())     return rgbToCss(cell.getBgColor());
+  if (cell.isBgRGB()) return rgbToCss(cell.getBgColor());
   if (cell.isBgPalette()) return indexToCss(cell.getBgColor());
   return null;
 }
@@ -52,11 +53,11 @@ function cellStyle(cell: IBufferCell): string {
     if (bg) parts.push(`background:${bg}`);
   }
 
-  if (cell.isBold())           parts.push('font-weight:bold');
-  if (cell.isItalic())         parts.push('font-style:italic');
-  if (cell.isUnderline())      parts.push('text-decoration:underline');
-  if (cell.isStrikethrough())  parts.push('text-decoration:line-through');
-  if (cell.isDim())            parts.push('opacity:0.6');
+  if (cell.isBold()) parts.push('font-weight:bold');
+  if (cell.isItalic()) parts.push('font-style:italic');
+  if (cell.isUnderline()) parts.push('text-decoration:underline');
+  if (cell.isStrikethrough()) parts.push('text-decoration:line-through');
+  if (cell.isDim()) parts.push('opacity:0.6');
 
   return parts.join(';');
 }
@@ -67,7 +68,18 @@ export interface TerminalSnapshot {
 }
 
 export function extractSnapshotFromBuffer(
-  buf: { length: number; getLine(y: number): { translateToString(trim?: boolean): string; getCell(x: number, cell?: IBufferCell): IBufferCell | undefined } | undefined; getNullCell(): IBufferCell },
+  buf: {
+    length: number;
+    getLine(
+      y: number,
+    ):
+      | {
+          translateToString(trim?: boolean): string;
+          getCell(x: number, cell?: IBufferCell): IBufferCell | undefined;
+        }
+      | undefined;
+    getNullCell(): IBufferCell;
+  },
   cols: number,
   startLine?: number,
   endLine?: number,
@@ -102,14 +114,16 @@ export function extractSnapshotFromBuffer(
         // 光标（Xch 定位）和其后的排版全部向右漂移 ——
         // 包 inline-block 强制占满 2ch，让渲染宽度与网格严格一致。
         if (currentText) {
-          spans.push(currentStyle
-            ? `<span style="${currentStyle}">${currentText}</span>`
-            : currentText);
+          spans.push(
+            currentStyle ? `<span style="${currentStyle}">${currentText}</span>` : currentText,
+          );
         }
         const wide = 'display:inline-block;width:2ch';
-        spans.push(style
-          ? `<span style="${style};${wide}">${escapeHtml(chars)}</span>`
-          : `<span style="${wide}">${escapeHtml(chars)}</span>`);
+        spans.push(
+          style
+            ? `<span style="${style};${wide}">${escapeHtml(chars)}</span>`
+            : `<span style="${wide}">${escapeHtml(chars)}</span>`,
+        );
         currentStyle = '';
         currentText = '';
         continue;
@@ -119,9 +133,9 @@ export function extractSnapshotFromBuffer(
         currentText += escapeHtml(chars);
       } else {
         if (currentText) {
-          spans.push(currentStyle
-            ? `<span style="${currentStyle}">${currentText}</span>`
-            : currentText);
+          spans.push(
+            currentStyle ? `<span style="${currentStyle}">${currentText}</span>` : currentText,
+          );
         }
         currentStyle = style;
         currentText = escapeHtml(chars);
@@ -129,9 +143,9 @@ export function extractSnapshotFromBuffer(
     }
 
     if (currentText) {
-      spans.push(currentStyle
-        ? `<span style="${currentStyle}">${currentText}</span>`
-        : currentText);
+      spans.push(
+        currentStyle ? `<span style="${currentStyle}">${currentText}</span>` : currentText,
+      );
     }
 
     htmlLines.push(spans.join('').replace(/ +$/, ''));
@@ -143,7 +157,10 @@ export function extractSnapshotFromBuffer(
   return { html: htmlLines.join('<br>'), plainText: textLines.join('\n') };
 }
 
-export async function captureTerminalOutput(rawAnsi: string, cols: number): Promise<TerminalSnapshot> {
+export async function captureTerminalOutput(
+  rawAnsi: string,
+  cols: number,
+): Promise<TerminalSnapshot> {
   if (!rawAnsi.trim()) return { html: '', plainText: '' };
 
   const safeCols = Math.max(cols || 80, 1);
@@ -153,7 +170,9 @@ export async function captureTerminalOutput(rawAnsi: string, cols: number): Prom
 
   const { term, dispose } = createOffscreenTerm(safeCols);
   try {
-    await new Promise<void>((resolve) => { term.write(cleanAnsi, () => resolve()); });
+    await new Promise<void>((resolve) => {
+      term.write(cleanAnsi, () => resolve());
+    });
     await new Promise((r) => setTimeout(r, 0));
     return extractSnapshotFromBuffer(term.buffer.active, safeCols);
   } finally {
@@ -187,10 +206,7 @@ export function createOffscreenTerm(
 }
 
 function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 /** 与主 xterm / BlockOutput CSS 一致的字体栈（活 block 终端必须同源，否则完成切换时跳变） */
@@ -228,7 +244,8 @@ export function createBlockTerm(
       background: cs.getPropertyValue('--xterm-bg').trim() || '#050505',
       foreground: cs.getPropertyValue('--text-primary').trim() || '#e8e8e8',
       cursor: cs.getPropertyValue('--xterm-cursor').trim() || '#e8e8e8',
-      selectionBackground: cs.getPropertyValue('--xterm-selection').trim() || 'rgba(255,255,255,0.25)',
+      selectionBackground:
+        cs.getPropertyValue('--xterm-selection').trim() || 'rgba(255,255,255,0.25)',
     },
   });
   // 与主终端一致：WebGL renderer 让半块字符拼接无缝（TUI 图标无横裂缝）；

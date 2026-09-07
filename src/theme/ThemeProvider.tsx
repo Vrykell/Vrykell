@@ -2,9 +2,9 @@
  * 主题 Provider — 通过 React Context 管理 dark/light 切换。
  * 所有组件通过 useTheme() 获取当前模式和切换函数。
  */
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
-import { getCurrentTheme, type ThemeMode } from './tokens';
-import { applyTerminalTheme, useTerminalThemeStore } from './terminalTheme';
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+import { applyTerminalTheme, useTerminalThemeStore } from '@/theme/terminalTheme';
+import { getCurrentTheme, type ThemeMode } from '@/theme/tokens';
 
 interface ThemeCtx {
   mode: ThemeMode;

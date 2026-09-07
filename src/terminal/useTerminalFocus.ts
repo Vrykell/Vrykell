@@ -13,8 +13,8 @@
  */
 
 import { useEffect } from 'react';
-import { termInstances } from '../stores/terminal';
-import { getExecutingTerm } from './useTerminalSession';
+import { termInstances } from '@/stores/terminal';
+import { getExecutingTerm } from '@/terminal/useTerminalSession';
 
 const isEditable = (t: EventTarget | null): boolean => {
   const el = t as HTMLElement | null;

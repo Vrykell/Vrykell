@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { ptyWrite } from '../lib/pty';
-import { useTerminalStore } from '../stores/terminal';
-import { useChatStore } from '../stores/chat';
-import { useWorkspaceStore } from '../stores/workspace';
-import { useBlockStore } from '../stores/blocks';
-import { clearSessionBlocks } from './useTerminalSession';
-import { fmtDuration } from '../components/UiBtn';
-import type { TermBlock } from './pipeline/termBlock';
+import { fmtDuration } from '@/components/UiBtn';
+import { ptyWrite } from '@/lib/pty';
+import { useBlockStore } from '@/stores/blocks';
+import { useChatStore } from '@/stores/chat';
+import { useTerminalStore } from '@/stores/terminal';
+import { useWorkspaceStore } from '@/stores/workspace';
+import type { TermBlock } from '@/terminal/pipeline/termBlock';
+import { clearSessionBlocks } from '@/terminal/useTerminalSession';
 
 interface Props {
   block: TermBlock;
@@ -19,27 +19,43 @@ interface Props {
 
 // ── MenuItem — 菜单项（label · shortcut hint） ──
 
-function MenuItem({ label, shortcut, onClick }: { label: string; shortcut?: string; onClick: () => void }) {
+function MenuItem({
+  label,
+  shortcut,
+  onClick,
+}: {
+  label: string;
+  shortcut?: string;
+  onClick: () => void;
+}) {
   return (
     <div
       onClick={onClick}
       style={{ cursor: 'pointer' }}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--hover)'; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLElement).style.background = 'var(--hover)';
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLElement).style.background = 'transparent';
+      }}
     >
-      <div style={{
-        padding: '4px 12px',
-        fontSize: 12,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 24,
-        color: 'var(--text-primary)',
-        transition: 'background var(--dur-fast) var(--ease)',
-      }}>
+      <div
+        style={{
+          padding: '4px 12px',
+          fontSize: 12,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 24,
+          color: 'var(--text-primary)',
+          transition: 'background var(--dur-fast) var(--ease)',
+        }}
+      >
         <span>{label}</span>
         {shortcut && (
-          <span style={{ color: 'var(--text-muted)', fontSize: 11, fontFamily: 'var(--font-mono)' }}>
+          <span
+            style={{ color: 'var(--text-muted)', fontSize: 11, fontFamily: 'var(--font-mono)' }}
+          >
             {shortcut}
           </span>
         )}
@@ -59,10 +75,13 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
     return () => document.removeEventListener('click', h);
   }, [onClose]);
 
-  const copy = useCallback((text: string) => {
-    navigator.clipboard.writeText(text).catch(() => {});
-    onClose();
-  }, [onClose]);
+  const copy = useCallback(
+    (text: string) => {
+      navigator.clipboard.writeText(text).catch(() => {});
+      onClose();
+    },
+    [onClose],
+  );
 
   const rerun = useCallback(() => {
     const sessions = useTerminalStore.getState().sessions;
@@ -74,16 +93,14 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
 
   const sendToAI = useCallback(() => {
     const output = getOutputText();
-    useChatStore.getState().send(
-      `分析这条命令的执行结果：\n\`\`\`\n$ ${block.command}\n${output}\n\`\`\``,
-      { paneId },
-    );
+    useChatStore
+      .getState()
+      .send(`分析这条命令的执行结果：\n\`\`\`\n$ ${block.command}\n${output}\n\`\`\``, { paneId });
     onClose();
   }, [block, paneId, getOutputText, onClose]);
 
-  const duration = block.endedAt && block.startedAt
-    ? fmtDuration(block.endedAt - block.startedAt)
-    : '';
+  const duration =
+    block.endedAt && block.startedAt ? fmtDuration(block.endedAt - block.startedAt) : '';
 
   const top = Math.min(anchor.bottom + 4, window.innerHeight - 260);
   const left = Math.min(anchor.left, window.innerWidth - 220);
@@ -119,30 +136,36 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
       }}
     >
       {/* 块信息头 — 命令摘要 + 退出状态 */}
-      <div style={{
-        padding: '6px 12px 5px',
-        borderBottom: '1px solid var(--border)',
-        color: 'var(--text-muted)',
-        fontSize: 11,
-      }}>
-        <code style={{
+      <div
+        style={{
+          padding: '6px 12px 5px',
+          borderBottom: '1px solid var(--border)',
+          color: 'var(--text-muted)',
           fontSize: 11,
-          fontFamily: 'var(--font-mono)',
-          color: 'var(--block-cmd-text)',
-          display: 'block',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}>
+        }}
+      >
+        <code
+          style={{
+            fontSize: 11,
+            fontFamily: 'var(--font-mono)',
+            color: 'var(--block-cmd-text)',
+            display: 'block',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
           $ {block.command}
         </code>
         <div style={{ display: 'flex', gap: 10, marginTop: 2 }}>
           {duration && <span>{duration}</span>}
           {block.exitCode !== null && (
-            <span style={{
-              color: block.exitCode === 0 ? 'var(--success)' : 'var(--error)',
-              fontWeight: 600,
-            }}>
+            <span
+              style={{
+                color: block.exitCode === 0 ? 'var(--success)' : 'var(--error)',
+                fontWeight: 600,
+              }}
+            >
               exit {block.exitCode}
             </span>
           )}
@@ -155,10 +178,7 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
       <MenuItem label="重新运行" shortcut="⌘R" onClick={rerun} />
       <MenuItem label="发给 AI 分析" onClick={sendToAI} />
       <div style={{ height: 1, background: 'var(--border)', margin: '3px 8px' }} />
-      <MenuItem
-        label={block.bookmarked ? '取消书签' : '添加书签'}
-        onClick={toggleBookmark}
-      />
+      <MenuItem label={block.bookmarked ? '取消书签' : '添加书签'} onClick={toggleBookmark} />
       <MenuItem label="清除所有块" onClick={clearAllBlocks} />
     </div>
   );

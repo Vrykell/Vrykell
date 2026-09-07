@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { invokeMock, listenMock } = vi.hoisted(() => ({
   invokeMock: vi.fn(),
@@ -7,22 +7,39 @@ const { invokeMock, listenMock } = vi.hoisted(() => ({
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 vi.mock('@tauri-apps/api/event', () => ({ listen: listenMock }));
 
-import { ptySpawn, ptyWrite, ptyResize, ptyClose, onPtyOutput } from './pty';
+import { onPtyOutput, ptyClose, ptyResize, ptySpawn, ptyWrite } from '@/lib/pty';
 
 describe('pty IPC wrapper', () => {
-  beforeEach(() => { invokeMock.mockReset(); listenMock.mockReset(); });
+  beforeEach(() => {
+    invokeMock.mockReset();
+    listenMock.mockReset();
+  });
 
   it('pty_spawn 传 camelCase 参数并返回 id', async () => {
     invokeMock.mockResolvedValue('sess-1');
     const id = await ptySpawn(80, 24, '/tmp');
-    expect(invokeMock).toHaveBeenCalledWith('pty_spawn', { cols: 80, rows: 24, cwd: '/tmp', shell: null, ssh: null, openMode: null });
+    expect(invokeMock).toHaveBeenCalledWith('pty_spawn', {
+      cols: 80,
+      rows: 24,
+      cwd: '/tmp',
+      shell: null,
+      ssh: null,
+      openMode: null,
+    });
     expect(id).toBe('sess-1');
   });
 
   it('pty_spawn 缺省 cwd 传 null', async () => {
     invokeMock.mockResolvedValue('sess-2');
     await ptySpawn(120, 40);
-    expect(invokeMock).toHaveBeenCalledWith('pty_spawn', { cols: 120, rows: 40, cwd: null, shell: null, ssh: null, openMode: null });
+    expect(invokeMock).toHaveBeenCalledWith('pty_spawn', {
+      cols: 120,
+      rows: 40,
+      cwd: null,
+      shell: null,
+      ssh: null,
+      openMode: null,
+    });
   });
 
   it('pty_spawn 透传 shell 与 ssh 目标', async () => {

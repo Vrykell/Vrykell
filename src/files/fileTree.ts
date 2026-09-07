@@ -1,4 +1,4 @@
-import type { FsEntry } from './fs';
+import type { FsEntry } from '@/files/fs';
 
 /**
  * fileTree — 文件面板树形展开的纯逻辑（排序 + 可见行拍平）。

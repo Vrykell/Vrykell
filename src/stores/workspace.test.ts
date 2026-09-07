@@ -1,12 +1,19 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
+
+import { leaf } from '@/lib/windowLayout';
+import { useTerminalStore } from '@/stores/terminal';
 import {
-  useWorkspaceStore, isSessionTab, getFocusedCwd, firstTerminalOf,
-  terminalsOf, serializeSession, nextTerminalId,
-} from './workspace';
-import { useTerminalStore } from './terminal';
-import { leaf } from '../lib/windowLayout';
+  firstTerminalOf,
+  getFocusedCwd,
+  isSessionTab,
+  nextTerminalId,
+  serializeSession,
+  terminalsOf,
+  useWorkspaceStore,
+} from '@/stores/workspace';
 
 const initial = useWorkspaceStore.getState();
 
@@ -120,9 +127,19 @@ describe('workspace store', () => {
     const b = ws.addTab({ title: 'b' });
     ws.moveTab(a, 'g1', 0);
     ws.moveTab(b, 'g1', 1);
-    expect(useWorkspaceStore.getState().tabs.filter((t) => isSessionTab(t) && t.groupId === 'g1').map((t) => t.id)).toEqual([a, b]);
+    expect(
+      useWorkspaceStore
+        .getState()
+        .tabs.filter((t) => isSessionTab(t) && t.groupId === 'g1')
+        .map((t) => t.id),
+    ).toEqual([a, b]);
     ws.moveTab(a, 'g1', 2);
-    expect(useWorkspaceStore.getState().tabs.filter((t) => isSessionTab(t) && t.groupId === 'g1').map((t) => t.id)).toEqual([b, a]);
+    expect(
+      useWorkspaceStore
+        .getState()
+        .tabs.filter((t) => isSessionTab(t) && t.groupId === 'g1')
+        .map((t) => t.id),
+    ).toEqual([b, a]);
   });
 
   it('moveTab 跨组移动并追加到目标组末尾', () => {
@@ -135,7 +152,10 @@ describe('workspace store', () => {
     const s = useWorkspaceStore.getState();
     const ta = s.tabs.find((t) => t.id === a)!;
     expect(isSessionTab(ta) && ta.groupId).toBe('g2');
-    expect(s.tabs.filter((t) => isSessionTab(t) && t.groupId === 'g2').map((t) => t.id)).toEqual([b, a]);
+    expect(s.tabs.filter((t) => isSessionTab(t) && t.groupId === 'g2').map((t) => t.id)).toEqual([
+      b,
+      a,
+    ]);
   });
 
   it('moveTab 移出分组到未分组', () => {
@@ -188,7 +208,13 @@ describe('workspace store', () => {
   it('pruneEmptyGroups 只删除没有任何标签的空分组', () => {
     useWorkspaceStore.setState({
       tabs: [
-        { id: 't0', title: 'a', kind: 'session', groupId: 'g1', layout: leaf({ id: 't0#0', kind: 'local' }) },
+        {
+          id: 't0',
+          title: 'a',
+          kind: 'session',
+          groupId: 'g1',
+          layout: leaf({ id: 't0#0', kind: 'local' }),
+        },
         { id: 't1', title: 'b', kind: 'session', layout: leaf({ id: 't1#0', kind: 'local' }) },
       ],
       groups: [
@@ -272,9 +298,13 @@ describe('workspace store 扩展', () => {
     const ws = useWorkspaceStore.getState();
     const a = ws.addTab();
     ws.titleFromMessage(a, 'x'.repeat(20));
-    expect(useWorkspaceStore.getState().tabs.find((t) => t.id === a)!.title).toBe('x'.repeat(14) + '…');
+    expect(useWorkspaceStore.getState().tabs.find((t) => t.id === a)!.title).toBe(
+      'x'.repeat(14) + '…',
+    );
     ws.titleFromMessage(a, '再来一条');
-    expect(useWorkspaceStore.getState().tabs.find((t) => t.id === a)!.title).toBe('x'.repeat(14) + '…');
+    expect(useWorkspaceStore.getState().tabs.find((t) => t.id === a)!.title).toBe(
+      'x'.repeat(14) + '…',
+    );
     ws.openHistoryTab();
     const histId = useWorkspaceStore.getState().tabs.find((t) => t.kind === 'history')!.id;
     ws.titleFromMessage(histId, '历史页');
@@ -287,7 +317,9 @@ describe('workspace store 扩展', () => {
     ws.titleFromCommand(a, '   ');
     expect(useWorkspaceStore.getState().tabs.find((t) => t.id === a)!.title).toBe('终端');
     ws.titleFromCommand(a, 'y'.repeat(30));
-    expect(useWorkspaceStore.getState().tabs.find((t) => t.id === a)!.title).toBe('y'.repeat(24) + '…');
+    expect(useWorkspaceStore.getState().tabs.find((t) => t.id === a)!.title).toBe(
+      'y'.repeat(24) + '…',
+    );
   });
 
   it('autoTitle：覆盖自动标题；不覆盖手动命名；空标题 no-op', () => {
@@ -325,13 +357,18 @@ describe('workspace store 扩展', () => {
     const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === a)!;
     expect(terminalsOf(tab).map((t) => t.id)).toEqual([`${a}#0`]);
     expect(firstTerminalOf(tab)!.id).toBe(`${a}#0`);
-    expect(serializeSession(tab)).toEqual({ kind: 'session', payload: JSON.stringify({ layout: isSessionTab(tab) ? tab.layout : null }) });
+    expect(serializeSession(tab)).toEqual({
+      kind: 'session',
+      payload: JSON.stringify({ layout: isSessionTab(tab) ? tab.layout : null }),
+    });
     ws.openHistoryTab();
     const hist = useWorkspaceStore.getState().tabs.find((t) => t.kind === 'history')!;
     expect(terminalsOf(hist)).toEqual([]);
     expect(firstTerminalOf(hist)).toBeNull();
     expect(serializeSession(hist)).toBeNull();
-    expect(nextTerminalId(a, isSessionTab(tab) ? tab.layout : leaf({ id: `${a}#0`, kind: 'local' }))).toBe(`${a}#1`);
+    expect(
+      nextTerminalId(a, isSessionTab(tab) ? tab.layout : leaf({ id: `${a}#0`, kind: 'local' })),
+    ).toBe(`${a}#1`);
     expect(nextTerminalId('fresh', leaf({ id: 'fresh#0', kind: 'local' }))).toBe('fresh#1');
     // 布局里没有 #N 结尾的终端 id 时从 0 开始
     expect(nextTerminalId('x', leaf({ id: 'plain', kind: 'local' }))).toBe('x#0');
@@ -388,7 +425,9 @@ describe('workspace store 扩展', () => {
     ws.splitFocusedDirect('row');
     const before = terminalsOf(useWorkspaceStore.getState().tabs.find((t) => t.id === a)!).length;
     ws.closeFocusedTerminal();
-    expect(terminalsOf(useWorkspaceStore.getState().tabs.find((t) => t.id === a)!)).toHaveLength(before - 1);
+    expect(terminalsOf(useWorkspaceStore.getState().tabs.find((t) => t.id === a)!)).toHaveLength(
+      before - 1,
+    );
   });
 
   it('getFocusedCwd：回退 spec.cwd；非 session 活跃标签返回 undefined', () => {
@@ -462,7 +501,9 @@ describe('workspace store 扩展', () => {
     const ws = useWorkspaceStore.getState();
     useWorkspaceStore.setState({
       groups: [{ id: 'g1', title: '一', collapsed: false }],
-      tabs: useWorkspaceStore.getState().tabs.map((t) => (isSessionTab(t) ? { ...t, groupId: 'g1' } : t)),
+      tabs: useWorkspaceStore
+        .getState()
+        .tabs.map((t) => (isSessionTab(t) ? { ...t, groupId: 'g1' } : t)),
     });
     await ws.deleteGroup('g1', true);
     expect(useWorkspaceStore.getState().groups).toEqual([]);
@@ -505,9 +546,11 @@ describe('workspace store 扩展', () => {
     const b = ws.addTab({ title: 'b' });
     useWorkspaceStore.setState({
       groups: [{ id: 'g1', title: '一', collapsed: false }],
-      tabs: useWorkspaceStore.getState().tabs.map((t) =>
-        isSessionTab(t) && (t.id === a || t.id === b) ? { ...t, groupId: 'g1' } : t,
-      ),
+      tabs: useWorkspaceStore
+        .getState()
+        .tabs.map((t) =>
+          isSessionTab(t) && (t.id === a || t.id === b) ? { ...t, groupId: 'g1' } : t,
+        ),
     });
     ws.activate(a);
     await ws.archiveGroup('g1');

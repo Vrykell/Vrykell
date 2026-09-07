@@ -1,15 +1,15 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
-  hexToRgba,
-  toRgba,
-  setThemeOverrides,
   applyTheme,
   getCurrentTheme,
   getThemeOverrides,
+  hexToRgba,
   paletteToCssVars,
-  themes,
+  setThemeOverrides,
   TEAL_THEME_PRESET,
-} from './tokens';
+  themes,
+  toRgba,
+} from '@/theme/tokens';
 
 describe('hexToRgba', () => {
   it('converts 3-digit and 6-digit hex to rgba', () => {
@@ -130,8 +130,14 @@ describe('TEAL_THEME_PRESET（青绿自定义主题）', () => {
 
   it('只覆盖带色相变量，不触碰中性结构变量', () => {
     const structural = [
-      '--canvas', '--surface', '--block', '--elevated', '--border',
-      '--border-strong', '--overlay', '--overlay-light',
+      '--canvas',
+      '--surface',
+      '--block',
+      '--elevated',
+      '--border',
+      '--border-strong',
+      '--overlay',
+      '--overlay-light',
     ];
     for (const s of structural) {
       expect(TEAL_THEME_PRESET[s]).toBeUndefined();
@@ -144,7 +150,9 @@ describe('TEAL_THEME_PRESET（青绿自定义主题）', () => {
     // 结构变量仍来自默认
     expect(document.documentElement.style.getPropertyValue('--canvas')).toBe(themes.dark.canvas);
     // 色相变量被预设覆盖
-    expect(document.documentElement.style.getPropertyValue('--accent')).toBe(TEAL_THEME_PRESET['--accent']);
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe(
+      TEAL_THEME_PRESET['--accent'],
+    );
   });
 });
 

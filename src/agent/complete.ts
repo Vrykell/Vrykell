@@ -10,12 +10,13 @@
  * 返回的是「后缀」（接在当前输入后面的部分），调用方渲染 ghost text。
  * 全程可 abort（输入变化即作废上一次），任何失败静默返回 null。
  */
-import { generateText } from 'ai';
+
 import { invoke } from '@tauri-apps/api/core';
-import { createChatModel } from './provider';
-import { useAgentSettings } from './agentSettings';
-import { activeModelProfile, isApiKeyConfigured } from '../lib/ai';
-import { useHistoryStore } from '../stores/history';
+import { generateText } from 'ai';
+import { useAgentSettings } from '@/agent/agentSettings';
+import { createChatModel } from '@/agent/provider';
+import { activeModelProfile, isApiKeyConfigured } from '@/lib/ai';
+import { useHistoryStore } from '@/stores/history';
 
 export interface CompleteOptions {
   cwd?: string;
@@ -92,7 +93,10 @@ export async function pathComplete(
     const entries = await invoke<FsEntry[]>('fs_list', { path: dirAbs });
     if (signal?.aborted) return null;
     const hit = entries.find(
-      (e) => e.name.startsWith(base) && e.name !== base && (base.startsWith('.') || !e.name.startsWith('.')),
+      (e) =>
+        e.name.startsWith(base) &&
+        e.name !== base &&
+        (base.startsWith('.') || !e.name.startsWith('.')),
     );
     if (!hit) return null;
     return hit.name.slice(base.length) + (hit.is_dir ? '/' : '');
@@ -110,7 +114,10 @@ export async function aiComplete(
   if (!isApiKeyConfigured()) return null;
   const settings = useAgentSettings.getState().resolve();
   const active = activeModelProfile();
-  const recent = useHistoryStore.getState().entries.slice(0, 5).map((e) => e.command);
+  const recent = useHistoryStore
+    .getState()
+    .entries.slice(0, 5)
+    .map((e) => e.command);
   try {
     const model = createChatModel({
       provider: active.provider,

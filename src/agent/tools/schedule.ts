@@ -2,10 +2,10 @@
  * schedule — 定时任务工具：create/list/toggle/remove，让 LLM 自己管理定时任务。
  */
 import { tool } from 'ai';
-import { DESC_SCHEDULE } from '../toolTexts';
 import { z } from 'zod';
-import { listSchedules, saveSchedule, removeSchedule } from '../platform';
-import { gate, type ToolContext } from '../permissions';
+import { gate, type ToolContext } from '@/agent/permissions';
+import { listSchedules, removeSchedule, saveSchedule } from '@/agent/platform';
+import { DESC_SCHEDULE } from '@/agent/toolTexts';
 
 export function buildScheduleTool(ctx: ToolContext) {
   return {
@@ -15,7 +15,13 @@ export function buildScheduleTool(ctx: ToolContext) {
         action: z.enum(['create', 'list', 'toggle', 'remove']),
         name: z.string().optional().describe('任务名（create/toggle/remove 用）'),
         prompt: z.string().optional().describe('create 时的提示词'),
-        intervalMinutes: z.number().int().min(1).max(10080).optional().describe('间隔分钟数，默认 60'),
+        intervalMinutes: z
+          .number()
+          .int()
+          .min(1)
+          .max(10080)
+          .optional()
+          .describe('间隔分钟数，默认 60'),
         enabled: z.boolean().optional().describe('toggle 时的目标状态'),
         id: z.string().optional().describe('任务 id（toggle/remove 用，可省，用 name 匹配）'),
       }),
@@ -28,14 +34,22 @@ export function buildScheduleTool(ctx: ToolContext) {
               const list = await listSchedules();
               if (!list.length) return '（无定时任务）';
               return list
-                .map((s) => `- ${s.name} | ${s.enabled ? '启用' : '停用'} | 每 ${s.intervalMinutes} 分钟 | ${s.prompt || '（无提示词）'}`)
+                .map(
+                  (s) =>
+                    `- ${s.name} | ${s.enabled ? '启用' : '停用'} | 每 ${s.intervalMinutes} 分钟 | ${s.prompt || '（无提示词）'}`,
+                )
                 .join('\n');
             }
             case 'create': {
-              if (!args.name?.trim() || !args.prompt?.trim()) return { ok: false, error: 'create 需要 name 与 prompt' };
+              if (!args.name?.trim() || !args.prompt?.trim())
+                return { ok: false, error: 'create 需要 name 与 prompt' };
               await saveSchedule({
-                id: '', name: args.name.trim(), prompt: args.prompt,
-                intervalMinutes: args.intervalMinutes ?? 60, enabled: args.enabled ?? false, lastRunAt: 0,
+                id: '',
+                name: args.name.trim(),
+                prompt: args.prompt,
+                intervalMinutes: args.intervalMinutes ?? 60,
+                enabled: args.enabled ?? false,
+                lastRunAt: 0,
               });
               return { ok: true, result: `已创建定时任务「${args.name.trim()}」` };
             }

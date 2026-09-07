@@ -11,13 +11,13 @@
 
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import '../theme.css';
-import { useTerminalStore } from '../stores/terminal';
-import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
-import { useChatStore } from '../stores/chat';
-import { firstLeaf } from '../lib/windowLayout';
-import InputEditor from '../terminal/InputEditor';
-import PanelChat from '../chat/PanelChat';
+import '@/theme.css';
+import PanelChat from '@/chat/PanelChat';
+import { firstLeaf } from '@/lib/windowLayout';
+import { useChatStore } from '@/stores/chat';
+import { useTerminalStore } from '@/stores/terminal';
+import { isSessionTab, useWorkspaceStore } from '@/stores/workspace';
+import InputEditor from '@/terminal/InputEditor';
 
 // ── 最小 store 状态：默认 session tab 已存在，补上 pane 会话/场景/聚焦 ──
 const tab = useWorkspaceStore.getState().tabs.find(isSessionTab);
@@ -32,10 +32,17 @@ useTerminalStore.setState({
 // ── 全局错误捕获（渲染崩溃会落到这里） ──
 const errors: string[] = [];
 window.addEventListener('error', (e) => errors.push(`error: ${e.message}`));
-window.addEventListener('unhandledrejection', (e) => errors.push(`rejection: ${String(e.reason).slice(0, 300)}`));
+window.addEventListener('unhandledrejection', (e) =>
+  errors.push(`rejection: ${String(e.reason).slice(0, 300)}`),
+);
 const origConsoleError = console.error.bind(console);
 console.error = (...args: unknown[]) => {
-  errors.push(`console.error: ${args.map((a) => String(a)).join(' ').slice(0, 500)}`);
+  errors.push(
+    `console.error: ${args
+      .map((a) => String(a))
+      .join(' ')
+      .slice(0, 500)}`,
+  );
   origConsoleError(...args);
 };
 
@@ -51,7 +58,10 @@ const STREAM_ANSWER = [
 ].join('');
 
 function startStreamSimulation() {
-  const streamFn = async (_msgs: Array<{ role: string; content: string }>, onChunk: (t: string) => void) => {
+  const streamFn = async (
+    _msgs: Array<{ role: string; content: string }>,
+    onChunk: (t: string) => void,
+  ) => {
     let i = 0;
     while (i < STREAM_ANSWER.length) {
       const n = 1 + Math.floor(Math.random() * 3); // 1~3 字符随机切片，制造脏中间态
@@ -86,12 +96,15 @@ function measure(slotId: string) {
 
 function publish() {
   const fallbackEls = document.querySelectorAll('#panel-slot .md span, #panel-slot span');
-  const fallbackHit = Array.from(fallbackEls).some((el) => el.textContent?.includes('无法渲染此消息'));
+  const fallbackHit = Array.from(fallbackEls).some((el) =>
+    el.textContent?.includes('无法渲染此消息'),
+  );
   const out = {
     dpr: window.devicePixelRatio,
     term: measure('term-slot'),
     panel: measure('panel-slot'),
-    streamRenderedText: document.querySelector('#panel-slot .md')?.textContent?.slice(0, 120) ?? null,
+    streamRenderedText:
+      document.querySelector('#panel-slot .md')?.textContent?.slice(0, 120) ?? null,
     fallbackVisible: fallbackHit,
     errors,
   };
@@ -103,15 +116,27 @@ function publish() {
 
 function Harness() {
   return (
-    <div style={{ display: 'flex', gap: 40, padding: 20, height: '100%', background: 'var(--canvas)' }}>
+    <div
+      style={{ display: 'flex', gap: 40, padding: 20, height: '100%', background: 'var(--canvas)' }}
+    >
       {/* 终端侧：模拟 pane 底部（700px 宽） */}
-      <div style={{ width: 700, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', background: 'var(--surface)' }}>
+      <div
+        style={{
+          width: 700,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'flex-end',
+          background: 'var(--surface)',
+        }}
+      >
         <div id="term-slot">
           <InputEditor paneId={paneId} focused />
         </div>
       </div>
       {/* 面板侧：模拟 dock 面板（320px 宽，固定高度） */}
-      <div style={{ width: 320, background: 'var(--surface)', borderLeft: '1px solid var(--border)' }}>
+      <div
+        style={{ width: 320, background: 'var(--surface)', borderLeft: '1px solid var(--border)' }}
+      >
         <div id="panel-slot" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
           <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             <PanelChat />
@@ -138,4 +163,7 @@ const poll = setInterval(() => {
     setTimeout(publish, 400); // 等最后一帧渲染落地
   }
 }, 300);
-setTimeout(() => { clearInterval(poll); publish(); }, 30000); // 兜底
+setTimeout(() => {
+  clearInterval(poll);
+  publish();
+}, 30000); // 兜底

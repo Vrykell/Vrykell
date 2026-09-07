@@ -8,38 +8,65 @@
  *
  * 同文件导出 ModelScopeBar：设置页「按模型配置」用的模型选择条。
  */
+
+import {
+  Bot,
+  BrainCircuit,
+  Check,
+  ChevronDown,
+  Eye,
+  Globe,
+  Search,
+  SlidersHorizontal,
+  Wrench,
+  X,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Bot, BrainCircuit, Check, ChevronDown, Eye, Globe, Search, SlidersHorizontal, Wrench, X } from 'lucide-react';
-import { useAiConfigStore, setActiveModel, type ModelProfile } from '../lib/ai';
-import { useAgentSettings } from '../agent/agentSettings';
+import { useAgentSettings } from '@/agent/agentSettings';
 import {
-  CAPABILITY_LABELS, detectCapabilities, hasCapability,
+  CAPABILITY_LABELS,
+  detectCapabilities,
+  hasCapability,
   type ModelCapability,
-} from '../agent/capabilities';
-import { modelIcon, providerLabel } from '../agent/modelIcon';
-import { useToastStore } from '../components/Toast';
+} from '@/agent/capabilities';
+import { modelIcon, providerLabel } from '@/agent/modelIcon';
+import { useToastStore } from '@/components/Toast';
+import { type ModelProfile, setActiveModel, useAiConfigStore } from '@/lib/ai';
 
 const CAP_ORDER: ModelCapability[] = ['vision', 'reasoning', 'tools', 'search'];
 
 // ── 样式 ──
 
 const pill: React.CSSProperties = {
-  padding: '3px 10px', fontSize: 11, border: '1px solid var(--border)',
-  borderRadius: 999, background: 'transparent', color: 'var(--text-secondary)',
-  cursor: 'pointer', flexShrink: 0,
+  padding: '3px 10px',
+  fontSize: 11,
+  border: '1px solid var(--border)',
+  borderRadius: 999,
+  background: 'transparent',
+  color: 'var(--text-secondary)',
+  cursor: 'pointer',
+  flexShrink: 0,
 };
 const pillOn: React.CSSProperties = {
   ...pill,
-  background: 'var(--accent)', borderColor: 'var(--accent)', color: 'var(--accent-text)',
+  background: 'var(--accent)',
+  borderColor: 'var(--accent)',
+  color: 'var(--accent-text)',
 };
 
 function CapBadge({ on, label }: { on: boolean; label: string }) {
   return (
     <span
       style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 10, lineHeight: '14px', padding: '1px 6px', borderRadius: 4, flexShrink: 0,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 10,
+        lineHeight: '14px',
+        padding: '1px 6px',
+        borderRadius: 4,
+        flexShrink: 0,
         color: on ? 'var(--text-secondary)' : 'var(--text-muted)',
         background: on ? 'var(--hover)' : 'transparent',
         border: on ? 'none' : '1px solid var(--border)',
@@ -68,11 +95,17 @@ function ItemControls({ profile }: { profile: ModelProfile }) {
         data-testid={`think-level-${profile.id}`}
         value={eff.thinkingLevel}
         onChange={(e) =>
-          agentSettings.updateModel(profile.id, { thinkingLevel: e.target.value as 'low' | 'medium' | 'high' })
+          agentSettings.updateModel(profile.id, {
+            thinkingLevel: e.target.value as 'low' | 'medium' | 'high',
+          })
         }
         style={{
-          fontSize: 11, padding: '3px 6px', background: 'var(--canvas)',
-          border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-primary)',
+          fontSize: 11,
+          padding: '3px 6px',
+          background: 'var(--canvas)',
+          border: '1px solid var(--border)',
+          borderRadius: 6,
+          color: 'var(--text-primary)',
           cursor: 'pointer',
         }}
       >
@@ -112,7 +145,8 @@ export default function ModelPicker({ open, onClose }: { open: boolean; onClose:
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
     return models.filter((m) => {
-      if (q && !m.name.toLowerCase().includes(q) && !m.model.toLowerCase().includes(q)) return false;
+      if (q && !m.name.toLowerCase().includes(q) && !m.model.toLowerCase().includes(q))
+        return false;
       for (const cap of tags) {
         if (!hasCapability(m.capabilities, cap, m.provider, m.model)) return false;
       }
@@ -132,24 +166,34 @@ export default function ModelPicker({ open, onClose }: { open: boolean; onClose:
 
   return createPortal(
     <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 10000,
+        background: 'var(--overlay)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        animation: 'overlayIn 0.18s var(--ease)',
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
         style={{
-          position: 'fixed', inset: 0, zIndex: 10000,
-          background: 'var(--overlay)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          animation: 'overlayIn 0.18s var(--ease)',
+          width: 480,
+          maxWidth: 'calc(100vw - 48px)',
+          maxHeight: 'min(560px, 80vh)',
+          display: 'flex',
+          flexDirection: 'column',
+          background: 'var(--elevated)',
+          border: '1px solid var(--border)',
+          borderRadius: 12,
+          boxShadow: 'var(--shadow-lg)',
+          overflow: 'hidden',
+          animation: 'modalIn 0.22s var(--ease-out)',
         }}
-        onClick={onClose}
       >
-        <div
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            width: 480, maxWidth: 'calc(100vw - 48px)', maxHeight: 'min(560px, 80vh)',
-            display: 'flex', flexDirection: 'column',
-            background: 'var(--elevated)', border: '1px solid var(--border)',
-            borderRadius: 12, boxShadow: 'var(--shadow-lg)', overflow: 'hidden',
-            animation: 'modalIn 0.22s var(--ease-out)',
-          }}
-        >
         {/* 顶部：标题 + 搜索框 */}
         <div style={{ padding: '14px 16px 10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
@@ -159,14 +203,27 @@ export default function ModelPicker({ open, onClose }: { open: boolean; onClose:
               title="关闭"
               onClick={onClose}
               style={{
-                border: 'none', background: 'transparent', color: 'var(--text-muted)',
-                cursor: 'pointer', padding: 2, display: 'inline-flex',
+                border: 'none',
+                background: 'transparent',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                padding: 2,
+                display: 'inline-flex',
               }}
             >
               <X size={14} />
             </button>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderRadius: 8, padding: '6px 10px', background: 'var(--canvas)' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              borderRadius: 8,
+              padding: '6px 10px',
+              background: 'var(--canvas)',
+            }}
+          >
             <Search size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
             <input
               autoFocus
@@ -174,8 +231,13 @@ export default function ModelPicker({ open, onClose }: { open: boolean; onClose:
               onChange={(e) => setQuery(e.target.value)}
               placeholder="搜索模型…"
               style={{
-                flex: 1, minWidth: 0, background: 'transparent', border: 'none',
-                outline: 'none', fontSize: 12, color: 'var(--text-primary)',
+                flex: 1,
+                minWidth: 0,
+                background: 'transparent',
+                border: 'none',
+                outline: 'none',
+                fontSize: 12,
+                color: 'var(--text-primary)',
               }}
             />
           </div>
@@ -185,14 +247,22 @@ export default function ModelPicker({ open, onClose }: { open: boolean; onClose:
         <div style={{ display: 'flex', gap: 6, padding: '0 16px 10px', flexWrap: 'wrap' }}>
           {CAP_ORDER.map((cap) => {
             const TagIcon =
-              cap === 'vision' ? Eye : cap === 'reasoning' ? BrainCircuit : cap === 'tools' ? Wrench : Globe;
+              cap === 'vision'
+                ? Eye
+                : cap === 'reasoning'
+                  ? BrainCircuit
+                  : cap === 'tools'
+                    ? Wrench
+                    : Globe;
             return (
               <button
                 key={cap}
                 onClick={() => toggleTag(cap)}
                 style={{
                   ...(tags.has(cap) ? pillOn : pill),
-                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
                 }}
               >
                 <TagIcon size={11} />
@@ -205,7 +275,9 @@ export default function ModelPicker({ open, onClose }: { open: boolean; onClose:
         {/* 模型列表 */}
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 8px 10px' }}>
           {list.length === 0 && (
-            <div style={{ padding: 18, textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>
+            <div
+              style={{ padding: 18, textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}
+            >
               无匹配模型
             </div>
           )}
@@ -224,16 +296,25 @@ export default function ModelPicker({ open, onClose }: { open: boolean; onClose:
                   });
                 }}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '9px 10px', borderRadius: 8, cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '9px 10px',
+                  borderRadius: 8,
+                  cursor: 'pointer',
                   background: active ? 'var(--hover)' : 'transparent',
                   marginBottom: 2,
                 }}
               >
                 <span
                   style={{
-                    width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    width: 30,
+                    height: 30,
+                    borderRadius: 8,
+                    flexShrink: 0,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     background: active ? 'var(--hover)' : 'var(--block)',
                     color: active ? 'var(--text-primary)' : 'var(--text-muted)',
                   }}
@@ -242,7 +323,9 @@ export default function ModelPicker({ open, onClose }: { open: boolean; onClose:
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{m.name || m.model}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {m.name || m.model}
+                    </span>
                     {active && <Check size={12} style={{ color: 'var(--accent)' }} />}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
@@ -286,16 +369,26 @@ export function ModelScopeBar({
         data-testid="model-scope-bar"
         onClick={() => setOpen((v) => !v)}
         style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '5px 10px', fontSize: 12, border: '1px solid var(--border)',
-          borderRadius: 8, background: 'var(--canvas)', color: 'var(--text-primary)',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '5px 10px',
+          fontSize: 12,
+          border: '1px solid var(--border)',
+          borderRadius: 8,
+          background: 'var(--canvas)',
+          color: 'var(--text-primary)',
           cursor: 'pointer',
         }}
       >
-        {cur?.provider && cur.model ? (() => {
-          const Icon = modelIcon(cur.provider, cur.model);
-          return <Icon size={13} style={{ color: 'var(--text-secondary)' }} />;
-        })() : <Bot size={13} style={{ color: 'var(--text-muted)' }} />}
+        {cur?.provider && cur.model ? (
+          (() => {
+            const Icon = modelIcon(cur.provider, cur.model);
+            return <Icon size={13} style={{ color: 'var(--text-secondary)' }} />;
+          })()
+        ) : (
+          <Bot size={13} style={{ color: 'var(--text-muted)' }} />
+        )}
         {cur?.label ?? '全局默认'}
         <ChevronDown size={12} style={{ color: 'var(--text-muted)' }} />
       </button>
@@ -307,41 +400,74 @@ export function ModelScopeBar({
           />
           <div
             style={{
-              position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 9999,
-              minWidth: 200, background: 'var(--elevated)', border: '1px solid var(--border)',
-              borderRadius: 8, boxShadow: 'var(--shadow-md)', padding: '4px',
+              position: 'absolute',
+              top: 'calc(100% + 4px)',
+              left: 0,
+              zIndex: 9999,
+              minWidth: 200,
+              background: 'var(--elevated)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              boxShadow: 'var(--shadow-md)',
+              padding: '4px',
             }}
           >
             <button
-              onClick={() => { onChange(''); setOpen(false); }}
+              onClick={() => {
+                onChange('');
+                setOpen(false);
+              }}
               style={{
-                display: 'flex', alignItems: 'center', gap: 6, width: '100%',
-                padding: '6px 8px', fontSize: 12, textAlign: 'left',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                width: '100%',
+                padding: '6px 8px',
+                fontSize: 12,
+                textAlign: 'left',
                 background: value === '' ? 'var(--hover)' : 'transparent',
-                border: 'none', borderRadius: 6, cursor: 'pointer',
+                border: 'none',
+                borderRadius: 6,
+                cursor: 'pointer',
                 color: value === '' ? 'var(--text-primary)' : 'var(--text-secondary)',
               }}
             >
               <Bot size={13} style={{ color: 'var(--text-muted)' }} />
               全局默认
-              {value === '' && <Check size={12} style={{ color: 'var(--accent)', marginLeft: 'auto' }} />}
+              {value === '' && (
+                <Check size={12} style={{ color: 'var(--accent)', marginLeft: 'auto' }} />
+              )}
             </button>
             {options.map((o) => (
               <button
                 key={o.value}
-                onClick={() => { onChange(o.value); setOpen(false); }}
+                onClick={() => {
+                  onChange(o.value);
+                  setOpen(false);
+                }}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 6, width: '100%',
-                  padding: '6px 8px', fontSize: 12, textAlign: 'left',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  width: '100%',
+                  padding: '6px 8px',
+                  fontSize: 12,
+                  textAlign: 'left',
                   background: o.value === value ? 'var(--hover)' : 'transparent',
-                  border: 'none', borderRadius: 6, cursor: 'pointer',
+                  border: 'none',
+                  borderRadius: 6,
+                  cursor: 'pointer',
                   color: o.value === value ? 'var(--text-primary)' : 'var(--text-secondary)',
                 }}
               >
-                {o.provider && o.model ? (() => {
-                  const Icon = modelIcon(o.provider, o.model);
-                  return <Icon size={13} style={{ color: 'var(--text-secondary)' }} />;
-                })() : <Bot size={13} style={{ color: 'var(--text-muted)' }} />}
+                {o.provider && o.model ? (
+                  (() => {
+                    const Icon = modelIcon(o.provider, o.model);
+                    return <Icon size={13} style={{ color: 'var(--text-secondary)' }} />;
+                  })()
+                ) : (
+                  <Bot size={13} style={{ color: 'var(--text-muted)' }} />
+                )}
                 <span style={{ flex: 1 }}>{o.label}</span>
                 {o.value === value && <Check size={12} style={{ color: 'var(--accent)' }} />}
               </button>

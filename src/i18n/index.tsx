@@ -1,5 +1,5 @@
-import { createContext, useContext, type ReactNode } from 'react';
-import zh from './zh';
+import { createContext, type ReactNode, useContext } from 'react';
+import zh from '@/i18n/zh';
 
 // ── 类型 ──
 
@@ -35,9 +35,15 @@ const Ctx = createContext<I18nCtx>({
 
 // ── Provider ──
 
-export function I18nProvider({ locale = 'zh', children }: { locale?: Locale; children: ReactNode }) {
+export function I18nProvider({
+  locale = 'zh',
+  children,
+}: {
+  locale?: Locale;
+  children: ReactNode;
+}) {
   const t = (key: I18nKey, vars?: Record<string, string | number>) => {
-    const s = (messages[locale]?.[key]) ?? messages.zh[key] ?? key;
+    const s = messages[locale]?.[key] ?? messages.zh[key] ?? key;
     return interpolate(s, vars);
   };
   return <Ctx.Provider value={{ locale, t }}>{children}</Ctx.Provider>;

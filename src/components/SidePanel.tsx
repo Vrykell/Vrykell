@@ -1,11 +1,11 @@
-import { useCallback, type FC } from 'react';
-import { useDockStore, PANEL_DEFS, MIN_PANEL_WIDTH, type DockSide } from '../stores/dock';
-import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
-import ResizeHandle from './ResizeHandle';
-import PanelTabs from './PanelTabs';
-import PanelFiles from '../files/PanelFiles';
-import PanelSsh from '../ssh/PanelSsh';
-import PanelChat from '../chat/PanelChat';
+import { type FC, useCallback } from 'react';
+import PanelChat from '@/chat/PanelChat';
+import PanelTabs from '@/components/PanelTabs';
+import ResizeHandle from '@/components/ResizeHandle';
+import PanelFiles from '@/files/PanelFiles';
+import PanelSsh from '@/ssh/PanelSsh';
+import { type DockSide, MIN_PANEL_WIDTH, PANEL_DEFS, useDockStore } from '@/stores/dock';
+import { isSessionTab, useWorkspaceStore } from '@/stores/workspace';
 
 interface SidePanelProps {
   side: DockSide;
@@ -56,22 +56,26 @@ function SinglePanel({ side, panelId }: { side: DockSide; panelId: string }) {
   // 避免回撤一两像素就弹出面板造成抖动。
   const COLLAPSE_HYSTERESIS = 24;
 
-  const handleDelta = useCallback((d: number) => {
-    const st = useDockStore.getState();
-    // 折叠中（未定局）或已正式下架：先调宽，只有宽度**超过下限 + 滞回余量**
-    // 才取消折叠/恢复面板（未超过前保持隐藏，避免微动即弹出）。
-    const folded = st.collapsedPanels.includes(panelId)
-      || (!st.leftPanels.includes(panelId) && !st.rightPanels.includes(panelId));
-    if (folded) {
-      setPanelWidth(panelId, isLeft ? d : -d);
-      const cur = useDockStore.getState().panelWidths[panelId] ?? def?.width ?? 200;
-      if (cur > MIN_PANEL_WIDTH + COLLAPSE_HYSTERESIS) {
-        useDockStore.getState().openPanel(panelId);
+  const handleDelta = useCallback(
+    (d: number) => {
+      const st = useDockStore.getState();
+      // 折叠中（未定局）或已正式下架：先调宽，只有宽度**超过下限 + 滞回余量**
+      // 才取消折叠/恢复面板（未超过前保持隐藏，避免微动即弹出）。
+      const folded =
+        st.collapsedPanels.includes(panelId) ||
+        (!st.leftPanels.includes(panelId) && !st.rightPanels.includes(panelId));
+      if (folded) {
+        setPanelWidth(panelId, isLeft ? d : -d);
+        const cur = useDockStore.getState().panelWidths[panelId] ?? def?.width ?? 200;
+        if (cur > MIN_PANEL_WIDTH + COLLAPSE_HYSTERESIS) {
+          useDockStore.getState().openPanel(panelId);
+        }
+        return;
       }
-      return;
-    }
-    setPanelWidth(panelId, isLeft ? d : -d);
-  }, [panelId, isLeft, setPanelWidth, def?.width]);
+      setPanelWidth(panelId, isLeft ? d : -d);
+    },
+    [panelId, isLeft, setPanelWidth, def?.width],
+  );
 
   const handleCommit = useCallback(() => {
     // 松手才判定折叠：拖动过程中不折叠，可来回拖
@@ -81,29 +85,39 @@ function SinglePanel({ side, panelId }: { side: DockSide; panelId: string }) {
   if (!def || !PanelContent) return null;
 
   return (
-    <div style={{
-      position: 'relative',
-      flexShrink: 0,
-      minHeight: 0,
-      ...(isLeft
-        ? { borderRight: '1px solid var(--block-divider)' }
-        : { borderLeft: '1px solid var(--block-divider)' }),
-    }}>
-      <div style={{
-        width,
-        display: collapsed ? 'none' : 'flex',
-        flexDirection: 'column',
+    <div
+      style={{
+        position: 'relative',
+        flexShrink: 0,
         minHeight: 0,
-        height: '100%',
-        background: 'var(--surface)',
-      }}>
+        ...(isLeft
+          ? { borderRight: '1px solid var(--block-divider)' }
+          : { borderLeft: '1px solid var(--block-divider)' }),
+      }}
+    >
+      <div
+        style={{
+          width,
+          display: collapsed ? 'none' : 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
+          height: '100%',
+          background: 'var(--surface)',
+        }}
+      >
         <div style={{ flex: 1, minHeight: 0 }}>
           <PanelContent />
         </div>
       </div>
 
       {/* 拖拽手柄 — 绝对定位覆盖在内边缘，无可见缝隙；折叠中手柄仍在，可反向拖回 */}
-      <ResizeHandle axis="x" edge={isLeft ? 'right' : 'left'} onDelta={handleDelta} onUp={handleCommit} testId={`resize-handle-${panelId}`} />
+      <ResizeHandle
+        axis="x"
+        edge={isLeft ? 'right' : 'left'}
+        onDelta={handleDelta}
+        onUp={handleCommit}
+        testId={`resize-handle-${panelId}`}
+      />
     </div>
   );
 }

@@ -1,16 +1,16 @@
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
-import { type AttachmentMeta, serializeAttachments } from '../agent/attachments';
-import { clearCompactionCache } from '../agent/context';
+import { type AttachmentMeta, serializeAttachments } from '@/agent/attachments';
+import { clearCompactionCache } from '@/agent/context';
 import {
   type MessagePart,
   partsToHistoryText,
   serializeParts,
   type ToolRun,
-} from '../agent/messageParts';
-import { denyAllPending } from '../agent/permissions';
-import { appendChatMessage, deleteChatMessage } from '../api/session';
-import { useWorkspaceStore } from './workspace';
+} from '@/agent/messageParts';
+import { denyAllPending } from '@/agent/permissions';
+import { appendChatMessage, deleteChatMessage } from '@/api/session';
+import { useWorkspaceStore } from '@/stores/workspace';
 
 export interface ChatMessage {
   id: string;
