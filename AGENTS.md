@@ -13,8 +13,11 @@ npm run tauri dev    # Full Tauri app with hot reload
 npm run build        # tsc + vite build
 npm run test         # vitest run (unit tests, ports 1421 handled by e2e)
 npm run test:e2e     # playwright test (e2e, starts dev server on 1421)
+npm run typecheck    # npx tsc --noEmit (typecheck only)
+npm run lint         # biome check . (lint + format check)
+npm run lint:fix     # biome check --write . (auto-fix)
+npm run format       # biome format --write . (format only)
 cargo test           # Rust backend tests (src-tauri/)
-npx tsc --noEmit     # typecheck only (build also runs tsc)
 ```
 
 ## System Dependencies
@@ -63,18 +66,35 @@ Domain layout:
 
 - `src/terminal/` - Terminal components (block list, input bar, panels)
 - `src/stores/` - Zustand state management
-- `src/components/` - Shared UI components
-- `src/chat/` - AI chat related
+- `src/components/` - Shared UI components (each with `.module.css`)
+- `src/chat/` - AI chat rendering (each with `.module.css`)
 - `src/agent/` - AI agent logic
 - `src/lib/` - Tauri IPC wrappers (pty, fs, ai)
+- `src/styles/` - Global styles (reset, tokens, base, animations, xterm)
+- `src/theme/` - Theme system (tokens.ts single color source, ThemeProvider, terminalTheme)
 - `src-tauri/src/` - Rust backend
+
+## Style Architecture
+
+- **CSS Modules** — 每个组件配同名 `.module.css`，Vite 原生支持、零运行时
+- 静态样式 → CSS Module class；条件状态 → `cx(s.base, cond && s.active)` 合并 class；运行时数值（width/坐标）→ 保留 inline style
+- JS 手动 `onMouseEnter/onMouseLeave` 改 DOM 样式 → 禁止，改用 CSS `:hover`/`:disabled` 伪类
+- **颜色统一由 `src/theme/tokens.ts` 的 `applyTheme()` 注入**（不做 CSS 双份维护）
+- 全局样式分层：`reset.css` / `tokens.css` / `base.css` / `animations.css` / `xterm.css`
+
+## Import Conventions
+
+- **跨目录导入使用 `@/` 别名**：`import { foo } from '@/stores/bar'`（不再使用 `../` 跨目录）
+- 同目录文件使用 `./` 相对路径保持
 
 ## Code Conventions
 
 - Use generic terms in comments, avoid third-party brand names
 - Independent implementation, don't copy third-party source code
-- Colors via `theme.css` CSS variables, no hardcoded colors (except ANSI)
+- Colors via CSS variables from `tokens.ts` — no hardcoded colors (except ANSI)
 - Animations >= 0.1s, no faster transitions
+- **Biome** for lint + format（pre-commit hook 自动格式化暂存文件）
+- Commitlint enforces conventional commits (`feat:/fix:/refactor:/style:/docs:/test:/chore:`)
 
 ## Test Setup
 

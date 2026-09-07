@@ -1,13 +1,24 @@
 # Vrykell 开发规则
 
-> 最后更新: 2026-09-02
+> 最后更新: 2026-09-08
 
 ## 一、代码规范
 
 1. **注释与命名** — 使用通用术语描述功能，避免在注释或变量名中出现任何第三方产品/品牌名。
 2. **独立实现** — 用自己的方式实现功能，不照抄任何第三方源码。
 3. **中文 UI** — 所有用户可见的文案使用中文。
-4. **TypeScript 严格** — 零 TS 错误，不使用 `any` 除非必要且标注 `// eslint-disable-next-line`。
+4. **TypeScript 严格** — 零 TS 错误，不使用 `any` 除非必要且标注注释说明。
+5. **Biome 代码质量** — 使用 Biome 进行 lint + format（pre-commit hook 自动格式化暂存文件）。Commitlint 检查 commit message 规范。
+
+## 二、样式规范
+
+6. **CSS Modules** — 每个组件配同名 `.module.css`，Vite 原生支持、零运行时。
+7. **静态样式 → class** — 不依赖 JS 状态的样式全部进 CSS Module。
+8. **条件样式 → `cx()`** — 多 class 组合用 `@/styles/cx` 的 `cx()` 函数。
+9. **运行时数值 → inline** — 组件宽高、坐标、动画中间值等运行时计算值，保留 inline style（CSS 无法表达）。
+10. **禁止 JS 手动 hover** — 禁止 `onMouseEnter`/`onMouseLeave` 改 DOM 样式，改用 CSS `:hover`/`:disabled`/`:focus` 伪类。
+11. **颜色统一来源** — 所有颜色使用 CSS 变量（由 `theme/tokens.ts` 的 `applyTheme()` 注入），不硬编码色值。
+12. **导入别名** — 跨目录导入使用 `@/` 别名（`import { foo } from '@/stores/bar'`），同目录用 `./`。
 
 ## 二、测试要求
 
