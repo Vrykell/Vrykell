@@ -10,20 +10,25 @@
   --font-ui: -apple-system, "SF Pro Text", "PingFang SC", "Segoe UI", sans-serif;
   --font-mono: "SF Mono", Menlo, "JetBrains Mono", monospace;
 
-  /* 几何 */
+  /* 几何 — 圆角层级 */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
   --radius-block: 10px;
   --radius-inner: 6px;
 
-  /* 节奏与缓动 */
+  /* 节奏与缓动 — 分层更细腻 */
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --dur-fast: 0.14s;
   --dur: 0.18s;
   --dur-slow: 0.26s;
 
-  /* 浮层内描边高光 */
-  --hairline: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  --hairline-soft: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  /* 浮层内描边高光（增强体积感） */
+  --hairline: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --hairline-soft: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 
   /* 文字层级（字重 + 字号梯度） */
   --fs-title: 17px;
@@ -43,6 +48,8 @@
   --sp-2: 8px;
   --sp-3: 12px;
   --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
 
   /* 标签 overlay */
   --tab-hover: rgba(255, 255, 255, 0.05);
