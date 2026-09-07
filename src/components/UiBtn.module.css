@@ -1,0 +1,110 @@
+/* UiBtn 组件样式模块 */
+
+/* ── HBtn（小型 header 按钮）── */
+.hBtn {
+  font-size: 11px;
+  padding: 1px 5px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  line-height: 18px;
+  transition: background var(--dur-fast) var(--ease);
+}
+.hBtn:hover {
+  background: var(--hover);
+}
+
+/* ── InputBtn（输入栏按钮）── */
+.inputBtn {
+  font-size: 12px;
+  padding: 1px 5px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  line-height: 22px;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.inputBtn:hover {
+  background: var(--hover);
+  border-color: var(--border);
+}
+
+/* ── MenuItem（下拉/右键菜单项）── */
+.menuItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 12px;
+  transition: background var(--dur-fast) var(--ease);
+}
+.menuItem:hover {
+  background: var(--hover);
+}
+.menuItemDanger {
+  color: var(--error);
+}
+
+/* ── IconBtn（侧栏图标按钮 24×24）── */
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 5px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.iconBtn:hover {
+  background: var(--button-hover);
+  color: var(--text-secondary);
+}
+.iconBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ── ToolbarBtn（顶栏工具栏按钮 28×28）── */
+.toolbarBtn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  line-height: 1;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+  padding: 0;
+  transition: background 0.12s ease, color 0.12s ease;
+  /* @ts-expect-error Tauri 拖拽区域排除 */
+  -webkit-app-region: no-drag;
+}
+.toolbarBtn:hover {
+  color: var(--text-primary);
+}
+.toolbarBtnActive {
+  color: var(--accent);
+}
+.toolbarBtnActive:hover {
+  color: var(--accent);
+}

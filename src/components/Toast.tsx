@@ -1,5 +1,6 @@
+import { AlertCircle, CheckCircle2, Info, TriangleAlert, X } from 'lucide-react';
 import { create } from 'zustand';
-import { Info, CheckCircle2, AlertCircle, TriangleAlert, X } from 'lucide-react';
+import s from './Toast.module.css';
 
 type ToastType = 'info' | 'success' | 'error' | 'warning';
 
@@ -112,17 +113,15 @@ export default function ToastContainer() {
   if (toasts.length === 0) return null;
 
   return (
-    <div style={{
-      position: 'fixed', right: 16, bottom: 16, zIndex: 9999,
-      display: 'flex', flexDirection: 'column', gap: 8,
-      alignItems: 'flex-end', pointerEvents: 'none',
-    }}>
-      {toasts.map((t) => <ToastItem key={t.id} t={t} />)}
+    <div className={s.container}>
+      {toasts.map((t) => (
+        <ToastItemComp key={t.id} t={t} />
+      ))}
     </div>
   );
 }
 
-function ToastItem({ t }: { t: ToastItem }) {
+function ToastItemComp({ t }: { t: ToastItem }) {
   const removeToast = useToastStore((s) => s.removeToast);
   const pause = useToastStore((s) => s.pause);
   const resume = useToastStore((s) => s.resume);
@@ -134,34 +133,17 @@ function ToastItem({ t }: { t: ToastItem }) {
       onMouseEnter={() => pause(t.id)}
       onMouseLeave={() => resume(t.id)}
       role="status"
-      style={{
-        pointerEvents: 'auto',
-        display: 'flex', alignItems: 'center', gap: 8,
-        maxWidth: 380, padding: '8px 8px 8px 0',
-        background: 'var(--elevated)', border: '1px solid var(--border)',
-        borderRadius: 8, boxShadow: 'var(--shadow-md)',
-        color: 'var(--text-primary)', fontSize: 12.5, lineHeight: 1.5,
-        animation: t.leaving
-          ? 'toastOut 0.2s var(--ease) forwards'
-          : 'toastIn 0.24s var(--ease)',
-      }}
+      className={t.leaving ? `${s.item} ${s.itemExit}` : `${s.item} ${s.itemEnter}`}
     >
-      {/* 左侧类型色强调条 + 图标 */}
-      <span style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, background: color, flexShrink: 0 }} />
-      <Icon size={15} style={{ color, flexShrink: 0 }} />
-      <span style={{ flex: 1, minWidth: 0, overflowWrap: 'break-word' }}>{t.message}</span>
+      {/* 左侧类型色强调条 */}
+      <span className={s.colorBar} style={{ background: color }} />
+      <Icon size={15} className={s.icon} style={{ color }} />
+      <span className={s.message}>{t.message}</span>
       <button
         onClick={() => removeToast(t.id)}
         title="关闭"
         aria-label="关闭通知"
-        style={{
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          width: 20, height: 20, padding: 0,
-          border: 'none', borderRadius: 4, background: 'transparent',
-          color: 'var(--text-muted)', cursor: 'pointer', flexShrink: 0,
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+        className={s.closeBtn}
       >
         <X size={13} />
       </button>

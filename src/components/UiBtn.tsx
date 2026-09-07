@@ -1,8 +1,11 @@
 /**
  * 共享 UI 原子组件 — 避免在多个文件间复制粘贴。
+ * 样式已迁移至 UiBtn.module.css（CSS Modules），消除 JS 手动 hover 反模式。
  */
 
-import type { CSSProperties, MouseEvent } from 'react';
+import type { MouseEvent } from 'react';
+import { cx } from '@/styles/cx';
+import s from './UiBtn.module.css';
 
 // ── 通用小型按钮（header hover 工具条用）──
 
@@ -14,42 +17,21 @@ interface HBtnProps {
 
 export function HBtn({ title, onClick, children }: HBtnProps) {
   return (
-    <button title={title} onClick={onClick} style={hBtnStyle}
-      onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'var(--hover)'; }}
-      onMouseLeave={(e) => { (e.target as HTMLElement).style.background = 'transparent'; }}
-    >{children}</button>
+    <button title={title} onClick={onClick} className={s.hBtn}>
+      {children}
+    </button>
   );
 }
-
-const hBtnStyle: CSSProperties = {
-  fontSize: 11, padding: '1px 5px', border: 'none', borderRadius: 3,
-  background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer',
-  lineHeight: '18px',
-};
 
 // ── 输入栏小按钮（InputEditor 用，样式略有不同）──
 
 export function InputBtn({ title, onClick, children }: HBtnProps) {
   return (
-    <button title={title} onClick={onClick} style={inputBtnStyle}
-      onMouseEnter={(e) => {
-        (e.target as HTMLElement).style.background = 'var(--hover)';
-        (e.target as HTMLElement).style.borderColor = 'var(--border)';
-      }}
-      onMouseLeave={(e) => {
-        (e.target as HTMLElement).style.background = 'transparent';
-        (e.target as HTMLElement).style.borderColor = 'transparent';
-      }}
-    >{children}</button>
+    <button title={title} onClick={onClick} className={s.inputBtn}>
+      {children}
+    </button>
   );
 }
-
-const inputBtnStyle: CSSProperties = {
-  fontSize: 12, padding: '1px 5px',
-  background: 'transparent', border: '1px solid transparent',
-  borderRadius: 3, color: 'var(--text-secondary)', cursor: 'pointer',
-  lineHeight: '22px',
-};
 
 // ── 下拉/右键菜单项 ──
 
@@ -61,20 +43,11 @@ interface MenuItemProps {
 
 export function MenuItem({ label, onClick, danger }: MenuItemProps) {
   return (
-    <button
-      onClick={onClick}
-      style={danger ? { ...menuItemStyle, color: 'var(--error)' } : menuItemStyle}
-      onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'var(--hover)'; }}
-      onMouseLeave={(e) => { (e.target as HTMLElement).style.background = 'transparent'; }}
-    >{label}</button>
+    <button onClick={onClick} className={cx(s.menuItem, danger && s.menuItemDanger)}>
+      {label}
+    </button>
   );
 }
-
-const menuItemStyle: CSSProperties = {
-  display: 'block', width: '100%', textAlign: 'left' as const,
-  padding: '6px 12px', border: 'none', background: 'transparent',
-  color: 'var(--text-primary)', cursor: 'pointer', fontSize: 12,
-};
 
 // ── 侧栏图标按钮（24×24，悬停显背景；标签/SSH/文件面板统一使用）──
 
@@ -87,36 +60,18 @@ interface IconBtnProps {
 }
 
 export function IconBtn({ title, onClick, disabled, children, ...rest }: IconBtnProps) {
-  return (
-    <button
-      data-subtle
-      title={title}
-      onClick={onClick}
-      disabled={disabled}
-      {...rest}
-      style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 24, height: 24, padding: 0, borderRadius: 5,
-        background: 'transparent', border: 'none', color: 'var(--text-muted)',
-        cursor: disabled ? 'default' : 'pointer', flexShrink: 0, opacity: disabled ? 0.4 : 1,
-      }}
-      onMouseEnter={(e) => {
-        if (!disabled) {
-          e.currentTarget.style.background = 'var(--button-hover)';
-          e.currentTarget.style.color = 'var(--text-secondary)';
-        }
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'transparent';
-        e.currentTarget.style.color = 'var(--text-muted)';
-      }}
-    >
-      {children}
-    </button>
-  );
+  const props: Record<string, unknown> = {
+    'data-subtle': true,
+    title,
+    onClick,
+    disabled,
+    className: s.iconBtn,
+    ...rest,
+  };
+  return <button {...props}>{children}</button>;
 }
 
-// ── 顶栏工具栏按钮（24×24 正方形图标按钮）──
+// ── 顶栏工具栏按钮（28×28 正方形图标按钮）──
 
 interface ToolbarBtnProps {
   title: string;
@@ -127,39 +82,16 @@ interface ToolbarBtnProps {
   attrs?: Record<string, unknown>;
 }
 
-const toolbarBtnBase: CSSProperties = {
-  width: 28, height: 28,
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
-  fontSize: 15, lineHeight: 1,
-  border: 'none', borderRadius: 6,
-  background: 'transparent', color: 'var(--text-secondary)',
-  cursor: 'pointer', userSelect: 'none', flexShrink: 0,
-  padding: 0,
-  transition: 'background 0.12s ease, color 0.12s ease',
-  // @ts-expect-error Tauri 拖拽区域排除
-  WebkitAppRegion: 'no-drag',
-};
-
 export function ToolbarBtn({ title, active, onClick, children, attrs }: ToolbarBtnProps) {
   return (
     <button
       title={title}
       onClick={onClick}
-      style={{
-        ...toolbarBtnBase,
-        // 状态用图标颜色表达，不使用背景：默认灰、悬停亮、打开=琥珀金
-        color: active ? 'var(--accent)' : 'var(--text-secondary)',
-      }}
-      onMouseEnter={(e) => {
-        const t = e.currentTarget as HTMLElement;
-        t.style.color = active ? 'var(--accent)' : 'var(--text-primary)';
-      }}
-      onMouseLeave={(e) => {
-        const t = e.currentTarget as HTMLElement;
-        t.style.color = active ? 'var(--accent)' : 'var(--text-secondary)';
-      }}
+      className={cx(s.toolbarBtn, active && s.toolbarBtnActive)}
       {...(attrs ?? {})}
-    >{children}</button>
+    >
+      {children}
+    </button>
   );
 }
 
