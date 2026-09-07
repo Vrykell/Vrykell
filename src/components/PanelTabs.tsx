@@ -13,8 +13,6 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { regenerateTitle } from '@/agent/title';
-import ContextMenu, { type ContextMenuItem } from '@/components/ContextMenu';
-import NewTabModal from '@/components/NewTabModal';
 import { useToastStore } from '@/components/Toast';
 import { IconBtn } from '@/components/UiBtn';
 import { shellTypeLabel } from '@/lib/shells';
@@ -26,18 +24,10 @@ import {
   terminalsOf,
   useWorkspaceStore,
 } from '@/stores/workspace';
-
-/**
- * PanelTabs — 标签列表面板（会话管理侧栏）。
- * 顶部：搜索 + 历史 + 新建（仅「新建终端」）。
- * 列表：分组 section（可折叠、可拖拽排序）+ 组内标签 + 未分组标签。
- * 分组通过「右键标签 → 新建分组」创建（默认带走该标签）；空分组会被自动清理。
- * 拖拽用自定义 mousedown/mousemove/mouseup（同 Dock 按钮），不用 HTML5 DnD。
- *
- * 标签采用「外壳 + 内壳」两层：
- *  - 外壳 = 外层容器背景，与分组容器背景同色（idle 透明，hover/选中 5%）；
- *  - 内壳 = 内层圆角卡片，idle 透明（与外壳同色看不出区别），悬停 5%、选中 10% + 描边。
- */
+import { cx } from '@/styles/cx';
+import ContextMenu, { type ContextMenuItem } from './ContextMenu';
+import NewTabModal from './NewTabModal';
+import s from './PanelTabs.module.css';
 
 type DropTarget =
   | { kind: 'tab'; groupId: string | null; beforeTabId: string | null }
@@ -91,7 +81,6 @@ export default function PanelTabs() {
   const [renamingGroupTitle, setRenamingGroupTitle] = useState('');
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; tabId: string } | null>(null);
 
-  // 自定义拖拽
   const dragRef = useRef<{
     type: 'tab' | 'group';
     id: string;
@@ -115,9 +104,8 @@ export default function PanelTabs() {
       if (
         Math.abs(e.clientX - info.startX) < DRAG_THRESHOLD &&
         Math.abs(e.clientY - info.startY) < DRAG_THRESHOLD
-      ) {
+      )
         return;
-      }
       dragActiveRef.current = true;
       setDragging(true);
       setDragCursor({ x: e.clientX, y: e.clientY });
@@ -151,7 +139,6 @@ export default function PanelTabs() {
     const ws = useWorkspaceStore.getState();
     if (info.type === 'tab') {
       if (!target) {
-        // 拖到侧栏空白区域（不在任何标签/分组上）：组内标签直接脱离分组，自由标签不动
         const src = ws.tabs.find((t) => t.id === info.id);
         if (src && isSessionTab(src) && src.groupId) {
           const scope = ws.tabs.filter((t) => isSessionTab(t) && (t.groupId ?? null) === null);
@@ -188,7 +175,6 @@ export default function PanelTabs() {
   };
 
   const startDrag = (e: React.MouseEvent, type: 'tab' | 'group', id: string) => {
-    // 仅左键拖拽；忽略输入框/按钮
     if (e.button !== 0) return;
     if ((e.target as HTMLElement).closest('input,button,[data-no-drag]')) return;
     dragRef.current = { type, id, startX: e.clientX, startY: e.clientY };
@@ -215,7 +201,6 @@ export default function PanelTabs() {
                 {
                   label: '新建分组',
                   onClick: () => {
-                    // 建组后立即进入重命名（自动聚焦名称输入框）
                     void createGroupForTab(ctxTab.id).then((gid) => {
                       if (!gid) return;
                       const g = useWorkspaceStore.getState().groups.find((x) => x.id === gid);
@@ -248,54 +233,17 @@ export default function PanelTabs() {
       : [];
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        userSelect: 'none',
-        background: 'var(--surface)',
-      }}
-    >
+    <div className={s.panel}>
       {/* 顶栏 */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-          padding: '6px 8px',
-          position: 'relative',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 5,
-            flex: 1,
-            minWidth: 0,
-            background: 'var(--canvas)',
-            borderRadius: 'var(--radius-inner)',
-            padding: '0 6px',
-            height: 24,
-          }}
-        >
-          <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+      <div className={s.toolbar}>
+        <div className={s.searchBox}>
+          <Search size={12} className={s.searchIcon} />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="搜索会话…"
             data-testid="tab-search"
-            style={{
-              flex: 1,
-              minWidth: 0,
-              background: 'transparent',
-              border: 'none',
-              outline: 'none',
-              fontSize: 12,
-              color: 'var(--text-primary)',
-              fontFamily: 'var(--font-ui)',
-            }}
+            className={s.searchInput}
           />
         </div>
         <IconBtn title="会话历史" data-testid="tab-history-btn" onClick={openHistoryTab}>
@@ -314,7 +262,7 @@ export default function PanelTabs() {
       </div>
 
       {/* 列表 */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 0 8px' }}>
+      <div className={s.list}>
         {groups.map((g) => (
           <GroupSection
             key={g.id}
@@ -356,8 +304,7 @@ export default function PanelTabs() {
                 void deleteGroup(g.id, false);
                 return;
               }
-              const ok = window.confirm(`归档分组「${g.title}」？组内标签将关闭并移入会话历史。`);
-              if (!ok) return;
+              if (!window.confirm(`归档分组「${g.title}」？组内标签将关闭并移入会话历史。`)) return;
               void archiveGroup(g.id);
             }}
             onMouseDownTab={(e, tabId) => startDrag(e, 'tab', tabId)}
@@ -384,11 +331,7 @@ export default function PanelTabs() {
               gap: 2,
             }}
           >
-            {groups.length > 0 && (
-              <div style={{ padding: '0 8px 2px', fontSize: 11, color: 'var(--text-muted)' }}>
-                未分组
-              </div>
-            )}
+            {groups.length > 0 && <div className={s.ungroupedLabel}>未分组</div>}
             {ungroupedTabs.map((t) => (
               <TabRow
                 key={t.id}
@@ -436,7 +379,6 @@ export default function PanelTabs() {
         )}
       </div>
 
-      {/* 右键菜单 */}
       {ctxMenu && ctxItems.length > 0 && (
         <ContextMenu
           anchor={{ x: ctxMenu.x, y: ctxMenu.y }}
@@ -445,7 +387,6 @@ export default function PanelTabs() {
         />
       )}
 
-      {/* 拖拽预览：鼠标附近的标签图（无文字） */}
       {dragging && dragCursor && dragRef.current && (
         <DragGhost
           type={dragRef.current.type}
@@ -496,9 +437,9 @@ function GroupSection(props: {
   const groupHighlight =
     props.dropTarget?.kind === 'group' && props.dropTarget.groupId === group.id;
   const anyMemberActive = tabs.some((t) => t.id === activeId);
+
   return (
-    <div style={{ marginBottom: 4 }}>
-      {/* 分组容器 = 标签的「外壳」：idle 透明，hover 或含活跃标签时显灰（CSS） */}
+    <div className={s.groupSection}>
       <div
         className="tab-group-container"
         data-group-id={group.id}
@@ -509,9 +450,8 @@ function GroupSection(props: {
           boxShadow: groupHighlight ? 'inset 0 0 0 1px var(--accent)' : 'none',
         }}
       >
-        {/* 分组头：图标徽章 + 名称 + 副标题 + 折叠 chevron */}
         <div
-          className="tab-group-header"
+          className={cx('tab-group-header', s.groupHeader)}
           data-group-header-id={group.id}
           data-header-selected={collapsed && anyMemberActive ? 'true' : 'false'}
           data-testid={`group-header-${group.id}`}
@@ -519,33 +459,12 @@ function GroupSection(props: {
             if (!props.renamingGroupId) props.onToggleCollapse();
           }}
           onDoubleClick={() => {
-            // 双击重命名（两次 click 已把折叠状态抵消回原样）
             if (props.renamingGroupId !== group.id) props.onStartRenameGroup();
           }}
           onMouseDown={props.onMouseDownGroup}
           title="点击折叠/展开 · 双击重命名 · 拖拽排序"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '6px 8px',
-            minHeight: 40,
-            cursor: 'pointer',
-          }}
         >
-          <span
-            style={{
-              width: 24,
-              height: 24,
-              borderRadius: 6,
-              flexShrink: 0,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'var(--hover)',
-              color: 'var(--text-secondary)',
-            }}
-          >
+          <span className={s.groupIcon}>
             <Folder size={14} />
           </span>
           {props.renamingGroupId === group.id ? (
@@ -560,38 +479,12 @@ function GroupSection(props: {
                 if (e.key === 'Enter') props.onCommitRenameGroup();
                 else if (e.key === 'Escape') props.setRenamingGroupTitle(group.title);
               }}
-              style={{
-                flex: 1,
-                background: 'var(--canvas)',
-                border: '1px solid var(--accent)',
-                borderRadius: 3,
-                padding: '1px 4px',
-                fontSize: 13,
-                fontWeight: 600,
-                color: 'var(--text-primary)',
-                outline: 'none',
-              }}
+              className={cx(s.renameInput, s.groupTitle)}
             />
           ) : (
-            <span
-              style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}
-            >
-              <span
-                style={{
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  fontSize: 13,
-                  lineHeight: '18px',
-                  fontWeight: 600,
-                  color: 'var(--text-primary)',
-                }}
-              >
-                {group.title}
-              </span>
-              <span style={{ fontSize: 10.5, color: 'var(--text-muted)', lineHeight: '14px' }}>
-                {tabs.length} 个标签
-              </span>
+            <span className={s.groupInfo}>
+              <span className={s.groupTitle}>{group.title}</span>
+              <span className={s.groupCount}>{tabs.length} 个标签</span>
             </span>
           )}
           <GroupActions
@@ -600,22 +493,13 @@ function GroupSection(props: {
             onRename={props.onStartRenameGroup}
             onDelete={props.onDeleteGroup}
           />
-          <ChevronRight
-            size={13}
-            style={{
-              color: 'var(--text-muted)',
-              flexShrink: 0,
-              transition: 'transform 0.12s ease',
-              transform: collapsed ? 'none' : 'rotate(90deg)',
-            }}
-          />
+          <ChevronRight size={13} className={cx(s.chevron, !collapsed && s.chevronOpen)} />
         </div>
 
-        {/* 展开：组内标签与自由标签同尺寸，靠左缩进 12px 体现层级 */}
         {!collapsed && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 0 4px' }}>
+          <div className={s.groupContent}>
             {tabs.map((t) => (
-              <div key={t.id} style={{ padding: '0 4px 0 12px' }}>
+              <div key={t.id} className={s.groupContentInner}>
                 <TabRow
                   tab={t}
                   active={t.id === activeId}
@@ -671,13 +555,7 @@ function GroupActions({
           e.stopPropagation();
           onAdd();
         }}
-        style={actionStyle}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.color = 'var(--text-secondary)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.color = 'var(--text-muted)';
-        }}
+        className={s.groupActions}
       >
         <Plus size={12} />
       </button>
@@ -689,13 +567,7 @@ function GroupActions({
           e.stopPropagation();
           onRename();
         }}
-        style={actionStyle}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.color = 'var(--text-secondary)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.color = 'var(--text-muted)';
-        }}
+        className={s.groupActions}
       >
         <Pencil size={12} />
       </button>
@@ -707,33 +579,14 @@ function GroupActions({
           e.stopPropagation();
           onDelete();
         }}
-        style={actionStyle}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.color = empty ? 'var(--error-light)' : 'var(--text-secondary)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.color = 'var(--text-muted)';
-        }}
+        className={s.groupActions}
+        style={empty ? { color: 'var(--error-light)' } : undefined}
       >
         {empty ? <Trash2 size={12} /> : <Archive size={12} />}
       </button>
     </span>
   );
 }
-
-const actionStyle: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  width: 18,
-  height: 18,
-  padding: 0,
-  border: 'none',
-  borderRadius: 4,
-  background: 'transparent',
-  color: 'var(--text-muted)',
-  cursor: 'pointer',
-};
 
 // ── 标签行 ──
 
@@ -794,21 +647,15 @@ function TabRow({
           : '本地',
     )
     .join(' + ');
-  // session 标签不再写文字副标题，改用胶囊状态（圆点 + 终端数）
   const subtitle =
     tab.kind === 'history' ? '会话历史' : tab.kind === 'settings' ? '设置' : undefined;
 
-  // 内外壳两层：外壳（外层容器，idle 透明，hover/选中 5%，与分组容器同色）+ 内壳（内层卡片，idle 透明，hover 5%，选中 10% + 1px 描边，圆角）
   const inGroup = groupId != null;
   const outerBg = !inGroup && (active || hovered) ? 'var(--tab-hover)' : 'transparent';
   let innerBg = 'transparent';
-  if (highlight) {
-    innerBg = 'var(--tab-hover)';
-  } else if (active) {
-    innerBg = 'var(--tab-active)';
-  } else if (hovered) {
-    innerBg = 'var(--tab-hover)';
-  }
+  if (highlight) innerBg = 'var(--tab-hover)';
+  else if (active) innerBg = 'var(--tab-active)';
+  else if (hovered) innerBg = 'var(--tab-hover)';
 
   return (
     <div
@@ -822,37 +669,16 @@ function TabRow({
       data-testid={`tab-row-${tab.id}`}
       data-tab-row-id={tab.id}
       data-tab-group={groupId ?? ''}
-      style={{
-        padding: 10,
-        background: outerBg,
-        cursor: 'pointer',
-      }}
+      style={{ padding: 10, background: outerBg, cursor: 'pointer' }}
     >
       <div
+        className={cx(s.tabRow, highlight && s.tabRowDragOver)}
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: 8,
-          borderRadius: 'var(--tab-radius)',
           background: innerBg,
           color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-          transition: 'background 0.12s ease',
         }}
       >
-        <span
-          style={{
-            width: 24,
-            height: 24,
-            borderRadius: 6,
-            flexShrink: 0,
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: iconBg,
-            color: iconColor,
-          }}
-        >
+        <span className={s.tabIcon} style={{ background: iconBg, color: iconColor }}>
           <Icon size={15} />
         </span>
         {editing ? (
@@ -867,123 +693,88 @@ function TabRow({
               else if (e.key === 'Escape') onCancelEdit();
             }}
             onClick={(e) => e.stopPropagation()}
-            style={{
-              flex: 1,
-              background: 'var(--canvas)',
-              border: '1px solid var(--accent)',
-              borderRadius: 3,
-              padding: '1px 4px',
-              fontSize: 13,
-              color: 'var(--text-primary)',
-              outline: 'none',
-              fontFamily: 'var(--font-ui)',
-            }}
+            className={s.renameInput}
           />
         ) : (
-          <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <span
-              style={{
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                fontSize: 12,
-                lineHeight: '16px',
-                fontWeight: active ? 600 : 500,
-              }}
-            >
-              {tab.title}
-            </span>
-            {subtitle && (
-              <span
-                style={{
-                  fontSize: 11,
-                  color: 'var(--text-muted)',
-                  lineHeight: '14px',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  fontFamily: 'var(--font-mono)',
-                }}
-              >
-                {subtitle}
-              </span>
-            )}
+          <span className={s.tabInfo}>
+            <span className={cx(s.tabTitle, active && s.tabTitleActive)}>{tab.title}</span>
+            {subtitle && <span className={s.tabStatus}>{subtitle}</span>}
           </span>
         )}
         {tab.kind === 'session' && (
           <span
-            title={typeSummary}
+            className={s.tabStatus}
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              height: 16,
-              padding: '0 6px',
-              flexShrink: 0,
-              lineHeight: '14px',
+              color: 'var(--shell-connected)',
+              fontSize: 10,
+              fontWeight: 600,
+              fontFamily: 'var(--font-mono)',
+              padding: '0 4px',
             }}
           >
-            <span
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                flexShrink: 0,
-                background: 'var(--success)',
-              }}
-            />
-            <span
-              style={{
-                fontSize: 10,
-                fontWeight: 600,
-                color: 'var(--text-secondary)',
-                fontFamily: 'var(--font-mono)',
-              }}
-            >
-              {terms.length}
-            </span>
+            {typeSummary}
           </span>
         )}
-        <span
-          onClick={(e) => {
-            e.stopPropagation();
-            onClose();
-          }}
-          title="关闭标签"
-          data-testid={`tab-close-${tab.id}`}
-          data-no-drag
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 18,
-            height: 18,
-            fontSize: 15,
-            cursor: 'pointer',
-            lineHeight: 1,
-            borderRadius: 4,
-            flexShrink: 0,
-            color: 'var(--text-muted)',
-            opacity: active || hovered ? 1 : 0,
-            transition: 'opacity 0.12s ease',
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLElement).style.background = 'var(--button-hover)';
-            (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)';
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.background = 'transparent';
-            (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)';
-          }}
-        >
-          ×
-        </span>
+        {tab.kind === 'session' && (
+          <button
+            data-subtle
+            data-no-drag
+            title="关闭标签"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            className={s.tabStatus}
+            style={{
+              display: 'none',
+              width: 16,
+              height: 16,
+              border: 'none',
+              borderRadius: 3,
+              background: 'transparent',
+              cursor: 'pointer',
+              color: 'var(--text-muted)',
+              fontSize: 10,
+              padding: 0,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = 'var(--error-light)';
+              e.currentTarget.style.background = 'var(--hover)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--text-muted)';
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            <XIcon />
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-// ── 拖拽预览（标签图，无文字）──
+function XIcon() {
+  return (
+    <svg
+      width="10"
+      height="10"
+      viewBox="0 0 10 10"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    >
+      <title>关闭</title>
+      <line x1="2" y1="2" x2="8" y2="8" />
+      <line x1="8" y1="2" x2="2" y2="8" />
+    </svg>
+  );
+}
+
+// ── 拖拽预览 ──
 
 function DragGhost({
   type,
@@ -998,44 +789,27 @@ function DragGhost({
   x: number;
   y: number;
 }) {
-  const tab = type === 'tab' ? tabs.find((t) => t.id === id) : undefined;
-  const first = tab ? firstTerminalOf(tab) : null;
-  const isSsh = type === 'tab' && first?.kind === 'ssh';
-  const Icon =
-    type === 'tab'
-      ? tab?.kind === 'history'
-        ? History
-        : tab?.kind === 'settings'
-          ? Settings
-          : isSsh
-            ? Server
-            : SquareTerminal
-      : Folder;
-  const color = type === 'group' ? 'var(--accent-warm)' : 'var(--accent)';
+  const label = type === 'tab' ? (tabs.find((t) => t.id === id)?.title ?? '…') : '分组';
   return (
     <div
       style={{
         position: 'fixed',
         left: x,
         top: y,
-        zIndex: 9999,
-        pointerEvents: 'none',
-        transform: 'translate(-50%, -60%) scale(1.06)',
-        width: 40,
-        height: 26,
-        borderRadius: 7,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        padding: '4px 10px',
+        borderRadius: 5,
         background: 'var(--elevated)',
         border: '1px solid var(--border-strong)',
-        boxShadow: 'var(--shadow-lg)',
-        animation: 'dragGhostIn 0.1s ease',
+        color: 'var(--text-primary)',
+        fontSize: 12,
+        fontWeight: 500,
+        pointerEvents: 'none',
+        zIndex: 9999,
+        opacity: 0.92,
+        transform: 'translate(8px, 8px)',
       }}
     >
-      <Icon size={14} style={{ color }} />
+      {label}
     </div>
   );
 }
-
-// ── 通用 ──
