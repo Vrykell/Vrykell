@@ -1,0 +1,126 @@
+/**
+ * 全局基础组件样式 —— 按钮默认、输入框、组头操作显隐、markdown 排版、文字层级工具类。
+ * 颜色引用 CSS 变量（由 theme/tokens.ts 注入），不在此硬编码。
+ */
+
+/* ── 默认按钮 ── */
+button:not([data-subtle]) {
+  font-family: var(--font-ui);
+  background: var(--elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-inner);
+  cursor: pointer;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+button:not([data-subtle]):hover { background: var(--button-hover); }
+button:disabled { opacity: 0.45; cursor: default; }
+
+/* ── 分组头 hover 操作 ── */
+.group-actions { opacity: 0; transition: opacity var(--dur) var(--ease); }
+[data-group-header-id]:hover .group-actions { opacity: 1; }
+
+/* ── AI 问答块 hover 操作 — */
+.ai-block-actions { opacity: 0; transition: opacity var(--dur) var(--ease); }
+.ai-block:hover .ai-block-actions { opacity: 1; }
+
+/* ── 分组容器 ── */
+.tab-group-container {
+  background: transparent;
+  transition: background var(--dur) var(--ease);
+}
+.tab-group-container:hover { background: var(--tab-hover); }
+.tab-group-container[data-group-active="true"] { background: var(--tab-hover); }
+
+.tab-group-header {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--tab-radius);
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.tab-group-header:hover { background: var(--tab-active); }
+.tab-group-header[data-header-selected="true"] {
+  background: var(--tab-active);
+  border-color: var(--tab-active-border);
+}
+
+/* ── 文字层级工具类 ── */
+.text-title { font-size: var(--fs-title); font-weight: var(--fw-semibold); color: var(--text-title); letter-spacing: -0.01em; }
+.text-subtitle { font-size: var(--fs-subtitle); font-weight: var(--fw-medium); color: var(--text-primary); }
+.text-label { font-size: var(--fs-label); font-weight: var(--fw-medium); color: var(--text-label); letter-spacing: 0.01em; }
+.text-caption { font-size: var(--fs-caption); font-weight: var(--fw-regular); color: var(--text-muted); }
+.text-micro { font-size: var(--fs-micro); font-weight: var(--fw-regular); color: var(--text-muted); letter-spacing: 0.02em; }
+.text-eyebrow { font-size: var(--fs-micro); font-weight: var(--fw-semibold); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+
+input, textarea {
+  font-family: var(--font-ui);
+  color: var(--text-primary);
+  outline: none;
+}
+input::placeholder, textarea::placeholder { color: var(--text-muted); }
+
+/* ── Markdown（GitHub-dark 风格） ── */
+.md {
+  overflow-wrap: break-word;
+  word-break: break-word;
+  max-width: 760px;
+}
+.md h1, .md h2, .md h3 { margin: 0.7em 0 0.35em; line-height: 1.3; letter-spacing: -0.01em; }
+.md h1 { font-size: 1.4em; font-weight: 700; color: var(--text-title); }
+.md h2 { font-size: 1.18em; font-weight: 600; }
+.md h3 { font-size: 1.04em; font-weight: 600; }
+.md p { margin: 0.4em 0; }
+.md ul, .md ol { margin: 0.35em 0; padding-left: 1.4em; }
+.md li { margin: 0.18em 0; }
+.md li::marker { color: var(--text-muted); }
+.md li input[type="checkbox"] { margin-right: 6px; accent-color: var(--accent-warm); }
+.md li:has(input[type="checkbox"]) { list-style: none; margin-left: -1.4em; }
+.md del { color: var(--text-muted); }
+.md a { color: var(--accent); text-decoration: none; }
+.md a:hover { text-decoration: underline; }
+.md blockquote {
+  margin: 0.45em 0;
+  padding: 4px 12px;
+  border-left: 3px solid var(--accent-warm);
+  border-radius: 0 6px 6px 0;
+  background: var(--accent-warm-dim);
+  color: var(--text-secondary);
+}
+.md blockquote p { margin: 0.15em 0; }
+.md code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.md pre { margin: 0.45em 0; width: 100%; }
+.md pre code { background: none; border: none; padding: 0; font-size: 12.5px; line-height: 1.55; }
+.md table {
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 0.5em 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  font-size: 0.92em;
+  background: var(--block);
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  max-width: 100%;
+}
+.md th, .md td {
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 6px 14px;
+  text-align: left;
+}
+.md tbody tr:last-child td { border-bottom: none; }
+.md th { background: var(--th-bg); font-weight: 600; color: var(--text-primary); }
+.md thead th:first-child { border-top-left-radius: 7px; }
+.md thead th:last-child { border-top-right-radius: 7px; }
+.md tbody tr:hover td { background: var(--hover); }
+.md hr { border: none; border-top: 1px solid var(--border); margin: 0.8em 0; }
+.md .katex-display { margin: 0.5em 0; overflow-x: auto; }
+.md .katex { color: var(--text-primary); }

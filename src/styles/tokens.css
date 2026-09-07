@@ -1,0 +1,54 @@
+/**
+ * Token 定义 —— 结构变量（字体/几何/缓动/间距/字阶）。
+ * 颜色变量由 theme/tokens.ts 的 applyTheme() 在运行时注入。
+ * 下方 :root 颜色块为暗色主题的 CSS 回退值（FOUC 防护），
+ * tokens.ts 的 dark palette 是唯一权威来源，修改颜色时请同步。
+ */
+
+:root {
+  /* 字体 */
+  --font-ui: -apple-system, "SF Pro Text", "PingFang SC", "Segoe UI", sans-serif;
+  --font-mono: "SF Mono", Menlo, "JetBrains Mono", monospace;
+
+  /* 几何 */
+  --radius-block: 10px;
+  --radius-inner: 6px;
+
+  /* 节奏与缓动 */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 0.14s;
+  --dur: 0.18s;
+  --dur-slow: 0.26s;
+
+  /* 浮层内描边高光 */
+  --hairline: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --hairline-soft: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+
+  /* 文字层级（字重 + 字号梯度） */
+  --fs-title: 17px;
+  --fs-subtitle: 15px;
+  --fs-body: 14px;
+  --fs-label: 13px;
+  --fs-caption: 12px;
+  --fs-micro: 11px;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --text-title: #F4F4F4;
+  --text-label: #C4C4C4;
+
+  /* 间距标尺 */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+
+  /* 标签 overlay */
+  --tab-hover: rgba(255, 255, 255, 0.05);
+  --tab-active: rgba(255, 255, 255, 0.10);
+  --tab-active-border: rgba(255, 255, 255, 0.15);
+  --tab-radius: 4px;
+
+  --error-text: #FFFFFF;
+}

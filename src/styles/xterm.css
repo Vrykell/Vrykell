@@ -1,0 +1,31 @@
+/**
+ * xterm.js 全局覆盖规则。
+ *
+ * 注意：部分规则依赖三层选择器特异性（对抗 xterm.css 的同特异性规则，
+ * 后者随组件晚于本文件加载）。这些规则必须为全局，不能下沉到 CSS Module。
+ */
+
+/* 容器贴边：取消全屏终端的边缘内边距 */
+.xterm { padding: 0; }
+
+/* viewport 残差区颜色统一（三层选择器压过 xterm.css 的同特异性规则） */
+[data-testid^="pane-"] .xterm .xterm-viewport { background-color: var(--xterm-bg); }
+
+/* 主 xterm：canvas 水平居中，消除取整残差 */
+.xterm { display: flex; justify-content: center; }
+.xterm .xterm-screen { flex-shrink: 0; }
+
+/* 隐藏 xterm 6 的 DOM 滚动条 */
+.xterm .xterm-scrollable-element > .scrollbar { opacity: 0 !important; }
+
+/* 块内活终端：覆盖全局 .xterm padding，加呼吸边距（4px/8px） */
+[data-testid="running-term"] .xterm { padding: 4px 8px; display: flex; justify-content: center; }
+
+/* 全屏 TUI 宿主内：贴边，无内边距 */
+[data-testid="tui-fullscreen"] [data-testid="running-term"] .xterm { padding: 0; }
+
+/* 禁收缩：screen 有显式宽度，shrink 会压扁盒子导致居中失效 */
+[data-testid="running-term"] .xterm-screen { flex-shrink: 0; }
+
+/* 透掉 viewport 默认 #000 背景，让 --xterm-bg 透出（三层选择器对抗 xterm.css） */
+[data-testid="running-term"] .xterm .xterm-viewport { background-color: transparent; }
