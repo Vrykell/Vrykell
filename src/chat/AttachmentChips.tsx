@@ -1,14 +1,7 @@
-/**
- * AttachmentChips — 附件 chips 行 + 预览浮层（M5）。
- *
- * 两处复用：PanelChat 输入栏（可删除，onRemove 存在）与 AiBlock 问题行
- * （只读展示持久化附件，onRemove 缺省）。预览 = chip 上方浮层：
- * 图片读 dataUrl 显示，文本显示头部 2000 字。
- */
-
 import { ClipboardPaste, FileText, Image as ImageIcon, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { type AttachmentMeta, readAttachmentDataUrl } from '@/agent/attachments';
+import s from './AttachmentChips.module.css';
 
 export default function AttachmentChips({
   atts,
@@ -19,30 +12,20 @@ export default function AttachmentChips({
   atts: AttachmentMeta[];
   previewId: string | null;
   onPreview: (id: string) => void;
-  /** 缺省 = 只读（AiBlock 历史消息） */
   onRemove?: (id: string) => void;
 }) {
   return (
-    <div style={{ position: 'relative', display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+    <div className={s.chips}>
       {atts.map((a) => {
         const Icon =
           a.kind === 'image' ? ImageIcon : a.kind === 'paste' ? ClipboardPaste : FileText;
         return (
           <span
             key={a.id}
+            className={s.chip}
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 11,
-              fontFamily: 'var(--font-mono)',
-              padding: '1px 4px 1px 6px',
-              border: '1px solid var(--border)',
-              borderRadius: 4,
               background: previewId === a.id ? 'var(--button-hover)' : 'var(--bg)',
-              color: 'var(--text-secondary)',
               maxWidth: 220,
-              userSelect: 'none',
             }}
           >
             <Icon size={11} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />
@@ -63,20 +46,7 @@ export default function AttachmentChips({
                 data-subtle
                 title="移除附件"
                 onClick={() => onRemove(a.id)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: 14,
-                  height: 14,
-                  padding: 0,
-                  border: 'none',
-                  borderRadius: 2,
-                  background: 'transparent',
-                  color: 'var(--text-muted)',
-                  cursor: 'pointer',
-                  flexShrink: 0,
-                }}
+                className={s.removeChip}
               >
                 <X size={10} />
               </button>
@@ -89,7 +59,6 @@ export default function AttachmentChips({
   );
 }
 
-/** 预览浮层（chips 行上方）：图片读 dataUrl 显示，文本显示头部 2000 字 */
 function AttachmentPreview({ att }: { att: AttachmentMeta }) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const isImage = att.mime.startsWith('image/');
