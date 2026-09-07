@@ -1,0 +1,68 @@
+/* PanelTabs + SessionHistoryView 共用样式模块 */
+
+.panel{display:flex;flex-direction:column;height:100%;user-select:none;background:var(--surface)}
+.toolbar{display:flex;align-items:center;gap:4px;padding:6px 8px;position:relative}
+.searchBox{display:flex;align-items:center;gap:5px;flex:1;min-width:0;background:var(--canvas);border-radius:var(--radius-inner);padding:0 6px;height:24px}
+.searchIcon{color:var(--text-muted);flex-shrink:0}
+.searchInput{flex:1;min-width:0;background:transparent;border:none;outline:none;font-size:12px;color:var(--text-primary);font-family:var(--font-ui)}
+.list{flex:1;overflow-y:auto;padding:0 0 8px}
+
+/* 标签行 */
+.tabRow{display:flex;align-items:center;gap:4px;padding:5px 8px;border-radius:var(--tab-radius);cursor:pointer;transition:background var(--dur-fast) var(--ease);font-size:13px;min-height:28px;position:relative}
+.tabRow:hover{background:var(--tab-hover)}
+.tabRowActive{background:var(--tab-active);border:1px solid var(--tab-active-border)}
+.tabRowDragOver{border:1px dashed var(--accent)}
+
+.tabShell{flex:1;min-width:0;display:flex;align-items:center;gap:6px;overflow:hidden}
+.tabIcon{flex-shrink:0;color:var(--text-muted)}
+.tabTitle{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-primary);font-weight:500;font-size:13px}
+.tabStatus{flex-shrink:0;color:var(--text-muted);font-size:11px}
+
+/* 分组 */
+.groupSection{margin-bottom:2px}
+.groupHeader{display:flex;align-items:center;gap:8px;padding:6px 8px;min-height:40px;cursor:pointer}
+.groupIcon{width:24px;height:24px;border-radius:6px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;background:var(--hover);color:var(--text-secondary)}
+.groupInfo{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.groupTitle{font-size:12px;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.groupCount{font-size:11px;color:var(--text-muted)}
+.groupActions{display:flex;align-items:center;gap:2px;opacity:0;transition:opacity var(--dur) var(--ease)}
+.groupHeader:hover .groupActions{opacity:1}
+.groupContent{display:flex;flex-direction:column;gap:2px;padding:0 0 4px}
+.groupContentInner{padding:4px 0 4px 12px}
+
+/* 内联重命名输入 */
+.renameInput{flex:1;min-width:0;background:var(--canvas);border:1px solid var(--accent);border-radius:3px;padding:1px 4px;font-size:13px;font-family:var(--font-ui);color:var(--text-primary);outline:none}
+
+/* 拖拽目标 */
+.dropLine{height:0;border-top:2px solid var(--accent);margin:0 8px;border-radius:1px}
+
+/* SessionHistoryView 特有 */
+.historyPanel{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--surface);user-select:none}
+.historyHeader{display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--text-secondary)}
+.historyTitle{font-weight:600;color:var(--text-primary);flex-shrink:0}
+.historyCount{color:var(--text-muted);flex-shrink:0}
+.historySearch{display:flex;align-items:center;gap:4px;flex:1;min-width:140px;background:var(--block);border-radius:6px;padding:0 4px 0 8px;height:26px}
+.historySearchInput{flex:1;min-width:0;background:transparent;border:none;outline:none;font-size:12px;color:var(--text-primary);font-family:var(--font-ui)}
+.filterBtn{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;padding:0;border:none;border-radius:4px;background:transparent;cursor:pointer;transition:color var(--dur-fast) var(--ease)}
+.filterBtnActive{color:var(--accent)}
+.filterBtnInactive{color:var(--text-muted)}
+.refreshBtn{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--text-secondary);cursor:pointer;flex-shrink:0;transition:background var(--dur-fast) var(--ease)}
+.refreshBtn:hover{background:var(--hover)}
+.historyList{flex:1;overflow-y:auto;padding:8px}
+.loading{text-align:center;color:var(--text-muted);font-size:12px;padding:24px}
+.empty{display:flex;flex-direction:column;align-items:center;gap:8px;padding-top:14vh;color:var(--text-muted);font-size:12px}
+.emptyIcon{opacity:.4}
+.sessionRow{display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:var(--tab-radius);cursor:pointer;transition:background var(--dur-fast) var(--ease);font-size:12px;min-height:26px}
+.sessionRow:hover{background:var(--tab-hover)}
+.sessionInfo{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.sessionTitle{font-size:12px;font-weight:500;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sessionMeta{font-size:10px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sessionDelete{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;border:none;border-radius:4px;background:transparent;color:var(--text-muted);cursor:pointer;flex-shrink:0;transition:color var(--dur-fast) var(--ease)}
+.sessionDelete:hover{color:var(--error-light)}
+.groupRestoreBtn{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--text-secondary);cursor:pointer;transition:background var(--dur-fast) var(--ease)}
+.groupRestoreBtn:hover{background:var(--hover)}
+.groupDeleteBtn{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;padding:0;border:none;border-radius:4px;background:transparent;color:var(--text-muted);cursor:pointer;transition:color var(--dur-fast) var(--ease)}
+.groupDeleteBtn:hover{color:var(--error-light)}
+.chevron{color:var(--text-muted);flex-shrink:0;transition:transform .12s ease}
+.chevronOpen{transform:rotate(90deg)}
+.ungroupedLabel{padding:0 8px 2px;font-size:11px;color:var(--text-muted)}

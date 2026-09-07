@@ -10,20 +10,16 @@ import {
 import type { TerminalSpec } from '@/lib/windowLayout';
 import { ensureSshLoaded, useSshStore } from '@/ssh/store';
 import { useWorkspaceStore } from '@/stores/workspace';
+import { cx } from '@/styles/cx';
+import s from './NewTabModal.module.css';
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  /** 新建标签归属的分组 id（undefined=未分组） */
   groupId?: string;
-  /** 提供时：选择后不新建标签，而是回调所选终端 spec（分裂/替换终端用） */
   onPick?: (spec: TerminalSpec) => void;
 }
 
-/**
- * NewTabModal — 新建标签页 / 选择终端类型的弹窗（屏幕居中）。
- * 候选 = 机器可用 shell + 已配置 SSH 连接，按最近打开时间倒序，顶部搜索框过滤。
- */
 export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
@@ -37,8 +33,8 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
     setSelected(0);
     ensureSshLoaded();
     let cancelled = false;
-    getAvailableShells().then((s) => {
-      if (!cancelled) setShells(s);
+    getAvailableShells().then((sh) => {
+      if (!cancelled) setShells(sh);
     });
     requestAnimationFrame(() => inputRef.current?.focus());
     return () => {
@@ -50,7 +46,6 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
     () => buildNewTabOptions(shells, sshConnections),
     [shells, sshConnections],
   );
-
   const filtered = useMemo(() => filterNewTabOptions(options, query), [options, query]);
 
   useEffect(() => setSelected(0), [query]);
@@ -85,17 +80,19 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
             onClose();
             return;
           }
-          useWorkspaceStore.getState().addTab({
-            kind: 'ssh',
-            ssh: {
-              name: conn.name,
-              host: conn.host,
-              user: conn.user,
-              port: conn.port,
-              connectionId: conn.id,
-            },
-            groupId,
-          });
+          useWorkspaceStore
+            .getState()
+            .addTab({
+              kind: 'ssh',
+              ssh: {
+                name: conn.name,
+                host: conn.host,
+                user: conn.user,
+                port: conn.port,
+                connectionId: conn.id,
+              },
+              groupId,
+            });
         }
       }
       onClose();
@@ -124,86 +121,24 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
   if (!open) return null;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 9996,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'var(--overlay)',
-        animation: 'overlayIn 0.18s var(--ease)',
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          width: 420,
-          maxHeight: '70vh',
-          background: 'var(--elevated)',
-          border: '1px solid var(--border-strong)',
-          borderRadius: 'var(--radius-block)',
-          boxShadow: 'var(--shadow-lg)',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          animation: 'modalIn 0.22s var(--ease-out)',
-        }}
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={handleKey}
-      >
-        <div
-          style={{
-            padding: '12px 16px 4px',
-            fontSize: 13,
-            fontWeight: 600,
-            color: 'var(--text-primary)',
-          }}
-        >
-          新建标签页
-        </div>
-
-        {/* 搜索框 */}
-        <div style={{ padding: '8px 16px' }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              background: 'var(--canvas)',
-              borderRadius: 'var(--radius-inner)',
-              padding: '0 8px',
-              height: 28,
-            }}
-          >
-            <Search size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+    <div className={s.overlay} onClick={onClose}>
+      <div className={s.panel} onClick={(e) => e.stopPropagation()} onKeyDown={handleKey}>
+        <div className={s.title}>新建标签页</div>
+        <div className={s.searchBox}>
+          <div className={s.searchInner}>
+            <Search size={13} className={s.searchIcon} />
             <input
               ref={inputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="搜索标签页类型…"
-              style={{
-                flex: 1,
-                background: 'transparent',
-                border: 'none',
-                outline: 'none',
-                fontSize: 13,
-                color: 'var(--text-primary)',
-                fontFamily: 'var(--font-ui)',
-              }}
+              className={s.searchInput}
             />
           </div>
         </div>
-
-        {/* 候选列表 */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '4px 8px 10px' }}>
+        <div className={s.list}>
           {filtered.length === 0 ? (
-            <div
-              style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}
-            >
-              无匹配类型
-            </div>
+            <div className={s.empty}>无匹配类型</div>
           ) : (
             filtered.map((o, i) => (
               <OptionRow
@@ -238,61 +173,14 @@ function OptionRow({
       onClick={onCreate}
       onMouseEnter={onSelect}
       data-testid={`new-tab-option-${opt.key}`}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        width: '100%',
-        textAlign: 'left',
-        padding: '8px 10px',
-        border: 'none',
-        borderRadius: 'var(--radius-inner)',
-        background: selected ? 'var(--hover)' : 'transparent',
-        color: 'var(--text-primary)',
-        cursor: 'pointer',
-        fontSize: 13,
-      }}
+      className={cx(s.option, selected && s.optionSelected)}
     >
-      <span
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: 24,
-          height: 24,
-          borderRadius: 5,
-          background: 'var(--canvas)',
-          color: 'var(--text-secondary)',
-          flexShrink: 0,
-        }}
-      >
+      <span className={s.optionIcon}>
         <Icon size={13} />
       </span>
-      <span style={{ flex: 1, overflow: 'hidden' }}>
-        <span
-          style={{
-            display: 'block',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {opt.label}
-        </span>
-        {opt.subtitle && (
-          <span
-            style={{
-              display: 'block',
-              fontSize: 11,
-              color: 'var(--text-muted)',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {opt.subtitle}
-          </span>
-        )}
+      <span className={s.optionLabel}>
+        <span className={s.optionName}>{opt.label}</span>
+        {opt.subtitle && <span className={s.optionSubtitle}>{opt.subtitle}</span>}
       </span>
     </button>
   );

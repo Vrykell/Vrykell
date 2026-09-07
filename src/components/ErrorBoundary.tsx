@@ -1,5 +1,6 @@
-import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { TriangleAlert } from 'lucide-react';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
+import s from './ErrorBoundary.module.css';
 
 interface Props {
   children: ReactNode;
@@ -36,12 +37,14 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.error) {
-      return this.props.fallback ?? (
-        <DefaultFallback
-          error={this.state.error}
-          componentStack={this.state.errorInfo?.componentStack ?? undefined}
-          onReset={this.handleReset}
-        />
+      return (
+        this.props.fallback ?? (
+          <DefaultFallback
+            error={this.state.error}
+            componentStack={this.state.errorInfo?.componentStack ?? undefined}
+            onReset={this.handleReset}
+          />
+        )
       );
     }
     return this.props.children;
@@ -58,62 +61,23 @@ function DefaultFallback({
   onReset: () => void;
 }) {
   return (
-    <div style={{
-      height: '100vh', display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      background: 'var(--canvas)', color: 'var(--text-primary)',
-      fontFamily: 'var(--font-ui)', padding: 40, gap: 16,
-    }}>
-      <div style={{ opacity: 0.3 }}><TriangleAlert size={48} /></div>
-      <h2 style={{ margin: 0, fontWeight: 600 }}>页面渲染错误</h2>
-      <p style={{
-        margin: 0, color: 'var(--text-secondary)', fontSize: 13,
-        maxWidth: 480, textAlign: 'center', lineHeight: 1.6,
-      }}>
-        {error.message}
-      </p>
-      <details open style={{ maxWidth: 520, width: '100%' }}>
-        <summary style={{
-          cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)',
-          marginBottom: 8,
-        }}>
-          完整错误堆栈
-        </summary>
-        <pre style={{
-          fontSize: 9, color: 'var(--error)', overflow: 'auto',
-          background: 'var(--surface)', padding: 12, borderRadius: 6,
-          border: '1px solid var(--border)', maxHeight: 120,
-          whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-        }}>
-          {error.stack}
-        </pre>
+    <div className={s.fallback}>
+      <div className={s.icon}>
+        <TriangleAlert size={48} />
+      </div>
+      <h2 className={s.heading}>页面渲染错误</h2>
+      <p className={s.errorText}>{error.message}</p>
+      <details open className={s.details}>
+        <summary className={s.summary}>完整错误堆栈</summary>
+        <pre className={s.pre}>{error.stack}</pre>
       </details>
       {componentStack && (
-        <details style={{ maxWidth: 520, width: '100%' }}>
-          <summary style={{
-            cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)',
-            marginBottom: 8,
-          }}>
-            组件堆栈
-          </summary>
-          <pre style={{
-            fontSize: 10, color: 'var(--text-muted)', overflow: 'auto',
-            background: 'var(--surface)', padding: 12, borderRadius: 6,
-            border: '1px solid var(--border)', maxHeight: 200,
-            whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-          }}>
-            {componentStack.trim()}
-          </pre>
+        <details className={s.details}>
+          <summary className={s.summary}>组件堆栈</summary>
+          <pre className={s.preMuted}>{componentStack.trim()}</pre>
         </details>
       )}
-      <button
-        onClick={onReset}
-        style={{
-          marginTop: 8, padding: '8px 24px', fontSize: 13,
-          background: 'var(--accent)', border: 'none', borderRadius: 6,
-          color: 'var(--accent-text)', cursor: 'pointer',
-        }}
-      >
+      <button onClick={onReset} className={s.retryBtn}>
         重试
       </button>
     </div>

@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import { cx } from '@/styles/cx';
+import s from './Segmented.module.css';
 
 export interface SegmentedOption<T extends string> {
   value: T;
@@ -16,8 +18,7 @@ interface SegmentedProps<T extends string> {
 /**
  * Segmented — 圆角分段选择器。
  *
- * 整条是一个圆角矩形；首/末按钮各带外侧圆角，使被选中项的高亮填满圆角区域
- * （不再出现「选中块是直角、容器是圆角」导致的角落留缝）。
+ * 整条是一个圆角矩形；首/末按钮各带外侧圆角，使被选中项的高亮填满圆角区域。
  */
 export default function Segmented<T extends string>({
   options,
@@ -25,20 +26,11 @@ export default function Segmented<T extends string>({
   onChange,
   size = 'md',
 }: SegmentedProps<T>) {
-  // 容器有 1px 边框，按钮外侧圆角需减 1px 才能与内容盒圆角严丝合缝
   const innerRadius = 'calc(var(--radius-inner) - 1px)';
   const pad = size === 'sm' ? '3px 10px' : '5px 14px';
-  const fontSize = size === 'sm' ? 11 : 11;
 
   return (
-    <div
-      style={{
-        display: 'inline-flex',
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius-inner)',
-        background: 'transparent',
-      }}
-    >
+    <div className={s.container}>
       {options.map((o, i) => {
         const active = o.value === value;
         const first = i === 0;
@@ -49,13 +41,9 @@ export default function Segmented<T extends string>({
             data-subtle
             type="button"
             onClick={() => onChange(o.value)}
+            className={cx(s.btn, active ? s.btnActive : s.btnInactive)}
             style={{
-              fontSize,
               padding: pad,
-              border: 'none',
-              cursor: 'pointer',
-              background: active ? 'var(--accent)' : 'transparent',
-              color: active ? 'var(--accent-text)' : 'var(--text-secondary)',
               borderTopLeftRadius: first ? innerRadius : 0,
               borderBottomLeftRadius: first ? innerRadius : 0,
               borderTopRightRadius: last ? innerRadius : 0,
