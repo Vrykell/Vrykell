@@ -1,0 +1,1 @@
+.handle{position:absolute;background:transparent;z-index:2;transition:border-color .15s ease}.handleX{top:0;bottom:0;width:3px;border-right:2px solid transparent}.handleXLeft{left:0;border-right:none;border-left:2px solid transparent}.handleY{left:0;right:0;top:-2px;height:8px;border-top:2px solid transparent}.handle:hover{border-color:var(--accent)}
