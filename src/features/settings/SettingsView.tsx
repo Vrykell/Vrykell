@@ -9,8 +9,8 @@ import {
   SquareTerminal,
 } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import Segmented from '@/components/Segmented';
-import { useToastStore } from '@/components/Toast';
+import Segmented from '@/components/ui/Segmented/Segmented';
+import { useToastStore } from '@/components/ui/Toast/Toast';
 import {
   clearSessionGrants,
   TOOL_NAMES,

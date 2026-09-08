@@ -12,8 +12,10 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useToastStore } from '@/components/Toast';
-import { IconBtn } from '@/components/UiBtn';
+import { IconBtn } from '@/components/ui/Button/Button';
+import ContextMenu, { type ContextMenuItem } from '@/components/ui/ContextMenu/ContextMenu';
+import NewTabModal from '@/components/ui/NewTabModal/NewTabModal';
+import { useToastStore } from '@/components/ui/Toast/Toast';
 import { regenerateTitle } from '@/features/agent/title';
 import { shellTypeLabel } from '@/services/tauri/shells';
 import { cx } from '@/shared/utils/cx';
@@ -25,8 +27,6 @@ import {
   terminalsOf,
   useWorkspaceStore,
 } from '@/store/workspace';
-import ContextMenu, { type ContextMenuItem } from './ContextMenu';
-import NewTabModal from './NewTabModal';
 import s from './PanelTabs.module.css';
 
 type DropTarget =

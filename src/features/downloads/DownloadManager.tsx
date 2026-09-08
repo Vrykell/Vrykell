@@ -1,9 +1,9 @@
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { ArrowLeft, FolderOpen, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import ConfirmDialog from '@/components/ConfirmDialog';
-import { useToastStore } from '@/components/Toast';
-import { fmtSize, IconBtn } from '@/components/UiBtn';
+import { fmtSize, IconBtn } from '@/components/ui/Button/Button';
+import ConfirmDialog from '@/components/ui/ConfirmDialog/ConfirmDialog';
+import { useToastStore } from '@/components/ui/Toast/Toast';
 import { type DownloadEntry, downloadsClear, downloadsList } from '@/features/downloads/api';
 import { fileIcon } from '@/features/files/fileIcon';
 

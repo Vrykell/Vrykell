@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
-import CommandPalette from '@/components/CommandPalette';
-import NewTabModal from '@/components/NewTabModal';
-import SidePanel from '@/components/SidePanel';
-import ToastContainer from '@/components/Toast';
-import TopDock from '@/components/TopDock';
+import SidePanel from '@/components/layout/SidePanel/SidePanel';
+import TopDock from '@/components/layout/TopDock/TopDock';
+import CommandPalette from '@/components/ui/CommandPalette/CommandPalette';
+import NewTabModal from '@/components/ui/NewTabModal/NewTabModal';
+import ToastContainer from '@/components/ui/Toast/Toast';
 import { agentStream } from '@/features/agent/agentStream';
 import { initScheduleRunner } from '@/features/agent/scheduleRunner';
 import { initAutoTitle } from '@/features/agent/title';

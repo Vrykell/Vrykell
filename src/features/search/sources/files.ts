@@ -1,5 +1,5 @@
 import { FileText } from 'lucide-react';
-import { fmtSize } from '@/components/UiBtn';
+import { fmtSize } from '@/components/ui/Button/Button';
 import { useWorkspaceDirsStore } from '@/features/files/workspaceDirs';
 import { registerSource } from '@/features/search/registry';
 import type { FileResultData, SearchResult } from '@/features/search/types';

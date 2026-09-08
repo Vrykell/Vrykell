@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { fmtDuration } from '@/components/UiBtn';
+import { fmtDuration } from '@/components/ui/Button/Button';
 import type { TermBlock } from '@/features/terminal/pipeline/termBlock';
 import { clearSessionBlocks } from '@/features/terminal/useTerminalSession';
 import { ptyWrite } from '@/services/tauri/pty';

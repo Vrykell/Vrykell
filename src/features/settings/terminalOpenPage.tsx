@@ -2,7 +2,7 @@
  * terminalOpenPage — 各 Shell 打开模式设置页。
  */
 
-import Segmented from '@/components/Segmented';
+import Segmented from '@/components/ui/Segmented/Segmented';
 import { useAgentSettings } from '@/features/agent/agentSettings';
 import { Field } from '@/features/settings/ui';
 import type { ShellType } from '@/services/tauri/shells';

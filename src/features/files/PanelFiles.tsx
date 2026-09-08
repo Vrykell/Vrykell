@@ -9,10 +9,10 @@ import {
   Star,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import ConfirmDialog from '@/components/ConfirmDialog';
-import ContextMenu, { type ContextMenuItem } from '@/components/ContextMenu';
-import { useToastStore } from '@/components/Toast';
-import { fmtSize, IconBtn } from '@/components/UiBtn';
+import { fmtSize, IconBtn } from '@/components/ui/Button/Button';
+import ConfirmDialog from '@/components/ui/ConfirmDialog/ConfirmDialog';
+import ContextMenu, { type ContextMenuItem } from '@/components/ui/ContextMenu/ContextMenu';
+import { useToastStore } from '@/components/ui/Toast/Toast';
 import DownloadManager from '@/features/downloads/DownloadManager';
 import { fileIcon } from '@/features/files/fileIcon';
 import { openFile } from '@/features/files/fileOpen';

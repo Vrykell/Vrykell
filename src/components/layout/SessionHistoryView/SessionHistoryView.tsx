@@ -16,8 +16,8 @@ import {
   isSshSession,
   type SessionDateFilter,
   type SessionTypeFilter,
-} from '@/components/sessionFilter';
-import { useToastStore } from '@/components/Toast';
+} from '@/components/layout/SessionHistoryView/sessionFilter';
+import { useToastStore } from '@/components/ui/Toast/Toast';
 import type { BackendGroupEntry, BackendSessionEntry } from '@/features/search/types';
 import { groupDeleteWithSessions, groupRestore, groupsList } from '@/services/api/group';
 import { listSessions } from '@/services/api/session';

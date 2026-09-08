@@ -2,7 +2,7 @@
  * aiBehaviorPage — AI 行为设置（全局默认 + 每模型覆盖）。
  */
 import { useState } from 'react';
-import Segmented from '@/components/Segmented';
+import Segmented from '@/components/ui/Segmented/Segmented';
 import {
   type AgentSettings,
   type ModelBehaviorSettings,
