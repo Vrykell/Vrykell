@@ -10,9 +10,9 @@ vi.mock('../../lib/pty', () => ({
 
 import { agentControl } from '@/agent/agentControl';
 import { runCommandAndWait } from '@/agent/tools/runCommand';
-import { useBlockStore } from '@/stores/blocks';
-import { useTerminalStore } from '@/stores/terminal';
-import { useWorkspaceStore } from '@/stores/workspace';
+import { useBlockStore } from '@/store/blocks';
+import { useTerminalStore } from '@/store/terminal';
+import { useWorkspaceStore } from '@/store/workspace';
 import type { TermBlock } from '@/terminal/pipeline/termBlock';
 
 const initialBlocks = useBlockStore.getState();

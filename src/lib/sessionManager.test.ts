@@ -7,9 +7,9 @@ const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import * as sessionManager from '@/lib/sessionManager';
-import { useBlockStore } from '@/stores/blocks';
-import { useChatStore } from '@/stores/chat';
-import { isSessionTab, useWorkspaceStore } from '@/stores/workspace';
+import { useBlockStore } from '@/store/blocks';
+import { useChatStore } from '@/store/chat';
+import { isSessionTab, useWorkspaceStore } from '@/store/workspace';
 
 const wsInitial = useWorkspaceStore.getState();
 

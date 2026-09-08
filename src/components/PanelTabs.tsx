@@ -23,7 +23,7 @@ import {
   type TabGroup,
   terminalsOf,
   useWorkspaceStore,
-} from '@/stores/workspace';
+} from '@/store/workspace';
 import { cx } from '@/styles/cx';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 import NewTabModal from './NewTabModal';

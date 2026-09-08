@@ -17,8 +17,8 @@ import { z } from 'zod';
 import { gate, type ToolContext } from '@/agent/permissions';
 import { DESC_READ_TERMINAL, DESC_TERMINAL_KEYS } from '@/agent/toolTexts';
 import { ptyWrite } from '@/lib/pty';
-import { useBlockStore } from '@/stores/blocks';
-import { getFocusedTerminalId, getTerminalScreen, useTerminalStore } from '@/stores/terminal';
+import { useBlockStore } from '@/store/blocks';
+import { getFocusedTerminalId, getTerminalScreen, useTerminalStore } from '@/store/terminal';
 
 const BLOCK_OUTPUT_CAP = 2000;
 const BLOCK_COUNT = 4;

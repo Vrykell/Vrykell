@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
 import { countLeaves, leaves } from '@/lib/windowLayout';
-import { useBlockStore } from '@/stores/blocks';
-import { getFocusedTerminalId, termInstances, useTerminalStore } from '@/stores/terminal';
-import { useUiStore } from '@/stores/ui';
-import { isSessionTab, useWorkspaceStore } from '@/stores/workspace';
+import { useBlockStore } from '@/store/blocks';
+import { getFocusedTerminalId, termInstances, useTerminalStore } from '@/store/terminal';
+import { useUiStore } from '@/store/ui';
+import { isSessionTab, useWorkspaceStore } from '@/store/workspace';
 
 /**
  * 全局快捷键：

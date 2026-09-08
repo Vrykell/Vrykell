@@ -2,7 +2,7 @@ import { Folder, type LucideIcon, Server, Sparkles, SquareStack } from 'lucide-r
 import { create } from 'zustand';
 import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@/lib/errorHandler';
 import { MIN_PANE_SIZE, minTerminalWidth } from '@/lib/windowLayout';
-import { isSessionTab, useWorkspaceStore } from '@/stores/workspace';
+import { isSessionTab, useWorkspaceStore } from '@/store/workspace';
 
 // ── 面板定义（可扩展）──
 

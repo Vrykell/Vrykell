@@ -41,9 +41,9 @@ import { useToastStore } from '@/components/Toast';
 import { useAiConfigStore } from '@/lib/ai';
 import { shellTypeLabel } from '@/lib/shells';
 import { firstLeaf, leaves as layoutLeaves } from '@/lib/windowLayout';
-import { useActiveMessages, useChatStore } from '@/stores/chat';
-import { useTerminalStore } from '@/stores/terminal';
-import { isSessionTab, useWorkspaceStore } from '@/stores/workspace';
+import { useActiveMessages, useChatStore } from '@/store/chat';
+import { useTerminalStore } from '@/store/terminal';
+import { isSessionTab, useWorkspaceStore } from '@/store/workspace';
 import { CurrentDir } from '@/terminal/InputEditor';
 import ShellIndicator from '@/terminal/ShellIndicator';
 

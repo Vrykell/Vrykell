@@ -6,8 +6,8 @@ import { IconBtn } from '@/components/UiBtn';
 import type { SshConnection } from '@/ssh/api';
 import SshFormModal from '@/ssh/SshFormModal';
 import { ensureSshLoaded, useSshStore } from '@/ssh/store';
-import { useDockStore } from '@/stores/dock';
-import { useWorkspaceStore } from '@/stores/workspace';
+import { useDockStore } from '@/store/dock';
+import { useWorkspaceStore } from '@/store/workspace';
 
 /**
  * PanelSsh — SSH 远程连接管理侧栏。

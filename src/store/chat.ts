@@ -10,7 +10,7 @@ import {
 } from '@/agent/messageParts';
 import { denyAllPending } from '@/agent/permissions';
 import { appendChatMessage, deleteChatMessage } from '@/api/session';
-import { useWorkspaceStore } from '@/stores/workspace';
+import { useWorkspaceStore } from '@/store/workspace';
 
 export interface ChatMessage {
   id: string;

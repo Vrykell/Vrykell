@@ -15,10 +15,10 @@ import * as sessionManager from '@/lib/sessionManager';
 import { MIN_PANE_SIZE, minTerminalWidth, type TerminalSpec } from '@/lib/windowLayout';
 import GlobalSearch from '@/search/GlobalSearch';
 import type { BackendSessionEntry } from '@/search/types';
-import { setDefaultStream } from '@/stores/chat';
-import { useHistoryStore } from '@/stores/history';
-import { useUiStore } from '@/stores/ui';
-import { isSessionTab, serializeSession, useWorkspaceStore } from '@/stores/workspace';
+import { setDefaultStream } from '@/store/chat';
+import { useHistoryStore } from '@/store/history';
+import { useUiStore } from '@/store/ui';
+import { isSessionTab, serializeSession, useWorkspaceStore } from '@/store/workspace';
 import TerminalView from '@/terminal/TerminalView';
 import { useTerminalThemeStore } from '@/theme/terminalTheme';
 import '@/search/init'; // 触发所有搜索源自动注册

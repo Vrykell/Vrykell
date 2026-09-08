@@ -4,9 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import DockButton from '@/components/DockButton';
 import { ToolbarBtn } from '@/components/UiBtn';
 import { isMacOS } from '@/lib/platform';
-import { type DockSide, PANEL_DEFS, useDockStore } from '@/stores/dock';
-import { useUiStore } from '@/stores/ui';
-import { isSessionTab, useWorkspaceStore } from '@/stores/workspace';
+import { type DockSide, PANEL_DEFS, useDockStore } from '@/store/dock';
+import { useUiStore } from '@/store/ui';
+import { isSessionTab, useWorkspaceStore } from '@/store/workspace';
 import s from './TopDock.module.css';
 
 /** 按 clientX 判定落在哪个 zone */

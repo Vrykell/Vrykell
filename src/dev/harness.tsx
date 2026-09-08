@@ -14,9 +14,9 @@ import { createRoot } from 'react-dom/client';
 import '@/theme.css';
 import PanelChat from '@/chat/PanelChat';
 import { firstLeaf } from '@/lib/windowLayout';
-import { useChatStore } from '@/stores/chat';
-import { useTerminalStore } from '@/stores/terminal';
-import { isSessionTab, useWorkspaceStore } from '@/stores/workspace';
+import { useChatStore } from '@/store/chat';
+import { useTerminalStore } from '@/store/terminal';
+import { isSessionTab, useWorkspaceStore } from '@/store/workspace';
 import InputEditor from '@/terminal/InputEditor';
 
 // ── 最小 store 状态：默认 session tab 已存在，补上 pane 会话/场景/聚焦 ──

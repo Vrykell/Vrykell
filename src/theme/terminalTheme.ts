@@ -9,7 +9,7 @@
 
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { create } from 'zustand';
-import { termInstances } from '@/stores/terminal';
+import { termInstances } from '@/store/terminal';
 import { applyTheme, getCurrentTheme, setThemeOverrides, type ThemeMode } from '@/theme/tokens';
 
 export interface TerminalThemeConfig {

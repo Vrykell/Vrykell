@@ -18,8 +18,8 @@ import {
   sshPaneIdFor,
   useRemotePathStore,
 } from '@/ssh/remotePath';
-import { useTerminalStore } from '@/stores/terminal';
-import { useWorkspaceStore } from '@/stores/workspace';
+import { useTerminalStore } from '@/store/terminal';
+import { useWorkspaceStore } from '@/store/workspace';
 
 /** 待二次确认的操作：重命名（携带新名）或删除。 */
 type RemoteConfirm =

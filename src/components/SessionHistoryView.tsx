@@ -22,7 +22,7 @@ import {
 import { useToastStore } from '@/components/Toast';
 import * as sessionManager from '@/lib/sessionManager';
 import type { BackendGroupEntry, BackendSessionEntry } from '@/search/types';
-import { useWorkspaceStore } from '@/stores/workspace';
+import { useWorkspaceStore } from '@/store/workspace';
 
 const TYPE_OPTIONS: { value: SessionTypeFilter; label: string }[] = [
   { value: 'all', label: '全部' },

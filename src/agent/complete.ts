@@ -16,7 +16,7 @@ import { generateText } from 'ai';
 import { useAgentSettings } from '@/agent/agentSettings';
 import { createChatModel } from '@/agent/provider';
 import { activeModelProfile, isApiKeyConfigured } from '@/lib/ai';
-import { useHistoryStore } from '@/stores/history';
+import { useHistoryStore } from '@/store/history';
 
 export interface CompleteOptions {
   cwd?: string;

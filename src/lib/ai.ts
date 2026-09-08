@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { create } from 'zustand';
 import type { ProviderKind } from '@/agent/provider';
-import type { StreamFn } from '@/stores/chat';
+import type { StreamFn } from '@/store/chat';
 
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_MODEL = 'gpt-4o-mini';

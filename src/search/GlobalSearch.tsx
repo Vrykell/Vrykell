@@ -15,10 +15,10 @@ import type {
   SearchResult,
   SessionResultData,
 } from '@/search/types';
-import { useSearchHighlightStore } from '@/stores/searchHighlight';
-import { useSearchHistoryStore } from '@/stores/searchHistory';
-import { useTerminalStore } from '@/stores/terminal';
-import { useWorkspaceStore } from '@/stores/workspace';
+import { useSearchHighlightStore } from '@/store/searchHighlight';
+import { useSearchHistoryStore } from '@/store/searchHistory';
+import { useTerminalStore } from '@/store/terminal';
+import { useWorkspaceStore } from '@/store/workspace';
 
 interface Props {
   open: boolean;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mergeFlow, toExchanges } from '@/chat/exchanges';
-import type { ChatMessage } from '@/stores/chat';
+import type { ChatMessage } from '@/store/chat';
 import type { TermBlock } from '@/terminal/pipeline/termBlock';
 
 const msg = (
