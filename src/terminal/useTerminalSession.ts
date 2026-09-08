@@ -12,10 +12,17 @@ import { Terminal } from '@xterm/xterm';
 import { useEffect, useRef } from 'react';
 import { agentControl } from '@/agent/agentControl';
 import { defaultOpenModeForShell } from '@/agent/agentSettings';
-import { onPtyExit, onPtyOutput, ptyClose, ptyResize, ptySpawn, ptyWrite } from '@/lib/pty';
-import * as sessionManager from '@/lib/sessionManager';
-import { getCellMetrics } from '@/lib/termMetrics';
-import { leaves as layoutLeaves } from '@/lib/windowLayout';
+import {
+  onPtyExit,
+  onPtyOutput,
+  ptyClose,
+  ptyResize,
+  ptySpawn,
+  ptyWrite,
+} from '@/services/tauri/pty';
+import * as sessionManager from '@/services/tauri/sessionManager';
+import { getCellMetrics } from '@/services/tauri/termMetrics';
+import { leaves as layoutLeaves } from '@/services/tauri/windowLayout';
 import { useBlockStore } from '@/store/blocks';
 import { useHistoryStore } from '@/store/history';
 import { registerTerminal, unregisterTerminal, useTerminalStore } from '@/store/terminal';

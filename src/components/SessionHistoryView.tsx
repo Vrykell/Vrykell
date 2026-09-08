@@ -11,8 +11,6 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { groupDeleteWithSessions, groupRestore, groupsList } from '@/api/group';
-import { listSessions } from '@/api/session';
 import {
   filterSessions,
   isSshSession,
@@ -20,8 +18,10 @@ import {
   type SessionTypeFilter,
 } from '@/components/sessionFilter';
 import { useToastStore } from '@/components/Toast';
-import * as sessionManager from '@/lib/sessionManager';
 import type { BackendGroupEntry, BackendSessionEntry } from '@/search/types';
+import { groupDeleteWithSessions, groupRestore, groupsList } from '@/services/api/group';
+import { listSessions } from '@/services/api/session';
+import * as sessionManager from '@/services/tauri/sessionManager';
 import { useWorkspaceStore } from '@/store/workspace';
 
 const TYPE_OPTIONS: { value: SessionTypeFilter; label: string }[] = [

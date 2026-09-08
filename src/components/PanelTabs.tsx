@@ -15,7 +15,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { regenerateTitle } from '@/agent/title';
 import { useToastStore } from '@/components/Toast';
 import { IconBtn } from '@/components/UiBtn';
-import { shellTypeLabel } from '@/lib/shells';
+import { shellTypeLabel } from '@/services/tauri/shells';
 import {
   firstTerminalOf,
   isSessionTab,

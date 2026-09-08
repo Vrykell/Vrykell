@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { leaf } from '@/lib/windowLayout';
+import { leaf } from '@/services/tauri/windowLayout';
 import { useTerminalStore } from '@/store/terminal';
 import {
   firstTerminalOf,

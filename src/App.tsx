@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { agentStream } from '@/agent/agentStream';
 import { initScheduleRunner } from '@/agent/scheduleRunner';
 import { initAutoTitle } from '@/agent/title';
-import { listSessions } from '@/api/session';
 import CommandPalette from '@/components/CommandPalette';
 import NewTabModal from '@/components/NewTabModal';
 import SidePanel from '@/components/SidePanel';
@@ -10,17 +9,18 @@ import ToastContainer from '@/components/Toast';
 import TopDock from '@/components/TopDock';
 import { useWorkspaceDirsStore } from '@/files/workspaceDirs';
 import { useGlobalShortcuts } from '@/hooks/useGlobalShortcuts';
-import { refreshAiConfig } from '@/lib/ai';
-import * as sessionManager from '@/lib/sessionManager';
-import { MIN_PANE_SIZE, minTerminalWidth, type TerminalSpec } from '@/lib/windowLayout';
 import GlobalSearch from '@/search/GlobalSearch';
 import type { BackendSessionEntry } from '@/search/types';
+import { listSessions } from '@/services/api/session';
+import { refreshAiConfig } from '@/services/tauri/ai';
+import * as sessionManager from '@/services/tauri/sessionManager';
+import { MIN_PANE_SIZE, minTerminalWidth, type TerminalSpec } from '@/services/tauri/windowLayout';
+import { useTerminalThemeStore } from '@/services/theme/terminalTheme';
 import { setDefaultStream } from '@/store/chat';
 import { useHistoryStore } from '@/store/history';
 import { useUiStore } from '@/store/ui';
 import { isSessionTab, serializeSession, useWorkspaceStore } from '@/store/workspace';
 import TerminalView from '@/terminal/TerminalView';
-import { useTerminalThemeStore } from '@/theme/terminalTheme';
 import '@/search/init'; // 触发所有搜索源自动注册
 
 /**

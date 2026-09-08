@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import * as sessionManager from '@/lib/sessionManager';
-import { leaves } from '@/lib/windowLayout';
+import * as sessionManager from '@/services/tauri/sessionManager';
+import { leaves } from '@/services/tauri/windowLayout';
 import { useBlockStore } from '@/store/blocks';
 import { firstTerminalOf, isSessionTab, useWorkspaceStore } from '@/store/workspace';
 

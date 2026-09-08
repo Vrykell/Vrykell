@@ -1,7 +1,7 @@
 import type { Terminal } from '@xterm/xterm';
 import { create } from 'zustand';
-import { ptyWrite } from '@/lib/pty';
-import { firstLeaf, leaves as layoutLeaves } from '@/lib/windowLayout';
+import { ptyWrite } from '@/services/tauri/pty';
+import { firstLeaf, leaves as layoutLeaves } from '@/services/tauri/windowLayout';
 import { isSessionTab, useWorkspaceStore } from '@/store/workspace';
 import type { Scene } from '@/terminal/pipeline/sessionController';
 

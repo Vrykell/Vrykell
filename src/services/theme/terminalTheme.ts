@@ -9,8 +9,13 @@
 
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { create } from 'zustand';
+import {
+  applyTheme,
+  getCurrentTheme,
+  setThemeOverrides,
+  type ThemeMode,
+} from '@/services/theme/tokens';
 import { termInstances } from '@/store/terminal';
-import { applyTheme, getCurrentTheme, setThemeOverrides, type ThemeMode } from '@/theme/tokens';
 
 export interface TerminalThemeConfig {
   /** 应用整体不透明度 0.05..=1.0（1 = 完全不透明） */

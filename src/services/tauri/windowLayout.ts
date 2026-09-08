@@ -133,7 +133,11 @@ export function splitLeaf(
 }
 
 /** 替换某个叶子里的终端。 */
-export function replaceLeaf(root: WindowLayout, leafId: string, newTerminal: TerminalSpec): WindowLayout {
+export function replaceLeaf(
+  root: WindowLayout,
+  leafId: string,
+  newTerminal: TerminalSpec,
+): WindowLayout {
   if (root.type === 'leaf') {
     return root.terminal.id === leafId ? leaf(newTerminal) : root;
   }
@@ -164,12 +168,22 @@ export function leafRects(
   if (layout.dir === 'row') {
     return [
       ...leafRects(layout.first, { x: rect.x, y: rect.y, w: rect.w * r, h: rect.h }),
-      ...leafRects(layout.second, { x: rect.x + rect.w * r, y: rect.y, w: rect.w * (1 - r), h: rect.h }),
+      ...leafRects(layout.second, {
+        x: rect.x + rect.w * r,
+        y: rect.y,
+        w: rect.w * (1 - r),
+        h: rect.h,
+      }),
     ];
   }
   return [
     ...leafRects(layout.first, { x: rect.x, y: rect.y, w: rect.w, h: rect.h * r }),
-    ...leafRects(layout.second, { x: rect.x, y: rect.y + rect.h * r, w: rect.w, h: rect.h * (1 - r) }),
+    ...leafRects(layout.second, {
+      x: rect.x,
+      y: rect.y + rect.h * r,
+      w: rect.w,
+      h: rect.h * (1 - r),
+    }),
   ];
 }
 
@@ -184,12 +198,14 @@ export function dropTargets(layout: WindowLayout): DropTarget[] {
       const rect = rectMap.get(node.terminal.id)!;
       const dirs: SplitDir[] = depth === 0 ? ['row', 'col'] : [perpendicular(parentDir!)];
       for (const dir of dirs) {
-        const first = dir === 'row'
-          ? { x: rect.x, y: rect.y, w: rect.w / 2, h: rect.h }
-          : { x: rect.x, y: rect.y, w: rect.w, h: rect.h / 2 };
-        const second = dir === 'row'
-          ? { x: rect.x + rect.w / 2, y: rect.y, w: rect.w / 2, h: rect.h }
-          : { x: rect.x, y: rect.y + rect.h / 2, w: rect.w, h: rect.h / 2 };
+        const first =
+          dir === 'row'
+            ? { x: rect.x, y: rect.y, w: rect.w / 2, h: rect.h }
+            : { x: rect.x, y: rect.y, w: rect.w, h: rect.h / 2 };
+        const second =
+          dir === 'row'
+            ? { x: rect.x + rect.w / 2, y: rect.y, w: rect.w / 2, h: rect.h }
+            : { x: rect.x, y: rect.y + rect.h / 2, w: rect.w, h: rect.h / 2 };
         targets.push({ leafId: node.terminal.id, dir, position: 'first', rect: first });
         targets.push({ leafId: node.terminal.id, dir, position: 'second', rect: second });
       }
@@ -215,13 +231,20 @@ export function moveTargets(layout: WindowLayout, dragId: string): DropTarget[] 
   for (const { terminalId, rect } of leafRects(remaining)) {
     for (const dir of ['row', 'col'] as SplitDir[]) {
       for (const position of ['first', 'second'] as const) {
-        const first = dir === 'row'
-          ? { x: rect.x, y: rect.y, w: rect.w / 2, h: rect.h }
-          : { x: rect.x, y: rect.y, w: rect.w, h: rect.h / 2 };
-        const second = dir === 'row'
-          ? { x: rect.x + rect.w / 2, y: rect.y, w: rect.w / 2, h: rect.h }
-          : { x: rect.x, y: rect.y + rect.h / 2, w: rect.w, h: rect.h / 2 };
-        targets.push({ leafId: terminalId, dir, position, rect: position === 'first' ? first : second });
+        const first =
+          dir === 'row'
+            ? { x: rect.x, y: rect.y, w: rect.w / 2, h: rect.h }
+            : { x: rect.x, y: rect.y, w: rect.w, h: rect.h / 2 };
+        const second =
+          dir === 'row'
+            ? { x: rect.x + rect.w / 2, y: rect.y, w: rect.w / 2, h: rect.h }
+            : { x: rect.x, y: rect.y + rect.h / 2, w: rect.w, h: rect.h / 2 };
+        targets.push({
+          leafId: terminalId,
+          dir,
+          position,
+          rect: position === 'first' ? first : second,
+        });
       }
     }
   }
@@ -236,19 +259,21 @@ export function dividers(layout: WindowLayout): Divider[] {
     const r = Math.max(0, Math.min(1, node.ratio));
     const aId = firstLeaf(node.first).id;
     const bId = firstLeaf(node.second).id;
-    const line: Rect = node.dir === 'row'
-      ? { x: rect.x + rect.w * r, y: rect.y, w: 0, h: rect.h }
-      : { x: rect.x, y: rect.y + rect.h * r, w: rect.w, h: 0 };
+    const line: Rect =
+      node.dir === 'row'
+        ? { x: rect.x + rect.w * r, y: rect.y, w: 0, h: rect.h }
+        : { x: rect.x, y: rect.y + rect.h * r, w: rect.w, h: 0 };
     list.push({ dir: node.dir, ratio: node.ratio, aId, bId, rect: line, region: rect });
-    const r2 = node.dir === 'row'
-      ? [
-          { x: rect.x, y: rect.y, w: rect.w * r, h: rect.h },
-          { x: rect.x + rect.w * r, y: rect.y, w: rect.w * (1 - r), h: rect.h },
-        ]
-      : [
-          { x: rect.x, y: rect.y, w: rect.w, h: rect.h * r },
-          { x: rect.x, y: rect.y + rect.h * r, w: rect.w, h: rect.h * (1 - r) },
-        ];
+    const r2 =
+      node.dir === 'row'
+        ? [
+            { x: rect.x, y: rect.y, w: rect.w * r, h: rect.h },
+            { x: rect.x + rect.w * r, y: rect.y, w: rect.w * (1 - r), h: rect.h },
+          ]
+        : [
+            { x: rect.x, y: rect.y, w: rect.w, h: rect.h * r },
+            { x: rect.x, y: rect.y + rect.h * r, w: rect.w, h: rect.h * (1 - r) },
+          ];
     walk(node.first, r2[0]!);
     walk(node.second, r2[1]!);
   };
@@ -257,7 +282,12 @@ export function dividers(layout: WindowLayout): Divider[] {
 }
 
 /** 调整分隔线比例（用 aId/bId 定位 split 节点）。 */
-export function setRatio(root: WindowLayout, aId: string, bId: string, ratio: number): WindowLayout {
+export function setRatio(
+  root: WindowLayout,
+  aId: string,
+  bId: string,
+  ratio: number,
+): WindowLayout {
   if (root.type === 'leaf') return root;
   if (firstLeaf(root.first).id === aId && firstLeaf(root.second).id === bId) {
     return { ...root, ratio: Math.max(0.1, Math.min(0.9, ratio)) };
@@ -291,15 +321,21 @@ export function collectLayoutCells(layout: WindowLayout): LayoutCell[] {
     const r = Math.max(0.1, Math.min(0.9, node.ratio));
     const firstInner = node.dir === 'row' ? { ...inner, right: true } : { ...inner, bottom: true };
     const secondInner = node.dir === 'row' ? { ...inner, left: true } : { ...inner, top: true };
-    const firstRect: Rect = node.dir === 'row'
-      ? { x: rect.x, y: rect.y, w: rect.w * r, h: rect.h }
-      : { x: rect.x, y: rect.y, w: rect.w, h: rect.h * r };
-    const secondRect: Rect = node.dir === 'row'
-      ? { x: rect.x + rect.w * r, y: rect.y, w: rect.w * (1 - r), h: rect.h }
-      : { x: rect.x, y: rect.y + rect.h * r, w: rect.w, h: rect.h * (1 - r) };
+    const firstRect: Rect =
+      node.dir === 'row'
+        ? { x: rect.x, y: rect.y, w: rect.w * r, h: rect.h }
+        : { x: rect.x, y: rect.y, w: rect.w, h: rect.h * r };
+    const secondRect: Rect =
+      node.dir === 'row'
+        ? { x: rect.x + rect.w * r, y: rect.y, w: rect.w * (1 - r), h: rect.h }
+        : { x: rect.x, y: rect.y + rect.h * r, w: rect.w, h: rect.h * (1 - r) };
     walk(node.first, firstRect, firstInner);
     walk(node.second, secondRect, secondInner);
   };
-  walk(layout, { x: 0, y: 0, w: 1, h: 1 }, { left: false, right: false, top: false, bottom: false });
+  walk(
+    layout,
+    { x: 0, y: 0, w: 1, h: 1 },
+    { left: false, right: false, top: false, bottom: false },
+  );
   return out;
 }

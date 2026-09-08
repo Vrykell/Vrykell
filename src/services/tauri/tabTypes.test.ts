@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { ShellOption } from '@/lib/shells';
+import type { ShellOption } from '@/services/tauri/shells';
 import {
   buildNewTabOptions,
   filterNewTabOptions,
   loadRecentOpen,
   saveRecentOpen,
   touchRecentOpen,
-} from '@/lib/tabTypes';
+} from '@/services/tauri/tabTypes';
 import type { SshConnection } from '@/ssh/api';
 
 const shells: ShellOption[] = [

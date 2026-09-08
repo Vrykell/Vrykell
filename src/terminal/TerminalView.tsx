@@ -12,8 +12,8 @@ import { defaultOpenModeForShell } from '@/agent/agentSettings';
 import ContextMenu from '@/components/ContextMenu';
 import SessionHistoryView from '@/components/SessionHistoryView';
 import { useToastStore } from '@/components/Toast';
-import { ESCALATE_WINDOW_MS, killForeground } from '@/lib/killForeground';
-import { ptyWrite } from '@/lib/pty';
+import { ESCALATE_WINDOW_MS, killForeground } from '@/services/tauri/killForeground';
+import { ptyWrite } from '@/services/tauri/pty';
 import {
   collectLayoutCells,
   DIVIDER_SIZE,
@@ -31,7 +31,7 @@ import {
   splitLeaf,
   type TerminalSpec,
   type WindowLayout,
-} from '@/lib/windowLayout';
+} from '@/services/tauri/windowLayout';
 import SettingsView from '@/settings/SettingsView';
 import { selectBlocks, useBlockStore } from '@/store/blocks';
 import { usePaneMessages } from '@/store/chat';

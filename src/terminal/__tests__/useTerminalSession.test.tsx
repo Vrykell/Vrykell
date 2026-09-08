@@ -86,8 +86,8 @@ globalThis.ResizeObserver = class {
   disconnect() {}
 } as unknown as typeof ResizeObserver;
 
-import { onPtyOutput as mockedOnPtyOutput, ptySpawn as mockedPtySpawn } from '@/lib/pty';
-import { leaf } from '@/lib/windowLayout';
+import { onPtyOutput as mockedOnPtyOutput, ptySpawn as mockedPtySpawn } from '@/services/tauri/pty';
+import { leaf } from '@/services/tauri/windowLayout';
 import { useBlockStore } from '@/store/blocks';
 import { useTerminalStore } from '@/store/terminal';
 import { useWorkspaceStore } from '@/store/workspace';

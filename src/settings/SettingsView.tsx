@@ -19,7 +19,12 @@ import {
 import Segmented from '@/components/Segmented';
 import { useToastStore } from '@/components/Toast';
 import { type FileOpenConfig, loadConfig, saveConfig } from '@/files/fileOpen';
-import { clearTavilyKey, refreshAiConfig, setTavilyKey, useAiConfigStore } from '@/lib/ai';
+import {
+  clearTavilyKey,
+  refreshAiConfig,
+  setTavilyKey,
+  useAiConfigStore,
+} from '@/services/tauri/ai';
 import { AgentsSettings, MemorySettings, SchedulesSettings } from '@/settings/AgentExtrasSettings';
 import { AiBehaviorPage } from '@/settings/aiBehaviorPage';
 import { AiModelPage } from '@/settings/aiModelPage';

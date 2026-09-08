@@ -3,7 +3,7 @@ import { Search, Settings, Terminal } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import DockButton from '@/components/DockButton';
 import { ToolbarBtn } from '@/components/UiBtn';
-import { isMacOS } from '@/lib/platform';
+import { isMacOS } from '@/services/tauri/platform';
 import { type DockSide, PANEL_DEFS, useDockStore } from '@/store/dock';
 import { useUiStore } from '@/store/ui';
 import { isSessionTab, useWorkspaceStore } from '@/store/workspace';

@@ -7,6 +7,7 @@
 
 import { deserializeAttachments } from '@/agent/attachments';
 import { deserializeParts } from '@/agent/messageParts';
+import type { BackendBlockEntry, BackendSessionEntry } from '@/search/types';
 import {
   archiveSession,
   createSession,
@@ -20,10 +21,9 @@ import {
   updateSessionCwd,
   updateSessionPayload,
   updateSessionTitle,
-} from '@/api/session';
-import { sanitizeOutputHtml } from '@/lib/sanitizeHtml';
-import { leaf, type WindowLayout } from '@/lib/windowLayout';
-import type { BackendBlockEntry, BackendSessionEntry } from '@/search/types';
+} from '@/services/api/session';
+import { sanitizeOutputHtml } from '@/services/tauri/sanitizeHtml';
+import { leaf, type WindowLayout } from '@/services/tauri/windowLayout';
 import { useBlockStore } from '@/store/blocks';
 import { useChatStore } from '@/store/chat';
 import { type Tab, useWorkspaceStore } from '@/store/workspace';

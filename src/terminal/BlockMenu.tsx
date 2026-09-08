@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { fmtDuration } from '@/components/UiBtn';
-import { ptyWrite } from '@/lib/pty';
+import { ptyWrite } from '@/services/tauri/pty';
 import { useBlockStore } from '@/store/blocks';
 import { useChatStore } from '@/store/chat';
 import { useTerminalStore } from '@/store/terminal';

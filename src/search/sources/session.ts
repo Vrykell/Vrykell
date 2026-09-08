@@ -1,7 +1,7 @@
 import { Monitor } from 'lucide-react';
-import { searchSessions } from '@/api/search';
 import { registerSource } from '@/search/registry';
 import type { BackendSessionEntry, SearchResult } from '@/search/types';
+import { searchSessions } from '@/services/api/search';
 
 registerSource({
   id: 'session',

@@ -15,7 +15,7 @@
 import { generateText } from 'ai';
 import { useAgentSettings } from '@/agent/agentSettings';
 import { createChatModel } from '@/agent/provider';
-import { activeModelProfile, isApiKeyConfigured } from '@/lib/ai';
+import { activeModelProfile, isApiKeyConfigured } from '@/services/tauri/ai';
 import { useBlockStore } from '@/store/blocks';
 import { useChatStore } from '@/store/chat';
 import { isSessionTab, useWorkspaceStore } from '@/store/workspace';

@@ -1,13 +1,13 @@
 import { Search, Server, Terminal } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getAvailableShells, type ShellOption } from '@/lib/shells';
+import { getAvailableShells, type ShellOption } from '@/services/tauri/shells';
 import {
   buildNewTabOptions,
   filterNewTabOptions,
   type NewTabOption,
   touchRecentOpen,
-} from '@/lib/tabTypes';
-import type { TerminalSpec } from '@/lib/windowLayout';
+} from '@/services/tauri/tabTypes';
+import type { TerminalSpec } from '@/services/tauri/windowLayout';
 import { ensureSshLoaded, useSshStore } from '@/ssh/store';
 import { useWorkspaceStore } from '@/store/workspace';
 import { cx } from '@/styles/cx';

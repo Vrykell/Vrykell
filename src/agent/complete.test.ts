@@ -14,7 +14,7 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import { DEFAULT_AGENT_SETTINGS, useAgentSettings } from '@/agent/agentSettings';
 import { completeCommand, localComplete, looksLikePath, pathComplete } from '@/agent/complete';
-import { useAiConfigStore } from '@/lib/ai';
+import { useAiConfigStore } from '@/services/tauri/ai';
 import { useHistoryStore } from '@/store/history';
 
 function reset() {

@@ -1,5 +1,5 @@
 import { loadConfig, serializeTemplates } from '@/files/fileOpen';
-import { getModel, isApiKeyConfigured } from '@/lib/ai';
+import { getModel, isApiKeyConfigured } from '@/services/tauri/ai';
 import { useWorkspaceStore } from '@/store/workspace';
 
 /** 设置项定义 — 供全局搜索索引 */

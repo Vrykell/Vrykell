@@ -35,8 +35,8 @@ import {
   segmentsToPath,
 } from '@/files/pathUtils';
 import { useWorkspaceDirsStore } from '@/files/workspaceDirs';
-import { ptyWrite } from '@/lib/pty';
-import { firstLeaf, leaves as layoutLeaves } from '@/lib/windowLayout';
+import { ptyWrite } from '@/services/tauri/pty';
+import { firstLeaf, leaves as layoutLeaves } from '@/services/tauri/windowLayout';
 import RemoteFiles from '@/ssh/RemoteFiles';
 import { shellQuote } from '@/ssh/remotePath';
 import { ensureSshLoaded, useSshStore } from '@/ssh/store';

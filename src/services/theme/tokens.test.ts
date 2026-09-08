@@ -9,7 +9,7 @@ import {
   TEAL_THEME_PRESET,
   themes,
   toRgba,
-} from '@/theme/tokens';
+} from '@/services/theme/tokens';
 
 describe('hexToRgba', () => {
   it('converts 3-digit and 6-digit hex to rgba', () => {

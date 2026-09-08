@@ -21,7 +21,7 @@ import {
 } from '@/agent/capabilities';
 import { modelIcon, providerLabel } from '@/agent/modelIcon';
 import { useToastStore } from '@/components/Toast';
-import { type ModelProfile, setActiveModel, useAiConfigStore } from '@/lib/ai';
+import { type ModelProfile, setActiveModel, useAiConfigStore } from '@/services/tauri/ai';
 import { cx } from '@/styles/cx';
 import s from './ModelPicker.module.css';
 

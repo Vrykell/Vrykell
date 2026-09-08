@@ -6,8 +6,14 @@ import { describe, expect, it, vi } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { groupCreate, groupDelete, groupRename, groupSetCollapsed, groupsList } from '@/api/group';
-import { searchFiles } from '@/api/search';
+import {
+  groupCreate,
+  groupDelete,
+  groupRename,
+  groupSetCollapsed,
+  groupsList,
+} from '@/services/api/group';
+import { searchFiles } from '@/services/api/search';
 import {
   archiveSession,
   createSession,
@@ -16,8 +22,8 @@ import {
   restoreSession,
   updateSessionCwd,
   updateSessionTitle,
-} from '@/api/session';
-import { addWorkspace, listWorkspaces, removeWorkspace } from '@/api/workspace';
+} from '@/services/api/session';
+import { addWorkspace, listWorkspaces, removeWorkspace } from '@/services/api/workspace';
 
 describe('api 封装', () => {
   it('session 命令透传', async () => {

@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { openPath } from '@tauri-apps/plugin-opener';
-import { safeLocalStorageGet, safeLocalStorageSet } from '@/lib/errorHandler';
+import { safeLocalStorageGet, safeLocalStorageSet } from '@/services/tauri/errorHandler';
 
 /**
  * fileOpen — 文件面板的文件打开逻辑。

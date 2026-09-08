@@ -4,7 +4,7 @@
 
 import { useAgentSettings } from '@/agent/agentSettings';
 import Segmented from '@/components/Segmented';
-import type { ShellType } from '@/lib/shells';
+import type { ShellType } from '@/services/tauri/shells';
 import { Field } from '@/settings/ui';
 
 const OPEN_MODE_OPTIONS = (
