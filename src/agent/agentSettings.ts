@@ -11,7 +11,7 @@
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ShellType } from '@/lib/shells';
+import type { ShellType } from '@/services/tauri/shells';
 
 /** 上下文管理策略（code-agent 式） */
 export type ContextStrategy = 'off' | 'window' | 'compact';

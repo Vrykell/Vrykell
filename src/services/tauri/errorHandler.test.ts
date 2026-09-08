@@ -7,7 +7,7 @@ import {
   safeJsonParse,
   safeLocalStorageGet,
   safeLocalStorageSet,
-} from '@/lib/errorHandler';
+} from '@/services/tauri/errorHandler';
 
 describe('safeJsonParse / safeLocalStorage', () => {
   it('safeJsonParse 合法/非法/空', () => {

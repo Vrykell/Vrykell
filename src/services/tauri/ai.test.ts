@@ -26,7 +26,7 @@ import {
   setProviderKey,
   setTavilyKey,
   useAiConfigStore,
-} from '@/lib/ai';
+} from '@/services/tauri/ai';
 
 describe('anthropicStream', () => {
   beforeEach(() => {

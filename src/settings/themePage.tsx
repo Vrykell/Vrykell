@@ -17,9 +17,9 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useToastStore } from '@/components/Toast';
+import { useTheme } from '@/services/theme/ThemeProvider';
+import { useTerminalThemeStore } from '@/services/theme/terminalTheme';
 import { btnStyle, Field } from '@/settings/ui';
-import { useTheme } from '@/theme/ThemeProvider';
-import { useTerminalThemeStore } from '@/theme/terminalTheme';
 
 export function ThemePage() {
   const { mode, setMode } = useTheme();

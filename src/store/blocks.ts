@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { useToastStore } from '@/components/Toast';
 import { t } from '@/i18n';
-import * as sessionManager from '@/lib/sessionManager';
+import * as sessionManager from '@/services/tauri/sessionManager';
 import type { TermBlock } from '@/terminal/pipeline/termBlock';
 
 const EMPTY: TermBlock[] = [];

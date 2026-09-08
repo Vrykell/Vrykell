@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAgentSettings } from '@/agent/agentSettings';
 import { modelIcon } from '@/agent/modelIcon';
 import ModelPicker from '@/chat/ModelPicker';
-import { useAiConfigStore } from '@/lib/ai';
+import { useAiConfigStore } from '@/services/tauri/ai';
 import { cx } from '@/styles/cx';
 import s from './ModelPill.module.css';
 

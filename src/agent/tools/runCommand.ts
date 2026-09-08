@@ -15,7 +15,7 @@
  */
 
 import { agentControl } from '@/agent/agentControl';
-import { ptyWrite } from '@/lib/pty';
+import { ptyWrite } from '@/services/tauri/pty';
 import { useBlockStore } from '@/store/blocks';
 import { getFocusedTerminalId, getRecentOutputFor, useTerminalStore } from '@/store/terminal';
 

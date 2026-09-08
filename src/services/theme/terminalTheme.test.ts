@@ -14,7 +14,7 @@ import {
   applyTerminalTheme,
   reapplyXtermTheme,
   useTerminalThemeStore,
-} from '@/theme/terminalTheme';
+} from '@/services/theme/terminalTheme';
 
 const baseConfig = { opacity: 1, backgroundImage: null, vars: {} };
 

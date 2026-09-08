@@ -12,8 +12,8 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 
 import { DEFAULT_AGENT_SETTINGS, useAgentSettings } from '@/agent/agentSettings';
 import { maybeAutoTitle, resetTitleState, sanitizeTitle } from '@/agent/title';
-import { useAiConfigStore } from '@/lib/ai';
-import { leaf } from '@/lib/windowLayout';
+import { useAiConfigStore } from '@/services/tauri/ai';
+import { leaf } from '@/services/tauri/windowLayout';
 import { useBlockStore } from '@/store/blocks';
 import { useChatStore } from '@/store/chat';
 import { useWorkspaceStore } from '@/store/workspace';

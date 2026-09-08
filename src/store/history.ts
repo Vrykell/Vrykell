@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { clearHistory, recordHistory, searchHistory } from '@/api/search';
+import { clearHistory, recordHistory, searchHistory } from '@/services/api/search';
 
 interface HistoryEntry {
   command: string;

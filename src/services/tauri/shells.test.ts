@@ -6,7 +6,12 @@ import { describe, expect, it, vi } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { fallbackShells, getAvailableShells, listShells, shellTypeLabel } from '@/lib/shells';
+import {
+  fallbackShells,
+  getAvailableShells,
+  listShells,
+  shellTypeLabel,
+} from '@/services/tauri/shells';
 
 describe('shells', () => {
   it('shellTypeLabel 映射与兜底', () => {

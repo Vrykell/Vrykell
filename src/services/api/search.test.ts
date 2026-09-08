@@ -15,7 +15,7 @@ import {
   searchFiles,
   searchHistory,
   searchSessions,
-} from '@/api/search';
+} from '@/services/api/search';
 
 describe('api/search', () => {
   it('searchFiles：默认参数与显式 roots/root', async () => {

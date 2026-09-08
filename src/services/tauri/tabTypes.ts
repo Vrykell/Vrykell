@@ -1,5 +1,5 @@
-import { safeLocalStorageGet, safeLocalStorageSet } from '@/lib/errorHandler';
-import type { ShellOption, ShellType } from '@/lib/shells';
+import { safeLocalStorageGet, safeLocalStorageSet } from '@/services/tauri/errorHandler';
+import type { ShellOption, ShellType } from '@/services/tauri/shells';
 import type { SshConnection } from '@/ssh/api';
 
 /**

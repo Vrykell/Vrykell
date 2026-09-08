@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { isMacOS } from '@/lib/platform';
+import { isMacOS } from '@/services/tauri/platform';
 
 /** 本地 shell 类型标识 */
 export type ShellType = 'zsh' | 'bash' | 'powershell' | 'pwsh' | 'cmd';

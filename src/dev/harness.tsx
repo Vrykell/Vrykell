@@ -13,7 +13,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@/theme.css';
 import PanelChat from '@/chat/PanelChat';
-import { firstLeaf } from '@/lib/windowLayout';
+import { firstLeaf } from '@/services/tauri/windowLayout';
 import { useChatStore } from '@/store/chat';
 import { useTerminalStore } from '@/store/terminal';
 import { isSessionTab, useWorkspaceStore } from '@/store/workspace';

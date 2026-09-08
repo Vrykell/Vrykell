@@ -1,9 +1,9 @@
 import { FileText } from 'lucide-react';
-import { searchFiles as backendSearchFiles } from '@/api/search';
 import { fmtSize } from '@/components/UiBtn';
 import { useWorkspaceDirsStore } from '@/files/workspaceDirs';
 import { registerSource } from '@/search/registry';
 import type { FileResultData, SearchResult } from '@/search/types';
+import { searchFiles as backendSearchFiles } from '@/services/api/search';
 
 function fmtTimeAgo(ts: number): string {
   const ms = Date.now() - ts;

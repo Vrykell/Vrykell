@@ -9,7 +9,7 @@ import {
 } from '@/agent/agentSettings';
 import { ModelScopeBar } from '@/chat/ModelPicker';
 import Segmented from '@/components/Segmented';
-import { useAiConfigStore } from '@/lib/ai';
+import { useAiConfigStore } from '@/services/tauri/ai';
 import { btnStyle, Field, inputStyle, NumberInput, Toggle } from '@/settings/ui';
 
 export function AiBehaviorPage() {

@@ -16,7 +16,7 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { gate, type ToolContext } from '@/agent/permissions';
 import { DESC_READ_TERMINAL, DESC_TERMINAL_KEYS } from '@/agent/toolTexts';
-import { ptyWrite } from '@/lib/pty';
+import { ptyWrite } from '@/services/tauri/pty';
 import { useBlockStore } from '@/store/blocks';
 import { getFocusedTerminalId, getTerminalScreen, useTerminalStore } from '@/store/terminal';
 

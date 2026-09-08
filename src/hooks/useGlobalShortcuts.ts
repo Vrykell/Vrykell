@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { countLeaves, leaves } from '@/lib/windowLayout';
+import { countLeaves, leaves } from '@/services/tauri/windowLayout';
 import { useBlockStore } from '@/store/blocks';
 import { getFocusedTerminalId, termInstances, useTerminalStore } from '@/store/terminal';
 import { useUiStore } from '@/store/ui';

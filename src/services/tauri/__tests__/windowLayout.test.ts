@@ -19,7 +19,7 @@ import {
   setRatio,
   splitLeaf,
   type TerminalSpec,
-} from '@/lib/windowLayout';
+} from '@/services/tauri/windowLayout';
 
 const t = (id: string, kind: 'local' | 'ssh' = 'local'): TerminalSpec => ({ id, kind });
 

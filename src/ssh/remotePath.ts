@@ -6,7 +6,7 @@
  */
 
 import { create } from 'zustand';
-import { leaves } from '@/lib/windowLayout';
+import { leaves } from '@/services/tauri/windowLayout';
 import { useTerminalStore } from '@/store/terminal';
 import { isSessionTab, useWorkspaceStore } from '@/store/workspace';
 

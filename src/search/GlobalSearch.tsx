@@ -1,7 +1,6 @@
 import { ChevronDown, type LucideIcon, Search } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getCommands } from '@/commands';
-import * as sessionManager from '@/lib/sessionManager';
 import { useSearchEngine } from '@/search/engine';
 import FilterPopover from '@/search/FilterPopover';
 import { getSources, useEnabledSourcesStore } from '@/search/registry';
@@ -15,6 +14,7 @@ import type {
   SearchResult,
   SessionResultData,
 } from '@/search/types';
+import * as sessionManager from '@/services/tauri/sessionManager';
 import { useSearchHighlightStore } from '@/store/searchHighlight';
 import { useSearchHistoryStore } from '@/store/searchHistory';
 import { useTerminalStore } from '@/store/terminal';

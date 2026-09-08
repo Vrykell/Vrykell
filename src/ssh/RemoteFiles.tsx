@@ -8,7 +8,7 @@ import { IconBtn } from '@/components/UiBtn';
 import DownloadManager from '@/downloads/DownloadManager';
 import { loadConfig, remoteOpenCommand } from '@/files/fileOpen';
 import { compactPathSegments } from '@/files/pathUtils';
-import { ptyWrite } from '@/lib/pty';
+import { ptyWrite } from '@/services/tauri/pty';
 import type { SshConnection, SshFsEntry } from '@/ssh/api';
 import { sshDelete, sshDownload, sshFsList, sshRename, sshUpload } from '@/ssh/api';
 import {

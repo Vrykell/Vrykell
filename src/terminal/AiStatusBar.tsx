@@ -6,7 +6,7 @@ import { Bot, Brain, type LucideIcon } from 'lucide-react';
 import { useAgentSettings } from '@/agent/agentSettings';
 import ModelPill from '@/chat/ModelPill';
 import ContextRing from '@/components/ContextRing';
-import { useAiConfigStore } from '@/lib/ai';
+import { useAiConfigStore } from '@/services/tauri/ai';
 import { selectPaneInput, useInputStore } from '@/store/input';
 
 function Toggle({

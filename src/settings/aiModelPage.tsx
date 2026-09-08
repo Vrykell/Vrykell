@@ -16,7 +16,7 @@ import {
   setAiModels,
   setProviderKey,
   useAiConfigStore,
-} from '@/lib/ai';
+} from '@/services/tauri/ai';
 import { btnStyle, Field, inputStyle, ModelTextInput } from '@/settings/ui';
 
 const PROVIDERS: { id: ProviderKind; label: string }[] = [

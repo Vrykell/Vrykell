@@ -9,7 +9,7 @@ import {
   type ToolRun,
 } from '@/agent/messageParts';
 import { denyAllPending } from '@/agent/permissions';
-import { appendChatMessage, deleteChatMessage } from '@/api/session';
+import { appendChatMessage, deleteChatMessage } from '@/services/api/session';
 import { useWorkspaceStore } from '@/store/workspace';
 
 export interface ChatMessage {

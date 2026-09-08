@@ -1,5 +1,8 @@
 import { create } from 'zustand';
 import { defaultOpenModeForShell, useAgentSettings } from '@/agent/agentSettings';
+import { useToastStore } from '@/components/Toast';
+import { t } from '@/i18n';
+import type { BackendGroupEntry } from '@/search/types';
 import {
   groupArchive,
   groupCreate,
@@ -12,12 +15,10 @@ import {
   groupsReorder,
   sessionSetGroup,
   sessionsReorder,
-} from '@/api/group';
-import { useToastStore } from '@/components/Toast';
-import { t } from '@/i18n';
-import * as sessionManager from '@/lib/sessionManager';
-import type { ShellType } from '@/lib/shells';
-import { shellTypeLabel } from '@/lib/shells';
+} from '@/services/api/group';
+import * as sessionManager from '@/services/tauri/sessionManager';
+import type { ShellType } from '@/services/tauri/shells';
+import { shellTypeLabel } from '@/services/tauri/shells';
 import {
   countLeaves,
   findLeaf,
@@ -29,8 +30,7 @@ import {
   splitLeaf,
   type TerminalSpec,
   type WindowLayout,
-} from '@/lib/windowLayout';
-import type { BackendGroupEntry } from '@/search/types';
+} from '@/services/tauri/windowLayout';
 import { useBlockStore } from '@/store/blocks';
 import { useChatStore } from '@/store/chat';
 import { getFocusedTerminalId, useTerminalStore } from '@/store/terminal';

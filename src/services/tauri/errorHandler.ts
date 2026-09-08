@@ -18,18 +18,13 @@ export function installGlobalErrorHandlers() {
   window.addEventListener('error', (event) => {
     // 只处理运行时错误，跳过资源加载失败（如 <img src=404>）
     if (event instanceof ErrorEvent) {
-      console.error(
-        `[global] ${event.filename}:${event.lineno}:${event.colno} ${event.message}`,
-      );
+      console.error(`[global] ${event.filename}:${event.lineno}:${event.colno} ${event.message}`);
     }
     // 不调用 preventDefault()，让浏览器默认行为（控制台报错）继续
   });
 
   window.addEventListener('unhandledrejection', (event) => {
-    console.error(
-      '[global] Unhandled Promise rejection:',
-      event.reason,
-    );
+    console.error('[global] Unhandled Promise rejection:', event.reason);
     // 不调用 preventDefault()，让浏览器默认行为继续
   });
 }
