@@ -31,9 +31,9 @@ import {
   type WindowLayout,
 } from '@/lib/windowLayout';
 import type { BackendGroupEntry } from '@/search/types';
-import { useBlockStore } from '@/stores/blocks';
-import { useChatStore } from '@/stores/chat';
-import { getFocusedTerminalId, useTerminalStore } from '@/stores/terminal';
+import { useBlockStore } from '@/store/blocks';
+import { useChatStore } from '@/store/chat';
+import { getFocusedTerminalId, useTerminalStore } from '@/store/terminal';
 
 export type TabKind = 'session' | 'history' | 'settings';
 

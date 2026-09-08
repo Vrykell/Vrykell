@@ -10,8 +10,8 @@ import {
   registerTerminal,
   unregisterTerminal,
   useTerminalStore,
-} from '@/stores/terminal';
-import { useWorkspaceStore } from '@/stores/workspace';
+} from '@/store/terminal';
+import { useWorkspaceStore } from '@/store/workspace';
 
 const initialTerm = useTerminalStore.getState();
 const initialWs = useWorkspaceStore.getState();

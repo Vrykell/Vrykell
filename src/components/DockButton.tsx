@@ -1,6 +1,6 @@
 import { ToolbarBtn } from '@/components/UiBtn';
 import { useT } from '@/i18n';
-import { PANEL_DEFS } from '@/stores/dock';
+import { PANEL_DEFS } from '@/store/dock';
 
 interface DockButtonProps {
   panelId: string;

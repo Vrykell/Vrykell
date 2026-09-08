@@ -1,6 +1,6 @@
 import { loadConfig, serializeTemplates } from '@/files/fileOpen';
 import { getModel, isApiKeyConfigured } from '@/lib/ai';
-import { useWorkspaceStore } from '@/stores/workspace';
+import { useWorkspaceStore } from '@/store/workspace';
 
 /** 设置项定义 — 供全局搜索索引 */
 export interface SettingDef {

@@ -2,7 +2,7 @@
  * blocks — 命令块 store 测试。
  */
 import { describe, expect, it } from 'vitest';
-import { selectBlocks, useBlockStore } from '@/stores/blocks';
+import { selectBlocks, useBlockStore } from '@/store/blocks';
 
 const mk = (id: string): any => ({
   id,

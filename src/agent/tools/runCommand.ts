@@ -16,8 +16,8 @@
 
 import { agentControl } from '@/agent/agentControl';
 import { ptyWrite } from '@/lib/pty';
-import { useBlockStore } from '@/stores/blocks';
-import { getFocusedTerminalId, getRecentOutputFor, useTerminalStore } from '@/stores/terminal';
+import { useBlockStore } from '@/store/blocks';
+import { getFocusedTerminalId, getRecentOutputFor, useTerminalStore } from '@/store/terminal';
 
 export interface RunCommandResult {
   ok: boolean;

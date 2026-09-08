@@ -88,9 +88,9 @@ globalThis.ResizeObserver = class {
 
 import { onPtyOutput as mockedOnPtyOutput, ptySpawn as mockedPtySpawn } from '@/lib/pty';
 import { leaf } from '@/lib/windowLayout';
-import { useBlockStore } from '@/stores/blocks';
-import { useTerminalStore } from '@/stores/terminal';
-import { useWorkspaceStore } from '@/stores/workspace';
+import { useBlockStore } from '@/store/blocks';
+import { useTerminalStore } from '@/store/terminal';
+import { useWorkspaceStore } from '@/store/workspace';
 import { useTerminalSession } from '@/terminal/useTerminalSession';
 
 /** 设置一个本地终端 tab，指定打开模式（classic / block） */

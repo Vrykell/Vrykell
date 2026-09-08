@@ -24,9 +24,9 @@ import {
 import { sanitizeOutputHtml } from '@/lib/sanitizeHtml';
 import { leaf, type WindowLayout } from '@/lib/windowLayout';
 import type { BackendBlockEntry, BackendSessionEntry } from '@/search/types';
-import { useBlockStore } from '@/stores/blocks';
-import { useChatStore } from '@/stores/chat';
-import { type Tab, useWorkspaceStore } from '@/stores/workspace';
+import { useBlockStore } from '@/store/blocks';
+import { useChatStore } from '@/store/chat';
+import { type Tab, useWorkspaceStore } from '@/store/workspace';
 import type { TermBlock } from '@/terminal/pipeline/termBlock';
 
 /** 恢复会话时用于重建 tab 的元数据（kind/payload 已由后端持久化）。 */

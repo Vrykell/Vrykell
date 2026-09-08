@@ -2,8 +2,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as sessionManager from '@/lib/sessionManager';
 import { leaves } from '@/lib/windowLayout';
-import { useBlockStore } from '@/stores/blocks';
-import { firstTerminalOf, isSessionTab, useWorkspaceStore } from '@/stores/workspace';
+import { useBlockStore } from '@/store/blocks';
+import { firstTerminalOf, isSessionTab, useWorkspaceStore } from '@/store/workspace';
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 
@@ -151,12 +151,10 @@ describe('addTab 持久化 kind + payload', () => {
       return undefined;
     });
 
-    useWorkspaceStore
-      .getState()
-      .addTab({
-        kind: 'ssh',
-        ssh: { name: 'prod', host: 'prod.example.com', user: 'root', port: 22, connectionId: 'c1' },
-      });
+    useWorkspaceStore.getState().addTab({
+      kind: 'ssh',
+      ssh: { name: 'prod', host: 'prod.example.com', user: 'root', port: 22, connectionId: 'c1' },
+    });
     const create = calls.find((c) => c.cmd === 'create_session');
     expect(create).toBeTruthy();
     expect(create!.args.kind).toBe('session');

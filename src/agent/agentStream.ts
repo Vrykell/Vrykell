@@ -34,7 +34,7 @@ import { buildSystemPrompt } from '@/agent/systemPrompt';
 import { buildTools } from '@/agent/tools';
 import { buildWebCrawlTool, buildWebFetchTool, buildWebSearchTool } from '@/agent/tools/webFetch';
 import { buildTavilySearchTool } from '@/agent/tools/webSearch';
-import type { StreamFn } from '@/stores/chat';
+import type { StreamFn } from '@/store/chat';
 
 interface AiConfigInfoRust {
   has_key: boolean;

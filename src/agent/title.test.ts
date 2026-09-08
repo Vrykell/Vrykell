@@ -14,9 +14,9 @@ import { DEFAULT_AGENT_SETTINGS, useAgentSettings } from '@/agent/agentSettings'
 import { maybeAutoTitle, resetTitleState, sanitizeTitle } from '@/agent/title';
 import { useAiConfigStore } from '@/lib/ai';
 import { leaf } from '@/lib/windowLayout';
-import { useBlockStore } from '@/stores/blocks';
-import { useChatStore } from '@/stores/chat';
-import { useWorkspaceStore } from '@/stores/workspace';
+import { useBlockStore } from '@/store/blocks';
+import { useChatStore } from '@/store/chat';
+import { useWorkspaceStore } from '@/store/workspace';
 
 function mkTab(id: string, extra: Record<string, unknown> = {}) {
   return {

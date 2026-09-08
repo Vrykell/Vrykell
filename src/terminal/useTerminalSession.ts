@@ -16,10 +16,10 @@ import { onPtyExit, onPtyOutput, ptyClose, ptyResize, ptySpawn, ptyWrite } from 
 import * as sessionManager from '@/lib/sessionManager';
 import { getCellMetrics } from '@/lib/termMetrics';
 import { leaves as layoutLeaves } from '@/lib/windowLayout';
-import { useBlockStore } from '@/stores/blocks';
-import { useHistoryStore } from '@/stores/history';
-import { registerTerminal, unregisterTerminal, useTerminalStore } from '@/stores/terminal';
-import { useWorkspaceStore } from '@/stores/workspace';
+import { useBlockStore } from '@/store/blocks';
+import { useHistoryStore } from '@/store/history';
+import { registerTerminal, unregisterTerminal, useTerminalStore } from '@/store/terminal';
+import { useWorkspaceStore } from '@/store/workspace';
 import type { DispatchEvent } from '@/terminal/pipeline/events';
 import { SessionController } from '@/terminal/pipeline/sessionController';
 import type { TermBlock } from '@/terminal/pipeline/termBlock';

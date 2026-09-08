@@ -7,7 +7,7 @@ import { useAgentSettings } from '@/agent/agentSettings';
 import ModelPill from '@/chat/ModelPill';
 import ContextRing from '@/components/ContextRing';
 import { useAiConfigStore } from '@/lib/ai';
-import { selectPaneInput, useInputStore } from '@/stores/input';
+import { selectPaneInput, useInputStore } from '@/store/input';
 
 function Toggle({
   icon: Icon,

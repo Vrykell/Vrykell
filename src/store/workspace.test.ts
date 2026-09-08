@@ -4,7 +4,7 @@ const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import { leaf } from '@/lib/windowLayout';
-import { useTerminalStore } from '@/stores/terminal';
+import { useTerminalStore } from '@/store/terminal';
 import {
   firstTerminalOf,
   getFocusedCwd,
@@ -13,7 +13,7 @@ import {
   serializeSession,
   terminalsOf,
   useWorkspaceStore,
-} from '@/stores/workspace';
+} from '@/store/workspace';
 
 const initial = useWorkspaceStore.getState();
 

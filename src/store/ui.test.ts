@@ -2,7 +2,7 @@
  * ui — UI 状态 store 测试。
  */
 import { describe, expect, it } from 'vitest';
-import { useUiStore } from '@/stores/ui';
+import { useUiStore } from '@/store/ui';
 
 describe('ui store', () => {
   it('splitPlacement 开关', () => {

@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { useBlockStore } from '@/stores/blocks';
+import { useBlockStore } from '@/store/blocks';
 import type { TermBlock } from '@/terminal/pipeline/termBlock';
 import TerminalBlockList from '@/terminal/TerminalBlockList';
 
@@ -68,18 +68,16 @@ describe('TerminalBlockList', () => {
   });
 
   it('空 done block（无命令无输出，连按回车产生）不渲染空卡片', () => {
-    useBlockStore
-      .getState()
-      .setBlocks('t1', [
-        block({
-          id: 'e1',
-          command: '',
-          outputText: '',
-          outputHtml: '',
-          exitCode: null,
-          startedAt: null,
-        }),
-      ]);
+    useBlockStore.getState().setBlocks('t1', [
+      block({
+        id: 'e1',
+        command: '',
+        outputText: '',
+        outputHtml: '',
+        exitCode: null,
+        startedAt: null,
+      }),
+    ]);
     const { container } = render(<TerminalBlockList tabId="t1" />);
     expect(container.innerHTML).toBe('');
   });

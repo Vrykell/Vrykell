@@ -33,13 +33,13 @@ import {
   type WindowLayout,
 } from '@/lib/windowLayout';
 import SettingsView from '@/settings/SettingsView';
-import { selectBlocks, useBlockStore } from '@/stores/blocks';
-import { usePaneMessages } from '@/stores/chat';
-import { useChatPanelOpen } from '@/stores/dock';
-import { useDockDragStore } from '@/stores/dockDrag';
-import { useTerminalStore } from '@/stores/terminal';
-import { useUiStore } from '@/stores/ui';
-import { nextTerminalId, type Tab, useWorkspaceStore } from '@/stores/workspace';
+import { selectBlocks, useBlockStore } from '@/store/blocks';
+import { usePaneMessages } from '@/store/chat';
+import { useChatPanelOpen } from '@/store/dock';
+import { useDockDragStore } from '@/store/dockDrag';
+import { useTerminalStore } from '@/store/terminal';
+import { useUiStore } from '@/store/ui';
+import { nextTerminalId, type Tab, useWorkspaceStore } from '@/store/workspace';
 import AiStatusBar from '@/terminal/AiStatusBar';
 import InputEditor from '@/terminal/InputEditor';
 import TerminalBlockList, { hasVisibleContent } from '@/terminal/TerminalBlockList';

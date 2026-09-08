@@ -28,7 +28,7 @@ import { agentControl } from '@/agent/agentControl';
 import type { ToolRun, ToolRunState } from '@/agent/messageParts';
 import { resolveApproval } from '@/agent/permissions';
 import ToolNode from '@/chat/ToolNode';
-import { useBlockStore } from '@/stores/blocks';
+import { useBlockStore } from '@/store/blocks';
 import BlockOutput from '@/terminal/BlockOutput';
 
 const STATE_CHIP: Record<ToolRunState, { label: string; color: string }> = {

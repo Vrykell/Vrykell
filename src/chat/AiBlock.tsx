@@ -6,8 +6,8 @@ import type { ChatExchange } from '@/chat/exchanges';
 import SafeMarkdown from '@/chat/SafeMarkdown';
 import ToolNode from '@/chat/ToolNode';
 import ToolRunCard from '@/chat/ToolRunCard';
-import { useChatStore } from '@/stores/chat';
-import { useWorkspaceStore } from '@/stores/workspace';
+import { useChatStore } from '@/store/chat';
+import { useWorkspaceStore } from '@/store/workspace';
 import { cx } from '@/styles/cx';
 import s from './AiBlock.module.css';
 

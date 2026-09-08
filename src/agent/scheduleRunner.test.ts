@@ -8,7 +8,7 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import type { Schedule } from '@/agent/platform';
 import { initScheduleRunner, kickScheduleRunner } from '@/agent/scheduleRunner';
-import { useChatStore } from '@/stores/chat';
+import { useChatStore } from '@/store/chat';
 
 function makeSchedule(over: Partial<Schedule> = {}): Schedule {
   return {

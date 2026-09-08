@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { fmtDuration } from '@/components/UiBtn';
 import { ptyWrite } from '@/lib/pty';
-import { useBlockStore } from '@/stores/blocks';
-import { useChatStore } from '@/stores/chat';
-import { useTerminalStore } from '@/stores/terminal';
-import { useWorkspaceStore } from '@/stores/workspace';
+import { useBlockStore } from '@/store/blocks';
+import { useChatStore } from '@/store/chat';
+import { useTerminalStore } from '@/store/terminal';
+import { useWorkspaceStore } from '@/store/workspace';
 import type { TermBlock } from '@/terminal/pipeline/termBlock';
 import { clearSessionBlocks } from '@/terminal/useTerminalSession';
 

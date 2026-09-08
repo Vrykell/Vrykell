@@ -2,7 +2,7 @@ import type { Terminal } from '@xterm/xterm';
 import { create } from 'zustand';
 import { ptyWrite } from '@/lib/pty';
 import { firstLeaf, leaves as layoutLeaves } from '@/lib/windowLayout';
-import { isSessionTab, useWorkspaceStore } from '@/stores/workspace';
+import { isSessionTab, useWorkspaceStore } from '@/store/workspace';
 import type { Scene } from '@/terminal/pipeline/sessionController';
 
 // 每个标签页一个 xterm 实例（模块级引用，不进 zustand state）

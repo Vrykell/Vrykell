@@ -9,7 +9,7 @@ import {
 } from '@/lib/tabTypes';
 import type { TerminalSpec } from '@/lib/windowLayout';
 import { ensureSshLoaded, useSshStore } from '@/ssh/store';
-import { useWorkspaceStore } from '@/stores/workspace';
+import { useWorkspaceStore } from '@/store/workspace';
 import { cx } from '@/styles/cx';
 import s from './NewTabModal.module.css';
 
@@ -80,19 +80,17 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
             onClose();
             return;
           }
-          useWorkspaceStore
-            .getState()
-            .addTab({
-              kind: 'ssh',
-              ssh: {
-                name: conn.name,
-                host: conn.host,
-                user: conn.user,
-                port: conn.port,
-                connectionId: conn.id,
-              },
-              groupId,
-            });
+          useWorkspaceStore.getState().addTab({
+            kind: 'ssh',
+            ssh: {
+              name: conn.name,
+              host: conn.host,
+              user: conn.user,
+              port: conn.port,
+              connectionId: conn.id,
+            },
+            groupId,
+          });
         }
       }
       onClose();

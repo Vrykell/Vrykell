@@ -40,8 +40,8 @@ import { firstLeaf, leaves as layoutLeaves } from '@/lib/windowLayout';
 import RemoteFiles from '@/ssh/RemoteFiles';
 import { shellQuote } from '@/ssh/remotePath';
 import { ensureSshLoaded, useSshStore } from '@/ssh/store';
-import { useTerminalStore } from '@/stores/terminal';
-import { isSessionTab, useWorkspaceStore } from '@/stores/workspace';
+import { useTerminalStore } from '@/store/terminal';
+import { isSessionTab, useWorkspaceStore } from '@/store/workspace';
 
 /** 待二次确认的操作：重命名（携带新名）或删除。 */
 type ConfirmState =
