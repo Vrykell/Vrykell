@@ -1,8 +1,8 @@
 import { ask } from '@tauri-apps/plugin-dialog';
 import { Pencil, Plus, Search, Server } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import ContextMenu from '@/components/ContextMenu';
-import { IconBtn } from '@/components/UiBtn';
+import { IconBtn } from '@/components/ui/Button/Button';
+import ContextMenu from '@/components/ui/ContextMenu/ContextMenu';
 import type { SshConnection } from '@/features/ssh/api';
 import SshFormModal from '@/features/ssh/SshFormModal';
 import { ensureSshLoaded, useSshStore } from '@/features/ssh/store';

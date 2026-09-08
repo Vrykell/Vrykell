@@ -16,7 +16,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useToastStore } from '@/components/Toast';
+import { useToastStore } from '@/components/ui/Toast/Toast';
 import { btnStyle, Field } from '@/features/settings/ui';
 import { useTheme } from '@/services/theme/ThemeProvider';
 import { useTerminalThemeStore } from '@/services/theme/terminalTheme';

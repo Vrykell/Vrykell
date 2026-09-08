@@ -26,8 +26,8 @@ import {
   Zap,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import ContextRing from '@/components/ContextRing';
-import { useToastStore } from '@/components/Toast';
+import ContextRing from '@/components/ui/ContextRing/ContextRing';
+import { useToastStore } from '@/components/ui/Toast/Toast';
 import { agentControl } from '@/features/agent/agentControl';
 import { useAgentSettings } from '@/features/agent/agentSettings';
 import {

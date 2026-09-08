@@ -8,7 +8,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { generateText } from 'ai';
 import { Plus, Sparkles, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useToastStore } from '@/components/Toast';
+import { useToastStore } from '@/components/ui/Toast/Toast';
 import {
   type AgentDef,
   getMemory,

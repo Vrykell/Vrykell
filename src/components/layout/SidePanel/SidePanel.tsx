@@ -1,6 +1,6 @@
 import { type FC, useCallback } from 'react';
-import PanelTabs from '@/components/PanelTabs';
-import ResizeHandle from '@/components/ResizeHandle';
+import PanelTabs from '@/components/layout/PanelTabs/PanelTabs';
+import ResizeHandle from '@/components/ui/ResizeHandle/ResizeHandle';
 import PanelChat from '@/features/chat/PanelChat';
 import PanelFiles from '@/features/files/PanelFiles';
 import PanelSsh from '@/features/ssh/PanelSsh';

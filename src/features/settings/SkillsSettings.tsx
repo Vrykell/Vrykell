@@ -17,7 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { useToastStore } from '@/components/Toast';
+import { useToastStore } from '@/components/ui/Toast/Toast';
 import {
   fetchRemoteSkills,
   getSkill,

@@ -1,10 +1,10 @@
 import { open } from '@tauri-apps/plugin-dialog';
 import { ArrowUp, File, Folder, LocateFixed, MoreHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import ConfirmDialog from '@/components/ConfirmDialog';
-import ContextMenu, { type ContextMenuItem } from '@/components/ContextMenu';
-import { useToastStore } from '@/components/Toast';
-import { IconBtn } from '@/components/UiBtn';
+import { IconBtn } from '@/components/ui/Button/Button';
+import ConfirmDialog from '@/components/ui/ConfirmDialog/ConfirmDialog';
+import ContextMenu, { type ContextMenuItem } from '@/components/ui/ContextMenu/ContextMenu';
+import { useToastStore } from '@/components/ui/Toast/Toast';
 import DownloadManager from '@/features/downloads/DownloadManager';
 import { loadConfig, remoteOpenCommand } from '@/features/files/fileOpen';
 import { compactPathSegments } from '@/features/files/pathUtils';

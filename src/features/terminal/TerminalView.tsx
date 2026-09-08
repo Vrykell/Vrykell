@@ -8,9 +8,9 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import ContextMenu from '@/components/ContextMenu';
-import SessionHistoryView from '@/components/SessionHistoryView';
-import { useToastStore } from '@/components/Toast';
+import SessionHistoryView from '@/components/layout/SessionHistoryView/SessionHistoryView';
+import ContextMenu from '@/components/ui/ContextMenu/ContextMenu';
+import { useToastStore } from '@/components/ui/Toast/Toast';
 import { defaultOpenModeForShell } from '@/features/agent/agentSettings';
 import SettingsView from '@/features/settings/SettingsView';
 import AiStatusBar from '@/features/terminal/AiStatusBar';

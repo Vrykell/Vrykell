@@ -5,7 +5,7 @@
 
 import { Plus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useToastStore } from '@/components/Toast';
+import { useToastStore } from '@/components/ui/Toast/Toast';
 import {
   connectMcp,
   disconnectMcp,

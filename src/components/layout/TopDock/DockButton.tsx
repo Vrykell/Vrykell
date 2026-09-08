@@ -1,4 +1,4 @@
-import { ToolbarBtn } from '@/components/UiBtn';
+import { ToolbarBtn } from '@/components/ui/Button/Button';
 import { useT } from '@/i18n';
 import { PANEL_DEFS } from '@/store/dock';
 

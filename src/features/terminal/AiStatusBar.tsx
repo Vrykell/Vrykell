@@ -3,7 +3,7 @@
  * 模型下拉 · 上下文圆环 · 深思/Agent 开关，与聊天面板顶栏同构。
  */
 import { Bot, Brain, type LucideIcon } from 'lucide-react';
-import ContextRing from '@/components/ContextRing';
+import ContextRing from '@/components/ui/ContextRing/ContextRing';
 import { useAgentSettings } from '@/features/agent/agentSettings';
 import ModelPill from '@/features/chat/ModelPill';
 import { useAiConfigStore } from '@/services/tauri/ai';

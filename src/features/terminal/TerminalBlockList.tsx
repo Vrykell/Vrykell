@@ -23,8 +23,8 @@ import {
   Zap,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useToastStore } from '@/components/Toast';
-import { fmtDuration } from '@/components/UiBtn';
+import { fmtDuration } from '@/components/ui/Button/Button';
+import { useToastStore } from '@/components/ui/Toast/Toast';
 import { agentControl } from '@/features/agent/agentControl';
 import AiBlock from '@/features/chat/AiBlock';
 import { mergeFlow, toExchanges } from '@/features/chat/exchanges';

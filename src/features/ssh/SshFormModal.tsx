@@ -1,7 +1,7 @@
 import { Loader2, Plug, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import ConfirmDialog from '@/components/ConfirmDialog';
-import { useToastStore } from '@/components/Toast';
+import ConfirmDialog from '@/components/ui/ConfirmDialog/ConfirmDialog';
+import { useToastStore } from '@/components/ui/Toast/Toast';
 import {
   newSshId,
   type SshAuthMethod,

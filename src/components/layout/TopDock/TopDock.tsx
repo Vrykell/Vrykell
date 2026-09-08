@@ -1,8 +1,8 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Search, Settings, Terminal } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import DockButton from '@/components/DockButton';
-import { ToolbarBtn } from '@/components/UiBtn';
+import DockButton from '@/components/layout/TopDock/DockButton';
+import { ToolbarBtn } from '@/components/ui/Button/Button';
 import { isMacOS } from '@/services/tauri/platform';
 import { type DockSide, PANEL_DEFS, useDockStore } from '@/store/dock';
 import { useUiStore } from '@/store/ui';

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { MenuItem } from '@/components/UiBtn';
+import { MenuItem } from '@/components/ui/Button/Button';
 import s from './ContextMenu.module.css';
 
 export interface ContextMenuItem {

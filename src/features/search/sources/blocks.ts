@@ -1,5 +1,5 @@
 import { SquareTerminal } from 'lucide-react';
-import { fmtDuration } from '@/components/UiBtn';
+import { fmtDuration } from '@/components/ui/Button/Button';
 import { registerSource } from '@/features/search/registry';
 import type { BackendBlockEntry, BlockResultData, SearchResult } from '@/features/search/types';
 import { searchBlocks } from '@/services/api/search';
