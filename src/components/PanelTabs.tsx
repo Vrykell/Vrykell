@@ -12,9 +12,9 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { regenerateTitle } from '@/agent/title';
 import { useToastStore } from '@/components/Toast';
 import { IconBtn } from '@/components/UiBtn';
+import { regenerateTitle } from '@/features/agent/title';
 import { shellTypeLabel } from '@/services/tauri/shells';
 import { cx } from '@/shared/utils/cx';
 import {

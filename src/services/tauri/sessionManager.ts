@@ -5,9 +5,10 @@
  * 后续添加会话管理 UI 时，只需接入同一套 API。
  */
 
-import { deserializeAttachments } from '@/agent/attachments';
-import { deserializeParts } from '@/agent/messageParts';
-import type { BackendBlockEntry, BackendSessionEntry } from '@/search/types';
+import { deserializeAttachments } from '@/features/agent/attachments';
+import { deserializeParts } from '@/features/agent/messageParts';
+import type { BackendBlockEntry, BackendSessionEntry } from '@/features/search/types';
+import type { TermBlock } from '@/features/terminal/pipeline/termBlock';
 import {
   archiveSession,
   createSession,
@@ -27,7 +28,6 @@ import { leaf, type WindowLayout } from '@/services/tauri/windowLayout';
 import { useBlockStore } from '@/store/blocks';
 import { useChatStore } from '@/store/chat';
 import { type Tab, useWorkspaceStore } from '@/store/workspace';
-import type { TermBlock } from '@/terminal/pipeline/termBlock';
 
 /** 恢复会话时用于重建 tab 的元数据（kind/payload 已由后端持久化）。 */
 export interface RestoreMeta {

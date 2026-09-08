@@ -12,12 +12,12 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@/theme.css';
-import PanelChat from '@/chat/PanelChat';
+import PanelChat from '@/features/chat/PanelChat';
+import InputEditor from '@/features/terminal/InputEditor';
 import { firstLeaf } from '@/services/tauri/windowLayout';
 import { useChatStore } from '@/store/chat';
 import { useTerminalStore } from '@/store/terminal';
 import { isSessionTab, useWorkspaceStore } from '@/store/workspace';
-import InputEditor from '@/terminal/InputEditor';
 
 // ── 最小 store 状态：默认 session tab 已存在，补上 pane 会话/场景/聚焦 ──
 const tab = useWorkspaceStore.getState().tabs.find(isSessionTab);

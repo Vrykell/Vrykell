@@ -1,5 +1,6 @@
 import { Search, Server, Terminal } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ensureSshLoaded, useSshStore } from '@/features/ssh/store';
 import { getAvailableShells, type ShellOption } from '@/services/tauri/shells';
 import {
   buildNewTabOptions,
@@ -9,7 +10,6 @@ import {
 } from '@/services/tauri/tabTypes';
 import type { TerminalSpec } from '@/services/tauri/windowLayout';
 import { cx } from '@/shared/utils/cx';
-import { ensureSshLoaded, useSshStore } from '@/ssh/store';
 import { useWorkspaceStore } from '@/store/workspace';
 import s from './NewTabModal.module.css';
 

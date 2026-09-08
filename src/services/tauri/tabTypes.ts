@@ -1,6 +1,6 @@
+import type { SshConnection } from '@/features/ssh/api';
 import { safeLocalStorageGet, safeLocalStorageSet } from '@/services/tauri/errorHandler';
 import type { ShellOption, ShellType } from '@/services/tauri/shells';
-import type { SshConnection } from '@/ssh/api';
 
 /**
  * 新建标签页弹窗的候选类型与「最近打开」排序。
