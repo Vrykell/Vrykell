@@ -1,4 +1,4 @@
-import { cx } from '@/styles/cx';
+import { cx } from '@/shared/utils/cx';
 import s from './ConfirmDialog.module.css';
 
 interface Props {

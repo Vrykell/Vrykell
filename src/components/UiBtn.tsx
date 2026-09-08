@@ -4,7 +4,7 @@
  */
 
 import type { MouseEvent } from 'react';
-import { cx } from '@/styles/cx';
+import { cx } from '@/shared/utils/cx';
 import s from './UiBtn.module.css';
 
 // ── 通用小型按钮（header hover 工具条用）──

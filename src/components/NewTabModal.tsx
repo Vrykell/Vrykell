@@ -8,9 +8,9 @@ import {
   touchRecentOpen,
 } from '@/services/tauri/tabTypes';
 import type { TerminalSpec } from '@/services/tauri/windowLayout';
+import { cx } from '@/shared/utils/cx';
 import { ensureSshLoaded, useSshStore } from '@/ssh/store';
 import { useWorkspaceStore } from '@/store/workspace';
-import { cx } from '@/styles/cx';
 import s from './NewTabModal.module.css';
 
 interface Props {

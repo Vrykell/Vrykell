@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { cx } from '@/styles/cx';
+import { cx } from '@/shared/utils/cx';
 import s from './Segmented.module.css';
 
 export interface SegmentedOption<T extends string> {

@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { cx } from '@/styles/cx';
+import { cx } from '@/shared/utils/cx';
 import s from './ResizeHandle.module.css';
 
 interface ResizeHandleProps {

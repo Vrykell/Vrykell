@@ -2,7 +2,7 @@
  * ToolNode — rail 上的动作状态节点（8px 圆，细线从圆心穿过）。
  */
 import type { ToolRunState } from '@/agent/messageParts';
-import { cx } from '@/styles/cx';
+import { cx } from '@/shared/utils/cx';
 import s from './ToolNode.module.css';
 
 const STATE_CLASS: Record<ToolRunState, string> = {

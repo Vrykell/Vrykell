@@ -16,6 +16,7 @@ import { regenerateTitle } from '@/agent/title';
 import { useToastStore } from '@/components/Toast';
 import { IconBtn } from '@/components/UiBtn';
 import { shellTypeLabel } from '@/services/tauri/shells';
+import { cx } from '@/shared/utils/cx';
 import {
   firstTerminalOf,
   isSessionTab,
@@ -24,7 +25,6 @@ import {
   terminalsOf,
   useWorkspaceStore,
 } from '@/store/workspace';
-import { cx } from '@/styles/cx';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 import NewTabModal from './NewTabModal';
 import s from './PanelTabs.module.css';

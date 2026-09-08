@@ -3,10 +3,10 @@ import PanelChat from '@/chat/PanelChat';
 import PanelTabs from '@/components/PanelTabs';
 import ResizeHandle from '@/components/ResizeHandle';
 import PanelFiles from '@/files/PanelFiles';
+import { cx } from '@/shared/utils/cx';
 import PanelSsh from '@/ssh/PanelSsh';
 import { type DockSide, MIN_PANEL_WIDTH, PANEL_DEFS, useDockStore } from '@/store/dock';
 import { isSessionTab, useWorkspaceStore } from '@/store/workspace';
-import { cx } from '@/styles/cx';
 import s from './SidePanel.module.css';
 
 interface SidePanelProps {

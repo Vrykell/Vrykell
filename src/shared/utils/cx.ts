@@ -3,7 +3,7 @@
  *
  * 用法：
  *   import s from './Foo.module.css';
- *   import { cx } from '@/styles/cx';
+ *   import { cx } from '@/shared/utils/cx';
  *   <div className={cx(s.base, active && s.active, error && s.error)} />
  *
  * 与 clsx 兼容（falsy 值被忽略），零依赖。
