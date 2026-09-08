@@ -1,13 +1,13 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { create } from 'zustand';
-import type { ProviderKind } from '@/agent/provider';
+import type { ProviderKind } from '@/features/agent/provider';
 import type { StreamFn } from '@/store/chat';
 
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_MODEL = 'gpt-4o-mini';
 
-import type { ModelCapabilities } from '@/agent/capabilities';
+import type { ModelCapabilities } from '@/features/agent/capabilities';
 
 /** 一个可用的模型配置（命名 profile）。API key 按 provider 复用，不做每模型单独 key。 */
 export interface ModelProfile {

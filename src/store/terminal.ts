@@ -1,9 +1,9 @@
 import type { Terminal } from '@xterm/xterm';
 import { create } from 'zustand';
+import type { Scene } from '@/features/terminal/pipeline/sessionController';
 import { ptyWrite } from '@/services/tauri/pty';
 import { firstLeaf, leaves as layoutLeaves } from '@/services/tauri/windowLayout';
 import { isSessionTab, useWorkspaceStore } from '@/store/workspace';
-import type { Scene } from '@/terminal/pipeline/sessionController';
 
 // 每个标签页一个 xterm 实例（模块级引用，不进 zustand state）
 const termInstances = new Map<string, Terminal>();

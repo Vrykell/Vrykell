@@ -5,7 +5,7 @@ import type {
   BackendHistoryEntry,
   BackendSearchContext,
   BackendSessionEntry,
-} from '@/search/types';
+} from '@/features/search/types';
 
 /** 搜索文件系统 */
 export function searchFiles(

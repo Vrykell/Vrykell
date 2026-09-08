@@ -3,7 +3,7 @@
  * 数据来自 list_sessions，全部在前端过滤，后端零改动。
  */
 
-import type { BackendSessionEntry } from '@/search/types';
+import type { BackendSessionEntry } from '@/features/search/types';
 
 export type SessionTypeFilter = 'all' | 'local' | 'ssh';
 export type SessionDateFilter = 'all' | 'today' | '7d' | '30d' | '90d';

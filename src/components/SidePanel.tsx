@@ -1,10 +1,10 @@
 import { type FC, useCallback } from 'react';
-import PanelChat from '@/chat/PanelChat';
 import PanelTabs from '@/components/PanelTabs';
 import ResizeHandle from '@/components/ResizeHandle';
-import PanelFiles from '@/files/PanelFiles';
+import PanelChat from '@/features/chat/PanelChat';
+import PanelFiles from '@/features/files/PanelFiles';
+import PanelSsh from '@/features/ssh/PanelSsh';
 import { cx } from '@/shared/utils/cx';
-import PanelSsh from '@/ssh/PanelSsh';
 import { type DockSide, MIN_PANEL_WIDTH, PANEL_DEFS, useDockStore } from '@/store/dock';
 import { isSessionTab, useWorkspaceStore } from '@/store/workspace';
 import s from './SidePanel.module.css';

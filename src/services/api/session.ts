@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { BackendBlockEntry, BackendSessionEntry } from '@/search/types';
+import type { BackendBlockEntry, BackendSessionEntry } from '@/features/search/types';
 
 export function createSession(
   id: string,

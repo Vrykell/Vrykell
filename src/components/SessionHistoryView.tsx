@@ -18,7 +18,7 @@ import {
   type SessionTypeFilter,
 } from '@/components/sessionFilter';
 import { useToastStore } from '@/components/Toast';
-import type { BackendGroupEntry, BackendSessionEntry } from '@/search/types';
+import type { BackendGroupEntry, BackendSessionEntry } from '@/features/search/types';
 import { groupDeleteWithSessions, groupRestore, groupsList } from '@/services/api/group';
 import { listSessions } from '@/services/api/session';
 import * as sessionManager from '@/services/tauri/sessionManager';
