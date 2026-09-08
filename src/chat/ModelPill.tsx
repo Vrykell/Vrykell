@@ -7,7 +7,7 @@ import { useAgentSettings } from '@/agent/agentSettings';
 import { modelIcon } from '@/agent/modelIcon';
 import ModelPicker from '@/chat/ModelPicker';
 import { useAiConfigStore } from '@/services/tauri/ai';
-import { cx } from '@/styles/cx';
+import { cx } from '@/shared/utils/cx';
 import s from './ModelPill.module.css';
 
 const LEVEL_LABEL: Record<string, string> = { low: '低', medium: '中', high: '高' };

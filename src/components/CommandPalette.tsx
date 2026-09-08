@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getCommands } from '@/commands';
-import { cx } from '@/styles/cx';
+import { getCommands } from '@/shared/constants/commands';
+import { cx } from '@/shared/utils/cx';
 import s from './CommandPalette.module.css';
 
 interface Props {

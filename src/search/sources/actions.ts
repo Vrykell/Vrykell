@@ -1,7 +1,7 @@
 import { Command } from 'lucide-react';
-import { searchCommands } from '@/commands';
 import { registerSource } from '@/search/registry';
 import type { ActionResultData, SearchResult } from '@/search/types';
+import { searchCommands } from '@/shared/constants/commands';
 
 registerSource({
   id: 'action',
