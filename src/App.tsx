@@ -21,7 +21,7 @@ import { setDefaultStream } from '@/store/chat';
 import { useHistoryStore } from '@/store/history';
 import { useUiStore } from '@/store/ui';
 import { isSessionTab, serializeSession, useWorkspaceStore } from '@/store/workspace';
-import '@/search/init'; // 触发所有搜索源自动注册
+import '@/features/search/init'; // 触发所有搜索源自动注册
 
 /**
  * App 布局（Dock 功能区系统）：
