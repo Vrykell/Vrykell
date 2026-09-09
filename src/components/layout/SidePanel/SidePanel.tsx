@@ -1,9 +1,9 @@
 import { type FC, useCallback } from 'react';
 import PanelTabs from '@/components/layout/PanelTabs/PanelTabs';
 import ResizeHandle from '@/components/ui/ResizeHandle/ResizeHandle';
-import PanelChat from '@/features/chat/PanelChat';
-import PanelFiles from '@/features/files/PanelFiles';
-import PanelSsh from '@/features/ssh/PanelSsh';
+import PanelChat from '@/features/chat/components/PanelChat';
+import PanelFiles from '@/features/files/components/PanelFiles';
+import PanelSsh from '@/features/ssh/components/PanelSsh';
 import { cx } from '@/shared/utils/cx';
 import { type DockSide, MIN_PANEL_WIDTH, PANEL_DEFS, useDockStore } from '@/store/dock';
 import { isSessionTab, useWorkspaceStore } from '@/store/workspace';

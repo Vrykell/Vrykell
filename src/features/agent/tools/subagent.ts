@@ -5,10 +5,10 @@
 import { invoke } from '@tauri-apps/api/core';
 import { generateText, tool } from 'ai';
 import { z } from 'zod';
-import { gate, type ToolContext } from '@/features/agent/permissions';
-import { getAgent, listAgents, removeAgent, saveAgent } from '@/features/agent/platform';
-import { createChatModel, type ProviderKind } from '@/features/agent/provider';
-import { DESC_SUBAGENT } from '@/features/agent/toolTexts';
+import { gate, type ToolContext } from '@/features/agent/services/permissions';
+import { getAgent, listAgents, removeAgent, saveAgent } from '@/features/agent/services/platform';
+import { createChatModel, type ProviderKind } from '@/features/agent/services/provider';
+import { DESC_SUBAGENT } from '@/features/agent/services/toolTexts';
 
 interface AiConfigRust {
   base_url: string;

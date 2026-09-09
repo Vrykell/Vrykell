@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import BlockOutput, { plainText } from '@/features/terminal/BlockOutput';
+import BlockOutput, { plainText } from '@/features/terminal/components/BlockOutput';
 
 // ═══════ Mock @xterm/xterm ═══════
 // xterm.js requires canvas + matchMedia which jsdom doesn't fully support.
@@ -227,7 +227,7 @@ vi.mock('@xterm/xterm', () => {
 import {
   captureTerminalOutput,
   extractSnapshotFromBuffer,
-} from '@/features/terminal/terminalSnapshot';
+} from '@/features/terminal/utils/terminalSnapshot';
 
 describe('extractSnapshotFromBuffer 宽字符', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

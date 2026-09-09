@@ -3,9 +3,9 @@
  */
 import { tool } from 'ai';
 import { z } from 'zod';
-import { gate, type ToolContext } from '@/features/agent/permissions';
-import { listSchedules, removeSchedule, saveSchedule } from '@/features/agent/platform';
-import { DESC_SCHEDULE } from '@/features/agent/toolTexts';
+import { gate, type ToolContext } from '@/features/agent/services/permissions';
+import { listSchedules, removeSchedule, saveSchedule } from '@/features/agent/services/platform';
+import { DESC_SCHEDULE } from '@/features/agent/services/toolTexts';
 
 export function buildScheduleTool(ctx: ToolContext) {
   return {

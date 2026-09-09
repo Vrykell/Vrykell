@@ -6,7 +6,7 @@ import {
   parentOf,
   pathSegments,
   segmentsToPath,
-} from '@/features/files/pathUtils';
+} from '@/features/files/services/pathUtils';
 
 describe('pathUtils', () => {
   it('normPath 归一化反斜杠并去尾斜杠', () => {

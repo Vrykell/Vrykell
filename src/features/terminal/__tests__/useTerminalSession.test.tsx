@@ -86,7 +86,7 @@ globalThis.ResizeObserver = class {
   disconnect() {}
 } as unknown as typeof ResizeObserver;
 
-import { useTerminalSession } from '@/features/terminal/useTerminalSession';
+import { useTerminalSession } from '@/features/terminal/hooks/useTerminalSession';
 import { onPtyOutput as mockedOnPtyOutput, ptySpawn as mockedPtySpawn } from '@/services/tauri/pty';
 import { leaf } from '@/services/tauri/windowLayout';
 import { useBlockStore } from '@/store/blocks';

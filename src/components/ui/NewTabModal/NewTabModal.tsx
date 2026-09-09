@@ -1,6 +1,6 @@
 import { Search, Server, Terminal } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ensureSshLoaded, useSshStore } from '@/features/ssh/store';
+import { ensureSshLoaded, useSshStore } from '@/features/ssh/services/store';
 import { getAvailableShells, type ShellOption } from '@/services/tauri/shells';
 import {
   buildNewTabOptions,

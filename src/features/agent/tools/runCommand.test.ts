@@ -8,7 +8,7 @@ vi.mock('../../lib/pty', () => ({
   ptyWrite: vi.fn(async () => {}),
 }));
 
-import { agentControl } from '@/features/agent/agentControl';
+import { agentControl } from '@/features/agent/services/agentControl';
 import { runCommandAndWait } from '@/features/agent/tools/runCommand';
 import type { TermBlock } from '@/features/terminal/pipeline/termBlock';
 import { useBlockStore } from '@/store/blocks';

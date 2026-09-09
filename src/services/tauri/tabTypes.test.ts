@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { SshConnection } from '@/features/ssh/api';
+import type { SshConnection } from '@/features/ssh/services/api';
 import type { ShellOption } from '@/services/tauri/shells';
 import {
   buildNewTabOptions,

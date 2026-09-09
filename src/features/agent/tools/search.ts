@@ -9,8 +9,8 @@
 import { invoke } from '@tauri-apps/api/core';
 import { tool } from 'ai';
 import { z } from 'zod';
-import { gate, type ToolContext } from '@/features/agent/permissions';
-import { DESC_LIST_DIR, DESC_SEARCH_FILES } from '@/features/agent/toolTexts';
+import { gate, type ToolContext } from '@/features/agent/services/permissions';
+import { DESC_LIST_DIR, DESC_SEARCH_FILES } from '@/features/agent/services/toolTexts';
 
 interface FsEntry {
   name: string;

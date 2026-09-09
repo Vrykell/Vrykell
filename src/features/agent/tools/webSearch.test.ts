@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { type ToolContext, usePermissions } from '@/features/agent/permissions';
+import { type ToolContext, usePermissions } from '@/features/agent/services/permissions';
 import { buildTavilySearchTool, formatResults } from '@/features/agent/tools/webSearch';
 
 // 本文件测 invoke 参数/结果映射，不测门控（门控见 permissions.test.ts）

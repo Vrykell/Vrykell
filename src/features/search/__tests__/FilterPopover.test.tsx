@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { FileText, Terminal } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
-import FilterPopover from '@/features/search/FilterPopover';
+import FilterPopover from '@/features/search/components/FilterPopover';
 import { registerSource } from '@/features/search/registry';
 
 // 注册两个假源（避免 import search/init 拉入后端 invoke）

@@ -14,7 +14,7 @@
  * 约定：永不 throw —— 返回结构化结果，让模型自我修正。
  */
 
-import { agentControl } from '@/features/agent/agentControl';
+import { agentControl } from '@/features/agent/services/agentControl';
 import { ptyWrite } from '@/services/tauri/pty';
 import { useBlockStore } from '@/store/blocks';
 import { getFocusedTerminalId, getRecentOutputFor, useTerminalStore } from '@/store/terminal';

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { useToastStore } from '@/components/ui/Toast/Toast';
-import { defaultOpenModeForShell, useAgentSettings } from '@/features/agent/agentSettings';
+import { defaultOpenModeForShell, useAgentSettings } from '@/features/agent/services/agentSettings';
 import type { BackendGroupEntry } from '@/features/search/types';
 import { t } from '@/i18n';
 import {

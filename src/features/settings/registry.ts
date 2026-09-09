@@ -1,4 +1,4 @@
-import { loadConfig, serializeTemplates } from '@/features/files/fileOpen';
+import { loadConfig, serializeTemplates } from '@/features/files/services/fileOpen';
 import { getModel, isApiKeyConfigured } from '@/services/tauri/ai';
 import { useWorkspaceStore } from '@/store/workspace';
 
