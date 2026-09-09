@@ -3,8 +3,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { InputVisibilityContext } from '@/features/terminal/inputVisibility';
-import { getLongRunningHint, isInputBoxVisible } from '@/features/terminal/inputVisibility';
+import type { InputVisibilityContext } from '@/features/terminal/hooks/inputVisibility';
+import { getLongRunningHint, isInputBoxVisible } from '@/features/terminal/hooks/inputVisibility';
 
 function ctx(overrides: Partial<InputVisibilityContext> = {}): InputVisibilityContext {
   return {

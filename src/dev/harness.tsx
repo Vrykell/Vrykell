@@ -12,8 +12,8 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@/theme.css';
-import PanelChat from '@/features/chat/PanelChat';
-import InputEditor from '@/features/terminal/InputEditor';
+import PanelChat from '@/features/chat/components/PanelChat';
+import InputEditor from '@/features/terminal/components/InputEditor';
 import { firstLeaf } from '@/services/tauri/windowLayout';
 import { useChatStore } from '@/store/chat';
 import { useTerminalStore } from '@/store/terminal';

@@ -2,7 +2,7 @@
  * tools/index — buildTools 组装与 deny 过滤测试。
  */
 import { describe, expect, it } from 'vitest';
-import { usePermissions } from '@/features/agent/permissions';
+import { usePermissions } from '@/features/agent/services/permissions';
 import { buildTools } from '@/features/agent/tools/index';
 
 describe('buildTools', () => {

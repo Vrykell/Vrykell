@@ -17,7 +17,8 @@ import {
   levelOf,
   TOOL_NAMES,
   type ToolContext,
-} from '@/features/agent/permissions';
+} from '@/features/agent/services/permissions';
+import { DESC_RUN_COMMAND } from '@/features/agent/services/toolTexts';
 import { buildFileTools } from '@/features/agent/tools/files';
 import { buildMemoryTool } from '@/features/agent/tools/memory';
 import { runCommandAndWait } from '@/features/agent/tools/runCommand';
@@ -26,9 +27,8 @@ import { buildSearchTools } from '@/features/agent/tools/search';
 import { buildInstallSkillTool, buildSkillTool } from '@/features/agent/tools/skill';
 import { buildSubagentTool } from '@/features/agent/tools/subagent';
 import { buildTerminalTools } from '@/features/agent/tools/terminal';
-import { DESC_RUN_COMMAND } from '@/features/agent/toolTexts';
 
-export type { ToolContext } from '@/features/agent/permissions';
+export type { ToolContext } from '@/features/agent/services/permissions';
 
 export function buildTools(ctx: ToolContext) {
   const all = {

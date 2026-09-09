@@ -5,14 +5,14 @@
  */
 import { tool } from 'ai';
 import { z } from 'zod';
-import { gate, type ToolContext } from '@/features/agent/permissions';
+import { gate, type ToolContext } from '@/features/agent/services/permissions';
 import {
   appendMemoryJournal,
   getMemory,
   getMemoryJournal,
   setMemory,
-} from '@/features/agent/platform';
-import { DESC_MEMORY } from '@/features/agent/toolTexts';
+} from '@/features/agent/services/platform';
+import { DESC_MEMORY } from '@/features/agent/services/toolTexts';
 
 export function buildMemoryTool(ctx: ToolContext) {
   return {

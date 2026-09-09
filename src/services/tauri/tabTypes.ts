@@ -1,4 +1,4 @@
-import type { SshConnection } from '@/features/ssh/api';
+import type { SshConnection } from '@/features/ssh/services/api';
 import { safeLocalStorageGet, safeLocalStorageSet } from '@/services/tauri/errorHandler';
 import type { ShellOption, ShellType } from '@/services/tauri/shells';
 

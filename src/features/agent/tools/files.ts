@@ -9,8 +9,12 @@
 import { invoke } from '@tauri-apps/api/core';
 import { tool } from 'ai';
 import { z } from 'zod';
-import { ensureSkillAccess, gate, type ToolContext } from '@/features/agent/permissions';
-import { DESC_EDIT_FILE, DESC_READ_FILE, DESC_WRITE_FILE } from '@/features/agent/toolTexts';
+import { ensureSkillAccess, gate, type ToolContext } from '@/features/agent/services/permissions';
+import {
+  DESC_EDIT_FILE,
+  DESC_READ_FILE,
+  DESC_WRITE_FILE,
+} from '@/features/agent/services/toolTexts';
 
 /** invoke 结果统一成结构化结果（约定见 tools/index.ts 头注释） */
 async function call<T>(

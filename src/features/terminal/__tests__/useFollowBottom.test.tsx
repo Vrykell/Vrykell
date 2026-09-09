@@ -4,7 +4,7 @@ import {
   engageFollow,
   registerFollowEngager,
   useFollowBottom,
-} from '@/features/terminal/useFollowBottom';
+} from '@/features/terminal/hooks/useFollowBottom';
 
 function makeEl(scrollTop: number) {
   const el = document.createElement('div');

@@ -9,9 +9,9 @@
 
 import { tool } from 'ai';
 import { z } from 'zod';
-import { gate, type ToolContext } from '@/features/agent/permissions';
-import { getSkill, installSkillMd, listSkills } from '@/features/agent/skills';
-import { DESC_INSTALL_SKILL, DESC_USE_SKILL } from '@/features/agent/toolTexts';
+import { gate, type ToolContext } from '@/features/agent/services/permissions';
+import { getSkill, installSkillMd, listSkills } from '@/features/agent/services/skills';
+import { DESC_INSTALL_SKILL, DESC_USE_SKILL } from '@/features/agent/services/toolTexts';
 
 export function buildSkillTool(ctx: ToolContext) {
   return {

@@ -14,8 +14,8 @@
 import { invoke } from '@tauri-apps/api/core';
 import { tool } from 'ai';
 import { z } from 'zod';
-import { gate, type ToolContext } from '@/features/agent/permissions';
-import { DESC_WEB_SEARCH_TAVILY } from '@/features/agent/toolTexts';
+import { gate, type ToolContext } from '@/features/agent/services/permissions';
+import { DESC_WEB_SEARCH_TAVILY } from '@/features/agent/services/toolTexts';
 
 interface TavilyResult {
   title?: string;

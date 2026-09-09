@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { create } from 'zustand';
-import type { ProviderKind } from '@/features/agent/provider';
+import type { ProviderKind } from '@/features/agent/services/provider';
 import type { StreamFn } from '@/store/chat';
 
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';

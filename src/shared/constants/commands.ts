@@ -1,4 +1,4 @@
-import { clearSessionBlocks } from '@/features/terminal/useTerminalSession';
+import { clearSessionBlocks } from '@/features/terminal/hooks/useTerminalSession';
 import { useBlockStore } from '@/store/blocks';
 import { useDockStore } from '@/store/dock';
 import { termInstances } from '@/store/terminal';

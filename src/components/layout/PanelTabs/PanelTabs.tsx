@@ -16,7 +16,7 @@ import { IconBtn } from '@/components/ui/Button/Button';
 import ContextMenu, { type ContextMenuItem } from '@/components/ui/ContextMenu/ContextMenu';
 import NewTabModal from '@/components/ui/NewTabModal/NewTabModal';
 import { useToastStore } from '@/components/ui/Toast/Toast';
-import { regenerateTitle } from '@/features/agent/title';
+import { regenerateTitle } from '@/features/agent/services/title';
 import { shellTypeLabel } from '@/services/tauri/shells';
 import { cx } from '@/shared/utils/cx';
 import {

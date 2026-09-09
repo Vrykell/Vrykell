@@ -27,7 +27,7 @@ vi.mock('../../stores/terminal', () => ({
   termInstances: new Map(),
 }));
 
-import { type ToolContext, usePermissions } from '@/features/agent/permissions';
+import { type ToolContext, usePermissions } from '@/features/agent/services/permissions';
 import { buildTerminalTools } from '@/features/agent/tools/terminal';
 import { useBlockStore } from '@/store/blocks';
 
