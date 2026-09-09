@@ -21,8 +21,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Brain, ChevronRight, Copy, Pencil, RotateCw, Trash2, Zap } from 'lucide-react';
 import { ask } from '@tauri-apps/plugin-dialog';
-import { useChatStore } from '../stores/chat';
-import { useWorkspaceStore } from '../stores/workspace';
+import { useChatStore } from '../store/chat';
+import { useWorkspaceStore } from '../store/workspace';
 import SafeMarkdown from './SafeMarkdown';
 import ToolNode from './ToolNode';
 import ToolRunCard from './ToolRunCard';

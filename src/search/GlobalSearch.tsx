@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { ChevronDown, Search, type LucideIcon } from 'lucide-react';
 import { useSearchEngine } from './engine';
-import { useSearchHistoryStore } from '../stores/searchHistory';
-import { useSearchHighlightStore } from '../stores/searchHighlight';
-import { useWorkspaceStore } from '../stores/workspace';
-import { useTerminalStore } from '../stores/terminal';
+import { useSearchHistoryStore } from '../store/searchHistory';
+import { useSearchHighlightStore } from '../store/searchHighlight';
+import { useWorkspaceStore } from '../store/workspace';
+import { useTerminalStore } from '../store/terminal';
 import { getCommands } from '../commands';
 import * as sessionManager from '../lib/sessionManager';
 import type { ResultType, SearchResult, BlockResultData, HistoryResultData, FileResultData, ActionResultData, SessionResultData } from './types';

@@ -8,7 +8,7 @@ import {
   type NewTabOption,
 } from '../lib/tabTypes';
 import { useSshStore, ensureSshLoaded } from '../ssh/store';
-import { useWorkspaceStore } from '../stores/workspace';
+import { useWorkspaceStore } from '../store/workspace';
 import type { TerminalSpec } from '../lib/windowLayout';
 
 interface Props {

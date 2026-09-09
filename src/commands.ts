@@ -1,8 +1,8 @@
-import { useWorkspaceStore } from './stores/workspace';
-import { useBlockStore } from './stores/blocks';
-import { useUiStore } from './stores/ui';
-import { useDockStore } from './stores/dock';
-import { termInstances } from './stores/terminal';
+import { useWorkspaceStore } from './store/workspace';
+import { useBlockStore } from './store/blocks';
+import { useUiStore } from './store/ui';
+import { useDockStore } from './store/dock';
+import { termInstances } from './store/terminal';
 import { clearSessionBlocks } from './terminal/useTerminalSession';
 
 /** 应用命令定义 — 被 CommandPalette 和全局搜索共用 */

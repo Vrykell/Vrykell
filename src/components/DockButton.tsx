@@ -1,5 +1,5 @@
 import { useT } from '../i18n';
-import { PANEL_DEFS } from '../stores/dock';
+import { PANEL_DEFS } from '../store/dock';
 import { ToolbarBtn } from './UiBtn';
 
 interface DockButtonProps {

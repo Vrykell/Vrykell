@@ -5,7 +5,7 @@ import { groupsList, groupRestore, groupDeleteWithSessions } from '../api/group'
 import type { BackendSessionEntry, BackendGroupEntry } from '../search/types';
 import { filterSessions, isSshSession, type SessionDateFilter, type SessionTypeFilter } from './sessionFilter';
 import * as sessionManager from '../lib/sessionManager';
-import { useWorkspaceStore } from '../stores/workspace';
+import { useWorkspaceStore } from '../store/workspace';
 import { useToastStore } from './Toast';
 
 const TYPE_OPTIONS: { value: SessionTypeFilter; label: string }[] = [

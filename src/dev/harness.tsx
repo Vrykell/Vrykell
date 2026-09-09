@@ -12,9 +12,9 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../theme.css';
-import { useTerminalStore } from '../stores/terminal';
-import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
-import { useChatStore } from '../stores/chat';
+import { useTerminalStore } from '../store/terminal';
+import { useWorkspaceStore, isSessionTab } from '../store/workspace';
+import { useChatStore } from '../store/chat';
 import { firstLeaf } from '../lib/windowLayout';
 import InputEditor from '../terminal/InputEditor';
 import PanelChat from '../chat/PanelChat';
