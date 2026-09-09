@@ -11,7 +11,11 @@
 
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import '@/theme.css';
+import '@/styles/reset.css';
+import '@/styles/tokens.css';
+import '@/styles/base.css';
+import '@/styles/animations.css';
+import '@/styles/xterm.css';
 import PanelChat from '@/features/chat/components/PanelChat';
 import InputEditor from '@/features/terminal/components/InputEditor';
 import { firstLeaf } from '@/services/tauri/windowLayout';
