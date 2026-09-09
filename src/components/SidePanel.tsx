@@ -1,6 +1,6 @@
 import { useCallback, type FC } from 'react';
-import { useDockStore, PANEL_DEFS, MIN_PANEL_WIDTH, type DockSide } from '../stores/dock';
-import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
+import { useDockStore, PANEL_DEFS, MIN_PANEL_WIDTH, type DockSide } from '../store/dock';
+import { useWorkspaceStore, isSessionTab } from '../store/workspace';
 import ResizeHandle from './ResizeHandle';
 import PanelTabs from './PanelTabs';
 import PanelFiles from '../files/PanelFiles';

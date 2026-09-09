@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { ptyWrite } from '../lib/pty';
-import { useTerminalStore } from '../stores/terminal';
-import { useChatStore } from '../stores/chat';
-import { useWorkspaceStore } from '../stores/workspace';
-import { useBlockStore } from '../stores/blocks';
+import { useTerminalStore } from '../store/terminal';
+import { useChatStore } from '../store/chat';
+import { useWorkspaceStore } from '../store/workspace';
+import { useBlockStore } from '../store/blocks';
 import { clearSessionBlocks } from './useTerminalSession';
 import { fmtDuration } from '../components/UiBtn';
 import type { TermBlock } from './pipeline/termBlock';

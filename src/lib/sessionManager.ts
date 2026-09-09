@@ -4,10 +4,10 @@
  * 所有会话/块的持久化操作都通过此模块，封装后端 invoke + 前端 store 同步。
  * 后续添加会话管理 UI 时，只需接入同一套 API。
  */
-import { useWorkspaceStore, type Tab } from '../stores/workspace';
-import { useBlockStore } from '../stores/blocks';
+import { useWorkspaceStore, type Tab } from '../store/workspace';
+import { useBlockStore } from '../store/blocks';
 import { sanitizeOutputHtml } from './sanitizeHtml';
-import { useChatStore } from '../stores/chat';
+import { useChatStore } from '../store/chat';
 import { deserializeParts } from '../agent/messageParts';
 import { deserializeAttachments } from '../agent/attachments';
 import { leaf, type WindowLayout } from './windowLayout';

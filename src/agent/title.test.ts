@@ -13,9 +13,9 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 import { maybeAutoTitle, sanitizeTitle, resetTitleState } from './title';
 import { useAgentSettings, DEFAULT_AGENT_SETTINGS } from './agentSettings';
 import { useAiConfigStore } from '../lib/ai';
-import { useBlockStore } from '../stores/blocks';
-import { useChatStore } from '../stores/chat';
-import { useWorkspaceStore } from '../stores/workspace';
+import { useBlockStore } from '../store/blocks';
+import { useChatStore } from '../store/chat';
+import { useWorkspaceStore } from '../store/workspace';
 import { leaf } from '../lib/windowLayout';
 
 function mkTab(id: string, extra: Record<string, unknown> = {}) {

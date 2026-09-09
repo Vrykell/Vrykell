@@ -13,7 +13,7 @@ vi.mock('ai', () => ({ generateText: mockGenerate }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import { completeCommand, localComplete, pathComplete, looksLikePath } from './complete';
-import { useHistoryStore } from '../stores/history';
+import { useHistoryStore } from '../store/history';
 import { useAgentSettings, DEFAULT_AGENT_SETTINGS } from './agentSettings';
 import { useAiConfigStore } from '../lib/ai';
 

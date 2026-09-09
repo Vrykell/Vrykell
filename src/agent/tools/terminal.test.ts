@@ -12,7 +12,7 @@ const { termMock } = vi.hoisted(() => ({
     screen: null as { text?: string } | null,
   },
 }));
-vi.mock('../../stores/terminal', () => ({
+vi.mock('../../store/terminal', () => ({
   useTerminalStore: {
     getState: () => termMock.state,
     setState: (p: unknown) => Object.assign(termMock.state, p),
@@ -24,7 +24,7 @@ vi.mock('../../stores/terminal', () => ({
 
 import { buildTerminalTools } from './terminal';
 import { usePermissions, type ToolContext } from '../permissions';
-import { useBlockStore } from '../../stores/blocks';
+import { useBlockStore } from '../../store/blocks';
 
 usePermissions.setState({ levels: { read_terminal: 'allow', terminal_keys: 'allow' } });
 const CTX: ToolContext = {};

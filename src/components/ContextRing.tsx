@@ -1,7 +1,7 @@
 /**
  * ContextRing — 上下文占用圆环（估算 token / 预算）。压缩完成时数值变小，圆环自动减少。
  */
-import { useContextUsage } from '../stores/chat';
+import { useContextUsage } from '../store/chat';
 
 export default function ContextRing() {
   const { used, budget } = useContextUsage();

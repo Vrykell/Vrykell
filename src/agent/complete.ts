@@ -15,7 +15,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { createChatModel } from './provider';
 import { useAgentSettings } from './agentSettings';
 import { activeModelProfile, isApiKeyConfigured } from '../lib/ai';
-import { useHistoryStore } from '../stores/history';
+import { useHistoryStore } from '../store/history';
 
 export interface CompleteOptions {
   cwd?: string;

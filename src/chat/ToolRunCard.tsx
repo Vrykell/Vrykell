@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import ToolNode from './ToolNode';
 import BlockOutput from '../terminal/BlockOutput';
-import { useBlockStore } from '../stores/blocks';
+import { useBlockStore } from '../store/blocks';
 import { agentControl } from '../agent/agentControl';
 import { resolveApproval } from '../agent/permissions';
 import type { ToolRun, ToolRunState } from '../agent/messageParts';

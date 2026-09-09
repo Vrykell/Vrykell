@@ -1,11 +1,11 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { Terminal, Settings, Search } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { useDockStore, PANEL_DEFS, type DockSide } from '../stores/dock';
+import { useDockStore, PANEL_DEFS, type DockSide } from '../store/dock';
 import DockButton from './DockButton';
 import { ToolbarBtn } from './UiBtn';
-import { useUiStore } from '../stores/ui';
-import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
+import { useUiStore } from '../store/ui';
+import { useWorkspaceStore, isSessionTab } from '../store/workspace';
 import { isMacOS } from '../lib/platform';
 
 /** 按 clientX 判定落在哪个 zone */

@@ -3,7 +3,7 @@ import {
   History, Plus, Search, Server, Settings, SquareTerminal,
   ChevronRight, Pencil, Archive, Folder, Trash2,
 } from 'lucide-react';
-import { useWorkspaceStore, isSessionTab, firstTerminalOf, terminalsOf, type Tab, type TabGroup } from '../stores/workspace';
+import { useWorkspaceStore, isSessionTab, firstTerminalOf, terminalsOf, type Tab, type TabGroup } from '../store/workspace';
 import { regenerateTitle } from '../agent/title';
 import { useToastStore } from './Toast';
 import { IconBtn } from './UiBtn';

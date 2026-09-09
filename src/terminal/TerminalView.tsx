@@ -8,14 +8,14 @@
  */
 
 import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
-import { useWorkspaceStore, nextTerminalId, type Tab } from '../stores/workspace';
+import { useWorkspaceStore, nextTerminalId, type Tab } from '../store/workspace';
 import { defaultOpenModeForShell } from '../agent/agentSettings';
-import { useTerminalStore } from '../stores/terminal';
-import { useUiStore } from '../stores/ui';
-import { useDockDragStore } from '../stores/dockDrag';
-import { useBlockStore, selectBlocks } from '../stores/blocks';
-import { usePaneMessages } from '../stores/chat';
-import { useChatPanelOpen } from '../stores/dock';
+import { useTerminalStore } from '../store/terminal';
+import { useUiStore } from '../store/ui';
+import { useDockDragStore } from '../store/dockDrag';
+import { useBlockStore, selectBlocks } from '../store/blocks';
+import { usePaneMessages } from '../store/chat';
+import { useChatPanelOpen } from '../store/dock';
 import { ptyWrite } from '../lib/pty';
 import { killForeground, ESCALATE_WINDOW_MS } from '../lib/killForeground';
 import { useToastStore } from '../components/Toast';

@@ -19,8 +19,8 @@ import {
   useTerminalStore,
   getFocusedTerminalId,
   getRecentOutputFor,
-} from '../../stores/terminal';
-import { useBlockStore } from '../../stores/blocks';
+} from '../../store/terminal';
+import { useBlockStore } from '../../store/blocks';
 import { agentControl } from '../agentControl';
 
 export interface RunCommandResult {
