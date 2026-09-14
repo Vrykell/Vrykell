@@ -157,7 +157,7 @@ export async function attachmentsForModel(
   return { text: textParts.join('\n\n'), images };
 }
 
-/** 附件合计大小（前端限额校验用） */
+/** 附件合计大小 */
 export function totalSize(atts: AttachmentMeta[]): number {
   return atts.reduce((s, a) => s + a.size, 0);
 }
