@@ -32,12 +32,12 @@ import { agentControl } from '@features/agent/services/agentControl';
 import { useAgentSettings, usePermissions } from '@entities/agent';
 import { LIMITS, importFileAsAttachment, totalSize, saveBlobAsAttachment, makePasteAttachment, type AttachmentMeta } from '@features/agent/model/attachments';
 import { completeCommand, localCompleteCandidates } from '@features/agent/services/complete';
-import { useHistoryStore } from '@entities/terminal';
 import { useDockStore } from '@shared/ui';
 import { useToastStore } from '@/components/Toast';
 import { engageFollow } from '@features/terminal/hooks/useFollowBottom';
 import AttachmentChips from '@features/chat/components/AttachmentChips';
 import ShellIndicator from '@features/terminal/components/ShellIndicator';
+import { useCommandHistoryNavigation } from '@features/terminal/hooks/useCommandHistoryNavigation';
 
 /** 权限模式循环（与 PanelChat 顶栏同款三色 Shield）：标准=逐工具 / 严格=逐次问 / 放行=直放 */
 const PERM_MODES = [
@@ -318,35 +318,12 @@ export default function InputEditor({
 
   // ── ↑/↓ 翻命令历史（cmd 模式、单行时；fish 式按当前前缀过滤） ──
   // idx=-1 表示未在翻历史；base 记录开始翻之前的草稿，翻到底（ArrowDown 越界）还原
-  const histNav = useRef<{ idx: number; base: string }>({ idx: -1, base: '' });
-  const resetHistNav = useCallback(() => {
-    histNav.current = { idx: -1, base: '' };
-  }, []);
-
-  const navHistory = useCallback(
-    (dir: 1 | -1) => {
-      const entries = useHistoryStore.getState().entries;
-      const nav = histNav.current;
-      const base = nav.idx === -1 ? text : nav.base;
-      const candidates = entries.filter(
-        (e) => e.command.startsWith(base) && e.command.length > base.length,
-      );
-      const next = nav.idx + dir;
-      if (next < -1 || next >= candidates.length) return false;
-      histNav.current = { idx: next, base };
-      setText(next === -1 ? base : candidates[next]!.command);
-      clearGhost();
-      // 光标移到行尾（受控 textarea 更新后光标停在原处）
-      const el = inputRef.current;
-      if (el) {
-        requestAnimationFrame(() => {
-          el.selectionStart = el.selectionEnd = el.value.length;
-        });
-      }
-      return true;
-    },
-    [text, setText, clearGhost],
-  );
+  const { reset: resetHistNav, navigate: navHistory } = useCommandHistoryNavigation({
+    text,
+    setText,
+    inputRef,
+    onNavigate: clearGhost,
+  });
 
   // ── AI 面板开启时锁定 cmd 模式（AI 提问收口到面板；切换按钮显式禁用） ──
   const chatOpen = useDockStore((s) => s.leftPanels.includes('chat') || s.rightPanels.includes('chat'));
