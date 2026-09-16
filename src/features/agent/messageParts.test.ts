@@ -7,7 +7,7 @@ import {
   deserializeParts,
   partsToHistoryText,
   type MessagePart,
-} from '@features/agent/messageParts';
+} from '@features/agent/model/messageParts';
 
 const sampleParts: MessagePart[] = [
   { kind: 'text', text: '我来看看。' },

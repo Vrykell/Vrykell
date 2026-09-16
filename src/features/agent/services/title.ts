@@ -13,8 +13,8 @@
  * workspace.autoTitle（复用 rename 落库路径，named/titleAuto 置位）。
  */
 import { generateText } from 'ai';
-import { createChatModel } from '@features/agent/provider';
-import { useAgentSettings } from '@features/agent/agentSettings';
+import { createChatModel } from '@features/agent/services/provider';
+import { useAgentSettings } from '@features/agent/stores/agentSettings';
 import { activeModelProfile, isApiKeyConfigured } from '@/lib/ai';
 import { useBlockStore } from '@entities/terminal';
 import { useChatStore } from '@entities/chat';

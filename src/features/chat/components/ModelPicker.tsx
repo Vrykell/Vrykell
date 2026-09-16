@@ -12,12 +12,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Bot, BrainCircuit, Check, ChevronDown, Eye, Globe, Search, SlidersHorizontal, Wrench, X } from 'lucide-react';
 import { useAiConfigStore, setActiveModel, type ModelProfile } from '@/lib/ai';
-import { useAgentSettings } from '@features/agent/agentSettings';
+import { useAgentSettings } from '@features/agent/stores/agentSettings';
 import {
   CAPABILITY_LABELS, detectCapabilities, hasCapability,
   type ModelCapability,
-} from '@features/agent/capabilities';
-import { modelIcon, providerLabel } from '@features/agent/modelIcon';
+} from '@features/agent/model/capabilities';
+import { modelIcon, providerLabel } from '@features/agent/components/modelIcon';
 import { useToastStore } from '@/components/Toast';
 
 const CAP_ORDER: ModelCapability[] = ['vision', 'reasoning', 'tools', 'search'];

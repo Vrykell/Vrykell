@@ -12,8 +12,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, type LucideIcon } from 'lucide-react';
 import { useAiConfigStore } from '@/lib/ai';
-import { useAgentSettings } from '@features/agent/agentSettings';
-import { modelIcon } from '@features/agent/modelIcon';
+import { useAgentSettings } from '@features/agent/stores/agentSettings';
+import { modelIcon } from '@features/agent/components/modelIcon';
 import ModelPicker from '@features/chat/components/ModelPicker';
 
 const LEVEL_LABEL: Record<string, string> = { low: '低', medium: '中', high: '高' };

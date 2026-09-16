@@ -8,10 +8,10 @@
  */
 
 import { tool } from 'ai';
-import { DESC_WEB_SEARCH_DDG, DESC_WEB_FETCH, DESC_WEB_CRAWL } from '@features/agent/toolTexts';
+import { DESC_WEB_SEARCH_DDG, DESC_WEB_FETCH, DESC_WEB_CRAWL } from '@features/agent/model/toolTexts';
 import { z } from 'zod';
 import { invoke } from '@tauri-apps/api/core';
-import { gate, type ToolContext } from '@features/agent/permissions';
+import { gate, type ToolContext } from '@features/agent/stores/permissions';
 
 interface WebResultItem {
   title?: string;

@@ -3,7 +3,7 @@
  */
 import { useState } from 'react';
 import { useAiConfigStore } from '@/lib/ai';
-import { useAgentSettings, type AgentSettings, type ModelBehaviorSettings } from '@features/agent/agentSettings';
+import { useAgentSettings, type AgentSettings, type ModelBehaviorSettings } from '@features/agent/stores/agentSettings';
 import Segmented from '@/components/Segmented';
 import { ModelScopeBar } from '@features/chat/components/ModelPicker';
 import { Field, Toggle, NumberInput, inputStyle, btnStyle } from '@features/settings/components/ui';

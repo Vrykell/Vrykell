@@ -2,8 +2,8 @@
  * provider — 思考强度映射与模型工厂测试。
  */
 import { describe, it, expect, vi } from 'vitest';
-vi.mock('@features/agent/llmFetch', () => ({ createProxyFetch: () => vi.fn() }));
-import { deepThinkProviderOptions, createChatModel } from '@features/agent/provider';
+vi.mock('@features/agent/services/llmFetch', () => ({ createProxyFetch: () => vi.fn() }));
+import { deepThinkProviderOptions, createChatModel } from '@features/agent/services/provider';
 
 describe('deepThinkProviderOptions', () => {
   it('openai-compatible → reasoning_effort 按档位', () => {

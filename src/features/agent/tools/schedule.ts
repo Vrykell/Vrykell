@@ -2,10 +2,10 @@
  * schedule — 定时任务工具：create/list/toggle/remove，让 LLM 自己管理定时任务。
  */
 import { tool } from 'ai';
-import { DESC_SCHEDULE } from '@features/agent/toolTexts';
+import { DESC_SCHEDULE } from '@features/agent/model/toolTexts';
 import { z } from 'zod';
-import { listSchedules, saveSchedule, removeSchedule } from '@features/agent/platform';
-import { gate, type ToolContext } from '@features/agent/permissions';
+import { listSchedules, saveSchedule, removeSchedule } from '@features/agent/services/platform';
+import { gate, type ToolContext } from '@features/agent/stores/permissions';
 
 export function buildScheduleTool(ctx: ToolContext) {
   return {

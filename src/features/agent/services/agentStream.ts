@@ -7,23 +7,23 @@
  * agentMode 关闭时 tools=undefined，行为等价 M0 纯文本路径。
  * 网络层走 createChatModel 注入的 Rust 代理 fetch（key 不出 Rust）。
  */
-import { describeError } from '@features/agent/agentErrors';
+import { describeError } from '@features/agent/model/agentErrors';
 import { stepCountIs, streamText, type ModelMessage, type ToolSet } from 'ai';
 import { invoke } from '@tauri-apps/api/core';
 import type { StreamFn } from '@entities/chat';
-import { createChatModel, createNativeWebSearchTool, deepThinkProviderOptions, type ProviderKind } from '@features/agent/provider';
-import { useAgentSettings } from '@features/agent/agentSettings';
-import { estimateTokens, planContext, IMAGE_TOKEN_ESTIMATE, type SizedMessage } from '@features/agent/context';
-import { attachmentsForModel, supportsVision } from '@features/agent/attachments';
+import { createChatModel, createNativeWebSearchTool, deepThinkProviderOptions, type ProviderKind } from '@features/agent/services/provider';
+import { useAgentSettings } from '@features/agent/stores/agentSettings';
+import { estimateTokens, planContext, IMAGE_TOKEN_ESTIMATE, type SizedMessage } from '@features/agent/model/context';
+import { attachmentsForModel, supportsVision } from '@features/agent/model/attachments';
 import { buildTools } from '@features/agent/tools';
 import { buildTavilySearchTool } from '@features/agent/tools/webSearch';
 import { buildWebSearchTool, buildWebFetchTool, buildWebCrawlTool } from '@features/agent/tools/webFetch';
-import { buildSystemPrompt } from '@features/agent/systemPrompt';
-import { listSkills, buildSkillsContext, availableSkillMetas } from '@features/agent/skills';
-import { getMemory, getMemoryJournal, listAgents } from '@features/agent/platform';
-import { listMcpTools, buildMcpTool } from '@features/agent/mcp';
-import { levelOf, type ToolContext } from '@features/agent/permissions';
-import type { ToolRunState } from '@features/agent/messageParts';
+import { buildSystemPrompt } from '@features/agent/model/systemPrompt';
+import { listSkills, buildSkillsContext, availableSkillMetas } from '@features/agent/services/skills';
+import { getMemory, getMemoryJournal, listAgents } from '@features/agent/services/platform';
+import { listMcpTools, buildMcpTool } from '@features/agent/services/mcp';
+import { levelOf, type ToolContext } from '@features/agent/stores/permissions';
+import type { ToolRunState } from '@features/agent/model/messageParts';
 
 interface AiConfigInfoRust {
   has_key: boolean;

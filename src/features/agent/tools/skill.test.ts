@@ -7,7 +7,7 @@ const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import { buildSkillTool, buildInstallSkillTool } from '@features/agent/tools/skill';
-import { usePermissions, type ToolContext } from '@features/agent/permissions';
+import { usePermissions, type ToolContext } from '@features/agent/stores/permissions';
 
 usePermissions.setState({ levels: { use_skill: 'allow', install_skill: 'allow' } });
 const CTX: ToolContext = {};

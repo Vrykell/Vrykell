@@ -10,7 +10,7 @@
  */
 
 import { tool, type ToolSet } from 'ai';
-import { DESC_RUN_COMMAND } from '@features/agent/toolTexts';
+import { DESC_RUN_COMMAND } from '@features/agent/model/toolTexts';
 import { z } from 'zod';
 import { runCommandAndWait } from '@features/agent/tools/runCommand';
 import { buildFileTools } from '@features/agent/tools/files';
@@ -20,9 +20,9 @@ import { buildSkillTool, buildInstallSkillTool } from '@features/agent/tools/ski
 import { buildMemoryTool } from '@features/agent/tools/memory';
 import { buildScheduleTool } from '@features/agent/tools/schedule';
 import { buildSubagentTool } from '@features/agent/tools/subagent';
-import { gate, levelOf, ensureSkillAccess, TOOL_NAMES, type ToolContext } from '@features/agent/permissions';
+import { gate, levelOf, ensureSkillAccess, TOOL_NAMES, type ToolContext } from '@features/agent/stores/permissions';
 
-export type { ToolContext } from '@features/agent/permissions';
+export type { ToolContext } from '@features/agent/stores/permissions';
 
 export function buildTools(ctx: ToolContext) {
   const all = {

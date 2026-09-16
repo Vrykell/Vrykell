@@ -7,9 +7,9 @@ import {
   setProviderKey, clearProviderKey, setAiModels, setActiveModel, useAiConfigStore,
   type ModelProfile,
 } from '@/lib/ai';
-import type { ProviderKind } from '@features/agent/provider';
-import { detectCapabilities, type ModelCapability } from '@features/agent/capabilities';
-import { modelIcon, providerLabel } from '@features/agent/modelIcon';
+import type { ProviderKind } from '@features/agent/services/provider';
+import { detectCapabilities, type ModelCapability } from '@features/agent/model/capabilities';
+import { modelIcon, providerLabel } from '@features/agent/components/modelIcon';
 import Segmented from '@/components/Segmented';
 import { useToastStore } from '@/components/Toast';
 import { Field, ModelTextInput, btnStyle, inputStyle } from '@features/settings/components/ui';

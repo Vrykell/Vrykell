@@ -10,8 +10,8 @@ import {
 import type { BackendGroupEntry } from '@features/search/types';
 import { useBlockStore } from '@/store/blocks';
 import { useChatStore } from '@/store/chat';
-import { useAgentSettings } from '@features/agent/agentSettings';
-import { defaultOpenModeForShell } from '@features/agent/agentSettings';
+import { useAgentSettings } from '@features/agent/stores/agentSettings';
+import { defaultOpenModeForShell } from '@features/agent/stores/agentSettings';
 import { useTerminalStore, getFocusedTerminalId } from '@/store/terminal';
 import type { ShellType } from '@/lib/shells';
 import { shellTypeLabel } from '@/lib/shells';

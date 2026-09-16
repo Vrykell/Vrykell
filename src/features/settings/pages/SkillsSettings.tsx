@@ -13,7 +13,7 @@ import {
   listSkills, getSkill, removeSkill, installSkillMd, fetchRemoteSkills, importSkillsFromPath,
   setSkillState, readSkillFile, marketGithubList, marketGithubInstall,
   type SkillMeta, type SkillDetail, type MarketSkill,
-} from '@features/agent/skills';
+} from '@features/agent/services/skills';
 import { useToastStore } from '@/components/Toast';
 
 const toast = (msg: string, type: 'info' | 'success' | 'error') =>

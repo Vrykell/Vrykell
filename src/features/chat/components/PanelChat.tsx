@@ -15,8 +15,8 @@ import { useChatStore, useActiveMessages } from '@entities/chat';
 import { useSessionStore, isSessionTab } from '@entities/session';
 import { useTerminalStore } from '@entities/terminal';
 import { useToastStore } from '@/components/Toast';
-import { useAgentSettings } from '@features/agent/agentSettings';
-import { usePermissions } from '@features/agent/permissions';
+import { useAgentSettings } from '@features/agent/stores/agentSettings';
+import { usePermissions } from '@features/agent/stores/permissions';
 import { useAiConfigStore } from '@/lib/ai';
 import ModelPill from '@features/chat/components/ModelPill';
 import {
@@ -26,7 +26,7 @@ import {
   saveBlobAsAttachment,
   totalSize,
   type AttachmentMeta,
-} from '@features/agent/attachments';
+} from '@features/agent/model/attachments';
 import AttachmentChips from '@features/chat/components/AttachmentChips';
 import { leaves as layoutLeaves, firstLeaf } from '@/lib/windowLayout';
 import { shellTypeLabel } from '@/lib/shells';

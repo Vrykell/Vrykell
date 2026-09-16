@@ -10,7 +10,7 @@ import {
   buildSkillsContext, availableSkillMetas,
   listSkills, getSkill, setSkillState, readSkillFile, removeSkill, installSkillMd,
   importSkillsFromPath, fetchRemoteSkills, type SkillMeta,
-} from '@features/agent/skills';
+} from '@features/agent/services/skills';
 
 const m1: SkillMeta = { name: '写单测', description: '写测试', dir: '/s/a', files: ['scripts/x.py'], hasScripts: true, allowedTools: '', source: '内置', trusted: true, enabled: true, modified: false };
 const m2: SkillMeta = { name: '代码审查', description: '审查', dir: '/s/b', files: [], hasScripts: false, allowedTools: '', source: 'AI 安装', trusted: false, enabled: true, modified: true };

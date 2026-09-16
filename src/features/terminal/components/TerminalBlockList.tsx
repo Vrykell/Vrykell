@@ -18,7 +18,7 @@ import { useTerminalStore } from '@entities/terminal';
 import { useSearchHighlightStore } from '@/store/searchHighlight';
 import { toExchanges, mergeFlow } from '@features/chat/model/exchanges';
 import AiBlock from '@features/chat/components/AiBlock';
-import { agentControl } from '@features/agent/agentControl';
+import { agentControl } from '@features/agent/services/agentControl';
 import { ptyWrite } from '@/lib/pty';
 import { killForeground } from '@/lib/killForeground';
 import { useToastStore } from '@/components/Toast';

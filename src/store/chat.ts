@@ -7,10 +7,10 @@ import {
   partsToHistoryText,
   type MessagePart,
   type ToolRun,
-} from '@features/agent/messageParts';
-import { denyAllPending } from '@features/agent/permissions';
-import { clearCompactionCache } from '@features/agent/context';
-import { serializeAttachments, type AttachmentMeta } from '@features/agent/attachments';
+} from '@features/agent/model/messageParts';
+import { denyAllPending } from '@features/agent/stores/permissions';
+import { clearCompactionCache } from '@features/agent/model/context';
+import { serializeAttachments, type AttachmentMeta } from '@features/agent/model/attachments';
 
 export interface ChatMessage {
   id: string;

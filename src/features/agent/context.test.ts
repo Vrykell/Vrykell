@@ -9,7 +9,7 @@ import type { LanguageModel, ModelMessage } from 'ai';
 const { mockGenerate } = vi.hoisted(() => ({ mockGenerate: vi.fn() }));
 vi.mock('ai', () => ({ generateText: mockGenerate }));
 
-import { estimateTokens, planContext, type SizedMessage } from '@features/agent/context';
+import { estimateTokens, planContext, type SizedMessage } from '@features/agent/model/context';
 
 const model = {} as LanguageModel;
 

@@ -2,7 +2,7 @@
  * agentSettings — 全局/模型覆盖/迁移测试。
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useAgentSettings, defaultOpenModeForShell, DEFAULT_AGENT_SETTINGS, type AgentSettings } from '@features/agent/agentSettings';
+import { useAgentSettings, defaultOpenModeForShell, DEFAULT_AGENT_SETTINGS, type AgentSettings } from '@features/agent/stores/agentSettings';
 
 beforeEach(() => {
   useAgentSettings.setState({ global: { ...DEFAULT_AGENT_SETTINGS }, overrides: {} });
