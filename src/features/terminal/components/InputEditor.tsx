@@ -12,7 +12,7 @@
  *   └──────────────────────────────────────────────┘
  */
 
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import {
   ArrowUp, Columns2, GitBranch, Paperclip,
   ShieldAlert, ShieldCheck, ShieldOff, Square, X, Zap,
@@ -24,14 +24,14 @@ import { useUiStore } from '@shared/ui';
 import { useSessionStore } from '@entities/session';
 import { useInputStore, selectPaneInput } from '@entities/terminal';
 import { getLongRunningHint } from '@features/terminal/inputVisibility';
-import { useAgentSettings, usePermissions, useAttachmentComposer } from '@entities/agent';
-import { completeCommand, localCompleteCandidates } from '@features/agent/services/complete';
+import { usePermissions, useAttachmentComposer } from '@entities/agent';
 import { useDockStore } from '@shared/ui';
 import { engageFollow } from '@features/terminal/hooks/useFollowBottom';
 import AttachmentChips from '@features/chat/components/AttachmentChips';
 import ShellIndicator from '@features/terminal/components/ShellIndicator';
 import { useCommandHistoryNavigation } from '@features/terminal/hooks/useCommandHistoryNavigation';
 import { useTerminalInputContext } from '@features/terminal/hooks/useTerminalInputContext';
+import { useCommandCompletion } from '@features/terminal/hooks/useCommandCompletion';
 
 /** 权限模式循环（与 PanelChat 顶栏同款三色 Shield）：标准=逐工具 / 严格=逐次问 / 放行=直放 */
 const PERM_MODES = [
@@ -151,65 +151,20 @@ export default function InputEditor({
   // 本地级（历史前缀/路径）零网络始终可用；AI 增强有 key 才叠加。
   // 本地历史前缀命中是同步即时反馈（零延迟体感）；本地未命中才防抖走路径/AI。
   // seq + AbortController 双保险防止过期建议落地。
-  const completeOn = useAgentSettings((s) => s.global.completeEnabled);
-  const completeDebounceMs = useAgentSettings((s) => s.global.completeDebounceMs);
-  const [ghost, setGhost] = useState('');
-  const [ghostCandidates, setGhostCandidates] = useState<string[]>([]);
-  const ghostSeq = useRef(0);
-  // 补全循环状态：base = 用户输入的原始前缀；candidates = 候选后缀；idx = 当前已接受下标
-  const completionRef = useRef<{ base: string; candidates: string[]; idx: number } | null>(null);
-  // Tab 提交会改写 text 触发 effect，用此标记跳过当次重算
-  const suppressEffectRef = useRef(false);
-
-  const clearGhost = useCallback(() => {
-    ghostSeq.current++;
-    completionRef.current = null;
-    setGhost('');
-    setGhostCandidates([]);
-  }, []);
-
-  useEffect(() => {
-    if (suppressEffectRef.current) {
-      suppressEffectRef.current = false;
-      return; // Tab 提交引起的 text 变化，跳过重算
-    }
-    completionRef.current = null; // 用户正常输入，结束补全循环
-    setGhost('');
-    setGhostCandidates([]);
-    if (
-      !completeOn ||
-      aiMode ||
-      !isFocused ||
-      !visible ||
-      text.trim().length < 1 ||
-      text.includes('\n')
-    ) {
-      return;
-    }
-    // 本地历史前缀：同步命中立即出全部候选 ghost（不等防抖）
-    const locals = localCompleteCandidates(text);
-    if (locals.length > 0) {
-      setGhostCandidates(locals);
-      setGhost(locals[0]!);
-      return;
-    }
-    const seq = ++ghostSeq.current;
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => {
-      completeCommand(text, { cwd: tabCwd }, ctrl.signal)
-        .then((suffix) => {
-          if (suffix && seq === ghostSeq.current && !ctrl.signal.aborted) {
-            setGhostCandidates([suffix]);
-            setGhost(suffix);
-          }
-        })
-        .catch(() => {});
-    }, completeDebounceMs);
-    return () => {
-      ctrl.abort();
-      clearTimeout(timer);
-    };
-  }, [text, aiMode, completeOn, completeDebounceMs, isFocused, visible, tabCwd]);
+  const {
+    ghost,
+    clearGhost,
+    acceptCompletion,
+    restoreCompletion,
+  } = useCommandCompletion({
+    text,
+    aiMode,
+    isFocused,
+    visible,
+    cwd: tabCwd,
+    inputRef,
+    setText,
+  });
 
   // ── ↑/↓ 翻命令历史（cmd 模式、单行时；fish 式按当前前缀过滤） ──
   // idx=-1 表示未在翻历史；base 记录开始翻之前的草稿，翻到底（ArrowDown 越界）还原
@@ -420,40 +375,13 @@ export default function InputEditor({
                   }
                 }
                 // Tab 接受当前候选；再按 Tab 替换为下一个命令（Shift+Tab 后退）；Esc 丢弃
-                if (e.key === 'Tab' && (ghostCandidates.length > 0 || completionRef.current)) {
+                if (e.key === 'Tab' && acceptCompletion(e.shiftKey)) {
                   e.preventDefault();
                   resetHistNav();
-                  const cycle = completionRef.current;
-                  if (cycle) {
-                    // 已在循环中：替换为下一个 / 上一个候选
-                    const dir = e.shiftKey ? -1 : 1;
-                    cycle.idx = (cycle.idx + dir + cycle.candidates.length) % cycle.candidates.length;
-                    suppressEffectRef.current = true;
-                    setText(cycle.base + cycle.candidates[cycle.idx]!);
-                  } else {
-                    // 首次 Tab：接受第一个候选，进入循环
-                    completionRef.current = { base: text, candidates: ghostCandidates, idx: 0 };
-                    suppressEffectRef.current = true;
-                    setText(text + ghostCandidates[0]!);
-                    setGhost('');
-                    setGhostCandidates([]);
-                  }
-                  const el = inputRef.current;
-                  if (el) {
-                    el.style.height = 'auto';
-                    requestAnimationFrame(() => {
-                      el.style.height = Math.min(el.scrollHeight, 120) + 'px';
-                    });
-                  }
                   return;
                 }
                 if (e.key === 'Escape') {
-                  const cycle = completionRef.current;
-                  if (cycle) {
-                    // 补全循环中：Esc 还原到原始前缀
-                    suppressEffectRef.current = true;
-                    setText(cycle.base);
-                    clearGhost();
+                  if (restoreCompletion()) {
                     return;
                   }
                   if (ghost) {
