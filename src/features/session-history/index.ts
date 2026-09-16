@@ -4,7 +4,7 @@ export {
   type SessionHistoryController,
   type SessionHistoryNotification,
   type UseSessionHistoryOptions,
-} from '@features/session-history/model/useSessionHistory';
+} from '@features/session-history/hooks/useSessionHistory';
 
 export {
   filterSessions,
