@@ -16,7 +16,7 @@ import {
   denyAllPending,
   clearSessionGrants,
   type ToolContext,
-} from './permissions';
+} from '@features/agent/permissions';
 
 const DEFAULTS = {
   run_command: 'ask',

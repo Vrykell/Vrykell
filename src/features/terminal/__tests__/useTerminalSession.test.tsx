@@ -80,7 +80,7 @@ globalThis.ResizeObserver = class {
   disconnect() {}
 } as unknown as typeof ResizeObserver;
 
-import { useTerminalSession } from '../useTerminalSession';
+import { useTerminalSession } from '@features/terminal/hooks/useTerminalSession';
 import { useTerminalStore } from '@/store/terminal';
 import { useBlockStore } from '@/store/blocks';
 import { useWorkspaceStore } from '@/store/workspace';

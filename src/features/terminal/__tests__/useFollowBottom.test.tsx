@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { useFollowBottom, registerFollowEngager, engageFollow } from '../useFollowBottom';
+import { useFollowBottom, registerFollowEngager, engageFollow } from '@features/terminal/hooks/useFollowBottom';
 
 function makeEl(scrollTop: number) {
   const el = document.createElement('div');

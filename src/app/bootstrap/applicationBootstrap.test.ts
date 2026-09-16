@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createApplicationBootstrap, type ApplicationBootstrapDependencies } from './applicationBootstrap';
+import { createApplicationBootstrap, type ApplicationBootstrapDependencies } from '@/app/bootstrap/applicationBootstrap';
 
 function createDependencies(): ApplicationBootstrapDependencies {
   return {

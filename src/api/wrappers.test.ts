@@ -5,10 +5,10 @@ import { describe, it, expect, vi } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { createSession, archiveSession, restoreSession, updateSessionTitle, updateSessionCwd, listSessions, deleteSession } from './session';
-import { groupsList, groupCreate, groupRename, groupSetCollapsed, groupDelete } from './group';
-import { addWorkspace, removeWorkspace, listWorkspaces } from './workspace';
-import { searchFiles } from './search';
+import { createSession, archiveSession, restoreSession, updateSessionTitle, updateSessionCwd, listSessions, deleteSession } from '@/api/session';
+import { groupsList, groupCreate, groupRename, groupSetCollapsed, groupDelete } from '@/api/group';
+import { addWorkspace, removeWorkspace, listWorkspaces } from '@/api/workspace';
+import { searchFiles } from '@/api/search';
 
 describe('api 封装', () => {
   it('session 命令透传', async () => {

@@ -11,7 +11,7 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock, convertFileSrc: con
 
 import {
   useTerminalThemeStore, applyCachedWallpaper, reapplyXtermTheme, applyTerminalTheme,
-} from './terminalTheme';
+} from '@/theme/terminalTheme';
 
 const baseConfig = { opacity: 1, backgroundImage: null, vars: {} };
 

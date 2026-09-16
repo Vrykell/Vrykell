@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { restoreWorkspaceWithDependencies, type RestoreWorkspaceDependencies } from './restoreWorkspace';
+import { restoreWorkspaceWithDependencies, type RestoreWorkspaceDependencies } from '@/entities/session/model/restoreWorkspace';
 
 function createDependencies(overrides: Partial<RestoreWorkspaceDependencies> = {}): RestoreWorkspaceDependencies {
   return {

@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import type { DispatchEvent } from '@features/terminal/pipeline/events';
+import type { DispatchEvent } from '@features/terminal/services/pipeline/events';
 
 /** SSH 连接目标（透传给 Rust pty_spawn 的 ssh 参数） */
 export interface SshSpawnTarget {

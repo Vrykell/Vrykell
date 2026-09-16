@@ -3,8 +3,8 @@
  * 所有组件通过 useTheme() 获取当前模式和切换函数。
  */
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
-import { getCurrentTheme, type ThemeMode } from './tokens';
-import { applyTerminalTheme, useTerminalThemeStore } from './terminalTheme';
+import { getCurrentTheme, type ThemeMode } from '@/theme/tokens';
+import { applyTerminalTheme, useTerminalThemeStore } from '@/theme/terminalTheme';
 
 interface ThemeCtx {
   mode: ThemeMode;

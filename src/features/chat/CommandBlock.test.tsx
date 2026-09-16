@@ -5,7 +5,7 @@ const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 invokeMock.mockResolvedValue(undefined);
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import Markdown from './Markdown';
+import Markdown from '@features/chat/components/Markdown';
 import { useTerminalStore } from '@/store/terminal';
 import { useSessionStore } from '@entities/session';
 

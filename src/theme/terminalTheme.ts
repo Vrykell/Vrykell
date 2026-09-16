@@ -14,7 +14,7 @@ import {
   getCurrentTheme,
   setThemeOverrides,
   type ThemeMode,
-} from './tokens';
+} from '@/theme/tokens';
 import { termInstances } from '@entities/terminal';
 
 export interface TerminalThemeConfig {

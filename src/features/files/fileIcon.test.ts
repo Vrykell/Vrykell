@@ -2,7 +2,7 @@
  * fileIcon — 扩展名分类测试。
  */
 import { describe, it, expect } from 'vitest';
-import { fileIcon } from './fileIcon';
+import { fileIcon } from '@features/files/utils/fileIcon';
 import { File, FileArchive, FileCode, FileCog, FileImage, FileText, Folder } from 'lucide-react';
 
 describe('fileIcon', () => {

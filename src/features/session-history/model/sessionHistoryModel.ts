@@ -1,5 +1,5 @@
 import type { BackendGroupEntry, BackendSessionEntry } from '@features/search/types';
-import { filterSessions, type SessionDateFilter, type SessionTypeFilter } from './filter';
+import { filterSessions, type SessionDateFilter, type SessionTypeFilter } from '@features/session-history/model/filter';
 
 export interface SessionHistoryFilter {
   query: string;

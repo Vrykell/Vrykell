@@ -4,8 +4,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
-import { buildScheduleTool } from './schedule';
-import { usePermissions, type ToolContext } from '../permissions';
+import { buildScheduleTool } from '@features/agent/tools/schedule';
+import { usePermissions, type ToolContext } from '@features/agent/permissions';
 
 usePermissions.setState({ levels: { schedule: 'allow' } });
 const CTX: ToolContext = {};

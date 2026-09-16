@@ -7,7 +7,7 @@
 
 import { tool, jsonSchema } from 'ai';
 import { invoke } from '@tauri-apps/api/core';
-import { gate, type ToolContext } from './permissions';
+import { gate, type ToolContext } from '@features/agent/permissions';
 
 /** 服务器状态（Rust mcp_get_servers 返回）。 */
 export interface McpServer {

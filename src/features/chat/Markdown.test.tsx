@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import Markdown from './Markdown';
+import Markdown from '@features/chat/components/Markdown';
 
 describe('Markdown', () => {
   it('渲染 GFM 表格', () => {

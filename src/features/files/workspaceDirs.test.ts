@@ -4,7 +4,7 @@
 import { describe, it, expect, vi } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
-import { useWorkspaceDirsStore } from './workspaceDirs';
+import { useWorkspaceDirsStore } from '@features/files/services/workspaceDirs';
 
 describe('workspaceDirs', () => {
   it('load 填充 dirs；contains 判断；remove 过滤', async () => {

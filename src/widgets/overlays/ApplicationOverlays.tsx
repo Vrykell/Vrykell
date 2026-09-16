@@ -1,5 +1,5 @@
 import CommandPalette from '@/components/CommandPalette';
-import GlobalSearch from '@features/search/GlobalSearch';
+import GlobalSearch from '@features/search/components/GlobalSearch';
 import NewTabModal from '@/components/NewTabModal';
 import ToastContainer from '@/components/Toast';
 import { useUiStore } from '@shared/ui';

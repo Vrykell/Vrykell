@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import type { Terminal } from '@xterm/xterm';
-import { getTerminalScreen, registerTerminal, useTerminalStore } from '../terminal';
+import { getTerminalScreen, registerTerminal, useTerminalStore } from '@/store/terminal';
 
 function makeLine(text: string) {
   return { translateToString: () => text };

@@ -16,8 +16,8 @@ import { useTerminalStore } from '@entities/terminal';
 import { useSessionStore, isSessionTab } from '@entities/session';
 import { useChatStore } from '@entities/chat';
 import { firstLeaf } from '@/lib/windowLayout';
-import InputEditor from '@features/terminal/InputEditor';
-import PanelChat from '@features/chat/PanelChat';
+import InputEditor from '@features/terminal/components/InputEditor';
+import PanelChat from '@features/chat/components/PanelChat';
 
 // ── 最小 store 状态：默认 session tab 已存在，补上 pane 会话/场景/聚焦 ──
 const tab = useSessionStore.getState().tabs.find(isSessionTab);

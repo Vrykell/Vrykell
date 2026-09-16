@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
-import { useWorkspaceStore } from './workspace';
+import { useWorkspaceStore } from '@/store/workspace';
 import { appendChatMessage, deleteChatMessage } from '@/api/session';
 import {
   serializeParts,

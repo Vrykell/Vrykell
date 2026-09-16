@@ -5,9 +5,9 @@ import {
   loadRecentOpen,
   saveRecentOpen,
   touchRecentOpen,
-} from './tabTypes';
-import type { ShellOption } from './shells';
-import type { SshConnection } from '@features/ssh/api';
+} from '@/lib/tabTypes';
+import type { ShellOption } from '@/lib/shells';
+import type { SshConnection } from '@features/ssh/services/api';
 
 const shells: ShellOption[] = [
   { id: 'zsh', label: 'Zsh', default: true },

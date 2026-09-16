@@ -9,7 +9,7 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import type { Tool } from 'ai';
-import { createProxyFetch } from './llmFetch';
+import { createProxyFetch } from '@features/agent/llmFetch';
 
 export type ProviderKind = 'openai-compatible' | 'anthropic' | 'gemini';
 

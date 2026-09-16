@@ -5,11 +5,11 @@ import {
 } from 'lucide-react';
 import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, type Tab, type TabGroup } from '@entities/session';
 import { regenerateTitle } from '@features/agent/title';
-import { useToastStore } from './Toast';
-import { IconBtn } from './UiBtn';
+import { useToastStore } from '@/components/Toast';
+import { IconBtn } from '@/components/UiBtn';
 import { shellTypeLabel } from '@/lib/shells';
-import NewTabModal from './NewTabModal';
-import ContextMenu, { type ContextMenuItem } from './ContextMenu';
+import NewTabModal from '@/components/NewTabModal';
+import ContextMenu, { type ContextMenuItem } from '@/components/ContextMenu';
 
 /**
  * PanelTabs — 标签列表面板（会话管理侧栏）。

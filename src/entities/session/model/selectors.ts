@@ -1,4 +1,4 @@
-import { isSessionTab, type Tab } from './store';
+import { isSessionTab, type Tab } from '@/entities/session/model/store';
 
 export interface SessionWorkspaceSnapshot {
   tabs: Tab[];

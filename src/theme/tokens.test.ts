@@ -9,7 +9,7 @@ import {
   paletteToCssVars,
   themes,
   TEAL_THEME_PRESET,
-} from './tokens';
+} from '@/theme/tokens';
 
 describe('hexToRgba', () => {
   it('converts 3-digit and 6-digit hex to rgba', () => {

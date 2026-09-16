@@ -10,8 +10,8 @@ const { mockGenerate } = vi.hoisted(() => ({ mockGenerate: vi.fn() }));
 vi.mock('ai', () => ({ generateText: mockGenerate }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 
-import { maybeAutoTitle, sanitizeTitle, resetTitleState } from './title';
-import { useAgentSettings, DEFAULT_AGENT_SETTINGS } from './agentSettings';
+import { maybeAutoTitle, sanitizeTitle, resetTitleState } from '@features/agent/title';
+import { useAgentSettings, DEFAULT_AGENT_SETTINGS } from '@features/agent/agentSettings';
 import { useAiConfigStore } from '@/lib/ai';
 import { useBlockStore } from '@/store/blocks';
 import { useChatStore } from '@/store/chat';

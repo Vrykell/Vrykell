@@ -4,8 +4,8 @@
 import { describe, it, expect, vi } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
-import { buildMemoryTool } from './memory';
-import { usePermissions, type ToolContext } from '../permissions';
+import { buildMemoryTool } from '@features/agent/tools/memory';
+import { usePermissions, type ToolContext } from '@features/agent/permissions';
 
 usePermissions.setState({ levels: { memory: 'allow' } });
 const CTX: ToolContext = {};

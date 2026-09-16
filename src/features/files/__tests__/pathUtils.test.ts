@@ -6,7 +6,7 @@ import {
   parentOf,
   isDriveRoot,
   compactPathSegments,
-} from '../pathUtils';
+} from '@features/files/utils/pathUtils';
 
 describe('pathUtils', () => {
   it('normPath 归一化反斜杠并去尾斜杠', () => {

@@ -4,7 +4,7 @@ export {
   type SessionHistoryController,
   type SessionHistoryNotification,
   type UseSessionHistoryOptions,
-} from './model/useSessionHistory';
+} from '@features/session-history/model/useSessionHistory';
 
 export {
   filterSessions,
@@ -12,10 +12,10 @@ export {
   sshTargetOf,
   type SessionDateFilter,
   type SessionTypeFilter,
-} from './model/filter';
+} from '@features/session-history/model/filter';
 
 export {
   SESSION_DATE_OPTIONS,
   SESSION_TYPE_OPTIONS,
   type SessionHistoryFilter,
-} from './model/sessionHistoryModel';
+} from '@features/session-history/model/sessionHistoryModel';

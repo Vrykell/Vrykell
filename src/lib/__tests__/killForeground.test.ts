@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { killForeground } from '../killForeground';
+import { killForeground } from '@/lib/killForeground';
 
 describe('killForeground（升级决策已下沉 Rust）', () => {
   beforeEach(() => {

@@ -14,7 +14,7 @@ import {
   SYSTEM_DEFAULT,
   DEFAULT_CONFIG,
   type FileOpenConfig,
-} from '@features/files/fileOpen';
+} from '@features/files/services/fileOpen';
 
 const cfg = (over: Partial<FileOpenConfig> = {}): FileOpenConfig => ({
   defaultEditor: 'vim',

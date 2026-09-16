@@ -1,7 +1,7 @@
 import { useSessionStore } from '@entities/session';
 import { useBlockStore, termInstances } from '@entities/terminal';
 import { useUiStore, useDockStore } from '@shared/ui';
-import { clearSessionBlocks } from '@features/terminal/useTerminalSession';
+import { clearSessionBlocks } from '@features/terminal/hooks/useTerminalSession';
 
 /** 应用命令定义 — 被 CommandPalette 和全局搜索共用 */
 export interface AppCommand {

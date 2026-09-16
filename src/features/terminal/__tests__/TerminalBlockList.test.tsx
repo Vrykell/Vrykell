@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import TerminalBlockList from '../TerminalBlockList';
+import TerminalBlockList from '@features/terminal/components/TerminalBlockList';
 import { useBlockStore } from '@/store/blocks';
-import type { TermBlock } from '../pipeline/termBlock';
+import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 
 function block(patch: Partial<TermBlock>): TermBlock {
   return {

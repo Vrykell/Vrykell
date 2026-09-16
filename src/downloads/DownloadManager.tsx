@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { ArrowLeft, FolderOpen, Trash2 } from 'lucide-react';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
-import { downloadsList, downloadsClear, type DownloadEntry } from './api';
-import { fileIcon } from '@features/files/fileIcon';
+import { downloadsList, downloadsClear, type DownloadEntry } from '@/downloads/api';
+import { fileIcon } from '@features/files/utils/fileIcon';
 import { useToastStore } from '@/components/Toast';
 import { IconBtn, fmtSize } from '@/components/UiBtn';
 import ConfirmDialog from '@/components/ConfirmDialog';

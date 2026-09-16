@@ -16,7 +16,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
-import type { ProviderKind } from './provider';
+import type { ProviderKind } from '@features/agent/provider';
 
 export interface AttachmentMeta {
   id: string;

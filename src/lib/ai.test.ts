@@ -7,7 +7,7 @@ const { invokeMock, listenMock } = vi.hoisted(() => ({
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 vi.mock('@tauri-apps/api/event', () => ({ listen: listenMock }));
 
-import { anthropicStream, activeModelProfile, isApiKeyConfigured, getModel, getAiBaseUrl, useAiConfigStore, refreshAiConfig, setApiKey, clearApiKey, setAiBaseUrl, setAiModel, setAiProvider, setAiModels, setActiveModel, setProviderKey, clearProviderKey, setTavilyKey, clearTavilyKey } from './ai';
+import { anthropicStream, activeModelProfile, isApiKeyConfigured, getModel, getAiBaseUrl, useAiConfigStore, refreshAiConfig, setApiKey, clearApiKey, setAiBaseUrl, setAiModel, setAiProvider, setAiModels, setActiveModel, setProviderKey, clearProviderKey, setTavilyKey, clearTavilyKey } from '@/lib/ai';
 
 describe('anthropicStream', () => {
   beforeEach(() => {

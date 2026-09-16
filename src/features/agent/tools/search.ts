@@ -7,10 +7,10 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
-import { DESC_LIST_DIR, DESC_SEARCH_FILES } from '../toolTexts';
+import { DESC_LIST_DIR, DESC_SEARCH_FILES } from '@features/agent/toolTexts';
 import { tool } from 'ai';
 import { z } from 'zod';
-import { gate, type ToolContext } from '../permissions';
+import { gate, type ToolContext } from '@features/agent/permissions';
 
 interface FsEntry {
   name: string;

@@ -10,7 +10,7 @@ import {
   SESSION_DATE_OPTIONS,
   SESSION_TYPE_OPTIONS,
   type SessionHistoryFilter,
-} from './sessionHistoryModel';
+} from '@features/session-history/model/sessionHistoryModel';
 
 export type SessionHistoryNotification = (message: string, kind: 'success' | 'error') => void;
 
@@ -176,6 +176,6 @@ export function useSessionHistory(options: UseSessionHistoryOptions = {}): Sessi
   };
 }
 
-export { filterSessions, isSshSession, sshTargetOf, type SessionDateFilter, type SessionTypeFilter } from './filter';
-export { SESSION_DATE_OPTIONS, SESSION_TYPE_OPTIONS } from './sessionHistoryModel';
-export type { SessionHistoryFilter } from './sessionHistoryModel';
+export { filterSessions, isSshSession, sshTargetOf, type SessionDateFilter, type SessionTypeFilter } from '@features/session-history/model/filter';
+export { SESSION_DATE_OPTIONS, SESSION_TYPE_OPTIONS } from '@features/session-history/model/sessionHistoryModel';
+export type { SessionHistoryFilter } from '@features/session-history/model/sessionHistoryModel';

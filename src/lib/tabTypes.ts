@@ -1,6 +1,6 @@
-import { safeLocalStorageGet, safeLocalStorageSet } from './errorHandler';
-import type { ShellOption, ShellType } from './shells';
-import type { SshConnection } from '@features/ssh/api';
+import { safeLocalStorageGet, safeLocalStorageSet } from '@/lib/errorHandler';
+import type { ShellOption, ShellType } from '@/lib/shells';
+import type { SshConnection } from '@features/ssh/services/api';
 
 /**
  * 新建标签页弹窗的候选类型与「最近打开」排序。

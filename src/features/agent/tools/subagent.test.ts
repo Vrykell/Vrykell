@@ -4,8 +4,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
-import { buildSubagentTool } from './subagent';
-import { usePermissions, type ToolContext } from '../permissions';
+import { buildSubagentTool } from '@features/agent/tools/subagent';
+import { usePermissions, type ToolContext } from '@features/agent/permissions';
 
 usePermissions.setState({ levels: { subagent: 'allow' } });
 const CTX: ToolContext = {};
