@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUp, Bot, Brain, Globe, Paperclip, ShieldAlert, ShieldCheck, ShieldOff, Square, Zap } from 'lucide-react';
 import { useChatStore, useActiveMessages } from '@entities/chat';
 import { isSessionTab } from '@entities/session';
-import { useAgentSettings, usePermissions, useAiConfigStore } from '@entities/agent';
+import { useAgentSettings, usePermissions, useAiConfigStore, useAttachmentComposer } from '@entities/agent';
 import ModelPill from '@features/chat/components/ModelPill';
 import AttachmentChips from '@features/chat/components/AttachmentChips';
 import { leaves as layoutLeaves, firstLeaf } from '@features/workspace/model/windowLayout';
@@ -22,7 +22,6 @@ import AiBlock from '@features/chat/components/AiBlock';
 import { toExchanges, type ChatExchange } from '@features/chat/model/exchanges';
 import ContextRing from '@/components/ContextRing';
 import { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
-import { useChatAttachments } from '@features/chat/hooks/useChatAttachments';
 
 /** 权限模式循环（状态栏 Shield chip）：图标 + 颜色双通道辨识（勾=标准逐工具 / 叹号=严格逐次问 / 斜线=放行直放）
  *  标准=逐工具级别；严格=全部逐次问；放行=全部直放行（危险命令仍逐次问） */
@@ -89,7 +88,7 @@ export default function PanelChat() {
     togglePreview,
     removeAttachment,
     clearAttachments,
-  } = useChatAttachments();
+  } = useAttachmentComposer();
   const exchanges = useMemo(() => toExchanges(messages), [messages]);
 
   // 新内容（条数变化 / 流式增长 / 工具动作增减或状态迁移）时吸底

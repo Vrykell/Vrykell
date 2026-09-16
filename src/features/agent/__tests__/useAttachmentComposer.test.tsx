@@ -2,9 +2,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useToastStore } from '@/components/Toast';
 import { LIMITS, makePasteAttachment } from '@features/agent/model/attachments';
-import { useChatAttachments } from '@features/chat/hooks/useChatAttachments';
+import { useAttachmentComposer } from '@features/agent/hooks/useAttachmentComposer';
 
-describe('useChatAttachments', () => {
+describe('useAttachmentComposer', () => {
   const toastSnapshot = useToastStore.getState();
 
   afterEach(() => {
@@ -14,7 +14,7 @@ describe('useChatAttachments', () => {
 
   it('manages attachment preview, removal and clearing', () => {
     const attachment = makePasteAttachment('x'.repeat(LIMITS.pasteFoldChars + 1));
-    const { result } = renderHook(() => useChatAttachments());
+    const { result } = renderHook(() => useAttachmentComposer());
 
     act(() => result.current.addAttachments([attachment]));
     expect(result.current.attachments).toEqual([attachment]);
@@ -33,7 +33,7 @@ describe('useChatAttachments', () => {
   });
 
   it('folds long pasted text and ignores short text', () => {
-    const { result } = renderHook(() => useChatAttachments());
+    const { result } = renderHook(() => useAttachmentComposer());
     const shortText = 'short';
     const longText = 'x'.repeat(LIMITS.pasteFoldChars + 1);
 
@@ -50,7 +50,7 @@ describe('useChatAttachments', () => {
   });
 
   it('rejects attachments beyond the aggregate size limit', () => {
-    const { result } = renderHook(() => useChatAttachments());
+    const { result } = renderHook(() => useAttachmentComposer());
     const oversized = {
       id: 'oversized',
       kind: 'file' as const,

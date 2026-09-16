@@ -17,7 +17,6 @@ import {
   ArrowUp, Columns2, GitBranch, Paperclip,
   ShieldAlert, ShieldCheck, ShieldOff, Square, X, Zap,
 } from 'lucide-react';
-import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { ptyWrite } from '@/platform/pty';
 import { useTerminalStore } from '@entities/terminal';
 import { useChatStore } from '@entities/chat';
@@ -29,11 +28,9 @@ import { shellTypeLabel } from '@/platform/shells';
 import { useBlockStore, useInputStore, selectPaneInput } from '@entities/terminal';
 import { isInputBoxVisible, getLongRunningHint } from '@features/terminal/inputVisibility';
 import { agentControl } from '@features/agent/services/agentControl';
-import { useAgentSettings, usePermissions } from '@entities/agent';
-import { LIMITS, importFileAsAttachment, totalSize, saveBlobAsAttachment, makePasteAttachment, type AttachmentMeta } from '@features/agent/model/attachments';
+import { useAgentSettings, usePermissions, useAttachmentComposer } from '@entities/agent';
 import { completeCommand, localCompleteCandidates } from '@features/agent/services/complete';
 import { useDockStore } from '@shared/ui';
-import { useToastStore } from '@/components/Toast';
 import { engageFollow } from '@features/terminal/hooks/useFollowBottom';
 import AttachmentChips from '@features/chat/components/AttachmentChips';
 import ShellIndicator from '@features/terminal/components/ShellIndicator';
@@ -99,70 +96,17 @@ export default function InputEditor({
   const permMode = usePermissions((s) => s.mode);
   const setPermMode = usePermissions((s) => s.setMode);
 
-  const [atts, setAtts] = useState<AttachmentMeta[]>([]);
-  const [previewId, setPreviewId] = useState<string | null>(null);
-
-  const toastErr = (m: string) => useToastStore.getState().addToast(m, 'error');
-
-  const addAtts = (list: AttachmentMeta[]) => {
-    if (list.length === 0) return;
-    setAtts((cur) => {
-      const next = [...cur, ...list];
-      if (totalSize(next) > LIMITS.totalBytes) {
-        toastErr('附件合计超过 10MB 上限');
-        return cur;
-      }
-      return next;
-    });
-  };
-
-  /** 粘贴/拖入的二进制（File）→ base64 → Rust 落盘（同聊天面板） */
-  const addBlobs = async (files: File[]) => {
-    const out: AttachmentMeta[] = [];
-    for (const f of files) {
-      if (f.type.startsWith('image/') && f.size > LIMITS.imageBytes) {
-        toastErr(`图片 ${f.name || '粘贴的图片'} 超过 5MB 上限`);
-        continue;
-      }
-      try {
-        const b64 = await new Promise<string>((resolve, reject) => {
-          const r = new FileReader();
-          r.onload = () => resolve(String(r.result).split(',')[1] ?? '');
-          r.onerror = () => reject(r.error);
-          r.readAsDataURL(f);
-        });
-        const name = f.name || `pasted-${Date.now()}.png`;
-        out.push(await saveBlobAsAttachment(name, f.type || 'application/octet-stream', b64));
-      } catch (e) {
-        toastErr(String((e as Error)?.message ?? e));
-      }
-    }
-    addAtts(out);
-  };
-
-  /** 📎 选择文件（plugin-dialog 多选 → Rust 导入） */
-  const pickFiles = async () => {
-    try {
-      const sel = await openDialog({ multiple: true });
-      if (!sel) return;
-      const out: AttachmentMeta[] = [];
-      for (const p of Array.isArray(sel) ? sel : [sel]) {
-        try {
-          const m = await importFileAsAttachment(p);
-          if (m.kind === 'image' && m.size > LIMITS.imageBytes) {
-            toastErr(`图片 ${m.name} 超过 5MB 上限`);
-            continue;
-          }
-          out.push(m);
-        } catch (e) {
-          toastErr(String((e as Error)?.message ?? e));
-        }
-      }
-      addAtts(out);
-    } catch (e) {
-      toastErr(String((e as Error)?.message ?? e));
-    }
-  };
+  const {
+    attachments: atts,
+    previewId,
+    panelRef,
+    addPastedText,
+    pickFiles,
+    addBlobs,
+    togglePreview,
+    removeAttachment,
+    clearAttachments,
+  } = useAttachmentComposer();
 
   const canSendAi = (!!text.trim() || atts.length > 0) && !sendingTab;
 
@@ -342,8 +286,7 @@ export default function InputEditor({
       if (aiMode) {
         // AI 模式：问题带上本 pane id —— 回答会内联进本 pane 的块流，同时进全局面板
         chatSend(cmd, { paneId, attachments: atts.length > 0 ? atts : undefined });
-        setAtts([]);
-        setPreviewId(null);
+        clearAttachments();
       } else {
         const sid = sessions[paneId];
         if (sid) {
@@ -354,7 +297,7 @@ export default function InputEditor({
     } catch (e) {
       console.error('[InputEditor] execute failed:', e);
     }
-  }, [text, aiMode, atts, sendingTab, chatSend, paneId, sessions, resetHeight, resetHistNav]);
+  }, [text, aiMode, atts, sendingTab, chatSend, paneId, sessions, resetHeight, resetHistNav, clearAttachments]);
 
   // ── 全局 End 键监听 ──
 
@@ -378,6 +321,7 @@ export default function InputEditor({
     const hint = getLongRunningHint(runningCommand || '');
     return (
       <div
+        ref={panelRef}
         style={{
           background: 'var(--block)',
           padding: '5px 16px',
@@ -444,11 +388,8 @@ export default function InputEditor({
           <AttachmentChips
             atts={atts}
             previewId={previewId}
-            onPreview={(id) => setPreviewId((cur) => (cur === id ? null : id))}
-            onRemove={(id) => {
-              setAtts((cur) => cur.filter((a) => a.id !== id));
-              setPreviewId((cur) => (cur === id ? null : cur));
-            }}
+            onPreview={togglePreview}
+            onRemove={removeAttachment}
           />
         )}
 
@@ -517,10 +458,7 @@ export default function InputEditor({
                   return;
                 }
                 const t = e.clipboardData.getData('text/plain');
-                if (t && t.length > LIMITS.pasteFoldChars) {
-                  e.preventDefault();
-                  addAtts([makePasteAttachment(t)]);
-                }
+                if (t && addPastedText(t)) e.preventDefault();
               }}
               onKeyDown={(e) => {
                 // ↑/↓ 翻命令历史（cmd 模式 + 单行；fish 式按当前前缀过滤）

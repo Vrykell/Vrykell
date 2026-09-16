@@ -12,10 +12,10 @@ import {
 } from '@features/agent/model/attachments';
 
 /**
- * 管理聊天附件的选择、粘贴、拖放和预览状态。
- * 组件只负责把状态渲染出来，文件对话框和 Tauri 拖放事件由此 Hook 统一处理。
+ * 管理附件编辑态：选择、粘贴、拖放、预览、删除和发送前清空。
+ * 聊天面板与终端 AI 输入共用这套工作流，避免各自维护不同的校验规则。
  */
-export function useChatAttachments() {
+export function useAttachmentComposer() {
   const [attachments, setAttachments] = useState<AttachmentMeta[]>([]);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -53,7 +53,6 @@ export function useChatAttachments() {
     addAttachments(imported);
   }, [addAttachments, toastError]);
 
-  /** 通过系统文件选择器导入附件。 */
   const pickFiles = useCallback(async () => {
     try {
       const selected = await openDialog({ multiple: true });
@@ -64,7 +63,6 @@ export function useChatAttachments() {
     }
   }, [importPaths, toastError]);
 
-  /** 将粘贴或拖放得到的浏览器 File 保存到附件目录。 */
   const addBlobs = useCallback(async (files: File[]) => {
     const saved: AttachmentMeta[] = [];
     for (const file of files) {
@@ -88,7 +86,6 @@ export function useChatAttachments() {
     addAttachments(saved);
   }, [addAttachments, toastError]);
 
-  /** Tauri 默认拦截 OS 拖放，这里只接受落在聊天面板范围内的文件。 */
   useEffect(() => {
     if (!('__TAURI_INTERNALS__' in window)) return;
 
