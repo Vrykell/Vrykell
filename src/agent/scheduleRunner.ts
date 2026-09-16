@@ -5,7 +5,7 @@
  * 提升到这里后，应用运行期间每 30s 检查一次所有启用的定时任务。
  */
 import { listSchedules, markScheduleRun } from './platform';
-import { sendToChat } from '../store/chat';
+import { sendToChat } from '@entities/chat';
 
 const POLL_MS = 30_000;
 

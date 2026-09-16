@@ -1,6 +1,6 @@
 import { isApiKeyConfigured, getModel } from '../lib/ai';
 import { loadConfig, serializeTemplates } from '../files/fileOpen';
-import { useWorkspaceStore } from '../store/workspace';
+import { useSessionStore } from '@entities/session';
 
 /** 设置项定义 — 供全局搜索索引 */
 export interface SettingDef {
@@ -44,7 +44,7 @@ registerSetting({
   label: 'API Key',
   desc: 'AI 服务 API 密钥',
   getValue: () => (isApiKeyConfigured() ? '已配置' : '未配置'),
-  onSelect: () => useWorkspaceStore.getState().openSettingsTab(),
+  onSelect: () => useSessionStore.getState().openSettingsTab(),
 });
 
 registerSetting({
@@ -52,7 +52,7 @@ registerSetting({
   label: '模型 ID',
   desc: 'AI 模型标识符',
   getValue: () => getModel(),
-  onSelect: () => useWorkspaceStore.getState().openSettingsTab(),
+  onSelect: () => useSessionStore.getState().openSettingsTab(),
 });
 
 registerSetting({
@@ -60,7 +60,7 @@ registerSetting({
   label: '主题',
   desc: '深色 / 浅色模式切换',
   getValue: () => (document.documentElement.dataset.theme === 'light' ? '浅色' : '深色'),
-  onSelect: () => useWorkspaceStore.getState().openSettingsTab(),
+  onSelect: () => useSessionStore.getState().openSettingsTab(),
 });
 
 registerSetting({
@@ -72,5 +72,5 @@ registerSetting({
     const tpl = serializeTemplates(cfg.templates);
     return tpl ? `${cfg.defaultEditor}（${tpl.replace(/\n/g, '，')}）` : cfg.defaultEditor;
   },
-  onSelect: () => useWorkspaceStore.getState().openSettingsTab(),
+  onSelect: () => useSessionStore.getState().openSettingsTab(),
 });

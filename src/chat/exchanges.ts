@@ -5,7 +5,7 @@
  * 归并是纯渲染层操作，不改 block store，也不改终端管线。
  */
 
-import type { ChatMessage } from '../store/chat';
+import type { ChatMessage } from '@entities/chat';
 import type { TermBlock } from '../terminal/pipeline/termBlock';
 
 /** 一次问答交换：用户问题 + 可选的 AI 回答（流式中回答可能为空） */

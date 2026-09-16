@@ -11,9 +11,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUp, Bot, Brain, Globe, Paperclip, ShieldAlert, ShieldCheck, ShieldOff, Square, Zap } from 'lucide-react';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { useChatStore, useActiveMessages } from '../store/chat';
-import { useWorkspaceStore, isSessionTab } from '../store/workspace';
-import { useTerminalStore } from '../store/terminal';
+import { useChatStore, useActiveMessages } from '@entities/chat';
+import { useSessionStore, isSessionTab } from '@entities/session';
+import { useTerminalStore } from '@entities/terminal';
 import { useToastStore } from '../components/Toast';
 import { useAgentSettings } from '../agent/agentSettings';
 import { usePermissions } from '../agent/permissions';
@@ -50,12 +50,12 @@ export default function PanelChat() {
   const send = useChatStore((s) => s.send);
   const sending = useChatStore((s) => s.sendingTab !== null);
 
-  const activeTab = useWorkspaceStore((s) => s.tabs.find((t) => t.id === s.activeId));
-  const activeId = useWorkspaceStore((s) => s.activeId);
+  const activeTab = useSessionStore((s) => s.tabs.find((t) => t.id === s.activeId));
+  const activeId = useSessionStore((s) => s.activeId);
   const abortStream = useChatStore((s) => s.abortStream);
   /** 当前 tab 正在流式（发送键变停止键；其它 tab 的发送中只禁用发送） */
   const sendingHere = useChatStore((s) => s.sendingTab !== null && s.sendingTab === activeId);
-  const cwds = useWorkspaceStore((s) => s.terminalCwds);
+  const cwds = useSessionStore((s) => s.terminalCwds);
   const focusedPaneId = useTerminalStore((s) => s.focusedPaneId);
   const sessions = useTerminalStore((s) => s.sessions);
   const isSession = !!activeTab && isSessionTab(activeTab);

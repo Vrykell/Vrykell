@@ -15,7 +15,7 @@ import { useAgentSettings, DEFAULT_AGENT_SETTINGS } from './agentSettings';
 import { useAiConfigStore } from '../lib/ai';
 import { useBlockStore } from '../store/blocks';
 import { useChatStore } from '../store/chat';
-import { useWorkspaceStore } from '../store/workspace';
+import { useSessionStore } from '@entities/session';
 import { leaf } from '../lib/windowLayout';
 
 function mkTab(id: string, extra: Record<string, unknown> = {}) {
@@ -41,7 +41,7 @@ function reset() {
   });
   useBlockStore.setState({ byTab: {} });
   useChatStore.setState({ byTab: {} });
-  useWorkspaceStore.setState({ tabs: [mkTab('t1')], activeId: 't1' });
+  useSessionStore.setState({ tabs: [mkTab('t1')], activeId: 't1' });
 }
 
 const doneBlock = (id: string, command: string) =>
@@ -65,7 +65,7 @@ describe('智能标题触发', () => {
     reset();
     setThreeDoneBlocks('t1');
     expect(await maybeAutoTitle('t1')).toBe(true);
-    const tab = useWorkspaceStore.getState().tabs[0]!;
+    const tab = useSessionStore.getState().tabs[0]!;
     expect(tab.title).toBe('Rust 学习笔记');
     expect(tab.named).toBe(true);
     expect(tab.titleAuto).toBe(true);
@@ -89,7 +89,7 @@ describe('智能标题触发', () => {
 
   it('手动命名的标签不被覆盖', async () => {
     reset();
-    useWorkspaceStore.setState({ tabs: [mkTab('t1', { title: '我的窗口', named: true })], activeId: 't1' });
+    useSessionStore.setState({ tabs: [mkTab('t1', { title: '我的窗口', named: true })], activeId: 't1' });
     setThreeDoneBlocks('t1');
     expect(await maybeAutoTitle('t1')).toBe(false);
     expect(mockGenerate).not.toHaveBeenCalled();
@@ -97,13 +97,13 @@ describe('智能标题触发', () => {
 
   it('截断兜底命名的标签（titleAuto）可被 AI 标题升级', async () => {
     reset();
-    useWorkspaceStore.setState({
+    useSessionStore.setState({
       tabs: [mkTab('t1', { title: 'git status', named: true, titleAuto: true })],
       activeId: 't1',
     });
     setThreeDoneBlocks('t1');
     expect(await maybeAutoTitle('t1')).toBe(true);
-    expect(useWorkspaceStore.getState().tabs[0]!.title).toBe('Rust 学习笔记');
+    expect(useSessionStore.getState().tabs[0]!.title).toBe('Rust 学习笔记');
   });
 
   it('冷却：60s 内第二次尝试直接跳过', async () => {
@@ -140,7 +140,7 @@ describe('智能标题触发', () => {
     });
     expect(await maybeAutoTitle('t1')).toBe(true);
     expect(mockGenerate).not.toHaveBeenCalled();
-    const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === 't1');
+    const tab = useSessionStore.getState().tabs.find((t) => t.id === 't1');
     expect(tab?.title).toContain('帮我看看这个报错');
   });
 

@@ -10,10 +10,10 @@ import { WebglAddon } from '@xterm/addon-webgl';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { ptySpawn, ptyWrite, ptyResize, ptyClose, onPtyOutput, onPtyExit } from '../lib/pty';
-import { registerTerminal, unregisterTerminal, useTerminalStore } from '../store/terminal';
-import { useBlockStore } from '../store/blocks';
+import { registerTerminal, unregisterTerminal, useTerminalStore } from '@entities/terminal';
+import { useBlockStore } from '@entities/terminal';
 import { useHistoryStore } from '../store/history';
-import { useWorkspaceStore } from '../store/workspace';
+import { useSessionStore } from '@entities/session';
 import { leaves as layoutLeaves } from '../lib/windowLayout';
 import * as sessionManager from '../lib/sessionManager';
 import { agentControl } from '../agent/agentControl';
@@ -181,7 +181,7 @@ export function useTerminalSession(
     // ── 管线：controller（扫描已在 Rust 端完成，这里直接消费事件） ──
 
     // 从窗口布局取该终端的打开模式（paneId 即终端 id）
-    const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === tabId);
+    const tab = useSessionStore.getState().tabs.find((t) => t.id === tabId);
     const spec = tab && tab.kind === 'session'
       ? layoutLeaves(tab.layout).find((t) => t.id === paneId)
       : undefined;
@@ -209,7 +209,7 @@ export function useTerminalSession(
       onSceneChanged: (scene) => {
         currentScene = scene;
         useTerminalStore.getState().setScene(paneId, scene);
-        if (useWorkspaceStore.getState().activeId !== tabId) return;
+        if (useSessionStore.getState().activeId !== tabId) return;
         // 注意：真实 altScreen（1049h）不得触碰 altScreenActive ——
         // 该 flag 仅表示「用户手动全屏块终端」（TerminalBlockList 进入全屏交互），
         // 误设会让 TerminalView 判定 manualTui，把持有 TUI 输出的主 xterm 用
@@ -225,13 +225,13 @@ export function useTerminalSession(
         applyWidth();
       },
       onCwd: (path) => {
-        useWorkspaceStore.getState().setTerminalCwd(paneId, path);
+        useSessionStore.getState().setTerminalCwd(paneId, path);
       },
       onBlockStart: (block) => {
         sessionManager.record(tabId, paneId, block, 'start');
         // 惯用命名：标题跟随「聚焦终端」的首条命令（未定名时）
         if (block.command && paneId === useTerminalStore.getState().focusedPaneId) {
-          useWorkspaceStore.getState().titleFromCommand(tabId, block.command);
+          useSessionStore.getState().titleFromCommand(tabId, block.command);
         }
       },
       onBlockComplete: (block) => {

@@ -19,15 +19,14 @@ import {
 } from 'lucide-react';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { ptyWrite } from '../lib/pty';
-import { useTerminalStore } from '../store/terminal';
-import { useChatStore } from '../store/chat';
+import { useTerminalStore } from '@entities/terminal';
+import { useChatStore } from '@entities/chat';
 import ContextRing from '../components/ContextRing';
 import { useUiStore } from '../store/ui';
-import { useWorkspaceStore, isSessionTab } from '../store/workspace';
+import { useSessionStore, isSessionTab } from '@entities/session';
 import { leaves as layoutLeaves } from '../lib/windowLayout';
 import { shellTypeLabel } from '../lib/shells';
-import { useBlockStore } from '../store/blocks';
-import { useInputStore, selectPaneInput } from '../store/input';
+import { useBlockStore, useInputStore, selectPaneInput } from '@entities/terminal';
 import { isInputBoxVisible, getLongRunningHint } from './inputVisibility';
 import { agentControl } from '../agent/agentControl';
 import { useAgentSettings } from '../agent/agentSettings';
@@ -95,7 +94,7 @@ export default function InputEditor({
   // ── AI 模式扩展：与 AI 聊天面板对齐的发送/停止、快捷开关、权限、附件 ──
   const sendingTab = useChatStore((s) => s.sendingTab);
   const abortStream = useChatStore((s) => s.abortStream);
-  const activeId = useWorkspaceStore((s) => s.activeId);
+  const activeId = useSessionStore((s) => s.activeId);
   const sendingHere = sendingTab !== null && sendingTab === activeId;
 
   const permMode = usePermissions((s) => s.mode);
@@ -175,7 +174,7 @@ export default function InputEditor({
   const pendingInput = useTerminalStore((s) => s.pendingInput);
   const setPendingInput = useTerminalStore((s) => s.setPendingInput);
 
-  const tabCwd = useWorkspaceStore((s) => {
+  const tabCwd = useSessionStore((s) => {
     const at = s.tabs.find((x) => x.id === s.activeId);
     if (at && isSessionTab(at)) {
       const spec = layoutLeaves(at.layout).find((t) => t.id === paneId);
@@ -184,7 +183,7 @@ export default function InputEditor({
     return undefined;
   });
 
-  const terminalLabel = useWorkspaceStore((s) => {
+  const terminalLabel = useSessionStore((s) => {
     const at = s.tabs.find((x) => x.id === s.activeId);
     if (at && isSessionTab(at)) {
       const spec = layoutLeaves(at.layout).find((t) => t.id === paneId);
@@ -743,7 +742,7 @@ export default function InputEditor({
               <InputActionBtn title="选择类型分裂" onClick={() => useUiStore.getState().openSplitPicker()}>
                 <Columns2 size={13} />
               </InputActionBtn>
-              <InputActionBtn title="关闭当前终端" onClick={() => useWorkspaceStore.getState().closeTerminal(paneId)}>
+              <InputActionBtn title="关闭当前终端" onClick={() => useSessionStore.getState().closeTerminal(paneId)}>
                 <X size={13} />
               </InputActionBtn>
             </>

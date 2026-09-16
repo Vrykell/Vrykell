@@ -8,7 +8,7 @@ import {
   type NewTabOption,
 } from '../lib/tabTypes';
 import { useSshStore, ensureSshLoaded } from '../ssh/store';
-import { useWorkspaceStore } from '../store/workspace';
+import { useSessionStore } from '@entities/session';
 import type { TerminalSpec } from '../lib/windowLayout';
 
 interface Props {
@@ -66,7 +66,7 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
         onClose();
         return;
       }
-      useWorkspaceStore.getState().addTab({ shellType: opt.shellType, groupId });
+      useSessionStore.getState().addTab({ shellType: opt.shellType, groupId });
     } else {
       touchRecentOpen(opt.key);
       void useSshStore.getState().touch(opt.sshId);
@@ -80,7 +80,7 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
           onClose();
           return;
         }
-        useWorkspaceStore.getState().addTab({
+      useSessionStore.getState().addTab({
           kind: 'ssh',
           ssh: { name: conn.name, host: conn.host, user: conn.user, port: conn.port, connectionId: conn.id },
           groupId,

@@ -3,7 +3,7 @@ import {
   History, Plus, Search, Server, Settings, SquareTerminal,
   ChevronRight, Pencil, Archive, Folder, Trash2,
 } from 'lucide-react';
-import { useWorkspaceStore, isSessionTab, firstTerminalOf, terminalsOf, type Tab, type TabGroup } from '../store/workspace';
+import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, type Tab, type TabGroup } from '@entities/session';
 import { regenerateTitle } from '../agent/title';
 import { useToastStore } from './Toast';
 import { IconBtn } from './UiBtn';
@@ -50,20 +50,20 @@ function computeDropTarget(el: Element | null): DropTarget | null {
 }
 
 export default function PanelTabs() {
-  const tabs = useWorkspaceStore((s) => s.tabs);
-  const activeId = useWorkspaceStore((s) => s.activeId);
-  const groups = useWorkspaceStore((s) => s.groups);
-  const activate = useWorkspaceStore((s) => s.activate);
-  const closeTab = useWorkspaceStore((s) => s.closeTab);
-  const renameTab = useWorkspaceStore((s) => s.renameTab);
-  const duplicateTab = useWorkspaceStore((s) => s.duplicateTab);
-  const openHistoryTab = useWorkspaceStore((s) => s.openHistoryTab);
-  const loadGroups = useWorkspaceStore((s) => s.loadGroups);
-  const createGroupForTab = useWorkspaceStore((s) => s.createGroupForTab);
-  const renameGroup = useWorkspaceStore((s) => s.renameGroup);
-  const archiveGroup = useWorkspaceStore((s) => s.archiveGroup);
-  const deleteGroup = useWorkspaceStore((s) => s.deleteGroup);
-  const toggleGroupCollapse = useWorkspaceStore((s) => s.toggleGroupCollapse);
+  const tabs = useSessionStore((s) => s.tabs);
+  const activeId = useSessionStore((s) => s.activeId);
+  const groups = useSessionStore((s) => s.groups);
+  const activate = useSessionStore((s) => s.activate);
+  const closeTab = useSessionStore((s) => s.closeTab);
+  const renameTab = useSessionStore((s) => s.renameTab);
+  const duplicateTab = useSessionStore((s) => s.duplicateTab);
+  const openHistoryTab = useSessionStore((s) => s.openHistoryTab);
+  const loadGroups = useSessionStore((s) => s.loadGroups);
+  const createGroupForTab = useSessionStore((s) => s.createGroupForTab);
+  const renameGroup = useSessionStore((s) => s.renameGroup);
+  const archiveGroup = useSessionStore((s) => s.archiveGroup);
+  const deleteGroup = useSessionStore((s) => s.deleteGroup);
+  const toggleGroupCollapse = useSessionStore((s) => s.toggleGroupCollapse);
 
   const [query, setQuery] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
@@ -122,7 +122,7 @@ export default function PanelTabs() {
   }, []);
 
   const commitDrop = (info: { type: 'tab' | 'group'; id: string }, target: DropTarget | null) => {
-    const ws = useWorkspaceStore.getState();
+    const ws = useSessionStore.getState();
     if (info.type === 'tab') {
       if (!target) {
         // 拖到侧栏空白区域（不在任何标签/分组上）：组内标签直接脱离分组，自由标签不动
@@ -178,7 +178,7 @@ export default function PanelTabs() {
             // 建组后立即进入重命名（自动聚焦名称输入框）
             void createGroupForTab(ctxTab.id).then((gid) => {
               if (!gid) return;
-              const g = useWorkspaceStore.getState().groups.find((x) => x.id === gid);
+              const g = useSessionStore.getState().groups.find((x) => x.id === gid);
               setRenamingGroupId(gid);
               setRenamingGroupTitle(g?.title ?? '新分组');
             });

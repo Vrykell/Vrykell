@@ -8,8 +8,8 @@ import { fileIcon } from './fileIcon';
 import { normPath, pathSegments, segmentsToPath, parentOf, compactPathSegments } from './pathUtils';
 import { shellQuote } from '../ssh/remotePath';
 import { useWorkspaceDirsStore } from './workspaceDirs';
-import { useWorkspaceStore, isSessionTab } from '../store/workspace';
-import { useTerminalStore } from '../store/terminal';
+import { useSessionStore, isSessionTab } from '@entities/session';
+import { useTerminalStore } from '@entities/terminal';
 import { leaves as layoutLeaves, firstLeaf } from '../lib/windowLayout';
 import { useToastStore } from '../components/Toast';
 import { IconBtn, fmtSize } from '../components/UiBtn';
@@ -30,8 +30,8 @@ type ConfirmState =
  * 活跃标签页为 SSH 连接时切到远程文件浏览，否则走本地文件浏览。
  */
 export default function PanelFiles() {
-  const tabs = useWorkspaceStore((s) => s.tabs);
-  const activeId = useWorkspaceStore((s) => s.activeId);
+  const tabs = useSessionStore((s) => s.tabs);
+  const activeId = useSessionStore((s) => s.activeId);
   const focusedPaneId = useTerminalStore((s) => s.focusedPaneId);
   const sessions = useTerminalStore((s) => s.sessions);
   const sshConnections = useSshStore((s) => s.connections);
@@ -71,12 +71,12 @@ function LocalFiles() {
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [showDownloads, setShowDownloads] = useState(false);
   const workspaceDirs = useWorkspaceDirsStore();
-  const addTab = useWorkspaceStore((s) => s.addTab);
+  const addTab = useSessionStore((s) => s.addTab);
 
   // ── 跟随聚焦终端的 cwd：切窗口 / 切换聚焦终端 / 终端 cd 都会实时定位 ──
   const focusedPaneId = useTerminalStore((s) => s.focusedPaneId);
   const sessions = useTerminalStore((s) => s.sessions);
-  const focused = useWorkspaceStore((s) => {
+  const focused = useSessionStore((s) => {
     const at = s.tabs.find((x) => x.id === s.activeId);
     if (at && isSessionTab(at)) {
       const fp = focusedPaneId;
@@ -85,7 +85,7 @@ function LocalFiles() {
     }
     return s.activeId;
   });
-  const activeCwd = useWorkspaceStore((s) => {
+  const activeCwd = useSessionStore((s) => {
     const at = s.tabs.find((x) => x.id === s.activeId);
     if (at && isSessionTab(at)) {
       const spec = layoutLeaves(at.layout).find((t) => t.id === focused);
@@ -182,7 +182,7 @@ function LocalFiles() {
 
     // 新建标签页，等 shell 就绪后写入编辑器命令
     const parentDir = parentOf(normPath(entry.path)) ?? undefined;
-    const tabId = useWorkspaceStore.getState().addTab({ cwd: parentDir, title: entry.name });
+    const tabId = useSessionStore.getState().addTab({ cwd: parentDir, title: entry.name });
     const sid = await waitForSession(tabId);
     if (sid) {
       ptyWrite(sid, command.endsWith('\n') ? command : command + '\n').catch(() => {});

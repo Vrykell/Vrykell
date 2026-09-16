@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pencil, Plus, Search, Server } from 'lucide-react';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { ensureSshLoaded, useSshStore } from './store';
-import { useWorkspaceStore } from '../store/workspace';
+import { useSessionStore } from '@entities/session';
 import { useDockStore } from '../store/dock';
 import ContextMenu from '../components/ContextMenu';
 import { IconBtn } from '../components/UiBtn';
@@ -40,7 +40,7 @@ export default function PanelSsh() {
   const openConnection = (conn: SshConnection) => {
     setSelectedId(conn.id);
     void touch(conn.id);
-    useWorkspaceStore.getState().addTab({
+    useSessionStore.getState().addTab({
       kind: 'ssh',
       ssh: { name: conn.name, host: conn.host, user: conn.user, port: conn.port, connectionId: conn.id },
     });

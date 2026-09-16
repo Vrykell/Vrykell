@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
-import { useWorkspaceStore, isSessionTab } from '../store/workspace';
-import { useTerminalStore, termInstances, getFocusedTerminalId } from '../store/terminal';
+import { useSessionStore, isSessionTab } from '@entities/session';
+import { useTerminalStore, termInstances, getFocusedTerminalId } from '@entities/terminal';
 import { countLeaves, leaves } from '../lib/windowLayout';
 import { useUiStore } from '../store/ui';
-import { useBlockStore } from '../store/blocks';
+import { useBlockStore } from '@entities/terminal';
 
 /**
  * 全局快捷键：
@@ -35,7 +35,7 @@ function scaleFontSize(delta: 1 | -1 | 0) {
 export function useGlobalShortcuts() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      const activeId = useWorkspaceStore.getState().activeId;
+      const activeId = useSessionStore.getState().activeId;
 
       // Escape: 当键盘路由到终端且不在 TUI 全屏场景时，切回输入栏
       // （场景判定走 scenes —— altScreenActive 仅手动全屏，真 vim 里 Esc 必须进 PTY）
@@ -69,7 +69,7 @@ export function useGlobalShortcuts() {
       // Cmd/Ctrl+Shift+T: 撤销关闭标签
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'T') {
         e.preventDefault();
-        useWorkspaceStore.getState().undoCloseTab();
+        useSessionStore.getState().undoCloseTab();
         return;
       }
 
@@ -93,7 +93,7 @@ export function useGlobalShortcuts() {
 
       // Cmd+] / Cmd+[ 在当前窗口的终端间切换焦点（仅 Cmd，避免 Ctrl+[ = ESC 被劫持）
       if (e.metaKey && !e.ctrlKey && !e.shiftKey && (e.key === ']' || e.key === '[')) {
-        const ws = useWorkspaceStore.getState();
+        const ws = useSessionStore.getState();
         const tab = ws.tabs.find((t) => t.id === ws.activeId);
         if (tab && isSessionTab(tab) && countLeaves(tab.layout) >= 2) {
           e.preventDefault();
@@ -116,7 +116,7 @@ export function useGlobalShortcuts() {
       }
 
       if (!e.metaKey && !e.ctrlKey) return;
-      const ws = useWorkspaceStore.getState();
+      const ws = useSessionStore.getState();
       if (e.key === 't') {
         e.preventDefault();
         ws.addTab();
@@ -133,7 +133,7 @@ export function useGlobalShortcuts() {
         ws.closeFocusedTerminal();
       } else if (e.key === ',') {
         e.preventDefault();
-        useWorkspaceStore.getState().openSettingsTab();
+        useSessionStore.getState().openSettingsTab();
       } else if (/^[1-9]$/.test(e.key)) {
         const tab = ws.tabs[parseInt(e.key, 10) - 1];
         if (tab) {

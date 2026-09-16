@@ -1,5 +1,8 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import { fileURLToPath } from "node:url";
+
+const sourceRoot = fileURLToPath(new URL("./src", import.meta.url));
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
@@ -7,6 +10,18 @@ const host = process.env.TAURI_DEV_HOST;
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [react()],
+
+  // Keep runtime imports aligned with tsconfig paths in Vite and Vitest.
+  resolve: {
+    alias: {
+      "@app": `${sourceRoot}/app`,
+      "@shared": `${sourceRoot}/shared`,
+      "@widgets": `${sourceRoot}/widgets`,
+      "@features": `${sourceRoot}/features`,
+      "@entities": `${sourceRoot}/entities`,
+      "@": sourceRoot,
+    },
+  },
 
   test: {
     environment: "jsdom",

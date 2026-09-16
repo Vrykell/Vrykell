@@ -1,56 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Monitor, RotateCcw, History, Trash2, ChevronRight, Folder, Server, Search, Filter, Check } from 'lucide-react';
-import { listSessions } from '../api/session';
-import { groupsList, groupRestore, groupDeleteWithSessions } from '../api/group';
-import type { BackendSessionEntry, BackendGroupEntry } from '../search/types';
-import { filterSessions, isSshSession, type SessionDateFilter, type SessionTypeFilter } from './sessionFilter';
-import * as sessionManager from '../lib/sessionManager';
-import { useWorkspaceStore } from '../store/workspace';
+import type { BackendSessionEntry } from '../search/types';
+import {
+  isSshSession,
+  sshTargetOf,
+  SESSION_DATE_OPTIONS,
+  SESSION_TYPE_OPTIONS,
+  useSessionHistory,
+  type SessionDateFilter,
+  type SessionHistoryFilter,
+  type SessionTypeFilter,
+} from '@features/session-history';
 import { useToastStore } from './Toast';
 
-const TYPE_OPTIONS: { value: SessionTypeFilter; label: string }[] = [
-  { value: 'all', label: '全部' },
-  { value: 'local', label: '本地' },
-  { value: 'ssh', label: 'SSH' },
-];
+const TYPE_OPTIONS = SESSION_TYPE_OPTIONS;
 
-const DATE_OPTIONS: { value: SessionDateFilter; label: string }[] = [
-  { value: 'all', label: '全部' },
-  { value: 'today', label: '今天' },
-  { value: '7d', label: '近7天' },
-  { value: '30d', label: '近30天' },
-  { value: '90d', label: '近90天' },
-];
+const DATE_OPTIONS = SESSION_DATE_OPTIONS;
 
-interface SessionFilterState {
-  query: string;
-  type: SessionTypeFilter;
-  date: SessionDateFilter;
-}
-
-/** 筛选状态记忆在 sessionStorage（会话内保留，应用重启后不跨启动持久化）。 */
-const FILTER_KEY = 'vrykell-session-history-filter';
-
-function loadFilter(): SessionFilterState {
-  try {
-    const raw = sessionStorage.getItem(FILTER_KEY);
-    if (raw) {
-      const p = JSON.parse(raw) as Partial<SessionFilterState>;
-      return {
-        query: typeof p.query === 'string' ? p.query : '',
-        type: TYPE_OPTIONS.some((o) => o.value === p.type) ? p.type! : 'all',
-        date: DATE_OPTIONS.some((o) => o.value === p.date) ? p.date! : 'all',
-      };
-    }
-  } catch { /* 缓存损坏/不可用 → 默认 */ }
-  return { query: '', type: 'all', date: 'all' };
-}
-
-function saveFilter(f: SessionFilterState): void {
-  try {
-    sessionStorage.setItem(FILTER_KEY, JSON.stringify(f));
-  } catch { /* 忽略 */ }
-}
+type SessionFilterState = SessionHistoryFilter;
 
 /**
  * SessionHistoryView — 「会话历史查看」标签页内容。
@@ -58,113 +25,34 @@ function saveFilter(f: SessionFilterState): void {
  * 或「删除分组及历史」（删除组 + 组内全部会话）。
  */
 export default function SessionHistoryView() {
-  const [sessions, setSessions] = useState<BackendSessionEntry[]>([]);
-  const [groups, setGroups] = useState<BackendGroupEntry[]>([]);
-  const [loading, setLoading] = useState(true);
   // 历史页分组折叠状态（覆盖后端 collapsed，会话内本地态）
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  // 筛选（搜索 + 类型 + 日期）：记忆在 sessionStorage，跨启动不持久化
-  const [filter, setFilterState] = useState<SessionFilterState>(loadFilter);
   const [filterMenu, setFilterMenu] = useState<{ x: number; y: number } | null>(null);
-
-  const setFilter = (patch: Partial<SessionFilterState>) => {
-    setFilterState((prev) => {
-      const next = { ...prev, ...patch };
-      saveFilter(next);
-      return next;
-    });
-  };
+  const notify = useCallback((message: string, kind: 'success' | 'error') => {
+    useToastStore.getState().addToast(message, kind);
+  }, []);
+  const {
+    groups,
+    loading,
+    filter,
+    setFilter,
+    load,
+    openSession,
+    deleteHistoricalSession,
+    restoreGroup,
+    deleteGroup,
+    historical,
+    grouped,
+    ungrouped,
+    hasFilter,
+  } = useSessionHistory({ notify });
   const { query, type: typeFilter, date: dateFilter } = filter;
-  // 订阅标签面板的分组状态：归档/恢复分组后自动刷新历史列表
-  const activeGroups = useWorkspaceStore((s) => s.groups);
 
   const toggleCollapsed = useCallback((id: string, initial: boolean) => {
     setCollapsed((prev) => ({ ...prev, [id]: !(prev[id] ?? initial) }));
   }, []);
 
-  const load = useCallback(() => {
-    setLoading(true);
-    Promise.all([listSessions(), groupsList()])
-      .then(([ss, gs]) => { setSessions(ss); setGroups(gs); })
-      .catch(() => { setSessions([]); setGroups([]); })
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => { load(); }, [load, activeGroups]);
-
-  const openSession = useCallback((s: BackendSessionEntry) => {
-    const ws = useWorkspaceStore.getState();
-    if (s.status === 'historical') {
-      sessionManager.restore(s.id, s.title).catch((e) => {
-        console.warn('SessionHistoryView restore failed:', e);
-      });
-      return;
-    }
-    if (ws.tabs.some((t) => t.id === s.id)) {
-      ws.activate(s.id);
-    } else {
-      sessionManager.restore(s.id, s.title).catch((e) => {
-        console.warn('SessionHistoryView activate failed:', e);
-      });
-    }
-  }, []);
-
-  const deleteSession = useCallback((s: BackendSessionEntry) => {
-    sessionManager.remove(s.id)
-      .then(() => load())
-      .catch((e) => console.warn('SessionHistoryView delete failed:', e));
-  }, [load]);
-
-  const restoreGroup = useCallback(async (g: BackendGroupEntry) => {
-    try {
-      await groupRestore(g.id);
-      const all = await listSessions();
-      const groupSessions = all
-        .filter((s) => s.group_id === g.id)
-        .sort((a, b) => a.sort_order - b.sort_order);
-      // 先把分组加入 store，避免组内标签在 loadGroups 完成前短暂不可见
-      const ws = useWorkspaceStore.getState();
-      if (!ws.groups.some((x) => x.id === g.id)) {
-        useWorkspaceStore.setState((s) => ({
-          groups: [...s.groups, { id: g.id, title: g.title, collapsed: g.collapsed }],
-        }));
-      }
-      // 逐个恢复会话，带上 groupId 保持嵌套关系（而不是恢复成自由标签 + 空组）
-      for (const s of groupSessions) {
-        await sessionManager.restore(s.id, s.title, { groupId: g.id });
-      }
-      // 分组恢复为活跃，标签面板需重新加载分组（含折叠态）
-      await useWorkspaceStore.getState().loadGroups();
-      useToastStore.getState().addToast(`已恢复分组「${g.title}」`, 'success');
-    } catch (e) {
-      useToastStore.getState().addToast(String((e as Error)?.message ?? e), 'error');
-    }
-    load();
-  }, [load]);
-
-  const deleteGroup = useCallback(async (g: BackendGroupEntry) => {
-    const ok = window.confirm(`删除分组「${g.title}」及其全部会话历史？此操作不可恢复。`);
-    if (!ok) return;
-    try {
-      await groupDeleteWithSessions(g.id);
-      useToastStore.getState().addToast(`已删除分组「${g.title}」`, 'success');
-    } catch (e) {
-      useToastStore.getState().addToast(String((e as Error)?.message ?? e), 'error');
-    }
-    load();
-  }, [load]);
-
-  // 会话历史页只展示「历史（已关闭）」会话；组内/未分组按 sort_order 排序
-  const hasFilter = typeFilter !== 'all' || dateFilter !== 'all';
-  const historical = filterSessions(
-    sessions.filter((s) => s.status === 'historical'),
-    query,
-    typeFilter,
-    dateFilter,
-  );
-  const groupSessions = (gid: string) =>
-    historical.filter((s) => s.group_id === gid).sort((a, b) => a.sort_order - b.sort_order);
-  const ungrouped = historical.filter((s) => !s.group_id).sort((a, b) => a.sort_order - b.sort_order);
+  const groupSessions = useCallback((groupId: string) => grouped.get(groupId) ?? [], [grouped]);
 
   return (
     <div style={{
@@ -332,7 +220,7 @@ export default function SessionHistoryView() {
                             <SessionRow
                               s={s}
                               onOpen={() => openSession(s)}
-                              onDelete={s.status === 'historical' ? () => deleteSession(s) : undefined}
+                              onDelete={s.status === 'historical' ? () => deleteHistoricalSession(s) : undefined}
                             />
                           </div>
                         ))}
@@ -353,7 +241,7 @@ export default function SessionHistoryView() {
                     key={s.id}
                     s={s}
                     onOpen={() => openSession(s)}
-                    onDelete={s.status === 'historical' ? () => deleteSession(s) : undefined}
+                    onDelete={s.status === 'historical' ? () => deleteHistoricalSession(s) : undefined}
                   />
                 ))}
               </div>
@@ -444,20 +332,6 @@ function FilterOption({ label, active, onClick }: { label: string; active: boole
       {active && <Check size={12} style={{ color: 'var(--accent)', flexShrink: 0 }} />}
     </button>
   );
-}
-
-/** 从 payload 解析 SSH 目标（user@host），非 SSH 会话返回 null。 */
-function sshTargetOf(s: BackendSessionEntry): string | null {
-  if (s.kind !== 'ssh') return null;
-  try {
-    const p = JSON.parse(s.payload) as { ssh?: { host?: string; user?: string | null } };
-    const host = p.ssh?.host;
-    if (!host) return null;
-    const user = p.ssh?.user;
-    return user ? `${user}@${host}` : host;
-  } catch {
-    return null;
-  }
 }
 
 function SessionRow({
