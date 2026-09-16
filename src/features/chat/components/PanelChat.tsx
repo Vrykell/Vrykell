@@ -50,9 +50,7 @@ export default function PanelChat() {
   const send = useChatStore((s) => s.send);
   const sending = useChatStore((s) => s.sendingTab !== null);
 
-  const abortStream = useChatStore((s) => s.abortStream);
   /** 当前 tab 正在流式（发送键变停止键；其它 tab 的发送中只禁用发送） */
-  const sendingHere = useChatStore((s) => s.sendingTab !== null && s.sendingTab === activeId);
   const {
     activeId,
     activeTab,
@@ -60,6 +58,8 @@ export default function PanelChat() {
     terminalCwds: cwds,
     sessions,
   } = useActiveWorkspace();
+  const abortStream = useChatStore((s) => s.abortStream);
+  const sendingHere = useChatStore((s) => s.sendingTab !== null && s.sendingTab === activeId);
   const isSession = !!activeTab && isSessionTab(activeTab);
 
   const [text, setText] = useState('');
