@@ -9,21 +9,10 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUp, Bot, Brain, Globe, Paperclip, ShieldAlert, ShieldCheck, ShieldOff, Square, Zap } from 'lucide-react';
-import { open as openDialog } from '@tauri-apps/plugin-dialog';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useChatStore, useActiveMessages } from '@entities/chat';
 import { isSessionTab } from '@entities/session';
-import { useToastStore } from '@/components/Toast';
 import { useAgentSettings, usePermissions, useAiConfigStore } from '@entities/agent';
 import ModelPill from '@features/chat/components/ModelPill';
-import {
-  LIMITS,
-  importFileAsAttachment,
-  makePasteAttachment,
-  saveBlobAsAttachment,
-  totalSize,
-  type AttachmentMeta,
-} from '@features/agent/model/attachments';
 import AttachmentChips from '@features/chat/components/AttachmentChips';
 import { leaves as layoutLeaves, firstLeaf } from '@features/workspace/model/windowLayout';
 import { shellTypeLabel } from '@/platform/shells';
@@ -33,6 +22,7 @@ import AiBlock from '@features/chat/components/AiBlock';
 import { toExchanges, type ChatExchange } from '@features/chat/model/exchanges';
 import ContextRing from '@/components/ContextRing';
 import { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
+import { useChatAttachments } from '@features/chat/hooks/useChatAttachments';
 
 /** 权限模式循环（状态栏 Shield chip）：图标 + 颜色双通道辨识（勾=标准逐工具 / 叹号=严格逐次问 / 斜线=放行直放）
  *  标准=逐工具级别；严格=全部逐次问；放行=全部直放行（危险命令仍逐次问） */
@@ -89,104 +79,17 @@ export default function PanelChat() {
   }, [draft, setDraft]);
 
   // ── M5 附件：chips 状态 + 三个来源（📎 选择 / 粘贴 / 拖拽） ──
-  const [atts, setAtts] = useState<AttachmentMeta[]>([]);
-  const [previewId, setPreviewId] = useState<string | null>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const toastErr = (m: string) => useToastStore.getState().addToast(m, 'error');
-
-  const addAtts = (list: AttachmentMeta[]) => {
-    if (list.length === 0) return;
-    setAtts((cur) => {
-      const next = [...cur, ...list];
-      if (totalSize(next) > LIMITS.totalBytes) {
-        toastErr('附件合计超过 10MB 上限');
-        return cur;
-      }
-      return next;
-    });
-  };
-
-  /** 📎 选择文件（plugin-dialog 多选 → Rust 导入） */
-  const pickFiles = async () => {
-    try {
-      const sel = await openDialog({ multiple: true });
-      if (!sel) return;
-      const out: AttachmentMeta[] = [];
-      for (const p of Array.isArray(sel) ? sel : [sel]) {
-        try {
-          const m = await importFileAsAttachment(p);
-          if (m.kind === 'image' && m.size > LIMITS.imageBytes) {
-            toastErr(`图片 ${m.name} 超过 5MB 上限`);
-            continue;
-          }
-          out.push(m);
-        } catch (e) {
-          toastErr(String((e as Error)?.message ?? e));
-        }
-      }
-      addAtts(out);
-    } catch (e) {
-      toastErr(String((e as Error)?.message ?? e));
-    }
-  };
-
-  /** 粘贴/拖入的二进制（File）→ base64 → Rust 落盘 */
-  const addBlobs = async (files: File[]) => {
-    const out: AttachmentMeta[] = [];
-    for (const f of files) {
-      if (f.type.startsWith('image/') && f.size > LIMITS.imageBytes) {
-        toastErr(`图片 ${f.name || '粘贴的图片'} 超过 5MB 上限`);
-        continue;
-      }
-      try {
-        const b64 = await new Promise<string>((resolve, reject) => {
-          const r = new FileReader();
-          r.onload = () => resolve(String(r.result).split(',')[1] ?? '');
-          r.onerror = () => reject(r.error);
-          r.readAsDataURL(f);
-        });
-        const name = f.name || `pasted-${Date.now()}.png`;
-        out.push(await saveBlobAsAttachment(name, f.type || 'application/octet-stream', b64));
-      } catch (e) {
-        toastErr(String((e as Error)?.message ?? e));
-      }
-    }
-    addAtts(out);
-  };
-
-  // 拖拽：Tauri 默认拦截 OS 拖放，走窗口事件；按坐标限定在面板内才接
-  // （纯浏览器环境——harness 页——无 Tauri internals，直接跳过）
-  useEffect(() => {
-    if (!('__TAURI_INTERNALS__' in window)) return;
-    // ref 持有 unlisten：promise 在卸载后才 resolve 时，cleanup 仍能取到并解除
-    const unlistenRef: { current: (() => void) | undefined } = { current: undefined };
-    getCurrentWindow()
-      .onDragDropEvent((e) => {
-        if (e.payload.type !== 'drop') return;
-        const el = panelRef.current;
-        if (!el) return;
-        const r = el.getBoundingClientRect();
-        const scale = window.devicePixelRatio || 1;
-        const { x, y } = e.payload.position;
-        if (x / scale < r.left || x / scale > r.right || y / scale < r.top || y / scale > r.bottom) return;
-        void (async () => {
-          const out: AttachmentMeta[] = [];
-          for (const p of (e.payload as { paths: string[] }).paths) {
-            try {
-              out.push(await importFileAsAttachment(p));
-            } catch (err) {
-              toastErr(String((err as Error)?.message ?? err));
-            }
-          }
-          addAtts(out);
-        })();
-      })
-      .then((u) => { unlistenRef.current = u; })
-      .catch(() => {});
-    return () => unlistenRef.current?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
+  const {
+    attachments: atts,
+    previewId,
+    panelRef,
+    addPastedText,
+    pickFiles,
+    addBlobs,
+    togglePreview,
+    removeAttachment,
+    clearAttachments,
+  } = useChatAttachments();
   const exchanges = useMemo(() => toExchanges(messages), [messages]);
 
   // 新内容（条数变化 / 流式增长 / 工具动作增减或状态迁移）时吸底
@@ -271,8 +174,7 @@ export default function PanelChat() {
     resetHistNav();
     if (inputRef.current) inputRef.current.style.height = 'auto';
     const payload = atts.length > 0 ? atts : undefined;
-    setAtts([]);
-    setPreviewId(null);
+    clearAttachments();
     send(q, { paneId: targetPane, attachments: payload });
   };
 
@@ -329,11 +231,8 @@ export default function PanelChat() {
               <AttachmentChips
                 atts={atts}
                 previewId={previewId}
-                onPreview={(id) => setPreviewId((cur) => (cur === id ? null : id))}
-                onRemove={(id) => {
-                  setAtts((cur) => cur.filter((a) => a.id !== id));
-                  setPreviewId((cur) => (cur === id ? null : cur));
-                }}
+                onPreview={togglePreview}
+                onRemove={removeAttachment}
               />
             )}
 
@@ -380,10 +279,7 @@ export default function PanelChat() {
                     return;
                   }
                   const t = e.clipboardData.getData('text/plain');
-                  if (t && t.length > LIMITS.pasteFoldChars) {
-                    e.preventDefault();
-                    addAtts([makePasteAttachment(t)]);
-                  }
+                  if (t && addPastedText(t)) e.preventDefault();
                 }}
                 style={{
                   flex: 1, minWidth: 0, resize: 'none',
