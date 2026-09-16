@@ -1,31 +1,13 @@
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { Folder, File, MoreHorizontal, LocateFixed, ArrowUp } from 'lucide-react';
-import { open } from '@tauri-apps/plugin-dialog';
-import { sshFsList, sshDownload, sshRename, sshDelete, sshUpload } from '@features/ssh/services/api';
 import type { SshFsEntry } from '@features/ssh/services/api';
 import type { SshConnection } from '@features/ssh/services/api';
-import { ptyWrite } from '@/platform/pty';
-import { loadConfig, remoteOpenCommand } from '@features/files/services/fileOpen';
-import { useTerminalStore } from '@entities/terminal';
-import { useSessionStore } from '@entities/session';
-import { useToastStore } from '@/components/Toast';
 import { IconBtn } from '@/components/UiBtn';
-import ContextMenu, { type ContextMenuItem } from '@/components/ContextMenu';
+import ContextMenu from '@/components/ContextMenu';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import DownloadManager from '@/downloads/DownloadManager';
 import { compactPathSegments } from '@features/files/utils/pathUtils';
-import {
-  useRemotePathStore,
-  normalizeRemotePath,
-  parentOfRemote,
-  sshPaneIdFor,
-  shellQuote,
-} from '@features/ssh/utils/remotePath';
-
-/** 待二次确认的操作：重命名（携带新名）或删除。 */
-type RemoteConfirm =
-  | { kind: 'rename'; entry: SshFsEntry; newName: string }
-  | { kind: 'delete'; entry: SshFsEntry };
+import { useRemoteFileBrowser } from '@features/ssh/hooks/useRemoteFileBrowser';
 
 /**
  * RemoteFiles — SSH 标签页的文件面板。
@@ -34,37 +16,33 @@ type RemoteConfirm =
  * 「上传文件夹」递归上传目录、「下载」进入下载管理页。
  */
 export default function RemoteFiles({ conn }: { conn: SshConnection }) {
-  // 面板路径 = 真实远程绝对路径（存 store 按连接 id）；null = 尚未定位（首次加载 home）
-  const path = useRemotePathStore((s) => s.path[conn.id] ?? null);
-  const setPath = (p: string | null) => useRemotePathStore.getState().set(conn.id, p);
-  const [entries, setEntries] = useState<SshFsEntry[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; entry: SshFsEntry } | null>(null);
-  const [renameTarget, setRenameTarget] = useState<SshFsEntry | null>(null);
-  const [confirm, setConfirm] = useState<RemoteConfirm | null>(null);
-  const [showDownloads, setShowDownloads] = useState(false);
-  const [moreMenu, setMoreMenu] = useState<{ x: number; y: number } | null>(null);
-
-  const toast = (msg: string, type: 'info' | 'success' | 'error') =>
-    useToastStore.getState().addToast(msg, type);
-
-  const load = useCallback((p: string | null) => {
-    setLoading(true);
-    setError(null);
-    sshFsList(conn.id, p ?? undefined)
-      .then((res) => {
-        setEntries(res.entries);
-        // 首次定位：请求 home 后拿到真实路径（如 /home/user），面板不再用 null 表示 home
-        if (p === null && res.base) setPath(normalizeRemotePath(res.base));
-      })
-      .catch((e) => setError(String((e as Error)?.message ?? e)))
-      .finally(() => setLoading(false));
-  }, [conn.id]);
-
-  useEffect(() => { load(path); }, [load, path]);
-  // 操作后的刷新（重命名/删除/上传）
-  const refresh = () => load(path);
+  const {
+    path,
+    setPath,
+    entries,
+    error,
+    loading,
+    ctxMenu,
+    renameTarget,
+    confirm,
+    showDownloads,
+    moreMenu,
+    setShowDownloads,
+    closeContextMenu,
+    closeMoreMenu,
+    openMoreMenu,
+    remoteEdit,
+    handleContextMenu,
+    buildMenuItems,
+    requestRename,
+    cancelRename,
+    cancelConfirm,
+    confirmAction,
+    goUp,
+    syncToTerminal,
+    doUpload,
+    doUploadDir,
+  } = useRemoteFileBrowser(conn);
 
   // 顶栏面包屑压缩：不换行，侧栏窄时省略高层级目录（必须在视图切换的提前返回之前）
   const segs = path ? path.split('/').filter(Boolean) : [];
@@ -85,121 +63,6 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
 
   // hooks 之后再做视图切换，避免「条件 hook」导致 React 报错
   if (showDownloads) return <DownloadManager onBack={() => setShowDownloads(false)} />;
-
-  const currentDir = () => path ?? '';
-
-  const remoteEdit = (entry: SshFsEntry) => {
-    const activeId = useSessionStore.getState().activeId;
-    const sid = useTerminalStore.getState().sessions[activeId];
-    if (!sid) { toast('SSH 会话未就绪', 'info'); return; }
-    const command = remoteOpenCommand(loadConfig(), entry.path);
-    ptyWrite(sid, command).catch(() => {});
-  };
-
-  const doDownload = async (entry: SshFsEntry) => {
-    toast(entry.is_dir ? '正在下载文件夹…' : '正在下载…', 'info');
-    try {
-      const localPath = await sshDownload(conn.id, entry.path);
-      toast(`已下载到 ${localPath}`, 'success');
-    } catch (e) {
-      toast(String((e as Error)?.message ?? e), 'error');
-    }
-  };
-
-  const doRename = async (entry: SshFsEntry, newName: string) => {
-    try {
-      await sshRename(conn.id, entry.path, newName);
-      toast('已重命名', 'success');
-      refresh();
-    } catch (e) {
-      toast(String((e as Error)?.message ?? e), 'error');
-    }
-  };
-
-  const doDelete = async (entry: SshFsEntry) => {
-    try {
-      await sshDelete(conn.id, entry.path);
-      toast('已删除', 'success');
-      refresh();
-    } catch (e) {
-      toast(String((e as Error)?.message ?? e), 'error');
-    }
-  };
-
-  const doUpload = async () => {
-    const selected = await open({ multiple: true, directory: false });
-    const files = (Array.isArray(selected) ? selected : selected ? [selected] : []).filter(Boolean);
-    if (files.length === 0) return;
-    toast(`开始上传 ${files.length} 个文件…`, 'info');
-    let ok = 0;
-    for (let i = 0; i < files.length; i += 1) {
-      try {
-        await sshUpload(conn.id, currentDir(), files[i]);
-        ok += 1;
-      } catch (e) {
-        toast(`${files[i]}：${String((e as Error)?.message ?? e)}`, 'error');
-      }
-    }
-    toast(ok === files.length ? `已上传 ${ok} 个文件` : `上传完成：${ok}/${files.length} 成功`, ok === files.length ? 'success' : 'error');
-      refresh();
-  };
-
-  const doUploadDir = async () => {
-    const selected = await open({ directory: true });
-    const dir = Array.isArray(selected) ? selected[0] : selected;
-    if (!dir) return;
-    toast('正在上传文件夹…', 'info');
-    try {
-      await sshUpload(conn.id, currentDir(), dir);
-      toast('已上传文件夹', 'success');
-      refresh();
-    } catch (e) {
-      toast(String((e as Error)?.message ?? e), 'error');
-    }
-  };
-
-  const onContextMenu = (e: React.MouseEvent, entry: SshFsEntry) => {
-    e.preventDefault();
-    setCtxMenu({ x: e.clientX, y: e.clientY, entry });
-  };
-
-  const buildMenuItems = (entry: SshFsEntry): ContextMenuItem[] => {
-    const items: ContextMenuItem[] = [
-      { label: '重命名', onClick: () => setRenameTarget(entry) },
-    ];
-    items.push({ label: entry.is_dir ? '下载文件夹到本地' : '下载到本地', onClick: () => doDownload(entry) });
-    items.push({ label: '删除', onClick: () => setConfirm({ kind: 'delete', entry }), danger: true });
-    return items;
-  };
-
-  /** 内联重命名提交：空名或未改动直接取消，否则弹二次确认。 */
-  const requestRename = (entry: SshFsEntry, newName: string) => {
-    setRenameTarget(null);
-    const name = newName.trim();
-    if (!name || name === entry.name) return;
-    setConfirm({ kind: 'rename', entry, newName: name });
-  };
-
-  const cancelRename = () => setRenameTarget(null);
-
-  const goUp = () => {
-    if (!path || path === '/') return;
-    const p = parentOfRemote(path);
-    if (p) setPath(p);
-  };
-
-  /** 同步：终端跟随文件管理器 —— 向 SSH 终端发送 cd 到面板当前目录。 */
-  const syncToTerminal = async () => {
-    if (!path) return;
-    const paneId = sshPaneIdFor(conn.id);
-    const sid = paneId ? useTerminalStore.getState().sessions[paneId] : null;
-    if (!sid) { toast('SSH 会话未就绪', 'info'); return; }
-    try {
-      await ptyWrite(sid, `cd ${shellQuote(path)}\r`);
-    } catch (e) {
-      toast(String((e as Error)?.message ?? e), 'error');
-    }
-  };
 
   // 面包屑：真实路径层级（/ › home › user › …），根是顶层、home 是 /home/user
 
@@ -253,10 +116,7 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
           <IconBtn
             title="更多操作"
             data-testid="remote-more-btn"
-            onClick={(e) => {
-              const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-              setMoreMenu({ x: r.left, y: r.bottom + 4 });
-            }}
+            onClick={openMoreMenu}
           >
             <MoreHorizontal size={14} />
           </IconBtn>
@@ -280,7 +140,7 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
             onRenameCancel={cancelRename}
             onClick={(entry) => entry.is_dir && setPath(entry.path)}
             onDoubleClick={(entry) => !entry.is_dir && remoteEdit(entry)}
-            onContextMenu={onContextMenu}
+            onContextMenu={handleContextMenu}
           />
         ))}
       </div>
@@ -289,7 +149,7 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
         <ContextMenu
           anchor={{ x: ctxMenu.x, y: ctxMenu.y }}
           items={buildMenuItems(ctxMenu.entry)}
-          onClose={() => setCtxMenu(null)}
+          onClose={closeContextMenu}
         />
       )}
 
@@ -301,7 +161,7 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
             { label: '上传文件夹', onClick: doUploadDir },
             { label: '下载管理', onClick: () => setShowDownloads(true) },
           ]}
-          onClose={() => setMoreMenu(null)}
+          onClose={closeMoreMenu}
         />
       )}
 
@@ -317,14 +177,8 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
         }
         danger={confirm?.kind === 'delete'}
         confirmLabel={confirm?.kind === 'delete' ? '删除' : '重命名'}
-        onConfirm={() => {
-          const c = confirm;
-          setConfirm(null);
-          if (!c) return;
-          if (c.kind === 'delete') doDelete(c.entry);
-          else doRename(c.entry, c.newName);
-        }}
-        onCancel={() => setConfirm(null)}
+        onConfirm={confirmAction}
+        onCancel={cancelConfirm}
       />
     </div>
   );
