@@ -12,11 +12,11 @@ export {
   serializeSession,
   nextTerminalId,
   getFocusedCwd,
-} from '@/store/workspace';
+} from '@features/workspace/stores/workspace';
 
 export type {
   Tab,
   TabGroup,
   AddTabOptions,
   SshTabTarget,
-} from '@/store/workspace';
+} from '@features/workspace/stores/workspace';

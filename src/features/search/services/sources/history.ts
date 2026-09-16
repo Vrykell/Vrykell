@@ -2,7 +2,7 @@ import { History } from 'lucide-react';
 import { registerSource } from '@features/search/services/registry';
 import { searchHistory as backendSearchHistory } from '@/api/search';
 import type { SearchResult, HistoryResultData } from '@features/search/types';
-import { useHistoryStore } from '@/store/history';
+import { useHistoryStore } from '@features/terminal/stores/history';
 
 registerSource({
   id: 'history',

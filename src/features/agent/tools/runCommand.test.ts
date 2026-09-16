@@ -9,8 +9,8 @@ vi.mock('@/lib/pty', () => ({
 }));
 
 import { runCommandAndWait } from '@features/agent/tools/runCommand';
-import { useBlockStore } from '@/store/blocks';
-import { useTerminalStore } from '@/store/terminal';
+import { useBlockStore } from '@features/terminal/stores/blocks';
+import { useTerminalStore } from '@features/terminal/stores/terminal';
 import { useSessionStore } from '@entities/session';
 import { agentControl } from '@features/agent/services/agentControl';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';

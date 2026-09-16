@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { ptyWrite } from '@/lib/pty';
-import { useWorkspaceStore, isSessionTab } from '@/store/workspace';
+import { useWorkspaceStore, isSessionTab } from '@features/workspace/stores/workspace';
 import { leaves as layoutLeaves, firstLeaf } from '@/lib/windowLayout';
 import type { Terminal } from '@xterm/xterm';
 import type { Scene } from '@features/terminal/services/pipeline/sessionController';

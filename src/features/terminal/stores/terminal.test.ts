@@ -4,8 +4,8 @@ const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 invokeMock.mockResolvedValue(undefined);
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { useTerminalStore, registerTerminal, unregisterTerminal, getRecentOutput, getFocusedTerminalId } from '@/store/terminal';
-import { useWorkspaceStore } from '@/store/workspace';
+import { useTerminalStore, registerTerminal, unregisterTerminal, getRecentOutput, getFocusedTerminalId } from '@features/terminal/stores/terminal';
+import { useWorkspaceStore } from '@features/workspace/stores/workspace';
 
 const initialTerm = useTerminalStore.getState();
 const initialWs = useWorkspaceStore.getState();

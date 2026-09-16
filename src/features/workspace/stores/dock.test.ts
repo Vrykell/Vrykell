@@ -2,7 +2,7 @@
  * dock — 侧栏面板 store 测试。
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { useDockStore } from '@/store/dock';
+import { useDockStore } from '@features/workspace/stores/dock';
 
 const RESET = { leftZone: [], rightZone: [], leftPanels: [], rightPanels: [], panelWidths: {} };
 beforeEach(() => {
@@ -136,7 +136,7 @@ describe('dock store', () => {
 describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
   async function freshStore() {
     vi.resetModules();
-    const m = await import('@/store/dock');
+    const m = await import('@features/workspace/stores/dock');
     return m.useDockStore;
   }
 

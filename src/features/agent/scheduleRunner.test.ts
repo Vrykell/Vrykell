@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { useChatStore } from '@/store/chat';
+import { useChatStore } from '@features/chat/stores/chat';
 import { kickScheduleRunner, initScheduleRunner } from '@features/agent/services/scheduleRunner';
 import type { Schedule } from '@features/agent/services/platform';
 

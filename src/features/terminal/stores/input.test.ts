@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useInputStore, selectPaneInput } from '@/store/input';
+import { useInputStore, selectPaneInput } from '@features/terminal/stores/input';
 
 const initial = useInputStore.getState();
 
