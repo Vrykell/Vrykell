@@ -7,15 +7,13 @@
  *   分裂用 ⌘D/⌘⇧D（继承类型）、⌥⌘D（选类型）；分隔线拖动调整比例。
  */
 
-import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
+import { useRef, useEffect, useMemo, useState } from 'react';
 import { useSessionStore, type Tab } from '@entities/session';
 import { useTerminalStore } from '@entities/terminal';
 import { useUiStore, useDockDragStore } from '@shared/ui';
 import { useBlockStore, selectBlocks } from '@entities/terminal';
 import { usePaneMessages } from '@entities/chat';
 import { useChatPanelOpen } from '@shared/ui';
-import { ptyWrite } from '@/platform/pty';
-import { killForeground, ESCALATE_WINDOW_MS } from '@shared/utils/killForeground';
 import { useToastStore } from '@/components/Toast';
 import { useFollowBottom, registerFollowEngager, engageFollow } from '@features/terminal/hooks/useFollowBottom';
 import { useTerminalFocus } from '@features/terminal/hooks/useTerminalFocus';
@@ -32,6 +30,7 @@ import SessionHistoryView from '@/components/SessionHistoryView';
 import SettingsView from '@features/settings/pages/SettingsView';
 import ContextMenu from '@/components/ContextMenu';
 import { useTerminalLayoutActions } from '@features/terminal/hooks/useTerminalLayoutActions';
+import { useTuiControls } from '@features/terminal/hooks/useTuiControls';
 
 export default function TerminalView() {
   const tabs = useSessionStore((s) => s.tabs);
@@ -540,31 +539,15 @@ function MoveDragLayer({ layout, draggingId, onCommit }: {
 // ── TuiBanner（altScreen 应用：vim/htop 等） ──
 
 function TuiBanner({ tabId }: { tabId: string }) {
-  const setAltScreenActive = useTerminalStore((s) => s.setAltScreenActive);
-  const setScene = useTerminalStore((s) => s.setScene);
-  const altScreenActive = useTerminalStore((s) => s.altScreenActive);
-  const sessions = useTerminalStore((s) => s.sessions);
-  const blocks = useBlockStore(selectBlocks(tabId));
-  const [killArmed, setKillArmed] = useState(false);
-  const killTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (killTimer.current) clearTimeout(killTimer.current); }, []);
-  const runningCommand = useMemo(() => {
-    const running = blocks.filter((b) => b.status === 'executing');
-    return running.length > 0 ? running[running.length - 1]!.command : '';
-  }, [blocks]);
-  const sendCtrlC = useCallback(() => {
-    const sid = sessions[tabId];
-    if (sid) ptyWrite(sid, '\x03').catch(() => {});
-  }, [sessions, tabId]);
-  const killApp = useCallback(() => {
-    const sid = sessions[tabId];
-    if (!sid) return;
-    killForeground(sid).then((level) => {
-      if (killTimer.current) clearTimeout(killTimer.current);
-      if (level === 'term') { setKillArmed(true); killTimer.current = setTimeout(() => setKillArmed(false), ESCALATE_WINDOW_MS); }
-      else setKillArmed(false);
-    }).catch((e) => useToastStore.getState().addToast(String((e as Error)?.message ?? e), 'info'));
-  }, [sessions, tabId]);
+  const {
+    altScreenActive,
+    runningCommand,
+    killArmed,
+    sendCtrlC,
+    killApp,
+    setAltScreenActive,
+    setScene,
+  } = useTuiControls(tabId);
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 101, padding: '3px 12px', fontSize: 11, fontFamily: 'var(--font-mono)', background: 'transparent', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)' }}>
       <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--accent-warm)', flexShrink: 0 }} />
