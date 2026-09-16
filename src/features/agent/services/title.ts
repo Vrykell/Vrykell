@@ -15,7 +15,7 @@
 import { generateText } from 'ai';
 import { createChatModel } from '@features/agent/services/provider';
 import { useAgentSettings } from '@features/agent/stores/agentSettings';
-import { activeModelProfile, isApiKeyConfigured } from '@/lib/ai';
+import { activeModelProfile, isApiKeyConfigured } from '@features/agent/stores/aiConfig';
 import { useBlockStore } from '@entities/terminal';
 import { useChatStore } from '@entities/chat';
 import { useSessionStore, isSessionTab } from '@entities/session';

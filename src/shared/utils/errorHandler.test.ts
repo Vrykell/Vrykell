@@ -2,7 +2,7 @@
  * errorHandler — 全局错误处理与安全解析测试。
  */
 import { describe, it, expect, vi } from 'vitest';
-import { installGlobalErrorHandlers, safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@/lib/errorHandler';
+import { installGlobalErrorHandlers, safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@shared/utils/errorHandler';
 
 describe('safeJsonParse / safeLocalStorage', () => {
   it('safeJsonParse 合法/非法/空', () => {

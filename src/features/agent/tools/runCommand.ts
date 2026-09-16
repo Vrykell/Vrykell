@@ -14,7 +14,7 @@
  * 约定：永不 throw —— 返回结构化结果，让模型自我修正。
  */
 
-import { ptyWrite } from '@/lib/pty';
+import { ptyWrite } from '@/platform/pty';
 import {
   useTerminalStore,
   useBlockStore,

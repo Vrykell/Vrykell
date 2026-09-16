@@ -1,5 +1,5 @@
 import { setDefaultStream } from '@entities/chat';
-import { refreshAiConfig } from '@/lib/ai';
+import { refreshAiConfig } from '@features/agent/stores/aiConfig';
 import { agentStream } from '@features/agent/services/agentStream';
 import { initAutoTitle } from '@features/agent/services/title';
 import { initScheduleRunner } from '@features/agent/services/scheduleRunner';

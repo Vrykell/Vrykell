@@ -15,8 +15,8 @@ import { useUiStore, useDockDragStore } from '@shared/ui';
 import { useBlockStore, selectBlocks } from '@entities/terminal';
 import { usePaneMessages } from '@entities/chat';
 import { useChatPanelOpen } from '@shared/ui';
-import { ptyWrite } from '@/lib/pty';
-import { killForeground, ESCALATE_WINDOW_MS } from '@/lib/killForeground';
+import { ptyWrite } from '@/platform/pty';
+import { killForeground, ESCALATE_WINDOW_MS } from '@shared/utils/killForeground';
 import { useToastStore } from '@/components/Toast';
 import { useFollowBottom, registerFollowEngager, engageFollow } from '@features/terminal/hooks/useFollowBottom';
 import { useTerminalFocus } from '@features/terminal/hooks/useTerminalFocus';
@@ -24,7 +24,7 @@ import {
   leaves as layoutLeaves, firstLeaf, findLeaf, splitLeaf, removeLeaf, dropTargets, moveTargets,
   setRatio, dividers, collectLayoutCells, MIN_PANE_SIZE, DIVIDER_SIZE,
   type WindowLayout, type TerminalSpec, type DropTarget, type Rect,
-} from '@/lib/windowLayout';
+} from '@features/workspace/model/windowLayout';
 import InputEditor from '@features/terminal/components/InputEditor';
 import AiStatusBar from '@features/terminal/components/AiStatusBar';
 import TerminalBlockList, { hasVisibleContent } from '@features/terminal/components/TerminalBlockList';

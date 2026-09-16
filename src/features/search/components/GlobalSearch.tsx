@@ -6,7 +6,7 @@ import { useSearchHighlightStore } from '@features/search/stores/searchHighlight
 import { useSessionStore } from '@entities/session';
 import { useTerminalStore } from '@entities/terminal';
 import { getCommands } from '@/commands';
-import * as sessionManager from '@/lib/sessionManager';
+import * as sessionManager from '@features/workspace/services/sessionManager';
 import type { ResultType, SearchResult, BlockResultData, HistoryResultData, FileResultData, ActionResultData, SessionResultData } from '@features/search/types';
 import { getSources, useEnabledSourcesStore } from '@features/search/services/registry';
 import SearchResultCard from '@features/search/components/SearchResultCard';

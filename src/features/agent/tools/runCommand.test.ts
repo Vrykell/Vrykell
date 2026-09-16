@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-vi.mock('@/lib/pty', () => ({
+vi.mock('@/platform/pty', () => ({
   ptyWrite: vi.fn(async () => {}),
 }));
 

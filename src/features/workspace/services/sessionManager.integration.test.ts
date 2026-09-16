@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { invoke } from '@tauri-apps/api/core';
-import * as sessionManager from '@/lib/sessionManager';
+import * as sessionManager from '@features/workspace/services/sessionManager';
 import { useWorkspaceStore, isSessionTab, firstTerminalOf } from '@features/workspace/stores/workspace';
 import { useBlockStore } from '@features/terminal/stores/blocks';
-import { leaves } from '@/lib/windowLayout';
+import { leaves } from '@features/workspace/model/windowLayout';
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 

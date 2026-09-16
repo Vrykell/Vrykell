@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Search, ChevronRight, Settings, Cpu, FileCode, Palette, Keyboard, SquareTerminal } from 'lucide-react';
 import { loadConfig, saveConfig, type FileOpenConfig } from '@features/files/services/fileOpen';
-import { refreshAiConfig, setTavilyKey, clearTavilyKey, useAiConfigStore } from '@/lib/ai';
+import { refreshAiConfig, setTavilyKey, clearTavilyKey, useAiConfigStore } from '@features/agent/stores/aiConfig';
 import SkillsSettings from '@features/settings/pages/SkillsSettings';
 import { MemorySettings, AgentsSettings, SchedulesSettings } from '@features/settings/pages/AgentExtrasSettings';
 import Segmented from '@/components/Segmented';

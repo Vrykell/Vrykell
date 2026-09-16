@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { ptyWrite } from '@/lib/pty';
+import { ptyWrite } from '@/platform/pty';
 import { useTerminalStore } from '@entities/terminal';
 import { useChatStore } from '@entities/chat';
 import { useSessionStore } from '@entities/session';

@@ -1,4 +1,4 @@
-import { isApiKeyConfigured, getModel } from '@/lib/ai';
+import { isApiKeyConfigured, getModel } from '@features/agent/stores/aiConfig';
 import { loadConfig, serializeTemplates } from '@features/files/services/fileOpen';
 import { useSessionStore } from '@entities/session';
 

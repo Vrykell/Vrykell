@@ -7,7 +7,7 @@ import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, type Tab, 
 import { regenerateTitle } from '@features/agent/services/title';
 import { useToastStore } from '@/components/Toast';
 import { IconBtn } from '@/components/UiBtn';
-import { shellTypeLabel } from '@/lib/shells';
+import { shellTypeLabel } from '@/platform/shells';
 import NewTabModal from '@/components/NewTabModal';
 import ContextMenu, { type ContextMenuItem } from '@/components/ContextMenu';
 
