@@ -12,7 +12,7 @@ import { runCommandAndWait } from '@features/agent/tools/runCommand';
 import { useBlockStore } from '@/store/blocks';
 import { useTerminalStore } from '@/store/terminal';
 import { useSessionStore } from '@entities/session';
-import { agentControl } from '@features/agent/agentControl';
+import { agentControl } from '@features/agent/services/agentControl';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 
 const initialBlocks = useBlockStore.getState();

@@ -7,7 +7,7 @@ const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import { buildWebSearchTool, buildWebFetchTool, buildWebCrawlTool } from '@features/agent/tools/webFetch';
-import { usePermissions, type ToolContext } from '@features/agent/permissions';
+import { usePermissions, type ToolContext } from '@features/agent/stores/permissions';
 
 usePermissions.setState({ levels: { web_search: 'allow', web_fetch: 'allow', web_crawl: 'allow' } });
 const CTX: ToolContext = {};

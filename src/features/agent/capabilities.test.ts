@@ -2,7 +2,7 @@
  * capabilities — 模型能力探测规则测试。
  */
 import { describe, it, expect } from 'vitest';
-import { detectCapabilities, hasCapability, CAPABILITY_LABELS } from '@features/agent/capabilities';
+import { detectCapabilities, hasCapability, CAPABILITY_LABELS } from '@features/agent/model/capabilities';
 
 describe('detectCapabilities', () => {
   it('anthropic / gemini：原生视觉与搜索，现代模型有推理', () => {

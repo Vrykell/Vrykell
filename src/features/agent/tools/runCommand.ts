@@ -21,7 +21,7 @@ import {
   getFocusedTerminalId,
   getRecentOutputFor,
 } from '@entities/terminal';
-import { agentControl } from '@features/agent/agentControl';
+import { agentControl } from '@features/agent/services/agentControl';
 
 export interface RunCommandResult {
   ok: boolean;

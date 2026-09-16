@@ -2,7 +2,7 @@
  * terminalOpenPage — 各 Shell 打开模式设置页。
  */
 import Segmented from '@/components/Segmented';
-import { useAgentSettings } from '@features/agent/agentSettings';
+import { useAgentSettings } from '@features/agent/stores/agentSettings';
 import type { ShellType } from '@/lib/shells';
 import { Field } from '@features/settings/components/ui';
 

@@ -23,7 +23,7 @@ vi.mock('@/store/terminal', () => ({
 }));
 
 import { buildTerminalTools } from '@features/agent/tools/terminal';
-import { usePermissions, type ToolContext } from '@features/agent/permissions';
+import { usePermissions, type ToolContext } from '@features/agent/stores/permissions';
 import { useBlockStore } from '@/store/blocks';
 
 usePermissions.setState({ levels: { read_terminal: 'allow', terminal_keys: 'allow' } });

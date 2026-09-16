@@ -9,7 +9,7 @@
 
 import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
 import { useSessionStore, nextTerminalId, type Tab } from '@entities/session';
-import { defaultOpenModeForShell } from '@features/agent/agentSettings';
+import { defaultOpenModeForShell } from '@features/agent/stores/agentSettings';
 import { useTerminalStore } from '@entities/terminal';
 import { useUiStore, useDockDragStore } from '@shared/ui';
 import { useBlockStore, selectBlocks } from '@entities/terminal';

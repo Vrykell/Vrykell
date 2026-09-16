@@ -2,12 +2,12 @@
  * subagent — 子代理工具：spawn/create/list/remove，让 LLM 自己调度与扩展子代理。
  */
 import { generateText, tool } from 'ai';
-import { DESC_SUBAGENT } from '@features/agent/toolTexts';
+import { DESC_SUBAGENT } from '@features/agent/model/toolTexts';
 import { invoke } from '@tauri-apps/api/core';
 import { z } from 'zod';
-import { createChatModel, type ProviderKind } from '@features/agent/provider';
-import { listAgents, saveAgent, removeAgent, getAgent } from '@features/agent/platform';
-import { gate, type ToolContext } from '@features/agent/permissions';
+import { createChatModel, type ProviderKind } from '@features/agent/services/provider';
+import { listAgents, saveAgent, removeAgent, getAgent } from '@features/agent/services/platform';
+import { gate, type ToolContext } from '@features/agent/stores/permissions';
 
 interface AiConfigRust {
   base_url: string;

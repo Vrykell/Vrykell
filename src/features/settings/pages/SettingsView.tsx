@@ -9,7 +9,7 @@ import { useToastStore } from '@/components/Toast';
 import {
   usePermissions, clearSessionGrants, TOOL_NAMES,
   type ToolLevel, type ToolName,
-} from '@features/agent/permissions';
+} from '@features/agent/stores/permissions';
 import { Field, TemplateListEditor, inputStyle, btnStyle } from '@features/settings/components/ui';
 import { AiModelPage } from '@features/settings/pages/aiModelPage';
 import { AiBehaviorPage } from '@features/settings/pages/aiBehaviorPage';

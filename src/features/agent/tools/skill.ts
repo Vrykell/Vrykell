@@ -8,10 +8,10 @@
  */
 
 import { tool } from 'ai';
-import { DESC_USE_SKILL, DESC_INSTALL_SKILL } from '@features/agent/toolTexts';
+import { DESC_USE_SKILL, DESC_INSTALL_SKILL } from '@features/agent/model/toolTexts';
 import { z } from 'zod';
-import { getSkill, listSkills, installSkillMd } from '@features/agent/skills';
-import { gate, type ToolContext } from '@features/agent/permissions';
+import { getSkill, listSkills, installSkillMd } from '@features/agent/services/skills';
+import { gate, type ToolContext } from '@features/agent/stores/permissions';
 
 export function buildSkillTool(ctx: ToolContext) {
   return {

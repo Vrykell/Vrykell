@@ -17,7 +17,7 @@ import {
   totalSize,
   LIMITS,
   type AttachmentMeta,
-} from '@features/agent/attachments';
+} from '@features/agent/model/attachments';
 
 const img: AttachmentMeta = {
   id: 'a1', kind: 'image', name: 'shot.png', mime: 'image/png', size: 1234, blobPath: '/atts/x-shot.png',

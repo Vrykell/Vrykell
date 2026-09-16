@@ -3,7 +3,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { buildTools } from '@features/agent/tools/index';
-import { usePermissions } from '@features/agent/permissions';
+import { usePermissions } from '@features/agent/stores/permissions';
 
 describe('buildTools', () => {
   it('默认注册核心工具；deny 级不注册', () => {

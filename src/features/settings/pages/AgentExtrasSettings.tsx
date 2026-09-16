@@ -7,14 +7,14 @@ import { useEffect, useState } from 'react';
 import { Plus, X, Sparkles } from 'lucide-react';
 import { generateText } from 'ai';
 import { invoke } from '@tauri-apps/api/core';
-import { createChatModel, type ProviderKind } from '@features/agent/provider';
+import { createChatModel, type ProviderKind } from '@features/agent/services/provider';
 import {
   getMemory, setMemory, getMemoryJournal,
   listAgents, saveAgent, removeAgent, type AgentDef,
   listSchedules, saveSchedule, removeSchedule, type Schedule,
-} from '@features/agent/platform';
+} from '@features/agent/services/platform';
 import { useToastStore } from '@/components/Toast';
-import { kickScheduleRunner } from '@features/agent/scheduleRunner';
+import { kickScheduleRunner } from '@features/agent/services/scheduleRunner';
 
 const toast = (msg: string, type: 'info' | 'success' | 'error') =>
   useToastStore.getState().addToast(msg, type);

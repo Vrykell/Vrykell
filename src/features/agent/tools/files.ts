@@ -7,10 +7,10 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
-import { DESC_READ_FILE, DESC_WRITE_FILE, DESC_EDIT_FILE } from '@features/agent/toolTexts';
+import { DESC_READ_FILE, DESC_WRITE_FILE, DESC_EDIT_FILE } from '@features/agent/model/toolTexts';
 import { tool } from 'ai';
 import { z } from 'zod';
-import { gate, ensureSkillAccess, type ToolContext } from '@features/agent/permissions';
+import { gate, ensureSkillAccess, type ToolContext } from '@features/agent/stores/permissions';
 
 /** invoke 结果统一成结构化结果（约定见 tools/index.ts 头注释） */
 async function call<T>(fn: () => Promise<T>): Promise<{ ok: boolean; result?: string; error?: string }> {

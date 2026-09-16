@@ -18,10 +18,10 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ToolRunState } from '@features/agent/messageParts';
-import { untrustedSkillFor, setSkillState } from '@features/agent/skills';
-import { dangerousCommandReason } from '@features/agent/dangerousCommands';
-import { sensitivePathReason } from '@features/agent/sensitivePaths';
+import type { ToolRunState } from '@features/agent/model/messageParts';
+import { untrustedSkillFor, setSkillState } from '@features/agent/services/skills';
+import { dangerousCommandReason } from '@features/agent/model/dangerousCommands';
+import { sensitivePathReason } from '@features/agent/model/sensitivePaths';
 
 export { dangerousCommandReason };
 export { sensitivePathReason };

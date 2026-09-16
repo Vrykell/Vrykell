@@ -4,7 +4,7 @@ import {
   ChevronRight, Pencil, Archive, Folder, Trash2,
 } from 'lucide-react';
 import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, type Tab, type TabGroup } from '@entities/session';
-import { regenerateTitle } from '@features/agent/title';
+import { regenerateTitle } from '@features/agent/services/title';
 import { useToastStore } from '@/components/Toast';
 import { IconBtn } from '@/components/UiBtn';
 import { shellTypeLabel } from '@/lib/shells';

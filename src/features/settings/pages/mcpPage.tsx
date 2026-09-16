@@ -7,7 +7,7 @@ import { Plus, X } from 'lucide-react';
 import {
   listMcpServers, saveMcpServer, removeMcpServer, toggleMcpServer,
   connectMcp, disconnectMcp, type McpServer,
-} from '@features/agent/mcp';
+} from '@features/agent/services/mcp';
 import { useToastStore } from '@/components/Toast';
 import { Field, Toggle, inputStyle, btnStyle } from '@features/settings/components/ui';
 
