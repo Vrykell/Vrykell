@@ -1,9 +1,9 @@
 import { setDefaultStream } from '@entities/chat';
 import { refreshAiConfig } from '@/lib/ai';
-import { agentStream } from '@/agent/agentStream';
-import { initAutoTitle } from '@/agent/title';
-import { initScheduleRunner } from '@/agent/scheduleRunner';
-import { useWorkspaceDirsStore } from '@/files/workspaceDirs';
+import { agentStream } from '@features/agent/agentStream';
+import { initAutoTitle } from '@features/agent/title';
+import { initScheduleRunner } from '@features/agent/scheduleRunner';
+import { useWorkspaceDirsStore } from '@features/files/workspaceDirs';
 import { useHistoryStore } from '@/store/history';
 import { restoreWorkspace } from '@entities/session';
 import { createApplicationBootstrap } from './applicationBootstrap';

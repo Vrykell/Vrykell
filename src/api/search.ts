@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type {
   BackendHistoryEntry, BackendFileMatch, BackendSearchContext,
   BackendBlockEntry, BackendSessionEntry,
-} from '../search/types';
+} from '@features/search/types';
 
 /** 搜索文件系统 */
 export function searchFiles(

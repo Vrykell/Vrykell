@@ -2,7 +2,7 @@ import { selectActiveSessionTab, useSessionStore } from '@entities/session';
 import { MIN_PANE_SIZE, minTerminalWidth } from '@/lib/windowLayout';
 import TopDock from '@/components/TopDock';
 import SidePanel from '@/components/SidePanel';
-import TerminalView from '@/terminal/TerminalView';
+import TerminalView from '@features/terminal/TerminalView';
 
 /** 工作区主布局：Dock、侧边面板和终端内容区。 */
 export default function WorkspaceShell() {

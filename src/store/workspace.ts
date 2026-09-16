@@ -1,24 +1,24 @@
 import { create } from 'zustand';
-import { useToastStore } from '../components/Toast';
+import { useToastStore } from '@/components/Toast';
 import { t } from '../i18n';
-import * as sessionManager from '../lib/sessionManager';
+import * as sessionManager from '@/lib/sessionManager';
 import {
   groupsList, groupCreate, groupRename, groupSetCollapsed, groupDelete,
   groupDeleteWithSessions, groupsReorder, sessionSetGroup, sessionsReorder,
   groupRestore, groupArchive,
-} from '../api/group';
-import type { BackendGroupEntry } from '../search/types';
+} from '@/api/group';
+import type { BackendGroupEntry } from '@features/search/types';
 import { useBlockStore } from './blocks';
 import { useChatStore } from './chat';
-import { useAgentSettings } from '../agent/agentSettings';
-import { defaultOpenModeForShell } from '../agent/agentSettings';
+import { useAgentSettings } from '@features/agent/agentSettings';
+import { defaultOpenModeForShell } from '@features/agent/agentSettings';
 import { useTerminalStore, getFocusedTerminalId } from './terminal';
-import type { ShellType } from '../lib/shells';
-import { shellTypeLabel } from '../lib/shells';
+import type { ShellType } from '@/lib/shells';
+import { shellTypeLabel } from '@/lib/shells';
 import {
   leaf, leaves as layoutLeaves, firstLeaf, findLeaf, splitLeaf, removeLeaf, countLeaves,
   type WindowLayout, type TerminalSpec, type SplitDir,
-} from '../lib/windowLayout';
+} from '@/lib/windowLayout';
 
 export type TabKind = 'session' | 'history' | 'settings';
 

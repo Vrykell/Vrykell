@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useSessionStore, isSessionTab } from '@entities/session';
 import { useTerminalStore, termInstances, getFocusedTerminalId } from '@entities/terminal';
-import { countLeaves, leaves } from '../lib/windowLayout';
+import { countLeaves, leaves } from '@/lib/windowLayout';
 import { useUiStore } from '@shared/ui';
 import { useBlockStore } from '@entities/terminal';
 

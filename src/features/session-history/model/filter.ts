@@ -1,4 +1,4 @@
-import type { BackendSessionEntry } from '@/search/types';
+import type { BackendSessionEntry } from '@features/search/types';
 
 export type SessionTypeFilter = 'all' | 'local' | 'ssh';
 export type SessionDateFilter = 'all' | 'today' | '7d' | '30d' | '90d';

@@ -2,10 +2,10 @@ import { useEffect, useState, useCallback } from 'react';
 import { ArrowLeft, FolderOpen, Trash2 } from 'lucide-react';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { downloadsList, downloadsClear, type DownloadEntry } from './api';
-import { fileIcon } from '../files/fileIcon';
-import { useToastStore } from '../components/Toast';
-import { IconBtn, fmtSize } from '../components/UiBtn';
-import ConfirmDialog from '../components/ConfirmDialog';
+import { fileIcon } from '@features/files/fileIcon';
+import { useToastStore } from '@/components/Toast';
+import { IconBtn, fmtSize } from '@/components/UiBtn';
+import ConfirmDialog from '@/components/ConfirmDialog';
 
 function fmtTime(ms: number): string {
   const d = new Date(ms);

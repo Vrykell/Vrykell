@@ -3,9 +3,9 @@ import { useDockStore, PANEL_DEFS, MIN_PANEL_WIDTH, type DockSide } from '@share
 import { selectActiveSessionTab, useSessionStore } from '@entities/session';
 import ResizeHandle from './ResizeHandle';
 import PanelTabs from './PanelTabs';
-import PanelFiles from '../files/PanelFiles';
-import PanelSsh from '../ssh/PanelSsh';
-import PanelChat from '../chat/PanelChat';
+import PanelFiles from '@features/files/PanelFiles';
+import PanelSsh from '@features/ssh/PanelSsh';
+import PanelChat from '@features/chat/PanelChat';
 
 interface SidePanelProps {
   side: DockSide;
