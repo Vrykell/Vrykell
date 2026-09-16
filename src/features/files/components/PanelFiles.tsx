@@ -8,9 +8,9 @@ import { fileIcon } from '@features/files/utils/fileIcon';
 import { normPath, pathSegments, segmentsToPath, parentOf, compactPathSegments } from '@features/files/utils/pathUtils';
 import { shellQuote } from '@features/ssh/utils/remotePath';
 import { useWorkspaceDirsStore } from '@features/files/services/workspaceDirs';
-import { useSessionStore, isSessionTab } from '@entities/session';
+import { useSessionStore } from '@entities/session';
 import { useTerminalStore } from '@entities/terminal';
-import { leaves as layoutLeaves, firstLeaf } from '@features/workspace/model/windowLayout';
+import { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
 import { useToastStore } from '@/components/Toast';
 import { IconBtn, fmtSize } from '@/components/UiBtn';
 import { flattenVisible, type VisibleRow } from '@features/files/utils/fileTree';
@@ -30,19 +30,10 @@ type ConfirmState =
  * 活跃标签页为 SSH 连接时切到远程文件浏览，否则走本地文件浏览。
  */
 export default function PanelFiles() {
-  const tabs = useSessionStore((s) => s.tabs);
-  const activeId = useSessionStore((s) => s.activeId);
-  const focusedPaneId = useTerminalStore((s) => s.focusedPaneId);
-  const sessions = useTerminalStore((s) => s.sessions);
+  const { focusedSpec } = useActiveWorkspace();
   const sshConnections = useSshStore((s) => s.connections);
   const sshLoaded = useSshStore((s) => s.loaded);
   useEffect(() => { ensureSshLoaded(); }, []);
-
-  const activeTab = tabs.find((t) => t.id === activeId);
-  const focusedSpec = activeTab && isSessionTab(activeTab)
-    ? layoutLeaves(activeTab.layout).find((t) => t.id === focusedPaneId && sessions[focusedPaneId])
-      ?? firstLeaf(activeTab.layout)
-    : null;
 
   if (sshLoaded && focusedSpec?.kind === 'ssh' && focusedSpec.ssh?.connectionId) {
     const conn = sshConnections.find((c) => c.id === focusedSpec.ssh!.connectionId);
@@ -74,25 +65,8 @@ function LocalFiles() {
   const addTab = useSessionStore((s) => s.addTab);
 
   // ── 跟随聚焦终端的 cwd：切窗口 / 切换聚焦终端 / 终端 cd 都会实时定位 ──
-  const focusedPaneId = useTerminalStore((s) => s.focusedPaneId);
   const sessions = useTerminalStore((s) => s.sessions);
-  const focused = useSessionStore((s) => {
-    const at = s.tabs.find((x) => x.id === s.activeId);
-    if (at && isSessionTab(at)) {
-      const fp = focusedPaneId;
-      if (fp && sessions[fp] && layoutLeaves(at.layout).some((t) => t.id === fp)) return fp;
-      return firstLeaf(at.layout).id;
-    }
-    return s.activeId;
-  });
-  const activeCwd = useSessionStore((s) => {
-    const at = s.tabs.find((x) => x.id === s.activeId);
-    if (at && isSessionTab(at)) {
-      const spec = layoutLeaves(at.layout).find((t) => t.id === focused);
-      return s.terminalCwds[focused] ?? spec?.cwd;
-    }
-    return undefined;
-  });
+  const { focusedPaneId: focused, activeCwd } = useActiveWorkspace();
   useEffect(() => {
     fsHome().then((h) => setHomePath(normPath(h))).catch(() => setHomePath(null));
   }, []);
