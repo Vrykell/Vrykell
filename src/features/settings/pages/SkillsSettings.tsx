@@ -5,15 +5,17 @@
  * 信任分级：未信任/已信任 + 启用/禁用；含脚本/来源/已修改 徽标；导入默认未信任。
  */
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { ChevronRight, Download, FileText, Folder, ShieldAlert, Store, Trash2, X } from 'lucide-react';
 import { fileOpenWith } from '@features/files/services/fs';
 import {
-  setSkillState, removeSkill, readSkillFile, marketGithubList, marketGithubInstall,
+  setSkillState, removeSkill, marketGithubList, marketGithubInstall,
   type SkillMeta, type SkillDetail, type MarketSkill,
 } from '@features/agent/services/skills';
 import { useToastStore } from '@/components/Toast';
 import { useSkillsSettings } from '@features/settings/hooks/useSkillsSettings';
+import { useSkillFileBrowser } from '@features/settings/hooks/useSkillFileBrowser';
+import type { FileNode } from '@features/settings/model/skillFileTree';
 
 const toast = (msg: string, type: 'info' | 'success' | 'error') =>
   useToastStore.getState().addToast(msg, type);
@@ -54,61 +56,8 @@ function Badge({ text, tone }: { text: string; tone: 'warn' | 'muted' | 'ok' | '
   return <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, color, background: bg, flexShrink: 0 }}>{text}</span>;
 }
 
-// ── 文件树（从扁平相对路径构建） ──
-
-interface FileNode {
-  name: string;
-  path: string;
-  isDir: boolean;
-  children?: FileNode[];
-}
-
-function buildFileTree(files: string[]): FileNode[] {
-  const root: FileNode[] = [];
-  const map = new Map<string, FileNode>();
-  for (const f of files) {
-    const parts = f.split('/');
-    let cur = root;
-    let curPath = '';
-    for (let i = 0; i < parts.length; i++) {
-      const p = parts[i]!;
-      curPath = curPath ? `${curPath}/${p}` : p;
-      const isDir = i < parts.length - 1;
-      let node = map.get(curPath);
-      if (!node) {
-        node = { name: p, path: curPath, isDir, children: isDir ? [] : undefined };
-        map.set(curPath, node);
-        cur.push(node);
-      }
-      cur = node.children ?? [];
-    }
-  }
-  return root;
-}
-
 function SkillFileBrowser({ skillName, files }: { skillName: string; files: string[] }) {
-  const tree = useMemo(() => buildFileTree(files), [files]);
-  const [open, setOpen] = useState<Set<string>>(new Set());
-  const [selected, setSelected] = useState<string | null>(null);
-  const [content, setContent] = useState<string>('');
-
-  const pick = async (node: FileNode) => {
-    if (node.isDir) {
-      setOpen((prev) => {
-        const next = new Set(prev);
-        if (next.has(node.path)) next.delete(node.path);
-        else next.add(node.path);
-        return next;
-      });
-      return;
-    }
-    setSelected(node.path);
-    try {
-      setContent(await readSkillFile(skillName, node.path));
-    } catch (e) {
-      setContent(`读取失败：${(e as Error)?.message ?? e}`);
-    }
-  };
+  const { tree, open, selected, content, pick } = useSkillFileBrowser({ skillName, files });
 
   const render = (nodes: FileNode[], depth: number): React.ReactNode =>
     nodes.map((n) => (
