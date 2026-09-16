@@ -1,5 +1,5 @@
 import { useCallback, type FC } from 'react';
-import { useDockStore, PANEL_DEFS, MIN_PANEL_WIDTH, type DockSide } from '../store/dock';
+import { useDockStore, PANEL_DEFS, MIN_PANEL_WIDTH, type DockSide } from '@shared/ui';
 import { selectActiveSessionTab, useSessionStore } from '@entities/session';
 import ResizeHandle from './ResizeHandle';
 import PanelTabs from './PanelTabs';

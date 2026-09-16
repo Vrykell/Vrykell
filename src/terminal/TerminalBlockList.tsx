@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useBlockStore, selectBlocks } from '@entities/terminal';
 import { useChatStore, usePaneMessages } from '@entities/chat';
-import { useChatPanelOpen } from '../store/dock';
+import { useChatPanelOpen } from '@shared/ui';
 import { useTerminalStore } from '@entities/terminal';
 import { useSearchHighlightStore } from '../store/searchHighlight';
 import { toExchanges, mergeFlow } from '../chat/exchanges';

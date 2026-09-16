@@ -1,10 +1,10 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { Terminal, Settings, Search } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { useDockStore, PANEL_DEFS, type DockSide } from '../store/dock';
+import { useDockStore, PANEL_DEFS, type DockSide } from '@shared/ui';
 import DockButton from './DockButton';
 import { ToolbarBtn } from './UiBtn';
-import { useUiStore } from '../store/ui';
+import { useUiStore } from '@shared/ui';
 import { selectActiveSessionTab, useSessionStore } from '@entities/session';
 import { isMacOS } from '../lib/platform';
 

@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useUiStore } from '@/store/ui';
+import { useUiStore } from '@shared/ui';
 import { useTerminalThemeStore } from '@/theme/terminalTheme';
 import type { TerminalSpec } from '@/lib/windowLayout';
 import WorkspaceShell from '@/widgets/workspace/WorkspaceShell';

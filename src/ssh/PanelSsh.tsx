@@ -3,7 +3,7 @@ import { Pencil, Plus, Search, Server } from 'lucide-react';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { ensureSshLoaded, useSshStore } from './store';
 import { useSessionStore } from '@entities/session';
-import { useDockStore } from '../store/dock';
+import { useDockStore } from '@shared/ui';
 import ContextMenu from '../components/ContextMenu';
 import { IconBtn } from '../components/UiBtn';
 import type { SshConnection } from './api';

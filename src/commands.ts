@@ -1,7 +1,6 @@
 import { useSessionStore } from '@entities/session';
 import { useBlockStore, termInstances } from '@entities/terminal';
-import { useUiStore } from './store/ui';
-import { useDockStore } from './store/dock';
+import { useUiStore, useDockStore } from '@shared/ui';
 import { clearSessionBlocks } from './terminal/useTerminalSession';
 
 /** 应用命令定义 — 被 CommandPalette 和全局搜索共用 */
