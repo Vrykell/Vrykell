@@ -4,8 +4,8 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 import {
   useWorkspaceStore, isSessionTab, getFocusedCwd, firstTerminalOf,
   terminalsOf, serializeSession, nextTerminalId,
-} from './workspace';
-import { useTerminalStore } from './terminal';
+} from '@/store/workspace';
+import { useTerminalStore } from '@/store/terminal';
 import { leaf } from '@/lib/windowLayout';
 
 const initial = useWorkspaceStore.getState();

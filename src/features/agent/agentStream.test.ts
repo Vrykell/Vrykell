@@ -16,7 +16,7 @@ vi.mock('@tauri-apps/api/core', () => {
 });
 
 import { invoke, Channel } from '@tauri-apps/api/core';
-import { agentStream } from './agentStream';
+import { agentStream } from '@features/agent/agentStream';
 
 const mockInvoke = vi.mocked(invoke);
 

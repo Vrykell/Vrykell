@@ -7,7 +7,7 @@ import {
   touchRecentOpen,
   type NewTabOption,
 } from '@/lib/tabTypes';
-import { useSshStore, ensureSshLoaded } from '@features/ssh/store';
+import { useSshStore, ensureSshLoaded } from '@features/ssh/stores/store';
 import { useSessionStore } from '@entities/session';
 import type { TerminalSpec } from '@/lib/windowLayout';
 

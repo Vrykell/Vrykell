@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { MenuItem } from './UiBtn';
+import { MenuItem } from '@/components/UiBtn';
 
 export interface ContextMenuItem {
   label: string;

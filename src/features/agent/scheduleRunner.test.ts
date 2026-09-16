@@ -6,8 +6,8 @@ const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import { useChatStore } from '@/store/chat';
-import { kickScheduleRunner, initScheduleRunner } from './scheduleRunner';
-import type { Schedule } from './platform';
+import { kickScheduleRunner, initScheduleRunner } from '@features/agent/scheduleRunner';
+import type { Schedule } from '@features/agent/platform';
 
 function makeSchedule(over: Partial<Schedule> = {}): Schedule {
   return { id: 's1', name: '任务', prompt: '提示词', intervalMinutes: 60, enabled: true, lastRunAt: 0, ...over };

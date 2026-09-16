@@ -6,11 +6,11 @@
  */
 import { useSessionStore, type Tab } from '@entities/session';
 import { useBlockStore } from '@entities/terminal';
-import { sanitizeOutputHtml } from './sanitizeHtml';
+import { sanitizeOutputHtml } from '@/lib/sanitizeHtml';
 import { useChatStore } from '@entities/chat';
 import { deserializeParts } from '@features/agent/messageParts';
 import { deserializeAttachments } from '@features/agent/attachments';
-import { leaf, type WindowLayout } from './windowLayout';
+import { leaf, type WindowLayout } from '@/lib/windowLayout';
 import {
   createSession,
   archiveSession,
@@ -25,7 +25,7 @@ import {
   setBlockCollapsed,
   listChatMessages,
 } from '@/api/session';
-import type { TermBlock } from '@features/terminal/pipeline/termBlock';
+import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 import type { BackendBlockEntry, BackendSessionEntry } from '@features/search/types';
 
 /** 恢复会话时用于重建 tab 的元数据（kind/payload 已由后端持久化）。 */

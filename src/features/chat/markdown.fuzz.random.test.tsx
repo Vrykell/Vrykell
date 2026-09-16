@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
-import Markdown from './Markdown';
+import Markdown from '@features/chat/components/Markdown';
 
 // 确定性 PRNG（mulberry32）—— 同一种子序列完全可复现
 function mulberry32(seed: number) {

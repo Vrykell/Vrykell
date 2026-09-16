@@ -13,7 +13,7 @@ import {
   sshFsList,
   sshDownload,
   newSshId,
-} from '@features/ssh/api';
+} from '@features/ssh/services/api';
 
 describe('sshApi', () => {
   beforeEach(() => invokeMock.mockReset());

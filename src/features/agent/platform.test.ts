@@ -8,7 +8,7 @@ import {
   getMemory, setMemory, getMemoryJournal, appendMemoryJournal,
   listAgents, saveAgent, removeAgent, getAgent,
   listSchedules, saveSchedule, removeSchedule, markScheduleRun,
-} from './platform';
+} from '@features/agent/platform';
 
 describe('platform invoke 封装', () => {
   it('记忆命令透传', async () => {

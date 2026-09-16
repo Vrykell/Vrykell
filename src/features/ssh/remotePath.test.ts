@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeRemotePath, parentOfRemote, shellQuote } from './remotePath';
+import { normalizeRemotePath, parentOfRemote, shellQuote } from '@features/ssh/utils/remotePath';
 
 describe('normalizeRemotePath', () => {
   it('去尾部斜杠并合并 . / ..', () => {

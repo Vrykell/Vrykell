@@ -13,7 +13,7 @@ vi.mock('@tauri-apps/api/core', () => ({
   },
 }));
 
-import { createProxyFetch } from './llmFetch';
+import { createProxyFetch } from '@features/agent/llmFetch';
 
 const fetchProxy = createProxyFetch();
 

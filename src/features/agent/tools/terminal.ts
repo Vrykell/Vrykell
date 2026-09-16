@@ -13,7 +13,7 @@
  */
 
 import { tool } from 'ai';
-import { DESC_READ_TERMINAL, DESC_TERMINAL_KEYS } from '../toolTexts';
+import { DESC_READ_TERMINAL, DESC_TERMINAL_KEYS } from '@features/agent/toolTexts';
 import { z } from 'zod';
 import { ptyWrite } from '@/lib/pty';
 import {
@@ -22,7 +22,7 @@ import {
   useTerminalStore,
   useBlockStore,
 } from '@entities/terminal';
-import { gate, type ToolContext } from '../permissions';
+import { gate, type ToolContext } from '@features/agent/permissions';
 
 const BLOCK_OUTPUT_CAP = 2000;
 const BLOCK_COUNT = 4;

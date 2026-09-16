@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
-import Markdown from './Markdown';
+import Markdown from '@features/chat/components/Markdown';
 
 const NASTY: Record<string, string> = {
   '美元符号命令': '$ make test',

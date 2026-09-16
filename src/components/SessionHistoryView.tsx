@@ -11,7 +11,7 @@ import {
   type SessionHistoryFilter,
   type SessionTypeFilter,
 } from '@features/session-history';
-import { useToastStore } from './Toast';
+import { useToastStore } from '@/components/Toast';
 
 const TYPE_OPTIONS = SESSION_TYPE_OPTIONS;
 

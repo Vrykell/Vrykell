@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sensitivePathReason } from './sensitivePaths';
+import { sensitivePathReason } from '@features/agent/sensitivePaths';
 
 describe('sensitivePathReason', () => {
   it('命中 SSH/AWS/GPG 密钥目录', () => {

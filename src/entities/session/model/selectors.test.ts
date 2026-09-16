@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { leaf } from '@/lib/windowLayout';
-import { selectActiveSessionTab, selectSessionTabs } from './selectors';
+import { selectActiveSessionTab, selectSessionTabs } from '@/entities/session/model/selectors';
 
 const session = { id: 'session', title: '终端', kind: 'session' as const, layout: leaf({ id: 'session#0', kind: 'local' }) };
 const history = { id: 'history', title: '会话历史', kind: 'history' as const };

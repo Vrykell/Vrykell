@@ -7,8 +7,8 @@ import { describe, it, expect, vi } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { buildMcpTool, type McpExposedTool } from './mcp';
-import { usePermissions, type ToolContext } from './permissions';
+import { buildMcpTool, type McpExposedTool } from '@features/agent/mcp';
+import { usePermissions, type ToolContext } from '@features/agent/permissions';
 
 usePermissions.setState({ levels: { mcp: 'allow' } });
 const CTX: ToolContext = {};

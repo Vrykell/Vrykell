@@ -4,7 +4,7 @@
 import { describe, it, expect, vi } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
-import { fsList, fsDisks, fsHome, fsRename, fsDelete, fileOpenWith } from './fs';
+import { fsList, fsDisks, fsHome, fsRename, fsDelete, fileOpenWith } from '@features/files/services/fs';
 
 describe('fs 封装', () => {
   it('各命令按约定透传', async () => {

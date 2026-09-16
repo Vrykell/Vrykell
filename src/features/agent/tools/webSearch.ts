@@ -12,10 +12,10 @@
  */
 
 import { tool } from 'ai';
-import { DESC_WEB_SEARCH_TAVILY } from '../toolTexts';
+import { DESC_WEB_SEARCH_TAVILY } from '@features/agent/toolTexts';
 import { z } from 'zod';
 import { invoke } from '@tauri-apps/api/core';
-import { gate, type ToolContext } from '../permissions';
+import { gate, type ToolContext } from '@features/agent/permissions';
 
 interface TavilyResult {
   title?: string;

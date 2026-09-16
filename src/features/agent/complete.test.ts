@@ -12,9 +12,9 @@ const { mockGenerate, invokeMock } = vi.hoisted(() => ({
 vi.mock('ai', () => ({ generateText: mockGenerate }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { completeCommand, localComplete, pathComplete, looksLikePath } from './complete';
+import { completeCommand, localComplete, pathComplete, looksLikePath } from '@features/agent/complete';
 import { useHistoryStore } from '@/store/history';
-import { useAgentSettings, DEFAULT_AGENT_SETTINGS } from './agentSettings';
+import { useAgentSettings, DEFAULT_AGENT_SETTINGS } from '@features/agent/agentSettings';
 import { useAiConfigStore } from '@/lib/ai';
 
 function reset() {

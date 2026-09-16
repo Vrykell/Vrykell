@@ -8,12 +8,12 @@ vi.mock('@/lib/pty', () => ({
   ptyWrite: vi.fn(async () => {}),
 }));
 
-import { runCommandAndWait } from './runCommand';
+import { runCommandAndWait } from '@features/agent/tools/runCommand';
 import { useBlockStore } from '@/store/blocks';
 import { useTerminalStore } from '@/store/terminal';
 import { useSessionStore } from '@entities/session';
-import { agentControl } from '../agentControl';
-import type { TermBlock } from '@features/terminal/pipeline/termBlock';
+import { agentControl } from '@features/agent/agentControl';
+import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 
 const initialBlocks = useBlockStore.getState();
 const initialTerm = useTerminalStore.getState();

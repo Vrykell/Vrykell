@@ -11,9 +11,9 @@ import { describe, it, expect, vi } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { buildFileTools } from './files';
-import { buildSearchTools } from './search';
-import { usePermissions, type ToolContext } from '../permissions';
+import { buildFileTools } from '@features/agent/tools/files';
+import { buildSearchTools } from '@features/agent/tools/search';
+import { usePermissions, type ToolContext } from '@features/agent/permissions';
 
 // 本文件测 invoke 参数/结果映射，不测门控（门控见 permissions.test.ts）：
 // 全部工具置 allow，ctx 留空

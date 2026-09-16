@@ -9,7 +9,7 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 import {
   searchFiles, searchHistory, getSearchContext, recordHistory,
   historyStats, clearHistory, searchBlocks, searchSessions,
-} from './search';
+} from '@/api/search';
 
 describe('api/search', () => {
   it('searchFiles：默认参数与显式 roots/root', async () => {

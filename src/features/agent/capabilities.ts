@@ -10,7 +10,7 @@
  * 判定是启发式（按服务商 + 模型名），足够准确且零成本；
  * 结果随 ModelProfile 持久化，设置页/模型选择窗口据此打标签。
  */
-import type { ProviderKind } from './provider';
+import type { ProviderKind } from '@features/agent/provider';
 
 export type ModelCapability = 'vision' | 'reasoning' | 'tools' | 'search';
 

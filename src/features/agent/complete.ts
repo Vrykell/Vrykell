@@ -12,8 +12,8 @@
  */
 import { generateText } from 'ai';
 import { invoke } from '@tauri-apps/api/core';
-import { createChatModel } from './provider';
-import { useAgentSettings } from './agentSettings';
+import { createChatModel } from '@features/agent/provider';
+import { useAgentSettings } from '@features/agent/agentSettings';
 import { activeModelProfile, isApiKeyConfigured } from '@/lib/ai';
 import { useHistoryStore } from '@/store/history';
 

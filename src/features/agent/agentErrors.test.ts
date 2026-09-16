@@ -2,7 +2,7 @@
  * agentErrors — AI SDK 错误拆解测试。
  */
 import { describe, it, expect } from 'vitest';
-import { describeError } from './agentErrors';
+import { describeError } from '@features/agent/agentErrors';
 
 describe('describeError', () => {
   it('普通 Error 取其 message', () => {

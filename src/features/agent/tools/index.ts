@@ -10,19 +10,19 @@
  */
 
 import { tool, type ToolSet } from 'ai';
-import { DESC_RUN_COMMAND } from '../toolTexts';
+import { DESC_RUN_COMMAND } from '@features/agent/toolTexts';
 import { z } from 'zod';
-import { runCommandAndWait } from './runCommand';
-import { buildFileTools } from './files';
-import { buildSearchTools } from './search';
-import { buildTerminalTools } from './terminal';
-import { buildSkillTool, buildInstallSkillTool } from './skill';
-import { buildMemoryTool } from './memory';
-import { buildScheduleTool } from './schedule';
-import { buildSubagentTool } from './subagent';
-import { gate, levelOf, ensureSkillAccess, TOOL_NAMES, type ToolContext } from '../permissions';
+import { runCommandAndWait } from '@features/agent/tools/runCommand';
+import { buildFileTools } from '@features/agent/tools/files';
+import { buildSearchTools } from '@features/agent/tools/search';
+import { buildTerminalTools } from '@features/agent/tools/terminal';
+import { buildSkillTool, buildInstallSkillTool } from '@features/agent/tools/skill';
+import { buildMemoryTool } from '@features/agent/tools/memory';
+import { buildScheduleTool } from '@features/agent/tools/schedule';
+import { buildSubagentTool } from '@features/agent/tools/subagent';
+import { gate, levelOf, ensureSkillAccess, TOOL_NAMES, type ToolContext } from '@features/agent/permissions';
 
-export type { ToolContext } from '../permissions';
+export type { ToolContext } from '@features/agent/permissions';
 
 export function buildTools(ctx: ToolContext) {
   const all = {

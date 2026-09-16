@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { useToastStore } from '@/components/Toast';
-import { t } from '../i18n';
+import { t } from '@/i18n';
 import * as sessionManager from '@/lib/sessionManager';
 import {
   groupsList, groupCreate, groupRename, groupSetCollapsed, groupDelete,
@@ -8,11 +8,11 @@ import {
   groupRestore, groupArchive,
 } from '@/api/group';
 import type { BackendGroupEntry } from '@features/search/types';
-import { useBlockStore } from './blocks';
-import { useChatStore } from './chat';
+import { useBlockStore } from '@/store/blocks';
+import { useChatStore } from '@/store/chat';
 import { useAgentSettings } from '@features/agent/agentSettings';
 import { defaultOpenModeForShell } from '@features/agent/agentSettings';
-import { useTerminalStore, getFocusedTerminalId } from './terminal';
+import { useTerminalStore, getFocusedTerminalId } from '@/store/terminal';
 import type { ShellType } from '@/lib/shells';
 import { shellTypeLabel } from '@/lib/shells';
 import {

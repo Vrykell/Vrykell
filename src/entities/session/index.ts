@@ -4,7 +4,7 @@ export {
   type PersistableSession,
   type RestoreWorkspaceDependencies,
   type WorkspaceSession,
-} from './model/restoreWorkspace';
+} from '@/entities/session/model/restoreWorkspace';
 export {
   useSessionStore,
   firstTerminalOf,
@@ -17,5 +17,5 @@ export {
   type SshTabTarget,
   type Tab,
   type TabGroup,
-} from './model/store';
-export { selectActiveSessionTab, selectSessionTabs, type SessionWorkspaceSnapshot } from './model/selectors';
+} from '@/entities/session/model/store';
+export { selectActiveSessionTab, selectSessionTabs, type SessionWorkspaceSnapshot } from '@/entities/session/model/selectors';
