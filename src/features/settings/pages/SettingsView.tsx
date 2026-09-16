@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Search, ChevronRight, Settings, Cpu, FileCode, Palette, Keyboard, SquareTerminal } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Search, ChevronRight, Settings } from 'lucide-react';
 import { loadConfig, saveConfig, type FileOpenConfig } from '@features/files/services/fileOpen';
 import { refreshAiConfig, setTavilyKey, clearTavilyKey, useAiConfigStore } from '@entities/agent';
 import SkillsSettings from '@features/settings/pages/SkillsSettings';
@@ -17,6 +17,7 @@ import { McpPage } from '@features/settings/pages/mcpPage';
 import { TerminalOpenPage } from '@features/settings/pages/terminalOpenPage';
 import { ThemePage } from '@features/settings/pages/themePage';
 import { ShortcutPage } from '@features/settings/pages/shortcutPage';
+import { useSettingsNavigation } from '@features/settings/hooks/useSettingsNavigation';
 
 /** 权限页工具中文名（与 messageParts 的 TOOL_LABEL 保持同步） */
 const PERM_TOOL_LABEL: Record<ToolName, string> = {
@@ -43,71 +44,22 @@ const PERM_TOOL_LABEL: Record<ToolName, string> = {
 // 外层 = 按功能划分的组（大菜单，可展开）；内层 = 细分设置页（小菜单）。
 // 每个设置页内再放多个相关的具体配置项。
 
-type PageId = 'ai-model' | 'ai-behavior' | 'ai-perms' | 'ai-web' | 'ai-skill' | 'ai-mcp' | 'ai-memory' | 'ai-agents' | 'ai-schedules' | 'terminal-open' | 'editor-local' | 'editor-remote' | 'appearance-theme' | 'shortcuts';
-
-interface SettingItem {
-  id: PageId;
-  label: string;
-  keywords: string[];
-}
-interface SettingGroup {
-  id: string;
-  label: string;
-  icon: typeof Settings;
-  items: SettingItem[];
-}
-
-const GROUPS: SettingGroup[] = [
-  {
-    id: 'ai', label: 'AI 模型', icon: Cpu,
-    items: [
-      { id: 'ai-model', label: '模型配置', keywords: ['ai', 'model', 'api', 'key', 'baseurl', '模型', '密钥', '服务地址', 'provider', '服务商', 'anthropic', 'gemini'] },
-      { id: 'ai-behavior', label: '模型行为', keywords: ['agent', '联网', '深思考', '思考', '智能标题', '标题', '自动补全', '补全', '防抖', 'debounce'] },
-      { id: 'ai-perms', label: '模型权限', keywords: ['权限', '审批', 'permission', '工具', '许可', '授权', '危险命令'] },
-      { id: 'ai-web', label: '网络搜索', keywords: ['tavily', '联网', '搜索', 'web', 'search', 'grounding'] },
-      { id: 'ai-skill', label: '技能', keywords: ['技能', 'skill', '能力', '提示词', 'prompt', '自定义', '代理'] },
-      { id: 'ai-mcp', label: 'MCP 服务器', keywords: ['mcp', '工具', '服务器', 'server', 'stdio', '协议', '外部工具'] },
-      { id: 'ai-memory', label: '记忆', keywords: ['记忆', 'memory', '长期', '偏好', '约定'] },
-      { id: 'ai-agents', label: '子代理', keywords: ['子代理', 'agent', '多agent', '委派', 'subagent'] },
-      { id: 'ai-schedules', label: '定时任务', keywords: ['定时', '任务', 'schedule', 'cron', '自动'] },
-    ],
-  },
-  {
-    id: 'terminal', label: '终端', icon: SquareTerminal,
-    items: [
-      { id: 'terminal-open', label: '打开方式', keywords: ['终端', '打开', '模式', '经典', '块', 'block', 'classic', 'terminal'] },
-    ],
-  },
-  {
-    id: 'editor', label: '编辑器', icon: FileCode,
-    items: [
-      { id: 'editor-local', label: '本地编辑器', keywords: ['编辑器', 'editor', 'vim', '本地', '扩展名', '模板'] },
-      { id: 'editor-remote', label: '远程编辑器', keywords: ['远程', 'remote', 'ssh', '编辑器', '扩展名', '模板'] },
-    ],
-  },
-  {
-    id: 'appearance', label: '外观', icon: Palette,
-    items: [
-      { id: 'appearance-theme', label: '主题', keywords: ['主题', 'theme', '深色', '浅色', '暗色'] },
-    ],
-  },
-  {
-    id: 'shortcuts', label: '快捷键', icon: Keyboard,
-    items: [
-      { id: 'shortcuts', label: '快捷键说明', keywords: ['快捷键', 'shortcut', 'key', '键位', '分屏', '搜索'] },
-    ],
-  },
-];
-
-
 /**
  * SettingsView — 设置标签页内容（与「会话历史」同级，作为一个会话看待）。
  * 左侧分级侧栏（组可展开 + 搜索过滤），右侧为当前设置页（页内含多个相关配置）。
  */
 export default function SettingsView() {
-  const [selected, setSelected] = useState<PageId>('ai-model');
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(GROUPS.map((g) => g.id)));
-  const [query, setQuery] = useState('');
+  const {
+    selected,
+    setSelected,
+    expanded,
+    query,
+    setQuery,
+    normalizedQuery,
+    visibleGroups,
+    activeLabel,
+    toggleGroup,
+  } = useSettingsNavigation();
 
   // 文件打开配置（localStorage）
   const [fileCfg, setFileCfg] = useState<FileOpenConfig>(() => loadConfig());
@@ -132,30 +84,6 @@ export default function SettingsView() {
   useEffect(() => {
     refreshAiConfig();
   }, []);
-
-  // 搜索过滤：命中项保留，自动展开其所在组
-  const q = query.trim().toLowerCase();
-  const visibleGroups = useMemo(() => {
-    if (!q) return GROUPS;
-    return GROUPS.map((g) => ({
-      ...g,
-      items: g.items.filter((it) =>
-        it.label.toLowerCase().includes(q) || it.keywords.some((k) => k.toLowerCase().includes(q)),
-      ),
-    })).filter((g) => g.items.length > 0);
-  }, [q]);
-
-  const toggleGroup = (id: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const activeLabel =
-    GROUPS.flatMap((g) => g.items).find((it) => it.id === selected)?.label ?? '设置';
 
   const renderPage = (): ReactNode => {
     switch (selected) {
@@ -380,7 +308,7 @@ export default function SettingsView() {
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 6px 8px' }}>
           {visibleGroups.map((g) => {
             const Icon = g.icon;
-            const open = q ? true : expanded.has(g.id);
+            const open = normalizedQuery ? true : expanded.has(g.id);
             return (
               <div key={g.id} style={{ marginBottom: 2 }}>
                 <button
