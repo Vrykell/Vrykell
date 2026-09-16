@@ -203,7 +203,7 @@
 
 ## 十六、AI 代理（代码代理）
 
-> 实现见 `src/agent/`；权限模式图标在状态栏（Shield chip）。
+> 实现见 `src/features/agent/`；权限模式图标在状态栏（Shield chip）。
 
 | ID | 功能 | 预期行为 | 测试方法 |
 |---|---|---|---|
