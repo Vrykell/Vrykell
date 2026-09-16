@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { Star, Folder, ChevronRight, Download, LocateFixed, ArrowUp, HardDrive } from 'lucide-react';
 import { openPath } from '@tauri-apps/plugin-opener';
-import { fsList, fsDisks, fsHome, fsRename, fsDelete, fileOpenWith, type FsEntry, type DiskEntry } from '@features/files/services/fs';
+import { fsRename, fsDelete, fileOpenWith, type FsEntry, type DiskEntry } from '@features/files/services/fs';
 import { ptyWrite } from '@/platform/pty';
 import { openFile } from '@features/files/services/fileOpen';
 import { fileIcon } from '@features/files/utils/fileIcon';
@@ -19,6 +19,7 @@ import { ensureSshLoaded, useSshStore } from '@entities/ssh';
 import RemoteFiles from '@features/ssh/components/RemoteFiles';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import DownloadManager from '@/downloads/DownloadManager';
+import { useLocalFileBrowser } from '@features/files/hooks/useLocalFileBrowser';
 
 /** 待二次确认的操作：重命名（携带新名）或删除。 */
 type ConfirmState =
@@ -52,11 +53,6 @@ export default function PanelFiles() {
  * 随后的 dblclick 再进入目录。
  */
 function LocalFiles() {
-  const [path, setPath] = useState<string | null>(null);
-  const [homePath, setHomePath] = useState<string | null>(null);
-  const [entries, setEntries] = useState<FsEntry[]>([]);
-  const [expandedSet, setExpandedSet] = useState<ReadonlySet<string>>(new Set());
-  const [childCache, setChildCache] = useState<Record<string, FsEntry[]>>({});
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; entry: FsEntry } | null>(null);
   const [renameTarget, setRenameTarget] = useState<FsEntry | null>(null);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
@@ -67,42 +63,16 @@ function LocalFiles() {
   // ── 跟随聚焦终端的 cwd：切窗口 / 切换聚焦终端 / 终端 cd 都会实时定位 ──
   const sessions = useTerminalStore((s) => s.sessions);
   const { focusedPaneId: focused, activeCwd } = useActiveWorkspace();
-  useEffect(() => {
-    fsHome().then((h) => setHomePath(normPath(h))).catch(() => setHomePath(null));
-  }, []);
-
-  useEffect(() => {
-    setPath(activeCwd ? normPath(activeCwd) : homePath);
-  }, [focused, activeCwd, homePath]);
-
-  // path === null 表示「此电脑」（磁盘卡片列表），否则是具体目录
-  const [disks, setDisks] = useState<DiskEntry[]>([]);
-  const load = useCallback((p: string | null) => {
-    if (p === null) {
-      setEntries([]);
-      fsDisks().then(setDisks).catch(() => setDisks([]));
-      return;
-    }
-    fsList(p).then(setEntries).catch(() => setEntries([]));
-  }, []);
-
-  useEffect(() => { load(path); }, [path, load]);
-
-  // ── 树形展开 ──
-
-  const toggleExpand = useCallback((entry: FsEntry) => {
-    setExpandedSet((prev) => {
-      const next = new Set(prev);
-      if (next.has(entry.path)) next.delete(entry.path);
-      else next.add(entry.path);
-      return next;
-    });
-    // 已缓存则收起再展开不重复请求
-    if (childCache[entry.path]) return;
-    fsList(entry.path)
-      .then((children) => setChildCache((p) => ({ ...p, [entry.path]: children })))
-      .catch(() => setChildCache((p) => ({ ...p, [entry.path]: [] })));
-  }, [childCache]);
+  const {
+    path,
+    setPath,
+    entries,
+    disks,
+    expandedSet,
+    childCache,
+    load,
+    toggleExpand,
+  } = useLocalFileBrowser({ activeCwd, focusedPaneId: focused });
 
   // 顶栏面包屑压缩：不换行，侧栏窄时省略高层级目录（必须在视图切换的提前返回之前）
   const crumbs = pathSegments(path ?? '');
