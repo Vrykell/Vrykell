@@ -14,9 +14,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useChatStore, useActiveMessages } from '@entities/chat';
 import { isSessionTab } from '@entities/session';
 import { useToastStore } from '@/components/Toast';
-import { useAgentSettings } from '@features/agent/stores/agentSettings';
-import { usePermissions } from '@features/agent/stores/permissions';
-import { useAiConfigStore } from '@features/agent/stores/aiConfig';
+import { useAgentSettings, usePermissions, useAiConfigStore } from '@entities/agent';
 import ModelPill from '@features/chat/components/ModelPill';
 import {
   LIMITS,

@@ -11,8 +11,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Bot, BrainCircuit, Check, ChevronDown, Eye, Globe, Search, SlidersHorizontal, Wrench, X } from 'lucide-react';
-import { useAiConfigStore, setActiveModel, type ModelProfile } from '@features/agent/stores/aiConfig';
-import { useAgentSettings } from '@features/agent/stores/agentSettings';
+import { useAiConfigStore, setActiveModel, type ModelProfile, useAgentSettings } from '@entities/agent';
 import {
   CAPABILITY_LABELS, detectCapabilities, hasCapability,
   type ModelCapability,

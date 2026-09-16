@@ -6,7 +6,7 @@ import { Plus, X } from 'lucide-react';
 import {
   setProviderKey, clearProviderKey, setAiModels, setActiveModel, useAiConfigStore,
   type ModelProfile,
-} from '@features/agent/stores/aiConfig';
+} from '@entities/agent';
 import type { ProviderKind } from '@features/agent/services/provider';
 import { detectCapabilities, type ModelCapability } from '@features/agent/model/capabilities';
 import { modelIcon, providerLabel } from '@features/agent/components/modelIcon';
