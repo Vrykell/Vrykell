@@ -60,6 +60,9 @@ describe('useTuiControls', () => {
     expect(ptyMocks.killForeground).toHaveBeenCalledWith('session-1');
     expect(result.current.killArmed).toBe(true);
 
+    act(() => result.current.enterFullScreen());
+    expect(useTerminalStore.getState().altScreenActive).toBe(true);
+    expect(useTerminalStore.getState().scenes['pane-1']).toBe('altScreen');
     act(() => result.current.exitFullScreen());
     expect(useTerminalStore.getState().altScreenActive).toBe(false);
     expect(useTerminalStore.getState().scenes['pane-1']).toBe('blockList');
