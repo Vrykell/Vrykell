@@ -12,8 +12,7 @@ import { ArrowUp, Bot, Brain, Globe, Paperclip, ShieldAlert, ShieldCheck, Shield
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useChatStore, useActiveMessages } from '@entities/chat';
-import { useSessionStore, isSessionTab } from '@entities/session';
-import { useTerminalStore } from '@entities/terminal';
+import { isSessionTab } from '@entities/session';
 import { useToastStore } from '@/components/Toast';
 import { useAgentSettings } from '@features/agent/stores/agentSettings';
 import { usePermissions } from '@features/agent/stores/permissions';
@@ -35,6 +34,7 @@ import { CurrentDir } from '@features/terminal/components/InputEditor';
 import AiBlock from '@features/chat/components/AiBlock';
 import { toExchanges, type ChatExchange } from '@features/chat/model/exchanges';
 import ContextRing from '@/components/ContextRing';
+import { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
 
 /** 权限模式循环（状态栏 Shield chip）：图标 + 颜色双通道辨识（勾=标准逐工具 / 叹号=严格逐次问 / 斜线=放行直放）
  *  标准=逐工具级别；严格=全部逐次问；放行=全部直放行（危险命令仍逐次问） */
@@ -50,14 +50,16 @@ export default function PanelChat() {
   const send = useChatStore((s) => s.send);
   const sending = useChatStore((s) => s.sendingTab !== null);
 
-  const activeTab = useSessionStore((s) => s.tabs.find((t) => t.id === s.activeId));
-  const activeId = useSessionStore((s) => s.activeId);
   const abortStream = useChatStore((s) => s.abortStream);
   /** 当前 tab 正在流式（发送键变停止键；其它 tab 的发送中只禁用发送） */
   const sendingHere = useChatStore((s) => s.sendingTab !== null && s.sendingTab === activeId);
-  const cwds = useSessionStore((s) => s.terminalCwds);
-  const focusedPaneId = useTerminalStore((s) => s.focusedPaneId);
-  const sessions = useTerminalStore((s) => s.sessions);
+  const {
+    activeId,
+    activeTab,
+    focusedPaneId,
+    terminalCwds: cwds,
+    sessions,
+  } = useActiveWorkspace();
   const isSession = !!activeTab && isSessionTab(activeTab);
 
   const [text, setText] = useState('');
