@@ -7,7 +7,7 @@
  * 发送目标是当前聚焦 pane。
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { ArrowUp, Bot, Brain, Globe, Paperclip, ShieldAlert, ShieldCheck, ShieldOff, Square, Zap } from 'lucide-react';
 import { useChatStore, useActiveMessages } from '@entities/chat';
 import { isSessionTab } from '@entities/session';
@@ -22,6 +22,7 @@ import AiBlock from '@features/chat/components/AiBlock';
 import { toExchanges, type ChatExchange } from '@features/chat/model/exchanges';
 import ContextRing from '@/components/ContextRing';
 import { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
+import { useChatComposer } from '@features/chat/hooks/useChatComposer';
 
 /** 权限模式循环（状态栏 Shield chip）：图标 + 颜色双通道辨识（勾=标准逐工具 / 叹号=严格逐次问 / 斜线=放行直放）
  *  标准=逐工具级别；严格=全部逐次问；放行=全部直放行（危险命令仍逐次问） */
@@ -49,8 +50,6 @@ export default function PanelChat() {
   const sendingHere = useChatStore((s) => s.sendingTab !== null && s.sendingTab === activeId);
   const isSession = !!activeTab && isSessionTab(activeTab);
 
-  const [text, setText] = useState('');
-  const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // M6 快捷设置：模型下拉 + 联网/深思/Agent 开关（agentSettings 即时生效，
@@ -62,20 +61,8 @@ export default function PanelChat() {
   // 快捷开关作用于「当前模型」的行为覆盖（绑定模型，不污染全局）
   const eff = agentSettings.resolve(activeModel);
 
-  // 编辑重发：chat store 的 draft 是单次投递——灌入输入框后立即清掉
   const draft = useChatStore((s) => s.draft);
   const setDraft = useChatStore((s) => s.setDraft);
-  useEffect(() => {
-    if (!draft) return;
-    setText(draft);
-    setDraft('');
-    const el = inputRef.current;
-    if (el) {
-      el.focus();
-      el.style.height = 'auto';
-      el.style.height = Math.min(el.scrollHeight, 120) + 'px';
-    }
-  }, [draft, setDraft]);
 
   // ── M5 附件：chips 状态 + 三个来源（📎 选择 / 粘贴 / 拖拽） ──
   const {
@@ -141,48 +128,29 @@ export default function PanelChat() {
         .reverse(),
     [exchanges],
   );
-  const histNav = useRef<{ idx: number; base: string }>({ idx: -1, base: '' });
-  const resetHistNav = () => {
-    histNav.current = { idx: -1, base: '' };
-  };
-  const navHistory = (dir: 1 | -1) => {
-    const nav = histNav.current;
-    const base = nav.idx === -1 ? text : nav.base;
-    const candidates = historyQuestions.filter(
-      (q) => q.startsWith(base) && q.length > base.length,
-    );
-    const next = nav.idx + dir;
-    if (next < -1 || next >= candidates.length) return false;
-    histNav.current = { idx: next, base };
-    setText(next === -1 ? base : candidates[next]!);
-    const el = inputRef.current;
-    if (el) {
-      requestAnimationFrame(() => {
-        el.selectionStart = el.selectionEnd = el.value.length;
-        el.style.height = 'auto';
-        el.style.height = Math.min(el.scrollHeight, 120) + 'px';
-      });
-    }
-    return true;
-  };
-
-  const submit = () => {
-    const q = text.trim();
-    if ((!q && atts.length === 0) || sending || !isSession) return;
-    setText('');
-    resetHistNav();
-    if (inputRef.current) inputRef.current.style.height = 'auto';
-    const payload = atts.length > 0 ? atts : undefined;
-    clearAttachments();
-    send(q, { paneId: targetPane, attachments: payload });
-  };
+  const {
+    text,
+    inputRef,
+    canSend,
+    submit,
+    handleChange,
+    handleKeyDown,
+  } = useChatComposer({
+    questions: historyQuestions,
+    draft,
+    setDraft,
+    send,
+    sending,
+    isSession,
+    targetPane,
+    attachments: atts,
+    clearAttachments,
+  });
 
   // 目标 pane 的显示分量（prompt 行镜像终端输入栏：shell 胶囊 · cwd）
   const targetInfo = paneInfo(targetPane);
   const targetConnected = targetPane ? !!sessions[targetPane] : false;
   const targetFocused = !!targetPane && targetPane === focusedPaneId;
-  const canSend = (!!text.trim() || atts.length > 0) && !sending && isSession;
-
   return (
     <div ref={panelRef} style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       {/* 顶栏：会话级 AI 配置（模型 · 联网 · 深思 · Agent），低频、影响后续所有消息，从输入卡抽离避免拥挤 */}
@@ -249,26 +217,8 @@ export default function PanelChat() {
                 value={text}
                 placeholder="自然语言描述你想做什么…"
                 rows={1}
-                onChange={(e) => {
-                  resetHistNav();
-                  setText(e.target.value);
-                  e.target.style.height = 'auto';
-                  e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
-                }}
-                onKeyDown={(e) => {
-                  // ↑/↓ 翻历史提问（单行时；fish 式按当前前缀过滤）
-                  if (!text.includes('\n') && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
-                    if (navHistory(e.key === 'ArrowUp' ? 1 : -1)) {
-                      e.preventDefault();
-                      return;
-                    }
-                  }
-                  if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                    e.preventDefault();
-                    submit();
-                  }
-                  if (e.key === 'Escape') setText('');
-                }}
+                onChange={handleChange}
+                onKeyDown={handleKeyDown}
                 onPaste={(e) => {
                   // 图片/文件粘贴优先；长文本（>500 字）折叠为 chip，不糊进输入框
                   const files = Array.from(e.clipboardData.files);
