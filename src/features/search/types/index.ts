@@ -82,76 +82,13 @@ export interface SessionResultData {
 }
 
 // ── 后端返回类型 ──
-export interface BackendHistoryEntry {
-  id: number;
-  command: string;
-  cwd: string;
-  exit_code: number | null;
-  timestamp: number;
-  run_count: number;
-}
-
-export interface BackendFileMatch {
-  name: string;
-  path: string;
-  is_dir: boolean;
-  size: number;
-  modified: number;
-  match_type: string;
-  content_snippet: string | null;
-}
-
-export interface BackendSearchContext {
-  cwd: string;
-  home: string;
-  shell: string;
-  git_branch: string | null;
-  project_name: string | null;
-}
-
-/** Rust blocks 表 JOIN sessions 返回 */
-export interface BackendBlockEntry {
-  id: string;
-  session_id: string;
-  pane_id: string | null;
-  command: string;
-  output_raw: string;
-  output_clean: string;
-  output_html: string;
-  exit_code: number | null;
-  status: string;
-  started_at: number;
-  ended_at: number | null;
-  session_title: string;
-  session_status: string;
-  /** block 是否被用户折叠（恢复时回读） */
-  collapsed: boolean;
-}
-
-/** Rust sessions 表返回 */
-export interface BackendSessionEntry {
-  id: string;
-  title: string;
-  status: string;
-  created_at: number;
-  closed_at: number | null;
-  block_count: number;
-  cwd: string;
-  group_id: string | null;
-  sort_order: number;
-  /** 会话类型判别：local | ssh */
-  kind: string;
-  /** 变体专属数据的 JSON 字符串 */
-  payload: string;
-}
-
-/** Rust groups 表返回 */
-export interface BackendGroupEntry {
-  id: string;
-  title: string;
-  sort_order: number;
-  collapsed: boolean;
-  created_at: number;
-  session_count: number;
-  archived: boolean;
-}
+// 后端契约类型已收敛到 `@shared/api/types`（基础设施层唯一权威定义）。
+// 此处保留兼容再导出，迁移期间旧导入路径继续可用；新代码请直接引用 `@shared/api/types`。
+export type {
+  BackendHistoryEntry,
+  BackendFileMatch,
+  BackendSearchContext,
+  BackendBlockEntry,
+  BackendSessionEntry,
+  BackendGroupEntry,
+} from '@shared/api/types';

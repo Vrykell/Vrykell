@@ -1,11 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
+import type { BackendWorkspaceEntry } from '@shared/api/types';
 
-export interface BackendWorkspaceEntry {
-  id: number;
-  path: string;
-  name: string;
-  added_at: number;
-}
+export type { BackendWorkspaceEntry };
 
 export function addWorkspace(path: string, name: string, timestamp: number): Promise<void> {
   return invoke('add_workspace', { path, name, timestamp });

@@ -22,7 +22,7 @@ src/
 app → widgets → features → entities → shared
 ```
 
-现阶段 `agent`、`terminal`、`store`、`api` 等目录仍保留原位置。新代码应通过 `@app/*`、`@widgets/*`、`@features/*`、`@entities/*`、`@shared/*` 或 `@/*` 导入，禁止从组件反向依赖 `app`，也不要在 `main.tsx` 直接组装业务组件。
+现阶段 `agent`、`terminal`、`store` 等目录仍保留原位置；后端 `invoke` 封装与跨进程契约类型已收敛到 `@shared/api`（`@shared/api/types` 为契约类型唯一权威定义，`@features/search/types` 仅保留兼容再导出）。新代码应通过 `@app/*`、`@widgets/*`、`@features/*`、`@entities/*`、`@shared/*` 或 `@/*` 导入，禁止从组件反向依赖 `app`，也不要在 `main.tsx` 直接组装业务组件。基础设施层（`shared`）不得反向依赖 `features`/`entities`。
 
 ## 应用启动约定
 

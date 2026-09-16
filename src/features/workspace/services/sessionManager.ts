@@ -24,9 +24,9 @@ import {
   getSessionBlocks,
   setBlockCollapsed,
   listChatMessages,
-} from '@/api/session';
+} from '@shared/api/session';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
-import type { BackendBlockEntry, BackendSessionEntry } from '@features/search/types';
+import type { BackendBlockEntry, BackendSessionEntry } from '@shared/api/types';
 
 /** 恢复会话时用于重建 tab 的元数据（kind/payload 已由后端持久化）。 */
 export interface RestoreMeta {

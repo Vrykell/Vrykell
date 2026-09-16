@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { BackendGroupEntry } from '@features/search/types';
+import type { BackendGroupEntry } from '@shared/api/types';
 
 export function groupsList(): Promise<BackendGroupEntry[]> {
   return invoke('groups_list');

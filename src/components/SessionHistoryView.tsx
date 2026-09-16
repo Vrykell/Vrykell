@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Monitor, RotateCcw, History, Trash2, ChevronRight, Folder, Server, Search, Filter, Check } from 'lucide-react';
-import type { BackendSessionEntry } from '@features/search/types';
+import type { BackendSessionEntry } from '@shared/api/types';
 import {
   isSshSession,
   sshTargetOf,

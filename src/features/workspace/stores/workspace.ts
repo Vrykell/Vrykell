@@ -6,8 +6,8 @@ import {
   groupsList, groupCreate, groupRename, groupSetCollapsed, groupDelete,
   groupDeleteWithSessions, groupsReorder, sessionSetGroup, sessionsReorder,
   groupRestore, groupArchive,
-} from '@/api/group';
-import type { BackendGroupEntry } from '@features/search/types';
+} from '@shared/api/group';
+import type { BackendGroupEntry } from '@shared/api/types';
 import { useBlockStore } from '@features/terminal/stores/blocks';
 import { useChatStore } from '@features/chat/stores/chat';
 import { useAgentSettings } from '@features/agent/stores/agentSettings';

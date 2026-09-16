@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { BackendSessionEntry } from '@features/search/types';
+import type { BackendSessionEntry } from '@shared/api/types';
 import { deriveSessionHistorySections, hasSessionHistoryFilter } from '@features/session-history/model/sessionHistoryModel';
 
 function session(overrides: Partial<BackendSessionEntry>): BackendSessionEntry {
