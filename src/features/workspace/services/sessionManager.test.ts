@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import * as sessionManager from '@/lib/sessionManager';
+import * as sessionManager from '@features/workspace/services/sessionManager';
 import { useSessionStore, isSessionTab } from '@entities/session';
 import { useBlockStore } from '@features/terminal/stores/blocks';
 import { useChatStore } from '@features/chat/stores/chat';

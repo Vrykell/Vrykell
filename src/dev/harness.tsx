@@ -15,7 +15,7 @@ import '../theme.css';
 import { useTerminalStore } from '@entities/terminal';
 import { useSessionStore, isSessionTab } from '@entities/session';
 import { useChatStore } from '@entities/chat';
-import { firstLeaf } from '@/lib/windowLayout';
+import { firstLeaf } from '@features/workspace/model/windowLayout';
 import InputEditor from '@features/terminal/components/InputEditor';
 import PanelChat from '@features/chat/components/PanelChat';
 

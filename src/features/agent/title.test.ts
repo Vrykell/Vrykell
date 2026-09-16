@@ -12,11 +12,11 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 
 import { maybeAutoTitle, sanitizeTitle, resetTitleState } from '@features/agent/services/title';
 import { useAgentSettings, DEFAULT_AGENT_SETTINGS } from '@features/agent/stores/agentSettings';
-import { useAiConfigStore } from '@/lib/ai';
+import { useAiConfigStore } from '@features/agent/stores/aiConfig';
 import { useBlockStore } from '@features/terminal/stores/blocks';
 import { useChatStore } from '@features/chat/stores/chat';
 import { useSessionStore } from '@entities/session';
-import { leaf } from '@/lib/windowLayout';
+import { leaf } from '@features/workspace/model/windowLayout';
 
 function mkTab(id: string, extra: Record<string, unknown> = {}) {
   return {

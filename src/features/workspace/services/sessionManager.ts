@@ -6,11 +6,11 @@
  */
 import { useSessionStore, type Tab } from '@entities/session';
 import { useBlockStore } from '@entities/terminal';
-import { sanitizeOutputHtml } from '@/lib/sanitizeHtml';
+import { sanitizeOutputHtml } from '@shared/utils/sanitizeHtml';
 import { useChatStore } from '@entities/chat';
 import { deserializeParts } from '@features/agent/model/messageParts';
 import { deserializeAttachments } from '@features/agent/model/attachments';
-import { leaf, type WindowLayout } from '@/lib/windowLayout';
+import { leaf, type WindowLayout } from '@features/workspace/model/windowLayout';
 import {
   createSession,
   archiveSession,

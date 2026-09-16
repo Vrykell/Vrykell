@@ -4,7 +4,7 @@
  */
 import { Bot, Brain, type LucideIcon } from 'lucide-react';
 import { useInputStore, selectPaneInput } from '@entities/terminal';
-import { useAiConfigStore } from '@/lib/ai';
+import { useAiConfigStore } from '@features/agent/stores/aiConfig';
 import { useAgentSettings } from '@features/agent/stores/agentSettings';
 import ModelPill from '@features/chat/components/ModelPill';
 import ContextRing from '@/components/ContextRing';

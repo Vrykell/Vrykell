@@ -17,7 +17,7 @@ import { useTerminalStore } from '@entities/terminal';
 import { useToastStore } from '@/components/Toast';
 import { useAgentSettings } from '@features/agent/stores/agentSettings';
 import { usePermissions } from '@features/agent/stores/permissions';
-import { useAiConfigStore } from '@/lib/ai';
+import { useAiConfigStore } from '@features/agent/stores/aiConfig';
 import ModelPill from '@features/chat/components/ModelPill';
 import {
   LIMITS,
@@ -28,8 +28,8 @@ import {
   type AttachmentMeta,
 } from '@features/agent/model/attachments';
 import AttachmentChips from '@features/chat/components/AttachmentChips';
-import { leaves as layoutLeaves, firstLeaf } from '@/lib/windowLayout';
-import { shellTypeLabel } from '@/lib/shells';
+import { leaves as layoutLeaves, firstLeaf } from '@features/workspace/model/windowLayout';
+import { shellTypeLabel } from '@/platform/shells';
 import ShellIndicator from '@features/terminal/components/ShellIndicator';
 import { CurrentDir } from '@features/terminal/components/InputEditor';
 import AiBlock from '@features/chat/components/AiBlock';

@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { SquareStack, Folder, Server, Sparkles, type LucideIcon } from 'lucide-react';
-import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@/lib/errorHandler';
+import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@shared/utils/errorHandler';
 import { useWorkspaceStore, isSessionTab } from '@features/workspace/stores/workspace';
-import { minTerminalWidth, MIN_PANE_SIZE } from '@/lib/windowLayout';
+import { minTerminalWidth, MIN_PANE_SIZE } from '@features/workspace/model/windowLayout';
 
 // ── 面板定义（可扩展）──
 

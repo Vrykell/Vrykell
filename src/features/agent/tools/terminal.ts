@@ -15,7 +15,7 @@
 import { tool } from 'ai';
 import { DESC_READ_TERMINAL, DESC_TERMINAL_KEYS } from '@features/agent/model/toolTexts';
 import { z } from 'zod';
-import { ptyWrite } from '@/lib/pty';
+import { ptyWrite } from '@/platform/pty';
 import {
   getFocusedTerminalId,
   getTerminalScreen,

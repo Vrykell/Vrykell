@@ -7,7 +7,7 @@ const { invokeMock, listenMock } = vi.hoisted(() => ({
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 vi.mock('@tauri-apps/api/event', () => ({ listen: listenMock }));
 
-import { ptySpawn, ptyWrite, ptyResize, ptyClose, onPtyOutput } from '@/lib/pty';
+import { ptySpawn, ptyWrite, ptyResize, ptyClose, onPtyOutput } from '@/platform/pty';
 
 describe('pty IPC wrapper', () => {
   beforeEach(() => { invokeMock.mockReset(); listenMock.mockReset(); });

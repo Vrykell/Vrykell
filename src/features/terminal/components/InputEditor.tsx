@@ -18,14 +18,14 @@ import {
   ShieldAlert, ShieldCheck, ShieldOff, Square, X, Zap,
 } from 'lucide-react';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
-import { ptyWrite } from '@/lib/pty';
+import { ptyWrite } from '@/platform/pty';
 import { useTerminalStore } from '@entities/terminal';
 import { useChatStore } from '@entities/chat';
 import ContextRing from '@/components/ContextRing';
 import { useUiStore } from '@shared/ui';
 import { useSessionStore, isSessionTab } from '@entities/session';
-import { leaves as layoutLeaves } from '@/lib/windowLayout';
-import { shellTypeLabel } from '@/lib/shells';
+import { leaves as layoutLeaves } from '@features/workspace/model/windowLayout';
+import { shellTypeLabel } from '@/platform/shells';
 import { useBlockStore, useInputStore, selectPaneInput } from '@entities/terminal';
 import { isInputBoxVisible, getLongRunningHint } from '@features/terminal/inputVisibility';
 import { agentControl } from '@features/agent/services/agentControl';

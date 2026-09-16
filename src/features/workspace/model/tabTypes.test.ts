@@ -5,8 +5,8 @@ import {
   loadRecentOpen,
   saveRecentOpen,
   touchRecentOpen,
-} from '@/lib/tabTypes';
-import type { ShellOption } from '@/lib/shells';
+} from '@features/workspace/model/tabTypes';
+import type { ShellOption } from '@/platform/shells';
 import type { SshConnection } from '@features/ssh/services/api';
 
 const shells: ShellOption[] = [

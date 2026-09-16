@@ -19,11 +19,11 @@ import { useSearchHighlightStore } from '@features/search/stores/searchHighlight
 import { toExchanges, mergeFlow } from '@features/chat/model/exchanges';
 import AiBlock from '@features/chat/components/AiBlock';
 import { agentControl } from '@features/agent/services/agentControl';
-import { ptyWrite } from '@/lib/pty';
-import { killForeground } from '@/lib/killForeground';
+import { ptyWrite } from '@/platform/pty';
+import { killForeground } from '@shared/utils/killForeground';
 import { useToastStore } from '@/components/Toast';
 import { fmtDuration } from '@/components/UiBtn';
-import { getCellMetrics } from '@/lib/termMetrics';
+import { getCellMetrics } from '@shared/utils/termMetrics';
 import { getExecutingTerm, syncTermWidth, applyCompactCharSize } from '@features/terminal/hooks/useTerminalSession';
 import BlockMenu from '@features/terminal/components/BlockMenu';
 import BlockOutput from '@features/terminal/components/BlockOutput';

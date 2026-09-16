@@ -3,7 +3,7 @@
  */
 import Segmented from '@/components/Segmented';
 import { useAgentSettings } from '@features/agent/stores/agentSettings';
-import type { ShellType } from '@/lib/shells';
+import type { ShellType } from '@/platform/shells';
 import { Field } from '@features/settings/components/ui';
 
 const OPEN_MODE_OPTIONS = (

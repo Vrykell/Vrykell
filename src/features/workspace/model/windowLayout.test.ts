@@ -5,7 +5,7 @@ import {
   maxRowPanes, minTerminalWidth, MIN_PANE_SIZE, DIVIDER_SIZE,
   collectLayoutCells,
   type TerminalSpec,
-} from '@/lib/windowLayout';
+} from '@features/workspace/model/windowLayout';
 
 const t = (id: string, kind: 'local' | 'ssh' = 'local'): TerminalSpec => ({ id, kind });
 

@@ -3,7 +3,7 @@ import GlobalSearch from '@features/search/components/GlobalSearch';
 import NewTabModal from '@/components/NewTabModal';
 import ToastContainer from '@/components/Toast';
 import { useUiStore } from '@shared/ui';
-import type { TerminalSpec } from '@/lib/windowLayout';
+import type { TerminalSpec } from '@features/workspace/model/windowLayout';
 
 interface ApplicationOverlaysProps {
   onPickSplit: (spec: TerminalSpec) => void;

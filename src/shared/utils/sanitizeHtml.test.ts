@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeOutputHtml } from '@/lib/sanitizeHtml';
+import { sanitizeOutputHtml } from '@shared/utils/sanitizeHtml';
 
 describe('sanitizeOutputHtml', () => {
   it('保留生成器的 span + 安全 style + br 结构', () => {

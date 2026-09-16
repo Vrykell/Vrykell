@@ -4,7 +4,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { sshFsList, sshDownload, sshRename, sshDelete, sshUpload } from '@features/ssh/services/api';
 import type { SshFsEntry } from '@features/ssh/services/api';
 import type { SshConnection } from '@features/ssh/services/api';
-import { ptyWrite } from '@/lib/pty';
+import { ptyWrite } from '@/platform/pty';
 import { loadConfig, remoteOpenCommand } from '@features/files/services/fileOpen';
 import { useTerminalStore } from '@entities/terminal';
 import { useSessionStore } from '@entities/session';

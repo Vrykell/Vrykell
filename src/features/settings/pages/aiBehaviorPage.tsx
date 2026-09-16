@@ -2,7 +2,7 @@
  * aiBehaviorPage — AI 行为设置（全局默认 + 每模型覆盖）。
  */
 import { useState } from 'react';
-import { useAiConfigStore } from '@/lib/ai';
+import { useAiConfigStore } from '@features/agent/stores/aiConfig';
 import { useAgentSettings, type AgentSettings, type ModelBehaviorSettings } from '@features/agent/stores/agentSettings';
 import Segmented from '@/components/Segmented';
 import { ModelScopeBar } from '@features/chat/components/ModelPicker';
