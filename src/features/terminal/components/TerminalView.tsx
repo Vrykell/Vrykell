@@ -8,8 +8,7 @@
  */
 
 import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
-import { useSessionStore, nextTerminalId, type Tab } from '@entities/session';
-import { defaultOpenModeForShell } from '@entities/agent';
+import { useSessionStore, type Tab } from '@entities/session';
 import { useTerminalStore } from '@entities/terminal';
 import { useUiStore, useDockDragStore } from '@shared/ui';
 import { useBlockStore, selectBlocks } from '@entities/terminal';
@@ -21,8 +20,7 @@ import { useToastStore } from '@/components/Toast';
 import { useFollowBottom, registerFollowEngager, engageFollow } from '@features/terminal/hooks/useFollowBottom';
 import { useTerminalFocus } from '@features/terminal/hooks/useTerminalFocus';
 import {
-  leaves as layoutLeaves, firstLeaf, findLeaf, splitLeaf, removeLeaf, dropTargets, moveTargets,
-  setRatio, dividers, collectLayoutCells, MIN_PANE_SIZE, DIVIDER_SIZE,
+  leaves as layoutLeaves, firstLeaf, moveTargets, dividers, collectLayoutCells, MIN_PANE_SIZE, DIVIDER_SIZE,
   type WindowLayout, type TerminalSpec, type DropTarget, type Rect,
 } from '@features/workspace/model/windowLayout';
 import InputEditor from '@features/terminal/components/InputEditor';
@@ -32,6 +30,7 @@ import TerminalPanel from '@features/terminal/components/TerminalPanel';
 import SessionHistoryView from '@/components/SessionHistoryView';
 import SettingsView from '@features/settings/pages/SettingsView';
 import ContextMenu from '@/components/ContextMenu';
+import { useTerminalLayoutActions } from '@features/terminal/hooks/useTerminalLayoutActions';
 
 export default function TerminalView() {
   const tabs = useSessionStore((s) => s.tabs);
@@ -110,13 +109,8 @@ function SessionTabView(props: {
   const { tab, active, setSession, setFocusedPane, onPaneContextMenu } = props;
   const windowId = tab.id;
   const layout = tab.layout;
-  const setWindowLayout = useSessionStore((s) => s.setWindowLayout);
   const focusedPaneId = useTerminalStore((s) => s.focusedPaneId);
   const sessions = useTerminalStore((s) => s.sessions);
-  const splitPlacement = useUiStore((s) => s.splitPlacement);
-  const cancelSplit = useUiStore((s) => s.cancelSplit);
-  const movePlacement = useUiStore((s) => s.movePlacement);
-  const cancelMove = useUiStore((s) => s.cancelMove);
   const draggingId = useDockDragStore((s) => s.draggingTerminalId);
 
   const focusedTermId = focusedPaneId && sessions[focusedPaneId] && layoutLeaves(layout).some((t) => t.id === focusedPaneId)
@@ -128,46 +122,18 @@ function SessionTabView(props: {
   const hasExecutingBlock = focusBlocks.some((b) => b.status === 'executing');
   useTerminalFocus(active && scene === 'blockList' && hasExecutingBlock, focusedTermId);
 
-  // 分裂落点：smart 规则（dropTargets 决定 1→4 半屏 / 2→4 四分之一 / 3→2 半屏 / 4→无）
-  const placementTargets = useMemo(
-    () => (splitPlacement.open && layout ? dropTargets(layout) : []),
-    [splitPlacement.open, layout],
-  );
-
-  // 更换位置落点：对「其它终端」给出上/下/左/右边沿落点（与拖动重排同规则）
-  const movePlacementTargets = useMemo(
-    () => (movePlacement.open && layout && movePlacement.terminalId
-      ? moveTargets(layout, movePlacement.terminalId)
-      : []),
-    [movePlacement, layout],
-  );
-
-  const commitPlacement = useCallback((zone: DropTarget) => {
-    if (!layout) return;
-    // 继承类型：优先继承「被分裂的那个终端」（zone.leafId），而非聚焦终端
-    const base = splitPlacement.spec ?? findLeaf(layout, zone.leafId);
-    if (!base) return;
-    const newId = nextTerminalId(windowId, layout);
-    // 打开模式：继承源模式，未设置则回退：SSH 经典、local 按 shell 类型
-    const openMode = base.openMode ?? (base.kind === 'ssh'
-      ? 'classic'
-      : defaultOpenModeForShell(base.shellType));
-    const next = splitLeaf(layout, zone.leafId, zone.dir, zone.position, { ...base, id: newId, openMode });
-    setWindowLayout(windowId, next);
-    setFocusedPane(newId);
-    cancelSplit();
-  }, [layout, splitPlacement.spec, windowId, setWindowLayout, setFocusedPane, cancelSplit]);
-
-  const commitMove = useCallback((dragId: string, zone: DropTarget) => {
-    if (!layout) return;
-    if (zone.leafId === dragId) return;
-    const spec = findLeaf(layout, dragId);
-    const removed = removeLeaf(layout, dragId);
-    if (!spec || !removed) return;
-    const next = splitLeaf(removed, zone.leafId, zone.dir, zone.position, spec);
-    setWindowLayout(windowId, next);
-    setFocusedPane(dragId);
-  }, [layout, windowId, setWindowLayout, setFocusedPane]);
+  const {
+    splitPlacement,
+    cancelSplit,
+    movePlacement,
+    cancelMove,
+    placementTargets,
+    movePlacementTargets,
+    commitPlacement,
+    commitMove,
+    completeMove,
+    setRatioNode,
+  } = useTerminalLayoutActions({ windowId, layout });
 
   return (
     <div style={{
@@ -185,7 +151,7 @@ function SessionTabView(props: {
           focusedTermId={focusedTermId}
           setSession={setSession}
           setFocusedPane={setFocusedPane}
-          setRatioNode={(aId, bId, r) => setWindowLayout(windowId, setRatio(layout, aId, bId, r))}
+          setRatioNode={setRatioNode}
           onPaneContextMenu={onPaneContextMenu}
         />
 
@@ -199,11 +165,7 @@ function SessionTabView(props: {
           <PlacementOverlay
             targets={movePlacementTargets}
             emptyMessage="只有一个终端，无法更换位置"
-            onPick={(zone) => {
-              const id = movePlacement.terminalId;
-              if (id) commitMove(id, zone);
-              cancelMove();
-            }}
+            onPick={completeMove}
             onCancel={cancelMove}
           />
         )}
