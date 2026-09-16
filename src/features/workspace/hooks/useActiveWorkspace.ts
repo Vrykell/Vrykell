@@ -40,5 +40,7 @@ export function useActiveWorkspace() {
     focusedPaneId: resolvedFocusedPaneId,
     focusedSpec,
     activeCwd,
+    terminalCwds,
+    sessions,
   };
 }
