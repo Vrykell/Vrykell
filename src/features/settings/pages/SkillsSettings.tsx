@@ -5,16 +5,15 @@
  * 信任分级：未信任/已信任 + 启用/禁用；含脚本/来源/已修改 徽标；导入默认未信任。
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ChevronRight, Download, FileText, Folder, ShieldAlert, Store, Trash2, X } from 'lucide-react';
-import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { fileOpenWith } from '@features/files/services/fs';
 import {
-  listSkills, getSkill, removeSkill, installSkillMd, fetchRemoteSkills, importSkillsFromPath,
-  setSkillState, readSkillFile, marketGithubList, marketGithubInstall,
+  setSkillState, removeSkill, readSkillFile, marketGithubList, marketGithubInstall,
   type SkillMeta, type SkillDetail, type MarketSkill,
 } from '@features/agent/services/skills';
 import { useToastStore } from '@/components/Toast';
+import { useSkillsSettings } from '@features/settings/hooks/useSkillsSettings';
 
 const toast = (msg: string, type: 'info' | 'success' | 'error') =>
   useToastStore.getState().addToast(msg, type);
@@ -363,74 +362,25 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
 // ── 主页面 ──
 
 export default function SkillsSettings() {
-  const [metas, setMetas] = useState<SkillMeta[]>([]);
-  const [detail, setDetail] = useState<SkillDetail | null>(null);
-  const [importUrl, setImportUrl] = useState('');
-  const [importing, setImporting] = useState(false);
-  const [warnDismissed, setWarnDismissed] = useState(false);
-  const [market, setMarket] = useState(false);
-
-  const refresh = () => {
-    listSkills().then(setMetas).catch((e) => toast(String((e as Error)?.message ?? e), 'error'));
-  };
-  useEffect(() => { refresh(); }, []);
-
-  const openDetail = async (name: string) => {
-    try {
-      setDetail(await getSkill(name));
-    } catch (e) {
-      toast(String((e as Error)?.message ?? e), 'error');
-    }
-  };
-
-  const doImportUrl = async () => {
-    const url = importUrl.trim();
-    if (!url) return;
-    setImporting(true);
-    try {
-      const remote = await fetchRemoteSkills(url);
-      if (remote.length === 0) { toast('清单为空', 'info'); return; }
-      for (const r of remote) await installSkillMd(r.name, r.description, r.prompt);
-      toast(`已安装 ${remote.length} 个技能`, 'success');
-      setImportUrl('');
-      refresh();
-    } catch (e) {
-      toast(String((e as Error)?.message ?? e), 'error');
-    } finally {
-      setImporting(false);
-    }
-  };
-
-  const doImportPath = async (directory: boolean) => {
-    try {
-      const sel = await openDialog({ multiple: false, directory });
-      if (typeof sel !== 'string') return;
-      setImporting(true);
-      try {
-        const imported = await importSkillsFromPath(sel);
-        toast(`已导入 ${imported.length} 个技能`, 'success');
-        refresh();
-      } finally {
-        setImporting(false);
-      }
-    } catch (e) {
-      toast(String((e as Error)?.message ?? e), 'error');
-    }
-  };
-
-  const toggleTrust = async (m: SkillMeta) => {
-    await setSkillState(m.name, !m.trusted, undefined);
-    refresh();
-  };
-  const toggleEnabled = async (m: SkillMeta) => {
-    await setSkillState(m.name, undefined, !m.enabled);
-    refresh();
-  };
-  const del = async (name: string) => {
-    await removeSkill(name);
-    toast(`已删除 ${name}`, 'success');
-    refresh();
-  };
+  const {
+    metas,
+    detail,
+    importUrl,
+    importing,
+    warnDismissed,
+    market,
+    setImportUrl,
+    setWarnDismissed,
+    setMarket,
+    setDetail,
+    refresh,
+    openDetail,
+    doImportUrl,
+    doImportPath,
+    toggleTrust,
+    toggleEnabled,
+    del,
+  } = useSkillsSettings();
 
   return (
     <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 10 }}>
