@@ -12,26 +12,17 @@
  *   └──────────────────────────────────────────────┘
  */
 
-import { useRef, useCallback, useEffect } from 'react';
 import {
   ArrowUp, Columns2, GitBranch, Paperclip,
   ShieldAlert, ShieldCheck, ShieldOff, Square, X, Zap,
 } from 'lucide-react';
-import { ptyWrite } from '@/platform/pty';
-import { useChatStore } from '@entities/chat';
 import ContextRing from '@/components/ContextRing';
 import { useUiStore } from '@shared/ui';
 import { useSessionStore } from '@entities/session';
-import { useInputStore, selectPaneInput } from '@entities/terminal';
 import { getLongRunningHint } from '@features/terminal/inputVisibility';
-import { usePermissions, useAttachmentComposer } from '@entities/agent';
-import { useDockStore } from '@shared/ui';
-import { engageFollow } from '@features/terminal/hooks/useFollowBottom';
 import AttachmentChips from '@features/chat/components/AttachmentChips';
 import ShellIndicator from '@features/terminal/components/ShellIndicator';
-import { useCommandHistoryNavigation } from '@features/terminal/hooks/useCommandHistoryNavigation';
-import { useTerminalInputContext } from '@features/terminal/hooks/useTerminalInputContext';
-import { useCommandCompletion } from '@features/terminal/hooks/useCommandCompletion';
+import { useInputEditorController } from '@features/terminal/hooks/useInputEditorController';
 
 /** 权限模式循环（与 PanelChat 顶栏同款三色 Shield）：标准=逐工具 / 严格=逐次问 / 放行=直放 */
 const PERM_MODES = [
@@ -64,162 +55,39 @@ export default function InputEditor({
   insetLeft = 8,
   insetRight = 8,
 }: Props) {
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-  const chatSend = useChatStore((s) => s.send);
-
   const {
-    sessions,
+    inputRef,
+    text,
+    aiMode,
+    setAiMode,
+    toggleAiMode,
     isFocused,
     hasSession,
-    pendingInput,
-    setPendingInput,
     tabCwd,
     terminalLabel,
     recentGitBranch,
     visible,
-  } = useTerminalInputContext({ paneId, focused, isLongRunning });
-
-  // 每 pane 独立输入态（text + AI 模式）
-  const input = useInputStore(selectPaneInput(paneId));
-  const text = input.text;
-  const aiMode = input.aiMode;
-  const setText = useCallback(
-    (t: string) => useInputStore.getState().setText(paneId, t),
-    [paneId],
-  );
-  const setAiMode = useCallback(
-    (m: boolean) => useInputStore.getState().setAiMode(paneId, m),
-    [paneId],
-  );
-
-  // ── AI 模式扩展：与 AI 聊天面板对齐的发送/停止、快捷开关、权限、附件 ──
-  const sendingTab = useChatStore((s) => s.sendingTab);
-  const abortStream = useChatStore((s) => s.abortStream);
-  const activeId = useSessionStore((s) => s.activeId);
-  const sendingHere = sendingTab !== null && sendingTab === activeId;
-
-  const permMode = usePermissions((s) => s.mode);
-  const setPermMode = usePermissions((s) => s.setMode);
-
-  const {
-    attachments: atts,
+    chatOpen,
+    sendingHere,
+    activeId,
+    abortStream,
+    permMode,
+    setPermMode,
+    atts,
     previewId,
     panelRef,
-    addPastedText,
     pickFiles,
     addBlobs,
     togglePreview,
     removeAttachment,
-    clearAttachments,
-  } = useAttachmentComposer();
-
-  const canSendAi = (!!text.trim() || atts.length > 0) && !sendingTab;
-
-  // ── 消费 pendingInput ──
-
-  useEffect(() => {
-    if (pendingInput) {
-      setText(text ? text + ' ' + pendingInput : pendingInput);
-      setAiMode(false);
-      setPendingInput('');
-      inputRef.current?.focus();
-    }
-    // text/paneId 变化不重跑此 effect（只消费一次性 pendingInput）
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingInput, setPendingInput, setText, setAiMode]);
-
-  // 长运行结束输入栏重现时自动聚焦：运行期间焦点在块内活终端，
-  // 块完成 dispose 后焦点掉回 body，不接管的话键盘无处可去
-  const wasVisibleRef = useRef(visible);
-  useEffect(() => {
-    if (visible && !wasVisibleRef.current) inputRef.current?.focus();
-    wasVisibleRef.current = visible;
-  }, [visible]);
-
-  // 焦点切换（⌘]/⌘[ 或点击 pane）时，把键盘焦点交给新聚焦终端的输入栏
-  const wasFocusedRef = useRef(isFocused);
-  useEffect(() => {
-    if (isFocused && !wasFocusedRef.current && visible) inputRef.current?.focus();
-    wasFocusedRef.current = isFocused;
-  }, [isFocused, visible]);
-
-  const resetHeight = useCallback(() => {
-    if (inputRef.current) inputRef.current.style.height = 'auto';
-  }, []);
-
-  // ── 命令自动补全（M8 ghost text）──
-  // 本地级（历史前缀/路径）零网络始终可用；AI 增强有 key 才叠加。
-  // 本地历史前缀命中是同步即时反馈（零延迟体感）；本地未命中才防抖走路径/AI。
-  // seq + AbortController 双保险防止过期建议落地。
-  const {
+    canSendAi,
     ghost,
-    clearGhost,
-    acceptCompletion,
-    restoreCompletion,
-  } = useCommandCompletion({
-    text,
-    aiMode,
-    isFocused,
-    visible,
-    cwd: tabCwd,
-    inputRef,
-    setText,
-  });
+    execute,
+    handleChange,
+    handlePaste,
+    handleKeyDown,
+  } = useInputEditorController({ paneId, focused, isLongRunning, onEndPress });
 
-  // ── ↑/↓ 翻命令历史（cmd 模式、单行时；fish 式按当前前缀过滤） ──
-  // idx=-1 表示未在翻历史；base 记录开始翻之前的草稿，翻到底（ArrowDown 越界）还原
-  const { reset: resetHistNav, navigate: navHistory } = useCommandHistoryNavigation({
-    text,
-    setText,
-    inputRef,
-    onNavigate: clearGhost,
-  });
-
-  // ── AI 面板开启时锁定 cmd 模式（AI 提问收口到面板；切换按钮显式禁用） ──
-  const chatOpen = useDockStore((s) => s.leftPanels.includes('chat') || s.rightPanels.includes('chat'));
-  useEffect(() => {
-    if (chatOpen && aiMode) setAiMode(false);
-  }, [chatOpen, aiMode, setAiMode]);
-
-  const execute = useCallback(() => {
-    const cmd = text.trim();
-    // AI 模式允许「空文本 + 附件」发送（纯图片提问）；cmd 模式必须有命令
-    if (aiMode ? (!cmd && atts.length === 0) || sendingTab : !cmd) return;
-    useInputStore.getState().clearText(paneId);
-    resetHeight();
-    resetHistNav();
-    try {
-      if (aiMode) {
-        // AI 模式：问题带上本 pane id —— 回答会内联进本 pane 的块流，同时进全局面板
-        chatSend(cmd, { paneId, attachments: atts.length > 0 ? atts : undefined });
-        clearAttachments();
-      } else {
-        const sid = sessions[paneId];
-        if (sid) {
-          ptyWrite(sid, cmd.endsWith('\n') ? cmd : cmd + '\n').catch(() => {});
-        }
-        engageFollow(paneId); // 提交新命令 = 明确回底意图
-      }
-    } catch (e) {
-      console.error('[InputEditor] execute failed:', e);
-    }
-  }, [text, aiMode, atts, sendingTab, chatSend, paneId, sessions, resetHeight, resetHistNav, clearAttachments]);
-
-  // ── 全局 End 键监听 ──
-
-  useEffect(() => {
-    if (!visible && onEndPress) {
-      const onKey = (e: KeyboardEvent) => {
-        if (e.key === 'End' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-          onEndPress();
-        }
-      };
-      window.addEventListener('keydown', onKey);
-      return () => window.removeEventListener('keydown', onKey);
-    }
-  }, [visible, onEndPress]);
-
-  // ── 长运行命令提示条 ──
 
   if (forceHidden) return null;
 
@@ -326,9 +194,7 @@ export default function InputEditor({
               cursor: chatOpen ? 'not-allowed' : 'pointer',
               opacity: chatOpen ? 0.45 : 1,
             }}
-            onClick={() => {
-              if (!chatOpen) setAiMode(!aiMode);
-            }}
+            onClick={toggleAiMode}
             title={
               chatOpen
                 ? 'AI 对话面板开启中，请在面板中提问'
@@ -348,57 +214,9 @@ export default function InputEditor({
               value={text}
               placeholder={aiMode ? '自然语言描述你想做什么…' : '输入命令…'}
               rows={1}
-              onChange={(e) => {
-                resetHistNav();
-                setText(e.target.value);
-                e.target.style.height = 'auto';
-                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
-              }}
-              onPaste={(e) => {
-                // AI 模式：图片/文件粘贴为附件；长文本折叠为 chip
-                if (!aiMode) return;
-                const files = Array.from(e.clipboardData.files);
-                if (files.length > 0) {
-                  e.preventDefault();
-                  void addBlobs(files);
-                  return;
-                }
-                const t = e.clipboardData.getData('text/plain');
-                if (t && addPastedText(t)) e.preventDefault();
-              }}
-              onKeyDown={(e) => {
-                // ↑/↓ 翻命令历史（cmd 模式 + 单行；fish 式按当前前缀过滤）
-                if (!aiMode && !text.includes('\n') && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
-                  if (navHistory(e.key === 'ArrowUp' ? 1 : -1)) {
-                    e.preventDefault();
-                    return;
-                  }
-                }
-                // Tab 接受当前候选；再按 Tab 替换为下一个命令（Shift+Tab 后退）；Esc 丢弃
-                if (e.key === 'Tab' && acceptCompletion(e.shiftKey)) {
-                  e.preventDefault();
-                  resetHistNav();
-                  return;
-                }
-                if (e.key === 'Escape') {
-                  if (restoreCompletion()) {
-                    return;
-                  }
-                  if (ghost) {
-                    clearGhost();
-                    return;
-                  }
-                  if (text) {
-                    setText('');
-                    resetHeight();
-                  } else if (aiMode && !chatOpen) setAiMode(false);
-                }
-                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                  e.preventDefault();
-                  clearGhost();
-                  execute();
-                }
-              }}
+              onChange={handleChange}
+              onPaste={handlePaste}
+              onKeyDown={handleKeyDown}
               style={{
                 position: 'relative',
                 zIndex: 1,
