@@ -545,8 +545,7 @@ function TuiBanner({ tabId }: { tabId: string }) {
     killArmed,
     sendCtrlC,
     killApp,
-    setAltScreenActive,
-    setScene,
+    exitFullScreen,
   } = useTuiControls(tabId);
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 101, padding: '3px 12px', fontSize: 11, fontFamily: 'var(--font-mono)', background: 'transparent', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)' }}>
@@ -556,7 +555,7 @@ function TuiBanner({ tabId }: { tabId: string }) {
       <span onClick={sendCtrlC} title="发送 Ctrl+C" style={{ fontSize: 10, padding: '2px 6px', borderRadius: 3, cursor: 'pointer' }}>^C</span>
       <span onClick={killApp} title="结束前台应用 (SIGTERM)" style={{ fontSize: 10, padding: '2px 6px', borderRadius: 3, cursor: 'pointer', color: killArmed ? 'var(--accent-warm)' : 'var(--text-secondary)' }}>{killArmed ? '强杀!' : '结束'}</span>
       {altScreenActive && (
-        <span onClick={() => { setAltScreenActive(false); setScene(tabId, 'blockList'); }} title="退出全屏" style={{ fontSize: 10, padding: '2px 6px', borderRadius: 3, cursor: 'pointer' }}>esc</span>
+        <span onClick={exitFullScreen} title="退出全屏" style={{ fontSize: 10, padding: '2px 6px', borderRadius: 3, cursor: 'pointer' }}>esc</span>
       )}
     </div>
   );

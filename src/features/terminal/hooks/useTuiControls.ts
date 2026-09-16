@@ -50,6 +50,11 @@ export function useTuiControls(tabId: string) {
     setScene(tabId, 'blockList');
   }, [setAltScreenActive, setScene, tabId]);
 
+  const enterFullScreen = useCallback(() => {
+    setScene(tabId, 'altScreen');
+    setAltScreenActive(true);
+  }, [setAltScreenActive, setScene, tabId]);
+
   return {
     altScreenActive,
     runningCommand,
@@ -57,7 +62,6 @@ export function useTuiControls(tabId: string) {
     sendCtrlC,
     killApp,
     exitFullScreen,
-    setAltScreenActive,
-    setScene,
+    enterFullScreen,
   };
 }

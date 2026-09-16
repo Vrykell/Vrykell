@@ -6,7 +6,7 @@
  * cwd/git 不在 block 顶部重复告知（底部输入栏已有 cwd）。
  */
 
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Bookmark, Check, ChevronDown, ChevronRight, Copy, Ellipsis,
   Maximize2, RotateCw, Skull, Sparkles, Square, Terminal, X, Zap,
@@ -15,8 +15,6 @@ import { useBlockStore } from '@entities/terminal';
 import { useTerminalStore } from '@entities/terminal';
 import AiBlock from '@features/chat/components/AiBlock';
 import { ptyWrite } from '@/platform/pty';
-import { killForeground } from '@shared/utils/killForeground';
-import { useToastStore } from '@/components/Toast';
 import { fmtDuration } from '@/components/UiBtn';
 import { getCellMetrics } from '@shared/utils/termMetrics';
 import { getExecutingTerm, syncTermWidth, applyCompactCharSize } from '@features/terminal/hooks/useTerminalSession';
@@ -25,6 +23,7 @@ import BlockOutput from '@features/terminal/components/BlockOutput';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 import { useTerminalBlockFlow } from '@features/terminal/hooks/useTerminalBlockFlow';
 import { useBlockItemActions } from '@features/terminal/hooks/useBlockItemActions';
+import { useTuiControls } from '@features/terminal/hooks/useTuiControls';
 import { hasVisibleContent as hasVisibleBlockContent } from '@features/terminal/model/blockVisibility';
 
 interface Props {
@@ -357,9 +356,7 @@ function RunningItem({
   const [elapsedNow, setElapsedNow] = useState(
     block.startedAt ? fmtDuration(Date.now() - block.startedAt) : '',
   );
-  const sessions = useTerminalStore((s) => s.sessions);
-  const setAltScreenActive = useTerminalStore((s) => s.setAltScreenActive);
-  const setScene = useTerminalStore((s) => s.setScene);
+  const { sendCtrlC, killApp, enterFullScreen } = useTuiControls(tabId);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -367,25 +364,6 @@ function RunningItem({
     }, 1000);
     return () => clearInterval(timer);
   }, [block.startedAt]);
-
-  const sendCtrlC = useCallback(() => {
-    const sid = sessions[tabId];
-    if (sid) ptyWrite(sid, '\x03').catch(() => {});
-  }, [sessions, tabId]);
-
-  // 升级式结束：首击 SIGTERM，3 秒内再击 SIGKILL（应对忽略 Ctrl+C 的应用）
-  const killApp = useCallback(() => {
-    const sid = sessions[tabId];
-    if (!sid) return;
-    killForeground(sid).catch((e) => {
-      useToastStore.getState().addToast(String((e as Error)?.message ?? e), 'info');
-    });
-  }, [sessions, tabId]);
-
-  const enterTui = useCallback(() => {
-    setScene(tabId, 'altScreen');
-    setAltScreenActive(true);
-  }, [setScene, setAltScreenActive, tabId]);
 
   const coloredCommand = useMemo(() => highlightCommand(block.command || ''), [block.command]);
 
@@ -433,7 +411,7 @@ function RunningItem({
           )}
           <BlockToolBtn title="终止命令 (Ctrl+C)" onClick={sendCtrlC} label={<Square size={10} fill="currentColor" />} />
           <BlockToolBtn title="结束前台应用（SIGTERM；3 秒内再点强杀 SIGKILL）" onClick={killApp} label={<Skull size={11} />} />
-          <BlockToolBtn title="进入全屏交互" onClick={enterTui} label={<Maximize2 size={12} />} />
+          <BlockToolBtn title="进入全屏交互" onClick={enterFullScreen} label={<Maximize2 size={12} />} />
         </span>
       </div>
 
