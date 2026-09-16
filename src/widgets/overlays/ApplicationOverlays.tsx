@@ -2,7 +2,7 @@ import CommandPalette from '@/components/CommandPalette';
 import GlobalSearch from '@/search/GlobalSearch';
 import NewTabModal from '@/components/NewTabModal';
 import ToastContainer from '@/components/Toast';
-import { useUiStore } from '@/store/ui';
+import { useUiStore } from '@shared/ui';
 import type { TerminalSpec } from '@/lib/windowLayout';
 
 interface ApplicationOverlaysProps {
