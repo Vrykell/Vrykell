@@ -81,9 +81,9 @@ globalThis.ResizeObserver = class {
 } as unknown as typeof ResizeObserver;
 
 import { useTerminalSession } from '@features/terminal/hooks/useTerminalSession';
-import { useTerminalStore } from '@/store/terminal';
-import { useBlockStore } from '@/store/blocks';
-import { useWorkspaceStore } from '@/store/workspace';
+import { useTerminalStore } from '@features/terminal/stores/terminal';
+import { useBlockStore } from '@features/terminal/stores/blocks';
+import { useWorkspaceStore } from '@features/workspace/stores/workspace';
 import { leaf } from '@/lib/windowLayout';
 import { onPtyOutput as mockedOnPtyOutput, ptySpawn as mockedPtySpawn } from '@/lib/pty';
 

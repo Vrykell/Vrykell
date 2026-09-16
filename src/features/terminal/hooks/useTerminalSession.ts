@@ -12,7 +12,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { ptySpawn, ptyWrite, ptyResize, ptyClose, onPtyOutput, onPtyExit } from '@/lib/pty';
 import { registerTerminal, unregisterTerminal, useTerminalStore } from '@entities/terminal';
 import { useBlockStore } from '@entities/terminal';
-import { useHistoryStore } from '@/store/history';
+import { useHistoryStore } from '@features/terminal/stores/history';
 import { useSessionStore } from '@entities/session';
 import { leaves as layoutLeaves } from '@/lib/windowLayout';
 import * as sessionManager from '@/lib/sessionManager';

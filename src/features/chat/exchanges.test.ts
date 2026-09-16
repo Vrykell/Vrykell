@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { toExchanges, mergeFlow } from '@features/chat/model/exchanges';
-import type { ChatMessage } from '@/store/chat';
+import type { ChatMessage } from '@features/chat/stores/chat';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 
 const msg = (id: string, role: 'user' | 'assistant', createdAt: number, extra: Partial<ChatMessage> = {}): ChatMessage => ({

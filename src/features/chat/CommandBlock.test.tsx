@@ -6,7 +6,7 @@ invokeMock.mockResolvedValue(undefined);
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import Markdown from '@features/chat/components/Markdown';
-import { useTerminalStore } from '@/store/terminal';
+import { useTerminalStore } from '@features/terminal/stores/terminal';
 import { useSessionStore } from '@entities/session';
 
 describe('CommandBlock', () => {

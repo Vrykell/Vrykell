@@ -8,11 +8,11 @@ import {
   groupRestore, groupArchive,
 } from '@/api/group';
 import type { BackendGroupEntry } from '@features/search/types';
-import { useBlockStore } from '@/store/blocks';
-import { useChatStore } from '@/store/chat';
+import { useBlockStore } from '@features/terminal/stores/blocks';
+import { useChatStore } from '@features/chat/stores/chat';
 import { useAgentSettings } from '@features/agent/stores/agentSettings';
 import { defaultOpenModeForShell } from '@features/agent/stores/agentSettings';
-import { useTerminalStore, getFocusedTerminalId } from '@/store/terminal';
+import { useTerminalStore, getFocusedTerminalId } from '@features/terminal/stores/terminal';
 import type { ShellType } from '@/lib/shells';
 import { shellTypeLabel } from '@/lib/shells';
 import {

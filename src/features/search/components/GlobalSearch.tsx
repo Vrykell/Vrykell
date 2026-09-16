@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { ChevronDown, Search, type LucideIcon } from 'lucide-react';
 import { useSearchEngine } from '@features/search/services/engine';
-import { useSearchHistoryStore } from '@/store/searchHistory';
-import { useSearchHighlightStore } from '@/store/searchHighlight';
+import { useSearchHistoryStore } from '@features/search/stores/searchHistory';
+import { useSearchHighlightStore } from '@features/search/stores/searchHighlight';
 import { useSessionStore } from '@entities/session';
 import { useTerminalStore } from '@entities/terminal';
 import { getCommands } from '@/commands';

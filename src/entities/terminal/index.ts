@@ -14,15 +14,15 @@ export {
   getRecentOutputFor,
   getTerminalScreen,
   type TerminalScreen,
-} from '@/store/terminal';
+} from '@features/terminal/stores/terminal';
 
 export {
   useBlockStore,
   selectBlocks,
-} from '@/store/blocks';
+} from '@features/terminal/stores/blocks';
 
 export {
   useInputStore,
   selectPaneInput,
   type PaneInput,
-} from '@/store/input';
+} from '@features/terminal/stores/input';

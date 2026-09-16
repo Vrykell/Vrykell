@@ -33,7 +33,7 @@ import { useAgentSettings } from '@features/agent/stores/agentSettings';
 import { usePermissions } from '@features/agent/stores/permissions';
 import { LIMITS, importFileAsAttachment, totalSize, saveBlobAsAttachment, makePasteAttachment, type AttachmentMeta } from '@features/agent/model/attachments';
 import { completeCommand, localCompleteCandidates } from '@features/agent/services/complete';
-import { useHistoryStore } from '@/store/history';
+import { useHistoryStore } from '@features/terminal/stores/history';
 import { useDockStore } from '@shared/ui';
 import { useToastStore } from '@/components/Toast';
 import { engageFollow } from '@features/terminal/hooks/useFollowBottom';

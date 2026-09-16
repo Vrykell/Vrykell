@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useChatStore, setDefaultStream } from '@/store/chat';
-import { useWorkspaceStore } from '@/store/workspace';
+import { useChatStore, setDefaultStream } from '@features/chat/stores/chat';
+import { useWorkspaceStore } from '@features/workspace/stores/workspace';
 
 const initialChat = useChatStore.getState();
 const initialWs = useWorkspaceStore.getState();
