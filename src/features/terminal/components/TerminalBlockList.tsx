@@ -11,14 +11,10 @@ import {
   Bookmark, Check, ChevronDown, ChevronRight, Copy, Ellipsis,
   Maximize2, RotateCw, Skull, Sparkles, Square, Terminal, X, Zap,
 } from 'lucide-react';
-import { useBlockStore, selectBlocks } from '@entities/terminal';
-import { useChatStore, usePaneMessages } from '@entities/chat';
-import { useChatPanelOpen } from '@shared/ui';
+import { useBlockStore } from '@entities/terminal';
+import { useChatStore } from '@entities/chat';
 import { useTerminalStore } from '@entities/terminal';
-import { useSearchHighlightStore } from '@entities/search';
-import { toExchanges, mergeFlow } from '@features/chat/model/exchanges';
 import AiBlock from '@features/chat/components/AiBlock';
-import { agentControl } from '@features/agent/services/agentControl';
 import { ptyWrite } from '@/platform/pty';
 import { killForeground } from '@shared/utils/killForeground';
 import { useToastStore } from '@/components/Toast';
@@ -28,6 +24,8 @@ import { getExecutingTerm, syncTermWidth, applyCompactCharSize } from '@features
 import BlockMenu from '@features/terminal/components/BlockMenu';
 import BlockOutput from '@features/terminal/components/BlockOutput';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
+import { useTerminalBlockFlow } from '@features/terminal/hooks/useTerminalBlockFlow';
+import { hasVisibleContent as hasVisibleBlockContent } from '@features/terminal/model/blockVisibility';
 
 interface Props {
   tabId: string;
@@ -41,46 +39,22 @@ const ANSI_CSI_RE = /\x1b\[[0-9;?]*[a-zA-Z]/g;
 
 /** block 是否有值得渲染的内容（pending 占位、连按回车产生的空 done 都不算）。 */
 export function hasVisibleContent(b: TermBlock): boolean {
-  return b.status === 'executing' || b.command !== '' || b.outputHtml !== '' || b.outputText !== '';
+  return hasVisibleBlockContent(b);
 }
 
 export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8 }: Props) {
-  const blocks = useBlockStore(selectBlocks(tabId));
-  const highlightQuery = useSearchHighlightStore((s) => s.query);
-  const [menuBlock, setMenuBlock] = useState<{ block: TermBlock; rect: DOMRect } | null>(null);
-  // 该 pane 的 AI 对话线（注意：本组件的 tabId prop 实际是 paneId）
-  const aiMessages = usePaneMessages(tabId);
-  // AI 面板打开时不再内联 —— 回答只在面板显示，避免两处重复
-  const chatPanelOpen = useChatPanelOpen();
-
-  // 按新 TermBlock 状态分组；pending 与空块不渲染（底部固定输入栏即提示符，
-  // 空占位卡片只是视觉噪音 —— 「最下面有一个空行」）
-  const completed = useMemo(
-    () =>
-      blocks.filter(
-        (b) => (b.status === 'done' || b.status === 'interrupted') && hasVisibleContent(b),
-      ),
-    [blocks],
-  );
-  const running = useMemo(() => blocks.filter((b) => b.status === 'executing'), [blocks]);
-
-  // AI 问答折叠为交换，与已完成命令块按时间归并（渲染层操作，不改管线）
-  const exchanges = useMemo(
-    () => (chatPanelOpen ? [] : toExchanges(aiMessages)),
-    [aiMessages, chatPanelOpen],
-  );
-  // agent 发起的已完成块不独立出现 —— 它们内嵌在回答的 run_command 节点下。
-  // 面板打开时回答不内联，块保持独立渲染（否则会整个不可见）。
-  // 运行中块不过滤：执行期间留在列表底部提供实时输出视图，完成后「对接」进回答。
-  const standalone = useMemo(
-    () => (chatPanelOpen ? completed : completed.filter((b) => !agentControl.hasBlock(b.id))),
-    [completed, chatPanelOpen],
-  );
-  const flow = useMemo(() => mergeFlow(standalone, exchanges), [standalone, exchanges]);
+  const {
+    highlightQuery,
+    completed,
+    running,
+    flow,
+    allCollapsed,
+    menuBlock,
+    openMenu,
+    closeMenu,
+  } = useTerminalBlockFlow(tabId);
 
   if (flow.length === 0 && running.length === 0) return null;
-
-  const allCollapsed = completed.length > 0 && completed.every((b) => b.collapsed);
 
   return (
     <>
@@ -115,7 +89,7 @@ export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8
             insetLeft={insetLeft}
             insetRight={insetRight}
             highlightQuery={highlightQuery}
-            onMenu={(block, rect) => setMenuBlock({ block, rect })}
+            onMenu={openMenu}
           />
         ) : (
           <div key={item.exchange.id} style={{ padding: `0 ${insetRight}px 0 ${insetLeft}px` }}>
@@ -142,7 +116,7 @@ export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8
           block={menuBlock.block}
           paneId={tabId}
           anchor={menuBlock.rect}
-          onClose={() => setMenuBlock(null)}
+          onClose={closeMenu}
           getOutputText={() =>
             menuBlock.block.outputText ||
             menuBlock.block.outputRaw.replace(ANSI_CSI_RE, '')
