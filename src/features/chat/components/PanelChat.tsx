@@ -10,19 +10,16 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { ArrowUp, Bot, Brain, Globe, Paperclip, ShieldAlert, ShieldCheck, ShieldOff, Square, Zap } from 'lucide-react';
 import { useChatStore, useActiveMessages } from '@entities/chat';
-import { isSessionTab } from '@entities/session';
 import { useAgentSettings, usePermissions, useAiConfigStore, useAttachmentComposer } from '@entities/agent';
 import ModelPill from '@features/chat/components/ModelPill';
 import AttachmentChips from '@features/chat/components/AttachmentChips';
-import { leaves as layoutLeaves, firstLeaf } from '@features/workspace/model/windowLayout';
-import { shellTypeLabel } from '@/platform/shells';
 import ShellIndicator from '@features/terminal/components/ShellIndicator';
 import { CurrentDir } from '@features/terminal/components/InputEditor';
 import AiBlock from '@features/chat/components/AiBlock';
 import { toExchanges, type ChatExchange } from '@features/chat/model/exchanges';
 import ContextRing from '@/components/ContextRing';
-import { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
 import { useChatComposer } from '@features/chat/hooks/useChatComposer';
+import { useChatPaneContext } from '@features/chat/hooks/useChatPaneContext';
 
 /** 权限模式循环（状态栏 Shield chip）：图标 + 颜色双通道辨识（勾=标准逐工具 / 叹号=严格逐次问 / 斜线=放行直放）
  *  标准=逐工具级别；严格=全部逐次问；放行=全部直放行（危险命令仍逐次问） */
@@ -41,14 +38,15 @@ export default function PanelChat() {
   /** 当前 tab 正在流式（发送键变停止键；其它 tab 的发送中只禁用发送） */
   const {
     activeId,
-    activeTab,
-    focusedPaneId,
-    terminalCwds: cwds,
-    sessions,
-  } = useActiveWorkspace();
+    isSession,
+    targetPane,
+    targetInfo,
+    targetConnected,
+    targetFocused,
+    paneLabel,
+  } = useChatPaneContext();
   const abortStream = useChatStore((s) => s.abortStream);
   const sendingHere = useChatStore((s) => s.sendingTab !== null && s.sendingTab === activeId);
-  const isSession = !!activeTab && isSessionTab(activeTab);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -89,36 +87,6 @@ export default function PanelChat() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages.length, lastLen, lastToolSig]);
 
-  /** pane → shell/cwd 分量（prompt 行用）；无 paneId 的旧消息返回 null（归「本窗口」） */
-  const paneInfo = (paneId?: string): { shell: string; cwd?: string } | null => {
-    if (!paneId || !activeTab || !isSessionTab(activeTab)) return null;
-    const spec = layoutLeaves(activeTab.layout).find((t) => t.id === paneId);
-    if (!spec) return null;
-    const shell = spec.kind === 'ssh'
-      ? spec.ssh?.name || spec.ssh?.host || 'SSH'
-      : spec.shellType ? shellTypeLabel(spec.shellType) : '本地';
-    return { shell, cwd: cwds[paneId] ?? spec.cwd };
-  };
-
-  /** pane → 分段标签（shell · cwd），无 paneId 的旧消息归入「本窗口」 */
-  const paneLabel = (paneId?: string): string => {
-    const info = paneInfo(paneId);
-    if (!info) return '本窗口';
-    const dir = info.cwd
-      ? info.cwd.startsWith('/') && info.cwd.length > 20
-        ? '…' + info.cwd.slice(-19)
-        : info.cwd.slice(1)
-      : '';
-    return dir ? `${info.shell} · ${dir}` : info.shell;
-  };
-
-  // 发送目标 = 当前聚焦 pane（回退到布局第一个 pane）
-  const targetPane = isSession && activeTab && isSessionTab(activeTab)
-    ? (focusedPaneId && layoutLeaves(activeTab.layout).some((t) => t.id === focusedPaneId)
-        ? focusedPaneId
-        : firstLeaf(activeTab.layout).id)
-    : undefined;
-
   // ── ↑/↓ 翻历史提问（fish 式：以开始翻前的草稿为前缀过滤，最新在前） ──
   const historyQuestions = useMemo(
     () =>
@@ -148,9 +116,6 @@ export default function PanelChat() {
   });
 
   // 目标 pane 的显示分量（prompt 行镜像终端输入栏：shell 胶囊 · cwd）
-  const targetInfo = paneInfo(targetPane);
-  const targetConnected = targetPane ? !!sessions[targetPane] : false;
-  const targetFocused = !!targetPane && targetPane === focusedPaneId;
   return (
     <div ref={panelRef} style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       {/* 顶栏：会话级 AI 配置（模型 · 联网 · 深思 · Agent），低频、影响后续所有消息，从输入卡抽离避免拥挤 */}
