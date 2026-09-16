@@ -12,22 +12,18 @@
  *   └──────────────────────────────────────────────┘
  */
 
-import { useRef, useState, useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import {
   ArrowUp, Columns2, GitBranch, Paperclip,
   ShieldAlert, ShieldCheck, ShieldOff, Square, X, Zap,
 } from 'lucide-react';
 import { ptyWrite } from '@/platform/pty';
-import { useTerminalStore } from '@entities/terminal';
 import { useChatStore } from '@entities/chat';
 import ContextRing from '@/components/ContextRing';
 import { useUiStore } from '@shared/ui';
-import { useSessionStore, isSessionTab } from '@entities/session';
-import { leaves as layoutLeaves } from '@features/workspace/model/windowLayout';
-import { shellTypeLabel } from '@/platform/shells';
-import { useBlockStore, useInputStore, selectPaneInput } from '@entities/terminal';
-import { isInputBoxVisible, getLongRunningHint } from '@features/terminal/inputVisibility';
-import { agentControl } from '@features/agent/services/agentControl';
+import { useSessionStore } from '@entities/session';
+import { useInputStore, selectPaneInput } from '@entities/terminal';
+import { getLongRunningHint } from '@features/terminal/inputVisibility';
 import { useAgentSettings, usePermissions, useAttachmentComposer } from '@entities/agent';
 import { completeCommand, localCompleteCandidates } from '@features/agent/services/complete';
 import { useDockStore } from '@shared/ui';
@@ -35,6 +31,7 @@ import { engageFollow } from '@features/terminal/hooks/useFollowBottom';
 import AttachmentChips from '@features/chat/components/AttachmentChips';
 import ShellIndicator from '@features/terminal/components/ShellIndicator';
 import { useCommandHistoryNavigation } from '@features/terminal/hooks/useCommandHistoryNavigation';
+import { useTerminalInputContext } from '@features/terminal/hooks/useTerminalInputContext';
 
 /** 权限模式循环（与 PanelChat 顶栏同款三色 Shield）：标准=逐工具 / 严格=逐次问 / 放行=直放 */
 const PERM_MODES = [
@@ -70,9 +67,17 @@ export default function InputEditor({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const chatSend = useChatStore((s) => s.send);
 
-  const sessions = useTerminalStore((s) => s.sessions);
-  const focusedPaneId = useTerminalStore((s) => s.focusedPaneId);
-  const isFocused = focused ?? paneId === focusedPaneId;
+  const {
+    sessions,
+    isFocused,
+    hasSession,
+    pendingInput,
+    setPendingInput,
+    tabCwd,
+    terminalLabel,
+    recentGitBranch,
+    visible,
+  } = useTerminalInputContext({ paneId, focused, isLongRunning });
 
   // 每 pane 独立输入态（text + AI 模式）
   const input = useInputStore(selectPaneInput(paneId));
@@ -109,60 +114,6 @@ export default function InputEditor({
   } = useAttachmentComposer();
 
   const canSendAi = (!!text.trim() || atts.length > 0) && !sendingTab;
-
-  // 场景 / 连接态按聚焦 pane 读取（分屏时每 pane 各自的状态机）
-  const scene = useTerminalStore((s) => s.scenes[paneId] ?? 'classic');
-  const altScreenActive = scene === 'altScreen';
-  const hasSession = !!sessions[paneId];
-  const pendingInput = useTerminalStore((s) => s.pendingInput);
-  const setPendingInput = useTerminalStore((s) => s.setPendingInput);
-
-  const tabCwd = useSessionStore((s) => {
-    const at = s.tabs.find((x) => x.id === s.activeId);
-    if (at && isSessionTab(at)) {
-      const spec = layoutLeaves(at.layout).find((t) => t.id === paneId);
-      return s.terminalCwds[paneId] ?? spec?.cwd;
-    }
-    return undefined;
-  });
-
-  const terminalLabel = useSessionStore((s) => {
-    const at = s.tabs.find((x) => x.id === s.activeId);
-    if (at && isSessionTab(at)) {
-      const spec = layoutLeaves(at.layout).find((t) => t.id === paneId);
-      if (spec?.kind === 'ssh') return spec.ssh?.name || spec.ssh?.host || 'SSH';
-      return spec?.shellType ? shellTypeLabel(spec.shellType) : '本地';
-    }
-    return undefined;
-  });
-
-  // 从最近完成的 block 中读取 git 分支信息（聚焦 pane 的块）
-  const recentGitBranch = useBlockStore((s) => {
-    const blocks = s.byTab[paneId] ?? [];
-    for (let i = blocks.length - 1; i >= 0; i--) {
-      if (blocks[i]?.gitBranch) return blocks[i]!.gitBranch!;
-    }
-    return null;
-  });
-
-  // ── 输入框可见性状态机（§7） ──
-
-  // agent 正在本 pane 执行命令时输入栏保持可见（接通 isAgentInControl 预留位）
-  const isAgentInControl = useSyncExternalStore(agentControl.subscribe, () =>
-    agentControl.isControlled(paneId),
-  );
-
-  const visible = useMemo(
-    () =>
-      isInputBoxVisible({
-        isReadOnly: false,
-        isAltScreenActive: altScreenActive,
-        isLongRunning: isLongRunning ?? false,
-        isAgentInControl,
-        isAgentTaggedIn: false,
-      }),
-    [altScreenActive, isLongRunning, isAgentInControl],
-  );
 
   // ── 消费 pendingInput ──
 
