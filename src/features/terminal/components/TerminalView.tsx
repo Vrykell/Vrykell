@@ -19,6 +19,7 @@ import { killForeground, ESCALATE_WINDOW_MS } from '@shared/utils/killForeground
 import { useToastStore } from '@/components/Toast';
 import { useFollowBottom, registerFollowEngager, engageFollow } from '@features/terminal/hooks/useFollowBottom';
 import { useTerminalFocus } from '@features/terminal/hooks/useTerminalFocus';
+import { useTerminalPaneDrag } from '@features/terminal/hooks/useTerminalPaneDrag';
 import {
   leaves as layoutLeaves, firstLeaf, moveTargets, dividers, collectLayoutCells, MIN_PANE_SIZE, DIVIDER_SIZE,
   type WindowLayout, type TerminalSpec, type DropTarget, type Rect,
@@ -331,29 +332,7 @@ function TerminalPane(props: {
   const showXterm = scene === 'classic' || (scene === 'altScreen' && !altScreenActive);
   const showBlocks = scene === 'blockList';
 
-  // 整个终端表面都可拖（无需把手）：按住超过 5px 阈值即进入拖动调整位置；
-  // 排除输入框/按钮/链接/活终端/可选中文本等交互元素，避免与打字、点击、选中冲突。
-  const onPaneMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    const target = e.target as HTMLElement;
-    if (target.closest('input, textarea, button, a, [contenteditable="true"], .xterm, [data-no-drag], [data-selectable]')) return;
-    e.preventDefault();
-    const startX = e.clientX;
-    const startY = e.clientY;
-    let started = false;
-    const onMove = (ev: MouseEvent) => {
-      if (started) return;
-      if (Math.abs(ev.clientX - startX) < 5 && Math.abs(ev.clientY - startY) < 5) return;
-      started = true;
-      useDockDragStore.getState().start(terminal.id);
-    };
-    const onUp = () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  };
+  const onPaneMouseDown = useTerminalPaneDrag(terminal.id);
 
   return (
     <div
