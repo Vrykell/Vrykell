@@ -1,5 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { BackendBlockEntry, BackendSessionEntry } from '@features/search/types';
+import type { BackendBlockEntry, BackendChatMessage, BackendSessionEntry } from '@shared/api/types';
+
+export type { BackendChatMessage };
 
 export function createSession(
   id: string,
@@ -68,17 +70,6 @@ export function setBlockCollapsed(id: string, collapsed: boolean): Promise<void>
 }
 
 // ── AI 对话持久化 ──
-
-export interface BackendChatMessage {
-  id: string;
-  role: string;
-  content: string;
-  created_at: number;
-  /** 消息 parts 渲染层 JSON（'' = 无/旧数据，见 agent/messageParts.ts） */
-  parts: string;
-  /** 附件元数据 JSON（M5，'' = 无/旧数据，见 agent/attachments.ts） */
-  attachments: string;
-}
 
 export function appendChatMessage(
   id: string, sessionId: string, role: string, content: string, createdAt: number, parts: string,

@@ -1,7 +1,7 @@
 import { SquareTerminal } from 'lucide-react';
 import { registerSource } from '@features/search/services/registry';
 import type { SearchResult, BlockResultData, BackendBlockEntry } from '@features/search/types';
-import { searchBlocks } from '@/api/search';
+import { searchBlocks } from '@shared/api/search';
 import { fmtDuration } from '@/components/UiBtn';
 
 /** 去除 ANSI 转义序列，提取纯文本 */
