@@ -16,9 +16,9 @@ import { generateText } from 'ai';
 import { createChatModel } from './provider';
 import { useAgentSettings } from './agentSettings';
 import { activeModelProfile, isApiKeyConfigured } from '../lib/ai';
-import { useBlockStore } from '../store/blocks';
-import { useChatStore } from '../store/chat';
-import { useWorkspaceStore, isSessionTab } from '../store/workspace';
+import { useBlockStore } from '@entities/terminal';
+import { useChatStore } from '@entities/chat';
+import { useSessionStore, isSessionTab } from '@entities/session';
 
 export const TITLE_COOLDOWN_MS = 60_000;
 export const TITLE_IDLE_MS = 5_000;
@@ -82,7 +82,7 @@ export function heuristicTitle(tabId: string): string {
 export async function maybeAutoTitle(tabId: string, now = Date.now(), force = false): Promise<boolean> {
   const settings = useAgentSettings.getState().resolve();
   if (!settings.autoTitle) return false;
-  const tab = useWorkspaceStore.getState().tabs.find((t) => t.id === tabId);
+  const tab = useSessionStore.getState().tabs.find((t) => t.id === tabId);
   if (!tab || !isSessionTab(tab)) return false;
   if (!force && tab.named && !tab.titleAuto) return false;
   if (now - (lastAttempt.get(tabId) ?? -Infinity) < TITLE_COOLDOWN_MS) return false;
@@ -91,8 +91,8 @@ export async function maybeAutoTitle(tabId: string, now = Date.now(), force = fa
   lastAttempt.set(tabId, now);
   const markTitled = () => titledCount.set(tabId, (useChatStore.getState().byTab[tabId] ?? []).length);
   const applyTitle = (title: string) => {
-    if (force) useWorkspaceStore.getState().renameTab(tabId, title);
-    else useWorkspaceStore.getState().autoTitle(tabId, title);
+    if (force) useSessionStore.getState().renameTab(tabId, title);
+    else useSessionStore.getState().autoTitle(tabId, title);
   };
   // 未配置 AI：启发式总结
   if (!isApiKeyConfigured()) {
@@ -167,7 +167,7 @@ export function initAutoTitle(): () => void {
     }
   });
   // 关 tab 时清掉该 tab 的冷却/计数/防抖记录，防 Map 长期累积
-  const unWorkspace = useWorkspaceStore.subscribe((s, prev) => {
+  const unWorkspace = useSessionStore.subscribe((s, prev) => {
     if (s.tabs === prev.tabs) return;
     const alive = new Set(s.tabs.map((t) => t.id));
     for (const tabId of [...lastAttempt.keys()]) {

@@ -15,7 +15,7 @@ import {
   setThemeOverrides,
   type ThemeMode,
 } from './tokens';
-import { termInstances } from '../store/terminal';
+import { termInstances } from '@entities/terminal';
 
 export interface TerminalThemeConfig {
   /** 应用整体不透明度 0.05..=1.0（1 = 完全不透明） */

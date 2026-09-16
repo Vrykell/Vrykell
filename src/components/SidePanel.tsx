@@ -1,6 +1,6 @@
 import { useCallback, type FC } from 'react';
 import { useDockStore, PANEL_DEFS, MIN_PANEL_WIDTH, type DockSide } from '../store/dock';
-import { useWorkspaceStore, isSessionTab } from '../store/workspace';
+import { selectActiveSessionTab, useSessionStore } from '@entities/session';
 import ResizeHandle from './ResizeHandle';
 import PanelTabs from './PanelTabs';
 import PanelFiles from '../files/PanelFiles';
@@ -22,10 +22,7 @@ export default function SidePanel({ side }: SidePanelProps) {
   const leftPanels = useDockStore((s) => s.leftPanels);
   const rightPanels = useDockStore((s) => s.rightPanels);
   // AI 面板与终端强相关：当前激活标签不是会话（设置/历史）时隐藏，切回会话自动恢复
-  const isSessionActive = useWorkspaceStore((s) => {
-    const tab = s.tabs.find((t) => t.id === s.activeId);
-    return !!tab && isSessionTab(tab);
-  });
+  const isSessionActive = useSessionStore((state) => selectActiveSessionTab(state) !== null);
 
   const panelIds = side === 'left' ? leftPanels : rightPanels;
   if (panelIds.length === 0) return null;

@@ -1,6 +1,6 @@
 import { isValidElement, useState, type ReactNode, type ReactElement } from 'react';
 import { Play, Copy, Check } from 'lucide-react';
-import { useTerminalStore } from '../store/terminal';
+import { useTerminalStore } from '@entities/terminal';
 
 const SHELL_LANGS = new Set(['bash', 'sh', 'zsh', 'shell']);
 

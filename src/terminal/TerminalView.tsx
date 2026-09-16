@@ -8,13 +8,13 @@
  */
 
 import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
-import { useWorkspaceStore, nextTerminalId, type Tab } from '../store/workspace';
+import { useSessionStore, nextTerminalId, type Tab } from '@entities/session';
 import { defaultOpenModeForShell } from '../agent/agentSettings';
-import { useTerminalStore } from '../store/terminal';
+import { useTerminalStore } from '@entities/terminal';
 import { useUiStore } from '../store/ui';
 import { useDockDragStore } from '../store/dockDrag';
-import { useBlockStore, selectBlocks } from '../store/blocks';
-import { usePaneMessages } from '../store/chat';
+import { useBlockStore, selectBlocks } from '@entities/terminal';
+import { usePaneMessages } from '@entities/chat';
 import { useChatPanelOpen } from '../store/dock';
 import { ptyWrite } from '../lib/pty';
 import { killForeground, ESCALATE_WINDOW_MS } from '../lib/killForeground';
@@ -35,8 +35,8 @@ import SettingsView from '../settings/SettingsView';
 import ContextMenu from '../components/ContextMenu';
 
 export default function TerminalView() {
-  const tabs = useWorkspaceStore((s) => s.tabs);
-  const activeId = useWorkspaceStore((s) => s.activeId);
+  const tabs = useSessionStore((s) => s.tabs);
+  const activeId = useSessionStore((s) => s.activeId);
   const setSession = useTerminalStore((s) => s.setSession);
   const setFocusedPane = useTerminalStore((s) => s.setFocusedPane);
   const focusedPaneId = useTerminalStore((s) => s.focusedPaneId);
@@ -89,7 +89,7 @@ export default function TerminalView() {
             { label: '分裂终端（选位置）', onClick: () => useUiStore.getState().beginSplit(null) },
             { label: '选择类型分裂', onClick: () => useUiStore.getState().openSplitPicker() },
             { label: '更换位置', onClick: () => useUiStore.getState().beginMove(focusedTermId) },
-            { label: '关闭终端', danger: true, onClick: () => useWorkspaceStore.getState().closeFocusedTerminal() },
+        { label: '关闭终端', danger: true, onClick: () => useSessionStore.getState().closeFocusedTerminal() },
           ]}
         />
       )}
@@ -111,7 +111,7 @@ function SessionTabView(props: {
   const { tab, active, setSession, setFocusedPane, onPaneContextMenu } = props;
   const windowId = tab.id;
   const layout = tab.layout;
-  const setWindowLayout = useWorkspaceStore((s) => s.setWindowLayout);
+  const setWindowLayout = useSessionStore((s) => s.setWindowLayout);
   const focusedPaneId = useTerminalStore((s) => s.focusedPaneId);
   const sessions = useTerminalStore((s) => s.sessions);
   const splitPlacement = useUiStore((s) => s.splitPlacement);

@@ -6,8 +6,8 @@
  */
 
 import { create } from 'zustand';
-import { useWorkspaceStore, isSessionTab } from '../store/workspace';
-import { useTerminalStore } from '../store/terminal';
+import { useSessionStore, isSessionTab } from '@entities/session';
+import { useTerminalStore } from '@entities/terminal';
 import { leaves } from '../lib/windowLayout';
 
 interface RemotePathState {
@@ -44,7 +44,7 @@ export function parentOfRemote(p: string): string | null {
 
 /** 当前活跃标签里与指定连接匹配的 SSH pane id（优先聚焦 pane）。 */
 export function sshPaneIdFor(connId: string): string | null {
-  const ws = useWorkspaceStore.getState();
+  const ws = useSessionStore.getState();
   const at = ws.tabs.find((x) => x.id === ws.activeId);
   if (!at || !isSessionTab(at)) return null;
   const focused = useTerminalStore.getState().focusedPaneId;

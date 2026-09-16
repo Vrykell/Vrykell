@@ -4,10 +4,10 @@
  * 所有会话/块的持久化操作都通过此模块，封装后端 invoke + 前端 store 同步。
  * 后续添加会话管理 UI 时，只需接入同一套 API。
  */
-import { useWorkspaceStore, type Tab } from '../store/workspace';
-import { useBlockStore } from '../store/blocks';
+import { useSessionStore, type Tab } from '@entities/session';
+import { useBlockStore } from '@entities/terminal';
 import { sanitizeOutputHtml } from './sanitizeHtml';
-import { useChatStore } from '../store/chat';
+import { useChatStore } from '@entities/chat';
 import { deserializeParts } from '../agent/messageParts';
 import { deserializeAttachments } from '../agent/attachments';
 import { leaf, type WindowLayout } from './windowLayout';
@@ -206,9 +206,9 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
     layout,
   };
 
-  const ws = useWorkspaceStore.getState();
+  const ws = useSessionStore.getState();
   if (!ws.tabs.some((t) => t.id === sessionId)) {
-    useWorkspaceStore.setState((s) => ({
+    useSessionStore.setState((s) => ({
       tabs: [...s.tabs, tab],
       activeId: sessionId,
     }));

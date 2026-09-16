@@ -5,7 +5,7 @@ import { useDockStore, PANEL_DEFS, type DockSide } from '../store/dock';
 import DockButton from './DockButton';
 import { ToolbarBtn } from './UiBtn';
 import { useUiStore } from '../store/ui';
-import { useWorkspaceStore, isSessionTab } from '../store/workspace';
+import { selectActiveSessionTab, useSessionStore } from '@entities/session';
 import { isMacOS } from '../lib/platform';
 
 /** 按 clientX 判定落在哪个 zone */
@@ -59,10 +59,7 @@ export default function TopDock() {
   const togglePanel = useDockStore((s) => s.togglePanel);
   // AI 面板与终端强相关：非会话标签（设置/历史）时隐藏「AI 进入按钮」。
   // 这里是条件按钮的统一钩子——以后需要选择性显隐的按钮都从这里过滤。
-  const isSessionActive = useWorkspaceStore((s) => {
-    const tab = s.tabs.find((t) => t.id === s.activeId);
-    return !!tab && isSessionTab(tab);
-  });
+  const isSessionActive = useSessionStore((state) => selectActiveSessionTab(state) !== null);
 
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const [dragCursor, setDragCursor] = useState<{ x: number; y: number } | null>(null);
@@ -215,7 +212,7 @@ export default function TopDock() {
       {/* 中间窗口拖拽区 */}
       <div data-tauri-drag-region style={{ flex: 1, height: BAR_H }} />
       {renderZone('right', rightZone, rightPanels)}
-      <ToolbarBtn title="设置（⌘,）" onClick={() => useWorkspaceStore.getState().openSettingsTab()}>
+      <ToolbarBtn title="设置（⌘,）" onClick={() => useSessionStore.getState().openSettingsTab()}>
         <Settings size={16} />
       </ToolbarBtn>
       <span style={{

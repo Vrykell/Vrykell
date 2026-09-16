@@ -13,7 +13,7 @@
  */
 
 import { useEffect } from 'react';
-import { termInstances } from '../store/terminal';
+import { termInstances } from '@entities/terminal';
 import { getExecutingTerm } from './useTerminalSession';
 
 const isEditable = (t: EventTarget | null): boolean => {

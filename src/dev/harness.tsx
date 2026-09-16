@@ -12,15 +12,15 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../theme.css';
-import { useTerminalStore } from '../store/terminal';
-import { useWorkspaceStore, isSessionTab } from '../store/workspace';
-import { useChatStore } from '../store/chat';
+import { useTerminalStore } from '@entities/terminal';
+import { useSessionStore, isSessionTab } from '@entities/session';
+import { useChatStore } from '@entities/chat';
 import { firstLeaf } from '../lib/windowLayout';
 import InputEditor from '../terminal/InputEditor';
 import PanelChat from '../chat/PanelChat';
 
 // ── 最小 store 状态：默认 session tab 已存在，补上 pane 会话/场景/聚焦 ──
-const tab = useWorkspaceStore.getState().tabs.find(isSessionTab);
+const tab = useSessionStore.getState().tabs.find(isSessionTab);
 if (!tab) throw new Error('harness: no session tab in initial workspace state');
 const paneId = firstLeaf(tab.layout).id;
 useTerminalStore.setState({

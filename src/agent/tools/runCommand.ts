@@ -17,10 +17,10 @@
 import { ptyWrite } from '../../lib/pty';
 import {
   useTerminalStore,
+  useBlockStore,
   getFocusedTerminalId,
   getRecentOutputFor,
-} from '../../store/terminal';
-import { useBlockStore } from '../../store/blocks';
+} from '@entities/terminal';
 import { agentControl } from '../agentControl';
 
 export interface RunCommandResult {

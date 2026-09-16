@@ -11,10 +11,10 @@ import {
   Bookmark, Check, ChevronDown, ChevronRight, Copy, Ellipsis,
   Maximize2, RotateCw, Skull, Sparkles, Square, Terminal, X, Zap,
 } from 'lucide-react';
-import { useBlockStore, selectBlocks } from '../store/blocks';
-import { useChatStore, usePaneMessages } from '../store/chat';
+import { useBlockStore, selectBlocks } from '@entities/terminal';
+import { useChatStore, usePaneMessages } from '@entities/chat';
 import { useChatPanelOpen } from '../store/dock';
-import { useTerminalStore } from '../store/terminal';
+import { useTerminalStore } from '@entities/terminal';
 import { useSearchHighlightStore } from '../store/searchHighlight';
 import { toExchanges, mergeFlow } from '../chat/exchanges';
 import AiBlock from '../chat/AiBlock';

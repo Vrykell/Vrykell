@@ -11,18 +11,18 @@ vi.mock('../../lib/pty', () => ({
 import { runCommandAndWait } from './runCommand';
 import { useBlockStore } from '../../store/blocks';
 import { useTerminalStore } from '../../store/terminal';
-import { useWorkspaceStore } from '../../store/workspace';
+import { useSessionStore } from '@entities/session';
 import { agentControl } from '../agentControl';
 import type { TermBlock } from '../../terminal/pipeline/termBlock';
 
 const initialBlocks = useBlockStore.getState();
 const initialTerm = useTerminalStore.getState();
-const initialWs = useWorkspaceStore.getState();
+const initialWs = useSessionStore.getState();
 
 function setupPane(): string {
   // 模拟启动后存在活跃标签（store 不再内置初始标签）
-  useWorkspaceStore.getState().addTab({});
-  const tabId = useWorkspaceStore.getState().activeId;
+  useSessionStore.getState().addTab({});
+  const tabId = useSessionStore.getState().activeId;
   const paneId = `${tabId}#0`;
   useTerminalStore.setState((s) => ({ sessions: { ...s.sessions, [paneId]: 'pty-1' } }));
   return paneId;
@@ -53,7 +53,7 @@ describe('runCommandAndWait', () => {
   beforeEach(() => {
     useBlockStore.setState(initialBlocks, true);
     useTerminalStore.setState(initialTerm, true);
-    useWorkspaceStore.setState(initialWs, true);
+    useSessionStore.setState(initialWs, true);
   });
   afterEach(() => {
     vi.useRealTimers();

@@ -10,7 +10,7 @@
 import { describeError } from './agentErrors';
 import { stepCountIs, streamText, type ModelMessage, type ToolSet } from 'ai';
 import { invoke } from '@tauri-apps/api/core';
-import type { StreamFn } from '../store/chat';
+import type { StreamFn } from '@entities/chat';
 import { createChatModel, createNativeWebSearchTool, deepThinkProviderOptions, type ProviderKind } from './provider';
 import { useAgentSettings } from './agentSettings';
 import { estimateTokens, planContext, IMAGE_TOKEN_ESTIMATE, type SizedMessage } from './context';

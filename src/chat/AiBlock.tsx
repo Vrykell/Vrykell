@@ -21,8 +21,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Brain, ChevronRight, Copy, Pencil, RotateCw, Trash2, Zap } from 'lucide-react';
 import { ask } from '@tauri-apps/plugin-dialog';
-import { useChatStore } from '../store/chat';
-import { useWorkspaceStore } from '../store/workspace';
+import { useChatStore } from '@entities/chat';
+import { useSessionStore } from '@entities/session';
 import SafeMarkdown from './SafeMarkdown';
 import ToolNode from './ToolNode';
 import ToolRunCard from './ToolRunCard';
@@ -92,7 +92,7 @@ export default function AiBlock({ exchange }: { exchange: ChatExchange }) {
   // 重新生成：删旧回答、原地起新流（不再追加一轮新交换）
   const regenerate = () => {
     if (!question) return;
-    useChatStore.getState().regenerate(useWorkspaceStore.getState().activeId, question.id);
+    useChatStore.getState().regenerate(useSessionStore.getState().activeId, question.id);
   };
   // 编辑重发：删该条及之后全部消息，问题灌回输入框
   const editResend = async () => {
@@ -101,13 +101,13 @@ export default function AiBlock({ exchange }: { exchange: ChatExchange }) {
       title: '编辑重发',
       kind: 'warning',
     });
-    if (ok) useChatStore.getState().editResend(useWorkspaceStore.getState().activeId, question.id);
+    if (ok) useChatStore.getState().editResend(useSessionStore.getState().activeId, question.id);
   };
   // 删除整个交换（问题 + 回答）
   const removeExchange = async () => {
     if (!question) return;
     const ok = await ask('删除这条问答？', { title: '删除', kind: 'warning' });
-    if (ok) useChatStore.getState().deleteExchange(useWorkspaceStore.getState().activeId, question.id);
+    if (ok) useChatStore.getState().deleteExchange(useSessionStore.getState().activeId, question.id);
   };
 
   // 回答 parts（tool part 渲染为 rail 上的动作节点）

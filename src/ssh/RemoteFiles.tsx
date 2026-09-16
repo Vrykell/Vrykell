@@ -6,8 +6,8 @@ import type { SshFsEntry } from './api';
 import type { SshConnection } from './api';
 import { ptyWrite } from '../lib/pty';
 import { loadConfig, remoteOpenCommand } from '../files/fileOpen';
-import { useTerminalStore } from '../store/terminal';
-import { useWorkspaceStore } from '../store/workspace';
+import { useTerminalStore } from '@entities/terminal';
+import { useSessionStore } from '@entities/session';
 import { useToastStore } from '../components/Toast';
 import { IconBtn } from '../components/UiBtn';
 import ContextMenu, { type ContextMenuItem } from '../components/ContextMenu';
@@ -89,7 +89,7 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
   const currentDir = () => path ?? '';
 
   const remoteEdit = (entry: SshFsEntry) => {
-    const activeId = useWorkspaceStore.getState().activeId;
+    const activeId = useSessionStore.getState().activeId;
     const sid = useTerminalStore.getState().sessions[activeId];
     if (!sid) { toast('SSH 会话未就绪', 'info'); return; }
     const command = remoteOpenCommand(loadConfig(), entry.path);

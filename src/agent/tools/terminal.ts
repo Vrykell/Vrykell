@@ -20,8 +20,8 @@ import {
   getFocusedTerminalId,
   getTerminalScreen,
   useTerminalStore,
-} from '../../store/terminal';
-import { useBlockStore } from '../../store/blocks';
+  useBlockStore,
+} from '@entities/terminal';
 import { gate, type ToolContext } from '../permissions';
 
 const BLOCK_OUTPUT_CAP = 2000;

@@ -7,14 +7,14 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import Markdown from './Markdown';
 import { useTerminalStore } from '../store/terminal';
-import { useWorkspaceStore } from '../store/workspace';
+import { useSessionStore } from '@entities/session';
 
 describe('CommandBlock', () => {
   beforeEach(() => {
     invokeMock.mockClear();
     // 模拟启动后存在活跃标签（store 不再内置初始标签）
-    useWorkspaceStore.getState().addTab({});
-    const tabId = useWorkspaceStore.getState().activeId;
+    useSessionStore.getState().addTab({});
+    const tabId = useSessionStore.getState().activeId;
     useTerminalStore.setState({ sessions: { [`${tabId}#0`]: 's1' }, dims: {}, visible: true });
   });
 

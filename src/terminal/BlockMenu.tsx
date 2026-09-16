@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { ptyWrite } from '../lib/pty';
-import { useTerminalStore } from '../store/terminal';
-import { useChatStore } from '../store/chat';
-import { useWorkspaceStore } from '../store/workspace';
-import { useBlockStore } from '../store/blocks';
+import { useTerminalStore } from '@entities/terminal';
+import { useChatStore } from '@entities/chat';
+import { useSessionStore } from '@entities/session';
+import { useBlockStore } from '@entities/terminal';
 import { clearSessionBlocks } from './useTerminalSession';
 import { fmtDuration } from '../components/UiBtn';
 import type { TermBlock } from './pipeline/termBlock';
@@ -66,7 +66,7 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
 
   const rerun = useCallback(() => {
     const sessions = useTerminalStore.getState().sessions;
-    const activeId = useWorkspaceStore.getState().activeId;
+    const activeId = useSessionStore.getState().activeId;
     const sid = sessions[activeId];
     if (sid) ptyWrite(sid, block.command + '\n').catch(() => {});
     onClose();
@@ -89,12 +89,12 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
   const left = Math.min(anchor.left, window.innerWidth - 220);
 
   const clearAllBlocks = useCallback(() => {
-    clearSessionBlocks(useWorkspaceStore.getState().activeId);
+    clearSessionBlocks(useSessionStore.getState().activeId);
     onClose();
   }, [onClose]);
 
   const toggleBookmark = useCallback(() => {
-    useBlockStore.getState().toggleBookmark(useWorkspaceStore.getState().activeId, block.id);
+    useBlockStore.getState().toggleBookmark(useSessionStore.getState().activeId, block.id);
     onClose();
   }, [block.id, onClose]);
 

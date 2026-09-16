@@ -3,8 +3,8 @@ import { ChevronDown, Search, type LucideIcon } from 'lucide-react';
 import { useSearchEngine } from './engine';
 import { useSearchHistoryStore } from '../store/searchHistory';
 import { useSearchHighlightStore } from '../store/searchHighlight';
-import { useWorkspaceStore } from '../store/workspace';
-import { useTerminalStore } from '../store/terminal';
+import { useSessionStore } from '@entities/session';
+import { useTerminalStore } from '@entities/terminal';
 import { getCommands } from '../commands';
 import * as sessionManager from '../lib/sessionManager';
 import type { ResultType, SearchResult, BlockResultData, HistoryResultData, FileResultData, ActionResultData, SessionResultData } from './types';
@@ -107,7 +107,7 @@ export default function GlobalSearch({ open, onClose }: Props) {
           return;
         }
         // 活跃会话：跳转 + 滚动
-        useWorkspaceStore.getState().activate(d.tabId);
+        useSessionStore.getState().activate(d.tabId);
         setTimeout(() => {
           const el = document.querySelector(`[data-block-id="${d.blockId}"]`);
           el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -120,7 +120,7 @@ export default function GlobalSearch({ open, onClose }: Props) {
         break;
       }
       case 'setting': {
-        useWorkspaceStore.getState().openSettingsTab();
+        useSessionStore.getState().openSettingsTab();
         break;
       }
       case 'action': {
@@ -138,7 +138,7 @@ export default function GlobalSearch({ open, onClose }: Props) {
           });
         } else {
           // 活跃会话 → 切换标签页
-          useWorkspaceStore.getState().activate(d.sessionId);
+        useSessionStore.getState().activate(d.sessionId);
         }
         break;
       }

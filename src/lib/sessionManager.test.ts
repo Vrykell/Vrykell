@@ -7,16 +7,16 @@ const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import * as sessionManager from './sessionManager';
-import { useWorkspaceStore, isSessionTab } from '../store/workspace';
+import { useSessionStore, isSessionTab } from '@entities/session';
 import { useBlockStore } from '../store/blocks';
 import { useChatStore } from '../store/chat';
 
-const wsInitial = useWorkspaceStore.getState();
+const wsInitial = useSessionStore.getState();
 
 beforeEach(() => {
   invokeMock.mockReset();
   invokeMock.mockImplementation(() => Promise.reject(new Error('no backend')));
-  useWorkspaceStore.setState(wsInitial, true);
+  useSessionStore.setState(wsInitial, true);
   useBlockStore.setState({ byTab: {} });
   useChatStore.setState({ byTab: {} });
 });
@@ -59,7 +59,7 @@ describe('sessionManager 生命周期', () => {
       id: sessionId, title: '旧标题', kind: 'session', payload: JSON.stringify({ layout: { type: 'leaf', id: `${sessionId}#0`, kind: 'local' } }), group_id: 'g9', cwd: null, created_at: 1, updated_at: 2, archived_at: null,
     }); // get_session
     await sessionManager.restore(sessionId, '恢复的标题');
-    const s = useWorkspaceStore.getState();
+    const s = useSessionStore.getState();
     const tab = s.tabs.find((t) => t.id === sessionId)!;
     expect(tab).toBeDefined();
     expect(s.activeId).toBe(sessionId);
@@ -74,13 +74,13 @@ describe('sessionManager 生命周期', () => {
 
   it('restore：无 blocks/chat 时清空 chat；tab 已存在时 activate', async () => {
     // 模拟已有一个活跃标签（store 不再内置初始标签）
-    const sessionId = useWorkspaceStore.getState().addTab({});
+    const sessionId = useSessionStore.getState().addTab({});
     invokeMock.mockResolvedValueOnce(undefined); // restore_session
     invokeMock.mockResolvedValueOnce([]); // blocks
     invokeMock.mockResolvedValueOnce([]); // chat
     invokeMock.mockResolvedValueOnce({ id: sessionId, title: 'x', kind: 'session', payload: 'garbage{{{', group_id: null, cwd: null, created_at: 1, updated_at: 2, archived_at: null }); // get_session
     await sessionManager.restore(sessionId, 'T');
-    expect(useWorkspaceStore.getState().activeId).toBe(sessionId);
+    expect(useSessionStore.getState().activeId).toBe(sessionId);
     expect(useChatStore.getState().byTab[sessionId]).toBeUndefined();
   });
 
@@ -91,7 +91,7 @@ describe('sessionManager 生命周期', () => {
     invokeMock.mockResolvedValueOnce([]);
     invokeMock.mockResolvedValueOnce({ id: sid1, title: 'ssh', kind: 'session', payload: JSON.stringify({ ssh: { name: 'prod', host: 'h', user: 'root', port: 22, connectionId: 'c' } }), group_id: null, cwd: null, created_at: 1, updated_at: 2, archived_at: null });
     await sessionManager.restore(sid1, 'ssh');
-    let tab = useWorkspaceStore.getState().tabs.find((t) => t.id === sid1)!;
+    let tab = useSessionStore.getState().tabs.find((t) => t.id === sid1)!;
     let term = (tab as { layout: { terminal: { kind: string; ssh?: { host: string; user?: string; port?: number } } } }).layout.terminal as { kind: string; ssh?: { host: string }; shellType?: string };
     expect(term.kind).toBe('ssh');
     expect(term.ssh?.host).toBe('h');
@@ -102,7 +102,7 @@ describe('sessionManager 生命周期', () => {
     invokeMock.mockResolvedValueOnce([]);
     invokeMock.mockResolvedValueOnce({ id: sid2, title: 'l', kind: 'session', payload: JSON.stringify({ shellType: 'zsh' }), group_id: null, cwd: null, created_at: 1, updated_at: 2, archived_at: null });
     await sessionManager.restore(sid2, 'l');
-    tab = useWorkspaceStore.getState().tabs.find((t) => t.id === sid2)!;
+    tab = useSessionStore.getState().tabs.find((t) => t.id === sid2)!;
     term = (tab as { layout: { terminal: { kind: string; shellType?: string } } }).layout.terminal as { kind: string; ssh?: { host: string }; shellType?: string };
     expect(term.kind).toBe('local');
     expect(term.shellType).toBe('zsh');
