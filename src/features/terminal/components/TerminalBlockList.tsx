@@ -15,7 +15,7 @@ import { useBlockStore, selectBlocks } from '@entities/terminal';
 import { useChatStore, usePaneMessages } from '@entities/chat';
 import { useChatPanelOpen } from '@shared/ui';
 import { useTerminalStore } from '@entities/terminal';
-import { useSearchHighlightStore } from '@features/search/stores/searchHighlight';
+import { useSearchHighlightStore } from '@entities/search';
 import { toExchanges, mergeFlow } from '@features/chat/model/exchanges';
 import AiBlock from '@features/chat/components/AiBlock';
 import { agentControl } from '@features/agent/services/agentControl';

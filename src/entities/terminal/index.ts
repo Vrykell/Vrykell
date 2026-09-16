@@ -26,3 +26,5 @@ export {
   selectPaneInput,
   type PaneInput,
 } from '@features/terminal/stores/input';
+
+export { useHistoryStore } from '@features/terminal/stores/history';

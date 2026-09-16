@@ -15,6 +15,15 @@ const forbiddenImports = [
   '/store/dock',
   '/store/dockDrag',
 ];
+const viewForbiddenImports = [
+  '@features/agent/stores/',
+  '@features/chat/stores/',
+  '@features/files/stores/',
+  '@features/search/stores/',
+  '@features/ssh/stores/',
+  '@features/terminal/stores/',
+  '@features/workspace/stores/',
+];
 
 function collectFiles(directory) {
   const files = [];
@@ -34,6 +43,8 @@ function collectFiles(directory) {
 const violations = [];
 for (const file of collectFiles(root)) {
   const source = fs.readFileSync(file, 'utf8');
+  const relativeFile = path.relative(root, file).replaceAll(path.sep, '/');
+  const isView = /(^|\/)(components|pages)\//.test(relativeFile);
   const lines = source.split(/\r?\n/);
   lines.forEach((line, index) => {
     if (!line.includes('from ')) return;
@@ -41,6 +52,9 @@ for (const file of collectFiles(root)) {
       if (line.includes(forbiddenImport)) {
         violations.push(`${path.relative(process.cwd(), file)}:${index + 1} ${line.trim()}`);
       }
+    }
+    if (isView && viewForbiddenImports.some((forbiddenImport) => line.includes(forbiddenImport))) {
+      violations.push(`${path.relative(process.cwd(), file)}:${index + 1} 视图层不得直接依赖领域 Store：${line.trim()}`);
     }
   });
 }

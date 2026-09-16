@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Plug, Trash2 } from 'lucide-react';
 import { newSshId, validateSshConnection, sshTest, sshTrustHostKey, type SshConnection, type SshAuthMethod } from '@features/ssh/services/api';
-import { useSshStore } from '@features/ssh/stores/store';
+import { useSshStore } from '@entities/ssh';
 import { useToastStore } from '@/components/Toast';
 import ConfirmDialog from '@/components/ConfirmDialog';
 

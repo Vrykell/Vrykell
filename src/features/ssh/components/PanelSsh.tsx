@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pencil, Plus, Search, Server } from 'lucide-react';
 import { ask } from '@tauri-apps/plugin-dialog';
-import { ensureSshLoaded, useSshStore } from '@features/ssh/stores/store';
+import { ensureSshLoaded, useSshStore } from '@entities/ssh';
 import { useSessionStore } from '@entities/session';
 import { useDockStore } from '@shared/ui';
 import ContextMenu from '@/components/ContextMenu';

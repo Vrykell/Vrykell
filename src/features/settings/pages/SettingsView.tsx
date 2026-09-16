@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Search, ChevronRight, Settings, Cpu, FileCode, Palette, Keyboard, SquareTerminal } from 'lucide-react';
 import { loadConfig, saveConfig, type FileOpenConfig } from '@features/files/services/fileOpen';
-import { refreshAiConfig, setTavilyKey, clearTavilyKey, useAiConfigStore } from '@features/agent/stores/aiConfig';
+import { refreshAiConfig, setTavilyKey, clearTavilyKey, useAiConfigStore } from '@entities/agent';
 import SkillsSettings from '@features/settings/pages/SkillsSettings';
 import { MemorySettings, AgentsSettings, SchedulesSettings } from '@features/settings/pages/AgentExtrasSettings';
 import Segmented from '@/components/Segmented';
@@ -9,7 +9,7 @@ import { useToastStore } from '@/components/Toast';
 import {
   usePermissions, clearSessionGrants, TOOL_NAMES,
   type ToolLevel, type ToolName,
-} from '@features/agent/stores/permissions';
+} from '@entities/agent';
 import { Field, TemplateListEditor, inputStyle, btnStyle } from '@features/settings/components/ui';
 import { AiModelPage } from '@features/settings/pages/aiModelPage';
 import { AiBehaviorPage } from '@features/settings/pages/aiBehaviorPage';

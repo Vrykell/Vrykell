@@ -15,7 +15,7 @@ import { useToastStore } from '@/components/Toast';
 import { IconBtn, fmtSize } from '@/components/UiBtn';
 import { flattenVisible, type VisibleRow } from '@features/files/utils/fileTree';
 import ContextMenu, { type ContextMenuItem } from '@/components/ContextMenu';
-import { ensureSshLoaded, useSshStore } from '@features/ssh/stores/store';
+import { ensureSshLoaded, useSshStore } from '@entities/ssh';
 import RemoteFiles from '@features/ssh/components/RemoteFiles';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import DownloadManager from '@/downloads/DownloadManager';
