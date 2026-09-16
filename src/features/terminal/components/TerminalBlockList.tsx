@@ -12,7 +12,6 @@ import {
   Maximize2, RotateCw, Skull, Sparkles, Square, Terminal, X, Zap,
 } from 'lucide-react';
 import { useBlockStore } from '@entities/terminal';
-import { useChatStore } from '@entities/chat';
 import { useTerminalStore } from '@entities/terminal';
 import AiBlock from '@features/chat/components/AiBlock';
 import { ptyWrite } from '@/platform/pty';
@@ -25,6 +24,7 @@ import BlockMenu from '@features/terminal/components/BlockMenu';
 import BlockOutput from '@features/terminal/components/BlockOutput';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 import { useTerminalBlockFlow } from '@features/terminal/hooks/useTerminalBlockFlow';
+import { useBlockItemActions } from '@features/terminal/hooks/useBlockItemActions';
 import { hasVisibleContent as hasVisibleBlockContent } from '@features/terminal/model/blockVisibility';
 
 interface Props {
@@ -226,36 +226,20 @@ function BlockItem({
   onMenu: (b: TermBlock, rect: DOMRect) => void;
 }) {
   const [hovered, setHovered] = useState(false);
-  const isCollapsed = !!block.collapsed;
-  const send = useChatStore((s) => s.send);
+  const {
+    isCollapsed,
+    rerun,
+    askAI,
+    copyCmd,
+    copyOut,
+    toggleCollapsed,
+    toggleBookmark,
+  } = useBlockItemActions({ tabId, block });
   const failed = block.exitCode !== null && block.exitCode !== 0;
   const duration =
     block.endedAt && block.startedAt ? fmtDuration(block.endedAt - block.startedAt) : '';
 
   const coloredCommand = useMemo(() => highlightCommand(block.command), [block.command]);
-
-  // copyOut 优先用 outputText，回退到剥离 CSI 的 outputRaw
-  const copyOutput =
-    block.outputText || block.outputRaw.replace(ANSI_CSI_RE, '');
-
-  const rerun = useCallback(() => {
-    const sid = useTerminalStore.getState().sessions[tabId];
-    if (sid) ptyWrite(sid, block.command + '\n').catch(() => {});
-  }, [block.command, tabId]);
-
-  const askAI = useCallback(() => {
-    const plain = copyOutput.slice(0, 2000);
-    // tabId prop 即 paneId：问答内联进本 pane 的块流
-    send(`解释:\n\`\`\`\n${block.command}\n${plain}\n\`\`\``, { paneId: tabId });
-  }, [block, copyOutput, send, tabId]);
-
-  const copyCmd = useCallback(
-    () => navigator.clipboard.writeText(block.command).catch(() => {}),
-    [block.command],
-  );
-  const copyOut = useCallback(() => {
-    navigator.clipboard.writeText(copyOutput).catch(() => {});
-  }, [copyOutput]);
 
   return (
     <div
@@ -281,7 +265,7 @@ function BlockItem({
         padding: '6px 10px', userSelect: 'none', minHeight: 30,
       }}>
         <button
-          onClick={() => useBlockStore.getState().setBlockCollapsed(tabId, block.id, !isCollapsed)}
+          onClick={toggleCollapsed}
           title={isCollapsed ? '展开' : '折叠'}
           style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)',
             cursor: 'pointer', padding: 0, width: 14, flexShrink: 0, display: 'inline-flex' }}>
@@ -301,7 +285,7 @@ function BlockItem({
             <BlockToolBtn title="复制命令" onClick={copyCmd} label={<Terminal size={12} />} />
             <BlockToolBtn title="复制输出" onClick={copyOut} label={<Copy size={12} />} />
             <BlockToolBtn title={block.bookmarked ? '取消书签' : '添加书签'}
-              onClick={() => useBlockStore.getState().toggleBookmark(tabId, block.id)}
+              onClick={toggleBookmark}
               label={<Bookmark size={12} fill={block.bookmarked ? 'currentColor' : 'none'} />} />
             <BlockToolBtn title="更多操作"
               onClick={(e) => onMenu(block, (e.target as HTMLElement).getBoundingClientRect())}
