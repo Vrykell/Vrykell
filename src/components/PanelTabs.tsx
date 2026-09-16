@@ -4,10 +4,10 @@ import {
   ChevronRight, Pencil, Archive, Folder, Trash2,
 } from 'lucide-react';
 import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, type Tab, type TabGroup } from '@entities/session';
-import { regenerateTitle } from '../agent/title';
+import { regenerateTitle } from '@features/agent/title';
 import { useToastStore } from './Toast';
 import { IconBtn } from './UiBtn';
-import { shellTypeLabel } from '../lib/shells';
+import { shellTypeLabel } from '@/lib/shells';
 import NewTabModal from './NewTabModal';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 

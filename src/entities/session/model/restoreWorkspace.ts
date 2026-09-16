@@ -1,5 +1,5 @@
 import { listSessions } from '@/api/session';
-import type { BackendSessionEntry } from '@/search/types';
+import type { BackendSessionEntry } from '@features/search/types';
 import * as sessionManager from '@/lib/sessionManager';
 import { isSessionTab, serializeSession, useWorkspaceStore } from '@/store/workspace';
 

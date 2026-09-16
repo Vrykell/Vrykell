@@ -6,7 +6,7 @@ import DockButton from './DockButton';
 import { ToolbarBtn } from './UiBtn';
 import { useUiStore } from '@shared/ui';
 import { selectActiveSessionTab, useSessionStore } from '@entities/session';
-import { isMacOS } from '../lib/platform';
+import { isMacOS } from '@/lib/platform';
 
 /** 按 clientX 判定落在哪个 zone */
 function hitZone(

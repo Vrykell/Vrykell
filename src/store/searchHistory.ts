@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '../lib/errorHandler';
+import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@/lib/errorHandler';
 
 const STORAGE_KEY = 'vrykell-search-history';
 const MAX_ITEMS = 20;

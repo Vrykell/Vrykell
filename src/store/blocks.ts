@@ -1,8 +1,8 @@
 import { create } from 'zustand';
-import type { TermBlock } from '../terminal/pipeline/termBlock';
-import { useToastStore } from '../components/Toast';
+import type { TermBlock } from '@features/terminal/pipeline/termBlock';
+import { useToastStore } from '@/components/Toast';
 import { t } from '../i18n';
-import * as sessionManager from '../lib/sessionManager';
+import * as sessionManager from '@/lib/sessionManager';
 
 const EMPTY: TermBlock[] = [];
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { filterSessions, isSshSession, sshTargetOf } from '../sessionFilter';
-import type { BackendSessionEntry } from '../../search/types';
+import type { BackendSessionEntry } from '@features/search/types';
 
 function mk(over: Partial<BackendSessionEntry>): BackendSessionEntry {
   return {

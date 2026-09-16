@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { Search, Server, Terminal } from 'lucide-react';
-import { getAvailableShells, type ShellOption } from '../lib/shells';
+import { getAvailableShells, type ShellOption } from '@/lib/shells';
 import {
   buildNewTabOptions,
   filterNewTabOptions,
   touchRecentOpen,
   type NewTabOption,
-} from '../lib/tabTypes';
-import { useSshStore, ensureSshLoaded } from '../ssh/store';
+} from '@/lib/tabTypes';
+import { useSshStore, ensureSshLoaded } from '@features/ssh/store';
 import { useSessionStore } from '@entities/session';
-import type { TerminalSpec } from '../lib/windowLayout';
+import type { TerminalSpec } from '@/lib/windowLayout';
 
 interface Props {
   open: boolean;

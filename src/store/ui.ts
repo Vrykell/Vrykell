@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { TerminalSpec } from '../lib/windowLayout';
+import type { TerminalSpec } from '@/lib/windowLayout';
 
 /** 分裂落点选择器：open=true 时显示可分裂区域，spec 为空 = 继承聚焦终端类型。 */
 interface SplitPlacement {

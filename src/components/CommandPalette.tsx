@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { getCommands } from '../commands';
+import { getCommands } from '@/commands';
 
 interface Props {
   open: boolean;

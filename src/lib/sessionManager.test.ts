@@ -8,8 +8,8 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import * as sessionManager from './sessionManager';
 import { useSessionStore, isSessionTab } from '@entities/session';
-import { useBlockStore } from '../store/blocks';
-import { useChatStore } from '../store/chat';
+import { useBlockStore } from '@/store/blocks';
+import { useChatStore } from '@/store/chat';
 
 const wsInitial = useSessionStore.getState();
 

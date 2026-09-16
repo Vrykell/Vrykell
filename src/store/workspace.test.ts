@@ -6,7 +6,7 @@ import {
   terminalsOf, serializeSession, nextTerminalId,
 } from './workspace';
 import { useTerminalStore } from './terminal';
-import { leaf } from '../lib/windowLayout';
+import { leaf } from '@/lib/windowLayout';
 
 const initial = useWorkspaceStore.getState();
 

@@ -7,7 +7,7 @@ import {
   touchRecentOpen,
 } from './tabTypes';
 import type { ShellOption } from './shells';
-import type { SshConnection } from '../ssh/api';
+import type { SshConnection } from '@features/ssh/api';
 
 const shells: ShellOption[] = [
   { id: 'zsh', label: 'Zsh', default: true },

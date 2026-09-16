@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { listSessions } from '@/api/session';
 import { groupDeleteWithSessions, groupRestore, groupsList } from '@/api/group';
-import type { BackendGroupEntry, BackendSessionEntry } from '@/search/types';
+import type { BackendGroupEntry, BackendSessionEntry } from '@features/search/types';
 import { useSessionStore } from '@entities/session';
 import * as sessionManager from '@/lib/sessionManager';
 import {
