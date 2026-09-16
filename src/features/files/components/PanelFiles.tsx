@@ -1,30 +1,18 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { Star, Folder, ChevronRight, Download, LocateFixed, ArrowUp, HardDrive } from 'lucide-react';
-import { openPath } from '@tauri-apps/plugin-opener';
-import { fsRename, fsDelete, fileOpenWith, type FsEntry, type DiskEntry } from '@features/files/services/fs';
-import { ptyWrite } from '@/platform/pty';
-import { openFile } from '@features/files/services/fileOpen';
+import { type FsEntry, type DiskEntry } from '@features/files/services/fs';
 import { fileIcon } from '@features/files/utils/fileIcon';
 import { normPath, pathSegments, segmentsToPath, parentOf, compactPathSegments } from '@features/files/utils/pathUtils';
-import { shellQuote } from '@features/ssh/utils/remotePath';
-import { useWorkspaceDirsStore } from '@features/files/services/workspaceDirs';
-import { useSessionStore } from '@entities/session';
-import { useTerminalStore } from '@entities/terminal';
 import { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
-import { useToastStore } from '@/components/Toast';
 import { IconBtn, fmtSize } from '@/components/UiBtn';
 import { flattenVisible, type VisibleRow } from '@features/files/utils/fileTree';
-import ContextMenu, { type ContextMenuItem } from '@/components/ContextMenu';
+import ContextMenu from '@/components/ContextMenu';
 import { ensureSshLoaded, useSshStore } from '@entities/ssh';
 import RemoteFiles from '@features/ssh/components/RemoteFiles';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import DownloadManager from '@/downloads/DownloadManager';
 import { useLocalFileBrowser } from '@features/files/hooks/useLocalFileBrowser';
-
-/** 待二次确认的操作：重命名（携带新名）或删除。 */
-type ConfirmState =
-  | { kind: 'rename'; entry: FsEntry; newName: string }
-  | { kind: 'delete'; entry: FsEntry };
+import { useLocalFileActions } from '@features/files/hooks/useLocalFileActions';
 
 /**
  * PanelFiles — 文件面板入口。
@@ -53,16 +41,10 @@ export default function PanelFiles() {
  * 随后的 dblclick 再进入目录。
  */
 function LocalFiles() {
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; entry: FsEntry } | null>(null);
-  const [renameTarget, setRenameTarget] = useState<FsEntry | null>(null);
-  const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [showDownloads, setShowDownloads] = useState(false);
-  const workspaceDirs = useWorkspaceDirsStore();
-  const addTab = useSessionStore((s) => s.addTab);
 
   // ── 跟随聚焦终端的 cwd：切窗口 / 切换聚焦终端 / 终端 cd 都会实时定位 ──
-  const sessions = useTerminalStore((s) => s.sessions);
-  const { focusedPaneId: focused, activeCwd } = useActiveWorkspace();
+  const { focusedPaneId: focused, activeCwd, sessions } = useActiveWorkspace();
   const {
     path,
     setPath,
@@ -73,6 +55,22 @@ function LocalFiles() {
     load,
     toggleExpand,
   } = useLocalFileBrowser({ activeCwd, focusedPaneId: focused });
+  const {
+    ctxMenu,
+    renameTarget,
+    confirm,
+    closeContextMenu,
+    cancelConfirm,
+    isWorkspace,
+    openFileInTerminal,
+    handleContextMenu,
+    buildMenuItems,
+    requestRename,
+    cancelRename,
+    confirmAction,
+    goUp,
+    syncToTerminal,
+  } = useLocalFileActions({ path, setPath, load, focusedPaneId: focused, sessions });
 
   // 顶栏面包屑压缩：不换行，侧栏窄时省略高层级目录（必须在视图切换的提前返回之前）
   const crumbs = pathSegments(path ?? '');
@@ -102,139 +100,7 @@ function LocalFiles() {
     setPath(normPath(entry.path));
   };
 
-  // ── 文件打开：默认新建标签页，在其中的终端编辑器打开（标签页意义已泛化） ──
-
-  const openFileInTerminal = async (entry: FsEntry) => {
-    const addToast = useToastStore.getState().addToast;
-    // 先解析编辑器命令（Rust file_open），暂不写任何终端
-    let command = '';
-    try {
-      const res = await openFile(entry.path, (cmd) => { command = cmd; });
-      if (res.via === 'system') {
-        // 系统默认应用打开（openFile 内部已 openPath）
-        if (res.degraded) addToast('未找到可用的终端编辑器，已用系统默认应用打开', 'info');
-        return;
-      }
-      if (res.fellBack) {
-        addToast(`未找到配置的编辑器，已降级为 ${res.editor}`, 'info');
-      }
-    } catch (e) {
-      addToast(String((e as Error)?.message ?? e), 'error');
-      return;
-    }
-    if (!command) return;
-
-    // 新建标签页，等 shell 就绪后写入编辑器命令
-    const parentDir = parentOf(normPath(entry.path)) ?? undefined;
-    const tabId = useSessionStore.getState().addTab({ cwd: parentDir, title: entry.name });
-    const sid = await waitForSession(tabId);
-    if (sid) {
-      ptyWrite(sid, command.endsWith('\n') ? command : command + '\n').catch(() => {});
-    } else {
-      addToast('终端启动超时，请重试', 'error');
-    }
-  };
-
   const rows = flattenVisible(entries, expandedSet, childCache);
-
-  // ── 右键菜单 ──
-
-  const isWorkspace = (entryPath: string) => workspaceDirs.contains(entryPath);
-
-  const handleContextMenu = (e: React.MouseEvent, entry: FsEntry) => {
-    e.preventDefault();
-    setCtxMenu({ x: e.clientX, y: e.clientY, entry });
-  };
-
-  const buildMenuItems = (entry: FsEntry): ContextMenuItem[] => {
-    const items: ContextMenuItem[] = [];
-    const inWorkspace = isWorkspace(entry.path);
-
-    if (entry.is_dir) {
-      if (inWorkspace) {
-        items.push({
-          label: '从工作区移除',
-          onClick: () => {
-            const ws = workspaceDirs.dirs.find((d) => d.path === entry.path);
-            if (ws) workspaceDirs.remove(ws.id);
-          },
-        });
-      } else {
-        items.push({
-          label: '添加到工作区',
-          onClick: () => workspaceDirs.add(entry.path, entry.name),
-        });
-      }
-      items.push({
-        label: '在新标签页中打开',
-        onClick: () => addTab({ cwd: entry.path, title: entry.name }),
-      });
-    } else {
-      items.push({
-        label: '使用终端编辑器打开',
-        onClick: () => openFileInTerminal(entry),
-      });
-      items.push({
-        label: '使用系统默认应用打开',
-        onClick: () => openPath(entry.path).catch(() => {}),
-      });
-      items.push({
-        label: '打开方式…',
-        onClick: () =>
-          fileOpenWith(entry.path).catch((e) =>
-            useToastStore.getState().addToast(String((e as Error)?.message ?? e), 'error'),
-          ),
-      });
-    }
-
-    items.push({ label: '复制路径', onClick: () => navigator.clipboard.writeText(entry.path) });
-    items.push({ label: '重命名', onClick: () => setRenameTarget(entry) });
-    items.push({
-      label: '删除',
-      danger: true,
-      onClick: () => setConfirm({ kind: 'delete', entry }),
-    });
-    return items;
-  };
-
-  const doRename = (entry: FsEntry, newName: string) => {
-    fsRename(entry.path, newName)
-      .then(() => { useToastStore.getState().addToast('已重命名', 'success'); load(path); })
-      .catch((e) => useToastStore.getState().addToast(String((e as Error)?.message ?? e), 'error'));
-  };
-
-  const doDelete = (entry: FsEntry) => {
-    fsDelete(entry.path)
-      .then(() => { useToastStore.getState().addToast('已移入回收站', 'success'); load(path); })
-      .catch((e) => useToastStore.getState().addToast(String((e as Error)?.message ?? e), 'error'));
-  };
-
-  /** 内联重命名提交：空名或未改动直接取消，否则弹二次确认。 */
-  const requestRename = (entry: FsEntry, newName: string) => {
-    setRenameTarget(null);
-    const name = newName.trim();
-    if (!name || name === entry.name) return;
-    setConfirm({ kind: 'rename', entry, newName: name });
-  };
-
-  const cancelRename = () => setRenameTarget(null);
-
-  const goUp = () => {
-    if (path === null) return;
-    setPath(parentOf(path));
-  };
-
-  /** 同步：终端跟随文件管理器 —— 向聚焦的本地终端发送 cd 到面板当前目录。 */
-  const syncToTerminal = async () => {
-    if (!path) return;
-    const sid = sessions[focused];
-    if (!sid) { useToastStore.getState().addToast('终端会话未就绪', 'info'); return; }
-    try {
-      await ptyWrite(sid, `cd ${shellQuote(path)}\r`);
-    } catch (e) {
-      useToastStore.getState().addToast(String((e as Error)?.message ?? e), 'error');
-    }
-  };
 
   return (
     <div style={{
@@ -340,7 +206,7 @@ function LocalFiles() {
         <ContextMenu
           anchor={{ x: ctxMenu.x, y: ctxMenu.y }}
           items={buildMenuItems(ctxMenu.entry)}
-          onClose={() => setCtxMenu(null)}
+          onClose={closeContextMenu}
         />
       )}
 
@@ -356,14 +222,8 @@ function LocalFiles() {
         }
         danger={confirm?.kind === 'delete'}
         confirmLabel={confirm?.kind === 'delete' ? '删除' : '重命名'}
-        onConfirm={() => {
-          const c = confirm;
-          setConfirm(null);
-          if (!c) return;
-          if (c.kind === 'delete') doDelete(c.entry);
-          else doRename(c.entry, c.newName);
-        }}
-        onCancel={() => setConfirm(null)}
+        onConfirm={confirmAction}
+        onCancel={cancelConfirm}
       />
     </div>
   );
@@ -528,21 +388,6 @@ function FileRow({
       )}
     </div>
   );
-}
-
-// ── 等待新标签页的 PTY 会话就绪 ──
-
-function waitForSession(tabId: string, timeoutMs = 8000): Promise<string | null> {
-  return new Promise((resolve) => {
-    const start = Date.now();
-    const check = () => {
-      const sid = useTerminalStore.getState().sessions[`${tabId}#0`];
-      if (sid) return resolve(sid);
-      if (Date.now() - start > timeoutMs) return resolve(null);
-      setTimeout(check, 50);
-    };
-    check();
-  });
 }
 
 // ── 面包屑段 ──
