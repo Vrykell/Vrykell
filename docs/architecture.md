@@ -64,7 +64,7 @@ App
 └── ApiKeyField     (fixed 右下角，不在文档流)
 ```
 
-`TerminalView`（`src/terminal/TerminalView.tsx`）是终端主表面，内部由 SessionController 的**场景状态**驱动（见 §6）。
+`TerminalView`（`src/features/terminal/components/TerminalView.tsx`）是终端主表面，内部由 SessionController 的**场景状态**驱动（见 §6）。
 
 ## 4. 端到端分层
 
@@ -103,13 +103,13 @@ Rust PTY 输出的每个 chunk 不再先写主 xterm 再等 parser 异步回调�
 ### 5.1 Rust StreamScanner（`src-tauri/src/terminal/scan.rs`）
 
 - 输入：`push(chunk)` 返回有序 `ScanEvent` 流，顺序与字节顺序一致；经 `pty.rs` 汇入 Tauri event `pty-output`。
-- 事件形状（serde tag=kind, camelCase）：`{kind:'data', text}` / `{kind:'osc', code, payload, raw}` / `{kind:'altEnter'|'altExit', raw}`；前端镜像类型在 `src/terminal/pipeline/events.ts`（`DispatchEvent`）。
+- 事件形状（serde tag=kind, camelCase）：`{kind:'data', text}` / `{kind:'osc', code, payload, raw}` / `{kind:'altEnter'|'altExit', raw}`；前端镜像类型在 `src/features/terminal/services/pipeline/events.ts`（`DispatchEvent`）。
 - OSC 解析：识别 `133;A` / `133;C` / `133;D;ec` / `133;E;b64` / `133;G;b64`、`7;path`、`0/2;title`；OSC 从 data 段剥离，但保留 `raw` 用于 classic / altScreen 场景下透传给主 xterm（保 OSC 8 超链接、OSC 52 剪贴板等）。
 - alt-screen 观测：检测 `\x1b[?1049/1047/47[hl]`，只发事件，序列本身保留在 data 段。
 - 跨 chunk 边界：不完整 ESC / OSC 序列存入 `pending`，与下一 chunk 拼接后再扫。
 - 输入是 StreamDecoder 解码后的 UTF-8 字符串；扫描对象全是 ASCII 单字节控制字符，按字节索引安全。
 
-### 5.2 SessionController（`src/terminal/pipeline/sessionController.ts`）
+### 5.2 SessionController（`src/features/terminal/services/pipeline/sessionController.ts`）
 
 每 tab 一个实例（分屏时每 pane 一个），同步消费 `DispatchEvent`：
 
@@ -153,7 +153,7 @@ Rust PTY 输出的每个 chunk 不再先写主 xterm 再等 parser 异步回调�
 
 ## 7. Block 生命周期状态机
 
-`TermBlock` 状态定义见 `src/terminal/pipeline/termBlock.ts`：
+`TermBlock` 状态定义见 `src/features/terminal/services/pipeline/termBlock.ts`：
 
 ```
 pending ──(133;C)──▶ executing ──(133;D)──▶ done
@@ -178,7 +178,7 @@ pending ──(133;C)──▶ executing ──(133;D)──▶ done
 
 ## 8. 滚动：普通 DOM + follow-bottom
 
-`blockList` 场景下删除 `ScrollStateMachine`，改为普通 DOM 滚动 + `useFollowBottom`（`src/terminal/useFollowBottom.ts`）：
+`blockList` 场景下删除 `ScrollStateMachine`，改为普通 DOM 滚动 + `useFollowBottom`（`src/features/terminal/hooks/useFollowBottom.ts`）：
 
 - 列表距底部 < 2 行时，新输出自动滚动到底部。
 - 用户上滚后解除跟随；手动回到底部时恢复跟随。
@@ -224,7 +224,7 @@ pending ──(133;C)──▶ executing ──(133;D)──▶ done
 
 ## 12. 状态管理
 
-zustand，按域拆分（`src/stores/`）：
+zustand，按域拆分（`src/features/*/stores/`）：
 
 | store | 关键状态 |
 |-------|---------|
@@ -235,7 +235,7 @@ zustand，按域拆分（`src/stores/`）：
 | `history` | 命令历史 |
 | `ui` / `dock` / `workspaceDirs` / `searchHistory` / `searchHighlight` | UI 面板、搜索等 |
 
-`TermBlock`（`src/terminal/pipeline/termBlock.ts`）是 UI 层的块投影，字段：id/command/cwd/gitBranch/status/exitCode/startedAt/endedAt/wasLongRunning/outputHtml/outputText/outputRaw/linesTruncated/bookmarked。
+`TermBlock`（`src/features/terminal/services/pipeline/termBlock.ts`）是 UI 层的块投影，字段：id/command/cwd/gitBranch/status/exitCode/startedAt/endedAt/wasLongRunning/outputHtml/outputText/outputRaw/linesTruncated/bookmarked。
 
 ## 13. 后端（Rust 层）
 
@@ -255,7 +255,7 @@ zustand，按域拆分（`src/stores/`）：
 | `theme.rs` | 主题配置持久化 |
 | `lib.rs` / `main.rs` | Tauri 命令注册、AppState 组装、启动/退出归档 |
 
-前端通过 `src/lib/pty.ts` 的 `invoke`/`listen` 与后端交互。
+前端通过 `src/platform/pty.ts` 的 `invoke`/`listen` 与后端交互。
 
 ## 14. 完整数据流时间线
 
@@ -292,26 +292,26 @@ T4   渲染帧
 | 文件 | 内容 |
 |------|------|
 | `src/App.tsx` | 顶层布局（Dock + SidePanel + TerminalView + 壁纸背景层） |
-| `src/terminal/TerminalView.tsx` | scene 驱动 UI：loading / classic / blockList / altScreen（含分屏） |
-| `src/terminal/useTerminalSession.ts` | 事件接线 + controller 生命周期 + 主 xterm 生命周期 |
-| `src/terminal/useFollowBottom.ts` | block 列表贴底跟随 hook |
-| `src/terminal/pipeline/events.ts` | `DispatchEvent` 类型（Rust `ScanEvent` 的镜像） |
-| `src/terminal/pipeline/sessionController.ts` | block 生命周期 + 三场景状态机（classic/blockList/altScreen） |
-| `src/terminal/pipeline/termBlock.ts` | UI 可见的 TermBlock 类型 |
-| `src/terminal/terminalSnapshot.ts` | 离屏 xterm + buffer→HTML/纯文本提取 |
-| `src/terminal/blockTypes.ts` | 256 色调色板 + `indexToCss` |
-| `src/terminal/inputVisibility.ts` | 输入框可见性状态机 |
-| `src/terminal/TerminalBlockList.tsx` | block 列表 + BlockItem/RunningItem/PendingItem |
-| `src/terminal/TerminalPanel.tsx` | 主 xterm 面板（classic / altScreen 全屏） |
-| `src/terminal/InputEditor.tsx` | 底部输入栏（命令/AI 模式、可见性消费、附件/权限） |
-| `src/terminal/BlockOutput.tsx` | 块输出渲染（HTML/文本/高亮） |
-| `src/terminal/useTerminalFocus.ts` | 终端聚焦路由 |
-| `src/stores/terminal.ts` | 会话/尺寸/键盘路由 store + `termInstances` |
-| `src/stores/blocks.ts` | 块 store |
-| `src/lib/pty.ts` | Tauri IPC 封装 |
-| `src/lib/sessionManager.ts` | 会话/块持久化编排 |
-| `src/lib/sanitizeHtml.ts` | outputHtml 落库/渲染双向净化（span 白名单 style + br，防注入） |
-| `src/lib/windowLayout.ts` | 分屏布局模型（TerminalSpec / pane 分裂） |
+| `src/features/terminal/components/TerminalView.tsx` | scene 驱动 UI：loading / classic / blockList / altScreen（含分屏） |
+| `src/features/terminal/hooks/useTerminalSession.ts` | 事件接线 + controller 生命周期 + 主 xterm 生命周期 |
+| `src/features/terminal/hooks/useFollowBottom.ts` | block 列表贴底跟随 hook |
+| `src/features/terminal/services/pipeline/events.ts` | `DispatchEvent` 类型（Rust `ScanEvent` 的镜像） |
+| `src/features/terminal/services/pipeline/sessionController.ts` | block 生命周期 + 三场景状态机（classic/blockList/altScreen） |
+| `src/features/terminal/services/pipeline/termBlock.ts` | UI 可见的 TermBlock 类型 |
+| `src/features/terminal/model/terminalSnapshot.ts` | 离屏 xterm + buffer→HTML/纯文本提取 |
+| `src/features/terminal/model/blockTypes.ts` | 256 色调色板 + `indexToCss` |
+| `src/features/terminal/inputVisibility.ts` | 输入框可见性状态机 |
+| `src/features/terminal/components/TerminalBlockList.tsx` | block 列表 + BlockItem/RunningItem/PendingItem |
+| `src/features/terminal/components/TerminalPanel.tsx` | 主 xterm 面板（classic / altScreen 全屏） |
+| `src/features/terminal/components/InputEditor.tsx` | 底部输入栏（命令/AI 模式、可见性消费、附件/权限） |
+| `src/features/terminal/components/BlockOutput.tsx` | 块输出渲染（HTML/文本/高亮） |
+| `src/features/terminal/hooks/useTerminalFocus.ts` | 终端聚焦路由 |
+| `src/features/terminal/stores/terminal.ts` | 会话/尺寸/键盘路由 store + `termInstances` |
+| `src/features/terminal/stores/blocks.ts` | 块 store |
+| `src/platform/pty.ts` | Tauri IPC 封装 |
+| `src/features/workspace/services/sessionManager.ts` | 会话/块持久化编排 |
+| `src/shared/utils/sanitizeHtml.ts` | outputHtml 落库/渲染双向净化（span 白名单 style + br，防注入） |
+| `src/features/workspace/model/windowLayout.ts` | 分屏布局模型（TerminalSpec / pane 分裂） |
 | `src-tauri/src/terminal/pty.rs` | portable-pty 会话生命周期 + 扫描接线 |
 | `src-tauri/src/terminal/scan.rs` | **Rust StreamScanner**（PTY 字节流同步扫描器） |
 | `src-tauri/src/terminal/shell_integration.rs` | OSC 133/7 shell integration 注入 |
@@ -320,15 +320,15 @@ T4   渲染帧
 
 | 文件 | 内容 |
 |------|------|
-| `src/agent/agentStream.ts` | chat store 的 AI SDK 流式实现（streamText + 工具） |
-| `src/agent/messageParts.ts` | 消息部件模型（ToolRun 状态等） |
-| `src/agent/tools/` | 工具集（runCommand/terminal/files/skill/webSearch/webFetch/subagent/memory/schedule） |
-| `src/agent/permissions.ts` | 权限模式（标准/严格/放行） |
-| `src/agent/context.ts` | 上下文策略（off/window/compact + 摘要压缩） |
-| `src/agent/skills.ts` / `src/agent/mcp.ts` | Skills / MCP 工具装配 |
-| `src/chat/PanelChat.tsx` | 全局 AI 对话面板（dock 侧栏） |
-| `src/chat/AiBlock.tsx` / `ToolRunCard.tsx` | 内联 AI 块 / 工具运行卡片 |
-| `src/settings/` | 设置页（AI 行为/模型/MCP/Skills/快捷键/终端打开模式/主题） |
+| `src/features/agent/services/agentStream.ts` | chat store 的 AI SDK 流式实现（streamText + 工具） |
+| `src/features/agent/model/messageParts.ts` | 消息部件模型（ToolRun 状态等） |
+| `src/features/agent/tools/` | 工具集（runCommand/terminal/files/skill/webSearch/webFetch/subagent/memory/schedule） |
+| `src/features/agent/stores/permissions.ts` | 权限模式（标准/严格/放行） |
+| `src/features/agent/model/context.ts` | 上下文策略（off/window/compact + 摘要压缩） |
+| `src/features/agent/services/skills.ts` / `src/features/agent/services/mcp.ts` | Skills / MCP 工具装配 |
+| `src/features/chat/components/PanelChat.tsx` | 全局 AI 对话面板（dock 侧栏） |
+| `src/features/chat/components/AiBlock.tsx` / `ToolRunCard.tsx` | 内联 AI 块 / 工具运行卡片 |
+| `src/features/settings/` | 设置页（AI 行为/模型/MCP/Skills/快捷键/终端打开模式/主题） |
 | `src-tauri/src/agent/` | AI 流/配置/记忆/Skills/MCP/调度/web 抓取后端 |
 | `src-tauri/src/remote/ssh.rs` | SSH/SFTP（主机指纹 TOFU、密码认证） |
 
@@ -346,7 +346,7 @@ T4   渲染帧
 
 每个终端标签可左右/上下拆成多个独立 PTY pane；**每个 pane 拥有独立的 SessionController 与 blocks store 键**，共享底部输入栏（输入路由到当前聚焦 pane，`useTerminalStore.focusedPaneId`）。
 
-- 布局模型在 `src/lib/windowLayout.ts`（`TerminalSpec` / `layoutLeaves` / `firstLeaf`）：标签的 layout 是一棵**分裂树**（N/S/E/W 边），叶子即 pane。
+- 布局模型在 `src/features/workspace/model/windowLayout.ts`（`TerminalSpec` / `layoutLeaves` / `firstLeaf`）：标签的 layout 是一棵**分裂树**（N/S/E/W 边），叶子即 pane。
 - `TerminalView.tsx` 按叶子渲染：每个叶子挂一个 `TerminalPanel` + scene 驱动视图，统一由 `useTerminalSession` 管理 PTY/xterm/controller。
 - 分屏启动流程：NewTabModal（TopDock `+`）选择类型 → `beginSplit`（进入落点选择，在原 pane 上哪侧分裂）→ 创建新 pane。
 - 连续 pane 尺寸用绝对定位 + 百分比，拖拽经 ResizeHandle 调 `windowLayout` 更新树。
@@ -358,7 +358,7 @@ AI 对话以**两种形态消费同一份 chat store**：
 - **内联**：`InputEditor` ⚡ 模式，回答渲染为终端上方的 `AiBlock`（AI 块，随负载分级渲染）。
 - **面板**：`PanelChat`（dock 侧栏「AI」面板，跨 pane 的会话转录，按来源 pane 分段）。
 
-### 流式管线（`src/agent/`）
+### 流式管线（`src/features/agent/`）
 
 ```
 chat store send → agentStream（AI SDK streamText）
@@ -386,5 +386,5 @@ chat store send → agentStream（AI SDK streamText）
 | 外观主题（`terminalTheme.ts` + Rust `theme.rs`） | 壁纸（data URL，背景层固定铺满 zIndex 0）+ 应用不透明度（有壁纸才生效）+ 主题导入/导出 JSON |
 
 - 配置持久化在 Rust 侧（`theme_config` 命令，JSON 文件），启动先 `applyCachedWallpaper()` 再异步 `load()`。
-- 终端配色（ANSI 调色板）在 `src/terminal/blockTypes.ts`，独立于设计 token。
+- 终端配色（ANSI 调色板）在 `src/features/terminal/model/blockTypes.ts`，独立于设计 token。
 
