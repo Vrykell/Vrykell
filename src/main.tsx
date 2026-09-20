@@ -3,7 +3,7 @@ import { StrictMode } from 'react';
 import App from '@app/App';
 import { AppProviders } from '@app/providers/AppProviders';
 import { preloadApplication } from '@app/preload';
-import './theme.css';
+import '@app/theme.css';
 
 preloadApplication();
 

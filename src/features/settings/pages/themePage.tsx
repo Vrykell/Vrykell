@@ -6,9 +6,9 @@ import { Sun, Moon, Image as ImageIcon, Download, Upload, RefreshCw, FileText, T
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { invoke } from '@tauri-apps/api/core';
-import { useTheme } from '@/theme/ThemeProvider';
-import { useTerminalThemeStore } from '@/theme/terminalTheme';
-import { useToastStore } from '@/components/Toast';
+import { useTheme } from '@app/providers/ThemeProvider';
+import { useTerminalThemeStore } from '@features/settings/model/terminalTheme';
+import { useToastStore } from '@ui/Toast';
 import { Field, btnStyle } from '@features/settings/components/ui';
 
 export function ThemePage() {

@@ -14,7 +14,7 @@ const sshMocks = vi.hoisted(() => ({
 
 vi.mock('@features/ssh/services/api', () => sshMocks);
 vi.mock('@tauri-apps/plugin-dialog', () => ({ open: vi.fn() }));
-vi.mock('@/platform/pty', () => ({ ptyWrite: vi.fn() }));
+vi.mock('@platform/pty', () => ({ ptyWrite: vi.fn() }));
 
 describe('useRemoteFileBrowser', () => {
   const pathSnapshot = useRemotePathStore.getState();

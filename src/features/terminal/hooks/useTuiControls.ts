@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ptyWrite } from '@/platform/pty';
-import { killForeground, ESCALATE_WINDOW_MS } from '@shared/utils/killForeground';
-import { useToastStore } from '@/components/Toast';
-import { useBlockStore, useTerminalStore, selectBlocks } from '@entities/terminal';
+import { ptyWrite } from '@platform/pty';
+import { killForeground, ESCALATE_WINDOW_MS } from '@utils/killForeground';
+import { useToastStore } from '@ui/Toast';
+import { useBlockStore, useTerminalStore, selectBlocks } from '@features/terminal';
 
 /** 管理 TUI 场景顶部工具条的交互和场景切换。 */
 export function useTuiControls(tabId: string) {

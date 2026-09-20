@@ -1,9 +1,9 @@
 import { useCallback, useMemo } from 'react';
-import { useTerminalStore } from '@entities/terminal';
-import { isSessionTab } from '@entities/session';
+import { useTerminalStore } from '@features/terminal';
+import { isSessionTab } from '@features/workspace';
 import { leaves as layoutLeaves, type TerminalSpec } from '@features/workspace/model/windowLayout';
 import { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
-import { shellTypeLabel } from '@/platform/shells';
+import { shellTypeLabel } from '@platform/shells';
 
 interface PaneInfo {
   shell: string;

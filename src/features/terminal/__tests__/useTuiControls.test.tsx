@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import { useBlockStore, useTerminalStore } from '@entities/terminal';
+import { useBlockStore, useTerminalStore } from '@features/terminal';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 import { useTuiControls } from '@features/terminal/hooks/useTuiControls';
 
@@ -9,8 +9,8 @@ const ptyMocks = vi.hoisted(() => ({
   killForeground: vi.fn(),
 }));
 
-vi.mock('@/platform/pty', () => ({ ptyWrite: ptyMocks.ptyWrite }));
-vi.mock('@shared/utils/killForeground', () => ({
+vi.mock('@platform/pty', () => ({ ptyWrite: ptyMocks.ptyWrite }));
+vi.mock('@utils/killForeground', () => ({
   ESCALATE_WINDOW_MS: 3000,
   killForeground: ptyMocks.killForeground,
 }));

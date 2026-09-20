@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react';
-import { ptyWrite } from '@/platform/pty';
-import { useChatStore } from '@entities/chat';
-import { useBlockStore, useTerminalStore } from '@entities/terminal';
+import { ptyWrite } from '@platform/pty';
+import { useChatStore } from '@features/chat';
+import { useBlockStore, useTerminalStore } from '@features/terminal';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 
 interface UseBlockItemActionsOptions {

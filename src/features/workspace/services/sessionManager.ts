@@ -4,10 +4,10 @@
  * 所有会话/块的持久化操作都通过此模块，封装后端 invoke + 前端 store 同步。
  * 后续添加会话管理 UI 时，只需接入同一套 API。
  */
-import { useSessionStore, type Tab } from '@entities/session';
-import { useBlockStore } from '@entities/terminal';
-import { sanitizeOutputHtml } from '@shared/utils/sanitizeHtml';
-import { useChatStore } from '@entities/chat';
+import { useSessionStore, type Tab } from '@features/workspace';
+import { useBlockStore } from '@features/terminal';
+import { sanitizeOutputHtml } from '@utils/sanitizeHtml';
+import { useChatStore } from '@features/chat';
 import { deserializeParts } from '@features/agent/model/messageParts';
 import { deserializeAttachments } from '@features/agent/model/attachments';
 import { leaf, type WindowLayout } from '@features/workspace/model/windowLayout';
@@ -24,9 +24,9 @@ import {
   getSessionBlocks,
   setBlockCollapsed,
   listChatMessages,
-} from '@shared/api/session';
+} from '@platform/api/session';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
-import type { BackendBlockEntry, BackendSessionEntry } from '@shared/api/types';
+import type { BackendBlockEntry, BackendSessionEntry } from '@platform/api/types';
 
 /** 恢复会话时用于重建 tab 的元数据（kind/payload 已由后端持久化）。 */
 export interface RestoreMeta {

@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useState } from 'react';
-import { useAgentSettings } from '@entities/agent';
-import { useHistoryStore } from '@entities/terminal';
+import { useAgentSettings } from '@features/agent';
+import { useHistoryStore } from '@features/terminal';
 import { useCommandCompletion } from '@features/terminal/hooks/useCommandCompletion';
 
 describe('useCommandCompletion', () => {

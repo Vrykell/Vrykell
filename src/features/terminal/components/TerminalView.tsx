@@ -8,13 +8,13 @@
  */
 
 import { useRef, useEffect, useMemo, useState } from 'react';
-import { useSessionStore, type Tab } from '@entities/session';
-import { useTerminalStore } from '@entities/terminal';
-import { useUiStore, useDockDragStore } from '@shared/ui';
-import { useBlockStore, selectBlocks } from '@entities/terminal';
-import { usePaneMessages } from '@entities/chat';
-import { useChatPanelOpen } from '@shared/ui';
-import { useToastStore } from '@/components/Toast';
+import { useSessionStore, type Tab } from '@features/workspace';
+import { useTerminalStore } from '@features/terminal';
+import { useUiStore, useDockDragStore } from '@features/workspace';
+import { useBlockStore, selectBlocks } from '@features/terminal';
+import { usePaneMessages } from '@features/chat';
+import { useChatPanelOpen } from '@features/workspace';
+import { useToastStore } from '@ui/Toast';
 import { useFollowBottom, registerFollowEngager, engageFollow } from '@features/terminal/hooks/useFollowBottom';
 import { useTerminalFocus } from '@features/terminal/hooks/useTerminalFocus';
 import { useTerminalPaneDrag } from '@features/terminal/hooks/useTerminalPaneDrag';
@@ -26,9 +26,9 @@ import InputEditor from '@features/terminal/components/InputEditor';
 import AiStatusBar from '@features/terminal/components/AiStatusBar';
 import TerminalBlockList, { hasVisibleContent } from '@features/terminal/components/TerminalBlockList';
 import TerminalPanel from '@features/terminal/components/TerminalPanel';
-import SessionHistoryView from '@/components/SessionHistoryView';
+import { SessionHistoryView } from '@features/session-history';
 import SettingsView from '@features/settings/pages/SettingsView';
-import ContextMenu from '@/components/ContextMenu';
+import ContextMenu from '@ui/ContextMenu';
 import { useTerminalLayoutActions } from '@features/terminal/hooks/useTerminalLayoutActions';
 import { useTuiControls } from '@features/terminal/hooks/useTuiControls';
 

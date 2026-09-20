@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { useSessionStore, isSessionTab } from '@entities/session';
-import { useTerminalStore } from '@entities/terminal';
+import { useSessionStore, isSessionTab } from '@features/workspace';
+import { useTerminalStore } from '@features/terminal';
 import { firstLeaf, leaves as layoutLeaves, type TerminalSpec } from '@features/workspace/model/windowLayout';
 
 /**

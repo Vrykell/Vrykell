@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { useToastStore } from '@/components/Toast';
+import { useToastStore } from '@ui/Toast';
 import {
   LIMITS,
   importFileAsAttachment,

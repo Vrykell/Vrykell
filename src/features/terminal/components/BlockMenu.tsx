@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { ptyWrite } from '@/platform/pty';
-import { useTerminalStore } from '@entities/terminal';
-import { useChatStore } from '@entities/chat';
-import { useSessionStore } from '@entities/session';
-import { useBlockStore } from '@entities/terminal';
+import { ptyWrite } from '@platform/pty';
+import { useTerminalStore } from '@features/terminal';
+import { useChatStore } from '@features/chat';
+import { useSessionStore } from '@features/workspace';
+import { useBlockStore } from '@features/terminal';
 import { clearSessionBlocks } from '@features/terminal/hooks/useTerminalSession';
-import { fmtDuration } from '@/components/UiBtn';
+import { fmtDuration } from '@ui/UiBtn';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 
 interface Props {

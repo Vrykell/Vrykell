@@ -11,7 +11,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, type LucideIcon } from 'lucide-react';
-import { useAiConfigStore, useAgentSettings } from '@entities/agent';
+import { useAiConfigStore, useAgentSettings } from '@features/agent';
 import { modelIcon } from '@features/agent/components/modelIcon';
 import ModelPicker from '@features/chat/components/ModelPicker';
 

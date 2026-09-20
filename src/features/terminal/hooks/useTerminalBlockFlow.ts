@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useBlockStore, selectBlocks } from '@entities/terminal';
-import { usePaneMessages } from '@entities/chat';
-import { useChatPanelOpen } from '@shared/ui';
-import { useSearchHighlightStore } from '@entities/search';
+import { useBlockStore, selectBlocks } from '@features/terminal';
+import { usePaneMessages } from '@features/chat';
+import { useChatPanelOpen } from '@features/workspace';
+import { useSearchHighlightStore } from '@features/search';
 import { toExchanges, mergeFlow } from '@features/chat/model/exchanges';
 import { agentControl } from '@features/agent/services/agentControl';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';

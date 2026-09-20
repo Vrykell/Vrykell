@@ -9,18 +9,18 @@ import { Terminal } from '@xterm/xterm';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
-import { ptySpawn, ptyWrite, ptyResize, ptyClose, onPtyOutput, onPtyExit } from '@/platform/pty';
-import { registerTerminal, unregisterTerminal, useTerminalStore } from '@entities/terminal';
-import { useBlockStore } from '@entities/terminal';
+import { ptySpawn, ptyWrite, ptyResize, ptyClose, onPtyOutput, onPtyExit } from '@platform/pty';
+import { registerTerminal, unregisterTerminal, useTerminalStore } from '@features/terminal';
+import { useBlockStore } from '@features/terminal';
 import { useHistoryStore } from '@features/terminal/stores/history';
-import { useSessionStore } from '@entities/session';
+import { useSessionStore } from '@features/workspace';
 import { leaves as layoutLeaves } from '@features/workspace/model/windowLayout';
 import * as sessionManager from '@features/workspace/services/sessionManager';
 import { agentControl } from '@features/agent/services/agentControl';
 import { defaultOpenModeForShell } from '@features/agent/stores/agentSettings';
 import { SessionController } from '@features/terminal/services/pipeline/sessionController';
-import { getCellMetrics } from '@shared/utils/termMetrics';
-import type { DispatchEvent } from '@features/terminal/services/pipeline/events';
+import { getCellMetrics } from '@utils/termMetrics';
+import type { DispatchEvent } from '@core/terminal/events';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import { XTERM_FONT_FAMILY } from '@features/terminal/model/terminalSnapshot';
@@ -432,7 +432,7 @@ export function useTerminalSession(
       const scene = useTerminalStore.getState().scenes[paneId] ?? currentScene;
       // 手动全屏：全屏宿主铺满整个终端区（宽于单 pane），以宿主实测宽换算列数，
       // 否则 canvas 停在单 pane 宽 → 全屏两侧露出黑色条。全屏是纯 canvas 视图
-      //（无 HTML 快照），按 xterm 自身 cellWidth 排布即可铺满。
+      //（无 HTML 快照），按 xterm 自身 cellWidth 排布才能精确铺满。
       if (scene === 'altScreen') {
         const fs = fullscreenHostSize();
         if (fs && fs.w > 0) return Math.max(2, Math.floor(fs.w / cellWidth()));
@@ -468,6 +468,16 @@ export function useTerminalSession(
         widthRaf = 0;
         // 后台标签 display:none 宽度为 0，别把 PTY 挤成 2 列
         if (el.offsetWidth === 0) return;
+        const scene = useTerminalStore.getState().scenes[paneId] ?? currentScene;
+        if (scene === 'altScreen') {
+          // 全屏是纯 xterm 画布：让 fit 使用渲染器实测尺寸，避免字体回退后的
+          // 私有 cellWidth 与 canvas 实际 cell 不一致。
+          fit.fit();
+          useTerminalStore.getState().setDims(paneId, term.cols, term.rows);
+          if (sessionId) ptyResize(sessionId, term.cols, term.rows).catch(() => {});
+          controller.resize(term.cols, term.rows);
+          return;
+        }
         const cols = effectiveCols();
         const rows = effectiveRows();
         if (cols <= 0 || rows <= 0) return;

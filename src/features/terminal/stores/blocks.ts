@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
-import { useToastStore } from '@/components/Toast';
-import { t } from '@/i18n';
+import { useToastStore } from '@ui/Toast';
+import { t } from '@i18n';
 import * as sessionManager from '@features/workspace/services/sessionManager';
 
 const EMPTY: TermBlock[] = [];

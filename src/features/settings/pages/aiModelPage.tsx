@@ -6,12 +6,12 @@ import { Plus, X } from 'lucide-react';
 import {
   setProviderKey, clearProviderKey, setAiModels, setActiveModel, useAiConfigStore,
   type ModelProfile,
-} from '@entities/agent';
+} from '@features/agent';
 import type { ProviderKind } from '@features/agent/services/provider';
 import { detectCapabilities, type ModelCapability } from '@features/agent/model/capabilities';
 import { modelIcon, providerLabel } from '@features/agent/components/modelIcon';
-import Segmented from '@/components/Segmented';
-import { useToastStore } from '@/components/Toast';
+import Segmented from '@ui/Segmented';
+import { useToastStore } from '@ui/Toast';
 import { Field, ModelTextInput, btnStyle, inputStyle } from '@features/settings/components/ui';
 
 const PROVIDERS: { id: ProviderKind; label: string }[] = [

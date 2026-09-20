@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { ChangeEvent, ClipboardEvent, KeyboardEvent } from 'react';
-import { ptyWrite } from '@/platform/pty';
-import { useChatStore } from '@entities/chat';
-import { useSessionStore } from '@entities/session';
-import { useInputStore, selectPaneInput } from '@entities/terminal';
-import { usePermissions, useAttachmentComposer } from '@entities/agent';
-import { useDockStore } from '@shared/ui';
+import { ptyWrite } from '@platform/pty';
+import { useChatStore } from '@features/chat';
+import { useSessionStore } from '@features/workspace';
+import { useInputStore, selectPaneInput } from '@features/terminal';
+import { usePermissions, useAttachmentComposer } from '@features/agent';
+import { useDockStore } from '@features/workspace';
 import { engageFollow } from '@features/terminal/hooks/useFollowBottom';
 import { useCommandHistoryNavigation } from '@features/terminal/hooks/useCommandHistoryNavigation';
 import { useTerminalInputContext } from '@features/terminal/hooks/useTerminalInputContext';

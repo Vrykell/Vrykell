@@ -54,7 +54,7 @@ vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn().mockResolvedValue(() => {}),
 }));
 
-vi.mock('@/platform/pty', () => ({
+vi.mock('@platform/pty', () => ({
   ptySpawn: vi.fn((_cols: number, _rows: number) => Promise.resolve('sess-x')),
   ptyWrite: vi.fn(() => Promise.resolve()),
   ptyResize: vi.fn(() => Promise.resolve()),
@@ -85,7 +85,7 @@ import { useTerminalStore } from '@features/terminal/stores/terminal';
 import { useBlockStore } from '@features/terminal/stores/blocks';
 import { useWorkspaceStore } from '@features/workspace/stores/workspace';
 import { leaf } from '@features/workspace/model/windowLayout';
-import { onPtyOutput as mockedOnPtyOutput, ptySpawn as mockedPtySpawn } from '@/platform/pty';
+import { onPtyOutput as mockedOnPtyOutput, ptySpawn as mockedPtySpawn } from '@platform/pty';
 
 /** 设置一个本地终端 tab，指定打开模式（classic / block） */
 function setTab(openMode: 'classic' | 'block') {

@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import { useChatStore } from '@entities/chat';
-import { useSessionStore } from '@entities/session';
-import { useInputStore } from '@entities/terminal';
-import { useDockStore } from '@shared/ui';
+import { useChatStore } from '@features/chat';
+import { useSessionStore } from '@features/workspace';
+import { useInputStore } from '@features/terminal';
+import { useDockStore } from '@features/workspace';
 import { useInputEditorController } from '@features/terminal/hooks/useInputEditorController';
 
 const mocks = vi.hoisted(() => ({
@@ -23,7 +23,7 @@ const mocks = vi.hoisted(() => ({
   chatSend: vi.fn(),
 }));
 
-vi.mock('@/platform/pty', () => ({ ptyWrite: mocks.ptyWrite }));
+vi.mock('@platform/pty', () => ({ ptyWrite: mocks.ptyWrite }));
 vi.mock('@features/terminal/hooks/useFollowBottom', () => ({ engageFollow: mocks.engageFollow }));
 vi.mock('@features/terminal/hooks/useTerminalInputContext', () => ({
   useTerminalInputContext: () => ({
@@ -49,7 +49,7 @@ vi.mock('@features/terminal/hooks/useCommandCompletion', () => ({
 vi.mock('@features/terminal/hooks/useCommandHistoryNavigation', () => ({
   useCommandHistoryNavigation: () => ({ reset: mocks.resetHistory, navigate: mocks.navigateHistory }),
 }));
-vi.mock('@entities/agent', () => ({
+vi.mock('@features/agent', () => ({
   usePermissions: (selector: (state: { mode: string; setMode: () => void }) => unknown) =>
     selector({ mode: 'standard', setMode: vi.fn() }),
   useAttachmentComposer: () => ({

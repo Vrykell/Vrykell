@@ -45,12 +45,12 @@
 
 ## 七、文件组织
 
-24. `src/features/terminal/` — 终端相关组件（Block 列表、输入栏、终端面板、输出渲染、pipeline/）。
-25. `src/features/*/stores/` — zustand 状态管理（workspace、terminal、blocks、chat、history、ui、dock、input）。
-26. `src/components/` — 通用 UI 组件（TabBar、Sidebar、CommandPalette、NewTabModal、Toast、ContextRing）。
+24. `src/features/terminal/` — 终端领域（components、hooks、stores、model、services/pipeline）。
+25. `src/features/*/stores/` — 领域 Zustand 状态；视图层通过 Feature 公共入口访问。
+26. `src/ui/` — 无业务语义的通用 UI 组件。
 27. `src/features/chat/` — AI 对话渲染（AiBlock、ModelPill、ToolRunCard、Markdown、PanelChat）。
 28. `src/features/agent/` — AI 代理逻辑（agentStream、工具、权限、Skills、MCP、上下文、记忆、调度、智能标题）。
 29. `src/features/settings/` — 设置页（行为/模型/MCP/Skills/快捷键/终端打开模式/主题）。
-30. `src/platform/` 与 `src/shared/utils/` — Tauri IPC 与纯基础设施（pty、shell、运行时、错误处理、终端工具）。业务服务归属对应 feature。
-31. `src/features/ssh/` `src/features/files/` `src/features/search/` `src/theme/` — SSH 领域 / 本地文件领域 / 全局搜索 / 主题（tokens + terminalTheme）。
-32. `e2e/` — Playwright e2e 测试，tauri-mock.ts 提供 Tauri + Anthropic mock。
+30. `src/platform/` 与 `src/utils/` — Tauri IPC、PTY、运行时适配与纯工具函数。业务服务归属对应 Feature。
+31. `src/features/ssh/` `src/features/files/` `src/features/search/` `src/config/theme/` — SSH / 本地文件 / 全局搜索 / 设计 token。
+32. `e2e/` — Playwright E2E 测试，`tauri-mock.ts` 提供 Tauri + Anthropic mock。

@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useDockDragStore } from '@shared/ui';
+import { useDockDragStore } from '@features/workspace';
 
 const DRAG_THRESHOLD_PX = 5;
 const NON_DRAG_SELECTOR = 'input, textarea, button, a, [contenteditable="true"], .xterm, [data-no-drag], [data-selectable]';

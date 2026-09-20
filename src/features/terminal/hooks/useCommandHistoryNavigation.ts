@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react';
 import type { RefObject } from 'react';
-import { useHistoryStore } from '@entities/terminal';
+import { useHistoryStore } from '@features/terminal';
 
 interface UseCommandHistoryNavigationOptions {
   text: string;

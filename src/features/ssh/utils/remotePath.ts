@@ -6,8 +6,8 @@
  */
 
 import { create } from 'zustand';
-import { useSessionStore, isSessionTab } from '@entities/session';
-import { useTerminalStore } from '@entities/terminal';
+import { useSessionStore, isSessionTab } from '@features/workspace';
+import { useTerminalStore } from '@features/terminal';
 import { leaves } from '@features/workspace/model/windowLayout';
 
 interface RemotePathState {

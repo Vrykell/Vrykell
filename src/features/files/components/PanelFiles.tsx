@@ -4,13 +4,13 @@ import { type FsEntry, type DiskEntry } from '@features/files/services/fs';
 import { fileIcon } from '@features/files/utils/fileIcon';
 import { normPath, pathSegments, segmentsToPath, parentOf, compactPathSegments } from '@features/files/utils/pathUtils';
 import { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
-import { IconBtn, fmtSize } from '@/components/UiBtn';
+import { IconBtn, fmtSize } from '@ui/UiBtn';
 import { flattenVisible, type VisibleRow } from '@features/files/utils/fileTree';
-import ContextMenu from '@/components/ContextMenu';
-import { ensureSshLoaded, useSshStore } from '@entities/ssh';
+import ContextMenu from '@ui/ContextMenu';
+import { ensureSshLoaded, useSshStore } from '@features/ssh';
 import RemoteFiles from '@features/ssh/components/RemoteFiles';
-import ConfirmDialog from '@/components/ConfirmDialog';
-import DownloadManager from '@/downloads/DownloadManager';
+import ConfirmDialog from '@ui/ConfirmDialog';
+import DownloadManager from '@features/files/components/DownloadManager';
 import { useLocalFileBrowser } from '@features/files/hooks/useLocalFileBrowser';
 import { useLocalFileActions } from '@features/files/hooks/useLocalFileActions';
 

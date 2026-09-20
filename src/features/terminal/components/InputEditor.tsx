@@ -16,9 +16,9 @@ import {
   ArrowUp, Columns2, GitBranch, Paperclip,
   ShieldAlert, ShieldCheck, ShieldOff, Square, X, Zap,
 } from 'lucide-react';
-import ContextRing from '@/components/ContextRing';
-import { useUiStore } from '@shared/ui';
-import { useSessionStore } from '@entities/session';
+import ContextRing from '@features/chat/components/ContextRing';
+import { useUiStore } from '@features/workspace';
+import { useSessionStore } from '@features/workspace';
 import { getLongRunningHint } from '@features/terminal/inputVisibility';
 import AttachmentChips from '@features/chat/components/AttachmentChips';
 import ShellIndicator from '@features/terminal/components/ShellIndicator';

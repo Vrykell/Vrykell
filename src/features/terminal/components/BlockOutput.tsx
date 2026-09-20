@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { sanitizeOutputHtml } from '@shared/utils/sanitizeHtml';
+import { sanitizeOutputHtml } from '@utils/sanitizeHtml';
+import { XTERM_FONT_FAMILY } from '@features/terminal/model/terminalSnapshot';
 
 export function plainText(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -58,7 +59,7 @@ export default function BlockOutput({ text, maxHeight, highlight, isHtml: isHtml
         maxHeight: maxHeight ? `${maxHeight}px` : undefined,
         overflow: maxHeight ? 'auto' : undefined,
         // 与 xterm.js 实时渲染保持一致的字体参数
-        fontFamily: 'Menlo, Monaco, "Cascadia Code", "JetBrains Mono", "Noto Sans CJK SC", "PingFang SC", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", monospace',
+        fontFamily: XTERM_FONT_FAMILY,
         fontSize: 14,
         // 行高 1.0 与活终端一致（applyCompactCharSize 把 xterm 行高压到 fontSize）；
         // 1.4 时行间留缝，TUI 半块字符（▀▄）拼图会出现分割线

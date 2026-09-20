@@ -3,11 +3,11 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { sshFsList, sshDownload, sshRename, sshDelete, sshUpload } from '@features/ssh/services/api';
 import type { SshConnection, SshFsEntry } from '@features/ssh/services/api';
 import { loadConfig, remoteOpenCommand } from '@features/files/services/fileOpen';
-import { useTerminalStore } from '@entities/terminal';
-import { useSessionStore } from '@entities/session';
-import { ptyWrite } from '@/platform/pty';
-import { useToastStore } from '@/components/Toast';
-import type { ContextMenuItem } from '@/components/ContextMenu';
+import { useTerminalStore } from '@features/terminal';
+import { useSessionStore } from '@features/workspace';
+import { ptyWrite } from '@platform/pty';
+import { useToastStore } from '@ui/Toast';
+import type { ContextMenuItem } from '@ui/ContextMenu';
 import {
   useRemotePathStore,
   normalizeRemotePath,

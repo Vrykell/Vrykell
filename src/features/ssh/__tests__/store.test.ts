@@ -1,0 +1,89 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  listSshConnections,
+  saveSshConnection,
+  deleteSshConnection,
+  touchSshConnection,
+  type SshConnection,
+} from '@features/ssh/services/api';
+import { ensureSshLoaded, useSshStore } from '@features/ssh/stores/store';
+
+vi.mock('@features/ssh/services/api', () => ({
+  listSshConnections: vi.fn(),
+  saveSshConnection: vi.fn(),
+  deleteSshConnection: vi.fn(),
+  touchSshConnection: vi.fn(),
+}));
+
+const connection: SshConnection = {
+  id: 'ssh-1',
+  name: '生产机',
+  host: 'prod.example.com',
+  user: 'root',
+  authMethod: 'key',
+};
+
+describe('ssh store', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSshStore.setState({
+      connections: [],
+      loaded: false,
+      loading: false,
+    });
+  });
+
+  it('加载连接并更新状态', async () => {
+    vi.mocked(listSshConnections).mockResolvedValue([connection]);
+
+    await useSshStore.getState().load();
+
+    expect(useSshStore.getState()).toMatchObject({
+      connections: [connection],
+      loaded: true,
+      loading: false,
+    });
+  });
+
+  it('加载失败时降级为空列表并结束 loading', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.mocked(listSshConnections).mockRejectedValue(new Error('backend down'));
+
+    await useSshStore.getState().load();
+
+    expect(useSshStore.getState()).toMatchObject({
+      connections: [],
+      loaded: true,
+      loading: false,
+    });
+  });
+
+  it('save/remove/touch 调用后端后重新加载', async () => {
+    vi.mocked(listSshConnections).mockResolvedValue([]);
+
+    await useSshStore.getState().save(connection);
+    await useSshStore.getState().remove(connection.id);
+    await useSshStore.getState().touch(connection.id);
+
+    expect(saveSshConnection).toHaveBeenCalledWith(connection);
+    expect(deleteSshConnection).toHaveBeenCalledWith(connection.id);
+    expect(touchSshConnection).toHaveBeenCalledWith(connection.id);
+    expect(listSshConnections).toHaveBeenCalledTimes(3);
+  });
+
+  it('ensureSshLoaded 仅触发一次加载', async () => {
+    let resolveLoad: (connections: SshConnection[]) => void = () => {};
+    vi.mocked(listSshConnections).mockImplementation(
+      () => new Promise((resolve) => {
+        resolveLoad = resolve;
+      }),
+    );
+
+    ensureSshLoaded();
+    ensureSshLoaded();
+
+    expect(listSshConnections).toHaveBeenCalledTimes(1);
+    resolveLoad([connection]);
+    await vi.waitFor(() => expect(useSshStore.getState().loaded).toBe(true));
+  });
+});

@@ -4,7 +4,7 @@
 
 Vrykell 后续采用以业务 Feature 为中心的架构。参考 Lithe-IDEA 的组织方式，避免继续扩张 `app / entities / widgets / features / 旧业务目录` 的混合层。
 
-目标结构：
+当前结构：
 
 ```text
 src/
@@ -35,10 +35,10 @@ src/
 - Feature 内部允许按职责拆分，但外部只通过 Feature 公共入口访问。
 - Store、Service、IPC 和组件不跨层互相穿透；Tauri 调用集中在 `platform` 或 Feature 的 `services`。
 - `ui`、`utils`、`core` 不允许依赖具体业务 Feature。
-- 迁移期间可以保留兼容导出，但兼容导出只能位于旧目录的边界文件，不能继续被新代码扩散使用。
-- 迁移每个垂直切片后必须通过 TypeScript、单元测试和相关 E2E 测试。
+- 模块只通过 Feature 公共入口访问领域能力，不保留旧目录兼容导出。
+- 每个垂直切片必须通过 TypeScript、单元测试和相关 E2E 测试。
 
-## 迁移顺序
+## 落地顺序
 
 1. 建立 Feature 公共入口和架构门禁。
 2. 将 terminal、chat、workspace 的组件、Hooks、Store、服务合并到各自 Feature。
@@ -46,4 +46,4 @@ src/
 4. 将 Tauri IPC、PTY、文件系统和窗口 API 收敛到 `platform`。
 5. 清理兼容层，按 Feature 拆分懒加载边界，处理构建产物体积。
 
-不会一次性移动全部文件；每次迁移一个可运行的垂直切片，并在切片后完成回归验证。
+本阶段已按可运行的垂直切片完成目录、别名、入口、平台适配和架构门禁迁移。

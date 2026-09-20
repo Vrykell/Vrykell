@@ -3,10 +3,10 @@
  * 模型下拉 · 上下文圆环 · 深思/Agent 开关，与聊天面板顶栏同构。
  */
 import { Bot, Brain, type LucideIcon } from 'lucide-react';
-import { useInputStore, selectPaneInput } from '@entities/terminal';
-import { useAiConfigStore, useAgentSettings } from '@entities/agent';
+import { useInputStore, selectPaneInput } from '@features/terminal';
+import { useAiConfigStore, useAgentSettings } from '@features/agent';
 import ModelPill from '@features/chat/components/ModelPill';
-import ContextRing from '@/components/ContextRing';
+import ContextRing from '@features/chat/components/ContextRing';
 
 function Toggle({ icon: Icon, on, title, onClick }: {
   icon: LucideIcon;

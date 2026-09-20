@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { getCommands } from '@/commands';
-import { useSessionStore } from '@entities/session';
-import { useTerminalStore } from '@entities/terminal';
+import { getCommands } from '@app/commands';
+import { useSessionStore } from '@features/workspace';
+import { useTerminalStore } from '@features/terminal';
 import type {
   ActionResultData,
   BlockResultData,

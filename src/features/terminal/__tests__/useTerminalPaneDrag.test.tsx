@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import { useDockDragStore } from '@shared/ui';
+import { useDockDragStore } from '@features/workspace';
 import { useTerminalPaneDrag } from '@features/terminal/hooks/useTerminalPaneDrag';
 
 describe('useTerminalPaneDrag', () => {

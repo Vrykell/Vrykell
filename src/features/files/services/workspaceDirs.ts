@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { listWorkspaces, addWorkspace, removeWorkspace } from '@shared/api/workspace';
+import { listWorkspaces, addWorkspace, removeWorkspace } from '@platform/api/workspace';
 
 export interface WorkspaceDir {
   id: number;

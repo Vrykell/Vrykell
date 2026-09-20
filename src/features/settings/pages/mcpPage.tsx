@@ -8,7 +8,7 @@ import {
   listMcpServers, saveMcpServer, removeMcpServer, toggleMcpServer,
   connectMcp, disconnectMcp, type McpServer,
 } from '@features/agent/services/mcp';
-import { useToastStore } from '@/components/Toast';
+import { useToastStore } from '@ui/Toast';
 import { Field, Toggle, inputStyle, btnStyle } from '@features/settings/components/ui';
 
 function parseEnvLines(text: string): Record<string, string> {
