@@ -80,15 +80,3 @@ export interface SessionResultData {
   status: string;
   blockCount: number;
 }
-
-// ── 后端返回类型 ──
-// 后端契约类型已收敛到 `@shared/api/types`（基础设施层唯一权威定义）。
-// 此处保留兼容再导出，迁移期间旧导入路径继续可用；新代码请直接引用 `@shared/api/types`。
-export type {
-  BackendHistoryEntry,
-  BackendFileMatch,
-  BackendSearchContext,
-  BackendBlockEntry,
-  BackendSessionEntry,
-  BackendGroupEntry,
-} from '@shared/api/types';

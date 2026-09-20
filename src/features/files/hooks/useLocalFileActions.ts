@@ -5,11 +5,11 @@ import { openFile } from '@features/files/services/fileOpen';
 import { parentOf, normPath } from '@features/files/utils/pathUtils';
 import { shellQuote } from '@features/ssh/utils/remotePath';
 import { useWorkspaceDirsStore } from '@features/files/services/workspaceDirs';
-import { useSessionStore } from '@entities/session';
-import { useTerminalStore } from '@entities/terminal';
-import { ptyWrite } from '@/platform/pty';
-import { useToastStore } from '@/components/Toast';
-import type { ContextMenuItem } from '@/components/ContextMenu';
+import { useSessionStore } from '@features/workspace';
+import { useTerminalStore } from '@features/terminal';
+import { ptyWrite } from '@platform/pty';
+import { useToastStore } from '@ui/Toast';
+import type { ContextMenuItem } from '@ui/ContextMenu';
 
 export type LocalFileConfirmState =
   | { kind: 'rename'; entry: FsEntry; newName: string }

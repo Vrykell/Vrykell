@@ -12,7 +12,7 @@ import {
   setSkillState, removeSkill, marketGithubList, marketGithubInstall,
   type SkillMeta, type SkillDetail, type MarketSkill,
 } from '@features/agent/services/skills';
-import { useToastStore } from '@/components/Toast';
+import { useToastStore } from '@ui/Toast';
 import { useSkillsSettings } from '@features/settings/hooks/useSkillsSettings';
 import { useSkillFileBrowser } from '@features/settings/hooks/useSkillFileBrowser';
 import type { FileNode } from '@features/settings/model/skillFileTree';

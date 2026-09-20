@@ -310,7 +310,7 @@ T4   渲染帧
 | `src/features/terminal/stores/blocks.ts` | 块 store |
 | `src/platform/pty.ts` | Tauri IPC 封装 |
 | `src/features/workspace/services/sessionManager.ts` | 会话/块持久化编排 |
-| `src/shared/utils/sanitizeHtml.ts` | outputHtml 落库/渲染双向净化（span 白名单 style + br，防注入） |
+| `src/utils/sanitizeHtml.ts` | outputHtml 落库/渲染双向净化（span 白名单 style + br，防注入） |
 | `src/features/workspace/model/windowLayout.ts` | 分屏布局模型（TerminalSpec / pane 分裂） |
 | `src-tauri/src/terminal/pty.rs` | portable-pty 会话生命周期 + 扫描接线 |
 | `src-tauri/src/terminal/scan.rs` | **Rust StreamScanner**（PTY 字节流同步扫描器） |
@@ -336,8 +336,8 @@ T4   渲染帧
 
 | 文件 | 内容 |
 |------|------|
-| `src/theme/tokens.ts` | 主题 CSS 变量（亮/暗） |
-| `src/theme/terminalTheme.ts` | 终端主题 store（壁纸 data URL + 应用不透明度 + 导入导出） |
+| `src/config/theme/tokens.ts` | 主题 CSS 变量（亮/暗） |
+| `src/features/settings/model/terminalTheme.ts` | 终端主题 Store（壁纸 data URL + 应用不透明度 + 导入导出） |
 | `src-tauri/src/theme.rs` | 主题配置持久化（JSON 文件） |
 
 ---
@@ -378,13 +378,12 @@ chat store send → agentStream（AI SDK streamText）
 
 ## 18. 主题系统
 
-主题分两层，都在 `src/theme/`：
+主题分两层：
 
 | 层 | 内容 |
 |---|---|
-| 设计 tokens（`tokens.ts`） | 亮/暗两套 CSS 变量（`--canvas/--text-primary/--border/...`），`applyTheme` 首帧同步写入防 FOUC |
-| 外观主题（`terminalTheme.ts` + Rust `theme.rs`） | 壁纸（data URL，背景层固定铺满 zIndex 0）+ 应用不透明度（有壁纸才生效）+ 主题导入/导出 JSON |
+| 设计 tokens（`src/config/theme/tokens.ts`） | 亮/暗两套 CSS 变量（`--canvas/--text-primary/--border/...`），`applyTheme` 首帧同步写入防 FOUC |
+| 外观主题（`src/features/settings/model/terminalTheme.ts` + Rust `theme.rs`） | 壁纸（data URL，背景层固定铺满 zIndex 0）+ 应用不透明度（有壁纸才生效）+ 主题导入/导出 JSON |
 
 - 配置持久化在 Rust 侧（`theme_config` 命令，JSON 文件），启动先 `applyCachedWallpaper()` 再异步 `load()`。
 - 终端配色（ANSI 调色板）在 `src/features/terminal/model/blockTypes.ts`，独立于设计 token。
-

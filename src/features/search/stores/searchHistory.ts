@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@shared/utils/errorHandler';
+import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
 
 const STORAGE_KEY = 'vrykell-search-history';
 const MAX_ITEMS = 20;
@@ -29,7 +29,7 @@ export const useSearchHistoryStore = create<SearchHistoryState>((set, get) => ({
   add: (query) => {
     const q = query.trim();
     if (!q) return;
-    const next = [q, ...get().items.filter((i) => i !== q)];
+    const next = [q, ...get().items.filter((i) => i !== q)].slice(0, MAX_ITEMS);
     save(next);
     set({ items: next });
   },

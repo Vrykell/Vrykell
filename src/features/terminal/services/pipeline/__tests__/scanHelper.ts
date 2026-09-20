@@ -1,4 +1,4 @@
-import type { DispatchEvent } from '@features/terminal/services/pipeline/events';
+import type { DispatchEvent } from '@core/terminal/events';
 
 /**
  * 测试用字节流扫描器 —— 生产路径的扫描已在 Rust 端（src-tauri/src/scan.rs），

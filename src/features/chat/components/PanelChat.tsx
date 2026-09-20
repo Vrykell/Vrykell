@@ -9,15 +9,15 @@
 
 import { useEffect, useMemo, useRef } from 'react';
 import { ArrowUp, Bot, Brain, Globe, Paperclip, ShieldAlert, ShieldCheck, ShieldOff, Square, Zap } from 'lucide-react';
-import { useChatStore, useActiveMessages } from '@entities/chat';
-import { useAgentSettings, usePermissions, useAiConfigStore, useAttachmentComposer } from '@entities/agent';
+import { useChatStore, useActiveMessages } from '@features/chat';
+import { useAgentSettings, usePermissions, useAiConfigStore, useAttachmentComposer } from '@features/agent';
 import ModelPill from '@features/chat/components/ModelPill';
 import AttachmentChips from '@features/chat/components/AttachmentChips';
 import ShellIndicator from '@features/terminal/components/ShellIndicator';
 import { CurrentDir } from '@features/terminal/components/InputEditor';
 import AiBlock from '@features/chat/components/AiBlock';
 import { toExchanges, type ChatExchange } from '@features/chat/model/exchanges';
-import ContextRing from '@/components/ContextRing';
+import ContextRing from '@features/chat/components/ContextRing';
 import { useChatComposer } from '@features/chat/hooks/useChatComposer';
 import { useChatPaneContext } from '@features/chat/hooks/useChatPaneContext';
 

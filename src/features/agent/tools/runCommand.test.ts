@@ -4,14 +4,14 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-vi.mock('@/platform/pty', () => ({
+vi.mock('@platform/pty', () => ({
   ptyWrite: vi.fn(async () => {}),
 }));
 
 import { runCommandAndWait } from '@features/agent/tools/runCommand';
 import { useBlockStore } from '@features/terminal/stores/blocks';
 import { useTerminalStore } from '@features/terminal/stores/terminal';
-import { useSessionStore } from '@entities/session';
+import { useSessionStore } from '@features/workspace';
 import { agentControl } from '@features/agent/services/agentControl';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 

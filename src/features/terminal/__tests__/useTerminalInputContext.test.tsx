@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import { useSessionStore, type Tab } from '@entities/session';
-import { useBlockStore, useTerminalStore } from '@entities/terminal';
+import { useSessionStore, type Tab } from '@features/workspace';
+import { useBlockStore, useTerminalStore } from '@features/terminal';
 import { leaf } from '@features/workspace/model/windowLayout';
 import { useTerminalInputContext } from '@features/terminal/hooks/useTerminalInputContext';
 

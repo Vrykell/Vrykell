@@ -1,6 +1,6 @@
 import { isApiKeyConfigured, getModel } from '@features/agent/stores/aiConfig';
 import { loadConfig, serializeTemplates } from '@features/files/services/fileOpen';
-import { useSessionStore } from '@entities/session';
+import { useSessionStore } from '@features/workspace';
 
 /** 设置项定义 — 供全局搜索索引 */
 export interface SettingDef {

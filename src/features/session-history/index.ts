@@ -19,3 +19,5 @@ export {
   SESSION_TYPE_OPTIONS,
   type SessionHistoryFilter,
 } from '@features/session-history/model/sessionHistoryModel';
+
+export { default as SessionHistoryView } from '@features/session-history/components/SessionHistoryView';

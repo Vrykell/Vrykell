@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import { useSessionStore, type Tab } from '@entities/session';
-import { useTerminalStore } from '@entities/terminal';
-import { useUiStore } from '@shared/ui';
+import { useSessionStore, type Tab } from '@features/workspace';
+import { useTerminalStore } from '@features/terminal';
+import { useUiStore } from '@features/workspace';
 import { countLeaves, leaf, leaves, splitLeaf } from '@features/workspace/model/windowLayout';
 import { useTerminalLayoutActions } from '@features/terminal/hooks/useTerminalLayoutActions';
 

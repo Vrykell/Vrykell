@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import { useChatStore } from '@entities/chat';
-import { useBlockStore, useTerminalStore } from '@entities/terminal';
+import { useChatStore } from '@features/chat';
+import { useBlockStore, useTerminalStore } from '@features/terminal';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 import { useBlockItemActions } from '@features/terminal/hooks/useBlockItemActions';
 
 const mocks = vi.hoisted(() => ({ ptyWrite: vi.fn(), chatSend: vi.fn() }));
-vi.mock('@/platform/pty', () => ({ ptyWrite: mocks.ptyWrite }));
+vi.mock('@platform/pty', () => ({ ptyWrite: mocks.ptyWrite }));
 
 function block(patch: Partial<TermBlock> = {}): TermBlock {
   return {

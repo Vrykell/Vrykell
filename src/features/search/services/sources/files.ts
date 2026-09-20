@@ -1,8 +1,8 @@
 import { FileText } from 'lucide-react';
 import { registerSource } from '@features/search/services/registry';
-import { searchFiles as backendSearchFiles } from '@shared/api/search';
+import { searchFiles as backendSearchFiles } from '@platform/api/search';
 import { useWorkspaceDirsStore } from '@features/files/services/workspaceDirs';
-import { fmtSize } from '@/components/UiBtn';
+import { fmtSize } from '@ui/UiBtn';
 import type { SearchResult, FileResultData } from '@features/search/types';
 
 function fmtTimeAgo(ts: number): string {

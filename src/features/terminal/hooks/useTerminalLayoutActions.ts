@@ -1,8 +1,8 @@
 import { useCallback, useMemo } from 'react';
-import { useSessionStore, nextTerminalId } from '@entities/session';
-import { useTerminalStore } from '@entities/terminal';
-import { useUiStore } from '@shared/ui';
-import { defaultOpenModeForShell } from '@entities/agent';
+import { useSessionStore, nextTerminalId } from '@features/workspace';
+import { useTerminalStore } from '@features/terminal';
+import { useUiStore } from '@features/workspace';
+import { defaultOpenModeForShell } from '@features/agent';
 import {
   dropTargets,
   findLeaf,

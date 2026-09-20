@@ -343,6 +343,30 @@
 
 **小结**：持久化闭环（颜色快照 + 双向净化）与文件面板形态收敛（磁盘卡片、面包屑回顶栏、路径入底栏），GUI 启动环境补全使 TUI 应用兼容性修复。
 
+## Phase 16 — 企业级前端结构与边界收口（2026-09-16 ~ 09-20）
+
+### 目录迁移
+
+- 业务域统一收敛到 `src/features/*`，删除旧顶层 `agent/chat/settings/ssh/files/search/terminal` 与 `stores/`。
+- 通用 UI、平台适配、协议、配置和工具分别下沉到 `ui/`、`platform/`、`core/`、`config/`、`utils/`。
+- `components/`、`downloads/`、`hooks/`、`theme/`、`widgets/`、`shared/`、`entities/` 兼容层全部移除。
+- 应用启动、Provider、根布局、全局命令和开发入口统一归入 `app/`。
+
+### 边界与质量
+
+- 新增 `@app`、`@features`、`@platform`、`@core`、`@ui`、`@config`、`@utils`、`@i18n` 稳定别名。
+- 架构门禁升级：禁止旧目录、低层反向依赖和视图层 Store 穿透。
+- 覆盖率范围切换到新目录结构，并补齐 SSH Store 与搜索历史 Store 测试。
+- 搜索历史状态修正为内存和持久化都最多保留 20 条。
+
+### 验证
+
+- TypeScript strict 通过。
+- 架构检查通过。
+- 单元测试：100 个文件通过、1 个跳过；652 个用例通过、1 个跳过。
+- 覆盖率：Statements 86.68%、Branches 75.08%、Functions 86.73%、Lines 89.29%。
+- 生产构建通过，保留大包拆分为后续性能任务。
+
 ---
 
 ## 现状与后续

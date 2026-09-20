@@ -1,5 +1,5 @@
 import { createContext, useContext, type ReactNode } from 'react';
-import zh from '@/i18n/zh';
+import zh from '@i18n/zh';
 
 // ── 类型 ──
 

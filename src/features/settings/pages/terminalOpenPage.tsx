@@ -1,9 +1,9 @@
 /**
  * terminalOpenPage — 各 Shell 打开模式设置页。
  */
-import Segmented from '@/components/Segmented';
-import { useAgentSettings } from '@entities/agent';
-import type { ShellType } from '@/platform/shells';
+import Segmented from '@ui/Segmented';
+import { useAgentSettings } from '@features/agent';
+import type { ShellType } from '@platform/shells';
 import { Field } from '@features/settings/components/ui';
 
 const OPEN_MODE_OPTIONS = (

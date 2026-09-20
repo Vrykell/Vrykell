@@ -1,8 +1,9 @@
 import { SquareTerminal } from 'lucide-react';
 import { registerSource } from '@features/search/services/registry';
-import type { SearchResult, BlockResultData, BackendBlockEntry } from '@features/search/types';
-import { searchBlocks } from '@shared/api/search';
-import { fmtDuration } from '@/components/UiBtn';
+import type { BackendBlockEntry } from '@platform/api/types';
+import type { SearchResult, BlockResultData } from '@features/search/types';
+import { searchBlocks } from '@platform/api/search';
+import { fmtDuration } from '@ui/UiBtn';
 
 /** 去除 ANSI 转义序列，提取纯文本 */
 function stripAnsi(s: string): string {

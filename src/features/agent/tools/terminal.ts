@@ -15,13 +15,13 @@
 import { tool } from 'ai';
 import { DESC_READ_TERMINAL, DESC_TERMINAL_KEYS } from '@features/agent/model/toolTexts';
 import { z } from 'zod';
-import { ptyWrite } from '@/platform/pty';
+import { ptyWrite } from '@platform/pty';
 import {
   getFocusedTerminalId,
   getTerminalScreen,
   useTerminalStore,
   useBlockStore,
-} from '@entities/terminal';
+} from '@features/terminal';
 import { gate, type ToolContext } from '@features/agent/stores/permissions';
 
 const BLOCK_OUTPUT_CAP = 2000;

@@ -16,9 +16,9 @@ import { generateText } from 'ai';
 import { createChatModel } from '@features/agent/services/provider';
 import { useAgentSettings } from '@features/agent/stores/agentSettings';
 import { activeModelProfile, isApiKeyConfigured } from '@features/agent/stores/aiConfig';
-import { useBlockStore } from '@entities/terminal';
-import { useChatStore } from '@entities/chat';
-import { useSessionStore, isSessionTab } from '@entities/session';
+import { useBlockStore } from '@features/terminal';
+import { useChatStore } from '@features/chat';
+import { useSessionStore, isSessionTab } from '@features/workspace';
 
 export const TITLE_COOLDOWN_MS = 60_000;
 export const TITLE_IDLE_MS = 5_000;

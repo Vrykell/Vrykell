@@ -13,7 +13,7 @@ import {
   listAgents, saveAgent, removeAgent, type AgentDef,
   listSchedules, saveSchedule, removeSchedule, type Schedule,
 } from '@features/agent/services/platform';
-import { useToastStore } from '@/components/Toast';
+import { useToastStore } from '@ui/Toast';
 import { kickScheduleRunner } from '@features/agent/services/scheduleRunner';
 
 const toast = (msg: string, type: 'info' | 'success' | 'error') =>

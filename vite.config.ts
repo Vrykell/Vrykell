@@ -15,41 +15,49 @@ export default defineConfig(async () => ({
   resolve: {
     alias: {
       "@app": `${sourceRoot}/app`,
-      "@shared": `${sourceRoot}/shared`,
-      "@widgets": `${sourceRoot}/widgets`,
+      "@config": `${sourceRoot}/config`,
+      "@core": `${sourceRoot}/core`,
       "@features": `${sourceRoot}/features`,
-      "@entities": `${sourceRoot}/entities`,
+      "@i18n": `${sourceRoot}/i18n`,
+      "@platform": `${sourceRoot}/platform`,
+      "@ui": `${sourceRoot}/ui`,
+      "@utils": `${sourceRoot}/utils`,
       "@": sourceRoot,
     },
   },
 
   test: {
     environment: "jsdom",
-    setupFiles: "./src/test/setup.ts",
+    setupFiles: "./src/test-utils/setup.ts",
     globals: true,
     exclude: ["e2e/**", "node_modules/**"],
     coverage: {
       provider: "v8",
       reporter: ["text", "text-summary"],
-      // 覆盖范围 = 核心逻辑（agent/工具/API/文件/库/状态/主题/终端管线）；
-      // UI 壳层（聊天/设置/组件/终端视图/搜索/SSH/下载/开发页）属渲染层，不在单测范围内
+      // 覆盖范围 = 核心逻辑（Feature、平台适配、状态、主题、终端管线）；
+      // 纯展示组件仍由交互测试和 E2E 覆盖，不纳入单元测试门槛。
       include: [
-        "src/agent/**/*.{ts,tsx}",
-        "src/api/**/*.{ts,tsx}",
-        "src/files/**/*.{ts,tsx}",
-        "src/lib/**/*.{ts,tsx}",
-        "src/stores/**/*.{ts,tsx}",
-        "src/theme/**/*.{ts,tsx}",
-        "src/terminal/pipeline/**/*.{ts,tsx}",
+        "src/config/theme/**/*.{ts,tsx}",
+        "src/features/*/stores/**/*.{ts,tsx}",
+        "src/features/agent/**/*.{ts,tsx}",
+        "src/features/files/**/*.{ts,tsx}",
+        "src/features/settings/model/terminalTheme.ts",
+        "src/features/terminal/services/pipeline/**/*.{ts,tsx}",
+        "src/platform/**/*.{ts,tsx}",
+        "src/app/providers/ThemeProvider.tsx",
+        "src/utils/**/*.{ts,tsx}",
       ],
       exclude: [
-        "src/files/PanelFiles.tsx",
-        "src/agent/standardSkills.ts",
-        "src/agent/tools/remember.ts",
-        "src/agent/tools/spawnAgent.ts",
+        "src/app/providers/**",
+        "src/features/*/components/**",
+        "src/features/*/hooks/**",
+        "src/features/files/components/**",
+        "src/features/agent/model/standardSkills.ts",
+        "src/features/agent/tools/remember.ts",
+        "src/features/agent/tools/spawnAgent.ts",
         "src/**/*.test.*",
         "src/**/__tests__/**",
-        "src/test/**",
+        "src/test-utils/**",
       ],
       thresholds: {
         statements: 80,

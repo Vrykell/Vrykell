@@ -9,7 +9,7 @@
 
 import type { Terminal } from '@xterm/xterm';
 import { createBlockTerm, extractSnapshotFromBuffer } from '@features/terminal/model/terminalSnapshot';
-import type { DispatchEvent } from '@features/terminal/services/pipeline/events';
+import type { DispatchEvent } from '@core/terminal/events';
 import type { TermBlock, BlockStatus } from '@features/terminal/services/pipeline/termBlock';
 
 export type Scene = 'classic' | 'blockList' | 'altScreen';

@@ -15,7 +15,7 @@ import { useAgentSettings, DEFAULT_AGENT_SETTINGS } from '@features/agent/stores
 import { useAiConfigStore } from '@features/agent/stores/aiConfig';
 import { useBlockStore } from '@features/terminal/stores/blocks';
 import { useChatStore } from '@features/chat/stores/chat';
-import { useSessionStore } from '@entities/session';
+import { useSessionStore } from '@features/workspace';
 import { leaf } from '@features/workspace/model/windowLayout';
 
 function mkTab(id: string, extra: Record<string, unknown> = {}) {

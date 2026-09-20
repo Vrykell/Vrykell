@@ -1,5 +1,5 @@
-import { safeLocalStorageGet, safeLocalStorageSet } from '@shared/utils/errorHandler';
-import type { ShellOption, ShellType } from '@/platform/shells';
+import { safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
+import type { ShellOption, ShellType } from '@platform/shells';
 import type { SshConnection } from '@features/ssh/services/api';
 
 /**

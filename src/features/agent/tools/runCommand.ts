@@ -14,13 +14,13 @@
  * 约定：永不 throw —— 返回结构化结果，让模型自我修正。
  */
 
-import { ptyWrite } from '@/platform/pty';
+import { ptyWrite } from '@platform/pty';
 import {
   useTerminalStore,
   useBlockStore,
   getFocusedTerminalId,
   getRecentOutputFor,
-} from '@entities/terminal';
+} from '@features/terminal';
 import { agentControl } from '@features/agent/services/agentControl';
 
 export interface RunCommandResult {

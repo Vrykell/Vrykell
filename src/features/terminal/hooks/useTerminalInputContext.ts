@@ -1,8 +1,8 @@
 import { useMemo, useSyncExternalStore } from 'react';
-import { useTerminalStore, useBlockStore } from '@entities/terminal';
-import { useSessionStore, isSessionTab } from '@entities/session';
+import { useTerminalStore, useBlockStore } from '@features/terminal';
+import { useSessionStore, isSessionTab } from '@features/workspace';
 import { leaves as layoutLeaves } from '@features/workspace/model/windowLayout';
-import { shellTypeLabel } from '@/platform/shells';
+import { shellTypeLabel } from '@platform/shells';
 import { isInputBoxVisible } from '@features/terminal/inputVisibility';
 import { agentControl } from '@features/agent/services/agentControl';
 

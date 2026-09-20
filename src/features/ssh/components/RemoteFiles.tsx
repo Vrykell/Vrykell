@@ -2,10 +2,10 @@ import { useEffect, useState, useRef, useMemo } from 'react';
 import { Folder, File, MoreHorizontal, LocateFixed, ArrowUp } from 'lucide-react';
 import type { SshFsEntry } from '@features/ssh/services/api';
 import type { SshConnection } from '@features/ssh/services/api';
-import { IconBtn } from '@/components/UiBtn';
-import ContextMenu from '@/components/ContextMenu';
-import ConfirmDialog from '@/components/ConfirmDialog';
-import DownloadManager from '@/downloads/DownloadManager';
+import { IconBtn } from '@ui/UiBtn';
+import ContextMenu from '@ui/ContextMenu';
+import ConfirmDialog from '@ui/ConfirmDialog';
+import DownloadManager from '@features/files/components/DownloadManager';
 import { compactPathSegments } from '@features/files/utils/pathUtils';
 import { useRemoteFileBrowser } from '@features/ssh/hooks/useRemoteFileBrowser';
 

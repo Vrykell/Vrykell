@@ -12,7 +12,7 @@ const fsMocks = vi.hoisted(() => ({
 vi.mock('@features/files/services/fs', () => fsMocks);
 vi.mock('@features/files/services/fileOpen', () => ({ openFile: vi.fn() }));
 vi.mock('@tauri-apps/plugin-opener', () => ({ openPath: vi.fn() }));
-vi.mock('@/platform/pty', () => ({ ptyWrite: vi.fn() }));
+vi.mock('@platform/pty', () => ({ ptyWrite: vi.fn() }));
 
 describe('useLocalFileActions', () => {
   beforeEach(() => {

@@ -1,20 +1,20 @@
 import { create } from 'zustand';
-import { useToastStore } from '@/components/Toast';
-import { t } from '@/i18n';
+import { useToastStore } from '@ui/Toast';
+import { t } from '@i18n';
 import * as sessionManager from '@features/workspace/services/sessionManager';
 import {
   groupsList, groupCreate, groupRename, groupSetCollapsed, groupDelete,
   groupDeleteWithSessions, groupsReorder, sessionSetGroup, sessionsReorder,
   groupRestore, groupArchive,
-} from '@shared/api/group';
-import type { BackendGroupEntry } from '@shared/api/types';
+} from '@platform/api/group';
+import type { BackendGroupEntry } from '@platform/api/types';
 import { useBlockStore } from '@features/terminal/stores/blocks';
 import { useChatStore } from '@features/chat/stores/chat';
 import { useAgentSettings } from '@features/agent/stores/agentSettings';
 import { defaultOpenModeForShell } from '@features/agent/stores/agentSettings';
 import { useTerminalStore, getFocusedTerminalId } from '@features/terminal/stores/terminal';
-import type { ShellType } from '@/platform/shells';
-import { shellTypeLabel } from '@/platform/shells';
+import type { ShellType } from '@platform/shells';
+import { shellTypeLabel } from '@platform/shells';
 import {
   leaf, leaves as layoutLeaves, firstLeaf, findLeaf, splitLeaf, removeLeaf, countLeaves,
   type WindowLayout, type TerminalSpec, type SplitDir,

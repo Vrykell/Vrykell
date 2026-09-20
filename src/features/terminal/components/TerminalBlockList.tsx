@@ -11,12 +11,12 @@ import {
   Bookmark, Check, ChevronDown, ChevronRight, Copy, Ellipsis,
   Maximize2, RotateCw, Skull, Sparkles, Square, Terminal, X, Zap,
 } from 'lucide-react';
-import { useBlockStore } from '@entities/terminal';
-import { useTerminalStore } from '@entities/terminal';
+import { useBlockStore } from '@features/terminal';
+import { useTerminalStore } from '@features/terminal';
 import AiBlock from '@features/chat/components/AiBlock';
-import { ptyWrite } from '@/platform/pty';
-import { fmtDuration } from '@/components/UiBtn';
-import { getCellMetrics } from '@shared/utils/termMetrics';
+import { ptyResize, ptyWrite } from '@platform/pty';
+import { fmtDuration } from '@ui/UiBtn';
+import { getCellMetrics } from '@utils/termMetrics';
 import { getExecutingTerm, syncTermWidth, applyCompactCharSize } from '@features/terminal/hooks/useTerminalSession';
 import BlockMenu from '@features/terminal/components/BlockMenu';
 import BlockOutput from '@features/terminal/components/BlockOutput';
@@ -476,9 +476,24 @@ function RunningTerm({ tabId }: { tabId: string }) {
     };
 
     let renderSub: { dispose(): void } | null = null;
+    const resizeFullscreen = () => {
+      const screen = el.querySelector<HTMLElement>('.xterm-screen');
+      if (!screen || term.cols <= 0 || term.rows <= 0) return;
+      const rect = screen.getBoundingClientRect();
+      const cellW = rect.width / term.cols;
+      const cellH = rect.height / term.rows;
+      if (cellW <= 0 || cellH <= 0) return;
+      const cols = Math.max(2, Math.floor(host.clientWidth / cellW));
+      const rows = Math.max(1, Math.floor(host.clientHeight / cellH));
+      if (cols === term.cols && rows === term.rows) return;
+      term.resize(cols, rows);
+      const sid = useTerminalStore.getState().sessions[tabId];
+      if (sid) ptyResize(sid, cols, rows).catch(() => {});
+    };
     if (tuiFs) {
       el.style.height = '100%'; // 全屏：不裁剪，完整行数可见
       term.focus(); // 主 xterm 已隐藏，键盘落点交给块终端
+      requestAnimationFrame(resizeFullscreen);
     } else {
       updateHeight();
       renderSub = term.onRender(updateHeight);
@@ -500,7 +515,10 @@ function RunningTerm({ tabId }: { tabId: string }) {
     // 卡片宿主宽度变化（出现/滚动条挤占/侧栏拖拽）→ 校核 PTY 与块终端列数
     //（blockList 场景下宽度跟随卡片内容宽，见 useTerminalSession.applyWidth）。
     // ResizeObserver 在 observe 时立即回调一次，兼作挂载时的首次校核。
-    const widthRo = new ResizeObserver(() => syncTermWidth(tabId));
+    const widthRo = new ResizeObserver(() => {
+      if (tuiFs) resizeFullscreen();
+      else syncTermWidth(tabId);
+    });
     widthRo.observe(host);
     // 选中即复制（与主 xterm 一致）
     const selSub = term.onSelectionChange(() => {

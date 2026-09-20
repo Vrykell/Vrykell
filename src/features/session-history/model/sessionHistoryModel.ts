@@ -1,4 +1,4 @@
-import type { BackendGroupEntry, BackendSessionEntry } from '@shared/api/types';
+import type { BackendGroupEntry, BackendSessionEntry } from '@platform/api/types';
 import { filterSessions, type SessionDateFilter, type SessionTypeFilter } from '@features/session-history/model/filter';
 
 export interface SessionHistoryFilter {

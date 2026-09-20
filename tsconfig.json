@@ -19,10 +19,14 @@
     "paths": {
       "@/*": ["src/*"],
       "@app/*": ["src/app/*"],
-      "@shared/*": ["src/shared/*"],
-      "@widgets/*": ["src/widgets/*"],
+      "@config/*": ["src/config/*"],
+      "@core/*": ["src/core/*"],
       "@features/*": ["src/features/*"],
-      "@entities/*": ["src/entities/*"]
+      "@i18n": ["src/i18n/index.tsx"],
+      "@i18n/*": ["src/i18n/*"],
+      "@platform/*": ["src/platform/*"],
+      "@ui/*": ["src/ui/*"],
+      "@utils/*": ["src/utils/*"]
     },
 
     /* Linting */

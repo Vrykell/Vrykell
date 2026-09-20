@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
-import { useAgentSettings } from '@entities/agent';
+import { useAgentSettings } from '@features/agent';
 import { completeCommand, localCompleteCandidates } from '@features/agent/services/complete';
 
 export interface CompletionCycle {

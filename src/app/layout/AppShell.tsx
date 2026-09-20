@@ -1,9 +1,9 @@
 import { useCallback } from 'react';
-import { useUiStore } from '@shared/ui';
-import { useTerminalThemeStore } from '@/theme/terminalTheme';
+import { useUiStore } from '@features/workspace';
+import { useTerminalThemeStore } from '@features/settings/model/terminalTheme';
 import type { TerminalSpec } from '@features/workspace/model/windowLayout';
-import WorkspaceShell from '@/widgets/workspace/WorkspaceShell';
-import ApplicationOverlays from '@/widgets/overlays/ApplicationOverlays';
+import WorkspaceShell from '@app/layout/WorkspaceShell';
+import ApplicationOverlays from '@app/layout/ApplicationOverlays';
 
 /** 应用视觉壳：背景、内容层、工作区与应用级弹层。 */
 export default function AppShell() {

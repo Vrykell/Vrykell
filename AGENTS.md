@@ -47,26 +47,26 @@ PTY output → Rust StreamScanner (scan.rs, synchronous) → SessionController (
 
 Key files:
 - `src-tauri/src/terminal/scan.rs` - **Rust** byte-level synchronous scanner (was `streamDispatcher.ts` in TS, sunk down)
-- `src/terminal/pipeline/events.ts` - `DispatchEvent` mirror of Rust `ScanEvent`
-- `src/terminal/pipeline/sessionController.ts` - Block lifecycle + scene management (one per tab/pane)
+- `src/core/terminal/events.ts` - `DispatchEvent` mirror of Rust `ScanEvent`
+- `src/features/terminal/services/pipeline/sessionController.ts` - Block lifecycle + scene management (one per tab/pane)
 - `src-tauri/src/terminal/pty.rs` - PTY session lifecycle
 - `src-tauri/src/shell_integration.rs` - OSC 133/7 shell hooks
 
 Domain layout:
-- `src/agent/` - AI agent logic (agentStream, tools, permissions, skills, MCP, context, memory, scheduling, auto-title)
-- `src/chat/` - AI render (AiBlock/ModelPill/ToolRunCard/Markdown/PanelChat)
-- `src/settings/` - Settings pages (behavior/model/MCP/skills/shortcuts/open-mode/theme)
-- `src/ssh/` `src/files/` `src/search/` `src/theme/` - SSH / local files / global search / theme
-- `src/lib/` - Tauri IPC + infra (pty, ai, sessionManager, windowLayout for splits)
+- `src/features/agent/` - AI agent logic (agentStream, tools, permissions, skills, MCP, context, memory, scheduling, auto-title)
+- `src/features/chat/` - AI render (AiBlock/ModelPill/ToolRunCard/Markdown/PanelChat)
+- `src/features/settings/` - Settings pages and theme state
+- `src/features/ssh/` `src/features/files/` `src/features/search/` - SSH / local files / global search
+- `src/platform/` - Tauri IPC, PTY, filesystem, shells and runtime adapters
 
 ## File Organization
 
-- `src/terminal/` - Terminal components (block list, input bar, panels)
-- `src/stores/` - Zustand state management
-- `src/components/` - Shared UI components
-- `src/chat/` - AI chat related
-- `src/agent/` - AI agent logic
-- `src/lib/` - Tauri IPC wrappers (pty, fs, ai)
+- `src/app/` - Application bootstrap, providers, root layout, global commands and dev entry
+- `src/features/` - Business domains with colocated components, hooks, stores, services and models
+- `src/platform/` - Tauri IPC and runtime infrastructure
+- `src/core/` - Cross-domain protocols and contracts
+- `src/ui/` - Business-agnostic UI components
+- `src/config/` `src/utils/` `src/i18n/` `src/test-utils/` - Shared infrastructure
 - `src-tauri/src/` - Rust backend
 
 ## Code Conventions
@@ -78,9 +78,10 @@ Domain layout:
 
 ## Test Setup
 
-- Unit tests use jsdom with xterm.js canvas mock (`src/test/setup.ts`)
+- Unit tests use jsdom with xterm.js canvas mock (`src/test-utils/setup.ts`)
 - E2e tests use Playwright with Tauri + Anthropic mocks (`e2e/tauri-mock.ts`)
 - Coverage thresholds: 80% statements/functions/lines, 75% branches
+- Architecture guard: `npm run check:architecture`
 
 ## Commit Convention
 

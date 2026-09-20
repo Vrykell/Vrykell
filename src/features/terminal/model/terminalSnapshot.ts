@@ -195,7 +195,7 @@ function escapeHtml(s: string): string {
 
 /** 与主 xterm / BlockOutput CSS 一致的字体栈（活 block 终端必须同源，否则完成切换时跳变） */
 export const XTERM_FONT_FAMILY =
-  'Menlo, Monaco, "Cascadia Code", "JetBrains Mono", "Noto Sans CJK SC", "PingFang SC", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", monospace';
+  'Menlo, Monaco, "Cascadia Code", "JetBrains Mono", "Noto Sans Mono", "DejaVu Sans Mono", "Noto Sans CJK SC", "PingFang SC", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", monospace';
 
 /**
  * createBlockTerm — 运行中 block 的活终端（：块内是真实 xterm 栅格，
