@@ -170,6 +170,10 @@ button:not([data-subtle]):hover { background: var(--button-hover); }
 button:disabled { opacity: 0.45; cursor: default; }
 
 /* Windows/Linux 鏃犳湁鍘熺敓鏍囬鏍忔椂鐨勭獥鍙ｆ帶鍒舵寜閽?*/
+button.window-control-button {
+  background: transparent;
+  color: var(--text-secondary);
+}
 .window-control-button:hover {
   background: var(--button-hover);
   color: var(--text-primary);
