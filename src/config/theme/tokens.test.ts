@@ -69,6 +69,13 @@ describe('默认调色板（中性，主色不带颜色倾向）', () => {
     expect(themes.dark.error).toBe('#F14C4C');
     expect(themes.dark.warning).toBe('#CCA700');
   });
+
+  it('终端表面与应用外壳分层，并提供完整 ANSI 色板', () => {
+    expect(themes.dark.xtermBg).not.toBe(themes.dark.canvas);
+    expect(themes.dark.xtermForeground).toBe('#D6D9E0');
+    expect(themes.dark.xtermBlue).toBe('#8DB7E8');
+    expect(themes.dark.xtermBrightRed).toBe('#FF9A92');
+  });
 });
 
 describe('paletteToCssVars', () => {

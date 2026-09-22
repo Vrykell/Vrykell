@@ -99,14 +99,31 @@ export interface ThemePalette {
 
   // xterm.js 主题
   xtermBg: string;
+  xtermForeground: string;
   xtermCursor: string;
   xtermSelection: string;
+  xtermBlack: string;
+  xtermRed: string;
+  xtermGreen: string;
+  xtermYellow: string;
+  xtermBlue: string;
+  xtermMagenta: string;
+  xtermCyan: string;
+  xtermWhite: string;
+  xtermBrightBlack: string;
+  xtermBrightRed: string;
+  xtermBrightGreen: string;
+  xtermBrightYellow: string;
+  xtermBrightBlue: string;
+  xtermBrightMagenta: string;
+  xtermBrightCyan: string;
+  xtermBrightWhite: string;
 }
 
 // ── Dark（默认：中性，主色不带任何颜色倾向） ──
 
 const dark: ThemePalette = {
-  // 纯中性近黑底（无冷/暖倾向），侧栏与终端统一
+  // 应用外壳保持近黑，终端单独提亮一层，避免大块内容融进外壳。
   canvas: '#0A0A0A',
   surface: '#0A0A0A',
   block: '#171717',
@@ -185,9 +202,27 @@ const dark: ThemePalette = {
   apiKeyBg: 'rgba(255,255,255,0.06)',
   apiKeyBorder: 'rgba(255,255,255,0.18)',
 
-  xtermBg: '#0A0A0A',
-  xtermCursor: '#C8C8C8',
-  xtermSelection: 'rgba(255,255,255,0.16)',
+  xtermBg: '#111417',
+  xtermForeground: '#D6D9E0',
+  xtermCursor: '#C9D1DB',
+  xtermSelection: 'rgba(141,183,232,0.28)',
+  // 低饱和 ANSI 色板：保留目录、路径、错误等语义，同时避免彩色噪声。
+  xtermBlack: '#1B1F24',
+  xtermRed: '#F28B82',
+  xtermGreen: '#A8D5A2',
+  xtermYellow: '#E6C98A',
+  xtermBlue: '#8DB7E8',
+  xtermMagenta: '#C5A4D8',
+  xtermCyan: '#8FCFD0',
+  xtermWhite: '#D6D9E0',
+  xtermBrightBlack: '#66707C',
+  xtermBrightRed: '#FF9A92',
+  xtermBrightGreen: '#BFE8B7',
+  xtermBrightYellow: '#F2DFA3',
+  xtermBrightBlue: '#A9CCF5',
+  xtermBrightMagenta: '#D7B7E8',
+  xtermBrightCyan: '#B0E4E1',
+  xtermBrightWhite: '#F3F5F8',
 };
 
 /**
@@ -297,9 +332,26 @@ const light: ThemePalette = {
   apiKeyBg: 'rgba(46,46,46,0.06)',
   apiKeyBorder: 'rgba(46,46,46,0.18)',
 
-  xtermBg: '#FFFFFF',
-  xtermCursor: '#2E2E2E',
-  xtermSelection: 'rgba(46,46,46,0.14)',
+  xtermBg: '#F8F9FB',
+  xtermForeground: '#2B3038',
+  xtermCursor: '#2E3742',
+  xtermSelection: 'rgba(46,96,150,0.20)',
+  xtermBlack: '#41454D',
+  xtermRed: '#B42318',
+  xtermGreen: '#2E7D32',
+  xtermYellow: '#8A6500',
+  xtermBlue: '#2166A5',
+  xtermMagenta: '#7A4E9B',
+  xtermCyan: '#087F8C',
+  xtermWhite: '#F3F4F6',
+  xtermBrightBlack: '#6B7280',
+  xtermBrightRed: '#D33A2C',
+  xtermBrightGreen: '#3F9443',
+  xtermBrightYellow: '#A47B00',
+  xtermBrightBlue: '#2F7EC5',
+  xtermBrightMagenta: '#9364B5',
+  xtermBrightCyan: '#1499A5',
+  xtermBrightWhite: '#FFFFFF',
 };
 
 // ── 导出 ──
@@ -369,8 +421,25 @@ export function paletteToCssVars(p: ThemePalette): Record<string, string> {
     '--api-key-bg': p.apiKeyBg,
     '--api-key-border': p.apiKeyBorder,
     '--xterm-bg': p.xtermBg,
+    '--xterm-foreground': p.xtermForeground,
     '--xterm-cursor': p.xtermCursor,
     '--xterm-selection': p.xtermSelection,
+    '--xterm-black': p.xtermBlack,
+    '--xterm-red': p.xtermRed,
+    '--xterm-green': p.xtermGreen,
+    '--xterm-yellow': p.xtermYellow,
+    '--xterm-blue': p.xtermBlue,
+    '--xterm-magenta': p.xtermMagenta,
+    '--xterm-cyan': p.xtermCyan,
+    '--xterm-white': p.xtermWhite,
+    '--xterm-bright-black': p.xtermBrightBlack,
+    '--xterm-bright-red': p.xtermBrightRed,
+    '--xterm-bright-green': p.xtermBrightGreen,
+    '--xterm-bright-yellow': p.xtermBrightYellow,
+    '--xterm-bright-blue': p.xtermBrightBlue,
+    '--xterm-bright-magenta': p.xtermBrightMagenta,
+    '--xterm-bright-cyan': p.xtermBrightCyan,
+    '--xterm-bright-white': p.xtermBrightWhite,
     // 保持现有字体/几何变量不变（不在 palette 中管理）
   };
 }

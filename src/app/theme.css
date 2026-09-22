@@ -128,9 +128,26 @@
   --th-bg: rgba(255,255,255,0.05);
 
   /* xterm 专用 */
-  --xterm-bg: #0A0A0A;
-  --xterm-cursor: #C8C8C8;
-  --xterm-selection: rgba(255, 255, 255, 0.16);
+  --xterm-bg: #111417;
+  --xterm-foreground: #D6D9E0;
+  --xterm-cursor: #C9D1DB;
+  --xterm-selection: rgba(141, 183, 232, 0.28);
+  --xterm-black: #1B1F24;
+  --xterm-red: #F28B82;
+  --xterm-green: #A8D5A2;
+  --xterm-yellow: #E6C98A;
+  --xterm-blue: #8DB7E8;
+  --xterm-magenta: #C5A4D8;
+  --xterm-cyan: #8FCFD0;
+  --xterm-white: #D6D9E0;
+  --xterm-bright-black: #66707C;
+  --xterm-bright-red: #FF9A92;
+  --xterm-bright-green: #BFE8B7;
+  --xterm-bright-yellow: #F2DFA3;
+  --xterm-bright-blue: #A9CCF5;
+  --xterm-bright-magenta: #D7B7E8;
+  --xterm-bright-cyan: #B0E4E1;
+  --xterm-bright-white: #F3F5F8;
 }
 
 * { box-sizing: border-box; }

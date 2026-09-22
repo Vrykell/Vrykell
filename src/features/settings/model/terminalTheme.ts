@@ -16,6 +16,7 @@ import {
   type ThemeMode,
 } from '@config/theme/tokens';
 import { termInstances } from '@features/terminal';
+import { readXtermTheme } from '@features/terminal/model/xtermTheme';
 
 export interface TerminalThemeConfig {
   /** 应用整体不透明度 0.05..=1.0（1 = 完全不透明） */
@@ -73,10 +74,8 @@ function resolveWallpaperUrl(path: string | null): string | null {
 
 /** 重应用所有 xterm 实例的主题（明暗/颜色覆盖变化时同步背景/光标/选区/滚动条滑块）。 */
 export function reapplyXtermTheme(): void {
+  const theme = readXtermTheme();
   const cs = getComputedStyle(document.documentElement);
-  const bg = cs.getPropertyValue('--xterm-bg').trim() || '#050505';
-  const cursor = cs.getPropertyValue('--xterm-cursor').trim() || '#e8e8e8';
-  const selection = cs.getPropertyValue('--xterm-selection').trim() || 'rgba(255,255,255,0.25)';
   // 滚动条滑块颜色与 block 列表滚动条(theme.css)一致
   const thumb = cs.getPropertyValue('--scrollbar-thumb').trim() || 'rgba(255,255,255,0.14)';
   const thumbHover = cs.getPropertyValue('--scrollbar-thumb-hover').trim() || 'rgba(255,255,255,0.22)';
@@ -84,9 +83,7 @@ export function reapplyXtermTheme(): void {
     try {
       t.options.theme = {
         ...(t.options.theme ?? {}),
-        background: bg,
-        cursor,
-        selectionBackground: selection,
+        ...theme,
         scrollbarSliderBackground: thumb,
         scrollbarSliderHoverBackground: thumbHover,
         scrollbarSliderActiveBackground: thumbHover,

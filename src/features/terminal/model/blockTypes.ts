@@ -4,11 +4,16 @@
 
 // ── 256 色调色板 ──
 
+// 使用 CSS 变量而不是写死颜色，保证已完成的命令块与实时 xterm 共用主题。
 const ANSI_16 = [
-  '#000000', '#cc0000', '#4e9a06', '#c4a000',
-  '#3465a4', '#75507b', '#06989a', '#d3d7cf',
-  '#555753', '#ef2929', '#8ae234', '#fce94f',
-  '#729fcf', '#ad7fa8', '#34e2e2', '#eeeeec',
+  'var(--xterm-black, #1B1F24)', 'var(--xterm-red, #F28B82)',
+  'var(--xterm-green, #A8D5A2)', 'var(--xterm-yellow, #E6C98A)',
+  'var(--xterm-blue, #8DB7E8)', 'var(--xterm-magenta, #C5A4D8)',
+  'var(--xterm-cyan, #8FCFD0)', 'var(--xterm-white, #D6D9E0)',
+  'var(--xterm-bright-black, #66707C)', 'var(--xterm-bright-red, #FF9A92)',
+  'var(--xterm-bright-green, #BFE8B7)', 'var(--xterm-bright-yellow, #F2DFA3)',
+  'var(--xterm-bright-blue, #A9CCF5)', 'var(--xterm-bright-magenta, #D7B7E8)',
+  'var(--xterm-bright-cyan, #B0E4E1)', 'var(--xterm-bright-white, #F3F5F8)',
 ];
 
 function buildColorCube(): string[] {
@@ -41,10 +46,10 @@ export const PALETTE: string[] = [...ANSI_16, ...buildColorCube(), ...buildGrays
 /** 调色板索引 → CSS 颜色 */
 export function indexToCss(index: number): string {
   if (index >= 0 && index < PALETTE.length) return PALETTE[index]!;
-  if (index === 256) return 'var(--fg, #d3d7cf)';
-  if (index === 257) return 'var(--bg, #050505)';
-  if (index === 258) return 'var(--cursor, #e8e8e8)';
+  if (index === 256) return 'var(--xterm-foreground, #D6D9E0)';
+  if (index === 257) return 'var(--xterm-bg, #111417)';
+  if (index === 258) return 'var(--xterm-cursor, #C9D1DB)';
   if (index >= 259 && index <= 266) return PALETTE[index - 259]!;
-  if (index === 267 || index === 268) return 'var(--fg, #d3d7cf)';
-  return '#ffffff';
+  if (index === 267 || index === 268) return 'var(--xterm-foreground, #D6D9E0)';
+  return 'var(--xterm-bright-white, #F3F5F8)';
 }

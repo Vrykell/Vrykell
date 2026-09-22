@@ -13,6 +13,7 @@ import { ptySpawn, ptyWrite, ptyResize, ptyClose, onPtyOutput, onPtyExit } from 
 import { registerTerminal, unregisterTerminal, useTerminalStore } from '@features/terminal';
 import { useBlockStore } from '@features/terminal';
 import { useHistoryStore } from '@features/terminal/stores/history';
+import { readXtermTheme } from '@features/terminal/model/xtermTheme';
 import { useSessionStore } from '@features/workspace';
 import { leaves as layoutLeaves } from '@features/workspace/model/windowLayout';
 import * as sessionManager from '@features/workspace/services/sessionManager';
@@ -138,7 +139,6 @@ export function useTerminalSession(
     const el = containerRef.current;
     if (!el) return;
 
-    const cs = getComputedStyle(document.documentElement);
     const term = new Terminal({
       fontFamily:
         'Menlo, Monaco, "Cascadia Code", "JetBrains Mono", "Noto Sans CJK SC", "PingFang SC", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", monospace',
@@ -146,11 +146,7 @@ export function useTerminalSession(
       cursorBlink: true,
       scrollback: 5000,
       allowTransparency: false,
-      theme: {
-        background: cs.getPropertyValue('--xterm-bg').trim() || '#050505',
-        cursor: cs.getPropertyValue('--xterm-cursor').trim() || '#e8e8e8',
-        selectionBackground: cs.getPropertyValue('--xterm-selection').trim() || 'rgba(255,255,255,0.25)',
-      },
+      theme: readXtermTheme(),
     });
     const fit = new FitAddon();
     term.loadAddon(fit);
