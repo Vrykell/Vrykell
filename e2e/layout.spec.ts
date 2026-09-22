@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { setupTauriMock } from './tauri-mock';
+import { setupTauriMock, ensureTabsOpen } from './tauri-mock';
 
 test.beforeEach(async ({ page }) => {
   await setupTauriMock(page);
@@ -12,6 +12,9 @@ test.describe('应用布局', () => {
     await expect(page.locator('[data-dock-btn="tabs"]')).toBeVisible();
     await expect(page.locator('[data-dock-btn="files"]')).toBeVisible();
     await expect(page.getByTitle('设置')).toBeVisible();
+    await expect(page.locator('[data-testid="tab-search"]')).toBeVisible();
+    await expect(page.getByText('Documents')).toHaveCount(0);
+    await expect(page.locator('[data-testid="ssh-search"]')).toHaveCount(0);
   });
 
   test('Windows/Linux 使用应用内窗口控制按钮', async ({ page }) => {
@@ -65,7 +68,7 @@ test.describe('应用布局', () => {
     // 新标签同样进入 blockList，xterm 挂载但隐藏
     await expect(page.locator('.xterm')).toBeAttached();
     // 点击 "标签" dock 按钮打开标签面板
-    await page.locator('[data-dock-btn="tabs"]').click();
+    await ensureTabsOpen(page);
     // 面板内点击顶部新建按钮 → 直接弹出类型选择弹窗（无中间菜单）
     await page.locator('[data-testid="tab-new-btn"]').click();
     await page.getByText('Zsh', { exact: true }).click();
@@ -95,7 +98,7 @@ test.describe('应用布局', () => {
     expect(s.scrollY).toBe(0);
 
     // 打开面板后重新验证
-    await page.locator('[data-dock-btn="tabs"]').click();
+    await ensureTabsOpen(page);
     await page.waitForTimeout(300);
 
     s = await check();

@@ -22,7 +22,8 @@ export const PANEL_DEFS: Record<string, PanelDef> = {
 
 export type DockSide = 'left' | 'right';
 
-const STORAGE_KEY = 'dock-layout-v3';
+const STORAGE_KEY = 'dock-layout-v4';
+const LEGACY_STORAGE_KEY = 'dock-layout-v3';
 const VALID_IDS = Object.keys(PANEL_DEFS);
 
 interface PersistedLayout {
@@ -47,12 +48,18 @@ function isValidLayout(data: unknown): data is PersistedLayout {
 
 const DEFAULTS: PersistedLayout = {
   leftZone: ['tabs', 'ssh'], rightZone: ['files'],
-  leftPanels: [], rightPanels: [],
+  // 首次进入只保留会话列表和终端，文件/SSH 面板按需打开。
+  leftPanels: ['tabs'], rightPanels: [],
   panelWidths: {},
 };
 
 function loadLayout(): PersistedLayout {
-  const raw = safeLocalStorageGet(STORAGE_KEY);
+  let raw = safeLocalStorageGet(STORAGE_KEY);
+  let migratingLegacy = false;
+  if (!raw) {
+    raw = safeLocalStorageGet(LEGACY_STORAGE_KEY);
+    migratingLegacy = !!raw;
+  }
   if (!raw) return DEFAULTS;
   const parsed = safeJsonParse<unknown>(raw);
   if (!isValidLayout(parsed)) {
@@ -60,16 +67,29 @@ function loadLayout(): PersistedLayout {
     return DEFAULTS;
   }
   // 迁移：新面板 id 未出现在任何 zone 时，追加到右侧，保证新增面板按钮可见
-  const layout = parsed as PersistedLayout;
+  const layout: PersistedLayout = {
+    leftZone: [...parsed.leftZone],
+    rightZone: [...parsed.rightZone],
+    leftPanels: [...parsed.leftPanels],
+    rightPanels: [...parsed.rightPanels],
+    panelWidths: { ...parsed.panelWidths },
+  };
   const known = new Set([...layout.leftZone, ...layout.rightZone]);
   const missing = VALID_IDS.filter((id) => !known.has(id));
   if (missing.length > 0) {
     layout.rightZone = [...layout.rightZone, ...missing];
-    saveLayout(layout);
+  }
+  // v3 的默认布局会把多个侧栏同时打开。升级时保留按钮位置和宽度，
+  // 只恢复会话列表，避免旧缓存继续占用终端空间。
+  if (migratingLegacy) {
+    const tabsOnLeft = layout.leftZone.includes('tabs');
+    layout.leftPanels = tabsOnLeft ? ['tabs'] : [];
+    layout.rightPanels = tabsOnLeft ? [] : (layout.rightZone.includes('tabs') ? ['tabs'] : []);
   }
   // 面板顺序对齐按钮顺序（而非打开先后）
   layout.leftPanels = sortByZone(layout.leftPanels, layout.leftZone);
   layout.rightPanels = sortByZone(layout.rightPanels, layout.rightZone);
+  if (migratingLegacy || missing.length > 0) saveLayout(layout);
   return layout;
 }
 

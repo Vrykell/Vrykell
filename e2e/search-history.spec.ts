@@ -2,7 +2,7 @@
  * 标题重生成 + 全局搜索 + 命令历史 e2e。
  */
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, mockAnthropic, searchCalls } from './tauri-mock';
+import { setupTauriMock, mockAnthropic, searchCalls, ensureTabsOpen } from './tauri-mock';
 
 test.describe('重新生成标题（标签右键菜单）', () => {
   test('AI 模式发消息后右键重新生成标题', async ({ page }) => {
@@ -19,7 +19,7 @@ test.describe('重新生成标题（标签右键菜单）', () => {
     await expect(page.getByText('部署服务').first()).toBeVisible({ timeout: 10000 });
 
     // 打开标签面板，右键第一个标签 → 重新生成标题
-    await page.locator('[data-dock-btn="tabs"]').click();
+    await ensureTabsOpen(page);
     const row = page.locator('[data-testid^="tab-row-"]').first();
     await expect(row).toBeVisible();
     await row.click({ button: 'right' });
