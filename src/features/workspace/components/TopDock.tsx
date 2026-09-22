@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { Terminal, Settings, Search } from 'lucide-react';
+import { Settings, Search } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useDockStore, PANEL_DEFS, type DockSide } from '@features/workspace';
 import DockButton from '@features/workspace/components/DockButton';
@@ -216,12 +216,6 @@ export default function TopDock() {
       <ToolbarBtn title="设置（⌘,）" onClick={() => useSessionStore.getState().openSettingsTab()}>
         <Settings size={16} />
       </ToolbarBtn>
-      <span style={{
-        display: 'inline-flex', alignItems: 'center', gap: 4,
-        fontSize: 10, color: 'var(--text-muted)', paddingLeft: 6, paddingRight: 2,
-      }}>
-        <Terminal size={11} /> Vrykell
-      </span>
       <WindowControls />
 
       {/* 拖拽跟随光标预览 */}
