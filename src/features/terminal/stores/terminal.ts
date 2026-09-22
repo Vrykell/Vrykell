@@ -109,6 +109,8 @@ export function getTerminalScreen(paneId: string): TerminalScreen | null {
 interface TerminalState {
   /** tabId → PTY session id */
   sessions: Record<string, string>;
+  /** session 尚未返回时暂存的命令；PTY 就绪后由 setSession 原样冲刷 */
+  pendingCommands: Record<string, string[]>;
   /** tabId → 终端尺寸（状态栏展示用） */
   dims: Record<string, { cols: number; rows: number }>;
   visible: boolean;
@@ -126,6 +128,7 @@ interface TerminalState {
   scenes: Record<string, Scene>;
   setScene: (tabId: string, scene: Scene) => void;
   setSession: (tabId: string, sessionId: string) => void;
+  queueCommand: (tabId: string, command: string) => void;
   setDims: (tabId: string, cols: number, rows: number) => void;
   /** 关 tab 时删除该 tab 的 session/dims/scene，避免 per-tab 残留 */
   dropTab: (tabId: string) => void;
@@ -138,6 +141,7 @@ interface TerminalState {
 
 export const useTerminalStore = create<TerminalState>((set, get) => ({
   sessions: {},
+  pendingCommands: {},
   dims: {},
   visible: true,
   altScreenActive: false,
@@ -149,20 +153,56 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   setFocusedPane: (paneId) => set({ focusedPaneId: paneId }),
   setScene: (tabId, scene) =>
     set((s) => ({ scenes: { ...s.scenes, [tabId]: scene } })),
-  setSession: (tabId, sessionId) =>
-    set((s) => ({ sessions: { ...s.sessions, [tabId]: sessionId } })),
+  setSession: (tabId, sessionId) => {
+    const queued = get().pendingCommands[tabId] ?? [];
+    set((s) => {
+      const pendingCommands = { ...s.pendingCommands };
+      delete pendingCommands[tabId];
+      return {
+        sessions: { ...s.sessions, [tabId]: sessionId },
+        pendingCommands,
+      };
+    });
+    if (queued.length > 0) {
+      const data = queued
+        .map((command) => (command.endsWith('\n') ? command : command + '\n'))
+        .join('');
+      ptyWrite(sessionId, data).catch(() => {});
+    }
+  },
+  queueCommand: (tabId, command) => {
+    const sessionId = get().sessions[tabId];
+    if (sessionId) {
+      ptyWrite(sessionId, command.endsWith('\n') ? command : command + '\n').catch(() => {});
+      return;
+    }
+    if (!command.trim()) return;
+    set((s) => ({
+      pendingCommands: {
+        ...s.pendingCommands,
+        [tabId]: [...(s.pendingCommands[tabId] ?? []), command],
+      },
+    }));
+  },
   setDims: (tabId, cols, rows) =>
     set((s) => ({ dims: { ...s.dims, [tabId]: { cols, rows } } })),
   dropTab: (tabId) =>
     set((s) => {
-      if (!(tabId in s.sessions) && !(tabId in s.dims) && !(tabId in s.scenes)) return s;
+      if (
+        !(tabId in s.sessions)
+        && !(tabId in s.pendingCommands)
+        && !(tabId in s.dims)
+        && !(tabId in s.scenes)
+      ) return s;
       const sessions = { ...s.sessions };
+      const pendingCommands = { ...s.pendingCommands };
       const dims = { ...s.dims };
       const scenes = { ...s.scenes };
       delete sessions[tabId];
+      delete pendingCommands[tabId];
       delete dims[tabId];
       delete scenes[tabId];
-      return { sessions, dims, scenes };
+      return { sessions, pendingCommands, dims, scenes };
     }),
   toggle: () => set((s) => ({ visible: !s.visible })),
   runInTerminal: (command) => {

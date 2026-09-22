@@ -39,6 +39,17 @@ describe('terminal store', () => {
     expect(invokeMock).not.toHaveBeenCalled();
   });
 
+  it('PTY 尚未就绪时暂存命令，并在会话建立后冲刷', () => {
+    const termId = getFocusedTerminalId();
+    useTerminalStore.getState().queueCommand(termId, 'echo ready');
+    expect(useTerminalStore.getState().pendingCommands[termId]).toEqual(['echo ready']);
+
+    useTerminalStore.getState().setSession(termId, 's1');
+
+    expect(invokeMock).toHaveBeenCalledWith('pty_write', { id: 's1', data: 'echo ready\n' });
+    expect(useTerminalStore.getState().pendingCommands[termId]).toBeUndefined();
+  });
+
   it('getRecentOutput 读取聚焦终端的终端缓冲并去尾部空行', () => {
     const termId = getFocusedTerminalId();
     const fakeLines = ['$ ls', 'file1  file2', '', ''];

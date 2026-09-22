@@ -3,7 +3,7 @@ import type { ChangeEvent, ClipboardEvent, KeyboardEvent } from 'react';
 import { ptyWrite } from '@platform/pty';
 import { useChatStore } from '@features/chat';
 import { useSessionStore } from '@features/workspace';
-import { useInputStore, selectPaneInput } from '@features/terminal';
+import { useInputStore, useTerminalStore, selectPaneInput } from '@features/terminal';
 import { usePermissions, useAttachmentComposer } from '@features/agent';
 import { useDockStore } from '@features/workspace';
 import { engageFollow } from '@features/terminal/hooks/useFollowBottom';
@@ -134,7 +134,12 @@ export function useInputEditorController({
         clearAttachments();
       } else {
         const sessionId = sessions[paneId];
-        if (sessionId) ptyWrite(sessionId, command.endsWith('\n') ? command : command + '\n').catch(() => {});
+        if (sessionId) {
+          ptyWrite(sessionId, command.endsWith('\n') ? command : command + '\n').catch(() => {});
+        } else {
+          // Windows shell 探测/启动可能晚于输入栏，不能在 sessionId 返回前静默丢掉命令。
+          useTerminalStore.getState().queueCommand(paneId, command);
+        }
         engageFollow(paneId);
       }
     } catch (error) {
