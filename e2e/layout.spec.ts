@@ -19,15 +19,21 @@ test.describe('应用布局', () => {
     const controls = page.locator('[data-testid="window-controls"]');
     await expect(controls).toBeVisible();
     await expect(controls.locator('button')).toHaveCount(3);
+    const controlRight = await controls.evaluate((element) => element.getBoundingClientRect().right);
+    const viewportRight = await page.evaluate(() => window.innerWidth);
+    expect(Math.abs(viewportRight - controlRight)).toBeLessThanOrEqual(1);
     await expect(page.getByText('Vrykell', { exact: true })).toHaveCount(0);
 
     const minimize = controls.locator('[data-testid="window-minimize"]');
     const close = controls.locator('[data-testid="window-close"]');
     await minimize.hover();
+    await expect.poll(() => minimize.evaluate((element) => getComputedStyle(element).backgroundColor))
+      .not.toBe('rgba(0, 0, 0, 0)');
     const neutralHover = await minimize.evaluate((element) => getComputedStyle(element).backgroundColor);
     await close.hover();
+    await expect.poll(() => close.evaluate((element) => getComputedStyle(element).backgroundColor))
+      .not.toBe('rgba(0, 0, 0, 0)');
     const dangerHover = await close.evaluate((element) => getComputedStyle(element).backgroundColor);
-    expect(neutralHover).not.toBe('rgba(0, 0, 0, 0)');
     expect(dangerHover).not.toBe(neutralHover);
 
     await controls.locator('[data-testid="window-minimize"]').click();

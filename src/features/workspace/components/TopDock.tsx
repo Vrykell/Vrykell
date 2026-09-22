@@ -7,7 +7,7 @@ import WindowControls from '@features/workspace/components/WindowControls';
 import { ToolbarBtn } from '@ui/UiBtn';
 import { useUiStore } from '@features/workspace';
 import { selectActiveSessionTab, useSessionStore } from '@features/workspace';
-import { isMacOS } from '@platform/runtime';
+import { isMacOS, usesCustomWindowControls } from '@platform/runtime';
 
 /** 按 clientX 判定落在哪个 zone */
 function hitZone(
@@ -186,7 +186,7 @@ export default function TopDock() {
     <div style={{
       display: 'flex', alignItems: 'center', height: BAR_H, flexShrink: 0,
       background: 'var(--surface)', borderBottom: '1px solid var(--block-divider)',
-      paddingRight: 6, userSelect: 'none',
+      paddingRight: usesCustomWindowControls ? 0 : 6, userSelect: 'none',
       position: 'relative',
     }}>
       {/* 左侧窗口拖拽区 — macOS 红绿灯保留空间（全屏时红绿灯隐藏，无需预留；Windows 无需预留） */}
