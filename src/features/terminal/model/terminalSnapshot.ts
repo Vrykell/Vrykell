@@ -8,6 +8,7 @@ import { Terminal } from '@xterm/xterm';
 import { WebglAddon } from '@xterm/addon-webgl';
 import type { IBufferCell } from '@xterm/xterm';
 import { indexToCss } from '@features/terminal/model/blockTypes';
+import { readXtermTheme } from '@features/terminal/model/xtermTheme';
 
 function getFgCss(cell: IBufferCell): string | null {
   if (cell.isFgDefault()) return null;
@@ -211,7 +212,6 @@ export function createBlockTerm(
   cols: number,
   rows: number,
 ): { term: Terminal; el: HTMLDivElement; dispose: () => void } {
-  const cs = getComputedStyle(document.documentElement);
   // 深色圆角盒子：canvas 直接画 --xterm-bg（不依赖 WebKit 的透明 canvas 支持），
   // el 同底色兜底 padding 环带 —— 两种渲染引擎下观感一致
   const el = document.createElement('div');
@@ -224,12 +224,7 @@ export function createBlockTerm(
     fontSize: 14,
     lineHeight: 1.0,
     cursorBlink: true,
-    theme: {
-      background: cs.getPropertyValue('--xterm-bg').trim() || '#050505',
-      foreground: cs.getPropertyValue('--text-primary').trim() || '#e8e8e8',
-      cursor: cs.getPropertyValue('--xterm-cursor').trim() || '#e8e8e8',
-      selectionBackground: cs.getPropertyValue('--xterm-selection').trim() || 'rgba(255,255,255,0.25)',
-    },
+    theme: readXtermTheme(),
   });
   // 与主终端一致：WebGL renderer 让半块字符拼接无缝（TUI 图标无横裂缝）；
   // 无 GPU 时回退 DOM renderer（xterm 内部行为）
