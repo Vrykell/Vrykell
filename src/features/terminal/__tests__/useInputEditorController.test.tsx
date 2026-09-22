@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useChatStore } from '@features/chat';
 import { useSessionStore } from '@features/workspace';
-import { useInputStore } from '@features/terminal';
+import { useInputStore, useTerminalStore } from '@features/terminal';
 import { useDockStore } from '@features/workspace';
 import { useInputEditorController } from '@features/terminal/hooks/useInputEditorController';
 
@@ -21,15 +21,16 @@ const mocks = vi.hoisted(() => ({
   removeAttachment: vi.fn(),
   clearAttachments: vi.fn(),
   chatSend: vi.fn(),
+  sessions: { 'pane-1': 'pty-1' } as Record<string, string>,
 }));
 
 vi.mock('@platform/pty', () => ({ ptyWrite: mocks.ptyWrite }));
 vi.mock('@features/terminal/hooks/useFollowBottom', () => ({ engageFollow: mocks.engageFollow }));
 vi.mock('@features/terminal/hooks/useTerminalInputContext', () => ({
   useTerminalInputContext: () => ({
-    sessions: { 'pane-1': 'pty-1' },
+    sessions: mocks.sessions,
     isFocused: true,
-    hasSession: true,
+    hasSession: Boolean(mocks.sessions['pane-1']),
     pendingInput: '',
     setPendingInput: vi.fn(),
     tabCwd: 'C:/workspace',
@@ -70,6 +71,7 @@ describe('useInputEditorController', () => {
   const chatSnapshot = useChatStore.getState();
   const sessionSnapshot = useSessionStore.getState();
   const dockSnapshot = useDockStore.getState();
+  const terminalSnapshot = useTerminalStore.getState();
 
   beforeEach(() => {
     mocks.ptyWrite.mockReset().mockResolvedValue(undefined);
@@ -81,6 +83,7 @@ describe('useInputEditorController', () => {
     mocks.acceptCompletion.mockReset().mockReturnValue(false);
     mocks.restoreCompletion.mockReset().mockReturnValue(false);
     mocks.clearAttachments.mockReset();
+    mocks.sessions = { 'pane-1': 'pty-1' };
     useInputStore.setState({ byPane: { 'pane-1': { text: 'git status', aiMode: false } } });
     useChatStore.setState({ sendingTab: null, send: mocks.chatSend });
     useSessionStore.setState({ activeId: 'tab-1' });
@@ -92,6 +95,7 @@ describe('useInputEditorController', () => {
     useChatStore.setState(chatSnapshot, true);
     useSessionStore.setState(sessionSnapshot, true);
     useDockStore.setState(dockSnapshot, true);
+    useTerminalStore.setState(terminalSnapshot, true);
   });
 
   it('submits command text through the pane PTY and engages follow-bottom', () => {
@@ -115,5 +119,21 @@ describe('useInputEditorController', () => {
 
     expect(preventDefault).toHaveBeenCalledOnce();
     expect(mocks.ptyWrite).toHaveBeenCalledWith('pty-1', 'git status\n');
+  });
+
+  it('queues a command entered before the PTY is ready and flushes it on session attach', () => {
+    mocks.sessions = {};
+    useTerminalStore.setState({ sessions: {}, pendingCommands: {} });
+    const { result } = renderHook(() => useInputEditorController({ paneId: 'pane-1' }));
+
+    act(() => result.current.execute());
+
+    expect(mocks.ptyWrite).not.toHaveBeenCalled();
+    expect(useTerminalStore.getState().pendingCommands['pane-1']).toEqual(['git status']);
+
+    act(() => useTerminalStore.getState().setSession('pane-1', 'pty-1'));
+
+    expect(mocks.ptyWrite).toHaveBeenCalledWith('pty-1', 'git status\n');
+    expect(useTerminalStore.getState().pendingCommands['pane-1']).toBeUndefined();
   });
 });

@@ -2,6 +2,7 @@ use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize}
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{Read, Write};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager, State};
 use uuid::Uuid;
@@ -261,30 +262,53 @@ fn cmd_command(cwd: Option<String>) -> CommandBuilder {
 /// 且用户 .zshrc 里 `npm config get prefix` 这类依赖也会失败。
 /// 已存在的目录排在系统 PATH 前面（作为种子，最终 PATH 仍由 .zshrc 决定）。
 fn merge_user_bin_paths(cmd: &mut CommandBuilder) {
-    let current = std::env::var("PATH").unwrap_or_default();
-    let home = std::env::var("HOME").unwrap_or_default();
-    let mut merged: Vec<String> = Vec::new();
-    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-    let push = |dir: String, merged: &mut Vec<String>, seen: &mut std::collections::HashSet<String>| {
-        if dir.is_empty() || !std::path::Path::new(&dir).is_dir() || seen.contains(&dir) {
+    // `PATH` uses `:` on Unix and `;` on Windows.  Splitting/joining it by
+    // hand silently turns Windows drive letters into separate entries and
+    // can make the selected shell (especially `pwsh`) impossible to spawn.
+    let current = std::env::var_os("PATH").unwrap_or_default();
+    let mut merged: Vec<PathBuf> = Vec::new();
+    let mut seen: std::collections::HashSet<PathBuf> = std::collections::HashSet::new();
+    let push = |dir: PathBuf,
+                require_directory: bool,
+                merged: &mut Vec<PathBuf>,
+                seen: &mut std::collections::HashSet<PathBuf>| {
+        if dir.as_os_str().is_empty()
+            || (require_directory && !dir.is_dir())
+            || seen.contains(&dir)
+        {
             return;
         }
         seen.insert(dir.clone());
         merged.push(dir);
     };
-    // 用户 bin 目录优先（GUI 缺的就是这些）；.cargo/bin 由 ~/.zshenv 补，这里兜底
-    for dir in [
-        "/usr/local/bin",
-        "/opt/homebrew/bin",
-        &format!("{home}/.local/bin"),
-        &format!("{home}/.cargo/bin"),
-    ] {
-        push(dir.to_string(), &mut merged, &mut seen);
+
+    // GUI launches on Unix often omit these user directories.  Windows keeps
+    // its normal PATH intact; only the cross-platform path serialization is
+    // needed there to keep shell discovery and spawning reliable.
+    #[cfg(unix)]
+    {
+        let home = dirs::home_dir().unwrap_or_default();
+        for dir in [
+            PathBuf::from("/usr/local/bin"),
+            PathBuf::from("/opt/homebrew/bin"),
+            home.join(".local/bin"),
+            home.join(".cargo/bin"),
+        ] {
+            push(dir, true, &mut merged, &mut seen);
+        }
     }
-    for dir in current.split(':') {
-        push(dir.to_string(), &mut merged, &mut seen);
+
+    // Keep inherited entries even when a directory has disappeared since the
+    // process started.  Dropping them would change the user's shell PATH.
+    for dir in std::env::split_paths(&current) {
+        push(dir, false, &mut merged, &mut seen);
     }
-    cmd.env("PATH", merged.join(":"));
+
+    // `join_paths` applies the platform separator and preserves Windows drive
+    // letters.  Fall back to the original value if an unusual entry cannot be
+    // joined rather than replacing PATH with an empty value.
+    let path = std::env::join_paths(merged).unwrap_or(current);
+    cmd.env("PATH", path);
 }
 
 /// GUI（Finder/Dock 启动）的 TERM 通常为空 —— zsh 会退化为 dumb、依赖终端
@@ -764,6 +788,27 @@ mod tests {
         }
         // 继承的 PATH 不丢失
         assert!(dirs.contains(&"/usr/bin"));
+    }
+
+    /// Windows 的 PATH 必须保留盘符和 `;` 分隔符，否则 `pwsh` 无法被找到。
+    #[cfg(windows)]
+    #[test]
+    fn merge_user_bin_paths_preserves_windows_path_entries() {
+        let original = std::env::var_os("PATH");
+        std::env::set_var("PATH", r"C:\Windows\System32;C:\Program Files\PowerShell\7");
+
+        let mut cmd = CommandBuilder::new("pwsh");
+        merge_user_bin_paths(&mut cmd);
+        let path = cmd.get_env("PATH").expect("PATH 被设置");
+        assert_eq!(
+            path.to_str(),
+            Some(r"C:\Windows\System32;C:\Program Files\PowerShell\7")
+        );
+
+        match original {
+            Some(value) => std::env::set_var("PATH", value),
+            None => std::env::remove_var("PATH"),
+        }
     }
 
     /// GUI 启动 TERM 为空：补 xterm-256color + truecolor；已显式设置时不动。
