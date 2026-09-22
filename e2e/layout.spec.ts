@@ -19,6 +19,17 @@ test.describe('应用布局', () => {
     const controls = page.locator('[data-testid="window-controls"]');
     await expect(controls).toBeVisible();
     await expect(controls.locator('button')).toHaveCount(3);
+    await expect(page.getByText('Vrykell', { exact: true })).toHaveCount(0);
+
+    const minimize = controls.locator('[data-testid="window-minimize"]');
+    const close = controls.locator('[data-testid="window-close"]');
+    await minimize.hover();
+    const neutralHover = await minimize.evaluate((element) => getComputedStyle(element).backgroundColor);
+    await close.hover();
+    const dangerHover = await close.evaluate((element) => getComputedStyle(element).backgroundColor);
+    expect(neutralHover).not.toBe('rgba(0, 0, 0, 0)');
+    expect(dangerHover).not.toBe(neutralHover);
+
     await controls.locator('[data-testid="window-minimize"]').click();
     await controls.locator('[data-testid="window-maximize"]').click();
     await controls.locator('[data-testid="window-close"]').click();

@@ -92,8 +92,6 @@ export default function WindowControls() {
     padding: 0,
     border: 'none',
     borderRadius: 0,
-    background: 'transparent',
-    color: 'var(--text-secondary)',
     cursor: 'pointer',
     flexShrink: 0,
   } as const;
