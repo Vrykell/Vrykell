@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { setupTauriMock } from './tauri-mock';
+import { setupTauriMock, ensureTabsOpen } from './tauri-mock';
 
 test.beforeEach(async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   // 打开标签管理面板
-  await page.locator('[data-dock-btn="tabs"]').click();
+  await ensureTabsOpen(page);
   await expect(page.locator('[data-testid="tab-search"]')).toBeVisible();
 });
 

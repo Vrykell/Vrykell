@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, revealedPaths } from './tauri-mock';
+import { setupTauriMock, revealedPaths, ensureTabsOpen } from './tauri-mock';
 
 test.beforeEach(async ({ page }) => {
   await setupTauriMock(page);
@@ -30,7 +30,7 @@ test.describe('SSH 远程连接管理侧栏', () => {
     await expect(page.getByText('app.log')).toBeVisible({ timeout: 5000 });
     await expect(page.getByText('Documents')).toBeVisible();
     // 标签面板出现以连接名命名的标签页
-    await page.locator('[data-dock-btn="tabs"]').click();
+    await ensureTabsOpen(page);
     await expect(page.locator('[data-testid^="tab-row-"]', { hasText: '生产服务器' })).toHaveCount(1);
   });
 

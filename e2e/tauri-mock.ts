@@ -986,3 +986,12 @@ export async function expectAnyTermContains(page: Page, text: string, timeout = 
     })
     .toBe(true);
 }
+
+/** 确保会话列表面板打开，兼容默认布局与按需打开状态。 */
+export async function ensureTabsOpen(page: Page): Promise<void> {
+  const search = page.locator('[data-testid="tab-search"]');
+  if (!(await search.isVisible().catch(() => false))) {
+    await page.locator('[data-dock-btn="tabs"]').click();
+  }
+  await search.waitFor({ state: 'visible' });
+}

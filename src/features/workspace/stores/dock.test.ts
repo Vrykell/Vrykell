@@ -141,23 +141,29 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
   }
 
   it('无缓存时使用默认布局', async () => {
+    localStorage.removeItem('dock-layout-v4');
     localStorage.removeItem('dock-layout-v3');
     const store = await freshStore();
     expect(store.getState().leftZone).toEqual(['tabs', 'ssh']);
     expect(store.getState().rightZone).toEqual(['files']);
+    expect(store.getState().leftPanels).toEqual(['tabs']);
+    expect(store.getState().rightPanels).toEqual([]);
   });
 
   it('损坏数据回退默认并告警', async () => {
-    localStorage.setItem('dock-layout-v3', 'not-json');
+    localStorage.removeItem('dock-layout-v3');
+    localStorage.setItem('dock-layout-v4', 'not-json');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const store = await freshStore();
     expect(store.getState().leftZone).toEqual(['tabs', 'ssh']);
+    expect(store.getState().leftPanels).toEqual(['tabs']);
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
   });
 
   it('合法但缺新面板 id 的旧布局：追加到右侧并重排面板', async () => {
-    localStorage.setItem('dock-layout-v3', JSON.stringify({
+    localStorage.removeItem('dock-layout-v3');
+    localStorage.setItem('dock-layout-v4', JSON.stringify({
       leftZone: ['tabs'], rightZone: [],
       leftPanels: [], rightPanels: [],
       panelWidths: {},
@@ -170,12 +176,30 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
   });
 
   it('面板顺序对齐按钮顺序', async () => {
-    localStorage.setItem('dock-layout-v3', JSON.stringify({
+    localStorage.removeItem('dock-layout-v3');
+    localStorage.setItem('dock-layout-v4', JSON.stringify({
       leftZone: ['tabs', 'ssh'], rightZone: ['files'],
       leftPanels: ['ssh', 'tabs'], rightPanels: ['files'],
       panelWidths: {},
     }));
     const store = await freshStore();
     expect(store.getState().leftPanels).toEqual(['tabs', 'ssh']);
+  });
+
+  it('v3 布局迁移时保留按钮位置，只打开会话列表', async () => {
+    localStorage.removeItem('dock-layout-v4');
+    localStorage.setItem('dock-layout-v3', JSON.stringify({
+      leftZone: ['tabs', 'ssh'], rightZone: ['files'],
+      leftPanels: ['tabs', 'ssh'], rightPanels: ['files'],
+      panelWidths: { tabs: 220, files: 280 },
+    }));
+    const store = await freshStore();
+    const s = store.getState();
+    expect(s.leftZone).toEqual(['tabs', 'ssh']);
+    expect(s.rightZone).toEqual(['files', 'chat']);
+    expect(s.leftPanels).toEqual(['tabs']);
+    expect(s.rightPanels).toEqual([]);
+    expect(s.panelWidths).toEqual({ tabs: 220, files: 280 });
+    expect(localStorage.getItem('dock-layout-v4')).toContain('"leftPanels":["tabs"]');
   });
 });

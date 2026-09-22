@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, ptyWrites } from './tauri-mock';
+import { setupTauriMock, ptyWrites, ensureTabsOpen } from './tauri-mock';
 
 async function openHistory(page: import('@playwright/test').Page) {
-  await page.locator('[data-dock-btn="tabs"]').click();
+  await ensureTabsOpen(page);
   await page.locator('[data-testid="tab-history-btn"]').click();
 }
 
@@ -15,7 +15,7 @@ test.describe('会话历史管理', () => {
   test('启动时自动恢复上次活跃会话', async ({ page }) => {
     // mock list_sessions 返回 status=active 的 t1 → 启动后自动恢复为标签
     // （恢复的标签 id 为 t1，区别于模块级默认标签）
-    await page.locator('[data-dock-btn="tabs"]').click();
+    await ensureTabsOpen(page);
     await expect(page.locator('[data-testid="tab-row-t1"]')).toBeVisible({ timeout: 5000 });
   });
 
@@ -43,7 +43,7 @@ test.describe('会话历史管理', () => {
     // 幂等打开会话历史页（面板状态可能已被持久化，避免 toggle 关掉它）
     await expect(page.locator('[data-testid^="tab-row-"]').first()).toBeVisible();
     if (!(await page.locator('[data-testid="tab-history-btn"]').isVisible().catch(() => false))) {
-      await page.locator('[data-dock-btn="tabs"]').click();
+      await ensureTabsOpen(page);
     }
     await expect(page.locator('[data-testid="tab-history-btn"]')).toBeVisible({ timeout: 5000 });
     await page.locator('[data-testid="tab-history-btn"]').click();
@@ -76,7 +76,7 @@ test.describe('文件双击打开', () => {
     await expect(page.getByText('notes.txt')).toBeVisible();
     await page.getByText('notes.txt').dblclick();
     // 新建标签页（标题为文件名）
-    await page.locator('[data-dock-btn="tabs"]').click();
+    await ensureTabsOpen(page);
     await expect(page.locator('[data-testid^="tab-row-"]', { hasText: 'notes.txt' })).toHaveCount(1);
     // 编辑器命令写入 PTY
     await expect.poll(() => ptyWrites(page)).toContain('vim /home/e2e/notes.txt\n');

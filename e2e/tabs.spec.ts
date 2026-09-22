@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, mockAnthropic } from './tauri-mock';
+import { setupTauriMock, mockAnthropic, ensureTabsOpen } from './tauri-mock';
 
 test.beforeEach(async ({ page }) => {
   await setupTauriMock(page);
@@ -20,7 +20,7 @@ test.describe('多标签工作区', () => {
     // 用快捷键新建标签 2
     await page.keyboard.press('Meta+t');
     // 打开标签面板验证两个标签存在
-    await page.locator('[data-dock-btn="tabs"]').click();
+    await ensureTabsOpen(page);
     await expect(page.locator('text=第一标签的问题').first()).toBeVisible();
     await expect(page.getByText('终端').first()).toBeVisible();
 
@@ -36,7 +36,7 @@ test.describe('多标签工作区', () => {
     // 用快捷键新建标签
     await page.keyboard.press('Meta+t');
     // 打开标签面板验证第二个标签存在
-    await page.locator('[data-dock-btn="tabs"]').click();
+    await ensureTabsOpen(page);
     await expect(page.getByText('终端').first()).toBeVisible();
     // 快捷键关闭标签（会关闭当前激活的标签）
     await page.keyboard.press('Meta+w');

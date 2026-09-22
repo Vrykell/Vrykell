@@ -10,7 +10,7 @@ async function boot(page: import('@playwright/test').Page, reply: string) {
   await setupTauriMock(page);
   // 种入 dock 布局：chat 面板按钮在左区（默认布局里 chat 不在任何 zone）
   await page.addInitScript(() => {
-    localStorage.setItem('dock-layout-v3', JSON.stringify({
+    localStorage.setItem('dock-layout-v4', JSON.stringify({
       leftZone: ['tabs', 'chat'], rightZone: ['files'],
       leftPanels: [], rightPanels: [], panelWidths: {},
     }));

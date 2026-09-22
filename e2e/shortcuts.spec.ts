@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { setupTauriMock } from './tauri-mock';
+import { setupTauriMock, ensureTabsOpen } from './tauri-mock';
 
 test.beforeEach(async ({ page }) => {
   await setupTauriMock(page);
@@ -10,7 +10,7 @@ test.beforeEach(async ({ page }) => {
 test.describe('全局快捷键', () => {
   test('Cmd+T 新建标签，Cmd+W 关闭标签', async ({ page }) => {
     // 打开标签面板
-    await page.locator('[data-dock-btn="tabs"]').click();
+    await ensureTabsOpen(page);
     // 应有至少一个标签
     await expect(page.locator('[data-testid^="tab-row-"]')).toHaveCount(1);
     // 新建标签
@@ -30,7 +30,7 @@ test.describe('全局快捷键', () => {
     await page.keyboard.press('Meta+t');
     await page.keyboard.press('Meta+t');
     // 打开标签面板验证多个标签存在
-    await page.locator('[data-dock-btn="tabs"]').click();
+    await ensureTabsOpen(page);
     await expect(page.getByText('终端').first()).toBeVisible();
     // 切换回第一个标签（验证 activate 生效）
     await page.keyboard.press('Meta+1');
