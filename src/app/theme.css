@@ -171,7 +171,7 @@ button:disabled { opacity: 0.45; cursor: default; }
 
 /* Windows/Linux 鏃犳湁鍘熺敓鏍囬鏍忔椂鐨勭獥鍙ｆ帶鍒舵寜閽?*/
 .window-control-button:hover {
-  background: var(--hover);
+  background: var(--button-hover);
   color: var(--text-primary);
 }
 .window-control-button[data-danger="true"]:hover {
