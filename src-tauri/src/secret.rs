@@ -7,6 +7,7 @@
 #[cfg(not(target_os = "macos"))]
 use std::path::PathBuf;
 
+#[cfg(target_os = "macos")]
 const SERVICE: &str = "com.vrykell.app.ssh";
 
 #[cfg(not(target_os = "macos"))]
