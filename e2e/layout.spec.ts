@@ -16,8 +16,12 @@ test.describe('应用布局', () => {
 
   test('Windows/Linux 使用应用内窗口控制按钮', async ({ page }) => {
     test.skip(await page.evaluate(() => /Mac/.test(navigator.userAgent)), 'macOS 使用原生交通灯');
-    await expect(page.locator('[data-testid="window-controls"]')).toBeVisible();
-    await expect(page.locator('[data-testid="window-controls"] button')).toHaveCount(3);
+    const controls = page.locator('[data-testid="window-controls"]');
+    await expect(controls).toBeVisible();
+    await expect(controls.locator('button')).toHaveCount(3);
+    await controls.locator('[data-testid="window-minimize"]').click();
+    await controls.locator('[data-testid="window-maximize"]').click();
+    await controls.locator('[data-testid="window-close"]').click();
   });
 
   test('文件面板：点击资源按钮后显示目录和文件', async ({ page }) => {
