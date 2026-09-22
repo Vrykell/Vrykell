@@ -169,6 +169,16 @@ button:not([data-subtle]) {
 button:not([data-subtle]):hover { background: var(--button-hover); }
 button:disabled { opacity: 0.45; cursor: default; }
 
+/* Windows/Linux 鏃犳湁鍘熺敓鏍囬鏍忔椂鐨勭獥鍙ｆ帶鍒舵寜閽?*/
+.window-control-button:hover {
+  background: var(--hover);
+  color: var(--text-primary);
+}
+.window-control-button[data-danger="true"]:hover {
+  background: var(--error);
+  color: var(--error-text);
+}
+
 /* 分组头：hover 时才显示操作按钮（重命名/删除） */
 .group-actions { opacity: 0; transition: opacity var(--dur) var(--ease); }
 [data-group-header-id]:hover .group-actions { opacity: 1; }

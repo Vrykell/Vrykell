@@ -3,6 +3,7 @@ import { Terminal, Settings, Search } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useDockStore, PANEL_DEFS, type DockSide } from '@features/workspace';
 import DockButton from '@features/workspace/components/DockButton';
+import WindowControls from '@features/workspace/components/WindowControls';
 import { ToolbarBtn } from '@ui/UiBtn';
 import { useUiStore } from '@features/workspace';
 import { selectActiveSessionTab, useSessionStore } from '@features/workspace';
@@ -221,6 +222,7 @@ export default function TopDock() {
       }}>
         <Terminal size={11} /> Vrykell
       </span>
+      <WindowControls />
 
       {/* 拖拽跟随光标预览 */}
       {dragCursor && dragRef.current && (
