@@ -14,6 +14,12 @@ test.describe('应用布局', () => {
     await expect(page.getByTitle('设置')).toBeVisible();
   });
 
+  test('Windows/Linux 使用应用内窗口控制按钮', async ({ page }) => {
+    test.skip(await page.evaluate(() => /Mac/.test(navigator.userAgent)), 'macOS 使用原生交通灯');
+    await expect(page.locator('[data-testid="window-controls"]')).toBeVisible();
+    await expect(page.locator('[data-testid="window-controls"] button')).toHaveCount(3);
+  });
+
   test('文件面板：点击资源按钮后显示目录和文件', async ({ page }) => {
     // 点击 "资源" dock 按钮打开文件面板
     await page.locator('[data-dock-btn="files"]').click();
