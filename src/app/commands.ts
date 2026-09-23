@@ -2,6 +2,8 @@ import { useSessionStore } from '@features/workspace';
 import { useBlockStore, termInstances } from '@features/terminal';
 import { useUiStore, useDockStore } from '@features/workspace';
 import { clearSessionBlocks } from '@features/terminal/hooks/useTerminalSession';
+import { isTerminalDebugEnabled, setTerminalDebugEnabled } from '@features/terminal/services/terminalDebug';
+import { useToastStore } from '@ui/Toast';
 
 /** 应用命令定义 — 被 CommandPalette 和全局搜索共用 */
 export interface AppCommand {
@@ -72,6 +74,10 @@ registerCommand({ id: 'toggle-bookmark', label: '切换书签', desc: '给当前
 }});
 registerCommand({ id: 'open-settings', label: '打开设置', desc: '配置 API Key、模型与编辑器', keys: '⌘,', keywords: ['settings', 'config', 'api'], action: () => useSessionStore.getState().openSettingsTab() });
 registerCommand({ id: 'clear-blocks', label: '清除输出块', desc: '清空当前标签的所有命令块', keywords: ['clear', 'reset'], action: () => clearSessionBlocks(getActiveId()) });
+registerCommand({ id: 'toggle-terminal-debug', label: '切换终端诊断日志', desc: '开关 PTY、Shell 集成和会话状态日志', keywords: ['terminal', 'debug', 'log', 'pty'], action: () => {
+  const enabled = setTerminalDebugEnabled(!isTerminalDebugEnabled());
+  useToastStore.getState().addToast(`终端诊断日志已${enabled ? '开启' : '关闭'}`, 'info');
+} });
 registerCommand({ id: 'font-inc', label: '增大字号', desc: '终端字体变大', keys: '⌘+', keywords: ['font', 'bigger', 'zoom'], action: () => scaleFont(1) });
 registerCommand({ id: 'font-dec', label: '减小字号', desc: '终端字体变小', keys: '⌘-', keywords: ['font', 'smaller', 'zoom'], action: () => scaleFont(-1) });
 registerCommand({ id: 'font-reset', label: '重置字号', desc: '恢复默认字体大小', keys: '⌘0', keywords: ['font', 'reset', 'zoom'], action: () => scaleFont(0) });
