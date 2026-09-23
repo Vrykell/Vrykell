@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager, State};
 use uuid::Uuid;
 
-use crate::terminal::shell_integration;
+use crate::terminal::{debug, shell_integration};
 use crate::terminal::scan::{ScanEvent, StreamScanner};
 
 /// 流式 UTF-8 解码器：跨 read 边界缓冲不完整的多字节序列。
@@ -351,6 +351,10 @@ pub fn pty_spawn(
     ssh: Option<SshTarget>,
     open_mode: Option<String>,
 ) -> Result<String, String> {
+    let debug_shell = shell.clone();
+    let debug_ssh = ssh.is_some();
+    let debug_open_mode = open_mode.clone();
+    let debug_cwd = cwd.clone();
     let pty_system = native_pty_system();
     let pair = pty_system
         .openpty(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
@@ -366,6 +370,21 @@ pub fn pty_spawn(
     let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
 
     let id = format!("pty-{}", Uuid::new_v4());
+    if debug::enabled() {
+        debug::write(
+            "spawn",
+            format!(
+                "id={} cols={} rows={} shell={:?} ssh={} open_mode={:?} cwd={:?}",
+                id,
+                cols,
+                rows,
+                debug_shell,
+                debug_ssh,
+                debug_open_mode,
+                debug_cwd,
+            ),
+        );
+    }
     state.0.lock().map_err(|e| e.to_string())?.insert(
         id.clone(),
         Arc::new(Mutex::new(PtySession { master: pair.master, writer, child })),
@@ -423,6 +442,9 @@ pub fn pty_spawn(
                     if !pending.is_empty() {
                         flush_output(&app, &tid, &mut pending, &mut pending_bytes);
                     }
+                    if debug::enabled() {
+                        debug::write("exit", format!("id={tid}"));
+                    }
                     let _ = app.emit("pty-exit", PtyExit { id: tid.clone() });
                     reap_session(&app, &tid);
                     break;
@@ -455,6 +477,29 @@ fn flush_output(
     if pending.is_empty() {
         return;
     }
+    if debug::enabled() {
+        let mut data_bytes = 0usize;
+        let mut osc = 0usize;
+        let mut alt = 0usize;
+        for event in pending.iter() {
+            match event {
+                ScanEvent::Data { text } => data_bytes += text.len(),
+                ScanEvent::Osc { .. } => osc += 1,
+                ScanEvent::AltEnter { .. } | ScanEvent::AltExit { .. } => alt += 1,
+            }
+        }
+        debug::write(
+            "output",
+            format!(
+                "id={} events={} data_bytes={} osc={} alt={}",
+                id,
+                pending.len(),
+                data_bytes,
+                osc,
+                alt,
+            ),
+        );
+    }
     let events = std::mem::take(pending);
     *pending_bytes = 0;
     if app.emit("pty-output", PtyOutput { id: id.to_string(), events }).is_err() {
@@ -469,6 +514,9 @@ pub async fn pty_write(state: State<'_, PtyState>, id: String, data: String) -> 
     // 前端命令发送统一用 \n，这里归一化成 CR，否则 PowerShell 等收不到回车、命令无响应。
     #[cfg(windows)]
     let data = normalize_enter(&data);
+    if debug::enabled() {
+        debug::write("write", format!("id={} bytes={}", id, data.len()));
+    }
     // 只从全局表取 Arc 句柄，不持锁做 IO——写 PTY 可能因前台进程不读 stdin 而阻塞，
     // 若持全局锁会冻结其它会话的 resize/signal/close。
     let session = {
@@ -493,6 +541,9 @@ fn normalize_enter(data: &str) -> String {
 
 #[tauri::command]
 pub fn pty_resize(state: State<'_, PtyState>, id: String, cols: u16, rows: u16) -> Result<(), String> {
+    if debug::enabled() {
+        debug::write("resize", format!("id={} cols={} rows={}", id, cols, rows));
+    }
     let session = {
         let sessions = state.0.lock().map_err(|e| e.to_string())?;
         sessions.get(&id).cloned().ok_or("session not found")?

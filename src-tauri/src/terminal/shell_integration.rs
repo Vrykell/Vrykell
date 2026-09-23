@@ -84,14 +84,18 @@ function prompt {
     Write-VrykellOsc "133;D" "$ec"
     Write-VrykellOsc "133;A" ""
 
-    # OSC 133;G git branch
-    $b = & git branch --show-current 2>$null
-    if ($b) {
-        $txt = ($b | Out-String).Trim()
-        if ($txt) {
-            $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($txt))
-            Write-VrykellOsc "133;G" $b64
-        }
+    # Cache the branch lookup per directory; spawning git on every prompt makes
+    # short commands feel sluggish, especially on Windows file systems.
+    if ($script:__vrykell_git_cwd -ne $PWD.Path) {
+        $script:__vrykell_git_cwd = $PWD.Path
+        $script:__vrykell_git_branch = (& git branch --show-current 2>$null | Out-String).Trim()
+        # The lookup is an implementation detail and must not become the next
+        # prompt's command status (git returns 128 outside a repository).
+        $global:LASTEXITCODE = $null
+    }
+    if ($script:__vrykell_git_branch) {
+        $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($script:__vrykell_git_branch))
+        Write-VrykellOsc "133;G" $b64
     }
 
     "PS $($PWD.Path)> "
@@ -221,6 +225,15 @@ mod tests {
         assert!(ps.contains("Set-PSReadLineKeyHandler"));
     }
 
+    #[test]
+    fn powershell_prompt_does_not_leak_git_exit_status() {
+        let lookup = "__vrykell_git_branch = (& git branch --show-current 2>$null | Out-String).Trim()";
+        let reset = "$global:LASTEXITCODE = $null";
+        assert!(PS_RC.contains(lookup));
+        assert!(PS_RC.matches(reset).count() >= 2);
+        assert!(PS_RC.contains("$script:__vrykell_git_cwd -ne $PWD.Path"));
+    }
+
     /// 真起一个 zsh 验证钩子发出 OSC 133 标记（zsh 只在 Unix 上可用）。
     #[cfg(unix)]
     #[test]
@@ -315,6 +328,7 @@ mod tests {
 
         let deadline = Instant::now() + Duration::from_secs(15);
         let (mut saw_a, mut saw_c, mut saw_e, mut sent) = (false, false, false, false);
+        let mut saw_git_status_leak = false;
         let mut last_out = String::new();
         while Instant::now() < deadline {
             while let Ok(s) = rx.try_recv() {
@@ -322,6 +336,7 @@ mod tests {
                 saw_a |= s.contains("\u{1b}]133;A");
                 saw_c |= s.contains("\u{1b}]133;C");
                 saw_e |= s.contains("\u{1b}]133;E;");
+                saw_git_status_leak |= s.contains("\u{1b}]133;D;128");
             }
             if saw_a && !sent {
                 sent = true;
@@ -336,6 +351,7 @@ mod tests {
 
         let _ = child.kill();
         let _ = child.wait();
+        assert!(!saw_git_status_leak, "PowerShell prompt leaked git exit code 128: {last_out}");
         assert!(saw_a, "未收到 133;A（prompt 未发 precmd）。输出片段：{last_out}");
         assert!(saw_c, "未收到 133;C（Enter 拦截未发 preexec）。输出片段：{last_out}");
         assert!(saw_e, "未收到 133;E（命令文本未发）。输出片段：{last_out}");

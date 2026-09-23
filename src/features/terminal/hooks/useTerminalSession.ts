@@ -13,6 +13,7 @@ import { ptySpawn, ptyWrite, ptyResize, ptyClose, onPtyOutput, onPtyExit } from 
 import { registerTerminal, unregisterTerminal, useTerminalStore } from '@features/terminal';
 import { useBlockStore } from '@features/terminal';
 import { useHistoryStore } from '@features/terminal/stores/history';
+import { isTerminalDebugEnabled, terminalDebug } from '@features/terminal/services/terminalDebug';
 import { readXtermTheme } from '@features/terminal/model/xtermTheme';
 import { useSessionStore } from '@features/workspace';
 import { leaves as layoutLeaves } from '@features/workspace/model/windowLayout';
@@ -265,6 +266,9 @@ export function useTerminalSession(
     pendingUnlisteners.push(
       onPtyOutput((id, events) => {
         if (disposed) return;
+        if (isTerminalDebugEnabled()) {
+          terminalDebug('pty-output', { id, events: events.length, kinds: events.map((event) => event.kind) });
+        }
         if (sessionId === null) {
           // 尚未拿到 sessionId：先缓冲，等 spawn 完成后回放
           preSession.push({ id, events });
@@ -279,6 +283,7 @@ export function useTerminalSession(
     pendingUnlisteners.push(
       onPtyExit((id) => {
         if (disposed) return;
+        if (isTerminalDebugEnabled()) terminalDebug('pty-exit', { id, sessionId });
         if (id === sessionId) term.write('\r\n\x1b[31m[进程已退出]\x1b[0m\r\n');
       }),
     );
@@ -296,6 +301,9 @@ export function useTerminalSession(
     // 等 ResizeObserver/就绪后重校到真实尺寸，避免 PTY 以 0×0 启动导致空白。
     const spawnCols = term.cols > 0 ? term.cols : 80;
     const spawnRows = term.rows > 0 ? term.rows : 24;
+    if (isTerminalDebugEnabled()) {
+      terminalDebug('pty-spawn-request', { paneId, tabId, cols: spawnCols, rows: spawnRows, spawnOpts });
+    }
     ptySpawn(spawnCols, spawnRows, tabCwd, spawnOpts)
       .then((id) => {
         if (disposed) {
@@ -303,6 +311,7 @@ export function useTerminalSession(
           return;
         }
         sessionId = id;
+        if (isTerminalDebugEnabled()) terminalDebug('pty-spawn-ready', { paneId, id });
         // 回放 spawn 完成前缓冲的初始输出（shell 启动提示符）
         for (const ev of preSession) {
           if (ev.id === sessionId) {
@@ -322,6 +331,7 @@ export function useTerminalSession(
       })
       .catch((e) => {
         if (!disposed) {
+          if (isTerminalDebugEnabled()) terminalDebug('pty-spawn-error', { paneId, error: String(e) });
           console.error('[useTerminalSession] PTY spawn failed:', e);
           term.write(`\r\n\x1b[31m[无法启动 Shell: ${e}]\x1b[0m\r\n`);
         }
@@ -363,7 +373,11 @@ export function useTerminalSession(
     });
 
     const dataSub = term.onData((data) => {
-      if (sessionId) ptyWrite(sessionId, data).catch(() => {});
+      if (sessionId) {
+        ptyWrite(sessionId, data).catch((error) => {
+          if (isTerminalDebugEnabled()) terminalDebug('pty-write-error', { sessionId, error: String(error) });
+        });
+      }
     });
 
     // ── 选中即复制 ──

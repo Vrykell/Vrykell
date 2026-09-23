@@ -11,6 +11,7 @@ import type { Terminal } from '@xterm/xterm';
 import { createBlockTerm, extractSnapshotFromBuffer } from '@features/terminal/model/terminalSnapshot';
 import type { DispatchEvent } from '@core/terminal/events';
 import type { TermBlock, BlockStatus } from '@features/terminal/services/pipeline/termBlock';
+import { isTerminalDebugEnabled, terminalDebug } from '@features/terminal/services/terminalDebug';
 
 export type Scene = 'classic' | 'blockList' | 'altScreen';
 
@@ -99,6 +100,14 @@ export class SessionController {
   // ── 事件入口 ──
 
   handleEvents(events: DispatchEvent[]): void {
+    if (isTerminalDebugEnabled()) {
+      terminalDebug('controller-events', {
+        tabId: this.tabId,
+        scene: this._scene,
+        count: events.length,
+        kinds: events.map((event) => event.kind),
+      });
+    }
     if (!this.blockEnabled) {
       // 经典模式：传统终端，所有输出直进主 xterm（不建块、不切场景、TUI 由 xterm 原生处理）
       for (const ev of events) {
@@ -155,6 +164,9 @@ export class SessionController {
   // ── OSC 处理 ──
 
   private handleOsc(code: string, payload: string, raw: string): void {
+    if (isTerminalDebugEnabled()) {
+      terminalDebug('osc', { tabId: this.tabId, code, payload, rawLength: raw.length, scene: this._scene });
+    }
     // classic/altScreen：OSC raw 转发主 xterm（OSC 8 超链接等不失效）；
     // 但 133/7 是 integration 标记，永不进主 xterm。
     const isIntegration = code === '133;A' || code === '133;C' || code === '133;D'
@@ -255,6 +267,7 @@ export class SessionController {
   private onPreexec(): void {
     const ab = this.activeBlock;
     if (!ab || ab.status !== 'pending') return;
+    if (isTerminalDebugEnabled()) terminalDebug('command-start', { tabId: this.tabId, command: this.pendingCommand });
     ab.command = this.pendingCommand;
     ab.startedAt = Date.now();
     ab.status = 'executing';
@@ -304,6 +317,9 @@ export class SessionController {
     const ab = this.activeBlock;
     if (!ab || ab.status !== 'executing') return;
     const ec = parseInt(payload, 10);
+    if (isTerminalDebugEnabled()) {
+      terminalDebug('command-done', { tabId: this.tabId, command: ab.command, payload, exitCode: isNaN(ec) ? null : ec });
+    }
     this.finishBlock(ab, isNaN(ec) ? null : ec, 'done');
   }
 

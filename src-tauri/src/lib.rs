@@ -112,6 +112,8 @@ pub fn run() {
             agent::mcp::mcp_list_all_tools,
             agent::mcp::mcp_call_tool,
             terminal::pty::pty_spawn,
+            terminal::debug::terminal_debug_set,
+            terminal::debug::terminal_debug_status,
             terminal::shells::list_shells,
             remote::ssh::ssh_connections_list,
             remote::ssh::ssh_connection_save,
