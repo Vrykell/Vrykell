@@ -71,6 +71,7 @@ Domain layout:
 
 ## Code Conventions
 
+- Write new or edited code comments in English, including JSDoc, inline, CSS, and Rust comments
 - Use generic terms in comments, avoid third-party brand names
 - Independent implementation, don't copy third-party source code
 - Colors via `theme.css` CSS variables, no hardcoded colors (except ANSI)
