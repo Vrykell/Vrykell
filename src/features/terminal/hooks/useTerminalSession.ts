@@ -25,7 +25,7 @@ import { getCellMetrics } from '@utils/termMetrics';
 import type { DispatchEvent } from '@core/terminal/events';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 import type { UnlistenFn } from '@tauri-apps/api/event';
-import { XTERM_FONT_FAMILY } from '@features/terminal/model/terminalSnapshot';
+import { TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE, TERMINAL_LINE_HEIGHT } from '@features/terminal/model/terminalFont';
 
 /**
  * TermBlock UI 投影：剥离 controller 内部字段（outputTerm/earlyBuf 等）。
@@ -105,7 +105,7 @@ export function applyCompactCharSize(term: Terminal): void {
   if (!cs?.onCharSizeChange || !render?.handleCharSizeChanged) return;
   if (cs._compactPatched) return;
   cs._compactPatched = true;
-  const fontSize = term.options.fontSize ?? 14;
+  const fontSize = term.options.fontSize ?? TERMINAL_FONT_SIZE;
   cs.onCharSizeChange(() => {
     if (cs.height !== fontSize) {
       cs.height = fontSize;
@@ -141,9 +141,9 @@ export function useTerminalSession(
     if (!el) return;
 
     const term = new Terminal({
-      fontFamily:
-        'Menlo, Monaco, "Cascadia Code", "JetBrains Mono", "Noto Sans CJK SC", "PingFang SC", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", monospace',
-      fontSize: 14,
+      fontFamily: TERMINAL_FONT_FAMILY,
+      fontSize: TERMINAL_FONT_SIZE,
+      lineHeight: TERMINAL_LINE_HEIGHT,
       cursorBlink: true,
       scrollback: 5000,
       allowTransparency: false,
@@ -361,7 +361,7 @@ export function useTerminalSession(
       }
       if (!sessionId) return false;
       // 行高已压到 fontSize（applyCompactCharSize），滚轮按行折算用实际行高
-      const linePx = Math.max(1, (term.options.fontSize ?? 13) * 1.0);
+      const linePx = Math.max(1, (term.options.fontSize ?? TERMINAL_FONT_SIZE) * TERMINAL_LINE_HEIGHT);
       if (Math.sign(e.deltaY) !== Math.sign(wheelResidual)) wheelResidual = 0;
       wheelResidual += e.deltaY;
       const lines = Math.trunc(wheelResidual / linePx);
@@ -416,7 +416,7 @@ export function useTerminalSession(
      * 而完成块的 HTML 快照用浏览器字体渲染（同字体实测 ≈8.43px，偏宽 ~4%）。
      * 若按 cellWidth 定列数，快照会比卡片内容宽 → 结束运行中块时即使没调窗宽
      * 也会折行。统一按 DOM 字符宽换算列数，活终端与完成块宽度一致。
-     * 字体栈取快照渲染同款（XTERM_FONT_FAMILY），一次测量后缓存。
+     * 字体栈取快照渲染同款（TERMINAL_FONT_FAMILY），一次测量后缓存。
      */
     let cachedDomCellWidth = 0;
     const domCellWidth = (): number => {
@@ -424,8 +424,8 @@ export function useTerminalSession(
       const probe = document.createElement('span');
       probe.style.cssText =
         'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:pre;line-height:1;';
-      probe.style.fontFamily = XTERM_FONT_FAMILY;
-      probe.style.fontSize = '14px';
+      probe.style.fontFamily = TERMINAL_FONT_FAMILY;
+      probe.style.fontSize = `${TERMINAL_FONT_SIZE}px`;
       probe.textContent = 'W'.repeat(100);
       document.body.appendChild(probe);
       const w = probe.getBoundingClientRect().width / 100;

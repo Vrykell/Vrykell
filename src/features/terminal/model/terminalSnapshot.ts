@@ -8,6 +8,7 @@ import { Terminal } from '@xterm/xterm';
 import { WebglAddon } from '@xterm/addon-webgl';
 import type { IBufferCell } from '@xterm/xterm';
 import { indexToCss } from '@features/terminal/model/blockTypes';
+import { TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE, TERMINAL_LINE_HEIGHT } from '@features/terminal/model/terminalFont';
 import { readXtermTheme } from '@features/terminal/model/xtermTheme';
 
 function getFgCss(cell: IBufferCell): string | null {
@@ -176,6 +177,9 @@ export function createOffscreenTerm(
     rows,
     scrollback,
     allowTransparency: true,
+    fontFamily: TERMINAL_FONT_FAMILY,
+    fontSize: TERMINAL_FONT_SIZE,
+    lineHeight: TERMINAL_LINE_HEIGHT,
   });
   term.open(el);
   return {
@@ -194,10 +198,6 @@ function escapeHtml(s: string): string {
     .replace(/>/g, '&gt;');
 }
 
-/** 与主 xterm / BlockOutput CSS 一致的字体栈（活 block 终端必须同源，否则完成切换时跳变） */
-export const XTERM_FONT_FAMILY =
-  'Menlo, Monaco, "Cascadia Code", "JetBrains Mono", "Noto Sans Mono", "DejaVu Sans Mono", "Noto Sans CJK SC", "PingFang SC", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", monospace';
-
 /**
  * createBlockTerm — 运行中 block 的活终端（：块内是真实 xterm 栅格，
  * 原生光标/IME/选择/CJK 对齐，不再走 250ms HTML 快照同步）。
@@ -205,8 +205,8 @@ export const XTERM_FONT_FAMILY =
  * 创建时**不 open**（xterm v5 的 write 先于 open 是安全的：解析器与 buffer
  * 是 core 服务，open 只接管 DOM/渲染；xterm-headless 即此用法）。
  * RunningItem 挂载后把 el 移进卡片并 term.open(el)；生命周期归 controller
- * （块完成提取快照后 dispose）。lineHeight 1.0 与完成块 HTML 快照行高一致
- * （14px），完成切换无跳动。
+ * （块完成提取快照后 dispose）。字体和行高与完成块 HTML 快照一致，
+ * 完成切换时不会因字体参数不同而跳动。
  */
 export function createBlockTerm(
   cols: number,
@@ -220,9 +220,9 @@ export function createBlockTerm(
     cols: Math.max(cols || 80, 1),
     rows: Math.max(rows || 24, 1),
     scrollback: 5000,
-    fontFamily: XTERM_FONT_FAMILY,
-    fontSize: 14,
-    lineHeight: 1.0,
+    fontFamily: TERMINAL_FONT_FAMILY,
+    fontSize: TERMINAL_FONT_SIZE,
+    lineHeight: TERMINAL_LINE_HEIGHT,
     cursorBlink: true,
     theme: readXtermTheme(),
   });
