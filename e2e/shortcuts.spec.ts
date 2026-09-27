@@ -63,13 +63,24 @@ test.describe('全局快捷键', () => {
     await expect(page.getByPlaceholder('搜索命令…')).not.toBeVisible({ timeout: 3000 });
   });
 
-  test('Cmd+= 增大字号', async ({ page }) => {
+  test('页面缩放快捷键和滚轮不会改变字号或页面比例', async ({ page }) => {
+    const initialFontSize = await page.evaluate(() => getComputedStyle(document.documentElement).fontSize);
     await page.keyboard.press('Meta+=');
-    // 字号应增大（检查 style 属性被设置）
-    const size = await page.evaluate(() => document.documentElement.style.fontSize);
-    expect(size).toBeTruthy();
-    // 重置
+    await page.keyboard.press('Meta+-');
     await page.keyboard.press('Meta+0');
+    await page.keyboard.press('Control+=');
+    const result = await page.evaluate(() => {
+      const wheel = new WheelEvent('wheel', { ctrlKey: true, deltaY: -100, cancelable: true, bubbles: true });
+      window.dispatchEvent(wheel);
+      return {
+        fontSize: getComputedStyle(document.documentElement).fontSize,
+        inlineFontSize: document.documentElement.style.fontSize,
+        wheelPrevented: wheel.defaultPrevented,
+      };
+    });
+    expect(result.fontSize).toBe(initialFontSize);
+    expect(result.inlineFontSize).toBe('');
+    expect(result.wheelPrevented).toBe(true);
   });
 
   test('点击 TopDock 搜索触发器打开居中搜索窗', async ({ page }) => {

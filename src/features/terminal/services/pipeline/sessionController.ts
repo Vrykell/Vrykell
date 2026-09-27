@@ -22,13 +22,13 @@ export interface SessionSinks {
   onCwd(path: string): void;
   onBlockStart(block: TermBlock): void;
   onBlockComplete(block: TermBlock): void;
-  /** 读取当前书签块 id 集合（书签状态只活在 store，controller 驱逐块时需反查） */
-  getBookmarkedIds?(): Set<string>;
+  takePendingUiCommand?(): string | null;
+  clearPendingUiCommand?(): void;
 }
 
 const RAW_CAP = 256 * 1024;
 const MAX_FULL_BLOCKS = 200;    // 超出丢弃最老 block 的输出，保留 header
-const MAX_TOTAL_BLOCKS = 500;   // 总块数硬上限（含 header-only），超出丢弃最老非书签块
+const MAX_TOTAL_BLOCKS = 500;   // Hard cap for block history, including header-only entries.
 
 interface InternalBlock extends TermBlock {
   outputTerm: Terminal | null;
@@ -40,6 +40,7 @@ interface InternalBlock extends TermBlock {
   _commandEchoPrefixConsumed: boolean;
   _consumeCommandEchoTerminator: boolean;
   _prevBaseY: number;
+  _commandFromUi: boolean;
   /** 是否由 OSC 133;A 正常创建（用于决定 earlyBuf 是否含提示符行） */
   _fromA: boolean;
 }
@@ -55,7 +56,8 @@ export class SessionController {
   private preAltScene: Scene;
   /** 是否启用块系统：false = 经典模式（传统终端，输出直进 xterm，不建块） */
   private blockEnabled: boolean;
-  private pendingCommand = '';
+  private pendingUiCommand = '';
+  private pendingShellCommand = '';
   private longRunningTimer: ReturnType<typeof setTimeout> | null = null;
   private _disposed = false;
   /** 最近一次 OSC 7 上报的 cwd：真实 RC 顺序是 OSC7 → D → A，新 block 以此播种 */
@@ -214,7 +216,7 @@ export class SessionController {
         this.onPrecmd(true);
         break;
       case '133;E':
-        this.pendingCommand = decodeB64(payload).trim() || this.pendingCommand;
+        this.onShellCommand(decodeB64(payload).trim());
         break;
       case '133;G': {
         const branch = decodeB64(payload).trim();
@@ -275,6 +277,9 @@ export class SessionController {
         prev.endedAt = Date.now();
       }
     }
+    this.pendingUiCommand = '';
+    this.pendingShellCommand = '';
+    this.sinks.clearPendingUiCommand?.();
     const block: InternalBlock = {
       id: `b${BLOCK_PREFIX}-${nextId++}`,
       command: '',
@@ -296,6 +301,7 @@ export class SessionController {
       _commandEchoPrefixConsumed: false,
       _consumeCommandEchoTerminator: false,
       _prevBaseY: 0,
+      _commandFromUi: false,
       _fromA: fromA,
     };
     this._blocks.push(block);
@@ -306,15 +312,30 @@ export class SessionController {
   private onPreexec(): void {
     const ab = this.activeBlock;
     if (!ab || ab.status !== 'pending') return;
+    const controllerUiCommand = this.pendingUiCommand;
+    const deferredUiCommand = this.sinks.takePendingUiCommand?.() ?? '';
+    const uiCommand = controllerUiCommand || deferredUiCommand;
+    const shellCommand = this.pendingShellCommand;
+    const command = uiCommand || shellCommand;
+    this.pendingUiCommand = '';
+    this.pendingShellCommand = '';
     if (isTerminalDebugEnabled()) {
       terminalDebug('command-start', {
         tabId: this.tabId,
         blockId: ab.id,
-        commandChars: this.pendingCommand.length,
+        commandChars: command.length,
+        commandSource: controllerUiCommand
+          ? 'input-editor-controller'
+          : deferredUiCommand
+            ? 'input-editor-deferred'
+            : shellCommand
+              ? 'osc-133-e'
+              : 'unavailable',
         earlyBufferChars: ab.earlyBuf.length,
       });
     }
-    ab.command = this.pendingCommand || ab.command;
+    ab.command = command;
+    ab._commandFromUi = Boolean(uiCommand);
     ab.startedAt = Date.now();
     ab.status = 'executing';
     ab._pendingCommandEcho = ab.command.split(/\r?\n/, 1)[0]?.trim() || null;
@@ -356,7 +377,6 @@ export class SessionController {
       }
     }
 
-    this.pendingCommand = '';
     this.longRunningTimer = setTimeout(() => {
       if (this._disposed) return;
       if (this.activeBlock === ab && ab.status === 'executing') {
@@ -369,9 +389,59 @@ export class SessionController {
     this.sinks.onBlocksChanged();
   }
 
-  setPendingCommand(command: string): void {
+  setPendingCommand(command: string): boolean {
     const normalized = command.trim();
-    if (normalized) this.pendingCommand = normalized;
+    if (!normalized) return false;
+    const active = this.activeBlock;
+    if (active?.status === 'executing') {
+      if (isTerminalDebugEnabled()) {
+        terminalDebug('command-submit-to-running-process', {
+          tabId: this.tabId,
+          blockId: active.id,
+          chars: normalized.length,
+        });
+      }
+      return false;
+    }
+    this.pendingUiCommand = normalized;
+    if (isTerminalDebugEnabled()) {
+      terminalDebug('command-pending-ui', {
+        tabId: this.tabId,
+        chars: normalized.length,
+        activeStatus: active?.status ?? null,
+      });
+    }
+    return true;
+  }
+
+  private onShellCommand(command: string): void {
+    if (!command) return;
+    const active = this.activeBlock;
+    if (active?.status === 'executing') {
+      if (!active._commandFromUi) {
+        active.command = command;
+        active._pendingCommandEcho = command.split(/\r?\n/, 1)[0]?.trim() || null;
+        active._commandEchoPrefixConsumed = false;
+        this.sinks.onBlocksChanged();
+      }
+      if (isTerminalDebugEnabled()) {
+        terminalDebug('shell-command-late', {
+          tabId: this.tabId,
+          blockId: active.id,
+          commandChars: command.length,
+          uiCommandAuthoritative: active._commandFromUi,
+        });
+      }
+      return;
+    }
+    this.pendingShellCommand = command;
+    if (isTerminalDebugEnabled()) {
+      terminalDebug('shell-command-pending', {
+        tabId: this.tabId,
+        commandChars: command.length,
+        activeStatus: active?.status ?? null,
+      });
+    }
   }
 
   private stripCommandEcho(block: InternalBlock, text: string): string {
@@ -501,15 +571,13 @@ export class SessionController {
     }
     // 2. 总块数硬上限：_blocks 数组本身要有界，否则 header 只增不减，
     //    store 每次全量 map/filter 越来越慢，长会话慢性内存增长。
-    const bookmarkedIds = this.sinks.getBookmarkedIds?.() ?? new Set<string>();
     while (this._blocks.length > MAX_TOTAL_BLOCKS) {
-      const idx = this._blocks.findIndex((b) => !bookmarkedIds.has(b.id));
-      if (idx === -1) break; // 全是书签，兜底放弃上限（避免死循环）
-      const [b] = this._blocks.splice(idx, 1);
-      b!._outputDispose?.();
-      b!.outputTerm = null;
-      b!.outputEl = null;
-      b!._outputDispose = null;
+      const [b] = this._blocks.splice(0, 1);
+      if (!b) break;
+      b._outputDispose?.();
+      b.outputTerm = null;
+      b.outputEl = null;
+      b._outputDispose = null;
     }
   }
 
@@ -574,6 +642,7 @@ export class SessionController {
         _commandEchoPrefixConsumed: false,
         _consumeCommandEchoTerminator: false,
         _prevBaseY: 0,
+        _commandFromUi: false,
         _fromA: false,
       };
     });
@@ -648,5 +717,9 @@ function isCommandEcho(line: string, command: string): boolean {
   const firstLine = command.split(/\r?\n/, 1)[0]?.trim() ?? '';
   if (!firstLine) return false;
   const visible = stripTerminalControls(line).replace(/\r/g, '').trim();
-  return visible === firstLine || visible.endsWith(firstLine);
+  if (visible === firstLine) return true;
+  if (!visible.endsWith(firstLine)) return false;
+  // Only a shell prompt may precede an echoed command; ordinary output can end with it too.
+  const prefix = visible.slice(0, -firstLine.length).trimEnd();
+  return /[$#>%❯]$/.test(prefix);
 }

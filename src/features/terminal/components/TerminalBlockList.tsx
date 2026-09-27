@@ -1,14 +1,11 @@
 /**
- * TerminalBlockList —  block 卡片列表。
- *
- * 每块一张卡片（圆角 + 浅底）：头部行内是加粗命令，右侧退出码/耗时，
- * hover 浮出操作按钮；输出在卡片内下方。
- * cwd/git 不在 block 顶部重复告知（底部输入栏已有 cwd）。
+ * TerminalBlockList renders command output as a continuous stream with thin separators.
+ * Each command keeps its status and actions in a compact header above its output.
  */
 
 import { useState, useMemo, useEffect, useRef } from 'react';
 import {
-  Bookmark, Check, ChevronDown, ChevronRight, Copy, Ellipsis,
+  Check, ChevronDown, ChevronRight, Copy, Ellipsis,
   Maximize2, RotateCw, Skull, Sparkles, Square, Terminal, X, Zap,
 } from 'lucide-react';
 import { useBlockStore } from '@features/terminal';
@@ -17,7 +14,8 @@ import AiBlock from '@features/chat/components/AiBlock';
 import { ptyResize, ptyWrite } from '@platform/pty';
 import { fmtDuration } from '@ui/UiBtn';
 import { getCellMetrics } from '@utils/termMetrics';
-import { getExecutingTerm, syncTermWidth, applyCompactCharSize } from '@features/terminal/hooks/useTerminalSession';
+import { getExecutingTerm, syncTermWidth } from '@features/terminal/hooks/useTerminalSession';
+import { isTerminalDebugEnabled, terminalDebug } from '@features/terminal/services/terminalDebug';
 import BlockMenu from '@features/terminal/components/BlockMenu';
 import BlockOutput from '@features/terminal/components/BlockOutput';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
@@ -80,7 +78,7 @@ export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8
       )}
 
       {/* 已完成块 + AI 问答（按时间交错） */}
-      {flow.map((item) =>
+      {flow.map((item, index) =>
         item.type === 'block' ? (
           <BlockItem
             key={item.block.id}
@@ -89,6 +87,7 @@ export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8
             insetLeft={insetLeft}
             insetRight={insetRight}
             highlightQuery={highlightQuery}
+            dividerBefore={index > 0}
             onMenu={openMenu}
           />
         ) : (
@@ -107,6 +106,7 @@ export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8
           insetLeft={insetLeft}
           insetRight={insetRight}
           highlightQuery={highlightQuery}
+          dividerBefore={flow.length > 0}
         />
       ))}
 
@@ -216,6 +216,7 @@ function BlockItem({
   insetLeft,
   insetRight,
   highlightQuery,
+  dividerBefore,
   onMenu,
 }: {
   block: TermBlock;
@@ -223,6 +224,7 @@ function BlockItem({
   insetLeft: number;
   insetRight: number;
   highlightQuery: string;
+  dividerBefore: boolean;
   onMenu: (b: TermBlock, rect: DOMRect) => void;
 }) {
   const [hovered, setHovered] = useState(false);
@@ -234,7 +236,6 @@ function BlockItem({
     copyCmd,
     copyOut,
     toggleCollapsed,
-    toggleBookmark,
   } = useBlockItemActions({ tabId, block });
   const failed = block.exitCode !== null && block.exitCode !== 0;
   const duration =
@@ -246,11 +247,10 @@ function BlockItem({
     <div
       data-testid={`command-block-${block.id}`}
       style={{
-        margin: `4px ${insetRight}px 10px ${insetLeft}px`,
-        borderRadius: 8,
-        background: 'var(--block)',
-        position: 'relative',
-        overflow: 'hidden',
+        paddingLeft: insetLeft,
+        paddingRight: insetRight,
+        borderTop: dividerBefore ? '1px solid var(--block-divider)' : 'none',
+        paddingTop: dividerBefore ? 4 : 0,
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -261,7 +261,7 @@ function BlockItem({
         onMenu(block, e.currentTarget.getBoundingClientRect());
       }}
     >
-      {/* 头部行：折叠 chevron + 加粗命令（行内）+ 右侧退出码/耗时，hover 浮出操作 */}
+      {/* The compact header keeps the command, result, duration, and hover actions together. */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 6,
         padding: '6px 10px', userSelect: 'none', minHeight: 30,
@@ -298,9 +298,6 @@ function BlockItem({
                 ? <Check size={12} data-testid="copy-output-success" />
                 : <Copy size={12} />}
             />
-            <BlockToolBtn title={block.bookmarked ? '取消书签' : '添加书签'}
-              onClick={toggleBookmark}
-              label={<Bookmark size={12} fill={block.bookmarked ? 'currentColor' : 'none'} />} />
             <BlockToolBtn title="更多操作"
               onClick={(e) => onMenu(block, e.currentTarget.getBoundingClientRect())}
               label={<Ellipsis size={12} />} />
@@ -311,7 +308,6 @@ function BlockItem({
             fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)',
           }}>
             {block.agent && <Zap size={11} style={{ color: 'var(--accent-warm)' }} aria-label="AI 执行" />}
-            {block.bookmarked && <Bookmark size={11} fill="currentColor" />}
             {block.exitCode !== null && (
               <span
                 data-testid="exit-code"
@@ -328,7 +324,7 @@ function BlockItem({
         )}
       </div>
 
-      {/* 输出：outputHtml 恒为 HTML（可能无 <span），显式 isHtml 分流 */}
+      {/* Route outputHtml explicitly because snapshots may contain plain text without spans. */}
       {!isCollapsed && (block.outputHtml ? (
         <BlockOutput
           text={block.outputHtml}
@@ -343,7 +339,7 @@ function BlockItem({
         />
       ) : null)}
 
-      {/* 截断提示 */}
+      {/* Show when older output lines were truncated. */}
       {!isCollapsed && block.linesTruncated > 0 && (
         <div style={{ padding: '0 12px 6px 30px', fontSize: 10, color: 'var(--text-muted)' }}>
           …已截断 {block.linesTruncated} 行
@@ -361,12 +357,14 @@ function RunningItem({
   insetLeft,
   insetRight,
   highlightQuery,
+  dividerBefore,
 }: {
   block: TermBlock;
   tabId: string;
   insetLeft: number;
   insetRight: number;
   highlightQuery: string;
+  dividerBefore: boolean;
 }) {
   const [elapsedNow, setElapsedNow] = useState(
     block.startedAt ? fmtDuration(Date.now() - block.startedAt) : '',
@@ -384,15 +382,15 @@ function RunningItem({
 
   return (
     <div
+      data-testid={`running-block-${block.id}`}
       style={{
-        margin: `4px ${insetRight}px 10px ${insetLeft}px`,
-        borderRadius: 8,
-        background: 'var(--block)',
-        position: 'relative',
-        overflow: 'hidden',
+        paddingLeft: insetLeft,
+        paddingRight: insetRight,
+        borderTop: dividerBefore ? '1px solid var(--block-divider)' : 'none',
+        paddingTop: dividerBefore ? 4 : 0,
       }}
     >
-      {/* 头部行：脉冲点 + 加粗命令 + 耗时/操作按钮 */}
+      {/* The running header keeps the command, elapsed time, and controls together. */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 6,
         padding: '6px 10px', userSelect: 'none', minHeight: 30,
@@ -430,9 +428,8 @@ function RunningItem({
         </span>
       </div>
 
-      {/* 实时输出：块内活 xterm（活终端栅格 —— 原生光标/IME/CJK 对齐，
-          无 250ms 快照同步）。完成后由 BlockItem 渲染静态 HTML 快照 */}
-      <RunningTerm tabId={tabId} />
+      {/* Live xterm preserves native cursor, IME, and CJK layout while the command runs. */}
+      <RunningTerm tabId={tabId} blockId={block.id} />
     </div>
   );
 }
@@ -440,11 +437,10 @@ function RunningItem({
 // ══════ RunningTerm — 运行中块的活 xterm 宿主 ══════
 
 /**
- * 挂载 controller 创建的块内活终端：移入卡片、open、按内容裁剪高度，
- * 并接键盘（onData → PTY，与 classic 同一条 xterm 原生输入路径）。
- * term 生命周期归 controller（块完成提取快照后 dispose），这里只断开订阅。
+ * Mount the controller-owned live terminal, trim it to visible output, and connect input.
+ * The controller owns the terminal lifecycle; this component only manages subscriptions.
  */
-function RunningTerm({ tabId }: { tabId: string }) {
+function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
   // Move the live terminal into the fullscreen host when manually activated.
   const tuiFs = useTerminalStore(
@@ -453,27 +449,43 @@ function RunningTerm({ tabId }: { tabId: string }) {
 
   useEffect(() => {
     const handle = getExecutingTerm(tabId);
-    if (!handle) return;
+    if (!handle) {
+      if (isTerminalDebugEnabled()) {
+        terminalDebug('running-terminal-mount-missing', { tabId, blockId });
+      }
+      return;
+    }
     const { term, el } = handle;
     const host = tuiFs
       ? document.querySelector<HTMLElement>('[data-testid="tui-fullscreen"]')
       : hostRef.current;
-    if (!host) return;
+    if (!host) {
+      if (isTerminalDebugEnabled()) {
+        terminalDebug('running-terminal-host-missing', { tabId, blockId, fullscreen: tuiFs });
+      }
+      return;
+    }
 
     host.appendChild(el);
     if (!term.element) term.open(el); // 重复挂载（StrictMode/切标签返回）只搬 el
-    applyCompactCharSize(term); // 行高压到 fontSize（与主终端一致，半块字符无缝）
+    if (isTerminalDebugEnabled()) {
+      terminalDebug('running-terminal-mounted', {
+        tabId,
+        blockId,
+        fullscreen: tuiFs,
+        hostWidth: host.clientWidth,
+        hostVisible: host.getClientRects().length > 0,
+      });
+    }
     // e2e 测试桥：块终端 buffer 也进注册表（WebGL 下文本不进 DOM，测试读 buffer 断言）
     const w = window as unknown as { __vrykellTerms?: Map<string, unknown> };
     if (w.__vrykellTerms && !w.__vrykellTerms.has(`block:${tabId}`)) {
       w.__vrykellTerms.set(`block:${tabId}`, term);
     }
 
-    // 高度裁剪：term 行数恒 = 主 xterm/PTY 行数（TUI 几何一致），
-    // 短输出裁掉尾部空白行 —— 内容高度 = 最后非空行（含光标行）× 行高。
-    // 裁剪设在 el（xterm 外层，overflow:hidden）而非 host：host 的底部
-    // padding 需要露出卡片底色作呼吸空间，裁 host 会让黑终端区吃满 padding。
+    // Keep the PTY row geometry and trim blank rows after the last visible output.
     const cellHeight = (): number => getCellMetrics(term).height;
+    let visibleOutputLogged = false;
     const updateHeight = () => {
       const buf = term.buffer.active;
       let contentEnd = buf.baseY + buf.cursorY + 1;
@@ -486,8 +498,12 @@ function RunningTerm({ tabId }: { tabId: string }) {
         }
       }
       const visible = Math.max(1, Math.min(contentEnd, term.rows));
-      // +8 = .xterm 的垂直 padding（4px 上 + 4px 下，深色盒子的内侧呼吸边距）
+      // The xterm element has 4px of vertical padding on each side.
       el.style.height = `${visible * cellHeight() + 8}px`;
+      if (!visibleOutputLogged && visible > 1 && isTerminalDebugEnabled()) {
+        visibleOutputLogged = true;
+        terminalDebug('running-terminal-output-visible', { tabId, blockId, rows: visible });
+      }
     };
 
     let renderSub: { dispose(): void } | null = null;
@@ -517,19 +533,30 @@ function RunningTerm({ tabId }: { tabId: string }) {
     // 键盘：xterm 原生路径（IME 组合/退格/控制键全由 xterm 处理）
     const dataSub = term.onData((d) => {
       const sid = useTerminalStore.getState().sessions[tabId];
-      if (sid) ptyWrite(sid, d).catch(() => {});
+      if (!sid) return;
+      if (isTerminalDebugEnabled()) {
+        terminalDebug('running-terminal-input', { tabId, chars: d.length });
+      }
+      ptyWrite(sid, d).then(() => {
+        if (isTerminalDebugEnabled()) {
+          terminalDebug('running-terminal-input-write-complete', { tabId, chars: d.length });
+        }
+      }).catch((error) => {
+        if (isTerminalDebugEnabled()) {
+          terminalDebug('running-terminal-input-error', {
+            tabId,
+            errorType: error instanceof Error ? error.name : typeof error,
+          });
+        }
+      });
     });
     // End 保留给「回到输入栏」（InputEditor 全局监听），不进 PTY
     term.attachCustomKeyEventHandler(
       (e) => !(e.type === 'keydown' && e.key === 'End'),
     );
-    // 滚轮：卡片内不消费 wheel —— return false 让 xterm 跳过自家处理，
-    // 事件继续冒泡到块列表的 DOM 滚动容器（否则滚轮落在运行中卡片上时整页滚不动）。
-    // 全屏时交回 xterm 默认（normal buffer 滚自己的 scrollback）。
+    // Bubble wheel events to the block list; fullscreen mode keeps xterm scrollback behavior.
     term.attachCustomWheelEventHandler(() => tuiFs);
-    // 卡片宿主宽度变化（出现/滚动条挤占/侧栏拖拽）→ 校核 PTY 与块终端列数
-    //（blockList 场景下宽度跟随卡片内容宽，见 useTerminalSession.applyWidth）。
-    // ResizeObserver 在 observe 时立即回调一次，兼作挂载时的首次校核。
+    // Recheck terminal columns when the host width changes, including its first layout.
     const widthRo = new ResizeObserver(() => {
       if (tuiFs) resizeFullscreen();
       else syncTermWidth(tabId);
@@ -547,7 +574,7 @@ function RunningTerm({ tabId }: { tabId: string }) {
       selSub.dispose();
       widthRo.disconnect();
     };
-  }, [tabId, tuiFs]);
+  }, [tabId, blockId, tuiFs]);
 
   return (
     <div

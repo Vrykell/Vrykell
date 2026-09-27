@@ -382,12 +382,15 @@ pub fn pty_spawn(
         .unwrap_or_else(|| "xterm-256color".to_string());
     let debug_colorterm = std::env::var("COLORTERM").ok().filter(|value| !value.is_empty())
         .unwrap_or_else(|| "truecolor".to_string());
+    let debug_vte_inherited = std::env::var("VTE_VERSION").is_ok();
     let debug_cwd_set = cwd.is_some();
     let pty_system = native_pty_system();
     let pair = pty_system
         .openpty(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
         .map_err(|e| e.to_string())?;
     let mut cmd = build_shell_cmd(cwd, shell, ssh, open_mode)?;
+    // The parent desktop terminal may export VTE_VERSION; its OSC 133 hooks conflict with ours.
+    cmd.env_remove("VTE_VERSION");
     // GUI 启动 PATH 缺用户 bin（/usr/local/bin 等），补进子进程（ssh 分支也顺带受益）
     merge_user_bin_paths(&mut cmd);
     // GUI 启动 TERM 为空 → TUI 应用（claude 等）能力检测失败会挂起，补 xterm-256color
@@ -402,7 +405,7 @@ pub fn pty_spawn(
         debug::write(
             "spawn",
             format!(
-                "id={} cols={} rows={} requested_shell={} shell_env={} integration_available={} ssh={} open_mode={:?} cwd_set={} term={} colorterm={}",
+                "id={} cols={} rows={} requested_shell={} shell_env={} integration_available={} ssh={} open_mode={:?} cwd_set={} term={} colorterm={} vte_inherited={} vte_integration_disabled=true",
                 id,
                 cols,
                 rows,
@@ -414,6 +417,7 @@ pub fn pty_spawn(
                 debug_cwd_set,
                 debug_term,
                 debug_colorterm,
+                debug_vte_inherited,
             ),
         );
     }

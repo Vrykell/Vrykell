@@ -4,3 +4,4 @@ export const TERMINAL_FONT_FAMILY =
 
 export const TERMINAL_FONT_SIZE = 14;
 export const TERMINAL_LINE_HEIGHT = 1.0;
+export const TERMINAL_SNAPSHOT_ROW_HEIGHT = 16;

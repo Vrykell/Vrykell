@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { sanitizeOutputHtml } from '@utils/sanitizeHtml';
-import { TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE, TERMINAL_LINE_HEIGHT } from '@features/terminal/model/terminalFont';
+import { TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE, TERMINAL_SNAPSHOT_ROW_HEIGHT } from '@features/terminal/model/terminalFont';
 
 export function plainText(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -61,9 +61,8 @@ export default function BlockOutput({ text, maxHeight, highlight, isHtml: isHtml
         // 与 xterm.js 实时渲染保持一致的字体参数
         fontFamily: TERMINAL_FONT_FAMILY,
         fontSize: TERMINAL_FONT_SIZE,
-        // 行高与活终端一致（applyCompactCharSize 把 xterm 行高压到 fontSize）；
-        // 1.4 时行间留缝，TUI 半块字符（▀▄）拼图会出现分割线
-        lineHeight: TERMINAL_LINE_HEIGHT,
+        // Keep snapshot rows tall enough for the glyph bounds used by live xterm.
+        lineHeight: `${TERMINAL_SNAPSHOT_ROW_HEIGHT}px`,
         padding: '2px 8px 8px',
         // 统一回流：不论 isHtml 快照还是纯文本，宽度不足时一律折行。
         // 快照已按网格 cols 用 <br> 预分行，卡片比网格窄时软换行会撕裂

@@ -15,8 +15,6 @@ const SHORTCUTS: { keys: string[]; desc: string }[] = [
   { keys: ['⌘F'], desc: '全局搜索' },
   { keys: ['⌘P'], desc: '命令面板' },
   { keys: ['⌘,'], desc: '打开设置' },
-  { keys: ['⌘+', '⌘-', '⌘0'], desc: '放大 / 缩小 / 重置终端字号' },
-  { keys: ['Ctrl+Shift+B'], desc: '切换书签' },
   { keys: ['Esc'], desc: '切回命令输入栏' },
 ];
 
@@ -60,4 +58,3 @@ export function ShortcutPage() {
     </Field>
   );
 }
-

@@ -29,11 +29,10 @@ import { TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE, TERMINAL_LINE_HEIGHT } from '
 
 /**
  * TermBlock UI 投影：剥离 controller 内部字段（outputTerm/earlyBuf 等）。
- * bookmarked 只活在 store（controller 不读回），整体替换数组时按 id 保留，
- * 否则下一次 onBlocksChanged 会把用户的书签冲掉。
- * agent 标记同理——真源在 agentControl 注册表，投影时按 id 查回。
+ * The store owns collapsed state, so preserve it by block ID when replacing the projection.
+ * agentControl owns agent markers, which are looked up again during projection.
  */
-function projectBlock(b: TermBlock, bookmarked: boolean, collapsed: boolean, agent: boolean): TermBlock {
+function projectBlock(b: TermBlock, collapsed: boolean, agent: boolean): TermBlock {
   return {
     id: b.id,
     command: b.command,
@@ -44,7 +43,6 @@ function projectBlock(b: TermBlock, bookmarked: boolean, collapsed: boolean, age
     startedAt: b.startedAt,
     endedAt: b.endedAt,
     wasLongRunning: b.wasLongRunning,
-    bookmarked: bookmarked || undefined,
     collapsed: collapsed || undefined,
     agent: agent || undefined,
     outputHtml: b.outputHtml,
@@ -54,9 +52,23 @@ function projectBlock(b: TermBlock, bookmarked: boolean, collapsed: boolean, age
   };
 }
 
-/** tabId → SessionController 注册表：供命令层反向触达（「清除输出块」必须经 controller，
- *  它是真相源，只清 store 会被下一次 onBlocksChanged 整体回填） */
-const sessionControllers = new Map<string, SessionController>();
+interface SessionRegistry {
+  controllers: Map<string, SessionController>;
+  pendingUiCommands: Map<string, { command: string; stagedAt: number }>;
+  widthSyncs: Map<string, () => void>;
+}
+
+// Preserve live controller references when the renderer reloads a module during development.
+const registryScope = globalThis as typeof globalThis & { __vrykellSessionRegistry?: SessionRegistry };
+const sessionRegistry = registryScope.__vrykellSessionRegistry ??= {
+  controllers: new Map<string, SessionController>(),
+  pendingUiCommands: new Map<string, { command: string; stagedAt: number }>(),
+  widthSyncs: new Map<string, () => void>(),
+};
+const sessionControllers = sessionRegistry.controllers;
+const pendingUiCommands = sessionRegistry.pendingUiCommands;
+const widthSyncs = sessionRegistry.widthSyncs;
+const PENDING_COMMAND_TTL_MS = 30_000;
 
 /** 清除指定 tab 的全部输出块；无存活 session 时退化为清 store。 */
 export function clearSessionBlocks(tabId: string): void {
@@ -66,7 +78,19 @@ export function clearSessionBlocks(tabId: string): void {
 }
 
 export function setPendingTerminalCommand(tabId: string, command: string): void {
-  sessionControllers.get(tabId)?.setPendingCommand(command);
+  const normalized = command.trim();
+  if (!normalized) return;
+  const controller = sessionControllers.get(tabId);
+  if (!controller) {
+    pendingUiCommands.set(tabId, { command: normalized, stagedAt: Date.now() });
+    if (isTerminalDebugEnabled()) {
+      terminalDebug('command-pending-deferred', { paneId: tabId, chars: normalized.length });
+    }
+    return;
+  }
+  const accepted = controller.setPendingCommand(normalized);
+  if (accepted) pendingUiCommands.set(tabId, { command: normalized, stagedAt: Date.now() });
+  else pendingUiCommands.delete(tabId);
 }
 
 /** 运行中块的活终端（RunningItem 挂载显示 / useTerminalFocus 聚焦目标） */
@@ -74,62 +98,15 @@ export function getExecutingTerm(tabId: string) {
   return sessionControllers.get(tabId)?.executingTerm ?? null;
 }
 
-/** tabId → 场景感知 resize 驱动（blockList 下 PTY/块终端宽度跟随卡片内容宽）。
- *  RunningTerm 的宿主尺寸变化（卡片出现、滚动条挤占）时回调进来 */
-const widthSyncs = new Map<string, () => void>();
-
-/**
- * 压缩 xterm 字符高度度量到 fontSize，让行高贴近字形实际高度。
- *
- * xterm 6 用字体 fontBoundingBox 度量字符高（Menlo 14px → 16px），而字形
- * ink 实际只有 ~14px —— 行高虚高，行与行之间留缝，TUI 用半块字符
- * （▀▄ 拼图标/进度条）时上下行之间出现明显的分割线。把度量压到
- * fontSize 后行高 ≈ 字形高度，半块字符无缝拼接（iTerm2 同款行高）。
- *
- * 实现要点：measure() 会先测出 16px 并 fire onCharSizeChange（renderer
- * 立即按 16px 重算行高），所以必须**在事件里压回 fontSize 并再次触发
- * 重算**；只包装 measure 改字段不 fire 的话，下一次 resize/宽度校核的
- * measure 会把行高永久打回 16px。
- *
- * 注意：只能动私有 _core，open 之后调用；xterm 升级时需回归验证。
- */
-export function applyCompactCharSize(term: Terminal): void {
-  const core = (term as unknown as {
-    _core?: {
-      _charSizeService?: {
-        height?: number;
-        onCharSizeChange?: (cb: () => void) => { dispose(): void };
-        _compactPatched?: boolean;
-      };
-      _renderService?: { handleCharSizeChanged?: () => void };
-    };
-  })._core;
-  const cs = core?._charSizeService;
-  const render = core?._renderService;
-  if (!cs?.onCharSizeChange || !render?.handleCharSizeChanged) return;
-  if (cs._compactPatched) return;
-  cs._compactPatched = true;
-  const fontSize = term.options.fontSize ?? TERMINAL_FONT_SIZE;
-  cs.onCharSizeChange(() => {
-    if (cs.height !== fontSize) {
-      cs.height = fontSize;
-      render.handleCharSizeChanged?.();
-    }
-  });
-  cs.height = fontSize;
-  render.handleCharSizeChanged();
-}
+/** Scene-aware resize driver; block output follows the available command-list width. */
 
 /** 触发指定 tab 重新校核 PTY/块终端宽度（无 session 时 no-op） */
 export function syncTermWidth(tabId: string): void {
   widthSyncs.get(tabId)?.();
 }
 
-/** blockList 场景下卡片屏幕宽度 = 容器宽 − 50px：
- *  卡片 margin 8×2 + border 1×2（RunningItem）+ 宿主 padding 8×2（RunningTerm）
- *  + 块内 .xterm padding 8×2（theme.css running-term 覆写）。
- *  与 CSS 耦合，改卡片几何需同步此常量；有运行中宿主时优先实测而非用常量 */
-const CARD_CHROME_PX = 50;
+/** Fallback width deduction for command insets, host padding, and xterm padding. */
+const BLOCK_CONTENT_INSET_PX = 48;
 
 export function useTerminalSession(
   paneId: string,
@@ -166,7 +143,6 @@ export function useTerminalSession(
       // 忽略：回退默认 DOM renderer（缝隙问题在无 GPU 环境无法根治）
     }
     term.open(el);
-    applyCompactCharSize(term);
     fit.fit();
     registerTerminal(paneId, term);
     useTerminalStore.getState().setDims(paneId, term.cols, term.rows);
@@ -191,19 +167,16 @@ export function useTerminalSession(
     const blockEnabled = openMode === 'block';
     const initialScene: 'classic' | 'blockList' = blockEnabled ? 'blockList' : 'classic';
 
-    // 场景本地镜像（onSceneChanged 同步）：决定 resize 用全宽还是卡片宽
+    // The local scene mirror determines whether the PTY uses full or block-list width.
     let currentScene: 'classic' | 'blockList' | 'altScreen' = initialScene;
     const controller = new SessionController(paneId, term.cols, {      writeMain: (data) => term.write(data),
-      getBookmarkedIds: () =>
-        new Set((useBlockStore.getState().byTab[paneId] ?? []).filter((b) => b.bookmarked).map((b) => b.id)),
       onBlocksChanged: () => {
         const prev = useBlockStore.getState().byTab[paneId] ?? [];
-        const bookmarkedIds = new Set(prev.filter((b) => b.bookmarked).map((b) => b.id));
         const collapsedIds = new Set(prev.filter((b) => b.collapsed).map((b) => b.id));
         useBlockStore.getState().setBlocks(
           paneId,
           controller.blocks.map((b) =>
-            projectBlock(b, bookmarkedIds.has(b.id), collapsedIds.has(b.id), agentControl.hasBlock(b.id)),
+            projectBlock(b, collapsedIds.has(b.id), agentControl.hasBlock(b.id)),
           ),
         );
       },
@@ -218,9 +191,20 @@ export function useTerminalSession(
           useTerminalStore.getState().setKeyboardTarget('input');
         } else {
           useTerminalStore.getState().setKeyboardTarget('terminal');
-          focusTimer = setTimeout(() => term.focus(), 50);
+          focusTimer = setTimeout(() => {
+            term.focus();
+            const textarea = term.element?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea');
+            if (isTerminalDebugEnabled()) {
+              terminalDebug('terminal-scene-focus', {
+                paneId,
+                scene,
+                focused: Boolean(textarea && document.activeElement === textarea),
+                mounted: Boolean(term.element),
+              });
+            }
+          }, 50);
         }
-        // 场景切换改变有效宽度（blockList=卡片宽，其余=全宽），重新校核
+        // Recheck the PTY width when switching between full-width and block-list scenes.
         applyWidth();
       },
       onCwd: (path) => {
@@ -243,8 +227,26 @@ export function useTerminalSession(
           ts.setAltScreenActive(false);
         }
       },
+      takePendingUiCommand: () => {
+        const pending = pendingUiCommands.get(paneId);
+        if (!pending) return null;
+        pendingUiCommands.delete(paneId);
+        if (Date.now() - pending.stagedAt > PENDING_COMMAND_TTL_MS) {
+          if (isTerminalDebugEnabled()) {
+            terminalDebug('command-pending-expired', { paneId, chars: pending.command.length });
+          }
+          return null;
+        }
+        return pending.command;
+      },
+      clearPendingUiCommand: () => {
+        pendingUiCommands.delete(paneId);
+      },
     }, term.rows, initialScene, blockEnabled);
     sessionControllers.set(paneId, controller);
+    if (isTerminalDebugEnabled()) {
+      terminalDebug('session-controller-register', { paneId, tabId, scene: initialScene, blockEnabled });
+    }
     // 初始场景手动落位（无 OSC 133 触发）：
     // blockList → 清 classic 残留、焦点到输入栏；classic → 焦点到 xterm 直接打字
     if (initialScene === 'blockList') {
@@ -253,7 +255,18 @@ export function useTerminalSession(
       useTerminalStore.getState().setKeyboardTarget('input');
     } else {
       useTerminalStore.getState().setKeyboardTarget('terminal');
-      focusTimer = setTimeout(() => term.focus(), 50);
+      focusTimer = setTimeout(() => {
+        term.focus();
+        const textarea = term.element?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea');
+        if (isTerminalDebugEnabled()) {
+          terminalDebug('terminal-scene-focus', {
+            paneId,
+            scene: initialScene,
+            focused: Boolean(textarea && document.activeElement === textarea),
+            mounted: Boolean(term.element),
+          });
+        }
+      }, 50);
     }
 
     // 会话恢复：restore 已把持久化 block 按 pane 写进 store（在 addTab 之前），
@@ -364,8 +377,8 @@ export function useTerminalSession(
         return true;
       }
       if (!sessionId) return false;
-      // 行高已压到 fontSize（applyCompactCharSize），滚轮按行折算用实际行高
-      const linePx = Math.max(1, (term.options.fontSize ?? TERMINAL_FONT_SIZE) * TERMINAL_LINE_HEIGHT);
+      // Use the renderer's measured row height when converting wheel movement to keys.
+      const linePx = Math.max(1, getCellMetrics(term).height);
       if (Math.sign(e.deltaY) !== Math.sign(wheelResidual)) wheelResidual = 0;
       wheelResidual += e.deltaY;
       const lines = Math.trunc(wheelResidual / linePx);
@@ -378,9 +391,23 @@ export function useTerminalSession(
 
     const dataSub = term.onData((data) => {
       if (sessionId) {
-        ptyWrite(sessionId, data).catch((error) => {
+        const inputScene = currentScene;
+        if (isTerminalDebugEnabled()) {
+          terminalDebug('terminal-input', {
+            paneId,
+            sessionId,
+            scene: inputScene,
+            buffer: term.buffer.active.type,
+            chars: data.length,
+          });
+        }
+        ptyWrite(sessionId, data).then(() => {
           if (isTerminalDebugEnabled()) {
-            terminalDebug('pty-write-error', { sessionId, errorType: error instanceof Error ? error.name : typeof error });
+            terminalDebug('terminal-input-write-complete', { paneId, sessionId, chars: data.length });
+          }
+        }).catch((error) => {
+          if (isTerminalDebugEnabled()) {
+            terminalDebug('pty-write-error', { paneId, sessionId, source: 'main-xterm', errorType: error instanceof Error ? error.name : typeof error });
           }
         });
       }
@@ -394,11 +421,8 @@ export function useTerminalSession(
     });
 
     // ── Resize ──
-    // 场景感知宽度：classic/altScreen 用主 xterm 全宽；blockList 下 PTY 与块终端
-    // 跟随卡片内容宽（卡片比主表面窄 ~50px，满宽输出会在卡片右缘被裁 ——
-    // 「输出宽度与可显示宽度不一致导致部分边缘看不到」）。
-    // 主 xterm 本体始终保持全宽（隐藏时 opacity:0 仍有真实尺寸），
-    // 回到 classic/altScreen 直接恢复。
+    // Classic and alternate-screen scenes use the main xterm width. In block-list
+    // mode, match the PTY to the visible output width so wrapped lines stay intact.
 
     /** 实测字符宽（渲染服务内部尺寸，与 RunningTerm 的 cellHeight 同源） */
     const cellWidth = (): number => getCellMetrics(term).width;
@@ -417,11 +441,9 @@ export function useTerminalSession(
     };
 
     /**
-     * DOM 实测字符宽：活终端画布按 xterm 内部 cellWidth 排布（实测 ≈8.16px），
-     * 而完成块的 HTML 快照用浏览器字体渲染（同字体实测 ≈8.43px，偏宽 ~4%）。
-     * 若按 cellWidth 定列数，快照会比卡片内容宽 → 结束运行中块时即使没调窗宽
-     * 也会折行。统一按 DOM 字符宽换算列数，活终端与完成块宽度一致。
-     * 字体栈取快照渲染同款（TERMINAL_FONT_FAMILY），一次测量后缓存。
+     * Measure DOM glyph width because completed HTML snapshots use browser font
+     * metrics while live xterm uses its internal cell width. Reuse the snapshot
+     * font family so command output keeps the same wrapping before and after exit.
      */
     let cachedDomCellWidth = 0;
     const domCellWidth = (): number => {
@@ -451,14 +473,14 @@ export function useTerminalSession(
         return term.cols;
       }
       if (scene !== 'blockList') return term.cols;
-      // 有运行中卡片宿主时实测（自动覆盖滚动条挤占等偏差）；
-      // 否则用容器宽 − 卡片常量。宿主 clientWidth 含 .xterm 左右各 8px padding。
-      const host = document.querySelector<HTMLElement>('[data-testid="running-term"]');
+      // Measure a mounted output host to account for its padding and scrollbars.
+      // Before it mounts, estimate the content width from the main terminal container.
+      const pane = document.querySelector<HTMLElement>(`[data-testid="pane-${paneId}"]`);
+      const host = pane?.querySelector<HTMLElement>('[data-testid="running-term"]');
       const screenPx = host
         ? host.clientWidth - 16
-        : el.offsetWidth - CARD_CHROME_PX;
-      // 宿主折叠（display:none / 布局过渡中 clientWidth≈0）→ screenPx≤0，
-      // 退回主 xterm 全宽，等宿主落位后 ResizeObserver 再按真实卡片宽校正。
+        : el.offsetWidth - BLOCK_CONTENT_INSET_PX;
+      // A hidden or not-yet-laid-out host has no measurable width; retry after mount.
       if (screenPx <= 0) return term.cols;
       return Math.max(2, Math.min(term.cols, Math.floor(screenPx / domCellWidth())));
     };
@@ -518,6 +540,9 @@ export function useTerminalSession(
 
     return () => {
       disposed = true;
+      if (isTerminalDebugEnabled()) {
+        terminalDebug('session-controller-dispose', { paneId, tabId, hasSession: Boolean(sessionId) });
+      }
       if (focusTimer) {
         clearTimeout(focusTimer);
         focusTimer = null;
@@ -527,8 +552,8 @@ export function useTerminalSession(
       cancelAnimationFrame(resizeRaf);
       cancelAnimationFrame(widthRaf);
       ro.disconnect();
-      widthSyncs.delete(paneId);
-      sessionControllers.delete(paneId);
+      if (widthSyncs.get(paneId) === applyWidth) widthSyncs.delete(paneId);
+      if (sessionControllers.get(paneId) === controller) sessionControllers.delete(paneId);
       controller.dispose();
       unlisteners.forEach((u) => u());
       pendingUnlisteners.forEach((p) => p.then((u) => u()).catch(() => {}));

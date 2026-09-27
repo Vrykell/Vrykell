@@ -1,6 +1,6 @@
 # Vrykell 开发规则
 
-> 最后更新: 2026-09-26
+> 最后更新: 2026-09-27
 
 ## 一、代码规范
 
@@ -54,3 +54,10 @@
 30. `src/platform/` 与 `src/utils/` — Tauri IPC、PTY、运行时适配与纯工具函数。业务服务归属对应 Feature。
 31. `src/features/ssh/` `src/features/files/` `src/features/search/` `src/config/theme/` — SSH / 本地文件 / 全局搜索 / 设计 token。
 32. `e2e/` — Playwright E2E 测试，`tauri-mock.ts` 提供 Tauri + Anthropic mock。
+
+## 八、可观测性与日志
+
+33. **修改功能时同步补充日志** — 对有状态流程，在入口、状态转换、外部调用结果和错误/超时分支记录结构化事件，确保问题可以按时间线排查。
+34. **优先记录元数据** — 记录会话/块 ID、状态、耗时、字节数和错误类型；不要记录原始命令、终端输出、提示词、凭据或未经脱敏的用户路径。
+35. **复用诊断接口** — 前端使用 `terminalDebug`，Rust 终端层使用 `terminal::debug::write`；新增事件名应稳定且能说明操作阶段，避免逐字符或高频输出日志。
+36. **开发环境自动记录** — dev 模式启动时诊断日志默认开启；生产环境按需启用。涉及后台任务或新 IPC 流程时，应确认入口和失败分支都能留下可关联的日志。

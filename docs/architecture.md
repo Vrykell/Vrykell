@@ -176,13 +176,18 @@ pending ──(133;C)──▶ executing ──(133;D)──▶ done
 2. 更新 `useBlockStore`（status、exitCode、outputHtml/outputText/outputRaw、linesTruncated）。
 3. 下一个 `133;A` 创建新 pending block。
 
+命令文本有两条来源：InputEditor 提交时按 pane 暂存；shell 的 `133;E` 是补充来源，可在 `133;C` 之后到达并更正正在执行块的命令名。controller 暂时未注册时，InputEditor 暂存仍保留并由下一次 preexec 消费；没有命令文本时保持空值，禁止沿用前一块命令。创建 PTY 子进程时会移除继承的 `VTE_VERSION`，避免 GNOME VTE 的 Bash hook 与 Vrykell 同时发送 `133;C`。
+
 ## 8. 滚动：普通 DOM + follow-bottom
 
 `blockList` 场景下删除 `ScrollStateMachine`，改为普通 DOM 滚动 + `useFollowBottom`（`src/features/terminal/hooks/useFollowBottom.ts`）：
 
 - 列表距底部 < 2 行时，新输出自动滚动到底部。
 - 用户上滚后解除跟随；手动回到底部时恢复跟随。
+- 滚动容器观察整段输出内容与自身尺寸；运行中 xterm 改变高度时，贴底视图继续贴底。阅读历史时记录视口附近的文字位置，面板开合或终端宽度变化导致折行后按文字锚点恢复视图。
 - `altScreen` / `classic` 场景的滚动由主 xterm 自身处理。
+
+运行中块通过 `SessionController` 持有块内 xterm，`RunningTerm` 把它挂到可见宿主。controller、待提交命令和宽度同步回调使用同一个跨热更新注册表，避免 dev 模式更新模块后 PTY 仍写入旧 controller、页面却无法取得活终端。诊断日志记录 `running-terminal-mounted`、`running-terminal-mount-missing` 和首次可见输出行数。
 
 ## 9. 输入框可见性状态机
 
@@ -203,13 +208,15 @@ pending ──(133;C)──▶ executing ──(133;D)──▶ done
 
 **（A）主 xterm**（`TerminalPanel`）：`classic` / `altScreen` 场景下全屏接管，直接渲染 PTY 输出并接收键盘输入。
 
-**（B）Block DOM**（`TerminalBlockList`）：`blockList` 场景下 React 渲染整个 block 列表。已完成块直接显示 `outputHtml` 快照；运行中块订阅 store 的节流快照；pending 块只显示上下文行。列表滚动为普通 DOM 滚动，不再做 viewport cropping。
+**（B）Block DOM**（`TerminalBlockList`）：`blockList` 场景下 React 渲染整个 block 列表。已完成块显示 `outputHtml` 快照；运行中块挂载 controller 持有的活 xterm，直接呈现 PTY 输出；pending 块不显示。列表使用普通 DOM 滚动，整段输出变化由 `ResizeObserver` 驱动贴底。
+
+活终端使用 xterm 测得的字符高度，避免强行压缩行高时裁掉首行顶部笔画；完成块的 HTML 快照使用对应的默认行高。
 
 `TerminalBlockList` 按状态分组：
 
 | 分组 | 条件 | 渲染 |
 |------|------|------|
-| `completed` | `done` / `interrupted` | `BlockItem`（上下文行 + 命令 + outputHtml、hover 工具条、书签） |
+| `completed` | `done` / `interrupted` | `BlockItem`（上下文行 + 命令 + outputHtml、hover 工具条） |
 | `running` | `executing` | `RunningItem`（脉冲点、实时输出、耗时、终止按钮） |
 | `pending` | `pending` | `PendingItem`（只显示上下文行） |
 
@@ -230,12 +237,12 @@ zustand，按域拆分（`src/features/*/stores/`）：
 |-------|---------|
 | `workspace` | tabs、activeId、激活/关闭、每 tab cwd |
 | `terminal` | sessions（tabId→PTY id）、dims、`scenes`（tabId→classic/blockList/altScreen）、altScreenActive、keyboardTarget、pendingInput；`termInstances`（模块级 Map，不进 state） |
-| `blocks` | `byTab: tabId → TermBlock[]`，setBlocks/updateBlock/clearBlocks/toggleBookmark |
+| `blocks` | `byTab: tabId → TermBlock[]`，setBlocks/updateBlock/clearBlocks/setBlockCollapsed/setAllCollapsed |
 | `chat` | 每 tab AI 消息、send、setDefaultStream |
 | `history` | 命令历史 |
 | `ui` / `dock` / `workspaceDirs` / `searchHistory` / `searchHighlight` | UI 面板、搜索等 |
 
-`TermBlock`（`src/features/terminal/services/pipeline/termBlock.ts`）是 UI 层的块投影，字段：id/command/cwd/gitBranch/status/exitCode/startedAt/endedAt/wasLongRunning/outputHtml/outputText/outputRaw/linesTruncated/bookmarked。
+`TermBlock`（`src/features/terminal/services/pipeline/termBlock.ts`）是 UI 层的块投影，字段：id/command/cwd/gitBranch/status/exitCode/startedAt/endedAt/wasLongRunning/outputHtml/outputText/outputRaw/linesTruncated/collapsed/agent。
 
 ## 13. 后端（Rust 层）
 
@@ -263,10 +270,11 @@ zustand，按域拆分（`src/features/*/stores/`）：
 
 ```
 T0   用户在 InputEditor 输入 "ls -la" 回车
-       → ptyWrite(sessionId, "ls -la\n")
+       → 暂存命令名 → ptyWrite(sessionId, "ls -la\n")
        → Rust pty.rs 写入 PTY → shell 执行
 
 T1   shell_integration 发出 OSC 133;E（命令文本）→ 133;C（preexec）
+       → 如先收到外部 133;C，controller 先消费 InputEditor 暂存；后到的 133;E 只更新当前块
        → PTY chunk 进入 Rust StreamScanner，同步产生 osc 事件（经 pty-output 事件交付）
        → SessionController: 133;C 将 block status→executing，创建 outputTerm
 
@@ -284,6 +292,8 @@ T4   渲染帧
        → TerminalView 读取 scene==='blockList'
        → TerminalBlockList 渲染 BlockItem（DOM + outputHtml）
 ```
+
+dev 模式会自动写入 `terminal-debug.jsonl`。排查命令挂起时，按时间关联 `command-submit`、`command-start`、`route-data`、`terminal-scene-focus`、`terminal-input`、`terminal-input-write-complete` 和 `command-done`；日志只保留长度、状态和错误类型，不记录命令或终端原文。`session-controller-register/dispose` 与 `command-pending-deferred` 用于定位热更新或生命周期竞态。
 
 ## 15. 关键文件索引
 

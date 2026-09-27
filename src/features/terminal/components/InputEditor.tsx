@@ -98,8 +98,10 @@ export default function InputEditor({
       <div
         ref={panelRef}
         style={{
-          background: 'var(--block)',
-          padding: '5px 16px',
+          flexShrink: 0,
+          background: 'var(--canvas)',
+          borderTop: '1px solid var(--block-divider)',
+          padding: `5px ${insetRight + 8}px 5px ${insetLeft + 8}px`,
           fontSize: 12,
           color: 'var(--text-secondary)',
           fontFamily: 'var(--font-mono)',
@@ -139,16 +141,20 @@ export default function InputEditor({
     );
   }
 
-  // ── 正常输入栏（卡片式：四周留缝 + 圆角卡片；prompt 元素下沉为底部状态栏） ──
+  // The input content stays inset while its divider spans the pane width.
 
   return (
-    <div style={{ margin: '0.45em 0', padding: `0 ${insetRight}px 0 ${insetLeft}px` }}>
+    <div style={{
+      flexShrink: 0,
+      margin: 0,
+      padding: `0 ${insetRight}px 0 ${insetLeft}px`,
+      borderTop: '1px solid var(--block-divider)',
+      background: 'var(--canvas)',
+    }}>
       <div
         style={{
-          background: 'var(--block)',
-          borderRadius: 12,
+          background: 'transparent',
           padding: '8px 12px 5px',
-          boxShadow: '0 1px 4px rgba(0, 0, 0, 0.22)',
         }}
         onDragOver={(e) => { if (aiMode) e.preventDefault(); }}
         onDrop={(e) => {

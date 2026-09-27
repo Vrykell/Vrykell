@@ -33,7 +33,7 @@ test.describe('命令块操作全链路', () => {
     await expect(block).toContainText('linux-block-action');
   });
 
-  test('通过更多菜单执行复制、书签和清除，操作作用于当前面板', async ({ page }) => {
+  test('通过更多菜单复制输出并清除当前面板的命令块', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
 
@@ -50,12 +50,6 @@ test.describe('命令块操作全链路', () => {
     await expect(menu).toBeVisible();
     await menu.getByRole('menuitem', { name: '复制输出' }).click();
     await expect.poll(() => clipboardText(page)).toBe('menu-action');
-
-    await block.hover();
-    await page.getByTitle('更多操作').click();
-    await page.getByRole('menuitem', { name: '添加书签' }).click();
-    await block.hover();
-    await expect(page.getByTitle('取消书签')).toBeVisible();
 
     await block.hover();
     await page.getByTitle('更多操作').click();
