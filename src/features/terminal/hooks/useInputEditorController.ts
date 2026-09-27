@@ -10,6 +10,8 @@ import { engageFollow } from '@features/terminal/hooks/useFollowBottom';
 import { useCommandHistoryNavigation } from '@features/terminal/hooks/useCommandHistoryNavigation';
 import { useTerminalInputContext } from '@features/terminal/hooks/useTerminalInputContext';
 import { useCommandCompletion } from '@features/terminal/hooks/useCommandCompletion';
+import { setPendingTerminalCommand } from '@features/terminal/hooks/useTerminalSession';
+import { terminalDebug } from '@features/terminal/services/terminalDebug';
 
 interface UseInputEditorControllerOptions {
   paneId: string;
@@ -133,9 +135,18 @@ export function useInputEditorController({
         chatSend(command, { paneId, attachments: atts.length > 0 ? atts : undefined });
         clearAttachments();
       } else {
+        setPendingTerminalCommand(paneId, command);
         const sessionId = sessions[paneId];
+        terminalDebug('command-submit', { paneId, commandChars: command.length, sessionReady: Boolean(sessionId) });
         if (sessionId) {
-          ptyWrite(sessionId, command.endsWith('\n') ? command : command + '\n').catch(() => {});
+          const input = command.endsWith('\n') ? command : command + '\n';
+          terminalDebug('pty-write-request', { sessionId, chars: input.length });
+          ptyWrite(sessionId, input)
+            .then(() => terminalDebug('pty-write-complete', { sessionId, chars: input.length }))
+            .catch((error) => terminalDebug('pty-write-error', {
+              sessionId,
+              errorType: error instanceof Error ? error.name : typeof error,
+            }));
         } else {
           // Windows shell 探测/启动可能晚于输入栏，不能在 sessionId 返回前静默丢掉命令。
           useTerminalStore.getState().queueCommand(paneId, command);

@@ -1,7 +1,7 @@
-import { useCallback, useMemo } from 'react';
-import { ptyWrite } from '@platform/pty';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useChatStore } from '@features/chat';
-import { useBlockStore, useTerminalStore } from '@features/terminal';
+import { useBlockStore } from '@features/terminal';
+import { copyBlockText, rerunBlockCommand } from '@features/terminal/services/blockActions';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 
 interface UseBlockItemActionsOptions {
@@ -9,18 +9,32 @@ interface UseBlockItemActionsOptions {
   block: TermBlock;
 }
 
-/** 收敛已完成命令块的操作：重跑、解释、复制、折叠和书签。 */
+/** Coordinates completed command block actions: rerun, explain, copy, collapse, and bookmark. */
 export function useBlockItemActions({ tabId, block }: UseBlockItemActionsOptions) {
   const send = useChatStore((state) => state.send);
+  const [copiedAction, setCopiedAction] = useState<'command' | 'output' | null>(null);
+  const copyResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isCollapsed = !!block.collapsed;
   const copyOutput = useMemo(
     () => block.outputText || block.outputRaw.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, ''),
     [block.outputRaw, block.outputText],
   );
 
+  useEffect(() => () => {
+    if (copyResetTimer.current) clearTimeout(copyResetTimer.current);
+  }, []);
+
+  const markCopied = useCallback((action: 'command' | 'output', text: string) => {
+    void copyBlockText(text).then((success) => {
+      if (!success) return;
+      setCopiedAction(action);
+      if (copyResetTimer.current) clearTimeout(copyResetTimer.current);
+      copyResetTimer.current = setTimeout(() => setCopiedAction(null), 1200);
+    });
+  }, []);
+
   const rerun = useCallback(() => {
-    const sessionId = useTerminalStore.getState().sessions[tabId];
-    if (sessionId) ptyWrite(sessionId, block.command + '\n').catch(() => {});
+    void rerunBlockCommand(tabId, block.command);
   }, [block.command, tabId]);
 
   const askAI = useCallback(() => {
@@ -29,12 +43,12 @@ export function useBlockItemActions({ tabId, block }: UseBlockItemActionsOptions
   }, [block.command, copyOutput, send, tabId]);
 
   const copyCmd = useCallback(() => {
-    navigator.clipboard.writeText(block.command).catch(() => {});
-  }, [block.command]);
+    markCopied('command', block.command);
+  }, [block.command, markCopied]);
 
   const copyOut = useCallback(() => {
-    navigator.clipboard.writeText(copyOutput).catch(() => {});
-  }, [copyOutput]);
+    markCopied('output', copyOutput);
+  }, [copyOutput, markCopied]);
 
   const toggleCollapsed = useCallback(() => {
     useBlockStore.getState().setBlockCollapsed(tabId, block.id, !isCollapsed);
@@ -44,5 +58,15 @@ export function useBlockItemActions({ tabId, block }: UseBlockItemActionsOptions
     useBlockStore.getState().toggleBookmark(tabId, block.id);
   }, [block.id, tabId]);
 
-  return { isCollapsed, copyOutput, rerun, askAI, copyCmd, copyOut, toggleCollapsed, toggleBookmark };
+  return {
+    isCollapsed,
+    copiedAction,
+    copyOutput,
+    rerun,
+    askAI,
+    copyCmd,
+    copyOut,
+    toggleCollapsed,
+    toggleBookmark,
+  };
 }

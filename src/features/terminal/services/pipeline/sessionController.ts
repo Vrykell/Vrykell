@@ -36,6 +36,9 @@ interface InternalBlock extends TermBlock {
   outputEl: HTMLDivElement | null;
   _outputDispose: (() => void) | null;
   earlyBuf: string;
+  _pendingCommandEcho: string | null;
+  _commandEchoPrefixConsumed: boolean;
+  _consumeCommandEchoTerminator: boolean;
   _prevBaseY: number;
   /** 是否由 OSC 133;A 正常创建（用于决定 earlyBuf 是否含提示符行） */
   _fromA: boolean;
@@ -105,7 +108,11 @@ export class SessionController {
         tabId: this.tabId,
         scene: this._scene,
         count: events.length,
-        kinds: events.map((event) => event.kind),
+        events: events.map((event) => event.kind === 'data'
+          ? { kind: event.kind, chars: event.text.length }
+          : event.kind === 'osc'
+            ? { kind: event.kind, code: event.code, payloadChars: event.payload.length }
+            : { kind: event.kind }),
       });
     }
     if (!this.blockEnabled) {
@@ -137,6 +144,9 @@ export class SessionController {
 
   private routeData(text: string): void {
     if (this._scene === 'classic' || this._scene === 'altScreen') {
+      if (isTerminalDebugEnabled()) {
+        terminalDebug('route-data', { tabId: this.tabId, scene: this._scene, chars: text.length, target: 'main' });
+      }
       this.sinks.writeMain(text);
       return;
     }
@@ -148,15 +158,38 @@ export class SessionController {
     }
     if (!ab) return;
     if (ab.status === 'executing') {
-      ab.outputTerm?.write(text);
-      // 追加后仅在超出 2×上限时裁剪一次，避免每个 data 事件都对 256KB 字符串
-      // 做 concat + slice 两次全量拷贝（长输出时是明显卡顿源）
-      ab.outputRaw += text;
+      if (isTerminalDebugEnabled()) {
+        terminalDebug('route-data', {
+          tabId: this.tabId,
+          scene: this._scene,
+          blockId: ab.id,
+          blockStatus: ab.status,
+          chars: text.length,
+          target: 'block',
+          outputTermReady: ab.outputTerm !== null,
+          pendingEchoFilter: ab._pendingCommandEcho !== null,
+        });
+      }
+      const output = this.stripCommandEcho(ab, text);
+      if (!output) return;
+      ab.outputTerm?.write(output);
+      // Trim only after crossing 2× the cap to avoid repeated full-string copies.
+      ab.outputRaw += output;
       if (ab.outputRaw.length > RAW_CAP * 2) {
         ab.outputRaw = ab.outputRaw.slice(-RAW_CAP);
       }
       this.trackTruncation(ab);
     } else {
+      if (isTerminalDebugEnabled()) {
+        terminalDebug('route-data', {
+          tabId: this.tabId,
+          scene: this._scene,
+          blockId: ab.id,
+          blockStatus: ab.status,
+          chars: text.length,
+          target: 'early-buffer',
+        });
+      }
       ab.earlyBuf += text;
     }
   }
@@ -165,7 +198,7 @@ export class SessionController {
 
   private handleOsc(code: string, payload: string, raw: string): void {
     if (isTerminalDebugEnabled()) {
-      terminalDebug('osc', { tabId: this.tabId, code, payload, rawLength: raw.length, scene: this._scene });
+      terminalDebug('osc', { tabId: this.tabId, code, payloadLength: payload.length, rawLength: raw.length, scene: this._scene });
     }
     // classic/altScreen：OSC raw 转发主 xterm（OSC 8 超链接等不失效）；
     // 但 133/7 是 integration 标记，永不进主 xterm。
@@ -181,7 +214,7 @@ export class SessionController {
         this.onPrecmd(true);
         break;
       case '133;E':
-        this.pendingCommand = decodeB64(payload).trim();
+        this.pendingCommand = decodeB64(payload).trim() || this.pendingCommand;
         break;
       case '133;G': {
         const branch = decodeB64(payload).trim();
@@ -223,6 +256,9 @@ export class SessionController {
   // ── Block 生命周期（Spec §2） ──
 
   private onPrecmd(fromA = true): void {
+    if (isTerminalDebugEnabled()) {
+      terminalDebug('block-prompt-start', { tabId: this.tabId, scene: this._scene, previousStatus: this.activeBlock?.status ?? null });
+    }
     // 首个 A：classic → blockList
     if (this._scene === 'classic') {
       this._scene = 'blockList';
@@ -256,6 +292,9 @@ export class SessionController {
       outputEl: null,
       _outputDispose: null,
       earlyBuf: '',
+      _pendingCommandEcho: null,
+      _commandEchoPrefixConsumed: false,
+      _consumeCommandEchoTerminator: false,
       _prevBaseY: 0,
       _fromA: fromA,
     };
@@ -267,30 +306,47 @@ export class SessionController {
   private onPreexec(): void {
     const ab = this.activeBlock;
     if (!ab || ab.status !== 'pending') return;
-    if (isTerminalDebugEnabled()) terminalDebug('command-start', { tabId: this.tabId, command: this.pendingCommand });
-    ab.command = this.pendingCommand;
+    if (isTerminalDebugEnabled()) {
+      terminalDebug('command-start', {
+        tabId: this.tabId,
+        blockId: ab.id,
+        commandChars: this.pendingCommand.length,
+        earlyBufferChars: ab.earlyBuf.length,
+      });
+    }
+    ab.command = this.pendingCommand || ab.command;
     ab.startedAt = Date.now();
     ab.status = 'executing';
+    ab._pendingCommandEcho = ab.command.split(/\r?\n/, 1)[0]?.trim() || null;
+    ab._commandEchoPrefixConsumed = false;
 
     // 创建块内活终端（隐藏宿主，RunningItem 挂载后移入卡片可见化）
     const blk = createBlockTerm(this.cols, this.rows);
     ab.outputTerm = blk.term;
     ab.outputEl = blk.el;
     ab._outputDispose = blk.dispose;
+    if (isTerminalDebugEnabled()) {
+      terminalDebug('block-terminal-ready', { tabId: this.tabId, blockId: ab.id, cols: blk.term.cols, rows: blk.term.rows });
+    }
 
     // earlyBuf 处置（typeahead / 提示符行剥离启发式，Spec §2）
     const early = ab.earlyBuf;
     ab.earlyBuf = '';
     if (early) {
       let rest = early;
-      if (ab._fromA) {
-        const lines = early.split('\n');
-        // 正常 A 创建的 block：earlyBuf 最后一非空行是提示符+命令行，剥离它
-        const lastNonEmpty = [...lines].reverse().find((l) => l.trim().length > 0);
-        if (lastNonEmpty !== undefined) {
-          lines.splice(lines.lastIndexOf(lastNonEmpty), 1);
+      const lines = early.split('\n');
+      const lastNonEmpty = [...lines].reverse().find((line) => line.trim().length > 0);
+      if (lastNonEmpty !== undefined) {
+        const lineIndex = lines.lastIndexOf(lastNonEmpty);
+        const commandEcho = isCommandEcho(lastNonEmpty, ab.command);
+        if (ab._fromA || commandEcho) {
+          lines.splice(lineIndex, 1);
+          rest = lines.join('\n');
         }
-        rest = lines.join('\n');
+        if (commandEcho) {
+          ab._pendingCommandEcho = null;
+          ab._commandEchoPrefixConsumed = false;
+        }
       }
       // 剩余含非空白内容 → 后台输出，进 outputTerm
       if (rest.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').trim().length > 0) {
@@ -313,12 +369,76 @@ export class SessionController {
     this.sinks.onBlocksChanged();
   }
 
+  setPendingCommand(command: string): void {
+    const normalized = command.trim();
+    if (normalized) this.pendingCommand = normalized;
+  }
+
+  private stripCommandEcho(block: InternalBlock, text: string): string {
+    if (block._consumeCommandEchoTerminator) {
+      block._consumeCommandEchoTerminator = false;
+      block._commandEchoPrefixConsumed = false;
+      text = stripCommandEchoTerminator(text);
+    }
+
+    const command = block._pendingCommandEcho;
+    if (!command) return text;
+    const lineEnd = text.search(/[\r\n]/);
+    if (lineEnd < 0) {
+      const controlsLength = leadingCsiControlsLength(text);
+      const visible = text.slice(controlsLength).trim();
+      if (visible && command.startsWith(visible)) {
+        const remaining = command.slice(visible.length);
+        block._commandEchoPrefixConsumed = true;
+        block._pendingCommandEcho = remaining || null;
+        if (!remaining) {
+          block._commandEchoPrefixConsumed = false;
+          block._consumeCommandEchoTerminator = true;
+        }
+        if (isTerminalDebugEnabled()) {
+          terminalDebug('command-echo-check', {
+            chars: text.length,
+            commandChars: command.length,
+            matched: true,
+            prefixChars: visible.length,
+            complete: !remaining,
+          });
+        }
+        return text.slice(0, controlsLength);
+      }
+      const possiblePrefix = stripTerminalControls(text).trim();
+      if (!possiblePrefix || command.startsWith(possiblePrefix)) return text;
+      block._pendingCommandEcho = null;
+      block._commandEchoPrefixConsumed = false;
+      if (isTerminalDebugEnabled()) {
+        terminalDebug('command-echo-check', { chars: text.length, commandChars: command.length, hasLineEnd: false, matched: false });
+      }
+      return text;
+    }
+
+    block._pendingCommandEcho = null;
+    const matched = block._commandEchoPrefixConsumed
+      ? stripTerminalControls(text.slice(0, lineEnd)).trim() === command
+      : isCommandEcho(text.slice(0, lineEnd), command);
+    block._commandEchoPrefixConsumed = false;
+    if (isTerminalDebugEnabled()) {
+      terminalDebug('command-echo-check', { chars: text.length, commandChars: command.length, hasLineEnd: lineEnd >= 0, matched });
+    }
+    if (!matched) return text;
+    let consumed = lineEnd + 1;
+    if (text[lineEnd] === '\r') {
+      if (text[lineEnd + 1] === '\n') consumed++;
+      else if (lineEnd === text.length - 1) block._consumeCommandEchoTerminator = true;
+    }
+    return text.slice(consumed);
+  }
+
   private onCommandDone(payload: string): void {
     const ab = this.activeBlock;
     if (!ab || ab.status !== 'executing') return;
     const ec = parseInt(payload, 10);
     if (isTerminalDebugEnabled()) {
-      terminalDebug('command-done', { tabId: this.tabId, command: ab.command, payload, exitCode: isNaN(ec) ? null : ec });
+      terminalDebug('command-done', { tabId: this.tabId, blockId: ab.id, exitCode: isNaN(ec) ? null : ec });
     }
     this.finishBlock(ab, isNaN(ec) ? null : ec, 'done');
   }
@@ -402,6 +522,7 @@ export class SessionController {
     }
     // alt 期间输出只写主 xterm，块内 outputTerm 收不到任何字节
     this.preAltScene = this._scene;
+    if (isTerminalDebugEnabled()) terminalDebug('alternate-screen-enter', { tabId: this.tabId, previousScene: this._scene });
     this._scene = 'altScreen';
     this.sinks.writeMain(raw); // xterm 自己切 alt buffer
     this.sinks.onSceneChanged('altScreen');
@@ -409,6 +530,7 @@ export class SessionController {
 
   private exitAlt(raw: string): void {
     if (this._scene !== 'altScreen') return;
+    if (isTerminalDebugEnabled()) terminalDebug('alternate-screen-exit', { tabId: this.tabId, restoreScene: this.preAltScene });
     this.sinks.writeMain(raw);
     this._scene = this.preAltScene;
     this.sinks.onSceneChanged(this._scene);
@@ -431,15 +553,30 @@ export class SessionController {
    * 恢复出来的块整体覆盖掉。
    */
   seed(blocks: readonly TermBlock[]): void {
-    const seeded: InternalBlock[] = blocks.map((b) => ({
-      ...b,
-      outputTerm: null,
-      outputEl: null,
-      _outputDispose: null,
-      earlyBuf: '',
-      _prevBaseY: 0,
-      _fromA: false,
-    }));
+    if (isTerminalDebugEnabled()) {
+      terminalDebug('blocks-restored', {
+        tabId: this.tabId,
+        count: blocks.length,
+        recoveredExecuting: blocks.filter((block) => block.status === 'executing').length,
+      });
+    }
+    const seeded: InternalBlock[] = blocks.map((b) => {
+      const wasExecuting = b.status === 'executing';
+      return {
+        ...b,
+        status: wasExecuting ? 'interrupted' : b.status,
+        endedAt: wasExecuting ? Date.now() : b.endedAt,
+        outputTerm: null,
+        outputEl: null,
+        _outputDispose: null,
+        earlyBuf: '',
+        _pendingCommandEcho: null,
+        _commandEchoPrefixConsumed: false,
+        _consumeCommandEchoTerminator: false,
+        _prevBaseY: 0,
+        _fromA: false,
+      };
+    });
     this._blocks = seeded;
     this.sinks.onBlocksChanged();
   }
@@ -479,4 +616,37 @@ function decodeB64(b64: string): string {
   } catch {
     return b64;
   }
+}
+
+function stripTerminalControls(value: string): string {
+  return value.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '');
+}
+
+function leadingCsiControlsLength(value: string): number {
+  let rest = value;
+  let length = 0;
+  while (rest.startsWith('\x1b[')) {
+    const match = /^\x1b\[[0-?]*[ -/]*[@-~]/.exec(rest);
+    if (!match) break;
+    length += match[0].length;
+    rest = rest.slice(match[0].length);
+  }
+  return length;
+}
+
+function stripCommandEchoTerminator(value: string): string {
+  const controlsLength = leadingCsiControlsLength(value);
+  const rest = value.slice(controlsLength);
+  if (rest.startsWith('\r\n')) return value.slice(0, controlsLength) + rest.slice(2);
+  if (rest.startsWith('\r') || rest.startsWith('\n')) {
+    return value.slice(0, controlsLength) + rest.slice(1);
+  }
+  return value;
+}
+
+function isCommandEcho(line: string, command: string): boolean {
+  const firstLine = command.split(/\r?\n/, 1)[0]?.trim() ?? '';
+  if (!firstLine) return false;
+  const visible = stripTerminalControls(line).replace(/\r/g, '').trim();
+  return visible === firstLine || visible.endsWith(firstLine);
 }

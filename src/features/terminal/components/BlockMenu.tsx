@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { ptyWrite } from '@platform/pty';
-import { useTerminalStore } from '@features/terminal';
+import { copyBlockText, rerunBlockCommand } from '@features/terminal/services/blockActions';
 import { useChatStore } from '@features/chat';
-import { useSessionStore } from '@features/workspace';
 import { useBlockStore } from '@features/terminal';
 import { clearSessionBlocks } from '@features/terminal/hooks/useTerminalSession';
 import { fmtDuration } from '@ui/UiBtn';
@@ -21,9 +19,11 @@ interface Props {
 
 function MenuItem({ label, shortcut, onClick }: { label: string; shortcut?: string; onClick: () => void }) {
   return (
-    <div
+    <button
+      type="button"
+      role="menuitem"
       onClick={onClick}
-      style={{ cursor: 'pointer' }}
+      style={{ cursor: 'pointer', display: 'block', width: '100%', border: 'none', background: 'transparent', textAlign: 'left' }}
       onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--hover)'; }}
       onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
     >
@@ -44,7 +44,7 @@ function MenuItem({ label, shortcut, onClick }: { label: string; shortcut?: stri
           </span>
         )}
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -55,22 +55,22 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
     const h = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
-    requestAnimationFrame(() => document.addEventListener('click', h));
-    return () => document.removeEventListener('click', h);
+    const frame = requestAnimationFrame(() => document.addEventListener('click', h));
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener('click', h);
+    };
   }, [onClose]);
 
   const copy = useCallback((text: string) => {
-    navigator.clipboard.writeText(text).catch(() => {});
+    void copyBlockText(text);
     onClose();
   }, [onClose]);
 
   const rerun = useCallback(() => {
-    const sessions = useTerminalStore.getState().sessions;
-    const activeId = useSessionStore.getState().activeId;
-    const sid = sessions[activeId];
-    if (sid) ptyWrite(sid, block.command + '\n').catch(() => {});
+    void rerunBlockCommand(paneId, block.command);
     onClose();
-  }, [block.command, onClose]);
+  }, [paneId, block.command, onClose]);
 
   const sendToAI = useCallback(() => {
     const output = getOutputText();
@@ -89,18 +89,21 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
   const left = Math.min(anchor.left, window.innerWidth - 220);
 
   const clearAllBlocks = useCallback(() => {
-    clearSessionBlocks(useSessionStore.getState().activeId);
+    clearSessionBlocks(paneId);
     onClose();
-  }, [onClose]);
+  }, [paneId, onClose]);
 
   const toggleBookmark = useCallback(() => {
-    useBlockStore.getState().toggleBookmark(useSessionStore.getState().activeId, block.id);
+    useBlockStore.getState().toggleBookmark(paneId, block.id);
     onClose();
-  }, [block.id, onClose]);
+  }, [paneId, block.id, onClose]);
 
   return (
     <div
       ref={ref}
+      role="menu"
+      aria-label="命令块操作"
+      data-no-drag
       style={{
         position: 'fixed',
         zIndex: 9999,
@@ -149,10 +152,10 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
         </div>
       </div>
 
-      <MenuItem label="复制命令" shortcut="⌘C" onClick={() => copy(block.command)} />
-      <MenuItem label="复制输出" shortcut="⌘⇧C" onClick={() => copy(getOutputText())} />
+      <MenuItem label="复制命令" onClick={() => copy(block.command)} />
+      <MenuItem label="复制输出" onClick={() => copy(getOutputText())} />
       <div style={{ height: 1, background: 'var(--border)', margin: '3px 8px' }} />
-      <MenuItem label="重新运行" shortcut="⌘R" onClick={rerun} />
+      <MenuItem label="重新运行" onClick={rerun} />
       <MenuItem label="发给 AI 分析" onClick={sendToAI} />
       <div style={{ height: 1, background: 'var(--border)', margin: '3px 8px' }} />
       <MenuItem

@@ -550,7 +550,7 @@ function TabRow({
   const typeSummary = terms.map((t) =>
     t.kind === 'ssh' ? (t.ssh?.name || t.ssh?.host || 'SSH') : (t.shellType ? shellTypeLabel(t.shellType) : '本地'),
   ).join(' + ');
-  // session 标签不再写文字副标题，改用胶囊状态（圆点 + 终端数）
+  // Only multi-pane sessions need a count beside the tab title.
   const subtitle = tab.kind === 'history' ? '会话历史' : tab.kind === 'settings' ? '设置' : undefined;
 
   // 内外壳两层：外壳（外层容器，idle 透明，hover/选中 5%，与分组容器同色）+ 内壳（内层卡片，idle 透明，hover 5%，选中 10% + 1px 描边，圆角）
@@ -636,19 +636,15 @@ function TabRow({
             )}
           </span>
         )}
-        {tab.kind === 'session' && (
+        {tab.kind === 'session' && terms.length > 1 && (
           <span
             title={typeSummary}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
+              display: 'inline-flex', alignItems: 'center',
               height: 16, padding: '0 6px', flexShrink: 0,
               lineHeight: '14px',
             }}
           >
-            <span style={{
-              width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-              background: 'var(--success)',
-            }} />
             <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
               {terms.length}
             </span>

@@ -42,7 +42,7 @@
 
 /* 字体 */
   --font-ui: -apple-system, "SF Pro Text", "PingFang SC", "Segoe UI", sans-serif;
-  --font-mono: "SF Mono", Menlo, "JetBrains Mono", monospace;
+  --font-mono: Menlo, Monaco, "Cascadia Code", "JetBrains Mono", "Noto Sans Mono", "DejaVu Sans Mono", "Noto Sans CJK SC", "PingFang SC", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", monospace;
 
   /* 几何 */
   --radius-block: 10px;

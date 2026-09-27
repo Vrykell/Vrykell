@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { ptyWrite } from '@platform/pty';
 import { useWorkspaceStore, isSessionTab } from '@features/workspace/stores/workspace';
 import { leaves as layoutLeaves, firstLeaf } from '@features/workspace/model/windowLayout';
+import { terminalDebug } from '@features/terminal/services/terminalDebug';
 import type { Terminal } from '@xterm/xterm';
 import type { Scene } from '@features/terminal/services/pipeline/sessionController';
 
@@ -114,8 +115,7 @@ interface TerminalState {
   /** tabId → 终端尺寸（状态栏展示用） */
   dims: Record<string, { cols: number; rows: number }>;
   visible: boolean;
-  /** 手动全屏块终端（块卡片「进入全屏交互」）。
-   *  仅为手动全屏置位；真实 alt buffer 应用（vim/htop，1049h）看 scenes[tabId] === 'altScreen' */
+  /** Whether the user manually fullscreened a running block terminal. */
   altScreenActive: boolean;
   setAltScreenActive: (active: boolean) => void;
   /** 键盘路由目标：'input' → InputEditor, 'terminal' → xterm.js */
@@ -167,7 +167,14 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       const data = queued
         .map((command) => (command.endsWith('\n') ? command : command + '\n'))
         .join('');
-      ptyWrite(sessionId, data).catch(() => {});
+      terminalDebug('queued-command-flush', { tabId, sessionId, count: queued.length, chars: data.length });
+      ptyWrite(sessionId, data)
+        .then(() => terminalDebug('queued-command-write-complete', { tabId, sessionId, chars: data.length }))
+        .catch((error) => terminalDebug('queued-command-write-error', {
+          tabId,
+          sessionId,
+          errorType: error instanceof Error ? error.name : typeof error,
+        }));
     }
   },
   queueCommand: (tabId, command) => {
@@ -177,6 +184,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       return;
     }
     if (!command.trim()) return;
+    terminalDebug('command-queued', { tabId, commandChars: command.length });
     set((s) => ({
       pendingCommands: {
         ...s.pendingCommands,

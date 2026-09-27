@@ -1,6 +1,8 @@
 import { useSessionStore } from '@features/workspace';
 import { useBlockStore, termInstances } from '@features/terminal';
 import { useUiStore, useDockStore } from '@features/workspace';
+import { invoke } from '@tauri-apps/api/core';
+import { openPath } from '@tauri-apps/plugin-opener';
 import { clearSessionBlocks } from '@features/terminal/hooks/useTerminalSession';
 import { isTerminalDebugEnabled, setTerminalDebugEnabled } from '@features/terminal/services/terminalDebug';
 import { useToastStore } from '@ui/Toast';
@@ -77,6 +79,11 @@ registerCommand({ id: 'clear-blocks', label: '清除输出块', desc: '清空当
 registerCommand({ id: 'toggle-terminal-debug', label: '切换终端诊断日志', desc: '开关 PTY、Shell 集成和会话状态日志', keywords: ['terminal', 'debug', 'log', 'pty'], action: () => {
   const enabled = setTerminalDebugEnabled(!isTerminalDebugEnabled());
   useToastStore.getState().addToast(`终端诊断日志已${enabled ? '开启' : '关闭'}`, 'info');
+} });
+registerCommand({ id: 'open-terminal-debug-log', label: '打开终端诊断日志', desc: '查看 PTY、Shell 集成和会话状态记录', keywords: ['terminal', 'debug', 'log', 'pty'], action: () => {
+  void invoke<string>('terminal_debug_log_path')
+    .then((path) => openPath(path))
+    .catch(() => useToastStore.getState().addToast('无法打开终端诊断日志', 'error'));
 } });
 registerCommand({ id: 'font-inc', label: '增大字号', desc: '终端字体变大', keys: '⌘+', keywords: ['font', 'bigger', 'zoom'], action: () => scaleFont(1) });
 registerCommand({ id: 'font-dec', label: '减小字号', desc: '终端字体变小', keys: '⌘-', keywords: ['font', 'smaller', 'zoom'], action: () => scaleFont(-1) });
