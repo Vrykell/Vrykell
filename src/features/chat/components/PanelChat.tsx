@@ -150,14 +150,18 @@ export default function PanelChat() {
         )}
       </div>
 
-      {/* 输入卡片：外边距与命令块一致（0.45em 0），左右 8px 对齐消息区与终端命令块 */}
+      {/* Dock the chat composer at the bottom and separate it with a subtle rule. */}
       {isSession && (
-        <div style={{ flexShrink: 0, margin: '0.45em 0', padding: '0 8px' }}>
+        <div style={{
+          flexShrink: 0,
+          margin: 0,
+          padding: '0 8px',
+          borderTop: '1px solid var(--block-divider)',
+          background: 'var(--canvas)',
+        }}>
           <div style={{
-            background: 'var(--block)',
-            borderRadius: 12,
+            background: 'transparent',
             padding: '8px 12px 5px',
-            boxShadow: '0 1px 4px rgba(0, 0, 0, 0.22)',
           }}>
             {/* 附件 chips 行（预览/删除；随发送清空） */}
             {atts.length > 0 && (
@@ -384,4 +388,3 @@ function EmptyHint({ isSession }: { isSession: boolean }) {
     </div>
   );
 }
-

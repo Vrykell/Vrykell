@@ -199,23 +199,25 @@ function escapeHtml(s: string): string {
 }
 
 /**
- * createBlockTerm — 运行中 block 的活终端（：块内是真实 xterm 栅格，
- * 原生光标/IME/选择/CJK 对齐，不再走 250ms HTML 快照同步）。
+ * createBlockTerm creates the live xterm used while a command is running.
+ * It preserves native cursor, IME, selection, and CJK layout.
  *
  * 创建时**不 open**（xterm v5 的 write 先于 open 是安全的：解析器与 buffer
  * 是 core 服务，open 只接管 DOM/渲染；xterm-headless 即此用法）。
- * RunningItem 挂载后把 el 移进卡片并 term.open(el)；生命周期归 controller
- * （块完成提取快照后 dispose）。字体和行高与完成块 HTML 快照一致，
- * 完成切换时不会因字体参数不同而跳动。
+ * RunningItem moves the element into the output stream and opens it. The controller
+ * owns its lifecycle; completed blocks use a matching HTML snapshot and font metrics.
  */
 export function createBlockTerm(
   cols: number,
   rows: number,
 ): { term: Terminal; el: HTMLDivElement; dispose: () => void } {
-  // 深色圆角盒子：canvas 直接画 --xterm-bg（不依赖 WebKit 的透明 canvas 支持），
-  // el 同底色兜底 padding 环带 —— 两种渲染引擎下观感一致
+  // Keep the live terminal on the same flat canvas as the surrounding output.
   const el = document.createElement('div');
-  el.style.cssText = 'overflow:hidden;width:100%;background:var(--xterm-bg);border-radius:6px';
+  el.style.cssText = 'overflow:hidden;width:100%;background:var(--canvas)';
+  const xtermTheme = readXtermTheme();
+  const canvasBackground = getComputedStyle(document.documentElement)
+    .getPropertyValue('--canvas')
+    .trim();
   const term = new Terminal({
     cols: Math.max(cols || 80, 1),
     rows: Math.max(rows || 24, 1),
@@ -224,7 +226,7 @@ export function createBlockTerm(
     fontSize: TERMINAL_FONT_SIZE,
     lineHeight: TERMINAL_LINE_HEIGHT,
     cursorBlink: true,
-    theme: readXtermTheme(),
+    theme: { ...xtermTheme, background: canvasBackground || xtermTheme.background },
   });
   // 与主终端一致：WebGL renderer 让半块字符拼接无缝（TUI 图标无横裂缝）；
   // 无 GPU 时回退 DOM renderer（xterm 内部行为）

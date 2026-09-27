@@ -130,3 +130,31 @@ test('运行中卡片：PTY/块终端宽度跟随卡片内容宽（右缘不裁�
     expect(last.cols * 8).toBeLessThanOrEqual(probe.screenW + 1);
   }).toPass({ timeout: 5000 });
 });
+
+test('命令块分隔线延伸到终端左右边缘', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  const input = page.getByPlaceholder(/输入命令/);
+  await expect(input).toBeVisible({ timeout: 5000 });
+  for (const command of ['echo first', 'echo second']) {
+    await input.fill(command);
+    await input.press('Enter');
+  }
+  const blocks = page.locator('[data-testid^="command-block-"]');
+  await expect(blocks).toHaveCount(2);
+  const bounds = await blocks.nth(1).evaluate((block) => {
+    const scroll = block.closest<HTMLElement>('[data-testid^="terminal-scroll-"]')!;
+    const b = block.getBoundingClientRect();
+    const s = scroll.getBoundingClientRect();
+    return {
+      leftGap: b.left - s.left,
+      rightGap: s.right - b.right,
+      borderTop: getComputedStyle(block).borderTopWidth,
+      contentInset: parseFloat(getComputedStyle(block).paddingLeft),
+    };
+  });
+  expect(Math.abs(bounds.leftGap)).toBeLessThanOrEqual(1);
+  expect(Math.abs(bounds.rightGap)).toBeLessThanOrEqual(1);
+  expect(bounds.borderTop).toBe('1px');
+  expect(bounds.contentInset).toBeGreaterThan(0);
+});

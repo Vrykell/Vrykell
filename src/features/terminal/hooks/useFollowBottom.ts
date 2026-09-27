@@ -4,6 +4,40 @@ import { useCallback, useEffect, useRef } from 'react';
 
 const BOTTOM_THRESHOLD_PX = 32; // ≈2 行
 
+interface ViewAnchor {
+  range: Range | null;
+  element: HTMLElement;
+  textTop: number | null;
+  elementTop: number;
+}
+
+function textTop(range: Range | null, scroll: HTMLElement): number | null {
+  if (!range?.startContainer.isConnected || !scroll.contains(range.startContainer)) return null;
+  const rect = range.getBoundingClientRect();
+  return rect.height > 0 ? rect.top : null;
+}
+
+function captureViewAnchor(scroll: HTMLElement): ViewAnchor | null {
+  const viewport = scroll.getBoundingClientRect();
+  if (viewport.width <= 0 || viewport.height <= 0) return null;
+  const x = Math.min(viewport.right - 8, viewport.left + 80);
+  const y = Math.min(viewport.bottom - 8, viewport.top + 20);
+  const target = document.elementFromPoint(x, y);
+  if (!target || !scroll.contains(target)) return null;
+  const element = target.closest<HTMLElement>('[data-testid^="command-block-"], [data-testid^="running-block-"]')
+    ?? target as HTMLElement;
+  const caret = document.caretRangeFromPoint?.(x, y);
+  const range = caret?.startContainer.nodeType === Node.TEXT_NODE
+    && scroll.contains(caret.startContainer) ? caret.cloneRange() : null;
+  const caretTop = textTop(range, scroll);
+  return {
+    range,
+    element,
+    textTop: caretTop === null ? null : caretTop - viewport.top,
+    elementTop: element.getBoundingClientRect().top - viewport.top,
+  };
+}
+
 /** paneId engage() 注册表：共享输入栏提交命令时，按聚焦 pane 复位对应列表的贴底跟随。
  *  （主列表按 activeId 注册，分屏各 pane 按 paneId 注册。） */
 const engagers = new Map<string, () => void>();
@@ -77,6 +111,27 @@ export function useFollowBottom(
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
+    let width = el.clientWidth;
+    let height = el.clientHeight;
+    let anchor: ViewAnchor | null = null;
+    let restoredTop: number | null = null;
+    const restoreAnchor = () => {
+      if (!anchor) return;
+      if (!anchor.element.isConnected || !el.contains(anchor.element)) {
+        anchor = captureViewAnchor(el);
+        return;
+      }
+      const caretTop = textTop(anchor.range, el);
+      const viewportTop = el.getBoundingClientRect().top;
+      let offset = anchor.element.getBoundingClientRect().top - viewportTop - anchor.elementTop;
+      if (caretTop !== null && anchor.textTop !== null) {
+        offset = caretTop - viewportTop - anchor.textTop;
+      }
+      if (Math.abs(offset) < 0.5) return;
+      el.scrollTop += offset;
+      restoredTop = el.scrollTop;
+      if (persistKey) saveScrollPos(persistKey, restoredTop);
+    };
     // 挂载时恢复上次记录的滚动进度；恢复后按实际位置校正 latch，
     // 避免随后的 snap（content 变化时）把用户又拉回底部。
     if (persistKey) {
@@ -85,28 +140,44 @@ export function useFollowBottom(
         el.scrollTop = saved;
         atBottomRef.current =
           el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX;
+        if (!atBottomRef.current) anchor = captureViewAnchor(el);
       }
     }
     const onScroll = () => {
+      if (el.clientWidth !== width || el.clientHeight !== height) {
+        width = el.clientWidth;
+        height = el.clientHeight;
+        if (atBottomRef.current) snap();
+        else restoreAnchor();
+        return;
+      }
+      if (restoredTop !== null && Math.abs(el.scrollTop - restoredTop) < 1) {
+        restoredTop = null;
+        return;
+      }
+      restoredTop = null;
       // 自引发的 scroll 事件（snap 位置）：即使内容已增长也保持贴底
       if (el.scrollTop === snappedTopRef.current) {
         atBottomRef.current = true;
+        anchor = null;
         return;
       }
       atBottomRef.current =
         el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX;
+      anchor = atBottomRef.current ? null : captureViewAnchor(el);
       if (persistKey) saveScrollPos(persistKey, el.scrollTop);
     };
     el.addEventListener('scroll', onScroll, { passive: true });
-    // 运行中块的活 xterm 高度直改 DOM（不经 React → deps 不触发）：
-    // 观察内容包装层（TerminalView 的单根 div），latch 在底时持续增长跟随
+    // Observe the whole output flow because live xterm height changes outside React.
     const content = el.firstElementChild;
-    const ro = content
-      ? new ResizeObserver(() => {
-          if (atBottomRef.current) snap();
-        })
-      : null;
-    if (content) ro!.observe(content);
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {
+      width = el.clientWidth;
+      height = el.clientHeight;
+      if (atBottomRef.current) snap();
+      else restoreAnchor();
+    });
+    ro?.observe(el);
+    if (content) ro?.observe(content);
     return () => {
       el.removeEventListener('scroll', onScroll);
       ro?.disconnect();

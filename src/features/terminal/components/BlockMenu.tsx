@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { copyBlockText, rerunBlockCommand } from '@features/terminal/services/blockActions';
 import { useChatStore } from '@features/chat';
-import { useBlockStore } from '@features/terminal';
 import { clearSessionBlocks } from '@features/terminal/hooks/useTerminalSession';
 import { fmtDuration } from '@ui/UiBtn';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
@@ -93,11 +92,6 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
     onClose();
   }, [paneId, onClose]);
 
-  const toggleBookmark = useCallback(() => {
-    useBlockStore.getState().toggleBookmark(paneId, block.id);
-    onClose();
-  }, [paneId, block.id, onClose]);
-
   return (
     <div
       ref={ref}
@@ -158,10 +152,6 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
       <MenuItem label="重新运行" onClick={rerun} />
       <MenuItem label="发给 AI 分析" onClick={sendToAI} />
       <div style={{ height: 1, background: 'var(--border)', margin: '3px 8px' }} />
-      <MenuItem
-        label={block.bookmarked ? '取消书签' : '添加书签'}
-        onClick={toggleBookmark}
-      />
       <MenuItem label="清除所有块" onClick={clearAllBlocks} />
     </div>
   );

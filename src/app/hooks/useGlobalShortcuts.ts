@@ -1,39 +1,32 @@
 import { useEffect } from 'react';
 import { useSessionStore, isSessionTab } from '@features/workspace';
-import { useTerminalStore, termInstances, getFocusedTerminalId } from '@features/terminal';
+import { useTerminalStore, getFocusedTerminalId } from '@features/terminal';
 import { countLeaves, leaves } from '@features/workspace/model/windowLayout';
 import { useUiStore } from '@features/workspace';
-import { useBlockStore } from '@features/terminal';
 
 /**
  * 全局快捷键：
  * - Cmd/Ctrl+T 新建标签；Cmd/Ctrl+W 关闭当前标签
  * - Cmd/Ctrl+1..9 切换到第 N 个标签
  * - Cmd/Ctrl+F 打开全局搜索
- * - Ctrl+Shift+B 切换书签
  * - Cmd/Ctrl+, 打开设置
  * - Cmd/Ctrl+P 命令面板
  */
 
-/** 缩放终端字号，同时更新所有 xterm 实例和全局字体大小。 */
-function scaleFontSize(delta: 1 | -1 | 0) {
-  const el = document.documentElement;
-  const cur = parseFloat(el.style.fontSize || '14');
-  let next: number;
-  if (delta === 0) next = 14;
-  else next = Math.max(10, Math.min(18, cur + delta));
-
-  if (delta === 0) el.style.fontSize = '';
-  else el.style.fontSize = `${next}px`;
-
-  // 同步所有 xterm 实例的字号
-  for (const t of termInstances.values()) {
-    try { t.options.fontSize = next; } catch { /* ignore */ }
-  }
-}
-
 export function useGlobalShortcuts() {
   useEffect(() => {
+    const preventZoomKeys = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      if (!['=', '+', '-', '0', 'Add', 'Subtract'].includes(e.key)
+        && !['NumpadAdd', 'NumpadSubtract', 'Numpad0'].includes(e.code)) return;
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    const preventZoomWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) e.preventDefault();
+    };
+    const preventZoomGesture = (e: Event) => e.preventDefault();
+
     const handler = (e: KeyboardEvent) => {
       const activeId = useSessionStore.getState().activeId;
 
@@ -50,15 +43,6 @@ export function useGlobalShortcuts() {
         }
       }
 
-      // Cmd/Ctrl+/-/0: 字体缩放
-      if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '-' || e.key === '0')) {
-        e.preventDefault();
-        if (e.key === '=') scaleFontSize(1);
-        else if (e.key === '-') scaleFontSize(-1);
-        else scaleFontSize(0);
-        return;
-      }
-
       // Cmd/Ctrl+P: 命令面板
       if ((e.metaKey || e.ctrlKey) && e.key === 'p' && !e.shiftKey) {
         e.preventDefault();
@@ -70,17 +54,6 @@ export function useGlobalShortcuts() {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'T') {
         e.preventDefault();
         useSessionStore.getState().undoCloseTab();
-        return;
-      }
-
-      // Ctrl+Shift+B: 切换当前选中块的书签
-      if (e.ctrlKey && e.shiftKey && !e.metaKey && e.key === 'B') {
-        e.preventDefault();
-        const blocks = useBlockStore.getState().byTab[activeId];
-        if (blocks?.length) {
-          const last = blocks[blocks.length - 1];
-          if (last) useBlockStore.getState().toggleBookmark(activeId, last.id);
-        }
         return;
       }
 
@@ -142,7 +115,17 @@ export function useGlobalShortcuts() {
         }
       }
     };
+    window.addEventListener('keydown', preventZoomKeys, true);
+    window.addEventListener('wheel', preventZoomWheel, { capture: true, passive: false });
+    window.addEventListener('gesturestart', preventZoomGesture, { capture: true, passive: false });
+    window.addEventListener('gesturechange', preventZoomGesture, { capture: true, passive: false });
     window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    return () => {
+      window.removeEventListener('keydown', preventZoomKeys, true);
+      window.removeEventListener('wheel', preventZoomWheel, true);
+      window.removeEventListener('gesturestart', preventZoomGesture, true);
+      window.removeEventListener('gesturechange', preventZoomGesture, true);
+      window.removeEventListener('keydown', handler);
+    };
   }, []);
 }

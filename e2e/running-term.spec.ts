@@ -34,6 +34,42 @@ test('运行中 block 挂载可见 xterm，输出实时渲染，完成后换成�
   await expect(page.getByText('hello world')).toBeVisible({ timeout: 3000 });
 });
 
+test('已有历史命令时，运行中的输出会持续保持在可见区域', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.setViewportSize({ width: 800, height: 320 });
+  await page.goto('/');
+  const input = page.getByPlaceholder(/输入命令/);
+  await expect(input).toBeVisible({ timeout: 5000 });
+  await input.fill('echo previous');
+  await input.press('Enter');
+  await expect(page.getByTestId('exit-code')).toHaveCount(1);
+
+  await startRunningBlock(page);
+  const host = page.getByTestId('running-term');
+  await expect(host.locator('.xterm')).toBeVisible({ timeout: 5000 });
+  await emitPtyOutput(page, Array.from({ length: 40 }, (_, i) => `live-${i}`).join('\r\n') + '\r\n');
+  await expectAnyTermContains(page, 'live-39', 3000);
+
+  const scroller = page.locator('[data-testid^="terminal-scroll-"]').first();
+  await expect.poll(() => scroller.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeLessThan(32);
+  await expect(host.locator('.xterm')).toBeVisible();
+  await expect(page.getByTestId('exit-code')).toHaveCount(1);
+});
+
+test('重新加载会话模块后仍能取得运行中的活终端', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  await startRunningBlock(page);
+  const available = await page.evaluate(async () => {
+    const scroller = document.querySelector<HTMLElement>('[data-testid^="terminal-scroll-"]');
+    const paneId = scroller?.dataset.testid?.slice('terminal-scroll-'.length);
+    const moduleUrl = `/src/features/terminal/hooks/useTerminalSession.ts?registry-check=${Date.now()}`;
+    const fresh = await import(/* @vite-ignore */ moduleUrl);
+    return Boolean(paneId && fresh.getExecutingTerm(paneId));
+  });
+  expect(available).toBe(true);
+});
+
 test('运行中焦点落在块内活 xterm 的 textarea（而非隐藏主 xterm）', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
@@ -143,7 +179,7 @@ test('卡片内滚轮冒泡到块列表滚动容器（不被块 xterm 吞掉）'
   }).toPass({ timeout: 5000 });
 });
 
-test('块终端是深色圆角盒子：el 底色 --xterm-bg + 圆角，裁剪落在 el', async ({ page }) => {
+test('块终端与页面同色且无圆角，裁剪仍落在 el', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await startRunningBlock(page);
@@ -158,12 +194,13 @@ test('块终端是深色圆角盒子：el 底色 --xterm-bg + 圆角，裁剪落
     return {
       innerBg: cs.backgroundColor,
       innerRadius: cs.borderTopLeftRadius,
+      canvasBg: getComputedStyle(document.querySelector('[data-testid^="terminal-scroll-"]')!).backgroundColor,
       viewportBg,
       cropOnInner: /px$/.test(inner.style.height) && !/px$/.test(el.style.height),
     };
   });
-  expect(probe.innerBg).toBe('rgb(17, 20, 23)'); // --xterm-bg #111417
-  expect(parseFloat(probe.innerRadius)).toBeGreaterThanOrEqual(6);
-  expect(probe.viewportBg).toBe('rgba(0, 0, 0, 0)'); // 滚动条侧条不露 #000
+  expect(probe.innerBg).toBe(probe.canvasBg);
+  expect(parseFloat(probe.innerRadius)).toBe(0);
+  expect(probe.viewportBg).toBe('rgba(0, 0, 0, 0)');
   expect(probe.cropOnInner).toBe(true);
 });

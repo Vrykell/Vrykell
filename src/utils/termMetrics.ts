@@ -11,13 +11,13 @@ export interface TermCellMetrics {
   height: number;
 }
 
-/** 渲染服务内部尺寸；取不到时回退默认值（width 7.8 / height 14）。 */
+/** Read renderer cell dimensions; use the default font's measured row height as fallback. */
 export function getCellMetrics(term: Terminal): TermCellMetrics {
   const dims = (term as unknown as {
     _core?: { _renderService?: { dimensions?: { css?: { cell?: { width?: number; height?: number } } } } };
   })._core?._renderService?.dimensions;
   return {
     width: dims?.css?.cell?.width || 7.8,
-    height: dims?.css?.cell?.height || 14,
+    height: dims?.css?.cell?.height || 16,
   };
 }

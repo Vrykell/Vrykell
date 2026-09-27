@@ -15,6 +15,7 @@
 import { useEffect } from 'react';
 import { termInstances } from '@features/terminal';
 import { getExecutingTerm } from '@features/terminal/hooks/useTerminalSession';
+import { isTerminalDebugEnabled, terminalDebug } from '@features/terminal/services/terminalDebug';
 
 const isEditable = (t: EventTarget | null): boolean => {
   const el = t as HTMLElement | null;
@@ -30,12 +31,27 @@ export function useTerminalFocus(active: boolean, tabId: string): void {
     if (!active) return;
     const term = getExecutingTerm(tabId)?.term ?? termInstances.get(tabId);
     if (!term) return;
+    let lastFocusState = '';
+    const recordFocusState = (state: string, focused: boolean) => {
+      if (!isTerminalDebugEnabled() || lastFocusState === state) return;
+      lastFocusState = state;
+      terminalDebug('terminal-focus', { tabId, state, focused, mounted: Boolean(term.element) });
+    };
 
     // 焦点空闲（落 body）时收归 xterm —— 关键场景：长运行后输入栏隐藏，焦点掉回
     // body；若焦点不到位，IME 无法起组合、按键无处去。
     const grabIfIdle = () => {
       const ae = document.activeElement as HTMLElement | null;
-      if (!ae || ae === document.body || ae === document.documentElement) term.focus();
+      if (!ae || ae === document.body || ae === document.documentElement) {
+        if (!term.element) {
+          recordFocusState('terminal-not-mounted', false);
+          return;
+        }
+        term.focus();
+        const textarea = term.element.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea');
+        const focused = Boolean(textarea && document.activeElement === textarea);
+        recordFocusState(focused ? 'focused' : 'focus-not-applied', focused);
+      }
     };
     grabIfIdle(); // 激活时：若焦点本就空闲，立即就位
     const onFocusOut = () => {

@@ -1,7 +1,5 @@
 import { create } from 'zustand';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
-import { useToastStore } from '@ui/Toast';
-import { t } from '@i18n';
 import * as sessionManager from '@features/workspace/services/sessionManager';
 
 const EMPTY: TermBlock[] = [];
@@ -15,13 +13,10 @@ interface BlockState {
   clearBlocks: (tabId: string) => void;
   /** 关 tab 时删除该 tab 的 block 数据，避免 per-tab 残留 */
   dropTab: (tabId: string) => void;
-  toggleBookmark: (tabId: string, blockId: string) => void;
   /** 单个 block 折叠/展开（持久化） */
   setBlockCollapsed: (tabId: string, blockId: string, collapsed: boolean) => void;
   /** 全部 block 折叠/展开（持久化） */
   setAllCollapsed: (tabId: string, collapsed: boolean) => void;
-  jumpToNextBookmark: (tabId: string) => string | null;
-  jumpToPrevBookmark: (tabId: string) => string | null;
 }
 
 export const useBlockStore = create<BlockState>((set, get) => ({
@@ -55,21 +50,6 @@ export const useBlockStore = create<BlockState>((set, get) => ({
       return { byTab };
     }),
 
-  toggleBookmark: (tabId, blockId) => {
-    const blocks = get().byTab[tabId];
-    if (!blocks) return;
-    const found = blocks.find((b) => b.id === blockId);
-    const newState = !found?.bookmarked;
-    set((s) => ({
-      byTab: {
-        ...s.byTab,
-        [tabId]: (s.byTab[tabId] ?? []).map((b) => (b.id === blockId ? { ...b, bookmarked: newState } : b)),
-      },
-    }));
-    // 副作用（toast）放在 set 外，避免 StrictMode 下更新函数重复执行导致重复提示
-    useToastStore.getState().addToast(newState ? t('toast.bookmarked') : t('toast.unbookmarked'), 'success');
-  },
-
   setBlockCollapsed: (tabId, blockId, collapsed) => {
     set((s) => ({
       byTab: {
@@ -95,19 +75,6 @@ export const useBlockStore = create<BlockState>((set, get) => ({
     }
   },
 
-  jumpToNextBookmark: (tabId) => {
-    const blocks = get().byTab[tabId];
-    if (!blocks?.length) return null;
-    const bm = blocks.filter((b) => b.bookmarked);
-    return bm.length > 0 ? bm[0]!.id : null;
-  },
-
-  jumpToPrevBookmark: (tabId) => {
-    const blocks = get().byTab[tabId];
-    if (!blocks?.length) return null;
-    const bm = blocks.filter((b) => b.bookmarked);
-    return bm.length > 0 ? bm[bm.length - 1]!.id : null;
-  },
 }));
 
 /** 根据 tabId 获取块的 selector（始终返回稳定引用避免无限渲染）。 */

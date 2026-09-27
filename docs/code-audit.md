@@ -47,7 +47,7 @@ src/
 | `terminal/InputEditor.tsx` | 「输出发给 AI」「清除对话」两按钮空状态静默无反馈 | 加 toast 反馈 |
 | `components/` | `PromptDialog.tsx` 死代码 | 删除 |
 | `ai.ts` / `StatusBar.tsx` | 模型名非响应式（模块级缓存） | 改 zustand store，状态栏订阅 |
-| `stores/blocks.ts` | `toggleBookmark` 在 reducer 内触发 toast（StrictMode 双执行） | toast 移到 set 外 |
+| `stores/blocks.ts` | 命令块书签带来额外状态、Toast 和驱逐分支 | 移除书签功能及配套状态 |
 | `i18n/zh.ts` | 缺 `dock.ssh`，SSH 按钮 tooltip 显示 key | 补 key |
 | `fs.rs` | `fs_rename` 的 `new_name` 可含 `/`/`..` 路径遍历 | 校验单一 path component |
 | `search.rs` | 内容匹配上下文切片未对齐 UTF-8 边界，中文文件搜索 panic | `floor/ceil_char_boundary` 对齐 |
@@ -60,7 +60,7 @@ src/
 | `history.rs` | `create_session` 用 `INSERT OR IGNORE` 丢真信息 | 改 `ON CONFLICT DO UPDATE` |
 | `stores/chat.ts` | 流式中关标签残留 per-tab 幽灵空条目 | `appendChunk`/`finally` 判 tab 存在 |
 | `ssh/SshFormModal.tsx` | `doTest` 非数字端口传 NaN | 校验端口合法性 |
-| `terminal/pipeline/sessionController.ts` | 块数上限驱逐时书签保护是死逻辑，书签块被删 | `getBookmarkedIds` 从 store 反查书签 |
+| `terminal/pipeline/sessionController.ts` | 块数上限包含书签保护分支 | 移除书签后统一淘汰最旧块并释放输出终端 |
 | `stores/workspace.ts` | `_lastClosed` 隐藏状态靠强转读写 | 声明进接口 |
 | `shells.rs` | `list_shells` 同步 command 在主线程跑探测 | 改 async + spawn_blocking |
 | `pty.rs` | `KillState` 条目从不清理 | `pty_close`/`reap_session` 同步删除 |
@@ -93,7 +93,6 @@ src/
 
 - `search/registry.ts` — 筛选源启用集合是模块级变量，非响应式；切换后结果不更新直到重新输入。
 - `lib/sessionManager.ts` — `restore()` 只写 `{id,title,kind,cwd}`，丢失 shellType/ssh 元数据，SSH/指定 shell 标签恢复后 spawn 成默认 shell。
-- `terminal/pipeline/sessionController.ts` — 块数上限的书签保护是死逻辑（controller 内部块无 `bookmarked`）。
 
 ### 前端 · 中
 

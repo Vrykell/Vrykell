@@ -348,20 +348,12 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 @keyframes dragGhostIn { from { opacity: 0; } to { opacity: 1; } }
 .spin { animation: spin 0.8s linear infinite; }
 
-/* 块内活终端：深色圆角盒子（el 底色 --xterm-bg），覆盖全局 .xterm padding，
-   4px/8px 是盒子内侧呼吸边距。
-   画布居中：块终端 cols = 主终端（TUI 几何与 PTY 一致），画布通常比
-   卡片内宽略宽 —— 左对齐会把溢出全裁在右侧，TUI 居中布局（claude
-   欢迎框等）看起来偏心；flex 居中让两侧对称裁剪 */
+/* Live command output stays on the canvas; padding preserves terminal cell geometry. */
 [data-testid="running-term"] .xterm { padding: 4px 8px; display: flex; justify-content: center; }
-/* 手动全屏宿主内：贴边，无内边距（覆盖块内的呼吸边距） */
+/* Manually fullscreened terminals extend to the host edges. */
 [data-testid="tui-fullscreen"] [data-testid="running-term"] .xterm { padding: 0; }
-/* 禁收缩：screen 有显式宽度（cols × 格宽），默认 shrink 会压扁盒子、
-   内部绝对定位 canvas 仍从左缘起画，居中失效 */
+/* Keep the explicitly sized xterm screen centered without shrinking it. */
 [data-testid="running-term"] .xterm-screen { flex-shrink: 0; }
 
-/* xterm.css 默认给 viewport 垫 #000（在 screen 未覆盖的滚动条侧条会露出），
-   透掉让 el 的 --xterm-bg 透出。
-   注意必须三层选择器：xterm.css 的 .xterm .xterm-viewport 与它同特异性
-   且随 TerminalPanel 晚于本文件加载，同特异性后加载者胜 */
+/* Let the output canvas show through xterm's viewport gutter. */
 [data-testid="running-term"] .xterm .xterm-viewport { background-color: transparent; }

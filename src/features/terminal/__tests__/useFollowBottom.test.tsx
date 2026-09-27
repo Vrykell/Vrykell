@@ -13,6 +13,32 @@ function makeEl(scrollTop: number) {
 }
 
 describe('useFollowBottom', () => {
+  it('observes the complete output wrapper and follows live height changes', () => {
+    let notify: ResizeObserverCallback = () => {};
+    const observe = vi.fn();
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: ResizeObserverCallback) { notify = callback; }
+      observe = observe;
+      disconnect() {}
+    });
+    try {
+      const el = makeEl(800);
+      const wrapper = document.createElement('div');
+      wrapper.appendChild(document.createElement('button'));
+      el.appendChild(wrapper);
+      const ref = { current: el } as React.RefObject<HTMLDivElement>;
+      renderHook(() => useFollowBottom(ref, []));
+      expect(observe).toHaveBeenCalledWith(el);
+      expect(observe).toHaveBeenCalledWith(wrapper);
+
+      Object.defineProperty(el, 'scrollHeight', { value: 1400, configurable: true });
+      notify([] as ResizeObserverEntry[], {} as ResizeObserver);
+      expect(el.scrollTop).toBe(1400);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('贴底时 deps 变化自动滚到底', async () => {
     const el = makeEl(800); // 贴底
     const ref = { current: el } as React.RefObject<HTMLDivElement>;

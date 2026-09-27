@@ -35,8 +35,6 @@ const zh: Record<string, string> = {
   // ── Toast ──
   'toast.tabRestored': '已恢复关闭的标签',
   'toast.renamed': '已重命名为 "{{title}}"',
-  'toast.bookmarked': '已添加书签',
-  'toast.unbookmarked': '已取消书签',
 
   // ── 设置 ──
   'settings.title': '设置（⌘,）',

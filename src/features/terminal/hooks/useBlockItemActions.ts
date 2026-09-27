@@ -9,7 +9,7 @@ interface UseBlockItemActionsOptions {
   block: TermBlock;
 }
 
-/** Coordinates completed command block actions: rerun, explain, copy, collapse, and bookmark. */
+/** Coordinates completed command block actions: rerun, explain, copy, and collapse. */
 export function useBlockItemActions({ tabId, block }: UseBlockItemActionsOptions) {
   const send = useChatStore((state) => state.send);
   const [copiedAction, setCopiedAction] = useState<'command' | 'output' | null>(null);
@@ -54,10 +54,6 @@ export function useBlockItemActions({ tabId, block }: UseBlockItemActionsOptions
     useBlockStore.getState().setBlockCollapsed(tabId, block.id, !isCollapsed);
   }, [block.id, isCollapsed, tabId]);
 
-  const toggleBookmark = useCallback(() => {
-    useBlockStore.getState().toggleBookmark(tabId, block.id);
-  }, [block.id, tabId]);
-
   return {
     isCollapsed,
     copiedAction,
@@ -67,6 +63,5 @@ export function useBlockItemActions({ tabId, block }: UseBlockItemActionsOptions
     copyCmd,
     copyOut,
     toggleCollapsed,
-    toggleBookmark,
   };
 }
