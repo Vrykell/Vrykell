@@ -17,6 +17,11 @@ const ZSH_RC: &str = r#"# vrykell shell integration (zsh)
 
 __ait_precmd() {
   local ec=$?
+  if [[ "${VRYKELL_BLOCK_MODE:-0}" == "1" ]]; then
+    PROMPT=''
+    RPROMPT=''
+    PROMPT2=''
+  fi
   printf '\e]7;file://%s%s\a' "$HOST" "$PWD"
   printf '\e]133;D;%d\a' "$ec"
   printf '\e]133;A\a'
@@ -38,19 +43,34 @@ const BASH_RC: &str = r#"# vrykell shell integration (bash)
 __ait_in_prompt=0
 __ait_prompt_command() {
   local ec=$?
+  __ait_in_prompt=0
   printf '\e]7;file://%s%s\a' "$HOSTNAME" "$PWD"
-  printf '\e]133;D;%d\a' "$ec"
-  printf '\e]133;A\a'
+  if [[ "${VRYKELL_BLOCK_MODE:-0}" == "1" || "$PS1" != *"133;A"* ]]; then
+    printf '\e]133;D;%d\a' "$ec"
+    printf '\e]133;A\a'
+  fi
   local b=$(git branch --show-current 2>/dev/null) && [[ -n "$b" ]] && \
     printf '\e]133;G;%s\a' "$(printf %s "$b" | base64 | tr -d '\n')"
+}
+__ait_mark_prompt_ready() {
+  if [[ "${VRYKELL_BLOCK_MODE:-0}" == "1" ]]; then
+    PS1=''
+    PS2=''
+  fi
   __ait_in_prompt=1
 }
-PROMPT_COMMAND="__ait_prompt_command${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
+if [[ "$(declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]]; then
+  PROMPT_COMMAND=(__ait_prompt_command "${PROMPT_COMMAND[@]}" __ait_mark_prompt_ready)
+else
+  PROMPT_COMMAND="__ait_prompt_command${PROMPT_COMMAND:+;$PROMPT_COMMAND};__ait_mark_prompt_ready"
+fi
 __ait_preexec() {
   [[ $__ait_in_prompt == 0 ]] && return
-  [[ "$BASH_COMMAND" == __ait_* ]] && return
   __ait_in_prompt=0
-  printf '\e]133;E;%s\a' "$(printf %s "$BASH_COMMAND" | base64 | tr -d '\n')"
+  local __ait_history_line=$(HISTTIMEFORMAT= history 1)
+  local __ait_command=${__ait_history_line##*  }
+  [[ -n "$__ait_command" ]] || __ait_command="$BASH_COMMAND"
+  printf '\e]133;E;%s\a' "$(printf %s "$__ait_command" | base64 | tr -d '\n')"
   printf '\e]133;C\a'
 }
 trap '__ait_preexec' DEBUG
@@ -69,6 +89,12 @@ function Write-VrykellOsc {
 
 function prompt {
     $esc = [char]27; $bel = [char]7
+
+    if ($env:VRYKELL_BLOCK_MODE -eq '1') {
+        $promptText = ''
+    } else {
+        $promptText = "PS $($PWD.Path)> "
+    }
 
     # exit code of the previous command (LASTEXITCODE for native commands)
     $ec = 0
@@ -98,7 +124,7 @@ function prompt {
         Write-VrykellOsc "133;G" $b64
     }
 
-    "PS $($PWD.Path)> "
+    $promptText
 }
 
 # Enter hook: emit 133;E (command) then 133;C (preexec)
@@ -152,8 +178,8 @@ pub fn ssh_remote_command() -> String {
     format!(
         r#"b64d() {{ printf %s "$1" | base64 -d 2>/dev/null || printf %s "$1" | base64 -D 2>/dev/null; }}
 case ${{SHELL##*/}} in
-zsh) d=$(umask 077 && mktemp -d 2>/dev/null) && b64d '{zsh_b64}' > "$d/.zshrc" && ZDOTDIR=$d exec zsh -i 2>/dev/null;;
-bash) f=$(umask 077 && mktemp 2>/dev/null) && b64d '{bash_b64}' > "$f" && exec bash --rcfile "$f" -i 2>/dev/null;;
+zsh) d=$(umask 077 && mktemp -d 2>/dev/null) && b64d '{zsh_b64}' > "$d/.zshrc" && VRYKELL_BLOCK_MODE=1 ZDOTDIR=$d exec zsh -i 2>/dev/null;;
+bash) f=$(umask 077 && mktemp 2>/dev/null) && b64d '{bash_b64}' > "$f" && VRYKELL_BLOCK_MODE=1 exec bash --rcfile "$f" -i 2>/dev/null;;
 esac
 exec "${{SHELL:-sh}}" -i"#
     )
@@ -216,6 +242,7 @@ mod tests {
         assert!(bash.contains("133;G;"));
         assert!(bash.contains("7;file://"));
         assert!(bash.contains("PROMPT_COMMAND"));
+        assert!(bash.contains("__ait_mark_prompt_ready"));
         let ps = fs::read_to_string(dir.join("powershell/profile.ps1")).unwrap();
         assert!(ps.contains("133;A"));
         assert!(ps.contains("133;C"));
@@ -223,6 +250,89 @@ mod tests {
         assert!(ps.contains("133;E"));
         assert!(ps.contains("133;G"));
         assert!(ps.contains("Set-PSReadLineKeyHandler"));
+    }
+
+    #[test]
+    fn bash_prompt_commands_are_not_reported_as_user_commands() {
+        let ready = BASH_RC.find("__ait_mark_prompt_ready").unwrap();
+        let prompt = BASH_RC.find("__ait_prompt_command()").unwrap();
+        let reset = BASH_RC.find("  __ait_in_prompt=0\n  printf").unwrap();
+        assert!(prompt < reset && reset < ready);
+        assert!(BASH_RC.contains("PROMPT_COMMAND=\"__ait_prompt_command"));
+        assert!(BASH_RC.contains("history 1"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn bash_prompt_hooks_full_chain_only_reports_user_commands() {
+        use std::io::{Read, Write};
+
+        let bash_available = std::process::Command::new("sh")
+            .args(["-c", "command -v bash"])
+            .output()
+            .ok()
+            .is_some_and(|output| output.status.success());
+        if !bash_available {
+            eprintln!("Skipping Bash prompt hook simulation: bash is not installed");
+            return;
+        }
+
+        let dir = integration_dir().unwrap();
+        let test_home = std::path::Path::new("/tmp/vrykell-shell-test-home-hooks");
+        let _ = fs::create_dir_all(test_home);
+        fs::write(
+            test_home.join(".bashrc"),
+            r#"[ -f /etc/bashrc ] && . /etc/bashrc
+shopt -s expand_aliases
+alias ls='ls --color=auto'
+HISTTIMEFORMAT='%F %T '
+"#,
+        )
+        .unwrap();
+
+        let pty_system = portable_pty::native_pty_system();
+        let pair = pty_system
+            .openpty(portable_pty::PtySize {
+                rows: 24,
+                cols: 80,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .unwrap();
+        let mut cmd = portable_pty::CommandBuilder::new("bash");
+        cmd.arg("--rcfile");
+        cmd.arg(dir.join("bash").join("rc").to_string_lossy().to_string());
+        cmd.arg("-i");
+        cmd.env("HOME", "/tmp/vrykell-shell-test-home-hooks");
+        cmd.env("VTE_VERSION", "7200");
+        cmd.env("TERM", "xterm");
+        let mut child = pair.slave.spawn_command(cmd).unwrap();
+        drop(pair.slave);
+        let mut reader = pair.master.try_clone_reader().unwrap();
+        let mut writer = pair.master.take_writer().unwrap();
+        writer.write_all(b"ls\nexit\n").unwrap();
+        writer.flush().unwrap();
+
+        let mut output = Vec::new();
+        let _ = reader.read_to_end(&mut output);
+        let _ = child.wait();
+        let output = String::from_utf8_lossy(&output);
+        let prompt_st = output.matches("\u{1b}]133;A\u{1b}\\").count();
+        let prompt_bel = output.matches("\u{1b}]133;A\u{07}").count();
+        assert_eq!(prompt_st + prompt_bel, 2, "one prompt marker per shell prompt");
+
+        let commands = output
+            .split("\u{1b}]133;E;")
+            .skip(1)
+            .filter_map(|chunk| chunk.split('\u{07}').next())
+            .filter_map(|payload| {
+                base64::engine::general_purpose::STANDARD
+                    .decode(payload)
+                    .ok()
+                    .and_then(|bytes| String::from_utf8(bytes).ok())
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands, ["ls", "exit"]);
     }
 
     #[test]
@@ -238,6 +348,18 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn zsh_emits_osc133_marks() {
+        // Keep the integration test meaningful on minimal Linux images without zsh.
+        let zsh_path = std::process::Command::new("sh")
+            .args(["-c", "command -v zsh"])
+            .output()
+            .ok()
+            .filter(|output| output.status.success())
+            .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
+            .filter(|path| !path.is_empty());
+        if zsh_path.is_none() {
+            eprintln!("Skipping zsh integration test: zsh is not installed");
+            return;
+        }
         let dir = integration_dir().unwrap();
         let pty_system = portable_pty::native_pty_system();
         let pair = pty_system
@@ -248,7 +370,7 @@ mod tests {
                 pixel_height: 0,
             })
             .unwrap();
-        let mut cmd = portable_pty::CommandBuilder::new("/bin/zsh");
+        let mut cmd = portable_pty::CommandBuilder::new(zsh_path.expect("zsh path checked above"));
         cmd.env("ZDOTDIR", dir.join("zsh").to_string_lossy().to_string());
         cmd.env("HOST", "testhost");
         let _child = pair.slave.spawn_command(cmd).unwrap();

@@ -73,7 +73,7 @@ export default function TerminalView() {
         return tab.kind === 'history' ? <SessionHistoryView key={tab.id} /> : <SettingsView key={tab.id} />;
       })}
 
-      {/* 手动全屏宿主（块终端「进入全屏交互」）：顶部为透明工具条让位，其余贴边 */}
+      {/* Manual fullscreen host for a running block, with room for the toolbar. */}
       {altScreenActive && (
         <div data-testid="tui-fullscreen" style={{ position: 'absolute', inset: 0, zIndex: 100, background: 'var(--canvas)', paddingTop: 28 }} />
       )}
@@ -327,7 +327,7 @@ function TerminalPane(props: {
   const { terminal, windowId, focused, setSession, setFocusedPane, onContextMenu, inner } = props;
   const scene = useTerminalStore((s) => s.scenes[terminal.id] ?? 'classic');
   const altScreenActive = useTerminalStore((s) => s.altScreenActive);
-  // 真实 alt buffer（vim/htop）显示主 xterm；手动全屏（块终端）时 xterm 是空壳，隐藏
+  // Real alternate buffers use the main xterm; manual fullscreen uses the live block terminal.
   const showXterm = scene === 'classic' || (scene === 'altScreen' && !altScreenActive);
   const showBlocks = scene === 'blockList';
 
@@ -354,7 +354,7 @@ function TerminalPane(props: {
         overflow: 'hidden',
       }}
     >
-      {/* xterm 表面：classic/真实 altScreen 可见，blockList/手动全屏隐藏但保持挂载 */}
+      {/* Keep xterm mounted; hide it only while the block terminal is manually fullscreened. */}
       {/* AI 状态栏（仅 AI 模式显示，置于页面顶部） */}
       <AiStatusBar paneId={terminal.id} />
       <div style={showXterm
@@ -364,7 +364,7 @@ function TerminalPane(props: {
         <TerminalPanel paneId={terminal.id} tabId={windowId} onReady={(sid) => setSession(terminal.id, sid)} />
       </div>
 
-      {/* 块列表：始终挂载（手动全屏时 RunningTerm 需保持存活），blockList 才可见 */}
+      {/* Keep the block list mounted so its live terminal survives manual fullscreen. */}
       <div style={{ display: showBlocks ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column' }}>
         <PaneBlockList paneId={terminal.id} insetLeft={inner.left ? 4 : 8} insetRight={inner.right ? 4 : 8} />
       </div>

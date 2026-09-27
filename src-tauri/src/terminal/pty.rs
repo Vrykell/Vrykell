@@ -76,7 +76,7 @@ struct PtyExit {
 /// read 线程 → 主循环的消息（Windows 无 poll，用 channel + recv_timeout 做空闲超时冲刷）。
 enum ReadMsg {
     Data(Vec<u8>),
-    End,
+    End(&'static str),
 }
 
 #[cfg(test)]
@@ -177,6 +177,7 @@ fn build_shell_cmd(
             if let Some(ref dir) = integ_dir {
                 cmd.env("ZDOTDIR", dir.join("zsh").to_string_lossy().to_string());
             }
+            set_shell_open_mode(&mut cmd, open_mode.as_deref());
             if let Some(d) = cwd { cmd.cwd(d); }
             return Ok(cmd);
         }
@@ -186,12 +187,13 @@ fn build_shell_cmd(
                 cmd.arg("--rcfile");
                 cmd.arg(dir.join("bash/rc").to_string_lossy().replace('\\', "/"));
             }
+            set_shell_open_mode(&mut cmd, open_mode.as_deref());
             if let Some(d) = cwd { cmd.cwd(d); }
             return Ok(cmd);
         }
         "powershell" | "pwsh" => {
             let prog = if requested == "pwsh" { "pwsh" } else { "powershell" };
-            return Ok(powershell_command(prog, &integ_dir, cwd));
+            return Ok(powershell_command(prog, &integ_dir, cwd, open_mode.as_deref()));
         }
         "cmd" => {
             return Ok(cmd_command(cwd));
@@ -205,7 +207,7 @@ fn build_shell_cmd(
     {
         match default_windows_shell() {
             "cmd" => return Ok(cmd_command(cwd)),
-            prog => return Ok(powershell_command(prog, &integ_dir, cwd)),
+            prog => return Ok(powershell_command(prog, &integ_dir, cwd, open_mode.as_deref())),
         }
     }
 
@@ -216,6 +218,7 @@ fn build_shell_cmd(
             if shell_env.contains("zsh") {
                 let mut cmd = CommandBuilder::new(&shell_env);
                 cmd.env("ZDOTDIR", dir.join("zsh").to_string_lossy().to_string());
+                set_shell_open_mode(&mut cmd, open_mode.as_deref());
                 if let Some(d) = cwd { cmd.cwd(d); }
                 return Ok(cmd);
             }
@@ -223,6 +226,7 @@ fn build_shell_cmd(
                 let mut cmd = CommandBuilder::new(&shell_env);
                 cmd.arg("--rcfile");
                 cmd.arg(dir.join("bash/rc").to_string_lossy().replace('\\', "/"));
+                set_shell_open_mode(&mut cmd, open_mode.as_deref());
                 if let Some(d) = cwd { cmd.cwd(d); }
                 return Ok(cmd);
             }
@@ -235,7 +239,12 @@ fn build_shell_cmd(
 }
 
 /// 构造 PowerShell / pwsh 启动命令（注入 OSC 133 集成脚本）。
-fn powershell_command(prog: &str, integ_dir: &Option<std::path::PathBuf>, cwd: Option<String>) -> CommandBuilder {
+fn powershell_command(
+    prog: &str,
+    integ_dir: &Option<std::path::PathBuf>,
+    cwd: Option<String>,
+    open_mode: Option<&str>,
+) -> CommandBuilder {
     let mut cmd = CommandBuilder::new(prog);
     if let Some(dir) = integ_dir {
         cmd.arg("-NoLogo");
@@ -243,8 +252,13 @@ fn powershell_command(prog: &str, integ_dir: &Option<std::path::PathBuf>, cwd: O
         cmd.arg("-File");
         cmd.arg(dir.join("powershell").join("profile.ps1").to_string_lossy().to_string());
     }
+    set_shell_open_mode(&mut cmd, open_mode);
     if let Some(d) = cwd { cmd.cwd(d); }
     cmd
+}
+
+fn set_shell_open_mode(cmd: &mut CommandBuilder, open_mode: Option<&str>) {
+    cmd.env("VRYKELL_BLOCK_MODE", if open_mode == Some("block") { "1" } else { "0" });
 }
 
 /// 构造 cmd 启动命令（无集成）。
@@ -311,11 +325,13 @@ fn merge_user_bin_paths(cmd: &mut CommandBuilder) {
     cmd.env("PATH", path);
 }
 
-/// GUI（Finder/Dock 启动）的 TERM 通常为空 —— zsh 会退化为 dumb、依赖终端
-/// 能力检测的 TUI（claude 等 truecolor 全屏应用）会因检测失败挂起/黑屏。
-/// 统一补上 xterm-256color + truecolor（用户已显式设置的优先，不改动）。
+/// GUI launches may inherit an empty or dumb TERM, which breaks terminal capability checks.
+/// Provide xterm-256color and truecolor defaults while preserving other explicit values.
 fn merge_term_env(cmd: &mut CommandBuilder) {
-    if std::env::var("TERM").map(|v| v.is_empty()).unwrap_or(true) {
+    if std::env::var("TERM")
+        .map(|value| value.trim().is_empty() || value.eq_ignore_ascii_case("dumb"))
+        .unwrap_or(true)
+    {
         cmd.env("TERM", "xterm-256color");
     }
     if std::env::var("COLORTERM").map(|v| v.is_empty()).unwrap_or(true) {
@@ -354,7 +370,19 @@ pub fn pty_spawn(
     let debug_shell = shell.clone();
     let debug_ssh = ssh.is_some();
     let debug_open_mode = open_mode.clone();
-    let debug_cwd = cwd.clone();
+    let debug_requested_shell = debug_shell.as_deref().map(shell_kind).unwrap_or("default");
+    let debug_shell_env = std::env::var("SHELL")
+        .ok()
+        .map(|value| shell_kind(&value))
+        .unwrap_or("unset");
+    let debug_integration_available = shell_integration::integration_dir().is_ok();
+    let debug_term = std::env::var("TERM")
+        .ok()
+        .filter(|value| !value.trim().is_empty() && !value.eq_ignore_ascii_case("dumb"))
+        .unwrap_or_else(|| "xterm-256color".to_string());
+    let debug_colorterm = std::env::var("COLORTERM").ok().filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "truecolor".to_string());
+    let debug_cwd_set = cwd.is_some();
     let pty_system = native_pty_system();
     let pair = pty_system
         .openpty(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
@@ -374,14 +402,18 @@ pub fn pty_spawn(
         debug::write(
             "spawn",
             format!(
-                "id={} cols={} rows={} shell={:?} ssh={} open_mode={:?} cwd={:?}",
+                "id={} cols={} rows={} requested_shell={} shell_env={} integration_available={} ssh={} open_mode={:?} cwd_set={} term={} colorterm={}",
                 id,
                 cols,
                 rows,
-                debug_shell,
+                debug_requested_shell,
+                debug_shell_env,
+                debug_integration_available,
                 debug_ssh,
                 debug_open_mode,
-                debug_cwd,
+                debug_cwd_set,
+                debug_term,
+                debug_colorterm,
             ),
         );
     }
@@ -400,12 +432,16 @@ pub fn pty_spawn(
             let mut buf = [0u8; 8192];
             loop {
                 match reader.read(&mut buf) {
-                    Ok(0) | Err(_) => {
-                        let _ = tx.send(ReadMsg::End);
+                    Ok(0) => {
+                        let _ = tx.send(ReadMsg::End("eof"));
                         break;
                     }
                     Ok(n) => {
                         let _ = tx.send(ReadMsg::Data(buf[..n].to_vec()));
+                    }
+                    Err(_) => {
+                        let _ = tx.send(ReadMsg::End("read-error"));
+                        break;
                     }
                 }
             }
@@ -423,6 +459,12 @@ pub fn pty_spawn(
             match rx.recv_timeout(FLUSH_INTERVAL) {
                 Ok(ReadMsg::Data(bytes)) => {
                     let data = decoder.push(&bytes);
+                    if debug::enabled() {
+                        debug::write(
+                            "read-chunk",
+                            format!("id={} bytes={} decoded_chars={}", tid, bytes.len(), data.len()),
+                        );
+                    }
                     if data.is_empty() {
                         continue; // 不完整尾部，等下次 read
                     }
@@ -438,12 +480,23 @@ pub fn pty_spawn(
                     }
                 }
                 // EOF / 出错 / 读线程意外断开：冲刷剩余，收敛会话
-                Ok(ReadMsg::End) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                Ok(ReadMsg::End(reason)) => {
                     if !pending.is_empty() {
                         flush_output(&app, &tid, &mut pending, &mut pending_bytes);
                     }
                     if debug::enabled() {
-                        debug::write("exit", format!("id={tid}"));
+                        debug::write("reader-end", format!("id={} reason={}", tid, reason));
+                    }
+                    let _ = app.emit("pty-exit", PtyExit { id: tid.clone() });
+                    reap_session(&app, &tid);
+                    break;
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    if !pending.is_empty() {
+                        flush_output(&app, &tid, &mut pending, &mut pending_bytes);
+                    }
+                    if debug::enabled() {
+                        debug::write("reader-end", format!("id={} reason=channel-closed", tid));
                     }
                     let _ = app.emit("pty-exit", PtyExit { id: tid.clone() });
                     reap_session(&app, &tid);
@@ -460,6 +513,24 @@ pub fn pty_spawn(
         }
     });
     Ok(id)
+}
+
+fn shell_kind(value: &str) -> &'static str {
+    let name = value
+        .rsplit(|character| character == '/' || character == '\\')
+        .next()
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    match name.as_str() {
+        "bash" => "bash",
+        "zsh" => "zsh",
+        "fish" => "fish",
+        "sh" | "dash" => "sh",
+        "pwsh" => "pwsh",
+        "powershell" => "powershell",
+        "cmd" | "cmd.exe" => "cmd",
+        _ => "custom",
+    }
 }
 
 /// 输出合批窗口：距上次冲刷超过该时长即 flush（即使数据量未达阈值）
@@ -514,8 +585,9 @@ pub async fn pty_write(state: State<'_, PtyState>, id: String, data: String) -> 
     // 前端命令发送统一用 \n，这里归一化成 CR，否则 PowerShell 等收不到回车、命令无响应。
     #[cfg(windows)]
     let data = normalize_enter(&data);
+    let data_len = data.len();
     if debug::enabled() {
-        debug::write("write", format!("id={} bytes={}", id, data.len()));
+        debug::write("write-start", format!("id={} bytes={}", id, data_len));
     }
     // 只从全局表取 Arc 句柄，不持锁做 IO——写 PTY 可能因前台进程不读 stdin 而阻塞，
     // 若持全局锁会冻结其它会话的 resize/signal/close。
@@ -524,10 +596,18 @@ pub async fn pty_write(state: State<'_, PtyState>, id: String, data: String) -> 
         sessions.get(&id).cloned().ok_or("session not found")?
     };
     // write_all/flush 是阻塞 IO，放 blocking 线程，只锁本会话，不占主线程
+    let log_id = id.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let mut s = session.lock().map_err(|e| e.to_string())?;
-        s.writer.write_all(data.as_bytes()).map_err(|e| e.to_string())?;
-        s.writer.flush().map_err(|e| e.to_string())
+        let result = s.writer.write_all(data.as_bytes()).and_then(|()| s.writer.flush());
+        drop(s);
+        if debug::enabled() {
+            debug::write(
+                "write-complete",
+                format!("id={} bytes={} ok={}", log_id, data_len, result.is_ok()),
+            );
+        }
+        result.map_err(|e| e.to_string())
     })
     .await
     .map_err(|e| e.to_string())?

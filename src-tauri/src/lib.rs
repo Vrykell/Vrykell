@@ -34,6 +34,7 @@ pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .manage(terminal::pty::PtyState::default())
         .manage(history_state)
         .manage(agent::ai::AiConfig::load())
@@ -43,6 +44,9 @@ pub fn run() {
         .manage(agent::mcp::McpState::default())
         // asset 协议 scope 已收窄：启动时把已保存的壁纸文件动态授权
         .setup(|app| {
+            if let Err(error) = terminal::debug::initialize(app.handle()) {
+                eprintln!("[terminal-debug] log initialization failed: {error}");
+            }
             if let Some(cfg) = app.try_state::<theme::ThemeState>() {
                 let path = cfg.0.lock().ok().map(|c| c.background_image.clone());
                 if let Some(Some(p)) = path {
@@ -114,6 +118,8 @@ pub fn run() {
             terminal::pty::pty_spawn,
             terminal::debug::terminal_debug_set,
             terminal::debug::terminal_debug_status,
+            terminal::debug::terminal_debug_record,
+            terminal::debug::terminal_debug_log_path,
             terminal::shells::list_shells,
             remote::ssh::ssh_connections_list,
             remote::ssh::ssh_connection_save,

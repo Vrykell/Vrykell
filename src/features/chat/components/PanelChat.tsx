@@ -20,6 +20,7 @@ import { toExchanges, type ChatExchange } from '@features/chat/model/exchanges';
 import ContextRing from '@features/chat/components/ContextRing';
 import { useChatComposer } from '@features/chat/hooks/useChatComposer';
 import { useChatPaneContext } from '@features/chat/hooks/useChatPaneContext';
+import { TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE } from '@features/terminal/model/terminalFont';
 
 /** 权限模式循环（状态栏 Shield chip）：图标 + 颜色双通道辨识（勾=标准逐工具 / 叹号=严格逐次问 / 斜线=放行直放）
  *  标准=逐工具级别；严格=全部逐次问；放行=全部直放行（危险命令仍逐次问） */
@@ -198,7 +199,7 @@ export default function PanelChat() {
                 style={{
                   flex: 1, minWidth: 0, resize: 'none',
                   background: 'transparent', border: 'none', padding: '1px 0',
-                  fontSize: 13, fontFamily: 'var(--font-mono)',
+                  fontSize: TERMINAL_FONT_SIZE, fontFamily: TERMINAL_FONT_FAMILY,
                   color: 'var(--text-primary)', lineHeight: '22px', outline: 'none',
                 }}
               />

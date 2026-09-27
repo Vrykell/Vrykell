@@ -1,4 +1,4 @@
-/** 终端画布、运行中块、完成块快照共用的字体参数。 */
+/** Shared font metrics for the terminal canvas and block snapshots. */
 export const TERMINAL_FONT_FAMILY =
   'Menlo, Monaco, "Cascadia Code", "JetBrains Mono", "Noto Sans Mono", "DejaVu Sans Mono", "Noto Sans CJK SC", "PingFang SC", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", monospace';
 

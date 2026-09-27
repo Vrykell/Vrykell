@@ -28,6 +28,7 @@ import ToolNode from '@features/chat/components/ToolNode';
 import ToolRunCard from '@features/chat/components/ToolRunCard';
 import AttachmentChips from '@features/chat/components/AttachmentChips';
 import type { ChatExchange } from '@features/chat/model/exchanges';
+import { TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE } from '@features/terminal/model/terminalFont';
 
 /** rail 细线：1px，绝对定位贯穿整个回答容器（top 起于首端灰点圆心，
  *  bottom 收于末端节点圆心：完成=灰点 / 出错=红节点 / 流式=延伸至底）。
@@ -134,8 +135,8 @@ export default function AiBlock({ exchange }: { exchange: ChatExchange }) {
             style={{
               flex: 1,
               minWidth: 0,
-              fontFamily: 'var(--font-mono)',
-              fontSize: 13,
+              fontFamily: TERMINAL_FONT_FAMILY,
+              fontSize: TERMINAL_FONT_SIZE,
               color: 'var(--text-primary)',
               lineHeight: '20px',
               wordBreak: 'break-word',

@@ -65,6 +65,10 @@ export function clearSessionBlocks(tabId: string): void {
   else useBlockStore.getState().clearBlocks(tabId);
 }
 
+export function setPendingTerminalCommand(tabId: string, command: string): void {
+  sessionControllers.get(tabId)?.setPendingCommand(command);
+}
+
 /** 运行中块的活终端（RunningItem 挂载显示 / useTerminalFocus 聚焦目标） */
 export function getExecutingTerm(tabId: string) {
   return sessionControllers.get(tabId)?.executingTerm ?? null;
@@ -207,10 +211,8 @@ export function useTerminalSession(
         currentScene = scene;
         useTerminalStore.getState().setScene(paneId, scene);
         if (useSessionStore.getState().activeId !== tabId) return;
-        // 注意：真实 altScreen（1049h）不得触碰 altScreenActive ——
-        // 该 flag 仅表示「用户手动全屏块终端」（TerminalBlockList 进入全屏交互），
-        // 误设会让 TerminalView 判定 manualTui，把持有 TUI 输出的主 xterm 用
-        // opacity:0 藏掉，用户看到冻结画面且键盘如无响应。
+        // Actual alternate-buffer mode is rendered by the main xterm, so do not mark it
+        // as a manually fullscreened block terminal or the visible TUI would be hidden.
         if (scene === 'blockList') {
           term.reset(); // 清掉 classic 残留
           useTerminalStore.getState().setKeyboardTarget('input');
@@ -234,7 +236,7 @@ export function useTerminalSession(
       onBlockComplete: (block) => {
         useHistoryStore.getState().record(block.command, block.cwd ?? '', block.exitCode);
         sessionManager.record(tabId, paneId, block, 'complete');
-        // 手动全屏（「进入全屏交互」）的运行块完成时退出全屏，回到块列表
+        // Return a manually fullscreened running block to the block list when it ends.
         const ts = useTerminalStore.getState();
         if (ts.scenes[paneId] === 'altScreen') {
           ts.setScene(paneId, 'blockList');
@@ -294,8 +296,8 @@ export function useTerminalSession(
     const tabCwd = spec?.cwd;
     const spawnOpts = spec?.kind === 'ssh'
       ? { ssh: { host: spec.ssh?.host ?? '', user: spec.ssh?.user, port: spec.ssh?.port }, openMode }
-      : spec?.kind === 'local' && spec.shellType
-        ? { shell: spec.shellType }
+      : spec?.kind === 'local'
+        ? { shell: spec.shellType, openMode }
         : undefined;
     // 分屏 pane 初次挂载时容器可能尚未布局，fit 会算出 0×0；用兜底尺寸先启动，
     // 等 ResizeObserver/就绪后重校到真实尺寸，避免 PTY 以 0×0 启动导致空白。
@@ -331,7 +333,9 @@ export function useTerminalSession(
       })
       .catch((e) => {
         if (!disposed) {
-          if (isTerminalDebugEnabled()) terminalDebug('pty-spawn-error', { paneId, error: String(e) });
+          if (isTerminalDebugEnabled()) {
+            terminalDebug('pty-spawn-error', { paneId, errorType: e instanceof Error ? e.name : typeof e });
+          }
           console.error('[useTerminalSession] PTY spawn failed:', e);
           term.write(`\r\n\x1b[31m[无法启动 Shell: ${e}]\x1b[0m\r\n`);
         }
@@ -375,7 +379,9 @@ export function useTerminalSession(
     const dataSub = term.onData((data) => {
       if (sessionId) {
         ptyWrite(sessionId, data).catch((error) => {
-          if (isTerminalDebugEnabled()) terminalDebug('pty-write-error', { sessionId, error: String(error) });
+          if (isTerminalDebugEnabled()) {
+            terminalDebug('pty-write-error', { sessionId, errorType: error instanceof Error ? error.name : typeof error });
+          }
         });
       }
     });
@@ -401,8 +407,7 @@ export function useTerminalSession(
     const cellHeight = (): number => getCellMetrics(term).height;
 
     /**
-     * 手动全屏宿主：铺满整个终端区（TerminalView inset:0），可能比单 pane 宽/高。
-     * 返回 { w, h } 宿主内容尺寸（px）；非手动全屏时返回 null。
+     * Return the manual fullscreen host size, or null when it is inactive.
      */
     const fullscreenHostSize = (): { w: number; h: number } | null => {
       const fsHost = document.querySelector<HTMLElement>('[data-testid="tui-fullscreen"]');
@@ -436,13 +441,10 @@ export function useTerminalSession(
 
     /** 当前场景下 PTY/块终端应有的列数 */
     const effectiveCols = (): number => {
-      // 以 store 场景为准：手动全屏（「进入全屏交互」）只写 store.scene，不回调
-      // onSceneChanged，currentScene 本地镜像仍停在 blockList；若只看它会误走
-      // 卡片宽分支、把折叠宿主宽读成 0 → PTY 挤成 2 列（全屏 TUI「宽度极其小」）。
+      // Manual fullscreen changes the store scene without changing the controller scene.
+      // Read the store value here to keep sizing on the fullscreen branch.
       const scene = useTerminalStore.getState().scenes[paneId] ?? currentScene;
-      // 手动全屏：全屏宿主铺满整个终端区（宽于单 pane），以宿主实测宽换算列数，
-      // 否则 canvas 停在单 pane 宽 → 全屏两侧露出黑色条。全屏是纯 canvas 视图
-      //（无 HTML 快照），按 xterm 自身 cellWidth 排布才能精确铺满。
+      // Measure the manual fullscreen host with xterm's cell width so the canvas fills it.
       if (scene === 'altScreen') {
         const fs = fullscreenHostSize();
         if (fs && fs.w > 0) return Math.max(2, Math.floor(fs.w / cellWidth()));
@@ -461,7 +463,7 @@ export function useTerminalSession(
       return Math.max(2, Math.min(term.cols, Math.floor(screenPx / domCellWidth())));
     };
 
-    /** 当前场景下 PTY/块终端应有的行数（手动全屏以宿主高为准，其余用主 xterm） */
+    /** PTY row count for the current scene; manual fullscreen uses the host height. */
     const effectiveRows = (): number => {
       const scene = useTerminalStore.getState().scenes[paneId] ?? currentScene;
       if (scene === 'altScreen') {

@@ -42,6 +42,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     let cbCounter = 0;
     const eventListeners = new Map<string, number>();
     const writes: string[] = [];
+    let clipboardText = '';
     const signals: { id: string; sig: number }[] = [];
     const killAttempts = new Map<string, number>();
     const resizes: { cols: number; rows: number }[] = [];
@@ -106,6 +107,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     let integrationEnabled = enableIntegration;
     (window as unknown as Record<string, unknown>).__AI_MODELS__ = aiModels;
     (window as unknown as Record<string, unknown>).__PTY_WRITES__ = writes;
+    (window as unknown as Record<string, unknown>).__CLIPBOARD_TEXT__ = clipboardText;
     (window as unknown as Record<string, unknown>).__PTY_SIGNALS__ = signals;
     (window as unknown as Record<string, unknown>).__PTY_RESIZES__ = resizes;
     (window as unknown as Record<string, unknown>).__FS_OPS__ = fsOps;
@@ -324,6 +326,10 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             resizes.push({ cols: args.cols as number, rows: args.rows as number });
             return undefined;
           case 'pty_close':
+            return undefined;
+          case 'plugin:clipboard-manager|write_text':
+            clipboardText = args.text as string;
+            (window as unknown as Record<string, string>).__CLIPBOARD_TEXT__ = clipboardText;
             return undefined;
           case 'pty_kill_foreground': {
             const id = args.id as string;
@@ -823,6 +829,11 @@ export async function mockAnthropic(page: Page, replyText: string) {
 /** 读取假 PTY 收到的全部写入 */
 export function ptyWrites(page: Page): Promise<string[]> {
   return page.evaluate(() => (window as unknown as Record<string, string[]>).__PTY_WRITES__);
+}
+
+/** Read the native clipboard value captured by the Tauri mock. */
+export function clipboardText(page: Page): Promise<string> {
+  return page.evaluate(() => (window as unknown as Record<string, string>).__CLIPBOARD_TEXT__ ?? '');
 }
 
 /** 读取 pty_signal 调用记录（结束按钮升级链路断言用） */

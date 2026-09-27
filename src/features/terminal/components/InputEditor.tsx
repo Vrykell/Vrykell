@@ -23,6 +23,7 @@ import { getLongRunningHint } from '@features/terminal/inputVisibility';
 import AttachmentChips from '@features/chat/components/AttachmentChips';
 import ShellIndicator from '@features/terminal/components/ShellIndicator';
 import { useInputEditorController } from '@features/terminal/hooks/useInputEditorController';
+import { TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE } from '@features/terminal/model/terminalFont';
 
 /** 权限模式循环（与 PanelChat 顶栏同款三色 Shield）：标准=逐工具 / 严格=逐次问 / 放行=直放 */
 const PERM_MODES = [
@@ -179,8 +180,8 @@ export default function InputEditor({
               固定 24px 高 + flex 居中，与 textarea（22px 行高 + 1px 上下 padding）精确对齐 */}
           <span
             style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 13,
+              fontFamily: TERMINAL_FONT_FAMILY,
+              fontSize: TERMINAL_FONT_SIZE,
               fontWeight: 600,
               minWidth: 16,
               height: 24,
@@ -226,8 +227,8 @@ export default function InputEditor({
                 background: 'transparent',
                 border: 'none',
                 padding: '1px 0',
-                fontSize: 13,
-                fontFamily: 'var(--font-mono)',
+                fontSize: TERMINAL_FONT_SIZE,
+                fontFamily: TERMINAL_FONT_FAMILY,
                 color: 'var(--text-primary)',
                 lineHeight: '22px',
                 outline: 'none',
@@ -242,8 +243,8 @@ export default function InputEditor({
                   zIndex: 0,
                   pointerEvents: 'none',
                   padding: '1px 0',
-                  fontSize: 13,
-                  fontFamily: 'var(--font-mono)',
+                  fontSize: TERMINAL_FONT_SIZE,
+                  fontFamily: TERMINAL_FONT_FAMILY,
                   lineHeight: '22px',
                   whiteSpace: 'pre-wrap',
                   overflowWrap: 'break-word',

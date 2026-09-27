@@ -25,6 +25,7 @@ import { useTerminalBlockFlow } from '@features/terminal/hooks/useTerminalBlockF
 import { useBlockItemActions } from '@features/terminal/hooks/useBlockItemActions';
 import { useTuiControls } from '@features/terminal/hooks/useTuiControls';
 import { hasVisibleContent as hasVisibleBlockContent } from '@features/terminal/model/blockVisibility';
+import { TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE } from '@features/terminal/model/terminalFont';
 
 interface Props {
   tabId: string;
@@ -227,6 +228,7 @@ function BlockItem({
   const [hovered, setHovered] = useState(false);
   const {
     isCollapsed,
+    copiedAction,
     rerun,
     askAI,
     copyCmd,
@@ -242,6 +244,7 @@ function BlockItem({
 
   return (
     <div
+      data-testid={`command-block-${block.id}`}
       style={{
         margin: `4px ${insetRight}px 10px ${insetLeft}px`,
         borderRadius: 8,
@@ -253,7 +256,7 @@ function BlockItem({
       onMouseLeave={() => setHovered(false)}
       onContextMenu={(e) => {
         e.preventDefault();
-        // 阻止冒泡到 pane 级右键菜单，避免命令块菜单与终端菜单叠加出现
+        // Keep the block menu separate from the pane-level context menu.
         e.stopPropagation();
         onMenu(block, e.currentTarget.getBoundingClientRect());
       }}
@@ -271,8 +274,8 @@ function BlockItem({
           {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
         </button>
         <div data-selectable style={{
-          flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600,
-          fontFamily: 'var(--font-mono)', color: 'var(--text-primary)',
+          flex: 1, minWidth: 0, fontSize: TERMINAL_FONT_SIZE, fontWeight: 600,
+          fontFamily: TERMINAL_FONT_FAMILY, color: 'var(--text-primary)',
           whiteSpace: 'pre-wrap', wordBreak: 'break-all', userSelect: 'text',
         }}>
           {highlightQuery ? <HighlightSpan text={block.command} query={highlightQuery} /> : coloredCommand}
@@ -281,13 +284,25 @@ function BlockItem({
           <span style={{ display: 'inline-flex', gap: 2, flexShrink: 0 }}>
             <BlockToolBtn title="AI 解释" onClick={askAI} label={<Sparkles size={12} />} />
             <BlockToolBtn title="重新运行" onClick={rerun} label={<RotateCw size={12} />} />
-            <BlockToolBtn title="复制命令" onClick={copyCmd} label={<Terminal size={12} />} />
-            <BlockToolBtn title="复制输出" onClick={copyOut} label={<Copy size={12} />} />
+            <BlockToolBtn
+              title="复制命令"
+              onClick={copyCmd}
+              label={copiedAction === 'command'
+                ? <Check size={12} data-testid="copy-command-success" />
+                : <Terminal size={12} />}
+            />
+            <BlockToolBtn
+              title="复制输出"
+              onClick={copyOut}
+              label={copiedAction === 'output'
+                ? <Check size={12} data-testid="copy-output-success" />
+                : <Copy size={12} />}
+            />
             <BlockToolBtn title={block.bookmarked ? '取消书签' : '添加书签'}
               onClick={toggleBookmark}
               label={<Bookmark size={12} fill={block.bookmarked ? 'currentColor' : 'none'} />} />
             <BlockToolBtn title="更多操作"
-              onClick={(e) => onMenu(block, (e.target as HTMLElement).getBoundingClientRect())}
+              onClick={(e) => onMenu(block, e.currentTarget.getBoundingClientRect())}
               label={<Ellipsis size={12} />} />
           </span>
         ) : (
@@ -395,8 +410,8 @@ function RunningItem({
           }}
         />
         <div data-selectable style={{
-          flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600,
-          fontFamily: 'var(--font-mono)', color: 'var(--text-primary)',
+          flex: 1, minWidth: 0, fontSize: TERMINAL_FONT_SIZE, fontWeight: 600,
+          fontFamily: TERMINAL_FONT_FAMILY, color: 'var(--text-primary)',
           whiteSpace: 'pre-wrap', wordBreak: 'break-all', userSelect: 'text',
         }}>
           {highlightQuery ? <HighlightSpan text={block.command} query={highlightQuery} /> : coloredCommand}
@@ -431,7 +446,7 @@ function RunningItem({
  */
 function RunningTerm({ tabId }: { tabId: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
-  // 手动全屏（「进入全屏交互」）：el 搬进全屏宿主铺满；退出时搬回卡片
+  // Move the live terminal into the fullscreen host when manually activated.
   const tuiFs = useTerminalStore(
     (s) => s.altScreenActive && (s.scenes[tabId] ?? 'classic') === 'altScreen',
   );
