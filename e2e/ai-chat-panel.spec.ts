@@ -35,7 +35,7 @@ test.describe('AI 对话面板', () => {
     await page.locator('[data-dock-btn="chat"]').click();
     await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
     // 终端输入栏的 cmd pill 提示去面板提问（点击被守卫拦截）
-    const pill = page.getByRole('button', { name: 'cmd' });
+    const pill = page.getByRole('button', { name: '命令', exact: true });
     await expect(pill).toHaveAttribute('title', /AI 对话面板开启中/);
     await pill.click();
     await expect(page.getByPlaceholder(/自然语言描述/)).toHaveCount(1); // 终端未进入 AI 模式

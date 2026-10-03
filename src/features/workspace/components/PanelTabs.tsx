@@ -12,15 +12,8 @@ import NewTabModal from '@features/workspace/components/NewTabModal';
 import ContextMenu, { type ContextMenuItem } from '@ui/ContextMenu';
 
 /**
- * PanelTabs — 标签列表面板（会话管理侧栏）。
- * 顶部：搜索 + 历史 + 新建（仅「新建终端」）。
- * 列表：分组 section（可折叠、可拖拽排序）+ 组内标签 + 未分组标签。
- * 分组通过「右键标签 → 新建分组」创建（默认带走该标签）；空分组会被自动清理。
- * 拖拽用自定义 mousedown/mousemove/mouseup（同 Dock 按钮），不用 HTML5 DnD。
- *
- * 标签采用「外壳 + 内壳」两层：
- *  - 外壳 = 外层容器背景，与分组容器背景同色（idle 透明，hover/选中 5%）；
- *  - 内壳 = 内层圆角卡片，idle 透明（与外壳同色看不出区别），悬停 5%、选中 10% + 描边。
+ * Session navigation with filtering, grouping, renaming and drag ordering.
+ * Each row uses one subtle background for hover or selection.
  */
 
 type DropTarget =
@@ -199,7 +192,7 @@ export default function PanelTabs() {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100%',
-      userSelect: 'none', background: 'var(--surface)',
+      userSelect: 'none', background: 'transparent',
     }}>
       {/* 顶栏 */}
       <div style={{
@@ -207,9 +200,9 @@ export default function PanelTabs() {
         padding: '6px 8px',
         position: 'relative',
       }}>
-        <div style={{
+        <div className="workspace-sidebar-search" style={{
           display: 'flex', alignItems: 'center', gap: 5, flex: 1, minWidth: 0,
-          background: 'var(--canvas)',
+          background: 'var(--chrome-field)',
           borderRadius: 'var(--radius-inner)', padding: '0 6px', height: 24,
         }}>
           <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
@@ -366,7 +359,7 @@ function GroupSection(props: {
   const anyMemberActive = tabs.some((t) => t.id === activeId);
   return (
     <div style={{ marginBottom: 4 }}>
-      {/* 分组容器 = 标签的「外壳」：idle 透明，hover 或含活跃标签时显灰（CSS） */}
+      {/* Group containers stay transparent so selection belongs to a single row. */}
       <div
         className="tab-group-container"
         data-group-id={group.id}
@@ -545,25 +538,15 @@ function TabRow({
   const terms = terminalsOf(tab);
   const isSsh = first?.kind === 'ssh';
   const Icon = tab.kind === 'history' ? History : tab.kind === 'settings' ? Settings : isSsh ? Server : SquareTerminal;
-  const iconColor = active ? 'var(--accent)' : 'var(--text-secondary)';
-  const iconBg = active ? 'var(--accent-bg)' : 'transparent';
+  const iconColor = active ? 'var(--text-primary)' : 'var(--text-secondary)';
   const typeSummary = terms.map((t) =>
     t.kind === 'ssh' ? (t.ssh?.name || t.ssh?.host || 'SSH') : (t.shellType ? shellTypeLabel(t.shellType) : '本地'),
   ).join(' + ');
   // Only multi-pane sessions need a count beside the tab title.
   const subtitle = tab.kind === 'history' ? '会话历史' : tab.kind === 'settings' ? '设置' : undefined;
 
-  // 内外壳两层：外壳（外层容器，idle 透明，hover/选中 5%，与分组容器同色）+ 内壳（内层卡片，idle 透明，hover 5%，选中 10% + 1px 描边，圆角）
-  const inGroup = groupId != null;
-  const outerBg = (!inGroup && (active || hovered)) ? 'var(--tab-hover)' : 'transparent';
-  let innerBg = 'transparent';
-  if (highlight) {
-    innerBg = 'var(--tab-hover)';
-  } else if (active) {
-    innerBg = 'var(--tab-active)';
-  } else if (hovered) {
-    innerBg = 'var(--tab-hover)';
-  }
+  // Keep selection on the content row rather than its surrounding spacing.
+  const innerBg = active || highlight ? 'var(--selection-bg)' : hovered ? 'var(--hover)' : 'transparent';
 
   return (
     <div
@@ -578,23 +561,22 @@ function TabRow({
       data-tab-row-id={tab.id}
       data-tab-group={groupId ?? ''}
       style={{
-        padding: 10,
-        background: outerBg,
+        padding: '2px 6px',
         cursor: 'pointer',
       }}
     >
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        padding: 8,
-        borderRadius: 'var(--tab-radius)',
+        display: 'flex', alignItems: 'center', gap: 6,
+        padding: '6px 8px', minHeight: 34,
+        borderRadius: 5,
         background: innerBg,
         color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
         transition: 'background 0.12s ease',
       }}>
         <span style={{
-          width: 24, height: 24, borderRadius: 6, flexShrink: 0,
+          width: 18, height: 18, flexShrink: 0,
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          background: iconBg, color: iconColor,
+          color: iconColor,
         }}>
           <Icon size={15} />
         </span>

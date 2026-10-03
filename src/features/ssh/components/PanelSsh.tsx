@@ -74,7 +74,7 @@ export default function PanelSsh() {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100%',
-      userSelect: 'none', background: 'var(--surface)',
+      userSelect: 'none', background: 'transparent',
     }}>
       {/* 顶栏：搜索 + 编辑 + 新建 */}
       <div style={{
@@ -83,7 +83,7 @@ export default function PanelSsh() {
       }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 5, flex: 1, minWidth: 0,
-          background: 'var(--canvas)',
+          background: 'var(--chrome-field)',
           borderRadius: 'var(--radius-inner)', padding: '0 6px', height: 24,
         }}>
           <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
@@ -133,8 +133,7 @@ export default function PanelSsh() {
               display: 'flex', alignItems: 'center', gap: 8,
               padding: '7px 10px', cursor: 'pointer', fontSize: 12,
               color: c.id === selectedId ? 'var(--text-primary)' : 'var(--text-secondary)',
-              background: c.id === selectedId ? 'var(--block)' : 'transparent',
-              borderLeft: c.id === selectedId ? '2px solid var(--accent)' : '2px solid transparent',
+              background: c.id === selectedId ? 'var(--selection-bg)' : 'transparent',
               minHeight: 34,
             }}
             onMouseEnter={(e) => {

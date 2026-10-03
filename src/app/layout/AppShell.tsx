@@ -25,7 +25,7 @@ export default function AppShell() {
           position: 'fixed',
           inset: 0,
           zIndex: 0,
-          backgroundColor: 'var(--canvas)',
+          backgroundColor: 'var(--chrome-bg)',
           backgroundImage: wallpaperDataUrl ? `url("${wallpaperDataUrl}")` : 'none',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
@@ -40,7 +40,7 @@ export default function AppShell() {
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          background: 'var(--canvas)',
+          background: 'var(--chrome-bg)',
           color: 'var(--text-primary)',
           opacity: effectiveOpacity,
         }}

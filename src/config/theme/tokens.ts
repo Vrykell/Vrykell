@@ -7,6 +7,12 @@
 // ── 类型 ──
 
 export interface ThemePalette {
+  /** Shared frame for the titlebar and primary navigation. */
+  chromeBg: string;
+  /** Secondary navigation uses its own surface within the window frame. */
+  sidebarBg: string;
+  chromeField: string;
+  selectionBg: string;
   // 背景层（从深到浅）
   canvas: string;
   surface: string;
@@ -50,6 +56,7 @@ export interface ThemePalette {
   success: string;
   successDim: string;
   error: string;
+  errorText: string;
   errorDim: string;
   errorLight: string;   // 失败命令文字等浅红
   warning: string;
@@ -123,35 +130,39 @@ export interface ThemePalette {
 // ── Dark（默认：中性，主色不带任何颜色倾向） ──
 
 const dark: ThemePalette = {
-  // 应用外壳保持近黑，终端单独提亮一层，避免大块内容融进外壳。
-  canvas: '#0A0A0A',
-  surface: '#0A0A0A',
-  block: '#171717',
-  elevated: '#242424',
+  // Neutral levels distinguish the window frame, sidebars and content.
+  chromeBg: '#282828',
+  sidebarBg: '#202020',
+  chromeField: '#303030',
+  selectionBg: '#3D3D3D',
+  canvas: '#161616',
+  surface: '#222222',
+  block: '#2B2B2B',
+  elevated: '#333333',
   hover: 'rgba(255,255,255,0.07)',
-  buttonHover: '#1E1E1E',
+  buttonHover: '#383838',
 
-  border: '#2A2A2A',
-  borderStrong: '#3A3A3A',
+  border: '#404040',
+  borderStrong: '#5A5A5A',
   inputBorder: 'rgba(255,255,255,0.08)',
 
   // 文字
-  textPrimary: '#E8E8E8',
-  textSecondary: '#ABABAB',
-  textMuted: '#6C6C6C',
+  textPrimary: '#EBEBEB',
+  textSecondary: '#B8B8B8',
+  textMuted: '#9E9E9E',
 
   // 主色：中性浅灰（选中/激活态用明度差区分，不引入色相）
-  accent: '#C2C7CF',
-  accentDim: 'rgba(194,199,207,0.22)',
+  accent: '#C7C7C7',
+  accentDim: 'rgba(199,199,199,0.22)',
   accentText: '#0A0A0A',
 
   // 信息检索 / AI：默认同样中性（带色方案见 TEAL_THEME_PRESET）
-  accentBlue: '#AEB4BE',
-  accentBlueDim: 'rgba(174,180,190,0.20)',
-  accentBlueStrong: '#C2C7CF',
+  accentBlue: '#B4B4B4',
+  accentBlueDim: 'rgba(180,180,180,0.20)',
+  accentBlueStrong: '#C7C7C7',
 
-  accentWarm: '#B8BCC4',
-  accentWarmDim: 'rgba(184,188,196,0.18)',
+  accentWarm: '#BCBCBC',
+  accentWarmDim: 'rgba(188,188,188,0.18)',
 
   // 用户消息：浅灰
   accentUser: '#A5A5A5',
@@ -161,6 +172,7 @@ const dark: ThemePalette = {
   success: '#89D185',
   successDim: 'rgba(137,209,133,0.15)',
   error: '#F14C4C',
+  errorText: '#FFFFFF',
   errorDim: 'rgba(241,76,76,0.15)',
   errorLight: '#F48771',
   warning: '#CCA700',
@@ -193,7 +205,7 @@ const dark: ThemePalette = {
   errorBg: 'rgba(241,76,76,0.12)',
   errorBadgeBg: 'rgba(241,76,76,0.08)',
 
-  tuiBanner: '#B8BCC4',
+  tuiBanner: '#BCBCBC',
   codeBg: 'rgba(255,255,255,0.06)',
   thBg: 'rgba(255,255,255,0.05)',
   commandBlockBg: 'rgba(255,255,255,0.03)',
@@ -259,32 +271,36 @@ export const TEAL_THEME_PRESET: Record<string, string> = {
 // ── Light（默认：中性，主色不带任何颜色倾向） ──
 
 const light: ThemePalette = {
+  chromeBg: '#E2E2E2',
+  sidebarBg: '#EFEFEF',
+  chromeField: '#D8D8D8',
+  selectionBg: '#D5D5D5',
   canvas: '#FFFFFF',
-  surface: '#F3F3F3',
-  block: '#ECECEC',
-  elevated: '#E4E4E4',
+  surface: '#F5F5F5',
+  block: '#EAEAEA',
+  elevated: '#FFFFFF',
   hover: 'rgba(0,0,0,0.05)',
-  buttonHover: '#E4E4E4',
+  buttonHover: '#DDDDDD',
 
-  border: '#D4D4D4',
-  borderStrong: '#C0C0C0',
+  border: '#CCCCCC',
+  borderStrong: '#A8A8A8',
   inputBorder: '#D4D4D4',
 
-  textPrimary: '#1F1F1F',
-  textSecondary: '#5D5D5D',
-  textMuted: '#8C8C8C',
+  textPrimary: '#272727',
+  textSecondary: '#595959',
+  textMuted: '#707070',
 
   // 主色：中性深灰（浅色模式下带色相同样只在预设中出现）
-  accent: '#4A4F57',
-  accentDim: 'rgba(74,79,87,0.15)',
+  accent: '#4F4F4F',
+  accentDim: 'rgba(79,79,79,0.15)',
   accentText: '#FFFFFF',
 
-  accentBlue: '#5B616B',
-  accentBlueDim: 'rgba(91,97,107,0.15)',
-  accentBlueStrong: '#3A3F47',
+  accentBlue: '#616161',
+  accentBlueDim: 'rgba(97,97,97,0.15)',
+  accentBlueStrong: '#3F3F3F',
 
-  accentWarm: '#4A4F57',
-  accentWarmDim: 'rgba(74,79,87,0.12)',
+  accentWarm: '#4F4F4F',
+  accentWarmDim: 'rgba(79,79,79,0.12)',
 
   accentUser: '#5D5D5D',
   accentUserDim: 'rgba(93,93,93,0.12)',
@@ -292,6 +308,7 @@ const light: ThemePalette = {
   success: '#2F8132',
   successDim: 'rgba(47,129,50,0.12)',
   error: '#A31515',
+  errorText: '#FFFFFF',
   errorDim: 'rgba(163,21,21,0.1)',
   errorLight: '#C94F4F',
   warning: '#795E26',
@@ -323,7 +340,7 @@ const light: ThemePalette = {
   errorBg: 'rgba(163,21,21,0.07)',
   errorBadgeBg: 'rgba(163,21,21,0.05)',
 
-  tuiBanner: '#4A4F57',
+  tuiBanner: '#4F4F4F',
   codeBg: 'rgba(0,0,0,0.04)',
   thBg: 'rgba(0,0,0,0.03)',
   commandBlockBg: 'rgba(0,0,0,0.02)',
@@ -363,6 +380,10 @@ export const themes: Record<ThemeMode, ThemePalette> = { dark, light };
 /** Palette → CSS 自定义属性映射 */
 export function paletteToCssVars(p: ThemePalette): Record<string, string> {
   return {
+    '--chrome-bg': p.chromeBg,
+    '--sidebar-bg': p.sidebarBg,
+    '--chrome-field': p.chromeField,
+    '--selection-bg': p.selectionBg,
     '--canvas': p.canvas,
     '--surface': p.surface,
     '--block': p.block,
@@ -388,6 +409,7 @@ export function paletteToCssVars(p: ThemePalette): Record<string, string> {
     '--success': p.success,
     '--success-dim': p.successDim,
     '--error': p.error,
+    '--error-text': p.errorText,
     '--error-dim': p.errorDim,
     '--error-light': p.errorLight,
     '--warning': p.warning,
@@ -447,6 +469,7 @@ export function paletteToCssVars(p: ThemePalette): Record<string, string> {
 // ── 用户主题覆盖（终端主题配置的 vars，叠加在基础 palette 之上） ──
 
 let overrides: Record<string, string> = {};
+let appliedOverrideKeys = new Set<string>();
 
 /** 设置 CSS 变量覆盖表（theme.json 的 vars）。空对象 = 无覆盖。 */
 export function setThemeOverrides(o: Record<string, string>): void {
@@ -463,10 +486,15 @@ export function applyTheme(mode: ThemeMode): void {
   const base = paletteToCssVars(themes[mode]);
   const vars = { ...base, ...overrides };
   const root = document.documentElement;
+  // Clear former custom aliases so the stylesheet can inherit the current palette again.
+  for (const key of appliedOverrideKeys) {
+    if (!(key in vars)) root.style.removeProperty(key);
+  }
   for (const [k, v] of Object.entries(vars)) {
     root.style.setProperty(k, v);
   }
   root.dataset.theme = mode;
+  appliedOverrideKeys = new Set(Object.keys(overrides));
 }
 
 export function getCurrentTheme(): ThemeMode {

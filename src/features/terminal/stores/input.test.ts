@@ -9,9 +9,10 @@ describe('input store（每 pane 独立输入态）', () => {
   it('setText / setAiMode 按 pane 隔离', () => {
     useInputStore.getState().setText('a', 'ls');
     useInputStore.getState().setAiMode('a', true);
+    useInputStore.getState().setText('a', '解释这个项目');
     useInputStore.getState().setText('b', 'pwd');
 
-    expect(selectPaneInput('a')(useInputStore.getState())).toEqual({ text: 'ls', aiMode: true });
+    expect(selectPaneInput('a')(useInputStore.getState())).toMatchObject({ text: '解释这个项目', aiMode: true, commandDraft: 'ls' });
     expect(selectPaneInput('b')(useInputStore.getState())).toEqual({ text: 'pwd', aiMode: false });
   });
 
@@ -20,7 +21,7 @@ describe('input store（每 pane 独立输入态）', () => {
     useInputStore.getState().setAiMode('a', true);
     useInputStore.getState().clearText('a');
 
-    expect(selectPaneInput('a')(useInputStore.getState())).toEqual({ text: '', aiMode: true });
+    expect(selectPaneInput('a')(useInputStore.getState())).toMatchObject({ text: '', aiMode: true });
   });
 
   it('dropPane 删除该 pane 状态', () => {

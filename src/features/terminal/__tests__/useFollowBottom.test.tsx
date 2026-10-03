@@ -13,6 +13,27 @@ function makeEl(scrollTop: number) {
 }
 
 describe('useFollowBottom', () => {
+  it('keeps following when a bottom jump is followed by a resize before its scroll event', () => {
+    let notify: ResizeObserverCallback = () => {};
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: ResizeObserverCallback) { notify = callback; }
+      observe() {}
+      disconnect() {}
+    });
+    try {
+      const el = makeEl(800);
+      const ref = { current: el } as React.RefObject<HTMLDivElement>;
+      renderHook(() => useFollowBottom(ref, []));
+      el.scrollTop = 300;
+      el.dispatchEvent(new Event('scroll'));
+      el.scrollTop = 800;
+      Object.defineProperty(el, 'clientHeight', { value: 180, configurable: true });
+      notify([], {} as ResizeObserver);
+      expect(el.scrollTop).toBe(1000);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
   it('observes the complete output wrapper and follows live height changes', () => {
     let notify: ResizeObserverCallback = () => {};
     const observe = vi.fn();

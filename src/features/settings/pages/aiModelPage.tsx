@@ -181,7 +181,7 @@ function ModelListField() {
             key={m.id}
             style={{
               borderRadius: 'var(--radius-inner)',
-              padding: '10px 12px', background: 'var(--canvas)',
+              padding: '12px 14px', background: 'var(--surface)',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

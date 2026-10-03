@@ -1,4 +1,5 @@
-import { useCallback, type FC } from 'react';
+import { useCallback, useEffect, useState, type FC } from 'react';
+import { X } from 'lucide-react';
 import { useDockStore, PANEL_DEFS, MIN_PANEL_WIDTH, type DockSide } from '@features/workspace';
 import { selectActiveSessionTab, useSessionStore } from '@features/workspace';
 import ResizeHandle from '@ui/ResizeHandle';
@@ -25,19 +26,27 @@ export default function SidePanel({ side }: SidePanelProps) {
   const isSessionActive = useSessionStore((state) => selectActiveSessionTab(state) !== null);
 
   const panelIds = side === 'left' ? leftPanels : rightPanels;
-  if (panelIds.length === 0) return null;
+  const zone = useDockStore(s => side === 'left' ? s.leftZone : s.rightZone);
+  const [visited, setVisited] = useState<string[]>([]);
+  useEffect(() => {
+    setVisited(previous => {
+      const added = panelIds.filter(id => id !== 'chat' && !previous.includes(id));
+      return added.length ? [...previous, ...added] : previous;
+    });
+  }, [panelIds]);
+  const mountedIds = [...new Set([...visited.filter(id => zone.includes(id)), ...panelIds])];
 
   return (
     <>
-      {panelIds.map((panelId) => {
+      {mountedIds.map((panelId) => {
         if (panelId === 'chat' && !isSessionActive) return null;
-        return <SinglePanel key={panelId} side={side} panelId={panelId} />;
+        return <SinglePanel key={panelId} side={side} panelId={panelId} visible={panelIds.includes(panelId)} />;
       })}
     </>
   );
 }
 
-function SinglePanel({ side, panelId }: { side: DockSide; panelId: string }) {
+function SinglePanel({ side, panelId, visible }: { side: DockSide; panelId: string; visible: boolean }) {
   const setPanelWidth = useDockStore((s) => s.setPanelWidth);
   const commitPanelWidth = useDockStore((s) => s.commitPanelWidth);
   const panelWidths = useDockStore((s) => s.panelWidths);
@@ -78,28 +87,32 @@ function SinglePanel({ side, panelId }: { side: DockSide; panelId: string }) {
   if (!def || !PanelContent) return null;
 
   return (
-    <div style={{
+    <div className="workspace-side-panel" data-side={side} style={{
+      display: visible ? 'block' : 'none',
       position: 'relative',
       flexShrink: 0,
       minHeight: 0,
-      ...(isLeft
-        ? { borderRight: '1px solid var(--block-divider)' }
-        : { borderLeft: '1px solid var(--block-divider)' }),
     }}>
       <div style={{
         width,
+        maxWidth: `calc(100vw - var(--workspace-activity-width) - var(--workspace-terminal-min-width) - ${isLeft ? 2 : 3} * var(--workspace-gap))`,
         display: collapsed ? 'none' : 'flex',
         flexDirection: 'column',
         minHeight: 0,
         height: '100%',
-        background: 'var(--surface)',
+        background: isLeft ? 'var(--sidebar-bg)' : 'var(--canvas)',
       }}>
+        <div className="workspace-panel-heading">
+          <span>{panelId === 'chat' ? 'AI 助手' : def.label}</span>
+          <button data-subtle className="workspace-panel-close" aria-label={`关闭${panelId === 'chat' ? 'AI 助手' : def.label}面板`}
+            onClick={() => useDockStore.getState().togglePanel(side, panelId)}><X size={14} /></button>
+        </div>
         <div style={{ flex: 1, minHeight: 0 }}>
           <PanelContent />
         </div>
       </div>
 
-      {/* 拖拽手柄 — 绝对定位覆盖在内边缘，无可见缝隙；折叠中手柄仍在，可反向拖回 */}
+      {/* Keep the resize edge mounted during collapse so dragging back restores the panel. */}
       <ResizeHandle axis="x" edge={isLeft ? 'right' : 'left'} onDelta={handleDelta} onUp={handleCommit} testId={`resize-handle-${panelId}`} />
     </div>
   );

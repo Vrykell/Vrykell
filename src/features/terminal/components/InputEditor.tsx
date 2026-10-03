@@ -141,20 +141,19 @@ export default function InputEditor({
     );
   }
 
-  // The input content stays inset while its divider spans the pane width.
+  // Give the composer a clear boundary without competing with terminal output.
 
   return (
     <div style={{
       flexShrink: 0,
       margin: 0,
-      padding: `0 ${insetRight}px 0 ${insetLeft}px`,
-      borderTop: '1px solid var(--block-divider)',
+      padding: `10px ${insetRight + 4}px 12px ${insetLeft + 4}px`,
       background: 'var(--canvas)',
     }}>
       <div
+        className="terminal-composer"
         style={{
-          background: 'transparent',
-          padding: '8px 12px 5px',
+          padding: '10px 12px 8px',
         }}
         onDragOver={(e) => { if (aiMode) e.preventDefault(); }}
         onDrop={(e) => {
@@ -163,6 +162,10 @@ export default function InputEditor({
           void addBlobs(Array.from(e.dataTransfer.files));
         }}
       >
+        <div className="terminal-composer-heading">
+          <span>{aiMode ? 'AI 对话' : '命令输入'}</span>
+          <span>{aiMode ? 'Enter 发送' : 'Enter 执行'} · Shift+Enter 换行</span>
+        </div>
 
         {/* 附件 chips（仅 AI 模式，随发送清空） */}
         {aiMode && atts.length > 0 && (
@@ -306,8 +309,9 @@ export default function InputEditor({
           )}
         </div>
 
-        {/* 底部状态栏 — shell · CWD · git分支 | cmd/AI pill · 分裂 · 关闭 */}
+        {/* Keep context separate from the primary input row. */}
         <div
+          className="terminal-input-status"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -353,7 +357,7 @@ export default function InputEditor({
               transition: 'background 0.12s ease, color 0.12s ease',
             }}
           >
-            {aiMode ? 'AI' : 'cmd'}
+            {aiMode ? 'AI' : '命令'}
           </button>
           {!aiMode && (
             <>
@@ -455,10 +459,10 @@ export function CurrentDir({ dir }: { dir?: string }) {
   const label = dir
     ? dir.startsWith('/') && dir.length > 20
       ? '…' + dir.slice(-19)
-      : dir.slice(1)
+      : dir
     : '~/project';
   return (
-    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)' }}>
+    <span className="terminal-directory" title={dir} style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
       {label}
     </span>
   );
@@ -470,6 +474,8 @@ function GitBranchLabel({ branch }: { branch: string }) {
   const label = branch.length > 22 ? branch.slice(0, 21) + '…' : branch;
   return (
     <span
+      className="terminal-branch"
+      title={branch}
       style={{
         fontFamily: 'var(--font-mono)',
         fontSize: 11,

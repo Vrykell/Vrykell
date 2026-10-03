@@ -8,7 +8,7 @@ test.beforeEach(async ({ page }) => {
 
 test.describe('应用布局', () => {
   test('TopDock 功能区：标签/资源按钮 + 设置入口', async ({ page }) => {
-    // Dock 按钮存在（可拖拽按钮）
+    // Navigation actions remain discoverable in the activity bar.
     await expect(page.locator('[data-dock-btn="tabs"]')).toBeVisible();
     await expect(page.locator('[data-dock-btn="files"]')).toBeVisible();
     await expect(page.getByTitle('设置')).toBeVisible();
@@ -25,6 +25,20 @@ test.describe('应用布局', () => {
     const controlRight = await controls.evaluate((element) => element.getBoundingClientRect().right);
     const viewportRight = await page.evaluate(() => window.innerWidth);
     expect(Math.abs(viewportRight - controlRight)).toBeLessThanOrEqual(1);
+    for (const width of [1240, 720]) {
+      await page.setViewportSize({ width, height: 800 });
+      const titlebar = await page.locator('.workspace-titlebar').boundingBox();
+      for (const id of ['window-minimize', 'window-maximize', 'window-close']) {
+        const button = page.getByTestId(id);
+        const rect = await button.boundingBox();
+        expect(rect!.y).toBe(0);
+        expect(rect!.height).toBe(titlebar!.height);
+        expect(await button.evaluate(el => {
+          const bounds = el.getBoundingClientRect();
+          return el.contains(document.elementFromPoint(bounds.x + bounds.width / 2, 0));
+        })).toBe(true);
+      }
+    }
     await expect(page.getByText('Vrykell', { exact: true })).toHaveCount(0);
 
     const minimize = controls.locator('[data-testid="window-minimize"]');
@@ -58,9 +72,9 @@ test.describe('应用布局', () => {
   });
 
   test('底部输入栏支持 AI 模式切换', async ({ page }) => {
-    await page.getByRole('button', { name: 'cmd' }).click();
+    await page.getByRole('button', { name: '命令', exact: true }).click();
     await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
-    await page.getByRole('button', { name: 'AI' }).click();
+    await page.getByRole('button', { name: 'AI', exact: true }).click();
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   });
 

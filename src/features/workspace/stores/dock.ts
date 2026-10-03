@@ -14,9 +14,9 @@ export interface PanelDef {
 }
 
 export const PANEL_DEFS: Record<string, PanelDef> = {
-  tabs:  { id: 'tabs',  icon: SquareStack, label: '标签', width: 200 },
-  files: { id: 'files', icon: Folder, label: '资源', width: 240 },
-  ssh:   { id: 'ssh',   icon: Server, label: 'SSH', width: 260 },
+  tabs:  { id: 'tabs',  icon: SquareStack, label: '标签', width: 180 },
+  files: { id: 'files', icon: Folder, label: '资源', width: 200 },
+  ssh:   { id: 'ssh',   icon: Server, label: 'SSH', width: 208 },
   chat:  { id: 'chat',  icon: Sparkles, label: 'AI', width: 320 },
 };
 
@@ -47,8 +47,8 @@ function isValidLayout(data: unknown): data is PersistedLayout {
 }
 
 const DEFAULTS: PersistedLayout = {
-  leftZone: ['tabs', 'ssh'], rightZone: ['files'],
-  // 首次进入只保留会话列表和终端，文件/SSH 面板按需打开。
+  leftZone: ['tabs', 'ssh', 'files'], rightZone: ['chat'],
+  // Start with the session list; auxiliary panels open on demand.
   leftPanels: ['tabs'], rightPanels: [],
   panelWidths: {},
 };
@@ -86,10 +86,13 @@ function loadLayout(): PersistedLayout {
     layout.leftPanels = tabsOnLeft ? ['tabs'] : [];
     layout.rightPanels = tabsOnLeft ? [] : (layout.rightZone.includes('tabs') ? ['tabs'] : []);
   }
-  // 面板顺序对齐按钮顺序（而非打开先后）
-  layout.leftPanels = sortByZone(layout.leftPanels, layout.leftZone);
-  layout.rightPanels = sortByZone(layout.rightPanels, layout.rightZone);
-  if (migratingLegacy || missing.length > 0) saveLayout(layout);
+  // Keep navigation on the left and the assistant on the right, including older saved layouts.
+  const openPanels = [...layout.leftPanels, ...layout.rightPanels];
+  layout.leftZone = [...new Set([...layout.leftZone, ...layout.rightZone])].filter(id => id !== 'chat');
+  layout.rightZone = ['chat'];
+  layout.leftPanels = sortByZone(openPanels.filter(id => id !== 'chat'), layout.leftZone).slice(0, 1);
+  layout.rightPanels = openPanels.includes('chat') ? ['chat'] : [];
+  saveLayout(layout);
   return layout;
 }
 
@@ -109,7 +112,7 @@ function sortByZone(panels: string[], zone: string[]): string[] {
 interface DockState {
   leftZone: string[];
   rightZone: string[];
-  /** 同侧可同时打开多个面板 */
+  /** Each side displays one panel at a time. */
   leftPanels: string[];
   rightPanels: string[];
   /** 每个面板的用户自定义宽度（px），未设置则用 PANEL_DEFS 默认值 */
@@ -128,6 +131,7 @@ interface DockState {
   setPanelWidth: (id: string, delta: number) => void;
   /** 松手定局：宽度仍 ≤ 下限 → 正式折叠（下架）；否则恢复展开 */
   commitPanelWidth: (id: string) => void;
+  reconcilePanelSpace: () => void;
 }
 
 /** 每个侧栏面板自身的最小宽度（px）。 */
@@ -138,6 +142,29 @@ function currentTerminalMinWidth(): number {
   const ws = useWorkspaceStore.getState();
   const tab = ws.tabs.find((t) => t.id === ws.activeId);
   return tab && isSessionTab(tab) ? minTerminalWidth(tab.layout) : MIN_PANE_SIZE;
+}
+
+export const ACTIVITY_BAR_WIDTH = 44;
+export const WORKSPACE_GAP = 8;
+
+function workspaceFrameWidth(s: DockState): number {
+  return WORKSPACE_GAP * (s.rightPanels.length ? 3 : 2);
+}
+
+/** Reserve useful command space and close the older side when both do not fit. */
+function fitPanelSpace(s: DockState, preferred: DockSide): Pick<DockState, 'leftPanels' | 'rightPanels'> {
+  const available = window.innerWidth - ACTIVITY_BAR_WIDTH - workspaceFrameWidth(s) - Math.max(360, currentTerminalMinWidth());
+  if (available < MIN_PANEL_WIDTH) return { leftPanels: [], rightPanels: [] };
+  const panelWidth = (ids: string[]) => ids.reduce((sum, id) => sum + (s.collapsedPanels.includes(id) ? 0 : (s.panelWidths[id] ?? PANEL_DEFS[id]?.width ?? 200)), 0);
+  if (panelWidth(s.leftPanels) + panelWidth(s.rightPanels) <= available) {
+    return { leftPanels: s.leftPanels, rightPanels: s.rightPanels };
+  }
+  if (s.leftPanels.length && s.rightPanels.length) {
+    return preferred === 'left'
+      ? { leftPanels: s.leftPanels, rightPanels: [] }
+      : { leftPanels: [], rightPanels: s.rightPanels };
+  }
+  return { leftPanels: s.leftPanels, rightPanels: s.rightPanels };
 }
 
 const saved = loadLayout();
@@ -209,7 +236,6 @@ export const useDockStore = create<DockState>((set) => ({
 
   togglePanel: (side, id) => {
     set((s) => {
-      const zone = side === 'left' ? s.leftZone : s.rightZone;
       const panels = side === 'left' ? [...s.leftPanels] : [...s.rightPanels];
       const idx = panels.indexOf(id);
       const wasCollapsed = s.collapsedPanels.includes(id);
@@ -217,38 +243,34 @@ export const useDockStore = create<DockState>((set) => ({
         panels.splice(idx, 1); // 已打开（非折叠）→ 关闭
       } else {
         // 未打开或处于折叠中 → 打开（并清掉折叠标记）
-        if (idx < 0) {
-          panels.push(id);
-          const sorted = sortByZone(panels, zone);
-          panels.splice(0, panels.length, ...sorted);
-        }
+        panels.splice(0, panels.length, id);
       }
       const collapsedPanels = s.collapsedPanels.filter((p) => p !== id);
       const patch: Partial<DockState> = side === 'left'
         ? { leftPanels: panels, collapsedPanels }
         : { rightPanels: panels, collapsedPanels };
+      const next = { ...s, ...patch };
+      Object.assign(patch, fitPanelSpace(next, side));
       saveLayout(toPersisted({ ...s, ...patch }));
-      return patch as DockState;
+      return patch;
     });
   },
 
   openPanel: (id) => {
     set((s) => {
       const side: DockSide = s.leftZone.includes(id) ? 'left' : 'right';
-      const zone = side === 'left' ? s.leftZone : s.rightZone;
       const panels = side === 'left' ? [...s.leftPanels] : [...s.rightPanels];
       const collapsedPanels = s.collapsedPanels.filter((p) => p !== id);
       if (panels.includes(id) && collapsedPanels.length === s.collapsedPanels.length) return {};
       if (!panels.includes(id)) {
-        panels.push(id);
-        const sorted = sortByZone(panels, zone);
-        panels.splice(0, panels.length, ...sorted);
+        panels.splice(0, panels.length, id);
       }
       const patch: Partial<DockState> = side === 'left'
         ? { leftPanels: panels, collapsedPanels }
         : { rightPanels: panels, collapsedPanels };
+      Object.assign(patch, fitPanelSpace({ ...s, ...patch }, side));
       saveLayout(toPersisted({ ...s, ...patch }));
-      return patch as DockState;
+      return patch;
     });
   },
 
@@ -277,8 +299,8 @@ export const useDockStore = create<DockState>((set) => ({
         if (pid === id) continue;
         otherWidth += s.panelWidths[pid] ?? PANEL_DEFS[pid]?.width ?? 200;
       }
-      const available = window.innerWidth - otherWidth;
-      const maxW = Math.max(MIN_PANEL_WIDTH, Math.round(available - currentTerminalMinWidth()));
+      const available = window.innerWidth - ACTIVITY_BAR_WIDTH - workspaceFrameWidth(s) - otherWidth;
+      const maxW = Math.max(MIN_PANEL_WIDTH, Math.round(available - Math.max(360, currentTerminalMinWidth())));
       const clamped = Math.max(MIN_PANEL_WIDTH, Math.min(maxW, next));
       if (clamped === cur && !s.collapsedPanels.includes(id)) return {};
       const collapsedPanels = s.collapsedPanels.filter((p) => p !== id);
@@ -306,6 +328,14 @@ export const useDockStore = create<DockState>((set) => ({
       const patch = { leftPanels, rightPanels, collapsedPanels };
       saveLayout(toPersisted({ ...s, ...patch }));
       return patch as DockState;
+    });
+  },
+  reconcilePanelSpace: () => {
+    set((s) => {
+      const patch = fitPanelSpace(s, s.rightPanels.includes('chat') ? 'right' : 'left');
+      if (patch.leftPanels === s.leftPanels && patch.rightPanels === s.rightPanels) return s;
+      saveLayout(toPersisted({ ...s, ...patch }));
+      return patch;
     });
   },
 }));

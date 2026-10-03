@@ -336,6 +336,7 @@ function TerminalPane(props: {
   return (
     <div
       data-testid={`pane-${terminal.id}`}
+      className="terminal-pane"
       data-focused={focused ? 'true' : 'false'}
       onClick={() => setFocusedPane(terminal.id)}
       onMouseDown={onPaneMouseDown}
@@ -442,9 +443,12 @@ function PlacementOverlay({ targets, onPick, onCancel, emptyMessage = '最多 4 
       }}
       onMouseMove={(e) => setHovered(locate(e.clientX, e.clientY))}
       onMouseLeave={() => setHovered(null)}
-      style={{ position: 'absolute', inset: 0, zIndex: 80 }}
+      style={{ position: 'absolute', inset: 0, zIndex: 80, cursor: 'crosshair' }}
     >
-      {/* 落点：完整未来区域，悬停时该区域整体微微变灰（如 Windows 吸附预览） */}
+      <div data-testid="placement-hint" style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 1, background: 'var(--elevated)', color: 'var(--text-primary)', border: '1px solid var(--border-strong)', borderRadius: 8, padding: '8px 12px', fontSize: 12, whiteSpace: 'nowrap', boxShadow: 'var(--shadow-md)' }}>
+        点击区域选择位置 · Esc 取消
+      </div>
+      {/* A visible grid explains the placement mode before the pointer moves. */}
       {targets.map((t, i) => (
         <div
           key={i}
@@ -454,10 +458,19 @@ function PlacementOverlay({ targets, onPick, onCancel, emptyMessage = '最多 4 
             left: `${t.rect.x * 100}%`, top: `${t.rect.y * 100}%`,
             width: `${t.rect.w * 100}%`, height: `${t.rect.h * 100}%`,
             boxSizing: 'border-box', pointerEvents: 'none',
-            background: hovered === i ? 'rgba(128,128,128,0.18)' : 'transparent',
-            transition: 'background var(--dur-fast) var(--ease)',
+            background: hovered === i ? 'var(--placement-hover)' : 'var(--placement-bg)',
+            border: `1px dashed ${hovered === i ? 'var(--accent)' : 'var(--border-strong)'}`,
+            transition: 'background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease)',
           }}
-        />
+        >
+          <span style={{ position: 'absolute', fontSize: 12, color: hovered === i ? 'var(--text-primary)' : 'var(--text-secondary)',
+            left: t.dir === 'col' ? '50%' : t.position === 'first' ? 16 : undefined,
+            right: t.dir === 'row' && t.position === 'second' ? 16 : undefined,
+            top: t.dir === 'row' ? '50%' : t.position === 'first' ? 66 : undefined,
+            bottom: t.dir === 'col' && t.position === 'second' ? 20 : undefined,
+            transform: t.dir === 'row' ? 'translateY(-50%)' : 'translateX(-50%)',
+          }}>{t.dir === 'row' ? (t.position === 'first' ? '左侧' : '右侧') : (t.position === 'first' ? '上方' : '下方')}</span>
+        </div>
       ))}
     </div>
   );
@@ -605,10 +618,10 @@ function PaneEmptyHint({ paneId }: { paneId: string }) {
   // AI 面板打开时内联不显示，空态提示也不把面板里的对话算作 pane 内容
   if (blocks.some(hasVisibleContent) || (!chatPanelOpen && aiMessages.length > 0)) return null;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: '8vh', color: 'var(--text-muted)', fontSize: 12, userSelect: 'none', gap: 6 }}>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, color: 'var(--text-muted)', opacity: 0.25, fontWeight: 600, marginBottom: 6 }}>$</div>
-      <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>在下方输入命令</div>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', opacity: 0.6, fontFamily: 'var(--font-mono)' }}>Enter 执行 · Shift+Enter 换行</div>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '32px 28px', color: 'var(--text-muted)', fontSize: 12, userSelect: 'none', gap: 8 }}>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 24, color: 'var(--text-secondary)', fontWeight: 500, marginBottom: 4 }}>$</div>
+      <div style={{ color: 'var(--text-primary)', fontSize: 15, fontWeight: 500 }}>从一条命令开始</div>
+      <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>在底部输入命令，或打开右上角 AI 助手。</div>
     </div>
   );
 }

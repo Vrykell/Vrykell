@@ -8,6 +8,7 @@ const zh: Record<string, string> = {
   'dock.tabs': '标签',
   'dock.files': '资源',
   'dock.ssh': 'SSH',
+  'dock.chat': 'AI 助手',
   'dock.dragTip': '拖拽排序或换侧 / 点击{{action}}',
   'dock.open': '打开',
   'dock.close': '关闭',

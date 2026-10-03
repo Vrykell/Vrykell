@@ -10,6 +10,8 @@ import { create } from 'zustand';
 export interface PaneInput {
   text: string;
   aiMode: boolean;
+  commandDraft?: string;
+  aiDraft?: string;
 }
 
 interface InputState {
@@ -31,9 +33,18 @@ export const useInputStore = create<InputState>((set) => ({
     })),
 
   setAiMode: (paneId, aiMode) =>
-    set((s) => ({
-      byPane: { ...s.byPane, [paneId]: { ...(s.byPane[paneId] ?? EMPTY), aiMode } },
-    })),
+    set((s) => {
+      const current = s.byPane[paneId] ?? EMPTY;
+      if (current.aiMode === aiMode) return s;
+      // Keep drafts separate so natural language never becomes a shell command.
+      const next = {
+        ...current,
+        [current.aiMode ? 'aiDraft' : 'commandDraft']: current.text,
+        text: (aiMode ? current.aiDraft : current.commandDraft) ?? '',
+        aiMode,
+      };
+      return { byPane: { ...s.byPane, [paneId]: next } };
+    }),
 
   clearText: (paneId) =>
     set((s) => ({
