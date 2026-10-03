@@ -7,7 +7,7 @@ import { Plus, X } from 'lucide-react';
 // ── 通用样式 ──
 
 export const inputStyle: React.CSSProperties = {
-  background: 'var(--canvas)', border: '1px solid var(--border)',
+  background: 'var(--surface)', border: '1px solid var(--border)',
   borderRadius: 'var(--radius-inner)', padding: '6px 8px', fontSize: 12,
   color: 'var(--text-primary)', outline: 'none', width: '100%',
   fontFamily: 'var(--font-mono)', boxSizing: 'border-box',

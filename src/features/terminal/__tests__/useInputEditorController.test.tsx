@@ -121,6 +121,29 @@ describe('useInputEditorController', () => {
     expect(mocks.ptyWrite).toHaveBeenCalledWith('pty-1', 'git status\n');
   });
 
+  it('keeps an AI draft out of the PTY when the chat panel opens', () => {
+    useInputStore.setState({ byPane: { 'pane-1': { text: '解释这个项目', aiMode: true } } });
+    const { result } = renderHook(() => useInputEditorController({ paneId: 'pane-1' }));
+    act(() => useDockStore.setState({ rightPanels: ['chat'] }));
+    expect(result.current.aiMode).toBe(false);
+    expect(result.current.text).toBe('');
+    act(() => result.current.execute());
+    expect(mocks.ptyWrite).not.toHaveBeenCalled();
+    expect(useInputStore.getState().byPane['pane-1']?.aiDraft).toBe('解释这个项目');
+    act(() => useDockStore.setState({ rightPanels: [] }));
+    act(() => result.current.toggleAiMode());
+    expect(result.current.text).toBe('解释这个项目');
+  });
+
+  it('restores the command draft instead of submitting the AI draft', () => {
+    useInputStore.setState({ byPane: { 'pane-1': { text: '解释这个项目', aiMode: true, commandDraft: 'git status' } } });
+    const { result } = renderHook(() => useInputEditorController({ paneId: 'pane-1' }));
+    act(() => useDockStore.setState({ rightPanels: ['chat'] }));
+    expect(result.current.text).toBe('git status');
+    act(() => result.current.execute());
+    expect(mocks.ptyWrite).toHaveBeenCalledWith('pty-1', 'git status\n');
+  });
+
   it('queues a command entered before the PTY is ready and flushes it on session attach', () => {
     mocks.sessions = {};
     useTerminalStore.setState({ sessions: {}, pendingCommands: {} });

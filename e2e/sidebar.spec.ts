@@ -42,7 +42,7 @@ test.describe('文件面板', () => {
   test('关闭面板再重新打开', async ({ page }) => {
     // 关闭面板——再点一次 dock 按钮
     await page.locator('[data-dock-btn="files"]').click();
-    await expect(page.getByText('Documents')).toHaveCount(0);
+    await expect(page.getByText('Documents')).toBeHidden();
     // 重新打开
     await page.locator('[data-dock-btn="files"]').click();
     await expect(page.getByText('Documents')).toBeVisible({ timeout: 3000 });
@@ -50,7 +50,7 @@ test.describe('文件面板', () => {
 
   test('拖拽到最小宽度立即折叠；松手前可反悔拖回', async ({ page }) => {
     await expect(page.getByText('Documents')).toBeVisible();
-    // 向右拖手柄 = 面板变窄（files 在右栏，手柄在左缘；默认宽 240 → 下限 160 需拖 80px）
+    // Drag the right edge left to reduce the file sidebar width.
     const handle = page.locator('[data-testid="resize-handle-files"]');
     await expect(handle).toBeVisible();
     const box = await handle.boundingBox();
@@ -60,15 +60,15 @@ test.describe('文件面板', () => {
     await page.mouse.down();
     // 第 5 步（80px）到下限 → 立即折叠（内容隐藏但保持挂载，状态不丢），之后保持收起
     for (let i = 0; i < 8; i++) {
-      await page.mouse.move(cx + (i + 1) * 16, cy);
+      await page.mouse.move(cx - (i + 1) * 16, cy);
       await page.waitForTimeout(12);
       if (i >= 5) {
         await expect(page.getByText('Documents')).toBeHidden();
       }
     }
-    // 松手前反悔：向左拖回 → 面板恢复（内容仍是原挂载实例，非重新加载）
+    // Drag right before releasing to restore the same mounted panel.
     for (let i = 0; i < 8; i++) {
-      await page.mouse.move(cx + (8 - i) * 16, cy);
+      await page.mouse.move(cx - (8 - i) * 16, cy);
       await page.waitForTimeout(12);
     }
     await expect(page.getByText('Documents')).toBeVisible({ timeout: 3000 });
@@ -82,7 +82,7 @@ test.describe('文件面板', () => {
     await page.mouse.move(cx2, cy);
     await page.mouse.down();
     for (let i = 0; i < 8; i++) {
-      await page.mouse.move(cx2 + (i + 1) * 16, cy);
+      await page.mouse.move(cx2 - (i + 1) * 16, cy);
       await page.waitForTimeout(12);
     }
     await page.mouse.up();
@@ -104,13 +104,13 @@ test.describe('文件面板', () => {
     await page.mouse.move(cx, cy);
     await page.mouse.down();
     for (let i = 0; i < 8; i++) {
-      await page.mouse.move(cx + (i + 1) * 16, cy);
+      await page.mouse.move(cx - (i + 1) * 16, cy);
       await page.waitForTimeout(12);
     }
     await expect(page.locator('[data-testid="local-up-btn"]')).toBeHidden();
     // 反向拖回并松手 → 面板恢复，且仍停留在之前进入的目录（状态未丢、未 reload）
     for (let i = 0; i < 8; i++) {
-      await page.mouse.move(cx + (8 - i) * 16, cy);
+      await page.mouse.move(cx - (8 - i) * 16, cy);
       await page.waitForTimeout(12);
     }
     await page.mouse.up();

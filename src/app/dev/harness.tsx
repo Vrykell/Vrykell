@@ -12,12 +12,15 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@app/theme.css';
+import { applyTheme } from '@config/theme/tokens';
 import { useTerminalStore } from '@features/terminal';
 import { useSessionStore, isSessionTab } from '@features/workspace';
 import { useChatStore } from '@features/chat';
 import { firstLeaf } from '@features/workspace/model/windowLayout';
 import InputEditor from '@features/terminal/components/InputEditor';
 import PanelChat from '@features/chat/components/PanelChat';
+
+applyTheme('dark');
 
 // ── 最小 store 状态：默认 session tab 已存在，补上 pane 会话/场景/聚焦 ──
 const tab = useSessionStore.getState().tabs.find(isSessionTab);

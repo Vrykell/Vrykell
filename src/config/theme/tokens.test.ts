@@ -79,6 +79,25 @@ describe('默认调色板（中性，主色不带颜色倾向）', () => {
 });
 
 describe('paletteToCssVars', () => {
+  it.each(['dark', 'light'] as const)('%s uses neutral grays and separates primary navigation from sidebars', (mode) => {
+    const vars = paletteToCssVars(themes[mode]);
+    for (const key of ['--chrome-bg', '--sidebar-bg', '--chrome-field', '--selection-bg', '--canvas', '--surface', '--block', '--elevated', '--border', '--border-strong', '--text-primary', '--text-secondary', '--text-muted']) {
+      expect(vars[key]).toMatch(/^#[0-9a-f]{6}$/i);
+      const channels = [1, 3, 5].map(offset => parseInt(vars[key].slice(offset, offset + 2), 16));
+      expect(new Set(channels).size).toBe(1);
+    }
+    expect(vars['--sidebar-bg']).not.toBe(vars['--chrome-bg']);
+    expect(vars['--sidebar-bg']).not.toBe(vars['--canvas']);
+  });
+  it.each(['dark', 'light'] as const)('%s separates window chrome, content, fields and selection', (mode) => {
+    const vars = paletteToCssVars(themes[mode]);
+    expect(vars['--chrome-bg']).toBeTruthy();
+    expect(vars['--chrome-field']).toBeTruthy();
+    expect(vars['--selection-bg']).toBeTruthy();
+    expect(vars['--chrome-bg']).not.toBe(vars['--canvas']);
+    expect(vars['--chrome-field']).not.toBe(vars['--chrome-bg']);
+    expect(vars['--surface']).not.toBe(vars['--canvas']);
+  });
   it('覆盖 ThemePalette 全部字段', () => {
     const vars = paletteToCssVars(themes.dark);
     const fields = Object.keys(themes.dark);
@@ -124,6 +143,25 @@ describe('theme overrides', () => {
   it('getThemeOverrides 返回当前覆盖表', () => {
     setThemeOverrides({ '--accent': '#57D4C2' });
     expect(getThemeOverrides()).toEqual({ '--accent': '#57D4C2' });
+  });
+
+  it('switches every structural color together and preserves an explicit chrome override', () => {
+    setThemeOverrides({ '--chrome-bg': '#243043' });
+    applyTheme('dark');
+    const darkSelection = document.documentElement.style.getPropertyValue('--selection-bg');
+    applyTheme('light');
+    expect(document.documentElement.style.getPropertyValue('--chrome-bg')).toBe('#243043');
+    expect(document.documentElement.style.getPropertyValue('--selection-bg')).not.toBe(darkSelection);
+    expect(document.documentElement.style.getPropertyValue('--canvas')).toBe(themes.light.canvas);
+  });
+
+  it('removes obsolete custom aliases when restoring the default theme', () => {
+    setThemeOverrides({ '--text-title': '#FFFFFF', '--tab-hover': '#303030' });
+    applyTheme('dark');
+    setThemeOverrides({});
+    applyTheme('light');
+    expect(document.documentElement.style.getPropertyValue('--text-title')).toBe('');
+    expect(document.documentElement.style.getPropertyValue('--tab-hover')).toBe('');
   });
 });
 

@@ -116,9 +116,13 @@ export default function PanelChat() {
     clearAttachments,
   });
 
+  useEffect(() => {
+    if (isSession) inputRef.current?.focus();
+  }, [isSession, inputRef]);
+
   // 目标 pane 的显示分量（prompt 行镜像终端输入栏：shell 胶囊 · cwd）
   return (
-    <div ref={panelRef} style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+    <div ref={panelRef} style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, containerType: 'inline-size' }}>
       {/* 顶栏：会话级 AI 配置（模型 · 联网 · 深思 · Agent），低频、影响后续所有消息，从输入卡抽离避免拥挤 */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 4,
@@ -150,19 +154,18 @@ export default function PanelChat() {
         )}
       </div>
 
-      {/* Dock the chat composer at the bottom and separate it with a subtle rule. */}
+      {/* Match the terminal composer's visual boundary and spacing. */}
       {isSession && (
         <div style={{
           flexShrink: 0,
           margin: 0,
-          padding: '0 8px',
-          borderTop: '1px solid var(--block-divider)',
+          padding: '10px 12px 12px',
           background: 'var(--canvas)',
         }}>
-          <div style={{
-            background: 'transparent',
-            padding: '8px 12px 5px',
+          <div className="terminal-composer" style={{
+            padding: '10px 12px 8px',
           }}>
+            <div className="terminal-composer-heading"><span>AI 对话</span><span>Enter 发送</span></div>
             {/* 附件 chips 行（预览/删除；随发送清空） */}
             {atts.length > 0 && (
               <AttachmentChips

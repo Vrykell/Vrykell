@@ -278,20 +278,20 @@ export default function SettingsView() {
   }
 
   return (
-    <div style={{
+    <div className="settings-view" style={{
       flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row',
-      background: 'var(--surface)', userSelect: 'none',
+      background: 'var(--canvas)', userSelect: 'none',
     }}>
       {/* 侧栏 */}
-      <aside style={{
-        width: 216, flexShrink: 0, borderRight: '1px solid var(--border)',
+      <aside className="settings-navigation" style={{
+        width: 192, flexShrink: 0, background: 'var(--surface)',
         display: 'flex', flexDirection: 'column', minHeight: 0,
       }}>
         <div style={{ padding: 8 }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6,
             padding: '4px 8px',
-            borderRadius: 'var(--radius-inner)', background: 'var(--canvas)',
+            borderRadius: 'var(--radius-inner)', background: 'var(--block)',
           }}>
             <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
             <input
@@ -334,7 +334,7 @@ export default function SettingsView() {
                     style={{
                       display: 'block', width: '100%', textAlign: 'left',
                       padding: '5px 8px 5px 32px', fontSize: 12,
-                      background: selected === it.id ? 'var(--hover)' : 'transparent',
+                      background: selected === it.id ? 'var(--selection-bg)' : 'transparent',
                       border: 'none', borderRadius: 5, cursor: 'pointer',
                       color: selected === it.id ? 'var(--text-primary)' : 'var(--text-secondary)',
                     }}
@@ -354,10 +354,10 @@ export default function SettingsView() {
       </aside>
 
       {/* 内容区 */}
-      <section style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '18px 22px' }}>
+      <section className="settings-content" style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '22px 26px', background: 'var(--canvas)' }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
-          marginBottom: 18, paddingBottom: 12, borderBottom: '1px solid var(--border)',
+          marginBottom: 24,
         }}>
           <Settings size={15} style={{ color: 'var(--text-muted)' }} />
           <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{activeLabel}</span>

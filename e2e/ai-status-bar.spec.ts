@@ -19,7 +19,7 @@ async function boot(
 test.describe('终端 AI 模式', () => {
   test('切换到 AI 模式出现状态栏（模型按钮 + 深思/Agent 开关）', async ({ page }) => {
     await boot(page);
-    await page.getByRole('button', { name: 'cmd' }).click();
+    await page.getByRole('button', { name: '命令', exact: true }).click();
     const bar = page.getByTestId('ai-status-bar');
     await expect(bar).toBeVisible();
     // 胶囊入口：图标 + 名称(7) ｜ 思考强度 + 下拉提示(3)，悬停前透明无边框
@@ -33,13 +33,13 @@ test.describe('终端 AI 模式', () => {
     await expect(bar.getByTitle('深度思考')).toBeVisible();
     await expect(bar.getByTitle('Agent 模式（可使用工具）')).toBeVisible();
     // 切回命令模式状态栏消失
-    await page.getByRole('button', { name: 'AI' }).click();
+    await page.getByRole('button', { name: 'AI', exact: true }).click();
     await expect(bar).toHaveCount(0);
   });
 
   test('胶囊内快速调整思考强度：原位下拉与胶囊同宽对齐，选完恢复', async ({ page }) => {
     await boot(page);
-    await page.getByRole('button', { name: 'cmd' }).click();
+    await page.getByRole('button', { name: '命令', exact: true }).click();
     const bar = page.getByTestId('ai-status-bar');
     const pill = bar.getByTestId('model-pill');
     await expect(pill).toBeVisible();
@@ -70,7 +70,7 @@ test.describe('终端 AI 模式', () => {
 
   test('状态栏深思开关：切换写模型覆盖', async ({ page }) => {
     await boot(page);
-    await page.getByRole('button', { name: 'cmd' }).click();
+    await page.getByRole('button', { name: '命令', exact: true }).click();
     const bar = page.getByTestId('ai-status-bar');
     await bar.getByTitle('深度思考').click();
     const saved = await page.evaluate(() => localStorage.getItem('vrykell-agent-settings') ?? '');
@@ -79,7 +79,7 @@ test.describe('终端 AI 模式', () => {
 
   test('状态栏打开模型选择窗口：本地模型项调思考强度', async ({ page }) => {
     await boot(page);
-    await page.getByRole('button', { name: 'cmd' }).click();
+    await page.getByRole('button', { name: '命令', exact: true }).click();
     const bar = page.getByTestId('ai-status-bar');
     await bar.getByTitle('切换模型（更多在设置页配置）').click();
     // 窗口出现：搜索框 + 能力标签 + 列表项
@@ -99,7 +99,7 @@ test.describe('终端 AI 模式', () => {
 
   test('AI 模式粘贴图片：附件 chip 出现，空文本 + 附件可发送', async ({ page }) => {
     await boot(page, '看到了图片');
-    await page.getByRole('button', { name: 'cmd' }).click();
+    await page.getByRole('button', { name: '命令', exact: true }).click();
     const input = page.getByPlaceholder(/自然语言描述/);
     await expect(input).toBeVisible();
 
@@ -127,7 +127,7 @@ test.describe('终端 AI 模式', () => {
         { id: 'medium', name: '本地开发模型测试', provider: 'openai-compatible', baseUrl: 'https://api.openai.com/v1', model: 'x-model', capabilities: { vision: false, reasoning: false, tools: true, search: false } },
       ],
     });
-    await page.getByRole('button', { name: 'cmd' }).click();
+    await page.getByRole('button', { name: '命令', exact: true }).click();
     const pill = page.getByTestId('ai-status-bar').getByTestId('model-pill');
     // 名字完整显示（不做字符截断）
     await expect(pill.getByTestId('pill-name')).toContainText('本地开发模型测试');
@@ -143,7 +143,7 @@ test.describe('终端 AI 模式', () => {
         { id: 'long', name: '超长模型名字测试一二三四五六七八九十', provider: 'openai-compatible', baseUrl: 'https://api.openai.com/v1', model: 'x-model', capabilities: { vision: false, reasoning: false, tools: true, search: false } },
       ],
     });
-    await page.getByRole('button', { name: 'cmd' }).click();
+    await page.getByRole('button', { name: '命令', exact: true }).click();
     const pill = page.getByTestId('ai-status-bar').getByTestId('model-pill');
     // 完整显示，不做任何省略
     await expect(pill.getByTestId('pill-name')).toContainText('超长模型名字测试一二三四五六七八九十');
@@ -166,7 +166,7 @@ test.describe('终端 AI 模式', () => {
         { id: 'vlong', name: longName, provider: 'openai-compatible', baseUrl: 'https://api.openai.com/v1', model: 'x-model', capabilities: { vision: false, reasoning: false, tools: true, search: false } },
       ],
     });
-    await page.getByRole('button', { name: 'cmd' }).click();
+    await page.getByRole('button', { name: '命令', exact: true }).click();
     const pill = page.getByTestId('ai-status-bar').getByTestId('model-pill');
     // 显示前 35 字符 + 省略号
     await expect(pill.getByTestId('pill-name')).toContainText('模'.repeat(35) + '…');

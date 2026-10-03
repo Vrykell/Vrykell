@@ -12,7 +12,7 @@ test.describe('重新生成标题（标签右键菜单）', () => {
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
 
     // 发一条 AI 消息（触发首条消息命名）
-    await page.getByRole('button', { name: 'cmd' }).click();
+    await page.getByRole('button', { name: '命令', exact: true }).click();
     const input = page.getByPlaceholder(/自然语言描述/);
     await input.fill('帮我部署服务');
     await input.press('Enter');

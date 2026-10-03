@@ -3,10 +3,9 @@ import { Copy, Minus, Square, X } from 'lucide-react';
 import { getCurrentWindow, type Window } from '@tauri-apps/api/window';
 import { usesCustomWindowControls } from '@platform/runtime';
 
-const CONTROL_HEIGHT = 40;
 const CONTROL_WIDTH = 46;
 
-/** Windows/Linux 在无原生标题栏时使用的窗口控制按钮。 */
+/** Custom window controls fill the titlebar to keep the top edge clickable. */
 export default function WindowControls() {
   const [maximized, setMaximized] = useState(false);
   const windowRef = useRef<Window | null>(null);
@@ -85,7 +84,7 @@ export default function WindowControls() {
 
   const buttonStyle = {
     width: CONTROL_WIDTH,
-    height: CONTROL_HEIGHT,
+    height: '100%',
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -99,7 +98,7 @@ export default function WindowControls() {
   return (
     <div
       data-testid="window-controls"
-      style={{ display: 'flex', alignItems: 'center', height: CONTROL_HEIGHT, flexShrink: 0 }}
+      style={{ display: 'flex', alignItems: 'stretch', alignSelf: 'stretch', height: '100%', flexShrink: 0 }}
       onMouseDown={(event) => event.stopPropagation()}
     >
       <button

@@ -145,6 +145,11 @@ export function useFollowBottom(
     }
     const onScroll = () => {
       if (el.clientWidth !== width || el.clientHeight !== height) {
+        // A jump to the bottom may precede its scroll event and a layout resize.
+        if (el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX) {
+          atBottomRef.current = true;
+          anchor = null;
+        }
         width = el.clientWidth;
         height = el.clientHeight;
         if (atBottomRef.current) snap();
@@ -171,6 +176,11 @@ export function useFollowBottom(
     // Observe the whole output flow because live xterm height changes outside React.
     const content = el.firstElementChild;
     const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {
+      // Honor the visible bottom position before restoring an older reading anchor.
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX) {
+        atBottomRef.current = true;
+        anchor = null;
+      }
       width = el.clientWidth;
       height = el.clientHeight;
       if (atBottomRef.current) snap();

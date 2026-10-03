@@ -68,6 +68,8 @@ export default function ShellIndicator({ shell, connected, focused, compact, lab
     <span
       style={{
         display: 'inline-flex',
+        flexShrink: 0,
+        whiteSpace: 'nowrap',
         alignItems: 'center',
         gap: 5,
         fontFamily: 'var(--font-mono)',

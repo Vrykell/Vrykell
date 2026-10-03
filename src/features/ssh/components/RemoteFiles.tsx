@@ -69,7 +69,7 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100%',
-      userSelect: 'none', background: 'var(--surface)',
+      userSelect: 'none', background: 'transparent',
     }}>
       {/* 顶栏：面包屑（不换行，窄时省略高层级）+ 操作按钮（右对齐） */}
       <div style={{

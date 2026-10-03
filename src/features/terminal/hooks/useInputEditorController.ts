@@ -79,8 +79,9 @@ export function useInputEditorController({
 
   useEffect(() => {
     if (pendingInput) {
-      setText(text ? text + ' ' + pendingInput : pendingInput);
       setAiMode(false);
+      const commandText = useInputStore.getState().byPane[paneId]?.text ?? '';
+      setText(commandText ? commandText + ' ' + pendingInput : pendingInput);
       setPendingInput('');
       inputRef.current?.focus();
     }
@@ -125,6 +126,9 @@ export function useInputEditorController({
   }, [chatOpen, aiMode, setAiMode]);
 
   const execute = useCallback(() => {
+    // Read the current mode again in case the panel changed before React committed.
+    const latest = selectPaneInput(paneId)(useInputStore.getState());
+    if (latest.aiMode !== aiMode || latest.text !== text || (chatOpen && aiMode)) return;
     const command = text.trim();
     if (aiMode ? (!command && atts.length === 0) || sendingTab : !command) return;
     useInputStore.getState().clearText(paneId);
@@ -156,7 +160,7 @@ export function useInputEditorController({
     } catch (error) {
       console.error('[InputEditor] execute failed:', error);
     }
-  }, [text, aiMode, atts, sendingTab, chatSend, paneId, sessions, resetHeight, resetHistNav, clearAttachments]);
+  }, [text, aiMode, chatOpen, atts, sendingTab, chatSend, paneId, sessions, resetHeight, resetHistNav, clearAttachments]);
 
   useEffect(() => {
     if (!visible && onEndPress) {

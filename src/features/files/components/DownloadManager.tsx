@@ -50,7 +50,7 @@ export default function DownloadManager({ onBack }: { onBack: () => void }) {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100%',
-      userSelect: 'none', background: 'var(--surface)',
+      userSelect: 'none', background: 'transparent',
     }}>
       {/* 顶栏 */}
       <div style={{
