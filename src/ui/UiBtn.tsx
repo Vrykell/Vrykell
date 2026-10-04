@@ -77,7 +77,7 @@ const menuItemStyle: CSSProperties = {
   color: 'var(--text-primary)', cursor: 'pointer', fontSize: 'calc(12px * var(--ui-font-scale))',
 };
 
-// ── 侧栏图标按钮（24×24，悬停显背景；标签/SSH/文件面板统一使用）──
+// Shared sidebar icon controls keep a comfortable pointer target.
 
 interface IconBtnProps {
   title: string;
@@ -92,12 +92,14 @@ export function IconBtn({ title, onClick, disabled, children, ...rest }: IconBtn
     <button
       data-subtle
       title={title}
+      type="button"
+      aria-label={title}
       onClick={onClick}
       disabled={disabled}
       {...rest}
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 24, height: 24, padding: 0, borderRadius: 5,
+        width: 32, height: 32, padding: 0, borderRadius: 5,
         background: 'transparent', border: 'none', color: 'var(--text-muted)',
         cursor: disabled ? 'default' : 'pointer', flexShrink: 0, opacity: disabled ? 0.4 : 1,
       }}
@@ -117,7 +119,7 @@ export function IconBtn({ title, onClick, disabled, children, ...rest }: IconBtn
   );
 }
 
-// ── 顶栏工具栏按钮（24×24 正方形图标按钮）──
+// Toolbar controls use the same pointer target as sidebar controls.
 
 interface ToolbarBtnProps {
   title: string;
@@ -129,7 +131,7 @@ interface ToolbarBtnProps {
 }
 
 const toolbarBtnBase: CSSProperties = {
-  width: 28, height: 28,
+  width: 32, height: 32,
   display: 'flex', alignItems: 'center', justifyContent: 'center',
   fontSize: 'calc(15px * var(--ui-font-scale))', lineHeight: 1,
   border: 'none', borderRadius: 6,

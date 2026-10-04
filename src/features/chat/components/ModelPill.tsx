@@ -10,7 +10,7 @@
  * 未悬停时胶囊透明无边框，只显示文字与图标；悬停显示背景。
  */
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, type LucideIcon } from 'lucide-react';
+import { iconSizes, ChevronDown, type AppIcon  } from '@ui/icons';
 import { useAiConfigStore, useAgentSettings } from '@features/agent';
 import { modelIcon } from '@features/agent/components/modelIcon';
 import ModelPicker from '@features/chat/components/ModelPicker';
@@ -29,7 +29,7 @@ export default function ModelPill({ showThinking = true }: { showThinking?: bool
   const pillRef = useRef<HTMLDivElement>(null);
   const [lockedWidth, setLockedWidth] = useState<number | null>(null);
 
-  const Icon: LucideIcon = modelIcon(aiCfg.provider, aiCfg.model);
+  const Icon: AppIcon = modelIcon(aiCfg.provider, aiCfg.model);
   const name = aiCfg.models.find((m) => m.id === activeModel)?.name || aiCfg.model || '模型';
   /** 模型名最长 35 字符，超出截断加省略号 */
   const MAX_NAME_LEN = 35;
@@ -53,7 +53,7 @@ export default function ModelPill({ showThinking = true }: { showThinking?: bool
       style={{
         position: 'relative', flexShrink: showThinking ? 0 : 1, minWidth: 0, maxWidth: '100%',
         width: levelOpen && lockedWidth ? lockedWidth : 'fit-content',
-        height: 30, boxSizing: 'border-box',
+        height: 32, boxSizing: 'border-box',
         display: 'flex', alignItems: 'stretch',
         borderRadius: 999,
         overflow: levelOpen ? 'visible' : 'hidden',
@@ -131,7 +131,7 @@ export default function ModelPill({ showThinking = true }: { showThinking?: bool
               cursor: 'pointer',
             }}
           >
-            <Icon size={15} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+            <Icon size={iconSizes.row} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
             <span
               style={{
                 fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 500, color: 'var(--text-primary)',
@@ -162,7 +162,7 @@ export default function ModelPill({ showThinking = true }: { showThinking?: bool
             }}
           >
             <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-secondary)' }}>{levelLabel}</span>
-            <ChevronDown size={11} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+            <ChevronDown size={iconSizes.compact} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           </button></>}
         </>
       )}

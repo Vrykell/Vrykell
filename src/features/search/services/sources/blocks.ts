@@ -1,4 +1,4 @@
-import { SquareTerminal } from 'lucide-react';
+import { SquareTerminal } from '@ui/icons';
 import { registerSource } from '@features/search/services/registry';
 import type { BackendBlockEntry } from '@platform/api/types';
 import type { SearchResult, BlockResultData } from '@features/search/types';

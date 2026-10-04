@@ -1,4 +1,4 @@
-import { ChevronDown, Search } from 'lucide-react';
+import { ChevronDown, Search } from '@ui/icons';
 import { useGlobalSearch } from '@features/search/hooks/useGlobalSearch';
 import FilterPopover from '@features/search/components/FilterPopover';
 import SearchResultCard from '@features/search/components/SearchResultCard';

@@ -12,10 +12,10 @@
  *   └──────────────────────────────────────────────┘
  */
 
-import {
+import { iconSizes,
   ArrowUp, Columns2, GitBranch, Paperclip,
   ShieldAlert, ShieldCheck, ShieldOff, Square, X, Zap,
-} from 'lucide-react';
+ } from '@ui/icons';
 import ContextRing from '@features/chat/components/ContextRing';
 import { useUiStore } from '@features/workspace';
 import { useSessionStore } from '@features/workspace';
@@ -187,13 +187,14 @@ export default function InputEditor({
           }}
         >
           {/* Center the mode toggle against the input; the chat panel locks command mode. */}
-          <span
+          <button type="button" data-subtle disabled={chatOpen} aria-pressed={aiMode}
             style={{
               fontFamily: TERMINAL_FONT_FAMILY,
               fontSize: 'var(--terminal-font-size)',
               fontWeight: 600,
-              minWidth: 16,
-              height: 24,
+              width: 32,
+              height: 32,
+              padding: 0, border: 'none', background: 'transparent', borderRadius: 4,
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -213,8 +214,8 @@ export default function InputEditor({
                   : '切换到 AI 模式'
             }
           >
-            {aiMode ? <Zap size={13} /> : '$'}
-          </span>
+            {aiMode ? <Zap size={iconSizes.control} /> : '$'}
+          </button>
 
           {/* textarea + ghost overlay（绝对定位同字体同内边距，透明已输入 + muted 建议后缀）
               display:flex 让 textarea 成为 flex item，消除 inline-block 基线下方空隙（否则容器比 textarea 高 7px） */}
@@ -278,13 +279,13 @@ export default function InputEditor({
                 onClick={() => abortStream(activeId)}
                 style={{
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
+                  width: 32, height: 32, padding: 0, border: 'none', borderRadius: 4,
                   background: 'transparent', color: 'var(--accent-warm)', cursor: 'pointer', flexShrink: 0,
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--button-hover)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
               >
-                <Square size={11} fill="currentColor" />
+                <Square size={iconSizes.compact} fill="currentColor" />
               </button>
             ) : (
               <button
@@ -294,7 +295,7 @@ export default function InputEditor({
                 disabled={!canSendAi}
                 style={{
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
+                  width: 32, height: 32, padding: 0, border: 'none', borderRadius: 4,
                   background: 'transparent',
                   color: canSendAi ? 'var(--accent-warm)' : 'var(--text-muted)',
                   cursor: canSendAi ? 'pointer' : 'default', flexShrink: 0,
@@ -302,7 +303,7 @@ export default function InputEditor({
                 onMouseEnter={(e) => { if (canSendAi) e.currentTarget.style.background = 'var(--button-hover)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
               >
-                <ArrowUp size={13} />
+                <ArrowUp size={iconSizes.control} />
               </button>
             )}
             </>
@@ -362,10 +363,10 @@ export default function InputEditor({
           {!aiMode && (
             <>
               <InputActionBtn title="选择类型分裂" onClick={() => useUiStore.getState().openSplitPicker()}>
-                <Columns2 size={13} />
+                <Columns2 size={iconSizes.control} />
               </InputActionBtn>
               <InputActionBtn title="关闭当前终端" onClick={() => useSessionStore.getState().closeTerminal(paneId)}>
-                <X size={13} />
+                <X size={iconSizes.control} />
               </InputActionBtn>
             </>
           )}
@@ -383,13 +384,13 @@ export default function InputEditor({
                     onClick={() => setPermMode(next.id)}
                     style={{
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
+                      width: 32, height: 32, padding: 0, border: 'none', borderRadius: 4,
                       background: 'transparent', color: cur.color, cursor: 'pointer',
                     }}
                     onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--button-hover)'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                   >
-                    <CurIcon size={13} />
+                    <CurIcon size={iconSizes.control} />
                   </button>
                 );
               })()}
@@ -399,7 +400,7 @@ export default function InputEditor({
                 onClick={() => void pickFiles()}
                 style={{
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
+                  width: 32, height: 32, padding: 0, border: 'none', borderRadius: 4,
                   background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
                 }}
                 onMouseEnter={(e) => {
@@ -411,7 +412,7 @@ export default function InputEditor({
                   e.currentTarget.style.color = 'var(--text-muted)';
                 }}
               >
-                <Paperclip size={13} />
+                <Paperclip size={iconSizes.control} />
               </button>
             </>
           )}
@@ -435,7 +436,7 @@ function InputActionBtn({ title, onClick, children }: {
       onClick={onClick}
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
+        width: 32, height: 32, padding: 0, border: 'none', borderRadius: 4,
         background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', flexShrink: 0,
       }}
       onMouseEnter={(e) => {

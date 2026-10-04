@@ -1,5 +1,5 @@
 // ── 结果类型枚举 ──
-import type { LucideIcon } from 'lucide-react';
+import type { AppIcon } from '@ui/icons';
 
 export type ResultType = 'history' | 'block' | 'file' | 'setting' | 'action' | 'session';
 
@@ -7,7 +7,7 @@ export type ResultType = 'history' | 'block' | 'file' | 'setting' | 'action' | '
 export interface SearchSource {
   id: ResultType;
   label: string;
-  icon: LucideIcon;
+  icon: AppIcon;
   search: (query: string) => Promise<SearchResult[]>;
 }
 

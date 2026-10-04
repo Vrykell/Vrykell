@@ -1,6 +1,6 @@
 import {
-  Command, History, Monitor, Settings, SquareTerminal, Undo2, type LucideIcon,
-} from 'lucide-react';
+  Command, History, Monitor, Settings, SquareTerminal, Undo2, type AppIcon,
+} from '@ui/icons';
 import { fileIcon } from '@features/files/utils/fileIcon';
 import type {
   SearchResult,
@@ -221,7 +221,7 @@ function RestoreBtn({ onClick }: { onClick: (e: React.MouseEvent) => void }) {
   );
 }
 
-function typeIcon(result: SearchResult): LucideIcon {
+function typeIcon(result: SearchResult): AppIcon {
   switch (result.type) {
     case 'history': return History;
     case 'block': return SquareTerminal;

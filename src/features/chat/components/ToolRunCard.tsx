@@ -23,7 +23,7 @@ import {
   Terminal,
   Wrench,
   X,
-} from 'lucide-react';
+} from '@ui/icons';
 import ToolNode from '@features/chat/components/ToolNode';
 import BlockOutput from '@features/terminal/components/BlockOutput';
 import { useBlockStore } from '@features/terminal';

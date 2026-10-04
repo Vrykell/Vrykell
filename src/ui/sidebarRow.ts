@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { iconSizes } from './icons';
 
 export const sidebarRowSpacing: CSSProperties = { padding: '2px 6px', cursor: 'pointer' };
 export const sidebarRowContent: CSSProperties = {
@@ -7,7 +8,7 @@ export const sidebarRowContent: CSSProperties = {
   transition: 'background 0.12s ease',
 };
 export const sidebarRowIcon: CSSProperties = {
-  width: 18, height: 18, flexShrink: 0,
+  width: iconSizes.row, height: iconSizes.row, flexShrink: 0,
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
 };
 export const sidebarRowTitle: CSSProperties = {

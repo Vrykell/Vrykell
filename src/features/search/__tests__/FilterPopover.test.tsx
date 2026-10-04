@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { Terminal, FileText } from 'lucide-react';
+import { Terminal, FileText } from '@ui/icons';
 import FilterPopover from '@features/search/components/FilterPopover';
 import { registerSource } from '@features/search/services/registry';
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FC } from 'react';
-import { X } from 'lucide-react';
+import { iconSizes, X  } from '@ui/icons';
 import { useDockStore, PANEL_DEFS, MIN_PANEL_WIDTH, type DockSide } from '@features/workspace';
 import { selectActiveSessionTab, useSessionStore } from '@features/workspace';
 import ResizeHandle from '@ui/ResizeHandle';
@@ -107,7 +107,7 @@ function SinglePanel({ side, panelId, visible }: { side: DockSide; panelId: stri
         <div className="workspace-panel-heading">
           <span>{panelId === 'chat' ? 'AI 助手' : def.label}</span>
           <button data-subtle className="workspace-panel-close" aria-label={`关闭${panelId === 'chat' ? 'AI 助手' : def.label}面板`}
-            onClick={() => useDockStore.getState().togglePanel(side, panelId)}><X size={14} /></button>
+            onClick={() => useDockStore.getState().togglePanel(side, panelId)}><X size={iconSizes.control} /></button>
         </div>
         <div style={{ flex: 1, minHeight: 0 }}>
           <PanelContent />

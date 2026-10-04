@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
+import { iconSizes,
   History, Plus, Search, Server, Settings, SquareTerminal,
-  ChevronRight, Pencil, Archive, Folder, Trash2,
-} from 'lucide-react';
+  ChevronRight, Pencil, Archive, Folder, Trash2, X,
+ } from '@ui/icons';
 import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, type Tab, type TabGroup } from '@features/workspace';
 import { regenerateTitle } from '@features/agent/services/title';
 import { useToastStore } from '@ui/Toast';
@@ -206,7 +206,7 @@ export default function PanelTabs() {
           background: 'var(--chrome-field)',
           borderRadius: 'var(--radius-inner)', padding: '0 8px', height: 30,
         }}>
-          <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+          <Search size={iconSizes.compact} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -219,10 +219,10 @@ export default function PanelTabs() {
           />
         </div>
         <IconBtn title="会话历史" data-testid="tab-history-btn" onClick={openHistoryTab}>
-          <History size={14} />
+          <History size={iconSizes.control} />
         </IconBtn>
         <IconBtn title="新建终端" data-testid="tab-new-btn" onClick={() => { setModalGroupId(activeGroupId); setModalOpen(true); }}>
-          <Plus size={14} />
+          <Plus size={iconSizes.control} />
         </IconBtn>
       </div>
 
@@ -393,7 +393,7 @@ function GroupSection(props: {
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             background: 'var(--hover)', color: 'var(--text-secondary)',
           }}>
-            <Folder size={14} />
+            <Folder size={iconSizes.row} />
           </span>
           {props.renamingGroupId === group.id ? (
             <input
@@ -433,7 +433,7 @@ function GroupSection(props: {
             onDelete={props.onDeleteGroup}
           />
           <ChevronRight
-            size={13}
+            size={iconSizes.compact}
             style={{
               color: 'var(--text-muted)', flexShrink: 0,
               transition: 'transform 0.12s ease', transform: collapsed ? 'none' : 'rotate(90deg)',
@@ -486,21 +486,21 @@ function GroupActions({ onAdd, onRename, onDelete, empty }: {
         style={actionStyle}
         onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}>
-        <Plus size={12} />
+        <Plus size={iconSizes.compact} />
       </button>
       <button data-subtle data-no-drag title="重命名分组"
         onClick={(e) => { e.stopPropagation(); onRename(); }}
         style={actionStyle}
         onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}>
-        <Pencil size={12} />
+        <Pencil size={iconSizes.compact} />
       </button>
       <button data-subtle data-no-drag title={empty ? '删除分组' : '归档分组（移入会话历史）'}
         onClick={(e) => { e.stopPropagation(); onDelete(); }}
         style={actionStyle}
         onMouseEnter={(e) => { e.currentTarget.style.color = empty ? 'var(--error-light)' : 'var(--text-secondary)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}>
-        {empty ? <Trash2 size={12} /> : <Archive size={12} />}
+        {empty ? <Trash2 size={iconSizes.compact} /> : <Archive size={iconSizes.compact} />}
       </button>
     </span>
   );
@@ -508,7 +508,7 @@ function GroupActions({ onAdd, onRename, onDelete, empty }: {
 
 const actionStyle: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-  width: 18, height: 18, padding: 0, border: 'none', borderRadius: 4,
+  width: 28, height: 28, padding: 0, border: 'none', borderRadius: 4,
   background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
 };
 
@@ -572,7 +572,7 @@ function TabRow({
           ...sidebarRowIcon,
           color: iconColor,
         }}>
-          <Icon size={15} />
+          <Icon size={iconSizes.row} />
         </span>
         {editing ? (
           <input
@@ -625,14 +625,15 @@ function TabRow({
             </span>
           </span>
         )}
-        <span
+        <button type="button" data-subtle aria-label="关闭标签" className="sidebar-row-action"
           onClick={(e) => { e.stopPropagation(); onClose(); }}
+          onDoubleClick={(e) => e.stopPropagation()}
           title="关闭标签"
           data-testid={`tab-close-${tab.id}`}
           data-no-drag
           style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: 18, height: 18, fontSize: 'calc(15px * var(--ui-font-scale))', cursor: 'pointer', lineHeight: 1,
+            width: 28, height: 28, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', lineHeight: 1,
             borderRadius: 4, flexShrink: 0,
             color: 'var(--text-muted)',
             opacity: (active || hovered) ? 1 : 0,
@@ -646,7 +647,7 @@ function TabRow({
             (e.currentTarget as HTMLElement).style.background = 'transparent';
             (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)';
           }}
-        >×</span>
+        ><X size={iconSizes.control} /></button>
       </div>
     </div>
   );
@@ -676,7 +677,7 @@ function DragGhost({ type, id, tabs, x, y }: {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       animation: 'dragGhostIn 0.1s ease',
     }}>
-      <Icon size={14} style={{ color }} />
+      <Icon size={iconSizes.row} style={{ color }} />
     </div>
   );
 }

@@ -3,7 +3,7 @@ import ErrorBoundary from '@ui/ErrorBoundary';
 import { I18nProvider } from '@i18n';
 import { ThemeProvider } from '@app/providers/ThemeProvider';
 
-/** 应用基础 Provider 组合，入口文件只负责挂载，不负责组织依赖。 */
+/** Compose application providers so the entry point only mounts the app. */
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <ErrorBoundary>

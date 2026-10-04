@@ -1,4 +1,4 @@
-import { Monitor } from 'lucide-react';
+import { Monitor } from '@ui/icons';
 import { registerSource } from '@features/search/services/registry';
 import type { BackendSessionEntry } from '@platform/api/types';
 import type { SearchResult } from '@features/search/types';

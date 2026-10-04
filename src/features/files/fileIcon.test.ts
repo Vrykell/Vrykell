@@ -3,7 +3,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { fileIcon } from '@features/files/utils/fileIcon';
-import { File, FileArchive, FileCode, FileCog, FileImage, FileText, Folder } from 'lucide-react';
+import { File, FileArchive, FileCode, FileCog, FileImage, FileText, Folder } from '@ui/icons';
 
 describe('fileIcon', () => {
   it('目录恒为 Folder', () => {

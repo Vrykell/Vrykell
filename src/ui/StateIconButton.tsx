@@ -1,9 +1,9 @@
-import type { LucideIcon } from 'lucide-react';
+import { iconSizes, type AppIcon } from '@ui/icons';
 
 export default function StateIconButton({ icon: Icon, on, title, onClick }: {
-  icon: LucideIcon; on: boolean; title: string; onClick: () => void;
+  icon: AppIcon; on: boolean; title: string; onClick: () => void;
 }) {
   return <button type="button" className="state-icon-button" aria-pressed={on} title={title} onClick={onClick}>
-    <Icon size={14} />
+    <Icon size={iconSizes.control} />
   </button>;
 }

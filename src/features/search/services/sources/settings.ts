@@ -1,4 +1,4 @@
-import { Settings } from 'lucide-react';
+import { Settings } from '@ui/icons';
 import { registerSource } from '@features/search/services/registry';
 import { searchSettings } from '@features/settings/services/registry';
 import type { SearchResult, SettingResultData } from '@features/search/types';

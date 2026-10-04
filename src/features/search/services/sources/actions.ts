@@ -1,4 +1,4 @@
-import { Command } from 'lucide-react';
+import { Command } from '@ui/icons';
 import { registerSource } from '@features/search/services/registry';
 import { searchCommands } from '@app/commands';
 import type { SearchResult, ActionResultData } from '@features/search/types';
