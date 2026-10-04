@@ -8,6 +8,7 @@ import {
   type ModelProfile,
 } from '@features/agent';
 import type { ProviderKind } from '@features/agent/services/provider';
+import { baseUrlForProvider } from '@features/agent/services/provider';
 import { detectCapabilities, type ModelCapability } from '@features/agent/model/capabilities';
 import { modelIcon, providerLabel } from '@features/agent/components/modelIcon';
 import Segmented from '@ui/Segmented';
@@ -236,7 +237,7 @@ function ModelListField() {
               <Segmented
                 options={PROVIDERS.map((p) => ({ value: p.id, label: p.label }))}
                 value={m.provider}
-                onChange={(v) => update(m.id, { provider: v })}
+                onChange={(v) => update(m.id, { provider: v, baseUrl: baseUrlForProvider(m.baseUrl, v) })}
               />
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>

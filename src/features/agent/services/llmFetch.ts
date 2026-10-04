@@ -10,6 +10,7 @@
  * 取消语义：AI SDK abort signal / Response.body.cancel() 都会触发
  * llm_abort，Rust 侧用 AbortHandle 取消 reqwest 请求。
  */
+import type { ProviderKind } from './provider';
 import { invoke, Channel } from '@tauri-apps/api/core';
 
 interface LlmStreamEvent {
@@ -39,7 +40,7 @@ function normalizeHeaders(h?: HeadersInit): [string, string][] {
   return Object.entries(h).map(([k, v]) => [k, String(v)] as [string, string]);
 }
 
-export function createProxyFetch(): typeof fetch {
+export function createProxyFetch(provider?: ProviderKind): typeof fetch {
   return (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url =
       typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -101,7 +102,7 @@ export function createProxyFetch(): typeof fetch {
       init.signal.addEventListener('abort', abort, { once: true });
     }
 
-    invoke('llm_stream', { id, req: { url, method, headers, body }, onEvent: channel }).catch(
+    invoke('llm_stream', { id, req: { url, method, headers, body, provider }, onEvent: channel }).catch(
       (e) => {
         console.error('[llmFetch] llm_stream 调用被 Rust 拒绝:', url, e);
         const err = e instanceof Error ? e : new Error(String(e));

@@ -13,26 +13,39 @@ import { createProxyFetch } from '@features/agent/services/llmFetch';
 
 export type ProviderKind = 'openai-compatible' | 'anthropic' | 'gemini';
 
+const DEFAULT_BASE_URLS: Record<ProviderKind, string> = {
+  'openai-compatible': 'https://api.openai.com/v1',
+  anthropic: 'https://api.anthropic.com/v1',
+  gemini: 'https://generativelanguage.googleapis.com/v1beta',
+};
+
+export function baseUrlForProvider(baseUrl: string, provider: ProviderKind): string {
+  const current = baseUrl.trim().replace(/\/+$/, '');
+  return !current || Object.values(DEFAULT_BASE_URLS).includes(current)
+    ? DEFAULT_BASE_URLS[provider] : baseUrl;
+}
+
 export interface ChatModelConfig {
   provider: ProviderKind;
   baseUrl: string;
   model: string;
 }
 
-let proxyFetch: typeof fetch | null = null;
+const proxyFetches = new Map<ProviderKind, typeof fetch>();
 
-function getProxyFetch(): typeof fetch {
-  proxyFetch ??= createProxyFetch();
-  return proxyFetch;
+function getProxyFetch(provider: ProviderKind): typeof fetch {
+  let proxy = proxyFetches.get(provider);
+  if (!proxy) { proxy = createProxyFetch(provider); proxyFetches.set(provider, proxy); }
+  return proxy;
 }
 
 export function createChatModel(cfg: ChatModelConfig) {
-  const fetchImpl = getProxyFetch();
+  const fetchImpl = getProxyFetch(cfg.provider);
   switch (cfg.provider) {
     case 'anthropic':
-      return createAnthropic({ apiKey: 'proxy-managed', fetch: fetchImpl })(cfg.model);
+      return createAnthropic({ baseURL: cfg.baseUrl, apiKey: 'proxy-managed', fetch: fetchImpl })(cfg.model);
     case 'gemini':
-      return createGoogleGenerativeAI({ apiKey: 'proxy-managed', fetch: fetchImpl })(cfg.model);
+      return createGoogleGenerativeAI({ baseURL: cfg.baseUrl, apiKey: 'proxy-managed', fetch: fetchImpl })(cfg.model);
     default:
       return createOpenAICompatible({
         name: 'vrykell',
@@ -52,7 +65,7 @@ export function createChatModel(cfg: ChatModelConfig) {
 export function createNativeWebSearchTool(
   provider: ProviderKind,
 ): { name: string; tool: Tool } | null {
-  const fetchImpl = getProxyFetch();
+  const fetchImpl = getProxyFetch(provider);
   switch (provider) {
     case 'anthropic':
       return {

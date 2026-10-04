@@ -2,8 +2,9 @@
  * provider — 思考强度映射与模型工厂测试。
  */
 import { describe, it, expect, vi } from 'vitest';
-vi.mock('@features/agent/services/llmFetch', () => ({ createProxyFetch: () => vi.fn() }));
-import { deepThinkProviderOptions, createChatModel } from '@features/agent/services/provider';
+const proxy = vi.hoisted(() => vi.fn<typeof fetch>());
+vi.mock('@features/agent/services/llmFetch', () => ({ createProxyFetch: () => proxy }));
+import { deepThinkProviderOptions, createChatModel, baseUrlForProvider } from '@features/agent/services/provider';
 
 describe('deepThinkProviderOptions', () => {
   it('openai-compatible → reasoning_effort 按档位', () => {
@@ -30,5 +31,25 @@ describe('deepThinkProviderOptions', () => {
       const m = createChatModel({ provider, baseUrl: 'https://x', model: 'm' });
       expect(m).toBeTruthy();
     }
+  });
+});
+
+
+describe('configured provider endpoints', () => {
+  it('updates official defaults when switching providers and preserves custom gateways', () => {
+    expect(baseUrlForProvider('https://api.openai.com/v1/', 'anthropic')).toBe('https://api.anthropic.com/v1');
+    expect(baseUrlForProvider('', 'gemini')).toBe('https://generativelanguage.googleapis.com/v1beta');
+    expect(baseUrlForProvider('https://gateway.example/v1', 'anthropic')).toBe('https://gateway.example/v1');
+  });
+  it.each([
+    ['anthropic', 'https://gateway.example/v1/messages'],
+    ['gemini', 'https://gateway.example/v1/models/m:generateContent'],
+    ['openai-compatible', 'https://gateway.example/v1/chat/completions'],
+  ] as const)('uses the saved base URL for %s', async (provider, expectedUrl) => {
+    proxy.mockClear();
+    proxy.mockRejectedValue(new Error('test transport stopped'));
+    const model = createChatModel({ provider, baseUrl: 'https://gateway.example/v1', model: 'm' });
+    await expect(model.doGenerate({ prompt: [{ role: 'user', content: [{ type: 'text', text: 'hello' }] }] })).rejects.toThrow();
+    expect(String(proxy.mock.calls[0]?.[0])).toBe(expectedUrl);
   });
 });
