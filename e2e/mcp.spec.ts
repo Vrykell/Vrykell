@@ -12,6 +12,23 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('MCP 设置页', () => {
+  test('deleting during an automatic rename waits for the save and removes the renamed server', async ({ page }) => {
+    await page.evaluate(() => {
+      const bridge = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__;
+      const original = bridge.invoke;
+      bridge.invoke = async (command, args) => {
+        if (command === 'mcp_save_server') await new Promise(resolve => setTimeout(resolve, 400));
+        return original(command, args);
+      };
+    });
+    const name = page.getByPlaceholder('服务器名').first();
+    const card = name.locator('xpath=../..');
+    await name.fill('重命名中的服务器');
+    await expect(card.getByRole('status')).toHaveText('保存中…');
+    await card.getByTitle('删除服务器').click();
+    await expect(page.getByPlaceholder('服务器名')).toHaveCount(0);
+    expect(await mcpServers(page)).toEqual([]);
+  });
   test('已保存服务器：连接状态徽标与工具数', async ({ page }) => {
     const nameInput = page.locator('section').getByPlaceholder('服务器名').first();
     await expect(nameInput).toHaveValue('文件系统');
@@ -26,18 +43,16 @@ test.describe('MCP 设置页', () => {
     const nameInputs = page.locator('section').getByPlaceholder('服务器名');
     await expect(nameInputs).toHaveCount(2);
     const draftCard = nameInputs.nth(1).locator('xpath=../..');
-    await draftCard.getByRole('button', { name: '保存' }).click();
+    await nameInputs.nth(1).fill(' ');
     await expect(page.getByText('请填写服务器名')).toBeVisible();
 
     await nameInputs.nth(1).fill('e2e-mcp');
-    await draftCard.getByRole('button', { name: '保存' }).click();
-    await expect(page.getByText('请填写 command 或 url')).toBeVisible();
+    await expect(page.getByText('请填写命令或远程地址')).toBeVisible();
 
     await draftCard.getByPlaceholder('command，如 npx').fill('npx');
     await draftCard.getByPlaceholder('args，空格分隔').fill('-y @scope/server');
     await draftCard.getByPlaceholder(/环境变量/).fill('TOKEN=abc');
-    await draftCard.getByRole('button', { name: '保存' }).click();
-    await expect(page.getByText('已保存')).toBeVisible();
+    await expect.poll(async () => (await mcpOps(page)).filter(op => op.op === 'save' && op.name === 'e2e-mcp').length).toBe(1);
 
     const ops = await mcpOps(page);
     const save = ops.find((o) => o.op === 'save' && o.name === 'e2e-mcp');

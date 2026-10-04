@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Search, ChevronRight, Settings } from 'lucide-react';
+import { iconSizes, Search, ChevronRight, Settings  } from '@ui/icons';
 import { loadConfig, saveConfig, type FileOpenConfig } from '@features/files/services/fileOpen';
 import { refreshAiConfig, setTavilyKey, clearTavilyKey, useAiConfigStore } from '@features/agent';
 import SkillsSettings from '@features/settings/pages/SkillsSettings';
@@ -10,7 +10,7 @@ import {
   usePermissions, clearSessionGrants, TOOL_NAMES,
   type ToolLevel, type ToolName,
 } from '@features/agent';
-import { Field, TemplateListEditor, inputStyle, btnStyle } from '@features/settings/components/ui';
+import { Field, TemplateListEditor, btnStyle } from '@features/settings/components/ui';
 import { AiModelPage } from '@features/settings/pages/aiModelPage';
 import { AiBehaviorPage } from '@features/settings/pages/aiBehaviorPage';
 import { McpPage } from '@features/settings/pages/mcpPage';
@@ -18,6 +18,9 @@ import { TerminalOpenPage } from '@features/settings/pages/terminalOpenPage';
 import { ThemePage } from '@features/settings/pages/themePage';
 import { ShortcutPage } from '@features/settings/pages/shortcutPage';
 import { useSettingsNavigation } from '@features/settings/hooks/useSettingsNavigation';
+import AutoSaveInput from '../components/AutoSaveInput';
+import SaveStatus from '../components/SaveStatus';
+import { SettingsSaveProvider, useSettingsSave } from '../components/SettingsSaveProvider';
 
 /** 权限页工具中文名（与 messageParts 的 TOOL_LABEL 保持同步） */
 const PERM_TOOL_LABEL: Record<ToolName, string> = {
@@ -49,6 +52,11 @@ const PERM_TOOL_LABEL: Record<ToolName, string> = {
  * 左侧分级侧栏（组可展开 + 搜索过滤），右侧为当前设置页（页内含多个相关配置）。
  */
 export default function SettingsView() {
+  return <SettingsSaveProvider><SettingsContent /></SettingsSaveProvider>;
+}
+
+function SettingsContent() {
+  const { save, status, retry } = useSettingsSave();
   const {
     selected,
     setSelected,
@@ -64,16 +72,13 @@ export default function SettingsView() {
   // 文件打开配置（localStorage）
   const [fileCfg, setFileCfg] = useState<FileOpenConfig>(() => loadConfig());
   const updateFileCfg = (patch: Partial<FileOpenConfig>) => {
-    setFileCfg((prev) => {
-      const next = { ...prev, ...patch };
-      saveConfig(next);
-      return next;
-    });
+    const next = { ...loadConfig(), ...patch };
+    if (!saveConfig(next)) throw new Error('配置写入失败');
+    setFileCfg(next);
   };
 
   // AI 配置（Rust 后端；store 镜像供响应式订阅，key 只写不回显）
   const aiCfg = useAiConfigStore();
-  const [tavilyDraft, setTavilyDraft] = useState('');
   const toast = (msg: string, type: 'info' | 'success' | 'error') =>
     useToastStore.getState().addToast(msg, type);
 
@@ -119,30 +124,18 @@ export default function SettingsView() {
                 }}>
                   {aiCfg.hasTavilyKey ? '已配置' : '未配置'}
                 </span>
-                {aiCfg.hasTavilyKey && (
-                  <button
-                    onClick={() => clearTavilyKey().then(() => toast('已清除 Tavily Key', 'success'))}
-                    style={btnStyle}
-                  >
-                    清除
-                  </button>
-                )}
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <input
+                <AutoSaveInput
                   type="password"
-                  value={tavilyDraft}
+                  value=""
                   placeholder={aiCfg.hasTavilyKey ? '输入以覆盖，留空不改动' : '输入 Tavily API Key'}
-                  onChange={(e) => setTavilyDraft(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') commitTavilyKey(); }}
-                  style={inputStyle}
+                  onCommit={key => setTavilyKey(key)}
+                  clearAfterSave
+                  onClear={aiCfg.hasTavilyKey ? async () => { await clearTavilyKey(); toast('已清除 Tavily Key', 'success'); } : undefined}
+                  validate={key => key.trim() ? undefined : '留空不改动'}
+                  style={{ flex: 1 }}
                 />
-                <button
-                  onClick={commitTavilyKey}
-                  style={{ ...btnStyle, background: 'var(--accent)', color: 'var(--accent-text)', border: 'none', flexShrink: 0 }}
-                >
-                  保存
-                </button>
               </div>
             </Field>
           </>
@@ -174,7 +167,7 @@ export default function SettingsView() {
                           ] as const
                         ).map(([v, label]) => ({ value: v, label }))}
                         value={lv}
-                        onChange={(v) => setPermLevel(name, v)}
+                        onChange={(v) => { void save(() => setPermLevel(name, v)); }}
                       />
                     </div>
                   );
@@ -220,15 +213,16 @@ export default function SettingsView() {
         return (
           <>
             <Field title="默认编辑器" description="本地文件双击打开时使用的编辑器命令；缺失时自动降级 vim → nano → vi。">
-              <input
+              <AutoSaveInput
+                key="local-editor"
                 value={fileCfg.defaultEditor}
                 placeholder="vim"
-                onChange={(e) => updateFileCfg({ defaultEditor: e.target.value })}
-                style={inputStyle}
+                onCommit={defaultEditor => updateFileCfg({ defaultEditor })}
               />
             </Field>
             <Field title="按扩展名打开" description="为不同扩展名指定打开命令；{file} 为路径占位符，__system__ 表示用系统默认应用。">
               <TemplateListEditor
+                key="local-templates"
                 value={fileCfg.templates}
                 onChange={(templates) => updateFileCfg({ templates })}
                 placeholder="如 code、__system__"
@@ -241,15 +235,16 @@ export default function SettingsView() {
         return (
           <>
             <Field title="默认编辑器" description="远程文件双击打开时，在 SSH 终端里使用的编辑器命令。">
-              <input
+              <AutoSaveInput
+                key="remote-editor"
                 value={fileCfg.remoteEditor}
                 placeholder="vim"
-                onChange={(e) => updateFileCfg({ remoteEditor: e.target.value })}
-                style={inputStyle}
+                onCommit={remoteEditor => updateFileCfg({ remoteEditor })}
               />
             </Field>
             <Field title="按扩展名打开" description="为远程不同扩展名指定打开命令；{file} 为路径占位符。">
               <TemplateListEditor
+                key="remote-templates"
                 value={fileCfg.remoteTemplates}
                 onChange={(remoteTemplates) => updateFileCfg({ remoteTemplates })}
                 placeholder="如 nvim、less"
@@ -269,14 +264,6 @@ export default function SettingsView() {
     }
   };
 
-  function commitTavilyKey() {
-    const k = tavilyDraft.trim();
-    if (!k) return;
-    setTavilyKey(k)
-      .then(() => { setTavilyDraft(''); toast('已保存 Tavily Key', 'success'); })
-      .catch((e) => toast(String((e as Error)?.message ?? e), 'error'));
-  }
-
   return (
     <div className="settings-view" style={{
       flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row',
@@ -293,7 +280,7 @@ export default function SettingsView() {
             padding: '6px 8px',
             borderRadius: 'var(--radius-inner)', background: 'var(--block)',
           }}>
-            <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+            <Search size={iconSizes.compact} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -322,10 +309,10 @@ export default function SettingsView() {
                   }}
                 >
                   <ChevronRight
-                    size={12}
+                    size={iconSizes.compact}
                     style={{ color: 'var(--text-muted)', transition: 'transform 0.12s ease', transform: open ? 'rotate(90deg)' : 'none' }}
                   />
-                  <Icon size={13} style={{ color: 'var(--text-muted)' }} />
+                  <Icon size={iconSizes.control} style={{ color: 'var(--text-muted)' }} />
                   {g.label}
                 </button>
                 {open && g.items.map((it) => (
@@ -361,10 +348,14 @@ export default function SettingsView() {
           display: 'flex', alignItems: 'center', gap: 8,
           marginBottom: 24,
         }}>
-          <Settings size={15} style={{ color: 'var(--text-muted)' }} />
+          <Settings size={iconSizes.row} style={{ color: 'var(--text-muted)' }} />
           <span style={{ fontSize: 'var(--fs-title)', fontWeight: 600, color: 'var(--text-primary)' }}>{activeLabel}</span>
         </div>
         <div className="settings-page-body">
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, marginBottom: 16, fontSize: 'var(--fs-caption)', color: 'var(--text-muted)' }}>
+            <span>选择项立即保存，文本停止输入后自动保存。</span>
+            <SaveStatus status={status} onRetry={retry} />
+          </div>
           {renderPage()}
         </div>
       </section>

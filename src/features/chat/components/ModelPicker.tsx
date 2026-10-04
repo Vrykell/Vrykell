@@ -10,7 +10,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Bot, BrainCircuit, ChevronDown, Eye, Globe, Search, SlidersHorizontal, Wrench, X } from 'lucide-react';
+import { iconSizes, Bot, BrainCircuit, ChevronDown, Eye, Globe, Search, SlidersHorizontal, Wrench, X  } from '@ui/icons';
 import { useAiConfigStore, setActiveModel, type ModelProfile, useAgentSettings } from '@features/agent';
 import {
   CAPABILITY_LABELS, detectCapabilities, hasCapability,
@@ -18,6 +18,7 @@ import {
 } from '@features/agent/model/capabilities';
 import { modelIcon, providerLabel } from '@features/agent/components/modelIcon';
 import { useToastStore } from '@ui/Toast';
+import Select from '@ui/Select';
 
 const CAP_ORDER: ModelCapability[] = ['vision', 'reasoning', 'tools', 'search'];
 
@@ -62,23 +63,16 @@ function ItemControls({ profile }: { profile: ModelProfile }) {
       onClick={(e) => e.stopPropagation()}
       title="思考强度"
     >
-      <SlidersHorizontal size={12} style={{ color: 'var(--text-muted)' }} />
-      <select
-        data-testid={`think-level-${profile.id}`}
+      <SlidersHorizontal size={iconSizes.compact} style={{ color: 'var(--text-muted)' }} />
+      <Select<'low' | 'medium' | 'high'>
+        aria-label={`${profile.name || profile.model}的思考强度`}
         value={eff.thinkingLevel}
-        onChange={(e) =>
-          agentSettings.updateModel(profile.id, { thinkingLevel: e.target.value as 'low' | 'medium' | 'high' })
+        onChange={(thinkingLevel) =>
+          agentSettings.updateModel(profile.id, { thinkingLevel })
         }
-        style={{
-          fontSize: 'calc(11px * var(--ui-font-scale))', padding: '3px 6px', background: 'var(--canvas)',
-          border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-primary)',
-          cursor: 'pointer',
-        }}
-      >
-        <option value="low">低</option>
-        <option value="medium">中</option>
-        <option value="high">高</option>
-      </select>
+        options={[{ value: 'low', label: '低' }, { value: 'medium', label: '中' }, { value: 'high', label: '高' }]}
+        style={{ width: 84, background: 'var(--canvas)' }}
+      />
     </div>
   );
 }
@@ -158,14 +152,14 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
               onClick={onClose}
               style={{
                 border: 'none', background: 'transparent', color: 'var(--text-muted)',
-                cursor: 'pointer', padding: 2, display: 'inline-flex',
+                cursor: 'pointer', padding: 0, width: 32, height: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               }}
             >
-              <X size={14} />
+              <X size={iconSizes.control} />
             </button>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderRadius: 8, padding: '6px 10px', background: 'var(--canvas)' }}>
-            <Search size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+            <Search size={iconSizes.control} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
             <input
               autoFocus
               value={query}
@@ -193,7 +187,7 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
                   display: 'inline-flex', alignItems: 'center', gap: 5,
                 }}
               >
-                <TagIcon size={11} />
+                <TagIcon size={iconSizes.compact} />
                 {CAPABILITY_LABELS[cap]}
               </button>
             );
@@ -237,7 +231,7 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
                     color: active ? 'var(--text-primary)' : 'var(--text-muted)',
                   }}
                 >
-                  <Icon size={15} />
+                  <Icon size={iconSizes.row} />
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -292,10 +286,10 @@ export function ModelScopeBar({
       >
         {cur?.provider && cur.model ? (() => {
           const Icon = modelIcon(cur.provider, cur.model);
-          return <Icon size={13} style={{ color: 'var(--text-secondary)' }} />;
-        })() : <Bot size={13} style={{ color: 'var(--text-muted)' }} />}
+          return <Icon size={iconSizes.control} style={{ color: 'var(--text-secondary)' }} />;
+        })() : <Bot size={iconSizes.control} style={{ color: 'var(--text-muted)' }} />}
         {cur?.label ?? '全局默认'}
-        <ChevronDown size={12} style={{ color: 'var(--text-muted)' }} />
+        <ChevronDown size={iconSizes.compact} style={{ color: 'var(--text-muted)' }} />
       </button>
       {open && (
         <>
@@ -319,7 +313,7 @@ export function ModelScopeBar({
                 color: value === '' ? 'var(--text-primary)' : 'var(--text-secondary)',
               }}
             >
-              <Bot size={13} style={{ color: 'var(--text-muted)' }} />
+              <Bot size={iconSizes.control} style={{ color: 'var(--text-muted)' }} />
               全局默认
             </button>
             {options.map((o) => (
@@ -336,8 +330,8 @@ export function ModelScopeBar({
               >
                 {o.provider && o.model ? (() => {
                   const Icon = modelIcon(o.provider, o.model);
-                  return <Icon size={13} style={{ color: 'var(--text-secondary)' }} />;
-                })() : <Bot size={13} style={{ color: 'var(--text-muted)' }} />}
+                  return <Icon size={iconSizes.control} style={{ color: 'var(--text-secondary)' }} />;
+                })() : <Bot size={iconSizes.control} style={{ color: 'var(--text-muted)' }} />}
                 <span style={{ flex: 1 }}>{o.label}</span>
               </button>
             ))}

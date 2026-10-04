@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
-import type { LucideIcon } from 'lucide-react';
+import type { AppIcon } from '@ui/icons';
 import { getCommands } from '@app/commands';
 import { useSessionStore } from '@features/workspace';
 import { useTerminalStore } from '@features/terminal';
@@ -12,12 +12,14 @@ import type {
   ResultType,
   SearchResult,
   SessionResultData,
+  SettingResultData,
 } from '@features/search/types';
 import { getSources, useEnabledSourcesStore } from '@features/search/services/registry';
 import { useSearchEngine } from '@features/search/hooks/useSearchEngine';
 import { useSearchHistoryStore } from '@features/search/stores/searchHistory';
 import { useSearchHighlightStore } from '@features/search/stores/searchHighlight';
 import * as sessionManager from '@features/workspace/services/sessionManager';
+import { getSettings } from '@features/settings/services/registry';
 
 export interface UseGlobalSearchOptions {
   open: boolean;
@@ -27,7 +29,7 @@ export interface UseGlobalSearchOptions {
 export interface SearchGroup {
   type: ResultType;
   label: string;
-  icon: LucideIcon;
+  icon: AppIcon;
   results: SearchResult[];
 }
 
@@ -125,9 +127,13 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
           setPendingInput(data.path);
           break;
         }
-        case 'setting':
-          useSessionStore.getState().openSettingsTab();
+        case 'setting': {
+          const data = result.data as SettingResultData;
+          const setting = getSettings().find(item => item.id === data.settingId);
+          if (setting) setting.onSelect();
+          else useSessionStore.getState().openSettingsTab();
           break;
+        }
         case 'action': {
           const data = result.data as ActionResultData;
           const command = getCommands().find((item) => item.id === data.commandId);

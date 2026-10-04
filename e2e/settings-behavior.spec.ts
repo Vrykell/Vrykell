@@ -40,7 +40,8 @@ test.describe('模型行为页', () => {
     await page.locator('aside').getByRole('button', { name: '模型配置', exact: true }).click();
     const thinking = page.getByLabel('主力模型的思考设置');
     await thinking.getByRole('switch').click();
-    await thinking.getByRole('combobox', { name: '主力模型的思考强度' }).selectOption('low');
+    await thinking.getByRole('combobox', { name: '主力模型的思考强度' }).click();
+    await page.getByRole('option', { name: '低', exact: true }).click();
     const saved = await settingsJson(page);
     expect(saved).toContain('"thinkingLevel":"low"');
   });
@@ -56,6 +57,7 @@ test.describe('模型行为页', () => {
     const prompt = fieldOf(page, '系统提示词');
     const ta = prompt.locator('textarea');
     await ta.fill('你是 Vrykell 助手。');
+    await expect(ta.locator('xpath=..').getByRole('status')).toHaveText('已保存');
     const saved = await settingsJson(page);
     expect(saved).toContain('你是 Vrykell 助手。');
   });

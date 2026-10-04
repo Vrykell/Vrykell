@@ -88,9 +88,12 @@ test.describe('终端 AI 模式', () => {
     const row = page.getByTestId('model-pick-m-local');
     await expect(row).toBeVisible();
     // 本地模型无推理能力 → 无思考强度下拉；主力模型有
-    await expect(row.locator('select')).toHaveCount(0);
+    await expect(row.getByRole('combobox')).toHaveCount(0);
     const main = page.getByTestId('model-pick-m-main');
-    await main.locator('select').selectOption('low');
+    await main.getByRole('combobox', { name: '主力模型的思考强度' }).click();
+    await page.getByRole('option', { name: '低', exact: true }).click();
+    await expect(main.getByRole('combobox')).toHaveText('低');
+    await expect(page.getByRole('dialog', { name: '选择模型' })).toBeVisible();
     const saved = await page.evaluate(() => localStorage.getItem('vrykell-agent-settings') ?? '');
     expect(saved).toContain('"thinkingLevel":"low"');
     await page.keyboard.press('Escape');

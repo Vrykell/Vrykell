@@ -6,13 +6,14 @@
  */
 
 import { useState } from 'react';
-import { ChevronRight, Download, FileText, Folder, ShieldAlert, Store, Trash2, X } from 'lucide-react';
+import { ChevronRight, Download, FileText, Folder, ShieldAlert, Store, Trash2, X } from '@ui/icons';
 import { fileOpenWith } from '@features/files/services/fs';
 import {
   setSkillState, removeSkill, marketGithubList, marketGithubInstall,
   type SkillMeta, type SkillDetail, type MarketSkill,
 } from '@features/agent/services/skills';
 import { useToastStore } from '@ui/Toast';
+import Select from '@ui/Select';
 import { useSkillsSettings } from '@features/settings/hooks/useSkillsSettings';
 import { useSkillFileBrowser } from '@features/settings/hooks/useSkillFileBrowser';
 import type { FileNode } from '@features/settings/model/skillFileTree';
@@ -26,6 +27,8 @@ const MARKETPLACES: { name: string; repo: string }[] = [
   { name: 'agentskills/agentskills', repo: 'https://github.com/agentskills/agentskills' },
   { name: 'magnus919/agent-skills', repo: 'https://github.com/magnus919/agent-skills' },
 ];
+
+const marketplaceOptions = [{ value: '', label: '自定义…' }, ...MARKETPLACES.map(m => ({ value: m.repo, label: m.name }))];
 
 // ── 样式 ──
 
@@ -244,14 +247,8 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-        <select
-          value={repo}
-          onChange={(e) => setRepo(e.target.value)}
-          style={{ ...input, flexShrink: 0, width: 170, appearance: 'none', cursor: 'pointer' }}
-        >
-          <option value="">自定义…</option>
-          {MARKETPLACES.map((m) => <option key={m.repo} value={m.repo}>{m.name}</option>)}
-        </select>
+        <Select aria-label="技能市场仓库" value={repo} options={marketplaceOptions} onChange={setRepo}
+          placeholder="自定义…" style={{ flexShrink: 0, width: 190 }} />
         <input
           value={repo}
           placeholder="GitHub 仓库 URL，如 https://github.com/anthropics/skills"

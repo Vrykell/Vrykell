@@ -1,15 +1,17 @@
 /**
  * mcpPage — MCP 服务器设置页。
- * 「添加服务器」先生成本地草稿卡片，填好 command/url 再保存落库。
+ * New server drafts are persisted automatically after required fields are valid.
  */
-import { useEffect, useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Plus, X } from '@ui/icons';
 import {
   listMcpServers, saveMcpServer, removeMcpServer, toggleMcpServer,
   connectMcp, disconnectMcp, type McpServer,
 } from '@features/agent/services/mcp';
 import { useToastStore } from '@ui/Toast';
 import { Field, Toggle, inputStyle, btnStyle } from '@features/settings/components/ui';
+import { useAutoSave } from '../hooks/useAutoSave';
+import SaveStatus from '../components/SaveStatus';
 
 function parseEnvLines(text: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -90,9 +92,9 @@ export function McpPage() {
             key={s.name}
             s={s}
             busy={busy === s.name}
-            onConnect={() => connect(s.name)}
-            onDisconnect={() => disconnect(s.name)}
-            onDelete={() => del(s.name)}
+            onConnect={name => { void connect(name ?? s.name); }}
+            onDisconnect={name => { void disconnect(name ?? s.name); }}
+            onDelete={name => { void del(name ?? s.name); }}
             onSaved={refresh}
           />
         ))}
@@ -123,60 +125,39 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
   s?: McpServer;
   draft?: boolean;
   busy: boolean;
-  onConnect: () => void;
-  onDisconnect: () => void;
-  onDelete: () => void;
+  onConnect: (name?: string) => void;
+  onDisconnect: (name?: string) => void;
+  onDelete: (name?: string) => void;
   onSaved: () => void;
   onCancel?: () => void;
 }) {
-  const [name, setName] = useState(s?.name ?? '');
-  const [command, setCommand] = useState(s?.command ?? '');
-  const [args, setArgs] = useState(s ? s.args.join(' ') : '');
-  const [url, setUrl] = useState(s?.url ?? '');
-  const [env, setEnv] = useState(s ? Object.entries(s.env).map(([k, v]) => `${k}=${v}`).join('\n') : '');
-  const [enabled, setEnabled] = useState(s?.enabled ?? true);
-  const toast = (msg: string, type: 'info' | 'success' | 'error') =>
-    useToastStore.getState().addToast(msg, type);
-
-  const save = async () => {
-    if (!name.trim()) {
-      toast('请填写服务器名', 'error');
+  const initial = useMemo(() => ({ name: s?.name ?? '', command: s?.command ?? '', args: s?.args.join(' ') ?? '',
+    url: s?.url ?? '', env: s ? Object.entries(s.env).map(([k, v]) => `${k}=${v}`).join('\n') : '', enabled: s?.enabled ?? true }), [s]);
+  const savedName = useRef(s?.name);
+  const saving = useAutoSave(initial, async next => {
+    const name = next.name.trim();
+    if (s && name === s.name && next.command === initial.command && next.args === initial.args && next.url === initial.url && next.env === initial.env && next.enabled !== s.enabled) {
+      await toggleMcpServer(s.name, next.enabled);
+      onSaved();
       return;
     }
-    if (!command.trim() && !url.trim()) {
-      toast('请填写 command 或 url', 'error');
-      return;
+    if (savedName.current !== name) {
+      const existing = await listMcpServers();
+      if (existing.some(server => server.name === name)) throw new Error('服务器名已存在');
     }
-    try {
-      await saveMcpServer({
-        name: name.trim(),
-        command: command.trim(),
-        args: args.split(/\s+/).filter(Boolean),
-        env: parseEnvLines(env),
-        url: url.trim(),
-        enabled,
-      });
-      toast('已保存', 'success');
-      onSaved();
-    } catch (e) {
-      toast(String((e as Error)?.message ?? e), 'error');
-    }
-  };
-
-  const toggle = async () => {
-    if (!s) return;
-    const next = !enabled;
-    setEnabled(next);
-    try {
-      await toggleMcpServer(s.name, next);
-      onSaved();
-    } catch (e) {
-      toast(String((e as Error)?.message ?? e), 'error');
-    }
-  };
+    await saveMcpServer({ name, command: next.command.trim(), args: next.args.split(/\s+/).filter(Boolean),
+      env: parseEnvLines(next.env), url: next.url.trim(), enabled: next.enabled });
+    if (savedName.current && savedName.current !== name) await removeMcpServer(savedName.current);
+    savedName.current = name;
+    onSaved();
+  }, next => !next.name.trim() ? '请填写服务器名' : !next.command.trim() && !next.url.trim() ? '请填写命令或远程地址' : undefined);
+  const { name, command, args, url, env, enabled } = saving.value;
+  const change = (patch: Partial<typeof initial>, immediate = false) => saving.setValue(previous => ({ ...previous, ...patch }), immediate);
+  const discard = async (operation: () => void) => { await saving.cancel(); operation(); };
 
   return (
     <div
+      onCompositionStart={() => saving.setComposing(true)} onCompositionEnd={() => saving.setComposing(false)}
       style={{
         borderRadius: 'var(--radius-inner)',
         padding: '10px 12px', background: 'var(--canvas)', opacity: enabled ? 1 : 0.6,
@@ -186,7 +167,7 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
         <input
           value={name}
           placeholder="服务器名"
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => change({ name: e.target.value })}
           style={{ ...inputStyle, flex: 1, fontWeight: 600, minWidth: 120 }}
         />
         {s && (
@@ -198,24 +179,22 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
             {s.connected ? `已连接 · ${s.toolCount} 工具` : '未连接'}
           </span>
         )}
-        {s && <Toggle on={enabled} onChange={() => void toggle()} />}
-        <button onClick={() => void save()} disabled={busy} style={{ ...btnStyle, flexShrink: 0 }}>
-          保存
-        </button>
+        {s && <Toggle on={enabled} onChange={enabled => change({ enabled }, true)} />}
+        <SaveStatus status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
         {s && s.connected && (
-          <button onClick={onDisconnect} disabled={busy} style={{ ...btnStyle, flexShrink: 0 }}>断开</button>
+          <button onClick={() => { void saving.flush().then(() => { if (!saving.hasPending()) onDisconnect(savedName.current); }); }} disabled={busy} style={{ ...btnStyle, flexShrink: 0 }}>断开</button>
         )}
         {s && !s.connected && (
-          <button onClick={onConnect} disabled={busy} style={{ ...btnStyle, flexShrink: 0 }}>
+          <button onClick={() => { void saving.flush().then(() => { if (!saving.hasPending()) onConnect(savedName.current); }); }} disabled={busy} style={{ ...btnStyle, flexShrink: 0 }}>
             {busy ? '连接中…' : '连接'}
           </button>
         )}
         {draft && onCancel && (
-          <button onClick={onCancel} style={{ ...btnStyle, flexShrink: 0 }}>取消</button>
+          <button onClick={() => { void discard(onCancel); }} style={{ ...btnStyle, flexShrink: 0 }}>取消</button>
         )}
         {s && (
           <button
-            onClick={onDelete}
+            onClick={() => { void discard(() => onDelete(savedName.current)); }}
             title="删除服务器"
             style={{
               width: 26, height: 26, flexShrink: 0, display: 'inline-flex', alignItems: 'center',
@@ -233,26 +212,26 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
         <input
           value={command}
           placeholder="command，如 npx"
-          onChange={(e) => setCommand(e.target.value)}
+          onChange={(e) => change({ command: e.target.value })}
           style={{ ...inputStyle, flex: 1 }}
         />
         <input
           value={args}
           placeholder="args，空格分隔"
-          onChange={(e) => setArgs(e.target.value)}
+          onChange={(e) => change({ args: e.target.value })}
           style={{ ...inputStyle, flex: 1 }}
         />
       </div>
       <input
         value={url}
         placeholder="远程 URL，可选"
-        onChange={(e) => setUrl(e.target.value)}
+        onChange={(e) => change({ url: e.target.value })}
         style={{ ...inputStyle, marginTop: 8 }}
       />
       <textarea
         value={env}
         placeholder={'环境变量，每行 KEY=VALUE'}
-        onChange={(e) => setEnv(e.target.value)}
+        onChange={(e) => change({ env: e.target.value })}
         rows={3}
         style={{
           ...inputStyle, marginTop: 8, minHeight: 52, resize: 'vertical',

@@ -5,6 +5,7 @@ import Segmented from '@ui/Segmented';
 import { useAgentSettings } from '@features/agent';
 import type { ShellType } from '@platform/shells';
 import { Field } from '@features/settings/components/ui';
+import { useSettingsSave } from '../components/SettingsSaveProvider';
 
 const OPEN_MODE_OPTIONS = (
   [
@@ -25,10 +26,11 @@ export function TerminalOpenPage() {
   const agentSettings = useAgentSettings();
   const openModeByShell = agentSettings.global.openModeByShell;
   const sshOpenMode = agentSettings.global.sshOpenMode;
+  const { save } = useSettingsSave();
   const setShellMode = (shell: ShellType, mode: 'classic' | 'block') =>
-    agentSettings.update({ openModeByShell: { ...openModeByShell, [shell]: mode } });
+    save(() => agentSettings.update({ openModeByShell: { ...openModeByShell, [shell]: mode } }));
   const setSshMode = (mode: 'classic' | 'block') =>
-    agentSettings.update({ sshOpenMode: mode });
+    save(() => agentSettings.update({ sshOpenMode: mode }));
 
   return (
     <>

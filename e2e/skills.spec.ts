@@ -75,7 +75,8 @@ test.describe('技能设置页', () => {
     await page.getByRole('button', { name: /技能市场/ }).click();
     await expect(page.getByText('技能市场', { exact: true }).last()).toBeVisible();
     // 选预置仓库并浏览
-    await page.locator('select').selectOption('anthropics/skills');
+    await page.getByRole('combobox', { name: '技能市场仓库' }).click();
+    await page.getByRole('option', { name: 'anthropics/skills', exact: true }).click();
     await page.getByRole('button', { name: '浏览' }).click();
     await expect(page.getByText('github-skill-1')).toBeVisible({ timeout: 5000 });
     await expect(page.getByText('github-skill-2')).toBeVisible();

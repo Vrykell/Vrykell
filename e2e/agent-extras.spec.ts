@@ -20,8 +20,7 @@ test.describe('记忆设置页', () => {
 
     // 编辑保存
     await ta.fill('新的事实内容');
-    await page.getByRole('button', { name: '保存', exact: true }).click();
-    await expect(page.getByText('已保存')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: /^已保存$/ }).first()).toBeVisible();
     expect(await memoryFact(page)).toBe('新的事实内容');
     expect((await memoryOps(page)).some((o) => o.op === 'set' && o.content === '新的事实内容')).toBe(true);
 
@@ -44,8 +43,7 @@ test.describe('子代理设置页', () => {
     await nameInputs.nth(1).fill('测试代理');
     await page.locator('section').getByPlaceholder(/一句话描述/).nth(1).fill('跑测试');
     await nameInputs.nth(1).press('Tab');
-    await page.getByRole('button', { name: '保存' }).nth(1).click();
-    await expect(page.getByText('已保存')).toBeVisible();
+    await expect(nameInputs.nth(1).locator('xpath=../..').getByRole('status')).toHaveText('已保存');
     expect((await agentOps(page)).some((o) => o.op === 'save' && (o.agent as { name: string }).name === '测试代理')).toBe(true);
 
     // 删除
@@ -68,8 +66,7 @@ test.describe('定时任务设置页', () => {
     await expect(names).toHaveCount(2);
     await names.nth(1).fill('夜间备份');
     await page.locator('section').getByPlaceholder('要执行的提示词').nth(1).fill('执行备份脚本');
-    await page.getByRole('button', { name: '保存' }).nth(1).click();
-    await expect(page.getByText('已保存')).toBeVisible();
+    await expect(names.nth(1).locator('xpath=../..').getByRole('status')).toHaveText('已保存');
     expect((await scheduleOps(page)).some((o) => o.op === 'save' && (o.schedule as { name: string }).name === '夜间备份')).toBe(true);
 
     // 启停

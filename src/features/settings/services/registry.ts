@@ -1,6 +1,15 @@
 import { isApiKeyConfigured, getModel } from '@features/agent/stores/aiConfig';
 import { loadConfig, serializeTemplates } from '@features/files/services/fileOpen';
 import { useSessionStore } from '@features/workspace';
+import { useSettingsNavigationStore } from '../stores/navigation';
+import type { PageId } from '../model/navigation';
+import { terminalDebug } from '@features/terminal/services/terminalDebug';
+
+function openPage(page: PageId) {
+  useSettingsNavigationStore.getState().setSelected(page);
+  useSessionStore.getState().openSettingsTab();
+  terminalDebug('settings-navigation', { page });
+}
 
 /** 设置项定义 — 供全局搜索索引 */
 export interface SettingDef {
@@ -44,7 +53,7 @@ registerSetting({
   label: 'API Key',
   desc: 'AI 服务 API 密钥',
   getValue: () => (isApiKeyConfigured() ? '已配置' : '未配置'),
-  onSelect: () => useSessionStore.getState().openSettingsTab(),
+  onSelect: () => openPage('ai-model'),
 });
 
 registerSetting({
@@ -52,7 +61,7 @@ registerSetting({
   label: '模型 ID',
   desc: 'AI 模型标识符',
   getValue: () => getModel(),
-  onSelect: () => useSessionStore.getState().openSettingsTab(),
+  onSelect: () => openPage('ai-model'),
 });
 
 registerSetting({
@@ -60,7 +69,7 @@ registerSetting({
   label: '主题',
   desc: '深色 / 浅色模式切换',
   getValue: () => (document.documentElement.dataset.theme === 'light' ? '浅色' : '深色'),
-  onSelect: () => useSessionStore.getState().openSettingsTab(),
+  onSelect: () => openPage('appearance-theme'),
 });
 
 registerSetting({
@@ -72,5 +81,5 @@ registerSetting({
     const tpl = serializeTemplates(cfg.templates);
     return tpl ? `${cfg.defaultEditor}（${tpl.replace(/\n/g, '，')}）` : cfg.defaultEditor;
   },
-  onSelect: () => useSessionStore.getState().openSettingsTab(),
+  onSelect: () => openPage('editor-local'),
 });

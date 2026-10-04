@@ -1,8 +1,24 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useSettingsNavigation } from '@features/settings/hooks/useSettingsNavigation';
+import { useSettingsNavigationStore } from '../stores/navigation';
+import { getSettings } from '../services/registry';
+import { useSessionStore } from '@features/workspace';
 
 describe('useSettingsNavigation', () => {
+  beforeEach(() => useSettingsNavigationStore.setState({ selected: 'ai-model' }));
+  afterEach(() => vi.restoreAllMocks());
+
+  it('opens the indexed page before mounting and updates an existing settings view', () => {
+    const open = vi.spyOn(useSessionStore.getState(), 'openSettingsTab').mockImplementation(() => {});
+    getSettings().find(setting => setting.id === 'theme')!.onSelect();
+    const { result } = renderHook(() => useSettingsNavigation());
+    expect(result.current.selected).toBe('appearance-theme');
+    act(() => getSettings().find(setting => setting.id === 'file-open')!.onSelect());
+    expect(result.current.selected).toBe('editor-local');
+    expect(open).toHaveBeenCalledTimes(2);
+    open.mockRestore();
+  });
   it('filters groups by label and keyword and expands them while searching', () => {
     const { result } = renderHook(() => useSettingsNavigation());
 
