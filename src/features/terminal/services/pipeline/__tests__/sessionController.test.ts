@@ -87,6 +87,23 @@ describe('SessionController', () => {
     expect(b.command).toBe('echo hi');
   });
 
+  it('keeps authentication and prompt repaint out of a command with its own screen origin', async () => {
+    const { ctrl, feed } = wire();
+    feed("user@server's password: ");
+    feed(`${A}user@server's password: \r\n\x1b[9;1Hls\r\n${E('ls')}${C}\x1b[H\x1b[2Jfile.txt\r\n${D(0)}`);
+    await waitFor(() => ctrl.blocks[0]?.outputText === 'file.txt');
+    expect(ctrl.blocks[0]!.outputText).not.toContain('password');
+    expect(ctrl.blocks[0]!.outputHtml).not.toContain('password');
+  });
+
+  it('starts PowerShell table output at the command origin after line-editor repainting', async () => {
+    const { ctrl, feed } = wire();
+    feed(`${A}PS> \r\n\x1b[9;1Hls\r\n${E('ls')}${C}\x1b[H\x1b[2JMode  Name\r\nd---  Documents\r\n${D(0)}`);
+    await waitFor(() => ctrl.blocks[0]?.outputText?.includes('Documents') === true);
+    expect(ctrl.blocks[0]!.outputText).toBe('Mode  Name\nd---  Documents');
+    expect(ctrl.blocks[0]!.outputHtml).not.toContain('PS&gt;');
+  });
+
   it('无 D 直接 A → 上个 block 标记 interrupted', () => {
     const { ctrl, feed } = wire();
     feed(`${A}p$ ${E('sleep 99')}${C}`);
@@ -115,6 +132,13 @@ describe('SessionController', () => {
     feed(`${A}${OSC7('/Users/w/work')}`);
     expect(st.cwds).toEqual(['/Users/w/work']);
     expect(ctrl.blocks[0]!.cwd).toBe('/Users/w/work');
+  });
+
+  it('stores the normalized Windows drive path from OSC 7 in both the sink and block', () => {
+    const { st, ctrl, feed } = wire();
+    feed(`${A}${OSC7('/C:/Users/My Project')}`);
+    expect(st.cwds).toEqual(['C:/Users/My Project']);
+    expect(ctrl.blocks[0]!.cwd).toBe('C:/Users/My Project');
   });
 
   it('OSC 7 在 133;A 之前到达（真实 RC 顺序）：cwd 播种到新 pending block', () => {
@@ -229,8 +253,18 @@ describe('SessionController', () => {
       };
       check();
     });
-    expect(ctrl.blocks[0]!.linesTruncated).toBeGreaterThan(0);
+    expect(ctrl.blocks[0]!.linesTruncated).toBe(977);
   }, 30000);
+
+  it('keeps output beyond the viewport without reporting it as truncated', async () => {
+    const { st, ctrl, feed } = wire();
+    const lines = Array.from({ length: 100 }, (_, i) => `retained-line-${i}`);
+    feed(`${A}${E('git --help')}${C}${lines.join('\r\n')}\r\n${D(0)}`);
+    await waitFor(() => st.completed.length === 1);
+    expect(ctrl.blocks[0]!.linesTruncated).toBe(0);
+    expect(ctrl.blocks[0]!.outputText).toContain(lines[0]);
+    expect(ctrl.blocks[0]!.outputText).toContain(lines[99]);
+  });
 
   it('finishBlock 触发 enforceBlockCap，旧 block 输出被丢弃', async () => {
     const { st, ctrl, feed } = wire();

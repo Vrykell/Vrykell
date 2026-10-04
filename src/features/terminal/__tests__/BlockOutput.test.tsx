@@ -288,6 +288,16 @@ describe('plainText HTML 转义', () => {
 // ═══════════════════════════════════════════
 
 describe('BlockOutput 组件', () => {
+  it('preserves terminal grid rows and allows wide historical output to scroll', () => {
+    const { container } = render(<BlockOutput isHtml text={'mode    length    name<br>-a--    128       file.txt'} maxHeight={120} />);
+    const output = container.querySelector<HTMLElement>('[data-selectable]')!;
+    expect(output.style.whiteSpace).toBe('pre');
+    expect(output.style.wordBreak).toBe('normal');
+    expect(output.style.overflowX).toBe('auto');
+    expect(output.style.overflowY).toBe('auto');
+    expect(output.querySelectorAll('br')).toHaveLength(1);
+    expect(output.textContent).toContain('128       file.txt');
+  });
   it('渲染纯文本', () => {
     const { container } = render(<BlockOutput text="hello: world" />);
     expect(container.innerHTML).toContain('hello');

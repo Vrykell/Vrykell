@@ -1,6 +1,37 @@
 import { test, expect } from '@playwright/test';
 import { setupTauriMock, emitPtyOutput, ptyResizes } from './tauri-mock';
 
+test('maximized command output uses the available columns without a fixed 80-column limit', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
+  await page.getByRole('button', { name: '关闭标签面板' }).click();
+  await page.setViewportSize({ width: 1550, height: 1000 });
+  await expect.poll(async () => (await ptyResizes(page)).at(-1)?.cols ?? 0).toBeGreaterThan(160);
+  const cols = (await ptyResizes(page)).at(-1)!.cols;
+  const line = 'wide-output-start ' + 'x'.repeat(cols - 38) + ' wide-output-end';
+  await emitPtyOutput(page, `\x1b]133;E;${btoa('wide-output')}\x07\x1b]133;C\x07${line}\r\n\x1b]133;D;0\x07`);
+  const output = page.locator('[data-testid^="command-block-"] [data-selectable]').last();
+  await expect(output).toContainText(line);
+  expect(await output.locator(':scope > div').innerHTML()).not.toContain('<br>');
+  const bounds = await output.evaluate(el => ({ width: el.clientWidth, overflow: el.scrollWidth - el.clientWidth }));
+  expect(bounds.width).toBeGreaterThan(1400);
+  expect(bounds.overflow).toBeLessThanOrEqual(1);
+});
+
+test('output longer than the viewport stays complete without a false truncation notice', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
+  const lines = Array.from({ length: 100 }, (_, i) => `help-line-${i}`);
+  await emitPtyOutput(page, `\x1b]133;E;${btoa('git --help')}\x07\x1b]133;C\x07${lines.join('\r\n')}\r\n\x1b]133;D;0\x07`);
+  const block = page.locator('[data-testid^="command-block-"]').last();
+  await expect(block).toContainText('help-line-99');
+  await expect(block).toContainText('help-line-0');
+  await expect(block).not.toContainText('已截断');
+  expect(await block.locator('[data-selectable] > div').last().evaluate(el => el.innerHTML.split('<br>').length)).toBe(100);
+});
+
 /**
  * 满宽 TUI 输出（box-drawing）在块卡片内的渲染诊断/回归：
  * 快照 HTML 每行已按网格 cols 预分行（<br> 分隔，每行 ≤ cols 字符）。
@@ -18,7 +49,7 @@ interface Diag {
   innerWidth: number;
 }
 
-test('满宽 box-drawing 输出在块内回流折行，不横向滚动', async ({ page }) => {
+test('满宽 box-drawing 输出保持网格行，当前宽度足够时不横向滚动', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   const input = page.getByPlaceholder(/输入命令/);
@@ -92,6 +123,43 @@ test('满宽 box-drawing 输出在块内回流折行，不横向滚动', async (
   // 行高 1.0 下字形 font metrics 有亚像素溢出，scrollHeight 会多计 ~0.1 行；
   // 折行则会差 1 行以上 —— 用容差区分。
   expect(Math.abs(diag.visualLines - diag.gridRows)).toBeLessThan(0.2);
+});
+
+test('opening the assistant preserves completed table rows and allows horizontal scrolling', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
+  await expect.poll(async () => (await ptyResizes(page)).at(-1)?.cols ?? 0).toBeGreaterThan(100);
+  const row = '-a--    2026/10/04    12:30    2048    ' + 'file-name-'.repeat(6);
+  await emitPtyOutput(page, `\x1b]133;E;${btoa('table-output')}\x07\x1b]133;C\x07${row}\r\n${row}\r\n\x1b]133;D;0\x07`);
+  const output = page.locator('[data-testid^="command-block-"] [data-selectable]').last();
+  await expect(output).toContainText('file-name-');
+  const grid = output.locator(':scope > div');
+  const before = await grid.evaluate(el => ({ height: el.clientHeight, text: el.textContent, html: el.innerHTML }));
+  await page.locator('[data-dock-btn="chat"]').click();
+  await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
+  await expect.poll(() => grid.evaluate(el => el.clientHeight)).toBe(before.height);
+  expect(await grid.textContent()).toBe(before.text);
+  expect(await grid.innerHTML()).toBe(before.html);
+  await expect.poll(() => output.evaluate(el => el.scrollWidth - el.clientWidth)).toBeGreaterThan(40);
+  const atEnd = await output.evaluate(el => {
+    el.scrollLeft = el.scrollWidth;
+    return el.scrollLeft;
+  });
+  expect(atEnd).toBeGreaterThan(40);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+});
+
+test('line-editor repaint does not add a prompt or inherited blank rows to command output', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
+  await emitPtyOutput(page, '\x1b]133;A\x07PS> \r\n\x1b[9;1Hls\r\n\x1b]133;E;bHM=\x07\x1b]133;C\x07\x1b[H\x1b[2JMode  Name\r\nd---  Documents\r\n\x1b]133;D;0\x07');
+  const output = page.locator('[data-testid^="command-block-"] [data-selectable]').last();
+  await expect(output).toContainText('Documents');
+  await expect(output).not.toContainText('PS>');
+  const grid = output.locator(':scope > div');
+  expect(await grid.evaluate(el => el.clientHeight)).toBeLessThanOrEqual(34);
 });
 
 test('运行中卡片：PTY/块终端宽度跟随卡片内容宽（右缘不裁剪）', async ({ page }) => {
