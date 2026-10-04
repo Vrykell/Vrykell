@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { Search, Server, Terminal } from 'lucide-react';
+import { Search, Server, Terminal } from '@ui/icons';
 import { getAvailableShells, type ShellOption } from '@platform/shells';
 import {
   buildNewTabOptions,
@@ -8,6 +8,7 @@ import {
   type NewTabOption,
 } from '@features/workspace/model/tabTypes';
 import { useSshStore, ensureSshLoaded } from '@features/ssh';
+import { connectionTarget } from '@features/ssh/services/api';
 import { useSessionStore } from '@features/workspace';
 import type { TerminalSpec } from '@features/workspace/model/windowLayout';
 
@@ -75,14 +76,14 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
         if (onPick) {
           onPick({
             id: '', kind: 'ssh',
-            ssh: { name: conn.name, host: conn.host, user: conn.user, port: conn.port, connectionId: conn.id },
+            ssh: connectionTarget(conn),
           });
           onClose();
           return;
         }
       useSessionStore.getState().addTab({
           kind: 'ssh',
-          ssh: { name: conn.name, host: conn.host, user: conn.user, port: conn.port, connectionId: conn.id },
+          ssh: connectionTarget(conn),
           groupId,
         });
       }

@@ -1,5 +1,5 @@
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::PathBuf;
@@ -105,64 +105,9 @@ fn spawn_shell(cols: u16, rows: u16, cwd: Option<String>) -> Result<TestSession,
     Ok(TestSession { master: pair.master, reader, writer, child })
 }
 
-/// SSH 连接目标（新建 SSH 终端标签页时由前端传入）。
-#[derive(Clone, Deserialize, Debug)]
-pub struct SshTarget {
-    pub host: String,
-    pub user: Option<String>,
-    pub port: Option<u16>,
-    #[serde(rename = "hostKeyType")]
-    pub host_key_type: Option<String>,
-}
-
-/// Keep the CLI on the host key and trust file checked by the connection dialog.
-fn verified_ssh_options(key_type: Option<&str>, known_hosts: &std::path::Path) -> Result<Vec<String>, String> {
-    let path = known_hosts.to_string_lossy().replace('\\', "/");
-    let mut options = vec!["-o".into(), "StrictHostKeyChecking=yes".into(),
-        "-o".into(), format!("UserKnownHostsFile=\"{path}\"")];
-    if let Some(key_type) = key_type {
-        let algorithms = match key_type {
-            "ed25519" => "ssh-ed25519",
-            "rsa" => "rsa-sha2-512,rsa-sha2-256",
-            "ecdsa256" => "ecdsa-sha2-nistp256",
-            "ecdsa384" => "ecdsa-sha2-nistp384",
-            "ecdsa521" => "ecdsa-sha2-nistp521",
-            _ => return Err(format!("不支持的 SSH 主机密钥类型：{key_type}")),
-        };
-        options.extend(["-o".into(), format!("HostKeyAlgorithms={algorithms}")]);
-    }
-    Ok(options)
-}
-
-/// 构造 ssh 命令行参数（不含程序名）。纯函数，便于单测。
-pub fn ssh_args(host: &str, user: Option<&str>, port: Option<u16>) -> Vec<String> {
-    let mut args = Vec::new();
-    if let Some(p) = port {
-        args.push("-p".to_string());
-        args.push(p.to_string());
-    }
-    let target = match user {
-        Some(u) if !u.is_empty() => format!("{u}@{host}"),
-        _ => host.to_string(),
-    };
-    args.push(target);
-    args
-}
-
-/// 校验 SSH 目标主机：host 以 `-` 开头会被 ssh 解析为命令行选项
-/// （如 `-oProxyCommand=…`），必须拒绝，防止参数注入。
-fn validate_ssh_host(host: &str) -> Result<(), String> {
-    if host.is_empty() {
-        return Err("SSH 主机不能为空".to_string());
-    }
-    if host.starts_with('-') {
-        return Err("SSH 主机名不能以 - 开头（会被解析为命令行选项）".to_string());
-    }
-    if host.chars().any(char::is_whitespace) {
-        return Err("SSH 主机名不能包含空白字符".to_string());
-    }
-    Ok(())
-}
+pub use super::ssh_command::SshTarget;
+#[cfg(test)]
+use super::ssh_command::{ssh_args, verified_ssh_options};
 
 /// 按用户选择的 shell / ssh 目标构建启动命令，并注入 OSC 133 shell integration。
 fn build_shell_cmd(
@@ -175,19 +120,8 @@ fn build_shell_cmd(
     //    -t 强制分配 TTY；打开模式为 block 时附加远端注入命令（OSC 133 shell integration，
     //    安全性最高版本，注入失败自动回退经典模式）；classic 则不注入（传统交互）。
     if let Some(target) = ssh {
-        validate_ssh_host(&target.host)?;
-        let mut cmd = CommandBuilder::new("ssh");
-        cmd.arg("-t");
-        let known_hosts = dirs::home_dir().ok_or("无法定位 SSH 信任记录目录")?.join(".ssh").join("known_hosts");
-        for option in verified_ssh_options(target.host_key_type.as_deref(), &known_hosts)? {
-            cmd.arg(option);
-        }
-        for arg in ssh_args(&target.host, target.user.as_deref(), target.port) {
-            cmd.arg(arg);
-        }
-        if open_mode.as_deref() != Some("classic") {
-            cmd.arg(shell_integration::ssh_remote_command());
-        }
+        let remote = (open_mode.as_deref() != Some("classic")).then(shell_integration::ssh_remote_command);
+        let mut cmd = super::ssh_command::build_ssh_command(&target, remote.as_deref())?;
         if let Some(d) = cwd { cmd.cwd(d); }
         return Ok(cmd);
     }

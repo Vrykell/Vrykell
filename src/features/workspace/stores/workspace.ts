@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { SshOptions } from '@core/ssh';
 import { useToastStore } from '@ui/Toast';
 import { t } from '@i18n';
 import * as sessionManager from '@features/workspace/services/sessionManager';
@@ -23,7 +24,7 @@ import {
 export type TabKind = 'session' | 'history' | 'settings';
 
 /** SSH 会话目标（终端类型=ssh 时的专属字段） */
-export interface SshTabTarget {
+export interface SshTabTarget extends SshOptions {
   name: string;
   host: string;
   user?: string;
@@ -214,7 +215,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         kind: 'ssh',
         cwd: o.cwd,
         openMode: useAgentSettings.getState().global.sshOpenMode,
-        ssh: { name: ssh!.name, host: ssh!.host, user: ssh!.user, port: ssh!.port, connectionId: ssh!.connectionId },
+        ssh: { ...ssh! },
       };
       tab = {
         id,

@@ -14,12 +14,13 @@
  */
 
 export type SplitDir = 'row' | 'col'; // row = 左右，col = 上下
+import type { SshOptions } from '@core/ssh';
 
 export interface TerminalSpec {
   id: string;
   kind: 'local' | 'ssh';
   shellType?: string;
-  ssh?: { name: string; host: string; user?: string; port?: number; connectionId?: string };
+  ssh?: SshOptions & { name: string; host: string; user?: string; port?: number; connectionId?: string };
   cwd?: string;
   /** 打开模式：classic = 经典 xterm；block = 块列表视图（SSH 恒 classic） */
   openMode?: 'classic' | 'block';

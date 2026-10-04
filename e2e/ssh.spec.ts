@@ -34,7 +34,7 @@ test.describe('SSH 远程连接管理侧栏', () => {
     const rowStyle = async (selector: string) => page.locator(selector).evaluate(el => {
       const inner = el.firstElementChild!;
       const style = getComputedStyle(inner);
-      return { outerPadding: getComputedStyle(el).padding, padding: style.padding, radius: style.borderRadius, height: inner.getBoundingClientRect().height, background: style.backgroundColor, gap: style.gap, icon: inner.querySelector('svg')?.getAttribute('width') };
+      return { outerPadding: getComputedStyle(el).padding, padding: style.padding, radius: style.borderRadius, height: inner.getBoundingClientRect().height, background: style.backgroundColor, gap: style.gap, icon: inner.querySelector('svg')?.getBoundingClientRect().width };
     });
     const sshStyle = await rowStyle('[data-testid="ssh-row-ssh-1"]');
     await expect(row).toHaveAttribute('title', /root@prod.example.com:22/);

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { SquareStack, Folder, Server, Sparkles, type LucideIcon } from 'lucide-react';
+import { SquareStack, Folder, Server, Sparkles, type AppIcon } from '@ui/icons';
 import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
 import { useWorkspaceStore, isSessionTab } from '@features/workspace/stores/workspace';
 import { minTerminalWidth, MIN_PANE_SIZE } from '@features/workspace/model/windowLayout';
@@ -8,7 +8,7 @@ import { minTerminalWidth, MIN_PANE_SIZE } from '@features/workspace/model/windo
 
 export interface PanelDef {
   id: string;
-  icon: LucideIcon;
+  icon: AppIcon;
   label: string;
   width: number;
 }

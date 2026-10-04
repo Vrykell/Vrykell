@@ -2,6 +2,7 @@ use super::HistoryDb;
 use crate::secret;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
+use crate::terminal::ssh_command::{SshOptions, validate_options, validate_ssh_host};
 
 impl HistoryDb {
     // ── SSH 连接 CRUD ──
@@ -11,7 +12,7 @@ impl HistoryDb {
         let mut stmt = self
             .conn()
             .prepare(
-                "SELECT id, name, host, port, user, password, auth_method, last_opened_at \
+                "SELECT id, name, host, port, user, password, auth_method, last_opened_at, options_json \
                  FROM ssh_connections ORDER BY last_opened_at DESC, name ASC",
             )
             .map_err(|e| e.to_string())?;
@@ -26,7 +27,7 @@ impl HistoryDb {
         let mut conn = self
             .conn()
             .query_row(
-                "SELECT id, name, host, port, user, password, auth_method, last_opened_at \
+                "SELECT id, name, host, port, user, password, auth_method, last_opened_at, options_json \
                  FROM ssh_connections WHERE id = ?1",
                 params![id],
                 |row| map_ssh_connection(row, false),
@@ -47,6 +48,9 @@ impl HistoryDb {
     /// 新增或更新连接。密码为空且连接已存在时保留旧密码（编辑不回显密码）。
     /// 密码不落 SQLite：非空时写入密钥存储（macOS 钥匙串 / 平台回退文件）。
     pub fn save_ssh_connection(&self, conn: &SshConnection) -> Result<(), String> {
+        validate_ssh_host(&conn.host)?;
+        validate_options(&conn.options)?;
+        let options_json = serde_json::to_string(&conn.options).map_err(|e| e.to_string())?;
         if !conn.password.is_empty() {
             secret::set_secret(&conn.id, &conn.password)?;
         } else {
@@ -66,12 +70,12 @@ impl HistoryDb {
         // 库内一律不存明文密码
         self.conn()
             .execute(
-                "INSERT INTO ssh_connections (id, name, host, port, user, password, auth_method, last_opened_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, '', ?6, ?7) \
+                "INSERT INTO ssh_connections (id, name, host, port, user, password, auth_method, last_opened_at, options_json) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, '', ?6, ?7, ?8) \
                  ON CONFLICT(id) DO UPDATE SET \
                    name=excluded.name, host=excluded.host, port=excluded.port, user=excluded.user, \
                    password='', auth_method=excluded.auth_method, \
-                   last_opened_at=excluded.last_opened_at",
+                   last_opened_at=excluded.last_opened_at, options_json=excluded.options_json",
                 params![
                     conn.id,
                     conn.name,
@@ -80,6 +84,7 @@ impl HistoryDb {
                     conn.user,
                     conn.auth_method,
                     conn.last_opened_at.map(|v| v as i64),
+                    options_json,
                 ],
             )
             .map_err(|e| e.to_string())?;
@@ -123,6 +128,8 @@ pub struct SshConnection {
     pub last_opened_at: Option<u64>,
     #[serde(default)]
     pub has_password: bool,
+    #[serde(flatten)]
+    pub options: SshOptions,
 }
 
 fn map_ssh_connection(row: &rusqlite::Row, mask: bool) -> rusqlite::Result<SshConnection> {
@@ -139,5 +146,32 @@ fn map_ssh_connection(row: &rusqlite::Row, mask: bool) -> rusqlite::Result<SshCo
         auth_method: row.get(6)?,
         last_opened_at: row.get::<_, Option<i64>>(7)?.map(|v| v as u64),
         has_password: !password.is_empty() || has_secret,
+        options: serde_json::from_str(&row.get::<_, String>(8)?).map_err(|error| {
+            rusqlite::Error::FromSqlConversionFailure(8, rusqlite::types::Type::Text, Box::new(error))
+        })?,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn advanced_options_survive_save_and_update() {
+        let db = HistoryDb::open_in_memory();
+        let mut conn: SshConnection = serde_json::from_value(serde_json::json!({
+            "id":"options-roundtrip", "name":"测试", "host":"target", "user":"tester",
+            "authMethod":"key", "identityFile":"C:/keys/private", "jumpHost":"user@jump:2222",
+            "serverAliveInterval":45, "shellIntegration":false
+        })).unwrap();
+        db.save_ssh_connection(&conn).unwrap();
+        let saved = serde_json::to_value(db.list_ssh_connections().unwrap().remove(0)).unwrap();
+        assert_eq!(saved["identityFile"], "C:/keys/private");
+        assert_eq!(saved["jumpHost"], "user@jump:2222");
+        assert_eq!(saved["serverAliveInterval"], 45);
+        assert_eq!(saved["shellIntegration"], false);
+        conn.name = "更新".into();
+        db.save_ssh_connection(&conn).unwrap();
+        assert_eq!(serde_json::to_value(db.get_ssh_connection(&conn.id).unwrap()).unwrap()["jumpHost"], "user@jump:2222");
+    }
 }

@@ -122,7 +122,8 @@ fn init_schema(conn: &Connection) -> Result<(), String> {
                 user TEXT NOT NULL DEFAULT '',
                 password TEXT NOT NULL DEFAULT '',
                 auth_method TEXT NOT NULL DEFAULT 'password',
-                last_opened_at INTEGER
+                last_opened_at INTEGER,
+                options_json TEXT NOT NULL DEFAULT '{}'
             );
 
             CREATE TABLE IF NOT EXISTS chat_messages (
@@ -150,7 +151,17 @@ fn init_schema(conn: &Connection) -> Result<(), String> {
         )
         .map_err(|e| e.to_string())?;
 
-    // 新库直接标记当前 schema 版本；旧库（v1 及更早）由 open() 检测后整库删除重建
+    // Preserve existing connections when adding optional connection settings.
+    let has_options = conn.prepare("PRAGMA table_info(ssh_connections)")
+        .map_err(|e| e.to_string())?
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|e| e.to_string())?
+        .any(|column| column.as_deref() == Ok("options_json"));
+    if !has_options {
+        conn.execute_batch("ALTER TABLE ssh_connections ADD COLUMN options_json TEXT NOT NULL DEFAULT '{}';")
+            .map_err(|e| e.to_string())?;
+    }
+    // Keep the existing schema version to avoid resetting compatible databases.
     conn.execute_batch("PRAGMA user_version = 2;")
         .map_err(|e| format!("记录 schema 版本失败：{e}"))?;
     // 索引幂等创建

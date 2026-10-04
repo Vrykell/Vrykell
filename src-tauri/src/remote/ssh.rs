@@ -6,6 +6,7 @@
 //! 终端会话本身仍由前端经 `pty_spawn`（pty.rs）用 `ssh` CLI 拉起（交互式），这里只做非交互式后端操作。
 
 use crate::db::{HistoryState, SshConnection};
+use crate::terminal::ssh_command::SshOptions;
 use base64::Engine;
 use serde::Serialize;
 use ssh2::{CheckResult, HostKeyType, KnownHostFileKind, KnownHostKeyFormat, Session, Sftp};
@@ -50,6 +51,9 @@ fn tcp_handshake(conn: &SshConnection) -> Result<Session, String> {
 
 /// 建立 TCP 连接 + SSH 握手 + 主机密钥校验 + 认证，返回已认证的会话。
 fn connect(conn: &SshConnection) -> Result<Session, String> {
+    if conn.options.jump_host.is_some() {
+        return Err("跳板机连接请使用交互终端；文件管理暂不支持跳板机".into());
+    }
     let user = conn.user.trim();
     // 用户名为空时直接报错，绝不静默默认 root（误留空表单会以 root 登录）
     if user.is_empty() {
@@ -152,6 +156,11 @@ fn host_key_format(t: HostKeyType) -> KnownHostKeyFormat {
 }
 
 fn authenticate(sess: &Session, conn: &SshConnection, user: &str) -> Result<(), String> {
+    if let Some(identity) = &conn.options.identity_file {
+        sess.userauth_pubkey_file(user, None, Path::new(identity), None)
+            .map_err(|e| format!("指定私钥认证失败（加密私钥请在终端输入口令）：{e}"))?;
+        return Ok(());
+    }
     // 密码认证
     if conn.auth_method == "password" && !conn.password.is_empty() {
         sess.userauth_password(user, &conn.password)
@@ -277,6 +286,7 @@ pub async fn ssh_host_key_info(host: String, port: Option<u16>) -> Result<SshHos
         auth_method: "password".to_string(),
         last_opened_at: None,
         has_password: false,
+        options: Default::default(),
     };
     tauri::async_runtime::spawn_blocking(move || {
         let sess = tcp_handshake(&conn)?;
@@ -309,6 +319,7 @@ pub async fn ssh_trust_host_key(host: String, port: Option<u16>, expected_finger
         auth_method: "password".to_string(),
         last_opened_at: None,
         has_password: false,
+        options: Default::default(),
     };
     tauri::async_runtime::spawn_blocking(move || {
         let sess = tcp_handshake(&conn)?;
@@ -325,6 +336,7 @@ pub async fn ssh_test(
     port: Option<u16>,
     user: String,
     password: String,
+    options: Option<SshOptions>,
 ) -> Result<String, String> {
     let conn = SshConnection {
         id: String::new(),
@@ -336,6 +348,7 @@ pub async fn ssh_test(
         auth_method: "password".to_string(),
         last_opened_at: None,
         has_password: false,
+        options: options.unwrap_or_default(),
     };
     tauri::async_runtime::spawn_blocking(move || ssh_test_sync(&conn))
         .await
@@ -641,6 +654,7 @@ mod tests {
             auth_method: "password".into(),
             last_opened_at: None,
             has_password: false,
+        options: Default::default(),
         };
         let res = ssh_list_sync(&conn, None).expect("列出远程 home 失败");
         println!("SFTP 条目数: {}（base={}）", res.entries.len(), res.base);

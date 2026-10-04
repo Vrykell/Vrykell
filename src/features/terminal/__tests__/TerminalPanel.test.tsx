@@ -5,13 +5,17 @@ import { useTerminalStore } from '../stores/terminal';
 import { ptyWrite } from '@platform/pty';
 import TerminalPanel from '../components/TerminalPanel';
 
-const { closeSession } = vi.hoisted(() => ({ closeSession: vi.fn() }));
-vi.mock('../hooks/useTerminalSession', () => ({ useTerminalSession: () => ({ ref: createRef<HTMLDivElement>(), closeSession }) }));
+const { closeSession, reconnect, sessionView } = vi.hoisted(() => ({ closeSession: vi.fn(), reconnect: vi.fn(), sessionView: { status: 'ready', frame: { html: 'Password:', plainText: 'Password:', cols: 80, rows: 24, cursorX: 9, cursorY: 0, cellWidth: 8, cellHeight: 18 } } }));
+vi.mock('../hooks/useTerminalSession', () => ({ useTerminalSession: () => ({ ref: createRef<HTMLDivElement>(), closeSession, reconnect, status: sessionView.status, frame: sessionView.frame }) }));
 vi.mock('@platform/pty', () => ({ ptyWrite: vi.fn().mockResolvedValue(undefined) }));
 afterEach(cleanup);
 beforeEach(() => {
   vi.mocked(ptyWrite).mockClear();
   closeSession.mockReset().mockResolvedValue(undefined);
+  reconnect.mockReset().mockResolvedValue(undefined);
+  sessionView.status = 'ready';
+  sessionView.frame.plainText = 'Password:';
+  sessionView.frame.html = 'Password:';
   useTerminalStore.setState({ sessions: {}, scenes: { p: 'classic' } });
 });
 
@@ -70,5 +74,27 @@ describe('SSH connection input', () => {
     useTerminalStore.setState({ scenes: { p: 'blockList' } });
     render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
     expect(screen.queryByLabelText('SSH 认证响应')).toBeNull();
+  });
+  it('switches to raw keyboard interaction after a password response without waiting for shell markers', () => {
+    useTerminalStore.setState({ sessions: { p: 'session' } });
+    const { rerender } = render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+    const input = screen.getByLabelText('SSH 认证响应');
+    fireEvent.change(input, { target: { value: 'temporary' } });
+    fireEvent.submit(input.closest('form')!);
+    sessionView.frame.plainText = '交互程序 倒计时 30s';
+    sessionView.frame.html = '交互程序 倒计时 30s';
+    rerender(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+    expect(screen.queryByLabelText('SSH 认证响应')).toBeNull();
+    expect(screen.getByRole('textbox', { name: 'SSH 交互终端' })).toBeVisible();
+    expect(screen.getByText('交互程序 倒计时 30s')).toBeVisible();
+  });
+  it('keeps the last screen and offers reconnection after a remote exit', async () => {
+    sessionView.status = 'closed';
+    sessionView.frame.plainText = '连接已关闭';
+    sessionView.frame.html = '连接已关闭';
+    render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+    expect(screen.getByRole('status')).toHaveTextContent('连接已断开');
+    fireEvent.click(screen.getByRole('button', { name: '重新连接' }));
+    await waitFor(() => expect(reconnect).toHaveBeenCalledOnce());
   });
 });

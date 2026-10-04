@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { FsEntry } from '@features/files/services/fs';
+import type { SshOptions } from '@core/ssh';
 
 /**
  * SSH 连接 API —— 存储与 CRUD 均在后端（SQLite），前端只调用命令。
@@ -8,7 +9,7 @@ import type { FsEntry } from '@features/files/services/fs';
 
 export type SshAuthMethod = 'password' | 'key';
 
-export interface SshConnection {
+export interface SshConnection extends SshOptions {
   id: string;
   name: string;
   host: string;
@@ -32,6 +33,11 @@ export interface SshListResponse {
 export function validateSshConnection(c: Partial<SshConnection>): string | null {
   if (!c.name || !c.name.trim()) return '请输入连接名';
   if (!c.host || !c.host.trim()) return '请输入主机 IP 或域名';
+  if (c.host.startsWith('-') || /\s/.test(c.host)) return '主机名不能包含空白或以 - 开头';
+  if (c.user?.startsWith('-') || /\s/.test(c.user ?? '')) return '账户名不能包含空白或以 - 开头';
+  if (c.serverAliveInterval !== undefined && (!Number.isInteger(c.serverAliveInterval) || c.serverAliveInterval < 0 || c.serverAliveInterval > 3600)) return '保活间隔需为 0-3600 秒的整数';
+  if (c.jumpHost && !c.jumpHost.split(',').every(value => /^(?:[\w.-]+@)?(?:\[[0-9a-fA-F:]+\]|[\w.][\w.-]*)(?::[0-9]{1,5})?$/.test(value) && Number(value.match(/:(\d+)$/)?.[1] ?? 22) > 0 && Number(value.match(/:(\d+)$/)?.[1] ?? 22) <= 65535)) return '跳板机格式为 用户@主机:端口，多个跳板机用逗号分隔';
+  if (/[\r\n\0]/.test(c.identityFile ?? '')) return '私钥路径不能包含控制字符';
   if (
     c.port !== undefined &&
     c.port !== null &&
@@ -64,12 +70,14 @@ export function sshTest(target: {
   port?: number;
   user: string;
   password?: string;
-}): Promise<string> {
+} & SshOptions): Promise<string> {
   return invoke('ssh_test', {
     host: target.host,
     port: target.port ?? null,
     user: target.user ?? '',
     password: target.password ?? '',
+    options: { identityFile: target.identityFile, jumpHost: target.jumpHost,
+      serverAliveInterval: target.serverAliveInterval, shellIntegration: target.shellIntegration },
   });
 }
 
@@ -78,6 +86,12 @@ export interface SshHostKeyInfo {
   fingerprint: string;
   known: boolean;
   keyType: string;
+}
+
+export function connectionTarget(conn: SshConnection) {
+  return { name: conn.name, host: conn.host, user: conn.user, port: conn.port, connectionId: conn.id,
+    identityFile: conn.identityFile, jumpHost: conn.jumpHost, serverAliveInterval: conn.serverAliveInterval,
+    shellIntegration: conn.shellIntegration };
 }
 
 export function sshHostKeyInfo(host: string, port?: number): Promise<SshHostKeyInfo> {

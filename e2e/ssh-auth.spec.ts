@@ -16,8 +16,7 @@ async function ipcRecords(page: Page, key: string): Promise<Record<string, unkno
 test('first SSH connection confirms its fingerprint and accepts authentication input', async ({ page }) => {
   await openSsh(page, 'unknown');
   const surface = page.getByTestId('ssh-connection-input');
-  const response = surface.getByLabel('SSH 认证响应');
-  await expect(response).toBeEnabled();
+  await expect(surface).toBeVisible();
   await expect(page.getByTestId('remote-file-Documents')).toBeVisible();
   const dialogs = await ipcRecords(page, '__SSH_DIALOGS__');
   expect(dialogs).toHaveLength(1);
@@ -26,13 +25,19 @@ test('first SSH connection confirms its fingerprint and accepts authentication i
   const sshSpawns = (await ipcRecords(page, '__PTY_SPAWNS__')).filter(s => s.ssh);
   expect(sshSpawns).toHaveLength(1);
   expect(sshSpawns[0]?.ssh).toMatchObject({ hostKeyType: 'ed25519' });
+  // 认证输入跟随远端输出：只有服务端真的索要密码时才出现
   await emitPtyOutput(page, '请输入远端密码：');
   await expect(surface.locator('pre')).toContainText('请输入远端密码：');
+  const response = surface.getByLabel('SSH 认证响应');
+  await expect(response).toBeEnabled();
   await response.fill('test-response');
   await response.press('Enter');
   expect(await ptyWrites(page)).toContain('test-response\r');
-  await expect(response).toHaveValue('');
-  await expect(surface.locator('..').locator('.xterm')).toBeHidden();
+  await expect(response).toHaveCount(0);
+  // 真实 xterm 只负责键盘与解析，界面上保持不可见
+  const xtermHost = surface.locator('div[aria-hidden="true"]').first();
+  await expect(xtermHost).toHaveCSS('opacity', '0');
+  await expect(xtermHost).toHaveCSS('pointer-events', 'none');
   await emitPtyOutput(page, '\r\n\x1b]133;A\x07');
   await expect(surface).toBeHidden();
   await expect(page.getByPlaceholder(/输入命令/).last()).toBeVisible();
@@ -41,6 +46,8 @@ test('first SSH connection confirms its fingerprint and accepts authentication i
 test('canceling authentication closes the PTY and leaves no editable password field', async ({ page }) => {
   await openSsh(page, 'known');
   const surface = page.getByTestId('ssh-connection-input');
+  await expect(surface).toBeVisible();
+  await emitPtyOutput(page, "user@server's password: ");
   const response = surface.getByLabel('SSH 认证响应');
   await expect(response).toBeEnabled();
   await expect(response).toHaveCSS('font-size', '13px');
@@ -53,8 +60,7 @@ test('canceling authentication closes the PTY and leaves no editable password fi
   await surface.getByRole('button', { name: '取消认证' }).click();
   await expect(surface.getByRole('status')).toHaveText('已取消认证，SSH 连接已关闭');
   expect(await ipcRecords(page, '__PTY_CLOSES__')).toContainEqual({ id: 'e2e-session' });
-  await expect(response).toBeDisabled();
-  await expect(response).toHaveValue('');
+  await expect(response).toHaveCount(0);
   expect(await ptyWrites(page)).not.toContain('unsent-secret\r');
   expect(await ptyWrites(page)).not.toContain('\x03');
   await emitPtyOutput(page, 'late password prompt');
@@ -64,10 +70,11 @@ test('canceling authentication closes the PTY and leaves no editable password fi
 test('a logged-in SSH command does not retain the previous password prompt', async ({ page }) => {
   await openSsh(page, 'known');
   const surface = page.getByTestId('ssh-connection-input');
+  await emitPtyOutput(page, "user@server's password: ");
   await expect(surface.getByLabel('SSH 认证响应')).toBeEnabled();
   await emitPtyOutput(page, "user@server's password: \r\n\x1b]133;A\x07user@server's password: \r\nls\r\n\x1b]133;E;bHM=\x07\x1b]133;C\x07\x1b[H\x1b[2Jfile.txt\r\n\x1b]133;D;0\x07\x1b]133;A\x07");
   await expect(surface).toBeHidden();
-  await expect(page.getByLabel('SSH 认证响应')).toBeHidden();
+  await expect(page.getByLabel('SSH 认证响应')).toHaveCount(0);
   await expect(page.getByText('file.txt', { exact: true })).toBeVisible();
   await expect(page.getByText("user@server's password:", { exact: true })).toBeHidden();
 });
@@ -77,7 +84,8 @@ test('canceling host trust does not spawn SSH or record a key', async ({ page })
   await expect(page.getByTestId('ssh-connection-input').locator('pre')).toContainText('已取消 SSH 连接');
   expect(await ipcRecords(page, '__SSH_TRUSTS__')).toEqual([]);
   expect((await ipcRecords(page, '__PTY_SPAWNS__')).filter(s => s.ssh)).toEqual([]);
-  await expect(page.getByLabel('SSH 认证响应')).toBeDisabled();
+  // 未出现密码提示时没有可输入的认证框
+  await expect(page.getByLabel('SSH 认证响应')).toHaveCount(0);
 });
 
 test('changed host keys fail without asking to overwrite trust', async ({ page }) => {
