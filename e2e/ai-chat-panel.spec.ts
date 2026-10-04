@@ -77,36 +77,34 @@ test.describe('AI 对话面板', () => {
     await expect(page.getByText('选择模型', { exact: true })).toHaveCount(0);
   });
 
-  test('模型选择窗口：列表项内快速调整思考强度', async ({ page }) => {
+  test('模型选择窗口：思考强度只在模型配置页调整', async ({ page }) => {
     await boot(page, '好的');
     await page.locator('[data-dock-btn="chat"]').click();
     await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
     await page.getByTitle('切换模型（更多在设置页配置）').click();
     const row = page.getByTestId('model-pick-m-main');
     await expect(row).toBeVisible();
-    // 主力模型（推理能力）有思考强度下拉；切到「低」写模型覆盖
     const select = row.getByTestId('think-level-m-main');
-    await select.selectOption('low');
-    const saved = await page.evaluate(() => localStorage.getItem('vrykell-agent-settings') ?? '');
-    expect(saved).toContain('"thinkingLevel":"low"');
-    // 无推理能力的模型不显示思考强度控件
+    await expect(select).toHaveCount(0);
     await expect(page.getByTestId('model-pick-m-local').locator('select')).toHaveCount(0);
     // 关闭窗口
     await page.keyboard.press('Escape');
     await expect(page.getByText('选择模型', { exact: true })).toHaveCount(0);
   });
 
-  test('深度思考 / Agent 模式开关：切换后写模型覆盖', async ({ page }) => {
+  test('Chat / Agent 模式下拉框：切换后写模型覆盖', async ({ page }) => {
     await boot(page, '好的');
     await page.locator('[data-dock-btn="chat"]').click();
     await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
-    // 关闭 Agent 模式（默认开）
-    await page.getByTitle('Agent 模式（可使用工具）').click();
+    const mode = page.getByRole('button', { name: '对话模式' });
+    await mode.click();
+    await page.getByRole('option', { name: /^Chat 模式/ }).click();
     let saved = await page.evaluate(() => localStorage.getItem('vrykell-agent-settings') ?? '');
     expect(saved).toContain('"agentMode":false');
-    // 开深度思考 → 出现思考强度菜单项
-    await page.getByTitle('深度思考（reasoning effort）').click();
+    await mode.click();
+    await page.getByRole('option', { name: /^Agent 模式/ }).click();
     saved = await page.evaluate(() => localStorage.getItem('vrykell-agent-settings') ?? '');
-    expect(saved).toContain('"deepThink":true');
+    expect(saved).toContain('"agentMode":true');
+    await expect(page.getByTitle('深度思考（reasoning effort）')).toHaveCount(0);
   });
 });

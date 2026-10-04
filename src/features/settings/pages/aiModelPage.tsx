@@ -14,6 +14,7 @@ import { modelIcon, providerLabel } from '@features/agent/components/modelIcon';
 import Segmented from '@ui/Segmented';
 import { useToastStore } from '@ui/Toast';
 import { Field, ModelTextInput, btnStyle, inputStyle } from '@features/settings/components/ui';
+import ModelThinkingSettings from '@features/settings/components/ModelThinkingSettings';
 
 const PROVIDERS: { id: ProviderKind; label: string }[] = [
   { id: 'openai-compatible', label: 'OpenAI 兼容' },
@@ -257,6 +258,7 @@ function ModelListField() {
             <div style={{ marginTop: 8 }}>
               <CapChips profile={m} />
             </div>
+            <ModelThinkingSettings modelId={m.id} name={m.name || m.model} />
           </div>
         ))}
         <button

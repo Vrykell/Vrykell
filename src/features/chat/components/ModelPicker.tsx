@@ -10,7 +10,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Bot, BrainCircuit, Check, ChevronDown, Eye, Globe, Search, SlidersHorizontal, Wrench, X } from 'lucide-react';
+import { Bot, BrainCircuit, ChevronDown, Eye, Globe, Search, SlidersHorizontal, Wrench, X } from 'lucide-react';
 import { useAiConfigStore, setActiveModel, type ModelProfile, useAgentSettings } from '@features/agent';
 import {
   CAPABILITY_LABELS, detectCapabilities, hasCapability,
@@ -85,7 +85,7 @@ function ItemControls({ profile }: { profile: ModelProfile }) {
 
 // ── 模型选择窗口 ──
 
-export default function ModelPicker({ open, onClose }: { open: boolean; onClose: () => void }) {
+export default function ModelPicker({ open, onClose, showThinking = true }: { open: boolean; onClose: () => void; showThinking?: boolean }) {
   const models = useAiConfigStore((s) => s.models);
   const activeModel = useAiConfigStore((s) => s.activeModel);
   const [query, setQuery] = useState('');
@@ -242,7 +242,6 @@ export default function ModelPicker({ open, onClose }: { open: boolean; onClose:
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>{m.name || m.model}</span>
-                    {active && <Check size={12} style={{ color: 'var(--accent)' }} />}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
                     <span style={{ fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)', marginRight: 2 }}>
@@ -253,7 +252,7 @@ export default function ModelPicker({ open, onClose }: { open: boolean; onClose:
                     ))}
                   </div>
                 </div>
-                <ItemControls profile={m} />
+                {showThinking && <ItemControls profile={m} />}
               </div>
             );
           })}
@@ -322,7 +321,6 @@ export function ModelScopeBar({
             >
               <Bot size={13} style={{ color: 'var(--text-muted)' }} />
               全局默认
-              {value === '' && <Check size={12} style={{ color: 'var(--accent)', marginLeft: 'auto' }} />}
             </button>
             {options.map((o) => (
               <button
@@ -341,7 +339,6 @@ export function ModelScopeBar({
                   return <Icon size={13} style={{ color: 'var(--text-secondary)' }} />;
                 })() : <Bot size={13} style={{ color: 'var(--text-muted)' }} />}
                 <span style={{ flex: 1 }}>{o.label}</span>
-                {o.value === value && <Check size={12} style={{ color: 'var(--accent)' }} />}
               </button>
             ))}
           </div>

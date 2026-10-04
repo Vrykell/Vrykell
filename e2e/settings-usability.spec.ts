@@ -26,17 +26,16 @@ test('saved custom Anthropic address is used by the next chat request', async ({
   expect(calls.map(call => call.args.url)).toEqual(calls.map(() => 'https://gateway.example/v1/messages'));
 });
 
-test('font quick settings apply immediately, resize the terminal and persist after reload', async ({ page }) => {
+test('theme page font settings apply globally and are absent from other settings pages', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await expect.poll(async () => (await ptyResizes(page)).length).toBeGreaterThan(0);
   const originalColumns = (await ptyResizes(page)).at(-1)!.cols;
   await gotoSetting(page, '主题');
-  const quick = page.getByLabel('字号快速设置');
-  await quick.getByRole('button', { name: '15', exact: true }).click();
-  await quick.getByRole('button', { name: '增大终端字号' }).click();
-  await quick.getByRole('button', { name: '增大终端字号' }).click();
-  await expect(quick.getByTestId('terminal-font-size')).toHaveText('16px');
+  const fonts = page.getByLabel('字号设置');
+  await fonts.getByRole('combobox', { name: '页面字号' }).selectOption('15');
+  await fonts.getByRole('combobox', { name: '终端字号' }).selectOption('16');
+  await expect(page.locator('.settings-content .lucide-check')).toHaveCount(0);
   await expect(page.locator('aside').getByRole('button', { name: '主题', exact: true })).toHaveCSS('font-size', '15px');
   await page.keyboard.press('Meta+1');
   await expect.poll(async () => (await ptyResizes(page)).at(-1)!.cols).toBeLessThan(originalColumns);
@@ -49,28 +48,61 @@ test('font quick settings apply immediately, resize the terminal and persist aft
   await page.reload();
   await expect(page.getByPlaceholder(/输入命令/)).toHaveCSS('font-size', '16px');
   await gotoSetting(page, '模型配置');
-  await expect(quick.getByRole('button', { name: '15', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await quick.getByRole('button', { name: '恢复默认字号' }).click();
-  await expect(quick.getByTestId('terminal-font-size')).toHaveText('14px');
-  await page.screenshot({ path: test.info().outputPath('settings.png') });
+  await expect(fonts).toHaveCount(0);
+  await page.locator('aside').getByRole('button', { name: '模型行为', exact: true }).click();
+  await expect(fonts).toHaveCount(0);
   await page.locator('aside').getByRole('button', { name: '主题', exact: true }).click();
+  await expect(fonts.getByRole('combobox', { name: '页面字号' })).toHaveValue('15');
+  await expect(fonts.getByRole('combobox', { name: '终端字号' })).toHaveValue('16');
+  await fonts.getByRole('button', { name: '恢复默认字号' }).click();
+  await expect(fonts.getByRole('combobox', { name: '终端字号' })).toHaveValue('14');
+  await page.screenshot({ path: test.info().outputPath('settings.png') });
   await page.getByRole('button', { name: '浅色', exact: true }).click();
   await page.screenshot({ path: test.info().outputPath('settings-light.png') });
 });
 
-test('persistent AI toggles keep a visible checkmark and state after hover and reload', async ({ page }) => {
+test('chat mode dropdown persists per model and replaces the two header toggles', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await page.locator('[data-dock-btn="chat"]').click();
-  const toggle = page.getByTitle('深度思考（reasoning effort）');
-  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
-  await toggle.click();
-  await page.mouse.move(20, 400);
-  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
-  await expect(toggle.locator('.state-icon-check')).toBeVisible();
+  const mode = page.getByRole('button', { name: '对话模式' });
+  await page.mouse.move(0, 0);
+  await expect(mode).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(page.getByTitle('深度思考（reasoning effort）')).toHaveCount(0);
+  await expect(page.getByTestId('pill-level')).toHaveCount(0);
+  const modeBounds = await mode.boundingBox();
+  const modelBounds = await page.getByTestId('pill-name').boundingBox();
+  expect(modeBounds!.x + modeBounds!.width).toBeLessThan(modelBounds!.x);
+  await mode.press('ArrowDown');
+  const menu = page.getByRole('listbox', { name: '选择对话模式' });
+  await expect(menu).toHaveCSS('border-radius', '18px');
+  await expect(menu.getByRole('option').first()).toHaveCSS('border-top-width', '0px');
+  await expect(menu.getByText('对话、解答与探索')).toBeVisible();
+  await expect(menu.getByText('使用工具，执行与完成任务')).toBeVisible();
+  await expect(menu.locator('svg')).toHaveCount(0);
+  const agent = menu.getByRole('option', { name: /^Agent 模式/ });
+  await expect(agent).toBeFocused();
+  await expect(agent).toHaveAttribute('aria-selected', 'true');
+  await agent.press('ArrowUp');
+  await menu.getByRole('option', { name: /^Chat 模式/ }).press('Enter');
+  await expect(menu).toHaveCount(0);
+  await expect(mode).toBeFocused();
+  await page.mouse.move(0, 0);
+  await expect(mode).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await mode.click();
+  await page.mouse.move(0, 0);
+  await page.screenshot({ path: test.info().outputPath('chat-mode-open.png') });
+  await page.getByRole('option', { name: /^Chat 模式/ }).press('Escape');
+  await expect(mode).toHaveText('Chat 模式');
   await page.reload();
-  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
-  await expect(toggle.locator('.state-icon-check')).toBeVisible();
+  await expect(mode).toHaveText('Chat 模式');
+  await page.getByTestId('pill-name').click();
+  await page.getByTestId('model-pick-m-main').click();
+  await expect(mode).toHaveText('Agent 模式');
+  await page.getByTestId('pill-name').click();
+  await page.getByTestId('model-pick-m-local').click();
+  await expect(mode).toHaveText('Chat 模式');
+  await page.screenshot({ path: test.info().outputPath('chat-mode.png') });
 });
 
 test('CMD stored in legacy block mode opens an interactive classic terminal', async ({ page }) => {
