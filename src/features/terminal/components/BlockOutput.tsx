@@ -57,18 +57,18 @@ export default function BlockOutput({ text, maxHeight, highlight, isHtml: isHtml
       data-selectable
       style={{
         maxHeight: maxHeight ? `${maxHeight}px` : undefined,
-        overflow: maxHeight ? 'auto' : undefined,
+        overflowX: 'auto',
+        overflowY: maxHeight ? 'auto' : 'hidden',
+        maxWidth: '100%',
         // 与 xterm.js 实时渲染保持一致的字体参数
         fontFamily: TERMINAL_FONT_FAMILY,
         fontSize: 'var(--terminal-font-size)',
         // Keep snapshot rows tall enough for the glyph bounds used by live xterm.
         lineHeight: 'var(--terminal-row-height)',
         padding: '2px 8px 8px',
-        // 统一回流：不论 isHtml 快照还是纯文本，宽度不足时一律折行。
-        // 快照已按网格 cols 用 <br> 预分行，卡片比网格窄时软换行会撕裂
-        // TUI 框线，但横向滚动更割裂 —— 折行保证内容始终完整可见。
-        whiteSpace: 'pre-wrap',
-        wordBreak: 'break-all',
+        // Terminal snapshots already contain grid row breaks; preserve their columns.
+        whiteSpace: 'pre',
+        wordBreak: 'normal',
       }}
     >
       {/* 内层 div 承载 HTML：React 不允许 children 与 dangerouslySetInnerHTML 并存 */}

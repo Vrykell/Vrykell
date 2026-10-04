@@ -12,6 +12,8 @@ import { createBlockTerm, extractSnapshotFromBuffer } from '@features/terminal/m
 import type { DispatchEvent } from '@core/terminal/events';
 import type { TermBlock, BlockStatus } from '@features/terminal/services/pipeline/termBlock';
 import { isTerminalDebugEnabled, terminalDebug } from '@features/terminal/services/terminalDebug';
+import { workingDirectoryFromUri } from '@features/terminal/services/pipeline/workingDirectory';
+import { trackBufferTruncation, type BufferTruncationTracker } from '@features/terminal/services/pipeline/bufferTruncation';
 
 export type Scene = 'classic' | 'blockList' | 'altScreen';
 
@@ -39,7 +41,7 @@ interface InternalBlock extends TermBlock {
   _pendingCommandEcho: string | null;
   _commandEchoPrefixConsumed: boolean;
   _consumeCommandEchoTerminator: boolean;
-  _prevBaseY: number;
+  _truncationTracker: BufferTruncationTracker | null;
   _commandFromUi: boolean;
   /** 是否由 OSC 133;A 正常创建（用于决定 earlyBuf 是否含提示符行） */
   _fromA: boolean;
@@ -180,7 +182,6 @@ export class SessionController {
       if (ab.outputRaw.length > RAW_CAP * 2) {
         ab.outputRaw = ab.outputRaw.slice(-RAW_CAP);
       }
-      this.trackTruncation(ab);
     } else {
       if (isTerminalDebugEnabled()) {
         terminalDebug('route-data', {
@@ -234,9 +235,8 @@ export class SessionController {
         this.onCommandDone(payload);
         break;
       case '7': {
-        const idx = payload.indexOf('/', 7);
-        if (idx > 0) {
-          const path = payload.slice(idx);
+        const path = workingDirectoryFromUri(payload);
+        if (path !== undefined) {
           this.lastCwd = path;
           // OSC 7 常在 133;A 之前到达（真实 RC 顺序），此刻活跃 block 是刚结束的旧
           // block，不能把新 cwd 记到它头上；只有 pending（当前位置行）才同步更新。
@@ -300,7 +300,7 @@ export class SessionController {
       _pendingCommandEcho: null,
       _commandEchoPrefixConsumed: false,
       _consumeCommandEchoTerminator: false,
-      _prevBaseY: 0,
+      _truncationTracker: null,
       _commandFromUi: false,
       _fromA: fromA,
     };
@@ -345,7 +345,9 @@ export class SessionController {
     const blk = createBlockTerm(this.cols, this.rows);
     ab.outputTerm = blk.term;
     ab.outputEl = blk.el;
-    ab._outputDispose = blk.dispose;
+    const tracker = trackBufferTruncation(blk.term, lines => { ab.linesTruncated += lines; });
+    ab._truncationTracker = tracker;
+    ab._outputDispose = () => { tracker.dispose(); blk.dispose(); };
     if (isTerminalDebugEnabled()) {
       terminalDebug('block-terminal-ready', { tabId: this.tabId, blockId: ab.id, cols: blk.term.cols, rows: blk.term.rows });
     }
@@ -373,7 +375,6 @@ export class SessionController {
       if (rest.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').trim().length > 0) {
         ab.outputTerm!.write(rest);
         ab.outputRaw = rest.slice(-RAW_CAP);
-        this.trackTruncation(ab);
       }
     }
 
@@ -524,7 +525,6 @@ export class SessionController {
     block.endedAt = Date.now();
     const done = () => {
       if (this._disposed) return;
-      this.trackTruncation(block);
       if (block.outputTerm) {
         const snap = extractSnapshotFromBuffer(block.outputTerm.buffer.active, block.outputTerm.cols);
         block.outputHtml = snap.html;
@@ -533,6 +533,7 @@ export class SessionController {
         block.outputTerm = null;
         block.outputEl = null;
         block._outputDispose = null;
+        block._truncationTracker = null;
       }
       this.enforceBlockCap();
       this.sinks.onBlockComplete(block);
@@ -546,16 +547,6 @@ export class SessionController {
       done();
     }
     this.sinks.onBlocksChanged();
-  }
-
-  // ── 截断统计 ──
-
-  private trackTruncation(block: InternalBlock): void {
-    if (!block.outputTerm) return;
-    const baseY = block.outputTerm.buffer.active.baseY;
-    const delta = baseY - block._prevBaseY;
-    if (delta > 0) block.linesTruncated += delta;
-    block._prevBaseY = baseY;
   }
 
   private enforceBlockCap(): void {
@@ -611,7 +602,9 @@ export class SessionController {
     if (rows !== undefined) this.rows = rows;
     const ab = this.activeBlock;
     if (ab?.status === 'executing' && ab.outputTerm) {
+      ab._truncationTracker?.pause();
       ab.outputTerm.resize(cols, this.rows);
+      ab._truncationTracker?.resume();
     }
   }
 
@@ -641,7 +634,7 @@ export class SessionController {
         _pendingCommandEcho: null,
         _commandEchoPrefixConsumed: false,
         _consumeCommandEchoTerminator: false,
-        _prevBaseY: 0,
+        _truncationTracker: null,
         _commandFromUi: false,
         _fromA: false,
       };

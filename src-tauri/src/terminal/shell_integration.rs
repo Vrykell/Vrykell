@@ -31,6 +31,8 @@ __ait_precmd() {
 __ait_preexec() {
   printf '\e]133;E;%s\a' "$(printf %s "$1" | base64 | tr -d '\n')"
   printf '\e]133;C\a'
+  # Each command block starts with an independent terminal screen origin.
+  if [[ "${VRYKELL_BLOCK_MODE:-0}" == "1" ]]; then printf '\e[H\e[2J'; fi
 }
 autoload -Uz add-zsh-hook
 add-zsh-hook precmd __ait_precmd
@@ -72,6 +74,8 @@ __ait_preexec() {
   [[ -n "$__ait_command" ]] || __ait_command="$BASH_COMMAND"
   printf '\e]133;E;%s\a' "$(printf %s "$__ait_command" | base64 | tr -d '\n')"
   printf '\e]133;C\a'
+  # Reset the shared PTY screen so earlier authentication text cannot be repainted.
+  if [[ "${VRYKELL_BLOCK_MODE:-0}" == "1" ]]; then printf '\e[H\e[2J'; fi
 }
 trap '__ait_preexec' DEBUG
 "#;
@@ -91,7 +95,8 @@ function prompt {
     $esc = [char]27; $bel = [char]7
 
     if ($env:VRYKELL_BLOCK_MODE -eq '1') {
-        $promptText = ''
+        # An empty string makes the host fall back to its default prompt.
+        $promptText = ' '
     } else {
         $promptText = "PS $($PWD.Path)> "
     }
@@ -127,19 +132,22 @@ function prompt {
     $promptText
 }
 
-# Enter hook: emit 133;E (command) then 133;C (preexec)
+# Finish line-editor repainting before marking command output as started.
 if (Get-Command Set-PSReadLineKeyHandler -ErrorAction SilentlyContinue) {
     Set-PSReadLineKeyHandler -Key Enter -ScriptBlock {
         $esc = [char]27; $bel = [char]7
         $line = $null; $cursor = $null
         [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
         $trimmed = $line.Trim()
+        [Microsoft.PowerShell.PSConsoleReadLine]::AcceptLine()
         if ($trimmed.Length -gt 0) {
             $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($trimmed))
             Write-VrykellOsc "133;E" $b64
             Write-VrykellOsc "133;C" ""
+            if ($env:VRYKELL_BLOCK_MODE -eq '1') {
+                [Console]::Out.Write([char]27 + '[H' + [char]27 + '[2J')
+            }
         }
-        [Microsoft.PowerShell.PSConsoleReadLine]::AcceptLine()
     }
 }
 
@@ -409,6 +417,17 @@ HISTTIMEFORMAT='%F %T '
     #[cfg(target_os = "windows")]
     #[test]
     fn powershell_emits_osc133_marks() {
+        check_powershell_integration(false);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn powershell_block_mode_does_not_repaint_the_default_prompt() {
+        check_powershell_integration(true);
+    }
+
+    #[cfg(target_os = "windows")]
+    fn check_powershell_integration(block_mode: bool) {
         use std::sync::mpsc;
         use std::time::{Duration, Instant};
 
@@ -423,6 +442,7 @@ HISTTIMEFORMAT='%F %T '
             })
             .unwrap();
         let mut cmd = portable_pty::CommandBuilder::new("powershell");
+        cmd.env("VRYKELL_BLOCK_MODE", if block_mode { "1" } else { "0" });
         cmd.arg("-NoLogo");
         cmd.arg("-NoExit");
         cmd.arg("-File");
@@ -465,7 +485,7 @@ HISTTIMEFORMAT='%F %T '
                 let _ = writer.write_all(b"echo v2psok\r");
                 let _ = writer.flush();
             }
-            if saw_a && saw_c && saw_e {
+            if saw_a && saw_c && saw_e && last_out.matches("\u{1b}]133;A").count() >= 2 {
                 break;
             }
             std::thread::sleep(Duration::from_millis(50));
@@ -477,5 +497,10 @@ HISTTIMEFORMAT='%F %T '
         assert!(saw_a, "未收到 133;A（prompt 未发 precmd）。输出片段：{last_out}");
         assert!(saw_c, "未收到 133;C（Enter 拦截未发 preexec）。输出片段：{last_out}");
         assert!(saw_e, "未收到 133;E（命令文本未发）。输出片段：{last_out}");
+        assert!(last_out.matches("\u{1b}]133;A").count() >= 2, "Command did not finish: {last_out}");
+        if block_mode {
+            assert!(!last_out.contains("PS>"), "Default prompt leaked into block mode: {last_out:?}");
+            assert!(last_out.contains("v2psok"), "Command output missing: {last_out:?}");
+        }
     }
 }
