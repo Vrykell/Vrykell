@@ -3,6 +3,9 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import type { SshConnection } from '@features/ssh/services/api';
 import { useRemoteFileBrowser } from '@features/ssh/hooks/useRemoteFileBrowser';
 import { useRemotePathStore } from '@features/ssh/utils/remotePath';
+import { useTerminalStore } from '@features/terminal';
+import { useSessionStore } from '@features/workspace';
+import { leaf } from '@features/workspace/model/windowLayout';
 
 const sshMocks = vi.hoisted(() => ({
   sshFsList: vi.fn(),
@@ -18,6 +21,8 @@ vi.mock('@platform/pty', () => ({ ptyWrite: vi.fn() }));
 
 describe('useRemoteFileBrowser', () => {
   const pathSnapshot = useRemotePathStore.getState();
+  const terminalSnapshot = useTerminalStore.getState();
+  const workspaceSnapshot = useSessionStore.getState();
   const conn: SshConnection = {
     id: 'ssh-1',
     name: '测试服务器',
@@ -40,6 +45,19 @@ describe('useRemoteFileBrowser', () => {
 
   afterEach(() => {
     useRemotePathStore.setState(pathSnapshot, true);
+    useTerminalStore.setState(terminalSnapshot, true);
+    useSessionStore.setState(workspaceSnapshot, true);
+  });
+
+  it('retries an initially untrusted directory after SSH startup', async () => {
+    useSessionStore.setState({ tabs: [{ id: 'tab', kind: 'session', title: 'ssh', layout: leaf({ id: 'pane', kind: 'ssh', ssh: { name: conn.name, host: conn.host, connectionId: conn.id } }) }], activeId: 'tab' });
+    useTerminalStore.setState({ sessions: {} });
+    sshMocks.sshFsList.mockRejectedValueOnce(new Error('HOST_KEY_UNKNOWN:SHA256:key'));
+    const { result } = renderHook(() => useRemoteFileBrowser(conn));
+    await waitFor(() => expect(result.current.error).toContain('HOST_KEY_UNKNOWN'));
+    act(() => useTerminalStore.setState({ sessions: { pane: 'session' } }));
+    await waitFor(() => expect(result.current.entries[0]?.name).toBe('src'));
+    expect(result.current.error).toBeNull();
   });
 
   it('loads the remote home directory and normalizes the stored base path', async () => {

@@ -15,6 +15,8 @@ use std::path::Path;
 use std::time::Duration;
 use tauri::State;
 
+static KH_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[derive(Clone, Serialize, Debug, PartialEq)]
 pub struct SshFsEntry {
     pub name: String,
@@ -65,7 +67,7 @@ fn connect(conn: &SshConnection) -> Result<Session, String> {
 /// 主机指纹（OpenSSH 风格 SHA256:base64）。
 fn fingerprint_of(sess: &Session) -> String {
     match sess.host_key_hash(ssh2::HashType::Sha256) {
-        Some(hash) => format!("SHA256:{}", base64::engine::general_purpose::STANDARD.encode(hash)),
+        Some(hash) => format!("SHA256:{}", base64::engine::general_purpose::STANDARD_NO_PAD.encode(hash)),
         None => "unknown".to_string(),
     }
 }
@@ -74,7 +76,6 @@ fn fingerprint_of(sess: &Session) -> String {
 /// 返回 `HOST_KEY_UNKNOWN:<指纹>` 要求用户显式确认后再信任（见 ssh_trust_host_key）。
 /// 整个「读-改-写」在进程级锁内串行，避免多个 SSH 连接并发写互相覆盖。
 fn verify_host_key(sess: &Session, host: &str, port: u16) -> Result<(), String> {
-    static KH_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
     let _guard = KH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
 
     let (key, _key_type) = sess.host_key().ok_or("远端未返回主机密钥".to_string())?;
@@ -84,7 +85,8 @@ fn verify_host_key(sess: &Session, host: &str, port: u16) -> Result<(), String> 
         .map(|h| h.join(".ssh").join("known_hosts"))
         .unwrap_or_default();
     if kh_path.exists() {
-        kh.read_file(&kh_path, KnownHostFileKind::OpenSSH).ok();
+        kh.read_file(&kh_path, KnownHostFileKind::OpenSSH)
+            .map_err(|e| format!("读取 SSH 信任记录失败：{e}"))?;
     }
 
     match kh.check_port(host, port, key) {
@@ -96,9 +98,10 @@ fn verify_host_key(sess: &Session, host: &str, port: u16) -> Result<(), String> 
 }
 
 /// 记录主机密钥到 known_hosts（用户显式信任后调用）。
-fn record_host_key(sess: &Session, host: &str, port: u16) -> Result<(), String> {
-    static KH_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+fn record_host_key(sess: &Session, host: &str, port: u16, expected_fingerprint: &str) -> Result<(), String> {
     let _guard = KH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
+    validate_confirmed_fingerprint(&fingerprint_of(sess), expected_fingerprint)?;
 
     let (key, key_type) = sess.host_key().ok_or("远端未返回主机密钥".to_string())?;
     let mut kh = sess.known_hosts().map_err(|e| format!("初始化 known_hosts 失败：{e}"))?;
@@ -107,12 +110,15 @@ fn record_host_key(sess: &Session, host: &str, port: u16) -> Result<(), String> 
         .map(|h| h.join(".ssh").join("known_hosts"))
         .unwrap_or_default();
     if kh_path.exists() {
-        kh.read_file(&kh_path, KnownHostFileKind::OpenSSH).ok();
+        kh.read_file(&kh_path, KnownHostFileKind::OpenSSH)
+            .map_err(|e| format!("读取 SSH 信任记录失败：{e}"))?;
     }
 
-    // 已记录且匹配则无需重复写
-    if matches!(kh.check_port(host, port, key), CheckResult::Match) {
-        return Ok(());
+    match kh.check_port(host, port, key) {
+        CheckResult::Match => return Ok(()),
+        CheckResult::NotFound => {},
+        CheckResult::Mismatch => return Err(format!("主机密钥不匹配，请核对远端主机：{host}")),
+        CheckResult::Failure => return Err(format!("主机密钥校验失败：{host}")),
     }
     let fmt = host_key_format(key_type);
     let kh_host = if port == 22 { host.to_string() } else { format!("[{host}]:{port}") };
@@ -123,6 +129,13 @@ fn record_host_key(sess: &Session, host: &str, port: u16) -> Result<(), String> 
     }
     kh.write_file(&kh_path, KnownHostFileKind::OpenSSH)
         .map_err(|e| format!("写入 known_hosts 失败：{e}"))?;
+    Ok(())
+}
+
+fn validate_confirmed_fingerprint(actual: &str, expected: &str) -> Result<(), String> {
+    if actual == "unknown" || actual.trim_end_matches('=') != expected.trim_end_matches('=') {
+        return Err("主机指纹在确认后发生变化，请重新核对后连接".into());
+    }
     Ok(())
 }
 
@@ -268,9 +281,14 @@ pub async fn ssh_host_key_info(host: String, port: Option<u16>) -> Result<SshHos
     tauri::async_runtime::spawn_blocking(move || {
         let sess = tcp_handshake(&conn)?;
         let (_, key_type) = sess.host_key().ok_or("远端未返回主机密钥".to_string())?;
+        let known = match verify_host_key(&sess, &conn.host, conn.port.unwrap_or(22)) {
+            Ok(()) => true,
+            Err(error) if error.starts_with("HOST_KEY_UNKNOWN:") => false,
+            Err(error) => return Err(error),
+        };
         Ok(SshHostKeyInfo {
             fingerprint: fingerprint_of(&sess),
-            known: host_key_known(&sess, &conn.host, conn.port.unwrap_or(22)),
+            known,
             key_type: format!("{key_type:?}").to_lowercase(),
         })
     })
@@ -280,7 +298,7 @@ pub async fn ssh_host_key_info(host: String, port: Option<u16>) -> Result<SshHos
 
 /// 用户确认指纹后，记录主机密钥到 known_hosts（幂等）。
 #[tauri::command]
-pub async fn ssh_trust_host_key(host: String, port: Option<u16>) -> Result<(), String> {
+pub async fn ssh_trust_host_key(host: String, port: Option<u16>, expected_fingerprint: String) -> Result<(), String> {
     let conn = SshConnection {
         id: String::new(),
         name: String::new(),
@@ -294,27 +312,10 @@ pub async fn ssh_trust_host_key(host: String, port: Option<u16>) -> Result<(), S
     };
     tauri::async_runtime::spawn_blocking(move || {
         let sess = tcp_handshake(&conn)?;
-        record_host_key(&sess, &conn.host, conn.port.unwrap_or(22))
+        record_host_key(&sess, &conn.host, conn.port.unwrap_or(22), &expected_fingerprint)
     })
     .await
     .map_err(|e| e.to_string())?
-}
-
-/// 查询主机密钥是否已记录（不写入）。
-fn host_key_known(sess: &Session, host: &str, port: u16) -> bool {
-    let Some((key, _)) = sess.host_key() else {
-        return false;
-    };
-    let Ok(mut kh) = sess.known_hosts() else {
-        return false;
-    };
-    let kh_path = dirs::home_dir()
-        .map(|h| h.join(".ssh").join("known_hosts"))
-        .unwrap_or_default();
-    if kh_path.exists() {
-        kh.read_file(&kh_path, KnownHostFileKind::OpenSSH).ok();
-    }
-    matches!(kh.check_port(host, port, key), CheckResult::Match)
 }
 
 /// 测试连接（显式参数，供表单在保存前测试）。
@@ -598,6 +599,14 @@ pub async fn ssh_upload(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn trust_requires_the_confirmed_fingerprint() {
+        assert!(validate_confirmed_fingerprint("SHA256:abc", "SHA256:abc").is_ok());
+        assert!(validate_confirmed_fingerprint("SHA256:abc", "SHA256:abc=").is_ok());
+        assert!(validate_confirmed_fingerprint("SHA256:changed", "SHA256:abc").is_err());
+        assert!(validate_confirmed_fingerprint("unknown", "unknown").is_err());
+    }
 
     #[test]
     fn join_path_trims_trailing_slash() {

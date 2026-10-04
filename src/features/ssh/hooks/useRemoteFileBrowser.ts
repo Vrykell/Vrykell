@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { sshFsList, sshDownload, sshRename, sshDelete, sshUpload } from '@features/ssh/services/api';
 import type { SshConnection, SshFsEntry } from '@features/ssh/services/api';
@@ -22,6 +22,8 @@ export type RemoteFileConfirmState =
 
 /** 管理 SSH 文件面板的数据加载和远程文件操作。 */
 export function useRemoteFileBrowser(conn: SshConnection) {
+  const sessionId = useTerminalStore(state => state.sessions[sshPaneIdFor(conn.id) ?? '']);
+  const loadVersion = useRef(0);
   const path = useRemotePathStore((state) => state.path[conn.id] ?? null);
   const setPath = useCallback((nextPath: string | null) => {
     useRemotePathStore.getState().set(conn.id, nextPath);
@@ -40,20 +42,24 @@ export function useRemoteFileBrowser(conn: SshConnection) {
   }, []);
 
   const load = useCallback((currentPath: string | null) => {
+    const version = ++loadVersion.current;
     setLoading(true);
     setError(null);
     sshFsList(conn.id, currentPath ?? undefined)
       .then((response) => {
+        if (version !== loadVersion.current) return;
         setEntries(response.entries);
         if (currentPath === null && response.base) setPath(normalizeRemotePath(response.base));
       })
-      .catch((errorValue) => setError(String((errorValue as Error)?.message ?? errorValue)))
-      .finally(() => setLoading(false));
+      .catch((errorValue) => { if (version === loadVersion.current) setError(String((errorValue as Error)?.message ?? errorValue)); })
+      .finally(() => { if (version === loadVersion.current) setLoading(false); });
   }, [conn.id, setPath]);
 
   useEffect(() => {
     load(path);
-  }, [load, path]);
+    // Retry after host confirmation and PTY startup; the first SFTP request may have been untrusted.
+    return () => { loadVersion.current += 1; };
+  }, [load, path, sessionId]);
 
   const refresh = useCallback(() => load(path), [load, path]);
   const currentDir = path ?? '';

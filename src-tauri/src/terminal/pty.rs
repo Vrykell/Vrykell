@@ -111,6 +111,27 @@ pub struct SshTarget {
     pub host: String,
     pub user: Option<String>,
     pub port: Option<u16>,
+    #[serde(rename = "hostKeyType")]
+    pub host_key_type: Option<String>,
+}
+
+/// Keep the CLI on the host key and trust file checked by the connection dialog.
+fn verified_ssh_options(key_type: Option<&str>, known_hosts: &std::path::Path) -> Result<Vec<String>, String> {
+    let path = known_hosts.to_string_lossy().replace('\\', "/");
+    let mut options = vec!["-o".into(), "StrictHostKeyChecking=yes".into(),
+        "-o".into(), format!("UserKnownHostsFile=\"{path}\"")];
+    if let Some(key_type) = key_type {
+        let algorithms = match key_type {
+            "ed25519" => "ssh-ed25519",
+            "rsa" => "rsa-sha2-512,rsa-sha2-256",
+            "ecdsa256" => "ecdsa-sha2-nistp256",
+            "ecdsa384" => "ecdsa-sha2-nistp384",
+            "ecdsa521" => "ecdsa-sha2-nistp521",
+            _ => return Err(format!("不支持的 SSH 主机密钥类型：{key_type}")),
+        };
+        options.extend(["-o".into(), format!("HostKeyAlgorithms={algorithms}")]);
+    }
+    Ok(options)
 }
 
 /// 构造 ssh 命令行参数（不含程序名）。纯函数，便于单测。
@@ -157,6 +178,10 @@ fn build_shell_cmd(
         validate_ssh_host(&target.host)?;
         let mut cmd = CommandBuilder::new("ssh");
         cmd.arg("-t");
+        let known_hosts = dirs::home_dir().ok_or("无法定位 SSH 信任记录目录")?.join(".ssh").join("known_hosts");
+        for option in verified_ssh_options(target.host_key_type.as_deref(), &known_hosts)? {
+            cmd.arg(option);
+        }
         for arg in ssh_args(&target.host, target.user.as_deref(), target.port) {
             cmd.arg(arg);
         }
@@ -886,6 +911,18 @@ mod tests {
             ssh_args("host", Some("deploy"), None),
             vec!["deploy@host"]
         );
+    }
+
+    #[test]
+    fn ssh_cli_uses_verified_trust_and_algorithm() {
+        let path = std::path::Path::new("C:/Users/Test User/.ssh/known_hosts");
+        let options = verified_ssh_options(Some("ed25519"), path).unwrap();
+        assert!(options.contains(&"StrictHostKeyChecking=yes".into()));
+        assert!(options.contains(&"HostKeyAlgorithms=ssh-ed25519".into()));
+        assert!(options.contains(&"UserKnownHostsFile=\"C:/Users/Test User/.ssh/known_hosts\"".into()));
+        assert!(verified_ssh_options(Some("unknown"), path).is_err());
+        assert!(verified_ssh_options(Some("rsa"), path).unwrap().contains(&"HostKeyAlgorithms=rsa-sha2-512,rsa-sha2-256".into()));
+        assert!(verified_ssh_options(None, path).unwrap().contains(&"StrictHostKeyChecking=yes".into()));
     }
 
     #[test]

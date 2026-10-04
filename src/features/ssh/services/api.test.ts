@@ -13,10 +13,20 @@ import {
   sshFsList,
   sshDownload,
   newSshId,
+  sshHostKeyInfo,
+  sshTrustHostKey,
 } from '@features/ssh/services/api';
 
 describe('sshApi', () => {
   beforeEach(() => invokeMock.mockReset());
+
+  it('passes the confirmed fingerprint when recording host trust', async () => {
+    invokeMock.mockResolvedValue(undefined);
+    await sshHostKeyInfo('server');
+    expect(invokeMock).toHaveBeenCalledWith('ssh_host_key_info', { host: 'server', port: null });
+    await sshTrustHostKey('server', 2222, 'SHA256:confirmed');
+    expect(invokeMock).toHaveBeenCalledWith('ssh_trust_host_key', { host: 'server', port: 2222, expectedFingerprint: 'SHA256:confirmed' });
+  });
 
   it('validateSshConnection 校验名称/主机/端口', () => {
     expect(validateSshConnection({ name: '', host: 'h' })).toBe('请输入连接名');
