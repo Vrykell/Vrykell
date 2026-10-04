@@ -10,7 +10,7 @@
  * 未悬停时胶囊透明无边框，只显示文字与图标；悬停显示背景。
  */
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, type LucideIcon } from 'lucide-react';
+import { ChevronDown, type LucideIcon } from 'lucide-react';
 import { useAiConfigStore, useAgentSettings } from '@features/agent';
 import { modelIcon } from '@features/agent/components/modelIcon';
 import ModelPicker from '@features/chat/components/ModelPicker';
@@ -18,7 +18,7 @@ import ModelPicker from '@features/chat/components/ModelPicker';
 const LEVEL_LABEL: Record<string, string> = { low: '低', medium: '中', high: '高' };
 const LEVELS = ['low', 'medium', 'high'] as const;
 
-export default function ModelPill() {
+export default function ModelPill({ showThinking = true }: { showThinking?: boolean }) {
   const aiCfg = useAiConfigStore();
   const activeModel = useAiConfigStore((s) => s.activeModel);
   const agentSettings = useAgentSettings();
@@ -51,7 +51,7 @@ export default function ModelPill() {
       ref={pillRef}
       data-testid="model-pill"
       style={{
-        position: 'relative', flexShrink: 0,
+        position: 'relative', flexShrink: showThinking ? 0 : 1, minWidth: 0, maxWidth: '100%',
         width: levelOpen && lockedWidth ? lockedWidth : 'fit-content',
         height: 30, boxSizing: 'border-box',
         display: 'flex', alignItems: 'stretch',
@@ -93,6 +93,7 @@ export default function ModelPill() {
                   key={lv}
                   className="workspace-floating-row" data-selected={on}
                   data-testid={`think-option-${lv}`}
+                  aria-pressed={on}
                   onClick={() => {
                     agentSettings.updateModel(activeModel, { thinkingLevel: lv });
                     setLevelOpen(false);
@@ -112,7 +113,6 @@ export default function ModelPill() {
                   }}
                 >
                   <span style={{ flex: 1 }}>{LEVEL_LABEL[lv]}</span>
-                  {on && <Check size={12} style={{ color: 'var(--accent)' }} />}
                 </button>
               );
             })}
@@ -126,7 +126,7 @@ export default function ModelPill() {
             title="切换模型（更多在设置页配置）"
             onClick={() => setPickerOpen(true)}
             style={{
-              flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 6,
+              flex: showThinking ? '0 0 auto' : '1 1 auto', minWidth: 0, display: 'flex', alignItems: 'center', gap: 6,
               padding: '0 10px 0 12px', background: 'transparent', border: 'none',
               cursor: 'pointer',
             }}
@@ -135,14 +135,13 @@ export default function ModelPill() {
             <span
               style={{
                 fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 500, color: 'var(--text-primary)',
-                whiteSpace: 'nowrap',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               }}
             >
               {displayName}
             </span>
           </button>
-          {/* 竖线分隔 */}
-          <span
+          {showThinking && <><span
             style={{
               width: 1, margin: '4px 0', flexShrink: 0,
               background: 'var(--border-strong)',
@@ -164,11 +163,11 @@ export default function ModelPill() {
           >
             <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-secondary)' }}>{levelLabel}</span>
             <ChevronDown size={11} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-          </button>
+          </button></>}
         </>
       )}
 
-      <ModelPicker open={pickerOpen} onClose={() => setPickerOpen(false)} />
+      <ModelPicker open={pickerOpen} onClose={() => setPickerOpen(false)} showThinking={showThinking} />
     </div>
   );
 }

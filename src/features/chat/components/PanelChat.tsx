@@ -7,11 +7,11 @@
  * 发送目标是当前聚焦 pane。
  */
 
-import QuickToggle from '@ui/StateIconButton';
 import { useEffect, useMemo, useRef } from 'react';
-import { ArrowUp, Bot, Brain, Paperclip, ShieldAlert, ShieldCheck, ShieldOff, Sparkles, Square, Zap } from 'lucide-react';
+import { ArrowUp, Paperclip, ShieldAlert, ShieldCheck, ShieldOff, Sparkles, Square, Zap } from 'lucide-react';
 import { useChatStore, useActiveMessages } from '@features/chat';
-import { useAgentSettings, usePermissions, useAiConfigStore, useAttachmentComposer } from '@features/agent';
+import { usePermissions, useAttachmentComposer } from '@features/agent';
+import ChatModeSelect from '@features/chat/components/ChatModeSelect';
 import ModelPill from '@features/chat/components/ModelPill';
 import AttachmentChips from '@features/chat/components/AttachmentChips';
 import ShellIndicator from '@features/terminal/components/ShellIndicator';
@@ -52,14 +52,8 @@ export default function PanelChat() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // M6 快捷设置：模型下拉 + 联网/深思/Agent 开关（agentSettings 即时生效，
-  // 下一条消息起用；模型名写 Rust config）
-  const agentSettings = useAgentSettings();
-  const activeModel = useAiConfigStore((s) => s.activeModel);
   const permMode = usePermissions((s) => s.mode);
   const setPermMode = usePermissions((s) => s.setMode);
-  // 快捷开关作用于「当前模型」的行为覆盖（绑定模型，不污染全局）
-  const eff = agentSettings.resolve(activeModel);
 
   const draft = useChatStore((s) => s.draft);
   const setDraft = useChatStore((s) => s.setDraft);
@@ -124,26 +118,16 @@ export default function PanelChat() {
   // 目标 pane 的显示分量（prompt 行镜像终端输入栏：shell 胶囊 · cwd）
   return (
     <div ref={panelRef} style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, containerType: 'inline-size' }}>
-      {/* 顶栏：会话级 AI 配置（模型 · 联网 · 深思 · Agent），低频、影响后续所有消息，从输入卡抽离避免拥挤 */}
+      {/* Model and conversation mode apply to subsequent messages. */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 4,
         padding: '7px 10px 6px',
         flexShrink: 0, userSelect: 'none',
       }}>
-        <ModelPill />
-        <div style={{ flex: 1 }} />
-        <QuickToggle
-          icon={Brain}
-          on={eff.deepThink}
-          title="深度思考（reasoning effort）"
-          onClick={() => agentSettings.updateModel(activeModel, { deepThink: !eff.deepThink })}
-        />
-        <QuickToggle
-          icon={Bot}
-          on={eff.agentMode}
-          title={eff.agentMode ? 'Agent 模式（可使用工具）' : '纯聊天（工具已关闭）'}
-          onClick={() => agentSettings.updateModel(activeModel, { agentMode: !eff.agentMode })}
-        />
+        <ChatModeSelect />
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'flex-end' }}>
+          <ModelPill showThinking={false} />
+        </div>
       </div>
 
       {/* 转录区：按来源 pane 分段 */}

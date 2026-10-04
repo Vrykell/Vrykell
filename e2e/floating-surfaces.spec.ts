@@ -93,6 +93,8 @@ for (const theme of ['深色', '浅色']) {
     await models.getByTestId('model-pick-m-main').click();
     await expect(models).toBeHidden();
     await assertSurface(page.getByRole('status').filter({ hasText: '已切换到' }));
+    await page.locator('[data-dock-btn="chat"]').click();
+    await page.getByRole('button', { name: '命令', exact: true }).click();
     await page.getByTestId('pill-level').first().click();
     await assertSurface(page.getByTestId('think-level-menu'));
     await page.getByTestId('think-option-high').click();

@@ -15,11 +15,9 @@ const settingsJson = (page: import('@playwright/test').Page) =>
   page.evaluate(() => localStorage.getItem('vrykell-agent-settings') ?? '');
 
 test.describe('模型行为页', () => {
-  test('Agent 模式 / 深度思考开关：切换后持久化，思考强度出现', async ({ page }) => {
+  test('Agent 模式切换后持久化，深度思考移至模型配置', async ({ page }) => {
     const switches = page.getByRole('switch');
-    // 顺序：Agent 模式、深度思考、采样温度、智能会话标题、命令自动补全
     const agentSwitch = switches.nth(0);
-    const thinkSwitch = switches.nth(1);
     await expect(agentSwitch).toHaveAttribute('aria-checked', 'true');
 
     await agentSwitch.click();
@@ -27,18 +25,22 @@ test.describe('模型行为页', () => {
     let saved = await settingsJson(page);
     expect(saved).toContain('"agentMode":false');
 
-    // 深度思考开启 → 思考强度字段出现
+    await expect(page.locator('.settings-content').getByText('深度思考', { exact: true })).toHaveCount(0);
+    await page.locator('aside').getByRole('button', { name: '模型配置', exact: true }).click();
+    const thinking = page.getByLabel('主力模型的思考设置');
+    const thinkSwitch = thinking.getByRole('switch');
     await thinkSwitch.click();
     await expect(thinkSwitch).toHaveAttribute('aria-checked', 'true');
     saved = await settingsJson(page);
     expect(saved).toContain('"deepThink":true');
-    await expect(page.getByText('思考强度')).toBeVisible();
+    await expect(thinking.getByRole('combobox', { name: '主力模型的思考强度' })).toBeVisible();
   });
 
   test('思考强度切换为低并持久化', async ({ page }) => {
-    await page.getByRole('switch').nth(1).click(); // 开深度思考
-    const strength = fieldOf(page, '思考强度');
-    await strength.getByRole('button', { name: '低' }).click();
+    await page.locator('aside').getByRole('button', { name: '模型配置', exact: true }).click();
+    const thinking = page.getByLabel('主力模型的思考设置');
+    await thinking.getByRole('switch').click();
+    await thinking.getByRole('combobox', { name: '主力模型的思考强度' }).selectOption('low');
     const saved = await settingsJson(page);
     expect(saved).toContain('"thinkingLevel":"low"');
   });
@@ -79,8 +81,7 @@ test.describe('模型行为页', () => {
   });
 
   test('智能会话标题开关关闭', async ({ page }) => {
-    // 全局作用域下最后一个 switch 组：智能会话标题（nth 3）、命令自动补全（nth 4）
-    await page.getByRole('switch').nth(3).click();
+    await fieldOf(page, '智能会话标题').getByRole('switch').click();
     const saved = await settingsJson(page);
     expect(saved).toContain('"autoTitle":false');
   });
