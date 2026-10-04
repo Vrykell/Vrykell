@@ -1,4 +1,3 @@
-import { Check } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 export interface SegmentedOption<T extends string> {
@@ -65,7 +64,6 @@ export default function Segmented<T extends string>({
               borderBottomRightRadius: last ? innerRadius : 0,
             }}
           >
-            {active && <Check size={11} aria-hidden="true" />}
             {o.label}
           </button>
         );
