@@ -42,4 +42,42 @@ describe('useLocalFileBrowser', () => {
     expect(fsMocks.fsList).toHaveBeenCalledTimes(2);
     expect(result.current.expandedSet.has(folder.path)).toBe(false);
   });
+
+  it('reports a failed directory load and recovers on retry', async () => {
+    fsMocks.fsList.mockRejectedValueOnce(new Error('denied')).mockResolvedValue([]);
+    const { result } = renderHook(() => useLocalFileBrowser({ activeCwd: 'C:/private' }));
+    await waitFor(() => expect(result.current.error).toBe('无法读取目录，请检查访问权限后重试'));
+    expect(result.current.loading).toBe(false);
+    act(() => result.current.load(result.current.path));
+    await waitFor(() => expect(result.current.error).toBeNull());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+  });
+
+  it('ignores an earlier directory result after navigating elsewhere', async () => {
+    let resolveOld: (entries: never[]) => void = () => {};
+    fsMocks.fsList.mockImplementation((path: string) => path === 'C:/old'
+      ? new Promise<never[]>((resolve) => { resolveOld = resolve; })
+      : Promise.resolve([{ name: 'new.txt', path: 'C:/new/new.txt', is_dir: false }]));
+    const { result } = renderHook(() => useLocalFileBrowser({ activeCwd: 'C:/old' }));
+    await waitFor(() => expect(fsMocks.fsList).toHaveBeenCalledWith('C:/old'));
+    act(() => result.current.setPath('C:/new'));
+    await waitFor(() => expect(result.current.entries[0]?.name).toBe('new.txt'));
+    await act(async () => resolveOld([]));
+    expect(result.current.entries[0]?.name).toBe('new.txt');
+  });
+
+  it('does not cache a failed tree expansion as an empty directory', async () => {
+    const folder = { name: 'private', path: 'C:/workspace/private', is_dir: true };
+    fsMocks.fsList.mockImplementation((path: string) => path === folder.path
+      ? Promise.reject(new Error('denied')) : Promise.resolve([folder]));
+    const { result } = renderHook(() => useLocalFileBrowser({ activeCwd: 'C:/workspace' }));
+    await waitFor(() => expect(result.current.entries).toEqual([folder]));
+    act(() => result.current.toggleExpand(folder));
+    await waitFor(() => expect(result.current.childErrors[folder.path]).toBeDefined());
+    expect(result.current.childCache[folder.path]).toBeUndefined();
+    fsMocks.fsList.mockResolvedValue([]);
+    act(() => result.current.retryExpand(folder));
+    await waitFor(() => expect(result.current.childCache[folder.path]).toEqual([]));
+    expect(result.current.childErrors[folder.path]).toBeUndefined();
+  });
 });

@@ -7,8 +7,8 @@
  * 发送目标是当前聚焦 pane。
  */
 
-import { useEffect, useMemo, useRef } from 'react';
-import { ArrowUp, Paperclip, ShieldAlert, ShieldCheck, ShieldOff, Sparkles, Square, Zap } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { iconSizes, ArrowUp, Paperclip, ShieldAlert, ShieldCheck, ShieldOff, Sparkles, Square, Zap  } from '@ui/icons';
 import { useChatStore, useActiveMessages } from '@features/chat';
 import { usePermissions, useAttachmentComposer } from '@features/agent';
 import ChatModeSelect from '@features/chat/components/ChatModeSelect';
@@ -22,6 +22,8 @@ import ContextRing from '@features/chat/components/ContextRing';
 import { useChatComposer } from '@features/chat/hooks/useChatComposer';
 import { useChatPaneContext } from '@features/chat/hooks/useChatPaneContext';
 import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
+import { EMPTY_COMPOSER_DRAFT, useComposerDrafts } from '@features/chat';
+import type { AttachmentMeta } from '@features/agent/model/attachments';
 
 /** 权限模式循环（状态栏 Shield chip）：图标 + 颜色双通道辨识（勾=标准逐工具 / 叹号=严格逐次问 / 斜线=放行直放）
  *  标准=逐工具级别；严格=全部逐次问；放行=全部直放行（危险命令仍逐次问） */
@@ -55,8 +57,15 @@ export default function PanelChat() {
   const permMode = usePermissions((s) => s.mode);
   const setPermMode = usePermissions((s) => s.setMode);
 
-  const draft = useChatStore((s) => s.draft);
+  const draft = useChatStore((s) => s.draftTabId === activeId ? s.draft : '');
   const setDraft = useChatStore((s) => s.setDraft);
+  const composerDraft = useComposerDrafts((s) => s.byTab[activeId] ?? EMPTY_COMPOSER_DRAFT);
+  const setComposerText = useCallback((text: string) => {
+    useComposerDrafts.getState().setText(activeId, text);
+  }, [activeId]);
+  const updateComposerAttachments = useCallback((update: (current: AttachmentMeta[]) => AttachmentMeta[]) => {
+    useComposerDrafts.getState().updateAttachments(activeId, update);
+  }, [activeId]);
 
   // ── M5 附件：chips 状态 + 三个来源（📎 选择 / 粘贴 / 拖拽） ──
   const {
@@ -69,7 +78,11 @@ export default function PanelChat() {
     togglePreview,
     removeAttachment,
     clearAttachments,
-  } = useAttachmentComposer();
+  } = useAttachmentComposer({
+    attachments: composerDraft.attachments,
+    updateAttachments: updateComposerAttachments,
+    scopeKey: activeId,
+  });
   const exchanges = useMemo(() => toExchanges(messages), [messages]);
 
   // 新内容（条数变化 / 流式增长 / 工具动作增减或状态迁移）时吸底
@@ -109,6 +122,9 @@ export default function PanelChat() {
     targetPane,
     attachments: atts,
     clearAttachments,
+    value: composerDraft.text,
+    onTextChange: setComposerText,
+    scopeKey: activeId,
   });
 
   useEffect(() => {
@@ -164,11 +180,11 @@ export default function PanelChat() {
             {/* 输入行：⚡ prompt + textarea + 发送/停止（度量同终端输入栏） */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <span style={{
-                minWidth: 16, height: 24, lineHeight: 1,
+                minWidth: iconSizes.row, height: 24, lineHeight: 1,
                 color: 'var(--accent-warm)', userSelect: 'none', flexShrink: 0,
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <Zap size={13} />
+                <Zap size={iconSizes.control} />
               </span>
               <textarea
                 ref={inputRef}
@@ -206,13 +222,13 @@ export default function PanelChat() {
                   onClick={() => abortStream(activeId)}
                   style={{
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
+                    width: 32, height: 32, padding: 0, border: 'none', borderRadius: 4,
                     background: 'transparent', color: 'var(--accent-warm)', cursor: 'pointer', flexShrink: 0,
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--button-hover)'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                 >
-                  <Square size={11} fill="currentColor" />
+                  <Square size={iconSizes.compact} fill="currentColor" />
                 </button>
               ) : (
                 <button
@@ -222,7 +238,7 @@ export default function PanelChat() {
                   disabled={!canSend}
                   style={{
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
+                    width: 32, height: 32, padding: 0, border: 'none', borderRadius: 4,
                     background: 'transparent',
                     color: canSend ? 'var(--accent-warm)' : 'var(--text-muted)',
                     cursor: canSend ? 'pointer' : 'default', flexShrink: 0,
@@ -230,7 +246,7 @@ export default function PanelChat() {
                   onMouseEnter={(e) => { if (canSend) e.currentTarget.style.background = 'var(--button-hover)'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                 >
-                  <ArrowUp size={13} />
+                  <ArrowUp size={iconSizes.control} />
                 </button>
               )}
             </div>
@@ -262,7 +278,7 @@ export default function PanelChat() {
                     onClick={() => setPermMode(next.id)}
                     style={{
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
+                      width: 32, height: 32, padding: 0, border: 'none', borderRadius: 4,
                       background: 'transparent', color: cur.color, cursor: 'pointer',
                     }}
                     onMouseEnter={(e) => {
@@ -272,7 +288,7 @@ export default function PanelChat() {
                       e.currentTarget.style.background = 'transparent';
                     }}
                   >
-                    <CurIcon size={13} />
+                    <CurIcon size={iconSizes.control} />
                   </button>
                 );
               })()}
@@ -283,7 +299,7 @@ export default function PanelChat() {
                 onClick={() => void pickFiles()}
                 style={{
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
+                  width: 32, height: 32, padding: 0, border: 'none', borderRadius: 4,
                   background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
                 }}
                 onMouseEnter={(e) => {
@@ -295,7 +311,7 @@ export default function PanelChat() {
                   e.currentTarget.style.color = 'var(--text-muted)';
                 }}
               >
-                <Paperclip size={13} />
+                <Paperclip size={iconSizes.control} />
               </button>
             </div>
           </div>
@@ -344,7 +360,7 @@ function EmptyHint({ isSession }: { isSession: boolean }) {
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12,
       textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-label)', userSelect: 'none',
     }}>
-      <Sparkles size={24} strokeWidth={1.5} aria-hidden="true" />
+      <Sparkles size={24} aria-hidden="true" />
       <span>{isSession ? '描述问题，Enter 发送' : '打开一个终端会话开始对话'}</span>
     </div>
   );

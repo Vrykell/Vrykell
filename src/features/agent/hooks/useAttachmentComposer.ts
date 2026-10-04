@@ -11,14 +11,21 @@ import {
   type AttachmentMeta,
 } from '@features/agent/model/attachments';
 
-/**
- * 管理附件编辑态：选择、粘贴、拖放、预览、删除和发送前清空。
- * 聊天面板与终端 AI 输入共用这套工作流，避免各自维护不同的校验规则。
- */
-export function useAttachmentComposer() {
-  const [attachments, setAttachments] = useState<AttachmentMeta[]>([]);
+interface AttachmentComposerState {
+  attachments: AttachmentMeta[];
+  updateAttachments: (update: (current: AttachmentMeta[]) => AttachmentMeta[]) => void;
+  scopeKey: string;
+}
+
+/** Manage attachments using local state or a session-owned draft. */
+export function useAttachmentComposer(state?: AttachmentComposerState) {
+  const [localAttachments, setLocalAttachments] = useState<AttachmentMeta[]>([]);
+  const attachments = state?.attachments ?? localAttachments;
+  const setAttachments = state?.updateAttachments ?? setLocalAttachments;
   const [previewId, setPreviewId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { setPreviewId(null); }, [state?.scopeKey]);
 
   const toastError = useCallback((message: string) => {
     useToastStore.getState().addToast(message, 'error');
@@ -34,7 +41,7 @@ export function useAttachmentComposer() {
       }
       return next;
     });
-  }, [toastError]);
+  }, [toastError, setAttachments]);
 
   const importPaths = useCallback(async (paths: string[]) => {
     const imported: AttachmentMeta[] = [];
@@ -120,12 +127,12 @@ export function useAttachmentComposer() {
   const removeAttachment = useCallback((id: string) => {
     setAttachments((current) => current.filter((attachment) => attachment.id !== id));
     setPreviewId((current) => (current === id ? null : current));
-  }, []);
+  }, [setAttachments]);
 
   const clearAttachments = useCallback(() => {
-    setAttachments([]);
+    setAttachments(() => []);
     setPreviewId(null);
-  }, []);
+  }, [setAttachments]);
 
   return {
     attachments,
