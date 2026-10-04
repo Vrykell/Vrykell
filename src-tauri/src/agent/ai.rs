@@ -498,6 +498,7 @@ pub struct LlmStreamState(pub Mutex<HashMap<String, AbortHandle>>);
 #[derive(Deserialize)]
 pub struct LlmProxyRequest {
     pub url: String,
+    pub provider: Option<String>,
     pub method: Option<String>,
     pub headers: Option<Vec<(String, String)>>,
     pub body: Option<String>,
@@ -535,45 +536,61 @@ impl LlmStreamEvent {
     }
 }
 
+#[derive(Debug, PartialEq)]
 enum ProviderAuth {
     OpenAI,
     Anthropic,
     Gemini,
 }
 
-/// 从 base_url 字符串提取 host（失败为空串）。
-fn host_of(base_url: &str) -> String {
-    reqwest::Url::parse(base_url)
-        .ok()
-        .and_then(|u| u.host_str().map(|h| h.to_string()))
-        .unwrap_or_default()
+// Match the configured origin and path, including local ports.
+fn matches_endpoint(url: &reqwest::Url, base: &str) -> bool {
+    let Ok(base) = reqwest::Url::parse(base) else { return false; };
+    let path = base.path().trim_end_matches('/');
+    url.origin() == base.origin()
+        && (url.path() == path || url.path().starts_with(&format!("{path}/")))
 }
 
-/// 按目标 host 归类 provider 并校验白名单。
-fn classify(url: &str, cfg: &AiConfigInner) -> Result<(reqwest::Url, ProviderAuth), String> {
+fn provider_auth(provider: &str) -> Result<ProviderAuth, String> {
+    match provider {
+        "anthropic" => Ok(ProviderAuth::Anthropic),
+        "gemini" => Ok(ProviderAuth::Gemini),
+        "openai-compatible" => Ok(ProviderAuth::OpenAI),
+        _ => Err("未知 AI 服务商".to_string()),
+    }
+}
+
+// The requested provider selects its key only after validating the saved endpoint.
+fn classify(url: &str, cfg: &AiConfigInner, requested: Option<&str>) -> Result<(reqwest::Url, ProviderAuth), String> {
     let parsed = reqwest::Url::parse(url).map_err(|e| format!("无效 URL：{e}"))?;
-    let host = parsed
-        .host_str()
-        .ok_or_else(|| "无效 URL：缺少 host".to_string())?
-        .to_string();
-    let local = matches!(host.as_str(), "localhost" | "127.0.0.1" | "::1");
-    if parsed.scheme() != "https" && !local {
+    let host = parsed.host_str().ok_or_else(|| "无效 URL：缺少 host".to_string())?;
+    let local = matches!(host, "localhost" | "127.0.0.1" | "::1");
+    if parsed.scheme() != "https" && !(parsed.scheme() == "http" && local) {
         return Err("仅允许 https 请求（本地调试地址除外）".to_string());
     }
-    if host == "api.anthropic.com" {
-        return Ok((parsed, ProviderAuth::Anthropic));
+    let official = match host {
+        "api.anthropic.com" => Some("anthropic"),
+        "generativelanguage.googleapis.com" => Some("gemini"),
+        _ => None,
+    };
+    if let Some(provider) = official {
+        if requested.is_none() || requested == Some(provider) {
+            let auth = provider_auth(provider)?;
+            return Ok((parsed, auth));
+        }
     }
-    if host == "generativelanguage.googleapis.com" {
-        return Ok((parsed, ProviderAuth::Gemini));
-    }
-    // openai-compatible：白名单覆盖所有已配置模型的 base_url host（多模型各自可不同端点）
-    let allowed = cfg.models.iter().any(|m| host_of(&m.base_url) == host)
-        || host_of(&cfg.base_url) == host;
-    if allowed {
-        Ok((parsed, ProviderAuth::OpenAI))
-    } else {
-        Err(format!("目标地址 {host} 不在 AI 服务白名单内"))
-    }
+    let configured = cfg.models.iter().find(|model| {
+        matches_endpoint(&parsed, &model.base_url)
+            && requested.map_or(true, |provider| model.provider == provider)
+    });
+    let provider = configured.map(|model| model.provider.as_str()).or_else(|| {
+        if matches_endpoint(&parsed, &cfg.base_url)
+            && requested.map_or(true, |provider| cfg.provider == provider) {
+            Some(cfg.provider.as_str())
+        } else { None }
+    }).ok_or_else(|| format!("目标地址 {host} 不在当前服务商的 AI 服务白名单内"))?;
+    let auth = provider_auth(provider)?;
+    Ok((parsed, auth))
 }
 
 async fn run_proxy(
@@ -581,7 +598,7 @@ async fn run_proxy(
     req: LlmProxyRequest,
     on_event: &Channel<LlmStreamEvent>,
 ) -> Result<(), String> {
-    let (url, auth) = classify(&req.url, &cfg)?;
+    let (url, auth) = classify(&req.url, &cfg, req.provider.as_deref())?;
     let key = match auth {
         ProviderAuth::OpenAI => cfg.api_key.clone(),
         ProviderAuth::Anthropic => cfg.anthropic_key.clone(),
@@ -671,5 +688,33 @@ pub fn llm_abort(streams: State<'_, LlmStreamState>, id: String) {
         if let Some(h) = m.remove(&id) {
             h.abort();
         }
+    }
+}
+
+#[cfg(test)]
+mod proxy_endpoint_tests {
+    use super::*;
+
+    #[test]
+    fn configured_gateways_use_their_provider_auth() {
+        for (provider, expected) in [("anthropic", ProviderAuth::Anthropic), ("gemini", ProviderAuth::Gemini), ("openai-compatible", ProviderAuth::OpenAI)] {
+            let mut cfg = AiConfigInner::default();
+            cfg.provider = provider.into();
+            cfg.base_url = "https://gateway.example/api/v1".into();
+            cfg.models.clear();
+            assert_eq!(classify("https://gateway.example/api/v1/messages", &cfg, Some(provider)).unwrap().1, expected);
+            assert!(classify("https://gateway.example/unconfigured/messages", &cfg, Some(provider)).is_err());
+        }
+    }
+
+    #[test]
+    fn configured_origins_reject_different_ports_and_providers() {
+        let mut cfg = AiConfigInner::default();
+        cfg.provider = "anthropic".into();
+        cfg.base_url = "http://localhost:8000/v1".into();
+        cfg.models.clear();
+        assert!(classify("http://localhost:8001/v1/messages", &cfg, Some("anthropic")).is_err());
+        assert!(classify("http://localhost:8000/v1/messages", &cfg, Some("gemini")).is_err());
+        assert!(classify("http://localhost:8000/v1/messages", &cfg, Some("anthropic")).is_ok());
     }
 }

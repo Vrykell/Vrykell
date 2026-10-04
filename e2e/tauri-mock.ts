@@ -430,11 +430,23 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
           case 'set_ai_models': {
             aiModels.splice(0, aiModels.length, ...(args.models as typeof aiModels));
             aiActive = args.activeModel as string;
+            const selected = aiModels.find(model => model.id === aiActive);
+            if (selected) {
+              aiProvider = selected.provider;
+              aiConfig.baseUrl = selected.baseUrl;
+              aiConfig.model = selected.model;
+            }
             aiModelCalls.push({ kind: 'set_models', models: args.models as unknown[], active: args.activeModel as string });
             return undefined;
           }
           case 'set_active_model': {
             aiActive = args.id as string;
+            const selected = aiModels.find(model => model.id === aiActive);
+            if (selected) {
+              aiProvider = selected.provider;
+              aiConfig.baseUrl = selected.baseUrl;
+              aiConfig.model = selected.model;
+            }
             aiModelCalls.push({ kind: 'set_active', id: args.id as string });
             return undefined;
           }
