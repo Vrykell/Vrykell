@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Copy, Minus, Square, X } from 'lucide-react';
+import { iconSizes, Copy, Minus, Square, X  } from '@ui/icons';
 import { getCurrentWindow, type Window } from '@tauri-apps/api/window';
 import { usesCustomWindowControls } from '@platform/runtime';
 
@@ -110,7 +110,7 @@ export default function WindowControls() {
         style={buttonStyle}
         onClick={minimize}
       >
-        <Minus size={14} strokeWidth={1.6} />
+        <Minus size={iconSizes.control} />
       </button>
       <button
         type="button"
@@ -121,7 +121,7 @@ export default function WindowControls() {
         style={buttonStyle}
         onClick={toggleMaximize}
       >
-        {maximized ? <Copy size={12} strokeWidth={1.5} /> : <Square size={12} strokeWidth={1.5} />}
+        {maximized ? <Copy size={iconSizes.compact} /> : <Square size={iconSizes.compact} />}
       </button>
       <button
         type="button"
@@ -133,7 +133,7 @@ export default function WindowControls() {
         style={buttonStyle}
         onClick={close}
       >
-        <X size={15} strokeWidth={1.6} />
+        <X size={iconSizes.row} />
       </button>
     </div>
   );

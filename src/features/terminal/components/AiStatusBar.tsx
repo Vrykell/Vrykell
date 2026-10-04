@@ -3,7 +3,7 @@
  * 模型下拉 · 上下文圆环 · 深思/Agent 开关，与聊天面板顶栏同构。
  */
 import Toggle from '@ui/StateIconButton';
-import { Bot, Brain } from 'lucide-react';
+import { Bot, Brain } from '@ui/icons';
 import { useInputStore, selectPaneInput } from '@features/terminal';
 import { useAiConfigStore, useAgentSettings } from '@features/agent';
 import ModelPill from '@features/chat/components/ModelPill';

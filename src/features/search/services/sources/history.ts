@@ -1,4 +1,4 @@
-import { History } from 'lucide-react';
+import { History } from '@ui/icons';
 import { registerSource } from '@features/search/services/registry';
 import { searchHistory as backendSearchHistory } from '@platform/api/search';
 import type { SearchResult, HistoryResultData } from '@features/search/types';

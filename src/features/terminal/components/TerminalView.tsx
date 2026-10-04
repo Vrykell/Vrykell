@@ -364,7 +364,7 @@ function TerminalPane(props: {
         // 经典/TUI/SSH：统一 8px 透明边距（透出壁纸/画布）；TUI 顶部为工具条让位
         ? { flex: 1, minHeight: 0, position: 'relative', padding: 8, paddingTop: scene === 'altScreen' ? 28 : 8, background: 'transparent' }
         : { position: 'absolute', inset: 0, opacity: 0, pointerEvents: 'none' }}>
-        <TerminalPanel paneId={terminal.id} tabId={windowId} connectionInput={terminal.kind === 'ssh' && terminal.openMode === 'block'} onReady={(sid) => setSession(terminal.id, sid)} />
+        <TerminalPanel paneId={terminal.id} tabId={windowId} connectionInput={terminal.kind === 'ssh'} onReady={(sid) => setSession(terminal.id, sid)} />
       </div>
 
       {/* Keep the block list mounted so its live terminal survives manual fullscreen. */}

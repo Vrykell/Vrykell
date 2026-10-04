@@ -19,7 +19,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { Brain, ChevronRight, Copy, Pencil, RotateCw, Trash2, Zap } from 'lucide-react';
+import { Brain, ChevronRight, Copy, Pencil, RotateCw, Trash2, Zap } from '@ui/icons';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { useChatStore } from '@features/chat';
 import { useSessionStore } from '@features/workspace';

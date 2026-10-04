@@ -7,7 +7,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Check, ChevronDown, ChevronRight, Copy, Ellipsis,
   Maximize2, RotateCw, Skull, Sparkles, Square, Terminal, X, Zap,
-} from 'lucide-react';
+} from '@ui/icons';
 import { useBlockStore } from '@features/terminal';
 import { useTerminalStore } from '@features/terminal';
 import AiBlock from '@features/chat/components/AiBlock';

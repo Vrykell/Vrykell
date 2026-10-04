@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Info, CheckCircle2, AlertCircle, TriangleAlert, X } from 'lucide-react';
+import { Info, CheckCircle2, AlertCircle, TriangleAlert, X } from '@ui/icons';
 
 type ToastType = 'info' | 'success' | 'error' | 'warning';
 

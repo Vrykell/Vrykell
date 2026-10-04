@@ -1,6 +1,6 @@
 /**
- * fileIcon — 按文件扩展名返回通用 lucide 图标（粗粒度分类）。
- * PanelFiles 与搜索结果卡片共用，替代原两处重复的扩展名→emoji 映射。
+ * Map file extensions to shared icons using broad categories.
+ * File panels and search results use the same mapping.
  */
 
 import {
@@ -11,8 +11,8 @@ import {
   FileImage,
   FileText,
   Folder,
-  type LucideIcon,
-} from 'lucide-react';
+  type AppIcon,
+} from '@ui/icons';
 
 const CODE = new Set([
   'ts', 'tsx', 'js', 'jsx', 'mjs', 'cjs', 'rs', 'go', 'py', 'rb', 'java',
@@ -25,7 +25,7 @@ const IMAGE = new Set(['svg', 'png', 'jpg', 'jpeg', 'gif', 'ico', 'webp', 'bmp']
 const CONFIG = new Set(['json', 'yml', 'yaml', 'toml', 'cfg', 'ini', 'lock', 'gitignore', 'env']);
 const ARCHIVE = new Set(['zip', 'tar', 'gz', 'rar', '7z']);
 
-export function fileIcon(name: string, isDir = false): LucideIcon {
+export function fileIcon(name: string, isDir = false): AppIcon {
   if (isDir) return Folder;
   const ext = name.split('.').pop()?.toLowerCase() ?? '';
   if (CODE.has(ext)) return FileCode;

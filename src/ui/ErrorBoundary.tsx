@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
-import { TriangleAlert } from 'lucide-react';
+import { TriangleAlert } from '@ui/icons';
 
 interface Props {
   children: ReactNode;

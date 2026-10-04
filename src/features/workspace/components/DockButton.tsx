@@ -1,3 +1,4 @@
+import { iconSizes } from '@ui/icons';
 import { useT } from '@i18n';
 import { PANEL_DEFS } from '@features/workspace';
 import { ToolbarBtn } from '@ui/UiBtn';
@@ -36,7 +37,7 @@ export default function DockButton({ panelId, active, onClick, onDragStart, onDr
         onDragStart, onDragEnd, onDragOver, onDrop,
       }}
     >
-      <Icon size={16} />
+      <Icon size={iconSizes.navigation} />
     </ToolbarBtn>
   );
 }

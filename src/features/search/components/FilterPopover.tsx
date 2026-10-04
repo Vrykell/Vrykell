@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Check } from 'lucide-react';
+import { Check } from '@ui/icons';
 import type { ResultType } from '@features/search/types';
 import { getSources, useEnabledSourcesStore, toggleSource } from '@features/search/services/registry';
 

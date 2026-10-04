@@ -1,4 +1,4 @@
-import { FileText } from 'lucide-react';
+import { FileText } from '@ui/icons';
 import { registerSource } from '@features/search/services/registry';
 import { searchFiles as backendSearchFiles } from '@platform/api/search';
 import { useWorkspaceDirsStore } from '@features/files/services/workspaceDirs';

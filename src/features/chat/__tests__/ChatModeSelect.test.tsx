@@ -54,7 +54,8 @@ describe('model-scoped conversation controls', () => {
     render(<ModelThinkingSettings modelId="m-one" name="模型一" />);
     expect(screen.queryByRole('combobox')).toBeNull();
     fireEvent.click(screen.getByRole('switch'));
-    fireEvent.change(screen.getByRole('combobox', { name: '模型一的思考强度' }), { target: { value: 'low' } });
+    fireEvent.click(screen.getByRole('combobox', { name: '模型一的思考强度' }));
+    fireEvent.click(screen.getByRole('option', { name: '低' }));
     expect(useAgentSettings.getState().overrides['m-one']).toEqual({ deepThink: true, thinkingLevel: 'low' });
     expect(useAgentSettings.getState().global.deepThink).toBe(false);
     expect(useAgentSettings.getState().resolve('m-one').agentMode).toBe(true);

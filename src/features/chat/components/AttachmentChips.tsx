@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { ClipboardPaste, FileText, Image as ImageIcon, X } from 'lucide-react';
+import { ClipboardPaste, FileText, Image as ImageIcon, X } from '@ui/icons';
 import { readAttachmentDataUrl, type AttachmentMeta } from '@features/agent/model/attachments';
 
 export default function AttachmentChips({ atts, previewId, onPreview, onRemove }: {

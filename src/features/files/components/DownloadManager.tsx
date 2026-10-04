@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { ArrowLeft, FolderOpen, Trash2 } from 'lucide-react';
+import { ArrowLeft, FolderOpen, Trash2 } from '@ui/icons';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { downloadsList, downloadsClear, type DownloadEntry } from '@features/files/services/downloads';
 import { fileIcon } from '@features/files/utils/fileIcon';

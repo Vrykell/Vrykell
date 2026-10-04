@@ -1,6 +1,6 @@
 import { useAgentSettings, useAiConfigStore } from '@features/agent';
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { iconSizes, ChevronDown  } from '@ui/icons';
 
 const MODES = [
   { id: 'chat', label: 'Chat 模式', description: '对话、解答与探索' },
@@ -34,7 +34,7 @@ export default function ChatModeSelect() {
       style={{ display: 'flex', alignItems: 'center', gap: 6, height: 30, padding: '0 10px', borderRadius: 8,
         border: 'none', color: 'var(--text-primary)',
         fontSize: 'calc(12px * var(--ui-font-scale))', cursor: 'pointer' }}>
-      {agentMode ? 'Agent 模式' : 'Chat 模式'}<ChevronDown size={13} />
+      {agentMode ? 'Agent 模式' : 'Chat 模式'}<ChevronDown size={iconSizes.compact} />
     </button>
     {open && <div role="listbox" aria-label="选择对话模式" className="workspace-floating"
       style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 200, width: 280,

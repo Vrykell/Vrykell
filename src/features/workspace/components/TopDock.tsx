@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Search, Settings, Sparkles } from 'lucide-react';
+import { iconSizes, Search, Settings, Sparkles  } from '@ui/icons';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useDockStore, useSessionStore, useUiStore, selectActiveSessionTab } from '@features/workspace';
 import WindowControls from '@features/workspace/components/WindowControls';
@@ -36,7 +36,7 @@ export default function TopDock() {
       </div>
       <button data-subtle data-testid="global-search-trigger" className="workspace-search"
         onClick={() => useUiStore.getState().setGlobalSearchOpen(true)}>
-        <Search size={14} />
+        <Search size={iconSizes.control} />
         <span>搜索文件、命令、设置…</span>
         <kbd>{isMacOS ? '⌘ F' : 'Ctrl F'}</kbd>
       </button>
@@ -48,11 +48,11 @@ export default function TopDock() {
               const dock = useDockStore.getState();
               dock.togglePanel('right', 'chat');
             }}>
-            <Sparkles size={15} /><span>AI 助手</span>
+            <Sparkles size={iconSizes.row} /><span>AI 助手</span>
           </button>
         )}
         <button data-subtle className="workspace-settings" aria-label="设置" title={`设置（${isMacOS ? '⌘' : 'Ctrl'}+,）`}
-          onClick={() => useSessionStore.getState().openSettingsTab()}><Settings size={16} /></button>
+          onClick={() => useSessionStore.getState().openSettingsTab()}><Settings size={iconSizes.row} /></button>
         <WindowControls />
       </div>
     </header>
