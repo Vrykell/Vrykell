@@ -1207,3 +1207,43 @@ mod tests {
         let _ = child.wait();
     }
 }
+
+#[cfg(all(test, windows))]
+mod cmd_interaction_tests {
+    use super::*;
+    use std::io::{Read, Write};
+
+    #[test]
+    fn cmd_accepts_commands_and_returns_output() {
+        let pair = portable_pty::native_pty_system().openpty(portable_pty::PtySize {
+            rows: 24, cols: 80, pixel_width: 0, pixel_height: 0,
+        }).unwrap();
+        let mut command = cmd_command(None);
+        command.arg("/d");
+        command.arg("/q");
+        command.env("VRYKELL_TEST_TOKEN", "verified");
+        let mut child = pair.slave.spawn_command(command).unwrap();
+        drop(pair.slave);
+        let mut reader = pair.master.try_clone_reader().unwrap();
+        let mut writer = pair.master.take_writer().unwrap();
+        let (send, receive) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let mut bytes = [0u8; 4096];
+            while let Ok(count) = reader.read(&mut bytes) {
+                if count == 0 || send.send(bytes[..count].to_vec()).is_err() { break; }
+            }
+        });
+        writer.write_all(b"echo VRYKELL_CMD_OUTPUT_%VRYKELL_TEST_TOKEN%\r\n").unwrap();
+        writer.flush().unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        let mut output = String::new();
+        while std::time::Instant::now() < deadline {
+            if let Ok(bytes) = receive.recv_timeout(std::time::Duration::from_millis(250)) {
+                output.push_str(&String::from_utf8_lossy(&bytes));
+                if output.contains("VRYKELL_CMD_OUTPUT_verified") { break; }
+            }
+        }
+        let _ = child.kill();
+        assert!(output.contains("VRYKELL_CMD_OUTPUT_verified"), "Command output missing: {output}");
+    }
+}

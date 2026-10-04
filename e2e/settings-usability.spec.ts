@@ -72,3 +72,26 @@ test('persistent AI toggles keep a visible checkmark and state after hover and r
   await expect(toggle).toHaveAttribute('aria-pressed', 'true');
   await expect(toggle.locator('.state-icon-check')).toBeVisible();
 });
+
+test('CMD stored in legacy block mode opens an interactive classic terminal', async ({ page }) => {
+  await setupTauriMock(page, { integration: false });
+  await page.addInitScript(() => {
+    const bridge = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__;
+    const original = bridge.invoke;
+    bridge.invoke = (command, args) => command === 'list_shells'
+      ? Promise.resolve([{ id: 'cmd', label: 'CMD', default: true }]) : original(command, args);
+    localStorage.setItem('vrykell-agent-settings', JSON.stringify({ version: 8, state: { global: { openModeByShell: { cmd: 'block' } }, overrides: {} } }));
+  });
+  await page.goto('/');
+  await page.getByTestId('tab-new-btn').click();
+  await page.getByTestId('new-tab-option-shell:cmd').click();
+  const terminal = page.locator('.terminal-pane').last().locator('.xterm');
+  await expect(terminal).toBeVisible();
+  const input = terminal.locator('.xterm-helper-textarea');
+  await input.focus();
+  await input.press('a');
+  await input.press('Enter');
+  expect(await ptyWrites(page)).toContain('a');
+  const spawns = await page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: { shell: string; openMode: string }[] }).__PTY_SPAWNS__);
+  expect(spawns.some(spawn => spawn.shell === 'cmd' && spawn.openMode === 'classic')).toBe(true);
+});

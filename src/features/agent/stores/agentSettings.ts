@@ -77,7 +77,7 @@ export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
     bash: 'block',
     powershell: 'block',
     pwsh: 'block',
-    cmd: 'block',
+    cmd: 'classic',
   },
   sshOpenMode: 'classic',
   maxSteps: 50,
@@ -105,6 +105,7 @@ interface AgentSettingsState {
 
 /** 本地终端（shell）的默认打开模式；未知 shell 回退 block。SSH 恒经典，不经过这里。 */
 export function defaultOpenModeForShell(shellType?: string): 'classic' | 'block' {
+  if (shellType === 'cmd') return 'classic';
   const t = (shellType || 'zsh') as ShellType;
   const map = useAgentSettings.getState().global.openModeByShell;
   return (map && map[t]) || 'block';

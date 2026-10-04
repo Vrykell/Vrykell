@@ -194,7 +194,9 @@ export function useTerminalSession(
       ? layoutLeaves(tab.layout).find((t) => t.id === paneId)
       : undefined;
     // 打开模式：spec.openMode 优先；老会话缺省时 SSH 回退 classic、local 按 shell 类型
-    const openMode = spec?.openMode ?? (spec?.kind === 'ssh' ? 'classic' : defaultOpenModeForShell(spec?.shellType));
+    // Shells without integration must remain interactive, including restored sessions.
+    const openMode = spec?.kind === 'local' && spec.shellType === 'cmd' ? 'classic'
+      : spec?.openMode ?? (spec?.kind === 'ssh' ? 'classic' : defaultOpenModeForShell(spec?.shellType));
     const blockEnabled = openMode === 'block';
     // Remote authentication must remain interactive until shell integration announces its prompt.
     const initialScene: 'classic' | 'blockList' = blockEnabled && spec?.kind !== 'ssh' ? 'blockList' : 'classic';

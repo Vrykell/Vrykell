@@ -41,10 +41,11 @@ export function TerminalOpenPage() {
               </span>
               <Segmented
                 size="sm"
-                options={OPEN_MODE_OPTIONS}
-                value={openModeByShell[shell]}
+                options={shell === 'cmd' ? OPEN_MODE_OPTIONS.filter(option => option.value === 'classic') : OPEN_MODE_OPTIONS}
+                value={shell === 'cmd' ? 'classic' : openModeByShell[shell]}
                 onChange={(v) => setShellMode(shell, v)}
               />
+              {shell === 'cmd' && <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>使用经典模式</span>}
             </div>
           ))}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
