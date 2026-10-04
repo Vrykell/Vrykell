@@ -11,6 +11,7 @@ import {
 import { denyAllPending } from '@features/agent/stores/permissions';
 import { clearCompactionCache } from '@features/agent/model/context';
 import { serializeAttachments, type AttachmentMeta } from '@features/agent/model/attachments';
+import { useComposerDrafts } from '@features/chat/stores/composerDrafts';
 
 export interface ChatMessage {
   id: string;
@@ -73,6 +74,7 @@ interface ChatState {
   setContextUsed: (tabId: string, used: number, budget: number) => void;
   /** 输入框草稿（侧栏可追加内容，如文件路径） */
   draft: string;
+  draftTabId: string | null;
   setDraft: (text: string) => void;
   appendDraft: (text: string) => void;
   send: (text: string, opts?: SendOptions) => Promise<void>;
@@ -241,10 +243,14 @@ export const useChatStore = create<ChatState>((set, get) => {
   sendingTab: null,
   contextUsed: {},
   draft: '',
-  setDraft: (text) => set({ draft: text }),
+  draftTabId: null,
+  setDraft: (text) => set({ draft: text, draftTabId: text ? useWorkspaceStore.getState().activeId : null }),
   setContextUsed: (tabId, used, budget) =>
     set((s) => ({ contextUsed: { ...s.contextUsed, [tabId]: { used, budget } } })),
-  appendDraft: (text) => set((s) => ({ draft: s.draft ? `${s.draft} ${text}` : text })),
+  appendDraft: (text) => set((s) => {
+    const tabId = useWorkspaceStore.getState().activeId;
+    return { draft: s.draftTabId === tabId && s.draft ? `${s.draft} ${text}` : text, draftTabId: tabId };
+  }),
   appendChunk: (tabId, id, chunk) =>
     set((s) => {
       if (!(tabId in s.byTab)) return s; // tab 已关闭，丢弃流式 chunk
@@ -328,6 +334,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       byTab: { ...s.byTab, [tabId]: [...(s.byTab[tabId] ?? []), userMsg, assistantMsg] },
       sendingTab: tabId,
       draft: '',
+      draftTabId: null,
       contextUsed: { ...s.contextUsed, [tabId]: null },
     }));
     // 持久化用户消息（AI 对话是会话状态的一部分；用户消息无 parts）
@@ -388,10 +395,13 @@ export const useChatStore = create<ChatState>((set, get) => {
     const idx = msgs.findIndex((m) => m.id === userMsgId);
     if (idx < 0 || msgs[idx].role !== 'user') return;
     const removed = msgs.slice(idx);
-    // 该条及之后全部删除；提问内容灌回草稿（PanelChat 订阅 draft 灌入输入框）
+    // Restore the entire question to its session before removing the old exchange.
+    useComposerDrafts.getState().setText(tabId, msgs[idx].content);
+    useComposerDrafts.getState().updateAttachments(tabId, () => msgs[idx].attachments ?? []);
     set((s) => ({
       byTab: { ...s.byTab, [tabId]: (s.byTab[tabId] ?? []).slice(0, idx) },
       draft: msgs[idx].content,
+      draftTabId: tabId,
     }));
     for (const m of removed) deleteChatMessage(m.id).catch(() => {});
   },
@@ -400,6 +410,8 @@ export const useChatStore = create<ChatState>((set, get) => {
     set((s) => ({ byTab: { ...s.byTab, [tabId]: [] } }));
   },
   dropTab: (tabId) => {
+    useComposerDrafts.getState().dropTab(tabId);
+    if (get().draftTabId === tabId) set({ draft: '', draftTabId: null });
     abortControllers.get(tabId)?.abort();
     abortControllers.delete(tabId);
     denyAllPending(); // 同 abortStream：防审批悬挂

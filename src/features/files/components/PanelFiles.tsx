@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef, useMemo } from 'react';
-import { Star, Folder, ChevronRight, Download, LocateFixed, ArrowUp, HardDrive } from 'lucide-react';
+import { Fragment, useEffect, useState, useRef, useMemo } from 'react';
+import { iconSizes, Star, Folder, ChevronRight, Download, FolderArrowRight, ArrowUp, HardDrive } from '@ui/icons';
 import { type FsEntry, type DiskEntry } from '@features/files/services/fs';
 import { fileIcon } from '@features/files/utils/fileIcon';
 import { normPath, pathSegments, segmentsToPath, parentOf, compactPathSegments } from '@features/files/utils/pathUtils';
@@ -52,8 +52,13 @@ function LocalFiles() {
     disks,
     expandedSet,
     childCache,
+    loading,
+    error,
+    childErrors,
+    childLoading,
     load,
     toggleExpand,
+    retryExpand,
   } = useLocalFileBrowser({ activeCwd, focusedPaneId: focused });
   const {
     ctxMenu,
@@ -138,14 +143,14 @@ function LocalFiles() {
             data-testid="local-sync-btn"
             onClick={() => void syncToTerminal()}
           >
-            <LocateFixed size={14} />
+            <FolderArrowRight size={iconSizes.control} />
           </IconBtn>
           <IconBtn
             title="下载管理"
             data-testid="local-downloads-btn"
             onClick={() => setShowDownloads(true)}
           >
-            <Download size={14} />
+            <Download size={iconSizes.control} />
           </IconBtn>
           {/* 已在根目录/盘符根时无上级，隐藏返回按钮 */}
           {path !== null && parentOf(path) !== null && (
@@ -154,7 +159,7 @@ function LocalFiles() {
               data-testid="local-up-btn"
               onClick={goUp}
             >
-              <ArrowUp size={14} />
+              <ArrowUp size={iconSizes.control} />
             </IconBtn>
           )}
         </div>
@@ -162,10 +167,19 @@ function LocalFiles() {
 
       {/* 文件列表（树形）/ 此电脑（磁盘卡片） */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
-        {path === null ? (
+        {loading ? (
+          <div role="status" style={{ padding: 16, color: 'var(--text-muted)', fontSize: 'var(--fs-label)' }}>
+            {path === null ? '正在扫描磁盘…' : '正在读取目录…'}
+          </div>
+        ) : error ? (
+          <div role="alert" style={{ padding: 16, color: 'var(--text-secondary)', fontSize: 'var(--fs-label)' }}>
+            <div>{error}</div>
+            <button onClick={() => load(path)} style={{ marginTop: 10, minHeight: 32 }}>重试</button>
+          </div>
+        ) : path === null ? (
           disks.length === 0 ? (
             <div style={{ padding: 16, fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', textAlign: 'center' }}>
-              正在扫描磁盘…
+              暂无可用磁盘
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 10px' }}>
@@ -177,20 +191,30 @@ function LocalFiles() {
         ) : (
           <>
             {rows.map((row) => (
-              <FileRow
-                key={row.entry.path}
-                row={row}
-                inWorkspace={isWorkspace(row.entry.path)}
-                renaming={renameTarget?.path === row.entry.path}
-                onRenameCommit={requestRename}
-                onRenameCancel={cancelRename}
-                onRowClick={(entry) => entry.is_dir && handleDirClick(entry)}
-                onRowDoubleClick={(entry) =>
-                  entry.is_dir ? handleDirDoubleClick(entry) : openFileInTerminal(entry)
-                }
-                onChevronClick={toggleExpand}
-                onContextMenu={handleContextMenu}
-              />
+              <Fragment key={row.entry.path}>
+                <FileRow
+                  row={row}
+                  inWorkspace={isWorkspace(row.entry.path)}
+                  renaming={renameTarget?.path === row.entry.path}
+                  onRenameCommit={requestRename}
+                  onRenameCancel={cancelRename}
+                  onRowClick={(entry) => entry.is_dir && handleDirClick(entry)}
+                  onRowDoubleClick={(entry) =>
+                    entry.is_dir ? handleDirDoubleClick(entry) : openFileInTerminal(entry)
+                  }
+                  onChevronClick={toggleExpand}
+                  onContextMenu={handleContextMenu}
+                />
+                {row.expanded && childLoading.has(row.entry.path) && (
+                  <div role="status" style={{ padding: '4px 12px', color: 'var(--text-muted)', fontSize: 'var(--fs-label)' }}>正在读取目录…</div>
+                )}
+                {row.expanded && childErrors[row.entry.path] && (
+                  <div role="alert" style={{ padding: '4px 12px', color: 'var(--text-secondary)', fontSize: 'var(--fs-label)' }}>
+                    {childErrors[row.entry.path]}
+                    <button onClick={() => retryExpand(row.entry)} style={{ marginLeft: 8, minHeight: 32 }}>重试</button>
+                  </div>
+                )}
+              </Fragment>
             ))}
             {rows.length === 0 && (
               <div style={{ padding: 16, fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', textAlign: 'center' }}>
@@ -252,7 +276,7 @@ function DiskCard({ disk, onOpen }: { disk: DiskEntry; onOpen: () => void }) {
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         background: 'var(--hover)', color: 'var(--accent)',
       }}>
-        <HardDrive size={17} />
+        <HardDrive size={iconSizes.row} />
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
@@ -344,17 +368,17 @@ function FileRow({
       <span
         onClick={entry.is_dir && !renaming ? (e) => { e.stopPropagation(); onChevronClick(entry); } : undefined}
         style={{
-          width: 14, flexShrink: 0, display: 'inline-flex', justifyContent: 'center',
+          width: iconSizes.compact, flexShrink: 0, display: 'inline-flex', justifyContent: 'center',
           color: 'var(--text-muted)',
           transition: 'transform 0.12s ease',
           transform: expanded ? 'rotate(90deg)' : 'none',
           visibility: entry.is_dir ? 'visible' : 'hidden',
         }}
       >
-        <ChevronRight size={11} />
+        <ChevronRight size={iconSizes.compact} />
       </span>
       <span style={{ width: 20, flexShrink: 0, display: 'inline-flex', justifyContent: 'center' }}>
-        <Icon size={13} fill={entry.is_dir && inWorkspace ? 'currentColor' : 'none'} />
+        <Icon size={iconSizes.row} fill={entry.is_dir && inWorkspace ? 'currentColor' : 'none'} />
       </span>
       {renaming ? (
         <input
