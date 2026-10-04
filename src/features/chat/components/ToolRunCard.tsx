@@ -128,7 +128,7 @@ function CommandOutputBlock({ run, paneId }: { run: ToolRun; paneId?: string }) 
         border: '1px solid var(--border)',
         overflow: 'hidden',
         fontFamily: 'var(--font-mono)',
-        fontSize: 11,
+        fontSize: 'calc(11px * var(--ui-font-scale))',
         lineHeight: 1.5,
       }}
     >
@@ -174,7 +174,7 @@ export default function ToolRunCard({ run, paneId }: { run: ToolRun; paneId?: st
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
             fontFamily: 'var(--font-mono)',
-            fontSize: 11,
+            fontSize: 'calc(11px * var(--ui-font-scale))',
             color: 'var(--text-secondary)',
           }}
         >
@@ -187,7 +187,7 @@ export default function ToolRunCard({ run, paneId }: { run: ToolRun; paneId?: st
               display: 'inline-flex',
               alignItems: 'center',
               gap: 2,
-              fontSize: 10,
+              fontSize: 'calc(10px * var(--ui-font-scale))',
               fontFamily: 'var(--font-mono)',
               color: exitCode === 0 ? 'var(--success)' : 'var(--error)',
               flexShrink: 0,
@@ -197,21 +197,21 @@ export default function ToolRunCard({ run, paneId }: { run: ToolRun; paneId?: st
             {exitCode}
           </span>
         )}
-        <span style={{ fontSize: 10, color: chip.color, flexShrink: 0 }}>{chip.label}</span>
+        <span style={{ fontSize: 'calc(10px * var(--ui-font-scale))', color: chip.color, flexShrink: 0 }}>{chip.label}</span>
       </div>
 
       {/* M3 审批行：等待批准时行内三按钮（零浮层），危险命令附原因 */}
       {run.state === 'approval-pending' && (
         <div style={{ margin: '2px 0 6px' }}>
           {run.danger && (
-            <div style={{ fontSize: 11, color: 'var(--accent-warm)', marginBottom: 4 }}>
+            <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--accent-warm)', marginBottom: 4 }}>
               ⚠ {run.danger}，确认后再放行
             </div>
           )}
           <div style={{ display: 'flex', gap: 6 }}>
             <button
               style={{
-                fontSize: 11,
+                fontSize: 'calc(11px * var(--ui-font-scale))',
                 padding: '2px 10px',
                 borderColor: 'var(--accent-warm)',
                 color: 'var(--accent-warm)',
@@ -221,13 +221,13 @@ export default function ToolRunCard({ run, paneId }: { run: ToolRun; paneId?: st
               允许一次
             </button>
             <button
-              style={{ fontSize: 11, padding: '2px 10px' }}
+              style={{ fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 10px' }}
               onClick={() => resolveApproval(run.toolCallId, 'session')}
             >
               本会话允许
             </button>
             <button
-              style={{ fontSize: 11, padding: '2px 10px', color: 'var(--error-light)' }}
+              style={{ fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 10px', color: 'var(--error-light)' }}
               onClick={() => resolveApproval(run.toolCallId, 'deny')}
             >
               拒绝
@@ -247,7 +247,7 @@ export default function ToolRunCard({ run, paneId }: { run: ToolRun; paneId?: st
             background: 'var(--block)',
             borderRadius: 4,
             fontFamily: 'var(--font-mono)',
-            fontSize: 11,
+            fontSize: 'calc(11px * var(--ui-font-scale))',
             lineHeight: 1.5,
             color: run.state === 'error' ? 'var(--error-light)' : 'var(--text-secondary)',
             maxHeight: 240,

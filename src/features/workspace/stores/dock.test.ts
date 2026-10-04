@@ -190,6 +190,7 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
     localStorage.setItem('dock-layout-v4', JSON.stringify({
       leftZone: ['chat', 'ssh', 'tabs'], rightZone: ['files'],
       leftPanels: ['chat'], rightPanels: ['files'], panelWidths: { chat: 350, files: 280 },
+      widthPreset: 'compact',
     }));
     const store = await freshStore();
     expect(store.getState().leftZone).toEqual(['ssh', 'tabs', 'files']);
@@ -199,7 +200,7 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
     expect(store.getState().panelWidths).toEqual({ chat: 350, files: 280 });
   });
 
-  it('migrates legacy navigation to the left, preserving widths and opening only sessions', async () => {
+  it('migrates legacy navigation to the left with compact widths and only sessions open', async () => {
     localStorage.removeItem('dock-layout-v4');
     localStorage.setItem('dock-layout-v3', JSON.stringify({
       leftZone: ['tabs', 'ssh'], rightZone: ['files'],
@@ -212,7 +213,21 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
     expect(s.rightZone).toEqual(['chat']);
     expect(s.leftPanels).toEqual(['tabs']);
     expect(s.rightPanels).toEqual([]);
-    expect(s.panelWidths).toEqual({ tabs: 220, files: 280 });
+    expect(s.panelWidths).toEqual({ tabs: 180, files: 200 });
     expect(localStorage.getItem('dock-layout-v4')).toContain('"leftPanels":["tabs"]');
+  });
+  it('shrinks oversized saved widths once and preserves subsequent manual resizing', async () => {
+    localStorage.setItem('dock-layout-v4', JSON.stringify({
+      leftZone: ['tabs', 'files', 'ssh'], rightZone: ['chat'],
+      leftPanels: ['tabs'], rightPanels: ['chat'], panelWidths: { tabs: 251, chat: 373, files: 170 },
+    }));
+    const store = await freshStore();
+    expect(store.getState().panelWidths).toEqual({ tabs: 180, chat: 320, files: 170 });
+    store.getState().setPanelWidth('tabs', 60);
+    store.getState().setPanelWidth('chat', 40);
+    const reloaded = await freshStore();
+    expect(reloaded.getState().panelWidths).toEqual({ tabs: 240, chat: 360, files: 170 });
+    expect(reloaded.getState().leftPanels).toEqual(['tabs']);
+    expect(reloaded.getState().rightPanels).toEqual(['chat']);
   });
 });

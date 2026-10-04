@@ -33,7 +33,7 @@ export function ShortcutPage() {
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
               padding: '8px 12px',
               background: i % 2 === 0 ? 'transparent' : 'var(--hover)',
-              fontSize: 12,
+              fontSize: 'calc(12px * var(--ui-font-scale))',
             }}
           >
             <span style={{ color: 'var(--text-secondary)' }}>{s.desc}</span>
@@ -42,7 +42,7 @@ export function ShortcutPage() {
                 <kbd
                   key={j}
                   style={{
-                    fontFamily: 'var(--font-mono)', fontSize: 11,
+                    fontFamily: 'var(--font-mono)', fontSize: 'calc(11px * var(--ui-font-scale))',
                     padding: '2px 6px', borderRadius: 4,
                     background: 'var(--canvas)', border: '1px solid var(--border)',
                     color: 'var(--text-primary)', whiteSpace: 'nowrap',

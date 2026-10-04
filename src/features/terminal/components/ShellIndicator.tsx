@@ -73,7 +73,7 @@ export default function ShellIndicator({ shell, connected, focused, compact, lab
         alignItems: 'center',
         gap: 5,
         fontFamily: 'var(--font-mono)',
-        fontSize: 11,
+        fontSize: 'calc(11px * var(--ui-font-scale))',
         fontWeight: 500,
         color: fg,
         userSelect: 'none',

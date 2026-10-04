@@ -41,7 +41,7 @@ export function AiBehaviorPage() {
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '6px 10px', marginBottom: 8, borderRadius: 'var(--radius-inner)',
           background: hasOverride ? 'var(--accent-warm-dim)' : 'var(--hover)',
-          fontSize: 11, color: hasOverride ? 'var(--accent-warm)' : 'var(--text-muted)',
+          fontSize: 'calc(11px * var(--ui-font-scale))', color: hasOverride ? 'var(--accent-warm)' : 'var(--text-muted)',
         }}>
           <span>{hasOverride ? `已覆盖 ${overrideKeys.length} 项` : '跟随全局默认'}</span>
           <div style={{ flex: 1 }} />

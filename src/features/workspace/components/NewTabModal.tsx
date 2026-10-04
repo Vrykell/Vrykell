@@ -109,11 +109,9 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
       }}
       onClick={onClose}
     >
-      <div
+      <div className="workspace-floating workspace-floating-dialog" role="dialog" aria-modal="true" aria-label="新建标签页"
         style={{
-          width: 420, maxHeight: '70vh',
-          background: 'var(--elevated)', border: '1px solid var(--border-strong)',
-          borderRadius: 'var(--radius-block)', boxShadow: 'var(--shadow-lg)',
+          width: 420, maxWidth: 'calc(100vw - 40px)', maxHeight: '70vh',
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
           animation: 'modalIn 0.22s var(--ease-out)',
         }}
@@ -121,7 +119,7 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
         onKeyDown={handleKey}
       >
         <div style={{
-          padding: '12px 16px 4px', fontSize: 13, fontWeight: 600,
+          padding: '12px 16px 4px', fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 600,
           color: 'var(--text-primary)',
         }}>
           新建标签页
@@ -142,7 +140,7 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
               placeholder="搜索标签页类型…"
               style={{
                 flex: 1, background: 'transparent', border: 'none', outline: 'none',
-                fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+                fontSize: 'calc(13px * var(--ui-font-scale))', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
               }}
             />
           </div>
@@ -151,7 +149,7 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
         {/* 候选列表 */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '4px 8px 10px' }}>
           {filtered.length === 0 ? (
-            <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
+            <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>
               无匹配类型
             </div>
           ) : filtered.map((o, i) => (
@@ -191,7 +189,7 @@ function OptionRow({
         width: '100%', textAlign: 'left', padding: '8px 10px',
         border: 'none', borderRadius: 'var(--radius-inner)',
         background: selected ? 'var(--hover)' : 'transparent',
-        color: 'var(--text-primary)', cursor: 'pointer', fontSize: 13,
+        color: 'var(--text-primary)', cursor: 'pointer', fontSize: 'calc(13px * var(--ui-font-scale))',
       }}
     >
       <span style={{
@@ -206,7 +204,7 @@ function OptionRow({
           {opt.label}
         </span>
         {opt.subtitle && (
-          <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span style={{ display: 'block', fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {opt.subtitle}
           </span>
         )}

@@ -75,7 +75,7 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
       <div style={{
         display: 'flex', alignItems: 'center', gap: 2,
         padding: '6px 8px',
-        fontSize: 11, minHeight: 30, flexShrink: 0,
+        fontSize: 'calc(11px * var(--ui-font-scale))', minHeight: 30, flexShrink: 0,
         whiteSpace: 'nowrap',
       }}>
         <div ref={crumbRef} style={{
@@ -126,11 +126,11 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
       {/* 远程文件列表 */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
         {loading ? (
-          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>连接中…</div>
+          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>连接中…</div>
         ) : error ? (
-          <div style={{ padding: 16, fontSize: 12, color: 'var(--error-light)', textAlign: 'center' }}>{error}</div>
+          <div style={{ padding: 16, fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--error-light)', textAlign: 'center' }}>{error}</div>
         ) : entries.length === 0 ? (
-          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>空目录</div>
+          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>空目录</div>
         ) : entries.map((e) => (
           <RemoteRow
             key={e.path}
@@ -233,7 +233,8 @@ function RemoteRow({
       data-testid={`remote-file-${entry.name}`}
       style={{
         display: 'flex', alignItems: 'center', gap: 6,
-        padding: '3px 10px', fontSize: 12, cursor: renaming ? 'text' : 'pointer',
+        padding: '5px 10px', fontSize: 'var(--fs-label)', lineHeight: '20px', minHeight: 32,
+        cursor: renaming ? 'text' : 'pointer',
         color: entry.is_dir ? 'var(--text-primary)' : 'var(--text-secondary)',
       }}
       onMouseEnter={(ev) => { ev.currentTarget.style.background = 'var(--hover)'; }}
@@ -259,7 +260,7 @@ function RemoteRow({
           style={{
             flex: 1, minWidth: 0,
             background: 'var(--canvas)', border: '1px solid var(--accent)',
-            borderRadius: 3, padding: '0 4px', fontSize: 12,
+            borderRadius: 3, padding: '0 4px', fontSize: 'calc(12px * var(--ui-font-scale))',
             color: 'var(--text-primary)', fontFamily: 'var(--font-mono)',
             outline: 'none',
           }}
@@ -279,7 +280,7 @@ function Crumb({ label, onClick, active }: { label: string; onClick: () => void;
       cursor: 'pointer', padding: '1px 4px', borderRadius: 3,
       color: active ? 'var(--text-primary)' : 'var(--text-muted)',
       background: active ? 'var(--hover)' : 'transparent',
-      fontFamily: 'var(--font-mono)', fontSize: 11,
+      fontFamily: 'var(--font-mono)', fontSize: 'calc(11px * var(--ui-font-scale))',
     }}>{label}</span>
   );
 }

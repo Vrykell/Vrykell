@@ -75,12 +75,9 @@ export default function SearchResultCard({
   const sessionData = isSession ? (result.data as SessionResultData) : null;
   const isHistoricalBlock = isBlock && blockData?.sessionStatus === 'historical';
   const isHistoricalSession = isSession && sessionData?.status === 'historical';
-  const borderColor = blockData
-    ? (blockData.exitCode === 0 ? 'var(--success)' : 'var(--error)')
-    : 'transparent';
 
   return (
-    <div
+    <div className="workspace-floating-row" data-search-result data-selected={selected}
       onClick={(e) => {
         // 历史会话/块：点击卡片 = 恢复（与 ↩ 按钮一致）
         if (isHistoricalBlock && onRestore) {
@@ -100,13 +97,12 @@ export default function SearchResultCard({
         gap: 10,
         width: '100%',
         textAlign: 'left',
-        padding: '10px 14px 8px',
+        padding: '9px 10px',
+        marginBottom: 2,
         border: 'none',
-        borderLeft: isBlock ? `3px solid ${borderColor}` : '3px solid transparent',
-        background: selected ? 'var(--accent-bg)' : 'transparent',
         color: 'var(--text-primary)',
         cursor: 'pointer',
-        fontSize: 12,
+        fontSize: 'calc(12px * var(--ui-font-scale))',
         fontFamily: 'var(--font-ui)',
         transition: 'background 0.1s',
         position: 'relative',
@@ -124,7 +120,7 @@ export default function SearchResultCard({
       <div style={{ flex: 1, minWidth: 0 }}>
         {/* 主标题 */}
         <div style={{
-          fontWeight: 600, fontSize: 12.5,
+          fontWeight: 600, fontSize: 'calc(13px * var(--ui-font-scale))',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           fontFamily: isHistory ? 'var(--font-mono)' : undefined,
         }}>
@@ -134,7 +130,7 @@ export default function SearchResultCard({
         {/* 副标题 — 输出片段，带高亮 */}
         {result.subtitle && (
           <div style={{
-            fontSize: 11, color: 'var(--text-muted)', marginTop: 2,
+            fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', marginTop: 2,
             overflow: 'hidden', textOverflow: 'ellipsis',
             whiteSpace: isBlock ? 'normal' : 'nowrap',
             fontFamily: isBlock ? 'var(--font-mono)' : undefined,
@@ -148,17 +144,17 @@ export default function SearchResultCard({
         {/* 第三行：detail + badge */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
-          marginTop: 3, fontSize: 10, color: 'var(--text-muted)',
+          marginTop: 3, fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)',
         }}>
           {result.detail && <span>{result.detail}</span>}
           {isBlock && blockData?.status && !isHistoricalBlock && (
             <span style={{
-              fontSize: 9, padding: '1px 5px', borderRadius: 3,
+              fontSize: 'calc(10px * var(--ui-font-scale))', padding: '1px 5px', borderRadius: 4,
               background: blockData.status === 'completed'
-                ? 'var(--success-bg)' : blockData.status === 'failed'
+                ? 'var(--canvas)' : blockData.status === 'failed'
                 ? 'var(--error-bg)' : 'var(--accent-bg)',
               color: blockData.status === 'completed'
-                ? 'var(--success)' : blockData.status === 'failed'
+                ? 'var(--text-secondary)' : blockData.status === 'failed'
                 ? 'var(--error)' : 'var(--accent)',
             }}>
               {statusLabel(blockData.status)}
@@ -167,9 +163,9 @@ export default function SearchResultCard({
           {/* 历史会话徽章 */}
           {(isHistoricalBlock || isHistoricalSession) && (
             <span style={{
-              fontSize: 9, padding: '1px 5px', borderRadius: 3,
-              background: 'var(--accent-warm-dim)',
-              color: 'var(--accent-warm)',
+              fontSize: 'calc(10px * var(--ui-font-scale))', padding: '1px 5px', borderRadius: 4,
+              background: 'var(--canvas)',
+              color: 'var(--text-secondary)',
             }}>
               历史会话
             </span>
@@ -203,12 +199,12 @@ function RestoreBtn({ onClick }: { onClick: (e: React.MouseEvent) => void }) {
         flexShrink: 0,
         width: 22, height: 22,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        border: '1px solid var(--accent-warm)',
+        border: '1px solid var(--border)',
         borderRadius: 4,
-        background: 'var(--accent-warm-dim)',
-        color: 'var(--accent-warm)',
+        background: 'var(--canvas)',
+        color: 'var(--text-secondary)',
         cursor: 'pointer',
-        fontSize: 10,
+        fontSize: 'calc(10px * var(--ui-font-scale))',
         padding: 0,
         marginTop: -1,
         opacity: 0.8,

@@ -6,6 +6,7 @@ import { useSessionStore } from '@features/workspace';
 import { useDockStore } from '@features/workspace';
 import ContextMenu from '@ui/ContextMenu';
 import { IconBtn } from '@ui/UiBtn';
+import { sidebarRowSpacing, sidebarRowContent, sidebarRowIcon, sidebarRowTitle } from '@ui/sidebarRow';
 import type { SshConnection } from '@features/ssh/services/api';
 import SshFormModal from '@features/ssh/components/SshFormModal';
 
@@ -18,6 +19,7 @@ export default function PanelSsh() {
   const connections = useSshStore((s) => s.connections);
   const touch = useSshStore((s) => s.touch);
   const remove = useSshStore((s) => s.remove);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -79,12 +81,12 @@ export default function PanelSsh() {
       {/* 顶栏：搜索 + 编辑 + 新建 */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 4,
-        padding: '6px 8px',
+        padding: '6px 10px 8px',
       }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 5, flex: 1, minWidth: 0,
           background: 'var(--chrome-field)',
-          borderRadius: 'var(--radius-inner)', padding: '0 6px', height: 24,
+          borderRadius: 'var(--radius-inner)', padding: '0 8px', height: 30,
         }}>
           <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           <input
@@ -94,7 +96,7 @@ export default function PanelSsh() {
             data-testid="ssh-search"
             style={{
               flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none',
-              fontSize: 12, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+              fontSize: 'calc(13px * var(--ui-font-scale))', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
             }}
           />
         </div>
@@ -112,9 +114,9 @@ export default function PanelSsh() {
       </div>
 
       {/* 连接列表 */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '0 0 8px' }}>
         {filtered.length === 0 ? (
-          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
+          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>
             {connections.length === 0 ? '暂无 SSH 连接，点击右上角 + 新建' : '无匹配连接'}
           </div>
         ) : filtered.map((c) => (
@@ -128,36 +130,32 @@ export default function PanelSsh() {
               setMenu({ x: e.clientX, y: e.clientY, conn: c });
             }}
             data-testid={`ssh-row-${c.id}`}
-            title={`双击连接到 ${c.host}；右键编辑 / 删除`}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '7px 10px', cursor: 'pointer', fontSize: 12,
-              color: c.id === selectedId ? 'var(--text-primary)' : 'var(--text-secondary)',
-              background: c.id === selectedId ? 'var(--selection-bg)' : 'transparent',
-              minHeight: 34,
+            title={`${c.user ? `${c.user}@` : ''}${c.host}:${c.port ?? 22}；双击连接，右键编辑 / 删除`}
+            tabIndex={0}
+            onKeyDown={e => {
+              if (e.target !== e.currentTarget) return;
+              if (e.key === 'Enter') { e.preventDefault(); openConnection(c); }
+              if (e.key === ' ') { e.preventDefault(); setSelectedId(c.id); }
             }}
-            onMouseEnter={(e) => {
-              if (c.id !== selectedId) (e.currentTarget as HTMLElement).style.background = 'var(--hover)';
-            }}
-            onMouseLeave={(e) => {
-              if (c.id !== selectedId) (e.currentTarget as HTMLElement).style.background = 'transparent';
-            }}
+            style={sidebarRowSpacing}
+            onMouseEnter={() => setHoveredId(c.id)}
+            onMouseLeave={() => setHoveredId(null)}
           >
-            <Server size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-            <span style={{ flex: 1, overflow: 'hidden' }}>
-              <span style={{
-                display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>
-                {c.name}
-              </span>
-              <span style={{
-                display: 'block', fontSize: 11, color: 'var(--text-muted)',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                fontFamily: 'var(--font-mono)',
-              }}>
-                {c.user ? `${c.user}@` : ''}{c.host}{c.port && c.port !== 22 ? `:${c.port}` : ''}
-              </span>
-            </span>
+            <div style={{
+              ...sidebarRowContent,
+              color: c.id === selectedId ? 'var(--text-primary)' : 'var(--text-secondary)',
+              background: c.id === selectedId ? 'var(--selection-bg)' : hoveredId === c.id ? 'var(--hover)' : 'transparent',
+            }}>
+              <span style={sidebarRowIcon}><Server size={15} /></span>
+              <span style={{ ...sidebarRowTitle, flex: 1, minWidth: 0, fontWeight: c.id === selectedId ? 600 : 500 }}>{c.name}</span>
+              <button data-subtle aria-label={`编辑「${c.name}」`} onDoubleClick={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); setSelectedId(c.id); editConn(c); }} style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: 18, height: 18, padding: 0, border: 'none', borderRadius: 4,
+                flexShrink: 0, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+                opacity: c.id === selectedId || hoveredId === c.id ? 1 : 0,
+                transition: 'opacity 0.12s ease',
+              }}><Pencil size={12} /></button>
+            </div>
           </div>
         ))}
       </div>

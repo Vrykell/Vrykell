@@ -26,3 +26,49 @@ test('saved custom Anthropic address is used by the next chat request', async ({
   expect(calls.map(call => call.args.url)).toEqual(calls.map(() => 'https://gateway.example/v1/messages'));
 });
 
+test('font quick settings apply immediately, resize the terminal and persist after reload', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  await expect.poll(async () => (await ptyResizes(page)).length).toBeGreaterThan(0);
+  const originalColumns = (await ptyResizes(page)).at(-1)!.cols;
+  await gotoSetting(page, '主题');
+  const quick = page.getByLabel('字号快速设置');
+  await quick.getByRole('button', { name: '15', exact: true }).click();
+  await quick.getByRole('button', { name: '增大终端字号' }).click();
+  await quick.getByRole('button', { name: '增大终端字号' }).click();
+  await expect(quick.getByTestId('terminal-font-size')).toHaveText('16px');
+  await expect(page.locator('aside').getByRole('button', { name: '主题', exact: true })).toHaveCSS('font-size', '15px');
+  await page.keyboard.press('Meta+1');
+  await expect.poll(async () => (await ptyResizes(page)).at(-1)!.cols).toBeLessThan(originalColumns);
+  const input = page.getByPlaceholder(/输入命令/);
+  await expect(input).toHaveCSS('font-size', '16px');
+  await input.fill('echo font-preferences');
+  await input.press('Enter');
+  const output = page.locator('[data-selectable]').filter({ hasText: 'font-preferences' }).last();
+  await expect(output).toHaveCSS('font-size', '16px');
+  await page.reload();
+  await expect(page.getByPlaceholder(/输入命令/)).toHaveCSS('font-size', '16px');
+  await gotoSetting(page, '模型配置');
+  await expect(quick.getByRole('button', { name: '15', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await quick.getByRole('button', { name: '恢复默认字号' }).click();
+  await expect(quick.getByTestId('terminal-font-size')).toHaveText('14px');
+  await page.screenshot({ path: test.info().outputPath('settings.png') });
+  await page.locator('aside').getByRole('button', { name: '主题', exact: true }).click();
+  await page.getByRole('button', { name: '浅色', exact: true }).click();
+  await page.screenshot({ path: test.info().outputPath('settings-light.png') });
+});
+
+test('persistent AI toggles keep a visible checkmark and state after hover and reload', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  await page.locator('[data-dock-btn="chat"]').click();
+  const toggle = page.getByTitle('深度思考（reasoning effort）');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  await toggle.click();
+  await page.mouse.move(20, 400);
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await expect(toggle.locator('.state-icon-check')).toBeVisible();
+  await page.reload();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await expect(toggle.locator('.state-icon-check')).toBeVisible();
+});

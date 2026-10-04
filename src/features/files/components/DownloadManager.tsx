@@ -61,7 +61,7 @@ export default function DownloadManager({ onBack }: { onBack: () => void }) {
         <IconBtn title="返回文件浏览" data-testid="downloads-back" onClick={onBack}>
           <ArrowLeft size={14} />
         </IconBtn>
-        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>下载管理</span>
+        <span style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>下载管理</span>
         <div style={{ flex: 1 }} />
         {items.length > 0 && (
           <IconBtn title="清空下载历史" data-testid="downloads-clear" onClick={() => setConfirmClear(true)}>
@@ -73,9 +73,9 @@ export default function DownloadManager({ onBack }: { onBack: () => void }) {
       {/* 列表 */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
         {loading ? (
-          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>加载中…</div>
+          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>加载中…</div>
         ) : items.length === 0 ? (
-          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
+          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>
             暂无下载记录
           </div>
         ) : items.map((entry) => {
@@ -86,7 +86,7 @@ export default function DownloadManager({ onBack }: { onBack: () => void }) {
               title={`远程路径：${entry.remotePath}`}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
-                padding: '5px 10px', fontSize: 12,
+                padding: '5px 10px', fontSize: 'calc(12px * var(--ui-font-scale))',
               }}>
               <span style={{ width: 18, flexShrink: 0, display: 'inline-flex', justifyContent: 'center', color: 'var(--text-muted)' }}>
                 <Icon size={13} />
@@ -98,7 +98,7 @@ export default function DownloadManager({ onBack }: { onBack: () => void }) {
                 }}>
                   {entry.name}
                 </span>
-                <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>
                   {fmtSize(entry.size)} · {fmtTime(entry.downloadedAt)}
                   {entry.connectionName ? ` · ${entry.connectionName}` : ''}
                 </span>
@@ -107,7 +107,7 @@ export default function DownloadManager({ onBack }: { onBack: () => void }) {
                 title="在文件管理器中显示"
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
-                  fontSize: 11, padding: '2px 8px', border: '1px solid var(--border)',
+                  fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', border: '1px solid var(--border)',
                   borderRadius: 4, background: 'transparent', color: 'var(--text-secondary)',
                   cursor: 'pointer',
                 }}>

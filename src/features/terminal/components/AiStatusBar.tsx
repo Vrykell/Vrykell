@@ -2,36 +2,12 @@
  * AiStatusBar — 终端 pane 顶部的 AI 状态栏（仅 AI 模式显示）：
  * 模型下拉 · 上下文圆环 · 深思/Agent 开关，与聊天面板顶栏同构。
  */
-import { Bot, Brain, type LucideIcon } from 'lucide-react';
+import Toggle from '@ui/StateIconButton';
+import { Bot, Brain } from 'lucide-react';
 import { useInputStore, selectPaneInput } from '@features/terminal';
 import { useAiConfigStore, useAgentSettings } from '@features/agent';
 import ModelPill from '@features/chat/components/ModelPill';
 import ContextRing from '@features/chat/components/ContextRing';
-
-function Toggle({ icon: Icon, on, title, onClick }: {
-  icon: LucideIcon;
-  on: boolean;
-  title: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      data-subtle
-      title={title}
-      onClick={onClick}
-      style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
-        background: 'transparent', color: on ? 'var(--accent-warm)' : 'var(--text-muted)',
-        cursor: 'pointer',
-      }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--button-hover)'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-    >
-      <Icon size={13} />
-    </button>
-  );
-}
 
 export default function AiStatusBar({ paneId }: { paneId: string }) {
   const aiMode = useInputStore(selectPaneInput(paneId)).aiMode;

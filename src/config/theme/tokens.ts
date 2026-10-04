@@ -25,6 +25,8 @@ export interface ThemePalette {
   // 边框
   border: string;
   borderStrong: string;
+  /** Low-contrast resting divider for resizable panes. */
+  resizeDivider: string;
   /** InputEditor 未聚焦时的边框色 */
   inputBorder: string;
 
@@ -127,23 +129,24 @@ export interface ThemePalette {
   xtermBrightWhite: string;
 }
 
-// ── Dark（默认：中性，主色不带任何颜色倾向） ──
+// Dark surfaces and interactive accents use neutral gray levels.
 
 const dark: ThemePalette = {
   // Neutral levels distinguish the window frame, sidebars and content.
-  chromeBg: '#282828',
-  sidebarBg: '#202020',
-  chromeField: '#303030',
-  selectionBg: '#3D3D3D',
-  canvas: '#161616',
-  surface: '#222222',
-  block: '#2B2B2B',
-  elevated: '#333333',
+  chromeBg: '#323232',
+  sidebarBg: '#242424',
+  chromeField: '#3C3C3C',
+  selectionBg: '#353535',
+  canvas: '#141414',
+  surface: '#292929',
+  block: '#333333',
+  elevated: '#383838',
   hover: 'rgba(255,255,255,0.07)',
   buttonHover: '#383838',
 
   border: '#404040',
   borderStrong: '#5A5A5A',
+  resizeDivider: 'rgba(255,255,255,0.035)',
   inputBorder: 'rgba(255,255,255,0.08)',
 
   // 文字
@@ -151,12 +154,12 @@ const dark: ThemePalette = {
   textSecondary: '#B8B8B8',
   textMuted: '#9E9E9E',
 
-  // 主色：中性浅灰（选中/激活态用明度差区分，不引入色相）
+  // Neutral accents mark active controls and focus indicators.
   accent: '#C7C7C7',
   accentDim: 'rgba(199,199,199,0.22)',
   accentText: '#0A0A0A',
 
-  // 信息检索 / AI：默认同样中性（带色方案见 TEAL_THEME_PRESET）
+  // Secondary information uses neutral accents as well.
   accentBlue: '#B4B4B4',
   accentBlueDim: 'rgba(180,180,180,0.20)',
   accentBlueStrong: '#C7C7C7',
@@ -168,7 +171,7 @@ const dark: ThemePalette = {
   accentUser: '#A5A5A5',
   accentUserDim: 'rgba(165,165,165,0.15)',
 
-  // 功能性语义色（仅这类保留色相：成功/错误/警告/连接状态）
+  // Semantic colors remain independent from decorative accents.
   success: '#89D185',
   successDim: 'rgba(137,209,133,0.15)',
   error: '#F14C4C',
@@ -238,9 +241,9 @@ const dark: ThemePalette = {
 };
 
 /**
- * TEAL_THEME_PRESET — 青绿自定义主题（覆盖变量，走 theme.json 自定义主题机制）。
- * 默认内置调色板保持中性；喜欢带色外观的用户可在设置页一键应用本预设。
- * 仅覆盖「带色相」的变量，结构/明度层级（含 shadow 内描边高光）沿用默认。
+ * Optional teal accent overrides for the custom theme configuration.
+ * The built-in palette stays neutral; this preset adds colored accents.
+ * Structural surfaces, brightness levels and shadows keep their defaults.
  */
 export const TEAL_THEME_PRESET: Record<string, string> = {
   '--accent': '#57D4C2',
@@ -284,13 +287,14 @@ const light: ThemePalette = {
 
   border: '#CCCCCC',
   borderStrong: '#A8A8A8',
+  resizeDivider: 'rgba(0,0,0,0.05)',
   inputBorder: '#D4D4D4',
 
   textPrimary: '#272727',
   textSecondary: '#595959',
   textMuted: '#707070',
 
-  // 主色：中性深灰（浅色模式下带色相同样只在预设中出现）
+  // A darker neutral accent stays readable on light surfaces.
   accent: '#4F4F4F',
   accentDim: 'rgba(79,79,79,0.15)',
   accentText: '#FFFFFF',
@@ -392,6 +396,7 @@ export function paletteToCssVars(p: ThemePalette): Record<string, string> {
     '--button-hover': p.buttonHover,
     '--border': p.border,
     '--border-strong': p.borderStrong,
+    '--resize-divider': p.resizeDivider,
     '--input-border': p.inputBorder,
     '--text-primary': p.textPrimary,
     '--text-secondary': p.textSecondary,

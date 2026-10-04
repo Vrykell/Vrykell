@@ -4,6 +4,7 @@ import { loadConfig, saveConfig, type FileOpenConfig } from '@features/files/ser
 import { refreshAiConfig, setTavilyKey, clearTavilyKey, useAiConfigStore } from '@features/agent';
 import SkillsSettings from '@features/settings/pages/SkillsSettings';
 import { MemorySettings, AgentsSettings, SchedulesSettings } from '@features/settings/pages/AgentExtrasSettings';
+import FontQuickSettings from '@features/settings/components/FontQuickSettings';
 import Segmented from '@ui/Segmented';
 import { useToastStore } from '@ui/Toast';
 import {
@@ -104,7 +105,7 @@ export default function SettingsView() {
           <>
             <Field title="当前搜索方式" description="搜索始终可用，无需配置。">
               <span style={{
-                fontSize: 11, padding: '2px 8px', borderRadius: 4,
+                fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', borderRadius: 4,
                 color: 'var(--text-secondary)', background: 'var(--hover)',
               }}>
                 {mode}
@@ -113,7 +114,7 @@ export default function SettingsView() {
             <Field title="Tavily API Key" description="可选，配置后搜索质量更好，未配置时用 DuckDuckGo 兜底。">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span style={{
-                  fontSize: 11, padding: '2px 8px', borderRadius: 4,
+                  fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', borderRadius: 4,
                   color: aiCfg.hasTavilyKey ? 'var(--success)' : 'var(--text-muted)',
                   background: aiCfg.hasTavilyKey ? 'var(--success-bg)' : 'var(--hover)',
                 }}>
@@ -161,7 +162,7 @@ export default function SettingsView() {
                   const lv: ToolLevel = permLevels[name] ?? 'ask';
                   return (
                     <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ flex: 1, fontSize: 12, color: 'var(--text-primary)' }}>
+                      <span style={{ flex: 1, fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-primary)' }}>
                         {PERM_TOOL_LABEL[name]}
                       </span>
                       <Segmented
@@ -284,13 +285,13 @@ export default function SettingsView() {
     }}>
       {/* 侧栏 */}
       <aside className="settings-navigation" style={{
-        width: 192, flexShrink: 0, background: 'var(--surface)',
+        width: 192, flexShrink: 0, background: 'var(--sidebar-bg)',
         display: 'flex', flexDirection: 'column', minHeight: 0,
       }}>
         <div style={{ padding: 8 }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6,
-            padding: '4px 8px',
+            padding: '6px 8px',
             borderRadius: 'var(--radius-inner)', background: 'var(--block)',
           }}>
             <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
@@ -300,7 +301,7 @@ export default function SettingsView() {
               placeholder="搜索设置…"
               style={{
                 flex: 1, minWidth: 0, background: 'transparent', border: 'none',
-                outline: 'none', fontSize: 12, color: 'var(--text-primary)',
+                outline: 'none', fontSize: 'var(--fs-label)', color: 'var(--text-primary)',
               }}
             />
           </div>
@@ -312,11 +313,12 @@ export default function SettingsView() {
             return (
               <div key={g.id} style={{ marginBottom: 2 }}>
                 <button
+                  aria-expanded={open}
                   onClick={() => toggleGroup(g.id)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6, width: '100%',
-                    padding: '6px 8px', fontSize: 12, fontWeight: 600,
-                    background: 'transparent', border: 'none', borderRadius: 5,
+                    padding: '8px 10px', fontSize: 'var(--fs-label)', lineHeight: '20px', fontWeight: 600,
+                    background: 'transparent', border: 'none', borderRadius: 'var(--radius-inner)',
                     color: 'var(--text-primary)', cursor: 'pointer',
                   }}
                 >
@@ -330,12 +332,13 @@ export default function SettingsView() {
                 {open && g.items.map((it) => (
                   <button
                     key={it.id}
+                    aria-current={selected === it.id ? 'page' : undefined}
                     onClick={() => setSelected(it.id)}
                     style={{
                       display: 'block', width: '100%', textAlign: 'left',
-                      padding: '5px 8px 5px 32px', fontSize: 12,
+                      padding: '7px 10px 7px 32px', fontSize: 'var(--fs-label)', lineHeight: '20px',
                       background: selected === it.id ? 'var(--selection-bg)' : 'transparent',
-                      border: 'none', borderRadius: 5, cursor: 'pointer',
+                      border: 'none', borderRadius: 'var(--radius-inner)', cursor: 'pointer',
                       color: selected === it.id ? 'var(--text-primary)' : 'var(--text-secondary)',
                     }}
                   >
@@ -346,7 +349,7 @@ export default function SettingsView() {
             );
           })}
           {visibleGroups.length === 0 && (
-            <div style={{ padding: 16, textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>
+            <div style={{ padding: 16, textAlign: 'center', fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>
               无匹配设置
             </div>
           )}
@@ -354,15 +357,18 @@ export default function SettingsView() {
       </aside>
 
       {/* 内容区 */}
-      <section className="settings-content" style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '22px 26px', background: 'var(--canvas)' }}>
+      <section className="settings-content" style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '24px 28px', background: 'var(--canvas)' }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
           marginBottom: 24,
         }}>
           <Settings size={15} style={{ color: 'var(--text-muted)' }} />
-          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{activeLabel}</span>
+          <span style={{ fontSize: 'var(--fs-title)', fontWeight: 600, color: 'var(--text-primary)' }}>{activeLabel}</span>
         </div>
-        <div style={{ maxWidth: 560 }}>{renderPage()}</div>
+        <div className="settings-page-body">
+          <FontQuickSettings />
+          {renderPage()}
+        </div>
       </section>
     </div>
   );

@@ -8,23 +8,23 @@ import { Plus, X } from 'lucide-react';
 
 export const inputStyle: React.CSSProperties = {
   background: 'var(--surface)', border: '1px solid var(--border)',
-  borderRadius: 'var(--radius-inner)', padding: '6px 8px', fontSize: 12,
+  borderRadius: 'var(--radius-inner)', padding: '6px 8px', fontSize: 'calc(12px * var(--ui-font-scale))',
   color: 'var(--text-primary)', outline: 'none', width: '100%',
   fontFamily: 'var(--font-mono)', boxSizing: 'border-box',
 };
 
 export const btnStyle: React.CSSProperties = {
-  padding: '5px 12px', fontSize: 12, border: '1px solid var(--border)',
+  padding: '5px 12px', fontSize: 'calc(12px * var(--ui-font-scale))', border: '1px solid var(--border)',
   borderRadius: 'var(--radius-inner)', background: 'transparent',
   color: 'var(--text-secondary)', cursor: 'pointer',
 };
 
 export function Field({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
-    <div style={{ marginBottom: 24 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2, letterSpacing: '0.01em' }}>{title}</div>
+    <div className="settings-field">
+      <div style={{ fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2, letterSpacing: '0.01em' }}>{title}</div>
       {description && (
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 10 }}>{description}</div>
+        <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 10 }}>{description}</div>
       )}
       <div style={{ marginTop: description ? 0 : 8 }}>{children}</div>
     </div>
@@ -35,24 +35,24 @@ export function Field({ title, description, children }: { title: string; descrip
 
 export function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
   return (
-    <button
+    <span className="settings-toggle"><button
       data-subtle
       role="switch"
       aria-checked={on}
       onClick={() => onChange(!on)}
       style={{
-        width: 34, height: 19, borderRadius: 10, border: 'none', cursor: 'pointer',
+        width: 38, height: 22, borderRadius: 10, border: 'none', cursor: 'pointer',
         background: on ? 'var(--accent)' : 'var(--hover)', position: 'relative', flexShrink: 0,
       }}
     >
       <span
         style={{
-          position: 'absolute', top: 2, left: on ? 17 : 2, width: 15, height: 15,
+          position: 'absolute', top: 3, left: on ? 19 : 3, width: 16, height: 16,
           borderRadius: '50%', transition: 'left 0.16s var(--ease)',
           background: on ? 'var(--accent-text)' : 'var(--text-muted)',
         }}
       />
-    </button>
+    </button><span aria-hidden="true">{on ? '已开启' : '已关闭'}</span></span>
   );
 }
 

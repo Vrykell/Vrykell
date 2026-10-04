@@ -50,25 +50,21 @@ export default function FilterPopover({ open, onClose, counts }: Props) {
   return (
     <div
       ref={popoverRef}
+      className="workspace-floating"
       style={{
         position: 'absolute',
         top: '100%',
         right: 0,
         marginTop: 4,
         width: 200,
-        background: 'var(--elevated)',
-        border: '1px solid var(--border)',
-        borderRadius: 8,
-        boxShadow: 'var(--shadow-lg)',
-        padding: '6px 0',
+        padding: 4,
         zIndex: 200,
       }}
     >
       <div style={{
         padding: '6px 12px',
-        fontSize: 11,
+        fontSize: 'calc(11px * var(--ui-font-scale))',
         color: 'var(--text-muted)',
-        borderBottom: '1px solid var(--border)',
         fontWeight: 600,
       }}>
         搜索范围
@@ -79,6 +75,7 @@ export default function FilterPopover({ open, onClose, counts }: Props) {
         return (
           <button
             key={s.id}
+            className="workspace-floating-row"
             onClick={() => handleToggle(s.id)}
             style={{
               display: 'flex',
@@ -91,7 +88,7 @@ export default function FilterPopover({ open, onClose, counts }: Props) {
               background: 'transparent',
               color: isEnabled ? 'var(--text-primary)' : 'var(--text-muted)',
               cursor: 'pointer',
-              fontSize: 12,
+              fontSize: 'calc(12px * var(--ui-font-scale))',
               fontFamily: 'var(--font-ui)',
             }}
             onMouseEnter={(e) => {
@@ -110,7 +107,7 @@ export default function FilterPopover({ open, onClose, counts }: Props) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 10,
+              fontSize: 'calc(10px * var(--ui-font-scale))',
               color: 'var(--accent-text)',
               flexShrink: 0,
             }}>
@@ -121,7 +118,7 @@ export default function FilterPopover({ open, onClose, counts }: Props) {
             </span>
             {count !== undefined && count > 0 && (
               <span style={{
-                fontSize: 10,
+                fontSize: 'calc(10px * var(--ui-font-scale))',
                 color: 'var(--text-muted)',
                 background: 'var(--canvas)',
                 padding: '0 6px',

@@ -35,18 +35,17 @@ export default function ContextMenu({ anchor, items, onClose }: Props) {
   return (
     <div
       ref={ref}
+      role="menu"
+      aria-label="操作菜单"
+      className="workspace-floating"
       style={{
         position: 'fixed',
         zIndex: 9999,
         top,
         left,
         minWidth: 180,
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius-inner)',
-        boxShadow: 'var(--shadow-md)',
-        padding: '4px 0',
-        fontSize: 12,
+        padding: 4,
+        fontSize: 'calc(12px * var(--ui-font-scale))',
       }}
     >
       {items.map((item, i) => (

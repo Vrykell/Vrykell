@@ -10,6 +10,7 @@ import { IconBtn } from '@ui/UiBtn';
 import { shellTypeLabel } from '@platform/shells';
 import NewTabModal from '@features/workspace/components/NewTabModal';
 import ContextMenu, { type ContextMenuItem } from '@ui/ContextMenu';
+import { sidebarRowSpacing, sidebarRowContent, sidebarRowIcon, sidebarRowTitle } from '@ui/sidebarRow';
 
 /**
  * Session navigation with filtering, grouping, renaming and drag ordering.
@@ -197,13 +198,13 @@ export default function PanelTabs() {
       {/* 顶栏 */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 4,
-        padding: '6px 8px',
+        padding: '6px 10px 8px',
         position: 'relative',
       }}>
         <div className="workspace-sidebar-search" style={{
           display: 'flex', alignItems: 'center', gap: 5, flex: 1, minWidth: 0,
           background: 'var(--chrome-field)',
-          borderRadius: 'var(--radius-inner)', padding: '0 6px', height: 24,
+          borderRadius: 'var(--radius-inner)', padding: '0 8px', height: 30,
         }}>
           <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           <input
@@ -213,7 +214,7 @@ export default function PanelTabs() {
             data-testid="tab-search"
             style={{
               flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none',
-              fontSize: 12, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+              fontSize: 'calc(13px * var(--ui-font-scale))', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
             }}
           />
         </div>
@@ -267,7 +268,7 @@ export default function PanelTabs() {
         {ungroupedTabs.length > 0 && (
           <div data-ungrouped="true" style={{ marginTop: groups.length > 0 ? 6 : 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
             {groups.length > 0 && (
-              <div style={{ padding: '0 8px 2px', fontSize: 11, color: 'var(--text-muted)' }}>未分组</div>
+              <div style={{ padding: '0 8px 2px', fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>未分组</div>
             )}
             {ungroupedTabs.map((t) => (
               <TabRow
@@ -294,7 +295,7 @@ export default function PanelTabs() {
         )}
 
         {filtered.length === 0 && (
-          <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>无匹配会话</div>
+          <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>无匹配会话</div>
         )}
       </div>
 
@@ -408,7 +409,7 @@ function GroupSection(props: {
               }}
               style={{
                 flex: 1, background: 'var(--canvas)', border: '1px solid var(--accent)',
-                borderRadius: 3, padding: '1px 4px', fontSize: 13, fontWeight: 600,
+                borderRadius: 3, padding: '1px 4px', fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 600,
                 color: 'var(--text-primary)', outline: 'none',
               }}
             />
@@ -416,11 +417,11 @@ function GroupSection(props: {
             <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
               <span style={{
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                fontSize: 13, lineHeight: '18px', fontWeight: 600, color: 'var(--text-primary)',
+                fontSize: 'calc(13px * var(--ui-font-scale))', lineHeight: '18px', fontWeight: 600, color: 'var(--text-primary)',
               }}>
                 {group.title}
               </span>
-              <span style={{ fontSize: 10.5, color: 'var(--text-muted)', lineHeight: '14px' }}>
+              <span style={{ fontSize: 'calc(10.5px * var(--ui-font-scale))', color: 'var(--text-muted)', lineHeight: '14px' }}>
                 {tabs.length} 个标签
               </span>
             </span>
@@ -560,22 +561,15 @@ function TabRow({
       data-testid={`tab-row-${tab.id}`}
       data-tab-row-id={tab.id}
       data-tab-group={groupId ?? ''}
-      style={{
-        padding: '2px 6px',
-        cursor: 'pointer',
-      }}
+      style={sidebarRowSpacing}
     >
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        padding: '6px 8px', minHeight: 34,
-        borderRadius: 5,
+        ...sidebarRowContent,
         background: innerBg,
         color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-        transition: 'background 0.12s ease',
       }}>
         <span style={{
-          width: 18, height: 18, flexShrink: 0,
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          ...sidebarRowIcon,
           color: iconColor,
         }}>
           <Icon size={15} />
@@ -594,22 +588,21 @@ function TabRow({
             onClick={(e) => e.stopPropagation()}
             style={{
               flex: 1, background: 'var(--canvas)', border: '1px solid var(--accent)',
-              borderRadius: 3, padding: '1px 4px', fontSize: 13,
+              borderRadius: 3, padding: '1px 4px', fontSize: 'calc(13px * var(--ui-font-scale))',
               color: 'var(--text-primary)', outline: 'none', fontFamily: 'var(--font-ui)',
             }}
           />
         ) : (
           <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
             <span style={{
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              fontSize: 12, lineHeight: '16px',
+              ...sidebarRowTitle,
               fontWeight: active ? 600 : 500,
             }}>
               {tab.title}
             </span>
             {subtitle && (
               <span style={{
-                fontSize: 11, color: 'var(--text-muted)', lineHeight: '14px',
+                fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', lineHeight: '14px',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 fontFamily: 'var(--font-mono)',
               }}>
@@ -627,7 +620,7 @@ function TabRow({
               lineHeight: '14px',
             }}
           >
-            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+            <span style={{ fontSize: 'calc(10px * var(--ui-font-scale))', fontWeight: 600, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
               {terms.length}
             </span>
           </span>
@@ -639,7 +632,7 @@ function TabRow({
           data-no-drag
           style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: 18, height: 18, fontSize: 15, cursor: 'pointer', lineHeight: 1,
+            width: 18, height: 18, fontSize: 'calc(15px * var(--ui-font-scale))', cursor: 'pointer', lineHeight: 1,
             borderRadius: 4, flexShrink: 0,
             color: 'var(--text-muted)',
             opacity: (active || hovered) ? 1 : 0,
@@ -676,13 +669,11 @@ function DragGhost({ type, id, tabs, x, y }: {
     : Folder;
   const color = type === 'group' ? 'var(--accent-warm)' : 'var(--accent)';
   return (
-    <div style={{
+    <div className="workspace-floating" style={{
       position: 'fixed', left: x, top: y, zIndex: 9999, pointerEvents: 'none',
       transform: 'translate(-50%, -60%) scale(1.06)',
-      width: 40, height: 26, borderRadius: 7,
+      width: 40, height: 26,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'var(--elevated)', border: '1px solid var(--border-strong)',
-      boxShadow: 'var(--shadow-lg)',
       animation: 'dragGhostIn 0.1s ease',
     }}>
       <Icon size={14} style={{ color }} />

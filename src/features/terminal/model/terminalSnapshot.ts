@@ -8,7 +8,8 @@ import { Terminal } from '@xterm/xterm';
 import { WebglAddon } from '@xterm/addon-webgl';
 import type { IBufferCell } from '@xterm/xterm';
 import { indexToCss } from '@features/terminal/model/blockTypes';
-import { TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE, TERMINAL_LINE_HEIGHT } from '@features/terminal/model/terminalFont';
+import { TERMINAL_FONT_FAMILY, getTerminalFontSize, TERMINAL_LINE_HEIGHT } from '@features/terminal/model/terminalFont';
+import { useTypographyStore } from '@config/typography';
 import { readXtermTheme } from '@features/terminal/model/xtermTheme';
 
 function getFgCss(cell: IBufferCell): string | null {
@@ -178,7 +179,7 @@ export function createOffscreenTerm(
     scrollback,
     allowTransparency: true,
     fontFamily: TERMINAL_FONT_FAMILY,
-    fontSize: TERMINAL_FONT_SIZE,
+    fontSize: getTerminalFontSize(),
     lineHeight: TERMINAL_LINE_HEIGHT,
   });
   term.open(el);
@@ -223,10 +224,13 @@ export function createBlockTerm(
     rows: Math.max(rows || 24, 1),
     scrollback: 5000,
     fontFamily: TERMINAL_FONT_FAMILY,
-    fontSize: TERMINAL_FONT_SIZE,
+    fontSize: getTerminalFontSize(),
     lineHeight: TERMINAL_LINE_HEIGHT,
     cursorBlink: true,
     theme: { ...xtermTheme, background: canvasBackground || xtermTheme.background },
+  });
+  const unsubscribeTypography = useTypographyStore.subscribe((state, previous) => {
+    if (state.terminalFontSize !== previous.terminalFontSize) term.options.fontSize = state.terminalFontSize;
   });
   // 与主终端一致：WebGL renderer 让半块字符拼接无缝（TUI 图标无横裂缝）；
   // 无 GPU 时回退 DOM renderer（xterm 内部行为）
@@ -239,6 +243,7 @@ export function createBlockTerm(
     term,
     el,
     dispose: () => {
+      unsubscribeTypography();
       term.dispose();
       el.remove();
     },

@@ -40,20 +40,21 @@ export default function TopDock() {
         <span>搜索文件、命令、设置…</span>
         <kbd>{isMacOS ? '⌘ F' : 'Ctrl F'}</kbd>
       </button>
-      <div data-tauri-drag-region className="workspace-title-spacer" />
-      {isSession && (
-        <button data-subtle data-dock-btn="chat" className="workspace-ai-toggle" aria-pressed={chatOpen}
-          title={chatOpen ? '关闭 AI 助手' : '打开 AI 助手'}
-          onClick={() => {
-            const dock = useDockStore.getState();
-            dock.togglePanel('right', 'chat');
-          }}>
-          <Sparkles size={15} /><span>AI 助手</span>
-        </button>
-      )}
-      <button data-subtle className="workspace-settings" aria-label="设置" title={`设置（${isMacOS ? '⌘' : 'Ctrl'}+,）`}
-        onClick={() => useSessionStore.getState().openSettingsTab()}><Settings size={16} /></button>
-      <WindowControls />
+      <div data-tauri-drag-region className="workspace-title-actions">
+        {isSession && (
+          <button data-subtle data-dock-btn="chat" className="workspace-ai-toggle" aria-pressed={chatOpen}
+            title={chatOpen ? '关闭 AI 助手' : '打开 AI 助手'}
+            onClick={() => {
+              const dock = useDockStore.getState();
+              dock.togglePanel('right', 'chat');
+            }}>
+            <Sparkles size={15} /><span>AI 助手</span>
+          </button>
+        )}
+        <button data-subtle className="workspace-settings" aria-label="设置" title={`设置（${isMacOS ? '⌘' : 'Ctrl'}+,）`}
+          onClick={() => useSessionStore.getState().openSettingsTab()}><Settings size={16} /></button>
+        <WindowControls />
+      </div>
     </header>
   );
 }

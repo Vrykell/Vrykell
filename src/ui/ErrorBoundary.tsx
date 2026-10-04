@@ -67,20 +67,20 @@ function DefaultFallback({
       <div style={{ opacity: 0.3 }}><TriangleAlert size={48} /></div>
       <h2 style={{ margin: 0, fontWeight: 600 }}>页面渲染错误</h2>
       <p style={{
-        margin: 0, color: 'var(--text-secondary)', fontSize: 13,
+        margin: 0, color: 'var(--text-secondary)', fontSize: 'calc(13px * var(--ui-font-scale))',
         maxWidth: 480, textAlign: 'center', lineHeight: 1.6,
       }}>
         {error.message}
       </p>
       <details open style={{ maxWidth: 520, width: '100%' }}>
         <summary style={{
-          cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)',
+          cursor: 'pointer', fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)',
           marginBottom: 8,
         }}>
           完整错误堆栈
         </summary>
         <pre style={{
-          fontSize: 9, color: 'var(--error)', overflow: 'auto',
+          fontSize: 'calc(9px * var(--ui-font-scale))', color: 'var(--error)', overflow: 'auto',
           background: 'var(--surface)', padding: 12, borderRadius: 6,
           border: '1px solid var(--border)', maxHeight: 120,
           whiteSpace: 'pre-wrap', wordBreak: 'break-word',
@@ -91,13 +91,13 @@ function DefaultFallback({
       {componentStack && (
         <details style={{ maxWidth: 520, width: '100%' }}>
           <summary style={{
-            cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)',
+            cursor: 'pointer', fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)',
             marginBottom: 8,
           }}>
             组件堆栈
           </summary>
           <pre style={{
-            fontSize: 10, color: 'var(--text-muted)', overflow: 'auto',
+            fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)', overflow: 'auto',
             background: 'var(--surface)', padding: 12, borderRadius: 6,
             border: '1px solid var(--border)', maxHeight: 200,
             whiteSpace: 'pre-wrap', wordBreak: 'break-word',
@@ -109,7 +109,7 @@ function DefaultFallback({
       <button
         onClick={onReset}
         style={{
-          marginTop: 8, padding: '8px 24px', fontSize: 13,
+          marginTop: 8, padding: '8px 24px', fontSize: 'calc(13px * var(--ui-font-scale))',
           background: 'var(--accent)', border: 'none', borderRadius: 6,
           color: 'var(--accent-text)', cursor: 'pointer',
         }}

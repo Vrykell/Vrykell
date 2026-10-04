@@ -81,7 +81,7 @@ export function McpPage() {
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {servers.length === 0 && drafts.length === 0 && (
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 0' }}>
+          <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', padding: '6px 0' }}>
             还没有 MCP 服务器，点下方「添加服务器」创建一个。
           </div>
         )}
@@ -191,7 +191,7 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
         />
         {s && (
           <span style={{
-            fontSize: 11, padding: '2px 8px', borderRadius: 4, flexShrink: 0,
+            fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', borderRadius: 4, flexShrink: 0,
             color: s.connected ? 'var(--success)' : 'var(--text-muted)',
             background: s.connected ? 'var(--success-bg)' : 'var(--hover)',
           }}>

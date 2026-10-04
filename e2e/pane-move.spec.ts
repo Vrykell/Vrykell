@@ -1,6 +1,22 @@
 import { test, expect } from '@playwright/test';
 import { setupTauriMock, emitPtyOutput, expectAnyTermContains } from './tauri-mock';
 
+test('a single pane ignores reordering gestures and remains ready for splitting', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
+  const pane = await page.locator('[data-testid^="pane-"]').boundingBox();
+  await page.mouse.move(pane!.x + pane!.width / 2, pane!.y + 100);
+  await page.mouse.down();
+  await page.mouse.move(pane!.x + pane!.width / 2 + 50, pane!.y + 100);
+  await page.mouse.up();
+  await page.keyboard.press('Meta+d');
+  await expect(page.getByTestId('placement-zone-1')).toBeVisible();
+  const zone = await page.getByTestId('placement-zone-1').boundingBox();
+  await page.mouse.click(zone!.x + zone!.width / 2, zone!.y + zone!.height / 2);
+  await expect(page.locator('[data-testid^="pane-"]')).toHaveCount(2);
+});
+
 /**
  * 拖动终端重排保活：拖拽 pane 改变布局结构（removeLeaf + splitLeaf）后，
  * 运行中块的 PTY 必须存活 —— 回归「拖拽终端/标签时运行中内容立刻退出」。

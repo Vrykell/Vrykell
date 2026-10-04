@@ -23,7 +23,8 @@ import { getLongRunningHint } from '@features/terminal/inputVisibility';
 import AttachmentChips from '@features/chat/components/AttachmentChips';
 import ShellIndicator from '@features/terminal/components/ShellIndicator';
 import { useInputEditorController } from '@features/terminal/hooks/useInputEditorController';
-import { TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE } from '@features/terminal/model/terminalFont';
+import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
+import { normalizeWorkingDirectory } from '@features/terminal/services/pipeline/workingDirectory';
 
 /** 权限模式循环（与 PanelChat 顶栏同款三色 Shield）：标准=逐工具 / 严格=逐次问 / 放行=直放 */
 const PERM_MODES = [
@@ -102,7 +103,7 @@ export default function InputEditor({
           background: 'var(--canvas)',
           borderTop: '1px solid var(--block-divider)',
           padding: `5px ${insetRight + 8}px 5px ${insetLeft + 8}px`,
-          fontSize: 12,
+          fontSize: 'calc(12px * var(--ui-font-scale))',
           color: 'var(--text-secondary)',
           fontFamily: 'var(--font-mono)',
           display: 'flex',
@@ -125,7 +126,7 @@ export default function InputEditor({
         <span
           onClick={onEndPress}
           style={{
-            fontSize: 10,
+            fontSize: 'calc(10px * var(--ui-font-scale))',
             padding: '1px 6px',
             border: '1px solid var(--border)',
             borderRadius: 3,
@@ -185,12 +186,11 @@ export default function InputEditor({
             gap: 4,
           }}
         >
-          {/* Prompt 字符 — 点击切换模式（AI 面板开启时锁定 cmd，显式禁用）
-              固定 24px 高 + flex 居中，与 textarea（22px 行高 + 1px 上下 padding）精确对齐 */}
+          {/* Center the mode toggle against the input; the chat panel locks command mode. */}
           <span
             style={{
               fontFamily: TERMINAL_FONT_FAMILY,
-              fontSize: TERMINAL_FONT_SIZE,
+              fontSize: 'var(--terminal-font-size)',
               fontWeight: 600,
               minWidth: 16,
               height: 24,
@@ -236,10 +236,10 @@ export default function InputEditor({
                 background: 'transparent',
                 border: 'none',
                 padding: '1px 0',
-                fontSize: TERMINAL_FONT_SIZE,
+                fontSize: 'var(--terminal-font-size)',
                 fontFamily: TERMINAL_FONT_FAMILY,
                 color: 'var(--text-primary)',
-                lineHeight: '22px',
+                lineHeight: 'max(22px, var(--terminal-row-height))',
                 outline: 'none',
               }}
             />
@@ -252,9 +252,9 @@ export default function InputEditor({
                   zIndex: 0,
                   pointerEvents: 'none',
                   padding: '1px 0',
-                  fontSize: TERMINAL_FONT_SIZE,
+                  fontSize: 'var(--terminal-font-size)',
                   fontFamily: TERMINAL_FONT_FAMILY,
-                  lineHeight: '22px',
+                  lineHeight: 'max(22px, var(--terminal-row-height))',
                   whiteSpace: 'pre-wrap',
                   overflowWrap: 'break-word',
                 }}
@@ -319,7 +319,7 @@ export default function InputEditor({
             minHeight: 22,
             marginTop: 4,
             paddingTop: 5,
-            fontSize: 11,
+            fontSize: 'calc(11px * var(--ui-font-scale))',
             color: 'var(--text-muted)',
             userSelect: 'none',
           }}
@@ -344,7 +344,7 @@ export default function InputEditor({
             }
             style={{
               fontFamily: 'var(--font-mono)',
-              fontSize: 10,
+              fontSize: 'calc(10px * var(--ui-font-scale))',
               fontWeight: 500,
               padding: '1px 8px',
               border: '1px solid var(--border)',
@@ -456,13 +456,14 @@ function InputActionBtn({ title, onClick, children }: {
 
 /** 当前目录标签（mono 11px）；导出给 PanelChat 的 prompt 行复用，保证两处一致 */
 export function CurrentDir({ dir }: { dir?: string }) {
-  const label = dir
-    ? dir.startsWith('/') && dir.length > 20
-      ? '…' + dir.slice(-19)
-      : dir
+  const path = dir ? normalizeWorkingDirectory(dir) : undefined;
+  const label = path
+    ? path.startsWith('/') && path.length > 20
+      ? '…' + path.slice(-19)
+      : path
     : '~/project';
   return (
-    <span className="terminal-directory" title={dir} style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
+    <span className="terminal-directory" title={path} style={{ fontFamily: 'var(--font-mono)', fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)' }}>
       {label}
     </span>
   );
@@ -478,7 +479,7 @@ function GitBranchLabel({ branch }: { branch: string }) {
       title={branch}
       style={{
         fontFamily: 'var(--font-mono)',
-        fontSize: 11,
+        fontSize: 'calc(11px * var(--ui-font-scale))',
         color: 'var(--accent-warm)',
         display: 'inline-flex',
         alignItems: 'center',

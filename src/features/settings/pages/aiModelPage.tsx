@@ -45,7 +45,7 @@ function CapChips({ profile }: { profile: ModelProfile }) {
           key={cap}
           style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 10, lineHeight: '14px', padding: '1px 6px', borderRadius: 4,
+            fontSize: 'calc(10px * var(--ui-font-scale))', lineHeight: '14px', padding: '1px 6px', borderRadius: 4,
             color: caps[cap] ? 'var(--text-secondary)' : 'var(--text-muted)',
             background: caps[cap] ? 'var(--hover)' : 'transparent',
             border: caps[cap] ? 'none' : '1px solid var(--border)',
@@ -85,7 +85,7 @@ export function AiModelPage() {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
           <span style={{
-            fontSize: 11, padding: '2px 8px', borderRadius: 4,
+            fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', borderRadius: 4,
             color: keySet ? 'var(--success)' : 'var(--text-muted)',
             background: keySet ? 'var(--success-bg)' : 'var(--hover)',
           }}>
@@ -207,7 +207,7 @@ function ModelListField() {
               />
               {m.id === activeId ? (
                 <span style={{
-                  fontSize: 11, padding: '2px 8px', borderRadius: 4, flexShrink: 0,
+                  fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', borderRadius: 4, flexShrink: 0,
                   color: 'var(--success)', background: 'var(--success-bg)',
                 }}>
                   当前

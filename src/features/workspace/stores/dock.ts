@@ -27,6 +27,7 @@ const LEGACY_STORAGE_KEY = 'dock-layout-v3';
 const VALID_IDS = Object.keys(PANEL_DEFS);
 
 interface PersistedLayout {
+  widthPreset?: 'compact';
   leftZone: string[];
   rightZone: string[];
   leftPanels: string[];
@@ -74,6 +75,13 @@ function loadLayout(): PersistedLayout {
     rightPanels: [...parsed.rightPanels],
     panelWidths: { ...parsed.panelWidths },
   };
+  // Apply compact defaults once to oversized legacy widths, then retain future resizing.
+  if (parsed.widthPreset !== 'compact') {
+    for (const [id, width] of Object.entries(layout.panelWidths)) {
+      const defaultWidth = PANEL_DEFS[id]?.width;
+      if (defaultWidth && width > defaultWidth) layout.panelWidths[id] = defaultWidth;
+    }
+  }
   const known = new Set([...layout.leftZone, ...layout.rightZone]);
   const missing = VALID_IDS.filter((id) => !known.has(id));
   if (missing.length > 0) {
@@ -97,7 +105,7 @@ function loadLayout(): PersistedLayout {
 }
 
 function saveLayout(layout: PersistedLayout) {
-  safeLocalStorageSet(STORAGE_KEY, JSON.stringify(layout));
+  safeLocalStorageSet(STORAGE_KEY, JSON.stringify({ ...layout, widthPreset: 'compact' }));
 }
 
 /** 按 zone（按钮顺序）排面板：不在 zone 内的排到末尾（防御）。 */
@@ -147,8 +155,9 @@ function currentTerminalMinWidth(): number {
 export const ACTIVITY_BAR_WIDTH = 44;
 export const WORKSPACE_GAP = 8;
 
-function workspaceFrameWidth(s: DockState): number {
-  return WORKSPACE_GAP * (s.rightPanels.length ? 3 : 2);
+/** Left navigation touches the content; only a closed sidebar leaves an inset. */
+export function workspaceFrameWidth(s: Pick<DockState, 'leftPanels'>): number {
+  return WORKSPACE_GAP * (s.leftPanels.length ? 1 : 2);
 }
 
 /** Reserve useful command space and close the older side when both do not fit. */

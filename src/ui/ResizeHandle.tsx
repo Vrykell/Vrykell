@@ -2,27 +2,38 @@ import { useRef } from 'react';
 
 interface ResizeHandleProps {
   axis: 'x' | 'y';
-  /** 仅 axis='x' 时有效：手柄在元素的哪一侧。'right'=左侧面板用（手柄在右边缘），'left'=右侧面板用（手柄在左边缘） */
+  /** Only for axis='x': which side of the element the handle sits on.
+   *  'right' = left sidebar (handle on its right edge), 'left' = right sidebar (handle on its left edge). */
   edge?: 'left' | 'right';
   onDelta: (d: number) => void;
-  /** 松手回调（拖动结束提交用：如面板宽度 commit 折叠判定） */
+  /** Release callback, e.g. to commit a collapsed width. */
   onUp?: () => void;
   testId?: string;
 }
 
+/** Grab strip thickness (px). The strip stays transparent; only its hairline is painted. */
+const HANDLE_THICKNESS = 8;
+/** Divider thickness (px), drawn on the element edge the strip is anchored to. */
+const LINE_THICKNESS = 1;
+
 /**
- * ResizeHandle — 通用拖拽调整大小手柄。
+ * ResizeHandle — generic drag-to-resize handle.
  *
- * 绝对定位叠放在目标面板的内边缘，不占 flex 空间 → 无可见缝隙。
- * axis='x': 水平拖动（cursor=col-resize），axis='y': 垂直拖动（cursor=row-resize）。
+ * Absolutely positioned across the edge of its target and out of flex flow, so it
+ * costs no visible gap: a 1px hairline marks the boundary between the panel and the
+ * neighbouring surface (--resize-divider at rest, --border-strong while hovered or dragged), and the
+ * 8px strip around it is the transparent grab area.
+ * axis='x': horizontal drag (cursor=col-resize), axis='y': vertical drag (cursor=row-resize).
  *
- * 拖动监听随 mousedown 绑定、mouseup 解除，**不随组件卸载清理**：
- * 拖拽过程中面板可能被折叠（组件卸载，如侧栏拖到最小宽度收起），
- * 只要鼠标未松开，document 级监听继续工作 —— 支持「折叠后反方向拖回」。
+ * Drag listeners bind on mousedown and unbind on mouseup, deliberately **not** tied to
+ * component lifetime: a panel can collapse mid-drag (unmounting this handle), and the
+ * document-level listeners must keep working until the button is released so the user
+ * can drag back out of the collapse.
  */
 export default function ResizeHandle({ axis, edge = 'right', onDelta, onUp, testId }: ResizeHandleProps) {
   const startRef = useRef<{ clientX: number; clientY: number } | null>(null);
   const cleanupRef = useRef<() => void>(() => {});
+  const lineRef = useRef<HTMLDivElement>(null);
   const onDeltaRef = useRef(onDelta);
   onDeltaRef.current = onDelta;
   const onUpRef = useRef(onUp);
@@ -31,14 +42,20 @@ export default function ResizeHandle({ axis, edge = 'right', onDelta, onUp, test
   const isX = axis === 'x';
   const cursor = isX ? 'col-resize' : 'row-resize';
 
+  const paintLine = (color: string) => {
+    const line = lineRef.current;
+    if (line) line.style.backgroundColor = color;
+  };
+
   return (
     <div
       data-testid={testId}
       onMouseDown={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        cleanupRef.current(); // 防御：重复 mousedown 先解绑旧的
+        cleanupRef.current(); // Defensive: a repeated mousedown must release the previous listeners first.
         startRef.current = { clientX: e.clientX, clientY: e.clientY };
+        paintLine('var(--border-strong)');
         document.body.style.cursor = cursor;
         document.body.style.userSelect = 'none';
 
@@ -60,45 +77,39 @@ export default function ResizeHandle({ axis, edge = 'right', onDelta, onUp, test
           document.body.style.userSelect = '';
           document.removeEventListener('mousemove', onMove);
           document.removeEventListener('mouseup', onUp);
+          paintLine('var(--resize-divider)');
         };
         document.addEventListener('mousemove', onMove);
         document.addEventListener('mouseup', onUp);
+      }}
+      onMouseEnter={() => paintLine('var(--border-strong)')}
+      onMouseLeave={() => {
+        // Keep the highlight while dragging, even when the pointer leaves the strip.
+        if (!startRef.current) paintLine('var(--resize-divider)');
       }}
       style={{
         position: 'absolute',
         background: 'transparent',
         cursor,
         zIndex: 2,
-        // 2px 透明线 → hover/拖拽时蓝色全高线
         ...(isX
-          ? {
-              [edge === 'right' ? 'right' : 'left']: 0,
-              top: 0, bottom: 0, width: 3,
-              [`border${edge === 'right' ? 'Left' : 'Right'}`]: '2px solid transparent',
-              transition: 'border-color 0.15s ease',
-            }
-          : {
-              left: 0, right: 0, top: -2, height: 8,
-              borderTop: '2px solid transparent',
-              transition: 'border-color 0.15s ease',
-            }),
+          ? { [edge === 'right' ? 'right' : 'left']: -HANDLE_THICKNESS / 2, top: 0, bottom: 0, width: HANDLE_THICKNESS }
+          : { left: 0, right: 0, top: -HANDLE_THICKNESS / 2, height: HANDLE_THICKNESS }),
       }}
-      onMouseEnter={(e) => {
-        const el = e.currentTarget as HTMLElement;
-        const prop = isX
-          ? (edge === 'right' ? 'borderLeftColor' : 'borderRightColor')
-          : 'borderTopColor';
-        el.style.setProperty(prop, 'var(--accent)');
-      }}
-      onMouseLeave={(e) => {
-        if (!startRef.current) {
-          const el = e.currentTarget as HTMLElement;
-          const prop = isX
-            ? (edge === 'right' ? 'borderLeftColor' : 'borderRightColor')
-            : 'borderTopColor';
-          el.style.setProperty(prop, 'transparent');
-        }
-      }}
-    />
+    >
+      <div
+        data-resize-line
+        ref={lineRef}
+        aria-hidden
+        style={{
+          position: 'absolute',
+          backgroundColor: 'var(--resize-divider)',
+          transition: 'background-color var(--dur) var(--ease)',
+          ...(isX
+            ? { left: 'calc(50% - 0.5px)', top: 0, bottom: 0, width: LINE_THICKNESS }
+            : { top: 'calc(50% - 0.5px)', left: 0, right: 0, height: LINE_THICKNESS }),
+        }}
+      />
+    </div>
   );
 }

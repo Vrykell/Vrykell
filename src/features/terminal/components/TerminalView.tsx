@@ -235,6 +235,7 @@ function PaneLayout(props: {
             setFocusedPane={setFocusedPane}
             onContextMenu={onPaneContextMenu}
             inner={cell.inner}
+            reorderable={cells.length > 1}
           />
         </div>
       ))}
@@ -323,15 +324,16 @@ function TerminalPane(props: {
   setFocusedPane: (id: string) => void;
   onContextMenu: (e: React.MouseEvent) => void;
   inner: InnerEdges;
+  reorderable: boolean;
 }) {
-  const { terminal, windowId, focused, setSession, setFocusedPane, onContextMenu, inner } = props;
+  const { terminal, windowId, focused, setSession, setFocusedPane, onContextMenu, inner, reorderable } = props;
   const scene = useTerminalStore((s) => s.scenes[terminal.id] ?? 'classic');
   const altScreenActive = useTerminalStore((s) => s.altScreenActive);
   // Real alternate buffers use the main xterm; manual fullscreen uses the live block terminal.
   const showXterm = scene === 'classic' || (scene === 'altScreen' && !altScreenActive);
   const showBlocks = scene === 'blockList';
 
-  const onPaneMouseDown = useTerminalPaneDrag(terminal.id);
+  const onPaneMouseDown = useTerminalPaneDrag(terminal.id, reorderable);
 
   return (
     <div
@@ -445,7 +447,7 @@ function PlacementOverlay({ targets, onPick, onCancel, emptyMessage = '最多 4 
       onMouseLeave={() => setHovered(null)}
       style={{ position: 'absolute', inset: 0, zIndex: 80, cursor: 'crosshair' }}
     >
-      <div data-testid="placement-hint" style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 1, background: 'var(--elevated)', color: 'var(--text-primary)', border: '1px solid var(--border-strong)', borderRadius: 8, padding: '8px 12px', fontSize: 12, whiteSpace: 'nowrap', boxShadow: 'var(--shadow-md)' }}>
+      <div data-testid="placement-hint" className="workspace-floating" style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 1, padding: '8px 12px', fontSize: 'calc(12px * var(--ui-font-scale))', whiteSpace: 'nowrap' }}>
         点击区域选择位置 · Esc 取消
       </div>
       {/* A visible grid explains the placement mode before the pointer moves. */}
@@ -463,7 +465,7 @@ function PlacementOverlay({ targets, onPick, onCancel, emptyMessage = '最多 4 
             transition: 'background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease)',
           }}
         >
-          <span style={{ position: 'absolute', fontSize: 12, color: hovered === i ? 'var(--text-primary)' : 'var(--text-secondary)',
+          <span style={{ position: 'absolute', fontSize: 'calc(12px * var(--ui-font-scale))', color: hovered === i ? 'var(--text-primary)' : 'var(--text-secondary)',
             left: t.dir === 'col' ? '50%' : t.position === 'first' ? 16 : undefined,
             right: t.dir === 'row' && t.position === 'second' ? 16 : undefined,
             top: t.dir === 'row' ? '50%' : t.position === 'first' ? 66 : undefined,
@@ -561,14 +563,14 @@ function TuiBanner({ tabId }: { tabId: string }) {
     exitFullScreen,
   } = useTuiControls(tabId);
   return (
-    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 101, padding: '3px 12px', fontSize: 11, fontFamily: 'var(--font-mono)', background: 'transparent', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)' }}>
+    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 101, padding: '3px 12px', fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-mono)', background: 'transparent', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)' }}>
       <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--accent-warm)', flexShrink: 0 }} />
       <span>TUI{runningCommand ? ` · ${runningCommand}` : ''}</span>
       <div style={{ flex: 1 }} />
-      <span onClick={sendCtrlC} title="发送 Ctrl+C" style={{ fontSize: 10, padding: '2px 6px', borderRadius: 3, cursor: 'pointer' }}>^C</span>
-      <span onClick={killApp} title="结束前台应用 (SIGTERM)" style={{ fontSize: 10, padding: '2px 6px', borderRadius: 3, cursor: 'pointer', color: killArmed ? 'var(--accent-warm)' : 'var(--text-secondary)' }}>{killArmed ? '强杀!' : '结束'}</span>
+      <span onClick={sendCtrlC} title="发送 Ctrl+C" style={{ fontSize: 'calc(10px * var(--ui-font-scale))', padding: '2px 6px', borderRadius: 3, cursor: 'pointer' }}>^C</span>
+      <span onClick={killApp} title="结束前台应用 (SIGTERM)" style={{ fontSize: 'calc(10px * var(--ui-font-scale))', padding: '2px 6px', borderRadius: 3, cursor: 'pointer', color: killArmed ? 'var(--accent-warm)' : 'var(--text-secondary)' }}>{killArmed ? '强杀!' : '结束'}</span>
       {altScreenActive && (
-        <span onClick={exitFullScreen} title="退出全屏" style={{ fontSize: 10, padding: '2px 6px', borderRadius: 3, cursor: 'pointer' }}>esc</span>
+        <span onClick={exitFullScreen} title="退出全屏" style={{ fontSize: 'calc(10px * var(--ui-font-scale))', padding: '2px 6px', borderRadius: 3, cursor: 'pointer' }}>esc</span>
       )}
     </div>
   );
@@ -618,10 +620,10 @@ function PaneEmptyHint({ paneId }: { paneId: string }) {
   // AI 面板打开时内联不显示，空态提示也不把面板里的对话算作 pane 内容
   if (blocks.some(hasVisibleContent) || (!chatPanelOpen && aiMessages.length > 0)) return null;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '32px 28px', color: 'var(--text-muted)', fontSize: 12, userSelect: 'none', gap: 8 }}>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 24, color: 'var(--text-secondary)', fontWeight: 500, marginBottom: 4 }}>$</div>
-      <div style={{ color: 'var(--text-primary)', fontSize: 15, fontWeight: 500 }}>从一条命令开始</div>
-      <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>在底部输入命令，或打开右上角 AI 助手。</div>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '32px 28px', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))', userSelect: 'none', gap: 8 }}>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'calc(24px * var(--ui-font-scale))', color: 'var(--text-secondary)', fontWeight: 500, marginBottom: 4 }}>$</div>
+      <div style={{ color: 'var(--text-primary)', fontSize: 'calc(15px * var(--ui-font-scale))', fontWeight: 500 }}>从一条命令开始</div>
+      <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)' }}>在底部输入命令，或打开右上角 AI 助手。</div>
     </div>
   );
 }
