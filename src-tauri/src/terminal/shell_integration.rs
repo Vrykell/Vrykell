@@ -8,7 +8,7 @@
 
 use base64::Engine;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const ZSH_RC: &str = r#"# vrykell shell integration (zsh)
 [[ -f "$HOME/.zshenv" ]] && source "$HOME/.zshenv"
@@ -154,8 +154,23 @@ if (Get-Command Set-PSReadLineKeyHandler -ErrorAction SilentlyContinue) {
 $global:LASTEXITCODE = $null
 "#;
 
-/// 集成脚本根目录（~/.vrykell/shell），每次启动重写保证脚本最新。
+// Publish complete scripts without truncating a file another terminal is loading.
+fn write_script(path: &Path, script: &str) -> Result<(), String> {
+    if fs::read(path).ok().as_deref() == Some(script.as_bytes()) {
+        return Ok(());
+    }
+    let temporary = path.with_file_name(format!(".script-{}.tmp", uuid::Uuid::new_v4()));
+    let result = fs::write(&temporary, script).and_then(|_| fs::rename(&temporary, path));
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    result.map_err(|error| error.to_string())
+}
+
+/// Keep the shared integration scripts current when a terminal starts.
 pub fn integration_dir() -> Result<PathBuf, String> {
+    static WRITE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _guard = WRITE_LOCK.lock().unwrap_or_else(|error| error.into_inner());
     // 用 dirs::home_dir 而非 HOME 环境变量 —— Windows 原生环境没有 HOME，
     // 从 Git Bash 启动时 HOME 又是 MSYS 路径，都不适合作为 Windows 侧写盘位置。
     let home = dirs::home_dir().ok_or_else(|| "无法定位用户主目录".to_string())?;
@@ -163,9 +178,9 @@ pub fn integration_dir() -> Result<PathBuf, String> {
     fs::create_dir_all(dir.join("zsh")).map_err(|e| e.to_string())?;
     fs::create_dir_all(dir.join("bash")).map_err(|e| e.to_string())?;
     fs::create_dir_all(dir.join("powershell")).map_err(|e| e.to_string())?;
-    fs::write(dir.join("zsh").join(".zshrc"), ZSH_RC).map_err(|e| e.to_string())?;
-    fs::write(dir.join("bash").join("rc"), BASH_RC).map_err(|e| e.to_string())?;
-    fs::write(dir.join("powershell").join("profile.ps1"), PS_RC).map_err(|e| e.to_string())?;
+    write_script(&dir.join("zsh").join(".zshrc"), ZSH_RC)?;
+    write_script(&dir.join("bash").join("rc"), BASH_RC)?;
+    write_script(&dir.join("powershell").join("profile.ps1"), PS_RC)?;
     Ok(dir)
 }
 
@@ -232,6 +247,61 @@ mod tests {
         let q1 = cmd[start..].find('\'').expect("分支含 b64") + start + 1;
         let q2 = cmd[q1..].find('\'').expect("b64 闭合") + q1;
         cmd[q1..q2].to_string()
+    }
+
+    #[test]
+    fn script_updates_never_expose_partial_contents() {
+        use std::sync::{Arc, Barrier, atomic::{AtomicBool, Ordering}};
+        let dir = std::env::temp_dir().join(format!("vrykell-script-test-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("profile.ps1");
+        let first = "first script\n".repeat(1024);
+        let second = "second script\n".repeat(1024);
+        write_script(&path, &first).unwrap();
+        let running = Arc::new(AtomicBool::new(true));
+        let barrier = Arc::new(Barrier::new(2));
+        std::thread::scope(|scope| {
+            let reader_running = running.clone();
+            let reader_barrier = barrier.clone();
+            let path = &path;
+            let first = &first;
+            let second = &second;
+            let reader = scope.spawn(move || {
+                reader_barrier.wait();
+                let mut reads = 0;
+                loop {
+                    let script = fs::read_to_string(path).unwrap();
+                    assert!(script == *first || script == *second);
+                    reads += 1;
+                    if !reader_running.load(Ordering::Acquire) || reads >= 4096 { break; }
+                }
+                reads
+            });
+            // Start the reader before publishing alternating script versions.
+            barrier.wait();
+            for i in 0..32 { write_script(path, if i % 2 == 0 { second } else { first }).unwrap(); }
+            running.store(false, Ordering::Release);
+            assert!(reader.join().unwrap() > 0);
+        });
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn concurrent_terminal_starts_read_complete_scripts() {
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(8));
+        let threads: Vec<_> = (0..8).map(|_| {
+            let barrier = barrier.clone();
+            std::thread::spawn(move || {
+                barrier.wait();
+                for _ in 0..16 {
+                    let dir = integration_dir().unwrap();
+                    for (path, script) in [("zsh/.zshrc", ZSH_RC), ("bash/rc", BASH_RC), ("powershell/profile.ps1", PS_RC)] {
+                        assert_eq!(fs::read_to_string(dir.join(path)).unwrap(), script);
+                    }
+                }
+            })
+        }).collect();
+        for thread in threads { thread.join().unwrap(); }
     }
 
     #[test]
