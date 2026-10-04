@@ -128,6 +128,8 @@ interface TerminalState {
   scenes: Record<string, Scene>;
   setScene: (tabId: string, scene: Scene) => void;
   setSession: (tabId: string, sessionId: string) => void;
+  /** Clear a stopped session without discarding its scene, dimensions or history. */
+  clearSession: (tabId: string, expectedSessionId?: string) => void;
   queueCommand: (tabId: string, command: string) => void;
   setDims: (tabId: string, cols: number, rows: number) => void;
   /** 关 tab 时删除该 tab 的 session/dims/scene，避免 per-tab 残留 */
@@ -177,6 +179,14 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
         }));
     }
   },
+  clearSession: (tabId, expectedSessionId) => set((s) => {
+    if (expectedSessionId && s.sessions[tabId] !== expectedSessionId) return s;
+    const sessions = { ...s.sessions };
+    const pendingCommands = { ...s.pendingCommands };
+    delete sessions[tabId];
+    delete pendingCommands[tabId];
+    return { sessions, pendingCommands };
+  }),
   queueCommand: (tabId, command) => {
     const sessionId = get().sessions[tabId];
     if (sessionId) {

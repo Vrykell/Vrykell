@@ -4,13 +4,14 @@
  * 主 xterm 只在 classic / altScreen 场景接收数据（blockList 下闲置隐藏）。
  */
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
-import { ptySpawn, ptyWrite, ptyResize, ptyClose, onPtyOutput, onPtyExit } from '@platform/pty';
+import { ptySpawn, ptyWrite, ptyResize, ptyClose, onPtyOutput, onPtyExit, type PtySpawnOptions } from '@platform/pty';
 import { registerTerminal, unregisterTerminal, useTerminalStore } from '@features/terminal';
+import { getRecentOutputFor } from '@features/terminal/stores/terminal';
 import { useBlockStore } from '@features/terminal';
 import { useHistoryStore } from '@features/terminal/stores/history';
 import { isTerminalDebugEnabled, terminalDebug } from '@features/terminal/services/terminalDebug';
@@ -26,6 +27,7 @@ import type { DispatchEvent } from '@core/terminal/events';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import { TERMINAL_FONT_FAMILY, getTerminalFontSize, TERMINAL_LINE_HEIGHT } from '@features/terminal/model/terminalFont';
+import { prepareSshHost } from '@features/ssh/services/hostTrust';
 import { useTypographyStore } from '@config/typography';
 
 /**
@@ -99,6 +101,11 @@ export function getExecutingTerm(tabId: string) {
   return sessionControllers.get(tabId)?.executingTerm ?? null;
 }
 
+/** Keep manual fullscreen resizing on the controller's buffer tracking path. */
+export function resizeExecutingTerm(tabId: string, cols: number, rows: number): void {
+  sessionControllers.get(tabId)?.resize(cols, rows);
+}
+
 /** Scene-aware resize driver; block output follows the available command-list width. */
 
 /** 触发指定 tab 重新校核 PTY/块终端宽度（无 session 时 no-op） */
@@ -113,10 +120,15 @@ export function useTerminalSession(
   paneId: string,
   tabId: string,
   onReady: (sessionId: string) => void,
+  onConnectionOutput?: (text: string) => void,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const closeSessionRef = useRef<() => Promise<void>>(async () => {});
+  const closeSession = useCallback(() => closeSessionRef.current(), []);
   const onReadyRef = useRef(onReady);
   onReadyRef.current = onReady;
+  const connectionOutputRef = useRef(onConnectionOutput);
+  connectionOutputRef.current = onConnectionOutput;
 
   useEffect(() => {
     const el = containerRef.current;
@@ -150,11 +162,29 @@ export function useTerminalSession(
 
     let sessionId: string | null = null;
     let disposed = false;
+    let stopped = false;
+    const startupAbort = new AbortController();
     // spawn 完成前的初始输出缓冲（shell 启动提示符）：拿到 sessionId 后回放，避免丢失
     let preSession: { id: string; events: DispatchEvent[] }[] = [];
     const unlisteners: UnlistenFn[] = [];
     const pendingUnlisteners: Promise<UnlistenFn>[] = [];
     let focusTimer: ReturnType<typeof setTimeout> | null = null;
+    const close = async () => {
+      if (disposed || stopped) return;
+      stopped = true;
+      const id = sessionId;
+      try {
+        if (id) await ptyClose(id);
+      } catch (reason) {
+        stopped = false;
+        throw reason;
+      }
+      startupAbort.abort();
+      sessionId = null;
+      preSession = [];
+      useTerminalStore.getState().clearSession(paneId, id ?? undefined);
+    };
+    closeSessionRef.current = close;
 
     // ── 管线：controller（扫描已在 Rust 端完成，这里直接消费事件） ──
 
@@ -166,11 +196,17 @@ export function useTerminalSession(
     // 打开模式：spec.openMode 优先；老会话缺省时 SSH 回退 classic、local 按 shell 类型
     const openMode = spec?.openMode ?? (spec?.kind === 'ssh' ? 'classic' : defaultOpenModeForShell(spec?.shellType));
     const blockEnabled = openMode === 'block';
-    const initialScene: 'classic' | 'blockList' = blockEnabled ? 'blockList' : 'classic';
+    // Remote authentication must remain interactive until shell integration announces its prompt.
+    const initialScene: 'classic' | 'blockList' = blockEnabled && spec?.kind !== 'ssh' ? 'blockList' : 'classic';
 
     // The local scene mirror determines whether the PTY uses full or block-list width.
     let currentScene: 'classic' | 'blockList' | 'altScreen' = initialScene;
-    const controller = new SessionController(paneId, term.cols, {      writeMain: (data) => term.write(data),
+    const writeMain = (data: string) => term.write(data, () => {
+      if (spec?.kind === 'ssh' && currentScene === 'classic') {
+        connectionOutputRef.current?.(getRecentOutputFor(paneId, 100));
+      }
+    });
+    const controller = new SessionController(paneId, term.cols, {      writeMain,
       onBlocksChanged: () => {
         const prev = useBlockStore.getState().byTab[paneId] ?? [];
         const collapsedIds = new Set(prev.filter((b) => b.collapsed).map((b) => b.id));
@@ -255,9 +291,10 @@ export function useTerminalSession(
       term.reset();
       useTerminalStore.getState().setKeyboardTarget('input');
     } else {
+      useTerminalStore.getState().setScene(paneId, 'classic');
       useTerminalStore.getState().setKeyboardTarget('terminal');
       focusTimer = setTimeout(() => {
-        term.focus();
+        if (!(spec?.kind === 'ssh' && blockEnabled && connectionOutputRef.current)) term.focus();
         const textarea = term.element?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea');
         if (isTerminalDebugEnabled()) {
           terminalDebug('terminal-scene-focus', {
@@ -281,7 +318,7 @@ export function useTerminalSession(
 
     pendingUnlisteners.push(
       onPtyOutput((id, events) => {
-        if (disposed) return;
+        if (disposed || stopped) return;
         if (isTerminalDebugEnabled()) {
           terminalDebug('pty-output', { id, events: events.length, kinds: events.map((event) => event.kind) });
         }
@@ -298,9 +335,14 @@ export function useTerminalSession(
 
     pendingUnlisteners.push(
       onPtyExit((id) => {
-        if (disposed) return;
+        if (disposed || stopped) return;
         if (isTerminalDebugEnabled()) terminalDebug('pty-exit', { id, sessionId });
-        if (id === sessionId) term.write('\r\n\x1b[31m[进程已退出]\x1b[0m\r\n');
+        if (id === sessionId) {
+          sessionId = null;
+          stopped = true;
+          useTerminalStore.getState().clearSession(paneId, id);
+          writeMain('\r\n\x1b[31m[进程已退出]\x1b[0m\r\n');
+        }
       }),
     );
 
@@ -308,7 +350,7 @@ export function useTerminalSession(
 
     // 类型/cwd 已在 controller 创建前取好（spec）
     const tabCwd = spec?.cwd;
-    const spawnOpts = spec?.kind === 'ssh'
+    const spawnOpts: PtySpawnOptions | undefined = spec?.kind === 'ssh'
       ? { ssh: { host: spec.ssh?.host ?? '', user: spec.ssh?.user, port: spec.ssh?.port }, openMode }
       : spec?.kind === 'local'
         ? { shell: spec.shellType, openMode }
@@ -320,9 +362,17 @@ export function useTerminalSession(
     if (isTerminalDebugEnabled()) {
       terminalDebug('pty-spawn-request', { paneId, tabId, cols: spawnCols, rows: spawnRows, spawnOpts });
     }
-    ptySpawn(spawnCols, spawnRows, tabCwd, spawnOpts)
+    const startSession = async () => {
+      if (spawnOpts?.ssh) {
+        const info = await prepareSshHost(spawnOpts.ssh.host, spawnOpts.ssh.port, startupAbort.signal);
+        spawnOpts.ssh.hostKeyType = info.keyType;
+      }
+      if (disposed || stopped) throw new Error('已取消连接');
+      return ptySpawn(spawnCols, spawnRows, tabCwd, spawnOpts);
+    };
+    startSession()
       .then((id) => {
-        if (disposed) {
+        if (disposed || stopped) {
           ptyClose(id).catch(() => {});
           return;
         }
@@ -336,6 +386,9 @@ export function useTerminalSession(
         }
         preSession = [];
         onReadyRef.current(id);
+        if (currentScene === 'classic' && useSessionStore.getState().activeId === tabId && !(spec?.kind === 'ssh' && blockEnabled && connectionOutputRef.current)) {
+          term.focus();
+        }
         // PTY 就绪后按真实布局尺寸重校
         requestAnimationFrame(() => {
           if (disposed || el.offsetWidth === 0 || el.offsetHeight === 0) return;
@@ -346,12 +399,12 @@ export function useTerminalSession(
         });
       })
       .catch((e) => {
-        if (!disposed) {
+        if (!disposed && !stopped) {
           if (isTerminalDebugEnabled()) {
             terminalDebug('pty-spawn-error', { paneId, errorType: e instanceof Error ? e.name : typeof e });
           }
           console.error('[useTerminalSession] PTY spawn failed:', e);
-          term.write(`\r\n\x1b[31m[无法启动 Shell: ${e}]\x1b[0m\r\n`);
+          writeMain(`\r\n\x1b[31m[${spec?.kind === 'ssh' ? 'SSH 连接失败' : '无法启动 Shell'}：${e}]\x1b[0m\r\n`);
         }
       });
 
@@ -391,7 +444,7 @@ export function useTerminalSession(
     });
 
     const dataSub = term.onData((data) => {
-      if (sessionId) {
+      if (sessionId && !stopped) {
         const inputScene = currentScene;
         if (isTerminalDebugEnabled()) {
           terminalDebug('terminal-input', {
@@ -552,6 +605,8 @@ export function useTerminalSession(
     return () => {
       unsubscribeTypography();
       disposed = true;
+      if (closeSessionRef.current === close) closeSessionRef.current = async () => {};
+      startupAbort.abort();
       if (isTerminalDebugEnabled()) {
         terminalDebug('session-controller-dispose', { paneId, tabId, hasSession: Boolean(sessionId) });
       }
@@ -575,5 +630,5 @@ export function useTerminalSession(
     };
   }, [paneId, tabId]);
 
-  return containerRef;
+  return { ref: containerRef, closeSession };
 }

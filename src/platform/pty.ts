@@ -7,6 +7,7 @@ export interface SshSpawnTarget {
   host: string;
   user?: string;
   port?: number;
+  hostKeyType?: string;
 }
 
 export interface PtySpawnOptions {

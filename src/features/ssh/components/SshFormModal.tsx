@@ -89,7 +89,7 @@ export default function SshFormModal({ open, initial, onClose }: Props) {
   const confirmTrust = async () => {
     if (!pendingTrust) return;
     try {
-      await sshTrustHostKey(pendingTrust.host, pendingTrust.port);
+      await sshTrustHostKey(pendingTrust.host, pendingTrust.port, pendingTrust.fingerprint);
       setPendingTrust(null);
       useToastStore.getState().addToast('已信任该主机，重新测试…', 'info');
       void doTest();

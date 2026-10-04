@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, waitFor } from '@testing-library/react';
+import { fireEvent, render, waitFor } from '@testing-library/react';
 
 const {
   writeMock,
@@ -47,6 +47,7 @@ vi.mock('@xterm/xterm', () => ({
 }));
 vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit() {} } }));
 vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: class {} }));
+vi.mock('@features/ssh/services/hostTrust', () => ({ prepareSshHost: vi.fn().mockResolvedValue({ known: true, fingerprint: 'SHA256:test', keyType: 'ed25519' }) }));
 
 invokeMock.mockResolvedValue('sess-x');
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
@@ -85,7 +86,8 @@ import { useTerminalStore } from '@features/terminal/stores/terminal';
 import { useBlockStore } from '@features/terminal/stores/blocks';
 import { useWorkspaceStore } from '@features/workspace/stores/workspace';
 import { leaf } from '@features/workspace/model/windowLayout';
-import { onPtyOutput as mockedOnPtyOutput, ptySpawn as mockedPtySpawn } from '@platform/pty';
+import { onPtyOutput as mockedOnPtyOutput, ptySpawn as mockedPtySpawn, ptyWrite, ptyClose } from '@platform/pty';
+import { prepareSshHost } from '@features/ssh/services/hostTrust';
 
 /** 设置一个本地终端 tab，指定打开模式（classic / block） */
 function setTab(openMode: 'classic' | 'block') {
@@ -96,12 +98,16 @@ function setTab(openMode: 'classic' | 'block') {
 }
 
 function TestHarness({ tabId, onReady }: { tabId: string; onReady: (sessionId: string) => void }) {
-  const ref = useTerminalSession(tabId, tabId, onReady);
-  return <div ref={ref} data-testid="term-host" />;
+  const { ref, closeSession } = useTerminalSession(tabId, tabId, onReady);
+  return <><div ref={ref} data-testid="term-host" /><button onClick={() => void closeSession()}>关闭连接</button></>;
 }
 
 describe('useTerminalSession', () => {
   beforeEach(() => {
+    vi.mocked(mockedPtySpawn).mockClear();
+    vi.mocked(ptyClose).mockClear();
+    vi.mocked(ptyWrite).mockClear();
+    vi.mocked(prepareSshHost).mockClear();
     writeMock.mockClear();
     invokeMock.mockClear();
     onDataHandlers.length = 0;
@@ -111,6 +117,7 @@ describe('useTerminalSession', () => {
     exitResolvers.length = 0;
     useTerminalStore.setState({
       sessions: {},
+      pendingCommands: {},
       dims: {},
       scenes: {},
       altScreenActive: false,
@@ -120,13 +127,60 @@ describe('useTerminalSession', () => {
     setTab('block');
   });
 
+  it('keeps SSH block authentication interactive until the remote prompt arrives', async () => {
+    useWorkspaceStore.setState({ tabs: [{ id: 't1', title: 'ssh', kind: 'session', layout: leaf({ id: 't1', kind: 'ssh', openMode: 'block', ssh: { name: 'server', host: 'server', user: 'user' } }) }], activeId: 't1' });
+    render(<TestHarness tabId="t1" onReady={() => {}} />);
+    await waitFor(() => expect(mockedPtySpawn).toHaveBeenCalled());
+    expect(prepareSshHost).toHaveBeenCalledWith('server', undefined, expect.any(AbortSignal));
+    expect(mockedPtySpawn).toHaveBeenCalledWith(80, 24, undefined, expect.objectContaining({ ssh: expect.objectContaining({ hostKeyType: 'ed25519' }), openMode: 'block' }));
+    expect(useTerminalStore.getState().scenes.t1).toBe('classic');
+    ptyOutputHandlers[0]!('sess-x', [{ kind: 'data', text: 'Password: ' }]);
+    expect(writeMock).toHaveBeenCalledWith('Password: ', expect.any(Function));
+    onDataHandlers[0]!('response\r');
+    expect(ptyWrite).toHaveBeenCalledWith('sess-x', 'response\r');
+    ptyOutputHandlers[0]!('sess-x', [{ kind: 'osc', code: '133;A', payload: '', raw: '\x1b]133;A\x07' }]);
+    await waitFor(() => expect(useTerminalStore.getState().scenes.t1).toBe('blockList'));
+  });
+
   it('classic 模式：数据直进主 xterm，不建块', async () => {
     setTab('classic');
     render(<TestHarness tabId="t1" onReady={() => {}} />);
     await waitFor(() => expect(ptyOutputHandlers.length).toBe(1));
 
     ptyOutputHandlers[0]!('sess-x', [{ kind: 'data', text: 'hello' }]);
-    await waitFor(() => expect(writeMock).toHaveBeenCalledWith('hello'));
+    await waitFor(() => expect(writeMock).toHaveBeenCalledWith('hello', expect.any(Function)));
+  });
+
+  it('closes the PTY and ignores output and keyboard input after cancellation', async () => {
+    const { getByText } = render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
+    fireEvent.click(getByText('关闭连接'));
+    await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBeUndefined());
+    expect(ptyClose).toHaveBeenCalledWith('sess-x');
+    writeMock.mockClear();
+    ptyOutputHandlers[0]!('sess-x', [{ kind: 'data', text: 'late password prompt' }]);
+    onDataHandlers[0]!('secret\r');
+    expect(writeMock).not.toHaveBeenCalled();
+    expect(ptyWrite).not.toHaveBeenCalled();
+  });
+
+  it('closes a late spawn without publishing a session after cancellation', async () => {
+    let finish!: (id: string) => void;
+    vi.mocked(mockedPtySpawn).mockImplementationOnce(() => new Promise<string>(resolve => { finish = resolve; }));
+    const onReady = vi.fn();
+    const { getByText } = render(<TestHarness tabId="t1" onReady={onReady} />);
+    await waitFor(() => expect(mockedPtySpawn).toHaveBeenCalled());
+    fireEvent.click(getByText('关闭连接'));
+    finish('late-session');
+    await waitFor(() => expect(ptyClose).toHaveBeenCalledWith('late-session'));
+    expect(onReady).not.toHaveBeenCalled();
+  });
+
+  it('removes the session mapping when its process exits', async () => {
+    render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
+    ptyExitHandlers[0]!('sess-x');
+    expect(useTerminalStore.getState().sessions.t1).toBeUndefined();
   });
 
   it('block 模式：初始即 blockList，OSC 133;A 建立 block', async () => {

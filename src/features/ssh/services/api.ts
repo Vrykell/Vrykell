@@ -74,13 +74,19 @@ export function sshTest(target: {
 }
 
 /** 查询主机指纹与 known_hosts 记录状态（首次连接确认用）。 */
-export function sshHostKeyInfo(host: string, port?: number): Promise<{ fingerprint: string; known: boolean; keyType: string }> {
+export interface SshHostKeyInfo {
+  fingerprint: string;
+  known: boolean;
+  keyType: string;
+}
+
+export function sshHostKeyInfo(host: string, port?: number): Promise<SshHostKeyInfo> {
   return invoke('ssh_host_key_info', { host, port: port ?? null });
 }
 
 /** 用户确认指纹后记录主机密钥到 known_hosts（幂等）。 */
-export function sshTrustHostKey(host: string, port?: number): Promise<void> {
-  return invoke('ssh_trust_host_key', { host, port: port ?? null });
+export function sshTrustHostKey(host: string, port: number | undefined, expectedFingerprint: string): Promise<void> {
+  return invoke('ssh_trust_host_key', { host, port: port ?? null, expectedFingerprint });
 }
 
 /** 列出远程目录（按连接 id，密码由后端解析）。返回条目 + 实际目录真实路径。 */

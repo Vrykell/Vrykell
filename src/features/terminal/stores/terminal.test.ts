@@ -24,6 +24,21 @@ describe('terminal store', () => {
     expect(getFocusedTerminalId()).toBe(`${activeId}#0`);
   });
 
+  it('clears a stopped session and queued input while retaining its scene and dimensions', () => {
+    useTerminalStore.setState({ sessions: { p: 'old', other: 'live' }, pendingCommands: { p: ['secret'], other: ['ls'] }, scenes: { p: 'classic' }, dims: { p: { cols: 80, rows: 24 } } });
+    useTerminalStore.getState().clearSession('p', 'old');
+    expect(useTerminalStore.getState().sessions).toEqual({ other: 'live' });
+    expect(useTerminalStore.getState().pendingCommands).toEqual({ other: ['ls'] });
+    expect(useTerminalStore.getState().scenes.p).toBe('classic');
+    expect(useTerminalStore.getState().dims.p).toEqual({ cols: 80, rows: 24 });
+  });
+
+  it('does not clear a replacement session when an older process exits', () => {
+    useTerminalStore.setState({ sessions: { p: 'new' } });
+    useTerminalStore.getState().clearSession('p', 'old');
+    expect(useTerminalStore.getState().sessions.p).toBe('new');
+  });
+
   it('runInTerminal 写入聚焦终端的会话并补换行', () => {
     const termId = getFocusedTerminalId();
     useTerminalStore.getState().setSession(termId, 's1');
