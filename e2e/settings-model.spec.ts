@@ -23,8 +23,7 @@ test.describe('模型配置页', () => {
     expect(clears.some((c) => c.provider === 'openai-compatible' && !c.key)).toBe(true);
     // 重新保存
     await keyField.getByPlaceholder('输入 API Key').fill('sk-e2e-key');
-    await keyField.getByRole('button', { name: '保存' }).click();
-    await expect(page.getByText('已保存 API Key')).toBeVisible();
+    await expect(keyField.getByRole('status')).toHaveText('已保存');
     await expect(keyField.getByText('已配置')).toBeVisible();
     const calls = await aiKeyCalls(page);
     expect(calls.some((c) => c.provider === 'openai-compatible' && c.key === 'sk-e2e-key')).toBe(true);
@@ -38,8 +37,8 @@ test.describe('模型配置页', () => {
     await expect(nameInputs.nth(1)).toHaveValue('本地模型');
 
     // 默认生效模型是本地模型（mock 种子），第一张卡有「设为当前」
-    await expect(nameInputs.nth(1).locator('xpath=../..').getByText('当前')).toBeVisible();
-    const mainCard = nameInputs.nth(0).locator('xpath=../..');
+    await expect(nameInputs.nth(1).locator('xpath=../../..').getByText('当前')).toBeVisible();
+    const mainCard = nameInputs.nth(0).locator('xpath=../../..');
     await mainCard.getByRole('button', { name: '设为当前' }).click();
     await expect(mainCard.getByText('当前')).toBeVisible();
     const activeCalls = await aiModelCalls(page);
@@ -50,6 +49,7 @@ test.describe('模型配置页', () => {
     await expect(nameInputs).toHaveCount(3);
     await nameInputs.nth(2).fill('新模型');
     await nameInputs.nth(2).press('Enter');
+    await expect(nameInputs.nth(2).locator('xpath=..').getByRole('status')).toHaveText('已保存');
     await expect(nameInputs.nth(2)).toHaveValue('新模型');
     const setModels = await aiModelCalls(page);
     const addCall = setModels.filter((c) => c.kind === 'set_models').pop();
@@ -57,7 +57,7 @@ test.describe('模型配置页', () => {
     expect((addCall?.models as { name: string }[])[2]?.name).toBe('新模型');
 
     // 删除新模型 → 回 2 个
-    const newCard = nameInputs.nth(2).locator('xpath=../..');
+    const newCard = nameInputs.nth(2).locator('xpath=../../..');
     await newCard.getByTitle('删除模型').click();
     await expect(page.getByPlaceholder('模型名称')).toHaveCount(2);
   });

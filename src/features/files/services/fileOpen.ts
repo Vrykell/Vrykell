@@ -67,7 +67,7 @@ export function loadConfig(): FileOpenConfig {
 }
 
 export function saveConfig(cfg: FileOpenConfig) {
-  safeLocalStorageSet(STORAGE_KEY, JSON.stringify(cfg));
+  return safeLocalStorageSet(STORAGE_KEY, JSON.stringify(cfg));
 }
 
 // ── 模板文本（设置 UI 用）：每行 ext=命令 ──

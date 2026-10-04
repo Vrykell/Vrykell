@@ -6,11 +6,14 @@ import { useAiConfigStore, useAgentSettings, type AgentSettings, type ModelBehav
 import Segmented from '@ui/Segmented';
 import { ModelScopeBar } from '@features/chat/components/ModelPicker';
 import { Field, Toggle, NumberInput, inputStyle, btnStyle } from '@features/settings/components/ui';
+import AutoSaveInput from '../components/AutoSaveInput';
+import { useSettingsSave } from '../components/SettingsSaveProvider';
 
 export function AiBehaviorPage() {
   const models = useAiConfigStore((s) => s.models);
   const agentSettings = useAgentSettings();
   const [scope, setScope] = useState<string>('global');
+  const { save } = useSettingsSave();
 
   const isGlobal = scope === 'global';
   const model = models.find((m) => m.id === scope) ?? null;
@@ -57,10 +60,13 @@ export function AiBehaviorPage() {
         title="系统提示词"
         description="定义 AI 的角色与行为，留空使用内置默认。"
       >
-        <textarea
+        <AutoSaveInput
+          key={`prompt-${scope}`}
+          multiline
+          trim={false}
           value={eff.systemPrompt ?? ''}
           placeholder="留空使用内置默认提示词"
-          onChange={(e) => update({ systemPrompt: e.target.value })}
+          onCommit={systemPrompt => update({ systemPrompt })}
           rows={8}
           style={{
             ...inputStyle,
@@ -76,7 +82,7 @@ export function AiBehaviorPage() {
         <Toggle on={eff.agentMode} onChange={(v) => update({ agentMode: v })} />
       </Field>
       <Field title="最大迭代步数" description="Agent 一次回答最多调用多少轮工具；1–100。">
-        <NumberInput value={eff.maxSteps} min={1} max={100} onChange={(v) => update({ maxSteps: v })} />
+        <NumberInput key={scope} value={eff.maxSteps} min={1} max={100} onChange={(v) => update({ maxSteps: v })} />
       </Field>
       <Field title="上下文策略" description="全量不裁剪；窗口按预算保留最近消息；摘要压缩旧消息。">
         <Segmented
@@ -86,36 +92,37 @@ export function AiBehaviorPage() {
             { value: 'compact', label: '摘要' },
           ]}
           value={eff.contextStrategy}
-          onChange={(v) => update({ contextStrategy: v })}
+          onChange={(v) => { void save(() => update({ contextStrategy: v })); }}
         />
       </Field>
       <Field title="上下文 Token 预算" description="估算的上下文 token 预算；0 = 不设限。超预算时按上面的策略裁剪或压缩。">
-        <NumberInput value={eff.contextMaxTokens} min={0} max={1000000} onChange={(v) => update({ contextMaxTokens: v })} />
+        <NumberInput key={scope} value={eff.contextMaxTokens} min={0} max={1000000} onChange={(v) => update({ contextMaxTokens: v })} />
       </Field>
       {eff.contextStrategy === 'compact' && (
         <Field title="摘要长度上限" description="压缩摘要的最大 token 数。">
-          <NumberInput value={eff.contextSummaryTokens} min={64} max={8000} onChange={(v) => update({ contextSummaryTokens: v })} />
+          <NumberInput key={scope} value={eff.contextSummaryTokens} min={64} max={8000} onChange={(v) => update({ contextSummaryTokens: v })} />
         </Field>
       )}
       <Field title="工具输出截断" description="单个工具结果的最大字符数，超长截断避免占满上下文。">
-        <NumberInput value={eff.contextToolChars} min={256} max={65536} onChange={(v) => update({ contextToolChars: v })} />
+        <NumberInput key={scope} value={eff.contextToolChars} min={256} max={65536} onChange={(v) => update({ contextToolChars: v })} />
       </Field>
       <Field title="回复 Token 上限" description="单次回复的最大 token 数，0 为服务商默认。">
-        <NumberInput value={eff.maxOutputTokens} min={0} max={32768} onChange={(v) => update({ maxOutputTokens: v })} />
+        <NumberInput key={scope} value={eff.maxOutputTokens} min={0} max={32768} onChange={(v) => update({ maxOutputTokens: v })} />
       </Field>
       <Field title="采样温度" description="控制输出随机性；关闭 = 使用服务商默认。">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Toggle on={eff.temperature != null} onChange={(v) => update({ temperature: v ? 0.7 : null })} />
           {eff.temperature != null && (
-            <input
+            <AutoSaveInput
+              key={`temperature-${scope}`}
               type="number"
               step={0.1}
               min={0}
               max={2}
-              value={eff.temperature}
-              onChange={(e) => {
-                const n = Number(e.target.value);
-                if (Number.isFinite(n)) update({ temperature: Math.min(2, Math.max(0, n)) });
+              value={String(eff.temperature)}
+              onCommit={next => {
+                const n = Number(next);
+                if (Number.isFinite(n)) return update({ temperature: Math.min(2, Math.max(0, n)) });
               }}
               style={{ ...inputStyle, width: 100 }}
             />
@@ -129,10 +136,10 @@ export function AiBehaviorPage() {
             <Toggle on={eff.autoTitle} onChange={(v) => update({ autoTitle: v })} />
           </Field>
           <Field title="标题模型" description="生成标题用的模型；留空 = 沿用聊天模型。">
-            <input
+            <AutoSaveInput
               value={eff.titleModel}
               placeholder="沿用聊天模型"
-              onChange={(e) => update({ titleModel: e.target.value })}
+              onCommit={titleModel => update({ titleModel })}
               style={inputStyle}
             />
           </Field>
@@ -140,13 +147,13 @@ export function AiBehaviorPage() {
             <Toggle on={eff.completeEnabled} onChange={(v) => update({ completeEnabled: v })} />
           </Field>
           <Field title="补全防抖" description="触发补全的停顿毫秒数，100–2000。">
-            <NumberInput value={eff.completeDebounceMs} min={100} max={2000} onChange={(v) => update({ completeDebounceMs: v })} />
+            <NumberInput key={scope} value={eff.completeDebounceMs} min={100} max={2000} onChange={(v) => update({ completeDebounceMs: v })} />
           </Field>
           <Field title="补全模型" description="AI 增强补全用的模型；留空 = 沿用聊天模型。">
-            <input
+            <AutoSaveInput
               value={eff.completeModel}
               placeholder="沿用聊天模型"
-              onChange={(e) => update({ completeModel: e.target.value })}
+              onCommit={completeModel => update({ completeModel })}
               style={inputStyle}
             />
           </Field>

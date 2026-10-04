@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Cpu, FileCode, Keyboard, Palette, Settings, SquareTerminal } from 'lucide-react';
-
-export type PageId = 'ai-model' | 'ai-behavior' | 'ai-perms' | 'ai-web' | 'ai-skill' | 'ai-mcp' | 'ai-memory' | 'ai-agents' | 'ai-schedules' | 'terminal-open' | 'editor-local' | 'editor-remote' | 'appearance-theme' | 'shortcuts';
+import { BrainCircuit, FileCode, Keyboard, Palette, Settings, SquareTerminal } from '@ui/icons';
+import type { PageId } from '../model/navigation';
+import { useSettingsNavigationStore } from '../stores/navigation';
+export type { PageId } from '../model/navigation';
 
 export interface SettingItem {
   id: PageId;
@@ -18,7 +19,7 @@ export interface SettingGroup {
 
 export const SETTINGS_GROUPS: SettingGroup[] = [
   {
-    id: 'ai', label: 'AI 模型', icon: Cpu,
+    id: 'ai', label: 'AI 模型', icon: BrainCircuit,
     items: [
       { id: 'ai-model', label: '模型配置', keywords: ['ai', 'model', 'api', 'key', 'baseurl', '模型', '密钥', '服务地址', 'provider', '服务商', 'anthropic', 'gemini'] },
       { id: 'ai-behavior', label: '模型行为', keywords: ['agent', '联网', '深思考', '思考', '智能标题', '标题', '自动补全', '补全', '防抖', 'debounce'] },
@@ -54,7 +55,8 @@ export const SETTINGS_GROUPS: SettingGroup[] = [
 
 /** 管理设置页搜索、分组折叠和当前页选择。 */
 export function useSettingsNavigation() {
-  const [selected, setSelected] = useState<PageId>('ai-model');
+  const selected = useSettingsNavigationStore(state => state.selected);
+  const setSelected = useSettingsNavigationStore(state => state.setSelected);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(SETTINGS_GROUPS.map((group) => group.id)));
   const [query, setQuery] = useState('');
   const normalizedQuery = query.trim().toLowerCase();

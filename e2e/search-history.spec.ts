@@ -31,6 +31,18 @@ test.describe('重新生成标题（标签右键菜单）', () => {
 });
 
 test.describe('全局搜索（Cmd+F）', () => {
+  test('setting results open their matching page on first and subsequent visits', async ({ page }) => {
+    await setupTauriMock(page);
+    await page.goto('/');
+    for (const [query, target] of [['主题', '主题'], ['文件打开方式', '本地编辑器']]) {
+      await page.getByTestId('global-search-trigger').click();
+      const dialog = page.getByRole('dialog', { name: '全局搜索' });
+      await dialog.getByPlaceholder('搜索文件、命令、设置…').fill(query);
+      await dialog.getByText(query, { exact: true }).click();
+      await expect(page.locator('section').getByText(target, { exact: true }).first()).toBeVisible();
+      await expect(dialog).not.toBeVisible();
+    }
+  });
   test('搜索触发各来源后端并渲染结果', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');

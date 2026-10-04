@@ -4,7 +4,7 @@
  * 子代理 = 独立系统提示词助手；定时任务 = 间隔执行（AI 也可用工具自行管理）。
  */
 import { useEffect, useState } from 'react';
-import { Plus, X, Sparkles } from 'lucide-react';
+import { Plus, X, Sparkles } from '@ui/icons';
 import { generateText } from 'ai';
 import { invoke } from '@tauri-apps/api/core';
 import { createChatModel, type ProviderKind } from '@features/agent/services/provider';
@@ -15,6 +15,8 @@ import {
 } from '@features/agent/services/platform';
 import { useToastStore } from '@ui/Toast';
 import { kickScheduleRunner } from '@features/agent/services/scheduleRunner';
+import { useAutoSave } from '../hooks/useAutoSave';
+import SaveStatus from '../components/SaveStatus';
 
 const toast = (msg: string, type: 'info' | 'success' | 'error') =>
   useToastStore.getState().addToast(msg, type);
@@ -37,6 +39,7 @@ export function MemorySettings() {
   const [fact, setFact] = useState('');
   const [journal, setJournal] = useState('');
   const [organizing, setOrganizing] = useState(false);
+  const saving = useAutoSave(fact, async next => { await setMemory(next); setFact(next); });
 
   const refresh = () => {
     getMemory().then(setFact).catch((e) => console.warn('[memory] 读取记忆失败:', e));
@@ -44,17 +47,9 @@ export function MemorySettings() {
   };
   useEffect(() => { refresh(); }, []);
 
-  const save = async () => {
-    try {
-      await setMemory(fact);
-      toast('已保存', 'success');
-    } catch (e) {
-      toast(String((e as Error)?.message ?? e), 'error');
-    }
-  };
-
   const clear = async () => {
     try {
+      await saving.cancel();
       await setMemory('');
       setFact('');
       toast('已清空持久知识', 'success');
@@ -67,6 +62,8 @@ export function MemorySettings() {
   const organize = async () => {
     setOrganizing(true);
     try {
+      await saving.flush();
+      if (saving.hasPending()) throw new Error('请先完成记忆保存');
       const curFact = await getMemory();
       const curJournal = await getMemoryJournal();
       const info = await invoke<{ base_url: string; model: string; provider: ProviderKind }>('get_ai_config');
@@ -101,15 +98,18 @@ export function MemorySettings() {
         </button>
       </div>
       <textarea
-        value={fact}
-        onChange={(e) => setFact(e.target.value)}
+        value={saving.value}
+        disabled={organizing}
+        onCompositionStart={() => saving.setComposing(true)}
+        onCompositionEnd={() => saving.setComposing(false)}
+        onChange={(e) => saving.setValue(e.target.value)}
         rows={10}
         placeholder="持久知识（偏好、约定、待办…）"
         style={{ ...inputStyle, minHeight: 160, resize: 'vertical', lineHeight: 1.6 }}
       />
       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-        <button onClick={() => void save()} style={btnStyle}>保存</button>
-        <button onClick={() => void clear()} style={{ ...btnStyle, color: 'var(--error-light)' }}>清空</button>
+        <SaveStatus status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
+        <button onClick={() => void clear()} disabled={organizing} style={{ ...btnStyle, color: 'var(--error-light)' }}>清空</button>
       </div>
       {jlines.length > 0 && (
         <div style={{ marginTop: 12 }}>
@@ -131,20 +131,14 @@ export function MemorySettings() {
 // ── 子代理 ──
 
 function AgentCard({ a, onChanged }: { a: AgentDef; onChanged: () => void }) {
-  const [name, setName] = useState(a.name);
-  const [description, setDescription] = useState(a.description);
-  const [prompt, setPrompt] = useState(a.prompt);
-  const save = async () => {
-    try {
-      await saveAgent({ id: a.id, name: name.trim(), description, prompt });
-      toast('已保存', 'success');
-      onChanged();
-    } catch (e) {
-      toast(String((e as Error)?.message ?? e), 'error');
-    }
-  };
+  const saving = useAutoSave(a, async next => {
+    await saveAgent({ ...next, name: next.name.trim() });
+    onChanged();
+  }, next => next.name.trim() ? undefined : '请填写名称');
+  const { name, description, prompt } = saving.value;
   const del = async () => {
     try {
+      await saving.cancel();
       await removeAgent(a.id);
       toast('已删除', 'success');
       onChanged();
@@ -153,16 +147,16 @@ function AgentCard({ a, onChanged }: { a: AgentDef; onChanged: () => void }) {
     }
   };
   return (
-    <div style={{ borderRadius: 'var(--radius-inner)', padding: '10px 12px', background: 'var(--canvas)' }}>
+    <div onCompositionStart={() => saving.setComposing(true)} onCompositionEnd={() => saving.setComposing(false)} style={{ borderRadius: 'var(--radius-inner)', padding: '10px 12px', background: 'var(--canvas)' }}>
       <div style={{ display: 'flex', gap: 8 }}>
-        <input value={name} placeholder="名称" onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, flex: 1, fontWeight: 600 }} />
-        <button onClick={() => void save()} style={btnStyle}>保存</button>
+        <input value={name} placeholder="名称" onChange={(e) => saving.setValue(previous => ({ ...previous, name: e.target.value }))} style={{ ...inputStyle, flex: 1, fontWeight: 600 }} />
+        <SaveStatus status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
         <button onClick={() => void del()} title="删除" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid transparent', borderRadius: 4, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>
           <X size={13} />
         </button>
       </div>
-      <input value={description} placeholder="一句话描述何时委派给它" onChange={(e) => setDescription(e.target.value)} style={{ ...inputStyle, marginTop: 8 }} />
-      <textarea value={prompt} placeholder="系统提示词（行为准则）" onChange={(e) => setPrompt(e.target.value)} rows={5} style={{ ...inputStyle, marginTop: 8, minHeight: 80, resize: 'vertical', lineHeight: 1.55 }} />
+      <input value={description} placeholder="一句话描述何时委派给它" onChange={(e) => saving.setValue(previous => ({ ...previous, description: e.target.value }))} style={{ ...inputStyle, marginTop: 8 }} />
+      <textarea value={prompt} placeholder="系统提示词（行为准则）" onChange={(e) => saving.setValue(previous => ({ ...previous, prompt: e.target.value }))} rows={5} style={{ ...inputStyle, marginTop: 8, minHeight: 80, resize: 'vertical', lineHeight: 1.55 }} />
     </div>
   );
 }
@@ -197,21 +191,15 @@ export function AgentsSettings() {
 // ── 定时任务 ──
 
 function ScheduleCard({ s, onChanged }: { s: Schedule; onChanged: () => void }) {
-  const [name, setName] = useState(s.name);
-  const [prompt, setPrompt] = useState(s.prompt);
-  const [interval, setIntervalM] = useState(s.intervalMinutes);
-  const [enabled, setEnabled] = useState(s.enabled);
-  const save = async () => {
-    try {
-      await saveSchedule({ id: s.id, name: name.trim(), prompt, intervalMinutes: Math.max(1, interval), enabled, lastRunAt: s.lastRunAt });
-      toast('已保存', 'success');
-      onChanged();
-    } catch (e) {
-      toast(String((e as Error)?.message ?? e), 'error');
-    }
-  };
+  const saving = useAutoSave(s, async next => {
+    await saveSchedule({ ...next, name: next.name.trim(), intervalMinutes: Math.max(1, next.intervalMinutes) });
+    onChanged();
+    kickScheduleRunner();
+  }, next => !next.name.trim() ? '请填写名称' : !Number.isFinite(next.intervalMinutes) || next.intervalMinutes < 1 ? '间隔至少为 1 分钟' : undefined);
+  const { name, prompt, intervalMinutes: interval, enabled } = saving.value;
   const del = async () => {
     try {
+      await saving.cancel();
       await removeSchedule(s.id);
       toast('已删除', 'success');
       onChanged();
@@ -222,18 +210,18 @@ function ScheduleCard({ s, onChanged }: { s: Schedule; onChanged: () => void }) 
   };
   const nextRun = s.lastRunAt ? s.lastRunAt + s.intervalMinutes * 60_000 : Date.now();
   return (
-    <div style={{ borderRadius: 'var(--radius-inner)', padding: '10px 12px', background: 'var(--canvas)', opacity: enabled ? 1 : 0.55 }}>
+    <div onCompositionStart={() => saving.setComposing(true)} onCompositionEnd={() => saving.setComposing(false)} style={{ borderRadius: 'var(--radius-inner)', padding: '10px 12px', background: 'var(--canvas)', opacity: enabled ? 1 : 0.55 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <input value={name} placeholder="名称" onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, flex: 1, fontWeight: 600 }} />
-        <input type="number" min={1} value={interval} onChange={(e) => setIntervalM(Number(e.target.value))} style={{ ...inputStyle, width: 70, flexShrink: 0 }} />
+        <input value={name} placeholder="名称" onChange={(e) => saving.setValue(previous => ({ ...previous, name: e.target.value }))} style={{ ...inputStyle, flex: 1, fontWeight: 600 }} />
+        <input type="number" min={1} value={interval} onChange={(e) => saving.setValue(previous => ({ ...previous, intervalMinutes: Number(e.target.value) }))} style={{ ...inputStyle, width: 70, flexShrink: 0 }} />
         <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>分钟</span>
-        <button onClick={() => setEnabled((v) => !v)} style={{ ...btnStyle }}>{enabled ? '停用' : '启用'}</button>
-        <button onClick={() => void save()} style={btnStyle}>保存</button>
+        <button onClick={() => saving.setValue(previous => ({ ...previous, enabled: !previous.enabled }), true)} style={{ ...btnStyle }}>{enabled ? '停用' : '启用'}</button>
+        <SaveStatus status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
         <button onClick={() => void del()} title="删除" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid transparent', borderRadius: 4, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>
           <X size={13} />
         </button>
       </div>
-      <textarea value={prompt} placeholder="要执行的提示词" onChange={(e) => setPrompt(e.target.value)} rows={3} style={{ ...inputStyle, marginTop: 8, minHeight: 56, resize: 'vertical', lineHeight: 1.55 }} />
+      <textarea value={prompt} placeholder="要执行的提示词" onChange={(e) => saving.setValue(previous => ({ ...previous, prompt: e.target.value }))} rows={3} style={{ ...inputStyle, marginTop: 8, minHeight: 56, resize: 'vertical', lineHeight: 1.55 }} />
       <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', marginTop: 6 }}>
         上次执行 {s.lastRunAt ? new Date(s.lastRunAt).toLocaleString() : '从未'}
         {enabled ? ` · 下次 ${new Date(nextRun).toLocaleString()}` : ''}

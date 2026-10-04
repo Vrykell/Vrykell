@@ -94,7 +94,12 @@ describe('配置读写', () => {
   });
   it('save/load 往返', () => {
     const c = cfg({ defaultEditor: 'emacs', templates: { rs: 'nvim' } });
-    saveConfig(c);
+    expect(saveConfig(c)).toBe(true);
     expect(loadConfig()).toEqual(c);
+  });
+  it('reports a failed storage write instead of claiming a successful save', () => {
+    const storage = vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => { throw new Error('quota'); });
+    expect(saveConfig(cfg())).toBe(false);
+    storage.mockRestore();
   });
 });

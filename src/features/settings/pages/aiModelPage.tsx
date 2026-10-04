@@ -1,8 +1,7 @@
 /**
  * aiModelPage — 模型配置页（API Key + 模型列表）。
  */
-import { useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Plus, X } from '@ui/icons';
 import {
   setProviderKey, clearProviderKey, setAiModels, setActiveModel, useAiConfigStore,
   type ModelProfile,
@@ -13,8 +12,10 @@ import { detectCapabilities, type ModelCapability } from '@features/agent/model/
 import { modelIcon, providerLabel } from '@features/agent/components/modelIcon';
 import Segmented from '@ui/Segmented';
 import { useToastStore } from '@ui/Toast';
-import { Field, ModelTextInput, btnStyle, inputStyle } from '@features/settings/components/ui';
+import { Field, ModelTextInput, btnStyle } from '@features/settings/components/ui';
 import ModelThinkingSettings from '@features/settings/components/ModelThinkingSettings';
+import AutoSaveInput from '../components/AutoSaveInput';
+import { useSettingsSave } from '../components/SettingsSaveProvider';
 
 const PROVIDERS: { id: ProviderKind; label: string }[] = [
   { id: 'openai-compatible', label: 'OpenAI 兼容' },
@@ -22,11 +23,22 @@ const PROVIDERS: { id: ProviderKind; label: string }[] = [
   { id: 'gemini', label: 'Gemini' },
 ];
 
-/** 提交模型列表的落库助手（Rust 侧会兜底保证至少一个 + active 有效）。 */
-function commitModels(next: ModelProfile[], activeId: string) {
-  setAiModels(next, activeId).catch((e) =>
-    useToastStore.getState().addToast(String((e as Error)?.message ?? e), 'error'),
-  );
+/** Serialize model edits and merge each patch with the latest persisted list. */
+let modelWrites = Promise.resolve();
+function commitModels(transform: (models: ModelProfile[]) => ModelProfile[]) {
+  const write = modelWrites.then(() => {
+    const current = useAiConfigStore.getState();
+    const next = transform(current.models);
+    return setAiModels(next, next.some(model => model.id === current.activeModel) ? current.activeModel : next[0]!.id);
+  });
+  modelWrites = write.catch(() => {});
+  return write;
+}
+
+function selectModel(id: string) {
+  const write = modelWrites.then(() => setActiveModel(id));
+  modelWrites = write.catch(() => {});
+  return write;
 }
 
 /** 能力徽标行（视觉/推理/工具/搜索，探测结果） */
@@ -61,7 +73,6 @@ function CapChips({ profile }: { profile: ModelProfile }) {
 
 export function AiModelPage() {
   const aiCfg = useAiConfigStore();
-  const [keyDraft, setKeyDraft] = useState('');
   const provider = aiCfg.provider;
   const keySet =
     provider === 'anthropic' ? aiCfg.hasAnthropicKey
@@ -69,14 +80,6 @@ export function AiModelPage() {
     : aiCfg.hasKey;
   const toast = (msg: string, type: 'info' | 'success' | 'error') =>
     useToastStore.getState().addToast(msg, type);
-
-  const commitKey = () => {
-    const k = keyDraft.trim();
-    if (!k) return;
-    setProviderKey(provider, k)
-      .then(() => { setKeyDraft(''); toast('已保存 API Key', 'success'); })
-      .catch((e) => toast(String((e as Error)?.message ?? e), 'error'));
-  };
 
   return (
     <>
@@ -92,30 +95,19 @@ export function AiModelPage() {
           }}>
             {keySet ? '已配置' : '未配置'}
           </span>
-          {keySet && (
-            <button
-              onClick={() => clearProviderKey(provider).then(() => toast('已清除 API Key', 'success'))}
-              style={btnStyle}
-            >
-              清除
-            </button>
-          )}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <input
+          <AutoSaveInput
+            key={provider}
             type="password"
-            value={keyDraft}
+            value=""
             placeholder={keySet ? '输入以覆盖，留空不改动' : '输入 API Key'}
-            onChange={(e) => setKeyDraft(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') commitKey(); }}
-            style={inputStyle}
+            onCommit={key => setProviderKey(provider, key)}
+            clearAfterSave
+            onClear={keySet ? async () => { await clearProviderKey(provider); toast('已清除 API Key', 'success'); } : undefined}
+            validate={key => key.trim() ? undefined : '留空不改动'}
+            style={{ flex: 1 }}
           />
-          <button
-            onClick={commitKey}
-            style={{ ...btnStyle, background: 'var(--accent)', color: 'var(--accent-text)', border: 'none', flexShrink: 0 }}
-          >
-            保存
-          </button>
         </div>
       </Field>
 
@@ -127,21 +119,21 @@ export function AiModelPage() {
 function ModelListField() {
   const models = useAiConfigStore((s) => s.models);
   const activeId = useAiConfigStore((s) => s.activeModel);
+  const { save } = useSettingsSave();
   const toast = (msg: string, type: 'info' | 'success' | 'error') =>
     useToastStore.getState().addToast(msg, type);
 
   const update = (id: string, patch: Partial<ModelProfile>) =>
     commitModels(
-      models.map((m) => {
+      current => current.map((m) => {
         if (m.id !== id) return m;
         const next = { ...m, ...patch };
-        // 模型 ID / 服务商变化时重新探测能力
+        // Recalculate capabilities when the provider or model identifier changes.
         if (patch.model !== undefined || patch.provider !== undefined) {
           next.capabilities = detectCapabilities(next.provider, next.model);
         }
         return next;
       }),
-      activeId,
     );
 
   const remove = (id: string) => {
@@ -149,16 +141,14 @@ function ModelListField() {
       toast('至少保留一个模型', 'info');
       return;
     }
-    const next = models.filter((m) => m.id !== id);
-    const nextActive = id === activeId ? next[0]!.id : activeId;
-    commitModels(next, nextActive);
+    void save(() => commitModels(current => current.filter((m) => m.id !== id)));
   };
 
   const add = () => {
     const id = `m${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
-    commitModels(
-      [
-        ...models,
+    void save(() => commitModels(
+      current => [
+        ...current,
         {
           id,
           name: `模型 ${models.length + 1}`,
@@ -168,8 +158,7 @@ function ModelListField() {
           capabilities: detectCapabilities('openai-compatible', ''),
         },
       ],
-      activeId,
-    );
+    ));
   };
 
   return (
@@ -214,7 +203,7 @@ function ModelListField() {
                   当前
                 </span>
               ) : (
-                <button data-subtle onClick={() => void setActiveModel(m.id)} style={btnStyle}>
+                <button data-subtle onClick={() => { void save(() => selectModel(m.id)); }} style={btnStyle}>
                   设为当前
                 </button>
               )}
@@ -238,7 +227,7 @@ function ModelListField() {
               <Segmented
                 options={PROVIDERS.map((p) => ({ value: p.id, label: p.label }))}
                 value={m.provider}
-                onChange={(v) => update(m.id, { provider: v, baseUrl: baseUrlForProvider(m.baseUrl, v) })}
+                onChange={(v) => { void save(() => update(m.id, { provider: v, baseUrl: baseUrlForProvider(m.baseUrl, v) })); }}
               />
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
