@@ -127,6 +127,16 @@ describe('useTerminalSession', () => {
     setTab('block');
   });
 
+  it('restores legacy CMD block sessions into an interactive classic scene', async () => {
+    useWorkspaceStore.setState({ tabs: [{ id: 't1', title: 'CMD', kind: 'session', layout: leaf({ id: 't1', kind: 'local', shellType: 'cmd', openMode: 'block' }) }] });
+    render(<TestHarness tabId="t1" onReady={() => {}} />);
+    await waitFor(() => expect(mockedPtySpawn).toHaveBeenCalled());
+    expect(vi.mocked(mockedPtySpawn).mock.calls[0]?.[3]).toMatchObject({ shell: 'cmd', openMode: 'classic' });
+    expect(useTerminalStore.getState().scenes.t1).toBe('classic');
+    ptyOutputHandlers[0]!('sess-x', [{ kind: 'data', text: 'CMD command output' }]);
+    expect(writeMock).toHaveBeenCalledWith('CMD command output', expect.any(Function));
+  });
+
   it('keeps SSH block authentication interactive until the remote prompt arrives', async () => {
     useWorkspaceStore.setState({ tabs: [{ id: 't1', title: 'ssh', kind: 'session', layout: leaf({ id: 't1', kind: 'ssh', openMode: 'block', ssh: { name: 'server', host: 'server', user: 'user' } }) }], activeId: 't1' });
     render(<TestHarness tabId="t1" onReady={() => {}} />);
