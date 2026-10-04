@@ -40,7 +40,7 @@ function cellStyle(cell: IBufferCell): string {
   // 前景色（inverse 时取背景色）
   if (inverse) {
     const bg = getBgCss(cell);
-    if (bg) parts.push(`color:${bg}`);
+    parts.push(`color:${bg ?? 'var(--canvas)'}`);
   } else {
     const fg = getFgCss(cell);
     if (fg) parts.push(`color:${fg}`);
@@ -49,7 +49,7 @@ function cellStyle(cell: IBufferCell): string {
   // 背景色（inverse 时取前景色）
   if (inverse) {
     const fg = getFgCss(cell);
-    if (fg) parts.push(`background:${fg}`);
+    parts.push(`background:${fg ?? 'var(--text-primary)'}`);
   } else {
     const bg = getBgCss(cell);
     if (bg) parts.push(`background:${bg}`);

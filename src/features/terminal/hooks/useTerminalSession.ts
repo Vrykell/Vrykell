@@ -4,7 +4,8 @@
  * 主 xterm 只在 classic / altScreen 场景接收数据（blockList 下闲置隐藏）。
  */
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { captureFrame, type TerminalFrame } from '../model/terminalFrame';
 import { Terminal } from '@xterm/xterm';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { FitAddon } from '@xterm/addon-fit';
@@ -123,8 +124,16 @@ export function useTerminalSession(
   onConnectionOutput?: (text: string) => void,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [attempt, setAttempt] = useState(0);
+  const [status, setStatus] = useState<'connecting' | 'ready' | 'closed' | 'error'>('connecting');
+  const [frame, setFrame] = useState<TerminalFrame | null>(null);
   const closeSessionRef = useRef<() => Promise<void>>(async () => {});
   const closeSession = useCallback(() => closeSessionRef.current(), []);
+  const reconnect = useCallback(async () => {
+    await closeSessionRef.current();
+    setFrame(null);
+    setAttempt(value => value + 1);
+  }, []);
   const onReadyRef = useRef(onReady);
   onReadyRef.current = onReady;
   const connectionOutputRef = useRef(onConnectionOutput);
@@ -133,6 +142,7 @@ export function useTerminalSession(
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    setStatus('connecting');
 
     const term = new Terminal({
       fontFamily: TERMINAL_FONT_FAMILY,
@@ -156,6 +166,14 @@ export function useTerminalSession(
       // 忽略：回退默认 DOM renderer（缝隙问题在无 GPU 环境无法根治）
     }
     term.open(el);
+    let frameRaf = 0;
+    const frameSub = term.onWriteParsed?.(() => {
+      if (frameRaf) return;
+      frameRaf = requestAnimationFrame(() => {
+        frameRaf = 0;
+        setFrame(captureFrame(term));
+      });
+    });
     fit.fit();
     registerTerminal(paneId, term);
     useTerminalStore.getState().setDims(paneId, term.cols, term.rows);
@@ -183,6 +201,7 @@ export function useTerminalSession(
       sessionId = null;
       preSession = [];
       useTerminalStore.getState().clearSession(paneId, id ?? undefined);
+      setStatus('closed');
     };
     closeSessionRef.current = close;
 
@@ -343,6 +362,7 @@ export function useTerminalSession(
           sessionId = null;
           stopped = true;
           useTerminalStore.getState().clearSession(paneId, id);
+          setStatus('closed');
           writeMain('\r\n\x1b[31m[进程已退出]\x1b[0m\r\n');
         }
       }),
@@ -353,7 +373,9 @@ export function useTerminalSession(
     // 类型/cwd 已在 controller 创建前取好（spec）
     const tabCwd = spec?.cwd;
     const spawnOpts: PtySpawnOptions | undefined = spec?.kind === 'ssh'
-      ? { ssh: { host: spec.ssh?.host ?? '', user: spec.ssh?.user, port: spec.ssh?.port }, openMode }
+      ? { ssh: { host: spec.ssh?.host ?? '', user: spec.ssh?.user, port: spec.ssh?.port,
+        identityFile: spec.ssh?.identityFile, jumpHost: spec.ssh?.jumpHost,
+        serverAliveInterval: spec.ssh?.serverAliveInterval, shellIntegration: spec.ssh?.shellIntegration }, openMode }
       : spec?.kind === 'local'
         ? { shell: spec.shellType, openMode }
         : undefined;
@@ -365,7 +387,7 @@ export function useTerminalSession(
       terminalDebug('pty-spawn-request', { paneId, tabId, cols: spawnCols, rows: spawnRows, spawnOpts });
     }
     const startSession = async () => {
-      if (spawnOpts?.ssh) {
+      if (spawnOpts?.ssh && !spawnOpts.ssh.jumpHost) {
         const info = await prepareSshHost(spawnOpts.ssh.host, spawnOpts.ssh.port, startupAbort.signal);
         spawnOpts.ssh.hostKeyType = info.keyType;
       }
@@ -388,6 +410,7 @@ export function useTerminalSession(
         }
         preSession = [];
         onReadyRef.current(id);
+        setStatus('ready');
         if (currentScene === 'classic' && useSessionStore.getState().activeId === tabId && !(spec?.kind === 'ssh' && blockEnabled && connectionOutputRef.current)) {
           term.focus();
         }
@@ -402,6 +425,7 @@ export function useTerminalSession(
       })
       .catch((e) => {
         if (!disposed && !stopped) {
+          setStatus('error');
           if (isTerminalDebugEnabled()) {
             terminalDebug('pty-spawn-error', { paneId, errorType: e instanceof Error ? e.name : typeof e });
           }
@@ -617,6 +641,8 @@ export function useTerminalSession(
         focusTimer = null;
       }
       selectionSub.dispose();
+      frameSub?.dispose();
+      cancelAnimationFrame(frameRaf);
       dataSub.dispose();
       cancelAnimationFrame(resizeRaf);
       cancelAnimationFrame(widthRaf);
@@ -630,7 +656,7 @@ export function useTerminalSession(
       unregisterTerminal(paneId, term);
       term.dispose();
     };
-  }, [paneId, tabId]);
+  }, [paneId, tabId, attempt]);
 
-  return { ref: containerRef, closeSession };
+  return { ref: containerRef, closeSession, reconnect, status, frame };
 }

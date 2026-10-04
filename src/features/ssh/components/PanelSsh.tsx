@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pencil, Plus, Search, Server } from 'lucide-react';
+import { iconSizes, Pencil, Plus, Search, Server  } from '@ui/icons';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { ensureSshLoaded, useSshStore } from '@features/ssh';
 import { useSessionStore } from '@features/workspace';
@@ -8,6 +8,7 @@ import ContextMenu from '@ui/ContextMenu';
 import { IconBtn } from '@ui/UiBtn';
 import { sidebarRowSpacing, sidebarRowContent, sidebarRowIcon, sidebarRowTitle } from '@ui/sidebarRow';
 import type { SshConnection } from '@features/ssh/services/api';
+import { connectionTarget } from '@features/ssh/services/api';
 import SshFormModal from '@features/ssh/components/SshFormModal';
 
 /**
@@ -23,6 +24,7 @@ export default function PanelSsh() {
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
   const [editing, setEditing] = useState<SshConnection | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; conn: SshConnection } | null>(null);
 
@@ -44,7 +46,7 @@ export default function PanelSsh() {
     void touch(conn.id);
     useSessionStore.getState().addTab({
       kind: 'ssh',
-      ssh: { name: conn.name, host: conn.host, user: conn.user, port: conn.port, connectionId: conn.id },
+      ssh: connectionTarget(conn),
     });
     // 文件管理器自动连到远程机文件
     useDockStore.getState().openPanel('files');
@@ -88,7 +90,7 @@ export default function PanelSsh() {
           background: 'var(--chrome-field)',
           borderRadius: 'var(--radius-inner)', padding: '0 8px', height: 30,
         }}>
-          <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+          <Search size={iconSizes.compact} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -106,13 +108,13 @@ export default function PanelSsh() {
           data-testid="ssh-edit-btn"
           onClick={openEdit}
         >
-          <Pencil size={14} />
+          <Pencil size={iconSizes.control} />
         </IconBtn>
         <IconBtn title="新建 SSH 连接" data-testid="ssh-new-btn" onClick={openNew}>
-          <Plus size={14} />
+          <Plus size={iconSizes.control} />
         </IconBtn>
       </div>
-
+      <button data-testid="ssh-quick-btn" onClick={() => setQuickOpen(true)} style={{ margin: '0 10px 10px', minHeight: 36 }}>快速连接</button>
       {/* 连接列表 */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 0 8px' }}>
         {filtered.length === 0 ? (
@@ -146,15 +148,15 @@ export default function PanelSsh() {
               color: c.id === selectedId ? 'var(--text-primary)' : 'var(--text-secondary)',
               background: c.id === selectedId ? 'var(--selection-bg)' : hoveredId === c.id ? 'var(--hover)' : 'transparent',
             }}>
-              <span style={sidebarRowIcon}><Server size={15} /></span>
+              <span style={sidebarRowIcon}><Server size={iconSizes.row} /></span>
               <span style={{ ...sidebarRowTitle, flex: 1, minWidth: 0, fontWeight: c.id === selectedId ? 600 : 500 }}>{c.name}</span>
-              <button data-subtle aria-label={`编辑「${c.name}」`} onDoubleClick={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); setSelectedId(c.id); editConn(c); }} style={{
+              <button data-subtle className="sidebar-row-action" aria-label={`编辑「${c.name}」`} onDoubleClick={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); setSelectedId(c.id); editConn(c); }} style={{
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                width: 18, height: 18, padding: 0, border: 'none', borderRadius: 4,
+                width: 28, height: 28, padding: 0, border: 'none', borderRadius: 4,
                 flexShrink: 0, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
                 opacity: c.id === selectedId || hoveredId === c.id ? 1 : 0,
                 transition: 'opacity 0.12s ease',
-              }}><Pencil size={12} /></button>
+              }}><Pencil size={iconSizes.compact} /></button>
             </div>
           </div>
         ))}
@@ -173,6 +175,9 @@ export default function PanelSsh() {
       )}
 
       <SshFormModal open={formOpen} initial={editing} onClose={() => setFormOpen(false)} />
+      <SshFormModal open={quickOpen} initial={null} onClose={() => setQuickOpen(false)} onConnect={conn => {
+        useSessionStore.getState().addTab({ kind: 'ssh', ssh: { ...connectionTarget(conn), connectionId: undefined } });
+      }} />
     </div>
   );
 }

@@ -4,3 +4,4 @@ pub mod scan;
 pub mod shell_integration;
 pub mod shells;
 pub mod debug;
+pub mod ssh_command;

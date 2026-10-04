@@ -18,6 +18,11 @@ import {
 } from '@features/ssh/services/api';
 
 describe('sshApi', () => {
+  it('validates keepalive and jump destinations before saving', () => {
+    expect(validateSshConnection({ name: 'n', host: 'h', serverAliveInterval: -1 })).toContain('保活');
+    expect(validateSshConnection({ name: 'n', host: 'h', jumpHost: '-oProxyCommand=bad' })).toContain('跳板机');
+    expect(validateSshConnection({ name: 'n', host: 'h', jumpHost: 'user@jump.example.com:2222', identityFile: 'C:/Keys/test key', serverAliveInterval: 30 })).toBeNull();
+  });
   beforeEach(() => invokeMock.mockReset());
 
   it('passes the confirmed fingerprint when recording host trust', async () => {
@@ -60,6 +65,7 @@ describe('sshApi', () => {
     await sshTest({ host: 'h', port: 2222, user: 'root', password: 'pw' });
     expect(invokeMock).toHaveBeenCalledWith('ssh_test', {
       host: 'h', port: 2222, user: 'root', password: 'pw',
+      options: { identityFile: undefined, jumpHost: undefined, serverAliveInterval: undefined, shellIntegration: undefined },
     });
 
     await sshFsList('s1', '/home');

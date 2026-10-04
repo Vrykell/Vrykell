@@ -1,9 +1,10 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { DispatchEvent } from '@core/terminal/events';
+import type { SshOptions } from '@core/ssh';
 
 /** SSH 连接目标（透传给 Rust pty_spawn 的 ssh 参数） */
-export interface SshSpawnTarget {
+export interface SshSpawnTarget extends SshOptions {
   host: string;
   user?: string;
   port?: number;

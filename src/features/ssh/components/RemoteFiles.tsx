@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
-import { Folder, File, MoreHorizontal, LocateFixed, ArrowUp } from 'lucide-react';
+import { iconSizes, Folder, File, MoreHorizontal, FolderArrowRight, ArrowUp } from '@ui/icons';
 import type { SshFsEntry } from '@features/ssh/services/api';
 import type { SshConnection } from '@features/ssh/services/api';
 import { IconBtn } from '@ui/UiBtn';
@@ -111,14 +111,14 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
             data-testid="remote-sync-btn"
             onClick={() => void syncToTerminal()}
           >
-            <LocateFixed size={14} />
+            <FolderArrowRight size={iconSizes.control} />
           </IconBtn>
           <IconBtn
             title="更多操作"
             data-testid="remote-more-btn"
             onClick={openMoreMenu}
           >
-            <MoreHorizontal size={14} />
+            <MoreHorizontal size={iconSizes.control} />
           </IconBtn>
         </div>
       </div>
