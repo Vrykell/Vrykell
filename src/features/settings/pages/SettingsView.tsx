@@ -4,7 +4,6 @@ import { loadConfig, saveConfig, type FileOpenConfig } from '@features/files/ser
 import { refreshAiConfig, setTavilyKey, clearTavilyKey, useAiConfigStore } from '@features/agent';
 import SkillsSettings from '@features/settings/pages/SkillsSettings';
 import { MemorySettings, AgentsSettings, SchedulesSettings } from '@features/settings/pages/AgentExtrasSettings';
-import FontQuickSettings from '@features/settings/components/FontQuickSettings';
 import Segmented from '@ui/Segmented';
 import { useToastStore } from '@ui/Toast';
 import {
@@ -366,11 +365,9 @@ export default function SettingsView() {
           <span style={{ fontSize: 'var(--fs-title)', fontWeight: 600, color: 'var(--text-primary)' }}>{activeLabel}</span>
         </div>
         <div className="settings-page-body">
-          <FontQuickSettings />
           {renderPage()}
         </div>
       </section>
     </div>
   );
 }
-

@@ -17,9 +17,9 @@ describe('persistent option feedback', () => {
     fireEvent.click(button);
     fireEvent.mouseLeave(button);
     expect(button).toHaveAttribute('aria-pressed', 'true');
-    expect(button.querySelector('.state-icon-check')).toBeInTheDocument();
+    expect(button.querySelectorAll('svg')).toHaveLength(1);
     fireEvent.click(button);
-    expect(button.querySelector('.state-icon-check')).toBeNull();
+    expect(button).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('marks only the current segmented option as selected', () => {
@@ -31,5 +31,6 @@ describe('persistent option feedback', () => {
     fireEvent.click(screen.getByRole('button', { name: '块模式' }));
     expect(screen.getByRole('button', { pressed: true })).toHaveTextContent('块模式');
     expect(screen.getByRole('button', { name: '经典模式' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { pressed: true }).querySelector('svg')).toBeNull();
   });
 });

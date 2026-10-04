@@ -2,7 +2,8 @@
  * themePage — 外观主题设置页（明暗/不透明度/壁纸/导入导出）。
  */
 import { useEffect, useState } from 'react';
-import { Check, Sun, Moon, Image as ImageIcon, Download, Upload, RefreshCw, FileText, Trash2 } from 'lucide-react';
+import { Sun, Moon, Image as ImageIcon, Download, Upload, RefreshCw, FileText, Trash2 } from 'lucide-react';
+import FontSettings from '@features/settings/components/FontSettings';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { invoke } from '@tauri-apps/api/core';
@@ -101,12 +102,14 @@ export function ThemePage() {
                   color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
                 }}
               >
-                <Icon size={14} /> {m === 'dark' ? '深色' : '浅色'} {active && <Check size={12} aria-hidden="true" />}
+                <Icon size={14} /> {m === 'dark' ? '深色' : '浅色'}
               </button>
             );
           })}
         </div>
       </Field>
+
+      <FontSettings />
 
       <Field title="应用不透明度" description="整个应用内容的不透明度，数值越低背景壁纸越透出。">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
