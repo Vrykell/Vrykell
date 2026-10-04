@@ -21,12 +21,12 @@ const toast = (msg: string, type: 'info' | 'success' | 'error') =>
 
 const inputStyle: React.CSSProperties = {
   background: 'var(--canvas)', border: '1px solid var(--border)',
-  borderRadius: 'var(--radius-inner)', padding: '6px 8px', fontSize: 12,
+  borderRadius: 'var(--radius-inner)', padding: '6px 8px', fontSize: 'calc(12px * var(--ui-font-scale))',
   color: 'var(--text-primary)', outline: 'none', width: '100%',
   fontFamily: 'var(--font-mono)', boxSizing: 'border-box',
 };
 const btnStyle: React.CSSProperties = {
-  padding: '4px 10px', fontSize: 12, border: '1px solid var(--border)',
+  padding: '4px 10px', fontSize: 'calc(12px * var(--ui-font-scale))', border: '1px solid var(--border)',
   borderRadius: 'var(--radius-inner)', background: 'transparent',
   color: 'var(--text-secondary)', cursor: 'pointer', flexShrink: 0,
 };
@@ -93,7 +93,7 @@ export function MemorySettings() {
   return (
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <span style={{ fontSize: 12, color: 'var(--text-muted)', flex: 1 }}>
+        <span style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', flex: 1 }}>
           持久知识会注入每次对话；AI 可用「记忆」工具自行读写与整理，也可一键让 AI 整理。
         </span>
         <button onClick={() => void organize()} disabled={organizing} style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
@@ -113,11 +113,11 @@ export function MemorySettings() {
       </div>
       {jlines.length > 0 && (
         <div style={{ marginTop: 12 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>近期流水</div>
+          <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 600, marginBottom: 6 }}>近期流水</div>
           <pre style={{
             margin: 0, padding: '8px 10px', maxHeight: 180, overflow: 'auto',
             background: 'var(--hover)', borderRadius: 'var(--radius-inner)',
-            fontSize: 11, fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+            fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
             color: 'var(--text-secondary)',
           }}>
             {jlines.join('\n')}
@@ -181,7 +181,7 @@ export function AgentsSettings() {
   };
   return (
     <>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+      <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', marginBottom: 8 }}>
         子代理 = 独立系统提示词的助手，主 AI 用「子代理」工具委派任务，也可自行创建、删除。
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -226,7 +226,7 @@ function ScheduleCard({ s, onChanged }: { s: Schedule; onChanged: () => void }) 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <input value={name} placeholder="名称" onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, flex: 1, fontWeight: 600 }} />
         <input type="number" min={1} value={interval} onChange={(e) => setIntervalM(Number(e.target.value))} style={{ ...inputStyle, width: 70, flexShrink: 0 }} />
-        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>分钟</span>
+        <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>分钟</span>
         <button onClick={() => setEnabled((v) => !v)} style={{ ...btnStyle }}>{enabled ? '停用' : '启用'}</button>
         <button onClick={() => void save()} style={btnStyle}>保存</button>
         <button onClick={() => void del()} title="删除" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid transparent', borderRadius: 4, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>
@@ -234,7 +234,7 @@ function ScheduleCard({ s, onChanged }: { s: Schedule; onChanged: () => void }) 
         </button>
       </div>
       <textarea value={prompt} placeholder="要执行的提示词" onChange={(e) => setPrompt(e.target.value)} rows={3} style={{ ...inputStyle, marginTop: 8, minHeight: 56, resize: 'vertical', lineHeight: 1.55 }} />
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
+      <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', marginTop: 6 }}>
         上次执行 {s.lastRunAt ? new Date(s.lastRunAt).toLocaleString() : '从未'}
         {enabled ? ` · 下次 ${new Date(nextRun).toLocaleString()}` : ''}
       </div>
@@ -259,7 +259,7 @@ export function SchedulesSettings() {
   };
   return (
     <>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+      <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', marginBottom: 8 }}>
         定时任务在应用运行期间按间隔触发；AI 也可用「定时任务」工具自行创建、启停、删除。
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

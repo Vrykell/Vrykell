@@ -68,7 +68,7 @@ export default function CommandBlock({ children }: { children?: ReactNode }) {
           borderBottom: '1px solid var(--border)',
           background: 'var(--command-block-bg)',
         }}>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
+          <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
             {code.lang || 'code'}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
@@ -76,7 +76,7 @@ export default function CommandBlock({ children }: { children?: ReactNode }) {
               <button
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 4,
-                  fontSize: 11,
+                  fontSize: 'calc(11px * var(--ui-font-scale))',
                   padding: '2px 10px',
                   background: 'var(--accent-dim)',
                   border: '1px solid var(--accent-blue-dim)',
@@ -94,7 +94,7 @@ export default function CommandBlock({ children }: { children?: ReactNode }) {
               onClick={() => void copy()}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
-                fontSize: 11, padding: '2px 8px', border: 'none',
+                fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', border: 'none',
                 background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
               }}
             >

@@ -63,7 +63,7 @@ export default function SessionHistoryView() {
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
         padding: '8px 16px', borderBottom: '1px solid var(--border)',
-        fontSize: 12, color: 'var(--text-secondary)',
+        fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)',
       }}>
         <History size={13} />
         <span style={{ fontWeight: 600, color: 'var(--text-primary)', flexShrink: 0 }}>会话历史</span>
@@ -83,7 +83,7 @@ export default function SessionHistoryView() {
             data-testid="session-filter-input"
             style={{
               flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none',
-              fontSize: 12, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+              fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
             }}
           />
           <button
@@ -109,7 +109,7 @@ export default function SessionHistoryView() {
           title="刷新"
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 4,
-            fontSize: 11, padding: '3px 8px', border: '1px solid var(--border)',
+            fontSize: 'calc(11px * var(--ui-font-scale))', padding: '3px 8px', border: '1px solid var(--border)',
             borderRadius: 4, background: 'transparent', color: 'var(--text-secondary)',
             cursor: 'pointer', flexShrink: 0,
           }}
@@ -131,11 +131,11 @@ export default function SessionHistoryView() {
       {/* 列表 */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 8px 8px' }}>
         {loading ? (
-          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>加载中…</div>
+          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>加载中…</div>
         ) : historical.length === 0 ? (
           <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-            paddingTop: '14vh', color: 'var(--text-muted)', fontSize: 12,
+            paddingTop: '14vh', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))',
           }}>
             <Monitor size={22} style={{ opacity: 0.4 }} />
             <span>暂无历史会话</span>
@@ -168,12 +168,12 @@ export default function SessionHistoryView() {
                       </span>
                       <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
                         <span style={{
-                          fontSize: 12, fontWeight: 600, color: 'var(--text-primary)',
+                          fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 600, color: 'var(--text-primary)',
                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                         }}>
                           {g.title}
                         </span>
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{gs.length} 个会话</span>
+                        <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>{gs.length} 个会话</span>
                       </span>
                       <button
                         data-subtle
@@ -181,7 +181,7 @@ export default function SessionHistoryView() {
                         onClick={(e) => { e.stopPropagation(); void restoreGroup(g); }}
                         style={{
                           display: 'inline-flex', alignItems: 'center', gap: 4,
-                          fontSize: 11, padding: '2px 8px', border: '1px solid var(--border)',
+                          fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', border: '1px solid var(--border)',
                           borderRadius: 4, background: 'transparent', color: 'var(--text-secondary)',
                           cursor: 'pointer',
                         }}
@@ -234,7 +234,7 @@ export default function SessionHistoryView() {
             {ungrouped.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {groups.length > 0 && (
-                  <div style={{ padding: '0 8px 2px', fontSize: 11, color: 'var(--text-muted)' }}>未分组</div>
+                  <div style={{ padding: '0 8px 2px', fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>未分组</div>
                 )}
                 {ungrouped.map((s) => (
                   <SessionRow
@@ -284,14 +284,13 @@ function SessionFilterMenu({ anchor, value, onChange, onClose }: {
     <div
       ref={ref}
       data-testid="session-filter-menu"
+      className="workspace-floating"
       style={{
         position: 'fixed', zIndex: 9999, top, left, minWidth: 150,
-        background: 'var(--elevated)', border: '1px solid var(--border)',
-        borderRadius: 'var(--radius-inner)', boxShadow: 'var(--shadow-md)',
-        padding: '4px 0', fontSize: 12,
+        padding: 4, fontSize: 'calc(12px * var(--ui-font-scale))',
       }}
     >
-      <div style={{ padding: '4px 10px 2px', fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.04em' }}>
+      <div style={{ padding: '4px 10px 2px', fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.04em' }}>
         类型
       </div>
       {TYPE_OPTIONS.map((o) => {
@@ -301,7 +300,7 @@ function SessionFilterMenu({ anchor, value, onChange, onClose }: {
         );
       })}
       <div style={{ height: 1, background: 'var(--border)', margin: '4px 8px' }} />
-      <div style={{ padding: '4px 10px 2px', fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.04em' }}>
+      <div style={{ padding: '4px 10px 2px', fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.04em' }}>
         日期
       </div>
       {DATE_OPTIONS.map((o) => {
@@ -317,13 +316,13 @@ function SessionFilterMenu({ anchor, value, onChange, onClose }: {
 /** 筛选菜单单选行（选中打勾 + 强调色）。 */
 function FilterOption({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
-    <button
+    <button className="workspace-floating-row"
       onClick={onClick}
       style={{
         display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
         padding: '5px 10px', border: 'none', background: 'transparent', cursor: 'pointer',
         color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-        fontSize: 12,
+        fontSize: 'calc(12px * var(--ui-font-scale))',
       }}
       onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; }}
       onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
@@ -367,19 +366,19 @@ function SessionRow({
       </span>
       <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
         <span style={{
-          display: 'block', fontSize: 12, color: 'var(--text-primary)',
+          display: 'block', fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-primary)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {s.title || '(未命名会话)'}
         </span>
         <span style={{
-          display: 'block', fontSize: 11, color: 'var(--text-muted)',
+          display: 'block', fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {sshTarget ? `${when} · ${sshTarget}` : `${when} · ${s.block_count} 个命令块`}
         </span>
       </span>
-      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>
+      <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', flexShrink: 0 }}>
         {historical ? '恢复' : '打开'}
       </span>
       {onDelete && (

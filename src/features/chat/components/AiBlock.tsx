@@ -28,7 +28,7 @@ import ToolNode from '@features/chat/components/ToolNode';
 import ToolRunCard from '@features/chat/components/ToolRunCard';
 import AttachmentChips from '@features/chat/components/AttachmentChips';
 import type { ChatExchange } from '@features/chat/model/exchanges';
-import { TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE } from '@features/terminal/model/terminalFont';
+import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
 
 /** rail 细线：1px，绝对定位贯穿整个回答容器（top 起于首端灰点圆心，
  *  bottom 收于末端节点圆心：完成=灰点 / 出错=红节点 / 流式=延伸至底）。
@@ -136,7 +136,7 @@ export default function AiBlock({ exchange }: { exchange: ChatExchange }) {
               flex: 1,
               minWidth: 0,
               fontFamily: TERMINAL_FONT_FAMILY,
-              fontSize: TERMINAL_FONT_SIZE,
+              fontSize: 'var(--terminal-font-size)',
               color: 'var(--text-primary)',
               lineHeight: '20px',
               wordBreak: 'break-word',
@@ -183,7 +183,7 @@ export default function AiBlock({ exchange }: { exchange: ChatExchange }) {
             paddingTop: 6,
             paddingBottom: !answer.pending && !answer.error ? 8 : 0,
             fontFamily: 'var(--font-ui)',
-            fontSize: 12,
+            fontSize: 'calc(12px * var(--ui-font-scale))',
             lineHeight: 1.6,
             color: 'var(--text-primary)',
           }}
@@ -242,7 +242,7 @@ export default function AiBlock({ exchange }: { exchange: ChatExchange }) {
               }}
             >
               <ToolNode state="error" top={12} />
-              <span style={{ fontSize: 12, color: 'var(--error)' }}>出错了</span>
+              <span style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--error)' }}>出错了</span>
             </div>
           )}
           {/* 回答完成 = 末端灰点（6px，圆心距容器底 4px，与 Rail bottom 对齐） */}
@@ -271,7 +271,7 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
         title={open ? '收起思考过程' : '展开思考过程'}
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 4,
-          fontFamily: 'var(--font-ui)', fontSize: 11,
+          fontFamily: 'var(--font-ui)', fontSize: 'calc(11px * var(--ui-font-scale))',
           padding: '2px 6px', border: 'none', borderRadius: 4,
           background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
           maxWidth: '100%',
@@ -288,7 +288,7 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
         {!open && preview && (
           <span style={{
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            fontSize: 10, color: 'var(--text-muted)', opacity: 0.6, minWidth: 0,
+            fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)', opacity: 0.6, minWidth: 0,
           }}>
             {preview}
           </span>
@@ -300,7 +300,7 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
           style={{
             marginTop: 4, marginLeft: 1, padding: '2px 0 2px 12px',
             borderLeft: '2px solid var(--border-strong)',
-            fontSize: 11, lineHeight: 1.6, color: 'var(--text-secondary)',
+            fontSize: 'calc(11px * var(--ui-font-scale))', lineHeight: 1.6, color: 'var(--text-secondary)',
             wordBreak: 'break-word', maxHeight: 260, overflowY: 'auto',
           }}
         >

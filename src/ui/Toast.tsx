@@ -134,20 +134,18 @@ function ToastItem({ t }: { t: ToastItem }) {
       onMouseEnter={() => pause(t.id)}
       onMouseLeave={() => resume(t.id)}
       role="status"
+      className="workspace-floating"
       style={{
         pointerEvents: 'auto',
         display: 'flex', alignItems: 'center', gap: 8,
-        maxWidth: 380, padding: '8px 8px 8px 0',
-        background: 'var(--elevated)', border: '1px solid var(--border)',
-        borderRadius: 8, boxShadow: 'var(--shadow-md)',
-        color: 'var(--text-primary)', fontSize: 12.5, lineHeight: 1.5,
+        maxWidth: 380, padding: '10px 12px',
+        color: 'var(--text-primary)', fontSize: 'calc(12.5px * var(--ui-font-scale))', lineHeight: 1.5,
         animation: t.leaving
           ? 'toastOut 0.2s var(--ease) forwards'
           : 'toastIn 0.24s var(--ease)',
       }}
     >
-      {/* 左侧类型色强调条 + 图标 */}
-      <span style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, background: color, flexShrink: 0 }} />
+      {/* A semantic icon identifies the notification without a colored edge. */}
       <Icon size={15} style={{ color, flexShrink: 0 }} />
       <span style={{ flex: 1, minWidth: 0, overflowWrap: 'break-word' }}>{t.message}</span>
       <button

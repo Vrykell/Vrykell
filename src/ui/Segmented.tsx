@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 export interface SegmentedOption<T extends string> {
@@ -28,7 +29,7 @@ export default function Segmented<T extends string>({
   // 容器有 1px 边框，按钮外侧圆角需减 1px 才能与内容盒圆角严丝合缝
   const innerRadius = 'calc(var(--radius-inner) - 1px)';
   const pad = size === 'sm' ? '3px 10px' : '5px 14px';
-  const fontSize = size === 'sm' ? 11 : 11;
+  const fontSize = 'calc(12px * var(--ui-font-scale))';
 
   return (
     <div
@@ -48,9 +49,11 @@ export default function Segmented<T extends string>({
             key={o.value}
             data-subtle
             type="button"
+            aria-pressed={active}
             onClick={() => onChange(o.value)}
             style={{
               fontSize,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
               padding: pad,
               border: 'none',
               cursor: 'pointer',
@@ -62,6 +65,7 @@ export default function Segmented<T extends string>({
               borderBottomRightRadius: last ? innerRadius : 0,
             }}
           >
+            {active && <Check size={11} aria-hidden="true" />}
             {o.label}
           </button>
         );

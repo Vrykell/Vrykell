@@ -36,29 +36,28 @@ export default function ConfirmDialog({
       onClick={onCancel}
       data-testid="confirm-dialog"
     >
-      <div
+      <div className="workspace-floating workspace-floating-dialog" role="dialog" aria-modal="true" aria-label={title}
         style={{
-          width: 360, background: 'var(--elevated)', border: '1px solid var(--border-strong)',
-          borderRadius: 'var(--radius-block)', boxShadow: 'var(--shadow-lg)', padding: 14,
+          width: 360, maxWidth: 'calc(100vw - 40px)', padding: 16,
           display: 'flex', flexDirection: 'column', gap: 10,
           animation: 'modalIn 0.22s var(--ease-out)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{title}</div>
+        <div style={{ fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>{title}</div>
         {message && (
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6, wordBreak: 'break-all' }}>
+          <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)', lineHeight: 1.6, wordBreak: 'break-all' }}>
             {message}
           </div>
         )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button onClick={onCancel} data-testid="confirm-cancel" style={{
-            padding: '5px 12px', fontSize: 12, border: '1px solid var(--border)',
+            padding: '5px 12px', fontSize: 'calc(12px * var(--ui-font-scale))', border: '1px solid var(--border)',
             borderRadius: 'var(--radius-inner)', background: 'transparent',
             color: 'var(--text-secondary)', cursor: 'pointer',
           }}>{cancelLabel}</button>
           <button onClick={onConfirm} data-testid="confirm-ok" style={{
-            padding: '5px 16px', fontSize: 12, border: 'none',
+            padding: '5px 16px', fontSize: 'calc(12px * var(--ui-font-scale))', border: 'none',
             borderRadius: 'var(--radius-inner)',
             background: danger ? 'var(--error)' : 'var(--accent)',
             color: danger ? 'var(--error-text)' : 'var(--accent-text)', cursor: 'pointer',

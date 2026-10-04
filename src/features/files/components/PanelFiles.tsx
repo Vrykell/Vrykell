@@ -111,7 +111,7 @@ function LocalFiles() {
       <div style={{
         display: 'flex', alignItems: 'center', gap: 2,
         padding: '6px 8px',
-        fontSize: 11, minHeight: 30, flexShrink: 0,
+        fontSize: 'calc(11px * var(--ui-font-scale))', minHeight: 30, flexShrink: 0,
         whiteSpace: 'nowrap',
       }}>
         <div ref={crumbRef} style={{
@@ -164,7 +164,7 @@ function LocalFiles() {
       <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
         {path === null ? (
           disks.length === 0 ? (
-            <div style={{ padding: 16, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+            <div style={{ padding: 16, fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', textAlign: 'center' }}>
               正在扫描磁盘…
             </div>
           ) : (
@@ -193,7 +193,7 @@ function LocalFiles() {
               />
             ))}
             {rows.length === 0 && (
-              <div style={{ padding: 16, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+              <div style={{ padding: 16, fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', textAlign: 'center' }}>
                 空目录
               </div>
             )}
@@ -256,13 +256,13 @@ function DiskCard({ disk, onOpen }: { disk: DiskEntry; onOpen: () => void }) {
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          fontSize: 12, fontWeight: 600, color: 'var(--text-primary)',
+          fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 600, color: 'var(--text-primary)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {disk.name}
         </div>
         <div style={{
-          fontSize: 10.5, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)',
+          fontSize: 'calc(10.5px * var(--ui-font-scale))', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)',
           marginTop: 1,
         }}>
           {total > 0 ? `${fmtSize(free)} 可用` : '—'}
@@ -330,8 +330,9 @@ function FileRow({
           : '双击在终端编辑器中打开'}
       style={{
         display: 'flex', alignItems: 'center', gap: 4,
-        padding: `3px 10px 3px ${4 + depth * 14}px`,
-        fontSize: 12, cursor: renaming ? 'text' : 'pointer',
+        padding: `5px 10px 5px ${4 + depth * 14}px`,
+        fontSize: 'var(--fs-label)', lineHeight: '20px', minHeight: 32,
+        cursor: renaming ? 'text' : 'pointer',
         color: entry.is_dir
           ? (inWorkspace ? 'var(--accent-warm)' : 'var(--text-primary)')
           : 'var(--text-secondary)',
@@ -373,7 +374,7 @@ function FileRow({
           style={{
             flex: 1, minWidth: 0,
             background: 'var(--canvas)', border: '1px solid var(--accent)',
-            borderRadius: 3, padding: '0 4px', fontSize: 12,
+            borderRadius: 3, padding: '0 4px', fontSize: 'calc(12px * var(--ui-font-scale))',
             color: 'var(--text-primary)', fontFamily: 'var(--font-mono)',
             outline: 'none',
           }}
@@ -398,7 +399,7 @@ function Crumb({ label, onClick, active }: { label: string; onClick: () => void;
       cursor: 'pointer', padding: '1px 4px', borderRadius: 3,
       color: active ? 'var(--text-primary)' : 'var(--text-muted)',
       background: active ? 'var(--hover)' : 'transparent',
-      fontFamily: 'var(--font-mono)', fontSize: 11,
+      fontFamily: 'var(--font-mono)', fontSize: 'calc(11px * var(--ui-font-scale))',
     }}>{label}</span>
   );
 }

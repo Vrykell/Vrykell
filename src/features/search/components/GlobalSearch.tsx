@@ -49,16 +49,12 @@ export default function GlobalSearch({ open, onClose }: Props) {
       }}
       onClick={close}
     >
-      <div
+      <div className="workspace-floating workspace-floating-dialog" role="dialog" aria-modal="true" aria-label="全局搜索"
         style={{
           width: 480,
           maxWidth: 'calc(100vw - 40px)',
           minHeight: 240,
           maxHeight: 'min(400px, 72vh)',
-          background: 'var(--elevated)',
-          border: '1px solid var(--border-strong)',
-          borderRadius: 12,
-          boxShadow: 'var(--shadow-lg)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'visible',
@@ -72,8 +68,10 @@ export default function GlobalSearch({ open, onClose }: Props) {
             display: 'flex',
             alignItems: 'center',
             gap: 8,
-            padding: '12px 16px',
-            borderBottom: '1px solid var(--border)',
+            padding: '8px 10px',
+            margin: 10,
+            borderRadius: 'var(--radius-inner)',
+            background: 'var(--canvas)',
           }}
         >
           <Search size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
@@ -88,7 +86,9 @@ export default function GlobalSearch({ open, onClose }: Props) {
               background: 'transparent',
               border: 'none',
               outline: 'none',
-              fontSize: 15,
+              fontSize: 'calc(13px * var(--ui-font-scale))',
+              height: 28,
+              padding: 0,
               color: 'var(--text-primary)',
               fontFamily: 'var(--font-ui)',
             }}
@@ -107,7 +107,7 @@ export default function GlobalSearch({ open, onClose }: Props) {
               background: filterOpen ? 'var(--hover)' : 'transparent',
               color: 'var(--text-secondary)',
               cursor: 'pointer',
-              fontSize: 12,
+              fontSize: 'calc(12px * var(--ui-font-scale))',
               fontFamily: 'var(--font-ui)',
               whiteSpace: 'nowrap',
               flexShrink: 0,
@@ -130,8 +130,8 @@ export default function GlobalSearch({ open, onClose }: Props) {
             overflowX: 'hidden',
             padding: '6px 10px 12px',
             minHeight: 220,
-            borderBottomLeftRadius: 12,
-            borderBottomRightRadius: 12,
+            borderBottomLeftRadius: 'var(--radius-block)',
+            borderBottomRightRadius: 'var(--radius-block)',
           }}
         >
           {!hasInput && hasHistory && (
@@ -142,16 +142,15 @@ export default function GlobalSearch({ open, onClose }: Props) {
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '6px 8px',
-                  borderBottom: '1px solid var(--border)',
                 }}
               >
-                <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
+                <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', fontWeight: 600 }}>
                   最近搜索
                 </span>
                 <button
                   onClick={() => searchHistory.clear()}
                   style={{
-                    fontSize: 10,
+                    fontSize: 'calc(10px * var(--ui-font-scale))',
                     padding: '2px 8px',
                     border: 'none',
                     borderRadius: 3,
@@ -166,6 +165,7 @@ export default function GlobalSearch({ open, onClose }: Props) {
               {searchHistory.items.slice(0, 8).map((item, index) => (
                 <button
                   key={`sh-${index}`}
+                  className="workspace-floating-row"
                   onClick={() => handleInput(item)}
                   style={{
                     display: 'flex',
@@ -178,7 +178,7 @@ export default function GlobalSearch({ open, onClose }: Props) {
                     background: 'transparent',
                     color: 'var(--text-secondary)',
                     cursor: 'pointer',
-                    fontSize: 12,
+                    fontSize: 'calc(12px * var(--ui-font-scale))',
                     fontFamily: 'var(--font-ui)',
                   }}
                   onMouseEnter={(event) => {
@@ -196,7 +196,7 @@ export default function GlobalSearch({ open, onClose }: Props) {
           )}
 
           {!hasInput && !hasHistory && (
-            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>
               输入关键词搜索文件、命令、设置
             </div>
           )}
@@ -209,12 +209,11 @@ export default function GlobalSearch({ open, onClose }: Props) {
                   alignItems: 'center',
                   gap: 5,
                   padding: '6px 10px',
-                  fontSize: 10,
+                  fontSize: 'calc(10px * var(--ui-font-scale))',
                   fontWeight: 600,
                   color: 'var(--text-muted)',
                   textTransform: 'uppercase',
                   letterSpacing: 0.5,
-                  borderTop: '1px solid var(--border)',
                 }}
               >
                 <group.icon size={11} /> {group.label}
@@ -237,12 +236,12 @@ export default function GlobalSearch({ open, onClose }: Props) {
           ))}
 
           {hasInput && !hasResults && state.loading && (
-            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>
               搜索中…
             </div>
           )}
           {hasInput && !hasResults && !state.loading && (
-            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>
               无匹配结果
             </div>
           )}

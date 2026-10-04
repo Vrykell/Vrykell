@@ -25,7 +25,8 @@ import { getCellMetrics } from '@utils/termMetrics';
 import type { DispatchEvent } from '@core/terminal/events';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 import type { UnlistenFn } from '@tauri-apps/api/event';
-import { TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE, TERMINAL_LINE_HEIGHT } from '@features/terminal/model/terminalFont';
+import { TERMINAL_FONT_FAMILY, getTerminalFontSize, TERMINAL_LINE_HEIGHT } from '@features/terminal/model/terminalFont';
+import { useTypographyStore } from '@config/typography';
 
 /**
  * TermBlock UI 投影：剥离 controller 内部字段（outputTerm/earlyBuf 等）。
@@ -123,7 +124,7 @@ export function useTerminalSession(
 
     const term = new Terminal({
       fontFamily: TERMINAL_FONT_FAMILY,
-      fontSize: TERMINAL_FONT_SIZE,
+      fontSize: getTerminalFontSize(),
       lineHeight: TERMINAL_LINE_HEIGHT,
       cursorBlink: true,
       scrollback: 5000,
@@ -452,7 +453,7 @@ export function useTerminalSession(
       probe.style.cssText =
         'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:pre;line-height:1;';
       probe.style.fontFamily = TERMINAL_FONT_FAMILY;
-      probe.style.fontSize = `${TERMINAL_FONT_SIZE}px`;
+      probe.style.fontSize = `${getTerminalFontSize()}px`;
       probe.textContent = 'W'.repeat(100);
       document.body.appendChild(probe);
       const w = probe.getBoundingClientRect().width / 100;
@@ -520,6 +521,16 @@ export function useTerminalSession(
       });
     };
     widthSyncs.set(paneId, applyWidth);
+    const unsubscribeTypography = useTypographyStore.subscribe((state, previous) => {
+      if (state.terminalFontSize === previous.terminalFontSize) return;
+      term.options.fontSize = state.terminalFontSize;
+      cachedDomCellWidth = 0;
+      if (el.offsetWidth > 0 && el.offsetHeight > 0) {
+        fit.fit();
+        useTerminalStore.getState().setDims(paneId, term.cols, term.rows);
+        applyWidth();
+      }
+    });
 
     let resizeRaf = 0;
     const ro = new ResizeObserver(() => {
@@ -539,6 +550,7 @@ export function useTerminalSession(
     // ── 清理 ──
 
     return () => {
+      unsubscribeTypography();
       disposed = true;
       if (isTerminalDebugEnabled()) {
         terminalDebug('session-controller-dispose', { paneId, tabId, hasSession: Boolean(sessionId) });

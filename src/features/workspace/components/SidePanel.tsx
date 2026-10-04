@@ -87,7 +87,7 @@ function SinglePanel({ side, panelId, visible }: { side: DockSide; panelId: stri
   if (!def || !PanelContent) return null;
 
   return (
-    <div className="workspace-side-panel" data-side={side} style={{
+    <div className="workspace-side-panel" data-side={side} data-visible={visible ? 'true' : 'false'} style={{
       display: visible ? 'block' : 'none',
       position: 'relative',
       flexShrink: 0,
@@ -95,12 +95,14 @@ function SinglePanel({ side, panelId, visible }: { side: DockSide; panelId: stri
     }}>
       <div style={{
         width,
-        maxWidth: `calc(100vw - var(--workspace-activity-width) - var(--workspace-terminal-min-width) - ${isLeft ? 2 : 3} * var(--workspace-gap))`,
+        // Reserve the same frame space as the dock width budget.
+        maxWidth: 'calc(100vw - var(--workspace-activity-width) - var(--workspace-terminal-min-width) - var(--workspace-frame-width))',
         display: collapsed ? 'none' : 'flex',
         flexDirection: 'column',
         minHeight: 0,
         height: '100%',
-        background: isLeft ? 'var(--sidebar-bg)' : 'var(--canvas)',
+        background: 'var(--sidebar-bg)',
+        borderRadius: 'inherit', overflow: 'hidden',
       }}>
         <div className="workspace-panel-heading">
           <span>{panelId === 'chat' ? 'AI 助手' : def.label}</span>

@@ -21,6 +21,7 @@ function MenuItem({ label, shortcut, onClick }: { label: string; shortcut?: stri
     <button
       type="button"
       role="menuitem"
+      className="workspace-floating-row"
       onClick={onClick}
       style={{ cursor: 'pointer', display: 'block', width: '100%', border: 'none', background: 'transparent', textAlign: 'left' }}
       onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--hover)'; }}
@@ -28,7 +29,7 @@ function MenuItem({ label, shortcut, onClick }: { label: string; shortcut?: stri
     >
       <div style={{
         padding: '4px 12px',
-        fontSize: 12,
+        fontSize: 'calc(12px * var(--ui-font-scale))',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -38,7 +39,7 @@ function MenuItem({ label, shortcut, onClick }: { label: string; shortcut?: stri
       }}>
         <span>{label}</span>
         {shortcut && (
-          <span style={{ color: 'var(--text-muted)', fontSize: 11, fontFamily: 'var(--font-mono)' }}>
+          <span style={{ color: 'var(--text-muted)', fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-mono)' }}>
             {shortcut}
           </span>
         )}
@@ -95,6 +96,7 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
   return (
     <div
       ref={ref}
+      className="workspace-floating"
       role="menu"
       aria-label="命令块操作"
       data-no-drag
@@ -104,12 +106,8 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
         top,
         left,
         minWidth: 210,
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderRadius: 8,
-        boxShadow: '0 8px 32px rgba(0,0,0,0.55)',
-        padding: '4px 0',
-        fontSize: 12,
+        padding: 4,
+        fontSize: 'calc(12px * var(--ui-font-scale))',
         fontFamily: 'var(--font-ui)',
         userSelect: 'none',
         overflow: 'hidden',
@@ -120,10 +118,10 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
         padding: '6px 12px 5px',
         borderBottom: '1px solid var(--border)',
         color: 'var(--text-muted)',
-        fontSize: 11,
+        fontSize: 'calc(11px * var(--ui-font-scale))',
       }}>
         <code style={{
-          fontSize: 11,
+          fontSize: 'calc(11px * var(--ui-font-scale))',
           fontFamily: 'var(--font-mono)',
           color: 'var(--block-cmd-text)',
           display: 'block',
@@ -140,7 +138,7 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
               color: block.exitCode === 0 ? 'var(--success)' : 'var(--error)',
               fontWeight: 600,
             }}>
-              exit {block.exitCode}
+              退出码 {block.exitCode}
             </span>
           )}
         </div>

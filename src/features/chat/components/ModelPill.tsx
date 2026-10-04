@@ -76,14 +76,14 @@ export default function ModelPill() {
           />
           <div
             data-testid="think-level-menu"
+            className="workspace-floating"
             style={{
               position: 'absolute', top: 0, left: 0, zIndex: 9999,
               width: '100%', boxSizing: 'border-box',
-              background: 'var(--surface)', border: '1px solid var(--border)',
-              borderRadius: 10, boxShadow: 'var(--shadow-md)', padding: 4,
+              padding: 4,
             }}
           >
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', padding: '4px 8px 2px' }}>
+            <div style={{ fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)', padding: '4px 8px 2px' }}>
               思考强度
             </div>
             {LEVELS.map((lv) => {
@@ -91,6 +91,7 @@ export default function ModelPill() {
               return (
                 <button
                   key={lv}
+                  className="workspace-floating-row" data-selected={on}
                   data-testid={`think-option-${lv}`}
                   onClick={() => {
                     agentSettings.updateModel(activeModel, { thinkingLevel: lv });
@@ -105,9 +106,8 @@ export default function ModelPill() {
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6, width: '100%',
                     height: 30, padding: '0 8px', boxSizing: 'border-box',
-                    fontSize: 12, textAlign: 'left',
-                    background: on ? 'var(--hover)' : 'transparent',
-                    border: 'none', borderRadius: 6, cursor: 'pointer',
+                    fontSize: 'calc(12px * var(--ui-font-scale))', textAlign: 'left',
+                    border: 'none', borderRadius: 'var(--radius-inner)', cursor: 'pointer',
                     color: on ? 'var(--text-primary)' : 'var(--text-secondary)',
                   }}
                 >
@@ -134,7 +134,7 @@ export default function ModelPill() {
             <Icon size={15} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
             <span
               style={{
-                fontSize: 12, fontWeight: 500, color: 'var(--text-primary)',
+                fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 500, color: 'var(--text-primary)',
                 whiteSpace: 'nowrap',
               }}
             >
@@ -162,7 +162,7 @@ export default function ModelPill() {
               background: 'transparent', border: 'none', cursor: 'pointer',
             }}
           >
-            <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{levelLabel}</span>
+            <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-secondary)' }}>{levelLabel}</span>
             <ChevronDown size={11} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           </button>
         </>

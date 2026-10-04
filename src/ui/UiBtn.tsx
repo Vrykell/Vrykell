@@ -22,7 +22,7 @@ export function HBtn({ title, onClick, children }: HBtnProps) {
 }
 
 const hBtnStyle: CSSProperties = {
-  fontSize: 11, padding: '1px 5px', border: 'none', borderRadius: 3,
+  fontSize: 'calc(11px * var(--ui-font-scale))', padding: '1px 5px', border: 'none', borderRadius: 3,
   background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer',
   lineHeight: '18px',
 };
@@ -45,7 +45,7 @@ export function InputBtn({ title, onClick, children }: HBtnProps) {
 }
 
 const inputBtnStyle: CSSProperties = {
-  fontSize: 12, padding: '1px 5px',
+  fontSize: 'calc(12px * var(--ui-font-scale))', padding: '1px 5px',
   background: 'transparent', border: '1px solid transparent',
   borderRadius: 3, color: 'var(--text-secondary)', cursor: 'pointer',
   lineHeight: '22px',
@@ -63,6 +63,7 @@ export function MenuItem({ label, onClick, danger }: MenuItemProps) {
   return (
     <button
       onClick={onClick}
+      className="workspace-floating-row"
       style={danger ? { ...menuItemStyle, color: 'var(--error)' } : menuItemStyle}
       onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'var(--hover)'; }}
       onMouseLeave={(e) => { (e.target as HTMLElement).style.background = 'transparent'; }}
@@ -73,7 +74,7 @@ export function MenuItem({ label, onClick, danger }: MenuItemProps) {
 const menuItemStyle: CSSProperties = {
   display: 'block', width: '100%', textAlign: 'left' as const,
   padding: '6px 12px', border: 'none', background: 'transparent',
-  color: 'var(--text-primary)', cursor: 'pointer', fontSize: 12,
+  color: 'var(--text-primary)', cursor: 'pointer', fontSize: 'calc(12px * var(--ui-font-scale))',
 };
 
 // ── 侧栏图标按钮（24×24，悬停显背景；标签/SSH/文件面板统一使用）──
@@ -130,7 +131,7 @@ interface ToolbarBtnProps {
 const toolbarBtnBase: CSSProperties = {
   width: 28, height: 28,
   display: 'flex', alignItems: 'center', justifyContent: 'center',
-  fontSize: 15, lineHeight: 1,
+  fontSize: 'calc(15px * var(--ui-font-scale))', lineHeight: 1,
   border: 'none', borderRadius: 6,
   background: 'transparent', color: 'var(--text-secondary)',
   cursor: 'pointer', userSelect: 'none', flexShrink: 0,

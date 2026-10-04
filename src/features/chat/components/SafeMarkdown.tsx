@@ -47,7 +47,7 @@ export default class SafeMarkdown extends Component<{ content: string }, { error
     if (this.state.error) {
       return (
         <div>
-          <span style={{ color: 'var(--error)', fontStyle: 'italic', fontSize: 11 }}>
+          <span style={{ color: 'var(--error)', fontStyle: 'italic', fontSize: 'calc(11px * var(--ui-font-scale))' }}>
             渲染失败（{this.state.errorMessage}），以下为原文：
           </span>
           <pre
@@ -57,7 +57,7 @@ export default class SafeMarkdown extends Component<{ content: string }, { error
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
               fontFamily: 'var(--font-mono)',
-              fontSize: 12,
+              fontSize: 'calc(12px * var(--ui-font-scale))',
               color: 'var(--text-secondary)',
             }}
           >

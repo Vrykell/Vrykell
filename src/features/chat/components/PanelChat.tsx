@@ -7,8 +7,9 @@
  * 发送目标是当前聚焦 pane。
  */
 
+import QuickToggle from '@ui/StateIconButton';
 import { useEffect, useMemo, useRef } from 'react';
-import { ArrowUp, Bot, Brain, Globe, Paperclip, ShieldAlert, ShieldCheck, ShieldOff, Square, Zap } from 'lucide-react';
+import { ArrowUp, Bot, Brain, Paperclip, ShieldAlert, ShieldCheck, ShieldOff, Sparkles, Square, Zap } from 'lucide-react';
 import { useChatStore, useActiveMessages } from '@features/chat';
 import { useAgentSettings, usePermissions, useAiConfigStore, useAttachmentComposer } from '@features/agent';
 import ModelPill from '@features/chat/components/ModelPill';
@@ -20,7 +21,7 @@ import { toExchanges, type ChatExchange } from '@features/chat/model/exchanges';
 import ContextRing from '@features/chat/components/ContextRing';
 import { useChatComposer } from '@features/chat/hooks/useChatComposer';
 import { useChatPaneContext } from '@features/chat/hooks/useChatPaneContext';
-import { TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE } from '@features/terminal/model/terminalFont';
+import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
 
 /** 权限模式循环（状态栏 Shield chip）：图标 + 颜色双通道辨识（勾=标准逐工具 / 叹号=严格逐次问 / 斜线=放行直放）
  *  标准=逐工具级别；严格=全部逐次问；放行=全部直放行（危险命令仍逐次问） */
@@ -160,7 +161,7 @@ export default function PanelChat() {
           flexShrink: 0,
           margin: 0,
           padding: '10px 12px 12px',
-          background: 'var(--canvas)',
+          background: 'transparent',
         }}>
           <div className="terminal-composer" style={{
             padding: '10px 12px 8px',
@@ -206,7 +207,7 @@ export default function PanelChat() {
                 style={{
                   flex: 1, minWidth: 0, resize: 'none',
                   background: 'transparent', border: 'none', padding: '1px 0',
-                  fontSize: TERMINAL_FONT_SIZE, fontFamily: TERMINAL_FONT_FAMILY,
+                  fontSize: 'var(--terminal-font-size)', fontFamily: TERMINAL_FONT_FAMILY,
                   color: 'var(--text-primary)', lineHeight: '22px', outline: 'none',
                 }}
               />
@@ -254,7 +255,7 @@ export default function PanelChat() {
             <div style={{
               display: 'flex', alignItems: 'center', gap: 6,
               minHeight: 22, marginTop: 4, paddingTop: 5,
-              fontSize: 11, color: 'var(--text-muted)', userSelect: 'none',
+              fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', userSelect: 'none',
             }}>
               <ShellIndicator connected={targetConnected} focused={targetFocused} label={targetInfo?.shell ?? '本地'} />
               {targetInfo?.cwd && (
@@ -322,39 +323,7 @@ export default function PanelChat() {
   );
 }
 
-/** 快捷开关小按钮（prompt 行用，与 📎 同尺寸；开 = 暖色） */
-function QuickToggle({ icon: Icon, on, title, onClick }: {
-  icon: typeof Globe;
-  on: boolean;
-  title: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      data-subtle
-      title={title}
-      onClick={onClick}
-      style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4,
-        background: 'transparent',
-        color: on ? 'var(--accent-warm)' : 'var(--text-muted)', cursor: 'pointer',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'var(--button-hover)';
-        e.currentTarget.style.color = on ? 'var(--accent-warm)' : 'var(--text-secondary)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'transparent';
-        e.currentTarget.style.color = on ? 'var(--accent-warm)' : 'var(--text-muted)';
-      }}
-    >
-      <Icon size={13} />
-    </button>
-  );
-}
 
-/** 转录：连续同 pane 的交换归一段，段首 mono 标签（样式同面板分组标签） */
 function Transcript({ exchanges, paneLabel }: {
   exchanges: ChatExchange[];
   paneLabel: (paneId?: string) => string;
@@ -369,7 +338,7 @@ function Transcript({ exchanges, paneLabel }: {
           <div key={ex.id}>
             {showTag && (
               <div style={{
-                fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)',
+                fontFamily: 'var(--font-mono)', fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)',
                 padding: '10px 4px 2px', userSelect: 'none',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}>
@@ -386,8 +355,13 @@ function Transcript({ exchanges, paneLabel }: {
 
 function EmptyHint({ isSession }: { isSession: boolean }) {
   return (
-    <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, userSelect: 'none' }}>
-      {isSession ? '描述问题，Enter 发送' : '打开一个终端会话开始对话'}
+    <div style={{
+      height: '100%', minHeight: 140, padding: 16,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12,
+      textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-label)', userSelect: 'none',
+    }}>
+      <Sparkles size={24} strokeWidth={1.5} aria-hidden="true" />
+      <span>{isSession ? '描述问题，Enter 发送' : '打开一个终端会话开始对话'}</span>
     </div>
   );
 }

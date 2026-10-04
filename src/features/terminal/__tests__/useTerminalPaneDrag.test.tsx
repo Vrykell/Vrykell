@@ -52,4 +52,16 @@ describe('useTerminalPaneDrag', () => {
     expect(preventDefault).not.toHaveBeenCalled();
     expect(useDockDragStore.getState().draggingTerminalId).toBeNull();
   });
+
+  it('does not intercept pointer gestures when no other pane can be reordered', () => {
+    const preventDefault = vi.fn();
+    const { result } = renderHook(() => useTerminalPaneDrag('pane-1', false));
+    act(() => result.current({
+      button: 0, target: document.createElement('div'), clientX: 0, clientY: 0, preventDefault,
+    } as unknown as React.MouseEvent));
+    act(() => document.dispatchEvent(new MouseEvent('mousemove', { clientX: 30, clientY: 30 })));
+    act(() => document.dispatchEvent(new MouseEvent('mouseup')));
+    expect(preventDefault).not.toHaveBeenCalled();
+    expect(useDockDragStore.getState().draggingTerminalId).toBeNull();
+  });
 });

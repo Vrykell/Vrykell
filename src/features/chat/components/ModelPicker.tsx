@@ -24,7 +24,7 @@ const CAP_ORDER: ModelCapability[] = ['vision', 'reasoning', 'tools', 'search'];
 // ── 样式 ──
 
 const pill: React.CSSProperties = {
-  padding: '3px 10px', fontSize: 11, border: '1px solid var(--border)',
+  padding: '3px 10px', fontSize: 'calc(11px * var(--ui-font-scale))', border: '1px solid var(--border)',
   borderRadius: 999, background: 'transparent', color: 'var(--text-secondary)',
   cursor: 'pointer', flexShrink: 0,
 };
@@ -38,7 +38,7 @@ function CapBadge({ on, label }: { on: boolean; label: string }) {
     <span
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 10, lineHeight: '14px', padding: '1px 6px', borderRadius: 4, flexShrink: 0,
+        fontSize: 'calc(10px * var(--ui-font-scale))', lineHeight: '14px', padding: '1px 6px', borderRadius: 4, flexShrink: 0,
         color: on ? 'var(--text-secondary)' : 'var(--text-muted)',
         background: on ? 'var(--hover)' : 'transparent',
         border: on ? 'none' : '1px solid var(--border)',
@@ -70,7 +70,7 @@ function ItemControls({ profile }: { profile: ModelProfile }) {
           agentSettings.updateModel(profile.id, { thinkingLevel: e.target.value as 'low' | 'medium' | 'high' })
         }
         style={{
-          fontSize: 11, padding: '3px 6px', background: 'var(--canvas)',
+          fontSize: 'calc(11px * var(--ui-font-scale))', padding: '3px 6px', background: 'var(--canvas)',
           border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-primary)',
           cursor: 'pointer',
         }}
@@ -139,20 +139,19 @@ export default function ModelPicker({ open, onClose }: { open: boolean; onClose:
         }}
         onClick={onClose}
       >
-        <div
+        <div className="workspace-floating workspace-floating-dialog" role="dialog" aria-modal="true" aria-label="选择模型"
           onClick={(e) => e.stopPropagation()}
           style={{
             width: 480, maxWidth: 'calc(100vw - 48px)', maxHeight: 'min(560px, 80vh)',
             display: 'flex', flexDirection: 'column',
-            background: 'var(--elevated)', border: '1px solid var(--border)',
-            borderRadius: 12, boxShadow: 'var(--shadow-lg)', overflow: 'hidden',
+            overflow: 'hidden',
             animation: 'modalIn 0.22s var(--ease-out)',
           }}
         >
         {/* 顶部：标题 + 搜索框 */}
         <div style={{ padding: '14px 16px 10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, flex: 1 }}>选择模型</span>
+            <span style={{ fontSize: 'calc(14px * var(--ui-font-scale))', fontWeight: 600, flex: 1 }}>选择模型</span>
             <button
               data-subtle
               title="关闭"
@@ -174,7 +173,7 @@ export default function ModelPicker({ open, onClose }: { open: boolean; onClose:
               placeholder="搜索模型…"
               style={{
                 flex: 1, minWidth: 0, background: 'transparent', border: 'none',
-                outline: 'none', fontSize: 12, color: 'var(--text-primary)',
+                outline: 'none', fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-primary)',
               }}
             />
           </div>
@@ -204,7 +203,7 @@ export default function ModelPicker({ open, onClose }: { open: boolean; onClose:
         {/* 模型列表 */}
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 8px 10px' }}>
           {list.length === 0 && (
-            <div style={{ padding: 18, textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>
+            <div style={{ padding: 18, textAlign: 'center', fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>
               无匹配模型
             </div>
           )}
@@ -216,6 +215,8 @@ export default function ModelPicker({ open, onClose }: { open: boolean; onClose:
               <div
                 key={m.id}
                 data-testid={`model-pick-${m.id}`}
+                className="workspace-floating-row"
+                data-selected={active}
                 onClick={() => {
                   void setActiveModel(m.id).then(() => {
                     toast(`已切换到 ${m.name || m.model}`);
@@ -225,7 +226,6 @@ export default function ModelPicker({ open, onClose }: { open: boolean; onClose:
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: '9px 10px', borderRadius: 8, cursor: 'pointer',
-                  background: active ? 'var(--hover)' : 'transparent',
                   marginBottom: 2,
                 }}
               >
@@ -241,11 +241,11 @@ export default function ModelPicker({ open, onClose }: { open: boolean; onClose:
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{m.name || m.model}</span>
+                    <span style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>{m.name || m.model}</span>
                     {active && <Check size={12} style={{ color: 'var(--accent)' }} />}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
-                    <span style={{ fontSize: 10, color: 'var(--text-muted)', marginRight: 2 }}>
+                    <span style={{ fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)', marginRight: 2 }}>
                       {providerLabel(m.provider)}
                     </span>
                     {CAP_ORDER.map((cap) => (
@@ -286,7 +286,7 @@ export function ModelScopeBar({
         onClick={() => setOpen((v) => !v)}
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '5px 10px', fontSize: 12, border: '1px solid var(--border)',
+          padding: '5px 10px', fontSize: 'calc(12px * var(--ui-font-scale))', border: '1px solid var(--border)',
           borderRadius: 8, background: 'var(--canvas)', color: 'var(--text-primary)',
           cursor: 'pointer',
         }}
@@ -304,20 +304,19 @@ export function ModelScopeBar({
             style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
             onClick={() => setOpen(false)}
           />
-          <div
+          <div className="workspace-floating"
             style={{
               position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 9999,
-              minWidth: 200, background: 'var(--elevated)', border: '1px solid var(--border)',
-              borderRadius: 8, boxShadow: 'var(--shadow-md)', padding: '4px',
+              minWidth: 200, padding: '4px',
             }}
           >
             <button
+              className="workspace-floating-row" data-selected={value === ''}
               onClick={() => { onChange(''); setOpen(false); }}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6, width: '100%',
-                padding: '6px 8px', fontSize: 12, textAlign: 'left',
-                background: value === '' ? 'var(--hover)' : 'transparent',
-                border: 'none', borderRadius: 6, cursor: 'pointer',
+                padding: '6px 8px', fontSize: 'calc(12px * var(--ui-font-scale))', textAlign: 'left',
+                border: 'none', borderRadius: 'var(--radius-inner)', cursor: 'pointer',
                 color: value === '' ? 'var(--text-primary)' : 'var(--text-secondary)',
               }}
             >
@@ -328,12 +327,12 @@ export function ModelScopeBar({
             {options.map((o) => (
               <button
                 key={o.value}
+                className="workspace-floating-row" data-selected={o.value === value}
                 onClick={() => { onChange(o.value); setOpen(false); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6, width: '100%',
-                  padding: '6px 8px', fontSize: 12, textAlign: 'left',
-                  background: o.value === value ? 'var(--hover)' : 'transparent',
-                  border: 'none', borderRadius: 6, cursor: 'pointer',
+                  padding: '6px 8px', fontSize: 'calc(12px * var(--ui-font-scale))', textAlign: 'left',
+                  border: 'none', borderRadius: 'var(--radius-inner)', cursor: 'pointer',
                   color: o.value === value ? 'var(--text-primary)' : 'var(--text-secondary)',
                 }}
               >

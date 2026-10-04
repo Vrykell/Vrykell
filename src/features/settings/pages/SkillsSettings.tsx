@@ -30,14 +30,14 @@ const MARKETPLACES: { name: string; repo: string }[] = [
 // ── 样式 ──
 
 const btn: React.CSSProperties = {
-  padding: '4px 10px', fontSize: 12, border: '1px solid var(--border)',
+  padding: '4px 10px', fontSize: 'calc(12px * var(--ui-font-scale))', border: '1px solid var(--border)',
   borderRadius: 'var(--radius-inner)', background: 'transparent',
   color: 'var(--text-secondary)', cursor: 'pointer',
 };
 
 const input: React.CSSProperties = {
   background: 'var(--canvas)', border: '1px solid var(--border)',
-  borderRadius: 'var(--radius-inner)', padding: '6px 8px', fontSize: 12,
+  borderRadius: 'var(--radius-inner)', padding: '6px 8px', fontSize: 'calc(12px * var(--ui-font-scale))',
   color: 'var(--text-primary)', outline: 'none', flex: 1,
   fontFamily: 'var(--font-mono)', boxSizing: 'border-box',
 };
@@ -53,7 +53,7 @@ function Badge({ text, tone }: { text: string; tone: 'warn' | 'muted' | 'ok' | '
     : tone === 'ok' ? 'var(--success-bg)'
     : tone === 'danger' ? 'var(--error-bg)'
     : 'var(--hover)';
-  return <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, color, background: bg, flexShrink: 0 }}>{text}</span>;
+  return <span style={{ fontSize: 'calc(10px * var(--ui-font-scale))', padding: '1px 6px', borderRadius: 4, color, background: bg, flexShrink: 0 }}>{text}</span>;
 }
 
 function SkillFileBrowser({ skillName, files }: { skillName: string; files: string[] }) {
@@ -66,7 +66,7 @@ function SkillFileBrowser({ skillName, files }: { skillName: string; files: stri
           onClick={() => void pick(n)}
           style={{
             display: 'flex', alignItems: 'center', gap: 4,
-            padding: `2px 8px 2px ${8 + depth * 14}px`, fontSize: 12,
+            padding: `2px 8px 2px ${8 + depth * 14}px`, fontSize: 'calc(12px * var(--ui-font-scale))',
             cursor: 'pointer', color: n.isDir ? 'var(--text-primary)' : 'var(--text-secondary)',
             background: selected === n.path ? 'var(--hover)' : 'transparent',
           }}
@@ -86,7 +86,7 @@ function SkillFileBrowser({ skillName, files }: { skillName: string; files: stri
     ));
 
   if (files.length === 0) {
-    return <div style={{ fontSize: 11, color: 'var(--text-muted)', padding: 8 }}>仅 SKILL.md，无其他文件</div>;
+    return <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', padding: 8 }}>仅 SKILL.md，无其他文件</div>;
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -97,7 +97,7 @@ function SkillFileBrowser({ skillName, files }: { skillName: string; files: stri
         <pre style={{
           margin: 0, padding: '8px 10px', maxHeight: 180, overflow: 'auto',
           background: 'var(--hover)', borderRadius: 'var(--radius-inner)',
-          fontSize: 11, fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
           color: 'var(--text-secondary)',
         }}>
           {content}
@@ -147,7 +147,7 @@ function SkillDetailPanel({ skill, onClose, onChanged }: {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 14, fontWeight: 600 }}>{skill.name}</span>
+        <span style={{ fontSize: 'calc(14px * var(--ui-font-scale))', fontWeight: 600 }}>{skill.name}</span>
         {skill.trusted ? <Badge text="已信任" tone="ok" /> : <Badge text="未信任" tone="warn" />}
         {!skill.enabled && <Badge text="已禁用" tone="muted" />}
         {skill.hasScripts && <Badge text="含脚本" tone="danger" />}
@@ -155,29 +155,29 @@ function SkillDetailPanel({ skill, onClose, onChanged }: {
         <Badge text={skill.source || '本地'} tone="muted" />
       </div>
 
-      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 8 }}>
+      <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)', marginTop: 8 }}>
         {skill.description || '无描述'}
       </div>
       {skill.allowedTools && (
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
+        <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', marginTop: 6 }}>
           允许工具：<span style={{ fontFamily: 'var(--font-mono)' }}>{skill.allowedTools}</span>
         </div>
       )}
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginTop: 6, wordBreak: 'break-all' }}>
+      <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginTop: 6, wordBreak: 'break-all' }}>
         {skill.dir}
       </div>
 
       <div style={{ marginTop: 12 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>文件</div>
+        <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 600, marginBottom: 6 }}>文件</div>
         <SkillFileBrowser skillName={skill.name} files={skill.files} />
       </div>
 
       <div style={{ marginTop: 12 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>SKILL.md</div>
+        <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 600, marginBottom: 6 }}>SKILL.md</div>
         <pre style={{
           margin: 0, padding: '8px 10px', maxHeight: 240, overflow: 'auto',
           background: 'var(--hover)', borderRadius: 'var(--radius-inner)',
-          fontSize: 11, fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
           color: 'var(--text-secondary)',
         }}>
           {skill.prompt || '正文为空'}
@@ -238,9 +238,9 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <button onClick={onClose} style={{ ...btn }}>← 返回</button>
-        <span style={{ fontSize: 14, fontWeight: 600 }}>技能市场</span>
+        <span style={{ fontSize: 'calc(14px * var(--ui-font-scale))', fontWeight: 600 }}>技能市场</span>
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>第三方技能默认未信任，安装后可查看来源再信任</span>
+        <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>第三方技能默认未信任，安装后可查看来源再信任</span>
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
@@ -271,14 +271,14 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
           onChange={(e) => setQuery(e.target.value)}
           style={{ ...input, border: 'none', background: 'transparent' }}
         />
-        <span style={{ fontSize: 11, color: 'var(--text-muted)', alignSelf: 'center', flexShrink: 0 }}>
+        <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', alignSelf: 'center', flexShrink: 0 }}>
           {remote.length > 0 ? `共 ${remote.length} 个` : ''}
         </span>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {remote.length === 0 && !browsing && (
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '8px 0' }}>
+          <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', padding: '8px 0' }}>
             选择 GitHub 仓库并点「浏览」加载技能列表。
           </div>
         )}
@@ -287,14 +287,14 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
           return (
             <div key={r.name} style={{ borderRadius: 'var(--radius-inner)', padding: '8px 12px', background: 'var(--canvas)', display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 600 }}>
+                <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 600 }}>
                   {r.name}
-                  <span style={{ color: 'var(--text-muted)', fontSize: 11 }}> · {r.dir}</span>
+                  <span style={{ color: 'var(--text-muted)', fontSize: 'calc(11px * var(--ui-font-scale))' }}> · {r.dir}</span>
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>{r.description || '无描述'}</div>
+                <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-secondary)', marginTop: 2 }}>{r.description || '无描述'}</div>
               </div>
               {installed ? (
-                <span style={{ fontSize: 11, padding: '2px 10px', borderRadius: 4, color: 'var(--success)', background: 'var(--success-bg)', flexShrink: 0 }}>已安装</span>
+                <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 10px', borderRadius: 4, color: 'var(--success)', background: 'var(--success-bg)', flexShrink: 0 }}>已安装</span>
               ) : (
                 <button onClick={() => void install(r)} disabled={installing.has(r.name)} style={{ ...btn, flexShrink: 0 }}>
                   {installing.has(r.name) ? '安装中…' : '安装'}
@@ -337,7 +337,7 @@ export default function SkillsSettings() {
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '8px 10px', borderRadius: 'var(--radius-inner)',
-          background: 'var(--accent-warm-dim)', fontSize: 11, lineHeight: 1.5, color: 'var(--accent-warm)',
+          background: 'var(--accent-warm-dim)', fontSize: 'calc(11px * var(--ui-font-scale))', lineHeight: 1.5, color: 'var(--accent-warm)',
         }}>
           <ShieldAlert size={14} style={{ flexShrink: 0 }} />
           <span style={{ flex: 1 }}>技能可能包含脚本，启用即信任其内容；脚本执行仍受 AI 权限管控。导入的第三方技能默认未信任。</span>
@@ -384,7 +384,7 @@ export default function SkillsSettings() {
       )}
 
       {metas.length === 0 && (
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 0' }}>
+        <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', padding: '6px 0' }}>
           还没有技能，可从 URL、文件夹或压缩包导入。
         </div>
       )}
@@ -400,13 +400,13 @@ export default function SkillsSettings() {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{m.name}</span>
+            <span style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>{m.name}</span>
             {m.trusted ? <Badge text="已信任" tone="ok" /> : <Badge text="未信任" tone="warn" />}
             {!m.enabled && <Badge text="禁用" tone="muted" />}
             {m.hasScripts && <Badge text="含脚本" tone="danger" />}
             {m.modified && <Badge text="已修改" tone="warn" />}
-            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{m.source || '本地'}</span>
-            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{m.files.length} 个文件</span>
+            <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>{m.source || '本地'}</span>
+            <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>{m.files.length} 个文件</span>
             <div style={{ flex: 1 }} />
             <button onClick={(e) => { e.stopPropagation(); void toggleTrust(m); }} style={btn}>
               {m.trusted ? '取消信任' : '信任'}
@@ -424,7 +424,7 @@ export default function SkillsSettings() {
               <Trash2 size={13} />
             </button>
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+          <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)', marginTop: 4 }}>
             {m.description || '无描述'}
           </div>
         </div>

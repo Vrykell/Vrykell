@@ -1,10 +1,13 @@
 /* Colors come from the active palette before the application mounts. */
 :root {
+  --ui-font-scale: 1;
+  --terminal-font-size: calc(14px * var(--ui-font-scale));
+  --terminal-row-height: 16px;
   --font-ui: -apple-system, "SF Pro Text", "PingFang SC", "Segoe UI", sans-serif;
   --font-mono: Menlo, Monaco, "Cascadia Code", "JetBrains Mono", "Noto Sans Mono", "DejaVu Sans Mono", "Noto Sans CJK SC", "PingFang SC", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", monospace;
 
-  --radius-block: 10px;
-  --radius-inner: 6px;
+  --radius-block: 14px;
+  --radius-inner: 8px;
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --dur-fast: 0.14s;
@@ -13,12 +16,12 @@
 
   --hairline: inset 0 1px 0 var(--border);
   --hairline-soft: inset 0 1px 0 var(--border);
-  --fs-title: 17px;
-  --fs-subtitle: 15px;
-  --fs-body: 14px;
-  --fs-label: 13px;
-  --fs-caption: 12px;
-  --fs-micro: 11px;
+  --fs-title: calc(17px * var(--ui-font-scale));
+  --fs-subtitle: calc(15px * var(--ui-font-scale));
+  --fs-body: calc(14px * var(--ui-font-scale));
+  --fs-label: calc(13px * var(--ui-font-scale));
+  --fs-caption: calc(12px * var(--ui-font-scale));
+  --fs-micro: calc(11px * var(--ui-font-scale));
   --fw-regular: 400;
   --fw-medium: 500;
   --fw-semibold: 600;
@@ -42,30 +45,60 @@
 
 * { box-sizing: border-box; }
 
+/* Floating surfaces share the workspace palette and a restrained outline. */
+.workspace-floating {
+  background: var(--surface); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: var(--shadow-md); font: calc(12px * var(--ui-font-scale))/1.5 var(--font-ui);
+}
+.workspace-floating-dialog { border-radius: var(--radius-block); box-shadow: var(--shadow-lg); }
+.workspace-floating-row {
+  border: none; border-radius: var(--radius-inner); background: transparent;
+  transition: background var(--dur-fast) var(--ease);
+}
+.workspace-floating-row:hover, .workspace-floating-row[data-selected="true"] { background: var(--hover); }
+.workspace-floating :is(input, textarea, select):focus-visible { outline: 1px solid var(--border-strong); outline-offset: 2px; }
+.workspace-floating button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.settings-page-body { max-width: 720px; }
+.settings-field { padding: 16px; margin-bottom: 12px; background: var(--surface); border-radius: 12px; }
+.settings-field input:focus-visible, .settings-field textarea:focus-visible { border-color: var(--border-strong); outline: 1px solid var(--border-strong); }
+.settings-font-quick { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 12px 16px; margin-bottom: 16px; background: var(--sidebar-bg); border-radius: 12px; font: calc(12px * var(--ui-font-scale)) var(--font-ui); }
+.settings-font-row { display: flex; align-items: center; gap: 8px; }
+.settings-font-row output { min-width: 32px; text-align: center; font-variant-numeric: tabular-nums; }
+.settings-font-quick > button, .settings-font-row > button { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text-secondary); cursor: pointer; }
+.settings-toggle { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-caption); color: var(--text-secondary); }
+button.state-icon-button { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--text-muted); cursor: pointer; }
+button.state-icon-button[aria-pressed="true"] { background: var(--selection-bg); border-color: var(--border-strong); color: var(--text-primary); }
+button.state-icon-button:hover { background: var(--hover); color: var(--text-primary); }
+.state-icon-check { position: absolute; right: 1px; bottom: 1px; }
+@media (max-width: 900px) { .settings-content { padding: 16px !important; } .settings-navigation { width: 160px !important; } }
+
 /* Use spacing and subtle surfaces to keep the workspace visually continuous. */
 .workspace-titlebar {
-  display: flex; align-items: center; flex-shrink: 0; height: 44px;
+  display: grid; grid-template-columns: minmax(0, 1fr) min(34vw, 420px) minmax(0, 1fr);
+  align-items: center; flex-shrink: 0; height: 48px;
   background: var(--chrome-bg);
   gap: 12px; user-select: none;
 }
-.workspace-title { flex: 1; min-width: 0; height: 100%; display: flex; align-items: center; }
-.workspace-title span { font-size: 12px; font-weight: 500; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.workspace-title-spacer { flex: 1; height: 100%; min-width: 0; }
+.workspace-title { min-width: 0; height: 100%; display: flex; align-items: center; overflow: hidden; }
+.workspace-title span { font-size: calc(13px * var(--ui-font-scale)); font-weight: 500; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-title-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; height: 100%; min-width: 0; }
 .workspace-search {
-  width: clamp(220px, 34vw, 420px); height: 30px; flex-shrink: 1;
+  width: 100%; min-width: 0; height: 32px;
   display: flex; align-items: center; gap: 8px; padding: 0 10px;
   background: var(--chrome-field); color: var(--text-secondary); border: none;
-  border-radius: 7px; cursor: pointer; font: 12px var(--font-ui);
+  border-radius: 9px; cursor: pointer; font: calc(13px * var(--ui-font-scale)) var(--font-ui);
 }
 .workspace-search span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
-.workspace-search kbd { color: var(--text-muted); font: 10px var(--font-ui); white-space: nowrap; }
+.workspace-search kbd { color: var(--text-muted); font: calc(10px * var(--ui-font-scale)) var(--font-ui); white-space: nowrap; }
 .workspace-ai-toggle {
-  display: flex; align-items: center; gap: 6px; padding: 0 10px; height: 30px; flex-shrink: 0;
-  border: none; border-radius: 7px; background: transparent;
-  color: var(--text-secondary); font: 12px var(--font-ui); cursor: pointer;
+  display: flex; align-items: center; gap: 6px; padding: 0 12px; height: 32px; flex-shrink: 0;
+  border: none; border-radius: 9px; background: transparent;
+  color: var(--text-secondary); font: calc(13px * var(--ui-font-scale)) var(--font-ui); cursor: pointer;
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
-.workspace-ai-toggle[aria-pressed="true"] { background: var(--selection-bg); color: var(--text-primary); }
+.workspace-ai-toggle[aria-pressed="true"] { background: var(--chrome-field); color: var(--text-primary); }
 .workspace-settings, .workspace-panel-close {
   display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
   width: 28px; height: 28px; padding: 0; border: none; border-radius: 5px;
@@ -73,8 +106,14 @@
 }
 .workspace-settings:hover, .workspace-panel-close:hover { background: var(--hover); color: var(--text-primary); }
 .workspace-body { display: flex; flex: 1; min-height: 0; position: relative; padding: 0 var(--workspace-gap) var(--workspace-gap) 0; background: var(--chrome-bg); }
-.workspace-main { margin-left: var(--workspace-gap); background: var(--canvas); border-radius: 10px; overflow: hidden; }
-.workspace-side-panel[data-side="right"] { margin-left: var(--workspace-gap); border-radius: 10px; overflow: hidden; }
+.workspace-main { margin-left: var(--workspace-gap); background: var(--canvas); border-radius: var(--radius-block); overflow: hidden; }
+/* The terminal squares off the edge it shares with a docked right sidebar. */
+.workspace-main:has(~ .workspace-side-panel[data-side="right"][data-visible="true"]) { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.workspace-body:has(.workspace-side-panel[data-side="left"][data-visible="true"]) .workspace-main { margin-left: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+/* Round the outer navigation edge while the shared resize boundary stays flush. */
+.workspace-side-panel[data-side="left"] { border-radius: var(--radius-block) 0 0 var(--radius-block); overflow: visible; }
+/* Right sidebar docks flush onto the terminal: no gap, just the resize hairline, rounded outer edge. */
+.workspace-side-panel[data-side="right"] { border-radius: 0 var(--radius-block) var(--radius-block) 0; overflow: visible; }
 .workspace-activity-bar {
   width: var(--workspace-activity-width); flex-shrink: 0; display: flex; flex-direction: column;
   padding: 10px 6px; background: var(--chrome-bg);
@@ -83,18 +122,22 @@
 button.activity-button {
   width: 32px !important; height: 32px !important; position: relative; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center; padding: 0;
-  border: none !important; border-radius: 6px !important;
+  border: none !important; border-radius: 8px !important;
   background: transparent; color: var(--text-muted) !important; cursor: pointer;
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 .activity-button svg { width: 18px; height: 18px; }
 button.activity-button:hover { background: var(--hover) !important; color: var(--text-primary) !important; }
-button.activity-button[aria-pressed="true"] { background: var(--selection-bg) !important; color: var(--text-primary) !important; }
+button.activity-button[aria-pressed="true"] { background: var(--chrome-field) !important; color: var(--text-primary) !important; }
 .workspace-search:focus-visible, .workspace-ai-toggle:focus-visible, .activity-button:focus-visible, .workspace-settings:focus-visible, .workspace-panel-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.workspace-panel-heading { display: flex; align-items: center; justify-content: space-between; min-height: 36px; padding: 2px 6px 2px 10px; font-size: 11px; font-weight: 500; color: var(--text-secondary); }
+.workspace-panel-heading { display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 4px 8px 4px 12px; font-size: calc(13px * var(--ui-font-scale)); font-weight: 600; color: var(--text-primary); }
 .terminal-composer { border: none; border-radius: 8px; background: var(--composer-bg); transition: background var(--dur) var(--ease); }
 .terminal-composer:focus-within { background: var(--block); }
-.terminal-composer-heading { display: flex; justify-content: space-between; gap: 12px; color: var(--text-secondary); font-size: 11px; margin-bottom: 6px; }
+input.ssh-auth-response { padding: 0; line-height: 32px; font-size: calc(20px * var(--ui-font-scale)); letter-spacing: 2px; }
+/* Empty inputs use the same font metrics as their placeholder. */
+input.ssh-auth-response:placeholder-shown { font-size: calc(13px * var(--ui-font-scale)); letter-spacing: normal; }
+input.ssh-auth-response::placeholder { font-size: inherit; letter-spacing: inherit; }
+.terminal-composer-heading { display: flex; justify-content: space-between; gap: 12px; color: var(--text-secondary); font-size: calc(11px * var(--ui-font-scale)); margin-bottom: 6px; }
 .terminal-composer-heading span:last-child { color: var(--text-muted); white-space: nowrap; }
 .terminal-input-status { min-width: 0; }
 .terminal-input-status > button { flex-shrink: 0; }
@@ -105,8 +148,17 @@ button.activity-button[aria-pressed="true"] { background: var(--selection-bg) !i
   .terminal-composer-heading span:last-child, .terminal-branch { display: none !important; }
   .terminal-directory { max-width: 30%; }
 }
-@media (max-width: 900px) { .workspace-titlebar { gap: 8px; } .workspace-title-spacer { display: none; } .workspace-search kbd { display: none; } }
+@media (max-width: 900px) {
+  .workspace-titlebar { gap: 8px; grid-template-columns: minmax(0, 1fr) 30vw minmax(0, 1fr); }
+  .workspace-title-actions { gap: 8px; }
+  .workspace-search kbd { display: none; }
+}
 @media (max-width: 740px) { .workspace-ai-toggle span { display: none; } }
+@media (max-width: 640px) {
+  .workspace-titlebar, .workspace-title-actions { gap: 4px; }
+  .workspace-ai-toggle { padding: 0 6px; }
+  .workspace-title-actions .window-control-button { width: 40px !important; }
+}
 
 html, body, #root {
   margin: 0;
@@ -114,7 +166,7 @@ html, body, #root {
   height: 100%;
   color: var(--text-primary);
   font-family: var(--font-ui);
-  font-size: 15px;
+  font-size: calc(15px * var(--ui-font-scale));
   font-weight: 400;
   line-height: 1.6;
   user-select: none;
@@ -236,7 +288,7 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
   padding: 1px 5px;
 }
 .md pre { margin: 0.45em 0; width: 100%; }
-.md pre code { background: none; border: none; padding: 0; font-size: 12.5px; line-height: 1.55; }
+.md pre code { background: none; border: none; padding: 0; font-size: calc(12.5px * var(--ui-font-scale)); line-height: 1.55; }
 /* 表格：separate 模型才能出圆角；边框收到表格外圈，格内只留行分隔 */
 .md table {
   border-collapse: separate;

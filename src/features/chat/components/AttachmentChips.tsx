@@ -26,7 +26,7 @@ export default function AttachmentChips({ atts, previewId, onPreview, onRemove }
             key={a.id}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
-              fontSize: 11, fontFamily: 'var(--font-mono)',
+              fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-mono)',
               padding: '1px 4px 1px 6px',
               border: '1px solid var(--border)', borderRadius: 4,
               background: previewId === a.id ? 'var(--button-hover)' : 'var(--bg)',
@@ -79,11 +79,9 @@ function AttachmentPreview({ att }: { att: AttachmentMeta }) {
   }, [att, isImage]);
 
   return (
-    <div
+    <div className="workspace-floating"
       style={{
         position: 'absolute', bottom: '100%', left: 0, marginBottom: 4, zIndex: 20,
-        border: '1px solid var(--border)', borderRadius: 6,
-        background: 'var(--surface)', boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
         padding: 8, maxWidth: 320, maxHeight: 240, overflow: 'auto',
       }}
     >
@@ -91,11 +89,11 @@ function AttachmentPreview({ att }: { att: AttachmentMeta }) {
         dataUrl ? (
           <img src={dataUrl} alt={att.name} style={{ maxWidth: 300, maxHeight: 220, display: 'block', borderRadius: 4 }} />
         ) : (
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>加载中…</span>
+          <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>加载中…</span>
         )
       ) : (
         <pre style={{
-          margin: 0, fontSize: 11, fontFamily: 'var(--font-mono)', lineHeight: 1.5,
+          margin: 0, fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-mono)', lineHeight: 1.5,
           color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
         }}>
           {(att.textContent ?? '').slice(0, 2000)}

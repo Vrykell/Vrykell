@@ -14,7 +14,7 @@ import AiBlock from '@features/chat/components/AiBlock';
 import { ptyResize, ptyWrite } from '@platform/pty';
 import { fmtDuration } from '@ui/UiBtn';
 import { getCellMetrics } from '@utils/termMetrics';
-import { getExecutingTerm, syncTermWidth } from '@features/terminal/hooks/useTerminalSession';
+import { getExecutingTerm, resizeExecutingTerm, syncTermWidth } from '@features/terminal/hooks/useTerminalSession';
 import { isTerminalDebugEnabled, terminalDebug } from '@features/terminal/services/terminalDebug';
 import BlockMenu from '@features/terminal/components/BlockMenu';
 import BlockOutput from '@features/terminal/components/BlockOutput';
@@ -23,7 +23,7 @@ import { useTerminalBlockFlow } from '@features/terminal/hooks/useTerminalBlockF
 import { useBlockItemActions } from '@features/terminal/hooks/useBlockItemActions';
 import { useTuiControls } from '@features/terminal/hooks/useTuiControls';
 import { hasVisibleContent as hasVisibleBlockContent } from '@features/terminal/model/blockVisibility';
-import { TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE } from '@features/terminal/model/terminalFont';
+import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
 
 interface Props {
   tabId: string;
@@ -63,7 +63,7 @@ export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8
             onClick={() => useBlockStore.getState().setAllCollapsed(tabId, !allCollapsed)}
             title={allCollapsed ? '展开全部' : '折叠全部'}
             style={{
-              fontSize: 10,
+              fontSize: 'calc(10px * var(--ui-font-scale))',
               padding: '1px 8px',
               border: 'none',
               borderRadius: 3,
@@ -274,7 +274,7 @@ function BlockItem({
           {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
         </button>
         <div data-selectable style={{
-          flex: 1, minWidth: 0, fontSize: TERMINAL_FONT_SIZE, fontWeight: 600,
+          flex: 1, minWidth: 0, fontSize: 'var(--terminal-font-size)', fontWeight: 600,
           fontFamily: TERMINAL_FONT_FAMILY, color: 'var(--text-primary)',
           whiteSpace: 'pre-wrap', wordBreak: 'break-all', userSelect: 'text',
         }}>
@@ -305,7 +305,7 @@ function BlockItem({
         ) : (
           <span style={{
             display: 'inline-flex', gap: 8, alignItems: 'center', flexShrink: 0,
-            fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)',
+            fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)',
           }}>
             {block.agent && <Zap size={11} style={{ color: 'var(--accent-warm)' }} aria-label="AI 执行" />}
             {block.exitCode !== null && (
@@ -341,7 +341,7 @@ function BlockItem({
 
       {/* Show when older output lines were truncated. */}
       {!isCollapsed && block.linesTruncated > 0 && (
-        <div style={{ padding: '0 12px 6px 30px', fontSize: 10, color: 'var(--text-muted)' }}>
+        <div style={{ padding: '0 12px 6px 30px', fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>
           …已截断 {block.linesTruncated} 行
         </div>
       )}
@@ -408,7 +408,7 @@ function RunningItem({
           }}
         />
         <div data-selectable style={{
-          flex: 1, minWidth: 0, fontSize: TERMINAL_FONT_SIZE, fontWeight: 600,
+          flex: 1, minWidth: 0, fontSize: 'var(--terminal-font-size)', fontWeight: 600,
           fontFamily: TERMINAL_FONT_FAMILY, color: 'var(--text-primary)',
           whiteSpace: 'pre-wrap', wordBreak: 'break-all', userSelect: 'text',
         }}>
@@ -416,7 +416,7 @@ function RunningItem({
         </div>
         <span style={{
           display: 'inline-flex', gap: 8, alignItems: 'center', flexShrink: 0,
-          fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)',
+          fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)',
         }}>
           {block.agent && <Zap size={11} style={{ color: 'var(--accent-warm)' }} aria-label="AI 执行" />}
           {elapsedNow && (
@@ -517,7 +517,7 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
       const cols = Math.max(2, Math.floor(host.clientWidth / cellW));
       const rows = Math.max(1, Math.floor(host.clientHeight / cellH));
       if (cols === term.cols && rows === term.rows) return;
-      term.resize(cols, rows);
+      resizeExecutingTerm(tabId, cols, rows);
       const sid = useTerminalStore.getState().sessions[tabId];
       if (sid) ptyResize(sid, cols, rows).catch(() => {});
     };
@@ -615,7 +615,7 @@ function BlockToolBtn({
         borderRadius: 4,
         background: 'transparent',
         color: 'var(--text-muted)',
-        fontSize: 12,
+        fontSize: 'calc(12px * var(--ui-font-scale))',
         cursor: 'pointer',
         flexShrink: 0,
       }}

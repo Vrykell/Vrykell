@@ -4,6 +4,8 @@ export interface TauriMockOptions {
   /** 是否启用 OSC 133 shell integration（默认 true）。
    *  false 时 mock 保持 classic 场景，用于测试无 integration 回退。 */
   integration?: boolean;
+  sshHost?: 'known' | 'unknown' | 'changed';
+  sshTrustConfirmed?: boolean;
   /** 预置模型列表（默认 2 个：主力模型 + 本地模型） */
   aiModels?: { id: string; name: string; provider: string; baseUrl: string; model: string }[];
   /** 当前生效模型 id（默认 '' = 镜像字段） */
@@ -38,10 +40,19 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     { name: '旧脚本技能', description: '遗留技能，含脚本', source: 'market', trusted: false, enabled: false, hasScripts: true, modified: true, files: ['SKILL.md', 'scripts/run.sh', 'references/说明.md'], dir: '/home/e2e/.vrykell/skills/旧脚本技能', prompt: '运行 scripts/run.sh 完成工作。' },
   ];
   await page.addInitScript(
-    ({ enableIntegration, models, active, skillsSeed }) => {
+    ({ enableIntegration, models, active, skillsSeed, sshHost, sshTrustConfirmed }) => {
     let cbCounter = 0;
     const eventListeners = new Map<string, number>();
     const writes: string[] = [];
+    const sshTrusts: Record<string, unknown>[] = [];
+    const dialogs: Record<string, unknown>[] = [];
+    const spawns: Record<string, unknown>[] = [];
+    const closes: Record<string, unknown>[] = [];
+    (window as unknown as Record<string, unknown>).__SSH_TRUSTS__ = sshTrusts;
+    (window as unknown as Record<string, unknown>).__SSH_DIALOGS__ = dialogs;
+    (window as unknown as Record<string, unknown>).__PTY_SPAWNS__ = spawns;
+    (window as unknown as Record<string, unknown>).__PTY_CLOSES__ = closes;
+    let hostKnown = sshHost === 'known';
     let clipboardText = '';
     const signals: { id: string; sig: number }[] = [];
     const killAttempts = new Map<string, number>();
@@ -310,6 +321,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
       invoke: async (cmd: string, args: any) => {
         switch (cmd) {
           case 'pty_spawn': {
+            spawns.push(args);
             // 注册完 listener 后再发初始 prompt，避免瞬间丢失
             setTimeout(emitInitialPrompt, 20);
             return 'e2e-session';
@@ -326,6 +338,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             resizes.push({ cols: args.cols as number, rows: args.rows as number });
             return undefined;
           case 'pty_close':
+            closes.push({ id: args.id });
             return undefined;
           case 'plugin:clipboard-manager|write_text':
             clipboardText = args.text as string;
@@ -687,6 +700,17 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             ];
           case 'ssh_connections_list':
             return sshConnections;
+          case 'ssh_host_key_info':
+            if (sshHost === 'changed') throw new Error('主机密钥不匹配，请核对远端主机');
+            return { known: hostKnown, fingerprint: 'SHA256:e2e-verified-key', keyType: 'ed25519' };
+          case 'ssh_trust_host_key':
+            sshTrusts.push(args);
+            hostKnown = true;
+            return undefined;
+          case 'plugin:dialog|message':
+            dialogs.push(args);
+            if (args.buttons?.OkCancelCustom) return args.buttons.OkCancelCustom[sshTrustConfirmed ? 0 : 1];
+            return sshTrustConfirmed ? 'Yes' : 'No';
           case 'ssh_connection_save': {
             const conn = args.conn as Record<string, unknown>;
             const idx = sshConnections.findIndex((c) => c.id === conn.id);
@@ -712,6 +736,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             if (args.host === 'bad.example.com') throw new Error('连接超时');
             return '连接成功';
           case 'ssh_list': {
+            if (!hostKnown) throw new Error('HOST_KEY_UNKNOWN:SHA256:e2e-verified-key');
             const base = (args.path as string) || '/home/root';
             return {
               base,
@@ -827,7 +852,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
       },
     };
     localStorage.setItem('vrykell-api-key', 'sk-e2e-fake');
-  }, { enableIntegration: integration, models: seedModels, active: seedActive, skillsSeed: seedSkills });
+  }, { enableIntegration: integration, models: seedModels, active: seedActive, skillsSeed: seedSkills, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true });
 }
 
 /** 预置 AI 回复文本：mock 的 ai_stream 会按 chunk 流式 emit ai-chunk 事件。

@@ -35,33 +35,25 @@ describe('toRgba', () => {
   });
 });
 
-describe('默认调色板（中性，主色不带颜色倾向）', () => {
+describe('默认调色板（中性灰色）', () => {
   it('dark 与 light 均存在', () => {
     expect(themes.dark).toBeDefined();
     expect(themes.light).toBeDefined();
   });
 
-  it('dark 主色为近中性（各通道差 ≤ 16，无显著色相）', () => {
-    // 中性：R≈G≈B。允许极轻微冷/暖偏差，但不允许出现明显色相
-    // （带色方案只在 TEAL_THEME_PRESET 中提供）。
-    const accent = themes.dark.accent;
+  it.each(['dark', 'light'] as const)('%s uses neutral interactive accents', (mode) => {
+    const accent = themes[mode].accent;
     expect(accent.startsWith('#')).toBe(true);
     const [r, g, b] = [
       parseInt(accent.slice(1, 3), 16),
       parseInt(accent.slice(3, 5), 16),
       parseInt(accent.slice(5, 7), 16),
     ];
-    expect(Math.max(r, g, b) - Math.min(r, g, b)).toBeLessThanOrEqual(16);
-  });
-
-  it('light 主色同样为近中性', () => {
-    const accent = themes.light.accent;
-    const [r, g, b] = [
-      parseInt(accent.slice(1, 3), 16),
-      parseInt(accent.slice(3, 5), 16),
-      parseInt(accent.slice(5, 7), 16),
-    ];
-    expect(Math.max(r, g, b) - Math.min(r, g, b)).toBeLessThanOrEqual(16);
+    expect(r).toBe(g);
+    expect(g).toBe(b);
+    const warm = themes[mode].accentWarm;
+    expect(warm.slice(1, 3)).toBe(warm.slice(3, 5));
+    expect(warm.slice(3, 5)).toBe(warm.slice(5, 7));
   });
 
   it('dark 语义色保留（成功/错误/警告）', () => {

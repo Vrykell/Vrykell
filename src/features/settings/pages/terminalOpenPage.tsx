@@ -36,7 +36,7 @@ export function TerminalOpenPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {(Object.keys(SHELL_LABELS) as ShellType[]).map((shell) => (
             <div key={shell} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ width: 110, fontSize: 12, color: 'var(--text-primary)' }}>
+              <span style={{ width: 110, fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-primary)' }}>
                 {SHELL_LABELS[shell]}
               </span>
               <Segmented
@@ -48,7 +48,7 @@ export function TerminalOpenPage() {
             </div>
           ))}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ width: 110, fontSize: 12, color: 'var(--text-primary)' }}>SSH</span>
+            <span style={{ width: 110, fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-primary)' }}>SSH</span>
             <Segmented
               size="sm"
               options={OPEN_MODE_OPTIONS}

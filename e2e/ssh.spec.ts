@@ -10,6 +10,37 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('SSH 远程连接管理侧栏', () => {
+  test('Enter on an edit button opens the form without connecting', async ({ page }) => {
+    await page.getByTestId('ssh-row-ssh-1').click();
+    const edit = page.getByRole('button', { name: '编辑「生产服务器」', exact: true }).last();
+    await edit.focus();
+    await edit.press('Enter');
+    await expect(page.getByTestId('ssh-form-name')).toHaveValue('生产服务器');
+    const spawns = await page.evaluate(() => (window as unknown as Record<string, { ssh?: unknown }[]>).__PTY_SPAWNS__);
+    expect(spawns.filter(s => s.ssh)).toHaveLength(0);
+  });
+  test('SSH rows match the current session tab style', async ({ page }) => {
+    const row = page.getByTestId('ssh-row-ssh-1');
+    await row.click();
+    const selectionColor = await page.evaluate(() => {
+      const probe = document.createElement('div');
+      probe.style.backgroundColor = 'var(--selection-bg)';
+      document.body.appendChild(probe);
+      const color = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return color;
+    });
+    await expect(row.locator(':scope > div')).toHaveCSS('background-color', selectionColor);
+    const rowStyle = async (selector: string) => page.locator(selector).evaluate(el => {
+      const inner = el.firstElementChild!;
+      const style = getComputedStyle(inner);
+      return { outerPadding: getComputedStyle(el).padding, padding: style.padding, radius: style.borderRadius, height: inner.getBoundingClientRect().height, background: style.backgroundColor, gap: style.gap, icon: inner.querySelector('svg')?.getAttribute('width') };
+    });
+    const sshStyle = await rowStyle('[data-testid="ssh-row-ssh-1"]');
+    await expect(row).toHaveAttribute('title', /root@prod.example.com:22/);
+    await ensureTabsOpen(page);
+    expect(await rowStyle('[data-tab-row-id]')).toEqual(sshStyle);
+  });
   test('顶栏：搜索 + 编辑 + 新建按钮', async ({ page }) => {
     await expect(page.locator('[data-testid="ssh-search"]')).toBeVisible();
     await expect(page.locator('[data-testid="ssh-edit-btn"]')).toBeVisible();

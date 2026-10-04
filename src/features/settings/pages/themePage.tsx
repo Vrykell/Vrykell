@@ -2,7 +2,7 @@
  * themePage — 外观主题设置页（明暗/不透明度/壁纸/导入导出）。
  */
 import { useEffect, useState } from 'react';
-import { Sun, Moon, Image as ImageIcon, Download, Upload, RefreshCw, FileText, Trash2 } from 'lucide-react';
+import { Check, Sun, Moon, Image as ImageIcon, Download, Upload, RefreshCw, FileText, Trash2 } from 'lucide-react';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { invoke } from '@tauri-apps/api/core';
@@ -91,16 +91,17 @@ export function ThemePage() {
             return (
               <button
                 key={m}
+                aria-pressed={active}
                 onClick={() => setMode(m)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '10px 16px', fontSize: 12, cursor: 'pointer',
+                  padding: '10px 16px', fontSize: 'calc(12px * var(--ui-font-scale))', cursor: 'pointer',
                   border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
                   borderRadius: 'var(--radius-inner)', background: active ? 'var(--hover)' : 'transparent',
                   color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
                 }}
               >
-                <Icon size={14} /> {m === 'dark' ? '深色' : '浅色'}
+                <Icon size={14} /> {m === 'dark' ? '深色' : '浅色'} {active && <Check size={12} aria-hidden="true" />}
               </button>
             );
           })}
@@ -119,7 +120,7 @@ export function ThemePage() {
             style={{ flex: 1, accentColor: 'var(--accent-warm)' }}
           />
           <span style={{
-            fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)',
+            fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)',
             minWidth: 40, textAlign: 'right',
           }}>
             {Math.round(config.opacity * 100)}%
@@ -144,7 +145,7 @@ export function ThemePage() {
         </div>
         {config.backgroundImage && (
           <div style={{
-            marginTop: 8, fontSize: 11, color: 'var(--text-muted)',
+            marginTop: 8, fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)',
             fontFamily: 'var(--font-mono)', wordBreak: 'break-all',
           }}>
             {config.backgroundImage}
@@ -180,7 +181,7 @@ export function ThemePage() {
             </span>
           </button>
           {themePath && (
-            <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}>
+            <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}>
               {themePath}
             </span>
           )}

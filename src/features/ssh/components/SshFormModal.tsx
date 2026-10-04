@@ -16,10 +16,10 @@ interface Props {
 const field: React.CSSProperties = {
   display: 'block', width: '100%', marginTop: 4,
   background: 'var(--canvas)', border: '1px solid var(--border)',
-  borderRadius: 'var(--radius-inner)', padding: '6px 8px', fontSize: 12,
+  borderRadius: 'var(--radius-inner)', padding: '6px 8px', fontSize: 'calc(12px * var(--ui-font-scale))',
   color: 'var(--text-primary)', fontFamily: 'var(--font-mono)',
 };
-const label: React.CSSProperties = { fontSize: 11, color: 'var(--text-secondary)' };
+const label: React.CSSProperties = { fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-secondary)' };
 
 /**
  * SshFormModal — 新建 / 编辑 SSH 连接弹窗。
@@ -142,16 +142,14 @@ export default function SshFormModal({ open, initial, onClose }: Props) {
       }}
       onClick={onClose}
     >
-      <div
+      <div className="workspace-floating workspace-floating-dialog" role="dialog" aria-modal="true" aria-label="SSH 连接"
         style={{
-          width: 400, maxHeight: '82vh', overflowY: 'auto',
-          background: 'var(--elevated)', border: '1px solid var(--border-strong)',
-          borderRadius: 'var(--radius-block)', boxShadow: 'var(--shadow-lg)',
+          width: 400, maxWidth: 'calc(100vw - 40px)', maxHeight: '82vh', overflowY: 'auto',
           padding: 16, display: 'flex', flexDirection: 'column', gap: 10,
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+        <div style={{ fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>
           {initial ? '编辑 SSH 连接' : '新建 SSH 连接'}
         </div>
 
@@ -185,7 +183,7 @@ export default function SshFormModal({ open, initial, onClose }: Props) {
                 data-subtle
                 onClick={() => setAuthMethod(m)}
                 style={{
-                  flex: 1, padding: '5px 0', fontSize: 12, borderRadius: 'var(--radius-inner)',
+                  flex: 1, padding: '5px 0', fontSize: 'calc(12px * var(--ui-font-scale))', borderRadius: 'var(--radius-inner)',
                   border: `1px solid ${authMethod === m ? 'var(--accent)' : 'var(--border)'}`,
                   background: authMethod === m ? 'var(--accent-dim)' : 'transparent',
                   color: authMethod === m ? 'var(--text-primary)' : 'var(--text-secondary)',
@@ -205,7 +203,7 @@ export default function SshFormModal({ open, initial, onClose }: Props) {
           </label>
         )}
         {authMethod === 'key' && (
-          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+          <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>
             使用本机默认密钥 / SSH Agent 认证。
           </div>
         )}
@@ -216,7 +214,7 @@ export default function SshFormModal({ open, initial, onClose }: Props) {
           data-testid="ssh-test-btn"
           style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            padding: '6px 0', fontSize: 12, border: '1px solid var(--border)',
+            padding: '6px 0', fontSize: 'calc(12px * var(--ui-font-scale))', border: '1px solid var(--border)',
             borderRadius: 'var(--radius-inner)', background: 'transparent',
             color: 'var(--text-secondary)', cursor: 'pointer',
           }}
@@ -227,7 +225,7 @@ export default function SshFormModal({ open, initial, onClose }: Props) {
 
         {testResult && (
           <div style={{
-            fontSize: 12, padding: '6px 8px', borderRadius: 'var(--radius-inner)',
+            fontSize: 'calc(12px * var(--ui-font-scale))', padding: '6px 8px', borderRadius: 'var(--radius-inner)',
             color: testResult.ok ? 'var(--success)' : 'var(--error-light)',
             background: testResult.ok ? 'var(--success-bg)' : 'var(--error-bg)',
           }} data-testid="ssh-test-result">
@@ -242,7 +240,7 @@ export default function SshFormModal({ open, initial, onClose }: Props) {
               data-testid="ssh-delete-btn"
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
-                padding: '6px 12px', fontSize: 12, border: '1px solid var(--border)',
+                padding: '6px 12px', fontSize: 'calc(12px * var(--ui-font-scale))', border: '1px solid var(--border)',
                 borderRadius: 'var(--radius-inner)', background: 'transparent',
                 color: 'var(--error-light)', cursor: 'pointer',
               }}
@@ -252,14 +250,14 @@ export default function SshFormModal({ open, initial, onClose }: Props) {
           )}
           <div style={{ flex: 1 }} />
           <button onClick={onClose} style={{
-            padding: '6px 12px', fontSize: 12, border: '1px solid var(--border)',
+            padding: '6px 12px', fontSize: 'calc(12px * var(--ui-font-scale))', border: '1px solid var(--border)',
             borderRadius: 'var(--radius-inner)', background: 'transparent',
             color: 'var(--text-secondary)', cursor: 'pointer',
           }}>
             取消
           </button>
           <button onClick={doSave} data-testid="ssh-save-btn" style={{
-            padding: '6px 16px', fontSize: 12, border: 'none',
+            padding: '6px 16px', fontSize: 'calc(12px * var(--ui-font-scale))', border: 'none',
             borderRadius: 'var(--radius-inner)', background: 'var(--accent)',
             color: 'var(--accent-text)', cursor: 'pointer',
           }}>
