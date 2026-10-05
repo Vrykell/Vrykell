@@ -8,7 +8,7 @@ test('startup preference is discoverable and persists the selected mode', async 
   await gotoSetting(page, '启动');
   const picker = page.getByRole('combobox', { name: '启动时打开' });
   await picker.click();
-  await page.getByRole('option', { name: '什么都不新建（显示会话记录）' }).click();
+  await page.getByRole('option', { name: '显示会话记录' }).click();
   await expect.poll(() => page.evaluate(() => localStorage.getItem('vrykell-startup-mode'))).toBe('empty');
   await expect(page.getByRole('status')).toHaveText('已保存');
 });

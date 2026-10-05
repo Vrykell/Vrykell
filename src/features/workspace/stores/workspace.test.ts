@@ -56,6 +56,17 @@ describe('workspace store', () => {
     expect(s.activeId).toBe('');
   });
 
+  it('关闭最后一个会话标签后回到会话记录视图', () => {
+    const ws = useWorkspaceStore.getState();
+    const sessionId = ws.tabs[0]!.id;
+    ws.openSettingsTab();
+    ws.closeTab(sessionId);
+
+    const state = useWorkspaceStore.getState();
+    expect(state.tabs.some(isSessionTab)).toBe(false);
+    expect(state.activeId).toBe('');
+  });
+
   it('addTab 支持指定 shell 类型', () => {
     useWorkspaceStore.getState().addTab({ shellType: 'zsh' });
     const t = useWorkspaceStore.getState().tabs[1]!;

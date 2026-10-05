@@ -55,6 +55,30 @@ test.describe('标签页管理侧栏', () => {
     await expect(page.getByText('1 个会话')).toBeVisible();
   });
 
+  test('标签右键菜单靠近窗口边缘时仍完整显示', async ({ page }) => {
+    await page.evaluate(() => {
+      const row = document.querySelector<HTMLElement>('[data-tab-row-id]');
+      if (!row) throw new Error('未找到标签行');
+      row.dispatchEvent(new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: window.innerWidth - 2,
+        clientY: window.innerHeight - 2,
+      }));
+    });
+
+    const menu = page.getByRole('menu', { name: '操作菜单' });
+    await expect(menu).toBeVisible();
+    const bounds = await menu.boundingBox();
+    const viewport = page.viewportSize();
+    expect(bounds).not.toBeNull();
+    expect(viewport).not.toBeNull();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.y).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport!.width);
+    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(viewport!.height);
+  });
+
   test('非活跃标签悬停时才显示关闭按钮', async ({ page }) => {
     await page.keyboard.press('Meta+t');
     const rows = page.locator('[data-testid^="tab-row-"]');
