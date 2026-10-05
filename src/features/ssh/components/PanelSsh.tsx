@@ -3,7 +3,6 @@ import { iconSizes, Pencil, Plus, Search, Server  } from '@ui/icons';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { ensureSshLoaded, useSshStore } from '@features/ssh';
 import { useSessionStore } from '@features/workspace';
-import { useDockStore } from '@features/workspace';
 import ContextMenu from '@ui/ContextMenu';
 import { IconBtn } from '@ui/UiBtn';
 import { sidebarRowSpacing, sidebarRowContent, sidebarRowIcon, sidebarRowTitle } from '@ui/sidebarRow';
@@ -48,8 +47,7 @@ export default function PanelSsh() {
       kind: 'ssh',
       ssh: connectionTarget(conn),
     });
-    // 文件管理器自动连到远程机文件
-    useDockStore.getState().openPanel('files');
+    // File browsing is an optional service and should not replace connection navigation.
   };
 
   const openNew = () => {

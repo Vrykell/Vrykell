@@ -55,9 +55,10 @@ test.describe('SSH 远程连接管理侧栏', () => {
     await expect(page.getByText('生产服务器')).toBeVisible();
   });
 
-  test('双击连接新建活跃会话标签页，文件面板自动连到远程', async ({ page }) => {
+  test('双击连接新建活跃会话标签页，按需打开文件面板', async ({ page }) => {
     await page.getByText('生产服务器').dblclick();
-    // 文件面板自动打开并连到远程（mock ssh_list 返回远程条目）
+    await page.locator('[data-dock-btn="files"]').click();
+    // Open the optional file service separately from the terminal session.
     await expect(page.getByText('app.log')).toBeVisible({ timeout: 5000 });
     await expect(page.getByText('Documents')).toBeVisible();
     // 标签面板出现以连接名命名的标签页
@@ -94,6 +95,7 @@ test.describe('SSH 远程连接管理侧栏', () => {
 
   test('远程目录可下载，下载管理可定位到文件管理器', async ({ page }) => {
     await page.getByText('生产服务器').dblclick();
+    await page.locator('[data-dock-btn="files"]').click();
     await expect(page.locator('[data-testid="remote-file-Documents"]')).toBeVisible({ timeout: 5000 });
     // 右键远程目录 → 下载文件夹到本地
     await page.locator('[data-testid="remote-file-Documents"]').click({ button: 'right' });

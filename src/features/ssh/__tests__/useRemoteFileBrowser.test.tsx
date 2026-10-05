@@ -67,6 +67,12 @@ describe('useRemoteFileBrowser', () => {
     expect(result.current.entries[0]?.path).toBe('/home/tester/src');
     expect(sshMocks.sshFsList).toHaveBeenCalledWith(conn.id, undefined);
   });
+  it('does not connect a hidden file panel and starts loading when it is opened', async () => {
+    const { result, rerender } = renderHook(({ enabled }) => useRemoteFileBrowser(conn, enabled), { initialProps: { enabled: false } });
+    expect(sshMocks.sshFsList).not.toHaveBeenCalled();
+    rerender({ enabled: true });
+    await waitFor(() => expect(result.current.entries[0]?.name).toBe('src'));
+  });
 
   it('keeps rename confirmation and refreshes after the remote mutation', async () => {
     useRemotePathStore.setState({ path: { [conn.id]: '/home/tester' } });

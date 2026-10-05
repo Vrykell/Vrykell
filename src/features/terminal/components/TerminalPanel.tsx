@@ -15,6 +15,7 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
   const [response, setResponse] = useState('');
   const [error, setError] = useState('');
   const [cancellation, setCancellation] = useState<'idle' | 'pending' | 'done'>('idle');
+  const [cancelledAuthentication, setCancelledAuthentication] = useState(false);
   const [manualSecret, setManualSecret] = useState(false);
   const [dismissedPrompt, setDismissedPrompt] = useState<string | null>(null);
   const cancellingRef = useRef(false);
@@ -38,6 +39,7 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
   const cancelAuthentication = async () => {
     if (!sessionId || cancellingRef.current) return;
     cancellingRef.current = true;
+    setCancelledAuthentication(secret);
     setCancellation('pending'); setResponse(''); setError('');
     try { await closeSession(); setCancellation('done'); }
     catch (reason) { cancellingRef.current = false; setCancellation('idle'); setError(`取消失败：${String(reason)}`); }
@@ -54,7 +56,7 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
     {!connectionInput && <div ref={ref} style={{ position: 'absolute', inset: 0, minHeight: 0, background: 'transparent' }} />}
     {interactive && <div data-testid="ssh-connection-input" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0, padding: '4px 8px', fontSize: 'calc(12px * var(--ui-font-scale))' }}>
-        <span role="status" style={{ flex: 1, color: 'var(--text-secondary)' }}>{cancellation === 'done' ? '已取消认证，SSH 连接已关闭' : disconnected ? '连接已断开' : status === 'connecting' ? '正在连接…' : secret ? '等待认证响应' : 'SSH 交互会话'}</span>
+        <span role="status" style={{ flex: 1, color: 'var(--text-secondary)' }}>{cancellation === 'done' ? cancelledAuthentication ? '已取消认证，SSH 连接已关闭' : '已断开 SSH 连接' : disconnected ? '连接已断开' : status === 'connecting' ? '正在连接…' : secret ? '等待认证响应' : 'SSH 交互会话'}</span>
         {!disconnected && <button type="button" disabled={inputDisabled} onClick={() => { setManualSecret(!secret); if (secret) setDismissedPrompt(text); }} style={{ padding: '7px 12px' }}>{secret ? '直接输入' : '密码输入'}</button>}
         {disconnected ? <button type="button" disabled={cancellation === 'pending'} onClick={() => void restart()} style={{ padding: '7px 12px' }}>重新连接</button>
           : <button type="button" disabled={inputDisabled} onClick={() => void cancelAuthentication()} style={{ padding: '7px 12px' }}>{cancellation === 'pending' ? '正在取消…' : secret ? '取消认证' : '断开连接'}</button>}
@@ -63,7 +65,7 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
         onFocus={focusTerminal} onMouseDown={focusTerminal} style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'auto', outline: 'none', cursor: 'text' }}>
         <div ref={ref} aria-hidden="true" style={{ position: 'absolute', inset: 0, opacity: 0, pointerEvents: 'none' }} />
         <pre data-testid="ssh-terminal-screen" style={{ margin: 0, fontFamily: TERMINAL_FONT_FAMILY, fontSize: getTerminalFontSize(), lineHeight: `${rowHeight}px`, color: 'var(--text-primary)', whiteSpace: 'pre', minHeight: '100%' }} dangerouslySetInnerHTML={{ __html: frame?.html || '正在连接远端主机…' }} />
-        {!inputDisabled && !secret && frame && frame.cursorY >= 0 && frame.cursorY < frame.rows && <span aria-hidden="true" style={{ position: 'absolute', pointerEvents: 'none', left: frame.cursorX * frame.cellWidth, top: frame.cursorY * rowHeight, width: frame.cellWidth, height: rowHeight, background: 'var(--text-primary)', opacity: 0.45 }} />}
+        {!inputDisabled && !secret && frame && !frame.cursorHidden && frame.cursorY >= 0 && frame.cursorY < frame.rows && <span aria-hidden="true" data-testid="ssh-screen-cursor" style={{ position: 'absolute', pointerEvents: 'none', left: frame.cursorX * frame.cellWidth, top: frame.cursorY * rowHeight, width: frame.cursorStyle === 'block' ? frame.cellWidth : frame.cursorStyle === 'underline' ? frame.cellWidth : 2, height: frame.cursorStyle === 'underline' ? 2 : rowHeight, background: 'white', mixBlendMode: 'difference', opacity: 1, animation: 'cursor-blink 1.2s step-end infinite' }} />}
       </div>
       {secret && !disconnected && <form onSubmit={e => {
         e.preventDefault();

@@ -667,4 +667,120 @@ mod tests {
         println!("下载到: {local}（{size} 字节）");
         assert!(std::path::Path::new(&local).exists());
     }
+    /// 从屏幕文本里找出「单个数字用空格分隔」的验证码行。
+    fn captcha_digits(text: &str) -> Option<String> {
+        text.lines().rev().find_map(|line| {
+            let tokens: Vec<&str> = line.split_whitespace().collect();
+            (tokens.len() >= 4 && tokens.iter().all(|token| token.len() == 1 && token.chars().all(|c| c.is_ascii_digit())))
+                .then(|| tokens.concat())
+        })
+    }
+
+    // 真机手动验证（需要网络与外部服务）：
+    // `cargo test manual_chat_server_flow -- --ignored --nocapture`
+    // 走「前置指纹校验 → 生产命令构造 → PTY 启动 → 密码 → 验证码 → 交互界面 → 退出」。
+    #[test]
+    #[ignore]
+    fn manual_chat_server_flow() {
+        use std::io::{Read, Write};
+        use std::sync::{Arc, Mutex};
+        use std::time::{Duration, Instant};
+
+        let host = "www.altzin.com";
+        let port = 2222u16;
+        let conn = SshConnection {
+            id: String::new(),
+            name: String::new(),
+            host: host.into(),
+            port: Some(port),
+            user: "vrykell_probe".into(),
+            password: String::new(),
+            auth_method: "password".into(),
+            last_opened_at: None,
+            has_password: false,
+            options: Default::default(),
+        };
+
+        // 1) 与前端 prepareSshHost 相同的前置校验
+        let mut host_key_type: Option<String> = None;
+        match tcp_handshake(&conn) {
+            Ok(sess) => {
+                let (_, key_type) = sess.host_key().expect("远端未返回主机密钥");
+                println!("key_type={key_type:?} fingerprint={}", fingerprint_of(&sess));
+                println!("known_hosts 校验：{:?}", verify_host_key(&sess, host, port));
+                host_key_type = Some(format!("{key_type:?}").to_lowercase());
+            }
+            Err(error) => println!("前置校验失败（继续用真实 ssh 验证）：{error}"),
+        }
+
+        // 2) 用生产命令构造器启动交互会话
+        let target: crate::terminal::ssh_command::SshTarget = serde_json::from_value(serde_json::json!({
+            "host": host, "user": "vrykell_probe", "port": port,
+            "hostKeyType": host_key_type,
+            "shellIntegration": false, "serverAliveInterval": 30, "hostKeyPolicy": "ask"
+        }))
+        .expect("构造 SSH 目标失败");
+        let cmd = crate::terminal::ssh_command::build_ssh_command(&target, None).expect("构造 ssh 命令失败");
+        println!("argv={:?}", cmd.get_argv());
+
+        let pty_system = portable_pty::native_pty_system();
+        let pair = pty_system
+            .openpty(portable_pty::PtySize { rows: 40, cols: 120, pixel_width: 0, pixel_height: 0 })
+            .expect("openpty 失败");
+        let mut child = pair.slave.spawn_command(cmd).expect("启动 ssh 失败");
+        drop(pair.slave);
+        let mut reader = pair.master.try_clone_reader().expect("读取端失败");
+        let mut writer = pair.master.take_writer().expect("写入端失败");
+        let buffer = Arc::new(Mutex::new(Vec::<u8>::new()));
+        let sink = Arc::clone(&buffer);
+        std::thread::spawn(move || {
+            let mut chunk = [0u8; 4096];
+            while let Ok(n) = reader.read(&mut chunk) {
+                if n == 0 { break; }
+                sink.lock().unwrap().extend_from_slice(&chunk[..n]);
+            }
+        });
+
+        let screen = |buffer: &Arc<Mutex<Vec<u8>>>| String::from_utf8_lossy(&buffer.lock().unwrap().clone()).to_string();
+        let started = Instant::now();
+        let (mut sent_password, mut sent_captcha, mut quit) = (false, false, false);
+        while started.elapsed() < Duration::from_secs(60) {
+            std::thread::sleep(Duration::from_millis(120));
+            let text = screen(&buffer);
+            if !sent_password && text.contains("password:") {
+                writer.write_all(b"probe-passphrase\r").unwrap();
+                writer.flush().unwrap();
+                sent_password = true;
+                println!("[{}ms] 已发送密码", started.elapsed().as_millis());
+            }
+            if sent_password && !sent_captcha {
+                if let Some(captcha) = captcha_digits(&text) {
+                    writer.write_all(format!("{captcha}\r").as_bytes()).unwrap();
+                    writer.flush().unwrap();
+                    sent_captcha = true;
+                    println!("[{}ms] 已提交验证码 {captcha}", started.elapsed().as_millis());
+                }
+            }
+            if sent_captcha && !quit && text.contains("sshfm") {
+                std::thread::sleep(Duration::from_secs(1));
+                writer.write_all(b"q").unwrap();
+                writer.flush().unwrap();
+                quit = true;
+                println!("[{}ms] 已发送退出键", started.elapsed().as_millis());
+            }
+            if let Ok(Some(status)) = child.try_wait() {
+                println!("ssh 退出：{status:?}");
+                break;
+            }
+        }
+
+        if let Some(root) = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).parent() {
+            let path = root.join(".cache-usability.local").join("chat-server-stream.bin");
+            let _ = std::fs::write(&path, buffer.lock().unwrap().clone());
+            println!("原始字节：{}", path.display());
+        }
+        println!("---- 屏幕 ----\n{}", screen(&buffer).escape_debug());
+        assert!(sent_password, "未出现密码提示");
+    }
+
 }

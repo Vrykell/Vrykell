@@ -90,15 +90,15 @@ export function useLocalFileActions({
       items.push({ label: '在新标签页中打开', onClick: () => useSessionStore.getState().addTab({ cwd: entry.path, title: entry.name }) });
     } else {
       items.push({ label: '使用终端编辑器打开', onClick: () => void openFileInTerminal(entry) });
-      items.push({ label: '使用系统默认应用打开', onClick: () => void openPath(entry.path).catch(() => {}) });
+      items.push({ label: '使用系统默认应用打开', onClick: () => void openPath(normPath(entry.path)).catch(() => {}) });
       items.push({
         label: '打开方式…',
-        onClick: () => void fileOpenWith(entry.path).catch((error) =>
+        onClick: () => void fileOpenWith(normPath(entry.path)).catch((error) =>
           useToastStore.getState().addToast(String((error as Error)?.message ?? error), 'error')),
       });
     }
 
-    items.push({ label: '复制路径', onClick: () => void navigator.clipboard.writeText(entry.path) });
+    items.push({ label: '复制路径', onClick: () => void navigator.clipboard.writeText(normPath(entry.path)) });
     items.push({ label: '重命名', onClick: () => setRenameTarget(entry) });
     items.push({ label: '删除', danger: true, onClick: () => setConfirm({ kind: 'delete', entry }) });
     return items;

@@ -152,6 +152,26 @@ describe('useTerminalSession', () => {
     await waitFor(() => expect(useTerminalStore.getState().scenes.t1).toBe('blockList'));
   });
 
+  it('keeps a working ssh available when the fingerprint preflight cannot run', async () => {
+    // 老服务器可能与预检库协商失败：此时改由 ssh 自己校验，不能因此连不上。
+    vi.mocked(prepareSshHost).mockRejectedValueOnce(new Error('SSH 握手失败：[Session(-5)] Unable to exchange encryption keys'));
+    useWorkspaceStore.setState({ tabs: [{ id: 't1', title: 'ssh', kind: 'session', layout: leaf({ id: 't1', kind: 'ssh', openMode: 'block', ssh: { name: 'server', host: 'server', user: 'user' } }) }], activeId: 't1' });
+    render(<TestHarness tabId="t1" onReady={() => {}} />);
+    await waitFor(() => expect(mockedPtySpawn).toHaveBeenCalled());
+    expect(mockedPtySpawn).toHaveBeenCalledWith(80, 24, undefined, expect.objectContaining({
+      ssh: expect.objectContaining({ hostKeyPolicy: 'ask' }),
+    }));
+    expect(vi.mocked(mockedPtySpawn).mock.calls[0]?.[3]).not.toHaveProperty('ssh.hostKeyType');
+  });
+
+  it('stops before spawning when the recorded host key changed', async () => {
+    vi.mocked(prepareSshHost).mockRejectedValueOnce(new Error('主机密钥不匹配（可能存在中间人攻击）：server'));
+    useWorkspaceStore.setState({ tabs: [{ id: 't1', title: 'ssh', kind: 'session', layout: leaf({ id: 't1', kind: 'ssh', openMode: 'block', ssh: { name: 'server', host: 'server', user: 'user' } }) }], activeId: 't1' });
+    render(<TestHarness tabId="t1" onReady={() => {}} />);
+    await waitFor(() => expect(writeMock).toHaveBeenCalledWith(expect.stringContaining('SSH 连接失败'), expect.any(Function)));
+    expect(mockedPtySpawn).not.toHaveBeenCalled();
+  });
+
   it('classic 模式：数据直进主 xterm，不建块', async () => {
     setTab('classic');
     render(<TestHarness tabId="t1" onReady={() => {}} />);
