@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@platform/diagnostics';
 import { listen } from '@tauri-apps/api/event';
 import { create } from 'zustand';
 import type { StreamFn } from '@features/chat';

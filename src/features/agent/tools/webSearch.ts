@@ -14,7 +14,7 @@
 import { tool } from 'ai';
 import { DESC_WEB_SEARCH_TAVILY } from '@features/agent/model/toolTexts';
 import { z } from 'zod';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@platform/diagnostics';
 import { gate, type ToolContext } from '@features/agent/stores/permissions';
 
 interface TavilyResult {

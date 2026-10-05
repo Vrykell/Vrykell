@@ -9,7 +9,7 @@
  */
 import { describeError } from '@features/agent/model/agentErrors';
 import { stepCountIs, streamText, type ModelMessage, type ToolSet } from 'ai';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@platform/diagnostics';
 import type { StreamFn } from '@features/chat';
 import { createChatModel, createNativeWebSearchTool, deepThinkProviderOptions, type ProviderKind } from '@features/agent/services/provider';
 import { useAgentSettings } from '@features/agent/stores/agentSettings';

@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@platform/diagnostics';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { DispatchEvent } from '@core/terminal/events';
 import type { SshOptions } from '@core/ssh';

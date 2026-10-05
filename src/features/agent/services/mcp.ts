@@ -6,7 +6,7 @@
  */
 
 import { tool, jsonSchema } from 'ai';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@platform/diagnostics';
 import { gate, type ToolContext } from '@features/agent/stores/permissions';
 
 /** 服务器状态（Rust mcp_get_servers 返回）。 */

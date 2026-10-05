@@ -6,7 +6,7 @@
  *  结果封顶）。execute 永不 throw（约定见 tools/index.ts 头注释）。
  */
 
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@platform/diagnostics';
 import { DESC_LIST_DIR, DESC_SEARCH_FILES } from '@features/agent/model/toolTexts';
 import { tool } from 'ai';
 import { z } from 'zod';

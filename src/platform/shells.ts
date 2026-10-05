@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@platform/diagnostics';
 import { isMacOS } from '@platform/runtime';
 
 /** 本地 shell 类型标识 */

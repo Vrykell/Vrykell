@@ -11,7 +11,8 @@
  * llm_abort，Rust 侧用 AbortHandle 取消 reqwest 请求。
  */
 import type { ProviderKind } from './provider';
-import { invoke, Channel } from '@tauri-apps/api/core';
+import { Channel } from '@tauri-apps/api/core';
+import { invoke } from '@platform/diagnostics';
 
 interface LlmStreamEvent {
   kind: 'started' | 'chunk' | 'done' | 'error';

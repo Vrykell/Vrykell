@@ -11,7 +11,7 @@
  * 全程可 abort（输入变化即作废上一次），任何失败静默返回 null。
  */
 import { generateText } from 'ai';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@platform/diagnostics';
 import { createChatModel } from '@features/agent/services/provider';
 import { useAgentSettings } from '@features/agent/stores/agentSettings';
 import { activeModelProfile, isApiKeyConfigured } from '@features/agent/stores/aiConfig';

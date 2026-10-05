@@ -3,7 +3,7 @@
  */
 import { generateText, tool } from 'ai';
 import { DESC_SUBAGENT } from '@features/agent/model/toolTexts';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@platform/diagnostics';
 import { z } from 'zod';
 import { createChatModel, type ProviderKind } from '@features/agent/services/provider';
 import { listAgents, saveAgent, removeAgent, getAgent } from '@features/agent/services/platform';

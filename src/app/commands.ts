@@ -1,6 +1,6 @@
 import { useSessionStore } from '@features/workspace';
 import { useUiStore, useDockStore } from '@features/workspace';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@platform/diagnostics';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { clearSessionBlocks } from '@features/terminal/hooks/useTerminalSession';
 import { isTerminalDebugEnabled, setTerminalDebugEnabled } from '@features/terminal/services/terminalDebug';
