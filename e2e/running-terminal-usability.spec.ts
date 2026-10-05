@@ -9,20 +9,26 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByTestId('running-term').locator('.xterm')).toBeVisible();
 });
 
-test('running controls have readable labels, larger targets and distinct actions', async ({ page }) => {
+test('运行中命令块以图标显示统一尺寸的操作按钮', async ({ page }) => {
   const block = page.locator('[data-testid^="running-block-"]').first();
-  for (const label of ['中断', '结束', '全屏']) {
+  const actions = [
+    '终止命令 (Ctrl+C)',
+    '结束前台应用（SIGTERM；3 秒内再点强杀 SIGKILL）',
+    '进入全屏交互',
+  ];
+  for (const label of actions) {
     const button = block.getByRole('button', { name: label, exact: true });
     const bounds = (await button.boundingBox())!;
-    expect(bounds.width).toBeGreaterThanOrEqual(30);
-    expect(bounds.height).toBeGreaterThanOrEqual(30);
-    await expect(button.locator('svg')).toHaveCSS('width', '18px');
+    expect(bounds.width).toBe(28);
+    expect(bounds.height).toBe(28);
+    await expect(button.locator('svg')).toHaveCSS('width', '16px');
+    await expect(button).toHaveText('');
   }
   await page.screenshot({ path: test.info().outputPath('running-controls.png') });
-  await block.getByRole('button', { name: '中断', exact: true }).click();
+  await block.getByRole('button', { name: '终止命令 (Ctrl+C)', exact: true }).click();
   await expect.poll(() => ptyWrites(page)).toContain('\x03');
-  await block.getByRole('button', { name: '结束', exact: true }).click();
-  await expect(block.getByRole('button', { name: '强制结束', exact: true })).toBeVisible();
+  await block.getByRole('button', { name: '结束前台应用（SIGTERM；3 秒内再点强杀 SIGKILL）', exact: true }).click();
+  await expect(block.getByRole('button', { name: '强制结束前台应用（SIGKILL）', exact: true })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('termination-armed.png') });
 });
 

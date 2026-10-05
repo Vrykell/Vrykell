@@ -1,5 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { MenuItem } from '@ui/UiBtn';
+import { clampMenuPosition } from '@ui/menuPosition';
 
 export interface ContextMenuItem {
   label: string;
@@ -20,19 +22,37 @@ interface Props {
  */
 export default function ContextMenu({ anchor, items, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ left: anchor.x, top: anchor.y });
+
+  useLayoutEffect(() => {
+    const updatePosition = () => {
+      const menu = ref.current;
+      if (!menu) return;
+      const rect = menu.getBoundingClientRect();
+      setPosition(clampMenuPosition(
+        { left: anchor.x, top: anchor.y },
+        { width: rect.width, height: rect.height },
+        { width: window.innerWidth, height: window.innerHeight },
+      ));
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    return () => window.removeEventListener('resize', updatePosition);
+  }, [anchor.x, anchor.y, items.length]);
 
   useEffect(() => {
     const h = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
-    requestAnimationFrame(() => document.addEventListener('click', h));
-    return () => document.removeEventListener('click', h);
+    const frame = requestAnimationFrame(() => document.addEventListener('click', h));
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener('click', h);
+    };
   }, [onClose]);
 
-  const top = Math.min(anchor.y, window.innerHeight - items.length * 32 - 20);
-  const left = Math.min(anchor.x, window.innerWidth - 220);
-
-  return (
+  return createPortal(
     <div
       ref={ref}
       role="menu"
@@ -41,9 +61,11 @@ export default function ContextMenu({ anchor, items, onClose }: Props) {
       style={{
         position: 'fixed',
         zIndex: 9999,
-        top,
-        left,
-        minWidth: 180,
+        top: position.top,
+        left: position.left,
+        minWidth: 'min(180px, calc(100vw - 16px))',
+        maxWidth: 'calc(100vw - 16px)',
+        boxSizing: 'border-box',
         padding: 4,
         fontSize: 'calc(12px * var(--ui-font-scale))',
       }}
@@ -56,6 +78,7 @@ export default function ContextMenu({ anchor, items, onClose }: Props) {
           onClick={() => { item.onClick(); onClose(); }}
         />
       ))}
-    </div>
+    </div>,
+    document.body,
   );
 }

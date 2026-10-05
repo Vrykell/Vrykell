@@ -20,6 +20,7 @@ import BlockMenu from '@features/terminal/components/BlockMenu';
 import BlockOutput from '@features/terminal/components/BlockOutput';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 import { useTerminalBlockFlow } from '@features/terminal/hooks/useTerminalBlockFlow';
+import type { BlockMenuAnchor } from '@features/terminal/hooks/useTerminalBlockFlow';
 import { useBlockItemActions } from '@features/terminal/hooks/useBlockItemActions';
 import { useTuiControls } from '@features/terminal/hooks/useTuiControls';
 import { hasVisibleContent as hasVisibleBlockContent } from '@features/terminal/model/blockVisibility';
@@ -35,6 +36,8 @@ interface Props {
 
 /** 从 ANSI CSI 序列剥离（OSC 已在 dispatcher 剥离）。 */
 const ANSI_CSI_RE = /\x1b\[[0-9;?]*[a-zA-Z]/g;
+const BLOCK_ACTION_BUTTON_SIZE = 28;
+const BLOCK_ACTION_ICON_SIZE = 16;
 
 /** block 是否有值得渲染的内容（pending 占位、连按回车产生的空 done 都不算）。 */
 export function hasVisibleContent(b: TermBlock): boolean {
@@ -116,7 +119,7 @@ export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8
         <BlockMenu
           block={menuBlock.block}
           paneId={tabId}
-          anchor={menuBlock.rect}
+          anchor={menuBlock.anchor}
           onClose={closeMenu}
           getOutputText={() =>
             menuBlock.block.outputText ||
@@ -226,7 +229,7 @@ function BlockItem({
   insetRight: number;
   highlightQuery: string;
   dividerBefore: boolean;
-  onMenu: (b: TermBlock, rect: DOMRect) => void;
+  onMenu: (b: TermBlock, anchor: BlockMenuAnchor) => void;
 }) {
   const [hovered, setHovered] = useState(false);
   const {
@@ -259,7 +262,7 @@ function BlockItem({
         e.preventDefault();
         // Keep the block menu separate from the pane-level context menu.
         e.stopPropagation();
-        onMenu(block, e.currentTarget.getBoundingClientRect());
+        onMenu(block, { kind: 'pointer', x: e.clientX, y: e.clientY });
       }}
     >
       {/* The compact header keeps the command, result, duration, and hover actions together. */}
@@ -283,25 +286,28 @@ function BlockItem({
         </div>
         {hovered ? (
           <span style={{ display: 'inline-flex', gap: 0, flexShrink: 0 }}>
-            <BlockToolBtn title="AI 解释" onClick={askAI} label={<Sparkles size={iconSizes.compact} />} />
-            <BlockToolBtn title="重新运行" onClick={rerun} label={<RotateCw size={iconSizes.compact} />} />
+            <BlockToolBtn title="AI 解释" onClick={askAI} label={<Sparkles size={BLOCK_ACTION_ICON_SIZE} />} />
+            <BlockToolBtn title="重新运行" onClick={rerun} label={<RotateCw size={BLOCK_ACTION_ICON_SIZE} />} />
             <BlockToolBtn
               title="复制命令"
               onClick={copyCmd}
               label={copiedAction === 'command'
-                ? <Check size={iconSizes.compact} data-testid="copy-command-success" />
-                : <Terminal size={iconSizes.compact} />}
+                ? <Check size={BLOCK_ACTION_ICON_SIZE} data-testid="copy-command-success" />
+                : <Terminal size={BLOCK_ACTION_ICON_SIZE} />}
             />
             <BlockToolBtn
               title="复制输出"
               onClick={copyOut}
               label={copiedAction === 'output'
-                ? <Check size={iconSizes.compact} data-testid="copy-output-success" />
-                : <Copy size={iconSizes.compact} />}
+                ? <Check size={BLOCK_ACTION_ICON_SIZE} data-testid="copy-output-success" />
+                : <Copy size={BLOCK_ACTION_ICON_SIZE} />}
             />
             <BlockToolBtn title="更多操作"
-              onClick={(e) => onMenu(block, e.currentTarget.getBoundingClientRect())}
-              label={<Ellipsis size={iconSizes.compact} />} />
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                onMenu(block, { kind: 'control', left: rect.left, top: rect.bottom + 4 });
+              }}
+              label={<Ellipsis size={BLOCK_ACTION_ICON_SIZE} />} />
           </span>
         ) : (
           <span style={{
@@ -416,16 +422,16 @@ function RunningItem({
           {highlightQuery ? <HighlightSpan text={block.command} query={highlightQuery} /> : coloredCommand}
         </div>
         <span style={{
-          display: 'inline-flex', gap: 4, alignItems: 'center', flexShrink: 0, flexWrap: 'wrap', maxWidth: '100%',
+          display: 'inline-flex', gap: 2, alignItems: 'center', flexShrink: 0, flexWrap: 'wrap', maxWidth: '100%',
           fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)',
         }}>
           {block.agent && <Zap size={11} style={{ color: 'var(--accent-warm)' }} aria-label="AI 执行" />}
           {elapsedNow && (
             <span style={{ fontVariantNumeric: 'tabular-nums' }}>({elapsedNow})</span>
           )}
-          <BlockToolBtn title="终止命令 (Ctrl+C)" text="中断" onClick={sendCtrlC} label={<Square size={iconSizes.control} />} />
-          <BlockToolBtn title={killArmed ? '强制结束前台应用（SIGKILL）' : '结束前台应用（SIGTERM；3 秒内再点强杀 SIGKILL）'} text={killArmed ? '强制结束' : '结束'} onClick={killApp} label={<CircleX size={iconSizes.control} />} />
-          <BlockToolBtn title="进入全屏交互" text="全屏" onClick={enterFullScreen} label={<Maximize2 size={iconSizes.control} />} />
+          <BlockToolBtn title="终止命令 (Ctrl+C)" onClick={sendCtrlC} label={<Square size={BLOCK_ACTION_ICON_SIZE} />} />
+          <BlockToolBtn title={killArmed ? '强制结束前台应用（SIGKILL）' : '结束前台应用（SIGTERM；3 秒内再点强杀 SIGKILL）'} onClick={killApp} label={<CircleX size={BLOCK_ACTION_ICON_SIZE} />} />
+          <BlockToolBtn title="进入全屏交互" onClick={enterFullScreen} label={<Maximize2 size={BLOCK_ACTION_ICON_SIZE} />} />
         </span>
       </div>
 
@@ -588,18 +594,16 @@ function BlockToolBtn({
   title,
   onClick,
   label,
-  text,
 }: {
   title: string;
   onClick: (e: React.MouseEvent) => void;
   label: React.ReactNode;
-  text?: string;
 }) {
   return (
     <button
       data-subtle
       title={title}
-      aria-label={text ?? title}
+      aria-label={title}
       onClick={(e) => {
         e.stopPropagation();
         onClick(e);
@@ -608,11 +612,11 @@ function BlockToolBtn({
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        width: text ? undefined : 26,
-        minWidth: text ? 30 : 26,
-        height: text ? 30 : 26,
-        padding: text ? '0 6px' : 0,
-        gap: 4,
+        width: BLOCK_ACTION_BUTTON_SIZE,
+        minWidth: BLOCK_ACTION_BUTTON_SIZE,
+        height: BLOCK_ACTION_BUTTON_SIZE,
+        padding: 0,
+        gap: 0,
         border: 'none',
         borderRadius: 4,
         background: 'transparent',
@@ -631,7 +635,6 @@ function BlockToolBtn({
       }}
     >
       {label}
-      {text && <span>{text}</span>}
     </button>
   );
 }

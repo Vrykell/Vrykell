@@ -48,11 +48,11 @@ describe('useTerminalBlockFlow', () => {
     const target = block({ id: 'target' });
     act(() => useBlockStore.setState({ byTab: { [tabId]: [target] } }));
     const { result } = renderHook(() => useTerminalBlockFlow(tabId));
-    const rect = document.createElement('div').getBoundingClientRect();
+    const anchor = { kind: 'pointer' as const, x: 123, y: 87 };
 
-    act(() => result.current.openMenu(target, rect));
+    act(() => result.current.openMenu(target, anchor));
     expect(result.current.menuBlock?.block.id).toBe('target');
-    expect(result.current.menuBlock?.rect).toBe(rect);
+    expect(result.current.menuBlock?.anchor).toEqual(anchor);
 
     act(() => result.current.closeMenu());
     expect(result.current.menuBlock).toBeNull();
