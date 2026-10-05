@@ -1,32 +1,18 @@
 import type { Terminal } from '@xterm/xterm';
 import { extractSnapshotFromBuffer } from './terminalSnapshot';
-import { getCellMetrics } from '@utils/termMetrics';
 
 export interface TerminalFrame {
   html: string;
   plainText: string;
   cols: number;
   rows: number;
-  cursorX: number;
-  cursorY: number;
-  cellWidth: number;
-  cellHeight: number;
-  cursorHidden: boolean;
-  cursorStyle: 'block' | 'underline' | 'bar';
 }
 
 export function captureFrame(term: Terminal): TerminalFrame {
   const buffer = term.buffer.active;
   const start = buffer.viewportY;
   const snapshot = extractSnapshotFromBuffer(buffer, term.cols, start, start + term.rows);
-  const metrics = getCellMetrics(term);
-  const internals = (term as unknown as { _core?: { coreService?: {
-    isCursorHidden?: boolean;
-    decPrivateModes?: { cursorStyle?: 'block' | 'underline' | 'bar' };
-  } } })._core?.coreService;
-  return { ...snapshot, cols: term.cols, rows: term.rows, cursorX: buffer.cursorX,
-    cursorY: buffer.baseY + buffer.cursorY - start, cellWidth: metrics.width, cellHeight: metrics.height,
-    cursorHidden: internals?.isCursorHidden ?? false, cursorStyle: internals?.decPrivateModes?.cursorStyle ?? term.options.cursorStyle ?? 'block' };
+  return { ...snapshot, cols: term.cols, rows: term.rows };
 }
 
 export function needsSecretResponse(text: string): boolean {

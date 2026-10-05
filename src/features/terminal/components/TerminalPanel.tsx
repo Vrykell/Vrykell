@@ -4,10 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useTerminalStore } from '@features/terminal';
 import { ptyWrite } from '@platform/pty';
 import { needsSecretResponse } from '../model/terminalFrame';
-import { TERMINAL_FONT_FAMILY, getTerminalFontSize } from '../model/terminalFont';
 import { terminalDebug } from '../services/terminalDebug';
 
-/** Render parsed SSH frames while the hidden terminal handles keyboard protocols and IME. */
+/** Render an interactive SSH session with xterm so screen contents and cursor stay in sync. */
 export default function TerminalPanel({ paneId, tabId, onReady, connectionInput = false }: {
   paneId: string; tabId: string; onReady: (sessionId: string) => void; connectionInput?: boolean;
 }) {
@@ -51,7 +50,7 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
     try { await reconnect(); cancellingRef.current = false; setCancellation('idle'); }
     catch (reason) { setCancellation('idle'); setError(`重连失败：${String(reason)}`); }
   };
-  const rowHeight = frame?.cellHeight ?? getTerminalFontSize() * 1.2;
+  const showSnapshot = secret || disconnected;
   return <div style={{ width: '100%', height: '100%', position: 'relative' }}>
     {!connectionInput && <div ref={ref} style={{ position: 'absolute', inset: 0, minHeight: 0, background: 'transparent' }} />}
     {interactive && <div data-testid="ssh-connection-input" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -63,9 +62,8 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
       </div>
       <div role="textbox" aria-label="SSH 交互终端" aria-multiline="true" aria-disabled={inputDisabled} tabIndex={inputDisabled ? -1 : 0}
         onFocus={focusTerminal} onMouseDown={focusTerminal} style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'auto', outline: 'none', cursor: 'text' }}>
-        <div ref={ref} aria-hidden="true" style={{ position: 'absolute', inset: 0, opacity: 0, pointerEvents: 'none' }} />
-        <pre data-testid="ssh-terminal-screen" style={{ margin: 0, fontFamily: TERMINAL_FONT_FAMILY, fontSize: getTerminalFontSize(), lineHeight: `${rowHeight}px`, color: 'var(--text-primary)', whiteSpace: 'pre', minHeight: '100%' }} dangerouslySetInnerHTML={{ __html: frame?.html || '正在连接远端主机…' }} />
-        {!inputDisabled && !secret && frame && !frame.cursorHidden && frame.cursorY >= 0 && frame.cursorY < frame.rows && <span aria-hidden="true" data-testid="ssh-screen-cursor" style={{ position: 'absolute', pointerEvents: 'none', left: frame.cursorX * frame.cellWidth, top: frame.cursorY * rowHeight, width: frame.cursorStyle === 'block' ? frame.cellWidth : frame.cursorStyle === 'underline' ? frame.cellWidth : 2, height: frame.cursorStyle === 'underline' ? 2 : rowHeight, background: 'white', mixBlendMode: 'difference', opacity: 1, animation: 'cursor-blink 1.2s step-end infinite' }} />}
+        <div ref={ref} data-testid={showSnapshot ? undefined : 'ssh-terminal-screen'} style={{ position: 'absolute', inset: 0, overflow: 'auto', visibility: showSnapshot ? 'hidden' : 'visible', pointerEvents: showSnapshot ? 'none' : 'auto' }} />
+        {showSnapshot && <pre data-testid="ssh-terminal-screen" style={{ position: 'absolute', inset: 0, overflow: 'auto', margin: 0, whiteSpace: 'pre', color: 'var(--text-primary)' }} dangerouslySetInnerHTML={{ __html: frame?.html || '正在连接远端主机…' }} />}
       </div>
       {secret && !disconnected && <form onSubmit={e => {
         e.preventDefault();

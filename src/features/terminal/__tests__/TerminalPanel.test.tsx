@@ -5,7 +5,7 @@ import { useTerminalStore } from '../stores/terminal';
 import { ptyWrite } from '@platform/pty';
 import TerminalPanel from '../components/TerminalPanel';
 
-const { closeSession, reconnect, sessionView } = vi.hoisted(() => ({ closeSession: vi.fn(), reconnect: vi.fn(), sessionView: { status: 'ready', frame: { html: 'Password:', plainText: 'Password:', cols: 80, rows: 24, cursorX: 9, cursorY: 0, cellWidth: 8, cellHeight: 18, cursorHidden: false, cursorStyle: 'block' as const } } }));
+const { closeSession, reconnect, sessionView } = vi.hoisted(() => ({ closeSession: vi.fn(), reconnect: vi.fn(), sessionView: { status: 'ready', frame: { html: 'Password:', plainText: 'Password:', cols: 80, rows: 24 } } }));
 vi.mock('../hooks/useTerminalSession', () => ({ useTerminalSession: () => ({ ref: createRef<HTMLDivElement>(), closeSession, reconnect, status: sessionView.status, frame: sessionView.frame }) }));
 vi.mock('@platform/pty', () => ({ ptyWrite: vi.fn().mockResolvedValue(undefined) }));
 afterEach(cleanup);
@@ -16,7 +16,6 @@ beforeEach(() => {
   sessionView.status = 'ready';
   sessionView.frame.plainText = 'Password:';
   sessionView.frame.html = 'Password:';
-  sessionView.frame.cursorHidden = false;
   useTerminalStore.setState({ sessions: {}, scenes: { p: 'classic' } });
 });
 
@@ -34,17 +33,21 @@ describe('SSH connection input', () => {
     render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
     expect(screen.getByLabelText('SSH 认证响应')).toBeDisabled();
   });
-  it('draws an inverse blinking block cursor and respects terminal cursor visibility', () => {
+  it('shows the xterm renderer for interactive output without synthesizing a cursor overlay', () => {
     useTerminalStore.setState({ sessions: { p: 'session' } });
     sessionView.frame.plainText = '正在等待输入';
     sessionView.frame.html = '正在等待输入';
     render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
-    expect(screen.getByTestId('ssh-screen-cursor')).toHaveStyle({ width: '8px', height: '18px', background: 'white', mixBlendMode: 'difference' });
-    sessionView.frame.cursorHidden = true;
-    cleanup();
-    render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+    const xtermHost = screen.getByTestId('ssh-terminal-screen');
+    expect(xtermHost).toHaveStyle({ visibility: 'visible', pointerEvents: 'auto' });
     expect(screen.queryByTestId('ssh-screen-cursor')).not.toBeInTheDocument();
-    sessionView.frame.cursorHidden = false;
+  });
+  it('uses the snapshot while a secret response is requested and keeps xterm out of view', () => {
+    useTerminalStore.setState({ sessions: { p: 'session' } });
+    render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+    expect(screen.getByTestId('ssh-terminal-screen').tagName).toBe('PRE');
+    expect(screen.getByLabelText('SSH 认证响应')).toBeVisible();
+    expect(screen.queryByTestId('ssh-screen-cursor')).not.toBeInTheDocument();
   });
   it('masks and clears the response after sending it to the connected PTY', () => {
     useTerminalStore.setState({ sessions: { p: 'session' } });
@@ -108,7 +111,8 @@ describe('SSH connection input', () => {
     rerender(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
     expect(screen.queryByLabelText('SSH 认证响应')).toBeNull();
     expect(screen.getByRole('textbox', { name: 'SSH 交互终端' })).toBeVisible();
-    expect(screen.getByText('交互程序 倒计时 30s')).toBeVisible();
+    expect(screen.getByTestId('ssh-terminal-screen')).toBeVisible();
+    expect(screen.queryByText('交互程序 倒计时 30s')).not.toBeInTheDocument();
   });
   it('keeps the last screen and offers reconnection after a remote exit', async () => {
     sessionView.status = 'closed';

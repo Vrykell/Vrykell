@@ -34,10 +34,11 @@ test('first SSH connection confirms its fingerprint and accepts authentication i
   await response.press('Enter');
   expect(await ptyWrites(page)).toContain('test-response\r');
   await expect(response).toHaveCount(0);
-  // 真实 xterm 只负责键盘与解析，界面上保持不可见
-  const xtermHost = surface.locator('div[aria-hidden="true"]').first();
-  await expect(xtermHost).toHaveCSS('opacity', '0');
-  await expect(xtermHost).toHaveCSS('pointer-events', 'none');
+  // The interactive SSH screen is rendered by xterm so its native cursor follows VT state.
+  const xtermHost = surface.getByTestId('ssh-terminal-screen');
+  await expect(xtermHost).toBeVisible();
+  await expect(xtermHost).toHaveCSS('visibility', 'visible');
+  await expect(surface.getByTestId('ssh-screen-cursor')).toHaveCount(0);
   await emitPtyOutput(page, '\r\n\x1b]133;A\x07');
   await expect(surface).toBeHidden();
   await expect(page.getByPlaceholder(/输入命令/).last()).toBeVisible();
