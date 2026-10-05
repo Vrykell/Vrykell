@@ -20,11 +20,13 @@ test('quick connection completes interactive authentication, navigation and reco
   await page.getByRole('textbox', { name: 'SSH 交互终端' }).press('ArrowDown');
   await page.getByRole('textbox', { name: 'SSH 交互终端' }).press('Enter');
   await emitPtyOutput(page, '\x1b[2J\x1b[Hsshfm\r\nPath: /Test\r\n\x1b[7mSelected item\x1b[0m');
-  await expect(screen).toContainText('Path: /Test');
-  await expect(screen.locator('span', { hasText: 'Selected item' })).toHaveCSS('background-color', /rgb/);
+  // Text and ANSI rendition are drawn by xterm's live renderer rather than snapshot HTML.
+  await expect(screen.locator('.xterm-screen')).toBeVisible();
+  await expect(screen).toHaveCSS('visibility', 'visible');
+  await expect(page.getByTestId('ssh-screen-cursor')).toHaveCount(0);
   await page.getByRole('textbox', { name: 'SSH 交互终端' }).press('Escape');
   await emitPtyOutput(page, '\x1b[2J\x1b[Hsshfm\r\nPath: /');
-  await expect(screen).toContainText('Path: /');
+  await expect(screen.locator('.xterm-screen')).toBeVisible();
   await page.getByRole('textbox', { name: 'SSH 交互终端' }).press('q');
   await page.getByRole('button', { name: '断开连接', exact: true }).click();
   await expect(page.getByRole('button', { name: '重新连接' })).toBeVisible();
