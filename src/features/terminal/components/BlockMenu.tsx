@@ -1,4 +1,7 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { clampMenuPosition } from '@ui/menuPosition';
+import type { BlockMenuAnchor } from '@features/terminal/hooks/useTerminalBlockFlow';
 import { copyBlockText, rerunBlockCommand } from '@features/terminal/services/blockActions';
 import { useChatStore } from '@features/chat';
 import { clearSessionBlocks } from '@features/terminal/hooks/useTerminalSession';
@@ -9,7 +12,7 @@ interface Props {
   block: TermBlock;
   /** 该块所属 pane（「发给 AI 分析」时作为对话来源，回答内联回本 pane 块流） */
   paneId: string;
-  anchor: DOMRect;
+  anchor: BlockMenuAnchor;
   onClose: () => void;
   getOutputText: () => string;
 }
@@ -50,6 +53,27 @@ function MenuItem({ label, shortcut, onClick }: { label: string; shortcut?: stri
 
 export default function BlockMenu({ block, paneId, anchor, onClose, getOutputText }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const preferredPosition = anchor.kind === 'pointer'
+    ? { left: anchor.x, top: anchor.y }
+    : { left: anchor.left, top: anchor.top };
+  const [position, setPosition] = useState(preferredPosition);
+
+  useLayoutEffect(() => {
+    const updatePosition = () => {
+      const menu = ref.current;
+      if (!menu) return;
+      const rect = menu.getBoundingClientRect();
+      setPosition(clampMenuPosition(
+        preferredPosition,
+        { width: rect.width, height: rect.height },
+        { width: window.innerWidth, height: window.innerHeight },
+      ));
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    return () => window.removeEventListener('resize', updatePosition);
+  }, [preferredPosition.left, preferredPosition.top]);
 
   useEffect(() => {
     const h = (e: MouseEvent) => {
@@ -85,15 +109,12 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
     ? fmtDuration(block.endedAt - block.startedAt)
     : '';
 
-  const top = Math.min(anchor.bottom + 4, window.innerHeight - 260);
-  const left = Math.min(anchor.left, window.innerWidth - 220);
-
   const clearAllBlocks = useCallback(() => {
     clearSessionBlocks(paneId);
     onClose();
   }, [paneId, onClose]);
 
-  return (
+  return createPortal(
     <div
       ref={ref}
       className="workspace-floating"
@@ -103,9 +124,11 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
       style={{
         position: 'fixed',
         zIndex: 9999,
-        top,
-        left,
+        top: position.top,
+        left: position.left,
         minWidth: 210,
+        maxWidth: 'calc(100vw - 16px)',
+        boxSizing: 'border-box',
         padding: 4,
         fontSize: 'calc(12px * var(--ui-font-scale))',
         fontFamily: 'var(--font-ui)',
@@ -151,6 +174,7 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
       <MenuItem label="发给 AI 分析" onClick={sendToAI} />
       <div style={{ height: 1, background: 'var(--border)', margin: '3px 8px' }} />
       <MenuItem label="清除所有块" onClick={clearAllBlocks} />
-    </div>
+    </div>,
+    document.body,
   );
 }

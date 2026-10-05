@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import TerminalBlockList from '@features/terminal/components/TerminalBlockList';
 import { useBlockStore } from '@features/terminal/stores/blocks';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
@@ -40,6 +40,18 @@ describe('TerminalBlockList', () => {
     expect(container.innerHTML).not.toContain('border-left: 3px');
   });
 
+  it('已完成块操作按钮保持统一尺寸', () => {
+    useBlockStore.getState().setBlocks('t1', [block({})]);
+    render(<TerminalBlockList tabId="t1" />);
+    fireEvent.mouseEnter(screen.getByTestId('command-block-b1'));
+
+    for (const title of ['AI 解释', '重新运行', '复制命令', '复制输出', '更多操作']) {
+      const button = screen.getByTitle(title);
+      expect(button).toHaveStyle({ width: '28px', minWidth: '28px', height: '28px', padding: '0px' });
+      expect(button.querySelector('svg')).toHaveStyle({ width: '16px', height: '16px' });
+    }
+  });
+
   it('截断提示：linesTruncated > 0 显示已截断', () => {
     useBlockStore.getState().setBlocks('t1', [block({ linesTruncated: 42 })]);
     render(<TerminalBlockList tabId="t1" />);
@@ -69,11 +81,16 @@ describe('TerminalBlockList', () => {
     ]);
     render(<TerminalBlockList tabId="t1" />);
     expect(screen.getByTitle('终止命令 (Ctrl+C)')).toBeTruthy();
-    for (const name of ['中断', '结束', '全屏']) {
+    for (const name of [
+      '终止命令 (Ctrl+C)',
+      '结束前台应用（SIGTERM；3 秒内再点强杀 SIGKILL）',
+      '进入全屏交互',
+    ]) {
       const button = screen.getByRole('button', { name });
-      expect(button.style.minWidth).toBe('30px');
-      expect(button.style.height).toBe('30px');
-      expect(button.querySelector('svg')).toHaveStyle({ width: '18px', height: '18px' });
+      expect(button.style.minWidth).toBe('28px');
+      expect(button.style.height).toBe('28px');
+      expect(button.querySelector('svg')).toHaveStyle({ width: '16px', height: '16px' });
+      expect(button.textContent).toBe('');
     }
     // jsdom 下 getExecutingTerm 返回 null，只渲染宿主 div
     expect(screen.getByTestId('running-term')).toBeTruthy();

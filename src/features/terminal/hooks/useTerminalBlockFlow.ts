@@ -10,8 +10,12 @@ import { hasVisibleContent } from '@features/terminal/model/blockVisibility';
 
 export interface BlockMenuState {
   block: TermBlock;
-  rect: DOMRect;
+  anchor: BlockMenuAnchor;
 }
+
+export type BlockMenuAnchor =
+  | { kind: 'pointer'; x: number; y: number }
+  | { kind: 'control'; left: number; top: number };
 
 /** 聚合块列表需要的显示流、AI 交错内容和菜单状态。 */
 export function useTerminalBlockFlow(tabId: string) {
@@ -38,8 +42,8 @@ export function useTerminalBlockFlow(tabId: string) {
   );
   const flow = useMemo(() => mergeFlow(standalone, exchanges), [exchanges, standalone]);
   const allCollapsed = completed.length > 0 && completed.every((block) => block.collapsed);
-  const openMenu = useCallback((block: TermBlock, rect: DOMRect) => {
-    setMenuBlock({ block, rect });
+  const openMenu = useCallback((block: TermBlock, anchor: BlockMenuAnchor) => {
+    setMenuBlock({ block, anchor });
   }, []);
   const closeMenu = useCallback(() => setMenuBlock(null), []);
 
