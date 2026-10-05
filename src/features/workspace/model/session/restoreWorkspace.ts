@@ -1,7 +1,8 @@
-import { listSessions } from '@platform/api/session';
+import { archiveSession, listSessions } from '@platform/api/session';
 import type { BackendSessionEntry } from '@platform/api/types';
 import * as sessionManager from '@features/workspace/services/sessionManager';
 import { isSessionTab, serializeSession, useWorkspaceStore } from '@features/workspace/stores/workspace';
+import { useStartupSettings, type StartupMode } from '@features/settings/stores/startup';
 
 export interface WorkspaceSession {
   id: string;
@@ -19,12 +20,14 @@ export interface PersistableSession {
 }
 
 export interface RestoreWorkspaceDependencies {
+  startupMode?: StartupMode;
+  archiveSession?: (sessionId: string) => Promise<void>;
   listSessions: () => Promise<WorkspaceSession[]>;
   loadGroups: () => Promise<void>;
   restoreSession: (session: WorkspaceSession) => Promise<void>;
   hasTabs: () => boolean;
   createDefaultSession: () => PersistableSession | null;
-  persistSession: (session: PersistableSession) => void | Promise<void>;
+  persistSession?: (session: PersistableSession) => void | Promise<void>;
   onError?: (message: string, error: unknown) => void;
 }
 
@@ -32,14 +35,30 @@ function defaultErrorHandler(message: string, error: unknown): void {
   console.warn(`[session] ${message}:`, error);
 }
 
-/**
- * 会话恢复规则：按持久化顺序恢复 active 会话；无可用标签时创建默认会话。
- * 通过依赖注入隔离 Zustand、IPC 和持久化实现，便于测试和后续替换存储层。
- */
+/** Restore saved sessions or create a fresh workspace according to startup preferences. */
 export async function restoreWorkspaceWithDependencies(
   dependencies: RestoreWorkspaceDependencies,
 ): Promise<void> {
   const onError = dependencies.onError ?? defaultErrorHandler;
+  const mode = dependencies.startupMode ?? 'restore';
+  if (mode !== 'restore' && dependencies.archiveSession) {
+    const saved = await dependencies.listSessions().catch((error: unknown) => {
+      onError('整理上次的会话记录失败', error);
+      return [];
+    });
+    for (const session of saved.filter((item) => item.status === 'active')) {
+      await dependencies.archiveSession(session.id).catch((error: unknown) => onError(`归档上次的会话失败：${session.id}`, error));
+    }
+  }
+  if (mode === 'empty') return;
+  if (mode === 'default') {
+    if (dependencies.hasTabs()) return;
+    const session = dependencies.createDefaultSession();
+    if (session && dependencies.persistSession) await Promise.resolve(dependencies.persistSession(session)).catch((error: unknown) => {
+      onError(`持久化默认会话失败：${session.id}`, error);
+    });
+    return;
+  }
   const sessions = await dependencies.listSessions().catch((error: unknown) => {
     onError('读取会话列表失败', error);
     return [];
@@ -63,6 +82,7 @@ export async function restoreWorkspaceWithDependencies(
   const defaultSession = dependencies.createDefaultSession();
   if (!defaultSession) return;
 
+  if (!dependencies.persistSession) return;
   await Promise.resolve(dependencies.persistSession(defaultSession)).catch((error: unknown) => {
     onError(`持久化默认会话失败：${defaultSession.id}`, error);
   });
@@ -95,6 +115,8 @@ function createDefaultSession(): PersistableSession | null {
 /** 默认生产适配器：连接现有 IPC、Store 和 sessionManager。 */
 export function restoreWorkspace(): Promise<void> {
   return restoreWorkspaceWithDependencies({
+    startupMode: useStartupSettings.getState().mode,
+    archiveSession: (id) => archiveSession(id, Date.now()),
     listSessions: async () => {
       const sessions = await listSessions();
       return sessions.map(toWorkspaceSession);
@@ -103,6 +125,5 @@ export function restoreWorkspace(): Promise<void> {
     restoreSession: (session) => sessionManager.restore(session.id, session.title, { groupId: session.groupId }),
     hasTabs: () => useWorkspaceStore.getState().tabs.length !== 0,
     createDefaultSession,
-    persistSession: (session) => sessionManager.create(session.id, session.title, undefined, session.kind, session.payload),
   });
 }

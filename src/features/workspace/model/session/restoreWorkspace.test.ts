@@ -50,6 +50,37 @@ describe('restoreWorkspaceWithDependencies', () => {
     });
   });
 
+  it('选择空工作区后不恢复也不创建默认标签页', async () => {
+    const deps = createDependencies({ startupMode: 'empty' });
+    await restoreWorkspaceWithDependencies(deps);
+    expect(deps.restoreSession).not.toHaveBeenCalled();
+    expect(deps.createDefaultSession).not.toHaveBeenCalled();
+    expect(deps.persistSession).not.toHaveBeenCalled();
+  });
+
+  it('选择默认标签页时跳过已保存会话恢复', async () => {
+    const deps = createDependencies({ startupMode: 'default' });
+    await restoreWorkspaceWithDependencies(deps);
+    expect(deps.restoreSession).not.toHaveBeenCalled();
+    expect(deps.createDefaultSession).toHaveBeenCalledOnce();
+  });
+
+  it('选择不恢复时把上次的活动会话整理到会话历史', async () => {
+    const archiveSession = vi.fn(async () => {});
+    const deps = createDependencies({
+      startupMode: 'empty',
+      archiveSession,
+      listSessions: vi.fn(async () => [
+        { id: 'active-one', title: '终端', status: 'active', sortOrder: 0 },
+        { id: 'history', title: '历史', status: 'historical', sortOrder: 1 },
+      ]),
+    });
+    await restoreWorkspaceWithDependencies(deps);
+    expect(archiveSession).toHaveBeenCalledExactlyOnceWith('active-one');
+    expect(deps.restoreSession).not.toHaveBeenCalled();
+    expect(deps.createDefaultSession).not.toHaveBeenCalled();
+  });
+
   it('已有标签时不创建默认会话', async () => {
     const deps = createDependencies({ hasTabs: vi.fn(() => true) });
 

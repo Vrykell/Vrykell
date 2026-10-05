@@ -49,6 +49,15 @@ export function searchSettings(query: string): SettingDef[] {
 // ── 注册所有设置项 ──
 
 registerSetting({
+  id: 'startup', label: '启动', desc: '恢复标签页、新建默认标签页或显示会话记录',
+  getValue: () => '启动行为', onSelect: () => openPage('startup'),
+});
+registerSetting({
+  id: 'logs', label: '日志与诊断', desc: '导出详细日志、自动保存日志和错误排查',
+  getValue: () => '诊断日志', onSelect: () => openPage('logs'),
+});
+
+registerSetting({
   id: 'api-key',
   label: 'API Key',
   desc: 'AI 服务 API 密钥',

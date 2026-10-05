@@ -46,10 +46,12 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     const writes: string[] = [];
     const sshTrusts: Record<string, unknown>[] = [];
     const dialogs: Record<string, unknown>[] = [];
+    const diagnosticsExports: Record<string, unknown>[] = [];
     const spawns: Record<string, unknown>[] = [];
     const closes: Record<string, unknown>[] = [];
     (window as unknown as Record<string, unknown>).__SSH_TRUSTS__ = sshTrusts;
     (window as unknown as Record<string, unknown>).__SSH_DIALOGS__ = dialogs;
+    (window as unknown as Record<string, unknown>).__DIAGNOSTICS_EXPORTS__ = diagnosticsExports;
     (window as unknown as Record<string, unknown>).__PTY_SPAWNS__ = spawns;
     (window as unknown as Record<string, unknown>).__PTY_CLOSES__ = closes;
     let hostKnown = sshHost === 'known';
@@ -773,6 +775,22 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             return undefined;
           case 'list_sessions':
             return mockSessions;
+          case 'terminal_debug_status':
+            return false;
+          case 'diagnostics_set_auto_save':
+          case 'terminal_debug_set':
+            return args.enabled;
+          case 'terminal_debug_record':
+          case 'diagnostics_export':
+            diagnosticsExports.push(args);
+            return undefined;
+          case 'diagnostics_log_directory':
+            return '/home/e2e/.vrykell/logs';
+          case 'plugin:dialog|save':
+            return (args.options as Record<string, unknown> | undefined)?.defaultPath ?? '/home/e2e/vrykell-diagnostics.jsonl';
+          case 'archive_session':
+            { const session = mockSessions.find(item => item.id === args.id); if (session) session.status = 'historical'; }
+            return undefined;
           case 'get_session':
             return mockSessions.find((s) => s.id === args.id) ?? null;
           case 'groups_list':

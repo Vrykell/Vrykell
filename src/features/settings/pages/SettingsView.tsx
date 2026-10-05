@@ -21,6 +21,8 @@ import { useSettingsNavigation } from '@features/settings/hooks/useSettingsNavig
 import AutoSaveInput from '../components/AutoSaveInput';
 import SaveStatus from '../components/SaveStatus';
 import { SettingsSaveProvider, useSettingsSave } from '../components/SettingsSaveProvider';
+import { StartupPage } from './startupPage';
+import { LogsPage } from './logsPage';
 
 /** 权限页工具中文名（与 messageParts 的 TOOL_LABEL 保持同步） */
 const PERM_TOOL_LABEL: Record<ToolName, string> = {
@@ -92,6 +94,8 @@ function SettingsContent() {
 
   const renderPage = (): ReactNode => {
     switch (selected) {
+      case 'startup': return <StartupPage />;
+      case 'logs': return <LogsPage />;
       case 'ai-model':
         return <AiModelPage />;
 

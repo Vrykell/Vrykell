@@ -48,12 +48,12 @@ describe('workspace store', () => {
     expect(s.activeId).toBe(tabs[0]!.id);
   });
 
-  it('关闭最后一个标签时自动新建一个', () => {
+  it('关闭最后一个标签后保持空工作区', () => {
     const only = useWorkspaceStore.getState().tabs[0]!.id;
     useWorkspaceStore.getState().closeTab(only);
     const s = useWorkspaceStore.getState();
-    expect(s.tabs).toHaveLength(1);
-    expect(s.activeId).toBe(s.tabs[0]!.id);
+    expect(s.tabs).toHaveLength(0);
+    expect(s.activeId).toBe('');
   });
 
   it('addTab 支持指定 shell 类型', () => {
@@ -499,14 +499,15 @@ describe('workspace store 扩展', () => {
     expect(useWorkspaceStore.getState().tabs).toEqual(before);
   });
 
-  it('archiveGroup：组内标签关闭、activeId 回落；全部归档后新建标签', async () => {
+  it('archiveGroup：组内标签关闭、activeId 回落；全部归档后保持空工作区', async () => {
     const ws = useWorkspaceStore.getState();
     const a = ws.addTab({ title: 'a' });
     const b = ws.addTab({ title: 'b' });
+    const initialTab = useWorkspaceStore.getState().tabs[0]!.id;
     useWorkspaceStore.setState({
       groups: [{ id: 'g1', title: '一', collapsed: false }],
       tabs: useWorkspaceStore.getState().tabs.map((t) =>
-        isSessionTab(t) && (t.id === a || t.id === b) ? { ...t, groupId: 'g1' } : t,
+        isSessionTab(t) && (t.id === initialTab || t.id === a || t.id === b) ? { ...t, groupId: 'g1' } : t,
       ),
     });
     ws.activate(a);
@@ -514,6 +515,7 @@ describe('workspace store 扩展', () => {
     const s = useWorkspaceStore.getState();
     expect(s.groups.find((g) => g.id === 'g1')).toBeUndefined();
     expect(s.tabs.some((t) => t.id === a || t.id === b)).toBe(false);
-    expect(s.tabs.length).toBeGreaterThan(0);
+    expect(s.tabs).toHaveLength(0);
+    expect(s.activeId).toBe('');
   });
 });
