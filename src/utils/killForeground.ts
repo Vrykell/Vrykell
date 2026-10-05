@@ -5,7 +5,7 @@
  * `pty_kill_foreground`，跨窗口重载保持升级状态；这里只负责调用并返回级别。
  */
 
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@platform/diagnostics';
 
 export type KillLevel = 'term' | 'kill';
 

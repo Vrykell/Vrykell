@@ -15,7 +15,7 @@
  * textContent 随元数据入库（重开后仍在）；blobPath 指向附件目录文件。
  */
 
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@platform/diagnostics';
 import type { ProviderKind } from '@features/agent/services/provider';
 
 export interface AttachmentMeta {

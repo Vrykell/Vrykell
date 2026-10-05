@@ -6,7 +6,7 @@ import { iconSizes, Sun, Moon, Image as ImageIcon, Download, Upload, RefreshCw, 
 import FontSettings from '@features/settings/components/FontSettings';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
 import { openPath } from '@tauri-apps/plugin-opener';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@platform/diagnostics';
 import { useTheme } from '@app/providers/ThemeProvider';
 import { useTerminalThemeStore } from '@features/settings/model/terminalTheme';
 import { useToastStore } from '@ui/Toast';

@@ -8,7 +8,8 @@
  */
 
 import { create } from 'zustand';
-import { invoke, convertFileSrc } from '@tauri-apps/api/core';
+import { convertFileSrc } from '@tauri-apps/api/core';
+import { invoke } from '@platform/diagnostics';
 import {
   applyTheme,
   getCurrentTheme,

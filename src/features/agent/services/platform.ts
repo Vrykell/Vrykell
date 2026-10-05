@@ -1,7 +1,7 @@
 /**
  * platform — 长期记忆 / 子代理 / 定时任务 的 Rust 封装与类型。
  */
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@platform/diagnostics';
 
 // ── 记忆 ──
 

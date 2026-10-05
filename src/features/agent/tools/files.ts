@@ -6,7 +6,7 @@
  * 结构化 { ok:false, error }，让模型自我修正。
  */
 
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@platform/diagnostics';
 import { DESC_READ_FILE, DESC_WRITE_FILE, DESC_EDIT_FILE } from '@features/agent/model/toolTexts';
 import { tool } from 'ai';
 import { z } from 'zod';

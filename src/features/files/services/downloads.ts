@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@platform/diagnostics';
 
 /**
  * 下载历史 API —— 下载记录由后端在 ssh_download 成功后写入 SQLite，

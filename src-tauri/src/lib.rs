@@ -7,6 +7,7 @@ mod remote;
 mod secret;
 mod terminal;
 mod theme;
+mod diagnostics;
 
 use db::HistoryState;
 use std::sync::Mutex;
@@ -116,6 +117,9 @@ pub fn run() {
             agent::mcp::mcp_list_all_tools,
             agent::mcp::mcp_call_tool,
             terminal::pty::pty_spawn,
+            diagnostics::diagnostics_set_auto_save,
+            diagnostics::diagnostics_export,
+            diagnostics::diagnostics_log_directory,
             terminal::debug::terminal_debug_set,
             terminal::debug::terminal_debug_status,
             terminal::debug::terminal_debug_record,

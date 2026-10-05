@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@platform/diagnostics';
 import type { BackendWorkspaceEntry } from '@platform/api/types';
 
 export type { BackendWorkspaceEntry };

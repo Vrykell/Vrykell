@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, X, Sparkles } from '@ui/icons';
 import { generateText } from 'ai';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@platform/diagnostics';
 import { createChatModel, type ProviderKind } from '@features/agent/services/provider';
 import {
   getMemory, setMemory, getMemoryJournal,

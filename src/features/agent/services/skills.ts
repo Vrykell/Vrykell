@@ -6,7 +6,7 @@
  * 索引（来源/信任/启停/内容哈希）由 Rust 持有，本模块只做类型 + invoke 封装。
  */
 
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@platform/diagnostics';
 
 /** 技能元信息（list_skills 返回，不含正文）。 */
 export interface SkillMeta {
