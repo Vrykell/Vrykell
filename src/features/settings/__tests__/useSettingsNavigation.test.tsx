@@ -22,7 +22,7 @@ describe('useSettingsNavigation', () => {
   it('filters groups by label and keyword and expands them while searching', () => {
     const { result } = renderHook(() => useSettingsNavigation());
 
-    expect(result.current.visibleGroups.length).toBe(5);
+    expect(result.current.visibleGroups.length).toBe(6);
     act(() => result.current.setQuery('快捷'));
 
     expect(result.current.normalizedQuery).toBe('快捷');

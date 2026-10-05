@@ -53,6 +53,7 @@ export default function TerminalView() {
 
   return (
     <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      {!activeTab && <SessionHistoryView />}
       {/* 所有 session tab 保持挂载，非活跃 tab 隐藏而非卸载 ——
           卸载会触发 useTerminalSession cleanup 里的 ptyClose，杀掉运行中的命令。
           切走再切回时 PTY/块列表/离屏终端全部存活。 */}
@@ -75,7 +76,7 @@ export default function TerminalView() {
 
       {/* Manual fullscreen host for a running block, with room for the toolbar. */}
       {altScreenActive && (
-        <div data-testid="tui-fullscreen" style={{ position: 'absolute', inset: 0, zIndex: 100, background: 'var(--canvas)', paddingTop: 28 }} />
+        <div data-testid="tui-fullscreen" style={{ position: 'absolute', inset: 0, zIndex: 100, background: 'var(--xterm-bg)', paddingTop: 28 }} />
       )}
 
       {/* 终端区域右键菜单 */}
@@ -140,7 +141,7 @@ function SessionTabView(props: {
       position: 'absolute', inset: 0,
       display: active ? 'flex' : 'none',
       flexDirection: 'column',
-      background: 'var(--canvas)',
+      background: 'var(--xterm-bg)',
     }}>
       <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', position: 'relative' }}>
         {/* 平面渲染：pane 按终端 id 作 key，绝对定位落位 ——
@@ -346,9 +347,8 @@ function TerminalPane(props: {
       style={{
         flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column',
         position: 'relative',
-        // 背景 = 终端同款色（--canvas 与 xterm 的 --xterm-bg 同色）：8px 边距与终端融为一体，
-        // 视觉上像是终端的呼吸空间而非缝隙
-        background: 'var(--canvas)',
+        // Match terminal output, pane padding and block history to the classic background.
+        background: 'var(--xterm-bg)',
         // 只在「面向其它终端」的边上画线，外缘不画 —— 避免与侧栏的 1px 边框叠加成重线
         borderTop: inner.top ? `1px solid ${focused ? 'var(--border-strong)' : 'var(--border)'}` : 'none',
         borderBottom: inner.bottom ? `1px solid ${focused ? 'var(--border-strong)' : 'var(--border)'}` : 'none',
@@ -604,7 +604,7 @@ function PaneBlockList({ paneId, insetLeft = 8, insetRight = 8 }: { paneId: stri
   const snap = useFollowBottom(scrollRef, [blocks], paneId);
   useEffect(() => registerFollowEngager(paneId, snap), [paneId, snap]);
   return (
-    <div ref={scrollRef} data-testid={`terminal-scroll-${paneId}`} style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--canvas)', overflowAnchor: 'none' }}>
+    <div ref={scrollRef} data-testid={`terminal-scroll-${paneId}`} style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--xterm-bg)', overflowAnchor: 'none' }}>
       <div data-testid={`terminal-flow-${paneId}`}>
         <TerminalBlockList tabId={paneId} insetLeft={insetLeft} insetRight={insetRight} />
         <PaneEmptyHint paneId={paneId} />

@@ -19,6 +19,13 @@ export interface SettingGroup {
 
 export const SETTINGS_GROUPS: SettingGroup[] = [
   {
+    id: 'application', label: '应用', icon: Settings,
+    items: [
+      { id: 'startup', label: '启动', keywords: ['启动', '标签页', '恢复', '会话记录', '默认', 'startup'] },
+      { id: 'logs', label: '日志与诊断', keywords: ['日志', '诊断', '导出', '自动保存', '错误', 'log', 'debug'] },
+    ],
+  },
+  {
     id: 'ai', label: 'AI 模型', icon: BrainCircuit,
     items: [
       { id: 'ai-model', label: '模型配置', keywords: ['ai', 'model', 'api', 'key', 'baseurl', '模型', '密钥', '服务地址', 'provider', '服务商', 'anthropic', 'gemini'] },

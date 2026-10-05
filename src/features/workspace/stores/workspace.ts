@@ -280,22 +280,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const idx = tabs.findIndex((t) => t.id === id);
     if (idx === -1) return;
     const closed = tabs[idx]!;
-    let next = tabs.filter((t) => t.id !== id);
-    if (next.length === 0) {
-      const newId = nextTabId();
-      next = [{ id: newId, title: DEFAULT_TITLE, kind: 'session', layout: leaf({ id: `${newId}#0`, kind: 'local' }) }];
-      sessionManager.create(newId, DEFAULT_TITLE, undefined, 'session', JSON.stringify({ layout: leaf({ id: `${newId}#0`, kind: 'local' }) }));
-    }
+    const next = tabs.filter((t) => t.id !== id);
     set({
       tabs: next,
-      activeId: activeId === id ? next[Math.max(0, idx - 1)]!.id : activeId,
+      activeId: activeId === id ? next[Math.max(0, idx - 1)]?.id ?? '' : activeId,
       lastClosed: closed,
     });
     // 聚焦若属于被关标签则回落到新的活跃标签
     const fp = useTerminalStore.getState().focusedPaneId;
     if (fp === id || (isSessionTab(closed) && layoutLeaves(closed.layout).some((t) => t.id === fp))) {
-      const nextTab = next[Math.max(0, idx - 1)]!;
-      useTerminalStore.getState().setFocusedPane(isSessionTab(nextTab) ? firstLeaf(nextTab.layout).id : nextTab.id);
+      const nextTab = next.find((tab) => tab.id === get().activeId);
+      useTerminalStore.getState().setFocusedPane(nextTab ? (isSessionTab(nextTab) ? firstLeaf(nextTab.layout).id : nextTab.id) : null);
     }
     // 清理该 tab 各终端的 per-terminal 数据（blocks/chat/terminal 残留）
     if (isSessionTab(closed)) {
@@ -615,13 +610,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     let nextActive = activeId;
     if (groupTabIds.includes(activeId)) {
       nextActive = next[0]?.id ?? '';
-    }
-    if (next.length === 0) {
-      const newId = nextTabId();
-      const layout = leaf({ id: `${newId}#0`, kind: 'local' });
-      next = [{ id: newId, title: DEFAULT_TITLE, kind: 'session' as const, layout }];
-      sessionManager.create(newId, DEFAULT_TITLE, undefined, 'session', JSON.stringify({ layout }));
-      nextActive = newId;
     }
     set((s) => ({
       tabs: next,
