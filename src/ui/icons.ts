@@ -72,6 +72,7 @@ import { ArrowUndo24Regular } from '@fluentui/react-icons/headless/svg/arrow-und
 import { ArrowUpload24Regular } from '@fluentui/react-icons/headless/svg/arrow-upload';
 import { Wrench24Regular } from '@fluentui/react-icons/headless/svg/wrench';
 import { Dismiss24Regular } from '@fluentui/react-icons/headless/svg/dismiss';
+import { DismissCircle24Regular } from '@fluentui/react-icons/headless/svg/dismiss-circle';
 import { Flash24Regular } from '@fluentui/react-icons/headless/svg/flash';
 
 export type AppIconProps = Omit<FluentIconsProps, 'ref'> & { size?: number | string };
@@ -167,4 +168,5 @@ export const Undo2 = createAppIcon(ArrowUndo24Regular);
 export const Upload = createAppIcon(ArrowUpload24Regular);
 export const Wrench = createAppIcon(Wrench24Regular);
 export const X = createAppIcon(Dismiss24Regular);
+export const CircleX = createAppIcon(DismissCircle24Regular);
 export const Zap = createAppIcon(Flash24Regular);

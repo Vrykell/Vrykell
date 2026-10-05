@@ -100,7 +100,7 @@ export default function InputEditor({
         ref={panelRef}
         style={{
           flexShrink: 0,
-          background: 'var(--canvas)',
+          background: 'var(--xterm-bg)',
           borderTop: '1px solid var(--block-divider)',
           padding: `5px ${insetRight + 8}px 5px ${insetLeft + 8}px`,
           fontSize: 'calc(12px * var(--ui-font-scale))',
@@ -149,7 +149,7 @@ export default function InputEditor({
       flexShrink: 0,
       margin: 0,
       padding: `10px ${insetRight + 4}px 12px ${insetLeft + 4}px`,
-      background: 'var(--canvas)',
+      background: 'var(--xterm-bg)',
     }}>
       <div
         className="terminal-composer"
