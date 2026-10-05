@@ -6,7 +6,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Check, ChevronDown, ChevronRight, Copy, Ellipsis,
-  Maximize2, RotateCw, Skull, Sparkles, Square, Terminal, X, Zap,
+  CircleX, iconSizes, Maximize2, RotateCw, Sparkles, Square, Terminal, X, Zap,
 } from '@ui/icons';
 import { useBlockStore } from '@features/terminal';
 import { useTerminalStore } from '@features/terminal';
@@ -24,6 +24,7 @@ import { useBlockItemActions } from '@features/terminal/hooks/useBlockItemAction
 import { useTuiControls } from '@features/terminal/hooks/useTuiControls';
 import { hasVisibleContent as hasVisibleBlockContent } from '@features/terminal/model/blockVisibility';
 import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
+import { measureRunningTerminalRows } from '../model/runningTerminalRows';
 
 interface Props {
   tabId: string;
@@ -263,15 +264,15 @@ function BlockItem({
     >
       {/* The compact header keeps the command, result, duration, and hover actions together. */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        padding: '6px 10px', userSelect: 'none', minHeight: 30,
+        display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+        padding: '6px 10px', userSelect: 'none', minHeight: 44,
       }}>
         <button
           onClick={toggleCollapsed}
           title={isCollapsed ? '展开' : '折叠'}
           style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)',
-            cursor: 'pointer', padding: 0, width: 14, flexShrink: 0, display: 'inline-flex' }}>
-          {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+            cursor: 'pointer', padding: 0, width: 32, height: 32, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+          {isCollapsed ? <ChevronRight size={iconSizes.control} /> : <ChevronDown size={iconSizes.control} />}
         </button>
         <div data-selectable style={{
           flex: 1, minWidth: 0, fontSize: 'var(--terminal-font-size)', fontWeight: 600,
@@ -281,26 +282,26 @@ function BlockItem({
           {highlightQuery ? <HighlightSpan text={block.command} query={highlightQuery} /> : coloredCommand}
         </div>
         {hovered ? (
-          <span style={{ display: 'inline-flex', gap: 2, flexShrink: 0 }}>
-            <BlockToolBtn title="AI 解释" onClick={askAI} label={<Sparkles size={12} />} />
-            <BlockToolBtn title="重新运行" onClick={rerun} label={<RotateCw size={12} />} />
+          <span style={{ display: 'inline-flex', gap: 0, flexShrink: 0 }}>
+            <BlockToolBtn title="AI 解释" onClick={askAI} label={<Sparkles size={iconSizes.compact} />} />
+            <BlockToolBtn title="重新运行" onClick={rerun} label={<RotateCw size={iconSizes.compact} />} />
             <BlockToolBtn
               title="复制命令"
               onClick={copyCmd}
               label={copiedAction === 'command'
-                ? <Check size={12} data-testid="copy-command-success" />
-                : <Terminal size={12} />}
+                ? <Check size={iconSizes.compact} data-testid="copy-command-success" />
+                : <Terminal size={iconSizes.compact} />}
             />
             <BlockToolBtn
               title="复制输出"
               onClick={copyOut}
               label={copiedAction === 'output'
-                ? <Check size={12} data-testid="copy-output-success" />
-                : <Copy size={12} />}
+                ? <Check size={iconSizes.compact} data-testid="copy-output-success" />
+                : <Copy size={iconSizes.compact} />}
             />
             <BlockToolBtn title="更多操作"
               onClick={(e) => onMenu(block, e.currentTarget.getBoundingClientRect())}
-              label={<Ellipsis size={12} />} />
+              label={<Ellipsis size={iconSizes.compact} />} />
           </span>
         ) : (
           <span style={{
@@ -369,7 +370,7 @@ function RunningItem({
   const [elapsedNow, setElapsedNow] = useState(
     block.startedAt ? fmtDuration(Date.now() - block.startedAt) : '',
   );
-  const { sendCtrlC, killApp, enterFullScreen } = useTuiControls(tabId);
+  const { sendCtrlC, killApp, killArmed, enterFullScreen } = useTuiControls(tabId);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -392,8 +393,8 @@ function RunningItem({
     >
       {/* The running header keeps the command, elapsed time, and controls together. */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        padding: '6px 10px', userSelect: 'none', minHeight: 30,
+        display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+        padding: '6px 10px', userSelect: 'none', minHeight: 44,
       }}>
         <span
           style={{
@@ -415,16 +416,16 @@ function RunningItem({
           {highlightQuery ? <HighlightSpan text={block.command} query={highlightQuery} /> : coloredCommand}
         </div>
         <span style={{
-          display: 'inline-flex', gap: 8, alignItems: 'center', flexShrink: 0,
+          display: 'inline-flex', gap: 4, alignItems: 'center', flexShrink: 0, flexWrap: 'wrap', maxWidth: '100%',
           fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)',
         }}>
           {block.agent && <Zap size={11} style={{ color: 'var(--accent-warm)' }} aria-label="AI 执行" />}
           {elapsedNow && (
             <span style={{ fontVariantNumeric: 'tabular-nums' }}>({elapsedNow})</span>
           )}
-          <BlockToolBtn title="终止命令 (Ctrl+C)" onClick={sendCtrlC} label={<Square size={10} fill="currentColor" />} />
-          <BlockToolBtn title="结束前台应用（SIGTERM；3 秒内再点强杀 SIGKILL）" onClick={killApp} label={<Skull size={11} />} />
-          <BlockToolBtn title="进入全屏交互" onClick={enterFullScreen} label={<Maximize2 size={12} />} />
+          <BlockToolBtn title="终止命令 (Ctrl+C)" text="中断" onClick={sendCtrlC} label={<Square size={iconSizes.control} />} />
+          <BlockToolBtn title={killArmed ? '强制结束前台应用（SIGKILL）' : '结束前台应用（SIGTERM；3 秒内再点强杀 SIGKILL）'} text={killArmed ? '强制结束' : '结束'} onClick={killApp} label={<CircleX size={iconSizes.control} />} />
+          <BlockToolBtn title="进入全屏交互" text="全屏" onClick={enterFullScreen} label={<Maximize2 size={iconSizes.control} />} />
         </span>
       </div>
 
@@ -442,6 +443,7 @@ function RunningItem({
  */
 function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const occupiedRowsRef = useRef(1);
   // Move the live terminal into the fullscreen host when manually activated.
   const tuiFs = useTerminalStore(
     (s) => s.altScreenActive && (s.scenes[tabId] ?? 'classic') === 'altScreen',
@@ -483,21 +485,12 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
       w.__vrykellTerms.set(`block:${tabId}`, term);
     }
 
-    // Keep the PTY row geometry and trim blank rows after the last visible output.
+    // Preserve occupied space across partial clear-and-repaint frames.
     const cellHeight = (): number => getCellMetrics(term).height;
     let visibleOutputLogged = false;
     const updateHeight = () => {
-      const buf = term.buffer.active;
-      let contentEnd = buf.baseY + buf.cursorY + 1;
-      const bottom = Math.min(buf.baseY + term.rows, buf.length);
-      for (let y = bottom - 1; y >= 0; y--) {
-        const line = buf.getLine(y);
-        if (line && line.translateToString(true).trim()) {
-          contentEnd = Math.max(contentEnd, y + 1);
-          break;
-        }
-      }
-      const visible = Math.max(1, Math.min(contentEnd, term.rows));
+      const visible = measureRunningTerminalRows(term.buffer.active, term.rows, occupiedRowsRef.current);
+      occupiedRowsRef.current = visible;
       // The xterm element has 4px of vertical padding on each side.
       el.style.height = `${visible * cellHeight() + 8}px`;
       if (!visibleOutputLogged && visible > 1 && isTerminalDebugEnabled()) {
@@ -557,9 +550,13 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
     // Bubble wheel events to the block list; fullscreen mode keeps xterm scrollback behavior.
     term.attachCustomWheelEventHandler(() => tuiFs);
     // Recheck terminal columns when the host width changes, including its first layout.
+    let lastHostWidth = -1;
     const widthRo = new ResizeObserver(() => {
       if (tuiFs) resizeFullscreen();
-      else syncTermWidth(tabId);
+      else if (host.clientWidth > 0 && host.clientWidth !== lastHostWidth) {
+        lastHostWidth = host.clientWidth;
+        syncTermWidth(tabId);
+      }
     });
     widthRo.observe(host);
     // 选中即复制（与主 xterm 一致）
@@ -591,15 +588,18 @@ function BlockToolBtn({
   title,
   onClick,
   label,
+  text,
 }: {
   title: string;
   onClick: (e: React.MouseEvent) => void;
   label: React.ReactNode;
+  text?: string;
 }) {
   return (
     <button
       data-subtle
       title={title}
+      aria-label={text ?? title}
       onClick={(e) => {
         e.stopPropagation();
         onClick(e);
@@ -608,9 +608,11 @@ function BlockToolBtn({
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        width: 22,
-        height: 22,
-        padding: 0,
+        width: text ? undefined : 26,
+        minWidth: text ? 30 : 26,
+        height: text ? 30 : 26,
+        padding: text ? '0 6px' : 0,
+        gap: 4,
         border: 'none',
         borderRadius: 4,
         background: 'transparent',
@@ -629,6 +631,7 @@ function BlockToolBtn({
       }}
     >
       {label}
+      {text && <span>{text}</span>}
     </button>
   );
 }

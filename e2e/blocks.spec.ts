@@ -85,12 +85,13 @@ test.describe('命令块（OSC 133）', () => {
     }).toPass({ timeout: 5000 });
 
     // 升级式结束按钮：首击 SIGTERM → 窗口内再击 SIGKILL
-    await expect(page.getByText('结束', { exact: true })).toBeVisible();
-    await page.getByText('结束', { exact: true }).click();
+    const bannerEnd = page.getByTitle('结束前台应用 (SIGTERM)');
+    await expect(bannerEnd).toBeVisible();
+    await bannerEnd.click();
     await expect(async () => {
       expect(await ptySignals(page)).toEqual([{ id: 'e2e-session', sig: 15 }]);
     }).toPass({ timeout: 5000 });
-    await page.getByText('强杀!', { exact: true }).click();
+    await page.getByTitle('结束前台应用 (SIGTERM)').click();
     await expect(async () => {
       expect(await ptySignals(page)).toEqual([
         { id: 'e2e-session', sig: 15 },

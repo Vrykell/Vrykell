@@ -40,7 +40,7 @@ function cellStyle(cell: IBufferCell): string {
   // 前景色（inverse 时取背景色）
   if (inverse) {
     const bg = getBgCss(cell);
-    parts.push(`color:${bg ?? 'var(--canvas)'}`);
+    parts.push(`color:${bg ?? 'var(--xterm-bg)'}`);
   } else {
     const fg = getFgCss(cell);
     if (fg) parts.push(`color:${fg}`);
@@ -212,13 +212,10 @@ export function createBlockTerm(
   cols: number,
   rows: number,
 ): { term: Terminal; el: HTMLDivElement; dispose: () => void } {
-  // Keep the live terminal on the same flat canvas as the surrounding output.
+  // Use the same terminal background for live output and completed snapshots.
   const el = document.createElement('div');
-  el.style.cssText = 'overflow:hidden;width:100%;background:var(--canvas)';
+  el.style.cssText = 'overflow:hidden;width:100%;background:var(--xterm-bg)';
   const xtermTheme = readXtermTheme();
-  const canvasBackground = getComputedStyle(document.documentElement)
-    .getPropertyValue('--canvas')
-    .trim();
   const term = new Terminal({
     cols: Math.max(cols || 80, 1),
     rows: Math.max(rows || 24, 1),
@@ -227,8 +224,13 @@ export function createBlockTerm(
     fontSize: getTerminalFontSize(),
     lineHeight: TERMINAL_LINE_HEIGHT,
     cursorBlink: true,
-    theme: { ...xtermTheme, background: canvasBackground || xtermTheme.background },
+    theme: xtermTheme,
   });
+  // Running output must follow palette changes just like the surrounding pane.
+  const themeObserver = new MutationObserver(() => {
+    term.options.theme = { ...term.options.theme, ...readXtermTheme() };
+  });
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'data-theme'] });
   const unsubscribeTypography = useTypographyStore.subscribe((state, previous) => {
     if (state.terminalFontSize !== previous.terminalFontSize) term.options.fontSize = state.terminalFontSize;
   });
@@ -243,6 +245,7 @@ export function createBlockTerm(
     term,
     el,
     dispose: () => {
+      themeObserver.disconnect();
       unsubscribeTypography();
       term.dispose();
       el.remove();

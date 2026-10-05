@@ -69,6 +69,12 @@ describe('TerminalBlockList', () => {
     ]);
     render(<TerminalBlockList tabId="t1" />);
     expect(screen.getByTitle('终止命令 (Ctrl+C)')).toBeTruthy();
+    for (const name of ['中断', '结束', '全屏']) {
+      const button = screen.getByRole('button', { name });
+      expect(button.style.minWidth).toBe('30px');
+      expect(button.style.height).toBe('30px');
+      expect(button.querySelector('svg')).toHaveStyle({ width: '18px', height: '18px' });
+    }
     // jsdom 下 getExecutingTerm 返回 null，只渲染宿主 div
     expect(screen.getByTestId('running-term')).toBeTruthy();
     // 快照文本不应再出现在 executing 块中（完成前不提取）
