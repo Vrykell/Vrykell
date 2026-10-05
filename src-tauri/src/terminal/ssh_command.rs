@@ -9,6 +9,9 @@ pub struct SshOptions {
     pub jump_host: Option<String>,
     pub server_alive_interval: Option<u32>,
     pub shell_integration: Option<bool>,
+    /// `strict` (default) trusts only recorded hosts; `ask` lets the ssh client prompt in the
+    /// terminal when the fingerprint is unknown, used when the preflight could not run.
+    pub host_key_policy: Option<String>,
 }
 
 #[derive(Clone, Deserialize, Debug)]
@@ -84,7 +87,11 @@ pub fn build_ssh_command(target: &SshTarget, remote_command: Option<&str>) -> Re
     command.arg("-tt");
     let mut verified = verified_ssh_options(target.host_key_type.as_deref(), &known_hosts)?;
     // Hop hosts are verified by the client because a direct preflight cannot reach the destination.
-    if target.options.jump_host.is_some() { verified[1] = "StrictHostKeyChecking=ask".into(); }
+    // The same relaxation applies when the preflight itself was unavailable: the client still
+    // verifies recorded hosts and only asks about unknown fingerprints.
+    if target.options.jump_host.is_some() || target.options.host_key_policy.as_deref() == Some("ask") {
+        verified[1] = "StrictHostKeyChecking=ask".into();
+    }
     command.args(verified);
     command.args(["-o", "ConnectTimeout=15", "-o", "ServerAliveCountMax=3"]);
     command.args(["-o".to_string(), format!("ServerAliveInterval={}", target.options.server_alive_interval.unwrap_or(30))]);
@@ -114,6 +121,15 @@ mod tests {
         assert!(!args.contains(&"shell-hook".into()));
         assert!(validate_options(&SshOptions { jump_host: Some("-oProxyCommand=x".into()), ..Default::default() }).is_err());
         assert!(validate_options(&SshOptions { server_alive_interval: Some(3601), ..Default::default() }).is_err());
+    }
+    #[test]
+    fn host_key_policy_ask_relaxes_only_unknown_fingerprints() {
+        let relaxed: SshTarget = serde_json::from_value(serde_json::json!({"host":"server","hostKeyPolicy":"ask"})).unwrap();
+        let args: Vec<_> = build_ssh_command(&relaxed, None).unwrap().get_argv().iter().map(|arg| arg.to_string_lossy().into_owned()).collect();
+        assert!(args.contains(&"StrictHostKeyChecking=ask".into()));
+        let strict: SshTarget = serde_json::from_value(serde_json::json!({"host":"server"})).unwrap();
+        let args: Vec<_> = build_ssh_command(&strict, None).unwrap().get_argv().iter().map(|arg| arg.to_string_lossy().into_owned()).collect();
+        assert!(args.contains(&"StrictHostKeyChecking=yes".into()));
     }
     #[test]
     fn missing_explicit_identity_is_an_error() {

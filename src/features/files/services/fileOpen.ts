@@ -1,5 +1,6 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@platform/diagnostics';
 import { openPath } from '@tauri-apps/plugin-opener';
+import { normPath } from '@features/files/utils/pathUtils';
 import { safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
 
 /**
@@ -143,6 +144,6 @@ export async function openFile(
     return { via: 'terminal', editor: res.editor ?? '', fellBack: res.fellBack ?? false };
   }
 
-  await openPath(path);
+  await openPath(normPath(path));
   return { via: 'system', degraded: res.degraded ?? false };
 }

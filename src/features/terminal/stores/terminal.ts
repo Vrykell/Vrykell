@@ -206,6 +206,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     set((s) => ({ dims: { ...s.dims, [tabId]: { cols, rows } } })),
   dropTab: (tabId) =>
     set((s) => {
+      const scene = s.scenes[tabId];
       if (
         !(tabId in s.sessions)
         && !(tabId in s.pendingCommands)
@@ -220,7 +221,9 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       delete pendingCommands[tabId];
       delete dims[tabId];
       delete scenes[tabId];
-      return { sessions, pendingCommands, dims, scenes };
+      const sessionsRemainInAltScreen = Object.keys(scenes).some((id) => scenes[id] === 'altScreen');
+      return { sessions, pendingCommands, dims, scenes,
+        altScreenActive: scene === 'altScreen' ? false : (sessionsRemainInAltScreen ? s.altScreenActive : false) };
     }),
   toggle: () => set((s) => ({ visible: !s.visible })),
   runInTerminal: (command) => {

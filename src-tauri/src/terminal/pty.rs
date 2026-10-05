@@ -59,6 +59,10 @@ pub struct PtySession {
     child: Box<dyn Child + Send + Sync>,
 }
 
+fn session_has_exited(session: &Arc<Mutex<PtySession>>) -> bool {
+    session.lock().ok().and_then(|mut state| state.child.try_wait().ok()).flatten().is_some()
+}
+
 #[derive(Default)]
 pub struct PtyState(pub Mutex<HashMap<String, Arc<Mutex<PtySession>>>>);
 
@@ -470,6 +474,14 @@ pub fn pty_spawn(
                     if !pending.is_empty() {
                         flush_output(&app, &tid, &mut pending, &mut pending_bytes);
                         last_flush = std::time::Instant::now();
+                    }
+                    // A retained console handle can keep its reader open after the child exits.
+                    let session = app.state::<PtyState>().0.lock().ok().and_then(|all| all.get(&tid).cloned());
+                    if session.as_ref().is_some_and(session_has_exited) {
+                        if debug::enabled() { debug::write("reader-end", format!("id={} reason=child-exit", tid)); }
+                        let _ = app.emit("pty-exit", PtyExit { id: tid.clone() });
+                        reap_session(&app, &tid);
+                        break;
                     }
                 }
             }
@@ -1146,6 +1158,21 @@ mod tests {
 mod cmd_interaction_tests {
     use super::*;
     use std::io::{Read, Write};
+
+    #[test]
+    fn detects_child_exit_while_the_terminal_handles_are_still_open() {
+        let pair = native_pty_system().openpty(PtySize { rows: 24, cols: 80, pixel_width: 0, pixel_height: 0 }).unwrap();
+        let mut command = CommandBuilder::new("cmd.exe");
+        command.args(["/d", "/c", "exit", "7"]);
+        let child = pair.slave.spawn_command(command).unwrap();
+        let writer = pair.master.take_writer().unwrap();
+        let session = Arc::new(Mutex::new(PtySession { master: pair.master, writer, child }));
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !session_has_exited(&session) && std::time::Instant::now() < deadline {
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        assert!(session_has_exited(&session));
+    }
 
     #[test]
     fn cmd_accepts_commands_and_returns_output() {

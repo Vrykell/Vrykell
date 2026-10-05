@@ -388,8 +388,18 @@ export function useTerminalSession(
     }
     const startSession = async () => {
       if (spawnOpts?.ssh && !spawnOpts.ssh.jumpHost) {
-        const info = await prepareSshHost(spawnOpts.ssh.host, spawnOpts.ssh.port, startupAbort.signal);
-        spawnOpts.ssh.hostKeyType = info.keyType;
+        try {
+          const info = await prepareSshHost(spawnOpts.ssh.host, spawnOpts.ssh.port, startupAbort.signal);
+          spawnOpts.ssh.hostKeyType = info.keyType;
+        } catch (error) {
+          const message = String((error as Error)?.message ?? error);
+          // 用户主动取消，或已记录的主机密钥发生变化（可能是中间人）时必须停下。
+          if (message.includes('已取消') || message.includes('主机密钥不匹配')) throw error;
+          // 预检只是「提前看指纹」，它失败（例如老服务器无法与预检库协商算法）不应该
+          // 让可用的 ssh 无法启动：改由 ssh 自己校验，未知指纹在终端里询问。
+          if (isTerminalDebugEnabled()) terminalDebug('ssh-preflight-unavailable', { paneId });
+          spawnOpts.ssh.hostKeyPolicy = 'ask';
+        }
       }
       if (disposed || stopped) throw new Error('已取消连接');
       return ptySpawn(spawnCols, spawnRows, tabCwd, spawnOpts);

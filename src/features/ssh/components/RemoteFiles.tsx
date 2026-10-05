@@ -8,6 +8,10 @@ import ConfirmDialog from '@ui/ConfirmDialog';
 import DownloadManager from '@features/files/components/DownloadManager';
 import { compactPathSegments } from '@features/files/utils/pathUtils';
 import { useRemoteFileBrowser } from '@features/ssh/hooks/useRemoteFileBrowser';
+import { describeFileServiceFailure } from '@features/ssh/model/fileServiceState';
+import { useDockStore } from '@features/workspace';
+import { termInstances } from '@features/terminal';
+import { sshPaneIdFor } from '@features/ssh/utils/remotePath';
 
 /**
  * RemoteFiles — SSH 标签页的文件面板。
@@ -15,8 +19,9 @@ import { useRemoteFileBrowser } from '@features/ssh/hooks/useRemoteFileBrowser';
  * 右键：重命名 / 下载到本地（含目录）/ 删除；顶栏「上传」多选上传文件、
  * 「上传文件夹」递归上传目录、「下载」进入下载管理页。
  */
-export default function RemoteFiles({ conn }: { conn: SshConnection }) {
+export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnection; enabled?: boolean }) {
   const {
+    refresh,
     path,
     setPath,
     entries,
@@ -42,7 +47,8 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
     syncToTerminal,
     doUpload,
     doUploadDir,
-  } = useRemoteFileBrowser(conn);
+  } = useRemoteFileBrowser(conn, enabled);
+  const failure = error ? describeFileServiceFailure(error) : null;
 
   // 顶栏面包屑压缩：不换行，侧栏窄时省略高层级目录（必须在视图切换的提前返回之前）
   const segs = path ? path.split('/').filter(Boolean) : [];
@@ -82,7 +88,8 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
           display: 'flex', alignItems: 'center', gap: 2,
           flex: 1, minWidth: 0, overflow: 'hidden',
         }}>
-          <Crumb label="/" onClick={() => setPath('/')} active={path === '/'} />
+          {path === null ? <span title={conn.name} style={{ color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis' }}>远程文件 · {conn.name}</span>
+            : <Crumb label="/" onClick={() => setPath('/')} active={path === '/'} />}
           {hiddenCount > 0 && (
             <>
               <span style={{ color: 'var(--text-muted)' }}>›</span>
@@ -96,7 +103,7 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
             </span>
           ))}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+        {!loading && !error && <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
           {path && path !== '/' && (
             <IconBtn
               title="上级目录"
@@ -120,15 +127,29 @@ export default function RemoteFiles({ conn }: { conn: SshConnection }) {
           >
             <MoreHorizontal size={iconSizes.control} />
           </IconBtn>
-        </div>
+        </div>}
       </div>
 
       {/* 远程文件列表 */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
         {loading ? (
-          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>连接中…</div>
-        ) : error ? (
-          <div style={{ padding: 16, fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--error-light)', textAlign: 'center' }}>{error}</div>
+          <div role="status" style={{ padding: 20, color: 'var(--text-muted)', fontSize: 'var(--fs-label)' }}>正在连接文件服务…</div>
+        ) : failure ? (
+          <div role={failure.kind === 'error' ? 'alert' : 'status'} style={{ padding: 16, fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+            <strong style={{ color: 'var(--text-primary)' }}>{failure.title}</strong>
+            <p>{failure.message}</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <button style={{ minHeight: 36 }} onClick={() => {
+                const dock = useDockStore.getState();
+                const side = dock.leftPanels.includes('files') ? 'left' : 'right';
+                dock.togglePanel(side, 'files');
+                const paneId = sshPaneIdFor(conn.id);
+                if (paneId) termInstances.get(paneId)?.focus();
+              }}>继续使用终端</button>
+              <button style={{ minHeight: 36 }} onClick={refresh}>重试文件服务</button>
+            </div>
+            <details style={{ marginTop: 12, overflowWrap: 'anywhere', color: 'var(--text-muted)' }}><summary style={{ cursor: 'pointer' }}>技术详情</summary>{error}</details>
+          </div>
         ) : entries.length === 0 ? (
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>空目录</div>
         ) : entries.map((e) => (

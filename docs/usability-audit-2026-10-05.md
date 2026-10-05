@@ -138,6 +138,16 @@
 
 草稿保存、嵌套确认冒泡、通用确认窗口高度上限仍未修复。
 
+### SSH 连不上：指纹预检失败被当成硬门槛
+
+从本机诊断日志（`%LOCALAPPDATA%\com.vrykell.app\logs\terminal-debug.jsonl`）看到：13 个 SSH 面板里只有 3 个真正把 PTY 起起来，其余在几十毫秒内以 `pty-spawn-error` 结束，而且所有 SSH 请求的端口都是 22——聊天服务器的 2222 从未到达后端。
+
+用生产代码写了一个真机探针（`cargo test manual_chat_server_flow -- --ignored --nocapture`）复现后确认：libssh2 前置校验对 `www.altzin.com:2222` 直接失败（`[Session(-5)] Unable to exchange encryption keys`），而 `prepareSshHost` 把它当成致命错误抛出，真正的 `ssh` 因此从未启动。同一个服务器用系统 OpenSSH 可以正常登录、显示验证码界面并断开。
+
+修复：预检失败不再阻断连接，改由 ssh 客户端自己校验——已记录主机仍严格比对，未知指纹在终端内询问（`StrictHostKeyChecking=ask`）；用户主动取消或已记录密钥发生变化时仍然中止。探针在修复后的参数下连上了服务器：密码被接受（1.4s），sshfm 界面完整渲染，超时后按服务端行为断开。
+
+范围说明：探针验证的是后端链路（命令构造、PTY、真实密码/验证码交互）；前端渲染与按键联动由 e2e 夹具覆盖，未在真实服务器上逐键验证。
+
 ## 补充：真实 SSH 聊天服务器体验
 
 用户明确授权后，使用系统 OpenSSH 连接 `www.altzin.com:2222`。这次是外部服务器真实连接，不是测试夹具；连接入口是独立工具终端，未通过 Vrykell 前端，因此不能把它标为项目端到端通过。

@@ -8,6 +8,7 @@ import { useSessionStore } from '@features/workspace';
 import { ptyWrite } from '@platform/pty';
 import { useToastStore } from '@ui/Toast';
 import type { ContextMenuItem } from '@ui/ContextMenu';
+import { terminalDebug } from '@features/terminal/services/terminalDebug';
 import {
   useRemotePathStore,
   normalizeRemotePath,
@@ -21,7 +22,7 @@ export type RemoteFileConfirmState =
   | { kind: 'delete'; entry: SshFsEntry };
 
 /** 管理 SSH 文件面板的数据加载和远程文件操作。 */
-export function useRemoteFileBrowser(conn: SshConnection) {
+export function useRemoteFileBrowser(conn: SshConnection, enabled = true) {
   const sessionId = useTerminalStore(state => state.sessions[sshPaneIdFor(conn.id) ?? '']);
   const loadVersion = useRef(0);
   const path = useRemotePathStore((state) => state.path[conn.id] ?? null);
@@ -45,21 +46,29 @@ export function useRemoteFileBrowser(conn: SshConnection) {
     const version = ++loadVersion.current;
     setLoading(true);
     setError(null);
+    terminalDebug('ssh-files-load-start', { connectionId: conn.id, hasPath: currentPath !== null });
     sshFsList(conn.id, currentPath ?? undefined)
       .then((response) => {
         if (version !== loadVersion.current) return;
         setEntries(response.entries);
+        terminalDebug('ssh-files-load-ready', { connectionId: conn.id, entries: response.entries.length });
         if (currentPath === null && response.base) setPath(normalizeRemotePath(response.base));
       })
-      .catch((errorValue) => { if (version === loadVersion.current) setError(String((errorValue as Error)?.message ?? errorValue)); })
+      .catch((errorValue) => {
+        if (version !== loadVersion.current) return;
+        setEntries([]);
+        setError(String((errorValue as Error)?.message ?? errorValue));
+        terminalDebug('ssh-files-load-failed', { connectionId: conn.id, errorType: errorValue instanceof Error ? errorValue.name : typeof errorValue });
+      })
       .finally(() => { if (version === loadVersion.current) setLoading(false); });
   }, [conn.id, setPath]);
 
   useEffect(() => {
+    if (!enabled) return;
     load(path);
     // Retry after host confirmation and PTY startup; the first SFTP request may have been untrusted.
     return () => { loadVersion.current += 1; };
-  }, [load, path, sessionId]);
+  }, [load, path, sessionId, enabled]);
 
   const refresh = useCallback(() => load(path), [load, path]);
   const currentDir = path ?? '';
@@ -196,6 +205,7 @@ export function useRemoteFileBrowser(conn: SshConnection) {
   }, [conn.id, path, toast]);
 
   return {
+    refresh,
     path,
     setPath,
     entries,

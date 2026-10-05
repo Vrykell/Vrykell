@@ -11,6 +11,8 @@ export interface TerminalFrame {
   cursorY: number;
   cellWidth: number;
   cellHeight: number;
+  cursorHidden: boolean;
+  cursorStyle: 'block' | 'underline' | 'bar';
 }
 
 export function captureFrame(term: Terminal): TerminalFrame {
@@ -18,8 +20,13 @@ export function captureFrame(term: Terminal): TerminalFrame {
   const start = buffer.viewportY;
   const snapshot = extractSnapshotFromBuffer(buffer, term.cols, start, start + term.rows);
   const metrics = getCellMetrics(term);
+  const internals = (term as unknown as { _core?: { coreService?: {
+    isCursorHidden?: boolean;
+    decPrivateModes?: { cursorStyle?: 'block' | 'underline' | 'bar' };
+  } } })._core?.coreService;
   return { ...snapshot, cols: term.cols, rows: term.rows, cursorX: buffer.cursorX,
-    cursorY: buffer.baseY + buffer.cursorY - start, cellWidth: metrics.width, cellHeight: metrics.height };
+    cursorY: buffer.baseY + buffer.cursorY - start, cellWidth: metrics.width, cellHeight: metrics.height,
+    cursorHidden: internals?.isCursorHidden ?? false, cursorStyle: internals?.decPrivateModes?.cursorStyle ?? term.options.cursorStyle ?? 'block' };
 }
 
 export function needsSecretResponse(text: string): boolean {

@@ -5,7 +5,7 @@ import { useTerminalStore } from '../stores/terminal';
 import { ptyWrite } from '@platform/pty';
 import TerminalPanel from '../components/TerminalPanel';
 
-const { closeSession, reconnect, sessionView } = vi.hoisted(() => ({ closeSession: vi.fn(), reconnect: vi.fn(), sessionView: { status: 'ready', frame: { html: 'Password:', plainText: 'Password:', cols: 80, rows: 24, cursorX: 9, cursorY: 0, cellWidth: 8, cellHeight: 18 } } }));
+const { closeSession, reconnect, sessionView } = vi.hoisted(() => ({ closeSession: vi.fn(), reconnect: vi.fn(), sessionView: { status: 'ready', frame: { html: 'Password:', plainText: 'Password:', cols: 80, rows: 24, cursorX: 9, cursorY: 0, cellWidth: 8, cellHeight: 18, cursorHidden: false, cursorStyle: 'block' as const } } }));
 vi.mock('../hooks/useTerminalSession', () => ({ useTerminalSession: () => ({ ref: createRef<HTMLDivElement>(), closeSession, reconnect, status: sessionView.status, frame: sessionView.frame }) }));
 vi.mock('@platform/pty', () => ({ ptyWrite: vi.fn().mockResolvedValue(undefined) }));
 afterEach(cleanup);
@@ -16,13 +16,35 @@ beforeEach(() => {
   sessionView.status = 'ready';
   sessionView.frame.plainText = 'Password:';
   sessionView.frame.html = 'Password:';
+  sessionView.frame.cursorHidden = false;
   useTerminalStore.setState({ sessions: {}, scenes: { p: 'classic' } });
 });
 
 describe('SSH connection input', () => {
+  it('reports a manual interactive disconnect without calling it authentication cancellation', async () => {
+    sessionView.frame.plainText = '交互程序';
+    sessionView.frame.html = '交互程序';
+    useTerminalStore.setState({ sessions: { p: 'session' } });
+    render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+    fireEvent.click(screen.getByRole('button', { name: '断开连接' }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('已断开 SSH 连接'));
+    expect(screen.getByRole('status')).not.toHaveTextContent('已取消认证');
+  });
   it('disables authentication until the PTY is ready', () => {
     render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
     expect(screen.getByLabelText('SSH 认证响应')).toBeDisabled();
+  });
+  it('draws an inverse blinking block cursor and respects terminal cursor visibility', () => {
+    useTerminalStore.setState({ sessions: { p: 'session' } });
+    sessionView.frame.plainText = '正在等待输入';
+    sessionView.frame.html = '正在等待输入';
+    render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+    expect(screen.getByTestId('ssh-screen-cursor')).toHaveStyle({ width: '8px', height: '18px', background: 'white', mixBlendMode: 'difference' });
+    sessionView.frame.cursorHidden = true;
+    cleanup();
+    render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+    expect(screen.queryByTestId('ssh-screen-cursor')).not.toBeInTheDocument();
+    sessionView.frame.cursorHidden = false;
   });
   it('masks and clears the response after sending it to the connected PTY', () => {
     useTerminalStore.setState({ sessions: { p: 'session' } });

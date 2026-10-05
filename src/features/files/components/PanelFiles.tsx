@@ -13,6 +13,7 @@ import ConfirmDialog from '@ui/ConfirmDialog';
 import DownloadManager from '@features/files/components/DownloadManager';
 import { useLocalFileBrowser } from '@features/files/hooks/useLocalFileBrowser';
 import { useLocalFileActions } from '@features/files/hooks/useLocalFileActions';
+import { useDockStore } from '@features/workspace';
 
 /**
  * PanelFiles — 文件面板入口。
@@ -22,11 +23,12 @@ export default function PanelFiles() {
   const { focusedSpec } = useActiveWorkspace();
   const sshConnections = useSshStore((s) => s.connections);
   const sshLoaded = useSshStore((s) => s.loaded);
+  const filesOpen = useDockStore(s => (s.leftPanels.includes('files') || s.rightPanels.includes('files')) && !s.collapsedPanels.includes('files'));
   useEffect(() => { ensureSshLoaded(); }, []);
 
   if (sshLoaded && focusedSpec?.kind === 'ssh' && focusedSpec.ssh?.connectionId) {
     const conn = sshConnections.find((c) => c.id === focusedSpec.ssh!.connectionId);
-    if (conn) return <RemoteFiles conn={conn} />;
+    if (conn) return <RemoteFiles key={conn.id} conn={conn} enabled={filesOpen} />;
   }
   return <LocalFiles />;
 }

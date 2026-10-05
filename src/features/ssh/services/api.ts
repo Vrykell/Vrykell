@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@platform/diagnostics';
 import type { FsEntry } from '@features/files/services/fs';
 import type { SshOptions } from '@core/ssh';
 
