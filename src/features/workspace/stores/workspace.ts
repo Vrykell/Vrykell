@@ -281,9 +281,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (idx === -1) return;
     const closed = tabs[idx]!;
     const next = tabs.filter((t) => t.id !== id);
+    const noSessionsRemain = !next.some(isSessionTab);
+    const historyTab = next.find((tab) => tab.kind === 'history');
+    const nextActiveId = noSessionsRemain
+      ? historyTab?.id ?? ''
+      : activeId === id
+        ? next[Math.max(0, idx - 1)]?.id ?? ''
+        : activeId;
     set({
       tabs: next,
-      activeId: activeId === id ? next[Math.max(0, idx - 1)]?.id ?? '' : activeId,
+      activeId: nextActiveId,
       lastClosed: closed,
     });
     // 聚焦若属于被关标签则回落到新的活跃标签
