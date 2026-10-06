@@ -50,6 +50,8 @@ export interface FilePanelConfig {
     downloadBeforeNativeDrag: boolean;
     /** 系统文件拖入面板：移动进面板（本地）还是上传（远端） */
     externalDropMode: 'move' | 'upload';
+    /** 拖出到系统成功后是否清理源头（本地 = 移动，true；远端 = 下载，源文件保留，false） */
+    cleanupSourceAfterNativeDrag: boolean;
   };
   /** 打开文件的语义 */
   open: 'terminal-editor' | 'remote-editor';
@@ -101,7 +103,7 @@ export function filePanelConfigFor(target: FileOpsTarget): FilePanelConfig {
         blank: ['new-file', 'new-folder', 'paste', 'upload-file', 'upload-dir'],
         more: ['upload-file', 'upload-dir', 'downloads-view'],
       },
-      drag: { downloadBeforeNativeDrag: true, externalDropMode: 'upload' },
+      drag: { downloadBeforeNativeDrag: true, externalDropMode: 'upload', cleanupSourceAfterNativeDrag: false },
       open: 'remote-editor',
       syncToTerminal: true,
       rootLabel: '/',
@@ -119,7 +121,7 @@ export function filePanelConfigFor(target: FileOpsTarget): FilePanelConfig {
       blank: ['new-file', 'new-folder', 'paste', 'new-tab-here'],
       more: ['new-tab-here', 'downloads-view'],
     },
-    drag: { downloadBeforeNativeDrag: false, externalDropMode: 'move' },
+    drag: { downloadBeforeNativeDrag: false, externalDropMode: 'move', cleanupSourceAfterNativeDrag: true },
     open: 'terminal-editor',
     syncToTerminal: true,
     rootLabel: '此电脑',
