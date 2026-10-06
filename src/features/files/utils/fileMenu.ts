@@ -1,4 +1,5 @@
 import type { FsEntry } from '@platform/api/types';
+import { t } from '@i18n';
 import type { ContextMenuItem } from '@ui/ContextMenu';
 import type { FileClipboard } from '@features/files/hooks/useFileBrowser';
 import type { FileMenuItemKey } from '@features/files/model/filePanelConfig';
@@ -101,7 +102,7 @@ function itemFor(key: FileMenuItemKey, ctx: FileMenuContext, folderTarget: FsEnt
     case 'downloads-view':
       return handlers.onOpenDownloads ? { label: '下载管理', onClick: () => handlers.onOpenDownloads?.() } : null;
     case 'collapse-all':
-      return handlers.onCollapseAll ? { label: '收起全部文件夹', onClick: handlers.onCollapseAll } : null;
+      return handlers.onCollapseAll ? { label: t('files.collapseAll'), onClick: handlers.onCollapseAll } : null;
     default:
       return null;
   }
