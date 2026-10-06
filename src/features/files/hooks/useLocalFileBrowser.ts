@@ -4,14 +4,17 @@ import { normPath } from '@features/files/utils/pathUtils';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 
 interface UseLocalFileBrowserOptions {
-  activeCwd?: string;
-  focusedPaneId?: string;
+  initialCwd?: string;
 }
 
 /** Load local directories and keep navigation results associated with their requests. */
-export function useLocalFileBrowser({ activeCwd, focusedPaneId }: UseLocalFileBrowserOptions) {
-  const [path, setPath] = useState<string | null>(() => activeCwd ? normPath(activeCwd) : null);
-  const [homePath, setHomePath] = useState<string | null>(null);
+export function useLocalFileBrowser({ initialCwd }: UseLocalFileBrowserOptions) {
+  const [path, setBrowserPath] = useState<string | null>(() => initialCwd ? normPath(initialCwd) : null);
+  const initialized = useRef(Boolean(initialCwd));
+  const setPath = useCallback((nextPath: string | null) => {
+    initialized.current = true;
+    setBrowserPath(nextPath);
+  }, []);
   const [entries, setEntries] = useState<FsEntry[]>([]);
   const [disks, setDisks] = useState<DiskEntry[]>([]);
   const [expandedSet, setExpandedSet] = useState<ReadonlySet<string>>(new Set());
@@ -29,13 +32,12 @@ export function useLocalFileBrowser({ activeCwd, focusedPaneId }: UseLocalFileBr
   }, []);
 
   useEffect(() => {
-    fsHome().then((home) => setHomePath(normPath(home))).catch(() => setHomePath(null));
-  }, []);
-
-  const followedPath = activeCwd ? normPath(activeCwd) : homePath;
-  useEffect(() => {
-    setPath(followedPath);
-  }, [followedPath, focusedPaneId]);
+    if (initialized.current) return;
+    // Seed the browser once; later terminal cwd changes cannot interrupt navigation.
+    void fsHome().then((home) => {
+      if (alive.current && !initialized.current) setPath(normPath(home));
+    }).catch(() => {});
+  }, [setPath]);
 
   const load = useCallback((currentPath: string | null) => {
     const version = ++requestVersion.current;

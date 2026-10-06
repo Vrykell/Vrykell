@@ -84,6 +84,17 @@ describe('sessionManager.restore（窗口布局）', () => {
     expect(isSessionTab(tab) && tab.groupId).toBe('g1');
   });
 
+  it('does not keep an archived group id when restoring only one session', async () => {
+    const session = mockSession({ id: 'g-tab', group_id: 'archived-group', payload: '{}' });
+    mockedInvoke.mockImplementation(async (cmd: string) => (cmd === 'get_session' ? session : defaultInvoke(cmd)));
+
+    await sessionManager.restore('g-tab', 't');
+
+    const tab = useWorkspaceStore.getState().tabs.find((item) => item.id === 'g-tab')!;
+    expect(isSessionTab(tab) ? tab.groupId : undefined).toBeUndefined();
+    expect(mockedInvoke).toHaveBeenCalledWith('session_set_group', { sessionId: 'g-tab', groupId: null });
+  });
+
   it('payload 损坏时降级为单本地终端', async () => {
     const session = mockSession({ id: 'bad', payload: 'not-json' });
     mockedInvoke.mockImplementation(async (cmd: string) => (cmd === 'get_session' ? session : defaultInvoke(cmd)));

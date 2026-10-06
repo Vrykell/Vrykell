@@ -6,8 +6,8 @@ import { parentOf, normPath } from '@features/files/utils/pathUtils';
 import { shellQuote } from '@features/ssh/utils/remotePath';
 import { useWorkspaceDirsStore } from '@features/files/services/workspaceDirs';
 import { useSessionStore } from '@features/workspace';
-import { useTerminalStore } from '@features/terminal';
 import { ptyWrite } from '@platform/pty';
+import { waitForTerminalStartup } from '@features/terminal/services/terminalStartup';
 import { useToastStore } from '@ui/Toast';
 import type { ContextMenuItem } from '@ui/ContextMenu';
 
@@ -23,7 +23,7 @@ interface UseLocalFileActionsOptions {
   sessions: Record<string, string>;
 }
 
-/** 管理本地文件面板的打开、工作区、重命名、删除和终端同步动作。 */
+/** Manage file actions and explicit terminal navigation without changing the browser on file open. */
 export function useLocalFileActions({
   path,
   setPath,
@@ -58,11 +58,11 @@ export function useLocalFileActions({
 
     const parentDir = parentOf(normPath(entry.path)) ?? undefined;
     const tabId = useSessionStore.getState().addTab({ cwd: parentDir, title: entry.name });
-    const sid = await waitForSession(tabId);
-    if (sid) {
-      await ptyWrite(sid, command.endsWith('\n') ? command : `${command}\n`).catch(() => {});
-    } else {
-      addToast('终端启动超时，请重试', 'error');
+    try {
+      const sid = await waitForTerminalStartup(`${tabId}#0`);
+      await ptyWrite(sid, command.endsWith('\n') ? command : `${command}\n`);
+    } catch (error) {
+      addToast(`无法执行文件打开命令：${String((error as Error)?.message ?? error)}`, 'error');
     }
   }, []);
 
@@ -173,17 +173,4 @@ export function useLocalFileActions({
     goUp,
     syncToTerminal,
   };
-}
-
-function waitForSession(tabId: string, timeoutMs = 8000): Promise<string | null> {
-  return new Promise((resolve) => {
-    const start = Date.now();
-    const check = () => {
-      const sid = useTerminalStore.getState().sessions[`${tabId}#0`];
-      if (sid) return resolve(sid);
-      if (Date.now() - start > timeoutMs) return resolve(null);
-      setTimeout(check, 50);
-    };
-    check();
-  });
 }

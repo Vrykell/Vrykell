@@ -46,6 +46,7 @@ describe('sessionManager 生命周期', () => {
 
   it('restore：完整重建（layout 用 payload；blocks 按 pane 归属；chat 恢复）', async () => {
     const sessionId = 'restored-1';
+    useSessionStore.setState({ groups: [{ id: 'g9', title: '恢复分组', collapsed: false }] });
     invokeMock.mockResolvedValueOnce(undefined); // restore_session
     invokeMock.mockResolvedValueOnce([
       { id: 'b1', pane_id: null, command: 'ls', exit_code: 0, started_at: 1, ended_at: 2, status: 'done', collapsed: 0, output_clean: 'out', output_raw: 'out', output_html: '' },

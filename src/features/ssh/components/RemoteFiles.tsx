@@ -131,7 +131,7 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
       </div>
 
       {/* 远程文件列表 */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
+      <div className="scroll-region" style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
         {loading ? (
           <div role="status" style={{ padding: 20, color: 'var(--text-muted)', fontSize: 'var(--fs-label)' }}>正在连接文件服务…</div>
         ) : failure ? (
