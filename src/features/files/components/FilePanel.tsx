@@ -372,7 +372,7 @@ export default function FilePanel({
               {hiddenCount > 0 && (
                 <>
                   <span style={{ color: 'var(--text-muted)' }}>›</span>
-                  <span title="已省略上级目录" style={{ color: 'var(--text-muted)', letterSpacing: 1 }}>…</span>
+                  <span data-tip="已省略上级目录" style={{ color: 'var(--text-muted)', letterSpacing: 1 }}>…</span>
                 </>
               )}
               {visibleCrumbs.map((crumb, index) => {
@@ -675,7 +675,7 @@ function FileRow({
       onPointerDown={renaming ? undefined : onRowPointerDown}
       onDoubleClick={renaming ? undefined : () => onRowDoubleClick(entry)}
       onContextMenu={renaming ? undefined : (event) => onRowContextMenu(event, entry)}
-      title={renaming
+      data-tip={renaming
         ? '输入新名称，回车确认，Esc 取消'
         : entry.is_dir
           ? (highlighted ? '工作区文件夹 · 单击选中，双击进入，可拖入文件' : '单击选中，双击进入，可拖入文件')
@@ -767,7 +767,7 @@ function Crumb({ label, onClick, active, title, dropPath }: {
 }) {
   return (
     <span
-      title={title}
+      data-tip={title}
       data-drop-dir={dropPath}
       data-path={dropPath}
       onClick={(event) => { event.stopPropagation(); onClick(); }}

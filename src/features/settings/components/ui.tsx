@@ -122,7 +122,8 @@ export function TemplateListEditor({ value, onChange, placeholder }: {
           />
           <button
             onClick={() => sync(rows.filter((_, j) => j !== i), true)}
-            title="删除此行"
+            data-tip="删除此行"
+            aria-label="删除此行"
             style={{
               width: 26, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               border: '1px solid transparent', borderRadius: 4, background: 'transparent',

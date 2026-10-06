@@ -40,7 +40,7 @@ test('Windows working directories show their drive prefix without the URI slash'
   await emitPtyOutput(page, '\x1b]7;file://host/C:/Users/My Project\x07');
   const directory = page.locator('.terminal-directory');
   await expect(directory).toHaveText('C:/Users/My Project');
-  await expect(directory).toHaveAttribute('title', 'C:/Users/My Project');
+  await expect(directory).toHaveAttribute('data-tip', 'C:/Users/My Project');
 });
 
 test('terminal error notifications follow the active gray theme and can be closed', async ({ page }) => {
@@ -62,7 +62,7 @@ test('terminal error notifications follow the active gray theme and can be close
     await input.fill(`echo notification-${theme === '浅色' ? 'light' : 'dark'}`);
     await input.press('Enter');
     await page.locator('[data-testid^="command-block-"]').last().hover();
-    await page.getByTitle('复制输出').last().click();
+    await page.locator('[data-tip="复制输出"]').last().click();
     const notification = page.getByRole('status').filter({ hasText: '复制失败' });
     await expect(notification).toBeVisible();
     await notification.hover();
@@ -232,7 +232,7 @@ test('narrow layouts preserve command space and fit the toolbar', async ({ page 
   await expect(page.getByText('notes.txt')).toBeHidden();
   const main = await page.locator('main').boundingBox();
   expect(main!.width).toBeGreaterThanOrEqual(360);
-  await expect(page.getByTitle('关闭当前终端')).toBeInViewport();
+  await expect(page.locator('[data-tip="关闭当前终端"]')).toBeInViewport();
   const overlap = await page.evaluate(() => {
     const search = document.querySelector('[data-testid="global-search-trigger"]')!.getBoundingClientRect();
     const ai = document.querySelector('[data-dock-btn="chat"]')!.getBoundingClientRect();
@@ -264,7 +264,7 @@ test('separate command and AI drafts survive repeated switches', async ({ page }
 });
 
 test('split placement explains selection and cancellation before hover', async ({ page }) => {
-  await page.getByTitle('选择类型分裂', { exact: true }).click();
+  await page.locator('[data-tip="选择类型分裂"]').click();
   await page.getByTestId('new-tab-option-shell:zsh').click();
   await expect(page.getByTestId('placement-hint')).toBeVisible();
   await expect(page.getByTestId('placement-hint')).toContainText('Esc 取消');
@@ -274,7 +274,7 @@ test('split placement explains selection and cancellation before hover', async (
 });
 
 test('navigation controls only the adjacent sidebar and AI has an independent entrance', async ({ page }) => {
-  await expect(page.locator('[data-dock-btn="chat"]')).toHaveAttribute('title', /AI 助手 — 打开右侧面板/);
+  await expect(page.locator('[data-dock-btn="chat"]')).toHaveAttribute('data-tip', /AI 助手 — 打开右侧面板/);
   await page.locator('[data-dock-btn="files"]').click();
   await expect(page.getByText('notes.txt')).toBeVisible();
   await expect(page.getByTestId('tab-search')).toBeHidden();

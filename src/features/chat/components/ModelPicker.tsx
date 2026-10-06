@@ -61,7 +61,7 @@ function ItemControls({ profile }: { profile: ModelProfile }) {
     <div
       style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}
       onClick={(e) => e.stopPropagation()}
-      title="思考强度"
+      data-tip="思考强度"
     >
       <SlidersHorizontal size={iconSizes.compact} style={{ color: 'var(--text-muted)' }} />
       <Select<'low' | 'medium' | 'high'>
@@ -148,7 +148,8 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
             <span style={{ fontSize: 'calc(14px * var(--ui-font-scale))', fontWeight: 600, flex: 1 }}>选择模型</span>
             <button
               data-subtle
-              title="关闭"
+              data-tip="关闭"
+              aria-label="关闭"
               onClick={onClose}
               style={{
                 border: 'none', background: 'transparent', color: 'var(--text-muted)',

@@ -151,7 +151,7 @@ function AgentCard({ a, onChanged }: { a: AgentDef; onChanged: () => void }) {
       <div style={{ display: 'flex', gap: 8 }}>
         <input value={name} placeholder="名称" onChange={(e) => saving.setValue(previous => ({ ...previous, name: e.target.value }))} style={{ ...inputStyle, flex: 1, fontWeight: 600 }} />
         <SaveStatus status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
-        <button onClick={() => void del()} title="删除" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid transparent', borderRadius: 4, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>
+        <button onClick={() => void del()} data-tip="删除" aria-label="删除" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid transparent', borderRadius: 4, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>
           <X size={13} />
         </button>
       </div>
@@ -217,7 +217,7 @@ function ScheduleCard({ s, onChanged }: { s: Schedule; onChanged: () => void }) 
         <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>分钟</span>
         <button onClick={() => saving.setValue(previous => ({ ...previous, enabled: !previous.enabled }), true)} style={{ ...btnStyle }}>{enabled ? '停用' : '启用'}</button>
         <SaveStatus status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
-        <button onClick={() => void del()} title="删除" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid transparent', borderRadius: 4, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>
+        <button onClick={() => void del()} data-tip="删除" aria-label="删除" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid transparent', borderRadius: 4, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>
           <X size={13} />
         </button>
       </div>

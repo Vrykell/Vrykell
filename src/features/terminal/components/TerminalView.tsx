@@ -573,10 +573,10 @@ function TuiBanner({ tabId }: { tabId: string }) {
       <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--accent-warm)', flexShrink: 0 }} />
       <span>TUI{runningCommand ? ` · ${runningCommand}` : ''}</span>
       <div style={{ flex: 1 }} />
-      <span onClick={sendCtrlC} title="发送 Ctrl+C" style={{ fontSize: 'calc(10px * var(--ui-font-scale))', padding: '2px 6px', borderRadius: 3, cursor: 'pointer' }}>^C</span>
-      <span onClick={killApp} title="结束前台应用 (SIGTERM)" style={{ fontSize: 'calc(10px * var(--ui-font-scale))', padding: '2px 6px', borderRadius: 3, cursor: 'pointer', color: killArmed ? 'var(--accent-warm)' : 'var(--text-secondary)' }}>{killArmed ? '强杀!' : '结束'}</span>
+      <span onClick={sendCtrlC} data-tip="发送 Ctrl+C" style={{ fontSize: 'calc(10px * var(--ui-font-scale))', padding: '2px 6px', borderRadius: 3, cursor: 'pointer' }}>^C</span>
+      <span onClick={killApp} data-tip="结束前台应用 (SIGTERM)" style={{ fontSize: 'calc(10px * var(--ui-font-scale))', padding: '2px 6px', borderRadius: 3, cursor: 'pointer', color: killArmed ? 'var(--accent-warm)' : 'var(--text-secondary)' }}>{killArmed ? '强杀!' : '结束'}</span>
       {altScreenActive && (
-        <span onClick={exitFullScreen} title="退出全屏" style={{ fontSize: 'calc(10px * var(--ui-font-scale))', padding: '2px 6px', borderRadius: 3, cursor: 'pointer' }}>esc</span>
+        <span onClick={exitFullScreen} data-tip="退出全屏" style={{ fontSize: 'calc(10px * var(--ui-font-scale))', padding: '2px 6px', borderRadius: 3, cursor: 'pointer' }}>esc</span>
       )}
     </div>
   );

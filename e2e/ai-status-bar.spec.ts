@@ -30,8 +30,8 @@ test.describe('终端 AI 模式', () => {
     await expect(pill.getByTestId('pill-level')).toContainText('高');
     await expect(pill.locator('svg')).toHaveCount(2); // 模型图标 + 下拉提示（图标库实现）
     await expect(pill).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-    await expect(bar.getByTitle('深度思考')).toBeVisible();
-    await expect(bar.getByTitle('Agent 模式（可使用工具）')).toBeVisible();
+    await expect(bar.locator('[data-tip="深度思考"]')).toBeVisible();
+    await expect(bar.locator('[data-tip="Agent 模式（可使用工具）"]')).toBeVisible();
     // 切回命令模式状态栏消失
     await page.getByRole('button', { name: 'AI', exact: true }).click();
     await expect(bar).toHaveCount(0);
@@ -72,7 +72,7 @@ test.describe('终端 AI 模式', () => {
     await boot(page);
     await page.getByRole('button', { name: '命令', exact: true }).click();
     const bar = page.getByTestId('ai-status-bar');
-    await bar.getByTitle('深度思考').click();
+    await bar.locator('[data-tip="深度思考"]').click();
     const saved = await page.evaluate(() => localStorage.getItem('vrykell-agent-settings') ?? '');
     expect(saved).toContain('"deepThink":true');
   });
@@ -81,7 +81,7 @@ test.describe('终端 AI 模式', () => {
     await boot(page);
     await page.getByRole('button', { name: '命令', exact: true }).click();
     const bar = page.getByTestId('ai-status-bar');
-    await bar.getByTitle('切换模型（更多在设置页配置）').click();
+    await bar.locator('[data-tip="切换模型（更多在设置页配置）"]').click();
     // 窗口出现：搜索框 + 能力标签 + 列表项
     await expect(page.getByText('选择模型', { exact: true })).toBeVisible();
     await expect(page.getByPlaceholder('搜索模型…')).toBeVisible();
@@ -117,7 +117,7 @@ test.describe('终端 AI 模式', () => {
     });
     await expect(page.getByText('screenshot.png')).toBeVisible({ timeout: 3000 });
     // 附件 chip 显示 + 空文本也能发送（发送按钮可用）
-    const sendBtn = page.getByTitle('发送 (Enter)');
+    const sendBtn = page.locator('[data-tip="发送 (Enter)"]');
     await expect(sendBtn).toBeEnabled();
     await sendBtn.click();
     await expect(page.getByText('看到了图片')).toBeVisible({ timeout: 10000 });

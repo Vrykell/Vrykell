@@ -25,10 +25,10 @@ describe('shared navigation buttons', () => {
       expect(button).toHaveAttribute('draggable', 'false');
     }
     const ai = screen.getByRole('button', { name: 'AI 助手' });
-    expect(ai).toHaveAttribute('title', expect.stringContaining('打开右侧面板'));
+    expect(ai).toHaveAttribute('data-tip', expect.stringContaining('打开右侧面板'));
     fireEvent.click(ai);
     expect(ai).toHaveAttribute('aria-pressed', 'true');
-    expect(ai).toHaveAttribute('title', expect.stringContaining('关闭右侧面板'));
+    expect(ai).toHaveAttribute('data-tip', expect.stringContaining('关闭右侧面板'));
     expect(useDockStore.getState().rightPanels).toEqual(['chat']);
   });
   it('opens the settings page from its moved action without replacing a sidebar', () => {

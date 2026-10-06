@@ -47,7 +47,7 @@ export default function Markdown({ content }: { content: string }) {
         // 图片降级为链接文本：不加载远程图片（防追踪/外带，CSP 亦不放行 http(s) 图片源），
         // 同时避免因 CSP 拦截而裂图
         img: (props) => (
-          <a href={props.src} title={props.alt} style={{ color: 'var(--accent)', textDecoration: 'underline' }}>
+          <a href={props.src} data-tip={props.alt} style={{ color: 'var(--accent)', textDecoration: 'underline' }}>
             {props.alt || props.src}
           </a>
         ),

@@ -98,7 +98,7 @@ export default function GlobalSearch({ open, onClose }: Props) {
           <button
             data-testid="search-filter-button"
             onClick={() => setFilterOpen((openState) => !openState)}
-            title="筛选搜索范围"
+            data-tip="筛选搜索范围"
             style={{
               display: 'flex',
               alignItems: 'center',

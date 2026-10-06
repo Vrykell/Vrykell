@@ -14,7 +14,7 @@ interface HBtnProps {
 
 export function HBtn({ title, onClick, children }: HBtnProps) {
   return (
-    <button title={title} onClick={onClick} style={hBtnStyle}
+    <button data-tip={title} onClick={onClick} style={hBtnStyle}
       onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'var(--hover)'; }}
       onMouseLeave={(e) => { (e.target as HTMLElement).style.background = 'transparent'; }}
     >{children}</button>
@@ -31,7 +31,7 @@ const hBtnStyle: CSSProperties = {
 
 export function InputBtn({ title, onClick, children }: HBtnProps) {
   return (
-    <button title={title} onClick={onClick} style={inputBtnStyle}
+    <button data-tip={title} onClick={onClick} style={inputBtnStyle}
       onMouseEnter={(e) => {
         (e.target as HTMLElement).style.background = 'var(--hover)';
         (e.target as HTMLElement).style.borderColor = 'var(--border)';
@@ -103,7 +103,7 @@ export function IconBtn({ title, onClick, disabled, children, ...rest }: IconBtn
   return (
     <button
       data-subtle
-      title={title}
+      data-tip={title}
       type="button"
       aria-label={title}
       onClick={onClick}
@@ -158,7 +158,8 @@ const toolbarBtnBase: CSSProperties = {
 export function ToolbarBtn({ title, active, onClick, children, attrs }: ToolbarBtnProps) {
   return (
     <button
-      title={title}
+      data-tip={title}
+      aria-label={title}
       onClick={onClick}
       style={{
         ...toolbarBtnBase,

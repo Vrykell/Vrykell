@@ -55,6 +55,6 @@ describe('SidebarItem', () => {
     const row = screen.getByTestId('row-1');
     expect(row).toHaveAttribute('data-reorder-item', 'tab-1');
     expect(row).toHaveAttribute('data-reorder-kind', 'tab');
-    expect(row).toHaveAttribute('title', '会话提示');
+    expect(row).toHaveAttribute('data-tip', '会话提示');
   });
 });

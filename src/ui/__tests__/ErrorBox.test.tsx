@@ -70,7 +70,7 @@ describe('ErrorBox', () => {
   it('copies the raw details from the shared icon button', async () => {
     render(<ErrorBox details="raw diagnostic">出错了</ErrorBox>);
 
-    fireEvent.click(screen.getByTitle('复制技术详情'));
+    fireEvent.click(screen.getByLabelText('复制技术详情'));
 
     await waitFor(() => expect(writeClipboardTextMock).toHaveBeenCalledWith('raw diagnostic'));
   });

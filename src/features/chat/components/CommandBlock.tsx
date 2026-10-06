@@ -90,7 +90,7 @@ export default function CommandBlock({ children }: { children?: ReactNode }) {
             {/* 复制按钮固定在右上角（最右侧） */}
             <button
               data-testid="code-copy-btn"
-              title={copied ? '已复制' : '复制代码'}
+              data-tip={copied ? '已复制' : '复制代码'}
               onClick={() => void copy()}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,

@@ -80,7 +80,7 @@ export default function SidebarItem({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       tabIndex={tabIndex}
-      title={tooltip}
+      data-tip={tooltip}
       data-testid={testId}
       data-reorder-item={reorderItemId}
       data-reorder-kind={reorderKind}
@@ -115,7 +115,7 @@ export default function SidebarItem({
             data-no-drag
             className="sidebar-row-action"
             aria-label={action.label}
-            title={action.title ?? action.label}
+            data-tip={action.title ?? action.label}
             data-testid={action.testId}
             onDoubleClick={(event) => event.stopPropagation()}
             onClick={(event) => { event.stopPropagation(); action.onClick(); }}

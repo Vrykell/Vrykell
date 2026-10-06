@@ -203,7 +203,8 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
         {s && (
           <button
             onClick={() => { void discard(() => onDelete(savedName.current)); }}
-            title="删除服务器"
+            data-tip="删除服务器"
+            aria-label="删除服务器"
             style={{
               width: 26, height: 26, flexShrink: 0, display: 'inline-flex', alignItems: 'center',
               justifyContent: 'center', border: '1px solid transparent', borderRadius: 4,

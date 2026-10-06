@@ -64,7 +64,7 @@ test.describe('技能设置页', () => {
 
   test('删除技能：确认后移除并提示', async ({ page }) => {
     const row = rowOf('写单测')(page);
-    await row.getByTitle('删除技能').click();
+    await row.locator('[data-tip="删除技能"]').click();
     await expect(page.getByText('已删除 写单测')).toBeVisible();
     await expect(page.getByText('写单测')).toHaveCount(0);
     const ops = await skillOps(page);
@@ -108,7 +108,7 @@ test.describe('技能设置页', () => {
   test('安全提示条可关闭', async ({ page }) => {
     const banner = page.locator('section').getByText(/技能可能包含脚本/);
     await expect(banner).toBeVisible();
-    await banner.locator('xpath=..').getByTitle('关闭').click();
+    await banner.locator('xpath=..').locator('[data-tip="关闭"]').click();
     await expect(banner).toHaveCount(0);
   });
 });

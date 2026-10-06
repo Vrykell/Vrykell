@@ -28,7 +28,7 @@ describe('search result actions', () => {
     render(<SearchResultCard result={blockResult({ sessionStatus: 'historical', tabTitle: '远程' })}
       selected={false} query="" onSelect={vi.fn()} onExecute={execute} onRestore={restore} />);
     fireEvent.click(screen.getByText('历史会话'));
-    fireEvent.click(screen.getByTitle('恢复此会话'));
+    fireEvent.click(screen.getByLabelText('恢复此会话'));
     expect(restore.mock.calls).toEqual([['t', '远程'], ['t', '远程']]);
     expect(execute).not.toHaveBeenCalled();
   });

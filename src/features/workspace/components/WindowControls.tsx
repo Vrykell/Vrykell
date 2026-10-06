@@ -106,7 +106,7 @@ export default function WindowControls() {
         data-testid="window-minimize"
         className="window-control-button"
         aria-label="最小化窗口"
-        title="最小化"
+        data-tip="最小化"
         style={buttonStyle}
         onClick={minimize}
       >
@@ -117,7 +117,7 @@ export default function WindowControls() {
         data-testid="window-maximize"
         className="window-control-button"
         aria-label={maximized ? '还原窗口' : '最大化窗口'}
-        title={maximized ? '还原' : '最大化'}
+        data-tip={maximized ? '还原' : '最大化'}
         style={buttonStyle}
         onClick={toggleMaximize}
       >
@@ -129,7 +129,7 @@ export default function WindowControls() {
         className="window-control-button"
         data-danger="true"
         aria-label="关闭窗口"
-        title="关闭"
+        data-tip="关闭"
         style={buttonStyle}
         onClick={close}
       >

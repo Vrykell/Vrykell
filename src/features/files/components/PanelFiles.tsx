@@ -148,7 +148,7 @@ function DiskCard({ disk, onOpen }: { disk: DiskEntry; onOpen: () => void }) {
   return (
     <div
       onClick={onOpen}
-      title={`${disk.path} · 共 ${fmtSize(total)} · 已用 ${pct}%`}
+      data-tip={`${disk.path} · 共 ${fmtSize(total)} · 已用 ${pct}%`}
       data-testid={`disk-card-${disk.name}`}
       style={{
         display: 'flex', alignItems: 'center', gap: 10,

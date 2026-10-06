@@ -25,8 +25,8 @@ test('small action buttons have readable targets and tab close works from the ke
   await expect(page.locator('[data-tab-row-id]')).toHaveCount(1);
   await page.locator('[data-dock-btn="chat"]').click();
   const chat = page.locator('.workspace-side-panel[data-side="right"][data-visible="true"]');
-  await size(chat.locator('button[title^="添加附件"]'));
-  await size(chat.locator('button[title^="发送"]'));
+  await size(chat.locator('button[data-tip^="添加附件"]'));
+  await size(chat.locator('button[data-tip^="发送"]'));
   await page.screenshot({ path: test.info().outputPath('readable-actions.png'), animations: 'disabled' });
 });
 
@@ -67,7 +67,7 @@ test('workspace icons remain readable and fit inside their controls', async ({ p
   await checkSize(page.getByTestId('ssh-row-ssh-1').locator('svg').first(), 20);
   await page.locator('[data-dock-btn="chat"]').click();
   const chat = page.locator('.workspace-side-panel[data-side="right"][data-visible="true"]');
-  const attachment = chat.locator('button[title^="添加附件"] svg');
+  const attachment = chat.locator('button[data-tip^="添加附件"] svg');
   await checkSize(attachment, 18);
   await checkFits(attachment);
   await page.screenshot({ path: test.info().outputPath('workspace-icons.png'), animations: 'disabled' });

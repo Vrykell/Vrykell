@@ -67,7 +67,8 @@ export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8
         <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '2px 8px' }}>
           <button
             onClick={() => useBlockStore.getState().setAllCollapsed(tabId, !allCollapsed)}
-            title={allCollapsed ? '展开全部' : '折叠全部'}
+            data-tip={allCollapsed ? '展开全部' : '折叠全部'}
+            aria-label={allCollapsed ? '展开全部' : '折叠全部'}
             style={{
               fontSize: 'calc(10px * var(--ui-font-scale))',
               padding: '1px 8px',
@@ -274,7 +275,8 @@ const BlockItem = memo(function BlockItem({
       }}>
         <button
           onClick={toggleCollapsed}
-          title={isCollapsed ? '展开' : '折叠'}
+          data-tip={isCollapsed ? '展开' : '折叠'}
+          aria-label={isCollapsed ? '展开' : '折叠'}
           style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)',
             cursor: 'pointer', padding: 0, width: BLOCK_ACTION_BUTTON_SIZE, height: BLOCK_ACTION_BUTTON_SIZE, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
           {isCollapsed ? <ChevronRight size={BLOCK_COLLAPSE_ICON_SIZE} /> : <ChevronDown size={BLOCK_COLLAPSE_ICON_SIZE} />}
@@ -612,7 +614,7 @@ function BlockToolBtn({
   return (
     <button
       data-subtle
-      title={title}
+      data-tip={title}
       aria-label={title}
       onClick={(e) => {
         e.stopPropagation();

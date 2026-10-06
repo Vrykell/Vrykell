@@ -288,7 +288,7 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
       <button
         data-subtle
         onClick={() => setOpen((o) => !o)}
-        title={open ? '收起思考过程' : '展开思考过程'}
+        data-tip={open ? '收起思考过程' : '展开思考过程'}
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 4,
           fontFamily: 'var(--font-ui)', fontSize: 'calc(11px * var(--ui-font-scale))',
@@ -356,7 +356,8 @@ function ActionBtn({ title, onClick, children }: {
   return (
     <button
       data-subtle
-      title={title}
+      data-tip={title}
+      aria-label={title}
       onClick={(e) => { e.stopPropagation(); onClick(); }}
       style={{
         display: 'inline-flex',

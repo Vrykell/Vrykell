@@ -77,7 +77,7 @@ export default function ErrorDetails({
           data-subtle
           type="button"
           aria-expanded={open}
-          title={open ? `收起${title}` : `展开${title}`}
+          data-tip={open ? `收起${title}` : `展开${title}`}
           onClick={() => setOpen((value) => !value)}
           {...subtleHover}
           style={{
@@ -97,7 +97,8 @@ export default function ErrorDetails({
           data-subtle
           type="button"
           data-testid={copyTestId}
-          title={copied ? '已复制' : `复制${title}`}
+          data-tip={copied ? '已复制' : `复制${title}`}
+          aria-label={copied ? '已复制' : `复制${title}`}
           onClick={handleCopy}
           {...subtleHover}
           style={{

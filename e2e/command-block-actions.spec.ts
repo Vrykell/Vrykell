@@ -16,7 +16,7 @@ test.describe('命令块操作全链路', () => {
     const titles = ['AI 解释', '重新运行', '复制命令', '复制输出', '更多操作'];
     const bounds: Array<{ x: number; width: number }> = [];
     for (const title of titles) {
-      const button = block.getByTitle(title);
+      const button = block.locator(`[data-tip="${title}"]`);
       await expect(button).toHaveCSS('width', '28px');
       await expect(button).toHaveCSS('height', '28px');
       await expect(button.locator('svg')).toHaveCSS('width', '14px');
@@ -29,12 +29,12 @@ test.describe('命令块操作全链路', () => {
       const current = bounds[index]!;
       expect(current.x - previous.x - previous.width).toBeLessThanOrEqual(1);
     }
-    const collapse = block.getByTitle('折叠', { exact: true });
+    const collapse = block.locator('[data-tip="折叠"]');
     await expect(collapse).toHaveCSS('width', '28px');
     await expect(collapse.locator('svg')).toHaveCSS('width', '12px');
     await collapse.click();
-    await expect(block.getByTitle('展开', { exact: true }).locator('svg')).toHaveCSS('width', '12px');
-    await block.getByTitle('展开', { exact: true }).click();
+    await expect(block.locator('[data-tip="展开"]').locator('svg')).toHaveCSS('width', '12px');
+    await block.locator('[data-tip="展开"]').click();
     await block.hover();
     await block.screenshot({ path: test.info().outputPath('compact-toolbar.png') });
   });
@@ -80,19 +80,19 @@ test.describe('命令块操作全链路', () => {
     await expect(block).toContainText('linux-block-action');
 
     await block.hover();
-    await page.getByTitle('复制命令').click();
+    await page.locator('[data-tip="复制命令"]').click();
     await expect.poll(() => clipboardText(page)).toBe('echo linux-block-action');
     await expect(block.getByTestId('copy-command-success')).toBeVisible();
     await expect(page.getByText('已复制', { exact: true })).toHaveCount(0);
 
     await block.hover();
-    await page.getByTitle('复制输出').click();
+    await page.locator('[data-tip="复制输出"]').click();
     await expect.poll(() => clipboardText(page)).toBe('linux-block-action');
     await expect(block.getByTestId('copy-output-success')).toBeVisible();
 
     const writesBefore = (await ptyWrites(page)).length;
     await block.hover();
-    await page.getByTitle('重新运行').click();
+    await page.locator('[data-tip="重新运行"]').click();
     await expect.poll(async () => (await ptyWrites(page)).slice(writesBefore)).toContain('echo linux-block-action\n');
     await expect(block).toContainText('linux-block-action');
   });
@@ -109,14 +109,14 @@ test.describe('命令块操作全链路', () => {
     await expect(block).toBeVisible({ timeout: 5000 });
 
     await block.hover();
-    await page.getByTitle('更多操作').click();
+    await page.locator('[data-tip="更多操作"]').click();
     const menu = page.getByRole('menu', { name: '命令块操作' });
     await expect(menu).toBeVisible();
     await menu.getByRole('menuitem', { name: '复制输出' }).click();
     await expect.poll(() => clipboardText(page)).toBe('menu-action');
 
     await block.hover();
-    await page.getByTitle('更多操作').click();
+    await page.locator('[data-tip="更多操作"]').click();
     await page.getByRole('menuitem', { name: '清除所有块' }).click();
     await expect(block).toHaveCount(0);
   });

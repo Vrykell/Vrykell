@@ -345,7 +345,8 @@ export default function SkillsSettings() {
           <span style={{ flex: 1 }}>技能可能包含脚本，启用即信任其内容；脚本执行仍受 AI 权限管控。导入的第三方技能默认未信任。</span>
           <button
             onClick={() => setWarnDismissed(true)}
-            title="关闭"
+            data-tip="关闭"
+            aria-label="关闭"
             style={{ border: 'none', background: 'transparent', color: 'var(--accent-warm)', cursor: 'pointer', padding: 2, display: 'inline-flex' }}
           >
             <X size={13} />
@@ -418,7 +419,8 @@ export default function SkillsSettings() {
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); void del(m.name); }}
-              title="删除技能"
+              data-tip="删除技能"
+              aria-label="删除技能"
               style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid transparent', borderRadius: 4, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}
               onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--error-light)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}

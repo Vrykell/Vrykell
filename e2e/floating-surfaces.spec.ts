@@ -63,7 +63,7 @@ for (const theme of ['深色', '浅色']) {
     await assertSurface(palette, true);
     await palette.getByPlaceholder('搜索命令…').press('Escape');
 
-    await page.getByTitle('选择类型分裂', { exact: true }).click();
+    await page.locator('[data-tip="选择类型分裂"]').click();
     const newTab = page.getByRole('dialog', { name: '新建标签页' });
     await assertSurface(newTab, true);
     await newTab.getByPlaceholder('搜索标签页类型…').press('Escape');

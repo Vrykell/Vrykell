@@ -218,7 +218,8 @@ export default function PanelChat() {
               {sendingHere ? (
                 <button
                   data-subtle
-                  title="停止生成"
+                  data-tip="停止生成"
+                  aria-label="停止生成"
                   onClick={() => abortStream(activeId)}
                   style={{
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -233,7 +234,8 @@ export default function PanelChat() {
               ) : (
                 <button
                   data-subtle
-                  title="发送 (Enter)"
+                  data-tip="发送 (Enter)"
+                  aria-label="发送 (Enter)"
                   onClick={submit}
                   disabled={!canSend}
                   style={{
@@ -274,7 +276,8 @@ export default function PanelChat() {
                 return (
                   <button
                     data-subtle
-                    title={cur.title}
+                    data-tip={cur.title}
+                    aria-label={cur.title}
                     onClick={() => setPermMode(next.id)}
                     style={{
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -295,7 +298,8 @@ export default function PanelChat() {
               {/* 📎 附件 */}
               <button
                 data-subtle
-                title="添加附件（图片 / 文件，也可直接粘贴或拖入）"
+                data-tip="添加附件（图片 / 文件，也可直接粘贴或拖入）"
+                aria-label="添加附件（图片 / 文件，也可直接粘贴或拖入）"
                 onClick={() => void pickFiles()}
                 style={{
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',

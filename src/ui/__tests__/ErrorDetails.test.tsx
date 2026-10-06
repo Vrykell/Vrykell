@@ -47,12 +47,12 @@ describe('ErrorDetails', () => {
     render(<ErrorDetails title="组件堆栈" text="at Crash" copyTestId="details-copy" />);
 
     const copyButton = screen.getByTestId('details-copy');
-    expect(copyButton).toHaveAttribute('title', '复制组件堆栈');
+    expect(copyButton).toHaveAttribute('data-tip', '复制组件堆栈');
 
     fireEvent.click(copyButton);
 
     await waitFor(() => expect(writeClipboardTextMock).toHaveBeenCalledWith('at Crash'));
-    expect(copyButton).toHaveAttribute('title', '已复制');
+    expect(copyButton).toHaveAttribute('data-tip', '已复制');
   });
 
   it('restarts the confirmation window when copied again', async () => {
@@ -63,17 +63,17 @@ describe('ErrorDetails', () => {
 
       fireEvent.click(copyButton);
       await act(async () => { await vi.advanceTimersByTimeAsync(0); });
-      expect(copyButton).toHaveAttribute('title', '已复制');
+      expect(copyButton).toHaveAttribute('data-tip', '已复制');
 
       // Second click at t=800ms: the first timer would clear the check at
       // t=1500ms, so the restart has to keep it alive past that point.
       await act(async () => { await vi.advanceTimersByTimeAsync(800); });
       fireEvent.click(copyButton);
       await act(async () => { await vi.advanceTimersByTimeAsync(800); });
-      expect(copyButton).toHaveAttribute('title', '已复制');
+      expect(copyButton).toHaveAttribute('data-tip', '已复制');
 
       await act(async () => { await vi.advanceTimersByTimeAsync(800); });
-      expect(copyButton).toHaveAttribute('title', '复制组件堆栈');
+      expect(copyButton).toHaveAttribute('data-tip', '复制组件堆栈');
     } finally {
       vi.useRealTimers();
     }
@@ -88,6 +88,6 @@ describe('ErrorDetails', () => {
 
     await waitFor(() => expect(writeClipboardTextMock).toHaveBeenCalledTimes(1));
     await act(async () => {});
-    expect(copyButton).toHaveAttribute('title', '复制组件堆栈');
+    expect(copyButton).toHaveAttribute('data-tip', '复制组件堆栈');
   });
 });

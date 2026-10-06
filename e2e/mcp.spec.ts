@@ -25,7 +25,7 @@ test.describe('MCP 设置页', () => {
     const card = name.locator('xpath=../..');
     await name.fill('重命名中的服务器');
     await expect(card.getByRole('status')).toHaveText('保存中…');
-    await card.getByTitle('删除服务器').click();
+    await card.locator('[data-tip="删除服务器"]').click();
     await expect(page.getByPlaceholder('服务器名')).toHaveCount(0);
     expect(await mcpServers(page)).toEqual([]);
   });
@@ -93,7 +93,7 @@ test.describe('MCP 设置页', () => {
     expect(ops.some((o) => o.op === 'toggle' && o.name === '文件系统')).toBe(true);
 
     // 删除
-    await card.getByTitle('删除服务器').click();
+    await card.locator('[data-tip="删除服务器"]').click();
     await expect(page.getByText('已删除 文件系统')).toBeVisible();
     await expect(nameInputs).toHaveCount(0);
   });

@@ -337,7 +337,7 @@ function GroupSection(props: {
             if (props.renamingGroupId !== group.id) props.onStartRenameGroup();
           }}
           onPointerDown={props.onPointerDownGroup}
-          title="点击折叠/展开 · 双击重命名 · 拖拽排序"
+          data-tip="点击折叠/展开 · 双击重命名 · 拖拽排序"
           style={{
             display: 'flex', alignItems: 'center', gap: 8,
             padding: '6px 8px', minHeight: 40, cursor: 'pointer',
@@ -433,21 +433,21 @@ function GroupActions({ onAdd, onRename, onDelete, empty }: {
 }) {
   return (
     <span className="group-actions" style={{ display: 'inline-flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
-      <button data-subtle data-no-drag title="在此分组新建终端"
+      <button data-subtle data-no-drag data-tip="在此分组新建终端" aria-label="在此分组新建终端"
         onClick={(e) => { e.stopPropagation(); onAdd(); }}
         style={actionStyle}
         onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}>
         <Plus size={iconSizes.compact} />
       </button>
-      <button data-subtle data-no-drag title="重命名分组"
+      <button data-subtle data-no-drag data-tip="重命名分组" aria-label="重命名分组"
         onClick={(e) => { e.stopPropagation(); onRename(); }}
         style={actionStyle}
         onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}>
         <Pencil size={iconSizes.compact} />
       </button>
-      <button data-subtle data-no-drag title={empty ? '删除分组' : '归档分组（移入会话历史）'}
+      <button data-subtle data-no-drag data-tip={empty ? '删除分组' : '归档分组（移入会话历史）'} aria-label={empty ? '删除分组' : '归档分组（移入会话历史）'}
         onClick={(e) => { e.stopPropagation(); onDelete(); }}
         style={actionStyle}
         onMouseEnter={(e) => { e.currentTarget.style.color = empty ? 'var(--error-light)' : 'var(--text-secondary)'; }}
@@ -535,7 +535,7 @@ function TabRow({
       ) : undefined}
       badge={tab.kind === 'session' && terms.length > 1 ? (
         <span
-          title={typeSummary}
+          data-tip={typeSummary}
           style={{ display: 'inline-flex', alignItems: 'center', height: 16, padding: '0 6px', flexShrink: 0, lineHeight: '14px' }}
         >
           <span style={{ fontSize: 'calc(10px * var(--ui-font-scale))', fontWeight: 600, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
