@@ -58,6 +58,26 @@ describe('useFileBrowser（本地目标）', () => {
     await waitFor(() => expect(noCwd.result.current.path).toBe('C:/Users/test'));
   });
 
+  it('调用方每次渲染换新回调时不重新拉取目录（如调整面板宽度导致的重渲染）', async () => {
+    const { result, rerender } = renderHook(
+      ({ tick }: { tick: number }) => useFileBrowser({
+        target: LOCAL_TARGET,
+        initialPath: 'C:/work',
+        openEntry,
+        // 内联回调：每次渲染都是新函数（与 RemoteFiles 传入的写法一致）
+        onPathChange: () => { void tick; },
+      }),
+      { initialProps: { tick: 0 } },
+    );
+    await waitFor(() => expect(result.current.entries).toHaveLength(2));
+    const callsAfterMount = fsMocks.fsList.mock.calls.length;
+
+    rerender({ tick: 1 });
+    rerender({ tick: 2 });
+
+    expect(fsMocks.fsList.mock.calls.length).toBe(callsAfterMount);
+  });
+
   it('导航压入视图快照，回退还原选中与滚动位置', async () => {
     fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
       dir === 'C:/work/src' ? [entry('main.ts', 'C:/work/src/main.ts')] : [entry('src', 'C:/work/src', true), entry('a.txt', 'C:/work/a.txt')],
