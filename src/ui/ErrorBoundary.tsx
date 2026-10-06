@@ -1,5 +1,8 @@
-import { Component, useState, type ErrorInfo, type ReactNode } from 'react';
-import { TriangleAlert, Copy, Check } from '@ui/icons';
+import {
+  Component, useState,
+  type CSSProperties, type ErrorInfo, type MouseEvent, type ReactNode,
+} from 'react';
+import { Check, ChevronRight, Copy, TriangleAlert } from '@ui/icons';
 import { writeClipboardText } from '@platform/clipboard';
 
 interface Props {
@@ -49,39 +52,114 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 }
 
-/** Diagnostic text copied from the fallback page for bug reports. */
-function buildErrorReport(error: Error, componentStack?: string): string {
-  return [
-    `${error.name}: ${error.message}`,
-    '',
-    '完整错误堆栈:',
-    error.stack ?? '(无堆栈信息)',
-    ...(componentStack ? ['', '组件堆栈:', componentStack.trim()] : []),
-  ].join('\n');
-}
+/** Hover feedback shared by the subtle header buttons. */
+const subtleHover = {
+  onMouseEnter: (event: MouseEvent<HTMLButtonElement>) => {
+    event.currentTarget.style.background = 'var(--hover)';
+    event.currentTarget.style.color = 'var(--text-secondary)';
+  },
+  onMouseLeave: (event: MouseEvent<HTMLButtonElement>) => {
+    event.currentTarget.style.background = 'transparent';
+    event.currentTarget.style.color = 'var(--text-muted)';
+  },
+};
 
-function DefaultFallback({
-  error,
-  componentStack,
-  onReset,
+/**
+ * Collapsible diagnostic box: a chevron toggle button on the left, an
+ * icon-only copy button in the top-right corner, and the raw text below.
+ */
+function DiagnosticSection({
+  title,
+  text,
+  copyTestId,
+  defaultOpen = false,
+  preStyle,
 }: {
-  error: Error;
-  componentStack?: string;
-  onReset: () => void;
+  title: string;
+  text: string;
+  copyTestId: string;
+  defaultOpen?: boolean;
+  preStyle?: CSSProperties;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
-    void writeClipboardText(buildErrorReport(error, componentStack))
+    void writeClipboardText(text)
       .then(() => {
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       })
       .catch(() => {
-        // The stacks stay selectable when the clipboard is unavailable.
+        // The text stays selectable when the clipboard is unavailable.
       });
   };
 
+  return (
+    <div style={{
+      maxWidth: 520, width: '100%',
+      background: 'var(--surface)', border: '1px solid var(--border)',
+      borderRadius: 6, overflow: 'hidden',
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
+        padding: '2px 3px 2px 2px', background: 'var(--command-block-bg)',
+        borderBottom: open ? '1px solid var(--border)' : 'none',
+      }}>
+        <button
+          data-subtle
+          type="button"
+          aria-expanded={open}
+          title={open ? `收起${title}` : `展开${title}`}
+          onClick={() => setOpen((value) => !value)}
+          {...subtleHover}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            fontFamily: 'var(--font-ui)', fontSize: 'calc(11px * var(--ui-font-scale))',
+            padding: '3px 6px', border: 'none', borderRadius: 4,
+            background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+          }}
+        >
+          <ChevronRight size={11} style={{
+            transition: 'transform 0.12s ease',
+            transform: open ? 'rotate(90deg)' : 'none',
+          }} />
+          <span>{title}</span>
+        </button>
+        <button
+          data-subtle
+          type="button"
+          data-testid={copyTestId}
+          title={copied ? '已复制' : `复制${title}`}
+          onClick={handleCopy}
+          {...subtleHover}
+          style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            width: 22, height: 22, padding: 0, border: 'none', borderRadius: 4, flexShrink: 0,
+            background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+          }}
+        >
+          {copied ? <Check size={12} style={{ color: 'var(--success)' }} /> : <Copy size={12} />}
+        </button>
+      </div>
+      {open && (
+        <pre data-selectable style={{
+          margin: 0, padding: 12, overflow: 'auto',
+          whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          ...preStyle,
+        }}>
+          {text}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+function DefaultFallback({ error, componentStack, onReset }: {
+  error: Error;
+  componentStack?: string;
+  onReset: () => void;
+}) {
   return (
     <div style={{
       height: '100vh', display: 'flex', flexDirection: 'column',
@@ -97,65 +175,37 @@ function DefaultFallback({
       }}>
         {error.message}
       </p>
-      <details open style={{ maxWidth: 520, width: '100%' }}>
-        <summary style={{
-          cursor: 'pointer', fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)',
-          marginBottom: 8,
-        }}>
-          完整错误堆栈
-        </summary>
-        <pre data-selectable style={{
-          fontSize: 'calc(9px * var(--ui-font-scale))', color: 'var(--error)', overflow: 'auto',
-          background: 'var(--surface)', padding: 12, borderRadius: 6,
-          border: '1px solid var(--border)', maxHeight: 120,
-          whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-        }}>
-          {error.stack}
-        </pre>
-      </details>
+      <DiagnosticSection
+        title="完整错误堆栈"
+        text={error.stack ?? '(无堆栈信息)'}
+        copyTestId="error-copy-stack"
+        defaultOpen
+        preStyle={{
+          fontSize: 'calc(9px * var(--ui-font-scale))',
+          color: 'var(--error)', maxHeight: 120,
+        }}
+      />
       {componentStack && (
-        <details style={{ maxWidth: 520, width: '100%' }}>
-          <summary style={{
-            cursor: 'pointer', fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)',
-            marginBottom: 8,
-          }}>
-            组件堆栈
-          </summary>
-          <pre data-selectable style={{
-            fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)', overflow: 'auto',
-            background: 'var(--surface)', padding: 12, borderRadius: 6,
-            border: '1px solid var(--border)', maxHeight: 200,
-            whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-          }}>
-            {componentStack.trim()}
-          </pre>
-        </details>
+        <DiagnosticSection
+          title="组件堆栈"
+          text={componentStack.trim()}
+          copyTestId="error-copy-component-stack"
+          preStyle={{
+            fontSize: 'calc(10px * var(--ui-font-scale))',
+            color: 'var(--text-muted)', maxHeight: 200,
+          }}
+        />
       )}
-      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-        <button
-          data-testid="error-copy-btn"
-          onClick={handleCopy}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '8px 16px', fontSize: 'calc(13px * var(--ui-font-scale))',
-            background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 6,
-            color: 'var(--text-primary)', cursor: 'pointer',
-          }}
-        >
-          {copied ? <Check size={14} style={{ color: 'var(--success)' }} /> : <Copy size={14} />}
-          {copied ? '已复制' : '复制错误信息'}
-        </button>
-        <button
-          onClick={onReset}
-          style={{
-            padding: '8px 24px', fontSize: 'calc(13px * var(--ui-font-scale))',
-            background: 'var(--accent)', border: 'none', borderRadius: 6,
-            color: 'var(--accent-text)', cursor: 'pointer',
-          }}
-        >
-          重试
-        </button>
-      </div>
+      <button
+        onClick={onReset}
+        style={{
+          marginTop: 8, padding: '8px 24px', fontSize: 'calc(13px * var(--ui-font-scale))',
+          background: 'var(--accent)', border: 'none', borderRadius: 6,
+          color: 'var(--accent-text)', cursor: 'pointer',
+        }}
+      >
+        重试
+      </button>
     </div>
   );
 }
