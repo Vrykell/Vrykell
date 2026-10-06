@@ -14,7 +14,7 @@ function fmtTime(ms: number): string {
 }
 
 /**
- * DownloadManager — 下载管理页（入口在文件面板顶栏）。
+ * DownloadManager — 下载管理页（入口在文件面板顶栏的更多菜单）。
  * 展示下载历史（文件/目录），支持在系统文件管理器中定位，支持清空历史。
  */
 export default function DownloadManager({ onBack }: { onBack: () => void }) {
