@@ -123,7 +123,7 @@ export default function ModelPill({ showThinking = true }: { showThinking?: bool
           {/* 名称区（约 70%）：打开模型选择窗口 */}
           <button
             data-testid="pill-name"
-            title="切换模型（更多在设置页配置）"
+            data-tip="切换模型（更多在设置页配置）"
             onClick={() => setPickerOpen(true)}
             style={{
               flex: showThinking ? '0 0 auto' : '1 1 auto', minWidth: 0, display: 'flex', alignItems: 'center', gap: 6,
@@ -150,7 +150,7 @@ export default function ModelPill({ showThinking = true }: { showThinking?: bool
           {/* 强度区（约 30%）：原位弹出思考强度下拉 */}
           <button
             data-testid="pill-level"
-            title={`思考强度：${levelLabel}`}
+            data-tip={`思考强度：${levelLabel}`}
             onClick={() => {
               setLockedWidth(pillRef.current?.offsetWidth ?? null);
               setLevelOpen(true);

@@ -58,7 +58,7 @@ test.describe('模型配置页', () => {
 
     // 删除新模型 → 回 2 个
     const newCard = nameInputs.nth(2).locator('xpath=../../..');
-    await newCard.getByTitle('删除模型').click();
+    await newCard.locator('[data-tip="删除模型"]').click();
     await expect(page.getByPlaceholder('模型名称')).toHaveCount(2);
   });
 

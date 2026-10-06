@@ -93,7 +93,7 @@ export default function DownloadManager({ onBack }: { onBack: () => void }) {
           return (
             <div key={entry.id}
               data-testid={`download-item-${entry.name}`}
-              title={`远程路径：${entry.remotePath}`}
+              data-tip={`远程路径：${entry.remotePath}`}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '5px 10px', fontSize: 'calc(12px * var(--ui-font-scale))',
@@ -114,7 +114,7 @@ export default function DownloadManager({ onBack }: { onBack: () => void }) {
                 </span>
               </div>
               <button onClick={() => reveal(entry)} data-testid={`download-reveal-${entry.name}`}
-                title="在文件管理器中显示"
+                data-tip="在文件管理器中显示"
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
                   fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', border: '1px solid var(--border)',

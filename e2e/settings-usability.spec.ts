@@ -69,7 +69,7 @@ test('chat mode dropdown persists per model and replaces the two header toggles'
   const mode = page.getByRole('button', { name: '对话模式' });
   await page.mouse.move(0, 0);
   await expect(mode).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  await expect(page.getByTitle('深度思考（reasoning effort）')).toHaveCount(0);
+  await expect(page.locator('[data-tip="深度思考（reasoning effort）"]')).toHaveCount(0);
   await expect(page.getByTestId('pill-level')).toHaveCount(0);
   const modeBounds = await mode.boundingBox();
   const modelBounds = await page.getByTestId('pill-name').boundingBox();

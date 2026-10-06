@@ -56,7 +56,7 @@ describe('TerminalBlockList', () => {
     fireEvent.mouseEnter(screen.getByTestId('command-block-b1'));
 
     for (const title of ['AI 解释', '重新运行', '复制命令', '复制输出', '更多操作']) {
-      const button = screen.getByTitle(title);
+      const button = screen.getByLabelText(title);
       expect(button).toHaveStyle({ width: '28px', minWidth: '28px', height: '28px', padding: '0px' });
       expect(button.querySelector('svg')).toHaveStyle({ width: '14px', height: '14px' });
     }
@@ -65,11 +65,11 @@ describe('TerminalBlockList', () => {
   it('折叠与展开箭头使用较小图标，同时保持一致的按钮尺寸', () => {
     useBlockStore.getState().setBlocks('t1', [block({})]);
     render(<TerminalBlockList tabId="t1" />);
-    const collapse = screen.getByTitle('折叠');
+    const collapse = screen.getByLabelText('折叠');
     expect(collapse).toHaveStyle({ width: '28px', height: '28px' });
     expect(collapse.querySelector('svg')).toHaveStyle({ width: '12px', height: '12px' });
     fireEvent.click(collapse);
-    expect(screen.getByTitle('展开').querySelector('svg')).toHaveStyle({ width: '12px', height: '12px' });
+    expect(screen.getByLabelText('展开').querySelector('svg')).toHaveStyle({ width: '12px', height: '12px' });
   });
 
   it('截断提示：linesTruncated > 0 显示已截断', () => {
@@ -100,7 +100,7 @@ describe('TerminalBlockList', () => {
       block({ status: 'executing', command: 'npm i', outputText: 'fetching…' }),
     ]);
     render(<TerminalBlockList tabId="t1" />);
-    expect(screen.getByTitle('终止命令 (Ctrl+C)')).toBeTruthy();
+    expect(screen.getByLabelText('终止命令 (Ctrl+C)')).toBeTruthy();
     for (const name of [
       '终止命令 (Ctrl+C)',
       '结束前台应用（SIGTERM；3 秒内再点强杀 SIGKILL）',

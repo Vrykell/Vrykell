@@ -85,11 +85,11 @@ describe('ErrorBoundary fallback', () => {
     renderCrash();
 
     const copyButton = screen.getByTestId('error-copy-stack');
-    expect(copyButton).toHaveAttribute('title', '复制完整错误堆栈');
+    expect(copyButton).toHaveAttribute('data-tip', '复制完整错误堆栈');
 
     fireEvent.click(copyButton);
 
-    await waitFor(() => expect(copyButton).toHaveAttribute('title', '已复制'));
+    await waitFor(() => expect(copyButton).toHaveAttribute('data-tip', '已复制'));
   });
 
   it('keeps the icon button idle when the clipboard write fails', async () => {
@@ -101,6 +101,6 @@ describe('ErrorBoundary fallback', () => {
 
     await waitFor(() => expect(writeClipboardTextMock).toHaveBeenCalledTimes(1));
     await act(async () => {});
-    expect(copyButton).toHaveAttribute('title', '复制完整错误堆栈');
+    expect(copyButton).toHaveAttribute('data-tip', '复制完整错误堆栈');
   });
 });

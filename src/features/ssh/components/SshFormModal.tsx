@@ -254,11 +254,11 @@ export default function SshFormModal({ open, initial, onClose, onConnect }: Prop
           <div style={rowMain}>
             <label style={label}>
               跳板机（可选）
-              <input value={jumpHost} onChange={e => setJumpHost(e.target.value)} style={field} data-testid="ssh-form-jump" placeholder="用户@主机:端口" title="多个跳板机用逗号分隔" />
+              <input value={jumpHost} onChange={e => setJumpHost(e.target.value)} style={field} data-testid="ssh-form-jump" placeholder="用户@主机:端口" data-tip="多个跳板机用逗号分隔" />
             </label>
             <label style={label}>
               保活间隔（秒）
-              <input type="number" min={0} max={3600} value={keepalive} onChange={e => setKeepalive(e.target.value)} style={field} data-testid="ssh-form-keepalive" title="0 表示关闭保活" />
+              <input type="number" min={0} max={3600} value={keepalive} onChange={e => setKeepalive(e.target.value)} style={field} data-testid="ssh-form-keepalive" data-tip="0 表示关闭保活" />
             </label>
           </div>
 

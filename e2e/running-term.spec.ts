@@ -12,7 +12,7 @@ async function startRunningBlock(page: import('@playwright/test').Page) {
   const input = page.getByPlaceholder(/输入命令/);
   await expect(input).toBeVisible({ timeout: 5000 });
   await emitPtyOutput(page, `\x1b]133;E;${btoa('sleep 100')}\x07\x1b]133;C\x07`);
-  await expect(page.getByTitle('终止命令 (Ctrl+C)')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('[data-tip="终止命令 (Ctrl+C)"]')).toBeVisible({ timeout: 5000 });
 }
 
 test('运行中 block 挂载可见 xterm，输出实时渲染，完成后换成快照', async ({ page }) => {
@@ -98,7 +98,7 @@ test('手动全屏：块内活终端搬进全屏宿主，退出后搬回卡片',
   await expectAnyTermContains(page, 'tui-content-line', 3000);
 
   // 进入全屏：el 搬进 tui-fullscreen，内容仍在（块路由下主 xterm 是空壳）
-  await page.getByTitle('进入全屏交互').click();
+  await page.locator('[data-tip="进入全屏交互"]').click();
   const fs = page.getByTestId('tui-fullscreen');
   await expect(fs.locator('.xterm')).toBeVisible();
   await expect(cardHost.locator('.xterm')).toHaveCount(0);
@@ -125,7 +125,7 @@ test('手动全屏：块内活终端搬进全屏宿主，退出后搬回卡片',
   await expectAnyTermContains(page, 'tui-second-line');
 
   // esc 退出全屏 → el 搬回卡片
-  await page.getByTitle('退出全屏').click();
+  await page.locator('[data-tip="退出全屏"]').click();
   await expect(cardHost.locator('.xterm')).toBeVisible();
   await expect(page.getByTestId('tui-fullscreen')).toHaveCount(0);
 });

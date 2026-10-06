@@ -2,6 +2,7 @@ import CommandPalette from '@app/overlays/CommandPalette';
 import GlobalSearch from '@features/search/components/GlobalSearch';
 import NewTabModal from '@features/workspace/components/NewTabModal';
 import ToastContainer from '@ui/Toast';
+import TooltipLayer from '@ui/TooltipLayer';
 import { useUiStore } from '@features/workspace';
 import type { TerminalSpec } from '@features/workspace/model/windowLayout';
 
@@ -24,6 +25,7 @@ export default function ApplicationOverlays({ onPickSplit }: ApplicationOverlays
       <GlobalSearch open={globalSearchOpen} onClose={() => setGlobalSearchOpen(false)} />
       <NewTabModal open={splitPickerOpen} onClose={closeSplitPicker} onPick={onPickSplit} />
       <ToastContainer />
+      <TooltipLayer />
     </>
   );
 }

@@ -57,7 +57,7 @@ test.describe('文件面板', () => {
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
 
     // 点击当前路径进入编辑态：显示完整路径并且文本全选
-    await bar.getByTitle('单击编辑路径，回车跳转').click();
+    await bar.locator('[data-tip="单击编辑路径，回车跳转"]').click();
     await expect(input).toBeVisible();
     await expect(input).toHaveValue('/home/e2e/project');
     await input.fill('/home/e2e/Documents');
@@ -66,14 +66,14 @@ test.describe('文件面板', () => {
     await expect(input).toHaveCount(0);
 
     // Esc 取消编辑，路径不变
-    await bar.getByTitle('单击编辑路径，回车跳转').click();
+    await bar.locator('[data-tip="单击编辑路径，回车跳转"]').click();
     await expect(input).toHaveValue('/home/e2e/Documents');
     await input.press('Escape');
     await expect(input).toHaveCount(0);
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/Documents');
 
     // 失焦取消编辑，路径不变
-    await bar.getByTitle('单击编辑路径，回车跳转').click();
+    await bar.locator('[data-tip="单击编辑路径，回车跳转"]').click();
     await input.fill('/home/e2e/Downloads');
     await tree.getByText('notes.txt').click();
     await expect(input).toHaveCount(0);

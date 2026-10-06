@@ -177,7 +177,7 @@ function ModelListField() {
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span
-                title={providerLabel(m.provider)}
+                data-tip={providerLabel(m.provider)}
                 style={{
                   width: 28, height: 28, borderRadius: 7, flexShrink: 0,
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -210,7 +210,8 @@ function ModelListField() {
               <button
                 data-subtle
                 onClick={() => remove(m.id)}
-                title="删除模型"
+                data-tip="删除模型"
+                aria-label="删除模型"
                 style={{
                   width: 24, height: 24, flexShrink: 0, display: 'inline-flex',
                   alignItems: 'center', justifyContent: 'center',

@@ -36,7 +36,7 @@ export default function AttachmentChips({ atts, previewId, onPreview, onRemove }
           >
             <Icon size={11} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />
             <span
-              title={`${a.name}（点击预览）`}
+              data-tip={`${a.name}（点击预览）`}
               onClick={() => onPreview(a.id)}
               style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}
             >
@@ -45,7 +45,8 @@ export default function AttachmentChips({ atts, previewId, onPreview, onRemove }
             {onRemove && (
               <button
                 data-subtle
-                title="移除附件"
+                data-tip="移除附件"
+                aria-label="移除附件"
                 onClick={() => onRemove(a.id)}
                 style={{
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',

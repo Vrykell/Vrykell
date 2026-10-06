@@ -206,7 +206,14 @@ export default function InputEditor({
               opacity: chatOpen ? 0.45 : 1,
             }}
             onClick={toggleAiMode}
-            title={
+            data-tip={
+              chatOpen
+                ? 'AI 对话面板开启中，请在面板中提问'
+                : aiMode
+                  ? '切回命令模式'
+                  : '切换到 AI 模式'
+            }
+            aria-label={
               chatOpen
                 ? 'AI 对话面板开启中，请在面板中提问'
                 : aiMode
@@ -275,7 +282,8 @@ export default function InputEditor({
               {sendingHere ? (
               <button
                 data-subtle
-                title="停止生成"
+                data-tip="停止生成"
+                aria-label="停止生成"
                 onClick={() => abortStream(activeId)}
                 style={{
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -290,7 +298,8 @@ export default function InputEditor({
             ) : (
               <button
                 data-subtle
-                title="发送 (Enter)"
+                data-tip="发送 (Enter)"
+                aria-label="发送 (Enter)"
                 onClick={execute}
                 disabled={!canSendAi}
                 style={{
@@ -340,7 +349,7 @@ export default function InputEditor({
             onClick={() => {
               if (!chatOpen) setAiMode(!aiMode);
             }}
-            title={
+            data-tip={
               chatOpen ? 'AI 对话面板开启中，请在面板中提问' : aiMode ? '切回命令模式' : '切换到 AI 模式'
             }
             style={{
@@ -380,7 +389,8 @@ export default function InputEditor({
                 return (
                   <button
                     data-subtle
-                    title={cur.title}
+                    data-tip={cur.title}
+                    aria-label={cur.title}
                     onClick={() => setPermMode(next.id)}
                     style={{
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -396,7 +406,8 @@ export default function InputEditor({
               })()}
               <button
                 data-subtle
-                title="添加附件（图片 / 文件，也可直接粘贴或拖入）"
+                data-tip="添加附件（图片 / 文件，也可直接粘贴或拖入）"
+                aria-label="添加附件（图片 / 文件，也可直接粘贴或拖入）"
                 onClick={() => void pickFiles()}
                 style={{
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -432,7 +443,8 @@ function InputActionBtn({ title, onClick, children }: {
   return (
     <button
       data-subtle
-      title={title}
+      data-tip={title}
+      aria-label={title}
       onClick={onClick}
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -464,7 +476,7 @@ export function CurrentDir({ dir }: { dir?: string }) {
       : path
     : '~/project';
   return (
-    <span className="terminal-directory" title={path} style={{ fontFamily: 'var(--font-mono)', fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)' }}>
+    <span className="terminal-directory" data-tip={path} style={{ fontFamily: 'var(--font-mono)', fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)' }}>
       {label}
     </span>
   );
@@ -477,7 +489,7 @@ function GitBranchLabel({ branch }: { branch: string }) {
   return (
     <span
       className="terminal-branch"
-      title={branch}
+      data-tip={branch}
       style={{
         fontFamily: 'var(--font-mono)',
         fontSize: 'calc(11px * var(--ui-font-scale))',

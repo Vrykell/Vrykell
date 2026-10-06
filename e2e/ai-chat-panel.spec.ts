@@ -36,7 +36,7 @@ test.describe('AI 对话面板', () => {
     await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
     // 终端输入栏的 cmd pill 提示去面板提问（点击被守卫拦截）
     const pill = page.getByRole('button', { name: '命令', exact: true });
-    await expect(pill).toHaveAttribute('title', /AI 对话面板开启中/);
+    await expect(pill).toHaveAttribute('data-tip', /AI 对话面板开启中/);
     await pill.click();
     await expect(page.getByPlaceholder(/自然语言描述/)).toHaveCount(1); // 终端未进入 AI 模式
   });
@@ -46,7 +46,7 @@ test.describe('AI 对话面板', () => {
     await page.locator('[data-dock-btn="chat"]').click();
     await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
     // 打开模型选择窗口
-    await page.getByTitle('切换模型（更多在设置页配置）').click();
+    await page.locator('[data-tip="切换模型（更多在设置页配置）"]').click();
     await expect(page.getByText('选择模型', { exact: true })).toBeVisible();
     await expect(page.getByPlaceholder('搜索模型…')).toBeVisible();
     // 两个模型列表项（带能力徽标）
@@ -81,7 +81,7 @@ test.describe('AI 对话面板', () => {
     await boot(page, '好的');
     await page.locator('[data-dock-btn="chat"]').click();
     await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
-    await page.getByTitle('切换模型（更多在设置页配置）').click();
+    await page.locator('[data-tip="切换模型（更多在设置页配置）"]').click();
     const row = page.getByTestId('model-pick-m-main');
     await expect(row).toBeVisible();
     const select = row.getByTestId('think-level-m-main');
@@ -105,6 +105,6 @@ test.describe('AI 对话面板', () => {
     await page.getByRole('option', { name: /^Agent 模式/ }).click();
     saved = await page.evaluate(() => localStorage.getItem('vrykell-agent-settings') ?? '');
     expect(saved).toContain('"agentMode":true');
-    await expect(page.getByTitle('深度思考（reasoning effort）')).toHaveCount(0);
+    await expect(page.locator('[data-tip="深度思考（reasoning effort）"]')).toHaveCount(0);
   });
 });

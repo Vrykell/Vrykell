@@ -46,6 +46,20 @@
 
 * { box-sizing: border-box; }
 
+/* One themed hover hint for the whole app: the OS tooltip renders in its own style. */
+.app-tooltip {
+  position: fixed; z-index: 9999; pointer-events: none;
+  max-width: 340px; padding: 3px 8px;
+  background: var(--surface); color: var(--text-primary);
+  border: 1px solid var(--border-strong); border-radius: 6px;
+  box-shadow: var(--shadow-md);
+  font: calc(11px * var(--ui-font-scale))/1.5 var(--font-mono);
+  overflow-wrap: anywhere;
+  animation: app-tooltip-in var(--dur-fast) var(--ease);
+}
+@keyframes app-tooltip-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .app-tooltip { animation: none; } }
+
 /* Floating surfaces share the workspace palette and a restrained outline. */
 .workspace-floating {
   background: var(--surface); color: var(--text-primary);

@@ -150,7 +150,7 @@ function ToastItem({ t }: { t: ToastItem }) {
       <span style={{ flex: 1, minWidth: 0, overflowWrap: 'break-word' }}>{t.message}</span>
       <button
         onClick={() => removeToast(t.id)}
-        title="关闭"
+        data-tip="关闭"
         aria-label="关闭通知"
         style={{
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',

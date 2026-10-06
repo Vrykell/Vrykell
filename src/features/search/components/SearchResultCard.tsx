@@ -194,7 +194,8 @@ function RestoreBtn({ onClick }: { onClick: (e: React.MouseEvent) => void }) {
   return (
     <button
       onClick={onClick}
-      title="恢复此会话"
+      data-tip="恢复此会话"
+      aria-label="恢复此会话"
       style={{
         flexShrink: 0,
         width: 22, height: 22,

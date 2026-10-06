@@ -48,7 +48,7 @@ test.describe('子代理设置页', () => {
 
     // 删除
     const card = nameInputs.nth(1).locator('xpath=../..');
-    await card.getByTitle('删除').click();
+    await card.locator('[data-tip="删除"]').click();
     await expect(page.locator('section').getByPlaceholder('名称')).toHaveCount(1);
     expect((await agentOps(page)).some((o) => o.op === 'remove')).toBe(true);
   });
@@ -75,7 +75,7 @@ test.describe('定时任务设置页', () => {
     await expect(card.getByRole('button', { name: '启用' })).toBeVisible();
 
     // 删除
-    await card.getByTitle('删除').click();
+    await card.locator('[data-tip="删除"]').click();
     await expect(page.locator('section').getByPlaceholder('名称')).toHaveCount(1);
     expect((await scheduleOps(page)).some((o) => o.op === 'remove')).toBe(true);
   });

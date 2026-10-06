@@ -93,7 +93,7 @@ export default function SessionHistoryView() {
               const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
               setFilterMenu({ x: r.left, y: r.bottom + 4 });
             }}
-            title={hasFilter ? '筛选（当前已启用，点击调整）' : '筛选'}
+            data-tip={hasFilter ? '筛选（当前已启用，点击调整）' : '筛选'}
             data-testid="session-filter-btn"
             style={{
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -108,7 +108,7 @@ export default function SessionHistoryView() {
 
         <button
           onClick={load}
-          title="刷新"
+          data-tip="刷新"
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 4,
             fontSize: 'calc(11px * var(--ui-font-scale))', padding: '3px 8px', border: '1px solid var(--border)',
@@ -162,7 +162,7 @@ export default function SessionHistoryView() {
                     <div
                       className="tab-group-header"
                       onClick={() => toggleCollapsed(g.id, g.collapsed)}
-                      title="点击折叠/展开"
+                      data-tip="点击折叠/展开"
                       style={{
                         display: 'flex', alignItems: 'center', gap: 8,
                         padding: '6px 8px', minHeight: 40, cursor: 'pointer',
@@ -186,7 +186,8 @@ export default function SessionHistoryView() {
                       </span>
                       <button
                         data-subtle
-                        title="恢复分组（重建组内历史会话为标签页）"
+                        data-tip="恢复分组（重建组内历史会话为标签页）"
+                        aria-label="恢复分组（重建组内历史会话为标签页）"
                         onClick={(e) => { e.stopPropagation(); void restoreGroup(g); }}
                         style={{
                           display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -199,7 +200,8 @@ export default function SessionHistoryView() {
                       </button>
                       <button
                         data-subtle
-                        title="删除分组及其全部会话历史"
+                        data-tip="删除分组及其全部会话历史"
+                        aria-label="删除分组及其全部会话历史"
                         onClick={(e) => { e.stopPropagation(); void deleteGroup(g); }}
                         style={{
                           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -354,7 +356,7 @@ function SessionRow({
   return (
     <div
       onClick={onOpen}
-      title={historical ? '点击恢复此会话' : '点击切换到该会话'}
+      data-tip={historical ? '点击恢复此会话' : '点击切换到该会话'}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -393,7 +395,8 @@ function SessionRow({
       {onDelete && (
         <button
           data-subtle
-          title="删除此会话"
+          data-tip="删除此会话"
+          aria-label="删除此会话"
           data-testid={`session-delete-${s.id}`}
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
           style={{
