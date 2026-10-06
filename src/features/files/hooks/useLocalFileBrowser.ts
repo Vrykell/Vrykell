@@ -11,7 +11,8 @@ interface UseLocalFileBrowserOptions {
 interface BrowserViewSnapshot {
   path: string | null;
   expanded: ReadonlySet<string>;
-  selectedPath: string | null;
+  selection: ReadonlySet<string>;
+  anchorPath: string | null;
   scrollTop: number;
 }
 
@@ -26,7 +27,8 @@ const LOADING_HINT_DELAY_MS = 150;
 export function useLocalFileBrowser({ initialCwd }: UseLocalFileBrowserOptions) {
   const [path, setBrowserPath] = useState<string | null>(() => initialCwd ? normPath(initialCwd) : null);
   const initialized = useRef(Boolean(initialCwd));
-  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [selection, setSelectionState] = useState<ReadonlySet<string>>(new Set());
+  const [anchorPath, setAnchorPath] = useState<string | null>(null);
   const [loadedPath, setLoadedPath] = useState<string | null | undefined>(undefined);
   const [history, setHistory] = useState<BrowserViewSnapshot[]>([]);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -129,6 +131,30 @@ export function useLocalFileBrowser({ initialCwd }: UseLocalFileBrowserOptions) 
     if (scrollRef.current) scrollRef.current.scrollTop = target;
   }, [loadedPath, loading, path]);
 
+  /** Replace the selection with a single row (plain click, keyboard cursor). */
+  const selectOnly = useCallback((target: string | null) => {
+    setSelectionState(target === null ? new Set() : new Set([target]));
+    setAnchorPath(target);
+  }, []);
+
+  /** Ctrl/Cmd+click: add or remove one row without touching the rest. */
+  const toggleSelection = useCallback((target: string) => {
+    setSelectionState((current) => {
+      const next = new Set(current);
+      if (next.has(target)) next.delete(target);
+      else next.add(target);
+      return next;
+    });
+    setAnchorPath(target);
+  }, []);
+
+  /** Shift+click / programmatic: replace the selection, keeping an anchor for ranges. */
+  const replaceSelection = useCallback((paths: Iterable<string>, anchor: string | null = null) => {
+    const next = new Set(paths);
+    setSelectionState(next);
+    setAnchorPath(anchor ?? (next.size > 0 ? Array.from(next).pop()! : null));
+  }, []);
+
   /**
    * Navigate and remember the current tree view as a snapshot.
    * Forward navigation always starts the target view at the top with no selection.
@@ -139,13 +165,15 @@ export function useLocalFileBrowser({ initialCwd }: UseLocalFileBrowserOptions) 
     setHistory((stack) => [...stack, {
       path,
       expanded: expandedSet,
-      selectedPath,
+      selection,
+      anchorPath,
       scrollTop: scrollRef.current?.scrollTop ?? 0,
     }]);
     pendingScrollTop.current = 0;
-    setSelectedPath(null);
+    setSelectionState(new Set());
+    setAnchorPath(null);
     setBrowserPath(nextPath);
-  }, [expandedSet, path, selectedPath]);
+  }, [anchorPath, expandedSet, path, selection]);
 
   /** Go back to the previous view snapshot: root directory, expansion, selection and scroll. */
   const goBack = useCallback(() => {
@@ -153,7 +181,8 @@ export function useLocalFileBrowser({ initialCwd }: UseLocalFileBrowserOptions) 
     if (!snapshot) return;
     setHistory(history.slice(0, -1));
     setExpandedSet(new Set(snapshot.expanded));
-    setSelectedPath(snapshot.selectedPath);
+    setSelectionState(new Set(snapshot.selection));
+    setAnchorPath(snapshot.anchorPath);
     pendingScrollTop.current = snapshot.scrollTop;
     setBrowserPath(snapshot.path);
   }, [history]);
@@ -214,8 +243,11 @@ export function useLocalFileBrowser({ initialCwd }: UseLocalFileBrowserOptions) 
     navigate,
     goBack,
     canGoBack: history.length > 0,
-    selectedPath,
-    setSelectedPath,
+    selection,
+    anchorPath,
+    selectOnly,
+    toggleSelection,
+    replaceSelection,
     scrollRef,
     entries,
     disks,

@@ -78,6 +78,18 @@ describe('flattenVisible', () => {
     expect(rows).toHaveLength(3);
   });
 
+  it('已知为空的目录标记 empty（行首不显示展开箭头），未加载与非空目录不是', () => {
+    const rows = flattenVisible(roots, new Set(['/root/docs']), { '/root/docs': [] });
+    expect(rows.find((r) => r.entry.name === 'docs')!.empty).toBe(true);
+    // 未加载子项的目录不知道该不该显示箭头，保持 empty=false
+    expect(rows.find((r) => r.entry.name === 'src')!.empty).toBe(false);
+    // 有子项目录
+    const withChildren = flattenVisible(roots, new Set(), { '/root/src': [{ name: 'lib', path: '/root/src/lib', is_dir: true }] });
+    expect(withChildren.find((r) => r.entry.name === 'src')!.empty).toBe(false);
+    // 文件永远不是 empty 目录
+    expect(rows.find((r) => r.entry.name === 'readme.md')!.empty).toBe(false);
+  });
+
   it('子项路径与祖先重复（自引用 symlink / 后端异常返回）时停止递归，不栈溢出', () => {
     const selfRef: FsEntry[] = [{ name: 'loop', path: '/root/loop', is_dir: true }];
     const rows = flattenVisible(selfRef, new Set(['/root/loop']), { '/root/loop': selfRef });

@@ -13,6 +13,8 @@ export interface VisibleRow {
   expanded: boolean;
   /** 目录且已展开但子项尚未加载完成 */
   loading: boolean;
+  /** 目录已加载且没有子项（已知为空，行首不再显示展开箭头） */
+  empty: boolean;
 }
 
 /** 目录在前，同类按名称排序（localeCompare） */
@@ -25,7 +27,7 @@ export function sortEntries(list: FsEntry[]): FsEntry[] {
 
 /**
  * 把根列表 + 展开状态 + 子项缓存拍平成渲染用的可见行。
- * 展开但缓存未到的目录标记 loading；缓存为空数组视为已加载的空目录。
+ * 展开但缓存未到的目录标记 loading；缓存为空数组视为已加载的空目录（empty）。
  */
 export function flattenVisible(
   roots: FsEntry[],
@@ -36,14 +38,15 @@ export function flattenVisible(
   const walk = (list: FsEntry[], depth: number, ancestors: ReadonlySet<string>) => {
     for (const entry of sortEntries(list)) {
       const isOpen = entry.is_dir && expanded.has(entry.path);
+      const children = cache[entry.path];
       rows.push({
         entry,
         depth,
         expanded: isOpen,
-        loading: isOpen && cache[entry.path] === undefined,
+        loading: isOpen && children === undefined,
+        empty: entry.is_dir && children !== undefined && children.length === 0,
       });
       if (isOpen) {
-        const children = cache[entry.path];
         // 防环：目录路径已在祖先链上（自引用 symlink、后端对任意路径返回相同
         // 列表等异常情况）时照常渲染该行，但不再递归，否则栈溢出
         if (children && !ancestors.has(entry.path)) {

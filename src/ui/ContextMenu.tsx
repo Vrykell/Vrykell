@@ -52,6 +52,18 @@ export default function ContextMenu({ anchor, items, onClose }: Props) {
     };
   }, [onClose]);
 
+  // Esc 关闭（捕获阶段：不再触发全局 Esc，例如终端键盘目标切换）
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      onClose();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [onClose]);
+
   return createPortal(
     <div
       ref={ref}
