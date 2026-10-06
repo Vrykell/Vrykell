@@ -3,6 +3,7 @@ mod agent;
 mod commands;
 mod db;
 mod files;
+mod platform;
 mod remote;
 mod secret;
 mod terminal;

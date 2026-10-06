@@ -210,27 +210,20 @@ fn ssh_list_sync(conn: &SshConnection, path: Option<String>) -> Result<SshListRe
         .map_err(|e| format!("读取目录 {base} 失败：{e}"))?;
 
     let mut result: Vec<SshFsEntry> = Vec::new();
-    for (p, stat) in entries {
-        let name = p
-            .file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_default();
-        if name.is_empty() {
+    for (listed, stat) in entries {
+        // ssh2 用宿主平台的 join 返回路径（Windows 上会出现反斜杠），因此只取文件名，
+        // 再由平台层的 POSIX 拼接生成条目路径。
+        let Some(name) = crate::platform::path::name_from_listing(&listed.to_string_lossy(), &base) else {
             continue;
-        }
+        };
         result.push(SshFsEntry {
             name: name.clone(),
-            path: join_path(&base, &name),
+            path: crate::platform::path::join(&base, &name),
             is_dir: stat.is_dir(),
         });
     }
     result.sort_by(|a, b| b.is_dir.cmp(&a.is_dir).then_with(|| a.name.cmp(&b.name)));
     Ok(SshListResponse { entries: result, base })
-}
-
-/// 拼接目录路径（去掉重复斜杠）。纯函数，便于单测。
-fn join_path(base: &str, name: &str) -> String {
-    format!("{}/{}", base.trim_end_matches('/'), name)
 }
 
 // ── 连接 CRUD（后端 SQLite） ──
@@ -481,81 +474,69 @@ pub async fn ssh_download(
 }
 
 /// 远端目录里为 name 找可用路径：同名时按 `name (1)`、`name (2)`… 递增（保留扩展名）。
-fn unique_remote_path(sftp: &Sftp, dir: &Path, name: &str) -> std::path::PathBuf {
-    let stem = Path::new(name)
-        .file_stem()
-        .map(|value| value.to_string_lossy().to_string())
-        .unwrap_or_else(|| name.to_string());
-    let extension = Path::new(name).extension().map(|value| value.to_string_lossy().to_string());
-    for index in 1..10_000u32 {
-        let candidate = match &extension {
-            Some(ext) => format!("{stem} ({index}).{ext}"),
-            None => format!("{stem} ({index})"),
-        };
-        let path = dir.join(candidate);
-        if sftp.stat(&path).is_err() {
-            return path;
-        }
-    }
-    dir.join(format!("{stem} ({})", uuid::Uuid::new_v4()))
+/// 序号规则来自平台层（`crate::platform::path::numbered_name`），远端只负责判断是否存在。
+fn unique_remote_path(sftp: &Sftp, dir: &str, name: &str) -> String {
+    let candidate = crate::platform::path::numbered_name(name, |candidate| {
+        sftp.stat(Path::new(&crate::platform::path::join(dir, candidate))).is_ok()
+    });
+    crate::platform::path::join(dir, &candidate)
 }
 
 /// 重命名远程文件/目录；目标名被占用时自动加序号，返回最终路径。
 fn ssh_rename_sync(conn: &SshConnection, path: &str, new_name: &str) -> Result<String, String> {
     let sess = connect(conn)?;
     let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
-    let parent = Path::new(path).parent().ok_or("无法定位父目录")?;
-    let candidate = parent.join(new_name);
-    let dst = if candidate != Path::new(path) && sftp.stat(&candidate).is_ok() {
-        unique_remote_path(&sftp, parent, new_name)
+    let parent = crate::platform::path::parent(path).ok_or("无法定位父目录")?;
+    let candidate = crate::platform::path::join(&parent, new_name);
+    let dst = if candidate != path && sftp.stat(Path::new(&candidate)).is_ok() {
+        unique_remote_path(&sftp, &parent, new_name)
     } else {
         candidate
     };
-    sftp.rename(Path::new(path), &dst, None)
+    sftp.rename(Path::new(path), Path::new(&dst), None)
         .map_err(|e| format!("重命名失败：{e}"))?;
-    Ok(dst.to_string_lossy().to_string())
+    Ok(dst)
 }
 
 /// 移动远程文件/目录到目标目录（SFTP rename 支持跨目录；原地移动拒绝，重名自动加序号）。
 fn ssh_move_sync(conn: &SshConnection, path: &str, dest_dir: &str) -> Result<String, String> {
-    let name = Path::new(path).file_name().ok_or("无法定位文件名")?.to_string_lossy().to_string();
+    let name = crate::platform::path::file_name(path).ok_or("无法定位文件名")?;
     let sess = connect(conn)?;
     let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
-    let dir = Path::new(dest_dir);
-    let candidate = dir.join(&name);
-    if candidate == Path::new(path) {
+    let candidate = crate::platform::path::join(dest_dir, &name);
+    if candidate == path {
         return Err("已在目标目录中".into());
     }
-    let dst = if sftp.stat(&candidate).is_ok() {
-        unique_remote_path(&sftp, dir, &name)
+    let dst = if sftp.stat(Path::new(&candidate)).is_ok() {
+        unique_remote_path(&sftp, dest_dir, &name)
     } else {
         candidate
     };
-    sftp.rename(Path::new(path), &dst, None)
+    sftp.rename(Path::new(path), Path::new(&dst), None)
         .map_err(|e| format!("移动失败：{e}"))?;
-    Ok(dst.to_string_lossy().to_string())
+    Ok(dst)
 }
 
 /// 新建远程文件（空文件）或目录；同名时自动加序号，返回最终路径。
 fn ssh_create_sync(conn: &SshConnection, dir: &str, name: &str, is_dir: bool) -> Result<String, String> {
     let sess = connect(conn)?;
     let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
-    let parent = Path::new(dir);
-    if sftp.stat(parent).is_err() {
+    if sftp.stat(Path::new(dir)).is_err() {
         return Err(format!("目标目录不可用：{dir}"));
     }
-    let path = if sftp.stat(&parent.join(name)).is_ok() {
+    let direct = crate::platform::path::join(dir, name);
+    let path = if sftp.stat(Path::new(&direct)).is_ok() {
         // 同名时按 name (1) 递增避让（unique_remote_path 只在重名时调用）
-        unique_remote_path(&sftp, parent, name)
+        unique_remote_path(&sftp, dir, name)
     } else {
-        parent.join(name)
+        direct
     };
     if is_dir {
-        sftp.mkdir(&path, 0o755).map_err(|e| format!("新建文件夹失败：{e}"))?;
+        sftp.mkdir(Path::new(&path), 0o755).map_err(|e| format!("新建文件夹失败：{e}"))?;
     } else {
-        sftp.create(&path).map_err(|e| format!("新建文件失败：{e}"))?;
+        sftp.create(Path::new(&path)).map_err(|e| format!("新建文件失败：{e}"))?;
     }
-    Ok(path.to_string_lossy().to_string())
+    Ok(path)
 }
 
 // ── 远程面板：复制 / 可回退删除（远端暂存） ──
@@ -566,38 +547,41 @@ fn shell_quote_remote(value: &str) -> String {
 }
 
 /// 远端暂存目录（可回退删除）：<home>/.vrykell/undo
-fn ssh_undo_dir(sftp: &Sftp) -> Result<std::path::PathBuf, String> {
+fn ssh_undo_dir(sftp: &Sftp) -> Result<String, String> {
     let home = sftp
         .realpath(Path::new("."))
         .map_err(|e| format!("无法定位远端主目录：{e}"))?;
-    Ok(home.join(".vrykell").join("undo"))
+    let home = home.to_string_lossy().to_string();
+    Ok(crate::platform::path::join(&crate::platform::path::join(&home, ".vrykell"), "undo"))
 }
 
 /// 逐级创建远端目录（已存在时忽略）。
-fn ensure_remote_dir(sftp: &Sftp, dir: &Path) -> Result<(), String> {
-    let mut current = std::path::PathBuf::new();
-    for component in dir.components() {
-        current.push(component);
-        if current.as_os_str().is_empty() || current == Path::new("/") {
-            continue;
-        }
-        let _ = sftp.mkdir(&current, 0o755); // 已存在会报错，忽略
+fn ensure_remote_dir(sftp: &Sftp, dir: &str) -> Result<(), String> {
+    let normalized = crate::platform::path::normalize(dir);
+    let mut current = String::new();
+    for segment in normalized.split('/').filter(|part| !part.is_empty()) {
+        current = crate::platform::path::join(&current, segment);
+        let _ = sftp.mkdir(Path::new(&current), 0o755); // 已存在会报错，忽略
     }
     Ok(())
 }
 
 /// 递归删除远端路径（目录先清空再 rmdir；用于暂存项清理）。
-fn remove_remote_recursive(sftp: &Sftp, target: &Path) -> Result<(), String> {
-    let stat = sftp.stat(target).map_err(|e| format!("读取远端信息失败：{e}"))?;
+fn remove_remote_recursive(sftp: &Sftp, target: &str) -> Result<(), String> {
+    let stat = sftp.stat(Path::new(target)).map_err(|e| format!("读取远端信息失败：{e}"))?;
     if stat.is_dir() {
-        if let Ok(children) = sftp.readdir(target) {
+        if let Ok(children) = sftp.readdir(Path::new(target)) {
             for (child, _) in children {
-                remove_remote_recursive(sftp, &child)?;
+                // readdir 的路径由宿主平台拼接（Windows 上是 `\`），只取名字再按 POSIX 拼
+                let Some(name) = crate::platform::path::name_from_listing(&child.to_string_lossy(), target) else {
+                    continue;
+                };
+                remove_remote_recursive(sftp, &crate::platform::path::join(target, &name))?;
             }
         }
-        sftp.rmdir(target).map_err(|e| format!("删除远端目录失败：{e}"))
+        sftp.rmdir(Path::new(target)).map_err(|e| format!("删除远端目录失败：{e}"))
     } else {
-        sftp.unlink(target).map_err(|e| format!("删除远端文件失败：{e}"))
+        sftp.unlink(Path::new(target)).map_err(|e| format!("删除远端文件失败：{e}"))
     }
 }
 
@@ -621,39 +605,35 @@ fn remote_copy_one(sess: &Session, from: &str, to: &str) -> Result<(), String> {
 fn ssh_copy_sync(conn: &SshConnection, paths: Vec<String>, dest_dir: String) -> Result<FileOpOutcome, String> {
     let sess = connect(conn)?;
     let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
-    let dest = Path::new(&dest_dir);
-    if !dest.is_absolute() {
+    // 绝对/相对判断必须按远端（POSIX）规则：Windows 宿主上 Path::is_absolute("/home") 为 false
+    if !crate::platform::path::is_absolute(&dest_dir) {
         return Err("目标目录必须是绝对路径".into());
     }
-    if sftp.stat(dest).is_err() {
+    if sftp.stat(Path::new(&dest_dir)).is_err() {
         return Err(format!("目标目录不可用：{dest_dir}"));
     }
 
     let mut completed = Vec::new();
     let mut errors = Vec::new();
     for path in paths {
-        let src = Path::new(&path);
-        let Some(name) = src.file_name().map(|value| value.to_string_lossy().to_string()) else {
+        let Some(name) = crate::platform::path::file_name(&path) else {
             errors.push(format!("无法定位 {path} 的文件名"));
             continue;
         };
-        let src_is_dir = sftp.stat(src).map(|s| s.is_dir()).unwrap_or(false);
-        if src_is_dir && dest.starts_with(src) {
+        let src_is_dir = sftp.stat(Path::new(&path)).map(|s| s.is_dir()).unwrap_or(false);
+        if src_is_dir && crate::platform::path::is_within(&dest_dir, &path) {
             errors.push(format!("不能把「{name}」放入它自己内部"));
             continue;
         }
-        let direct = dest.join(&name);
+        let direct = crate::platform::path::join(&dest_dir, &name);
         // 目标重名（含复制到自己所在目录）→ 自动加序号，不产生重名文件
-        let target = if direct == src || sftp.stat(&direct).is_ok() {
-            unique_remote_path(&sftp, dest, &name)
+        let target = if direct == path || sftp.stat(Path::new(&direct)).is_ok() {
+            unique_remote_path(&sftp, &dest_dir, &name)
         } else {
             direct
         };
-        match remote_copy_one(&sess, &path, &target.to_string_lossy()) {
-            Ok(()) => completed.push(FileOpPair {
-                from: path,
-                to: target.to_string_lossy().to_string(),
-            }),
+        match remote_copy_one(&sess, &path, &target) {
+            Ok(()) => completed.push(FileOpPair { from: path, to: target }),
             Err(error) => errors.push(error),
         }
     }
@@ -665,24 +645,18 @@ fn ssh_stage_delete_sync(conn: &SshConnection, paths: Vec<String>) -> Result<Fil
     let sess = connect(conn)?;
     let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
     let dir = ssh_undo_dir(&sftp)?;
-    if let Some(parent) = dir.parent() {
-        ensure_remote_dir(&sftp, parent)?;
-    }
     ensure_remote_dir(&sftp, &dir)?;
 
     let mut completed = Vec::new();
     let mut errors = Vec::new();
     for path in paths {
-        let Some(name) = Path::new(&path).file_name() else {
+        let Some(name) = crate::platform::path::file_name(&path) else {
             errors.push(format!("无法定位 {path} 的文件名"));
             continue;
         };
-        let staged = dir.join(format!("{}-{}", uuid::Uuid::new_v4(), name.to_string_lossy()));
-        match sftp.rename(Path::new(&path), &staged, None) {
-            Ok(()) => completed.push(FileOpPair {
-                from: path,
-                to: staged.to_string_lossy().to_string(),
-            }),
+        let staged = crate::platform::path::join(&dir, &format!("{}-{name}", uuid::Uuid::new_v4()));
+        match sftp.rename(Path::new(&path), Path::new(&staged), None) {
+            Ok(()) => completed.push(FileOpPair { from: path, to: staged }),
             Err(error) => errors.push(format!("删除失败：{error}")),
         }
     }
@@ -696,13 +670,11 @@ fn ssh_restore_staged_sync(conn: &SshConnection, items: Vec<FileOpPair>) -> Resu
     let mut completed = Vec::new();
     let mut errors = Vec::new();
     for item in items {
-        let staged = Path::new(&item.to);
-        let original = Path::new(&item.from);
-        if sftp.stat(original).is_ok() {
+        if sftp.stat(Path::new(&item.from)).is_ok() {
             errors.push(format!("恢复失败：{} 已存在同名项", item.from));
             continue;
         }
-        match sftp.rename(staged, original, None) {
+        match sftp.rename(Path::new(&item.to), Path::new(&item.from), None) {
             Ok(()) => completed.push(item),
             Err(error) => errors.push(format!("恢复失败：{error}")),
         }
@@ -715,7 +687,7 @@ fn ssh_purge_staged_sync(conn: &SshConnection, paths: Vec<String>) {
     let Ok(sess) = connect(conn) else { return };
     let Ok(sftp) = sess.sftp() else { return };
     for path in paths {
-        let _ = remove_remote_recursive(&sftp, Path::new(&path));
+        let _ = remove_remote_recursive(&sftp, &path);
     }
 }
 
@@ -724,9 +696,12 @@ fn ssh_sweep_undo_sync(conn: &SshConnection) {
     let Ok(sess) = connect(conn) else { return };
     let Ok(sftp) = sess.sftp() else { return };
     let Ok(dir) = ssh_undo_dir(&sftp) else { return };
-    let Ok(children) = sftp.readdir(&dir) else { return };
+    let Ok(children) = sftp.readdir(Path::new(&dir)) else { return };
     for (child, _) in children {
-        let _ = remove_remote_recursive(&sftp, &child);
+        let Some(name) = crate::platform::path::name_from_listing(&child.to_string_lossy(), &dir) else {
+            continue;
+        };
+        let _ = remove_remote_recursive(&sftp, &crate::platform::path::join(&dir, &name));
     }
 }
 
@@ -804,8 +779,8 @@ pub async fn ssh_sweep_undo(state: State<'_, HistoryState>, id: String) -> Resul
     Ok(())
 }
 
-/// 递归上传本地目录到远程目录，返回上传文件数。
-fn upload_dir_recursive(sftp: &Sftp, local: &Path, remote: &Path, depth: u32) -> Result<u64, String> {
+/// 递归上传本地目录到远程目录，返回上传文件数（远端路径按 POSIX 拼接，本地路径用 std）。
+fn upload_dir_recursive(sftp: &Sftp, local: &Path, remote: &str, depth: u32) -> Result<u64, String> {
     if depth > 40 {
         return Err("目录层级过深，已中止上传".to_string());
     }
@@ -814,16 +789,16 @@ fn upload_dir_recursive(sftp: &Sftp, local: &Path, remote: &Path, depth: u32) ->
     for entry in rd.flatten() {
         let p = entry.path();
         let name = entry.file_name().to_string_lossy().to_string();
-        let remote_child = remote.join(&name);
+        let remote_child = crate::platform::path::join(remote, &name);
         let ft = entry.file_type().map_err(|e| format!("读取文件类型失败：{e}"))?;
         if ft.is_dir() {
-            sftp.mkdir(&remote_child, 0o755)
+            sftp.mkdir(Path::new(&remote_child), 0o755)
                 .map_err(|e| format!("创建远程目录失败：{e}"))?;
             count += upload_dir_recursive(sftp, &p, &remote_child, depth + 1)?;
         } else if ft.is_file() {
             let bytes = std::fs::read(&p).map_err(|e| format!("读取本地文件失败：{e}"))?;
             let mut file = sftp
-                .create(&remote_child)
+                .create(Path::new(&remote_child))
                 .map_err(|e| format!("创建远程文件失败：{e}"))?;
             file.write_all(&bytes).map_err(|e| format!("上传失败：{e}"))?;
             count += 1;
@@ -834,6 +809,7 @@ fn upload_dir_recursive(sftp: &Sftp, local: &Path, remote: &Path, depth: u32) ->
 
 /// 上传本地文件/目录到远程目录（remote_dir 为空表示远程 home）。
 fn ssh_upload_sync(conn: &SshConnection, remote_dir: &str, local_path: &str) -> Result<(), String> {
+    // 本地路径用宿主平台规则取文件名
     let name = Path::new(local_path)
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
@@ -849,9 +825,9 @@ fn ssh_upload_sync(conn: &SshConnection, remote_dir: &str, local_path: &str) -> 
         remote_dir.to_string()
     };
     // 远程已有同名项时自动加序号，上传不静默覆盖
-    let direct = join_path(&base, &name);
+    let direct = crate::platform::path::join(&base, &name);
     let remote_path = if sftp.stat(Path::new(&direct)).is_ok() {
-        unique_remote_path(&sftp, Path::new(&base), &name).to_string_lossy().to_string()
+        unique_remote_path(&sftp, &base, &name)
     } else {
         direct
     };
@@ -860,7 +836,7 @@ fn ssh_upload_sync(conn: &SshConnection, remote_dir: &str, local_path: &str) -> 
     if meta.is_dir() {
         sftp.mkdir(Path::new(&remote_path), 0o755)
             .map_err(|e| format!("创建远程目录失败：{e}"))?;
-        upload_dir_recursive(&sftp, Path::new(local_path), Path::new(&remote_path), 0)?;
+        upload_dir_recursive(&sftp, Path::new(local_path), &remote_path, 0)?;
     } else {
         let bytes = std::fs::read(local_path).map_err(|e| format!("读取本地文件失败：{e}"))?;
         let mut file = sftp
@@ -964,10 +940,13 @@ mod tests {
     }
 
     #[test]
-    fn join_path_trims_trailing_slash() {
-        assert_eq!(join_path("/home/user", "docs"), "/home/user/docs");
-        assert_eq!(join_path("/home/user/", "docs"), "/home/user/docs");
-        assert_eq!(join_path("/", "etc"), "/etc");
+    fn remote_entry_paths_follow_posix_rules() {
+        // 条目路径由平台层 POSIX 拼接产生：Windows 宿主上也不能出现反斜杠或双斜杠
+        let path = crate::platform::path::join("/home/user/", "docs");
+        assert_eq!(path, "/home/user/docs");
+        assert!(!path.contains('\\'));
+        assert_eq!(crate::platform::path::name_from_listing("/home/user\\docs", "/home/user").as_deref(), Some("docs"));
+        assert_eq!(crate::platform::path::name_from_listing("/home/user/docs", "/home/user").as_deref(), Some("docs"));
     }
 
     #[test]

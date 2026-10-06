@@ -46,34 +46,36 @@
 22. **Session 保活** — 多标签 PTY 会话通过隐藏 xterm.js (display:none) 保活，切换标签不重建。
 23. **颜色系统** — 所有颜色通过 `theme.css` CSS 变量定义，不在组件中硬编码色值（除 ANSI 颜色相关）。
 24. **一套实现 + 状态选择** — 同一份界面在不同运行目标（本地 / SSH）下不写两套逻辑：文件操作统一走 `FileOps` 接口（`fileOpsFor(target)` 是唯一的实现选择点），菜单、拖放语义等状态差异写成 `filePanelConfig` 配置项；视图层不得按目标写 `if (isSsh)`，也不得绕过接口直接 `invoke` 文件命令或自行处理路径。
+25. **终端区域对齐** — 终端 pane 根层左/右内边距为 0（整宽元素如认证输入条、输入栏与 pane 边界对齐，左右留白相等）；8px 左边距只加在终端屏幕内容上，右侧一律不留，保证原生滚动条贴住 pane 右边缘。终端内容因此是「左留白、右贴边」而不是居中，这是有意取舍；详见 `docs/architecture.md`「终端区域的真实对齐」。
+26. **路径判断归平台层** — 绝对/相对判断、拼接、取父目录与文件名一律交给平台层：本地路径前端用 `@platform/path`、Rust 用 `std::path`；远端（POSIX）路径前端用 `@platform/posixPath`、Rust 用 `src-tauri/src/platform/path.rs`。业务模块不得自行判断路径形态（Windows 宿主上 `Path::is_absolute("/home")` 为 false、`join` 会插反斜杠）。
 
 ## 七、文件组织
 
-25. `src/features/terminal/` — 终端领域（components、hooks、stores、model、services/pipeline）。
-26. `src/features/*/stores/` — 领域 Zustand 状态；视图层通过 Feature 公共入口访问。
-27. `src/ui/` — 无业务语义的通用 UI 组件。
-28. `src/features/chat/` — AI 对话渲染（AiBlock、ModelPill、ToolRunCard、Markdown、PanelChat）。
-29. `src/features/agent/` — AI 代理逻辑（agentStream、工具、权限、Skills、MCP、上下文、记忆、调度、智能标题）。
-30. `src/features/settings/` — 设置页（行为/模型/MCP/Skills/快捷键/终端打开模式/主题）。
-31. `src/platform/` 与 `src/utils/` — Tauri IPC、PTY、运行时适配与纯工具函数。业务服务归属对应 Feature。
-32. `src/features/ssh/` `src/features/files/` `src/features/search/` `src/config/theme/` — SSH / 本地文件 / 全局搜索 / 设计 token。
-33. `e2e/` — Playwright E2E 测试，`tauri-mock.ts` 提供 Tauri + Anthropic mock。
+27. `src/features/terminal/` — 终端领域（components、hooks、stores、model、services/pipeline）。
+28. `src/features/*/stores/` — 领域 Zustand 状态；视图层通过 Feature 公共入口访问。
+29. `src/ui/` — 无业务语义的通用 UI 组件。
+30. `src/features/chat/` — AI 对话渲染（AiBlock、ModelPill、ToolRunCard、Markdown、PanelChat）。
+31. `src/features/agent/` — AI 代理逻辑（agentStream、工具、权限、Skills、MCP、上下文、记忆、调度、智能标题）。
+32. `src/features/settings/` — 设置页（行为/模型/MCP/Skills/快捷键/终端打开模式/主题）。
+33. `src/platform/` 与 `src/utils/` — Tauri IPC、PTY、运行时适配与纯工具函数。业务服务归属对应 Feature。
+34. `src/features/ssh/` `src/features/files/` `src/features/search/` `src/config/theme/` — SSH / 本地文件 / 全局搜索 / 设计 token。
+35. `e2e/` — Playwright E2E 测试，`tauri-mock.ts` 提供 Tauri + Anthropic mock。
 
 ## 八、可观测性与日志
 
-34. **修改功能时同步补充日志** — 对有状态流程，在入口、状态转换、外部调用结果和错误/超时分支记录结构化事件，确保问题可以按时间线排查。
-35. **优先记录元数据** — 记录会话/块 ID、状态、耗时、字节数和错误类型；不要记录原始命令、终端输出、提示词、凭据或未经脱敏的用户路径。
-36. **复用诊断接口** — 前端使用 `terminalDebug`，Rust 终端层使用 `terminal::debug::write`；新增事件名应稳定且能说明操作阶段，避免逐字符或高频输出日志。
-37. **按现有配置记录日志** — 当前共享测试机已开启详细诊断日志自动保存，排查时先检查已有记录，不要每轮测试重新开启；其他环境按自身设置决定，应用新环境默认关闭自动保存。涉及后台任务或新 IPC 流程时，应确认入口和失败分支都能留下可关联的日志。
-38. **先检查已有日志** — 先检查 `%LOCALAPPDATA%\com.vrykell.app\logs\diagnostics.jsonl`；文件达到轮转上限后，较早记录在同目录的 `.1`、`.2` 文件中。配置保存在 `%APPDATA%\com.vrykell.app\diagnostics.json`，其开启状态属于测试机配置，不要据此推断新用户的默认值。
-39. **日志不阻塞输入输出** — 高频记录经前端批量传送与后端缓冲线程写入，保留详细事件；导出和修改自动保存配置前冲刷待写记录。新增诊断逻辑不得恢复逐按键同步写盘。
+36. **修改功能时同步补充日志** — 对有状态流程，在入口、状态转换、外部调用结果和错误/超时分支记录结构化事件，确保问题可以按时间线排查。
+37. **优先记录元数据** — 记录会话/块 ID、状态、耗时、字节数和错误类型；不要记录原始命令、终端输出、提示词、凭据或未经脱敏的用户路径。
+38. **复用诊断接口** — 前端使用 `terminalDebug`，Rust 终端层使用 `terminal::debug::write`；新增事件名应稳定且能说明操作阶段，避免逐字符或高频输出日志。
+39. **按现有配置记录日志** — 当前共享测试机已开启详细诊断日志自动保存，排查时先检查已有记录，不要每轮测试重新开启；其他环境按自身设置决定，应用新环境默认关闭自动保存。涉及后台任务或新 IPC 流程时，应确认入口和失败分支都能留下可关联的日志。
+40. **先检查已有日志** — 先检查 `%LOCALAPPDATA%\com.vrykell.app\logs\diagnostics.jsonl`；文件达到轮转上限后，较早记录在同目录的 `.1`、`.2` 文件中。配置保存在 `%APPDATA%\com.vrykell.app\diagnostics.json`，其开启状态属于测试机配置，不要据此推断新用户的默认值。
+41. **日志不阻塞输入输出** — 高频记录经前端批量传送与后端缓冲线程写入，保留详细事件；导出和修改自动保存配置前冲刷待写记录。新增诊断逻辑不得恢复逐按键同步写盘。
 
 ## 九、窗口与标题栏
 
-40. **拖动把手只落在非交互元素上** — 运行时只在光标下的元素带 `data-tauri-drag-region` 且路径上没有「不带该属性的可点击元素」时才开始拖动。因此标题文字、留白等需要补上该属性，而按钮、输入框、链接等可点击元素不要添加，否则点击会变成拖窗口；新增标题栏元素时同步检查 `e2e/titlebar-drag.spec.ts` 覆盖的把手位置。
+42. **拖动把手只落在非交互元素上** — 运行时只在光标下的元素带 `data-tauri-drag-region` 且路径上没有「不带该属性的可点击元素」时才开始拖动。因此标题文字、留白等需要补上该属性，而按钮、输入框、链接等可点击元素不要添加，否则点击会变成拖窗口；新增标题栏元素时同步检查 `e2e/titlebar-drag.spec.ts` 覆盖的把手位置。
 
 ## 十、公共组件与文档
 
-41. **公共组件优先** — 侧栏列表项统一走 `src/ui/sidebarItem.tsx`（会话标签行与 SSH 连接行共用同一外观与交互）；列表拖拽排序统一走 `src/ui/listReorder.tsx` 的「占位空位」交互（拖起的行让出槽位、落点用虚线占位、跟随指针的图标预览、Esc 取消、抑制拖拽后的点击），新列表通过 `data-reorder-list` / `data-reorder-item` / `data-reorder-kind` 接入，不得另造一套观感；错误展示统一走 `src/ui/ErrorBox.tsx` 与 `ErrorDetails.tsx`（面板正在展示的数据加载失败用行内 ErrorBox，临时动作结果用 Toast）；设置项选择器统一用 `src/ui/Select.tsx` 下拉框。新增同类界面时先抽公共组件再接入。
-42. **测试钩子稳定** — 重构移动标记时保留既有测试钩子（`data-testid`、`data-tab-row-id`、`data-tab-group`、ARIA 名称等），或在同一提交内更新全部引用它的单测 / e2e。
-43. **文档分层** — 规则正本 = 本文件；常驻摘要 = `AGENTS.md`（Codex 等 agent 先读它）；agent 规范入口 = `.agents/skills/vrykell-conventions/SKILL.md`（Command Code 与 Codex 直接读取，`.claude/skills/vrykell-conventions/SKILL.md` 是 Claude Code 的桥接）。规则变化时同步这三处，不再新增第四份副本。
+43. **公共组件优先** — 侧栏列表项统一走 `src/ui/sidebarItem.tsx`（会话标签行与 SSH 连接行共用同一外观与交互）；列表拖拽排序统一走 `src/ui/listReorder.tsx` 的「占位空位」交互（拖起的行让出槽位、落点用虚线占位、跟随指针的图标预览、Esc 取消、抑制拖拽后的点击），新列表通过 `data-reorder-list` / `data-reorder-item` / `data-reorder-kind` 接入，不得另造一套观感；错误展示统一走 `src/ui/ErrorBox.tsx` 与 `ErrorDetails.tsx`（面板正在展示的数据加载失败用行内 ErrorBox，临时动作结果用 Toast）；设置项选择器统一用 `src/ui/Select.tsx` 下拉框。新增同类界面时先抽公共组件再接入。
+44. **测试钩子稳定** — 重构移动标记时保留既有测试钩子（`data-testid`、`data-tab-row-id`、`data-tab-group`、ARIA 名称等），或在同一提交内更新全部引用它的单测 / e2e。
+45. **文档分层** — 规则正本 = 本文件；常驻摘要 = `AGENTS.md`（Codex 等 agent 先读它）；agent 规范入口 = `.agents/skills/vrykell-conventions/SKILL.md`（Command Code 与 Codex 直接读取，`.claude/skills/vrykell-conventions/SKILL.md` 是 Claude Code 的桥接）。规则变化时同步这三处，不再新增第四份副本。
