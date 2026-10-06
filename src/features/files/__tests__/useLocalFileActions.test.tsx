@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import type { FsEntry } from '@features/files/services/fs';
+import type { FsEntry } from '@platform/api/types';
 import { useLocalFileActions } from '@features/files/hooks/useLocalFileActions';
 import { openFile } from '@features/files/services/fileOpen';
 import { useSessionStore } from '@features/workspace';
@@ -18,7 +18,7 @@ const fsMocks = vi.hoisted(() => ({
 /** Spies replace the action on the live store object, so each test restores the original. */
 const originalAddTab = useSessionStore.getState().addTab;
 
-vi.mock('@features/files/services/fs', () => fsMocks);
+vi.mock('@platform/api/fs', () => fsMocks);
 vi.mock('@features/files/services/fileOpen', () => ({ openFile: vi.fn() }));
 vi.mock('@tauri-apps/plugin-opener', () => ({ openPath: vi.fn() }));
 vi.mock('@platform/pty', () => ({ ptyWrite: vi.fn() }));
