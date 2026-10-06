@@ -483,7 +483,7 @@
 - "Send output to AI" and "Clear conversation" gave silent, feedback-free results in the empty state → added a toast (`code-audit.md`); conversely, a deterministic operation like directory sync **shouldn't** pop a success notification (`d7c569c`). The principle of feedback: prompt only when the outcome is uncertain.
 
 ### 15.8 i18n in Name Only (`code-audit.md`)
-- A large number of keys had no references and most UI copy was hardcoded Chinese; a missing key displayed the key string directly (`dock.ssh`). Half-baked i18n is worse than none — either complete it or delete it, and this project ultimately chose "UI always in Chinese", written into Development Rules item 3.
+- A large number of keys had no references and most UI copy was hardcoded Chinese; a missing key displayed the key string directly (`dock.ssh`). Half-baked i18n is worse than none — either complete it or delete it. This project first chose "UI always in Chinese", written into Development Rules item 3, then moved to "English key in code plus a Chinese entry in `src/i18n`"; the lesson stands either way.
 
 ### 15.9 Minimum Animation Duration (Development Rules item 19; `2114f6c` fixed animation durations)
 - Collapse/expand and hover transitions ≥ 100ms; animations that were too fast, along with hardcoded colors (which should go through CSS variables), were cleaned up together.

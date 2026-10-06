@@ -6,8 +6,8 @@ description: Vrykell project conventions and definition of done for any code, te
 # Vrykell conventions
 
 Vrykell is a Tauri 2 desktop app: React 19 + TypeScript frontend, Rust backend
-(`src-tauri/`), terminal-first UI with AI chat (Anthropic BYOK). All user-visible text is
-Chinese; all code comments are English.
+(`src-tauri/`), terminal-first UI with AI chat (Anthropic BYOK). User-visible copy lives as
+English strings in code with Chinese entries in `src/i18n`; all code comments are English.
 
 ## Commands
 
@@ -31,8 +31,9 @@ Before committing, run at least `npx tsc --noEmit`, `npm run test` and
    xterm in the UI (it exists for PTY handling and VT parsing, hidden).
 2. No regex lookbehind (`(?<=...)`, `(?<!...)`) - macOS WKWebView rejects it. No lookahead
    tricks that rely on it either.
-3. User-visible copy is Chinese. New or edited comments (JSDoc, inline, CSS, Rust) are
-   English and use generic terms - no third-party brand names.
+3. Never hardcode user-visible Chinese: write the string in English and add its Chinese entry
+   to `src/i18n`. New or edited comments (JSDoc, inline, CSS, Rust) are English and use generic
+   terms - no third-party brand names.
 4. TypeScript strict: zero errors; avoid `any` unless unavoidable.
 5. Colors come from `theme.css` variables - no hardcoded colors (ANSI palette excepted).
    Animations are 100 ms or slower.
