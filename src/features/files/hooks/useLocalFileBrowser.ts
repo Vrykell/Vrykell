@@ -15,6 +15,13 @@ interface BrowserViewSnapshot {
   scrollTop: number;
 }
 
+/**
+ * A directory load may settle before this; only slower loads surface a progress
+ * hint. Fast loads (local disks, empty folders) therefore never flash a
+ * transient message while navigating or expanding.
+ */
+const LOADING_HINT_DELAY_MS = 150;
+
 /** Load local directories and keep navigation results associated with their requests. */
 export function useLocalFileBrowser({ initialCwd }: UseLocalFileBrowserOptions) {
   const [path, setBrowserPath] = useState<string | null>(() => initialCwd ? normPath(initialCwd) : null);
@@ -29,15 +36,40 @@ export function useLocalFileBrowser({ initialCwd }: UseLocalFileBrowserOptions) 
   const [expandedSet, setExpandedSet] = useState<ReadonlySet<string>>(new Set());
   const [childCache, setChildCache] = useState<Record<string, FsEntry[]>>({});
   const [loading, setLoading] = useState(false);
+  const [loadingHint, setLoadingHint] = useState(false);
+  const loadingHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [childErrors, setChildErrors] = useState<Record<string, string>>({});
-  const [childLoading, setChildLoading] = useState<ReadonlySet<string>>(new Set());
+  const [childPending, setChildPending] = useState<ReadonlySet<string>>(new Set());
+  const [childLoadingHint, setChildLoadingHint] = useState<ReadonlySet<string>>(new Set());
+  const childHintTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const requestVersion = useRef(0);
   const alive = useRef(true);
 
   useEffect(() => {
     alive.current = true;
-    return () => { alive.current = false; requestVersion.current += 1; };
+    return () => {
+      alive.current = false;
+      requestVersion.current += 1;
+      if (loadingHintTimer.current !== null) clearTimeout(loadingHintTimer.current);
+      for (const timer of childHintTimers.current.values()) clearTimeout(timer);
+      childHintTimers.current.clear();
+    };
+  }, []);
+
+  const clearLoadingHintTimer = useCallback(() => {
+    if (loadingHintTimer.current !== null) {
+      clearTimeout(loadingHintTimer.current);
+      loadingHintTimer.current = null;
+    }
+  }, []);
+
+  const clearChildHintTimer = useCallback((entryPath: string) => {
+    const timer = childHintTimers.current.get(entryPath);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      childHintTimers.current.delete(entryPath);
+    }
   }, []);
 
   useEffect(() => {
@@ -54,9 +86,15 @@ export function useLocalFileBrowser({ initialCwd }: UseLocalFileBrowserOptions) 
   const load = useCallback((currentPath: string | null) => {
     const version = ++requestVersion.current;
     setLoading(true);
+    setLoadingHint(false);
+    clearLoadingHintTimer();
+    loadingHintTimer.current = setTimeout(() => {
+      loadingHintTimer.current = null;
+      if (alive.current && version === requestVersion.current) setLoadingHint(true);
+    }, LOADING_HINT_DELAY_MS);
     setError(null);
-    setEntries([]);
-    setDisks([]);
+    // Keep the previous listing on screen while the next one loads: a fast swap
+    // replaces the content in place instead of flashing an empty area.
     const kind = currentPath === null ? 'disks' : 'directory';
     terminalDebug('files-load-start', { requestId: version, kind });
     const request = currentPath === null
@@ -70,10 +108,12 @@ export function useLocalFileBrowser({ initialCwd }: UseLocalFileBrowserOptions) 
       terminalDebug('files-load-error', { requestId: version, kind, errorType: cause instanceof Error ? cause.name : typeof cause });
     }).finally(() => {
       if (version !== requestVersion.current) return;
+      clearLoadingHintTimer();
       setLoading(false);
+      setLoadingHint(false);
       terminalDebug('files-load-end', { requestId: version, kind });
     });
-  }, []);
+  }, [clearLoadingHintTimer]);
 
   useEffect(() => {
     load(path);
@@ -124,7 +164,12 @@ export function useLocalFileBrowser({ initialCwd }: UseLocalFileBrowserOptions) 
       delete next[entry.path];
       return next;
     });
-    setChildLoading((current) => new Set([...current, entry.path]));
+    setChildPending((current) => new Set([...current, entry.path]));
+    clearChildHintTimer(entry.path);
+    childHintTimers.current.set(entry.path, setTimeout(() => {
+      childHintTimers.current.delete(entry.path);
+      if (alive.current) setChildLoadingHint((current) => new Set([...current, entry.path]));
+    }, LOADING_HINT_DELAY_MS));
     terminalDebug('files-tree-load-start', {});
     void fsList(entry.path)
       .then((children) => {
@@ -137,13 +182,21 @@ export function useLocalFileBrowser({ initialCwd }: UseLocalFileBrowserOptions) 
       })
       .finally(() => {
         if (!alive.current) return;
-        setChildLoading((current) => {
+        clearChildHintTimer(entry.path);
+        setChildPending((current) => {
+          if (!current.has(entry.path)) return current;
+          const next = new Set(current);
+          next.delete(entry.path);
+          return next;
+        });
+        setChildLoadingHint((current) => {
+          if (!current.has(entry.path)) return current;
           const next = new Set(current);
           next.delete(entry.path);
           return next;
         });
       });
-  }, []);
+  }, [clearChildHintTimer]);
 
   const toggleExpand = useCallback((entry: FsEntry) => {
     setExpandedSet((current) => {
@@ -152,9 +205,9 @@ export function useLocalFileBrowser({ initialCwd }: UseLocalFileBrowserOptions) 
       else next.add(entry.path);
       return next;
     });
-    if (expandedSet.has(entry.path) || childCache[entry.path] || childLoading.has(entry.path)) return;
+    if (expandedSet.has(entry.path) || childCache[entry.path] || childPending.has(entry.path)) return;
     retryExpand(entry);
-  }, [childCache, childLoading, expandedSet, retryExpand]);
+  }, [childCache, childPending, expandedSet, retryExpand]);
 
   return {
     path,
@@ -169,9 +222,11 @@ export function useLocalFileBrowser({ initialCwd }: UseLocalFileBrowserOptions) 
     expandedSet,
     childCache,
     loading,
+    loadingHint,
+    loadedPath,
     error,
     childErrors,
-    childLoading,
+    childLoadingHint,
     load,
     toggleExpand,
     retryExpand,
