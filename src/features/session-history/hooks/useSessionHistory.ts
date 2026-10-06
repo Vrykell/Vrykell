@@ -117,14 +117,18 @@ export function useSessionHistory(options: UseSessionHistoryOptions = {}): Sessi
     }
     void sessionManager.restore(session.id, session.title).catch((error: unknown) => {
       console.warn('恢复会话失败:', error);
+      notify(`恢复会话失败：${String((error as Error)?.message ?? error)}`, 'error');
     });
-  }, []);
+  }, [notify]);
 
   const deleteHistoricalSession = useCallback((session: BackendSessionEntry) => {
     void sessionManager.remove(session.id)
       .then(load)
-      .catch((error: unknown) => console.warn('删除历史会话失败:', error));
-  }, [load]);
+      .catch((error: unknown) => {
+        console.warn('删除历史会话失败:', error);
+        notify(`删除历史会话失败：${String((error as Error)?.message ?? error)}`, 'error');
+      });
+  }, [load, notify]);
 
   const restoreGroup = useCallback(async (group: BackendGroupEntry) => {
     try {
