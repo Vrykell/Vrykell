@@ -95,6 +95,13 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
   const enabledCount = enabledIds.size;
   const totalSources = getSources().length;
   const flatResults = useMemo(() => grouped.flatMap((group) => group.results), [grouped]);
+  /** Enabled sources that failed this round (errors are collected by the engine). */
+  const failedSources = useMemo(
+    () => getSources()
+      .filter((source) => enabledIds.has(source.id) && state.sources[source.id]?.error)
+      .map((source) => ({ id: source.id, label: source.label, error: state.sources[source.id]!.error! })),
+    [enabledIds, state.sources],
+  );
 
   const handleExecute = useCallback(
     (result: SearchResult) => {
@@ -201,6 +208,7 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
     enabledCount,
     totalSources,
     flatResults,
+    failedSources,
     hasInput,
     hasResults,
     hasHistory,

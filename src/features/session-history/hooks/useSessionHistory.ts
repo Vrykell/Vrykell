@@ -22,6 +22,8 @@ export interface SessionHistoryController {
   sessions: BackendSessionEntry[];
   groups: BackendGroupEntry[];
   loading: boolean;
+  /** Load failure message; the view renders it through the shared ErrorBox. */
+  loadError: string;
   filter: SessionHistoryFilter;
   setFilter: (patch: Partial<SessionHistoryFilter>) => void;
   load: () => Promise<void>;
@@ -68,6 +70,7 @@ export function useSessionHistory(options: UseSessionHistoryOptions = {}): Sessi
   const [sessions, setSessions] = useState<BackendSessionEntry[]>([]);
   const [groups, setGroups] = useState<BackendGroupEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [filter, setFilterState] = useState<SessionHistoryFilter>(loadFilter);
   const loadRequestRef = useRef(0);
   const activeGroups = useSessionStore((state) => state.groups);
@@ -83,6 +86,7 @@ export function useSessionHistory(options: UseSessionHistoryOptions = {}): Sessi
   const load = useCallback(() => {
     const requestId = ++loadRequestRef.current;
     setLoading(true);
+    setLoadError('');
     return Promise.all([listSessions(), groupsList()])
       .then(([nextSessions, nextGroups]) => {
         if (requestId !== loadRequestRef.current) return;
@@ -90,10 +94,11 @@ export function useSessionHistory(options: UseSessionHistoryOptions = {}): Sessi
         setSessions([...nextSessions]);
         setGroups([...nextGroups]);
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (requestId !== loadRequestRef.current) return;
         setSessions([]);
         setGroups([]);
+        setLoadError(String((error as Error)?.message ?? error));
       })
       .finally(() => {
         if (requestId === loadRequestRef.current) setLoading(false);
@@ -162,6 +167,7 @@ export function useSessionHistory(options: UseSessionHistoryOptions = {}): Sessi
     sessions,
     groups,
     loading,
+    loadError,
     filter,
     setFilter,
     load,

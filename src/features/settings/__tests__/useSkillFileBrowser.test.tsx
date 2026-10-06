@@ -34,6 +34,13 @@ describe('useSkillFileBrowser', () => {
     const { result } = renderHook(() => useSkillFileBrowser({ skillName: 'helper', files: ['SKILL.md'] }));
 
     await act(async () => { await result.current.pick(result.current.tree[0]!); });
-    expect(result.current.content).toBe('读取失败：文件不存在');
+    expect(result.current.content).toBe('');
+    expect(result.current.error).toBe('文件不存在');
+
+    // Retrying re-reads the selected file once the backend succeeds.
+    mocks.readSkillFile.mockResolvedValue('# OK');
+    await act(async () => { result.current.reload(); });
+    await waitFor(() => expect(result.current.content).toBe('# OK'));
+    expect(result.current.error).toBe('');
   });
 });

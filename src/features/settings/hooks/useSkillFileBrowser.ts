@@ -14,12 +14,24 @@ export function useSkillFileBrowser({ skillName, files }: UseSkillFileBrowserOpt
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<string | null>(null);
   const [content, setContent] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     setOpen(new Set());
     setSelected(null);
     setContent('');
+    setError('');
   }, [filesKey, skillName]);
+
+  const read = useCallback(async (path: string) => {
+    setContent('');
+    setError('');
+    try {
+      setContent(await readSkillFile(skillName, path));
+    } catch (cause) {
+      setError(String((cause as Error)?.message ?? cause));
+    }
+  }, [skillName]);
 
   const pick = useCallback(async (node: FileNode) => {
     if (node.isDir) {
@@ -32,12 +44,12 @@ export function useSkillFileBrowser({ skillName, files }: UseSkillFileBrowserOpt
       return;
     }
     setSelected(node.path);
-    try {
-      setContent(await readSkillFile(skillName, node.path));
-    } catch (error) {
-      setContent(`读取失败：${(error as Error)?.message ?? error}`);
-    }
-  }, [skillName]);
+    await read(node.path);
+  }, [read]);
 
-  return { tree, open, selected, content, pick };
+  const reload = useCallback(() => {
+    if (selected) void read(selected);
+  }, [read, selected]);
+
+  return { tree, open, selected, content, error, pick, reload };
 }

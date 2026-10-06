@@ -14,6 +14,7 @@ import {
 } from '@features/agent/services/skills';
 import { useToastStore } from '@ui/Toast';
 import Select from '@ui/Select';
+import ErrorBox from '@ui/ErrorBox';
 import { useSkillsSettings } from '@features/settings/hooks/useSkillsSettings';
 import { useSkillFileBrowser } from '@features/settings/hooks/useSkillFileBrowser';
 import type { FileNode } from '@features/settings/model/skillFileTree';
@@ -60,7 +61,7 @@ function Badge({ text, tone }: { text: string; tone: 'warn' | 'muted' | 'ok' | '
 }
 
 function SkillFileBrowser({ skillName, files }: { skillName: string; files: string[] }) {
-  const { tree, open, selected, content, pick } = useSkillFileBrowser({ skillName, files });
+  const { tree, open, selected, content, error, pick, reload } = useSkillFileBrowser({ skillName, files });
 
   const render = (nodes: FileNode[], depth: number): React.ReactNode =>
     nodes.map((n) => (
@@ -96,7 +97,11 @@ function SkillFileBrowser({ skillName, files }: { skillName: string; files: stri
       <div style={{ borderRadius: 'var(--radius-inner)', overflow: 'auto', maxHeight: 180, background: 'var(--canvas)' }}>
         {render(tree, 0)}
       </div>
-      {selected && (
+      {selected && (error ? (
+        <ErrorBox actions={<button onClick={reload} style={{ minHeight: 32 }}>重试</button>}>
+          {error}
+        </ErrorBox>
+      ) : (
         <pre style={{
           margin: 0, padding: '8px 10px', maxHeight: 180, overflow: 'auto',
           background: 'var(--hover)', borderRadius: 'var(--radius-inner)',
@@ -105,7 +110,7 @@ function SkillFileBrowser({ skillName, files }: { skillName: string; files: stri
         }}>
           {content}
         </pre>
-      )}
+      ))}
     </div>
   );
 }

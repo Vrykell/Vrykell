@@ -29,7 +29,8 @@ describe('chat store（按标签隔离）', () => {
     const failStream = async () => { throw new Error('boom'); };
     await useChatStore.getState().send('hi', { streamFn: failStream });
     const msgs = useChatStore.getState().byTab[tabId]!;
-    expect(msgs[1]!.content).toContain('出错了');
+    expect(msgs[1]!.content).not.toContain('出错了');
+    expect(msgs[1]!.errorText).toBe('boom');
     expect(msgs[1]!.pending).toBe(false);
   });
 
@@ -293,6 +294,7 @@ describe('chat store M4（停止 / 重新生成 / 编辑重发 / 删除）', () 
     expect(msgs).toHaveLength(2);
     expect(msgs[1]).toMatchObject({ role: 'assistant', content: '半截回答', pending: false });
     expect(msgs[1]!.error).toBeUndefined();
+    expect(msgs[1]!.errorText).toBeUndefined();
     expect(useChatStore.getState().sendingTab).toBeNull();
   });
 
