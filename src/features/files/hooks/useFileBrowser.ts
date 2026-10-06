@@ -5,6 +5,7 @@ import {
 } from '@features/files/model/fileOps';
 import type { FileOpPair, FileOps, FileOpsTarget } from '@features/files/model/fileOps';
 import { useToastStore } from '@ui/Toast';
+import { terminalDebug } from '@features/terminal/services/terminalDebug';
 
 /** 右键菜单 / 重命名 / 删除确认的状态。 */
 export type FileConfirmState =
@@ -57,6 +58,12 @@ export interface UseFileBrowserOptions {
 /** 路径末段名称（本地 / 远端分隔符都适用）。 */
 function pathName(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+}
+
+/** 下一帧执行（环境没有 rAF 时退回定时器）。 */
+function schedule(task: () => void) {
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(task);
+  else setTimeout(task, 16);
 }
 
 /**
@@ -153,6 +160,8 @@ export function useFileBrowser({
     }, LOADING_HINT_DELAY_MS);
     setError(null);
     // 保留上一份列表，快速切换时原地替换而不是先闪成空白
+    const kind = currentPath === null ? 'root' : 'directory';
+    terminalDebug('files-load-start', { requestId: version, kind });
     const request = ops.list(currentPath).then((result) => {
       if (version !== requestVersion.current) return;
       setLoadedPath(currentPath);
@@ -164,6 +173,7 @@ export function useFileBrowser({
       // 本地面板的 null 路径是磁盘视图（条目为空）；其余情况直接用列表结果
       const showDisks = currentPath === null && ops.disks !== undefined;
       setEntries(showDisks ? [] : result.entries);
+      terminalDebug('files-load-end', { requestId: version, kind, entryCount: result.entries.length });
       return result.entries;
     });
     if (currentPath === null && ops.disks) {
@@ -175,6 +185,7 @@ export function useFileBrowser({
       if (version !== requestVersion.current) return;
       // 保留原始错误：远程面板据此区分「文件服务不可用 / 需要认证」等情况
       setError(String((cause as Error)?.message ?? cause));
+      terminalDebug('files-load-error', { requestId: version, kind, errorType: cause instanceof Error ? cause.name : typeof cause });
     }).finally(() => {
       if (version !== requestVersion.current) return;
       clearLoadingTimer();
@@ -221,6 +232,25 @@ export function useFileBrowser({
   const refresh = useCallback(() => load(path), [load, path]);
   const currentDir = path ?? '';
   const settled = loadedPath === path;
+
+  /** 把某个路径的行滚入视野（列表刷新是异步的，按帧重试几次）。 */
+  const revealPath = useCallback((target: string) => {
+    let attempts = 0;
+    const step = () => {
+      const container = scrollRef.current;
+      if (container) {
+        const element = Array.from(container.querySelectorAll<HTMLElement>('[data-file-row]'))
+          .find((candidate) => candidate.dataset.path === target);
+        if (element) {
+          if (typeof element.scrollIntoView === 'function') element.scrollIntoView({ block: 'nearest' });
+          return;
+        }
+      }
+      attempts += 1;
+      if (attempts < 20 && alive.current) schedule(step);
+    };
+    schedule(step);
+  }, []);
 
   // ── 选中 ──
 
@@ -282,6 +312,7 @@ export function useFileBrowser({
   // ── 树形展开 ──
 
   const loadChildren = useCallback((entry: Pick<FsEntry, 'path'>) => {
+    terminalDebug('files-tree-load-start', {});
     setChildErrors((current) => {
       const next = { ...current };
       delete next[entry.path];
@@ -296,10 +327,12 @@ export function useFileBrowser({
     return ops.list(entry.path)
       .then((result) => {
         if (alive.current) setChildCache((current) => ({ ...current, [entry.path]: result.entries }));
+        terminalDebug('files-tree-load-end', { entryCount: result.entries.length });
         return result.entries;
       })
-      .catch(() => {
+      .catch((cause: unknown) => {
         if (alive.current) setChildErrors((current) => ({ ...current, [entry.path]: '无法读取目录' }));
+        terminalDebug('files-tree-load-error', { errorType: cause instanceof Error ? cause.name : typeof cause });
         return undefined;
       })
       .finally(() => {
@@ -335,6 +368,30 @@ export function useFileBrowser({
     if (expandedSet.has(entry.path) || childCache[entry.path] || childPending.has(entry.path)) return;
     void loadChildren(entry);
   }, [childCache, childPending, expandedSet, loadChildren]);
+
+  /**
+   * 文件变更后刷新受影响的目录：当前目录列表 + 变更项的父目录 + 目标目录。
+   * 只刷新根列表会留下「幽灵条目」——已展开子目录里的旧内容还留在 childCache 中，
+   * 于是被删除/移动的条目仍在树上、改名后的条目仍显示旧名字。
+   */
+  const refreshAffected = useCallback((touched: Array<string | null | undefined>, destDir?: string | null) => {
+    const dirs = new Set<string>();
+    for (const item of touched) {
+      if (!item) continue;
+      const parent = ops.parentOf(item);
+      if (parent) dirs.add(parent);
+    }
+    if (destDir) dirs.add(destDir);
+    load(path);
+    let refreshed = 0;
+    for (const dir of dirs) {
+      // 未展开过的目录没有缓存，等用户展开时再读
+      if (childCache[dir] === undefined && !expandedSet.has(dir)) continue;
+      void refreshDir({ path: dir });
+      refreshed += 1;
+    }
+    terminalDebug('files-dir-refresh', { candidateDirs: dirs.size, refreshedDirs: refreshed });
+  }, [childCache, expandedSet, load, ops, path, refreshDir]);
 
   // ── 回退历史 ──
 
@@ -410,11 +467,13 @@ export function useFileBrowser({
         replaceSelection(current.pairs.map((pair) => pair.from));
         settleUndo(current, failed);
       }
-      refresh();
+      terminalDebug('files-op', { op: `undo-${current.kind}`, itemCount: current.pairs.length });
+      // 回退同样会改动已展开目录里的内容：按涉及的路径刷新父目录与目标目录
+      refreshAffected(current.pairs.flatMap((pair) => [pair.from, pair.to]));
     } catch (error) {
       toast(String((error as Error)?.message ?? error), 'error');
     }
-  }, [ops, refresh, replaceSelection, settleUndo, toast]);
+  }, [ops, refreshAffected, replaceSelection, settleUndo, toast]);
 
   // ── 迁移（粘贴 / 拖拽共用） ──
 
@@ -428,20 +487,27 @@ export function useFileBrowser({
       const sources = mode === 'move' ? paths.filter((source) => ops.parentOf(source) !== destDir) : paths;
       if (sources.length === 0) return;
       const outcome = mode === 'copy' ? await ops.copy(sources, destDir) : await ops.move(sources, destDir);
+      terminalDebug('files-op', { op: mode, itemCount: sources.length, doneCount: outcome.completed.length, errorCount: outcome.errors.length });
       if (outcome.completed.length > 0) {
         if (mode === 'move') pushUndo({ kind: 'move', label: '移动', pairs: outcome.completed });
-        toast(mode === 'copy' ? `已复制 ${outcome.completed.length} 项` : `已移动 ${outcome.completed.length} 项`, 'success');
+        // 后端为重名自动加了序号时说明一下，避免用户以为名字被改了
+        const renamed = outcome.completed.some((pair) => pathName(pair.to) !== pathName(pair.from));
+        const suffixHint = renamed ? '（同名已自动加序号）' : '';
+        toast(
+          mode === 'copy'
+            ? `已复制 ${outcome.completed.length} 项${suffixHint}`
+            : `已移动 ${outcome.completed.length} 项${suffixHint}`,
+          'success',
+        );
         replaceSelection(outcome.completed.map((pair) => pair.to));
-        // 目标目录是已展开的子文件夹时刷新它的子列表
-        if (destDir !== path) void refreshDir({ path: destDir });
-        load(path);
       }
       if (outcome.errors.length > 0) toast(outcome.errors[0]!, 'error');
       if (outcome.completed.length === 0 && outcome.errors.length === 0) return;
+      refreshAffected(sources, destDir);
     } catch (error) {
       toast(String((error as Error)?.message ?? error), 'error');
     }
-  }, [load, ops, path, pushUndo, refreshDir, replaceSelection, toast]);
+  }, [ops, pushUndo, refreshAffected, replaceSelection, toast]);
 
   // ── 剪贴板 ──
 
@@ -476,14 +542,16 @@ export function useFileBrowser({
   const doRename = useCallback(async (entry: FsEntry, newName: string) => {
     try {
       const finalPath = await ops.rename(entry.path, newName);
+      terminalDebug('files-op', { op: 'rename', doneCount: 1, errorCount: 0 });
       pushUndo({ kind: 'rename', label: '重命名', pairs: [{ from: entry.path, to: finalPath }] });
       toast('已重命名', 'success');
       replaceSelection([finalPath]);
-      load(path);
+      // 改名的条目可能位于已展开的子目录里：父目录缓存必须一起刷新，否则仍显示旧名字
+      refreshAffected([entry.path, finalPath]);
     } catch (error) {
       toast(String((error as Error)?.message ?? error), 'error');
     }
-  }, [load, ops, path, pushUndo, replaceSelection, toast]);
+  }, [ops, pushUndo, refreshAffected, replaceSelection, toast]);
 
   /**
    * 新建文件 / 文件夹：位置由命中的行决定（文件夹内 / 文件同级 / 空白处=当前目录），
@@ -496,6 +564,7 @@ export function useFileBrowser({
       const created = kind === 'file'
         ? await ops.createFile(dir, DEFAULT_FILE_NAME)
         : await ops.createDir(dir, DEFAULT_DIR_NAME);
+      terminalDebug('files-op', { op: kind === 'file' ? 'create-file' : 'create-dir', doneCount: 1 });
       const entry: FsEntry = { name: pathName(created), path: created, is_dir: kind === 'dir' };
       if (targetEntry?.is_dir) {
         // 落在目录里：确保该目录已展开并刷新子列表，新条目才可见
@@ -506,16 +575,19 @@ export function useFileBrowser({
       }
       replaceSelection([created]);
       setRenameTarget(entry);
-      toast(kind === 'dir' ? '已新建文件夹' : '已新建文件', 'success');
+      revealPath(created);
+      const defaultName = kind === 'file' ? DEFAULT_FILE_NAME : DEFAULT_DIR_NAME;
+      toast(`${kind === 'dir' ? '已新建文件夹' : '已新建文件'}${entry.name !== defaultName ? '（同名已自动加序号）' : ''}`, 'success');
     } catch (error) {
       toast(String((error as Error)?.message ?? error), 'error');
     }
-  }, [load, loadChildren, ops, path, replaceSelection, toast]);
+  }, [load, loadChildren, ops, path, replaceSelection, revealPath, toast]);
 
   /** 删除 = 移到暂存区（可回退）；回退窗口结束或挤出历史后永久清理。 */
   const doDelete = useCallback(async (list: FsEntry[]) => {
     try {
       const outcome = await ops.stageDelete(list.map((entry) => entry.path));
+      terminalDebug('files-op', { op: 'delete', itemCount: list.length, doneCount: outcome.completed.length, errorCount: outcome.errors.length });
       if (outcome.errors.length > 0) toast(outcome.errors[0]!, 'error');
       if (outcome.completed.length > 0) {
         pushUndo({ kind: 'delete', label: '删除', pairs: outcome.completed });
@@ -527,11 +599,12 @@ export function useFileBrowser({
         );
         replaceSelection([]);
       }
-      load(path);
+      // 被删项可能位于已展开的子目录里：刷新父目录缓存，避免残留幽灵条目
+      refreshAffected(outcome.completed.map((pair) => pair.from));
     } catch (error) {
       toast(String((error as Error)?.message ?? error), 'error');
     }
-  }, [load, ops, path, pushUndo, replaceSelection, toast]);
+  }, [ops, pushUndo, refreshAffected, replaceSelection, toast]);
 
   // ── 菜单与确认 ──
 
@@ -608,6 +681,7 @@ export function useFileBrowser({
     toggleExpand,
     refreshDir,
     scrollRef,
+    revealPath,
     clipboard,
     cutPaths,
     undo: undoStack[0] ?? null,

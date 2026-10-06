@@ -70,7 +70,7 @@ const LOCAL_IDS: FilePanelConfig['ids'] = {
   more: 'local-more-btn',
   sync: 'local-sync-btn',
   row: () => 'file-row',
-  rowSelector: '[data-testid="file-row"]',
+  rowSelector: '[data-file-row]',
   expander: 'file-row-expander',
   empty: 'file-row-empty',
 };
@@ -83,7 +83,7 @@ const SSH_IDS: FilePanelConfig['ids'] = {
   more: 'remote-more-btn',
   sync: 'remote-sync-btn',
   row: (entry) => `remote-file-${entry.name}`,
-  rowSelector: '[data-testid^="remote-file-"]',
+  rowSelector: '[data-file-row]',
   expander: 'remote-row-expander',
   empty: 'remote-row-empty',
 };

@@ -674,6 +674,7 @@ function FileRow({
       <span
         onClick={entry.is_dir && !empty && !renaming ? (event) => { event.stopPropagation(); onChevronClick(entry); } : undefined}
         data-testid={expanderTestId}
+        data-row-expander="true"
         style={{
           width: iconSizes.compact, flexShrink: 0, display: 'inline-flex', justifyContent: 'center',
           color: 'var(--text-muted)',
