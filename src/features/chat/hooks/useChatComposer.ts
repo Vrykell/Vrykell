@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SendOptions } from '@features/chat/stores/chat';
 import type { AttachmentMeta } from '@features/agent/model/attachments';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
+import { useAutoSizeTextarea } from '@ui/hooks/useAutoSizeTextarea';
 
 interface UseChatComposerOptions {
   questions: string[];
@@ -37,6 +38,7 @@ export function useChatComposer({
   const text = value ?? localText;
   const setText = onTextChange ?? setLocalText;
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  useAutoSizeTextarea(inputRef, text, 120, isSession);
   const historyRef = useRef<{ index: number; base: string }>({ index: -1, base: '' });
 
   useEffect(() => {
@@ -46,18 +48,11 @@ export function useChatComposer({
     const element = inputRef.current;
     if (!element) return;
     element.focus();
-    element.style.height = 'auto';
-    element.style.height = `${Math.min(element.scrollHeight, 120)}px`;
   }, [draft, setDraft, setText]);
 
   useEffect(() => {
     historyRef.current = { index: -1, base: '' };
     terminalDebug('chat-composer-scope', { scopeId: scopeKey });
-    const element = inputRef.current;
-    if (element) {
-      element.style.height = 'auto';
-      element.style.height = `${Math.min(element.scrollHeight, 120)}px`;
-    }
   }, [scopeKey]);
 
   const resetHistory = useCallback(() => {
@@ -79,8 +74,6 @@ export function useChatComposer({
     if (element) {
       requestAnimationFrame(() => {
         element.selectionStart = element.selectionEnd = element.value.length;
-        element.style.height = 'auto';
-        element.style.height = `${Math.min(element.scrollHeight, 120)}px`;
       });
     }
     return true;
@@ -93,7 +86,6 @@ export function useChatComposer({
 
     setText('');
     resetHistory();
-    if (inputRef.current) inputRef.current.style.height = 'auto';
     const payload = attachments.length > 0 ? attachments : undefined;
     clearAttachments();
     void send(question, { paneId: targetPane, attachments: payload });
@@ -102,8 +94,6 @@ export function useChatComposer({
   const handleChange = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
     resetHistory();
     setText(event.target.value);
-    event.target.style.height = 'auto';
-    event.target.style.height = `${Math.min(event.target.scrollHeight, 120)}px`;
   }, [resetHistory, setText]);
 
   const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {

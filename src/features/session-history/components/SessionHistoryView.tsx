@@ -129,7 +129,7 @@ export default function SessionHistoryView() {
       )}
 
       {/* 列表 */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 8px 8px' }}>
+      <div className="scroll-region" style={{ flex: 1, overflowY: 'auto', padding: '8px 8px 8px' }}>
         {loading ? (
           <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>加载中…</div>
         ) : historical.length === 0 ? (

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { SquareStack, Folder, Server, Sparkles, type AppIcon } from '@ui/icons';
+import { SquareStack, Folder, Server, Sparkles, Settings, type AppIcon } from '@ui/icons';
 import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
 import { useWorkspaceStore, isSessionTab } from '@features/workspace/stores/workspace';
 import { minTerminalWidth, MIN_PANE_SIZE } from '@features/workspace/model/windowLayout';
@@ -22,9 +22,16 @@ export const PANEL_DEFS: Record<string, PanelDef> = {
 
 export type DockSide = 'left' | 'right';
 
+// Page actions participate in navigation placement without becoming sidebars.
+export const NAVIGATION_DEFS: Record<string, Pick<PanelDef, 'id' | 'icon' | 'label'>> = {
+  ...PANEL_DEFS,
+  settings: { id: 'settings', icon: Settings, label: '设置' },
+};
+
 const STORAGE_KEY = 'dock-layout-v4';
 const LEGACY_STORAGE_KEY = 'dock-layout-v3';
-const VALID_IDS = Object.keys(PANEL_DEFS);
+const VALID_IDS = Object.keys(NAVIGATION_DEFS);
+const PANEL_IDS = Object.keys(PANEL_DEFS);
 
 interface PersistedLayout {
   widthPreset?: 'compact';
@@ -41,14 +48,14 @@ function isValidLayout(data: unknown): data is PersistedLayout {
   return (
     Array.isArray(d.leftZone) && d.leftZone.every((v: unknown) => typeof v === 'string' && VALID_IDS.includes(v)) &&
     Array.isArray(d.rightZone) && d.rightZone.every((v: unknown) => typeof v === 'string' && VALID_IDS.includes(v)) &&
-    Array.isArray(d.leftPanels) && d.leftPanels.every((v: unknown) => typeof v === 'string' && VALID_IDS.includes(v)) &&
-    Array.isArray(d.rightPanels) && d.rightPanels.every((v: unknown) => typeof v === 'string' && VALID_IDS.includes(v)) &&
+    Array.isArray(d.leftPanels) && d.leftPanels.every((v: unknown) => typeof v === 'string' && PANEL_IDS.includes(v)) &&
+    Array.isArray(d.rightPanels) && d.rightPanels.every((v: unknown) => typeof v === 'string' && PANEL_IDS.includes(v)) &&
     typeof d.panelWidths === 'object' && d.panelWidths !== null
   );
 }
 
 const DEFAULTS: PersistedLayout = {
-  leftZone: ['tabs', 'ssh', 'files'], rightZone: ['chat'],
+  leftZone: ['tabs', 'ssh', 'files'], rightZone: ['chat', 'settings'],
   // Start with the session list; auxiliary panels open on demand.
   leftPanels: ['tabs'], rightPanels: [],
   panelWidths: {},
@@ -67,10 +74,10 @@ function loadLayout(): PersistedLayout {
     console.warn('[dock] layout data corrupted, resetting to defaults');
     return DEFAULTS;
   }
-  // 迁移：新面板 id 未出现在任何 zone 时，追加到右侧，保证新增面板按钮可见
+  // Preserve saved placement, repair duplicate entries, and add missing actions.
   const layout: PersistedLayout = {
-    leftZone: [...parsed.leftZone],
-    rightZone: [...parsed.rightZone],
+    leftZone: [...new Set(parsed.leftZone)],
+    rightZone: [...new Set(parsed.rightZone)].filter(id => !parsed.leftZone.includes(id)),
     leftPanels: [...parsed.leftPanels],
     rightPanels: [...parsed.rightPanels],
     panelWidths: { ...parsed.panelWidths },
@@ -85,7 +92,8 @@ function loadLayout(): PersistedLayout {
   const known = new Set([...layout.leftZone, ...layout.rightZone]);
   const missing = VALID_IDS.filter((id) => !known.has(id));
   if (missing.length > 0) {
-    layout.rightZone = [...layout.rightZone, ...missing];
+    layout.leftZone.push(...missing.filter(id => DEFAULTS.leftZone.includes(id)));
+    layout.rightZone.push(...missing.filter(id => !DEFAULTS.leftZone.includes(id)));
   }
   // v3 的默认布局会把多个侧栏同时打开。升级时保留按钮位置和宽度，
   // 只恢复会话列表，避免旧缓存继续占用终端空间。
@@ -94,12 +102,9 @@ function loadLayout(): PersistedLayout {
     layout.leftPanels = tabsOnLeft ? ['tabs'] : [];
     layout.rightPanels = tabsOnLeft ? [] : (layout.rightZone.includes('tabs') ? ['tabs'] : []);
   }
-  // Keep navigation on the left and the assistant on the right, including older saved layouts.
-  const openPanels = [...layout.leftPanels, ...layout.rightPanels];
-  layout.leftZone = [...new Set([...layout.leftZone, ...layout.rightZone])].filter(id => id !== 'chat');
-  layout.rightZone = ['chat'];
-  layout.leftPanels = sortByZone(openPanels.filter(id => id !== 'chat'), layout.leftZone).slice(0, 1);
-  layout.rightPanels = openPanels.includes('chat') ? ['chat'] : [];
+  const openPanels = [...new Set([...layout.leftPanels, ...layout.rightPanels])];
+  layout.leftPanels = sortByZone(openPanels.filter(id => layout.leftZone.includes(id)), layout.leftZone).slice(0, 1);
+  layout.rightPanels = sortByZone(openPanels.filter(id => layout.rightZone.includes(id)), layout.rightZone).slice(0, 1);
   saveLayout(layout);
   return layout;
 }
@@ -220,7 +225,7 @@ export const useDockStore = create<DockState>((set) => ({
       let leftZone = s.leftZone;
       let rightZone = s.rightZone;
       const targetList = from === to ? fromList : (to === 'left' ? [...leftZone] : [...rightZone]);
-      let idx = atIndex ?? targetList.length;
+      let idx = atIndex ?? (targetList.length + (from === to ? 1 : 0));
       if (from === to && srcIdx < idx) idx = Math.max(0, idx - 1);
       idx = Math.max(0, Math.min(idx, targetList.length));
       targetList.splice(idx, 0, id);
@@ -233,18 +238,31 @@ export const useDockStore = create<DockState>((set) => ({
         else { leftZone = fromList; rightZone = targetList; }
       }
 
-      // 面板在 from 侧打开 → 关掉；其余按新按钮顺序重排
-      const leftPanels = sortByZone(from === 'left' ? s.leftPanels.filter((p) => p !== id) : s.leftPanels, leftZone);
-      const rightPanels = sortByZone(from === 'right' ? s.rightPanels.filter((p) => p !== id) : s.rightPanels, rightZone);
-
-      const next = { ...s, leftZone, rightZone, leftPanels, rightPanels };
+      // Reordering preserves visibility; an open panel follows its action across sides.
+      const wasOpen = s.leftPanels.includes(id) || s.rightPanels.includes(id);
+      let leftPanels = s.leftPanels;
+      let rightPanels = s.rightPanels;
+      if (from !== to) {
+        leftPanels = s.leftPanels.filter(panel => panel !== id);
+        rightPanels = s.rightPanels.filter(panel => panel !== id);
+        if (wasOpen) {
+          if (to === 'left') leftPanels = [id];
+          else rightPanels = [id];
+        }
+      }
+      const collapsedPanels = from === to ? s.collapsedPanels : s.collapsedPanels.filter(panel => panel !== id);
+      const next = { ...s, leftZone, rightZone, leftPanels, rightPanels, collapsedPanels };
+      Object.assign(next, fitPanelSpace(next, to));
       saveLayout(toPersisted(next));
       return next;
     });
   },
 
-  togglePanel: (side, id) => {
+  togglePanel: (requestedSide, id) => {
     set((s) => {
+      if (!PANEL_DEFS[id]) return s;
+      // All entry points follow persisted placement, including older keyboard commands.
+      const side = s.leftZone.includes(id) ? 'left' : s.rightZone.includes(id) ? 'right' : requestedSide;
       const panels = side === 'left' ? [...s.leftPanels] : [...s.rightPanels];
       const idx = panels.indexOf(id);
       const wasCollapsed = s.collapsedPanels.includes(id);
@@ -267,6 +285,7 @@ export const useDockStore = create<DockState>((set) => ({
 
   openPanel: (id) => {
     set((s) => {
+      if (!PANEL_DEFS[id]) return s;
       const side: DockSide = s.leftZone.includes(id) ? 'left' : 'right';
       const panels = side === 'left' ? [...s.leftPanels] : [...s.rightPanels];
       const collapsedPanels = s.collapsedPanels.filter((p) => p !== id);
@@ -341,7 +360,7 @@ export const useDockStore = create<DockState>((set) => ({
   },
   reconcilePanelSpace: () => {
     set((s) => {
-      const patch = fitPanelSpace(s, s.rightPanels.includes('chat') ? 'right' : 'left');
+      const patch = fitPanelSpace(s, s.leftPanels.includes('chat') ? 'left' : s.rightPanels.includes('chat') ? 'right' : s.rightPanels.length ? 'right' : 'left');
       if (patch.leftPanels === s.leftPanels && patch.rightPanels === s.rightPanels) return s;
       saveLayout(toPersisted({ ...s, ...patch }));
       return patch;

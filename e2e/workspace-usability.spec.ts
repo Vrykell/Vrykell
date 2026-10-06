@@ -274,7 +274,7 @@ test('split placement explains selection and cancellation before hover', async (
 });
 
 test('navigation controls only the adjacent sidebar and AI has an independent entrance', async ({ page }) => {
-  await expect(page.locator('[data-dock-btn="chat"]')).toHaveAttribute('title', '打开 AI 助手');
+  await expect(page.locator('[data-dock-btn="chat"]')).toHaveAttribute('title', /AI 助手 — 打开右侧面板/);
   await page.locator('[data-dock-btn="files"]').click();
   await expect(page.getByText('notes.txt')).toBeVisible();
   await expect(page.getByTestId('tab-search')).toBeHidden();

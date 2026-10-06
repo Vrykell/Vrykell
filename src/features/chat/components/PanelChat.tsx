@@ -147,7 +147,7 @@ export default function PanelChat() {
       </div>
 
       {/* 转录区：按来源 pane 分段 */}
-      <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '4px 8px 8px' }}>
+      <div ref={scrollRef} className="scroll-region" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '4px 8px 8px' }}>
         {exchanges.length === 0 ? (
           <EmptyHint isSession={isSession} />
         ) : (

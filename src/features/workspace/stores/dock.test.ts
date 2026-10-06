@@ -73,17 +73,17 @@ describe('dock store', () => {
     expect(useDockStore.getState().leftZone).toEqual(['ssh', 'tabs', 'files', 'chat']);
   });
 
-  it('moveButton：跨侧带 atIndex；打开的面板随按钮关闭', () => {
+  it('moves an open panel with its button across sides and replaces the destination panel', () => {
     useDockStore.setState({ leftZone: ['tabs', 'ssh'], rightZone: ['files'], rightPanels: ['files'] });
     useDockStore.getState().moveButton('tabs', 'right', 0);
     expect(useDockStore.getState().rightZone).toEqual(['tabs', 'files']);
     expect(useDockStore.getState().leftZone).toEqual(['ssh']);
-    // from 侧打开的面板被关闭
+    // The open source follows its action and replaces the destination sidebar.
     useDockStore.setState({ leftZone: ['chat'], leftPanels: ['chat'], rightZone: ['files'], rightPanels: ['files'] });
     useDockStore.getState().moveButton('chat', 'right');
     const s = useDockStore.getState();
     expect(s.leftPanels).toEqual([]);
-    expect(s.rightPanels).toEqual(['files']);
+    expect(s.rightPanels).toEqual(['chat']);
   });
 
   it('moveButton：未知 id no-op', () => {
@@ -145,7 +145,7 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
     localStorage.removeItem('dock-layout-v3');
     const store = await freshStore();
     expect(store.getState().leftZone).toEqual(['tabs', 'ssh', 'files']);
-    expect(store.getState().rightZone).toEqual(['chat']);
+    expect(store.getState().rightZone).toEqual(['chat', 'settings']);
     expect(store.getState().leftPanels).toEqual(['tabs']);
     expect(store.getState().rightPanels).toEqual([]);
   });
@@ -171,7 +171,7 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
     const store = await freshStore();
     const s = store.getState();
     expect(s.leftZone).toEqual(['tabs', 'files', 'ssh']);
-    expect(s.rightZone).toEqual(['chat']);
+    expect(s.rightZone).toEqual(['chat', 'settings']);
   });
 
   it('面板顺序对齐按钮顺序', async () => {
@@ -185,7 +185,64 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
     expect(store.getState().leftPanels).toEqual(['tabs']);
   });
 
-  it('moves saved file navigation left and the saved assistant right without losing their state', async () => {
+  it('persists settings placement without treating its page action as a sidebar', async () => {
+    localStorage.setItem('dock-layout-v4', JSON.stringify({
+      leftZone: ['files', 'tabs', 'ssh'], rightZone: ['chat'],
+      leftPanels: ['files'], rightPanels: ['chat'], panelWidths: {}, widthPreset: 'compact',
+    }));
+    const store = await freshStore();
+    expect(store.getState().rightZone).toEqual(['chat', 'settings']);
+    store.getState().moveButton('settings', 'left', 0);
+    store.getState().togglePanel('left', 'settings');
+    store.getState().openPanel('settings');
+    expect(store.getState().leftPanels).toEqual(['files']);
+    expect(store.getState().rightPanels).toEqual(['chat']);
+    const reloaded = await freshStore();
+    expect(reloaded.getState().leftZone).toEqual(['settings', 'files', 'tabs', 'ssh']);
+    expect(reloaded.getState().rightZone).toEqual(['chat']);
+    reloaded.getState().moveButton('settings', 'right', 0);
+    expect((await freshStore()).getState().rightZone).toEqual(['settings', 'chat']);
+  });
+
+  it('appends to the same side when no insertion index is specified', () => {
+    useDockStore.setState({ leftZone: ['tabs', 'ssh', 'files'], leftPanels: ['tabs'] });
+    useDockStore.getState().moveButton('tabs', 'left');
+    expect(useDockStore.getState().leftZone).toEqual(['ssh', 'files', 'tabs']);
+    expect(useDockStore.getState().leftPanels).toEqual(['tabs']);
+  });
+
+  it('keeps the open panel visible during same-side reordering and persists the exact order', () => {
+    useDockStore.setState({ leftZone: ['tabs', 'ssh', 'files'], rightZone: ['chat'], leftPanels: ['tabs'], rightPanels: ['chat'] });
+    useDockStore.getState().moveButton('tabs', 'left', 3);
+    const state = useDockStore.getState();
+    expect(state.leftZone).toEqual(['ssh', 'files', 'tabs']);
+    expect(state.leftPanels).toEqual(['tabs']);
+    expect(state.rightPanels).toEqual(['chat']);
+    const saved = JSON.parse(localStorage.getItem('dock-layout-v4')!);
+    expect(saved.leftZone).toEqual(state.leftZone);
+    expect(saved.leftPanels).toEqual(['tabs']);
+  });
+
+  it('opens on the configured side even when an older entry point requests the other side', () => {
+    useDockStore.setState({ leftZone: ['chat'], rightZone: ['files'] });
+    useDockStore.getState().togglePanel('right', 'chat');
+    expect(useDockStore.getState().leftPanels).toEqual(['chat']);
+    useDockStore.getState().togglePanel('left', 'files');
+    expect(useDockStore.getState().rightPanels).toEqual(['files']);
+  });
+
+  it('moves closed actions to an empty side without opening a sidebar', () => {
+    useDockStore.setState({ leftZone: ['files'], rightZone: [], panelWidths: { files: 240 } });
+    useDockStore.getState().moveButton('files', 'right');
+    expect(useDockStore.getState().leftZone).toEqual([]);
+    expect(useDockStore.getState().rightZone).toEqual(['files']);
+    expect(useDockStore.getState().rightPanels).toEqual([]);
+    expect(useDockStore.getState().panelWidths.files).toBe(240);
+    useDockStore.getState().openPanel('files');
+    expect(useDockStore.getState().rightPanels).toEqual(['files']);
+  });
+
+  it('restores custom left and right placement without forcing the default sides', async () => {
     localStorage.removeItem('dock-layout-v3');
     localStorage.setItem('dock-layout-v4', JSON.stringify({
       leftZone: ['chat', 'ssh', 'tabs'], rightZone: ['files'],
@@ -193,14 +250,14 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
       widthPreset: 'compact',
     }));
     const store = await freshStore();
-    expect(store.getState().leftZone).toEqual(['ssh', 'tabs', 'files']);
-    expect(store.getState().rightZone).toEqual(['chat']);
-    expect(store.getState().leftPanels).toEqual(['files']);
-    expect(store.getState().rightPanels).toEqual(['chat']);
+    expect(store.getState().leftZone).toEqual(['chat', 'ssh', 'tabs']);
+    expect(store.getState().rightZone).toEqual(['files', 'settings']);
+    expect(store.getState().leftPanels).toEqual(['chat']);
+    expect(store.getState().rightPanels).toEqual(['files']);
     expect(store.getState().panelWidths).toEqual({ chat: 350, files: 280 });
   });
 
-  it('migrates legacy navigation to the left with compact widths and only sessions open', async () => {
+  it('migrates legacy placement with compact widths and only sessions open', async () => {
     localStorage.removeItem('dock-layout-v4');
     localStorage.setItem('dock-layout-v3', JSON.stringify({
       leftZone: ['tabs', 'ssh'], rightZone: ['files'],
@@ -209,8 +266,8 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
     }));
     const store = await freshStore();
     const s = store.getState();
-    expect(s.leftZone).toEqual(['tabs', 'ssh', 'files']);
-    expect(s.rightZone).toEqual(['chat']);
+    expect(s.leftZone).toEqual(['tabs', 'ssh']);
+    expect(s.rightZone).toEqual(['files', 'chat', 'settings']);
     expect(s.leftPanels).toEqual(['tabs']);
     expect(s.rightPanels).toEqual([]);
     expect(s.panelWidths).toEqual({ tabs: 180, files: 200 });
@@ -229,5 +286,17 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
     expect(reloaded.getState().panelWidths).toEqual({ tabs: 240, chat: 360, files: 170 });
     expect(reloaded.getState().leftPanels).toEqual(['tabs']);
     expect(reloaded.getState().rightPanels).toEqual(['chat']);
+  });
+
+  it('repairs duplicated buttons and places saved open panels on their configured side', async () => {
+    localStorage.setItem('dock-layout-v4', JSON.stringify({
+      leftZone: ['chat', 'chat'], rightZone: ['files', 'chat', 'files', 'tabs', 'ssh'],
+      leftPanels: ['files'], rightPanels: ['chat'], panelWidths: {}, widthPreset: 'compact',
+    }));
+    const store = await freshStore();
+    expect(store.getState().leftZone).toEqual(['chat']);
+    expect(store.getState().rightZone).toEqual(['files', 'tabs', 'ssh', 'settings']);
+    expect(store.getState().leftPanels).toEqual(['chat']);
+    expect(store.getState().rightPanels).toEqual(['files']);
   });
 });

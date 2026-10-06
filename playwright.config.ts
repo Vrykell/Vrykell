@@ -7,6 +7,8 @@ export default defineConfig({
   // PTY、Canvas 与窗口尺寸断言对并行资源竞争敏感，E2E 串行运行以保持确定性。
   workers: 1,
   use: {
+    // Match the desktop browser: native scrollbars must be visible and draggable.
+    launchOptions: { ignoreDefaultArgs: ['--hide-scrollbars'] },
     baseURL: 'http://127.0.0.1:1421',
     viewport: { width: 1240, height: 800 },
   },
