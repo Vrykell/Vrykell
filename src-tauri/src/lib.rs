@@ -48,6 +48,8 @@ pub fn run() {
             if let Err(error) = terminal::debug::initialize(app.handle()) {
                 eprintln!("[terminal-debug] log initialization failed: {error}");
             }
+            // 上次会话残留的可回退删除暂存项：补送入系统回收站（后台执行，不阻塞启动）
+            std::thread::spawn(files::fs::sweep_undo_dir);
             if let Some(cfg) = app.try_state::<theme::ThemeState>() {
                 let path = cfg.0.lock().ok().map(|c| c.background_image.clone());
                 if let Some(Some(p)) = path {
@@ -147,7 +149,11 @@ pub fn run() {
             files::fs::fs_disks,
             files::fs::fs_home,
             files::fs::fs_rename,
-            files::fs::fs_delete,
+            files::fs::fs_copy,
+            files::fs::fs_move,
+            files::fs::fs_stage_delete,
+            files::fs::fs_restore_staged,
+            files::fs::fs_purge_staged,
             files::fs::which_cmd,
             files::fs::read_file_text,
             files::fs::write_file_text,
