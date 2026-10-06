@@ -12,8 +12,12 @@ const sshMocks = vi.hoisted(() => ({
   sshDownload: vi.fn(),
   sshRename: vi.fn(),
   sshMove: vi.fn(),
-  sshDelete: vi.fn(),
   sshUpload: vi.fn(),
+  sshCopy: vi.fn(),
+  sshStageDelete: vi.fn(),
+  sshRestoreStaged: vi.fn(),
+  sshPurgeStaged: vi.fn(),
+  sshSweepUndo: vi.fn(),
 }));
 
 vi.mock('@features/ssh/services/api', () => sshMocks);
@@ -39,7 +43,11 @@ describe('useRemoteFileBrowser', () => {
     });
     sshMocks.sshRename.mockReset().mockResolvedValue(undefined);
     sshMocks.sshMove.mockReset().mockResolvedValue(undefined);
-    sshMocks.sshDelete.mockReset().mockResolvedValue(undefined);
+    sshMocks.sshCopy.mockReset().mockResolvedValue({ completed: [], errors: [] });
+    sshMocks.sshStageDelete.mockReset().mockResolvedValue({ completed: [], errors: [] });
+    sshMocks.sshRestoreStaged.mockReset().mockResolvedValue({ completed: [], errors: [] });
+    sshMocks.sshPurgeStaged.mockReset().mockResolvedValue(undefined);
+    sshMocks.sshSweepUndo.mockReset().mockResolvedValue(undefined);
     sshMocks.sshDownload.mockReset().mockResolvedValue('C:/Downloads/src');
     sshMocks.sshUpload.mockReset().mockResolvedValue(undefined);
     useRemotePathStore.setState({ path: {} });
@@ -79,6 +87,95 @@ describe('useRemoteFileBrowser', () => {
     });
     expect(locals).toEqual(['C:/Downloads/a', 'C:/Downloads/b']);
     expect(sshMocks.sshDownload).toHaveBeenCalledWith(conn.id, '/home/tester/a');
+  });
+
+  it('keeps selection and restores the previous view when going back', async () => {
+    useRemotePathStore.setState({ path: { [conn.id]: '/home/tester' } });
+    const folder = { name: 'src', path: '/home/tester/src', is_dir: true };
+    sshMocks.sshFsList.mockImplementation((_id: string, target?: string) => Promise.resolve(
+      target === folder.path
+        ? { base: folder.path, entries: [{ name: 'main.ts', path: '/home/tester/src/main.ts', is_dir: false }] }
+        : { base: '/home/tester', entries: [folder] },
+    ));
+    const { result } = renderHook(() => useRemoteFileBrowser(conn));
+    await waitFor(() => expect(result.current.entries[0]?.name).toBe('src'));
+
+    act(() => result.current.selectOnly(folder.path));
+    expect(result.current.canGoBack).toBe(false);
+
+    act(() => result.current.navigate(folder.path));
+    await waitFor(() => expect(result.current.entries[0]?.name).toBe('main.ts'));
+    expect(result.current.selection.size).toBe(0);
+    expect(result.current.canGoBack).toBe(true);
+
+    act(() => result.current.goBack());
+    await waitFor(() => expect(result.current.entries[0]?.name).toBe('src'));
+    expect(result.current.selection.has(folder.path)).toBe(true);
+    expect(result.current.anchorPath).toBe(folder.path);
+    expect(result.current.canGoBack).toBe(false);
+  });
+
+  it('expands remote folders lazily through the child cache', async () => {
+    useRemotePathStore.setState({ path: { [conn.id]: '/home/tester' } });
+    const folder = { name: 'src', path: '/home/tester/src', is_dir: true };
+    const child = { name: 'main.ts', path: '/home/tester/src/main.ts', is_dir: false };
+    sshMocks.sshFsList.mockImplementation((_id: string, target?: string) => Promise.resolve(
+      target === folder.path ? { base: folder.path, entries: [child] } : { base: '/home/tester', entries: [folder] },
+    ));
+    const { result } = renderHook(() => useRemoteFileBrowser(conn));
+    await waitFor(() => expect(result.current.entries).toEqual([folder]));
+
+    act(() => result.current.toggleExpand(folder));
+    await waitFor(() => expect(result.current.childCache[folder.path]).toEqual([child]));
+    expect(result.current.expandedSet.has(folder.path)).toBe(true);
+
+    act(() => result.current.toggleExpand(folder));
+    expect(result.current.expandedSet.has(folder.path)).toBe(false);
+  });
+
+  it('stages deletes for undo and restores them from the history stack', async () => {
+    useRemotePathStore.setState({ path: { [conn.id]: '/home/tester' } });
+    const entry = { name: 'old.txt', path: '/home/tester/old.txt', is_dir: false };
+    const staged = { from: entry.path, to: '/home/tester/.vrykell/undo/u-old.txt' };
+    sshMocks.sshStageDelete.mockResolvedValue({ completed: [staged], errors: [] });
+    const { result } = renderHook(() => useRemoteFileBrowser(conn));
+    await waitFor(() => expect(result.current.path).toBe('/home/tester'));
+
+    act(() => {
+      result.current.buildMenuItems(entry).find((item) => item.label === '删除')!.onClick();
+    });
+    expect(result.current.confirm).toEqual({ kind: 'delete', entries: [entry] });
+    await act(async () => { result.current.confirmAction(); });
+    await waitFor(() => expect(sshMocks.sshStageDelete).toHaveBeenCalledWith(conn.id, [entry.path]));
+    expect(result.current.undo).toMatchObject({ kind: 'delete', label: '删除' });
+    expect(result.current.undoCount).toBe(1);
+
+    sshMocks.sshRestoreStaged.mockResolvedValue({ completed: [staged], errors: [] });
+    await act(async () => { await result.current.runUndo(); });
+    expect(sshMocks.sshRestoreStaged).toHaveBeenCalledWith(conn.id, [staged]);
+    expect(result.current.undoCount).toBe(0);
+  });
+
+  it('pastes a copy into a folder row and a cut into the current directory', async () => {
+    useRemotePathStore.setState({ path: { [conn.id]: '/home/tester' } });
+    const entry = { name: 'a.txt', path: '/home/tester/a.txt', is_dir: false };
+    const folder = { name: 'src', path: '/home/tester/src', is_dir: true };
+    const nested = { name: 'b.txt', path: '/home/tester/src/b.txt', is_dir: false };
+    sshMocks.sshCopy.mockResolvedValue({ completed: [{ from: entry.path, to: '/home/tester/src/a.txt' }], errors: [] });
+    const { result } = renderHook(() => useRemoteFileBrowser(conn));
+    await waitFor(() => expect(result.current.path).toBe('/home/tester'));
+
+    act(() => result.current.copySelection([entry]));
+    act(() => {
+      result.current.buildMenuItems(folder).find((item) => item.label === '粘贴到「src」')!.onClick();
+    });
+    await waitFor(() => expect(sshMocks.sshCopy).toHaveBeenCalledWith(conn.id, [entry.path], folder.path));
+
+    // 剪切粘贴 = 移动，目标为当前目录
+    act(() => result.current.cutSelection([nested]));
+    await act(async () => { await result.current.pasteClipboard(); });
+    expect(sshMocks.sshMove).toHaveBeenCalledWith(conn.id, nested.path, '/home/tester');
+    expect(result.current.undo).toMatchObject({ kind: 'move' });
   });
 
   it('retries an initially untrusted directory after SSH startup', async () => {
