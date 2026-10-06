@@ -895,7 +895,14 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             const destDir = args.destDir as string;
             for (const path of paths) fsOps.push({ op, path, destDir });
             return {
-              completed: paths.map((path) => ({ from: path, to: `${destDir}/${path.split('/').pop()}` })),
+              completed: paths.map((path) => {
+                const name = path.split('/').pop() ?? 'file';
+                const candidate = `${destDir}/${name}`;
+                // 同名避让（真实实现在后端）：目标已被占用时返回带序号的路径
+                const taken = ['Documents', 'Downloads', 'notes.txt'].includes(name)
+                  || createdEntries.some((item) => item.path === candidate);
+                return { from: path, to: taken ? candidate.replace(/(\.[^.]*)?$/, ' (1)$1') : candidate };
+              }),
               errors: [],
             };
           }
