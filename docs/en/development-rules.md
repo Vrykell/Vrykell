@@ -11,7 +11,7 @@
 
 1. **Comments and naming** — New or edited code comments are English (JSDoc, inline, CSS and Rust comments alike); comments and identifiers describe behavior in generic terms and avoid third-party product or brand names.
 2. **Independent implementation** — Implement features your own way; never copy third-party source.
-3. **Chinese UI** — All user-visible copy is Chinese.
+3. **User-visible copy goes through i18n** — Never hardcode user-visible Chinese in code: write the string in English and add its Chinese entry to `src/i18n`.
 4. **TypeScript strict** — Zero TS errors; do not use `any` unless necessary and annotated with `// eslint-disable-next-line`.
 
 ## 2. Testing

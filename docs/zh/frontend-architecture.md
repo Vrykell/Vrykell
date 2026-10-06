@@ -55,4 +55,4 @@ app → features → platform / core / ui / config / utils
 - 一个文件只承担一个主要职责。
 - 状态转换、IPC 适配、纯业务逻辑必须有单元测试。
 - 键盘、拖拽、弹窗、异步恢复等用户路径必须有 Playwright E2E。
-- 用户可见文字统一使用中文，颜色使用主题 CSS 变量。
+- 用户可见文案走 i18n（代码内写英文，`src/i18n` 补中文条目），颜色使用主题 CSS 变量。

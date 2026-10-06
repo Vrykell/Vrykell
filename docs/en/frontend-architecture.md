@@ -55,4 +55,4 @@ app → features → platform / core / ui / config / utils
 - A file assumes only one primary responsibility.
 - State transitions, IPC adaptation, and pure business logic must have unit tests.
 - User paths such as keyboard, drag-and-drop, popups, and async recovery must have Playwright E2E.
-- User-visible text uniformly uses Chinese, and colors use theme CSS variables.
+- User-visible copy goes through i18n (an English string in code plus a Chinese entry in `src/i18n`), and colors use theme CSS variables.

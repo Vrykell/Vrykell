@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Tauri 2 desktop app: React 19 + TypeScript frontend, Rust backend. Terminal-first UI with AI chat integration (Anthropic BYOK). All user-visible text is Chinese.
+Tauri 2 desktop app: React 19 + TypeScript frontend, Rust backend. Terminal-first UI with AI chat integration (Anthropic BYOK). User-visible copy lives as English strings in code with Chinese entries in the i18n catalog.
 
 ## Quick Commands
 
