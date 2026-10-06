@@ -31,6 +31,10 @@ export interface FileMenuHandlers {
   onSyncToTerminal?: () => void;
   onOpenDownloads?: () => void;
   onNewTabHere?: (currentDir: string) => void;
+  /** 在系统文件管理器中定位某个条目（本地专有）。 */
+  onReveal?: (entry: FsEntry) => void;
+  /** 在系统文件管理器中定位当前文件夹（⋯ 菜单，本地专有）。 */
+  onRevealDir?: (dir: string) => void;
 }
 
 export interface FileMenuContext {
@@ -39,6 +43,11 @@ export interface FileMenuContext {
   /** 菜单作用目标：命中行属于多选时是整组 */
   targets: FsEntry[];
   currentDir: string | null;
+  /**
+   * 命中行的落点目录：文件夹 = 自身；文件 = 它的同级目录；空白处 = 当前目录。
+   * 粘贴等竖切操作按它落点，语义与拖放、新建保持一致（rule 24）。
+   */
+  targetDir: string | null;
   clipboard: FileClipboard | null;
   /** 该行是否在工作区（本地专有高亮） */
   inWorkspace?: boolean;
@@ -75,16 +84,25 @@ function itemFor(key: FileMenuItemKey, ctx: FileMenuContext, folderTarget: FsEnt
     case 'cut':
       return { label: cmdLabel('剪切', count), onClick: () => handlers.onCut(targets) };
     case 'paste':
-      if (!clipboard || currentDir === null) return null;
-      // 右键文件夹：粘贴进该文件夹；右键文件 / 空白处：粘贴到当前目录（文件同级）
+      if (!clipboard || ctx.targetDir === null) return null;
+      // 右键文件夹：粘贴进该文件夹；右键文件：粘贴到它的同级目录；空白处：当前目录
       return {
         label: folderTarget
           ? `粘贴到「${folderTarget.name}」`
           : clipboard.mode === 'cut' ? '粘贴（移动）' : '粘贴',
-        onClick: () => handlers.onPasteInto(folderTarget ? folderTarget.path : currentDir),
+        onClick: () => handlers.onPasteInto(ctx.targetDir!),
       };
     case 'copy-path':
       return single ? { label: '复制路径', onClick: () => void navigator.clipboard.writeText(single.path) } : null;
+    case 'reveal':
+      if (single && handlers.onReveal) {
+        return { label: t('files.reveal'), onClick: () => handlers.onReveal!(single) };
+      }
+      if (!single && ctx.targetDir && handlers.onRevealDir) {
+        const dir = ctx.targetDir;
+        return { label: t('files.reveal.dir'), onClick: () => handlers.onRevealDir!(dir) };
+      }
+      return null;
     case 'rename':
       return single ? { label: '重命名', onClick: () => handlers.onRename(single) } : null;
     case 'download':

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, fsOps, ensureTabsOpen } from './tauri-mock';
+import { setupTauriMock, fsOps, revealedPaths, ensureTabsOpen } from './tauri-mock';
 
 test.beforeEach(async ({ page }) => {
   await setupTauriMock(page);
@@ -124,7 +124,7 @@ test.describe('文件面板', () => {
     await expect(page.getByRole('button', { name: '重命名' })).toHaveCount(0);
   });
 
-  test('粘贴目标：右键文件夹进该文件夹，右键文件与 Ctrl+V 进当前目录', async ({ page }) => {
+  test('粘贴目标：右键文件夹进该文件夹，右键文件进其同级目录，Ctrl+V 进当前目录', async ({ page }) => {
     const tree = page.getByTestId('local-file-tree');
     const notes = tree.locator('[data-testid="file-row"][data-path="/home/e2e/notes.txt"]');
 
@@ -136,10 +136,11 @@ test.describe('文件面板', () => {
     await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'copy'))
       .toContainEqual({ op: 'copy', path: '/home/e2e/notes.txt', destDir: '/home/e2e/Documents' });
 
-    // 右键文件：粘贴项指向同级目录（当前目录）
+    // 右键文件：粘贴到该文件的同级目录（不是当前目录）
     await notes.click({ button: 'right' });
-    await expect(page.getByRole('button', { name: '粘贴', exact: true })).toBeVisible();
-    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: '粘贴', exact: true }).click();
+    await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'copy'))
+      .toContainEqual({ op: 'copy', path: '/home/e2e/notes.txt', destDir: '/home/e2e' });
 
     // 空白处右键：粘贴到当前目录
     const box = await tree.boundingBox();
@@ -411,6 +412,22 @@ test.describe('文件面板', () => {
     await page.getByRole('button', { name: '新建文件', exact: true }).click();
     await expect(input).toBeVisible();
     await expect(input).toHaveValue('Untitled (1)');
+  });
+
+  test('右键行与更多菜单都能在系统文件管理器中定位', async ({ page }) => {
+    const tree = page.getByTestId('local-file-tree');
+    const notes = tree.locator('[data-testid="file-row"][data-path="/home/e2e/notes.txt"]');
+
+    // 行右键：定位该条目
+    await notes.click({ button: 'right' });
+    await page.getByRole('button', { name: '在文件管理器中显示' }).click();
+    await expect.poll(() => revealedPaths(page)).toContain('/home/e2e/notes.txt');
+
+    // ⋯ 菜单：定位当前文件夹
+    const currentDir = await tree.getAttribute('data-path');
+    await page.getByTestId('local-more-btn').click();
+    await page.getByRole('button', { name: '在文件管理器中显示当前文件夹' }).click();
+    await expect.poll(() => revealedPaths(page)).toContain(currentDir);
   });
 
   test('更多菜单可直接在当前文件夹新建文件/文件夹', async ({ page }) => {

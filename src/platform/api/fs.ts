@@ -1,3 +1,4 @@
+import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { invoke } from '@platform/diagnostics';
 import { normPath } from '@platform/path';
 import type { FsEntry, DiskEntry } from '@platform/api/types';
@@ -94,4 +95,9 @@ export function fsPurgeStaged(paths: string[]): Promise<void> {
 /** 用系统「打开方式」对话框打开文件（Windows 选择器 / macOS 在 Finder 中显示）。 */
 export function fileOpenWith(path: string): Promise<void> {
   return invoke('file_open_with', { path: normPath(path) });
+}
+
+/** 在系统文件管理器中定位并选中该路径（Windows 资源管理器 / macOS Finder）。 */
+export function fileRevealInDir(path: string): Promise<void> {
+  return revealItemInDir(path);
 }
