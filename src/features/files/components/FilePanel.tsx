@@ -107,6 +107,7 @@ export default function FilePanel({
     transferInto,
     createEntry,
     removeAfterTransfer,
+    collapseAll,
     ctxMenu,
     handleContextMenu,
     closeContextMenu,
@@ -208,6 +209,7 @@ export default function FilePanel({
 
   /** 菜单回调：核心动作由面板实现，专有动作由上层注入 */
   const handlers: FileMenuHandlers = {
+    onCollapseAll: collapseAll,
     onNew: (kind, entry) => void createEntry(kind, entry),
     onCopy: copySelection,
     onCut: cutSelection,
@@ -471,16 +473,25 @@ export default function FilePanel({
                   onChevronClick={toggleExpand}
                 />
                 {row.expanded && childLoadingHint.has(row.entry.path) && (
-                  <div role="status" style={{ padding: '4px 12px', color: 'var(--text-muted)', fontSize: 'var(--fs-label)' }}>正在读取目录…</div>
+                  <div role="status" style={{ padding: `5px 10px 5px ${4 + (row.depth + 1) * 14}px`, color: 'var(--text-muted)' }}>正在读取目录…</div>
                 )}
                 {row.expanded && childErrors[row.entry.path] && (
-                  <ErrorBox
-                    compact
-                    style={{ margin: '4px 12px' }}
-                    actions={<button onClick={() => void refreshDir(row.entry)} style={{ minHeight: 32 }}>重试</button>}
+                  // 与文件树行同缩进、同行高的普通行（不是告警卡片），右侧给一个重试按钮
+                  <div
+                    role="alert"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: `5px 10px 5px ${4 + (row.depth + 1) * 14}px`,
+                      color: 'var(--danger)',
+                    }}
                   >
-                    {childErrors[row.entry.path]}
-                  </ErrorBox>
+                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {childErrors[row.entry.path]}
+                    </span>
+                    <button onClick={() => void refreshDir(row.entry)} style={{ minHeight: 24, padding: '0 8px' }}>重试</button>
+                  </div>
                 )}
               </Fragment>
             ))}

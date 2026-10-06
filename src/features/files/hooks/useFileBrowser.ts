@@ -366,6 +366,11 @@ export function useFileBrowser({
     return loadChildren(target1);
   }, [loadChildren]);
 
+  /** 收起全部展开的文件夹（保留子列表缓存，重新展开不再请求）。 */
+  const collapseAll = useCallback(() => {
+    setExpandedSet(new Set());
+  }, []);
+
   const toggleExpand = useCallback((entry: FsEntry) => {
     setExpandedSet((current) => {
       const next = new Set(current);
@@ -777,6 +782,7 @@ export function useFileBrowser({
     createEntry,
     removeAfterTransfer,
     uploadInto,
+    collapseAll,
     openEntry,
     ctxMenu,
     handleContextMenu,

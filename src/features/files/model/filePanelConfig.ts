@@ -17,7 +17,7 @@ export type FileMenuItemKey =
   | 'workspace-add' | 'workspace-remove' | 'open-tab'
   | 'open-editor' | 'open-system' | 'open-with'
   | 'copy' | 'cut' | 'paste' | 'copy-path' | 'rename' | 'download' | 'delete'
-  | 'upload-file' | 'upload-dir' | 'new-tab-here' | 'downloads-view';
+  | 'upload-file' | 'upload-dir' | 'new-tab-here' | 'downloads-view' | 'collapse-all';
 
 export interface FilePanelConfig {
   variant: 'local' | 'ssh';
@@ -101,7 +101,7 @@ export function filePanelConfigFor(target: FileOpsTarget): FilePanelConfig {
         rowFile: ['new-file', 'new-folder', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'download', 'delete'],
         rowMulti: ['copy', 'cut', 'paste', 'download', 'delete'],
         blank: ['new-file', 'new-folder', 'paste', 'upload-file', 'upload-dir'],
-        more: ['upload-file', 'upload-dir', 'downloads-view'],
+        more: ['upload-file', 'upload-dir', 'downloads-view', 'collapse-all'],
       },
       drag: { downloadBeforeNativeDrag: true, externalDropMode: 'upload', cleanupSourceAfterNativeDrag: false },
       open: 'remote-editor',
@@ -119,7 +119,7 @@ export function filePanelConfigFor(target: FileOpsTarget): FilePanelConfig {
       rowFile: ['new-file', 'new-folder', 'open-editor', 'open-system', 'open-with', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'delete'],
       rowMulti: ['copy', 'cut', 'paste', 'delete'],
       blank: ['new-file', 'new-folder', 'paste', 'new-tab-here'],
-      more: ['new-tab-here', 'downloads-view'],
+      more: ['new-tab-here', 'downloads-view', 'collapse-all'],
     },
     drag: { downloadBeforeNativeDrag: false, externalDropMode: 'move', cleanupSourceAfterNativeDrag: true },
     open: 'terminal-editor',
