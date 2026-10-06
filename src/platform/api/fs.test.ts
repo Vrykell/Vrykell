@@ -4,7 +4,9 @@
 import { describe, it, expect, vi } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
-import { fsList, fsDisks, fsHome, fsRename, fsDelete, fileOpenWith } from '@platform/api/fs';
+import {
+  fsList, fsDisks, fsHome, fsRename, fsCopy, fsMove, fsStageDelete, fsRestoreStaged, fsPurgeStaged, fileOpenWith,
+} from '@platform/api/fs';
 
 describe('api/fs 封装', () => {
   it('各命令按约定透传', async () => {
@@ -22,8 +24,6 @@ describe('api/fs 封装', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('fs_home');
     await fsRename('/a', 'b');
     expect(invokeMock).toHaveBeenLastCalledWith('fs_rename', { oldPath: '/a', newName: 'b' });
-    await fsDelete('/a');
-    expect(invokeMock).toHaveBeenLastCalledWith('fs_delete', { path: '/a' });
     await fileOpenWith('/a.txt');
     expect(invokeMock).toHaveBeenLastCalledWith('file_open_with', { path: '/a.txt' });
   });
@@ -47,9 +47,36 @@ describe('api/fs 封装', () => {
 
     await fsRename('C:\\Users\\37863\\old.txt', 'new.txt');
     expect(invokeMock).toHaveBeenLastCalledWith('fs_rename', { oldPath: 'C:/Users/37863/old.txt', newName: 'new.txt' });
-    await fsDelete('C:\\Users\\37863\\old.txt');
-    expect(invokeMock).toHaveBeenLastCalledWith('fs_delete', { path: 'C:/Users/37863/old.txt' });
     await fileOpenWith('C:\\Users\\37863\\old.txt');
     expect(invokeMock).toHaveBeenLastCalledWith('file_open_with', { path: 'C:/Users/37863/old.txt' });
+  });
+
+  it('复制 / 移动：入参归一化，返回的完成项也归一化', async () => {
+    invokeMock.mockResolvedValueOnce({ completed: [{ from: 'C:\\a\\x.txt', to: 'C:\\b\\x.txt' }], errors: ['目标已存在'] });
+    const copy = await fsCopy(['C:\\a\\x.txt'], 'C:\\b');
+    expect(invokeMock).toHaveBeenLastCalledWith('fs_copy', { paths: ['C:/a/x.txt'], destDir: 'C:/b' });
+    expect(copy.completed).toEqual([{ from: 'C:/a/x.txt', to: 'C:/b/x.txt' }]);
+    expect(copy.errors).toEqual(['目标已存在']);
+
+    invokeMock.mockResolvedValueOnce({ completed: [], errors: [] });
+    await fsMove(['/a/x.txt'], '/b');
+    expect(invokeMock).toHaveBeenLastCalledWith('fs_move', { paths: ['/a/x.txt'], destDir: '/b' });
+  });
+
+  it('可回退删除：暂存映射归一化，回退与清理按约定透传', async () => {
+    invokeMock.mockResolvedValueOnce([{ from: 'C:\\Users\\37863\\old.txt', to: 'C:\\Users\\37863\\.vrykell\\undo\\u-old.txt' }]);
+    const staged = await fsStageDelete(['C:\\Users\\37863\\old.txt']);
+    expect(invokeMock).toHaveBeenLastCalledWith('fs_stage_delete', { paths: ['C:/Users/37863/old.txt'] });
+    expect(staged).toEqual([{ from: 'C:/Users/37863/old.txt', to: 'C:/Users/37863/.vrykell/undo/u-old.txt' }]);
+
+    invokeMock.mockResolvedValueOnce({ completed: [{ from: 'C:/a/old.txt', to: 'C:/s/old.txt' }], errors: [] });
+    await fsRestoreStaged([{ from: 'C:\\a\\old.txt', to: 'C:\\s\\old.txt' }]);
+    expect(invokeMock).toHaveBeenLastCalledWith('fs_restore_staged', {
+      items: [{ from: 'C:/a/old.txt', to: 'C:/s/old.txt' }],
+    });
+
+    invokeMock.mockResolvedValueOnce(undefined);
+    await fsPurgeStaged(['C:\\s\\old.txt']);
+    expect(invokeMock).toHaveBeenLastCalledWith('fs_purge_staged', { paths: ['C:/s/old.txt'] });
   });
 });

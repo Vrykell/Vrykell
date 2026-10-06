@@ -31,8 +31,53 @@ export function fsRename(oldPath: string, newName: string): Promise<void> {
   return invoke('fs_rename', { oldPath: normPath(oldPath), newName });
 }
 
-export function fsDelete(path: string): Promise<void> {
-  return invoke('fs_delete', { path: normPath(path) });
+/** 完成的一条 from→to 对（用于记录文件操作回退）。 */
+export interface FileOpPair {
+  from: string;
+  to: string;
+}
+
+/** 批量文件操作结果：完成项 + 失败说明（部分失败不中断其余项）。 */
+export interface FileOpOutcome {
+  completed: FileOpPair[];
+  errors: string[];
+}
+
+function normalizePair(pair: FileOpPair): FileOpPair {
+  return { from: normPath(pair.from), to: normPath(pair.to) };
+}
+
+function normalizeOutcome(outcome: FileOpOutcome): FileOpOutcome {
+  return { completed: outcome.completed.map(normalizePair), errors: outcome.errors };
+}
+
+/** 复制到目标目录（目录递归，符号链接按链接复制）。 */
+export function fsCopy(paths: string[], destDir: string): Promise<FileOpOutcome> {
+  return invoke<FileOpOutcome>('fs_copy', { paths: paths.map(normPath), destDir: normPath(destDir) })
+    .then(normalizeOutcome);
+}
+
+/** 移动到目标目录（跨盘自动退化为复制 + 删源）。 */
+export function fsMove(paths: string[], destDir: string): Promise<FileOpOutcome> {
+  return invoke<FileOpOutcome>('fs_move', { paths: paths.map(normPath), destDir: normPath(destDir) })
+    .then(normalizeOutcome);
+}
+
+/** 可回退删除：先把内容移动到应用暂存区，返回 原始→暂存 映射。 */
+export function fsStageDelete(paths: string[]): Promise<FileOpPair[]> {
+  return invoke<FileOpPair[]>('fs_stage_delete', { paths: paths.map(normPath) })
+    .then((pairs) => pairs.map(normalizePair));
+}
+
+/** 回退删除：把暂存项移回原位（原位置已占用时该项报错）。 */
+export function fsRestoreStaged(items: FileOpPair[]): Promise<FileOpOutcome> {
+  return invoke<FileOpOutcome>('fs_restore_staged', { items: items.map(normalizePair) })
+    .then(normalizeOutcome);
+}
+
+/** 把暂存项送入系统回收站（可回退窗口结束后补完删除）。 */
+export function fsPurgeStaged(paths: string[]): Promise<void> {
+  return invoke('fs_purge_staged', { paths: paths.map(normPath) });
 }
 
 /** 用系统「打开方式」对话框打开文件（Windows 选择器 / macOS 在 Finder 中显示）。 */

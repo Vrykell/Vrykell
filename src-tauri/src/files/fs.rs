@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize)]
 pub struct FsEntry {
@@ -201,12 +201,6 @@ fn fs_rename_sync(old_path: String, new_name: String) -> Result<(), String> {
     std::fs::rename(&old, &new_path).map_err(|e| e.to_string())
 }
 
-/// 删除本地文件/目录：移入系统回收站（trash crate 跨平台，macOS 用原生
-/// NSFileManager trashItemAtURL，Windows 用回收站，Linux 走 XDG trash 规范）。
-fn fs_delete_sync(path: String) -> Result<(), String> {
-    trash::delete(&path).map_err(|e| e.to_string())
-}
-
 #[tauri::command]
 pub async fn fs_rename(old_path: String, new_name: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || fs_rename_sync(old_path, new_name))
@@ -214,11 +208,257 @@ pub async fn fs_rename(old_path: String, new_name: String) -> Result<(), String>
         .map_err(|e| e.to_string())?
 }
 
+// ── 文件操作与回退：复制 / 移动 / 可回退删除 ──
+//
+// 删除不再直接进系统回收站，而是先移动到 ~/.vrykell/undo 暂存：
+// 前端「更多 → 回退删除」可把暂存项移回原位；暂存项在下一次文件操作或应用启动时
+// 送入系统回收站，最终语义仍是「删除 = 进回收站」，只是多了一个可回退的窗口。
+
+/// 完成的一条 from→to 对（前端据此记录回退）。
+#[derive(Clone, Serialize, Deserialize)]
+pub struct FileOpPair {
+    from: String,
+    to: String,
+}
+
+/// 批量文件操作结果：完成项 + 失败说明（部分失败不中断其余项）。
+#[derive(Clone, Serialize)]
+pub struct FileOpOutcome {
+    completed: Vec<FileOpPair>,
+    errors: Vec<String>,
+}
+
+fn file_name_of(path: &std::path::Path) -> Result<String, String> {
+    path.file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .ok_or_else(|| format!("无法定位 {} 的文件名", path.display()))
+}
+
+/// 是否跨设备（跨盘移动需要退化为复制 + 删源）。
+fn is_cross_device(error: &std::io::Error) -> bool {
+    #[cfg(unix)]
+    {
+        error.raw_os_error() == Some(18) // EXDEV
+    }
+    #[cfg(windows)]
+    {
+        error.raw_os_error() == Some(17) // ERROR_NOT_SAME_DEVICE
+    }
+}
+
+#[cfg(unix)]
+fn copy_symlink(from: &std::path::Path, to: &std::path::Path) -> Result<(), String> {
+    let target = std::fs::read_link(from).map_err(|e| format!("读取符号链接失败: {e}"))?;
+    std::os::unix::fs::symlink(target, to).map_err(|e| format!("复制符号链接失败: {e}"))
+}
+
+#[cfg(windows)]
+fn copy_symlink(from: &std::path::Path, to: &std::path::Path) -> Result<(), String> {
+    let target = std::fs::read_link(from).map_err(|e| format!("读取符号链接失败: {e}"))?;
+    let target_is_dir = std::fs::metadata(from).map(|m| m.is_dir()).unwrap_or(false);
+    let created = if target_is_dir {
+        std::os::windows::fs::symlink_dir(&target, to)
+    } else {
+        std::os::windows::fs::symlink_file(&target, to)
+    };
+    created.map_err(|e| format!("复制符号链接失败: {e}"))
+}
+
+/// 复制单条路径：目录递归，符号链接按链接本身复制（不跟随，避免环）。
+fn copy_entry(from: &std::path::Path, to: &std::path::Path) -> Result<(), String> {
+    let meta = std::fs::symlink_metadata(from).map_err(|e| format!("无法读取 {}: {e}", from.display()))?;
+    if meta.file_type().is_symlink() {
+        return copy_symlink(from, to);
+    }
+    if meta.is_dir() {
+        std::fs::create_dir_all(to).map_err(|e| format!("创建 {} 失败: {e}", to.display()))?;
+        let rd = std::fs::read_dir(from).map_err(|e| format!("读取 {} 失败: {e}", from.display()))?;
+        for entry in rd.flatten() {
+            copy_entry(&entry.path(), &to.join(entry.file_name()))?;
+        }
+        return Ok(());
+    }
+    std::fs::copy(from, to).map(|_| ()).map_err(|e| format!("复制 {} 失败: {e}", from.display()))
+}
+
+/// 删除单条路径（目录递归；符号链接只删链接本身，不删目标内容）。
+#[cfg(unix)]
+fn remove_entry(path: &std::path::Path) -> Result<(), String> {
+    let meta = std::fs::symlink_metadata(path).map_err(|e| format!("无法读取 {}: {e}", path.display()))?;
+    if meta.is_dir() {
+        std::fs::remove_dir_all(path).map_err(|e| format!("删除 {} 失败: {e}", path.display()))
+    } else {
+        std::fs::remove_file(path).map_err(|e| format!("删除 {} 失败: {e}", path.display()))
+    }
+}
+
+#[cfg(windows)]
+fn remove_entry(path: &std::path::Path) -> Result<(), String> {
+    let meta = std::fs::symlink_metadata(path).map_err(|e| format!("无法读取 {}: {e}", path.display()))?;
+    let link_to_dir = meta.file_type().is_symlink()
+        && std::fs::metadata(path).map(|m| m.is_dir()).unwrap_or(false);
+    if link_to_dir {
+        std::fs::remove_dir(path).map_err(|e| format!("删除 {} 失败: {e}", path.display()))
+    } else if meta.is_dir() {
+        std::fs::remove_dir_all(path).map_err(|e| format!("删除 {} 失败: {e}", path.display()))
+    } else {
+        std::fs::remove_file(path).map_err(|e| format!("删除 {} 失败: {e}", path.display()))
+    }
+}
+
+/// 移动单条路径：同设备 rename；跨设备退化为复制 + 删源。
+fn move_entry(from: &std::path::Path, to: &std::path::Path) -> Result<(), String> {
+    match std::fs::rename(from, to) {
+        Ok(()) => Ok(()),
+        Err(error) if is_cross_device(&error) => {
+            copy_entry(from, to)?;
+            remove_entry(from)
+        }
+        Err(error) => Err(format!("移动 {} 失败: {error}", from.display())),
+    }
+}
+
+/// 校验并把源解析成目标路径：同名目标、自身、把目录放进自身子树都拒绝。
+fn resolve_dest(from: &std::path::Path, dest_dir: &std::path::Path) -> Result<std::path::PathBuf, String> {
+    let name = file_name_of(from)?;
+    let dest = dest_dir.join(&name);
+    if dest == from {
+        return Err(format!("「{name}」已在目标目录中"));
+    }
+    if dest.exists() {
+        return Err(format!("目标已存在同名项「{name}」"));
+    }
+    let meta = std::fs::symlink_metadata(from).map_err(|e| format!("无法读取 {}: {e}", from.display()))?;
+    let is_real_dir = meta.is_dir() && !meta.file_type().is_symlink();
+    if is_real_dir {
+        let src = std::fs::canonicalize(from).map_err(|e| format!("无法解析 {}: {e}", from.display()))?;
+        let dst = std::fs::canonicalize(dest_dir).map_err(|e| format!("无法解析 {}: {e}", dest_dir.display()))?;
+        if dst.starts_with(&src) {
+            return Err(format!("不能把「{name}」放入它自己内部"));
+        }
+    }
+    Ok(dest)
+}
+
+fn fs_transfer_sync(paths: Vec<String>, dest_dir: String, copy: bool) -> Result<FileOpOutcome, String> {
+    let dest_dir = std::path::PathBuf::from(&dest_dir);
+    let mut completed = Vec::new();
+    let mut errors = Vec::new();
+    for path in paths {
+        let from = std::path::PathBuf::from(&path);
+        let outcome = resolve_dest(&from, &dest_dir).and_then(|dest| {
+            let result = if copy { copy_entry(&from, &dest) } else { move_entry(&from, &dest) };
+            result.map(|()| dest)
+        });
+        match outcome {
+            Ok(dest) => completed.push(FileOpPair { from: path, to: dest.to_string_lossy().to_string() }),
+            Err(error) => errors.push(error),
+        }
+    }
+    Ok(FileOpOutcome { completed, errors })
+}
+
+fn undo_dir() -> Result<std::path::PathBuf, String> {
+    let dir = dirs::home_dir()
+        .ok_or("无法定位主目录")?
+        .join(".vrykell")
+        .join("undo");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("无法创建暂存目录: {e}"))?;
+    Ok(dir)
+}
+
+/// 把待删除项移动进暂存目录（返回原始→暂存的映射，供回退）。
+fn stage_delete_into(dir: &std::path::Path, paths: Vec<String>) -> Result<Vec<FileOpPair>, String> {
+    std::fs::create_dir_all(dir).map_err(|e| format!("无法创建暂存目录: {e}"))?;
+    let mut completed = Vec::new();
+    for path in paths {
+        let from = std::path::PathBuf::from(&path);
+        let name = file_name_of(&from)?;
+        let staged = dir.join(format!("{}-{}", uuid::Uuid::new_v4(), name));
+        move_entry(&from, &staged)?;
+        completed.push(FileOpPair { from: path, to: staged.to_string_lossy().to_string() });
+    }
+    Ok(completed)
+}
+
+/// 回退删除：把暂存项移回原位（原位置已有同名项时跳过并报错）。
+fn restore_staged_sync(items: Vec<FileOpPair>) -> Result<FileOpOutcome, String> {
+    let mut completed = Vec::new();
+    let mut errors = Vec::new();
+    for item in items {
+        let staged = std::path::PathBuf::from(&item.to);
+        let original = std::path::PathBuf::from(&item.from);
+        if original.exists() {
+            errors.push(format!("恢复失败：{} 已存在同名项", original.display()));
+            continue;
+        }
+        let prepared = original
+            .parent()
+            .map(|parent| std::fs::create_dir_all(parent).map_err(|e| format!("无法创建 {}: {e}", parent.display())))
+            .unwrap_or(Ok(()))
+            .and_then(|()| move_entry(&staged, &original));
+        match prepared {
+            Ok(()) => completed.push(FileOpPair { from: item.from, to: item.to }),
+            Err(error) => errors.push(error),
+        }
+    }
+    Ok(FileOpOutcome { completed, errors })
+}
+
+/// 把暂存项送入系统回收站（下一次文件操作 / 应用启动时补完删除）。单项失败不阻断。
+fn purge_staged(paths: Vec<String>) {
+    for path in paths {
+        let _ = trash::delete(&path);
+    }
+}
+
+/// 启动时清理上次会话残留的暂存项：它们已经被用户删除，只是没来得及进回收站。
+pub fn sweep_undo_dir() {
+    let Ok(dir) = undo_dir() else { return };
+    if let Ok(rd) = std::fs::read_dir(&dir) {
+        for entry in rd.flatten() {
+            let _ = trash::delete(entry.path());
+        }
+    }
+}
+
 #[tauri::command]
-pub async fn fs_delete(path: String) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || fs_delete_sync(path))
+pub async fn fs_copy(paths: Vec<String>, dest_dir: String) -> Result<FileOpOutcome, String> {
+    tauri::async_runtime::spawn_blocking(move || fs_transfer_sync(paths, dest_dir, true))
         .await
         .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn fs_move(paths: Vec<String>, dest_dir: String) -> Result<FileOpOutcome, String> {
+    tauri::async_runtime::spawn_blocking(move || fs_transfer_sync(paths, dest_dir, false))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn fs_stage_delete(paths: Vec<String>) -> Result<Vec<FileOpPair>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let dir = undo_dir()?;
+        stage_delete_into(&dir, paths)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn fs_restore_staged(items: Vec<FileOpPair>) -> Result<FileOpOutcome, String> {
+    tauri::async_runtime::spawn_blocking(move || restore_staged_sync(items))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn fs_purge_staged(paths: Vec<String>) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || purge_staged(paths))
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 /// 检测命令是否可用（经登录 shell 解析用户 PATH，GUI 进程 PATH 找不到 code 等自定义命令）。
@@ -804,5 +1044,129 @@ mod tests {
         // 空搜索词报错
         assert!(super::fs_search_sync(root, "".into(), false, None).is_err());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 本次测试独占的临时目录（uuid 防并发冲突）。
+    fn temp_workspace(tag: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("vrykell-op-{tag}-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn fs_transfer_copies_moves_and_rejects_unsafe_targets() {
+        let root = temp_workspace("transfer");
+        let src = root.join("src");
+        let dst = root.join("dst");
+        std::fs::create_dir_all(src.join("folder/inner")).unwrap();
+        std::fs::create_dir_all(&dst).unwrap();
+        std::fs::write(src.join("a.txt"), "alpha").unwrap();
+        std::fs::write(src.join("folder/inner/b.txt"), "beta").unwrap();
+
+        // 复制文件：源保留、目标内容一致
+        let outcome = super::fs_transfer_sync(
+            vec![src.join("a.txt").to_string_lossy().to_string()],
+            dst.to_string_lossy().to_string(),
+            true,
+        )
+        .unwrap();
+        assert_eq!(outcome.errors, Vec::<String>::new());
+        assert_eq!(outcome.completed.len(), 1);
+        assert!(src.join("a.txt").exists());
+        assert_eq!(std::fs::read_to_string(dst.join("a.txt")).unwrap(), "alpha");
+
+        // 同名冲突：报错但不影响其他项
+        let outcome = super::fs_transfer_sync(
+            vec![src.join("a.txt").to_string_lossy().to_string()],
+            dst.to_string_lossy().to_string(),
+            true,
+        )
+        .unwrap();
+        assert!(outcome.completed.is_empty());
+        assert!(outcome.errors[0].contains("同名"));
+
+        // 复制目录：递归内容完整
+        let outcome = super::fs_transfer_sync(
+            vec![src.join("folder").to_string_lossy().to_string()],
+            dst.to_string_lossy().to_string(),
+            true,
+        )
+        .unwrap();
+        assert_eq!(outcome.errors, Vec::<String>::new());
+        assert_eq!(std::fs::read_to_string(dst.join("folder/inner/b.txt")).unwrap(), "beta");
+
+        // 移动文件：源消失、目标出现
+        let outcome = super::fs_transfer_sync(
+            vec![src.join("a.txt").to_string_lossy().to_string()],
+            root.join("moved").to_string_lossy().to_string(),
+            false,
+        )
+        .unwrap();
+        assert_eq!(outcome.errors.len(), 1, "目标目录不存在时应报错");
+        std::fs::create_dir_all(root.join("moved")).unwrap();
+        let outcome = super::fs_transfer_sync(
+            vec![src.join("a.txt").to_string_lossy().to_string()],
+            root.join("moved").to_string_lossy().to_string(),
+            false,
+        )
+        .unwrap();
+        assert_eq!(outcome.errors, Vec::<String>::new());
+        assert!(!src.join("a.txt").exists());
+        assert!(root.join("moved/a.txt").exists());
+
+        // 目录放进自身子树：拒绝（防无限递归）
+        std::fs::create_dir_all(src.join("folder/sub")).unwrap();
+        let outcome = super::fs_transfer_sync(
+            vec![src.join("folder").to_string_lossy().to_string()],
+            src.join("folder/sub").to_string_lossy().to_string(),
+            true,
+        )
+        .unwrap();
+        assert!(outcome.completed.is_empty());
+        assert!(outcome.errors[0].contains("自己内部"));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn stage_delete_and_restore_round_trip() {
+        let root = temp_workspace("undo");
+        let staging = root.join("staging");
+        let file = root.join("note.txt");
+        std::fs::write(&file, "keep me").unwrap();
+
+        let staged = super::stage_delete_into(
+            &staging,
+            vec![file.to_string_lossy().to_string()],
+        )
+        .unwrap();
+        assert_eq!(staged.len(), 1);
+        assert!(!file.exists(), "暂存后原位置应消失");
+        let staged_path = std::path::PathBuf::from(&staged[0].to);
+        assert!(staged_path.exists());
+
+        // 回退：移回原位且内容一致
+        let outcome = super::restore_staged_sync(staged.clone()).unwrap();
+        assert_eq!(outcome.errors, Vec::<String>::new());
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "keep me");
+        assert!(!staged_path.exists());
+
+        // 原位置被占用时回退报错，暂存项保留
+        let staged = super::stage_delete_into(&staging, vec![file.to_string_lossy().to_string()]).unwrap();
+        std::fs::write(&file, "occupied").unwrap();
+        let outcome = super::restore_staged_sync(staged.clone()).unwrap();
+        assert_eq!(outcome.completed.len(), 0);
+        assert!(outcome.errors[0].contains("已存在"));
+        assert!(std::path::PathBuf::from(&staged[0].to).exists());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn purge_staged_sends_items_to_system_trash() {
+        let root = temp_workspace("purge");
+        let staged = root.join("staged.txt");
+        std::fs::write(&staged, "gone").unwrap();
+        super::purge_staged(vec![staged.to_string_lossy().to_string()]);
+        assert!(!staged.exists());
+        let _ = std::fs::remove_dir_all(&root);
     }
 }
