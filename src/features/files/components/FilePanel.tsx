@@ -17,6 +17,9 @@ import FileDragPreview from '@features/files/components/FileDragPreview';
 import ContextMenu from '@ui/ContextMenu';
 import ConfirmDialog from '@ui/ConfirmDialog';
 import ErrorBox from '@ui/ErrorBox';
+import { useToastStore } from '@ui/Toast';
+import { downloadsDiscard } from '@features/files/services/downloads';
+import { t } from '@i18n';
 
 export interface FilePanelProps {
   /** 执行目标：本地文件面板与 SSH 文件面板只是这个状态变量的不同取值。 */
@@ -148,6 +151,17 @@ export default function FilePanel({
     [segs, maxChars, ops],
   );
 
+  /** 远端拖出取消：删除本次拖拽下载的临时副本并提示（源文件在远端，未被改动）。 */
+  const discardNativeDragCopies = async (paths: string[]) => {
+    if (paths.length === 0) return;
+    try {
+      await downloadsDiscard(paths);
+      useToastStore.getState().addToast(t('files.dragOut.cancelled'), 'info');
+    } catch (error) {
+      useToastStore.getState().addToast(String((error as Error)?.message ?? error), 'error');
+    }
+  };
+
   /** 拖到目标目录 = 移动；拖出窗口按配置决定是否先下载，成功后按移动语义清理源 */
   const startRowDrag = useFileRowDrag({
     onDrop: (items, dropTarget) => {
@@ -156,10 +170,12 @@ export default function FilePanel({
       void transferInto(paths, dropTarget.dir, 'move');
     },
     prepareNativeDrag: config.drag.downloadBeforeNativeDrag ? prepareNativeDrag : undefined,
-    onNativeDragEnd: (result, items) => {
+    onNativeDragEnd: (result, items, payload) => {
       // 本地：系统按「移动」接收，拖出成功后清理源头；远端：拖出=下载，源文件必须保留
       if (result === 'Dropped' && config.drag.cleanupSourceAfterNativeDrag) {
         void removeAfterTransfer(items.map((item) => ({ name: item.name, path: item.path, is_dir: item.is_dir })));
+      } else if (result === 'Cancelled' && config.drag.downloadBeforeNativeDrag) {
+        void discardNativeDragCopies(payload.paths);
       }
       load(path);
     },

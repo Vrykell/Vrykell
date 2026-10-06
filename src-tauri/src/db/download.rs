@@ -47,6 +47,14 @@ impl HistoryDb {
             .map_err(|e| e.to_string())?;
         Ok(())
     }
+
+    /// 移除某条下载历史（按本地路径；丢弃拖出取消后遗留的临时副本时调用）。
+    pub fn remove_download(&self, local_path: &str) -> Result<(), String> {
+        self.conn()
+            .execute("DELETE FROM downloads WHERE local_path = ?1", params![local_path])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
 }
 
 /// 下载历史记录（文件管理「下载管理」页使用）。

@@ -366,7 +366,7 @@ pub async fn ssh_list(
 }
 
 /// 本地下载根目录：~/.vrykell/downloads
-fn downloads_dir() -> Result<std::path::PathBuf, String> {
+pub(crate) fn downloads_dir() -> Result<std::path::PathBuf, String> {
     let dir = dirs::home_dir()
         .ok_or("无法定位主目录".to_string())?
         .join(".vrykell")

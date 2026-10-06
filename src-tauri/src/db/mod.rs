@@ -276,6 +276,17 @@ mod tests {
     }
 
     #[test]
+    fn remove_download_drops_only_the_matching_path() {
+        let db = test_db();
+        db.record_download("a", "/d/a", "/r/a", "conn", false, 1, 1).unwrap();
+        db.record_download("b", "/d/b", "/r/b", "conn", false, 1, 2).unwrap();
+        db.remove_download("/d/a").unwrap();
+        let list = db.list_downloads().unwrap();
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].local_path, "/d/b");
+    }
+
+    #[test]
     fn delete_session_cascades_blocks_and_chat() {
         let db = test_db();
         db.create_session("s1", "标题", 0, "", "local", "{}").unwrap();
