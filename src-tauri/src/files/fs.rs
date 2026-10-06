@@ -183,7 +183,8 @@ pub fn fs_home() -> Result<String, String> {
 }
 
 /// 重命名本地文件/目录：old_path → 同目录 new_name。
-fn fs_rename_sync(old_path: String, new_name: String) -> Result<(), String> {
+/// 目标名被占用时按 `name (1)` 递增避让（不产生重名），返回最终路径。
+fn fs_rename_sync(old_path: String, new_name: String) -> Result<String, String> {
     // 校验 new_name 为单一 path component，防止 `/`、`..` 等路径遍历逃逸出父目录
     let np = std::path::Path::new(&new_name);
     if new_name.is_empty()
@@ -194,16 +195,85 @@ fn fs_rename_sync(old_path: String, new_name: String) -> Result<(), String> {
     }
     let old = std::path::PathBuf::from(&old_path);
     let parent = old.parent().ok_or("无法定位父目录")?;
-    let new_path = parent.join(&new_name);
-    if new_path.exists() {
-        return Err("目标名称已存在".to_string());
+    let candidate = parent.join(&new_name);
+    let new_path = if candidate.exists() && candidate != old {
+        unique_path(parent, &new_name)
+    } else {
+        candidate
+    };
+    std::fs::rename(&old, &new_path).map_err(|e| e.to_string())?;
+    Ok(new_path.to_string_lossy().to_string())
+}
+
+/// 在目录里为 name 找可用路径：同名时按 `name (1)`、`name (2)`… 递增（保留扩展名）。
+fn unique_path(dir: &std::path::Path, name: &str) -> std::path::PathBuf {
+    let stem = std::path::Path::new(name)
+        .file_stem()
+        .map(|value| value.to_string_lossy().to_string())
+        .unwrap_or_else(|| name.to_string());
+    let extension = std::path::Path::new(name)
+        .extension()
+        .map(|value| value.to_string_lossy().to_string());
+    for index in 1..10_000u32 {
+        let candidate = match &extension {
+            Some(ext) => format!("{stem} ({index}).{ext}"),
+            None => format!("{stem} ({index})"),
+        };
+        let path = dir.join(candidate);
+        if !path.exists() {
+            return path;
+        }
     }
-    std::fs::rename(&old, &new_path).map_err(|e| e.to_string())
+    dir.join(format!("{stem} ({})", uuid::Uuid::new_v4()))
+}
+
+/// 新建本地文件（空文件）或文件夹；同名时自动加序号，返回最终路径。
+fn fs_create_sync(dir: String, name: String, is_dir: bool) -> Result<String, String> {
+    let np = std::path::Path::new(&name);
+    if name.is_empty()
+        || np.components().count() != 1
+        || matches!(np.components().next(), Some(std::path::Component::ParentDir | std::path::Component::RootDir | std::path::Component::Prefix(_)))
+    {
+        return Err("非法文件名".to_string());
+    }
+    let parent = std::path::PathBuf::from(&dir);
+    if !parent.is_dir() {
+        return Err(format!("目标目录不可用：{dir}"));
+    }
+    let path = {
+        let direct = parent.join(&name);
+        if direct.exists() {
+            // 同名时按 name (1) 递增避让（unique_path 只在重名时调用）
+            unique_path(&parent, &name)
+        } else {
+            direct
+        }
+    };
+    if is_dir {
+        std::fs::create_dir(&path).map_err(|e| format!("新建文件夹失败：{e}"))?;
+    } else {
+        std::fs::File::create(&path).map_err(|e| format!("新建文件失败：{e}"))?;
+    }
+    Ok(path.to_string_lossy().to_string())
 }
 
 #[tauri::command]
-pub async fn fs_rename(old_path: String, new_name: String) -> Result<(), String> {
+pub async fn fs_rename(old_path: String, new_name: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || fs_rename_sync(old_path, new_name))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn fs_create_file(dir: String, name: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || fs_create_sync(dir, name, false))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn fs_create_dir(dir: String, name: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || fs_create_sync(dir, name, true))
         .await
         .map_err(|e| e.to_string())?
 }
@@ -326,16 +396,9 @@ fn move_entry(from: &std::path::Path, to: &std::path::Path) -> Result<(), String
     }
 }
 
-/// 校验并把源解析成目标路径：同名目标、自身、把目录放进自身子树都拒绝。
-fn resolve_dest(from: &std::path::Path, dest_dir: &std::path::Path) -> Result<std::path::PathBuf, String> {
+/// 校验并把源解析成目标路径：把目录放进自身子树拒绝；目标重名时自动加序号避让。
+fn resolve_dest(from: &std::path::Path, dest_dir: &std::path::Path, copy: bool) -> Result<std::path::PathBuf, String> {
     let name = file_name_of(from)?;
-    let dest = dest_dir.join(&name);
-    if dest == from {
-        return Err(format!("「{name}」已在目标目录中"));
-    }
-    if dest.exists() {
-        return Err(format!("目标已存在同名项「{name}」"));
-    }
     let meta = std::fs::symlink_metadata(from).map_err(|e| format!("无法读取 {}: {e}", from.display()))?;
     let is_real_dir = meta.is_dir() && !meta.file_type().is_symlink();
     if is_real_dir {
@@ -345,7 +408,18 @@ fn resolve_dest(from: &std::path::Path, dest_dir: &std::path::Path) -> Result<st
             return Err(format!("不能把「{name}」放入它自己内部"));
         }
     }
-    Ok(dest)
+    let direct = dest_dir.join(&name);
+    if direct == from {
+        if !copy {
+            return Err(format!("「{name}」已在目标目录中"));
+        }
+        // 复制到它自己所在的目录：生成 "name (1)" 副本
+        return Ok(unique_path(dest_dir, &name));
+    }
+    if direct.exists() {
+        return Ok(unique_path(dest_dir, &name));
+    }
+    Ok(direct)
 }
 
 fn fs_transfer_sync(paths: Vec<String>, dest_dir: String, copy: bool) -> Result<FileOpOutcome, String> {
@@ -354,7 +428,7 @@ fn fs_transfer_sync(paths: Vec<String>, dest_dir: String, copy: bool) -> Result<
     let mut errors = Vec::new();
     for path in paths {
         let from = std::path::PathBuf::from(&path);
-        let outcome = resolve_dest(&from, &dest_dir).and_then(|dest| {
+        let outcome = resolve_dest(&from, &dest_dir, copy).and_then(|dest| {
             let result = if copy { copy_entry(&from, &dest) } else { move_entry(&from, &dest) };
             result.map(|()| dest)
         });
@@ -1083,15 +1157,39 @@ mod tests {
         assert!(src.join("a.txt").exists());
         assert_eq!(std::fs::read_to_string(dst.join("a.txt")).unwrap(), "alpha");
 
-        // 同名冲突：报错但不影响其他项
+        // 同名冲突：自动加序号（不覆盖、不报错），回退对记录真实目标路径
         let outcome = super::fs_transfer_sync(
             vec![src.join("a.txt").to_string_lossy().to_string()],
             dst.to_string_lossy().to_string(),
             true,
         )
         .unwrap();
-        assert!(outcome.completed.is_empty());
-        assert!(outcome.errors[0].contains("同名"));
+        assert_eq!(outcome.errors, Vec::<String>::new());
+        assert_eq!(outcome.completed.len(), 1);
+        assert!(outcome.completed[0].to.ends_with("a (1).txt"), "{}", outcome.completed[0].to);
+        assert_eq!(std::fs::read_to_string(dst.join("a.txt")).unwrap(), "alpha");
+        assert_eq!(std::fs::read_to_string(dst.join("a (1).txt")).unwrap(), "alpha");
+
+        // 再复制一次：序号递增
+        let outcome = super::fs_transfer_sync(
+            vec![src.join("a.txt").to_string_lossy().to_string()],
+            dst.to_string_lossy().to_string(),
+            true,
+        )
+        .unwrap();
+        assert!(outcome.completed[0].to.ends_with("a (2).txt"), "{}", outcome.completed[0].to);
+
+        // 移动同名文件：同样避让，源被移走
+        let outcome = super::fs_transfer_sync(
+            vec![src.join("a.txt").to_string_lossy().to_string()],
+            dst.to_string_lossy().to_string(),
+            false,
+        )
+        .unwrap();
+        assert_eq!(outcome.errors, Vec::<String>::new());
+        assert!(outcome.completed[0].to.ends_with("a (3).txt"), "{}", outcome.completed[0].to);
+        assert!(!src.join("a.txt").exists());
+        assert!(dst.join("a (3).txt").exists());
 
         // 复制目录：递归内容完整
         let outcome = super::fs_transfer_sync(
@@ -1104,6 +1202,7 @@ mod tests {
         assert_eq!(std::fs::read_to_string(dst.join("folder/inner/b.txt")).unwrap(), "beta");
 
         // 移动文件：源消失、目标出现
+        std::fs::write(src.join("a.txt"), "alpha").unwrap();
         let outcome = super::fs_transfer_sync(
             vec![src.join("a.txt").to_string_lossy().to_string()],
             root.join("moved").to_string_lossy().to_string(),
@@ -1175,6 +1274,77 @@ mod tests {
         std::fs::write(&staged, "gone").unwrap();
         super::purge_staged(vec![staged.to_string_lossy().to_string()]);
         assert!(!staged.exists());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn unique_path_appends_index_before_extension() {
+        let root = temp_workspace("unique");
+        std::fs::write(root.join("a.txt"), "1").unwrap();
+        std::fs::write(root.join("a (1).txt"), "2").unwrap();
+        std::fs::write(root.join(".bashrc"), "3").unwrap();
+        std::fs::create_dir(root.join("Documents")).unwrap();
+
+        assert_eq!(super::unique_path(&root, "a.txt").file_name().unwrap(), "a (2).txt");
+        // 该助手只在重名时调用：返回第一个可用的编号名
+        assert_eq!(super::unique_path(&root, "free.txt").file_name().unwrap(), "free (1).txt");
+        assert_eq!(super::unique_path(&root, "Documents").file_name().unwrap(), "Documents (1)");
+        assert_eq!(super::unique_path(&root, ".bashrc").file_name().unwrap(), ".bashrc (1)");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn create_file_and_dir_avoid_existing_names() {
+        let root = temp_workspace("create");
+        std::fs::write(root.join("Untitled"), "x").unwrap();
+        let dir = root.to_string_lossy().to_string();
+
+        let file = super::fs_create_sync(dir.clone(), "Untitled".into(), false).unwrap();
+        assert!(file.ends_with("Untitled (1)"), "{file}");
+        assert!(std::path::Path::new(&file).is_file());
+
+        let folder = super::fs_create_sync(dir.clone(), "NewFolder".into(), true).unwrap();
+        assert!(folder.ends_with("NewFolder"), "{folder}");
+        assert!(std::path::Path::new(&folder).is_dir());
+        let folder2 = super::fs_create_sync(dir, "NewFolder".into(), true).unwrap();
+        assert!(folder2.ends_with("NewFolder (1)"), "{folder2}");
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn rename_returns_final_path_and_avoids_existing_name() {
+        let root = temp_workspace("rename");
+        let dir = root.to_string_lossy().to_string();
+        std::fs::write(root.join("a.txt"), "a").unwrap();
+        std::fs::write(root.join("b.txt"), "b").unwrap();
+
+        // 改成已存在的名字：自动加序号，返回真实路径（回退对据此记录）
+        let final_path = super::fs_rename_sync(
+            root.join("a.txt").to_string_lossy().to_string(),
+            "b.txt".into(),
+        )
+        .unwrap();
+        assert!(final_path.ends_with("b (1).txt"), "{final_path}");
+        assert!(std::path::Path::new(&final_path).exists());
+        assert!(root.join("b.txt").exists());
+
+        // 普通改名：直接返回新路径
+        let final_path = super::fs_rename_sync(
+            root.join("b.txt").to_string_lossy().to_string(),
+            "c.txt".into(),
+        )
+        .unwrap();
+        assert!(final_path.ends_with("c.txt"), "{final_path}");
+
+        // 非法名称仍然拒绝
+        assert!(super::fs_rename_sync(
+            root.join("c.txt").to_string_lossy().to_string(),
+            "../escape.txt".into(),
+        )
+        .is_err());
+        assert!(super::fs_create_sync(dir, "a/b".into(), false).is_err());
+
         let _ = std::fs::remove_dir_all(&root);
     }
 }

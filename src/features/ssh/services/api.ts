@@ -113,13 +113,24 @@ export function sshDownload(id: string, path: string): Promise<string> {
   return invoke('ssh_download', { id, path });
 }
 
-export function sshRename(id: string, path: string, newName: string): Promise<void> {
-  return invoke('ssh_rename', { id, path, newName });
+/** 重命名远程条目（目标重名时自动加序号），返回最终路径。 */
+export function sshRename(id: string, path: string, newName: string): Promise<string> {
+  return invoke<string>('ssh_rename', { id, path, newName });
 }
 
-/** 移动远程文件/目录到目标目录（SFTP rename，支持跨目录）。 */
-export function sshMove(id: string, path: string, destDir: string): Promise<void> {
-  return invoke('ssh_move', { id, path, destDir });
+/** 新建远程空文件（同名自动加序号），返回最终路径。 */
+export function sshCreateFile(id: string, dir: string, name: string): Promise<string> {
+  return invoke<string>('ssh_create_file', { id, dir, name });
+}
+
+/** 新建远程文件夹（同名自动加序号），返回最终路径。 */
+export function sshCreateDir(id: string, dir: string, name: string): Promise<string> {
+  return invoke<string>('ssh_create_dir', { id, dir, name });
+}
+
+/** 移动远程文件/目录到目标目录（SFTP rename，重名自动加序号），返回最终路径。 */
+export function sshMove(id: string, path: string, destDir: string): Promise<string> {
+  return invoke<string>('ssh_move', { id, path, destDir });
 }
 
 /** 完成的一条 from→to 对（用于远程文件操作回退）。 */
