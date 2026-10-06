@@ -39,7 +39,7 @@ test('AI 草稿和附件按会话保留，关闭面板后仍能继续发送', as
   await expect(page.getByText('任务完成', { exact: true })).toBeVisible();
 });
 
-test('目录加载失败显示错误，可重试并返回父目录', async ({ page }) => {
+test('目录加载失败显示错误，可重试并回退到上一个视图', async ({ page }) => {
   await setupTauriMock(page);
   await page.addInitScript(() => {
     const internals = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } }).__TAURI_INTERNALS__;
@@ -48,7 +48,7 @@ test('目录加载失败显示错误，可重试并返回父目录', async ({ pa
     internals.invoke = async (command, args) => {
       if (command !== 'fs_list') return original(command, args);
       if (args?.path === '/home/e2e/project/Denied') {
-        if (attempts++ < 2) throw new Error('denied');
+        if (attempts++ < 1) throw new Error('denied');
         return [{ name: '恢复后的文件.txt', path: '/home/e2e/project/Denied/恢复后的文件.txt', is_dir: false }];
       }
       return [{ name: 'Denied', path: '/home/e2e/project/Denied', is_dir: true }];
@@ -62,7 +62,7 @@ test('目录加载失败显示错误，可重试并返回父目录', async ({ pa
   await page.screenshot({ path: '.cache-usability.local/product-loop-proof.png' });
   await page.getByRole('button', { name: '重试', exact: true }).click();
   await expect(page.getByText('恢复后的文件.txt')).toBeVisible();
-  await page.getByRole('button', { name: '上级目录', exact: true }).click();
+  await page.getByRole('button', { name: '回到上一个视图', exact: true }).click();
   await expect(page.getByText('Denied', { exact: true })).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
