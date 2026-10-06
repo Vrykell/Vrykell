@@ -807,9 +807,10 @@ fn upload_dir_recursive(sftp: &Sftp, local: &Path, remote: &str, depth: u32) -> 
     Ok(count)
 }
 
-/// 上传本地文件/目录到远程目录（remote_dir 为空表示远程 home）。
-fn ssh_upload_sync(conn: &SshConnection, remote_dir: &str, local_path: &str) -> Result<(), String> {
-    // 本地路径用宿主平台规则取文件名
+/// Upload a local file or directory into a remote directory (empty `remote_dir` means the remote home).
+/// Returns the final remote path (a sequence number may have been added to avoid an existing name).
+fn ssh_upload_sync(conn: &SshConnection, remote_dir: &str, local_path: &str) -> Result<String, String> {
+    // Local side uses host platform rules to get the file name
     let name = Path::new(local_path)
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
@@ -844,7 +845,7 @@ fn ssh_upload_sync(conn: &SshConnection, remote_dir: &str, local_path: &str) -> 
             .map_err(|e| format!("创建远程文件失败：{e}"))?;
         file.write_all(&bytes).map_err(|e| format!("上传失败：{e}"))?;
     }
-    Ok(())
+    Ok(remote_path)
 }
 
 #[tauri::command]
@@ -917,7 +918,7 @@ pub async fn ssh_upload(
     id: String,
     remote_dir: String,
     local_path: String,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let conn = {
         let db = state.0.lock().map_err(|e| e.to_string())?;
         db.get_ssh_connection(&id)?
