@@ -6,6 +6,7 @@
   "permissions": [
     "core:default",
     "dialog:default",
+    "drag:default",
     "clipboard-manager:allow-write-text",
     "opener:default",
     {

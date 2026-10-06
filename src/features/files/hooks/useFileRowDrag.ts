@@ -1,8 +1,12 @@
 import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react';
+import { startDrag } from '@crabnebula/tauri-plugin-drag';
 import { useFileDragStore, type FileDragItem, type FileDropTarget } from '@features/files/stores/fileDrag';
 
 /** 拖动阈值（与导航拖拽一致）：超过才视为拖拽，避免误触。 */
 const DRAG_THRESHOLD_PX = 6;
+
+/** 指针离开窗口多远后交给系统原生拖拽。 */
+const NATIVE_DRAG_MARGIN_PX = 8;
 
 /** 指针下方的放置目标：带 data-drop-dir 的文件夹行 / 文件行（其同级目录）或面包屑。 */
 function locateDropTarget(x: number, y: number): FileDropTarget | null {
@@ -13,11 +17,30 @@ function locateDropTarget(x: number, y: number): FileDropTarget | null {
   return { rowPath: zone.dataset.path ?? null, dir };
 }
 
+function isOutsideWindow(x: number, y: number): boolean {
+  return x <= -NATIVE_DRAG_MARGIN_PX || y <= -NATIVE_DRAG_MARGIN_PX
+    || x >= window.innerWidth + NATIVE_DRAG_MARGIN_PX
+    || y >= window.innerHeight + NATIVE_DRAG_MARGIN_PX;
+}
+
+/** 拖出窗口：交给系统原生拖拽（拖到桌面/资源管理器），结束后刷新面板以反映系统侧改动。 */
+function beginNativeDrag(paths: string[], onEnd?: () => void) {
+  if (!('__TAURI_INTERNALS__' in window)) return;
+  // 预览图留空：读取失败时按“无自定义拖动图”处理（Windows 回退系统默认拖动图）
+  void startDrag({ item: paths, icon: '' })
+    .catch(() => {})
+    .finally(() => onEnd?.());
+}
+
 /**
- * 行拖拽：按住行拖到文件夹/文件（同级目录）/面包屑即可移动（拖拽只做移动，不复制）。
- * 使用指针事件而不是 HTML5 拖放，避免与桌面窗口的原生文件拖放冲突。
+ * 行拖拽：按住行拖到文件夹/文件（同级目录）/面包屑即可移动（拖拽只做移动，不复制）；
+ * 拖出窗口则转为系统原生拖拽，可直接放到桌面 / 资源管理器。
+ * 面板内用指针事件而不是 HTML5 拖放，避免与桌面窗口的原生文件拖入冲突。
  */
-export function useFileRowDrag(onDrop: (items: FileDragItem[], target: FileDropTarget) => void) {
+export function useFileRowDrag(
+  onDrop: (items: FileDragItem[], target: FileDropTarget) => void,
+  onNativeDragEnd?: () => void,
+) {
   const cleanupRef = useRef<(() => void) | null>(null);
   useEffect(() => () => cleanupRef.current?.(), []);
 
@@ -42,6 +65,14 @@ export function useFileRowDrag(onDrop: (items: FileDragItem[], target: FileDropT
         useFileDragStore.getState().start(items, { x: next.clientX, y: next.clientY });
       }
       next.preventDefault();
+      // 拖出窗口：转成系统原生拖拽（可以放到桌面 / 资源管理器）
+      if (isOutsideWindow(next.clientX, next.clientY)) {
+        canceled = true;
+        useFileDragStore.getState().end();
+        clean();
+        beginNativeDrag(items.map((item) => item.path), onNativeDragEnd);
+        return;
+      }
       const store = useFileDragStore.getState();
       store.movePointer({ x: next.clientX, y: next.clientY });
       store.hover(locateDropTarget(next.clientX, next.clientY));
