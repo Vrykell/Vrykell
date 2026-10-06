@@ -33,8 +33,11 @@ export interface FileRowDragOptions {
   onDrop: (items: FileDragItem[], target: FileDropTarget) => void;
   /** 拖出窗口前准备本地路径（远程条目先下载）；返回 null 表示取消本次拖出。 */
   prepareNativeDrag?: (items: FileDragItem[]) => Promise<NativeDragPayload | null> | NativeDragPayload | null;
-  /** 系统拖拽结束后的回调（result 为 Dropped 时调用方按“移动”语义清理源，并刷新面板）。 */
-  onNativeDragEnd?: (result: DragResult, items: FileDragItem[]) => void;
+  /**
+   * 系统拖拽结束后的回调：`payload.paths` 是交给系统拖拽的本地路径（远端 = 临时下载副本）。
+   * `Dropped` 时调用方按「移动」语义清理源并刷新面板；`Cancelled` 时远端面板据此删除临时副本。
+   */
+  onNativeDragEnd?: (result: DragResult, items: FileDragItem[], payload: NativeDragPayload) => void;
 }
 
 /** 拖出窗口：交给系统原生拖拽（拖到桌面/资源管理器），结束后刷新面板以反映系统侧改动。 */
@@ -87,11 +90,12 @@ export function useFileRowDrag({ onDrop, prepareNativeDrag, onNativeDragEnd }: F
             // Local panel: hand the paths to the OS right now, while the pointer button is still
             // down. Windows only starts a drop session inside the press, so awaiting anything
             // here would silently drop the drag.
-            beginNativeDrag({ paths: items.map((item) => item.path), mode: 'move' as const }, (result) => onNativeDragEnd?.(result, items));
+            const payload: NativeDragPayload = { paths: items.map((item) => item.path), mode: 'move' };
+            beginNativeDrag(payload, (result) => onNativeDragEnd?.(result, items, payload));
             return;
           }
           const payload = await prepareNativeDrag(items);
-          if (payload) beginNativeDrag(payload, (result) => onNativeDragEnd?.(result, items));
+          if (payload) beginNativeDrag(payload, (result) => onNativeDragEnd?.(result, items, payload));
         })();
         return;
       }

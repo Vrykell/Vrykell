@@ -76,6 +76,7 @@ const zh: Record<string, string> = {
   'files.upload.startCount': '开始上传 {{n}} 项…',
   'files.upload.done': '已上传，可在更多菜单回退',
   'files.upload.doneCount': '已上传 {{n}} 项，可在更多菜单回退',
+  'files.dragOut.cancelled': '已取消拖出，已清理临时下载副本',
 };
 
 export default zh;
