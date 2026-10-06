@@ -142,25 +142,29 @@ describe('useLocalFileBrowser', () => {
     expect(result.current.childErrors[folder.path]).toBeUndefined();
   });
 
-  it('clears the selection when entering an unvisited directory', async () => {
+  it('starts forward navigation fresh and tracks back availability', async () => {
     const folder = { name: 'src', path: 'C:/workspace/src', is_dir: true };
     fsMocks.fsList.mockResolvedValue([folder]);
     render(<BrowserHarness initialCwd="C:/workspace" />);
     await waitFor(() => expect(browserApi.entries).toEqual([folder]));
 
+    expect(browserApi.canGoBack).toBe(false);
     act(() => browserApi.setSelectedPath('C:/workspace/notes.txt'));
-    act(() => browserApi.navigate('C:/elsewhere'));
+    await act(async () => browserApi.navigate('C:/elsewhere'));
     expect(browserApi.path).toBe('C:/elsewhere');
     expect(browserApi.selectedPath).toBeNull();
+    expect(browserApi.canGoBack).toBe(true);
   });
 
-  it('restores the selected row and scroll offset when returning to a directory', async () => {
+  it('goBack restores the previous view snapshot', async () => {
     const folder = { name: 'src', path: 'C:/workspace/src', is_dir: true };
     const child = { name: 'main.ts', path: 'C:/workspace/src/main.ts', is_dir: false };
     fsMocks.fsList.mockImplementation((path: string) => Promise.resolve(path === folder.path ? [child] : [folder]));
     render(<BrowserHarness initialCwd="C:/workspace" />);
     await waitFor(() => expect(browserApi.entries).toEqual([folder]));
 
+    act(() => browserApi.toggleExpand(folder));
+    await waitFor(() => expect(browserApi.childCache[folder.path]).toEqual([child]));
     act(() => browserApi.setSelectedPath(folder.path));
     const tree = screen.getByTestId('browser-scroll');
     Object.defineProperty(tree, 'scrollTop', { value: 120, writable: true, configurable: true });
@@ -168,11 +172,28 @@ describe('useLocalFileBrowser', () => {
     act(() => browserApi.navigate(folder.path));
     await waitFor(() => expect(browserApi.entries).toEqual([child]));
     expect(browserApi.selectedPath).toBeNull();
+    // Expansion made while away must not leak into the restored snapshot.
+    act(() => browserApi.toggleExpand(folder));
+    expect(browserApi.expandedSet.has(folder.path)).toBe(false);
 
-    act(() => browserApi.navigate('C:/workspace'));
+    act(() => browserApi.goBack());
     await waitFor(() => expect(browserApi.entries).toEqual([folder]));
+    expect(browserApi.path).toBe('C:/workspace');
     expect(browserApi.selectedPath).toBe(folder.path);
+    expect(browserApi.expandedSet.has(folder.path)).toBe(true);
     expect(tree.scrollTop).toBe(120);
+    expect(browserApi.canGoBack).toBe(false);
+  });
+
+  it('goBack does nothing when no view has been left', async () => {
+    const folder = { name: 'src', path: 'C:/workspace/src', is_dir: true };
+    fsMocks.fsList.mockResolvedValue([folder]);
+    render(<BrowserHarness initialCwd="C:/workspace" />);
+    await waitFor(() => expect(browserApi.entries).toEqual([folder]));
+
+    act(() => browserApi.goBack());
+    expect(browserApi.path).toBe('C:/workspace');
+    expect(browserApi.entries).toEqual([folder]);
   });
 
   it('keeps the current scroll offset when navigating to the same path', async () => {
@@ -186,5 +207,6 @@ describe('useLocalFileBrowser', () => {
     act(() => browserApi.navigate('C:/workspace'));
     expect(browserApi.path).toBe('C:/workspace');
     expect(tree.scrollTop).toBe(80);
+    expect(browserApi.canGoBack).toBe(false);
   });
 });

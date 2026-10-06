@@ -17,9 +17,13 @@ test.beforeEach(async ({ page }) => {
       requests.push(path);
       if (/\/branch-\d+$/.test(path)) {
         return [
+          { name: 'nested-dir', path: `${path}/nested-dir`, is_dir: true },
           { name: 'nested-notes.txt', path: `${path}/nested-notes.txt`, is_dir: false },
           { name: 'sibling.txt', path: `${path}/sibling.txt`, is_dir: false },
         ];
+      }
+      if (path.endsWith('/nested-dir')) {
+        return [{ name: 'deep.txt', path: `${path}/deep.txt`, is_dir: false }];
       }
       return Array.from({ length: 60 }, (_, index) => {
         const name = `branch-${String(index).padStart(2, '0')}`;
@@ -74,7 +78,7 @@ for (const method of ['double-click', 'context-menu'] as const) {
   });
 }
 
-test('returning to the parent directory restores the selected row and scroll', async ({ page }) => {
+test('going back restores the previous view selection and scroll', async ({ page }) => {
   const tree = page.getByTestId('local-file-tree');
   const branch = tree.locator('[data-testid="file-row"][data-path="/home/e2e/project/branch-30"]');
   await branch.scrollIntoViewIfNeeded();
@@ -87,8 +91,27 @@ test('returning to the parent directory restores the selected row and scroll', a
   await expect(tree).toHaveAttribute('data-path', '/home/e2e/project/branch-30');
   await expect(tree.getByText('nested-notes.txt', { exact: true })).toBeVisible();
 
-  await page.locator('[data-testid="local-up-btn"]').click();
+  await page.getByTestId('local-back-btn').click();
   await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
   await expect(branch).toHaveAttribute('data-selected', 'true');
   await expect.poll(() => tree.evaluate((element) => element.scrollTop)).toBe(scrollTop);
+  await expect(page.getByTestId('local-back-btn')).toBeDisabled();
+});
+
+test('going back returns to the previous view, not the parent folder', async ({ page }) => {
+  const tree = page.getByTestId('local-file-tree');
+  // project 根目录展开 branch-30 后，直接双击其中的嵌套目录进入更深层
+  const branch = tree.locator('[data-testid="file-row"][data-path="/home/e2e/project/branch-30"]');
+  await branch.locator('[data-testid="file-row-expander"]').click();
+  const nestedDir = tree.locator('[data-testid="file-row"][data-path="/home/e2e/project/branch-30/nested-dir"]');
+  await nestedDir.dblclick();
+  await expect(tree).toHaveAttribute('data-path', '/home/e2e/project/branch-30/nested-dir');
+  await expect(tree.getByText('deep.txt', { exact: true })).toBeVisible();
+
+  // 回退 = 上一个视图快照（project 根 + branch-30 展开 + nested-dir 选中），而不是父目录 branch-30
+  await page.getByTestId('local-back-btn').click();
+  await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
+  await expect(tree.getByText('nested-notes.txt', { exact: true })).toBeVisible();
+  await expect(nestedDir).toHaveAttribute('data-selected', 'true');
+  await expect(page.getByTestId('local-back-btn')).toBeDisabled();
 });

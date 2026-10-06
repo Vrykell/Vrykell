@@ -41,7 +41,6 @@ describe('useLocalFileActions', () => {
     const load = vi.fn();
     const { result } = renderHook(() => useLocalFileActions({
       path: 'C:/workspace',
-      navigate: vi.fn(),
       load,
       focusedPaneId: 'pane-1',
       sessions: {},
@@ -56,12 +55,10 @@ describe('useLocalFileActions', () => {
     expect(result.current.confirm).toBeNull();
   });
 
-  it('tracks context-menu coordinates and navigates to the parent directory', () => {
-    const navigate = vi.fn();
+  it('tracks context-menu coordinates and closes the menu', () => {
     const preventDefault = vi.fn();
     const { result } = renderHook(() => useLocalFileActions({
       path: 'C:/workspace/src',
-      navigate,
       load: vi.fn(),
       focusedPaneId: 'pane-1',
       sessions: {},
@@ -77,9 +74,6 @@ describe('useLocalFileActions', () => {
 
     act(() => result.current.closeContextMenu());
     expect(result.current.ctxMenu).toBeNull();
-
-    act(() => result.current.goUp());
-    expect(navigate).toHaveBeenCalledWith('C:/workspace');
   });
 
   it('opens an editor without navigating or reloading the browser', async () => {
@@ -92,16 +86,14 @@ describe('useLocalFileActions', () => {
       useTerminalStore.setState({ sessions: { 'editor-tab#0': 'editor-session' }, startupStates: { 'editor-tab#0': 'ready' } });
       return 'editor-tab';
     });
-    const navigate = vi.fn();
     const load = vi.fn();
     const { result } = renderHook(() => useLocalFileActions({
-      path: 'C:/', navigate, load, focusedPaneId: 'pane-1', sessions: {},
+      path: 'C:/', load, focusedPaneId: 'pane-1', sessions: {},
     }));
 
     await act(async () => result.current.openFileInTerminal(entry));
     expect(addTab).toHaveBeenCalledWith({ cwd: 'C:/workspace', title: 'old.txt' });
     expect(ptyWrite).toHaveBeenCalledWith('editor-session', 'vim C:/workspace/old.txt\n');
-    expect(navigate).not.toHaveBeenCalled();
     expect(load).not.toHaveBeenCalled();
   });
 
@@ -109,7 +101,7 @@ describe('useLocalFileActions', () => {
     vi.mocked(openFile).mockResolvedValue({ via: 'system', degraded: false });
     const addTab = vi.spyOn(useSessionStore.getState(), 'addTab');
     const { result } = renderHook(() => useLocalFileActions({
-      path: 'C:/workspace', navigate: vi.fn(), load: vi.fn(), focusedPaneId: 'pane-1', sessions: {},
+      path: 'C:/workspace', load: vi.fn(), focusedPaneId: 'pane-1', sessions: {},
     }));
     await act(async () => result.current.openFileInTerminal(entry));
     expect(addTab).not.toHaveBeenCalled();
@@ -127,7 +119,7 @@ describe('useLocalFileActions', () => {
     });
     const toast = vi.spyOn(useToastStore.getState(), 'addToast');
     const { result } = renderHook(() => useLocalFileActions({
-      path: 'C:/workspace', navigate: vi.fn(), load: vi.fn(), focusedPaneId: 'pane-1', sessions: {},
+      path: 'C:/workspace', load: vi.fn(), focusedPaneId: 'pane-1', sessions: {},
     }));
     const opened = result.current.openFileInTerminal(entry);
     await waitFor(() => expect(useTerminalStore.getState().sessions['editor-tab#0']).toBe('editor-session'));

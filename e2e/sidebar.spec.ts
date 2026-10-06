@@ -28,9 +28,9 @@ test.describe('文件面板', () => {
     // 展开交给箭头按钮（mock 对每个路径返回相同子项，展开后 Documents 出现两个）
     await documents.locator('[data-testid="file-row-expander"]').click();
     await expect(tree.getByText('Documents')).toHaveCount(2);
-    // 双击 = 进入文件夹，出现返回按钮（mock 对子路径返回同名子项，取第一行即父目录行）
+    // 双击 = 进入文件夹，回退按钮变为可用
     await documents.first().dblclick();
-    await expect(page.locator('[data-testid="local-up-btn"]')).toBeVisible();
+    await expect(page.getByTestId('local-back-btn')).toBeEnabled();
   });
 
   test('上下键切换选中行，Enter 进入目录', async ({ page }) => {
@@ -45,9 +45,9 @@ test.describe('文件面板', () => {
     await expect(documents).not.toHaveAttribute('data-selected', 'true');
     await page.keyboard.press('ArrowUp');
     await expect(documents).toHaveAttribute('data-selected', 'true');
-    // Enter = 进入选中目录
+    // Enter = 进入选中目录，回退按钮变为可用
     await page.keyboard.press('Enter');
-    await expect(page.locator('[data-testid="local-up-btn"]')).toBeVisible();
+    await expect(page.getByTestId('local-back-btn')).toBeEnabled();
   });
 
   test('此电脑视图：磁盘以小卡片展示（含容量），点击进入', async ({ page }) => {
@@ -117,9 +117,10 @@ test.describe('文件面板', () => {
 
   test('拖动折叠后反向拖回：面板内部状态不丢失（未重新加载）', async ({ page }) => {
     // 进入目录（改变面板内部路径状态）：双击目录
-    const documents = page.getByTestId('local-file-tree').locator('[data-testid="file-row"][data-path="/home/e2e/Documents"]');
+    const tree = page.getByTestId('local-file-tree');
+    const documents = tree.locator('[data-testid="file-row"][data-path="/home/e2e/Documents"]');
     await documents.dblclick();
-    await expect(page.locator('[data-testid="local-up-btn"]')).toBeVisible();
+    await expect(tree).toHaveAttribute('data-path', '/home/e2e/Documents');
     // 拖到折叠（不松手）
     const handle = page.locator('[data-testid="resize-handle-files"]');
     const box = await handle.boundingBox();
@@ -132,14 +133,15 @@ test.describe('文件面板', () => {
       await page.mouse.move(cx - (i + 1) * 16, cy);
       await page.waitForTimeout(12);
     }
-    await expect(page.locator('[data-testid="local-up-btn"]')).toBeHidden();
+    await expect(page.getByTestId('local-back-btn')).toBeHidden();
     // 反向拖回并松手 → 面板恢复，且仍停留在之前进入的目录（状态未丢、未 reload）
     for (let i = 0; i < 8; i++) {
       await page.mouse.move(cx - (8 - i) * 16, cy);
       await page.waitForTimeout(12);
     }
     await page.mouse.up();
-    await expect(page.locator('[data-testid="local-up-btn"]')).toBeVisible({ timeout: 3000 });
+    await expect(tree).toHaveAttribute('data-path', '/home/e2e/Documents');
+    await expect(page.getByTestId('local-back-btn')).toBeVisible({ timeout: 3000 });
   });
 
   test('删除文件需二次确认，确认后调用后端删除（回收站）', async ({ page }) => {
