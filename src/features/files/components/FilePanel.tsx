@@ -8,7 +8,7 @@ import { fileIcon } from '@features/files/utils/fileIcon';
 import { compactPathSegments } from '@features/files/utils/breadcrumb';
 import { buildFileMenuItems, type FileMenuHandlers } from '@features/files/utils/fileMenu';
 import { filePanelConfigFor } from '@features/files/model/filePanelConfig';
-import type { FileOpsTarget } from '@features/files/model/fileOps';
+import { resolveTargetDir, type FileOpsTarget } from '@features/files/model/fileOps';
 import { useFileBrowser } from '@features/files/hooks/useFileBrowser';
 import { useFileRowDrag } from '@features/files/hooks/useFileRowDrag';
 import { useExternalFileDrop } from '@features/files/hooks/useExternalFileDrop';
@@ -527,6 +527,7 @@ export default function FilePanel({
             entry: ctxMenu.entry,
             targets: targetsFor(ctxMenu.entry),
             currentDir: path,
+            targetDir: resolveTargetDir(ctxMenu.entry, path ?? '', ops.parentOf),
             clipboard,
             inWorkspace: isHighlighted?.(ctxMenu.entry.path) ?? false,
             handlers,
@@ -550,6 +551,7 @@ export default function FilePanel({
               entry: null,
               targets: [],
               currentDir: path,
+              targetDir: path,
               clipboard,
               handlers,
             }),
@@ -565,6 +567,7 @@ export default function FilePanel({
             entry: null,
             targets: [],
             currentDir: path,
+            targetDir: path,
             clipboard,
             handlers,
           })}

@@ -15,7 +15,7 @@ import type { FileOpsTarget } from '@features/files/model/fileOps';
 export type FileMenuItemKey =
   | 'new-file' | 'new-folder'
   | 'workspace-add' | 'workspace-remove' | 'open-tab'
-  | 'open-editor' | 'open-system' | 'open-with'
+  | 'open-editor' | 'open-system' | 'open-with' | 'reveal'
   | 'copy' | 'cut' | 'paste' | 'copy-path' | 'rename' | 'download' | 'delete'
   | 'upload-file' | 'upload-dir' | 'new-tab-here' | 'downloads-view' | 'collapse-all';
 
@@ -115,11 +115,11 @@ export function filePanelConfigFor(target: FileOpsTarget): FilePanelConfig {
     variant: 'local',
     ids: LOCAL_IDS,
     menus: {
-      rowFolder: ['new-file', 'new-folder', 'workspace-add', 'workspace-remove', 'open-tab', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'delete'],
-      rowFile: ['new-file', 'new-folder', 'open-editor', 'open-system', 'open-with', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'delete'],
+      rowFolder: ['new-file', 'new-folder', 'workspace-add', 'workspace-remove', 'open-tab', 'reveal', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'delete'],
+      rowFile: ['new-file', 'new-folder', 'open-editor', 'open-system', 'open-with', 'reveal', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'delete'],
       rowMulti: ['copy', 'cut', 'paste', 'delete'],
       blank: ['new-file', 'new-folder', 'paste', 'new-tab-here'],
-      more: ['new-file', 'new-folder', 'new-tab-here', 'downloads-view', 'collapse-all'],
+      more: ['new-file', 'new-folder', 'new-tab-here', 'reveal', 'downloads-view', 'collapse-all'],
     },
     drag: { downloadBeforeNativeDrag: false, externalDropMode: 'move', cleanupSourceAfterNativeDrag: true },
     open: 'terminal-editor',

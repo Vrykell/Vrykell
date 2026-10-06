@@ -77,6 +77,8 @@ const zh: Record<string, string> = {
   'files.upload.done': '已上传，可在更多菜单回退',
   'files.upload.doneCount': '已上传 {{n}} 项，可在更多菜单回退',
   'files.dragOut.cancelled': '已取消拖出，已清理临时下载副本',
+  'files.reveal': '在文件管理器中显示',
+  'files.reveal.dir': '在文件管理器中显示当前文件夹',
   'files.loading.directory': '正在读取目录…',
   'files.loading.disks': '正在扫描磁盘…',
   'files.loading.ssh': '正在连接文件服务…',

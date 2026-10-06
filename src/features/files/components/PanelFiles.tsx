@@ -4,7 +4,7 @@ import { Folder, HardDrive, Star, iconSizes } from '@ui/icons';
 import { fmtSize } from '@ui/UiBtn';
 import type { DiskEntry } from '@platform/api/types';
 import { fileIcon } from '@features/files/utils/fileIcon';
-import { fileOpenWith, type FsEntry } from '@platform/api/fs';
+import { fileOpenWith, fileRevealInDir, type FsEntry } from '@platform/api/fs';
 import FilePanel from '@features/files/components/FilePanel';
 import DownloadManager from '@features/files/components/DownloadManager';
 import { openFile } from '@features/files/services/fileOpen';
@@ -131,6 +131,10 @@ function LocalFiles() {
         },
         onNewTabHere: (dir) => useSessionStore.getState().addTab({ cwd: dir, title: dir.split(/[\\/]/).filter(Boolean).pop() ?? dir }),
         onOpenDownloads: () => setShowDownloads(true),
+        onReveal: (entry) => void fileRevealInDir(entry.path).catch((error) =>
+          useToastStore.getState().addToast(String((error as Error)?.message ?? error), 'error')),
+        onRevealDir: (dir) => void fileRevealInDir(dir).catch((error) =>
+          useToastStore.getState().addToast(String((error as Error)?.message ?? error), 'error')),
       }}
     />
   );

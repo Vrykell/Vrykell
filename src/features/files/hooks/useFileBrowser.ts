@@ -533,6 +533,9 @@ export function useFileBrowser({
           'success',
         );
         replaceSelection(outcome.completed.map((pair) => pair.to));
+        // 粘贴落点：目标目录若是已展开的子目录就展开并刷新，然后把新条目滚入视野
+        if (destDir !== path) setExpandedSet((current) => new Set([...current, destDir]));
+        revealPath(outcome.completed[0]!.to);
       }
       if (outcome.errors.length > 0) toast(outcome.errors[0]!, 'error');
       if (outcome.completed.length === 0 && outcome.errors.length === 0) return;
@@ -540,7 +543,7 @@ export function useFileBrowser({
     } catch (error) {
       toast(String((error as Error)?.message ?? error), 'error');
     }
-  }, [ops, pushUndo, refreshAffected, replaceSelection, toast]);
+  }, [ops, pushUndo, refreshAffected, replaceSelection, revealPath, toast]);
 
   // ── 剪贴板 ──
 
