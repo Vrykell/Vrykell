@@ -70,7 +70,7 @@ shells), `src/core` (cross-domain contracts), `src/ui` (business-agnostic compon
 
 ## Commit Convention
 
-`feat:` / `fix:` / `test:` / `refactor:` / `docs:` - small, focused commits.
+English commit messages (subject and body), prefix `feat:` / `fix:` / `test:` / `refactor:` / `docs:` - small, focused commits.
 
 ## Documentation
 
