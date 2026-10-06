@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { emitPtyOutput, ptyWrites, setupTauriMock } from './tauri-mock';
+import { emitPtyOutput, fsOps, ptyWrites, setupTauriMock } from './tauri-mock';
 
 test.beforeEach(async ({ page }) => {
   await setupTauriMock(page);
@@ -96,6 +96,31 @@ test('going back restores the previous view selection and scroll', async ({ page
   await expect(branch).toHaveAttribute('data-selected', 'true');
   await expect.poll(() => tree.evaluate((element) => element.scrollTop)).toBe(scrollTop);
   await expect(page.getByTestId('local-back-btn')).toBeDisabled();
+});
+
+test('dragging onto a file row drops into that file parent folder', async ({ page }) => {
+  const tree = page.getByTestId('local-file-tree');
+  const branch = tree.locator('[data-testid="file-row"][data-path="/home/e2e/project/branch-30"]');
+  await branch.scrollIntoViewIfNeeded();
+  await branch.locator('[data-testid="file-row-expander"]').click();
+  const sibling = tree.locator('[data-testid="file-row"][data-path="/home/e2e/project/branch-30/sibling.txt"]');
+  await expect(sibling).toBeVisible();
+
+  // 拖到文件行 = 放进该文件的同级目录（这里即它所在的 branch-30）
+  const source = tree.locator('[data-testid="file-row"][data-path="/home/e2e/project/branch-28"]');
+  await source.scrollIntoViewIfNeeded();
+  const from = await source.boundingBox();
+  const to = await sibling.boundingBox();
+  await page.mouse.move(from!.x + 40, from!.y + from!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to!.x + 40, to!.y + to!.height / 2, { steps: 8 });
+  await page.mouse.up();
+
+  await expect.poll(async () => fsOps(page)).toContainEqual({
+    op: 'move',
+    path: '/home/e2e/project/branch-28',
+    destDir: '/home/e2e/project/branch-30',
+  });
 });
 
 test('going back returns to the previous view, not the parent folder', async ({ page }) => {
