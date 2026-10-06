@@ -1,8 +1,9 @@
 import { Fragment, useEffect, useState, useRef, useMemo } from 'react';
 import { iconSizes, Star, Folder, ChevronRight, Download, FolderArrowRight, ArrowUp, HardDrive } from '@ui/icons';
-import { type FsEntry, type DiskEntry } from '@features/files/services/fs';
+import { type FsEntry, type DiskEntry } from '@platform/api/fs';
 import { fileIcon } from '@features/files/utils/fileIcon';
-import { normPath, pathSegments, segmentsToPath, compactPathSegments } from '@features/files/utils/pathUtils';
+import { normPath, pathSegments, segmentsToPath } from '@platform/path';
+import { compactPathSegments } from '@features/files/utils/breadcrumb';
 import { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
 import { IconBtn, fmtSize } from '@ui/UiBtn';
 import { flattenVisible, type VisibleRow } from '@features/files/utils/fileTree';

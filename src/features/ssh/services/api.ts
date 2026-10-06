@@ -1,5 +1,5 @@
 import { invoke } from '@platform/diagnostics';
-import type { FsEntry } from '@features/files/services/fs';
+import type { FsEntry } from '@platform/api/types';
 import type { SshOptions } from '@core/ssh';
 
 /**

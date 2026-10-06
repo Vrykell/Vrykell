@@ -1,8 +1,9 @@
 import { useCallback, useState } from 'react';
 import { openPath } from '@tauri-apps/plugin-opener';
-import { fsDelete, fsRename, fileOpenWith, type FsEntry } from '@features/files/services/fs';
+import { fsDelete, fsRename, fileOpenWith } from '@platform/api/fs';
+import type { FsEntry } from '@platform/api/types';
 import { openFile } from '@features/files/services/fileOpen';
-import { parentOf, normPath } from '@features/files/utils/pathUtils';
+import { parentOf } from '@platform/path';
 import { shellQuote } from '@features/ssh/utils/remotePath';
 import { useWorkspaceDirsStore } from '@features/files/services/workspaceDirs';
 import { useSessionStore } from '@features/workspace';
@@ -54,7 +55,7 @@ export function useLocalFileActions({
     }
     if (!command) return;
 
-    const parentDir = parentOf(normPath(entry.path)) ?? undefined;
+    const parentDir = parentOf(entry.path) ?? undefined;
     const tabId = useSessionStore.getState().addTab({ cwd: parentDir, title: entry.name });
     try {
       const sid = await waitForTerminalStartup(`${tabId}#0`);
@@ -88,15 +89,15 @@ export function useLocalFileActions({
       items.push({ label: '在新标签页中打开', onClick: () => useSessionStore.getState().addTab({ cwd: entry.path, title: entry.name }) });
     } else {
       items.push({ label: '使用终端编辑器打开', onClick: () => void openFileInTerminal(entry) });
-      items.push({ label: '使用系统默认应用打开', onClick: () => void openPath(normPath(entry.path)).catch(() => {}) });
+      items.push({ label: '使用系统默认应用打开', onClick: () => void openPath(entry.path).catch(() => {}) });
       items.push({
         label: '打开方式…',
-        onClick: () => void fileOpenWith(normPath(entry.path)).catch((error) =>
+        onClick: () => void fileOpenWith(entry.path).catch((error) =>
           useToastStore.getState().addToast(String((error as Error)?.message ?? error), 'error')),
       });
     }
 
-    items.push({ label: '复制路径', onClick: () => void navigator.clipboard.writeText(normPath(entry.path)) });
+    items.push({ label: '复制路径', onClick: () => void navigator.clipboard.writeText(entry.path) });
     items.push({ label: '重命名', onClick: () => setRenameTarget(entry) });
     items.push({ label: '删除', danger: true, onClick: () => setConfirm({ kind: 'delete', entry }) });
     return items;

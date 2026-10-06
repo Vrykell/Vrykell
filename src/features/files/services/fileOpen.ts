@@ -1,6 +1,6 @@
 import { invoke } from '@platform/diagnostics';
 import { openPath } from '@tauri-apps/plugin-opener';
-import { normPath } from '@features/files/utils/pathUtils';
+import { normPath } from '@platform/path';
 import { safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
 
 /**

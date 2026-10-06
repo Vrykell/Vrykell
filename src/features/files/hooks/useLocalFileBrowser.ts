@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { fsDisks, fsHome, fsList, type DiskEntry, type FsEntry } from '@features/files/services/fs';
-import { normPath } from '@features/files/utils/pathUtils';
+import { fsDisks, fsHome, fsList, type DiskEntry, type FsEntry } from '@platform/api/fs';
+import { normPath } from '@platform/path';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 
 interface UseLocalFileBrowserOptions {
@@ -78,7 +78,7 @@ export function useLocalFileBrowser({ initialCwd }: UseLocalFileBrowserOptions) 
     void fsHome().then((home) => {
       if (alive.current && !initialized.current) {
         initialized.current = true;
-        setBrowserPath(normPath(home));
+        setBrowserPath(home);
       }
     }).catch(() => {});
   }, []);

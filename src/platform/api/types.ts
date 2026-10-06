@@ -6,6 +6,22 @@
  * 与各业务域共同引用，避免 features 反向持有基础设施类型。
  */
 
+// ── 本地文件系统 ──
+/** Rust fs_list 返回的目录条目（path 由 @platform/api/fs 归一化后交给业务层） */
+export interface FsEntry {
+  name: string;
+  path: string;
+  is_dir: boolean;
+}
+
+/** Rust fs_disks 返回的磁盘条目（「此电脑」视图小卡片展示用） */
+export interface DiskEntry {
+  name: string;
+  path: string;
+  total_bytes: number;
+  free_bytes: number;
+}
+
 // ── 历史命令 ──
 export interface BackendHistoryEntry {
   id: number;
