@@ -12,6 +12,8 @@ import type { FileMenuItemKey } from '@features/files/model/filePanelConfig';
 
 /** 菜单项需要的回调：面板按自己的能力提供，未提供的条目不会渲染。 */
 export interface FileMenuHandlers {
+  /** 收起全部展开的文件夹（文件树 ⋯ 菜单，任何时候都可用）。 */
+  onCollapseAll?: () => void;
   onNew: (kind: 'file' | 'dir', target: FsEntry | null) => void;
   onCopy: (targets: FsEntry[]) => void;
   onCut: (targets: FsEntry[]) => void;
@@ -98,6 +100,8 @@ function itemFor(key: FileMenuItemKey, ctx: FileMenuContext, folderTarget: FsEnt
       return currentDir === null ? null : { label: '从当前文件夹新建标签页', onClick: () => handlers.onNewTabHere?.(currentDir) };
     case 'downloads-view':
       return handlers.onOpenDownloads ? { label: '下载管理', onClick: () => handlers.onOpenDownloads?.() } : null;
+    case 'collapse-all':
+      return handlers.onCollapseAll ? { label: '收起全部文件夹', onClick: handlers.onCollapseAll } : null;
     default:
       return null;
   }

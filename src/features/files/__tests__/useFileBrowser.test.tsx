@@ -267,6 +267,20 @@ describe('useFileBrowser（本地目标）', () => {
     expect(result.current.undo?.pairs).toEqual([{ from: child.path, to: 'C:/work/archive/a.txt' }]);
   });
 
+  it('收起全部：清空展开集合，保留已加载的子列表缓存', async () => {
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(2));
+
+    await act(async () => { await result.current.toggleExpand(entry('src', 'C:/work/src')); });
+    expect(result.current.expandedSet.has('C:/work/src')).toBe(true);
+    await waitFor(() => expect(result.current.childCache['C:/work/src']).toBeDefined());
+
+    act(() => result.current.collapseAll());
+    expect(result.current.expandedSet.size).toBe(0);
+    // 缓存保留：重新展开不再请求
+    expect(result.current.childCache['C:/work/src']).toBeDefined();
+  });
+
   it('新建可回退：回退新建把刚建出来的条目移入暂存', async () => {
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
