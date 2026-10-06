@@ -149,10 +149,10 @@ describe('useLocalFileBrowser', () => {
     await waitFor(() => expect(browserApi.entries).toEqual([folder]));
 
     expect(browserApi.canGoBack).toBe(false);
-    act(() => browserApi.setSelectedPath('C:/workspace/notes.txt'));
+    act(() => browserApi.selectOnly('C:/workspace/notes.txt'));
     await act(async () => browserApi.navigate('C:/elsewhere'));
     expect(browserApi.path).toBe('C:/elsewhere');
-    expect(browserApi.selectedPath).toBeNull();
+    expect(browserApi.selection.size).toBe(0);
     expect(browserApi.canGoBack).toBe(true);
   });
 
@@ -165,13 +165,13 @@ describe('useLocalFileBrowser', () => {
 
     act(() => browserApi.toggleExpand(folder));
     await waitFor(() => expect(browserApi.childCache[folder.path]).toEqual([child]));
-    act(() => browserApi.setSelectedPath(folder.path));
+    act(() => browserApi.selectOnly(folder.path));
     const tree = screen.getByTestId('browser-scroll');
     Object.defineProperty(tree, 'scrollTop', { value: 120, writable: true, configurable: true });
 
     act(() => browserApi.navigate(folder.path));
     await waitFor(() => expect(browserApi.entries).toEqual([child]));
-    expect(browserApi.selectedPath).toBeNull();
+    expect(browserApi.selection.size).toBe(0);
     // Expansion made while away must not leak into the restored snapshot.
     act(() => browserApi.toggleExpand(folder));
     expect(browserApi.expandedSet.has(folder.path)).toBe(false);
@@ -179,10 +179,37 @@ describe('useLocalFileBrowser', () => {
     act(() => browserApi.goBack());
     await waitFor(() => expect(browserApi.entries).toEqual([folder]));
     expect(browserApi.path).toBe('C:/workspace');
-    expect(browserApi.selectedPath).toBe(folder.path);
+    expect(browserApi.selection.has(folder.path)).toBe(true);
+    expect(browserApi.anchorPath).toBe(folder.path);
     expect(browserApi.expandedSet.has(folder.path)).toBe(true);
     expect(tree.scrollTop).toBe(120);
     expect(browserApi.canGoBack).toBe(false);
+  });
+
+  it('supports ctrl toggle and shift-style range selection with an anchor', async () => {
+    const folder = { name: 'src', path: 'C:/workspace/src', is_dir: true };
+    fsMocks.fsList.mockResolvedValue([folder]);
+    render(<BrowserHarness initialCwd="C:/workspace" />);
+    await waitFor(() => expect(browserApi.entries).toEqual([folder]));
+
+    act(() => browserApi.selectOnly('/a'));
+    expect([...browserApi.selection]).toEqual(['/a']);
+    expect(browserApi.anchorPath).toBe('/a');
+
+    act(() => browserApi.toggleSelection('/b'));
+    expect([...browserApi.selection].sort()).toEqual(['/a', '/b']);
+    expect(browserApi.anchorPath).toBe('/b');
+
+    act(() => browserApi.toggleSelection('/a'));
+    expect([...browserApi.selection]).toEqual(['/b']);
+
+    act(() => browserApi.replaceSelection(['/a', '/b', '/c'], '/a'));
+    expect([...browserApi.selection]).toEqual(['/a', '/b', '/c']);
+    expect(browserApi.anchorPath).toBe('/a');
+
+    act(() => browserApi.selectOnly(null));
+    expect(browserApi.selection.size).toBe(0);
+    expect(browserApi.anchorPath).toBeNull();
   });
 
   it('goBack does nothing when no view has been left', async () => {

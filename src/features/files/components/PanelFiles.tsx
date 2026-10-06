@@ -2,8 +2,11 @@ import { Fragment, useEffect, useState, useRef, useMemo } from 'react';
 import { iconSizes, Star, Folder, ChevronRight, FolderArrowRight, ArrowUp, HardDrive, MoreHorizontal } from '@ui/icons';
 import { type FsEntry, type DiskEntry } from '@platform/api/fs';
 import { fileIcon } from '@features/files/utils/fileIcon';
-import { normPath, pathSegments, segmentsToPath } from '@platform/path';
+import { normPath, pathSegments, segmentsToPath, parentOf } from '@platform/path';
 import { compactPathSegments } from '@features/files/utils/breadcrumb';
+import { useFileRowDrag } from '@features/files/hooks/useFileRowDrag';
+import { useFileDragStore } from '@features/files/stores/fileDrag';
+import FileDragPreview from '@features/files/components/FileDragPreview';
 import { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
 import { IconBtn, fmtSize } from '@ui/UiBtn';
 import { flattenVisible, type VisibleRow } from '@features/files/utils/fileTree';
@@ -48,8 +51,11 @@ function LocalFiles() {
     navigate,
     goBack,
     canGoBack,
-    selectedPath,
-    setSelectedPath,
+    selection,
+    anchorPath,
+    selectOnly,
+    toggleSelection,
+    replaceSelection,
     scrollRef,
     entries,
     disks,
@@ -64,10 +70,29 @@ function LocalFiles() {
     toggleExpand,
     retryExpand,
   } = useLocalFileBrowser({ initialCwd: activeCwd });
+
+  const rows = flattenVisible(entries, expandedSet, childCache);
+
+  /** The current path's listing has settled; empty states wait for it so loads never flash placeholders. */
+  const settled = loadedPath === path;
+
+  /** 右键菜单的目标行：命中行属于多选时是整组，否则只有该行。 */
+  const targetsFor = (entry: FsEntry): FsEntry[] => {
+    if (!selection.has(entry.path)) return [entry];
+    const byPath = new Map<string, FsEntry>();
+    for (const row of rows) {
+      if (selection.has(row.entry.path)) byPath.set(row.entry.path, row.entry);
+    }
+    return byPath.size > 0 ? [...byPath.values()] : [entry];
+  };
+
   const {
     ctxMenu,
     renameTarget,
     confirm,
+    clipboard,
+    cutPaths,
+    undo,
     closeContextMenu,
     cancelConfirm,
     isWorkspace,
@@ -77,8 +102,26 @@ function LocalFiles() {
     requestRename,
     cancelRename,
     confirmAction,
+    runUndo,
     syncToTerminal,
-  } = useLocalFileActions({ path, load, focusedPaneId: focused, sessions });
+    copySelection,
+    cutSelection,
+    pasteClipboard,
+    transferInto,
+  } = useLocalFileActions({
+    path,
+    load,
+    focusedPaneId: focused,
+    sessions,
+    targetsFor,
+    onSelectionChange: (paths) => replaceSelection(paths),
+    // 有内容被移入已展开的子文件夹时，重新读取它的子列表
+    onFolderMutated: (folderPath) => {
+      if (childCache[folderPath] !== undefined) {
+        retryExpand({ name: pathSegments(folderPath).pop() ?? folderPath, path: folderPath, is_dir: true });
+      }
+    },
+  });
 
   // 顶栏面包屑压缩：不换行，侧栏窄时省略高层级目录（必须在视图切换的提前返回之前）
   const crumbs = pathSegments(path ?? '');
@@ -86,6 +129,7 @@ function LocalFiles() {
   const [crumbWidth, setCrumbWidth] = useState(0);
   const [pathDraft, setPathDraft] = useState<string | null>(null);
   const [moreMenu, setMoreMenu] = useState<{ x: number; y: number } | null>(null);
+  const [blankMenu, setBlankMenu] = useState<{ x: number; y: number } | null>(null);
   useEffect(() => {
     const el = crumbRef.current;
     if (!el) return;
@@ -126,21 +170,50 @@ function LocalFiles() {
     useSessionStore.getState().addTab({ cwd: path, title: pathSegments(path).pop() ?? path });
   };
 
-  /** 单击只选中；进入目录 / 打开文件都由双击触发 */
-  const handleRowClick = (entry: FsEntry) => {
-    setSelectedPath(entry.path);
+  /** 空白处右键：粘贴 / 新建标签页；没有任何可执行项时不弹菜单 */
+  const handleTreeContextMenu = (event: React.MouseEvent) => {
+    if ((event.target as HTMLElement).closest('[data-testid="file-row"]')) return;
+    if (!clipboard && path === null) return;
+    event.preventDefault();
+    setBlankMenu({ x: event.clientX, y: event.clientY });
   };
 
-  /** 右键同时选中目标行，保持菜单作用于当前选中项 */
+  /** 拖到文件夹：移动（按住 Alt 复制）；不把文件夹放进自身子树，也不做同目录移动 */
+  const startRowDrag = useFileRowDrag((paths, targetPath, copy) => {
+    if (paths.some((item) => targetPath === item || targetPath.startsWith(`${item}/`))) return;
+    if (!copy && paths.every((item) => parentOf(item) === targetPath)) return;
+    void transferInto(paths, targetPath, copy ? 'copy' : 'move');
+  });
+  const dropTargetPath = useFileDragStore((state) => state.overPath);
+
+  /** 拖拽从指针按下的行开始：命中选中集时拖动整组 */
+  const handleRowPointerDown = (event: React.PointerEvent<HTMLElement>, entry: FsEntry) => {
+    startRowDrag(event, selection.has(entry.path) ? Array.from(selection) : [entry.path]);
+  };
+
+  /** 单击选中；Shift 连选、Ctrl/Cmd 加选；双击进入目录 / 打开文件由双击触发 */
+  const handleRowClick = (entry: FsEntry, event: React.MouseEvent) => {
+    if (event.shiftKey && anchorPath !== null) {
+      const from = rows.findIndex((row) => row.entry.path === anchorPath);
+      const to = rows.findIndex((row) => row.entry.path === entry.path);
+      if (from >= 0 && to >= 0) {
+        const [start, end] = from <= to ? [from, to] : [to, from];
+        replaceSelection(rows.slice(start, end + 1).map((row) => row.entry.path), anchorPath);
+        return;
+      }
+    }
+    if (event.ctrlKey || event.metaKey) {
+      toggleSelection(entry.path);
+      return;
+    }
+    selectOnly(entry.path);
+  };
+
+  /** 右键：命中的行不在选中集内时改为只选中它，菜单始终作用于整个选中集 */
   const handleRowContextMenu = (event: React.MouseEvent, entry: FsEntry) => {
-    setSelectedPath(entry.path);
+    if (!selection.has(entry.path)) selectOnly(entry.path);
     handleContextMenu(event, entry);
   };
-
-  const rows = flattenVisible(entries, expandedSet, childCache);
-
-  /** The current path's listing has settled; empty states wait for it so loads never flash placeholders. */
-  const settled = loadedPath === path;
 
   /** 进入目录 / 打开文件 —— 双击与 Enter 共用 */
   const activateEntry = (entry: FsEntry) => {
@@ -148,19 +221,34 @@ function LocalFiles() {
     else void openFileInTerminal(entry);
   };
 
-  /** ↑/↓ 在可见行之间移动选中并把目标行滚动到可见区域，Enter 进入目录 / 打开文件 */
+  /** ↑/↓ 在可见行之间移动光标并把目标行滚动到可见区域，Enter 进入目录 / 打开文件 */
   const handleTreeKeyDown = (event: React.KeyboardEvent) => {
     if ((event.target as HTMLElement).tagName === 'INPUT') return;
+
+    // 剪贴板快捷键（右键菜单的等价入口）
+    if ((event.ctrlKey || event.metaKey) && (event.key === 'c' || event.key === 'x' || event.key === 'v')) {
+      event.preventDefault();
+      if (event.key === 'v') {
+        void pasteClipboard();
+        return;
+      }
+      const anchorEntry = rows.find((row) => row.entry.path === anchorPath)?.entry;
+      if (!anchorEntry) return;
+      const targets = targetsFor(anchorEntry);
+      if (event.key === 'c') copySelection(targets);
+      else cutSelection(targets);
+      return;
+    }
 
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       if (rows.length === 0) return;
       event.preventDefault();
-      const currentIndex = rows.findIndex((row) => row.entry.path === selectedPath);
+      const currentIndex = rows.findIndex((row) => row.entry.path === anchorPath);
       const nextIndex = event.key === 'ArrowDown'
         ? (currentIndex < 0 ? 0 : Math.min(rows.length - 1, currentIndex + 1))
         : (currentIndex < 0 ? rows.length - 1 : Math.max(0, currentIndex - 1));
       const nextPath = rows[nextIndex]!.entry.path;
-      setSelectedPath(nextPath);
+      selectOnly(nextPath);
       const target = Array.from(scrollRef.current?.querySelectorAll<HTMLElement>('[data-testid="file-row"]') ?? [])
         .find((element) => element.dataset.path === nextPath);
       target?.scrollIntoView({ block: 'nearest' });
@@ -168,7 +256,7 @@ function LocalFiles() {
     }
 
     if (event.key === 'Enter') {
-      const selected = rows.find((row) => row.entry.path === selectedPath);
+      const selected = rows.find((row) => row.entry.path === anchorPath);
       if (!selected) return;
       event.preventDefault();
       activateEntry(selected.entry);
@@ -221,6 +309,7 @@ function LocalFiles() {
                       onClick={isCurrent ? beginPathEdit : () => navigate(c.full)}
                       active={isCurrent}
                       title={isCurrent ? EDIT_PATH_HINT : undefined}
+                      dropPath={isCurrent ? undefined : c.full}
                     />
                   </span>
                 );
@@ -286,6 +375,7 @@ function LocalFiles() {
         ref={scrollRef}
         tabIndex={0}
         onKeyDown={handleTreeKeyDown}
+        onContextMenu={handleTreeContextMenu}
         data-testid="local-file-tree"
         data-path={path ?? ''}
         style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}
@@ -319,12 +409,15 @@ function LocalFiles() {
               <Fragment key={row.entry.path}>
                 <FileRow
                   row={row}
-                  selected={selectedPath === row.entry.path}
+                  selected={selection.has(row.entry.path)}
+                  cut={cutPaths.has(row.entry.path)}
+                  dropTarget={row.entry.is_dir && dropTargetPath === row.entry.path}
                   inWorkspace={isWorkspace(row.entry.path)}
                   renaming={renameTarget?.path === row.entry.path}
                   onRenameCommit={requestRename}
                   onRenameCancel={cancelRename}
                   onRowClick={handleRowClick}
+                  onRowPointerDown={handleRowPointerDown}
                   onRowDoubleClick={activateEntry}
                   onRowContextMenu={handleRowContextMenu}
                   onChevronClick={toggleExpand}
@@ -373,6 +466,8 @@ function LocalFiles() {
         <ContextMenu
           anchor={moreMenu}
           items={[
+            // 回退入口只在确实操作过文件后出现
+            ...(undo ? [{ label: `回退${undo.label}`, onClick: () => void runUndo() }] : []),
             // 盘符视图没有「当前文件夹」，不显示不可用的新建标签页
             ...(path === null ? [] : [{ label: '从当前文件夹新建标签页', onClick: openTabAtCurrentFolder }]),
             { label: '下载管理', onClick: () => setShowDownloads(true) },
@@ -381,13 +476,30 @@ function LocalFiles() {
         />
       )}
 
+      {blankMenu && (
+        <ContextMenu
+          anchor={blankMenu}
+          items={[
+            ...(clipboard
+              ? [{ label: clipboard.mode === 'cut' ? '粘贴（移动）' : '粘贴', onClick: () => void pasteClipboard() }]
+              : []),
+            ...(path === null ? [] : [{ label: '从当前文件夹新建标签页', onClick: openTabAtCurrentFolder }]),
+          ]}
+          onClose={() => setBlankMenu(null)}
+        />
+      )}
+
+      <FileDragPreview />
+
       <ConfirmDialog
         open={confirm !== null}
         title={confirm?.kind === 'delete' ? '确认删除' : '确认重命名'}
         message={
           confirm
             ? confirm.kind === 'delete'
-              ? `确定要删除「${confirm.entry.name}」吗？删除后将移入系统回收站。`
+              ? confirm.entries.length > 1
+                ? `确定要删除选中的 ${confirm.entries.length} 项吗？删除后可在「更多 → 回退删除」恢复。`
+                : `确定要删除「${confirm.entries[0]!.name}」吗？删除后可在「更多 → 回退删除」恢复。`
               : `确定要将「${confirm.entry.name}」重命名为「${confirm.newName}」吗？`
             : undefined
         }
@@ -448,27 +560,35 @@ function DiskCard({ disk, onOpen }: { disk: DiskEntry; onOpen: () => void }) {
 function FileRow({
   row,
   selected,
+  cut,
+  dropTarget,
   inWorkspace,
   renaming,
   onRenameCommit,
   onRenameCancel,
   onRowClick,
+  onRowPointerDown,
   onRowDoubleClick,
   onRowContextMenu,
   onChevronClick,
 }: {
   row: VisibleRow;
   selected: boolean;
+  /** 已剪切待粘贴：淡显提示会被移走 */
+  cut: boolean;
+  /** 拖拽悬停在本文件夹上：高亮提示放置目标 */
+  dropTarget: boolean;
   inWorkspace: boolean;
   renaming: boolean;
   onRenameCommit: (entry: FsEntry, newName: string) => void;
   onRenameCancel: (entry: FsEntry) => void;
-  onRowClick: (entry: FsEntry) => void;
+  onRowClick: (entry: FsEntry, event: React.MouseEvent) => void;
+  onRowPointerDown: (event: React.PointerEvent<HTMLElement>, entry: FsEntry) => void;
   onRowDoubleClick: (entry: FsEntry) => void;
   onRowContextMenu: (e: React.MouseEvent, entry: FsEntry) => void;
   onChevronClick: (entry: FsEntry) => void;
 }) {
-  const { entry, depth, expanded } = row;
+  const { entry, depth, expanded, empty } = row;
   const Icon = entry.is_dir ? (inWorkspace ? Star : Folder) : fileIcon(entry.name);
   const [draft, setDraft] = useState(entry.name);
   const committedRef = useRef(false);
@@ -495,40 +615,45 @@ function FileRow({
 
   return (
     <div
-      onClick={renaming ? undefined : () => onRowClick(entry)}
+      onClick={renaming ? undefined : (event) => onRowClick(entry, event)}
+      onPointerDown={renaming ? undefined : (event) => onRowPointerDown(event, entry)}
       onDoubleClick={renaming ? undefined : () => onRowDoubleClick(entry)}
       onContextMenu={renaming ? undefined : (e) => onRowContextMenu(e, entry)}
       title={renaming
         ? '输入新名称，回车确认，Esc 取消'
         : entry.is_dir
-          ? (inWorkspace ? '工作区文件夹 · 单击选中，双击进入' : '单击选中，双击进入')
+          ? (inWorkspace ? '工作区文件夹 · 单击选中，双击进入，可拖入文件' : '单击选中，双击进入，可拖入文件')
           : '单击选中，双击在终端编辑器中打开'}
       data-testid="file-row"
       data-path={entry.path}
       data-selected={selected ? 'true' : undefined}
+      data-drop-dir={entry.is_dir && !renaming ? entry.path : undefined}
       style={{
         display: 'flex', alignItems: 'center', gap: 4,
         padding: `5px 10px 5px ${4 + depth * 14}px`,
         fontSize: 'var(--fs-label)', lineHeight: '20px', minHeight: 32,
         cursor: renaming ? 'text' : 'pointer',
-        background: restingBackground,
+        background: dropTarget ? 'var(--accent-bg)' : restingBackground,
+        opacity: cut ? 0.55 : 1,
+        outline: dropTarget ? '1px solid var(--accent)' : undefined,
+        outlineOffset: -1,
         color: entry.is_dir
           ? (inWorkspace ? 'var(--accent-warm)' : 'var(--text-primary)')
           : 'var(--text-secondary)',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = selected ? 'var(--selection-bg)' : 'var(--hover)'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = restingBackground; }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = dropTarget ? 'var(--accent-bg)' : selected ? 'var(--selection-bg)' : 'var(--hover)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = dropTarget ? 'var(--accent-bg)' : restingBackground; }}
     >
-      {/* 展开 chevron —— 仅目录有；展开/收起只由它负责 */}
+      {/* 展开 chevron —— 仅目录有；已知为空的目录不显示展开箭头 */}
       <span
-        onClick={entry.is_dir && !renaming ? (e) => { e.stopPropagation(); onChevronClick(entry); } : undefined}
+        onClick={entry.is_dir && !empty && !renaming ? (e) => { e.stopPropagation(); onChevronClick(entry); } : undefined}
         data-testid="file-row-expander"
         style={{
           width: iconSizes.compact, flexShrink: 0, display: 'inline-flex', justifyContent: 'center',
           color: 'var(--text-muted)',
           transition: 'transform 0.12s ease',
           transform: expanded ? 'rotate(90deg)' : 'none',
-          visibility: entry.is_dir ? 'visible' : 'hidden',
+          visibility: entry.is_dir && !empty ? 'visible' : 'hidden',
         }}
       >
         <ChevronRight size={iconSizes.compact} />
@@ -572,10 +697,18 @@ function FileRow({
 
 // ── 面包屑段 ──
 
-function Crumb({ label, onClick, active, title }: { label: string; onClick: () => void; active: boolean; title?: string }) {
+function Crumb({ label, onClick, active, title, dropPath }: {
+  label: string;
+  onClick: () => void;
+  active: boolean;
+  title?: string;
+  /** 可作为拖拽放置目标的完整路径（当前目录不可放） */
+  dropPath?: string;
+}) {
   return (
     <span
       title={title}
+      data-drop-dir={dropPath}
       onClick={(event) => { event.stopPropagation(); onClick(); }}
       style={{
         cursor: 'pointer', padding: '1px 4px', borderRadius: 3,
