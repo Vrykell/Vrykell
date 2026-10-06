@@ -5,7 +5,7 @@ import { fileIcon } from '@features/files/utils/fileIcon';
 import { normPath, pathSegments, segmentsToPath, parentOf } from '@platform/path';
 import { compactPathSegments } from '@features/files/utils/breadcrumb';
 import { useFileRowDrag } from '@features/files/hooks/useFileRowDrag';
-import { useFileDragStore } from '@features/files/stores/fileDrag';
+import { useFileDragStore } from '@features/files';
 import FileDragPreview from '@features/files/components/FileDragPreview';
 import { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
 import { IconBtn, fmtSize } from '@ui/UiBtn';

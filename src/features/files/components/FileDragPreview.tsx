@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { useFileDragStore } from '@features/files/stores/fileDrag';
+import { useFileDragStore } from '@features/files';
 
 /** 拖拽预览：跟随指针显示移动/复制的条目数与目标文件夹，不参与命中测试。 */
 export default function FileDragPreview() {
