@@ -866,9 +866,31 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
           case 'fs_rename':
             fsOps.push({ op: 'rename', path: args.oldPath as string, newName: args.newName as string });
             return undefined;
-          case 'fs_delete':
-            fsOps.push({ op: 'delete', path: args.path as string });
+          case 'fs_copy':
+          case 'fs_move': {
+            const op = cmd === 'fs_copy' ? 'copy' : 'move';
+            const paths = args.paths as string[];
+            const destDir = args.destDir as string;
+            for (const path of paths) fsOps.push({ op, path, destDir });
+            return {
+              completed: paths.map((path) => ({ from: path, to: `${destDir}/${path.split('/').pop()}` })),
+              errors: [],
+            };
+          }
+          case 'fs_stage_delete': {
+            const paths = args.paths as string[];
+            for (const path of paths) fsOps.push({ op: 'delete', path });
+            return paths.map((path) => ({ from: path, to: `/home/e2e/.vrykell/undo/u-${path.split('/').pop()}` }));
+          }
+          case 'fs_restore_staged': {
+            const items = args.items as { from: string; to: string }[];
+            for (const item of items) fsOps.push({ op: 'restore', path: item.from });
+            return { completed: items, errors: [] };
+          }
+          case 'fs_purge_staged': {
+            for (const path of args.paths as string[]) fsOps.push({ op: 'purge', path });
             return undefined;
+          }
           case 'ssh_rename':
             sshOps.push({ op: 'rename', path: args.path as string, newName: args.newName as string });
             return undefined;
