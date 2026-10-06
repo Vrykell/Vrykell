@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState, useRef, useMemo } from 'react';
-import { iconSizes, Star, Folder, ChevronRight, Download, FolderArrowRight, ArrowUp, HardDrive } from '@ui/icons';
+import { iconSizes, Star, Folder, ChevronRight, FolderArrowRight, ArrowUp, HardDrive, MoreHorizontal } from '@ui/icons';
 import { type FsEntry, type DiskEntry } from '@platform/api/fs';
 import { fileIcon } from '@features/files/utils/fileIcon';
 import { normPath, pathSegments, segmentsToPath } from '@platform/path';
@@ -14,7 +14,7 @@ import ConfirmDialog from '@ui/ConfirmDialog';
 import DownloadManager from '@features/files/components/DownloadManager';
 import { useLocalFileBrowser } from '@features/files/hooks/useLocalFileBrowser';
 import { useLocalFileActions } from '@features/files/hooks/useLocalFileActions';
-import { useDockStore } from '@features/workspace';
+import { useDockStore, useSessionStore } from '@features/workspace';
 
 /** Hint shown on the current-path crumb that switches the breadcrumb into an editable path. */
 const EDIT_PATH_HINT = '单击编辑路径，回车跳转';
@@ -85,6 +85,7 @@ function LocalFiles() {
   const crumbRef = useRef<HTMLDivElement>(null);
   const [crumbWidth, setCrumbWidth] = useState(0);
   const [pathDraft, setPathDraft] = useState<string | null>(null);
+  const [moreMenu, setMoreMenu] = useState<{ x: number; y: number } | null>(null);
   useEffect(() => {
     const el = crumbRef.current;
     if (!el) return;
@@ -110,6 +111,19 @@ function LocalFiles() {
     cancelPathEdit();
     if (!next || next === path) return;
     navigate(normPath(next));
+  };
+
+  /** Open the more-actions menu anchored to its button. */
+  const openMoreMenu = (event: React.MouseEvent) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setMoreMenu({ x: rect.left, y: rect.bottom + 4 });
+  };
+  const closeMoreMenu = () => setMoreMenu(null);
+
+  /** Open a new local session tab rooted at the folder currently browsed. */
+  const openTabAtCurrentFolder = () => {
+    if (path === null) return;
+    useSessionStore.getState().addTab({ cwd: path, title: pathSegments(path).pop() ?? path });
   };
 
   /** 单击只选中；进入目录 / 打开文件都由双击触发 */
@@ -246,13 +260,6 @@ function LocalFiles() {
           >
             <FolderArrowRight size={iconSizes.control} />
           </IconBtn>
-          <IconBtn
-            title="下载管理"
-            data-testid="local-downloads-btn"
-            onClick={() => setShowDownloads(true)}
-          >
-            <Download size={iconSizes.control} />
-          </IconBtn>
           {/* Back = the previous tree view snapshot (expanded rows, selection, scroll), not the parent folder */}
           <IconBtn
             title="回到上一个视图"
@@ -261,6 +268,14 @@ function LocalFiles() {
             onClick={goBack}
           >
             <ArrowUp size={iconSizes.control} />
+          </IconBtn>
+          {/* 本地可用的操作都收进更多菜单（本地没有上传能力，菜单里不出现上传项） */}
+          <IconBtn
+            title="更多操作"
+            data-testid="local-more-btn"
+            onClick={openMoreMenu}
+          >
+            <MoreHorizontal size={iconSizes.control} />
           </IconBtn>
         </div>
       </div>
@@ -351,6 +366,18 @@ function LocalFiles() {
           anchor={{ x: ctxMenu.x, y: ctxMenu.y }}
           items={buildMenuItems(ctxMenu.entry)}
           onClose={closeContextMenu}
+        />
+      )}
+
+      {moreMenu && (
+        <ContextMenu
+          anchor={moreMenu}
+          items={[
+            // 盘符视图没有「当前文件夹」，不显示不可用的新建标签页
+            ...(path === null ? [] : [{ label: '从当前文件夹新建标签页', onClick: openTabAtCurrentFolder }]),
+            { label: '下载管理', onClick: () => setShowDownloads(true) },
+          ]}
+          onClose={closeMoreMenu}
         />
       )}
 
