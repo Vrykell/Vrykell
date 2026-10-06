@@ -2,7 +2,7 @@ import { Fragment, useEffect, useState, useRef, useMemo } from 'react';
 import { iconSizes, Star, Folder, ChevronRight, Download, FolderArrowRight, ArrowUp, HardDrive } from '@ui/icons';
 import { type FsEntry, type DiskEntry } from '@features/files/services/fs';
 import { fileIcon } from '@features/files/utils/fileIcon';
-import { pathSegments, segmentsToPath, compactPathSegments } from '@features/files/utils/pathUtils';
+import { normPath, pathSegments, segmentsToPath, compactPathSegments } from '@features/files/utils/pathUtils';
 import { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
 import { IconBtn, fmtSize } from '@ui/UiBtn';
 import { flattenVisible, type VisibleRow } from '@features/files/utils/fileTree';
@@ -14,6 +14,9 @@ import DownloadManager from '@features/files/components/DownloadManager';
 import { useLocalFileBrowser } from '@features/files/hooks/useLocalFileBrowser';
 import { useLocalFileActions } from '@features/files/hooks/useLocalFileActions';
 import { useDockStore } from '@features/workspace';
+
+/** Hint shown on the current-path crumb that switches the breadcrumb into an editable path. */
+const EDIT_PATH_HINT = '单击编辑路径，回车跳转';
 
 /**
  * PanelFiles — 文件面板入口。
@@ -79,6 +82,7 @@ function LocalFiles() {
   const crumbs = pathSegments(path ?? '');
   const crumbRef = useRef<HTMLDivElement>(null);
   const [crumbWidth, setCrumbWidth] = useState(0);
+  const [pathDraft, setPathDraft] = useState<string | null>(null);
   useEffect(() => {
     const el = crumbRef.current;
     if (!el) return;
@@ -94,6 +98,17 @@ function LocalFiles() {
 
   // hooks 之后再做视图切换，避免「条件 hook」导致 React 报错
   if (showDownloads) return <DownloadManager onBack={() => setShowDownloads(false)} />;
+
+  /** Turn the breadcrumb into an editable full path: text selected, Enter navigates, Esc / blur cancels. */
+  const beginPathEdit = () => setPathDraft(path ?? '');
+  const cancelPathEdit = () => setPathDraft(null);
+  const commitPathEdit = () => {
+    // Accept paths copied with surrounding quotes ("Copy as path" style).
+    const next = (pathDraft ?? '').trim().replace(/^"(.*)"$/, '$1');
+    cancelPathEdit();
+    if (!next || next === path) return;
+    navigate(normPath(next));
+  };
 
   /** 单击只选中；进入目录 / 打开文件都由双击触发 */
   const handleRowClick = (entry: FsEntry) => {
@@ -153,23 +168,70 @@ function LocalFiles() {
         fontSize: 'calc(11px * var(--ui-font-scale))', minHeight: 30, flexShrink: 0,
         whiteSpace: 'nowrap',
       }}>
-        <div ref={crumbRef} style={{
-          display: 'flex', alignItems: 'center', gap: 2,
-          flex: 1, minWidth: 0, overflow: 'hidden',
-        }}>
-          <Crumb label="此电脑" onClick={() => navigate(null)} active={path === null} />
-          {hiddenCount > 0 && (
+        <div
+          ref={crumbRef}
+          data-testid="crumb-bar"
+          onClick={pathDraft === null ? beginPathEdit : undefined}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 2,
+            flex: 1, minWidth: 0, overflow: 'hidden',
+            cursor: pathDraft === null ? 'text' : undefined,
+          }}
+        >
+          {pathDraft === null ? (
             <>
-              <span style={{ color: 'var(--text-muted)' }}>›</span>
-              <span title="已省略上级目录" style={{ color: 'var(--text-muted)', letterSpacing: 1 }}>…</span>
+              <Crumb
+                label="此电脑"
+                onClick={path === null ? beginPathEdit : () => navigate(null)}
+                active={path === null}
+                title={path === null ? EDIT_PATH_HINT : undefined}
+              />
+              {hiddenCount > 0 && (
+                <>
+                  <span style={{ color: 'var(--text-muted)' }}>›</span>
+                  <span title="已省略上级目录" style={{ color: 'var(--text-muted)', letterSpacing: 1 }}>…</span>
+                </>
+              )}
+              {visibleCrumbs.map((c, i) => {
+                const isCurrent = i === visibleCrumbs.length - 1;
+                return (
+                  <span key={c.full} style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+                    <span style={{ color: 'var(--text-muted)' }}>›</span>
+                    <Crumb
+                      label={c.seg}
+                      onClick={isCurrent ? beginPathEdit : () => navigate(c.full)}
+                      active={isCurrent}
+                      title={isCurrent ? EDIT_PATH_HINT : undefined}
+                    />
+                  </span>
+                );
+              })}
             </>
+          ) : (
+            <input
+              autoFocus
+              value={pathDraft}
+              onChange={(event) => setPathDraft(event.target.value)}
+              onFocus={(event) => event.currentTarget.select()}
+              onKeyDown={(event) => {
+                if (event.nativeEvent.isComposing) return;
+                if (event.key === 'Enter') commitPathEdit();
+                else if (event.key === 'Escape') cancelPathEdit();
+              }}
+              onBlur={cancelPathEdit}
+              onClick={(event) => event.stopPropagation()}
+              spellCheck={false}
+              aria-label="编辑路径"
+              data-testid="path-input"
+              style={{
+                flex: 1, minWidth: 0, height: 22, padding: '0 6px',
+                background: 'var(--chrome-field)', border: '1px solid var(--border-strong)',
+                borderRadius: 4, outline: 'none',
+                fontFamily: 'var(--font-mono)', fontSize: 'calc(11px * var(--ui-font-scale))',
+                color: 'var(--text-primary)',
+              }}
+            />
           )}
-          {visibleCrumbs.map((c, i) => (
-            <span key={c.full} style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
-              <span style={{ color: 'var(--text-muted)' }}>›</span>
-              <Crumb label={c.seg} onClick={() => navigate(c.full)} active={i === visibleCrumbs.length - 1} />
-            </span>
-          ))}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
           <IconBtn
@@ -465,13 +527,17 @@ function FileRow({
 
 // ── 面包屑段 ──
 
-function Crumb({ label, onClick, active }: { label: string; onClick: () => void; active: boolean }) {
+function Crumb({ label, onClick, active, title }: { label: string; onClick: () => void; active: boolean; title?: string }) {
   return (
-    <span onClick={onClick} style={{
-      cursor: 'pointer', padding: '1px 4px', borderRadius: 3,
-      color: active ? 'var(--text-primary)' : 'var(--text-muted)',
-      background: active ? 'var(--hover)' : 'transparent',
-      fontFamily: 'var(--font-mono)', fontSize: 'calc(11px * var(--ui-font-scale))',
-    }}>{label}</span>
+    <span
+      title={title}
+      onClick={(event) => { event.stopPropagation(); onClick(); }}
+      style={{
+        cursor: 'pointer', padding: '1px 4px', borderRadius: 3,
+        color: active ? 'var(--text-primary)' : 'var(--text-muted)',
+        background: active ? 'var(--hover)' : 'transparent',
+        fontFamily: 'var(--font-mono)', fontSize: 'calc(11px * var(--ui-font-scale))',
+      }}
+    >{label}</span>
   );
 }

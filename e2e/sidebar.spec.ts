@@ -50,6 +50,36 @@ test.describe('文件面板', () => {
     await expect(page.getByTestId('local-back-btn')).toBeEnabled();
   });
 
+  test('面包屑可编辑：点击路径全选，回车跳转，Esc 或失焦取消', async ({ page }) => {
+    const tree = page.getByTestId('local-file-tree');
+    const bar = page.getByTestId('crumb-bar');
+    const input = page.getByTestId('path-input');
+    await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
+
+    // 点击当前路径进入编辑态：显示完整路径并且文本全选
+    await bar.getByTitle('单击编辑路径，回车跳转').click();
+    await expect(input).toBeVisible();
+    await expect(input).toHaveValue('/home/e2e/project');
+    await input.fill('/home/e2e/Documents');
+    await input.press('Enter');
+    await expect(tree).toHaveAttribute('data-path', '/home/e2e/Documents');
+    await expect(input).toHaveCount(0);
+
+    // Esc 取消编辑，路径不变
+    await bar.getByTitle('单击编辑路径，回车跳转').click();
+    await expect(input).toHaveValue('/home/e2e/Documents');
+    await input.press('Escape');
+    await expect(input).toHaveCount(0);
+    await expect(tree).toHaveAttribute('data-path', '/home/e2e/Documents');
+
+    // 失焦取消编辑，路径不变
+    await bar.getByTitle('单击编辑路径，回车跳转').click();
+    await input.fill('/home/e2e/Downloads');
+    await tree.getByText('notes.txt').click();
+    await expect(input).toHaveCount(0);
+    await expect(tree).toHaveAttribute('data-path', '/home/e2e/Documents');
+  });
+
   test('此电脑视图：磁盘以小卡片展示（含容量），点击进入', async ({ page }) => {
     // 点击面包屑「此电脑」进入磁盘视图
     await page.getByText('此电脑').click();
