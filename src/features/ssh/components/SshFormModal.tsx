@@ -4,6 +4,7 @@ import { newSshId, validateSshConnection, sshTest, sshTrustHostKey, type SshConn
 import { useSshStore } from '@features/ssh';
 import { useToastStore } from '@ui/Toast';
 import ConfirmDialog from '@ui/ConfirmDialog';
+import ErrorBox from '@ui/ErrorBox';
 import { open as chooseFile } from '@tauri-apps/plugin-dialog';
 
 interface Props {
@@ -268,14 +269,14 @@ export default function SshFormModal({ open, initial, onClose, onConnect }: Prop
         </div>
 
         {testResult && (
-          <div style={{
-            flexShrink: 0, maxHeight: 72, overflowY: 'auto',
-            fontSize: 'calc(12px * var(--ui-font-scale))', padding: '6px 8px', borderRadius: 'var(--radius-inner)',
-            color: testResult.ok ? 'var(--success)' : 'var(--error-light)',
-            background: testResult.ok ? 'var(--success-bg)' : 'var(--error-bg)',
-          }} data-testid="ssh-test-result">
+          <ErrorBox
+            compact
+            tone={testResult.ok ? 'success' : 'error'}
+            testId="ssh-test-result"
+            style={{ flexShrink: 0, maxHeight: 72, overflowY: 'auto' }}
+          >
             {testResult.msg}
-          </div>
+          </ErrorBox>
         )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>

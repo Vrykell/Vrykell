@@ -1,5 +1,6 @@
 import { Component } from 'react';
 import Markdown from '@features/chat/components/Markdown';
+import ErrorDetails from '@ui/ErrorDetails';
 
 /**
  * 单条消息的 Markdown 渲染保护。
@@ -46,24 +47,15 @@ export default class SafeMarkdown extends Component<{ content: string }, { error
   render() {
     if (this.state.error) {
       return (
-        <div>
-          <span style={{ color: 'var(--error)', fontStyle: 'italic', fontSize: 'calc(11px * var(--ui-font-scale))' }}>
-            渲染失败（{this.state.errorMessage}），以下为原文：
-          </span>
-          <pre
-            data-selectable
-            style={{
-              margin: '4px 0 0',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 'calc(12px * var(--ui-font-scale))',
-              color: 'var(--text-secondary)',
-            }}
-          >
-            {this.props.content}
-          </pre>
-        </div>
+        <ErrorDetails
+          title={`渲染失败（${this.state.errorMessage}），以下为原文`}
+          text={this.props.content}
+          defaultOpen
+          preStyle={{
+            fontSize: 'calc(12px * var(--ui-font-scale))',
+            color: 'var(--text-secondary)',
+          }}
+        />
       );
     }
     return <Markdown content={this.props.content} />;

@@ -5,6 +5,7 @@ import type { SshConnection } from '@features/ssh/services/api';
 import { IconBtn } from '@ui/UiBtn';
 import ContextMenu from '@ui/ContextMenu';
 import ConfirmDialog from '@ui/ConfirmDialog';
+import ErrorBox from '@ui/ErrorBox';
 import DownloadManager from '@features/files/components/DownloadManager';
 import { compactPathSegments } from '@features/files/utils/breadcrumb';
 import { useRemoteFileBrowser } from '@features/ssh/hooks/useRemoteFileBrowser';
@@ -170,10 +171,12 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
         {loading ? (
           <div role="status" style={{ padding: 20, color: 'var(--text-muted)', fontSize: 'var(--fs-label)' }}>正在连接文件服务…</div>
         ) : failure ? (
-          <div role={failure.kind === 'error' ? 'alert' : 'status'} style={{ padding: 16, fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-            <strong style={{ color: 'var(--text-primary)' }}>{failure.title}</strong>
-            <p>{failure.message}</p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <ErrorBox
+            tone={failure.kind === 'error' ? 'error' : 'info'}
+            title={failure.title}
+            details={error ?? undefined}
+            style={{ margin: 16, overflowWrap: 'anywhere' }}
+            actions={<>
               <button style={{ minHeight: 36 }} onClick={() => {
                 const dock = useDockStore.getState();
                 const side = dock.leftPanels.includes('files') ? 'left' : 'right';
@@ -182,9 +185,10 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
                 if (paneId) termInstances.get(paneId)?.focus();
               }}>继续使用终端</button>
               <button style={{ minHeight: 36 }} onClick={refresh}>重试文件服务</button>
-            </div>
-            <details style={{ marginTop: 12, overflowWrap: 'anywhere', color: 'var(--text-muted)' }}><summary style={{ cursor: 'pointer' }}>技术详情</summary>{error}</details>
-          </div>
+            </>}
+          >
+            {failure.message}
+          </ErrorBox>
         ) : entries.length === 0 ? (
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>空目录</div>
         ) : entries.map((e) => (
