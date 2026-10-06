@@ -17,7 +17,6 @@ export type LocalFileConfirmState =
 
 interface UseLocalFileActionsOptions {
   path: string | null;
-  navigate: (path: string | null) => void;
   load: (path: string | null) => void;
   focusedPaneId: string;
   sessions: Record<string, string>;
@@ -26,7 +25,6 @@ interface UseLocalFileActionsOptions {
 /** Manage file actions and explicit terminal navigation without changing the browser on file open. */
 export function useLocalFileActions({
   path,
-  navigate,
   load,
   focusedPaneId,
   sessions,
@@ -139,10 +137,6 @@ export function useLocalFileActions({
     else doRename(current.entry, current.newName);
   }, [confirm, doDelete, doRename]);
 
-  const goUp = useCallback(() => {
-    if (path !== null) navigate(parentOf(path));
-  }, [path, navigate]);
-
   const syncToTerminal = useCallback(async () => {
     if (!path) return;
     const sid = sessions[focusedPaneId];
@@ -170,7 +164,6 @@ export function useLocalFileActions({
     requestRename,
     cancelRename,
     confirmAction,
-    goUp,
     syncToTerminal,
   };
 }

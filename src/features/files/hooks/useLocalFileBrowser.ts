@@ -7,13 +7,13 @@ interface UseLocalFileBrowserOptions {
   initialCwd?: string;
 }
 
-interface BrowserViewMemory {
+/** Everything needed to bring the tree back to the view the user left. */
+interface BrowserViewSnapshot {
+  path: string | null;
+  expanded: ReadonlySet<string>;
   selectedPath: string | null;
   scrollTop: number;
 }
-
-/** Remember each directory's selected row and scroll offset while browsing away. */
-const memoryKey = (target: string | null) => target ?? '__disks__';
 
 /** Load local directories and keep navigation results associated with their requests. */
 export function useLocalFileBrowser({ initialCwd }: UseLocalFileBrowserOptions) {
@@ -21,30 +21,9 @@ export function useLocalFileBrowser({ initialCwd }: UseLocalFileBrowserOptions) 
   const initialized = useRef(Boolean(initialCwd));
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [loadedPath, setLoadedPath] = useState<string | null | undefined>(undefined);
+  const [history, setHistory] = useState<BrowserViewSnapshot[]>([]);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const viewMemory = useRef(new Map<string, BrowserViewMemory>());
   const pendingScrollTop = useRef<number | null>(null);
-  const currentView = useRef({ path, selectedPath });
-  useEffect(() => {
-    currentView.current = { path, selectedPath };
-  }, [path, selectedPath]);
-  /**
-   * Navigate and restore the target directory's last selection and scroll.
-   * The scroll offset is applied once the target directory finishes loading.
-   */
-  const navigate = useCallback((nextPath: string | null) => {
-    initialized.current = true;
-    const current = currentView.current;
-    if (current.path === nextPath) return;
-    viewMemory.current.set(memoryKey(current.path), {
-      selectedPath: current.selectedPath,
-      scrollTop: scrollRef.current?.scrollTop ?? 0,
-    });
-    const restored = viewMemory.current.get(memoryKey(nextPath));
-    pendingScrollTop.current = restored?.scrollTop ?? 0;
-    setSelectedPath(restored?.selectedPath ?? null);
-    setBrowserPath(nextPath);
-  }, []);
   const [entries, setEntries] = useState<FsEntry[]>([]);
   const [disks, setDisks] = useState<DiskEntry[]>([]);
   const [expandedSet, setExpandedSet] = useState<ReadonlySet<string>>(new Set());
@@ -101,7 +80,7 @@ export function useLocalFileBrowser({ initialCwd }: UseLocalFileBrowserOptions) 
     return () => { requestVersion.current += 1; };
   }, [load, path]);
 
-  // Restore the remembered scroll offset only once the target directory's own
+  // Restore the snapshotted scroll offset only once the target directory's own
   // entries are in the DOM; earlier commits still show the previous directory.
   useLayoutEffect(() => {
     if (loading || loadedPath !== path || pendingScrollTop.current === null) return;
@@ -109,6 +88,35 @@ export function useLocalFileBrowser({ initialCwd }: UseLocalFileBrowserOptions) 
     pendingScrollTop.current = null;
     if (scrollRef.current) scrollRef.current.scrollTop = target;
   }, [loadedPath, loading, path]);
+
+  /**
+   * Navigate and remember the current tree view as a snapshot.
+   * Forward navigation always starts the target view at the top with no selection.
+   */
+  const navigate = useCallback((nextPath: string | null) => {
+    initialized.current = true;
+    if (path === nextPath) return;
+    setHistory((stack) => [...stack, {
+      path,
+      expanded: expandedSet,
+      selectedPath,
+      scrollTop: scrollRef.current?.scrollTop ?? 0,
+    }]);
+    pendingScrollTop.current = 0;
+    setSelectedPath(null);
+    setBrowserPath(nextPath);
+  }, [expandedSet, path, selectedPath]);
+
+  /** Go back to the previous view snapshot: root directory, expansion, selection and scroll. */
+  const goBack = useCallback(() => {
+    const snapshot = history[history.length - 1];
+    if (!snapshot) return;
+    setHistory(history.slice(0, -1));
+    setExpandedSet(new Set(snapshot.expanded));
+    setSelectedPath(snapshot.selectedPath);
+    pendingScrollTop.current = snapshot.scrollTop;
+    setBrowserPath(snapshot.path);
+  }, [history]);
 
   const retryExpand = useCallback((entry: FsEntry) => {
     setChildErrors((current) => {
@@ -151,6 +159,8 @@ export function useLocalFileBrowser({ initialCwd }: UseLocalFileBrowserOptions) 
   return {
     path,
     navigate,
+    goBack,
+    canGoBack: history.length > 0,
     selectedPath,
     setSelectedPath,
     scrollRef,

@@ -2,7 +2,7 @@ import { Fragment, useEffect, useState, useRef, useMemo } from 'react';
 import { iconSizes, Star, Folder, ChevronRight, Download, FolderArrowRight, ArrowUp, HardDrive } from '@ui/icons';
 import { type FsEntry, type DiskEntry } from '@features/files/services/fs';
 import { fileIcon } from '@features/files/utils/fileIcon';
-import { pathSegments, segmentsToPath, parentOf, compactPathSegments } from '@features/files/utils/pathUtils';
+import { pathSegments, segmentsToPath, compactPathSegments } from '@features/files/utils/pathUtils';
 import { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
 import { IconBtn, fmtSize } from '@ui/UiBtn';
 import { flattenVisible, type VisibleRow } from '@features/files/utils/fileTree';
@@ -42,6 +42,8 @@ function LocalFiles() {
   const {
     path,
     navigate,
+    goBack,
+    canGoBack,
     selectedPath,
     setSelectedPath,
     scrollRef,
@@ -70,9 +72,8 @@ function LocalFiles() {
     requestRename,
     cancelRename,
     confirmAction,
-    goUp,
     syncToTerminal,
-  } = useLocalFileActions({ path, navigate, load, focusedPaneId: focused, sessions });
+  } = useLocalFileActions({ path, load, focusedPaneId: focused, sessions });
 
   // 顶栏面包屑压缩：不换行，侧栏窄时省略高层级目录（必须在视图切换的提前返回之前）
   const crumbs = pathSegments(path ?? '');
@@ -185,16 +186,15 @@ function LocalFiles() {
           >
             <Download size={iconSizes.control} />
           </IconBtn>
-          {/* 已在根目录/盘符根时无上级，隐藏返回按钮 */}
-          {path !== null && parentOf(path) !== null && (
-            <IconBtn
-              title="上级目录"
-              data-testid="local-up-btn"
-              onClick={goUp}
-            >
-              <ArrowUp size={iconSizes.control} />
-            </IconBtn>
-          )}
+          {/* Back = the previous tree view snapshot (expanded rows, selection, scroll), not the parent folder */}
+          <IconBtn
+            title="回到上一个视图"
+            data-testid="local-back-btn"
+            disabled={!canGoBack}
+            onClick={goBack}
+          >
+            <ArrowUp size={iconSizes.control} />
+          </IconBtn>
         </div>
       </div>
 
