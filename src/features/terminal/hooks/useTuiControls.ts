@@ -42,7 +42,7 @@ export function useTuiControls(tabId: string) {
           setKillArmed(false);
         }
       })
-      .catch((error) => useToastStore.getState().addToast(String((error as Error)?.message ?? error), 'info'));
+      .catch((error) => useToastStore.getState().addToast(String((error as Error)?.message ?? error), 'error'));
   }, [sessions, tabId]);
 
   const exitFullScreen = useCallback(() => {

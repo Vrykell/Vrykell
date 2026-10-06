@@ -20,6 +20,13 @@ import { useSearchHistoryStore } from '@features/search/stores/searchHistory';
 import { useSearchHighlightStore } from '@features/search/stores/searchHighlight';
 import * as sessionManager from '@features/workspace/services/sessionManager';
 import { getSettings } from '@features/settings/services/registry';
+import { useToastStore } from '@ui/Toast';
+
+/** Restore failures are user-visible: log them and surface a toast. */
+function notifyRestoreFailure(context: string, error: unknown): void {
+  console.warn(`${context}:`, error);
+  useToastStore.getState().addToast(`${context}：${String((error as Error)?.message ?? error)}`, 'error');
+}
 
 export interface UseGlobalSearchOptions {
   open: boolean;
@@ -118,7 +125,7 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
           const data = result.data as BlockResultData;
           if (data.sessionStatus === 'historical') {
             sessionManager.restore(data.tabId, data.tabTitle ?? '').catch((error) => {
-              console.warn('恢复历史区块所属会话失败:', error);
+              notifyRestoreFailure('恢复历史区块所属会话失败', error);
             });
             return;
           }
@@ -151,7 +158,7 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
           const data = result.data as SessionResultData;
           if (data.status === 'historical') {
             sessionManager.restore(data.sessionId, data.title).catch((error) => {
-              console.warn('恢复历史会话失败:', error);
+              notifyRestoreFailure('恢复历史会话失败', error);
             });
           } else {
             useSessionStore.getState().activate(data.sessionId);
@@ -186,7 +193,7 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
 
   const handleRestore = useCallback((sessionId: string, sessionTitle: string) => {
     sessionManager.restore(sessionId, sessionTitle).catch((error) => {
-      console.warn('恢复历史会话失败:', error);
+      notifyRestoreFailure('恢复历史会话失败', error);
     });
   }, []);
 

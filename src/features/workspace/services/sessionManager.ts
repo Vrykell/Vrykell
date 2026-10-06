@@ -26,6 +26,7 @@ import {
   setBlockCollapsed,
   listChatMessages,
 } from '@platform/api/session';
+import { useToastStore } from '@ui/Toast';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 import type { BackendBlockEntry, BackendSessionEntry } from '@platform/api/types';
 
@@ -118,8 +119,10 @@ export async function close(tabId: string): Promise<void> {
 
 /** 恢复会话（撤销关闭 / 搜索恢复 — 标记 active + 加载 blocks + 添加 tab）。 */
 export async function restore(sessionId: string, title: string, meta?: RestoreMeta): Promise<void> {
+  let degraded = false;
   // 1. 后端标记 active
   await restoreSession(sessionId).catch((e) => {
+    degraded = true;
     console.warn('sessionManager.restore: restore_session failed:', e);
   });
 
@@ -128,6 +131,7 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
   try {
     backendBlocks = await getSessionBlocks(sessionId);
   } catch (e) {
+    degraded = true;
     console.warn('sessionManager.restore: get_session_blocks failed:', e);
   }
 
@@ -186,6 +190,7 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
       useChatStore.getState().dropTab(sessionId);
     }
   } catch (e) {
+    degraded = true;
     console.warn('sessionManager.restore: list_chat_messages failed:', e);
   }
 
@@ -234,6 +239,10 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
         : existing),
     }));
     ws.activate(sessionId);
+  }
+
+  if (degraded) {
+    useToastStore.getState().addToast(`会话「${title || sessionId}」恢复不完整：部分内容未能加载`, 'error');
   }
 }
 

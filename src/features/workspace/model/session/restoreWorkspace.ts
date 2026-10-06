@@ -113,8 +113,11 @@ function createDefaultSession(): PersistableSession | null {
 }
 
 /** 默认生产适配器：连接现有 IPC、Store 和 sessionManager。 */
-export function restoreWorkspace(): Promise<void> {
+export function restoreWorkspace(
+  options: { onError?: (message: string, error: unknown) => void } = {},
+): Promise<void> {
   return restoreWorkspaceWithDependencies({
+    onError: options.onError,
     startupMode: useStartupSettings.getState().mode,
     archiveSession: (id) => archiveSession(id, Date.now()),
     listSessions: async () => {
