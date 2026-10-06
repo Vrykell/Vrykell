@@ -63,6 +63,19 @@ const zh: Record<string, string> = {
 
   // ── 历史面板 ──
   'history.search': '搜索命令历史…',
+
+  // ── 文件管理 ──
+  'files.collapseAll': '收起全部文件夹',
+  'files.undo.cut': '移动',
+  'files.undo.rename': '重命名',
+  'files.undo.delete': '删除',
+  'files.undo.create': '新建',
+  'files.undo.paste': '粘贴',
+  'files.undo.upload': '上传',
+  'files.upload.start': '正在上传…',
+  'files.upload.startCount': '开始上传 {{n}} 项…',
+  'files.upload.done': '已上传，可在更多菜单回退',
+  'files.upload.doneCount': '已上传 {{n}} 项，可在更多菜单回退',
 };
 
 export default zh;
