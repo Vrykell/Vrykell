@@ -33,7 +33,7 @@ export function AiBehaviorPage() {
         description="全局默认对所有模型生效；选中某个模型后，下面的设置只对该模型生效。"
       >
         <ModelScopeBar
-          options={models.map((m) => ({ value: m.id, label: m.name || m.model, provider: m.provider, model: m.model }))}
+          options={models.map((m) => ({ value: m.id, label: m.name || m.model }))}
           value={scope === 'global' ? '' : scope}
           onChange={(v) => setScope(v === '' ? 'global' : v)}
         />

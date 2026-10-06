@@ -42,6 +42,8 @@ const zh: Record<string, string> = {
   'settings.title': '设置（⌘,）',
   'settings.apiKeyLabel': 'Anthropic API Key',
   'settings.modelLabel': '模型 ID',
+  'model.scope.aria': '配置作用域',
+  'model.scope.global': '全局默认',
   'settings.save': '保存',
 
   // ── API Key 提示 ──

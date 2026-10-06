@@ -20,10 +20,11 @@ describe('FilterPopover', () => {
     expect(screen.getByText('文件')).toBeInTheDocument();
   });
 
-  it('点击某个源后关闭并调用 onClose', () => {
+  it('切换某个源后保持展开，不自动关闭', () => {
     const onClose = vi.fn();
     render(<FilterPopover open={true} onClose={onClose} counts={{}} />);
     fireEvent.click(screen.getByText('命令历史'));
-    expect(onClose).toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText('搜索范围')).toBeInTheDocument();
   });
 });
