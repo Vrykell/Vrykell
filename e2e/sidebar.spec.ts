@@ -154,20 +154,35 @@ test.describe('文件面板', () => {
       .toContainEqual({ op: 'copy', path: '/home/e2e/notes.txt', destDir: '/home/e2e/project' });
   });
 
-  test('删除后可回退：更多菜单出现回退删除并把暂存项移回原位', async ({ page }) => {
+  test('删除后可连续回退：历史栈支持多次回退', async ({ page }) => {
     const tree = page.getByTestId('local-file-tree');
     const notes = tree.locator('[data-testid="file-row"][data-path="/home/e2e/notes.txt"]');
+    const documents = tree.locator('[data-testid="file-row"][data-path="/home/e2e/Documents"]');
 
+    // 连续删除两次：历史栈保留两步
     await notes.click({ button: 'right' });
     await page.getByRole('button', { name: '删除', exact: true }).click();
     await page.locator('[data-testid="confirm-ok"]').click();
     await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'delete'))
       .toContainEqual({ op: 'delete', path: '/home/e2e/notes.txt' });
+    await documents.click({ button: 'right' });
+    await page.getByRole('button', { name: '删除', exact: true }).click();
+    await page.locator('[data-testid="confirm-ok"]').click();
+    await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'delete'))
+      .toContainEqual({ op: 'delete', path: '/home/e2e/Documents' });
 
+    // 更多菜单显示剩余步数，连续回退两次把两步都还原
     await page.getByTestId('local-more-btn').click();
-    await page.getByRole('button', { name: '回退删除' }).click();
+    await page.getByRole('button', { name: /^回退删除/ }).click();
+    await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'restore'))
+      .toContainEqual({ op: 'restore', path: '/home/e2e/Documents' });
+    await page.getByTestId('local-more-btn').click();
+    await page.getByRole('button', { name: /^回退删除/ }).click();
     await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'restore'))
       .toContainEqual({ op: 'restore', path: '/home/e2e/notes.txt' });
+    // 栈清空后不再显示回退项
+    await page.getByTestId('local-more-btn').click();
+    await expect(page.getByRole('button', { name: /^回退/ })).toHaveCount(0);
   });
 
   test('拖拽文件到文件夹：悬停高亮并移动', async ({ page }) => {
@@ -180,8 +195,8 @@ test.describe('文件面板', () => {
     await page.mouse.move(from!.x + 40, from!.y + from!.height / 2);
     await page.mouse.down();
     await page.mouse.move(to!.x + 40, to!.y + to!.height / 2, { steps: 8 });
-    // 拖拽预览显示目标文件夹
-    await expect(page.getByText(/移动 1 项.*Documents/)).toBeVisible();
+    // 拖拽预览显示被拖文件的图标（不再显示文字说明）
+    await expect(page.getByTestId('file-drag-preview')).toBeVisible();
     await page.mouse.up();
 
     await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'move'))
