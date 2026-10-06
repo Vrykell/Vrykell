@@ -62,6 +62,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     (window as unknown as Record<string, unknown>).__PTY_CLOSES__ = closes;
     let hostKnown = sshHost === 'known';
     let clipboardText = '';
+    let clipboardFiles: { paths: string[]; mode: string } | null = null;
     const signals: { id: string; sig: number }[] = [];
     const killAttempts = new Map<string, number>();
     const resizes: { cols: number; rows: number }[] = [];
@@ -363,6 +364,13 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             clipboardText = args.text as string;
             (window as unknown as Record<string, string>).__CLIPBOARD_TEXT__ = clipboardText;
             return undefined;
+          case 'clipboard_write_files': {
+            clipboardFiles = { paths: args.paths as string[], mode: args.mode as string };
+            (window as unknown as Record<string, unknown>).__CLIPBOARD_FILES__ = clipboardFiles;
+            return undefined;
+          }
+          case 'clipboard_read_files':
+            return clipboardFiles?.paths ?? [];
           case 'pty_kill_foreground': {
             const id = args.id as string;
             const now = Date.now();
@@ -1012,6 +1020,13 @@ export function ptyWrites(page: Page): Promise<string[]> {
 /** Read the native clipboard value captured by the Tauri mock. */
 export function clipboardText(page: Page): Promise<string> {
   return page.evaluate(() => (window as unknown as Record<string, string>).__CLIPBOARD_TEXT__ ?? '');
+}
+
+/** Read the file list the panel wrote to the system clipboard (captured by the Tauri mock). */
+export function clipboardFiles(page: Page): Promise<{ paths: string[]; mode: string } | null> {
+  return page.evaluate(
+    () => (window as unknown as Record<string, { paths: string[]; mode: string } | undefined>).__CLIPBOARD_FILES__ ?? null,
+  );
 }
 
 /** 读取 pty_signal 调用记录（结束按钮升级链路断言用） */

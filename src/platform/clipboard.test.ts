@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { writeClipboardText } from '@platform/clipboard';
+import { readClipboardFiles, writeClipboardFiles, writeClipboardText } from '@platform/clipboard';
 
 const nativeWriteText = vi.hoisted(() => vi.fn());
+const invokeMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@tauri-apps/plugin-clipboard-manager', () => ({
   writeText: nativeWriteText,
 }));
+
+vi.mock('@platform/diagnostics', () => ({ invoke: invokeMock }));
 
 describe('writeClipboardText', () => {
   beforeEach(() => {
@@ -56,5 +59,36 @@ describe('writeClipboardText', () => {
     await writeClipboardText('fallback');
 
     expect(execCommand).toHaveBeenCalledWith('copy');
+  });
+});
+
+describe('file clipboard', () => {
+  beforeEach(() => {
+    invokeMock.mockReset().mockResolvedValue(undefined);
+    delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+  });
+
+  it('writes the real paths with their copy/cut intent on desktop', async () => {
+    (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {};
+
+    await writeClipboardFiles(['/a', '/b'], 'cut');
+
+    expect(invokeMock).toHaveBeenCalledWith('clipboard_write_files', { paths: ['/a', '/b'], mode: 'cut' });
+  });
+
+  it('is a no-op outside the desktop runtime', async () => {
+    await writeClipboardFiles(['/a'], 'copy');
+
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it('reads the system file list on desktop and nothing otherwise', async () => {
+    await expect(readClipboardFiles()).resolves.toEqual([]);
+
+    (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {};
+    invokeMock.mockResolvedValue(['/a']);
+
+    await expect(readClipboardFiles()).resolves.toEqual(['/a']);
+    expect(invokeMock).toHaveBeenCalledWith('clipboard_read_files');
   });
 });
