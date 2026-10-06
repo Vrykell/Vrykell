@@ -26,6 +26,7 @@ const connection: SshConnection = {
 describe('ssh store', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     useSshStore.setState({
       connections: [],
       loaded: false,
@@ -56,6 +57,26 @@ describe('ssh store', () => {
       loaded: true,
       loading: false,
     });
+  });
+
+  it('reorder 移动连接并持久化顺序', () => {
+    const backup: SshConnection = { ...connection, id: 'ssh-2', name: '备用机' };
+    useSshStore.setState({ connections: [connection, backup], loaded: true, loading: false });
+
+    useSshStore.getState().reorder(0, 1);
+
+    expect(useSshStore.getState().connections.map((c) => c.id)).toEqual(['ssh-2', 'ssh-1']);
+    expect(localStorage.getItem('vrykell-ssh-order')).toBe(JSON.stringify(['ssh-2', 'ssh-1']));
+  });
+
+  it('load 按持久化顺序排列连接', async () => {
+    const backup: SshConnection = { ...connection, id: 'ssh-2', name: '备用机' };
+    localStorage.setItem('vrykell-ssh-order', JSON.stringify(['ssh-2']));
+    vi.mocked(listSshConnections).mockResolvedValue([connection, backup]);
+
+    await useSshStore.getState().load();
+
+    expect(useSshStore.getState().connections.map((c) => c.id)).toEqual(['ssh-2', 'ssh-1']);
   });
 
   it('save/remove/touch 调用后端后重新加载', async () => {

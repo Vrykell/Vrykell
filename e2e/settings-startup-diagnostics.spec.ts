@@ -19,7 +19,7 @@ test('detailed log export works with disk logging disabled by default', async ({
   await gotoSetting(page, '日志与诊断');
   await expect(page.getByRole('switch', { name: '自动保存日志' })).toHaveAttribute('aria-checked', 'false');
   await page.getByRole('button', { name: '导出详细日志' }).click();
-  await expect(page.locator('p[role="status"]')).toContainText('已导出到');
+  await expect(page.getByTestId('logs-export-status')).toContainText('已导出到');
   const exports = await page.evaluate(() => (window as unknown as { __DIAGNOSTICS_EXPORTS__: Record<string, unknown>[] }).__DIAGNOSTICS_EXPORTS__);
   expect(exports).toHaveLength(1);
   expect(exports[0]?.path).toContain('vrykell-diagnostics');
