@@ -217,15 +217,15 @@ pub async fn fs_rename(old_path: String, new_name: String) -> Result<(), String>
 /// 完成的一条 from→to 对（前端据此记录回退）。
 #[derive(Clone, Serialize, Deserialize)]
 pub struct FileOpPair {
-    from: String,
-    to: String,
+    pub from: String,
+    pub to: String,
 }
 
 /// 批量文件操作结果：完成项 + 失败说明（部分失败不中断其余项）。
 #[derive(Clone, Serialize)]
 pub struct FileOpOutcome {
-    completed: Vec<FileOpPair>,
-    errors: Vec<String>,
+    pub completed: Vec<FileOpPair>,
+    pub errors: Vec<String>,
 }
 
 fn file_name_of(path: &std::path::Path) -> Result<String, String> {

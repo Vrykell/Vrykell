@@ -122,8 +122,41 @@ export function sshMove(id: string, path: string, destDir: string): Promise<void
   return invoke('ssh_move', { id, path, destDir });
 }
 
-export function sshDelete(id: string, path: string): Promise<void> {
-  return invoke('ssh_delete', { id, path });
+/** 完成的一条 from→to 对（用于远程文件操作回退）。 */
+export interface SshOpPair {
+  from: string;
+  to: string;
+}
+
+/** 批量远程操作结果：完成项 + 失败说明（部分失败不中断其余项）。 */
+export interface SshOpOutcome {
+  completed: SshOpPair[];
+  errors: string[];
+}
+
+/** 复制远程文件/目录到目标目录（远端 cp -R，逐项预检同名/自身子树）。 */
+export function sshCopy(id: string, paths: string[], destDir: string): Promise<SshOpOutcome> {
+  return invoke('ssh_copy', { id, paths, destDir });
+}
+
+/** 可回退删除：把远程条目移动到远端暂存目录，返回 原始→暂存 映射。 */
+export function sshStageDelete(id: string, paths: string[]): Promise<SshOpOutcome> {
+  return invoke('ssh_stage_delete', { id, paths });
+}
+
+/** 回退删除：把暂存项移回原位。 */
+export function sshRestoreStaged(id: string, items: SshOpPair[]): Promise<SshOpOutcome> {
+  return invoke('ssh_restore_staged', { id, items });
+}
+
+/** 把暂存项永久删除（回退窗口结束后）。 */
+export function sshPurgeStaged(id: string, paths: string[]): Promise<void> {
+  return invoke('ssh_purge_staged', { id, paths });
+}
+
+/** 清理远端暂存目录残留（面板挂载时调用一次）。 */
+export function sshSweepUndo(id: string): Promise<void> {
+  return invoke('ssh_sweep_undo', { id });
 }
 
 export function sshUpload(id: string, remoteDir: string, localPath: string): Promise<void> {
