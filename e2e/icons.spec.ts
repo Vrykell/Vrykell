@@ -17,6 +17,8 @@ test('small action buttons have readable targets and tab close works from the ke
   await page.getByTestId('tab-new-btn').click();
   await page.getByText('Zsh', { exact: true }).click();
   const row = page.locator('[data-tab-row-id]').last();
+  // 标签行按 shell 显示品牌图标：从弹窗选择 Zsh → 行内出现 zsh 标记
+  await expect(row.locator('[data-shell-mark="zsh"]')).toBeVisible();
   const close = row.getByRole('button', { name: '关闭标签', exact: true });
   await size(close, 28);
   await close.press('Enter');
