@@ -59,8 +59,8 @@ export interface FileOps {
   home?(): Promise<string>;
   /** 本地专有：磁盘视图（path 为 null 时展示）。 */
   disks?(): Promise<DiskEntry[]>;
-  /** 远程专有：上传本地路径到目录 / 下载到本地并返回本地路径。 */
-  upload?(dir: string, localPath: string): Promise<void>;
+  /** 远程专有：上传本地路径到目录（返回远端最终路径；未返回时不做回退记录）/ 下载到本地并返回本地路径。 */
+  upload?(dir: string, localPath: string): Promise<string | void>;
   download?(path: string): Promise<string>;
 }
 

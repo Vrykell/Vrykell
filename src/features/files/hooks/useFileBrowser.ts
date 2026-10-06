@@ -637,6 +637,34 @@ export function useFileBrowser({
     }
   }, [ops, pushUndo, refreshAffected, replaceSelection, toast]);
 
+  /**
+   * 上传本地文件/目录到当前远端目录（系统拖入面板、菜单上传共用）。
+   * 上传是「复制到远端」：源文件不动，新增的远端条目进回退历史（回退上传 = 移入远端暂存）。
+   */
+  const uploadInto = useCallback(async (localPaths: string[], dir: string) => {
+    if (!ops.upload || localPaths.length === 0) return;
+    toast(localPaths.length > 1 ? `开始上传 ${localPaths.length} 项…` : '正在上传…', 'info');
+    const created: FileOpPair[] = [];
+    const failures: string[] = [];
+    for (const localPath of localPaths) {
+      try {
+        const remotePath = await ops.upload(dir, localPath);
+        // 后端返回真实远端路径（可能带序号）时才记录回退；未返回时只上传
+        if (typeof remotePath === 'string' && remotePath) created.push({ from: remotePath, to: remotePath });
+      } catch (error) {
+        failures.push(`${localPath}：${String((error as Error)?.message ?? error)}`);
+      }
+    }
+    terminalDebug('files-op', { op: 'upload', itemCount: localPaths.length, doneCount: created.length, errorCount: failures.length });
+    if (created.length > 0) pushUndo({ kind: 'remove', label: '上传', pairs: created });
+    if (failures.length > 0) toast(failures[0]!, 'error');
+    if (created.length > 0) {
+      toast(created.length > 1 ? `已上传 ${created.length} 项，可在更多菜单回退` : '已上传，可在更多菜单回退', 'success');
+      replaceSelection(created.map((pair) => pair.to));
+    }
+    refreshAffected([], dir);
+  }, [ops, pushUndo, refreshAffected, replaceSelection, toast]);
+
   /** 删除 = 移到暂存区（可回退）；回退窗口结束或挤出历史后永久清理。 */
   const doDelete = useCallback(async (list: FsEntry[]) => {
     try {
@@ -748,6 +776,7 @@ export function useFileBrowser({
     transferInto,
     createEntry,
     removeAfterTransfer,
+    uploadInto,
     openEntry,
     ctxMenu,
     handleContextMenu,

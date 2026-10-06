@@ -156,8 +156,8 @@ export default function FilePanel({
     },
     prepareNativeDrag: config.drag.downloadBeforeNativeDrag ? prepareNativeDrag : undefined,
     onNativeDragEnd: (result, items) => {
-      // 系统接收后即为「移动」：源头（本地暂存删除 / 远端暂存删除）同步移除并进回退历史
-      if (result === 'Dropped') {
+      // 本地：系统按「移动」接收，拖出成功后清理源头；远端：拖出=下载，源文件必须保留
+      if (result === 'Dropped' && config.drag.cleanupSourceAfterNativeDrag) {
         void removeAfterTransfer(items.map((item) => ({ name: item.name, path: item.path, is_dir: item.is_dir })));
       }
       load(path);
