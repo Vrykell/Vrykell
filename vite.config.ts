@@ -1,5 +1,6 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import Icons from "unplugin-icons/vite";
 import { fileURLToPath } from "node:url";
 
 const sourceRoot = fileURLToPath(new URL("./src", import.meta.url));
@@ -9,7 +10,9 @@ const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
-  plugins: [react()],
+  // Icons compiles `~icons/<collection>/<name>` imports at build time, so only
+  // the shell brand marks we actually use end up in the bundle.
+  plugins: [react(), Icons({ compiler: "jsx", jsx: "react" })],
 
   // Keep runtime imports aligned with tsconfig paths in Vite and Vitest.
   resolve: {
