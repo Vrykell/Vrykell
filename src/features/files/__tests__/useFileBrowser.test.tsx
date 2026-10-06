@@ -124,10 +124,12 @@ describe('useFileBrowser（本地目标）', () => {
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
 
+    fsMocks.fsCopy.mockResolvedValue({ completed: [{ from: 'C:/work/a.txt', to: 'C:/work/src/a.txt' }], errors: [] });
     act(() => result.current.copySelection([entry('a.txt', 'C:/work/a.txt')]));
     await act(async () => { await result.current.pasteInto('C:/work/src'); });
     expect(fsMocks.fsCopy).toHaveBeenCalledWith(['C:/work/a.txt'], 'C:/work/src');
-    expect(result.current.undo).toBeNull();
+    // 复制粘贴同样可回退（回退粘贴 = 把复制出来的条目移入暂存）
+    expect(result.current.undo).toMatchObject({ kind: 'remove', label: '粘贴' });
 
     act(() => result.current.cutSelection([entry('a.txt', 'C:/work/a.txt')]));
     await act(async () => { await result.current.pasteInto('C:/work/src'); });
@@ -263,6 +265,35 @@ describe('useFileBrowser（本地目标）', () => {
     await act(async () => { await result.current.transferInto([child.path], 'C:/work/archive', 'move'); });
     await waitFor(() => expect(result.current.childCache['C:/work/src']).toHaveLength(0));
     expect(result.current.undo?.pairs).toEqual([{ from: child.path, to: 'C:/work/archive/a.txt' }]);
+  });
+
+  it('新建可回退：回退新建把刚建出来的条目移入暂存', async () => {
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(2));
+
+    await act(async () => { await result.current.createEntry('file', null); });
+    expect(result.current.undo).toMatchObject({ kind: 'remove', label: '新建' });
+    expect(result.current.undo?.pairs).toEqual([{ from: 'C:/work/Untitled', to: 'C:/work/Untitled' }]);
+
+    fsMocks.fsStageDelete.mockResolvedValue([{ from: 'C:/work/Untitled', to: 'C:/Users/test/.vrykell/undo/u-Untitled' }]);
+    await act(async () => { await result.current.runUndo(); });
+    expect(fsMocks.fsStageDelete).toHaveBeenCalledWith(['C:/work/Untitled']);
+    expect(result.current.undoCount).toBe(0);
+  });
+
+  it('复制粘贴可回退：回退粘贴把复制出来的条目移入暂存', async () => {
+    fsMocks.fsCopy.mockResolvedValue({ completed: [{ from: 'C:/work/a.txt', to: 'C:/work/src/a (1).txt' }], errors: [] });
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(2));
+
+    act(() => result.current.copySelection([entry('a.txt', 'C:/work/a.txt')]));
+    await act(async () => { await result.current.pasteInto('C:/work/src'); });
+    expect(result.current.undo).toMatchObject({ kind: 'remove', label: '粘贴' });
+
+    fsMocks.fsStageDelete.mockResolvedValue([{ from: 'C:/work/src/a (1).txt', to: 'C:/Users/test/.vrykell/undo/u-a' }]);
+    await act(async () => { await result.current.runUndo(); });
+    expect(fsMocks.fsStageDelete).toHaveBeenCalledWith(['C:/work/src/a (1).txt']);
+    expect(result.current.undoCount).toBe(0);
   });
 
   it('回退失败也会消耗该步：目标已在别处被移动/删除时不再留下退不掉的记录', async () => {
