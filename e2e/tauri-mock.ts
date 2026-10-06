@@ -66,6 +66,8 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     const killAttempts = new Map<string, number>();
     const resizes: { cols: number; rows: number }[] = [];
     const fsOps: { op: string; path: string; newName?: string }[] = [];
+    /** 新建出来的条目（让后续列表能看到，便于断言「新建后立即重命名」）。 */
+    const createdEntries: { name: string; path: string; is_dir: boolean }[] = [];
     const sshOps: { op: string; path: string; newName?: string; destDir?: string }[] = [];
     const downloads: Record<string, unknown>[] = [];
     const revealed: string[] = [];
@@ -760,6 +762,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
               entries: [
                 { name: 'Documents', path: `${base}/Documents`, is_dir: true },
                 { name: 'app.log', path: `${base}/app.log`, is_dir: false },
+                ...createdEntries,
               ],
             };
           }
@@ -857,15 +860,34 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
               { name: 'Documents', path: '/home/e2e/Documents', is_dir: true },
               { name: 'Downloads', path: '/home/e2e/Downloads', is_dir: true },
               { name: 'notes.txt', path: '/home/e2e/notes.txt', is_dir: false },
+              // 新建出来的条目出现在列表里（模拟真实文件系统）
+              ...createdEntries,
             ];
           case 'fs_disks':
             return [
               { name: 'e2e-root', path: '/', total_bytes: 500 * 1024 ** 3, free_bytes: 250 * 1024 ** 3 },
               { name: 'Backup', path: '/Volumes/Backup', total_bytes: 2 * 1024 ** 4, free_bytes: 1.5 * 1024 ** 4 },
             ];
-          case 'fs_rename':
+          case 'fs_rename': {
             fsOps.push({ op: 'rename', path: args.oldPath as string, newName: args.newName as string });
-            return undefined;
+            const oldPath = args.oldPath as string;
+            const parent = oldPath.slice(0, oldPath.lastIndexOf('/'));
+            const name = args.newName as string;
+            // 同名避让（真实实现在后端）：目标已被占用时返回带序号的路径
+            const taken = ['Documents', 'Downloads', 'notes.txt'].includes(name)
+              || createdEntries.some((item) => item.path === `${parent}/${name}`);
+            return `${parent}/${taken ? `${name.replace(/(\.[^.]*)?$/, ' (1)$1')}` : name}`;
+          }
+          case 'fs_create_file':
+          case 'fs_create_dir': {
+            const dir = String(args.dir ?? '');
+            const name = args.name as string;
+            const path = `${dir}/${name}`;
+            fsOps.push({ op: cmd === 'fs_create_file' ? 'create-file' : 'create-dir', path });
+            const created = { name, path, is_dir: cmd === 'fs_create_dir' };
+            createdEntries.push(created);
+            return path;
+          }
           case 'fs_copy':
           case 'fs_move': {
             const op = cmd === 'fs_copy' ? 'copy' : 'move';
@@ -891,12 +913,36 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             for (const path of args.paths as string[]) fsOps.push({ op: 'purge', path });
             return undefined;
           }
-          case 'ssh_rename':
+          case 'ssh_rename': {
             sshOps.push({ op: 'rename', path: args.path as string, newName: args.newName as string });
-            return undefined;
-          case 'ssh_move':
+            const oldPath = args.path as string;
+            const parent = oldPath.slice(0, oldPath.lastIndexOf('/'));
+            const name = args.newName as string;
+            const taken = ['Documents', 'app.log'].includes(name)
+              || createdEntries.some((item) => item.path === `${parent}/${name}`);
+            return `${parent}/${taken ? `${name.replace(/(\.[^.]*)?$/, ' (1)$1')}` : name}`;
+          }
+          case 'ssh_create_file':
+          case 'ssh_create_dir': {
+            const dir = String(args.dir ?? '');
+            const name = args.name as string;
+            const path = `${dir}/${name}`;
+            sshOps.push({ op: cmd === 'ssh_create_file' ? 'create-file' : 'create-dir', path });
+            const created = { name, path, is_dir: cmd === 'ssh_create_dir' };
+            createdEntries.push(created);
+            return path;
+          }
+          case 'ssh_move': {
             sshOps.push({ op: 'move', path: args.path as string, destDir: args.destDir as string });
-            return undefined;
+            const source = args.path as string;
+            const name = source.split('/').pop();
+            const dir = String(args.destDir);
+            const candidate = `${dir === '/' ? '' : dir}/${name}`;
+            // 目标已有同名项：返回带序号的真实目标路径（真实实现在后端）
+            const taken = [...createdEntries, { name: 'app.log', path: `${dir}/app.log`, is_dir: false }]
+              .some((item) => item.path === candidate);
+            return taken ? candidate.replace(/(\.[^.]*)?$/, ' (1)$1') : candidate;
+          }
           case 'ssh_copy': {
             const paths = args.paths as string[];
             const destDir = args.destDir as string;
