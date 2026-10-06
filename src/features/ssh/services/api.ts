@@ -170,7 +170,8 @@ export function sshSweepUndo(id: string): Promise<void> {
   return invoke('ssh_sweep_undo', { id });
 }
 
-export function sshUpload(id: string, remoteDir: string, localPath: string): Promise<void> {
+/** Upload a local path into a remote directory; resolves with the final remote path. */
+export function sshUpload(id: string, remoteDir: string, localPath: string): Promise<string> {
   return invoke('ssh_upload', { id, remoteDir, localPath });
 }
 

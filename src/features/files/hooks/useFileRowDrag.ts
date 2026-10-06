@@ -83,9 +83,14 @@ export function useFileRowDrag({ onDrop, prepareNativeDrag, onNativeDragEnd }: F
         useFileDragStore.getState().end();
         clean();
         void (async () => {
-          const payload = prepareNativeDrag
-            ? await prepareNativeDrag(items)
-            : { paths: items.map((item) => item.path), mode: 'move' as const };
+          if (!prepareNativeDrag) {
+            // Local panel: hand the paths to the OS right now, while the pointer button is still
+            // down. Windows only starts a drop session inside the press, so awaiting anything
+            // here would silently drop the drag.
+            beginNativeDrag({ paths: items.map((item) => item.path), mode: 'move' as const }, (result) => onNativeDragEnd?.(result, items));
+            return;
+          }
+          const payload = await prepareNativeDrag(items);
           if (payload) beginNativeDrag(payload, (result) => onNativeDragEnd?.(result, items));
         })();
         return;
