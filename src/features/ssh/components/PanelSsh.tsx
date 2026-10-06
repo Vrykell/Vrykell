@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { iconSizes, Pencil, Plus, Search, Server  } from '@ui/icons';
+import { iconSizes, Pencil, Plus, Search } from '@ui/icons';
+import { SshIcon } from '@ui/shellIcons';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { ensureSshLoaded, useSshStore } from '@features/ssh';
 import { useSessionStore } from '@features/workspace';
@@ -141,7 +142,7 @@ export default function PanelSsh() {
             <ListReorderPlaceholder listId={LIST_ID} itemId={c.id} />
             <SidebarItem
               active={c.id === selectedId}
-              icon={<Server size={iconSizes.row} />}
+              icon={<SshIcon size={iconSizes.row} />}
               title={c.name}
               tooltip={`${c.user ? `${c.user}@` : ''}${c.host}:${c.port ?? 22}；双击连接，右键编辑 / 删除，拖拽排序`}
               testId={`ssh-row-${c.id}`}
@@ -175,7 +176,7 @@ export default function PanelSsh() {
       </div>
 
       <ListReorderPreview>
-        {() => <Server size={iconSizes.row} style={{ color: 'var(--accent)' }} />}
+        {() => <SshIcon size={iconSizes.row} />}
       </ListReorderPreview>
 
       {/* 右键菜单：编辑 / 删除 */}

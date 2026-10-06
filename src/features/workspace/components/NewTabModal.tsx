@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { Search, Server } from '@ui/icons';
-import { shellIconFor } from '@ui/shellIcons';
+import { Search } from '@ui/icons';
+import { SshIcon, shellIconFor } from '@ui/shellIcons';
 import { getAvailableShells, type ShellOption } from '@platform/shells';
 import {
   buildNewTabOptions,
@@ -180,7 +180,7 @@ function OptionRow({
   onSelect: () => void;
   onCreate: () => void;
 }) {
-  const Icon = opt.kind === 'ssh' ? Server : shellIconFor(opt.shellType);
+  const Icon = opt.kind === 'ssh' ? SshIcon : shellIconFor(opt.shellType);
   return (
     <button
       onClick={onCreate}

@@ -77,6 +77,15 @@ const zh: Record<string, string> = {
   'files.upload.done': '已上传，可在更多菜单回退',
   'files.upload.doneCount': '已上传 {{n}} 项，可在更多菜单回退',
   'files.dragOut.cancelled': '已取消拖出，已清理临时下载副本',
+
+  // ── 打开方式设置 ──
+  'settings.openMode.title': '各 Shell 打开模式',
+  'settings.openMode.description': '经典模式输出直进终端；块模式生成命令块。',
+  'settings.openMode.classic': '经典模式',
+  'settings.openMode.block': '块模式',
+  'settings.openMode.cmdHint': '使用经典模式',
+  'settings.openMode.aria': '{{shell}} 打开模式',
+  'settings.openMode.sshAria': 'SSH 打开模式',
 };
 
 export default zh;
