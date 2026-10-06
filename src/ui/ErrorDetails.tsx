@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type MouseEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
 import { Check, ChevronRight, Copy } from '@ui/icons';
 import { writeClipboardText } from '@platform/clipboard';
 
@@ -40,12 +40,22 @@ export default function ErrorDetails({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [copied, setCopied] = useState(false);
+  const copyTimer = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
+  }, []);
 
   const handleCopy = () => {
     void writeClipboardText(text)
       .then(() => {
         setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
+        // Restart the confirmation window so rapid clicks keep the checkmark.
+        if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
+        copyTimer.current = window.setTimeout(() => {
+          copyTimer.current = null;
+          setCopied(false);
+        }, 1500);
       })
       .catch(() => {
         // The text stays selectable when the clipboard is unavailable.
@@ -71,7 +81,7 @@ export default function ErrorDetails({
           onClick={() => setOpen((value) => !value)}
           {...subtleHover}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
+            display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 0,
             fontFamily: 'var(--font-ui)', fontSize: 'calc(11px * var(--ui-font-scale))',
             padding: '3px 6px', border: 'none', borderRadius: 4,
             background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
@@ -81,7 +91,7 @@ export default function ErrorDetails({
             transition: 'transform 0.12s ease',
             transform: open ? 'rotate(90deg)' : 'none',
           }} />
-          <span>{title}</span>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
         </button>
         <button
           data-subtle

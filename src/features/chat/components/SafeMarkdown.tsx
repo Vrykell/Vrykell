@@ -52,6 +52,7 @@ export default class SafeMarkdown extends Component<{ content: string }, { error
           text={this.props.content}
           defaultOpen
           preStyle={{
+            fontFamily: 'var(--font-mono)',
             fontSize: 'calc(12px * var(--ui-font-scale))',
             color: 'var(--text-secondary)',
           }}
