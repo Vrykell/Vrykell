@@ -480,30 +480,82 @@ pub async fn ssh_download(
     Ok(local_path)
 }
 
-/// 重命名远程文件/目录。
-fn ssh_rename_sync(conn: &SshConnection, path: &str, new_name: &str) -> Result<(), String> {
+/// 远端目录里为 name 找可用路径：同名时按 `name (1)`、`name (2)`… 递增（保留扩展名）。
+fn unique_remote_path(sftp: &Sftp, dir: &Path, name: &str) -> std::path::PathBuf {
+    let stem = Path::new(name)
+        .file_stem()
+        .map(|value| value.to_string_lossy().to_string())
+        .unwrap_or_else(|| name.to_string());
+    let extension = Path::new(name).extension().map(|value| value.to_string_lossy().to_string());
+    for index in 1..10_000u32 {
+        let candidate = match &extension {
+            Some(ext) => format!("{stem} ({index}).{ext}"),
+            None => format!("{stem} ({index})"),
+        };
+        let path = dir.join(candidate);
+        if sftp.stat(&path).is_err() {
+            return path;
+        }
+    }
+    dir.join(format!("{stem} ({})", uuid::Uuid::new_v4()))
+}
+
+/// 重命名远程文件/目录；目标名被占用时自动加序号，返回最终路径。
+fn ssh_rename_sync(conn: &SshConnection, path: &str, new_name: &str) -> Result<String, String> {
     let sess = connect(conn)?;
     let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
     let parent = Path::new(path).parent().ok_or("无法定位父目录")?;
-    let dst = parent.join(new_name);
+    let candidate = parent.join(new_name);
+    let dst = if candidate != Path::new(path) && sftp.stat(&candidate).is_ok() {
+        unique_remote_path(&sftp, parent, new_name)
+    } else {
+        candidate
+    };
     sftp.rename(Path::new(path), &dst, None)
-        .map_err(|e| format!("重命名失败：{e}"))
+        .map_err(|e| format!("重命名失败：{e}"))?;
+    Ok(dst.to_string_lossy().to_string())
 }
 
-/// 移动远程文件/目录到目标目录（SFTP rename 支持跨目录；目标同名或原地移动直接拒绝）。
-fn ssh_move_sync(conn: &SshConnection, path: &str, dest_dir: &str) -> Result<(), String> {
-    let name = Path::new(path).file_name().ok_or("无法定位文件名")?;
-    let dst = Path::new(dest_dir).join(name);
-    if dst == Path::new(path) {
-        return Err("已在目标目录中".into());
-    }
+/// 移动远程文件/目录到目标目录（SFTP rename 支持跨目录；原地移动拒绝，重名自动加序号）。
+fn ssh_move_sync(conn: &SshConnection, path: &str, dest_dir: &str) -> Result<String, String> {
+    let name = Path::new(path).file_name().ok_or("无法定位文件名")?.to_string_lossy().to_string();
     let sess = connect(conn)?;
     let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
-    if sftp.stat(&dst).is_ok() {
-        return Err(format!("目标已存在同名项「{}」", name.to_string_lossy()));
+    let dir = Path::new(dest_dir);
+    let candidate = dir.join(&name);
+    if candidate == Path::new(path) {
+        return Err("已在目标目录中".into());
     }
+    let dst = if sftp.stat(&candidate).is_ok() {
+        unique_remote_path(&sftp, dir, &name)
+    } else {
+        candidate
+    };
     sftp.rename(Path::new(path), &dst, None)
-        .map_err(|e| format!("移动失败：{e}"))
+        .map_err(|e| format!("移动失败：{e}"))?;
+    Ok(dst.to_string_lossy().to_string())
+}
+
+/// 新建远程文件（空文件）或目录；同名时自动加序号，返回最终路径。
+fn ssh_create_sync(conn: &SshConnection, dir: &str, name: &str, is_dir: bool) -> Result<String, String> {
+    let sess = connect(conn)?;
+    let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
+    let parent = Path::new(dir);
+    if sftp.stat(parent).is_err() {
+        return Err(format!("目标目录不可用：{dir}"));
+    }
+    let path = if sftp.stat(&parent.join(name)).is_ok() {
+        // 同名时按 name (1) 递增避让（unique_remote_path 只在重名时调用）
+        unique_remote_path(&sftp, parent, name)
+    } else {
+        parent.join(name)
+    };
+    if is_dir {
+        sftp.mkdir(&path, 0o755).map_err(|e| format!("新建文件夹失败：{e}"))?;
+    } else {
+        sftp.create(&path).map_err(|e| format!("新建文件失败：{e}"))?;
+    }
+    Ok(path.to_string_lossy().to_string())
 }
 
 // ── 远程面板：复制 / 可回退删除（远端暂存） ──
@@ -549,9 +601,9 @@ fn remove_remote_recursive(sftp: &Sftp, target: &Path) -> Result<(), String> {
     }
 }
 
-/// 远端复制单条（`cp -R`，参数单引号转义；目标必须是已存在的目录）。
-fn remote_copy_one(sess: &Session, from: &str, dest_dir: &str) -> Result<(), String> {
-    let command = format!("cp -R -- {} {}", shell_quote_remote(from), shell_quote_remote(dest_dir));
+/// 远端复制单条到指定目标路径（`cp -R`，参数单引号转义；目标必须尚不存在）。
+fn remote_copy_one(sess: &Session, from: &str, to: &str) -> Result<(), String> {
+    let command = format!("cp -R -- {} {}", shell_quote_remote(from), shell_quote_remote(to));
     let mut channel = sess.channel_session().map_err(|e| format!("打开远端通道失败：{e}"))?;
     channel.exec(&command).map_err(|e| format!("执行复制失败：{e}"))?;
     let mut stderr = String::new();
@@ -581,25 +633,23 @@ fn ssh_copy_sync(conn: &SshConnection, paths: Vec<String>, dest_dir: String) -> 
     let mut errors = Vec::new();
     for path in paths {
         let src = Path::new(&path);
-        let Some(name) = src.file_name() else {
+        let Some(name) = src.file_name().map(|value| value.to_string_lossy().to_string()) else {
             errors.push(format!("无法定位 {path} 的文件名"));
             continue;
         };
-        let target = dest.join(name);
-        if target == src {
-            errors.push(format!("「{}」已在目标目录中", name.to_string_lossy()));
-            continue;
-        }
         let src_is_dir = sftp.stat(src).map(|s| s.is_dir()).unwrap_or(false);
         if src_is_dir && dest.starts_with(src) {
-            errors.push(format!("不能把「{}」放入它自己内部", name.to_string_lossy()));
+            errors.push(format!("不能把「{name}」放入它自己内部"));
             continue;
         }
-        if sftp.stat(&target).is_ok() {
-            errors.push(format!("目标已存在同名项「{}」", name.to_string_lossy()));
-            continue;
-        }
-        match remote_copy_one(&sess, &path, &dest_dir) {
+        let direct = dest.join(&name);
+        // 目标重名（含复制到自己所在目录）→ 自动加序号，不产生重名文件
+        let target = if direct == src || sftp.stat(&direct).is_ok() {
+            unique_remote_path(&sftp, dest, &name)
+        } else {
+            direct
+        };
+        match remote_copy_one(&sess, &path, &target.to_string_lossy()) {
             Ok(()) => completed.push(FileOpPair {
                 from: path,
                 to: target.to_string_lossy().to_string(),
@@ -798,7 +848,13 @@ fn ssh_upload_sync(conn: &SshConnection, remote_dir: &str, local_path: &str) -> 
     } else {
         remote_dir.to_string()
     };
-    let remote_path = join_path(&base, &name);
+    // 远程已有同名项时自动加序号，上传不静默覆盖
+    let direct = join_path(&base, &name);
+    let remote_path = if sftp.stat(Path::new(&direct)).is_ok() {
+        unique_remote_path(&sftp, Path::new(&base), &name).to_string_lossy().to_string()
+    } else {
+        direct
+    };
 
     let meta = std::fs::metadata(local_path).map_err(|e| format!("读取本地文件信息失败：{e}"))?;
     if meta.is_dir() {
@@ -821,7 +877,7 @@ pub async fn ssh_move(
     id: String,
     path: String,
     dest_dir: String,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let conn = {
         let db = state.0.lock().map_err(|e| e.to_string())?;
         db.get_ssh_connection(&id)?
@@ -837,12 +893,44 @@ pub async fn ssh_rename(
     id: String,
     path: String,
     new_name: String,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let conn = {
         let db = state.0.lock().map_err(|e| e.to_string())?;
         db.get_ssh_connection(&id)?
     };
     tauri::async_runtime::spawn_blocking(move || ssh_rename_sync(&conn, &path, &new_name))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn ssh_create_file(
+    state: State<'_, HistoryState>,
+    id: String,
+    dir: String,
+    name: String,
+) -> Result<String, String> {
+    let conn = {
+        let db = state.0.lock().map_err(|e| e.to_string())?;
+        db.get_ssh_connection(&id)?
+    };
+    tauri::async_runtime::spawn_blocking(move || ssh_create_sync(&conn, &dir, &name, false))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn ssh_create_dir(
+    state: State<'_, HistoryState>,
+    id: String,
+    dir: String,
+    name: String,
+) -> Result<String, String> {
+    let conn = {
+        let db = state.0.lock().map_err(|e| e.to_string())?;
+        db.get_ssh_connection(&id)?
+    };
+    tauri::async_runtime::spawn_blocking(move || ssh_create_sync(&conn, &dir, &name, true))
         .await
         .map_err(|e| e.to_string())?
 }

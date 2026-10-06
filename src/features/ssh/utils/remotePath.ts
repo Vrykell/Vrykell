@@ -42,6 +42,12 @@ export function parentOfRemote(p: string): string | null {
   return parent === p ? null : parent;
 }
 
+/** POSIX 路径拼接（目录 + 名称）。 */
+export function joinRemote(dir: string, name: string): string {
+  const base = normalizeRemotePath(dir);
+  return base.endsWith('/') ? `${base}${name}` : `${base}/${name}`;
+}
+
 /** 当前活跃标签里与指定连接匹配的 SSH pane id（优先聚焦 pane）。 */
 export function sshPaneIdFor(connId: string): string | null {
   const ws = useSessionStore.getState();

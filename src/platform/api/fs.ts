@@ -27,8 +27,19 @@ export function fsHome(): Promise<string> {
   return invoke<string>('fs_home').then((home) => normPath(home));
 }
 
-export function fsRename(oldPath: string, newName: string): Promise<void> {
-  return invoke('fs_rename', { oldPath: normPath(oldPath), newName });
+/** 重命名：目标名被占用时后端自动加序号，返回最终路径。 */
+export function fsRename(oldPath: string, newName: string): Promise<string> {
+  return invoke<string>('fs_rename', { oldPath: normPath(oldPath), newName }).then(normPath);
+}
+
+/** 新建空文件（同名自动加序号），返回最终路径。 */
+export function fsCreateFile(dir: string, name: string): Promise<string> {
+  return invoke<string>('fs_create_file', { dir: normPath(dir), name }).then(normPath);
+}
+
+/** 新建文件夹（同名自动加序号），返回最终路径。 */
+export function fsCreateDir(dir: string, name: string): Promise<string> {
+  return invoke<string>('fs_create_dir', { dir: normPath(dir), name }).then(normPath);
 }
 
 /** 完成的一条 from→to 对（用于记录文件操作回退）。 */

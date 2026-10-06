@@ -5,7 +5,7 @@ import { describe, it, expect, vi } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 import {
-  fsList, fsDisks, fsHome, fsRename, fsCopy, fsMove, fsStageDelete, fsRestoreStaged, fsPurgeStaged, fileOpenWith,
+  fsList, fsDisks, fsHome, fsRename, fsCreateFile, fsCreateDir, fsCopy, fsMove, fsStageDelete, fsRestoreStaged, fsPurgeStaged, fileOpenWith,
 } from '@platform/api/fs';
 
 describe('api/fs 封装', () => {
@@ -22,8 +22,15 @@ describe('api/fs 封装', () => {
     invokeMock.mockResolvedValueOnce('/home/u');
     await fsHome();
     expect(invokeMock).toHaveBeenLastCalledWith('fs_home');
+    invokeMock.mockResolvedValueOnce('/a/b');
     await fsRename('/a', 'b');
     expect(invokeMock).toHaveBeenLastCalledWith('fs_rename', { oldPath: '/a', newName: 'b' });
+    invokeMock.mockResolvedValueOnce('/a/Untitled');
+    await fsCreateFile('/a', 'Untitled');
+    expect(invokeMock).toHaveBeenLastCalledWith('fs_create_file', { dir: '/a', name: 'Untitled' });
+    invokeMock.mockResolvedValueOnce('/a/NewFolder');
+    await fsCreateDir('/a', 'NewFolder');
+    expect(invokeMock).toHaveBeenLastCalledWith('fs_create_dir', { dir: '/a', name: 'NewFolder' });
     await fileOpenWith('/a.txt');
     expect(invokeMock).toHaveBeenLastCalledWith('file_open_with', { path: '/a.txt' });
   });
@@ -45,8 +52,11 @@ describe('api/fs 封装', () => {
     invokeMock.mockResolvedValueOnce('C:\\Users\\37863');
     await expect(fsHome()).resolves.toBe('C:/Users/37863');
 
-    await fsRename('C:\\Users\\37863\\old.txt', 'new.txt');
+    invokeMock.mockResolvedValueOnce('C:\\Users\\37863\\new.txt');
+    await expect(fsRename('C:\\Users\\37863\\old.txt', 'new.txt')).resolves.toBe('C:/Users/37863/new.txt');
     expect(invokeMock).toHaveBeenLastCalledWith('fs_rename', { oldPath: 'C:/Users/37863/old.txt', newName: 'new.txt' });
+    invokeMock.mockResolvedValueOnce('C:\\Users\\37863\\Untitled');
+    await expect(fsCreateFile('C:\\Users\\37863', 'Untitled')).resolves.toBe('C:/Users/37863/Untitled');
     await fileOpenWith('C:\\Users\\37863\\old.txt');
     expect(invokeMock).toHaveBeenLastCalledWith('file_open_with', { path: 'C:/Users/37863/old.txt' });
   });
