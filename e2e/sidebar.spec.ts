@@ -357,6 +357,30 @@ test.describe('文件面板', () => {
     expect(await fsOps(page)).toContainEqual({ op: 'rename', path: '/home/e2e/notes (1).txt', newName: 'Untitled' });
   });
 
+  test('新建与复制粘贴都能回退（回退新建 / 回退粘贴）', async ({ page }) => {
+    const tree = page.getByTestId('local-file-tree');
+    const box = (await tree.boundingBox())!;
+    // 新建文件 → 更多菜单出现「回退新建」
+    await page.mouse.click(box.x + 40, box.y + box.height - 12, { button: 'right' });
+    await page.getByRole('button', { name: '新建文件', exact: true }).click();
+    await page.locator('[data-testid="rename-input"]').press('Escape');
+    await page.getByTestId('local-more-btn').click();
+    await page.getByRole('button', { name: /回退新建/ }).click();
+    await expect(page.getByText('已回退新建')).toBeVisible();
+    expect(await fsOps(page)).toContainEqual({ op: 'delete', path: '/home/e2e/project/Untitled' });
+
+    // 复制同名文件到当前目录 → 回退粘贴移除复制出来的那一份
+    await page.getByText('notes.txt').first().click({ button: 'right' });
+    await page.getByRole('button', { name: '复制', exact: true }).click();
+    await page.mouse.click(box.x + 40, box.y + box.height - 12, { button: 'right' });
+    await page.getByRole('button', { name: '粘贴', exact: true }).click();
+    await expect(page.getByText('已复制 1 项（同名已自动加序号）')).toBeVisible();
+    await page.getByTestId('local-more-btn').click();
+    await page.getByRole('button', { name: /回退粘贴/ }).click();
+    await expect(page.getByText('已回退粘贴')).toBeVisible();
+    expect(await fsOps(page)).toContainEqual({ op: 'delete', path: '/home/e2e/project/notes (1).txt' });
+  });
+
   test('右键文件夹新建文件：落在文件夹内、立即重命名，提交后子列表可见', async ({ page }) => {
     await page.getByText('Documents').first().click({ button: 'right' });
     await page.getByRole('button', { name: '新建文件', exact: true }).click();

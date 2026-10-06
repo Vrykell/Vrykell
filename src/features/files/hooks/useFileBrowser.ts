@@ -20,7 +20,8 @@ export interface FileClipboard {
 
 /** 最近一次文件操作的回退记录（历史栈，栈顶是最近一步）。 */
 export interface FileUndo {
-  kind: 'rename' | 'move' | 'delete';
+  /** rename/move/delete 走「反向操作」；remove 走「把新增的条目移入暂存」（新建、粘贴复制）。 */
+  kind: 'rename' | 'move' | 'delete' | 'remove';
   label: string;
   pairs: FileOpPair[];
 }
@@ -444,6 +445,12 @@ export function useFileBrowser({
         failed = outcome.errors.length;
         firstError = outcome.errors[0] ?? '';
         restoredPaths.push(...outcome.completed.map((pair) => pair.from));
+      } else if (current.kind === 'remove') {
+        // 新建 / 复制粘贴的回退 = 把新增的条目移入暂存
+        const outcome = await ops.stageDelete(current.pairs.map((pair) => pair.to));
+        done = outcome.completed.length;
+        failed = outcome.errors.length;
+        firstError = outcome.errors[0] ?? '';
       } else if (current.kind === 'rename') {
         for (const pair of current.pairs) {
           try {
@@ -477,7 +484,7 @@ export function useFileBrowser({
     terminalDebug('files-op', { op: `undo-${current.kind}`, itemCount: current.pairs.length, doneCount: done, errorCount: failed });
     popUndo();
 
-    const label = current.kind === 'delete' ? '已回退删除' : current.kind === 'rename' ? '已回退重命名' : '已回退移动';
+    const label = `已回退${current.label}`;
     if (done > 0) {
       const count = done > 1 ? ` ${done} 项` : '';
       toast(
@@ -507,6 +514,7 @@ export function useFileBrowser({
       terminalDebug('files-op', { op: mode, itemCount: sources.length, doneCount: outcome.completed.length, errorCount: outcome.errors.length });
       if (outcome.completed.length > 0) {
         if (mode === 'move') pushUndo({ kind: 'move', label: '移动', pairs: outcome.completed });
+        else pushUndo({ kind: 'remove', label: '粘贴', pairs: outcome.completed.map((pair) => ({ from: pair.to, to: pair.to })) });
         // 后端为重名自动加了序号时说明一下，避免用户以为名字被改了
         const renamed = outcome.completed.some((pair) => pathName(pair.to) !== pathName(pair.from));
         const suffixHint = renamed ? '（同名已自动加序号）' : '';
@@ -583,6 +591,8 @@ export function useFileBrowser({
         : await ops.createDir(dir, DEFAULT_DIR_NAME);
       terminalDebug('files-op', { op: kind === 'file' ? 'create-file' : 'create-dir', doneCount: 1 });
       const entry: FsEntry = { name: pathName(created), path: created, is_dir: kind === 'dir' };
+      // 新建可回退：更多菜单的「回退新建」把刚建出来的条目移入暂存
+      pushUndo({ kind: 'remove', label: '新建', pairs: [{ from: created, to: created }] });
       if (targetEntry?.is_dir) {
         // 落在目录里：确保该目录已展开并刷新子列表，新条目才可见
         setExpandedSet((current) => new Set([...current, targetEntry.path]));
@@ -598,7 +608,7 @@ export function useFileBrowser({
     } catch (error) {
       toast(String((error as Error)?.message ?? error), 'error');
     }
-  }, [load, loadChildren, ops, path, replaceSelection, revealPath, toast]);
+  }, [load, loadChildren, ops, path, pushUndo, replaceSelection, revealPath, toast]);
 
   /**
    * 拖出窗口成功后的收尾：系统按「移动」接收了条目，源头（本地 / 远端）同步移除并进回退历史。
