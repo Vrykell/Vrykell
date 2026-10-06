@@ -1,9 +1,10 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ArrowUp, ChevronRight, Folder, FolderArrowRight, MoreHorizontal, iconSizes } from '@ui/icons';
+import { ArrowUp, ChevronRight, FolderArrowRight, MoreHorizontal, iconSizes } from '@ui/icons';
 import { IconBtn } from '@ui/UiBtn';
 import type { DiskEntry, FsEntry } from '@platform/api/types';
 import { flattenVisible, type VisibleRow } from '@features/files/utils/fileTree';
+import { fileIcon } from '@features/files/utils/fileIcon';
 import { compactPathSegments } from '@features/files/utils/breadcrumb';
 import { buildFileMenuItems, type FileMenuHandlers } from '@features/files/utils/fileMenu';
 import { filePanelConfigFor } from '@features/files/model/filePanelConfig';
@@ -474,17 +475,6 @@ export default function FilePanel({
                     {childErrors[row.entry.path]}
                   </ErrorBox>
                 )}
-                {row.expanded && childCache[row.entry.path]?.length === 0 && (
-                  <div
-                    data-testid={config.ids.empty}
-                    style={{
-                      padding: `4px 10px 4px ${4 + (row.depth + 1) * 14}px`,
-                      color: 'var(--text-muted)', fontSize: 'var(--fs-label)',
-                    }}
-                  >
-                    空文件夹
-                  </div>
-                )}
               </Fragment>
             ))}
             {rows.length === 0 && settled && (
@@ -637,6 +627,8 @@ function FileRow({
   };
 
   const restingBackground = selected ? 'var(--selection-bg)' : 'transparent';
+  /** Default row icon follows the entry kind (dirs vs file type) unless the panel overrides it. */
+  const RowIcon = fileIcon(entry.name, entry.is_dir);
 
   return (
     <div
@@ -686,7 +678,7 @@ function FileRow({
         <ChevronRight size={iconSizes.compact} />
       </span>
       <span style={{ width: 20, flexShrink: 0, display: 'inline-flex', justifyContent: 'center' }}>
-        {icon ?? <Folder size={iconSizes.row} fill={entry.is_dir && highlighted ? 'currentColor' : 'none'} />}
+        {icon ?? <RowIcon size={iconSizes.row} fill={entry.is_dir && highlighted ? 'currentColor' : 'none'} />}
       </span>
       {renaming ? (
         <input

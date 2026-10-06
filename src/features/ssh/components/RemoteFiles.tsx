@@ -12,6 +12,7 @@ import { useTerminalStore, termInstances } from '@features/terminal';
 import { useDockStore, useSessionStore } from '@features/workspace';
 import { ptyWrite } from '@platform/pty';
 import { useToastStore } from '@ui/Toast';
+import ErrorBox from '@ui/ErrorBox';
 
 /**
  * RemoteFiles — SSH 文件面板。
@@ -80,10 +81,12 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
       renderError={(error, retry) => {
         const failure = describeFileServiceFailure(error);
         return (
-          <div role={failure.kind === 'error' ? 'alert' : 'status'} style={{ padding: 16, fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-            <strong style={{ color: 'var(--text-primary)' }}>{failure.title}</strong>
-            <p>{failure.message}</p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <ErrorBox
+            tone={failure.kind === 'error' ? 'error' : 'info'}
+            title={failure.title}
+            details={error}
+            style={{ margin: 16, overflowWrap: 'anywhere' }}
+            actions={<>
               <button style={{ minHeight: 36 }} onClick={() => {
                 const dock = useDockStore.getState();
                 const side = dock.leftPanels.includes('files') ? 'left' : 'right';
@@ -91,11 +94,10 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
                 if (paneId) termInstances.get(paneId)?.focus();
               }}>继续使用终端</button>
               <button style={{ minHeight: 36 }} onClick={retry}>重试文件服务</button>
-            </div>
-            <details style={{ marginTop: 12, overflowWrap: 'anywhere', color: 'var(--text-muted)' }}>
-              <summary style={{ cursor: 'pointer' }}>技术详情</summary>{error}
-            </details>
-          </div>
+            </>}
+          >
+            {failure.message}
+          </ErrorBox>
         );
       }}
       handlers={{

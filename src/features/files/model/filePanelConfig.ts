@@ -32,7 +32,6 @@ export interface FilePanelConfig {
     row: (entry: FsEntry) => string;
     rowSelector: string;
     expander: string;
-    empty: string;
   };
   menus: {
     /** 右键文件夹行 */
@@ -72,7 +71,6 @@ const LOCAL_IDS: FilePanelConfig['ids'] = {
   row: () => 'file-row',
   rowSelector: '[data-file-row]',
   expander: 'file-row-expander',
-  empty: 'file-row-empty',
 };
 
 const SSH_IDS: FilePanelConfig['ids'] = {
@@ -85,7 +83,6 @@ const SSH_IDS: FilePanelConfig['ids'] = {
   row: (entry) => `remote-file-${entry.name}`,
   rowSelector: '[data-file-row]',
   expander: 'remote-row-expander',
-  empty: 'remote-row-empty',
 };
 
 /** 状态变量 → 面板配置：本地与 SSH 的唯一分歧点。 */

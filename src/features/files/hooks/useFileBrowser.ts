@@ -143,11 +143,18 @@ export function useFileBrowser({
     };
   }, [clearLoadingTimer]);
 
-  /** 记住目录（远端面板按连接持久化）。 */
+  /**
+   * Remember the current directory (the remote panel persists it per connection).
+   * The callback is held in a ref: callers pass inline arrows, and letting that
+   * identity into `load` would refetch the whole tree on every unrelated
+   * re-render, such as resizing the panel that hosts the tree.
+   */
+  const onPathChangeRef = useRef(onPathChange);
+  onPathChangeRef.current = onPathChange;
   const rememberPath = useCallback((next: string | null) => {
     setPath(next);
-    onPathChange?.(next);
-  }, [onPathChange]);
+    onPathChangeRef.current?.(next);
+  }, []);
 
   const load = useCallback((currentPath: string | null) => {
     const version = ++requestVersion.current;

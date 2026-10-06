@@ -57,7 +57,8 @@ test('目录加载失败显示错误，可重试并回退到上一个视图', as
   await page.goto('/');
   await page.locator('[data-dock-btn="files"]').click();
   await page.getByText('Denied', { exact: true }).dblclick();
-  await expect(page.getByRole('alert')).toContainText('无法读取目录');
+  // 统一面板保留后端原文（SSH 侧依赖原文分类失败原因），不再映射为固定文案
+  await expect(page.getByRole('alert')).toContainText('denied');
   await expect(page.getByText('空目录', { exact: true })).toHaveCount(0);
   await page.screenshot({ path: '.cache-usability.local/product-loop-proof.png' });
   await page.getByRole('button', { name: '重试', exact: true }).click();
