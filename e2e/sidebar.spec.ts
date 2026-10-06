@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, fsOps } from './tauri-mock';
+import { setupTauriMock, fsOps, ensureTabsOpen } from './tauri-mock';
 
 test.beforeEach(async ({ page }) => {
   await setupTauriMock(page);
@@ -78,6 +78,30 @@ test.describe('文件面板', () => {
     await tree.getByText('notes.txt').click();
     await expect(input).toHaveCount(0);
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/Documents');
+  });
+
+  test('更多菜单：只提供本地可用操作，可从当前文件夹新建标签页', async ({ page }) => {
+    const tree = page.getByTestId('local-file-tree');
+    await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
+
+    // 本地没有上传能力，更多菜单不出现上传项
+    await page.getByTestId('local-more-btn').click();
+    await expect(page.getByRole('button', { name: '上传文件' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '下载管理' })).toBeVisible();
+
+    // 从当前文件夹新建标签页（标题取目录名）
+    await page.getByRole('button', { name: '从当前文件夹新建标签页' }).click();
+    await ensureTabsOpen(page);
+    await expect(page.locator('[data-testid^="tab-row-"]', { hasText: 'project' })).toHaveCount(1);
+
+    // 切回文件面板；盘符视图没有「当前文件夹」，菜单里不出现不可用的新建标签页
+    await page.locator('[data-dock-btn="files"]').click();
+    await expect(tree).toBeVisible();
+    await page.getByText('此电脑').click();
+    await expect(page.getByTestId('disk-card-e2e-root')).toBeVisible({ timeout: 3000 });
+    await page.getByTestId('local-more-btn').click();
+    await expect(page.getByRole('button', { name: '从当前文件夹新建标签页' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '下载管理' })).toBeVisible();
   });
 
   test('此电脑视图：磁盘以小卡片展示（含容量），点击进入', async ({ page }) => {
