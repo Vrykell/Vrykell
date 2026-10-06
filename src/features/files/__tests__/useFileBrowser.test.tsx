@@ -129,7 +129,7 @@ describe('useFileBrowser（本地目标）', () => {
     await act(async () => { await result.current.pasteInto('C:/work/src'); });
     expect(fsMocks.fsCopy).toHaveBeenCalledWith(['C:/work/a.txt'], 'C:/work/src');
     // 复制粘贴同样可回退（回退粘贴 = 把复制出来的条目移入暂存）
-    expect(result.current.undo).toMatchObject({ kind: 'remove', label: '粘贴' });
+    expect(result.current.undo).toMatchObject({ kind: 'remove', labelKey: 'files.undo.paste' });
 
     act(() => result.current.cutSelection([entry('a.txt', 'C:/work/a.txt')]));
     await act(async () => { await result.current.pasteInto('C:/work/src'); });
@@ -286,7 +286,7 @@ describe('useFileBrowser（本地目标）', () => {
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
 
     await act(async () => { await result.current.createEntry('file', null); });
-    expect(result.current.undo).toMatchObject({ kind: 'remove', label: '新建' });
+    expect(result.current.undo).toMatchObject({ kind: 'remove', labelKey: 'files.undo.create' });
     expect(result.current.undo?.pairs).toEqual([{ from: 'C:/work/Untitled', to: 'C:/work/Untitled' }]);
 
     fsMocks.fsStageDelete.mockResolvedValue([{ from: 'C:/work/Untitled', to: 'C:/Users/test/.vrykell/undo/u-Untitled' }]);
@@ -302,7 +302,7 @@ describe('useFileBrowser（本地目标）', () => {
 
     act(() => result.current.copySelection([entry('a.txt', 'C:/work/a.txt')]));
     await act(async () => { await result.current.pasteInto('C:/work/src'); });
-    expect(result.current.undo).toMatchObject({ kind: 'remove', label: '粘贴' });
+    expect(result.current.undo).toMatchObject({ kind: 'remove', labelKey: 'files.undo.paste' });
 
     fsMocks.fsStageDelete.mockResolvedValue([{ from: 'C:/work/src/a (1).txt', to: 'C:/Users/test/.vrykell/undo/u-a' }]);
     await act(async () => { await result.current.runUndo(); });

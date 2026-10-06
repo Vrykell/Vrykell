@@ -451,7 +451,7 @@ export default function FilePanel({
       >
         {loadingHint ? (
           <div role="status" style={{ padding: 16, color: 'var(--text-muted)', fontSize: 'var(--fs-label)' }}>
-            {config.variant === 'ssh' ? '正在连接文件服务…' : path === null ? '正在扫描磁盘…' : '正在读取目录…'}
+            {config.variant === 'ssh' ? t('files.loading.ssh') : path === null ? t('files.loading.disks') : t('files.loading.directory')}
           </div>
         ) : error ? (
           renderError
@@ -489,7 +489,7 @@ export default function FilePanel({
                   onChevronClick={toggleExpand}
                 />
                 {row.expanded && childLoadingHint.has(row.entry.path) && (
-                  <div role="status" style={{ padding: `5px 10px 5px ${4 + (row.depth + 1) * 14}px`, color: 'var(--text-muted)' }}>正在读取目录…</div>
+                  <div role="status" style={{ padding: `5px 10px 5px ${4 + (row.depth + 1) * 14}px`, color: 'var(--text-muted)' }}>{t('files.loading.directory')}</div>
                 )}
                 {row.expanded && childErrors[row.entry.path] && (
                   // 与文件树行同缩进、同行高的普通行（不是告警卡片），右侧给一个重试按钮
@@ -541,7 +541,9 @@ export default function FilePanel({
           items={[
             // 回退入口只在确实操作过文件后出现；历史栈可连续回退
             ...(undo ? [{
-              label: `回退${undo.label}${undoCount > 1 ? `（共 ${undoCount} 步）` : ''}`,
+              label: undoCount > 1
+                ? t('files.undo.menuSteps', { label: t(undo.labelKey), n: undoCount })
+                : t('files.undo.menu', { label: t(undo.labelKey) }),
               onClick: () => void runUndo(),
             }] : []),
             ...buildFileMenuItems(config.menus.more, {

@@ -12,6 +12,7 @@ import { useTerminalStore, termInstances } from '@features/terminal';
 import { useDockStore, useSessionStore } from '@features/workspace';
 import { ptyWrite } from '@platform/pty';
 import { useToastStore } from '@ui/Toast';
+import { t } from '@i18n';
 import ErrorBox from '@ui/ErrorBox';
 
 /**
@@ -46,7 +47,7 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
   /** 上传（菜单与系统拖入共用）：逐个上传并汇总结果 */
   const uploadPaths = async (paths: string[], dir: string) => {
     if (!ops.upload) return;
-    toast(paths.length > 1 ? `开始上传 ${paths.length} 项…` : '正在上传…', 'info');
+    toast(paths.length > 1 ? t('files.upload.startCount', { n: paths.length }) : t('files.upload.start'), 'info');
     let succeeded = 0;
     for (const localPath of paths) {
       try {
@@ -56,7 +57,7 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
         toast(`${localPath}：${String((error as Error)?.message ?? error)}`, 'error');
       }
     }
-    if (succeeded > 0) toast(succeeded > 1 ? `已上传 ${succeeded} 项` : '已上传', 'success');
+    if (succeeded > 0) toast(succeeded > 1 ? t('files.upload.plainDoneCount', { n: succeeded }) : t('files.upload.plainDone'), 'success');
   };
 
   if (showDownloads) return <DownloadManager onBack={() => setShowDownloads(false)} />;

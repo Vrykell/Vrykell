@@ -7,6 +7,7 @@ import type { FileOpPair, FileOps, FileOpsTarget } from '@features/files/model/f
 import { useToastStore } from '@ui/Toast';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 import { writeClipboardFiles } from '@platform/clipboard';
+import { t, type I18nKey } from '@i18n';
 
 /** 右键菜单 / 重命名 / 删除确认的状态。 */
 export type FileConfirmState =
@@ -19,11 +20,12 @@ export interface FileClipboard {
   paths: string[];
 }
 
-/** 最近一次文件操作的回退记录（历史栈，栈顶是最近一步）。 */
+/** The latest undoable file operation (a history stack; the top is the most recent step). */
 export interface FileUndo {
-  /** rename/move/delete 走「反向操作」；remove 走「把新增的条目移入暂存」（新建、粘贴复制）。 */
+  /** rename/move/delete undo by reversing; remove stages the added entries (create and paste). */
   kind: 'rename' | 'move' | 'delete' | 'remove';
-  label: string;
+  /** i18n key of the operation name (`files.undo.*`). */
+  labelKey: I18nKey;
   pairs: FileOpPair[];
 }
 
@@ -340,7 +342,7 @@ export function useFileBrowser({
         return result.entries;
       })
       .catch((cause: unknown) => {
-        if (alive.current) setChildErrors((current) => ({ ...current, [entry.path]: '无法读取目录' }));
+        if (alive.current) setChildErrors((current) => ({ ...current, [entry.path]: t('files.error.readDir') }));
         terminalDebug('files-tree-load-error', { errorType: cause instanceof Error ? cause.name : typeof cause });
         return undefined;
       })
@@ -490,16 +492,16 @@ export function useFileBrowser({
     terminalDebug('files-op', { op: `undo-${current.kind}`, itemCount: current.pairs.length, doneCount: done, errorCount: failed });
     popUndo();
 
-    const label = `已回退${current.label}`;
+    const label = t('files.undo.result', { label: t(current.labelKey) });
     if (done > 0) {
-      const count = done > 1 ? ` ${done} 项` : '';
+      const count = done > 1 ? t('files.undo.countSuffix', { n: done }) : '';
       toast(
-        failed > 0 ? `${label}${count}，${failed} 项已不存在（已跳过）` : `${label}${count}`,
+        failed > 0 ? t('files.undo.skipped', { base: `${label}${count}`, n: failed }) : `${label}${count}`,
         failed > 0 ? 'info' : 'success',
       );
       replaceSelection(restoredPaths);
     } else if (failed > 0) {
-      toast(`无法回退：${firstError || '目标可能已在别处被移动或删除'}（该步已从历史移除）`, 'error');
+      toast(t('files.undo.failed', { reason: firstError || t('files.undo.reasonMissing') }), 'error');
     }
     // 回退同样会改动已展开目录里的内容：按涉及的路径刷新父目录与目标目录
     refreshAffected(current.pairs.flatMap((pair) => [pair.from, pair.to]));
@@ -519,8 +521,8 @@ export function useFileBrowser({
       const outcome = mode === 'copy' ? await ops.copy(sources, destDir) : await ops.move(sources, destDir);
       terminalDebug('files-op', { op: mode, itemCount: sources.length, doneCount: outcome.completed.length, errorCount: outcome.errors.length });
       if (outcome.completed.length > 0) {
-        if (mode === 'move') pushUndo({ kind: 'move', label: '移动', pairs: outcome.completed });
-        else pushUndo({ kind: 'remove', label: '粘贴', pairs: outcome.completed.map((pair) => ({ from: pair.to, to: pair.to })) });
+        if (mode === 'move') pushUndo({ kind: 'move', labelKey: 'files.undo.cut', pairs: outcome.completed });
+        else pushUndo({ kind: 'remove', labelKey: 'files.undo.paste', pairs: outcome.completed.map((pair) => ({ from: pair.to, to: pair.to })) });
         // 后端为重名自动加了序号时说明一下，避免用户以为名字被改了
         const renamed = outcome.completed.some((pair) => pathName(pair.to) !== pathName(pair.from));
         const suffixHint = renamed ? '（同名已自动加序号）' : '';
@@ -579,7 +581,7 @@ export function useFileBrowser({
     try {
       const finalPath = await ops.rename(entry.path, newName);
       terminalDebug('files-op', { op: 'rename', doneCount: 1, errorCount: 0 });
-      pushUndo({ kind: 'rename', label: '重命名', pairs: [{ from: entry.path, to: finalPath }] });
+      pushUndo({ kind: 'rename', labelKey: 'files.undo.rename', pairs: [{ from: entry.path, to: finalPath }] });
       toast('已重命名', 'success');
       replaceSelection([finalPath]);
       // 改名的条目可能位于已展开的子目录里：父目录缓存必须一起刷新，否则仍显示旧名字
@@ -603,7 +605,7 @@ export function useFileBrowser({
       terminalDebug('files-op', { op: kind === 'file' ? 'create-file' : 'create-dir', doneCount: 1 });
       const entry: FsEntry = { name: pathName(created), path: created, is_dir: kind === 'dir' };
       // 新建可回退：更多菜单的「回退新建」把刚建出来的条目移入暂存
-      pushUndo({ kind: 'remove', label: '新建', pairs: [{ from: created, to: created }] });
+      pushUndo({ kind: 'remove', labelKey: 'files.undo.create', pairs: [{ from: created, to: created }] });
       if (targetEntry?.is_dir) {
         // 落在目录里：确保该目录已展开并刷新子列表，新条目才可见
         setExpandedSet((current) => new Set([...current, targetEntry.path]));
@@ -631,7 +633,7 @@ export function useFileBrowser({
       const outcome = await ops.stageDelete(entries.map((entry) => entry.path));
       terminalDebug('files-op', { op: 'move-out', itemCount: entries.length, doneCount: outcome.completed.length, errorCount: outcome.errors.length });
       if (outcome.completed.length > 0) {
-        pushUndo({ kind: 'delete', label: '移出', pairs: outcome.completed });
+        pushUndo({ kind: 'delete', labelKey: 'files.undo.moveOut', pairs: outcome.completed });
         toast(
           outcome.completed.length > 1
             ? `已移动 ${outcome.completed.length} 项到系统，可在更多菜单回退`
@@ -654,7 +656,7 @@ export function useFileBrowser({
    */
   const uploadInto = useCallback(async (localPaths: string[], dir: string) => {
     if (!ops.upload || localPaths.length === 0) return;
-    toast(localPaths.length > 1 ? `开始上传 ${localPaths.length} 项…` : '正在上传…', 'info');
+    toast(localPaths.length > 1 ? t('files.upload.startCount', { n: localPaths.length }) : t('files.upload.start'), 'info');
     const created: FileOpPair[] = [];
     const failures: string[] = [];
     for (const localPath of localPaths) {
@@ -667,10 +669,10 @@ export function useFileBrowser({
       }
     }
     terminalDebug('files-op', { op: 'upload', itemCount: localPaths.length, doneCount: created.length, errorCount: failures.length });
-    if (created.length > 0) pushUndo({ kind: 'remove', label: '上传', pairs: created });
+    if (created.length > 0) pushUndo({ kind: 'remove', labelKey: 'files.undo.upload', pairs: created });
     if (failures.length > 0) toast(failures[0]!, 'error');
     if (created.length > 0) {
-      toast(created.length > 1 ? `已上传 ${created.length} 项，可在更多菜单回退` : '已上传，可在更多菜单回退', 'success');
+      toast(created.length > 1 ? t('files.upload.doneCount', { n: created.length }) : t('files.upload.done'), 'success');
       replaceSelection(created.map((pair) => pair.to));
     }
     refreshAffected([], dir);
@@ -683,7 +685,7 @@ export function useFileBrowser({
       terminalDebug('files-op', { op: 'delete', itemCount: list.length, doneCount: outcome.completed.length, errorCount: outcome.errors.length });
       if (outcome.errors.length > 0) toast(outcome.errors[0]!, 'error');
       if (outcome.completed.length > 0) {
-        pushUndo({ kind: 'delete', label: '删除', pairs: outcome.completed });
+        pushUndo({ kind: 'delete', labelKey: 'files.undo.delete', pairs: outcome.completed });
         toast(
           outcome.completed.length > 1
             ? `已删除 ${outcome.completed.length} 项，可在更多菜单回退`
