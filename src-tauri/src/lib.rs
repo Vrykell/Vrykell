@@ -36,6 +36,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_drag::init())
         .manage(terminal::pty::PtyState::default())
         .manage(history_state)
         .manage(agent::ai::AiConfig::load())

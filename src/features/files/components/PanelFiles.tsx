@@ -180,7 +180,7 @@ function LocalFiles() {
     setBlankMenu({ x: event.clientX, y: event.clientY });
   };
 
-  /** 拖动到目标目录：只做移动；不把文件夹放进自身子树，也不做同目录移动 */
+  /** 拖动到目标目录：只做移动；拖出窗口交给系统原生拖拽（结束后刷新面板） */
   const startRowDrag = useFileRowDrag((items, target) => {
     const paths = items.map((item) => item.path);
     const targetDir = target.dir;
@@ -188,7 +188,7 @@ function LocalFiles() {
     if (targetDir === path) return;
     if (paths.every((p) => parentOf(p) === targetDir)) return;
     void transferInto(paths, targetDir, 'move');
-  });
+  }, () => load(path));
   const dragTarget = useFileDragStore((state) => state.target);
   const dragItems = useFileDragStore((state) => state.items);
 
