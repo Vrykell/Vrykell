@@ -180,4 +180,68 @@ describe('useFileBrowser（本地目标）', () => {
     await act(async () => { await result.current.createEntry('file', file); });
     expect(fsMocks.fsCreateFile).toHaveBeenLastCalledWith('C:/work', 'Untitled');
   });
+
+  it('已展开子目录内重命名后刷新该目录缓存（不残留旧名字）', async () => {
+    const child = entry('a.txt', 'C:/work/src/a.txt');
+    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
+      dir === 'C:/work/src' ? [child] : [entry('src', 'C:/work/src', true)],
+    ));
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(1));
+    const folder = result.current.entries[0]!;
+    act(() => result.current.toggleExpand(folder));
+    await waitFor(() => expect(result.current.childCache['C:/work/src']).toHaveLength(1));
+
+    // 重命名后父目录重新读取：缓存里换成新名字，而不是继续显示 a.txt
+    fsMocks.fsRename.mockResolvedValue('C:/work/src/b.txt');
+    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
+      dir === 'C:/work/src' ? [entry('b.txt', 'C:/work/src/b.txt')] : [entry('src', 'C:/work/src', true)],
+    ));
+    act(() => result.current.requestRename(child, 'b.txt'));
+    await act(async () => { result.current.confirmAction(); });
+    await waitFor(() => expect(result.current.childCache['C:/work/src']?.[0]?.name).toBe('b.txt'));
+  });
+
+  it('已展开子目录内删除后刷新该目录缓存（不残留幽灵条目）', async () => {
+    const child = entry('a.txt', 'C:/work/src/a.txt');
+    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
+      dir === 'C:/work/src' ? [child] : [entry('src', 'C:/work/src', true)],
+    ));
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(1));
+    const folder = result.current.entries[0]!;
+    act(() => result.current.toggleExpand(folder));
+    await waitFor(() => expect(result.current.childCache['C:/work/src']).toHaveLength(1));
+
+    fsMocks.fsStageDelete.mockResolvedValue([{ from: child.path, to: 'C:/Users/test/.vrykell/undo/u-a.txt' }]);
+    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
+      dir === 'C:/work/src' ? [] : [entry('src', 'C:/work/src', true)],
+    ));
+    act(() => result.current.confirmDelete([child]));
+    await act(async () => { result.current.confirmAction(); });
+    await waitFor(() => expect(result.current.childCache['C:/work/src']).toHaveLength(0));
+  });
+
+  it('已展开子目录内移走条目后刷新源目录缓存', async () => {
+    const child = entry('a.txt', 'C:/work/src/a.txt');
+    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
+      dir === 'C:/work/archive' ? [] : dir === 'C:/work/src' ? [child] : [entry('src', 'C:/work/src', true)],
+    ));
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(1));
+    const folder = result.current.entries[0]!;
+    act(() => result.current.toggleExpand(folder));
+    await waitFor(() => expect(result.current.childCache['C:/work/src']).toHaveLength(1));
+
+    fsMocks.fsMove.mockResolvedValue({ completed: [{ from: child.path, to: 'C:/work/archive/a.txt' }], errors: [] });
+    // 移动完成后源目录已空、目标目录有了该文件
+    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
+      dir === 'C:/work/archive'
+        ? [entry('a.txt', 'C:/work/archive/a.txt')]
+        : dir === 'C:/work/src' ? [] : [entry('src', 'C:/work/src', true)],
+    ));
+    await act(async () => { await result.current.transferInto([child.path], 'C:/work/archive', 'move'); });
+    await waitFor(() => expect(result.current.childCache['C:/work/src']).toHaveLength(0));
+    expect(result.current.undo?.pairs).toEqual([{ from: child.path, to: 'C:/work/archive/a.txt' }]);
+  });
 });

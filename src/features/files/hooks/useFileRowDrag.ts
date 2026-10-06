@@ -57,8 +57,8 @@ export function useFileRowDrag({ onDrop, prepareNativeDrag, onNativeDragEnd }: F
 
   return (event: ReactPointerEvent<HTMLElement>, items: FileDragItem[]) => {
     if (event.button !== 0 || event.isPrimary === false || items.length === 0) return;
-    // 展开箭头与重命名输入框不参与拖拽
-    if ((event.target as HTMLElement).closest('input, [data-testid="file-row-expander"]')) return;
+    // 展开箭头与重命名输入框不参与拖拽（用与面板变体无关的标记判定）
+    if ((event.target as HTMLElement).closest('input, [data-row-expander]')) return;
 
     cleanupRef.current?.();
     const source = event.currentTarget;
