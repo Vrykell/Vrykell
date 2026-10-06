@@ -489,6 +489,22 @@ fn ssh_rename_sync(conn: &SshConnection, path: &str, new_name: &str) -> Result<(
         .map_err(|e| format!("重命名失败：{e}"))
 }
 
+/// 移动远程文件/目录到目标目录（SFTP rename 支持跨目录；目标同名或原地移动直接拒绝）。
+fn ssh_move_sync(conn: &SshConnection, path: &str, dest_dir: &str) -> Result<(), String> {
+    let name = Path::new(path).file_name().ok_or("无法定位文件名")?;
+    let dst = Path::new(dest_dir).join(name);
+    if dst == Path::new(path) {
+        return Err("已在目标目录中".into());
+    }
+    let sess = connect(conn)?;
+    let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
+    if sftp.stat(&dst).is_ok() {
+        return Err(format!("目标已存在同名项「{}」", name.to_string_lossy()));
+    }
+    sftp.rename(Path::new(path), &dst, None)
+        .map_err(|e| format!("移动失败：{e}"))
+}
+
 /// 删除远程文件（空目录用 rmdir，文件用 unlink）。
 fn ssh_delete_sync(conn: &SshConnection, path: &str) -> Result<(), String> {
     let sess = connect(conn)?;
@@ -560,6 +576,22 @@ fn ssh_upload_sync(conn: &SshConnection, remote_dir: &str, local_path: &str) -> 
         file.write_all(&bytes).map_err(|e| format!("上传失败：{e}"))?;
     }
     Ok(())
+}
+
+#[tauri::command]
+pub async fn ssh_move(
+    state: State<'_, HistoryState>,
+    id: String,
+    path: String,
+    dest_dir: String,
+) -> Result<(), String> {
+    let conn = {
+        let db = state.0.lock().map_err(|e| e.to_string())?;
+        db.get_ssh_connection(&id)?
+    };
+    tauri::async_runtime::spawn_blocking(move || ssh_move_sync(&conn, &path, &dest_dir))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
-import { sshFsList, sshDownload, sshRename, sshDelete, sshUpload } from '@features/ssh/services/api';
+import { sshFsList, sshDownload, sshRename, sshDelete, sshUpload, sshMove } from '@features/ssh/services/api';
 import type { SshConnection, SshFsEntry } from '@features/ssh/services/api';
 import { loadConfig, remoteOpenCommand } from '@features/files/services/fileOpen';
 import { useTerminalStore } from '@features/terminal';
@@ -165,6 +165,40 @@ export function useRemoteFileBrowser(conn: SshConnection, enabled = true) {
     }
   }, [conn.id, refresh, toast]);
 
+  /** 面板内拖动：把远程条目移动到目标目录（拖拽语义 = 移动）。 */
+  const moveInto = useCallback(async (entries: Array<{ path: string }>, destDir: string) => {
+    let moved = 0;
+    for (const entry of entries) {
+      if (parentOfRemote(entry.path) === destDir) continue;   // 同级：无操作
+      try {
+        await sshMove(conn.id, entry.path, destDir);
+        moved += 1;
+      } catch (errorValue) {
+        toast(String((errorValue as Error)?.message ?? errorValue), 'error');
+      }
+    }
+    if (moved > 0) {
+      toast(moved > 1 ? `已移动 ${moved} 项` : '已移动', 'success');
+      refresh();
+    }
+  }, [conn.id, refresh, toast]);
+
+  /** 拖出窗口前：把远程条目下载到本地（记入下载历史），返回本地路径供系统拖拽。 */
+  const downloadForDrag = useCallback(async (entries: Array<{ path: string }>): Promise<string[] | null> => {
+    toast('正在下载…', 'info');
+    const locals: string[] = [];
+    for (const entry of entries) {
+      try {
+        locals.push(await sshDownload(conn.id, entry.path));
+      } catch (errorValue) {
+        toast(String((errorValue as Error)?.message ?? errorValue), 'error');
+      }
+    }
+    if (locals.length === 0) return null;
+    toast(locals.length > 1 ? `已下载 ${locals.length} 项` : '已下载', 'success');
+    return locals;
+  }, [conn.id, toast]);
+
   const handleContextMenu = useCallback((event: React.MouseEvent, entry: SshFsEntry) => {
     event.preventDefault();
     setCtxMenu({ x: event.clientX, y: event.clientY, entry });
@@ -249,5 +283,7 @@ export function useRemoteFileBrowser(conn: SshConnection, enabled = true) {
     doUpload,
     doUploadDir,
     uploadPaths,
+    moveInto,
+    downloadForDrag,
   };
 }

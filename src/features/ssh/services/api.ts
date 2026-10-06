@@ -117,6 +117,11 @@ export function sshRename(id: string, path: string, newName: string): Promise<vo
   return invoke('ssh_rename', { id, path, newName });
 }
 
+/** 移动远程文件/目录到目标目录（SFTP rename，支持跨目录）。 */
+export function sshMove(id: string, path: string, destDir: string): Promise<void> {
+  return invoke('ssh_move', { id, path, destDir });
+}
+
 export function sshDelete(id: string, path: string): Promise<void> {
   return invoke('ssh_delete', { id, path });
 }

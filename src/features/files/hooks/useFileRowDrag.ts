@@ -23,11 +23,25 @@ function isOutsideWindow(x: number, y: number): boolean {
     || y >= window.innerHeight + NATIVE_DRAG_MARGIN_PX;
 }
 
+/** 交给系统原生拖拽的载荷：本地路径 + 拖拽效果（本地移动；远程先下载再按复制拖出）。 */
+export interface NativeDragPayload {
+  paths: string[];
+  mode: 'copy' | 'move';
+}
+
+export interface FileRowDragOptions {
+  onDrop: (items: FileDragItem[], target: FileDropTarget) => void;
+  /** 拖出窗口前准备本地路径（远程条目先下载）；返回 null 表示取消本次拖出。 */
+  prepareNativeDrag?: (items: FileDragItem[]) => Promise<NativeDragPayload | null> | NativeDragPayload | null;
+  /** 系统拖拽结束后的回调（刷新面板）。 */
+  onNativeDragEnd?: () => void;
+}
+
 /** 拖出窗口：交给系统原生拖拽（拖到桌面/资源管理器），结束后刷新面板以反映系统侧改动。 */
-function beginNativeDrag(paths: string[], onEnd?: () => void) {
+function beginNativeDrag(payload: NativeDragPayload, onEnd?: () => void) {
   if (!('__TAURI_INTERNALS__' in window)) return;
   // 预览图留空：读取失败时按“无自定义拖动图”处理（Windows 回退系统默认拖动图）
-  void startDrag({ item: paths, icon: '' })
+  void startDrag({ item: payload.paths, icon: '', mode: payload.mode })
     .catch(() => {})
     .finally(() => onEnd?.());
 }
@@ -37,10 +51,7 @@ function beginNativeDrag(paths: string[], onEnd?: () => void) {
  * 拖出窗口则转为系统原生拖拽，可直接放到桌面 / 资源管理器。
  * 面板内用指针事件而不是 HTML5 拖放，避免与桌面窗口的原生文件拖入冲突。
  */
-export function useFileRowDrag(
-  onDrop: (items: FileDragItem[], target: FileDropTarget) => void,
-  onNativeDragEnd?: () => void,
-) {
+export function useFileRowDrag({ onDrop, prepareNativeDrag, onNativeDragEnd }: FileRowDragOptions) {
   const cleanupRef = useRef<(() => void) | null>(null);
   useEffect(() => () => cleanupRef.current?.(), []);
 
@@ -70,7 +81,12 @@ export function useFileRowDrag(
         canceled = true;
         useFileDragStore.getState().end();
         clean();
-        beginNativeDrag(items.map((item) => item.path), onNativeDragEnd);
+        void (async () => {
+          const payload = prepareNativeDrag
+            ? await prepareNativeDrag(items)
+            : { paths: items.map((item) => item.path), mode: 'move' as const };
+          if (payload) beginNativeDrag(payload, onNativeDragEnd);
+        })();
         return;
       }
       const store = useFileDragStore.getState();

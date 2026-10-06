@@ -10,6 +10,8 @@ import { compactPathSegments } from '@features/files/utils/breadcrumb';
 import { useRemoteFileBrowser } from '@features/ssh/hooks/useRemoteFileBrowser';
 import { describeFileServiceFailure } from '@features/ssh/model/fileServiceState';
 import { useExternalFileDrop } from '@features/files/hooks/useExternalFileDrop';
+import { useFileRowDrag } from '@features/files/hooks/useFileRowDrag';
+import { useFileDragStore } from '@features/files';
 import { useDockStore } from '@features/workspace';
 import { termInstances } from '@features/terminal';
 import { sshPaneIdFor, parentOfRemote } from '@features/ssh/utils/remotePath';
@@ -49,8 +51,21 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
     doUpload,
     doUploadDir,
     uploadPaths,
+    moveInto,
+    downloadForDrag,
   } = useRemoteFileBrowser(conn, enabled);
   const failure = error ? describeFileServiceFailure(error) : null;
+
+  // 面板内拖动（移动）；拖出窗口先下载到本地（记入下载历史）再交给系统拖拽
+  const startRowDrag = useFileRowDrag({
+    onDrop: (items, target) => { void moveInto(items, target.dir); },
+    prepareNativeDrag: async (items) => {
+      const locals = await downloadForDrag(items);
+      return locals ? { paths: locals, mode: 'copy' } : null;
+    },
+    onNativeDragEnd: refresh,
+  });
+  const dragTarget = useFileDragStore((state) => state.target);
 
   // 系统文件拖入：命中远程文件夹行/文件行（同级目录），落在空白处 = 当前远程目录 → 上传
   const listRef = useRef<HTMLDivElement>(null);
@@ -177,7 +192,8 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
             key={e.path}
             entry={e}
             renaming={renameTarget?.path === e.path}
-            dropTarget={externalDrop?.rowPath === e.path}
+            dropTarget={externalDrop?.rowPath === e.path || dragTarget?.rowPath === e.path}
+            onPointerDown={(event) => startRowDrag(event, [{ path: e.path, name: e.name, is_dir: e.is_dir }])}
             onRenameCommit={requestRename}
             onRenameCancel={cancelRename}
             onClick={(entry) => entry.is_dir && setPath(entry.path)}
@@ -230,6 +246,7 @@ function RemoteRow({
   entry,
   renaming,
   dropTarget,
+  onPointerDown,
   onRenameCommit,
   onRenameCancel,
   onClick,
@@ -238,8 +255,9 @@ function RemoteRow({
 }: {
   entry: SshFsEntry;
   renaming: boolean;
-  /** 系统文件拖拽悬停在本行：高亮提示上传目标 */
+  /** 拖拽悬停在本行：高亮提示移动/上传目标 */
   dropTarget: boolean;
+  onPointerDown: (event: React.PointerEvent<HTMLElement>) => void;
   onRenameCommit: (entry: SshFsEntry, newName: string) => void;
   onRenameCancel: (entry: SshFsEntry) => void;
   onClick: (entry: SshFsEntry) => void;
@@ -270,6 +288,7 @@ function RemoteRow({
   return (
     <div
       onClick={renaming ? undefined : () => onClick(entry)}
+      onPointerDown={renaming ? undefined : onPointerDown}
       onDoubleClick={renaming ? undefined : () => onDoubleClick(entry)}
       onContextMenu={renaming ? undefined : (ev) => onContextMenu(ev, entry)}
       title={renaming
