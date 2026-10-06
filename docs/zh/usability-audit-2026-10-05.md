@@ -45,7 +45,7 @@
 
 这是长名称边界场景。默认字号、短旧名称配长新名称时没有复现溢出，不能据此将所有确认弹窗判断为日常不可用。
 
-![最大字号长名称确认窗口](audit-evidence/2026-10-05/confirm-overflow.png)
+![最大字号长名称确认窗口](../audit-evidence/2026-10-05/confirm-overflow.png)
 
 源码：`src/ui/ConfirmDialog.tsx`，仅限制宽度，没有最大高度或滚动区域。
 
@@ -70,7 +70,7 @@
 
 修复后，密码提示按当前提示行识别；同一提示在屏幕重绘后不会重新弹出，认证被拒绝后则会重新提供响应框，用户也可手动切换到密码输入或直接终端输入。SSH 的 xterm 挂载节点在块列表场景继续保留，进入备用屏幕程序时恢复原终端画面。没有 Shell 集成的服务器仍使用 xterm 的原生交互路径，不依赖程序名或手写 VT 解析。
 
-![已登录程序仍显示密码响应界面](audit-evidence/2026-10-05/ssh-interaction-stuck.png)
+![已登录程序仍显示密码响应界面](../audit-evidence/2026-10-05/ssh-interaction-stuck.png)
 
 源码：`src/features/terminal/components/TerminalPanel.tsx:25`、`src/features/terminal/hooks/useTerminalSession.ts:204`、`src/features/terminal/services/pipeline/sessionController.ts`。
 
@@ -115,7 +115,7 @@
 ## 本轮代码与验证
 
 - 按最新要求恢复 SSH 表单外侧遮罩关闭；保留填写区域内阻止冒泡的行为。
-- 更新对应单测、2 个 E2E 用例与 `docs/feature-spec.md` 的 SSH11。
+- 更新对应单测、2 个 E2E 用例与 `docs/zh/feature-spec.md` 的 SSH11。
 - TypeScript 检查通过。
 - 全量 Vitest：128 个测试文件通过、1 个跳过；796 个测试通过、1 个跳过。
 - SSH 表单关闭 E2E：新建、编辑 2 个用例通过。没有运行全量 E2E 或真实 Rust/SSH 后端验收。
@@ -136,7 +136,7 @@
 - 实际 SSH 输出的视觉检查还发现快照尾部空行被字距样式包装为非空 HTML，导致短输出占据整个终端高度并被滚动到视区外。现保留空行的空表示，裁掉尾部空行，同时保留内容之间的空行；E2E 增加短输出块高度与输出进入视区的断言。
 - 新增单测及持久化 E2E 覆盖完整/缺少 preexec 标记时连续执行 `ls`、`pwd`；Rust 测试实际运行远端 Bash 启动脚本，确认输出、状态标记与标准错误保留。
 - 另以临时测试桥将浏览器中的真实 Vrykell 输入栏接到 Windows OpenSSH，再连接隔离的本地 SSH 服务和实际 Bash 启动脚本。完整/缺少 preexec 标记两种配置均验证了两次 `ls`、`pwd` 与 `ls missing-test-path`：输出显示、错误可见、执行状态完成。此验证使用真实 SSH 传输和 Shell；桌面 ConPTY 与 Tauri IPC 仍由测试桥替代，没有使用用户远端账户。
-- [实际 SSH 命令输出与错误状态截图](audit-evidence/2026-10-06/ssh-block-real-command-flow.png)。
+- [实际 SSH 命令输出与错误状态截图](../audit-evidence/2026-10-06/ssh-block-real-command-flow.png)。
 - 最终验证：TypeScript、构建与架构检查通过；Vitest 834 项通过、1 项跳过；Rust 108 项通过、2 项忽略；持久化 Playwright 套件 198 项全部通过。额外的真实 OpenSSH 浏览器测试两种配置均通过。
 
 ## 后续修复记录
