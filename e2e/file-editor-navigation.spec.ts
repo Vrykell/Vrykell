@@ -39,7 +39,8 @@ for (const method of ['double-click', 'context-menu'] as const) {
     await emitPtyOutput(page, '\x1b]7;file://host/home/e2e/elsewhere\x07');
     await expect(page.locator('.terminal-directory:visible')).toHaveAttribute('title', '/home/e2e/elsewhere');
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
-    await tree.getByText('branch-30', { exact: true }).click();
+    const branch = tree.locator('[data-testid="file-row"][data-path="/home/e2e/project/branch-30"]');
+    await branch.locator('[data-testid="file-row-expander"]').click();
     const file = tree.getByText('nested-notes.txt', { exact: true });
     await expect(file).toBeVisible();
     await file.scrollIntoViewIfNeeded();
@@ -64,7 +65,7 @@ for (const method of ['double-click', 'context-menu'] as const) {
       (window as unknown as { __FILE_BROWSER_LOADS__: string[] }).__FILE_BROWSER_LOADS__)).toEqual(requestsBefore);
 
     // Explicit browsing still works; switching terminals cannot override the browsed directory.
-    await tree.getByText('branch-30', { exact: true }).dblclick();
+    await branch.dblclick();
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/project/branch-30');
     await emitPtyOutput(page, '\x1b]7;file://host/home/e2e/project\x07');
     await expect(page.locator('.terminal-directory:visible')).toHaveAttribute('title', '/home/e2e/project');
@@ -72,3 +73,22 @@ for (const method of ['double-click', 'context-menu'] as const) {
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/project/branch-30');
   });
 }
+
+test('returning to the parent directory restores the selected row and scroll', async ({ page }) => {
+  const tree = page.getByTestId('local-file-tree');
+  const branch = tree.locator('[data-testid="file-row"][data-path="/home/e2e/project/branch-30"]');
+  await branch.scrollIntoViewIfNeeded();
+  await branch.click();
+  await expect(branch).toHaveAttribute('data-selected', 'true');
+  const scrollTop = await tree.evaluate((element) => element.scrollTop);
+  expect(scrollTop).toBeGreaterThan(0);
+
+  await branch.dblclick();
+  await expect(tree).toHaveAttribute('data-path', '/home/e2e/project/branch-30');
+  await expect(tree.getByText('nested-notes.txt', { exact: true })).toBeVisible();
+
+  await page.locator('[data-testid="local-up-btn"]').click();
+  await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
+  await expect(branch).toHaveAttribute('data-selected', 'true');
+  await expect.poll(() => tree.evaluate((element) => element.scrollTop)).toBe(scrollTop);
+});

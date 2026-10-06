@@ -10,19 +10,43 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('文件面板', () => {
-  test('文件项可点击且面板保持打开', async ({ page }) => {
-    // 单击文件默认新建标签页打开（标签页意义已泛化），文件面板保持打开
-    await expect(page.getByText('Documents')).toBeVisible();
-    await page.getByText('notes.txt').click();
+  test('单击文件仅选中且面板保持打开', async ({ page }) => {
+    const file = page.getByTestId('local-file-tree').locator('[data-testid="file-row"][data-path="/home/e2e/notes.txt"]');
+    // 单击 = 选中（不打开），文件面板保持打开
+    await file.click();
+    await expect(file).toHaveAttribute('data-selected', 'true');
     await expect(page.getByText('Documents')).toBeVisible();
   });
 
-  test('单击目录原地展开，双击进入并显示返回按钮', async ({ page }) => {
-    // 单击 = 树形展开（mock 对每个路径返回相同子项，展开后 Documents 出现两个）
-    await page.getByText('Documents').click();
-    await expect(page.getByText('Documents')).toHaveCount(2);
-    // 双击 = 进入文件夹，出现返回按钮
-    await page.getByText('Documents').first().dblclick();
+  test('单击选中目录，双击进入；展开由箭头按钮控制', async ({ page }) => {
+    const tree = page.getByTestId('local-file-tree');
+    const documents = tree.locator('[data-testid="file-row"][data-path="/home/e2e/Documents"]');
+    // 单击 = 选中，不展开
+    await documents.click();
+    await expect(documents).toHaveAttribute('data-selected', 'true');
+    await expect(tree.getByText('Documents')).toHaveCount(1);
+    // 展开交给箭头按钮（mock 对每个路径返回相同子项，展开后 Documents 出现两个）
+    await documents.locator('[data-testid="file-row-expander"]').click();
+    await expect(tree.getByText('Documents')).toHaveCount(2);
+    // 双击 = 进入文件夹，出现返回按钮（mock 对子路径返回同名子项，取第一行即父目录行）
+    await documents.first().dblclick();
+    await expect(page.locator('[data-testid="local-up-btn"]')).toBeVisible();
+  });
+
+  test('上下键切换选中行，Enter 进入目录', async ({ page }) => {
+    const tree = page.getByTestId('local-file-tree');
+    const documents = tree.locator('[data-testid="file-row"][data-path="/home/e2e/Documents"]');
+    const downloads = tree.locator('[data-testid="file-row"][data-path="/home/e2e/Downloads"]');
+    // 点击行让文件列表获得焦点并选中 Documents
+    await documents.click();
+    await expect(documents).toHaveAttribute('data-selected', 'true');
+    await page.keyboard.press('ArrowDown');
+    await expect(downloads).toHaveAttribute('data-selected', 'true');
+    await expect(documents).not.toHaveAttribute('data-selected', 'true');
+    await page.keyboard.press('ArrowUp');
+    await expect(documents).toHaveAttribute('data-selected', 'true');
+    // Enter = 进入选中目录
+    await page.keyboard.press('Enter');
     await expect(page.locator('[data-testid="local-up-btn"]')).toBeVisible();
   });
 
@@ -92,8 +116,9 @@ test.describe('文件面板', () => {
   });
 
   test('拖动折叠后反向拖回：面板内部状态不丢失（未重新加载）', async ({ page }) => {
-    // 进入目录（改变面板内部路径状态）
-    await page.getByText('Documents').first().dblclick();
+    // 进入目录（改变面板内部路径状态）：双击目录
+    const documents = page.getByTestId('local-file-tree').locator('[data-testid="file-row"][data-path="/home/e2e/Documents"]');
+    await documents.dblclick();
     await expect(page.locator('[data-testid="local-up-btn"]')).toBeVisible();
     // 拖到折叠（不松手）
     const handle = page.locator('[data-testid="resize-handle-files"]');
