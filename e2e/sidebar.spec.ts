@@ -356,4 +356,44 @@ test.describe('文件面板', () => {
     await expect(page.getByText('已回退重命名')).toBeVisible();
     expect(await fsOps(page)).toContainEqual({ op: 'rename', path: '/home/e2e/notes (1).txt', newName: 'Untitled' });
   });
+
+  test('右键文件夹新建文件：落在文件夹内、立即重命名，提交后子列表可见', async ({ page }) => {
+    await page.getByText('Documents').first().click({ button: 'right' });
+    await page.getByRole('button', { name: '新建文件', exact: true }).click();
+    const input = page.locator('[data-testid="rename-input"]');
+    await expect(input).toHaveValue('Untitled');
+    expect(await fsOps(page)).toContainEqual({ op: 'create-file', path: '/home/e2e/Documents/Untitled' });
+
+    await input.fill('plan.md');
+    await input.press('Enter');
+    await page.locator('[data-testid="confirm-ok"]').click();
+    await expect(page.getByText('已重命名')).toBeVisible();
+    expect(await fsOps(page)).toContainEqual({ op: 'rename', path: '/home/e2e/Documents/Untitled', newName: 'plan.md' });
+    // 目标文件夹已自动展开，新条目出现在它的子列表里（mock 会把新建条目同时列在多处，取第一个）
+    await expect(page.locator('[data-testid="file-row"][data-path="/home/e2e/Documents/Untitled"]').first()).toBeVisible();
+  });
+
+  test('复制同名文件到当前目录：自动加序号并在提示中说明', async ({ page }) => {
+    await page.getByText('notes.txt').first().click({ button: 'right' });
+    await page.getByRole('button', { name: '复制', exact: true }).click();
+    const tree = page.getByTestId('local-file-tree');
+    const box = (await tree.boundingBox())!;
+    await page.mouse.click(box.x + 40, box.y + box.height - 12, { button: 'right' });
+    await page.getByRole('button', { name: '粘贴', exact: true }).click();
+    await expect(page.getByText('已复制 1 项（同名已自动加序号）')).toBeVisible();
+    expect(await fsOps(page)).toContainEqual({ op: 'copy', path: '/home/e2e/notes.txt', destDir: '/home/e2e/project' });
+  });
+
+  test('本地面板的菜单不含远程专有项', async ({ page }) => {
+    await page.getByText('Documents').first().click({ button: 'right' });
+    await expect(page.getByRole('button', { name: '在新标签页中打开' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /下载.*到本地/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '上传文件', exact: true })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+
+    await page.getByTestId('local-more-btn').click();
+    await expect(page.getByRole('button', { name: '从当前文件夹新建标签页' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '下载管理' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '上传文件', exact: true })).toHaveCount(0);
+  });
 });

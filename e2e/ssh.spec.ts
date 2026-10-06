@@ -218,4 +218,29 @@ test.describe('SSH 远程连接管理侧栏', () => {
     await expect(page.getByText('已回退移动')).toBeVisible();
     expect(await sshOps(page)).toEqual(expect.arrayContaining([{ op: 'move', path: '/home/root/Documents/app (1).log', destDir: '/home/root' }]));
   });
+
+  test('远程面板：展开箭头懒加载子项，菜单只显示远程可用项', async ({ page }) => {
+    await page.getByText('生产服务器').dblclick();
+    await page.locator('[data-dock-btn="files"]').click();
+    const folder = page.locator('[data-testid="remote-file-Documents"][data-path="/home/root/Documents"]');
+    await expect(folder).toBeVisible({ timeout: 5000 });
+
+    // 展开箭头（而不是单击行）懒加载子项
+    await folder.locator('[data-testid="remote-row-expander"]').click();
+    await expect(page.locator('[data-testid="remote-file-app.log"][data-path="/home/root/Documents/app.log"]').first()).toBeVisible();
+
+    // 行菜单：有下载，无工作区 / 终端编辑器等本地专有项
+    await folder.click({ button: 'right' });
+    await expect(page.getByRole('button', { name: /下载文件夹到本地/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: '添加到工作区' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '使用终端编辑器打开' })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+
+    // ⋯ 菜单：有上传与下载管理，没有本地专有的新建标签页
+    await page.locator('[data-testid="remote-more-btn"]').click();
+    await expect(page.getByRole('button', { name: '上传文件', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '上传文件夹', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '下载管理' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '从当前文件夹新建标签页' })).toHaveCount(0);
+  });
 });
