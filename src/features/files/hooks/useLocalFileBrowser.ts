@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { fsDisks, fsHome, fsList, type DiskEntry, type FsEntry } from '@features/files/services/fs';
 import { normPath } from '@features/files/utils/pathUtils';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
@@ -7,12 +7,42 @@ interface UseLocalFileBrowserOptions {
   initialCwd?: string;
 }
 
+interface BrowserViewMemory {
+  selectedPath: string | null;
+  scrollTop: number;
+}
+
+/** Remember each directory's selected row and scroll offset while browsing away. */
+const memoryKey = (target: string | null) => target ?? '__disks__';
+
 /** Load local directories and keep navigation results associated with their requests. */
 export function useLocalFileBrowser({ initialCwd }: UseLocalFileBrowserOptions) {
   const [path, setBrowserPath] = useState<string | null>(() => initialCwd ? normPath(initialCwd) : null);
   const initialized = useRef(Boolean(initialCwd));
-  const setPath = useCallback((nextPath: string | null) => {
+  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [loadedPath, setLoadedPath] = useState<string | null | undefined>(undefined);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const viewMemory = useRef(new Map<string, BrowserViewMemory>());
+  const pendingScrollTop = useRef<number | null>(null);
+  const currentView = useRef({ path, selectedPath });
+  useEffect(() => {
+    currentView.current = { path, selectedPath };
+  }, [path, selectedPath]);
+  /**
+   * Navigate and restore the target directory's last selection and scroll.
+   * The scroll offset is applied once the target directory finishes loading.
+   */
+  const navigate = useCallback((nextPath: string | null) => {
     initialized.current = true;
+    const current = currentView.current;
+    if (current.path === nextPath) return;
+    viewMemory.current.set(memoryKey(current.path), {
+      selectedPath: current.selectedPath,
+      scrollTop: scrollRef.current?.scrollTop ?? 0,
+    });
+    const restored = viewMemory.current.get(memoryKey(nextPath));
+    pendingScrollTop.current = restored?.scrollTop ?? 0;
+    setSelectedPath(restored?.selectedPath ?? null);
     setBrowserPath(nextPath);
   }, []);
   const [entries, setEntries] = useState<FsEntry[]>([]);
@@ -35,9 +65,12 @@ export function useLocalFileBrowser({ initialCwd }: UseLocalFileBrowserOptions) 
     if (initialized.current) return;
     // Seed the browser once; later terminal cwd changes cannot interrupt navigation.
     void fsHome().then((home) => {
-      if (alive.current && !initialized.current) setPath(normPath(home));
+      if (alive.current && !initialized.current) {
+        initialized.current = true;
+        setBrowserPath(normPath(home));
+      }
     }).catch(() => {});
-  }, [setPath]);
+  }, []);
 
   const load = useCallback((currentPath: string | null) => {
     const version = ++requestVersion.current;
@@ -50,7 +83,9 @@ export function useLocalFileBrowser({ initialCwd }: UseLocalFileBrowserOptions) 
     const request = currentPath === null
       ? fsDisks().then((result) => { if (version === requestVersion.current) setDisks(result); })
       : fsList(currentPath).then((result) => { if (version === requestVersion.current) setEntries(result); });
-    void request.catch((cause: unknown) => {
+    void request.then(() => {
+      if (version === requestVersion.current) setLoadedPath(currentPath);
+    }).catch((cause: unknown) => {
       if (version !== requestVersion.current) return;
       setError(currentPath === null ? '无法读取磁盘，请重试' : '无法读取目录，请检查访问权限后重试');
       terminalDebug('files-load-error', { requestId: version, kind, errorType: cause instanceof Error ? cause.name : typeof cause });
@@ -65,6 +100,15 @@ export function useLocalFileBrowser({ initialCwd }: UseLocalFileBrowserOptions) 
     load(path);
     return () => { requestVersion.current += 1; };
   }, [load, path]);
+
+  // Restore the remembered scroll offset only once the target directory's own
+  // entries are in the DOM; earlier commits still show the previous directory.
+  useLayoutEffect(() => {
+    if (loading || loadedPath !== path || pendingScrollTop.current === null) return;
+    const target = pendingScrollTop.current;
+    pendingScrollTop.current = null;
+    if (scrollRef.current) scrollRef.current.scrollTop = target;
+  }, [loadedPath, loading, path]);
 
   const retryExpand = useCallback((entry: FsEntry) => {
     setChildErrors((current) => {
@@ -106,7 +150,10 @@ export function useLocalFileBrowser({ initialCwd }: UseLocalFileBrowserOptions) 
 
   return {
     path,
-    setPath,
+    navigate,
+    selectedPath,
+    setSelectedPath,
+    scrollRef,
     entries,
     disks,
     expandedSet,
