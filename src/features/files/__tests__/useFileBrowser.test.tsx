@@ -1,0 +1,183 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { useFileBrowser } from '@features/files/hooks/useFileBrowser';
+import type { FileOpsTarget } from '@features/files/model/fileOps';
+import type { FsEntry } from '@platform/api/types';
+
+const fsMocks = vi.hoisted(() => ({
+  fsList: vi.fn(),
+  fsHome: vi.fn(),
+  fsDisks: vi.fn(),
+  fsRename: vi.fn(),
+  fsCreateFile: vi.fn(),
+  fsCreateDir: vi.fn(),
+  fsCopy: vi.fn(),
+  fsMove: vi.fn(),
+  fsStageDelete: vi.fn(),
+  fsRestoreStaged: vi.fn(),
+  fsPurgeStaged: vi.fn(),
+  fileOpenWith: vi.fn(),
+}));
+
+vi.mock('@platform/api/fs', async () => {
+  const actual = await vi.importActual<typeof import('@platform/api/fs')>('@platform/api/fs');
+  return { ...actual, ...fsMocks };
+});
+
+/** 执行目标是常量：实现选择只发生一次（与面板一致）。 */
+const LOCAL_TARGET: FileOpsTarget = { kind: 'local' };
+
+const entry = (name: string, path: string, is_dir = false): FsEntry => ({ name, path, is_dir });
+
+describe('useFileBrowser（本地目标）', () => {
+  const openEntry = vi.fn();
+
+  beforeEach(() => {
+    fsMocks.fsHome.mockReset().mockResolvedValue('C:/Users/test');
+    fsMocks.fsDisks.mockReset().mockResolvedValue([]);
+    fsMocks.fsList.mockReset().mockResolvedValue([entry('src', 'C:/work/src', true), entry('a.txt', 'C:/work/a.txt')]);
+    fsMocks.fsRename.mockReset().mockImplementation((path: string, name: string) => Promise.resolve(`${path.slice(0, path.lastIndexOf('/'))}/${name}`));
+    fsMocks.fsCreateFile.mockReset().mockResolvedValue('C:/work/Untitled');
+    fsMocks.fsCreateDir.mockReset().mockResolvedValue('C:/work/NewFolder');
+    fsMocks.fsCopy.mockReset().mockResolvedValue({ completed: [], errors: [] });
+    fsMocks.fsMove.mockReset().mockResolvedValue({ completed: [], errors: [] });
+    fsMocks.fsStageDelete.mockReset().mockResolvedValue([]);
+    fsMocks.fsRestoreStaged.mockReset().mockResolvedValue({ completed: [], errors: [] });
+    fsMocks.fsPurgeStaged.mockReset().mockResolvedValue(undefined);
+  });
+
+  afterEach(() => { vi.clearAllMocks(); });
+
+  it('用给定目录作为起始视图，未给定时落到主目录', async () => {
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(2));
+    expect(fsMocks.fsList).toHaveBeenCalledWith('C:/work');
+    expect(result.current.path).toBe('C:/work');
+
+    const noCwd = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, openEntry }));
+    await waitFor(() => expect(noCwd.result.current.path).toBe('C:/Users/test'));
+  });
+
+  it('导航压入视图快照，回退还原选中与滚动位置', async () => {
+    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
+      dir === 'C:/work/src' ? [entry('main.ts', 'C:/work/src/main.ts')] : [entry('src', 'C:/work/src', true), entry('a.txt', 'C:/work/a.txt')],
+    ));
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(2));
+
+    act(() => result.current.replaceSelection(['C:/work/src', 'C:/work/a.txt']));
+    expect(result.current.canGoBack).toBe(false);
+
+    act(() => result.current.navigate('C:/work/src'));
+    await waitFor(() => expect(result.current.entries[0]?.name).toBe('main.ts'));
+    expect(result.current.selection.size).toBe(0);
+    expect(result.current.canGoBack).toBe(true);
+
+    act(() => result.current.goBack());
+    await waitFor(() => expect(result.current.entries[0]?.name).toBe('src'));
+    expect([...result.current.selection].sort()).toEqual(['C:/work/a.txt', 'C:/work/src']);
+    expect(result.current.canGoBack).toBe(false);
+  });
+
+  it('展开目录时懒加载子项并缓存，重复展开不再请求', async () => {
+    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
+      dir === 'C:/work/src' ? [entry('main.ts', 'C:/work/src/main.ts')] : [entry('src', 'C:/work/src', true)],
+    ));
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(1));
+    const folder = result.current.entries[0]!;
+
+    act(() => result.current.toggleExpand(folder));
+    await waitFor(() => expect(result.current.childCache['C:/work/src']).toHaveLength(1));
+    const calls = fsMocks.fsList.mock.calls.length;
+
+    act(() => result.current.toggleExpand(folder));
+    act(() => result.current.toggleExpand(folder));
+    expect(fsMocks.fsList.mock.calls.length).toBe(calls);
+  });
+
+  it('粘贴按模式调用复制/移动，移动用后端返回的真实目标记录回退（重名避让）', async () => {
+    fsMocks.fsMove.mockResolvedValue({
+      completed: [{ from: 'C:/work/a.txt', to: 'C:/work/src/a (1).txt' }],
+      errors: [],
+    });
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(2));
+
+    act(() => result.current.copySelection([entry('a.txt', 'C:/work/a.txt')]));
+    await act(async () => { await result.current.pasteInto('C:/work/src'); });
+    expect(fsMocks.fsCopy).toHaveBeenCalledWith(['C:/work/a.txt'], 'C:/work/src');
+    expect(result.current.undo).toBeNull();
+
+    act(() => result.current.cutSelection([entry('a.txt', 'C:/work/a.txt')]));
+    await act(async () => { await result.current.pasteInto('C:/work/src'); });
+    expect(fsMocks.fsMove).toHaveBeenCalledWith(['C:/work/a.txt'], 'C:/work/src');
+    expect(result.current.undo?.pairs).toEqual([{ from: 'C:/work/a.txt', to: 'C:/work/src/a (1).txt' }]);
+  });
+
+  it('同级剪切粘贴是空操作（与后端语义一致）', async () => {
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(2));
+
+    act(() => result.current.cutSelection([entry('a.txt', 'C:/work/a.txt')]));
+    await act(async () => { await result.current.pasteInto('C:/work'); });
+    expect(fsMocks.fsMove).not.toHaveBeenCalled();
+  });
+
+  it('删除走暂存并可从历史栈回退', async () => {
+    fsMocks.fsStageDelete.mockResolvedValue([{ from: 'C:/work/a.txt', to: 'C:/Users/test/.vrykell/undo/u-a.txt' }]);
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(2));
+
+    act(() => result.current.confirmDelete([entry('a.txt', 'C:/work/a.txt')]));
+    await act(async () => { result.current.confirmAction(); });
+    await waitFor(() => expect(fsMocks.fsStageDelete).toHaveBeenCalledWith(['C:/work/a.txt']));
+    expect(result.current.undo).toMatchObject({ kind: 'delete' });
+
+    fsMocks.fsRestoreStaged.mockResolvedValue({
+      completed: [{ from: 'C:/work/a.txt', to: 'C:/Users/test/.vrykell/undo/u-a.txt' }],
+      errors: [],
+    });
+    await act(async () => { await result.current.runUndo(); });
+    expect(fsMocks.fsRestoreStaged).toHaveBeenCalled();
+    expect(result.current.undoCount).toBe(0);
+  });
+
+  it('重命名记录后端返回的最终路径（重名避让后仍可回退）', async () => {
+    fsMocks.fsRename.mockResolvedValue('C:/work/b (1).txt');
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(2));
+
+    act(() => result.current.startRename(entry('a.txt', 'C:/work/a.txt')));
+    act(() => result.current.requestRename(entry('a.txt', 'C:/work/a.txt'), 'b.txt'));
+    await act(async () => { result.current.confirmAction(); });
+    await waitFor(() => expect(result.current.undo?.pairs).toEqual([{ from: 'C:/work/a.txt', to: 'C:/work/b (1).txt' }]));
+  });
+
+  it('新建落在命中的文件夹内，立即进入重命名并展开该目录', async () => {
+    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
+      dir === 'C:/work/src' ? [] : [entry('src', 'C:/work/src', true)],
+    ));
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(1));
+    const folder = result.current.entries[0]!;
+
+    await act(async () => { await result.current.createEntry('file', folder); });
+    expect(fsMocks.fsCreateFile).toHaveBeenCalledWith('C:/work/src', 'Untitled');
+    expect(result.current.renameTarget?.path).toBe('C:/work/Untitled');
+    expect(result.current.expandedSet.has('C:/work/src')).toBe(true);
+    expect(result.current.selection.has('C:/work/Untitled')).toBe(true);
+  });
+
+  it('空白处新建使用当前目录，文件行新建落到同级目录', async () => {
+    const file = entry('a.txt', 'C:/work/a.txt');
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work/a', openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(2));
+
+    await act(async () => { await result.current.createEntry('dir', null); });
+    expect(fsMocks.fsCreateDir).toHaveBeenCalledWith('C:/work/a', 'NewFolder');
+
+    await act(async () => { await result.current.createEntry('file', file); });
+    expect(fsMocks.fsCreateFile).toHaveBeenLastCalledWith('C:/work', 'Untitled');
+  });
+});
