@@ -1,16 +1,19 @@
-import { useEffect, useState } from 'react';
-import { iconSizes, Search, Settings, Sparkles  } from '@ui/icons';
+import { useEffect, useRef, useState } from 'react';
+import { iconSizes, Search } from '@ui/icons';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { useDockStore, useSessionStore, useUiStore, selectActiveSessionTab } from '@features/workspace';
+import { useSessionStore, useUiStore } from '@features/workspace';
+import DockNavigation from './DockNavigation';
 import WindowControls from '@features/workspace/components/WindowControls';
 import { isMacOS } from '@platform/runtime';
+import { useBalancedTitlebar } from '../hooks/useBalancedTitlebar';
 
 /** Keep window controls and global actions separate from workspace navigation. */
 export default function TopDock() {
   const activeTab = useSessionStore(s => s.tabs.find(tab => tab.id === s.activeId));
-  const isSession = useSessionStore(s => selectActiveSessionTab(s) !== null);
-  const chatOpen = useDockStore(s => s.leftPanels.includes('chat') || s.rightPanels.includes('chat'));
   const [fullscreen, setFullscreen] = useState(false);
+  const headerRef = useRef<HTMLElement>(null);
+  const actionsRef = useRef<HTMLDivElement>(null);
+  useBalancedTitlebar(headerRef, actionsRef);
 
   useEffect(() => {
     if (!isMacOS) return;
@@ -30,7 +33,7 @@ export default function TopDock() {
   }, []);
 
   return (
-    <header className="workspace-titlebar">
+    <header ref={headerRef} className="workspace-titlebar">
       <div data-tauri-drag-region className="workspace-title" style={{ paddingLeft: isMacOS && !fullscreen ? 86 : 20 }}>
         <span>{activeTab?.title || '终端工作区'}</span>
       </div>
@@ -40,19 +43,8 @@ export default function TopDock() {
         <span>搜索文件、命令、设置…</span>
         <kbd>{isMacOS ? '⌘ F' : 'Ctrl F'}</kbd>
       </button>
-      <div data-tauri-drag-region className="workspace-title-actions">
-        {isSession && (
-          <button data-subtle data-dock-btn="chat" className="workspace-ai-toggle" aria-pressed={chatOpen}
-            title={chatOpen ? '关闭 AI 助手' : '打开 AI 助手'}
-            onClick={() => {
-              const dock = useDockStore.getState();
-              dock.togglePanel('right', 'chat');
-            }}>
-            <Sparkles size={iconSizes.row} /><span>AI 助手</span>
-          </button>
-        )}
-        <button data-subtle className="workspace-settings" aria-label="设置" title={`设置（${isMacOS ? '⌘' : 'Ctrl'}+,）`}
-          onClick={() => useSessionStore.getState().openSettingsTab()}><Settings size={iconSizes.row} /></button>
+      <div ref={actionsRef} className="workspace-title-actions">
+        <DockNavigation side="right" />
         <WindowControls />
       </div>
     </header>

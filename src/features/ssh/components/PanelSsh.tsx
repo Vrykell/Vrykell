@@ -114,7 +114,7 @@ export default function PanelSsh() {
       </div>
       <button data-testid="ssh-quick-btn" onClick={() => setQuickOpen(true)} style={{ margin: '0 10px 10px', minHeight: 36 }}>快速连接</button>
       {/* 连接列表 */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 0 8px' }}>
+      <div className="scroll-region" style={{ flex: 1, overflowY: 'auto', padding: '0 0 8px' }}>
         {filtered.length === 0 ? (
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>
             {connections.length === 0 ? '暂无 SSH 连接，点击右上角 + 新建' : '无匹配连接'}

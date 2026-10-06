@@ -12,6 +12,7 @@ import { useTerminalInputContext } from '@features/terminal/hooks/useTerminalInp
 import { useCommandCompletion } from '@features/terminal/hooks/useCommandCompletion';
 import { setPendingTerminalCommand } from '@features/terminal/hooks/useTerminalSession';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
+import { useAutoSizeTextarea } from '@ui/hooks/useAutoSizeTextarea';
 
 interface UseInputEditorControllerOptions {
   paneId: string;
@@ -49,6 +50,7 @@ export function useInputEditorController({
 
   const input = useInputStore(selectPaneInput(paneId));
   const text = input.text;
+  useAutoSizeTextarea(inputRef, text, 120, visible);
   const aiMode = input.aiMode;
   const setText = useCallback((value: string) => {
     useInputStore.getState().setText(paneId, value);
@@ -175,8 +177,6 @@ export function useInputEditorController({
   const handleChange = useCallback((event: ChangeEvent<HTMLTextAreaElement>) => {
     resetHistNav();
     setText(event.target.value);
-    event.target.style.height = 'auto';
-    event.target.style.height = Math.min(event.target.scrollHeight, 120) + 'px';
   }, [resetHistNav, setText]);
 
   const handlePaste = useCallback((event: ClipboardEvent<HTMLTextAreaElement>) => {

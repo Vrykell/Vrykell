@@ -227,7 +227,7 @@ export default function PanelTabs() {
       </div>
 
       {/* 列表 */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 0 8px' }}>
+      <div className="scroll-region" style={{ flex: 1, overflowY: 'auto', padding: '0 0 8px' }}>
         {groups.map((g) => (
           <GroupSection
             key={g.id}

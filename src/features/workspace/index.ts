@@ -3,11 +3,14 @@ export { useUiStore } from '@features/workspace/stores/ui';
 export {
   useDockStore,
   PANEL_DEFS,
+  NAVIGATION_DEFS,
   MIN_PANEL_WIDTH,
   useChatPanelOpen,
   type DockSide,
 } from '@features/workspace/stores/dock';
 export { useDockDragStore } from '@features/workspace/stores/dockDrag';
+export { useNavigationDrag } from '@features/workspace/stores/navigationDrag';
+export { useNavigationButtonDrag } from '@features/workspace/hooks/useNavigationButtonDrag';
 export {
   useSessionStore,
   firstTerminalOf,

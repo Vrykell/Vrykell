@@ -1,22 +1,21 @@
 import { iconSizes } from '@ui/icons';
 import { useT } from '@i18n';
-import { PANEL_DEFS } from '@features/workspace';
+import { NAVIGATION_DEFS, type DockSide } from '@features/workspace';
 import { ToolbarBtn } from '@ui/UiBtn';
-import type { DragEvent } from 'react';
+import type { PointerEvent } from 'react';
+import { isMacOS } from '@platform/runtime';
 
 interface DockButtonProps {
   panelId: string;
   active: boolean;
+  side?: DockSide;
   onClick?: () => void;
-  onDragStart?: (e: DragEvent<HTMLButtonElement>) => void;
-  onDragEnd?: () => void;
-  onDragOver?: (e: DragEvent<HTMLButtonElement>) => void;
-  onDrop?: (e: DragEvent<HTMLButtonElement>) => void;
+  onPointerDown?: (e: PointerEvent<HTMLButtonElement>) => void;
 }
 
-export default function DockButton({ panelId, active, onClick, onDragStart, onDragEnd, onDragOver, onDrop }: DockButtonProps) {
+export default function DockButton({ panelId, active, side = 'left', onClick, onPointerDown }: DockButtonProps) {
   const { t } = useT();
-  const def = PANEL_DEFS[panelId];
+  const def = NAVIGATION_DEFS[panelId];
   if (!def) return null;
 
   const label = t(`dock.${panelId}`);
@@ -25,16 +24,16 @@ export default function DockButton({ panelId, active, onClick, onDragStart, onDr
 
   return (
     <ToolbarBtn
-      title={`${label} — 点击${action}左侧面板`}
+      title={panelId === 'settings' ? `设置（${isMacOS ? '⌘' : 'Ctrl'}+,）；拖动调整位置` : `${label} — ${action}${side === 'left' ? '左' : '右'}侧面板；拖动调整位置`}
       active={active}
       onClick={onClick}
       attrs={{
         'data-dock-btn': panelId,
         'aria-label': label,
         'aria-pressed': active,
-        className: 'activity-button',
-        draggable: !!onDragStart,
-        onDragStart, onDragEnd, onDragOver, onDrop,
+        className: panelId === 'settings' ? 'activity-button workspace-settings' : 'activity-button',
+        draggable: false,
+        onPointerDown,
       }}
     >
       <Icon size={iconSizes.navigation} />
