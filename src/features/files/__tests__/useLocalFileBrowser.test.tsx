@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { useLocalFileBrowser } from '@features/files/hooks/useLocalFileBrowser';
 
 const fsMocks = vi.hoisted(() => ({
@@ -9,6 +9,14 @@ const fsMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@features/files/services/fs', () => fsMocks);
+
+let browserApi: ReturnType<typeof useLocalFileBrowser>;
+
+/** Renders the browser with a real scroll container so view memory can round-trip. */
+function BrowserHarness({ initialCwd }: { initialCwd?: string }) {
+  browserApi = useLocalFileBrowser({ initialCwd });
+  return <div data-testid="browser-scroll" ref={browserApi.scrollRef} />;
+}
 
 describe('useLocalFileBrowser', () => {
   beforeEach(() => {
@@ -59,7 +67,7 @@ describe('useLocalFileBrowser', () => {
     let resolveHome!: (home: string) => void;
     fsMocks.fsHome.mockImplementation(() => new Promise<string>(resolve => { resolveHome = resolve; }));
     const { result } = renderHook(() => useLocalFileBrowser({}));
-    act(() => result.current.setPath(null));
+    act(() => result.current.navigate(null));
     await act(async () => resolveHome('C:/Users/tester'));
     expect(result.current.path).toBeNull();
     expect(fsMocks.fsList).not.toHaveBeenCalled();
@@ -73,7 +81,7 @@ describe('useLocalFileBrowser', () => {
       initialProps: { initialCwd: 'C:/elsewhere' },
     });
     await waitFor(() => expect(result.current.loading).toBe(false));
-    act(() => result.current.setPath('C:/workspace'));
+    act(() => result.current.navigate('C:/workspace'));
     await waitFor(() => expect(result.current.entries).toEqual([folder]));
     act(() => result.current.toggleExpand(folder));
     await waitFor(() => expect(result.current.childCache[folder.path]).toEqual(children));
@@ -88,7 +96,7 @@ describe('useLocalFileBrowser', () => {
     expect(result.current.childCache[folder.path]).toEqual(children);
     expect(fsMocks.fsList).not.toHaveBeenCalled();
 
-    act(() => result.current.setPath('C:/manual'));
+    act(() => result.current.navigate('C:/manual'));
     await waitFor(() => expect(fsMocks.fsList).toHaveBeenCalledWith('C:/manual'));
     rerender({ initialCwd: 'C:/other' });
     expect(result.current.path).toBe('C:/manual');
@@ -113,7 +121,7 @@ describe('useLocalFileBrowser', () => {
       : Promise.resolve([{ name: 'new.txt', path: 'C:/new/new.txt', is_dir: false }]));
     const { result } = renderHook(() => useLocalFileBrowser({ initialCwd: 'C:/old' }));
     await waitFor(() => expect(fsMocks.fsList).toHaveBeenCalledWith('C:/old'));
-    act(() => result.current.setPath('C:/new'));
+    act(() => result.current.navigate('C:/new'));
     await waitFor(() => expect(result.current.entries[0]?.name).toBe('new.txt'));
     await act(async () => resolveOld([]));
     expect(result.current.entries[0]?.name).toBe('new.txt');
@@ -132,5 +140,51 @@ describe('useLocalFileBrowser', () => {
     act(() => result.current.retryExpand(folder));
     await waitFor(() => expect(result.current.childCache[folder.path]).toEqual([]));
     expect(result.current.childErrors[folder.path]).toBeUndefined();
+  });
+
+  it('clears the selection when entering an unvisited directory', async () => {
+    const folder = { name: 'src', path: 'C:/workspace/src', is_dir: true };
+    fsMocks.fsList.mockResolvedValue([folder]);
+    render(<BrowserHarness initialCwd="C:/workspace" />);
+    await waitFor(() => expect(browserApi.entries).toEqual([folder]));
+
+    act(() => browserApi.setSelectedPath('C:/workspace/notes.txt'));
+    act(() => browserApi.navigate('C:/elsewhere'));
+    expect(browserApi.path).toBe('C:/elsewhere');
+    expect(browserApi.selectedPath).toBeNull();
+  });
+
+  it('restores the selected row and scroll offset when returning to a directory', async () => {
+    const folder = { name: 'src', path: 'C:/workspace/src', is_dir: true };
+    const child = { name: 'main.ts', path: 'C:/workspace/src/main.ts', is_dir: false };
+    fsMocks.fsList.mockImplementation((path: string) => Promise.resolve(path === folder.path ? [child] : [folder]));
+    render(<BrowserHarness initialCwd="C:/workspace" />);
+    await waitFor(() => expect(browserApi.entries).toEqual([folder]));
+
+    act(() => browserApi.setSelectedPath(folder.path));
+    const tree = screen.getByTestId('browser-scroll');
+    Object.defineProperty(tree, 'scrollTop', { value: 120, writable: true, configurable: true });
+
+    act(() => browserApi.navigate(folder.path));
+    await waitFor(() => expect(browserApi.entries).toEqual([child]));
+    expect(browserApi.selectedPath).toBeNull();
+
+    act(() => browserApi.navigate('C:/workspace'));
+    await waitFor(() => expect(browserApi.entries).toEqual([folder]));
+    expect(browserApi.selectedPath).toBe(folder.path);
+    expect(tree.scrollTop).toBe(120);
+  });
+
+  it('keeps the current scroll offset when navigating to the same path', async () => {
+    const folder = { name: 'src', path: 'C:/workspace/src', is_dir: true };
+    fsMocks.fsList.mockResolvedValue([folder]);
+    render(<BrowserHarness initialCwd="C:/workspace" />);
+    await waitFor(() => expect(browserApi.entries).toEqual([folder]));
+
+    const tree = screen.getByTestId('browser-scroll');
+    Object.defineProperty(tree, 'scrollTop', { value: 80, writable: true, configurable: true });
+    act(() => browserApi.navigate('C:/workspace'));
+    expect(browserApi.path).toBe('C:/workspace');
+    expect(tree.scrollTop).toBe(80);
   });
 });
