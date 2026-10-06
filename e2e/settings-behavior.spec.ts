@@ -68,7 +68,7 @@ test.describe('模型行为页', () => {
     const bar = page.getByTestId('model-scope-bar');
     await expect(bar).toContainText('全局默认');
     await bar.click();
-    await page.getByRole('button', { name: '主力模型', exact: true }).click();
+    await page.getByRole('option', { name: '主力模型', exact: true }).click();
     await expect(page.getByText('跟随全局默认')).toBeVisible();
     // 关闭该模型的 Agent 模式
     const switches = page.getByRole('switch');

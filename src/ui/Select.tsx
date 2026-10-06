@@ -15,6 +15,7 @@ interface SelectProps<Value extends string | number> {
   onChange: (value: Value) => void;
   'aria-label': string;
   'aria-describedby'?: string;
+  'data-testid'?: string;
   id?: string;
   disabled?: boolean;
   placeholder?: string;
@@ -24,7 +25,7 @@ interface SelectProps<Value extends string | number> {
 /** A controlled select with a themed, viewport-aware listbox. */
 export default function Select<Value extends string | number>({
   value, options, onChange, disabled = false, placeholder = '请选择', style, id,
-  'aria-label': label, 'aria-describedby': description,
+  'aria-label': label, 'aria-describedby': description, 'data-testid': testId,
 }: SelectProps<Value>) {
   const listId = useId();
   const trigger = useRef<HTMLButtonElement>(null);
@@ -136,7 +137,7 @@ export default function Select<Value extends string | number>({
   };
 
   return <>
-    <button ref={trigger} id={id} type="button" data-subtle className="ui-select" style={style}
+    <button ref={trigger} id={id} type="button" data-subtle data-testid={testId} className="ui-select" style={style}
       role="combobox" aria-label={label} aria-describedby={description} aria-haspopup="listbox"
       aria-expanded={expanded} aria-controls={expanded ? listId : undefined}
       aria-activedescendant={expanded ? `${listId}-${activeIndex}` : undefined} disabled={unavailable}

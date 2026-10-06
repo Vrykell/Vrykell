@@ -10,7 +10,8 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { iconSizes, Bot, BrainCircuit, ChevronDown, Eye, Globe, Search, SlidersHorizontal, Wrench, X  } from '@ui/icons';
+import { iconSizes, BrainCircuit, Eye, Globe, Search, SlidersHorizontal, Wrench, X  } from '@ui/icons';
+import { t } from '@i18n';
 import { useAiConfigStore, setActiveModel, type ModelProfile, useAgentSettings } from '@features/agent';
 import {
   CAPABILITY_LABELS, detectCapabilities, hasCapability,
@@ -265,80 +266,17 @@ export function ModelScopeBar({
   value,
   onChange,
 }: {
-  /** 选项：value 为 '' 表示全局默认 */
-  options: { value: string; label: string; provider?: ModelProfile['provider']; model?: string }[];
+  options: { value: string; label: string }[];
   value: string;
   onChange: (value: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const cur = options.find((o) => o.value === value);
-
   return (
-    <div style={{ position: 'relative', display: 'inline-block' }}>
-      <button
-        data-testid="model-scope-bar"
-        onClick={() => setOpen((v) => !v)}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '5px 10px', fontSize: 'calc(12px * var(--ui-font-scale))', border: '1px solid var(--border)',
-          borderRadius: 8, background: 'var(--canvas)', color: 'var(--text-primary)',
-          cursor: 'pointer',
-        }}
-      >
-        {cur?.provider && cur.model ? (() => {
-          const Icon = modelIcon(cur.provider, cur.model);
-          return <Icon size={iconSizes.control} style={{ color: 'var(--text-secondary)' }} />;
-        })() : <Bot size={iconSizes.control} style={{ color: 'var(--text-muted)' }} />}
-        {cur?.label ?? '全局默认'}
-        <ChevronDown size={iconSizes.compact} style={{ color: 'var(--text-muted)' }} />
-      </button>
-      {open && (
-        <>
-          <div
-            style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
-            onClick={() => setOpen(false)}
-          />
-          <div className="workspace-floating"
-            style={{
-              position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 9999,
-              minWidth: 200, padding: '4px',
-            }}
-          >
-            <button
-              className="workspace-floating-row" data-selected={value === ''}
-              onClick={() => { onChange(''); setOpen(false); }}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6, width: '100%',
-                padding: '6px 8px', fontSize: 'calc(12px * var(--ui-font-scale))', textAlign: 'left',
-                border: 'none', borderRadius: 'var(--radius-inner)', cursor: 'pointer',
-                color: value === '' ? 'var(--text-primary)' : 'var(--text-secondary)',
-              }}
-            >
-              <Bot size={iconSizes.control} style={{ color: 'var(--text-muted)' }} />
-              全局默认
-            </button>
-            {options.map((o) => (
-              <button
-                key={o.value}
-                className="workspace-floating-row" data-selected={o.value === value}
-                onClick={() => { onChange(o.value); setOpen(false); }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6, width: '100%',
-                  padding: '6px 8px', fontSize: 'calc(12px * var(--ui-font-scale))', textAlign: 'left',
-                  border: 'none', borderRadius: 'var(--radius-inner)', cursor: 'pointer',
-                  color: o.value === value ? 'var(--text-primary)' : 'var(--text-secondary)',
-                }}
-              >
-                {o.provider && o.model ? (() => {
-                  const Icon = modelIcon(o.provider, o.model);
-                  return <Icon size={iconSizes.control} style={{ color: 'var(--text-secondary)' }} />;
-                })() : <Bot size={iconSizes.control} style={{ color: 'var(--text-muted)' }} />}
-                <span style={{ flex: 1 }}>{o.label}</span>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
+    <Select
+      data-testid="model-scope-bar"
+      aria-label={t('model.scope.aria')}
+      value={value}
+      onChange={onChange}
+      options={[{ value: '', label: t('model.scope.global') }, ...options]}
+    />
   );
 }
