@@ -10,6 +10,8 @@ export interface TauriMockOptions {
   sshPreexec?: boolean;
   /** Add one historical session under an archived group to test restoring it by itself. */
   groupedHistoricalSession?: boolean;
+  /** Keep the prompt but omit the OSC 133;B ready marker (older hooks / exotic shells). */
+  shellReadyMarker?: boolean;
   /** 预置模型列表（默认 2 个：主力模型 + 本地模型） */
   aiModels?: { id: string; name: string; provider: string; baseUrl: string; model: string }[];
   /** 当前生效模型 id（默认 '' = 镜像字段） */
@@ -44,7 +46,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     { name: '旧脚本技能', description: '遗留技能，含脚本', source: 'market', trusted: false, enabled: false, hasScripts: true, modified: true, files: ['SKILL.md', 'scripts/run.sh', 'references/说明.md'], dir: '/home/e2e/.vrykell/skills/旧脚本技能', prompt: '运行 scripts/run.sh 完成工作。' },
   ];
   await page.addInitScript(
-    ({ enableIntegration, models, active, skillsSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession }) => {
+    ({ enableIntegration, enableReadyMarker, models, active, skillsSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession }) => {
     let cbCounter = 0;
     const eventListeners = new Map<string, number>();
     const writes: string[] = [];
@@ -237,7 +239,8 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
      *  顺序与真实 RC 一致（shell_integration.rs：OSC7 → D → A → G），防 cwd 归属回归。 */
     function emitInitialPrompt() {
       if (!integrationEnabled) return;
-      emitOutput(`${OSC7('/home/e2e/project')}${A}~/project${G('main')} $ \x1b]133;B\x07`);
+      const ready = enableReadyMarker ? '\x1b]133;B\x07' : '';
+      emitOutput(`${OSC7('/home/e2e/project')}${A}~/project${G('main')} $ ${ready}`);
     }
 
     /** 发送 OSC 133 序列模拟 shell integration 输出 */
@@ -887,7 +890,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
       },
     };
     localStorage.setItem('vrykell-api-key', 'sk-e2e-fake');
-  }, { enableIntegration: integration, models: seedModels, active: seedActive, skillsSeed: seedSkills, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true, sshPreexec: opts.sshPreexec ?? true, groupedHistoricalSession: opts.groupedHistoricalSession ?? false });
+  }, { enableIntegration: integration, enableReadyMarker: opts.shellReadyMarker !== false, models: seedModels, active: seedActive, skillsSeed: seedSkills, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true, sshPreexec: opts.sshPreexec ?? true, groupedHistoricalSession: opts.groupedHistoricalSession ?? false });
 }
 
 /** 预置 AI 回复文本：mock 的 ai_stream 会按 chunk 流式 emit ai-chunk 事件。

@@ -93,6 +93,9 @@ export function syncTermWidth(tabId: string): void {
 /** Fallback width deduction for command insets, host padding, and xterm padding. */
 const BLOCK_CONTENT_INSET_PX = 32;
 
+/** Output silence that marks a prompt for shells without the ready marker. */
+const SHELL_IDLE_READY_MS = 2500;
+
 export function useTerminalSession(
   paneId: string,
   tabId: string,
@@ -315,8 +318,18 @@ export function useTerminalSession(
     }
 
     let startupTimer: ReturnType<typeof setTimeout> | undefined;
+    let idleFallbackTimer: ReturnType<typeof setTimeout> | undefined;
     let promptReady = false;
     let startupComplete = false;
+    const markInputReady = (integrated: boolean) => {
+      if (disposed || stopped || !sessionId) return;
+      if (startupComplete) return;
+      clearTimeout(startupTimer);
+      clearTimeout(idleFallbackTimer);
+      startupComplete = true;
+      useTerminalStore.getState().setStartupState(paneId, 'ready');
+      terminalDebug('shell-input-ready', { paneId, sessionId, integrated });
+    };
     const handleOutput = (events: DispatchEvent[]) => {
       controller.handleEvents(events);
       if (startupComplete) return;
@@ -325,15 +338,18 @@ export function useTerminalSession(
       // Non-integrated command shells have no OSC readiness marker.
       const plainShellOutput = spec?.kind === 'local' && spec.shellType === 'cmd'
         && events.some(event => event.kind === 'data' && event.text.length > 0);
-      if (!promptReady && !plainShellOutput) return;
-      clearTimeout(startupTimer);
-      // Let the line editor finish its initial repaint before injecting a command.
-      startupTimer = setTimeout(() => {
-        if (disposed || stopped || !sessionId) return;
-        startupComplete = true;
-        useTerminalStore.getState().setStartupState(paneId, 'ready');
-        terminalDebug('shell-input-ready', { paneId, sessionId, integrated: promptReady });
-      }, 150);
+      if (promptReady || plainShellOutput) {
+        clearTimeout(startupTimer);
+        clearTimeout(idleFallbackTimer);
+        // Let the line editor finish its initial repaint before injecting a command.
+        startupTimer = setTimeout(() => markInputReady(promptReady), 150);
+        return;
+      }
+      // Shells whose hooks predate the ready marker (or that never send one) would
+      // otherwise block the queued command forever. Output that stops for this long
+      // means the shell is sitting at its prompt, so type there and record why.
+      clearTimeout(idleFallbackTimer);
+      idleFallbackTimer = setTimeout(() => markInputReady(false), SHELL_IDLE_READY_MS);
     };
 
     // Register output before spawning to retain startup markers.
@@ -643,6 +659,7 @@ export function useTerminalSession(
       }
       selectionSub.dispose();
       clearTimeout(startupTimer);
+      clearTimeout(idleFallbackTimer);
       frameSub?.dispose();
       cancelAnimationFrame(frameRaf);
       dataSub.dispose();

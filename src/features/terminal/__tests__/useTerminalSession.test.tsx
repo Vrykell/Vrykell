@@ -153,6 +153,25 @@ describe('useTerminalSession', () => {
     await waitFor(() => expect(useTerminalStore.getState().startupStates.t1).toBe('ready'));
   });
 
+  it('marks input ready after quiet output even without a ready marker', async () => {
+    vi.useFakeTimers();
+    try {
+      render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(useTerminalStore.getState().sessions.t1).toBe('sess-x');
+
+      ptyOutputHandlers[0]!('sess-x', [{ kind: 'data', text: 'PS C:\\Users\\e2e> ' }]);
+      expect(useTerminalStore.getState().startupStates.t1).toBe('starting');
+
+      await vi.advanceTimersByTimeAsync(2400);
+      expect(useTerminalStore.getState().startupStates.t1).toBe('starting');
+      await vi.advanceTimersByTimeAsync(200);
+      expect(useTerminalStore.getState().startupStates.t1).toBe('ready');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('restores legacy CMD block sessions into an interactive classic scene', async () => {
     useWorkspaceStore.setState({ tabs: [{ id: 't1', title: 'CMD', kind: 'session', layout: leaf({ id: 't1', kind: 'local', shellType: 'cmd', openMode: 'block' }) }] });
     render(<TestHarness tabId="t1" onReady={() => {}} />);
