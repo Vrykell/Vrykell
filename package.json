@@ -50,6 +50,7 @@
   "devDependencies": {
     "@iconify-json/devicon": "^1.2.68",
     "@iconify-json/devicon-plain": "^1.2.61",
+    "@iconify-json/mdi": "^1.2.3",
     "@playwright/test": "^1.48.2",
     "@svgr/core": "^8.1.0",
     "@svgr/plugin-jsx": "^8.1.0",

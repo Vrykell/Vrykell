@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { iconSizes,
-  History, Plus, Search, Server, Settings,
+  History, Plus, Search, Settings,
   ChevronRight, Pencil, Archive, Folder, Trash2, X,
  } from '@ui/icons';
 import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, type Tab, type TabGroup } from '@features/workspace';
@@ -15,7 +15,7 @@ import {
   ListReorderPlaceholder, ListReorderPreview, ListReorderZonePlaceholder,
   useListReorder, useListReorderDrag, type ListReorderDrag, type ListReorderTarget,
 } from '@ui/listReorder';
-import { shellIconFor } from '@ui/shellIcons';
+import { SshIcon, shellIconFor } from '@ui/shellIcons';
 
 /**
  * Session navigation with filtering, grouping, renaming and drag ordering.
@@ -268,7 +268,7 @@ export default function PanelTabs() {
             ? Folder
             : tab?.kind === 'history' ? History
               : tab?.kind === 'settings' ? Settings
-                : first?.kind === 'ssh' ? Server
+                : first?.kind === 'ssh' ? SshIcon
                   : shellIconFor(first?.kind === 'local' ? first.shellType : undefined);
           return <Icon size={iconSizes.row} style={{ color: drag.kind === 'group' ? 'var(--accent-warm)' : 'var(--accent)' }} />;
         }}
@@ -488,7 +488,7 @@ function TabRow({
   const isSsh = first?.kind === 'ssh';
   const Icon = tab.kind === 'history' ? History
     : tab.kind === 'settings' ? Settings
-      : isSsh ? Server
+      : isSsh ? SshIcon
         : shellIconFor(first?.kind === 'local' ? first.shellType : undefined);
   const iconColor = active ? 'var(--text-primary)' : 'var(--text-secondary)';
   const typeSummary = terms.map((t) =>

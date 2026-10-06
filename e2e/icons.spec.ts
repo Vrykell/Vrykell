@@ -103,3 +103,19 @@ test('workspace and settings use the same themed icon family in both themes', as
     await page.getByRole('combobox', { name: '页面字号' }).press('Escape');
   }
 });
+
+test('every shell and SSH connection shows its own mark', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  const dialog = page.getByRole('dialog');
+  await page.getByTestId('tab-new-btn').click();
+  // 弹窗同时列出本地 shell 与 SSH 连接，各自带品牌标记
+  await expect(dialog.locator('[data-shell-mark="zsh"]')).toBeVisible();
+  await expect(dialog.locator('[data-shell-mark="bash"]')).toBeVisible();
+  await expect(dialog.locator('[data-shell-mark="ssh"]')).toBeVisible();
+  await dialog.getByText('Bash', { exact: true }).click();
+  await expect(page.locator('[data-tab-row-id]').last().locator('[data-shell-mark="bash"]')).toBeVisible();
+  // SSH 连接行用 SSH 标记，与 shell 标签行区分
+  await page.locator('[data-dock-btn="ssh"]').click();
+  await expect(page.getByTestId('ssh-row-ssh-1').locator('[data-shell-mark="ssh"]')).toBeVisible();
+});

@@ -103,4 +103,14 @@ describe('Select', () => {
     fireEvent.blur(trigger);
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
+
+  it('marks the selected option with a non-character check icon', async () => {
+    render(<Select aria-label="强度" value="low" options={options} onChange={vi.fn()} />);
+    await userEvent.setup().click(screen.getByRole('combobox'));
+    const selected = screen.getByRole('option', { name: '低' });
+    const check = selected.querySelector('svg.ui-select-check');
+    expect(check).not.toBeNull();
+    expect(check).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByRole('option', { name: '高' }).querySelector('svg')).toBeNull();
+  });
 });

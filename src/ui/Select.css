@@ -23,13 +23,18 @@
 .ui-select[aria-expanded="true"] .ui-select-chevron { transform: rotate(180deg); }
 .ui-select-menu { position: fixed; z-index: 10000; padding: 4px; overflow-y: auto; overscroll-behavior: contain; }
 .ui-select-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-height: 32px;
   padding: 6px 10px;
   border-radius: 6px;
-  overflow-wrap: anywhere;
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease);
 }
-.ui-select-option[aria-selected="true"] { background: var(--selection-bg); font-weight: var(--fw-medium); }
+.ui-select-option-label { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+/* The selected option is marked with a check icon, not a filled background. */
+.ui-select-option[aria-selected="true"] { font-weight: var(--fw-medium); }
+.ui-select-check { flex-shrink: 0; color: var(--accent); }
 .ui-select-option[data-active="true"] { background: var(--hover); box-shadow: inset 0 0 0 1px var(--border-strong); }
 .ui-select-option[aria-disabled="true"] { color: var(--text-muted); cursor: default; opacity: 0.45; }

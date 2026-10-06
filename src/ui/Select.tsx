@@ -1,6 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { iconSizes, ChevronDown  } from '@ui/icons';
+import { iconSizes, Check, ChevronDown } from '@ui/icons';
 import './Select.css';
 
 export interface SelectOption<Value extends string | number> {
@@ -151,7 +151,8 @@ export default function Select<Value extends string | number>({
         aria-selected={index === selected} aria-disabled={option.disabled || undefined}
         className="ui-select-option" data-active={index === activeIndex}
         onPointerMove={() => { if (!option.disabled) setActive(index); }} onClick={() => choose(index)}>
-        {option.label}
+        <span className="ui-select-option-label">{option.label}</span>
+        {index === selected && <Check size={iconSizes.compact} aria-hidden="true" className="ui-select-check" />}
       </div>)}
     </div>, document.body)}
   </>;
