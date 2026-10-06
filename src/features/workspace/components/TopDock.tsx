@@ -33,9 +33,12 @@ export default function TopDock() {
   }, []);
 
   return (
-    <header ref={headerRef} className="workspace-titlebar">
+    // Every non-interactive part of the titlebar is a window drag handle; buttons
+    // below keep their own behaviour because a clickable element without the
+    // attribute blocks dragging for the whole path.
+    <header ref={headerRef} className="workspace-titlebar" data-tauri-drag-region>
       <div data-tauri-drag-region className="workspace-title" style={{ paddingLeft: isMacOS && !fullscreen ? 86 : 20 }}>
-        <span>{activeTab?.title || '终端工作区'}</span>
+        <span data-tauri-drag-region>{activeTab?.title || '终端工作区'}</span>
       </div>
       <button data-subtle data-testid="global-search-trigger" className="workspace-search"
         onClick={() => useUiStore.getState().setGlobalSearchOpen(true)}>
