@@ -24,6 +24,7 @@ import * as sessionManager from '@features/workspace/services/sessionManager';
 import { agentControl } from '@features/agent/services/agentControl';
 import { defaultOpenModeForShell } from '@features/agent/stores/agentSettings';
 import { SessionController } from '@features/terminal/services/pipeline/sessionController';
+import { copyTerminalSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
 import { getCellMetrics } from '@utils/termMetrics';
 import type { DispatchEvent } from '@core/terminal/events';
 import type { UnlistenFn } from '@tauri-apps/api/event';
@@ -468,6 +469,20 @@ export function useTerminalSession(
     // blockList 下 End 保留给「回到输入栏」（InputEditor 的全局监听会接住），
     // 不能漏进 PTY（xterm 默认会发 \x1b[F）
     term.attachCustomKeyEventHandler((e) => {
+      // Ctrl+Shift+C/V 复制/粘贴；不劫持 Ctrl+C —— 各终端语义不同，仍直通 PTY。
+      if (e.type === 'keydown' && e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey) {
+        const key = e.key.toLowerCase();
+        if (key === 'c') {
+          e.preventDefault();
+          void copyTerminalSelection(term);
+          return false;
+        }
+        if (key === 'v') {
+          e.preventDefault();
+          void pasteClipboardIntoTerminal(paneId);
+          return false;
+        }
+      }
       if (e.type === 'keydown' && e.key === 'End') {
         const scene = useTerminalStore.getState().scenes[tabId] ?? 'classic';
         if (scene === 'blockList') return false;
@@ -520,13 +535,6 @@ export function useTerminalSession(
           }
         });
       }
-    });
-
-    // ── 选中即复制 ──
-
-    const selectionSub = term.onSelectionChange(() => {
-      const sel = term.getSelection();
-      if (sel) navigator.clipboard.writeText(sel).catch(() => {});
     });
 
     // ── Resize ──
@@ -657,7 +665,6 @@ export function useTerminalSession(
         clearTimeout(focusTimer);
         focusTimer = null;
       }
-      selectionSub.dispose();
       clearTimeout(startupTimer);
       clearTimeout(idleFallbackTimer);
       frameSub?.dispose();

@@ -31,6 +31,8 @@ import SettingsView from '@features/settings/pages/SettingsView';
 import ContextMenu from '@ui/ContextMenu';
 import { useTerminalLayoutActions } from '@features/terminal/hooks/useTerminalLayoutActions';
 import { useTuiControls } from '@features/terminal/hooks/useTuiControls';
+import { copyTerminalSelection, getPaneTerminal, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
+import { t } from '@i18n';
 
 export default function TerminalView() {
   const tabs = useSessionStore((s) => s.tabs);
@@ -85,10 +87,12 @@ export default function TerminalView() {
           anchor={ctxMenu}
           onClose={() => setCtxMenu(null)}
           items={[
+            { label: t('terminal.menu.copy'), shortcut: 'Ctrl+Shift+C', onClick: () => { void copyTerminalSelection(getPaneTerminal(focusedTermId)); } },
+            { label: t('terminal.menu.paste'), shortcut: 'Ctrl+Shift+V', onClick: () => { void pasteClipboardIntoTerminal(focusedTermId); } },
             { label: '分裂终端（选位置）', onClick: () => useUiStore.getState().beginSplit(null) },
             { label: '选择类型分裂', onClick: () => useUiStore.getState().openSplitPicker() },
             { label: '更换位置', onClick: () => useUiStore.getState().beginMove(focusedTermId) },
-        { label: '关闭终端', danger: true, onClick: () => useSessionStore.getState().closeFocusedTerminal() },
+            { label: '关闭终端', danger: true, onClick: () => useSessionStore.getState().closeFocusedTerminal() },
           ]}
         />
       )}

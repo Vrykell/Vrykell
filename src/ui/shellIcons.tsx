@@ -3,7 +3,7 @@ import PowerShellMark from '~icons/devicon/powershell';
 import ZshMark from '~icons/devicon/zsh';
 import BashMark from '~icons/devicon/bash';
 import CmdMark from '~icons/devicon/windows8';
-import SshMark from '~icons/mdi/ssh';
+import SshMark from '~icons/mdi/console-line';
 import { iconSizes, Terminal, type AppIcon, type AppIconProps } from '@ui/icons';
 
 /**
@@ -11,9 +11,11 @@ import { iconSizes, Terminal, type AppIcon, type AppIconProps } from '@ui/icons'
  * (`~icons/<collection>/<name>` via unplugin-icons), sized like the app icons.
  *
  * PowerShell, zsh, bash and CMD use their colored devicon mark. SSH has no
- * colored logo, so it uses the monochrome `mdi:ssh` glyph rendered in the
- * theme's success color, which stays readable on both light and dark themes.
- * Shells without a mark fall back to the generic terminal icon.
+ * colored logo, so it uses the monochrome `mdi:console-line` terminal glyph
+ * rendered in the theme's success color, which stays readable on both light and
+ * dark themes and reads as an interactive session at a glance (the literal "SSH"
+ * letters were hard to make out at row size). Shells without a mark fall back to
+ * the generic terminal icon.
  */
 
 type BrandMark = ForwardRefExoticComponent<SVGProps<SVGSVGElement> & { title?: string }>;

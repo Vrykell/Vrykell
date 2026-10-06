@@ -399,3 +399,9 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 
 /* Let the output canvas show through xterm's viewport gutter. */
 [data-testid="running-term"] .xterm .xterm-viewport { background-color: transparent; }
+
+/* The running block is trimmed to visible rows and bubbles wheel events to the list, so its
+ * own xterm scroll surfaces would only stack a second, redundant scrollbar (and an asymmetric
+ * right gutter) on top of the block-list scroller. */
+[data-testid="running-term"] .xterm .xterm-viewport { overflow-y: hidden; }
+[data-testid="running-term"] .xterm .xterm-scrollable-element > .scrollbar { display: none; }

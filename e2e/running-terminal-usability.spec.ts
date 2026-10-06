@@ -32,6 +32,13 @@ test('运行中命令块以图标显示统一尺寸的操作按钮', async ({ pa
   await page.screenshot({ path: test.info().outputPath('termination-armed.png') });
 });
 
+test('运行中块不再叠加第二个 xterm 滚动条', async ({ page }) => {
+  const host = page.getByTestId('running-term');
+  await expect(host.locator('.xterm-viewport')).toHaveCSS('overflow-y', 'hidden');
+  await expect(host.locator('.xterm-scrollable-element > .scrollbar.vertical')).toHaveCSS('display', 'none');
+  await expect(host.locator('.xterm-scrollable-element > .scrollbar.horizontal')).toHaveCSS('display', 'none');
+});
+
 test('split repaint frames during typing do not shrink the running terminal or resend its size', async ({ page }) => {
   const host = page.getByTestId('running-term');
   await emitPtyOutput(page, '\x1b[20;1Hinput-ready');

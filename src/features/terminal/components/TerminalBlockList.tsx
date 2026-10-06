@@ -24,6 +24,7 @@ import type { BlockMenuAnchor } from '@features/terminal/hooks/useTerminalBlockF
 import { useBlockItemActions } from '@features/terminal/hooks/useBlockItemActions';
 import { useTuiControls } from '@features/terminal/hooks/useTuiControls';
 import { hasVisibleContent as hasVisibleBlockContent } from '@features/terminal/model/blockVisibility';
+import { copyTerminalSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
 import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
 import { measureRunningTerminalRows } from '../model/runningTerminalRows';
 
@@ -548,10 +549,23 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
         }
       });
     });
-    // End 保留给「回到输入栏」（InputEditor 全局监听），不进 PTY
-    term.attachCustomKeyEventHandler(
-      (e) => !(e.type === 'keydown' && e.key === 'End'),
-    );
+    // Ctrl+Shift+C/V 复制/粘贴；End 保留给「回到输入栏」（InputEditor 全局监听），不进 PTY。
+    term.attachCustomKeyEventHandler((e) => {
+      if (e.type === 'keydown' && e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey) {
+        const key = e.key.toLowerCase();
+        if (key === 'c') {
+          e.preventDefault();
+          void copyTerminalSelection(term);
+          return false;
+        }
+        if (key === 'v') {
+          e.preventDefault();
+          void pasteClipboardIntoTerminal(tabId);
+          return false;
+        }
+      }
+      return !(e.type === 'keydown' && e.key === 'End');
+    });
     // Bubble wheel events to the block list; fullscreen mode keeps xterm scrollback behavior.
     term.attachCustomWheelEventHandler(() => tuiFs);
     // Recheck terminal columns when the host width changes, including its first layout.
@@ -564,11 +578,6 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
       }
     });
     widthRo.observe(host);
-    // 选中即复制（与主 xterm 一致）
-    const selSub = term.onSelectionChange(() => {
-      const sel = term.getSelection();
-      if (sel) navigator.clipboard.writeText(sel).catch(() => {});
-    });
 
     return () => {
       if (w.__vrykellTerms?.get(`block:${tabId}`) === term) {
@@ -576,7 +585,6 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
       }
       renderSub?.dispose();
       dataSub.dispose();
-      selSub.dispose();
       widthRo.disconnect();
     };
   }, [tabId, blockId, tuiFs]);

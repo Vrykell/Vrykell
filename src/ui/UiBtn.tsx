@@ -57,17 +57,29 @@ interface MenuItemProps {
   label: string;
   onClick: () => void;
   danger?: boolean;
+  /** 可选的快捷键提示，显示在行尾（如 Ctrl+Shift+C）。 */
+  shortcut?: string;
 }
 
-export function MenuItem({ label, onClick, danger }: MenuItemProps) {
+export function MenuItem({ label, onClick, danger, shortcut }: MenuItemProps) {
+  const style: CSSProperties = shortcut
+    ? { ...menuItemStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24 }
+    : menuItemStyle;
   return (
     <button
       onClick={onClick}
       className="workspace-floating-row"
-      style={danger ? { ...menuItemStyle, color: 'var(--error)' } : menuItemStyle}
+      style={danger ? { ...style, color: 'var(--error)' } : style}
       onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'var(--hover)'; }}
       onMouseLeave={(e) => { (e.target as HTMLElement).style.background = 'transparent'; }}
-    >{label}</button>
+    >
+      {shortcut ? (
+        <>
+          <span>{label}</span>
+          <span style={{ color: 'var(--text-muted)', fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-mono)' }}>{shortcut}</span>
+        </>
+      ) : label}
+    </button>
   );
 }
 

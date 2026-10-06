@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { readClipboardFiles, writeClipboardFiles, writeClipboardText } from '@platform/clipboard';
+import { readClipboardFiles, readClipboardText, writeClipboardFiles, writeClipboardText } from '@platform/clipboard';
 
 const nativeWriteText = vi.hoisted(() => vi.fn());
+const nativeReadText = vi.hoisted(() => vi.fn());
 const invokeMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@tauri-apps/plugin-clipboard-manager', () => ({
   writeText: nativeWriteText,
+  readText: nativeReadText,
 }));
 
 vi.mock('@platform/diagnostics', () => ({ invoke: invokeMock }));
@@ -59,6 +61,47 @@ describe('writeClipboardText', () => {
     await writeClipboardText('fallback');
 
     expect(execCommand).toHaveBeenCalledWith('copy');
+  });
+});
+
+describe('readClipboardText', () => {
+  beforeEach(() => {
+    nativeReadText.mockReset().mockResolvedValue('native value');
+    delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { readText: vi.fn().mockResolvedValue('browser value') },
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('reads through the native Tauri clipboard on desktop runtimes', async () => {
+    (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {};
+
+    await expect(readClipboardText()).resolves.toBe('native value');
+    expect(nativeReadText).toHaveBeenCalledOnce();
+  });
+
+  it('uses the browser clipboard outside Tauri', async () => {
+    await expect(readClipboardText()).resolves.toBe('browser value');
+    expect(nativeReadText).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the browser clipboard when the native read is rejected', async () => {
+    nativeReadText.mockRejectedValueOnce(new Error('permission denied'));
+    (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {};
+
+    await expect(readClipboardText()).resolves.toBe('browser value');
+    expect(nativeReadText).toHaveBeenCalledOnce();
+  });
+
+  it('returns an empty string when no clipboard API is available', async () => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+
+    await expect(readClipboardText()).resolves.toBe('');
   });
 });
 
