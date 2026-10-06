@@ -471,8 +471,10 @@
 ### 15.4 fileTree 防环（`fileTree.ts:47`）
 - 自引用 symlink、或后端对任意路径返回相同列表时，递归展开栈溢出。目录路径已在祖先链上则照常渲染该行但不再递归。
 
-### 15.5 normPath 把根剥成空串（`da7ee25`）
+### 15.5 路径规范化必须收口在平台层（`da7ee25`；混合分隔符 `C:/Users/foo\.android`）
 - `normPath('/')` → `''`，`fs_list('')` 失败 → `cd /` 后文件面板显示空目录。路径规范化必须保留文件系统根。
+- Windows 盘符根必须保留根斜杠 `C:/`：`C:` 是「该驱动器当前目录」，`fs_list('C:')` 不一定是根。
+- 后端条目路径带原生反斜杠，而从终端 cwd（已规范化）进入子目录时会拼出 `C:/Users/foo\.android` 这类混合路径。修复：路径语义收敛到 `@platform/path`，`@platform/api/fs`（以及 workspace/search）在 IPC 边界双向归一化；业务层不得再对 `entry.path` 手写 `normPath`。
 
 ### 15.6 waitForSession 8s 超时静默丢弃命令（`code-audit.md`）
 - 「同步到终端」等跨面板操作在 PTY 未就绪时静默失败，用户以为按钮坏了。超时要有用户可见反馈。
