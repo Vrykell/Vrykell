@@ -102,6 +102,8 @@ App
 └──────────────────────────────────────────────────────────┘
 ```
 
+`src/platform/` 是唯一的基础设施接入层：`platform/api/*` 按领域封装 `invoke` 调用与跨进程契约类型，视图/领域层不直接 invoke。本地路径语义收敛在 `platform/path.ts`（分隔符、盘符根、上级目录）；所有跨 IPC 边界的文件路径在 `platform/api/fs`（以及 workspace/search）双向归一化——入参先规范成前端统一的 `/` 形式再 invoke，后端返回的原生路径先规范再进业务状态。业务层直接使用规范路径，不自行处理分隔符（终端 cwd 的 OSC 7 归一化仍由终端管线负责）。
+
 ## 5. 同步派发与三场景状态机：PTY 输出到屏幕
 
 Rust PTY 输出的每个 chunk 不再先写主 xterm 再等 parser 异步回调，而是先在 **Rust 端同步扫描**，按字节顺序产生事件后经 Tauri IPC 一次性交付，前端 SessionController 同步消费。
