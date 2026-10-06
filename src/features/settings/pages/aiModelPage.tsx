@@ -10,7 +10,7 @@ import type { ProviderKind } from '@features/agent/services/provider';
 import { baseUrlForProvider } from '@features/agent/services/provider';
 import { detectCapabilities, type ModelCapability } from '@features/agent/model/capabilities';
 import { modelIcon, providerLabel } from '@features/agent/components/modelIcon';
-import Segmented from '@ui/Segmented';
+import Select from '@ui/Select';
 import { useToastStore } from '@ui/Toast';
 import { Field, ModelTextInput, btnStyle } from '@features/settings/components/ui';
 import ModelThinkingSettings from '@features/settings/components/ModelThinkingSettings';
@@ -224,7 +224,8 @@ function ModelListField() {
               </button>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-              <Segmented
+              <Select
+                aria-label={`${m.name || '未命名模型'} 提供方`}
                 options={PROVIDERS.map((p) => ({ value: p.id, label: p.label }))}
                 value={m.provider}
                 onChange={(v) => { void save(() => update(m.id, { provider: v, baseUrl: baseUrlForProvider(m.baseUrl, v) })); }}

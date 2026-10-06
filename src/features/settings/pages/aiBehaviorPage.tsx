@@ -3,7 +3,7 @@
  */
 import { useState } from 'react';
 import { useAiConfigStore, useAgentSettings, type AgentSettings, type ModelBehaviorSettings } from '@features/agent';
-import Segmented from '@ui/Segmented';
+import Select from '@ui/Select';
 import { ModelScopeBar } from '@features/chat/components/ModelPicker';
 import { Field, Toggle, NumberInput, inputStyle, btnStyle } from '@features/settings/components/ui';
 import AutoSaveInput from '../components/AutoSaveInput';
@@ -85,7 +85,8 @@ export function AiBehaviorPage() {
         <NumberInput key={scope} value={eff.maxSteps} min={1} max={100} onChange={(v) => update({ maxSteps: v })} />
       </Field>
       <Field title="上下文策略" description="全量不裁剪；窗口按预算保留最近消息；摘要压缩旧消息。">
-        <Segmented
+        <Select
+          aria-label="上下文策略"
           options={[
             { value: 'off', label: '全量' },
             { value: 'window', label: '窗口' },
