@@ -88,6 +88,8 @@ test.describe('文件面板', () => {
     await page.getByTestId('local-more-btn').click();
     await expect(page.getByRole('button', { name: '上传文件' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '下载管理' })).toBeVisible();
+    // 没有进行过文件操作时不出现回退项
+    await expect(page.getByRole('button', { name: /^回退/ })).toHaveCount(0);
 
     // 从当前文件夹新建标签页（标题取目录名）
     await page.getByRole('button', { name: '从当前文件夹新建标签页' }).click();
@@ -102,6 +104,88 @@ test.describe('文件面板', () => {
     await page.getByTestId('local-more-btn').click();
     await expect(page.getByRole('button', { name: '从当前文件夹新建标签页' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '下载管理' })).toBeVisible();
+  });
+
+  test('Ctrl 加选多行并在右键菜单批量操作', async ({ page }) => {
+    const tree = page.getByTestId('local-file-tree');
+    const notes = tree.locator('[data-testid="file-row"][data-path="/home/e2e/notes.txt"]');
+    const documents = tree.locator('[data-testid="file-row"][data-path="/home/e2e/Documents"]');
+
+    await notes.click();
+    await expect(notes).toHaveAttribute('data-selected', 'true');
+    await documents.click({ modifiers: ['ControlOrMeta'] });
+    await expect(documents).toHaveAttribute('data-selected', 'true');
+    await expect(notes).toHaveAttribute('data-selected', 'true');
+
+    // 右键命中选中集：菜单作用于整组，并隐藏只对单行有意义的操作
+    await notes.click({ button: 'right' });
+    await expect(page.getByRole('button', { name: '复制 2 项' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '删除 2 项' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '重命名' })).toHaveCount(0);
+  });
+
+  test('粘贴目标：右键文件夹进该文件夹，右键文件与 Ctrl+V 进当前目录', async ({ page }) => {
+    const tree = page.getByTestId('local-file-tree');
+    const notes = tree.locator('[data-testid="file-row"][data-path="/home/e2e/notes.txt"]');
+
+    // 复制 → 右键文件夹：粘贴进该文件夹
+    await notes.click({ button: 'right' });
+    await page.getByRole('button', { name: '复制', exact: true }).click();
+    await tree.locator('[data-testid="file-row"][data-path="/home/e2e/Documents"]').click({ button: 'right' });
+    await page.getByRole('button', { name: '粘贴到「Documents」' }).click();
+    await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'copy'))
+      .toContainEqual({ op: 'copy', path: '/home/e2e/notes.txt', destDir: '/home/e2e/Documents' });
+
+    // 右键文件：粘贴项指向同级目录（当前目录）
+    await notes.click({ button: 'right' });
+    await expect(page.getByRole('button', { name: '粘贴', exact: true })).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    // 空白处右键：粘贴到当前目录
+    const box = await tree.boundingBox();
+    await page.mouse.click(box!.x + 40, box!.y + box!.height - 20, { button: 'right' });
+    await expect(page.getByRole('button', { name: '粘贴', exact: true })).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    // Ctrl+V：粘贴到当前目录
+    await notes.click();
+    await page.keyboard.press('ControlOrMeta+v');
+    await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'copy'))
+      .toContainEqual({ op: 'copy', path: '/home/e2e/notes.txt', destDir: '/home/e2e/project' });
+  });
+
+  test('删除后可回退：更多菜单出现回退删除并把暂存项移回原位', async ({ page }) => {
+    const tree = page.getByTestId('local-file-tree');
+    const notes = tree.locator('[data-testid="file-row"][data-path="/home/e2e/notes.txt"]');
+
+    await notes.click({ button: 'right' });
+    await page.getByRole('button', { name: '删除', exact: true }).click();
+    await page.locator('[data-testid="confirm-ok"]').click();
+    await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'delete'))
+      .toContainEqual({ op: 'delete', path: '/home/e2e/notes.txt' });
+
+    await page.getByTestId('local-more-btn').click();
+    await page.getByRole('button', { name: '回退删除' }).click();
+    await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'restore'))
+      .toContainEqual({ op: 'restore', path: '/home/e2e/notes.txt' });
+  });
+
+  test('拖拽文件到文件夹：悬停高亮并移动', async ({ page }) => {
+    const tree = page.getByTestId('local-file-tree');
+    const notes = tree.locator('[data-testid="file-row"][data-path="/home/e2e/notes.txt"]');
+    const documents = tree.locator('[data-testid="file-row"][data-path="/home/e2e/Documents"]');
+
+    const from = await notes.boundingBox();
+    const to = await documents.boundingBox();
+    await page.mouse.move(from!.x + 40, from!.y + from!.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(to!.x + 40, to!.y + to!.height / 2, { steps: 8 });
+    // 拖拽预览显示目标文件夹
+    await expect(page.getByText(/移动 1 项.*Documents/)).toBeVisible();
+    await page.mouse.up();
+
+    await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'move'))
+      .toContainEqual({ op: 'move', path: '/home/e2e/notes.txt', destDir: '/home/e2e/Documents' });
   });
 
   test('此电脑视图：磁盘以小卡片展示（含容量），点击进入', async ({ page }) => {
