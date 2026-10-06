@@ -33,19 +33,11 @@ export default function PanelFiles() {
   return <LocalFiles />;
 }
 
-/**
- * LocalFiles — 本地文件浏览面板。
- * 跟随活跃标签页 cwd 实时定位；目录单击展开（树形）、双击进入；
- * 文件**双击**在终端编辑器中打开（可配置模板，编辑器缺失自动降级）；
- * 路径面包屑、右键菜单（工作区管理 / 打开方式）、顶栏「下载」进入下载管理。
- *
- * 单击/双击无需计时器消歧：双击会先触发两次单击（展开→收起，净效果为零），
- * 随后的 dblclick 再进入目录。
- */
+/** Browse local files; opening an editor keeps the directory, expanded tree and scroll intact. */
 function LocalFiles() {
   const [showDownloads, setShowDownloads] = useState(false);
 
-  // ── 跟随聚焦终端的 cwd：切窗口 / 切换聚焦终端 / 终端 cd 都会实时定位 ──
+  // Seed the browser from the terminal once, then keep navigation independent.
   const { focusedPaneId: focused, activeCwd, sessions } = useActiveWorkspace();
   const {
     path,
@@ -61,7 +53,7 @@ function LocalFiles() {
     load,
     toggleExpand,
     retryExpand,
-  } = useLocalFileBrowser({ activeCwd, focusedPaneId: focused });
+  } = useLocalFileBrowser({ initialCwd: activeCwd });
   const {
     ctxMenu,
     renameTarget,
@@ -168,7 +160,7 @@ function LocalFiles() {
       </div>
 
       {/* 文件列表（树形）/ 此电脑（磁盘卡片） */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
+      <div className="scroll-region" data-testid="local-file-tree" data-path={path ?? ''} style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
         {loading ? (
           <div role="status" style={{ padding: 16, color: 'var(--text-muted)', fontSize: 'var(--fs-label)' }}>
             {path === null ? '正在扫描磁盘…' : '正在读取目录…'}

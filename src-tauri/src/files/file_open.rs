@@ -293,6 +293,29 @@ mod tests {
     }
 
     #[test]
+    fn default_command_supports_parameters_and_file_placeholders() {
+        let cfg = cfg_with("edit --wait {file}", &[]);
+        assert_eq!(
+            file_open_sync("/tmp/a b.txt", &cfg, all()).unwrap(),
+            FileOpenResult::Terminal {
+                editor: "edit".into(),
+                command: "edit --wait '/tmp/a b.txt'".into(),
+                fell_back: false,
+            }
+        );
+    }
+
+    #[test]
+    fn default_system_command_skips_editor_detection() {
+        let cfg = cfg_with(SYSTEM_DEFAULT, &[("md", "edit {file}")]);
+        assert_eq!(
+            file_open_sync("/tmp/a.txt", &cfg, |_| panic!("system open must skip detection")).unwrap(),
+            FileOpenResult::System { degraded: false }
+        );
+        assert!(matches!(file_open_sync("/tmp/a.md", &cfg, all()).unwrap(), FileOpenResult::Terminal { .. }));
+    }
+
+    #[test]
     fn file_open_falls_back_when_bin_missing() {
         let cfg = cfg_with("vim", &[]);
         let r = file_open_sync("/tmp/a.txt", &cfg, check(&["nano"])).unwrap();

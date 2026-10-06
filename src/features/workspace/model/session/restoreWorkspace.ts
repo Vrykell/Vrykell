@@ -122,7 +122,13 @@ export function restoreWorkspace(): Promise<void> {
       return sessions.map(toWorkspaceSession);
     },
     loadGroups: () => useWorkspaceStore.getState().loadGroups(),
-    restoreSession: (session) => sessionManager.restore(session.id, session.title, { groupId: session.groupId }),
+    restoreSession: (session) => {
+      const hasRestoredGroup = session.groupId != null
+        && useWorkspaceStore.getState().groups.some((group) => group.id === session.groupId);
+      return sessionManager.restore(session.id, session.title, {
+        groupId: hasRestoredGroup ? session.groupId : null,
+      });
+    },
     hasTabs: () => useWorkspaceStore.getState().tabs.length !== 0,
     createDefaultSession,
   });

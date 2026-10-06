@@ -1,5 +1,33 @@
 import { test, expect, type Page } from '@playwright/test';
-import { setupTauriMock, emitPtyOutput, ptyWrites } from './tauri-mock';
+import { setupTauriMock, emitPtyOutput, expectAnyTermContains, ptyWrites } from './tauri-mock';
+import { readFileSync } from 'node:fs';
+
+const conptyOutput = JSON.parse(readFileSync(new URL('./fixtures/ssh-conpty-output.json', import.meta.url), 'utf8')) as Array<{ command: string; output: string }>;
+
+for (const sshPreexec of [true, false]) {
+  test(`SSH block commands render ls and pwd output with preexec=${sshPreexec}`, async ({ page }) => {
+    await setupTauriMock(page, { sshPreexec });
+    await page.addInitScript(() => localStorage.setItem('vrykell-agent-settings', JSON.stringify({ version: 8, state: { global: { sshOpenMode: 'block' }, overrides: {} } })));
+    await page.goto('/');
+    await page.locator('[data-dock-btn="ssh"]').click();
+    await page.getByTestId('ssh-row-ssh-1').dblclick();
+    await expect(page.getByTestId('ssh-connection-input')).toBeHidden();
+    const editor = page.getByPlaceholder(/输入命令/).last();
+    for (let index = 0; index < 2; index++) {
+      await editor.fill('ls');
+      await editor.press('Enter');
+      await expect(page.locator('[data-testid^="command-block-"]').filter({ hasText: 'Documents Downloads notes.txt' })).toHaveCount(index + 1);
+      const block = page.locator('[data-testid^="command-block-"]').filter({ hasText: 'Documents Downloads notes.txt' }).last();
+      await expect(block.locator('[data-selectable]').last()).toBeInViewport();
+      await expect.poll(() => block.evaluate(el => el.getBoundingClientRect().height)).toBeLessThan(120);
+    }
+    await editor.fill('pwd');
+    await editor.press('Enter');
+    await expect(page.locator('[data-testid^="command-block-"]').filter({ hasText: '/home/e2e/project' })).toHaveCount(1);
+    expect((await ptyWrites(page)).filter(data => data === 'ls\n')).toHaveLength(2);
+    await expect(page.locator('[data-testid^="running-block-"]')).toHaveCount(0);
+  });
+}
 
 async function openSsh(page: Page, host: 'known' | 'unknown' | 'changed', confirmed = true) {
   await setupTauriMock(page, { integration: false, sshHost: host, sshTrustConfirmed: confirmed });
@@ -12,6 +40,29 @@ async function openSsh(page: Page, host: 'known' | 'unknown' | 'changed', confir
 async function ipcRecords(page: Page, key: string): Promise<Record<string, unknown>[]> {
   return page.evaluate(name => (window as unknown as Record<string, Record<string, unknown>[]>)[name] ?? [], key);
 }
+
+test('native SSH recordings distinguish an empty directory from missing command output', async ({ page }) => {
+  await openSsh(page, 'known');
+  await emitPtyOutput(page, '\x1b]133;A\x07');
+  await expect(page.getByTestId('ssh-connection-input')).toBeHidden();
+
+  // Replay sanitized native SSH output, including the full blank-screen repaint.
+  for (const recording of conptyOutput) {
+    await emitPtyOutput(page, recording.output);
+  }
+  const blocks = page.locator('[data-testid^="command-block-"]');
+  await expect(blocks).toHaveCount(4);
+  await expect(blocks.nth(0).getByTestId('exit-code')).toHaveText('0');
+  await expect(blocks.nth(0).locator('[data-selectable]')).toHaveCount(1);
+  await expect(page.getByText('命令未产生输出')).toHaveCount(0);
+  await expect(blocks.nth(1).locator('[data-selectable]').last()).toContainText('/home/fixture');
+  await expect(blocks.nth(2).locator('[data-selectable]').last()).toContainText('share');
+  await expect(blocks.nth(3).locator('[data-selectable]').last()).toContainText('stderr-visible');
+  await blocks.nth(0).getByRole('button', { name: '折叠', exact: true }).click();
+  await blocks.nth(0).getByRole('button', { name: '展开', exact: true }).click();
+  await expect(blocks.nth(0).locator('[data-selectable]')).toHaveCount(1);
+  await page.screenshot({ path: test.info().outputPath('ssh-conpty-empty-and-visible-output.png') });
+});
 
 test('first SSH connection confirms its fingerprint and accepts authentication input', async ({ page }) => {
   await openSsh(page, 'unknown');
@@ -78,6 +129,59 @@ test('a logged-in SSH command does not retain the previous password prompt', asy
   await expect(page.getByLabel('SSH 认证响应')).toHaveCount(0);
   await expect(page.getByText('file.txt', { exact: true })).toBeVisible();
   await expect(page.getByText("user@server's password:", { exact: true })).toBeHidden();
+});
+
+test('SSH block mode remains directly interactive when the remote server has no shell integration', async ({ page }) => {
+  await openSsh(page, 'known');
+  const surface = page.getByTestId('ssh-connection-input');
+  await emitPtyOutput(page, "user@server's password: ");
+  const response = surface.getByLabel('SSH 认证响应');
+  await expect(response).toBeEnabled();
+  await response.fill('test-response');
+  await response.press('Enter');
+
+  // A forced-command/chat server can redraw its normal screen without emitting OSC 133.
+  await emitPtyOutput(page, '\r\n\x1b[2J\x1b[H已登录交互程序\r\n方向键选择，Enter 确认，Esc 退出\r\nuser@server\'s password: ');
+  await expect(surface.getByRole('status')).toHaveText('SSH 交互会话');
+  await expect(surface.getByLabel('SSH 认证响应')).toHaveCount(0);
+  await expect(surface.locator('.xterm-screen')).toBeVisible();
+
+  await surface.getByRole('button', { name: '密码输入' }).click();
+  await expect(surface.getByLabel('SSH 认证响应')).toBeVisible();
+  await expect(surface.locator('.xterm-screen')).toBeVisible();
+  await expect(surface.locator('pre')).toHaveCount(0);
+  await surface.getByRole('button', { name: '直接输入' }).click();
+
+  await surface.getByRole('textbox', { name: 'SSH 交互终端' }).click();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Escape');
+  expect(await ptyWrites(page)).toEqual(expect.arrayContaining(['\x1b[B', '\r', '\x1b']));
+  await surface.getByRole('button', { name: '断开连接' }).click();
+  await expect(surface.getByRole('status')).toHaveText('已断开 SSH 连接');
+  await expect(surface.locator('pre')).toContainText('已登录交互程序');
+});
+
+test('SSH block mode restores its xterm host when a command opens an alternate-screen app', async ({ page }) => {
+  await openSsh(page, 'known');
+  const surface = page.getByTestId('ssh-connection-input');
+
+  // The remote shell prompt switches from the authentication xterm to the block list.
+  await emitPtyOutput(page, '\x1b]133;A\x07');
+  await expect(surface).toBeHidden();
+  await expect(page.getByPlaceholder(/输入命令/).last()).toBeVisible();
+
+  // A command starts in a block, then enters a full-screen TUI that must use the same xterm.
+  await emitPtyOutput(page, '\x1b]133;E;dmlt\x07\x1b]133;C\x07\x1b[?1049hSSH-BLOCK-TUI');
+  await expect(page.getByText('TUI')).toBeVisible();
+  await expect(surface).toBeVisible();
+  await expect(surface.locator('.xterm-screen')).toBeVisible();
+  await expectAnyTermContains(page, 'SSH-BLOCK-TUI');
+
+  await emitPtyOutput(page, '\x1b[?1049l\x1b]133;D;0\x07\x1b]133;A\x07');
+  await expect(page.getByText('TUI')).toBeHidden();
+  await expect(surface).toBeHidden();
+  await expect(page.getByPlaceholder(/输入命令/).last()).toBeVisible();
 });
 
 test('canceling host trust does not spawn SSH or record a key', async ({ page }) => {

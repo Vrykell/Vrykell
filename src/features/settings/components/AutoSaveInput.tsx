@@ -21,9 +21,11 @@ interface Props {
   normalize?: (value: string) => string;
   onClear?: () => Promise<void>;
   clearAfterSave?: boolean;
+  /** Stable hook for tests; the visible copy may change. */
+  testId?: string;
 }
 
-export default function AutoSaveInput({ value, onCommit, placeholder, style, multiline, rows, type, min, max, step, disabled, trim = true, validate, normalize, onClear, clearAfterSave }: Props) {
+export default function AutoSaveInput({ value, onCommit, placeholder, style, multiline, rows, type, min, max, step, disabled, trim = true, validate, normalize, onClear, clearAfterSave, testId }: Props) {
   const composing = useRef(false);
   const { flex, flexShrink, width, minWidth, marginTop, marginBottom, ...controlStyle } = style ?? {};
   const validateDraft = validate ?? (type === 'number'
@@ -35,7 +37,7 @@ export default function AutoSaveInput({ value, onCommit, placeholder, style, mul
     return normalize ? normalize(result) : result;
   });
   const feedback = useSettingsSave();
-  const props = { value: save.value, placeholder, disabled,
+  const props = { value: save.value, placeholder, disabled, 'data-testid': testId,
     onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => save.setValue(event.target.value, false, composing.current),
     onBlur: () => { void save.flush(); },
     onCompositionStart: () => { composing.current = true; save.setComposing(true); },

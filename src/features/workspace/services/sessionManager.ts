@@ -11,6 +11,7 @@ import { useChatStore } from '@features/chat';
 import { deserializeParts } from '@features/agent/model/messageParts';
 import { deserializeAttachments } from '@features/agent/model/attachments';
 import { leaf, type WindowLayout } from '@features/workspace/model/windowLayout';
+import { sessionSetGroup } from '@platform/api/group';
 import {
   createSession,
   archiveSession,
@@ -31,7 +32,7 @@ import type { BackendBlockEntry, BackendSessionEntry } from '@platform/api/types
 /** 恢复会话时用于重建 tab 的元数据（kind/payload 已由后端持久化）。 */
 export interface RestoreMeta {
   /** 恢复为标签时归属的分组 id（恢复整组时保持嵌套关系） */
-  groupId?: string;
+  groupId?: string | null;
 }
 
 /** 解析后端 payload JSON → 窗口布局（兼容旧版 shellType/ssh 单终端 payload）。 */
@@ -196,13 +197,27 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
     console.warn('sessionManager.restore: get_session failed:', e);
   }
   const layout = parseLayout(info?.payload ?? '{}', sessionId);
+  const storedGroupId = info?.group_id ?? undefined;
+  const hasGroupOverride = meta != null && Object.prototype.hasOwnProperty.call(meta, 'groupId');
+  const knownGroupIds = new Set(useSessionStore.getState().groups.map((group) => group.id));
+  const groupId = hasGroupOverride
+    ? meta.groupId ?? undefined
+    : storedGroupId && knownGroupIds.has(storedGroupId) ? storedGroupId : undefined;
+
+  // A restored session must not point at an archived or unloaded group, or the tab sidebar
+  // cannot render it. Keep valid active groups; otherwise persist it as ungrouped.
+  if ((hasGroupOverride || storedGroupId) && (storedGroupId ?? null) !== (groupId ?? null)) {
+    await sessionSetGroup(sessionId, groupId ?? null).catch((e) => {
+      console.warn('sessionManager.restore: session_set_group failed:', e);
+    });
+  }
 
   // 4. 重建窗口 tab（含布局），设置为 active —— 恢复会话 = 恢复窗口布局
   const tab: Tab = {
     id: sessionId,
     title: title || info?.title || '',
     kind: 'session',
-    groupId: meta?.groupId ?? info?.group_id ?? undefined,
+    groupId,
     layout,
   };
 
@@ -213,6 +228,11 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
       activeId: sessionId,
     }));
   } else {
+    useSessionStore.setState((s) => ({
+      tabs: s.tabs.map((existing) => existing.id === sessionId && existing.kind === 'session'
+        ? { ...existing, groupId }
+        : existing),
+    }));
     ws.activate(sessionId);
   }
 }

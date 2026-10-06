@@ -216,11 +216,12 @@ function SettingsContent() {
       case 'editor-local':
         return (
           <>
-            <Field title="默认编辑器" description="本地文件双击打开时使用的编辑器命令；缺失时自动降级 vim → nano → vi。">
+            <Field title="默认编辑命令" description="本地文件双击打开时执行的命令；{file} 替换为文件路径，省略时追加路径；__system__ 使用系统默认应用打开。命令不可用时依次尝试 vim、nano、vi。">
               <AutoSaveInput
                 key="local-editor"
+                testId="editor-local-command"
                 value={fileCfg.defaultEditor}
-                placeholder="vim"
+                placeholder="例如 edit {file}，或 __system__"
                 onCommit={defaultEditor => updateFileCfg({ defaultEditor })}
               />
             </Field>
@@ -238,11 +239,12 @@ function SettingsContent() {
       case 'editor-remote':
         return (
           <>
-            <Field title="默认编辑器" description="远程文件双击打开时，在 SSH 终端里使用的编辑器命令。">
+            <Field title="默认编辑命令" description="远程文件双击打开时在 SSH 终端执行的命令；{file} 替换为远程文件路径，省略时追加路径。">
               <AutoSaveInput
                 key="remote-editor"
+                testId="editor-remote-command"
                 value={fileCfg.remoteEditor}
-                placeholder="vim"
+                placeholder="例如 vim {file}"
                 onCommit={remoteEditor => updateFileCfg({ remoteEditor })}
               />
             </Field>
@@ -296,7 +298,7 @@ function SettingsContent() {
             />
           </div>
         </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0 6px 8px' }}>
+        <div className="scroll-region" style={{ flex: 1, overflowY: 'auto', padding: '0 6px 8px' }}>
           {visibleGroups.map((g) => {
             const Icon = g.icon;
             const open = normalizedQuery ? true : expanded.has(g.id);

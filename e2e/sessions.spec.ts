@@ -6,8 +6,8 @@ async function openHistory(page: import('@playwright/test').Page) {
   await page.locator('[data-testid="tab-history-btn"]').click();
 }
 
-test.beforeEach(async ({ page }) => {
-  await setupTauriMock(page);
+test.beforeEach(async ({ page }, testInfo) => {
+  await setupTauriMock(page, { groupedHistoricalSession: testInfo.title === 'restoring one session from an archived group keeps it visible in the tab list' });
   await page.goto('/');
 });
 
@@ -67,6 +67,18 @@ test.describe('会话历史管理', () => {
     // 恢复的块带颜色快照（output_html 持久化回读，非纯文本）
     await expect(page.locator('span[style*="#4e9a06"]')).toBeVisible({ timeout: 5000 });
     await expect(page.locator('[data-testid^="tab-row-"]', { hasText: '旧的调试会话' })).toHaveCount(1);
+  });
+
+  test('restoring one session from an archived group keeps it visible in the tab list', async ({ page }) => {
+    await openHistory(page);
+    const historyRow = page.getByText('归档分组中的会话');
+    await expect(historyRow).toBeVisible();
+    await historyRow.click();
+
+    await ensureTabsOpen(page);
+    const restoredTab = page.locator('[data-testid="tab-row-hist-group-1"]');
+    await expect(restoredTab).toBeVisible();
+    await expect(restoredTab).toHaveAttribute('data-tab-group', '');
   });
 });
 
