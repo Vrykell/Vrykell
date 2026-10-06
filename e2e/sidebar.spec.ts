@@ -132,7 +132,7 @@ test.describe('文件面板', () => {
     await notes.click({ button: 'right' });
     await page.getByRole('button', { name: '复制', exact: true }).click();
     await tree.locator('[data-testid="file-row"][data-path="/home/e2e/Documents"]').click({ button: 'right' });
-    await page.getByRole('button', { name: '粘贴到「Documents」' }).click();
+    await page.getByRole('button', { name: '粘贴', exact: true }).click();
     await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'copy'))
       .toContainEqual({ op: 'copy', path: '/home/e2e/notes.txt', destDir: '/home/e2e/Documents' });
 

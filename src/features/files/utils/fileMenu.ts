@@ -57,7 +57,7 @@ export interface FileMenuContext {
 const cmdLabel = (base: string, count: number) => (count > 1 ? `${base} ${count} 项` : base);
 
 /** key → 菜单项；返回 null 表示当前状态不显示该条目。 */
-function itemFor(key: FileMenuItemKey, ctx: FileMenuContext, folderTarget: FsEntry | null): ContextMenuItem | null {
+function itemFor(key: FileMenuItemKey, ctx: FileMenuContext): ContextMenuItem | null {
   const { entry, targets, currentDir, clipboard, handlers } = ctx;
   const single = targets[0] ?? entry;
   const count = targets.length;
@@ -86,12 +86,7 @@ function itemFor(key: FileMenuItemKey, ctx: FileMenuContext, folderTarget: FsEnt
     case 'paste':
       if (!clipboard || ctx.targetDir === null) return null;
       // 右键文件夹：粘贴进该文件夹；右键文件：粘贴到它的同级目录；空白处：当前目录
-      return {
-        label: folderTarget
-          ? `粘贴到「${folderTarget.name}」`
-          : clipboard.mode === 'cut' ? '粘贴（移动）' : '粘贴',
-        onClick: () => handlers.onPasteInto(ctx.targetDir!),
-      };
+      return { label: '粘贴', onClick: () => handlers.onPasteInto(ctx.targetDir!) };
     case 'copy-path':
       return single ? { label: '复制路径', onClick: () => void navigator.clipboard.writeText(single.path) } : null;
     case 'reveal':
@@ -128,11 +123,9 @@ function itemFor(key: FileMenuItemKey, ctx: FileMenuContext, folderTarget: FsEnt
 
 /** 按 key 列表渲染菜单项（跳过当前状态不可用的条目）。 */
 export function buildFileMenuItems(keys: FileMenuItemKey[], ctx: FileMenuContext): ContextMenuItem[] {
-  const entry = ctx.entry;
-  const folderTarget = entry && entry.is_dir && ctx.targets.length === 1 ? entry : null;
   const items: ContextMenuItem[] = [];
   for (const key of keys) {
-    const item = itemFor(key, ctx, folderTarget);
+    const item = itemFor(key, ctx);
     if (item) items.push(item);
   }
   return items;

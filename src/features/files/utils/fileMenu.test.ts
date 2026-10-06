@@ -45,7 +45,7 @@ describe('fileMenu', () => {
     expect(onPasteInto).toHaveBeenCalledWith('/work/sub');
   });
 
-  it('labels a folder paste with its name and the current folder with the plain verb', () => {
+  it('uses the plain paste label for every target kind', () => {
     const folder = entry('sub', '/work/sub', true);
     const intoFolder = buildFileMenuItems(['paste'], ctx({
       entry: folder,
@@ -55,8 +55,8 @@ describe('fileMenu', () => {
     }));
     const intoCurrent = buildFileMenuItems(['paste'], ctx({ clipboard: { mode: 'cut', paths: ['/x'] } }));
 
-    expect(intoFolder[0]!.label).toBe('粘贴到「sub」');
-    expect(intoCurrent[0]!.label).toBe('粘贴（移动）');
+    expect(intoFolder[0]!.label).toBe('粘贴');
+    expect(intoCurrent[0]!.label).toBe('粘贴');
   });
 
   it('offers reveal for a row and for the current folder, only when the handlers exist', () => {
