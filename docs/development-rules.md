@@ -1,6 +1,9 @@
 # Vrykell 开发规则
 
-> 最后更新: 2026-09-27
+> 最后更新: 2026-10-06
+>
+> 本文件是规则正本；`AGENTS.md` 是常驻摘要，`.agents/skills/vrykell-conventions/SKILL.md`
+> 是面向 agent 的规范入口（`.claude/skills/` 下是给 Claude Code 的桥接）。三者修改时保持同步。
 
 ## 一、代码规范
 
@@ -68,3 +71,9 @@
 ## 九、窗口与标题栏
 
 40. **拖动把手只落在非交互元素上** — 运行时只在光标下的元素带 `data-tauri-drag-region` 且路径上没有「不带该属性的可点击元素」时才开始拖动。因此标题文字、留白等需要补上该属性，而按钮、输入框、链接等可点击元素不要添加，否则点击会变成拖窗口；新增标题栏元素时同步检查 `e2e/titlebar-drag.spec.ts` 覆盖的把手位置。
+
+## 十、公共组件与文档
+
+41. **公共组件优先** — 侧栏列表项统一走 `src/ui/sidebarItem.tsx`（会话标签行与 SSH 连接行共用同一外观与交互）；列表拖拽排序统一走 `src/ui/listReorder.tsx` 的「占位空位」交互（拖起的行让出槽位、落点用虚线占位、跟随指针的图标预览、Esc 取消、抑制拖拽后的点击），新列表通过 `data-reorder-list` / `data-reorder-item` / `data-reorder-kind` 接入，不得另造一套观感；错误展示统一走 `src/ui/ErrorBox.tsx` 与 `ErrorDetails.tsx`（面板正在展示的数据加载失败用行内 ErrorBox，临时动作结果用 Toast）；设置项选择器统一用 `src/ui/Select.tsx` 下拉框。新增同类界面时先抽公共组件再接入。
+42. **测试钩子稳定** — 重构移动标记时保留既有测试钩子（`data-testid`、`data-tab-row-id`、`data-tab-group`、ARIA 名称等），或在同一提交内更新全部引用它的单测 / e2e。
+43. **文档分层** — 规则正本 = 本文件；常驻摘要 = `AGENTS.md`（Codex 等 agent 先读它）；agent 规范入口 = `.agents/skills/vrykell-conventions/SKILL.md`（Command Code 与 Codex 直接读取，`.claude/skills/vrykell-conventions/SKILL.md` 是 Claude Code 的桥接）。规则变化时同步这三处，不再新增第四份副本。
