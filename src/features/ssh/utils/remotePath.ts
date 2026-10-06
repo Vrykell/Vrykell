@@ -3,12 +3,16 @@
  *
  * 面板路径按连接 id 持久（跨标签一致）；SSH 会话没有 cwd 自动上报，
  * 由「同步到终端目录」按钮主动注入 OSC 7 后读取解析结果（见 RemoteFiles）。
+ *
+ * 路径语义（规范化 / 拼接 / 上级目录）统一来自平台层 `@platform/posixPath`，
+ * 这里只做转发与 store/pane 相关的 SSH 专属工具。
  */
 
 import { create } from 'zustand';
 import { useSessionStore, isSessionTab } from '@features/workspace';
 import { useTerminalStore } from '@features/terminal';
 import { leaves } from '@features/workspace/model/windowLayout';
+import { normalizePosix, parentPosix, joinPosix } from '@platform/posixPath';
 
 interface RemotePathState {
   /** 连接 id → 面板路径；null = 连接 home */
@@ -21,31 +25,21 @@ export const useRemotePathStore = create<RemotePathState>((set) => ({
   set: (connId, p) => set((s) => ({ path: { ...s.path, [connId]: p } })),
 }));
 
-/** 规范化远程绝对路径：合并 ./..，去尾部斜杠（根除外）。 */
+/** 规范化远程绝对路径（POSIX 语义，实现见平台层）。 */
 export function normalizeRemotePath(p: string): string {
-  const parts: string[] = [];
-  for (const seg of p.split('/')) {
-    if (!seg || seg === '.') continue;
-    if (seg === '..') {
-      parts.pop();
-      continue;
-    }
-    parts.push(seg);
-  }
-  return '/' + parts.join('/') || '/';
+  return normalizePosix(p);
 }
 
 /** 上级目录；根再上返回 null（= home）。 */
 export function parentOfRemote(p: string): string | null {
   if (!p || p === '/') return null;
-  const parent = normalizeRemotePath(`${p}/..`);
-  return parent === p ? null : parent;
+  const parent = parentPosix(p);
+  return parent === normalizePosix(p) ? null : parent;
 }
 
 /** POSIX 路径拼接（目录 + 名称）。 */
 export function joinRemote(dir: string, name: string): string {
-  const base = normalizeRemotePath(dir);
-  return base.endsWith('/') ? `${base}${name}` : `${base}/${name}`;
+  return joinPosix(dir, name);
 }
 
 /** 当前活跃标签里与指定连接匹配的 SSH pane id（优先聚焦 pane）。 */

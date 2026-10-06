@@ -375,6 +375,23 @@ dev 模式会自动写入 `terminal-debug.jsonl`。排查命令挂起时，按�
 - 重名避让由后端保证（`unique_path` / `unique_remote_path`，序号插在扩展名前），返回真实目标路径，回退历史按真实路径记录。
 - 本地与远程的差异若属于「能力」而非「外观」，应表达为配置项（如 `drag.externalDropMode`），不要在组件里写 `if (isSsh)`。
 
+### 路径语义分层（本地 / 远端 / 平台层）
+
+路径的「绝对或相对、怎么拼、上级是谁」是平台相关的判断，一律收口到平台层，业务模块不自行判断：
+
+| 路径种类 | 前端 | Rust |
+|---|---|---|
+| 本地路径 | `@platform/path`（分隔符、盘符根 `C:/`、上级目录、路径段） | `std::path`（`files/fs.rs`） |
+| 远端（POSIX）路径 | `@platform/posixPath`（`isPosixAbsolute` / `joinPosix` / `parentPosix` / `fileNamePosix` / `normalizePosix`） | `src-tauri/src/platform/path.rs`（`is_absolute` / `join` / `parent` / `file_name` / `normalize` / `numbered_name` / `name_from_listing` / `is_within`） |
+| IPC 边界 | `@platform/api/fs` 双向归一化本地路径 | 远端路径原样收发（已是 POSIX） |
+
+规则：
+
+- 远端路径**禁止**使用 `std::path`：Windows 宿主上 `Path::is_absolute("/home/user")` 为 `false`、`PathBuf::join` 会插反斜杠、`Path::new("/a/b").parent()` 的语义也与远端不一致。SFTP 调用时用 `Path::new(&posix_string)` 只是把字符串交给 libssh2，判断与拼接必须先用平台层助手完成。
+- `ssh2` 的便捷 `Sftp::readdir` 会用宿主分隔符拼路径（Windows 上是 `\`）：取文件名必须走 `platform::path::name_from_listing(listed, dir)`，再由 `join` 生成 POSIX 路径。
+- 前端同理：远端绝对/相对判断与拼接走 `@platform/posixPath`；`features/ssh/utils/remotePath.ts` 只做转发与 store/pane 相关工具。
+- 在 Windows 上开发远端功能时，单测要覆盖「拼接结果不含 `\`」「`/home/user` 判定为绝对路径」，否则这类 bug 只会在真机操作时暴露。
+
 ### 主题
 
 | 文件 | 内容 |
@@ -394,6 +411,22 @@ dev 模式会自动写入 `terminal-debug.jsonl`。排查命令挂起时，按�
 - `TerminalView.tsx` 按叶子渲染：每个叶子挂一个 `TerminalPanel` + scene 驱动视图，统一由 `useTerminalSession` 管理 PTY/xterm/controller。
 - 分屏启动流程：NewTabModal（TopDock `+`）选择类型 → `beginSplit`（进入落点选择，在原 pane 上哪侧分裂）→ 创建新 pane。
 - 连续 pane 尺寸用绝对定位 + 百分比，拖拽经 ResizeHandle 调 `windowLayout` 更新树。
+
+### 终端区域的真实对齐（不是「居中」）
+
+终端 pane 里各层的内边距**故意不对称**，改布局前先读这一节，否则很容易把整宽元素推偏：
+
+| 层 | 内边距 | 说明 |
+|---|---|---|
+| `.terminal-pane`（`TerminalView` 的 pane 根） | 0 | 左/右都是 0：状态行、认证输入条等**整宽元素与 pane 的左右边界严格对齐**（左右留白相等，均为 0） |
+| 终端屏幕容器（xterm 宿主 `[data-testid="ssh-terminal-screen"]`、快照 `pre`） | 左 8px、右 0 | 左侧 8px 是给终端文字/提示符的视觉留白；**右侧不留**，好让原生滚动条贴住 pane 右边缘 |
+| 顶部状态行 / 认证输入条 | 对称 | 状态行 `4px 8px`；认证输入条 `padding: 12`，因此其内容左右各留 12px |
+
+因此：
+
+- 终端**内容**（文字、光标、滚动条）相对 pane 是**偏左留白、右侧贴边**的：文字比 pane 左边缘多缩进 8px，而 pane 右边缘不给滚动条留白。这不是「居中」，也不是错误，是有意取舍（滚动条贴边优先）。
+- 需要左右对称的整宽元素（认证输入条、输入栏、面板边框）**必须挂在 pane 根层**，不要挂进带 8px 左边距的那层容器；反之，终端屏幕内容要保留那 8px。
+- `e2e/ssh-auth.spec.ts` 的「认证输入条在终端区内左右对称」用例把这条约定固化了下来：一旦有人把左边距加回 pane 根层，用例会失败。
 
 ## 17. Agent / AI 对话（代码代理）
 
