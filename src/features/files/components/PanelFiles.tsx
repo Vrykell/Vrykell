@@ -181,14 +181,17 @@ function LocalFiles() {
   };
 
   /** 拖动到目标目录：只做移动；拖出窗口交给系统原生拖拽（结束后刷新面板） */
-  const startRowDrag = useFileRowDrag((items, target) => {
-    const paths = items.map((item) => item.path);
-    const targetDir = target.dir;
-    if (paths.some((p) => targetDir === p || targetDir.startsWith(`${p}/`))) return;
-    if (targetDir === path) return;
-    if (paths.every((p) => parentOf(p) === targetDir)) return;
-    void transferInto(paths, targetDir, 'move');
-  }, () => load(path));
+  const startRowDrag = useFileRowDrag({
+    onDrop: (items, target) => {
+      const paths = items.map((item) => item.path);
+      const targetDir = target.dir;
+      if (paths.some((p) => targetDir === p || targetDir.startsWith(`${p}/`))) return;
+      if (targetDir === path) return;
+      if (paths.every((p) => parentOf(p) === targetDir)) return;
+      void transferInto(paths, targetDir, 'move');
+    },
+    onNativeDragEnd: () => load(path),
+  });
   const dragTarget = useFileDragStore((state) => state.target);
   const dragItems = useFileDragStore((state) => state.items);
 

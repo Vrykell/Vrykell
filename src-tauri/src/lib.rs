@@ -139,6 +139,7 @@ pub fn run() {
             remote::ssh::ssh_list,
             remote::ssh::ssh_download,
             remote::ssh::ssh_rename,
+            remote::ssh::ssh_move,
             remote::ssh::ssh_delete,
             remote::ssh::ssh_upload,
             terminal::pty::pty_write,

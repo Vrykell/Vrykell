@@ -894,6 +894,9 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
           case 'ssh_rename':
             sshOps.push({ op: 'rename', path: args.path as string, newName: args.newName as string });
             return undefined;
+          case 'ssh_move':
+            sshOps.push({ op: 'move', path: args.path as string, destDir: args.destDir as string });
+            return undefined;
           case 'ssh_delete':
             sshOps.push({ op: 'delete', path: args.path as string });
             return undefined;

@@ -11,6 +11,7 @@ const sshMocks = vi.hoisted(() => ({
   sshFsList: vi.fn(),
   sshDownload: vi.fn(),
   sshRename: vi.fn(),
+  sshMove: vi.fn(),
   sshDelete: vi.fn(),
   sshUpload: vi.fn(),
 }));
@@ -37,6 +38,7 @@ describe('useRemoteFileBrowser', () => {
       entries: [{ name: 'src', path: '/home/tester/src', is_dir: true }],
     });
     sshMocks.sshRename.mockReset().mockResolvedValue(undefined);
+    sshMocks.sshMove.mockReset().mockResolvedValue(undefined);
     sshMocks.sshDelete.mockReset().mockResolvedValue(undefined);
     sshMocks.sshDownload.mockReset().mockResolvedValue('C:/Downloads/src');
     sshMocks.sshUpload.mockReset().mockResolvedValue(undefined);
@@ -47,6 +49,36 @@ describe('useRemoteFileBrowser', () => {
     useRemotePathStore.setState(pathSnapshot, true);
     useTerminalStore.setState(terminalSnapshot, true);
     useSessionStore.setState(workspaceSnapshot, true);
+  });
+
+  it('moves dropped entries into the target remote folder and skips same-level targets', async () => {
+    const { result } = renderHook(() => useRemoteFileBrowser(conn));
+    await waitFor(() => expect(result.current.path).toBe('/home/tester'));
+
+    await act(async () => result.current.moveInto(
+      [{ path: '/home/tester/src' }, { path: '/home/tester/docs' }],
+      '/home/tester/archive',
+    ));
+    expect(sshMocks.sshMove).toHaveBeenCalledWith(conn.id, '/home/tester/src', '/home/tester/archive');
+    expect(sshMocks.sshMove).toHaveBeenCalledWith(conn.id, '/home/tester/docs', '/home/tester/archive');
+
+    // 目标与源同级：无操作，不发请求
+    sshMocks.sshMove.mockClear();
+    await act(async () => result.current.moveInto([{ path: '/home/tester/src' }], '/home/tester'));
+    expect(sshMocks.sshMove).not.toHaveBeenCalled();
+  });
+
+  it('downloads entries before a system drag and returns the local paths', async () => {
+    sshMocks.sshDownload.mockResolvedValueOnce('C:/Downloads/a').mockResolvedValueOnce('C:/Downloads/b');
+    const { result } = renderHook(() => useRemoteFileBrowser(conn));
+    await waitFor(() => expect(result.current.path).toBe('/home/tester'));
+
+    let locals: string[] | null = null;
+    await act(async () => {
+      locals = await result.current.downloadForDrag([{ path: '/home/tester/a' }, { path: '/home/tester/b' }]);
+    });
+    expect(locals).toEqual(['C:/Downloads/a', 'C:/Downloads/b']);
+    expect(sshMocks.sshDownload).toHaveBeenCalledWith(conn.id, '/home/tester/a');
   });
 
   it('retries an initially untrusted directory after SSH startup', async () => {
