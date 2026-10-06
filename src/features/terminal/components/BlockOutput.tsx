@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { sanitizeOutputHtml } from '@utils/sanitizeHtml';
 import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
 
@@ -38,7 +38,7 @@ interface Props {
  * 严禁内容嗅探（如 text.includes('<span')）——历史输出是不可信文本，
  * 用户 cat 过的 HTML 会经嗅探被误判为 HTML 直接注入执行（存储型 XSS）。
  */
-export default function BlockOutput({ text, maxHeight, highlight, isHtml: isHtmlProp }: Props) {
+export default memo(function BlockOutput({ text, maxHeight, highlight, isHtml: isHtmlProp }: Props) {
   const isHtml = isHtmlProp === true;
 
   const content = useMemo(() => {
@@ -51,28 +51,33 @@ export default function BlockOutput({ text, maxHeight, highlight, isHtml: isHtml
     const escaped = plainText(text);
     return highlight ? highlightInHtml(`<span>${escaped}</span>`, highlight) : escaped;
   }, [text, highlight, isHtml]);
+  const rowCount = useMemo(() => Math.max(1, text.split(isHtml ? /<br\s*\/?>/gi : '\n').length), [text, isHtml]);
 
   return (
     <div
       data-selectable
       style={{
         maxHeight: maxHeight ? `${maxHeight}px` : undefined,
-        overflowX: 'auto',
+        overflowX: 'hidden',
         overflowY: maxHeight ? 'auto' : 'hidden',
         maxWidth: '100%',
+        // Preserve exact scroll geometry while skipping layout and paint of offscreen history.
+        contentVisibility: 'auto',
+        containIntrinsicBlockSize: `auto calc(var(--terminal-row-height) * ${rowCount})`,
         // 与 xterm.js 实时渲染保持一致的字体参数
         fontFamily: TERMINAL_FONT_FAMILY,
         fontSize: 'var(--terminal-font-size)',
         // Keep snapshot rows tall enough for the glyph bounds used by live xterm.
         lineHeight: 'var(--terminal-row-height)',
         padding: '2px 8px 8px',
-        // Terminal snapshots already contain grid row breaks; preserve their columns.
-        whiteSpace: 'pre',
-        wordBreak: 'normal',
+        // Preserve terminal spacing while fitting historical output to the current pane.
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-all',
+        overflowWrap: 'anywhere',
       }}
     >
       {/* 内层 div 承载 HTML：React 不允许 children 与 dangerouslySetInnerHTML 并存 */}
       {isHtml ? <div dangerouslySetInnerHTML={{ __html: content }} /> : content}
     </div>
   );
-}
+});

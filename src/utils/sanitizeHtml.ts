@@ -20,6 +20,7 @@ const SAFE_STYLE_PROPS = new Set([
   'opacity',
   'display',
   'width',
+  'letter-spacing',
 ]);
 
 /** 样式值黑名单：url()/expression/javascript:/@import 等一律拒绝。 */
@@ -33,6 +34,7 @@ function sanitizeStyleValue(style: string): string {
     const prop = part.slice(0, idx).trim().toLowerCase();
     const value = part.slice(idx + 1).trim();
     if (!SAFE_STYLE_PROPS.has(prop)) continue;
+    if (prop === 'letter-spacing' && (!/^-?(?:0|[1-9]\d*)(?:\.\d+)?em$/.test(value) || Math.abs(parseFloat(value)) > 0.2)) continue;
     if (DANGEROUS_STYLE_VALUE.test(value)) continue;
     decls.push(`${prop}:${value}`);
   }

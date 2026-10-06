@@ -3,10 +3,10 @@
  * Each command keeps its status and actions in a compact header above its output.
  */
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { memo, useState, useMemo, useEffect, useRef } from 'react';
 import {
   Check, ChevronDown, ChevronRight, Copy, Ellipsis,
-  CircleX, iconSizes, Maximize2, RotateCw, Sparkles, Square, Terminal, X, Zap,
+  CircleX, Maximize2, RotateCw, Sparkles, Square, Terminal, X, Zap,
 } from '@ui/icons';
 import { useBlockStore } from '@features/terminal';
 import { useTerminalStore } from '@features/terminal';
@@ -37,7 +37,8 @@ interface Props {
 /** 从 ANSI CSI 序列剥离（OSC 已在 dispatcher 剥离）。 */
 const ANSI_CSI_RE = /\x1b\[[0-9;?]*[a-zA-Z]/g;
 const BLOCK_ACTION_BUTTON_SIZE = 28;
-const BLOCK_ACTION_ICON_SIZE = 16;
+const BLOCK_ACTION_ICON_SIZE = 14;
+const BLOCK_COLLAPSE_ICON_SIZE = 12;
 
 /** block 是否有值得渲染的内容（pending 占位、连按回车产生的空 done 都不算）。 */
 export function hasVisibleContent(b: TermBlock): boolean {
@@ -214,7 +215,7 @@ function highlightCommand(cmd: string): React.ReactNode {
 
 // ══════ BlockItem（已完成 block） ══════
 
-function BlockItem({
+const BlockItem = memo(function BlockItem({
   block,
   tabId,
   insetLeft,
@@ -274,8 +275,8 @@ function BlockItem({
           onClick={toggleCollapsed}
           title={isCollapsed ? '展开' : '折叠'}
           style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)',
-            cursor: 'pointer', padding: 0, width: 32, height: 32, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-          {isCollapsed ? <ChevronRight size={iconSizes.control} /> : <ChevronDown size={iconSizes.control} />}
+            cursor: 'pointer', padding: 0, width: BLOCK_ACTION_BUTTON_SIZE, height: BLOCK_ACTION_BUTTON_SIZE, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+          {isCollapsed ? <ChevronRight size={BLOCK_COLLAPSE_ICON_SIZE} /> : <ChevronDown size={BLOCK_COLLAPSE_ICON_SIZE} />}
         </button>
         <div data-selectable style={{
           flex: 1, minWidth: 0, fontSize: 'var(--terminal-font-size)', fontWeight: 600,
@@ -354,7 +355,7 @@ function BlockItem({
       )}
     </div>
   );
-}
+});
 
 // ══════ RunningItem（运行中 block） ══════
 
@@ -487,9 +488,7 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
     }
     // e2e 测试桥：块终端 buffer 也进注册表（WebGL 下文本不进 DOM，测试读 buffer 断言）
     const w = window as unknown as { __vrykellTerms?: Map<string, unknown> };
-    if (w.__vrykellTerms && !w.__vrykellTerms.has(`block:${tabId}`)) {
-      w.__vrykellTerms.set(`block:${tabId}`, term);
-    }
+    w.__vrykellTerms?.set(`block:${tabId}`, term);
 
     // Preserve occupied space across partial clear-and-repaint frames.
     const cellHeight = (): number => getCellMetrics(term).height;
@@ -572,6 +571,9 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
     });
 
     return () => {
+      if (w.__vrykellTerms?.get(`block:${tabId}`) === term) {
+        w.__vrykellTerms.delete(`block:${tabId}`);
+      }
       renderSub?.dispose();
       dataSub.dispose();
       selSub.dispose();

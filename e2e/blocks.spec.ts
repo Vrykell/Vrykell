@@ -105,6 +105,7 @@ test.describe('命令块（OSC 133）', () => {
     await expect(page.getByText('TUI')).not.toBeVisible({ timeout: 5000 });
     // 恢复 block 列表后输入栏应重新出现
     await expect(input).toBeVisible({ timeout: 5000 });
+    await page.mouse.move(0, 0);
     // 全屏 TUI 画面不进块历史（alt 内容只在主 xterm 实时呈现），
     // 历史只留 teardown 后的 shell 噪音 —— 全屏应用不应污染命令历史
     await expect(page.getByTestId('exit-code')).toBeVisible({ timeout: 5000 });

@@ -66,6 +66,12 @@ App
 
 `TerminalView`（`src/features/terminal/components/TerminalView.tsx`）是终端主表面，内部由 SessionController 的**场景状态**驱动（见 §6）。
 
+左侧导航栏与右上方导航区共用 `DockNavigation`，支持同侧排序与跨侧移动。`dock.ts` 中的 `leftZone` / `rightZone` 同时决定按钮顺序和侧栏位置；打开的侧栏随按钮移动，关闭的侧栏保持关闭。布局通过 `dock-layout-v4` 持久化，加载时保留自定义位置、去重并补齐缺失按钮。拖动中的来源与插入位置由 `navigationDrag.ts` 临时维护，不写入设置。设置入口同样支持拖动，默认在右侧；`NAVIGATION_DEFS` 包含侧栏和页面动作，`PANEL_DEFS` 仅包含真实侧栏。点击设置入口打开或激活唯一的设置页，不创建设置侧栏。窗口控制按钮保持固定。
+
+导航按钮由 `useNavigationButtonDrag` 通过 Pointer Events 拖动，移动超过 6px 后才开始。来源按钮保留挂载但移出排列，图标通过 `NavigationDragPreview` 跟随指针；目标位置插入 32px 实际占位，其他按钮重新排列让位。占位区域保留对应插入索引，避免让位后重复命中导致落点跳动；按钮之间的间隙按邻近位置计算。预览不修改布局或持久化，松手才提交，取消时恢复原排列。禁止使用 HTML5 Drag and Drop：Windows 桌面窗口的原生文件拖放会拦截这些事件，浏览器预览无法直接验证该行为。保留原生文件拖入；导航按钮及右上方操作区不标记为窗口拖动区域。Esc、失焦、pointercancel 和卸载取消拖动；松手产生的 click 不触发面板切换。交互测试会禁用 HTML 拖放事件，确认指针拖动独立工作。
+
+顶栏通过 `useBalancedTitlebar` 观察右侧操作区的实际宽度，在搜索框左右预留对称空间。导航按钮增加或移动时不切换为非对称网格；窄窗口只收紧搜索框宽度，宽度恢复后同步展开，保持搜索框居中并避免遮挡按钮。
+
 ## 4. 端到端分层
 
 ```
@@ -104,7 +110,7 @@ Rust PTY 输出的每个 chunk 不再先写主 xterm 再等 parser 异步回调�
 
 - 输入：`push(chunk)` 返回有序 `ScanEvent` 流，顺序与字节顺序一致；经 `pty.rs` 汇入 Tauri event `pty-output`。
 - 事件形状（serde tag=kind, camelCase）：`{kind:'data', text}` / `{kind:'osc', code, payload, raw}` / `{kind:'altEnter'|'altExit', raw}`；前端镜像类型在 `src/features/terminal/services/pipeline/events.ts`（`DispatchEvent`）。
-- OSC 解析：识别 `133;A` / `133;C` / `133;D;ec` / `133;E;b64` / `133;G;b64`、`7;path`、`0/2;title`；OSC 从 data 段剥离，但保留 `raw` 用于 classic / altScreen 场景下透传给主 xterm（保 OSC 8 超链接、OSC 52 剪贴板等）。
+- OSC 解析：识别 `133;A` / `133;B` / `133;C` / `133;D;ec` / `133;E;b64` / `133;G;b64`、`7;path`、`0/2;title`；OSC 从 data 段剥离，但保留 `raw` 用于 classic / altScreen 场景下透传给主 xterm（保 OSC 8 超链接、OSC 52 剪贴板等）。
 - alt-screen 观测：检测 `\x1b[?1049/1047/47[hl]`，只发事件，序列本身保留在 data 段。
 - 跨 chunk 边界：不完整 ESC / OSC 序列存入 `pending`，与下一 chunk 拼接后再扫。
 - 输入是 StreamDecoder 解码后的 UTF-8 字符串；扫描对象全是 ASCII 单字节控制字符，按字节索引安全。
@@ -122,7 +128,7 @@ Rust PTY 输出的每个 chunk 不再先写主 xterm 再等 parser 异步回调�
   - `133;A` → 创建新 block（status=`pending`），上一 block 无 `D` 则标记 `interrupted`。
   - `133;E;<b64>` → 记录命令文本。
   - `133;G;<b64>` → 记录 git 分支。
-  - `133;C` → block 转 `executing`，创建唯一离屏 xterm（`outputTerm`）。
+  - 块输入栏提交命令或收到 `133;C` → block 转 `executing`，创建唯一离屏 xterm（`outputTerm`）；输入栏提交后不等待远端 preexec 标记，迟到的 `133;C` 不重复启动。
   - `133;D;ec` → 提取 `outputHtml` / `outputText`，dispose `outputTerm`，status=`done`。
   - 普通输出段按当前场景路由：pending → `earlyBuf`；executing → `outputTerm`；classic / altScreen → 主 xterm。
 
@@ -156,7 +162,7 @@ Rust PTY 输出的每个 chunk 不再先写主 xterm 再等 parser 异步回调�
 `TermBlock` 状态定义见 `src/features/terminal/services/pipeline/termBlock.ts`：
 
 ```
-pending ──(133;C)──▶ executing ──(133;D)──▶ done
+pending ──(输入栏提交 / 133;C)──▶ executing ──(133;D)──▶ done
    │                      │
    └──── 无 D 直接 A ────┘           interrupted（由下一个 133;A 触发）
 ```
@@ -166,6 +172,7 @@ pending ──(133;C)──▶ executing ──(133;D)──▶ done
 | 序列 | 语义 | 触发操作 |
 |------|------|---------|
 | `133;A` | precmd | 创建新 pending block；上一 block 无 `D` 则标记 `interrupted` |
+| `133;B` | prompt 结束 | 行编辑器已可接收输入；标记该 pane 的 Shell 启动就绪（文件打开等延后命令据此下发），本身不建块、不写入主 xterm |
 | `133;E;<b64>` | 命令文本 | 记录 `command` |
 | `133;G;<b64>` | git 分支 | 记录 `gitBranch` |
 | `133;C` | preexec | status→executing，创建单离屏 `outputTerm`；`earlyBuf` 按 typeahead 启发式丢弃或写回 |
@@ -211,6 +218,8 @@ pending ──(133;C)──▶ executing ──(133;D)──▶ done
 **（B）Block DOM**（`TerminalBlockList`）：`blockList` 场景下 React 渲染整个 block 列表。已完成块显示 `outputHtml` 快照；运行中块挂载 controller 持有的活 xterm，直接呈现 PTY 输出；pending 块不显示。列表使用普通 DOM 滚动，整段输出变化由 `ResizeObserver` 驱动贴底。
 
 活终端使用 xterm 测得的字符高度，避免强行压缩行高时裁掉首行顶部笔画；完成块的 HTML 快照使用对应的默认行高。
+
+终端宽度随窗口、侧栏及分屏布局更新，调用 PTY 和活 xterm 的 resize，不使用横向滚动容器替代尺寸同步。完成块提取快照时仅按 xterm buffer 的 `isWrapped` 合并软换行，保留显式换行、空行、间距和颜色；历史输出随当前容器宽度重新换行。认证与屏幕快照仍保留物理网格行。终端历史使用纵向主题滚动条，提前预留滑块区域，避免溢出时列宽变化。
 
 `TerminalBlockList` 按状态分组：
 

@@ -9,6 +9,7 @@ const {
   ptyExitHandlers,
   outputResolvers,
   exitResolvers,
+  terminalInitOptions,
 } = vi.hoisted(() => ({
   writeMock: vi.fn(),
   onDataHandlers: [] as Array<(d: string) => void>,
@@ -17,10 +18,14 @@ const {
   ptyExitHandlers: [] as Array<(id: string) => void>,
   outputResolvers: [] as Array<(u: () => void) => void>,
   exitResolvers: [] as Array<(u: () => void) => void>,
+  terminalInitOptions: [] as import('@xterm/xterm').ITerminalOptions[],
 }));
 
 vi.mock('@xterm/xterm', () => ({
   Terminal: class {
+    constructor(options: import('@xterm/xterm').ITerminalOptions) {
+      terminalInitOptions.push(options);
+    }
     cols = 80;
     rows = 24;
     options = { fontSize: 13 };
@@ -104,6 +109,7 @@ function TestHarness({ tabId, onReady }: { tabId: string; onReady: (sessionId: s
 
 describe('useTerminalSession', () => {
   beforeEach(() => {
+    terminalInitOptions.length = 0;
     vi.mocked(mockedPtySpawn).mockClear();
     vi.mocked(ptyClose).mockClear();
     vi.mocked(ptyWrite).mockClear();
@@ -117,6 +123,7 @@ describe('useTerminalSession', () => {
     exitResolvers.length = 0;
     useTerminalStore.setState({
       sessions: {},
+      startupStates: {},
       pendingCommands: {},
       dims: {},
       scenes: {},
@@ -125,6 +132,25 @@ describe('useTerminalSession', () => {
     });
     useBlockStore.setState({ byTab: {} });
     setTab('block');
+  });
+
+  it('configures a 10px native scrollbar so fitting uses the same width', () => {
+    render(<TestHarness tabId="t1" onReady={() => {}} />);
+    expect(terminalInitOptions[0]?.overviewRuler).toEqual({ width: 10, showTopBorder: false, showBottomBorder: false });
+  });
+
+  it('keeps startup pending until the shell emits its prompt-end marker', async () => {
+    render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
+
+    ptyOutputHandlers[0]!('sess-x', [
+      { kind: 'osc', code: '133;A', payload: '', raw: '\x1b]133;A\x07' },
+      { kind: 'data', text: '~/project $ ' },
+    ]);
+    expect(useTerminalStore.getState().startupStates.t1).toBe('starting');
+
+    ptyOutputHandlers[0]!('sess-x', [{ kind: 'osc', code: '133;B', payload: '', raw: '\x1b]133;B\x07' }]);
+    await waitFor(() => expect(useTerminalStore.getState().startupStates.t1).toBe('ready'));
   });
 
   it('restores legacy CMD block sessions into an interactive classic scene', async () => {

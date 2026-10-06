@@ -5,6 +5,8 @@ use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
+use std::sync::mpsc::{self, Sender};
+use std::time::{Duration, Instant};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager};
 
@@ -15,6 +17,90 @@ static PATHS: OnceLock<(PathBuf, PathBuf)> = OnceLock::new();
 static RECORDS: Mutex<VecDeque<Value>> = Mutex::new(VecDeque::new());
 static FILE_LOCK: Mutex<()> = Mutex::new(());
 static RUN_ID: OnceLock<String> = OnceLock::new();
+static LOG_WRITER: OnceLock<DiagnosticWriter> = OnceLock::new();
+
+enum LogMessage {
+    Append(Value),
+    Flush(Sender<Result<(), String>>),
+}
+
+struct DiagnosticWriter { sender: Sender<LogMessage> }
+
+impl DiagnosticWriter {
+    fn new(path: PathBuf) -> Self {
+        let (sender, receiver) = mpsc::channel();
+        std::thread::spawn(move || {
+            let mut file: Option<BufWriter<fs::File>> = None;
+            let mut size = 0;
+            let mut pending = Vec::new();
+            let mut error: Option<String> = None;
+            let mut pending_since = Instant::now();
+            loop {
+                let interval = Duration::from_millis(50);
+                let timeout = if pending.is_empty() { interval } else { interval.saturating_sub(pending_since.elapsed()) };
+                let message = receiver.recv_timeout(timeout);
+                if let Ok(LogMessage::Append(ref record)) = message {
+                    if pending.is_empty() { pending_since = Instant::now(); }
+                    pending.push(record.clone());
+                    if pending.len() < 64 { continue; }
+                }
+                if !pending.is_empty() {
+                    let result = write_batch(&path, &mut file, &mut size, &pending);
+                    pending.clear();
+                    if let Err(reason) = result {
+                        file = None;
+                        eprintln!("[diagnostics] {reason}");
+                        error = Some(reason);
+                    }
+                }
+                match message {
+                    Ok(LogMessage::Flush(reply)) => { let _ = reply.send(error.take().map_or(Ok(()), Err)); }
+                    Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                    _ => {}
+                }
+            }
+        });
+        Self { sender }
+    }
+
+    fn append(&self, record: Value) -> Result<(), String> {
+        self.sender.send(LogMessage::Append(record)).map_err(|error| error.to_string())
+    }
+
+    fn flush(&self) -> Result<(), String> {
+        let (sender, receiver) = mpsc::channel();
+        self.sender.send(LogMessage::Flush(sender)).map_err(|error| error.to_string())?;
+        receiver.recv().map_err(|error| error.to_string())?
+    }
+}
+
+fn write_batch(path: &Path, file: &mut Option<BufWriter<fs::File>>, size: &mut u64, records: &[Value]) -> Result<(), String> {
+    let _lock = FILE_LOCK.lock().map_err(|error| error.to_string())?;
+    for record in records {
+        if file.is_some() && *size >= MAX_LOG_BYTES {
+            if let Some(mut writer) = file.take() { writer.flush().map_err(|error| error.to_string())?; }
+            rotate(path)?;
+        }
+        if file.is_none() {
+            if let Some(parent) = path.parent() { fs::create_dir_all(parent).map_err(|error| error.to_string())?; }
+            rotate(path)?;
+            let handle = OpenOptions::new().create(true).append(true).open(path).map_err(|error| error.to_string())?;
+            *size = handle.metadata().map_err(|error| error.to_string())?.len();
+            *file = Some(BufWriter::with_capacity(64 * 1024, handle));
+        }
+        let bytes = serde_json::to_vec(record).map_err(|error| error.to_string())?;
+        let writer = file.as_mut().expect("writer was initialized");
+        writer.write_all(&bytes).and_then(|_| writer.write_all(b"\n")).map_err(|error| error.to_string())?;
+        *size += bytes.len() as u64 + 1;
+    }
+    if let Some(writer) = file { writer.flush().map_err(|error| error.to_string())?; }
+    Ok(())
+}
+
+pub fn flush_logs() -> Result<(), String> {
+    if let Some(writer) = LOG_WRITER.get() { writer.flush()?; }
+    Ok(())
+}
 
 pub fn auto_save() -> bool {
     AUTO_SAVE.load(Ordering::Relaxed)
@@ -133,22 +219,6 @@ fn rotate(path: &Path) -> Result<(), String> {
     fs::rename(path, first).map_err(|e| e.to_string())
 }
 
-fn append_file(path: &Path, record: &Value) -> Result<(), String> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    rotate(path)?;
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)
-        .map_err(|e| e.to_string())?;
-    serde_json::to_writer(&mut file, record).map_err(|e| e.to_string())?;
-    file.write_all(b"\n")
-        .and_then(|_| file.flush())
-        .map_err(|e| e.to_string())
-}
-
 pub fn record(event: &str, detail: Value) -> Result<(), String> {
     let mut detail = sanitize(detail, "", 0);
     if serde_json::to_vec(&detail)
@@ -167,10 +237,9 @@ pub fn record(event: &str, detail: Value) -> Result<(), String> {
         memory.pop_front();
     }
     drop(memory);
-    let _lock = FILE_LOCK.lock().map_err(|e| e.to_string())?;
     if auto_save() {
         if let Some((path, _)) = PATHS.get() {
-            append_file(path, &record)?;
+            LOG_WRITER.get_or_init(|| DiagnosticWriter::new(path.clone())).append(record)?;
         }
     }
     Ok(())
@@ -179,11 +248,10 @@ pub fn record(event: &str, detail: Value) -> Result<(), String> {
 #[tauri::command]
 pub fn diagnostics_set_auto_save(enabled: bool) -> Result<bool, String> {
     let (log, config) = PATHS.get().ok_or("日志尚未初始化")?;
+    let writer = LOG_WRITER.get_or_init(|| DiagnosticWriter::new(log.clone()));
+    writer.append(json!({ "timestampMs": SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis(), "source": "backend", "event": if enabled { "auto-save-enabled" } else { "auto-save-disabled" } }))?;
+    writer.flush()?;
     let _lock = FILE_LOCK.lock().map_err(|e| e.to_string())?;
-    append_file(
-        log,
-        &json!({ "timestampMs": SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis(), "source": "backend", "event": if enabled { "auto-save-enabled" } else { "auto-save-disabled" } }),
-    )?;
     if let Some(parent) = config.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
@@ -249,6 +317,7 @@ pub fn diagnostics_export(
     frontend: Vec<Value>,
     context: Value,
 ) -> Result<(), String> {
+    flush_logs()?;
     let destination = PathBuf::from(path);
     let _lock = FILE_LOCK.lock().map_err(|e| e.to_string())?;
     let mut history = Vec::new();
@@ -281,6 +350,51 @@ pub fn diagnostics_export(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn background_writer_preserves_all_records_and_flushes_before_reading() {
+        let directory = std::env::temp_dir().join(format!("vrykell-log-writer-{}", uuid::Uuid::new_v4()));
+        let path = directory.join("diagnostics.jsonl");
+        let writer = DiagnosticWriter::new(path.clone());
+        for sequence in 0..1025 { writer.append(json!({ "sequence": sequence })).unwrap(); }
+        writer.flush().unwrap();
+        let lines: Vec<Value> = fs::read_to_string(&path).unwrap().lines().map(|line| serde_json::from_str(line).unwrap()).collect();
+        assert_eq!(lines.len(), 1025);
+        for (sequence, record) in lines.iter().enumerate() { assert_eq!(record["sequence"], sequence); }
+        drop(writer);
+        fs::remove_file(path).unwrap();
+        fs::remove_dir(directory).unwrap();
+    }
+
+    #[test]
+    fn buffered_writer_rotates_complete_json_lines() {
+        let directory = std::env::temp_dir().join(format!("vrykell-log-batch-{}", uuid::Uuid::new_v4()));
+        let path = directory.join("diagnostics.jsonl");
+        let mut file = None;
+        let mut size = 0;
+        let payload = "x".repeat(1024 * 1024);
+        let records: Vec<Value> = (0..12).map(|sequence| json!({ "sequence": sequence, "detail": payload })).collect();
+        write_batch(&path, &mut file, &mut size, &records).unwrap();
+        drop(file);
+        let mut sequences = Vec::new();
+        for file in [path.with_extension("jsonl.2"), path.with_extension("jsonl.1"), path.clone()] {
+            let lines = fs::read_to_string(&file).unwrap();
+            for line in lines.lines() { sequences.push(serde_json::from_str::<Value>(line).unwrap()["sequence"].as_u64().unwrap()); }
+            fs::remove_file(file).unwrap();
+        }
+        assert_eq!(sequences, (0..12).collect::<Vec<_>>());
+        fs::remove_dir(directory).unwrap();
+    }
+
+    #[test]
+    fn background_write_failures_are_reported_by_flush() {
+        let path = std::env::temp_dir().join(format!("vrykell-log-denied-{}", uuid::Uuid::new_v4()));
+        fs::write(&path, "not a directory").unwrap();
+        let writer = DiagnosticWriter::new(path.join("diagnostics.jsonl"));
+        writer.append(json!({ "event": "fixture" })).unwrap();
+        assert!(writer.flush().is_err());
+        drop(writer);
+        fs::remove_file(path).unwrap();
+    }
     #[test]
     fn detailed_errors_keep_context_and_remove_credentials() {
         let value = sanitize(

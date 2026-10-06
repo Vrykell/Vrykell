@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter, Manager, State};
 use uuid::Uuid;
 
@@ -57,6 +58,7 @@ pub struct PtySession {
     master: Box<dyn MasterPty + Send>,
     writer: Box<dyn Write + Send>,
     child: Box<dyn Child + Send + Sync>,
+    input_pending: Arc<AtomicBool>,
 }
 
 fn session_has_exited(session: &Arc<Mutex<PtySession>>) -> bool {
@@ -364,6 +366,7 @@ pub fn pty_spawn(
     let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
 
     let id = format!("pty-{}", Uuid::new_v4());
+    let input_pending = Arc::new(AtomicBool::new(false));
     if debug::enabled() {
         debug::write(
             "spawn",
@@ -386,7 +389,7 @@ pub fn pty_spawn(
     }
     state.0.lock().map_err(|e| e.to_string())?.insert(
         id.clone(),
-        Arc::new(Mutex::new(PtySession { master: pair.master, writer, child })),
+        Arc::new(Mutex::new(PtySession { master: pair.master, writer, child, input_pending: input_pending.clone() })),
     );
 
     let tid = id.clone();
@@ -441,7 +444,8 @@ pub fn pty_spawn(
                     }
                     pending_bytes += data.len();
                     pending.extend(events);
-                    if pending_bytes >= FLUSH_BYTES || last_flush.elapsed() >= FLUSH_INTERVAL {
+                    // Echo the next input response immediately; sustained output still uses batching.
+                    if should_flush_output(&input_pending, pending_bytes, last_flush.elapsed()) {
                         flush_output(&app, &tid, &mut pending, &mut pending_bytes);
                         last_flush = std::time::Instant::now();
                     }
@@ -513,6 +517,10 @@ const FLUSH_INTERVAL: std::time::Duration = std::time::Duration::from_millis(16)
 /// 输出合批阈值：累积达到该字节数立即 flush，避免单条 IPC 消息过大
 const FLUSH_BYTES: usize = 32 * 1024;
 
+fn should_flush_output(input_pending: &AtomicBool, bytes: usize, elapsed: std::time::Duration) -> bool {
+    input_pending.swap(false, Ordering::AcqRel) || bytes >= FLUSH_BYTES || elapsed >= FLUSH_INTERVAL
+}
+
 /// 冲刷累积输出（结构化事件）；emit 失败（窗口已关闭）时顺手收敛会话。
 fn flush_output(
     app: &AppHandle,
@@ -574,6 +582,7 @@ pub async fn pty_write(state: State<'_, PtyState>, id: String, data: String) -> 
     let log_id = id.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let mut s = session.lock().map_err(|e| e.to_string())?;
+        s.input_pending.store(true, Ordering::Release);
         let result = s.writer.write_all(data.as_bytes()).and_then(|()| s.writer.flush());
         drop(s);
         if debug::enabled() {
@@ -1160,13 +1169,22 @@ mod cmd_interaction_tests {
     use std::io::{Read, Write};
 
     #[test]
+    fn input_echo_bypasses_the_output_window_without_disabling_stream_batching() {
+        let input_pending = AtomicBool::new(true);
+        assert!(should_flush_output(&input_pending, 1, std::time::Duration::ZERO));
+        assert!(!should_flush_output(&input_pending, 1, std::time::Duration::ZERO));
+        assert!(should_flush_output(&input_pending, FLUSH_BYTES, std::time::Duration::ZERO));
+        assert!(should_flush_output(&input_pending, 1, FLUSH_INTERVAL));
+    }
+
+    #[test]
     fn detects_child_exit_while_the_terminal_handles_are_still_open() {
         let pair = native_pty_system().openpty(PtySize { rows: 24, cols: 80, pixel_width: 0, pixel_height: 0 }).unwrap();
         let mut command = CommandBuilder::new("cmd.exe");
         command.args(["/d", "/c", "exit", "7"]);
         let child = pair.slave.spawn_command(command).unwrap();
         let writer = pair.master.take_writer().unwrap();
-        let session = Arc::new(Mutex::new(PtySession { master: pair.master, writer, child }));
+        let session = Arc::new(Mutex::new(PtySession { master: pair.master, writer, child, input_pending: Arc::new(AtomicBool::new(false)) }));
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
         while !session_has_exited(&session) && std::time::Instant::now() < deadline {
             std::thread::sleep(std::time::Duration::from_millis(20));

@@ -3,7 +3,7 @@ import { useTerminalSession } from '../hooks/useTerminalSession';
 import { useEffect, useRef, useState } from 'react';
 import { useTerminalStore } from '@features/terminal';
 import { ptyWrite } from '@platform/pty';
-import { needsSecretResponse } from '../model/terminalFrame';
+import { secretResponsePrompt, secretResponseWasRejected } from '../model/terminalFrame';
 import { terminalDebug } from '../services/terminalDebug';
 
 /** Render an interactive SSH session with xterm so screen contents and cursor stay in sync. */
@@ -16,6 +16,7 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
   const [cancellation, setCancellation] = useState<'idle' | 'pending' | 'done'>('idle');
   const [cancelledAuthentication, setCancelledAuthentication] = useState(false);
   const [manualSecret, setManualSecret] = useState(false);
+  const [directInput, setDirectInput] = useState(false);
   const [dismissedPrompt, setDismissedPrompt] = useState<string | null>(null);
   const cancellingRef = useRef(false);
   const responseRef = useRef<HTMLInputElement>(null);
@@ -23,7 +24,8 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
   const scene = useTerminalStore(s => s.scenes[paneId] ?? 'classic');
   const interactive = connectionInput && (scene !== 'blockList' || cancellation !== 'idle');
   const text = frame?.plainText ?? '';
-  const secret = manualSecret || (needsSecretResponse(text) && dismissedPrompt !== text);
+  const secretPrompt = secretResponsePrompt(text);
+  const secret = !directInput && (manualSecret || (secretPrompt !== null && (dismissedPrompt !== secretPrompt || secretResponseWasRejected(text))));
   const inputDisabled = !sessionId || cancellation !== 'idle';
   const disconnected = status === 'closed' || status === 'error' || cancellation === 'done';
   const focusTerminal = () => {
@@ -45,18 +47,27 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
   };
   const restart = async () => {
     if (cancellation === 'pending') return;
-    setCancellation('pending'); setResponse(''); setError(''); setManualSecret(false); setDismissedPrompt(null);
+    setCancellation('pending'); setResponse(''); setError(''); setManualSecret(false); setDirectInput(false); setDismissedPrompt(null);
     terminalDebug('ssh-reconnect-request', { paneId });
     try { await reconnect(); cancellingRef.current = false; setCancellation('idle'); }
     catch (reason) { setCancellation('idle'); setError(`重连失败：${String(reason)}`); }
   };
-  const showSnapshot = secret || disconnected;
+  const showSnapshot = (!manualSecret && secret && secretPrompt !== null) || disconnected;
   return <div style={{ width: '100%', height: '100%', position: 'relative' }}>
     {!connectionInput && <div ref={ref} style={{ position: 'absolute', inset: 0, minHeight: 0, background: 'transparent' }} />}
-    {interactive && <div data-testid="ssh-connection-input" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+    {connectionInput && <div data-testid="ssh-connection-input" style={{ position: 'absolute', inset: 0, display: interactive ? 'flex' : 'none', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0, padding: '4px 8px', fontSize: 'calc(12px * var(--ui-font-scale))' }}>
         <span role="status" style={{ flex: 1, color: 'var(--text-secondary)' }}>{cancellation === 'done' ? cancelledAuthentication ? '已取消认证，SSH 连接已关闭' : '已断开 SSH 连接' : disconnected ? '连接已断开' : status === 'connecting' ? '正在连接…' : secret ? '等待认证响应' : 'SSH 交互会话'}</span>
-        {!disconnected && <button type="button" disabled={inputDisabled} onClick={() => { setManualSecret(!secret); if (secret) setDismissedPrompt(text); }} style={{ padding: '7px 12px' }}>{secret ? '直接输入' : '密码输入'}</button>}
+        {!disconnected && <button type="button" disabled={inputDisabled} onClick={() => {
+          if (secret) {
+            setManualSecret(false);
+            setDirectInput(true);
+            if (secretPrompt) setDismissedPrompt(secretPrompt);
+          } else {
+            setDirectInput(false);
+            setManualSecret(true);
+          }
+        }} style={{ padding: '7px 12px' }}>{secret ? '直接输入' : '密码输入'}</button>}
         {disconnected ? <button type="button" disabled={cancellation === 'pending'} onClick={() => void restart()} style={{ padding: '7px 12px' }}>重新连接</button>
           : <button type="button" disabled={inputDisabled} onClick={() => void cancelAuthentication()} style={{ padding: '7px 12px' }}>{cancellation === 'pending' ? '正在取消…' : secret ? '取消认证' : '断开连接'}</button>}
       </div>
@@ -65,12 +76,12 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
         <div ref={ref} data-testid={showSnapshot ? undefined : 'ssh-terminal-screen'} style={{ position: 'absolute', inset: 0, overflow: 'auto', visibility: showSnapshot ? 'hidden' : 'visible', pointerEvents: showSnapshot ? 'none' : 'auto' }} />
         {showSnapshot && <pre data-testid="ssh-terminal-screen" style={{ position: 'absolute', inset: 0, overflow: 'auto', margin: 0, whiteSpace: 'pre', color: 'var(--text-primary)' }} dangerouslySetInnerHTML={{ __html: frame?.html || '正在连接远端主机…' }} />}
       </div>
-      {secret && !disconnected && <form onSubmit={e => {
+      {interactive && secret && !disconnected && <form onSubmit={e => {
         e.preventDefault();
         if (inputDisabled || cancellingRef.current || !sessionId) return;
         const value = response;
         if (responseRef.current) responseRef.current.value = '';
-        setResponse(''); setError(''); setManualSecret(false); setDismissedPrompt(text);
+        setResponse(''); setError(''); setManualSecret(false); setDirectInput(false); setDismissedPrompt(secretPrompt ?? text);
         void ptyWrite(sessionId, `${value}\r`).catch(reason => { setManualSecret(true); setError(`发送失败：${String(reason)}`); });
       }} className="terminal-composer" style={{ display: 'flex', gap: 8, alignItems: 'center', padding: 12, flexShrink: 0 }}>
         <input ref={responseRef} type="password" autoComplete="off" aria-label="SSH 认证响应" placeholder="输入密码、密钥口令或验证响应" value={response} onChange={e => setResponse(e.target.value)} disabled={inputDisabled} className="ssh-auth-response" style={{ flex: 1, minWidth: 0, height: 36, background: 'transparent', border: 'none', outline: 'none' }} />

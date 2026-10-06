@@ -27,6 +27,7 @@ __ait_precmd() {
   printf '\e]133;A\a'
   local b=$(git branch --show-current 2>/dev/null) && [[ -n "$b" ]] && \
     printf '\e]133;G;%s\a' "$(printf %s "$b" | base64 | tr -d '\n')"
+  printf '\e]133;B\a'
 }
 __ait_preexec() {
   printf '\e]133;E;%s\a' "$(printf %s "$1" | base64 | tr -d '\n')"
@@ -60,6 +61,7 @@ __ait_mark_prompt_ready() {
     PS2=''
   fi
   __ait_in_prompt=1
+  printf '\e]133;B\a'
 }
 if [[ "$(declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]]; then
   PROMPT_COMMAND=(__ait_prompt_command "${PROMPT_COMMAND[@]}" __ait_mark_prompt_ready)
@@ -129,7 +131,8 @@ function prompt {
         Write-VrykellOsc "133;G" $b64
     }
 
-    $promptText
+    # The prompt-end marker follows initialization and is rendered with the prompt.
+    $promptText + $esc + ']133;B' + $bel
 }
 
 # Finish line-editor repainting before marking command output as started.
@@ -201,8 +204,8 @@ pub fn ssh_remote_command() -> String {
     format!(
         r#"b64d() {{ printf %s "$1" | base64 -d 2>/dev/null || printf %s "$1" | base64 -D 2>/dev/null; }}
 case ${{SHELL##*/}} in
-zsh) d=$(umask 077 && mktemp -d 2>/dev/null) && b64d '{zsh_b64}' > "$d/.zshrc" && VRYKELL_BLOCK_MODE=1 ZDOTDIR=$d exec zsh -i 2>/dev/null;;
-bash) f=$(umask 077 && mktemp 2>/dev/null) && b64d '{bash_b64}' > "$f" && VRYKELL_BLOCK_MODE=1 exec bash --rcfile "$f" -i 2>/dev/null;;
+zsh) d=$(umask 077 && mktemp -d 2>/dev/null) && b64d '{zsh_b64}' > "$d/.zshrc" && VRYKELL_BLOCK_MODE=1 ZDOTDIR=$d exec zsh -i;;
+bash) f=$(umask 077 && mktemp 2>/dev/null) && b64d '{bash_b64}' > "$f" && VRYKELL_BLOCK_MODE=1 exec bash --rcfile "$f" -i;;
 esac
 exec "${{SHELL:-sh}}" -i"#
     )
@@ -211,6 +214,39 @@ exec "${{SHELL:-sh}}" -i"#
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn remote_wrapper_runs_commands_and_preserves_stderr() {
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+
+        #[cfg(windows)]
+        let bash = Path::new("C:/Program Files/Git/usr/bin/bash.exe");
+        #[cfg(not(windows))]
+        let bash = Path::new("/bin/bash");
+        if !bash.is_file() { return; }
+
+        let dir = std::env::temp_dir().join(format!("vrykell-remote-shell-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("ssh-block-visible.txt"), "fixture").unwrap();
+        fs::write(dir.join(".bashrc"), "").unwrap();
+        let mut command = Command::new(bash);
+        command.args(["--noprofile", "--norc", "-c", &ssh_remote_command()]);
+        command.current_dir(&dir).env("HOME", &dir).env("SHELL", "/bin/bash");
+        command.env("PATH", "/usr/bin:/bin").env("TERM", "xterm-256color");
+        command.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+        let mut child = command.spawn().unwrap();
+        child.stdin.take().unwrap().write_all(b"ls\npwd\nprintf 'stderr-visible\\n' >&2\nexit\n").unwrap();
+        let output = child.wait_with_output().unwrap();
+        fs::remove_dir_all(&dir).unwrap();
+        assert!(output.status.success());
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stdout.contains("ssh-block-visible.txt"), "ls output was lost: {stdout}");
+        assert!(stdout.contains("133;C"), "preexec markers were lost: {stdout}");
+        assert!(stdout.contains("133;D;0"), "completion markers were lost: {stdout}");
+        assert!(stderr.contains("stderr-visible"), "remote command errors were hidden: {stderr}");
+    }
 
     #[test]
     fn ssh_remote_command_contains_safe_wrapper_and_decodable_scripts() {
@@ -237,6 +273,8 @@ mod tests {
             .unwrap();
             assert!(script.contains("133;A"));
             assert!(script.contains("133;C"));
+            // 提示符结束标记：文件打开等延后命令依赖它判断行编辑器已就绪
+            assert!(script.contains("133;B"));
         }
     }
 
@@ -328,6 +366,10 @@ mod tests {
         assert!(ps.contains("133;E"));
         assert!(ps.contains("133;G"));
         assert!(ps.contains("Set-PSReadLineKeyHandler"));
+        // Prompt-end marker: delayed commands (file open) wait for it before typing.
+        assert!(zsh.contains("133;B"));
+        assert!(bash.contains("133;B"));
+        assert!(ps.contains("133;B"));
     }
 
     #[test]

@@ -40,6 +40,16 @@ describe('TerminalBlockList', () => {
     expect(container.innerHTML).not.toContain('border-left: 3px');
   });
 
+  it('命令没有输出时保持空白，仅保留命令头部和退出码', () => {
+    useBlockStore.getState().setBlocks('t1', [block({
+      outputText: '', outputHtml: '', outputRaw: '\x1b[H\x1b[2J\x1b[K\r\n',
+    })]);
+    render(<TerminalBlockList tabId="t1" />);
+    expect(screen.queryByText('命令未产生输出')).toBeNull();
+    expect(screen.getByTestId('exit-code')).toHaveTextContent('0');
+    expect(screen.getByTestId('command-block-b1').querySelectorAll('[data-selectable]')).toHaveLength(1);
+  });
+
   it('已完成块操作按钮保持统一尺寸', () => {
     useBlockStore.getState().setBlocks('t1', [block({})]);
     render(<TerminalBlockList tabId="t1" />);
@@ -48,8 +58,18 @@ describe('TerminalBlockList', () => {
     for (const title of ['AI 解释', '重新运行', '复制命令', '复制输出', '更多操作']) {
       const button = screen.getByTitle(title);
       expect(button).toHaveStyle({ width: '28px', minWidth: '28px', height: '28px', padding: '0px' });
-      expect(button.querySelector('svg')).toHaveStyle({ width: '16px', height: '16px' });
+      expect(button.querySelector('svg')).toHaveStyle({ width: '14px', height: '14px' });
     }
+  });
+
+  it('折叠与展开箭头使用较小图标，同时保持一致的按钮尺寸', () => {
+    useBlockStore.getState().setBlocks('t1', [block({})]);
+    render(<TerminalBlockList tabId="t1" />);
+    const collapse = screen.getByTitle('折叠');
+    expect(collapse).toHaveStyle({ width: '28px', height: '28px' });
+    expect(collapse.querySelector('svg')).toHaveStyle({ width: '12px', height: '12px' });
+    fireEvent.click(collapse);
+    expect(screen.getByTitle('展开').querySelector('svg')).toHaveStyle({ width: '12px', height: '12px' });
   });
 
   it('截断提示：linesTruncated > 0 显示已截断', () => {
@@ -89,7 +109,7 @@ describe('TerminalBlockList', () => {
       const button = screen.getByRole('button', { name });
       expect(button.style.minWidth).toBe('28px');
       expect(button.style.height).toBe('28px');
-      expect(button.querySelector('svg')).toHaveStyle({ width: '16px', height: '16px' });
+      expect(button.querySelector('svg')).toHaveStyle({ width: '14px', height: '14px' });
       expect(button.textContent).toBe('');
     }
     // jsdom 下 getExecutingTerm 返回 null，只渲染宿主 div

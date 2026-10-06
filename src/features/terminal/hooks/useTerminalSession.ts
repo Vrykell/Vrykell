@@ -5,7 +5,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { captureFrame, type TerminalFrame } from '../model/terminalFrame';
+import { captureConnectionFrame, type TerminalFrame } from '../model/terminalFrame';
+import { projectBlocks } from '../model/blockProjection';
 import { Terminal } from '@xterm/xterm';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { FitAddon } from '@xterm/addon-fit';
@@ -25,37 +26,12 @@ import { defaultOpenModeForShell } from '@features/agent/stores/agentSettings';
 import { SessionController } from '@features/terminal/services/pipeline/sessionController';
 import { getCellMetrics } from '@utils/termMetrics';
 import type { DispatchEvent } from '@core/terminal/events';
-import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 import type { UnlistenFn } from '@tauri-apps/api/event';
-import { TERMINAL_FONT_FAMILY, getTerminalFontSize, TERMINAL_LINE_HEIGHT } from '@features/terminal/model/terminalFont';
+import { TERMINAL_FONT_FAMILY, getTerminalFontSize, measureTerminalDomCellWidth, TERMINAL_LINE_HEIGHT } from '@features/terminal/model/terminalFont';
 import { prepareSshHost } from '@features/ssh/services/hostTrust';
 import { useTypographyStore } from '@config/typography';
 
-/**
- * TermBlock UI 投影：剥离 controller 内部字段（outputTerm/earlyBuf 等）。
- * The store owns collapsed state, so preserve it by block ID when replacing the projection.
- * agentControl owns agent markers, which are looked up again during projection.
- */
-function projectBlock(b: TermBlock, collapsed: boolean, agent: boolean): TermBlock {
-  return {
-    id: b.id,
-    command: b.command,
-    cwd: b.cwd,
-    gitBranch: b.gitBranch,
-    status: b.status,
-    exitCode: b.exitCode,
-    startedAt: b.startedAt,
-    endedAt: b.endedAt,
-    wasLongRunning: b.wasLongRunning,
-    collapsed: collapsed || undefined,
-    agent: agent || undefined,
-    outputHtml: b.outputHtml,
-    outputText: b.outputText,
-    outputRaw: b.outputRaw,
-    linesTruncated: b.linesTruncated,
-  };
-}
-
+/** Live session references shared across development reloads. */
 interface SessionRegistry {
   controllers: Map<string, SessionController>;
   pendingUiCommands: Map<string, { command: string; stagedAt: number }>;
@@ -115,7 +91,7 @@ export function syncTermWidth(tabId: string): void {
 }
 
 /** Fallback width deduction for command insets, host padding, and xterm padding. */
-const BLOCK_CONTENT_INSET_PX = 48;
+const BLOCK_CONTENT_INSET_PX = 32;
 
 export function useTerminalSession(
   paneId: string,
@@ -143,6 +119,7 @@ export function useTerminalSession(
     const el = containerRef.current;
     if (!el) return;
     setStatus('connecting');
+    useTerminalStore.getState().setStartupState(paneId, 'starting');
 
     const term = new Terminal({
       fontFamily: TERMINAL_FONT_FAMILY,
@@ -150,6 +127,8 @@ export function useTerminalSession(
       lineHeight: TERMINAL_LINE_HEIGHT,
       cursorBlink: true,
       scrollback: 5000,
+      // The public ruler width also sizes the native scrollbar and fit calculation.
+      overviewRuler: { width: 10, showTopBorder: false, showBottomBorder: false },
       allowTransparency: false,
       theme: readXtermTheme(),
     });
@@ -168,10 +147,11 @@ export function useTerminalSession(
     term.open(el);
     let frameRaf = 0;
     const frameSub = term.onWriteParsed?.(() => {
+      if (spec?.kind !== 'ssh') return;
       if (frameRaf) return;
       frameRaf = requestAnimationFrame(() => {
         frameRaf = 0;
-        setFrame(captureFrame(term));
+        setFrame(previous => captureConnectionFrame(term, previous, stopped || connectionFailed));
       });
     });
     fit.fit();
@@ -181,6 +161,7 @@ export function useTerminalSession(
     let sessionId: string | null = null;
     let disposed = false;
     let stopped = false;
+    let connectionFailed = false;
     const startupAbort = new AbortController();
     // spawn 完成前的初始输出缓冲（shell 启动提示符）：拿到 sessionId 后回放，避免丢失
     let preSession: { id: string; events: DispatchEvent[] }[] = [];
@@ -201,6 +182,7 @@ export function useTerminalSession(
       sessionId = null;
       preSession = [];
       useTerminalStore.getState().clearSession(paneId, id ?? undefined);
+      if (spec?.kind === 'ssh') setFrame(previous => captureConnectionFrame(term, previous, true));
       setStatus('closed');
     };
     closeSessionRef.current = close;
@@ -232,13 +214,8 @@ export function useTerminalSession(
     const controller = new SessionController(paneId, term.cols, {      writeMain,
       onBlocksChanged: () => {
         const prev = useBlockStore.getState().byTab[paneId] ?? [];
-        const collapsedIds = new Set(prev.filter((b) => b.collapsed).map((b) => b.id));
-        useBlockStore.getState().setBlocks(
-          paneId,
-          controller.blocks.map((b) =>
-            projectBlock(b, collapsedIds.has(b.id), agentControl.hasBlock(b.id)),
-          ),
-        );
+        const next = projectBlocks(controller.blocks, prev, id => agentControl.hasBlock(id));
+        if (next !== prev) useBlockStore.getState().setBlocks(paneId, next);
       },
       onSceneChanged: (scene) => {
         currentScene = scene;
@@ -337,21 +314,43 @@ export function useTerminalSession(
       controller.seed(restoredBlocks);
     }
 
-    // ── PTY 输出 → 管线（先注册，防止 spawn 瞬间的 OSC 133 标记丢失） ──
+    let startupTimer: ReturnType<typeof setTimeout> | undefined;
+    let promptReady = false;
+    let startupComplete = false;
+    const handleOutput = (events: DispatchEvent[]) => {
+      controller.handleEvents(events);
+      if (startupComplete) return;
+      // Prompt-end marker emitted by the shell hooks once the line editor accepts input.
+      if (events.some(event => event.kind === 'osc' && event.code === '133;B')) promptReady = true;
+      // Non-integrated command shells have no OSC readiness marker.
+      const plainShellOutput = spec?.kind === 'local' && spec.shellType === 'cmd'
+        && events.some(event => event.kind === 'data' && event.text.length > 0);
+      if (!promptReady && !plainShellOutput) return;
+      clearTimeout(startupTimer);
+      // Let the line editor finish its initial repaint before injecting a command.
+      startupTimer = setTimeout(() => {
+        if (disposed || stopped || !sessionId) return;
+        startupComplete = true;
+        useTerminalStore.getState().setStartupState(paneId, 'ready');
+        terminalDebug('shell-input-ready', { paneId, sessionId, integrated: promptReady });
+      }, 150);
+    };
+
+    // Register output before spawning to retain startup markers.
 
     pendingUnlisteners.push(
       onPtyOutput((id, events) => {
         if (disposed || stopped) return;
-        if (isTerminalDebugEnabled()) {
-          terminalDebug('pty-output', { id, events: events.length, kinds: events.map((event) => event.kind) });
-        }
         if (sessionId === null) {
           // 尚未拿到 sessionId：先缓冲，等 spawn 完成后回放
           preSession.push({ id, events });
           return;
         }
         if (id === sessionId) {
-          controller.handleEvents(events);
+          if (isTerminalDebugEnabled()) {
+            terminalDebug('pty-output', { id, events: events.length, kinds: events.map((event) => event.kind) });
+          }
+          handleOutput(events);
         }
       }),
     );
@@ -417,7 +416,7 @@ export function useTerminalSession(
         // 回放 spawn 完成前缓冲的初始输出（shell 启动提示符）
         for (const ev of preSession) {
           if (ev.id === sessionId) {
-            controller.handleEvents(ev.events);
+            handleOutput(ev.events);
           }
         }
         preSession = [];
@@ -437,6 +436,8 @@ export function useTerminalSession(
       })
       .catch((e) => {
         if (!disposed && !stopped) {
+          connectionFailed = true;
+          useTerminalStore.getState().setStartupState(paneId, 'failed');
           setStatus('error');
           if (isTerminalDebugEnabled()) {
             terminalDebug('pty-spawn-error', { paneId, errorType: e instanceof Error ? e.name : typeof e });
@@ -532,28 +533,15 @@ export function useTerminalSession(
       return { w: fsHost.clientWidth, h: fsHost.clientHeight - padTop };
     };
 
-    /**
-     * Measure DOM glyph width because completed HTML snapshots use browser font
-     * metrics while live xterm uses its internal cell width. Reuse the snapshot
-     * font family so command output keeps the same wrapping before and after exit.
-     */
     let cachedDomCellWidth = 0;
     const domCellWidth = (): number => {
       if (cachedDomCellWidth > 0) return cachedDomCellWidth;
-      const probe = document.createElement('span');
-      probe.style.cssText =
-        'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:pre;line-height:1;';
-      probe.style.fontFamily = TERMINAL_FONT_FAMILY;
-      probe.style.fontSize = `${getTerminalFontSize()}px`;
-      probe.textContent = 'W'.repeat(100);
-      document.body.appendChild(probe);
-      const w = probe.getBoundingClientRect().width / 100;
-      probe.remove();
-      cachedDomCellWidth = w > 0 ? w : 0;
-      return cachedDomCellWidth || cellWidth();
+      const measured = measureTerminalDomCellWidth();
+      cachedDomCellWidth = measured > 0 ? measured : cellWidth();
+      return cachedDomCellWidth;
     };
 
-    /** 当前场景下 PTY/块终端应有的列数 */
+    /** PTY column count leaves room for browser fallback glyphs in completed snapshots. */
     const effectiveCols = (): number => {
       // Manual fullscreen changes the store scene without changing the controller scene.
       // Read the store value here to keep sizing on the fullscreen branch.
@@ -569,9 +557,10 @@ export function useTerminalSession(
       // Before it mounts, estimate the content width from the main terminal container.
       const pane = document.querySelector<HTMLElement>(`[data-testid="pane-${paneId}"]`);
       const host = pane?.querySelector<HTMLElement>('[data-testid="running-term"]');
+      const list = pane?.querySelector<HTMLElement>(`[data-testid="terminal-scroll-${paneId}"]`);
       const screenPx = host
         ? host.clientWidth - 16
-        : el.offsetWidth - BLOCK_CONTENT_INSET_PX;
+        : (list?.clientWidth || el.offsetWidth) - BLOCK_CONTENT_INSET_PX;
       // A hidden or not-yet-laid-out host has no measurable width; retry after mount.
       if (screenPx <= 0) return term.cols;
       return Math.max(2, Math.min(term.cols, Math.floor(screenPx / domCellWidth())));
@@ -653,6 +642,7 @@ export function useTerminalSession(
         focusTimer = null;
       }
       selectionSub.dispose();
+      clearTimeout(startupTimer);
       frameSub?.dispose();
       cancelAnimationFrame(frameRaf);
       dataSub.dispose();

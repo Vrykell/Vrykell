@@ -19,7 +19,7 @@ test.describe('命令块操作全链路', () => {
       const button = block.getByTitle(title);
       await expect(button).toHaveCSS('width', '28px');
       await expect(button).toHaveCSS('height', '28px');
-      await expect(button.locator('svg')).toHaveCSS('width', '16px');
+      await expect(button.locator('svg')).toHaveCSS('width', '14px');
       const box = await button.boundingBox();
       expect(box).not.toBeNull();
       bounds.push({ x: box!.x, width: box!.width });
@@ -29,6 +29,13 @@ test.describe('命令块操作全链路', () => {
       const current = bounds[index]!;
       expect(current.x - previous.x - previous.width).toBeLessThanOrEqual(1);
     }
+    const collapse = block.getByTitle('折叠', { exact: true });
+    await expect(collapse).toHaveCSS('width', '28px');
+    await expect(collapse.locator('svg')).toHaveCSS('width', '12px');
+    await collapse.click();
+    await expect(block.getByTitle('展开', { exact: true }).locator('svg')).toHaveCSS('width', '12px');
+    await block.getByTitle('展开', { exact: true }).click();
+    await block.hover();
     await block.screenshot({ path: test.info().outputPath('compact-toolbar.png') });
   });
 

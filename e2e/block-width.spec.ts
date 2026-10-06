@@ -49,7 +49,7 @@ interface Diag {
   innerWidth: number;
 }
 
-test('满宽 box-drawing 输出保持网格行，当前宽度足够时不横向滚动', async ({ page }) => {
+test('long box-drawing rows reflow to the available columns without horizontal scrolling', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   const input = page.getByPlaceholder(/输入命令/);
@@ -103,7 +103,7 @@ test('满宽 box-drawing 输出保持网格行，当前宽度足够时不横向�
 
     return {
       cols,
-      gridRows: rows.length,
+      gridRows: rowLens.reduce((count, length) => count + Math.max(1, Math.ceil(length / Math.floor(el.clientWidth / charWidth))), 0),
       visualLines: Math.round((contentHeight / lineHeightPx) * 10) / 10,
       clientWidth: el.clientWidth,
       charWidth: Math.round(charWidth * 1000) / 1000,
@@ -116,8 +116,7 @@ test('满宽 box-drawing 输出保持网格行，当前宽度足够时不横向�
 
   console.log('WIDTH-DIAG', JSON.stringify(diag, null, 2));
 
-  // 网格行数与视觉行数 1:1：快照列数按 DOM 实测字符宽换算（与活终端一致），
-  // 结束运行中块时不会因为宽了 ~4% 而折行；也不产生横向滚动。
+  // Logical rows wrap to the measured available columns without horizontal scrolling.
   expect(diag.clientWidth).toBeGreaterThan(0);
   expect(diag.scrollWidth - diag.clientWidth).toBeLessThanOrEqual(1);
   // 行高 1.0 下字形 font metrics 有亚像素溢出，scrollHeight 会多计 ~0.1 行；
@@ -125,7 +124,34 @@ test('满宽 box-drawing 输出保持网格行，当前宽度足够时不横向�
   expect(Math.abs(diag.visualLines - diag.gridRows)).toBeLessThan(0.2);
 });
 
-test('opening the assistant preserves completed table rows and allows horizontal scrolling', async ({ page }) => {
+test('resizing a running block resizes both PTY and terminal buffer, then restores its width', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
+  await emitPtyOutput(page, `\x1b]133;E;${btoa('running-output')}\x07\x1b]133;C\x07${'x'.repeat(300)}\r\n`);
+  const host = page.getByTestId('running-term');
+  await expect(host.locator('.xterm')).toBeVisible();
+  const terminal = () => page.evaluate(() => {
+    const terms = (window as unknown as { __vrykellTerms: Map<string, import('@xterm/xterm').Terminal> }).__vrykellTerms;
+    const term = [...terms.entries()].find(([key]) => key.startsWith('block:'))![1];
+    const lines = Array.from({ length: term.buffer.active.length }, (_, row) => term.buffer.active.getLine(row)?.translateToString(true) ?? '').filter(Boolean);
+    return { cols: term.cols, rows: lines.length, text: lines.join('') };
+  });
+  await expect.poll(() => terminal().then(value => value.text)).toBe('x'.repeat(300));
+  const before = await terminal();
+  await page.setViewportSize({ width: 850, height: 800 });
+  await expect.poll(() => terminal().then(value => value.cols)).toBeLessThan(before.cols);
+  const narrow = await terminal();
+  await expect.poll(() => ptyResizes(page).then(resizes => resizes.at(-1)?.cols)).toBe(narrow.cols);
+  expect(narrow.rows).toBeGreaterThan(before.rows);
+  expect(narrow.text).toBe(before.text);
+  expect(await host.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+  await page.setViewportSize({ width: 1240, height: 800 });
+  await expect.poll(() => terminal().then(value => value.cols)).toBe(before.cols);
+  await expect.poll(() => terminal().then(value => value.rows)).toBe(before.rows);
+});
+
+test('opening the assistant resizes the PTY and wraps completed output without horizontal scrolling', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
@@ -136,17 +162,21 @@ test('opening the assistant preserves completed table rows and allows horizontal
   await expect(output).toContainText('file-name-');
   const grid = output.locator(':scope > div');
   const before = await grid.evaluate(el => ({ height: el.clientHeight, text: el.textContent, html: el.innerHTML }));
+  const beforeCols = (await ptyResizes(page)).at(-1)!.cols;
   await page.locator('[data-dock-btn="chat"]').click();
   await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
-  await expect.poll(() => grid.evaluate(el => el.clientHeight)).toBe(before.height);
+  await expect.poll(() => (ptyResizes(page)).then(resizes => resizes.at(-1)!.cols)).toBeLessThan(beforeCols);
+  await expect.poll(() => grid.evaluate(el => el.clientHeight)).toBeGreaterThan(before.height);
   expect(await grid.textContent()).toBe(before.text);
   expect(await grid.innerHTML()).toBe(before.html);
-  await expect.poll(() => output.evaluate(el => el.scrollWidth - el.clientWidth)).toBeGreaterThan(40);
+  await expect.poll(() => output.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
   const atEnd = await output.evaluate(el => {
     el.scrollLeft = el.scrollWidth;
     return el.scrollLeft;
   });
-  expect(atEnd).toBeGreaterThan(40);
+  expect(atEnd).toBe(0);
+  await page.locator('[data-dock-btn="chat"]').click();
+  await expect.poll(() => grid.evaluate(el => el.clientHeight)).toBe(before.height);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
 });
 
@@ -199,6 +229,37 @@ test('运行中卡片：PTY/块终端宽度跟随卡片内容宽（右缘不裁�
   }).toPass({ timeout: 5000 });
 });
 
+test('运行中输出与完成快照保持相同字符宽度', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
+  await emitPtyOutput(page, `\x1b]133;E;${btoa('ls')}\x07\x1b]133;C\x07`);
+  const host = page.getByTestId('running-term');
+  await expect(host.locator('.xterm-screen')).toBeVisible();
+  const running = await host.evaluate((el) => {
+    const screen = el.querySelector<HTMLElement>('.xterm-screen')!;
+    type MeasuredTerm = { cols: number };
+    const terms = (window as unknown as { __vrykellTerms: Map<string, MeasuredTerm> }).__vrykellTerms;
+    const term = [...terms.entries()].find(([key]) => key.startsWith('block:'))?.[1];
+    const rect = screen.getBoundingClientRect();
+    return { cols: term!.cols, screenLeft: rect.left, screenWidth: rect.width };
+  });
+  const output = 'W'.repeat(running.cols);
+  await emitPtyOutput(page, output);
+  await emitPtyOutput(page, '\x1b]133;D;0\x07');
+  const blockOutput = page.locator('[data-testid^="command-block-"] [data-selectable]').last();
+  await expect(blockOutput).toContainText(output);
+  const completed = await blockOutput.evaluate((el) => {
+    const content = el.querySelector(':scope > div')!;
+    const range = document.createRange();
+    range.selectNodeContents(content);
+    const rect = range.getBoundingClientRect();
+    return { left: rect.left, width: rect.width };
+  });
+  expect(Math.abs(completed.left - running.screenLeft)).toBeLessThanOrEqual(1);
+  expect(Math.abs(completed.width - running.screenWidth)).toBeLessThanOrEqual(1);
+});
+
 test('命令块分隔线延伸到终端左右边缘', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
@@ -216,7 +277,7 @@ test('命令块分隔线延伸到终端左右边缘', async ({ page }) => {
     const s = scroll.getBoundingClientRect();
     return {
       leftGap: b.left - s.left,
-      rightGap: s.right - b.right,
+      rightGap: s.left + scroll.clientLeft + scroll.clientWidth - b.right,
       borderTop: getComputedStyle(block).borderTopWidth,
       contentInset: parseFloat(getComputedStyle(block).paddingLeft),
     };

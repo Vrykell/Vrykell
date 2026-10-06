@@ -20,6 +20,17 @@ beforeEach(() => {
 });
 
 describe('SSH connection input', () => {
+  it('keeps the live screen visible when manually opening masked input without an authentication prompt', () => {
+    sessionView.frame.plainText = '';
+    sessionView.frame.html = '';
+    useTerminalStore.setState({ sessions: { p: 'session' } });
+    render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+    fireEvent.click(screen.getByRole('button', { name: '密码输入' }));
+    expect(screen.getByLabelText('SSH 认证响应')).toHaveAttribute('type', 'password');
+    expect(screen.getByTestId('ssh-terminal-screen').tagName).toBe('DIV');
+    expect(screen.getByTestId('ssh-terminal-screen')).toHaveStyle({ visibility: 'visible' });
+    expect(screen.queryByText('正在连接远端主机…')).not.toBeInTheDocument();
+  });
   it('reports a manual interactive disconnect without calling it authentication cancellation', async () => {
     sessionView.frame.plainText = '交互程序';
     sessionView.frame.html = '交互程序';
@@ -113,6 +124,37 @@ describe('SSH connection input', () => {
     expect(screen.getByRole('textbox', { name: 'SSH 交互终端' })).toBeVisible();
     expect(screen.getByTestId('ssh-terminal-screen')).toBeVisible();
     expect(screen.queryByText('交互程序 倒计时 30s')).not.toBeInTheDocument();
+  });
+  it('does not mistake a stale password prompt for a new challenge after the screen redraws', () => {
+    useTerminalStore.setState({ sessions: { p: 'session' } });
+    const { rerender } = render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+    const input = screen.getByLabelText('SSH 认证响应');
+    fireEvent.change(input, { target: { value: 'temporary' } });
+    fireEvent.submit(input.closest('form')!);
+
+    sessionView.frame.plainText = '交互程序：已完成登录\n方向键选择，Enter 确认，Esc 退出\nPassword:';
+    sessionView.frame.html = '交互程序：已完成登录<br>方向键选择，Enter 确认，Esc 退出<br>Password:';
+    rerender(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+
+    expect(screen.queryByLabelText('SSH 认证响应')).toBeNull();
+    expect(screen.getByTestId('ssh-terminal-screen')).toHaveStyle({ visibility: 'visible' });
+  });
+  it('reopens secret input after a rejected password and lets the user return to direct terminal input', () => {
+    useTerminalStore.setState({ sessions: { p: 'session' } });
+    const { rerender } = render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+    const input = screen.getByLabelText('SSH 认证响应');
+    fireEvent.change(input, { target: { value: 'wrong' } });
+    fireEvent.submit(input.closest('form')!);
+
+    sessionView.frame.plainText = 'Permission denied, please try again.\nPassword:';
+    sessionView.frame.html = 'Permission denied, please try again.<br>Password:';
+    rerender(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+    expect(screen.getByLabelText('SSH 认证响应')).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: '直接输入' }));
+    rerender(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+    expect(screen.queryByLabelText('SSH 认证响应')).toBeNull();
+    expect(screen.getByTestId('ssh-terminal-screen')).toHaveStyle({ visibility: 'visible' });
   });
   it('keeps the last screen and offers reconnection after a remote exit', async () => {
     sessionView.status = 'closed';
