@@ -6,6 +6,10 @@ export interface TauriMockOptions {
   integration?: boolean;
   sshHost?: 'known' | 'unknown' | 'changed';
   sshTrustConfirmed?: boolean;
+  /** Simulate a remote shell with prompt hooks but no preexec hook. */
+  sshPreexec?: boolean;
+  /** Add one historical session under an archived group to test restoring it by itself. */
+  groupedHistoricalSession?: boolean;
   /** 预置模型列表（默认 2 个：主力模型 + 本地模型） */
   aiModels?: { id: string; name: string; provider: string; baseUrl: string; model: string }[];
   /** 当前生效模型 id（默认 '' = 镜像字段） */
@@ -40,7 +44,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     { name: '旧脚本技能', description: '遗留技能，含脚本', source: 'market', trusted: false, enabled: false, hasScripts: true, modified: true, files: ['SKILL.md', 'scripts/run.sh', 'references/说明.md'], dir: '/home/e2e/.vrykell/skills/旧脚本技能', prompt: '运行 scripts/run.sh 完成工作。' },
   ];
   await page.addInitScript(
-    ({ enableIntegration, models, active, skillsSeed, sshHost, sshTrustConfirmed }) => {
+    ({ enableIntegration, models, active, skillsSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession }) => {
     let cbCounter = 0;
     const eventListeners = new Map<string, number>();
     const writes: string[] = [];
@@ -113,11 +117,16 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     const mockSessions: Record<string, unknown>[] = [
       { id: 't1', title: '终端', status: 'active', created_at: Date.now(), closed_at: null, block_count: 2, cwd: '', group_id: null, sort_order: 0, kind: 'local', payload: '{}' },
       { id: 'hist-1', title: '旧的调试会话', status: 'historical', created_at: Date.now() - 1000, closed_at: Date.now() - 500, block_count: 5, cwd: '', group_id: null, sort_order: 0, kind: 'local', payload: '{}' },
+      ...(groupedHistoricalSession ? [{ id: 'hist-group-1', title: '归档分组中的会话', status: 'historical', created_at: Date.now() - 2000, closed_at: Date.now() - 1000, block_count: 1, cwd: '', group_id: 'archived-group', sort_order: 0, kind: 'local', payload: '{}' }] : []),
     ];
+    const mockGroups: Record<string, unknown>[] = groupedHistoricalSession
+      ? [{ id: 'archived-group', title: '已归档分组', sort_order: 0, collapsed: false, created_at: Date.now() - 3000, session_count: 0, archived: true }]
+      : [];
     const mockChatMessages: Record<string, unknown>[] = [];
     const sessionPayloads: { id: string; payload: string }[] = [];
     let pendingCmd = '';
     let integrationEnabled = enableIntegration;
+    let sshSession = false;
     (window as unknown as Record<string, unknown>).__AI_MODELS__ = aiModels;
     (window as unknown as Record<string, unknown>).__PTY_WRITES__ = writes;
     (window as unknown as Record<string, unknown>).__CLIPBOARD_TEXT__ = clipboardText;
@@ -228,7 +237,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
      *  顺序与真实 RC 一致（shell_integration.rs：OSC7 → D → A → G），防 cwd 归属回归。 */
     function emitInitialPrompt() {
       if (!integrationEnabled) return;
-      emitOutput(`${OSC7('/home/e2e/project')}${A}~/project${G('main')} $ `);
+      emitOutput(`${OSC7('/home/e2e/project')}${A}~/project${G('main')} $ \x1b]133;B\x07`);
     }
 
     /** 发送 OSC 133 序列模拟 shell integration 输出 */
@@ -249,8 +258,10 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
         if (!cmd.trim()) continue;
         const clean = cmd.trim();
         const output = generateOutput(clean);
-        results.push(E(clean));
-        results.push(C);
+        if (!sshSession || sshPreexec) {
+          results.push(E(clean));
+          results.push(C);
+        }
         if (output) results.push(`${output}\r\n`);
         // 与真实 RC 同序：OSC7 在 D/A 之前
         results.push(OSC7('/home/e2e/project'));
@@ -324,6 +335,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
         switch (cmd) {
           case 'pty_spawn': {
             spawns.push(args);
+            sshSession = Boolean(args.ssh);
             // 注册完 listener 后再发初始 prompt，避免瞬间丢失
             setTimeout(emitInitialPrompt, 20);
             return 'e2e-session';
@@ -781,6 +793,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
           case 'terminal_debug_set':
             return args.enabled;
           case 'terminal_debug_record':
+          case 'terminal_debug_records':
           case 'diagnostics_export':
             diagnosticsExports.push(args);
             return undefined;
@@ -794,17 +807,21 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
           case 'get_session':
             return mockSessions.find((s) => s.id === args.id) ?? null;
           case 'groups_list':
-            return [];
+            return mockGroups;
           case 'group_create':
           case 'group_rename':
           case 'group_set_collapsed':
           case 'group_delete':
           case 'group_delete_with_sessions':
           case 'groups_reorder':
-          case 'session_set_group':
           case 'sessions_reorder':
           case 'group_restore':
             return undefined;
+          case 'session_set_group': {
+            const session = mockSessions.find((item) => item.id === args.sessionId);
+            if (session) session.group_id = args.groupId ?? null;
+            return undefined;
+          }
           case 'delete_session': {
             const i = mockSessions.findIndex((s) => s.id === args.id);
             if (i >= 0) mockSessions.splice(i, 1);
@@ -870,7 +887,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
       },
     };
     localStorage.setItem('vrykell-api-key', 'sk-e2e-fake');
-  }, { enableIntegration: integration, models: seedModels, active: seedActive, skillsSeed: seedSkills, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true });
+  }, { enableIntegration: integration, models: seedModels, active: seedActive, skillsSeed: seedSkills, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true, sshPreexec: opts.sshPreexec ?? true, groupedHistoricalSession: opts.groupedHistoricalSession ?? false });
 }
 
 /** 预置 AI 回复文本：mock 的 ai_stream 会按 chunk 流式 emit ai-chunk 事件。

@@ -4,7 +4,9 @@
  * 主终端、运行中块终端和主题热更新必须共用同一套颜色，避免同一条命令
  * 在不同渲染场景中出现背景或 ANSI 颜色跳变。
  */
-export interface XtermTheme {
+import type { ITheme } from '@xterm/xterm';
+
+export interface XtermTheme extends ITheme {
   background: string;
   foreground: string;
   cursor: string;
@@ -62,6 +64,11 @@ export function readXtermTheme(): XtermTheme {
     foreground: cssVar('--xterm-foreground', FALLBACKS.foreground),
     cursor: cssVar('--xterm-cursor', FALLBACKS.cursor),
     selectionBackground: cssVar('--xterm-selection', FALLBACKS.selectionBackground),
+    scrollbarSliderBackground: cssVar('--scrollbar-thumb', FALLBACKS.selectionBackground),
+    scrollbarSliderHoverBackground: cssVar('--scrollbar-thumb-hover', FALLBACKS.foreground),
+    scrollbarSliderActiveBackground: cssVar('--scrollbar-thumb-hover', FALLBACKS.foreground),
+    // Keep the ruler's outline blended into the terminal background.
+    overviewRulerBorder: cssVar('--xterm-bg', FALLBACKS.background),
     black: cssVar('--xterm-black', FALLBACKS.black),
     red: cssVar('--xterm-red', FALLBACKS.red),
     green: cssVar('--xterm-green', FALLBACKS.green),

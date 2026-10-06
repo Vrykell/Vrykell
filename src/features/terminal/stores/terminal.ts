@@ -110,6 +110,9 @@ export function getTerminalScreen(paneId: string): TerminalScreen | null {
 interface TerminalState {
   /** tabId → PTY session id */
   sessions: Record<string, string>;
+  /** Shell startup is separate from PTY allocation. */
+  startupStates: Record<string, 'starting' | 'ready' | 'failed' | 'closed'>;
+  setStartupState: (paneId: string, status: 'starting' | 'ready' | 'failed' | 'closed') => void;
   /** session 尚未返回时暂存的命令；PTY 就绪后由 setSession 原样冲刷 */
   pendingCommands: Record<string, string[]>;
   /** tabId → 终端尺寸（状态栏展示用） */
@@ -143,6 +146,8 @@ interface TerminalState {
 
 export const useTerminalStore = create<TerminalState>((set, get) => ({
   sessions: {},
+  startupStates: {},
+  setStartupState: (paneId, status) => set(s => ({ startupStates: { ...s.startupStates, [paneId]: status } })),
   pendingCommands: {},
   dims: {},
   visible: true,
@@ -185,7 +190,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     const pendingCommands = { ...s.pendingCommands };
     delete sessions[tabId];
     delete pendingCommands[tabId];
-    return { sessions, pendingCommands };
+    return { sessions, pendingCommands, startupStates: { ...s.startupStates, [tabId]: 'closed' } };
   }),
   queueCommand: (tabId, command) => {
     const sessionId = get().sessions[tabId];
@@ -212,17 +217,20 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
         && !(tabId in s.pendingCommands)
         && !(tabId in s.dims)
         && !(tabId in s.scenes)
+        && !(tabId in s.startupStates)
       ) return s;
       const sessions = { ...s.sessions };
       const pendingCommands = { ...s.pendingCommands };
       const dims = { ...s.dims };
       const scenes = { ...s.scenes };
+      const startupStates = { ...s.startupStates };
       delete sessions[tabId];
       delete pendingCommands[tabId];
       delete dims[tabId];
       delete scenes[tabId];
+      delete startupStates[tabId];
       const sessionsRemainInAltScreen = Object.keys(scenes).some((id) => scenes[id] === 'altScreen');
-      return { sessions, pendingCommands, dims, scenes,
+      return { sessions, pendingCommands, dims, scenes, startupStates,
         altScreenActive: scene === 'altScreen' ? false : (sessionsRemainInAltScreen ? s.altScreenActive : false) };
     }),
   toggle: () => set((s) => ({ visible: !s.visible })),

@@ -137,6 +137,20 @@ describe('extractSnapshotFromBuffer 宽字符', () => {
     expect(snap.html).toBe('a<span style="display:inline-block;width:2ch">你</span>b');
     expect(snap.plainText).toBe('a你b');
   });
+
+  it('快照可嵌入与实时 xterm 匹配的字距修正', () => {
+    const cells = [mkCell('o', 1), mkCell('k', 1)];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const buf: any = {
+      length: 1,
+      getLine: () => ({ translateToString: () => 'ok', getCell: (x: number) => cells[x] }),
+      getNullCell: () => mkCell(' ', 1),
+    };
+    const snap = extractSnapshotFromBuffer(buf, 2, undefined, undefined, -0.01);
+    expect(snap.html).toBe('<span style="letter-spacing:-0.01000em">ok</span>');
+    expect(snap.plainText).toBe('ok');
+    expect(extractSnapshotFromBuffer(buf, 2, undefined, undefined, 2).html).toBe('ok');
+  });
 });
 
 
@@ -288,13 +302,16 @@ describe('plainText HTML 转义', () => {
 // ═══════════════════════════════════════════
 
 describe('BlockOutput 组件', () => {
-  it('preserves terminal grid rows and allows wide historical output to scroll', () => {
+  it('preserves terminal spacing and wraps historical output without horizontal scrolling', () => {
     const { container } = render(<BlockOutput isHtml text={'mode    length    name<br>-a--    128       file.txt'} maxHeight={120} />);
     const output = container.querySelector<HTMLElement>('[data-selectable]')!;
-    expect(output.style.whiteSpace).toBe('pre');
-    expect(output.style.wordBreak).toBe('normal');
-    expect(output.style.overflowX).toBe('auto');
+    expect(output.style.whiteSpace).toBe('pre-wrap');
+    expect(output.style.wordBreak).toBe('break-all');
+    expect(output.style.overflowWrap).toBe('anywhere');
+    expect(output.style.overflowX).toBe('hidden');
     expect(output.style.overflowY).toBe('auto');
+    expect(output.style.contentVisibility).toBe('auto');
+    expect(output.style.containIntrinsicBlockSize).toBe('auto calc(var(--terminal-row-height) * 2)');
     expect(output.querySelectorAll('br')).toHaveLength(1);
     expect(output.textContent).toContain('128       file.txt');
   });

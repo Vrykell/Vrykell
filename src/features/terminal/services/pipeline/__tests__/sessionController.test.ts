@@ -42,11 +42,57 @@ async function waitFor(cond: () => boolean, timeoutMs = 2000): Promise<void> {
 }
 
 describe('SessionController', () => {
+  it('renders submitted SSH output even when the remote shell omits the preexec marker', async () => {
+    const { st, ctrl, feed } = wire();
+    feed(A);
+    ctrl.setPendingCommand('ls');
+    feed('ls\r\nDocuments\r\nnotes.txt\r\n');
+    expect(ctrl.activeBlock?.status).toBe('executing');
+    expect(ctrl.activeBlock?.outputRaw).toContain('notes.txt');
+    feed(`${D(0)}${A}`);
+    await waitFor(() => st.completed.length === 1);
+    expect(ctrl.blocks[0]?.outputText).toBe('Documents\nnotes.txt');
+    expect(ctrl.blocks[0]?.command).toBe('ls');
+    ctrl.setPendingCommand('pwd');
+    feed(`/home/test\r\n${D(0)}${A}`);
+    await waitFor(() => st.completed.length === 2);
+    expect(ctrl.blocks[1]?.outputText).toBe('/home/test');
+    ctrl.dispose();
+  });
+
+  it('does not duplicate submitted blocks when delayed preexec markers arrive', async () => {
+    const { st, ctrl, feed } = wire();
+    feed(A);
+    ctrl.setPendingCommand('ls');
+    feed(`ls\r\n${E('ls')}${C}notes.txt\r\n${D(0)}${A}`);
+    await waitFor(() => st.completed.length === 1);
+    expect(st.started).toEqual(['ls']);
+    expect(ctrl.blocks).toHaveLength(2);
+    expect(ctrl.blocks[0]?.outputText).toBe('notes.txt');
+    ctrl.dispose();
+  });
+
+  it('keeps commands sent to an unintegrated SSH session on the main terminal', () => {
+    const { st, ctrl, feed } = wire();
+    ctrl.setPendingCommand('ls');
+    feed('notes.txt\r\n$ ');
+    expect(st.written).toContain('notes.txt');
+    expect(ctrl.blocks).toHaveLength(0);
+    ctrl.dispose();
+  });
+
   it('初始场景为 classic，数据进主 xterm', () => {
     const { st, ctrl, feed } = wire();
     expect(ctrl.scene).toBe('classic');
     feed('no integration here\r\n');
     expect(st.written).toBe('no integration here\r\n');
+    expect(ctrl.blocks.length).toBe(0);
+  });
+
+  it('prompt-end 标记 133;B 保留在管线内，不写入主 xterm', () => {
+    const { st, ctrl, feed } = wire();
+    feed('\x1b]133;B\x07');
+    expect(st.written).toBe('');
     expect(ctrl.blocks.length).toBe(0);
   });
 

@@ -14,6 +14,8 @@ import type { TermBlock, BlockStatus } from '@features/terminal/services/pipelin
 import { isTerminalDebugEnabled, terminalDebug } from '@features/terminal/services/terminalDebug';
 import { workingDirectoryFromUri } from '@features/terminal/services/pipeline/workingDirectory';
 import { trackBufferTruncation, type BufferTruncationTracker } from '@features/terminal/services/pipeline/bufferTruncation';
+import { getTerminalFontSize, measureTerminalDomCellWidth } from '@features/terminal/model/terminalFont';
+import { getCellMetrics } from '@utils/termMetrics';
 
 export type Scene = 'classic' | 'blockList' | 'altScreen';
 
@@ -205,7 +207,7 @@ export class SessionController {
     }
     // classic/altScreen：OSC raw 转发主 xterm（OSC 8 超链接等不失效）；
     // 但 133/7 是 integration 标记，永不进主 xterm。
-    const isIntegration = code === '133;A' || code === '133;C' || code === '133;D'
+    const isIntegration = code === '133;A' || code === '133;B' || code === '133;C' || code === '133;D'
       || code === '133;E' || code === '133;G' || code === '7';
     if (this._scene !== 'blockList' && !isIntegration) {
       this.sinks.writeMain(raw);
@@ -412,6 +414,16 @@ export class SessionController {
         activeStatus: active?.status ?? null,
       });
     }
+    // UI submission already identifies the command boundary. Remote shells may
+    // emit prompt/completion markers without a preexec hook; their output must
+    // not remain in the invisible pending buffer while waiting for OSC 133;C.
+    if (this.blockEnabled && this._scene === 'blockList') {
+      if (this.activeBlock?.status !== 'pending') {
+        this.onPrecmd(false);
+        this.pendingUiCommand = normalized;
+      }
+      this.onPreexec();
+    }
     return true;
   }
 
@@ -526,7 +538,31 @@ export class SessionController {
     const done = () => {
       if (this._disposed) return;
       if (block.outputTerm) {
-        const snap = extractSnapshotFromBuffer(block.outputTerm.buffer.active, block.outputTerm.cols);
+        const term = block.outputTerm;
+        const xtermCellWidth = term.element ? getCellMetrics(term).width : 0;
+        const domCellWidth = term.element ? measureTerminalDomCellWidth() : 0;
+        const fontSize = getTerminalFontSize();
+        const letterSpacingEm = xtermCellWidth > 0 && domCellWidth > 0 && fontSize > 0
+          ? (xtermCellWidth - domCellWidth) / fontSize
+          : 0;
+        const snap = extractSnapshotFromBuffer(
+          term.buffer.active,
+          term.cols,
+          undefined,
+          undefined,
+          letterSpacingEm,
+          true,
+        );
+        if (isTerminalDebugEnabled() && Math.abs(letterSpacingEm) >= 0.001) {
+          terminalDebug('block-snapshot-cell-width', {
+            tabId: this.tabId,
+            blockId: block.id,
+            cols: term.cols,
+            xtermCellWidth: Math.round(xtermCellWidth * 1000) / 1000,
+            snapshotCellWidth: Math.round(domCellWidth * 1000) / 1000,
+            letterSpacingEm: Math.round(letterSpacingEm * 100000) / 100000,
+          });
+        }
         block.outputHtml = snap.html;
         block.outputText = snap.plainText;
         block._outputDispose?.();

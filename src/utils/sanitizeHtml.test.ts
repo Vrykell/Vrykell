@@ -9,6 +9,15 @@ describe('sanitizeOutputHtml', () => {
     );
   });
 
+  it('保留受限的字距修正并拒绝异常字距值', () => {
+    expect(sanitizeOutputHtml('<span style="letter-spacing:-0.01em">text</span>'))
+      .toBe('<span style="letter-spacing:-0.01em">text</span>');
+    expect(sanitizeOutputHtml('<span style="letter-spacing:2em">text</span>'))
+      .toBe('<span>text</span>');
+    expect(sanitizeOutputHtml('<span style="letter-spacing:calc(1px)">text</span>'))
+      .toBe('<span>text</span>');
+  });
+
   it('脚本标签被移除（仅剩文本）', () => {
     const html = '<span style="color:#000">ok</span><script>alert(1)</script>';
     expect(sanitizeOutputHtml(html)).toBe('<span style="color:#000">ok</span>alert(1)');

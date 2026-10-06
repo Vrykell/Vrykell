@@ -361,8 +361,8 @@ function TerminalPane(props: {
       {/* AI 状态栏（仅 AI 模式显示，置于页面顶部） */}
       <AiStatusBar paneId={terminal.id} />
       <div style={showXterm
-        // 经典/TUI/SSH：统一 8px 透明边距（透出壁纸/画布）；TUI 顶部为工具条让位
-        ? { flex: 1, minHeight: 0, position: 'relative', padding: 8, paddingTop: scene === 'altScreen' ? 28 : 8, background: 'transparent' }
+        // Keep the native terminal scrollbar flush with the pane's right edge.
+        ? { flex: 1, minHeight: 0, position: 'relative', padding: '8px 0 0 8px', paddingTop: scene === 'altScreen' ? 28 : 8, background: 'transparent' }
         : { position: 'absolute', inset: 0, opacity: 0, pointerEvents: 'none' }}>
         <TerminalPanel paneId={terminal.id} tabId={windowId} connectionInput={terminal.kind === 'ssh'} onReady={(sid) => setSession(terminal.id, sid)} />
       </div>
@@ -604,7 +604,7 @@ function PaneBlockList({ paneId, insetLeft = 8, insetRight = 8 }: { paneId: stri
   const snap = useFollowBottom(scrollRef, [blocks], paneId);
   useEffect(() => registerFollowEngager(paneId, snap), [paneId, snap]);
   return (
-    <div ref={scrollRef} data-testid={`terminal-scroll-${paneId}`} style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--xterm-bg)', overflowAnchor: 'none' }}>
+    <div ref={scrollRef} className="scroll-region" data-testid={`terminal-scroll-${paneId}`} style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--xterm-bg)', overflowAnchor: 'none' }}>
       <div data-testid={`terminal-flow-${paneId}`}>
         <TerminalBlockList tabId={paneId} insetLeft={insetLeft} insetRight={insetRight} />
         <PaneEmptyHint paneId={paneId} />

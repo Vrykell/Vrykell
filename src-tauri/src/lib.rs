@@ -123,6 +123,7 @@ pub fn run() {
             terminal::debug::terminal_debug_set,
             terminal::debug::terminal_debug_status,
             terminal::debug::terminal_debug_record,
+            terminal::debug::terminal_debug_records,
             terminal::debug::terminal_debug_log_path,
             terminal::shells::list_shells,
             remote::ssh::ssh_connections_list,
@@ -201,5 +202,9 @@ pub fn run() {
         .expect("error while building tauri application");
 
     // 退出时不再归档 active 会话：保留「上次打开未关闭的标签」供下次启动恢复。
-    app.run(|_app_handle, _event| {});
+    app.run(|_app_handle, event| {
+        if matches!(event, tauri::RunEvent::Exit) {
+            if let Err(error) = diagnostics::flush_logs() { eprintln!("[diagnostics] {error}"); }
+        }
+    });
 }

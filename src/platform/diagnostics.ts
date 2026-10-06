@@ -17,6 +17,28 @@ const MAX_BYTES = 8 * 1024 * 1024;
 let bytes = 0;
 let sequence = 0;
 let autoSaveRevision = 0;
+const pendingRecords: DiagnosticRecord[] = [];
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+let writeQueue: Promise<void> = Promise.resolve();
+
+/** Keep detailed records while amortizing the transport cost of frequent input events. */
+export function flushDiagnostics(): Promise<void> {
+  if (flushTimer !== null) clearTimeout(flushTimer);
+  flushTimer = null;
+  const batch = pendingRecords.splice(0);
+  if (batch.length) {
+    writeQueue = writeQueue.then(async () => {
+      for (let offset = 0; offset < batch.length; offset += 64) {
+        try {
+          await rawInvoke('terminal_debug_records', { records: batch.slice(offset, offset + 64) });
+        } catch (error) {
+          useDiagnosticSettings.setState({ error: `日志写入失败：${redactText(String(error))}` });
+        }
+      }
+    });
+  }
+  return writeQueue;
+}
 const privateKeys = /^(password|passphrase|key|apiKey|accessToken|refreshToken|token|secret|authorization|cookie|privateKey|privateKeyContent|env)$/i;
 const contentKeys = /^(data|raw|output|content|text|payload|prompt|command|question|messages)$/i;
 
@@ -49,9 +71,9 @@ export function diagnostic(event: string, detail: unknown = {}, level: Diagnosti
     bytes += length;
     while (records.length > MAX_RECORDS || bytes > MAX_BYTES) bytes -= JSON.stringify(records.shift()).length;
     if (useDiagnosticSettings.getState().autoSave) {
-      void rawInvoke('terminal_debug_record', { event, detail: record }).catch(error => {
-        useDiagnosticSettings.setState({ error: `日志写入失败：${redactText(String(error))}` });
-      });
+      pendingRecords.push(record);
+      if (pendingRecords.length >= 64) void flushDiagnostics();
+      else if (flushTimer === null) flushTimer = setTimeout(() => { void flushDiagnostics(); }, 50);
     }
   } catch {
     // Diagnostics must never interrupt an application operation.
@@ -64,6 +86,7 @@ export async function setDiagnosticAutoSave(enabled: boolean): Promise<void> {
   autoSaveRevision += 1;
   useDiagnosticSettings.setState({ saving: true, error: null });
   try {
+    await flushDiagnostics();
     await rawInvoke('diagnostics_set_auto_save', { enabled });
     useDiagnosticSettings.setState({ autoSave: enabled });
     diagnostic('diagnostics-preference', { autoSave: enabled }, 'info');
@@ -103,7 +126,11 @@ export function initializeDiagnostics(): void {
   }
   window.addEventListener('error', event => diagnostic('uncaught-error', { error: event.error, message: event.message, filename: event.filename, line: event.lineno, column: event.colno }, 'error'));
   window.addEventListener('unhandledrejection', event => diagnostic('unhandled-rejection', { error: event.reason }, 'error'));
-  document.addEventListener('visibilitychange', () => diagnostic('visibility-change', { state: document.visibilityState }));
+  document.addEventListener('visibilitychange', () => {
+    diagnostic('visibility-change', { state: document.visibilityState });
+    if (document.visibilityState === 'hidden') void flushDiagnostics();
+  });
+  window.addEventListener('pagehide', () => { void flushDiagnostics(); });
   const initialSettingsRevision = autoSaveRevision;
   void rawInvoke<boolean>('terminal_debug_status').then(autoSave => {
     if (initialSettingsRevision !== autoSaveRevision) return;
@@ -113,5 +140,6 @@ export function initializeDiagnostics(): void {
 }
 
 export async function exportDiagnostics(path: string): Promise<void> {
+  await flushDiagnostics();
   await rawInvoke('diagnostics_export', { path, frontend: diagnosticSnapshot(), context: { userAgent: navigator.userAgent, viewport: { width: innerWidth, height: innerHeight }, devicePixelRatio, build: import.meta.env.MODE } });
 }

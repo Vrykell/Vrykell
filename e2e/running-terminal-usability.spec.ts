@@ -21,7 +21,7 @@ test('运行中命令块以图标显示统一尺寸的操作按钮', async ({ pa
     const bounds = (await button.boundingBox())!;
     expect(bounds.width).toBe(28);
     expect(bounds.height).toBe(28);
-    await expect(button.locator('svg')).toHaveCSS('width', '16px');
+    await expect(button.locator('svg')).toHaveCSS('width', '14px');
     await expect(button).toHaveText('');
   }
   await page.screenshot({ path: test.info().outputPath('running-controls.png') });

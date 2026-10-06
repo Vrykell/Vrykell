@@ -70,28 +70,48 @@ export interface TerminalSnapshot {
 }
 
 export function extractSnapshotFromBuffer(
-  buf: { length: number; getLine(y: number): { translateToString(trim?: boolean): string; getCell(x: number, cell?: IBufferCell): IBufferCell | undefined } | undefined; getNullCell(): IBufferCell },
+  buf: { length: number; getLine(y: number): { isWrapped?: boolean; translateToString(trim?: boolean): string; getCell(x: number, cell?: IBufferCell): IBufferCell | undefined } | undefined; getNullCell(): IBufferCell },
   cols: number,
   startLine?: number,
   endLine?: number,
+  letterSpacingEm = 0,
+  joinWrappedLines = false,
 ): TerminalSnapshot {
   const start = startLine ?? 0;
   const end = endLine ?? buf.length;
   const htmlLines: string[] = [];
   const textLines: string[] = [];
   const cell = buf.getNullCell();
+  const spacing = Number.isFinite(letterSpacingEm) && Math.abs(letterSpacingEm) <= 0.2
+    ? letterSpacingEm
+    : 0;
 
   for (let y = start; y < end && y < buf.length; y++) {
     const line = buf.getLine(y);
     if (!line) continue;
 
-    textLines.push(line.translateToString(true));
+    // Only the terminal buffer decides whether a row break is soft or explicit.
+    const continues = joinWrappedLines && buf.getLine(y + 1)?.isWrapped === true;
+    const text = line.translateToString(true);
+    const wrapped = joinWrappedLines && line.isWrapped === true && htmlLines.length > 0;
+    if (wrapped) textLines[textLines.length - 1] += text;
+    else textLines.push(text);
 
     const spans: string[] = [];
     let currentStyle = '';
     let currentText = '';
 
-    for (let x = 0; x < cols; x++) {
+    // Empty padding at a soft wrap can precede a double-width glyph on the next row.
+    // Keep written spaces, but do not turn that padding into logical output characters.
+    let lineCols = cols;
+    if (continues) {
+      while (lineCols > 0) {
+        const last = line.getCell(lineCols - 1, cell);
+        if (last && (last.getChars() || last.getWidth() === 0)) break;
+        lineCols--;
+      }
+    }
+    for (let x = 0; x < lineCols; x++) {
       const c = line.getCell(x, cell);
       if (!c) break;
       const width = c.getWidth();
@@ -137,7 +157,14 @@ export function extractSnapshotFromBuffer(
         : currentText);
     }
 
-    htmlLines.push(spans.join('').replace(/ +$/, ''));
+    const renderedLine = continues ? spans.join('') : spans.join('').replace(/ +$/, '');
+    // Keep blank rows empty so metric styling cannot turn viewport padding
+    // into visible output after trailing rows are trimmed.
+    const html = spacing && renderedLine.trim()
+      ? `<span style="letter-spacing:${spacing.toFixed(5)}em">${renderedLine}</span>`
+      : renderedLine;
+    if (wrapped) htmlLines[htmlLines.length - 1] += html;
+    else htmlLines.push(html);
   }
 
   while (htmlLines.length > 0 && htmlLines[htmlLines.length - 1]!.trim() === '') htmlLines.pop();
