@@ -6,6 +6,7 @@ import {
 import type { FileOpPair, FileOps, FileOpsTarget } from '@features/files/model/fileOps';
 import { useToastStore } from '@ui/Toast';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
+import { writeClipboardFiles } from '@platform/clipboard';
 
 /** 右键菜单 / 重命名 / 删除确认的状态。 */
 export type FileConfirmState =
@@ -542,12 +543,17 @@ export function useFileBrowser({
   // ── 剪贴板 ──
 
   const copyEntries = useCallback((list: FsEntry[]) => {
-    setClipboard({ mode: 'copy', paths: list.map((entry) => entry.path) });
+    const paths = list.map((entry) => entry.path);
+    setClipboard({ mode: 'copy', paths });
+    // In-panel paste reads the in-memory clipboard; the OS file manager reads the system one.
+    void writeClipboardFiles(paths, 'copy').catch(() => {});
     toast(list.length > 1 ? `已复制 ${list.length} 项` : '已复制');
   }, [toast]);
 
   const cutEntries = useCallback((list: FsEntry[]) => {
-    setClipboard({ mode: 'cut', paths: list.map((entry) => entry.path) });
+    const paths = list.map((entry) => entry.path);
+    setClipboard({ mode: 'cut', paths });
+    void writeClipboardFiles(paths, 'cut').catch(() => {});
     toast(list.length > 1 ? `已剪切 ${list.length} 项` : '已剪切');
   }, [toast]);
 

@@ -215,6 +215,8 @@ pub fn run() {
             commands::download::downloads_list,
             commands::download::downloads_clear,
             commands::download::downloads_discard,
+            commands::clipboard::clipboard_write_files,
+            commands::clipboard::clipboard_read_files,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
