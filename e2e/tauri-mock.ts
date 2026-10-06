@@ -66,7 +66,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     const killAttempts = new Map<string, number>();
     const resizes: { cols: number; rows: number }[] = [];
     const fsOps: { op: string; path: string; newName?: string }[] = [];
-    const sshOps: { op: string; path: string; newName?: string }[] = [];
+    const sshOps: { op: string; path: string; newName?: string; destDir?: string }[] = [];
     const downloads: Record<string, unknown>[] = [];
     const revealed: string[] = [];
     const aiConfig: { hasKey: boolean; baseUrl: string; model: string } = {
@@ -897,8 +897,33 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
           case 'ssh_move':
             sshOps.push({ op: 'move', path: args.path as string, destDir: args.destDir as string });
             return undefined;
-          case 'ssh_delete':
-            sshOps.push({ op: 'delete', path: args.path as string });
+          case 'ssh_copy': {
+            const paths = args.paths as string[];
+            const destDir = args.destDir as string;
+            for (const path of paths) sshOps.push({ op: 'copy', path, destDir });
+            return {
+              completed: paths.map((path) => ({ from: path, to: `${destDir === '/' ? '' : destDir}/${path.split('/').pop()}` })),
+              errors: [],
+            };
+          }
+          case 'ssh_stage_delete': {
+            const paths = args.paths as string[];
+            for (const path of paths) sshOps.push({ op: 'delete', path });
+            return {
+              completed: paths.map((path) => ({ from: path, to: `/home/tester/.vrykell/undo/u-${path.split('/').pop()}` })),
+              errors: [],
+            };
+          }
+          case 'ssh_restore_staged': {
+            const items = args.items as { from: string; to: string }[];
+            for (const item of items) sshOps.push({ op: 'restore', path: item.from });
+            return { completed: items, errors: [] };
+          }
+          case 'ssh_purge_staged': {
+            for (const path of args.paths as string[]) sshOps.push({ op: 'purge', path });
+            return undefined;
+          }
+          case 'ssh_sweep_undo':
             return undefined;
           case 'plugin:event|listen':
             eventListeners.set(args.event as string, args.handler as number);
@@ -955,8 +980,8 @@ export function fsOps(page: Page): Promise<{ op: string; path: string; newName?:
   return page.evaluate(() => (window as unknown as Record<string, { op: string; path: string; newName?: string }[]>).__FS_OPS__);
 }
 
-/** 读取远程文件面板调用的 ssh_rename / ssh_delete 记录 */
-export function sshOps(page: Page): Promise<{ op: string; path: string; newName?: string }[]> {
+/** 读取远程文件面板调用的 ssh_rename / ssh_move / ssh_copy / ssh_stage_delete 等记录 */
+export function sshOps(page: Page): Promise<{ op: string; path: string; newName?: string; destDir?: string }[]> {
   return page.evaluate(() => (window as unknown as Record<string, { op: string; path: string; newName?: string }[]>).__SSH_OPS__);
 }
 

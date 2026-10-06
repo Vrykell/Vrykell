@@ -6,6 +6,7 @@
 //! 终端会话本身仍由前端经 `pty_spawn`（pty.rs）用 `ssh` CLI 拉起（交互式），这里只做非交互式后端操作。
 
 use crate::db::{HistoryState, SshConnection};
+use crate::files::fs::{FileOpOutcome, FileOpPair};
 use crate::terminal::ssh_command::SshOptions;
 use base64::Engine;
 use serde::Serialize;
@@ -505,16 +506,252 @@ fn ssh_move_sync(conn: &SshConnection, path: &str, dest_dir: &str) -> Result<(),
         .map_err(|e| format!("移动失败：{e}"))
 }
 
-/// 删除远程文件（空目录用 rmdir，文件用 unlink）。
-fn ssh_delete_sync(conn: &SshConnection, path: &str) -> Result<(), String> {
+// ── 远程面板：复制 / 可回退删除（远端暂存） ──
+
+/// 远端 shell 单引号转义（与前端 shellQuote 同规则）。
+fn shell_quote_remote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
+}
+
+/// 远端暂存目录（可回退删除）：<home>/.vrykell/undo
+fn ssh_undo_dir(sftp: &Sftp) -> Result<std::path::PathBuf, String> {
+    let home = sftp
+        .realpath(Path::new("."))
+        .map_err(|e| format!("无法定位远端主目录：{e}"))?;
+    Ok(home.join(".vrykell").join("undo"))
+}
+
+/// 逐级创建远端目录（已存在时忽略）。
+fn ensure_remote_dir(sftp: &Sftp, dir: &Path) -> Result<(), String> {
+    let mut current = std::path::PathBuf::new();
+    for component in dir.components() {
+        current.push(component);
+        if current.as_os_str().is_empty() || current == Path::new("/") {
+            continue;
+        }
+        let _ = sftp.mkdir(&current, 0o755); // 已存在会报错，忽略
+    }
+    Ok(())
+}
+
+/// 递归删除远端路径（目录先清空再 rmdir；用于暂存项清理）。
+fn remove_remote_recursive(sftp: &Sftp, target: &Path) -> Result<(), String> {
+    let stat = sftp.stat(target).map_err(|e| format!("读取远端信息失败：{e}"))?;
+    if stat.is_dir() {
+        if let Ok(children) = sftp.readdir(target) {
+            for (child, _) in children {
+                remove_remote_recursive(sftp, &child)?;
+            }
+        }
+        sftp.rmdir(target).map_err(|e| format!("删除远端目录失败：{e}"))
+    } else {
+        sftp.unlink(target).map_err(|e| format!("删除远端文件失败：{e}"))
+    }
+}
+
+/// 远端复制单条（`cp -R`，参数单引号转义；目标必须是已存在的目录）。
+fn remote_copy_one(sess: &Session, from: &str, dest_dir: &str) -> Result<(), String> {
+    let command = format!("cp -R -- {} {}", shell_quote_remote(from), shell_quote_remote(dest_dir));
+    let mut channel = sess.channel_session().map_err(|e| format!("打开远端通道失败：{e}"))?;
+    channel.exec(&command).map_err(|e| format!("执行复制失败：{e}"))?;
+    let mut stderr = String::new();
+    let _ = channel.stderr().read_to_string(&mut stderr);
+    let _ = channel.wait_close();
+    let code = channel.exit_status().unwrap_or(-1);
+    if code != 0 {
+        let detail = if stderr.trim().is_empty() { format!("退出码 {code}") } else { stderr.trim().to_string() };
+        return Err(format!("复制失败：{detail}"));
+    }
+    Ok(())
+}
+
+/// 复制远程文件/目录到目标目录（逐项预检：原地、自身子树、目标同名都拒绝）。
+fn ssh_copy_sync(conn: &SshConnection, paths: Vec<String>, dest_dir: String) -> Result<FileOpOutcome, String> {
     let sess = connect(conn)?;
     let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
-    let stat = sftp.stat(Path::new(path)).map_err(|e| format!("读取文件信息失败：{e}"))?;
-    if stat.is_dir() {
-        sftp.rmdir(Path::new(path)).map_err(|e| format!("删除目录失败（需为空目录）：{e}"))
-    } else {
-        sftp.unlink(Path::new(path)).map_err(|e| format!("删除文件失败：{e}"))
+    let dest = Path::new(&dest_dir);
+    if !dest.is_absolute() {
+        return Err("目标目录必须是绝对路径".into());
     }
+    if sftp.stat(dest).is_err() {
+        return Err(format!("目标目录不可用：{dest_dir}"));
+    }
+
+    let mut completed = Vec::new();
+    let mut errors = Vec::new();
+    for path in paths {
+        let src = Path::new(&path);
+        let Some(name) = src.file_name() else {
+            errors.push(format!("无法定位 {path} 的文件名"));
+            continue;
+        };
+        let target = dest.join(name);
+        if target == src {
+            errors.push(format!("「{}」已在目标目录中", name.to_string_lossy()));
+            continue;
+        }
+        let src_is_dir = sftp.stat(src).map(|s| s.is_dir()).unwrap_or(false);
+        if src_is_dir && dest.starts_with(src) {
+            errors.push(format!("不能把「{}」放入它自己内部", name.to_string_lossy()));
+            continue;
+        }
+        if sftp.stat(&target).is_ok() {
+            errors.push(format!("目标已存在同名项「{}」", name.to_string_lossy()));
+            continue;
+        }
+        match remote_copy_one(&sess, &path, &dest_dir) {
+            Ok(()) => completed.push(FileOpPair {
+                from: path,
+                to: target.to_string_lossy().to_string(),
+            }),
+            Err(error) => errors.push(error),
+        }
+    }
+    Ok(FileOpOutcome { completed, errors })
+}
+
+/// 可回退删除：把远程条目移动到远端暂存目录。
+fn ssh_stage_delete_sync(conn: &SshConnection, paths: Vec<String>) -> Result<FileOpOutcome, String> {
+    let sess = connect(conn)?;
+    let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
+    let dir = ssh_undo_dir(&sftp)?;
+    if let Some(parent) = dir.parent() {
+        ensure_remote_dir(&sftp, parent)?;
+    }
+    ensure_remote_dir(&sftp, &dir)?;
+
+    let mut completed = Vec::new();
+    let mut errors = Vec::new();
+    for path in paths {
+        let Some(name) = Path::new(&path).file_name() else {
+            errors.push(format!("无法定位 {path} 的文件名"));
+            continue;
+        };
+        let staged = dir.join(format!("{}-{}", uuid::Uuid::new_v4(), name.to_string_lossy()));
+        match sftp.rename(Path::new(&path), &staged, None) {
+            Ok(()) => completed.push(FileOpPair {
+                from: path,
+                to: staged.to_string_lossy().to_string(),
+            }),
+            Err(error) => errors.push(format!("删除失败：{error}")),
+        }
+    }
+    Ok(FileOpOutcome { completed, errors })
+}
+
+/// 回退删除：把暂存项移回原位（原位置已有同名项时该项报错）。
+fn ssh_restore_staged_sync(conn: &SshConnection, items: Vec<FileOpPair>) -> Result<FileOpOutcome, String> {
+    let sess = connect(conn)?;
+    let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
+    let mut completed = Vec::new();
+    let mut errors = Vec::new();
+    for item in items {
+        let staged = Path::new(&item.to);
+        let original = Path::new(&item.from);
+        if sftp.stat(original).is_ok() {
+            errors.push(format!("恢复失败：{} 已存在同名项", item.from));
+            continue;
+        }
+        match sftp.rename(staged, original, None) {
+            Ok(()) => completed.push(item),
+            Err(error) => errors.push(format!("恢复失败：{error}")),
+        }
+    }
+    Ok(FileOpOutcome { completed, errors })
+}
+
+/// 把暂存项永久删除（回退窗口结束）。
+fn ssh_purge_staged_sync(conn: &SshConnection, paths: Vec<String>) {
+    let Ok(sess) = connect(conn) else { return };
+    let Ok(sftp) = sess.sftp() else { return };
+    for path in paths {
+        let _ = remove_remote_recursive(&sftp, Path::new(&path));
+    }
+}
+
+/// 清理远端暂存目录残留（面板挂载时调用一次）。
+fn ssh_sweep_undo_sync(conn: &SshConnection) {
+    let Ok(sess) = connect(conn) else { return };
+    let Ok(sftp) = sess.sftp() else { return };
+    let Ok(dir) = ssh_undo_dir(&sftp) else { return };
+    let Ok(children) = sftp.readdir(&dir) else { return };
+    for (child, _) in children {
+        let _ = remove_remote_recursive(&sftp, &child);
+    }
+}
+
+#[tauri::command]
+pub async fn ssh_copy(
+    state: State<'_, HistoryState>,
+    id: String,
+    paths: Vec<String>,
+    dest_dir: String,
+) -> Result<FileOpOutcome, String> {
+    let conn = {
+        let db = state.0.lock().map_err(|e| e.to_string())?;
+        db.get_ssh_connection(&id)?
+    };
+    tauri::async_runtime::spawn_blocking(move || ssh_copy_sync(&conn, paths, dest_dir))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn ssh_stage_delete(
+    state: State<'_, HistoryState>,
+    id: String,
+    paths: Vec<String>,
+) -> Result<FileOpOutcome, String> {
+    let conn = {
+        let db = state.0.lock().map_err(|e| e.to_string())?;
+        db.get_ssh_connection(&id)?
+    };
+    tauri::async_runtime::spawn_blocking(move || ssh_stage_delete_sync(&conn, paths))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn ssh_restore_staged(
+    state: State<'_, HistoryState>,
+    id: String,
+    items: Vec<FileOpPair>,
+) -> Result<FileOpOutcome, String> {
+    let conn = {
+        let db = state.0.lock().map_err(|e| e.to_string())?;
+        db.get_ssh_connection(&id)?
+    };
+    tauri::async_runtime::spawn_blocking(move || ssh_restore_staged_sync(&conn, items))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn ssh_purge_staged(
+    state: State<'_, HistoryState>,
+    id: String,
+    paths: Vec<String>,
+) -> Result<(), String> {
+    let conn = {
+        let db = state.0.lock().map_err(|e| e.to_string())?;
+        db.get_ssh_connection(&id)?
+    };
+    tauri::async_runtime::spawn_blocking(move || ssh_purge_staged_sync(&conn, paths))
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn ssh_sweep_undo(state: State<'_, HistoryState>, id: String) -> Result<(), String> {
+    let conn = {
+        let db = state.0.lock().map_err(|e| e.to_string())?;
+        db.get_ssh_connection(&id)?
+    };
+    tauri::async_runtime::spawn_blocking(move || ssh_sweep_undo_sync(&conn))
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 /// 递归上传本地目录到远程目录，返回上传文件数。
@@ -606,21 +843,6 @@ pub async fn ssh_rename(
         db.get_ssh_connection(&id)?
     };
     tauri::async_runtime::spawn_blocking(move || ssh_rename_sync(&conn, &path, &new_name))
-        .await
-        .map_err(|e| e.to_string())?
-}
-
-#[tauri::command]
-pub async fn ssh_delete(
-    state: State<'_, HistoryState>,
-    id: String,
-    path: String,
-) -> Result<(), String> {
-    let conn = {
-        let db = state.0.lock().map_err(|e| e.to_string())?;
-        db.get_ssh_connection(&id)?
-    };
-    tauri::async_runtime::spawn_blocking(move || ssh_delete_sync(&conn, &path))
         .await
         .map_err(|e| e.to_string())?
 }
