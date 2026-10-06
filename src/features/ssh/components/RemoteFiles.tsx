@@ -6,7 +6,7 @@ import { IconBtn } from '@ui/UiBtn';
 import ContextMenu from '@ui/ContextMenu';
 import ConfirmDialog from '@ui/ConfirmDialog';
 import DownloadManager from '@features/files/components/DownloadManager';
-import { compactPathSegments } from '@features/files/utils/pathUtils';
+import { compactPathSegments } from '@features/files/utils/breadcrumb';
 import { useRemoteFileBrowser } from '@features/ssh/hooks/useRemoteFileBrowser';
 import { describeFileServiceFailure } from '@features/ssh/model/fileServiceState';
 import { useDockStore } from '@features/workspace';

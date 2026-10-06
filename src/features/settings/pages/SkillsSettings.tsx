@@ -7,7 +7,7 @@
 
 import { useState } from 'react';
 import { ChevronRight, Download, FileText, Folder, ShieldAlert, Store, Trash2, X } from '@ui/icons';
-import { fileOpenWith } from '@features/files/services/fs';
+import { fileOpenWith } from '@platform/api/fs';
 import {
   setSkillState, removeSkill, marketGithubList, marketGithubInstall,
   type SkillMeta, type SkillDetail, type MarketSkill,

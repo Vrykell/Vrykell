@@ -8,3 +8,4 @@ export * from '@platform/api/search';
 export * from '@platform/api/session';
 export * from '@platform/api/group';
 export * from '@platform/api/workspace';
+export * from '@platform/api/fs';

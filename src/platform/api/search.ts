@@ -1,10 +1,11 @@
 import { invoke } from '@platform/diagnostics';
+import { normPath } from '@platform/path';
 import type {
   BackendHistoryEntry, BackendFileMatch, BackendSearchContext,
   BackendBlockEntry, BackendSessionEntry,
 } from '@platform/api/types';
 
-/** 搜索文件系统 */
+/** 搜索文件系统；搜索根与结果路径在边界处归一化。 */
 export function searchFiles(
   query: string,
   maxResults = 50,
@@ -12,13 +13,13 @@ export function searchFiles(
   root?: string,
   roots?: string[],
 ): Promise<BackendFileMatch[]> {
-  return invoke('search_files', {
+  return invoke<BackendFileMatch[]>('search_files', {
     query,
     maxResults,
     searchContent,
-    root: root ?? null,
-    roots: roots ?? null,
-  });
+    root: root == null ? null : normPath(root),
+    roots: roots == null ? null : roots.map(normPath),
+  }).then((matches) => matches.map((match) => ({ ...match, path: normPath(match.path) })));
 }
 
 /** 搜索命令历史 */
