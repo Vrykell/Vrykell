@@ -8,7 +8,7 @@ const fsMocks = vi.hoisted(() => ({
   fsDisks: vi.fn(),
 }));
 
-vi.mock('@features/files/services/fs', () => fsMocks);
+vi.mock('@platform/api/fs', () => fsMocks);
 
 let browserApi: ReturnType<typeof useLocalFileBrowser>;
 
