@@ -179,4 +179,43 @@ test.describe('SSH 远程连接管理侧栏', () => {
     await expect(page.getByText(/已回退删除/)).toBeVisible();
     expect(await sshOps(page)).toEqual(expect.arrayContaining([{ op: 'restore', path: '/var/log/app.log' }]));
   });
+
+  test('远程面板：右键新建按落点决定目录，拖入同名文件避让后回退用真实路径', async ({ page }) => {
+    await page.getByText('生产服务器').dblclick();
+    await page.locator('[data-dock-btn="files"]').click();
+    const tree = page.locator('[data-testid="remote-file-tree"]');
+    await expect(page.locator('[data-testid="remote-file-app.log"]')).toBeVisible({ timeout: 5000 });
+
+    // 右键文件夹 → 新建文件落在该文件夹内，并立即进入重命名
+    await page.locator('[data-testid="remote-file-Documents"]').click({ button: 'right' });
+    await page.getByRole('button', { name: '新建文件', exact: true }).click();
+    const input = page.locator('[data-testid="rename-input"]');
+    await expect(input).toHaveValue('Untitled');
+    expect(await sshOps(page)).toEqual(expect.arrayContaining([{ op: 'create-file', path: '/home/root/Documents/Untitled' }]));
+    await input.press('Escape');
+
+    // 右键空白处 → 新建文件夹落在当前目录
+    const box = (await tree.boundingBox())!;
+    await page.mouse.click(box.x + 40, box.y + box.height - 12, { button: 'right' });
+    await page.getByRole('button', { name: '新建文件夹', exact: true }).click();
+    expect(await sshOps(page)).toEqual(expect.arrayContaining([{ op: 'create-dir', path: '/home/root/NewFolder' }]));
+    await page.locator('[data-testid="rename-input"]').press('Escape');
+
+    // 拖动 app.log 到 Documents：目标已有同名 → 后端返回带序号路径，回退按真实路径移回
+    const source = page.locator('[data-testid="remote-file-app.log"][data-path="/home/root/app.log"]');
+    const targetRow = page.locator('[data-testid="remote-file-Documents"][data-path="/home/root/Documents"]');
+    const from = (await source.boundingBox())!;
+    await page.mouse.move(from.x + 40, from.y + from.height / 2);
+    await page.mouse.down();
+    for (let i = 1; i <= 6; i++) {
+      const box = await targetRow.boundingBox();
+      await page.mouse.move(from.x + 40 + ((box!.x + 40) - (from.x + 40)) * (i / 6), from.y + from.height / 2 + ((box!.y + box!.height / 2) - (from.y + from.height / 2)) * (i / 6));
+      await page.waitForTimeout(12);
+    }
+    await page.mouse.up();
+    await page.locator('[data-testid="remote-more-btn"]').click();
+    await page.getByRole('button', { name: /回退移动/ }).click();
+    await expect(page.getByText('已回退移动')).toBeVisible();
+    expect(await sshOps(page)).toEqual(expect.arrayContaining([{ op: 'move', path: '/home/root/Documents/app (1).log', destDir: '/home/root' }]));
+  });
 });

@@ -42,28 +42,29 @@
 21. **AI 内联** — AI 对话结果显示在终端上方 InlineAI 区域，通过输入栏 ⚡ 模式触发。
 22. **Session 保活** — 多标签 PTY 会话通过隐藏 xterm.js (display:none) 保活，切换标签不重建。
 23. **颜色系统** — 所有颜色通过 `theme.css` CSS 变量定义，不在组件中硬编码色值（除 ANSI 颜色相关）。
+24. **一套实现 + 状态选择** — 同一份界面在不同运行目标（本地 / SSH）下不写两套逻辑：文件操作统一走 `FileOps` 接口（`fileOpsFor(target)` 是唯一的实现选择点），菜单、拖放语义等状态差异写成 `filePanelConfig` 配置项；视图层不得按目标写 `if (isSsh)`，也不得绕过接口直接 `invoke` 文件命令或自行处理路径。
 
 ## 七、文件组织
 
-24. `src/features/terminal/` — 终端领域（components、hooks、stores、model、services/pipeline）。
-25. `src/features/*/stores/` — 领域 Zustand 状态；视图层通过 Feature 公共入口访问。
-26. `src/ui/` — 无业务语义的通用 UI 组件。
-27. `src/features/chat/` — AI 对话渲染（AiBlock、ModelPill、ToolRunCard、Markdown、PanelChat）。
-28. `src/features/agent/` — AI 代理逻辑（agentStream、工具、权限、Skills、MCP、上下文、记忆、调度、智能标题）。
-29. `src/features/settings/` — 设置页（行为/模型/MCP/Skills/快捷键/终端打开模式/主题）。
-30. `src/platform/` 与 `src/utils/` — Tauri IPC、PTY、运行时适配与纯工具函数。业务服务归属对应 Feature。
-31. `src/features/ssh/` `src/features/files/` `src/features/search/` `src/config/theme/` — SSH / 本地文件 / 全局搜索 / 设计 token。
-32. `e2e/` — Playwright E2E 测试，`tauri-mock.ts` 提供 Tauri + Anthropic mock。
+25. `src/features/terminal/` — 终端领域（components、hooks、stores、model、services/pipeline）。
+26. `src/features/*/stores/` — 领域 Zustand 状态；视图层通过 Feature 公共入口访问。
+27. `src/ui/` — 无业务语义的通用 UI 组件。
+28. `src/features/chat/` — AI 对话渲染（AiBlock、ModelPill、ToolRunCard、Markdown、PanelChat）。
+29. `src/features/agent/` — AI 代理逻辑（agentStream、工具、权限、Skills、MCP、上下文、记忆、调度、智能标题）。
+30. `src/features/settings/` — 设置页（行为/模型/MCP/Skills/快捷键/终端打开模式/主题）。
+31. `src/platform/` 与 `src/utils/` — Tauri IPC、PTY、运行时适配与纯工具函数。业务服务归属对应 Feature。
+32. `src/features/ssh/` `src/features/files/` `src/features/search/` `src/config/theme/` — SSH / 本地文件 / 全局搜索 / 设计 token。
+33. `e2e/` — Playwright E2E 测试，`tauri-mock.ts` 提供 Tauri + Anthropic mock。
 
 ## 八、可观测性与日志
 
-33. **修改功能时同步补充日志** — 对有状态流程，在入口、状态转换、外部调用结果和错误/超时分支记录结构化事件，确保问题可以按时间线排查。
-34. **优先记录元数据** — 记录会话/块 ID、状态、耗时、字节数和错误类型；不要记录原始命令、终端输出、提示词、凭据或未经脱敏的用户路径。
-35. **复用诊断接口** — 前端使用 `terminalDebug`，Rust 终端层使用 `terminal::debug::write`；新增事件名应稳定且能说明操作阶段，避免逐字符或高频输出日志。
-36. **按现有配置记录日志** — 当前共享测试机已开启详细诊断日志自动保存，排查时先检查已有记录，不要每轮测试重新开启；其他环境按自身设置决定，应用新环境默认关闭自动保存。涉及后台任务或新 IPC 流程时，应确认入口和失败分支都能留下可关联的日志。
-37. **先检查已有日志** — 先检查 `%LOCALAPPDATA%\com.vrykell.app\logs\diagnostics.jsonl`；文件达到轮转上限后，较早记录在同目录的 `.1`、`.2` 文件中。配置保存在 `%APPDATA%\com.vrykell.app\diagnostics.json`，其开启状态属于测试机配置，不要据此推断新用户的默认值。
-38. **日志不阻塞输入输出** — 高频记录经前端批量传送与后端缓冲线程写入，保留详细事件；导出和修改自动保存配置前冲刷待写记录。新增诊断逻辑不得恢复逐按键同步写盘。
+34. **修改功能时同步补充日志** — 对有状态流程，在入口、状态转换、外部调用结果和错误/超时分支记录结构化事件，确保问题可以按时间线排查。
+35. **优先记录元数据** — 记录会话/块 ID、状态、耗时、字节数和错误类型；不要记录原始命令、终端输出、提示词、凭据或未经脱敏的用户路径。
+36. **复用诊断接口** — 前端使用 `terminalDebug`，Rust 终端层使用 `terminal::debug::write`；新增事件名应稳定且能说明操作阶段，避免逐字符或高频输出日志。
+37. **按现有配置记录日志** — 当前共享测试机已开启详细诊断日志自动保存，排查时先检查已有记录，不要每轮测试重新开启；其他环境按自身设置决定，应用新环境默认关闭自动保存。涉及后台任务或新 IPC 流程时，应确认入口和失败分支都能留下可关联的日志。
+38. **先检查已有日志** — 先检查 `%LOCALAPPDATA%\com.vrykell.app\logs\diagnostics.jsonl`；文件达到轮转上限后，较早记录在同目录的 `.1`、`.2` 文件中。配置保存在 `%APPDATA%\com.vrykell.app\diagnostics.json`，其开启状态属于测试机配置，不要据此推断新用户的默认值。
+39. **日志不阻塞输入输出** — 高频记录经前端批量传送与后端缓冲线程写入，保留详细事件；导出和修改自动保存配置前冲刷待写记录。新增诊断逻辑不得恢复逐按键同步写盘。
 
 ## 九、窗口与标题栏
 
-39. **拖动把手只落在非交互元素上** — 运行时只在光标下的元素带 `data-tauri-drag-region` 且路径上没有「不带该属性的可点击元素」时才开始拖动。因此标题文字、留白等需要补上该属性，而按钮、输入框、链接等可点击元素不要添加，否则点击会变成拖窗口；新增标题栏元素时同步检查 `e2e/titlebar-drag.spec.ts` 覆盖的把手位置。
+40. **拖动把手只落在非交互元素上** — 运行时只在光标下的元素带 `data-tauri-drag-region` 且路径上没有「不带该属性的可点击元素」时才开始拖动。因此标题文字、留白等需要补上该属性，而按钮、输入框、链接等可点击元素不要添加，否则点击会变成拖窗口；新增标题栏元素时同步检查 `e2e/titlebar-drag.spec.ts` 覆盖的把手位置。

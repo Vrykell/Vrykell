@@ -353,6 +353,28 @@ dev 模式会自动写入 `terminal-debug.jsonl`。排查命令挂起时，按�
 | `src-tauri/src/agent/` | AI 流/配置/记忆/Skills/MCP/调度/web 抓取后端 |
 | `src-tauri/src/remote/ssh.rs` | SSH/SFTP（主机指纹 TOFU、密码认证） |
 
+### 文件面板（本地 / SSH 唯一实现）
+
+本地文件面板与 SSH 文件面板**不是两套实现**：浏览与操作状态机只有一份，差异收敛到
+「执行目标」这一状态变量。
+
+| 文件 | 内容 |
+|------|------|
+| `src/features/files/model/fileOps.ts` | `FileOps` 接口 + `FileOpsTarget`（`{kind:'local'}` / `{kind:'ssh', connectionId}`）+ `fileOpsFor(target)` 唯一的实现选择点；`resolveTargetDir` 统一「右键/拖放落点」语义（文件夹=自身，文件=同级，空白=当前目录） |
+| `src/features/files/services/localFileOps.ts` | 本地实现：`@platform/api/fs` + `@platform/path` |
+| `src/features/ssh/services/fileOps.ts` | 远程实现：SSH 命令 + POSIX 路径工具 |
+| `src/features/files/model/filePanelConfig.ts` | 面板配置：菜单条目 key 列表（行/多选/空白/更多）、拖放语义（拖出是否先下载、拖入是移动还是上传）、打开语义、测试标识 —— 「因状态而异」的部分只在这里 |
+| `src/features/files/hooks/useFileBrowser.ts` | 共用的浏览与操作状态机：目录加载、树形懒加载、选中、视图快照回退、剪贴板、回退历史（≤20 步）、新建/重命名/删除 |
+| `src/features/files/components/FilePanel.tsx` | 共用视图：顶栏面包屑（可编辑）、文件树、右键/空白/更多菜单、确认弹窗、拖放接线 |
+| `src/features/files/components/PanelFiles.tsx` / `src/features/ssh/components/RemoteFiles.tsx` | 薄封装：仅提供各自专有的菜单回调、图标、错误视图与下载管理入口 |
+
+约定：
+
+- 文件操作一律经 `FileOps` 走后端命令；视图层不得直接 `invoke` 文件命令，也不得自行处理路径分隔符。
+- 新增「只对某类目标有意义」的入口时，先加菜单 key 与配置项，由配置决定是否显示，避免出现点了就报「当前目标不支持」的条目。
+- 重名避让由后端保证（`unique_path` / `unique_remote_path`，序号插在扩展名前），返回真实目标路径，回退历史按真实路径记录。
+- 本地与远程的差异若属于「能力」而非「外观」，应表达为配置项（如 `drag.externalDropMode`），不要在组件里写 `if (isSsh)`。
+
 ### 主题
 
 | 文件 | 内容 |
@@ -362,6 +384,7 @@ dev 模式会自动写入 `terminal-debug.jsonl`。排查命令挂起时，按�
 | `src-tauri/src/theme.rs` | 主题配置持久化（JSON 文件） |
 
 ---
+
 
 ## 16. 分屏与窗口布局
 

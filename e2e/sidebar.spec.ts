@@ -322,4 +322,38 @@ test.describe('文件面板', () => {
     const ops = await fsOps(page);
     expect(ops).toContainEqual({ op: 'rename', path: '/home/e2e/notes.txt', newName: 'renamed.txt' });
   });
+
+  test('右键新建按落点决定目录，建好立即重命名，重名自动加序号且回退用真实路径', async ({ page }) => {
+    const tree = page.getByTestId('local-file-tree');
+    /** 面板空白处右键（用元素范围定位，避免落到行上） */
+    const rightClickBlank = async () => {
+      const box = (await tree.boundingBox())!;
+      await page.mouse.click(box.x + 40, box.y + box.height - 12, { button: 'right' });
+    };
+    // 空白处右键 → 新建文件夹落在当前目录
+    await rightClickBlank();
+    await page.getByRole('button', { name: '新建文件夹', exact: true }).click();
+    const input = page.locator('[data-testid="rename-input"]');
+    await expect(input).toHaveValue('NewFolder');
+    expect(await fsOps(page)).toContainEqual({ op: 'create-dir', path: '/home/e2e/project/NewFolder' });
+    await input.press('Enter');   // 名称未变：不产生重命名请求
+    expect(await fsOps(page)).not.toContainEqual(expect.objectContaining({ op: 'rename' }));
+
+    // 右键文件行 → 新建文件落在该文件的同级目录
+    await page.getByText('notes.txt').click({ button: 'right' });
+    await page.getByRole('button', { name: '新建文件', exact: true }).click();
+    await expect(input).toHaveValue('Untitled');
+    expect(await fsOps(page)).toContainEqual({ op: 'create-file', path: '/home/e2e/Untitled' });
+
+    // 改成已存在的名字：后端避让为 notes (1).txt（序号在扩展名前），回退记录必须用真实路径
+    await input.fill('notes.txt');
+    await input.press('Enter');
+    await page.locator('[data-testid="confirm-ok"]').click();
+    await expect(page.getByText('已重命名')).toBeVisible();
+
+    await page.getByTestId('local-more-btn').click();
+    await page.getByRole('button', { name: /回退重命名/ }).click();
+    await expect(page.getByText('已回退重命名')).toBeVisible();
+    expect(await fsOps(page)).toContainEqual({ op: 'rename', path: '/home/e2e/notes (1).txt', newName: 'Untitled' });
+  });
 });
