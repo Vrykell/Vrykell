@@ -4,7 +4,7 @@ import { loadConfig, saveConfig, type FileOpenConfig } from '@features/files/ser
 import { refreshAiConfig, setTavilyKey, clearTavilyKey, useAiConfigStore } from '@features/agent';
 import SkillsSettings from '@features/settings/pages/SkillsSettings';
 import { MemorySettings, AgentsSettings, SchedulesSettings } from '@features/settings/pages/AgentExtrasSettings';
-import Segmented from '@ui/Segmented';
+import Select from '@ui/Select';
 import { useToastStore } from '@ui/Toast';
 import {
   usePermissions, clearSessionGrants, TOOL_NAMES,
@@ -161,8 +161,8 @@ function SettingsContent() {
                       <span style={{ flex: 1, fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-primary)' }}>
                         {PERM_TOOL_LABEL[name]}
                       </span>
-                      <Segmented
-                        size="sm"
+                      <Select
+                        aria-label={`${PERM_TOOL_LABEL[name]} 权限`}
                         options={(
                           [
                             ['allow', '允许'],

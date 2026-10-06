@@ -48,7 +48,8 @@ test.describe('模型行为页', () => {
 
   test('上下文策略切到窗口', async ({ page }) => {
     const strategy = fieldOf(page, '上下文策略');
-    await strategy.getByRole('button', { name: '窗口' }).click();
+    await strategy.getByRole('combobox', { name: '上下文策略' }).click();
+    await page.getByRole('option', { name: '窗口', exact: true }).click();
     const saved = await settingsJson(page);
     expect(saved).toContain('"contextStrategy":"window"');
   });

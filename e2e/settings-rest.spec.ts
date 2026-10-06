@@ -51,7 +51,8 @@ test.describe('打开方式设置页', () => {
     await expect(page.locator('section').getByText('CMD', { exact: true })).toBeVisible();
     // Zsh 行切经典
     const zshRow = rowOf(page, 'Zsh');
-    await zshRow.getByRole('button', { name: '经典模式' }).click();
+    await zshRow.getByRole('combobox', { name: 'Zsh 打开模式' }).click();
+    await page.getByRole('option', { name: '经典模式', exact: true }).click();
     const saved = await page.evaluate(() => localStorage.getItem('vrykell-agent-settings') ?? '');
     expect(saved).toContain('"zsh":"classic"');
   });
@@ -60,8 +61,9 @@ test.describe('打开方式设置页', () => {
     await gotoSetting(page, '打开方式');
     const sshRow = rowOf(page, 'SSH');
     // 默认经典
-    await expect(sshRow.getByRole('button', { name: '经典模式' })).toBeVisible();
-    await sshRow.getByRole('button', { name: '块模式' }).click();
+    await expect(sshRow.getByRole('combobox', { name: 'SSH 打开模式' })).toHaveText('经典模式');
+    await sshRow.getByRole('combobox', { name: 'SSH 打开模式' }).click();
+    await page.getByRole('option', { name: '块模式', exact: true }).click();
     const saved = await page.evaluate(() => localStorage.getItem('vrykell-agent-settings') ?? '');
     expect(saved).toContain('"sshOpenMode":"block"');
   });
@@ -102,12 +104,14 @@ test.describe('模型权限页', () => {
     await gotoSetting(page, '模型权限');
     // 执行终端命令 → 禁止
     const runRow = rowOf(page, '执行终端命令');
-    await runRow.getByRole('button', { name: '禁止' }).click();
+    await runRow.getByRole('combobox', { name: '执行终端命令 权限' }).click();
+    await page.getByRole('option', { name: '禁止', exact: true }).click();
     let saved = await page.evaluate(() => localStorage.getItem('vrykell-permissions') ?? '');
     expect(saved).toContain('"run_command":"deny"');
     // 联网搜索 → 每次询问
     const webRow = rowOf(page, '联网搜索');
-    await webRow.getByRole('button', { name: '每次询问' }).click();
+    await webRow.getByRole('combobox', { name: '联网搜索 权限' }).click();
+    await page.getByRole('option', { name: '每次询问', exact: true }).click();
     saved = await page.evaluate(() => localStorage.getItem('vrykell-permissions') ?? '');
     expect(saved).toContain('"web_search":"ask"');
   });
