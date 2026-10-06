@@ -264,4 +264,39 @@ describe('useFileBrowser（本地目标）', () => {
     await waitFor(() => expect(result.current.childCache['C:/work/src']).toHaveLength(0));
     expect(result.current.undo?.pairs).toEqual([{ from: child.path, to: 'C:/work/archive/a.txt' }]);
   });
+
+  it('回退失败也会消耗该步：目标已在别处被移动/删除时不再留下退不掉的记录', async () => {
+    fsMocks.fsRename.mockResolvedValueOnce('C:/work/b.txt');
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(2));
+
+    act(() => result.current.requestRename(entry('a.txt', 'C:/work/a.txt'), 'b.txt'));
+    await act(async () => { result.current.confirmAction(); });
+    await waitFor(() => expect(result.current.undoCount).toBe(1));
+    expect(result.current.undo?.pairs).toEqual([{ from: 'C:/work/a.txt', to: 'C:/work/b.txt' }]);
+
+    // 文件已在别处被移走：回退请求失败，但这一步必须被消耗掉
+    fsMocks.fsRename.mockRejectedValueOnce(new Error('文件不存在'));
+    await act(async () => { await result.current.runUndo(); });
+    expect(result.current.undoCount).toBe(0);
+    expect(result.current.undo).toBeNull();
+  });
+
+  it('回退部分失败时不保留失败项（计数跟着实际剩余步数走）', async () => {
+    const first = { from: 'C:/work/a.txt', to: 'C:/Users/test/.vrykell/undo/u-a.txt' };
+    const second = { from: 'C:/work/b.txt', to: 'C:/Users/test/.vrykell/undo/u-b.txt' };
+    fsMocks.fsStageDelete.mockResolvedValue([first, second]);
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(2));
+
+    act(() => result.current.confirmDelete([entry('a.txt', 'C:/work/a.txt'), entry('b.txt', 'C:/work/b.txt')]));
+    await act(async () => { result.current.confirmAction(); });
+    await waitFor(() => expect(result.current.undoCount).toBe(1));
+
+    // 只有一项能恢复：成功的记入选中，失败的也不留在栈顶
+    fsMocks.fsRestoreStaged.mockResolvedValue({ completed: [first], errors: ['恢复失败：C:/work/b.txt 已存在同名项'] });
+    await act(async () => { await result.current.runUndo(); });
+    expect(result.current.undoCount).toBe(0);
+    expect([...result.current.selection]).toEqual(['C:/work/a.txt']);
+  });
 });

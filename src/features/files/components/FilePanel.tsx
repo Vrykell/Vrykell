@@ -106,6 +106,7 @@ export default function FilePanel({
     pasteInto,
     transferInto,
     createEntry,
+    removeAfterTransfer,
     ctxMenu,
     handleContextMenu,
     closeContextMenu,
@@ -146,7 +147,7 @@ export default function FilePanel({
     [segs, maxChars, ops],
   );
 
-  /** 拖到目标目录 = 移动；拖出窗口按配置决定是否先下载 */
+  /** 拖到目标目录 = 移动；拖出窗口按配置决定是否先下载，成功后按移动语义清理源 */
   const startRowDrag = useFileRowDrag({
     onDrop: (items, dropTarget) => {
       const paths = items.map((item) => item.path);
@@ -154,7 +155,13 @@ export default function FilePanel({
       void transferInto(paths, dropTarget.dir, 'move');
     },
     prepareNativeDrag: config.drag.downloadBeforeNativeDrag ? prepareNativeDrag : undefined,
-    onNativeDragEnd: () => load(path),
+    onNativeDragEnd: (result, items) => {
+      // 系统接收后即为「移动」：源头（本地暂存删除 / 远端暂存删除）同步移除并进回退历史
+      if (result === 'Dropped') {
+        void removeAfterTransfer(items.map((item) => ({ name: item.name, path: item.path, is_dir: item.is_dir })));
+      }
+      load(path);
+    },
   });
   const dragTarget = useFileDragStore((state) => state.target);
   const dragItems = useFileDragStore((state) => state.items);
@@ -339,7 +346,7 @@ export default function FilePanel({
               ) : (
                 <Crumb
                   label={config.rootLabel}
-                  onClick={path === null ? beginPathEdit : () => navigate(null)}
+                  onClick={() => navigate(config.rootPath)}
                   active={path === null}
                   title={path === null ? '单击编辑路径，回车跳转' : undefined}
                 />
@@ -604,7 +611,7 @@ function FileRow({
   onRowContextMenu: (event: React.MouseEvent, entry: FsEntry) => void;
   onChevronClick: (entry: FsEntry) => void;
 }) {
-  const { entry, depth, expanded, empty } = row;
+  const { entry, depth, expanded } = row;
   const [draft, setDraft] = useState(entry.name);
   const committedRef = useRef(false);
 
@@ -662,9 +669,11 @@ function FileRow({
       onMouseEnter={(event) => { event.currentTarget.style.background = dropTarget ? 'var(--accent-bg)' : selected ? 'var(--selection-bg)' : 'var(--hover)'; }}
       onMouseLeave={(event) => { event.currentTarget.style.background = dropTarget ? 'var(--accent-bg)' : restingBackground; }}
     >
-      {/* 展开 chevron —— 仅目录有；已知为空的目录不显示展开箭头 */}
+      {/* 展开 chevron —— 仅目录有；空目录同样保留箭头（展开后不显示任何空提示）。
+          阻断 click 与 dblclick 冒泡：连点箭头只切换展开，不会被行当成双击而进入目录。 */}
       <span
-        onClick={entry.is_dir && !empty && !renaming ? (event) => { event.stopPropagation(); onChevronClick(entry); } : undefined}
+        onClick={entry.is_dir && !renaming ? (event) => { event.stopPropagation(); onChevronClick(entry); } : undefined}
+        onDoubleClick={(event) => event.stopPropagation()}
         data-testid={expanderTestId}
         data-row-expander="true"
         style={{
@@ -672,7 +681,7 @@ function FileRow({
           color: 'var(--text-muted)',
           transition: 'transform 0.12s ease',
           transform: expanded ? 'rotate(90deg)' : 'none',
-          visibility: entry.is_dir && !empty ? 'visible' : 'hidden',
+          visibility: entry.is_dir ? 'visible' : 'hidden',
         }}
       >
         <ChevronRight size={iconSizes.compact} />
