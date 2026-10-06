@@ -9,6 +9,7 @@ import {
   connectMcp, disconnectMcp, type McpServer,
 } from '@features/agent/services/mcp';
 import { useToastStore } from '@ui/Toast';
+import ErrorBox from '@ui/ErrorBox';
 import { Field, Toggle, inputStyle, btnStyle } from '@features/settings/components/ui';
 import { useAutoSave } from '../hooks/useAutoSave';
 import SaveStatus from '../components/SaveStatus';
@@ -26,13 +27,15 @@ export function McpPage() {
   const [servers, setServers] = useState<McpServer[]>([]);
   const [drafts, setDrafts] = useState<string[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [listError, setListError] = useState('');
   const toast = (msg: string, type: 'info' | 'success' | 'error') =>
     useToastStore.getState().addToast(msg, type);
 
   const refresh = () => {
+    setListError('');
     listMcpServers()
       .then(setServers)
-      .catch((e) => toast(String((e as Error)?.message ?? e), 'error'));
+      .catch((e) => setListError(String((e as Error)?.message ?? e)));
   };
   useEffect(() => {
     refresh();
@@ -82,7 +85,12 @@ export function McpPage() {
       description="接入外部工具服务器。本地服务器填 command 与 args，连接后工具即注册给 AI。"
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {servers.length === 0 && drafts.length === 0 && (
+        {listError && (
+          <ErrorBox actions={<button onClick={refresh} style={{ minHeight: 32 }}>重试</button>}>
+            {listError}
+          </ErrorBox>
+        )}
+        {!listError && servers.length === 0 && drafts.length === 0 && (
           <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', padding: '6px 0' }}>
             还没有 MCP 服务器，点下方「添加服务器」创建一个。
           </div>

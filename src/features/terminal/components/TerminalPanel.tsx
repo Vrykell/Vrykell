@@ -3,6 +3,7 @@ import { useTerminalSession } from '../hooks/useTerminalSession';
 import { useEffect, useRef, useState } from 'react';
 import { useTerminalStore } from '@features/terminal';
 import { ptyWrite } from '@platform/pty';
+import ErrorBox from '@ui/ErrorBox';
 import { secretResponsePrompt, secretResponseWasRejected } from '../model/terminalFrame';
 import { terminalDebug } from '../services/terminalDebug';
 
@@ -87,7 +88,7 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
         <input ref={responseRef} type="password" autoComplete="off" aria-label="SSH 认证响应" placeholder="输入密码、密钥口令或验证响应" value={response} onChange={e => setResponse(e.target.value)} disabled={inputDisabled} className="ssh-auth-response" style={{ flex: 1, minWidth: 0, height: 36, background: 'transparent', border: 'none', outline: 'none' }} />
         <button type="submit" disabled={inputDisabled} style={{ padding: '8px 16px' }}>发送</button>
       </form>}
-      {error && <span role="alert" style={{ color: 'var(--text-secondary)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>{error}</span>}
+      {error && <ErrorBox compact style={{ flexShrink: 0 }}>{error}</ErrorBox>}
     </div>}
   </div>;
 }

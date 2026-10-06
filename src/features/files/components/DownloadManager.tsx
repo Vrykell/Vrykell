@@ -6,6 +6,7 @@ import { fileIcon } from '@features/files/utils/fileIcon';
 import { useToastStore } from '@ui/Toast';
 import { IconBtn, fmtSize } from '@ui/UiBtn';
 import ConfirmDialog from '@ui/ConfirmDialog';
+import ErrorBox from '@ui/ErrorBox';
 
 function fmtTime(ms: number): string {
   const d = new Date(ms);
@@ -20,15 +21,17 @@ function fmtTime(ms: number): string {
 export default function DownloadManager({ onBack }: { onBack: () => void }) {
   const [items, setItems] = useState<DownloadEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [confirmClear, setConfirmClear] = useState(false);
   const toast = (msg: string, type: 'info' | 'success' | 'error') =>
     useToastStore.getState().addToast(msg, type);
 
   const load = useCallback(() => {
     setLoading(true);
+    setError('');
     downloadsList()
       .then(setItems)
-      .catch((e) => toast(String((e as Error)?.message ?? e), 'error'))
+      .catch((e) => setError(String((e as Error)?.message ?? e)))
       .finally(() => setLoading(false));
   }, []);
 
@@ -74,6 +77,13 @@ export default function DownloadManager({ onBack }: { onBack: () => void }) {
       <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
         {loading ? (
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>加载中…</div>
+        ) : error ? (
+          <ErrorBox
+            style={{ margin: 12 }}
+            actions={<button onClick={load} style={{ minHeight: 32 }}>重试</button>}
+          >
+            {error}
+          </ErrorBox>
         ) : items.length === 0 ? (
           <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>
             暂无下载记录
