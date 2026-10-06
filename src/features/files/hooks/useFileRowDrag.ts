@@ -2,13 +2,13 @@ import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react
 import { startDrag, type DragResult } from '@crabnebula/tauri-plugin-drag';
 import { useFileDragStore, type FileDragItem, type FileDropTarget } from '@features/files/stores/fileDrag';
 
-/** 拖动阈值（与导航拖拽一致）：超过才视为拖拽，避免误触。 */
+/** Drag threshold (matches navigation dragging): below this the gesture stays a click. */
 const DRAG_THRESHOLD_PX = 6;
 
-/** 指针离开窗口多远后交给系统原生拖拽。 */
+/** How far the pointer must leave the window before the OS owns the drag. */
 const NATIVE_DRAG_MARGIN_PX = 8;
 
-/** 指针下方的放置目标：带 data-drop-dir 的文件夹行 / 文件行（其同级目录）或面包屑。 */
+/** Drop target under the pointer: a folder row / file row (its sibling directory) or a breadcrumb. */
 function locateDropTarget(x: number, y: number): FileDropTarget | null {
   const hit = document.elementFromPoint(x, y);
   const zone = hit?.closest<HTMLElement>('[data-drop-dir]');
@@ -23,7 +23,7 @@ function isOutsideWindow(x: number, y: number): boolean {
     || y >= window.innerHeight + NATIVE_DRAG_MARGIN_PX;
 }
 
-/** 交给系统原生拖拽的载荷：本地路径 + 拖拽效果（本地移动；远程先下载再按复制拖出）。 */
+/** Payload handed to the OS drag: local paths plus the drop effect (local = move; remote = download then copy out). */
 export interface NativeDragPayload {
   paths: string[];
   mode: 'copy' | 'move';
@@ -31,19 +31,20 @@ export interface NativeDragPayload {
 
 export interface FileRowDragOptions {
   onDrop: (items: FileDragItem[], target: FileDropTarget) => void;
-  /** 拖出窗口前准备本地路径（远程条目先下载）；返回 null 表示取消本次拖出。 */
+  /** Prepare local paths before the OS drag (remote entries download first); null cancels the drag-out. */
   prepareNativeDrag?: (items: FileDragItem[]) => Promise<NativeDragPayload | null> | NativeDragPayload | null;
   /**
-   * 系统拖拽结束后的回调：`payload.paths` 是交给系统拖拽的本地路径（远端 = 临时下载副本）。
-   * `Dropped` 时调用方按「移动」语义清理源并刷新面板；`Cancelled` 时远端面板据此删除临时副本。
+   * Called when the OS drag ends: `payload.paths` are the local paths handed to the OS (remote = the
+   * downloaded copies). On `Dropped` the caller clears the source with move semantics; on `Cancelled`
+   * the remote panel discards the temporary copies.
    */
   onNativeDragEnd?: (result: DragResult, items: FileDragItem[], payload: NativeDragPayload) => void;
 }
 
-/** 拖出窗口：交给系统原生拖拽（拖到桌面/资源管理器），结束后刷新面板以反映系统侧改动。 */
+/** Drag out of the window: hand the drag to the OS (desktop / file manager) and refresh the panel afterwards. */
 function beginNativeDrag(payload: NativeDragPayload, onEnd?: (result: DragResult) => void) {
   if (!('__TAURI_INTERNALS__' in window)) return;
-  // 预览图留空：读取失败时按“无自定义拖动图”处理（Windows 回退系统默认拖动图）
+  // Leave the preview empty: a failed read means "no custom drag image" (Windows falls back to its default).
   void startDrag({ item: payload.paths, icon: '', mode: payload.mode }, (event) => {
     onEnd?.(event.result);
   })
@@ -51,9 +52,10 @@ function beginNativeDrag(payload: NativeDragPayload, onEnd?: (result: DragResult
 }
 
 /**
- * 行拖拽：按住行拖到文件夹/文件（同级目录）/面包屑即可移动（拖拽只做移动，不复制）；
- * 拖出窗口则转为系统原生拖拽，可直接放到桌面 / 资源管理器。
- * 面板内用指针事件而不是 HTML5 拖放，避免与桌面窗口的原生文件拖入冲突。
+ * Row dragging: holding a row and dragging onto a folder / file (sibling directory) / breadcrumb moves it
+ * (dragging only moves, never copies); dragging out of the window becomes an OS drag that can be dropped
+ * onto the desktop or a file manager. The panel uses pointer events instead of HTML5 drag-and-drop to
+ * avoid clashing with native file drops onto the window.
  */
 export function useFileRowDrag({ onDrop, prepareNativeDrag, onNativeDragEnd }: FileRowDragOptions) {
   const cleanupRef = useRef<(() => void) | null>(null);
@@ -61,7 +63,7 @@ export function useFileRowDrag({ onDrop, prepareNativeDrag, onNativeDragEnd }: F
 
   return (event: ReactPointerEvent<HTMLElement>, items: FileDragItem[]) => {
     if (event.button !== 0 || event.isPrimary === false || items.length === 0) return;
-    // 展开箭头与重命名输入框不参与拖拽（用与面板变体无关的标记判定）
+    // The expander and the rename input never start a drag (matched with panel-agnostic markers).
     if ((event.target as HTMLElement).closest('input, [data-row-expander]')) return;
 
     cleanupRef.current?.();
@@ -80,7 +82,7 @@ export function useFileRowDrag({ onDrop, prepareNativeDrag, onNativeDragEnd }: F
         useFileDragStore.getState().start(items, { x: next.clientX, y: next.clientY });
       }
       next.preventDefault();
-      // 拖出窗口：转成系统原生拖拽（可以放到桌面 / 资源管理器）
+      // Left the window: switch to an OS drag (droppable on the desktop / file manager).
       if (isOutsideWindow(next.clientX, next.clientY)) {
         canceled = true;
         useFileDragStore.getState().end();
@@ -116,7 +118,8 @@ export function useFileRowDrag({ onDrop, prepareNativeDrag, onNativeDragEnd }: F
       window.removeEventListener('blur', cancel);
       if (source.hasPointerCapture?.(pointerId)) source.releasePointerCapture(pointerId);
       if (started) useFileDragStore.getState().end();
-      // pointerup 之后浏览器还会派发 click：延迟一拍再解除抑制，避免拖完误选中
+      // The browser still dispatches a click after pointerup: release the suppression one tick later
+      // so the drop does not double as a selection.
       clickTimer = setTimeout(removeClick, 0);
       cleanupRef.current = () => { clearTimeout(clickTimer); removeClick(); };
     };
