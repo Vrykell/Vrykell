@@ -57,6 +57,9 @@ export interface FilePanelConfig {
   syncToTerminal: boolean;
   /** 面包屑首段（本地「此电脑」/ 远程「/」） */
   rootLabel: string;
+  /** 点击面包屑首段去的目录：本地 null（此电脑），远程 '/'（根目录）。
+      远程的 null 表示「尚未解析 → 回主目录」，根面包屑绝不能用它，否则会重新解析主目录。 */
+  rootPath: string | null;
   /** path 未知（远端主目录尚未解析）时显示的名称来源 */
   pendingLabel?: 'connection';
 }
@@ -102,6 +105,7 @@ export function filePanelConfigFor(target: FileOpsTarget): FilePanelConfig {
       open: 'remote-editor',
       syncToTerminal: true,
       rootLabel: '/',
+      rootPath: '/',
       pendingLabel: 'connection',
     };
   }
@@ -119,5 +123,6 @@ export function filePanelConfigFor(target: FileOpsTarget): FilePanelConfig {
     open: 'terminal-editor',
     syncToTerminal: true,
     rootLabel: '此电脑',
+    rootPath: null,
   };
 }

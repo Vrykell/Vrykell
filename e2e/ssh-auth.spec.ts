@@ -200,3 +200,24 @@ test('changed host keys fail without asking to overwrite trust', async ({ page }
   expect(await ipcRecords(page, '__SSH_TRUSTS__')).toEqual([]);
   expect((await ipcRecords(page, '__PTY_SPAWNS__')).filter(s => s.ssh)).toEqual([]);
 });
+
+test('认证输入条在终端区内左右对称（不再被 8px 左边距推右）', async ({ page }) => {
+  await openSsh(page, 'known');
+  const surface = page.getByTestId('ssh-connection-input');
+  await emitPtyOutput(page, "user@server's password: ");
+  await expect(surface.getByLabel('SSH 认证响应')).toBeEnabled();
+
+  const gaps = await surface.evaluate((host) => {
+    const form = host.querySelector('form.terminal-composer');
+    if (!form) return null;
+    const bar = form.getBoundingClientRect();
+    const pane = host.getBoundingClientRect();
+    return {
+      left: Math.round(bar.left - pane.left),
+      right: Math.round(pane.right - bar.right),
+    };
+  });
+  expect(gaps).not.toBeNull();
+  // 与终端区左右边界对称：左边距不再比右边多出 8px
+  expect(Math.abs((gaps?.left ?? 0) - (gaps?.right ?? 0))).toBeLessThanOrEqual(1);
+});

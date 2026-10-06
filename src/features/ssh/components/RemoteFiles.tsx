@@ -140,8 +140,8 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
         }
         if (locals.length === 0) return null;
         toast(locals.length > 1 ? `已下载 ${locals.length} 项` : '已下载', 'success');
-        // 远端文件已下载到本地：交给系统拖拽时用复制语义，远端源文件保留
-        return { paths: locals, mode: 'copy' as const };
+        // 拖出 = 移动：本地副本交给系统拖拽；远端源文件在拖放成功后被移除（见面板的移出收尾）
+        return { paths: locals, mode: 'move' as const };
       }}
     />
   );

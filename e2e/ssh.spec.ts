@@ -219,6 +219,20 @@ test.describe('SSH 远程连接管理侧栏', () => {
     expect(await sshOps(page)).toEqual(expect.arrayContaining([{ op: 'move', path: '/home/root/Documents/app (1).log', destDir: '/home/root' }]));
   });
 
+  test('远程面板：点击面包屑根目录回到根目录，而不是重新解析主目录', async ({ page }) => {
+    await page.getByText('生产服务器').dblclick();
+    await page.locator('[data-dock-btn="files"]').click();
+    const tree = page.locator('[data-testid="remote-file-tree"]');
+    await expect(page.locator('[data-testid="remote-file-app.log"]').first()).toBeVisible({ timeout: 5000 });
+    await expect(tree).toHaveAttribute('data-path', '/home/root');
+
+    await page.locator('[data-testid="remote-crumb-bar"]').getByText('/', { exact: true }).click();
+    await expect(tree).toHaveAttribute('data-path', '/');
+    // 停留一拍：确认没有被「未解析 → 回主目录」的逻辑改回 /home/root
+    await page.waitForTimeout(300);
+    await expect(tree).toHaveAttribute('data-path', '/');
+  });
+
   test('远程面板：展开箭头懒加载子项，菜单只显示远程可用项', async ({ page }) => {
     await page.getByText('生产服务器').dblclick();
     await page.locator('[data-dock-btn="files"]').click();

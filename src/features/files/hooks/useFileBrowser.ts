@@ -418,42 +418,42 @@ export function useFileBrowser({
     setUndo(next);
   }, [ops, setUndo]);
 
-  /** 回退一步后更新栈：全部成功则出栈，部分失败把失败项留在栈顶重试。 */
-  const settleUndo = useCallback((current: FileUndo, failed: FileOpPair[]) => {
-    const rest = undoStackRef.current.slice(1);
-    setUndo(failed.length > 0 ? [{ ...current, pairs: failed }, ...rest] : rest);
+  /** 该步被消耗后出栈（无论成功与否）。 */
+  const popUndo = useCallback(() => {
+    setUndo(undoStackRef.current.slice(1));
   }, [setUndo]);
 
-  /** 回退一步文件操作（重命名 / 移动 / 删除），可连续回退。 */
+  /**
+   * 回退一步文件操作（重命名 / 移动 / 删除），可连续回退。
+   *
+   * 每次调用都会消耗掉栈顶这一步：目标可能已在别处被移动 / 删除 / 改名，
+   * 若把失败项留在栈顶，菜单会一直显示一个再也退不掉的步数。失败时改为
+   * 「提示 + 移除该步」，让计数始终跟着实际剩余步数走。
+   */
   const runUndo = useCallback(async () => {
     const current = undoStackRef.current[0];
     if (!current) return;
+    let done = 0;
+    let failed = 0;
+    let firstError = '';
+    const restoredPaths: string[] = [];
     try {
       if (current.kind === 'delete') {
         const outcome = await ops.restoreStaged(current.pairs);
-        if (outcome.errors.length > 0) toast(outcome.errors[0]!, 'error');
-        if (outcome.completed.length > 0) {
-          toast(outcome.completed.length > 1 ? `已回退删除 ${outcome.completed.length} 项` : '已回退删除', 'success');
-          replaceSelection(outcome.completed.map((pair) => pair.from));
-        }
-        const restored = new Set(outcome.completed.map((pair) => pair.from));
-        settleUndo(current, current.pairs.filter((pair) => !restored.has(pair.from)));
+        done = outcome.completed.length;
+        failed = outcome.errors.length;
+        firstError = outcome.errors[0] ?? '';
+        restoredPaths.push(...outcome.completed.map((pair) => pair.from));
       } else if (current.kind === 'rename') {
-        const failed: FileOpPair[] = [];
-        const restoredPaths: string[] = [];
         for (const pair of current.pairs) {
           try {
             restoredPaths.push(await ops.rename(pair.to, pathName(pair.from)));
+            done += 1;
           } catch (error) {
-            failed.push(pair);
-            toast(String((error as Error)?.message ?? error), 'error');
+            failed += 1;
+            firstError ||= String((error as Error)?.message ?? error);
           }
         }
-        if (failed.length < current.pairs.length) {
-          toast('已回退重命名', 'success');
-          replaceSelection(restoredPaths);
-        }
-        settleUndo(current, failed);
       } else {
         // 按原目录分组移回（同一次操作通常来自同一目录）
         const byParent = new Map<string, FileOpPair[]>();
@@ -461,26 +461,36 @@ export function useFileBrowser({
           const parent = ops.parentOf(pair.from) ?? '/';
           byParent.set(parent, [...(byParent.get(parent) ?? []), pair]);
         }
-        const failed: FileOpPair[] = [];
-        let restored = 0;
         for (const [parent, pairs] of byParent) {
           const outcome = await ops.move(pairs.map((pair) => pair.to), parent);
-          restored += outcome.completed.length;
-          if (outcome.errors.length > 0) toast(outcome.errors[0]!, 'error');
-          const done = new Set(outcome.completed.map((pair) => pair.to));
-          failed.push(...pairs.filter((pair) => !done.has(pair.to)));
+          done += outcome.completed.length;
+          failed += outcome.errors.length;
+          firstError ||= outcome.errors[0] ?? '';
         }
-        if (restored > 0) toast(restored > 1 ? `已回退移动 ${restored} 项` : '已回退移动', 'success');
-        replaceSelection(current.pairs.map((pair) => pair.from));
-        settleUndo(current, failed);
+        restoredPaths.push(...current.pairs.map((pair) => pair.from));
       }
-      terminalDebug('files-op', { op: `undo-${current.kind}`, itemCount: current.pairs.length });
-      // 回退同样会改动已展开目录里的内容：按涉及的路径刷新父目录与目标目录
-      refreshAffected(current.pairs.flatMap((pair) => [pair.from, pair.to]));
     } catch (error) {
-      toast(String((error as Error)?.message ?? error), 'error');
+      failed = current.pairs.length;
+      firstError ||= String((error as Error)?.message ?? error);
     }
-  }, [ops, refreshAffected, replaceSelection, settleUndo, toast]);
+
+    terminalDebug('files-op', { op: `undo-${current.kind}`, itemCount: current.pairs.length, doneCount: done, errorCount: failed });
+    popUndo();
+
+    const label = current.kind === 'delete' ? '已回退删除' : current.kind === 'rename' ? '已回退重命名' : '已回退移动';
+    if (done > 0) {
+      const count = done > 1 ? ` ${done} 项` : '';
+      toast(
+        failed > 0 ? `${label}${count}，${failed} 项已不存在（已跳过）` : `${label}${count}`,
+        failed > 0 ? 'info' : 'success',
+      );
+      replaceSelection(restoredPaths);
+    } else if (failed > 0) {
+      toast(`无法回退：${firstError || '目标可能已在别处被移动或删除'}（该步已从历史移除）`, 'error');
+    }
+    // 回退同样会改动已展开目录里的内容：按涉及的路径刷新父目录与目标目录
+    refreshAffected(current.pairs.flatMap((pair) => [pair.from, pair.to]));
+  }, [ops, popUndo, refreshAffected, replaceSelection, toast]);
 
   // ── 迁移（粘贴 / 拖拽共用） ──
 
@@ -589,6 +599,33 @@ export function useFileBrowser({
       toast(String((error as Error)?.message ?? error), 'error');
     }
   }, [load, loadChildren, ops, path, replaceSelection, revealPath, toast]);
+
+  /**
+   * 拖出窗口成功后的收尾：系统按「移动」接收了条目，源头（本地 / 远端）同步移除并进回退历史。
+   * 同盘拖出时系统可能已经把源移走，此时 staged 请求会失败——这类「已不存在」安静跳过即可。
+   */
+  const removeAfterTransfer = useCallback(async (entries: FsEntry[]) => {
+    if (entries.length === 0) return;
+    try {
+      const outcome = await ops.stageDelete(entries.map((entry) => entry.path));
+      terminalDebug('files-op', { op: 'move-out', itemCount: entries.length, doneCount: outcome.completed.length, errorCount: outcome.errors.length });
+      if (outcome.completed.length > 0) {
+        pushUndo({ kind: 'delete', label: '移出', pairs: outcome.completed });
+        toast(
+          outcome.completed.length > 1
+            ? `已移动 ${outcome.completed.length} 项到系统，可在更多菜单回退`
+            : '已移动到系统，可在更多菜单回退',
+          'success',
+        );
+        replaceSelection([]);
+      }
+      refreshAffected(entries.map((entry) => entry.path));
+    } catch (error) {
+      // 失败通常是「源已被系统移走」：不打断用户，只记录日志
+      terminalDebug('files-op', { op: 'move-out-failed', itemCount: entries.length, errorType: (error as Error)?.name ?? typeof error });
+      refreshAffected(entries.map((entry) => entry.path));
+    }
+  }, [ops, pushUndo, refreshAffected, replaceSelection, toast]);
 
   /** 删除 = 移到暂存区（可回退）；回退窗口结束或挤出历史后永久清理。 */
   const doDelete = useCallback(async (list: FsEntry[]) => {
@@ -700,6 +737,7 @@ export function useFileBrowser({
     pasteInto,
     transferInto,
     createEntry,
+    removeAfterTransfer,
     openEntry,
     ctxMenu,
     handleContextMenu,

@@ -55,7 +55,7 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
   };
   const showSnapshot = (!manualSecret && secret && secretPrompt !== null) || disconnected;
   return <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-    {!connectionInput && <div ref={ref} style={{ position: 'absolute', inset: 0, minHeight: 0, background: 'transparent' }} />}
+    {!connectionInput && <div ref={ref} style={{ position: 'absolute', inset: 0, minHeight: 0, background: 'transparent', paddingLeft: 8 }} />}
     {connectionInput && <div data-testid="ssh-connection-input" style={{ position: 'absolute', inset: 0, display: interactive ? 'flex' : 'none', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0, padding: '4px 8px', fontSize: 'calc(12px * var(--ui-font-scale))' }}>
         <span role="status" style={{ flex: 1, color: 'var(--text-secondary)' }}>{cancellation === 'done' ? cancelledAuthentication ? '已取消认证，SSH 连接已关闭' : '已断开 SSH 连接' : disconnected ? '连接已断开' : status === 'connecting' ? '正在连接…' : secret ? '等待认证响应' : 'SSH 交互会话'}</span>
@@ -74,20 +74,23 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
       </div>
       <div role="textbox" aria-label="SSH 交互终端" aria-multiline="true" aria-disabled={inputDisabled} tabIndex={inputDisabled ? -1 : 0}
         onFocus={focusTerminal} onMouseDown={focusTerminal} style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'auto', outline: 'none', cursor: 'text' }}>
-        <div ref={ref} data-testid={showSnapshot ? undefined : 'ssh-terminal-screen'} style={{ position: 'absolute', inset: 0, overflow: 'auto', visibility: showSnapshot ? 'hidden' : 'visible', pointerEvents: showSnapshot ? 'none' : 'auto' }} />
-        {showSnapshot && <pre data-testid="ssh-terminal-screen" style={{ position: 'absolute', inset: 0, overflow: 'auto', margin: 0, whiteSpace: 'pre', color: 'var(--text-primary)' }} dangerouslySetInnerHTML={{ __html: frame?.html || '正在连接远端主机…' }} />}
+        <div ref={ref} data-testid={showSnapshot ? undefined : 'ssh-terminal-screen'} style={{ position: 'absolute', inset: 0, overflow: 'auto', visibility: showSnapshot ? 'hidden' : 'visible', pointerEvents: showSnapshot ? 'none' : 'auto', paddingLeft: 8 }} />
+        {showSnapshot && <pre data-testid="ssh-terminal-screen" style={{ position: 'absolute', inset: 0, overflow: 'auto', margin: 0, whiteSpace: 'pre', color: 'var(--text-primary)', paddingLeft: 8 }} dangerouslySetInnerHTML={{ __html: frame?.html || '正在连接远端主机…' }} />}
       </div>
-      {interactive && secret && !disconnected && <form onSubmit={e => {
-        e.preventDefault();
-        if (inputDisabled || cancellingRef.current || !sessionId) return;
-        const value = response;
-        if (responseRef.current) responseRef.current.value = '';
-        setResponse(''); setError(''); setManualSecret(false); setDirectInput(false); setDismissedPrompt(secretPrompt ?? text);
-        void ptyWrite(sessionId, `${value}\r`).catch(reason => { setManualSecret(true); setError(`发送失败：${String(reason)}`); });
-      }} className="terminal-composer" style={{ display: 'flex', gap: 8, alignItems: 'center', padding: 12, flexShrink: 0 }}>
-        <input ref={responseRef} type="password" autoComplete="off" aria-label="SSH 认证响应" placeholder="输入密码、密钥口令或验证响应" value={response} onChange={e => setResponse(e.target.value)} disabled={inputDisabled} className="ssh-auth-response" style={{ flex: 1, minWidth: 0, height: 36, background: 'transparent', border: 'none', outline: 'none' }} />
-        <button type="submit" disabled={inputDisabled} style={{ padding: '8px 16px' }}>发送</button>
-      </form>}
+      {/* 认证输入条：与终端区左右保持一致的 8px 边距（对称，不再贴边或被单侧推偏） */}
+      {interactive && secret && !disconnected && <div style={{ padding: '0 8px 8px', flexShrink: 0 }}>
+        <form onSubmit={e => {
+          e.preventDefault();
+          if (inputDisabled || cancellingRef.current || !sessionId) return;
+          const value = response;
+          if (responseRef.current) responseRef.current.value = '';
+          setResponse(''); setError(''); setManualSecret(false); setDirectInput(false); setDismissedPrompt(secretPrompt ?? text);
+          void ptyWrite(sessionId, `${value}\r`).catch(reason => { setManualSecret(true); setError(`发送失败：${String(reason)}`); });
+        }} className="terminal-composer" style={{ display: 'flex', gap: 8, alignItems: 'center', padding: 12, width: '100%' }}>
+          <input ref={responseRef} type="password" autoComplete="off" aria-label="SSH 认证响应" placeholder="输入密码、密钥口令或验证响应" value={response} onChange={e => setResponse(e.target.value)} disabled={inputDisabled} className="ssh-auth-response" style={{ flex: 1, minWidth: 0, height: 36, background: 'transparent', border: 'none', outline: 'none' }} />
+          <button type="submit" disabled={inputDisabled} style={{ padding: '8px 16px' }}>发送</button>
+        </form>
+      </div>}
       {error && <ErrorBox compact style={{ flexShrink: 0 }}>{error}</ErrorBox>}
     </div>}
   </div>;

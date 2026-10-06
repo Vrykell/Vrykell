@@ -362,7 +362,9 @@ function TerminalPane(props: {
       <AiStatusBar paneId={terminal.id} />
       <div style={showXterm
         // Keep the native terminal scrollbar flush with the pane's right edge.
-        ? { flex: 1, minHeight: 0, position: 'relative', padding: '8px 0 0 8px', paddingTop: scene === 'altScreen' ? 28 : 8, background: 'transparent' }
+        // 左边距不在这里加：它只属于终端屏幕内容（见 TerminalPanel），
+        // 否则认证输入条等整宽元素会被一起推右，出现左右不对称。
+        ? { flex: 1, minHeight: 0, position: 'relative', padding: '8px 0 0 0', paddingTop: scene === 'altScreen' ? 28 : 8, background: 'transparent' }
         : { position: 'absolute', inset: 0, opacity: 0, pointerEvents: 'none' }}>
         <TerminalPanel paneId={terminal.id} tabId={windowId} connectionInput={terminal.kind === 'ssh'} onReady={(sid) => setSession(terminal.id, sid)} />
       </div>

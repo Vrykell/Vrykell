@@ -1,5 +1,5 @@
 import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react';
-import { startDrag } from '@crabnebula/tauri-plugin-drag';
+import { startDrag, type DragResult } from '@crabnebula/tauri-plugin-drag';
 import { useFileDragStore, type FileDragItem, type FileDropTarget } from '@features/files/stores/fileDrag';
 
 /** 拖动阈值（与导航拖拽一致）：超过才视为拖拽，避免误触。 */
@@ -33,17 +33,18 @@ export interface FileRowDragOptions {
   onDrop: (items: FileDragItem[], target: FileDropTarget) => void;
   /** 拖出窗口前准备本地路径（远程条目先下载）；返回 null 表示取消本次拖出。 */
   prepareNativeDrag?: (items: FileDragItem[]) => Promise<NativeDragPayload | null> | NativeDragPayload | null;
-  /** 系统拖拽结束后的回调（刷新面板）。 */
-  onNativeDragEnd?: () => void;
+  /** 系统拖拽结束后的回调（result 为 Dropped 时调用方按“移动”语义清理源，并刷新面板）。 */
+  onNativeDragEnd?: (result: DragResult, items: FileDragItem[]) => void;
 }
 
 /** 拖出窗口：交给系统原生拖拽（拖到桌面/资源管理器），结束后刷新面板以反映系统侧改动。 */
-function beginNativeDrag(payload: NativeDragPayload, onEnd?: () => void) {
+function beginNativeDrag(payload: NativeDragPayload, onEnd?: (result: DragResult) => void) {
   if (!('__TAURI_INTERNALS__' in window)) return;
   // 预览图留空：读取失败时按“无自定义拖动图”处理（Windows 回退系统默认拖动图）
-  void startDrag({ item: payload.paths, icon: '', mode: payload.mode })
-    .catch(() => {})
-    .finally(() => onEnd?.());
+  void startDrag({ item: payload.paths, icon: '', mode: payload.mode }, (event) => {
+    onEnd?.(event.result);
+  })
+    .catch(() => { onEnd?.('Cancelled'); });
 }
 
 /**
@@ -85,7 +86,7 @@ export function useFileRowDrag({ onDrop, prepareNativeDrag, onNativeDragEnd }: F
           const payload = prepareNativeDrag
             ? await prepareNativeDrag(items)
             : { paths: items.map((item) => item.path), mode: 'move' as const };
-          if (payload) beginNativeDrag(payload, onNativeDragEnd);
+          if (payload) beginNativeDrag(payload, (result) => onNativeDragEnd?.(result, items));
         })();
         return;
       }
