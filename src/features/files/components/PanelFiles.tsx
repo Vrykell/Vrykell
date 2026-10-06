@@ -5,6 +5,7 @@ import { fileIcon } from '@features/files/utils/fileIcon';
 import { normPath, pathSegments, segmentsToPath, parentOf } from '@platform/path';
 import { compactPathSegments } from '@features/files/utils/breadcrumb';
 import { useFileRowDrag } from '@features/files/hooks/useFileRowDrag';
+import { useExternalFileDrop } from '@features/files/hooks/useExternalFileDrop';
 import { useFileDragStore } from '@features/files';
 import FileDragPreview from '@features/files/components/FileDragPreview';
 import { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
@@ -93,6 +94,7 @@ function LocalFiles() {
     clipboard,
     cutPaths,
     undo,
+    undoCount,
     closeContextMenu,
     cancelConfirm,
     isWorkspace,
@@ -178,17 +180,51 @@ function LocalFiles() {
     setBlankMenu({ x: event.clientX, y: event.clientY });
   };
 
-  /** 拖到文件夹：移动（按住 Alt 复制）；不把文件夹放进自身子树，也不做同目录移动 */
-  const startRowDrag = useFileRowDrag((paths, targetPath, copy) => {
-    if (paths.some((item) => targetPath === item || targetPath.startsWith(`${item}/`))) return;
-    if (!copy && paths.every((item) => parentOf(item) === targetPath)) return;
-    void transferInto(paths, targetPath, copy ? 'copy' : 'move');
+  /** 拖动到目标目录：只做移动；不把文件夹放进自身子树，也不做同目录移动 */
+  const startRowDrag = useFileRowDrag((items, target) => {
+    const paths = items.map((item) => item.path);
+    const targetDir = target.dir;
+    if (paths.some((p) => targetDir === p || targetDir.startsWith(`${p}/`))) return;
+    if (targetDir === path) return;
+    if (paths.every((p) => parentOf(p) === targetDir)) return;
+    void transferInto(paths, targetDir, 'move');
   });
-  const dropTargetPath = useFileDragStore((state) => state.overPath);
+  const dragTarget = useFileDragStore((state) => state.target);
+  const dragItems = useFileDragStore((state) => state.items);
 
   /** 拖拽从指针按下的行开始：命中选中集时拖动整组 */
   const handleRowPointerDown = (event: React.PointerEvent<HTMLElement>, entry: FsEntry) => {
-    startRowDrag(event, selection.has(entry.path) ? Array.from(selection) : [entry.path]);
+    const picked = selection.has(entry.path)
+      ? rows.filter((row) => selection.has(row.entry.path)).map((row) => row.entry)
+      : [entry];
+    startRowDrag(event, picked.map((item) => ({ path: item.path, name: item.name, is_dir: item.is_dir })));
+  };
+
+  /** 系统文件拖入：命中文件夹行/文件行（同级目录），落在空白处 = 当前目录（移动进面板） */
+  const [externalDrop, setExternalDrop] = useState<{ rowPath: string | null; dir: string } | null>(null);
+  useExternalFileDrop({
+    resolveTarget: (x, y) => {
+      const tree = scrollRef.current;
+      if (!tree) return null;
+      const rect = tree.getBoundingClientRect();
+      if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return null;
+      const zone = (document.elementFromPoint(x, y) as HTMLElement | null)?.closest<HTMLElement>('[data-drop-dir]');
+      const dir = zone && tree.contains(zone) ? zone.dataset.dropDir ?? null : null;
+      if (dir) return { rowPath: zone!.dataset.path ?? null, dir };
+      return path === null ? null : { rowPath: null, dir: path };
+    },
+    onHover: setExternalDrop,
+    onDrop: (paths, target) => { void transferInto(paths, target.dir, 'move'); },
+  });
+
+  /** 行是否显示为放置目标：内部拖拽要求目标有效，外部拖入只看命中行 */
+  const isDropTarget = (row: VisibleRow) => {
+    if (dragTarget?.rowPath === row.entry.path) {
+      const dir = dragTarget.dir;
+      const invalid = dir === path || dragItems.some((item) => dir === item.path || dir.startsWith(`${item.path}/`));
+      if (!invalid) return true;
+    }
+    return externalDrop?.rowPath === row.entry.path;
   };
 
   /** 单击选中；Shift 连选、Ctrl/Cmd 加选；双击进入目录 / 打开文件由双击触发 */
@@ -411,7 +447,7 @@ function LocalFiles() {
                   row={row}
                   selected={selection.has(row.entry.path)}
                   cut={cutPaths.has(row.entry.path)}
-                  dropTarget={row.entry.is_dir && dropTargetPath === row.entry.path}
+                  dropTarget={isDropTarget(row)}
                   inWorkspace={isWorkspace(row.entry.path)}
                   renaming={renameTarget?.path === row.entry.path}
                   onRenameCommit={requestRename}
@@ -466,8 +502,11 @@ function LocalFiles() {
         <ContextMenu
           anchor={moreMenu}
           items={[
-            // 回退入口只在确实操作过文件后出现
-            ...(undo ? [{ label: `回退${undo.label}`, onClick: () => void runUndo() }] : []),
+            // 回退入口只在确实操作过文件后出现；历史栈可连续回退
+            ...(undo ? [{
+              label: `回退${undo.label}${undoCount > 1 ? `（共 ${undoCount} 步）` : ''}`,
+              onClick: () => void runUndo(),
+            }] : []),
             // 盘符视图没有「当前文件夹」，不显示不可用的新建标签页
             ...(path === null ? [] : [{ label: '从当前文件夹新建标签页', onClick: openTabAtCurrentFolder }]),
             { label: '下载管理', onClick: () => setShowDownloads(true) },
@@ -627,7 +666,7 @@ function FileRow({
       data-testid="file-row"
       data-path={entry.path}
       data-selected={selected ? 'true' : undefined}
-      data-drop-dir={entry.is_dir && !renaming ? entry.path : undefined}
+      data-drop-dir={renaming ? undefined : (entry.is_dir ? entry.path : parentOf(entry.path) ?? undefined)}
       style={{
         display: 'flex', alignItems: 'center', gap: 4,
         padding: `5px 10px 5px ${4 + depth * 14}px`,
@@ -709,6 +748,7 @@ function Crumb({ label, onClick, active, title, dropPath }: {
     <span
       title={title}
       data-drop-dir={dropPath}
+      data-path={dropPath}
       onClick={(event) => { event.stopPropagation(); onClick(); }}
       style={{
         cursor: 'pointer', padding: '1px 4px', borderRadius: 3,

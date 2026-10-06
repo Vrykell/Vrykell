@@ -148,6 +148,23 @@ export function useRemoteFileBrowser(conn: SshConnection, enabled = true) {
     }
   }, [conn.id, currentDir, refresh, toast]);
 
+  /** 系统文件拖入远程面板：把拖入的本地路径上传到目标目录。 */
+  const uploadPaths = useCallback(async (localPaths: string[], remoteDir: string) => {
+    let succeeded = 0;
+    for (const localPath of localPaths) {
+      try {
+        await sshUpload(conn.id, remoteDir, localPath);
+        succeeded += 1;
+      } catch (errorValue) {
+        toast(`${localPath}：${String((errorValue as Error)?.message ?? errorValue)}`, 'error');
+      }
+    }
+    if (succeeded > 0) {
+      toast(succeeded > 1 ? `已上传 ${succeeded} 项` : '已上传', 'success');
+      refresh();
+    }
+  }, [conn.id, refresh, toast]);
+
   const handleContextMenu = useCallback((event: React.MouseEvent, entry: SshFsEntry) => {
     event.preventDefault();
     setCtxMenu({ x: event.clientX, y: event.clientY, entry });
@@ -231,5 +248,6 @@ export function useRemoteFileBrowser(conn: SshConnection, enabled = true) {
     syncToTerminal,
     doUpload,
     doUploadDir,
+    uploadPaths,
   };
 }

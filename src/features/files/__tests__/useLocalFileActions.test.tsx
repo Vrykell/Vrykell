@@ -137,8 +137,11 @@ describe('useLocalFileActions', () => {
     expect(result.current.undo).toMatchObject({ kind: 'move', label: '移动' });
   });
 
-  it('delete stages items for undo and purges a superseded staged delete', async () => {
-    fsMocks.fsStageDelete.mockResolvedValue([{ from: entry.path, to: 'C:/undo/u-old.txt' }]);
+  it('delete pushes undo history steps that can be rolled back one by one', async () => {
+    const second: FsEntry = { name: 'two.txt', path: 'C:/workspace/two.txt', is_dir: false };
+    fsMocks.fsStageDelete
+      .mockResolvedValueOnce([{ from: entry.path, to: 'C:/undo/u-old.txt' }])
+      .mockResolvedValueOnce([{ from: second.path, to: 'C:/undo/u-two.txt' }]);
     const load = vi.fn();
     const { result } = renderHook(() => useLocalFileActions({
       path: 'C:/workspace',
@@ -148,31 +151,37 @@ describe('useLocalFileActions', () => {
       targetsFor: singleTarget,
     }));
 
-    // 通过右键菜单触发删除确认
+    // 第一次删除：入栈一步
     act(() => {
-      const items = result.current.buildMenuItems(entry);
-      items.find((item) => item.label === '删除')!.onClick();
+      result.current.buildMenuItems(entry).find((item) => item.label === '删除')!.onClick();
     });
     expect(result.current.confirm).toEqual({ kind: 'delete', entries: [entry] });
-
     await act(async () => { result.current.confirmAction(); });
     await waitFor(() => expect(fsMocks.fsStageDelete).toHaveBeenCalledWith([entry.path]));
     expect(result.current.undo).toMatchObject({ kind: 'delete', label: '删除' });
-    expect(load).toHaveBeenCalledWith('C:/workspace');
+    expect(result.current.undoCount).toBe(1);
 
-    // 下一次删除会把上一批暂存项送入系统回收站（回退窗口只保留一步）
-    await act(async () => {
-      const items = result.current.buildMenuItems(entry);
-      items.find((item) => item.label === '删除')!.onClick();
+    // 第二次删除：历史栈保留两步，前一步暂存项不被清理（仍可回退）
+    act(() => {
+      result.current.buildMenuItems(second).find((item) => item.label === '删除')!.onClick();
     });
     await act(async () => { result.current.confirmAction(); });
-    await waitFor(() => expect(fsMocks.fsPurgeStaged).toHaveBeenCalledWith(['C:/undo/u-old.txt']));
+    await waitFor(() => expect(result.current.undoCount).toBe(2));
+    expect(fsMocks.fsPurgeStaged).not.toHaveBeenCalled();
 
-    // 回退删除：把暂存项移回原位并清空回退入口
-    fsMocks.fsRestoreStaged.mockResolvedValue({ completed: [{ from: entry.path, to: 'C:/undo/u-old.txt' }], errors: [] });
+    // 连续回退：两次删除分别恢复，栈清空后回退项消失
+    fsMocks.fsRestoreStaged
+      .mockResolvedValueOnce({ completed: [{ from: second.path, to: 'C:/undo/u-two.txt' }], errors: [] })
+      .mockResolvedValueOnce({ completed: [{ from: entry.path, to: 'C:/undo/u-old.txt' }], errors: [] });
     await act(async () => { await result.current.runUndo(); });
-    expect(fsMocks.fsRestoreStaged).toHaveBeenCalledWith([{ from: entry.path, to: 'C:/undo/u-old.txt' }]);
+    expect(fsMocks.fsRestoreStaged).toHaveBeenLastCalledWith([{ from: second.path, to: 'C:/undo/u-two.txt' }]);
+    expect(result.current.undoCount).toBe(1);
+
+    await act(async () => { await result.current.runUndo(); });
+    expect(fsMocks.fsRestoreStaged).toHaveBeenLastCalledWith([{ from: entry.path, to: 'C:/undo/u-old.txt' }]);
+    expect(result.current.undoCount).toBe(0);
     expect(result.current.undo).toBeNull();
+    expect(load).toHaveBeenCalled();
   });
 
   it('multi-selection targets show the whole group in the menu and act on it', async () => {
