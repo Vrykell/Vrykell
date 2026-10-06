@@ -56,7 +56,7 @@ Before committing, run at least `npx tsc --noEmit`, `npm run test` and
   segmented pill controls.
 - **One implementation per surface** - local and SSH file panels share the `FileOps`
   interface plus `filePanelConfig`; view code must not branch on the target or bypass the
-  interface (rule 24 in `docs/development-rules.md`).
+  interface (rule 24 in `docs/zh/development-rules.md`).
 
 ## Architecture in one screen
 
@@ -91,14 +91,16 @@ PTY output -> Rust StreamScanner (src-tauri/src/terminal/scan.rs, synchronous)
 1. Read the owning feature and the shared component before adding code.
 2. Small focused commits; English subject with the `feat:` / `fix:` / `test:` / `refactor:` /
    `docs:` prefix, details as body bullets.
-3. New features update the test checklist in `docs/feature-spec.md`.
+3. New features update the test checklist in `docs/zh/feature-spec.md` (mirror `docs/en/feature-spec.md`).
 4. Definition of done: typecheck, unit tests and the architecture guard are green; e2e covers
    touched interactions; no dead code, unused imports or commented-out blocks remain.
 
 ## Deep references
 
 - `AGENTS.md` - the always-on summary of these rules (Codex and other agents read it first).
-- `docs/development-rules.md` - the numbered rule book; this skill and that file must agree.
-- `docs/architecture.md` - pipeline and module detail.
-- `docs/pitfalls.md` - known traps worth reading before touching the terminal pipeline.
-- `docs/feature-spec.md` - feature specifications and test checklist.
+- `docs/zh/development-rules.md` (mirror `docs/en/development-rules.md`) - the numbered rule book;
+  this skill and that file must agree.
+- `docs/zh/architecture.md` - pipeline and module detail.
+- `docs/zh/pitfalls.md` - known traps worth reading before touching the terminal pipeline.
+- `docs/zh/feature-spec.md` - feature specifications and test checklist.
+- Docs are bilingual: Chinese in `docs/zh/`, English in `docs/en/`; keep both in sync when editing.

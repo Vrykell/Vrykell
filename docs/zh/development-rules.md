@@ -2,8 +2,9 @@
 
 > 最后更新: 2026-10-06
 >
-> 本文件是规则正本；`AGENTS.md` 是常驻摘要，`.agents/skills/vrykell-conventions/SKILL.md`
-> 是面向 agent 的规范入口（`.claude/skills/` 下是给 Claude Code 的桥接）。三者修改时保持同步。
+> 本文件（`docs/zh/development-rules.md`）是规则正本，英文镜像为 `docs/en/development-rules.md`。
+> `AGENTS.md` 是常驻摘要，`.agents/skills/vrykell-conventions/SKILL.md` 是面向 agent 的规范入口
+> （`.claude/skills/` 下是给 Claude Code 的桥接）。规则变化时同步这几处。
 
 ## 一、代码规范
 
@@ -21,8 +22,8 @@
 ## 三、实现流程
 
 8. **先写测试** — 先写失败的单测/ e2e，再写实现代码，确认测试通过。
-9. **小步提交** — 每完成一个功能独立提交，commit message 格式: `feat:` / `fix:` / `test:` / `refactor:` / `docs:`。
-10. **更新 feature-spec** — 新增功能必须同步更新 `docs/feature-spec.md` 的测试清单。
+9. **小步提交** — 每完成一个功能独立提交，commit message 使用英文，格式: `feat:` / `fix:` / `test:` / `refactor:` / `docs:`。
+10. **更新 feature-spec** — 新增功能必须同步更新 `docs/zh/feature-spec.md` 的测试清单。
 11. **代码评审** — 每完成一个大功能，自查代码质量：死代码、未使用导入、类型安全、命名一致性。
 
 ## 四、技术约束
@@ -46,7 +47,7 @@
 22. **Session 保活** — 多标签 PTY 会话通过隐藏 xterm.js (display:none) 保活，切换标签不重建。
 23. **颜色系统** — 所有颜色通过 `theme.css` CSS 变量定义，不在组件中硬编码色值（除 ANSI 颜色相关）。
 24. **一套实现 + 状态选择** — 同一份界面在不同运行目标（本地 / SSH）下不写两套逻辑：文件操作统一走 `FileOps` 接口（`fileOpsFor(target)` 是唯一的实现选择点），菜单、拖放语义等状态差异写成 `filePanelConfig` 配置项；视图层不得按目标写 `if (isSsh)`，也不得绕过接口直接 `invoke` 文件命令或自行处理路径。
-25. **终端区域对齐** — 终端 pane 根层左/右内边距为 0（整宽元素如认证输入条、输入栏与 pane 边界对齐，左右留白相等）；8px 左边距只加在终端屏幕内容上，右侧一律不留，保证原生滚动条贴住 pane 右边缘。终端内容因此是「左留白、右贴边」而不是居中，这是有意取舍；详见 `docs/architecture.md`「终端区域的真实对齐」。
+25. **终端区域对齐** — 终端 pane 根层左/右内边距为 0（整宽元素如认证输入条、输入栏与 pane 边界对齐，左右留白相等）；8px 左边距只加在终端屏幕内容上，右侧一律不留，保证原生滚动条贴住 pane 右边缘。终端内容因此是「左留白、右贴边」而不是居中，这是有意取舍；详见 `docs/zh/architecture.md`「终端区域的真实对齐」。
 26. **路径判断归平台层** — 绝对/相对判断、拼接、取父目录与文件名一律交给平台层：本地路径前端用 `@platform/path`、Rust 用 `std::path`；远端（POSIX）路径前端用 `@platform/posixPath`、Rust 用 `src-tauri/src/platform/path.rs`。业务模块不得自行判断路径形态（Windows 宿主上 `Path::is_absolute("/home")` 为 false、`join` 会插反斜杠）。
 
 ## 七、文件组织
@@ -78,4 +79,5 @@
 
 43. **公共组件优先** — 侧栏列表项统一走 `src/ui/sidebarItem.tsx`（会话标签行与 SSH 连接行共用同一外观与交互）；列表拖拽排序统一走 `src/ui/listReorder.tsx` 的「占位空位」交互（拖起的行让出槽位、落点用虚线占位、跟随指针的图标预览、Esc 取消、抑制拖拽后的点击），新列表通过 `data-reorder-list` / `data-reorder-item` / `data-reorder-kind` 接入，不得另造一套观感；错误展示统一走 `src/ui/ErrorBox.tsx` 与 `ErrorDetails.tsx`（面板正在展示的数据加载失败用行内 ErrorBox，临时动作结果用 Toast）；设置项选择器统一用 `src/ui/Select.tsx` 下拉框。新增同类界面时先抽公共组件再接入。
 44. **测试钩子稳定** — 重构移动标记时保留既有测试钩子（`data-testid`、`data-tab-row-id`、`data-tab-group`、ARIA 名称等），或在同一提交内更新全部引用它的单测 / e2e。
-45. **文档分层** — 规则正本 = 本文件；常驻摘要 = `AGENTS.md`（Codex 等 agent 先读它）；agent 规范入口 = `.agents/skills/vrykell-conventions/SKILL.md`（Command Code 与 Codex 直接读取，`.claude/skills/vrykell-conventions/SKILL.md` 是 Claude Code 的桥接）。规则变化时同步这三处，不再新增第四份副本。
+45. **文档分层** — 规则正本 = `docs/zh/development-rules.md`（英文镜像 `docs/en/development-rules.md`，两者保持同步）；常驻摘要 = `AGENTS.md`（Codex 等 agent 先读它）；agent 规范入口 = `.agents/skills/vrykell-conventions/SKILL.md`（Command Code 与 Codex 直接读取，`.claude/skills/vrykell-conventions/SKILL.md` 是 Claude Code 的桥接）。规则变化时同步这几处，不再新增副本。
+46. **双语文档** — `docs/` 下的文档保持中英双语：中文放 `docs/zh/`、英文放 `docs/en/`，两侧文件名一一对应。新增文档必须同时提供两种语言；修改任一语言版本时同步更新另一种。`docs/audit-evidence/` 下的截图等原始证据不翻译。

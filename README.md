@@ -80,16 +80,18 @@ npx tsc --noEmit && npx vitest run && npx playwright test
 
 ## 文档
 
-| 文档 | 内容 |
+文档中英双语：中文在 `docs/zh/`，英文在 `docs/en/`，两侧文件名一一对应。
+
+| 文档（中 · en） | 内容 |
 |------|------|
-| [docs/architecture.md](docs/architecture.md) | **当前实现架构**（Rust 扫描、三场景状态机、Block 生命周期、分屏、Agent、主题） |
-| [docs/development-rules.md](docs/development-rules.md) | 开发规则与硬约束 |
-| [docs/feature-spec.md](docs/feature-spec.md) | 功能规格与测试清单 |
-| [docs/development-log.md](docs/development-log.md) | 开发阶段日志 |
-| [docs/code-audit.md](docs/code-audit.md) | 代码审计与修复记录 |
-| [docs/security-review.md](docs/security-review.md) | 安全性审查 |
+| [docs/zh/architecture.md](docs/zh/architecture.md) · [en](docs/en/architecture.md) | **当前实现架构**（Rust 扫描、三场景状态机、Block 生命周期、分屏、Agent、主题） |
+| [docs/zh/development-rules.md](docs/zh/development-rules.md) · [en](docs/en/development-rules.md) | 开发规则与硬约束 |
+| [docs/zh/feature-spec.md](docs/zh/feature-spec.md) · [en](docs/en/feature-spec.md) | 功能规格与测试清单 |
+| [docs/zh/development-log.md](docs/zh/development-log.md) · [en](docs/en/development-log.md) | 开发阶段日志 |
+| [docs/zh/code-audit.md](docs/zh/code-audit.md) · [en](docs/en/code-audit.md) | 代码审计与修复记录 |
+| [docs/zh/security-review.md](docs/zh/security-review.md) · [en](docs/en/security-review.md) | 安全性审查 |
 | [NOTICE](NOTICE) | 第三方依赖许可说明 |
 
 ## 架构速览
 
-PTY 输出 → **Rust StreamScanner 同步扫描**（`src-tauri/src/terminal/scan.rs`）→ SessionController 三场景状态机（OSC 133 驱动）→ 每 executing block 一个离屏 xterm；完成后提取 outputHtml 快照 → scene 驱动 UI，block 列表普通 DOM 滚动 + follow-bottom。分屏时每个 pane 各有一个 SessionController。详见 [architecture.md](docs/architecture.md)。
+PTY 输出 → **Rust StreamScanner 同步扫描**（`src-tauri/src/terminal/scan.rs`）→ SessionController 三场景状态机（OSC 133 驱动）→ 每 executing block 一个离屏 xterm；完成后提取 outputHtml 快照 → scene 驱动 UI，block 列表普通 DOM 滚动 + follow-bottom。分屏时每个 pane 各有一个 SessionController。详见 [architecture.md](docs/zh/architecture.md)（英文版 [docs/en/architecture.md](docs/en/architecture.md)）。
