@@ -28,7 +28,7 @@ export function LogsPage() {
     </Field>
     <Field title="导出日志" description="自动保存关闭时也可导出本次运行的最近记录。包含系统与窗口信息、操作时序、IPC 参数与耗时、终端状态、错误堆栈和后端读写尺寸；密码、密钥和终端/对话正文会过滤。">
       <button style={btnStyle} disabled={exporting} onClick={() => { void exportLog(); }}>{exporting ? '导出中…' : '导出详细日志'}</button>
-      {message && <ErrorBox compact tone={message.tone} style={{ marginTop: 8 }}>{message.text}</ErrorBox>}
+      {message && <ErrorBox compact tone={message.tone} testId="logs-export-status" style={{ marginTop: 8 }}>{message.text}</ErrorBox>}
     </Field>
     <Field title="日志存储" description="本次运行最多保留 2000 条前端和 2000 条后端记录；自动保存每个文件最多 5 MB，保留当前文件和两份轮转文件。导出包含保留的自动日志与本次运行记录。">
       <button style={btnStyle} onClick={() => { void invoke<string>('diagnostics_log_directory').then(async path => { setDirectory(path); await openPath(path); }).catch(cause => setMessage({ text: `打开日志目录失败：${String(cause)}`, tone: 'error' })); }}>打开日志目录</button>

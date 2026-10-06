@@ -1,25 +1,29 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { iconSizes, Pencil, Plus, Search, Server  } from '@ui/icons';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { ensureSshLoaded, useSshStore } from '@features/ssh';
 import { useSessionStore } from '@features/workspace';
 import ContextMenu from '@ui/ContextMenu';
 import { IconBtn } from '@ui/UiBtn';
-import { sidebarRowSpacing, sidebarRowContent, sidebarRowIcon, sidebarRowTitle } from '@ui/sidebarRow';
+import SidebarItem from '@ui/sidebarItem';
+import { ListReorderPlaceholder, ListReorderPreview, useListReorderDrag } from '@ui/listReorder';
 import type { SshConnection } from '@features/ssh/services/api';
 import { connectionTarget } from '@features/ssh/services/api';
 import SshFormModal from '@features/ssh/components/SshFormModal';
 
+/** List id shared by the rows, their placeholders and the drag hook. */
+const LIST_ID = 'ssh-connections';
+
 /**
  * PanelSsh — SSH 远程连接管理侧栏。
  * 顶栏：搜索（按名字过滤）+ 编辑当前选中 + 新建。
- * 列表：已有连接；点击创建活跃会话（终端标签页），文件面板随后连到远程。
+ * 列表：已有连接；点击选中，双击创建活跃会话（终端标签页），拖拽排序。
  */
 export default function PanelSsh() {
   const connections = useSshStore((s) => s.connections);
   const touch = useSshStore((s) => s.touch);
   const remove = useSshStore((s) => s.remove);
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const reorder = useSshStore((s) => s.reorder);
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -39,6 +43,19 @@ export default function PanelSsh() {
     () => connections.find((c) => c.id === selectedId) ?? null,
     [connections, selectedId],
   );
+
+  const startDrag = useListReorderDrag({
+    listId: LIST_ID,
+    onDrop: (drag, target) => {
+      if (!target?.itemId || drag.id === target.itemId) return;
+      const from = connections.findIndex((c) => c.id === drag.id);
+      const over = connections.findIndex((c) => c.id === target.itemId);
+      if (from < 0 || over < 0) return;
+      let to = over + (target.after ? 1 : 0);
+      if (from < to) to -= 1;
+      if (to !== from) reorder(from, to);
+    },
+  });
 
   const openConnection = (conn: SshConnection) => {
     setSelectedId(conn.id);
@@ -113,52 +130,53 @@ export default function PanelSsh() {
         </IconBtn>
       </div>
       <button data-testid="ssh-quick-btn" onClick={() => setQuickOpen(true)} style={{ margin: '0 10px 10px', minHeight: 36 }}>快速连接</button>
-      {/* 连接列表 */}
-      <div className="scroll-region" style={{ flex: 1, overflowY: 'auto', padding: '0 0 8px' }}>
+      {/* 连接列表：拖动时源行让位，落点用虚线占位 */}
+      <div data-reorder-list={LIST_ID} className="scroll-region" style={{ flex: 1, overflowY: 'auto', padding: '0 0 8px' }}>
         {filtered.length === 0 ? (
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>
             {connections.length === 0 ? '暂无 SSH 连接，点击右上角 + 新建' : '无匹配连接'}
           </div>
         ) : filtered.map((c) => (
-          <div
-            key={c.id}
-            onClick={() => setSelectedId(c.id)}
-            onDoubleClick={() => openConnection(c)}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              setSelectedId(c.id);
-              setMenu({ x: e.clientX, y: e.clientY, conn: c });
-            }}
-            data-testid={`ssh-row-${c.id}`}
-            title={`${c.user ? `${c.user}@` : ''}${c.host}:${c.port ?? 22}；双击连接，右键编辑 / 删除`}
-            tabIndex={0}
-            onKeyDown={e => {
-              if (e.target !== e.currentTarget) return;
-              if (e.key === 'Enter') { e.preventDefault(); openConnection(c); }
-              if (e.key === ' ') { e.preventDefault(); setSelectedId(c.id); }
-            }}
-            style={sidebarRowSpacing}
-            onMouseEnter={() => setHoveredId(c.id)}
-            onMouseLeave={() => setHoveredId(null)}
-          >
-            <div style={{
-              ...sidebarRowContent,
-              color: c.id === selectedId ? 'var(--text-primary)' : 'var(--text-secondary)',
-              background: c.id === selectedId ? 'var(--selection-bg)' : hoveredId === c.id ? 'var(--hover)' : 'transparent',
-            }}>
-              <span style={sidebarRowIcon}><Server size={iconSizes.row} /></span>
-              <span style={{ ...sidebarRowTitle, flex: 1, minWidth: 0, fontWeight: c.id === selectedId ? 600 : 500 }}>{c.name}</span>
-              <button data-subtle className="sidebar-row-action" aria-label={`编辑「${c.name}」`} onDoubleClick={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); setSelectedId(c.id); editConn(c); }} style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                width: 28, height: 28, padding: 0, border: 'none', borderRadius: 4,
-                flexShrink: 0, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
-                opacity: c.id === selectedId || hoveredId === c.id ? 1 : 0,
-                transition: 'opacity 0.12s ease',
-              }}><Pencil size={iconSizes.compact} /></button>
-            </div>
-          </div>
+          <Fragment key={c.id}>
+            <ListReorderPlaceholder listId={LIST_ID} itemId={c.id} />
+            <SidebarItem
+              active={c.id === selectedId}
+              icon={<Server size={iconSizes.row} />}
+              title={c.name}
+              tooltip={`${c.user ? `${c.user}@` : ''}${c.host}:${c.port ?? 22}；双击连接，右键编辑 / 删除，拖拽排序`}
+              testId={`ssh-row-${c.id}`}
+              reorderItemId={c.id}
+              reorderKind="ssh"
+              tabIndex={0}
+              onClick={() => setSelectedId(c.id)}
+              onDoubleClick={() => openConnection(c)}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                setSelectedId(c.id);
+                setMenu({ x: event.clientX, y: event.clientY, conn: c });
+              }}
+              onKeyDown={(event) => {
+                if (event.target !== event.currentTarget) return;
+                if (event.key === 'Enter') { event.preventDefault(); openConnection(c); }
+                if (event.key === ' ') { event.preventDefault(); setSelectedId(c.id); }
+              }}
+              onPointerDown={(event) => startDrag(event, { id: c.id, kind: 'ssh' })}
+              action={{
+                icon: <Pencil size={iconSizes.compact} />,
+                label: `编辑「${c.name}」`,
+                onClick: () => { setSelectedId(c.id); editConn(c); },
+              }}
+            />
+          </Fragment>
         ))}
+        {filtered.length > 0 && (
+          <ListReorderPlaceholder listId={LIST_ID} itemId={filtered[filtered.length - 1]!.id} after />
+        )}
       </div>
+
+      <ListReorderPreview>
+        {() => <Server size={iconSizes.row} style={{ color: 'var(--accent)' }} />}
+      </ListReorderPreview>
 
       {/* 右键菜单：编辑 / 删除 */}
       {menu && (
