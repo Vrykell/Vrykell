@@ -32,43 +32,75 @@ describe('ErrorBoundary fallback', () => {
     vi.restoreAllMocks();
   });
 
-  it('keeps the crash message and both stacks selectable', async () => {
-    const { container } = renderCrash();
+  it('shows the message and the expanded render stack', async () => {
+    renderCrash();
 
     expect(screen.getByText('页面渲染错误')).toBeVisible();
-    expect(screen.getByText('handleRowDoubleClick is not defined')).toBeVisible();
-    expect(screen.getByText('完整错误堆栈')).toBeVisible();
-    expect(await screen.findByText('组件堆栈')).toBeVisible();
-    expect(container.querySelectorAll('[data-selectable]')).toHaveLength(3);
+    expect(screen.getByText('handleRowDoubleClick is not defined')).toHaveAttribute('data-selectable');
+    expect(screen.getByRole('button', { name: '完整错误堆栈' })).toHaveAttribute('aria-expanded', 'true');
+    expect(await screen.findByRole('button', { name: '组件堆栈' })).toHaveAttribute('aria-expanded', 'false');
+    expect(document.querySelectorAll('pre[data-selectable]')).toHaveLength(1);
   });
 
-  it('copies the message, render stack and component stack', async () => {
+  it('toggles a stack section through its chevron button', async () => {
     renderCrash();
-    await screen.findByText('组件堆栈');
-    fireEvent.click(screen.getByTestId('error-copy-btn'));
+
+    const toggle = await screen.findByRole('button', { name: '组件堆栈' });
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const expanded = document.querySelectorAll('pre[data-selectable]');
+    expect(expanded).toHaveLength(2);
+    expect(expanded[1].textContent).toContain('at Crash');
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(document.querySelectorAll('pre[data-selectable]')).toHaveLength(1);
+  });
+
+  it('copies the render stack from the box header', async () => {
+    renderCrash();
+
+    fireEvent.click(screen.getByTestId('error-copy-stack'));
 
     await waitFor(() => expect(writeClipboardTextMock).toHaveBeenCalledTimes(1));
-    const report = writeClipboardTextMock.mock.calls[0][0];
-    expect(report).toContain('Error: handleRowDoubleClick is not defined');
-    expect(report).toContain('完整错误堆栈:');
-    expect(report).toContain('组件堆栈:');
-    expect(report.indexOf('组件堆栈:')).toBeGreaterThan(report.indexOf('完整错误堆栈:'));
+    const copied = writeClipboardTextMock.mock.calls[0][0];
+    expect(copied).toContain('Error: handleRowDoubleClick is not defined');
+    expect(copied).toContain('at Crash');
+    expect(copied).not.toContain('组件堆栈');
   });
 
-  it('confirms the copy after a successful write', async () => {
+  it('copies a collapsed section without expanding it', async () => {
     renderCrash();
-    fireEvent.click(screen.getByTestId('error-copy-btn'));
 
-    expect(await screen.findByText('已复制')).toBeVisible();
+    const copyButton = await screen.findByTestId('error-copy-component-stack');
+    fireEvent.click(copyButton);
+
+    await waitFor(() => expect(writeClipboardTextMock).toHaveBeenCalledTimes(1));
+    expect(writeClipboardTextMock.mock.calls[0][0]).toContain('at Crash');
+    expect(screen.getByRole('button', { name: '组件堆栈' })).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('stays silent when the clipboard write fails', async () => {
+  it('switches the icon button to a copied state after a successful write', async () => {
+    renderCrash();
+
+    const copyButton = screen.getByTestId('error-copy-stack');
+    expect(copyButton).toHaveAttribute('title', '复制完整错误堆栈');
+
+    fireEvent.click(copyButton);
+
+    await waitFor(() => expect(copyButton).toHaveAttribute('title', '已复制'));
+  });
+
+  it('keeps the icon button idle when the clipboard write fails', async () => {
     writeClipboardTextMock.mockRejectedValueOnce(new Error('permission denied'));
     renderCrash();
-    fireEvent.click(screen.getByTestId('error-copy-btn'));
+
+    const copyButton = screen.getByTestId('error-copy-stack');
+    fireEvent.click(copyButton);
 
     await waitFor(() => expect(writeClipboardTextMock).toHaveBeenCalledTimes(1));
     await act(async () => {});
-    expect(screen.queryByText('已复制')).toBeNull();
+    expect(copyButton).toHaveAttribute('title', '复制完整错误堆栈');
   });
 });
