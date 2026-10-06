@@ -1,5 +1,6 @@
-import { Component, type ErrorInfo, type ReactNode } from 'react';
-import { TriangleAlert } from '@ui/icons';
+import { Component, useState, type ErrorInfo, type ReactNode } from 'react';
+import { TriangleAlert, Copy, Check } from '@ui/icons';
+import { writeClipboardText } from '@platform/clipboard';
 
 interface Props {
   children: ReactNode;
@@ -48,6 +49,17 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 }
 
+/** Diagnostic text copied from the fallback page for bug reports. */
+function buildErrorReport(error: Error, componentStack?: string): string {
+  return [
+    `${error.name}: ${error.message}`,
+    '',
+    '完整错误堆栈:',
+    error.stack ?? '(无堆栈信息)',
+    ...(componentStack ? ['', '组件堆栈:', componentStack.trim()] : []),
+  ].join('\n');
+}
+
 function DefaultFallback({
   error,
   componentStack,
@@ -57,6 +69,19 @@ function DefaultFallback({
   componentStack?: string;
   onReset: () => void;
 }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    void writeClipboardText(buildErrorReport(error, componentStack))
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      })
+      .catch(() => {
+        // The stacks stay selectable when the clipboard is unavailable.
+      });
+  };
+
   return (
     <div style={{
       height: '100vh', display: 'flex', flexDirection: 'column',
@@ -66,7 +91,7 @@ function DefaultFallback({
     }}>
       <div style={{ opacity: 0.3 }}><TriangleAlert size={48} /></div>
       <h2 style={{ margin: 0, fontWeight: 600 }}>页面渲染错误</h2>
-      <p style={{
+      <p data-selectable style={{
         margin: 0, color: 'var(--text-secondary)', fontSize: 'calc(13px * var(--ui-font-scale))',
         maxWidth: 480, textAlign: 'center', lineHeight: 1.6,
       }}>
@@ -79,7 +104,7 @@ function DefaultFallback({
         }}>
           完整错误堆栈
         </summary>
-        <pre style={{
+        <pre data-selectable style={{
           fontSize: 'calc(9px * var(--ui-font-scale))', color: 'var(--error)', overflow: 'auto',
           background: 'var(--surface)', padding: 12, borderRadius: 6,
           border: '1px solid var(--border)', maxHeight: 120,
@@ -96,7 +121,7 @@ function DefaultFallback({
           }}>
             组件堆栈
           </summary>
-          <pre style={{
+          <pre data-selectable style={{
             fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)', overflow: 'auto',
             background: 'var(--surface)', padding: 12, borderRadius: 6,
             border: '1px solid var(--border)', maxHeight: 200,
@@ -106,16 +131,31 @@ function DefaultFallback({
           </pre>
         </details>
       )}
-      <button
-        onClick={onReset}
-        style={{
-          marginTop: 8, padding: '8px 24px', fontSize: 'calc(13px * var(--ui-font-scale))',
-          background: 'var(--accent)', border: 'none', borderRadius: 6,
-          color: 'var(--accent-text)', cursor: 'pointer',
-        }}
-      >
-        重试
-      </button>
+      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+        <button
+          data-testid="error-copy-btn"
+          onClick={handleCopy}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '8px 16px', fontSize: 'calc(13px * var(--ui-font-scale))',
+            background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 6,
+            color: 'var(--text-primary)', cursor: 'pointer',
+          }}
+        >
+          {copied ? <Check size={14} style={{ color: 'var(--success)' }} /> : <Copy size={14} />}
+          {copied ? '已复制' : '复制错误信息'}
+        </button>
+        <button
+          onClick={onReset}
+          style={{
+            padding: '8px 24px', fontSize: 'calc(13px * var(--ui-font-scale))',
+            background: 'var(--accent)', border: 'none', borderRadius: 6,
+            color: 'var(--accent-text)', cursor: 'pointer',
+          }}
+        >
+          重试
+        </button>
+      </div>
     </div>
   );
 }
