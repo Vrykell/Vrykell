@@ -612,6 +612,12 @@ export function useFileBrowser({
         await loadChildren(targetEntry);
       } else {
         load(path);
+        if (dir !== path) {
+          // 右键的是展开目录里的文件：新条目落在它的同级目录（那个子目录），
+          // 只刷新根列表会在已展开的子目录里留下旧内容，必须一起刷新
+          setExpandedSet((current) => new Set([...current, dir]));
+          void loadChildren({ path: dir });
+        }
       }
       replaceSelection([created]);
       setRenameTarget(entry);
@@ -728,8 +734,11 @@ export function useFileBrowser({
     setConfirm({ kind: 'rename', entry, newName: trimmed });
   }, []);
 
-  /** 打开重命名输入框（菜单入口 / 新建后立即重命名）。 */
-  const startRename = useCallback((entry: FsEntry) => setRenameTarget(entry), []);
+  /** 打开重命名输入框（菜单入口 / 新建后立即重命名），并把该行滚入视野。 */
+  const startRename = useCallback((entry: FsEntry) => {
+    setRenameTarget(entry);
+    revealPath(entry.path);
+  }, [revealPath]);
 
   /** 打开删除确认（菜单入口）。 */
   const confirmDelete = useCallback((entries: FsEntry[]) => {

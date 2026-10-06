@@ -397,6 +397,38 @@ test.describe('文件面板', () => {
     await expect(page.locator('[data-testid="file-row"][data-path="/home/e2e/Documents/Untitled"]').first()).toBeVisible();
   });
 
+  test('新建同名项时后端避让加序号，仍会立即进入重命名', async ({ page }) => {
+    const input = page.locator('[data-testid="rename-input"]');
+
+    // 第一次新建默认名，Esc 取消重命名（条目保留在目录里）
+    await page.getByTestId('local-more-btn').click();
+    await page.getByRole('button', { name: '新建文件', exact: true }).click();
+    await expect(input).toHaveValue('Untitled');
+    await input.press('Escape');
+
+    // 第二次新建同名 → 后端避让为 Untitled (1)，仍要立刻进入重命名
+    await page.getByTestId('local-more-btn').click();
+    await page.getByRole('button', { name: '新建文件', exact: true }).click();
+    await expect(input).toBeVisible();
+    await expect(input).toHaveValue('Untitled (1)');
+  });
+
+  test('更多菜单可直接在当前文件夹新建文件/文件夹', async ({ page }) => {
+    const input = page.locator('[data-testid="rename-input"]');
+
+    await page.getByTestId('local-more-btn').click();
+    await page.getByRole('button', { name: '新建文件夹', exact: true }).click();
+    await expect(input).toHaveValue('NewFolder');
+    expect(await fsOps(page)).toContainEqual({ op: 'create-dir', path: '/home/e2e/project/NewFolder' });
+    await input.press('Escape');
+
+    await page.getByTestId('local-more-btn').click();
+    await page.getByRole('button', { name: '新建文件', exact: true }).click();
+    await expect(input).toHaveValue('Untitled');
+    expect(await fsOps(page)).toContainEqual({ op: 'create-file', path: '/home/e2e/project/Untitled' });
+    await input.press('Escape');
+  });
+
   test('复制同名文件到当前目录：自动加序号并在提示中说明', async ({ page }) => {
     await page.getByText('notes.txt').first().click({ button: 'right' });
     await page.getByRole('button', { name: '复制', exact: true }).click();

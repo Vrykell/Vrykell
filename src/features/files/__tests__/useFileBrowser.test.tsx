@@ -295,6 +295,30 @@ describe('useFileBrowser（本地目标）', () => {
     expect(result.current.undoCount).toBe(0);
   });
 
+  it('在已展开子目录内的文件上新建：刷新该子目录缓存并保持展开', async () => {
+    const child = entry('a.txt', 'C:/work/src/a.txt');
+    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
+      dir === 'C:/work/src' ? [child] : [entry('src', 'C:/work/src', true)],
+    ));
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(1));
+    act(() => result.current.toggleExpand(result.current.entries[0]!));
+    await waitFor(() => expect(result.current.childCache['C:/work/src']).toHaveLength(1));
+
+    fsMocks.fsCreateFile.mockResolvedValue('C:/work/src/Untitled');
+    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
+      dir === 'C:/work/src'
+        ? [child, entry('Untitled', 'C:/work/src/Untitled')]
+        : [entry('src', 'C:/work/src', true)],
+    ));
+    await act(async () => { await result.current.createEntry('file', child); });
+
+    // 新条目落在文件的同级目录（也就是那个已展开的子目录），必须刷新它的缓存
+    expect(fsMocks.fsCreateFile).toHaveBeenCalledWith('C:/work/src', 'Untitled');
+    expect(result.current.expandedSet.has('C:/work/src')).toBe(true);
+    await waitFor(() => expect(result.current.childCache['C:/work/src']).toHaveLength(2));
+  });
+
   it('复制粘贴可回退：回退粘贴把复制出来的条目移入暂存', async () => {
     fsMocks.fsCopy.mockResolvedValue({ completed: [{ from: 'C:/work/a.txt', to: 'C:/work/src/a (1).txt' }], errors: [] });
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
