@@ -1,9 +1,6 @@
-import {
-  Component, useState,
-  type CSSProperties, type ErrorInfo, type MouseEvent, type ReactNode,
-} from 'react';
-import { Check, ChevronRight, Copy, TriangleAlert } from '@ui/icons';
-import { writeClipboardText } from '@platform/clipboard';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { TriangleAlert } from '@ui/icons';
+import ErrorDetails from '@ui/ErrorDetails';
 
 interface Props {
   children: ReactNode;
@@ -52,109 +49,6 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 }
 
-/** Hover feedback shared by the subtle header buttons. */
-const subtleHover = {
-  onMouseEnter: (event: MouseEvent<HTMLButtonElement>) => {
-    event.currentTarget.style.background = 'var(--hover)';
-    event.currentTarget.style.color = 'var(--text-secondary)';
-  },
-  onMouseLeave: (event: MouseEvent<HTMLButtonElement>) => {
-    event.currentTarget.style.background = 'transparent';
-    event.currentTarget.style.color = 'var(--text-muted)';
-  },
-};
-
-/**
- * Collapsible diagnostic box: a chevron toggle button on the left, an
- * icon-only copy button in the top-right corner, and the raw text below.
- */
-function DiagnosticSection({
-  title,
-  text,
-  copyTestId,
-  defaultOpen = false,
-  preStyle,
-}: {
-  title: string;
-  text: string;
-  copyTestId: string;
-  defaultOpen?: boolean;
-  preStyle?: CSSProperties;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = () => {
-    void writeClipboardText(text)
-      .then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-      })
-      .catch(() => {
-        // The text stays selectable when the clipboard is unavailable.
-      });
-  };
-
-  return (
-    <div style={{
-      maxWidth: 520, width: '100%',
-      background: 'var(--surface)', border: '1px solid var(--border)',
-      borderRadius: 6, overflow: 'hidden',
-    }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
-        padding: '2px 3px 2px 2px', background: 'var(--command-block-bg)',
-        borderBottom: open ? '1px solid var(--border)' : 'none',
-      }}>
-        <button
-          data-subtle
-          type="button"
-          aria-expanded={open}
-          title={open ? `收起${title}` : `展开${title}`}
-          onClick={() => setOpen((value) => !value)}
-          {...subtleHover}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            fontFamily: 'var(--font-ui)', fontSize: 'calc(11px * var(--ui-font-scale))',
-            padding: '3px 6px', border: 'none', borderRadius: 4,
-            background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
-          }}
-        >
-          <ChevronRight size={11} style={{
-            transition: 'transform 0.12s ease',
-            transform: open ? 'rotate(90deg)' : 'none',
-          }} />
-          <span>{title}</span>
-        </button>
-        <button
-          data-subtle
-          type="button"
-          data-testid={copyTestId}
-          title={copied ? '已复制' : `复制${title}`}
-          onClick={handleCopy}
-          {...subtleHover}
-          style={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: 22, height: 22, padding: 0, border: 'none', borderRadius: 4, flexShrink: 0,
-            background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
-          }}
-        >
-          {copied ? <Check size={12} style={{ color: 'var(--success)' }} /> : <Copy size={12} />}
-        </button>
-      </div>
-      {open && (
-        <pre data-selectable style={{
-          margin: 0, padding: 12, overflow: 'auto',
-          whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-          ...preStyle,
-        }}>
-          {text}
-        </pre>
-      )}
-    </div>
-  );
-}
-
 function DefaultFallback({ error, componentStack, onReset }: {
   error: Error;
   componentStack?: string;
@@ -175,21 +69,23 @@ function DefaultFallback({ error, componentStack, onReset }: {
       }}>
         {error.message}
       </p>
-      <DiagnosticSection
+      <ErrorDetails
         title="完整错误堆栈"
         text={error.stack ?? '(无堆栈信息)'}
         copyTestId="error-copy-stack"
         defaultOpen
+        style={{ maxWidth: 520, width: '100%' }}
         preStyle={{
           fontSize: 'calc(9px * var(--ui-font-scale))',
           color: 'var(--error)', maxHeight: 120,
         }}
       />
       {componentStack && (
-        <DiagnosticSection
+        <ErrorDetails
           title="组件堆栈"
           text={componentStack.trim()}
           copyTestId="error-copy-component-stack"
+          style={{ maxWidth: 520, width: '100%' }}
           preStyle={{
             fontSize: 'calc(10px * var(--ui-font-scale))',
             color: 'var(--text-muted)', maxHeight: 200,

@@ -15,6 +15,7 @@ import ContextMenu from '@ui/ContextMenu';
 import { ensureSshLoaded, useSshStore } from '@features/ssh';
 import RemoteFiles from '@features/ssh/components/RemoteFiles';
 import ConfirmDialog from '@ui/ConfirmDialog';
+import ErrorBox from '@ui/ErrorBox';
 import DownloadManager from '@features/files/components/DownloadManager';
 import { useLocalFileBrowser } from '@features/files/hooks/useLocalFileBrowser';
 import { useLocalFileActions } from '@features/files/hooks/useLocalFileActions';
@@ -424,10 +425,12 @@ function LocalFiles() {
             {path === null ? '正在扫描磁盘…' : '正在读取目录…'}
           </div>
         ) : error ? (
-          <div role="alert" style={{ padding: 16, color: 'var(--text-secondary)', fontSize: 'var(--fs-label)' }}>
-            <div>{error}</div>
-            <button onClick={() => load(path)} style={{ marginTop: 10, minHeight: 32 }}>重试</button>
-          </div>
+          <ErrorBox
+            style={{ margin: 12 }}
+            actions={<button onClick={() => load(path)} style={{ minHeight: 32 }}>重试</button>}
+          >
+            {error}
+          </ErrorBox>
         ) : path === null ? (
           disks.length === 0 ? (
             settled && (
@@ -465,10 +468,13 @@ function LocalFiles() {
                   <div role="status" style={{ padding: '4px 12px', color: 'var(--text-muted)', fontSize: 'var(--fs-label)' }}>正在读取目录…</div>
                 )}
                 {row.expanded && childErrors[row.entry.path] && (
-                  <div role="alert" style={{ padding: '4px 12px', color: 'var(--text-secondary)', fontSize: 'var(--fs-label)' }}>
+                  <ErrorBox
+                    compact
+                    style={{ margin: '4px 12px' }}
+                    actions={<button onClick={() => retryExpand(row.entry)} style={{ minHeight: 32 }}>重试</button>}
+                  >
                     {childErrors[row.entry.path]}
-                    <button onClick={() => retryExpand(row.entry)} style={{ marginLeft: 8, minHeight: 32 }}>重试</button>
-                  </div>
+                  </ErrorBox>
                 )}
                 {row.expanded && childCache[row.entry.path]?.length === 0 && (
                   <div
