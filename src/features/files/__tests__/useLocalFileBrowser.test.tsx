@@ -209,4 +209,104 @@ describe('useLocalFileBrowser', () => {
     expect(tree.scrollTop).toBe(80);
     expect(browserApi.canGoBack).toBe(false);
   });
+
+  it('shows the directory loading hint only when the load outlasts the delay', async () => {
+    vi.useFakeTimers();
+    try {
+      let resolveList!: (entries: never[]) => void;
+      fsMocks.fsList.mockImplementation(() => new Promise<never[]>((resolve) => { resolveList = resolve; }));
+      const { result } = renderHook(() => useLocalFileBrowser({ initialCwd: 'C:/slow' }));
+
+      expect(result.current.loading).toBe(true);
+      expect(result.current.loadingHint).toBe(false);
+      act(() => { vi.advanceTimersByTime(149); });
+      expect(result.current.loadingHint).toBe(false);
+      act(() => { vi.advanceTimersByTime(1); });
+      expect(result.current.loadingHint).toBe(true);
+
+      await act(async () => { resolveList([]); });
+      expect(result.current.loading).toBe(false);
+      expect(result.current.loadingHint).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('never flashes the directory loading hint when the load settles quickly', async () => {
+    vi.useFakeTimers();
+    try {
+      fsMocks.fsList.mockResolvedValue([]);
+      const { result } = renderHook(() => useLocalFileBrowser({ initialCwd: 'C:/fast' }));
+      await act(async () => {});
+
+      expect(result.current.loading).toBe(false);
+      expect(result.current.loadingHint).toBe(false);
+      act(() => { vi.advanceTimersByTime(500); });
+      expect(result.current.loadingHint).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shows the child loading hint only when an expansion outlasts the delay', async () => {
+    vi.useFakeTimers();
+    try {
+      const folder = { name: 'empty', path: 'C:/workspace/empty', is_dir: true };
+      let resolveChildren!: (entries: never[]) => void;
+      fsMocks.fsList.mockImplementation((path?: string) => path === folder.path
+        ? new Promise<never[]>((resolve) => { resolveChildren = resolve; })
+        : Promise.resolve([folder]));
+      const { result } = renderHook(() => useLocalFileBrowser({ initialCwd: 'C:/workspace' }));
+      await act(async () => {});
+      expect(result.current.entries).toEqual([folder]);
+
+      act(() => result.current.toggleExpand(folder));
+      expect(result.current.childLoadingHint.has(folder.path)).toBe(false);
+      act(() => { vi.advanceTimersByTime(149); });
+      expect(result.current.childLoadingHint.has(folder.path)).toBe(false);
+      act(() => { vi.advanceTimersByTime(1); });
+      expect(result.current.childLoadingHint.has(folder.path)).toBe(true);
+
+      await act(async () => { resolveChildren([]); });
+      expect(result.current.childLoadingHint.has(folder.path)).toBe(false);
+      expect(result.current.childCache[folder.path]).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('never flashes the child loading hint when an expansion settles quickly', async () => {
+    vi.useFakeTimers();
+    try {
+      const folder = { name: 'empty', path: 'C:/workspace/empty', is_dir: true };
+      fsMocks.fsList.mockImplementation((path?: string) => Promise.resolve(path === folder.path ? [] : [folder]));
+      const { result } = renderHook(() => useLocalFileBrowser({ initialCwd: 'C:/workspace' }));
+      await act(async () => {});
+
+      act(() => result.current.toggleExpand(folder));
+      await act(async () => {});
+      expect(result.current.childLoadingHint.has(folder.path)).toBe(false);
+      act(() => { vi.advanceTimersByTime(500); });
+      expect(result.current.childLoadingHint.has(folder.path)).toBe(false);
+      expect(result.current.childCache[folder.path]).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the previous listing visible while the next directory loads', async () => {
+    const previous = [{ name: 'old.txt', path: 'C:/old/old.txt', is_dir: false }];
+    let resolveNext!: (entries: never[]) => void;
+    fsMocks.fsList.mockImplementation((path: string) => path === 'C:/next'
+      ? new Promise<never[]>((resolve) => { resolveNext = resolve; })
+      : Promise.resolve(previous));
+    const { result } = renderHook(() => useLocalFileBrowser({ initialCwd: 'C:/old' }));
+    await waitFor(() => expect(result.current.entries).toEqual(previous));
+
+    act(() => result.current.navigate('C:/next'));
+    expect(result.current.entries).toEqual(previous);
+
+    await act(async () => { resolveNext([]); });
+    expect(result.current.entries).toEqual([]);
+  });
 });

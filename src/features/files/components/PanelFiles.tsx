@@ -54,10 +54,11 @@ function LocalFiles() {
     disks,
     expandedSet,
     childCache,
-    loading,
+    loadedPath,
+    loadingHint,
     error,
     childErrors,
-    childLoading,
+    childLoadingHint,
     load,
     toggleExpand,
     retryExpand,
@@ -122,6 +123,9 @@ function LocalFiles() {
   };
 
   const rows = flattenVisible(entries, expandedSet, childCache);
+
+  /** The current path's listing has settled; empty states wait for it so loads never flash placeholders. */
+  const settled = loadedPath === path;
 
   /** 进入目录 / 打开文件 —— 双击与 Enter 共用 */
   const activateEntry = (entry: FsEntry) => {
@@ -270,7 +274,7 @@ function LocalFiles() {
         data-path={path ?? ''}
         style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}
       >
-        {loading ? (
+        {loadingHint ? (
           <div role="status" style={{ padding: 16, color: 'var(--text-muted)', fontSize: 'var(--fs-label)' }}>
             {path === null ? '正在扫描磁盘…' : '正在读取目录…'}
           </div>
@@ -281,9 +285,11 @@ function LocalFiles() {
           </div>
         ) : path === null ? (
           disks.length === 0 ? (
-            <div style={{ padding: 16, fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', textAlign: 'center' }}>
-              暂无可用磁盘
-            </div>
+            settled && (
+              <div style={{ padding: 16, fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', textAlign: 'center' }}>
+                暂无可用磁盘
+              </div>
+            )
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 10px' }}>
               {disks.map((d) => (
@@ -307,7 +313,7 @@ function LocalFiles() {
                   onRowContextMenu={handleRowContextMenu}
                   onChevronClick={toggleExpand}
                 />
-                {row.expanded && childLoading.has(row.entry.path) && (
+                {row.expanded && childLoadingHint.has(row.entry.path) && (
                   <div role="status" style={{ padding: '4px 12px', color: 'var(--text-muted)', fontSize: 'var(--fs-label)' }}>正在读取目录…</div>
                 )}
                 {row.expanded && childErrors[row.entry.path] && (
@@ -316,9 +322,20 @@ function LocalFiles() {
                     <button onClick={() => retryExpand(row.entry)} style={{ marginLeft: 8, minHeight: 32 }}>重试</button>
                   </div>
                 )}
+                {row.expanded && childCache[row.entry.path]?.length === 0 && (
+                  <div
+                    data-testid="file-row-empty"
+                    style={{
+                      padding: `4px 10px 4px ${4 + (row.depth + 1) * 14}px`,
+                      color: 'var(--text-muted)', fontSize: 'var(--fs-label)',
+                    }}
+                  >
+                    空文件夹
+                  </div>
+                )}
               </Fragment>
             ))}
-            {rows.length === 0 && (
+            {rows.length === 0 && settled && (
               <div style={{ padding: 16, fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', textAlign: 'center' }}>
                 空目录
               </div>
