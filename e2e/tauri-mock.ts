@@ -364,6 +364,9 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             clipboardText = args.text as string;
             (window as unknown as Record<string, string>).__CLIPBOARD_TEXT__ = clipboardText;
             return undefined;
+          case 'plugin:clipboard-manager|read_text':
+            // Tests may seed the clipboard by assigning __CLIPBOARD_TEXT__ before pasting.
+            return (window as unknown as Record<string, string>).__CLIPBOARD_TEXT__ ?? clipboardText;
           case 'clipboard_write_files': {
             clipboardFiles = { paths: args.paths as string[], mode: args.mode as string };
             (window as unknown as Record<string, unknown>).__CLIPBOARD_FILES__ = clipboardFiles;

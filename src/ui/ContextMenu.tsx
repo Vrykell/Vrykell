@@ -7,6 +7,8 @@ export interface ContextMenuItem {
   label: string;
   onClick: () => void;
   danger?: boolean;
+  /** 可选的快捷键提示，显示在行尾。 */
+  shortcut?: string;
 }
 
 interface Props {
@@ -87,6 +89,7 @@ export default function ContextMenu({ anchor, items, onClose }: Props) {
           key={i}
           label={item.label}
           danger={item.danger}
+          shortcut={item.shortcut}
           onClick={() => { item.onClick(); onClose(); }}
         />
       ))}

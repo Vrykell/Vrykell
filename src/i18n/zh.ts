@@ -53,6 +53,14 @@ const zh: Record<string, string> = {
   'palette.search': '搜索命令…',
   'palette.noMatch': '无匹配命令',
 
+  // ── 终端剪贴板 ──
+  'terminal.menu.copy': '复制',
+  'terminal.menu.paste': '粘贴',
+  'terminal.clipboard.copyEmpty': '没有选中内容',
+  'terminal.clipboard.copyFailed': '复制失败',
+  'terminal.clipboard.pasteFailed': '粘贴失败',
+  'terminal.clipboard.noSession': '终端尚未连接，无法粘贴',
+
   // ── TUI 模式 ──
   'tui.banner': 'TUI 模式 — 键盘直通终端',
   'tui.exit': '退出',

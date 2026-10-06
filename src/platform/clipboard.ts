@@ -1,4 +1,4 @@
-import { writeText as writeNativeClipboardText } from '@tauri-apps/plugin-clipboard-manager';
+import { writeText as writeNativeClipboardText, readText as readNativeClipboardText } from '@tauri-apps/plugin-clipboard-manager';
 import { invoke } from '@platform/diagnostics';
 
 /** Write text through the native clipboard when running inside Tauri. */
@@ -50,6 +50,31 @@ export async function writeClipboardText(text: string): Promise<void> {
       ranges.forEach((range) => selection.addRange(range));
     }
   }
+}
+
+/**
+ * Read text from the system clipboard. Prefers the native clipboard inside Tauri, then falls
+ * back to the web API; returns an empty string when neither is available.
+ */
+export async function readClipboardText(): Promise<string> {
+  const internals = (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+  if (internals) {
+    try {
+      return await readNativeClipboardText();
+    } catch {
+      // Fall through to the browser API when the native read is denied.
+    }
+  }
+
+  if (navigator.clipboard?.readText) {
+    try {
+      return await navigator.clipboard.readText();
+    } catch {
+      // Permission or an unsupported webview can reject the asynchronous API.
+    }
+  }
+
+  return '';
 }
 
 /** True inside the desktop runtime (where the Tauri IPC bridge exists). */
