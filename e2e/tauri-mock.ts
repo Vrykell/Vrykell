@@ -890,10 +890,20 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
           case 'fs_create_dir': {
             const dir = String(args.dir ?? '');
             const name = args.name as string;
-            const path = `${dir}/${name}`;
+            // 同名避让：真实后端会加序号并返回最终路径，mock 按已新建条目模拟
+            let finalName = name;
+            let path = `${dir}/${name}`;
+            if (createdEntries.some((item) => item.path === path)) {
+              const dot = name.lastIndexOf('.');
+              const stem = dot > 0 ? name.slice(0, dot) : name;
+              const ext = dot > 0 ? name.slice(dot) : '';
+              let index = 1;
+              while (createdEntries.some((item) => item.path === `${dir}/${stem} (${index})${ext}`)) index += 1;
+              finalName = `${stem} (${index})${ext}`;
+              path = `${dir}/${finalName}`;
+            }
             fsOps.push({ op: cmd === 'fs_create_file' ? 'create-file' : 'create-dir', path });
-            const created = { name, path, is_dir: cmd === 'fs_create_dir' };
-            createdEntries.push(created);
+            createdEntries.push({ name: finalName, path, is_dir: cmd === 'fs_create_dir' });
             return path;
           }
           case 'fs_copy':
