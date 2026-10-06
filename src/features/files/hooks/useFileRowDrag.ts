@@ -1,26 +1,28 @@
 import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react';
-import { useFileDragStore } from '@features/files/stores/fileDrag';
+import { useFileDragStore, type FileDragItem, type FileDropTarget } from '@features/files/stores/fileDrag';
 
 /** 拖动阈值（与导航拖拽一致）：超过才视为拖拽，避免误触。 */
 const DRAG_THRESHOLD_PX = 6;
 
-/** 指针下方的放置目标：带 data-drop-dir 的文件夹行或面包屑。 */
-function locateDropTarget(x: number, y: number): string | null {
+/** 指针下方的放置目标：带 data-drop-dir 的文件夹行 / 文件行（其同级目录）或面包屑。 */
+function locateDropTarget(x: number, y: number): FileDropTarget | null {
   const hit = document.elementFromPoint(x, y);
   const zone = hit?.closest<HTMLElement>('[data-drop-dir]');
-  return zone?.dataset.dropDir ?? null;
+  const dir = zone?.dataset.dropDir;
+  if (!zone || !dir) return null;
+  return { rowPath: zone.dataset.path ?? null, dir };
 }
 
 /**
- * 行拖拽：按住行拖到文件夹 / 面包屑即可移动（按住 Alt 复制）。
+ * 行拖拽：按住行拖到文件夹/文件（同级目录）/面包屑即可移动（拖拽只做移动，不复制）。
  * 使用指针事件而不是 HTML5 拖放，避免与桌面窗口的原生文件拖放冲突。
  */
-export function useFileRowDrag(onDrop: (paths: string[], targetPath: string, copy: boolean) => void) {
+export function useFileRowDrag(onDrop: (items: FileDragItem[], target: FileDropTarget) => void) {
   const cleanupRef = useRef<(() => void) | null>(null);
   useEffect(() => () => cleanupRef.current?.(), []);
 
-  return (event: ReactPointerEvent<HTMLElement>, paths: string[]) => {
-    if (event.button !== 0 || event.isPrimary === false || paths.length === 0) return;
+  return (event: ReactPointerEvent<HTMLElement>, items: FileDragItem[]) => {
+    if (event.button !== 0 || event.isPrimary === false || items.length === 0) return;
     // 展开箭头与重命名输入框不参与拖拽
     if ((event.target as HTMLElement).closest('input, [data-testid="file-row-expander"]')) return;
 
@@ -37,15 +39,13 @@ export function useFileRowDrag(onDrop: (paths: string[], targetPath: string, cop
       if (!started && Math.hypot(next.clientX - clientX, next.clientY - clientY) < DRAG_THRESHOLD_PX) return;
       if (!started) {
         started = true;
-        useFileDragStore.getState().start(paths, { x: next.clientX, y: next.clientY });
+        useFileDragStore.getState().start(items, { x: next.clientX, y: next.clientY });
       }
       next.preventDefault();
       const store = useFileDragStore.getState();
       store.movePointer({ x: next.clientX, y: next.clientY });
-      store.setCopy(next.altKey);
       store.hover(locateDropTarget(next.clientX, next.clientY));
     };
-
     const suppressClick = (next: MouseEvent) => {
       if (started) { next.preventDefault(); next.stopImmediatePropagation(); }
     };
@@ -68,7 +68,7 @@ export function useFileRowDrag(onDrop: (paths: string[], targetPath: string, cop
       if (next.pointerId !== pointerId) return;
       if (started && !canceled) {
         const target = locateDropTarget(next.clientX, next.clientY);
-        if (target) onDrop(paths, target, next.altKey);
+        if (target) onDrop(items, target);
       }
       clean();
     };

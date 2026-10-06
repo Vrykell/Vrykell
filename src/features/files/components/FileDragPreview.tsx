@@ -1,34 +1,47 @@
 import { createPortal } from 'react-dom';
+import { iconSizes, Folder } from '@ui/icons';
+import { fileIcon } from '@features/files/utils/fileIcon';
 import { useFileDragStore } from '@features/files';
 
-/** 拖拽预览：跟随指针显示移动/复制的条目数与目标文件夹，不参与命中测试。 */
+/** 拖拽预览：显示被拖文件/文件夹的图标（多选带数量角标），不参与命中测试。 */
 export default function FileDragPreview() {
-  const paths = useFileDragStore((state) => state.paths);
+  const items = useFileDragStore((state) => state.items);
   const pointer = useFileDragStore((state) => state.pointer);
-  const overPath = useFileDragStore((state) => state.overPath);
-  const copy = useFileDragStore((state) => state.copy);
-  if (paths.length === 0 || !pointer) return null;
-  const target = overPath ? overPath.split('/').pop() : null;
+  if (items.length === 0 || !pointer) return null;
+  const first = items[0]!;
+  const Icon = first.is_dir ? Folder : fileIcon(first.name);
   return createPortal(
     <div
       aria-hidden="true"
+      data-testid="file-drag-preview"
       style={{
         position: 'fixed',
-        left: pointer.x + 14,
-        top: pointer.y + 14,
+        left: pointer.x + 12,
+        top: pointer.y + 12,
         zIndex: 90,
         pointerEvents: 'none',
-        padding: '3px 8px',
-        borderRadius: 6,
+        width: 30,
+        height: 30,
+        borderRadius: 7,
         background: 'var(--elevated)',
         border: '1px solid var(--border)',
         boxShadow: '0 6px 18px rgba(0, 0, 0, 0.28)',
-        color: 'var(--text-secondary)',
-        fontSize: 'calc(11px * var(--ui-font-scale))',
-        whiteSpace: 'nowrap',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: first.is_dir ? 'var(--text-primary)' : 'var(--text-secondary)',
       }}
     >
-      {copy ? '复制' : '移动'} {paths.length} 项{target ? ` → ${target}` : ''}
+      <Icon size={iconSizes.row} />
+      {items.length > 1 && (
+        <span style={{
+          position: 'absolute', right: -6, bottom: -6, minWidth: 15, height: 15, padding: '0 3px',
+          borderRadius: 8, background: 'var(--accent)', color: 'var(--accent-contrast, #fff)',
+          fontSize: 'calc(10px * var(--ui-font-scale))', lineHeight: '15px', textAlign: 'center',
+        }}>
+          {items.length}
+        </span>
+      )}
     </div>,
     document.body,
   );

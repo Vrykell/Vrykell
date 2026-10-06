@@ -9,9 +9,10 @@ import DownloadManager from '@features/files/components/DownloadManager';
 import { compactPathSegments } from '@features/files/utils/breadcrumb';
 import { useRemoteFileBrowser } from '@features/ssh/hooks/useRemoteFileBrowser';
 import { describeFileServiceFailure } from '@features/ssh/model/fileServiceState';
+import { useExternalFileDrop } from '@features/files/hooks/useExternalFileDrop';
 import { useDockStore } from '@features/workspace';
 import { termInstances } from '@features/terminal';
-import { sshPaneIdFor } from '@features/ssh/utils/remotePath';
+import { sshPaneIdFor, parentOfRemote } from '@features/ssh/utils/remotePath';
 
 /**
  * RemoteFiles — SSH 标签页的文件面板。
@@ -47,8 +48,27 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
     syncToTerminal,
     doUpload,
     doUploadDir,
+    uploadPaths,
   } = useRemoteFileBrowser(conn, enabled);
   const failure = error ? describeFileServiceFailure(error) : null;
+
+  // 系统文件拖入：命中远程文件夹行/文件行（同级目录），落在空白处 = 当前远程目录 → 上传
+  const listRef = useRef<HTMLDivElement>(null);
+  const [externalDrop, setExternalDrop] = useState<{ rowPath: string | null; dir: string } | null>(null);
+  useExternalFileDrop({
+    resolveTarget: (x, y) => {
+      const list = listRef.current;
+      if (!list) return null;
+      const rect = list.getBoundingClientRect();
+      if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return null;
+      const zone = (document.elementFromPoint(x, y) as HTMLElement | null)?.closest<HTMLElement>('[data-drop-dir]');
+      const dir = zone && list.contains(zone) ? zone.dataset.dropDir ?? null : null;
+      if (dir) return { rowPath: zone!.dataset.path ?? null, dir };
+      return path === null ? null : { rowPath: null, dir: path };
+    },
+    onHover: setExternalDrop,
+    onDrop: (paths, target) => { void uploadPaths(paths, target.dir); },
+  });
 
   // 顶栏面包屑压缩：不换行，侧栏窄时省略高层级目录（必须在视图切换的提前返回之前）
   const segs = path ? path.split('/').filter(Boolean) : [];
@@ -131,7 +151,7 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
       </div>
 
       {/* 远程文件列表 */}
-      <div className="scroll-region" style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
+      <div className="scroll-region" ref={listRef} data-testid="remote-file-list" style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
         {loading ? (
           <div role="status" style={{ padding: 20, color: 'var(--text-muted)', fontSize: 'var(--fs-label)' }}>正在连接文件服务…</div>
         ) : failure ? (
@@ -157,6 +177,7 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
             key={e.path}
             entry={e}
             renaming={renameTarget?.path === e.path}
+            dropTarget={externalDrop?.rowPath === e.path}
             onRenameCommit={requestRename}
             onRenameCancel={cancelRename}
             onClick={(entry) => entry.is_dir && setPath(entry.path)}
@@ -208,6 +229,7 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
 function RemoteRow({
   entry,
   renaming,
+  dropTarget,
   onRenameCommit,
   onRenameCancel,
   onClick,
@@ -216,6 +238,8 @@ function RemoteRow({
 }: {
   entry: SshFsEntry;
   renaming: boolean;
+  /** 系统文件拖拽悬停在本行：高亮提示上传目标 */
+  dropTarget: boolean;
   onRenameCommit: (entry: SshFsEntry, newName: string) => void;
   onRenameCancel: (entry: SshFsEntry) => void;
   onClick: (entry: SshFsEntry) => void;
@@ -252,14 +276,19 @@ function RemoteRow({
         ? '输入新名称，回车确认，Esc 取消'
         : entry.is_dir ? `进入 ${entry.path}` : `双击在终端里编辑 ${entry.path}`}
       data-testid={`remote-file-${entry.name}`}
+      data-path={entry.path}
+      data-drop-dir={renaming ? undefined : (entry.is_dir ? entry.path : (parentOfRemote(entry.path) ?? '/'))}
       style={{
         display: 'flex', alignItems: 'center', gap: 6,
         padding: '5px 10px', fontSize: 'var(--fs-label)', lineHeight: '20px', minHeight: 32,
         cursor: renaming ? 'text' : 'pointer',
+        background: dropTarget ? 'var(--accent-bg)' : 'transparent',
+        outline: dropTarget ? '1px solid var(--accent)' : undefined,
+        outlineOffset: -1,
         color: entry.is_dir ? 'var(--text-primary)' : 'var(--text-secondary)',
       }}
-      onMouseEnter={(ev) => { ev.currentTarget.style.background = 'var(--hover)'; }}
-      onMouseLeave={(ev) => { ev.currentTarget.style.background = 'transparent'; }}
+      onMouseEnter={(ev) => { ev.currentTarget.style.background = dropTarget ? 'var(--accent-bg)' : 'var(--hover)'; }}
+      onMouseLeave={(ev) => { ev.currentTarget.style.background = dropTarget ? 'var(--accent-bg)' : 'transparent'; }}
     >
       <span style={{ width: 18, flexShrink: 0, display: 'inline-flex', justifyContent: 'center', color: 'var(--text-muted)' }}>
         {entry.is_dir ? <Folder size={13} /> : <File size={13} />}

@@ -23,12 +23,15 @@ export interface LocalFileClipboard {
   paths: string[];
 }
 
-/** 最近一次文件操作的回退记录（只保留一步）。 */
+/** 最近一次文件操作的回退记录（历史栈，栈顶是最近一步）。 */
 export interface LocalFileUndo {
   kind: 'rename' | 'move' | 'delete';
   label: string;
   pairs: FileOpPair[];
 }
+
+/** 回退历史最多保留的步数（更早的步进会把暂存删除项送入系统回收站）。 */
+const MAX_UNDO_STEPS = 20;
 
 interface UseLocalFileActionsOptions {
   path: string | null;
@@ -62,26 +65,38 @@ export function useLocalFileActions({
   const [renameTarget, setRenameTarget] = useState<FsEntry | null>(null);
   const [confirm, setConfirm] = useState<LocalFileConfirmState | null>(null);
   const [clipboard, setClipboard] = useState<LocalFileClipboard | null>(null);
-  const [undo, setUndo] = useState<LocalFileUndo | null>(null);
-  const undoRef = useRef<LocalFileUndo | null>(null);
+  const [undoStack, setUndoStack] = useState<LocalFileUndo[]>([]);
+  const undoStackRef = useRef<LocalFileUndo[]>([]);
   const workspaceDirs = useWorkspaceDirsStore();
 
   const closeContextMenu = useCallback(() => setCtxMenu(null), []);
   const cancelConfirm = useCallback(() => setConfirm(null), []);
   const isWorkspace = useCallback((entryPath: string) => workspaceDirs.contains(entryPath), [workspaceDirs]);
 
-  /**
-   * Remember the latest operation for 回退. A superseded reversible delete is pushed
-   * to the system trash, so staged items only live for the undo window.
-   */
-  const recordUndo = useCallback((next: LocalFileUndo | null) => {
-    const previous = undoRef.current;
-    if (previous?.kind === 'delete') {
-      void fsPurgeStaged(previous.pairs.map((pair) => pair.to)).catch(() => {});
-    }
-    undoRef.current = next;
-    setUndo(next);
+  const setUndo = useCallback((next: LocalFileUndo[]) => {
+    undoStackRef.current = next;
+    setUndoStack(next);
   }, []);
+
+  /**
+   * 记录一步可回退操作（历史栈，最多保留 MAX_UNDO_STEPS 步）。
+   * 超出上限而被挤掉的历史步进，其暂存删除项会送入系统回收站——暂存项只为回退窗口存在。
+   */
+  const pushUndo = useCallback((entry: LocalFileUndo) => {
+    const next = [entry, ...undoStackRef.current];
+    for (const dropped of next.splice(MAX_UNDO_STEPS)) {
+      if (dropped.kind === 'delete') {
+        void fsPurgeStaged(dropped.pairs.map((pair) => pair.to)).catch(() => {});
+      }
+    }
+    setUndo(next);
+  }, [setUndo]);
+
+  /** 回退一步后更新栈：全部成功则出栈，部分失败则把失败项留在栈顶以便重试。 */
+  const settleUndo = useCallback((current: LocalFileUndo, failed: FileOpPair[]) => {
+    const rest = undoStackRef.current.slice(1);
+    setUndo(failed.length > 0 ? [{ ...current, pairs: failed }, ...rest] : rest);
+  }, [setUndo]);
 
   const toast = useCallback((message: string, type: 'info' | 'success' | 'error' = 'info') => {
     useToastStore.getState().addToast(message, type);
@@ -140,7 +155,7 @@ export function useLocalFileActions({
         ? await fsCopy(paths, destDir)
         : await fsMove(paths, destDir);
       if (outcome.completed.length > 0) {
-        if (mode === 'move') recordUndo({ kind: 'move', label: '移动', pairs: outcome.completed });
+        if (mode === 'move') pushUndo({ kind: 'move', label: '移动', pairs: outcome.completed });
         toast(
           mode === 'copy'
             ? `已复制 ${outcome.completed.length} 项`
@@ -155,7 +170,7 @@ export function useLocalFileActions({
     } catch (error) {
       toast(String((error as Error)?.message ?? error), 'error');
     }
-  }, [load, onFolderMutated, onSelectionChange, path, recordUndo, toast]);
+  }, [load, onFolderMutated, onSelectionChange, path, pushUndo, toast]);
 
   /**
    * 粘贴到指定目录；剪切是移动（可回退），复制不改变回退记录。
@@ -176,17 +191,17 @@ export function useLocalFileActions({
   const doDelete = useCallback(async (entries: FsEntry[]) => {
     try {
       const staged = await fsStageDelete(entries.map((entry) => entry.path));
-      recordUndo({ kind: 'delete', label: '删除', pairs: staged });
+      pushUndo({ kind: 'delete', label: '删除', pairs: staged });
       toast(entries.length > 1 ? `已删除 ${entries.length} 项，可在更多菜单回退` : '已删除，可在更多菜单回退', 'success');
       load(path);
     } catch (error) {
       toast(String((error as Error)?.message ?? error), 'error');
     }
-  }, [load, path, recordUndo, toast]);
+  }, [load, path, pushUndo, toast]);
 
-  /** 回退最近一次文件操作（重命名 / 移动 / 删除）。 */
+  /** 回退一步文件操作（重命名 / 移动 / 删除）；可连续回退到更早的步骤。 */
   const runUndo = useCallback(async () => {
-    const current = undoRef.current;
+    const current = undoStackRef.current[0];
     if (!current) return;
     try {
       if (current.kind === 'delete') {
@@ -196,34 +211,48 @@ export function useLocalFileActions({
           toast(outcome.completed.length > 1 ? `已回退删除 ${outcome.completed.length} 项` : '已回退删除', 'success');
           onSelectionChange?.(outcome.completed.map((pair) => pair.from));
         }
+        const restored = new Set(outcome.completed.map((pair) => pair.from));
+        settleUndo(current, current.pairs.filter((pair) => !restored.has(pair.from)));
       } else if (current.kind === 'rename') {
+        const failed: FileOpPair[] = [];
         for (const pair of current.pairs) {
-          await fsRename(pair.to, pathSegments(pair.from).pop()!);
+          try {
+            await fsRename(pair.to, pathSegments(pair.from).pop()!);
+          } catch (error) {
+            failed.push(pair);
+            toast(String((error as Error)?.message ?? error), 'error');
+          }
         }
-        toast('已回退重命名', 'success');
-        onSelectionChange?.(current.pairs.map((pair) => pair.from));
+        if (failed.length < current.pairs.length) {
+          toast('已回退重命名', 'success');
+          onSelectionChange?.(current.pairs.map((pair) => pair.from));
+        }
+        settleUndo(current, failed);
       } else {
         // 按原目录分组移回（同一次操作通常来自同一目录）
-        const byParent = new Map<string, string[]>();
+        const byParent = new Map<string, FileOpPair[]>();
         for (const pair of current.pairs) {
           const parent = parentOf(pair.from) ?? '/';
-          byParent.set(parent, [...(byParent.get(parent) ?? []), pair.to]);
+          byParent.set(parent, [...(byParent.get(parent) ?? []), pair]);
         }
+        const failed: FileOpPair[] = [];
         let restored = 0;
-        for (const [parent, movedPaths] of byParent) {
-          const outcome = await fsMove(movedPaths, parent);
-          if (outcome.errors.length > 0) toast(outcome.errors[0]!, 'error');
+        for (const [parent, pairs] of byParent) {
+          const outcome = await fsMove(pairs.map((pair) => pair.to), parent);
           restored += outcome.completed.length;
+          if (outcome.errors.length > 0) toast(outcome.errors[0]!, 'error');
+          const done = new Set(outcome.completed.map((pair) => pair.to));
+          failed.push(...pairs.filter((pair) => !done.has(pair.to)));
         }
         if (restored > 0) toast(restored > 1 ? `已回退移动 ${restored} 项` : '已回退移动', 'success');
         onSelectionChange?.(current.pairs.map((pair) => pair.from));
+        settleUndo(current, failed);
       }
-      recordUndo(null);
       load(path);
     } catch (error) {
       toast(String((error as Error)?.message ?? error), 'error');
     }
-  }, [load, onSelectionChange, path, recordUndo, toast]);
+  }, [load, onSelectionChange, path, settleUndo, toast]);
 
   // ── 重命名 ──
 
@@ -231,12 +260,12 @@ export function useLocalFileActions({
     const target = renamedPath(entry, newName);
     fsRename(entry.path, newName)
       .then(() => {
-        recordUndo({ kind: 'rename', label: '重命名', pairs: [{ from: entry.path, to: target }] });
+        pushUndo({ kind: 'rename', label: '重命名', pairs: [{ from: entry.path, to: target }] });
         toast('已重命名', 'success');
         load(path);
       })
       .catch((error) => toast(String((error as Error)?.message ?? error), 'error'));
-  }, [load, path, recordUndo, toast]);
+  }, [load, path, pushUndo, toast]);
 
   const requestRename = useCallback((entry: FsEntry, newName: string) => {
     setRenameTarget(null);
@@ -334,7 +363,8 @@ export function useLocalFileActions({
     confirm,
     clipboard,
     cutPaths,
-    undo,
+    undo: undoStack[0] ?? null,
+    undoCount: undoStack.length,
     closeContextMenu,
     cancelConfirm,
     isWorkspace,

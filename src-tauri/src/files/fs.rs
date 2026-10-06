@@ -307,12 +307,20 @@ fn remove_entry(path: &std::path::Path) -> Result<(), String> {
 }
 
 /// 移动单条路径：同设备 rename；跨设备退化为复制 + 删源。
+/// 删源失败时回滚已复制的内容——移动要么成功，要么不留副本（否则用户看到的是"移动失败却变成复制"）。
 fn move_entry(from: &std::path::Path, to: &std::path::Path) -> Result<(), String> {
     match std::fs::rename(from, to) {
         Ok(()) => Ok(()),
         Err(error) if is_cross_device(&error) => {
             copy_entry(from, to)?;
-            remove_entry(from)
+            if let Err(remove_error) = remove_entry(from) {
+                let _ = remove_entry(to);
+                return Err(format!(
+                    "移动 {} 失败（已回滚复制的内容）: {remove_error}",
+                    from.display()
+                ));
+            }
+            Ok(())
         }
         Err(error) => Err(format!("移动 {} 失败: {error}", from.display())),
     }
