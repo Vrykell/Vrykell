@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, revealedPaths, ensureTabsOpen } from './tauri-mock';
+import { setupTauriMock, revealedPaths, sshOps, ensureTabsOpen } from './tauri-mock';
 
 test.beforeEach(async ({ page }) => {
   await setupTauriMock(page);
@@ -109,5 +109,74 @@ test.describe('SSH 远程连接管理侧栏', () => {
     // 定位到系统文件管理器
     await page.locator('[data-testid="download-reveal-Documents"]').click();
     expect(await revealedPaths(page)).toContain('/tmp/Documents');
+  });
+
+  test('远程面板：单击选中、Ctrl 加选、双击进入、回退还原视图与选中', async ({ page }) => {
+    await page.getByText('生产服务器').dblclick();
+    await page.locator('[data-dock-btn="files"]').click();
+    const tree = page.locator('[data-testid="remote-file-tree"]');
+    const folder = page.locator('[data-testid="remote-file-Documents"]');
+    await expect(folder).toBeVisible({ timeout: 5000 });
+
+    // 单击只选中，不进入目录
+    await folder.click();
+    await expect(folder).toHaveAttribute('data-selected', 'true');
+    await expect(tree).toHaveAttribute('data-path', '/home/root');
+
+    // Ctrl 点击加选文件行
+    await page.locator('[data-testid="remote-file-app.log"]').click({ modifiers: ['Control'] });
+    await expect(page.locator('[data-testid="remote-file-app.log"]')).toHaveAttribute('data-selected', 'true');
+
+    // 路径编辑跳转到上层目录
+    await page.locator('[data-testid="remote-crumb-bar"]').click();
+    const input = page.locator('[data-testid="remote-path-input"]');
+    await input.fill('/home');
+    await input.press('Enter');
+    await expect(tree).toHaveAttribute('data-path', '/home');
+
+    // 回退 = 上一个视图快照：路径与多选都还原
+    await page.locator('[data-testid="remote-back-btn"]').click();
+    await expect(tree).toHaveAttribute('data-path', '/home/root');
+    await expect(page.locator('[data-testid="remote-file-Documents"]')).toHaveAttribute('data-selected', 'true');
+    await expect(page.locator('[data-testid="remote-file-app.log"]')).toHaveAttribute('data-selected', 'true');
+
+    // 键盘 Enter 进入当前锚点目录
+    await folder.click();
+    await tree.focus();
+    await page.keyboard.press('Enter');
+    await expect(tree).toHaveAttribute('data-path', '/home/root/Documents');
+
+    // 双击同样进入目录
+    await page.locator('[data-testid="remote-back-btn"]').click();
+    await expect(tree).toHaveAttribute('data-path', '/home/root');
+    await folder.dblclick();
+    await expect(tree).toHaveAttribute('data-path', '/home/root/Documents');
+  });
+
+  test('远程面板：面包屑可编辑跳转，删除可从更多菜单回退', async ({ page }) => {
+    await page.getByText('生产服务器').dblclick();
+    await page.locator('[data-dock-btn="files"]').click();
+    const tree = page.locator('[data-testid="remote-file-tree"]');
+    await expect(page.locator('[data-testid="remote-file-app.log"]')).toBeVisible({ timeout: 5000 });
+
+    // 面包屑 → 编辑路径，回车跳转
+    await page.locator('[data-testid="remote-crumb-bar"]').click();
+    const input = page.locator('[data-testid="remote-path-input"]');
+    await expect(input).toBeVisible();
+    await input.fill('/var/log');
+    await input.press('Enter');
+    await expect(tree).toHaveAttribute('data-path', '/var/log');
+
+    // 删除 = 移到远端暂存，可从更多菜单回退
+    await page.locator('[data-testid="remote-file-app.log"]').click({ button: 'right' });
+    await page.getByRole('button', { name: '删除', exact: true }).click();
+    await page.locator('[data-testid="confirm-ok"]').click();
+    await expect(page.getByText(/可在更多菜单回退/)).toBeVisible();
+    expect(await sshOps(page)).toEqual(expect.arrayContaining([{ op: 'delete', path: '/var/log/app.log' }]));
+
+    await page.locator('[data-testid="remote-more-btn"]').click();
+    await page.getByRole('button', { name: /回退删除/ }).click();
+    await expect(page.getByText(/已回退删除/)).toBeVisible();
+    expect(await sshOps(page)).toEqual(expect.arrayContaining([{ op: 'restore', path: '/var/log/app.log' }]));
   });
 });
