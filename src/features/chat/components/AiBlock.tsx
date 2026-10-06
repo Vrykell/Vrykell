@@ -25,6 +25,7 @@ import { useChatStore } from '@features/chat';
 import { useSessionStore } from '@features/workspace';
 import SafeMarkdown from '@features/chat/components/SafeMarkdown';
 import ToolNode from '@features/chat/components/ToolNode';
+import ErrorBox from '@ui/ErrorBox';
 import ToolRunCard from '@features/chat/components/ToolRunCard';
 import AttachmentChips from '@features/chat/components/AttachmentChips';
 import type { ChatExchange } from '@features/chat/model/exchanges';
@@ -248,6 +249,25 @@ export default function AiBlock({ exchange }: { exchange: ChatExchange }) {
           {/* 回答完成 = 末端灰点（6px，圆心距容器底 4px，与 Rail bottom 对齐） */}
           {!answer.pending && !answer.error && <EndDot bottom={4} />}
         </div>
+      )}
+
+      {/* Failure details: message text + retry (the rail node is already red above). */}
+      {answer?.error && !collapsed && answer.errorText && (
+        <ErrorBox
+          compact
+          style={{ marginLeft: 22, marginTop: 2, marginBottom: 4 }}
+          actions={
+            <button
+              type="button"
+              onClick={() => regenerate()}
+              style={{ fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 10px' }}
+            >
+              重试
+            </button>
+          }
+        >
+          {answer.errorText}
+        </ErrorBox>
       )}
     </div>
   );

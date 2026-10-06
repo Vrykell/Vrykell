@@ -2,6 +2,7 @@ import { ChevronDown, Search } from '@ui/icons';
 import { useGlobalSearch } from '@features/search/hooks/useGlobalSearch';
 import FilterPopover from '@features/search/components/FilterPopover';
 import SearchResultCard from '@features/search/components/SearchResultCard';
+import ErrorBox from '@ui/ErrorBox';
 
 interface Props {
   open: boolean;
@@ -24,6 +25,7 @@ export default function GlobalSearch({ open, onClose }: Props) {
     enabledCount,
     totalSources,
     flatResults,
+    failedSources,
     hasInput,
     hasResults,
     hasHistory,
@@ -240,7 +242,19 @@ export default function GlobalSearch({ open, onClose }: Props) {
               搜索中…
             </div>
           )}
-          {hasInput && !hasResults && !state.loading && (
+          {hasInput && !state.loading && failedSources.length > 0 && (
+            <ErrorBox
+              style={{ margin: '6px 2px' }}
+              title={`部分搜索源失败：${failedSources.map((source) => source.label).join('、')}`}
+              details={failedSources.map((source) => `${source.label}: ${source.error}`).join('\n')}
+              detailsTitle="错误详情"
+              actions={<button onClick={() => handleInput(input)} style={{ minHeight: 32 }}>重试</button>}
+            >
+              结果可能不完整，请检查对应来源后重试。
+            </ErrorBox>
+          )}
+
+          {hasInput && !hasResults && !state.loading && failedSources.length === 0 && (
             <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>
               无匹配结果
             </div>

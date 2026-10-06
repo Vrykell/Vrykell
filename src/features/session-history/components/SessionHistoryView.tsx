@@ -12,6 +12,7 @@ import {
   type SessionTypeFilter,
 } from '@features/session-history';
 import { useToastStore } from '@ui/Toast';
+import ErrorBox from '@ui/ErrorBox';
 
 const TYPE_OPTIONS = SESSION_TYPE_OPTIONS;
 
@@ -34,6 +35,7 @@ export default function SessionHistoryView() {
   const {
     groups,
     loading,
+    loadError,
     filter,
     setFilter,
     load,
@@ -132,6 +134,13 @@ export default function SessionHistoryView() {
       <div className="scroll-region" style={{ flex: 1, overflowY: 'auto', padding: '8px 8px 8px' }}>
         {loading ? (
           <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>加载中…</div>
+        ) : loadError ? (
+          <ErrorBox
+            style={{ margin: 8 }}
+            actions={<button onClick={() => void load()} style={{ minHeight: 32 }}>重试</button>}
+          >
+            {loadError}
+          </ErrorBox>
         ) : historical.length === 0 ? (
           <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,

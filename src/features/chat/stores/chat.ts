@@ -33,6 +33,8 @@ export interface ChatMessage {
   pending?: boolean;
   /** 流式失败标记（渲染为合成错误节点行） */
   error?: boolean;
+  /** Raw failure text shown with the retry action; memory only, not persisted. */
+  errorText?: string;
 }
 
 /** 工具事件回调：run 为 upsert 语义补丁（未定义字段不覆盖既有值） */
@@ -106,8 +108,9 @@ export function setDefaultStream(fn: StreamFn) {
 export const useChatStore = create<ChatState>((set, get) => {
   /**
    * 流式内核（send/regenerate 共用）：history 取自 store 现状（排除 pending 占位）。
-   * 用户主动 abort 不算错误：保留已生成的部分内容、未完结工具落 error 终态，
-   * 但整条回答不标红、不追加「出错了」文本；立即停止的空壳回答直接移除。
+   * User aborts are not failures: partial content stays, unfinished tools end in the
+   * error state, but the answer is not marked red and carries no error text; an
+   * empty shell aborted immediately is removed.
    */
   const runAssistant = async (tabId: string, assistantId: string, streamFn?: StreamFn) => {
     // history 截止到回答占位之前（regenerate 时其后的旧交换不参与本轮上下文）
@@ -144,6 +147,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     abortControllers.set(tabId, controller);
 
     let failed = false;
+    let failureText = '';
     try {
       await (streamFn ?? defaultStream)(history, onChunk, {
         signal: controller.signal,
@@ -170,7 +174,8 @@ export const useChatStore = create<ChatState>((set, get) => {
       });
     } catch (err) {
       failed = !controller.signal.aborted;
-      if (failed) pending += `\n\n> 出错了：${err instanceof Error ? err.message : String(err)}`;
+      // Keep the failure text on the message; the error row renders it in an ErrorBox.
+      if (failed) failureText = err instanceof Error ? err.message : String(err);
     } finally {
       abortControllers.delete(tabId);
       if (timer !== null) {
@@ -218,7 +223,13 @@ export const useChatStore = create<ChatState>((set, get) => {
                     : p,
                 );
               }
-              return { ...m, pending: false, error: failed || undefined, parts };
+              return {
+                ...m,
+                pending: false,
+                error: failed || undefined,
+                errorText: failed ? failureText : undefined,
+                parts,
+              };
             }),
           },
         };
