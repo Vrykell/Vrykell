@@ -5,7 +5,7 @@
  * 只有终端模拟器自身能正确处理全部 ANSI 转义。
  */
 import { Terminal } from '@xterm/xterm';
-import { WebglAddon } from '@xterm/addon-webgl';
+import { loadWebglRenderer } from '@features/terminal/model/xtermRenderer';
 import type { IBufferCell } from '@xterm/xterm';
 import { indexToCss } from '@features/terminal/model/blockTypes';
 import { TERMINAL_FONT_FAMILY, getTerminalFontSize, TERMINAL_LINE_HEIGHT } from '@features/terminal/model/terminalFont';
@@ -261,13 +261,9 @@ export function createBlockTerm(
   const unsubscribeTypography = useTypographyStore.subscribe((state, previous) => {
     if (state.terminalFontSize !== previous.terminalFontSize) term.options.fontSize = state.terminalFontSize;
   });
-  // 与主终端一致：WebGL renderer 让半块字符拼接无缝（TUI 图标无横裂缝）；
-  // 无 GPU 时回退 DOM renderer（xterm 内部行为）
-  try {
-    term.loadAddon(new WebglAddon());
-  } catch {
-    // 忽略：回退默认 renderer
-  }
+  // Same renderer as the main terminal: WebGL keeps half-block glyphs seamless, and the shared
+  // helper steps down to the DOM renderer when the GPU context is lost or WebGL is unavailable.
+  loadWebglRenderer(term);
   return {
     term,
     el,

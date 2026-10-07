@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { captureConnectionFrame, type TerminalFrame } from '../model/terminalFrame';
 import { projectBlocks } from '../model/blockProjection';
 import { Terminal } from '@xterm/xterm';
-import { WebglAddon } from '@xterm/addon-webgl';
+import { loadWebglRenderer } from '@features/terminal/model/xtermRenderer';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { ptySpawn, ptyWrite, ptyResize, ptyClose, onPtyOutput, onPtyExit, type PtySpawnOptions } from '@platform/pty';
@@ -140,15 +140,11 @@ export function useTerminalSession(
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.loadAddon(new WebLinksAddon());
-    // WebGL renderer：字形画进 GPU 纹理、按 cell 精确对齐，半块字符（▀▄）
-    // 上下行拼接无缝 —— DOM renderer 的 CSS 行盒按字体 baseline 排布，
-    // 半块字符之间必然留缝（TUI 图标/对话框出现横裂缝）。
-    // 在 WKWebView 无 WebGL 时自动回退 DOM renderer（xterm 内部行为）。
-    try {
-      term.loadAddon(new WebglAddon());
-    } catch {
-      // 忽略：回退默认 DOM renderer（缝隙问题在无 GPU 环境无法根治）
-    }
+    // WebGL draws glyphs into GPU textures aligned to the cell grid, so half-block characters
+    // join without a seam; the DOM renderer lays their CSS line boxes on the font baseline and
+    // always leaves a gap. The shared helper steps down to the DOM renderer when the GPU context
+    // is lost or WebGL is unavailable.
+    loadWebglRenderer(term);
     term.open(el);
     let frameRaf = 0;
     const frameSub = term.onWriteParsed?.(() => {
