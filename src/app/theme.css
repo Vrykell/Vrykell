@@ -377,6 +377,12 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 /* Overflowing content shares a compact themed scrollbar in both directions. */
 ::-webkit-scrollbar { width: var(--scrollbar-size); height: var(--scrollbar-size); }
 ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+/* Terminal scrollbars use the terminal background: a transparent track lets the canvas
+   selection show through as a bright line beside the scrollbar. */
+[data-testid^="pane-"] .xterm ::-webkit-scrollbar-track,
+[data-testid="running-term"] .xterm ::-webkit-scrollbar-track,
+[data-testid^="pane-"] .xterm ::-webkit-scrollbar-corner,
+[data-testid="running-term"] .xterm ::-webkit-scrollbar-corner { background: var(--xterm-bg); }
 ::-webkit-scrollbar-thumb {
   background-color: var(--scrollbar-thumb);
   background-clip: padding-box;

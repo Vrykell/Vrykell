@@ -43,8 +43,8 @@ describe('SSH connection input', () => {
     useTerminalStore.setState({ sessions: { p: 'session' } });
     render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
     fireEvent.click(screen.getByRole('button', { name: '断开连接' }));
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('已断开 SSH 连接'));
-    expect(screen.getByRole('status')).not.toHaveTextContent('已取消认证');
+    await waitFor(() => expect(screen.getByText('已断开 SSH 连接')).toBeVisible());
+    expect(screen.queryByText(/已取消认证/)).toBeNull();
   });
   it('disables authentication until the PTY is ready', () => {
     render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
@@ -85,7 +85,7 @@ describe('SSH connection input', () => {
     expect(closeSession).toHaveBeenCalledOnce();
     expect(input).toHaveValue('');
     expect(input).toBeDisabled();
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('SSH 连接已关闭'));
+    await waitFor(() => expect(screen.getByText(/SSH 连接已关闭/)).toBeVisible());
     expect(ptyWrite).not.toHaveBeenCalled();
   });
   it('allows cancellation to be retried if closing the connection fails', async () => {
@@ -162,16 +162,17 @@ describe('SSH connection input', () => {
     expect(screen.queryByLabelText('SSH 认证响应')).toBeNull();
     expect(screen.getByTestId('ssh-terminal-screen')).toHaveStyle({ visibility: 'visible' });
   });
-  it('keeps the last screen dimmed, adds the exit line once and offers reconnect', async () => {
+  it('prints the failure output on the screen instead of a card', async () => {
     sessionView.status = 'closed';
     sessionView.frame.plainText = "user@server's password:\nConnection closed by server";
     sessionView.frame.html = "user@server's password:<br>Connection closed by server";
     render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput sshTarget="user@server" />);
     expect(screen.getByRole('status')).toHaveTextContent('连接已断开');
-    // 最后一屏留在原位（变暗）：没有彩色卡片，退出信息只出现一次
+    // 原因就当终端输出印在屏幕上（可选中复制），退出信息只补一次
     const ended = screen.getByTestId('ssh-terminal-ended');
     expect(ended).toHaveTextContent('Connection closed by server');
     expect(ended.textContent?.match(/\[进程已退出\]/g)).toHaveLength(1);
+    expect(ended).toHaveAttribute('data-selectable', 'true');
     fireEvent.click(screen.getByRole('button', { name: '重新连接' }));
     await waitFor(() => expect(reconnect).toHaveBeenCalledOnce());
   });

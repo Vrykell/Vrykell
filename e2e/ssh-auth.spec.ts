@@ -164,6 +164,7 @@ test('SSH block mode remains directly interactive when the remote server has no 
   expect(await ptyWrites(page)).toEqual(expect.arrayContaining(['\x1b[B', '\r', '\x1b']));
   await surface.getByRole('button', { name: '断开连接' }).click();
   await expect(surface.getByRole('status')).toHaveText('已断开 SSH 连接');
+  // 原因直接印在屏幕上，不用展开任何折叠区
   await expect(surface.getByTestId('ssh-terminal-ended')).toContainText('已登录交互程序');
 });
 
