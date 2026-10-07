@@ -8,9 +8,6 @@ import { secretResponsePrompt, secretResponseWasRejected } from '../model/termin
 import { t } from '@i18n';
 import { terminalDebug } from '../services/terminalDebug';
 
-/** 认证提示多久没有任何输出后，提示用户可以直接重连（不用先输一次密码）。 */
-const STALE_PROMPT_MS = 60_000;
-
 /** Render an interactive SSH session with xterm so screen contents and cursor stay in sync. */
 export default function TerminalPanel({ paneId, tabId, onReady, connectionInput = false }: {
   paneId: string; tabId: string; onReady: (sessionId: string) => void; connectionInput?: boolean;
@@ -35,8 +32,6 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
   const disconnected = status === 'closed' || status === 'error' || cancellation === 'done';
   const exitNotice = t('terminal.processExited');
   const exitNoticeShown = (frame?.plainText ?? '').includes(exitNotice);
-  // 密码提示长时间没有任何输出：连接可能已经被对端丢弃，给一个不用先输密码的出口
-  const [stalePrompt, setStalePrompt] = useState(false);
   const focusTerminal = () => {
     if (!inputDisabled) ref.current?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus();
   };
@@ -45,16 +40,6 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
     if (secret) responseRef.current?.focus();
     else ref.current?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus();
   }, [interactive, sessionId, secret, ref]);
-
-  useEffect(() => {
-    if (!interactive || !secret || disconnected) {
-      setStalePrompt(false);
-      return;
-    }
-    const timer = setTimeout(() => setStalePrompt(true), STALE_PROMPT_MS);
-    return () => { clearTimeout(timer); setStalePrompt(false); };
-    // text 每次有新输出都会变：提示不变才说明对方一直没有响应
-  }, [interactive, secret, disconnected, text]);
 
   const cancelAuthentication = async () => {
     if (!sessionId || cancellingRef.current) return;
@@ -76,7 +61,7 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
     {!connectionInput && <div ref={ref} style={{ position: 'absolute', inset: 0, minHeight: 0, background: 'transparent', paddingLeft: 8 }} />}
     {connectionInput && <div data-testid="ssh-connection-input" style={{ position: 'absolute', inset: 0, display: interactive ? 'flex' : 'none', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0, padding: '4px 8px', fontSize: 'calc(12px * var(--ui-font-scale))' }}>
-        <span role="status" style={{ flex: 1, color: 'var(--text-secondary)' }}>{cancellation === 'done' ? cancelledAuthentication ? '已取消认证，SSH 连接已关闭' : '已断开 SSH 连接' : disconnected ? '连接已断开' : status === 'connecting' ? '正在连接…' : secret ? (stalePrompt ? t('terminal.auth.stalled') : '等待认证响应') : 'SSH 交互会话'}</span>
+        <span role="status" style={{ flex: 1, color: 'var(--text-secondary)' }}>{cancellation === 'done' ? cancelledAuthentication ? '已取消认证，SSH 连接已关闭' : '已断开 SSH 连接' : disconnected ? '连接已断开' : status === 'connecting' ? '正在连接…' : secret ? '等待认证响应' : 'SSH 交互会话'}</span>
         {!disconnected && <button type="button" disabled={inputDisabled} onClick={() => {
           if (secret) {
             setManualSecret(false);
@@ -87,9 +72,8 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
             setManualSecret(true);
           }
         }} style={{ padding: '7px 12px' }}>{secret ? '直接输入' : '密码输入'}</button>}
-        {!disconnected && <button type="button" disabled={inputDisabled} onClick={() => void cancelAuthentication()} style={{ padding: '7px 12px' }}>{cancellation === 'pending' ? '正在取消…' : secret ? '取消认证' : '断开连接'}</button>}
-        {/* 认证长时间无响应时也给出重连入口，不必先输一次密码才发现连接已经断了 */}
-        {(disconnected || stalePrompt) && <button type="button" disabled={cancellation === 'pending'} onClick={() => void restart()} style={{ padding: '7px 12px' }}>重新连接</button>}
+        {disconnected ? <button type="button" disabled={cancellation === 'pending'} onClick={() => void restart()} style={{ padding: '7px 12px' }}>重新连接</button>
+          : <button type="button" disabled={inputDisabled} onClick={() => void cancelAuthentication()} style={{ padding: '7px 12px' }}>{cancellation === 'pending' ? '正在取消…' : secret ? '取消认证' : '断开连接'}</button>}
       </div>
       <div role="textbox" aria-label="SSH 交互终端" aria-multiline="true" aria-disabled={inputDisabled} tabIndex={inputDisabled ? -1 : 0}
         onFocus={focusTerminal} onMouseDown={focusTerminal} style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'auto', outline: 'none', cursor: 'text' }}>

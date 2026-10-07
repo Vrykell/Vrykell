@@ -63,7 +63,6 @@ const zh: Record<string, string> = {
   'terminal.clipboard.pasteFailed': '粘贴失败',
   'terminal.clipboard.noSession': '终端尚未连接，无法粘贴',
   'terminal.processExited': '[进程已退出]',
-  'terminal.auth.stalled': '等待认证响应（长时间无响应，可重新连接）',
 
   // ── TUI 模式 ──
   'tui.banner': 'TUI 模式 — 键盘直通终端',
