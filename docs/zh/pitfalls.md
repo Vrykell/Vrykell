@@ -101,7 +101,11 @@
 - **相关**：分屏 pane 空白同理，PTY 用 0×0 启动 → 兜底 80×24（Phase 10）。
 
 ### 3.5 pty_write 持锁阻塞写 → 缓冲区满时「结束」按钮也卡死（`code-audit.md` 高优）
-- 写入持会话锁且无超时，PTY 缓冲满时整个会话的所有操作（包括 kill）被卡死。→ 输出合批 + 非阻塞写入（Phase 8）。
+- **现象**：写入持会话锁且无超时，PTY 缓冲满时整个会话的所有操作（包括 kill）被卡死；这些 command 又是同步的（跑在主线程）→ 整个 UI 冻结，只能强杀应用。
+- **根因**：会话锁同时被「可能无限阻塞的写」与「resize / close / kill」争用，且后三者同步跑在主线程。
+- **修复**：writer 从会话锁里拆出来（独立 `Arc<Mutex<..>>`），阻塞写不再占用会话锁；`pty_resize` / `pty_close` / `pty_kill_foreground` 改 `async` + `spawn_blocking`，阻塞调用不再跑在主线程。
+- **验证**：日志里 233 次写入全部 ≤1ms，而 `pty_resize` 最慢 542ms、`pty_close` 667ms —— 卡的正是这些调用本身。回归测试 `session_lock_stays_free_while_a_write_is_stuck`（真实 PTY + 从不读 stdin 的子进程 + 8 MiB 写）：写卡住时会话锁 800ns 可取得；把写改回「持会话锁」后同一条测试 3s 超时失败。
+- **附带**：首击「结束」发 Ctrl+C 本质是往 stdin 写输入，写通道被卡住的写占用时送不进去 → 给写锁 1s 上限，超时返回可操作错误（升级窗口内再点一次即强杀）。
 
 ### 3.6 GUI 启动缺 TERM/COLORTERM → TUI 应用挂起（`4c4f15a`）
 - **现象**：从 Finder/Dock 启动时 `TERM` 为空，zsh 退化为 dumb，依赖终端能力检测的全屏 TUI（truecolor 应用）挂起/黑屏。终端里启动则正常——**只有 GUI 冷启动路径能复现**。

@@ -74,7 +74,7 @@ src/
 
 ### 后端 · 高
 
-- `pty.rs:343-358` — `pty_write` 持会话锁做无超时阻塞写，缓冲区满时「结束」也被卡死。→ 写入前非阻塞探测 / 超时后 drop 锁。
+- `pty.rs` — `pty_write` 持会话锁做无超时阻塞写，缓冲区满时「结束」也被卡死。→ **已修复**：writer 拆出独立锁，`pty_resize` / `pty_close` / `pty_kill_foreground` 改 async + `spawn_blocking`（见 `docs/zh/pitfalls.md` §3.5）。
 - `history.rs` — 迁移靠吞 `ALTER TABLE ADD COLUMN` 错误「碰运气」。→ `PRAGMA user_version` 版本化迁移。
 - `history.rs` — `create_session` 用 `INSERT OR IGNORE`，先落库的兜底行会把真 title/cwd/created_at 丢掉。→ `ON CONFLICT DO UPDATE`。
 - `ssh.rs` — 首次连接 TOFU 无确认即写 known_hosts，且 `write_file` 会覆盖整个文件破坏其它主机记录。→ 首次确认指纹 + 完整读入 + 并发锁。

@@ -74,7 +74,7 @@ Already split into single-file modules by domain (ai/fs/file_open/history/ssh/pt
 
 ### Backend · High
 
-- `pty.rs:343-358` — `pty_write` holds the session lock for a blocking write with no timeout; when the buffer is full, even "end" gets stuck. → Non-blocking probe before writing / drop the lock after a timeout.
+- `pty.rs` — `pty_write` held the session lock for a blocking write with no timeout; when the buffer was full, even "end" got stuck. → **Fixed**: the writer has its own lock, and `pty_resize` / `pty_close` / `pty_kill_foreground` now run async on `spawn_blocking` (see `docs/en/pitfalls.md` §3.5).
 - `history.rs` — Migrations rely on swallowing `ALTER TABLE ADD COLUMN` errors and hoping for the best. → Versioned migrations via `PRAGMA user_version`.
 - `history.rs` — `create_session` uses `INSERT OR IGNORE`, so a fallback row written first discards the real title/cwd/created_at. → `ON CONFLICT DO UPDATE`.
 - `ssh.rs` — On first connection, TOFU writes known_hosts without confirmation, and `write_file` overwrites the entire file, corrupting other hosts' records. → Confirm the fingerprint on first use + read the whole file + a concurrency lock.

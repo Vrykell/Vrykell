@@ -101,7 +101,11 @@
 - **Related**: the same applies to a blank split pane — the PTY started at 0×0 → fall back to 80×24 (Phase 10).
 
 ### 3.5 pty_write Holding the Lock for Blocking Writes → the "End" Button Also Hangs When the Buffer Is Full (`code-audit.md`, high priority)
-- A write held the session lock with no timeout, so when the PTY buffer filled up every operation on the session (including kill) hung. → Output batching + non-blocking writes (Phase 8).
+- **Symptom**: a write held the session lock with no timeout, so when the PTY buffer filled up every operation on that session (kill included) hung; those commands were synchronous (main thread), so the whole UI froze and force-quitting the app was the only way out.
+- **Root cause**: one session lock was shared by a write that may block indefinitely and by resize / close / kill, and the latter three ran synchronously on the main thread.
+- **Fix**: the writer moved out of the session lock into its own `Arc<Mutex<..>>`, so a blocking write never occupies it; `pty_resize` / `pty_close` / `pty_kill_foreground` became `async` + `spawn_blocking` so a blocking pseudo-console call no longer runs on the main thread.
+- **Evidence**: 233 logged writes were all ≤1ms while `pty_resize` reached 542ms and `pty_close` 667ms - the stalls are those calls themselves. The regression test `session_lock_stays_free_while_a_write_is_stuck` (real PTY + a child that never reads stdin + an 8 MiB write) shows the session lock is available in 800ns while the write is stuck, and fails with a 3s timeout once the write is put back under the session lock.
+- **Related**: the first press of "end" sends Ctrl+C, which is input written to stdin and cannot be delivered while a stuck write holds that channel - it now waits at most 1s and then reports an actionable error (pressing again inside the escalation window escalates to a kill).
 
 ### 3.6 GUI Startup Missing TERM/COLORTERM → TUI Apps Hang (`4c4f15a`)
 - **Symptom**: launching from Finder/Dock left `TERM` empty, zsh degraded to dumb, and full-screen TUIs that rely on terminal capability detection (truecolor apps) hung/went black. Launching from a terminal was fine — **only the GUI cold-start path reproduces it**.
