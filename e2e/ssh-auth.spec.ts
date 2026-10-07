@@ -48,6 +48,21 @@ test('the connection screen keeps no scrollbar of its own', async ({ page }) => 
   await expect(surface.locator('.xterm-viewport')).toHaveCSS('scrollbar-width', 'none');
 });
 
+test('the connection screen snaps its character cells to whole pixels', async ({ page }) => {
+  await openSsh(page, 'known');
+  await emitPtyOutput(page, 'ready\r\n');
+  // 整数字符格：否则画布右边缘会剩一条亚像素列，选区旁边就像有一条细线
+  const cellWidth = await page.evaluate(() => {
+    const map = (window as unknown as { __vrykellTerms?: Map<string, unknown> }).__vrykellTerms!;
+    const term = [...map.values()][0] as {
+      _core?: { _renderService?: { dimensions?: { css?: { cell?: { width?: number } } } } };
+    };
+    return term?._core?._renderService?.dimensions?.css?.cell?.width ?? 0;
+  });
+  expect(cellWidth).toBeGreaterThan(0);
+  expect(Number.isInteger(cellWidth)).toBe(true);
+});
+
 test('native SSH recordings distinguish an empty directory from missing command output', async ({ page }) => {
   await openSsh(page, 'known');
   await emitPtyOutput(page, '\x1b]133;A\x07');

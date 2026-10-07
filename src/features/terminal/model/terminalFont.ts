@@ -11,6 +11,23 @@ export const TERMINAL_FONT_FAMILY =
 export function getTerminalFontSize(): number { return useTypographyStore.getState().terminalFontSize; }
 export const TERMINAL_LINE_HEIGHT = 1.0;
 
+/**
+ * Snap the cell advance to whole CSS pixels, the way Windows Terminal does: a fractional
+ * advance (for example 8.4px at a 14px font) leaves a sub-pixel column at the right edge of
+ * the canvas, which shows up as a bright seam beside a selection. `letterSpacing` absorbs the
+ * fraction - at most half a pixel per cell - so the grid lands on device pixels.
+ */
+export function snapLetterSpacing(measuredCellWidth: number): number {
+  if (!Number.isFinite(measuredCellWidth) || measuredCellWidth <= 0) return 0;
+  const spacing = Math.round(measuredCellWidth) - measuredCellWidth;
+  return Math.abs(spacing) < 0.01 ? 0 : spacing;
+}
+
+/** The same snap, measured from the real font stack at the current terminal font size. */
+export function terminalLetterSpacing(fontSize = getTerminalFontSize()): number {
+  return snapLetterSpacing(measureTerminalDomCellWidth(fontSize));
+}
+
 /** Measure the browser glyph width used by completed block snapshots. */
 export function measureTerminalDomCellWidth(fontSize = getTerminalFontSize()): number {
   const probe = document.createElement('span');
