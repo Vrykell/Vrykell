@@ -116,8 +116,8 @@ test('canceling authentication closes the PTY and leaves no editable password fi
   expect(await ptyWrites(page)).not.toContain('unsent-secret\r');
   expect(await ptyWrites(page)).not.toContain('\x03');
   await emitPtyOutput(page, 'late password prompt');
-  // 断开后由状态框接管：迟到的输出不再出现在可见文案里（原始输出收在技术详情内）
-  await expect(surface.getByRole('alert')).not.toContainText('late password prompt');
+  // 断开后定格的是断开那一刻的屏幕：迟到的输出不会再画到页面上
+  await expect(surface.getByTestId('ssh-terminal-ended')).not.toContainText('late password prompt');
 });
 
 test('a logged-in SSH command does not retain the previous password prompt', async ({ page }) => {
@@ -164,8 +164,7 @@ test('SSH block mode remains directly interactive when the remote server has no 
   expect(await ptyWrites(page)).toEqual(expect.arrayContaining(['\x1b[B', '\r', '\x1b']));
   await surface.getByRole('button', { name: '断开连接' }).click();
   await expect(surface.getByRole('status')).toHaveText('已断开 SSH 连接');
-  await surface.getByRole('button', { name: '技术详情', exact: true }).click();
-  await expect(surface.locator('pre')).toContainText('已登录交互程序');
+  await expect(surface.getByTestId('ssh-terminal-ended')).toContainText('已登录交互程序');
 });
 
 test('SSH block mode restores its xterm host when a command opens an alternate-screen app', async ({ page }) => {
@@ -192,7 +191,7 @@ test('SSH block mode restores its xterm host when a command opens an alternate-s
 
 test('canceling host trust does not spawn SSH or record a key', async ({ page }) => {
   await openSsh(page, 'unknown', false);
-  await expect(page.getByTestId('ssh-connection-input').getByRole('alert')).toContainText('已取消 SSH 连接');
+  await expect(page.getByTestId('ssh-terminal-ended')).toContainText('已取消 SSH 连接');
   expect(await ipcRecords(page, '__SSH_TRUSTS__')).toEqual([]);
   expect((await ipcRecords(page, '__PTY_SPAWNS__')).filter(s => s.ssh)).toEqual([]);
   // 未出现密码提示时没有可输入的认证框
@@ -201,7 +200,7 @@ test('canceling host trust does not spawn SSH or record a key', async ({ page })
 
 test('changed host keys fail without asking to overwrite trust', async ({ page }) => {
   await openSsh(page, 'changed');
-  await expect(page.getByTestId('ssh-connection-input').getByRole('alert')).toContainText('主机密钥不匹配');
+  await expect(page.getByTestId('ssh-terminal-ended')).toContainText('主机密钥不匹配');
   expect(await ipcRecords(page, '__SSH_DIALOGS__')).toEqual([]);
   expect(await ipcRecords(page, '__SSH_TRUSTS__')).toEqual([]);
   expect((await ipcRecords(page, '__PTY_SPAWNS__')).filter(s => s.ssh)).toEqual([]);
