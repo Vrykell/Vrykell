@@ -144,7 +144,7 @@ export function useTerminalSession(
     // join without a seam; the DOM renderer lays their CSS line boxes on the font baseline and
     // always leaves a gap. The shared helper steps down to the DOM renderer when the GPU context
     // is lost or WebGL is unavailable.
-    loadWebglRenderer(term);
+    loadWebglRenderer(term, useTypographyStore.getState().terminalRenderer);
     term.open(el);
     let frameRaf = 0;
     const frameSub = term.onWriteParsed?.(() => {

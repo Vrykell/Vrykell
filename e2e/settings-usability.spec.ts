@@ -36,6 +36,11 @@ test('theme page font settings apply globally and are absent from other settings
   await page.getByRole('option', { name: '15px', exact: true }).click();
   await fonts.getByRole('combobox', { name: '终端字号' }).click();
   await page.getByRole('option', { name: '16px', exact: true }).click();
+  // 渲染器偏好与字号同页：切换后要持久化，并且不影响已打开的终端
+  await fonts.getByRole('combobox', { name: '终端渲染器' }).click();
+  await page.getByRole('option', { name: 'DOM（边缘更干净）', exact: true }).click();
+  await expect(fonts.getByRole('combobox', { name: '终端渲染器' })).toHaveText('DOM（边缘更干净）');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('vrykell-typography')!).state.terminalRenderer)).toBe('dom');
   await expect(page.getByRole('button', { name: '深色', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('aside').getByRole('button', { name: '主题', exact: true })).toHaveCSS('font-size', '15px');
   await page.keyboard.press('Meta+1');
@@ -57,6 +62,7 @@ test('theme page font settings apply globally and are absent from other settings
   await expect(fonts.getByRole('combobox', { name: '终端字号' })).toHaveText('16px');
   await fonts.getByRole('button', { name: '恢复默认字号' }).click();
   await expect(fonts.getByRole('combobox', { name: '终端字号' })).toHaveText('14px');
+  await expect(fonts.getByRole('combobox', { name: '终端渲染器' })).toHaveText('WebGL（默认）');
   await page.screenshot({ path: test.info().outputPath('settings.png') });
   await page.getByRole('button', { name: '浅色', exact: true }).click();
   await page.screenshot({ path: test.info().outputPath('settings-light.png') });

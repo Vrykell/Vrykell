@@ -82,6 +82,18 @@ const zh: Record<string, string> = {
   'ssh.action.cancelling': '正在取消…',
   'ssh.quick.connect': '快速连接',
 
+  // ── 设置：字号与终端渲染 ──
+  'settings.font.group': '字号设置',
+  'settings.font.pageTitle': '页面字号',
+  'settings.font.pageDescription': '调整整个应用的界面文字大小。',
+  'settings.font.terminalTitle': '终端字号',
+  'settings.font.terminalDescription': '调整终端输入与输出文字大小。',
+  'settings.font.reset': '恢复默认字号',
+  'settings.font.rendererTitle': '终端渲染器',
+  'settings.font.rendererDescription': 'WebGL 让半格字符无缝，但个别显卡驱动会在选区边缘留细线；DOM 边缘更干净、滚动稍慢。切换会立即应用到已打开的终端。',
+  'settings.font.rendererWebgl': 'WebGL（默认）',
+  'settings.font.rendererDom': 'DOM（边缘更干净）',
+
   // ── TUI 模式 ──
   'tui.banner': 'TUI 模式 — 键盘直通终端',
   'tui.exit': '退出',

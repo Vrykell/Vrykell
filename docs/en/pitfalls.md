@@ -540,7 +540,7 @@
 
 ## Terminal renderer and CJK width (order of investigation)
 
-- The renderer is chosen in exactly one place: `src/features/terminal/model/xtermRenderer.ts`, WebGL by default with a DOM fallback when the GPU context is lost. To compare, pin the DOM renderer with `localStorage['vrykell-terminal-renderer'] = 'dom'` and delete the key afterwards.
+- The renderer is chosen in exactly one place: `src/features/terminal/model/xtermRenderer.ts`, WebGL by default with a DOM fallback when the GPU context is lost. Users switch it under Settings → Theme → Terminal renderer (the `terminalRenderer` field in the typography store); the change applies to already open terminals (DOM disposes the addon, WebGL loads it again) and new terminals read the same preference.
 - **Check the font before blaming the renderer** when frames and tables drift: the usual cause is a CJK fallback face whose advance is not two Latin cells, so the right border of a table like `│ name │` shifts row by row. The font stack must reach a monospace CJK face (Sarasa Mono SC / Noto Sans Mono CJK SC). Headless e2e environments rarely have those fonts, so they never decide the renderer question.
 - The WebGL renderer cannot be screenshotted without a GPU (headless browser / SwiftShader): `.xterm-rows` is empty and captures come back black, because the selection lives in the canvas texture rather than the DOM. Renderer comparisons must run on real hardware.
 - Measured fact: the WebGL canvas is device-pixel aligned (CSS width times dpr is exactly integral), so "canvas rounding" does not explain an edge seam. Measure the `screen` / `region` / `canvas` rects before blaming rounding.

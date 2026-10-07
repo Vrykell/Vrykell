@@ -16,4 +16,14 @@ describe('theme font settings', () => {
     fireEvent.click(screen.getByRole('button', { name: '恢复默认字号' }));
     expect(useTypographyStore.getState()).toMatchObject({ uiFontSize: 13, terminalFontSize: 14 });
   });
+
+  it('switches the terminal renderer and restores WebGL by default', () => {
+    render(<FontSettings />);
+    expect(useTypographyStore.getState().terminalRenderer).toBe('webgl');
+    fireEvent.click(screen.getByRole('combobox', { name: '终端渲染器' }));
+    fireEvent.click(screen.getByRole('option', { name: 'DOM（边缘更干净）' }));
+    expect(useTypographyStore.getState().terminalRenderer).toBe('dom');
+    fireEvent.click(screen.getByRole('button', { name: '恢复默认字号' }));
+    expect(useTypographyStore.getState().terminalRenderer).toBe('webgl');
+  });
 });
