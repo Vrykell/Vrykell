@@ -10,7 +10,7 @@ describe('shells', () => {
   it('shellTypeLabel 映射与兜底', () => {
     expect(shellTypeLabel('zsh')).toBe('Zsh');
     expect(shellTypeLabel('cmd')).toBe('CMD');
-    expect(shellTypeLabel('powershell')).toBe('PowerShell');
+    expect(shellTypeLabel('powershell')).toBe('Windows PowerShell');
     expect(shellTypeLabel('weird')).toBe('weird');
     expect(shellTypeLabel('')).toBe('终端');
   });
@@ -35,8 +35,9 @@ describe('shells', () => {
     expect(await listShells()).toEqual([{ id: 'bash', label: 'Bash', default: true }]);
   });
 
-  it('shellTypeLabel：bash / pwsh 映射', () => {
+  it('shellTypeLabel：bash / pwsh 映射（两种 PowerShell 必须有不同标签）', () => {
     expect(shellTypeLabel('bash')).toBe('Bash');
-    expect(shellTypeLabel('pwsh')).toBe('PowerShell');
+    expect(shellTypeLabel('pwsh')).toBe('PowerShell 7');
+    expect(shellTypeLabel('pwsh')).not.toBe(shellTypeLabel('powershell'));
   });
 });

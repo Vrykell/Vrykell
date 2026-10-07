@@ -1,7 +1,12 @@
 /** Shared font metrics for the terminal canvas and block snapshots. */
 import { useTypographyStore } from '@config/typography';
+/**
+ * The first families all cover box drawing and block elements at one cell width, so
+ * frames and charts stay aligned. The generic `monospace` comes before the emoji
+ * families: an emoji fallback is proportional and would break the character grid.
+ */
 export const TERMINAL_FONT_FAMILY =
-  'Menlo, Monaco, "Cascadia Code", "JetBrains Mono", "Noto Sans Mono", "DejaVu Sans Mono", "Noto Sans CJK SC", "PingFang SC", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", monospace';
+  '"Cascadia Mono", "Cascadia Code", Menlo, Monaco, "JetBrains Mono", "Sarasa Mono SC", "Noto Sans Mono CJK SC", "Noto Sans Mono", "DejaVu Sans Mono", monospace, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"';
 
 export function getTerminalFontSize(): number { return useTypographyStore.getState().terminalFontSize; }
 export const TERMINAL_LINE_HEIGHT = 1.0;
