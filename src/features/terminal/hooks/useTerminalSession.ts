@@ -364,7 +364,15 @@ export function useTerminalSession(
           .filter((event): event is Extract<DispatchEvent, { kind: 'data' }> => event.kind === 'data')
           .map((event) => event.text)
           .join('');
-        if (output) win32InputMode(id).note(output);
+        if (output) {
+          const mode = win32InputMode(id);
+          const wasEnabled = mode.isEnabled;
+          mode.note(output);
+          // Recorded so a log shows which sessions read win32 key records.
+          if (mode.isEnabled !== wasEnabled) {
+            terminalDebug('win32-input-mode', { id, enabled: mode.isEnabled });
+          }
+        }
         if (sessionId === null) {
           // 尚未拿到 sessionId：先缓冲，等 spawn 完成后回放
           preSession.push({ id, events });
