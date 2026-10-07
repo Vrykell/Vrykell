@@ -80,13 +80,7 @@ const zh: Record<string, string> = {
   'ssh.action.disconnect': '断开连接',
   'ssh.action.reconnect': '重新连接',
   'ssh.action.cancelling': '正在取消…',
-  'ssh.ended.title': '连接已结束',
-  'ssh.ended.exited': 'SSH 进程已退出',
-  'ssh.ended.failed': '连接失败',
-  'ssh.ended.cancelled': '连接已按你的操作关闭，可以重新连接。',
-  'ssh.ended.authCancelledMessage': '认证已取消，连接已关闭。可以重新连接。',
-  'ssh.ended.exitedMessage': 'SSH 进程已退出，连接已关闭。可以重新连接。',
-  'ssh.ended.failedMessage': '无法建立 SSH 连接，请检查主机、端口或网络后重新连接。',
+  'ssh.ended.noOutput': '连接已结束，没有可显示的输出。',
   'ssh.quick.connect': '快速连接',
 
   // ── TUI 模式 ──

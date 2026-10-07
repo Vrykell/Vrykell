@@ -162,22 +162,16 @@ describe('SSH connection input', () => {
     expect(screen.queryByLabelText('SSH 认证响应')).toBeNull();
     expect(screen.getByTestId('ssh-terminal-screen')).toHaveStyle({ visibility: 'visible' });
   });
-  it('replaces the dead screen with a centred box that explains it and keeps the raw output', async () => {
+  it('keeps the last screen dimmed, adds the exit line once and offers reconnect', async () => {
     sessionView.status = 'closed';
-    sessionView.frame.plainText = "user@server's password:\nConnection closed by server\n[进程已退出]";
-    sessionView.frame.html = "user@server's password:<br>Connection closed by server<br>[进程已退出]";
+    sessionView.frame.plainText = "user@server's password:\nConnection closed by server";
+    sessionView.frame.html = "user@server's password:<br>Connection closed by server";
     render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput sshTarget="user@server" />);
     expect(screen.getByRole('status')).toHaveTextContent('连接已断开');
-    // 与文件面板的远端失败页同构：标题 + 说明 + 技术详情 + 动作
-    const ended = screen.getByTestId('ssh-connection-ended');
-    expect(ended).toHaveAttribute('role', 'alert');
-    expect(ended).toHaveTextContent('连接已结束');
-    expect(ended).toHaveTextContent('SSH 进程已退出，连接已关闭。可以重新连接。');
-    const details = ended.querySelector('button[aria-expanded]')!;
-    expect(details).toHaveTextContent('技术详情');
-    expect(details).toHaveAttribute('aria-expanded', 'false');
-    fireEvent.click(details);
+    // 最后一屏留在原位（变暗）：没有彩色卡片，退出信息只出现一次
+    const ended = screen.getByTestId('ssh-terminal-ended');
     expect(ended).toHaveTextContent('Connection closed by server');
+    expect(ended.textContent?.match(/\[进程已退出\]/g)).toHaveLength(1);
     fireEvent.click(screen.getByRole('button', { name: '重新连接' }));
     await waitFor(() => expect(reconnect).toHaveBeenCalledOnce());
   });

@@ -70,17 +70,11 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
         : secret ? t('ssh.state.authenticating')
           : t('ssh.state.connected');
   const stateColor = disconnected ? 'var(--error)' : (secret || status === 'connecting') ? 'var(--accent-warm)' : 'var(--accent)';
-  // 与文件面板的远端失败页一致：一句人话说明情况，原始输出收进「最后输出」
-  const endTitle = cancellation === 'done' ? t('ssh.state.manualClosed')
-    : status === 'error' ? t('ssh.ended.failed') : t('ssh.ended.title');
-  // 连接起不来时，ssh 自己那句就是最准确的原因（取消信任、主机密钥变化…），直接用
-  const lastOutputLine = text.split('\n').map((line) => line.trim()).filter((line) => line.length > 0).slice(-1)[0] ?? '';
-  const endMessage = cancelledAuthentication ? t('ssh.ended.authCancelledMessage')
-    : cancellation === 'done' ? t('ssh.ended.cancelled')
-      : status === 'error' ? (lastOutputLine || t('ssh.ended.failedMessage'))
-        : t('ssh.ended.exitedMessage');
-  const outputTail = disconnected ? text.split('\n').map((line) => line.trimEnd()).filter((line) => line.trim().length > 0).slice(-8).join('\n') : '';
-  const cardOutput = disconnected ? [outputTail, exitNoticeShown ? '' : exitNotice].filter(Boolean).join('\n') : '';
+  // 断线后保留最后一屏作为上下文：整屏变暗表示已结束，动作留在状态行，
+  // 原始退出信息（进程已退出）跟在最后一行；没有输出时退化成一句说明
+  const endedScreen = disconnected
+    ? `${frame?.html ?? ''}${exitNoticeShown ? '' : `${frame?.html ? '<br>' : ''}${exitNotice}`}`
+    : '';
   // 选择器显示「现在用哪种输入」：输密码框可见就是密码输入，否则是直接输入
   const inputMode = secret ? 'secret' : 'direct';
   return <div style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -112,13 +106,14 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
             style={{ height: 26, minWidth: 108, fontSize: 'calc(12px * var(--ui-font-scale))' }}
           />
         )}
-        {!disconnected && <button type="button" disabled={inputDisabled} onClick={() => void cancelAuthentication()} style={{ padding: '7px 12px' }}>{cancellation === 'pending' ? t('ssh.action.cancelling') : secret ? t('ssh.action.cancelAuth') : status === 'connecting' ? t('ssh.action.cancelConnect') : t('ssh.action.disconnect')}</button>}
+        {disconnected
+          ? <button type="button" disabled={cancellation === 'pending'} onClick={() => void restart()} style={{ padding: '7px 12px' }}>{t('ssh.action.reconnect')}</button>
+          : <button type="button" disabled={inputDisabled} onClick={() => void cancelAuthentication()} style={{ padding: '7px 12px' }}>{cancellation === 'pending' ? t('ssh.action.cancelling') : secret ? t('ssh.action.cancelAuth') : status === 'connecting' ? t('ssh.action.cancelConnect') : t('ssh.action.disconnect')}</button>}
       </div>
       {/* 终端区常驻：xterm 宿主必须一直在，否则重连时没有宿主可挂载。
-          断开后屏幕隐藏、由 ErrorBox 接管；aria-disabled 只在断开以外设置，
-          否则内嵌的重连按钮会被辅助技术当成禁用 */}
+          断开后宿主隐藏，改由变暗的最后一屏顶上 */}
       <div role="textbox" aria-label="SSH 交互终端" aria-multiline="true"
-        aria-disabled={disconnected ? undefined : (inputDisabled || secret)} tabIndex={inputDisabled || secret ? -1 : 0}
+        aria-disabled={inputDisabled || secret} tabIndex={inputDisabled || secret ? -1 : 0}
         onFocus={focusTerminal} onMouseDown={focusTerminal} style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'auto', outline: 'none', cursor: 'text' }}>
         {/* 密码框开着（secret）时屏幕只读，点它也不会把输入交给终端 */}
         <div ref={ref} data-testid={showSnapshot ? undefined : 'ssh-terminal-screen'} style={{ position: 'absolute', inset: 0, overflow: 'auto', visibility: showSnapshot || disconnected ? 'hidden' : 'visible', pointerEvents: showSnapshot || disconnected || secret ? 'none' : 'auto', paddingLeft: 8 }} />
@@ -131,19 +126,9 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
             <span className="ssh-connect-progress"><i /></span>
           </div>
         )}
-        {/* 连接已结束：与文件面板的远端失败页同构（标题 + 说明 + 技术详情 + 动作），在终端区里居中 */}
+        {/* 连接已结束：最后一屏留在原位并变暗，不再用彩色卡片盖住终端 */}
         {disconnected && (
-          <div style={{ position: 'absolute', inset: 0, overflow: 'auto', padding: 16 }}>
-            <ErrorBox
-              testId="ssh-connection-ended"
-              style={{ margin: '0 auto', width: 'min(100%, 520px)', overflowWrap: 'anywhere' }}
-              title={endTitle}
-              details={cardOutput || undefined}
-              actions={<button type="button" disabled={cancellation === 'pending'} onClick={() => void restart()} style={{ minHeight: 36 }}>{t('ssh.action.reconnect')}</button>}
-            >
-              {endMessage}
-            </ErrorBox>
-          </div>
+          <pre data-testid="ssh-terminal-ended" style={{ position: 'absolute', inset: 0, overflow: 'auto', margin: 0, paddingLeft: 8, paddingRight: 8, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'var(--font-mono)', fontSize: 'calc(12px * var(--ui-font-scale))', lineHeight: 1.55, color: 'var(--text-secondary)', opacity: 0.62 }} dangerouslySetInnerHTML={{ __html: endedScreen || t('ssh.ended.noOutput') }} />
         )}
       </div>
       {/* 认证输入条：与终端区左右保持一致的 8px 边距（对称，不再贴边或被单侧推偏） */}
