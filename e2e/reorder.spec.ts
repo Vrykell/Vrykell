@@ -79,4 +79,34 @@ test.describe('侧栏列表拖拽排序', () => {
     expect(after[after.length - 1]).toBe(first);
     expect(after.slice(0, -1)).toEqual(before.slice(1));
   });
+
+  test('标签拖入分组与组内换序：空位都出现在组内', async ({ page }) => {
+    await setupTauriMock(page);
+    await page.goto('/');
+    await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
+    await page.keyboard.press('Meta+t');
+    await ensureTabsOpen(page);
+
+    const tabs = await tabOrder(page);
+    expect(tabs.length).toBeGreaterThanOrEqual(2);
+    const [a, b] = tabs as [string, string];
+
+    // 在 a 上右键新建分组：a 进组，b 仍是未分组
+    await page.getByTestId(`tab-row-${a}`).click({ button: 'right' });
+    await page.getByRole('button', { name: '新建分组', exact: true }).click();
+    await page.keyboard.press('Escape');
+    const group = page.locator('[data-group-id]').first();
+    await expect(group).toBeVisible();
+
+    // 把未分组的 b 拖到组内 a 上：空位出现在组内，而不是列表里最近的行
+    await startDragRow(page, `tab-row-${b}`, `tab-row-${a}`, 0.3);
+    await expect(group.locator('[data-reorder-placeholder]')).toHaveCount(1);
+    await page.mouse.up();
+    await expect(group.locator(`[data-testid="tab-row-${b}"]`)).toHaveAttribute('data-tab-group', /.+/);
+
+    // 组内换序：a 拖到组内 b 上，空位同样在组内出现
+    await startDragRow(page, `tab-row-${a}`, `tab-row-${b}`, 0.85);
+    await expect(group.locator('[data-reorder-placeholder]')).toHaveCount(1);
+    await page.mouse.up();
+  });
 });

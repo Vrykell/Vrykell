@@ -30,6 +30,8 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
   const secret = !directInput && (manualSecret || (secretPrompt !== null && (dismissedPrompt !== secretPrompt || secretResponseWasRejected(text))));
   const inputDisabled = !sessionId || cancellation !== 'idle';
   const disconnected = status === 'closed' || status === 'error' || cancellation === 'done';
+  const exitNotice = t('terminal.processExited');
+  const exitNoticeShown = (frame?.plainText ?? '').includes(exitNotice);
   const focusTerminal = () => {
     if (!inputDisabled) ref.current?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus();
   };
@@ -77,8 +79,8 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
         onFocus={focusTerminal} onMouseDown={focusTerminal} style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'auto', outline: 'none', cursor: 'text' }}>
         <div ref={ref} data-testid={showSnapshot ? undefined : 'ssh-terminal-screen'} style={{ position: 'absolute', inset: 0, overflow: 'auto', visibility: showSnapshot ? 'hidden' : 'visible', pointerEvents: showSnapshot ? 'none' : 'auto', paddingLeft: 8 }} />
         {showSnapshot && <pre data-testid="ssh-terminal-screen" style={{ position: 'absolute', inset: 0, overflow: 'auto', margin: 0, whiteSpace: 'pre', color: 'var(--text-primary)', paddingLeft: 8 }} dangerouslySetInnerHTML={{ __html: frame?.html || '正在连接远端主机…' }} />}
-        {/* 进程已退出：写进隐藏 xterm 的那行不会出现在快照里，这里补上并给出重连入口 */}
-        {disconnected && <div data-testid="ssh-exit-notice" style={{ position: 'absolute', left: 8, bottom: 8, color: 'var(--error)', fontFamily: 'var(--font-mono)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>{t('terminal.processExited')}</div>}
+        {/* 进程已退出：快照里还没有这行时（写进隐藏 xterm 的内容不进快照）补上，避免重复 */}
+        {disconnected && !exitNoticeShown && <div data-testid="ssh-exit-notice" style={{ position: 'absolute', left: 8, bottom: 8, color: 'var(--error)', fontFamily: 'var(--font-mono)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>{exitNotice}</div>}
       </div>
       {/* 认证输入条：与终端区左右保持一致的 8px 边距（对称，不再贴边或被单侧推偏） */}
       {interactive && secret && !disconnected && <div style={{ padding: '0 8px 8px', flexShrink: 0 }}>

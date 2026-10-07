@@ -105,6 +105,10 @@ export default function PanelTabs() {
 
   const groupTabs = (gid: string) => filtered.filter((t) => isSessionTab(t) && t.groupId === gid);
   const ungroupedTabs = filtered.filter((t) => isSessionTab(t) && !t.groupId);
+  // 拖走的那行不参与「末尾占位」的判定（同 GroupSection）
+  const draggedTabId = useListReorder((s) => (s.drag?.kind === 'tab' ? s.drag.id : undefined));
+  const remainingUngrouped = ungroupedTabs.filter((t) => t.id !== draggedTabId);
+  const lastUngroupedId = remainingUngrouped[remainingUngrouped.length - 1]?.id;
   const activeTab = tabs.find((t) => t.id === activeId);
   const activeGroupId = activeTab && isSessionTab(activeTab) ? activeTab.groupId : undefined;
 
@@ -208,7 +212,7 @@ export default function PanelTabs() {
             />
             <ListReorderPlaceholder listId={LIST_ID} itemId={g.id} after />
             {/* 收起/空分组没有可插入的行：悬停分组头时在组末尾占位（追加进组） */}
-            {groupTabs(g.id).length === 0 && (
+            {(g.collapsed || groupTabs(g.id).length === 0) && (
               <ListReorderZonePlaceholder listId={LIST_ID} zoneId={g.id} />
             )}
           </Fragment>
@@ -243,8 +247,8 @@ export default function PanelTabs() {
                 />
               </Fragment>
             ))}
-            {ungroupedTabs.length > 0
-              ? <ListReorderPlaceholder listId={LIST_ID} itemId={ungroupedTabs[ungroupedTabs.length - 1]!.id} after />
+            {lastUngroupedId
+              ? <ListReorderPlaceholder listId={LIST_ID} itemId={lastUngroupedId} after />
               : <ListReorderZonePlaceholder listId={LIST_ID} zoneId={UNGROUPED_ZONE} />}
           </div>
         )}
@@ -313,7 +317,10 @@ function GroupSection(props: {
   const empty = tabs.length === 0;
   const anyMemberActive = tabs.some((t) => t.id === activeId);
   const dragging = useListReorder((s) => s.drag?.id === group.id);
-  const lastTabId = tabs[tabs.length - 1]?.id;
+  // 末尾占位对应当前可见的最后一行（拖走的那行不参与，否则拖末行时占位对不上）
+  const draggedTabId = useListReorder((s) => (s.drag?.kind === 'tab' ? s.drag.id : undefined));
+  const remainingTabs = tabs.filter((t) => t.id !== draggedTabId);
+  const lastTabId = remainingTabs[remainingTabs.length - 1]?.id;
   return (
     <div style={{ marginBottom: 4 }}>
       {/* Group containers stay transparent so selection belongs to a single row. */}
@@ -403,22 +410,26 @@ function GroupSection(props: {
         {!collapsed && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 0 4px' }}>
             {tabs.map((t) => (
-              <div key={t.id} style={{ padding: '0 4px 0 12px' }}>
-                <TabRow
-                  tab={t}
-                  active={t.id === activeId}
-                  editing={props.editId === t.id}
-                  editTitle={props.editTitle}
-                  setEditTitle={props.setEditTitle}
-                  onActivate={() => props.onActivate(t.id)}
-                  onClose={() => props.onClose(t.id)}
-                  onStartEdit={() => props.onStartEdit(t.id, t.title)}
-                  onCommitEdit={props.onCommitEdit}
-                  onCancelEdit={props.onCancelEdit}
-                  onPointerDown={(e) => props.onPointerDownTab(e, t.id)}
-                  onContextMenu={(e) => props.onContextMenuTab(e, t.id)}
-                />
-              </div>
+              <Fragment key={t.id}>
+                {/* 组内每行都有落点占位：拖进分组或组内换序都能看到预期的空位 */}
+                <ListReorderPlaceholder listId={LIST_ID} itemId={t.id} />
+                <div style={{ padding: '0 4px 0 12px' }}>
+                  <TabRow
+                    tab={t}
+                    active={t.id === activeId}
+                    editing={props.editId === t.id}
+                    editTitle={props.editTitle}
+                    setEditTitle={props.setEditTitle}
+                    onActivate={() => props.onActivate(t.id)}
+                    onClose={() => props.onClose(t.id)}
+                    onStartEdit={() => props.onStartEdit(t.id, t.title)}
+                    onCommitEdit={props.onCommitEdit}
+                    onCancelEdit={props.onCancelEdit}
+                    onPointerDown={(e) => props.onPointerDownTab(e, t.id)}
+                    onContextMenu={(e) => props.onContextMenuTab(e, t.id)}
+                  />
+                </div>
+              </Fragment>
             ))}
             {lastTabId && <ListReorderPlaceholder listId={LIST_ID} itemId={lastTabId} after />}
           </div>
