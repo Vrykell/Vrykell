@@ -157,3 +157,63 @@ export function encodeWin32Key(
   if (!tracker?.isEnabled) return null;
   return win32KeyRecord(event, down);
 }
+
+/** The terminal surface the capture needs. */
+export interface Win32KeyTerminal {
+  /** Container that holds the terminal's input textarea. */
+  element?: HTMLElement | undefined;
+  /** Copy needs to know whether there is a selection to take. */
+  hasSelection?: (() => boolean) | undefined;
+}
+
+/**
+ * Copy/paste shortcuts the terminal keeps for itself, so the mode never swallows them.
+ *
+ * Ctrl+V always pastes. Ctrl+C copies only when there is a selection: without one it stays the
+ * PTY's interrupt and must reach the encoder, otherwise the session loses its break key.
+ */
+function isTerminalShortcut(event: KeyboardEvent, terminal: Win32KeyTerminal): boolean {
+  if (!event.ctrlKey || event.altKey || event.metaKey) return false;
+  const key = event.key.toLowerCase();
+  if (event.shiftKey) return key === 'c' || key === 'v';
+  if (key === 'v') return true;
+  return key === 'c' && Boolean(terminal.hasSelection?.());
+}
+
+/**
+ * Take the keys over while a session is in win32-input-mode.
+ *
+ * The listener sits in the capture phase on the terminal's container, so a key
+ * never reaches xterm's own handlers while the mode is on and exactly one record
+ * leaves per physical key. Encoding through the custom key handler is not enough:
+ * xterm.js still produces its own data for the same key, and the application then
+ * sees the character twice. Nothing happens for a session that never asked for
+ * the mode, and the terminal's own copy/paste shortcuts keep working.
+ */
+export function attachWin32KeyCapture(
+  terminal: Win32KeyTerminal,
+  getSessionId: () => string | null,
+  write: (sessionId: string, data: string) => void,
+): () => void {
+  const element = terminal.element;
+  if (!element) return () => {};
+
+  const onKey = (event: KeyboardEvent): void => {
+    if (isTerminalShortcut(event, terminal)) return;
+    const sessionId = getSessionId();
+    if (!sessionId || !win32InputMode(sessionId).isEnabled) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.type === 'keypress') return; // Reported with the keydown already.
+    write(sessionId, win32KeyRecord(event, event.type === 'keydown'));
+  };
+
+  element.addEventListener('keydown', onKey, true);
+  element.addEventListener('keypress', onKey, true);
+  element.addEventListener('keyup', onKey, true);
+  return () => {
+    element.removeEventListener('keydown', onKey, true);
+    element.removeEventListener('keypress', onKey, true);
+    element.removeEventListener('keyup', onKey, true);
+  };
+}

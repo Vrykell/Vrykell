@@ -27,7 +27,7 @@ import { hasVisibleContent as hasVisibleBlockContent } from '@features/terminal/
 import { copyTerminalSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
 import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
 import { measureRunningTerminalRows } from '../model/runningTerminalRows';
-import { encodeWin32Key } from '@features/terminal/model/win32InputMode';
+import { attachWin32KeyCapture } from '@features/terminal/model/win32InputMode';
 
 interface Props {
   tabId: string;
@@ -552,34 +552,25 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
         }
       });
     });
-    // Ctrl+Shift+C/V 复制/粘贴；End 保留给「回到输入栏」（InputEditor 全局监听），不进 PTY。
+    // A session in win32-input-mode reads key records instead of VT sequences, and
+    // xterm.js does not implement the mode; the keys are taken over on the container
+    // so xterm never also emits them. The listener goes away with the element.
+    attachWin32KeyCapture(
+      term,
+      () => useTerminalStore.getState().sessions[tabId] ?? null,
+      (id, data) => { ptyWrite(id, data).catch(() => {}); },
+    );
+    // 复制/粘贴归终端（End 保留给「回到输入栏」，不进 PTY）：Ctrl+C 有选区时复制、
+    // Ctrl+V 粘贴，Ctrl+Shift+C/V 同样有效。
     term.attachCustomKeyEventHandler((e) => {
-      // A session in win32-input-mode reads key records, not VT sequences; xterm.js
-      // does not implement the mode, so encode the key here instead.
-      const inputSession = useTerminalStore.getState().sessions[tabId];
-      if (inputSession && (e.type === 'keydown' || e.type === 'keyup')) {
-        const record = encodeWin32Key(inputSession, e, e.type === 'keydown');
-        if (record) {
-          ptyWrite(inputSession, record).catch(() => {});
-          return false;
-        }
-      }
-      // Ctrl+C 有选中内容时复制（与常见终端一致），没有选区才直通 PTY 当中断用。
-      if (e.type === 'keydown' && e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === 'c' && term.hasSelection()) {
-        e.preventDefault();
-        void copyTerminalSelection(term);
-        return false;
-      }
-      if (e.type === 'keydown' && e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey) {
+      if (e.type === 'keydown' && e.ctrlKey && !e.altKey && !e.metaKey) {
         const key = e.key.toLowerCase();
-        if (key === 'c') {
+        const copy = key === 'c' && (e.shiftKey || term.hasSelection());
+        const paste = key === 'v';
+        if (copy || paste) {
           e.preventDefault();
-          void copyTerminalSelection(term);
-          return false;
-        }
-        if (key === 'v') {
-          e.preventDefault();
-          void pasteClipboardIntoTerminal(tabId);
+          if (copy) void copyTerminalSelection(term);
+          else void pasteClipboardIntoTerminal(tabId);
           return false;
         }
       }

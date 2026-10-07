@@ -26,7 +26,7 @@ import { defaultOpenModeForShell } from '@features/agent/stores/agentSettings';
 import { t } from '@i18n';
 import { SessionController } from '@features/terminal/services/pipeline/sessionController';
 import { copyTerminalSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
-import { encodeWin32Key, forgetWin32InputMode, win32InputMode } from '@features/terminal/model/win32InputMode';
+import { attachWin32KeyCapture, forgetWin32InputMode, win32InputMode } from '@features/terminal/model/win32InputMode';
 import { getCellMetrics } from '@utils/termMetrics';
 import type { DispatchEvent } from '@core/terminal/events';
 import type { UnlistenFn } from '@tauri-apps/api/event';
@@ -474,35 +474,26 @@ export function useTerminalSession(
 
     // ── 用户输入（xterm 聚焦时：classic/altScreen，及 blockList 运行中块） ──
 
+    // A session in win32-input-mode reads key records instead of VT sequences, and
+    // xterm.js does not implement the mode; the keys are taken over on the container
+    // so xterm never also emits them. The listener goes away with the element.
+    attachWin32KeyCapture(term, () => sessionId, (id, data) => {
+      ptyWrite(id, data).catch(() => {});
+    });
+
     // blockList 下 End 保留给「回到输入栏」（InputEditor 的全局监听会接住），
     // 不能漏进 PTY（xterm 默认会发 \x1b[F）
     term.attachCustomKeyEventHandler((e) => {
-      // A session in win32-input-mode reads key records, not VT sequences; xterm.js
-      // does not implement the mode, so encode the key here instead.
-      if (sessionId && (e.type === 'keydown' || e.type === 'keyup')) {
-        const record = encodeWin32Key(sessionId, e, e.type === 'keydown');
-        if (record) {
-          ptyWrite(sessionId, record).catch(() => {});
-          return false;
-        }
-      }
-      // Ctrl+C 有选中内容时复制（与常见终端一致），没有选区才直通 PTY 当中断用。
-      if (e.type === 'keydown' && e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === 'c' && term.hasSelection()) {
-        e.preventDefault();
-        void copyTerminalSelection(term);
-        return false;
-      }
-      // Ctrl+Shift+C/V 复制/粘贴；不劫持 Ctrl+C —— 各终端语义不同，仍直通 PTY。
-      if (e.type === 'keydown' && e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey) {
+      // 复制/粘贴归终端：Ctrl+C 有选区时复制（没有选区仍是 PTY 的中断），Ctrl+V 粘贴；
+      // Ctrl+Shift+C/V 同样有效。
+      if (e.type === 'keydown' && e.ctrlKey && !e.altKey && !e.metaKey) {
         const key = e.key.toLowerCase();
-        if (key === 'c') {
+        const copy = key === 'c' && (e.shiftKey || term.hasSelection());
+        const paste = key === 'v';
+        if (copy || paste) {
           e.preventDefault();
-          void copyTerminalSelection(term);
-          return false;
-        }
-        if (key === 'v') {
-          e.preventDefault();
-          void pasteClipboardIntoTerminal(paneId);
+          if (copy) void copyTerminalSelection(term);
+          else void pasteClipboardIntoTerminal(paneId);
           return false;
         }
       }

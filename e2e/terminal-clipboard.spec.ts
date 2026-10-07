@@ -38,21 +38,36 @@ test('终端右键菜单提供复制/粘贴并标注 Ctrl+Shift+C/V', async ({ p
   const menu = page.getByRole('menu', { name: '操作菜单' });
   await expect(menu).toBeVisible();
   await expect(menu).toContainText('复制');
-  await expect(menu).toContainText('Ctrl+Shift+C');
+  await expect(menu).toContainText('Ctrl+C');
   await expect(menu).toContainText('粘贴');
-  await expect(menu).toContainText('Ctrl+Shift+V');
+  await expect(menu).toContainText('Ctrl+V');
   await page.screenshot({ path: test.info().outputPath('terminal-clipboard-menu.png') });
 });
 
-test('运行中块 Ctrl+Shift+V 把剪贴板内容写入 PTY', async ({ page }) => {
+test('运行中块 Ctrl+V 把剪贴板内容写入 PTY', async ({ page }) => {
   const host = await startRunningBlock(page);
   await page.evaluate(() => {
     (window as unknown as Record<string, string>).__CLIPBOARD_TEXT__ = 'echo pasted\n';
   });
 
   const before = (await ptyWrites(page)).length;
-  await host.locator('.xterm-helper-textarea').press('Control+Shift+V');
+  await host.locator('.xterm-helper-textarea').press('Control+v');
   await expect.poll(async () => (await ptyWrites(page)).slice(before)).toContain('echo pasted\n');
+});
+
+test('会话请求 win32-input-mode 后 Ctrl+C 仍然复制而不是发按键记录', async ({ page }) => {
+  await emitPtyOutput(page, `\x1b]133;E;${btoa('sleep 100')}\x07\x1b]133;C\x07`);
+  await emitPtyOutput(page, '\x1b[?9001h\x1b[2;1Hcopyme');
+  const host = page.getByTestId('running-term');
+  await expect(host.locator('.xterm')).toBeVisible();
+  await expect.poll(() => hasBlockTerm(page)).toBe(true);
+  await selectInBlockTerm(page, 0, 1, 6);
+
+  const before = (await ptyWrites(page)).length;
+  await host.locator('.xterm-helper-textarea').press('Control+c');
+  await expect.poll(() => clipboardText(page)).toBe('copyme');
+  // 复制分支必须在按键编码之前：否则会话拿到的是 ^C 记录，复制失效
+  expect((await ptyWrites(page)).slice(before)).not.toContain('_');
 });
 
 test('运行中块 Ctrl+Shift+C 把选区写入剪贴板', async ({ page }) => {
