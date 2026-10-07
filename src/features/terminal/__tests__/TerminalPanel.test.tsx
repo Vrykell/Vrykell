@@ -26,15 +26,15 @@ function chooseInputMode(mode: '密码输入' | '直接输入') {
 }
 
 describe('SSH connection input', () => {
-  it('keeps the live screen visible when manually opening masked input without an authentication prompt', () => {
-    sessionView.frame.plainText = '';
-    sessionView.frame.html = '';
+  it('freezes the screen while masked input is open so no terminal cursor is left behind', () => {
+    sessionView.frame.plainText = 'bash-5.2$ ';
+    sessionView.frame.html = 'bash-5.2$ ';
     useTerminalStore.setState({ sessions: { p: 'session' } });
     render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
     chooseInputMode('密码输入');
     expect(screen.getByLabelText('SSH 认证响应')).toHaveAttribute('type', 'password');
-    expect(screen.getByTestId('ssh-terminal-screen').tagName).toBe('DIV');
-    expect(screen.getByTestId('ssh-terminal-screen')).toHaveStyle({ visibility: 'visible' });
+    // 冻结成快照：live xterm 会自己画光标，看起来像还能在屏幕上输入
+    expect(screen.getByTestId('ssh-terminal-screen').tagName).toBe('PRE');
     expect(screen.queryByText('正在连接远端主机…')).not.toBeInTheDocument();
   });
   it('reports a manual interactive disconnect without calling it authentication cancellation', async () => {
@@ -162,19 +162,22 @@ describe('SSH connection input', () => {
     expect(screen.queryByLabelText('SSH 认证响应')).toBeNull();
     expect(screen.getByTestId('ssh-terminal-screen')).toHaveStyle({ visibility: 'visible' });
   });
-  it('replaces the dead screen with an ended block that keeps the reason and the last output', async () => {
+  it('replaces the dead screen with a centred box that explains it and keeps the raw output', async () => {
     sessionView.status = 'closed';
     sessionView.frame.plainText = "user@server's password:\nConnection closed by server\n[进程已退出]";
     sessionView.frame.html = "user@server's password:<br>Connection closed by server<br>[进程已退出]";
     render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput sshTarget="user@server" />);
     expect(screen.getByRole('status')).toHaveTextContent('连接已断开');
+    // 与文件面板的远端失败页同构：标题 + 说明 + 技术详情 + 动作
     const ended = screen.getByTestId('ssh-connection-ended');
-    expect(ended).toHaveTextContent('连接已结束');
-    expect(ended).toHaveTextContent('SSH 进程已退出');
-    expect(ended).toHaveTextContent('最后输出');
-    expect(ended).toHaveTextContent('Connection closed by server');
-    // 与文件面板的远端失败页共用 ErrorBox：原因与原始输出都在，重连动作在 actions 里
     expect(ended).toHaveAttribute('role', 'alert');
+    expect(ended).toHaveTextContent('连接已结束');
+    expect(ended).toHaveTextContent('SSH 进程已退出，连接已关闭。可以重新连接。');
+    const details = ended.querySelector('button[aria-expanded]')!;
+    expect(details).toHaveTextContent('技术详情');
+    expect(details).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(details);
+    expect(ended).toHaveTextContent('Connection closed by server');
     fireEvent.click(screen.getByRole('button', { name: '重新连接' }));
     await waitFor(() => expect(reconnect).toHaveBeenCalledOnce());
   });
@@ -190,7 +193,8 @@ describe('SSH connection input', () => {
     chooseInputMode('密码输入');
     expect(area).toHaveAttribute('tabindex', '-1');
     expect(area).toHaveAttribute('aria-disabled', 'true');
-    expect(screen.getByTestId('ssh-terminal-screen')).toHaveStyle({ pointerEvents: 'none' });
+    // 屏幕同时冻结成快照，点不进去也没有终端光标
+    expect(screen.getByTestId('ssh-terminal-screen').tagName).toBe('PRE');
   });
 
   it('shows a connecting state with its own cancel action before the PTY is ready', () => {
