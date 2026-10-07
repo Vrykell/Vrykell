@@ -27,7 +27,6 @@ import { hasVisibleContent as hasVisibleBlockContent } from '@features/terminal/
 import { copyTerminalSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
 import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
 import { measureRunningTerminalRows } from '../model/runningTerminalRows';
-import { attachWin32KeyCapture } from '@features/terminal/model/win32InputMode';
 
 interface Props {
   tabId: string;
@@ -552,14 +551,6 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
         }
       });
     });
-    // A session in win32-input-mode reads key records instead of VT sequences, and
-    // xterm.js does not implement the mode; the keys are taken over on the container
-    // so xterm never also emits them. The listener goes away with the element.
-    attachWin32KeyCapture(
-      term,
-      () => useTerminalStore.getState().sessions[tabId] ?? null,
-      (id, data) => { ptyWrite(id, data).catch(() => {}); },
-    );
     // 复制/粘贴归终端（End 保留给「回到输入栏」，不进 PTY）：Ctrl+C 有选区时复制、
     // Ctrl+V 粘贴，Ctrl+Shift+C/V 同样有效。
     term.attachCustomKeyEventHandler((e) => {
