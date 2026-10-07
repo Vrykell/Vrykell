@@ -213,6 +213,20 @@ export class SessionController {
       this.sinks.writeMain(raw);
       return;
     }
+    // Block list: the running command's own terminal is the block terminal, so OSC that is
+    // not shell integration has to reach it. Colour and palette queries (OSC 10/11/12, OSC 4)
+    // wait for the reply that only that terminal can give, and hyperlinks (OSC 8) and
+    // clipboard (OSC 52) only take effect there. Dropping them made every TUI that probes the
+    // terminal (a background-colour query at startup is common) misbehave.
+    const running = this.activeBlock;
+    if (this._scene === 'blockList' && !isIntegration && running?.status === 'executing' && running.outputTerm) {
+      running.outputTerm.write(raw);
+      running.outputRaw += raw;
+      if (running.outputRaw.length > RAW_CAP * 2) {
+        running.outputRaw = running.outputRaw.slice(-RAW_CAP);
+      }
+      return;
+    }
 
     switch (code) {
       case '133;A':
@@ -252,7 +266,7 @@ export class SessionController {
         break;
       }
       default:
-        // 其他 OSC（0/2 标题等）：blockList 下丢弃
+        // Nothing is running (pending/done block): no terminal to answer it, so drop it.
         break;
     }
   }
