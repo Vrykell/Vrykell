@@ -5,6 +5,7 @@ import { useTerminalStore } from '@features/terminal';
 import { ptyWrite } from '@platform/pty';
 import ErrorBox from '@ui/ErrorBox';
 import { secretResponsePrompt, secretResponseWasRejected } from '../model/terminalFrame';
+import { t } from '@i18n';
 import { terminalDebug } from '../services/terminalDebug';
 
 /** Render an interactive SSH session with xterm so screen contents and cursor stay in sync. */
@@ -76,6 +77,8 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
         onFocus={focusTerminal} onMouseDown={focusTerminal} style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'auto', outline: 'none', cursor: 'text' }}>
         <div ref={ref} data-testid={showSnapshot ? undefined : 'ssh-terminal-screen'} style={{ position: 'absolute', inset: 0, overflow: 'auto', visibility: showSnapshot ? 'hidden' : 'visible', pointerEvents: showSnapshot ? 'none' : 'auto', paddingLeft: 8 }} />
         {showSnapshot && <pre data-testid="ssh-terminal-screen" style={{ position: 'absolute', inset: 0, overflow: 'auto', margin: 0, whiteSpace: 'pre', color: 'var(--text-primary)', paddingLeft: 8 }} dangerouslySetInnerHTML={{ __html: frame?.html || '正在连接远端主机…' }} />}
+        {/* 进程已退出：写进隐藏 xterm 的那行不会出现在快照里，这里补上并给出重连入口 */}
+        {disconnected && <div data-testid="ssh-exit-notice" style={{ position: 'absolute', left: 8, bottom: 8, color: 'var(--error)', fontFamily: 'var(--font-mono)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>{t('terminal.processExited')}</div>}
       </div>
       {/* 认证输入条：与终端区左右保持一致的 8px 边距（对称，不再贴边或被单侧推偏） */}
       {interactive && secret && !disconnected && <div style={{ padding: '0 8px 8px', flexShrink: 0 }}>
