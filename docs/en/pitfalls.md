@@ -538,6 +538,15 @@
 
 ---
 
+## Terminal renderer and CJK width (order of investigation)
+
+- The renderer is chosen in exactly one place: `src/features/terminal/model/xtermRenderer.ts`, WebGL by default with a DOM fallback when the GPU context is lost. To compare, pin the DOM renderer with `localStorage['vrykell-terminal-renderer'] = 'dom'` and delete the key afterwards.
+- **Check the font before blaming the renderer** when frames and tables drift: the usual cause is a CJK fallback face whose advance is not two Latin cells, so the right border of a table like `│ name │` shifts row by row. The font stack must reach a monospace CJK face (Sarasa Mono SC / Noto Sans Mono CJK SC). Headless e2e environments rarely have those fonts, so they never decide the renderer question.
+- The WebGL renderer cannot be screenshotted without a GPU (headless browser / SwiftShader): `.xterm-rows` is empty and captures come back black, because the selection lives in the canvas texture rather than the DOM. Renderer comparisons must run on real hardware.
+- Measured fact: the WebGL canvas is device-pixel aligned (CSS width times dpr is exactly integral), so "canvas rounding" does not explain an edge seam. Measure the `screen` / `region` / `canvas` rects before blaming rounding.
+
+---
+
 ## Appendix: Methodological Lessons (Distilled from the Pitfalls Above)
 
 1. **Silent failure is the most expensive failure**: swallowing ALTER errors, swallowing SQL failures, swallowing read errors, discarding unknown sequences, silently dropping commands on timeout, INSERT OR IGNORE — at least 6 kinds of "silence" in this project each caused a hard-to-diagnose production symptom. A failure must either be fixed or make noise.

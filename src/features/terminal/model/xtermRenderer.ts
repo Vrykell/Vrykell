@@ -14,6 +14,9 @@ import { WebglAddon } from '@xterm/addon-webgl';
  * error: the terminal keeps the renderer it already had.
  */
 export function loadWebglRenderer(term: Terminal): void {
+  // Diagnostic switch: `localStorage['vrykell-terminal-renderer'] = 'dom'` keeps the DOM
+  // renderer for the current profile, so the two renderers can be compared on real content.
+  if (globalThis.localStorage?.getItem('vrykell-terminal-renderer') === 'dom') return;
   try {
     const addon = new WebglAddon();
     addon.onContextLoss(() => addon.dispose());

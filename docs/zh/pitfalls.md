@@ -538,6 +538,15 @@
 
 ---
 
+## 终端渲染器与 CJK 宽度（排查顺序）
+
+- 渲染器只有一处可选：`src/features/terminal/model/xtermRenderer.ts`，默认 WebGL，GPU 上下文丢失时降级 DOM。对比实验用 `localStorage['vrykell-terminal-renderer'] = 'dom'` 固定 DOM 渲染器，比完删掉该键。
+- **框线/表格错位先查字体，不要先怀疑渲染器**：根因通常是 CJK 回退字体的字宽不是 2 个拉丁单元 —— 字体栈必须能命中一个等宽 CJK 字体（Sarasa Mono SC / Noto Sans Mono CJK SC），否则 `│ 名称 │` 这类表格的右边框逐行错开。无头 e2e 环境通常没有这些字体，**不能据此判断渲染器好坏**。
+- WebGL 渲染器在无 GPU 的环境（无头浏览器 / SwiftShader）截不到画面：`.xterm-rows` 为空、截图全黑（选区被画进 canvas 纹理，不是 DOM）。比较渲染器必须在真机跑。
+- 已量到的几何事实：WebGL 画布按设备像素对齐（CSS 宽 × dpr 恰为整数），所以「画布取整」这条推断不成立；怀疑边缘亮线前，先量 `screen` / `region` / `canvas` 三者的 rect 再下结论。
+
+---
+
 ## 附：方法论层面的教训（从上述坑中提炼）
 
 1. **静默失败是最贵的失败**：吞 ALTER 错误、吞 SQL 失败、吞 read 错误、丢弃未知序列、超时静默丢命令、INSERT OR IGNORE——本项目至少 6 类「静默」各自造成过一次难查的线上症状。失败要么修好，要么响。
