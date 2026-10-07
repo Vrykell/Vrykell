@@ -41,6 +41,13 @@ async function ipcRecords(page: Page, key: string): Promise<Record<string, unkno
   return page.evaluate(name => (window as unknown as Record<string, Record<string, unknown>[]>)[name] ?? [], key);
 }
 
+test('the connection screen keeps no scrollbar of its own', async ({ page }) => {
+  await openSsh(page, 'known');
+  await emitPtyOutput(page, 'ready\r\n');
+  const surface = page.getByTestId('ssh-connection-input');
+  await expect(surface.locator('.xterm-viewport')).toHaveCSS('scrollbar-width', 'none');
+});
+
 test('native SSH recordings distinguish an empty directory from missing command output', async ({ page }) => {
   await openSsh(page, 'known');
   await emitPtyOutput(page, '\x1b]133;A\x07');

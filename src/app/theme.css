@@ -377,12 +377,11 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 /* Overflowing content shares a compact themed scrollbar in both directions. */
 ::-webkit-scrollbar { width: var(--scrollbar-size); height: var(--scrollbar-size); }
 ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
-/* Terminal scrollbars use the terminal background: a transparent track lets the canvas
-   selection show through as a bright line beside the scrollbar. */
-[data-testid^="pane-"] .xterm ::-webkit-scrollbar-track,
-[data-testid="running-term"] .xterm ::-webkit-scrollbar-track,
-[data-testid^="pane-"] .xterm ::-webkit-scrollbar-corner,
-[data-testid="running-term"] .xterm ::-webkit-scrollbar-corner { background: var(--xterm-bg); }
+/* The terminal's own scrollbar draws a ~4px thumb inside an 8px lane, which reads as a
+   stray line next to a selection; the running block already hides its own scrollbar, so
+   the pane does too. Wheel, trackpad and keyboard scrolling are unaffected. */
+[data-testid^="pane-"] .xterm-viewport { scrollbar-width: none; }
+[data-testid^="pane-"] .xterm-viewport::-webkit-scrollbar { display: none; }
 ::-webkit-scrollbar-thumb {
   background-color: var(--scrollbar-thumb);
   background-clip: padding-box;

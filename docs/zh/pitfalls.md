@@ -544,6 +544,7 @@
 - **框线/表格错位先查字体，不要先怀疑渲染器**：根因通常是 CJK 回退字体的字宽不是 2 个拉丁单元 —— 字体栈必须能命中一个等宽 CJK 字体（Sarasa Mono SC / Noto Sans Mono CJK SC），否则 `│ 名称 │` 这类表格的右边框逐行错开。无头 e2e 环境通常没有这些字体，**不能据此判断渲染器好坏**。
 - WebGL 渲染器在无 GPU 的环境（无头浏览器 / SwiftShader）截不到画面：`.xterm-rows` 为空、截图全黑（选区被画进 canvas 纹理，不是 DOM）。比较渲染器必须在真机跑。
 - 已量到的几何事实：WebGL 画布按设备像素对齐（CSS 宽 × dpr 恰为整数），所以「画布取整」这条推断不成立；怀疑边缘亮线前，先量 `screen` / `region` / `canvas` 三者的 rect 再下结论。
+- **终端「选区旁边一条细线」= 终端自带的滚动条**：`.xterm-viewport` 比 `.xterm-screen` 宽 8px（那 8px 是原生滚动条滑道），全局 `::-webkit-scrollbar-thumb` 的 `2px 透明边框 + padding-box` 让它只剩中间约 4px 的浅色细条，紧贴选区时就像渲染瑕疵。运行块早就用 `display: none` 关掉了自己的滚动条，pane 现在也关（滚轮/触控板/键盘滚动不受影响）。切换渲染器（WebGL/DOM）**不会**改变这个现象，别把它当成渲染器问题。
 
 ---
 
