@@ -26,7 +26,7 @@ import { defaultOpenModeForShell } from '@features/agent/stores/agentSettings';
 import { t } from '@i18n';
 import { SessionController } from '@features/terminal/services/pipeline/sessionController';
 import { copyTerminalSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
-import { attachWin32KeyCapture, forgetWin32InputMode, win32InputMode } from '@features/terminal/model/win32InputMode';
+import { querySequences } from '@features/terminal/model/terminalQueries';
 import { getCellMetrics } from '@utils/termMetrics';
 import type { DispatchEvent } from '@core/terminal/events';
 import type { UnlistenFn } from '@tauri-apps/api/event';
@@ -365,13 +365,10 @@ export function useTerminalSession(
           .map((event) => event.text)
           .join('');
         if (output) {
-          const mode = win32InputMode(id);
-          const wasEnabled = mode.isEnabled;
-          mode.note(output);
-          // Recorded so a log shows which sessions read win32 key records.
-          if (mode.isEnabled !== wasEnabled) {
-            terminalDebug('win32-input-mode', { id, enabled: mode.isEnabled });
-          }
+          // Questions the program expects the terminal to answer; a line here shows what
+          // a session is waiting on without recording the output itself.
+          const queries = querySequences(output);
+          if (queries.length > 0) terminalDebug('terminal-queries', { id, queries });
         }
         if (sessionId === null) {
           // 尚未拿到 sessionId：先缓冲，等 spawn 完成后回放
@@ -394,7 +391,6 @@ export function useTerminalSession(
         if (id === sessionId) {
           sessionId = null;
           stopped = true;
-          forgetWin32InputMode(id);
           useTerminalStore.getState().clearSession(paneId, id);
           setStatus('closed');
           writeMain(`\r\n\x1b[31m${t('terminal.processExited')}\x1b[0m\r\n`);
@@ -481,13 +477,6 @@ export function useTerminalSession(
       });
 
     // ── 用户输入（xterm 聚焦时：classic/altScreen，及 blockList 运行中块） ──
-
-    // A session in win32-input-mode reads key records instead of VT sequences, and
-    // xterm.js does not implement the mode; the keys are taken over on the container
-    // so xterm never also emits them. The listener goes away with the element.
-    attachWin32KeyCapture(term, () => sessionId, (id, data) => {
-      ptyWrite(id, data).catch(() => {});
-    });
 
     // blockList 下 End 保留给「回到输入栏」（InputEditor 的全局监听会接住），
     // 不能漏进 PTY（xterm 默认会发 \x1b[F）
