@@ -27,6 +27,7 @@ import { hasVisibleContent as hasVisibleBlockContent } from '@features/terminal/
 import { copyTerminalSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
 import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
 import { measureRunningTerminalRows } from '../model/runningTerminalRows';
+import { encodeWin32Key } from '@features/terminal/model/win32InputMode';
 
 interface Props {
   tabId: string;
@@ -553,6 +554,16 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
     });
     // Ctrl+Shift+C/V 复制/粘贴；End 保留给「回到输入栏」（InputEditor 全局监听），不进 PTY。
     term.attachCustomKeyEventHandler((e) => {
+      // A session in win32-input-mode reads key records, not VT sequences; xterm.js
+      // does not implement the mode, so encode the key here instead.
+      const inputSession = useTerminalStore.getState().sessions[tabId];
+      if (inputSession && (e.type === 'keydown' || e.type === 'keyup')) {
+        const record = encodeWin32Key(inputSession, e, e.type === 'keydown');
+        if (record) {
+          ptyWrite(inputSession, record).catch(() => {});
+          return false;
+        }
+      }
       // Ctrl+C 有选中内容时复制（与常见终端一致），没有选区才直通 PTY 当中断用。
       if (e.type === 'keydown' && e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === 'c' && term.hasSelection()) {
         e.preventDefault();
