@@ -370,7 +370,13 @@ function TerminalPane(props: {
         // 否则认证输入条等整宽元素会被一起推右，出现左右不对称。
         ? { flex: 1, minHeight: 0, position: 'relative', padding: '8px 0 0 0', paddingTop: scene === 'altScreen' ? 28 : 8, background: 'transparent' }
         : { position: 'absolute', inset: 0, opacity: 0, pointerEvents: 'none' }}>
-        <TerminalPanel paneId={terminal.id} tabId={windowId} connectionInput={terminal.kind === 'ssh'} onReady={(sid) => setSession(terminal.id, sid)} />
+        <TerminalPanel
+          paneId={terminal.id}
+          tabId={windowId}
+          connectionInput={terminal.kind === 'ssh'}
+          sshTarget={terminal.ssh ? `${terminal.ssh.user ? `${terminal.ssh.user}@` : ''}${terminal.ssh.host}` : undefined}
+          onReady={(sid) => setSession(terminal.id, sid)}
+        />
       </div>
 
       {/* Keep the block list mounted so its live terminal survives manual fullscreen. */}

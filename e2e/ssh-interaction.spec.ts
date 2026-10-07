@@ -31,7 +31,8 @@ test('quick connection completes interactive authentication, navigation and reco
   await page.getByRole('button', { name: '断开连接', exact: true }).click();
   await expect(page.getByRole('button', { name: '重新连接' })).toBeVisible();
   await page.getByRole('button', { name: '重新连接' }).click();
-  await expect(page.getByRole('button', { name: '断开连接', exact: true })).toBeEnabled();
+  // 重连后先是「取消连接」（还在建立），连上后才变回「断开连接」
+  await expect(page.getByRole('button', { name: /^(取消连接|断开连接)$/ })).toBeEnabled();
   const state = await page.evaluate(() => {
     const w = window as unknown as { __PTY_WRITES__: string[]; __PTY_SPAWNS__: { ssh?: { host: string; shellIntegration: boolean } }[] };
     return { writes: w.__PTY_WRITES__, spawns: w.__PTY_SPAWNS__.filter(item => item.ssh) };
