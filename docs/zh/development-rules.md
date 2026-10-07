@@ -77,7 +77,7 @@
 
 ## 十、公共组件与文档
 
-43. **公共组件优先** — 侧栏列表项统一走 `src/ui/sidebarItem.tsx`（会话标签行与 SSH 连接行共用同一外观与交互）；列表拖拽排序统一走 `src/ui/listReorder.tsx` 的「占位空位」交互（拖起的行让出槽位、落点用虚线占位、跟随指针的图标预览、Esc 取消、抑制拖拽后的点击），新列表通过 `data-reorder-list` / `data-reorder-item` / `data-reorder-kind` 接入，不得另造一套观感；错误展示统一走 `src/ui/ErrorBox.tsx` 与 `ErrorDetails.tsx`（面板正在展示的数据加载失败用行内 ErrorBox，临时动作结果用 Toast）；设置项选择器统一用 `src/ui/Select.tsx` 下拉框。新增同类界面时先抽公共组件再接入。
+43. **公共组件优先** — 侧栏列表项统一走 `src/ui/sidebarItem.tsx`（会话标签行与 SSH 连接行共用同一外观与交互）；列表拖拽排序统一走 `src/ui/listReorder.tsx` 的「占位空位」交互（拖起的行让出槽位、落点用虚线占位、跟随指针的图标预览、Esc 取消、抑制拖拽后的点击），新列表通过 `data-reorder-list` / `data-reorder-item` / `data-reorder-kind` 接入，不得另造一套观感；错误展示统一走 `src/ui/ErrorBox.tsx` 与 `ErrorDetails.tsx`（面板正在展示的数据加载失败用行内 ErrorBox，临时动作结果用 Toast）；设置项选择器统一用 `src/ui/Select.tsx` 下拉框；悬停提示统一走 `data-tip` + `src/ui/TooltipLayer.tsx`（组件里不写 `title`：系统原生提示无法改样式；纯图标控件同时保留 `aria-label` 作为无障碍名称）；多选列表统一走 `src/ui/CheckboxMenu.tsx`（逐项切换后保持展开，失焦或 Esc 才关闭）。新增同类界面时先抽公共组件再接入。
 44. **测试钩子稳定** — 重构移动标记时保留既有测试钩子（`data-testid`、`data-tab-row-id`、`data-tab-group`、ARIA 名称等），或在同一提交内更新全部引用它的单测 / e2e。
 45. **文档分层** — 规则正本 = `docs/zh/development-rules.md`（英文镜像 `docs/en/development-rules.md`，两者保持同步）；常驻摘要 = `AGENTS.md`（Codex 等 agent 先读它）；agent 规范入口 = `.agents/skills/vrykell-conventions/SKILL.md`（Command Code 与 Codex 直接读取，`.claude/skills/vrykell-conventions/SKILL.md` 是 Claude Code 的桥接）。规则变化时同步这几处，不再新增副本。
 46. **双语文档** — `docs/` 下的文档保持中英双语：中文放 `docs/zh/`、英文放 `docs/en/`，两侧文件名一一对应。新增文档必须同时提供两种语言；修改任一语言版本时同步更新另一种。`docs/audit-evidence/` 下的截图等原始证据不翻译。

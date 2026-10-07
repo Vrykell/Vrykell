@@ -55,6 +55,11 @@ Before committing, run at least `npx tsc --noEmit`, `npm run test` and
   Bare `role="alert"` blocks are not acceptable.
 - **Settings option groups** use the `Select` dropdown from `src/ui/Select.tsx`, not
   segmented pill controls.
+- **Hover hints** go through `data-tip` and `src/ui/TooltipLayer.tsx` (one themed bubble).
+  Components do not set `title` - the OS tooltip cannot be styled - and icon-only
+  controls keep an `aria-label` as their accessible name.
+- **Multi-select menus** use `src/ui/CheckboxMenu.tsx`: toggling keeps the menu open and
+  it closes only when it loses focus (outside press or Escape).
 - **One implementation per surface** - local and SSH file panels share the `FileOps`
   interface plus `filePanelConfig`; view code must not branch on the target or bypass the
   interface (rule 24 in `docs/zh/development-rules.md`).
