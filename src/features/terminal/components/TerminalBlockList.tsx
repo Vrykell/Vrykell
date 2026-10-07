@@ -553,6 +553,12 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
     });
     // Ctrl+Shift+C/V 复制/粘贴；End 保留给「回到输入栏」（InputEditor 全局监听），不进 PTY。
     term.attachCustomKeyEventHandler((e) => {
+      // Ctrl+C 有选中内容时复制（与常见终端一致），没有选区才直通 PTY 当中断用。
+      if (e.type === 'keydown' && e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === 'c' && term.hasSelection()) {
+        e.preventDefault();
+        void copyTerminalSelection(term);
+        return false;
+      }
       if (e.type === 'keydown' && e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey) {
         const key = e.key.toLowerCase();
         if (key === 'c') {

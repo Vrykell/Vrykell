@@ -5,7 +5,9 @@
   --terminal-row-height: 16px;
   --scrollbar-size: 8px;
   --font-ui: -apple-system, "SF Pro Text", "PingFang SC", "Segoe UI", sans-serif;
-  --font-mono: Menlo, Monaco, "Cascadia Code", "JetBrains Mono", "Noto Sans Mono", "DejaVu Sans Mono", "Noto Sans CJK SC", "PingFang SC", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", monospace;
+  /* Ligature-free mono first, then a monospace CJK face, then the generic before the
+     emoji fallbacks (an emoji face is proportional and breaks terminal alignment). */
+  --font-mono: "Cascadia Mono", "Cascadia Code", Menlo, Monaco, "JetBrains Mono", "Sarasa Mono SC", "Noto Sans Mono CJK SC", "Noto Sans Mono", "DejaVu Sans Mono", monospace, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
 
   --radius-block: 14px;
   --radius-inner: 8px;
@@ -391,8 +393,8 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 .scroll-region, .settings-content { scrollbar-gutter: stable; }
 [data-testid^="terminal-scroll-"] { --scrollbar-size: 10px; }
 
-/* xterm 容器贴边：取消全屏终端的边缘内边距 */
-.xterm { padding: 0; }
+/* xterm 容器贴边：取消全屏终端的边缘内边距；连字会把多个字符画成一格，终端里必须关掉 */
+.xterm { padding: 0; font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
 
 /* xterm viewport 默认纯黑 #000：canvas 取整残差（容器宽 − cols×cellWidth）区域
  * 会显出比终端背景更黑的竖条。统一为终端背景色 --xterm-bg（残差区与终端同色）。

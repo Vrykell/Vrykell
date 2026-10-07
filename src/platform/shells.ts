@@ -4,13 +4,18 @@ import { isMacOS } from '@platform/runtime';
 /** 本地 shell 类型标识 */
 export type ShellType = 'zsh' | 'bash' | 'powershell' | 'pwsh' | 'cmd';
 
+/** Every configurable shell type, in the order settings lists them. */
+export const SHELL_TYPES: ShellType[] = ['zsh', 'bash', 'powershell', 'pwsh', 'cmd'];
+
 /** shell 类型 → 显示名（默认标签标题用）。 */
 export function shellTypeLabel(t: string): string {
   switch (t) {
     case 'zsh': return 'Zsh';
     case 'bash': return 'Bash';
-    case 'powershell': return 'PowerShell';
-    case 'pwsh': return 'PowerShell';
+    // The OS-bundled Windows PowerShell and the standalone pwsh build are different
+    // executables with their own open mode; identical labels would show two look-alike rows.
+    case 'powershell': return 'Windows PowerShell';
+    case 'pwsh': return 'PowerShell 7';
     case 'cmd': return 'CMD';
     default: return t || '终端';
   }

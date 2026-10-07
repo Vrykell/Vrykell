@@ -49,23 +49,24 @@ fn default_shell_id() -> String {
 #[cfg(target_os = "windows")]
 fn detect_shells() -> Vec<ShellInfo> {
     let mut shells = Vec::new();
-    // pwsh（PowerShell Core）优先展示
+    // Standalone PowerShell Core build, listed first when present.
     if shell_ok("pwsh") {
         shells.push(ShellInfo {
             id: "pwsh".into(),
-            label: "PowerShell (pwsh)".into(),
+            label: "PowerShell 7".into(),
             default: true,
         });
     }
-    // Windows PowerShell 5.1（内置 powershell.exe）
+    // The OS-bundled Windows PowerShell 5.1 (powershell.exe). The two builds are different
+    // executables and must not share a label, or the picker shows two look-alike entries.
     if shell_ok("powershell") {
         shells.push(ShellInfo {
             id: "powershell".into(),
-            label: "PowerShell".into(),
+            label: "Windows PowerShell".into(),
             default: shells.is_empty(),
         });
     }
-    // Windows cmd 恒可用，作为兜底
+    // cmd always exists on Windows and stays the fallback.
     shells.push(ShellInfo {
         id: "cmd".into(),
         label: "CMD".into(),

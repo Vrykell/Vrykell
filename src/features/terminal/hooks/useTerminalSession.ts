@@ -466,6 +466,12 @@ export function useTerminalSession(
     // blockList 下 End 保留给「回到输入栏」（InputEditor 的全局监听会接住），
     // 不能漏进 PTY（xterm 默认会发 \x1b[F）
     term.attachCustomKeyEventHandler((e) => {
+      // Ctrl+C 有选中内容时复制（与常见终端一致），没有选区才直通 PTY 当中断用。
+      if (e.type === 'keydown' && e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === 'c' && term.hasSelection()) {
+        e.preventDefault();
+        void copyTerminalSelection(term);
+        return false;
+      }
       // Ctrl+Shift+C/V 复制/粘贴；不劫持 Ctrl+C —— 各终端语义不同，仍直通 PTY。
       if (e.type === 'keydown' && e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey) {
         const key = e.key.toLowerCase();

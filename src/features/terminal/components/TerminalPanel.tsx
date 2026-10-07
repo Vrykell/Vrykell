@@ -117,7 +117,8 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
         onFocus={focusTerminal} onMouseDown={focusTerminal} style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'auto', outline: 'none', cursor: 'text' }}>
         {/* 密码框开着（secret）时屏幕只读，点它也不会把输入交给终端 */}
         <div ref={ref} data-testid={showSnapshot ? undefined : 'ssh-terminal-screen'} style={{ position: 'absolute', inset: 0, overflow: 'auto', visibility: showSnapshot || disconnected ? 'hidden' : 'visible', pointerEvents: showSnapshot || disconnected || secret ? 'none' : 'auto', paddingLeft: 8 }} />
-          {showSnapshot && frame?.html && <pre data-testid="ssh-terminal-screen" style={{ position: 'absolute', inset: 0, overflow: 'auto', margin: 0, whiteSpace: 'pre', color: 'var(--text-primary)', paddingLeft: 8 }} dangerouslySetInnerHTML={{ __html: frame.html }} />}
+          {/* data-selectable：页面整体禁选，但屏幕内容必须能选中，否则连不上时无法复制报错 */}
+          {showSnapshot && frame?.html && <pre data-selectable data-testid="ssh-terminal-screen" style={{ position: 'absolute', inset: 0, overflow: 'auto', margin: 0, whiteSpace: 'pre', color: 'var(--text-primary)', paddingLeft: 8 }} dangerouslySetInnerHTML={{ __html: frame.html }} />}
         {/* 连接中：居中转圈 + 细进度条（不写解释性小字） */}
         {!disconnected && status === 'connecting' && (
           <div data-testid="ssh-connecting" aria-hidden="true" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, pointerEvents: 'none' }}>
@@ -128,7 +129,7 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
         )}
         {/* 连接已结束：最后一屏留在原位并变暗，不再用彩色卡片盖住终端 */}
         {disconnected && (
-          <pre data-testid="ssh-terminal-ended" style={{ position: 'absolute', inset: 0, overflow: 'auto', margin: 0, paddingLeft: 8, paddingRight: 8, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'var(--font-mono)', fontSize: 'calc(12px * var(--ui-font-scale))', lineHeight: 1.55, color: 'var(--text-secondary)', opacity: 0.62 }} dangerouslySetInnerHTML={{ __html: endedScreen || t('ssh.ended.noOutput') }} />
+          <pre data-selectable data-testid="ssh-terminal-ended" style={{ position: 'absolute', inset: 0, overflow: 'auto', margin: 0, paddingLeft: 8, paddingRight: 8, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'var(--font-mono)', fontSize: 'calc(12px * var(--ui-font-scale))', lineHeight: 1.55, color: 'var(--text-secondary)', opacity: 0.62 }} dangerouslySetInnerHTML={{ __html: endedScreen || t('ssh.ended.noOutput') }} />
         )}
       </div>
       {/* 认证输入条：与终端区左右保持一致的 8px 边距（对称，不再贴边或被单侧推偏） */}
