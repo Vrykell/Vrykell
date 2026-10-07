@@ -47,21 +47,6 @@ export default function PanelSsh() {
     [connections, selectedId],
   );
 
-  // 「已连接」= 该连接还有活会话，与双击重连用的是同一份判定数据
-  const tabs = useSessionStore((s) => s.tabs);
-  const sessions = useTerminalStore((s) => s.sessions);
-  const liveConnectionIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const tab of tabs) {
-      if (tab.kind !== 'session') continue;
-      for (const term of terminalsOf(tab)) {
-        if (term.kind !== 'ssh' || !term.ssh?.connectionId || !sessions[term.id]) continue;
-        ids.add(term.ssh.connectionId);
-      }
-    }
-    return ids;
-  }, [tabs, sessions]);
-
   const startDrag = useListReorderDrag({
     listId: LIST_ID,
     onDrop: (drag, target) => {
@@ -192,12 +177,6 @@ export default function PanelSsh() {
                 if (event.key === ' ') { event.preventDefault(); setSelectedId(c.id); }
               }}
               onPointerDown={(event) => startDrag(event, { id: c.id, kind: 'ssh' })}
-              badge={liveConnectionIds.has(c.id) ? (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0, color: 'var(--accent)', fontSize: 'calc(10px * var(--ui-font-scale))', fontWeight: 600 }}>
-                  <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)' }} />
-                  {t('ssh.connected.badge')}
-                </span>
-              ) : undefined}
               action={{
                 icon: <Pencil size={iconSizes.compact} />,
                 label: `编辑「${c.name}」`,
