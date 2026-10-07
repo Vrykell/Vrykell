@@ -173,6 +173,20 @@ button.activity-button[aria-pressed="true"] { background: var(--chrome-field) !i
 .workspace-panel-heading { display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 4px 8px 4px 12px; font-size: calc(13px * var(--ui-font-scale)); font-weight: 600; color: var(--text-primary); }
 .terminal-composer { border: none; border-radius: 8px; background: var(--composer-bg); transition: background var(--dur) var(--ease); }
 .terminal-composer:focus-within { background: var(--block); }
+/* SSH 连接页：连接中的转圈与细进度条（15s 为 ConnectTimeout 的上限，仅作节奏参考） */
+.ssh-connect-spinner {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid var(--border-strong); border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+}
+.ssh-connect-progress { width: 260px; height: 3px; border-radius: 2px; background: var(--chrome-field); overflow: hidden; }
+.ssh-connect-progress > i { display: block; height: 100%; background: var(--accent); animation: sshConnectFill 15s linear infinite; }
+@keyframes sshConnectFill { from { width: 0; } to { width: 100%; } }
+@media (prefers-reduced-motion: reduce) {
+  .ssh-connect-spinner { animation: none; }
+  .ssh-connect-progress > i { animation: none; width: 100%; }
+}
+
 input.ssh-auth-response { padding: 0; line-height: 32px; font-size: calc(20px * var(--ui-font-scale)); letter-spacing: 2px; }
 /* Empty inputs use the same font metrics as their placeholder. */
 input.ssh-auth-response:placeholder-shown { font-size: calc(13px * var(--ui-font-scale)); letter-spacing: normal; }

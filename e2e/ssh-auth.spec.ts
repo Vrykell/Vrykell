@@ -146,11 +146,14 @@ test('SSH block mode remains directly interactive when the remote server has no 
   await expect(surface.getByLabel('SSH 认证响应')).toHaveCount(0);
   await expect(surface.locator('.xterm-screen')).toBeVisible();
 
-  await surface.getByRole('button', { name: '密码输入' }).click();
+  // 输入方式是显式单选（共享 Select），不再是会翻转文字的按钮
+  await surface.getByTestId('ssh-input-mode').click();
+  await page.getByRole('option', { name: '密码输入' }).click();
   await expect(surface.getByLabel('SSH 认证响应')).toBeVisible();
   await expect(surface.locator('.xterm-screen')).toBeVisible();
   await expect(surface.locator('pre')).toHaveCount(0);
-  await surface.getByRole('button', { name: '直接输入' }).click();
+  await surface.getByTestId('ssh-input-mode').click();
+  await page.getByRole('option', { name: '直接输入' }).click();
 
   await surface.getByRole('textbox', { name: 'SSH 交互终端' }).click();
   await page.keyboard.press('ArrowDown');

@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { iconSizes, Pencil, Plus, Search } from '@ui/icons';
 import { SshIcon } from '@ui/shellIcons';
 import { ask } from '@tauri-apps/plugin-dialog';
+import { t } from '@i18n';
 import { ensureSshLoaded, useSshStore } from '@features/ssh';
 import { useSessionStore, terminalsOf } from '@features/workspace';
 import { useTerminalStore } from '@features/terminal';
@@ -45,6 +46,21 @@ export default function PanelSsh() {
     () => connections.find((c) => c.id === selectedId) ?? null,
     [connections, selectedId],
   );
+
+  // 「已连接」= 该连接还有活会话，与双击重连用的是同一份判定数据
+  const tabs = useSessionStore((s) => s.tabs);
+  const sessions = useTerminalStore((s) => s.sessions);
+  const liveConnectionIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const tab of tabs) {
+      if (tab.kind !== 'session') continue;
+      for (const term of terminalsOf(tab)) {
+        if (term.kind !== 'ssh' || !term.ssh?.connectionId || !sessions[term.id]) continue;
+        ids.add(term.ssh.connectionId);
+      }
+    }
+    return ids;
+  }, [tabs, sessions]);
 
   const startDrag = useListReorderDrag({
     listId: LIST_ID,
@@ -144,7 +160,7 @@ export default function PanelSsh() {
           <Plus size={iconSizes.control} />
         </IconBtn>
       </div>
-      <button data-testid="ssh-quick-btn" onClick={() => setQuickOpen(true)} style={{ margin: '0 10px 10px', minHeight: 36 }}>快速连接</button>
+      <button data-testid="ssh-quick-btn" onClick={() => setQuickOpen(true)} style={{ margin: '0 10px 10px', minHeight: 36 }}>{t('ssh.quick.connect')}</button>
       {/* 连接列表：拖动时源行让位，落点用虚线占位 */}
       <div data-reorder-list={LIST_ID} className="scroll-region" style={{ flex: 1, overflowY: 'auto', padding: '0 0 8px' }}>
         {filtered.length === 0 ? (
@@ -176,6 +192,12 @@ export default function PanelSsh() {
                 if (event.key === ' ') { event.preventDefault(); setSelectedId(c.id); }
               }}
               onPointerDown={(event) => startDrag(event, { id: c.id, kind: 'ssh' })}
+              badge={liveConnectionIds.has(c.id) ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0, color: 'var(--accent)', fontSize: 'calc(10px * var(--ui-font-scale))', fontWeight: 600 }}>
+                  <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)' }} />
+                  {t('ssh.connected.badge')}
+                </span>
+              ) : undefined}
               action={{
                 icon: <Pencil size={iconSizes.compact} />,
                 label: `编辑「${c.name}」`,

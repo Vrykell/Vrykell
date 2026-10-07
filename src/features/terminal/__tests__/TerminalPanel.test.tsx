@@ -19,13 +19,19 @@ beforeEach(() => {
   useTerminalStore.setState({ sessions: {}, scenes: { p: 'classic' } });
 });
 
+/** 输入方式是显式单选：点开下拉再选，而不是点一个会翻转文字的按钮。 */
+function chooseInputMode(mode: '密码输入' | '直接输入') {
+  fireEvent.click(screen.getByRole('combobox', { name: '输入方式' }));
+  fireEvent.click(screen.getByRole('option', { name: mode }));
+}
+
 describe('SSH connection input', () => {
   it('keeps the live screen visible when manually opening masked input without an authentication prompt', () => {
     sessionView.frame.plainText = '';
     sessionView.frame.html = '';
     useTerminalStore.setState({ sessions: { p: 'session' } });
     render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
-    fireEvent.click(screen.getByRole('button', { name: '密码输入' }));
+    chooseInputMode('密码输入');
     expect(screen.getByLabelText('SSH 认证响应')).toHaveAttribute('type', 'password');
     expect(screen.getByTestId('ssh-terminal-screen').tagName).toBe('DIV');
     expect(screen.getByTestId('ssh-terminal-screen')).toHaveStyle({ visibility: 'visible' });
@@ -151,18 +157,50 @@ describe('SSH connection input', () => {
     rerender(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
     expect(screen.getByLabelText('SSH 认证响应')).toBeVisible();
 
-    fireEvent.click(screen.getByRole('button', { name: '直接输入' }));
+    chooseInputMode('直接输入');
     rerender(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
     expect(screen.queryByLabelText('SSH 认证响应')).toBeNull();
     expect(screen.getByTestId('ssh-terminal-screen')).toHaveStyle({ visibility: 'visible' });
   });
-  it('keeps the last screen and offers reconnection after a remote exit', async () => {
+  it('replaces the dead screen with an ended block that keeps the reason and the last output', async () => {
     sessionView.status = 'closed';
-    sessionView.frame.plainText = '连接已关闭';
-    sessionView.frame.html = '连接已关闭';
-    render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+    sessionView.frame.plainText = "user@server's password:\nConnection closed by server\n[进程已退出]";
+    sessionView.frame.html = "user@server's password:<br>Connection closed by server<br>[进程已退出]";
+    render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput sshTarget="user@server" />);
     expect(screen.getByRole('status')).toHaveTextContent('连接已断开');
+    const ended = screen.getByTestId('ssh-connection-ended');
+    expect(ended).toHaveTextContent('连接已结束');
+    expect(ended).toHaveTextContent('SSH 进程已退出');
+    expect(ended).toHaveTextContent('最后输出');
+    expect(ended).toHaveTextContent('Connection closed by server');
+    // 与文件面板的远端失败页共用 ErrorBox：原因与原始输出都在，重连动作在 actions 里
+    expect(ended).toHaveAttribute('role', 'alert');
     fireEvent.click(screen.getByRole('button', { name: '重新连接' }));
     await waitFor(() => expect(reconnect).toHaveBeenCalledOnce());
+  });
+
+  it('keeps the terminal read-only while the masked input is open, including after switching back from direct input', () => {
+    useTerminalStore.setState({ sessions: { p: 'session' } });
+    render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+    chooseInputMode('直接输入');
+    const area = screen.getByRole('textbox', { name: 'SSH 交互终端' });
+    expect(area).toHaveAttribute('tabindex', '0');
+    expect(screen.getByTestId('ssh-terminal-screen')).toHaveStyle({ pointerEvents: 'auto' });
+
+    chooseInputMode('密码输入');
+    expect(area).toHaveAttribute('tabindex', '-1');
+    expect(area).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByTestId('ssh-terminal-screen')).toHaveStyle({ pointerEvents: 'none' });
+  });
+
+  it('shows a connecting state with its own cancel action before the PTY is ready', () => {
+    sessionView.status = 'connecting';
+    sessionView.frame.plainText = '';
+    sessionView.frame.html = '';
+    render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput sshTarget="user@server" />);
+    expect(screen.getByRole('status')).toHaveTextContent('正在连接');
+    expect(screen.getByTestId('ssh-connecting')).toBeVisible();
+    expect(screen.getByRole('button', { name: '取消连接' })).toBeVisible();
+    expect(screen.queryByTestId('ssh-connection-ended')).toBeNull();
   });
 });
