@@ -214,7 +214,8 @@ export default function PanelTabs() {
           </Fragment>
         ))}
 
-        {ungroupedTabs.length > 0 && (
+        {/* 有分组时常驻「未分组」区：拖到这里的空位 = 脱离分组 */}
+        {(ungroupedTabs.length > 0 || groups.length > 0) && (
           <div
             data-reorder-zone={UNGROUPED_ZONE}
             data-reorder-kind="tab"
@@ -242,7 +243,9 @@ export default function PanelTabs() {
                 />
               </Fragment>
             ))}
-            <ListReorderPlaceholder listId={LIST_ID} itemId={ungroupedTabs[ungroupedTabs.length - 1]!.id} after />
+            {ungroupedTabs.length > 0
+              ? <ListReorderPlaceholder listId={LIST_ID} itemId={ungroupedTabs[ungroupedTabs.length - 1]!.id} after />
+              : <ListReorderZonePlaceholder listId={LIST_ID} zoneId={UNGROUPED_ZONE} />}
           </div>
         )}
 
