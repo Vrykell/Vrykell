@@ -65,7 +65,14 @@ function locateTarget(
   const list = hit.closest<HTMLElement>(`[data-reorder-list="${listId}"]`);
   if (!list) return null;
   if (hit.closest('[data-reorder-placeholder]')) return undefined;
-  const items = Array.from(list.querySelectorAll<HTMLElement>('[data-reorder-item]:not([data-reorder-dragging="true"])'))
+  // 指针所在的分区（分组容器 / 未分组区）。行与分区都接受这次拖动时，
+  // 只在该分区内找最近的行：拖进分组、拖出到未分组区才会落在指针所在的位置，
+  // 而不是整张列表里最近的那一行。
+  const zone = hit.closest<HTMLElement>('[data-reorder-zone]');
+  const area = zone && list.contains(zone) && accepts(dragKind, zone.dataset.reorderKind ?? '') ? zone : null;
+  // 分区内的空白（不在任何行上）：直接作为「追加到该分区」的落点，空位就出现在这里
+  if (area && !hit.closest('[data-reorder-item]')) return { zoneId: area.dataset.reorderZone };
+  const items = Array.from((area ?? list).querySelectorAll<HTMLElement>('[data-reorder-item]:not([data-reorder-dragging="true"])'))
     .filter((item) => accepts(dragKind, item.dataset.reorderKind ?? ''));
   for (const item of items) {
     const rect = item.getBoundingClientRect();
@@ -73,10 +80,7 @@ function locateTarget(
   }
   const last = items[items.length - 1];
   if (last) return { itemId: last.dataset.reorderItem, after: true };
-  const zone = hit.closest<HTMLElement>('[data-reorder-zone]');
-  if (zone && list.contains(zone) && accepts(dragKind, zone.dataset.reorderKind ?? '')) {
-    return { zoneId: zone.dataset.reorderZone };
-  }
+  if (area) return { zoneId: area.dataset.reorderZone };
   return null;
 }
 
