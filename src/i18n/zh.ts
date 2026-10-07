@@ -83,10 +83,11 @@ const zh: Record<string, string> = {
   'ssh.ended.title': '连接已结束',
   'ssh.ended.exited': 'SSH 进程已退出',
   'ssh.ended.failed': '连接失败',
-  'ssh.ended.cancelled': '连接已按你的操作关闭',
-  'ssh.ended.lastOutput': '最后输出',
+  'ssh.ended.cancelled': '连接已按你的操作关闭，可以重新连接。',
+  'ssh.ended.authCancelledMessage': '认证已取消，连接已关闭。可以重新连接。',
+  'ssh.ended.exitedMessage': 'SSH 进程已退出，连接已关闭。可以重新连接。',
+  'ssh.ended.failedMessage': '无法建立 SSH 连接，请检查主机、端口或网络后重新连接。',
   'ssh.quick.connect': '快速连接',
-  'ssh.connected.badge': '已连接',
 
   // ── TUI 模式 ──
   'tui.banner': 'TUI 模式 — 键盘直通终端',
