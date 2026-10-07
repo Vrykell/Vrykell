@@ -70,10 +70,9 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
         : secret ? t('ssh.state.authenticating')
           : t('ssh.state.connected');
   const stateColor = disconnected ? 'var(--error)' : (secret || status === 'connecting') ? 'var(--accent-warm)' : 'var(--accent)';
-  // 断线后保留最后一屏作为上下文：整屏变暗表示已结束，动作留在状态行，
-  // 原始退出信息（进程已退出）跟在最后一行；没有输出时退化成一句说明
-  const endedScreen = disconnected
-    ? `${frame?.html ?? ''}${exitNoticeShown ? '' : `${frame?.html ? '<br>' : ''}${exitNotice}`}`
+  // 断线后把最后几行输出直接印在屏幕上（就是 ssh 给出的原因），不做卡片、也不回放整屏历史
+  const outputTail = disconnected
+    ? [text.split('\n').map((line) => line.trimEnd()).filter((line) => line.trim().length > 0).slice(-8).join('\n'), exitNoticeShown ? '' : exitNotice].filter(Boolean).join('\n')
     : '';
   // 选择器显示「现在用哪种输入」：输密码框可见就是密码输入，否则是直接输入
   const inputMode = secret ? 'secret' : 'direct';
@@ -110,8 +109,7 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
           ? <button type="button" disabled={cancellation === 'pending'} onClick={() => void restart()} style={{ padding: '7px 12px' }}>{t('ssh.action.reconnect')}</button>
           : <button type="button" disabled={inputDisabled} onClick={() => void cancelAuthentication()} style={{ padding: '7px 12px' }}>{cancellation === 'pending' ? t('ssh.action.cancelling') : secret ? t('ssh.action.cancelAuth') : status === 'connecting' ? t('ssh.action.cancelConnect') : t('ssh.action.disconnect')}</button>}
       </div>
-      {/* 终端区常驻：xterm 宿主必须一直在，否则重连时没有宿主可挂载。
-          断开后宿主隐藏，改由变暗的最后一屏顶上 */}
+      {/* 终端区常驻：xterm 宿主必须一直在，否则重连时没有宿主可挂载；断开后宿主隐藏、原因直接印在屏幕上 */}
       <div role="textbox" aria-label="SSH 交互终端" aria-multiline="true"
         aria-disabled={inputDisabled || secret} tabIndex={inputDisabled || secret ? -1 : 0}
         onFocus={focusTerminal} onMouseDown={focusTerminal} style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'auto', outline: 'none', cursor: 'text' }}>
@@ -127,9 +125,9 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
             <span className="ssh-connect-progress"><i /></span>
           </div>
         )}
-        {/* 连接已结束：最后一屏留在原位并变暗，不再用彩色卡片盖住终端 */}
+        {/* 连接已结束：原因就当终端输出印在屏幕上，不加卡片、不回放整屏 */}
         {disconnected && (
-          <pre data-selectable data-testid="ssh-terminal-ended" style={{ position: 'absolute', inset: 0, overflow: 'auto', margin: 0, paddingLeft: 8, paddingRight: 8, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'var(--font-mono)', fontSize: 'calc(12px * var(--ui-font-scale))', lineHeight: 1.55, color: 'var(--text-secondary)', opacity: 0.62 }} dangerouslySetInnerHTML={{ __html: endedScreen || t('ssh.ended.noOutput') }} />
+          <pre data-selectable data-testid="ssh-terminal-ended" style={{ position: 'absolute', inset: 0, overflow: 'auto', margin: 0, padding: '0 8px', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'var(--font-mono)', fontSize: 'calc(12.5px * var(--ui-font-scale))', lineHeight: 1.55, color: 'var(--text-primary)' }}>{outputTail}</pre>
         )}
       </div>
       {/* 认证输入条：与终端区左右保持一致的 8px 边距（对称，不再贴边或被单侧推偏） */}

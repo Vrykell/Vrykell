@@ -80,7 +80,6 @@ const zh: Record<string, string> = {
   'ssh.action.disconnect': '断开连接',
   'ssh.action.reconnect': '重新连接',
   'ssh.action.cancelling': '正在取消…',
-  'ssh.ended.noOutput': '连接已结束，没有可显示的输出。',
   'ssh.quick.connect': '快速连接',
 
   // ── TUI 模式 ──
