@@ -8,7 +8,7 @@ import { Terminal } from '@xterm/xterm';
 import { loadWebglRenderer } from '@features/terminal/model/xtermRenderer';
 import type { IBufferCell } from '@xterm/xterm';
 import { indexToCss } from '@features/terminal/model/blockTypes';
-import { TERMINAL_FONT_FAMILY, getTerminalFontSize, TERMINAL_LINE_HEIGHT } from '@features/terminal/model/terminalFont';
+import { TERMINAL_FONT_FAMILY, getTerminalFontSize, terminalLetterSpacing, TERMINAL_LINE_HEIGHT } from '@features/terminal/model/terminalFont';
 import { useTypographyStore } from '@config/typography';
 import { readXtermTheme } from '@features/terminal/model/xtermTheme';
 
@@ -249,6 +249,8 @@ export function createBlockTerm(
     scrollback: 5000,
     fontFamily: TERMINAL_FONT_FAMILY,
     fontSize: getTerminalFontSize(),
+    // Same whole-pixel grid as the pane terminal, so snapshots measure the same cells.
+    letterSpacing: terminalLetterSpacing(),
     lineHeight: TERMINAL_LINE_HEIGHT,
     cursorBlink: true,
     theme: xtermTheme,
@@ -259,7 +261,10 @@ export function createBlockTerm(
   });
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'data-theme'] });
   const unsubscribeTypography = useTypographyStore.subscribe((state, previous) => {
-    if (state.terminalFontSize !== previous.terminalFontSize) term.options.fontSize = state.terminalFontSize;
+    if (state.terminalFontSize !== previous.terminalFontSize) {
+      term.options.fontSize = state.terminalFontSize;
+      term.options.letterSpacing = terminalLetterSpacing(state.terminalFontSize);
+    }
   });
   // Same renderer as the main terminal: WebGL keeps half-block glyphs seamless, and the shared
   // helper steps down to the DOM renderer when the GPU context is lost or WebGL is unavailable.
