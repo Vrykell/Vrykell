@@ -33,6 +33,10 @@ describe('useSettingsNavigation', () => {
   it('toggles groups without affecting the selected page', () => {
     const { result } = renderHook(() => useSettingsNavigation());
 
+    // 默认全部折叠，展开是用户显式动作
+    expect(result.current.expanded.size).toBe(0);
+    expect(result.current.expanded.has('ai')).toBe(false);
+    act(() => result.current.toggleGroup('ai'));
     expect(result.current.expanded.has('ai')).toBe(true);
     act(() => result.current.toggleGroup('ai'));
     expect(result.current.expanded.has('ai')).toBe(false);

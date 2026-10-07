@@ -64,7 +64,8 @@ export const SETTINGS_GROUPS: SettingGroup[] = [
 export function useSettingsNavigation() {
   const selected = useSettingsNavigationStore(state => state.selected);
   const setSelected = useSettingsNavigationStore(state => state.setSelected);
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(SETTINGS_GROUPS.map((group) => group.id)));
+  // Groups start collapsed; searching opens the matching ones on its own.
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [query, setQuery] = useState('');
   const normalizedQuery = query.trim().toLowerCase();
 

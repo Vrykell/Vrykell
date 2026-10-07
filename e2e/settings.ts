@@ -11,7 +11,15 @@ export async function openSettings(page: Page): Promise<void> {
 /** 点击设置侧栏项进入某设置页（label 为侧栏按钮名，如「模型配置」「技能」） */
 export async function gotoSetting(page: Page, label: string): Promise<void> {
   await openSettings(page);
-  await page.locator('aside').getByRole('button', { name: label, exact: true }).click();
+  const nav = page.locator('aside');
+  const item = nav.getByRole('button', { name: label, exact: true });
+  if (await item.count() === 0) {
+    // 分组默认折叠：先把所有分组展开再找目标项
+    while (await nav.locator('button[aria-expanded="false"]').count() > 0) {
+      await nav.locator('button[aria-expanded="false"]').first().click();
+    }
+  }
+  await item.click();
   await expect(page.locator('section').getByText(label, { exact: true }).first()).toBeVisible({ timeout: 3000 });
 }
 
