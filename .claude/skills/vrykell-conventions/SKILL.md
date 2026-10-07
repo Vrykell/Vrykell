@@ -1,6 +1,6 @@
 ---
 name: vrykell-conventions
-description: Vrykell project conventions and definition of done for any code, test or docs change in this repository - constraints, commands, shared components, testing and commit rules. Use whenever you work on Vrykell code.
+description: MANDATORY reading before any change to Vrykell code, tests or docs - hard constraints, commands, shared components, testing, commit rules and definition of done. Always open this skill first; never write Vrykell code from memory of the project.
 ---
 
 # vrykell-conventions (bridge)
@@ -12,5 +12,6 @@ Claude Code discovers skills under `.claude/skills/`, while Codex and Command Co
 .agents/skills/vrykell-conventions/SKILL.md
 ```
 
-Read that file and follow it. Keep this file's frontmatter identical to the canonical copy
-when its name or description changes, and do not add rules here - edit the canonical file.
+That file is **mandatory reading in full before any change** - open it and follow it. Keep this
+file's frontmatter identical to the canonical copy when its name or description changes, and do
+not add rules here - edit the canonical file.

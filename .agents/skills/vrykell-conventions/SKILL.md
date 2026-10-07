@@ -1,9 +1,14 @@
 ---
 name: vrykell-conventions
-description: Vrykell project conventions and definition of done for any code, test or docs change in this repository - constraints, commands, shared components, testing and commit rules. Use whenever you work on Vrykell code.
+description: MANDATORY reading before any change to Vrykell code, tests or docs - hard constraints, commands, shared components, testing, commit rules and definition of done. Always open this skill first; never write Vrykell code from memory of the project.
 ---
 
 # Vrykell conventions
+
+> **Mandatory: read this in full before writing, editing or reviewing anything.**
+> This is a hard requirement, not a reference. A change that breaks a constraint below is not
+> done, however green the tests are, and having skimmed the file does not count as having read
+> it. Re-check this list against your own diff before reporting a task finished.
 
 Vrykell is a Tauri 2 desktop app: React 19 + TypeScript frontend, Rust backend
 (`src-tauri/`), terminal-first UI with AI chat (Anthropic BYOK). User-visible copy lives as
@@ -99,7 +104,8 @@ PTY output -> Rust StreamScanner (src-tauri/src/terminal/scan.rs, synchronous)
    `docs:` prefix, details as body bullets.
 3. New features update the test checklist in `docs/zh/feature-spec.md` (mirror `docs/en/feature-spec.md`).
 4. Definition of done: typecheck, unit tests and the architecture guard are green; e2e covers
-   touched interactions; no dead code, unused imports or commented-out blocks remain.
+   touched interactions; no dead code, unused imports or commented-out blocks remain; every
+   comment you wrote or edited is English (constraint 3) while user-visible copy stays Chinese.
 
 ## Deep references
 
