@@ -23,6 +23,7 @@ import { leaves as layoutLeaves } from '@features/workspace/model/windowLayout';
 import * as sessionManager from '@features/workspace/services/sessionManager';
 import { agentControl } from '@features/agent/services/agentControl';
 import { defaultOpenModeForShell } from '@features/agent/stores/agentSettings';
+import { t } from '@i18n';
 import { SessionController } from '@features/terminal/services/pipeline/sessionController';
 import { copyTerminalSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
 import { getCellMetrics } from '@utils/termMetrics';
@@ -381,7 +382,7 @@ export function useTerminalSession(
           stopped = true;
           useTerminalStore.getState().clearSession(paneId, id);
           setStatus('closed');
-          writeMain('\r\n\x1b[31m[进程已退出]\x1b[0m\r\n');
+          writeMain(`\r\n\x1b[31m${t('terminal.processExited')}\x1b[0m\r\n`);
         }
       }),
     );

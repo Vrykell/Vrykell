@@ -3,7 +3,8 @@ import { iconSizes, Pencil, Plus, Search } from '@ui/icons';
 import { SshIcon } from '@ui/shellIcons';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { ensureSshLoaded, useSshStore } from '@features/ssh';
-import { useSessionStore } from '@features/workspace';
+import { useSessionStore, terminalsOf } from '@features/workspace';
+import { useTerminalStore } from '@features/terminal';
 import ContextMenu from '@ui/ContextMenu';
 import { IconBtn } from '@ui/UiBtn';
 import SidebarItem from '@ui/sidebarItem';
@@ -58,9 +59,22 @@ export default function PanelSsh() {
     },
   });
 
+  /**
+   * 双击 = 重新连接：先关掉同一连接里已经没有活会话的页面（进程已退出 / 已断开，
+   * 否则会留下一个「重新连接」按钮的失效页），再开一个全新的连接页。
+   */
   const openConnection = (conn: SshConnection) => {
     setSelectedId(conn.id);
     void touch(conn.id);
+    const workspace = useSessionStore.getState();
+    const sessions = useTerminalStore.getState().sessions;
+    for (const tab of workspace.tabs) {
+      if (tab.kind !== 'session') continue;
+      const terms = terminalsOf(tab);
+      if (!terms.some((term) => term.kind === 'ssh' && term.ssh?.connectionId === conn.id)) continue;
+      if (terms.some((term) => sessions[term.id])) continue;
+      workspace.closeTab(tab.id);
+    }
     useSessionStore.getState().addTab({
       kind: 'ssh',
       ssh: connectionTarget(conn),
