@@ -56,7 +56,10 @@ impl StreamDecoder {
 
 pub struct PtySession {
     master: Box<dyn MasterPty + Send>,
-    writer: Box<dyn Write + Send>,
+    /// The PTY stdin writer has its own lock. A write blocks whenever the
+    /// foreground program stops reading stdin, and that must never hold the
+    /// session lock: resize/close/kill would queue behind it and freeze the UI.
+    writer: Arc<Mutex<Box<dyn Write + Send>>>,
     child: Box<dyn Child + Send + Sync>,
     input_pending: Arc<AtomicBool>,
 }
@@ -319,10 +322,51 @@ fn default_windows_shell() -> &'static str {
     })
 }
 
+/// Result of openpty + spawning the shell: a fresh session id plus the handles kept in the
+/// session table.
+type SpawnedPty = (
+    String,
+    Box<dyn MasterPty + Send>,
+    Box<dyn Read + Send>,
+    Box<dyn Write + Send>,
+    Box<dyn Child + Send + Sync>,
+);
+
+/// Create a PTY session: openpty + spawn the shell + inject PATH/TERM.
+/// Every step blocks (the Windows pseudo console can take hundreds of ms), so callers must run
+/// it on a blocking thread rather than the main thread.
+fn spawn_pty(
+    cols: u16,
+    rows: u16,
+    cwd: Option<String>,
+    shell: Option<String>,
+    ssh: Option<SshTarget>,
+    open_mode: Option<String>,
+) -> Result<SpawnedPty, String> {
+    let pty_system = native_pty_system();
+    let pair = pty_system
+        .openpty(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
+        .map_err(|e| e.to_string())?;
+    let mut cmd = build_shell_cmd(cwd, shell, ssh, open_mode)?;
+    // The parent desktop terminal may export VTE_VERSION; its OSC 133 hooks conflict with ours.
+    cmd.env_remove("VTE_VERSION");
+    // A GUI launch inherits a PATH without the user bin directories (/usr/local/bin and
+    // friends); merge them into the child (the ssh branch benefits too).
+    merge_user_bin_paths(&mut cmd);
+    // A GUI launch can also inherit an empty TERM, which makes a full-screen TUI fail its
+    // capability probe and hang; default it to xterm-256color.
+    merge_term_env(&mut cmd);
+    let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
+    drop(pair.slave);
+    let reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
+    let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
+    Ok((format!("pty-{}", Uuid::new_v4()), pair.master, reader, writer, child))
+}
+
 #[tauri::command]
 // 参数镜像前端 IPC 调用契约（pty_spawn 逐字段传参），折叠结构体需同步改前端
 #[allow(clippy::too_many_arguments)]
-pub fn pty_spawn(
+pub async fn pty_spawn(
     state: State<'_, PtyState>,
     app: AppHandle,
     cols: u16,
@@ -349,23 +393,12 @@ pub fn pty_spawn(
         .unwrap_or_else(|| "truecolor".to_string());
     let debug_vte_inherited = std::env::var("VTE_VERSION").is_ok();
     let debug_cwd_set = cwd.is_some();
-    let pty_system = native_pty_system();
-    let pair = pty_system
-        .openpty(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
-        .map_err(|e| e.to_string())?;
-    let mut cmd = build_shell_cmd(cwd, shell, ssh, open_mode)?;
-    // The parent desktop terminal may export VTE_VERSION; its OSC 133 hooks conflict with ours.
-    cmd.env_remove("VTE_VERSION");
-    // GUI 启动 PATH 缺用户 bin（/usr/local/bin 等），补进子进程（ssh 分支也顺带受益）
-    merge_user_bin_paths(&mut cmd);
-    // GUI 启动 TERM 为空 → TUI 应用（claude 等）能力检测失败会挂起，补 xterm-256color
-    merge_term_env(&mut cmd);
-    let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
-    drop(pair.slave);
-    let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
-    let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
 
-    let id = format!("pty-{}", Uuid::new_v4());
+    // Creating the session is blocking: run it on a blocking thread, never on the main thread.
+    let (id, master, mut reader, writer, child) =
+        tauri::async_runtime::spawn_blocking(move || spawn_pty(cols, rows, cwd, shell, ssh, open_mode))
+            .await
+            .map_err(|e| e.to_string())??;
     let input_pending = Arc::new(AtomicBool::new(false));
     if debug::enabled() {
         debug::write(
@@ -389,7 +422,7 @@ pub fn pty_spawn(
     }
     state.0.lock().map_err(|e| e.to_string())?.insert(
         id.clone(),
-        Arc::new(Mutex::new(PtySession { master: pair.master, writer, child, input_pending: input_pending.clone() })),
+        Arc::new(Mutex::new(PtySession { master, writer: Arc::new(Mutex::new(writer)), child, input_pending: input_pending.clone() })),
     );
 
     let tid = id.clone();
@@ -578,23 +611,35 @@ pub async fn pty_write(state: State<'_, PtyState>, id: String, data: String) -> 
         let sessions = state.0.lock().map_err(|e| e.to_string())?;
         sessions.get(&id).cloned().ok_or("session not found")?
     };
-    // write_all/flush 是阻塞 IO，放 blocking 线程，只锁本会话，不占主线程
+    // Blocking IO: run it on a blocking thread, and take only the writer lock.
     let log_id = id.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let mut s = session.lock().map_err(|e| e.to_string())?;
-        s.input_pending.store(true, Ordering::Release);
-        let result = s.writer.write_all(data.as_bytes()).and_then(|()| s.writer.flush());
-        drop(s);
+        let result = write_session(&session, data.as_bytes());
         if debug::enabled() {
             debug::write(
                 "write-complete",
                 format!("id={} bytes={} ok={}", log_id, data_len, result.is_ok()),
             );
         }
-        result.map_err(|e| e.to_string())
+        result
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// Write to a session's stdin. It takes **only the writer lock**: `write_all` blocks whenever
+/// the foreground program stops reading stdin, and the session lock has to stay free for
+/// pty_resize / pty_close / pty_kill_foreground. Sharing one lock queues those behind a stuck
+/// write, and while they run on the main thread the whole UI freezes with them - the stop
+/// button included, so force-quitting the app becomes the only way out.
+fn write_session(session: &Arc<Mutex<PtySession>>, data: &[u8]) -> Result<(), String> {
+    let (writer, input_pending) = {
+        let state = session.lock().map_err(|e| e.to_string())?;
+        (state.writer.clone(), state.input_pending.clone())
+    };
+    input_pending.store(true, Ordering::Release);
+    let mut writer = writer.lock().map_err(|e| e.to_string())?;
+    writer.write_all(data).and_then(|()| writer.flush()).map_err(|e| e.to_string())
 }
 
 /// Windows：把换行统一成 CR（Enter）。\n 是 Ctrl+J，PSReadLine/cmd 都不认。
@@ -604,7 +649,7 @@ fn normalize_enter(data: &str) -> String {
 }
 
 #[tauri::command]
-pub fn pty_resize(state: State<'_, PtyState>, id: String, cols: u16, rows: u16) -> Result<(), String> {
+pub async fn pty_resize(state: State<'_, PtyState>, id: String, cols: u16, rows: u16) -> Result<(), String> {
     if debug::enabled() {
         debug::write("resize", format!("id={} cols={} rows={}", id, cols, rows));
     }
@@ -612,26 +657,43 @@ pub fn pty_resize(state: State<'_, PtyState>, id: String, cols: u16, rows: u16) 
         let sessions = state.0.lock().map_err(|e| e.to_string())?;
         sessions.get(&id).cloned().ok_or("session not found")?
     };
-    let session = session.lock().map_err(|e| e.to_string())?;
-    session
+    // Resizing the pseudo console can block on its own: run it on a blocking thread so the
+    // main thread (the UI) never waits.
+    tauri::async_runtime::spawn_blocking(move || resize_session(&session, cols, rows))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Resize a session's PTY. It takes only the session lock and never touches the writer, so a
+/// stuck write cannot delay it.
+fn resize_session(session: &Arc<Mutex<PtySession>>, cols: u16, rows: u16) -> Result<(), String> {
+    let state = session.lock().map_err(|e| e.to_string())?;
+    state
         .master
         .resize(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub fn pty_close(state: State<'_, PtyState>, kill: State<'_, KillState>, id: String) -> Result<(), String> {
+pub async fn pty_close(state: State<'_, PtyState>, kill: State<'_, KillState>, id: String) -> Result<(), String> {
     let session = {
         let mut sessions = state.0.lock().map_err(|e| e.to_string())?;
         sessions.remove(&id)
     };
-    if let Some(session) = session {
-        // 从表里移除后拿独占 Arc，kill 后必须 wait 回收子进程，否则成为僵尸进程。
-        // Windows 上连带终结整棵进程树，避免前台应用成为孤儿继续运行。
-        let mut s = session.lock().map_err(|e| e.to_string())?;
-        kill_child_tree(&mut *s.child);
-        let _ = s.child.wait();
-    }
+    // After removing it from the table we hold the only Arc: the kill must be followed by wait
+    // to reap the child, otherwise it stays a zombie. On Windows the whole process tree is
+    // terminated as well, so a foreground app does not keep running as an orphan.
+    // Kill and wait are blocking: run them on a blocking thread, never on the main thread.
+    tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
+        if let Some(session) = session {
+            let mut s = session.lock().map_err(|e| e.to_string())?;
+            kill_child_tree(&mut *s.child);
+            let _ = s.child.wait();
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())??;
     // 同步清理「结束升级」状态，避免长时间使用后无限增长
     if let Ok(mut attempts) = kill.0.lock() {
         attempts.remove(&id);
@@ -795,7 +857,7 @@ fn should_escalate(elapsed_since_last: Option<std::time::Duration>) -> bool {
 /// 窗口内再点升级 SIGKILL（Windows 上为终结整棵进程树）。
 /// 返回本次级别（"term" / "kill"），前端据此切换按钮文案。
 #[tauri::command]
-pub fn pty_kill_foreground(
+pub async fn pty_kill_foreground(
     state: State<'_, PtyState>,
     kill: State<'_, KillState>,
     id: String,
@@ -804,7 +866,6 @@ pub fn pty_kill_foreground(
         let sessions = state.0.lock().map_err(|e| e.to_string())?;
         sessions.get(&id).cloned().ok_or("session not found")?
     };
-    let mut session = session.lock().map_err(|e| e.to_string())?;
 
     let now = std::time::Instant::now();
     let escalate = {
@@ -814,7 +875,16 @@ pub fn pty_kill_foreground(
         esc
     };
 
-    kill_foreground_impl(&mut session, escalate)?;
+    // Signaling, terminating the process tree and writing Ctrl+C can all block: run them on a
+    // blocking thread so the main thread (the UI) never waits - otherwise the stop button itself
+    // wedges and force-quitting the app becomes the only way out.
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut session = session.lock().map_err(|e| e.to_string())?;
+        kill_foreground_impl(&mut session, escalate)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+
     Ok(if escalate { "kill" } else { "term" }.to_string())
 }
 
@@ -823,6 +893,30 @@ pub fn pty_kill_foreground(
 fn kill_foreground_impl(session: &mut PtySession, escalate: bool) -> Result<(), String> {
     let sig = if escalate { libc::SIGKILL } else { libc::SIGTERM };
     signal_fg_process_group(&*session.master, session.child.process_id(), sig)
+}
+
+/// How long the first press of the stop button waits for the write channel. Ctrl+C is input
+/// written to stdin, so it cannot be delivered while a stuck write holds that channel. On
+/// timeout we report an actionable error instead of hanging the button forever; pressing again
+/// inside the escalation window goes straight to the tree kill, which is the only way left to
+/// end an app that has stopped reading its input.
+#[cfg(windows)]
+const CTRL_C_WRITER_WAIT: std::time::Duration = std::time::Duration::from_millis(1000);
+
+/// Send Ctrl+C once the write channel is free; report an actionable error when it stays busy for
+/// longer than `CTRL_C_WRITER_WAIT`.
+#[cfg(windows)]
+fn send_ctrl_c_when_writable(session: &PtySession) -> Result<(), String> {
+    let deadline = std::time::Instant::now() + CTRL_C_WRITER_WAIT;
+    loop {
+        if let Ok(mut writer) = session.writer.try_lock() {
+            return send_ctrl_c(&mut **writer);
+        }
+        if std::time::Instant::now() >= deadline {
+            return Err("前台应用未读取输入，Ctrl+C 送不进去；再点一次「结束」可强杀".into());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
 }
 
 /// 平台相关的「结束前台应用」实现：Windows 首击发 Ctrl+C（等价用户按键），
@@ -836,7 +930,7 @@ fn kill_foreground_impl(session: &mut PtySession, escalate: bool) -> Result<(), 
             None => session.child.kill().map_err(|e| e.to_string()),
         }
     } else {
-        send_ctrl_c(&mut *session.writer)
+        send_ctrl_c_when_writable(session)
     }
 }
 
@@ -983,6 +1077,124 @@ mod tests {
             }
         }
         assert!(out.contains("v2-pty-ok"), "no echo, got: {out:?}");
+    }
+
+    /// `spawn_pty` is the single entry point for creating a session (now run on a blocking
+    /// thread): confirm it yields a usable session.
+    #[test]
+    fn spawn_pty_produces_a_live_session() {
+        let (id, master, mut reader, mut writer, mut child) =
+            spawn_pty(80, 24, None, None, None, None).expect("spawn_pty");
+        assert!(id.starts_with("pty-"), "unexpected id: {id}");
+
+        writer.write_all(b"echo spawn-pty-ok\n").expect("write");
+        writer.flush().expect("flush");
+        let mut out = String::new();
+        let mut buf = [0u8; 4096];
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !out.contains("spawn-pty-ok") && std::time::Instant::now() < deadline {
+            match reader.read(&mut buf) {
+                Ok(n) if n > 0 => out.push_str(&String::from_utf8_lossy(&buf[..n])),
+                _ => std::thread::sleep(std::time::Duration::from_millis(20)),
+            }
+        }
+        kill_child_tree(&mut *child);
+        let _ = child.wait();
+        drop(master);
+        assert!(out.contains("spawn-pty-ok"), "no echo, got: {out:?}");
+    }
+
+    /// A long-lived child that never reads stdin, used to fill up the PTY input buffer.
+    fn non_reading_command() -> CommandBuilder {
+        #[cfg(windows)]
+        {
+            let mut cmd = CommandBuilder::new("cmd");
+            cmd.args(["/c", "ping", "-n", "15", "127.0.0.1"]);
+            cmd
+        }
+        #[cfg(not(windows))]
+        {
+            let mut cmd = CommandBuilder::new("sleep");
+            cmd.arg("15");
+            cmd
+        }
+    }
+
+    /// End-to-end reproduction: while the foreground process is not reading stdin, `write_all`
+    /// stays blocked, and the session lock taken by `pty_resize` / `pty_close` /
+    /// `pty_kill_foreground` must still be available. If it is not, those commands queue behind
+    /// the stuck write, and since they run on the main thread the whole UI freezes with them -
+    /// the stop button included.
+    #[test]
+    fn session_lock_stays_free_while_a_write_is_stuck() {
+        let pair = native_pty_system()
+            .openpty(PtySize { rows: 24, cols: 80, pixel_width: 0, pixel_height: 0 })
+            .expect("openpty");
+        let child = pair.slave.spawn_command(non_reading_command()).expect("spawn");
+        drop(pair.slave);
+        let writer = pair.master.take_writer().expect("writer");
+        let session = Arc::new(Mutex::new(PtySession {
+            master: pair.master,
+            writer: Arc::new(Mutex::new(writer)),
+            child,
+            input_pending: Arc::new(AtomicBool::new(false)),
+        }));
+
+        // 8 MiB into a process that never reads stdin: `write_all` blocks once the pipe fills up.
+        let pumping = {
+            let session = session.clone();
+            let started = Arc::new(AtomicBool::new(false));
+            let flag = started.clone();
+            let handle = std::thread::spawn(move || {
+                flag.store(true, Ordering::Release);
+                let t0 = std::time::Instant::now();
+                let outcome = write_session(&session, &vec![b'x'; 8 * 1024 * 1024]);
+                println!("write_session finished: {outcome:?} after {:?}", t0.elapsed());
+            });
+            (started, handle)
+        };
+        let (started, pumping) = pumping;
+        while !started.load(Ordering::Acquire) {
+            std::thread::yield_now();
+        }
+        // This payload finishes in milliseconds on a pipe that is being drained, so still writing
+        // after 1s means it really is stuck inside `write_all`.
+        std::thread::sleep(std::time::Duration::from_millis(1000));
+        assert!(
+            !pumping.is_finished(),
+            "write_all never blocked (payload too small, or this platform does not block)"
+        );
+
+        // The wait is measured by timing the session lock that those three commands take.
+        let (tx, rx) = std::sync::mpsc::channel();
+        {
+            let session = session.clone();
+            std::thread::spawn(move || {
+                let started = std::time::Instant::now();
+                let _guard = session.lock();
+                let _ = tx.send(started.elapsed());
+            });
+        }
+        let probe_started = std::time::Instant::now();
+        let waited = rx.recv_timeout(std::time::Duration::from_secs(3)).unwrap_or_else(|_| {
+            panic!("session lock not free within 3s: a stuck write is holding it")
+        });
+
+        assert!(
+            waited < std::time::Duration::from_millis(250),
+            "session lock waited {waited:?} (probe took {:?}), still queued behind a stuck write",
+            probe_started.elapsed()
+        );
+        println!("OK: session lock free in {waited:?} while write_all is still blocked");
+
+        // Cleanup: end the child process. The stuck `write_all` is not joined - it only returns
+        // once the underlying pipe really breaks, so joining could hang; the thread finishes when
+        // this process exits.
+        if let Ok(mut s) = session.lock() {
+            kill_child_tree(&mut *s.child);
+            let _ = s.child.wait();
+        }
+        std::mem::forget(pumping);
     }
 
     #[cfg(unix)]
@@ -1184,7 +1396,7 @@ mod cmd_interaction_tests {
         command.args(["/d", "/c", "exit", "7"]);
         let child = pair.slave.spawn_command(command).unwrap();
         let writer = pair.master.take_writer().unwrap();
-        let session = Arc::new(Mutex::new(PtySession { master: pair.master, writer, child, input_pending: Arc::new(AtomicBool::new(false)) }));
+        let session = Arc::new(Mutex::new(PtySession { master: pair.master, writer: Arc::new(Mutex::new(writer)), child, input_pending: Arc::new(AtomicBool::new(false)) }));
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
         while !session_has_exited(&session) && std::time::Instant::now() < deadline {
             std::thread::sleep(std::time::Duration::from_millis(20));
