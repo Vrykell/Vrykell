@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Terminal } from '@xterm/xterm';
-import { loadWebglRenderer } from '../xtermRenderer';
+import { applyTerminalRenderer, loadWebglRenderer } from '../xtermRenderer';
 
 const mocked = vi.hoisted(() => ({
   handlers: [] as Array<() => void>,
@@ -57,5 +57,27 @@ describe('loadWebglRenderer', () => {
     const { term, loadAddon } = fakeTerminal();
     expect(() => loadWebglRenderer(term)).not.toThrow();
     expect(loadAddon).not.toHaveBeenCalled();
+  });
+
+  it('skips the addon when the stored preference is the DOM renderer', () => {
+    reset();
+    const { term, loadAddon } = fakeTerminal();
+    loadWebglRenderer(term, 'dom');
+    expect(loadAddon).not.toHaveBeenCalled();
+  });
+
+  it('applies a preference change to an open terminal in both directions', () => {
+    reset();
+    const { term, loadAddon } = fakeTerminal();
+    loadWebglRenderer(term, 'webgl');
+    expect(loadAddon).toHaveBeenCalledTimes(1);
+
+    applyTerminalRenderer(term, 'dom');
+    expect(mocked.disposed).toBe(1);
+    applyTerminalRenderer(term, 'dom');
+    expect(mocked.disposed).toBe(1);
+
+    applyTerminalRenderer(term, 'webgl');
+    expect(loadAddon).toHaveBeenCalledTimes(2);
   });
 });

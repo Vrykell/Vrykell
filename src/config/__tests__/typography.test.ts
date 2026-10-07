@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { boundedFontSize, useTypographyStore } from '../typography';
+import { boundedFontSize, boundedTerminalRenderer, useTypographyStore } from '../typography';
 
 describe('font preferences', () => {
   beforeEach(() => useTypographyStore.getState().reset());
@@ -16,7 +16,17 @@ describe('font preferences', () => {
     expect(document.documentElement.style.getPropertyValue('--terminal-font-size')).toBe('18px');
     expect(document.documentElement.style.getPropertyValue('--terminal-row-height')).toBe('21px');
     expect(document.documentElement.style.getPropertyValue('--ui-font-scale')).toBe(String(15 / 13));
-    expect(JSON.parse(localStorage.getItem('vrykell-typography')!).state).toEqual({ uiFontSize: 15, terminalFontSize: 18 });
+    expect(JSON.parse(localStorage.getItem('vrykell-typography')!).state).toEqual({ uiFontSize: 15, terminalFontSize: 18, terminalRenderer: 'webgl' });
+  });
+
+  it('keeps the renderer preference and rejects unknown values', async () => {
+    expect(boundedTerminalRenderer('dom', 'webgl')).toBe('dom');
+    expect(boundedTerminalRenderer('vulkan', 'webgl')).toBe('webgl');
+    useTypographyStore.getState().update({ terminalRenderer: 'dom' });
+    expect(JSON.parse(localStorage.getItem('vrykell-typography')!).state.terminalRenderer).toBe('dom');
+    localStorage.setItem('vrykell-typography', JSON.stringify({ version: 0, state: { terminalRenderer: 'vulkan' } }));
+    await useTypographyStore.persist.rehydrate();
+    expect(useTypographyStore.getState().terminalRenderer).toBe('webgl');
   });
 
   it('restores and validates persisted sizes without replacing store actions', async () => {

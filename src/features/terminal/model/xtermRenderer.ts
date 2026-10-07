@@ -1,5 +1,9 @@
 import type { Terminal } from '@xterm/xterm';
 import { WebglAddon } from '@xterm/addon-webgl';
+import type { TerminalRenderer } from '@config/typography';
+
+/** Live WebGL addons, so a preference change can be applied to an existing terminal. */
+const webglAddons = new WeakMap<Terminal, WebglAddon>();
 
 /**
  * Load the WebGL renderer, and step down to the DOM renderer when its GPU context is lost.
@@ -11,17 +15,34 @@ import { WebglAddon } from '@xterm/addon-webgl';
  * slower) instead of freezing.
  *
  * WebGL is also unavailable in some WebViews, which is why a failed construction is not an
- * error: the terminal keeps the renderer it already had.
+ * error: the terminal keeps the renderer it already had. Choosing the DOM renderer in settings
+ * skips the addon entirely, which some GPU drivers need to keep selection edges clean.
  */
-export function loadWebglRenderer(term: Terminal): void {
-  // Diagnostic switch: `localStorage['vrykell-terminal-renderer'] = 'dom'` keeps the DOM
-  // renderer for the current profile, so the two renderers can be compared on real content.
-  if (globalThis.localStorage?.getItem('vrykell-terminal-renderer') === 'dom') return;
+export function loadWebglRenderer(term: Terminal, preference: TerminalRenderer = 'webgl'): void {
+  if (preference === 'dom') return;
   try {
     const addon = new WebglAddon();
-    addon.onContextLoss(() => addon.dispose());
+    addon.onContextLoss(() => {
+      webglAddons.delete(term);
+      addon.dispose();
+    });
+    webglAddons.set(term, addon);
     term.loadAddon(addon);
   } catch {
     // No WebGL here: stay on the default DOM renderer.
+    webglAddons.delete(term);
   }
+}
+
+/** Apply a changed preference to an already open terminal: DOM drops the addon, WebGL loads it. */
+export function applyTerminalRenderer(term: Terminal, preference: TerminalRenderer): void {
+  const addon = webglAddons.get(term);
+  if (preference === 'dom') {
+    if (addon) {
+      webglAddons.delete(term);
+      addon.dispose();
+    }
+    return;
+  }
+  if (!addon) loadWebglRenderer(term, preference);
 }

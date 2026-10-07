@@ -263,7 +263,7 @@ export function createBlockTerm(
   });
   // Same renderer as the main terminal: WebGL keeps half-block glyphs seamless, and the shared
   // helper steps down to the DOM renderer when the GPU context is lost or WebGL is unavailable.
-  loadWebglRenderer(term);
+  loadWebglRenderer(term, useTypographyStore.getState().terminalRenderer);
   return {
     term,
     el,

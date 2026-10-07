@@ -3,12 +3,20 @@ import { ptyWrite } from '@platform/pty';
 import { useWorkspaceStore, isSessionTab } from '@features/workspace/stores/workspace';
 import { leaves as layoutLeaves, firstLeaf } from '@features/workspace/model/windowLayout';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
+import { applyTerminalRenderer } from '@features/terminal/model/xtermRenderer';
+import { useTypographyStore } from '@config/typography';
 import type { Terminal } from '@xterm/xterm';
 import type { Scene } from '@features/terminal/services/pipeline/sessionController';
 
 // 每个标签页一个 xterm 实例（模块级引用，不进 zustand state）
 const termInstances = new Map<string, Terminal>();
 export { termInstances };
+
+// 设置里的渲染器偏好变化后立即应用到已打开的终端（新建的终端在挂载时读同一份偏好）。
+useTypographyStore.subscribe((state, previous) => {
+  if (state.terminalRenderer === previous.terminalRenderer) return;
+  for (const term of termInstances.values()) applyTerminalRenderer(term, state.terminalRenderer);
+});
 
 // e2e 测试桥：暴露 term 注册表供断言读取 buffer（WebGL renderer 下文本不进 DOM，
 // 测试无法用 getByText 读终端输出）。仅测试环境初始化，不影响正常运行。
