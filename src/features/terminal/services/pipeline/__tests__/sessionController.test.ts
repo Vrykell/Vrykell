@@ -42,6 +42,27 @@ async function waitFor(cond: () => boolean, timeoutMs = 2000): Promise<void> {
 }
 
 describe('SessionController', () => {
+  it('hands terminal-control OSC to the running block terminal instead of dropping it', () => {
+    const { st, ctrl, feed } = wire();
+    feed(A);
+    ctrl.setPendingCommand('probe');
+    expect(ctrl.activeBlock?.status).toBe('executing');
+
+    // The block terminal is the running command's terminal, so a capability query has to
+    // reach it for the reply to come back; it must not leak into the idle main xterm.
+    const query = '\x1b]11;?\x07';
+    feed(query);
+    expect(ctrl.activeBlock?.outputRaw).toContain(query);
+    expect(st.written).not.toContain(query);
+
+    // Nothing is running once the block is done: the same OSC has no terminal to answer it.
+    feed(`${D(0)}${A}`);
+    feed(query);
+    expect(st.written).not.toContain(query);
+    expect(ctrl.activeBlock?.outputRaw).not.toContain(query);
+    ctrl.dispose();
+  });
+
   it('renders submitted SSH output even when the remote shell omits the preexec marker', async () => {
     const { st, ctrl, feed } = wire();
     feed(A);
