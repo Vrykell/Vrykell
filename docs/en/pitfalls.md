@@ -544,6 +544,7 @@
 - **Check the font before blaming the renderer** when frames and tables drift: the usual cause is a CJK fallback face whose advance is not two Latin cells, so the right border of a table like `│ name │` shifts row by row. The font stack must reach a monospace CJK face (Sarasa Mono SC / Noto Sans Mono CJK SC). Headless e2e environments rarely have those fonts, so they never decide the renderer question.
 - The WebGL renderer cannot be screenshotted without a GPU (headless browser / SwiftShader): `.xterm-rows` is empty and captures come back black, because the selection lives in the canvas texture rather than the DOM. Renderer comparisons must run on real hardware.
 - Measured fact: the WebGL canvas is device-pixel aligned (CSS width times dpr is exactly integral), so "canvas rounding" does not explain an edge seam. Measure the `screen` / `region` / `canvas` rects before blaming rounding.
+- **A thin line beside a terminal selection is the terminal's own scrollbar**: `.xterm-viewport` is 8px wider than `.xterm-screen` (that lane is the native scrollbar), and the global `::-webkit-scrollbar-thumb` rule (2px transparent border with padding-box) leaves only a ~4px light sliver in its middle, which hugs the selection and reads as a rendering artifact. The running block already hides its own scrollbar with `display: none`; the pane now does too (wheel, trackpad and keyboard scrolling are unaffected). Switching renderers (WebGL/DOM) does **not** change this, so never treat it as a renderer problem.
 
 ---
 
