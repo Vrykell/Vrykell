@@ -108,5 +108,11 @@ test.describe('侧栏列表拖拽排序', () => {
     await startDragRow(page, `tab-row-${a}`, `tab-row-${b}`, 0.85);
     await expect(group.locator('[data-reorder-placeholder]')).toHaveCount(1);
     await page.mouse.up();
+
+    // 组内标签的右键菜单可以显式移出分组（不必非要拖到「未分组」区）
+    await group.locator(`[data-testid="tab-row-${b}"]`).click({ button: 'right' });
+    await page.getByRole('button', { name: '移出分组', exact: true }).click();
+    await expect(group.locator(`[data-testid="tab-row-${b}"]`)).toHaveCount(0);
+    await expect(page.locator(`[data-testid="tab-row-${b}"][data-tab-group=""]`)).toHaveCount(1);
   });
 });

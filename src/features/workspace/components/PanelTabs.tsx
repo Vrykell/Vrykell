@@ -127,6 +127,14 @@ export default function PanelTabs() {
             });
           },
         }] : []),
+        // 组内标签的菜单补上出路：拖到「未分组」区之外，也能显式移出分组
+        ...(isSessionTab(ctxTab) && ctxTab.groupId ? [{
+          label: '移出分组',
+          onClick: () => {
+            const scope = tabs.filter((t) => isSessionTab(t) && !t.groupId && t.id !== ctxTab.id);
+            useSessionStore.getState().moveTab(ctxTab.id, null, scope.length);
+          },
+        }] : []),
         { label: '重命名', onClick: () => { setEditId(ctxTab.id); setEditTitle(ctxTab.title); } },
         { label: '重新生成标题', onClick: () => {
           useToastStore.getState().addToast('正在重新生成标题…', 'info');

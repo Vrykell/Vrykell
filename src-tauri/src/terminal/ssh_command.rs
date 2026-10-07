@@ -93,8 +93,10 @@ pub fn build_ssh_command(target: &SshTarget, remote_command: Option<&str>) -> Re
         verified[1] = "StrictHostKeyChecking=ask".into();
     }
     command.args(verified);
-    command.args(["-o", "ConnectTimeout=15", "-o", "ServerAliveCountMax=3"]);
-    command.args(["-o".to_string(), format!("ServerAliveInterval={}", target.options.server_alive_interval.unwrap_or(30))]);
+    // Keepalive: two missed probes (~30s) end the client, so a silently dropped
+    // connection is reported instead of waiting for the next user input.
+    command.args(["-o", "ConnectTimeout=15", "-o", "ServerAliveCountMax=2"]);
+    command.args(["-o".to_string(), format!("ServerAliveInterval={}", target.options.server_alive_interval.unwrap_or(15))]);
     if let Some(identity) = &target.options.identity_file {
         let path = Path::new(identity);
         if !path.is_file() { return Err("指定的 SSH 私钥文件不存在".into()); }
