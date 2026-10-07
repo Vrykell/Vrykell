@@ -97,13 +97,30 @@ PTY output -> Rust StreamScanner (src-tauri/src/terminal/scan.rs, synchronous)
 - When a refactor moves markup, either keep the existing hooks (`data-testid`,
   `data-tab-row-id`, `data-tab-group`, ARIA labels) or update every spec in the same commit.
 
+## Diagnosing runtime problems
+
+The app records structured diagnostics. **Read what is already recorded before asking for a
+reproduction, a hand-run probe or a log by hand.**
+
+- `%LOCALAPPDATA%\com.vrykell.app\logs\diagnostics.jsonl` - IPC calls, PTY writes, scan events,
+  terminal input, scene changes and block transitions, each with a timestamp and a `sequence`
+  number. Older records rotate to `.1` and `.2` beside it.
+- `%APPDATA%\com.vrykell.app\diagnostics.json` holds the `autoSave` flag. Its state belongs to
+  the machine: check the records that already exist instead of turning auto-save on again for
+  every run.
+- Only metadata is recorded (rule 37): command text, terminal output and key payloads are
+  redacted. When a question needs something the log cannot give, add a stable
+  `terminalDebug(...)` marker in the same commit as the fix, then read the log again.
+
 ## Workflow
 
 1. Read the owning feature and the shared component before adding code.
-2. Small focused commits; English subject with the `feat:` / `fix:` / `test:` / `refactor:` /
+2. When something fails at runtime, read the app's own diagnostics first (above); ask for a
+   reproduction only when the log cannot answer the question.
+3. Small focused commits; English subject with the `feat:` / `fix:` / `test:` / `refactor:` /
    `docs:` prefix, details as body bullets.
-3. New features update the test checklist in `docs/zh/feature-spec.md` (mirror `docs/en/feature-spec.md`).
-4. Definition of done: typecheck, unit tests and the architecture guard are green; e2e covers
+4. New features update the test checklist in `docs/zh/feature-spec.md` (mirror `docs/en/feature-spec.md`).
+5. Definition of done: typecheck, unit tests and the architecture guard are green; e2e covers
    touched interactions; no dead code, unused imports or commented-out blocks remain; every
    comment you wrote or edited is English (constraint 3) while user-visible copy stays Chinese.
 

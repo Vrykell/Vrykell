@@ -49,6 +49,15 @@ that file consistent when rules change.
 - **Interactive features need e2e** - in `e2e/` using Playwright (`tauri-mock.ts` mocks Tauri + Anthropic; single worker).
 - **Run before commit** - `npx tsc --noEmit && npm run test && npm run check:architecture`, plus `npm run test:e2e` / `cargo test` when the change can touch them.
 
+## Diagnosing Runtime Problems
+
+The app records structured diagnostics; read them before asking for a reproduction:
+`%LOCALAPPDATA%\com.vrykell.app\logs\diagnostics.jsonl` (older records rotate to `.1`, `.2`; the
+`autoSave` flag lives in `%APPDATA%\com.vrykell.app\diagnostics.json`). Only metadata is
+recorded - command text, terminal output and key payloads are redacted - so when a question needs
+something the log cannot give, add a stable `terminalDebug(...)` marker and read the log again.
+See rules 36-41 in `docs/zh/development-rules.md`.
+
 ## Architecture
 
 ```
