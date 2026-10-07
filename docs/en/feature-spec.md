@@ -178,7 +178,7 @@
 |---|---|---|---|
 | G1 | Theme color | Dark background #050505 | Visual check |
 | G2 | No bottom status bar | StatusBar has been removed and status information is no longer displayed at the bottom | Visual check that there is no status bar |
-| G3 | Terminal copy/paste | No longer copies on selection; the terminal context menu offers Copy and Paste, and the shortcuts are Ctrl+Shift+C / Ctrl+Shift+V; Ctrl+C **copies when there is a selection** (as most terminals do) and only passes straight through without one, so per-terminal interrupt semantics are never hijacked; copy uses the xterm selection or the block-list DOM selection, and paste writes to the focused terminal's PTY | Unit tests verify the copy/paste service (selection, empty selection, no session, PTY write); E2E verifies the context menu items and that the shortcuts write to the clipboard and the PTY |
+| G3 | Terminal copy/paste | No longer copies on selection; the terminal context menu offers Copy and Paste, and the shortcuts are **Ctrl+C / Ctrl+V**: Ctrl+C **copies when there is a selection**, stays the terminal's interrupt without one and Ctrl+V pastes, while Ctrl+Shift+C/V keep working; a session in win32-input-mode must still hit the copy/paste branch first; copy uses the xterm selection or the block-list DOM selection, and paste writes to the focused terminal's PTY | Unit tests verify the copy/paste service (selection, empty selection, no session, PTY write); E2E verifies the context menu items and that the shortcuts write to the clipboard and the PTY |
 | G4 | Clear AI conversation | Clicking ✕ clears the current AI conversation | Send a message then click ✕ |
 
 ## 10. Terminal Links

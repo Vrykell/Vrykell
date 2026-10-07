@@ -87,8 +87,8 @@ export default function TerminalView() {
           anchor={ctxMenu}
           onClose={() => setCtxMenu(null)}
           items={[
-            { label: t('terminal.menu.copy'), shortcut: 'Ctrl+Shift+C', onClick: () => { void copyTerminalSelection(getPaneTerminal(focusedTermId)); } },
-            { label: t('terminal.menu.paste'), shortcut: 'Ctrl+Shift+V', onClick: () => { void pasteClipboardIntoTerminal(focusedTermId); } },
+            { label: t('terminal.menu.copy'), shortcut: 'Ctrl+C', onClick: () => { void copyTerminalSelection(getPaneTerminal(focusedTermId)); } },
+            { label: t('terminal.menu.paste'), shortcut: 'Ctrl+V', onClick: () => { void pasteClipboardIntoTerminal(focusedTermId); } },
             { label: '分裂终端（选位置）', onClick: () => useUiStore.getState().beginSplit(null) },
             { label: '选择类型分裂', onClick: () => useUiStore.getState().openSplitPicker() },
             { label: '更换位置', onClick: () => useUiStore.getState().beginMove(focusedTermId) },
