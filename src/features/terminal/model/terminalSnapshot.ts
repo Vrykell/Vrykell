@@ -5,7 +5,6 @@
  * 只有终端模拟器自身能正确处理全部 ANSI 转义。
  */
 import { Terminal } from '@xterm/xterm';
-import { loadWebglRenderer } from '@features/terminal/model/xtermRenderer';
 import type { IBufferCell } from '@xterm/xterm';
 import { indexToCss } from '@features/terminal/model/blockTypes';
 import { TERMINAL_FONT_FAMILY, getTerminalFontSize, terminalLetterSpacing, TERMINAL_LINE_HEIGHT } from '@features/terminal/model/terminalFont';
@@ -266,9 +265,6 @@ export function createBlockTerm(
       term.options.letterSpacing = terminalLetterSpacing(state.terminalFontSize);
     }
   });
-  // Same renderer as the main terminal: WebGL keeps half-block glyphs seamless, and the shared
-  // helper steps down to the DOM renderer when the GPU context is lost or WebGL is unavailable.
-  loadWebglRenderer(term, useTypographyStore.getState().terminalRenderer);
   return {
     term,
     el,

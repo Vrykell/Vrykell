@@ -3,6 +3,7 @@
  * 模型下拉 · 上下文圆环 · 深思/Agent 开关，与聊天面板顶栏同构。
  */
 import Toggle from '@ui/StateIconButton';
+import { t } from '@i18n';
 import { Bot, Brain } from '@ui/icons';
 import { useInputStore, selectPaneInput } from '@features/terminal';
 import { useAiConfigStore, useAgentSettings } from '@features/agent';
@@ -33,13 +34,14 @@ export default function AiStatusBar({ paneId }: { paneId: string }) {
       <Toggle
         icon={Brain}
         on={eff.deepThink}
-        title="深度思考"
+        title={t('Deep thinking')}
         onClick={() => agentSettings.updateModel(activeModel, { deepThink: !eff.deepThink })}
       />
       <Toggle
         icon={Bot}
         on={eff.agentMode}
-        title={eff.agentMode ? 'Agent 模式（可使用工具）' : '纯聊天（工具已关闭）'}
+        title={t(eff.agentMode ? 'Agent mode' : 'Chat only')}
+        description={t(eff.agentMode ? 'Allow AI to use tools.' : 'Tools are turned off.')}
         onClick={() => agentSettings.updateModel(activeModel, { agentMode: !eff.agentMode })}
       />
 

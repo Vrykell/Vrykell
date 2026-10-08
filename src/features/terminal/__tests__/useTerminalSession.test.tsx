@@ -50,7 +50,7 @@ vi.mock('@xterm/xterm', () => ({
     }
   },
 }));
-vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit() {} } }));
+vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { proposeDimensions() { return { cols: 80, rows: 24 }; } } }));
 vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: class {} }));
 vi.mock('@features/ssh/services/hostTrust', () => ({ prepareSshHost: vi.fn().mockResolvedValue({ known: true, fingerprint: 'SHA256:test', keyType: 'ed25519' }) }));
 

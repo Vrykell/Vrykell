@@ -27,11 +27,11 @@ export function useTerminalBlockFlow(tabId: string) {
 
   const completed = useMemo(
     () => blocks.filter((block) =>
-      (block.status === 'done' || block.status === 'interrupted') && hasVisibleContent(block),
+      (block.status === 'done' || block.status === 'interrupted') && !block.snapshotPending && hasVisibleContent(block),
     ),
     [blocks],
   );
-  const running = useMemo(() => blocks.filter((block) => block.status === 'executing'), [blocks]);
+  const running = useMemo(() => blocks.filter((block) => block.status === 'executing' || block.snapshotPending), [blocks]);
   const exchanges = useMemo(
     () => (chatPanelOpen ? [] : toExchanges(aiMessages)),
     [aiMessages, chatPanelOpen],

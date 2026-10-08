@@ -63,7 +63,7 @@ describe('getLongRunningHint', () => {
   it('短命令名完整显示', () => {
     const hint = getLongRunningHint('npm run dev');
     expect(hint).toContain('npm run dev');
-    expect(hint).toContain('按 End 回到输入栏');
+    expect(hint).toContain('运行中');
   });
 
   it('长命令名截断', () => {

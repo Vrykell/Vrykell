@@ -310,8 +310,9 @@ describe('BlockOutput 组件', () => {
     expect(output.style.overflowWrap).toBe('anywhere');
     expect(output.style.overflowX).toBe('hidden');
     expect(output.style.overflowY).toBe('auto');
-    expect(output.style.contentVisibility).toBe('auto');
-    expect(output.style.containIntrinsicBlockSize).toBe('auto calc(var(--terminal-row-height) * 2)');
+    expect(output.style.contentVisibility).toBe('');
+    expect(output.style.containIntrinsicBlockSize).toBe('');
+    expect(output.style.contain).toBe('layout style paint');
     expect(output.querySelectorAll('br')).toHaveLength(1);
     expect(output.textContent).toContain('128       file.txt');
   });

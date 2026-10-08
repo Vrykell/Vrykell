@@ -13,7 +13,26 @@ function makeEl(scrollTop: number) {
 }
 
 describe('useFollowBottom', () => {
-  it('keeps following when a bottom jump is followed by a resize before its scroll event', () => {
+  it('routes embedded-terminal wheel events to history and pauses live following', async () => {
+    const el = makeEl(800);
+    const running = document.createElement('div');
+    running.dataset.testid = 'running-term';
+    el.appendChild(running);
+    const innerWheel = vi.fn();
+    running.addEventListener('wheel', innerWheel);
+    const { rerender } = renderHook(({ dep }) => useFollowBottom({ current: el }, [dep]), { initialProps: { dep: 1 } });
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    const wheel = new WheelEvent('wheel', { deltaY: -350, bubbles: true, cancelable: true });
+    running.dispatchEvent(wheel);
+    expect(wheel.defaultPrevented).toBe(true);
+    expect(innerWheel).not.toHaveBeenCalled();
+    expect(el.scrollTop).toBe(650);
+    Object.defineProperty(el, 'scrollHeight', { value: 1500, configurable: true });
+    rerender({ dep: 2 });
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    expect(el.scrollTop).toBe(650);
+  });
+  it('keeps following when a bottom jump is followed by a resize before its scroll event', async () => {
     let notify: ResizeObserverCallback = () => {};
     vi.stubGlobal('ResizeObserver', class {
       constructor(callback: ResizeObserverCallback) { notify = callback; }
@@ -29,12 +48,13 @@ describe('useFollowBottom', () => {
       el.scrollTop = 800;
       Object.defineProperty(el, 'clientHeight', { value: 180, configurable: true });
       notify([], {} as ResizeObserver);
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
       expect(el.scrollTop).toBe(1000);
     } finally {
       vi.unstubAllGlobals();
     }
   });
-  it('observes the complete output wrapper and follows live height changes', () => {
+  it('observes the complete output wrapper and follows live height changes', async () => {
     let notify: ResizeObserverCallback = () => {};
     const observe = vi.fn();
     vi.stubGlobal('ResizeObserver', class {
@@ -54,6 +74,7 @@ describe('useFollowBottom', () => {
 
       Object.defineProperty(el, 'scrollHeight', { value: 1400, configurable: true });
       notify([] as ResizeObserverEntry[], {} as ResizeObserver);
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
       expect(el.scrollTop).toBe(1400);
     } finally {
       vi.unstubAllGlobals();
@@ -127,4 +148,46 @@ describe('registerFollowEngager / engageFollow', () => {
     expect(fn2).toHaveBeenCalledTimes(1);
     expect(fn1).not.toHaveBeenCalled();
   });
+});
+
+it('retains bottom-following through remounts when output grows while the pane is detached', async () => {
+  const el = makeEl(800);
+  const ref = { current: el };
+  const first = renderHook(() => useFollowBottom(ref, [], 'remount-follow'));
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+  first.unmount();
+  Object.defineProperty(el, 'scrollHeight', { value: 1800, configurable: true });
+  renderHook(() => useFollowBottom(ref, [], 'remount-follow'));
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+  expect(el.scrollTop).toBe(1800);
+});
+
+it('retains a paused reading position through remounts and background output', async () => {
+  const el = makeEl(800);
+  const ref = { current: el };
+  const first = renderHook(() => useFollowBottom(ref, [], 'remount-reading'));
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+  el.scrollTop = 300;
+  el.dispatchEvent(new Event('scroll'));
+  first.unmount();
+  Object.defineProperty(el, 'scrollHeight', { value: 1800, configurable: true });
+  renderHook(() => useFollowBottom(ref, [], 'remount-reading'));
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+  expect(el.scrollTop).toBe(300);
+});
+
+it('keeps following fractional programmatic offsets and content-clamp scroll events', async () => {
+  const el = makeEl(800);
+  const ref = { current: el };
+  const { rerender } = renderHook(({ dep }) => useFollowBottom(ref, [dep]), { initialProps: { dep: 1 } });
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+  el.scrollTop += 0.25;
+  el.dispatchEvent(new Event('scroll'));
+  Object.defineProperty(el, 'scrollHeight', { value: 700, configurable: true });
+  el.scrollTop = 500;
+  el.dispatchEvent(new Event('scroll'));
+  Object.defineProperty(el, 'scrollHeight', { value: 1800, configurable: true });
+  rerender({ dep: 2 });
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+  expect(el.scrollTop).toBe(1800);
 });

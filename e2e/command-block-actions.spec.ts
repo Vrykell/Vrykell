@@ -12,14 +12,19 @@ test.describe('命令块操作全链路', () => {
 
     const block = page.locator('[data-testid^="command-block-"]').filter({ hasText: 'echo compact-toolbar' }).first();
     await expect(block).toBeVisible({ timeout: 5000 });
+    const command = block.locator('[data-selectable]').first();
+    const before = await command.boundingBox();
     await block.hover();
-    const titles = ['AI 解释', '重新运行', '复制命令', '复制输出', '更多操作'];
+    const after = await command.boundingBox();
+    expect(after!.x).toBe(before!.x);
+    expect(after!.width).toBe(before!.width);
+    const titles = ['重新运行', 'AI 解释', '复制命令', '复制输出', '更多操作'];
     const bounds: Array<{ x: number; width: number }> = [];
     for (const title of titles) {
       const button = block.locator(`[data-tip="${title}"]`);
       await expect(button).toHaveCSS('width', '28px');
       await expect(button).toHaveCSS('height', '28px');
-      await expect(button.locator('svg')).toHaveCSS('width', '14px');
+      await expect(button.locator('svg')).toHaveCSS('width', '16px');
       const box = await button.boundingBox();
       expect(box).not.toBeNull();
       bounds.push({ x: box!.x, width: box!.width });

@@ -8,6 +8,8 @@
  */
 
 import { useRef, useEffect, useMemo, useState } from 'react';
+import KeyHint from '@ui/KeyHint';
+import DropPlacementPreview from '@ui/DropPlacementPreview';
 import { useSessionStore, type Tab } from '@features/workspace';
 import { useTerminalStore } from '@features/terminal';
 import { useUiStore, useDockDragStore } from '@features/workspace';
@@ -87,11 +89,11 @@ export default function TerminalView() {
           anchor={ctxMenu}
           onClose={() => setCtxMenu(null)}
           items={[
-            { label: t('terminal.menu.copy'), shortcut: 'Ctrl+C', onClick: () => { void copyTerminalSelection(getPaneTerminal(focusedTermId)); } },
-            { label: t('terminal.menu.paste'), shortcut: 'Ctrl+V', onClick: () => { void pasteClipboardIntoTerminal(focusedTermId); } },
-            { label: '分裂终端（选位置）', onClick: () => useUiStore.getState().beginSplit(null) },
-            { label: '选择类型分裂', onClick: () => useUiStore.getState().openSplitPicker() },
-            { label: '更换位置', onClick: () => useUiStore.getState().beginMove(focusedTermId) },
+            { label: t('terminal.menu.copy'), group: 'clipboard', shortcut: 'Ctrl+C', onClick: () => { void copyTerminalSelection(getPaneTerminal(focusedTermId)); } },
+            { label: t('terminal.menu.paste'), group: 'clipboard', shortcut: 'Ctrl+V', onClick: () => { void pasteClipboardIntoTerminal(focusedTermId); } },
+            { label: '分裂终端（选位置）', group: 'view', onClick: () => useUiStore.getState().beginSplit(null) },
+            { label: '选择类型分裂', group: 'view', onClick: () => useUiStore.getState().openSplitPicker() },
+            { label: '更换位置', group: 'view', onClick: () => useUiStore.getState().beginMove(focusedTermId) },
             { label: '关闭终端', danger: true, onClick: () => useSessionStore.getState().closeFocusedTerminal() },
           ]}
         />
@@ -364,7 +366,7 @@ function TerminalPane(props: {
       {/* Keep xterm mounted; hide it only while the block terminal is manually fullscreened. */}
       {/* AI 状态栏（仅 AI 模式显示，置于页面顶部） */}
       <AiStatusBar paneId={terminal.id} />
-      <div style={showXterm
+      <div inert={!showXterm} style={showXterm
         // Keep the native terminal scrollbar flush with the pane's right edge.
         // 左边距不在这里加：它只属于终端屏幕内容（见 TerminalPanel），
         // 否则认证输入条等整宽元素会被一起推右，出现左右不对称。
@@ -374,13 +376,14 @@ function TerminalPane(props: {
           paneId={terminal.id}
           tabId={windowId}
           connectionInput={terminal.kind === 'ssh'}
+          connectionId={terminal.ssh?.connectionId}
           sshTarget={terminal.ssh ? `${terminal.ssh.user ? `${terminal.ssh.user}@` : ''}${terminal.ssh.host}` : undefined}
           onReady={(sid) => setSession(terminal.id, sid)}
         />
       </div>
 
       {/* Keep the block list mounted so its live terminal survives manual fullscreen. */}
-      <div style={{ display: showBlocks ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column' }}>
+      <div inert={!showBlocks} style={{ display: showBlocks ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column' }}>
         <PaneBlockList paneId={terminal.id} insetLeft={inner.left ? 4 : 8} insetRight={inner.right ? 4 : 8} />
       </div>
       {showBlocks && (
@@ -464,17 +467,14 @@ function PlacementOverlay({ targets, onPick, onCancel, emptyMessage = '最多 4 
       </div>
       {/* A visible grid explains the placement mode before the pointer moves. */}
       {targets.map((t, i) => (
-        <div
+        <DropPlacementPreview
           key={i}
           data-testid={`placement-zone-${i}`}
+          active={hovered === i}
           style={{
             position: 'absolute',
             left: `${t.rect.x * 100}%`, top: `${t.rect.y * 100}%`,
             width: `${t.rect.w * 100}%`, height: `${t.rect.h * 100}%`,
-            boxSizing: 'border-box', pointerEvents: 'none',
-            background: hovered === i ? 'var(--placement-hover)' : 'var(--placement-bg)',
-            border: `1px dashed ${hovered === i ? 'var(--accent)' : 'var(--border-strong)'}`,
-            transition: 'background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease)',
           }}
         >
           <span style={{ position: 'absolute', fontSize: 'calc(12px * var(--ui-font-scale))', color: hovered === i ? 'var(--text-primary)' : 'var(--text-secondary)',
@@ -484,7 +484,7 @@ function PlacementOverlay({ targets, onPick, onCancel, emptyMessage = '最多 4 
             bottom: t.dir === 'col' && t.position === 'second' ? 20 : undefined,
             transform: t.dir === 'row' ? 'translateY(-50%)' : 'translateX(-50%)',
           }}>{t.dir === 'row' ? (t.position === 'first' ? '左侧' : '右侧') : (t.position === 'first' ? '上方' : '下方')}</span>
-        </div>
+        </DropPlacementPreview>
       ))}
     </div>
   );
@@ -547,15 +547,14 @@ function MoveDragLayer({ layout, draggingId, onCommit }: {
   return (
     <div ref={overlayRef} style={{ position: 'absolute', inset: 0, zIndex: 79, cursor: 'grabbing' }}>
       {targets.map((t, i) => (
-        <div
+        <DropPlacementPreview
           key={i}
+          data-testid={`move-placement-zone-${i}`}
+          active={hovered === i}
           style={{
             position: 'absolute',
             left: `${t.rect.x * 100}%`, top: `${t.rect.y * 100}%`,
             width: `${t.rect.w * 100}%`, height: `${t.rect.h * 100}%`,
-            boxSizing: 'border-box', pointerEvents: 'none',
-            background: hovered === i ? 'rgba(128,128,128,0.18)' : 'transparent',
-            transition: 'background var(--dur-fast) var(--ease)',
           }}
         />
       ))}
@@ -579,10 +578,10 @@ function TuiBanner({ tabId }: { tabId: string }) {
       <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--accent-warm)', flexShrink: 0 }} />
       <span>TUI{runningCommand ? ` · ${runningCommand}` : ''}</span>
       <div style={{ flex: 1 }} />
-      <span onClick={sendCtrlC} data-tip="发送 Ctrl+C" style={{ fontSize: 'calc(10px * var(--ui-font-scale))', padding: '2px 6px', borderRadius: 3, cursor: 'pointer' }}>^C</span>
-      <span onClick={killApp} data-tip="结束前台应用 (SIGTERM)" style={{ fontSize: 'calc(10px * var(--ui-font-scale))', padding: '2px 6px', borderRadius: 3, cursor: 'pointer', color: killArmed ? 'var(--accent-warm)' : 'var(--text-secondary)' }}>{killArmed ? '强杀!' : '结束'}</span>
+      <button className="text-control tui-control" onClick={sendCtrlC} data-tip={t('Interrupt command')} data-tip-shortcut="Control+C" aria-label={t('Interrupt command')}><KeyHint shortcut="Control+C" /></button>
+      <button className="text-control tui-control" onClick={killApp} data-tip={t('End foreground task')}>{t(killArmed ? 'Force stop' : 'End foreground task')}</button>
       {altScreenActive && (
-        <span onClick={exitFullScreen} data-tip="退出全屏" style={{ fontSize: 'calc(10px * var(--ui-font-scale))', padding: '2px 6px', borderRadius: 3, cursor: 'pointer' }}>esc</span>
+        <button className="text-control tui-control" onClick={exitFullScreen} data-tip={t('Exit fullscreen')}><KeyHint shortcut="Escape" /></button>
       )}
     </div>
   );
@@ -616,7 +615,7 @@ function PaneBlockList({ paneId, insetLeft = 8, insetRight = 8 }: { paneId: stri
   const snap = useFollowBottom(scrollRef, [blocks], paneId);
   useEffect(() => registerFollowEngager(paneId, snap), [paneId, snap]);
   return (
-    <div ref={scrollRef} className="scroll-region" data-testid={`terminal-scroll-${paneId}`} style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--xterm-bg)', overflowAnchor: 'none' }}>
+    <div ref={scrollRef} className="scroll-region" data-testid={`terminal-scroll-${paneId}`} style={{ flex: 1, minHeight: 0, overflowY: 'scroll', background: 'var(--xterm-bg)', overflowAnchor: 'none' }}>
       <div data-testid={`terminal-flow-${paneId}`}>
         <TerminalBlockList tabId={paneId} insetLeft={insetLeft} insetRight={insetRight} />
         <PaneEmptyHint paneId={paneId} />
@@ -633,8 +632,8 @@ function PaneEmptyHint({ paneId }: { paneId: string }) {
   if (blocks.some(hasVisibleContent) || (!chatPanelOpen && aiMessages.length > 0)) return null;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '32px 28px', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))', userSelect: 'none', gap: 8 }}>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'calc(24px * var(--ui-font-scale))', color: 'var(--text-secondary)', fontWeight: 500, marginBottom: 4 }}>$</div>
-      <div style={{ color: 'var(--text-primary)', fontSize: 'calc(15px * var(--ui-font-scale))', fontWeight: 500 }}>从一条命令开始</div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'calc(24px * var(--ui-font-scale))', color: 'var(--text-secondary)', fontWeight: 'var(--fw-medium)', marginBottom: 4 }}>$</div>
+      <div style={{ color: 'var(--text-primary)', fontSize: 'calc(15px * var(--ui-font-scale))', fontWeight: 'var(--fw-medium)' }}>从一条命令开始</div>
       <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)' }}>在底部输入命令，或打开右上角 AI 助手。</div>
     </div>
   );

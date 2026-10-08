@@ -1,3 +1,4 @@
+import { resizeTerminal } from '../../model/terminalResize';
 /**
  * SessionController — block 生命周期 + 三场景状态机（Spec §1-§3）。
  *
@@ -26,6 +27,8 @@ export interface SessionSinks {
   onCwd(path: string): void;
   onBlockStart(block: TermBlock): void;
   onBlockComplete(block: TermBlock): void;
+  /** Keep terminal replies connected even before a running output view mounts. */
+  onTerminalData?(data: string): void;
   takePendingUiCommand?(): string | null;
   clearPendingUiCommand?(): void;
 }
@@ -220,6 +223,9 @@ export class SessionController {
     // terminal (a background-colour query at startup is common) misbehave.
     const running = this.activeBlock;
     if (this._scene === 'blockList' && !isIntegration && running?.status === 'executing' && running.outputTerm) {
+      // Color replies need the terminal's theme service, which is created on open.
+      // The detached host does not paint or take focus while a short command starts.
+      if (!running.outputTerm.element && running.outputEl) running.outputTerm.open(running.outputEl);
       running.outputTerm.write(raw);
       running.outputRaw += raw;
       if (running.outputRaw.length > RAW_CAP * 2) {
@@ -361,9 +367,14 @@ export class SessionController {
     const blk = createBlockTerm(this.cols, this.rows);
     ab.outputTerm = blk.term;
     ab.outputEl = blk.el;
+    // Subscribe before the first write. UI mounting can follow a scene transition,
+    // otherwise early capability replies are lost or arrive after the editor timeout.
+    const inputSub = blk.term.onData(data => {
+      if (!this._disposed && ab.status === 'executing') this.sinks.onTerminalData?.(data);
+    });
     const tracker = trackBufferTruncation(blk.term, lines => { ab.linesTruncated += lines; });
     ab._truncationTracker = tracker;
-    ab._outputDispose = () => { tracker.dispose(); blk.dispose(); };
+    ab._outputDispose = () => { inputSub.dispose(); tracker.dispose(); blk.dispose(); };
     if (isTerminalDebugEnabled()) {
       terminalDebug('block-terminal-ready', { tabId: this.tabId, blockId: ab.id, cols: blk.term.cols, rows: blk.term.rows });
     }
@@ -545,19 +556,20 @@ export class SessionController {
       clearTimeout(this.longRunningTimer);
       this.longRunningTimer = null;
     }
-    // 状态先同步更新并推一次 UI：done/interrupted 样式立即生效
+    // Publish completion metadata while retaining the live output until its snapshot is ready.
     block.exitCode = exitCode;
     block.status = status;
+    block.snapshotPending = Boolean(block.outputTerm);
     block.endedAt = Date.now();
     const done = () => {
       if (this._disposed) return;
       if (block.outputTerm) {
         const term = block.outputTerm;
         const xtermCellWidth = term.element ? getCellMetrics(term).width : 0;
-        const domCellWidth = term.element ? measureTerminalDomCellWidth() : 0;
+        const domCellWidth = measureTerminalDomCellWidth();
         const fontSize = getTerminalFontSize();
-        const letterSpacingEm = xtermCellWidth > 0 && domCellWidth > 0 && fontSize > 0
-          ? (xtermCellWidth - domCellWidth) / fontSize
+        const letterSpacingEm = domCellWidth > 0 && fontSize > 0
+          ? ((xtermCellWidth || Math.round(domCellWidth)) - domCellWidth) / fontSize
           : 0;
         const snap = extractSnapshotFromBuffer(
           term.buffer.active,
@@ -585,6 +597,7 @@ export class SessionController {
         block._outputDispose = null;
         block._truncationTracker = null;
       }
+      block.snapshotPending = false;
       this.enforceBlockCap();
       this.sinks.onBlockComplete(block);
       this.sinks.onBlocksChanged();
@@ -648,12 +661,13 @@ export class SessionController {
   // ── 外部接口 ──
 
   resize(cols: number, rows?: number): void {
+    if (this.cols === cols && (rows === undefined || this.rows === rows)) return;
     this.cols = cols;
     if (rows !== undefined) this.rows = rows;
     const ab = this.activeBlock;
     if (ab?.status === 'executing' && ab.outputTerm) {
       ab._truncationTracker?.pause();
-      ab.outputTerm.resize(cols, this.rows);
+      resizeTerminal(ab.outputTerm, cols, this.rows);
       ab._truncationTracker?.resume();
     }
   }

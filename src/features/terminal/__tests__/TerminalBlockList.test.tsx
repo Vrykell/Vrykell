@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import TerminalBlockList from '@features/terminal/components/TerminalBlockList';
 import { useBlockStore } from '@features/terminal/stores/blocks';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
@@ -24,7 +24,7 @@ describe('TerminalBlockList', () => {
     expect(screen.queryByText(/work/)).toBeNull();
     expect(screen.queryByText(/master/)).toBeNull();
     expect(screen.getByTestId('exit-code').textContent).toBe('0');
-    expect(screen.getByText('(1.4s)')).toBeTruthy(); // fmtDuration(1400ms) = '1.4s'
+    expect(screen.getByText('1.4s')).toBeTruthy(); // The duration label stays compact.
   });
 
   it('失败命令退出码红色 ✗N', () => {
@@ -57,8 +57,9 @@ describe('TerminalBlockList', () => {
 
     for (const title of ['AI 解释', '重新运行', '复制命令', '复制输出', '更多操作']) {
       const button = screen.getByLabelText(title);
-      expect(button).toHaveStyle({ width: '28px', minWidth: '28px', height: '28px', padding: '0px' });
-      expect(button.querySelector('svg')).toHaveStyle({ width: '14px', height: '14px' });
+      expect(button).toHaveClass('icon-button');
+      expect(button).toHaveAttribute('data-compact', 'true');
+      expect(button.querySelector('svg')).toHaveStyle({ width: '16px', height: '16px' });
     }
   });
 
@@ -95,25 +96,25 @@ describe('TerminalBlockList', () => {
     expect(container.innerHTML).toBe('');
   });
 
-  it('executing block 显示终止按钮与活终端挂载点（实时输出由 running-term xterm 承载）', () => {
+  it('executing block displays controls and mounts live output for sustained commands', async () => {
     useBlockStore.getState().setBlocks('t1', [
       block({ status: 'executing', command: 'npm i', outputText: 'fetching…' }),
     ]);
     render(<TerminalBlockList tabId="t1" />);
-    expect(screen.getByLabelText('终止命令 (Ctrl+C)')).toBeTruthy();
+    await waitFor(() => expect(screen.getByLabelText('终止命令')).toBeTruthy());
     for (const name of [
-      '终止命令 (Ctrl+C)',
-      '结束前台应用（SIGTERM；3 秒内再点强杀 SIGKILL）',
+      '终止命令',
+      '结束前台应用',
       '进入全屏交互',
     ]) {
       const button = screen.getByRole('button', { name });
-      expect(button.style.minWidth).toBe('28px');
-      expect(button.style.height).toBe('28px');
-      expect(button.querySelector('svg')).toHaveStyle({ width: '14px', height: '14px' });
+      expect(button).toHaveClass('icon-button');
+      expect(button).toHaveAttribute('data-compact', 'true');
+      expect(button.querySelector('svg')).toHaveStyle({ width: '16px', height: '16px' });
       expect(button.textContent).toBe('');
     }
     // jsdom 下 getExecutingTerm 返回 null，只渲染宿主 div
-    expect(screen.getByTestId('running-term')).toBeTruthy();
+    await waitFor(() => expect(screen.getByTestId('running-term')).toBeTruthy());
     // 快照文本不应再出现在 executing 块中（完成前不提取）
     expect(screen.queryByText(/fetching/)).toBeNull();
   });
@@ -129,4 +130,14 @@ describe('TerminalBlockList', () => {
     expect(container.innerHTML).not.toContain('&lt;br&gt;');
     expect(screen.getByText(/file1/).textContent).not.toContain('<br>');
   });
+});
+
+it('publishes a short command directly without a temporary running header', async () => {
+  useBlockStore.getState().setBlocks('t1', [block({ id: 'fast', status: 'executing', exitCode: null, endedAt: null })]);
+  render(<TerminalBlockList tabId="t1" />);
+  expect(screen.queryByTestId('running-block-fast')).toBeNull();
+  const { act } = await import('@testing-library/react');
+  act(() => useBlockStore.getState().setBlocks('t1', [block({ id: 'fast' })]));
+  expect(screen.getByTestId('command-block-fast')).toHaveTextContent('file1');
+  expect(screen.queryByTestId('running-block-fast')).toBeNull();
 });
