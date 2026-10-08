@@ -4,6 +4,7 @@ import { setupTauriMock, emitPtyOutput, ptyResizes } from './tauri-mock';
 test('maximized command output uses the available columns without a fixed 80-column limit', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
+  await expect(page.locator('[data-testid^="terminal-scroll-"]').first()).toBeVisible();
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await page.getByRole('button', { name: '关闭标签面板' }).click();
   await page.setViewportSize({ width: 1550, height: 1000 });
@@ -22,6 +23,7 @@ test('maximized command output uses the available columns without a fixed 80-col
 test('output longer than the viewport stays complete without a false truncation notice', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
+  await expect(page.locator('[data-testid^="terminal-scroll-"]').first()).toBeVisible();
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   const lines = Array.from({ length: 100 }, (_, i) => `help-line-${i}`);
   await emitPtyOutput(page, `\x1b]133;E;${btoa('git --help')}\x07\x1b]133;C\x07${lines.join('\r\n')}\r\n\x1b]133;D;0\x07`);
@@ -52,6 +54,7 @@ interface Diag {
 test('long box-drawing rows reflow to the available columns without horizontal scrolling', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
+  await expect(page.locator('[data-testid^="terminal-scroll-"]').first()).toBeVisible();
   const input = page.getByPlaceholder(/输入命令/);
   await expect(input).toBeVisible({ timeout: 5000 });
 
@@ -127,6 +130,7 @@ test('long box-drawing rows reflow to the available columns without horizontal s
 test('resizing a running block resizes both PTY and terminal buffer, then restores its width', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
+  await expect(page.locator('[data-testid^="terminal-scroll-"]').first()).toBeVisible();
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await emitPtyOutput(page, `\x1b]133;E;${btoa('running-output')}\x07\x1b]133;C\x07${'x'.repeat(300)}\r\n`);
   const host = page.getByTestId('running-term');
@@ -154,6 +158,7 @@ test('resizing a running block resizes both PTY and terminal buffer, then restor
 test('opening the assistant resizes the PTY and wraps completed output without horizontal scrolling', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
+  await expect(page.locator('[data-testid^="terminal-scroll-"]').first()).toBeVisible();
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await expect.poll(async () => (await ptyResizes(page)).at(-1)?.cols ?? 0).toBeGreaterThan(100);
   const row = '-a--    2026/10/04    12:30    2048    ' + 'file-name-'.repeat(6);
@@ -183,6 +188,7 @@ test('opening the assistant resizes the PTY and wraps completed output without h
 test('line-editor repaint does not add a prompt or inherited blank rows to command output', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
+  await expect(page.locator('[data-testid^="terminal-scroll-"]').first()).toBeVisible();
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await emitPtyOutput(page, '\x1b]133;A\x07PS> \r\n\x1b[9;1Hls\r\n\x1b]133;E;bHM=\x07\x1b]133;C\x07\x1b[H\x1b[2JMode  Name\r\nd---  Documents\r\n\x1b]133;D;0\x07');
   const output = page.locator('[data-testid^="command-block-"] [data-selectable]').last();
@@ -195,6 +201,7 @@ test('line-editor repaint does not add a prompt or inherited blank rows to comma
 test('运行中卡片：PTY/块终端宽度跟随卡片内容宽（右缘不裁剪）', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
+  await expect(page.locator('[data-testid^="terminal-scroll-"]').first()).toBeVisible();
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
 
   // 运行中块（活 xterm 挂载进卡片）
@@ -232,6 +239,7 @@ test('运行中卡片：PTY/块终端宽度跟随卡片内容宽（右缘不裁�
 test('运行中输出与完成快照保持相同字符宽度', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
+  await expect(page.locator('[data-testid^="terminal-scroll-"]').first()).toBeVisible();
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
   await emitPtyOutput(page, `\x1b]133;E;${btoa('ls')}\x07\x1b]133;C\x07`);
   const host = page.getByTestId('running-term');
@@ -263,6 +271,7 @@ test('运行中输出与完成快照保持相同字符宽度', async ({ page }) 
 test('命令块分隔线延伸到终端左右边缘', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
+  await expect(page.locator('[data-testid^="terminal-scroll-"]').first()).toBeVisible();
   const input = page.getByPlaceholder(/输入命令/);
   await expect(input).toBeVisible({ timeout: 5000 });
   for (const command of ['echo first', 'echo second']) {

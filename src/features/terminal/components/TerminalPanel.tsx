@@ -1,3 +1,5 @@
+import SshSessionGate from './SshSessionGate';
+import { TextInput } from '@ui/TextInput';
 import '@xterm/xterm/css/xterm.css';
 import { useTerminalSession } from '../hooks/useTerminalSession';
 import { useEffect, useRef, useState } from 'react';
@@ -10,11 +12,20 @@ import { t } from '@i18n';
 import { terminalDebug } from '../services/terminalDebug';
 
 /** Render an interactive SSH session with xterm so screen contents and cursor stay in sync. */
-export default function TerminalPanel({ paneId, tabId, onReady, connectionInput = false, sshTarget }: {
+interface TerminalPanelProps {
   paneId: string; tabId: string; onReady: (sessionId: string) => void; connectionInput?: boolean;
   /** 连接页状态行显示的目标（用户@主机），由标签的 SSH 目标传入。 */
   sshTarget?: string;
-}) {
+  connectionId?: string;
+}
+
+export default function TerminalPanel(props: TerminalPanelProps) {
+  return props.connectionId ? <SshSessionGate connectionId={props.connectionId} paneId={props.paneId} tabId={props.tabId}>
+    <ConnectedTerminalPanel key={props.connectionId} {...props} />
+  </SshSessionGate> : <ConnectedTerminalPanel key="direct" {...props} />;
+}
+
+function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = false, sshTarget }: TerminalPanelProps) {
   const { ref, closeSession, reconnect, status, frame } = useTerminalSession(paneId, tabId, onReady);
   const [response, setResponse] = useState('');
   const [error, setError] = useState('');
@@ -102,12 +113,12 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
                 setManualSecret(true);
               }
             }}
-            style={{ height: 26, minWidth: 108, fontSize: 'calc(12px * var(--ui-font-scale))' }}
+            style={{ height: 'var(--control-size)', minWidth: 108, fontSize: 'calc(12px * var(--ui-font-scale))' }}
           />
         )}
         {disconnected
-          ? <button type="button" disabled={cancellation === 'pending'} onClick={() => void restart()} style={{ padding: '7px 12px' }}>{t('ssh.action.reconnect')}</button>
-          : <button type="button" disabled={inputDisabled} onClick={() => void cancelAuthentication()} style={{ padding: '7px 12px' }}>{cancellation === 'pending' ? t('ssh.action.cancelling') : secret ? t('ssh.action.cancelAuth') : status === 'connecting' ? t('ssh.action.cancelConnect') : t('ssh.action.disconnect')}</button>}
+          ? <button type="button" disabled={cancellation === 'pending'} onClick={() => void restart()} style={{ height: 'var(--control-size)', padding: '0 12px' }}>{t('ssh.action.reconnect')}</button>
+          : <button type="button" disabled={inputDisabled} onClick={() => void cancelAuthentication()} style={{ height: 'var(--control-size)', padding: '0 12px' }}>{cancellation === 'pending' ? t('ssh.action.cancelling') : secret ? t('ssh.action.cancelAuth') : status === 'connecting' ? t('ssh.action.cancelConnect') : t('ssh.action.disconnect')}</button>}
       </div>
       {/* 终端区常驻：xterm 宿主必须一直在，否则重连时没有宿主可挂载；断开后宿主隐藏、原因直接印在屏幕上 */}
       <div role="textbox" aria-label="SSH 交互终端" aria-multiline="true"
@@ -140,7 +151,7 @@ export default function TerminalPanel({ paneId, tabId, onReady, connectionInput 
           setResponse(''); setError(''); setManualSecret(false); setDirectInput(false); setDismissedPrompt(secretPrompt ?? text);
           void ptyWrite(sessionId, `${value}\r`).catch(reason => { setManualSecret(true); setError(`发送失败：${String(reason)}`); });
         }} className="terminal-composer" style={{ display: 'flex', gap: 8, alignItems: 'center', padding: 12, width: '100%' }}>
-          <input ref={responseRef} type="password" autoComplete="off" aria-label="SSH 认证响应" placeholder="输入密码、密钥口令或验证响应" value={response} onChange={e => setResponse(e.target.value)} disabled={inputDisabled} className="ssh-auth-response" style={{ flex: 1, minWidth: 0, height: 36, background: 'transparent', border: 'none', outline: 'none' }} />
+          <TextInput ref={responseRef} type="password" autoComplete="off" aria-label="SSH 认证响应" placeholder="输入密码、密钥口令或验证响应" value={response} onChange={e => setResponse(e.target.value)} disabled={inputDisabled} className="ssh-auth-response" style={{ flex: 1, minWidth: 0, height: 36, background: 'transparent', border: 'none', outline: 'none' }} />
           <button type="submit" disabled={inputDisabled} style={{ padding: '8px 16px' }}>发送</button>
         </form>
       </div>}

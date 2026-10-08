@@ -216,7 +216,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     }));
   },
   setDims: (tabId, cols, rows) =>
-    set((s) => ({ dims: { ...s.dims, [tabId]: { cols, rows } } })),
+    set((s) => s.dims[tabId]?.cols === cols && s.dims[tabId]?.rows === rows ? s : { dims: { ...s.dims, [tabId]: { cols, rows } } }),
   dropTab: (tabId) =>
     set((s) => {
       const scene = s.scenes[tabId];

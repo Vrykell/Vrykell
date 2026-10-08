@@ -1,3 +1,4 @@
+import { t } from '@i18n';
 /**
  * inputVisibility — 输入框可见性状态机（对应文档 §7）。
  *
@@ -39,10 +40,8 @@ export function isInputBoxVisible(ctx: InputVisibilityContext): boolean {
   return true;
 }
 
-/**
- * 长运行命令时输入框隐藏的提示文本。
- */
+/** Label for a foreground command while the composer is hidden. */
 export function getLongRunningHint(command: string): string {
   const label = command.length > 40 ? command.slice(0, 37) + '...' : command;
-  return `${label} 运行中 · 按 End 回到输入栏`;
+  return t('{{command}} running', { command: label });
 }

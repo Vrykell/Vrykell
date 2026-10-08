@@ -5,6 +5,12 @@ test.beforeEach(async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
+  // Inject the command only after the mock shell has finished its startup prompt.
+  await page.waitForFunction(async () => {
+    const path = '/src/features/terminal/stores/terminal.ts';
+    const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+    return Object.values(useTerminalStore.getState().startupStates).includes('ready');
+  });
   await emitPtyOutput(page, '\x1b]133;E;Y2xhdWRl\x07\x1b]133;C\x07');
   await expect(page.getByTestId('running-term').locator('.xterm')).toBeVisible();
 });
@@ -12,8 +18,8 @@ test.beforeEach(async ({ page }) => {
 test('运行中命令块以图标显示统一尺寸的操作按钮', async ({ page }) => {
   const block = page.locator('[data-testid^="running-block-"]').first();
   const actions = [
-    '终止命令 (Ctrl+C)',
-    '结束前台应用（SIGTERM；3 秒内再点强杀 SIGKILL）',
+    '终止命令',
+    '结束前台应用',
     '进入全屏交互',
   ];
   for (const label of actions) {
@@ -21,14 +27,19 @@ test('运行中命令块以图标显示统一尺寸的操作按钮', async ({ pa
     const bounds = (await button.boundingBox())!;
     expect(bounds.width).toBe(28);
     expect(bounds.height).toBe(28);
-    await expect(button.locator('svg')).toHaveCSS('width', '14px');
+    await expect(button.locator('svg')).toHaveCSS('width', '16px');
     await expect(button).toHaveText('');
   }
+  const interrupt = block.getByRole('button', { name: '终止命令', exact: true });
+  await interrupt.hover();
+  const hint = page.getByTestId('app-tooltip');
+  await expect(hint).toContainText('终止命令');
+  await expect(hint.getByLabel('Control+C')).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('running-controls.png') });
-  await block.getByRole('button', { name: '终止命令 (Ctrl+C)', exact: true }).click();
+  await block.getByRole('button', { name: '终止命令', exact: true }).click();
   await expect.poll(() => ptyWrites(page)).toContain('\x03');
-  await block.getByRole('button', { name: '结束前台应用（SIGTERM；3 秒内再点强杀 SIGKILL）', exact: true }).click();
-  await expect(block.getByRole('button', { name: '强制结束前台应用（SIGKILL）', exact: true })).toBeVisible();
+  await block.getByRole('button', { name: '结束前台应用', exact: true }).click();
+  await expect(block.getByRole('button', { name: '强制结束前台应用', exact: true })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('termination-armed.png') });
 });
 

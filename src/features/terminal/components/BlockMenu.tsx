@@ -1,3 +1,5 @@
+import { ContextMenuItems } from '@ui/ContextMenu';
+import { t } from '@i18n';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { clampMenuPosition } from '@ui/menuPosition';
@@ -15,40 +17,6 @@ interface Props {
   anchor: BlockMenuAnchor;
   onClose: () => void;
   getOutputText: () => string;
-}
-
-// ── MenuItem — 菜单项（label · shortcut hint） ──
-
-function MenuItem({ label, shortcut, onClick }: { label: string; shortcut?: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      className="workspace-floating-row"
-      onClick={onClick}
-      style={{ cursor: 'pointer', display: 'block', width: '100%', border: 'none', background: 'transparent', textAlign: 'left' }}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--hover)'; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-    >
-      <div style={{
-        padding: '4px 12px',
-        fontSize: 'calc(12px * var(--ui-font-scale))',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 24,
-        color: 'var(--text-primary)',
-        transition: 'background var(--dur-fast) var(--ease)',
-      }}>
-        <span>{label}</span>
-        {shortcut && (
-          <span style={{ color: 'var(--text-muted)', fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-mono)' }}>
-            {shortcut}
-          </span>
-        )}
-      </div>
-    </button>
-  );
 }
 
 export default function BlockMenu({ block, paneId, anchor, onClose, getOutputText }: Props) {
@@ -88,13 +56,11 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
 
   const copy = useCallback((text: string) => {
     void copyBlockText(text);
-    onClose();
-  }, [onClose]);
+  }, []);
 
   const rerun = useCallback(() => {
     void rerunBlockCommand(paneId, block.command);
-    onClose();
-  }, [paneId, block.command, onClose]);
+  }, [paneId, block.command]);
 
   const sendToAI = useCallback(() => {
     const output = getOutputText();
@@ -102,8 +68,7 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
       `分析这条命令的执行结果：\n\`\`\`\n$ ${block.command}\n${output}\n\`\`\``,
       { paneId },
     );
-    onClose();
-  }, [block, paneId, getOutputText, onClose]);
+  }, [block, paneId, getOutputText]);
 
   const duration = block.endedAt && block.startedAt
     ? fmtDuration(block.endedAt - block.startedAt)
@@ -111,8 +76,7 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
 
   const clearAllBlocks = useCallback(() => {
     clearSessionBlocks(paneId);
-    onClose();
-  }, [paneId, onClose]);
+  }, [paneId]);
 
   return createPortal(
     <div
@@ -159,7 +123,7 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
           {block.exitCode !== null && (
             <span style={{
               color: block.exitCode === 0 ? 'var(--success)' : 'var(--error)',
-              fontWeight: 600,
+              fontWeight: 'var(--fw-semibold)',
             }}>
               退出码 {block.exitCode}
             </span>
@@ -167,13 +131,13 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
         </div>
       </div>
 
-      <MenuItem label="复制命令" onClick={() => copy(block.command)} />
-      <MenuItem label="复制输出" onClick={() => copy(getOutputText())} />
-      <div style={{ height: 1, background: 'var(--border)', margin: '3px 8px' }} />
-      <MenuItem label="重新运行" onClick={rerun} />
-      <MenuItem label="发给 AI 分析" onClick={sendToAI} />
-      <div style={{ height: 1, background: 'var(--border)', margin: '3px 8px' }} />
-      <MenuItem label="清除所有块" onClick={clearAllBlocks} />
+      <ContextMenuItems itemRole="menuitem" onClose={onClose} items={[
+        { label: t('Rerun command'), onClick: rerun, group: 'primary' },
+        { label: t('Send to AI for analysis'), onClick: sendToAI, group: 'primary' },
+        { label: t('Copy command'), onClick: () => copy(block.command), group: 'clipboard' },
+        { label: t('Copy output'), onClick: () => copy(getOutputText()), group: 'clipboard' },
+        { label: t('Clear all blocks'), onClick: clearAllBlocks, danger: true },
+      ]} />
     </div>,
     document.body,
   );

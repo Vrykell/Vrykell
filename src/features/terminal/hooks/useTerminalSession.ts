@@ -1,3 +1,7 @@
+import { preferredShell } from '@config/terminalDefaults';
+import { getAvailableShells, type ShellType } from '@platform/shells';
+import { createResizeQueue, fitTerminal } from '../model/terminalResize';
+import { configureTerminalInput } from '@features/terminal/model/terminalInput';
 /**
  * useTerminalSession — 主 xterm 生命周期 + SessionController 接线。
  *
@@ -149,6 +153,7 @@ export function useTerminalSession(
     // is lost or WebGL is unavailable.
     loadWebglRenderer(term, useTypographyStore.getState().terminalRenderer);
     term.open(el);
+    configureTerminalInput(term);
     let frameRaf = 0;
     const frameSub = term.onWriteParsed?.(() => {
       if (spec?.kind !== 'ssh') return;
@@ -158,11 +163,12 @@ export function useTerminalSession(
         setFrame(previous => captureConnectionFrame(term, previous, stopped || connectionFailed));
       });
     });
-    fit.fit();
+    fitTerminal(term, fit);
     registerTerminal(paneId, term);
     useTerminalStore.getState().setDims(paneId, term.cols, term.rows);
 
     let sessionId: string | null = null;
+    const resizeQueue = createResizeQueue((cols, rows) => sessionId ? ptyResize(sessionId, cols, rows) : Promise.resolve());
     let disposed = false;
     let stopped = false;
     let connectionFailed = false;
@@ -216,12 +222,20 @@ export function useTerminalSession(
       }
     });
     const controller = new SessionController(paneId, term.cols, {      writeMain,
+      onTerminalData: data => {
+        if (!sessionId || disposed || stopped) return;
+        terminalDebug('block-terminal-data', { paneId, sessionId, chars: data.length, scene: currentScene });
+        void ptyWrite(sessionId, data).catch(error => {
+          terminalDebug('pty-write-error', { paneId, sessionId, source: 'block-xterm', errorType: error instanceof Error ? error.name : typeof error });
+        });
+      },
       onBlocksChanged: () => {
         const prev = useBlockStore.getState().byTab[paneId] ?? [];
         const next = projectBlocks(controller.blocks, prev, id => agentControl.hasBlock(id));
         if (next !== prev) useBlockStore.getState().setBlocks(paneId, next);
       },
       onSceneChanged: (scene) => {
+        if (focusTimer) clearTimeout(focusTimer);
         currentScene = scene;
         useTerminalStore.getState().setScene(paneId, scene);
         if (useSessionStore.getState().activeId !== tabId) return;
@@ -233,6 +247,7 @@ export function useTerminalSession(
         } else {
           useTerminalStore.getState().setKeyboardTarget('terminal');
           focusTimer = setTimeout(() => {
+            if (disposed || currentScene !== scene || useSessionStore.getState().activeId !== tabId) return;
             term.focus();
             const textarea = term.element?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea');
             if (isTerminalDebugEnabled()) {
@@ -364,7 +379,7 @@ export function useTerminalSession(
           .filter((event): event is Extract<DispatchEvent, { kind: 'data' }> => event.kind === 'data')
           .map((event) => event.text)
           .join('');
-        if (output) {
+        if (output && (sessionId === null || id === sessionId)) {
           // Questions the program expects the terminal to answer; a line here shows what
           // a session is waiting on without recording the output itself.
           const queries = querySequences(output);
@@ -417,6 +432,10 @@ export function useTerminalSession(
       terminalDebug('pty-spawn-request', { paneId, tabId, cols: spawnCols, rows: spawnRows, spawnOpts });
     }
     const startSession = async () => {
+      if (spec?.kind === 'local' && spec.shellType && spawnOpts) {
+        const shells = await getAvailableShells();
+        spawnOpts.shell = preferredShell(spec.shellType as ShellType, shells);
+      }
       if (spawnOpts?.ssh && !spawnOpts.ssh.jumpHost) {
         try {
           const info = await prepareSshHost(spawnOpts.ssh.host, spawnOpts.ssh.port, startupAbort.signal);
@@ -457,9 +476,9 @@ export function useTerminalSession(
         // PTY 就绪后按真实布局尺寸重校
         requestAnimationFrame(() => {
           if (disposed || el.offsetWidth === 0 || el.offsetHeight === 0) return;
-          fit.fit();
+          fitTerminal(term, fit);
           useTerminalStore.getState().setDims(paneId, term.cols, term.rows);
-          ptyResize(id, term.cols, term.rows).catch(() => {});
+          resizeQueue.request(term.cols, term.rows);
           controller.resize(term.cols, term.rows);
         });
       })
@@ -495,7 +514,7 @@ export function useTerminalSession(
         }
       }
       if (e.type === 'keydown' && e.key === 'End') {
-        const scene = useTerminalStore.getState().scenes[tabId] ?? 'classic';
+        const scene = useTerminalStore.getState().scenes[paneId] ?? 'classic';
         if (scene === 'blockList') return false;
       }
       return true;
@@ -524,10 +543,18 @@ export function useTerminalSession(
       return false;
     });
 
+    let pendingInputAt: number | null = null;
+    const inputRenderSub = term.onRender?.(() => {
+      if (pendingInputAt === null) return;
+      terminalDebug('terminal-input-render-complete', { paneId, scene: currentScene,
+        durationMs: Math.round((performance.now() - pendingInputAt) * 10) / 10 });
+      pendingInputAt = null;
+    });
     const dataSub = term.onData((data) => {
       if (sessionId && !stopped) {
         const inputScene = currentScene;
         if (isTerminalDebugEnabled()) {
+          pendingInputAt ??= performance.now();
           terminalDebug('terminal-input', {
             paneId,
             sessionId,
@@ -618,20 +645,30 @@ export function useTerminalSession(
         widthRaf = 0;
         // 后台标签 display:none 宽度为 0，别把 PTY 挤成 2 列
         if (el.offsetWidth === 0) return;
+        const previousCols = term.cols;
+        const previousRows = term.rows;
+        fitTerminal(term, fit);
+        if (isTerminalDebugEnabled() && (previousCols !== term.cols || previousRows !== term.rows)) {
+          const screen = term.element?.querySelector('.xterm-screen')?.getBoundingClientRect();
+          const host = el.getBoundingClientRect();
+          terminalDebug('terminal-resize-frame', { paneId, scene: currentScene, previousCols, previousRows,
+            cols: term.cols, rows: term.rows, hostWidth: host.width, hostHeight: host.height,
+            screenOffsetX: screen ? screen.left - host.left : null, screenWidth: screen?.width,
+            cellWidth: getCellMetrics(term).width, devicePixelRatio: window.devicePixelRatio });
+        }
+        useTerminalStore.getState().setDims(paneId, term.cols, term.rows);
         const scene = useTerminalStore.getState().scenes[paneId] ?? currentScene;
         if (scene === 'altScreen') {
           // 全屏是纯 xterm 画布：让 fit 使用渲染器实测尺寸，避免字体回退后的
           // 私有 cellWidth 与 canvas 实际 cell 不一致。
-          fit.fit();
-          useTerminalStore.getState().setDims(paneId, term.cols, term.rows);
-          if (sessionId) ptyResize(sessionId, term.cols, term.rows).catch(() => {});
+          if (sessionId) resizeQueue.request(term.cols, term.rows);
           controller.resize(term.cols, term.rows);
           return;
         }
         const cols = effectiveCols();
         const rows = effectiveRows();
         if (cols <= 0 || rows <= 0) return;
-        if (sessionId) ptyResize(sessionId, cols, rows).catch(() => {});
+        if (sessionId) resizeQueue.request(cols, rows);
         controller.resize(cols, rows);
       });
     };
@@ -642,24 +679,14 @@ export function useTerminalSession(
       term.options.letterSpacing = terminalLetterSpacing(state.terminalFontSize);
       cachedDomCellWidth = 0;
       if (el.offsetWidth > 0 && el.offsetHeight > 0) {
-        fit.fit();
+        fitTerminal(term, fit);
         useTerminalStore.getState().setDims(paneId, term.cols, term.rows);
         applyWidth();
       }
     });
 
-    let resizeRaf = 0;
     const ro = new ResizeObserver(() => {
-      if (resizeRaf) return;
-      resizeRaf = requestAnimationFrame(() => {
-        resizeRaf = 0;
-        // 元素隐藏（display:none，如 blockList 场景/后台标签）时尺寸为 0，
-        // fit() 会算出 9×5 之类的虚假尺寸并污染 PTY 与离屏 outputTerm —— 跳过。
-        if (el.offsetWidth === 0 || el.offsetHeight === 0) return;
-        fit.fit();
-        useTerminalStore.getState().setDims(paneId, term.cols, term.rows);
-        applyWidth();
-      });
+      if (el.offsetWidth > 0 && el.offsetHeight > 0) applyWidth();
     });
     ro.observe(el);
 
@@ -682,7 +709,8 @@ export function useTerminalSession(
       frameSub?.dispose();
       cancelAnimationFrame(frameRaf);
       dataSub.dispose();
-      cancelAnimationFrame(resizeRaf);
+      inputRenderSub?.dispose();
+      resizeQueue.dispose();
       cancelAnimationFrame(widthRaf);
       ro.disconnect();
       if (widthSyncs.get(paneId) === applyWidth) widthSyncs.delete(paneId);

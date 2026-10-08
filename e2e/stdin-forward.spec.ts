@@ -10,8 +10,10 @@ import { setupTauriMock, emitPtyOutput, ptyWrites } from './tauri-mock';
 async function startRunningBlock(page: import('@playwright/test').Page) {
   const input = page.getByPlaceholder(/输入命令/);
   await expect(input).toBeVisible({ timeout: 5000 });
+  // Finish the initial shell prompt before emitting a foreground command.
+  await expect(page.locator('.terminal-branch')).toHaveText('main');
   await emitPtyOutput(page, `\x1b]133;E;${btoa('sleep 100')}\x07\x1b]133;C\x07`);
-  await expect(page.locator('[data-tip="终止命令 (Ctrl+C)"]')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('[data-tip="终止命令"]')).toBeVisible({ timeout: 5000 });
   return input;
 }
 

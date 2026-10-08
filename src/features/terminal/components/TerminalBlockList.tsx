@@ -1,3 +1,9 @@
+import { IconButton } from '@ui/IconButton';
+import { t } from '@i18n';
+import CommandStatus from './CommandStatus';
+import { applyTerminalRenderer } from '../model/xtermRenderer';
+import { useTypographyStore } from '@config/typography';
+import { configureTerminalInput } from '@features/terminal/model/terminalInput';
 /**
  * TerminalBlockList renders command output as a continuous stream with thin separators.
  * Each command keeps its status and actions in a compact header above its output.
@@ -6,12 +12,12 @@
 import { memo, useState, useMemo, useEffect, useRef } from 'react';
 import {
   Check, ChevronDown, ChevronRight, Copy, Ellipsis,
-  CircleX, Maximize2, RotateCw, Sparkles, Square, Terminal, X, Zap,
+  CircleX, Maximize2, RotateCw, Sparkles, Square, Terminal, Zap,
 } from '@ui/icons';
 import { useBlockStore } from '@features/terminal';
 import { useTerminalStore } from '@features/terminal';
 import AiBlock from '@features/chat/components/AiBlock';
-import { ptyResize, ptyWrite } from '@platform/pty';
+import { ptyResize } from '@platform/pty';
 import { fmtDuration } from '@ui/UiBtn';
 import { getCellMetrics } from '@utils/termMetrics';
 import { getExecutingTerm, resizeExecutingTerm, syncTermWidth } from '@features/terminal/hooks/useTerminalSession';
@@ -38,7 +44,7 @@ interface Props {
 /** 从 ANSI CSI 序列剥离（OSC 已在 dispatcher 剥离）。 */
 const ANSI_CSI_RE = /\x1b\[[0-9;?]*[a-zA-Z]/g;
 const BLOCK_ACTION_BUTTON_SIZE = 28;
-const BLOCK_ACTION_ICON_SIZE = 14;
+const BLOCK_ACTION_ICON_SIZE = 16;
 const BLOCK_COLLAPSE_ICON_SIZE = 12;
 
 /** block 是否有值得渲染的内容（pending 占位、连按回车产生的空 done 都不算）。 */
@@ -244,9 +250,8 @@ const BlockItem = memo(function BlockItem({
     copyOut,
     toggleCollapsed,
   } = useBlockItemActions({ tabId, block });
-  const failed = block.exitCode !== null && block.exitCode !== 0;
   const duration =
-    block.endedAt && block.startedAt ? fmtDuration(block.endedAt - block.startedAt) : '';
+    block.endedAt !== null && block.startedAt !== null ? block.endedAt - block.startedAt : null;
 
   const coloredCommand = useMemo(() => highlightCommand(block.command), [block.command]);
 
@@ -270,7 +275,7 @@ const BlockItem = memo(function BlockItem({
     >
       {/* The compact header keeps the command, result, duration, and hover actions together. */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+        display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', position: 'relative',
         padding: '6px 10px', userSelect: 'none', minHeight: 44,
       }}>
         <button
@@ -282,16 +287,16 @@ const BlockItem = memo(function BlockItem({
           {isCollapsed ? <ChevronRight size={BLOCK_COLLAPSE_ICON_SIZE} /> : <ChevronDown size={BLOCK_COLLAPSE_ICON_SIZE} />}
         </button>
         <div data-selectable style={{
-          flex: 1, minWidth: 0, fontSize: 'var(--terminal-font-size)', fontWeight: 600,
+          flex: 1, minWidth: 0, fontSize: 'var(--terminal-font-size)', fontWeight: 'var(--fw-semibold)',
           fontFamily: TERMINAL_FONT_FAMILY, color: 'var(--text-primary)',
           whiteSpace: 'pre-wrap', wordBreak: 'break-all', userSelect: 'text',
         }}>
           {highlightQuery ? <HighlightSpan text={block.command} query={highlightQuery} /> : coloredCommand}
         </div>
-        {hovered ? (
-          <span style={{ display: 'inline-flex', gap: 0, flexShrink: 0 }}>
-            <BlockToolBtn title="AI 解释" onClick={askAI} label={<Sparkles size={BLOCK_ACTION_ICON_SIZE} />} />
+        <span className="command-header-tail" data-hovered={hovered}>
+          <span className="command-header-actions" inert={!hovered}>
             <BlockToolBtn title="重新运行" onClick={rerun} label={<RotateCw size={BLOCK_ACTION_ICON_SIZE} />} />
+            <BlockToolBtn title="AI 解释" onClick={askAI} label={<Sparkles size={BLOCK_ACTION_ICON_SIZE} />} />
             <BlockToolBtn
               title="复制命令"
               onClick={copyCmd}
@@ -313,26 +318,8 @@ const BlockItem = memo(function BlockItem({
               }}
               label={<Ellipsis size={BLOCK_ACTION_ICON_SIZE} />} />
           </span>
-        ) : (
-          <span style={{
-            display: 'inline-flex', gap: 8, alignItems: 'center', flexShrink: 0,
-            fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)',
-          }}>
-            {block.agent && <Zap size={11} style={{ color: 'var(--accent-warm)' }} aria-label="AI 执行" />}
-            {block.exitCode !== null && (
-              <span
-                data-testid="exit-code"
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 2,
-                  color: failed ? 'var(--error)' : 'var(--success)',
-                }}
-              >
-                {failed ? <X size={11} /> : <Check size={11} />}{block.exitCode}
-              </span>
-            )}
-            {duration && <span style={{ fontVariantNumeric: 'tabular-nums' }}>({duration})</span>}
-          </span>
-        )}
+          <CommandStatus exitCode={block.exitCode} duration={duration} agent={block.agent} />
+        </span>
       </div>
 
       {/* Route outputHtml explicitly because snapshots may contain plain text without spans. */}
@@ -389,7 +376,17 @@ function RunningItem({
     return () => clearInterval(timer);
   }, [block.startedAt]);
 
+  const [outputReady, setOutputReady] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setOutputReady(true), 120);
+    return () => clearTimeout(timer);
+  }, []);
+
   const coloredCommand = useMemo(() => highlightCommand(block.command || ''), [block.command]);
+
+  // Short commands publish their completed output atomically instead of inserting
+  // and immediately replacing a temporary header that moves the whole history.
+  if (!outputReady) return null;
 
   return (
     <div
@@ -403,44 +400,43 @@ function RunningItem({
     >
       {/* The running header keeps the command, elapsed time, and controls together. */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+        display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', position: 'relative',
         padding: '6px 10px', userSelect: 'none', minHeight: 44,
       }}>
         <span
           style={{
             display: 'inline-block',
-            width: 7,
-            height: 7,
-            margin: '0 3.5px',
+            width: BLOCK_ACTION_BUTTON_SIZE,
+            height: BLOCK_ACTION_BUTTON_SIZE,
             borderRadius: '50%',
-            background: 'var(--accent-warm)',
+            background: 'radial-gradient(circle, var(--accent-warm) 0 3.5px, transparent 4px)',
             animation: 'pulse 1.5s ease-in-out infinite',
             flexShrink: 0,
           }}
         />
         <div data-selectable style={{
-          flex: 1, minWidth: 0, fontSize: 'var(--terminal-font-size)', fontWeight: 600,
+          flex: 1, minWidth: 0, fontSize: 'var(--terminal-font-size)', fontWeight: 'var(--fw-semibold)',
           fontFamily: TERMINAL_FONT_FAMILY, color: 'var(--text-primary)',
           whiteSpace: 'pre-wrap', wordBreak: 'break-all', userSelect: 'text',
         }}>
           {highlightQuery ? <HighlightSpan text={block.command} query={highlightQuery} /> : coloredCommand}
         </div>
         <span style={{
-          display: 'inline-flex', gap: 2, alignItems: 'center', flexShrink: 0, flexWrap: 'wrap', maxWidth: '100%',
+          display: 'inline-flex', gap: 2, alignItems: 'center', flexShrink: 0, flexWrap: 'wrap', position: 'relative', maxWidth: '100%',
           fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)',
         }}>
           {block.agent && <Zap size={11} style={{ color: 'var(--accent-warm)' }} aria-label="AI 执行" />}
           {elapsedNow && (
-            <span style={{ fontVariantNumeric: 'tabular-nums' }}>({elapsedNow})</span>
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{elapsedNow}</span>
           )}
-          <BlockToolBtn title="终止命令 (Ctrl+C)" onClick={sendCtrlC} label={<Square size={BLOCK_ACTION_ICON_SIZE} />} />
-          <BlockToolBtn title={killArmed ? '强制结束前台应用（SIGKILL）' : '结束前台应用（SIGTERM；3 秒内再点强杀 SIGKILL）'} onClick={killApp} label={<CircleX size={BLOCK_ACTION_ICON_SIZE} />} />
-          <BlockToolBtn title="进入全屏交互" onClick={enterFullScreen} label={<Maximize2 size={BLOCK_ACTION_ICON_SIZE} />} />
+          <BlockToolBtn title={t('Interrupt command')} shortcut="Control+C" onClick={sendCtrlC} label={<Square size={BLOCK_ACTION_ICON_SIZE} />} />
+          <BlockToolBtn title={killArmed ? t('Force quit foreground process') : t('Quit foreground process')} onClick={killApp} label={<CircleX size={BLOCK_ACTION_ICON_SIZE} />} />
+          <BlockToolBtn title="进入全屏交互" onClick={() => { setOutputReady(true); enterFullScreen(); }} label={<Maximize2 size={BLOCK_ACTION_ICON_SIZE} />} />
         </span>
       </div>
 
       {/* Live xterm preserves native cursor, IME, and CJK layout while the command runs. */}
-      <RunningTerm tabId={tabId} blockId={block.id} />
+      {outputReady && <RunningTerm tabId={tabId} blockId={block.id} />}
     </div>
   );
 }
@@ -479,7 +475,9 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
     }
 
     host.appendChild(el);
-    if (!term.element) term.open(el); // 重复挂载（StrictMode/切标签返回）只搬 el
+    if (!term.element) term.open(el);
+    applyTerminalRenderer(term, useTypographyStore.getState().terminalRenderer);
+    configureTerminalInput(term);
     if (isTerminalDebugEnabled()) {
       terminalDebug('running-terminal-mounted', {
         tabId,
@@ -531,26 +529,7 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
       renderSub = term.onRender(updateHeight);
     }
 
-    // 键盘：xterm 原生路径（IME 组合/退格/控制键全由 xterm 处理）
-    const dataSub = term.onData((d) => {
-      const sid = useTerminalStore.getState().sessions[tabId];
-      if (!sid) return;
-      if (isTerminalDebugEnabled()) {
-        terminalDebug('running-terminal-input', { tabId, chars: d.length });
-      }
-      ptyWrite(sid, d).then(() => {
-        if (isTerminalDebugEnabled()) {
-          terminalDebug('running-terminal-input-write-complete', { tabId, chars: d.length });
-        }
-      }).catch((error) => {
-        if (isTerminalDebugEnabled()) {
-          terminalDebug('running-terminal-input-error', {
-            tabId,
-            errorType: error instanceof Error ? error.name : typeof error,
-          });
-        }
-      });
-    });
+    // The controller owns data forwarding for both replies and native keyboard input.
     // 复制/粘贴归终端（End 保留给「回到输入栏」，不进 PTY）：Ctrl+C 有选区时复制、
     // Ctrl+V 粘贴，Ctrl+Shift+C/V 同样有效。
     term.attachCustomKeyEventHandler((e) => {
@@ -585,7 +564,6 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
         w.__vrykellTerms.delete(`block:${tabId}`);
       }
       renderSub?.dispose();
-      dataSub.dispose();
       widthRo.disconnect();
     };
   }, [tabId, blockId, tuiFs]);
@@ -603,49 +581,15 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
 
 function BlockToolBtn({
   title,
+  shortcut,
   onClick,
   label,
 }: {
   title: string;
+  shortcut?: string;
   onClick: (e: React.MouseEvent) => void;
   label: React.ReactNode;
 }) {
-  return (
-    <button
-      data-subtle
-      data-tip={title}
-      aria-label={title}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick(e);
-      }}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: BLOCK_ACTION_BUTTON_SIZE,
-        minWidth: BLOCK_ACTION_BUTTON_SIZE,
-        height: BLOCK_ACTION_BUTTON_SIZE,
-        padding: 0,
-        gap: 0,
-        border: 'none',
-        borderRadius: 4,
-        background: 'transparent',
-        color: 'var(--text-muted)',
-        fontSize: 'calc(12px * var(--ui-font-scale))',
-        cursor: 'pointer',
-        flexShrink: 0,
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'var(--button-hover)';
-        e.currentTarget.style.color = 'var(--text-secondary)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'transparent';
-        e.currentTarget.style.color = 'var(--text-muted)';
-      }}
-    >
-      {label}
-    </button>
-  );
+  return <IconButton compact data-subtle data-tip={title} data-tip-shortcut={shortcut} aria-label={title}
+    onClick={event => { event.stopPropagation(); onClick(event); }}>{label}</IconButton>;
 }

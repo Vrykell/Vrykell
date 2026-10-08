@@ -1,8 +1,9 @@
-/** useFollowBottom — block 列表贴底跟随（Spec §3 滚动简化，替代 ScrollStateMachine）。 */
+/** Follow live output while preserving explicit history navigation and reading anchors. */
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import { terminalDebug } from '../services/terminalDebug';
 
-const BOTTOM_THRESHOLD_PX = 32; // ≈2 行
+const BOTTOM_THRESHOLD_PX = 32;
 
 interface ViewAnchor {
   range: Range | null;
@@ -38,73 +39,31 @@ function captureViewAnchor(scroll: HTMLElement): ViewAnchor | null {
   };
 }
 
-/** paneId engage() 注册表：共享输入栏提交命令时，按聚焦 pane 复位对应列表的贴底跟随。
- *  （主列表按 activeId 注册，分屏各 pane 按 paneId 注册。） */
 const engagers = new Map<string, () => void>();
-
-/** 注册一个列表的 engage 回调，返回反注册函数。 */
 export function registerFollowEngager(id: string, engage: () => void): () => void {
   engagers.set(id, engage);
-  return () => {
-    if (engagers.get(id) === engage) engagers.delete(id);
-  };
+  return () => { if (engagers.get(id) === engage) engagers.delete(id); };
 }
+export function engageFollow(id: string): void { engagers.get(id)?.(); }
 
-/** 复位指定 pane 列表的贴底跟随（提交新命令时调用）。 */
-export function engageFollow(id: string): void {
-  engagers.get(id)?.();
-}
+interface SavedScroll { top: number; following?: boolean; }
+const scrollMemory = new Map<string, SavedScroll>();
+export function saveScrollPos(key: string, top: number): void { scrollMemory.set(key, { top }); }
 
-/**
- * 滚动进度记录：滚动时把 scrollTop 存进内存表，pane 重挂载（切场景/布局重排等）
- * 后恢复，避免用户读到一半的进度被「回到底部」吞掉。
- */
-const scrollMemory = new Map<string, number>();
-
-/** 保存某 pane 列表的滚动位置。 */
-export function saveScrollPos(key: string, top: number): void {
-  scrollMemory.set(key, top);
-}
-
-/** 读取并消费某 pane 的滚动位置（读后清除，防止陈旧位置在下次重挂载时被误恢复）。 */
-function takeScrollPos(key: string): number | null {
-  const v = scrollMemory.get(key);
-  if (v === undefined) return null;
-  scrollMemory.delete(key);
-  return v;
-}
-
-/** 用户主动贴底（提交新命令/按 End）时清掉记录，避免下次恢复时又被拉回旧位置。 */
-function clearScrollPos(key: string): void {
-  scrollMemory.delete(key);
-}
-
-/**
- * 返回 engage()：强制复位 latch 并立即贴底。
- * 用户上滚后 latch 脱离（不再跟随），但「提交新命令」是明确的回底意图
- * （），调用方在提交时调 engage() 复位。
- *
- * latch 只应被「用户滚动」杀死。程序化 snap 的 scroll 事件是异步派发的，
- * 派发时内容可能已增长（submit 后新 block 很快渲染），若按当时位置量 gap
- * 会误判为上滚 → latch 死亡 → 跟随在输出流中段停摆（「只滚到一半」）。
- * 因此记录每次 snap 的实际 scrollTop，scroll 事件落在该位置视为自引发。
- *
- * persistKey 传入时启用滚动进度记录：滚动位置按 key 持久化，挂载时恢复。
- */
 export function useFollowBottom(
   scrollRef: React.RefObject<HTMLDivElement | null>,
   deps: unknown[],
   persistKey?: string,
 ): () => void {
   const atBottomRef = useRef(true);
-  /** 最近一次 snap 读回的实际 scrollTop（浏览器 clamp 后的值）；-1 = 尚未 snap */
+  // Retain the actual, clamped offset to recognize delayed programmatic scroll events.
   const snappedTopRef = useRef(-1);
 
   const snap = useCallback(() => {
     const el = scrollRef.current;
-    if (!el) return;
+    if (!el || el.clientHeight <= 0) return;
     el.scrollTop = el.scrollHeight;
-    snappedTopRef.current = el.scrollTop; // 读回 clamp 后的实际值
+    snappedTopRef.current = el.scrollTop;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -113,6 +72,19 @@ export function useFollowBottom(
     if (!el) return;
     let width = el.clientWidth;
     let height = el.clientHeight;
+    let contentHeight = el.scrollHeight;
+    let frame = 0;
+    let lastVisibleTop = el.scrollTop;
+    let pendingRestoreTop: number | null = null;
+    const persist = () => {
+      if (el.clientHeight > 0) lastVisibleTop = el.scrollTop;
+      if (persistKey) scrollMemory.set(persistKey, { top: lastVisibleTop, following: atBottomRef.current });
+    };
+    const record = (reason: string) => terminalDebug('terminal-follow-state', { paneId: persistKey, reason, following: atBottomRef.current, top: el.scrollTop, height: el.clientHeight, contentHeight: el.scrollHeight });
+    const scheduleSnap = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => { frame = 0; if (atBottomRef.current) { snap(); persist(); } });
+    };
     let anchor: ViewAnchor | null = null;
     let restoredTop: number | null = null;
     const restoreAnchor = () => {
@@ -132,19 +104,44 @@ export function useFollowBottom(
       restoredTop = el.scrollTop;
       if (persistKey) saveScrollPos(persistKey, restoredTop);
     };
-    // 挂载时恢复上次记录的滚动进度；恢复后按实际位置校正 latch，
-    // 避免随后的 snap（content 变化时）把用户又拉回底部。
     if (persistKey) {
-      const saved = takeScrollPos(persistKey);
-      if (saved != null) {
-        el.scrollTop = saved;
-        atBottomRef.current =
-          el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX;
+      const saved = scrollMemory.get(persistKey);
+      scrollMemory.delete(persistKey);
+      if (saved) {
+        el.scrollTop = saved.top;
+        lastVisibleTop = saved.top;
+        if (el.clientHeight <= 0) pendingRestoreTop = saved.top;
+        atBottomRef.current = saved.following ?? el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX;
         if (!atBottomRef.current) anchor = captureViewAnchor(el);
+        else scheduleSnap();
+        record('restore');
       }
     }
+    const onWheel = (event: WheelEvent) => {
+      if (event.deltaY < 0 && el.scrollHeight > el.clientHeight) {
+        atBottomRef.current = false;
+        snappedTopRef.current = -1;
+        anchor = captureViewAnchor(el);
+        persist();
+        record('wheel-up');
+      }
+      // Embedded terminal viewports intercept wheel events even with their scrollbar hidden.
+      // Route them to the surrounding history before the inner viewport consumes them.
+      if (event.deltaY !== 0 && event.target instanceof Element && event.target.closest('[data-testid="running-term"]')) {
+        event.preventDefault();
+        event.stopPropagation();
+        const unit = event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? el.clientHeight
+          : event.deltaMode === WheelEvent.DOM_DELTA_LINE ? parseFloat(getComputedStyle(el).lineHeight) || 16 : 1;
+        el.scrollTop += event.deltaY * unit;
+        if (!atBottomRef.current) anchor = captureViewAnchor(el);
+        persist();
+      }
+    };
     const onScroll = () => {
-      if (el.clientWidth !== width || el.clientHeight !== height) {
+      if (el.clientHeight <= 0) return;
+      const contentChanged = el.scrollHeight !== contentHeight;
+      contentHeight = el.scrollHeight;
+      if (el.clientWidth !== width || el.clientHeight !== height || (contentChanged && atBottomRef.current)) {
         // A jump to the bottom may precede its scroll event and a layout resize.
         if (el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX) {
           atBottomRef.current = true;
@@ -152,7 +149,7 @@ export function useFollowBottom(
         }
         width = el.clientWidth;
         height = el.clientHeight;
-        if (atBottomRef.current) snap();
+        if (atBottomRef.current) scheduleSnap();
         else restoreAnchor();
         return;
       }
@@ -161,21 +158,31 @@ export function useFollowBottom(
         return;
       }
       restoredTop = null;
-      // 自引发的 scroll 事件（snap 位置）：即使内容已增长也保持贴底
-      if (el.scrollTop === snappedTopRef.current) {
+      // Fractional offsets and delayed scroll events must not disable live following.
+      if (Math.abs(el.scrollTop - snappedTopRef.current) < 1) {
         atBottomRef.current = true;
         anchor = null;
+        persist();
         return;
       }
+      const wasFollowing = atBottomRef.current;
       atBottomRef.current =
         el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX;
       anchor = atBottomRef.current ? null : captureViewAnchor(el);
-      if (persistKey) saveScrollPos(persistKey, el.scrollTop);
+      persist();
+      if (wasFollowing !== atBottomRef.current) record('scroll');
     };
     el.addEventListener('scroll', onScroll, { passive: true });
+    el.addEventListener('wheel', onWheel, { capture: true, passive: false });
     // Observe the whole output flow because live xterm height changes outside React.
     const content = el.firstElementChild;
     const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {
+      if (el.clientHeight <= 0) return;
+      if (pendingRestoreTop !== null) {
+        el.scrollTop = pendingRestoreTop; pendingRestoreTop = null;
+        if (!atBottomRef.current) anchor = captureViewAnchor(el);
+      }
+      contentHeight = el.scrollHeight;
       // Honor the visible bottom position before restoring an older reading anchor.
       if (el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX) {
         atBottomRef.current = true;
@@ -183,32 +190,36 @@ export function useFollowBottom(
       }
       width = el.clientWidth;
       height = el.clientHeight;
-      if (atBottomRef.current) snap();
+      const previousTop = el.scrollTop;
+      if (atBottomRef.current) { snap(); persist(); }
       else restoreAnchor();
+      if (Math.abs(el.scrollTop - previousTop) >= 1) terminalDebug('terminal-flow-layout', {
+        paneId: persistKey, following: atBottomRef.current, previousTop, top: el.scrollTop,
+        contentHeight: el.scrollHeight, height: el.clientHeight,
+      });
     });
     ro?.observe(el);
     if (content) ro?.observe(content);
     return () => {
+      persist();
       el.removeEventListener('scroll', onScroll);
+      el.removeEventListener('wheel', onWheel, true);
+      cancelAnimationFrame(frame);
       ro?.disconnect();
     };
-    // 滚动容器 div 生命周期与组件一致，只需在挂载时订阅一次。
+    // The output host remains attached for the lifetime of this pane.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (!atBottomRef.current) return;
-    requestAnimationFrame(() => {
-      // 滚动期间用户可能已上滚，需重新确认贴底状态
-      if (!atBottomRef.current) return;
-      snap();
-    });
+  useLayoutEffect(() => {
+    // Apply committed history geometry before paint, without a second presentation frame.
+    if (atBottomRef.current) snap();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
   return useCallback(() => {
     atBottomRef.current = true;
-    if (persistKey) clearScrollPos(persistKey);
+    if (persistKey) scrollMemory.delete(persistKey);
     snap();
   }, [snap, persistKey]);
 }

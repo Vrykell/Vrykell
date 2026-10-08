@@ -12,7 +12,7 @@ async function startRunningBlock(page: import('@playwright/test').Page) {
   const input = page.getByPlaceholder(/输入命令/);
   await expect(input).toBeVisible({ timeout: 5000 });
   await emitPtyOutput(page, `\x1b]133;E;${btoa('sleep 100')}\x07\x1b]133;C\x07`);
-  await expect(page.locator('[data-tip="终止命令 (Ctrl+C)"]')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('[data-tip="终止命令"]')).toBeVisible({ timeout: 5000 });
 }
 
 test('运行中 block 挂载可见 xterm，输出实时渲染，完成后换成快照', async ({ page }) => {

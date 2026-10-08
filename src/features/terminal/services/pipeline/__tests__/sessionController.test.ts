@@ -10,6 +10,7 @@ function wire(tabId = 't1') {
     cwds: [] as string[],
     started: [] as string[],
     completed: [] as string[],
+    replies: [] as string[],
   };
   const sinks: SessionSinks = {
     writeMain: (d) => { st.written += d; },
@@ -18,6 +19,7 @@ function wire(tabId = 't1') {
     onCwd: (p) => { st.cwds.push(p); },
     onBlockStart: (b) => { st.started.push(b.command); },
     onBlockComplete: (b) => { st.completed.push(b.command); },
+    onTerminalData: data => { st.replies.push(data); },
   };
   const ctrl = new SessionController(tabId, 80, sinks);
   const scan = new ScanHelper();
@@ -42,6 +44,31 @@ async function waitFor(cond: () => boolean, timeoutMs = 2000): Promise<void> {
 }
 
 describe('SessionController', () => {
+  it('answers startup queries before the running view mounts, without forwarding them twice', async () => {
+    const { st, ctrl, feed } = wire();
+    feed(`${A}${E('vi')}${C}\x1b[6n\x1b[>c`);
+    await waitFor(() => st.replies.length === 2);
+    expect(st.replies).toEqual(['\x1b[1;1R', '\x1b[>0;276;0c']);
+    expect(ctrl.executingTerm?.term.element).toBeUndefined();
+    feed('\x1b]11;?\x07');
+    await waitFor(() => st.replies.length === 3);
+    expect(st.replies[2]).toMatch(/^\x1b\]11;rgb:/);
+    expect(st.written).not.toContain('\x1b[6n');
+    ctrl.executingTerm!.term.input('j', true);
+    expect(st.replies[st.replies.length - 1]).toBe('j');
+    expect(st.replies).toHaveLength(4);
+    ctrl.dispose();
+  });
+  it('keeps live output until the complete parsed snapshot replaces it', async () => {
+    const { st, ctrl, feed } = wire();
+    feed(`${A}${E('ls')}${C}Documents\r\n${D(0)}`);
+    expect(ctrl.blocks[0]?.snapshotPending).toBe(true);
+    expect(st.completed).toHaveLength(0);
+    await waitFor(() => st.completed.length === 1);
+    expect(ctrl.blocks[0]?.snapshotPending).toBe(false);
+    expect(ctrl.blocks[0]?.outputText).toBe('Documents');
+    ctrl.dispose();
+  });
   it('hands terminal-control OSC to the running block terminal instead of dropping it', () => {
     const { st, ctrl, feed } = wire();
     feed(A);

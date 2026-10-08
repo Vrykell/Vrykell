@@ -74,7 +74,7 @@ export default function ShellIndicator({ shell, connected, focused, compact, lab
         gap: 5,
         fontFamily: 'var(--font-mono)',
         fontSize: 'calc(11px * var(--ui-font-scale))',
-        fontWeight: 500,
+        fontWeight: 'var(--fw-medium)',
         color: fg,
         userSelect: 'none',
         ...(compact

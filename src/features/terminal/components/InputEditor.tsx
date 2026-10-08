@@ -1,3 +1,9 @@
+import { t } from '@i18n';
+import { TextArea } from '@ui/TextInput';
+import KeyHint from '@ui/KeyHint';
+import { IconButton } from '@ui/IconButton';
+import { TextButton } from '@ui/TextButton';
+import { PermissionModeButton } from '@features/agent';
 /**
  * InputEditor — 命令输入栏（对应文档 §7 输入框可见性状态机）。
  *
@@ -14,7 +20,7 @@
 
 import { iconSizes,
   ArrowUp, Columns2, GitBranch, Paperclip,
-  ShieldAlert, ShieldCheck, ShieldOff, Square, X, Zap,
+  Square, X, Zap,
  } from '@ui/icons';
 import ContextRing from '@features/chat/components/ContextRing';
 import { useUiStore } from '@features/workspace';
@@ -26,12 +32,6 @@ import { useInputEditorController } from '@features/terminal/hooks/useInputEdito
 import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
 import { normalizeWorkingDirectory } from '@features/terminal/services/pipeline/workingDirectory';
 
-/** 权限模式循环（与 PanelChat 顶栏同款三色 Shield）：标准=逐工具 / 严格=逐次问 / 放行=直放 */
-const PERM_MODES = [
-  { id: 'standard', label: '标准', icon: ShieldCheck, color: 'var(--text-muted)', title: '标准权限：按设置页逐工具级别判定（点击切换）' },
-  { id: 'strict', label: '严格', icon: ShieldAlert, color: 'var(--accent-warm)', title: '严格权限：所有工具操作逐次询问（点击切换）' },
-  { id: 'relaxed', label: '放行', icon: ShieldOff, color: 'var(--error-light)', title: '放行模式：全部工具直接放行，危险命令仍会逐次询问（点击切换）' },
-] as const;
 
 interface Props {
   /** 该输入栏绑定的 pane（决定读写哪个终端） */
@@ -136,7 +136,7 @@ export default function InputEditor({
             fontFamily: 'var(--font-mono)',
           }}
         >
-          End
+          <KeyHint shortcut="End" />
         </span>
       </div>
     );
@@ -164,8 +164,8 @@ export default function InputEditor({
         }}
       >
         <div className="terminal-composer-heading">
-          <span>{aiMode ? 'AI 对话' : '命令输入'}</span>
-          <span>{aiMode ? 'Enter 发送' : 'Enter 执行'} · Shift+Enter 换行</span>
+          <span>{aiMode ? t('AI chat') : t('Command input')}</span>
+          <span className="composer-key-hints"><KeyHint shortcut="Enter" />{aiMode ? t('Send') : t('Run')}<KeyHint shortcut="Shift+Enter" />{t('New line')}</span>
         </div>
 
         {/* 附件 chips（仅 AI 模式，随发送清空） */}
@@ -187,47 +187,16 @@ export default function InputEditor({
           }}
         >
           {/* Center the mode toggle against the input; the chat panel locks command mode. */}
-          <button type="button" data-subtle disabled={chatOpen} aria-pressed={aiMode}
-            style={{
-              fontFamily: TERMINAL_FONT_FAMILY,
-              fontSize: 'var(--terminal-font-size)',
-              fontWeight: 600,
-              width: 32,
-              height: 32,
-              padding: 0, border: 'none', background: 'transparent', borderRadius: 4,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              color: aiMode ? 'var(--accent-warm)' : 'var(--accent)',
-              userSelect: 'none',
-              lineHeight: 1,
-              cursor: chatOpen ? 'not-allowed' : 'pointer',
-              opacity: chatOpen ? 0.45 : 1,
-            }}
-            onClick={toggleAiMode}
-            data-tip={
-              chatOpen
-                ? 'AI 对话面板开启中，请在面板中提问'
-                : aiMode
-                  ? '切回命令模式'
-                  : '切换到 AI 模式'
-            }
-            aria-label={
-              chatOpen
-                ? 'AI 对话面板开启中，请在面板中提问'
-                : aiMode
-                  ? '切回命令模式'
-                  : '切换到 AI 模式'
-            }
-          >
+          <IconButton data-subtle disabled={chatOpen} onClick={toggleAiMode}
+            data-tip={t(chatOpen ? 'Use the chat panel' : aiMode ? 'Switch to command mode' : 'Switch to AI mode')}
+            aria-label={t(chatOpen ? 'Use the chat panel' : aiMode ? 'Switch to command mode' : 'Switch to AI mode')}>
             {aiMode ? <Zap size={iconSizes.control} /> : '$'}
-          </button>
+          </IconButton>
 
           {/* textarea + ghost overlay（绝对定位同字体同内边距，透明已输入 + muted 建议后缀）
               display:flex 让 textarea 成为 flex item，消除 inline-block 基线下方空隙（否则容器比 textarea 高 7px） */}
           <div style={{ position: 'relative', flex: 1, minWidth: 0, display: 'flex' }}>
-            <textarea
+            <TextArea
               ref={inputRef}
               value={text}
               placeholder={aiMode ? '自然语言描述你想做什么…' : '输入命令…'}
@@ -280,40 +249,13 @@ export default function InputEditor({
                 <ContextRing />
               </span>
               {sendingHere ? (
-              <button
-                data-subtle
-                data-tip="停止生成"
-                aria-label="停止生成"
-                onClick={() => abortStream(activeId)}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  width: 32, height: 32, padding: 0, border: 'none', borderRadius: 4,
-                  background: 'transparent', color: 'var(--accent-warm)', cursor: 'pointer', flexShrink: 0,
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--button-hover)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-              >
-                <Square size={iconSizes.compact} fill="currentColor" />
-              </button>
+              <IconButton data-subtle tone="accent" data-tip={t('Stop generating')} aria-label={t('Stop generating')} onClick={() => abortStream(activeId)}>
+                  <Square size={iconSizes.compact} fill="currentColor" />
+                </IconButton>
             ) : (
-              <button
-                data-subtle
-                data-tip="发送 (Enter)"
-                aria-label="发送 (Enter)"
-                onClick={execute}
-                disabled={!canSendAi}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  width: 32, height: 32, padding: 0, border: 'none', borderRadius: 4,
-                  background: 'transparent',
-                  color: canSendAi ? 'var(--accent-warm)' : 'var(--text-muted)',
-                  cursor: canSendAi ? 'pointer' : 'default', flexShrink: 0,
-                }}
-                onMouseEnter={(e) => { if (canSendAi) e.currentTarget.style.background = 'var(--button-hover)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-              >
-                <ArrowUp size={iconSizes.control} />
-              </button>
+              <IconButton data-subtle tone="accent" data-tip={t('Send')} data-tip-shortcut="Enter" aria-label={t('Send')} onClick={execute} disabled={!canSendAi}>
+                  <ArrowUp size={iconSizes.control} />
+                </IconButton>
             )}
             </>
           )}
@@ -345,86 +287,25 @@ export default function InputEditor({
           )}
           <div style={{ flex: 1 }} />
           {/* AI / cmd 模式 pill（AI 面板开启时锁定 cmd，显式禁用） */}
-          <button
-            onClick={() => {
-              if (!chatOpen) setAiMode(!aiMode);
-            }}
-            data-tip={
-              chatOpen ? 'AI 对话面板开启中，请在面板中提问' : aiMode ? '切回命令模式' : '切换到 AI 模式'
-            }
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 'calc(10px * var(--ui-font-scale))',
-              fontWeight: 500,
-              padding: '1px 8px',
-              border: '1px solid var(--border)',
-              borderRadius: 4,
-              background: aiMode ? 'var(--accent-warm-dim)' : 'transparent',
-              color: aiMode ? 'var(--accent-warm)' : 'var(--text-muted)',
-              cursor: chatOpen ? 'not-allowed' : 'pointer',
-              opacity: chatOpen ? 0.45 : 1,
-              lineHeight: '16px',
-              transition: 'background 0.12s ease, color 0.12s ease',
-            }}
-          >
-            {aiMode ? 'AI' : '命令'}
-          </button>
+          <TextButton disabled={chatOpen} aria-pressed={aiMode}
+            data-tip={t(chatOpen ? 'Use the chat panel' : aiMode ? 'Switch to command mode' : 'Switch to AI mode')}
+            onClick={() => setAiMode(!aiMode)}>{aiMode ? 'AI' : t('Command')}</TextButton>
           {!aiMode && (
             <>
-              <InputActionBtn title="选择类型分裂" onClick={() => useUiStore.getState().openSplitPicker()}>
+              <InputActionBtn title={t('Choose split type')} onClick={() => useUiStore.getState().openSplitPicker()}>
                 <Columns2 size={iconSizes.control} />
               </InputActionBtn>
-              <InputActionBtn title="关闭当前终端" onClick={() => useSessionStore.getState().closeTerminal(paneId)}>
+              <InputActionBtn title={t('Close terminal')} onClick={() => useSessionStore.getState().closeTerminal(paneId)}>
                 <X size={iconSizes.control} />
               </InputActionBtn>
             </>
           )}
           {aiMode && (
             <>
-              {(() => {
-                const idx = PERM_MODES.findIndex((m) => m.id === permMode);
-                const cur = PERM_MODES[idx] ?? PERM_MODES[0]!;
-                const next = PERM_MODES[(idx + 1) % PERM_MODES.length]!;
-                const CurIcon = cur.icon;
-                return (
-                  <button
-                    data-subtle
-                    data-tip={cur.title}
-                    aria-label={cur.title}
-                    onClick={() => setPermMode(next.id)}
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      width: 32, height: 32, padding: 0, border: 'none', borderRadius: 4,
-                      background: 'transparent', color: cur.color, cursor: 'pointer',
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--button-hover)'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                  >
-                    <CurIcon size={iconSizes.control} />
-                  </button>
-                );
-              })()}
-              <button
-                data-subtle
-                data-tip="添加附件（图片 / 文件，也可直接粘贴或拖入）"
-                aria-label="添加附件（图片 / 文件，也可直接粘贴或拖入）"
-                onClick={() => void pickFiles()}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  width: 32, height: 32, padding: 0, border: 'none', borderRadius: 4,
-                  background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'var(--button-hover)';
-                  e.currentTarget.style.color = 'var(--text-secondary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'transparent';
-                  e.currentTarget.style.color = 'var(--text-muted)';
-                }}
-              >
+              <PermissionModeButton mode={permMode} onChange={setPermMode} />
+              <IconButton data-subtle data-tip={t('Add attachment')} aria-label={t('Add attachment')} onClick={() => void pickFiles()}>
                 <Paperclip size={iconSizes.control} />
-              </button>
+              </IconButton>
             </>
           )}
         </div>
@@ -434,35 +315,13 @@ export default function InputEditor({
   );
 }
 
-/** 输入栏小按钮（状态栏右侧：分裂/关闭） */
+/** Composer actions use the shared themed target. */
 function InputActionBtn({ title, onClick, children }: {
   title: string;
   onClick: () => void;
   children: React.ReactNode;
 }) {
-  return (
-    <button
-      data-subtle
-      data-tip={title}
-      aria-label={title}
-      onClick={onClick}
-      style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 32, height: 32, padding: 0, border: 'none', borderRadius: 4,
-        background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', flexShrink: 0,
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'var(--button-hover)';
-        e.currentTarget.style.color = 'var(--text-secondary)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'transparent';
-        e.currentTarget.style.color = 'var(--text-muted)';
-      }}
-    >
-      {children}
-    </button>
-  );
+  return <IconButton data-subtle data-tip={title} aria-label={title} onClick={onClick}>{children}</IconButton>;
 }
 
 // ── 工作目录 ──
