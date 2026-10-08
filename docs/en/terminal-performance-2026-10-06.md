@@ -12,7 +12,7 @@ This round targets the lag after the amount of historical output grows, and the 
 ## Implementation
 
 - The historical block projection keeps references to unchanged objects and arrays, and the block and output components use memoized rendering.
-- Historical output uses `content-visibility: auto`, provides an intrinsic height based on the number of terminal lines and the uniform line height, and preserves scroll position, output content, and copy capability. Environments that do not support this CSS property continue with normal rendering.
+- Updated on 2026-10-09: historical output keeps real wrapped heights with layout/style/paint containment. Estimated `content-visibility` heights were removed because output becoming visible changed the history geometry. Following runs before paint; content and copy remain intact. WebKit regression with about 30k lines measured input P95 at 143ms and append latency at 345ms.
 - A normal local terminal no longer generates connection page snapshots. SSH generates styled snapshots only on an authentication prompt, authentication rejection, or connection end/failure; normal interaction updates do not extract HTML.
 - The frontend log keeps every structured record and sends them in batches within a window of at most 64 records or 50ms, and commits pending records before export and before changing the auto-save setting.
 - The Rust log reuses a buffered file handle from a background thread, writing to disk within at most 64 records or 50ms; it explicitly flushes on export, on toggling the auto-save setting, and on normal exit. Rotation and redaction rules keep their previous behavior. Forcibly terminating the process can still lose the last small segment of pending records.

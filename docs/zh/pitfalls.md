@@ -116,6 +116,11 @@
 
 ---
 
+### 3.8 画布缩放产生空白帧
+
+尺寸测量前清空渲染器会多产生一帧空白，画布本身改变尺寸也会先清空像素、随后才异步重绘。统一通过缩放适配器处理，在该帧呈现前完成重绘。同步绘制依赖内部渲染能力，版本相关访问集中在适配器中并做能力判断。不要延迟输入或增加长时间 resize 防抖。首个 PTY 尺寸立即发送，相同尺寸去重，IPC 忙时只保留最新待发送尺寸。`terminal-resize-frame` 记录画布几何位置，`terminal-input-render-complete` 记录输入至下一次绘制耗时，用于区分布局位移、输出延迟与绘制延迟。
+
+
 ## 四、字符宽度 / 渲染
 
 ### 4.1 手写 charWidth 表与 TUI 的 string-width 记账不一致 → 光标劈成两半（`69061f4`、`3eb3b7e`）
@@ -160,6 +165,8 @@
 
 ### 5.3 follow-bottom latch 被「迟到 scroll 事件」误杀（`useFollowBottom.ts`）
 - snap 后读回浏览器 clamp 过的实际 scrollTop 存 ref；内容增长时浏览器发出的迟到 scroll 事件若直接与阈值比较会误判「用户已上滚」。真实浏览器 `scrollTop=scrollHeight` 会被 clamp 到 `scrollHeight-clientHeight`，测试必须模拟这一行为。
+
+- 内容增长和浏览器滚动锚定可能先于尺寸回调改变位置；布局触发的滚动事件应保留跟随状态，并容忍程序滚动的小数偏差。重新挂载时单独保存跟随状态，不能根据旧位置推断，因为隐藏期间输出可能增长；观察整个输出包装层。历史提交后通过 layout effect、尺寸回调在绘制前贴底，延后到下一动画帧会露出一帧跳动。换行输出不能使用估算固有高度，否则进入视口时会改变整棵历史树的高度。
 
 ---
 
@@ -547,6 +554,14 @@
 - **字符格取整（Windows Terminal 的做法）**：等宽字体的 advance 常是小数（14px 字号下约 8.4px），`cols × cellWidth` 就落在非整数上，画布右边缘会剩一条亚像素列 —— 拖动窗口时「有时有、有时没有」正是这个取整。做法是给 xterm 设置 `letterSpacing = round(实测格宽) − 实测格宽`（每格最多半个像素），格宽锁到整数、网格落在设备像素上；`useTerminalSession` 与 `createBlockTerm` 都在创建时设置、并在字号变化时重算（`terminalFont.ts` 的 `snapLetterSpacing` 有单测）。
 - **win32-input-mode 的按键捕获会顺手吞掉复制/粘贴**：`attachWin32KeyCapture` 在**捕获阶段**就 `preventDefault + stopPropagation`，会话一旦请求该模式，Ctrl+C 会被编码成按键记录发进 PTY，复制直接失效 —— 而 e2e 默认不开这个模式，所以「本机不触发、用户机上必现」。判定必须拿到终端本身：Ctrl+V 永远放行；Ctrl+C 只在**有选区**时放行（无选区仍要编码，否则会话丢了中断键）。回归覆盖见 `terminal-clipboard.spec.ts` 的「win32-input-mode 下 Ctrl+C 仍然复制」。
 - **终端「选区旁边一条细线」= 终端自带的滚动条**：`.xterm-viewport` 比 `.xterm-screen` 宽 8px（那 8px 是原生滚动条滑道），全局 `::-webkit-scrollbar-thumb` 的 `2px 透明边框 + padding-box` 让它只剩中间约 4px 的浅色细条，紧贴选区时就像渲染瑕疵。运行块早就用 `display: none` 关掉了自己的滚动条，pane 现在也关（滚轮/触控板/键盘滚动不受影响）。切换渲染器（WebGL/DOM）**不会**改变这个现象，别把它当成渲染器问题。
+
+---
+
+### 原生编辑器输入与历史 SSH 引用
+
+Escape 路由使用聚焦的 pane ID，因为场景状态按 pane 而非标签保存。只在块列表消费切回输入栏的 Escape，经典和备用屏幕编辑器直接接收。部分原生文本提交遗漏 keypress 且带 composed 标记，应先观察 xterm onData，仅补发未处理的 insertText，组合输入仍由原生路径管理。诊断只记录事件类型、长度和处理状态，不记录输入内容。真实 POSIX 编辑器测试需覆盖普通模式、插入模式和 Escape 后保存文件。
+
+SSH 历史 pane 可能引用已删除的连接。挂载连接终端前验证引用，保留地址快照，提供替换连接或重新认证。JSON 空白和嵌套布局不能影响 SSH 历史识别与主机搜索；经典连接会话不显示没有意义的命令块数量。
 
 ---
 
