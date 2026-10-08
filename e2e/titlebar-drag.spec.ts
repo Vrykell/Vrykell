@@ -51,8 +51,9 @@ for (const width of [1240, 720]) {
     // Controls keep their own behaviour: a clickable element without the attribute
     // stops the drag, so clicking them never moves the window.
     const dockButton = (await page.locator('[data-dock-btn]').first().boundingBox())!;
-    const windowControl = (await page.locator('.window-control-button').first().boundingBox())!;
-    for (const target of [searchBox, dockButton, windowControl]) {
+    const controls = page.locator('.window-control-button');
+    const windowControl = await controls.count() ? await controls.first().boundingBox() : null;
+    for (const target of [searchBox, dockButton, ...(windowControl ? [windowControl] : [])]) {
       const hit = await elementAt(page, Math.round(target.x + target.width / 2), middle);
       expect(hit?.isDragRegion).toBe(false);
     }

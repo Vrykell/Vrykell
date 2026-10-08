@@ -1,3 +1,6 @@
+import { useSettingsNavigationStore } from '../stores/navigation';
+import { t } from '@i18n';
+import KeyHint from '@ui/KeyHint';
 /**
  * aiBehaviorPage — AI 行为设置（全局默认 + 每模型覆盖）。
  */
@@ -10,6 +13,7 @@ import AutoSaveInput from '../components/AutoSaveInput';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
 
 export function AiBehaviorPage() {
+  const targetField = useSettingsNavigationStore(state => state.targetField);
   const models = useAiConfigStore((s) => s.models);
   const agentSettings = useAgentSettings();
   const [scope, setScope] = useState<string>('global');
@@ -30,7 +34,7 @@ export function AiBehaviorPage() {
     <>
       <Field
         title="配置作用域"
-        description="全局默认对所有模型生效；选中某个模型后，下面的设置只对该模型生效。"
+        description={t("Apply these options globally or to one model.")}
       >
         <ModelScopeBar
           options={models.map((m) => ({ value: m.id, label: m.name || m.model }))}
@@ -58,7 +62,7 @@ export function AiBehaviorPage() {
 
       <Field
         title="系统提示词"
-        description="定义 AI 的角色与行为，留空使用内置默认。"
+        description={t('AI instructions. Leave empty for the default.')}
       >
         <AutoSaveInput
           key={`prompt-${scope}`}
@@ -78,13 +82,13 @@ export function AiBehaviorPage() {
         />
       </Field>
 
-      <Field title="Agent 模式" description="开启后 AI 可调用工具；关闭则为纯聊天。">
+      <Field title="Agent 模式" description={t("Allow AI to use tools.")}>
         <Toggle on={eff.agentMode} onChange={(v) => update({ agentMode: v })} />
       </Field>
-      <Field title="最大迭代步数" description="Agent 一次回答最多调用多少轮工具；1–100。">
+      <Field title="最大迭代步数" description={t("Maximum tool rounds per response, from 1 to 100.")}>
         <NumberInput key={scope} value={eff.maxSteps} min={1} max={100} onChange={(v) => update({ maxSteps: v })} />
       </Field>
-      <Field title="上下文策略" description="全量不裁剪；窗口按预算保留最近消息；摘要压缩旧消息。">
+      <Field title="上下文策略" description={t("Keep all messages, recent messages or a summary of older messages.")}>
         <Select
           aria-label="上下文策略"
           options={[
@@ -96,21 +100,21 @@ export function AiBehaviorPage() {
           onChange={(v) => { void save(() => update({ contextStrategy: v })); }}
         />
       </Field>
-      <Field title="上下文 Token 预算" description="估算的上下文 token 预算；0 = 不设限。超预算时按上面的策略裁剪或压缩。">
+      <Field title="上下文 Token 预算" description={t("Limit context tokens. Use 0 for no limit.")}>
         <NumberInput key={scope} value={eff.contextMaxTokens} min={0} max={1000000} onChange={(v) => update({ contextMaxTokens: v })} />
       </Field>
-      {eff.contextStrategy === 'compact' && (
-        <Field title="摘要长度上限" description="压缩摘要的最大 token 数。">
+      {(eff.contextStrategy === 'compact' || targetField === t('Summary length limit')) && (
+        <Field title="摘要长度上限" description={t('Maximum tokens in a context summary.')}>
           <NumberInput key={scope} value={eff.contextSummaryTokens} min={64} max={8000} onChange={(v) => update({ contextSummaryTokens: v })} />
         </Field>
       )}
-      <Field title="工具输出截断" description="单个工具结果的最大字符数，超长截断避免占满上下文。">
+      <Field title="工具输出截断" description={t('Maximum characters per tool result.')}>
         <NumberInput key={scope} value={eff.contextToolChars} min={256} max={65536} onChange={(v) => update({ contextToolChars: v })} />
       </Field>
-      <Field title="回复 Token 上限" description="单次回复的最大 token 数，0 为服务商默认。">
+      <Field title="回复 Token 上限" description={t('Maximum reply tokens. Use 0 for the provider default.')}>
         <NumberInput key={scope} value={eff.maxOutputTokens} min={0} max={32768} onChange={(v) => update({ maxOutputTokens: v })} />
       </Field>
-      <Field title="采样温度" description="控制输出随机性；关闭 = 使用服务商默认。">
+      <Field title="采样温度" description={t("Response randomness. Turn off to use the provider default.")}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Toggle on={eff.temperature != null} onChange={(v) => update({ temperature: v ? 0.7 : null })} />
           {eff.temperature != null && (
@@ -133,10 +137,10 @@ export function AiBehaviorPage() {
 
       {isGlobal && (
         <>
-          <Field title="智能会话标题" description="内容足够时自动生成标题，手动改过的名字不覆盖。">
+          <Field title="智能会话标题" description={t('Generate titles without replacing custom names.')}>
             <Toggle on={eff.autoTitle} onChange={(v) => update({ autoTitle: v })} />
           </Field>
-          <Field title="标题模型" description="生成标题用的模型；留空 = 沿用聊天模型。">
+          <Field title="标题模型" description={t("Model for titles. Leave empty to use the chat model.")}>
             <AutoSaveInput
               value={eff.titleModel}
               placeholder="沿用聊天模型"
@@ -144,13 +148,14 @@ export function AiBehaviorPage() {
               style={inputStyle}
             />
           </Field>
-          <Field title="命令自动补全" description="在终端输入命令时给出补全建议，Tab 接受，Esc 丢弃。">
+          <Field title="命令自动补全" description={t('Suggest completions while typing commands.')}>
+            <div className="composer-key-hints settings-completion-keys"><KeyHint shortcut="Tab" />{t('Accept')}<KeyHint shortcut="Escape" />{t('Dismiss')}</div>
             <Toggle on={eff.completeEnabled} onChange={(v) => update({ completeEnabled: v })} />
           </Field>
-          <Field title="补全防抖" description="触发补全的停顿毫秒数，100–2000。">
+          <Field title="补全防抖" description={t('Wait 100–2000 ms before suggesting completions.')}>
             <NumberInput key={scope} value={eff.completeDebounceMs} min={100} max={2000} onChange={(v) => update({ completeDebounceMs: v })} />
           </Field>
-          <Field title="补全模型" description="AI 增强补全用的模型；留空 = 沿用聊天模型。">
+          <Field title="补全模型" description={t("Model for completion. Leave empty to use the chat model.")}>
             <AutoSaveInput
               value={eff.completeModel}
               placeholder="沿用聊天模型"

@@ -1,3 +1,4 @@
+import { preferredShell, useTerminalDefaults } from '@config/terminalDefaults';
 import { useEffect, useState } from 'react';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { Folder, HardDrive, Star, iconSizes } from '@ui/icons';
@@ -13,6 +14,7 @@ import type { FileOpsTarget } from '@features/files/model/fileOps';
 import { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
 import { useDockStore, useSessionStore } from '@features/workspace';
 import { ptyWrite } from '@platform/pty';
+import { getAvailableShells } from '@platform/shells';
 import { parentOf } from '@platform/path';
 import { shellQuote } from '@features/ssh/utils/remotePath';
 import { waitForTerminalStartup } from '@features/terminal/services/terminalStartup';
@@ -67,7 +69,9 @@ function LocalFiles() {
     if (!command) return;
 
     const parentDir = parentOf(entry.path) ?? undefined;
-    const tabId = useSessionStore.getState().addTab({ cwd: parentDir, title: entry.name });
+    const shells = await getAvailableShells();
+    const shellType = preferredShell(useTerminalDefaults.getState().shell, shells);
+    const tabId = useSessionStore.getState().addTab({ cwd: parentDir, title: entry.name, shellType });
     try {
       const sid = await waitForTerminalStartup(`${tabId}#0`);
       await ptyWrite(sid, command.endsWith('\n') ? command : `${command}\n`);
@@ -165,7 +169,7 @@ function DiskCard({ disk, onOpen }: { disk: DiskEntry; onOpen: () => void }) {
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 600, color: 'var(--text-primary)',
+          fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {disk.name}

@@ -3,21 +3,28 @@ import type { BackendSessionEntry } from '@platform/api/types';
 export type SessionTypeFilter = 'all' | 'local' | 'ssh';
 export type SessionDateFilter = 'all' | 'today' | '7d' | '30d' | '90d';
 
+/** Read legacy targets and modern pane layouts without depending on JSON formatting. */
+function sshTargets(session: BackendSessionEntry): Array<{ host?: string; user?: string | null }> {
+  const targets: Array<{ host?: string; user?: string | null }> = [];
+  const visit = (value: unknown) => {
+    if (!value || typeof value !== 'object') return;
+    const node = value as Record<string, unknown>;
+    if (node.ssh && typeof node.ssh === 'object') targets.push(node.ssh as { host?: string; user?: string | null });
+    if (node.layout) visit(node.layout);
+    if (node.terminal) visit(node.terminal);
+    if (node.type === 'split') { visit(node.first); visit(node.second); }
+  };
+  try { visit(JSON.parse(session.payload)); } catch { /* Invalid legacy metadata has no target. */ }
+  return targets;
+}
+
 export function isSshSession(session: BackendSessionEntry): boolean {
-  return session.kind === 'ssh' || (typeof session.payload === 'string' && session.payload.includes('"kind":"ssh"'));
+  return session.kind === 'ssh' || sshTargets(session).length > 0;
 }
 
 export function sshTargetOf(session: BackendSessionEntry): string | null {
-  if (session.kind !== 'ssh') return null;
-  try {
-    const payload = JSON.parse(session.payload) as { ssh?: { host?: string; user?: string | null } };
-    const host = payload.ssh?.host;
-    if (!host) return null;
-    const user = payload.ssh?.user;
-    return user ? `${user}@${host}` : host;
-  } catch {
-    return null;
-  }
+  const targets = sshTargets(session).filter(target => typeof target.host === 'string' && target.host);
+  return targets.length ? targets.map(target => target.user ? `${target.user}@${target.host}` : target.host).join(', ') : null;
 }
 
 const DATE_MS: Record<Exclude<SessionDateFilter, 'all' | 'today'>, number> = {

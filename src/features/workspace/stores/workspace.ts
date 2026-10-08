@@ -1,3 +1,4 @@
+import { useTerminalDefaults } from '@config/terminalDefaults';
 import { create } from 'zustand';
 import type { SshOptions } from '@core/ssh';
 import { useToastStore } from '@ui/Toast';
@@ -230,13 +231,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     } else if (o.kind === 'settings') {
       tab = { id, title: SETTINGS_TITLE, kind: 'settings', named: true };
     } else {
+      const preference = useTerminalDefaults.getState().shell;
+      const shellType = o.shellType ?? (preference === 'system' ? undefined : preference);
       const term: TerminalSpec = {
-        id: `${id}#0`, kind: 'local', cwd: o.cwd, shellType: o.shellType,
-        openMode: defaultOpenModeForShell(o.shellType),
+        id: `${id}#0`, kind: 'local', cwd: o.cwd, shellType,
+        openMode: defaultOpenModeForShell(shellType),
       };
       tab = {
         id,
-        title: o.title || (o.shellType ? shellTypeLabel(o.shellType) : DEFAULT_TITLE),
+        title: o.title || (shellType ? shellTypeLabel(shellType) : DEFAULT_TITLE),
         kind: 'session',
         named: !!o.title,
         groupId: o.groupId,

@@ -46,6 +46,10 @@ test('the connection screen keeps no scrollbar of its own', async ({ page }) => 
   await emitPtyOutput(page, 'ready\r\n');
   const surface = page.getByTestId('ssh-connection-input');
   await expect(surface.locator('.xterm-viewport')).toHaveCSS('scrollbar-width', 'none');
+  const mode = surface.getByTestId('ssh-input-mode');
+  const disconnect = surface.getByRole('button', { name: '断开连接', exact: true });
+  await expect(mode).toHaveCSS('height', '32px');
+  await expect(disconnect).toHaveCSS('height', '32px');
 });
 
 test('the connection screen snaps its character cells to whole pixels', async ({ page }) => {

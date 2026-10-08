@@ -1,3 +1,4 @@
+import { TextInput } from '@ui/TextInput';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ArrowUp, ChevronRight, FolderArrowRight, MoreHorizontal, iconSizes } from '@ui/icons';
@@ -392,7 +393,7 @@ export default function FilePanel({
               })}
             </>
           ) : (
-            <input
+            <TextInput
               autoFocus
               value={pathDraft}
               onChange={(event) => setPathDraft(event.target.value)}
@@ -722,7 +723,7 @@ function FileRow({
         {icon ?? <RowIcon size={iconSizes.row} fill={entry.is_dir && highlighted ? 'currentColor' : 'none'} />}
       </span>
       {renaming ? (
-        <input
+        <TextInput
           autoFocus
           value={draft}
           onChange={(event) => setDraft(event.target.value)}

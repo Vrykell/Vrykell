@@ -1,3 +1,4 @@
+import { TextInput } from '@ui/TextInput';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { iconSizes, Pencil, Plus, Search } from '@ui/icons';
 import { SshIcon } from '@ui/shellIcons';
@@ -122,7 +123,7 @@ export default function PanelSsh() {
           borderRadius: 'var(--radius-inner)', padding: '0 8px', height: 30,
         }}>
           <Search size={iconSizes.compact} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-          <input
+          <TextInput
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="搜索 SSH 连接…"
@@ -200,7 +201,7 @@ export default function PanelSsh() {
           anchor={{ x: menu.x, y: menu.y }}
           onClose={() => setMenu(null)}
           items={[
-            { label: '编辑', onClick: () => editConn(menu.conn) },
+            { label: '编辑', group: 'edit', onClick: () => editConn(menu.conn) },
             { label: '删除', danger: true, onClick: () => void removeConn(menu.conn) },
           ]}
         />

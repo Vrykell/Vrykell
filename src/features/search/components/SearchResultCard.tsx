@@ -2,11 +2,13 @@ import {
   Command, History, Monitor, Settings, SquareTerminal, Undo2, type AppIcon,
 } from '@ui/icons';
 import { fileIcon } from '@features/files/utils/fileIcon';
+import KeyHint from '@ui/KeyHint';
 import type {
   SearchResult,
   BlockResultData,
   FileResultData,
   SessionResultData,
+  ActionResultData,
 } from '@features/search/types';
 
 interface Props {
@@ -77,7 +79,7 @@ export default function SearchResultCard({
   const isHistoricalSession = isSession && sessionData?.status === 'historical';
 
   return (
-    <div className="workspace-floating-row" data-search-result data-selected={selected}
+    <div className="workspace-floating-row global-search-result" data-search-result data-selected={selected}
       onClick={(e) => {
         // 历史会话/块：点击卡片 = 恢复（与 ↩ 按钮一致）
         if (isHistoricalBlock && onRestore) {
@@ -113,14 +115,14 @@ export default function SearchResultCard({
         flexShrink: 0, width: 20, marginTop: 1,
         display: 'inline-flex', justifyContent: 'center', color: 'var(--text-muted)',
       }}>
-        {(() => { const Icon = typeIcon(result); return <Icon size={13} />; })()}
+        {(() => { const Icon = typeIcon(result); return <Icon size={16} />; })()}
       </span>
 
       {/* 内容 */}
       <div style={{ flex: 1, minWidth: 0 }}>
         {/* 主标题 */}
         <div style={{
-          fontWeight: 600, fontSize: 'calc(13px * var(--ui-font-scale))',
+          fontWeight: 'var(--fw-semibold)', fontSize: 'calc(13px * var(--ui-font-scale))',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           fontFamily: isHistory ? 'var(--font-mono)' : undefined,
         }}>
@@ -146,7 +148,9 @@ export default function SearchResultCard({
           display: 'flex', alignItems: 'center', gap: 8,
           marginTop: 3, fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)',
         }}>
-          {result.detail && <span>{result.detail}</span>}
+          {result.type === 'action' && (result.data as ActionResultData).shortcut
+            ? <KeyHint shortcut={(result.data as ActionResultData).shortcut!} />
+            : result.detail && <span>{result.detail}</span>}
           {isBlock && blockData?.status && !isHistoricalBlock && (
             <span style={{
               fontSize: 'calc(10px * var(--ui-font-scale))', padding: '1px 5px', borderRadius: 4,

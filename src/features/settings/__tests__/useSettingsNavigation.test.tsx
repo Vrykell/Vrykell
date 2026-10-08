@@ -45,4 +45,14 @@ describe('useSettingsNavigation', () => {
     expect(result.current.selected).toBe('terminal-open');
     expect(result.current.activeLabel).toBe('打开方式');
   });
+
+  it('finds individual fields using the same index as global search', () => {
+    const { result } = renderHook(() => useSettingsNavigation());
+    act(() => result.current.setQuery('补全防抖'));
+    expect(result.current.matchingSettings.map(setting => setting.id)).toEqual(['completion-delay']);
+    act(() => result.current.setQuery('opacity'));
+    expect(result.current.matchingSettings.map(setting => setting.id)).toEqual(['opacity']);
+    act(() => result.current.setQuery(''));
+    expect(result.current.matchingSettings).toEqual([]);
+  });
 });

@@ -41,7 +41,7 @@ test('拖动终端重排：运行中块的 PTY 保活（不重挂、命令不退
 
   // 启动长时间运行命令（单监听 → 只有后分裂 pane 进入执行）
   await emitPtyOutput(page, `\x1b]133;E;${btoa('sleep 100')}\x07\x1b]133;C\x07`);
-  await expect(page.locator('[data-tip="终止命令 (Ctrl+C)"]')).toHaveCount(1, { timeout: 5000 });
+  await expect(page.locator('[data-tip="终止命令"]')).toHaveCount(1, { timeout: 5000 });
 
   // 输出标记行，确认运行中块在渲染
   await emitPtyOutput(page, 'keep-alive-marker\r\n');
@@ -59,6 +59,6 @@ test('拖动终端重排：运行中块的 PTY 保活（不重挂、命令不退
   await page.mouse.up();
 
   // 布局重排后：运行中块仍活着（PTY 未退出、块未重挂、内容未丢失）
-  await expect(page.locator('[data-tip="终止命令 (Ctrl+C)"]')).toHaveCount(1, { timeout: 5000 });
+  await expect(page.locator('[data-tip="终止命令"]')).toHaveCount(1, { timeout: 5000 });
   await expectAnyTermContains(page, 'keep-alive-marker', 3000);
 });

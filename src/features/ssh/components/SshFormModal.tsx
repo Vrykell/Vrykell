@@ -1,3 +1,4 @@
+import { TextInput } from '@ui/TextInput';
 import { useEffect, useState } from 'react';
 import { Loader2, Plug, Trash2 } from '@ui/icons';
 import { newSshId, validateSshConnection, sshTest, sshTrustHostKey, type SshConnection, type SshAuthMethod } from '@features/ssh/services/api';
@@ -171,41 +172,37 @@ export default function SshFormModal({ open, initial, onClose, onConnect }: Prop
       }}
       onClick={onClose}
     >
-      <div className="workspace-floating workspace-floating-dialog" role="dialog" aria-modal="true" aria-label="SSH 连接"
+      <div className="workspace-floating workspace-floating-dialog ssh-form-dialog" role="dialog" aria-modal="true" aria-label="SSH 连接"
         style={{
           width: 480, maxWidth: 'calc(100vw - 32px)', maxHeight: 'calc(100dvh - 24px)', overflow: 'hidden',
           padding: 16, display: 'flex', flexDirection: 'column', gap: 12,
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>
+        <div style={{ fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)' }}>
           {onConnect ? '快速连接 SSH' : initial ? '编辑 SSH 连接' : '新建 SSH 连接'}
         </div>
-        {/*
-          The scroll container keeps a negative margin plus matching padding so the focus ring of a
-          full-width field has room and is not clipped by the container's overflow.
-        */}
         <div data-testid="ssh-form-body" style={{ overflowY: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 10, margin: -4, padding: 4 }}>
           <label style={label}>
             {onConnect ? '连接名（可选）' : '连接名'}
-            <input value={name} placeholder="生产服务器" onChange={(e) => setName(e.target.value)} style={field} data-testid="ssh-form-name" />
+            <TextInput value={name} placeholder="生产服务器" onChange={(e) => setName(e.target.value)} style={field} data-testid="ssh-form-name" />
           </label>
 
           <div style={rowMain}>
             <label style={label}>
               主机（IP / 域名）
-              <input value={host} placeholder="192.168.1.10" onChange={(e) => setHost(e.target.value)} style={field} data-testid="ssh-form-host" />
+              <TextInput value={host} placeholder="192.168.1.10" onChange={(e) => setHost(e.target.value)} style={field} data-testid="ssh-form-host" />
             </label>
             <label style={label}>
               端口
-              <input value={port} placeholder="22" onChange={(e) => setPort(e.target.value)} style={field} data-testid="ssh-form-port" />
+              <TextInput value={port} placeholder="22" onChange={(e) => setPort(e.target.value)} style={field} data-testid="ssh-form-port" />
             </label>
           </div>
 
           <div style={rowEven}>
             <label style={label}>
               账户
-              <input value={user} placeholder="root" onChange={(e) => setUser(e.target.value)} style={field} data-testid="ssh-form-user" />
+              <TextInput value={user} placeholder="root" onChange={(e) => setUser(e.target.value)} style={field} data-testid="ssh-form-user" />
             </label>
             <div style={label}>
               认证方式
@@ -234,13 +231,13 @@ export default function SshFormModal({ open, initial, onClose, onConnect }: Prop
           {authMethod === 'password' ? (
             <label style={label}>
               密码
-              <input type="password" value={password} placeholder={initial?.hasPassword ? '留空则不修改' : '••••••'} onChange={(e) => setPassword(e.target.value)} style={field} data-testid="ssh-form-password" />
+              <TextInput type="password" value={password} placeholder={initial?.hasPassword ? '留空则不修改' : '••••••'} onChange={(e) => setPassword(e.target.value)} style={field} data-testid="ssh-form-password" />
             </label>
           ) : (
             <label style={label}>
               私钥文件（留空使用默认密钥 / SSH Agent）
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input value={identityFile} onChange={e => setIdentityFile(e.target.value)} style={field} data-testid="ssh-form-identity" placeholder="私钥的完整路径" />
+                <TextInput value={identityFile} onChange={e => setIdentityFile(e.target.value)} style={field} data-testid="ssh-form-identity" placeholder="私钥的完整路径" />
                 <button type="button" style={ghostBtn} onClick={async () => {
                   try {
                     const path = await chooseFile({ multiple: false, directory: false, title: '选择 SSH 私钥' });
@@ -254,16 +251,16 @@ export default function SshFormModal({ open, initial, onClose, onConnect }: Prop
           <div style={rowMain}>
             <label style={label}>
               跳板机（可选）
-              <input value={jumpHost} onChange={e => setJumpHost(e.target.value)} style={field} data-testid="ssh-form-jump" placeholder="用户@主机:端口" data-tip="多个跳板机用逗号分隔" />
+              <TextInput value={jumpHost} onChange={e => setJumpHost(e.target.value)} style={field} data-testid="ssh-form-jump" placeholder="用户@主机:端口" data-tip="多个跳板机用逗号分隔" />
             </label>
             <label style={label}>
               保活间隔（秒）
-              <input type="number" min={0} max={3600} value={keepalive} onChange={e => setKeepalive(e.target.value)} style={field} data-testid="ssh-form-keepalive" data-tip="0 表示关闭保活" />
+              <TextInput type="number" min={0} max={3600} value={keepalive} onChange={e => setKeepalive(e.target.value)} style={field} data-testid="ssh-form-keepalive" data-tip="0 表示关闭保活" />
             </label>
           </div>
 
           <label style={{ ...label, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-            <input type="checkbox" checked={shellIntegration} onChange={e => setShellIntegration(e.target.checked)} data-testid="ssh-form-integration" style={{ marginTop: 2 }} />
+            <TextInput type="checkbox" checked={shellIntegration} onChange={e => setShellIntegration(e.target.checked)} data-testid="ssh-form-integration" style={{ marginTop: 2 }} />
             <span>启用远程 Shell 集成（命令分块）<small style={{ display: 'block', marginTop: 2, fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>聊天服务器和菜单程序请保持关闭，直接进入服务器的交互界面。</small></span>
           </label>
         </div>

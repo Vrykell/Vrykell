@@ -13,7 +13,7 @@ interface DockButtonProps {
   onPointerDown?: (e: PointerEvent<HTMLButtonElement>) => void;
 }
 
-export default function DockButton({ panelId, active, side = 'left', onClick, onPointerDown }: DockButtonProps) {
+export default function DockButton({ panelId, active, onClick, onPointerDown }: DockButtonProps) {
   const { t } = useT();
   const def = NAVIGATION_DEFS[panelId];
   if (!def) return null;
@@ -24,11 +24,12 @@ export default function DockButton({ panelId, active, side = 'left', onClick, on
 
   return (
     <ToolbarBtn
-      title={panelId === 'settings' ? `设置（${isMacOS ? '⌘' : 'Ctrl'}+,）；拖动调整位置` : `${label} — ${action}${side === 'left' ? '左' : '右'}侧面板；拖动调整位置`}
+      title={panelId === 'settings' ? t('Open settings') : t('{{action}} {{panel}}', { action, panel: label })}
       active={active}
       onClick={onClick}
       attrs={{
         'data-dock-btn': panelId,
+        'data-tip-shortcut': panelId === 'settings' ? `${isMacOS ? 'Meta' : 'Control'}+,` : undefined,
         'aria-label': label,
         'aria-pressed': active,
         className: panelId === 'settings' ? 'activity-button workspace-settings' : 'activity-button',

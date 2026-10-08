@@ -39,7 +39,7 @@ export default function DockNavigation({ side }: { side: DockSide }) {
         {ids.map(id => {
           const index = zone.indexOf(id);
           const active = id === 'settings' ? settingsActive : panels.includes(id);
-          const showPlaceholder = !!dragging && target?.side === side && target.index === index;
+          const showPlaceholder = !!dragging && !target?.openPanel && target?.side === side && target.index === index;
           return (
             <Fragment key={id}>
               {showPlaceholder && <div className="workspace-navigation-placeholder" data-dock-placeholder={target.index} aria-hidden="true" />}
@@ -49,7 +49,7 @@ export default function DockNavigation({ side }: { side: DockSide }) {
             </Fragment>
           );
         })}
-        {!!dragging && target?.side === side && target.index >= zone.length && <div className="workspace-navigation-placeholder" data-dock-placeholder={target.index} aria-hidden="true" />}
+        {!!dragging && !target?.openPanel && target?.side === side && target.index >= zone.length && <div className="workspace-navigation-placeholder" data-dock-placeholder={target.index} aria-hidden="true" />}
       </div>
       {side === 'left' && <NavigationDragPreview />}
     </nav>

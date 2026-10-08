@@ -49,6 +49,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     ({ enableIntegration, enableReadyMarker, models, active, skillsSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession }) => {
     let cbCounter = 0;
     const eventListeners = new Map<string, number>();
+    let fullscreen = false;
     const writes: string[] = [];
     const sshTrusts: Record<string, unknown>[] = [];
     const dialogs: Record<string, unknown>[] = [];
@@ -695,7 +696,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             return historyEntries;
           case 'search_blocks':
             searchCalls.push({ cmd: 'search_blocks', args });
-            return [{ id: 'b1', session_id: 'hist-1', pane_id: null, command: 'npm run dev', output_raw: 'o', output_clean: 'dev server running', exit_code: 0, status: 'done', started_at: 1, ended_at: 2, collapsed: false }];
+            return [{ id: 'b1', session_id: 'hist-1', pane_id: null, command: 'npm run dev', output_raw: 'o', output_clean: 'dev server running', exit_code: 0, status: 'done', started_at: Date.now() - 60000, ended_at: Date.now() - 59000, session_title: '终端', session_status: 'historical', collapsed: false }];
           case 'search_sessions':
             searchCalls.push({ cmd: 'search_sessions', args });
             return [{ id: 't1', title: 'npm run dev', status: 'active', created_at: Date.now(), closed_at: null, block_count: 2, cwd: '', group_id: null, sort_order: 0, kind: 'local', payload: '{}' }];
@@ -1004,6 +1005,8 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             return 0;
           case 'plugin:event|unlisten':
             return undefined;
+          case 'plugin:window|is_fullscreen':
+            return fullscreen;
           default:
             return null;
         }
@@ -1011,6 +1014,10 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
       // 测试可直接注入任意 PTY 输出字节（如 altScreen 序列）
       emitPtyOutput: (data: string) => {
         emitOutput(data);
+      },
+      setFullscreen: (value: boolean) => {
+        fullscreen = value;
+        emit('tauri://resize', { width: window.innerWidth, height: window.innerHeight });
       },
     };
     localStorage.setItem('vrykell-api-key', 'sk-e2e-fake');

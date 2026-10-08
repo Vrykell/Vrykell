@@ -75,8 +75,8 @@ test.describe('快捷键说明页', () => {
     await expect(page.getByText('新建标签页')).toBeVisible();
     await expect(page.getByText('全局搜索')).toBeVisible();
     await expect(page.getByText('打开设置')).toBeVisible();
-    await expect(page.getByText('⌘T', { exact: true })).toBeVisible();
-    await expect(page.getByText('⌘F', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Meta+T', { exact: true })).toBeVisible();
+    await expect(page.getByRole('main').getByLabel('Meta+F', { exact: true })).toBeVisible();
   });
 });
 

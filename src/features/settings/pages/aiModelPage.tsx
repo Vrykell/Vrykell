@@ -1,7 +1,9 @@
+import { IconButton } from '@ui/IconButton';
 /**
  * aiModelPage — 模型配置页（API Key + 模型列表）。
  */
 import { Plus, X } from '@ui/icons';
+import { t } from '@i18n';
 import {
   setProviderKey, clearProviderKey, setAiModels, setActiveModel, useAiConfigStore,
   type ModelProfile,
@@ -85,7 +87,7 @@ export function AiModelPage() {
     <>
       <Field
         title="服务商 API Key"
-        description="Key 按服务商共用：同一服务商下的多个模型复用同一个 Key。仅保存在本机后端，界面不回显明文。此处显示「当前模型」所在服务商。"
+        description={t('Models from the current provider share one key, stored only on this device.')}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
           <span style={{
@@ -164,7 +166,7 @@ function ModelListField() {
   return (
     <Field
       title="模型列表"
-      description="配置多个模型，每个模型独立服务商 / 服务地址 / 模型名；点「设为当前」切换生效。API Key 按服务商共用。"
+      description={t('Configure models and choose the active one. Models from the same provider share an API key.')}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {models.map((m) => (
@@ -175,11 +177,11 @@ function ModelListField() {
               padding: '12px 14px', background: 'var(--surface)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div className="settings-model-header">
               <span
                 data-tip={providerLabel(m.provider)}
                 style={{
-                  width: 28, height: 28, borderRadius: 7, flexShrink: 0,
+                  width: 28, height: 32, borderRadius: 7, flexShrink: 0,
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                   background: 'var(--block)', color: 'var(--text-secondary)',
                 }}
@@ -193,10 +195,10 @@ function ModelListField() {
                 value={m.name}
                 placeholder="模型名称"
                 onCommit={(v) => update(m.id, { name: v })}
-                style={{ flex: 1, fontWeight: 600 }}
+                style={{ flex: 1, fontWeight: 'var(--fw-medium)' }}
               />
               {m.id === activeId ? (
-                <span style={{
+                <span className="settings-model-active" style={{
                   fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', borderRadius: 4, flexShrink: 0,
                   color: 'var(--success)', background: 'var(--success-bg)',
                 }}>
@@ -207,22 +209,7 @@ function ModelListField() {
                   设为当前
                 </button>
               )}
-              <button
-                data-subtle
-                onClick={() => remove(m.id)}
-                data-tip="删除模型"
-                aria-label="删除模型"
-                style={{
-                  width: 24, height: 24, flexShrink: 0, display: 'inline-flex',
-                  alignItems: 'center', justifyContent: 'center',
-                  border: '1px solid transparent', borderRadius: 4, background: 'transparent',
-                  color: 'var(--text-muted)', cursor: 'pointer',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--error-light)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
-              >
-                <X size={13} />
-              </button>
+              <IconButton tone="danger" onClick={() => remove(m.id)} data-tip={t('Delete model')} aria-label={t('Delete model')}><X size={16} /></IconButton>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
               <Select
