@@ -116,6 +116,11 @@
 
 ---
 
+### 3.8 Blank frames during canvas resizing
+
+Fitting that clears the renderer before resizing causes an additional blank frame. A canvas size change also clears its pixels before the scheduled repaint. Keep those operations in the shared resize adapter and finish the resized repaint before presenting the frame. The synchronous repaint uses a version-sensitive renderer capability guarded in that adapter. Do not delay input or add a long resize debounce. Send the first PTY size immediately, skip duplicate dimensions and retain only the latest pending size while IPC is busy. Log `terminal-resize-frame` geometry and `terminal-input-render-complete` timing to distinguish layout shifts from output or paint latency.
+
+
 ## 4. Character Width / Rendering
 
 ### 4.1 A Hand-Written charWidth Table Inconsistent with the TUI's string-width Accounting → the Cursor Split in Two (`69061f4`, `3eb3b7e`)
@@ -160,6 +165,8 @@
 
 ### 5.3 The follow-bottom Latch Wrongly Killed by a "Late scroll Event" (`useFollowBottom.ts`)
 - After a snap, read back the browser-clamped actual scrollTop into a ref; if the late scroll event the browser emits as content grows is compared directly against the threshold, it wrongly concludes "the user has scrolled up". In a real browser `scrollTop=scrollHeight` is clamped to `scrollHeight-clientHeight`, and tests must simulate this behavior.
+
+- Content growth and browser anchoring can change the offset before a resize callback; keep the following latch during layout scroll events and tolerate fractional programmatic offsets. Save the latch separately from the position across remounts, because detached output may grow before restoration. Observe the entire output wrapper. Apply committed history geometry in a layout effect and resize-observer following before paint; postponing a resize snap to another animation frame exposes a one-frame jump. Avoid estimated intrinsic heights for wrapped output, since becoming visible can change the height of the whole history tree.
 
 ---
 
@@ -547,6 +554,14 @@
 - **Whole-pixel character cells (what Windows Terminal does)**: a monospace advance is often fractional (about 8.4px at a 14px font), so `cols * cellWidth` lands off the pixel grid and the canvas keeps a sub-pixel column at its right edge - which is why dragging the window makes the seam come and go. The fix sets `letterSpacing = round(measured cell) - measured cell` on the xterm (at most half a pixel per cell), locking the cell to whole pixels so the grid lands on device pixels; both `useTerminalSession` and `createBlockTerm` set it at creation and recompute it when the font size changes (`snapLetterSpacing` in `terminalFont.ts` has unit tests).
 - **The win32-input-mode key capture also swallows copy/paste**: `attachWin32KeyCapture` calls `preventDefault` plus `stopPropagation` in the **capture** phase, so once a session asks for the mode, Ctrl+C is encoded into a key record and sent to the PTY - copy silently stops working. e2e does not enable that mode by default, which is why it never happens locally but always happens on the user's machine. The predicate needs the terminal itself: always let Ctrl+V through, and let Ctrl+C through only when there is a selection (without one it must be encoded, or the session loses its interrupt key). Regression coverage lives in `terminal-clipboard.spec.ts`.
 - **A thin line beside a terminal selection is the terminal's own scrollbar**: `.xterm-viewport` is 8px wider than `.xterm-screen` (that lane is the native scrollbar), and the global `::-webkit-scrollbar-thumb` rule (2px transparent border with padding-box) leaves only a ~4px light sliver in its middle, which hugs the selection and reads as a rendering artifact. The running block already hides its own scrollbar with `display: none`; the pane now does too (wheel, trackpad and keyboard scrolling are unaffected). Switching renderers (WebGL/DOM) does **not** change this, so never treat it as a renderer problem.
+
+---
+
+### Native editor input and restored SSH references
+
+Escape routing must use the focused pane ID, because terminal scenes are keyed by pane rather than tab. Only the block-list input shortcut consumes Escape; classic and alternate-screen editors receive it. Some native commits omit keypress while setting the composed flag. Observe xterm onData first, forward only unhandled insertText commits and retain native composition ownership. Diagnostics record event type, size and whether it was consumed, never text. A real POSIX editor test should save a file after normal-mode, insert-mode and Escape commands.
+
+A historical SSH pane can reference a deleted saved profile. Validate the reference before mounting the connection terminal, retain its address snapshot and offer profile replacement or fresh authentication. JSON whitespace and nested pane layouts must not affect history SSH detection or host search. Classic connection sessions do not have a useful command-block count.
 
 ---
 
