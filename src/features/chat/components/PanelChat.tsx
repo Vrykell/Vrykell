@@ -1,3 +1,8 @@
+import { t } from '@i18n';
+import { TextArea } from '@ui/TextInput';
+import KeyHint from '@ui/KeyHint';
+import { IconButton } from '@ui/IconButton';
+import { PermissionModeButton } from '@features/agent';
 /**
  * PanelChat — 全局 AI 对话面板（dock 面板，「会话转录」形态）。
  *
@@ -8,7 +13,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { iconSizes, ArrowUp, Paperclip, ShieldAlert, ShieldCheck, ShieldOff, Sparkles, Square, Zap  } from '@ui/icons';
+import { iconSizes, ArrowUp, Paperclip, Sparkles, Square, Zap  } from '@ui/icons';
 import { useChatStore, useActiveMessages } from '@features/chat';
 import { usePermissions, useAttachmentComposer } from '@features/agent';
 import ChatModeSelect from '@features/chat/components/ChatModeSelect';
@@ -25,13 +30,6 @@ import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
 import { EMPTY_COMPOSER_DRAFT, useComposerDrafts } from '@features/chat';
 import type { AttachmentMeta } from '@features/agent/model/attachments';
 
-/** 权限模式循环（状态栏 Shield chip）：图标 + 颜色双通道辨识（勾=标准逐工具 / 叹号=严格逐次问 / 斜线=放行直放）
- *  标准=逐工具级别；严格=全部逐次问；放行=全部直放行（危险命令仍逐次问） */
-const PERM_MODES = [
-  { id: 'standard', label: '标准', icon: ShieldCheck, color: 'var(--text-muted)', title: '标准权限：按设置页逐工具级别判定（点击切换）' },
-  { id: 'strict', label: '严格', icon: ShieldAlert, color: 'var(--accent-warm)', title: '严格权限：所有工具操作逐次询问（点击切换）' },
-  { id: 'relaxed', label: '放行', icon: ShieldOff, color: 'var(--error-light)', title: '放行模式：全部工具直接放行，危险命令仍会逐次询问（点击切换）' },
-] as const;
 
 /** 各 provider 的常用模型（快捷下拉；完整自由度在设置页输入） */
 export default function PanelChat() {
@@ -166,7 +164,7 @@ export default function PanelChat() {
           <div className="terminal-composer" style={{
             padding: '10px 12px 8px',
           }}>
-            <div className="terminal-composer-heading"><span>AI 对话</span><span>Enter 发送</span></div>
+            <div className="terminal-composer-heading"><span>{t('AI chat')}</span><span className="composer-key-hints"><KeyHint shortcut="Enter" />{t('Send')}</span></div>
             {/* 附件 chips 行（预览/删除；随发送清空） */}
             {atts.length > 0 && (
               <AttachmentChips
@@ -186,7 +184,7 @@ export default function PanelChat() {
               }}>
                 <Zap size={iconSizes.control} />
               </span>
-              <textarea
+              <TextArea
                 ref={inputRef}
                 value={text}
                 placeholder="自然语言描述你想做什么…"
@@ -216,40 +214,13 @@ export default function PanelChat() {
               </span>
               {/* 发送/停止按钮 — 流式中当前 tab 变 ⏹ */}
               {sendingHere ? (
-                <button
-                  data-subtle
-                  data-tip="停止生成"
-                  aria-label="停止生成"
-                  onClick={() => abortStream(activeId)}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    width: 32, height: 32, padding: 0, border: 'none', borderRadius: 4,
-                    background: 'transparent', color: 'var(--accent-warm)', cursor: 'pointer', flexShrink: 0,
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--button-hover)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                >
+                <IconButton data-subtle tone="accent" data-tip={t('Stop generating')} aria-label={t('Stop generating')} onClick={() => abortStream(activeId)}>
                   <Square size={iconSizes.compact} fill="currentColor" />
-                </button>
+                </IconButton>
               ) : (
-                <button
-                  data-subtle
-                  data-tip="发送 (Enter)"
-                  aria-label="发送 (Enter)"
-                  onClick={submit}
-                  disabled={!canSend}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    width: 32, height: 32, padding: 0, border: 'none', borderRadius: 4,
-                    background: 'transparent',
-                    color: canSend ? 'var(--accent-warm)' : 'var(--text-muted)',
-                    cursor: canSend ? 'pointer' : 'default', flexShrink: 0,
-                  }}
-                  onMouseEnter={(e) => { if (canSend) e.currentTarget.style.background = 'var(--button-hover)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                >
+                <IconButton data-subtle tone="accent" data-tip={t('Send')} data-tip-shortcut="Enter" aria-label={t('Send')} onClick={submit} disabled={!canSend}>
                   <ArrowUp size={iconSizes.control} />
-                </button>
+                </IconButton>
               )}
             </div>
 
@@ -267,56 +238,11 @@ export default function PanelChat() {
                 </>
               )}
               <div style={{ flex: 1 }} />
-              {/* 权限模式切换（点击循环 标准→严格→放行）：纯图标 + 三色，与 📎 同尺寸同风格对齐 */}
-              {(() => {
-                const idx = PERM_MODES.findIndex((m) => m.id === permMode);
-                const cur = PERM_MODES[idx] ?? PERM_MODES[0]!;
-                const next = PERM_MODES[(idx + 1) % PERM_MODES.length]!;
-                const CurIcon = cur.icon;
-                return (
-                  <button
-                    data-subtle
-                    data-tip={cur.title}
-                    aria-label={cur.title}
-                    onClick={() => setPermMode(next.id)}
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      width: 32, height: 32, padding: 0, border: 'none', borderRadius: 4,
-                      background: 'transparent', color: cur.color, cursor: 'pointer',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'var(--button-hover)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent';
-                    }}
-                  >
-                    <CurIcon size={iconSizes.control} />
-                  </button>
-                );
-              })()}
+              <PermissionModeButton mode={permMode} onChange={setPermMode} />
               {/* 📎 附件 */}
-              <button
-                data-subtle
-                data-tip="添加附件（图片 / 文件，也可直接粘贴或拖入）"
-                aria-label="添加附件（图片 / 文件，也可直接粘贴或拖入）"
-                onClick={() => void pickFiles()}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  width: 32, height: 32, padding: 0, border: 'none', borderRadius: 4,
-                  background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'var(--button-hover)';
-                  e.currentTarget.style.color = 'var(--text-secondary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'transparent';
-                  e.currentTarget.style.color = 'var(--text-muted)';
-                }}
-              >
+              <IconButton data-subtle data-tip={t('Add attachment')} aria-label={t('Add attachment')} onClick={() => void pickFiles()}>
                 <Paperclip size={iconSizes.control} />
-              </button>
+              </IconButton>
             </div>
           </div>
         </div>

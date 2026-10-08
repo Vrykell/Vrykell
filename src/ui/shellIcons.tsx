@@ -1,62 +1,30 @@
-import { forwardRef, type ForwardRefExoticComponent, type SVGProps } from 'react';
-import PowerShellMark from '~icons/devicon/powershell';
-import ZshMark from '~icons/devicon/zsh';
-import BashMark from '~icons/devicon/bash';
-import CmdMark from '~icons/devicon/windows8';
-import SshMark from '~icons/mdi/console-line';
+import { forwardRef } from 'react';
 import { iconSizes, Terminal, type AppIcon, type AppIconProps } from '@ui/icons';
 
-/**
- * Shell marks — brand icons compiled in at build time
- * (`~icons/<collection>/<name>` via unplugin-icons), sized like the app icons.
- *
- * PowerShell, zsh, bash and CMD use their colored devicon mark. SSH has no
- * colored logo, so it uses the monochrome `mdi:console-line` terminal glyph
- * rendered in the theme's success color, which stays readable on both light and
- * dark themes and reads as an interactive session at a glance (the literal "SSH"
- * letters were hard to make out at row size). Shells without a mark fall back to
- * the generic terminal icon.
- */
-
-type BrandMark = ForwardRefExoticComponent<SVGProps<SVGSVGElement> & { title?: string }>;
-
-/** Adapter that gives a build-time brand mark the app icon contract. */
-function createShellIcon(Mark: BrandMark, mark: string, color?: string): AppIcon {
-  return forwardRef<SVGSVGElement, AppIconProps>(function ShellIcon({ size = iconSizes.row, style, className }, ref) {
-    return (
-      <Mark
-        ref={ref}
-        width={size}
-        height={size}
-        className={className}
-        data-shell-mark={mark}
-        style={{ flexShrink: 0, ...style, ...(color ? { color } : null) }}
-      />
-    );
+/** Small terminal windows share one silhouette and distinguish sessions by color. */
+function createShellTile(mark: string, color: string): AppIcon {
+  return forwardRef<SVGSVGElement, AppIconProps>(function ShellTile({ size = iconSizes.row, style, className }, ref) {
+    return <svg ref={ref} width={size} height={size} viewBox="0 0 24 24" className={className}
+      data-shell-mark={mark} aria-hidden="true" style={{ flexShrink: 0, ...style, color }}>
+      <rect x="1" y="3" width="22" height="18" rx="3.5" fill="currentColor" />
+      <path d="m6 8 4 4-4 4M12 16h6" fill="none" stroke="var(--shell-tile-ink)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>;
   }) as AppIcon;
 }
 
-export const PowerShellIcon = createShellIcon(PowerShellMark, 'powershell');
-export const ZshIcon = createShellIcon(ZshMark, 'zsh');
-export const BashIcon = createShellIcon(BashMark, 'bash');
-export const CmdIcon = createShellIcon(CmdMark, 'cmd');
+export const PowerShellIcon = createShellTile('powershell', 'var(--shell-powershell-accent)');
+export const ZshIcon = createShellTile('zsh', 'var(--shell-zsh-accent)');
+export const BashIcon = createShellTile('bash', 'var(--shell-bash-accent)');
+export const CmdIcon = createShellTile('cmd', 'var(--shell-cmd-accent)');
+export const SshIcon = createShellTile('ssh', 'var(--shell-ssh-accent)');
 
-/** SSH connections have no colored brand mark; the monochrome glyph carries the theme color. */
-export const SshIcon = createShellIcon(SshMark, 'ssh', 'var(--success)');
-
-/** Icon for a local shell; unmapped shells use the generic terminal icon. */
 export function shellIconFor(shellType: string | null | undefined): AppIcon {
   switch (shellType) {
     case 'powershell':
-    case 'pwsh':
-      return PowerShellIcon;
-    case 'zsh':
-      return ZshIcon;
-    case 'bash':
-      return BashIcon;
-    case 'cmd':
-      return CmdIcon;
-    default:
-      return Terminal;
+    case 'pwsh': return PowerShellIcon;
+    case 'zsh': return ZshIcon;
+    case 'bash': return BashIcon;
+    case 'cmd': return CmdIcon;
+    default: return Terminal;
   }
 }

@@ -51,13 +51,13 @@ test('workspace icons remain readable and fit inside their controls', async ({ p
   await checkSize(nav, 24);
   await checkFits(nav);
   const aiButton = page.locator('[data-dock-btn="chat"]');
-  await expect(aiButton).toHaveClass('activity-button');
+  await expect(aiButton).toHaveClass(/\bactivity-button\b/);
   await expect(aiButton).toHaveText('');
   await checkSize(aiButton.locator('svg'), 24);
   await checkFits(aiButton.locator('svg'));
   expect(await aiButton.boundingBox()).toMatchObject({ width: 32, height: 32 });
   await checkSize(page.locator('[data-tab-row-id] svg').first(), 20);
-  const search = page.getByTestId('global-search-trigger').locator('svg');
+  const search = page.getByTestId('global-search-trigger').locator('svg').first();
   await checkSize(search, 18);
   await checkFits(search);
   const settings = page.locator('.workspace-settings svg');
@@ -112,6 +112,13 @@ test('every shell and SSH connection shows its own mark', async ({ page }) => {
   // 弹窗同时列出本地 shell 与 SSH 连接，各自带品牌标记
   await expect(dialog.locator('[data-shell-mark="zsh"]')).toBeVisible();
   await expect(dialog.locator('[data-shell-mark="bash"]')).toBeVisible();
+  for (const shell of ['zsh', 'bash']) {
+    const mark = dialog.locator(`[data-shell-mark="${shell}"]`);
+    await expect(mark).toHaveAttribute('viewBox', '0 0 24 24');
+    await expect(mark).toHaveAttribute('width', '20');
+    expect(await mark.evaluate(element => getComputedStyle(element).color)).not.toBe('rgb(0, 0, 0)');
+    await expect(mark.locator('text')).toHaveCount(0);
+  }
   await expect(dialog.locator('[data-shell-mark="ssh"]')).toBeVisible();
   await dialog.getByText('Bash', { exact: true }).click();
   await expect(page.locator('[data-tab-row-id]').last().locator('[data-shell-mark="bash"]')).toBeVisible();

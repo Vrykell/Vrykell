@@ -54,7 +54,7 @@ export default function ChatModeSelect() {
           }}
           style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, width: '100%',
             padding: '12px 10px', borderRadius: 12, textAlign: 'left', cursor: 'pointer', color: 'var(--text-primary)' }}>
-          <span style={{ fontSize: 'calc(14px * var(--ui-font-scale))', fontWeight: 500 }}>{mode.label}</span>
+          <span style={{ fontSize: 'calc(14px * var(--ui-font-scale))', fontWeight: 'var(--fw-medium)' }}>{mode.label}</span>
           <span style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>{mode.description}</span>
         </button>;
       })}

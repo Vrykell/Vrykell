@@ -44,7 +44,7 @@ export default function ConfirmDialog({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>{title}</div>
+        <div style={{ fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)' }}>{title}</div>
         {message && (
           <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)', lineHeight: 1.6, wordBreak: 'break-all' }}>
             {message}

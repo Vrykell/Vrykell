@@ -95,7 +95,7 @@ export default function SidebarItem({
         <span style={sidebarRowIcon}>{icon}</span>
         {renameInput ?? (
           <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <span style={{ ...sidebarRowTitle, fontWeight: active ? 600 : 500 }}>{title}</span>
+            <span style={{ ...sidebarRowTitle, fontWeight: active ? 'var(--fw-semibold)' : 'var(--fw-regular)' }}>{title}</span>
             {subtitle && (
               <span style={{
                 fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', lineHeight: '14px',

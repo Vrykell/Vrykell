@@ -37,6 +37,11 @@ describe('SidebarItem', () => {
     expect(screen.getByRole('button', { name: '关闭标签' })).toHaveStyle({ opacity: '1' });
   });
 
+  it('uses theme typography for a selected label without forcing bold text', () => {
+    renderItem({ active: true });
+    expect(screen.getByText('会话一').style.fontWeight).toBe('var(--fw-semibold)');
+  });
+
   it('runs the action without activating the row', () => {
     const { onAction, onClick } = renderItem({ active: true });
     fireEvent.click(screen.getByRole('button', { name: '关闭标签' }));
