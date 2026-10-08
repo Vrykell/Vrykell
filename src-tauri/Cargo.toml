@@ -41,6 +41,10 @@ ssh2 = "0.9"
 trash = "5"
 tauri-plugin-drag = "2.1.1"
 
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSUserDefaults", "NSString"] }
+ssh2 = { version = "0.9", features = ["vendored-openssl"] }
+
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 

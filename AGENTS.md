@@ -18,7 +18,8 @@ npx tsc --noEmit     # typecheck only
 npm run check:architecture  # import-boundary guard
 ```
 
-macOS needs `libssh2` + `openssl` for SSH (`brew install libssh2 openssl`).
+macOS builds `libssh2` + OpenSSL from source for SSH, without Homebrew or system OpenSSL.
+Xcode Command Line Tools, Perl and Make are required (`xcode-select --install`).
 
 ## Critical Constraints
 
