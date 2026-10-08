@@ -52,6 +52,12 @@ test.describe('命令块（OSC 133）', () => {
     const input = page.getByPlaceholder(/输入命令/);
     await expect(input).toBeVisible({ timeout: 5000 });
 
+    // Wait for the shell startup prompt before injecting a sustained command.
+    await page.waitForFunction(async () => {
+      const path = '/src/features/terminal/stores/terminal.ts';
+      const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+      return Object.values(useTerminalStore.getState().startupStates).includes('ready');
+    });
     // 通过 PTY 输出直接注入 altScreen 序列
     await emitPtyOutput(
       page,
@@ -63,7 +69,7 @@ test.describe('命令块（OSC 133）', () => {
     );
 
     await expect(page.getByText('TUI')).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('[data-tip="发送 Ctrl+C"]')).toBeVisible();
+    await expect(page.locator('button.tui-control[data-tip="终止命令"]')).toBeVisible();
     // 真实 alt-buffer 应用不提供「退出全屏」（输出只写主 xterm，强制回 blockList 会画面失联）；
     // esc 仅手动全屏（块卡片进入全屏交互）才有 —— 见 running-term.spec.ts
     await expect(page.locator('[data-tip="退出全屏"]')).toHaveCount(0);
@@ -85,13 +91,13 @@ test.describe('命令块（OSC 133）', () => {
     }).toPass({ timeout: 5000 });
 
     // 升级式结束按钮：首击 SIGTERM → 窗口内再击 SIGKILL
-    const bannerEnd = page.locator('[data-tip="结束前台应用 (SIGTERM)"]');
+    const bannerEnd = page.locator('button.tui-control[data-tip="结束前台应用"]');
     await expect(bannerEnd).toBeVisible();
     await bannerEnd.click();
     await expect(async () => {
       expect(await ptySignals(page)).toEqual([{ id: 'e2e-session', sig: 15 }]);
     }).toPass({ timeout: 5000 });
-    await page.locator('[data-tip="结束前台应用 (SIGTERM)"]').click();
+    await page.locator('button.tui-control[data-tip="结束前台应用"]').click();
     await expect(async () => {
       expect(await ptySignals(page)).toEqual([
         { id: 'e2e-session', sig: 15 },
@@ -108,6 +114,7 @@ test.describe('命令块（OSC 133）', () => {
     await page.mouse.move(0, 0);
     // 全屏 TUI 画面不进块历史（alt 内容只在主 xterm 实时呈现），
     // 历史只留 teardown 后的 shell 噪音 —— 全屏应用不应污染命令历史
+    await page.locator('[data-testid^="command-block-"]').last().hover();
     await expect(page.getByTestId('exit-code')).toBeVisible({ timeout: 5000 });
     await expect(page.getByText('VIM BUFFER')).toHaveCount(0);
   });

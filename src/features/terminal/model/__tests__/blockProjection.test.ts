@@ -8,12 +8,10 @@ const block: TermBlock = {
 };
 
 describe('block projection', () => {
-  it('preserves existing history references and collapse state as new output arrives', () => {
+  it('preserves existing history references as new output arrives', () => {
     const previous = projectBlocks([block], [], () => false);
-    previous[0]!.collapsed = true;
     const next = projectBlocks([block, { ...block, id: 'new' }], previous, () => false);
     expect(next[0]).toBe(previous[0]);
-    expect(next[0]!.collapsed).toBe(true);
     expect(projectBlocks([block], previous, () => false)).toBe(previous);
   });
 

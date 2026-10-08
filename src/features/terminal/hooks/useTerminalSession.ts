@@ -11,6 +11,7 @@ import { configureTerminalInput } from '@features/terminal/model/terminalInput';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { captureConnectionFrame, type TerminalFrame } from '../model/terminalFrame';
 import { projectBlocks } from '../model/blockProjection';
+import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
 import { Terminal } from '@xterm/xterm';
 import { loadWebglRenderer } from '@features/terminal/model/xtermRenderer';
 import { FitAddon } from '@xterm/addon-fit';
@@ -97,8 +98,8 @@ export function syncTermWidth(tabId: string): void {
   widthSyncs.get(tabId)?.();
 }
 
-/** Fallback width deduction for command insets, host padding, and xterm padding. */
-const BLOCK_CONTENT_INSET_PX = 32;
+/** Estimate command content width before the visible output host mounts. */
+const BLOCK_CONTENT_INSET_PX = 16 + 2 * COMMAND_BLOCK_CONTENT_PADDING;
 
 /** Output silence that marks a prompt for shells without the ready marker. */
 const SHELL_IDLE_READY_MS = 2500;
@@ -621,8 +622,10 @@ export function useTerminalSession(
       const host = pane?.querySelector<HTMLElement>('[data-testid="running-term"]');
       const list = pane?.querySelector<HTMLElement>(`[data-testid="terminal-scroll-${paneId}"]`);
       const screenPx = host
-        ? host.clientWidth - 16
-        : (list?.clientWidth || el.offsetWidth) - BLOCK_CONTENT_INSET_PX;
+        ? host.clientWidth
+        : (list?.clientWidth || el.offsetWidth) - (list
+          ? parseFloat(getComputedStyle(list).getPropertyValue('--command-content-inset')) || BLOCK_CONTENT_INSET_PX
+          : BLOCK_CONTENT_INSET_PX);
       // A hidden or not-yet-laid-out host has no measurable width; retry after mount.
       if (screenPx <= 0) return term.cols;
       return Math.max(2, Math.min(term.cols, Math.floor(screenPx / domCellWidth())));

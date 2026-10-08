@@ -696,7 +696,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             return historyEntries;
           case 'search_blocks':
             searchCalls.push({ cmd: 'search_blocks', args });
-            return [{ id: 'b1', session_id: 'hist-1', pane_id: null, command: 'npm run dev', output_raw: 'o', output_clean: 'dev server running', exit_code: 0, status: 'done', started_at: Date.now() - 60000, ended_at: Date.now() - 59000, session_title: '终端', session_status: 'historical', collapsed: false }];
+            return [{ id: 'b1', session_id: 'hist-1', pane_id: null, command: 'npm run dev', output_raw: 'o', output_clean: 'dev server running', exit_code: 0, status: 'done', started_at: Date.now() - 60000, ended_at: Date.now() - 59000, session_title: '终端', session_status: 'historical' }];
           case 'search_sessions':
             searchCalls.push({ cmd: 'search_sessions', args });
             return [{ id: 't1', title: 'npm run dev', status: 'active', created_at: Date.now(), closed_at: null, block_count: 2, cwd: '', group_id: null, sort_order: 0, kind: 'local', payload: '{}' }];
@@ -847,13 +847,11 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
           }
           case 'get_session_blocks':
             if (args.sessionId === 'hist-1') {
-              return [{ id: 'b1', session_id: 'hist-1', pane_id: null, command: 'ls -la', output_raw: 'o', output_clean: 'total 1', output_html: '<span style="color:#4e9a06">total 1</span>', exit_code: 0, status: 'done', started_at: 1, ended_at: 2, collapsed: false }];
+              return [{ id: 'b1', session_id: 'hist-1', pane_id: null, command: 'ls -la', output_raw: 'o', output_clean: 'total 1', output_html: '<span style="color:#4e9a06">total 1</span>', exit_code: 0, status: 'done', started_at: 1, ended_at: 2, collapsed: true }];
             }
             return [];
           case 'update_session_payload':
             sessionPayloads.push({ id: args.id as string, payload: args.payload as string });
-            return undefined;
-          case 'set_block_collapsed':
             return undefined;
           case 'append_chat_message': {
             const i = mockChatMessages.findIndex((m) => m.id === args.id);

@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
-import * as sessionManager from '@features/workspace/services/sessionManager';
 
 const EMPTY: TermBlock[] = [];
 
@@ -13,13 +12,9 @@ interface BlockState {
   clearBlocks: (tabId: string) => void;
   /** 关 tab 时删除该 tab 的 block 数据，避免 per-tab 残留 */
   dropTab: (tabId: string) => void;
-  /** 单个 block 折叠/展开（持久化） */
-  setBlockCollapsed: (tabId: string, blockId: string, collapsed: boolean) => void;
-  /** 全部 block 折叠/展开（持久化） */
-  setAllCollapsed: (tabId: string, collapsed: boolean) => void;
 }
 
-export const useBlockStore = create<BlockState>((set, get) => ({
+export const useBlockStore = create<BlockState>((set) => ({
   byTab: {},
 
   addBlock: (tabId, block) =>
@@ -49,32 +44,6 @@ export const useBlockStore = create<BlockState>((set, get) => ({
       delete byTab[tabId];
       return { byTab };
     }),
-
-  setBlockCollapsed: (tabId, blockId, collapsed) => {
-    set((s) => ({
-      byTab: {
-        ...s.byTab,
-        [tabId]: (s.byTab[tabId] ?? []).map((b) =>
-          b.id === blockId ? { ...b, collapsed: collapsed || undefined } : b,
-        ),
-      },
-    }));
-    sessionManager.persistBlockCollapsed(blockId, collapsed);
-  },
-
-  setAllCollapsed: (tabId, collapsed) => {
-    set((s) => ({
-      byTab: {
-        ...s.byTab,
-        [tabId]: (s.byTab[tabId] ?? []).map((b) => ({ ...b, collapsed: collapsed || undefined })),
-      },
-    }));
-    const blocks = get().byTab[tabId] ?? [];
-    for (const b of blocks) {
-      sessionManager.persistBlockCollapsed(b.id, collapsed);
-    }
-  },
-
 }));
 
 /** 根据 tabId 获取块的 selector（始终返回稳定引用避免无限渲染）。 */

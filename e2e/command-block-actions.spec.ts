@@ -1,47 +1,50 @@
 import { test, expect } from '@playwright/test';
-import { clipboardText, ptyWrites, setupTauriMock } from './tauri-mock';
+import { clipboardText, mockAnthropic, ptyWrites, setupTauriMock } from './tauri-mock';
 
 test.describe('命令块操作全链路', () => {
-  test('已完成命令的悬停操作按钮保持统一紧凑尺寸', async ({ page }) => {
+  test('commands and output keep their geometry while hover reveals context and only more', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
     const input = page.getByPlaceholder(/输入命令/);
-    await expect(input).toBeVisible({ timeout: 5000 });
-    await input.fill('echo compact-toolbar');
+    await input.fill('echo content-first');
     await input.press('Enter');
-
-    const block = page.locator('[data-testid^="command-block-"]').filter({ hasText: 'echo compact-toolbar' }).first();
-    await expect(block).toBeVisible({ timeout: 5000 });
-    const command = block.locator('[data-selectable]').first();
-    const before = await command.boundingBox();
+    const block = page.locator('[data-testid^="command-block-"]').filter({ hasText: 'echo content-first' }).first();
+    await expect(block).toBeVisible();
+    await page.mouse.move(0, 0);
+    const metadata = block.locator('.command-block-info');
+    await expect(metadata).toHaveCSS('opacity', '0');
+    const command = block.locator('.command-block-command');
+    const output = block.locator('.command-block-output');
+    const before = { command: await command.boundingBox(), output: await output.boundingBox() };
+    const bounds = (await block.boundingBox())!;
+    expect(before.command!.x - bounds.x).toBe(32);
+    expect(before.output!.x).toBe(before.command!.x);
+    expect(before.output!.y - before.command!.y - before.command!.height).toBe(12);
     await block.hover();
-    const after = await command.boundingBox();
-    expect(after!.x).toBe(before!.x);
-    expect(after!.width).toBe(before!.width);
-    const titles = ['重新运行', 'AI 解释', '复制命令', '复制输出', '更多操作'];
-    const bounds: Array<{ x: number; width: number }> = [];
-    for (const title of titles) {
-      const button = block.locator(`[data-tip="${title}"]`);
-      await expect(button).toHaveCSS('width', '28px');
-      await expect(button).toHaveCSS('height', '28px');
-      await expect(button.locator('svg')).toHaveCSS('width', '16px');
-      const box = await button.boundingBox();
-      expect(box).not.toBeNull();
-      bounds.push({ x: box!.x, width: box!.width });
-    }
-    for (let index = 1; index < bounds.length; index += 1) {
-      const previous = bounds[index - 1]!;
-      const current = bounds[index]!;
-      expect(current.x - previous.x - previous.width).toBeLessThanOrEqual(1);
-    }
-    const collapse = block.locator('[data-tip="折叠"]');
-    await expect(collapse).toHaveCSS('width', '28px');
-    await expect(collapse.locator('svg')).toHaveCSS('width', '12px');
-    await collapse.click();
-    await expect(block.locator('[data-tip="展开"]').locator('svg')).toHaveCSS('width', '12px');
-    await block.locator('[data-tip="展开"]').click();
-    await block.hover();
-    await block.screenshot({ path: test.info().outputPath('compact-toolbar.png') });
+    await expect(metadata).toHaveCSS('opacity', '1');
+    expect(await command.boundingBox()).toEqual(before.command);
+    expect(await output.boundingBox()).toEqual(before.output);
+    await expect(block.getByRole('button')).toHaveCount(1);
+    const more = block.getByRole('button', { name: '更多操作' });
+    await expect(more).toHaveCSS('width', '28px');
+    await expect(more.locator('svg')).toHaveCSS('width', '16px');
+    await expect(page.getByRole('button', { name: /^(展开|折叠)(全部)?$/ })).toHaveCount(0);
+    await block.screenshot({ path: test.info().outputPath('content-first-hover.png') });
+    await page.mouse.move(0, 0);
+    await expect(metadata).toHaveCSS('opacity', '0');
+    await block.screenshot({ path: test.info().outputPath('content-first-rest.png') });
+    await page.keyboard.press('Tab');
+    await more.focus();
+    await expect(metadata).toHaveCSS('opacity', '1');
+    await more.press('Enter');
+    const menu = page.getByRole('menu', { name: '命令块操作' });
+    await expect(menu.getByRole('menuitem', { name: '重新运行' })).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(menu.getByRole('menuitem', { name: '发给 AI 分析' })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+    await expect(more).toBeFocused();
+    await expect(output).toContainText('content-first');
   });
 
   test('命令块右键菜单出现在鼠标点击位置', async ({ page }) => {
@@ -85,19 +88,22 @@ test.describe('命令块操作全链路', () => {
     await expect(block).toContainText('linux-block-action');
 
     await block.hover();
-    await page.locator('[data-tip="复制命令"]').click();
+    await block.getByRole('button', { name: '更多操作' }).click();
+    await page.getByRole('menuitem', { name: '复制命令' }).click();
     await expect.poll(() => clipboardText(page)).toBe('echo linux-block-action');
-    await expect(block.getByTestId('copy-command-success')).toBeVisible();
+    await page.mouse.move(0, 0);
+    await expect(block.locator('.command-block-info')).toHaveCSS('opacity', '0');
     await expect(page.getByText('已复制', { exact: true })).toHaveCount(0);
 
     await block.hover();
-    await page.locator('[data-tip="复制输出"]').click();
+    await block.getByRole('button', { name: '更多操作' }).click();
+    await page.getByRole('menuitem', { name: '复制输出' }).click();
     await expect.poll(() => clipboardText(page)).toBe('linux-block-action');
-    await expect(block.getByTestId('copy-output-success')).toBeVisible();
 
     const writesBefore = (await ptyWrites(page)).length;
     await block.hover();
-    await page.locator('[data-tip="重新运行"]').click();
+    await block.getByRole('button', { name: '更多操作' }).click();
+    await page.getByRole('menuitem', { name: '重新运行' }).click();
     await expect.poll(async () => (await ptyWrites(page)).slice(writesBefore)).toContain('echo linux-block-action\n');
     await expect(block).toContainText('linux-block-action');
   });
@@ -125,4 +131,49 @@ test.describe('命令块操作全链路', () => {
     await page.getByRole('menuitem', { name: '清除所有块' }).click();
     await expect(block).toHaveCount(0);
   });
+});
+
+test('narrow panes preserve context above multiline commands and all output', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  await page.setViewportSize({ width: 720, height: 800 });
+  const input = page.getByPlaceholder(/输入命令/);
+  const command = 'echo ' + 'long-path/'.repeat(35);
+  await input.fill(command);
+  await input.press('Enter');
+  const block = page.locator('[data-testid^="command-block-"]').last();
+  await expect(block).toContainText(command);
+  await block.hover();
+  const more = block.getByRole('button', { name: '更多操作' });
+  await expect(more).toBeVisible();
+  const geometry = await block.evaluate(element => {
+    const cmd = element.querySelector<HTMLElement>('.command-block-command')!;
+    const output = element.querySelector<HTMLElement>('.command-block-output')!;
+    return { overflow: element.scrollWidth - element.clientWidth, aligned: cmd.offsetLeft === output.offsetLeft,
+      rows: cmd.clientHeight / parseFloat(getComputedStyle(cmd).lineHeight) };
+  });
+  expect(geometry.overflow).toBeLessThanOrEqual(1);
+  expect(geometry.aligned).toBe(true);
+  expect(geometry.rows).toBeGreaterThan(1);
+  await more.click();
+  const menu = page.getByRole('menu', { name: '命令块操作' });
+  const bounds = (await menu.boundingBox())!;
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(720);
+  await page.keyboard.press('Escape');
+});
+
+test('the more menu sends command output for AI analysis in the same pane', async ({ page }) => {
+  await setupTauriMock(page);
+  await mockAnthropic(page, 'Analysis complete.');
+  await page.goto('/');
+  const input = page.getByPlaceholder(/输入命令/);
+  await input.fill('echo analyze-me');
+  await input.press('Enter');
+  const block = page.locator('[data-testid^="command-block-"]').last();
+  await block.hover();
+  await block.getByRole('button', { name: '更多操作' }).click();
+  await page.getByRole('menuitem', { name: '发给 AI 分析' }).click();
+  await expect(page.getByRole('menu', { name: '命令块操作' })).toHaveCount(0);
+  await expect(page.locator('[data-testid^="terminal-flow-"]').first()).toContainText('分析这条命令的执行结果');
+  await expect(page.getByText('Analysis complete.').first()).toBeVisible();
 });

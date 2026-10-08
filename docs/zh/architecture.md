@@ -248,12 +248,12 @@ zustand，按域拆分（`src/features/*/stores/`）：
 |-------|---------|
 | `workspace` | tabs、activeId、激活/关闭、每 tab cwd |
 | `terminal` | sessions（tabId→PTY id）、dims、`scenes`（tabId→classic/blockList/altScreen）、altScreenActive、keyboardTarget、pendingInput；`termInstances`（模块级 Map，不进 state） |
-| `blocks` | `byTab: tabId → TermBlock[]`，setBlocks/updateBlock/clearBlocks/setBlockCollapsed/setAllCollapsed |
+| `blocks` | `byTab: tabId → TermBlock[]`，setBlocks/updateBlock/clearBlocks/dropTab |
 | `chat` | 每 tab AI 消息、send、setDefaultStream |
 | `history` | 命令历史 |
 | `ui` / `dock` / `workspaceDirs` / `searchHistory` / `searchHighlight` | UI 面板、搜索等 |
 
-`TermBlock`（`src/features/terminal/services/pipeline/termBlock.ts`）是 UI 层的块投影，字段：id/command/cwd/gitBranch/status/exitCode/startedAt/endedAt/wasLongRunning/outputHtml/outputText/outputRaw/linesTruncated/collapsed/agent。
+`TermBlock`（`src/features/terminal/services/pipeline/termBlock.ts`）是 UI 层的块投影，字段：id/command/cwd/gitBranch/status/exitCode/startedAt/endedAt/wasLongRunning/outputHtml/outputText/outputRaw/linesTruncated/snapshotPending/agent。
 
 ## 13. 后端（Rust 层）
 

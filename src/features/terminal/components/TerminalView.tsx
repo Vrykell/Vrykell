@@ -7,6 +7,7 @@
  *   分裂用 ⌘D/⌘⇧D（继承类型）、⌥⌘D（选类型）；分隔线拖动调整比例。
  */
 
+import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
 import { useRef, useEffect, useMemo, useState } from 'react';
 import KeyHint from '@ui/KeyHint';
 import DropPlacementPreview from '@ui/DropPlacementPreview';
@@ -80,7 +81,9 @@ export default function TerminalView() {
 
       {/* Manual fullscreen host for a running block, with room for the toolbar. */}
       {altScreenActive && (
-        <div data-testid="tui-fullscreen" style={{ position: 'absolute', inset: 0, zIndex: 100, background: 'var(--xterm-bg)', paddingTop: 28 }} />
+        <div data-testid="tui-fullscreen" style={{ position: 'absolute', inset: 0, zIndex: 100, background: 'var(--xterm-bg)', paddingTop: 28 }}>
+          <TuiBanner tabId={focusedTermId} />
+        </div>
       )}
 
       {/* 终端区域右键菜单 */}
@@ -394,7 +397,7 @@ function TerminalPane(props: {
           insetRight={inner.right ? 4 : 8}
         />
       )}
-      {scene === 'altScreen' && <TuiBanner tabId={terminal.id} />}
+      {scene === 'altScreen' && !altScreenActive && <TuiBanner tabId={terminal.id} />}
     </div>
   );
 }
@@ -615,7 +618,7 @@ function PaneBlockList({ paneId, insetLeft = 8, insetRight = 8 }: { paneId: stri
   const snap = useFollowBottom(scrollRef, [blocks], paneId);
   useEffect(() => registerFollowEngager(paneId, snap), [paneId, snap]);
   return (
-    <div ref={scrollRef} className="scroll-region" data-testid={`terminal-scroll-${paneId}`} style={{ flex: 1, minHeight: 0, overflowY: 'scroll', background: 'var(--xterm-bg)', overflowAnchor: 'none' }}>
+    <div ref={scrollRef} className="scroll-region" data-testid={`terminal-scroll-${paneId}`} style={{ flex: 1, minHeight: 0, overflowY: 'scroll', background: 'var(--xterm-bg)', overflowAnchor: 'none', '--command-content-inset': `${insetLeft + insetRight + 2 * COMMAND_BLOCK_CONTENT_PADDING}px` } as React.CSSProperties}>
       <div data-testid={`terminal-flow-${paneId}`}>
         <TerminalBlockList tabId={paneId} insetLeft={insetLeft} insetRight={insetRight} />
         <PaneEmptyHint paneId={paneId} />

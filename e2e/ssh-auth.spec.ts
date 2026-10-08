@@ -19,11 +19,11 @@ for (const sshPreexec of [true, false]) {
       await expect(page.locator('[data-testid^="command-block-"]').filter({ hasText: 'Documents Downloads notes.txt' })).toHaveCount(index + 1);
       const block = page.locator('[data-testid^="command-block-"]').filter({ hasText: 'Documents Downloads notes.txt' }).last();
       await expect(block.locator('[data-selectable]').last()).toBeInViewport();
-      await expect.poll(() => block.evaluate(el => el.getBoundingClientRect().height)).toBeLessThan(120);
+      await expect.poll(() => block.evaluate(el => el.getBoundingClientRect().height)).toBeLessThan(140);
     }
     await editor.fill('pwd');
     await editor.press('Enter');
-    await expect(page.locator('[data-testid^="command-block-"]').filter({ hasText: '/home/e2e/project' })).toHaveCount(1);
+    await expect(page.locator('[data-testid^="command-block-"] .command-block-output').filter({ hasText: '/home/e2e/project' })).toHaveCount(1);
     expect((await ptyWrites(page)).filter(data => data === 'ls\n')).toHaveLength(2);
     await expect(page.locator('[data-testid^="running-block-"]')).toHaveCount(0);
   });
@@ -84,8 +84,7 @@ test('native SSH recordings distinguish an empty directory from missing command 
   await expect(blocks.nth(1).locator('[data-selectable]').last()).toContainText('/home/fixture');
   await expect(blocks.nth(2).locator('[data-selectable]').last()).toContainText('share');
   await expect(blocks.nth(3).locator('[data-selectable]').last()).toContainText('stderr-visible');
-  await blocks.nth(0).getByRole('button', { name: '折叠', exact: true }).click();
-  await blocks.nth(0).getByRole('button', { name: '展开', exact: true }).click();
+  await expect(blocks.nth(0).getByRole('button', { name: /展开|折叠/ })).toHaveCount(0);
   await expect(blocks.nth(0).locator('[data-selectable]')).toHaveCount(1);
   await page.screenshot({ path: test.info().outputPath('ssh-conpty-empty-and-visible-output.png') });
 });

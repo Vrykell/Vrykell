@@ -551,7 +551,7 @@ button.text-control:disabled:hover { background: transparent; color: var(--contr
 .app-tooltip { display: flex; align-items: center; gap: 10px; }
 .app-tooltip-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .app-tooltip-copy small { color: var(--text-secondary); font: var(--fs-caption) var(--font-ui); }
-.command-status { display: inline-flex; align-items: center; gap: 10px; flex-shrink: 0; color: var(--status-text); font: var(--fs-caption) var(--font-ui); }
+.command-status { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; color: var(--status-text); font: inherit; }
 .command-status-code { display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
 .command-status-code > svg { color: var(--status-success); }
 .command-status-code[data-failed="true"] > svg { color: var(--status-error); }
@@ -569,10 +569,18 @@ button.tui-control { min-height: 20px; padding: 0 4px; font-size: var(--fs-micro
 .search-scope-chip > button:hover { color: var(--icon-hover-color); }
 .global-search-history .search-scope-chip { max-width: 40%; }
 .global-search-dialog .key-hint { border: none; background: var(--key-hint-bg); color: var(--text-primary); font-family: var(--font-ui); }
-.command-header-tail { display: inline-flex; align-items: center; justify-content: flex-end; position: relative; min-width: calc(5 * var(--control-size-compact)); min-height: var(--control-size-compact); }
-.command-header-actions { display: inline-flex; position: absolute; inset: 0; justify-content: flex-end; opacity: 0; pointer-events: none; }
-.command-header-tail[data-hovered="true"] .command-header-actions { opacity: 1; pointer-events: auto; }
-.command-header-tail[data-hovered="true"] .command-header-status { visibility: hidden; }
+/* Reserve the context row so hover and keyboard focus never move terminal content. */
+.command-block { padding-top: 20px; padding-bottom: 24px; }
+.command-block-info { display: flex; align-items: center; gap: 8px; min-height: var(--control-size-compact); margin-bottom: 4px; font-family: var(--font-mono); font-size: calc(12px * var(--ui-font-scale)); color: var(--text-muted); opacity: 0; pointer-events: none; transition: opacity var(--dur-fast) var(--ease); }
+.command-block:hover .command-block-info, .command-block:has(.command-block-actions :focus-visible) .command-block-info, .command-block[data-menu-open="true"] .command-block-info { opacity: 1; pointer-events: auto; }
+.command-block-cwd { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.command-block-branch { min-width: 0; max-width: 25%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.command-block-actions { display: inline-flex; flex-shrink: 0; margin-left: auto; }
+.command-block-command { min-width: 0; font-family: var(--font-mono); font-size: var(--terminal-font-size); line-height: var(--terminal-row-height); font-weight: var(--fw-semibold); color: var(--text-primary); white-space: pre-wrap; word-break: break-all; user-select: text; }
+.command-block-output { margin-top: 12px; }
+.command-block-truncation { min-height: 0; margin: 8px 0 0; }
+.command-block-running { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--accent-warm); animation: pulse 1.5s ease-in-out infinite; }
+
 
 .settings-shortcuts { display: flex; flex-direction: column; }
 .settings-shortcut-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 0; color: var(--text-secondary); font-size: var(--fs-label); }

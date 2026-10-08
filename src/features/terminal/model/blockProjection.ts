@@ -8,7 +8,7 @@ export function projectBlocks(blocks: readonly TermBlock[], previous: TermBlock[
     const projected: TermBlock = {
       id: block.id, command: block.command, cwd: block.cwd, gitBranch: block.gitBranch,
       status: block.status, exitCode: block.exitCode, startedAt: block.startedAt, endedAt: block.endedAt,
-      wasLongRunning: block.wasLongRunning, collapsed: old?.collapsed || undefined,
+      wasLongRunning: block.wasLongRunning,
       snapshotPending: block.snapshotPending,
       agent: hasAgent(block.id) || undefined, outputHtml: block.outputHtml, outputText: block.outputText,
       outputRaw: block.outputRaw, linesTruncated: block.linesTruncated,

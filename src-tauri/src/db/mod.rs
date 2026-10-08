@@ -101,8 +101,7 @@ fn init_schema(conn: &Connection) -> Result<(), String> {
                 exit_code INTEGER,
                 status TEXT NOT NULL DEFAULT 'running',
                 started_at INTEGER NOT NULL,
-                ended_at INTEGER,
-                collapsed INTEGER NOT NULL DEFAULT 0
+                ended_at INTEGER
             );
             CREATE INDEX IF NOT EXISTS idx_blocks_session ON blocks(session_id);
             CREATE INDEX IF NOT EXISTS idx_blocks_command ON blocks(command);
@@ -362,15 +361,18 @@ mod tests {
     }
 
     #[test]
-    fn set_block_collapsed_persists_and_reads_back() {
+    fn legacy_collapsed_blocks_keep_output_in_history_and_search() {
         let db = test_db();
-        db.create_session("s1", "t", 0, "", "local", "{}").unwrap();
-        db.record_block("b1", "s1", None, "ls", "o", "o", "oh", Some(0), "done", 1, Some(2)).unwrap();
-        assert!(!db.get_session_blocks("s1").unwrap()[0].collapsed);
-        db.set_block_collapsed("b1", true).unwrap();
-        assert!(db.get_session_blocks("s1").unwrap()[0].collapsed);
-        db.set_block_collapsed("b1", false).unwrap();
-        assert!(!db.get_session_blocks("s1").unwrap()[0].collapsed);
+        db.conn().execute_batch("ALTER TABLE blocks ADD COLUMN collapsed INTEGER NOT NULL DEFAULT 0;").unwrap();
+        db.create_session("s1", "terminal", 0, "", "local", "{}").unwrap();
+        db.record_block("b1", "s1", None, "ls", "files", "files", "files", Some(0), "done", 1, Some(2)).unwrap();
+        db.conn().execute("UPDATE blocks SET collapsed = 1 WHERE id = 'b1'", []).unwrap();
+        let restored = db.get_session_blocks("s1").unwrap();
+        assert_eq!(restored[0].output_clean, "files");
+        assert!(serde_json::to_value(&restored[0]).unwrap().get("collapsed").is_none());
+        assert_eq!(db.search_blocks("ls", 10, None).unwrap()[0].output_clean, "files");
+        db.record_block("b1", "s1", None, "ls", "updated", "updated", "updated", Some(0), "done", 1, Some(3)).unwrap();
+        assert_eq!(db.get_session_blocks("s1").unwrap()[0].output_clean, "updated");
     }
 
     #[test]

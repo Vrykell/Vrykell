@@ -58,6 +58,12 @@ test('completed wide output follows the window width without a horizontal scroll
   await setupTauriMock(page);
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
+  // Wait for the startup prompt before injecting command output.
+  await page.waitForFunction(async () => {
+    const path = '/src/features/terminal/stores/terminal.ts';
+    const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+    return Object.values(useTerminalStore.getState().startupStates).includes('ready');
+  });
   await emitPtyOutput(page, `\x1b]133;E;${btoa('wide-table')}\x07\x1b]133;C\x07${'wide-column '.repeat(8)}\r\n\x1b]133;D;0\x07\x1b]133;A\x07`);
   const output = page.locator('[data-testid^="command-block-"] [data-selectable]').last();
   await expect(output).toContainText('wide-column');

@@ -198,17 +198,6 @@ impl HistoryDb {
         Ok(())
     }
 
-    /// 持久化单个 block 的折叠/展开状态。
-    pub fn set_block_collapsed(&self, id: &str, collapsed: bool) -> Result<(), String> {
-        self.conn()
-            .execute(
-                "UPDATE blocks SET collapsed = ?1 WHERE id = ?2",
-                params![collapsed as i64, id],
-            )
-            .map_err(|e| e.to_string())?;
-        Ok(())
-    }
-
     // ── 搜索 ──
 
     pub fn search_blocks(
@@ -233,7 +222,7 @@ impl HistoryDb {
         let limit_idx = params_vec.len() + 1;
         let sql = format!(
             "SELECT b.id, b.session_id, b.pane_id, b.command, b.output_raw, b.output_clean, b.output_html, b.exit_code,\
-                    b.status, b.started_at, b.ended_at, s.title, s.status, b.collapsed \
+                    b.status, b.started_at, b.ended_at, s.title, s.status \
              FROM blocks b JOIN sessions s ON b.session_id = s.id \
              WHERE {} \
              ORDER BY b.started_at DESC LIMIT ?{}",
@@ -296,7 +285,7 @@ impl HistoryDb {
             .conn()
             .prepare(
                 "SELECT b.id, b.session_id, b.pane_id, b.command, b.output_raw, b.output_clean, b.output_html, b.exit_code,\
-                        b.status, b.started_at, b.ended_at, s.title, s.status, b.collapsed \
+                        b.status, b.started_at, b.ended_at, s.title, s.status \
                  FROM blocks b JOIN sessions s ON b.session_id = s.id \
                  WHERE b.session_id = ?1 \
                  ORDER BY b.started_at ASC",
@@ -460,7 +449,6 @@ pub struct BlockEntry {
     pub ended_at: Option<u64>,
     pub session_title: String,
     pub session_status: String,
-    pub collapsed: bool,
 }
 
 fn map_block_entry(row: &rusqlite::Row) -> rusqlite::Result<BlockEntry> {
@@ -478,7 +466,6 @@ fn map_block_entry(row: &rusqlite::Row) -> rusqlite::Result<BlockEntry> {
         ended_at: row.get::<_, Option<i64>>(10)?.map(|v| v as u64),
         session_title: row.get(11)?,
         session_status: row.get(12)?,
-        collapsed: row.get::<_, i64>(13)? != 0,
     })
 }
 

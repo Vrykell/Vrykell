@@ -124,16 +124,6 @@ pub fn record_block(
 }
 
 #[tauri::command]
-pub fn set_block_collapsed(
-    state: tauri::State<'_, HistoryState>,
-    id: String,
-    collapsed: bool,
-) -> Result<(), String> {
-    let db = state.0.lock().map_err(|e| e.to_string())?;
-    db.set_block_collapsed(&id, collapsed)
-}
-
-#[tauri::command]
 // 参数镜像前端 IPC 调用契约（append_chat_message 逐字段传参），折叠结构体需同步改前端
 #[allow(clippy::too_many_arguments)]
 pub fn append_chat_message(

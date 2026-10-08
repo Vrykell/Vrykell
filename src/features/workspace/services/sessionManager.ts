@@ -23,7 +23,6 @@ import {
   deleteSession,
   recordBlock,
   getSessionBlocks,
-  setBlockCollapsed,
   listChatMessages,
 } from '@platform/api/session';
 import { useToastStore } from '@ui/Toast';
@@ -157,7 +156,6 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
         endedAt: b.ended_at,
         status,
         wasLongRunning: false,
-        collapsed: b.collapsed || undefined,
         // 落库内容不可信（DB 可能被篡改）：取出的 HTML 快照必须先净化再进渲染管线
         outputHtml: sanitizeOutputHtml(b.output_html || ''),
         outputText: b.output_clean || '',
@@ -268,15 +266,6 @@ export async function remove(sessionId: string): Promise<void> {
 // ═══════════════════════════════════════════════════════════════
 // 块持久化
 // ═══════════════════════════════════════════════════════════════
-
-/** 持久化单个 block 的折叠/展开状态（block 恢复时回读）。 */
-export async function persistBlockCollapsed(blockId: string, collapsed: boolean): Promise<void> {
-  try {
-    await setBlockCollapsed(blockId, collapsed);
-  } catch (e) {
-    console.warn('sessionManager.persistBlockCollapsed failed:', e);
-  }
-}
 
 /** 记录 block（start 和 complete 各调一次 — 后端 UPSERT） */
 export async function record(

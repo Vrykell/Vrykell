@@ -64,11 +64,6 @@ export function getSessionBlocks(sessionId: string): Promise<BackendBlockEntry[]
   return invoke('get_session_blocks', { sessionId });
 }
 
-/** 持久化单个 block 的折叠/展开状态。 */
-export function setBlockCollapsed(id: string, collapsed: boolean): Promise<void> {
-  return invoke('set_block_collapsed', { id, collapsed });
-}
-
 // ── AI 对话持久化 ──
 
 export function appendChatMessage(

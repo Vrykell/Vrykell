@@ -248,12 +248,12 @@ zustand, split by domain (`src/features/*/stores/`):
 |-------|---------|
 | `workspace` | tabs, activeId, activate/close, per-tab cwd |
 | `terminal` | sessions (tabId→PTY id), dims, `scenes` (tabId→classic/blockList/altScreen), altScreenActive, keyboardTarget, pendingInput; `termInstances` (module-level Map, not in state) |
-| `blocks` | `byTab: tabId → TermBlock[]`, setBlocks/updateBlock/clearBlocks/setBlockCollapsed/setAllCollapsed |
+| `blocks` | `byTab: tabId → TermBlock[]`, setBlocks/updateBlock/clearBlocks/dropTab |
 | `chat` | per-tab AI messages, send, setDefaultStream |
 | `history` | command history |
 | `ui` / `dock` / `workspaceDirs` / `searchHistory` / `searchHighlight` | UI panels, search, etc. |
 
-`TermBlock` (`src/features/terminal/services/pipeline/termBlock.ts`) is the UI-layer block projection, with fields: id/command/cwd/gitBranch/status/exitCode/startedAt/endedAt/wasLongRunning/outputHtml/outputText/outputRaw/linesTruncated/collapsed/agent.
+`TermBlock` (`src/features/terminal/services/pipeline/termBlock.ts`) is the UI-layer block projection, with fields: id/command/cwd/gitBranch/status/exitCode/startedAt/endedAt/wasLongRunning/outputHtml/outputText/outputRaw/linesTruncated/snapshotPending/agent.
 
 ## 13. Backend (Rust Layer)
 
