@@ -59,6 +59,7 @@ for (const method of ['double-click', 'context-menu'] as const) {
       await page.getByRole('button', { name: '使用终端编辑器打开', exact: true }).click();
     }
     await expect.poll(() => ptyWrites(page)).toContain('vim /home/e2e/project/branch-30/nested-notes.txt\n');
+    await expect(page.locator('[data-tab-row-id]').filter({ hasText: 'nested-notes.txt' }).locator('[data-shell-mark="zsh"]')).toHaveCount(1);
     // Wait for the editor terminal's delayed cwd reports as well as the initial focus switch.
     await emitPtyOutput(page, '\x1b]7;file://host/home/e2e/project/branch-30\x07');
     await expect(page.locator('.terminal-directory:visible')).toHaveAttribute('data-tip', '/home/e2e/project/branch-30');

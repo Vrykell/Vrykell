@@ -64,7 +64,7 @@ export default function DownloadManager({ onBack }: { onBack: () => void }) {
         <IconBtn title="返回文件浏览" data-testid="downloads-back" onClick={onBack}>
           <ArrowLeft size={14} />
         </IconBtn>
-        <span style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>下载管理</span>
+        <span style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)' }}>下载管理</span>
         <div style={{ flex: 1 }} />
         {items.length > 0 && (
           <IconBtn title="清空下载历史" data-testid="downloads-clear" onClick={() => setConfirmClear(true)}>

@@ -1,10 +1,12 @@
 /**
  * terminalOpenPage — per-shell terminal open-mode settings.
  */
+import { useEffect, useState } from 'react';
+import { useTerminalDefaults } from '@config/terminalDefaults';
 import Select from '@ui/Select';
 import { useAgentSettings } from '@features/agent';
 import { useT } from '@i18n';
-import { SHELL_TYPES, shellTypeLabel, type ShellType } from '@platform/shells';
+import { SHELL_TYPES, getAvailableShells, shellTypeLabel, type ShellType, type ShellOption } from '@platform/shells';
 import { Field } from '@features/settings/components/ui';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
 
@@ -15,6 +17,14 @@ const labelStyle = { flex: 1, fontSize: 'calc(12px * var(--ui-font-scale))', col
 export function TerminalOpenPage() {
   const { t } = useT();
   const agentSettings = useAgentSettings();
+  const defaultShell = useTerminalDefaults(state => state.shell);
+  const setDefaultShell = useTerminalDefaults(state => state.setShell);
+  const [shells, setShells] = useState<ShellOption[]>([]);
+  useEffect(() => {
+    let active = true;
+    void getAvailableShells().then(value => { if (active) setShells(value); });
+    return () => { active = false; };
+  }, []);
   const openModeByShell = agentSettings.global.openModeByShell;
   const sshOpenMode = agentSettings.global.sshOpenMode;
   const { save } = useSettingsSave();
@@ -29,6 +39,11 @@ export function TerminalOpenPage() {
 
   return (
     <>
+      <Field title={t('Default terminal')} description={t('Used for new tabs, startup and opening files in a terminal.')}>
+        <Select aria-label={t('Default terminal')} value={defaultShell}
+          options={[{ value: 'system' as const, label: t('System default') }, ...shells.map(shell => ({ value: shell.id, label: shell.label }))]}
+          onChange={value => save(() => setDefaultShell(value))} />
+      </Field>
       <Field title={t('settings.openMode.title')} description={t('settings.openMode.description')}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {SHELL_TYPES.map((shell) => (

@@ -26,21 +26,15 @@ test('连接表单保持适中尺寸，最小窗口下按钮依然完整可见',
 
   const box = await checkFits(page.viewportSize()!);
   expect(box.height).toBeLessThanOrEqual(620);
-  await page.screenshot({ path: '.cache-usability.local/ssh-form-compact.png' });
+  await page.screenshot({ path: test.info().outputPath('ssh-form-compact.png') });
 
-  // 整宽输入框的焦点描边（1px + 2px offset）必须完全落在滚动正文区内，不被 overflow 裁切
-  const checkFocusRing = async (testId: string) => {
+  // Focusing form fields preserves the neutral border without a ring.
+  for (const testId of ['ssh-form-name', 'ssh-form-password']) {
     const field = dialog.getByTestId(testId);
     await field.click();
-    const gaps = await field.evaluate((el) => {
-      const input = el.getBoundingClientRect();
-      const scroller = el.closest('[data-testid="ssh-form-body"]')!.getBoundingClientRect();
-      return [input.left - scroller.left, scroller.right - input.right, input.top - scroller.top, scroller.bottom - input.bottom];
-    });
-    for (const gap of gaps) expect(gap).toBeGreaterThanOrEqual(3);
-  };
-  await checkFocusRing('ssh-form-name');
-  await checkFocusRing('ssh-form-password');
+    await expect(field).toHaveCSS('outline-style', 'none');
+    await expect(field).toHaveCSS('box-shadow', 'none');
+  }
 
   // Key authentication keeps its input row inside the dialog as well.
   await dialog.getByRole('button', { name: '密钥', exact: true }).click();
@@ -52,7 +46,7 @@ test('连接表单保持适中尺寸，最小窗口下按钮依然完整可见',
   await page.setViewportSize({ width: 720, height: 480 });
   await page.evaluate(() => document.documentElement.style.setProperty('--ui-font-scale', '1.4'));
   await checkFits({ width: 720, height: 480 });
-  await page.screenshot({ path: '.cache-usability.local/ssh-form-min-window.png' });
+  await page.screenshot({ path: test.info().outputPath('ssh-form-min-window.png') });
 });
 
 for (const mode of ['新建', '编辑'] as const) {

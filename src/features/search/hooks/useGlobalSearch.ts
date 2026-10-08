@@ -1,3 +1,4 @@
+import { canSearchQuery, parseSearchQuery, searchQuerySources } from '../model/searchQuery';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { AppIcon } from '@ui/icons';
@@ -51,10 +52,12 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
   const { state, search } = useSearchEngine();
   const searchHistory = useSearchHistoryStore((state) => state);
   const addSearchHistory = useSearchHistoryStore((state) => state.add);
-  const enabledIds = useEnabledSourcesStore((state) => state.enabledIds);
+  const preferredIds = useEnabledSourcesStore((state) => state.enabledIds);
+  const query = parseSearchQuery(input);
+  const enabledIds = useMemo(() => searchQuerySources(input, preferredIds), [input, preferredIds]);
 
   useEffect(() => {
-    if (open && input.trim()) search(input);
+    if (open) search(input);
   }, [enabledIds, open, input, search]);
 
   useEffect(() => {
@@ -74,9 +77,10 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
   const handleInput = useCallback(
     (value: string) => {
       setInput(value);
-      setSelectedIdx(0);
+      if (parseSearchQuery(value).source) setFilterOpen(false);
       search(value);
-      setHighlightQuery(value.trim());
+      setSelectedIdx(0);
+      setHighlightQuery(parseSearchQuery(value).term.trim());
     },
     [search, setHighlightQuery],
   );
@@ -172,6 +176,18 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
 
   const handleKey = useCallback(
     (event: ReactKeyboardEvent) => {
+      if (event.key === 'Backspace' && query.source && !query.term && event.target === inputRef.current) {
+        event.preventDefault(); handleInput(''); return;
+      }
+      if (filterOpen && event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        setFilterOpen(false);
+        inputRef.current?.focus();
+        return;
+      }
+      if (event.target instanceof HTMLElement && event.target.closest('[role="menu"]')) return;
+      if (event.key === 'Enter' && event.target instanceof HTMLElement && event.target.closest('button')) return;
       if (event.key === 'Escape') {
         event.preventDefault();
         close();
@@ -188,7 +204,7 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
         handleExecute(selected);
       }
     },
-    [close, flatResults, handleExecute, selectedIdx],
+    [close, filterOpen, flatResults, handleExecute, handleInput, query.source, query.term, selectedIdx],
   );
 
   const handleRestore = useCallback((sessionId: string, sessionTitle: string) => {
@@ -197,13 +213,14 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
     });
   }, []);
 
-  const hasInput = input.trim().length > 0;
+  const hasInput = canSearchQuery(input);
   const hasResults = flatResults.length > 0;
   const hasHistory = searchHistory.items.length > 0;
 
   return {
     input,
     inputRef,
+    query,
     selectedIdx,
     filterOpen,
     setFilterOpen,
@@ -213,6 +230,7 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
     grouped,
     sourceCounts,
     enabledCount,
+    enabledIds,
     totalSources,
     flatResults,
     failedSources,

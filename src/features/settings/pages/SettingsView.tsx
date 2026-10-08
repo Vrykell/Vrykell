@@ -1,3 +1,5 @@
+import { t } from '@i18n';
+import { TextInput } from '@ui/TextInput';
 import { useEffect, useState, type ReactNode } from 'react';
 import { iconSizes, Search, ChevronRight, Settings  } from '@ui/icons';
 import { loadConfig, saveConfig, type FileOpenConfig } from '@features/files/services/fileOpen';
@@ -67,6 +69,7 @@ function SettingsContent() {
     setQuery,
     normalizedQuery,
     visibleGroups,
+    matchingSettings,
     activeLabel,
     toggleGroup,
   } = useSettingsNavigation();
@@ -111,7 +114,7 @@ function SettingsContent() {
               : 'DuckDuckGo 兜底';
         return (
           <>
-            <Field title="当前搜索方式" description="搜索始终可用，无需配置。">
+            <Field title="当前搜索方式" description={t('Web search works without configuration.')}>
               <span style={{
                 fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', borderRadius: 4,
                 color: 'var(--text-secondary)', background: 'var(--hover)',
@@ -119,7 +122,7 @@ function SettingsContent() {
                 {mode}
               </span>
             </Field>
-            <Field title="Tavily API Key" description="可选，配置后搜索质量更好，未配置时用 DuckDuckGo 兜底。">
+            <Field title="Tavily API Key" description={t('Optional search key. Without it, use the built-in fallback.')}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span style={{
                   fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', borderRadius: 4,
@@ -151,7 +154,7 @@ function SettingsContent() {
           <>
             <Field
               title="工具权限"
-              description="允许直接使用；每次询问会弹审批；禁止则不注册。危险命令始终逐次询问。"
+              description={t("Choose which tools may run. Dangerous commands always require approval.")}
             >
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {TOOL_NAMES.map((name) => {
@@ -180,7 +183,7 @@ function SettingsContent() {
             </Field>
             <Field
               title="会话授权"
-              description="审批卡上点过「本会话允许」的工具会被记住，重启后自动失效；也可在此一键清空。"
+              description={t("Temporary tool approvals expire on restart or when cleared.")}
             >
               <button
                 style={btnStyle}
@@ -216,7 +219,7 @@ function SettingsContent() {
       case 'editor-local':
         return (
           <>
-            <Field title="默认编辑命令" description="本地文件双击打开时执行的命令；{file} 替换为文件路径，省略时追加路径；__system__ 使用系统默认应用打开。命令不可用时依次尝试 vim、nano、vi。">
+            <Field title="默认编辑命令" description={t("Use {file} for the path or __system__ for the default app. Unavailable editors fall back to vim, nano or vi.")}>
               <AutoSaveInput
                 key="local-editor"
                 testId="editor-local-command"
@@ -225,7 +228,7 @@ function SettingsContent() {
                 onCommit={defaultEditor => updateFileCfg({ defaultEditor })}
               />
             </Field>
-            <Field title="按扩展名打开" description="为不同扩展名指定打开命令；{file} 为路径占位符，__system__ 表示用系统默认应用。">
+            <Field title="按扩展名打开" description={t("Set an opening command per extension, using {file} or __system__.")}>
               <TemplateListEditor
                 key="local-templates"
                 value={fileCfg.templates}
@@ -239,7 +242,7 @@ function SettingsContent() {
       case 'editor-remote':
         return (
           <>
-            <Field title="默认编辑命令" description="远程文件双击打开时在 SSH 终端执行的命令；{file} 替换为远程文件路径，省略时追加路径。">
+            <Field title="默认编辑命令" description={t("Run this editor over SSH. Use {file} for the remote path.")}>
               <AutoSaveInput
                 key="remote-editor"
                 testId="editor-remote-command"
@@ -248,7 +251,7 @@ function SettingsContent() {
                 onCommit={remoteEditor => updateFileCfg({ remoteEditor })}
               />
             </Field>
-            <Field title="按扩展名打开" description="为远程不同扩展名指定打开命令；{file} 为路径占位符。">
+            <Field title="按扩展名打开" description={t("Set an opening command per remote extension, using {file} for the path.")}>
               <TemplateListEditor
                 key="remote-templates"
                 value={fileCfg.remoteTemplates}
@@ -287,10 +290,10 @@ function SettingsContent() {
             borderRadius: 'var(--radius-inner)', background: 'var(--block)',
           }}>
             <Search size={iconSizes.compact} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-            <input
+            <TextInput
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="搜索设置…"
+              placeholder={t('Search settings…')}
               style={{
                 flex: 1, minWidth: 0, background: 'transparent', border: 'none',
                 outline: 'none', fontSize: 'var(--fs-label)', color: 'var(--text-primary)',
@@ -299,7 +302,13 @@ function SettingsContent() {
           </div>
         </div>
         <div className="scroll-region" style={{ flex: 1, overflowY: 'auto', padding: '0 6px 8px' }}>
-          {visibleGroups.map((g) => {
+          {normalizedQuery && matchingSettings.map(setting => (
+            <button key={setting.id} className="settings-search-result" onClick={setting.onSelect}>
+              <span>{setting.label}</span>
+              <small>{setting.desc}</small>
+            </button>
+          ))}
+          {(!normalizedQuery || matchingSettings.length === 0) && visibleGroups.map((g) => {
             const Icon = g.icon;
             const open = normalizedQuery ? true : expanded.has(g.id);
             return (
@@ -309,7 +318,7 @@ function SettingsContent() {
                   onClick={() => toggleGroup(g.id)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6, width: '100%',
-                    padding: '8px 10px', fontSize: 'var(--fs-label)', lineHeight: '20px', fontWeight: 600,
+                    padding: '8px 10px', fontSize: 'var(--fs-label)', lineHeight: '20px', fontWeight: 'var(--fw-semibold)',
                     background: 'transparent', border: 'none', borderRadius: 'var(--radius-inner)',
                     color: 'var(--text-primary)', cursor: 'pointer',
                   }}
@@ -340,9 +349,9 @@ function SettingsContent() {
               </div>
             );
           })}
-          {visibleGroups.length === 0 && (
+          {normalizedQuery && matchingSettings.length === 0 && visibleGroups.length === 0 && (
             <div style={{ padding: 16, textAlign: 'center', fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>
-              无匹配设置
+              {t('No matching settings')}
             </div>
           )}
         </div>
@@ -355,7 +364,7 @@ function SettingsContent() {
           marginBottom: 24,
         }}>
           <Settings size={iconSizes.row} style={{ color: 'var(--text-muted)' }} />
-          <span style={{ fontSize: 'var(--fs-title)', fontWeight: 600, color: 'var(--text-primary)' }}>{activeLabel}</span>
+          <span style={{ fontSize: 'var(--fs-title)', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)' }}>{activeLabel}</span>
         </div>
         <div className="settings-page-body">
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, marginBottom: 16, fontSize: 'var(--fs-caption)', color: 'var(--text-muted)' }}>

@@ -1,5 +1,8 @@
+import { useTerminalDefaults } from '@config/terminalDefaults';
+import { loadRecentOpen } from '../model/tabTypes';
+import { TextInput } from '@ui/TextInput';
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { Search } from '@ui/icons';
+import { iconSizes, Search } from '@ui/icons';
 import { SshIcon, shellIconFor } from '@ui/shellIcons';
 import { getAvailableShells, type ShellOption } from '@platform/shells';
 import {
@@ -29,6 +32,7 @@ interface Props {
 export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
+  const defaultShell = useTerminalDefaults(state => state.shell);
   const [shells, setShells] = useState<ShellOption[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const sshConnections = useSshStore((s) => s.connections);
@@ -49,8 +53,8 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
   }, [open]);
 
   const options = useMemo(
-    () => buildNewTabOptions(shells, sshConnections),
-    [shells, sshConnections],
+    () => buildNewTabOptions(shells, sshConnections, loadRecentOpen(), defaultShell),
+    [shells, sshConnections, defaultShell],
   );
 
   const filtered = useMemo(
@@ -121,7 +125,7 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
         onKeyDown={handleKey}
       >
         <div style={{
-          padding: '12px 16px 4px', fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 600,
+          padding: '12px 16px 4px', fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)',
           color: 'var(--text-primary)',
         }}>
           新建标签页
@@ -135,7 +139,7 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
             borderRadius: 'var(--radius-inner)', padding: '0 8px', height: 28,
           }}>
             <Search size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-            <input
+            <TextInput
               ref={inputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -197,9 +201,9 @@ function OptionRow({
       <span style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         width: 24, height: 24, borderRadius: 5,
-        background: 'var(--canvas)', color: 'var(--text-secondary)', flexShrink: 0,
+        color: 'var(--text-secondary)', flexShrink: 0,
       }}>
-        <Icon size={13} />
+        <Icon size={iconSizes.row} />
       </span>
       <span style={{ flex: 1, overflow: 'hidden' }}>
         <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

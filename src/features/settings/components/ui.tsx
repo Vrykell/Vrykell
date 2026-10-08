@@ -1,7 +1,11 @@
+import { t } from '@i18n';
+import { IconButton } from '@ui/IconButton';
+import { useSettingsNavigationStore } from '../stores/navigation';
+import { TextInput } from '@ui/TextInput';
 /**
  * Shared settings fields, controls and form styles.
  */
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { iconSizes, Plus, X  } from '@ui/icons';
 import AutoSaveInput from './AutoSaveInput';
 import { useAutoSave } from '../hooks/useAutoSave';
@@ -11,11 +15,21 @@ import { inputStyle, btnStyle } from './formStyles';
 export { inputStyle, btnStyle } from './formStyles';
 
 export function Field({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const target = useSettingsNavigationStore(state => state.targetField);
+  const control = useSettingsNavigationStore(state => state.targetControl);
+  const request = useSettingsNavigationStore(state => state.request);
+  useEffect(() => {
+    if (target !== title) return;
+    ref.current?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+    const controls = [...(ref.current?.querySelectorAll<HTMLElement>('input, textarea, button, [tabindex="0"]') ?? [])];
+    (controls.find(element => control && element.getAttribute('aria-label') === control) ?? controls[0])?.focus({ preventScroll: true });
+  }, [target, title, control, request]);
   return (
-    <div className="settings-field">
-      <div style={{ fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2, letterSpacing: '0.01em' }}>{title}</div>
+    <div ref={ref} className="settings-field" data-setting-title={title}>
+      <div style={{ fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)', marginBottom: 2, letterSpacing: '0.01em' }}>{title}</div>
       {description && (
-        <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 10 }}>{description}</div>
+        <div className="settings-description" style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 10 }}>{description}</div>
       )}
       <div style={{ marginTop: description ? 0 : 8 }}>{children}</div>
     </div>
@@ -108,32 +122,19 @@ export function TemplateListEditor({ value, onChange, placeholder }: {
     <div onCompositionStart={() => saving.setComposing(true)} onCompositionEnd={() => saving.setComposing(false)}>
       {rows.map((r, i) => (
         <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-          <input
+          <TextInput
             value={r.ext}
             placeholder="扩展名，如 md"
             onChange={(e) => updateRow(i, { ext: e.target.value })}
             style={{ ...inputStyle, width: 120, flexShrink: 0 }}
           />
-          <input
+          <TextInput
             value={r.cmd}
             placeholder={placeholder}
             onChange={(e) => updateRow(i, { cmd: e.target.value })}
             style={{ ...inputStyle, flex: 1 }}
           />
-          <button
-            onClick={() => sync(rows.filter((_, j) => j !== i), true)}
-            data-tip="删除此行"
-            aria-label="删除此行"
-            style={{
-              width: 26, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              border: '1px solid transparent', borderRadius: 4, background: 'transparent',
-              color: 'var(--text-muted)', cursor: 'pointer',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--error-light)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
-          >
-            <X size={iconSizes.compact} />
-          </button>
+          <IconButton compact tone="danger" onClick={() => sync(rows.filter((_, j) => j !== i), true)} data-tip={t('Delete row')} aria-label={t('Delete row')}><X size={iconSizes.compact} /></IconButton>
         </div>
       ))}
       <button

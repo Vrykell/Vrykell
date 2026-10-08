@@ -46,6 +46,9 @@ async function search(page: Page) {
   await dialog.getByTestId('search-filter-button').click();
   await assertSurface(dialog.locator('.workspace-floating').last());
   await dialog.getByPlaceholder('搜索文件、命令、设置…').press('Escape');
+  await expect(dialog.getByRole('menu')).toBeHidden();
+  await expect(dialog).toBeVisible();
+  await dialog.getByPlaceholder('搜索文件、命令、设置…').press('Escape');
   await expect(dialog).toBeHidden();
 }
 

@@ -1,3 +1,6 @@
+import { t } from '@i18n';
+import { sessionCommandCount } from '../model/sessionHistoryModel';
+import { TextInput } from '@ui/TextInput';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Monitor, RotateCcw, History, Trash2, ChevronRight, Folder, Server, Search, Filter, Check } from '@ui/icons';
 import type { BackendSessionEntry } from '@platform/api/types';
@@ -68,7 +71,7 @@ export default function SessionHistoryView() {
         fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)',
       }}>
         <History size={13} />
-        <span style={{ fontWeight: 600, color: 'var(--text-primary)', flexShrink: 0 }}>会话历史</span>
+        <span style={{ fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)', flexShrink: 0 }}>会话历史</span>
         <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>· {historical.length} 个会话</span>
 
         {/* 搜索栏（含筛选按钮） */}
@@ -78,7 +81,7 @@ export default function SessionHistoryView() {
           background: 'var(--block)', borderRadius: 6, padding: '0 4px 0 8px', height: 26,
         }}>
           <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-          <input
+          <TextInput
             value={query}
             onChange={(e) => setFilter({ query: e.target.value })}
             placeholder="搜索标题 / SSH 目标…"
@@ -177,7 +180,7 @@ export default function SessionHistoryView() {
                       </span>
                       <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
                         <span style={{
-                          fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 600, color: 'var(--text-primary)',
+                          fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)',
                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                         }}>
                           {g.title}
@@ -301,7 +304,7 @@ function SessionFilterMenu({ anchor, value, onChange, onClose }: {
         padding: 4, fontSize: 'calc(12px * var(--ui-font-scale))',
       }}
     >
-      <div style={{ padding: '4px 10px 2px', fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.04em' }}>
+      <div style={{ padding: '4px 10px 2px', fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)', fontWeight: 'var(--fw-semibold)', letterSpacing: '0.04em' }}>
         类型
       </div>
       {TYPE_OPTIONS.map((o) => {
@@ -311,7 +314,7 @@ function SessionFilterMenu({ anchor, value, onChange, onClose }: {
         );
       })}
       <div style={{ height: 1, background: 'var(--border)', margin: '4px 8px' }} />
-      <div style={{ padding: '4px 10px 2px', fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.04em' }}>
+      <div style={{ padding: '4px 10px 2px', fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)', fontWeight: 'var(--fw-semibold)', letterSpacing: '0.04em' }}>
         日期
       </div>
       {DATE_OPTIONS.map((o) => {
@@ -353,6 +356,7 @@ function SessionRow({
     ? `已关闭 · ${new Date(s.closed_at).toLocaleDateString()}`
     : '活跃中';
   const sshTarget = sshTargetOf(s);
+  const commandCount = sessionCommandCount(s);
   return (
     <div
       onClick={onOpen}
@@ -386,7 +390,7 @@ function SessionRow({
           display: 'block', fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
-          {sshTarget ? `${when} · ${sshTarget}` : `${when} · ${s.block_count} 个命令块`}
+          {[when, sshTarget, commandCount === null ? null : t('{{count}} command blocks', { count: commandCount })].filter(Boolean).join(' · ')}
         </span>
       </span>
       <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', flexShrink: 0 }}>

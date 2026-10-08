@@ -1,3 +1,6 @@
+import { t } from '@i18n';
+import { IconButton } from '@ui/IconButton';
+import { TextInput } from '@ui/TextInput';
 /**
  * SkillsSettings — 技能设置页（文件夹式技能 + 安全模型）。
  *
@@ -155,7 +158,7 @@ function SkillDetailPanel({ skill, onClose, onChanged }: {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 'calc(14px * var(--ui-font-scale))', fontWeight: 600 }}>{skill.name}</span>
+        <span style={{ fontSize: 'calc(14px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)' }}>{skill.name}</span>
         {skill.trusted ? <Badge text="已信任" tone="ok" /> : <Badge text="未信任" tone="warn" />}
         {!skill.enabled && <Badge text="已禁用" tone="muted" />}
         {skill.hasScripts && <Badge text="含脚本" tone="danger" />}
@@ -176,12 +179,12 @@ function SkillDetailPanel({ skill, onClose, onChanged }: {
       </div>
 
       <div style={{ marginTop: 12 }}>
-        <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 600, marginBottom: 6 }}>文件</div>
+        <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', marginBottom: 6 }}>文件</div>
         <SkillFileBrowser skillName={skill.name} files={skill.files} />
       </div>
 
       <div style={{ marginTop: 12 }}>
-        <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 600, marginBottom: 6 }}>SKILL.md</div>
+        <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', marginBottom: 6 }}>SKILL.md</div>
         <pre style={{
           margin: 0, padding: '8px 10px', maxHeight: 240, overflow: 'auto',
           background: 'var(--hover)', borderRadius: 'var(--radius-inner)',
@@ -246,7 +249,7 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <button onClick={onClose} style={{ ...btn }}>← 返回</button>
-        <span style={{ fontSize: 'calc(14px * var(--ui-font-scale))', fontWeight: 600 }}>技能市场</span>
+        <span style={{ fontSize: 'calc(14px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)' }}>技能市场</span>
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>第三方技能默认未信任，安装后可查看来源再信任</span>
       </div>
@@ -254,7 +257,7 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
         <Select aria-label="技能市场仓库" value={repo} options={marketplaceOptions} onChange={setRepo}
           placeholder="自定义…" style={{ flexShrink: 0, width: 190 }} />
-        <input
+        <TextInput
           value={repo}
           placeholder="GitHub 仓库 URL，如 https://github.com/anthropics/skills"
           onChange={(e) => setRepo(e.target.value)}
@@ -267,7 +270,7 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-        <input
+        <TextInput
           value={query}
           placeholder="搜索技能…"
           onChange={(e) => setQuery(e.target.value)}
@@ -289,7 +292,7 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
           return (
             <div key={r.name} style={{ borderRadius: 'var(--radius-inner)', padding: '8px 12px', background: 'var(--canvas)', display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 600 }}>
+                <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)' }}>
                   {r.name}
                   <span style={{ color: 'var(--text-muted)', fontSize: 'calc(11px * var(--ui-font-scale))' }}> · {r.dir}</span>
                 </div>
@@ -343,19 +346,12 @@ export default function SkillsSettings() {
         }}>
           <ShieldAlert size={14} style={{ flexShrink: 0 }} />
           <span style={{ flex: 1 }}>技能可能包含脚本，启用即信任其内容；脚本执行仍受 AI 权限管控。导入的第三方技能默认未信任。</span>
-          <button
-            onClick={() => setWarnDismissed(true)}
-            data-tip="关闭"
-            aria-label="关闭"
-            style={{ border: 'none', background: 'transparent', color: 'var(--accent-warm)', cursor: 'pointer', padding: 2, display: 'inline-flex' }}
-          >
-            <X size={13} />
-          </button>
+          <IconButton compact onClick={() => setWarnDismissed(true)} data-tip={t('Close')} aria-label={t('Close')}><X size={16} /></IconButton>
         </div>
       )}
 
       <div style={{ display: 'flex', gap: 8 }}>
-        <input
+        <TextInput
           value={importUrl}
           placeholder="从 URL 导入技能清单"
           onChange={(e) => setImportUrl(e.target.value)}
@@ -403,7 +399,7 @@ export default function SkillsSettings() {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>{m.name}</span>
+            <span style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)' }}>{m.name}</span>
             {m.trusted ? <Badge text="已信任" tone="ok" /> : <Badge text="未信任" tone="warn" />}
             {!m.enabled && <Badge text="禁用" tone="muted" />}
             {m.hasScripts && <Badge text="含脚本" tone="danger" />}
@@ -417,16 +413,7 @@ export default function SkillsSettings() {
             <button onClick={(e) => { e.stopPropagation(); void toggleEnabled(m); }} style={btn}>
               {m.enabled ? '禁用' : '启用'}
             </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); void del(m.name); }}
-              data-tip="删除技能"
-              aria-label="删除技能"
-              style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid transparent', borderRadius: 4, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--error-light)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
-            >
-              <Trash2 size={13} />
-            </button>
+            <IconButton compact tone="danger" onClick={(e) => { e.stopPropagation(); void del(m.name); }} data-tip={t('Delete skill')} aria-label={t('Delete skill')}><Trash2 size={16} /></IconButton>
           </div>
           <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)', marginTop: 4 }}>
             {m.description || '无描述'}

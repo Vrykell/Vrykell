@@ -84,6 +84,20 @@ describe('navigation pointer gestures', () => {
     expect(useNavigationDrag.getState().id).toBeNull();
     expect(localStorage.getItem('dock-layout-v4')).toBe(before);
   });
+  it('opens a closed panel when dropped over a workspace edge and cancels the preview in the middle', () => {
+    const { container } = render(<Harness />);
+    const body = document.createElement('div');
+    body.className = 'workspace-body'; container.append(body);
+    vi.spyOn(body, 'getBoundingClientRect').mockReturnValue({ left: 0, right: 1000, top: 40, bottom: 700, width: 1000, height: 660 } as DOMRect);
+    useDockStore.setState({ leftPanels: [] });
+    pointer('pointerdown', 10, 10, screen.getByText('标签'));
+    pointer('pointermove', 90, 200);
+    expect(useNavigationDrag.getState().target).toMatchObject({ side: 'left', openPanel: true });
+    pointer('pointermove', 500, 200);
+    expect(useNavigationDrag.getState().target).toBeNull();
+    pointer('pointerup', 960, 200);
+    expect(useDockStore.getState().rightPanels).toEqual(['tabs']);
+  });
   it('ignores secondary buttons and drops outside navigation', () => {
     render(<Harness />);
     const button = screen.getByText('标签');
@@ -94,6 +108,23 @@ describe('navigation pointer gestures', () => {
     pointer('pointermove', 100, 10);
     pointer('pointerup', 100, 10);
     expect(useDockStore.getState().leftZone).toEqual(['tabs', 'ssh']);
+  });
+
+  it('accepts release across the whole preview width on either side', () => {
+    const { container } = render(<Harness />);
+    const body = document.createElement('div');
+    body.className = 'workspace-body'; container.append(body);
+    vi.spyOn(body, 'getBoundingClientRect').mockReturnValue({ left: 0, right: 1000, top: 40, bottom: 700, width: 1000, height: 660 } as DOMRect);
+    useDockStore.setState({ leftPanels: [], panelWidths: { tabs: 280 } });
+    pointer('pointerdown', 10, 10, screen.getByText('标签'));
+    pointer('pointermove', 270, 200);
+    expect(useNavigationDrag.getState().target).toMatchObject({ side: 'left', openPanel: true });
+    pointer('pointermove', 725, 200);
+    expect(useNavigationDrag.getState().target).toMatchObject({ side: 'right', openPanel: true });
+    pointer('pointermove', 500, 200);
+    expect(useNavigationDrag.getState().target).toBeNull();
+    pointer('pointerup', 275, 200);
+    expect(useDockStore.getState().leftPanels).toEqual(['tabs']);
   });
   it('keeps the indicated insertion position when dropping inside the opened gap', () => {
     render(<Harness />);

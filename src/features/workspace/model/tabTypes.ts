@@ -1,3 +1,5 @@
+import { t } from '@i18n';
+import { preferredShell, type DefaultShell } from '@config/terminalDefaults';
 import { safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
 import type { ShellOption, ShellType } from '@platform/shells';
 import type { SshConnection } from '@features/ssh/services/api';
@@ -61,6 +63,7 @@ export function buildNewTabOptions(
   shells: ShellOption[],
   sshs: SshConnection[],
   recent: Record<string, number> = loadRecentOpen(),
+  defaultShell: DefaultShell = 'system',
 ): NewTabOption[] {
   const opts: NewTabOption[] = [];
 
@@ -69,7 +72,7 @@ export function buildNewTabOptions(
       key: `shell:${s.id}`,
       kind: 'shell',
       label: s.label,
-      subtitle: s.default ? '默认终端' : undefined,
+      subtitle: s.id === preferredShell(defaultShell, shells) ? t('Default terminal') : undefined,
       shellType: s.id,
       lastOpenedAt: recent[`shell:${s.id}`] ?? 0,
     });

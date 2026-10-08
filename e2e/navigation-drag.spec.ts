@@ -218,9 +218,11 @@ test('buttons make room for a stable full-size gap before the layout is saved', 
   await page.mouse.move(settingsBefore.x + 4, settingsBefore.y + 16, { steps: 8 });
   const rightGap = zone(page, 'right').locator('[data-dock-placeholder="1"]');
   await expect(rightGap).toBeVisible();
-  expect((await button(page, 'chat').boundingBox())!.x).toBe(chatBefore.x - 36);
-  expect((await button(page, 'settings').boundingBox())!.x).toBe(settingsBefore.x);
+  const rightSpacing = await zone(page, 'right').locator('.workspace-right-actions')
+    .evaluate(element => Number.parseFloat(getComputedStyle(element).columnGap));
   const rightBox = (await rightGap.boundingBox())!;
+  expect((await button(page, 'chat').boundingBox())!.x).toBe(chatBefore.x - rightBox.width - rightSpacing);
+  expect((await button(page, 'settings').boundingBox())!.x).toBe(settingsBefore.x);
   await page.mouse.move(rightBox.x + 16, rightBox.y + 16);
   await expect(rightGap).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('right-insertion-gap.png') });

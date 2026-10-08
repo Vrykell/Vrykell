@@ -1,3 +1,5 @@
+import { t } from '@i18n';
+import { TextInput } from '@ui/TextInput';
 /**
  * themePage — 外观主题设置页（明暗/不透明度/壁纸/导入导出）。
  */
@@ -12,6 +14,7 @@ import { useTerminalThemeStore } from '@features/settings/model/terminalTheme';
 import { useToastStore } from '@ui/Toast';
 import { Field, btnStyle } from '@features/settings/components/ui';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
+import { isWallpaperImage, wallpaperExtensions } from '../services/wallpaper';
 
 export function ThemePage() {
   const { mode, setMode } = useTheme();
@@ -32,10 +35,15 @@ export function ThemePage() {
 
   const pickBackground = async () => {
     try {
-      const sel = await openDialog({ multiple: false });
+      const sel = await openDialog({ multiple: false, directory: false,
+        filters: [{ name: t('Images'), extensions: wallpaperExtensions }] });
       if (typeof sel === 'string') {
+        if (!await isWallpaperImage(sel)) {
+          toast(t('Choose a valid image file.'), 'error');
+          return;
+        }
         await themeUpdate({ backgroundImage: sel });
-        toast('已设置背景图片', 'success');
+        toast(t('Wallpaper updated.'), 'success');
       }
     } catch (e) {
       toast(String((e as Error)?.message ?? e), 'error');
@@ -86,7 +94,7 @@ export function ThemePage() {
 
   return (
     <>
-      <Field title="主题" description="选择界面明暗外观。">
+      <Field title="主题" description={t('Choose a light or dark appearance.')}>
         <div style={{ display: 'flex', gap: 8 }}>
           {(['dark', 'light'] as const).map((m) => {
             const active = mode === m;
@@ -113,9 +121,9 @@ export function ThemePage() {
 
       <FontSettings />
 
-      <Field title="应用不透明度" description="整个应用内容的不透明度，数值越低背景壁纸越透出。">
+      <Field title="应用不透明度" description={t('Lower opacity reveals more of the wallpaper.')}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <input
+          <TextInput
             type="range"
             min={0.05}
             max={1}
@@ -133,7 +141,7 @@ export function ThemePage() {
         </div>
       </Field>
 
-      <Field title="应用背景图片" description="选择一张图片作为应用壁纸。">
+      <Field title="应用背景图片" description={t('Choose an application wallpaper.')}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <button onClick={() => void pickBackground()} style={btnStyle}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -158,7 +166,7 @@ export function ThemePage() {
         )}
       </Field>
 
-      <Field title="主题导入 / 导出" description="把当前主题外观导出为 JSON，或从 JSON 导入。">
+      <Field title="主题导入 / 导出" description={t('Save or load a theme as JSON.')}>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={() => void doExport()} style={btnStyle}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -173,7 +181,7 @@ export function ThemePage() {
         </div>
       </Field>
 
-      <Field title="配置文件" description="主题外观持久化在 theme.json，可手动编辑 vars 覆盖 CSS 变量。">
+      <Field title="配置文件" description={t('Edit theme.json to customize theme variables.')}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <button onClick={() => void openConfig()} style={btnStyle}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>

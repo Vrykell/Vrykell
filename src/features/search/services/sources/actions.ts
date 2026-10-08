@@ -8,7 +8,6 @@ registerSource({
   label: '快捷操作',
   icon: Command,
   search: async (query: string): Promise<SearchResult[]> => {
-    if (!query.trim()) return [];
     const matches = searchCommands(query);
     return matches.map((c) => ({
       type: 'action',

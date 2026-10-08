@@ -1,60 +1,30 @@
-/**
- * shortcutPage — 快捷键说明页。
- */
 import { Field } from '@features/settings/components/ui';
+import KeyHint from '@ui/KeyHint';
+import { isMacOS } from '@platform/runtime';
+import { t } from '@i18n';
 
 const SHORTCUTS: { keys: string[]; desc: string }[] = [
-  { keys: ['⌘T'], desc: '新建标签页' },
-  { keys: ['⌘⇧T'], desc: '撤销关闭标签' },
-  { keys: ['⌘W'], desc: '关闭标签页' },
-  { keys: ['⌘1–9'], desc: '切换到第 N 个标签' },
-  { keys: ['⌘D'], desc: '分裂终端，选择落点并继承类型' },
-  { keys: ['⌘⇧D'], desc: '直接上下分裂' },
-  { keys: ['⌥⌘D'], desc: '选择类型后分裂' },
-  { keys: ['⌘]', '⌘['], desc: '在窗口内终端间切换焦点' },
-  { keys: ['⌘F'], desc: '全局搜索' },
-  { keys: ['⌘P'], desc: '命令面板' },
-  { keys: ['⌘,'], desc: '打开设置' },
-  { keys: ['Esc'], desc: '切回命令输入栏' },
+  { keys: ['Meta+T'], desc: 'New tab' },
+  { keys: ['Meta+Shift+T'], desc: 'Reopen closed tab' },
+  { keys: ['Meta+W'], desc: 'Close tab' },
+  { keys: ['Meta+1–9'], desc: 'Switch to numbered tab' },
+  { keys: ['Meta+D'], desc: 'Split terminal' },
+  { keys: ['Meta+Shift+D'], desc: 'Split vertically' },
+  { keys: ['Alt+Meta+D'], desc: 'Choose type and split' },
+  { keys: ['Meta+]', 'Meta+['], desc: 'Focus another terminal' },
+  { keys: ['Meta+F'], desc: 'Global search' },
+  { keys: ['Meta+P'], desc: 'Command palette' },
+  { keys: ['Meta+,'], desc: 'Open settings' },
+  { keys: ['Escape'], desc: 'Focus command input' },
 ];
 
 export function ShortcutPage() {
-  return (
-    <Field title="快捷键说明" description="当前支持的键盘快捷键，macOS 下 ⌘ = Command。">
-      <div style={{
-        display: 'flex', flexDirection: 'column', gap: 4,
-        border: '1px solid var(--border)', borderRadius: 'var(--radius-inner)',
-        overflow: 'hidden',
-      }}>
-        {SHORTCUTS.map((s, i) => (
-          <div
-            key={i}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
-              padding: '8px 12px',
-              background: i % 2 === 0 ? 'transparent' : 'var(--hover)',
-              fontSize: 'calc(12px * var(--ui-font-scale))',
-            }}
-          >
-            <span style={{ color: 'var(--text-secondary)' }}>{s.desc}</span>
-            <span style={{ display: 'inline-flex', gap: 4, flexShrink: 0 }}>
-              {s.keys.map((k, j) => (
-                <kbd
-                  key={j}
-                  style={{
-                    fontFamily: 'var(--font-mono)', fontSize: 'calc(11px * var(--ui-font-scale))',
-                    padding: '2px 6px', borderRadius: 4,
-                    background: 'var(--canvas)', border: '1px solid var(--border)',
-                    color: 'var(--text-primary)', whiteSpace: 'nowrap',
-                  }}
-                >
-                  {k}
-                </kbd>
-              ))}
-            </span>
-          </div>
-        ))}
-      </div>
-    </Field>
-  );
+  return <Field title={t('Keyboard shortcuts')}>
+    <div className="settings-shortcuts">
+      {SHORTCUTS.map(shortcut => <div key={shortcut.desc} className="settings-shortcut-row">
+        <span>{t(shortcut.desc)}</span>
+        <span>{shortcut.keys.map(key => <KeyHint key={key} shortcut={isMacOS ? key : key.replace('Meta', 'Control')} />)}</span>
+      </div>)}
+    </div>
+  </Field>;
 }

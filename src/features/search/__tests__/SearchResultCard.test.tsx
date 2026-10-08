@@ -12,6 +12,15 @@ function blockResult(overrides: Partial<BlockResultData> = {}): SearchResult {
 }
 
 describe('search result actions', () => {
+  it('uses shared key icons for action shortcuts', () => {
+    render(<SearchResultCard result={{ id: 'action', type: 'action', title: 'Open settings', detail: '⌘,',
+      data: { commandId: 'settings', shortcut: '⌘,' } }} selected={false} query="" onSelect={vi.fn()} onExecute={vi.fn()} />);
+    const hint = screen.getByLabelText('Meta+,');
+    expect(hint.querySelector('[data-key-icon="Meta"]')).not.toBeNull();
+    expect(hint).toHaveTextContent(',');
+    expect(screen.queryByText('⌘,')).not.toBeInTheDocument();
+  });
+
   it('keeps query highlighting and opens the selected command result', () => {
     const result = blockResult();
     const execute = vi.fn();

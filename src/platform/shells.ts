@@ -50,7 +50,7 @@ export function fallbackShells(): ShellOption[] {
 export async function getAvailableShells(): Promise<ShellOption[]> {
   try {
     const shells = await listShells();
-    if (shells && shells.length > 0) return shells;
+    if (Array.isArray(shells) && shells.length > 0) return shells;
     return fallbackShells();
   } catch {
     return fallbackShells();

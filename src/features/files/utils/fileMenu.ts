@@ -1,3 +1,4 @@
+import { orderMenuItems, type MenuGroup } from '@ui/menuGroups';
 import type { FsEntry } from '@platform/api/types';
 import { t } from '@i18n';
 import type { ContextMenuItem } from '@ui/ContextMenu';
@@ -126,7 +127,14 @@ export function buildFileMenuItems(keys: FileMenuItemKey[], ctx: FileMenuContext
   const items: ContextMenuItem[] = [];
   for (const key of keys) {
     const item = itemFor(key, ctx);
-    if (item) items.push(item);
+    if (item) {
+      const clipboard = ['cut', 'copy', 'paste', 'copy-path'];
+      const group: MenuGroup = key.startsWith('open-') || key === 'new-tab-here' ? 'primary'
+        : clipboard.includes(key) ? 'clipboard'
+          : ['new-file', 'new-folder', 'rename', 'upload-file', 'upload-dir', 'download'].includes(key) ? 'edit'
+            : ['reveal', 'downloads-view', 'collapse-all'].includes(key) ? 'view' : 'organize';
+      items.push({ ...item, group, order: clipboard.includes(key) ? clipboard.indexOf(key) : 0 });
+    }
   }
-  return items;
+  return orderMenuItems(items);
 }

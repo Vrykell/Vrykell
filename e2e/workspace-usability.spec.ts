@@ -29,7 +29,11 @@ test('global search stays centered without covering actions or the title in both
     expect(Math.abs(search!.x + search!.width / 2 - width / 2)).toBeLessThan(1);
     expect(search!.x).toBeGreaterThanOrEqual(title!.x + title!.width);
     expect(search!.x + search!.width).toBeLessThanOrEqual(actions!.x);
-    await expect(page.getByTestId('window-close')).toBeInViewport();
+    if (await page.evaluate(() => /Mac/.test(navigator.userAgent))) {
+      await expect(page.getByTestId('window-controls')).toHaveCount(0);
+    } else {
+      await expect(page.getByTestId('window-close')).toBeInViewport();
+    }
   }
   await page.getByRole('button', { name: '设置', exact: true }).click();
   const search = await page.getByTestId('global-search-trigger').boundingBox();
@@ -274,7 +278,7 @@ test('split placement explains selection and cancellation before hover', async (
 });
 
 test('navigation controls only the adjacent sidebar and AI has an independent entrance', async ({ page }) => {
-  await expect(page.locator('[data-dock-btn="chat"]')).toHaveAttribute('data-tip', /AI 助手 — 打开右侧面板/);
+  await expect(page.locator('[data-dock-btn="chat"]')).toHaveAttribute('data-tip', /打开AI 助手/);
   await page.locator('[data-dock-btn="files"]').click();
   await expect(page.getByText('notes.txt')).toBeVisible();
   await expect(page.getByTestId('tab-search')).toBeHidden();

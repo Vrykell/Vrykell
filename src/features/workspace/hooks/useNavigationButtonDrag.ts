@@ -1,12 +1,24 @@
 import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react';
-import { useDockStore, type DockSide } from '../stores/dock';
-import { useNavigationDrag } from '../stores/navigationDrag';
+import { useDockStore, PANEL_DEFS, ACTIVITY_BAR_WIDTH } from '../stores/dock';
+import { useNavigationDrag, type NavigationDropTarget } from '../stores/navigationDrag';
+import { panelPlacementRects } from '../model/navigationPlacement';
 
-function locateTarget(x: number, y: number): { side: DockSide; index: number } | null {
+function locateTarget(x: number, y: number, id: string): NavigationDropTarget | null {
   const hit = document.elementFromPoint(x, y);
   const area = hit?.closest<HTMLElement>('[data-dock-zone]');
   const side = area?.dataset.dockZone;
-  if (!area || (side !== 'left' && side !== 'right')) return null;
+  if (!area || (side !== 'left' && side !== 'right')) {
+    if (!PANEL_DEFS[id]) return null;
+    const body = document.querySelector<HTMLElement>('.workspace-body')?.getBoundingClientRect();
+    if (!body || y < body.top || y > body.bottom || x < body.left + ACTIVITY_BAR_WIDTH || x > body.right) return null;
+    const dock = useDockStore.getState();
+    const regions = panelPlacementRects(body, dock.panelWidths[id] ?? PANEL_DEFS[id]!.width);
+    const destination = x <= regions.left.left + regions.left.width ? 'left'
+      : x >= regions.right.left ? 'right' : null;
+    if (!destination) return null;
+    const zone = destination === 'left' ? dock.leftZone : dock.rightZone;
+    return { side: destination, index: zone.includes(id) ? zone.indexOf(id) : zone.length, openPanel: true };
+  }
   const dock = useDockStore.getState();
   const zone = side === 'left' ? dock.leftZone : dock.rightZone;
   const placeholder = hit?.closest<HTMLElement>('[data-dock-placeholder]');
@@ -46,8 +58,8 @@ export function useNavigationButtonDrag() {
 
     const preview = (x: number, y: number) => {
       useNavigationDrag.getState().movePointer(x, y);
-      const target = locateTarget(x, y);
-      if (target) useNavigationDrag.getState().hover(target.side, target.index);
+      const target = locateTarget(x, y, id);
+      if (target) useNavigationDrag.getState().hover(target.side, target.index, target.openPanel);
       else useNavigationDrag.setState({ target: null });
     };
     const move = (next: PointerEvent) => {
@@ -81,7 +93,10 @@ export function useNavigationButtonDrag() {
       if (started && !canceled) {
         preview(next.clientX, next.clientY);
         const target = useNavigationDrag.getState().target;
-        if (target) useDockStore.getState().moveButton(id, target.side, target.index);
+        if (target) {
+          useDockStore.getState().moveButton(id, target.side, target.index);
+          if (target.openPanel) useDockStore.getState().openPanel(id);
+        }
       }
       clean();
     };

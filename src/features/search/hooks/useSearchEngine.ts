@@ -1,3 +1,4 @@
+import { canSearchQuery, parseSearchQuery, searchQuerySources } from '../model/searchQuery';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { SearchResult } from '@features/search/types';
 import { getSources, getEnabledSourceIds } from '@features/search/services/registry';
@@ -18,15 +19,15 @@ export interface SearchState {
 
 /** 执行一次全局搜索（函数版本，非 hook） */
 export async function globalSearch(query: string): Promise<SearchResult[]> {
-  if (!query.trim()) return [];
+  if (!canSearchQuery(query)) return [];
 
   const sources = getSources();
-  const enabled = getEnabledSourceIds();
+  const enabled = searchQuerySources(query, getEnabledSourceIds());
 
   const promises = sources
     .filter((s) => enabled.has(s.id))
     .map((s) =>
-      s.search(query).catch((err) => {
+      s.search(parseSearchQuery(query).term).catch((err) => {
         console.warn(`Search source "${s.id}" failed:`, err);
         return [] as SearchResult[];
       }),
@@ -52,10 +53,10 @@ export function useSearchEngine() {
     requestIdRef.current += 1;
     const reqId = requestIdRef.current;
 
-    setState((prev) => ({ ...prev, query, loading: true }));
+    setState({ query, sources: {}, allResults: [], loading: true });
 
     // 空查询：清空结果
-    if (!query.trim()) {
+    if (!canSearchQuery(query)) {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       setState({
         query: '',
@@ -71,7 +72,7 @@ export function useSearchEngine() {
 
     debounceRef.current = setTimeout(async () => {
       const sources = getSources();
-      const enabled = getEnabledSourceIds();
+      const enabled = searchQuerySources(query, getEnabledSourceIds());
 
       // 初始化每个源的 loading 状态
       const sourceStates: Record<string, SourceState> = {};
@@ -87,7 +88,7 @@ export function useSearchEngine() {
         .filter((s) => enabled.has(s.id))
         .map(async (s) => {
           try {
-            const results = await s.search(query);
+            const results = await s.search(parseSearchQuery(query).term);
             // 竞态检查：如果请求 ID 已变，丢弃结果
             if (reqId !== requestIdRef.current) return;
             setState((prev) => {
@@ -117,6 +118,7 @@ export function useSearchEngine() {
   // 清理 debounce
   useEffect(() => {
     return () => {
+      requestIdRef.current += 1;
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, []);

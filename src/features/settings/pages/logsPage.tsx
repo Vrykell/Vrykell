@@ -1,3 +1,4 @@
+import { t } from '@i18n';
 import { useState } from 'react';
 import { save } from '@tauri-apps/plugin-dialog';
 import { openPath } from '@tauri-apps/plugin-opener';
@@ -22,15 +23,15 @@ export function LogsPage() {
     finally { setExporting(false); }
   };
   return <>
-    <Field title="自动保存日志" description="默认关闭。开启后持续保存详细诊断日志，重启后继续生效；关闭后停止写入磁盘。">
+    <Field title="自动保存日志" description={t('Save diagnostics on this device across restarts.')}>
       <button role="switch" aria-label="自动保存日志" aria-checked={autoSave} disabled={saving} style={btnStyle} onClick={() => { void saveSetting(() => setDiagnosticAutoSave(!autoSave)); }}>{saving ? '保存中…' : autoSave ? '已开启' : '已关闭'}</button>
       {error && <ErrorBox compact testId="logs-error" style={{ marginTop: 8 }}>{error}</ErrorBox>}
     </Field>
-    <Field title="导出日志" description="自动保存关闭时也可导出本次运行的最近记录。包含系统与窗口信息、操作时序、IPC 参数与耗时、终端状态、错误堆栈和后端读写尺寸；密码、密钥和终端/对话正文会过滤。">
+    <Field title="导出日志" description={t('Export recent diagnostics. Passwords, keys and terminal or conversation content are excluded.')}>
       <button style={btnStyle} disabled={exporting} onClick={() => { void exportLog(); }}>{exporting ? '导出中…' : '导出详细日志'}</button>
       {message && <ErrorBox compact tone={message.tone} testId="logs-export-status" style={{ marginTop: 8 }}>{message.text}</ErrorBox>}
     </Field>
-    <Field title="日志存储" description="本次运行最多保留 2000 条前端和 2000 条后端记录；自动保存每个文件最多 5 MB，保留当前文件和两份轮转文件。导出包含保留的自动日志与本次运行记录。">
+    <Field title="日志存储" description={t('Files rotate at 5 MB. Keep the current file and two backups.')}>
       <button style={btnStyle} onClick={() => { void invoke<string>('diagnostics_log_directory').then(async path => { setDirectory(path); await openPath(path); }).catch(cause => setMessage({ text: `打开日志目录失败：${String(cause)}`, tone: 'error' })); }}>打开日志目录</button>
       {directory && <p style={{ color: 'var(--text-muted)', overflowWrap: 'anywhere' }}>{directory}</p>}
     </Field>

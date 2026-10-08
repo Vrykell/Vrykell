@@ -15,6 +15,7 @@ export {
 } from '@features/session-history/model/filter';
 
 export {
+  sessionCommandCount,
   SESSION_DATE_OPTIONS,
   SESSION_TYPE_OPTIONS,
   type SessionHistoryFilter,

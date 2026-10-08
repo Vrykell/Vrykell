@@ -1,7 +1,13 @@
-import { ChevronDown, Search } from '@ui/icons';
+import KeyHint from '@ui/KeyHint';
+import { IconButton } from '@ui/IconButton';
+import { parseSearchQuery, SEARCH_PREFIXES } from '../model/searchQuery';
+import { TextInput } from '@ui/TextInput';
+import { ChevronDown, History, Search, SlidersHorizontal, X } from '@ui/icons';
+import { t } from '@i18n';
 import { useGlobalSearch } from '@features/search/hooks/useGlobalSearch';
-import FilterPopover from '@features/search/components/FilterPopover';
-import SearchResultCard from '@features/search/components/SearchResultCard';
+import { getSources } from '@features/search/services/registry';
+import FilterPopover from './FilterPopover';
+import SearchResultCard from './SearchResultCard';
 import ErrorBox from '@ui/ErrorBox';
 
 interface Props {
@@ -9,257 +15,127 @@ interface Props {
   onClose: () => void;
 }
 
-/** 全局搜索视图：负责布局和展示，搜索编排由 useGlobalSearch 提供。 */
+/** Present workspace search as a compact palette with grouped results. */
 export default function GlobalSearch({ open, onClose }: Props) {
   const {
-    input,
-    inputRef,
-    selectedIdx,
-    filterOpen,
-    setFilterOpen,
-    setSelectedIdx,
-    state,
-    searchHistory,
-    grouped,
-    sourceCounts,
-    enabledCount,
-    totalSources,
-    flatResults,
-    failedSources,
-    hasInput,
-    hasResults,
-    hasHistory,
-    handleInput,
-    handleExecute,
-    handleKey,
-    handleRestore,
-    close,
+    input, inputRef, query, selectedIdx, filterOpen, setFilterOpen, setSelectedIdx,
+    state, searchHistory, grouped, sourceCounts, enabledCount, enabledIds, totalSources,
+    flatResults, failedSources, hasInput, hasResults, hasHistory,
+    handleInput, handleExecute, handleKey, handleRestore, close,
   } = useGlobalSearch({ open, onClose });
 
   if (!open) return null;
+  const activeSource = getSources().find(source => source.id === query.source);
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 9996,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'var(--overlay)',
-      }}
-      onClick={close}
-    >
-      <div className="workspace-floating workspace-floating-dialog" role="dialog" aria-modal="true" aria-label="全局搜索"
-        style={{
-          width: 480,
-          maxWidth: 'calc(100vw - 40px)',
-          minHeight: 240,
-          maxHeight: 'min(400px, 72vh)',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'visible',
-        }}
-        onClick={(event) => event.stopPropagation()}
-        onKeyDown={handleKey}
-      >
-        <div
-          style={{
-            position: 'relative',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '8px 10px',
-            margin: 10,
-            borderRadius: 'var(--radius-inner)',
-            background: 'var(--canvas)',
-          }}
-        >
-          <Search size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-          <input
-            ref={inputRef}
-            value={input}
-            onChange={(event) => handleInput(event.target.value)}
-            placeholder="搜索文件、命令、设置…"
-            style={{
-              flex: 1,
-              minWidth: 0,
-              background: 'transparent',
-              border: 'none',
-              outline: 'none',
-              fontSize: 'calc(13px * var(--ui-font-scale))',
-              height: 28,
-              padding: 0,
-              color: 'var(--text-primary)',
-              fontFamily: 'var(--font-ui)',
-            }}
-          />
-          <button
-            data-testid="search-filter-button"
-            onClick={() => setFilterOpen((openState) => !openState)}
-            data-tip="筛选搜索范围"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-              padding: '4px 10px',
-              border: '1px solid var(--border)',
-              borderRadius: 6,
-              background: filterOpen ? 'var(--hover)' : 'transparent',
-              color: 'var(--text-secondary)',
-              cursor: 'pointer',
-              fontSize: 'calc(12px * var(--ui-font-scale))',
-              fontFamily: 'var(--font-ui)',
-              whiteSpace: 'nowrap',
-              flexShrink: 0,
-            }}
-          >
-            {enabledCount < totalSources ? `${enabledCount}/${totalSources}` : ''}
-            <ChevronDown size={12} />
-          </button>
-          <FilterPopover
-            open={filterOpen}
-            onClose={() => setFilterOpen(false)}
-            counts={sourceCounts}
-          />
-        </div>
+    <div className="global-search-overlay" onClick={close}>
+      <div className="workspace-floating workspace-floating-dialog global-search-dialog"
+        role="dialog" aria-modal="true" aria-label={t('Global search')}
+        onClick={event => event.stopPropagation()} onKeyDown={handleKey}>
+        <header className="global-search-header">
+          <div className="global-search-input-row">
+            <Search size={20} />
+            {activeSource && <span className="search-scope-chip" data-testid="search-scope-chip">
+              <activeSource.icon size={14} /><span>{activeSource.label}</span>
+              <button aria-label={t('Clear search scope')} data-tip={t('Clear search scope')}
+                onClick={() => { handleInput(query.term); inputRef.current?.focus(); }}><X size={12} /></button>
+            </span>}
+            <TextInput ref={inputRef} value={query.source ? query.term : input} onChange={event => handleInput(query.source ? `${query.prefix} ${event.target.value}` : event.target.value)}
+              aria-label={t('Search workspace')} placeholder={t('Search files, commands, settings…')} />
+            {!query.source && <div className="global-search-filter-anchor">
+              <button data-testid="search-filter-button" className="global-search-filter"
+                aria-expanded={filterOpen} aria-haspopup="menu" data-tip={t('Filter search scope')}
+                onClick={() => setFilterOpen(value => !value)}>
+                <SlidersHorizontal size={16} />
+                <span>{t('Scope')}</span>
+                {!query.source && enabledCount < totalSources && <span className="global-search-source-count">{enabledCount}/{totalSources}</span>}
+                <ChevronDown size={12} />
+              </button>
+              <FilterPopover open={filterOpen} onClose={() => setFilterOpen(false)} counts={sourceCounts} />
+            </div>}
+            <IconButton aria-label={t('Close search')} data-tip={t('Close search')} data-tip-shortcut="Escape" onClick={close}><X size={16} /></IconButton>
+          </div>
+        </header>
 
-        <div
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            padding: '6px 10px 12px',
-            minHeight: 220,
-            borderBottomLeftRadius: 'var(--radius-block)',
-            borderBottomRightRadius: 'var(--radius-block)',
-          }}
-        >
+        <div className="global-search-body">
           {!hasInput && hasHistory && (
-            <div>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '6px 8px',
-                }}
-              >
-                <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', fontWeight: 600 }}>
-                  最近搜索
-                </span>
-                <button
-                  onClick={() => searchHistory.clear()}
-                  style={{
-                    fontSize: 'calc(10px * var(--ui-font-scale))',
-                    padding: '2px 8px',
-                    border: 'none',
-                    borderRadius: 3,
-                    background: 'transparent',
-                    color: 'var(--text-muted)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  清除
-                </button>
+            <section>
+              <div className="global-search-section-heading">
+                <span>{t('Recent searches')}</span>
+                <button className="global-search-clear" onClick={() => searchHistory.clear()}>{t('Clear')}</button>
               </div>
-              {searchHistory.items.slice(0, 8).map((item, index) => (
-                <button
-                  key={`sh-${index}`}
-                  className="workspace-floating-row"
-                  onClick={() => handleInput(item)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '7px 10px',
-                    border: 'none',
-                    background: 'transparent',
-                    color: 'var(--text-secondary)',
-                    cursor: 'pointer',
-                    fontSize: 'calc(12px * var(--ui-font-scale))',
-                    fontFamily: 'var(--font-ui)',
-                  }}
-                  onMouseEnter={(event) => {
-                    event.currentTarget.style.background = 'var(--hover)';
-                  }}
-                  onMouseLeave={(event) => {
-                    event.currentTarget.style.background = 'transparent';
-                  }}
-                >
-                  <Search size={11} style={{ flexShrink: 0 }} />
-                  {item}
-                </button>
-              ))}
-            </div>
+              {searchHistory.items.slice(0, 8).map((item, index) => {
+                const parsed = parseSearchQuery(item);
+                const source = getSources().find(source => source.id === parsed.source);
+                return <button key={`sh-${index}`} className="workspace-floating-row global-search-history"
+                  onClick={() => handleInput(item)}>
+                  <History size={16} />
+                  {source && <span className="search-scope-chip" data-testid="history-scope-chip"><source.icon size={14} />{source.label}</span>}
+                  <span>{parsed.term || (source ? '' : item)}</span>
+                </button>;
+              })}
+            </section>
           )}
 
           {!hasInput && !hasHistory && (
-            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>
-              输入关键词搜索文件、命令、设置
+            <div className="global-search-empty">
+              <p className="global-search-empty-title">{t('Find something in your workspace')}</p>
+              <p>{t('Commands, files and settings, all in one place.')}</p>
+              <div className="global-search-sources" aria-label={t('Search scope')}>
+                {getSources().map(source => (
+                  <button key={source.id} data-enabled={enabledIds.has(source.id)} className="global-search-source"
+                    onClick={() => handleInput(`${SEARCH_PREFIXES.find(scope => scope.source === source.id)?.prefix ?? ''} `)}>
+                    <source.icon size={16} /><span>{source.label}</span><kbd>{SEARCH_PREFIXES.find(scope => scope.source === source.id)?.prefix}</kbd>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
-          {hasResults && grouped.map((group) => (
-            <div key={group.type}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 5,
-                  padding: '6px 10px',
-                  fontSize: 'calc(10px * var(--ui-font-scale))',
-                  fontWeight: 600,
-                  color: 'var(--text-muted)',
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.5,
-                }}
-              >
-                <group.icon size={11} /> {group.label}
+          {hasResults && grouped.map(group => (
+            <section key={group.type} className="global-search-result-group">
+              <div className="global-search-section-heading">
+                <span><group.icon size={14} />{group.label}</span>
+                <span className="global-search-source-count">{group.results.length}</span>
               </div>
-              {group.results.map((result) => {
+              {group.results.map(result => {
                 const index = flatResults.indexOf(result);
-                return (
-                  <SearchResultCard
-                    key={result.id}
-                    result={result}
-                    selected={index === selectedIdx}
-                    query={input.trim()}
-                    onSelect={() => setSelectedIdx(index)}
-                    onExecute={handleExecute}
-                    onRestore={handleRestore}
-                  />
-                );
+                return <SearchResultCard key={result.id} result={result} selected={index === selectedIdx}
+                  query={query.term.trim()} onSelect={() => setSelectedIdx(index)}
+                  onExecute={handleExecute} onRestore={handleRestore} />;
               })}
-            </div>
+            </section>
           ))}
 
           {hasInput && !hasResults && state.loading && (
-            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>
-              搜索中…
-            </div>
+            <div className="global-search-message" role="status">{t('Searching…')}</div>
           )}
           {hasInput && !state.loading && failedSources.length > 0 && (
-            <ErrorBox
-              style={{ margin: '6px 2px' }}
-              title={`部分搜索源失败：${failedSources.map((source) => source.label).join('、')}`}
-              details={failedSources.map((source) => `${source.label}: ${source.error}`).join('\n')}
-              detailsTitle="错误详情"
-              actions={<button onClick={() => handleInput(input)} style={{ minHeight: 32 }}>重试</button>}
-            >
-              结果可能不完整，请检查对应来源后重试。
+            <ErrorBox style={{ margin: '8px 4px' }}
+              title={t('Some search sources failed: {{sources}}', { sources: failedSources.map(source => source.label).join(', ') })}
+              details={failedSources.map(source => `${source.label}: ${source.error}`).join('\n')}
+              detailsTitle={t('Error details')}
+              actions={<button onClick={() => handleInput(input)}>{t('Retry')}</button>}>
+              {t('Results may be incomplete. Retry the affected sources.')}
             </ErrorBox>
           )}
-
           {hasInput && !hasResults && !state.loading && failedSources.length === 0 && (
-            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>
-              无匹配结果
+            <div className="global-search-message" role="status">
+              <p className="global-search-empty-title">{t('No matching results')}</p>
+              <p>{enabledCount === 0 ? t('Select at least one search source.') : t('Try another keyword or expand the search scope.')}</p>
             </div>
           )}
         </div>
+
+        <footer className="global-search-footer">
+          <div className="global-search-shortcuts">
+            <span><KeyHint shortcut="ArrowUp" /><KeyHint shortcut="ArrowDown" />{t('Navigate')}</span>
+            <span><KeyHint shortcut="Enter" />{t('Use result')}</span>
+          </div>
+          <span className="global-search-summary" aria-live="polite">
+            {hasInput ? t('{{count}} results', { count: flatResults.length }) : t('{{count}} search sources', { count: enabledCount })}
+          </span>
+        </footer>
       </div>
     </div>
   );

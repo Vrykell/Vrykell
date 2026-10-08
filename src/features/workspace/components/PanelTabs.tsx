@@ -1,3 +1,4 @@
+import { TextInput } from '@ui/TextInput';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { iconSizes,
   History, Plus, Search, Settings,
@@ -116,7 +117,7 @@ export default function PanelTabs() {
   const ctxItems: ContextMenuItem[] = ctxMenu && ctxTab
     ? [
         ...(isSessionTab(ctxTab) && !ctxTab.groupId ? [{
-          label: '新建分组',
+          label: '新建分组', group: 'organize' as const,
           onClick: () => {
             // 建组后立即进入重命名（自动聚焦名称输入框）
             void createGroupForTab(ctxTab.id).then((gid) => {
@@ -129,21 +130,21 @@ export default function PanelTabs() {
         }] : []),
         // 组内标签的菜单补上出路：拖到「未分组」区之外，也能显式移出分组
         ...(isSessionTab(ctxTab) && ctxTab.groupId ? [{
-          label: '移出分组',
+          label: '移出分组', group: 'organize' as const,
           onClick: () => {
             const scope = tabs.filter((t) => isSessionTab(t) && !t.groupId && t.id !== ctxTab.id);
             useSessionStore.getState().moveTab(ctxTab.id, null, scope.length);
           },
         }] : []),
-        { label: '重命名', onClick: () => { setEditId(ctxTab.id); setEditTitle(ctxTab.title); } },
-        { label: '重新生成标题', onClick: () => {
+        { label: '重命名', group: 'edit', onClick: () => { setEditId(ctxTab.id); setEditTitle(ctxTab.title); } },
+        { label: '重新生成标题', group: 'edit', onClick: () => {
           useToastStore.getState().addToast('正在重新生成标题…', 'info');
           void regenerateTitle(ctxTab.id).then((ok) => {
             if (ok) useToastStore.getState().addToast('标题已更新', 'success');
           });
         } },
-        { label: '复制会话', onClick: () => duplicateTab(ctxTab.id) },
-        { label: '关闭标签', onClick: () => closeTab(ctxTab.id) },
+        { label: '复制会话', group: 'primary', onClick: () => duplicateTab(ctxTab.id) },
+        { label: '关闭标签', group: 'danger', onClick: () => closeTab(ctxTab.id) },
       ]
     : [];
 
@@ -164,7 +165,7 @@ export default function PanelTabs() {
           borderRadius: 'var(--radius-inner)', padding: '0 8px', height: 30,
         }}>
           <Search size={iconSizes.compact} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-          <input
+          <TextInput
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="搜索会话…"
@@ -369,7 +370,7 @@ function GroupSection(props: {
             <Folder size={iconSizes.row} />
           </span>
           {props.renamingGroupId === group.id ? (
-            <input
+            <TextInput
               autoFocus
               value={props.renamingGroupTitle}
               onChange={(e) => props.setRenamingGroupTitle(e.target.value)}
@@ -382,7 +383,7 @@ function GroupSection(props: {
               }}
               style={{
                 flex: 1, background: 'var(--canvas)', border: '1px solid var(--accent)',
-                borderRadius: 3, padding: '1px 4px', fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 600,
+                borderRadius: 3, padding: '1px 4px', fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)',
                 color: 'var(--text-primary)', outline: 'none',
               }}
             />
@@ -390,7 +391,7 @@ function GroupSection(props: {
             <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
               <span style={{
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                fontSize: 'calc(13px * var(--ui-font-scale))', lineHeight: '18px', fontWeight: 600, color: 'var(--text-primary)',
+                fontSize: 'calc(13px * var(--ui-font-scale))', lineHeight: '18px', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)',
               }}>
                 {group.title}
               </span>
@@ -537,7 +538,7 @@ function TabRow({
       onContextMenu={onContextMenu}
       onPointerDown={onPointerDown}
       renameInput={editing ? (
-        <input
+        <TextInput
           autoFocus
           value={editTitle}
           onChange={(e) => setEditTitle(e.target.value)}
@@ -560,7 +561,7 @@ function TabRow({
           data-tip={typeSummary}
           style={{ display: 'inline-flex', alignItems: 'center', height: 16, padding: '0 6px', flexShrink: 0, lineHeight: '14px' }}
         >
-          <span style={{ fontSize: 'calc(10px * var(--ui-font-scale))', fontWeight: 600, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+          <span style={{ fontSize: 'calc(10px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
             {terms.length}
           </span>
         </span>

@@ -78,3 +78,10 @@ describe('filterSessions', () => {
     expect(filterSessions(sessions, 'prod', 'local', '30d')).toEqual([]);
   });
 });
+
+it('finds SSH hosts in restored pane layouts with formatted JSON', () => {
+  const session = mk({ payload: JSON.stringify({ layout: { type: 'leaf', terminal: { kind: 'ssh', ssh: { host: 'saved.example', user: 'dev' } } } }, null, 2) });
+  expect(isSshSession(session)).toBe(true);
+  expect(sshTargetOf(session)).toBe('dev@saved.example');
+  expect(filterSessions([session], 'saved.example', 'ssh', 'all')).toEqual([session]);
+});

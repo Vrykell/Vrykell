@@ -1,3 +1,6 @@
+import { t } from '@i18n';
+import { IconButton } from '@ui/IconButton';
+import { TextInput, TextArea } from '@ui/TextInput';
 /**
  * AgentExtrasSettings — 记忆 / 子代理 / 定时任务 设置页。
  * 记忆 = 持久知识 FACT + 流水 JOURNAL（可一键让 AI 整理）；
@@ -97,7 +100,7 @@ export function MemorySettings() {
           <Sparkles size={12} /> {organizing ? '整理中…' : '让 AI 整理'}
         </button>
       </div>
-      <textarea
+      <TextArea
         value={saving.value}
         disabled={organizing}
         onCompositionStart={() => saving.setComposing(true)}
@@ -113,7 +116,7 @@ export function MemorySettings() {
       </div>
       {jlines.length > 0 && (
         <div style={{ marginTop: 12 }}>
-          <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 600, marginBottom: 6 }}>近期流水</div>
+          <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', marginBottom: 6 }}>近期流水</div>
           <pre style={{
             margin: 0, padding: '8px 10px', maxHeight: 180, overflow: 'auto',
             background: 'var(--hover)', borderRadius: 'var(--radius-inner)',
@@ -149,14 +152,12 @@ function AgentCard({ a, onChanged }: { a: AgentDef; onChanged: () => void }) {
   return (
     <div onCompositionStart={() => saving.setComposing(true)} onCompositionEnd={() => saving.setComposing(false)} style={{ borderRadius: 'var(--radius-inner)', padding: '10px 12px', background: 'var(--canvas)' }}>
       <div style={{ display: 'flex', gap: 8 }}>
-        <input value={name} placeholder="名称" onChange={(e) => saving.setValue(previous => ({ ...previous, name: e.target.value }))} style={{ ...inputStyle, flex: 1, fontWeight: 600 }} />
+        <TextInput value={name} placeholder="名称" onChange={(e) => saving.setValue(previous => ({ ...previous, name: e.target.value }))} style={{ ...inputStyle, flex: 1, fontWeight: 'var(--fw-semibold)' }} />
         <SaveStatus status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
-        <button onClick={() => void del()} data-tip="删除" aria-label="删除" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid transparent', borderRadius: 4, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>
-          <X size={13} />
-        </button>
+        <IconButton compact tone="danger" onClick={() => void del()} data-tip={t('Delete')} aria-label={t('Delete')}><X size={16} /></IconButton>
       </div>
-      <input value={description} placeholder="一句话描述何时委派给它" onChange={(e) => saving.setValue(previous => ({ ...previous, description: e.target.value }))} style={{ ...inputStyle, marginTop: 8 }} />
-      <textarea value={prompt} placeholder="系统提示词（行为准则）" onChange={(e) => saving.setValue(previous => ({ ...previous, prompt: e.target.value }))} rows={5} style={{ ...inputStyle, marginTop: 8, minHeight: 80, resize: 'vertical', lineHeight: 1.55 }} />
+      <TextInput value={description} placeholder="一句话描述何时委派给它" onChange={(e) => saving.setValue(previous => ({ ...previous, description: e.target.value }))} style={{ ...inputStyle, marginTop: 8 }} />
+      <TextArea value={prompt} placeholder="系统提示词（行为准则）" onChange={(e) => saving.setValue(previous => ({ ...previous, prompt: e.target.value }))} rows={5} style={{ ...inputStyle, marginTop: 8, minHeight: 80, resize: 'vertical', lineHeight: 1.55 }} />
     </div>
   );
 }
@@ -212,16 +213,14 @@ function ScheduleCard({ s, onChanged }: { s: Schedule; onChanged: () => void }) 
   return (
     <div onCompositionStart={() => saving.setComposing(true)} onCompositionEnd={() => saving.setComposing(false)} style={{ borderRadius: 'var(--radius-inner)', padding: '10px 12px', background: 'var(--canvas)', opacity: enabled ? 1 : 0.55 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <input value={name} placeholder="名称" onChange={(e) => saving.setValue(previous => ({ ...previous, name: e.target.value }))} style={{ ...inputStyle, flex: 1, fontWeight: 600 }} />
-        <input type="number" min={1} value={interval} onChange={(e) => saving.setValue(previous => ({ ...previous, intervalMinutes: Number(e.target.value) }))} style={{ ...inputStyle, width: 70, flexShrink: 0 }} />
+        <TextInput value={name} placeholder="名称" onChange={(e) => saving.setValue(previous => ({ ...previous, name: e.target.value }))} style={{ ...inputStyle, flex: 1, fontWeight: 'var(--fw-semibold)' }} />
+        <TextInput type="number" min={1} value={interval} onChange={(e) => saving.setValue(previous => ({ ...previous, intervalMinutes: Number(e.target.value) }))} style={{ ...inputStyle, width: 70, flexShrink: 0 }} />
         <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>分钟</span>
         <button onClick={() => saving.setValue(previous => ({ ...previous, enabled: !previous.enabled }), true)} style={{ ...btnStyle }}>{enabled ? '停用' : '启用'}</button>
         <SaveStatus status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
-        <button onClick={() => void del()} data-tip="删除" aria-label="删除" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid transparent', borderRadius: 4, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>
-          <X size={13} />
-        </button>
+        <IconButton compact tone="danger" onClick={() => void del()} data-tip={t('Delete')} aria-label={t('Delete')}><X size={16} /></IconButton>
       </div>
-      <textarea value={prompt} placeholder="要执行的提示词" onChange={(e) => saving.setValue(previous => ({ ...previous, prompt: e.target.value }))} rows={3} style={{ ...inputStyle, marginTop: 8, minHeight: 56, resize: 'vertical', lineHeight: 1.55 }} />
+      <TextArea value={prompt} placeholder="要执行的提示词" onChange={(e) => saving.setValue(previous => ({ ...previous, prompt: e.target.value }))} rows={3} style={{ ...inputStyle, marginTop: 8, minHeight: 56, resize: 'vertical', lineHeight: 1.55 }} />
       <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', marginTop: 6 }}>
         上次执行 {s.lastRunAt ? new Date(s.lastRunAt).toLocaleString() : '从未'}
         {enabled ? ` · 下次 ${new Date(nextRun).toLocaleString()}` : ''}

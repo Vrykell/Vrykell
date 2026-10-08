@@ -1,3 +1,4 @@
+import { searchSettings } from '../services/registry';
 import { useCallback, useMemo, useState } from 'react';
 import { BrainCircuit, FileCode, Keyboard, Palette, Settings, SquareTerminal } from '@ui/icons';
 import type { PageId } from '../model/navigation';
@@ -41,7 +42,7 @@ export const SETTINGS_GROUPS: SettingGroup[] = [
   },
   {
     id: 'terminal', label: '终端', icon: SquareTerminal,
-    items: [{ id: 'terminal-open', label: '打开方式', keywords: ['终端', '打开', '模式', '经典', '块', 'block', 'classic', 'terminal'] }],
+    items: [{ id: 'terminal-open', label: '打开方式', keywords: ['终端', '打开', '模式', '经典', '块', 'block', 'classic', 'terminal', '默认', 'shell', 'default'] }],
   },
   {
     id: 'editor', label: '编辑器', icon: FileCode,
@@ -68,6 +69,8 @@ export function useSettingsNavigation() {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [query, setQuery] = useState('');
   const normalizedQuery = query.trim().toLowerCase();
+
+  const matchingSettings = useMemo(() => normalizedQuery ? searchSettings(query) : [], [normalizedQuery, query]);
 
   const visibleGroups = useMemo(() => {
     if (!normalizedQuery) return SETTINGS_GROUPS;
@@ -99,6 +102,7 @@ export function useSettingsNavigation() {
     setQuery,
     normalizedQuery,
     visibleGroups,
+    matchingSettings,
     activeLabel,
     toggleGroup,
   };

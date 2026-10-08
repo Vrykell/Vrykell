@@ -1,3 +1,6 @@
+import { IconButton } from '@ui/IconButton';
+import { t } from '@i18n';
+import { TextInput, TextArea } from '@ui/TextInput';
 /**
  * mcpPage — MCP 服务器设置页。
  * New server drafts are persisted automatically after required fields are valid.
@@ -82,7 +85,7 @@ export function McpPage() {
   return (
     <Field
       title="MCP 服务器"
-      description="接入外部工具服务器。本地服务器填 command 与 args，连接后工具即注册给 AI。"
+      description={t('Connect external tools using a command and arguments or a server URL.')}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {listError && (
@@ -172,11 +175,11 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <input
+        <TextInput
           value={name}
           placeholder="服务器名"
           onChange={(e) => change({ name: e.target.value })}
-          style={{ ...inputStyle, flex: 1, fontWeight: 600, minWidth: 120 }}
+          style={{ ...inputStyle, flex: 1, fontWeight: 'var(--fw-semibold)', minWidth: 120 }}
         />
         {s && (
           <span style={{
@@ -201,43 +204,30 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
           <button onClick={() => { void discard(onCancel); }} style={{ ...btnStyle, flexShrink: 0 }}>取消</button>
         )}
         {s && (
-          <button
-            onClick={() => { void discard(() => onDelete(savedName.current)); }}
-            data-tip="删除服务器"
-            aria-label="删除服务器"
-            style={{
-              width: 26, height: 26, flexShrink: 0, display: 'inline-flex', alignItems: 'center',
-              justifyContent: 'center', border: '1px solid transparent', borderRadius: 4,
-              background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--error-light)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
-          >
-            <X size={13} />
-          </button>
+          <IconButton compact tone="danger" onClick={() => { void discard(() => onDelete(savedName.current)); }} data-tip={t('Delete server')} aria-label={t('Delete server')}><X size={16} /></IconButton>
         )}
       </div>
       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-        <input
+        <TextInput
           value={command}
           placeholder="command，如 npx"
           onChange={(e) => change({ command: e.target.value })}
           style={{ ...inputStyle, flex: 1 }}
         />
-        <input
+        <TextInput
           value={args}
           placeholder="args，空格分隔"
           onChange={(e) => change({ args: e.target.value })}
           style={{ ...inputStyle, flex: 1 }}
         />
       </div>
-      <input
+      <TextInput
         value={url}
         placeholder="远程 URL，可选"
         onChange={(e) => change({ url: e.target.value })}
         style={{ ...inputStyle, marginTop: 8 }}
       />
-      <textarea
+      <TextArea
         value={env}
         placeholder={'环境变量，每行 KEY=VALUE'}
         onChange={(e) => change({ env: e.target.value })}
