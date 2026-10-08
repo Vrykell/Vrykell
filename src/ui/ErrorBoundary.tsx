@@ -62,7 +62,7 @@ function DefaultFallback({ error, componentStack, onReset }: {
       fontFamily: 'var(--font-ui)', padding: 40, gap: 16,
     }}>
       <div style={{ opacity: 0.3 }}><TriangleAlert size={48} /></div>
-      <h2 style={{ margin: 0, fontWeight: 600 }}>页面渲染错误</h2>
+      <h2 style={{ margin: 0, fontWeight: 'var(--fw-semibold)' }}>页面渲染错误</h2>
       <p data-selectable style={{
         margin: 0, color: 'var(--text-secondary)', fontSize: 'calc(13px * var(--ui-font-scale))',
         maxWidth: 480, textAlign: 'center', lineHeight: 1.6,

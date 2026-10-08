@@ -1,3 +1,4 @@
+import { TextInput } from '@ui/TextInput';
 /**
  * ModelPicker — 页面化模型选择窗口。
  *
@@ -146,7 +147,7 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
         {/* 顶部：标题 + 搜索框 */}
         <div style={{ padding: '14px 16px 10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <span style={{ fontSize: 'calc(14px * var(--ui-font-scale))', fontWeight: 600, flex: 1 }}>选择模型</span>
+            <span style={{ fontSize: 'calc(14px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', flex: 1 }}>选择模型</span>
             <button
               data-subtle
               data-tip="关闭"
@@ -162,7 +163,7 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderRadius: 8, padding: '6px 10px', background: 'var(--canvas)' }}>
             <Search size={iconSizes.control} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-            <input
+            <TextInput
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -237,7 +238,7 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 600, color: 'var(--text-primary)' }}>{m.name || m.model}</span>
+                    <span style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)' }}>{m.name || m.model}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
                     <span style={{ fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)', marginRight: 2 }}>

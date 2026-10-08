@@ -66,7 +66,7 @@ export default function ErrorBox({
       data-testid={testId}
       style={{ ...base, display: 'flex', flexDirection: 'column', gap: 8, padding: 12 }}
     >
-      {title && <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{title}</div>}
+      {title && <div style={{ fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)' }}>{title}</div>}
       {children && <div style={{ lineHeight: 1.6 }}>{children}</div>}
       {actions && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{actions}</div>}
       {details && <ErrorDetails title={detailsTitle} text={details} preStyle={{ maxHeight: 160 }} />}

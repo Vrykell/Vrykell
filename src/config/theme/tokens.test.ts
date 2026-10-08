@@ -64,9 +64,24 @@ describe('默认调色板（中性灰色）', () => {
 
   it('终端表面与应用外壳分层，并提供完整 ANSI 色板', () => {
     expect(themes.dark.xtermBg).not.toBe(themes.dark.canvas);
-    expect(themes.dark.xtermForeground).toBe('#D6D9E0');
+    expect(themes.dark.xtermForeground).toBe('#ECEFF4');
     expect(themes.dark.xtermBlue).toBe('#8DB7E8');
     expect(themes.dark.xtermBrightRed).toBe('#FF9A92');
+  });
+
+  it('keeps dark-theme body and secondary text readable on every shared surface', () => {
+    const luminance = (hex: string) => {
+      const channels = [1, 3, 5].map(offset => {
+        const value = parseInt(hex.slice(offset, offset + 2), 16) / 255;
+        return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+      });
+      return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+    };
+    for (const text of [themes.dark.textPrimary, themes.dark.textSecondary, themes.dark.textMuted]) {
+      for (const surface of [themes.dark.chromeBg, themes.dark.sidebarBg, themes.dark.canvas, themes.dark.surface, themes.dark.block, themes.dark.elevated]) {
+        expect((luminance(text) + 0.05) / (luminance(surface) + 0.05)).toBeGreaterThanOrEqual(4.5);
+      }
+    }
   });
 });
 

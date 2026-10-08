@@ -61,7 +61,7 @@ export default function CheckboxMenu<Id extends string>({ title, options, onTogg
         padding: '6px 12px',
         fontSize: 'calc(11px * var(--ui-font-scale))',
         color: 'var(--text-muted)',
-        fontWeight: 600,
+        fontWeight: 'var(--fw-semibold)',
       }}>
         {title}
       </div>

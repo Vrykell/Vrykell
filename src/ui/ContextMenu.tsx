@@ -1,3 +1,5 @@
+import { Fragment } from 'react';
+import { menuGroup, orderMenuItems, type MenuGroup } from './menuGroups';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MenuItem } from '@ui/UiBtn';
@@ -7,6 +9,8 @@ export interface ContextMenuItem {
   label: string;
   onClick: () => void;
   danger?: boolean;
+  group?: MenuGroup;
+  order?: number;
   /** 可选的快捷键提示，显示在行尾。 */
   shortcut?: string;
 }
@@ -84,16 +88,17 @@ export default function ContextMenu({ anchor, items, onClose }: Props) {
         fontSize: 'calc(12px * var(--ui-font-scale))',
       }}
     >
-      {items.map((item, i) => (
-        <MenuItem
-          key={i}
-          label={item.label}
-          danger={item.danger}
-          shortcut={item.shortcut}
-          onClick={() => { item.onClick(); onClose(); }}
-        />
-      ))}
+      <ContextMenuItems items={items} onClose={onClose} />
     </div>,
     document.body,
   );
+}
+
+/** All action menus share ordering, group boundaries and row controls. */
+export function ContextMenuItems({ items, onClose, itemRole }: { items: ContextMenuItem[]; onClose: () => void; itemRole?: 'menuitem' }) {
+  const ordered = orderMenuItems(items);
+  return <>{ordered.map((item, index) => <Fragment key={`${menuGroup(item)}-${item.label}`}>
+    {index > 0 && menuGroup(item) !== menuGroup(ordered[index - 1]!) && <div role="separator" className="context-menu-separator" />}
+    <MenuItem role={itemRole} label={item.label} danger={item.danger} shortcut={item.shortcut} onClick={() => { item.onClick(); onClose(); }} />
+  </Fragment>)}</>;
 }

@@ -1,3 +1,4 @@
+import { t } from '@i18n';
 /**
  * ModelPill — 模型选择胶囊（终端 AI 状态栏 / 聊天面板顶栏共用）。
  *
@@ -123,7 +124,7 @@ export default function ModelPill({ showThinking = true }: { showThinking?: bool
           {/* 名称区（约 70%）：打开模型选择窗口 */}
           <button
             data-testid="pill-name"
-            data-tip="切换模型（更多在设置页配置）"
+            data-tip={t('Choose model')}
             onClick={() => setPickerOpen(true)}
             style={{
               flex: showThinking ? '0 0 auto' : '1 1 auto', minWidth: 0, display: 'flex', alignItems: 'center', gap: 6,
@@ -134,7 +135,7 @@ export default function ModelPill({ showThinking = true }: { showThinking?: bool
             <Icon size={iconSizes.row} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
             <span
               style={{
-                fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 500, color: 'var(--text-primary)',
+                fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-medium)', color: 'var(--text-primary)',
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               }}
             >

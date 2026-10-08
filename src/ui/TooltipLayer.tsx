@@ -1,3 +1,4 @@
+import KeyHint from './KeyHint';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -20,6 +21,8 @@ const FLIP_ABOVE_PX = 34;
 
 interface Hint {
   text: string;
+  description?: string;
+  shortcut?: string;
   rect: { top: number; bottom: number; left: number; width: number };
 }
 
@@ -60,6 +63,8 @@ export default function TooltipLayer() {
       setPlacement(null);
       setHint({
         text: owner.dataset.tip ?? '',
+        description: owner.dataset.tipDescription,
+        shortcut: owner.dataset.tipShortcut,
         rect: { top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width },
       });
     };
@@ -131,7 +136,8 @@ export default function TooltipLayer() {
         visibility: placement ? 'visible' : 'hidden',
       }}
     >
-      {hint.text}
+      <span className="app-tooltip-copy"><span>{hint.text}</span>{hint.description && <small>{hint.description}</small>}</span>
+      {hint.shortcut && <KeyHint shortcut={hint.shortcut} />}
     </div>,
     document.body,
   );

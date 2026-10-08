@@ -7,6 +7,17 @@
 // ── 类型 ──
 
 export interface ThemePalette {
+  /** Small controls and shell colors remain independently customizable. */
+  iconColor: string;
+  iconHoverColor: string;
+  focusRing: string;
+  shellZshAccent: string;
+  shellBashAccent: string;
+  shellPowershellAccent: string;
+  shellCmdAccent: string;
+  shellSshAccent: string;
+  shellTileInk: string;
+
   /** Shared frame for the titlebar and primary navigation. */
   chromeBg: string;
   /** Secondary navigation uses its own surface within the window frame. */
@@ -132,6 +143,16 @@ export interface ThemePalette {
 // Dark surfaces and interactive accents use neutral gray levels.
 
 const dark: ThemePalette = {
+  iconColor: '#D8D8D8',
+  iconHoverColor: '#FFFFFF',
+  focusRing: '#A3B6CE',
+  shellZshAccent: '#B58AFF',
+  shellBashAccent: '#6CE6A6',
+  shellPowershellAccent: '#75B8FF',
+  shellCmdAccent: '#E4E8F1',
+  shellSshAccent: '#61DCCB',
+  shellTileInk: '#15171D',
+
   // Neutral levels distinguish the window frame, sidebars and content.
   chromeBg: '#323232',
   sidebarBg: '#242424',
@@ -150,9 +171,9 @@ const dark: ThemePalette = {
   inputBorder: 'rgba(255,255,255,0.08)',
 
   // 文字
-  textPrimary: '#EBEBEB',
-  textSecondary: '#B8B8B8',
-  textMuted: '#9E9E9E',
+  textPrimary: '#FAFAFA',
+  textSecondary: '#D8D8D8',
+  textMuted: '#BABABA',
 
   // Neutral accents mark active controls and focus indicators.
   accent: '#C7C7C7',
@@ -218,8 +239,8 @@ const dark: ThemePalette = {
   apiKeyBorder: 'rgba(255,255,255,0.18)',
 
   xtermBg: '#111417',
-  xtermForeground: '#D6D9E0',
-  xtermCursor: '#C9D1DB',
+  xtermForeground: '#ECEFF4',
+  xtermCursor: '#ECEFF4',
   xtermSelection: 'rgba(141,183,232,0.28)',
   // 低饱和 ANSI 色板：保留目录、路径、错误等语义，同时避免彩色噪声。
   xtermBlack: '#1B1F24',
@@ -274,6 +295,16 @@ export const TEAL_THEME_PRESET: Record<string, string> = {
 // ── Light（默认：中性，主色不带任何颜色倾向） ──
 
 const light: ThemePalette = {
+  iconColor: '#454545',
+  iconHoverColor: '#111111',
+  focusRing: '#56728F',
+  shellZshAccent: '#B58AFF',
+  shellBashAccent: '#6CE6A6',
+  shellPowershellAccent: '#75B8FF',
+  shellCmdAccent: '#BBC3D4',
+  shellSshAccent: '#61DCCB',
+  shellTileInk: '#15171D',
+
   chromeBg: '#E2E2E2',
   sidebarBg: '#EFEFEF',
   chromeField: '#D8D8D8',
@@ -384,6 +415,15 @@ export const themes: Record<ThemeMode, ThemePalette> = { dark, light };
 /** Palette → CSS 自定义属性映射 */
 export function paletteToCssVars(p: ThemePalette): Record<string, string> {
   return {
+    '--icon-color': p.iconColor,
+    '--icon-hover-color': p.iconHoverColor,
+    '--focus-ring': p.focusRing,
+    '--shell-zsh-accent': p.shellZshAccent,
+    '--shell-bash-accent': p.shellBashAccent,
+    '--shell-powershell-accent': p.shellPowershellAccent,
+    '--shell-cmd-accent': p.shellCmdAccent,
+    '--shell-ssh-accent': p.shellSshAccent,
+    '--shell-tile-ink': p.shellTileInk,
     '--chrome-bg': p.chromeBg,
     '--sidebar-bg': p.sidebarBg,
     '--chrome-field': p.chromeField,
