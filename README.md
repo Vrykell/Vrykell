@@ -29,12 +29,9 @@ sudo dnf install gcc gcc-c++ make pkgconf-pkg-config \
 
 其他发行版请参考 [Tauri 系统依赖说明](https://v2.tauri.app/start/prerequisites/#linux)。
 
-> **构建依赖**：SSH 远程文件浏览（SFTP）用 `ssh2` crate，需要系统 `libssh2` + `openssl`。
-> macOS 用 Homebrew 安装：
-> ```bash
-> brew install libssh2 openssl
-> ```
-> （`ssh2` 的 `libssh2-sys` 不支持从源码 vendored libssh2，因此这是硬依赖；若要完全免系统依赖，可改用纯 Rust 的 `russh`。）
+> **macOS 构建依赖**：SSH/SFTP 所用的 `libssh2` 和 OpenSSL 随 Cargo 从源码编译，不需要安装 Homebrew、`pkg-config` 或系统 OpenSSL。Intel 和 Apple Silicon 均使用此配置。首次构建会较慢，需要 Xcode Command Line Tools、Perl 和 Make；可用 `xcode-select --install` 安装命令行工具。
+>
+> **macOS build dependencies**: Cargo builds the SSH/SFTP libraries (`libssh2` and OpenSSL) from source on both Intel and Apple Silicon. Homebrew, `pkg-config`, and system OpenSSL are not required. The first build takes longer and requires Xcode Command Line Tools, Perl, and Make; install the command line tools with `xcode-select --install`.
 
 ```bash
 npm install

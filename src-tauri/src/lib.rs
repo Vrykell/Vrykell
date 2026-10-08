@@ -21,6 +21,8 @@ fn greet(name: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "macos")]
+    configure_keyboard_input();
     // 打开失败降级为内存库（历史功能不可用），而不是启动即崩溃
     let history_db = match db::HistoryDb::open() {
         Ok(db) => db,
@@ -227,4 +229,18 @@ pub fn run() {
             if let Err(error) = diagnostics::flush_logs() { eprintln!("[diagnostics] {error}"); }
         }
     });
+}
+
+#[cfg(target_os = "macos")]
+fn configure_keyboard_input() {
+    use objc2_foundation::{NSString, NSUserDefaults};
+    // These preferences belong to this application, so terminal keys repeat normally.
+    let defaults = NSUserDefaults::standardUserDefaults();
+    for key in [
+        "ApplePressAndHoldEnabled",
+        "WebAutomaticSpellingCorrectionEnabled",
+        "WebAutomaticTextReplacementEnabled",
+    ] {
+        defaults.setBool_forKey(false, &NSString::from_str(key));
+    }
 }

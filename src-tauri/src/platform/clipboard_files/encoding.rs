@@ -74,7 +74,7 @@ pub fn windows_preferred_drop_effect(mode: ClipMode) -> Vec<u8> {
 ///
 /// macOS writes through the system pasteboard (see `macos`), which builds this flavour itself;
 /// the builder stays here as the canonical format definition and for cross-host unit tests.
-#[cfg(any(test, target_os = "macos"))]
+#[cfg(test)]
 pub fn macos_nsfilenames_plist(paths: &[String]) -> String {
     let mut out = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<plist version=\"1.0\"><array>");
     for path in paths {
@@ -131,7 +131,7 @@ pub fn parse_uri_list(text: &str) -> Vec<String> {
     paths
 }
 
-#[cfg(any(test, target_os = "macos"))]
+#[cfg(test)]
 fn xml_escape(value: &str) -> String {
     value.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
 }

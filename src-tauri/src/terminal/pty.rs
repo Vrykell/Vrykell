@@ -457,9 +457,9 @@ pub async fn pty_spawn(
         // pending 存扫描后的结构化事件，pending_bytes 追踪原始负载字节数作阈值依据。
         let mut pending: Vec<ScanEvent> = Vec::new();
         let mut pending_bytes = 0usize;
-        let mut last_flush = std::time::Instant::now();
+        let mut batch = super::output_batch::OutputBatchWindow::new(std::time::Instant::now());
         loop {
-            match rx.recv_timeout(FLUSH_INTERVAL) {
+            match rx.recv_timeout(batch.wait_timeout(std::time::Instant::now())) {
                 Ok(ReadMsg::Data(bytes)) => {
                     let data = decoder.push(&bytes);
                     if debug::enabled() {
@@ -477,10 +477,15 @@ pub async fn pty_spawn(
                     }
                     pending_bytes += data.len();
                     pending.extend(events);
-                    // Echo the next input response immediately; sustained output still uses batching.
-                    if should_flush_output(&input_pending, pending_bytes, last_flush.elapsed()) {
+                    // Hold only the short input burst so an intermediate repaint is not exposed.
+                    let now = std::time::Instant::now();
+                    if input_pending.swap(false, Ordering::AcqRel) {
+                        batch.input_response(now);
+                        if debug::enabled() { debug::write("input-response-batch", format!("id={} window_ms=2 bytes={}", tid, pending_bytes)); }
+                    }
+                    if batch.should_flush(pending_bytes, now) {
                         flush_output(&app, &tid, &mut pending, &mut pending_bytes);
-                        last_flush = std::time::Instant::now();
+                        batch.flushed(std::time::Instant::now());
                     }
                 }
                 // EOF / 出错 / 读线程意外断开：冲刷剩余，收敛会话
@@ -510,7 +515,7 @@ pub async fn pty_spawn(
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                     if !pending.is_empty() {
                         flush_output(&app, &tid, &mut pending, &mut pending_bytes);
-                        last_flush = std::time::Instant::now();
+                        batch.flushed(std::time::Instant::now());
                     }
                     // A retained console handle can keep its reader open after the child exits.
                     let session = app.state::<PtyState>().0.lock().ok().and_then(|all| all.get(&tid).cloned());
@@ -543,15 +548,6 @@ fn shell_kind(value: &str) -> &'static str {
         "cmd" | "cmd.exe" => "cmd",
         _ => "custom",
     }
-}
-
-/// 输出合批窗口：距上次冲刷超过该时长即 flush（即使数据量未达阈值）
-const FLUSH_INTERVAL: std::time::Duration = std::time::Duration::from_millis(16);
-/// 输出合批阈值：累积达到该字节数立即 flush，避免单条 IPC 消息过大
-const FLUSH_BYTES: usize = 32 * 1024;
-
-fn should_flush_output(input_pending: &AtomicBool, bytes: usize, elapsed: std::time::Duration) -> bool {
-    input_pending.swap(false, Ordering::AcqRel) || bytes >= FLUSH_BYTES || elapsed >= FLUSH_INTERVAL
 }
 
 /// 冲刷累积输出（结构化事件）；emit 失败（窗口已关闭）时顺手收敛会话。
@@ -990,25 +986,32 @@ mod tests {
         assert_eq!(super::normalize_enter("no-newline"), "no-newline");
     }
 
-    /// GUI 启动缺用户 bin 目录：合并后 /usr/local/bin 必须存在且去重。
+    /// Existing local tool directories precede inherited paths without duplicates.
     #[cfg(unix)]
     #[test]
     fn merge_user_bin_paths_adds_local_bin_and_dedups() {
         let mut cmd = CommandBuilder::new("zsh");
-        // 模拟 GUI 最小 PATH（Finder/Dock 启动的应用只有系统默认值）
-        std::env::set_var("PATH", "/usr/bin:/bin:/usr/sbin:/sbin");
+        let original = std::env::var_os("PATH");
+        // Simulate a minimal GUI environment with a duplicate inherited entry.
+        std::env::set_var("PATH", "/usr/bin:/bin:/usr/sbin:/sbin:/usr/bin");
         merge_user_bin_paths(&mut cmd);
-        let path = cmd.get_env("PATH").expect("PATH 被设置");
+        match original {
+            Some(value) => std::env::set_var("PATH", value),
+            None => std::env::remove_var("PATH"),
+        }
+        let path = cmd.get_env("PATH").expect("PATH is set");
         let dirs: Vec<&str> = path.to_str().unwrap().split(':').collect();
-        assert!(dirs.contains(&"/usr/local/bin"), "缺 /usr/local/bin: {path:?}");
-        // 用户目录在最前，系统目录在后；无重复
-        assert_eq!(dirs[0], "/usr/local/bin");
+        if std::path::Path::new("/usr/local/bin").is_dir() {
+            assert_eq!(dirs[0], "/usr/local/bin");
+        } else {
+            assert!(!dirs.contains(&"/usr/local/bin"));
+        }
         let mut seen = std::collections::HashSet::new();
         for d in &dirs {
-            assert!(seen.insert(*d), "PATH 有重复: {d}");
+            assert!(seen.insert(*d), "Duplicate PATH entry: {d}");
         }
-        // 继承的 PATH 不丢失
-        assert!(dirs.contains(&"/usr/bin"));
+        // Preserve the inherited system directories in their original order.
+        assert!(dirs.ends_with(&["/usr/bin", "/bin", "/usr/sbin", "/sbin"]));
     }
 
     /// Windows 的 PATH 必须保留盘符和 `;` 分隔符，否则 `pwsh` 无法被找到。
@@ -1379,15 +1382,6 @@ mod tests {
 mod cmd_interaction_tests {
     use super::*;
     use std::io::{Read, Write};
-
-    #[test]
-    fn input_echo_bypasses_the_output_window_without_disabling_stream_batching() {
-        let input_pending = AtomicBool::new(true);
-        assert!(should_flush_output(&input_pending, 1, std::time::Duration::ZERO));
-        assert!(!should_flush_output(&input_pending, 1, std::time::Duration::ZERO));
-        assert!(should_flush_output(&input_pending, FLUSH_BYTES, std::time::Duration::ZERO));
-        assert!(should_flush_output(&input_pending, 1, FLUSH_INTERVAL));
-    }
 
     #[test]
     fn detects_child_exit_while_the_terminal_handles_are_still_open() {
