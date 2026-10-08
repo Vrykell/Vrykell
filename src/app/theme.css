@@ -569,15 +569,20 @@ button.tui-control { min-height: 20px; padding: 0 4px; font-size: var(--fs-micro
 .search-scope-chip > button:hover { color: var(--icon-hover-color); }
 .global-search-history .search-scope-chip { max-width: 40%; }
 .global-search-dialog .key-hint { border: none; background: var(--key-hint-bg); color: var(--text-primary); font-family: var(--font-ui); }
-/* Reserve the context row so hover and keyboard focus never move terminal content. */
-.command-block { padding-top: 20px; padding-bottom: 24px; }
-.command-block-info { display: flex; align-items: center; gap: 8px; min-height: var(--control-size-compact); margin-bottom: 4px; font-family: var(--font-mono); font-size: calc(12px * var(--ui-font-scale)); color: var(--text-muted); opacity: 0; pointer-events: none; transition: opacity var(--dur-fast) var(--ease); }
-.command-block:hover .command-block-info, .command-block:has(.command-block-actions :focus-visible) .command-block-info, .command-block[data-menu-open="true"] .command-block-info { opacity: 1; pointer-events: auto; }
+/* Keep the context compact; floating controls do not increase the row height. */
+.command-block { padding-top: var(--terminal-row-height); padding-bottom: var(--terminal-row-height); --command-block-command-weight: 600; transition: background-color var(--dur-fast) var(--ease); }
+.command-block:hover, .command-block[data-menu-open="true"] { background: var(--command-block-bg); }
+.command-block[data-failed="true"] { background: var(--error-bg); box-shadow: inset 3px 0 0 var(--status-error); }
+.command-block-info { position: relative; display: flex; align-items: center; gap: 8px; min-height: var(--terminal-row-height); margin-bottom: 2px; padding-right: var(--control-size-compact); font-family: var(--font-mono); font-size: calc(var(--terminal-font-size) * 0.86); line-height: var(--terminal-row-height); color: var(--text-muted); }
+.command-block[data-running="true"] .command-block-info { padding-right: calc(3 * var(--control-size-compact)); }
+.command-block-actions, .command-block-branch, .command-block .command-status-code, .command-block .command-status-agent, .command-block-truncation { opacity: 0; pointer-events: none; transition: opacity var(--dur-fast) var(--ease); }
+.command-block:is(:hover, :has(.command-block-actions :focus-visible), [data-menu-open="true"]) :is(.command-block-actions, .command-block-branch, .command-status-code, .command-status-agent, .command-block-truncation) { opacity: 1; pointer-events: auto; }
+.command-block .command-status { color: inherit; }
 .command-block-cwd { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .command-block-branch { min-width: 0; max-width: 25%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.command-block-actions { display: inline-flex; flex-shrink: 0; margin-left: auto; }
-.command-block-command { min-width: 0; font-family: var(--font-mono); font-size: var(--terminal-font-size); line-height: var(--terminal-row-height); font-weight: var(--fw-semibold); color: var(--text-primary); white-space: pre-wrap; word-break: break-all; user-select: text; }
-.command-block-output { margin-top: 12px; }
+.command-block-actions { position: absolute; right: 0; top: 50%; transform: translateY(-50%); display: inline-flex; flex-shrink: 0; }
+.command-block-command { min-width: 0; font-family: var(--font-mono); font-size: var(--terminal-font-size); line-height: var(--terminal-row-height); font-weight: var(--command-block-command-weight); color: var(--xterm-foreground); white-space: pre-wrap; word-break: break-all; user-select: text; }
+.command-block-output { margin-top: calc(var(--terminal-row-height) / 2); }
 .command-block-truncation { min-height: 0; margin: 8px 0 0; }
 .command-block-running { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--accent-warm); animation: pulse 1.5s ease-in-out infinite; }
 

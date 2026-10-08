@@ -6,7 +6,7 @@ import { useTypographyStore } from '@config/typography';
 import { configureTerminalInput } from '@features/terminal/model/terminalInput';
 /**
  * TerminalBlockList renders command output as a continuous stream with thin separators.
- * Commands and output share an inset; metadata and controls appear on hover or focus.
+ * Commands and output share an inset; path and duration remain visible while controls reveal on hover.
  */
 
 import { memo, useState, useMemo, useEffect, useRef } from 'react';
@@ -17,7 +17,7 @@ import {
 import { useTerminalStore } from '@features/terminal';
 import AiBlock from '@features/chat/components/AiBlock';
 import { ptyResize } from '@platform/pty';
-import { fmtDuration } from '@ui/UiBtn';
+import { formatCommandDuration } from '../model/commandDuration';
 import { getCellMetrics } from '@utils/termMetrics';
 import { getExecutingTerm, resizeExecutingTerm, syncTermWidth } from '@features/terminal/hooks/useTerminalSession';
 import { isTerminalDebugEnabled, terminalDebug } from '@features/terminal/services/terminalDebug';
@@ -217,6 +217,7 @@ const BlockItem = memo(function BlockItem({
       className="command-block"
       data-testid={`command-block-${block.id}`}
       data-menu-open={menuOpen}
+      data-failed={block.exitCode !== null && block.exitCode !== 0}
       data-pane-id={tabId}
       style={{
         paddingLeft: insetLeft + COMMAND_BLOCK_CONTENT_PADDING,
@@ -232,6 +233,7 @@ const BlockItem = memo(function BlockItem({
       <div className="command-block-info">
         <BlockContext block={block} />
         <CommandStatus exitCode={block.exitCode} duration={duration} agent={block.agent} />
+        {block.gitBranch && <span className="command-block-branch">{block.gitBranch}</span>}
         <span className="command-block-actions">
           <IconButton compact data-subtle data-tip={t('More actions')} aria-label={t('More actions')}
             aria-haspopup="menu" aria-expanded={menuOpen}
@@ -261,7 +263,6 @@ const BlockItem = memo(function BlockItem({
 function BlockContext({ block }: { block: TermBlock }) {
   return <>
     {block.cwd && <span className="command-block-cwd" data-tip={block.cwd}>{block.cwd}</span>}
-    {block.gitBranch && <span className="command-block-branch">{block.gitBranch}</span>}
   </>;
 }
 
@@ -283,13 +284,13 @@ function RunningItem({
   dividerBefore: boolean;
 }) {
   const [elapsedNow, setElapsedNow] = useState(
-    block.startedAt !== null ? fmtDuration(Date.now() - block.startedAt) : '',
+    block.startedAt !== null ? formatCommandDuration(Date.now() - block.startedAt) : '',
   );
   const { sendCtrlC, killApp, killArmed, enterFullScreen } = useTuiControls(tabId);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      if (block.startedAt !== null) setElapsedNow(fmtDuration(Date.now() - block.startedAt));
+      if (block.startedAt !== null) setElapsedNow(formatCommandDuration(Date.now() - block.startedAt));
     }, 1000);
     return () => clearInterval(timer);
   }, [block.startedAt]);
@@ -309,6 +310,7 @@ function RunningItem({
   return (
     <div
       data-testid={`running-block-${block.id}`}
+      data-running="true"
       className="command-block"
       style={{
         paddingLeft: insetLeft + COMMAND_BLOCK_CONTENT_PADDING,
@@ -318,9 +320,10 @@ function RunningItem({
     >
       <div className="command-block-info">
         <BlockContext block={block} />
-        <span className="command-block-running" aria-label={t('Running')} />
-        {block.agent && <Zap size={14} className="command-status-agent" aria-label={t('AI execution')} />}
         {elapsedNow && <span className="command-status-duration">({elapsedNow})</span>}
+        <span className="command-block-running" aria-label={t('Running')} />
+        {block.gitBranch && <span className="command-block-branch">{block.gitBranch}</span>}
+        {block.agent && <Zap size={14} className="command-status-agent" aria-label={t('AI execution')} />}
         <span className="command-block-actions">
           <BlockToolBtn title={t('Interrupt command')} shortcut="Control+C" onClick={sendCtrlC} label={<Square size={BLOCK_ACTION_ICON_SIZE} />} />
           <BlockToolBtn title={killArmed ? t('Force quit foreground process') : t('Quit foreground process')} onClick={killApp} label={<CircleX size={BLOCK_ACTION_ICON_SIZE} />} />

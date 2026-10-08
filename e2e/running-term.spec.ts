@@ -11,6 +11,12 @@ import { setupTauriMock, emitPtyOutput, expectAnyTermContains } from './tauri-mo
 async function startRunningBlock(page: import('@playwright/test').Page) {
   const input = page.getByPlaceholder(/输入命令/);
   await expect(input).toBeVisible({ timeout: 5000 });
+  // Wait for the shell prompt before injecting a sustained command.
+  await page.waitForFunction(async () => {
+    const path = '/src/features/terminal/stores/terminal.ts';
+    const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+    return Object.values(useTerminalStore.getState().startupStates).includes('ready');
+  });
   await emitPtyOutput(page, `\x1b]133;E;${btoa('sleep 100')}\x07\x1b]133;C\x07`);
   await expect(page.locator('[data-tip="终止命令"]')).toBeVisible({ timeout: 5000 });
 }

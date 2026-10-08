@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { clipboardText, mockAnthropic, ptyWrites, setupTauriMock } from './tauri-mock';
 
 test.describe('命令块操作全链路', () => {
-  test('commands and output keep their geometry while hover reveals context and only more', async ({ page }) => {
+  test('commands and output keep their geometry while context remains visible and hover reveals only more', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
     const input = page.getByPlaceholder(/输入命令/);
@@ -12,16 +12,19 @@ test.describe('命令块操作全链路', () => {
     await expect(block).toBeVisible();
     await page.mouse.move(0, 0);
     const metadata = block.locator('.command-block-info');
-    await expect(metadata).toHaveCSS('opacity', '0');
+    await expect(metadata).toHaveCSS('opacity', '1');
+    await expect(block.locator('.command-block-cwd')).toBeVisible();
+    await expect(block.locator('.command-status-duration')).toBeVisible();
+    await expect(block.locator('.command-block-actions')).toHaveCSS('opacity', '0');
     const command = block.locator('.command-block-command');
     const output = block.locator('.command-block-output');
     const before = { command: await command.boundingBox(), output: await output.boundingBox() };
     const bounds = (await block.boundingBox())!;
-    expect(before.command!.x - bounds.x).toBe(32);
+    expect(before.command!.x - bounds.x).toBe(16);
     expect(before.output!.x).toBe(before.command!.x);
-    expect(before.output!.y - before.command!.y - before.command!.height).toBe(12);
+    expect(before.output!.y - before.command!.y - before.command!.height).toBe(8);
     await block.hover();
-    await expect(metadata).toHaveCSS('opacity', '1');
+    await expect(block.locator('.command-block-actions')).toHaveCSS('opacity', '1');
     expect(await command.boundingBox()).toEqual(before.command);
     expect(await output.boundingBox()).toEqual(before.output);
     await expect(block.getByRole('button')).toHaveCount(1);
@@ -31,11 +34,14 @@ test.describe('命令块操作全链路', () => {
     await expect(page.getByRole('button', { name: /^(展开|折叠)(全部)?$/ })).toHaveCount(0);
     await block.screenshot({ path: test.info().outputPath('content-first-hover.png') });
     await page.mouse.move(0, 0);
-    await expect(metadata).toHaveCSS('opacity', '0');
+    await expect(metadata).toHaveCSS('opacity', '1');
+    await expect(block.locator('.command-block-cwd')).toBeVisible();
+    await expect(block.locator('.command-status-duration')).toBeVisible();
+    await expect(block.locator('.command-block-actions')).toHaveCSS('opacity', '0');
     await block.screenshot({ path: test.info().outputPath('content-first-rest.png') });
     await page.keyboard.press('Tab');
     await more.focus();
-    await expect(metadata).toHaveCSS('opacity', '1');
+    await expect(block.locator('.command-block-actions')).toHaveCSS('opacity', '1');
     await more.press('Enter');
     const menu = page.getByRole('menu', { name: '命令块操作' });
     await expect(menu.getByRole('menuitem', { name: '重新运行' })).toBeFocused();
@@ -92,7 +98,8 @@ test.describe('命令块操作全链路', () => {
     await page.getByRole('menuitem', { name: '复制命令' }).click();
     await expect.poll(() => clipboardText(page)).toBe('echo linux-block-action');
     await page.mouse.move(0, 0);
-    await expect(block.locator('.command-block-info')).toHaveCSS('opacity', '0');
+    await expect(block.locator('.command-block-actions')).toHaveCSS('opacity', '0');
+    await expect(block.locator('.command-block-cwd')).toBeVisible();
     await expect(page.getByText('已复制', { exact: true })).toHaveCount(0);
 
     await block.hover();
@@ -176,4 +183,45 @@ test('the more menu sends command output for AI analysis in the same pane', asyn
   await expect(page.getByRole('menu', { name: '命令块操作' })).toHaveCount(0);
   await expect(page.locator('[data-testid^="terminal-flow-"]').first()).toContainText('分析这条命令的执行结果');
   await expect(page.getByText('Analysis complete.').first()).toBeVisible();
+});
+
+test('two-row command output matches the compact context and spacing proportions', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
+  await page.waitForFunction(async () => {
+    const path = '/src/features/terminal/stores/terminal.ts';
+    const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+    return Object.values(useTerminalStore.getState().startupStates).includes('ready');
+  });
+  await page.evaluate(async () => {
+    const blocksPath = '/src/features/terminal/stores/blocks.ts';
+    const terminalPath = '/src/features/terminal/stores/terminal.ts';
+    const { useBlockStore } = await import(blocksPath) as typeof import('../src/features/terminal/stores/blocks');
+    const { useTerminalStore } = await import(terminalPath) as typeof import('../src/features/terminal/stores/terminal');
+    const pane = Object.keys(useTerminalStore.getState().sessions)[0]!;
+    useBlockStore.getState().setBlocks(pane, [53, 44].map((duration, index) => ({
+      id: `compact-${index}`, command: 'ls', cwd: '~', status: 'done', exitCode: 0,
+      startedAt: 0, endedAt: duration, wasLongRunning: false, outputRaw: '', outputHtml: '',
+      outputText: 'Desktop       Downloads     Movies        Pictures\nDocuments     Library       Music         Public', linesTruncated: 0,
+    })));
+  });
+  await page.mouse.move(0, 0);
+  const block = page.getByTestId('command-block-compact-0');
+  await expect(block.locator('.command-block-cwd')).toHaveText('~');
+  await expect(block.locator('.command-status-duration')).toHaveText('(0.053s)');
+  const geometry = await block.evaluate(element => {
+    const info = element.querySelector<HTMLElement>('.command-block-info')!;
+    const command = element.querySelector<HTMLElement>('.command-block-command')!;
+    const output = element.querySelector<HTMLElement>('.command-block-output')!;
+    return { height: element.clientHeight, contextHeight: info.clientHeight,
+      contextGap: command.getBoundingClientRect().top - info.getBoundingClientRect().bottom,
+      outputHeight: output.clientHeight, font: parseFloat(getComputedStyle(command).fontSize) };
+  });
+  expect(geometry.contextHeight).toBe(16);
+  expect(geometry.contextGap).toBe(2);
+  expect(geometry.outputHeight).toBe(32);
+  expect(geometry.height).toBe(106);
+  expect(geometry.height / geometry.font).toBeLessThan(8);
+  await page.locator('[data-testid^="terminal-flow-"]').first().screenshot({ path: test.info().outputPath('compact-command-blocks.png') });
 });

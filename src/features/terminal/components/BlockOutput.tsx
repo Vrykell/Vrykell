@@ -64,7 +64,7 @@ export default memo(function BlockOutput({ text, maxHeight, flush = false, highl
         maxWidth: '100%',
         // Keep wrapped history geometry real when it moves into or out of the viewport.
         contain: 'layout style paint',
-        background: 'var(--xterm-bg)',
+        background: flush ? 'transparent' : 'var(--xterm-bg)',
         color: 'var(--xterm-foreground)',
         // 与 xterm.js 实时渲染保持一致的字体参数
         fontFamily: TERMINAL_FONT_FAMILY,
