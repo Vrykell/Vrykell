@@ -64,6 +64,7 @@ test.describe('会话历史管理', () => {
     await page.getByText('旧的调试会话').click();
     // 新标签页标题为会话标题，命令块输出恢复出来
     await expect(page.getByText('total 1')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('button', { name: /^(展开|折叠)(全部)?$/ })).toHaveCount(0);
     // 恢复的块带颜色快照（output_html 持久化回读，非纯文本）
     await expect(page.locator('span[style*="#4e9a06"]')).toBeVisible({ timeout: 5000 });
     await expect(page.locator('[data-testid^="tab-row-"]', { hasText: '旧的调试会话' })).toHaveCount(1);

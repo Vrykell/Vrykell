@@ -2,10 +2,11 @@
  * blocks — 命令块 store 测试。
  */
 import { describe, it, expect } from 'vitest';
+import type { TermBlock } from '../services/pipeline/termBlock';
 import { useBlockStore, selectBlocks } from '@features/terminal/stores/blocks';
 
-const mk = (id: string): any =>
-  ({ id, command: '', status: 'done', exitCode: 0, startedAt: 1, endedAt: 2, cwd: '', outputHtml: '', outputText: '' });
+const mk = (id: string): TermBlock =>
+  ({ id, command: '', status: 'done', exitCode: 0, startedAt: 1, endedAt: 2, cwd: '', outputHtml: '', outputText: '', outputRaw: '', linesTruncated: 0, wasLongRunning: false });
 
 describe('blocks store', () => {
   it('addBlock / updateBlock / setBlocks / clearBlocks / dropTab', () => {
@@ -25,25 +26,12 @@ describe('blocks store', () => {
     expect(useBlockStore.getState().byTab.t1).toBeUndefined();
   });
 
-  it('setBlockCollapsed / setAllCollapsed', () => {
-    useBlockStore.setState({ byTab: {} });
-    const s = useBlockStore.getState();
-    s.addBlock('t1', mk('b1'));
-    s.setBlockCollapsed('t1', 'b1', true);
-    expect(useBlockStore.getState().byTab.t1[0]!.collapsed).toBe(true);
-    s.addBlock('t1', mk('b2'));
-    s.setAllCollapsed('t1', false);
-    expect(useBlockStore.getState().byTab.t1.every((b) => !b.collapsed)).toBe(true);
-  });
-
   it('不存在的 tab / block：各操作安全无副作用', () => {
     useBlockStore.setState({ byTab: {} });
     const s = useBlockStore.getState();
     s.addBlock('t1', mk('b1'));
     const before = useBlockStore.getState().byTab;
     s.updateBlock('nope', 'b1', { exitCode: 9 });
-    s.setBlockCollapsed('nope', 'b1', true);
-    s.setAllCollapsed('nope', true);
     s.dropTab('nope');
     expect(useBlockStore.getState().byTab).toEqual(before);
   });

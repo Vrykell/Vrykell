@@ -194,7 +194,6 @@ pub fn run() {
             commands::session::get_session,
             commands::session::delete_session,
             commands::session::record_block,
-            commands::session::set_block_collapsed,
             commands::session::append_chat_message,
             commands::session::list_chat_messages,
             commands::session::delete_chat_message,

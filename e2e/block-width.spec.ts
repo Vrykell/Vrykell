@@ -132,6 +132,12 @@ test('resizing a running block resizes both PTY and terminal buffer, then restor
   await page.goto('/');
   await expect(page.locator('[data-testid^="terminal-scroll-"]').first()).toBeVisible();
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
+  // Wait for the shell startup prompt before injecting a sustained command.
+  await page.waitForFunction(async () => {
+    const path = '/src/features/terminal/stores/terminal.ts';
+    const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+    return Object.values(useTerminalStore.getState().startupStates).includes('ready');
+  });
   await emitPtyOutput(page, `\x1b]133;E;${btoa('running-output')}\x07\x1b]133;C\x07${'x'.repeat(300)}\r\n`);
   const host = page.getByTestId('running-term');
   await expect(host.locator('.xterm')).toBeVisible();
@@ -223,7 +229,7 @@ test('运行中卡片：PTY/块终端宽度跟随卡片内容宽（右缘不裁�
       // 断言画布完整容纳 PTY 列数（右缘不裁剪），cellWidth 用 8 作参考容差。
       return {
         screenW: screen.getBoundingClientRect().width,
-        hostContentW: el.clientWidth - 16, // .xterm 左右各 8px padding
+        hostContentW: el.clientWidth, // The command block supplies all horizontal spacing.
       };
     });
 

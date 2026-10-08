@@ -63,10 +63,17 @@ test('terminal error notifications follow the active gray theme and can be close
     await page.getByRole('button', { name: theme, exact: true }).click();
     await page.keyboard.press('Meta+1');
     const input = page.getByPlaceholder(/输入命令/);
-    await input.fill(`echo notification-${theme === '浅色' ? 'light' : 'dark'}`);
+    const command = `echo notification-${theme === '浅色' ? 'light' : 'dark'}`;
+    await input.fill(command);
     await input.press('Enter');
-    await page.locator('[data-testid^="command-block-"]').last().hover();
-    await page.locator('[data-tip="复制输出"]').last().click();
+    const block = page.locator('[data-testid^="command-block-"]').filter({
+      has: page.locator('.command-block-command', { hasText: command }),
+    });
+    await expect(block.locator('.command-block-output')).toBeVisible();
+    await block.hover();
+    await expect(block.locator('.command-block-info')).toHaveCSS('opacity', '1');
+    await block.getByRole('button', { name: '更多操作' }).click();
+    await page.getByRole('menuitem', { name: '复制输出' }).click();
     const notification = page.getByRole('status').filter({ hasText: '复制失败' });
     await expect(notification).toBeVisible();
     await notification.hover();

@@ -118,6 +118,12 @@ test('short commands preserve real wrapped history geometry without a reverse sc
   await page.goto('/');
   const input = page.getByPlaceholder(/输入命令/);
   await expect(input).toBeVisible();
+  // Wait for the startup prompt before injecting command output.
+  await page.waitForFunction(async () => {
+    const path = '/src/features/terminal/stores/terminal.ts';
+    const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+    return Object.values(useTerminalStore.getState().startupStates).includes('ready');
+  });
   for (let i = 0; i < 12; i++) {
     const command = `wrapped-${i}`;
     await emitPtyOutput(page, `\x1b]133;E;${btoa(command)}\x07\x1b]133;C\x07${'wrapped-long-output '.repeat(25)}\r\n\x1b]133;D;0\x07\x1b]133;A\x07`);

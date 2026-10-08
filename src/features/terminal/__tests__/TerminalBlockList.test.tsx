@@ -16,15 +16,19 @@ function block(patch: Partial<TermBlock>): TermBlock {
 describe('TerminalBlockList', () => {
   beforeEach(() => useBlockStore.setState({ byTab: {} }));
 
-  it('头部行内显示退出码与耗时；不再显示 cwd/git 上下文行', () => {
+  it('puts context above the command and leaves only the more control in the block', () => {
     useBlockStore.getState().setBlocks('t1', [
-      block({ cwd: '/Users/w/work', gitBranch: 'master', startedAt: 1000, endedAt: 2400 }),
+      block({ cwd: '/Users/w/work', gitBranch: 'main', startedAt: 1000, endedAt: 2400 }),
     ]);
     render(<TerminalBlockList tabId="t1" />);
-    expect(screen.queryByText(/work/)).toBeNull();
-    expect(screen.queryByText(/master/)).toBeNull();
-    expect(screen.getByTestId('exit-code').textContent).toBe('0');
-    expect(screen.getByText('1.4s')).toBeTruthy(); // The duration label stays compact.
+    const item = screen.getByTestId('command-block-b1');
+    const context = item.querySelector('.command-block-info')!;
+    expect(context).toHaveTextContent('/Users/w/work');
+    expect(context).toHaveTextContent('main');
+    expect(context).toHaveTextContent('(1.4s)');
+    expect(screen.getByTestId('exit-code')).toHaveTextContent('0');
+    expect(item.querySelectorAll('button')).toHaveLength(1);
+    expect(screen.getByLabelText('更多操作')).toHaveAttribute('aria-haspopup', 'menu');
   });
 
   it('失败命令退出码红色 ✗N', () => {
@@ -50,27 +54,30 @@ describe('TerminalBlockList', () => {
     expect(screen.getByTestId('command-block-b1').querySelectorAll('[data-selectable]')).toHaveLength(1);
   });
 
-  it('已完成块操作按钮保持统一尺寸', () => {
+  it('opens all four command actions in the more menu without collapse controls', async () => {
     useBlockStore.getState().setBlocks('t1', [block({})]);
     render(<TerminalBlockList tabId="t1" />);
-    fireEvent.mouseEnter(screen.getByTestId('command-block-b1'));
-
-    for (const title of ['AI 解释', '重新运行', '复制命令', '复制输出', '更多操作']) {
-      const button = screen.getByLabelText(title);
-      expect(button).toHaveClass('icon-button');
-      expect(button).toHaveAttribute('data-compact', 'true');
-      expect(button.querySelector('svg')).toHaveStyle({ width: '16px', height: '16px' });
-    }
+    expect(screen.queryByLabelText('折叠')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('折叠全部')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '更多操作' }));
+    const menu = screen.getByRole('menu', { name: '命令块操作' });
+    expect(menu).toHaveTextContent('重新运行');
+    expect(menu).toHaveTextContent('发给 AI 分析');
+    expect(menu).toHaveTextContent('复制命令');
+    expect(menu).toHaveTextContent('复制输出');
+    await waitFor(() => expect(screen.getByRole('menuitem', { name: '重新运行' })).toHaveFocus());
+    fireEvent.keyDown(window, { key: 'ArrowDown' });
+    expect(screen.getByRole('menuitem', { name: '发给 AI 分析' })).toHaveFocus();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(screen.getByText(/file1/)).toBeInTheDocument();
   });
 
-  it('折叠与展开箭头使用较小图标，同时保持一致的按钮尺寸', () => {
-    useBlockStore.getState().setBlocks('t1', [block({})]);
+  it('always renders output even when a legacy record has a collapse flag', () => {
+    useBlockStore.getState().setBlocks('t1', [{ ...block({}), ...{ collapsed: true } }]);
     render(<TerminalBlockList tabId="t1" />);
-    const collapse = screen.getByLabelText('折叠');
-    expect(collapse).toHaveStyle({ width: '28px', height: '28px' });
-    expect(collapse.querySelector('svg')).toHaveStyle({ width: '12px', height: '12px' });
-    fireEvent.click(collapse);
-    expect(screen.getByLabelText('展开').querySelector('svg')).toHaveStyle({ width: '12px', height: '12px' });
+    expect(screen.getByText(/file1/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('展开')).not.toBeInTheDocument();
   });
 
   it('截断提示：linesTruncated > 0 显示已截断', () => {

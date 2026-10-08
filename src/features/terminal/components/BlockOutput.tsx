@@ -20,6 +20,8 @@ function highlightInHtml(html: string, query: string): string {
 interface Props {
   text: string;
   maxHeight?: number;
+  /** Command blocks provide their own content inset. */
+  flush?: boolean;
   highlight?: string;
   /** 显式声明 text 为预渲染 HTML（新管线 outputHtml 恒为 HTML，可能不含 <span，靠嗅探会误判） */
   isHtml?: boolean;
@@ -38,7 +40,7 @@ interface Props {
  * 严禁内容嗅探（如 text.includes('<span')）——历史输出是不可信文本，
  * 用户 cat 过的 HTML 会经嗅探被误判为 HTML 直接注入执行（存储型 XSS）。
  */
-export default memo(function BlockOutput({ text, maxHeight, highlight, isHtml: isHtmlProp }: Props) {
+export default memo(function BlockOutput({ text, maxHeight, flush = false, highlight, isHtml: isHtmlProp }: Props) {
   const isHtml = isHtmlProp === true;
 
   const content = useMemo(() => {
@@ -69,7 +71,7 @@ export default memo(function BlockOutput({ text, maxHeight, highlight, isHtml: i
         fontSize: 'var(--terminal-font-size)',
         // Keep snapshot rows tall enough for the glyph bounds used by live xterm.
         lineHeight: 'var(--terminal-row-height)',
-        padding: '2px 8px 8px',
+        padding: flush ? 0 : '2px 8px 8px',
         // Preserve terminal spacing while fitting historical output to the current pane.
         whiteSpace: 'pre-wrap',
         wordBreak: 'break-all',

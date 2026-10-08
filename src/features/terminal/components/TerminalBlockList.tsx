@@ -6,15 +6,14 @@ import { useTypographyStore } from '@config/typography';
 import { configureTerminalInput } from '@features/terminal/model/terminalInput';
 /**
  * TerminalBlockList renders command output as a continuous stream with thin separators.
- * Each command keeps its status and actions in a compact header above its output.
+ * Commands and output share an inset; metadata and controls appear on hover or focus.
  */
 
 import { memo, useState, useMemo, useEffect, useRef } from 'react';
+import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
 import {
-  Check, ChevronDown, ChevronRight, Copy, Ellipsis,
-  CircleX, Maximize2, RotateCw, Sparkles, Square, Terminal, Zap,
+  Ellipsis, CircleX, Maximize2, Square, Zap,
 } from '@ui/icons';
-import { useBlockStore } from '@features/terminal';
 import { useTerminalStore } from '@features/terminal';
 import AiBlock from '@features/chat/components/AiBlock';
 import { ptyResize } from '@platform/pty';
@@ -27,7 +26,6 @@ import BlockOutput from '@features/terminal/components/BlockOutput';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 import { useTerminalBlockFlow } from '@features/terminal/hooks/useTerminalBlockFlow';
 import type { BlockMenuAnchor } from '@features/terminal/hooks/useTerminalBlockFlow';
-import { useBlockItemActions } from '@features/terminal/hooks/useBlockItemActions';
 import { useTuiControls } from '@features/terminal/hooks/useTuiControls';
 import { hasVisibleContent as hasVisibleBlockContent } from '@features/terminal/model/blockVisibility';
 import { copyTerminalSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
@@ -36,18 +34,16 @@ import { measureRunningTerminalRows } from '../model/runningTerminalRows';
 
 interface Props {
   tabId: string;
-  /** 命令块左右内边距（px），分屏时靠相邻终端一侧减半，让缝隙看起来像一个终端 */
+  /** Outer pane insets; command content adds its own consistent spacing. */
   insetLeft?: number;
   insetRight?: number;
 }
 
-/** 从 ANSI CSI 序列剥离（OSC 已在 dispatcher 剥离）。 */
+/** Strip CSI sequences from the clipboard fallback; OSC is removed upstream. */
 const ANSI_CSI_RE = /\x1b\[[0-9;?]*[a-zA-Z]/g;
-const BLOCK_ACTION_BUTTON_SIZE = 28;
 const BLOCK_ACTION_ICON_SIZE = 16;
-const BLOCK_COLLAPSE_ICON_SIZE = 12;
 
-/** block 是否有值得渲染的内容（pending 占位、连按回车产生的空 done 都不算）。 */
+/** Omit prompt placeholders and empty commands from the visible stream. */
 export function hasVisibleContent(b: TermBlock): boolean {
   return hasVisibleBlockContent(b);
 }
@@ -55,10 +51,8 @@ export function hasVisibleContent(b: TermBlock): boolean {
 export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8 }: Props) {
   const {
     highlightQuery,
-    completed,
     running,
     flow,
-    allCollapsed,
     menuBlock,
     openMenu,
     closeMenu,
@@ -68,29 +62,7 @@ export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8
 
   return (
     <>
-      {/* 折叠/展开全部按钮 */}
-      {completed.length > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '2px 8px' }}>
-          <button
-            onClick={() => useBlockStore.getState().setAllCollapsed(tabId, !allCollapsed)}
-            data-tip={allCollapsed ? '展开全部' : '折叠全部'}
-            aria-label={allCollapsed ? '展开全部' : '折叠全部'}
-            style={{
-              fontSize: 'calc(10px * var(--ui-font-scale))',
-              padding: '1px 8px',
-              border: 'none',
-              borderRadius: 3,
-              background: 'transparent',
-              color: 'var(--text-muted)',
-              cursor: 'pointer',
-            }}
-          >
-            {allCollapsed ? '展开全部' : '折叠全部'}
-          </button>
-        </div>
-      )}
-
-      {/* 已完成块 + AI 问答（按时间交错） */}
+      {/* Completed commands and inline chat are interleaved by time. */}
       {flow.map((item, index) =>
         item.type === 'block' ? (
           <BlockItem
@@ -102,6 +74,7 @@ export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8
             highlightQuery={highlightQuery}
             dividerBefore={index > 0}
             onMenu={openMenu}
+            menuOpen={menuBlock?.block.id === item.block.id}
           />
         ) : (
           <div key={item.exchange.id} style={{ padding: `0 ${insetRight}px 0 ${insetLeft}px` }}>
@@ -110,7 +83,7 @@ export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8
         ),
       )}
 
-      {/* 运行中块 */}
+      {/* Running commands retain their live terminal. */}
       {running.map((b) => (
         <RunningItem
           key={b.id}
@@ -123,7 +96,7 @@ export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8
         />
       ))}
 
-      {/* 右键菜单 */}
+      {/* Both pointer and control anchors open the same menu. */}
       {menuBlock && (
         <BlockMenu
           block={menuBlock.block}
@@ -140,7 +113,7 @@ export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8
   );
 }
 
-// ══════ 工具：搜索高亮 ══════
+// Search highlighting.
 
 function highlightFragments(
   text: string,
@@ -190,12 +163,12 @@ function HighlightSpan({ text, query }: { text: string; query: string }) {
   );
 }
 
-// ══════ 命令语法高亮（） ══════
+// Command syntax highlighting.
 
-/** 将命令文本中的 flag、路径、管道等按 着色 */
+/** Color flags, paths, pipes, redirection and quoted strings. */
 function highlightCommand(cmd: string): React.ReactNode {
   if (!cmd) return cmd;
-  // 按 token 分割：flag(--xxx 或 -x)、路径(/xxx/yyy 或 ./xxx)、管道(|)、重定向(>/>>)、引号字符串
+  // Tokenize command syntax without changing its text or whitespace.
   const pattern = /(--?[a-zA-Z0-9][a-zA-Z0-9_.-]*|\.?\/[\w./-]+|[|&;]|[<>]{1,2}|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g;
   const parts: React.ReactNode[] = [];
   let last = 0;
@@ -221,16 +194,10 @@ function highlightCommand(cmd: string): React.ReactNode {
   return parts.length > 0 ? <>{parts}</> : cmd;
 }
 
-// ══════ BlockItem（已完成 block） ══════
+// Completed command blocks.
 
 const BlockItem = memo(function BlockItem({
-  block,
-  tabId,
-  insetLeft,
-  insetRight,
-  highlightQuery,
-  dividerBefore,
-  onMenu,
+  block, tabId, insetLeft, insetRight, highlightQuery, dividerBefore, onMenu, menuOpen,
 }: {
   block: TermBlock;
   tabId: string;
@@ -239,115 +206,66 @@ const BlockItem = memo(function BlockItem({
   highlightQuery: string;
   dividerBefore: boolean;
   onMenu: (b: TermBlock, anchor: BlockMenuAnchor) => void;
+  menuOpen: boolean;
 }) {
-  const [hovered, setHovered] = useState(false);
-  const {
-    isCollapsed,
-    copiedAction,
-    rerun,
-    askAI,
-    copyCmd,
-    copyOut,
-    toggleCollapsed,
-  } = useBlockItemActions({ tabId, block });
-  const duration =
-    block.endedAt !== null && block.startedAt !== null ? block.endedAt - block.startedAt : null;
-
+  const duration = block.endedAt !== null && block.startedAt !== null
+    ? block.endedAt - block.startedAt : null;
   const coloredCommand = useMemo(() => highlightCommand(block.command), [block.command]);
 
   return (
     <div
+      className="command-block"
       data-testid={`command-block-${block.id}`}
+      data-menu-open={menuOpen}
+      data-pane-id={tabId}
       style={{
-        paddingLeft: insetLeft,
-        paddingRight: insetRight,
+        paddingLeft: insetLeft + COMMAND_BLOCK_CONTENT_PADDING,
+        paddingRight: insetRight + COMMAND_BLOCK_CONTENT_PADDING,
         borderTop: dividerBefore ? '1px solid var(--block-divider)' : 'none',
-        paddingTop: dividerBefore ? 4 : 0,
       }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        // Keep the block menu separate from the pane-level context menu.
-        e.stopPropagation();
-        onMenu(block, { kind: 'pointer', x: e.clientX, y: e.clientY });
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onMenu(block, { kind: 'pointer', x: event.clientX, y: event.clientY });
       }}
     >
-      {/* The compact header keeps the command, result, duration, and hover actions together. */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', position: 'relative',
-        padding: '6px 10px', userSelect: 'none', minHeight: 44,
-      }}>
-        <button
-          onClick={toggleCollapsed}
-          data-tip={isCollapsed ? '展开' : '折叠'}
-          aria-label={isCollapsed ? '展开' : '折叠'}
-          style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)',
-            cursor: 'pointer', padding: 0, width: BLOCK_ACTION_BUTTON_SIZE, height: BLOCK_ACTION_BUTTON_SIZE, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-          {isCollapsed ? <ChevronRight size={BLOCK_COLLAPSE_ICON_SIZE} /> : <ChevronDown size={BLOCK_COLLAPSE_ICON_SIZE} />}
-        </button>
-        <div data-selectable style={{
-          flex: 1, minWidth: 0, fontSize: 'var(--terminal-font-size)', fontWeight: 'var(--fw-semibold)',
-          fontFamily: TERMINAL_FONT_FAMILY, color: 'var(--text-primary)',
-          whiteSpace: 'pre-wrap', wordBreak: 'break-all', userSelect: 'text',
-        }}>
-          {highlightQuery ? <HighlightSpan text={block.command} query={highlightQuery} /> : coloredCommand}
-        </div>
-        <span className="command-header-tail" data-hovered={hovered}>
-          <span className="command-header-actions" inert={!hovered}>
-            <BlockToolBtn title="重新运行" onClick={rerun} label={<RotateCw size={BLOCK_ACTION_ICON_SIZE} />} />
-            <BlockToolBtn title="AI 解释" onClick={askAI} label={<Sparkles size={BLOCK_ACTION_ICON_SIZE} />} />
-            <BlockToolBtn
-              title="复制命令"
-              onClick={copyCmd}
-              label={copiedAction === 'command'
-                ? <Check size={BLOCK_ACTION_ICON_SIZE} data-testid="copy-command-success" />
-                : <Terminal size={BLOCK_ACTION_ICON_SIZE} />}
-            />
-            <BlockToolBtn
-              title="复制输出"
-              onClick={copyOut}
-              label={copiedAction === 'output'
-                ? <Check size={BLOCK_ACTION_ICON_SIZE} data-testid="copy-output-success" />
-                : <Copy size={BLOCK_ACTION_ICON_SIZE} />}
-            />
-            <BlockToolBtn title="更多操作"
-              onClick={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                onMenu(block, { kind: 'control', left: rect.left, top: rect.bottom + 4 });
-              }}
-              label={<Ellipsis size={BLOCK_ACTION_ICON_SIZE} />} />
-          </span>
-          <CommandStatus exitCode={block.exitCode} duration={duration} agent={block.agent} />
+      <div className="command-block-info">
+        <BlockContext block={block} />
+        <CommandStatus exitCode={block.exitCode} duration={duration} agent={block.agent} />
+        <span className="command-block-actions">
+          <IconButton compact data-subtle data-tip={t('More actions')} aria-label={t('More actions')}
+            aria-haspopup="menu" aria-expanded={menuOpen}
+            onClick={(event) => {
+              const rect = event.currentTarget.getBoundingClientRect();
+              onMenu(block, { kind: 'control', left: rect.left, top: rect.bottom + 4 });
+            }}>
+            <Ellipsis size={BLOCK_ACTION_ICON_SIZE} />
+          </IconButton>
         </span>
       </div>
-
-      {/* Route outputHtml explicitly because snapshots may contain plain text without spans. */}
-      {!isCollapsed && (block.outputHtml ? (
-        <BlockOutput
-          text={block.outputHtml}
-          isHtml
-          highlight={highlightQuery || undefined}
-        />
-      ) : block.outputText ? (
-        <BlockOutput
-          text={block.outputText}
-          isHtml={false}
-          highlight={highlightQuery || undefined}
-        />
-      ) : null)}
-
-      {/* Show when older output lines were truncated. */}
-      {!isCollapsed && block.linesTruncated > 0 && (
-        <div style={{ padding: '0 12px 6px 30px', fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>
-          …已截断 {block.linesTruncated} 行
-        </div>
-      )}
+      <div data-selectable className="command-block-command" style={{ fontFamily: TERMINAL_FONT_FAMILY }}>
+        {highlightQuery ? <HighlightSpan text={block.command} query={highlightQuery} /> : coloredCommand}
+      </div>
+      {(block.outputHtml || block.outputText) && <div className="command-block-output">
+        <BlockOutput text={block.outputHtml || block.outputText} isHtml={!!block.outputHtml}
+          flush highlight={highlightQuery || undefined} />
+      </div>}
+      {block.linesTruncated > 0 && <div className="command-block-info command-block-truncation">
+        {t('Truncated {{count}} lines', { count: block.linesTruncated })}
+      </div>}
     </div>
   );
 });
 
-// ══════ RunningItem（运行中 block） ══════
+/** Context stays on its own row so commands and output share the full content width. */
+function BlockContext({ block }: { block: TermBlock }) {
+  return <>
+    {block.cwd && <span className="command-block-cwd" data-tip={block.cwd}>{block.cwd}</span>}
+    {block.gitBranch && <span className="command-block-branch">{block.gitBranch}</span>}
+  </>;
+}
+
+// Running command blocks.
 
 function RunningItem({
   block,
@@ -365,13 +283,13 @@ function RunningItem({
   dividerBefore: boolean;
 }) {
   const [elapsedNow, setElapsedNow] = useState(
-    block.startedAt ? fmtDuration(Date.now() - block.startedAt) : '',
+    block.startedAt !== null ? fmtDuration(Date.now() - block.startedAt) : '',
   );
   const { sendCtrlC, killApp, killArmed, enterFullScreen } = useTuiControls(tabId);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      if (block.startedAt) setElapsedNow(fmtDuration(Date.now() - block.startedAt));
+      if (block.startedAt !== null) setElapsedNow(fmtDuration(Date.now() - block.startedAt));
     }, 1000);
     return () => clearInterval(timer);
   }, [block.startedAt]);
@@ -391,57 +309,35 @@ function RunningItem({
   return (
     <div
       data-testid={`running-block-${block.id}`}
+      className="command-block"
       style={{
-        paddingLeft: insetLeft,
-        paddingRight: insetRight,
+        paddingLeft: insetLeft + COMMAND_BLOCK_CONTENT_PADDING,
+        paddingRight: insetRight + COMMAND_BLOCK_CONTENT_PADDING,
         borderTop: dividerBefore ? '1px solid var(--block-divider)' : 'none',
-        paddingTop: dividerBefore ? 4 : 0,
       }}
     >
-      {/* The running header keeps the command, elapsed time, and controls together. */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', position: 'relative',
-        padding: '6px 10px', userSelect: 'none', minHeight: 44,
-      }}>
-        <span
-          style={{
-            display: 'inline-block',
-            width: BLOCK_ACTION_BUTTON_SIZE,
-            height: BLOCK_ACTION_BUTTON_SIZE,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, var(--accent-warm) 0 3.5px, transparent 4px)',
-            animation: 'pulse 1.5s ease-in-out infinite',
-            flexShrink: 0,
-          }}
-        />
-        <div data-selectable style={{
-          flex: 1, minWidth: 0, fontSize: 'var(--terminal-font-size)', fontWeight: 'var(--fw-semibold)',
-          fontFamily: TERMINAL_FONT_FAMILY, color: 'var(--text-primary)',
-          whiteSpace: 'pre-wrap', wordBreak: 'break-all', userSelect: 'text',
-        }}>
-          {highlightQuery ? <HighlightSpan text={block.command} query={highlightQuery} /> : coloredCommand}
-        </div>
-        <span style={{
-          display: 'inline-flex', gap: 2, alignItems: 'center', flexShrink: 0, flexWrap: 'wrap', position: 'relative', maxWidth: '100%',
-          fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)',
-        }}>
-          {block.agent && <Zap size={11} style={{ color: 'var(--accent-warm)' }} aria-label="AI 执行" />}
-          {elapsedNow && (
-            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{elapsedNow}</span>
-          )}
+      <div className="command-block-info">
+        <BlockContext block={block} />
+        <span className="command-block-running" aria-label={t('Running')} />
+        {block.agent && <Zap size={14} className="command-status-agent" aria-label={t('AI execution')} />}
+        {elapsedNow && <span className="command-status-duration">({elapsedNow})</span>}
+        <span className="command-block-actions">
           <BlockToolBtn title={t('Interrupt command')} shortcut="Control+C" onClick={sendCtrlC} label={<Square size={BLOCK_ACTION_ICON_SIZE} />} />
           <BlockToolBtn title={killArmed ? t('Force quit foreground process') : t('Quit foreground process')} onClick={killApp} label={<CircleX size={BLOCK_ACTION_ICON_SIZE} />} />
-          <BlockToolBtn title="进入全屏交互" onClick={() => { setOutputReady(true); enterFullScreen(); }} label={<Maximize2 size={BLOCK_ACTION_ICON_SIZE} />} />
+          <BlockToolBtn title={t('Enter fullscreen interaction')} onClick={enterFullScreen} label={<Maximize2 size={BLOCK_ACTION_ICON_SIZE} />} />
         </span>
+      </div>
+      <div data-selectable className="command-block-command" style={{ fontFamily: TERMINAL_FONT_FAMILY }}>
+        {highlightQuery ? <HighlightSpan text={block.command} query={highlightQuery} /> : coloredCommand}
       </div>
 
       {/* Live xterm preserves native cursor, IME, and CJK layout while the command runs. */}
-      {outputReady && <RunningTerm tabId={tabId} blockId={block.id} />}
+      <RunningTerm tabId={tabId} blockId={block.id} />
     </div>
   );
 }
 
-// ══════ RunningTerm — 运行中块的活 xterm 宿主 ══════
+// Live output host.
 
 /**
  * Mount the controller-owned live terminal, trim it to visible output, and connect input.
@@ -572,12 +468,13 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
     <div
       ref={hostRef}
       data-testid="running-term"
-      style={{ overflow: 'hidden', padding: '2px 8px 8px' }}
+      className="command-block-output"
+      style={{ overflow: 'hidden' }}
     />
   );
 }
 
-// ══════ BlockToolBtn — 小块操作按钮 ══════
+// Compact running controls.
 
 function BlockToolBtn({
   title,

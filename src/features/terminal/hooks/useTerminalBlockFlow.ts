@@ -41,7 +41,6 @@ export function useTerminalBlockFlow(tabId: string) {
     [chatPanelOpen, completed],
   );
   const flow = useMemo(() => mergeFlow(standalone, exchanges), [exchanges, standalone]);
-  const allCollapsed = completed.length > 0 && completed.every((block) => block.collapsed);
   const openMenu = useCallback((block: TermBlock, anchor: BlockMenuAnchor) => {
     setMenuBlock({ block, anchor });
   }, []);
@@ -52,7 +51,6 @@ export function useTerminalBlockFlow(tabId: string) {
     completed,
     running,
     flow,
-    allCollapsed,
     menuBlock,
     openMenu,
     closeMenu,

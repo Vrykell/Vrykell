@@ -67,8 +67,6 @@ export interface BackendBlockEntry {
   ended_at: number | null;
   session_title: string;
   session_status: string;
-  /** block 是否被用户折叠（恢复时回读） */
-  collapsed: boolean;
 }
 
 /** Rust sessions 表返回 */

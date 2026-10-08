@@ -49,7 +49,7 @@ describe('sessionManager 生命周期', () => {
     useSessionStore.setState({ groups: [{ id: 'g9', title: '恢复分组', collapsed: false }] });
     invokeMock.mockResolvedValueOnce(undefined); // restore_session
     invokeMock.mockResolvedValueOnce([
-      { id: 'b1', pane_id: null, command: 'ls', exit_code: 0, started_at: 1, ended_at: 2, status: 'done', collapsed: 0, output_clean: 'out', output_raw: 'out', output_html: '' },
+      { id: 'b1', pane_id: null, command: 'ls', exit_code: 0, started_at: 1, ended_at: 2, status: 'done', collapsed: true, output_clean: 'out', output_raw: 'out', output_html: '' },
       { id: 'b2', pane_id: `${sessionId}#1`, command: 'pwd', exit_code: null, started_at: 3, ended_at: null, status: 'running', collapsed: null, output_clean: '', output_raw: '', output_html: '' },
     ]); // get_session_blocks
     invokeMock.mockResolvedValueOnce([
@@ -68,6 +68,10 @@ describe('sessionManager 生命周期', () => {
     expect(isSessionTab(tab) && tab.groupId).toBe('g9');
     // blocks 归属：pane null → #0
     expect(useBlockStore.getState().byTab[`${sessionId}#0`]).toHaveLength(1);
+    const restored = useBlockStore.getState().byTab[`${sessionId}#0`]![0]!;
+    expect(restored.outputText).toBe('out');
+    expect(restored).not.toHaveProperty('collapsed');
+    expect(invokeMock).not.toHaveBeenCalledWith('set_block_collapsed', expect.anything());
     expect(useBlockStore.getState().byTab[`${sessionId}#1`]).toHaveLength(1);
     // chat 恢复
     expect(useChatStore.getState().byTab[sessionId]).toHaveLength(2);
@@ -109,10 +113,7 @@ describe('sessionManager 生命周期', () => {
     expect(term.shellType).toBe('zsh');
   });
 
-  it('persistBlockCollapsed / record：start 与 complete 透传', async () => {
-    invokeMock.mockResolvedValueOnce(undefined);
-    await sessionManager.persistBlockCollapsed('b1', true);
-    expect(invokeMock).toHaveBeenCalledWith('set_block_collapsed', { id: 'b1', collapsed: true });
+  it('record：start 与 complete 透传', async () => {
     const block = {
       id: 'b1', command: 'ls', status: 'done', exitCode: 0, startedAt: 1, endedAt: 2,
       outputHtml: '', outputText: 'out', outputRaw: 'raw', cwd: '', wasLongRunning: false,

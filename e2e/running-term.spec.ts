@@ -98,6 +98,7 @@ test('手动全屏：块内活终端搬进全屏宿主，退出后搬回卡片',
   await expectAnyTermContains(page, 'tui-content-line', 3000);
 
   // 进入全屏：el 搬进 tui-fullscreen，内容仍在（块路由下主 xterm 是空壳）
+  await page.locator('[data-testid^="running-block-"]').first().hover();
   await page.locator('[data-tip="进入全屏交互"]').click();
   const fs = page.getByTestId('tui-fullscreen');
   await expect(fs.locator('.xterm')).toBeVisible();
@@ -170,7 +171,8 @@ test('卡片内滚轮冒泡到块列表滚动容器（不被块 xterm 吞掉）'
   const box = await host.locator('.xterm').boundingBox();
   expect(box).not.toBeNull();
   // 取卡片可视区域内的一点（避开顶部卡片头与底部输入栏）
-  const wheelY = Math.min(box!.y + 60, 250);
+  const scrollBounds = (await page.locator('[data-testid^="terminal-scroll-"]').first().boundingBox())!;
+  const wheelY = Math.min(box!.y + 10, scrollBounds.y + scrollBounds.height - 10);
   await page.mouse.move(box!.x + box!.width / 2, wheelY);
   await page.mouse.wheel(0, 300);
 

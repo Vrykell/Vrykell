@@ -12,7 +12,7 @@ import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 
 interface Props {
   block: TermBlock;
-  /** 该块所属 pane（「发给 AI 分析」时作为对话来源，回答内联回本 pane 块流） */
+  /** Route the analysis reply to the command's owning pane. */
   paneId: string;
   anchor: BlockMenuAnchor;
   onClose: () => void;
@@ -54,6 +54,38 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
     };
   }, [onClose]);
 
+  useEffect(() => {
+    const trigger = document.activeElement;
+    const frame = requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus());
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        onClose();
+        return;
+      }
+      const items = Array.from(ref.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
+      if (!items.length || !ref.current?.contains(document.activeElement)) return;
+      const index = items.indexOf(document.activeElement as HTMLElement);
+      let next: number;
+      if (event.key === 'ArrowDown') next = (index + 1) % items.length;
+      else if (event.key === 'ArrowUp') next = (index - 1 + items.length) % items.length;
+      else if (event.key === 'Home') next = 0;
+      else if (event.key === 'End') next = items.length - 1;
+      else if (event.key === 'Tab') { onClose(); return; }
+      else return;
+      event.preventDefault();
+      event.stopPropagation();
+      items[next]?.focus();
+    };
+    window.addEventListener('keydown', handleKey, true);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('keydown', handleKey, true);
+      if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus({ preventScroll: true });
+    };
+  }, [onClose]);
+
   const copy = useCallback((text: string) => {
     void copyBlockText(text);
   }, []);
@@ -63,14 +95,14 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
   }, [paneId, block.command]);
 
   const sendToAI = useCallback(() => {
-    const output = getOutputText();
+    const output = getOutputText().slice(0, 2000);
     useChatStore.getState().send(
-      `分析这条命令的执行结果：\n\`\`\`\n$ ${block.command}\n${output}\n\`\`\``,
+      t('Analyze this command result:\n```\n$ {{command}}\n{{output}}\n```', { command: block.command, output }),
       { paneId },
     );
   }, [block, paneId, getOutputText]);
 
-  const duration = block.endedAt && block.startedAt
+  const duration = block.endedAt !== null && block.startedAt !== null
     ? fmtDuration(block.endedAt - block.startedAt)
     : '';
 
@@ -83,7 +115,7 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
       ref={ref}
       className="workspace-floating"
       role="menu"
-      aria-label="命令块操作"
+      aria-label={t('Command block actions')}
       data-no-drag
       style={{
         position: 'fixed',
@@ -100,7 +132,7 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
         overflow: 'hidden',
       }}
     >
-      {/* 块信息头 — 命令摘要 + 退出状态 */}
+      {/* Summarize the command without taking space from its output. */}
       <div style={{
         padding: '6px 12px 5px',
         borderBottom: '1px solid var(--border)',
@@ -125,7 +157,7 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
               color: block.exitCode === 0 ? 'var(--success)' : 'var(--error)',
               fontWeight: 'var(--fw-semibold)',
             }}>
-              退出码 {block.exitCode}
+              {t('Exit code {{code}}', { code: block.exitCode })}
             </span>
           )}
         </div>
