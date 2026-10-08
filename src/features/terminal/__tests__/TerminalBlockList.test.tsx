@@ -25,16 +25,18 @@ describe('TerminalBlockList', () => {
     const context = item.querySelector('.command-block-info')!;
     expect(context).toHaveTextContent('/Users/w/work');
     expect(context).toHaveTextContent('main');
-    expect(context).toHaveTextContent('(1.4s)');
+    expect(context).toHaveTextContent('(1.400s)');
     expect(screen.getByTestId('exit-code')).toHaveTextContent('0');
     expect(item.querySelectorAll('button')).toHaveLength(1);
     expect(screen.getByLabelText('更多操作')).toHaveAttribute('aria-haspopup', 'menu');
   });
 
-  it('失败命令退出码红色 ✗N', () => {
+  it('marks failed commands without changing their content inset', () => {
     useBlockStore.getState().setBlocks('t1', [block({ exitCode: 1 })]);
     render(<TerminalBlockList tabId="t1" />);
     expect(screen.getByTestId('exit-code').textContent).toBe('1');
+    expect(screen.getByTestId('command-block-b1')).toHaveAttribute('data-failed', 'true');
+    expect(screen.getByTestId('command-block-b1')).toHaveStyle({ paddingLeft: '16px' });
   });
 
   it('命令行无 $ 前缀、无 3px 左边框', () => {

@@ -18,9 +18,11 @@ test.beforeEach(async ({ page }) => {
 test('运行中命令块以图标显示统一尺寸的操作按钮', async ({ page }) => {
   const block = page.locator('[data-testid^="running-block-"]').first();
   await page.mouse.move(0, 0);
-  await expect(block.locator('.command-block-info')).toHaveCSS('opacity', '0');
-  await block.hover();
   await expect(block.locator('.command-block-info')).toHaveCSS('opacity', '1');
+  await expect(block.locator('.command-status-duration')).toBeVisible();
+  await expect(block.locator('.command-block-actions')).toHaveCSS('opacity', '0');
+  await block.hover();
+  await expect(block.locator('.command-block-actions')).toHaveCSS('opacity', '1');
   const actions = [
     '终止命令',
     '结束前台应用',
