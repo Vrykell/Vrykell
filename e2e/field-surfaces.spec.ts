@@ -1,4 +1,4 @@
-import { test, expect, type Locator } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { setupTauriMock, memoryFact } from './tauri-mock';
 import { gotoSetting } from './settings';
 
@@ -7,6 +7,23 @@ const luminance = (color: string) => channels(color).map(value => {
   const normalized = value / 255;
   return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
 }).reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+
+/** Theme switches animate surface colors, so measure only once every background has settled. */
+async function settleSurfaceColors(page: Page) {
+  await page.getByRole('combobox', { name: '终端字号' }).evaluate(element => new Promise<void>(resolve => {
+    const deadline = performance.now() + 1000;
+    let previous = '';
+    let stable = 0;
+    const frame = () => {
+      const current = getComputedStyle(element).backgroundColor;
+      stable = current === previous ? stable + 1 : 0;
+      previous = current;
+      if (stable >= 2 || performance.now() > deadline) resolve();
+      else requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  }));
+}
 
 async function expectFieldHierarchy(field: Locator, editable = true) {
   await expect(field).toBeVisible();
@@ -39,6 +56,7 @@ for (const theme of ['深色', '浅色']) {
     await page.goto('/');
     await gotoSetting(page, '主题');
     await page.getByRole('button', { name: theme, exact: true }).click();
+    await settleSurfaceColors(page);
     await page.mouse.move(0, 0);
     const preview = page.locator('.settings-terminal-preview');
     await expectFieldHierarchy(preview, false);
