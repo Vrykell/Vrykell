@@ -15,6 +15,14 @@ test('command coloring is optional, persists and leaves native input editing int
   const overlay = page.locator('.command-input-overlay');
   await expect(overlay.locator('[data-kind="command"]')).toHaveCount(2);
   await expect(overlay.locator('[data-kind="string"]')).toHaveText('"hello 中文"');
+  await input.fill('LANG=zh_CN npm run build --timeout 30 ./配置.json | echo "home=$HOME $(pwd)"');
+  await expect(overlay.locator('[data-kind="command"]')).toHaveCount(3);
+  await expect(overlay.locator('[data-kind="argument"]')).toHaveText(['run', 'build']);
+  await expect(overlay.locator('[data-kind="number"]')).toHaveText('30');
+  await expect(overlay.locator('[data-kind="variable"]')).toHaveText(['LANG=zh_CN', '$HOME']);
+  await expect(overlay.locator('[data-kind="path"]')).toHaveText('./配置.json');
+  await expect(overlay.locator('[data-kind="command"]').first()).toHaveCSS('color', 'rgb(179, 245, 109)');
+  await input.fill('echo "hello 中文" --flag | cat ./file');
   await input.press('Enter');
   const block = page.locator('.command-block-command').filter({ hasText: 'echo "hello 中文"' });
   await expect(block.locator('[data-kind="command"]')).toHaveCount(2);
