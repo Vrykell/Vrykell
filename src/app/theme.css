@@ -8,6 +8,7 @@
   --terminal-input-row-height: 22px;
   --terminal-bold-weight: 700;
   --terminal-command-weight: 500;
+  --cmd-program: var(--xterm-green);
   --scrollbar-size: 8px;
   --font-ui: -apple-system, "SF Pro Text", "PingFang SC", "Segoe UI", sans-serif;
   /* Ligature-free mono first, then a monospace CJK face, then the generic before the
@@ -64,9 +65,19 @@
   --status-error: var(--error-light);
 }
 
+/* Native carets and terminal cursors share the active blue cursor token. */
+input, textarea, [contenteditable="true"] { caret-color: var(--xterm-cursor); }
 .settings-nav-group { margin-bottom: 16px; }
 .settings-nav-heading { padding: 12px 16px 6px; color: var(--text-muted); font-size: var(--fs-caption); font-weight: var(--fw-medium); }
 .settings-navigation [role="button"]:focus-visible { outline: none; }
+.command-token[data-kind="command"] { color: var(--cmd-program); }
+.command-token[data-kind="flag"], .command-token[data-kind="variable"] { color: var(--cmd-flag); }
+.command-token[data-kind="path"] { color: var(--cmd-path); }
+.command-token[data-kind="string"] { color: var(--cmd-string); }
+.command-token[data-kind="operator"] { color: var(--cmd-pipe); }
+.command-token[data-kind="comment"] { color: var(--text-muted); }
+.command-completion-suffix { color: var(--text-muted); opacity: 0.65; }
+.command-completion-action { display: inline-block; vertical-align: middle; margin-left: 8px; pointer-events: auto; }
 
 * { box-sizing: border-box; }
 

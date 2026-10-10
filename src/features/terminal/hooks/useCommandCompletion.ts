@@ -79,8 +79,9 @@ export function useCommandCompletion({
     };
   }, [aiMode, completeDebounceMs, completeOn, cwd, isFocused, text, visible]);
 
-  const acceptCompletion = useCallback((shiftKey: boolean) => {
+  const acceptCompletion = useCallback((shiftKey: boolean, candidate?: string) => {
     if (ghostCandidates.length === 0 && !completionRef.current) return false;
+    if (candidate !== undefined && !ghostCandidates.includes(candidate)) return false;
     const cycle = completionRef.current;
     if (cycle) {
       const direction = shiftKey ? -1 : 1;
@@ -88,9 +89,10 @@ export function useCommandCompletion({
       suppressEffectRef.current = true;
       setText(cycle.base + cycle.candidates[cycle.index]!);
     } else {
-      completionRef.current = { base: text, candidates: ghostCandidates, index: 0 };
+      const index = candidate === undefined ? 0 : ghostCandidates.indexOf(candidate);
+      completionRef.current = { base: text, candidates: ghostCandidates, index };
       suppressEffectRef.current = true;
-      setText(text + ghostCandidates[0]!);
+      setText(text + ghostCandidates[index]!);
       setGhost('');
       setGhostCandidates([]);
     }

@@ -107,7 +107,7 @@ export function useInputEditorController({
     if (inputRef.current) inputRef.current.style.height = 'auto';
   }, []);
 
-  const { ghost, clearGhost, acceptCompletion, restoreCompletion } = useCommandCompletion({
+  const { ghost, ghostCandidates, clearGhost, acceptCompletion, restoreCompletion } = useCommandCompletion({
     text,
     aiMode,
     isFocused,
@@ -257,6 +257,12 @@ export function useInputEditorController({
     removeAttachment,
     canSendAi,
     ghost,
+    ghostCandidates,
+    acceptSuggestedCompletion: (candidate: string) => {
+      if (!acceptCompletion(false, candidate)) return;
+      resetHistNav();
+      inputRef.current?.focus();
+    },
     execute,
     handleChange,
     handlePaste,

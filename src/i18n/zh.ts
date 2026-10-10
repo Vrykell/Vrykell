@@ -1,5 +1,8 @@
 /** Simplified Chinese messages for shared UI and feature namespaces. */
 const zh: Record<string, string> = {
+  'Completion suggestions': '补全建议',
+  'Color commands, arguments and shell operators.': '为命令、参数和 shell 操作符着色。',
+  'Command syntax highlighting': '命令语法高亮',
   'Save failed': '保存失败',
   'Saved': '已保存',
   'Saving…': '保存中…',

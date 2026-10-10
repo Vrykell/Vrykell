@@ -243,7 +243,7 @@ const dark: ThemePalette = {
 
   xtermBg: '#1B1B1B',
   xtermForeground: '#ECEFF4',
-  xtermCursor: '#ECEFF4',
+  xtermCursor: '#4DA3FF',
   xtermSelection: 'rgba(141,183,232,0.28)',
   // 低饱和 ANSI 色板：保留目录、路径、错误等语义，同时避免彩色噪声。
   xtermBlack: '#1B1F24',
@@ -390,7 +390,7 @@ const light: ThemePalette = {
 
   xtermBg: '#E5E5E5',
   xtermForeground: '#2B3038',
-  xtermCursor: '#2E3742',
+  xtermCursor: '#006FDB',
   xtermSelection: 'rgba(46,96,150,0.20)',
   xtermBlack: '#41454D',
   xtermRed: '#B42318',
