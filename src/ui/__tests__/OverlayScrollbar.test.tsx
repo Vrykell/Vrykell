@@ -82,3 +82,22 @@ it('places floating tracks above the scroll surface itself', () => {
   expect(screen.getByRole('scrollbar')).toHaveAttribute('tabindex', '-1');
   expect(screen.getByRole('scrollbar')).toHaveStyle({ position: 'fixed', zIndex: '401', left: '300px', top: '180px' });
 });
+
+it('maps a hosted track into the owning layer so transformed popups stay aligned', () => {
+  const host = document.createElement('div');
+  host.style.position = 'fixed'; host.style.zIndex = '10000';
+  Object.defineProperties(host, {
+    clientTop: { value: 2 }, clientLeft: { value: 2 },
+    offsetWidth: { value: 600 }, offsetHeight: { value: 500 },
+    scrollLeft: { value: 20 }, scrollTop: { value: 40 },
+    getBoundingClientRect: { value: () => new DOMRect(100, 50, 600, 500) },
+  });
+  const scroll = document.createElement('div'); host.append(scroll);
+  Object.defineProperties(scroll, {
+    clientWidth: { value: 300 }, clientHeight: { value: 200 }, scrollHeight: { value: 1000 },
+    getClientRects: { value: () => [new DOMRect(120, 80, 300, 200)] },
+    getBoundingClientRect: { value: () => new DOMRect(120, 80, 300, 200) },
+  });
+  render(<OverlayScrollbar floating layerHost={host} scrollRef={{ current: scroll }} controlsId="panel" label="Scroll panel" />);
+  expect(screen.getByRole('scrollbar')).toHaveStyle({ position: 'absolute', zIndex: '1', left: '328px', top: '68px' });
+});
