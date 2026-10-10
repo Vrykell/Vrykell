@@ -20,6 +20,14 @@ function renderItem(overrides: Partial<Parameters<typeof SidebarItem>[0]> = {}) 
 }
 
 describe('SidebarItem', () => {
+  it('keeps compact rows selectable with the same title and action behavior', () => {
+    const { onClick, onAction } = renderItem({ compact: true, active: true });
+    fireEvent.click(screen.getByText('会话一'));
+    expect(onClick).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('button', { name: '关闭标签' }));
+    expect(onAction).toHaveBeenCalledOnce();
+    expect(onClick).toHaveBeenCalledOnce();
+  });
   it('keeps the trailing action hidden until hover or selection', () => {
     renderItem();
     const action = screen.getByRole('button', { name: '关闭标签' });

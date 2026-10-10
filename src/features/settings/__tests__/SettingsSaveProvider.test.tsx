@@ -61,8 +61,10 @@ describe('immediate settings save feedback', () => {
     expect(screen.getAllByRole('status')).toHaveLength(2);
     expect(screen.getByPlaceholderText('Draft')).toHaveValue('kept');
     fireEvent.click(screen.getByTestId('summary').querySelector('button')!);
-    await waitFor(() => expect(screen.getAllByRole('status')).toHaveLength(1));
-    expect(screen.getByRole('status')).toHaveTextContent('已保存');
+    await waitFor(() => {
+      expect(screen.getAllByRole('status')).toHaveLength(1);
+      expect(screen.getByRole('status')).toHaveTextContent('已保存');
+    });
     expect(commit).toHaveBeenCalledTimes(2);
   });
 });

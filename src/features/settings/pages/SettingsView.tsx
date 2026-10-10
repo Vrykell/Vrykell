@@ -273,7 +273,7 @@ function SettingsContent() {
     }}>
       {/* 侧栏 */}
       <aside className="settings-navigation" style={{
-        width: 192, flexShrink: 0, background: 'var(--sidebar-bg)',
+        width: 224, flexShrink: 0, background: 'var(--sidebar-bg)',
         display: 'flex', flexDirection: 'column', minHeight: 0,
       }}>
         <div style={{ padding: 8 }}>
@@ -307,7 +307,7 @@ function SettingsContent() {
                 <div className="settings-nav-heading">{g.label}</div>
                 {g.items.map(item => {
                   const Icon = item.icon;
-                  return <SidebarItem key={item.id} icon={<Icon size={iconSizes.row} />}
+                  return <SidebarItem compact key={item.id} icon={<Icon size={iconSizes.row} />}
                     title={item.label} tooltip={item.label} active={selected === item.id} tabIndex={0}
                     style={{ fontSize: 'var(--fs-label)' }}
                     dataAttributes={{ role: 'button', 'aria-label': item.label, 'aria-current': selected === item.id ? 'page' : undefined }}
