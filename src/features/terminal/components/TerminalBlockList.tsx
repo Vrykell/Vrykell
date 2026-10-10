@@ -187,6 +187,7 @@ const BlockItem = memo(function BlockItem({
     <div
       className="command-block"
       data-testid={`command-block-${block.id}`}
+      data-command-block-id={block.id}
       data-menu-open={menuOpen}
       data-failed={block.exitCode !== null && block.exitCode !== 0}
       data-divider-before={dividerBefore}
@@ -282,6 +283,7 @@ function RunningItem({
   return (
     <div
       data-testid={`running-block-${block.id}`}
+      data-command-block-id={block.id}
       data-running="true"
       data-divider-before={dividerBefore}
       className="command-block"
