@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MenuItem } from '@ui/UiBtn';
 import { clampMenuPosition } from '@ui/menuPosition';
+import { useExclusiveMenu } from './hooks/useExclusiveMenu';
 
 export interface ContextMenuItem {
   label: string;
@@ -28,6 +29,7 @@ interface Props {
  */
 export default function ContextMenu({ anchor, items, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  useExclusiveMenu(ref, onClose);
   const [position, setPosition] = useState({ left: anchor.x, top: anchor.y });
 
   useLayoutEffect(() => {
@@ -47,17 +49,6 @@ export default function ContextMenu({ anchor, items, onClose }: Props) {
     return () => window.removeEventListener('resize', updatePosition);
   }, [anchor.x, anchor.y, items.length]);
 
-  useEffect(() => {
-    const h = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    };
-    const frame = requestAnimationFrame(() => document.addEventListener('click', h));
-    return () => {
-      cancelAnimationFrame(frame);
-      document.removeEventListener('click', h);
-    };
-  }, [onClose]);
-
   // Esc 关闭（捕获阶段：不再触发全局 Esc，例如终端键盘目标切换）
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -76,6 +67,7 @@ export default function ContextMenu({ anchor, items, onClose }: Props) {
       role="menu"
       aria-label="操作菜单"
       className="workspace-floating"
+      onContextMenu={event => { event.preventDefault(); event.stopPropagation(); }}
       style={{
         position: 'fixed',
         zIndex: 9999,
