@@ -7,8 +7,8 @@
 import { Terminal } from '@xterm/xterm';
 import type { IBufferCell } from '@xterm/xterm';
 import { indexToCss } from '@features/terminal/model/blockTypes';
-import { TERMINAL_FONT_FAMILY, getTerminalFontSize, terminalLetterSpacing, TERMINAL_LINE_HEIGHT } from '@features/terminal/model/terminalFont';
-import { useTypographyStore } from '@config/typography';
+import { getTerminalFontOptions } from '@features/terminal/model/terminalFont';
+import { terminalTypographyChanged, useTypographyStore } from '@config/typography';
 import { readXtermTheme } from '@features/terminal/model/xtermTheme';
 
 function getFgCss(cell: IBufferCell): string | null {
@@ -204,9 +204,7 @@ export function createOffscreenTerm(
     rows,
     scrollback,
     allowTransparency: true,
-    fontFamily: TERMINAL_FONT_FAMILY,
-    fontSize: getTerminalFontSize(),
-    lineHeight: TERMINAL_LINE_HEIGHT,
+    ...getTerminalFontOptions(),
   });
   term.open(el);
   return {
@@ -246,11 +244,7 @@ export function createBlockTerm(
     cols: Math.max(cols || 80, 1),
     rows: Math.max(rows || 24, 1),
     scrollback: 5000,
-    fontFamily: TERMINAL_FONT_FAMILY,
-    fontSize: getTerminalFontSize(),
-    // Same whole-pixel grid as the pane terminal, so snapshots measure the same cells.
-    letterSpacing: terminalLetterSpacing(),
-    lineHeight: TERMINAL_LINE_HEIGHT,
+    ...getTerminalFontOptions(),
     cursorBlink: true,
     theme: xtermTheme,
   });
@@ -260,10 +254,7 @@ export function createBlockTerm(
   });
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'data-theme'] });
   const unsubscribeTypography = useTypographyStore.subscribe((state, previous) => {
-    if (state.terminalFontSize !== previous.terminalFontSize) {
-      term.options.fontSize = state.terminalFontSize;
-      term.options.letterSpacing = terminalLetterSpacing(state.terminalFontSize);
-    }
+    if (terminalTypographyChanged(state, previous)) Object.assign(term.options, getTerminalFontOptions());
   });
   return {
     term,

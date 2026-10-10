@@ -205,8 +205,9 @@ export default function InputEditor({
                 padding: '1px 0',
                 fontSize: 'var(--terminal-font-size)',
                 fontFamily: TERMINAL_FONT_FAMILY,
+                fontWeight: 'var(--terminal-font-weight)',
                 color: 'var(--text-primary)',
-                lineHeight: 'max(22px, var(--terminal-row-height))',
+                lineHeight: 'var(--terminal-input-row-height)',
                 outline: 'none',
               }}
             />
@@ -221,7 +222,8 @@ export default function InputEditor({
                   padding: '1px 0',
                   fontSize: 'var(--terminal-font-size)',
                   fontFamily: TERMINAL_FONT_FAMILY,
-                  lineHeight: 'max(22px, var(--terminal-row-height))',
+                  fontWeight: 'var(--terminal-font-weight)',
+                  lineHeight: 'var(--terminal-input-row-height)',
                   whiteSpace: 'pre-wrap',
                   overflowWrap: 'break-word',
                 }}

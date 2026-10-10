@@ -16,7 +16,7 @@ describe('font preferences', () => {
     expect(document.documentElement.style.getPropertyValue('--terminal-font-size')).toBe('18px');
     expect(document.documentElement.style.getPropertyValue('--terminal-row-height')).toBe('21px');
     expect(document.documentElement.style.getPropertyValue('--ui-font-scale')).toBe(String(15 / 13));
-    expect(JSON.parse(localStorage.getItem('vrykell-typography')!).state).toEqual({ uiFontSize: 15, terminalFontSize: 18, terminalRenderer: 'webgl' });
+    expect(JSON.parse(localStorage.getItem('vrykell-typography')!).state).toMatchObject({ uiFontSize: 15, terminalFontSize: 18, terminalRenderer: 'webgl' });
   });
 
   it('keeps the renderer preference and rejects unknown values', async () => {
@@ -37,4 +37,17 @@ describe('font preferences', () => {
     useTypographyStore.getState().reset();
     expect(useTypographyStore.getState().terminalFontSize).toBe(14);
   });
+});
+
+it('validates font preferences, migrates older settings and resets all metrics', async () => {
+  useTypographyStore.getState().update({ terminalFontPreset: 'Maple Mono NF CN', terminalFontWeight: 350, terminalLineHeight: 1.2 });
+  expect(document.documentElement.style.getPropertyValue('--terminal-font-family')).toContain('"Maple Mono NF CN"');
+  expect(document.documentElement.style.getPropertyValue('--terminal-font-weight')).toBe('350');
+  expect(document.documentElement.style.getPropertyValue('--terminal-row-height')).toBe('20px');
+  expect(JSON.parse(localStorage.getItem('vrykell-typography')!).state).toMatchObject({ terminalFontPreset: 'Maple Mono NF CN', terminalFontWeight: 350, terminalLineHeight: 1.2 });
+  localStorage.setItem('vrykell-typography', JSON.stringify({ version: 0, state: { terminalFontPreset: 'unknown', terminalFontWeight: 10000, terminalLineHeight: 'bad' } }));
+  await useTypographyStore.persist.rehydrate();
+  expect(useTypographyStore.getState()).toMatchObject({ terminalFontPreset: 'system', terminalFontWeight: 900, terminalLineHeight: 1 });
+  useTypographyStore.getState().reset();
+  expect(useTypographyStore.getState()).toMatchObject({ terminalFontPreset: 'system', terminalFontWeight: 400, terminalLineHeight: 1 });
 });

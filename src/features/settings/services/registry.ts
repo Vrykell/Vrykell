@@ -73,6 +73,9 @@ registerField("wallpaper", "appearance-theme", "Application background image", "
 registerField("theme-import", "appearance-theme", "Import / export theme", "Theme JSON");
 registerField("ui-font", "appearance-theme", "settings.font.pageTitle", "settings.font.pageTitle", () => String(useTypographyStore.getState().uiFontSize));
 registerField("terminal-font", "appearance-theme", "settings.font.terminalTitle", "settings.font.terminalTitle", () => String(useTypographyStore.getState().terminalFontSize));
+registerField('terminal-font-family', 'appearance-theme', 'Terminal font family', 'Use a font installed on your system; unavailable families use the fallback fonts.', () => useTypographyStore.getState().terminalFontPreset);
+registerField('terminal-font-weight', 'appearance-theme', 'Terminal font weight', 'Variable fonts support fine weight adjustments; static fonts use the nearest installed weight.', () => String(useTypographyStore.getState().terminalFontWeight));
+registerField('terminal-line-spacing', 'appearance-theme', 'Terminal line spacing', 'Adjust line spacing for terminal input, live output and command history.', () => String(useTypographyStore.getState().terminalLineHeight));
 registerField("terminal-renderer", "appearance-theme", "settings.font.rendererTitle", "settings.font.rendererTitle", () => String(useTypographyStore.getState().terminalRenderer));
 
 function globalValue(key: keyof AgentSettings): string {

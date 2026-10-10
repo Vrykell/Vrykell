@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { gotoSetting } from './settings';
 import { setupTauriMock, ptyWrites, emitPtyOutput } from './tauri-mock';
 
 async function ready(page: Page) {
@@ -158,4 +159,61 @@ test('latest-output arrow resumes following during a foreground command', async 
   await expect.poll(() => region.evaluate(element => element.scrollHeight - element.clientHeight - element.scrollTop)).toBeGreaterThan(100);
   await button.click();
   await expect.poll(() => region.evaluate(element => element.scrollHeight - element.clientHeight - element.scrollTop)).toBeLessThan(32);
+});
+
+test('font family, weight and spacing update existing terminal history and persist', async ({ page }) => {
+  await ready(page);
+  const input = page.getByPlaceholder(/输入命令/);
+  await input.fill('echo typography');
+  await input.press('Enter');
+  const command = page.locator('.command-block-command').filter({ hasText: 'echo typography' });
+  await expect(command).toHaveCSS('font-weight', '500');
+  const output = page.locator('.command-block-output [data-selectable]').first();
+  await expect(output).toHaveCSS('font-weight', '400');
+  await gotoSetting(page, '主题');
+  for (const [name, option] of [['终端字体', 'Maple Mono NF CN'], ['终端字重', '350'], ['终端行距', '1.2×']]) {
+    await page.getByRole('combobox', { name, exact: true }).click();
+    await page.getByRole('option', { name: option, exact: true }).click();
+  }
+  const preview = page.getByLabel('终端字体预览');
+  await expect(preview).toHaveCSS('font-weight', '350');
+  await expect(preview).toHaveCSS('line-height', '20px');
+  await expect(preview).toHaveCSS('font-family', /Maple Mono NF CN/);
+  await page.screenshot({ path: test.info().outputPath('terminal-typography-settings.png') });
+  await page.keyboard.press('Meta+1');
+  await expect(input).toHaveCSS('font-family', /Maple Mono NF CN/);
+  await expect(input).toHaveCSS('font-weight', '350');
+  await expect(input).toHaveCSS('line-height', '27px');
+  await expect(command).toHaveCSS('font-weight', '450');
+  await expect(output).toHaveCSS('font-weight', '350');
+  await expect(output).toHaveCSS('line-height', '20px');
+  await expect.poll(() => page.evaluate(() => {
+    const scope = window as unknown as { __vrykellTerms: Map<string, import('@xterm/xterm').Terminal> };
+    return [...scope.__vrykellTerms.values()].every(term => term.options.fontWeight === 350 && term.options.lineHeight === 1.2 && term.options.fontFamily!.includes('Maple Mono NF CN'));
+  })).toBe(true);
+  await emitPtyOutput(page, `\x1b]133;E;${btoa('typography-live')}\x07\x1b]133;C\x07live output\r\n`);
+  await expect.poll(() => page.evaluate(() => {
+    const scope = window as unknown as { __vrykellSessionRegistry?: { controllers: Map<string, import('../src/features/terminal/services/pipeline/sessionController').SessionController> } };
+    const active = [...(scope.__vrykellSessionRegistry?.controllers.values() ?? [])][0]?.activeBlock;
+    return active?.outputTerm?.options.fontWeight;
+  })).toBe(350);
+  await gotoSetting(page, '主题');
+  await page.getByRole('combobox', { name: '终端字重', exact: true }).click();
+  await page.getByRole('option', { name: '300', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => {
+    const scope = window as unknown as { __vrykellSessionRegistry?: { controllers: Map<string, import('../src/features/terminal/services/pipeline/sessionController').SessionController> } };
+    return [...(scope.__vrykellSessionRegistry?.controllers.values() ?? [])][0]?.activeBlock?.outputTerm?.options.fontWeight;
+  })).toBe(300);
+  await page.getByRole('combobox', { name: '终端字重', exact: true }).click();
+  await page.getByRole('option', { name: '350', exact: true }).click();
+  await page.keyboard.press('Meta+1');
+  await emitPtyOutput(page, '\x1b]133;D;0\x07\x1b]133;A\x07');
+  await page.reload();
+  await expect(input).toHaveCSS('font-weight', '350');
+  await expect(input).toHaveCSS('font-family', /Maple Mono NF CN/);
+  await gotoSetting(page, '主题');
+  await page.getByRole('button', { name: '恢复默认字体设置' }).click();
+  await expect(preview).toHaveCSS('font-weight', '400');
+  await expect(preview).toHaveCSS('line-height', '16px');
+  await expect(page.getByRole('combobox', { name: '终端字体', exact: true })).toHaveText('系统等宽字体');
 });

@@ -1,4 +1,4 @@
-import { useTypographyStore } from '@config/typography';
+import { TERMINAL_FONT_PRESETS, useTypographyStore } from '@config/typography';
 import Select from '@ui/Select';
 import { t } from '@i18n';
 import { Field, btnStyle } from './ui';
@@ -6,9 +6,11 @@ import { useSettingsSave } from './SettingsSaveProvider';
 
 const pageSizes = Array.from({ length: 9 }, (_, index) => ({ value: index + 10, label: `${index + 10}px` }));
 const terminalSizes = Array.from({ length: 15 }, (_, index) => ({ value: index + 10, label: `${index + 10}px` }));
+const weights = Array.from({ length: 17 }, (_, index) => ({ value: 100 + index * 50, label: String(100 + index * 50) }));
+const lineHeights = Array.from({ length: 7 }, (_, index) => ({ value: Number((1 + index / 10).toFixed(1)), label: `${(1 + index / 10).toFixed(1)}×` }));
 
 export default function FontSettings() {
-  const { uiFontSize, terminalFontSize, terminalRenderer, update, reset } = useTypographyStore();
+  const { uiFontSize, terminalFontSize, terminalRenderer, terminalFontPreset, terminalFontWeight, terminalLineHeight, update, reset } = useTypographyStore();
   const { save } = useSettingsSave();
   const rendererOptions = [
     { value: 'webgl' as const, label: t('settings.font.rendererWebgl') },
@@ -24,7 +26,24 @@ export default function FontSettings() {
       <div className="settings-font-row">
         <Select aria-label={t('settings.font.terminalTitle')} value={terminalFontSize} options={terminalSizes} onChange={terminalFontSize => { void save(() => update({ terminalFontSize })); }} style={{ width: 110 }} />
       </div>
-      <button type="button" onClick={reset} style={{ ...btnStyle, marginTop: 12 }}>{t('settings.font.reset')}</button>
+    </Field>
+    <Field title={t('Terminal font family')} description={t('Use a font installed on your system; unavailable families use the fallback fonts.')}>
+      <Select aria-label={t('Terminal font family')} value={terminalFontPreset}
+        options={TERMINAL_FONT_PRESETS.map(value => ({ value, label: value === 'system' ? t('System monospace') : value }))}
+        onChange={terminalFontPreset => { void save(() => update({ terminalFontPreset })); }} style={{ width: 220 }} />
+    </Field>
+    <Field title={t('Terminal font weight')} description={t('Variable fonts support fine weight adjustments; static fonts use the nearest installed weight.')}>
+      <Select aria-label={t('Terminal font weight')} value={terminalFontWeight} options={weights}
+        onChange={terminalFontWeight => { void save(() => update({ terminalFontWeight })); }} style={{ width: 110 }} />
+    </Field>
+    <Field title={t('Terminal line spacing')} description={t('Adjust line spacing for terminal input, live output and command history.')}>
+      <Select aria-label={t('Terminal line spacing')} value={terminalLineHeight} options={lineHeights}
+        onChange={terminalLineHeight => { void save(() => update({ terminalLineHeight })); }} style={{ width: 110 }} />
+      <div className="settings-terminal-preview" data-selectable aria-label={t('Terminal font preview')}>
+        <div>~/project $ ls</div>
+        <div>{t('Directories')}  AaBb 0123  ─│┌┐   </div>
+      </div>
+      <button type="button" onClick={() => { void save(reset); }} style={{ ...btnStyle, marginTop: 12 }}>{t('Restore default typography')}</button>
     </Field>
     <Field title={t('settings.font.rendererTitle')} description={t('settings.font.rendererDescription')}>
       <div className="settings-font-row">
