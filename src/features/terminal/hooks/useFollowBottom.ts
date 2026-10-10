@@ -22,7 +22,8 @@ function captureViewAnchor(scroll: HTMLElement): ViewAnchor | null {
   const viewport = scroll.getBoundingClientRect();
   if (viewport.width <= 0 || viewport.height <= 0) return null;
   const x = Math.min(viewport.right - 8, viewport.left + 80);
-  const y = Math.min(viewport.bottom - 8, viewport.top + 20);
+  const titleBottom = scroll.parentElement?.querySelector<HTMLElement>('.pinned-command')?.getBoundingClientRect().bottom;
+  const y = Math.min(viewport.bottom - 8, Math.max(viewport.top + 20, (titleBottom ?? viewport.top) + 8));
   const target = document.elementFromPoint(x, y);
   if (!target || !scroll.contains(target)) return null;
   const element = target.closest<HTMLElement>('[data-testid^="command-block-"], [data-testid^="running-block-"]')

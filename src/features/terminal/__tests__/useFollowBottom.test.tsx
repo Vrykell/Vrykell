@@ -191,3 +191,31 @@ it('keeps following fractional programmatic offsets and content-clamp scroll eve
   await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
   expect(el.scrollTop).toBe(1800);
 });
+
+it('captures a reading anchor below the pinned title overlay', async () => {
+  const scroll = makeEl(800);
+  const parent = document.createElement('div');
+  const title = document.createElement('div');
+  title.className = 'pinned-command';
+  const content = document.createElement('div');
+  content.dataset.testid = 'command-block-anchor';
+  scroll.appendChild(content);
+  parent.append(scroll, title);
+  document.body.appendChild(parent);
+  const rect = (top: number, bottom: number): DOMRect => ({ top, bottom, left: 0, right: 600,
+    width: 600, height: bottom - top, x: 0, y: top, toJSON: () => ({}) });
+  vi.spyOn(scroll, 'getBoundingClientRect').mockReturnValue(rect(100, 300));
+  vi.spyOn(title, 'getBoundingClientRect').mockReturnValue(rect(100, 160));
+  const original = Object.getOwnPropertyDescriptor(document, 'elementFromPoint');
+  const point = vi.fn(() => content);
+  Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: point });
+  const { unmount } = renderHook(() => useFollowBottom({ current: scroll }, []));
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+  scroll.scrollTop = 300;
+  scroll.dispatchEvent(new Event('scroll'));
+  expect(point).toHaveBeenLastCalledWith(80, 168);
+  unmount();
+  if (original) Object.defineProperty(document, 'elementFromPoint', original);
+  else Reflect.deleteProperty(document, 'elementFromPoint');
+  parent.remove();
+});

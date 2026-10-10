@@ -1,5 +1,8 @@
 /** Simplified Chinese messages for shared UI and feature namespaces. */
 const zh: Record<string, string> = {
+  'Current command': '当前命令',
+  'Show command header': '显示命令标题',
+  'Hide command header': '收起命令标题',
   'Completion shortcuts': '补全快捷键',
   'Right arrow': '右方向键',
   'Shift + right arrow': 'Shift + 右方向键',

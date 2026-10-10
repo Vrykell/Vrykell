@@ -29,6 +29,8 @@ import {
 import InputEditor from '@features/terminal/components/InputEditor';
 import AiStatusBar from '@features/terminal/components/AiStatusBar';
 import TerminalBlockList, { hasVisibleContent } from '@features/terminal/components/TerminalBlockList';
+import PinnedCommand from './PinnedCommand';
+import { usePinnedCommand } from '../hooks/usePinnedCommand';
 import TerminalPanel from '@features/terminal/components/TerminalPanel';
 import { SessionHistoryView } from '@features/session-history';
 import SettingsView from '@features/settings/pages/SettingsView';
@@ -617,6 +619,8 @@ function PaneBlockList({ paneId, insetLeft = 8, insetRight = 8 }: { paneId: stri
   const blocks = useBlockStore(selectBlocks(paneId));
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollId = useId();
+  const pinned = usePinnedCommand(scrollRef);
+  const pinnedBlock = pinned ? blocks.find(block => block.id === pinned.id) : undefined;
   const snap = useFollowBottom(scrollRef, [blocks], paneId);
   useEffect(() => registerFollowEngager(paneId, snap), [paneId, snap]);
   return (
@@ -627,6 +631,8 @@ function PaneBlockList({ paneId, insetLeft = 8, insetRight = 8 }: { paneId: stri
           <PaneEmptyHint paneId={paneId} />
         </div>
       </div>
+      {pinned && pinnedBlock && <PinnedCommand key={pinned.id} block={pinnedBlock} paneId={paneId}
+        remaining={pinned.remaining} insetLeft={insetLeft} insetRight={insetRight} scrollRef={scrollRef} />}
       <OverlayScrollbar scrollRef={scrollRef} controlsId={scrollId} label={t('Scroll command history')} />
     </div>
   );
