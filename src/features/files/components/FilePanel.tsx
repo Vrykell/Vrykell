@@ -410,7 +410,7 @@ export default function FilePanel({
               data-testid={config.ids.pathInput}
               style={{
                 flex: 1, minWidth: 0, height: 22, padding: '0 6px',
-                background: 'var(--chrome-field)', border: '1px solid var(--border-strong)',
+                background: 'var(--field-bg)', border: '1px solid var(--border)',
                 borderRadius: 4, outline: 'none',
                 fontFamily: 'var(--font-mono)', fontSize: 'calc(11px * var(--ui-font-scale))',
                 color: 'var(--text-primary)',
@@ -738,7 +738,7 @@ function FileRow({
           data-testid="rename-input"
           style={{
             flex: 1, minWidth: 0,
-            background: 'var(--field-bg)', border: '1px solid var(--accent)',
+            background: 'var(--field-bg)', border: '1px solid var(--border)',
             borderRadius: 3, padding: '0 4px', fontSize: 'calc(12px * var(--ui-font-scale))',
             color: 'var(--text-primary)', fontFamily: 'var(--font-mono)',
             outline: 'none',

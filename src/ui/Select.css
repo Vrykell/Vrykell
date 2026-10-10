@@ -15,9 +15,9 @@
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
 }
-.ui-select:hover:not(:disabled) { background: var(--button-hover); border-color: var(--border-strong); }
-.ui-select[aria-expanded="true"] { border-color: var(--border-strong); background: var(--button-hover); }
-.ui-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ui-select:hover:not(:disabled) { background: var(--button-hover); }
+.ui-select[aria-expanded="true"] { background: var(--button-hover); }
+.ui-select:focus-visible { outline: none; background: var(--button-hover); }
 .ui-select-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ui-select-chevron { flex-shrink: 0; color: var(--text-muted); transition: transform var(--dur-fast) var(--ease); }
 .ui-select[aria-expanded="true"] .ui-select-chevron { transform: rotate(180deg); }
@@ -36,5 +36,5 @@
 /* The selected option is marked with a check icon, not a filled background. */
 .ui-select-option[aria-selected="true"] { font-weight: var(--fw-medium); }
 .ui-select-check { flex-shrink: 0; color: var(--accent); }
-.ui-select-option[data-active="true"] { background: var(--hover); box-shadow: inset 0 0 0 1px var(--border-strong); }
+.ui-select-option[data-active="true"] { background: var(--hover); }
 .ui-select-option[aria-disabled="true"] { color: var(--text-muted); cursor: default; opacity: 0.45; }

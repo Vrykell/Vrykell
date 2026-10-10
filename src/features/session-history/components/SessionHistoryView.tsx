@@ -78,7 +78,7 @@ export default function SessionHistoryView() {
         <div style={{
           display: 'flex', alignItems: 'center', gap: 4,
           flex: 1, minWidth: 140,
-          background: 'var(--block)', borderRadius: 6, padding: '0 4px 0 8px', height: 26,
+          background: 'var(--field-bg)', borderRadius: 6, padding: '0 4px 0 8px', height: 26,
         }}>
           <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           <TextInput

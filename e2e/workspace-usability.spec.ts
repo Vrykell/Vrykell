@@ -108,7 +108,7 @@ test('navigation switches panels without losing their local state', async ({ pag
   await expect(page.getByTestId('ssh-search')).toBeHidden();
 });
 
-test('titlebar, activity rail and sidebars share a frame surface distinct from content', async ({ page }) => {
+test('the lighter titlebar and activity frame separate sidebars from content', async ({ page }) => {
   const nav = page.getByRole('navigation', { name: '工作区导航' });
   const panel = page.locator('.workspace-side-panel[data-side="left"]:visible');
   expect((await nav.boundingBox())!.width).toBe(44);
@@ -123,7 +123,7 @@ test('titlebar, activity rail and sidebars share a frame surface distinct from c
   await expect(row).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await expect(row.locator(':scope > div > span').first()).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   const panelBg = await panel.locator(':scope > div').first().evaluate(el => getComputedStyle(el).backgroundColor);
-  expect(panelBg).toBe(await nav.evaluate(el => getComputedStyle(el).backgroundColor));
+  expect(panelBg).not.toBe(await nav.evaluate(el => getComputedStyle(el).backgroundColor));
   expect(panelBg).toBe(await resolvedColor(page, '--sidebar-bg'));
   await expect(nav).toHaveCSS('background-color', await page.locator('.workspace-titlebar').evaluate(el => getComputedStyle(el).backgroundColor));
   const contentBg = await page.locator('main').evaluate(el => getComputedStyle(el).backgroundColor);
@@ -193,7 +193,10 @@ test('settings and terminal use the same color hierarchy in both themes', async 
     expect(await background('.workspace-titlebar')).toBe(await background('.workspace-activity-bar'));
     expect(await background('.workspace-titlebar')).not.toBe(await background('main'));
     const sidebarBg = await background('.workspace-side-panel[data-side="left"]:visible > div:first-child');
-    expect(sidebarBg).toBe(await background('.workspace-activity-bar'));
+    const frameBg = await background('.workspace-activity-bar');
+    expect(sidebarBg).not.toBe(frameBg);
+    const firstChannel = (color: string) => Number(color.match(/\d+/)![0]);
+    expect(firstChannel(frameBg)).toBeGreaterThan(firstChannel(sidebarBg));
     expect(sidebarBg).not.toBe(await background('main'));
     expect(await background('.settings-navigation')).toBe(sidebarBg);
     expect(await background('.settings-content')).toBe(await background('main'));

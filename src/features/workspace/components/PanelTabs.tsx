@@ -382,7 +382,7 @@ function GroupSection(props: {
                 else if (e.key === 'Escape') props.setRenamingGroupTitle(group.title);
               }}
               style={{
-                flex: 1, background: 'var(--field-bg)', border: '1px solid var(--accent)',
+                flex: 1, background: 'var(--field-bg)', border: '1px solid var(--border)',
                 borderRadius: 3, padding: '1px 4px', fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)',
                 color: 'var(--text-primary)', outline: 'none',
               }}
@@ -550,7 +550,7 @@ function TabRow({
           }}
           onClick={(e) => e.stopPropagation()}
           style={{
-            flex: 1, background: 'var(--field-bg)', border: '1px solid var(--accent)',
+            flex: 1, background: 'var(--field-bg)', border: '1px solid var(--border)',
             borderRadius: 3, padding: '1px 4px', fontSize: 'calc(13px * var(--ui-font-scale))',
             color: 'var(--text-primary)', outline: 'none', fontFamily: 'var(--font-ui)',
           }}

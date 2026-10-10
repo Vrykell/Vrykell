@@ -359,11 +359,11 @@ function TerminalPane(props: {
         position: 'relative',
         // Match terminal output, pane padding and block history to the classic background.
         background: 'var(--xterm-bg)',
-        // 只在「面向其它终端」的边上画线，外缘不画 —— 避免与侧栏的 1px 边框叠加成重线
-        borderTop: inner.top ? `1px solid ${focused ? 'var(--border-strong)' : 'var(--border)'}` : 'none',
-        borderBottom: inner.bottom ? `1px solid ${focused ? 'var(--border-strong)' : 'var(--border)'}` : 'none',
-        borderLeft: inner.left ? `1px solid ${focused ? 'var(--border-strong)' : 'var(--border)'}` : 'none',
-        borderRight: inner.right ? `1px solid ${focused ? 'var(--border-strong)' : 'var(--border)'}` : 'none',
+        // Interior pane dividers keep the same appearance when focus moves.
+        borderTop: inner.top ? '1px solid var(--border)' : 'none',
+        borderBottom: inner.bottom ? '1px solid var(--border)' : 'none',
+        borderLeft: inner.left ? '1px solid var(--border)' : 'none',
+        borderRight: inner.right ? '1px solid var(--border)' : 'none',
         overflow: 'hidden',
       }}
     >

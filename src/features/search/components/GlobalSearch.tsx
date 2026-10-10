@@ -1,5 +1,6 @@
 import KeyHint from '@ui/KeyHint';
 import { IconButton } from '@ui/IconButton';
+import { TextButton } from '@ui/TextButton';
 import { parseSearchQuery, SEARCH_PREFIXES } from '../model/searchQuery';
 import { TextInput } from '@ui/TextInput';
 import { ChevronDown, History, Search, SlidersHorizontal, X } from '@ui/icons';
@@ -34,23 +35,25 @@ export default function GlobalSearch({ open, onClose }: Props) {
         onClick={event => event.stopPropagation()} onKeyDown={handleKey}>
         <header className="global-search-header">
           <div className="global-search-input-row">
-            <Search size={20} />
-            {activeSource && <span className="search-scope-chip" data-testid="search-scope-chip">
-              <activeSource.icon size={14} /><span>{activeSource.label}</span>
-              <button aria-label={t('Clear search scope')} data-tip={t('Clear search scope')}
-                onClick={() => { handleInput(query.term); inputRef.current?.focus(); }}><X size={12} /></button>
-            </span>}
-            <TextInput ref={inputRef} value={query.source ? query.term : input} onChange={event => handleInput(query.source ? `${query.prefix} ${event.target.value}` : event.target.value)}
-              aria-label={t('Search workspace')} placeholder={t('Search files, commands, settings…')} />
+            <div className="global-search-query">
+              <Search size={18} />
+              {activeSource && <span className="search-scope-chip" data-testid="search-scope-chip">
+                <activeSource.icon size={14} /><span>{activeSource.label}</span>
+                <button data-subtle aria-label={t('Clear search scope')} data-tip={t('Clear search scope')}
+                  onClick={() => { handleInput(query.term); inputRef.current?.focus(); }}><X size={12} /></button>
+              </span>}
+              <TextInput ref={inputRef} value={query.source ? query.term : input} onChange={event => handleInput(query.source ? `${query.prefix} ${event.target.value}` : event.target.value)}
+                aria-label={t('Search workspace')} placeholder={t('Search files, commands, settings…')} />
+            </div>
             {!query.source && <div className="global-search-filter-anchor">
-              <button data-testid="search-filter-button" className="global-search-filter"
+              <TextButton data-testid="search-filter-button" className="global-search-filter"
                 aria-expanded={filterOpen} aria-haspopup="menu" data-tip={t('Filter search scope')}
                 onClick={() => setFilterOpen(value => !value)}>
                 <SlidersHorizontal size={16} />
                 <span>{t('Scope')}</span>
                 {!query.source && enabledCount < totalSources && <span className="global-search-source-count">{enabledCount}/{totalSources}</span>}
                 <ChevronDown size={12} />
-              </button>
+              </TextButton>
               <FilterPopover open={filterOpen} onClose={() => setFilterOpen(false)} counts={sourceCounts} />
             </div>}
             <IconButton aria-label={t('Close search')} data-tip={t('Close search')} data-tip-shortcut="Escape" onClick={close}><X size={16} /></IconButton>
@@ -62,12 +65,12 @@ export default function GlobalSearch({ open, onClose }: Props) {
             <section>
               <div className="global-search-section-heading">
                 <span>{t('Recent searches')}</span>
-                <button className="global-search-clear" onClick={() => searchHistory.clear()}>{t('Clear')}</button>
+                <TextButton className="global-search-clear" onClick={() => searchHistory.clear()}>{t('Clear')}</TextButton>
               </div>
               {searchHistory.items.slice(0, 8).map((item, index) => {
                 const parsed = parseSearchQuery(item);
                 const source = getSources().find(source => source.id === parsed.source);
-                return <button key={`sh-${index}`} className="workspace-floating-row global-search-history"
+                return <button data-subtle key={`sh-${index}`} className="workspace-floating-row global-search-history"
                   onClick={() => handleInput(item)}>
                   <History size={16} />
                   {source && <span className="search-scope-chip" data-testid="history-scope-chip"><source.icon size={14} />{source.label}</span>}
@@ -83,7 +86,7 @@ export default function GlobalSearch({ open, onClose }: Props) {
               <p>{t('Commands, files and settings, all in one place.')}</p>
               <div className="global-search-sources" aria-label={t('Search scope')}>
                 {getSources().map(source => (
-                  <button key={source.id} data-enabled={enabledIds.has(source.id)} className="global-search-source"
+                  <button data-subtle key={source.id} data-enabled={enabledIds.has(source.id)} className="global-search-source"
                     onClick={() => handleInput(`${SEARCH_PREFIXES.find(scope => scope.source === source.id)?.prefix ?? ''} `)}>
                     <source.icon size={16} /><span>{source.label}</span><kbd>{SEARCH_PREFIXES.find(scope => scope.source === source.id)?.prefix}</kbd>
                   </button>

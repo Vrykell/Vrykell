@@ -69,6 +69,7 @@ for (const theme of ['深色', '浅色']) {
     await expectFieldHierarchy(composer);
     const resting = await composer.evaluate(element => getComputedStyle(element).backgroundColor);
     await page.getByPlaceholder(/输入命令/).fill('echo surface-hierarchy');
+    await expect(composer).toHaveCSS('box-shadow', 'none');
     await expect(composer).toHaveCSS('background-color', resting);
     await page.getByPlaceholder(/输入命令/).blur();
     await expect(composer).toHaveCSS('background-color', resting);
@@ -89,6 +90,7 @@ for (const theme of ['深色', '浅色']) {
     const host = page.getByTestId('ssh-form-host');
     await expectFieldHierarchy(host);
     await host.fill('example.invalid');
+    await expect(host).toHaveCSS('outline-style', 'none');
     await expect(host).toHaveValue('example.invalid');
     await page.screenshot({ path: test.info().outputPath('ssh-fields.png') });
     await page.getByRole('dialog', { name: 'SSH 连接' }).getByRole('button', { name: '取消', exact: true }).click();
