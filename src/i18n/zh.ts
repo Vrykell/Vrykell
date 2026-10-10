@@ -1,6 +1,10 @@
 /** Simplified Chinese messages for shared UI and feature namespaces. */
 const zh: Record<string, string> = {
-  'Completion suggestions': '补全建议',
+  'Completion shortcuts': '补全快捷键',
+  'Right arrow': '右方向键',
+  'Shift + right arrow': 'Shift + 右方向键',
+  'Press a modified letter or number…': '按下修饰键与字母或数字…',
+  'Custom…': '自定义…',
   'Color commands, arguments and shell operators.': '为命令、参数和 shell 操作符着色。',
   'Command syntax highlighting': '命令语法高亮',
   'Save failed': '保存失败',

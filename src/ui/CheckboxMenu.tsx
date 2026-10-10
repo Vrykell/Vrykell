@@ -1,4 +1,4 @@
-import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import { Check } from '@ui/icons';
 
 /**
@@ -12,6 +12,7 @@ import { Check } from '@ui/icons';
 export interface CheckboxMenuOption<Id extends string = string> {
   id: Id;
   label: string;
+  displayLabel?: ReactNode;
   checked: boolean;
   /** Optional leading icon (e.g. a search source mark). */
   icon?: ReactNode;
@@ -27,14 +28,18 @@ export interface CheckboxMenuProps<Id extends string = string> {
   onClose: () => void;
   /** Placement of the floating panel (usually relative to its trigger). */
   style?: CSSProperties;
+  /** Compact shortcut menus omit the heading and use row selection as their check mark. */
+  compact?: boolean;
+  footer?: ReactNode;
+  triggerRef?: RefObject<HTMLElement | null>;
 }
 
-export default function CheckboxMenu<Id extends string>({ title, options, onToggle, onClose, style }: CheckboxMenuProps<Id>) {
+export default function CheckboxMenu<Id extends string>({ title, options, onToggle, onClose, style, compact = false, footer, triggerRef }: CheckboxMenuProps<Id>) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const outside = (event: PointerEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) onClose();
+      if (!menuRef.current?.contains(event.target as Node) && !triggerRef?.current?.contains(event.target as Node)) onClose();
     };
     const key = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
@@ -47,40 +52,52 @@ export default function CheckboxMenu<Id extends string>({ title, options, onTogg
       document.removeEventListener('pointerdown', outside);
       document.removeEventListener('keydown', key);
     };
-  }, [onClose]);
+  }, [onClose, triggerRef]);
 
   return (
     <div
       ref={menuRef}
       role="menu"
       aria-label={title}
-      className="workspace-floating"
+      className={`workspace-floating${compact ? ' checkbox-menu-compact' : ''}`}
       style={{ position: 'absolute', padding: 4, zIndex: 200, minWidth: 180, ...style }}
+      onKeyDown={event => {
+        if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onClose(); return; }
+        if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+        event.preventDefault(); event.stopPropagation();
+        const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'));
+        const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1
+          : (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length;
+        buttons[next]?.focus();
+      }}
     >
-      <div style={{
+      {!compact && <div style={{
         padding: '6px 12px',
         fontSize: 'calc(11px * var(--ui-font-scale))',
         color: 'var(--text-muted)',
         fontWeight: 'var(--fw-semibold)',
       }}>
         {title}
-      </div>
+      </div>}
       {options.map((option) => (
         <button
           key={option.id}
           type="button"
+          data-subtle
           role="menuitemcheckbox"
+          aria-label={option.label}
           aria-checked={option.checked}
           className="workspace-floating-row"
-          onClick={() => onToggle(option.id)}
+          onClick={event => { event.currentTarget.focus(); onToggle(option.id); }}
           style={{
             display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
-            padding: '6px 12px', border: 'none', background: 'transparent',
+            padding: '6px 12px', border: 'none',
             color: option.checked ? 'var(--text-primary)' : 'var(--text-muted)',
             cursor: 'pointer', fontSize: 'calc(12px * var(--ui-font-scale))', fontFamily: 'var(--font-ui)',
           }}
         >
-          <span aria-hidden="true" style={{
+          {!compact && <span aria-hidden="true" style={{
             width: 16, height: 16, borderRadius: 3,
             border: `1.5px solid ${option.checked ? 'var(--accent)' : 'var(--border)'}`,
             background: option.checked ? 'var(--accent)' : 'transparent',
@@ -88,9 +105,9 @@ export default function CheckboxMenu<Id extends string>({ title, options, onTogg
             color: 'var(--accent-text)', flexShrink: 0,
           }}>
             {option.checked ? <Check size={10} /> : ''}
-          </span>
+          </span>}
           <span style={{ flex: 1, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-            {option.icon}{option.label}
+            {option.icon}{option.displayLabel ?? option.label}
           </span>
           {option.count !== undefined && option.count > 0 && (
             <span style={{
@@ -105,6 +122,7 @@ export default function CheckboxMenu<Id extends string>({ title, options, onTogg
           )}
         </button>
       ))}
+      {footer}
     </div>
   );
 }

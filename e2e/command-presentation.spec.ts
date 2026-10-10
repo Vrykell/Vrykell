@@ -20,11 +20,23 @@ test('command coloring is optional, persists and leaves native input editing int
   await expect(block.locator('[data-kind="command"]')).toHaveCount(2);
   await input.fill('npm');
   await expect(page.locator('.command-completion-suffix')).toHaveText(' run dev');
-  const suggestions = page.getByRole('combobox', { name: '补全建议' });
+  const suggestions = page.getByRole('button', { name: '补全快捷键', exact: true });
   await expect(suggestions).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('command-completion.png') });
   await suggestions.click();
-  await page.getByRole('option', { name: 'npm run dev', exact: true }).click();
+  const menu = page.getByRole('menu', { name: '补全快捷键', exact: true });
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('menuitemcheckbox')).toHaveCount(3);
+  await menu.getByRole('menuitemcheckbox', { name: 'Shift + 右方向键', exact: true }).click();
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('menuitemcheckbox', { name: 'Shift + 右方向键', exact: true })).toHaveAttribute('aria-checked', 'true');
+  const triggerBox = (await suggestions.boundingBox())!;
+  const menuBox = (await menu.boundingBox())!;
+  expect(menuBox.y + menuBox.height).toBeLessThan(triggerBox.y);
+  await page.screenshot({ path: test.info().outputPath('completion-shortcut-menu.png') });
+  await page.keyboard.press('Escape');
+  await expect(input).toBeFocused();
+  await input.press('Shift+ArrowRight');
   await expect(input).toHaveValue('npm run dev');
   await expect(input).toBeFocused();
   await input.press('Escape');
@@ -43,4 +55,56 @@ test('command coloring is optional, persists and leaves native input editing int
   await gotoSetting(page, '主题');
   await page.getByRole('button', { name: '浅色', exact: true }).click();
   await expect(page.getByPlaceholder('搜索设置…')).toHaveCSS('caret-color', 'rgb(0, 111, 219)');
+});
+
+test('completion stays anchored while typing and its acceptance keys persist', async ({ page }) => {
+  await setupTauriMock(page); await page.goto('/');
+  const input = page.getByPlaceholder(/输入命令/);
+  await input.fill('npm');
+  const trigger = page.getByRole('button', { name: '补全快捷键', exact: true });
+  await expect(trigger).toBeVisible();
+  const x = (await trigger.boundingBox())!.x;
+  await page.evaluate(() => {
+    const positions: number[] = [];
+    const observer = new MutationObserver(() => {
+      const button = document.querySelector('.command-completion-trigger');
+      if (button) positions.push(button.getBoundingClientRect().x);
+    });
+    observer.observe(document.querySelector('.command-input-overlay')!, { subtree: true, childList: true, characterData: true });
+    Object.assign(window, { completionPositions: positions });
+  });
+  for (const char of ' run de') {
+    await input.pressSequentially(char);
+    await expect(page.locator('.command-completion-suffix')).toHaveText('npm run dev'.slice((await input.inputValue()).length));
+    expect(Math.abs((await trigger.boundingBox())!.x - x)).toBeLessThan(0.5);
+  }
+  const positions = await page.evaluate(() => (window as unknown as { completionPositions: number[] }).completionPositions);
+  expect(positions.length).toBeGreaterThan(5);
+  expect(positions.every(value => Math.abs(value - x) < 0.5)).toBe(true);
+  await trigger.click();
+  const menu = page.getByRole('menu', { name: '补全快捷键', exact: true });
+  await menu.getByRole('menuitemcheckbox', { name: 'Tab', exact: true }).click();
+  await menu.getByRole('button', { name: '自定义…', exact: true }).click();
+  await page.keyboard.press('Control+j');
+  await expect(menu.getByRole('menuitemcheckbox', { name: 'Control+J', exact: true })).toHaveAttribute('aria-checked', 'true');
+  await page.keyboard.press('Escape');
+  await input.press('Control+j');
+  await expect(input).toHaveValue('npm run dev');
+  await input.press('Escape');
+  await expect(input).toHaveValue('npm run de');
+  await page.reload();
+  await input.fill('npm');
+  await trigger.click();
+  await expect(menu.getByRole('menuitemcheckbox', { name: 'Tab', exact: true })).toHaveAttribute('aria-checked', 'false');
+  await expect(menu.getByRole('menuitemcheckbox', { name: 'Control+J', exact: true })).toHaveAttribute('aria-checked', 'true');
+  await trigger.click();
+  await expect(menu).toHaveCount(0);
+  await expect(input).toBeFocused();
+  await input.evaluate(element => element.setSelectionRange(1, 1));
+  await input.press('ArrowRight');
+  await expect(input).toHaveValue('npm');
+  expect(await input.evaluate(element => element.selectionStart)).toBe(2);
+  await input.evaluate(element => element.setSelectionRange(element.value.length, element.value.length));
+  await input.press('ArrowRight');
+  await expect(input).toHaveValue('npm run dev');
 });
