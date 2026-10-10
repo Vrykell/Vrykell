@@ -3,6 +3,23 @@ import { persist } from 'zustand/middleware';
 
 export const DEFAULT_UI_FONT_SIZE = 13;
 export const DEFAULT_TERMINAL_FONT_SIZE = 14;
+export const DEFAULT_TERMINAL_FONT_WEIGHT = 400;
+export const DEFAULT_TERMINAL_LINE_HEIGHT = 1;
+export const TERMINAL_FONT_PRESETS = ['system', 'Maple Mono NF CN', 'Maple Mono', 'Sarasa Mono SC', 'Cascadia Code', 'JetBrains Mono'] as const;
+export type TerminalFontPreset = typeof TERMINAL_FONT_PRESETS[number];
+const fallbackFonts = '"Cascadia Mono", "Cascadia Code", Menlo, Monaco, "JetBrains Mono", "Sarasa Mono SC", "Noto Sans Mono CJK SC", "Noto Sans Mono", "DejaVu Sans Mono", "Symbols Nerd Font Mono", monospace, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"';
+
+export function terminalFontFamily(preset: TerminalFontPreset): string {
+  return preset === 'system' ? fallbackFonts : `"${preset}", ${fallbackFonts}`;
+}
+
+function boundedFontPreset(value: unknown): TerminalFontPreset {
+  return TERMINAL_FONT_PRESETS.find(preset => preset === value) ?? 'system';
+}
+
+function boundedNumber(value: unknown, fallback: number, min: number, max: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
+}
 
 export function boundedFontSize(value: unknown, fallback: number, max = 24): number {
   return typeof value === 'number' && Number.isFinite(value)
@@ -21,33 +38,48 @@ interface TypographyState {
   uiFontSize: number;
   terminalFontSize: number;
   terminalRenderer: TerminalRenderer;
-  update: (patch: Partial<Pick<TypographyState, 'uiFontSize' | 'terminalFontSize' | 'terminalRenderer'>>) => void;
+  terminalFontPreset: TerminalFontPreset;
+  terminalFontWeight: number;
+  terminalLineHeight: number;
+  update: (patch: Partial<TypographyPreferences>) => void;
   reset: () => void;
 }
 
-export const useTypographyStore = create<TypographyState>()(persist((set) => ({
+type TypographyPreferences = Omit<TypographyState, 'update' | 'reset'>;
+const defaults: TypographyPreferences = {
   uiFontSize: DEFAULT_UI_FONT_SIZE,
   terminalFontSize: DEFAULT_TERMINAL_FONT_SIZE,
   terminalRenderer: DEFAULT_TERMINAL_RENDERER,
-  update: patch => set(state => ({
-    uiFontSize: boundedFontSize(patch.uiFontSize ?? state.uiFontSize, DEFAULT_UI_FONT_SIZE, 18),
-    terminalFontSize: boundedFontSize(patch.terminalFontSize ?? state.terminalFontSize, DEFAULT_TERMINAL_FONT_SIZE),
-    terminalRenderer: boundedTerminalRenderer(patch.terminalRenderer ?? state.terminalRenderer, DEFAULT_TERMINAL_RENDERER),
-  })),
-  reset: () => set({
-    uiFontSize: DEFAULT_UI_FONT_SIZE,
-    terminalFontSize: DEFAULT_TERMINAL_FONT_SIZE,
-    terminalRenderer: DEFAULT_TERMINAL_RENDERER,
-  }),
+  terminalFontPreset: 'system',
+  terminalFontWeight: DEFAULT_TERMINAL_FONT_WEIGHT,
+  terminalLineHeight: DEFAULT_TERMINAL_LINE_HEIGHT,
+};
+
+function sanitize(values: Partial<TypographyPreferences>): TypographyPreferences {
+  return {
+    uiFontSize: boundedFontSize(values.uiFontSize, DEFAULT_UI_FONT_SIZE, 18),
+    terminalFontSize: boundedFontSize(values.terminalFontSize, DEFAULT_TERMINAL_FONT_SIZE),
+    terminalRenderer: boundedTerminalRenderer(values.terminalRenderer, DEFAULT_TERMINAL_RENDERER),
+    terminalFontPreset: boundedFontPreset(values.terminalFontPreset),
+    terminalFontWeight: Math.round(boundedNumber(values.terminalFontWeight, DEFAULT_TERMINAL_FONT_WEIGHT, 100, 900)),
+    terminalLineHeight: boundedNumber(values.terminalLineHeight, DEFAULT_TERMINAL_LINE_HEIGHT, 1, 1.6),
+  };
+}
+
+export function terminalTypographyChanged(state: TypographyPreferences, previous: TypographyPreferences): boolean {
+  return state.terminalFontSize !== previous.terminalFontSize || state.terminalFontPreset !== previous.terminalFontPreset
+    || state.terminalFontWeight !== previous.terminalFontWeight || state.terminalLineHeight !== previous.terminalLineHeight;
+}
+
+export const useTypographyStore = create<TypographyState>()(persist((set) => ({
+  ...defaults,
+  update: patch => set(state => sanitize({ ...state, ...patch })),
+  reset: () => set(defaults),
 }), {
   name: 'vrykell-typography',
   merge: (saved, current) => {
     const values = saved as Partial<TypographyState> | undefined;
-    return { ...current,
-      uiFontSize: boundedFontSize(values?.uiFontSize, DEFAULT_UI_FONT_SIZE, 18),
-      terminalFontSize: boundedFontSize(values?.terminalFontSize, DEFAULT_TERMINAL_FONT_SIZE),
-      terminalRenderer: boundedTerminalRenderer(values?.terminalRenderer, DEFAULT_TERMINAL_RENDERER),
-    };
+    return { ...current, ...sanitize(values ?? {}) };
   },
 }));
 
@@ -56,7 +88,12 @@ function applyTypography(state: TypographyState): void {
   const root = document.documentElement.style;
   root.setProperty('--ui-font-scale', String(state.uiFontSize / DEFAULT_UI_FONT_SIZE));
   root.setProperty('--terminal-font-size', `${state.terminalFontSize}px`);
-  root.setProperty('--terminal-row-height', `${Math.ceil(state.terminalFontSize * 16 / 14)}px`);
+  root.setProperty('--terminal-font-family', terminalFontFamily(state.terminalFontPreset));
+  root.setProperty('--terminal-font-weight', String(state.terminalFontWeight));
+  root.setProperty('--terminal-bold-weight', String(Math.max(700, state.terminalFontWeight)));
+  root.setProperty('--terminal-input-row-height', `${Math.ceil(Math.max(22, state.terminalFontSize * 16 / 14) * state.terminalLineHeight)}px`);
+  root.setProperty('--terminal-command-weight', String(Math.min(900, state.terminalFontWeight + 100)));
+  root.setProperty('--terminal-row-height', `${Math.ceil(state.terminalFontSize * 16 / 14 * state.terminalLineHeight)}px`);
 }
 
 applyTypography(useTypographyStore.getState());

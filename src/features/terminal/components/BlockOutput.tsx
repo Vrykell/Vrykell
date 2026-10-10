@@ -66,8 +66,10 @@ export default memo(function BlockOutput({ text, maxHeight, flush = false, highl
         contain: 'layout style paint',
         background: flush ? 'transparent' : 'var(--xterm-bg)',
         color: 'var(--xterm-foreground)',
-        // 与 xterm.js 实时渲染保持一致的字体参数
+        // Use the same typography as live output.
         fontFamily: TERMINAL_FONT_FAMILY,
+        fontWeight: 'var(--terminal-font-weight)',
+        letterSpacing: 'var(--terminal-letter-spacing, 0px)',
         fontSize: 'var(--terminal-font-size)',
         // Keep snapshot rows tall enough for the glyph bounds used by live xterm.
         lineHeight: 'var(--terminal-row-height)',

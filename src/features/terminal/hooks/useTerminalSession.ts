@@ -35,9 +35,9 @@ import { querySequences } from '@features/terminal/model/terminalQueries';
 import { getCellMetrics } from '@utils/termMetrics';
 import type { DispatchEvent } from '@core/terminal/events';
 import type { UnlistenFn } from '@tauri-apps/api/event';
-import { TERMINAL_FONT_FAMILY, getTerminalFontSize, measureTerminalDomCellWidth, terminalLetterSpacing, TERMINAL_LINE_HEIGHT } from '@features/terminal/model/terminalFont';
+import { getTerminalFontOptions, measureTerminalDomCellWidth } from '@features/terminal/model/terminalFont';
 import { prepareSshHost } from '@features/ssh/services/hostTrust';
-import { useTypographyStore } from '@config/typography';
+import { terminalTypographyChanged, useTypographyStore } from '@config/typography';
 
 /** Live session references shared across development reloads. */
 interface SessionRegistry {
@@ -138,11 +138,7 @@ export function useTerminalSession(
     useTerminalStore.getState().setStartupState(paneId, 'starting');
 
     const term = new Terminal({
-      fontFamily: TERMINAL_FONT_FAMILY,
-      fontSize: getTerminalFontSize(),
-      // Whole-pixel cells: a fractional advance leaves a bright seam at the canvas edge.
-      letterSpacing: terminalLetterSpacing(),
-      lineHeight: TERMINAL_LINE_HEIGHT,
+      ...getTerminalFontOptions(),
       cursorBlink: true,
       scrollback: 5000,
       // The public ruler width also sizes the native scrollbar and fit calculation.
@@ -682,9 +678,8 @@ export function useTerminalSession(
     };
     widthSyncs.set(paneId, applyWidth);
     const unsubscribeTypography = useTypographyStore.subscribe((state, previous) => {
-      if (state.terminalFontSize === previous.terminalFontSize) return;
-      term.options.fontSize = state.terminalFontSize;
-      term.options.letterSpacing = terminalLetterSpacing(state.terminalFontSize);
+      if (!terminalTypographyChanged(state, previous)) return;
+      Object.assign(term.options, getTerminalFontOptions());
       cachedDomCellWidth = 0;
       if (el.offsetWidth > 0 && el.offsetHeight > 0) {
         fitTerminal(term, fit);

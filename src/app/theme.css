@@ -3,6 +3,11 @@
   --ui-font-scale: 1;
   --terminal-font-size: calc(14px * var(--ui-font-scale));
   --terminal-row-height: 16px;
+  --terminal-font-family: var(--font-mono);
+  --terminal-font-weight: 400;
+  --terminal-input-row-height: 22px;
+  --terminal-bold-weight: 700;
+  --terminal-command-weight: 500;
   --scrollbar-size: 8px;
   --font-ui: -apple-system, "SF Pro Text", "PingFang SC", "Segoe UI", sans-serif;
   /* Ligature-free mono first, then a monospace CJK face, then the generic before the
@@ -594,13 +599,13 @@ button.tui-control { min-height: 20px; padding: 0 4px; font-size: var(--fs-micro
 .global-search-history .search-scope-chip { max-width: 40%; }
 .global-search-dialog .key-hint { border: none; background: var(--key-hint-bg); color: var(--text-primary); font-family: var(--font-ui); }
 /* Keep the context compact; floating controls do not increase the row height. */
-.command-block { position: relative; padding-top: var(--terminal-row-height); padding-bottom: var(--terminal-row-height); --command-block-command-weight: 600; }
+.command-block { position: relative; padding-top: var(--terminal-row-height); padding-bottom: var(--terminal-row-height); font-weight: var(--terminal-font-weight); }
 .command-block[data-divider-before="true"] { border-top: 1px solid var(--block-divider); }
 .command-block[data-failed="true"] { background: var(--error-bg); }
 /* Paint the rail over the divider so adjacent failures remain continuous. */
 .command-block[data-failed="true"]::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 3px; background: var(--status-error); pointer-events: none; }
 .command-block[data-failed="true"][data-divider-before="true"]::before { top: -1px; }
-.command-block-info { position: relative; display: flex; align-items: center; gap: 8px; min-height: var(--terminal-row-height); margin-bottom: 2px; padding-right: var(--control-size-compact); font-family: var(--font-mono); font-size: calc(var(--terminal-font-size) * 0.86); line-height: var(--terminal-row-height); color: var(--text-muted); }
+.command-block-info { position: relative; display: flex; align-items: center; gap: 8px; min-height: var(--terminal-row-height); margin-bottom: 2px; padding-right: var(--control-size-compact); font-family: var(--terminal-font-family); font-size: calc(var(--terminal-font-size) * 0.86); line-height: var(--terminal-row-height); color: var(--text-muted); }
 .command-block[data-running="true"] .command-block-info { padding-right: calc(3 * var(--control-size-compact)); }
 .command-block-actions, .command-block-branch, .command-block .command-status-code, .command-block .command-status-agent, .command-block-truncation { opacity: 0; pointer-events: none; transition: opacity var(--dur-fast) var(--ease); }
 .command-block:is(:hover, :has(.command-block-actions :focus-visible), [data-menu-open="true"]) :is(.command-block-actions, .command-block-branch, .command-status-code, .command-status-agent, .command-block-truncation) { opacity: 1; pointer-events: auto; }
@@ -608,7 +613,7 @@ button.tui-control { min-height: 20px; padding: 0 4px; font-size: var(--fs-micro
 .command-block-cwd { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .command-block-branch { min-width: 0; max-width: 25%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .command-block-actions { position: absolute; right: 0; top: 50%; transform: translateY(-50%); display: inline-flex; flex-shrink: 0; }
-.command-block-command { min-width: 0; min-height: var(--terminal-row-height); font-family: var(--font-mono); font-size: var(--terminal-font-size); line-height: var(--terminal-row-height); font-weight: var(--command-block-command-weight); color: var(--xterm-foreground); white-space: pre-wrap; word-break: break-all; user-select: text; }
+.command-block-command { min-width: 0; min-height: var(--terminal-row-height); font-family: var(--font-mono); font-size: var(--terminal-font-size); line-height: var(--terminal-row-height); font-weight: var(--terminal-command-weight); color: var(--xterm-foreground); white-space: pre-wrap; word-break: break-all; user-select: text; }
 .command-block-output { margin-top: calc(var(--terminal-row-height) / 2); }
 .command-block-truncation { min-height: 0; margin: 8px 0 0; }
 .command-block-running { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--accent-warm); animation: pulse 1.5s ease-in-out infinite; }
@@ -632,3 +637,9 @@ button.state-icon-button { color: var(--icon-color); }
 .context-menu-separator { height: 1px; margin: 4px 8px; background: var(--border); }
 
 .ssh-recovery-action { height: var(--control-size); padding: 0 12px; color: var(--text-primary); }
+
+.settings-terminal-preview { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--xterm-bg); color: var(--xterm-foreground); font-family: var(--terminal-font-family); font-size: var(--terminal-font-size); font-weight: var(--terminal-font-weight); line-height: var(--terminal-row-height); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.command-block-output [style*="font-weight:bold"], .command-block-output [style*="font-weight: bold"] { font-weight: var(--terminal-bold-weight) !important; }
+
+.command-block-output [style*="letter-spacing"] { letter-spacing: var(--terminal-letter-spacing, 0px) !important; }

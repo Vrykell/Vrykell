@@ -8,7 +8,8 @@ test('saved custom Anthropic address is used by the next chat request', async ({
   await page.goto('/');
   await gotoSetting(page, '模型配置');
   const card = page.getByPlaceholder('模型名称').first().locator('xpath=../../..');
-  await card.getByRole('button', { name: 'Anthropic', exact: true }).click();
+  await card.getByRole('combobox', { name: /提供方/ }).click();
+  await page.getByRole('option', { name: 'Anthropic', exact: true }).click();
   await card.getByPlaceholder('服务地址 (Base URL)').fill('https://gateway.example/v1');
   await card.getByPlaceholder('服务地址 (Base URL)').press('Enter');
   await card.getByRole('button', { name: '设为当前' }).click();
@@ -36,7 +37,7 @@ test('theme page font settings apply globally and are absent from other settings
   await page.getByRole('option', { name: '15px', exact: true }).click();
   await fonts.getByRole('combobox', { name: '终端字号' }).click();
   await page.getByRole('option', { name: '16px', exact: true }).click();
-  // 渲染器偏好与字号同页：切换后要持久化，并且不影响已打开的终端
+  // Renderer preferences persist alongside typography without replacing open sessions.
   await fonts.getByRole('combobox', { name: '终端渲染器' }).click();
   await page.getByRole('option', { name: 'DOM（边缘更干净）', exact: true }).click();
   await expect(fonts.getByRole('combobox', { name: '终端渲染器' })).toHaveText('DOM（边缘更干净）');
@@ -60,7 +61,7 @@ test('theme page font settings apply globally and are absent from other settings
   await page.locator('aside').getByRole('button', { name: '主题', exact: true }).click();
   await expect(fonts.getByRole('combobox', { name: '页面字号' })).toHaveText('15px');
   await expect(fonts.getByRole('combobox', { name: '终端字号' })).toHaveText('16px');
-  await fonts.getByRole('button', { name: '恢复默认字号' }).click();
+  await fonts.getByRole('button', { name: '恢复默认字体设置' }).click();
   await expect(fonts.getByRole('combobox', { name: '终端字号' })).toHaveText('14px');
   await expect(fonts.getByRole('combobox', { name: '终端渲染器' })).toHaveText('WebGL（默认）');
   await page.screenshot({ path: test.info().outputPath('settings.png') });

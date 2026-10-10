@@ -333,6 +333,15 @@ const zh: Record<string, string> = {
   'ssh.quick.connect': '快速连接',
 
   // ── 设置：字号与终端渲染 ──
+  'Terminal font family': '终端字体',
+  'System monospace': '系统等宽字体',
+  'Use a font installed on your system; unavailable families use the fallback fonts.': '使用本机已安装的字体，未安装时使用后备字体。',
+  'Terminal font weight': '终端字重',
+  'Variable fonts support fine weight adjustments; static fonts use the nearest installed weight.': '可变字体支持细致调整；静态字体使用已安装的最接近字重。',
+  'Terminal line spacing': '终端行距',
+  'Adjust line spacing for terminal input, live output and command history.': '调整终端输入、实时输出与历史命令块的行距。',
+  'Terminal font preview': '终端字体预览',
+  'Restore default typography': '恢复默认字体设置',
   'settings.font.group': '字号设置',
   'settings.font.pageTitle': '页面字号',
   'settings.font.pageDescription': '调整整个应用的界面文字大小。',
