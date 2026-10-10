@@ -7,10 +7,12 @@ interface Props {
   label: string;
   horizontal?: boolean;
   floating?: boolean;
+  /** Element owning the floating layer; its coordinate space is used so transforms keep the track aligned. */
+  layerHost?: HTMLElement;
 }
 
 /** A transparent overlay for an ordinary DOM scroll surface. */
-export default function OverlayScrollbar({ scrollRef, controlsId, label, horizontal = false, floating = false }: Props) {
+export default function OverlayScrollbar({ scrollRef, controlsId, label, horizontal = false, floating = false, layerHost }: Props) {
   const [geometry, setGeometry] = useState(() => scrollbarGeometry(0, 0, 0));
   const drag = useRef<{ pointer: number; offset: number } | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -36,10 +38,11 @@ export default function OverlayScrollbar({ scrollRef, controlsId, label, horizon
         let clipLeft = Math.max(0, -left);
         let clipBottom = Math.max(0, top + scroll.clientHeight - window.innerHeight);
         let clipRight = Math.max(0, left + scroll.clientWidth - window.innerWidth);
-        let zIndex = Math.max(2, (parseInt(getComputedStyle(scroll).zIndex) || 0) + 1);
+        const ownedLayer = !!layerHost && layerHost !== document.body;
+        let zIndex = ownedLayer ? 1 : Math.max(2, (parseInt(getComputedStyle(scroll).zIndex) || 0) + 1);
         for (let parent = scroll.parentElement; parent; parent = parent.parentElement) {
           const style = getComputedStyle(parent);
-          zIndex = Math.max(zIndex, (parseInt(style.zIndex) || 0) + 1);
+          if (!ownedLayer) zIndex = Math.max(zIndex, (parseInt(style.zIndex) || 0) + 1);
           const bounds = parent.getBoundingClientRect();
           if (['auto', 'scroll', 'hidden', 'clip'].includes(style.overflowY)) {
             clipTop = Math.max(clipTop, bounds.top + parent.clientTop - top);
@@ -55,6 +58,15 @@ export default function OverlayScrollbar({ scrollRef, controlsId, label, horizon
             bottom: 'auto', right: 'auto', clipPath: `inset(0 ${Math.max(0, clipRight)}px 0 ${Math.max(0, clipLeft)}px)`, zIndex }
           : { position: 'fixed', top, left: left + scroll.clientWidth - 10, width: 10, height: scroll.clientHeight,
             bottom: 'auto', right: 'auto', clipPath: `inset(${Math.max(0, clipTop)}px 0 ${Math.max(0, clipBottom)}px 0)`, zIndex };
+        if (ownedLayer) {
+          // The layer lives in the host's coordinate space, which may be transformed, so map viewport pixels into it.
+          const hostBounds = layerHost.getBoundingClientRect();
+          const scaleX = layerHost.offsetWidth > 0 ? hostBounds.width / layerHost.offsetWidth || 1 : 1;
+          const scaleY = layerHost.offsetHeight > 0 ? hostBounds.height / layerHost.offsetHeight || 1 : 1;
+          nextPlacement.position = 'absolute';
+          nextPlacement.left = (Number(nextPlacement.left) - hostBounds.left) / scaleX - layerHost.clientLeft + layerHost.scrollLeft;
+          nextPlacement.top = (Number(nextPlacement.top) - hostBounds.top) / scaleY - layerHost.clientTop + layerHost.scrollTop;
+        }
         if (!scroll.getClientRects().length || (horizontal ? clipTop + clipBottom >= scroll.clientHeight : clipLeft + clipRight >= scroll.clientWidth)) nextPlacement.display = 'none';
         setPlacement(previous => JSON.stringify(previous) === JSON.stringify(nextPlacement) ? previous : nextPlacement);
       }
@@ -76,7 +88,7 @@ export default function OverlayScrollbar({ scrollRef, controlsId, label, horizon
       window.removeEventListener('resize', update);
       window.removeEventListener('overlay-scroll-layout', update);
     };
-  }, [scrollRef, horizontal, floating]);
+  }, [scrollRef, horizontal, floating, layerHost]);
 
   const move = (event: PointerEvent<HTMLDivElement>, offset: number) => {
     const scroll = scrollRef.current;

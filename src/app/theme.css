@@ -560,7 +560,8 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 .overlay-scroll-container { position: relative; display: flex; flex-direction: column; overflow: hidden; }
 .terminal-block-scroll { scrollbar-gutter: auto; scrollbar-width: none; }
 .terminal-block-scroll::-webkit-scrollbar { display: none; }
-.overlay-scrollbar { position: absolute; top: 0; bottom: 0; right: 0; width: 10px; z-index: 1; background: transparent; touch-action: none; user-select: none; }
+[data-scroll-overlay-layer] { position: absolute; top: 0; left: 0; width: 0; height: 0; overflow: visible; pointer-events: none; }
+.overlay-scrollbar { position: absolute; top: 0; bottom: 0; right: 0; width: 10px; z-index: 1; background: transparent; touch-action: none; user-select: none; pointer-events: auto; }
 .overlay-scrollbar-thumb { width: 6px; margin: 0 2px; border-radius: 999px; background: var(--scrollbar-thumb); }
 .overlay-scroll-target { scrollbar-width: none; scrollbar-gutter: auto; }
 .overlay-scroll-target::-webkit-scrollbar { display: none; }
