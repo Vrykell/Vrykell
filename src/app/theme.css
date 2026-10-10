@@ -153,8 +153,44 @@ button.chat-mode-trigger { background: transparent; transition: background var(-
 button.chat-mode-trigger:hover, button.chat-mode-trigger[aria-expanded="true"] { background: var(--hover); }
 button.chat-mode-option:focus-visible { outline: none; background: var(--selection-bg); }
 
-.settings-page-body { max-width: 720px; }
-.settings-field { padding: 16px; margin-bottom: 12px; background: var(--surface); border-radius: 12px; }
+.settings-content { container: settings / inline-size; }
+.settings-page-body, .settings-page-header { max-width: 900px; margin-inline: auto; }
+.settings-page-header { margin-bottom: 28px; }
+.settings-page-header h1 { margin: 0 0 10px; font-size: calc(24px * var(--ui-font-scale)); font-weight: var(--fw-medium); color: var(--text-primary); }
+.settings-save-hint { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: var(--fs-caption); color: var(--text-muted); }
+.settings-group { margin-bottom: 28px; min-width: 0; }
+.settings-group-title { margin: 0 0 12px; font-size: var(--fs-label); font-weight: var(--fw-medium); color: var(--text-primary); }
+.settings-group-panel { padding: 0 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; min-width: 0; }
+.settings-field { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto); column-gap: 24px; row-gap: 4px; align-items: center; padding: 18px 20px; margin-bottom: 16px; background: var(--surface); border-radius: 16px; min-width: 0; }
+.settings-group-panel > .settings-field { padding: 18px 0; margin: 0; background: transparent; border-radius: 0; }
+.settings-group-panel > .settings-field + .settings-field, .settings-record + .settings-record { border-top: 1px solid var(--border); }
+.settings-field-title { grid-column: 1; font-size: var(--fs-label); font-weight: var(--fw-medium); color: var(--text-primary); overflow-wrap: anywhere; }
+.settings-description { grid-column: 1; font-size: var(--fs-caption); line-height: 1.55; color: var(--text-secondary); overflow-wrap: anywhere; }
+.settings-field-control { grid-column: 2; grid-row: 1 / span 2; min-width: 0; width: 240px; max-width: 100%; justify-self: end; text-align: right; }
+.settings-field-control > * { max-width: 100%; }
+.settings-field-control > div { text-align: left; margin-left: auto; }
+.settings-field[data-layout="row"] > .settings-field-control > div { justify-content: flex-end; }
+.settings-field-control .settings-font-row { justify-content: flex-end; }
+.settings-field-control .settings-font-row > button { max-width: 100%; }
+.settings-field[data-layout="stacked"] { grid-template-columns: minmax(0, 1fr); }
+.settings-field[data-layout="stacked"] > .settings-field-control { grid-column: 1; grid-row: auto; width: 100%; margin-top: 10px; text-align: left; }
+.settings-option-list > div { padding: 12px 0; gap: 12px; }
+.settings-option-list > div + div { border-top: 1px solid var(--border); }
+.settings-record { min-width: 0; padding: 18px 0; }
+.settings-record:first-child { padding-top: 0; }
+.settings-group-panel > .settings-record { padding-block: 18px; }
+.settings-record-list { display: flex; flex-direction: column; min-width: 0; }
+.settings-group-panel > .settings-record-list { padding-block: 18px; }
+.settings-record-list > button { margin-top: 12px; align-self: flex-start; }
+@container settings (max-width: 580px) {
+  .settings-field { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .settings-field-control { grid-column: 1; grid-row: auto; width: 100%; margin-top: 10px; justify-self: start; text-align: left; }
+  .settings-field-control .settings-font-row { justify-content: flex-start; }
+  .settings-field[data-layout="row"] > .settings-field-control > div { margin-left: 0; justify-content: flex-start; }
+  .settings-group-panel { padding-inline: 16px; }
+  .settings-page-header h1 { font-size: calc(22px * var(--ui-font-scale)); }
+  .settings-option-list > div { flex-wrap: wrap; }
+}
 .settings-field input:focus-visible, .settings-field textarea:focus-visible { outline: none; }
 .settings-font-row { display: flex; align-items: center; gap: 8px; }
 .settings-toggle { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-caption); color: var(--text-secondary); }

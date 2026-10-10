@@ -2,9 +2,7 @@ import { t } from '@i18n';
 import { IconButton } from '@ui/IconButton';
 import { TextInput, TextArea } from '@ui/TextInput';
 /**
- * AgentExtrasSettings — 记忆 / 子代理 / 定时任务 设置页。
- * 记忆 = 持久知识 FACT + 流水 JOURNAL（可一键让 AI 整理）；
- * 子代理 = 独立系统提示词助手；定时任务 = 间隔执行（AI 也可用工具自行管理）。
+ * Persistent knowledge, assistant definitions and scheduled tasks.
  */
 import { useEffect, useState } from 'react';
 import { Plus, X, Sparkles } from '@ui/icons';
@@ -20,6 +18,7 @@ import { useToastStore } from '@ui/Toast';
 import { kickScheduleRunner } from '@features/agent/services/scheduleRunner';
 import { useAutoSave } from '../hooks/useAutoSave';
 import SaveStatus from '../components/SaveStatus';
+import { Field, SettingsGroup } from '../components/ui';
 import { inputStyle } from '../components/formStyles';
 
 const toast = (msg: string, type: 'info' | 'success' | 'error') =>
@@ -86,7 +85,7 @@ export function MemorySettings() {
   const jlines = journal.split('\n').filter(Boolean).slice(-20);
 
   return (
-    <>
+    <SettingsGroup title={t('Persistent knowledge')}><Field title={t('Memory content')} layout="stacked">
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <span style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', flex: 1 }}>
           持久知识会注入每次对话；AI 可用「记忆」工具自行读写与整理，也可一键让 AI 整理。
@@ -122,7 +121,7 @@ export function MemorySettings() {
           </pre>
         </div>
       )}
-    </>
+    </Field></SettingsGroup>
   );
 }
 
@@ -145,8 +144,8 @@ function AgentCard({ a, onChanged }: { a: AgentDef; onChanged: () => void }) {
     }
   };
   return (
-    <div onCompositionStart={() => saving.setComposing(true)} onCompositionEnd={() => saving.setComposing(false)} style={{ borderRadius: 'var(--radius-inner)', padding: '10px 12px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
-      <div style={{ display: 'flex', gap: 8 }}>
+    <div onCompositionStart={() => saving.setComposing(true)} onCompositionEnd={() => saving.setComposing(false)} className="settings-record">
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         <TextInput value={name} placeholder="名称" onChange={(e) => saving.setValue(previous => ({ ...previous, name: e.target.value }))} style={{ ...inputStyle, flex: 1, fontWeight: 'var(--fw-semibold)' }} />
         <SaveStatus status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
         <IconButton compact tone="danger" onClick={() => void del()} data-tip={t('Delete')} aria-label={t('Delete')}><X size={16} /></IconButton>
@@ -170,17 +169,17 @@ export function AgentsSettings() {
     }
   };
   return (
-    <>
+    <SettingsGroup title={t('Assistant definitions')}><div className="settings-record">
       <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', marginBottom: 8 }}>
         子代理 = 独立系统提示词的助手，主 AI 用「子代理」工具委派任务，也可自行创建、删除。
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div className="settings-record-list">
         {agents.map((a) => <AgentCard key={a.id} a={a} onChanged={refresh} />)}
         <button onClick={() => void add()} style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}>
           <Plus size={12} /> 添加子代理
         </button>
       </div>
-    </>
+    </div></SettingsGroup>
   );
 }
 
@@ -206,8 +205,8 @@ function ScheduleCard({ s, onChanged }: { s: Schedule; onChanged: () => void }) 
   };
   const nextRun = s.lastRunAt ? s.lastRunAt + s.intervalMinutes * 60_000 : Date.now();
   return (
-    <div onCompositionStart={() => saving.setComposing(true)} onCompositionEnd={() => saving.setComposing(false)} style={{ borderRadius: 'var(--radius-inner)', padding: '10px 12px', background: 'var(--surface)', border: '1px solid var(--border)', opacity: enabled ? 1 : 0.55 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <div onCompositionStart={() => saving.setComposing(true)} onCompositionEnd={() => saving.setComposing(false)} className="settings-record" style={{ opacity: enabled ? 1 : 0.55 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
         <TextInput value={name} placeholder="名称" onChange={(e) => saving.setValue(previous => ({ ...previous, name: e.target.value }))} style={{ ...inputStyle, flex: 1, fontWeight: 'var(--fw-semibold)' }} />
         <TextInput type="number" min={1} value={interval} onChange={(e) => saving.setValue(previous => ({ ...previous, intervalMinutes: Number(e.target.value) }))} style={{ ...inputStyle, width: 70, flexShrink: 0 }} />
         <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>分钟</span>
@@ -240,16 +239,16 @@ export function SchedulesSettings() {
     }
   };
   return (
-    <>
+    <SettingsGroup title={t('Scheduled tasks')}><div className="settings-record">
       <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', marginBottom: 8 }}>
         定时任务在应用运行期间按间隔触发；AI 也可用「定时任务」工具自行创建、启停、删除。
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div className="settings-record-list">
         {schedules.map((s) => <ScheduleCard key={s.id} s={s} onChanged={refresh} />)}
         <button onClick={() => void add()} style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}>
           <Plus size={12} /> 添加任务
         </button>
       </div>
-    </>
+    </div></SettingsGroup>
   );
 }

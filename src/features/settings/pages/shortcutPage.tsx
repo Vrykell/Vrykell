@@ -1,4 +1,4 @@
-import { Field } from '@features/settings/components/ui';
+import { SettingsGroup } from '@features/settings/components/ui';
 import KeyHint from '@ui/KeyHint';
 import { isMacOS } from '@platform/runtime';
 import { t } from '@i18n';
@@ -19,12 +19,12 @@ const SHORTCUTS: { keys: string[]; desc: string }[] = [
 ];
 
 export function ShortcutPage() {
-  return <Field title={t('Keyboard shortcuts')}>
+  return <SettingsGroup title={t('Keyboard shortcuts')}><div className="settings-record">
     <div className="settings-shortcuts">
       {SHORTCUTS.map(shortcut => <div key={shortcut.desc} className="settings-shortcut-row">
         <span>{t(shortcut.desc)}</span>
         <span>{shortcut.keys.map(key => <KeyHint key={key} shortcut={isMacOS ? key : key.replace('Meta', 'Control')} />)}</span>
       </div>)}
     </div>
-  </Field>;
+  </div></SettingsGroup>;
 }

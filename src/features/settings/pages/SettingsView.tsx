@@ -1,7 +1,7 @@
 import { t } from '@i18n';
 import { TextInput } from '@ui/TextInput';
 import { useEffect, useState, type ReactNode } from 'react';
-import { iconSizes, Search, ChevronRight, Settings  } from '@ui/icons';
+import { iconSizes, Search, ChevronRight  } from '@ui/icons';
 import { loadConfig, saveConfig, type FileOpenConfig } from '@features/files/services/fileOpen';
 import { refreshAiConfig, setTavilyKey, clearTavilyKey, useAiConfigStore } from '@features/agent';
 import SkillsSettings from '@features/settings/pages/SkillsSettings';
@@ -12,7 +12,7 @@ import {
   usePermissions, clearSessionGrants, TOOL_NAMES,
   type ToolLevel, type ToolName,
 } from '@features/agent';
-import { Field, TemplateListEditor, btnStyle } from '@features/settings/components/ui';
+import { SettingsGroup, Field, TemplateListEditor, btnStyle } from '@features/settings/components/ui';
 import { AiModelPage } from '@features/settings/pages/aiModelPage';
 import { AiBehaviorPage } from '@features/settings/pages/aiBehaviorPage';
 import { McpPage } from '@features/settings/pages/mcpPage';
@@ -113,7 +113,7 @@ function SettingsContent() {
               ? 'Tavily'
               : 'DuckDuckGo 兜底';
         return (
-          <>
+          <SettingsGroup title={t('Search services')}>
             <Field title="当前搜索方式" description={t('Web search works without configuration.')}>
               <span style={{
                 fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', borderRadius: 4,
@@ -122,7 +122,7 @@ function SettingsContent() {
                 {mode}
               </span>
             </Field>
-            <Field title="Tavily API Key" description={t('Optional search key. Without it, use the built-in fallback.')}>
+            <Field layout="stacked" title="Tavily API Key" description={t('Optional search key. Without it, use the built-in fallback.')}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span style={{
                   fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', borderRadius: 4,
@@ -145,18 +145,19 @@ function SettingsContent() {
                 />
               </div>
             </Field>
-          </>
+          </SettingsGroup>
         );
       }
 
       case 'ai-perms':
         return (
-          <>
+          <SettingsGroup title={t('Tool access')}>
             <Field
+              layout="stacked"
               title="工具权限"
               description={t("Choose which tools may run. Dangerous commands always require approval.")}
             >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div className="settings-option-list">
                 {TOOL_NAMES.map((name) => {
                   const lv: ToolLevel = permLevels[name] ?? 'ask';
                   return (
@@ -195,7 +196,7 @@ function SettingsContent() {
                 清空会话授权
               </button>
             </Field>
-          </>
+          </SettingsGroup>
         );
 
       case 'ai-skill':
@@ -218,7 +219,7 @@ function SettingsContent() {
 
       case 'editor-local':
         return (
-          <>
+          <SettingsGroup title={t('Opening files')}>
             <Field title="默认编辑命令" description={t("Use {file} for the path or __system__ for the default app. Unavailable editors fall back to vim, nano or vi.")}>
               <AutoSaveInput
                 key="local-editor"
@@ -228,7 +229,7 @@ function SettingsContent() {
                 onCommit={defaultEditor => updateFileCfg({ defaultEditor })}
               />
             </Field>
-            <Field title="按扩展名打开" description={t("Set an opening command per extension, using {file} or __system__.")}>
+            <Field layout="stacked" title="按扩展名打开" description={t("Set an opening command per extension, using {file} or __system__.")}>
               <TemplateListEditor
                 key="local-templates"
                 value={fileCfg.templates}
@@ -236,12 +237,12 @@ function SettingsContent() {
                 placeholder="如 code、__system__"
               />
             </Field>
-          </>
+          </SettingsGroup>
         );
 
       case 'editor-remote':
         return (
-          <>
+          <SettingsGroup title={t('Opening files')}>
             <Field title="默认编辑命令" description={t("Run this editor over SSH. Use {file} for the remote path.")}>
               <AutoSaveInput
                 key="remote-editor"
@@ -251,7 +252,7 @@ function SettingsContent() {
                 onCommit={remoteEditor => updateFileCfg({ remoteEditor })}
               />
             </Field>
-            <Field title="按扩展名打开" description={t("Set an opening command per remote extension, using {file} for the path.")}>
+            <Field layout="stacked" title="按扩展名打开" description={t("Set an opening command per remote extension, using {file} for the path.")}>
               <TemplateListEditor
                 key="remote-templates"
                 value={fileCfg.remoteTemplates}
@@ -259,7 +260,7 @@ function SettingsContent() {
                 placeholder="如 nvim、less"
               />
             </Field>
-          </>
+          </SettingsGroup>
         );
 
       case 'appearance-theme':
@@ -359,18 +360,14 @@ function SettingsContent() {
 
       {/* 内容区 */}
       <section className="settings-content" style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '24px 28px', background: 'var(--canvas)' }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          marginBottom: 24,
-        }}>
-          <Settings size={iconSizes.row} style={{ color: 'var(--text-muted)' }} />
-          <span style={{ fontSize: 'var(--fs-title)', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)' }}>{activeLabel}</span>
-        </div>
-        <div className="settings-page-body">
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, marginBottom: 16, fontSize: 'var(--fs-caption)', color: 'var(--text-muted)' }}>
-            <span>选择项立即保存，文本停止输入后自动保存。</span>
+        <header className="settings-page-header">
+          <h1>{activeLabel}</h1>
+          <div className="settings-save-hint">
+            <span>{t('Options save immediately; text saves after you stop typing.')}</span>
             <SaveStatus status={status} onRetry={retry} />
           </div>
+        </header>
+        <div className="settings-page-body">
           {renderPage()}
         </div>
       </section>

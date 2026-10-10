@@ -1,6 +1,6 @@
 import { IconButton } from '@ui/IconButton';
 /**
- * aiModelPage — 模型配置页（API Key + 模型列表）。
+ * Provider credentials and configured models.
  */
 import { Plus, X } from '@ui/icons';
 import { t } from '@i18n';
@@ -14,7 +14,7 @@ import { detectCapabilities, type ModelCapability } from '@features/agent/model/
 import { modelIcon, providerLabel } from '@features/agent/components/modelIcon';
 import Select from '@ui/Select';
 import { useToastStore } from '@ui/Toast';
-import { Field, ModelTextInput, btnStyle } from '@features/settings/components/ui';
+import { SettingsGroup, Field, ModelTextInput, btnStyle } from '@features/settings/components/ui';
 import ModelThinkingSettings from '@features/settings/components/ModelThinkingSettings';
 import AutoSaveInput from '../components/AutoSaveInput';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
@@ -85,35 +85,40 @@ export function AiModelPage() {
 
   return (
     <>
-      <Field
-        title="服务商 API Key"
-        description={t('Models from the current provider share one key, stored only on this device.')}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <span style={{
-            fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', borderRadius: 4,
-            color: keySet ? 'var(--success)' : 'var(--text-muted)',
-            background: keySet ? 'var(--success-bg)' : 'var(--hover)',
-          }}>
-            {keySet ? '已配置' : '未配置'}
-          </span>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <AutoSaveInput
-            key={provider}
-            type="password"
-            value=""
-            placeholder={keySet ? '输入以覆盖，留空不改动' : '输入 API Key'}
-            onCommit={key => setProviderKey(provider, key)}
-            clearAfterSave
-            onClear={keySet ? async () => { await clearProviderKey(provider); toast('已清除 API Key', 'success'); } : undefined}
-            validate={key => key.trim() ? undefined : '留空不改动'}
-            style={{ flex: 1 }}
-          />
-        </div>
-      </Field>
+      <SettingsGroup title={t('Provider credentials')}>
+        <Field
+          layout="stacked"
+          title="服务商 API Key"
+          description={t('Models from the current provider share one key, stored only on this device.')}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{
+              fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', borderRadius: 4,
+              color: keySet ? 'var(--success)' : 'var(--text-muted)',
+              background: keySet ? 'var(--success-bg)' : 'var(--hover)',
+            }}>
+              {keySet ? '已配置' : '未配置'}
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <AutoSaveInput
+              key={provider}
+              type="password"
+              value=""
+              placeholder={keySet ? '输入以覆盖，留空不改动' : '输入 API Key'}
+              onCommit={key => setProviderKey(provider, key)}
+              clearAfterSave
+              onClear={keySet ? async () => { await clearProviderKey(provider); toast('已清除 API Key', 'success'); } : undefined}
+              validate={key => key.trim() ? undefined : '留空不改动'}
+              style={{ flex: 1 }}
+            />
+          </div>
+        </Field>
 
-      <ModelListField />
+      </SettingsGroup>
+      <SettingsGroup title={t('Available models')}>
+          <ModelListField />
+      </SettingsGroup>
     </>
   );
 }
@@ -165,17 +170,15 @@ function ModelListField() {
 
   return (
     <Field
+      layout="stacked"
       title="模型列表"
       description={t('Configure models and choose the active one. Models from the same provider share an API key.')}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div className="settings-record-list">
         {models.map((m) => (
           <div
             key={m.id}
-            style={{
-              borderRadius: 'var(--radius-inner)',
-              padding: '12px 14px', background: 'var(--surface)',
-            }}
+            className="settings-record"
           >
             <div className="settings-model-header">
               <span

@@ -7,7 +7,7 @@ import Select from '@ui/Select';
 import { useAgentSettings } from '@features/agent';
 import { useT } from '@i18n';
 import { SHELL_TYPES, getAvailableShells, shellTypeLabel, type ShellType, type ShellOption } from '@platform/shells';
-import { Field } from '@features/settings/components/ui';
+import { SettingsGroup, Field } from '@features/settings/components/ui';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
 
 /** A row keeps its label on the left and pushes the dropdown to the right edge. */
@@ -38,14 +38,14 @@ export function TerminalOpenPage() {
     save(() => agentSettings.update({ sshOpenMode: mode }));
 
   return (
-    <>
+    <SettingsGroup title={t('Terminal defaults')}>
       <Field title={t('Default terminal')} description={t('Used for new tabs, startup and opening files in a terminal.')}>
         <Select aria-label={t('Default terminal')} value={defaultShell}
           options={[{ value: 'system' as const, label: t('System default') }, ...shells.map(shell => ({ value: shell.id, label: shell.label }))]}
           onChange={value => save(() => setDefaultShell(value))} />
       </Field>
-      <Field title={t('settings.openMode.title')} description={t('settings.openMode.description')}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <Field layout="stacked" title={t('settings.openMode.title')} description={t('settings.openMode.description')}>
+        <div className="settings-option-list">
           {SHELL_TYPES.map((shell) => (
             <div key={shell} style={rowStyle}>
               <span style={labelStyle}>{shellTypeLabel(shell)}</span>
@@ -73,6 +73,6 @@ export function TerminalOpenPage() {
           </div>
         </div>
       </Field>
-    </>
+    </SettingsGroup>
   );
 }

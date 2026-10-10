@@ -2,7 +2,7 @@ import { IconButton } from '@ui/IconButton';
 import { t } from '@i18n';
 import { TextInput, TextArea } from '@ui/TextInput';
 /**
- * mcpPage — MCP 服务器设置页。
+ * External tool server settings.
  * New server drafts are persisted automatically after required fields are valid.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -13,7 +13,7 @@ import {
 } from '@features/agent/services/mcp';
 import { useToastStore } from '@ui/Toast';
 import ErrorBox from '@ui/ErrorBox';
-import { Field, Toggle, inputStyle, btnStyle } from '@features/settings/components/ui';
+import { SettingsGroup, Field, Toggle, inputStyle, btnStyle } from '@features/settings/components/ui';
 import { useAutoSave } from '../hooks/useAutoSave';
 import SaveStatus from '../components/SaveStatus';
 
@@ -83,11 +83,12 @@ export function McpPage() {
   const dropDraft = (key: string) => setDrafts((d) => d.filter((x) => x !== key));
 
   return (
-    <Field
+    <SettingsGroup title={t('External tools')}><Field
+      layout="stacked"
       title="MCP 服务器"
       description={t('Connect external tools using a command and arguments or a server URL.')}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div className="settings-record-list">
         {listError && (
           <ErrorBox actions={<button onClick={refresh} style={{ minHeight: 32 }}>重试</button>}>
             {listError}
@@ -128,7 +129,7 @@ export function McpPage() {
           <Plus size={12} /> 添加服务器
         </button>
       </div>
-    </Field>
+    </Field></SettingsGroup>
   );
 }
 
@@ -168,10 +169,10 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
 
   return (
     <div
+      className="settings-record"
       onCompositionStart={() => saving.setComposing(true)} onCompositionEnd={() => saving.setComposing(false)}
       style={{
-        borderRadius: 'var(--radius-inner)',
-        padding: '10px 12px', background: 'var(--surface)', border: '1px solid var(--border)', opacity: enabled ? 1 : 0.6,
+        opacity: enabled ? 1 : 0.6,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
