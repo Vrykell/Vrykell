@@ -65,8 +65,8 @@
   --status-error: var(--error-light);
 }
 
-/* Native carets and terminal cursors share the active blue cursor token. */
-input, textarea, [contenteditable="true"] { caret-color: var(--xterm-cursor); }
+/* Blue native text carets stay separate from terminal cursor themes. */
+input, textarea, [contenteditable="true"] { caret-color: var(--text-caret); }
 .settings-nav-group { margin-bottom: 16px; }
 .settings-nav-heading { padding: 12px 16px 6px; color: var(--text-muted); font-size: var(--fs-caption); font-weight: var(--fw-medium); }
 .settings-navigation [role="button"]:focus-visible { outline: none; }
@@ -77,7 +77,13 @@ input, textarea, [contenteditable="true"] { caret-color: var(--xterm-cursor); }
 .command-token[data-kind="operator"] { color: var(--cmd-pipe); }
 .command-token[data-kind="comment"] { color: var(--text-muted); }
 .command-completion-suffix { color: var(--text-muted); opacity: 0.65; }
-.command-completion-action { display: inline-block; vertical-align: middle; margin-left: 8px; pointer-events: auto; }
+.command-completion-action { display: inline-block; vertical-align: middle; margin-left: 8px; pointer-events: auto; line-height: 1; }
+.command-completion-trigger { display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 20px; padding: 0 5px; border: 1px solid var(--border-strong); border-radius: 5px; background: transparent; color: var(--text-secondary); }
+.command-completion-trigger .key-hint, .checkbox-menu-compact .key-hint { min-height: 16px; padding: 0; background: transparent; color: inherit; }
+.command-completion-trigger .key-hint { height: 14px; }
+.checkbox-menu-compact .workspace-floating-row[aria-checked="true"] { background: var(--selection-bg) !important; }
+.checkbox-menu-compact .workspace-floating-row { border-radius: 0; }
+.completion-shortcut-custom { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px; border: 0; background: transparent; color: var(--text-secondary); text-align: left; font-size: var(--fs-label); }
 
 * { box-sizing: border-box; }
 

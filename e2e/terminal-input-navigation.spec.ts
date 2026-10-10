@@ -149,6 +149,10 @@ test('horizontal overlay tracks retain content height and support keyboard and d
 
 test('latest-output arrow resumes following during a foreground command', async ({ page }) => {
   await ready(page);
+  // Complete one user submission before injecting a foreground stream, draining startup output.
+  const input = page.getByPlaceholder(/输入命令/);
+  await input.fill('echo ready'); await input.press('Enter');
+  await expect(page.locator('[data-testid^="command-block-"]').filter({ has: page.getByText('echo ready', { exact: true }) })).toBeVisible();
   const lines = Array.from({ length: 80 }, (_, index) => `running-line-${index}`).join('\r\n');
   await emitPtyOutput(page, `\x1b]133;E;${btoa('running-demo')}\x07\x1b]133;C\x07${lines}\r\n`);
   const button = page.getByRole('button', { name: '回到最新输出' });

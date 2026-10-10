@@ -13,6 +13,7 @@ import { useCommandCompletion } from '@features/terminal/hooks/useCommandComplet
 import { appendTerminalBlankLines, setPendingTerminalCommand } from '@features/terminal/hooks/useTerminalSession';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 import { useAutoSizeTextarea } from '@ui/hooks/useAutoSizeTextarea';
+import { acceptsCompletionKey, completionShortcut, useCompletionPreferences } from '@config/completion';
 
 interface UseInputEditorControllerOptions {
   paneId: string;
@@ -107,7 +108,7 @@ export function useInputEditorController({
     if (inputRef.current) inputRef.current.style.height = 'auto';
   }, []);
 
-  const { ghost, ghostCandidates, clearGhost, acceptCompletion, restoreCompletion } = useCommandCompletion({
+  const { ghost, clearGhost, acceptCompletion, restoreCompletion } = useCommandCompletion({
     text,
     aiMode,
     isFocused,
@@ -200,8 +201,11 @@ export function useInputEditorController({
         return;
       }
     }
-    if (event.key === 'Tab' && acceptCompletion(event.shiftKey)) {
+    const input = event.currentTarget;
+    if (completionShortcut(event) && !event.nativeEvent.isComposing && acceptsCompletionKey(event, useCompletionPreferences.getState().shortcuts,
+      input.selectionStart, input.selectionEnd, text.length) && acceptCompletion(event.key === 'Tab' && event.shiftKey)) {
       event.preventDefault();
+      event.stopPropagation();
       resetHistNav();
       return;
     }
@@ -257,12 +261,6 @@ export function useInputEditorController({
     removeAttachment,
     canSendAi,
     ghost,
-    ghostCandidates,
-    acceptSuggestedCompletion: (candidate: string) => {
-      if (!acceptCompletion(false, candidate)) return;
-      resetHistNav();
-      inputRef.current?.focus();
-    },
     execute,
     handleChange,
     handlePaste,

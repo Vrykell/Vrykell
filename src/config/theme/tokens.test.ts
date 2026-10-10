@@ -36,12 +36,13 @@ describe('toRgba', () => {
 });
 
 describe('默认调色板（中性灰色）', () => {
-  it.each(['dark', 'light'] as const)('%s uses a blue cursor independently of neutral control accents', mode => {
-    const cursor = themes[mode].xtermCursor;
+  it.each(['dark', 'light'] as const)('%s keeps blue text carets separate from terminal cursors', mode => {
+    const cursor = themes[mode].textCaret;
     const channels = [1, 3, 5].map(offset => parseInt(cursor.slice(offset, offset + 2), 16));
     expect(channels[2]).toBeGreaterThan(channels[1]!);
     expect(channels[1]).toBeGreaterThan(channels[0]!);
-    expect(paletteToCssVars(themes[mode])['--xterm-cursor']).toBe(cursor);
+    expect(paletteToCssVars(themes[mode])['--text-caret']).toBe(cursor);
+    expect(paletteToCssVars(themes[mode])['--xterm-cursor']).toBe(mode === 'dark' ? '#ECEFF4' : '#2E3742');
   });
   it('dark 与 light 均存在', () => {
     expect(themes.dark).toBeDefined();

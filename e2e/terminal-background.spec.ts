@@ -24,6 +24,8 @@ for (const mode of ['block', 'classic'] as const) {
         return `rgb(${[1, 3, 5].map(offset => parseInt(color.slice(offset, offset + 2), 16)).join(', ')})`;
       });
       await expect(pane).toHaveCSS('background-color', expected);
+      const cursor = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--xterm-cursor').trim());
+      expect(cursor).toBe(theme === '深色' ? '#ECEFF4' : '#2E3742');
       if (mode === 'block') {
         await expect(page.locator('[data-testid^="terminal-scroll-"]').first()).toHaveCSS('background-color', expected);
         await expect(page.locator('.terminal-composer').locator('..')).toHaveCSS('background-color', expected);

@@ -6,6 +6,11 @@ beforeEach(() => {
 });
 
 describe('readXtermTheme', () => {
+  it('uses the terminal cursor token independently of the blue native text caret', () => {
+    document.documentElement.style.setProperty('--xterm-cursor', '#ECEFF4');
+    document.documentElement.style.setProperty('--text-caret', '#4DA3FF');
+    expect(readXtermTheme().cursor).toBe('#ECEFF4');
+  });
   it('读取终端背景、前景和 ANSI 颜色变量', () => {
     document.documentElement.style.setProperty('--xterm-bg', '#121820');
     document.documentElement.style.setProperty('--xterm-foreground', '#DDE4EE');

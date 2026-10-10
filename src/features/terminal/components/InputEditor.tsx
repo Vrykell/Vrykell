@@ -33,7 +33,7 @@ import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
 import { normalizeWorkingDirectory } from '@features/terminal/services/pipeline/workingDirectory';
 import DirectoryPicker from './DirectoryPicker';
 import CommandSyntax from './CommandSyntax';
-import Select from '@ui/Select';
+import CompletionControl from './CompletionControl';
 import { useTypographyStore } from '@config/typography';
 import { useRef } from 'react';
 
@@ -89,8 +89,6 @@ export default function InputEditor({
     removeAttachment,
     canSendAi,
     ghost,
-    ghostCandidates = [],
-    acceptSuggestedCompletion,
     execute,
     handleChange,
     handlePaste,
@@ -241,12 +239,9 @@ export default function InputEditor({
               >
                 <span aria-hidden style={{ color: highlightInput ? 'var(--text-primary)' : 'transparent' }}>{highlightInput ? <CommandSyntax text={text} /> : text}</span>
                 <span aria-hidden className="command-completion-suffix">{ghost}</span>
-                {ghost && ghostCandidates.length > 0 && <span className="command-completion-action"
+                {ghost && <span className="command-completion-action"
                   onClick={event => event.stopPropagation()} onMouseDown={event => event.stopPropagation()}>
-                  <Select aria-label={t('Completion suggestions')} value="" placeholder="→"
-                    options={ghostCandidates.map(candidate => ({ value: candidate, label: text + candidate }))}
-                    onChange={acceptSuggestedCompletion}
-                    style={{ height: 22, minHeight: 22, width: 44, gap: 4, padding: '0 4px', background: 'transparent', fontSize: 'var(--fs-caption)' }} />
+                  <CompletionControl onReturnFocus={() => inputRef.current?.focus()} />
                 </span>}
               </div>
             )}
