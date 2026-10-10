@@ -40,7 +40,7 @@ it('searches folders, keeps the parent choice, and navigates without losing the 
   expect(screen.queryByRole('option', { name: 'notes.txt' })).toBeNull();
   fireEvent.change(screen.getByRole('combobox'), { target: { value: "it's" } });
   expect(screen.queryByRole('option', { name: 'Documents' })).toBeNull();
-  expect(screen.getByRole('option', { name: /上级目录/ })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '上级目录' })).toBeInTheDocument();
   fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Enter' });
   await waitFor(() => expect(mocks.write).toHaveBeenCalledWith('pty', "cd -- '/work/it'\\''s a folder'\n"));
   expect(useInputStore.getState().byPane.pane.text).toBe('my draft');
@@ -84,4 +84,17 @@ it('keeps a disconnected remote pane from browsing the local filesystem', () => 
   fireEvent.click(trigger);
   expect(mocks.list).not.toHaveBeenCalled();
   expect(mocks.factory).not.toHaveBeenCalledWith({ kind: 'local' });
+});
+
+it('keeps the parent fixed outside the directory list and starts with neutral rows', async () => {
+  render(<DirectoryPicker paneId="pane" dir="/work" />);
+  fireEvent.click(screen.getByRole('button', { name: '切换工作目录' }));
+  const folder = await screen.findByRole('option', { name: 'Documents' });
+  const parent = screen.getByRole('button', { name: '上级目录' });
+  expect(parent.closest('[role="listbox"]')).toBeNull();
+  expect(folder).toHaveAttribute('aria-selected', 'false');
+  fireEvent.keyDown(screen.getByRole('combobox'), { key: 'ArrowDown' });
+  expect(folder).toHaveAttribute('aria-selected', 'true');
+  fireEvent.click(parent);
+  await waitFor(() => expect(mocks.write).toHaveBeenCalledWith('pty', "cd -- '/'\n"));
 });

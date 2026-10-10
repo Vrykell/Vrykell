@@ -42,11 +42,18 @@ test('cwd menu searches folders, changes directories, and preserves the command 
   await expect(trigger).toBeEnabled();
   await trigger.click();
   const menu = page.getByRole('dialog', { name: '选择工作目录' });
-  await expect(menu.getByRole('option', { name: /上级目录/ })).toBeVisible();
+  await expect(menu.getByRole('button', { name: '上级目录' })).toBeVisible();
+  await expect(menu.getByRole('button', { name: '上级目录' })).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await expect(menu.getByRole('option', { name: 'Documents' })).toBeVisible();
   await expect(menu.getByRole('option', { name: 'Documents' })).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await expect(menu.getByRole('option', { name: 'Documents' })).toHaveCSS('border-radius', '0px');
   await expect(menu.getByRole('option', { name: 'notes.txt' })).toHaveCount(0);
+  const folder = menu.getByRole('option', { name: 'Documents' });
+  await folder.hover();
+  const hover = await folder.evaluate(element => getComputedStyle(element).backgroundColor);
+  expect(hover).not.toBe('rgba(0, 0, 0, 0)');
+  await menu.getByRole('combobox').hover();
+  await expect(folder).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   const search = menu.getByRole('combobox');
   await search.fill('download');
   await expect(menu.getByRole('option', { name: 'Downloads' })).toBeVisible();
@@ -91,7 +98,7 @@ test('overflow menus retain transparent overlay tracks while dragging and clicki
   });
   await page.getByRole('button', { name: '切换工作目录' }).click();
   const list = page.locator('.directory-picker-list');
-  await expect(list.getByRole('option')).toHaveCount(41);
+  await expect(list.getByRole('option')).toHaveCount(40);
   await expect(list).toHaveClass(/overlay-scroll-target/);
   const id = await list.getAttribute('id');
   const bar = page.locator(`[role="scrollbar"][aria-controls="${id}"]`);
@@ -105,6 +112,8 @@ test('overflow menus retain transparent overlay tracks while dragging and clicki
   await expect(page.getByRole('dialog', { name: '选择工作目录' })).toBeVisible();
   await expect.poll(() => list.evaluate(element => element.scrollTop)).toBeGreaterThan(200);
   await expect(list.getByRole('option').first()).not.toBeInViewport();
+  await expect(page.getByRole('button', { name: '上级目录' })).toBeInViewport();
+  expect((await page.locator('.directory-picker').boundingBox())!.width).toBeLessThanOrEqual(280);
   await page.screenshot({ path: test.info().outputPath('cwd-overlay-menu.png') });
 });
 
