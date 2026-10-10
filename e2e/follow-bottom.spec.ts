@@ -52,6 +52,10 @@ test('改变终端宽度时保持阅读位置，贴底状态保持贴底', async
   await page.setViewportSize({ width: 1100, height: 500 });
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
+  await page.waitForFunction(() => {
+    const scope = window as unknown as { __vrykellSessionRegistry?: { controllers: Map<string, import('../src/features/terminal/services/pipeline/sessionController').SessionController> } };
+    return [...(scope.__vrykellSessionRegistry?.controllers.values() ?? [])].some(controller => controller.activeBlock?.status === 'pending' && !!controller.activeBlock.cwd);
+  });
 
   await expect(page.locator('[data-testid^="terminal-scroll-"]').first()).toBeVisible();
   for (let i = 0; i < 14; i++) {

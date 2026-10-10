@@ -19,7 +19,7 @@ import { PermissionModeButton } from '@features/agent';
  */
 
 import { iconSizes,
-  ArrowUp, Columns2, GitBranch, Paperclip,
+  ArrowUp, ArrowDown, DollarSign, Columns2, GitBranch, Paperclip,
   Square, X, Zap,
  } from '@ui/icons';
 import ContextRing from '@features/chat/components/ContextRing';
@@ -31,6 +31,7 @@ import ShellIndicator from '@features/terminal/components/ShellIndicator';
 import { useInputEditorController } from '@features/terminal/hooks/useInputEditorController';
 import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
 import { normalizeWorkingDirectory } from '@features/terminal/services/pipeline/workingDirectory';
+import DirectoryPicker from './DirectoryPicker';
 
 
 interface Props {
@@ -123,21 +124,10 @@ export default function InputEditor({
           }}
         />
         <span style={{ flex: 1 }}>{hint}</span>
-        <span
-          onClick={onEndPress}
-          style={{
-            fontSize: 'calc(10px * var(--ui-font-scale))',
-            padding: '1px 6px',
-            border: '1px solid var(--border)',
-            borderRadius: 3,
-            background: 'transparent',
-            color: 'var(--text-secondary)',
-            cursor: 'pointer',
-            fontFamily: 'var(--font-mono)',
-          }}
-        >
-          <KeyHint shortcut="End" />
-        </span>
+        <IconButton compact data-subtle onClick={onEndPress} data-tip={t('Jump to latest output')}
+          data-tip-shortcut="End" aria-label={t('Jump to latest output')}>
+          <ArrowDown size={iconSizes.compact} />
+        </IconButton>
       </div>
     );
   }
@@ -190,7 +180,7 @@ export default function InputEditor({
           <IconButton data-subtle disabled={chatOpen} onClick={toggleAiMode}
             data-tip={t(chatOpen ? 'Use the chat panel' : aiMode ? 'Switch to command mode' : 'Switch to AI mode')}
             aria-label={t(chatOpen ? 'Use the chat panel' : aiMode ? 'Switch to command mode' : 'Switch to AI mode')}>
-            {aiMode ? <Zap size={iconSizes.control} /> : '$'}
+            {aiMode ? <Zap size={iconSizes.control} /> : <DollarSign size={iconSizes.control} />}
           </IconButton>
 
           {/* textarea + ghost overlay（绝对定位同字体同内边距，透明已输入 + muted 建议后缀）
@@ -278,7 +268,7 @@ export default function InputEditor({
         >
           <ShellIndicator connected={hasSession} focused={isFocused} label={terminalLabel} />
           <span style={{ color: 'var(--border-strong)', opacity: 0.5, margin: '0 1px' }}>·</span>
-          <CurrentDir dir={tabCwd} />
+          <DirectoryPicker paneId={paneId} dir={tabCwd} />
           {recentGitBranch && (
             <>
               <span style={{ color: 'var(--border-strong)', opacity: 0.5, margin: '0 1px' }}>·</span>

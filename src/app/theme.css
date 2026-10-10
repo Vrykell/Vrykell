@@ -272,6 +272,14 @@ input.ssh-auth-response::placeholder { font-size: inherit; letter-spacing: inher
 .terminal-input-status { min-width: 0; }
 .terminal-input-status > button { flex-shrink: 0; }
 .terminal-directory { min-width: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.directory-picker-trigger { display: inline-flex; align-items: center; gap: 5px; min-width: 0; max-width: 50%; border: 1px solid var(--border); border-radius: var(--radius-inner); background: transparent; color: var(--text-secondary); padding: 2px 5px; font: calc(12px * var(--ui-font-scale))/1.4 var(--font-mono); }
+.directory-picker-trigger span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.directory-picker { padding: 0; overflow: hidden; }
+.directory-picker-search { width: 100%; box-sizing: border-box; padding: 10px 12px; border: none; border-bottom: 1px solid var(--border); background: var(--canvas); color: var(--text-primary); outline: none; font: inherit; }
+.directory-picker-list { max-height: min(240px, 45vh); overflow-y: auto; }
+.directory-picker-list button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: none; border-radius: 0; background: transparent; color: var(--text-primary); text-align: left; font: inherit; cursor: pointer; }
+.directory-picker-list button[aria-selected="true"] { background: var(--selection-bg); }
+.directory-picker p { margin: 0; padding: 10px 12px; color: var(--text-muted); }
 .terminal-branch { min-width: 0; max-width: 22%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .terminal-pane { container-type: inline-size; }
 @container (max-width: 420px) {
@@ -597,7 +605,7 @@ button.tui-control { min-height: 20px; padding: 0 4px; font-size: var(--fs-micro
 .command-block-cwd { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .command-block-branch { min-width: 0; max-width: 25%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .command-block-actions { position: absolute; right: 0; top: 50%; transform: translateY(-50%); display: inline-flex; flex-shrink: 0; }
-.command-block-command { min-width: 0; font-family: var(--font-mono); font-size: var(--terminal-font-size); line-height: var(--terminal-row-height); font-weight: var(--command-block-command-weight); color: var(--xterm-foreground); white-space: pre-wrap; word-break: break-all; user-select: text; }
+.command-block-command { min-width: 0; min-height: var(--terminal-row-height); font-family: var(--font-mono); font-size: var(--terminal-font-size); line-height: var(--terminal-row-height); font-weight: var(--command-block-command-weight); color: var(--xterm-foreground); white-space: pre-wrap; word-break: break-all; user-select: text; }
 .command-block-output { margin-top: calc(var(--terminal-row-height) / 2); }
 .command-block-truncation { min-height: 0; margin: 8px 0 0; }
 .command-block-running { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--accent-warm); animation: pulse 1.5s ease-in-out infinite; }

@@ -81,6 +81,11 @@ export function setPendingTerminalCommand(tabId: string, command: string): void 
   else pendingUiCommands.delete(tabId);
 }
 
+/** Empty submissions retain their visual spacing while the PTY handles the actual input. */
+export function appendTerminalBlankLines(paneId: string, count: number): void {
+  sessionControllers.get(paneId)?.appendBlankLines(count);
+}
+
 /** 运行中块的活终端（RunningItem 挂载显示 / useTerminalFocus 聚焦目标） */
 export function getExecutingTerm(tabId: string) {
   return sessionControllers.get(tabId)?.executingTerm ?? null;

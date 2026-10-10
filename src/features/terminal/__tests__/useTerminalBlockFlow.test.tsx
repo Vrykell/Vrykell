@@ -25,7 +25,7 @@ describe('useTerminalBlockFlow', () => {
   const blockSnapshot = useBlockStore.getState();
 
   afterEach(() => {
-    useBlockStore.setState(blockSnapshot, true);
+    act(() => useBlockStore.setState(blockSnapshot, true));
   });
 
   it('separates completed and running blocks and builds the render flow', () => {
@@ -33,13 +33,14 @@ describe('useTerminalBlockFlow', () => {
     const completed = block({ id: 'completed' });
     const running = block({ id: 'running', status: 'executing', outputText: '' });
     const empty = block({ id: 'empty', command: '', outputText: '', outputRaw: '' });
-    act(() => useBlockStore.setState({ byTab: { [tabId]: [completed, running, empty] } }));
+    const prompt = block({ id: 'prompt', command: '', outputText: '', outputRaw: '', startedAt: null });
+    act(() => useBlockStore.setState({ byTab: { [tabId]: [completed, running, empty, prompt] } }));
 
     const { result } = renderHook(() => useTerminalBlockFlow(tabId));
 
-    expect(result.current.completed.map((item) => item.id)).toEqual(['completed']);
+    expect(result.current.completed.map((item) => item.id)).toEqual(['completed', 'empty']);
     expect(result.current.running.map((item) => item.id)).toEqual(['running']);
-    expect(result.current.flow).toHaveLength(1);
+    expect(result.current.flow).toHaveLength(2);
     expect(result.current.flow[0]?.type).toBe('block');
   });
 

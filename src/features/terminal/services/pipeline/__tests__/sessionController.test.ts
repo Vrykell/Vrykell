@@ -44,6 +44,42 @@ async function waitFor(cond: () => boolean, timeoutMs = 2000): Promise<void> {
 }
 
 describe('SessionController', () => {
+  it('accepts an empty submission after restored history has no pending prompt', () => {
+    const { ctrl, feed } = wire();
+    feed(`${OSC7('/Users/test')}${A}`);
+    ctrl.seed([]);
+    ctrl.appendBlankLines(1);
+    expect(ctrl.blocks[0]).toMatchObject({ command: '', cwd: '/Users/test', status: 'done', outputText: '' });
+    expect(ctrl.activeBlock?.status).toBe('pending');
+    ctrl.dispose();
+  });
+
+  it('preserves every empty submission as a completed block with directory context', () => {
+    const { ctrl, feed, st } = wire();
+    feed(`${OSC7('/Users/test/work')}${A}`);
+    ctrl.appendBlankLines(3);
+    const submitted = ctrl.blocks.filter(block => block.status === 'done');
+    expect(submitted).toHaveLength(3);
+    expect(new Set(submitted.map(block => block.id)).size).toBe(3);
+    expect(submitted.every(block => block.cwd === '/Users/test/work' && block.command === '' && block.outputText === '' && block.startedAt !== null && block.outputHtml === '')).toBe(true);
+    expect(st.completed).toHaveLength(3);
+    expect(ctrl.activeBlock?.status).toBe('pending');
+    feed(A + A + A);
+    expect(ctrl.blocks.filter(block => block.outputText === '' && block.startedAt !== null)).toHaveLength(3);
+    const restored = wire('restored');
+    restored.ctrl.seed(submitted);
+    expect(restored.ctrl.blocks.map(block => [block.cwd, block.outputText])).toEqual(submitted.map(block => [block.cwd, block.outputText]));
+    restored.ctrl.dispose();
+    ctrl.dispose();
+  });
+  it('does not add empty submissions to a running foreground program', () => {
+    const { ctrl, feed } = wire();
+    feed(`${A}${E('vi')}${C}`);
+    ctrl.appendBlankLines(2);
+    expect(ctrl.blocks).toHaveLength(1);
+    ctrl.dispose();
+  });
+
   it('answers startup queries before the running view mounts, without forwarding them twice', async () => {
     const { st, ctrl, feed } = wire();
     feed(`${A}${E('vi')}${C}\x1b[6n\x1b[>c`);

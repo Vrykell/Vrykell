@@ -67,6 +67,31 @@ vi.mock('@features/agent', () => ({
 }));
 
 describe('useInputEditorController', () => {
+  it('submits repeat Enter events using the current cleared draft', () => {
+    const { result } = renderHook(() => useInputEditorController({ paneId: 'pane-1' }));
+    const execute = result.current.execute;
+    act(() => { execute(); execute(); execute(); });
+    expect(mocks.ptyWrite.mock.calls.map(call => call[1])).toEqual(['git status\n', '\n', '\n']);
+  });
+  it('preserves a draft consisting of standalone newline characters', () => {
+    useInputStore.setState({ byPane: { 'pane-1': { text: '\n\n', aiMode: false } } });
+    const { result } = renderHook(() => useInputEditorController({ paneId: 'pane-1' }));
+    act(() => result.current.execute());
+    expect(mocks.ptyWrite).toHaveBeenCalledWith('pty-1', '\n\n\n');
+  });
+  it('does not send empty AI messages or enqueue blank input before PTY connection', () => {
+    useInputStore.setState({ byPane: { 'pane-1': { text: '', aiMode: true } } });
+    const { result } = renderHook(() => useInputEditorController({ paneId: 'pane-1' }));
+    act(() => result.current.execute());
+    expect(mocks.ptyWrite).not.toHaveBeenCalled();
+    expect(mocks.chatSend).not.toHaveBeenCalled();
+    mocks.sessions = {};
+    act(() => useInputStore.setState({ byPane: { 'pane-1': { text: '', aiMode: false } } }));
+    act(() => result.current.execute());
+    expect(mocks.ptyWrite).not.toHaveBeenCalled();
+    expect(useTerminalStore.getState().pendingCommands['pane-1']).toBeUndefined();
+  });
+
   const inputSnapshot = useInputStore.getState();
   const chatSnapshot = useChatStore.getState();
   const sessionSnapshot = useSessionStore.getState();
@@ -128,7 +153,7 @@ describe('useInputEditorController', () => {
     expect(result.current.aiMode).toBe(false);
     expect(result.current.text).toBe('');
     act(() => result.current.execute());
-    expect(mocks.ptyWrite).not.toHaveBeenCalled();
+    expect(mocks.ptyWrite).toHaveBeenCalledWith('pty-1', '\n');
     expect(useInputStore.getState().byPane['pane-1']?.aiDraft).toBe('解释这个项目');
     act(() => useDockStore.setState({ rightPanels: [] }));
     act(() => result.current.toggleAiMode());
