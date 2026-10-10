@@ -3,6 +3,7 @@ import { t } from '@i18n';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { clampMenuPosition } from '@ui/menuPosition';
+import { useExclusiveMenu } from '@ui/hooks/useExclusiveMenu';
 import type { BlockMenuAnchor } from '@features/terminal/hooks/useTerminalBlockFlow';
 import { copyBlockText, rerunBlockCommand } from '@features/terminal/services/blockActions';
 import { useChatStore } from '@features/chat';
@@ -21,6 +22,7 @@ interface Props {
 
 export default function BlockMenu({ block, paneId, anchor, onClose, getOutputText }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  useExclusiveMenu(ref, onClose);
   const preferredPosition = anchor.kind === 'pointer'
     ? { left: anchor.x, top: anchor.y }
     : { left: anchor.left, top: anchor.top };
@@ -42,17 +44,6 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
     window.addEventListener('resize', updatePosition);
     return () => window.removeEventListener('resize', updatePosition);
   }, [preferredPosition.left, preferredPosition.top]);
-
-  useEffect(() => {
-    const h = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    };
-    const frame = requestAnimationFrame(() => document.addEventListener('click', h));
-    return () => {
-      cancelAnimationFrame(frame);
-      document.removeEventListener('click', h);
-    };
-  }, [onClose]);
 
   useEffect(() => {
     const trigger = document.activeElement;
@@ -82,7 +73,10 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
     return () => {
       cancelAnimationFrame(frame);
       window.removeEventListener('keydown', handleKey, true);
-      if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus({ preventScroll: true });
+      if (trigger instanceof HTMLElement && trigger.isConnected &&
+          (document.activeElement === document.body || ref.current?.contains(document.activeElement))) {
+        trigger.focus({ preventScroll: true });
+      }
     };
   }, [onClose]);
 
@@ -117,6 +111,7 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
       role="menu"
       aria-label={t('Command block actions')}
       data-no-drag
+      onContextMenu={event => { event.preventDefault(); event.stopPropagation(); }}
       style={{
         position: 'fixed',
         zIndex: 9999,
