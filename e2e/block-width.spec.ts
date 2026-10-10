@@ -254,6 +254,11 @@ test('运行中输出与完成快照保持相同字符宽度', async ({ page }) 
   await page.goto('/');
   await expect(page.locator('[data-testid^="terminal-scroll-"]').first()).toBeVisible();
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
+  await page.waitForFunction(async () => {
+    const path = '/src/features/terminal/stores/terminal.ts';
+    const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+    return Object.values(useTerminalStore.getState().startupStates).includes('ready');
+  });
   await emitPtyOutput(page, `\x1b]133;E;${btoa('ls')}\x07\x1b]133;C\x07`);
   const host = page.getByTestId('running-term');
   await expect(host.locator('.xterm-screen')).toBeVisible();

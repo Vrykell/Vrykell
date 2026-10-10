@@ -28,17 +28,77 @@ async function expectNativeScrollbar(region: Locator, size = 8) {
 }
 
 for (const mode of ['dark', 'light'] as const) {
+  test(`block backgrounds and dividers remain visible beneath the scrollbar track in ${mode}`, async ({ page }) => {
+    await setupTauriMock(page);
+    await page.goto('/');
+    await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
+    await page.waitForFunction(async () => {
+      const path = '/src/features/terminal/stores/terminal.ts';
+      const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+      return Object.values(useTerminalStore.getState().startupStates).includes('ready');
+    });
+    await applyPalette(page, mode);
+    await page.evaluate(() => {
+      const scope = window as unknown as { __vrykellSessionRegistry: {
+        controllers: Map<string, import('../src/features/terminal/services/pipeline/sessionController').SessionController>;
+      } };
+      const controller = [...scope.__vrykellSessionRegistry.controllers.values()][0]!;
+      controller.seed(Array.from({ length: 20 }, (_, index) => ({
+        id: `track-${index}`, command: 'l', cwd: '~', status: 'done', exitCode: 127,
+        startedAt: 0, endedAt: 50, wasLongRunning: false, outputRaw: '', outputHtml: '',
+        outputText: 'bash: l: command not found', linesTruncated: 0,
+      })));
+    });
+    const region = page.locator('[data-testid^="terminal-scroll-"]').first();
+    await expect(page.getByRole('scrollbar', { name: '滚动命令历史' })).toBeVisible();
+    await page.mouse.move(0, 0);
+    await region.evaluate(element => { element.scrollTop = 0; });
+    await expect.poll(() => region.evaluate(element => element.scrollTop)).toBe(0);
+    const bounds = (await region.boundingBox())!;
+    const divider = (await page.getByTestId('command-block-track-4').boundingBox())!;
+    const png = await region.screenshot({ path: test.info().outputPath(`transparent-track-${mode}.png`) });
+    const pixels = await page.evaluate(async ({ png, y }) => {
+      const image = new Image();
+      image.src = `data:image/png;base64,${png}`;
+      await image.decode();
+      const canvas = document.createElement('canvas');
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const context = canvas.getContext('2d')!;
+      context.drawImage(image, 0, 0);
+      const color = (x: number, row: number) => Array.from(context.getImageData(x, row, 1, 1).data).join(',');
+      return {
+        divider: color(image.width - 20, y), edgeDivider: color(image.width - 1, y),
+        background: color(image.width - 20, y + 8), edgeBackground: color(image.width - 1, y + 8),
+      };
+    }, { png: png.toString('base64'), y: Math.round(divider.y - bounds.y) });
+    expect(pixels.edgeDivider).toBe(pixels.divider);
+    expect(pixels.edgeBackground).toBe(pixels.background);
+    expect(pixels.edgeDivider).not.toBe(pixels.edgeBackground);
+  });
+
   test(`block history exposes a draggable scrollbar without changing output width in ${mode}`, async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
+    await page.waitForFunction(async () => {
+      const path = '/src/features/terminal/stores/terminal.ts';
+      const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+      return Object.values(useTerminalStore.getState().startupStates).includes('ready');
+    });
     await applyPalette(page, mode);
     const region = page.locator('[data-testid^="terminal-scroll-"]').first();
     const originalWidth = await region.evaluate(element => element.clientWidth);
     const lines = Array.from({ length: 160 }, (_, row) => `scroll-row-${row}`).join('\r\n');
     await emitPtyOutput(page, `\x1b]133;E;${btoa('scroll-history')}\x07\x1b]133;C\x07${lines}\r\n\x1b]133;D;0\x07\x1b]133;A\x07`);
     await expect(page.getByText('scroll-row-159', { exact: false }).last()).toBeVisible();
-    await expectNativeScrollbar(region, 10);
+    const bar = page.getByRole('scrollbar', { name: '滚动命令历史' });
+    await expect(bar).toHaveCSS('width', '10px');
+    await expect(bar).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(region).toHaveCSS('scrollbar-gutter', 'auto');
+    const edges = await region.evaluate(element => ({ right: element.getBoundingClientRect().right,
+      contentRight: element.firstElementChild!.getBoundingClientRect().right }));
+    expect(edges.contentRight).toBe(edges.right);
     const geometry = await region.evaluate(element => ({ height: element.clientHeight, scrollHeight: element.scrollHeight, top: element.scrollTop, width: element.clientWidth }));
     expect(geometry.width).toBe(originalWidth);
     expect(geometry.scrollHeight).toBeGreaterThan(geometry.height);
@@ -50,6 +110,11 @@ for (const mode of ['dark', 'light'] as const) {
     await page.mouse.move(bounds.x + bounds.width - 5, bounds.y + 24, { steps: 8 });
     await page.mouse.up();
     await expect.poll(() => region.evaluate(element => element.scrollTop)).toBeLessThan(geometry.top - 100);
+    await bar.focus();
+    await bar.press('Home');
+    await expect.poll(() => region.evaluate(element => element.scrollTop)).toBe(0);
+    await bar.press('End');
+    await expect.poll(() => region.evaluate(element => element.scrollTop)).toBe(geometry.scrollHeight - geometry.height);
     await page.screenshot({ path: test.info().outputPath(`scrollbar-${mode}.png`) });
   });
 }

@@ -473,6 +473,12 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 /* Reserve the content width before overflow to keep terminal columns stable. */
 .scroll-region, .settings-content { scrollbar-gutter: stable; }
 [data-testid^="terminal-scroll-"] { --scrollbar-size: 10px; }
+.overlay-scroll-container { position: relative; display: flex; flex-direction: column; overflow: hidden; }
+.terminal-block-scroll { scrollbar-gutter: auto; scrollbar-width: none; }
+.terminal-block-scroll::-webkit-scrollbar { display: none; }
+.overlay-scrollbar { position: absolute; top: 0; bottom: 0; right: 0; width: 10px; z-index: 1; background: transparent; touch-action: none; user-select: none; }
+.overlay-scrollbar-thumb { width: 6px; margin: 0 2px; border-radius: 999px; background: var(--scrollbar-thumb); }
+.overlay-scrollbar:hover .overlay-scrollbar-thumb, .overlay-scrollbar[data-dragging="true"] .overlay-scrollbar-thumb { background: var(--scrollbar-thumb-hover); }
 
 /* xterm 容器贴边：取消全屏终端的边缘内边距；连字会把多个字符画成一格，终端里必须关掉 */
 .xterm { padding: 0; font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
@@ -570,8 +576,12 @@ button.tui-control { min-height: 20px; padding: 0 4px; font-size: var(--fs-micro
 .global-search-history .search-scope-chip { max-width: 40%; }
 .global-search-dialog .key-hint { border: none; background: var(--key-hint-bg); color: var(--text-primary); font-family: var(--font-ui); }
 /* Keep the context compact; floating controls do not increase the row height. */
-.command-block { padding-top: var(--terminal-row-height); padding-bottom: var(--terminal-row-height); --command-block-command-weight: 600; }
-.command-block[data-failed="true"] { background: var(--error-bg); box-shadow: inset 3px 0 0 var(--status-error); }
+.command-block { position: relative; padding-top: var(--terminal-row-height); padding-bottom: var(--terminal-row-height); --command-block-command-weight: 600; }
+.command-block[data-divider-before="true"] { border-top: 1px solid var(--block-divider); }
+.command-block[data-failed="true"] { background: var(--error-bg); }
+/* Paint the rail over the divider so adjacent failures remain continuous. */
+.command-block[data-failed="true"]::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 3px; background: var(--status-error); pointer-events: none; }
+.command-block[data-failed="true"][data-divider-before="true"]::before { top: -1px; }
 .command-block-info { position: relative; display: flex; align-items: center; gap: 8px; min-height: var(--terminal-row-height); margin-bottom: 2px; padding-right: var(--control-size-compact); font-family: var(--font-mono); font-size: calc(var(--terminal-font-size) * 0.86); line-height: var(--terminal-row-height); color: var(--text-muted); }
 .command-block[data-running="true"] .command-block-info { padding-right: calc(3 * var(--control-size-compact)); }
 .command-block-actions, .command-block-branch, .command-block .command-status-code, .command-block .command-status-agent, .command-block-truncation { opacity: 0; pointer-events: none; transition: opacity var(--dur-fast) var(--ease); }

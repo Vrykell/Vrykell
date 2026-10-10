@@ -8,7 +8,8 @@
  */
 
 import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
-import { useRef, useEffect, useMemo, useState } from 'react';
+import { useRef, useEffect, useMemo, useState, useId } from 'react';
+import OverlayScrollbar from '@ui/OverlayScrollbar';
 import KeyHint from '@ui/KeyHint';
 import DropPlacementPreview from '@ui/DropPlacementPreview';
 import { useSessionStore, type Tab } from '@features/workspace';
@@ -615,14 +616,18 @@ function PaneInputEditor({ paneId, focused, insetLeft = 8, insetRight = 8 }: { p
 function PaneBlockList({ paneId, insetLeft = 8, insetRight = 8 }: { paneId: string; insetLeft?: number; insetRight?: number }) {
   const blocks = useBlockStore(selectBlocks(paneId));
   const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollId = useId();
   const snap = useFollowBottom(scrollRef, [blocks], paneId);
   useEffect(() => registerFollowEngager(paneId, snap), [paneId, snap]);
   return (
-    <div ref={scrollRef} className="scroll-region" data-testid={`terminal-scroll-${paneId}`} style={{ flex: 1, minHeight: 0, overflowY: 'scroll', background: 'var(--xterm-bg)', overflowAnchor: 'none', '--command-content-inset': `${insetLeft + insetRight + 2 * COMMAND_BLOCK_CONTENT_PADDING}px` } as React.CSSProperties}>
-      <div data-testid={`terminal-flow-${paneId}`}>
-        <TerminalBlockList tabId={paneId} insetLeft={insetLeft} insetRight={insetRight} />
-        <PaneEmptyHint paneId={paneId} />
+    <div className="overlay-scroll-container" style={{ flex: 1, minHeight: 0 }}>
+      <div ref={scrollRef} id={scrollId} className="scroll-region terminal-block-scroll" data-testid={`terminal-scroll-${paneId}`} style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--xterm-bg)', overflowAnchor: 'none', '--command-content-inset': `${insetLeft + insetRight + 2 * COMMAND_BLOCK_CONTENT_PADDING}px` } as React.CSSProperties}>
+        <div data-testid={`terminal-flow-${paneId}`}>
+          <TerminalBlockList tabId={paneId} insetLeft={insetLeft} insetRight={insetRight} />
+          <PaneEmptyHint paneId={paneId} />
+        </div>
       </div>
+      <OverlayScrollbar scrollRef={scrollRef} controlsId={scrollId} label={t('Scroll command history')} />
     </div>
   );
 }

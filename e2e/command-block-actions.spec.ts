@@ -130,14 +130,14 @@ test.describe('命令块操作全链路', () => {
     await expect(block).toBeVisible({ timeout: 5000 });
 
     await block.hover();
-    await page.locator('[data-tip="更多操作"]').click();
+    await block.getByRole('button', { name: '更多操作' }).click();
     const menu = page.getByRole('menu', { name: '命令块操作' });
     await expect(menu).toBeVisible();
     await menu.getByRole('menuitem', { name: '复制输出' }).click();
     await expect.poll(() => clipboardText(page)).toBe('menu-action');
 
     await block.hover();
-    await page.locator('[data-tip="更多操作"]').click();
+    await block.getByRole('button', { name: '更多操作' }).click();
     await page.getByRole('menuitem', { name: '清除所有块' }).click();
     await expect(block).toHaveCount(0);
   });
@@ -198,12 +198,13 @@ test('two-row command output matches the compact context and spacing proportions
     return Object.values(useTerminalStore.getState().startupStates).includes('ready');
   });
   await page.evaluate(async () => {
-    const blocksPath = '/src/features/terminal/stores/blocks.ts';
     const terminalPath = '/src/features/terminal/stores/terminal.ts';
-    const { useBlockStore } = await import(blocksPath) as typeof import('../src/features/terminal/stores/blocks');
     const { useTerminalStore } = await import(terminalPath) as typeof import('../src/features/terminal/stores/terminal');
     const pane = Object.keys(useTerminalStore.getState().sessions)[0]!;
-    useBlockStore.getState().setBlocks(pane, [53, 44].map((duration, index) => ({
+    const scope = window as unknown as { __vrykellSessionRegistry: {
+      controllers: Map<string, import('../src/features/terminal/services/pipeline/sessionController').SessionController>;
+    } };
+    scope.__vrykellSessionRegistry.controllers.get(pane)!.seed([53, 44].map((duration, index) => ({
       id: `compact-${index}`, command: 'ls', cwd: '~', status: 'done', exitCode: 0,
       startedAt: 0, endedAt: duration, wasLongRunning: false, outputRaw: '', outputHtml: '',
       outputText: 'Desktop       Downloads     Movies        Pictures\nDocuments     Library       Music         Public', linesTruncated: 0,

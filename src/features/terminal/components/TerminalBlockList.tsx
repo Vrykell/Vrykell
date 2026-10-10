@@ -218,11 +218,11 @@ const BlockItem = memo(function BlockItem({
       data-testid={`command-block-${block.id}`}
       data-menu-open={menuOpen}
       data-failed={block.exitCode !== null && block.exitCode !== 0}
+      data-divider-before={dividerBefore}
       data-pane-id={tabId}
       style={{
         paddingLeft: insetLeft + COMMAND_BLOCK_CONTENT_PADDING,
         paddingRight: insetRight + COMMAND_BLOCK_CONTENT_PADDING,
-        borderTop: dividerBefore ? '1px solid var(--block-divider)' : 'none',
       }}
       onContextMenu={(event) => {
         event.preventDefault();
@@ -311,11 +311,11 @@ function RunningItem({
     <div
       data-testid={`running-block-${block.id}`}
       data-running="true"
+      data-divider-before={dividerBefore}
       className="command-block"
       style={{
         paddingLeft: insetLeft + COMMAND_BLOCK_CONTENT_PADDING,
         paddingRight: insetRight + COMMAND_BLOCK_CONTENT_PADDING,
-        borderTop: dividerBefore ? '1px solid var(--block-divider)' : 'none',
       }}
     >
       <div className="command-block-info">
