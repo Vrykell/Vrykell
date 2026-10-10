@@ -20,14 +20,14 @@ export interface ThemePalette {
 
   /** Shared frame for the titlebar and primary navigation. */
   chromeBg: string;
-  /** Secondary navigation uses its own surface within the window frame. */
+  /** Secondary navigation shares the window frame level. */
   sidebarBg: string;
   chromeField: string;
   selectionBg: string;
   // 背景层（从深到浅）
   canvas: string;
   surface: string;
-  /** Quiet surface for fields and inset readouts inside panels. */
+  /** Editable fields sit above panel and floating surfaces. */
   fieldBg: string;
   block: string;
   elevated: string;
@@ -147,7 +147,7 @@ export interface ThemePalette {
 const dark: ThemePalette = {
   iconColor: '#D8D8D8',
   iconHoverColor: '#FFFFFF',
-  focusRing: '#A3B6CE',
+  focusRing: '#8F8F8F',
   shellZshAccent: '#B58AFF',
   shellBashAccent: '#6CE6A6',
   shellPowershellAccent: '#75B8FF',
@@ -155,28 +155,28 @@ const dark: ThemePalette = {
   shellSshAccent: '#61DCCB',
   shellTileInk: '#15171D',
 
-  // Neutral levels distinguish the window frame, sidebars and content.
-  chromeBg: '#323232',
+  // Surface brightness follows content, frame, panel, overlay and editable field levels.
+  chromeBg: '#242424',
   sidebarBg: '#242424',
-  chromeField: '#3C3C3C',
-  selectionBg: '#353535',
-  canvas: '#141414',
-  surface: '#292929',
-  fieldBg: '#303030',
-  block: '#333333',
-  elevated: '#383838',
+  chromeField: '#3B3B3B',
+  selectionBg: '#454545',
+  canvas: '#1E1E1E',
+  surface: '#2B2B2B',
+  fieldBg: '#3B3B3B',
+  block: '#2B2B2B',
+  elevated: '#313131',
   hover: 'rgba(255,255,255,0.07)',
-  buttonHover: '#383838',
+  buttonHover: '#454545',
 
-  border: '#404040',
-  borderStrong: '#5A5A5A',
+  border: '#484848',
+  borderStrong: '#626262',
   resizeDivider: 'rgba(255,255,255,0.035)',
   inputBorder: 'rgba(255,255,255,0.08)',
 
   // 文字
-  textPrimary: '#FAFAFA',
-  textSecondary: '#D8D8D8',
-  textMuted: '#BABABA',
+  textPrimary: '#EEEEEE',
+  textSecondary: '#CDCDCD',
+  textMuted: '#B2B2B2',
 
   // Neutral accents mark active controls and focus indicators.
   accent: '#C7C7C7',
@@ -227,7 +227,7 @@ const dark: ThemePalette = {
   shadowLg: '0 10px 30px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.06)',
 
   accentBg: 'rgba(255,255,255,0.06)',
-  accentBgStrong: '#1E1E1E',
+  accentBgStrong: '#454545',
   successBg: 'rgba(137,209,133,0.12)',
   errorBg: 'rgba(241,76,76,0.12)',
   errorBadgeBg: 'rgba(241,76,76,0.08)',
@@ -241,7 +241,7 @@ const dark: ThemePalette = {
   apiKeyBg: 'rgba(255,255,255,0.06)',
   apiKeyBorder: 'rgba(255,255,255,0.18)',
 
-  xtermBg: '#111417',
+  xtermBg: '#1B1B1B',
   xtermForeground: '#ECEFF4',
   xtermCursor: '#ECEFF4',
   xtermSelection: 'rgba(141,183,232,0.28)',
@@ -300,7 +300,7 @@ export const TEAL_THEME_PRESET: Record<string, string> = {
 const light: ThemePalette = {
   iconColor: '#454545',
   iconHoverColor: '#111111',
-  focusRing: '#56728F',
+  focusRing: '#7A7A7A',
   shellZshAccent: '#B58AFF',
   shellBashAccent: '#6CE6A6',
   shellPowershellAccent: '#75B8FF',
@@ -308,26 +308,26 @@ const light: ThemePalette = {
   shellSshAccent: '#61DCCB',
   shellTileInk: '#15171D',
 
-  chromeBg: '#E2E2E2',
+  chromeBg: '#EFEFEF',
   sidebarBg: '#EFEFEF',
-  chromeField: '#D8D8D8',
-  selectionBg: '#D5D5D5',
-  canvas: '#FFFFFF',
+  chromeField: '#FFFFFF',
+  selectionBg: '#DEDEDE',
+  canvas: '#E8E8E8',
   surface: '#F5F5F5',
-  fieldBg: '#FBFBFB',
-  block: '#EAEAEA',
-  elevated: '#FFFFFF',
+  fieldBg: '#FFFFFF',
+  block: '#F5F5F5',
+  elevated: '#FAFAFA',
   hover: 'rgba(0,0,0,0.05)',
-  buttonHover: '#DDDDDD',
+  buttonHover: '#F2F2F2',
 
-  border: '#CCCCCC',
-  borderStrong: '#A8A8A8',
+  border: '#DADADA',
+  borderStrong: '#B8B8B8',
   resizeDivider: 'rgba(0,0,0,0.05)',
-  inputBorder: '#D4D4D4',
+  inputBorder: '#DADADA',
 
-  textPrimary: '#272727',
-  textSecondary: '#595959',
-  textMuted: '#707070',
+  textPrimary: '#262626',
+  textSecondary: '#555555',
+  textMuted: '#606060',
 
   // A darker neutral accent stays readable on light surfaces.
   accent: '#4F4F4F',
@@ -388,7 +388,7 @@ const light: ThemePalette = {
   apiKeyBg: 'rgba(46,46,46,0.06)',
   apiKeyBorder: 'rgba(46,46,46,0.18)',
 
-  xtermBg: '#F8F9FB',
+  xtermBg: '#E5E5E5',
   xtermForeground: '#2B3038',
   xtermCursor: '#2E3742',
   xtermSelection: 'rgba(46,96,150,0.20)',

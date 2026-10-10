@@ -7,7 +7,7 @@ async function surfaceStyle(surface: Locator) {
   return surface.evaluate(el => {
     const style = getComputedStyle(el);
     const probe = document.createElement('div');
-    probe.style.background = 'var(--surface)';
+    probe.style.background = 'var(--elevated)';
     probe.style.border = '1px solid var(--border)';
     el.append(probe);
     const palette = getComputedStyle(probe);
@@ -38,7 +38,7 @@ async function search(page: Page) {
   await expect(results.first()).toBeVisible();
   const selected = dialog.locator('[data-search-result][data-selected="true"]');
   await expect(selected).toHaveCSS('border-left-width', '0px');
-  await expect(selected).toHaveCSS('border-radius', '8px');
+  await expect(selected).toHaveCSS('border-radius', '0px');
   const firstTitle = await selected.textContent();
   await dialog.getByPlaceholder('搜索文件、命令、设置…').press('ArrowDown');
   expect(await selected.textContent()).not.toBe(firstTitle);

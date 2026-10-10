@@ -155,7 +155,7 @@ export default function SearchResultCard({
             <span style={{
               fontSize: 'calc(10px * var(--ui-font-scale))', padding: '1px 5px', borderRadius: 4,
               background: blockData.status === 'completed'
-                ? 'var(--canvas)' : blockData.status === 'failed'
+                ? 'var(--hover)' : blockData.status === 'failed'
                 ? 'var(--error-bg)' : 'var(--accent-bg)',
               color: blockData.status === 'completed'
                 ? 'var(--text-secondary)' : blockData.status === 'failed'
@@ -168,7 +168,7 @@ export default function SearchResultCard({
           {(isHistoricalBlock || isHistoricalSession) && (
             <span style={{
               fontSize: 'calc(10px * var(--ui-font-scale))', padding: '1px 5px', borderRadius: 4,
-              background: 'var(--canvas)',
+              background: 'var(--hover)',
               color: 'var(--text-secondary)',
             }}>
               历史会话
@@ -206,7 +206,7 @@ function RestoreBtn({ onClick }: { onClick: (e: React.MouseEvent) => void }) {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         border: '1px solid var(--border)',
         borderRadius: 4,
-        background: 'var(--canvas)',
+        background: 'transparent',
         color: 'var(--text-secondary)',
         cursor: 'pointer',
         fontSize: 'calc(10px * var(--ui-font-scale))',

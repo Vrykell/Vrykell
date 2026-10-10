@@ -96,7 +96,7 @@ export default function CheckboxMenu<Id extends string>({ title, options, onTogg
             <span style={{
               fontSize: 'calc(10px * var(--ui-font-scale))',
               color: 'var(--text-muted)',
-              background: 'var(--canvas)',
+              background: 'var(--hover)',
               padding: '0 6px',
               borderRadius: 8,
             }}>
