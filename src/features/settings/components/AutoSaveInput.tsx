@@ -50,7 +50,7 @@ export default function AutoSaveInput({ value, onCommit, placeholder, style, mul
   };
   return <div style={{ minWidth: minWidth ?? 0, flex, flexShrink, width, marginTop, marginBottom }}>
     {multiline ? <TextArea {...props} rows={rows} /> : <TextInput {...props} type={type} min={min} max={max} step={step} />}
-    <SaveStatus status={save.status} error={save.error} onRetry={() => { void save.flush(); }} />
+    <SaveStatus inline status={save.status} error={save.error} onRetry={() => { void save.flush(); }} />
     {onClear && <button type="button" onClick={() => { void feedback.save(async () => {
       await save.cancel();
       await onClear();

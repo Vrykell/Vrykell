@@ -1,5 +1,9 @@
 /** Simplified Chinese messages for shared UI and feature namespaces. */
 const zh: Record<string, string> = {
+  'Save failed': '保存失败',
+  'Saved': '已保存',
+  'Saving…': '保存中…',
+  'Pending changes…': '待保存…',
   'Options save immediately; text saves after you stop typing.': '选择项立即保存，文本停止输入后自动保存。',
   'Installed skills': '已安装技能',
   'Import skills': '导入技能',

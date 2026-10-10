@@ -12,7 +12,7 @@ test('numeric feedback shows the actual saved value after bounds and rounding', 
   const steps = page.getByRole('spinbutton').first();
   for (const [draft, saved] of [['101', '100'], ['0', '1'], ['3.6', '4']]) {
     await steps.fill(draft);
-    await expect(steps.locator('xpath=..').getByRole('status')).toHaveText('已保存');
+    await expect(page.locator('.settings-page-header').getByRole('status')).toHaveText('已保存');
     await expect(steps).toHaveValue(saved);
   }
   await page.locator('aside').getByRole('button', { name: '主题', exact: true }).click();
@@ -25,11 +25,11 @@ test('model text waits for a pause and saves edits to different fields together'
   const before = (await aiModelCalls(page)).length;
   const name = page.getByPlaceholder('模型名称').first();
   await name.fill('新的模型名称');
-  await expect(name.locator('xpath=..').getByRole('status')).toHaveText('待保存…');
+  await expect(page.locator('.settings-page-header').getByRole('status')).toHaveText('待保存…');
   expect((await aiModelCalls(page)).length).toBe(before);
   await page.getByPlaceholder('服务地址 (Base URL)').first().fill('https://new.example/v1');
-  await expect(name.locator('xpath=..').getByRole('status')).toHaveText('已保存');
-  await expect(page.getByPlaceholder('服务地址 (Base URL)').first().locator('xpath=..').getByRole('status')).toHaveText('已保存');
+  await expect(page.locator('.settings-page-header').getByRole('status')).toHaveText('已保存');
+  await expect(page.getByRole('status')).toHaveCount(1);
   const last = (await aiModelCalls(page)).filter(call => call.kind === 'set_models').at(-1)!;
   expect((last.models as { name: string; baseUrl: string }[])[0]).toMatchObject({ name: '新的模型名称', baseUrl: 'https://new.example/v1' });
   await expect(page.getByRole('button', { name: '保存', exact: true })).toHaveCount(0);
@@ -68,7 +68,7 @@ test('save failures keep the draft visible and allow retry', async ({ page }) =>
   await expect(field.getByRole('status')).toContainText('保存失败');
   await expect(name).toHaveValue('失败时保留的草稿');
   await field.getByRole('button', { name: '重试' }).click();
-  await expect(field.getByRole('status')).toHaveText('已保存');
+  await expect(page.locator('.settings-page-header').getByRole('status')).toHaveText('已保存');
   const saved = (await aiModelCalls(page)).filter(call => call.kind === 'set_models').at(-1)!;
   expect((saved.models as { name: string }[])[0].name).toBe('失败时保留的草稿');
 });

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useSettingsSave } from '../components/SettingsSaveProvider';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 import { useToastStore } from '@ui/Toast';
 
@@ -9,6 +10,8 @@ export function useAutoSave<Value>(initialValue: Value, onSave: (value: Value) =
   const [value, setDraft] = useState(initialValue);
   const [status, setStatus] = useState<SaveStatus>('idle');
   const [error, setError] = useState('');
+  const id = useId();
+  const { report: reportFeedback } = useSettingsSave();
   const callbacks = useRef({ onSave, validate, resetAfterSave, normalize });
   callbacks.current = { onSave, validate, resetAfterSave, normalize };
   const state = useRef({ value: initialValue, dirty: false, version: 0, mounted: true,
@@ -112,5 +115,7 @@ export function useAutoSave<Value>(initialValue: Value, onSave: (value: Value) =
     return () => { state.current.mounted = false; state.current.composing = false; void flush(); };
   }, [flush]);
 
+  useEffect(() => { reportFeedback?.(id, { status, retry: () => { void flush(); } }); }, [id, status, flush, reportFeedback]);
+  useEffect(() => () => { reportFeedback?.(id, null); }, [id, reportFeedback]);
   return { value, setValue, status, error, flush, cancel, reset, setComposing, hasPending: () => state.current.dirty };
 }

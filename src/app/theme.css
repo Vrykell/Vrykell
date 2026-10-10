@@ -64,6 +64,10 @@
   --status-error: var(--error-light);
 }
 
+.settings-nav-group { margin-bottom: 16px; }
+.settings-nav-heading { padding: 12px 16px 6px; color: var(--text-muted); font-size: var(--fs-caption); font-weight: var(--fw-medium); }
+.settings-navigation [role="button"]:focus-visible { outline: none; }
+
 * { box-sizing: border-box; }
 
 /* One themed hover hint for the whole app: the OS tooltip renders in its own style. */

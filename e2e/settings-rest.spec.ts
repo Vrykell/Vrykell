@@ -88,7 +88,7 @@ test.describe('网络搜索页', () => {
 
     const keyField = fieldOf(page, 'Tavily API Key');
     await keyField.getByPlaceholder(/输入 Tavily API Key/).fill('tv-e2e');
-    await expect(keyField.getByRole('status')).toHaveText('已保存');
+    await expect(page.locator('.settings-page-header').getByRole('status')).toHaveText('已保存');
     await expect(page.getByText('已配置', { exact: true })).toBeVisible();
     const calls = await aiKeyCalls(page);
     expect(calls.some((c) => c.provider === 'tavily' && c.key === 'tv-e2e')).toBe(true);
