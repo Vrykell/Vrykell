@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 import { gotoSetting } from './settings';
 
-test('settings dropdown supports keyboard selection, cancellation and theme colors', async ({ page }) => {
+test('settings dropdown supports keyboard selection, cancellation and theme colors', async ({ page, browserName }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await gotoSetting(page, '主题');
@@ -21,6 +21,8 @@ test('settings dropdown supports keyboard selection, cancellation and theme colo
   await trigger.press('Enter');
   await expect(trigger).toHaveText('14px');
   await trigger.click();
+  await page.getByRole('button', { name: '深色', exact: true }).click();
+  await expect(menu).toHaveCount(0);
   await page.getByRole('button', { name: '恢复默认字号' }).click();
   await expect(menu).toHaveCount(0);
   await expect(trigger).toHaveText('13px');
@@ -43,7 +45,8 @@ test('settings dropdown supports keyboard selection, cancellation and theme colo
   }
   expect(colors[0]).not.toBe(colors[1]);
   await trigger.click();
-  await trigger.press('Tab');
+  // The native engine uses the full-navigation modifier for button tab stops.
+  await trigger.press(browserName === 'webkit' ? 'Alt+Tab' : 'Tab');
   await expect(menu).toHaveCount(0);
   await expect(page.getByRole('combobox', { name: '终端字号' })).toBeFocused();
 });
@@ -61,6 +64,16 @@ test('long dropdown stays within a small viewport and scrolls to keyboard select
   expect(bounds.y).toBeGreaterThanOrEqual(8);
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(672);
   expect(bounds.y + bounds.height).toBeLessThanOrEqual(512);
+  const id = await menu.getAttribute('id');
+  const bar = page.locator(`[role="scrollbar"][aria-controls="${id}"]`);
+  await expect(bar).toBeVisible();
+  const thumb = (await bar.locator('.overlay-scrollbar-thumb').boundingBox())!;
+  await page.mouse.move(thumb.x + thumb.width / 2, thumb.y + thumb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(thumb.x + thumb.width / 2, thumb.y + 160, { steps: 6 });
+  await page.mouse.up();
+  await expect(menu).toBeVisible();
+  await expect.poll(() => menu.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
   await trigger.press('End');
   await expect(menu.getByRole('option', { name: '24px', exact: true })).toBeInViewport();
   await trigger.press('Enter');

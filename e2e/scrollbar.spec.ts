@@ -10,21 +10,17 @@ async function applyPalette(page: Page, mode: 'dark' | 'light') {
   }, mode);
 }
 
-async function expectNativeScrollbar(region: Locator, size = 8) {
-  const style = await region.evaluate(element => {
-    const scrollbar = getComputedStyle(element, '::-webkit-scrollbar');
-    const thumb = getComputedStyle(element, '::-webkit-scrollbar-thumb');
-    const palette = getComputedStyle(document.documentElement);
-    return {
-      width: scrollbar.width, height: scrollbar.height, display: scrollbar.display,
-      color: thumb.backgroundColor.replace(/\s/g, ''),
-      expected: palette.getPropertyValue('--scrollbar-thumb').replace(/\s/g, ''),
-    };
-  });
-  expect(style.display).not.toBe('none');
-  expect(style.width).toBe(`${size}px`);
-  expect(style.height).toBe(`${size}px`);
-  expect(style.color).toBe(style.expected);
+async function expectOverlayScrollbar(page: Page, region: Locator) {
+  await expect(region).toHaveClass(/overlay-scroll-target/);
+  await expect(region).toHaveCSS('scrollbar-gutter', 'auto');
+  expect(await region.evaluate(element => getComputedStyle(element, '::-webkit-scrollbar').display)).toBe('none');
+  const id = await region.getAttribute('id');
+  const bar = page.locator(`[role="scrollbar"][aria-controls="${id}"][aria-orientation="vertical"]`);
+  await expect(bar).toBeVisible();
+  await expect(bar).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  const bounds = (await region.boundingBox())!;
+  const rail = (await bar.boundingBox())!;
+  expect(Math.abs(rail.x + rail.width - bounds.x - bounds.width)).toBeLessThanOrEqual(1);
 }
 
 for (const mode of ['dark', 'light'] as const) {
@@ -198,7 +194,7 @@ test('settings and long chat transcripts share visible themed scrollbars', async
   await gotoSetting(page, '模型行为');
   await page.setViewportSize({ width: 1240, height: 500 });
   const settings = page.locator('.settings-content');
-  await expectNativeScrollbar(settings);
+  await expectOverlayScrollbar(page, settings);
   await expect.poll(() => settings.evaluate(element => element.scrollHeight - element.clientHeight)).toBeGreaterThan(100);
   await settings.hover();
   await page.mouse.wheel(0, 400);
@@ -209,7 +205,7 @@ test('settings and long chat transcripts share visible themed scrollbars', async
   await page.getByPlaceholder(/自然语言描述/).press('Enter');
   await expect(page.getByText('对话内容第 99 行。', { exact: true })).toBeVisible();
   const transcript = page.locator('.workspace-side-panel[data-side="right"] .scroll-region');
-  await expectNativeScrollbar(transcript);
+  await expectOverlayScrollbar(page, transcript);
   await expect.poll(() => transcript.evaluate(element => element.scrollHeight - element.clientHeight)).toBeGreaterThan(100);
   await page.screenshot({ path: test.info().outputPath('chat-scrollbar.png') });
 });
