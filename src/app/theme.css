@@ -570,8 +570,7 @@ button.tui-control { min-height: 20px; padding: 0 4px; font-size: var(--fs-micro
 .global-search-history .search-scope-chip { max-width: 40%; }
 .global-search-dialog .key-hint { border: none; background: var(--key-hint-bg); color: var(--text-primary); font-family: var(--font-ui); }
 /* Keep the context compact; floating controls do not increase the row height. */
-.command-block { padding-top: var(--terminal-row-height); padding-bottom: var(--terminal-row-height); --command-block-command-weight: 600; transition: background-color var(--dur-fast) var(--ease); }
-.command-block:hover, .command-block[data-menu-open="true"] { background: var(--command-block-bg); }
+.command-block { padding-top: var(--terminal-row-height); padding-bottom: var(--terminal-row-height); --command-block-command-weight: 600; }
 .command-block[data-failed="true"] { background: var(--error-bg); box-shadow: inset 3px 0 0 var(--status-error); }
 .command-block-info { position: relative; display: flex; align-items: center; gap: 8px; min-height: var(--terminal-row-height); margin-bottom: 2px; padding-right: var(--control-size-compact); font-family: var(--font-mono); font-size: calc(var(--terminal-font-size) * 0.86); line-height: var(--terminal-row-height); color: var(--text-muted); }
 .command-block[data-running="true"] .command-block-info { padding-right: calc(3 * var(--control-size-compact)); }

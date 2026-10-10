@@ -20,11 +20,13 @@ test.describe('命令块操作全链路', () => {
     const output = block.locator('.command-block-output');
     const before = { command: await command.boundingBox(), output: await output.boundingBox() };
     const bounds = (await block.boundingBox())!;
+    const background = await block.evaluate(element => getComputedStyle(element).backgroundColor);
     expect(before.command!.x - bounds.x).toBe(16);
     expect(before.output!.x).toBe(before.command!.x);
     expect(before.output!.y - before.command!.y - before.command!.height).toBe(8);
     await block.hover();
     await expect(block.locator('.command-block-actions')).toHaveCSS('opacity', '1');
+    await expect(block).toHaveCSS('background-color', background);
     expect(await command.boundingBox()).toEqual(before.command);
     expect(await output.boundingBox()).toEqual(before.output);
     await expect(block.getByRole('button')).toHaveCount(1);
@@ -45,6 +47,7 @@ test.describe('命令块操作全链路', () => {
     await more.press('Enter');
     const menu = page.getByRole('menu', { name: '命令块操作' });
     await expect(menu.getByRole('menuitem', { name: '重新运行' })).toBeFocused();
+    await expect(block).toHaveCSS('background-color', background);
     await page.keyboard.press('ArrowDown');
     await expect(menu.getByRole('menuitem', { name: '发给 AI 分析' })).toBeFocused();
     await page.keyboard.press('Escape');
