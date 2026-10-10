@@ -5,7 +5,7 @@ import { TextInput } from '@ui/TextInput';
 /**
  * Shared settings fields, controls and form styles.
  */
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { iconSizes, Plus, X  } from '@ui/icons';
 import AutoSaveInput from './AutoSaveInput';
 import { useAutoSave } from '../hooks/useAutoSave';
@@ -14,7 +14,17 @@ import { useSettingsSave } from './SettingsSaveProvider';
 import { inputStyle, btnStyle } from './formStyles';
 export { inputStyle, btnStyle } from './formStyles';
 
-export function Field({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
+export function SettingsGroup({ title, children }: { title: string; children: ReactNode }) {
+  const id = useId();
+  return <div className="settings-group" role="group" aria-labelledby={id}>
+    <h2 id={id} className="settings-group-title">{title}</h2>
+    <div className="settings-group-panel">{children}</div>
+  </div>;
+}
+
+export function Field({ title, description, children, layout = 'row' }: {
+  title: string; description?: ReactNode; children: ReactNode; layout?: 'row' | 'stacked';
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const target = useSettingsNavigationStore(state => state.targetField);
   const control = useSettingsNavigationStore(state => state.targetControl);
@@ -26,12 +36,12 @@ export function Field({ title, description, children }: { title: string; descrip
     (controls.find(element => control && element.getAttribute('aria-label') === control) ?? controls[0])?.focus({ preventScroll: true });
   }, [target, title, control, request]);
   return (
-    <div ref={ref} className="settings-field" data-setting-title={title}>
-      <div style={{ fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)', marginBottom: 2, letterSpacing: '0.01em' }}>{title}</div>
+    <div ref={ref} className="settings-field" data-setting-title={title} data-layout={layout}>
+      <div className="settings-field-title">{title}</div>
       {description && (
-        <div className="settings-description" style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 10 }}>{description}</div>
+        <div className="settings-description">{description}</div>
       )}
-      <div style={{ marginTop: description ? 0 : 8 }}>{children}</div>
+      <div className="settings-field-control">{children}</div>
     </div>
   );
 }

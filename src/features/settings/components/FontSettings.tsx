@@ -1,7 +1,7 @@
 import { TERMINAL_FONT_PRESETS, useTypographyStore } from '@config/typography';
 import Select from '@ui/Select';
 import { t } from '@i18n';
-import { Field, btnStyle } from './ui';
+import { SettingsGroup, Field, btnStyle } from './ui';
 import { useSettingsSave } from './SettingsSaveProvider';
 
 const pageSizes = Array.from({ length: 9 }, (_, index) => ({ value: index + 10, label: `${index + 10}px` }));
@@ -17,38 +17,44 @@ export default function FontSettings() {
     { value: 'dom' as const, label: t('settings.font.rendererDom') },
   ];
   return <div aria-label={t('settings.font.group')}>
-    <Field title={t('settings.font.pageTitle')} description={t('settings.font.pageDescription')}>
-      <div className="settings-font-row">
-        <Select aria-label={t('settings.font.pageTitle')} value={uiFontSize} options={pageSizes} onChange={uiFontSize => { void save(() => update({ uiFontSize })); }} style={{ width: 110 }} />
+    <SettingsGroup title={t('Typography')}>
+      <Field title={t('settings.font.pageTitle')} description={t('settings.font.pageDescription')}>
+        <div className="settings-font-row">
+          <Select aria-label={t('settings.font.pageTitle')} value={uiFontSize} options={pageSizes} onChange={uiFontSize => { void save(() => update({ uiFontSize })); }} style={{ width: 110 }} />
+        </div>
+      </Field>
+      <Field title={t('settings.font.terminalTitle')} description={t('settings.font.terminalDescription')}>
+        <div className="settings-font-row">
+          <Select aria-label={t('settings.font.terminalTitle')} value={terminalFontSize} options={terminalSizes} onChange={terminalFontSize => { void save(() => update({ terminalFontSize })); }} style={{ width: 110 }} />
+        </div>
+      </Field>
+      <Field title={t('Terminal font family')} description={t('Use a font installed on your system; unavailable families use the fallback fonts.')}>
+        <Select aria-label={t('Terminal font family')} value={terminalFontPreset}
+          options={TERMINAL_FONT_PRESETS.map(value => ({ value, label: value === 'system' ? t('System monospace') : value }))}
+          onChange={terminalFontPreset => { void save(() => update({ terminalFontPreset })); }} style={{ width: 220 }} />
+      </Field>
+      <Field title={t('Terminal font weight')} description={t('Variable fonts support fine weight adjustments; static fonts use the nearest installed weight.')}>
+        <Select aria-label={t('Terminal font weight')} value={terminalFontWeight} options={weights}
+          onChange={terminalFontWeight => { void save(() => update({ terminalFontWeight })); }} style={{ width: 110 }} />
+      </Field>
+      <Field title={t('Terminal line spacing')} description={t('Adjust line spacing for terminal input, live output and command history.')}>
+        <Select aria-label={t('Terminal line spacing')} value={terminalLineHeight} options={lineHeights}
+          onChange={terminalLineHeight => { void save(() => update({ terminalLineHeight })); }} style={{ width: 110 }} />
+      </Field>
+      <Field title={t('settings.font.rendererTitle')} description={t('settings.font.rendererDescription')}>
+        <div className="settings-font-row">
+          <Select aria-label={t('settings.font.rendererTitle')} value={terminalRenderer} options={rendererOptions} onChange={terminalRenderer => { void save(() => update({ terminalRenderer })); }} style={{ width: 190 }} />
+        </div>
+      </Field>
+    </SettingsGroup>
+    <SettingsGroup title={t('Preview')}>
+      <div className="settings-record">
+        <div className="settings-terminal-preview" data-selectable aria-label={t('Terminal font preview')}>
+          <div>~/project $ ls</div>
+          <div>{t('Directories')}  AaBb 0123  ─│┌┐   </div>
+        </div>
+        <button type="button" onClick={() => { void save(reset); }} style={{ ...btnStyle, marginTop: 12 }}>{t('Restore default typography')}</button>
       </div>
-    </Field>
-    <Field title={t('settings.font.terminalTitle')} description={t('settings.font.terminalDescription')}>
-      <div className="settings-font-row">
-        <Select aria-label={t('settings.font.terminalTitle')} value={terminalFontSize} options={terminalSizes} onChange={terminalFontSize => { void save(() => update({ terminalFontSize })); }} style={{ width: 110 }} />
-      </div>
-    </Field>
-    <Field title={t('Terminal font family')} description={t('Use a font installed on your system; unavailable families use the fallback fonts.')}>
-      <Select aria-label={t('Terminal font family')} value={terminalFontPreset}
-        options={TERMINAL_FONT_PRESETS.map(value => ({ value, label: value === 'system' ? t('System monospace') : value }))}
-        onChange={terminalFontPreset => { void save(() => update({ terminalFontPreset })); }} style={{ width: 220 }} />
-    </Field>
-    <Field title={t('Terminal font weight')} description={t('Variable fonts support fine weight adjustments; static fonts use the nearest installed weight.')}>
-      <Select aria-label={t('Terminal font weight')} value={terminalFontWeight} options={weights}
-        onChange={terminalFontWeight => { void save(() => update({ terminalFontWeight })); }} style={{ width: 110 }} />
-    </Field>
-    <Field title={t('Terminal line spacing')} description={t('Adjust line spacing for terminal input, live output and command history.')}>
-      <Select aria-label={t('Terminal line spacing')} value={terminalLineHeight} options={lineHeights}
-        onChange={terminalLineHeight => { void save(() => update({ terminalLineHeight })); }} style={{ width: 110 }} />
-      <div className="settings-terminal-preview" data-selectable aria-label={t('Terminal font preview')}>
-        <div>~/project $ ls</div>
-        <div>{t('Directories')}  AaBb 0123  ─│┌┐   </div>
-      </div>
-      <button type="button" onClick={() => { void save(reset); }} style={{ ...btnStyle, marginTop: 12 }}>{t('Restore default typography')}</button>
-    </Field>
-    <Field title={t('settings.font.rendererTitle')} description={t('settings.font.rendererDescription')}>
-      <div className="settings-font-row">
-        <Select aria-label={t('settings.font.rendererTitle')} value={terminalRenderer} options={rendererOptions} onChange={terminalRenderer => { void save(() => update({ terminalRenderer })); }} style={{ width: 190 }} />
-      </div>
-    </Field>
+    </SettingsGroup>
   </div>;
 }

@@ -21,6 +21,7 @@ import ErrorBox from '@ui/ErrorBox';
 import { useSkillsSettings } from '@features/settings/hooks/useSkillsSettings';
 import { useSkillFileBrowser } from '@features/settings/hooks/useSkillFileBrowser';
 import type { FileNode } from '@features/settings/model/skillFileTree';
+import { SettingsGroup } from '../components/ui';
 import { inputStyle } from '../components/formStyles';
 
 const toast = (msg: string, type: 'info' | 'success' | 'error') =>
@@ -333,7 +334,8 @@ export default function SkillsSettings() {
   } = useSkillsSettings();
 
   return (
-    <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div style={{ position: 'relative' }}>
+      <SettingsGroup title={t('Import skills')}><div className="settings-record" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {!warnDismissed && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
@@ -346,7 +348,7 @@ export default function SkillsSettings() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 8 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         <TextInput
           value={importUrl}
           placeholder="从 URL 导入技能清单"
@@ -358,7 +360,7 @@ export default function SkillsSettings() {
           {importing ? '导入中…' : '导入'}
         </button>
       </div>
-      <div style={{ display: 'flex', gap: 8 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         <button onClick={() => void doImportPath(true)} disabled={importing} style={{ ...btn, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
           <Download size={13} /> 导入文件夹
         </button>
@@ -378,6 +380,8 @@ export default function SkillsSettings() {
         />
       )}
 
+      </div></SettingsGroup>
+      <SettingsGroup title={t('Installed skills')}><div className="settings-record-list">
       {metas.length === 0 && (
         <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', padding: '6px 0' }}>
           还没有技能，可从 URL、文件夹或压缩包导入。
@@ -386,11 +390,11 @@ export default function SkillsSettings() {
 
       {metas.map((m) => (
         <div
+          className="settings-record"
           key={m.name}
           onClick={() => void openDetail(m.name)}
           style={{
-            borderRadius: 'var(--radius-inner)',
-            padding: '8px 12px', background: 'var(--surface)', cursor: 'pointer',
+            cursor: 'pointer',
             opacity: m.enabled ? 1 : 0.55,
           }}
         >
@@ -417,6 +421,7 @@ export default function SkillsSettings() {
         </div>
       ))}
 
+      </div></SettingsGroup>
       {detail && (
         <SkillDetailPanel skill={detail} onClose={() => setDetail(null)} onChanged={refresh} />
       )}
