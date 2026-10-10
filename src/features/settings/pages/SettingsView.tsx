@@ -1,7 +1,8 @@
 import { t } from '@i18n';
+import SidebarItem from '@ui/sidebarItem';
 import { TextInput } from '@ui/TextInput';
 import { useEffect, useState, type ReactNode } from 'react';
-import { iconSizes, Search, ChevronRight  } from '@ui/icons';
+import { iconSizes, Search  } from '@ui/icons';
 import { loadConfig, saveConfig, type FileOpenConfig } from '@features/files/services/fileOpen';
 import { refreshAiConfig, setTavilyKey, clearTavilyKey, useAiConfigStore } from '@features/agent';
 import SkillsSettings from '@features/settings/pages/SkillsSettings';
@@ -47,14 +48,7 @@ const PERM_TOOL_LABEL: Record<ToolName, string> = {
   subagent: '委派子代理',
 };
 
-// ── 设置页结构 ──
-// 外层 = 按功能划分的组（大菜单，可展开）；内层 = 细分设置页（小菜单）。
-// 每个设置页内再放多个相关的具体配置项。
-
-/**
- * SettingsView — 设置标签页内容（与「会话历史」同级，作为一个会话看待）。
- * 左侧分级侧栏（组可展开 + 搜索过滤），右侧为当前设置页（页内含多个相关配置）。
- */
+/** Static grouped navigation and a single page-level save summary. */
 export default function SettingsView() {
   return <SettingsSaveProvider><SettingsContent /></SettingsSaveProvider>;
 }
@@ -64,14 +58,12 @@ function SettingsContent() {
   const {
     selected,
     setSelected,
-    expanded,
     query,
     setQuery,
     normalizedQuery,
     visibleGroups,
     matchingSettings,
     activeLabel,
-    toggleGroup,
   } = useSettingsNavigation();
 
   // 文件打开配置（localStorage）
@@ -310,43 +302,20 @@ function SettingsContent() {
             </button>
           ))}
           {(!normalizedQuery || matchingSettings.length === 0) && visibleGroups.map((g) => {
-            const Icon = g.icon;
-            const open = normalizedQuery ? true : expanded.has(g.id);
             return (
-              <div key={g.id} style={{ marginBottom: 2 }}>
-                <button
-                  aria-expanded={open}
-                  onClick={() => toggleGroup(g.id)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 6, width: '100%',
-                    padding: '8px 10px', fontSize: 'var(--fs-label)', lineHeight: '20px', fontWeight: 'var(--fw-semibold)',
-                    background: 'transparent', border: 'none', borderRadius: 'var(--radius-inner)',
-                    color: 'var(--text-primary)', cursor: 'pointer',
-                  }}
-                >
-                  <ChevronRight
-                    size={iconSizes.compact}
-                    style={{ color: 'var(--text-muted)', transition: 'transform 0.12s ease', transform: open ? 'rotate(90deg)' : 'none' }}
-                  />
-                  <Icon size={iconSizes.control} style={{ color: 'var(--text-muted)' }} />
-                  {g.label}
-                </button>
-                {open && g.items.map((it) => (
-                  <button
-                    key={it.id}
-                    aria-current={selected === it.id ? 'page' : undefined}
-                    onClick={() => setSelected(it.id)}
-                    style={{
-                      display: 'block', width: '100%', textAlign: 'left',
-                      padding: '7px 10px 7px 32px', fontSize: 'var(--fs-label)', lineHeight: '20px',
-                      background: selected === it.id ? 'var(--selection-bg)' : 'transparent',
-                      border: 'none', borderRadius: 'var(--radius-inner)', cursor: 'pointer',
-                      color: selected === it.id ? 'var(--text-primary)' : 'var(--text-secondary)',
-                    }}
-                  >
-                    {it.label}
-                  </button>
-                ))}
+              <div key={g.id} className="settings-nav-group">
+                <div className="settings-nav-heading">{g.label}</div>
+                {g.items.map(item => {
+                  const Icon = item.icon;
+                  return <SidebarItem key={item.id} icon={<Icon size={iconSizes.row} />}
+                    title={item.label} tooltip={item.label} active={selected === item.id} tabIndex={0}
+                    style={{ fontSize: 'var(--fs-label)' }}
+                    dataAttributes={{ role: 'button', 'aria-label': item.label, 'aria-current': selected === item.id ? 'page' : undefined }}
+                    onClick={() => setSelected(item.id)}
+                    onKeyDown={event => {
+                      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelected(item.id); }
+                    }} />;
+                })}
               </div>
             );
           })}

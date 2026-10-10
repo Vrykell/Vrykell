@@ -24,7 +24,7 @@ test.describe('MCP 设置页', () => {
     const name = page.getByPlaceholder('服务器名').first();
     const card = name.locator('xpath=../..');
     await name.fill('重命名中的服务器');
-    await expect(card.getByRole('status')).toHaveText('保存中…');
+    await expect(page.locator('.settings-page-header').getByRole('status')).toHaveText('保存中…');
     await card.locator('[data-tip="删除服务器"]').click();
     await expect(page.getByPlaceholder('服务器名')).toHaveCount(0);
     expect(await mcpServers(page)).toEqual([]);

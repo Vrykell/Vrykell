@@ -23,7 +23,7 @@ test.describe('模型配置页', () => {
     expect(clears.some((c) => c.provider === 'openai-compatible' && !c.key)).toBe(true);
     // 重新保存
     await keyField.getByPlaceholder('输入 API Key').fill('sk-e2e-key');
-    await expect(keyField.getByRole('status')).toHaveText('已保存');
+    await expect(page.locator('.settings-page-header').getByRole('status')).toHaveText('已保存');
     await expect(keyField.getByText('已配置')).toBeVisible();
     const calls = await aiKeyCalls(page);
     expect(calls.some((c) => c.provider === 'openai-compatible' && c.key === 'sk-e2e-key')).toBe(true);
@@ -49,7 +49,7 @@ test.describe('模型配置页', () => {
     await expect(nameInputs).toHaveCount(3);
     await nameInputs.nth(2).fill('新模型');
     await nameInputs.nth(2).press('Enter');
-    await expect(nameInputs.nth(2).locator('xpath=..').getByRole('status')).toHaveText('已保存');
+    await expect(page.locator('.settings-page-header').getByRole('status')).toHaveText('已保存');
     await expect(nameInputs.nth(2)).toHaveValue('新模型');
     const setModels = await aiModelCalls(page);
     const addCall = setModels.filter((c) => c.kind === 'set_models').pop();

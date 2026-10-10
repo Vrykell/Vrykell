@@ -105,7 +105,7 @@ export function MemorySettings() {
         style={{ ...inputStyle, minHeight: 160, resize: 'vertical', lineHeight: 1.6 }}
       />
       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-        <SaveStatus status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
+        <SaveStatus inline status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
         <button onClick={() => void clear()} disabled={organizing} style={{ ...btnStyle, color: 'var(--error-light)' }}>清空</button>
       </div>
       {jlines.length > 0 && (
@@ -147,7 +147,7 @@ function AgentCard({ a, onChanged }: { a: AgentDef; onChanged: () => void }) {
     <div onCompositionStart={() => saving.setComposing(true)} onCompositionEnd={() => saving.setComposing(false)} className="settings-record">
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         <TextInput value={name} placeholder="名称" onChange={(e) => saving.setValue(previous => ({ ...previous, name: e.target.value }))} style={{ ...inputStyle, flex: 1, fontWeight: 'var(--fw-semibold)' }} />
-        <SaveStatus status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
+        <SaveStatus inline status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
         <IconButton compact tone="danger" onClick={() => void del()} data-tip={t('Delete')} aria-label={t('Delete')}><X size={16} /></IconButton>
       </div>
       <TextInput value={description} placeholder="一句话描述何时委派给它" onChange={(e) => saving.setValue(previous => ({ ...previous, description: e.target.value }))} style={{ ...inputStyle, marginTop: 8 }} />
@@ -211,7 +211,7 @@ function ScheduleCard({ s, onChanged }: { s: Schedule; onChanged: () => void }) 
         <TextInput type="number" min={1} value={interval} onChange={(e) => saving.setValue(previous => ({ ...previous, intervalMinutes: Number(e.target.value) }))} style={{ ...inputStyle, width: 70, flexShrink: 0 }} />
         <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>分钟</span>
         <button onClick={() => saving.setValue(previous => ({ ...previous, enabled: !previous.enabled }), true)} style={{ ...btnStyle }}>{enabled ? '停用' : '启用'}</button>
-        <SaveStatus status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
+        <SaveStatus inline status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
         <IconButton compact tone="danger" onClick={() => void del()} data-tip={t('Delete')} aria-label={t('Delete')}><X size={16} /></IconButton>
       </div>
       <TextArea value={prompt} placeholder="要执行的提示词" onChange={(e) => saving.setValue(previous => ({ ...previous, prompt: e.target.value }))} rows={3} style={{ ...inputStyle, marginTop: 8, minHeight: 56, resize: 'vertical', lineHeight: 1.55 }} />

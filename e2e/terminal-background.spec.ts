@@ -15,9 +15,6 @@ for (const mode of ['block', 'classic'] as const) {
     for (const theme of ['浅色', '深色'] as const) {
       await page.getByRole('button', { name: '设置', exact: true }).click();
       const nav = page.locator('aside');
-      while (await nav.locator('button[aria-expanded="false"]').count() > 0) {
-        await nav.locator('button[aria-expanded="false"]').first().click();
-      }
       await nav.getByRole('button', { name: '主题', exact: true }).click();
       await page.getByRole('button', { name: theme, exact: true }).click();
       await page.keyboard.press('Meta+1');

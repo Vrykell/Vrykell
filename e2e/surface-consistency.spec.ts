@@ -18,9 +18,6 @@ for (const theme of ['深色', '浅色']) {
     await gotoSetting(page, '主题');
     await page.getByRole('button', { name: theme, exact: true }).click();
     const nav = page.locator('.settings-navigation');
-    while (await nav.locator('button[aria-expanded="false"]').count()) {
-      await nav.locator('button[aria-expanded="false"]').first().click();
-    }
     const labels = ['启动', '日志与诊断', '模型配置', '模型行为', '模型权限', '网络搜索', '技能',
       'MCP 服务器', '记忆', '子代理', '定时任务', '打开方式', '本地编辑器', '远程编辑器', '主题', '快捷键说明'];
     for (const [index, label] of labels.entries()) {

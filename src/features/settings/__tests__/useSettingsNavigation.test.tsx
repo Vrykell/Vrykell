@@ -19,7 +19,7 @@ describe('useSettingsNavigation', () => {
     expect(open).toHaveBeenCalledTimes(2);
     open.mockRestore();
   });
-  it('filters groups by label and keyword and expands them while searching', () => {
+  it('filters navigation groups by label and keyword', () => {
     const { result } = renderHook(() => useSettingsNavigation());
 
     expect(result.current.visibleGroups.length).toBe(6);
@@ -30,20 +30,13 @@ describe('useSettingsNavigation', () => {
     expect(result.current.visibleGroups[0]?.items[0]?.id).toBe('shortcuts');
   });
 
-  it('toggles groups without affecting the selected page', () => {
+  it('keeps all navigation pages visible and updates the selected page', () => {
     const { result } = renderHook(() => useSettingsNavigation());
-
-    // 默认全部折叠，展开是用户显式动作
-    expect(result.current.expanded.size).toBe(0);
-    expect(result.current.expanded.has('ai')).toBe(false);
-    act(() => result.current.toggleGroup('ai'));
-    expect(result.current.expanded.has('ai')).toBe(true);
-    act(() => result.current.toggleGroup('ai'));
-    expect(result.current.expanded.has('ai')).toBe(false);
-
+    expect(result.current.visibleGroups.flatMap(group => group.items)).toHaveLength(16);
     act(() => result.current.setSelected('terminal-open'));
     expect(result.current.selected).toBe('terminal-open');
     expect(result.current.activeLabel).toBe('打开方式');
+    expect(result.current.visibleGroups.flatMap(group => group.items)).toHaveLength(16);
   });
 
   it('finds individual fields using the same index as global search', () => {

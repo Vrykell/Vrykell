@@ -153,7 +153,7 @@ export function TemplateListEditor({ value, onChange, placeholder }: {
       >
         <Plus size={iconSizes.compact} /> 添加
       </button>
-      <div><SaveStatus status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} /></div>
+      <div><SaveStatus inline status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} /></div>
     </div>
   );
 }

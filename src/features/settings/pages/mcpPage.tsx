@@ -192,7 +192,7 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
           </span>
         )}
         {s && <Toggle on={enabled} onChange={enabled => change({ enabled }, true)} />}
-        <SaveStatus status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
+        <SaveStatus inline status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
         {s && s.connected && (
           <button onClick={() => { void saving.flush().then(() => { if (!saving.hasPending()) onDisconnect(savedName.current); }); }} disabled={busy} style={{ ...btnStyle, flexShrink: 0 }}>断开</button>
         )}

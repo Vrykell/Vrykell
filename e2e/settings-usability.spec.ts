@@ -14,7 +14,7 @@ test('saved custom Anthropic address is used by the next chat request', async ({
   await card.getByPlaceholder('服务地址 (Base URL)').press('Enter');
   await card.getByRole('button', { name: '设为当前' }).click();
   await page.locator('.settings-content input[type="password"]').fill('test-placeholder-key');
-  await expect(page.getByText('服务商 API Key', { exact: true }).locator('xpath=..').getByRole('status')).toHaveText('已保存');
+  await expect(page.locator('.settings-page-header').getByRole('status')).toHaveText('已保存');
   const previousCalls = (await searchCalls(page)).length;
   await page.keyboard.press('Meta+1');
   await page.locator('[data-dock-btn="chat"]').click();

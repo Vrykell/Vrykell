@@ -58,7 +58,7 @@ test.describe('模型行为页', () => {
     const prompt = fieldOf(page, '系统提示词');
     const ta = prompt.locator('textarea');
     await ta.fill('你是 Vrykell 助手。');
-    await expect(ta.locator('xpath=..').getByRole('status')).toHaveText('已保存');
+    await expect(page.locator('.settings-page-header').getByRole('status')).toHaveText('已保存');
     const saved = await settingsJson(page);
     expect(saved).toContain('你是 Vrykell 助手。');
   });

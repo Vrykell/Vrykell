@@ -1,24 +1,18 @@
 import { expect, type Page } from '@playwright/test';
 
-/** 打开设置页（Cmd+,），等待侧栏就绪 */
+/** Open settings and wait for the static navigation. */
 export async function openSettings(page: Page): Promise<void> {
-  // 先等应用挂载完（快捷键监听器就绪），避免按键丢失
+  // Wait for shortcut listeners before opening settings.
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
   await page.keyboard.press('Meta+,');
   await expect(page.locator('aside')).toBeVisible({ timeout: 5000 });
 }
 
-/** 点击设置侧栏项进入某设置页（label 为侧栏按钮名，如「模型配置」「技能」） */
+/** Select a settings page by its navigation label. */
 export async function gotoSetting(page: Page, label: string): Promise<void> {
   await openSettings(page);
   const nav = page.locator('aside');
   const item = nav.getByRole('button', { name: label, exact: true });
-  if (await item.count() === 0) {
-    // 分组默认折叠：先把所有分组展开再找目标项
-    while (await nav.locator('button[aria-expanded="false"]').count() > 0) {
-      await nav.locator('button[aria-expanded="false"]').first().click();
-    }
-  }
   await item.click();
   await expect(page.locator('section').getByText(label, { exact: true }).first()).toBeVisible({ timeout: 3000 });
 }
