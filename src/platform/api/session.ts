@@ -53,10 +53,10 @@ export function listSessions(): Promise<BackendSessionEntry[]> {
 export function recordBlock(
   id: string, sessionId: string, paneId: string | null, command: string,
   outputRaw: string, outputClean: string, outputHtml: string, exitCode: number | null, status: string,
-  startedAt: number, endedAt: number | null,
+  startedAt: number, endedAt: number | null, cwd = '',
 ): Promise<void> {
   return invoke('record_block', {
-    id, sessionId, paneId, command, outputRaw, outputClean, outputHtml, exitCode, status, startedAt, endedAt,
+    id, sessionId, paneId, command, outputRaw, outputClean, outputHtml, exitCode, status, startedAt, endedAt, cwd,
   });
 }
 

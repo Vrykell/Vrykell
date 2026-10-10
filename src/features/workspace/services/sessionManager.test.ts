@@ -49,7 +49,7 @@ describe('sessionManager 生命周期', () => {
     useSessionStore.setState({ groups: [{ id: 'g9', title: '恢复分组', collapsed: false }] });
     invokeMock.mockResolvedValueOnce(undefined); // restore_session
     invokeMock.mockResolvedValueOnce([
-      { id: 'b1', pane_id: null, command: 'ls', exit_code: 0, started_at: 1, ended_at: 2, status: 'done', collapsed: true, output_clean: 'out', output_raw: 'out', output_html: '' },
+      { id: 'b1', pane_id: null, command: 'ls', cwd: '/original/path', exit_code: 0, started_at: 1, ended_at: 2, status: 'done', collapsed: true, output_clean: 'out', output_raw: 'out', output_html: '' },
       { id: 'b2', pane_id: `${sessionId}#1`, command: 'pwd', exit_code: null, started_at: 3, ended_at: null, status: 'running', collapsed: null, output_clean: '', output_raw: '', output_html: '' },
     ]); // get_session_blocks
     invokeMock.mockResolvedValueOnce([
@@ -57,7 +57,7 @@ describe('sessionManager 生命周期', () => {
       { id: 'c2', role: 'assistant', content: '在的', created_at: 2, parts: '', attachments: '' },
     ]); // list_chat_messages
     invokeMock.mockResolvedValueOnce({
-      id: sessionId, title: '旧标题', kind: 'session', payload: JSON.stringify({ layout: { type: 'leaf', id: `${sessionId}#0`, kind: 'local' } }), group_id: 'g9', cwd: null, created_at: 1, updated_at: 2, archived_at: null,
+      id: sessionId, title: '旧标题', kind: 'session', payload: JSON.stringify({ layout: { type: 'leaf', id: `${sessionId}#0`, kind: 'local' } }), group_id: 'g9', cwd: '/latest/path', created_at: 1, updated_at: 2, archived_at: null,
     }); // get_session
     await sessionManager.restore(sessionId, '恢复的标题');
     const s = useSessionStore.getState();
@@ -70,6 +70,8 @@ describe('sessionManager 生命周期', () => {
     expect(useBlockStore.getState().byTab[`${sessionId}#0`]).toHaveLength(1);
     const restored = useBlockStore.getState().byTab[`${sessionId}#0`]![0]!;
     expect(restored.outputText).toBe('out');
+    expect(restored.cwd).toBe('/original/path');
+    expect(useBlockStore.getState().byTab[`${sessionId}#1`]![0]!.cwd).toBe('/latest/path');
     expect(restored).not.toHaveProperty('collapsed');
     expect(invokeMock).not.toHaveBeenCalledWith('set_block_collapsed', expect.anything());
     expect(useBlockStore.getState().byTab[`${sessionId}#1`]).toHaveLength(1);
@@ -116,17 +118,17 @@ describe('sessionManager 生命周期', () => {
   it('record：start 与 complete 透传', async () => {
     const block = {
       id: 'b1', command: 'ls', status: 'done', exitCode: 0, startedAt: 1, endedAt: 2,
-      outputHtml: '', outputText: 'out', outputRaw: 'raw', cwd: '', wasLongRunning: false,
+      outputHtml: '', outputText: 'out', outputRaw: 'raw', cwd: '/execution/path', wasLongRunning: false,
     };
     invokeMock.mockResolvedValueOnce(undefined);
     await sessionManager.record('t1', 'p1', block as never, 'start');
     expect(invokeMock).toHaveBeenLastCalledWith('record_block', expect.objectContaining({
-      id: 'b1', sessionId: 't1', paneId: 'p1', command: 'ls', exitCode: null, status: 'executing', endedAt: null,
+      id: 'b1', sessionId: 't1', paneId: 'p1', command: 'ls', cwd: '/execution/path', exitCode: null, status: 'executing', endedAt: null,
     }));
     invokeMock.mockResolvedValueOnce(undefined);
     await sessionManager.record('t1', 'p1', block as never, 'complete');
     expect(invokeMock).toHaveBeenLastCalledWith('record_block', expect.objectContaining({
-      id: 'b1', exitCode: 0, status: 'done', endedAt: 2, outputRaw: 'raw', outputClean: 'out',
+      id: 'b1', exitCode: 0, status: 'done', endedAt: 2, outputRaw: 'raw', outputClean: 'out', cwd: '/execution/path',
     }));
   });
 });

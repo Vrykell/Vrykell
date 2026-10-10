@@ -151,6 +151,7 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
       const block: TermBlock = {
         id: b.id,
         command: b.command,
+        cwd: b.cwd || undefined,
         exitCode: b.exit_code,
         startedAt: b.started_at,
         endedAt: b.ended_at,
@@ -198,6 +199,13 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
     info = await getSession(sessionId);
   } catch (e) {
     console.warn('sessionManager.restore: get_session failed:', e);
+  }
+  if (info?.cwd) {
+    for (const saved of backendBlocks) {
+      if (saved.cwd) continue;
+      const paneId = !saved.pane_id || saved.pane_id === sessionId ? `${sessionId}#0` : saved.pane_id;
+      useBlockStore.getState().updateBlock(paneId, saved.id, { cwd: info.cwd });
+    }
   }
   const layout = parseLayout(info?.payload ?? '{}', sessionId);
   const storedGroupId = info?.group_id ?? undefined;
@@ -287,6 +295,7 @@ export async function record(
       phase === 'start' ? 'executing' : block.status,
       block.startedAt ?? 0,
       phase === 'complete' ? block.endedAt : null,
+      block.cwd ?? '',
     );
   } catch (e) {
     console.warn('sessionManager.record failed:', e);

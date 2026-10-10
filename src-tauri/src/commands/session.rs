@@ -106,6 +106,7 @@ pub fn record_block(
     status: String,
     started_at: u64,
     ended_at: Option<u64>,
+    cwd: Option<String>,
 ) -> Result<(), String> {
     let db = state.0.lock().map_err(|e| e.to_string())?;
     db.record_block(
@@ -120,6 +121,7 @@ pub fn record_block(
         &status,
         started_at,
         ended_at,
+        cwd.as_deref().unwrap_or_default(),
     )
 }
 
