@@ -25,12 +25,12 @@ export default function DirectoryPicker({ paneId, dir }: { paneId: string; dir?:
   const listId = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [active, setActive] = useState(0);
+  const [active, setActive] = useState(-1);
   const [entries, setEntries] = useState<FsEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
-  const [position, setPosition] = useState({ left: 8, top: 8, width: 320 });
+  const [position, setPosition] = useState({ left: 8, top: 8, width: 280 });
   const spec = useSessionStore(state => state.tabs.flatMap(tab => tab.kind === 'session' ? leaves(tab.layout) : []).find(pane => pane.id === paneId));
   const session = useTerminalStore(state => state.sessions[paneId]);
   const blocks = useBlockStore(selectBlocks(paneId));
@@ -43,11 +43,7 @@ export default function DirectoryPicker({ paneId, dir }: { paneId: string; dir?:
   const connected = !!session && (spec?.kind !== 'ssh' || !!connectionId);
   const path = dir ? normalizeWorkingDirectory(dir) : undefined;
   const parent = path ? ops.parentOf(path) : null;
-  const options = useMemo(() => [
-    ...(parent ? [{ path: parent, name: t('Parent directory'), parent: true }] : []),
-    ...entries.filter(entry => entry.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
-      .map(entry => ({ path: entry.path, name: entry.name, parent: false })),
-  ], [entries, parent, query]);
+  const options = useMemo(() => entries.filter(entry => entry.name.toLocaleLowerCase().includes(query.toLocaleLowerCase())), [entries, query]);
 
   useEffect(() => { setOpen(false); }, [paneId, path, busy, connected]);
   useEffect(() => {
@@ -68,7 +64,7 @@ export default function DirectoryPicker({ paneId, dir }: { paneId: string; dir?:
       const bounds = trigger.current?.getBoundingClientRect();
       const height = menu.current?.getBoundingClientRect().height ?? 240;
       if (bounds) {
-        const width = Math.min(360, window.innerWidth - 16);
+        const width = Math.min(280, window.innerWidth - 16);
         const anchor = clampMenuPosition({ left: bounds.left, top: bounds.top - height - 6 }, { width, height }, { width: window.innerWidth, height: window.innerHeight });
         setPosition({ ...anchor, width });
       }
@@ -82,7 +78,7 @@ export default function DirectoryPicker({ paneId, dir }: { paneId: string; dir?:
     document.addEventListener('pointerdown', outside);
     return () => { window.removeEventListener('resize', update); document.removeEventListener('pointerdown', outside); };
   }, [open, loading, error, options.length]);
-  useEffect(() => { setActive(query && parent && options.length > 1 ? 1 : 0); }, [query, entries, parent, options.length]);
+  useEffect(() => { setActive(-1); }, [query, entries]);
   useEffect(() => { document.getElementById(`${listId}-${active}`)?.scrollIntoView?.({ block: 'nearest' }); }, [active, listId]);
 
   const choose = async (target: string) => {
@@ -101,28 +97,30 @@ export default function DirectoryPicker({ paneId, dir }: { paneId: string; dir?:
   return <>
     <button ref={trigger} className="directory-picker-trigger" type="button" data-subtle disabled={!path || !connected || busy}
       data-tip={path} aria-label={t('Change working directory')} aria-expanded={open} aria-haspopup="dialog"
-      onClick={() => { setQuery(''); setActive(0); setOpen(value => !value); }}>
+      onClick={() => { setQuery(''); setActive(-1); setOpen(value => !value); }}>
       <Folder size={iconSizes.compact} /><span>{path ? directoryLabel(path) : t('Working directory unavailable')}</span>
     </button>
     {open && createPortal(<div ref={menu} className="workspace-floating directory-picker" role="dialog" aria-label={t('Choose working directory')}
       style={{ position: 'fixed', zIndex: 10000, ...position }} onKeyDown={event => {
         if (event.nativeEvent.isComposing) return;
         if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setOpen(false); trigger.current?.focus(); }
-        else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        else if (event.target === search.current && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
           event.preventDefault(); event.stopPropagation();
-          setActive(value => options.length ? (value + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length : 0);
-        } else if (event.key === 'Enter' && options[active] && !loading) { event.preventDefault(); event.stopPropagation(); void choose(options[active]!.path); }
+          setActive(value => options.length ? (value < 0 ? (event.key === 'ArrowDown' ? 0 : options.length - 1) : (value + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length) : -1);
+        } else if (event.target === search.current && event.key === 'Enter' && options[Math.max(0, active)] && !loading) { event.preventDefault(); event.stopPropagation(); void choose(options[Math.max(0, active)]!.path); }
       }}>
       <TextInput ref={search} className="directory-picker-search" value={query} placeholder={t('Search directories…')}
         aria-label={t('Search directories')} role="combobox" aria-expanded="true" aria-controls={listId}
         aria-activedescendant={options[active] ? `${listId}-${active}` : undefined} onChange={event => setQuery(event.target.value)} />
+      {parent && <button className="directory-picker-parent" type="button" data-subtle onClick={() => void choose(parent)}>
+        <ArrowUp size={iconSizes.compact} /><span>{t('Parent directory')}</span>
+      </button>}
       {error ? <ErrorBox title={t('Unable to read directory')} actions={<button type="button" onClick={() => setRetry(value => value + 1)}>{t('Retry')}</button>}>{error}</ErrorBox>
         : loading ? <p role="status">{t('Loading directories…')}</p> : <div id={listId} role="listbox" aria-label={t('Directories')} className="directory-picker-list">
           {options.map((option, index) => <button type="button" data-subtle role="option" aria-selected={active === index} tabIndex={-1}
-            id={`${listId}-${index}`} key={option.path} onPointerMove={() => setActive(index)} onMouseDown={event => event.preventDefault()}
+            id={`${listId}-${index}`} key={option.path} onPointerMove={() => setActive(-1)} onMouseDown={event => event.preventDefault()}
             onClick={() => void choose(option.path)}>
-            {option.parent ? <ArrowUp size={iconSizes.compact} /> : <Folder size={iconSizes.compact} />}
-            {option.parent ? `.. (${option.name})` : option.name}
+            <Folder size={iconSizes.compact} /><span>{option.name}</span>
           </button>)}
           {!options.length && <p>{t('No matching directories')}</p>}
         </div>}
