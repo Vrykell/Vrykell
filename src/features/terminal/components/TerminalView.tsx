@@ -8,6 +8,7 @@
  */
 
 import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
+import { useTypographyStore } from '@config/typography';
 import { useRef, useEffect, useMemo, useState, useId } from 'react';
 import OverlayScrollbar from '@ui/OverlayScrollbar';
 import KeyHint from '@ui/KeyHint';
@@ -620,6 +621,8 @@ function PaneBlockList({ paneId, insetLeft = 8, insetRight = 8 }: { paneId: stri
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollId = useId();
   const pinned = usePinnedCommand(scrollRef);
+  const titleCollapsed = useTypographyStore(state => state.commandTitleCollapsed);
+  const updateTypography = useTypographyStore(state => state.update);
   const pinnedBlock = pinned ? blocks.find(block => block.id === pinned.id) : undefined;
   const snap = useFollowBottom(scrollRef, [blocks], paneId);
   useEffect(() => registerFollowEngager(paneId, snap), [paneId, snap]);
@@ -632,7 +635,8 @@ function PaneBlockList({ paneId, insetLeft = 8, insetRight = 8 }: { paneId: stri
         </div>
       </div>
       {pinned && pinnedBlock && <PinnedCommand key={pinned.id} block={pinnedBlock} paneId={paneId}
-        remaining={pinned.remaining} insetLeft={insetLeft} insetRight={insetRight} scrollRef={scrollRef} />}
+        remaining={pinned.remaining} insetLeft={insetLeft} insetRight={insetRight} scrollRef={scrollRef}
+        collapsed={titleCollapsed} onToggle={() => updateTypography({ commandTitleCollapsed: !titleCollapsed })} />}
       <OverlayScrollbar scrollRef={scrollRef} controlsId={scrollId} label={t('Scroll command history')} />
     </div>
   );

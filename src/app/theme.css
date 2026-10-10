@@ -683,12 +683,14 @@ button.tui-control { min-height: 20px; padding: 0 4px; font-size: var(--fs-micro
 .command-block-output { margin-top: calc(var(--terminal-row-height) / 2); }
 .command-block-truncation { min-height: 0; margin: 8px 0 0; }
 .pinned-command-clip { position: absolute; top: 0; left: 0; right: 0; overflow: hidden; pointer-events: none; }
-.pinned-command { pointer-events: auto; background: var(--xterm-bg); border-bottom: 1px solid var(--block-divider); padding-bottom: max(18px, calc(var(--terminal-row-height) / 2)); }
+.pinned-command { pointer-events: auto; background: var(--xterm-bg); border-bottom: 1px solid var(--block-divider); padding-bottom: max(20px, calc(var(--terminal-row-height) / 2)); }
 .pinned-command[data-failed="true"] { background: linear-gradient(var(--error-bg), var(--error-bg)), var(--xterm-bg); }
 .pinned-command .command-block-command { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-.pinned-command-toggle.icon-button { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 28px; height: 18px; min-height: 18px; border-radius: 5px 5px 0 0; background: var(--xterm-bg); opacity: 0; pointer-events: none; transition: opacity var(--dur-fast) var(--ease); }
-.pinned-command:is(:hover, :focus-within, [data-collapsed="true"]) .pinned-command-toggle { opacity: 1; pointer-events: auto; }
-.pinned-command[data-collapsed="true"] { height: 20px; padding-top: 0; padding-bottom: 0; background: transparent; border: 0; pointer-events: none; }
+.pinned-command-toggle-slot { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 44px; height: 24px; display: flex; align-items: center; justify-content: center; pointer-events: auto; }
+.pinned-command-toggle.icon-button[data-compact] { width: 32px; height: 20px; min-height: 20px; border: 1px solid var(--border); border-radius: 999px; background: var(--elevated); color: var(--text-secondary); box-shadow: var(--shadow-sm); opacity: 0; pointer-events: none; transition: opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease); }
+.pinned-command-toggle.icon-button[data-compact]:is(:hover, :focus-visible) { background: var(--field-bg); color: var(--text-primary); }
+.pinned-command:is(:hover, :focus-within) .pinned-command-toggle { opacity: 1; pointer-events: auto; }
+.pinned-command[data-collapsed="true"] { height: 24px; padding-top: 0; padding-bottom: 0; background: transparent; border: 0; pointer-events: none; }
 .pinned-command[data-collapsed="true"]::before { display: none; }
 .command-block-running { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--accent-warm); animation: pulse 1.5s ease-in-out infinite; }
 
