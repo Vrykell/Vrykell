@@ -44,6 +44,24 @@ describe('默认调色板（中性灰色）', () => {
     expect(paletteToCssVars(themes[mode])['--text-caret']).toBe(cursor);
     expect(paletteToCssVars(themes[mode])['--xterm-cursor']).toBe(mode === 'dark' ? '#ECEFF4' : '#2E3742');
   });
+  it.each(['dark', 'light'] as const)('%s command colors stay legible on input and output backgrounds', mode => {
+    const palette = themes[mode];
+    const luminance = (hex: string) => {
+      const values = [1, 3, 5].map(offset => {
+        const value = parseInt(hex.slice(offset, offset + 2), 16) / 255;
+        return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+      });
+      return values[0]! * 0.2126 + values[1]! * 0.7152 + values[2]! * 0.0722;
+    };
+    for (const color of [palette.cmdProgram, palette.cmdArgument, palette.cmdFlag, palette.cmdPath,
+      palette.cmdNumber, palette.cmdVariable, palette.cmdString, palette.cmdPipe]) {
+      for (const background of [palette.fieldBg, palette.xtermBg]) {
+        const values = [luminance(color), luminance(background)];
+        expect((Math.max(...values) + 0.05) / (Math.min(...values) + 0.05)).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+    expect(paletteToCssVars(palette)['--cmd-program']).toBe(palette.cmdProgram);
+  });
   it('dark 与 light 均存在', () => {
     expect(themes.dark).toBeDefined();
     expect(themes.light).toBeDefined();

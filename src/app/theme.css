@@ -8,7 +8,6 @@
   --terminal-input-row-height: 22px;
   --terminal-bold-weight: 700;
   --terminal-command-weight: 500;
-  --cmd-program: var(--xterm-green);
   --scrollbar-size: 8px;
   --font-ui: -apple-system, "SF Pro Text", "PingFang SC", "Segoe UI", sans-serif;
   /* Ligature-free mono first, then a monospace CJK face, then the generic before the
@@ -71,7 +70,11 @@ input, textarea, [contenteditable="true"] { caret-color: var(--text-caret); }
 .settings-nav-heading { padding: 12px 16px 6px; color: var(--text-muted); font-size: var(--fs-caption); font-weight: var(--fw-medium); }
 .settings-navigation [role="button"]:focus-visible { outline: none; }
 .command-token[data-kind="command"] { color: var(--cmd-program); }
-.command-token[data-kind="flag"], .command-token[data-kind="variable"] { color: var(--cmd-flag); }
+.command-token[data-kind="flag"] { color: var(--cmd-flag); }
+.command-token[data-kind="variable"] { color: var(--cmd-variable); }
+.command-token[data-kind="argument"] { color: var(--cmd-argument); }
+.command-token[data-kind="number"] { color: var(--cmd-number); }
+.command-token[data-kind="keyword"] { color: var(--cmd-pipe); }
 .command-token[data-kind="path"] { color: var(--cmd-path); }
 .command-token[data-kind="string"] { color: var(--cmd-string); }
 .command-token[data-kind="operator"] { color: var(--cmd-pipe); }

@@ -81,7 +81,11 @@ export interface ThemePalette {
   blockCmdFailed: string;     // 失败命令文字
   blockDivider: string;       // block 间 1px 分隔线
 
-  // 命令语法高亮（）
+  // Display-only command syntax colors.
+  cmdProgram: string;
+  cmdArgument: string;
+  cmdNumber: string;
+  cmdVariable: string;
   cmdFlag: string;            // --flag
   cmdPath: string;            // /path/to/file
   cmdPipe: string;            // | pipe
@@ -210,11 +214,15 @@ const dark: ThemePalette = {
   blockDivider: 'rgba(255,255,255,0.08)',
 
   // 终端语法高亮（命令内容的着色，非应用主色）
-  cmdFlag: '#7ECFFF',
-  cmdPath: '#8BE0B8',
-  cmdPipe: '#8B6CFF',
-  cmdRedirect: '#8B6CFF',
-  cmdString: '#E5A050',
+  cmdProgram: '#B3F56D',
+  cmdArgument: '#B9D9FF',
+  cmdNumber: '#FFD866',
+  cmdVariable: '#F0A6FF',
+  cmdFlag: '#69C9FF',
+  cmdPath: '#6DE4CC',
+  cmdPipe: '#C3A6FF',
+  cmdRedirect: '#C3A6FF',
+  cmdString: '#FFD08A',
 
   searchHighlightBg: 'rgba(255,255,255,0.20)',
 
@@ -358,11 +366,15 @@ const light: ThemePalette = {
   blockCmdFailed: '#C94F4F',
   blockDivider: 'rgba(0,0,0,0.08)',
 
-  cmdFlag: '#2E7FB8',
-  cmdPath: '#1E9E8C',
-  cmdPipe: '#6B5BB0',
-  cmdRedirect: '#6B5BB0',
-  cmdString: '#A87E3A',
+  cmdProgram: '#287000',
+  cmdArgument: '#245E99',
+  cmdNumber: '#8B5800',
+  cmdVariable: '#8A329A',
+  cmdFlag: '#006BA6',
+  cmdPath: '#006A5D',
+  cmdPipe: '#7540A8',
+  cmdRedirect: '#7540A8',
+  cmdString: '#875A14',
 
   searchHighlightBg: 'rgba(0,0,0,0.12)',
 
@@ -469,6 +481,10 @@ export function paletteToCssVars(p: ThemePalette): Record<string, string> {
     '--block-cmd-text': p.blockCmdText,
     '--block-cmd-failed': p.blockCmdFailed,
     '--block-divider': p.blockDivider,
+    '--cmd-program': p.cmdProgram,
+    '--cmd-argument': p.cmdArgument,
+    '--cmd-number': p.cmdNumber,
+    '--cmd-variable': p.cmdVariable,
     '--cmd-flag': p.cmdFlag,
     '--cmd-path': p.cmdPath,
     '--cmd-pipe': p.cmdPipe,
