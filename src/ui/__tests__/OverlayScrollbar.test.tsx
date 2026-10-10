@@ -54,3 +54,31 @@ it('navigates history by keyboard and forwards wheel input over the transparent 
   fireEvent.wheel(bar, { deltaY: -2, deltaMode: 1 });
   expect(scroll.scrollTop).toBe(528);
 });
+
+it('supports horizontal content without changing vertical position', () => {
+  const scroll = document.createElement('div');
+  Object.defineProperties(scroll, { clientWidth: { value: 200 }, scrollWidth: { value: 1000 } });
+  render(<OverlayScrollbar horizontal scrollRef={{ current: scroll }} controlsId="code" label="Scroll code" />);
+  const bar = screen.getByRole('scrollbar');
+  expect(bar).toHaveAttribute('aria-orientation', 'horizontal');
+  fireEvent.keyDown(bar, { key: 'End' });
+  expect(scroll.scrollLeft).toBe(800);
+  fireEvent.keyDown(bar, { key: 'ArrowLeft' });
+  expect(scroll.scrollLeft).toBe(760);
+  fireEvent.wheel(bar, { deltaX: -60 });
+  expect(scroll.scrollLeft).toBe(700);
+  expect(scroll.scrollTop).toBe(0);
+});
+
+it('places floating tracks above the scroll surface itself', () => {
+  const scroll = document.createElement('div');
+  scroll.style.zIndex = '400';
+  Object.defineProperties(scroll, {
+    clientWidth: { value: 300 }, scrollWidth: { value: 900 }, clientHeight: { value: 70 },
+    getClientRects: { value: () => [new DOMRect(300, 120, 300, 70)] },
+    getBoundingClientRect: { value: () => new DOMRect(300, 120, 300, 70) },
+  });
+  render(<OverlayScrollbar horizontal floating scrollRef={{ current: scroll }} controlsId="floating" label="Scroll content" />);
+  expect(screen.getByRole('scrollbar')).toHaveAttribute('tabindex', '-1');
+  expect(screen.getByRole('scrollbar')).toHaveStyle({ position: 'fixed', zIndex: '401', left: '300px', top: '180px' });
+});

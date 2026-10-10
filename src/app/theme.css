@@ -470,14 +470,21 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 @supports not selector(::-webkit-scrollbar) {
   * { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
 }
-/* Reserve the content width before overflow to keep terminal columns stable. */
-.scroll-region, .settings-content { scrollbar-gutter: stable; }
+/* Overlay tracks leave the full content width available. */
+.scroll-region, .settings-content { scrollbar-gutter: auto; }
 [data-testid^="terminal-scroll-"] { --scrollbar-size: 10px; }
+.application-window[data-platform="macos"] { border-radius: 10px; }
+.application-window:has(.workspace-titlebar[data-fullscreen="true"]) { border-radius: 0; }
+.application-window::after { content: ""; position: fixed; inset: 0; border: 1px solid var(--border-strong); border-radius: inherit; pointer-events: none; z-index: 20000; }
 .overlay-scroll-container { position: relative; display: flex; flex-direction: column; overflow: hidden; }
 .terminal-block-scroll { scrollbar-gutter: auto; scrollbar-width: none; }
 .terminal-block-scroll::-webkit-scrollbar { display: none; }
 .overlay-scrollbar { position: absolute; top: 0; bottom: 0; right: 0; width: 10px; z-index: 1; background: transparent; touch-action: none; user-select: none; }
 .overlay-scrollbar-thumb { width: 6px; margin: 0 2px; border-radius: 999px; background: var(--scrollbar-thumb); }
+.overlay-scroll-target { scrollbar-width: none; scrollbar-gutter: auto; }
+.overlay-scroll-target::-webkit-scrollbar { display: none; }
+.overlay-scrollbar[data-horizontal="true"] { top: auto; left: 0; width: auto; height: 10px; }
+.overlay-scrollbar[data-horizontal="true"] .overlay-scrollbar-thumb { height: 6px; margin: 2px 0; }
 .overlay-scrollbar:hover .overlay-scrollbar-thumb, .overlay-scrollbar[data-dragging="true"] .overlay-scrollbar-thumb { background: var(--scrollbar-thumb-hover); }
 
 /* xterm 容器贴边：取消全屏终端的边缘内边距；连字会把多个字符画成一格，终端里必须关掉 */

@@ -30,6 +30,8 @@ const zh: Record<string, string> = {
   'Close terminal': '关闭当前终端',
   'More actions': '更多操作',
   'Scroll command history': '滚动命令历史',
+  'Scroll content': '滚动内容',
+  'Scroll content horizontally': '横向滚动内容',
   'Running': '运行中',
   'Enter fullscreen interaction': '进入全屏交互',
   'Truncated {{count}} lines': '…已截断 {{count}} 行',

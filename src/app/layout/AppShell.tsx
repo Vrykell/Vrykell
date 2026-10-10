@@ -1,11 +1,13 @@
+import { isMacOS } from '@platform/runtime';
 import { useCallback } from 'react';
 import { useUiStore } from '@features/workspace';
 import { useTerminalThemeStore } from '@features/settings/model/terminalTheme';
 import type { TerminalSpec } from '@features/workspace/model/windowLayout';
 import WorkspaceShell from '@app/layout/WorkspaceShell';
 import ApplicationOverlays from '@app/layout/ApplicationOverlays';
+import OverlayScrollbars from '@ui/OverlayScrollbars';
 
-/** 应用视觉壳：背景、内容层、工作区与应用级弹层。 */
+/** Paint the window surface, workspace, and application overlays. */
 export default function AppShell() {
   const wallpaperDataUrl = useTerminalThemeStore((state) => state.wallpaperDataUrl);
   const appOpacity = useTerminalThemeStore((state) => state.config.opacity);
@@ -33,6 +35,8 @@ export default function AppShell() {
         }}
       />
       <div
+        className="application-window"
+        data-platform={isMacOS ? 'macos' : 'other'}
         style={{
           position: 'relative',
           zIndex: 1,
@@ -47,6 +51,7 @@ export default function AppShell() {
       >
         <WorkspaceShell />
         <ApplicationOverlays onPickSplit={handleSplitPick} />
+        <OverlayScrollbars />
       </div>
     </>
   );
