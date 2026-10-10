@@ -32,6 +32,10 @@ import { useInputEditorController } from '@features/terminal/hooks/useInputEdito
 import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
 import { normalizeWorkingDirectory } from '@features/terminal/services/pipeline/workingDirectory';
 import DirectoryPicker from './DirectoryPicker';
+import CommandSyntax from './CommandSyntax';
+import Select from '@ui/Select';
+import { useTypographyStore } from '@config/typography';
+import { useRef } from 'react';
 
 
 interface Props {
@@ -85,12 +89,16 @@ export default function InputEditor({
     removeAttachment,
     canSendAi,
     ghost,
+    ghostCandidates = [],
+    acceptSuggestedCompletion,
     execute,
     handleChange,
     handlePaste,
     handleKeyDown,
   } = useInputEditorController({ paneId, focused, isLongRunning, onEndPress });
-
+  const commandHighlighting = useTypographyStore(state => state.commandHighlighting);
+  const highlightInput = commandHighlighting && !aiMode && !!text;
+  const overlayRef = useRef<HTMLDivElement>(null);
 
   if (forceHidden) return null;
 
@@ -194,6 +202,7 @@ export default function InputEditor({
               onChange={handleChange}
               onPaste={handlePaste}
               onKeyDown={handleKeyDown}
+              onScroll={event => { if (overlayRef.current) overlayRef.current.scrollTop = event.currentTarget.scrollTop; }}
               style={{
                 position: 'relative',
                 zIndex: 1,
@@ -206,18 +215,19 @@ export default function InputEditor({
                 fontSize: 'var(--terminal-font-size)',
                 fontFamily: TERMINAL_FONT_FAMILY,
                 fontWeight: 'var(--terminal-font-weight)',
-                color: 'var(--text-primary)',
+                color: highlightInput ? 'transparent' : 'var(--text-primary)',
                 lineHeight: 'var(--terminal-input-row-height)',
                 outline: 'none',
               }}
             />
-            {ghost && (
+            {(ghost || highlightInput) && (
               <div
-                aria-hidden
+                ref={overlayRef}
+                className="command-input-overlay"
                 style={{
                   position: 'absolute',
                   inset: 0,
-                  zIndex: 0,
+                  zIndex: 2,
                   pointerEvents: 'none',
                   padding: '1px 0',
                   fontSize: 'var(--terminal-font-size)',
@@ -226,10 +236,18 @@ export default function InputEditor({
                   lineHeight: 'var(--terminal-input-row-height)',
                   whiteSpace: 'pre-wrap',
                   overflowWrap: 'break-word',
+                  overflow: 'hidden',
                 }}
               >
-                <span style={{ color: 'transparent' }}>{text}</span>
-                <span style={{ color: 'var(--text-muted)', opacity: 0.6 }}>{ghost}</span>
+                <span aria-hidden style={{ color: highlightInput ? 'var(--text-primary)' : 'transparent' }}>{highlightInput ? <CommandSyntax text={text} /> : text}</span>
+                <span aria-hidden className="command-completion-suffix">{ghost}</span>
+                {ghost && ghostCandidates.length > 0 && <span className="command-completion-action"
+                  onClick={event => event.stopPropagation()} onMouseDown={event => event.stopPropagation()}>
+                  <Select aria-label={t('Completion suggestions')} value="" placeholder="→"
+                    options={ghostCandidates.map(candidate => ({ value: candidate, label: text + candidate }))}
+                    onChange={acceptSuggestedCompletion}
+                    style={{ height: 22, minHeight: 22, width: 44, gap: 4, padding: '0 4px', background: 'transparent', fontSize: 'var(--fs-caption)' }} />
+                </span>}
               </div>
             )}
           </div>

@@ -180,7 +180,10 @@ test('the more menu sends command output for AI analysis in the same pane', asyn
   await input.fill('echo analyze-me');
   await input.press('Enter');
   const block = page.locator('[data-testid^="command-block-"]').last();
+  await expect(block.locator('.command-block-output')).toContainText('analyze-me');
+  await expect(block.getByTestId('exit-code')).toBeVisible();
   await block.hover();
+  await block.getByRole('button', { name: '更多操作' }).hover();
   await block.getByRole('button', { name: '更多操作' }).click();
   await page.getByRole('menuitem', { name: '发给 AI 分析' }).click();
   await expect(page.getByRole('menu', { name: '命令块操作' })).toHaveCount(0);
@@ -190,26 +193,22 @@ test('the more menu sends command output for AI analysis in the same pane', asyn
 
 test('two-row command output matches the compact context and spacing proportions', async ({ page }) => {
   await setupTauriMock(page);
+  await page.addInitScript(() => {
+    const target = window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args: Record<string, unknown>) => Promise<unknown> } };
+    const original = target.__TAURI_INTERNALS__.invoke;
+    target.__TAURI_INTERNALS__.invoke = (command, args) => {
+      if (command === 'get_session_blocks' && args.sessionId === 't1') {
+        return Promise.resolve([53, 44].map((duration, index) => ({
+          id: `compact-${index}`, session_id: 't1', pane_id: null, command: 'ls', cwd: '~', status: 'done', exit_code: 0,
+          started_at: 0, ended_at: duration, output_raw: '', output_html: '',
+          output_clean: 'Desktop       Downloads     Movies        Pictures\nDocuments     Library       Music         Public',
+        })));
+      }
+      return original(command, args);
+    };
+  });
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
-  await page.waitForFunction(async () => {
-    const path = '/src/features/terminal/stores/terminal.ts';
-    const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
-    return Object.values(useTerminalStore.getState().startupStates).includes('ready');
-  });
-  await page.evaluate(async () => {
-    const terminalPath = '/src/features/terminal/stores/terminal.ts';
-    const { useTerminalStore } = await import(terminalPath) as typeof import('../src/features/terminal/stores/terminal');
-    const pane = Object.keys(useTerminalStore.getState().sessions)[0]!;
-    const scope = window as unknown as { __vrykellSessionRegistry: {
-      controllers: Map<string, import('../src/features/terminal/services/pipeline/sessionController').SessionController>;
-    } };
-    scope.__vrykellSessionRegistry.controllers.get(pane)!.seed([53, 44].map((duration, index) => ({
-      id: `compact-${index}`, command: 'ls', cwd: '~', status: 'done', exitCode: 0,
-      startedAt: 0, endedAt: duration, wasLongRunning: false, outputRaw: '', outputHtml: '',
-      outputText: 'Desktop       Downloads     Movies        Pictures\nDocuments     Library       Music         Public', linesTruncated: 0,
-    })));
-  });
   await page.mouse.move(0, 0);
   const block = page.getByTestId('command-block-compact-0');
   await expect(block.locator('.command-block-cwd')).toHaveText('~');

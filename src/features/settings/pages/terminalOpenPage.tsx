@@ -7,7 +7,8 @@ import Select from '@ui/Select';
 import { useAgentSettings } from '@features/agent';
 import { useT } from '@i18n';
 import { SHELL_TYPES, getAvailableShells, shellTypeLabel, type ShellType, type ShellOption } from '@platform/shells';
-import { SettingsGroup, Field } from '@features/settings/components/ui';
+import { SettingsGroup, Field, Toggle } from '@features/settings/components/ui';
+import { useTypographyStore } from '@config/typography';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
 
 /** A row keeps its label on the left and pushes the dropdown to the right edge. */
@@ -16,6 +17,8 @@ const labelStyle = { flex: 1, fontSize: 'calc(12px * var(--ui-font-scale))', col
 
 export function TerminalOpenPage() {
   const { t } = useT();
+  const commandHighlighting = useTypographyStore(state => state.commandHighlighting);
+  const updateTypography = useTypographyStore(state => state.update);
   const agentSettings = useAgentSettings();
   const defaultShell = useTerminalDefaults(state => state.shell);
   const setDefaultShell = useTerminalDefaults(state => state.setShell);
@@ -39,6 +42,9 @@ export function TerminalOpenPage() {
 
   return (
     <SettingsGroup title={t('Terminal defaults')}>
+      <Field title={t('Command syntax highlighting')} description={t('Color commands, arguments and shell operators.')}>
+        <Toggle on={commandHighlighting} onChange={commandHighlighting => updateTypography({ commandHighlighting })} />
+      </Field>
       <Field title={t('Default terminal')} description={t('Used for new tabs, startup and opening files in a terminal.')}>
         <Select aria-label={t('Default terminal')} value={defaultShell}
           options={[{ value: 'system' as const, label: t('System default') }, ...shells.map(shell => ({ value: shell.id, label: shell.label }))]}

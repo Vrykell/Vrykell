@@ -1,3 +1,4 @@
+import CommandSyntax from './CommandSyntax';
 import { IconButton } from '@ui/IconButton';
 import { t } from '@i18n';
 import CommandStatus from './CommandStatus';
@@ -9,7 +10,7 @@ import { configureTerminalInput } from '@features/terminal/model/terminalInput';
  * Commands and output share an inset; path and duration remain visible while controls reveal on hover.
  */
 
-import { memo, useState, useMemo, useEffect, useRef } from 'react';
+import { memo, useState, useEffect, useRef } from 'react';
 import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
 import {
   Ellipsis, CircleX, Maximize2, Square, Zap,
@@ -163,37 +164,6 @@ function HighlightSpan({ text, query }: { text: string; query: string }) {
   );
 }
 
-// Command syntax highlighting.
-
-/** Color flags, paths, pipes, redirection and quoted strings. */
-function highlightCommand(cmd: string): React.ReactNode {
-  if (!cmd) return cmd;
-  // Tokenize command syntax without changing its text or whitespace.
-  const pattern = /(--?[a-zA-Z0-9][a-zA-Z0-9_.-]*|\.?\/[\w./-]+|[|&;]|[<>]{1,2}|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g;
-  const parts: React.ReactNode[] = [];
-  let last = 0;
-  let m: RegExpExecArray | null;
-  while ((m = pattern.exec(cmd)) !== null) {
-    if (m.index > last) parts.push(cmd.slice(last, m.index));
-    const token = m[0];
-    let color = 'var(--block-cmd-text)';
-    if (token.startsWith('-')) color = 'var(--cmd-flag)';
-    else if (token.startsWith('/') || token.startsWith('./') || token.startsWith('~/')) color = 'var(--cmd-path)';
-    else if (token === '|') color = 'var(--cmd-pipe)';
-    else if (token === '>' || token === '>>' || token === '<') color = 'var(--cmd-redirect)';
-    else if (token.startsWith('"') || token.startsWith("'")) color = 'var(--cmd-string)';
-    else if (token === '&' || token === ';') color = 'var(--cmd-pipe)';
-    parts.push(
-      <span key={m.index} style={{ color }}>
-        {token}
-      </span>,
-    );
-    last = m.index + token.length;
-  }
-  if (last < cmd.length) parts.push(cmd.slice(last));
-  return parts.length > 0 ? <>{parts}</> : cmd;
-}
-
 // Completed command blocks.
 
 const BlockItem = memo(function BlockItem({
@@ -210,7 +180,8 @@ const BlockItem = memo(function BlockItem({
 }) {
   const duration = block.endedAt !== null && block.startedAt !== null
     ? block.endedAt - block.startedAt : null;
-  const coloredCommand = useMemo(() => highlightCommand(block.command), [block.command]);
+  const highlightCommands = useTypographyStore(state => state.commandHighlighting);
+  const coloredCommand = highlightCommands ? <CommandSyntax text={block.command} /> : block.command;
 
   return (
     <div
@@ -301,7 +272,8 @@ function RunningItem({
     return () => clearTimeout(timer);
   }, []);
 
-  const coloredCommand = useMemo(() => highlightCommand(block.command || ''), [block.command]);
+  const highlightCommands = useTypographyStore(state => state.commandHighlighting);
+  const coloredCommand = highlightCommands ? <CommandSyntax text={block.command || ''} /> : block.command;
 
   // Short commands publish their completed output atomically instead of inserting
   // and immediately replacing a temporary header that moves the whole history.

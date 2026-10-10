@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { boundedFontSize, boundedTerminalRenderer, useTypographyStore } from '../typography';
 
 describe('font preferences', () => {
-  beforeEach(() => useTypographyStore.getState().reset());
+  beforeEach(() => {
+    useTypographyStore.getState().reset();
+    useTypographyStore.getState().update({ commandHighlighting: false });
+  });
 
   it('bounds and validates saved font sizes', () => {
     expect(boundedFontSize(30, 14)).toBe(24);
@@ -27,6 +30,19 @@ describe('font preferences', () => {
     localStorage.setItem('vrykell-typography', JSON.stringify({ version: 0, state: { terminalRenderer: 'vulkan' } }));
     await useTypographyStore.persist.rehydrate();
     expect(useTypographyStore.getState().terminalRenderer).toBe('webgl');
+  });
+
+  it('persists the optional command highlighting and defaults old preferences to off', async () => {
+    expect(useTypographyStore.getState().commandHighlighting).toBe(false);
+    useTypographyStore.getState().update({ commandHighlighting: true });
+    expect(JSON.parse(localStorage.getItem('vrykell-typography')!).state.commandHighlighting).toBe(true);
+    await useTypographyStore.persist.rehydrate();
+    expect(useTypographyStore.getState().commandHighlighting).toBe(true);
+    useTypographyStore.getState().reset();
+    expect(useTypographyStore.getState().commandHighlighting).toBe(true);
+    localStorage.setItem('vrykell-typography', JSON.stringify({ version: 0, state: { commandHighlighting: 'true' } }));
+    await useTypographyStore.persist.rehydrate();
+    expect(useTypographyStore.getState().commandHighlighting).toBe(false);
   });
 
   it('restores and validates persisted sizes without replacing store actions', async () => {

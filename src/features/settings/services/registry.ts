@@ -40,6 +40,7 @@ function registerField(id: string, page: PageId, label: string, description: str
 }
 
 registerField("startup", "startup", "Open on startup", "Restore sessions or open a default terminal", () => useStartupSettings.getState().mode);
+registerField('command-highlighting', 'terminal-open', 'Command syntax highlighting', 'Color commands, arguments and shell operators.', () => String(useTypographyStore.getState().commandHighlighting));
 registerField("logs", "logs", "Save diagnostic logs automatically", "Diagnostic logging and errors");
 registerField("export-logs", "logs", "Export logs", "Diagnostic archive");
 registerField("api-key", "ai-model", "Provider API Key", "Credentials for the current model provider", () => isApiKeyConfigured() ? t('Configured') : t('Not configured'));
