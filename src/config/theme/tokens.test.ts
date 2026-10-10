@@ -73,12 +73,13 @@ describe('默认调色板（中性灰色）', () => {
 
   it.each(['dark', 'light'] as const)('%s orders surfaces by role and reuses levels for matching roles', mode => {
     const palette = themes[mode];
-    const levels = [palette.canvas, palette.chromeBg, palette.surface, palette.elevated, palette.fieldBg]
+    const levels = [palette.canvas, palette.sidebarBg, palette.surface, palette.elevated, palette.fieldBg]
       .map(color => parseInt(color.slice(1, 3), 16));
     for (let index = 1; index < levels.length; index++) {
       expect(levels[index]).toBeGreaterThan(levels[index - 1]);
     }
-    expect(palette.sidebarBg).toBe(palette.chromeBg);
+    expect(parseInt(palette.chromeBg.slice(1, 3), 16)).toBeGreaterThan(parseInt(palette.sidebarBg.slice(1, 3), 16));
+    expect(parseInt(palette.chromeBg.slice(1, 3), 16)).toBeLessThan(parseInt(palette.fieldBg.slice(1, 3), 16));
     expect(palette.block).toBe(palette.surface);
     expect(palette.chromeField).toBe(palette.fieldBg);
   });
@@ -120,14 +121,14 @@ describe('默认调色板（中性灰色）', () => {
 });
 
 describe('paletteToCssVars', () => {
-  it.each(['dark', 'light'] as const)('%s uses neutral grays and keeps navigation on the frame level', (mode) => {
+  it.each(['dark', 'light'] as const)('%s uses neutral grays and separates navigation from the lighter frame', (mode) => {
     const vars = paletteToCssVars(themes[mode]);
     for (const key of ['--chrome-bg', '--sidebar-bg', '--chrome-field', '--selection-bg', '--canvas', '--surface', '--field-bg', '--block', '--elevated', '--border', '--border-strong', '--text-primary', '--text-secondary', '--text-muted', '--xterm-bg']) {
       expect(vars[key]).toMatch(/^#[0-9a-f]{6}$/i);
       const channels = [1, 3, 5].map(offset => parseInt(vars[key].slice(offset, offset + 2), 16));
       expect(new Set(channels).size).toBe(1);
     }
-    expect(vars['--sidebar-bg']).toBe(vars['--chrome-bg']);
+    expect(vars['--sidebar-bg']).not.toBe(vars['--chrome-bg']);
     expect(vars['--sidebar-bg']).not.toBe(vars['--canvas']);
   });
   it.each(['dark', 'light'] as const)('%s separates window chrome, content, fields and selection', (mode) => {

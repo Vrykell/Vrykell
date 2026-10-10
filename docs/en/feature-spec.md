@@ -332,17 +332,20 @@
 | TP8 | Input-response repaint batching | Temporary repaint and cleanup share a window capped at 2ms; sustained output retains frame and size thresholds; normal showcmd remains enabled | Rust OutputBatchWindow unit tests and real vi coverage linked to the production batcher, with explicit showcmd and matching PTY dimensions and resize |
 | TP9 | Model alignment, typography and wallpaper validation | Model headers align with inputs; UI body weight is 400 and headings mainly 500; wallpaper is saved only after successful image decoding | Wallpaper and SidebarItem unit tests; macos-feedback-refinements.spec.ts covers geometry, weights, file filters and disguised-file rejection |
 | TP10 | Shared placement previews and full hit bounds | Panels, splitting and moving share a gray target surface; the whole panel preview accepts release | Navigation pointer unit tests cover hits away from window edges; WebKit compares panel and split surfaces and verifies release across the full frame |
-| TP11 | Surface hierarchy | Page → navigation frame → panel → floating overlay → editable field uses progressively lighter neutral gray in both themes; navigation reuses the frame level, readouts reuse the panel level, and focus preserves the field fill | Palette tests verify ordered brightness, shared roles and text contrast; field-surfaces.spec.ts checks actual containing surfaces, hover, focus, editing and filtering |
+| TP11 | Surface hierarchy | Page → sidebar → panel → floating overlay → editable field uses progressively lighter neutral gray in both themes; the window frame is lighter than sidebars, readouts reuse panels, and focus keeps resting borders without a highlight ring | Palette tests verify brightness, role separation and text contrast; field-surfaces.spec.ts and surface-consistency.spec.ts check all settings pages, field focus, editing and flat search controls |
 
 Surface roles use the following default levels. Nested cards and readouts do not introduce a new fill; borders distinguish their bounds. Text uses primary, secondary and muted levels for content, labels and hints.
 
 | Role | Dark | Light |
 |---|---|---|
 | Page background | `#1E1E1E` | `#E8E8E8` |
-| Window frame and navigation | `#242424` | `#EFEFEF` |
+| Sidebars and settings navigation | `#242424` | `#EFEFEF` |
+| Window frame and activity rail | `#303030` | `#F5F5F5` |
 | Panels, cards and readouts | `#2B2B2B` | `#F5F5F5` |
 | Floating dialogs and menus | `#313131` | `#FAFAFA` |
 | Editable fields and composers | `#3B3B3B` | `#FFFFFF` |
+
+Global search places only the query in a lighter field, with inset spacing on all sides. Scope, clear and close controls stay flat; recent scope labels and footer shortcuts do not add nested cards. Keyboard focus uses a subtle fill on actions and options rather than a bright edge. Rename fields and split-pane dividers retain their resting border.
 
 ## 21. Terminal Performance
 

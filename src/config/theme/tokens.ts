@@ -20,7 +20,7 @@ export interface ThemePalette {
 
   /** Shared frame for the titlebar and primary navigation. */
   chromeBg: string;
-  /** Secondary navigation shares the window frame level. */
+  /** Secondary navigation rests on a darker level than the window frame. */
   sidebarBg: string;
   chromeField: string;
   selectionBg: string;
@@ -155,8 +155,8 @@ const dark: ThemePalette = {
   shellSshAccent: '#61DCCB',
   shellTileInk: '#15171D',
 
-  // Surface brightness follows content, frame, panel, overlay and editable field levels.
-  chromeBg: '#242424',
+  // Content, navigation, panels, overlays and fields have distinct roles; the frame is lighter than navigation.
+  chromeBg: '#303030',
   sidebarBg: '#242424',
   chromeField: '#3B3B3B',
   selectionBg: '#454545',
@@ -308,7 +308,7 @@ const light: ThemePalette = {
   shellSshAccent: '#61DCCB',
   shellTileInk: '#15171D',
 
-  chromeBg: '#EFEFEF',
+  chromeBg: '#F5F5F5',
   sidebarBg: '#EFEFEF',
   chromeField: '#FFFFFF',
   selectionBg: '#DEDEDE',

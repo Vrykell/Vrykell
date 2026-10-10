@@ -270,7 +270,7 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
           value={query}
           placeholder="搜索技能…"
           onChange={(e) => setQuery(e.target.value)}
-          style={{ ...input, border: 'none', background: 'transparent' }}
+          style={input}
         />
         <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', alignSelf: 'center', flexShrink: 0 }}>
           {remote.length > 0 ? `共 ${remote.length} 个` : ''}
