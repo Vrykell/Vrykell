@@ -42,6 +42,7 @@ interface TypographyState {
   terminalFontWeight: number;
   terminalLineHeight: number;
   commandHighlighting: boolean;
+  commandTitleCollapsed: boolean;
   update: (patch: Partial<TypographyPreferences>) => void;
   reset: () => void;
 }
@@ -55,6 +56,7 @@ const defaults: TypographyPreferences = {
   terminalFontWeight: DEFAULT_TERMINAL_FONT_WEIGHT,
   terminalLineHeight: DEFAULT_TERMINAL_LINE_HEIGHT,
   commandHighlighting: false,
+  commandTitleCollapsed: false,
 };
 
 function sanitize(values: Partial<TypographyPreferences>): TypographyPreferences {
@@ -66,6 +68,7 @@ function sanitize(values: Partial<TypographyPreferences>): TypographyPreferences
     terminalFontWeight: Math.round(boundedNumber(values.terminalFontWeight, DEFAULT_TERMINAL_FONT_WEIGHT, 100, 900)),
     terminalLineHeight: boundedNumber(values.terminalLineHeight, DEFAULT_TERMINAL_LINE_HEIGHT, 1, 1.6),
     commandHighlighting: values.commandHighlighting === true,
+    commandTitleCollapsed: values.commandTitleCollapsed === true,
   };
 }
 
@@ -77,7 +80,7 @@ export function terminalTypographyChanged(state: TypographyPreferences, previous
 export const useTypographyStore = create<TypographyState>()(persist((set) => ({
   ...defaults,
   update: patch => set(state => sanitize({ ...state, ...patch })),
-  reset: () => set(state => ({ ...defaults, commandHighlighting: state.commandHighlighting })),
+  reset: () => set(state => ({ ...defaults, commandHighlighting: state.commandHighlighting, commandTitleCollapsed: state.commandTitleCollapsed })),
 }), {
   name: 'vrykell-typography',
   merge: (saved, current) => {

@@ -4,7 +4,7 @@ import { boundedFontSize, boundedTerminalRenderer, useTypographyStore } from '..
 describe('font preferences', () => {
   beforeEach(() => {
     useTypographyStore.getState().reset();
-    useTypographyStore.getState().update({ commandHighlighting: false });
+    useTypographyStore.getState().update({ commandHighlighting: false, commandTitleCollapsed: false });
   });
 
   it('bounds and validates saved font sizes', () => {
@@ -43,6 +43,19 @@ describe('font preferences', () => {
     localStorage.setItem('vrykell-typography', JSON.stringify({ version: 0, state: { commandHighlighting: 'true' } }));
     await useTypographyStore.persist.rehydrate();
     expect(useTypographyStore.getState().commandHighlighting).toBe(false);
+  });
+
+  it('remembers the collapsed viewport title across launches and keeps it on reset', async () => {
+    expect(useTypographyStore.getState().commandTitleCollapsed).toBe(false);
+    useTypographyStore.getState().update({ commandTitleCollapsed: true });
+    expect(JSON.parse(localStorage.getItem('vrykell-typography')!).state.commandTitleCollapsed).toBe(true);
+    await useTypographyStore.persist.rehydrate();
+    expect(useTypographyStore.getState().commandTitleCollapsed).toBe(true);
+    useTypographyStore.getState().reset();
+    expect(useTypographyStore.getState().commandTitleCollapsed).toBe(true);
+    localStorage.setItem('vrykell-typography', JSON.stringify({ version: 0, state: { commandTitleCollapsed: 'yes' } }));
+    await useTypographyStore.persist.rehydrate();
+    expect(useTypographyStore.getState().commandTitleCollapsed).toBe(false);
   });
 
   it('restores and validates persisted sizes without replacing store actions', async () => {
