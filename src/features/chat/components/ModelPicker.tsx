@@ -73,7 +73,7 @@ function ItemControls({ profile }: { profile: ModelProfile }) {
           agentSettings.updateModel(profile.id, { thinkingLevel })
         }
         options={[{ value: 'low', label: '低' }, { value: 'medium', label: '中' }, { value: 'high', label: '高' }]}
-        style={{ width: 84, background: 'var(--canvas)' }}
+        style={{ width: 84, background: 'var(--field-bg)' }}
       />
     </div>
   );
@@ -161,7 +161,7 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
               <X size={iconSizes.control} />
             </button>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderRadius: 8, padding: '6px 10px', background: 'var(--canvas)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderRadius: 8, padding: '6px 10px', background: 'var(--field-bg)' }}>
             <Search size={iconSizes.control} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
             <TextInput
               autoFocus

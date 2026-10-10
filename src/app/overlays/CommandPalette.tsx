@@ -40,7 +40,7 @@ export default function CommandPalette({ open, onClose }: Props) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9995, display: 'flex', justifyContent: 'center', paddingTop: '15vh', background: 'var(--overlay)', animation: 'overlayIn 0.18s var(--ease)' }} onClick={onClose}>
       <div className="workspace-floating workspace-floating-dialog" role="dialog" aria-modal="true" aria-label="命令面板" style={{ width: 520, maxWidth: 'calc(100vw - 40px)', maxHeight: '55vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', animation: 'modalIn 0.22s var(--ease-out)' }} onClick={(e) => e.stopPropagation()} onKeyDown={handleKey}>
-        <div style={{ padding: '8px 10px', margin: 10, borderRadius: 'var(--radius-inner)', background: 'var(--canvas)' }}>
+        <div style={{ padding: '8px 10px', margin: 10, borderRadius: 'var(--radius-inner)', background: 'var(--field-bg)' }}>
           <TextInput ref={inputRef} value={query} onChange={(e) => { setQuery(e.target.value); setSelected(0); }}
             placeholder="搜索命令…" style={{ width: '100%', background: 'transparent', border: 'none', height: 28, padding: 0, fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 'var(--fw-medium)', color: 'var(--text-primary)', outline: 'none', fontFamily: 'var(--font-ui)' }} />
         </div>

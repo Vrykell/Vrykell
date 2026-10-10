@@ -738,7 +738,7 @@ function FileRow({
           data-testid="rename-input"
           style={{
             flex: 1, minWidth: 0,
-            background: 'var(--canvas)', border: '1px solid var(--accent)',
+            background: 'var(--field-bg)', border: '1px solid var(--accent)',
             borderRadius: 3, padding: '0 4px', fontSize: 'calc(12px * var(--ui-font-scale))',
             color: 'var(--text-primary)', fontFamily: 'var(--font-mono)',
             outline: 'none',

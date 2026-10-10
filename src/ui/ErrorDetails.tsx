@@ -64,7 +64,7 @@ export default function ErrorDetails({
 
   return (
     <div data-testid={testId} style={{
-      background: 'var(--surface)', border: '1px solid var(--border)',
+      background: 'var(--field-bg)', border: '1px solid var(--border)',
       borderRadius: 6, overflow: 'hidden',
       ...style,
     }}>

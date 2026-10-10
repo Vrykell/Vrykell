@@ -20,16 +20,11 @@ import { useToastStore } from '@ui/Toast';
 import { kickScheduleRunner } from '@features/agent/services/scheduleRunner';
 import { useAutoSave } from '../hooks/useAutoSave';
 import SaveStatus from '../components/SaveStatus';
+import { inputStyle } from '../components/formStyles';
 
 const toast = (msg: string, type: 'info' | 'success' | 'error') =>
   useToastStore.getState().addToast(msg, type);
 
-const inputStyle: React.CSSProperties = {
-  background: 'var(--canvas)', border: '1px solid var(--border)',
-  borderRadius: 'var(--radius-inner)', padding: '6px 8px', fontSize: 'calc(12px * var(--ui-font-scale))',
-  color: 'var(--text-primary)', outline: 'none', width: '100%',
-  fontFamily: 'var(--font-mono)', boxSizing: 'border-box',
-};
 const btnStyle: React.CSSProperties = {
   padding: '4px 10px', fontSize: 'calc(12px * var(--ui-font-scale))', border: '1px solid var(--border)',
   borderRadius: 'var(--radius-inner)', background: 'transparent',
@@ -150,7 +145,7 @@ function AgentCard({ a, onChanged }: { a: AgentDef; onChanged: () => void }) {
     }
   };
   return (
-    <div onCompositionStart={() => saving.setComposing(true)} onCompositionEnd={() => saving.setComposing(false)} style={{ borderRadius: 'var(--radius-inner)', padding: '10px 12px', background: 'var(--canvas)' }}>
+    <div onCompositionStart={() => saving.setComposing(true)} onCompositionEnd={() => saving.setComposing(false)} style={{ borderRadius: 'var(--radius-inner)', padding: '10px 12px', background: 'var(--field-bg)' }}>
       <div style={{ display: 'flex', gap: 8 }}>
         <TextInput value={name} placeholder="名称" onChange={(e) => saving.setValue(previous => ({ ...previous, name: e.target.value }))} style={{ ...inputStyle, flex: 1, fontWeight: 'var(--fw-semibold)' }} />
         <SaveStatus status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
@@ -211,7 +206,7 @@ function ScheduleCard({ s, onChanged }: { s: Schedule; onChanged: () => void }) 
   };
   const nextRun = s.lastRunAt ? s.lastRunAt + s.intervalMinutes * 60_000 : Date.now();
   return (
-    <div onCompositionStart={() => saving.setComposing(true)} onCompositionEnd={() => saving.setComposing(false)} style={{ borderRadius: 'var(--radius-inner)', padding: '10px 12px', background: 'var(--canvas)', opacity: enabled ? 1 : 0.55 }}>
+    <div onCompositionStart={() => saving.setComposing(true)} onCompositionEnd={() => saving.setComposing(false)} style={{ borderRadius: 'var(--radius-inner)', padding: '10px 12px', background: 'var(--field-bg)', opacity: enabled ? 1 : 0.55 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <TextInput value={name} placeholder="名称" onChange={(e) => saving.setValue(previous => ({ ...previous, name: e.target.value }))} style={{ ...inputStyle, flex: 1, fontWeight: 'var(--fw-semibold)' }} />
         <TextInput type="number" min={1} value={interval} onChange={(e) => saving.setValue(previous => ({ ...previous, intervalMinutes: Number(e.target.value) }))} style={{ ...inputStyle, width: 70, flexShrink: 0 }} />

@@ -280,7 +280,7 @@ input.ssh-auth-response::placeholder { font-size: inherit; letter-spacing: inher
 .directory-picker-trigger { display: inline-flex; align-items: center; gap: 5px; min-width: 0; max-width: 50%; border: 1px solid var(--border); border-radius: var(--radius-inner); background: transparent; color: var(--text-secondary); padding: 2px 5px; font: calc(12px * var(--ui-font-scale))/1.4 var(--font-mono); }
 .directory-picker-trigger span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .directory-picker { padding: 0; overflow: hidden; font-size: var(--fs-caption); line-height: 1.4; }
-.directory-picker-search { width: 100%; box-sizing: border-box; padding: 8px 10px; border: none; border-bottom: 1px solid var(--border); background: var(--canvas); color: var(--text-primary); outline: none; font: inherit; }
+.directory-picker-search { width: 100%; box-sizing: border-box; padding: 8px 10px; border: none; border-bottom: 1px solid var(--border); background: var(--field-bg); color: var(--text-primary); outline: none; font: inherit; }
 .directory-picker-list { max-height: min(180px, 35vh); overflow-y: auto; }
 .directory-picker :is(.directory-picker-parent, [role="option"]) { display: flex; align-items: center; gap: 7px; width: 100%; padding: 6px 10px; border: none; border-radius: 0; background: transparent; color: var(--text-primary); text-align: left; font: inherit; cursor: pointer; }
 .directory-picker :is(.directory-picker-parent, [role="option"]) > span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -638,7 +638,7 @@ button.state-icon-button { color: var(--icon-color); }
 
 .ssh-recovery-action { height: var(--control-size); padding: 0 12px; color: var(--text-primary); }
 
-.settings-terminal-preview { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--xterm-bg); color: var(--xterm-foreground); font-family: var(--terminal-font-family); font-size: var(--terminal-font-size); font-weight: var(--terminal-font-weight); line-height: var(--terminal-row-height); white-space: pre-wrap; overflow-wrap: anywhere; }
+.settings-terminal-preview { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--field-bg); color: var(--text-primary); font-family: var(--terminal-font-family); font-size: var(--terminal-font-size); font-weight: var(--terminal-font-weight); line-height: var(--terminal-row-height); white-space: pre-wrap; overflow-wrap: anywhere; }
 
 .command-block-output [style*="font-weight:bold"], .command-block-output [style*="font-weight: bold"] { font-weight: var(--terminal-bold-weight) !important; }
 
