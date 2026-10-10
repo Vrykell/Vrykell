@@ -39,6 +39,7 @@ export default function SidebarItem({
   reorderKind,
   dataAttributes,
   style,
+  compact = false,
 }: {
   icon: ReactNode;
   title: string;
@@ -63,6 +64,8 @@ export default function SidebarItem({
   /** List-specific data attributes (test hooks such as `data-tab-row-id`). */
   dataAttributes?: Record<string, string | undefined>;
   style?: CSSProperties;
+  /** Compact single-line rows use the same 32px height as file lists. */
+  compact?: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
   const dragging = useListReorder((state) => !!reorderItemId && state.drag?.id === reorderItemId);
@@ -85,10 +88,11 @@ export default function SidebarItem({
       data-reorder-item={reorderItemId}
       data-reorder-kind={reorderKind}
       data-reorder-dragging={dragging ? 'true' : undefined}
-      style={{ ...sidebarRowSpacing, ...style }}
+      style={{ ...sidebarRowSpacing, ...(compact ? { padding: '0 6px' } : {}), ...style }}
     >
       <div style={{
         ...sidebarRowContent,
+        ...(compact ? { minHeight: 32, padding: '5px 10px' } : {}),
         background,
         color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
       }}>
