@@ -43,7 +43,7 @@ interface Props {
 const ANSI_CSI_RE = /\x1b\[[0-9;?]*[a-zA-Z]/g;
 const BLOCK_ACTION_ICON_SIZE = 16;
 
-/** Omit prompt placeholders and empty commands from the visible stream. */
+/** Omit unsubmitted shell prompts while keeping explicit empty submissions. */
 export function hasVisibleContent(b: TermBlock): boolean {
   return hasVisibleBlockContent(b);
 }

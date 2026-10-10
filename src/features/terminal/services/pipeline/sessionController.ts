@@ -707,6 +707,25 @@ export class SessionController {
     this.sinks.onBlocksChanged();
   }
 
+  /** Preserve each empty submission as a normal block with its directory context. */
+  appendBlankLines(count: number): void {
+    if (this._scene !== 'blockList' || this.activeBlock?.status === 'executing' || count < 1) return;
+    if (this.activeBlock?.status !== 'pending') this.onPrecmd(false);
+    const pending = this.activeBlock!;
+    const now = Date.now();
+    for (let index = 0; index < count; index++) {
+      const blank: InternalBlock = {
+        ...pending, id: `b${BLOCK_PREFIX}-${nextId++}`, command: '', status: 'done', exitCode: 0,
+        startedAt: now, endedAt: now, outputHtml: '', outputRaw: '', outputText: '',
+        earlyBuf: '', _fromA: false,
+      };
+      this._blocks.splice(this._blocks.length - 1, 0, blank);
+      this.sinks.onBlockComplete(blank);
+    }
+    this.enforceBlockCap();
+    this.sinks.onBlocksChanged();
+  }
+
   /** 清空全部 block（用户「清除输出块」）。controller 是真相源，必须在此清，
    *  否则下一次 onBlocksChanged 会把 store 里清掉的 block 整体回填。 */
   clear(): void {

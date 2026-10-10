@@ -14,6 +14,20 @@ function block(patch: Partial<TermBlock>): TermBlock {
 }
 
 describe('TerminalBlockList', () => {
+  it('renders empty submissions as normal directory blocks without output', () => {
+    useBlockStore.getState().setBlocks('t1', [
+      block({ id: 'empty-1', command: '', cwd: '/Users/test', outputText: '' }),
+      block({ id: 'empty-2', command: '', cwd: '/Users/test', outputText: '' }),
+    ]);
+    render(<TerminalBlockList tabId="t1" />);
+    for (const id of ['empty-1', 'empty-2']) {
+      const item = screen.getByTestId(`command-block-${id}`);
+      expect(item.querySelector('.command-block-cwd')).toHaveTextContent('/Users/test');
+      expect(item.querySelector('.command-block-command')).toBeEmptyDOMElement();
+      expect(item.querySelector('.command-block-output')).toBeNull();
+    }
+  });
+
   beforeEach(() => useBlockStore.setState({ byTab: {} }));
 
   it('puts context above the command and leaves only the more control in the block', () => {

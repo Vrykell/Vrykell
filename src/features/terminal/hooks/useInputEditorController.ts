@@ -10,7 +10,7 @@ import { engageFollow } from '@features/terminal/hooks/useFollowBottom';
 import { useCommandHistoryNavigation } from '@features/terminal/hooks/useCommandHistoryNavigation';
 import { useTerminalInputContext } from '@features/terminal/hooks/useTerminalInputContext';
 import { useCommandCompletion } from '@features/terminal/hooks/useCommandCompletion';
-import { setPendingTerminalCommand } from '@features/terminal/hooks/useTerminalSession';
+import { appendTerminalBlankLines, setPendingTerminalCommand } from '@features/terminal/hooks/useTerminalSession';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 import { useAutoSizeTextarea } from '@ui/hooks/useAutoSizeTextarea';
 
@@ -130,9 +130,10 @@ export function useInputEditorController({
   const execute = useCallback(() => {
     // Read the current mode again in case the panel changed before React committed.
     const latest = selectPaneInput(paneId)(useInputStore.getState());
-    if (latest.aiMode !== aiMode || latest.text !== text || (chatOpen && aiMode)) return;
-    const command = text.trim();
-    if (aiMode ? (!command && atts.length === 0) || sendingTab : !command) return;
+    if (latest.aiMode !== aiMode || (chatOpen && aiMode)) return;
+    const command = latest.text.trim();
+    if (aiMode && ((!command && atts.length === 0) || sendingTab)) return;
+    if (!aiMode && !command && !sessions[paneId]) return;
     useInputStore.getState().clearText(paneId);
     resetHeight();
     resetHistNav();
@@ -141,11 +142,12 @@ export function useInputEditorController({
         chatSend(command, { paneId, attachments: atts.length > 0 ? atts : undefined });
         clearAttachments();
       } else {
-        setPendingTerminalCommand(paneId, command);
+        if (command) setPendingTerminalCommand(paneId, command);
         const sessionId = sessions[paneId];
         terminalDebug('command-submit', { paneId, commandChars: command.length, sessionReady: Boolean(sessionId) });
         if (sessionId) {
-          const input = command.endsWith('\n') ? command : command + '\n';
+          const input = command ? command + '\n' : latest.text + '\n';
+          if (!command) appendTerminalBlankLines(paneId, (input.match(/\n/g) ?? []).length);
           terminalDebug('pty-write-request', { sessionId, chars: input.length });
           ptyWrite(sessionId, input)
             .then(() => terminalDebug('pty-write-complete', { sessionId, chars: input.length }))
