@@ -262,7 +262,7 @@
 | SL4 | Session delete | Historical sessions can be deleted (cascading deletion of blocks and chat) | Click delete on the history page |
 | SL5 | Exit/startup archiving | On both exit and startup active sessions are marked as history (startup catches up crashed leftovers), avoiding a dirty active state | Close the app → reopen the history page |
 | SL6 | Default naming | The first command becomes the tab title; ssh = connection name; shell = type name | Run a command and observe the title |
-| SL7 | cwd restore | The session working directory is persisted along with cd and brought back on restore | cd to a directory → close → restore and observe the cwd |
+| SL7 | cwd restore | Each command block stores its execution directory and restores it independently of the session’s latest cwd, including split panes and search results. Compatible databases gain the column without deleting history; legacy blocks without a path use the saved session cwd when available | Rust tests cover migration and completion upserts; sessionManager tests and session-cwd.spec.ts verify record arguments and restored paths |
 
 ---
 

@@ -47,10 +47,8 @@ pub struct HistoryDb {
     conn: Connection,
 }
 
-/// 建表（open 与测试用 in-memory 连接共用）。
-///
-/// 不做逐列迁移：旧库（v1 及更早）由 HistoryDb::open 的 reset_old_db 整库删除
-/// 后从零重建，新库统一标记 `PRAGMA user_version = 2`。
+/// Initialize tables and add optional columns to compatible version 2 databases.
+/// Earlier incompatible schemas are reset by the existing open path.
 fn init_schema(conn: &Connection) -> Result<(), String> {
     // 开启外键约束，使 blocks.session_id 的 ON DELETE CASCADE 真正生效
     let _ = conn.execute_batch("PRAGMA foreign_keys = ON;");
@@ -95,6 +93,7 @@ fn init_schema(conn: &Connection) -> Result<(), String> {
                 session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
                 pane_id TEXT,
                 command TEXT NOT NULL DEFAULT '',
+                cwd TEXT NOT NULL DEFAULT '',
                 output_raw TEXT NOT NULL DEFAULT '',
                 output_clean TEXT NOT NULL DEFAULT '',
                 output_html TEXT NOT NULL DEFAULT '',
@@ -150,6 +149,16 @@ fn init_schema(conn: &Connection) -> Result<(), String> {
         )
         .map_err(|e| e.to_string())?;
 
+    // Add per-command paths without deleting compatible history databases.
+    let has_cwd = conn.prepare("PRAGMA table_info(blocks)")
+        .map_err(|e| e.to_string())?
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|e| e.to_string())?
+        .any(|column| column.as_deref() == Ok("cwd"));
+    if !has_cwd {
+        conn.execute_batch("ALTER TABLE blocks ADD COLUMN cwd TEXT NOT NULL DEFAULT '';")
+            .map_err(|e| e.to_string())?;
+    }
     // Preserve existing connections when adding optional connection settings.
     let has_options = conn.prepare("PRAGMA table_info(ssh_connections)")
         .map_err(|e| e.to_string())?
@@ -202,6 +211,36 @@ mod tests {
         let conn = Connection::open_in_memory().unwrap();
         init_schema(&conn).unwrap();
         HistoryDb { conn }
+    }
+
+    #[test]
+    fn per_command_paths_survive_completion_and_session_path_changes() {
+        let db = test_db();
+        db.create_session("s1", "terminal", 0, "/latest", "local", "{}").unwrap();
+        db.record_block("b1", "s1", None, "pwd", "", "", "", None, "executing", 1, None, "/original").unwrap();
+        db.record_block("b1", "s1", None, "pwd", "", "/original", "/original", Some(0), "done", 1, Some(2), "").unwrap();
+        db.record_block("b2", "s1", Some("pane2"), "pwd", "", "/other", "/other", Some(0), "done", 3, Some(4), "/other").unwrap();
+        let restored = db.get_session_blocks("s1").unwrap();
+        assert_eq!(restored[0].cwd, "/original");
+        assert_eq!(restored[1].cwd, "/other");
+        let found = db.search_blocks("pwd", 10, None).unwrap();
+        assert!(found.iter().any(|block| block.cwd == "/original"));
+        assert!(found.iter().any(|block| block.cwd == "/other"));
+    }
+
+    #[test]
+    fn adding_command_paths_preserves_existing_version_two_history() {
+        let db = test_db();
+        db.create_session("s1", "saved", 0, "/work", "local", "{}").unwrap();
+        db.record_block("b1", "s1", None, "ls", "raw", "files", "files", Some(0), "done", 1, Some(2), "").unwrap();
+        db.conn().execute_batch("ALTER TABLE blocks DROP COLUMN cwd;").unwrap();
+        init_schema(db.conn()).unwrap();
+        init_schema(db.conn()).unwrap();
+        let restored = db.get_session_blocks("s1").unwrap();
+        assert_eq!(restored.len(), 1);
+        assert_eq!(restored[0].output_clean, "files");
+        assert_eq!(restored[0].cwd, "");
+        assert_eq!(db.get_session("s1").unwrap().cwd, "/work");
     }
 
     #[test]
@@ -263,7 +302,7 @@ mod tests {
     fn record_block_persists_even_before_session_created() {
         let db = test_db();
         // 不先 create_session，直接记 block —— 兜底 INSERT OR IGNORE 会话行
-        db.record_block("b1", "t9", None, "ls -la", "out", "out", "<span>out</span>", Some(0), "done", 100, Some(200))
+        db.record_block("b1", "t9", None, "ls -la", "out", "out", "<span>out</span>", Some(0), "done", 100, Some(200), "/work")
             .unwrap();
         let blocks = db.get_session_blocks("t9").unwrap();
         assert_eq!(blocks.len(), 1);
@@ -289,7 +328,7 @@ mod tests {
     fn delete_session_cascades_blocks_and_chat() {
         let db = test_db();
         db.create_session("s1", "标题", 0, "", "local", "{}").unwrap();
-        db.record_block("b1", "s1", None, "ls", "o", "o", "oh", Some(0), "done", 1, Some(2)).unwrap();
+        db.record_block("b1", "s1", None, "ls", "o", "o", "oh", Some(0), "done", 1, Some(2), "/work").unwrap();
         db.append_chat_message("m1", "s1", "user", "hi", 1, "", "").unwrap();
         db.delete_session("s1").unwrap();
         assert!(db.get_session_blocks("s1").unwrap().is_empty());
@@ -365,13 +404,13 @@ mod tests {
         let db = test_db();
         db.conn().execute_batch("ALTER TABLE blocks ADD COLUMN collapsed INTEGER NOT NULL DEFAULT 0;").unwrap();
         db.create_session("s1", "terminal", 0, "", "local", "{}").unwrap();
-        db.record_block("b1", "s1", None, "ls", "files", "files", "files", Some(0), "done", 1, Some(2)).unwrap();
+        db.record_block("b1", "s1", None, "ls", "files", "files", "files", Some(0), "done", 1, Some(2), "/work").unwrap();
         db.conn().execute("UPDATE blocks SET collapsed = 1 WHERE id = 'b1'", []).unwrap();
         let restored = db.get_session_blocks("s1").unwrap();
         assert_eq!(restored[0].output_clean, "files");
         assert!(serde_json::to_value(&restored[0]).unwrap().get("collapsed").is_none());
         assert_eq!(db.search_blocks("ls", 10, None).unwrap()[0].output_clean, "files");
-        db.record_block("b1", "s1", None, "ls", "updated", "updated", "updated", Some(0), "done", 1, Some(3)).unwrap();
+        db.record_block("b1", "s1", None, "ls", "updated", "updated", "updated", Some(0), "done", 1, Some(3), "/work").unwrap();
         assert_eq!(db.get_session_blocks("s1").unwrap()[0].output_clean, "updated");
     }
 

@@ -54,6 +54,8 @@ export interface BackendSearchContext {
 
 /** Rust blocks 表 JOIN sessions 返回 */
 export interface BackendBlockEntry {
+  /** Absent on older backend responses. */
+  cwd?: string;
   id: string;
   session_id: string;
   pane_id: string | null;
