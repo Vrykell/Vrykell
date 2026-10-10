@@ -287,7 +287,7 @@ function SettingsContent() {
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6,
             padding: '6px 8px',
-            borderRadius: 'var(--radius-inner)', background: 'var(--block)',
+            borderRadius: 'var(--radius-inner)', background: 'var(--field-bg)',
           }}>
             <Search size={iconSizes.compact} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
             <TextInput

@@ -332,7 +332,17 @@
 | TP8 | Input-response repaint batching | Temporary repaint and cleanup share a window capped at 2ms; sustained output retains frame and size thresholds; normal showcmd remains enabled | Rust OutputBatchWindow unit tests and real vi coverage linked to the production batcher, with explicit showcmd and matching PTY dimensions and resize |
 | TP9 | Model alignment, typography and wallpaper validation | Model headers align with inputs; UI body weight is 400 and headings mainly 500; wallpaper is saved only after successful image decoding | Wallpaper and SidebarItem unit tests; macos-feedback-refinements.spec.ts covers geometry, weights, file filters and disguised-file rejection |
 | TP10 | Shared placement previews and full hit bounds | Panels, splitting and moving share a gray target surface; the whole panel preview accepts release | Navigation pointer unit tests cover hits away from window edges; WebKit compares panel and split surfaces and verifies release across the full frame |
-| TP11 | Quiet input and readout surfaces | Fields, search boxes and inset previews use a shared neutral surface close to their containing panel, with thin borders; terminal canvases retain their dedicated palette | Palette unit tests verify neutral colors, text contrast and independent overrides; field-surfaces.spec.ts checks both themes, editing and filtering |
+| TP11 | Surface hierarchy | Page → navigation frame → panel → floating overlay → editable field uses progressively lighter neutral gray in both themes; navigation reuses the frame level, readouts reuse the panel level, and focus preserves the field fill | Palette tests verify ordered brightness, shared roles and text contrast; field-surfaces.spec.ts checks actual containing surfaces, hover, focus, editing and filtering |
+
+Surface roles use the following default levels. Nested cards and readouts do not introduce a new fill; borders distinguish their bounds. Text uses primary, secondary and muted levels for content, labels and hints.
+
+| Role | Dark | Light |
+|---|---|---|
+| Page background | `#1E1E1E` | `#E8E8E8` |
+| Window frame and navigation | `#242424` | `#EFEFEF` |
+| Panels, cards and readouts | `#2B2B2B` | `#F5F5F5` |
+| Floating dialogs and menus | `#313131` | `#FAFAFA` |
+| Editable fields and composers | `#3B3B3B` | `#FFFFFF` |
 
 ## 21. Terminal Performance
 

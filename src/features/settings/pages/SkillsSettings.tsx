@@ -93,7 +93,7 @@ function SkillFileBrowser({ skillName, files }: { skillName: string; files: stri
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div style={{ borderRadius: 'var(--radius-inner)', overflow: 'auto', maxHeight: 180, background: 'var(--field-bg)' }}>
+      <div style={{ borderRadius: 'var(--radius-inner)', overflow: 'auto', maxHeight: 180, background: 'var(--surface)' }}>
         {render(tree, 0)}
       </div>
       {selected && (error ? (
@@ -103,7 +103,7 @@ function SkillFileBrowser({ skillName, files }: { skillName: string; files: stri
       ) : (
         <pre style={{
           margin: 0, padding: '8px 10px', maxHeight: 180, overflow: 'auto',
-          background: 'var(--hover)', borderRadius: 'var(--radius-inner)',
+          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-inner)',
           fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
           color: 'var(--text-secondary)',
         }}>
@@ -286,7 +286,7 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
         {visible.map((r) => {
           const installed = metas.some((m) => m.name === r.name);
           return (
-            <div key={r.name} style={{ borderRadius: 'var(--radius-inner)', padding: '8px 12px', background: 'var(--field-bg)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div key={r.name} style={{ borderRadius: 'var(--radius-inner)', padding: '8px 12px', background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)' }}>
                   {r.name}
@@ -390,7 +390,7 @@ export default function SkillsSettings() {
           onClick={() => void openDetail(m.name)}
           style={{
             borderRadius: 'var(--radius-inner)',
-            padding: '8px 12px', background: 'var(--field-bg)', cursor: 'pointer',
+            padding: '8px 12px', background: 'var(--surface)', cursor: 'pointer',
             opacity: m.enabled ? 1 : 0.55,
           }}
         >

@@ -42,7 +42,7 @@ test('global search stays centered without covering actions or the title in both
 
 test('Windows working directories show their drive prefix without the URI slash', async ({ page }) => {
   await emitPtyOutput(page, '\x1b]7;file://host/C:/Users/My Project\x07');
-  const directory = page.locator('.terminal-directory');
+  const directory = page.getByRole('button', { name: '切换工作目录' });
   await expect(directory).toHaveText('C:/Users/My Project');
   await expect(directory).toHaveAttribute('data-tip', 'C:/Users/My Project');
 });
@@ -77,7 +77,7 @@ test('terminal error notifications follow the active gray theme and can be close
     const notification = page.getByRole('status').filter({ hasText: '复制失败' });
     await expect(notification).toBeVisible();
     await notification.hover();
-    await expect(notification).toHaveCSS('background-color', await resolvedColor(page, '--surface'));
+    await expect(notification).toHaveCSS('background-color', await resolvedColor(page, '--elevated'));
     await expect(notification).toHaveCSS('border-radius', '10px');
     await expect(notification).toHaveCSS('border-color', await resolvedColor(page, '--border'));
     await page.screenshot({ path: `ux-audit.local/after-notification-${theme}.png` });
@@ -108,7 +108,7 @@ test('navigation switches panels without losing their local state', async ({ pag
   await expect(page.getByTestId('ssh-search')).toBeHidden();
 });
 
-test('titlebar and activity rail share a surface distinct from sidebars and content', async ({ page }) => {
+test('titlebar, activity rail and sidebars share a frame surface distinct from content', async ({ page }) => {
   const nav = page.getByRole('navigation', { name: '工作区导航' });
   const panel = page.locator('.workspace-side-panel[data-side="left"]:visible');
   expect((await nav.boundingBox())!.width).toBe(44);
@@ -123,7 +123,7 @@ test('titlebar and activity rail share a surface distinct from sidebars and cont
   await expect(row).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await expect(row.locator(':scope > div > span').first()).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   const panelBg = await panel.locator(':scope > div').first().evaluate(el => getComputedStyle(el).backgroundColor);
-  expect(panelBg).not.toBe(await nav.evaluate(el => getComputedStyle(el).backgroundColor));
+  expect(panelBg).toBe(await nav.evaluate(el => getComputedStyle(el).backgroundColor));
   expect(panelBg).toBe(await resolvedColor(page, '--sidebar-bg'));
   await expect(nav).toHaveCSS('background-color', await page.locator('.workspace-titlebar').evaluate(el => getComputedStyle(el).backgroundColor));
   const contentBg = await page.locator('main').evaluate(el => getComputedStyle(el).backgroundColor);
@@ -193,7 +193,7 @@ test('settings and terminal use the same color hierarchy in both themes', async 
     expect(await background('.workspace-titlebar')).toBe(await background('.workspace-activity-bar'));
     expect(await background('.workspace-titlebar')).not.toBe(await background('main'));
     const sidebarBg = await background('.workspace-side-panel[data-side="left"]:visible > div:first-child');
-    expect(sidebarBg).not.toBe(await background('.workspace-activity-bar'));
+    expect(sidebarBg).toBe(await background('.workspace-activity-bar'));
     expect(sidebarBg).not.toBe(await background('main'));
     expect(await background('.settings-navigation')).toBe(sidebarBg);
     expect(await background('.settings-content')).toBe(await background('main'));

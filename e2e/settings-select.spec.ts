@@ -30,7 +30,7 @@ test('settings dropdown supports keyboard selection, cancellation and theme colo
   for (const theme of ['深色', '浅色']) {
     await page.getByRole('button', { name: theme, exact: true }).click();
     await trigger.click();
-    const background = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--surface').trim());
+    const background = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--elevated').trim());
     await expect(menu).toHaveCSS('background-color', await page.evaluate(color => {
       const sample = document.createElement('div');
       sample.style.color = color;

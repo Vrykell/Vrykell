@@ -114,7 +114,7 @@ export function MemorySettings() {
           <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', marginBottom: 6 }}>近期流水</div>
           <pre style={{
             margin: 0, padding: '8px 10px', maxHeight: 180, overflow: 'auto',
-            background: 'var(--hover)', borderRadius: 'var(--radius-inner)',
+            background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-inner)',
             fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
             color: 'var(--text-secondary)',
           }}>
@@ -145,7 +145,7 @@ function AgentCard({ a, onChanged }: { a: AgentDef; onChanged: () => void }) {
     }
   };
   return (
-    <div onCompositionStart={() => saving.setComposing(true)} onCompositionEnd={() => saving.setComposing(false)} style={{ borderRadius: 'var(--radius-inner)', padding: '10px 12px', background: 'var(--field-bg)' }}>
+    <div onCompositionStart={() => saving.setComposing(true)} onCompositionEnd={() => saving.setComposing(false)} style={{ borderRadius: 'var(--radius-inner)', padding: '10px 12px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
       <div style={{ display: 'flex', gap: 8 }}>
         <TextInput value={name} placeholder="名称" onChange={(e) => saving.setValue(previous => ({ ...previous, name: e.target.value }))} style={{ ...inputStyle, flex: 1, fontWeight: 'var(--fw-semibold)' }} />
         <SaveStatus status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
@@ -206,7 +206,7 @@ function ScheduleCard({ s, onChanged }: { s: Schedule; onChanged: () => void }) 
   };
   const nextRun = s.lastRunAt ? s.lastRunAt + s.intervalMinutes * 60_000 : Date.now();
   return (
-    <div onCompositionStart={() => saving.setComposing(true)} onCompositionEnd={() => saving.setComposing(false)} style={{ borderRadius: 'var(--radius-inner)', padding: '10px 12px', background: 'var(--field-bg)', opacity: enabled ? 1 : 0.55 }}>
+    <div onCompositionStart={() => saving.setComposing(true)} onCompositionEnd={() => saving.setComposing(false)} style={{ borderRadius: 'var(--radius-inner)', padding: '10px 12px', background: 'var(--surface)', border: '1px solid var(--border)', opacity: enabled ? 1 : 0.55 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <TextInput value={name} placeholder="名称" onChange={(e) => saving.setValue(previous => ({ ...previous, name: e.target.value }))} style={{ ...inputStyle, flex: 1, fontWeight: 'var(--fw-semibold)' }} />
         <TextInput type="number" min={1} value={interval} onChange={(e) => saving.setValue(previous => ({ ...previous, intervalMinutes: Number(e.target.value) }))} style={{ ...inputStyle, width: 70, flexShrink: 0 }} />

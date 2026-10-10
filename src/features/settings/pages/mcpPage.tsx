@@ -171,7 +171,7 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
       onCompositionStart={() => saving.setComposing(true)} onCompositionEnd={() => saving.setComposing(false)}
       style={{
         borderRadius: 'var(--radius-inner)',
-        padding: '10px 12px', background: 'var(--field-bg)', opacity: enabled ? 1 : 0.6,
+        padding: '10px 12px', background: 'var(--surface)', border: '1px solid var(--border)', opacity: enabled ? 1 : 0.6,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>

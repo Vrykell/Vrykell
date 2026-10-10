@@ -56,18 +56,36 @@ describe('默认调色板（中性灰色）', () => {
     expect(warm.slice(3, 5)).toBe(warm.slice(5, 7));
   });
 
-  it.each(['dark', 'light'] as const)('%s keeps inset fields close to their surrounding panel', mode => {
+  it.each(['dark', 'light'] as const)('%s keeps editable fields lighter than panels with a restrained brightness step', mode => {
     const panel = themes[mode].surface;
     const field = themes[mode].fieldBg;
     const primary = themes[mode].textPrimary;
     const channel = (hex: string) => parseInt(hex.slice(1, 3), 16);
-    expect(Math.abs(channel(field) - channel(panel))).toBeLessThanOrEqual(12);
+    expect(channel(field)).toBeGreaterThan(channel(panel));
+    expect(channel(field) - channel(panel)).toBeLessThanOrEqual(24);
     const luminance = (hex: string) => {
       const value = channel(hex) / 255;
       return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
     };
     const values = [luminance(primary), luminance(field)];
     expect((Math.max(...values) + 0.05) / (Math.min(...values) + 0.05)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each(['dark', 'light'] as const)('%s orders surfaces by role and reuses levels for matching roles', mode => {
+    const palette = themes[mode];
+    const levels = [palette.canvas, palette.chromeBg, palette.surface, palette.elevated, palette.fieldBg]
+      .map(color => parseInt(color.slice(1, 3), 16));
+    for (let index = 1; index < levels.length; index++) {
+      expect(levels[index]).toBeGreaterThan(levels[index - 1]);
+    }
+    expect(palette.sidebarBg).toBe(palette.chromeBg);
+    expect(palette.block).toBe(palette.surface);
+    expect(palette.chromeField).toBe(palette.fieldBg);
+  });
+
+  it('dark field hover increases brightness instead of exposing the darker panel underneath', () => {
+    expect(parseInt(themes.dark.buttonHover.slice(1, 3), 16))
+      .toBeGreaterThan(parseInt(themes.dark.fieldBg.slice(1, 3), 16));
   });
 
   it('dark 语义色保留（成功/错误/警告）', () => {
@@ -83,7 +101,8 @@ describe('默认调色板（中性灰色）', () => {
     expect(themes.dark.xtermBrightRed).toBe('#FF9A92');
   });
 
-  it('keeps dark-theme body and secondary text readable on every shared surface', () => {
+  it.each(['dark', 'light'] as const)('%s keeps text readable on resting and active surfaces', mode => {
+    const palette = themes[mode];
     const luminance = (hex: string) => {
       const channels = [1, 3, 5].map(offset => {
         const value = parseInt(hex.slice(offset, offset + 2), 16) / 255;
@@ -91,23 +110,24 @@ describe('默认调色板（中性灰色）', () => {
       });
       return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
     };
-    for (const text of [themes.dark.textPrimary, themes.dark.textSecondary, themes.dark.textMuted]) {
-      for (const surface of [themes.dark.chromeBg, themes.dark.sidebarBg, themes.dark.canvas, themes.dark.surface, themes.dark.fieldBg, themes.dark.block, themes.dark.elevated]) {
-        expect((luminance(text) + 0.05) / (luminance(surface) + 0.05)).toBeGreaterThanOrEqual(4.5);
+    for (const text of [palette.textPrimary, palette.textSecondary, palette.textMuted]) {
+      for (const surface of [palette.chromeBg, palette.canvas, palette.surface, palette.fieldBg, palette.elevated, palette.selectionBg, palette.buttonHover]) {
+        const values = [luminance(text), luminance(surface)];
+        expect((Math.max(...values) + 0.05) / (Math.min(...values) + 0.05)).toBeGreaterThanOrEqual(4.5);
       }
     }
   });
 });
 
 describe('paletteToCssVars', () => {
-  it.each(['dark', 'light'] as const)('%s uses neutral grays and separates primary navigation from sidebars', (mode) => {
+  it.each(['dark', 'light'] as const)('%s uses neutral grays and keeps navigation on the frame level', (mode) => {
     const vars = paletteToCssVars(themes[mode]);
-    for (const key of ['--chrome-bg', '--sidebar-bg', '--chrome-field', '--selection-bg', '--canvas', '--surface', '--field-bg', '--block', '--elevated', '--border', '--border-strong', '--text-primary', '--text-secondary', '--text-muted']) {
+    for (const key of ['--chrome-bg', '--sidebar-bg', '--chrome-field', '--selection-bg', '--canvas', '--surface', '--field-bg', '--block', '--elevated', '--border', '--border-strong', '--text-primary', '--text-secondary', '--text-muted', '--xterm-bg']) {
       expect(vars[key]).toMatch(/^#[0-9a-f]{6}$/i);
       const channels = [1, 3, 5].map(offset => parseInt(vars[key].slice(offset, offset + 2), 16));
       expect(new Set(channels).size).toBe(1);
     }
-    expect(vars['--sidebar-bg']).not.toBe(vars['--chrome-bg']);
+    expect(vars['--sidebar-bg']).toBe(vars['--chrome-bg']);
     expect(vars['--sidebar-bg']).not.toBe(vars['--canvas']);
   });
   it.each(['dark', 'light'] as const)('%s separates window chrome, content, fields and selection', (mode) => {

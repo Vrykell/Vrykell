@@ -73,7 +73,7 @@ function ItemControls({ profile }: { profile: ModelProfile }) {
           agentSettings.updateModel(profile.id, { thinkingLevel })
         }
         options={[{ value: 'low', label: '低' }, { value: 'medium', label: '中' }, { value: 'high', label: '高' }]}
-        style={{ width: 84, background: 'var(--field-bg)' }}
+        style={{ width: 84 }}
       />
     </div>
   );
