@@ -29,6 +29,7 @@ const zh: Record<string, string> = {
   'Stop generating': '停止生成',
   'Close terminal': '关闭当前终端',
   'More actions': '更多操作',
+  'Scroll command history': '滚动命令历史',
   'Running': '运行中',
   'Enter fullscreen interaction': '进入全屏交互',
   'Truncated {{count}} lines': '…已截断 {{count}} 行',

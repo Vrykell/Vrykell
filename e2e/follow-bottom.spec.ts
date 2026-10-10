@@ -83,6 +83,11 @@ test('live output continues following after content grows and the viewport chang
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await expect(page.locator('[data-testid^="terminal-scroll-"]').first()).toBeVisible();
+  await page.waitForFunction(async () => {
+    const path = '/src/features/terminal/stores/terminal.ts';
+    const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+    return Object.values(useTerminalStore.getState().startupStates).includes('ready');
+  });
   for (let i = 0; i < 5; i++) {
     const command = `history-${i}`;
     await emitPtyOutput(page, `\x1b]133;E;${btoa(command)}\x07\x1b]133;C\x07${'history output\r\n'.repeat(20)}\x1b]133;D;0\x07\x1b]133;A\x07`);
