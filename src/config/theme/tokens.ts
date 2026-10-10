@@ -27,6 +27,8 @@ export interface ThemePalette {
   // 背景层（从深到浅）
   canvas: string;
   surface: string;
+  /** Quiet surface for fields and inset readouts inside panels. */
+  fieldBg: string;
   block: string;
   elevated: string;
   hover: string;
@@ -160,6 +162,7 @@ const dark: ThemePalette = {
   selectionBg: '#353535',
   canvas: '#141414',
   surface: '#292929',
+  fieldBg: '#303030',
   block: '#333333',
   elevated: '#383838',
   hover: 'rgba(255,255,255,0.07)',
@@ -311,6 +314,7 @@ const light: ThemePalette = {
   selectionBg: '#D5D5D5',
   canvas: '#FFFFFF',
   surface: '#F5F5F5',
+  fieldBg: '#FBFBFB',
   block: '#EAEAEA',
   elevated: '#FFFFFF',
   hover: 'rgba(0,0,0,0.05)',
@@ -430,6 +434,7 @@ export function paletteToCssVars(p: ThemePalette): Record<string, string> {
     '--selection-bg': p.selectionBg,
     '--canvas': p.canvas,
     '--surface': p.surface,
+    '--field-bg': p.fieldBg,
     '--block': p.block,
     '--elevated': p.elevated,
     '--hover': p.hover,

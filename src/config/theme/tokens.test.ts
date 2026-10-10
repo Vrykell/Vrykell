@@ -56,6 +56,20 @@ describe('默认调色板（中性灰色）', () => {
     expect(warm.slice(3, 5)).toBe(warm.slice(5, 7));
   });
 
+  it.each(['dark', 'light'] as const)('%s keeps inset fields close to their surrounding panel', mode => {
+    const panel = themes[mode].surface;
+    const field = themes[mode].fieldBg;
+    const primary = themes[mode].textPrimary;
+    const channel = (hex: string) => parseInt(hex.slice(1, 3), 16);
+    expect(Math.abs(channel(field) - channel(panel))).toBeLessThanOrEqual(12);
+    const luminance = (hex: string) => {
+      const value = channel(hex) / 255;
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    };
+    const values = [luminance(primary), luminance(field)];
+    expect((Math.max(...values) + 0.05) / (Math.min(...values) + 0.05)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it('dark 语义色保留（成功/错误/警告）', () => {
     expect(themes.dark.success).toBe('#89D185');
     expect(themes.dark.error).toBe('#F14C4C');
@@ -78,7 +92,7 @@ describe('默认调色板（中性灰色）', () => {
       return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
     };
     for (const text of [themes.dark.textPrimary, themes.dark.textSecondary, themes.dark.textMuted]) {
-      for (const surface of [themes.dark.chromeBg, themes.dark.sidebarBg, themes.dark.canvas, themes.dark.surface, themes.dark.block, themes.dark.elevated]) {
+      for (const surface of [themes.dark.chromeBg, themes.dark.sidebarBg, themes.dark.canvas, themes.dark.surface, themes.dark.fieldBg, themes.dark.block, themes.dark.elevated]) {
         expect((luminance(text) + 0.05) / (luminance(surface) + 0.05)).toBeGreaterThanOrEqual(4.5);
       }
     }
@@ -88,7 +102,7 @@ describe('默认调色板（中性灰色）', () => {
 describe('paletteToCssVars', () => {
   it.each(['dark', 'light'] as const)('%s uses neutral grays and separates primary navigation from sidebars', (mode) => {
     const vars = paletteToCssVars(themes[mode]);
-    for (const key of ['--chrome-bg', '--sidebar-bg', '--chrome-field', '--selection-bg', '--canvas', '--surface', '--block', '--elevated', '--border', '--border-strong', '--text-primary', '--text-secondary', '--text-muted']) {
+    for (const key of ['--chrome-bg', '--sidebar-bg', '--chrome-field', '--selection-bg', '--canvas', '--surface', '--field-bg', '--block', '--elevated', '--border', '--border-strong', '--text-primary', '--text-secondary', '--text-muted']) {
       expect(vars[key]).toMatch(/^#[0-9a-f]{6}$/i);
       const channels = [1, 3, 5].map(offset => parseInt(vars[key].slice(offset, offset + 2), 16));
       expect(new Set(channels).size).toBe(1);
@@ -133,6 +147,14 @@ describe('theme overrides', () => {
     expect(document.documentElement.style.getPropertyValue('--canvas')).toBe('#ff0000');
     // 未覆盖的变量保持 base
     expect(document.documentElement.style.getPropertyValue('--surface')).toBe(themes.dark.surface);
+  });
+
+  it('keeps field overrides independent of the panel and terminal palettes', () => {
+    setThemeOverrides({ '--field-bg': '#343434' });
+    applyTheme('dark');
+    expect(document.documentElement.style.getPropertyValue('--field-bg')).toBe('#343434');
+    expect(document.documentElement.style.getPropertyValue('--surface')).toBe(themes.dark.surface);
+    expect(document.documentElement.style.getPropertyValue('--xterm-bg')).toBe(themes.dark.xtermBg);
   });
 
   it('applies base only when overrides empty', () => {

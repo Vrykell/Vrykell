@@ -21,6 +21,7 @@ import ErrorBox from '@ui/ErrorBox';
 import { useSkillsSettings } from '@features/settings/hooks/useSkillsSettings';
 import { useSkillFileBrowser } from '@features/settings/hooks/useSkillFileBrowser';
 import type { FileNode } from '@features/settings/model/skillFileTree';
+import { inputStyle } from '../components/formStyles';
 
 const toast = (msg: string, type: 'info' | 'success' | 'error') =>
   useToastStore.getState().addToast(msg, type);
@@ -42,12 +43,7 @@ const btn: React.CSSProperties = {
   color: 'var(--text-secondary)', cursor: 'pointer',
 };
 
-const input: React.CSSProperties = {
-  background: 'var(--canvas)', border: '1px solid var(--border)',
-  borderRadius: 'var(--radius-inner)', padding: '6px 8px', fontSize: 'calc(12px * var(--ui-font-scale))',
-  color: 'var(--text-primary)', outline: 'none', flex: 1,
-  fontFamily: 'var(--font-mono)', boxSizing: 'border-box',
-};
+const input: React.CSSProperties = { ...inputStyle, width: 'auto', flex: 1 };
 
 function Badge({ text, tone }: { text: string; tone: 'warn' | 'muted' | 'ok' | 'danger' }) {
   const color =
@@ -97,7 +93,7 @@ function SkillFileBrowser({ skillName, files }: { skillName: string; files: stri
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div style={{ borderRadius: 'var(--radius-inner)', overflow: 'auto', maxHeight: 180, background: 'var(--canvas)' }}>
+      <div style={{ borderRadius: 'var(--radius-inner)', overflow: 'auto', maxHeight: 180, background: 'var(--field-bg)' }}>
         {render(tree, 0)}
       </div>
       {selected && (error ? (
@@ -290,7 +286,7 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
         {visible.map((r) => {
           const installed = metas.some((m) => m.name === r.name);
           return (
-            <div key={r.name} style={{ borderRadius: 'var(--radius-inner)', padding: '8px 12px', background: 'var(--canvas)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div key={r.name} style={{ borderRadius: 'var(--radius-inner)', padding: '8px 12px', background: 'var(--field-bg)', display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)' }}>
                   {r.name}
@@ -394,7 +390,7 @@ export default function SkillsSettings() {
           onClick={() => void openDetail(m.name)}
           style={{
             borderRadius: 'var(--radius-inner)',
-            padding: '8px 12px', background: 'var(--canvas)', cursor: 'pointer',
+            padding: '8px 12px', background: 'var(--field-bg)', cursor: 'pointer',
             opacity: m.enabled ? 1 : 0.55,
           }}
         >

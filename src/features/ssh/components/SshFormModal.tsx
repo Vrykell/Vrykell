@@ -19,7 +19,7 @@ interface Props {
 /** 通用字段样式 */
 const field: React.CSSProperties = {
   display: 'block', width: '100%', marginTop: 3,
-  background: 'var(--canvas)', border: '1px solid var(--border)',
+  background: 'var(--field-bg)', border: '1px solid var(--border)',
   borderRadius: 'var(--radius-inner)', padding: '6px 10px', minHeight: 34, boxSizing: 'border-box', fontSize: 'calc(13px * var(--ui-font-scale))',
   color: 'var(--text-primary)', fontFamily: 'var(--font-mono)',
 };

@@ -332,6 +332,7 @@
 | TP8 | Input-response repaint batching | Temporary repaint and cleanup share a window capped at 2ms; sustained output retains frame and size thresholds; normal showcmd remains enabled | Rust OutputBatchWindow unit tests and real vi coverage linked to the production batcher, with explicit showcmd and matching PTY dimensions and resize |
 | TP9 | Model alignment, typography and wallpaper validation | Model headers align with inputs; UI body weight is 400 and headings mainly 500; wallpaper is saved only after successful image decoding | Wallpaper and SidebarItem unit tests; macos-feedback-refinements.spec.ts covers geometry, weights, file filters and disguised-file rejection |
 | TP10 | Shared placement previews and full hit bounds | Panels, splitting and moving share a gray target surface; the whole panel preview accepts release | Navigation pointer unit tests cover hits away from window edges; WebKit compares panel and split surfaces and verifies release across the full frame |
+| TP11 | Quiet input and readout surfaces | Fields, search boxes and inset previews use a shared neutral surface close to their containing panel, with thin borders; terminal canvases retain their dedicated palette | Palette unit tests verify neutral colors, text contrast and independent overrides; field-surfaces.spec.ts checks both themes, editing and filtering |
 
 ## 21. Terminal Performance
 
