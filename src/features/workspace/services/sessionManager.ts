@@ -61,6 +61,15 @@ function parseLayout(payload: string, sessionId: string): WindowLayout {
   return leaf({ id: `${sessionId}#0`, kind: 'local' });
 }
 
+/** Older sessions kept one cwd on the session row instead of each terminal pane. */
+function applyLegacyCwd(layout: WindowLayout, cwd: string): WindowLayout {
+  if (layout.type === 'leaf') {
+    if (!layout.terminal || layout.terminal.cwd) return layout;
+    return { ...layout, terminal: { ...layout.terminal, cwd } };
+  }
+  return { ...layout, first: applyLegacyCwd(layout.first, cwd) };
+}
+
 // ═══════════════════════════════════════════════════════════════
 // 会话生命周期
 // ═══════════════════════════════════════════════════════════════
@@ -207,7 +216,8 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
       useBlockStore.getState().updateBlock(paneId, saved.id, { cwd: info.cwd });
     }
   }
-  const layout = parseLayout(info?.payload ?? '{}', sessionId);
+  const parsedLayout = parseLayout(info?.payload ?? '{}', sessionId);
+  const layout = info?.cwd ? applyLegacyCwd(parsedLayout, info.cwd) : parsedLayout;
   const storedGroupId = info?.group_id ?? undefined;
   const hasGroupOverride = meta != null && Object.prototype.hasOwnProperty.call(meta, 'groupId');
   const knownGroupIds = new Set(useSessionStore.getState().groups.map((group) => group.id));

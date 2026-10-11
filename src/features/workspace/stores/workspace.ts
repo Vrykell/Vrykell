@@ -391,6 +391,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
   setTerminalCwd: (terminalId, cwd) => {
     set((s) => ({ terminalCwds: { ...s.terminalCwds, [terminalId]: cwd } }));
+    const owner = get().tabs.find((tab) => isSessionTab(tab) && layoutLeaves(tab.layout).some((pane) => pane.id === terminalId));
+    if (!owner || !isSessionTab(owner) || findLeaf(owner.layout, terminalId)?.cwd === cwd) return;
+
+    const updateCwd = (layout: WindowLayout): WindowLayout => layout.type === 'leaf'
+      ? layout.terminal.id === terminalId ? { ...layout, terminal: { ...layout.terminal, cwd } } : layout
+      : { ...layout, first: updateCwd(layout.first), second: updateCwd(layout.second) };
+    const layout = updateCwd(owner.layout);
+    set((s) => ({ tabs: s.tabs.map((tab) => tab.id === owner.id && isSessionTab(tab) ? { ...tab, layout } : tab) }));
+    sessionManager.saveLayout(owner.id, layout);
+    if (firstLeaf(layout).id === terminalId) void sessionManager.setCwd(owner.id, cwd);
   },
   dropTerminalCwd: (terminalId) => {
     set((s) => {

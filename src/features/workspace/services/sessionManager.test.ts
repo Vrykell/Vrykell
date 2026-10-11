@@ -57,7 +57,7 @@ describe('sessionManager 生命周期', () => {
       { id: 'c2', role: 'assistant', content: '在的', created_at: 2, parts: '', attachments: '' },
     ]); // list_chat_messages
     invokeMock.mockResolvedValueOnce({
-      id: sessionId, title: '旧标题', kind: 'session', payload: JSON.stringify({ layout: { type: 'leaf', id: `${sessionId}#0`, kind: 'local' } }), group_id: 'g9', cwd: '/latest/path', created_at: 1, updated_at: 2, archived_at: null,
+      id: sessionId, title: '旧标题', kind: 'session', payload: JSON.stringify({ layout: { type: 'leaf', terminal: { id: `${sessionId}#0`, kind: 'local' } } }), group_id: 'g9', cwd: '/latest/path', created_at: 1, updated_at: 2, archived_at: null,
     }); // get_session
     await sessionManager.restore(sessionId, '恢复的标题');
     const s = useSessionStore.getState();
@@ -66,6 +66,7 @@ describe('sessionManager 生命周期', () => {
     expect(s.activeId).toBe(sessionId);
     expect(tab.title).toBe('恢复的标题');
     expect(isSessionTab(tab) && tab.groupId).toBe('g9');
+    expect(isSessionTab(tab) && tab.layout.type === 'leaf' && tab.layout.terminal.cwd).toBe('/latest/path');
     // blocks 归属：pane null → #0
     expect(useBlockStore.getState().byTab[`${sessionId}#0`]).toHaveLength(1);
     const restored = useBlockStore.getState().byTab[`${sessionId}#0`]![0]!;

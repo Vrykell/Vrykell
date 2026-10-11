@@ -110,6 +110,31 @@ pub fn build_ssh_command(target: &SshTarget, remote_command: Option<&str>) -> Re
     Ok(command)
 }
 
+pub fn build_ssh_command_in_directory(
+    target: &SshTarget,
+    remote_command: Option<&str>,
+    cwd: Option<&str>,
+) -> Result<CommandBuilder, String> {
+    let Some(cwd) = cwd.filter(|cwd| !cwd.is_empty()) else {
+        return build_ssh_command(target, remote_command);
+    };
+    if cwd.chars().any(char::is_control) {
+        return Err("远程工作目录不能包含控制字符".into());
+    }
+    let quoted_cwd = format!("'{}'", cwd.replace('\'', "'\\''"));
+    let command = if target.options.shell_integration.unwrap_or(true) {
+        match remote_command {
+            Some(remote) => format!("cd {quoted_cwd} || exit\n{remote}"),
+            None => format!("cd {quoted_cwd} || exit; exec \"${{SHELL:-sh}}\" -i"),
+        }
+    } else {
+        format!("cd {quoted_cwd} || exit; exec \"${{SHELL:-sh}}\" -i")
+    };
+    let mut target = target.clone();
+    target.options.shell_integration = Some(true);
+    build_ssh_command(&target, Some(&command))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -137,5 +162,15 @@ mod tests {
     fn missing_explicit_identity_is_an_error() {
         let target: SshTarget = serde_json::from_value(serde_json::json!({"host":"server", "identityFile":"/missing/private/key"})).unwrap();
         assert!(build_ssh_command(&target, None).is_err());
+    }
+
+    #[test]
+    fn restored_remote_directory_is_quoted_and_starts_an_interactive_shell() {
+        let target: SshTarget = serde_json::from_value(serde_json::json!({"host":"server", "shellIntegration":false})).unwrap();
+        let args: Vec<_> = build_ssh_command_in_directory(&target, None, Some("/remote/a user's project"))
+            .unwrap().get_argv().iter().map(|arg| arg.to_string_lossy().into_owned()).collect();
+        let remote = args.last().unwrap();
+        assert!(remote.starts_with("cd '/remote/a user'\\''s project' || exit;"));
+        assert!(remote.contains("exec \"${SHELL:-sh}\" -i"));
     }
 }

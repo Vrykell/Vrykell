@@ -130,9 +130,7 @@ fn build_shell_cmd(
     //    安全性最高版本，注入失败自动回退经典模式）；classic 则不注入（传统交互）。
     if let Some(target) = ssh {
         let remote = (open_mode.as_deref() != Some("classic")).then(shell_integration::ssh_remote_command);
-        let mut cmd = super::ssh_command::build_ssh_command(&target, remote.as_deref())?;
-        if let Some(d) = cwd { cmd.cwd(d); }
-        return Ok(cmd);
+        return super::ssh_command::build_ssh_command_in_directory(&target, remote.as_deref(), cwd.as_deref());
     }
 
     let integ_dir = shell_integration::integration_dir().ok();
