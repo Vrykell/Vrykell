@@ -11,6 +11,7 @@ function wire(tabId = 't1') {
     started: [] as string[],
     completed: [] as string[],
     replies: [] as string[],
+    programTitles: [] as string[],
   };
   const sinks: SessionSinks = {
     writeMain: (d) => { st.written += d; },
@@ -20,6 +21,7 @@ function wire(tabId = 't1') {
     onBlockStart: (b) => { st.started.push(b.command); },
     onBlockComplete: (b) => { st.completed.push(b.command); },
     onTerminalData: data => { st.replies.push(data); },
+    onProgramTitle: (title) => { st.programTitles.push(title); },
   };
   const ctrl = new SessionController(tabId, 80, sinks);
   const scan = new ScanHelper();
@@ -123,6 +125,41 @@ describe('SessionController', () => {
     feed(query);
     expect(st.written).not.toContain(query);
     expect(ctrl.activeBlock?.outputRaw).not.toContain(query);
+    ctrl.dispose();
+  });
+
+  it('reflects the window title a running command sets and clears it when the command ends', () => {
+    const { st, ctrl, feed } = wire();
+    feed(A);
+    // At the prompt the terminal belongs to the shell, so a title there is ignored.
+    feed('\x1b]2;shell-cwd\x07');
+    expect(st.programTitles).toEqual([]);
+    feed(`${E('claude')}${C}`);
+    feed('\x1b]2;⠋ Claude\x07');
+    expect(st.programTitles).toEqual(['⠋ Claude']);
+    // Re-sending the same title does not notify again (the spinner redraws often).
+    feed('\x1b]2;⠋ Claude\x07');
+    expect(st.programTitles).toEqual(['⠋ Claude']);
+    feed('\x1b]2;⠙ Claude\x07');
+    expect(st.programTitles).toEqual(['⠋ Claude', '⠙ Claude']);
+    // An empty payload clears it.
+    feed('\x1b]2;\x07');
+    expect(st.programTitles).toEqual(['⠋ Claude', '⠙ Claude', '']);
+    feed('\x1b]0;⠹ Claude\x07');
+    expect(st.programTitles).toEqual(['⠋ Claude', '⠙ Claude', '', '⠹ Claude']);
+    // Finishing the command returns to the generated title.
+    feed(D(0));
+    expect(st.programTitles).toEqual(['⠋ Claude', '⠙ Claude', '', '⠹ Claude', '']);
+    ctrl.dispose();
+  });
+
+  it('keeps a full-screen program title until the alternate screen exits', () => {
+    const { st, ctrl, feed } = wire();
+    feed(`${A}${E('claude')}${C}\x1b[?1049h`);
+    feed('\x1b]0;⠋ working\x07');
+    expect(st.programTitles).toEqual(['⠋ working']);
+    feed('\x1b[?1049l');
+    expect(st.programTitles).toEqual(['⠋ working', '']);
     ctrl.dispose();
   });
 

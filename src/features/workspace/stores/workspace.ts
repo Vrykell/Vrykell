@@ -21,6 +21,12 @@ import {
   leaf, leaves as layoutLeaves, firstLeaf, findLeaf, splitLeaf, removeLeaf, countLeaves,
   type WindowLayout, type TerminalSpec, type SplitDir,
 } from '@features/workspace/model/windowLayout';
+import {
+  COMMAND_TITLE_LEN, MESSAGE_TITLE_LEN, canApplyTitle, normalizeCommandForTitle, truncateTitle,
+  type TitleSource,
+} from '@features/workspace/model/sessionTitle';
+
+export type { TitleSource };
 
 export type TabKind = 'session' | 'history' | 'settings';
 
@@ -37,11 +43,8 @@ export interface SshTabTarget extends SshOptions {
 interface TabBase {
   id: string;
   title: string;
-  /** 标题是否已定名（true 时不被「首条命令/消息」自动改名） */
-  named?: boolean;
-  /** 标题来自自动命名（截断兜底或 AI 智能标题）；手动 renameTab 后为 false/缺省。
-   *  智能标题（M7 autoTitle）只覆盖未定名或自动命名的标签，尊重手动命名 */
-  titleAuto?: boolean;
+  /** Title source; decides which later assignment may overwrite it (absent = default title). */
+  titleSource?: TitleSource;
 }
 
 /**
@@ -147,12 +150,12 @@ interface WorkspaceState {
   openSettingsTab: () => void;
   closeTab: (id: string) => void;
   activate: (id: string) => void;
-  /** 用首条用户消息命名标签；已定名则不覆盖 */
+  /** Name the tab from the first user message (fills the default title or upgrades a command title). */
   titleFromMessage: (id: string, text: string) => void;
-  /** 用首条命令命名标签（惯用命名范式）；已定名则不覆盖 */
+  /** Name the tab from the first meaningful command (a shared naming convention). */
   titleFromCommand: (id: string, text: string) => void;
-  /** M7 智能标题：只覆盖未定名/自动命名的标题（手动命名不动） */
-  autoTitle: (id: string, title: string) => void;
+  /** AI title: refreshes any generated title; a manual name needs `allowManual`. */
+  autoTitle: (id: string, title: string, options?: { allowManual?: boolean }) => void;
   renameTab: (id: string, title: string) => void;
   undoCloseTab: () => void;
   /** 更新某终端的当前工作目录（从 shell OSC 7 检测），keyed by 终端 id */
@@ -161,6 +164,10 @@ interface WorkspaceState {
   terminalCwds: Record<string, string>;
   /** 移除终端时清理其 cwd 残留 */
   dropTerminalCwd: (terminalId: string) => void;
+  /** Live title a running program set via OSC 0/2, keyed by terminal id (never persisted). */
+  programTitles: Record<string, string>;
+  /** Record (or clear, with an empty value) a terminal's program-set title. */
+  setProgramTitle: (terminalId: string, title: string) => void;
   /** 更新窗口的终端布局（分裂/移除/替换/调比例），并持久化 */
   setWindowLayout: (id: string, layout: WindowLayout) => void;
   /** 直接分裂聚焦终端（继承类型，跳过落点选择；⌘⇧D 用） */
@@ -203,6 +210,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   lastClosed: null,
   groups: [],
   terminalCwds: {},
+  programTitles: {},
   addTab: (opts) => {
     const o = opts ?? {};
     const id = nextTabId();
@@ -222,14 +230,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         id,
         title: o.title || ssh!.name || DEFAULT_TITLE,
         kind: 'session',
-        named: !!o.title || !!ssh!.name,
+        titleSource: o.title || ssh!.name ? 'manual' : undefined,
         groupId: o.groupId,
         layout: leaf(term),
       };
     } else if (o.kind === 'history') {
-      tab = { id, title: HISTORY_TITLE, kind: 'history', named: true };
+      tab = { id, title: HISTORY_TITLE, kind: 'history', titleSource: 'manual' };
     } else if (o.kind === 'settings') {
-      tab = { id, title: SETTINGS_TITLE, kind: 'settings', named: true };
+      tab = { id, title: SETTINGS_TITLE, kind: 'settings', titleSource: 'manual' };
     } else {
       const preference = useTerminalDefaults.getState().shell;
       const shellType = o.shellType ?? (preference === 'system' ? undefined : preference);
@@ -241,7 +249,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         id,
         title: o.title || (shellType ? shellTypeLabel(shellType) : DEFAULT_TITLE),
         kind: 'session',
-        named: !!o.title,
+        titleSource: o.title ? 'manual' : undefined,
         groupId: o.groupId,
         layout: leaf(term),
       };
@@ -308,6 +316,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         useBlockStore.getState().dropTab(term.id);
         useTerminalStore.getState().dropTab(term.id);
         useWorkspaceStore.getState().dropTerminalCwd(term.id);
+        useWorkspaceStore.getState().setProgramTitle(term.id, '');
       }
       useChatStore.getState().dropTab(id);
     }
@@ -343,37 +352,39 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
   titleFromMessage: (id, text) => {
     const tab = get().tabs.find((t) => t.id === id);
-    if (!tab || tab.named || !isSessionTab(tab)) return;
-    const newTitle = text.slice(0, 14) + (text.length > 14 ? '…' : '');
+    if (!tab || !isSessionTab(tab) || !canApplyTitle(tab.titleSource, 'message')) return;
+    const line = text.trim().split('\n', 1)[0]?.trim() ?? '';
+    if (!line) return;
+    const newTitle = truncateTitle(line, MESSAGE_TITLE_LEN);
     set((s) => ({
-      tabs: s.tabs.map((t) => (t.id === id ? { ...t, title: newTitle, named: true, titleAuto: true } : t)),
+      tabs: s.tabs.map((t) => (t.id === id ? { ...t, title: newTitle, titleSource: 'message' } : t)),
     }));
     sessionManager.rename(id, newTitle);
   },
   titleFromCommand: (id, text) => {
     const tab = get().tabs.find((t) => t.id === id);
-    if (!tab || tab.named || !isSessionTab(tab)) return;
-    const cmd = text.trim();
-    if (!cmd) return;
-    const newTitle = cmd.slice(0, 24) + (cmd.length > 24 ? '…' : '');
+    if (!tab || !isSessionTab(tab) || !canApplyTitle(tab.titleSource, 'command')) return;
+    const label = normalizeCommandForTitle(text);
+    if (!label) return;
+    const newTitle = truncateTitle(label, COMMAND_TITLE_LEN);
     set((s) => ({
-      tabs: s.tabs.map((t) => (t.id === id ? { ...t, title: newTitle, named: true, titleAuto: true } : t)),
+      tabs: s.tabs.map((t) => (t.id === id ? { ...t, title: newTitle, titleSource: 'command' } : t)),
     }));
     sessionManager.rename(id, newTitle);
   },
-  autoTitle: (id, title) => {
+  autoTitle: (id, title, options) => {
     const tab = get().tabs.find((t) => t.id === id);
     if (!tab || !isSessionTab(tab) || !title) return;
-    // 手动命名（named 且非自动来源）的标题永不被覆盖
-    if (tab.named && !tab.titleAuto) return;
+    // A manual name is only replaced when the caller explicitly asks (user-triggered regenerate).
+    if (tab.titleSource === 'manual' && !options?.allowManual) return;
     set((s) => ({
-      tabs: s.tabs.map((t) => (t.id === id ? { ...t, title, named: true, titleAuto: true } : t)),
+      tabs: s.tabs.map((t) => (t.id === id ? { ...t, title, titleSource: 'ai' } : t)),
     }));
     sessionManager.rename(id, title);
   },
   renameTab: (id, title) => {
     set((s) => ({
-      tabs: s.tabs.map((t) => (t.id === id ? { ...t, title: title || DEFAULT_TITLE, named: true, titleAuto: false } : t)),
+      tabs: s.tabs.map((t) => (t.id === id ? { ...t, title: title || DEFAULT_TITLE, titleSource: 'manual' } : t)),
     }));
     if (title) useToastStore.getState().addToast(t('toast.renamed', { title }), 'success');
     sessionManager.rename(id, title);
@@ -387,6 +398,19 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const terminalCwds = { ...s.terminalCwds };
       delete terminalCwds[terminalId];
       return { terminalCwds };
+    });
+  },
+  setProgramTitle: (terminalId, title) => {
+    const next = title.trim();
+    set((s) => {
+      if (next) {
+        if (s.programTitles[terminalId] === next) return s;
+        return { programTitles: { ...s.programTitles, [terminalId]: next } };
+      }
+      if (!(terminalId in s.programTitles)) return s;
+      const programTitles = { ...s.programTitles };
+      delete programTitles[terminalId];
+      return { programTitles };
     });
   },
   setWindowLayout: (id, layout) => {
@@ -433,6 +457,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     useBlockStore.getState().dropTab(terminalId);
     useTerminalStore.getState().dropTab(terminalId);
     ws.dropTerminalCwd(terminalId);
+    ws.setProgramTitle(terminalId, '');
     useTerminalStore.getState().setFocusedPane(firstLeaf(next).id);
   },
   closeFocusedTerminal: () => {
@@ -569,7 +594,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       id: newId,
       title: `${tab.title} 副本`,
       kind: 'session',
-      named: true,
+      titleSource: 'manual',
       groupId: tab.groupId,
       layout,
     };
@@ -631,6 +656,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         useBlockStore.getState().dropTab(term.id);
         useTerminalStore.getState().dropTab(term.id);
         useWorkspaceStore.getState().dropTerminalCwd(term.id);
+        useWorkspaceStore.getState().setProgramTitle(term.id, '');
       }
       useChatStore.getState().dropTab(t.id);
     }

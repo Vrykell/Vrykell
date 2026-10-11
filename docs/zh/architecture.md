@@ -112,7 +112,7 @@ Rust PTY 输出的每个 chunk 不再先写主 xterm 再等 parser 异步回调�
 
 - 输入：`push(chunk)` 返回有序 `ScanEvent` 流，顺序与字节顺序一致；经 `pty.rs` 汇入 Tauri event `pty-output`。
 - 事件形状（serde tag=kind, camelCase）：`{kind:'data', text}` / `{kind:'osc', code, payload, raw}` / `{kind:'altEnter'|'altExit', raw}`；前端镜像类型在 `src/features/terminal/services/pipeline/events.ts`（`DispatchEvent`）。
-- OSC 解析：识别 `133;A` / `133;B` / `133;C` / `133;D;ec` / `133;E;b64` / `133;G;b64`、`7;path`、`0/2;title`；OSC 从 data 段剥离，但保留 `raw` 用于 classic / altScreen 场景下透传给主 xterm（保 OSC 8 超链接、OSC 52 剪贴板等）。
+- OSC 解析：识别 `133;A` / `133;B` / `133;C` / `133;D;ec` / `133;E;b64` / `133;G;b64`、`7;path`、`0/2;title`；OSC 从 data 段剥离，但保留 `raw` 用于 classic / altScreen 场景下透传给主 xterm（保 OSC 8 超链接、OSC 52 剪贴板等）。`0/2;title` 另被 SessionController 消费为「前台程序标题」：命令执行中或全屏（altScreen）时展示在标签与标题栏，命令结束或退出全屏即清除，且不覆盖手动命名。
 - alt-screen 观测：检测 `\x1b[?1049/1047/47[hl]`，只发事件，序列本身保留在 data 段。
 - 跨 chunk 边界：不完整 ESC / OSC 序列存入 `pending`，与下一 chunk 拼接后再扫。
 - 输入是 StreamDecoder 解码后的 UTF-8 字符串；扫描对象全是 ASCII 单字节控制字符，按字节索引安全。

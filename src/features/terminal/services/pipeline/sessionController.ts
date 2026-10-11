@@ -27,6 +27,8 @@ export interface SessionSinks {
   onCwd(path: string): void;
   onBlockStart(block: TermBlock): void;
   onBlockComplete(block: TermBlock): void;
+  /** Window title a foreground program set via OSC 0/2 (empty = cleared). */
+  onProgramTitle?(title: string): void;
   /** Keep terminal replies connected even before a running output view mounts. */
   onTerminalData?(data: string): void;
   takePendingUiCommand?(): string | null;
@@ -69,6 +71,8 @@ export class SessionController {
   private _disposed = false;
   /** 最近一次 OSC 7 上报的 cwd：真实 RC 顺序是 OSC7 → D → A，新 block 以此播种 */
   private lastCwd: string | undefined;
+  /** 当前前台程序设置的窗口标题（OSC 0/2）；空串=未设置，仅在程序占用终端时有效 */
+  private programTitle = '';
 
   constructor(
     private tabId: string,
@@ -208,6 +212,12 @@ export class SessionController {
     if (isTerminalDebugEnabled()) {
       terminalDebug('osc', { tabId: this.tabId, code, payloadLength: payload.length, rawLength: raw.length, scene: this._scene });
     }
+    // OSC 0/2 is the window title a foreground program sets; reflect it while that program owns
+    // the terminal so an animated TUI title (a spinner or running task) shows in the tab.
+    if (code === '0' || code === '2') {
+      const ownsTerminal = this.activeBlock?.status === 'executing' || this._scene === 'altScreen';
+      this.setProgramTitle(ownsTerminal ? cleanProgramTitle(payload) : '');
+    }
     // classic/altScreen：OSC raw 转发主 xterm（OSC 8 超链接等不失效）；
     // 但 133/7 是 integration 标记，永不进主 xterm。
     const isIntegration = code === '133;A' || code === '133;B' || code === '133;C' || code === '133;D'
@@ -277,12 +287,24 @@ export class SessionController {
     }
   }
 
+  /** Record a program title and notify on change; an empty value clears it. */
+  private setProgramTitle(title: string): void {
+    if (this.programTitle === title) return;
+    this.programTitle = title;
+    if (isTerminalDebugEnabled()) {
+      terminalDebug('program-title', { tabId: this.tabId, chars: title.length, scene: this._scene });
+    }
+    this.sinks.onProgramTitle?.(title);
+  }
+
   // ── Block 生命周期（Spec §2） ──
 
   private onPrecmd(fromA = true): void {
     if (isTerminalDebugEnabled()) {
       terminalDebug('block-prompt-start', { tabId: this.tabId, scene: this._scene, previousStatus: this.activeBlock?.status ?? null });
     }
+    // The prompt is back: any title the previous foreground program set no longer applies.
+    this.setProgramTitle('');
     // 首个 A：classic → blockList
     if (this._scene === 'classic') {
       this._scene = 'blockList';
@@ -552,6 +574,7 @@ export class SessionController {
   }
 
   private finishBlock(block: InternalBlock, exitCode: number | null, status: BlockStatus): void {
+    this.setProgramTitle('');
     if (this.longRunningTimer) {
       clearTimeout(this.longRunningTimer);
       this.longRunningTimer = null;
@@ -655,6 +678,8 @@ export class SessionController {
     if (isTerminalDebugEnabled()) terminalDebug('alternate-screen-exit', { tabId: this.tabId, restoreScene: this.preAltScene });
     this.sinks.writeMain(raw);
     this._scene = this.preAltScene;
+    // Leaving the alternate screen ends the full-screen program that owned the title.
+    this.setProgramTitle('');
     this.sinks.onSceneChanged(this._scene);
   }
 
@@ -753,6 +778,15 @@ export class SessionController {
     }
     this._blocks = [];
   }
+}
+
+/** Clean a program-set window title: drop control characters, collapse whitespace, cap length. */
+function cleanProgramTitle(value: string): string {
+  return value
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 64);
 }
 
 function decodeB64(b64: string): string {

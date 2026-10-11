@@ -23,6 +23,7 @@ export {
   type SshTabTarget,
   type Tab,
   type TabGroup,
+  type TitleSource,
 } from '@features/workspace/model/session/store';
 export {
   restoreWorkspace,
@@ -56,3 +57,4 @@ export {
   type NewTabOption,
 } from '@features/workspace/model/tabTypes';
 export { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
+export { useTabDisplayTitle } from '@features/workspace/hooks/useTabDisplayTitle';
