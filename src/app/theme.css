@@ -81,7 +81,7 @@ input, textarea, [contenteditable="true"] { caret-color: var(--text-caret); }
 .command-token[data-kind="comment"] { color: var(--text-muted); }
 .command-completion-suffix { color: var(--text-muted); opacity: 0.65; }
 .command-completion-action { display: inline-block; vertical-align: middle; margin-left: 8px; pointer-events: auto; line-height: 1; }
-.command-completion-trigger { display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 20px; padding: 0 5px; border: 1px solid var(--border-strong); border-radius: 5px; background: transparent; color: var(--text-secondary); }
+.command-completion-trigger { justify-content: center; height: 20px; }
 .command-completion-trigger .key-hint, .checkbox-menu-compact .key-hint { min-height: 16px; padding: 0; background: transparent; color: inherit; }
 .command-completion-trigger .key-hint { height: 14px; }
 .checkbox-menu-compact .workspace-floating-row[aria-checked="true"] { background: var(--selection-bg) !important; }
@@ -338,7 +338,7 @@ input.ssh-auth-response::placeholder { font-size: inherit; letter-spacing: inher
 .terminal-input-status { min-width: 0; }
 .terminal-input-status > button { flex-shrink: 0; }
 .terminal-directory { min-width: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.directory-picker-trigger { display: inline-flex; align-items: center; gap: 5px; min-width: 0; max-width: 50%; border: 1px solid var(--border); border-radius: var(--radius-inner); background: transparent; color: var(--text-secondary); padding: 2px 5px; font: calc(12px * var(--ui-font-scale))/1.4 var(--font-mono); }
+.directory-picker-trigger { min-width: 0; max-width: 50%; }
 .directory-picker-trigger span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .directory-picker { padding: 0; overflow: hidden; font-size: var(--fs-caption); line-height: 1.4; }
 .directory-picker-search { width: 100%; box-sizing: border-box; padding: 8px 10px; border: none; border-bottom: 1px solid var(--border); background: var(--field-bg); color: var(--text-primary); outline: none; font: inherit; }
@@ -655,6 +655,15 @@ button.text-control:disabled:hover { background: transparent; color: var(--contr
 .settings-completion-keys { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; color: var(--text-secondary); font-size: var(--fs-caption); }
 .settings-field { scroll-margin: 24px; }
 
+/* Canonical quiet chip: no border, only a gray background. Shared by the shell badge,
+   git branch, working-directory and completion chips so the input row stays uniform. */
+.terminal-chip {
+  display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; min-width: 0;
+  padding: 1px 7px; border: none; border-radius: 5px;
+  background: var(--hover); color: var(--text-secondary);
+  font-family: var(--font-mono); font-size: calc(11px * var(--ui-font-scale));
+  line-height: 18px; white-space: nowrap;
+}
 /* Scope tags share the same quiet appearance in the input and recent searches. */
 .search-scope-chip { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; max-width: 45%; padding: 4px 7px; border-radius: 5px; background: var(--hover); color: var(--text-primary); font-size: var(--fs-caption); }
 .search-scope-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

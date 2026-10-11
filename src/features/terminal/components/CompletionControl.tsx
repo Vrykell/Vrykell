@@ -42,7 +42,7 @@ export default function CompletionControl({ onReturnFocus }: { onReturnFocus: ()
   if (customShortcut) options.push({ id: customShortcut, label: customShortcut, displayLabel: <KeyHint shortcut={customShortcut} />, checked: shortcuts.includes(customShortcut) });
 
   return <>
-    <button ref={trigger} type="button" data-subtle className="command-completion-trigger"
+    <button ref={trigger} type="button" data-subtle className="command-completion-trigger terminal-chip"
       aria-label={t('Completion shortcuts')} aria-haspopup="menu" aria-expanded={open}
       onClick={() => open ? close() : setOpen(true)}>
       <KeyHint shortcut={shortcuts[0] ?? 'ArrowRight'} /><ChevronDown size={10} aria-hidden="true" />
