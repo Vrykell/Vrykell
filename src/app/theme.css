@@ -653,8 +653,6 @@ button.text-control:disabled:hover { background: transparent; color: var(--contr
 .command-status-duration { color: var(--status-secondary); font-variant-numeric: tabular-nums; }
 .command-status-agent { color: var(--control-accent-color); }
 .settings-completion-keys { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; color: var(--text-secondary); font-size: var(--fs-caption); }
-button.tui-control { min-height: 20px; padding: 0 4px; font-size: var(--fs-micro); }
-.tui-control .key-hint { min-height: 18px; padding: 0 4px; background: transparent; }
 .settings-field { scroll-margin: 24px; }
 
 /* Scope tags share the same quiet appearance in the input and recent searches. */
@@ -669,21 +667,27 @@ button.tui-control { min-height: 20px; padding: 0 4px; font-size: var(--fs-micro
 .command-block[data-divider-before="true"] { border-top: 1px solid var(--block-divider); }
 .command-block[data-failed="true"] { background: var(--error-bg); }
 /* Paint the rail over the divider so adjacent failures remain continuous. */
-.command-block[data-failed="true"]::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 3px; background: var(--status-error); pointer-events: none; }
+.command-block[data-failed="true"]::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 3px; background: var(--status-error); pointer-events: none; z-index: 1; }
 .command-block[data-failed="true"][data-divider-before="true"]::before { top: -1px; }
 .command-block-info { position: relative; display: flex; align-items: center; gap: 8px; min-height: var(--terminal-row-height); margin-bottom: 2px; padding-right: var(--control-size-compact); font-family: var(--terminal-font-family); font-size: calc(var(--terminal-font-size) * 0.86); line-height: var(--terminal-row-height); color: var(--text-muted); }
 .command-block[data-running="true"] .command-block-info { padding-right: calc(3 * var(--control-size-compact)); }
+/* Fullscreen TUI banner reuses the running-block row but keeps its actions always visible. */
+.command-block-info[data-bar-actions="always"] { padding-right: calc(3 * var(--control-size-compact)); }
+.command-block-info[data-bar-actions="always"] .command-block-actions { opacity: 1; pointer-events: auto; }
 .command-block-actions, .command-block-branch, .command-block .command-status-code, .command-block .command-status-agent, .command-block-truncation { opacity: 0; pointer-events: none; transition: opacity var(--dur-fast) var(--ease); }
 .command-block:is(:hover, :has(.command-block-actions :focus-visible), [data-menu-open="true"]) :is(.command-block-actions, .command-block-branch, .command-status-code, .command-status-agent, .command-block-truncation) { opacity: 1; pointer-events: auto; }
 .command-block .command-status { color: inherit; }
 .command-block-cwd { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.command-block-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .command-block-branch { min-width: 0; max-width: 25%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .command-block-actions { position: absolute; right: 0; top: 50%; transform: translateY(-50%); display: inline-flex; flex-shrink: 0; }
 .command-block-command { min-width: 0; min-height: var(--terminal-row-height); font-family: var(--font-mono); font-size: var(--terminal-font-size); line-height: var(--terminal-row-height); font-weight: var(--terminal-command-weight); color: var(--xterm-foreground); white-space: pre-wrap; word-break: break-all; user-select: text; -webkit-user-select: text; }
 .command-block-output { margin-top: calc(var(--terminal-row-height) / 2); }
 .command-block-truncation { min-height: 0; margin: 8px 0 0; }
 .pinned-command-clip { position: absolute; top: 0; left: 0; right: 0; overflow: hidden; pointer-events: none; }
-.pinned-command { pointer-events: auto; background: var(--xterm-bg); border-bottom: 1px solid var(--block-divider); padding-bottom: max(20px, calc(var(--terminal-row-height) / 2)); }
+.pinned-command { pointer-events: auto; background: var(--xterm-bg); padding-bottom: max(20px, calc(var(--terminal-row-height) / 2)); }
+/* Draw the header divider below the failure rail so the rail stays continuous across it. */
+.pinned-command::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--block-divider); pointer-events: none; }
 .pinned-command[data-failed="true"] { background: linear-gradient(var(--error-bg), var(--error-bg)), var(--xterm-bg); }
 .pinned-command .command-block-command { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .pinned-command-toggle-slot { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 44px; height: 24px; display: flex; align-items: center; justify-content: center; pointer-events: auto; }
@@ -692,6 +696,7 @@ button.tui-control { min-height: 20px; padding: 0 4px; font-size: var(--fs-micro
 .pinned-command:is(:hover, :focus-within) .pinned-command-toggle { opacity: 1; pointer-events: auto; }
 .pinned-command[data-collapsed="true"] { height: 24px; padding-top: 0; padding-bottom: 0; background: transparent; border: 0; pointer-events: none; }
 .pinned-command[data-collapsed="true"]::before { display: none; }
+.pinned-command[data-collapsed="true"]::after { display: none; }
 .command-block-running { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--accent-warm); animation: pulse 1.5s ease-in-out infinite; }
 
 

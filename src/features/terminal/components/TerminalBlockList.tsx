@@ -18,7 +18,7 @@ import {
 import { useTerminalStore } from '@features/terminal';
 import AiBlock from '@features/chat/components/AiBlock';
 import { ptyResize } from '@platform/pty';
-import { formatCommandDuration } from '../model/commandDuration';
+import { STATUS_ACTION_ICON_SIZE, StatusActionButton, TerminalStatusBar } from './TerminalStatusBar';
 import { getCellMetrics } from '@utils/termMetrics';
 import { getExecutingTerm, resizeExecutingTerm, syncTermWidth } from '@features/terminal/hooks/useTerminalSession';
 import { isTerminalDebugEnabled, terminalDebug } from '@features/terminal/services/terminalDebug';
@@ -43,7 +43,6 @@ interface Props {
 
 /** Strip CSI sequences from the clipboard fallback; OSC is removed upstream. */
 const ANSI_CSI_RE = /\x1b\[[0-9;?]*[a-zA-Z]/g;
-const BLOCK_ACTION_ICON_SIZE = 16;
 
 /** Omit unsubmitted shell prompts while keeping explicit empty submissions. */
 export function hasVisibleContent(b: TermBlock): boolean {
@@ -214,7 +213,7 @@ const BlockItem = memo(function BlockItem({
               const rect = event.currentTarget.getBoundingClientRect();
               onMenu(block, { kind: 'control', left: rect.left, top: rect.bottom + 4 });
             }}>
-            <Ellipsis size={BLOCK_ACTION_ICON_SIZE} />
+            <Ellipsis size={STATUS_ACTION_ICON_SIZE} />
           </IconButton>
         </span>
       </div>
@@ -256,17 +255,7 @@ function RunningItem({
   highlightQuery: string;
   dividerBefore: boolean;
 }) {
-  const [elapsedNow, setElapsedNow] = useState(
-    block.startedAt !== null ? formatCommandDuration(Date.now() - block.startedAt) : '',
-  );
   const { sendCtrlC, killApp, killArmed, enterFullScreen } = useTuiControls(tabId);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      if (block.startedAt !== null) setElapsedNow(formatCommandDuration(Date.now() - block.startedAt));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [block.startedAt]);
 
   const [outputReady, setOutputReady] = useState(false);
   useEffect(() => {
@@ -293,18 +282,17 @@ function RunningItem({
         paddingRight: insetRight + COMMAND_BLOCK_CONTENT_PADDING,
       }}
     >
-      <div data-selectable className="command-block-info">
-        <BlockContext block={block} />
-        {elapsedNow && <span className="command-status-duration">({elapsedNow})</span>}
-        <span className="command-block-running" aria-label={t('Running')} />
-        {block.gitBranch && <span className="command-block-branch">{block.gitBranch}</span>}
-        {block.agent && <Zap size={14} className="command-status-agent" aria-label={t('AI execution')} />}
-        <span className="command-block-actions">
-          <BlockToolBtn title={t('Interrupt command')} shortcut="Control+C" onClick={sendCtrlC} label={<Square size={BLOCK_ACTION_ICON_SIZE} />} />
-          <BlockToolBtn title={killArmed ? t('Force quit foreground process') : t('Quit foreground process')} onClick={killApp} label={<CircleX size={BLOCK_ACTION_ICON_SIZE} />} />
-          <BlockToolBtn title={t('Enter fullscreen interaction')} onClick={enterFullScreen} label={<Maximize2 size={BLOCK_ACTION_ICON_SIZE} />} />
-        </span>
-      </div>
+      <TerminalStatusBar
+        cwd={block.cwd}
+        startedAt={block.startedAt}
+        gitBranch={block.gitBranch}
+        agent={block.agent ? <Zap size={14} className="command-status-agent" aria-label={t('AI execution')} /> : undefined}
+        actions={<>
+          <StatusActionButton title={t('Interrupt command')} shortcut="Control+C" onClick={sendCtrlC} label={<Square size={STATUS_ACTION_ICON_SIZE} />} />
+          <StatusActionButton title={killArmed ? t('Force quit foreground process') : t('Quit foreground process')} onClick={killApp} label={<CircleX size={STATUS_ACTION_ICON_SIZE} />} />
+          <StatusActionButton title={t('Enter fullscreen interaction')} onClick={enterFullScreen} label={<Maximize2 size={STATUS_ACTION_ICON_SIZE} />} />
+        </>}
+      />
       <div data-selectable className="command-block-command" style={{ fontFamily: TERMINAL_FONT_FAMILY }}>
         {highlightQuery ? <HighlightSpan text={block.command} query={highlightQuery} /> : coloredCommand}
       </div>
@@ -477,19 +465,3 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
   );
 }
 
-// Compact running controls.
-
-function BlockToolBtn({
-  title,
-  shortcut,
-  onClick,
-  label,
-}: {
-  title: string;
-  shortcut?: string;
-  onClick: (e: React.MouseEvent) => void;
-  label: React.ReactNode;
-}) {
-  return <IconButton compact data-subtle data-tip={title} data-tip-shortcut={shortcut} aria-label={title}
-    onClick={event => { event.stopPropagation(); onClick(event); }}>{label}</IconButton>;
-}

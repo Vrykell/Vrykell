@@ -69,10 +69,11 @@ test.describe('命令块（OSC 133）', () => {
     );
 
     await expect(page.getByText('TUI')).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('button.tui-control[data-tip="终止命令"]')).toBeVisible();
+    const banner = page.getByTestId('tui-banner');
+    await expect(banner.locator('[data-tip="终止命令"]')).toBeVisible();
     // 真实 alt-buffer 应用不提供「退出全屏」（输出只写主 xterm，强制回 blockList 会画面失联）；
     // esc 仅手动全屏（块卡片进入全屏交互）才有 —— 见 running-term.spec.ts
-    await expect(page.locator('[data-tip="退出全屏"]')).toHaveCount(0);
+    await expect(banner.locator('[data-tip="退出全屏"]')).toHaveCount(0);
 
     // 真实 alt buffer 应用的内容必须进入主 xterm buffer（WebGL 下 canvas 渲染，读 buffer 断言）
     // —— 回归：manualTui 误判曾把 vim 画面盖住，用户看到冻结的块内容。
@@ -91,13 +92,15 @@ test.describe('命令块（OSC 133）', () => {
     }).toPass({ timeout: 5000 });
 
     // 升级式结束按钮：首击 SIGTERM → 窗口内再击 SIGKILL
-    const bannerEnd = page.locator('button.tui-control[data-tip="结束前台应用"]');
+    // 武装后 data-tip 变为「强制结束前台应用」，用联合选择器保持定位稳定。
+    const endButton = '[data-tip="结束前台应用"], [data-tip="强制结束前台应用"]';
+    const bannerEnd = banner.locator(endButton);
     await expect(bannerEnd).toBeVisible();
     await bannerEnd.click();
     await expect(async () => {
       expect(await ptySignals(page)).toEqual([{ id: 'e2e-session', sig: 15 }]);
     }).toPass({ timeout: 5000 });
-    await page.locator('button.tui-control[data-tip="结束前台应用"]').click();
+    await banner.locator(endButton).click();
     await expect(async () => {
       expect(await ptySignals(page)).toEqual([
         { id: 'e2e-session', sig: 15 },

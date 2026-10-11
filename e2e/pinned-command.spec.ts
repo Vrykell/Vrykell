@@ -72,6 +72,16 @@ test('viewport command follows history, collapses independently and keeps hover 
   await expect(pinned).toHaveAttribute('data-collapsed', 'false');
   await expect(pinned).toContainText('/work/directory-1');
   await expect(pinned).toHaveAttribute('data-failed', 'true');
+  // The header divider must not cut the failure rail: it is painted beneath the rail,
+  // not drawn as a border that ends the rail one pixel early.
+  const railMetrics = await pinned.evaluate(element => ({
+    border: getComputedStyle(element).borderBottomWidth,
+    divider: getComputedStyle(element, '::after').height,
+    railZ: getComputedStyle(element, '::before').zIndex,
+  }));
+  expect(railMetrics.border).toBe('0px');
+  expect(railMetrics.divider).toBe('1px');
+  expect(railMetrics.railZ).toBe('1');
   await pinned.hover();
   await pinned.getByRole('button', { name: '更多操作' }).click();
   await expect(page.getByRole('menu', { name: '命令块操作' })).toContainText('复制输出');

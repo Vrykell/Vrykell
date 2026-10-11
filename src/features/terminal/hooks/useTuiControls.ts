@@ -18,10 +18,11 @@ export function useTuiControls(tabId: string) {
     if (killTimer.current) clearTimeout(killTimer.current);
   }, []);
 
-  const runningCommand = useMemo(() => {
+  const runningBlock = useMemo(() => {
     const running = blocks.filter((block) => block.status === 'executing');
-    return running.length > 0 ? running[running.length - 1]!.command : '';
+    return running.length > 0 ? running[running.length - 1]! : null;
   }, [blocks]);
+  const runningCommand = runningBlock?.command ?? '';
 
   const sendCtrlC = useCallback(() => {
     const sessionId = sessions[tabId];
@@ -58,6 +59,8 @@ export function useTuiControls(tabId: string) {
   return {
     altScreenActive,
     runningCommand,
+    runningCwd: runningBlock?.cwd,
+    runningStartedAt: runningBlock?.startedAt ?? null,
     killArmed,
     sendCtrlC,
     killApp,
