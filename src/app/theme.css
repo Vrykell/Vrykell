@@ -679,7 +679,7 @@ button.tui-control { min-height: 20px; padding: 0 4px; font-size: var(--fs-micro
 .command-block-cwd { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .command-block-branch { min-width: 0; max-width: 25%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .command-block-actions { position: absolute; right: 0; top: 50%; transform: translateY(-50%); display: inline-flex; flex-shrink: 0; }
-.command-block-command { min-width: 0; min-height: var(--terminal-row-height); font-family: var(--font-mono); font-size: var(--terminal-font-size); line-height: var(--terminal-row-height); font-weight: var(--terminal-command-weight); color: var(--xterm-foreground); white-space: pre-wrap; word-break: break-all; user-select: text; }
+.command-block-command { min-width: 0; min-height: var(--terminal-row-height); font-family: var(--font-mono); font-size: var(--terminal-font-size); line-height: var(--terminal-row-height); font-weight: var(--terminal-command-weight); color: var(--xterm-foreground); white-space: pre-wrap; word-break: break-all; user-select: text; -webkit-user-select: text; }
 .command-block-output { margin-top: calc(var(--terminal-row-height) / 2); }
 .command-block-truncation { min-height: 0; margin: 8px 0 0; }
 .pinned-command-clip { position: absolute; top: 0; left: 0; right: 0; overflow: hidden; pointer-events: none; }

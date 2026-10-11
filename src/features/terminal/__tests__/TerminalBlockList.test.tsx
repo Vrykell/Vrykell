@@ -40,6 +40,8 @@ describe('TerminalBlockList', () => {
     expect(context).toHaveTextContent('/Users/w/work');
     expect(context).toHaveTextContent('main');
     expect(context).toHaveTextContent('(1.400s)');
+    // The context row (path, branch, status) is selectable so it can be copied.
+    expect(context).toHaveAttribute('data-selectable');
     expect(screen.getByTestId('exit-code')).toHaveTextContent('0');
     expect(item.querySelectorAll('button')).toHaveLength(1);
     expect(screen.getByLabelText('更多操作')).toHaveAttribute('aria-haspopup', 'menu');
@@ -67,7 +69,11 @@ describe('TerminalBlockList', () => {
     render(<TerminalBlockList tabId="t1" />);
     expect(screen.queryByText('命令未产生输出')).toBeNull();
     expect(screen.getByTestId('exit-code')).toHaveTextContent('0');
-    expect(screen.getByTestId('command-block-b1').querySelectorAll('[data-selectable]')).toHaveLength(1);
+    // Header row and command line are both selectable (no output here).
+    const selectable = screen.getByTestId('command-block-b1').querySelectorAll('[data-selectable]');
+    expect(selectable).toHaveLength(2);
+    expect([...selectable].some((el) => el.classList.contains('command-block-info'))).toBe(true);
+    expect([...selectable].some((el) => el.classList.contains('command-block-command'))).toBe(true);
   });
 
   it('opens all four command actions in the more menu without collapse controls', async () => {

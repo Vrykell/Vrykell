@@ -1,9 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Terminal } from '@xterm/xterm';
 import type { FitAddon } from '@xterm/addon-fit';
-import { createResizeQueue, fitTerminal } from '../model/terminalResize';
+import { createResizeQueue, fitTerminal, repaintTerminal } from '../model/terminalResize';
 
 describe('terminal resizing', () => {
+  it('repaints the whole viewport from the buffer after the pane was hidden', () => {
+    const refresh = vi.fn();
+    repaintTerminal({ rows: 24, refresh } as unknown as Terminal);
+    expect(refresh).toHaveBeenCalledWith(0, 23);
+    // A terminal that has not laid out yet has no rows to repaint.
+    repaintTerminal({ rows: 0, refresh } as unknown as Terminal);
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
   it('repaints resized pixels before presenting the frame and ignores unchanged dimensions', () => {
     const calls: string[] = [];
     const renderer = { _renderRows: vi.fn(() => calls.push('paint')) };
