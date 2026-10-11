@@ -19,4 +19,5 @@ export type {
   TabGroup,
   AddTabOptions,
   SshTabTarget,
+  TitleSource,
 } from '@features/workspace/stores/workspace';

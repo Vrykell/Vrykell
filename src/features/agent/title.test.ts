@@ -67,8 +67,7 @@ describe('智能标题触发', () => {
     expect(await maybeAutoTitle('t1')).toBe(true);
     const tab = useSessionStore.getState().tabs[0]!;
     expect(tab.title).toBe('Rust 学习笔记');
-    expect(tab.named).toBe(true);
-    expect(tab.titleAuto).toBe(true);
+    expect(tab.titleSource).toBe('ai');
   });
 
   it('首轮 AI 回答 ≥50 字也触发（无命令块）', async () => {
@@ -89,16 +88,16 @@ describe('智能标题触发', () => {
 
   it('手动命名的标签不被覆盖', async () => {
     reset();
-    useSessionStore.setState({ tabs: [mkTab('t1', { title: '我的窗口', named: true })], activeId: 't1' });
+    useSessionStore.setState({ tabs: [mkTab('t1', { title: '我的窗口', titleSource: 'manual' })], activeId: 't1' });
     setThreeDoneBlocks('t1');
     expect(await maybeAutoTitle('t1')).toBe(false);
     expect(mockGenerate).not.toHaveBeenCalled();
   });
 
-  it('截断兜底命名的标签（titleAuto）可被 AI 标题升级', async () => {
+  it('截断兜底命名的标签（command 来源）可被 AI 标题升级', async () => {
     reset();
     useSessionStore.setState({
-      tabs: [mkTab('t1', { title: 'git status', named: true, titleAuto: true })],
+      tabs: [mkTab('t1', { title: 'git status', titleSource: 'command' })],
       activeId: 't1',
     });
     setThreeDoneBlocks('t1');

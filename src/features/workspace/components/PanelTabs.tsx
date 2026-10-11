@@ -4,7 +4,7 @@ import { iconSizes,
   History, Plus, Search, Settings,
   ChevronRight, Pencil, Archive, Folder, Trash2, X,
  } from '@ui/icons';
-import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, type Tab, type TabGroup } from '@features/workspace';
+import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, useTabDisplayTitle, type Tab, type TabGroup } from '@features/workspace';
 import { regenerateTitle } from '@features/agent/services/title';
 import { useToastStore } from '@ui/Toast';
 import { IconBtn } from '@ui/UiBtn';
@@ -509,6 +509,7 @@ function TabRow({
 }) {
   const first = firstTerminalOf(tab);
   const terms = terminalsOf(tab);
+  const displayTitle = useTabDisplayTitle(tab);
   const isSsh = first?.kind === 'ssh';
   const Icon = tab.kind === 'history' ? History
     : tab.kind === 'settings' ? Settings
@@ -524,9 +525,9 @@ function TabRow({
     <SidebarItem
       active={active}
       icon={<Icon size={iconSizes.row} style={{ color: iconColor }} />}
-      title={tab.title}
+      title={displayTitle}
       subtitle={subtitle}
-      tooltip={tab.title}
+      tooltip={displayTitle}
       testId={`tab-row-${tab.id}`}
       reorderItemId={tab.id}
       reorderKind="tab"

@@ -319,15 +319,14 @@ describe('workspace store 扩展', () => {
     expect(useWorkspaceStore.getState().tabs.find((t) => t.id === histId)!.title).toBe('会话历史');
   });
 
-  it('renameTab：空标题回退默认；清 titleAuto', () => {
+  it('renameTab：空标题回退默认；置为手动来源', () => {
     const ws = useWorkspaceStore.getState();
     const a = ws.addTab({ title: 'a' });
     ws.autoTitle(a, '自动');
     ws.renameTab(a, '');
     const t = useWorkspaceStore.getState().tabs.find((x) => x.id === a)!;
     expect(t.title).toBe('终端');
-    expect(t.named).toBe(true);
-    expect(t.titleAuto).toBe(false);
+    expect(t.titleSource).toBe('manual');
   });
 
   it('terminalsOf / firstTerminalOf / serializeSession / nextTerminalId', () => {

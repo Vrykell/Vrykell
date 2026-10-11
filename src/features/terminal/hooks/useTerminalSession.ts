@@ -268,6 +268,9 @@ export function useTerminalSession(
       onCwd: (path) => {
         useSessionStore.getState().setTerminalCwd(paneId, path);
       },
+      onProgramTitle: (title) => {
+        useSessionStore.getState().setProgramTitle(paneId, title);
+      },
       onBlockStart: (block) => {
         sessionManager.record(tabId, paneId, block, 'start');
         // 惯用命名：标题跟随「聚焦终端」的首条命令（未定名时）
@@ -745,6 +748,7 @@ export function useTerminalSession(
       unlisteners.forEach((u) => u());
       pendingUnlisteners.forEach((p) => p.then((u) => u()).catch(() => {}));
       if (sessionId) ptyClose(sessionId).catch(() => {});
+      useSessionStore.getState().setProgramTitle(paneId, '');
       unregisterTerminal(paneId, term);
       term.dispose();
     };
