@@ -17,7 +17,7 @@ export type FileMenuItemKey =
   | 'workspace-add' | 'workspace-remove' | 'open-tab'
   | 'open-editor' | 'open-system' | 'open-with' | 'reveal'
   | 'copy' | 'cut' | 'paste' | 'copy-path' | 'rename' | 'download' | 'delete'
-  | 'upload-file' | 'upload-dir' | 'new-tab-here' | 'downloads-view' | 'collapse-all';
+  | 'upload-file' | 'upload-dir' | 'new-tab-here' | 'sync-cwd' | 'downloads-view' | 'collapse-all';
 
 export interface FilePanelConfig {
   variant: 'local' | 'ssh';
@@ -119,7 +119,7 @@ export function filePanelConfigFor(target: FileOpsTarget): FilePanelConfig {
       rowFile: ['new-file', 'new-folder', 'open-editor', 'open-system', 'open-with', 'reveal', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'delete'],
       rowMulti: ['copy', 'cut', 'paste', 'delete'],
       blank: ['new-file', 'new-folder', 'paste', 'new-tab-here'],
-      more: ['new-file', 'new-folder', 'new-tab-here', 'reveal', 'downloads-view', 'collapse-all'],
+      more: ['new-file', 'new-folder', 'new-tab-here', 'sync-cwd', 'reveal', 'downloads-view', 'collapse-all'],
     },
     drag: { downloadBeforeNativeDrag: false, externalDropMode: 'move', cleanupSourceAfterNativeDrag: true },
     open: 'terminal-editor',

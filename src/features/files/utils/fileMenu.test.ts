@@ -78,4 +78,16 @@ describe('fileMenu', () => {
     expect(buildFileMenuItems(['reveal'], ctx({ entry: file, targets: [file] }))).toHaveLength(0);
     expect(buildFileMenuItems(['reveal'], ctx())).toHaveLength(0);
   });
+
+  it('offers sync-to-cwd only when the panel provides a handler', () => {
+    const onSyncToCwd = vi.fn();
+    const withHandler = buildFileMenuItems(['sync-cwd'], ctx({ handlers: handlers({ onSyncToCwd }) }));
+    expect(withHandler).toHaveLength(1);
+    expect(withHandler[0]!.label).toBe('同步到终端目录');
+    withHandler[0]!.onClick();
+    expect(onSyncToCwd).toHaveBeenCalledTimes(1);
+
+    // 远程面板不提供 handler → 不渲染
+    expect(buildFileMenuItems(['sync-cwd'], ctx())).toHaveLength(0);
+  });
 });

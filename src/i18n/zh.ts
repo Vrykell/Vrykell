@@ -407,6 +407,7 @@ const zh: Record<string, string> = {
 
   // ── 文件管理 ──
   'files.collapseAll': '收起全部文件夹',
+  'files.syncToCwd': '同步到终端目录',
   'files.undo.cut': '移动',
   'files.undo.rename': '重命名',
   'files.undo.delete': '删除',
