@@ -46,6 +46,33 @@ it('forwards an otherwise unhandled native text commit once and preserves compos
   element.remove();
 });
 
+it('does not duplicate a preedit that an IME switch commits right after composition ends', async () => {
+  const element = document.createElement('div');
+  element.innerHTML = '<textarea></textarea>';
+  document.body.append(element);
+  const textarea = element.querySelector('textarea')!;
+  let onData = () => {};
+  const input = vi.fn(() => onData());
+  const term = { element, textarea, options: {}, input,
+    onData: (callback: () => void) => { onData = callback; } } as unknown as Terminal;
+  configureTerminalInput(term);
+  const key = () => textarea.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, keyCode: 229 }));
+  const commit = (data: string) => textarea.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data }));
+
+  // Type pinyin without picking a candidate, then switch the IME to English: the switch
+  // commits the pending preedit and xterm forwards it once through onData.
+  textarea.dispatchEvent(new CompositionEvent('compositionstart'));
+  commit('nihao');
+  textarea.dispatchEvent(new CompositionEvent('compositionend'));
+  onData();
+  // The switch keydown lands after that commit; the late native diff must not resend it.
+  key();
+  commit('nihao');
+  await new Promise(resolve => setTimeout(resolve, 5));
+  expect(input).not.toHaveBeenCalled();
+  element.remove();
+});
+
 it('lets the delayed native IME diff commit before applying an input fallback', async () => {
   const element = document.createElement('div');
   element.innerHTML = '<textarea></textarea>';
