@@ -370,6 +370,22 @@ describe('SessionController', () => {
     expect(ctrl.blocks[0]!.outputText).not.toContain('VI FULLSCREEN');
   });
 
+  it('合并其它 DEC 私有模式的 alt 序列同样不进块历史', async () => {
+    const { st, ctrl, feed } = wire();
+    feed(`${A}p$ ${E('htop')}${C}`);
+    feed('\x1b[?1049;2004h');
+    expect(ctrl.scene).toBe('altScreen');
+    feed('HTOP FULLSCREEN');
+    expect(st.written).toContain('\x1b[?1049;2004h');
+    expect(st.written).toContain('HTOP FULLSCREEN');
+    feed('\x1b[?1049;2004l');
+    expect(ctrl.scene).toBe('blockList');
+    feed(`done\r\n${D(0)}`);
+    await waitFor(() => ctrl.blocks[0]?.outputText === 'done');
+    expect(ctrl.blocks[0]!.outputText).toBe('done');
+    expect(ctrl.blocks[0]!.outputText).not.toContain('HTOP FULLSCREEN');
+  });
+
   it('classic 模式下 OSC raw 转发主 xterm（OSC 8/52 不失效）', () => {
     const { st, feed } = wire();
     feed('\x1b]8;;https://a.com\x07link\x1b]8;;\x07');

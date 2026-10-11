@@ -122,6 +122,37 @@ test.describe('命令块（OSC 133）', () => {
     await expect(page.getByText('VIM BUFFER')).toHaveCount(0);
   });
 
+  test('与其它 DEC 私有模式合写的 alt 序列仍按全屏 TUI 处理', async ({ page }) => {
+    await setupTauriMock(page);
+    await page.goto('/');
+    const input = page.getByPlaceholder(/输入命令/);
+    await expect(input).toBeVisible({ timeout: 5000 });
+    await page.waitForFunction(async () => {
+      const path = '/src/features/terminal/stores/terminal.ts';
+      const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+      return Object.values(useTerminalStore.getState().startupStates).includes('ready');
+    });
+    // `\x1b[?1049;2004h` shares one CSI with bracketed paste: it must still count as
+    // entering the alt screen instead of leaking into the running block.
+    await emitPtyOutput(
+      page,
+      '\x1b]133;A\x07' +
+        '\x1b]133;E;' + btoa('htop') + '\x07' +
+        '\x1b]133;C\x07' +
+        '\x1b[?1049;2004h' +
+        'HTOP FULLSCREEN',
+    );
+    await expect(page.getByText('TUI')).toBeVisible({ timeout: 5000 });
+    await expectAnyTermContains(page, 'HTOP FULLSCREEN', 5000);
+
+    await emitPtyOutput(page, '\x1b[?1049;2004l\x1b]133;D;0\x07\x1b]133;A\x07');
+    await expect(page.getByText('TUI')).not.toBeVisible({ timeout: 5000 });
+    await page.mouse.move(0, 0);
+    await page.locator('[data-testid^="command-block-"]').last().hover();
+    await expect(page.getByTestId('exit-code')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('HTOP FULLSCREEN')).toHaveCount(0);
+  });
+
   test('altScreen 中滚轮降级为方向键发给 PTY', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
