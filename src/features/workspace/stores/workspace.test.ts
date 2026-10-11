@@ -183,10 +183,14 @@ describe('workspace store', () => {
   });
 
   it('setTerminalCwd / dropTerminalCwd 管理终端的 cwd', () => {
-    useWorkspaceStore.getState().setTerminalCwd('t1#0', '/a');
-    expect(useWorkspaceStore.getState().terminalCwds['t1#0']).toBe('/a');
-    useWorkspaceStore.getState().dropTerminalCwd('t1#0');
-    expect(useWorkspaceStore.getState().terminalCwds['t1#0']).toBeUndefined();
+    const tabId = useWorkspaceStore.getState().tabs[0]!.id;
+    const paneId = `${tabId}#0`;
+    useWorkspaceStore.getState().setTerminalCwd(paneId, '/a');
+    expect(useWorkspaceStore.getState().terminalCwds[paneId]).toBe('/a');
+    const tab = useWorkspaceStore.getState().tabs.find((item) => item.id === tabId)!;
+    expect(isSessionTab(tab) && tab.layout.type === 'leaf' && tab.layout.terminal.cwd).toBe('/a');
+    useWorkspaceStore.getState().dropTerminalCwd(paneId);
+    expect(useWorkspaceStore.getState().terminalCwds[paneId]).toBeUndefined();
   });
 
   it('getFocusedCwd 读聚焦终端的 cwd（回退到 spec.cwd）', () => {
