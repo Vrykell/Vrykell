@@ -36,7 +36,7 @@ describe('useTuiControls', () => {
       scenes: { 'pane-1': 'altScreen' },
       altScreenActive: true,
     });
-    useBlockStore.setState({ byTab: { 'pane-1': [block({ status: 'executing' })] } });
+    useBlockStore.setState({ byTab: { 'pane-1': [block({ status: 'executing', cwd: '/work' })] } });
   });
 
   afterEach(() => {
@@ -48,6 +48,9 @@ describe('useTuiControls', () => {
     const { result } = renderHook(() => useTuiControls('pane-1'));
 
     expect(result.current.runningCommand).toBe('npm run dev');
+    // The banner shows the same basic info as a running block: cwd and elapsed start time.
+    expect(result.current.runningCwd).toBe('/work');
+    expect(result.current.runningStartedAt).toBe(1);
     act(() => result.current.sendCtrlC());
 
     expect(ptyMocks.ptyWrite).toHaveBeenCalledWith('session-1', '\x03');

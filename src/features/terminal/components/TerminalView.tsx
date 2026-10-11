@@ -11,7 +11,8 @@ import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
 import { useTypographyStore } from '@config/typography';
 import { useRef, useEffect, useMemo, useState, useId } from 'react';
 import OverlayScrollbar from '@ui/OverlayScrollbar';
-import KeyHint from '@ui/KeyHint';
+import { CircleX, Minimize2, Square } from '@ui/icons';
+import { STATUS_ACTION_ICON_SIZE, StatusActionButton, TerminalStatusBar } from '@features/terminal/components/TerminalStatusBar';
 import DropPlacementPreview from '@ui/DropPlacementPreview';
 import { useSessionStore, type Tab } from '@features/workspace';
 import { useTerminalStore } from '@features/terminal';
@@ -575,21 +576,27 @@ function TuiBanner({ tabId }: { tabId: string }) {
   const {
     altScreenActive,
     runningCommand,
+    runningCwd,
+    runningStartedAt,
     killArmed,
     sendCtrlC,
     killApp,
     exitFullScreen,
   } = useTuiControls(tabId);
   return (
-    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 101, padding: '3px 12px', fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-mono)', background: 'transparent', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)' }}>
-      <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--accent-warm)', flexShrink: 0 }} />
-      <span>TUI{runningCommand ? ` · ${runningCommand}` : ''}</span>
-      <div style={{ flex: 1 }} />
-      <button className="text-control tui-control" onClick={sendCtrlC} data-tip={t('Interrupt command')} data-tip-shortcut="Control+C" aria-label={t('Interrupt command')}><KeyHint shortcut="Control+C" /></button>
-      <button className="text-control tui-control" onClick={killApp} data-tip={t('End foreground task')}>{t(killArmed ? 'Force stop' : 'End foreground task')}</button>
-      {altScreenActive && (
-        <button className="text-control tui-control" onClick={exitFullScreen} data-tip={t('Exit fullscreen')}><KeyHint shortcut="Escape" /></button>
-      )}
+    <div data-testid="tui-banner" style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 101, height: 28, padding: '0 12px', overflow: 'hidden', display: 'flex', alignItems: 'center' }}>
+      <TerminalStatusBar
+        alwaysShowActions
+        cwd={runningCwd}
+        startedAt={runningStartedAt}
+        label={`TUI${runningCommand ? ` · ${runningCommand}` : ''}`}
+        style={{ flex: 1, minWidth: 0, marginBottom: 0 }}
+        actions={<>
+          <StatusActionButton title={t('Interrupt command')} shortcut="Control+C" onClick={sendCtrlC} label={<Square size={STATUS_ACTION_ICON_SIZE} />} />
+          <StatusActionButton title={killArmed ? t('Force quit foreground process') : t('Quit foreground process')} onClick={killApp} label={<CircleX size={STATUS_ACTION_ICON_SIZE} />} />
+          {altScreenActive && <StatusActionButton title={t('Exit fullscreen')} onClick={exitFullScreen} label={<Minimize2 size={STATUS_ACTION_ICON_SIZE} />} />}
+        </>}
+      />
     </div>
   );
 }
