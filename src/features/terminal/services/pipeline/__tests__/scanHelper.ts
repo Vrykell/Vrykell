@@ -7,7 +7,21 @@ import type { DispatchEvent } from '@core/terminal/events';
  */
 
 const ESC = '\x1b';
-const ALT_RE = /^\x1b\[\?(1049|1047|47)([hl])$/;
+const ALT_CODES = new Set(['1049', '1047', '47']);
+
+/**
+ * Alt-screen CSI direction: true = enter (h), false = exit (l), null = not alt.
+ * Inspects every parameter so a mode combined with other DEC private modes
+ * (e.g. `\x1b[?1049;2004h`) is still recognized.
+ */
+function altDirection(seq: string): boolean | null {
+  if (!seq.startsWith(`${ESC}[?`)) return null;
+  const body = seq.slice(3);
+  const finalByte = body.slice(-1);
+  if (finalByte !== 'h' && finalByte !== 'l') return null;
+  if (!body.slice(0, -1).split(';').some(param => ALT_CODES.has(param))) return null;
+  return finalByte === 'h';
+}
 
 export class ScanHelper {
   private pending = '';
@@ -75,10 +89,10 @@ export class ScanHelper {
         while (j < s.length && /[0-9;?]/.test(s[j]!)) j++;
         if (j >= s.length) break;
         const seq = s.slice(i, j + 1);
-        const m = ALT_RE.exec(seq);
-        if (m) {
+        const alt = altDirection(seq);
+        if (alt !== null) {
           flushData(i);
-          events.push(m[2] === 'h' ? { kind: 'altEnter', raw: seq } : { kind: 'altExit', raw: seq });
+          events.push(alt ? { kind: 'altEnter', raw: seq } : { kind: 'altExit', raw: seq });
           textStart = j + 1;
         }
         i = j + 1;

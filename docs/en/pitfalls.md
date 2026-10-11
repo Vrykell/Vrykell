@@ -75,6 +75,11 @@
 - **Fix**: added `TerminalEvent::Dsr`, and the frontend replies with the cursor position (dsr 6) / terminal-ok (dsr 5).
 - **Lesson**: "silently dropping unknown sequences" is a deadlock for query-type sequences (DSR/DA); the same commit also fixed "a read error silently breaking the loop" and "treating an empty `$SHELL` as valid".
 
+### 2.10 An alt screen combined with other DEC private modes polluting the block history again
+- **Symptom**: after force-killing a TUI that enables the alt screen in the same CSI as other modes (for example `\x1b[?1049;2004h`), a whole screen of TUI output still appears in the block history.
+- **Root cause**: the scanner matched whole strings such as `\x1b[?1049h` exactly, so a combined sequence passed through untouched into the running block's xterm, which switched to its own alternate buffer; the snapshot taken on command end then read that active buffer.
+- **Fix**: the scanner inspects every parameter instead (final byte `h`/`l` plus a 1049/1047/47 parameter), while the full raw sequence is still written to the main xterm so the other modes (bracketed paste and the like) keep their effect. The Rust scanner, the front-end test mirror and the e2e mock stay in step.
+
 ---
 
 ## 3. PTY / resize / Dimensions

@@ -171,6 +171,17 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
       }
     }
 
+    /** Alt-screen CSI direction: true = enter (h), false = exit (l), null = not alt.
+     *  Inspects every parameter so a mode combined with other DEC private modes is recognized. */
+    function altDirection(seq: string): boolean | null {
+      if (!seq.startsWith('\x1b[?')) return null;
+      const body = seq.slice(3);
+      const finalByte = body.slice(-1);
+      if (finalByte !== 'h' && finalByte !== 'l') return null;
+      if (!body.slice(0, -1).split(';').some(param => param === '1049' || param === '1047' || param === '47')) return null;
+      return finalByte === 'h';
+    }
+
     /** 极简 OSC/alt 扫描器：把 raw 字节流切成前端 `DispatchEvent`（对应 Rust StreamScanner）。 */
     function scanEvents(chunk: string): { kind: string; text?: string; code?: string; payload?: string; raw?: string }[] {
       const events: { kind: string; text?: string; code?: string; payload?: string; raw?: string }[] = [];
@@ -218,11 +229,10 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
           while (j < chunk.length && /[0-9;?]/.test(chunk[j]!)) j++;
           if (j >= chunk.length) break;
           const seq = chunk.slice(i, j + 1);
-          const enter = /\x1b\[\?(1049|1047|47)h/.test(seq);
-          const exit = /\x1b\[\?(1049|1047|47)l/.test(seq);
-          if (enter || exit) {
+          const alt = altDirection(seq);
+          if (alt !== null) {
             flushData(i);
-            events.push({ kind: enter ? 'altEnter' : 'altExit', raw: seq });
+            events.push({ kind: alt ? 'altEnter' : 'altExit', raw: seq });
             textStart = j + 1;
           }
           i = j + 1;

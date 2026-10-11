@@ -135,13 +135,24 @@ fn parse_osc(body: &str) -> (String, String) {
     }
 }
 
-/// 是否为 alt-screen CSI：返回 Some(true)=进入(h) / Some(false)=退出(l)。
+/// Alt-screen CSI direction: Some(true) = enter (h), Some(false) = exit (l).
+///
+/// The DEC private mode may share one CSI with other modes (for example
+/// `\x1b[?1049;2004h`), so every parameter is inspected instead of matching the
+/// whole sequence. Without this an alt screen leaks into the block terminal and its
+/// final frame is captured as a snapshot.
 fn alt_dir(seq: &str) -> Option<bool> {
-    match seq {
-        "\x1b[?1049h" | "\x1b[?1047h" | "\x1b[?47h" => Some(true),
-        "\x1b[?1049l" | "\x1b[?1047l" | "\x1b[?47l" => Some(false),
-        _ => None,
-    }
+    let body = seq.strip_prefix("\x1b[?")?;
+    let (params, final_byte) = body.split_at(body.len().checked_sub(1)?);
+    let enter = match final_byte {
+        "h" => true,
+        "l" => false,
+        _ => return None,
+    };
+    params
+        .split(';')
+        .any(|param| matches!(param, "1049" | "1047" | "47"))
+        .then_some(enter)
 }
 
 #[cfg(test)]
@@ -229,6 +240,26 @@ mod tests {
         let mut d = StreamScanner::new();
         assert!(matches!(&d.push("\x1b[?47h")[0], ScanEvent::AltEnter { .. }));
         assert!(matches!(&d.push("\x1b[?1047l")[0], ScanEvent::AltExit { .. }));
+    }
+
+    #[test]
+    fn alt_combined_with_other_modes_recognized() {
+        let mut d = StreamScanner::new();
+        let ev = d.push("a\x1b[?1049;2004hb\x1b[?1049;2004lc");
+        assert_eq!(kinds(&ev), ["data", "altEnter", "data", "altExit", "data"]);
+        assert!(matches!(&ev[1], ScanEvent::AltEnter { raw } if raw == "\x1b[?1049;2004h"));
+        assert!(matches!(&ev[3], ScanEvent::AltExit { raw } if raw == "\x1b[?1049;2004l"));
+        let mut d = StreamScanner::new();
+        assert!(matches!(&d.push("\x1b[?47;25h")[0], ScanEvent::AltEnter { .. }));
+    }
+
+    #[test]
+    fn other_private_modes_not_stripped() {
+        let mut d = StreamScanner::new();
+        assert!(matches!(
+            &d.push("\x1b[?2004h\x1b[?25l")[..],
+            [ScanEvent::Data { text }] if text == "\x1b[?2004h\x1b[?25l"
+        ));
     }
 
     #[test]
