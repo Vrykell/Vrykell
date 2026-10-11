@@ -246,6 +246,8 @@ export function createBlockTerm(
     scrollback: 5000,
     ...getTerminalFontOptions(),
     cursorBlink: true,
+    // Match the pane: keep a solid cursor when the command input holds focus.
+    cursorInactiveStyle: 'block',
     theme: xtermTheme,
   });
   // Running output must follow palette changes just like the surrounding pane.

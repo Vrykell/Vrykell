@@ -140,6 +140,9 @@ export function useTerminalSession(
     const term = new Terminal({
       ...getTerminalFontOptions(),
       cursorBlink: true,
+      // A solid inactive cursor stays visible when the command input takes focus;
+      // the default hairline outline reads as a vanished cursor on Retina displays.
+      cursorInactiveStyle: 'block',
       scrollback: 5000,
       // The public ruler width also sizes the native scrollbar and fit calculation.
       overviewRuler: { width: 10, showTopBorder: false, showBottomBorder: false },
