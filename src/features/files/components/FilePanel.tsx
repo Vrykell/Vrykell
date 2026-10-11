@@ -32,6 +32,8 @@ export interface FilePanelProps {
   openEntry: (entry: FsEntry) => void;
   /** 顶栏「终端切到当前目录」 */
   onSyncToTerminal?: (currentDir: string) => void;
+  /** 当前终端 cwd：「更多 → 同步到终端目录」重新定位面板（仅本地提供） */
+  terminalCwd?: string | null;
   /** 面板专有菜单回调：未提供的条目不会出现在菜单里 */
   handlers?: Partial<FileMenuHandlers>;
   /** 行图标（本地按扩展名 / 工作区高亮） */
@@ -64,6 +66,7 @@ export default function FilePanel({
   onPathChange,
   openEntry,
   onSyncToTerminal,
+  terminalCwd,
   handlers: extraHandlers,
   renderIcon,
   isHighlighted,
@@ -233,6 +236,7 @@ export default function FilePanel({
     onPasteInto: (dir) => void pasteInto(dir),
     onRename: (entry) => startRename(entry),
     onDelete: (targets) => confirmDelete(targets),
+    onSyncToCwd: terminalCwd != null ? () => navigate(terminalCwd) : undefined,
     ...extraHandlers,
   };
 

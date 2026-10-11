@@ -86,6 +86,7 @@ function LocalFiles() {
     <FilePanel
       target={LOCAL_TARGET}
       initialPath={activeCwd ?? null}
+      terminalCwd={activeCwd ?? null}
       openEntry={(entry) => void openFileInTerminal(entry)}
       onSyncToTerminal={(dir) => {
         const sid = sessions[focused];
