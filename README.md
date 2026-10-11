@@ -40,6 +40,28 @@ npm run tauri dev  # 启动完整 Tauri 应用
 
 `npm run tauri dev` 使用项目依赖 `@tauri-apps/cli`，并自动启动前端开发服务器，无需另外运行 `npm run dev`，也无需全局安装 Tauri CLI。仅开发前端时，可单独运行 `npm run dev`（端口 1420）。
 
+### 加速桌面打包
+
+Rust 编译缓存使用 [sccache](https://github.com/mozilla/sccache)。首次安装一次：
+
+```bash
+cargo install sccache --locked
+npm run tauri build
+```
+
+项目的 Tauri 命令会在打包时开启 Rust 增量编译；安装 sccache 后还会通过 `RUSTC_WRAPPER` 缓存依赖编译，并在结束后显示缓存统计。没有安装 sccache 时会提示并继续增量构建。首次构建仍需编译依赖，后续修改后的打包会复用增量结果，清理构建产物后的重建可复用 sccache 缓存。
+
+### Faster desktop packaging
+
+Rust compilation caching uses [sccache](https://github.com/mozilla/sccache). Install it once, then use the usual packaging command:
+
+```bash
+cargo install sccache --locked
+npm run tauri build
+```
+
+The project Tauri command enables Rust incremental compilation for packaging; when sccache is installed, it also caches dependency compilation through `RUSTC_WRAPPER` and prints cache statistics afterward. If sccache is not installed, the command warns and still uses incremental compilation. The first build still compiles dependencies; later source rebuilds can reuse incremental results, and clean rebuilds can reuse the sccache cache.
+
 ## 常见问题
 
 ### Linux 编译提示找不到 `glib-2.0`
