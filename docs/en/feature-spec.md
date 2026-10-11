@@ -16,6 +16,7 @@
 | T8 | TUI keyboard passthrough | In TUI mode keyboard input goes straight to the terminal | In fullscreen, keystrokes act directly on the program |
 | T9 | TUI hint bar | In fullscreen the bottom shows the "TUI mode" hint | Visual check |
 | T10 | Repaint on tab return | When a terminal's tab or panel was hidden and comes back, the pane repaints from the buffer: a static fullscreen TUI is no longer blank and a WebGL context lost while hidden is restored and repainted. The page returning from the background (visibilitychange) repaints too | Run a fullscreen TUI, switch to another tab for a while and back — the screen is still there; terminal-visibility.spec.ts asserts a repaint fires on return |
+| T11 | TUI multibyte encoding | A GUI-launched shell gets a UTF-8 locale (`LC_CTYPE`, plus `LANG` when it is empty), so locale-aware fullscreen programs such as vi no longer render CJK as `~X`; an environment already requesting UTF-8 anywhere is left untouched | Launch the app without `LANG`/`LC_*`, open a UTF-8 file with Chinese in `vi` and it renders correctly; Rust unit tests cover the locale decision |
 
 ## 2. Block Command Blocks
 

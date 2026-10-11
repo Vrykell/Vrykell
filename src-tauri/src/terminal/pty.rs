@@ -307,6 +307,55 @@ fn merge_term_env(cmd: &mut CommandBuilder) {
     }
 }
 
+/// Fallback UTF-8 locale for a GUI-launched shell, which inherits no `LANG`/`LC_*` at all.
+/// `en_US.UTF-8` always exists on macOS; other Unix systems use `C.UTF-8`, guaranteed to be
+/// available in a UTF-8 form.
+#[cfg(target_os = "macos")]
+const DEFAULT_UTF8_LOCALE: &str = "en_US.UTF-8";
+#[cfg(all(unix, not(target_os = "macos")))]
+const DEFAULT_UTF8_LOCALE: &str = "C.UTF-8";
+
+/// Whether a locale value requests UTF-8 character handling.
+#[cfg(unix)]
+fn is_utf8_locale(value: &str) -> bool {
+    let lowered = value.to_ascii_lowercase();
+    lowered.contains("utf-8") || lowered.contains("utf8")
+}
+
+/// Locale variables (name, value) to inject into the child, given the inherited values.
+///
+/// A GUI-launched process has no `LANG`/`LC_*`, so locale-aware full-screen programs fall back to
+/// the C locale: they read a UTF-8 stream as latin1 and paint the C1 high byte of every multibyte
+/// character as `~X` (the garbled CJK seen in their UI), while byte-through programs look fine.
+/// When any inherited variable already requests UTF-8 this is a no-op; otherwise `LC_CTYPE` is
+/// supplied so only the character-encoding category changes, not `LC_MESSAGES` (message language).
+#[cfg(unix)]
+fn locale_overrides(lc_all: Option<&str>, lc_ctype: Option<&str>, lang: Option<&str>) -> Vec<(&'static str, &'static str)> {
+    let configured_utf8 = [lc_all, lc_ctype, lang]
+        .into_iter()
+        .flatten()
+        .any(|value| !value.is_empty() && is_utf8_locale(value));
+    if configured_utf8 {
+        return Vec::new();
+    }
+    let mut overrides = vec![("LC_CTYPE", DEFAULT_UTF8_LOCALE)];
+    // Also fill an empty LANG (the GUI case) for programs that only consult it; an explicit
+    // non-UTF-8 LANG keeps its message language and gets its encoding fixed via LC_CTYPE alone.
+    if lang.map(|value| value.is_empty()).unwrap_or(true) {
+        overrides.push(("LANG", DEFAULT_UTF8_LOCALE));
+    }
+    overrides
+}
+
+/// Supply a UTF-8 locale to the spawned shell when the inherited environment has none.
+#[cfg(unix)]
+fn merge_locale_env(cmd: &mut CommandBuilder) {
+    let read = |key: &str| std::env::var(key).ok();
+    for (key, value) in locale_overrides(read("LC_ALL").as_deref(), read("LC_CTYPE").as_deref(), read("LANG").as_deref()) {
+        cmd.env(key, value);
+    }
+}
+
 /// Windows 默认 shell：pwsh → powershell → cmd（进程内缓存，避免每次建终端都 spawn 探测）。
 #[cfg(target_os = "windows")]
 fn default_windows_shell() -> &'static str {
@@ -356,6 +405,10 @@ fn spawn_pty(
     // A GUI launch can also inherit an empty TERM, which makes a full-screen TUI fail its
     // capability probe and hang; default it to xterm-256color.
     merge_term_env(&mut cmd);
+    // GUI launches carry no locale either: the C locale makes vim and friends render multibyte
+    // text as garbage. Provide a UTF-8 locale when none is configured.
+    #[cfg(unix)]
+    merge_locale_env(&mut cmd);
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
     drop(pair.slave);
     let reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
@@ -393,6 +446,9 @@ pub async fn pty_spawn(
         .unwrap_or_else(|| "truecolor".to_string());
     let debug_vte_inherited = std::env::var("VTE_VERSION").is_ok();
     let debug_cwd_set = cwd.is_some();
+    // Locale vars determine whether locale-aware full-screen programs render multibyte text.
+    let debug_lang = std::env::var("LANG").ok().filter(|value| !value.is_empty()).unwrap_or_else(|| "unset".to_string());
+    let debug_lc_ctype = std::env::var("LC_CTYPE").ok().filter(|value| !value.is_empty()).unwrap_or_else(|| "unset".to_string());
 
     // Creating the session is blocking: run it on a blocking thread, never on the main thread.
     let (id, master, mut reader, writer, child) =
@@ -404,7 +460,7 @@ pub async fn pty_spawn(
         debug::write(
             "spawn",
             format!(
-                "id={} cols={} rows={} requested_shell={} shell_env={} integration_available={} ssh={} open_mode={:?} cwd_set={} term={} colorterm={} vte_inherited={} vte_integration_disabled=true",
+                "id={} cols={} rows={} requested_shell={} shell_env={} integration_available={} ssh={} open_mode={:?} cwd_set={} term={} colorterm={} vte_inherited={} lang={} lc_ctype={} vte_integration_disabled=true",
                 id,
                 cols,
                 rows,
@@ -417,6 +473,8 @@ pub async fn pty_spawn(
                 debug_term,
                 debug_colorterm,
                 debug_vte_inherited,
+                debug_lang,
+                debug_lc_ctype,
             ),
         );
     }
@@ -1053,6 +1111,38 @@ mod tests {
         assert_eq!(cmd2.get_env("COLORTERM").unwrap().to_str().unwrap(), "24bit");
     }
 
+    /// A GUI launch has no locale: fill LC_CTYPE (and LANG when empty) with UTF-8; a configured
+    /// UTF-8 environment is left alone.
+    #[cfg(unix)]
+    #[test]
+    fn locale_overrides_fill_utf8_when_missing_and_keep_existing() {
+        assert_eq!(
+            locale_overrides(None, None, None),
+            vec![("LC_CTYPE", DEFAULT_UTF8_LOCALE), ("LANG", DEFAULT_UTF8_LOCALE)]
+        );
+        assert_eq!(
+            locale_overrides(None, None, Some("")),
+            vec![("LC_CTYPE", DEFAULT_UTF8_LOCALE), ("LANG", DEFAULT_UTF8_LOCALE)]
+        );
+        // An explicit non-UTF-8 LANG keeps its message language; only the encoding is corrected.
+        assert_eq!(locale_overrides(None, Some("C"), Some("C")), vec![("LC_CTYPE", DEFAULT_UTF8_LOCALE)]);
+        // No injection when any variable already requests UTF-8.
+        assert!(locale_overrides(Some("zh_CN.UTF-8"), None, None).is_empty());
+        assert!(locale_overrides(None, Some("UTF-8"), None).is_empty());
+        assert!(locale_overrides(None, None, Some("en_US.UTF-8")).is_empty());
+    }
+
+    /// The injected variables really land on the spawned CommandBuilder.
+    #[cfg(unix)]
+    #[test]
+    fn locale_overrides_apply_to_command_builder() {
+        let mut cmd = CommandBuilder::new("zsh");
+        for (key, value) in locale_overrides(Some("C"), Some("C"), Some("C")) {
+            cmd.env(key, value);
+        }
+        assert_eq!(cmd.get_env("LC_CTYPE").unwrap().to_str().unwrap(), DEFAULT_UTF8_LOCALE);
+    }
+
     /// 多字节 UTF-8 字符跨 read 边界不应产生 U+FFFD。
     #[test]
     fn utf8_split_across_reads_is_buffered() {
@@ -1105,6 +1195,39 @@ mod tests {
         let _ = child.wait();
         drop(master);
         assert!(out.contains("spawn-pty-ok"), "no echo, got: {out:?}");
+    }
+
+    /// With no UTF-8 locale in the test process (the GUI-launch situation), the spawned shell must
+    /// really receive the injected UTF-8 LC_CTYPE.
+    #[cfg(unix)]
+    #[test]
+    fn spawn_pty_injects_utf8_locale_when_missing() {
+        let inherited_utf8 = ["LC_ALL", "LC_CTYPE", "LANG"]
+            .iter()
+            .filter_map(|key| std::env::var(key).ok())
+            .any(|value| !value.is_empty() && is_utf8_locale(&value));
+        if inherited_utf8 {
+            return; // The design is a no-op here, so there is nothing to assert.
+        }
+        let (id, master, mut reader, mut writer, mut child) =
+            spawn_pty(80, 24, None, None, None, None).expect("spawn_pty");
+        assert!(id.starts_with("pty-"), "unexpected id: {id}");
+        writer.write_all(b"printf 'LOC:%s|%s\\n' \"$LC_CTYPE\" \"$LANG\"\n").expect("write");
+        writer.flush().expect("flush");
+        let expected = format!("LOC:{DEFAULT_UTF8_LOCALE}|");
+        let mut out = String::new();
+        let mut buf = [0u8; 4096];
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !out.contains(&expected) && std::time::Instant::now() < deadline {
+            match reader.read(&mut buf) {
+                Ok(n) if n > 0 => out.push_str(&String::from_utf8_lossy(&buf[..n])),
+                _ => std::thread::sleep(std::time::Duration::from_millis(20)),
+            }
+        }
+        kill_child_tree(&mut *child);
+        let _ = child.wait();
+        drop(master);
+        assert!(out.contains(&expected), "child locale not injected, got: {out:?}");
     }
 
     /// A long-lived child that never reads stdin, used to fill up the PTY input buffer.
