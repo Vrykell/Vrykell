@@ -17,6 +17,7 @@ import {
   useListReorder, useListReorderDrag, type ListReorderDrag, type ListReorderTarget,
 } from '@ui/listReorder';
 import { SshIcon, shellIconFor } from '@ui/shellIcons';
+import { t } from '@i18n';
 
 /**
  * Session navigation with filtering, grouping, renaming and drag ordering.
@@ -382,7 +383,7 @@ function GroupSection(props: {
                 else if (e.key === 'Escape') props.setRenamingGroupTitle(group.title);
               }}
               style={{
-                flex: 1, background: 'var(--field-bg)', border: '1px solid var(--border)',
+                flex: 1, minWidth: 0, background: 'var(--field-bg)', border: '1px solid var(--border)',
                 borderRadius: 3, padding: '1px 4px', fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)',
                 color: 'var(--text-primary)', outline: 'none',
               }}
@@ -395,8 +396,8 @@ function GroupSection(props: {
               }}>
                 {group.title}
               </span>
-              <span style={{ fontSize: 'calc(10.5px * var(--ui-font-scale))', color: 'var(--text-muted)', lineHeight: '14px' }}>
-                {tabs.length} 个标签
+              <span data-testid={`group-count-${group.id}`} style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 'calc(10.5px * var(--ui-font-scale))', color: 'var(--text-muted)', lineHeight: '14px' }}>
+                {t('panel.tabGroup.count', { n: tabs.length })}
               </span>
             </span>
           )}
@@ -550,7 +551,7 @@ function TabRow({
           }}
           onClick={(e) => e.stopPropagation()}
           style={{
-            flex: 1, background: 'var(--field-bg)', border: '1px solid var(--border)',
+            flex: 1, minWidth: 0, background: 'var(--field-bg)', border: '1px solid var(--border)',
             borderRadius: 3, padding: '1px 4px', fontSize: 'calc(13px * var(--ui-font-scale))',
             color: 'var(--text-primary)', outline: 'none', fontFamily: 'var(--font-ui)',
           }}

@@ -309,6 +309,8 @@ const zh: Record<string, string> = {
   'panel.goUp': '返回',
   'panel.enterDir': '进入目录',
   'panel.addToInput': '点击追加路径到 AI 输入',
+  'panel.tabGroup.count': '{{n}} 个标签',
+  'panel.sessionGroup.count': '{{n}} 个会话',
 
   // ── 状态栏 ──
   'statusBar.shellLocal': '本地 shell',

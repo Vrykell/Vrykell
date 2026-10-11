@@ -185,7 +185,7 @@ export default function SessionHistoryView() {
                         }}>
                           {g.title}
                         </span>
-                        <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>{gs.length} 个会话</span>
+                        <span data-testid={`history-group-count-${g.id}`} style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>{t('panel.sessionGroup.count', { n: gs.length })}</span>
                       </span>
                       <button
                         data-subtle
