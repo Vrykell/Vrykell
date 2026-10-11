@@ -340,7 +340,7 @@ export function CurrentDir({ dir }: { dir?: string }) {
       : path
     : '~/project';
   return (
-    <span className="terminal-directory" data-tip={path} style={{ fontFamily: 'var(--font-mono)', fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)' }}>
+    <span className="terminal-chip terminal-directory" data-tip={path}>
       {label}
     </span>
   );
@@ -352,18 +352,11 @@ function GitBranchLabel({ branch }: { branch: string }) {
   const label = branch.length > 22 ? branch.slice(0, 21) + '…' : branch;
   return (
     <span
-      className="terminal-branch"
+      className="terminal-chip terminal-branch"
       data-tip={branch}
-      style={{
-        fontFamily: 'var(--font-mono)',
-        fontSize: 'calc(11px * var(--ui-font-scale))',
-        color: 'var(--accent-warm)',
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 2,
-      }}
+      style={{ color: 'var(--text-primary)' }}
     >
-      <GitBranch size={10} style={{ opacity: 0.6 }} />
+      <GitBranch size={10} style={{ opacity: 0.6, color: 'var(--xterm-blue)' }} />
       {label}
     </span>
   );

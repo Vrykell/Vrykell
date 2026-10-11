@@ -66,26 +66,21 @@ export default function ShellIndicator({ shell, connected, focused, compact, lab
 
   return (
     <span
-      style={{
-        display: 'inline-flex',
-        flexShrink: 0,
-        whiteSpace: 'nowrap',
-        alignItems: 'center',
-        gap: 5,
-        fontFamily: 'var(--font-mono)',
-        fontSize: 'calc(11px * var(--ui-font-scale))',
-        fontWeight: 'var(--fw-medium)',
-        color: fg,
-        userSelect: 'none',
-        ...(compact
-          ? {}
-          : {
-              background: bg,
-              borderRadius: 5,
-              padding: '1px 7px',
-              lineHeight: '18px',
-            }),
-      }}
+      className={compact ? undefined : 'terminal-chip'}
+      style={compact
+        ? {
+            display: 'inline-flex',
+            flexShrink: 0,
+            whiteSpace: 'nowrap',
+            alignItems: 'center',
+            gap: 5,
+            fontFamily: 'var(--font-mono)',
+            fontSize: 'calc(11px * var(--ui-font-scale))',
+            fontWeight: 'var(--fw-medium)',
+            color: fg,
+            userSelect: 'none',
+          }
+        : { color: fg, background: bg, fontWeight: 'var(--fw-medium)', userSelect: 'none' }}
     >
       {connected !== undefined && (
         <span

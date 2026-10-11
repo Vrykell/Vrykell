@@ -95,7 +95,7 @@ export default function DirectoryPicker({ paneId, dir }: { paneId: string; dir?:
   };
 
   return <>
-    <button ref={trigger} className="directory-picker-trigger" type="button" data-subtle disabled={!path || !connected || busy}
+    <button ref={trigger} className="directory-picker-trigger terminal-chip" type="button" data-subtle disabled={!path || !connected || busy}
       data-tip={path} aria-label={t('Change working directory')} aria-expanded={open} aria-haspopup="dialog"
       onClick={() => { setQuery(''); setActive(-1); setOpen(value => !value); }}>
       <Folder size={iconSizes.compact} /><span>{path ? directoryLabel(path) : t('Working directory unavailable')}</span>
