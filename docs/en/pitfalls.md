@@ -227,6 +227,12 @@ Fitting that clears the renderer before resizing causes an additional blank fram
 ### 7.8 Tauri Internal Environment Detection — Drag-and-Drop Silently Fails in the Browser (`7860ee3`)
 - The e2e/browser environment has no `__TAURI_INTERNALS__`, so paths that rely on Tauri APIs, such as drag-and-drop, must first check `is_in_tauri_env`.
 
+### 7.9 A GUI-Launched Shell Has No Locale → vi and Other Fullscreen Programs Render CJK as Garbage (`pty.rs:merge_locale_env`)
+- **Symptom**: launched as a GUI app (Finder/Dock, no `LANG`/`LC_*`), `vi` shows Chinese in a UTF-8 file as `~H`, `~@`, `~C` and the like; `cat`/`ls` look fine.
+- **Root cause**: locale-aware programs pick their encoding from `LC_CTYPE` (the C locale by default). vim therefore reads the file as latin1 and paints the C1 high byte of every UTF-8 CJK character as `~X`; programs that just pass bytes through never consult the locale, so they look correct. Terminal.app/iTerm set the locale themselves, which is why the same command is fine elsewhere.
+- **Fix**: `merge_locale_env` sits next to `merge_term_env` in `spawn_pty` — when nothing in the environment requests UTF-8 it supplies `LC_CTYPE` (`en_US.UTF-8` on macOS, `C.UTF-8` on other Unix), plus `LANG` when it is empty; an existing UTF-8 setting is left alone so the message language is preserved.
+- **Lesson**: a GUI launch is missing not only PATH/TERM but also the locale; for any "fine locally, broken in the app" text issue, check `LANG`/`LC_CTYPE` first.
+
 ---
 
 ## 8. SQLite / Persistence

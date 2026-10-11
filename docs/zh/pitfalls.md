@@ -227,6 +227,12 @@
 ### 7.8 Tauri 内部环境检测 —— 拖拽功能在浏览器里静默失效（`7860ee3`）
 - e2e/浏览器环境没有 `__TAURI_INTERNALS__`，拖拽等依赖 Tauri API 的路径需先 `is_in_tauri_env` 检查。
 
+### 7.9 GUI 启动的 shell 没有 locale → vi 等全屏程序中文乱码（`pty.rs:merge_locale_env`）
+- **现象**：GUI 启动（Finder/Dock，无 `LANG`/`LC_*`）时，`vi` 打开 UTF-8 文件，中文显示成 `~H`、`~@`、`~C` 之类；`cat`/`ls` 却正常。
+- **根因**：区域感知的程序按 `LC_CTYPE`（缺省 C）选择编码。vim 于是按 latin1 读取文件，把每个 UTF-8 汉字的 C1 高位字节画成 `~X`；只透传字节的程序不查 locale，所以看起来没问题。Terminal.app/iTerm 会自己设置 locale，所以同一个命令在别的终端正常。
+- **修复**：`spawn_pty` 里 `merge_locale_env` 与 `merge_term_env` 并列——环境里没有任何 UTF-8 请求时补 `LC_CTYPE`（macOS 用 `en_US.UTF-8`，其它 Unix 用 `C.UTF-8`），`LANG` 为空时一并补；已有 UTF-8 时不动，保持用户语言。
+- **教训**：GUI 启动缺的不止 PATH/TERM，还有 locale；凡是「本地正常、GUI 异常」的文本问题，先看 `LANG`/`LC_CTYPE`。
+
 ---
 
 ## 八、SQLite / 持久化
