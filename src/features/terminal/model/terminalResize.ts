@@ -11,6 +11,19 @@ export function fitTerminal(term: Terminal, fit: FitAddon): void {
   }
 }
 
+/**
+ * Repaint the whole viewport from the buffer.
+ *
+ * A pane that was hidden (display:none while its tab or panel was inactive) comes back
+ * with an unpainted surface: a static alternate-screen application produces no output to
+ * trigger a repaint, and a WebGL context lost while hidden steps down to the DOM renderer
+ * without drawing any rows. Repainting on the hidden-to-visible transition restores it.
+ */
+export function repaintTerminal(term: Terminal): void {
+  if (term.rows <= 0) return;
+  term.refresh(0, term.rows - 1);
+}
+
 /** Keep a visible terminal resize and its repaint in the same presentation frame. */
 export function resizeTerminal(term: Terminal, cols: number, rows: number): void {
   if (cols === term.cols && rows === term.rows) return;

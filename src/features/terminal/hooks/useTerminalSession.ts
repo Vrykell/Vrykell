@@ -1,6 +1,6 @@
 import { preferredShell } from '@config/terminalDefaults';
 import { getAvailableShells, type ShellType } from '@platform/shells';
-import { createResizeQueue, fitTerminal } from '../model/terminalResize';
+import { createResizeQueue, fitTerminal, repaintTerminal } from '../model/terminalResize';
 import { configureTerminalInput } from '@features/terminal/model/terminalInput';
 /**
  * useTerminalSession — 主 xterm 生命周期 + SessionController 接线。
@@ -13,7 +13,7 @@ import { captureConnectionFrame, type TerminalFrame } from '../model/terminalFra
 import { projectBlocks } from '../model/blockProjection';
 import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
 import { Terminal } from '@xterm/xterm';
-import { loadWebglRenderer } from '@features/terminal/model/xtermRenderer';
+import { applyTerminalRenderer, loadWebglRenderer } from '@features/terminal/model/xtermRenderer';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { ptySpawn, ptyWrite, ptyResize, ptyClose, onPtyOutput, onPtyExit, type PtySpawnOptions } from '@platform/pty';
@@ -688,10 +688,32 @@ export function useTerminalSession(
       }
     });
 
+    // A pane hidden with display:none (inactive tab or panel) or a page backgrounded by the
+    // OS can come back blank: a static alternate-screen application prints nothing to trigger
+    // a repaint, and a WebGL context lost while hidden steps down to the DOM renderer without
+    // drawing any rows. Restore the surface on the way back and repaint from the buffer.
+    const restoreSurface = () => {
+      applyTerminalRenderer(term, useTypographyStore.getState().terminalRenderer);
+      repaintTerminal(term);
+      if (isTerminalDebugEnabled()) {
+        terminalDebug('terminal-visibility-repaint', { paneId, scene: currentScene, cols: term.cols, rows: term.rows });
+      }
+    };
+    let paneWasHidden = false;
     const ro = new ResizeObserver(() => {
-      if (el.offsetWidth > 0 && el.offsetHeight > 0) applyWidth();
+      if (el.offsetWidth === 0 || el.offsetHeight === 0) {
+        paneWasHidden = true;
+        return;
+      }
+      if (paneWasHidden) {
+        paneWasHidden = false;
+        restoreSurface();
+      }
+      applyWidth();
     });
     ro.observe(el);
+    const onVisibilityChange = () => { if (!document.hidden) restoreSurface(); };
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     // ── 清理 ──
 
@@ -716,6 +738,7 @@ export function useTerminalSession(
       resizeQueue.dispose();
       cancelAnimationFrame(widthRaf);
       ro.disconnect();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       if (widthSyncs.get(paneId) === applyWidth) widthSyncs.delete(paneId);
       if (sessionControllers.get(paneId) === controller) sessionControllers.delete(paneId);
       controller.dispose();

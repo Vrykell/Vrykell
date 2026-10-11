@@ -32,6 +32,7 @@ import { hasVisibleContent as hasVisibleBlockContent } from '@features/terminal/
 import { copyTerminalSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
 import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
 import { measureRunningTerminalRows } from '../model/runningTerminalRows';
+import { repaintTerminal } from '../model/terminalResize';
 
 interface Props {
   tabId: string;
@@ -202,7 +203,7 @@ const BlockItem = memo(function BlockItem({
         onMenu(block, { kind: 'pointer', x: event.clientX, y: event.clientY });
       }}
     >
-      <div className="command-block-info">
+      <div data-selectable className="command-block-info">
         <BlockContext block={block} />
         <CommandStatus exitCode={block.exitCode} duration={duration} agent={block.agent} />
         {block.gitBranch && <span className="command-block-branch">{block.gitBranch}</span>}
@@ -224,7 +225,7 @@ const BlockItem = memo(function BlockItem({
         <BlockOutput text={block.outputHtml || block.outputText} isHtml={!!block.outputHtml}
           flush highlight={highlightQuery || undefined} />
       </div>}
-      {block.linesTruncated > 0 && <div className="command-block-info command-block-truncation">
+      {block.linesTruncated > 0 && <div data-selectable className="command-block-info command-block-truncation">
         {t('Truncated {{count}} lines', { count: block.linesTruncated })}
       </div>}
     </div>
@@ -292,7 +293,7 @@ function RunningItem({
         paddingRight: insetRight + COMMAND_BLOCK_CONTENT_PADDING,
       }}
     >
-      <div className="command-block-info">
+      <div data-selectable className="command-block-info">
         <BlockContext block={block} />
         {elapsedNow && <span className="command-status-duration">({elapsedNow})</span>}
         <span className="command-block-running" aria-label={t('Running')} />
@@ -432,12 +433,37 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
     });
     widthRo.observe(host);
 
+    // The block is hidden with its tab or the page is backgrounded; a static TUI prints
+    // nothing to trigger a repaint, so restore the surface when it becomes visible again.
+    const restoreSurface = () => {
+      applyTerminalRenderer(term, useTypographyStore.getState().terminalRenderer);
+      repaintTerminal(term);
+      if (isTerminalDebugEnabled()) {
+        terminalDebug('running-terminal-visibility-repaint', { tabId, blockId, cols: term.cols, rows: term.rows });
+      }
+    };
+    let termWasHidden = false;
+    const visibilityRo = new ResizeObserver(() => {
+      if (el.clientWidth === 0 || el.clientHeight === 0) {
+        termWasHidden = true;
+        return;
+      }
+      if (!termWasHidden) return;
+      termWasHidden = false;
+      restoreSurface();
+    });
+    visibilityRo.observe(el);
+    const onVisibilityChange = () => { if (!document.hidden) restoreSurface(); };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
     return () => {
       if (w.__vrykellTerms?.get(`block:${tabId}`) === term) {
         w.__vrykellTerms.delete(`block:${tabId}`);
       }
       renderSub?.dispose();
       widthRo.disconnect();
+      visibilityRo.disconnect();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [tabId, blockId, tuiFs]);
 

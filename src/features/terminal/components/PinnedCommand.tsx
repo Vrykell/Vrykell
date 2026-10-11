@@ -69,7 +69,7 @@ export default function PinnedCommand({ block, paneId, remaining, insetLeft, ins
         setAnchor({ kind: 'pointer', x: event.clientX, y: event.clientY });
       }}>
       {!collapsed && <>
-        <div className="command-block-info">
+        <div data-selectable className="command-block-info">
           {block.cwd && <span className="command-block-cwd" data-tip={block.cwd}>{block.cwd}</span>}
           <CommandStatus exitCode={block.exitCode} duration={duration} agent={block.agent} />
           <span className="command-block-actions">
