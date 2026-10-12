@@ -30,6 +30,11 @@ English strings in code with Chinese entries in `src/i18n`; all code comments ar
 Before committing, run at least `npx tsc --noEmit`, `npm run test` and
 `npm run check:architecture`. Run `cargo test` / e2e when the change can touch them.
 
+Release package builds are opt-in. Run `npm run tauri build` (or another installer/package
+builder) only when the user explicitly asks to build packages. A request to fix, review, test,
+or verify application behavior does not by itself authorize producing installers; use tests,
+typechecking, architecture checks, or dev mode as appropriate.
+
 ## Hard constraints (never break)
 
 1. Terminal parsing is xterm.js only. Never implement a VT/ANSI parser, and never show

@@ -219,7 +219,7 @@ pending ──(输入栏提交 / 133;C)──▶ executing ──(133;D)──�
 
 **（B）Block DOM**（`TerminalBlockList`）：`blockList` 场景下 React 渲染整个 block 列表。已完成块显示 `outputHtml` 快照；运行中块挂载 controller 持有的活 xterm，直接呈现 PTY 输出；pending 块不显示。列表使用普通 DOM 滚动，整段输出变化由 `ResizeObserver` 驱动贴底。
 
-活终端使用 xterm 测得的字符高度，避免强行压缩行高时裁掉首行顶部笔画；完成块的 HTML 快照使用对应的默认行高。
+活终端使用 xterm 测得的字符高度，避免强行压缩行高时裁掉首行顶部笔画；完成块的 HTML 快照使用同一份实测行高（`floor(自然行高 × 行距)`，由终端层发布到 `--terminal-row-height`），历史输出因此与画布的网格逐行对齐——按字号公式估算会让整行着色的内容逐行重叠。
 
 终端宽度随窗口、侧栏及分屏布局更新，调用 PTY 和活 xterm 的 resize，不使用横向滚动容器替代尺寸同步。完成块提取快照时仅按 xterm buffer 的 `isWrapped` 合并软换行，保留显式换行、空行、间距和颜色；历史输出随当前容器宽度重新换行。认证与屏幕快照仍保留物理网格行。终端历史使用纵向主题滚动条，提前预留滑块区域，避免溢出时列宽变化。
 
