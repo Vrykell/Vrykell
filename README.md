@@ -51,6 +51,8 @@ npm run tauri build
 
 项目的 Tauri 命令会在打包时开启 Rust 增量编译；安装 sccache 后还会通过 `RUSTC_WRAPPER` 缓存依赖编译，并在结束后显示缓存统计。没有安装 sccache 时会提示并继续增量构建。首次构建仍需编译依赖，后续修改后的打包会复用增量结果，清理构建产物后的重建可复用 sccache 缓存。
 
+Linux 上打包 AppImage 时会自动设置 `NO_STRIP=1`：linuxdeploy 自带的 binutils 版本较旧，无法解析新版工具链产出的 `.relr.dyn` 段，逐库报错并让打包中断。跳过这一步不影响产物——拷入 AppDir 的系统库本身已经是 stripped。
+
 ### Faster desktop packaging
 
 Rust compilation caching uses [sccache](https://github.com/mozilla/sccache). Install it once, then use the usual packaging command:
@@ -61,6 +63,8 @@ npm run tauri build
 ```
 
 The project Tauri command enables Rust incremental compilation for packaging; when sccache is installed, it also caches dependency compilation through `RUSTC_WRAPPER` and prints cache statistics afterward. If sccache is not installed, the command warns and still uses incremental compilation. The first build still compiles dependencies; later source rebuilds can reuse incremental results, and clean rebuilds can reuse the sccache cache.
+
+On Linux the AppImage step sets `NO_STRIP=1` automatically: the binutils bundled with linuxdeploy is too old to parse the `.relr.dyn` sections newer toolchains emit, so every strip call fails and the bundle aborts. Skipping that pass does not affect the artifact — the system libraries copied into the AppDir are already stripped.
 
 ## 常见问题
 

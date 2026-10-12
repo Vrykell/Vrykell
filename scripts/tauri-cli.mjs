@@ -11,6 +11,10 @@ if (isBuild && !hasSccache) {
 const env = { ...process.env };
 if (isBuild) env.CARGO_INCREMENTAL = '1';
 if (hasSccache) env.RUSTC_WRAPPER = 'sccache';
+// The AppImage step runs linuxdeploy, which ships an older binutils. Its `strip` cannot parse
+// the RELR sections that newer toolchains emit, so every strip call fails and the bundle aborts.
+// Skipping the pass is safe: the libraries copied into the AppDir are already stripped.
+if (isBuild && process.platform === 'linux' && !env.NO_STRIP) env.NO_STRIP = '1';
 
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const child = spawn(npm, ['run', 'tauri:cli', '--', ...args], {
