@@ -132,6 +132,7 @@ describe('TerminalBlockList', () => {
     render(<TerminalBlockList tabId="t1" />);
     await waitFor(() => expect(screen.getByLabelText('终止命令')).toBeTruthy());
     for (const name of [
+      '重绘终端',
       '终止命令',
       '结束前台应用',
       '进入全屏交互',

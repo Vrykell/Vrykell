@@ -13,7 +13,7 @@ function makeEl(scrollTop: number) {
 }
 
 describe('useFollowBottom', () => {
-  it('routes embedded-terminal wheel events to history and pauses live following', async () => {
+  it('leaves live-terminal wheel events to the embedded terminal', async () => {
     const el = makeEl(800);
     const running = document.createElement('div');
     running.dataset.testid = 'running-term';
@@ -22,15 +22,15 @@ describe('useFollowBottom', () => {
     running.addEventListener('wheel', innerWheel);
     const { rerender } = renderHook(({ dep }) => useFollowBottom({ current: el }, [dep]), { initialProps: { dep: 1 } });
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    el.scrollTop = 700;
     const wheel = new WheelEvent('wheel', { deltaY: -350, bubbles: true, cancelable: true });
     running.dispatchEvent(wheel);
-    expect(wheel.defaultPrevented).toBe(true);
-    expect(innerWheel).not.toHaveBeenCalled();
-    expect(el.scrollTop).toBe(650);
-    Object.defineProperty(el, 'scrollHeight', { value: 1500, configurable: true });
+    expect(wheel.defaultPrevented).toBe(false);
+    expect(innerWheel).toHaveBeenCalledTimes(1);
+    expect(el.scrollTop).toBe(700);
     rerender({ dep: 2 });
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-    expect(el.scrollTop).toBe(650);
+    expect(el.scrollTop).toBe(1000);
   });
   it('keeps following when a bottom jump is followed by a resize before its scroll event', async () => {
     let notify: ResizeObserverCallback = () => {};

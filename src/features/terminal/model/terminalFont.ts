@@ -13,7 +13,7 @@ export function getTerminalFontOptions() {
     fontWeight: state.terminalFontWeight,
     fontWeightBold: Math.max(700, state.terminalFontWeight),
     lineHeight: state.terminalLineHeight,
-    letterSpacing: applyMeasuredSpacing(),
+    letterSpacing: applyMeasuredMetrics(),
   };
 }
 
@@ -36,28 +36,88 @@ export function terminalLetterSpacing(fontSize = getTerminalFontSize()): number 
 
 /** Measure the browser glyph width used by completed block snapshots. */
 export function measureTerminalDomCellWidth(fontSize = getTerminalFontSize()): number {
-  const probe = document.createElement('span');
-  probe.style.cssText =
-    'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:pre;line-height:1;';
-  probe.style.fontFamily = terminalFontFamily(useTypographyStore.getState().terminalFontPreset);
-  probe.style.fontWeight = String(useTypographyStore.getState().terminalFontWeight);
-  probe.style.fontSize = `${fontSize}px`;
+  const probe = createFontProbe(fontSize, '1');
+  if (!probe) return 0;
   probe.textContent = 'W'.repeat(100);
-  document.body.appendChild(probe);
   const width = probe.getBoundingClientRect().width / 100;
   probe.remove();
   return width;
 }
 
-/** Historical output follows the current cell grid, including stored snapshots. */
-function applyMeasuredSpacing(): number {
+/**
+ * Truncated cell height for a measured line box - the same derivation the canvas uses, so a
+ * snapshot row and a canvas row are the same height. A formula over the font size alone drifts
+ * from the resolved font by several pixels, which makes consecutive snapshot rows overlap and
+ * turns solid or reverse-video output into merged bands.
+ */
+export function cellHeightFromLineBox(naturalLineBox: number, lineHeight: number): number {
+  if (!Number.isFinite(naturalLineBox) || naturalLineBox <= 0) return 0;
+  const scale = Number.isFinite(lineHeight) && lineHeight > 0 ? lineHeight : 1;
+  return Math.floor(naturalLineBox * scale);
+}
+
+/**
+ * Row height for completed block snapshots, measured from the resolved font instead of
+ * approximated from the font size.
+ */
+export function measureTerminalDomCellHeight(
+  fontSize = getTerminalFontSize(),
+  lineHeight = useTypographyStore.getState().terminalLineHeight,
+): number {
+  const measured = cellHeightFromLineBox(measureTerminalNaturalLineBox(fontSize), lineHeight);
+  if (measured > 0) return measured;
+  // Without a measuring DOM (unit tests) keep the previous estimate rather than collapsing rows.
+  return Math.ceil(fontSize * 16 / 14 * lineHeight);
+}
+
+/** Natural line box of the terminal font: ascent plus descent, before the line-height factor. */
+function measureTerminalNaturalLineBox(fontSize: number): number {
+  const probe = createFontProbe(fontSize, 'normal');
+  if (!probe) return 0;
+  probe.textContent = 'W';
+  const height = probe.getBoundingClientRect().height;
+  probe.remove();
+  return height;
+}
+
+function createFontProbe(fontSize: number, lineHeight: string): HTMLSpanElement | null {
+  if (typeof document === 'undefined' || !document.body) return null;
+  const state = useTypographyStore.getState();
+  const probe = document.createElement('span');
+  probe.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:pre;';
+  probe.style.fontFamily = terminalFontFamily(state.terminalFontPreset);
+  probe.style.fontWeight = String(state.terminalFontWeight);
+  probe.style.fontSize = `${fontSize}px`;
+  probe.style.lineHeight = lineHeight;
+  document.body.appendChild(probe);
+  return probe;
+}
+
+/**
+ * Publish the metrics a completed snapshot needs but cannot read from preferences: the snapped
+ * cell advance and the measured cell height. Both follow the resolved font, so historical output
+ * keeps the grid the canvas drew.
+ */
+function applyMeasuredMetrics(): number {
   const spacing = terminalLetterSpacing();
-  const root = document.documentElement.style;
-  const value = `${spacing}px`;
-  if (root.getPropertyValue('--terminal-letter-spacing') !== value) root.setProperty('--terminal-letter-spacing', value);
+  if (typeof document !== 'undefined' && document.body) {
+    const root = document.documentElement.style;
+    const spacingValue = `${spacing}px`;
+    if (root.getPropertyValue('--terminal-letter-spacing') !== spacingValue) root.setProperty('--terminal-letter-spacing', spacingValue);
+    const heightValue = `${measureTerminalDomCellHeight()}px`;
+    if (root.getPropertyValue('--terminal-row-height') !== heightValue) root.setProperty('--terminal-row-height', heightValue);
+  }
   return spacing;
 }
 
 useTypographyStore.subscribe((state, previous) => {
-  if (typeof document !== 'undefined' && document.body && terminalTypographyChanged(state, previous)) applyMeasuredSpacing();
+  if (typeof document !== 'undefined' && document.body && terminalTypographyChanged(state, previous)) applyMeasuredMetrics();
 });
+
+// A fallback font satisfies the probe until the preferred family finishes loading; re-measure
+// once the font set settles so snapshots keep the canvas grid.
+if (typeof document !== 'undefined' && document.fonts) {
+  void document.fonts.ready.then(() => applyMeasuredMetrics());
+}
+
+applyMeasuredMetrics();

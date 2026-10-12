@@ -1,4 +1,4 @@
-import { writeText as writeNativeClipboardText, readText as readNativeClipboardText } from '@tauri-apps/plugin-clipboard-manager';
+import { writeText as writeNativeClipboardText, readText as readNativeClipboardText, readImage } from '@tauri-apps/plugin-clipboard-manager';
 import { invoke } from '@platform/diagnostics';
 
 /** Write text through the native clipboard when running inside Tauri. */
@@ -80,6 +80,25 @@ export async function readClipboardText(): Promise<string> {
 /** True inside the desktop runtime (where the Tauri IPC bridge exists). */
 function isDesktopRuntime(): boolean {
   return '__TAURI_INTERNALS__' in window;
+}
+
+/** Detect an image without copying pixels into the webview or changing the clipboard. */
+export async function hasClipboardImage(): Promise<boolean> {
+  if (isDesktopRuntime()) {
+    try {
+      const image = await readImage();
+      await image.close().catch(() => {});
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  try {
+    const items = await navigator.clipboard?.read();
+    return items?.some(item => item.types.some(type => type.startsWith('image/'))) ?? false;
+  } catch {
+    return false;
+  }
 }
 
 /**

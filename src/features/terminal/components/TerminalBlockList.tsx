@@ -19,6 +19,7 @@ import { useTerminalStore } from '@features/terminal';
 import AiBlock from '@features/chat/components/AiBlock';
 import { ptyResize } from '@platform/pty';
 import { STATUS_ACTION_ICON_SIZE, StatusActionButton, TerminalStatusBar } from './TerminalStatusBar';
+import { TerminalRedrawButton } from './TerminalRedrawButton';
 import { getCellMetrics } from '@utils/termMetrics';
 import { getExecutingTerm, resizeExecutingTerm, syncTermWidth } from '@features/terminal/hooks/useTerminalSession';
 import { isTerminalDebugEnabled, terminalDebug } from '@features/terminal/services/terminalDebug';
@@ -33,6 +34,7 @@ import { copyTerminalSelection, pasteClipboardIntoTerminal } from '@features/ter
 import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
 import { measureRunningTerminalRows } from '../model/runningTerminalRows';
 import { repaintTerminal } from '../model/terminalResize';
+import { useSessionStore } from '@features/workspace';
 
 interface Props {
   tabId: string;
@@ -288,6 +290,7 @@ function RunningItem({
         gitBranch={block.gitBranch}
         agent={block.agent ? <Zap size={14} className="command-status-agent" aria-label={t('AI execution')} /> : undefined}
         actions={<>
+          <TerminalRedrawButton paneId={tabId} />
           <StatusActionButton title={t('Interrupt command')} shortcut="Control+C" onClick={sendCtrlC} label={<Square size={STATUS_ACTION_ICON_SIZE} />} />
           <StatusActionButton title={killArmed ? t('Force quit foreground process') : t('Quit foreground process')} onClick={killApp} label={<CircleX size={STATUS_ACTION_ICON_SIZE} />} />
           <StatusActionButton title={t('Enter fullscreen interaction')} onClick={enterFullScreen} label={<Maximize2 size={STATUS_ACTION_ICON_SIZE} />} />
@@ -395,9 +398,9 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
     // 复制/粘贴归终端（End 保留给「回到输入栏」，不进 PTY）：Ctrl+C 有选区时复制、
     // Ctrl+V 粘贴，Ctrl+Shift+C/V 同样有效。
     term.attachCustomKeyEventHandler((e) => {
-      if (e.type === 'keydown' && e.ctrlKey && !e.altKey && !e.metaKey) {
+      if (e.type === 'keydown' && (e.ctrlKey || e.metaKey) && !e.altKey) {
         const key = e.key.toLowerCase();
-        const copy = key === 'c' && (e.shiftKey || term.hasSelection());
+        const copy = key === 'c' && (e.metaKey || e.shiftKey || term.hasSelection());
         const paste = key === 'v';
         if (copy || paste) {
           e.preventDefault();
@@ -408,8 +411,27 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
       }
       return !(e.type === 'keydown' && e.key === 'End');
     });
-    // Bubble wheel events to the block list; fullscreen mode keeps xterm scrollback behavior.
-    term.attachCustomWheelEventHandler(() => tuiFs);
+    let wheelResidual = 0;
+    term.attachCustomWheelEventHandler((event) => {
+      if (term.modes.mouseTrackingMode !== 'none' || term.buffer.active.type === 'alternate') {
+        wheelResidual = 0;
+        return true;
+      }
+      const lineHeight = Math.max(1, getCellMetrics(term).height);
+      const delta = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? event.deltaY * lineHeight
+        : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? event.deltaY * lineHeight * term.rows : event.deltaY;
+      if (Math.sign(delta) !== Math.sign(wheelResidual)) wheelResidual = 0;
+      wheelResidual += delta;
+      const lines = Math.trunc(wheelResidual / lineHeight);
+      if (lines === 0) {
+        event.preventDefault();
+        return false;
+      }
+      wheelResidual -= lines * lineHeight;
+      term.scrollLines(lines);
+      event.preventDefault();
+      return false;
+    });
     // Recheck terminal columns when the host width changes, including its first layout.
     let lastHostWidth = -1;
     const widthRo = new ResizeObserver(() => {
@@ -424,12 +446,19 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
     // The block is hidden with its tab or the page is backgrounded; a static TUI prints
     // nothing to trigger a repaint, so restore the surface when it becomes visible again.
     const restoreSurface = () => {
+      if (el.clientWidth === 0 || el.clientHeight === 0) return;
       applyTerminalRenderer(term, useTypographyStore.getState().terminalRenderer);
       repaintTerminal(term);
       if (isTerminalDebugEnabled()) {
         terminalDebug('running-terminal-visibility-repaint', { tabId, blockId, cols: term.cols, rows: term.rows });
       }
     };
+    let restoreRaf = requestAnimationFrame(restoreSurface);
+    const unsubscribeActiveTab = useSessionStore.subscribe((state, previous) => {
+      if (state.activeId === previous.activeId) return;
+      cancelAnimationFrame(restoreRaf);
+      restoreRaf = requestAnimationFrame(restoreSurface);
+    });
     let termWasHidden = false;
     const visibilityRo = new ResizeObserver(() => {
       if (el.clientWidth === 0 || el.clientHeight === 0) {
@@ -449,6 +478,8 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
         w.__vrykellTerms.delete(`block:${tabId}`);
       }
       renderSub?.dispose();
+      unsubscribeActiveTab();
+      cancelAnimationFrame(restoreRaf);
       widthRo.disconnect();
       visibilityRo.disconnect();
       document.removeEventListener('visibilitychange', onVisibilityChange);
@@ -464,4 +495,3 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
     />
   );
 }
-

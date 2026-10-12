@@ -6,7 +6,10 @@ import { createResizeQueue, fitTerminal, repaintTerminal } from '../model/termin
 describe('terminal resizing', () => {
   it('repaints the whole viewport from the buffer after the pane was hidden', () => {
     const refresh = vi.fn();
-    repaintTerminal({ rows: 24, refresh } as unknown as Terminal);
+    const clearTextureAtlas = vi.fn();
+    repaintTerminal({ rows: 24, refresh, clearTextureAtlas } as unknown as Terminal);
+    expect(clearTextureAtlas).toHaveBeenCalledOnce();
+    expect(clearTextureAtlas.mock.invocationCallOrder[0]).toBeLessThan(refresh.mock.invocationCallOrder[0]!);
     expect(refresh).toHaveBeenCalledWith(0, 23);
     // A terminal that has not laid out yet has no rows to repaint.
     repaintTerminal({ rows: 0, refresh } as unknown as Terminal);

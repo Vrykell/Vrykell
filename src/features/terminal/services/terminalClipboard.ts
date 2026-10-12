@@ -1,9 +1,10 @@
 import type { Terminal } from '@xterm/xterm';
-import { writeClipboardText, readClipboardText } from '@platform/clipboard';
+import { writeClipboardText, readClipboardText, hasClipboardImage } from '@platform/clipboard';
 import { ptyWrite } from '@platform/pty';
 import { termInstances, useTerminalStore } from '@features/terminal/stores/terminal';
 import { t } from '@i18n';
 import { useToastStore } from '@ui/Toast';
+import { terminalDebug } from './terminalDebug';
 
 /** 主 xterm 实例；blockList 场景下回退到运行中块的活 xterm（与测试桥同表注册）。 */
 export function getPaneTerminal(paneId: string): Terminal | null {
@@ -29,7 +30,7 @@ export async function copyTerminalSelection(term: Terminal | null | undefined): 
   }
 }
 
-/** 把系统剪贴板文本写入指定 pane 的 PTY。 */
+/** Paste text normally; let the foreground process read native clipboard images. */
 export async function pasteClipboardIntoTerminal(paneId: string): Promise<boolean> {
   const sessionId = useTerminalStore.getState().sessions[paneId];
   if (!sessionId) {
@@ -38,7 +39,9 @@ export async function pasteClipboardIntoTerminal(paneId: string): Promise<boolea
   }
   let text = '';
   try {
-    text = await readClipboardText();
+    const image = await hasClipboardImage();
+    text = image ? '\x16' : await readClipboardText();
+    terminalDebug('terminal-clipboard-paste', { paneId, image, chars: image ? 0 : text.length });
   } catch {
     useToastStore.getState().addToast(t('terminal.clipboard.pasteFailed'), 'error');
     return false;

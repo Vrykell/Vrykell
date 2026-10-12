@@ -252,4 +252,39 @@ test.describe('命令块（OSC 133）', () => {
     await page.keyboard.press('Meta+w');
     await expect(page.getByPlaceholder('搜索命令…')).not.toBeVisible();
   });
+
+  // Regression: estimating snapshot row height from font size made it several pixels
+  // shorter than the measured canvas cell. Full-row TUI backgrounds then overlapped.
+  test('完成块快照的行高等于画布实测单元格高度', async ({ page }) => {
+    await setupTauriMock(page);
+    await page.goto('/');
+    const input = page.getByPlaceholder(/输入命令/);
+    await expect(input).toBeVisible({ timeout: 5000 });
+    await input.fill('echo first-line');
+    await input.press('Enter');
+    await expect(page.getByText('first-line').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId('exit-code').first()).toHaveText('0', { timeout: 5000 });
+
+    const metrics = await page.evaluate(async () => {
+      const font = await import('/src/features/terminal/model/terminalFont.ts');
+      const { termInstances } = await import('/src/features/terminal/stores/terminal.ts');
+      const { getCellMetrics } = await import('/src/utils/termMetrics.ts');
+      const live = [...termInstances.values()].find((term) => term.element);
+      const output = document.querySelector<HTMLElement>('.command-block-output [data-selectable]');
+      return {
+        measured: font.measureTerminalDomCellHeight(),
+        published: Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--terminal-row-height')),
+        liveCellHeight: live ? getCellMetrics(live).height : null,
+        snapshotLineHeight: output ? Number.parseFloat(getComputedStyle(output).lineHeight) : null,
+      };
+    });
+
+    expect(metrics.measured).toBeGreaterThan(0);
+    // Publish the measured row height to CSS instead of estimating it from the font size.
+    expect(metrics.published).toBe(metrics.measured);
+    // The snapshot container uses the published row height.
+    expect(metrics.snapshotLineHeight).toBe(metrics.measured);
+    // The snapshot and live canvas share the same cell height.
+    if (metrics.liveCellHeight !== null) expect(metrics.measured).toBe(metrics.liveCellHeight);
+  });
 });

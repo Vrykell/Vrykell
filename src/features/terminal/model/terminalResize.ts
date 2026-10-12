@@ -21,6 +21,9 @@ export function fitTerminal(term: Terminal, fit: FitAddon): void {
  */
 export function repaintTerminal(term: Terminal): void {
   if (term.rows <= 0) return;
+  // Invalidate cached GPU cells as well as requesting rows: a restored canvas may
+  // be empty even though the renderer's model still matches the terminal buffer.
+  term.clearTextureAtlas?.();
   term.refresh(0, term.rows - 1);
 }
 

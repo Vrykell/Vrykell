@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { clipboardText, mockAnthropic, ptyWrites, setupTauriMock } from './tauri-mock';
+import { clipboardText, mockAnthropic, ptyWrites, setupTauriMock, terminalRowHeight } from './tauri-mock';
 
 test.describe('命令块操作全链路', () => {
   test('commands and output keep their geometry while context remains visible and hover reveals only more', async ({ page }) => {
@@ -221,10 +221,13 @@ test('two-row command output matches the compact context and spacing proportions
       contextGap: command.getBoundingClientRect().top - info.getBoundingClientRect().bottom,
       outputHeight: output.clientHeight, font: parseFloat(getComputedStyle(command).fontSize) };
   });
-  expect(geometry.contextHeight).toBe(16);
+  // Row height comes from the measured font metrics, so express the geometry in measured units:
+  // one row each for vertical padding, metadata, and command; two output rows with half-row spacing.
+  const rowHeight = await terminalRowHeight(page);
+  expect(geometry.contextHeight).toBe(rowHeight);
   expect(geometry.contextGap).toBe(2);
-  expect(geometry.outputHeight).toBe(32);
-  expect(geometry.height).toBe(106);
-  expect(geometry.height / geometry.font).toBeLessThan(8);
+  expect(geometry.outputHeight).toBe(rowHeight * 2);
+  expect(geometry.height).toBe(rowHeight * 6.5 + 2);
+  expect(geometry.height / rowHeight).toBeLessThan(7);
   await page.locator('[data-testid^="terminal-flow-"]').first().screenshot({ path: test.info().outputPath('compact-command-blocks.png') });
 });

@@ -4,11 +4,13 @@ import type { Terminal } from '@xterm/xterm';
 const writeTextMock = vi.hoisted(() => vi.fn());
 const readTextMock = vi.hoisted(() => vi.fn());
 const ptyWriteMock = vi.hoisted(() => vi.fn());
+const hasImageMock = vi.hoisted(() => vi.fn());
 const toasts = vi.hoisted(() => [] as Array<{ message: string; kind: string }>);
 
 vi.mock('@platform/clipboard', () => ({
   writeClipboardText: writeTextMock,
   readClipboardText: readTextMock,
+  hasClipboardImage: hasImageMock,
 }));
 vi.mock('@platform/pty', () => ({ ptyWrite: ptyWriteMock }));
 vi.mock('@ui/Toast', () => ({
@@ -31,6 +33,7 @@ describe('terminalClipboard', () => {
     writeTextMock.mockReset().mockResolvedValue(undefined);
     readTextMock.mockReset().mockResolvedValue('');
     ptyWriteMock.mockReset().mockResolvedValue(undefined);
+    hasImageMock.mockReset().mockResolvedValue(false);
     toasts.length = 0;
     useTerminalStore.setState({ sessions: {} });
     vi.spyOn(window, 'getSelection').mockReturnValue(null);
@@ -77,5 +80,14 @@ describe('terminalClipboard', () => {
     readTextMock.mockResolvedValue('');
     await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(false);
     expect(ptyWriteMock).not.toHaveBeenCalled();
+  });
+
+  it('forwards the native image paste key instead of dropping images or pasting alternative text', async () => {
+    useTerminalStore.setState({ sessions: { p1: 'sess-1' } });
+    hasImageMock.mockResolvedValue(true);
+    readTextMock.mockResolvedValue('alternative image text');
+    await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(true);
+    expect(ptyWriteMock).toHaveBeenCalledExactlyOnceWith('sess-1', '\x16');
+    expect(readTextMock).not.toHaveBeenCalled();
   });
 });

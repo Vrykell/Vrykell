@@ -30,4 +30,18 @@ describe('shared terminal background', () => {
       expect(snapshot.html).toContain('background:#010203');
     } finally { block.dispose(); }
   });
+
+  // Block art is drawn as reverse-video padding, so a fully painted row must survive the
+  // snapshot: its trailing cells are content, not padding that may be trimmed away.
+  it('keeps a fully painted reverse-video row intact', async () => {
+    const block = createBlockTerm(80, 24);
+    try {
+      await new Promise<void>(resolve => block.term.write('\x1b[7m' + ' '.repeat(12) + '\x1b[0m', resolve));
+      const snapshot = extractSnapshotFromBuffer(block.term.buffer.active, 80);
+      const painted = snapshot.html.match(/<span style="([^"]*)">( *)<\/span>/);
+      expect(painted).not.toBeNull();
+      expect(painted![1]).toContain('background:');
+      expect(painted![2]).toHaveLength(12);
+    } finally { block.dispose(); }
+  });
 });

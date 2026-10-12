@@ -119,23 +119,14 @@ export function useFollowBottom(
       }
     }
     const onWheel = (event: WheelEvent) => {
+      // Keep wheel navigation inside a live terminal's own scrollback or mouse protocol.
+      if (event.target instanceof Element && event.target.closest('[data-testid="running-term"]')) return;
       if (event.deltaY < 0 && el.scrollHeight > el.clientHeight) {
         atBottomRef.current = false;
         snappedTopRef.current = -1;
         anchor = captureViewAnchor(el);
         persist();
         record('wheel-up');
-      }
-      // Embedded terminal viewports intercept wheel events even with their scrollbar hidden.
-      // Route them to the surrounding history before the inner viewport consumes them.
-      if (event.deltaY !== 0 && event.target instanceof Element && event.target.closest('[data-testid="running-term"]')) {
-        event.preventDefault();
-        event.stopPropagation();
-        const unit = event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? el.clientHeight
-          : event.deltaMode === WheelEvent.DOM_DELTA_LINE ? parseFloat(getComputedStyle(el).lineHeight) || 16 : 1;
-        el.scrollTop += event.deltaY * unit;
-        if (!atBottomRef.current) anchor = captureViewAnchor(el);
-        persist();
       }
     };
     const onScroll = () => {
