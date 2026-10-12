@@ -1,3 +1,4 @@
+import { t } from '@i18n';
 import { invoke } from '@platform/diagnostics';
 import type { FsEntry } from '@platform/api/types';
 import type { SshOptions } from '@core/ssh';
@@ -29,6 +30,25 @@ export interface SshListResponse {
   base: string;
 }
 
+/** One host alias read from the user's SSH config file. */
+export interface SshConfigCandidate {
+  name: string;
+  host: string;
+  user?: string;
+  port?: number;
+  identityFile?: string;
+  jumpHost?: string;
+  localForwards?: string[];
+  remoteForwards?: string[];
+  dynamicForwards?: string[];
+}
+
+/** `[bind:]port:host:hostport`, the shape the client accepts for a static forward. */
+const FORWARD_HOST = String.raw`(?:\[[0-9a-fA-F:]+\]|[\w.][\w.-]*)`;
+const STATIC_FORWARD = new RegExp(`^(?:${FORWARD_HOST}:)?(\\d{1,5}):${FORWARD_HOST}:(\\d{1,5})$`);
+/** `[bind:]port`, a local SOCKS listener. */
+const DYNAMIC_FORWARD = new RegExp(`^(?:${FORWARD_HOST}:)?(\\d{1,5})$`);
+
 /** 表单校验：返回错误信息，合法返回 null。 */
 export function validateSshConnection(c: Partial<SshConnection>): string | null {
   if (!c.name || !c.name.trim()) return '请输入连接名';
@@ -38,6 +58,19 @@ export function validateSshConnection(c: Partial<SshConnection>): string | null 
   if (c.serverAliveInterval !== undefined && (!Number.isInteger(c.serverAliveInterval) || c.serverAliveInterval < 0 || c.serverAliveInterval > 3600)) return '保活间隔需为 0-3600 秒的整数';
   if (c.jumpHost && !c.jumpHost.split(',').every(value => /^(?:[\w.-]+@)?(?:\[[0-9a-fA-F:]+\]|[\w.][\w.-]*)(?::[0-9]{1,5})?$/.test(value) && Number(value.match(/:(\d+)$/)?.[1] ?? 22) > 0 && Number(value.match(/:(\d+)$/)?.[1] ?? 22) <= 65535)) return '跳板机格式为 用户@主机:端口，多个跳板机用逗号分隔';
   if (/[\r\n\0]/.test(c.identityFile ?? '')) return '私钥路径不能包含控制字符';
+  for (const [specs, pattern, label] of [
+    [c.localForwards, STATIC_FORWARD, 'Local forward'],
+    [c.remoteForwards, STATIC_FORWARD, 'Remote forward'],
+    [c.dynamicForwards, DYNAMIC_FORWARD, 'Dynamic forward'],
+  ] as const) {
+    for (const spec of specs ?? []) {
+      const match = spec.match(pattern);
+      const ports = match?.slice(1) ?? [];
+      if (!match || !ports.every(part => Number(part) >= 1 && Number(part) <= 65535)) {
+        return t('Invalid {{kind}} specification (example: {{example}})', { kind: t(label), example: pattern === DYNAMIC_FORWARD ? '1080' : '8080:localhost:80' });
+      }
+    }
+  }
   if (
     c.port !== undefined &&
     c.port !== null &&
@@ -77,8 +110,15 @@ export function sshTest(target: {
     user: target.user ?? '',
     password: target.password ?? '',
     options: { identityFile: target.identityFile, jumpHost: target.jumpHost,
-      serverAliveInterval: target.serverAliveInterval, shellIntegration: target.shellIntegration },
+      serverAliveInterval: target.serverAliveInterval, shellIntegration: target.shellIntegration,
+      localForwards: target.localForwards, remoteForwards: target.remoteForwards,
+      dynamicForwards: target.dynamicForwards },
   });
+}
+
+/** Host aliases declared in the user's SSH config file; only non-secret fields come back. */
+export function sshConfigCandidates(): Promise<SshConfigCandidate[]> {
+  return invoke('ssh_config_candidates');
 }
 
 /** 查询主机指纹与 known_hosts 记录状态（首次连接确认用）。 */
@@ -91,7 +131,9 @@ export interface SshHostKeyInfo {
 export function connectionTarget(conn: SshConnection) {
   return { name: conn.name, host: conn.host, user: conn.user, port: conn.port, connectionId: conn.id,
     identityFile: conn.identityFile, jumpHost: conn.jumpHost, serverAliveInterval: conn.serverAliveInterval,
-    shellIntegration: conn.shellIntegration };
+    shellIntegration: conn.shellIntegration, localForwards: conn.localForwards,
+    remoteForwards: conn.remoteForwards, dynamicForwards: conn.dynamicForwards,
+    autoReconnect: conn.autoReconnect };
 }
 
 export function sshHostKeyInfo(host: string, port?: number): Promise<SshHostKeyInfo> {

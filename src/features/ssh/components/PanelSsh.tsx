@@ -1,6 +1,6 @@
 import { TextInput } from '@ui/TextInput';
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { iconSizes, Pencil, Plus, Search } from '@ui/icons';
+import { Download, iconSizes, Pencil, Plus, Search } from '@ui/icons';
 import { SshIcon } from '@ui/shellIcons';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { t } from '@i18n';
@@ -9,11 +9,13 @@ import { useSessionStore, terminalsOf } from '@features/workspace';
 import { useTerminalStore } from '@features/terminal';
 import ContextMenu from '@ui/ContextMenu';
 import { IconBtn } from '@ui/UiBtn';
+import { TextButton } from '@ui/TextButton';
 import SidebarItem from '@ui/sidebarItem';
 import { ListReorderPlaceholder, ListReorderPreview, useListReorderDrag } from '@ui/listReorder';
 import type { SshConnection } from '@features/ssh/services/api';
 import { connectionTarget } from '@features/ssh/services/api';
 import SshFormModal from '@features/ssh/components/SshFormModal';
+import SshImportModal from '@features/ssh/components/SshImportModal';
 
 /** List id shared by the rows, their placeholders and the drag hook. */
 const LIST_ID = 'ssh-connections';
@@ -32,6 +34,7 @@ export default function PanelSsh() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<SshConnection | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; conn: SshConnection } | null>(null);
 
@@ -40,13 +43,12 @@ export default function PanelSsh() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return connections;
-    return connections.filter((c) => c.name.toLowerCase().includes(q));
+    return connections.filter(c => [c.name, c.host, c.user].some(value => value?.toLowerCase().includes(q)));
   }, [connections, query]);
 
-  const selected = useMemo(
-    () => connections.find((c) => c.id === selectedId) ?? null,
-    [connections, selectedId],
-  );
+  useEffect(() => {
+    if (selectedId) document.querySelector(`[data-testid="ssh-row-${selectedId}"]`)?.scrollIntoView?.({ block: 'nearest' });
+  }, [selectedId, connections]);
 
   const startDrag = useListReorderDrag({
     listId: LIST_ID,
@@ -89,12 +91,6 @@ export default function PanelSsh() {
     setFormOpen(true);
   };
 
-  const openEdit = () => {
-    if (!selected) return;
-    setEditing(selected);
-    setFormOpen(true);
-  };
-
   /** 右键菜单：编辑指定连接 */
   const editConn = (conn: SshConnection) => {
     setEditing(conn);
@@ -134,19 +130,12 @@ export default function PanelSsh() {
             }}
           />
         </div>
-        <IconBtn
-          title={selected ? `编辑「${selected.name}」` : '编辑当前选中的连接'}
-          disabled={!selected}
-          data-testid="ssh-edit-btn"
-          onClick={openEdit}
-        >
-          <Pencil size={iconSizes.control} />
-        </IconBtn>
-        <IconBtn title="新建 SSH 连接" data-testid="ssh-new-btn" onClick={openNew}>
-          <Plus size={iconSizes.control} />
-        </IconBtn>
       </div>
-      <button data-testid="ssh-quick-btn" onClick={() => setQuickOpen(true)} style={{ margin: '0 10px 10px', minHeight: 36 }}>{t('ssh.quick.connect')}</button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 10px 8px' }}>
+        <TextButton data-testid="ssh-quick-btn" onClick={() => setQuickOpen(true)} style={{ flex: 1, justifyContent: 'flex-start' }}>{t('ssh.quick.connect')}</TextButton>
+        <IconBtn title={t('ssh.import.open')} data-testid="ssh-import-btn" onClick={() => setImportOpen(true)}><Download size={iconSizes.control} /></IconBtn>
+        <IconBtn title={t('New SSH connection')} data-testid="ssh-new-btn" onClick={openNew}><Plus size={iconSizes.control} /></IconBtn>
+      </div>
       {/* 连接列表：拖动时源行让位，落点用虚线占位 */}
       <div data-reorder-list={LIST_ID} className="scroll-region" style={{ flex: 1, overflowY: 'auto', padding: '0 0 8px' }}>
         {filtered.length === 0 ? (
@@ -207,7 +196,8 @@ export default function PanelSsh() {
         />
       )}
 
-      <SshFormModal open={formOpen} initial={editing} onClose={() => setFormOpen(false)} />
+      <SshFormModal open={formOpen} initial={editing} onClose={() => setFormOpen(false)} onSaved={conn => setSelectedId(conn.id)} onSaveAndConnect={openConnection} />
+      <SshImportModal open={importOpen} onClose={() => setImportOpen(false)} onImported={conn => setSelectedId(conn.id)} />
       <SshFormModal open={quickOpen} initial={null} onClose={() => setQuickOpen(false)} onConnect={conn => {
         useSessionStore.getState().addTab({ kind: 'ssh', ssh: { ...connectionTarget(conn), connectionId: undefined } });
       }} />

@@ -1,6 +1,7 @@
+import ConfigTextArea from '@ui/ConfigTextArea';
 import { IconButton } from '@ui/IconButton';
 import { t } from '@i18n';
-import { TextInput, TextArea } from '@ui/TextInput';
+import { TextInput } from '@ui/TextInput';
 /**
  * External tool server settings.
  * New server drafts are persisted automatically after required fields are valid.
@@ -228,9 +229,9 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
         onChange={(e) => change({ url: e.target.value })}
         style={{ ...inputStyle, marginTop: 8 }}
       />
-      <TextArea
+      <ConfigTextArea
         value={env}
-        placeholder={'环境变量，每行 KEY=VALUE'}
+        placeholder={t('Environment variables, one KEY=VALUE per line')}
         onChange={(e) => change({ env: e.target.value })}
         rows={3}
         style={{

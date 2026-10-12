@@ -6,9 +6,13 @@ import { t } from '@i18n';
 import { useToastStore } from '@ui/Toast';
 import { terminalDebug } from './terminalDebug';
 
-/** 主 xterm 实例；blockList 场景下回退到运行中块的活 xterm（与测试桥同表注册）。 */
+/** Select the terminal that owns the current scene and its input modes. */
 export function getPaneTerminal(paneId: string): Terminal | null {
-  return termInstances.get(paneId) ?? termInstances.get(`block:${paneId}`) ?? null;
+  const main = termInstances.get(paneId);
+  const block = termInstances.get(`block:${paneId}`);
+  return useTerminalStore.getState().scenes[paneId] === 'blockList'
+    ? block ?? main ?? null
+    : main ?? block ?? null;
 }
 
 /**
@@ -30,7 +34,11 @@ export async function copyTerminalSelection(term: Terminal | null | undefined): 
   }
 }
 
-/** Paste text normally; let the foreground process read native clipboard images. */
+/**
+ * Paste through the active terminal so it can apply bracketed-paste mode and normalize line endings.
+ * When the clipboard contains an image, send the native paste key so the foreground process can
+ * read it. If no terminal instance is registered, write text directly to the pane's PTY.
+ */
 export async function pasteClipboardIntoTerminal(paneId: string): Promise<boolean> {
   const sessionId = useTerminalStore.getState().sessions[paneId];
   if (!sessionId) {
@@ -47,6 +55,11 @@ export async function pasteClipboardIntoTerminal(paneId: string): Promise<boolea
     return false;
   }
   if (!text) return false;
+  const term = getPaneTerminal(paneId);
+  if (term) {
+    term.paste(text);
+    return true;
+  }
   try {
     await ptyWrite(sessionId, text);
     return true;

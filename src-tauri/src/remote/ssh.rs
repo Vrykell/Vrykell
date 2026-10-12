@@ -110,7 +110,7 @@ fn tcp_handshake(conn: &SshConnection) -> Result<Session, String> {
 
 /// 建立 TCP 连接 + SSH 握手 + 主机密钥校验 + 认证，返回已认证的会话。
 fn connect(conn: &SshConnection) -> Result<Session, String> {
-    if conn.options.jump_host.is_some() {
+    if conn.options.jump_host.as_deref().is_some_and(|jump| !jump.eq_ignore_ascii_case("none")) {
         return Err("跳板机连接请使用交互终端；文件管理暂不支持跳板机".into());
     }
     let user = conn.user.trim();
@@ -1006,6 +1006,16 @@ pub async fn ssh_upload(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_explicit_no_jump_profile_uses_the_direct_file_connection_path() {
+        let mut conn: SshConnection = serde_json::from_value(serde_json::json!({
+            "id": "direct", "name": "direct", "host": "localhost", "jumpHost": "none"
+        })).unwrap();
+        assert_eq!(connect(&conn).err().as_deref(), Some("用户名不能为空"));
+        conn.options.jump_host = Some("bastion".into());
+        assert!(connect(&conn).err().unwrap().contains("跳板机"));
+    }
 
     #[test]
     fn trust_requires_the_confirmed_fingerprint() {

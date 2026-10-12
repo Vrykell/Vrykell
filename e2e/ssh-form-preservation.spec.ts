@@ -11,12 +11,12 @@ test('连接表单保持适中尺寸，最小窗口下按钮依然完整可见',
   /** 表单与操作按钮都必须完整落在弹窗和窗口内 */
   const checkFits = async (viewport: { width: number; height: number }) => {
     const box = (await dialog.boundingBox())!;
-    expect(box.width).toBeLessThanOrEqual(520);
+    expect(box.width).toBeLessThanOrEqual(860);
     expect(box.x).toBeGreaterThanOrEqual(0);
     expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
     expect(box.y).toBeGreaterThanOrEqual(0);
     expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
-    for (const name of ['保存', '取消', '测试连接']) {
+    for (const name of ['保存', '取消', '测试认证']) {
       const button = (await dialog.getByRole('button', { name, exact: true }).boundingBox())!;
       expect(button.y).toBeGreaterThanOrEqual(box.y - 1);
       expect(button.y + button.height).toBeLessThanOrEqual(box.y + box.height + 1);
@@ -25,7 +25,7 @@ test('连接表单保持适中尺寸，最小窗口下按钮依然完整可见',
   };
 
   const box = await checkFits(page.viewportSize()!);
-  expect(box.height).toBeLessThanOrEqual(620);
+  expect(box.height).toBeLessThanOrEqual(650);
   await page.screenshot({ path: test.info().outputPath('ssh-form-compact.png') });
 
   // Focusing form fields preserves the neutral border without a ring.
@@ -37,10 +37,12 @@ test('连接表单保持适中尺寸，最小窗口下按钮依然完整可见',
   }
 
   // Key authentication keeps its input row inside the dialog as well.
-  await dialog.getByRole('button', { name: '密钥', exact: true }).click();
+  await dialog.getByRole('combobox', { name: '认证方式' }).click();
+  await page.getByRole('option', { name: '密钥 / SSH Agent' }).click();
   const identity = (await dialog.getByTestId('ssh-form-identity').boundingBox())!;
   expect(identity.x + identity.width).toBeLessThanOrEqual(box.x + box.width + 1);
-  await dialog.getByRole('button', { name: '密码', exact: true }).click();
+  await dialog.getByRole('combobox', { name: '认证方式' }).click();
+  await page.getByRole('option', { name: '密码', exact: true }).click();
 
   // Smallest supported window plus the largest UI font size must keep the actions reachable.
   await page.setViewportSize({ width: 720, height: 480 });

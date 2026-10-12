@@ -54,6 +54,7 @@ export function onPtyOutput(cb: (id: string, events: DispatchEvent[]) => void): 
   );
 }
 
-export function onPtyExit(cb: (id: string) => void): Promise<UnlistenFn> {
-  return listen<{ id: string }>('pty-exit', (e) => cb(e.payload.id));
+/** `code` is the child exit code, or null when the reader ended without one. */
+export function onPtyExit(cb: (id: string, code: number | null) => void): Promise<UnlistenFn> {
+  return listen<{ id: string; code: number | null }>('pty-exit', (e) => cb(e.payload.id, e.payload.code ?? null));
 }

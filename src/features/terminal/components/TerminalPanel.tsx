@@ -26,7 +26,7 @@ export default function TerminalPanel(props: TerminalPanelProps) {
 }
 
 function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = false, sshTarget }: TerminalPanelProps) {
-  const { ref, closeSession, reconnect, status, frame } = useTerminalSession(paneId, tabId, onReady);
+  const { ref, closeSession, reconnect, stopReconnect, retry, status, frame } = useTerminalSession(paneId, tabId, onReady);
   const [response, setResponse] = useState('');
   const [error, setError] = useState('');
   const [cancellation, setCancellation] = useState<'idle' | 'pending' | 'done'>('idle');
@@ -74,6 +74,9 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
   };
   // 只要密码框开着就把屏幕冻结成快照：live xterm 会画自己的光标，看着像还有输入焦点
   const showSnapshot = !disconnected && secret;
+  const retryPhase = retry?.phase ?? 'idle';
+  const retryWaiting = retryPhase === 'waiting';
+  const retryConnecting = retryPhase === 'connecting';
   const stateLabel = cancellation === 'done'
     ? (cancelledAuthentication ? t('ssh.state.authCancelled') : t('ssh.state.manualClosed'))
     : disconnected ? t('ssh.state.disconnected')
@@ -92,7 +95,7 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
     {connectionInput && <div data-testid="ssh-connection-input" style={{ position: 'absolute', inset: 0, display: interactive ? 'flex' : 'none', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0, padding: '4px 8px', fontSize: 'calc(12px * var(--ui-font-scale))' }}>
         <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: stateColor }} />
-        <span role="status" style={{ color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{stateLabel}</span>
+        <span role="status" style={{ color: 'var(--text-primary)' }}>{retryWaiting ? t('Retry {{n}}/5 in {{seconds}} seconds', { n: retry.attempt, seconds: retry.seconds }) : retryConnecting ? t('Reconnecting ({{n}}/5)…', { n: retry.attempt }) : retryPhase === 'exhausted' ? t('Automatic reconnect ended after 5 attempts') : retryPhase === 'stopped' ? t('Automatic reconnect stopped') : stateLabel}</span>
         {sshTarget && <span style={{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sshTarget}</span>}
         <span style={{ flex: 1 }} />
         {/* 输入方式：显式单选，不再用会翻转文字的按钮 */}
@@ -116,8 +119,9 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
             style={{ height: 'var(--control-size)', minWidth: 108, fontSize: 'calc(12px * var(--ui-font-scale))' }}
           />
         )}
+        {(retryWaiting || retryConnecting) && <button type="button" onClick={() => void stopReconnect()} style={{ height: 'var(--control-size)', padding: '0 12px' }}>{t('Stop retrying')}</button>}
         {disconnected
-          ? <button type="button" disabled={cancellation === 'pending'} onClick={() => void restart()} style={{ height: 'var(--control-size)', padding: '0 12px' }}>{t('ssh.action.reconnect')}</button>
+          ? <button type="button" disabled={cancellation === 'pending'} onClick={() => void restart()} style={{ height: 'var(--control-size)', padding: '0 12px' }}>{retryWaiting ? t('Retry now') : t('ssh.action.reconnect')}</button>
           : <button type="button" disabled={inputDisabled} onClick={() => void cancelAuthentication()} style={{ height: 'var(--control-size)', padding: '0 12px' }}>{cancellation === 'pending' ? t('ssh.action.cancelling') : secret ? t('ssh.action.cancelAuth') : status === 'connecting' ? t('ssh.action.cancelConnect') : t('ssh.action.disconnect')}</button>}
       </div>
       {/* 终端区常驻：xterm 宿主必须一直在，否则重连时没有宿主可挂载；断开后宿主隐藏、原因直接印在屏幕上 */}

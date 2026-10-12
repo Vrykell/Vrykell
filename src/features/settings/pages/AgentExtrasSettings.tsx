@@ -1,6 +1,7 @@
+import ConfigTextArea from '@ui/ConfigTextArea';
 import { t } from '@i18n';
 import { IconButton } from '@ui/IconButton';
-import { TextInput, TextArea } from '@ui/TextInput';
+import { TextInput } from '@ui/TextInput';
 /**
  * Persistent knowledge, assistant definitions and scheduled tasks.
  */
@@ -94,14 +95,14 @@ export function MemorySettings() {
           <Sparkles size={12} /> {organizing ? '整理中…' : '让 AI 整理'}
         </button>
       </div>
-      <TextArea
+      <ConfigTextArea
         value={saving.value}
         disabled={organizing}
         onCompositionStart={() => saving.setComposing(true)}
         onCompositionEnd={() => saving.setComposing(false)}
         onChange={(e) => saving.setValue(e.target.value)}
         rows={10}
-        placeholder="持久知识（偏好、约定、待办…）"
+        placeholder={t('Persistent knowledge (preferences, agreements, tasks…)')}
         style={{ ...inputStyle, minHeight: 160, resize: 'vertical', lineHeight: 1.6 }}
       />
       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
@@ -151,7 +152,7 @@ function AgentCard({ a, onChanged }: { a: AgentDef; onChanged: () => void }) {
         <IconButton compact tone="danger" onClick={() => void del()} data-tip={t('Delete')} aria-label={t('Delete')}><X size={16} /></IconButton>
       </div>
       <TextInput value={description} placeholder="一句话描述何时委派给它" onChange={(e) => saving.setValue(previous => ({ ...previous, description: e.target.value }))} style={{ ...inputStyle, marginTop: 8 }} />
-      <TextArea value={prompt} placeholder="系统提示词（行为准则）" onChange={(e) => saving.setValue(previous => ({ ...previous, prompt: e.target.value }))} rows={5} style={{ ...inputStyle, marginTop: 8, minHeight: 80, resize: 'vertical', lineHeight: 1.55 }} />
+      <ConfigTextArea value={prompt} placeholder={t('System prompt (behavior guidelines)')} onChange={(e) => saving.setValue(previous => ({ ...previous, prompt: e.target.value }))} rows={5} style={{ ...inputStyle, marginTop: 8, minHeight: 80, resize: 'vertical', lineHeight: 1.55 }} />
     </div>
   );
 }
@@ -214,7 +215,7 @@ function ScheduleCard({ s, onChanged }: { s: Schedule; onChanged: () => void }) 
         <SaveStatus inline status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
         <IconButton compact tone="danger" onClick={() => void del()} data-tip={t('Delete')} aria-label={t('Delete')}><X size={16} /></IconButton>
       </div>
-      <TextArea value={prompt} placeholder="要执行的提示词" onChange={(e) => saving.setValue(previous => ({ ...previous, prompt: e.target.value }))} rows={3} style={{ ...inputStyle, marginTop: 8, minHeight: 56, resize: 'vertical', lineHeight: 1.55 }} />
+      <ConfigTextArea value={prompt} placeholder={t('Prompt to execute')} onChange={(e) => saving.setValue(previous => ({ ...previous, prompt: e.target.value }))} rows={3} style={{ ...inputStyle, marginTop: 8, minHeight: 56, resize: 'vertical', lineHeight: 1.55 }} />
       <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', marginTop: 6 }}>
         上次执行 {s.lastRunAt ? new Date(s.lastRunAt).toLocaleString() : '从未'}
         {enabled ? ` · 下次 ${new Date(nextRun).toLocaleString()}` : ''}
