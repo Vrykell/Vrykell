@@ -14,6 +14,7 @@ const SHORTCUTS: { keys: string[]; desc: string }[] = [
   { keys: ['Meta+]', 'Meta+['], desc: 'Focus another terminal' },
   { keys: ['Meta+F'], desc: 'Global search' },
   { keys: ['Meta+P'], desc: 'Command palette' },
+  { keys: ['Meta+Shift+R'], desc: 'Redraw terminal' },
   { keys: ['Meta+,'], desc: 'Open settings' },
   { keys: ['Escape'], desc: 'Focus command input' },
 ];

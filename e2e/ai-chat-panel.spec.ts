@@ -20,6 +20,31 @@ async function boot(page: import('@playwright/test').Page, reply: string) {
 }
 
 test.describe('AI 对话面板', () => {
+  test('opening the panel does not move focus into the chat composer', async ({ page }) => {
+    await boot(page, 'OK');
+    const trigger = page.locator('[data-dock-btn="chat"]');
+    await trigger.click();
+    const composer = page.locator('[data-chat-composer]');
+    await expect(composer).toBeVisible();
+    await expect(composer).not.toBeFocused();
+  });
+
+  test('chat context chips use spacing without decorative separator dots', async ({ page }) => {
+    await boot(page, 'OK');
+    await page.locator('[data-dock-btn="chat"]').click();
+    await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
+    const status = page.locator('.chat-input-status');
+    await expect(status.locator('.terminal-chip')).toHaveCount(2);
+    await expect(status).not.toContainText('·');
+    await expect(status).toHaveCSS('gap', '6px');
+    const chips = await status.locator('.terminal-chip').all();
+    const shell = (await chips[0].boundingBox())!;
+    const cwd = (await chips[1].boundingBox())!;
+    expect(cwd.x - shell.x - shell.width).toBeGreaterThanOrEqual(5);
+    await expect(status.getByTestId('permission-mode-button')).toBeVisible();
+    await expect(status.getByRole('button', { name: '添加附件' })).toBeVisible();
+  });
+
   test('打开面板发送消息，流式渲染回复', async ({ page }) => {
     await boot(page, '面板回复内容');
     await page.locator('[data-dock-btn="chat"]').click();

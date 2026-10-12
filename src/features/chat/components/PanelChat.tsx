@@ -125,11 +125,7 @@ export default function PanelChat() {
     scopeKey: activeId,
   });
 
-  useEffect(() => {
-    if (isSession) inputRef.current?.focus();
-  }, [isSession, inputRef]);
-
-  // 目标 pane 的显示分量（prompt 行镜像终端输入栏：shell 胶囊 · cwd）
+  // Match the terminal composer context with spacing between the chips.
   return (
     <div ref={panelRef} style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, containerType: 'inline-size' }}>
       {/* Model and conversation mode apply to subsequent messages. */}
@@ -186,6 +182,7 @@ export default function PanelChat() {
               </span>
               <TextArea
                 ref={inputRef}
+                data-chat-composer
                 value={text}
                 placeholder="自然语言描述你想做什么…"
                 rows={1}
@@ -225,18 +222,13 @@ export default function PanelChat() {
             </div>
 
             {/* 底部状态栏：目标 pane 上下文 + 权限模式 + 附件（AI 配置已上移到顶栏） */}
-            <div style={{
+            <div className="chat-input-status" style={{
               display: 'flex', alignItems: 'center', gap: 6,
               minHeight: 22, marginTop: 4, paddingTop: 5,
               fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', userSelect: 'none',
             }}>
               <ShellIndicator connected={targetConnected} focused={targetFocused} label={targetInfo?.shell ?? '本地'} />
-              {targetInfo?.cwd && (
-                <>
-                  <span style={{ color: 'var(--border-strong)', opacity: 0.5, margin: '0 1px' }}>·</span>
-                  <CurrentDir dir={targetInfo.cwd} />
-                </>
-              )}
+              {targetInfo?.cwd && <CurrentDir dir={targetInfo.cwd} />}
               <div style={{ flex: 1 }} />
               <PermissionModeButton mode={permMode} onChange={setPermMode} />
               {/* 📎 附件 */}

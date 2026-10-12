@@ -3,6 +3,7 @@ import { useSessionStore, isSessionTab } from '@features/workspace';
 import { useTerminalStore, getFocusedTerminalId } from '@features/terminal';
 import { countLeaves, leaves } from '@features/workspace/model/windowLayout';
 import { useUiStore } from '@features/workspace';
+import { redrawTerminal } from '@features/terminal/services/terminalRepaint';
 
 /**
  * 全局快捷键：
@@ -15,17 +16,25 @@ import { useUiStore } from '@features/workspace';
 
 export function useGlobalShortcuts() {
   useEffect(() => {
+    const redrawKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || !e.shiftKey || e.altKey
+        || e.isComposing || e.keyCode === 229 || e.key.toLowerCase() !== 'r') return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (!e.repeat) redrawTerminal();
+    };
     const preventZoomKeys = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
       if (!['=', '+', '-', '0', 'Add', 'Subtract'].includes(e.key)
-        && !['NumpadAdd', 'NumpadSubtract', 'Numpad0'].includes(e.code)) return;
+        && !['NumpadAdd', 'NumpadSubtract', 'Numpad0', 'NumpadEqual'].includes(e.code)) return;
       e.preventDefault();
-      e.stopPropagation();
+      e.stopImmediatePropagation();
     };
     const preventZoomWheel = (e: WheelEvent) => {
       if (e.ctrlKey || e.metaKey) e.preventDefault();
     };
     const preventZoomGesture = (e: Event) => e.preventDefault();
+    const preventNativeContextMenu = (e: MouseEvent) => e.preventDefault();
 
     const handler = (e: KeyboardEvent) => {
 
@@ -115,15 +124,21 @@ export function useGlobalShortcuts() {
       }
     };
     window.addEventListener('keydown', preventZoomKeys, true);
+    window.addEventListener('keydown', redrawKey, true);
     window.addEventListener('wheel', preventZoomWheel, { capture: true, passive: false });
     window.addEventListener('gesturestart', preventZoomGesture, { capture: true, passive: false });
     window.addEventListener('gesturechange', preventZoomGesture, { capture: true, passive: false });
+    window.addEventListener('gestureend', preventZoomGesture, { capture: true, passive: false });
+    window.addEventListener('contextmenu', preventNativeContextMenu, true);
     window.addEventListener('keydown', handler);
     return () => {
       window.removeEventListener('keydown', preventZoomKeys, true);
+      window.removeEventListener('keydown', redrawKey, true);
       window.removeEventListener('wheel', preventZoomWheel, true);
       window.removeEventListener('gesturestart', preventZoomGesture, true);
       window.removeEventListener('gesturechange', preventZoomGesture, true);
+      window.removeEventListener('gestureend', preventZoomGesture, true);
+      window.removeEventListener('contextmenu', preventNativeContextMenu, true);
       window.removeEventListener('keydown', handler);
     };
   }, []);

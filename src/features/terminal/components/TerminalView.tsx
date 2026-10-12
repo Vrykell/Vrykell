@@ -9,7 +9,7 @@
 
 import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
 import { useTypographyStore } from '@config/typography';
-import { useRef, useEffect, useMemo, useState, useId } from 'react';
+import { useRef, useEffect, useLayoutEffect, useMemo, useState, useId } from 'react';
 import OverlayScrollbar from '@ui/OverlayScrollbar';
 import { CircleX, Minimize2, Square } from '@ui/icons';
 import { STATUS_ACTION_ICON_SIZE, StatusActionButton, TerminalStatusBar } from '@features/terminal/components/TerminalStatusBar';
@@ -41,6 +41,8 @@ import { useTerminalLayoutActions } from '@features/terminal/hooks/useTerminalLa
 import { useTuiControls } from '@features/terminal/hooks/useTuiControls';
 import { copyTerminalSelection, getPaneTerminal, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
 import { t } from '@i18n';
+import { focusSessionInput } from '../services/terminalFocus';
+import { TerminalRedrawButton } from './TerminalRedrawButton';
 
 export default function TerminalView() {
   const tabs = useSessionStore((s) => s.tabs);
@@ -63,7 +65,6 @@ export default function TerminalView() {
 
   return (
     <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
-      {!activeTab && <SessionHistoryView />}
       {/* 所有 session tab 保持挂载，非活跃 tab 隐藏而非卸载 ——
           卸载会触发 useTerminalSession cleanup 里的 ptyClose，杀掉运行中的命令。
           切走再切回时 PTY/块列表/离屏终端全部存活。 */}
@@ -136,6 +137,9 @@ function SessionTabView(props: {
   const focusBlocks = useBlockStore(selectBlocks(focusedTermId));
   const hasExecutingBlock = focusBlocks.some((b) => b.status === 'executing');
   useTerminalFocus(active && scene === 'blockList' && hasExecutingBlock, focusedTermId);
+  useLayoutEffect(() => {
+    if (active) focusSessionInput(focusedTermId);
+  }, [active, focusedTermId, scene, hasExecutingBlock, sessions[focusedTermId]]);
 
   const {
     splitPlacement,
@@ -592,6 +596,7 @@ function TuiBanner({ tabId }: { tabId: string }) {
         label={`TUI${runningCommand ? ` · ${runningCommand}` : ''}`}
         style={{ flex: 1, minWidth: 0, marginBottom: 0 }}
         actions={<>
+          <TerminalRedrawButton paneId={tabId} />
           <StatusActionButton title={t('Interrupt command')} shortcut="Control+C" onClick={sendCtrlC} label={<Square size={STATUS_ACTION_ICON_SIZE} />} />
           <StatusActionButton title={killArmed ? t('Force quit foreground process') : t('Quit foreground process')} onClick={killApp} label={<CircleX size={STATUS_ACTION_ICON_SIZE} />} />
           {altScreenActive && <StatusActionButton title={t('Exit fullscreen')} onClick={exitFullScreen} label={<Minimize2 size={STATUS_ACTION_ICON_SIZE} />} />}

@@ -1,5 +1,16 @@
 /** Simplified Chinese messages for shared UI and feature namespaces. */
 const zh: Record<string, string> = {
+  'All modes': '全部模式',
+  'Block terminal': '块终端',
+  'Classic terminal': '普通终端',
+  'Terminal startup mode': '终端启动模式',
+  'Sort sessions': '会话排序',
+  'Recently closed': '最近关闭',
+  'Earliest closed': '最早关闭',
+  'Recently created': '最近创建',
+  'Earliest created': '最早创建',
+  'Title A–Z': '标题正序',
+  'Title Z–A': '标题倒序',
   'Current command': '当前命令',
   'Show command header': '显示命令标题',
   'Hide command header': '收起命令标题',
@@ -174,6 +185,9 @@ const zh: Record<string, string> = {
   "Open settings": "打开设置",
   "Focus command input": "切回命令输入栏",
   "Keyboard shortcuts": "快捷键说明",
+  'Redraw terminal': '重绘终端',
+  'Reload': '重新加载',
+  'Refresh the terminal display while keeping the running session': '刷新终端画面，保留运行中的会话',
 
   'File open-with': '文件打开方式',
   'Search settings…': '搜索设置…',

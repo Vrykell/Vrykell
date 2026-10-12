@@ -63,6 +63,8 @@ export function useTerminalFocus(active: boolean, tabId: string): void {
 
     // 点击面板空白处即预聚焦 xterm（划选文本时不抢焦点）
     const onClick = (e: MouseEvent) => {
+      const pane = term.element?.closest('.terminal-pane');
+      if (!(e.target instanceof Node) || !(pane?.contains(e.target) || term.element?.contains(e.target))) return;
       if (isEditable(e.target)) return;
       if (!window.getSelection()?.isCollapsed) return;
       term.focus();
