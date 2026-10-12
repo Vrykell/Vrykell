@@ -45,9 +45,6 @@ export function useChatComposer({
     if (!draft) return;
     setText(draft);
     setDraft('');
-    const element = inputRef.current;
-    if (!element) return;
-    element.focus();
   }, [draft, setDraft, setText]);
 
   useEffect(() => {

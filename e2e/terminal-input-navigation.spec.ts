@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { gotoSetting } from './settings';
-import { setupTauriMock, ptyWrites, emitPtyOutput } from './tauri-mock';
+import { setupTauriMock, ptyWrites, emitPtyOutput, terminalRowHeight } from './tauri-mock';
 
 async function ready(page: Page) {
   await setupTauriMock(page);
@@ -181,7 +181,9 @@ test('font family, weight and spacing update existing terminal history and persi
   }
   const preview = page.getByLabel('终端字体预览');
   await expect(preview).toHaveCSS('font-weight', '350');
-  await expect(preview).toHaveCSS('line-height', '20px');
+  // 行高来自字体实测（字号公式会与画布网格差数像素）
+  const rowHeightAtOnePointTwo = await terminalRowHeight(page);
+  await expect(preview).toHaveCSS('line-height', `${rowHeightAtOnePointTwo}px`);
   await expect(preview).toHaveCSS('font-family', /Maple Mono NF CN/);
   await page.screenshot({ path: test.info().outputPath('terminal-typography-settings.png') });
   await page.keyboard.press('Meta+1');
@@ -190,7 +192,7 @@ test('font family, weight and spacing update existing terminal history and persi
   await expect(input).toHaveCSS('line-height', '27px');
   await expect(command).toHaveCSS('font-weight', '450');
   await expect(output).toHaveCSS('font-weight', '350');
-  await expect(output).toHaveCSS('line-height', '20px');
+  await expect(output).toHaveCSS('line-height', `${rowHeightAtOnePointTwo}px`);
   await expect.poll(() => page.evaluate(() => {
     const scope = window as unknown as { __vrykellTerms: Map<string, import('@xterm/xterm').Terminal> };
     return [...scope.__vrykellTerms.values()].every(term => term.options.fontWeight === 350 && term.options.lineHeight === 1.2 && term.options.fontFamily!.includes('Maple Mono NF CN'));
@@ -218,6 +220,6 @@ test('font family, weight and spacing update existing terminal history and persi
   await gotoSetting(page, '主题');
   await page.getByRole('button', { name: '恢复默认字体设置' }).click();
   await expect(preview).toHaveCSS('font-weight', '400');
-  await expect(preview).toHaveCSS('line-height', '16px');
+  await expect(preview).toHaveCSS('line-height', `${await terminalRowHeight(page)}px`);
   await expect(page.getByRole('combobox', { name: '终端字体', exact: true })).toHaveText('系统等宽字体');
 });

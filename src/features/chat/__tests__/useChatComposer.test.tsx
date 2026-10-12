@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { act, renderHook } from '@testing-library/react';
+import { act, render, renderHook, screen } from '@testing-library/react';
 import type { AttachmentMeta } from '@features/agent/model/attachments';
 import { useChatComposer } from '@features/chat/hooks/useChatComposer';
 
@@ -65,5 +65,30 @@ describe('useChatComposer', () => {
     act(() => result.current.setText('不应发送'));
     act(() => result.current.submit());
     expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores a saved draft without moving focus into the chat composer', () => {
+    const setDraft = vi.fn();
+    function Harness() {
+      const { inputRef, text, handleChange } = useChatComposer({
+        questions: [],
+        draft: 'saved draft',
+        setDraft,
+        send: vi.fn().mockResolvedValue(undefined),
+        sending: false,
+        isSession: true,
+        targetPane: 'pane-1',
+        attachments: [],
+        clearAttachments: vi.fn(),
+      });
+      return <textarea ref={inputRef} aria-label="chat composer" value={text} onChange={handleChange} />;
+    }
+
+    render(<Harness />);
+
+    const composer = screen.getByRole('textbox', { name: 'chat composer' });
+    expect(composer).toHaveValue('saved draft');
+    expect(composer).not.toHaveFocus();
+    expect(setDraft).toHaveBeenCalledWith('');
   });
 });
