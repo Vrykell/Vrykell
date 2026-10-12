@@ -99,7 +99,9 @@ function applyTypography(state: TypographyState): void {
   root.setProperty('--terminal-bold-weight', String(Math.max(700, state.terminalFontWeight)));
   root.setProperty('--terminal-input-row-height', `${Math.ceil(Math.max(22, state.terminalFontSize * 16 / 14) * state.terminalLineHeight)}px`);
   root.setProperty('--terminal-command-weight', String(Math.min(900, state.terminalFontWeight + 100)));
-  root.setProperty('--terminal-row-height', `${Math.ceil(state.terminalFontSize * 16 / 14 * state.terminalLineHeight)}px`);
+  // `--terminal-row-height` is the terminal cell height: it belongs to the resolved font, so the
+  // terminal layer measures it (see features/terminal/model/terminalFont.ts) instead of deriving
+  // it here, where only the font size is known.
 }
 
 applyTypography(useTypographyStore.getState());

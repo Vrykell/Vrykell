@@ -70,6 +70,10 @@ else
 fi
 __ait_preexec() {
   [[ $__ait_in_prompt == 0 ]] && return
+  # The debug trap runs before the prompt hook can reset its ready flag.
+  case "$BASH_COMMAND" in
+    __ait_prompt_command|__ait_mark_prompt_ready) return ;;
+  esac
   __ait_in_prompt=0
   local __ait_history_line=$(HISTTIMEFORMAT= history 1)
   local __ait_command=${__ait_history_line##*  }
@@ -430,7 +434,7 @@ HISTTIMEFORMAT='%F %T '
         drop(pair.slave);
         let mut reader = pair.master.try_clone_reader().unwrap();
         let mut writer = pair.master.take_writer().unwrap();
-        writer.write_all(b"ls\nexit\n").unwrap();
+        writer.write_all(b"\nls\n\n \n\nexit\n").unwrap();
         writer.flush().unwrap();
 
         let mut output = Vec::new();
@@ -439,7 +443,8 @@ HISTTIMEFORMAT='%F %T '
         let output = String::from_utf8_lossy(&output);
         let prompt_st = output.matches("\u{1b}]133;A\u{1b}\\").count();
         let prompt_bel = output.matches("\u{1b}]133;A\u{07}").count();
-        assert_eq!(prompt_st + prompt_bel, 2, "one prompt marker per shell prompt");
+        assert_eq!(prompt_st + prompt_bel, 6, "one prompt marker per shell prompt");
+        assert_eq!(output.matches("\u{1b}]133;C\u{07}").count(), 2);
 
         let commands = output
             .split("\u{1b}]133;E;")

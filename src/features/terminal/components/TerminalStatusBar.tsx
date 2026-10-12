@@ -45,12 +45,14 @@ export function TerminalStatusBar({ cwd, startedAt, label, gitBranch, agent, act
 }
 
 /** Compact icon action button shared by both terminal status bars. */
-export function StatusActionButton({ title, shortcut, onClick, label }: {
+export function StatusActionButton({ title, shortcut, onClick, label, busy = false }: {
   title: string;
   shortcut?: string;
   onClick: (event: React.MouseEvent) => void;
   label: ReactNode;
+  busy?: boolean;
 }) {
   return <IconButton compact data-subtle data-tip={title} data-tip-shortcut={shortcut} aria-label={title}
+    disabled={busy} aria-busy={busy}
     onClick={event => { event.stopPropagation(); onClick(event); }}>{label}</IconButton>;
 }

@@ -1,5 +1,6 @@
 import { t } from '@i18n';
 import { TextInput } from '@ui/TextInput';
+import { useReloadFeedback } from '@ui/useReloadFeedback';
 /**
  * Appearance, typography, wallpaper and theme files.
  */
@@ -23,6 +24,7 @@ export function ThemePage() {
   const exportTo = useTerminalThemeStore((s) => s.exportTo);
   const importFrom = useTerminalThemeStore((s) => s.importFrom);
   const reloadTheme = useTerminalThemeStore((s) => s.load);
+  const reload = useReloadFeedback(reloadTheme);
   const [themePath, setThemePath] = useState('');
   const { save } = useSettingsSave();
 
@@ -191,9 +193,9 @@ export function ThemePage() {
                 <FileText size={iconSizes.control} /> 打开配置文件
               </span>
             </button>
-            <button onClick={() => void reloadTheme()} style={btnStyle}>
+            <button onClick={() => void reload.run()} disabled={reload.busy} aria-busy={reload.busy} style={btnStyle}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <RefreshCw size={iconSizes.control} /> 重新加载
+                <RefreshCw size={iconSizes.control} className={reload.busy ? 'reload-spin' : undefined} /> {t('Reload')}
               </span>
             </button>
             {themePath && (

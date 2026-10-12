@@ -1,13 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { readClipboardFiles, readClipboardText, writeClipboardFiles, writeClipboardText } from '@platform/clipboard';
+import { hasClipboardImage, readClipboardFiles, readClipboardText, writeClipboardFiles, writeClipboardText } from '@platform/clipboard';
 
 const nativeWriteText = vi.hoisted(() => vi.fn());
 const nativeReadText = vi.hoisted(() => vi.fn());
+const nativeReadImage = vi.hoisted(() => vi.fn());
 const invokeMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@tauri-apps/plugin-clipboard-manager', () => ({
   writeText: nativeWriteText,
   readText: nativeReadText,
+  readImage: nativeReadImage,
 }));
 
 vi.mock('@platform/diagnostics', () => ({ invoke: invokeMock }));
@@ -61,6 +63,19 @@ describe('writeClipboardText', () => {
     await writeClipboardText('fallback');
 
     expect(execCommand).toHaveBeenCalledWith('copy');
+  });
+});
+
+describe('clipboard image detection', () => {
+  it('detects native images and releases the image resource without changing the clipboard', async () => {
+    (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {};
+    const close = vi.fn().mockResolvedValue(undefined);
+    nativeReadImage.mockResolvedValue({ close });
+    await expect(hasClipboardImage()).resolves.toBe(true);
+    expect(close).toHaveBeenCalledOnce();
+    nativeReadImage.mockRejectedValueOnce(new Error('no image'));
+    await expect(hasClipboardImage()).resolves.toBe(false);
+    delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
   });
 });
 

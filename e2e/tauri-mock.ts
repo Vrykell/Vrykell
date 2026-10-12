@@ -378,6 +378,11 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
           case 'plugin:clipboard-manager|read_text':
             // Tests may seed the clipboard by assigning __CLIPBOARD_TEXT__ before pasting.
             return (window as unknown as Record<string, string>).__CLIPBOARD_TEXT__ ?? clipboardText;
+          case 'plugin:clipboard-manager|read_image':
+            if ((window as unknown as { __CLIPBOARD_IMAGE__?: boolean }).__CLIPBOARD_IMAGE__) return 700;
+            throw new Error('No clipboard image');
+          case 'plugin:resources|close':
+            return undefined;
           case 'clipboard_write_files': {
             clipboardFiles = { paths: args.paths as string[], mode: args.mode as string };
             (window as unknown as Record<string, unknown>).__CLIPBOARD_FILES__ = clipboardFiles;
@@ -1226,4 +1231,15 @@ export async function ensureTabsOpen(page: Page): Promise<void> {
     await page.locator('[data-dock-btn="tabs"]').click();
   }
   await search.waitFor({ state: 'visible' });
+}
+
+/**
+ * Returns the measured cell height used by completed-block snapshots.
+ * Geometry assertions should compare against this value rather than hard-coded pixels.
+ */
+export async function terminalRowHeight(page: Page): Promise<number> {
+  return page.evaluate(async () => {
+    const font = await import('/src/features/terminal/model/terminalFont.ts') as typeof import('../src/features/terminal/model/terminalFont');
+    return font.measureTerminalDomCellHeight();
+  });
 }

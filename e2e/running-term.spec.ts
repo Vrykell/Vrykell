@@ -1,5 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, emitPtyOutput, expectAnyTermContains } from './tauri-mock';
+import { setupTauriMock, emitPtyOutput, expectAnyTermContains, ptyWrites } from './tauri-mock';
+
+interface RunningTermScrollProbe {
+  buffer: { active: { viewportY: number; baseY: number } };
+  scrollToBottom(): void;
+}
 
 /**
  * 运行中 block 的活终端：block 卡片直接挂载真实可见的 xterm 实例
@@ -38,6 +43,35 @@ test('运行中 block 挂载可见 xterm，输出实时渲染，完成后换成�
   await emitPtyOutput(page, `\x1b]133;D;0\x07`);
   await expect(host.locator('.xterm')).toBeHidden({ timeout: 3000 });
   await expect(page.getByText('hello world')).toBeVisible({ timeout: 3000 });
+});
+
+test('running block redraw preserves its output and process without sending PTY input', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  await startRunningBlock(page);
+  await emitPtyOutput(page, 'live-before-redraw\r\n');
+  await expectAnyTermContains(page, 'live-before-redraw');
+  const block = page.locator('[data-testid^="running-block-"]').first();
+  const blockId = await block.getAttribute('data-command-block-id');
+  const before = await ptyWrites(page);
+  await block.hover();
+  await page.clock.pauseAt(new Date());
+  const redraw = block.getByRole('button', { name: '重绘终端' });
+  await redraw.click();
+  await expect(redraw).toBeDisabled();
+  await expect(redraw).toHaveAttribute('aria-busy', 'true');
+  await expect(redraw.locator('svg')).toHaveCSS('animation-name', 'spin');
+  await page.clock.runFor(850);
+  await expect(redraw).toBeEnabled();
+  await expect(redraw.locator('svg')).toHaveCSS('animation-name', 'none');
+  await page.clock.resume();
+  await expect(block).toHaveAttribute('data-command-block-id', blockId!);
+  await expect(block).toHaveAttribute('data-running', 'true');
+  await expect(block.getByTestId('running-term').locator('.xterm')).toBeVisible();
+  await expectAnyTermContains(page, 'live-before-redraw');
+  expect(await ptyWrites(page)).toEqual(before);
+  await emitPtyOutput(page, 'live-after-redraw\r\n');
+  await expectAnyTermContains(page, 'live-after-redraw');
 });
 
 test('已有历史命令时，运行中的输出会持续保持在可见区域', async ({ page }) => {
@@ -137,7 +171,7 @@ test('手动全屏：块内活终端搬进全屏宿主，退出后搬回卡片',
   await expect(page.getByTestId('tui-fullscreen')).toHaveCount(0);
 });
 
-test('卡片内滚轮冒泡到块列表滚动容器（不被块 xterm 吞掉）', async ({ page }) => {
+test('运行中块接管滚轮：xterm 回溯时不滚动外层命令历史', async ({ page }) => {
   await setupTauriMock(page);
   // 小视口保证块列表溢出可滚（卡片高度跟随内容行数增长）
   await page.setViewportSize({ width: 800, height: 320 });
@@ -153,38 +187,30 @@ test('卡片内滚轮冒泡到块列表滚动容器（不被块 xterm 吞掉）'
   );
   await expectAnyTermContains(page, 'line-39', 3000);
 
-  const setTop = (top: number) =>
-    page.evaluate((t) => {
-      let el: HTMLElement | null = document.querySelector('[data-testid="running-term"]');
-      while (el && !/auto|scroll/.test(getComputedStyle(el).overflowY)) el = el.parentElement;
-      if (el) el.scrollTop = t;
-    }, top);
-  const scrollerTop = () =>
-    page.evaluate(() => {
-      let el: HTMLElement | null = document.querySelector('[data-testid="running-term"]');
-      while (el && !/auto|scroll/.test(getComputedStyle(el).overflowY)) el = el.parentElement;
-      return el?.scrollTop ?? -1;
-    });
+  const blockScroll = () => page.evaluate(() => {
+    const terms = (window as unknown as { __vrykellTerms?: Map<string, RunningTermScrollProbe> }).__vrykellTerms;
+    const key = [...(terms?.keys() ?? [])].find((entry) => entry.startsWith('block:'));
+    const term = key ? terms?.get(key) : undefined;
+    return { viewportY: term?.buffer.active.viewportY ?? -1, baseY: term?.buffer.active.baseY ?? -1 };
+  });
+  await page.evaluate(() => {
+    const terms = (window as unknown as { __vrykellTerms?: Map<string, RunningTermScrollProbe> }).__vrykellTerms;
+    const key = [...(terms?.keys() ?? [])].find((entry) => entry.startsWith('block:'));
+    if (key) terms?.get(key)?.scrollToBottom();
+  });
+  const before = await blockScroll();
+  expect(before.baseY).toBeGreaterThan(0);
 
-  // 先滚到顶部，留出向下滚动空间（渲染完成后 follow-bottom 已把容器贴在底部）
-  await setTop(0);
-  await expect(async () => {
-    expect(await scrollerTop()).toBeLessThan(50);
-  }).toPass({ timeout: 3000 });
-
-  // 滚轮落在运行中卡片的 xterm 上：事件应冒泡给块列表 DOM 滚动容器
-  //（回归：xterm 默认吞 wheel 并 preventDefault，整页滚不动）
-  const box = await host.locator('.xterm').boundingBox();
-  expect(box).not.toBeNull();
-  // 取卡片可视区域内的一点（避开顶部卡片头与底部输入栏）
-  const scrollBounds = (await page.locator('[data-testid^="terminal-scroll-"]').first().boundingBox())!;
-  const wheelY = Math.min(box!.y + 10, scrollBounds.y + scrollBounds.height - 10);
-  await page.mouse.move(box!.x + box!.width / 2, wheelY);
-  await page.mouse.wheel(0, 300);
-
-  await expect(async () => {
-    expect(await scrollerTop()).toBeGreaterThan(50);
-  }).toPass({ timeout: 5000 });
+  const parent = page.locator('[data-testid^="terminal-scroll-"]').first();
+  const screen = host.locator('.xterm-screen');
+  const screenBox = await screen.boundingBox();
+  expect(screenBox).not.toBeNull();
+  const screenPoint = { x: screenBox!.width / 2, y: screenBox!.height / 2 };
+  await screen.hover({ position: screenPoint });
+  const parentTop = await parent.evaluate((el) => el.scrollTop);
+  await page.mouse.wheel(0, -300);
+  await expect.poll(async () => (await blockScroll()).viewportY).toBeLessThan(before.viewportY);
+  await expect.poll(() => parent.evaluate((el) => el.scrollTop)).toBe(parentTop);
 });
 
 test('块终端与页面同色且无圆角，裁剪仍落在 el', async ({ page }) => {

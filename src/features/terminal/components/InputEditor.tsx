@@ -4,19 +4,7 @@ import KeyHint from '@ui/KeyHint';
 import { IconButton } from '@ui/IconButton';
 import { TextButton } from '@ui/TextButton';
 import { PermissionModeButton } from '@features/agent';
-/**
- * InputEditor — 命令输入栏（对应文档 §7 输入框可见性状态机）。
- *
- * 每个 InputEditor 实例绑定一个 pane（未分屏 = 活跃标签 id；分屏后每个 pane 渲染各自的
- * 输入栏），text / AI 模式 / cwd / git 分支 / 提交路由都只针对该 pane，互不影响。
- *
- * ：
- *   ┌──────────────────────────────────────────────┐
- *   │ border-top (subtle，聚焦态无高亮)              │
- *   │  [shell胶囊] · ~/cwd · ⎇branch  [分屏][cmd/AI]│  ← prompt_elements
- *   │  $  [textarea.........................] ⤴ ✕  │  ← input_box
- *   └──────────────────────────────────────────────┘
- */
+/** Pane-scoped composer with separate input and context-chip rows. */
 
 import { iconSizes,
   ArrowUp, ArrowDown, DollarSign, Columns2, GitBranch, Paperclip,
@@ -194,6 +182,7 @@ export default function InputEditor({
           <div style={{ position: 'relative', flex: 1, minWidth: 0, display: 'flex' }}>
             <TextArea
               ref={inputRef}
+              data-terminal-input
               value={text}
               placeholder={aiMode ? '自然语言描述你想做什么…' : '输入命令…'}
               rows={1}
@@ -282,13 +271,9 @@ export default function InputEditor({
           }}
         >
           <ShellIndicator connected={hasSession} focused={isFocused} label={terminalLabel} />
-          <span style={{ color: 'var(--border-strong)', opacity: 0.5, margin: '0 1px' }}>·</span>
           <DirectoryPicker paneId={paneId} dir={tabCwd} />
           {recentGitBranch && (
-            <>
-              <span style={{ color: 'var(--border-strong)', opacity: 0.5, margin: '0 1px' }}>·</span>
-              <GitBranchLabel branch={recentGitBranch} />
-            </>
+            <GitBranchLabel branch={recentGitBranch} />
           )}
           <div style={{ flex: 1 }} />
           {/* AI / cmd 模式 pill（AI 面板开启时锁定 cmd，显式禁用） */}

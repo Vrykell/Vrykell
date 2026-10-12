@@ -510,9 +510,9 @@ export function useTerminalSession(
     term.attachCustomKeyEventHandler((e) => {
       // 复制/粘贴归终端：Ctrl+C 有选区时复制（没有选区仍是 PTY 的中断），Ctrl+V 粘贴；
       // Ctrl+Shift+C/V 同样有效。
-      if (e.type === 'keydown' && e.ctrlKey && !e.altKey && !e.metaKey) {
+      if (e.type === 'keydown' && (e.ctrlKey || e.metaKey) && !e.altKey) {
         const key = e.key.toLowerCase();
-        const copy = key === 'c' && (e.shiftKey || term.hasSelection());
+        const copy = key === 'c' && (e.metaKey || e.shiftKey || term.hasSelection());
         const paste = key === 'v';
         if (copy || paste) {
           e.preventDefault();
@@ -699,12 +699,21 @@ export function useTerminalSession(
     // a repaint, and a WebGL context lost while hidden steps down to the DOM renderer without
     // drawing any rows. Restore the surface on the way back and repaint from the buffer.
     const restoreSurface = () => {
+      if (disposed || el.offsetWidth === 0 || el.offsetHeight === 0) return;
       applyTerminalRenderer(term, useTypographyStore.getState().terminalRenderer);
       repaintTerminal(term);
       if (isTerminalDebugEnabled()) {
         terminalDebug('terminal-visibility-repaint', { paneId, scene: currentScene, cols: term.cols, rows: term.rows });
       }
     };
+    let restoreRaf = 0;
+    const unsubscribeActiveTab = useSessionStore.subscribe((state, previous) => {
+      if (state.activeId !== tabId || state.activeId === previous.activeId) return;
+      // The store changes before React reveals the pane. Repaint after layout even
+      // when a rapid tab switch never produces a zero-size ResizeObserver entry.
+      cancelAnimationFrame(restoreRaf);
+      restoreRaf = requestAnimationFrame(() => { restoreSurface(); applyWidth(); });
+    });
     let paneWasHidden = false;
     const ro = new ResizeObserver(() => {
       if (el.offsetWidth === 0 || el.offsetHeight === 0) {
@@ -725,6 +734,8 @@ export function useTerminalSession(
 
     return () => {
       unsubscribeTypography();
+      unsubscribeActiveTab();
+      cancelAnimationFrame(restoreRaf);
       disposed = true;
       if (closeSessionRef.current === close) closeSessionRef.current = async () => {};
       startupAbort.abort();

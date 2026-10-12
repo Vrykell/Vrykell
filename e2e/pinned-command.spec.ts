@@ -60,7 +60,17 @@ test('viewport command follows history, collapses independently and keeps hover 
   await expect(pinned).toHaveCount(0);
   await move('sticky-1', 140);
   await expect(pinned).toHaveAttribute('data-collapsed', 'true');
-  await pinned.locator('.pinned-command-toggle-slot').hover();
+  // The whole collapsed top strip reveals the toggle, including its far edge.
+  const collapsedBox = (await pinned.boundingBox())!;
+  for (const offset of [1, 12, collapsedBox.width / 2, collapsedBox.width - 2]) {
+    await page.mouse.move(collapsedBox.x + offset, collapsedBox.y + 12);
+    await expect(show).toHaveCSS('opacity', '1');
+    expect(await pinned.evaluate((element, x) => {
+      const rect = element.getBoundingClientRect();
+      return element.contains(document.elementFromPoint(rect.x + x, rect.y + 12));
+    }, offset)).toBe(true);
+    expect(await page.getByTestId('command-block-sticky-1').evaluate(element => element.matches(':hover'))).toBe(false);
+  }
   await expect(show).toHaveCSS('opacity', '1');
   await expect(show).toHaveCSS('border-radius', '999px');
   await expect(show).toHaveCSS('width', '32px');

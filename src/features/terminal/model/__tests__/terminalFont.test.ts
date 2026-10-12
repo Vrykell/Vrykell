@@ -1,6 +1,6 @@
 import { useTypographyStore } from '@config/typography';
 import { afterEach, describe, expect, it } from 'vitest';
-import { getTerminalFontOptions, snapLetterSpacing } from '../terminalFont';
+import { cellHeightFromLineBox, getTerminalFontOptions, measureTerminalDomCellHeight, snapLetterSpacing } from '../terminalFont';
 
 describe('terminal cell width snapping', () => {
   it('absorbs the fractional part of the measured advance', () => {
@@ -26,4 +26,29 @@ it('uses matching font preferences for terminal output and cell measurements', (
   expect(options).toMatchObject({ fontWeight: 350, fontWeightBold: 700, fontSize: 14, lineHeight: 1.2 });
   expect(options.fontFamily.indexOf('Noto Sans Mono CJK SC')).toBeLessThan(options.fontFamily.indexOf('monospace'));
   expect(document.querySelector('span')).toBeNull();
+});
+
+describe('terminal cell height', () => {
+  it('truncates the line box the way the canvas sizes a row', () => {
+    // Values measured against xterm's own cell height at the same font settings.
+    expect(cellHeightFromLineBox(20, 1)).toBe(20);
+    expect(cellHeightFromLineBox(20, 1.2)).toBe(24);
+    expect(cellHeightFromLineBox(17, 1.4)).toBe(23);
+    expect(cellHeightFromLineBox(26, 1.4)).toBe(36);
+    expect(cellHeightFromLineBox(15, 1.2)).toBe(18);
+  });
+
+  it('ignores unusable measurements', () => {
+    expect(cellHeightFromLineBox(0, 1)).toBe(0);
+    expect(cellHeightFromLineBox(Number.NaN, 1)).toBe(0);
+    expect(cellHeightFromLineBox(-4, 1)).toBe(0);
+    expect(cellHeightFromLineBox(20, Number.NaN)).toBe(20);
+  });
+
+  it('publishes the measured row height for completed snapshots', () => {
+    useTypographyStore.getState().update({ terminalFontSize: 16, terminalLineHeight: 1.4 });
+    const published = document.documentElement.style.getPropertyValue('--terminal-row-height');
+    expect(published).toBe(`${measureTerminalDomCellHeight()}px`);
+    expect(Number.parseInt(published, 10)).toBeGreaterThan(0);
+  });
 });

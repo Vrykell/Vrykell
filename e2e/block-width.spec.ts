@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, emitPtyOutput, ptyResizes } from './tauri-mock';
+import { setupTauriMock, emitPtyOutput, ptyResizes, terminalRowHeight } from './tauri-mock';
 
 test('maximized command output uses the available columns without a fixed 80-column limit', async ({ page }) => {
   await setupTauriMock(page);
@@ -201,7 +201,8 @@ test('line-editor repaint does not add a prompt or inherited blank rows to comma
   await expect(output).toContainText('Documents');
   await expect(output).not.toContainText('PS>');
   const grid = output.locator(':scope > div');
-  expect(await grid.evaluate(el => el.clientHeight)).toBeLessThanOrEqual(34);
+  // Two output rows must stay two rows, without a prompt or inherited blank row.
+  expect(await grid.evaluate(el => el.clientHeight)).toBeLessThanOrEqual((await terminalRowHeight(page)) * 2 + 2);
 });
 
 test('运行中卡片：PTY/块终端宽度跟随卡片内容宽（右缘不裁剪）', async ({ page }) => {
