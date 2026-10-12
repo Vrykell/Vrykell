@@ -43,7 +43,7 @@ test.describe('SSH 远程连接管理侧栏', () => {
   });
   test('顶栏：搜索 + 编辑 + 新建按钮', async ({ page }) => {
     await expect(page.locator('[data-testid="ssh-search"]')).toBeVisible();
-    await expect(page.locator('[data-testid="ssh-edit-btn"]')).toBeVisible();
+    await expect(page.getByRole('button', { name: '编辑「生产服务器」', exact: true })).toBeVisible();
     await expect(page.locator('[data-testid="ssh-new-btn"]')).toBeVisible();
   });
 
@@ -77,9 +77,10 @@ test.describe('SSH 远程连接管理侧栏', () => {
 
   test('编辑选中连接并删除', async ({ page }) => {
     await page.getByText('生产服务器').click(); // 选中
-    await page.locator('[data-testid="ssh-edit-btn"]').click();
+    await page.getByRole('button', { name: '编辑「生产服务器」', exact: true }).click();
     await expect(page.locator('[data-testid="ssh-form-name"]')).toHaveValue('生产服务器');
     await page.locator('[data-testid="ssh-delete-btn"]').click();
+    await page.getByTestId('confirm-ok').click();
     await expect(page.getByText(/暂无 SSH 连接/)).toBeVisible();
   });
 
@@ -90,7 +91,7 @@ test.describe('SSH 远程连接管理侧栏', () => {
     await expect(page.locator('[data-testid="ssh-test-result"]')).toContainText('连接超时');
     await page.locator('[data-testid="ssh-form-host"]').fill('good.example.com');
     await page.locator('[data-testid="ssh-test-btn"]').click();
-    await expect(page.locator('[data-testid="ssh-test-result"]')).toContainText('连接成功');
+    await expect(page.locator('[data-testid="ssh-test-result"]')).toContainText('认证成功');
   });
 
   test('远程目录可下载，下载管理可定位到文件管理器', async ({ page }) => {

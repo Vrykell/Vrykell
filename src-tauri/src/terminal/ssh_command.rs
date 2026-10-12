@@ -9,6 +9,15 @@ pub struct SshOptions {
     pub jump_host: Option<String>,
     pub server_alive_interval: Option<u32>,
     pub shell_integration: Option<bool>,
+    /// `-L` specifications, e.g. `8080:localhost:80`.
+    pub local_forwards: Option<Vec<String>>,
+    /// `-R` specifications, forwarded from the remote side.
+    pub remote_forwards: Option<Vec<String>>,
+    /// `-D` specifications: a local SOCKS port.
+    pub dynamic_forwards: Option<Vec<String>>,
+    /// Retry the connection after an unexpected drop. Handled by the terminal session, kept here
+    /// so it persists with the rest of the connection options.
+    pub auto_reconnect: Option<bool>,
     /// `strict` (default) trusts only recorded hosts; `ask` lets the ssh client prompt in the
     /// terminal when the fingerprint is unknown, used when the preflight could not run.
     pub host_key_policy: Option<String>,
@@ -48,7 +57,40 @@ pub fn validate_options(options: &SshOptions) -> Result<(), String> {
             }
         }
     }
+    for spec in options.local_forwards.iter().flatten().chain(options.remote_forwards.iter().flatten()) {
+        if !valid_forward(spec, true) {
+            return Err("Invalid port forward (example: 8080:localhost:80)".into());
+        }
+    }
+    for spec in options.dynamic_forwards.iter().flatten() {
+        if !valid_forward(spec, false) {
+            return Err("Invalid dynamic forward (example: 1080)".into());
+        }
+    }
     Ok(())
+}
+
+/// A forward destination: `[bind:]port:host:hostport` for a static forward, `[bind:]port` for a
+/// dynamic one. The pattern is anchored and bracket-aware, so a spec can never be read as another
+/// client option, and every numeric field must be a usable port.
+pub(crate) fn valid_forward(spec: &str, with_host: bool) -> bool {
+    const HOST: &str = r"(?:\[[0-9a-fA-F:]+\]|[\w.][\w.-]*)";
+    static STATIC: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    static DYNAMIC: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let pattern = if with_host {
+        STATIC.get_or_init(|| {
+            regex::Regex::new(&format!(r"^(?:{HOST}:)?([0-9]{{1,5}}):{HOST}:([0-9]{{1,5}})$")).expect("valid forward pattern")
+        })
+    } else {
+        DYNAMIC.get_or_init(|| {
+            regex::Regex::new(&format!(r"^(?:{HOST}:)?([0-9]{{1,5}})$")).expect("valid dynamic forward pattern")
+        })
+    };
+    pattern.captures(spec).is_some_and(|captures| {
+        captures.iter().skip(1).flatten().all(|port| {
+            port.as_str().parse::<u16>().ok().is_some_and(|port| port > 0)
+        })
+    })
 }
 
 pub fn verified_ssh_options(key_type: Option<&str>, known_hosts: &Path) -> Result<Vec<String>, String> {
@@ -102,7 +144,21 @@ pub fn build_ssh_command(target: &SshTarget, remote_command: Option<&str>) -> Re
         if !path.is_file() { return Err("指定的 SSH 私钥文件不存在".into()); }
         command.arg("-i"); command.arg(path); command.args(["-o", "IdentitiesOnly=yes"]);
     }
-    if let Some(jump) = &target.options.jump_host { command.args(["-J", jump]); }
+    if let Some(jump) = &target.options.jump_host {
+        command.args(["-J", if jump.eq_ignore_ascii_case("none") { "none" } else { jump }]);
+    }
+    for spec in target.options.local_forwards.iter().flatten() {
+        command.arg("-L");
+        command.arg(spec.as_str());
+    }
+    for spec in target.options.remote_forwards.iter().flatten() {
+        command.arg("-R");
+        command.arg(spec.as_str());
+    }
+    for spec in target.options.dynamic_forwards.iter().flatten() {
+        command.arg("-D");
+        command.arg(spec.as_str());
+    }
     command.args(ssh_args(&target.host, target.user.as_deref(), target.port));
     if target.options.shell_integration.unwrap_or(true) {
         if let Some(remote) = remote_command { command.arg(remote); }
@@ -162,6 +218,29 @@ mod tests {
     fn missing_explicit_identity_is_an_error() {
         let target: SshTarget = serde_json::from_value(serde_json::json!({"host":"server", "identityFile":"/missing/private/key"})).unwrap();
         assert!(build_ssh_command(&target, None).is_err());
+    }
+
+    #[test]
+    fn forwards_reach_the_client_and_bad_specs_are_rejected() {
+        let target: SshTarget = serde_json::from_value(serde_json::json!({
+            "host": "server",
+            "localForwards": ["8080:localhost:80", "127.0.0.1:9000:db:5432"],
+            "remoteForwards": ["5000:localhost:5000"],
+            "dynamicForwards": ["1080"]
+        }))
+        .unwrap();
+        let args: Vec<_> = build_ssh_command(&target, None).unwrap().get_argv().iter().map(|arg| arg.to_string_lossy().into_owned()).collect();
+        assert!(args.windows(2).any(|pair| pair == ["-L", "8080:localhost:80"]));
+        assert!(args.windows(2).any(|pair| pair == ["-L", "127.0.0.1:9000:db:5432"]));
+        assert!(args.windows(2).any(|pair| pair == ["-R", "5000:localhost:5000"]));
+        assert!(args.windows(2).any(|pair| pair == ["-D", "1080"]));
+
+        for bad in ["-oProxyCommand=x", "-:8080:localhost:80", "8080:localhost", "0:localhost:80", "99999:localhost:80", "8080:localhost:80 extra"] {
+            let options = SshOptions { local_forwards: Some(vec![bad.into()]), ..Default::default() };
+            assert!(validate_options(&options).is_err(), "{bad} should be rejected");
+        }
+        assert!(validate_options(&SshOptions { dynamic_forwards: Some(vec!["70000".into()]), ..Default::default() }).is_err());
+        assert!(validate_options(&SshOptions { dynamic_forwards: Some(vec!["1080".into(), "[::]:1081".into(), "[2001:db8::1]:1082".into()]), ..Default::default() }).is_ok());
     }
 
     #[test]

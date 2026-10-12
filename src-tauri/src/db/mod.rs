@@ -239,6 +239,68 @@ mod tests {
     }
 
     #[test]
+    fn persisted_blocks_and_messages_strip_recognizable_secrets() {
+        let db = test_db();
+        db.record_block("b1", "s1", None, "export TOKEN=abc123", "", "password=hunter2", "password=hunter2", Some(0), "done", 1, Some(2), "/work").unwrap();
+        db.append_chat_message("m1", "s1", "user", "my token=abcdef", 1, "", "").unwrap();
+        let block = &db.get_session_blocks("s1").unwrap()[0];
+        assert!(!block.command.contains("abc123"));
+        assert!(!block.output_clean.contains("hunter2"));
+        assert!(!block.output_html.contains("hunter2"));
+        let message = &db.get_chat_messages("s1").unwrap()[0];
+        assert!(!message.content.contains("abcdef"));
+    }
+
+    #[test]
+    fn redacted_history_preserves_json_and_uses_plain_output_for_styled_secrets() {
+        let db = test_db();
+        let parts = r#"[{"type":"text","text":"Authorization: Bearer xy.z"},{"type":"tool","input":{"password":"hunter2"}}]"#;
+        let attachments = r#"[{"name":"key","content":"token=abc123"}]"#;
+        db.append_chat_message("m1", "s1", "assistant", "ok", 1, parts, attachments).unwrap();
+        let messages = db.get_chat_messages("s1").unwrap();
+        let message = &messages[0];
+        let restored: serde_json::Value = serde_json::from_str(&message.parts).unwrap();
+        assert_eq!(restored[0]["type"], "text");
+        assert_eq!(restored[1]["input"]["password"], "[redacted]");
+        assert!(!message.parts.contains("xy.z"));
+        assert!(serde_json::from_str::<serde_json::Value>(&message.attachments).is_ok());
+        assert!(!message.attachments.contains("abc123"));
+        db.record_block("b1", "s1", None, "cat config", "token=abc123", "token=abc123", "<span>token=</span><span>abc123</span>", Some(0), "done", 1, Some(2), "/work").unwrap();
+        let blocks = db.get_session_blocks("s1").unwrap();
+        assert_eq!(blocks[0].output_clean, "[redacted]");
+        assert!(blocks[0].output_html.is_empty());
+    }
+
+    #[test]
+    fn command_history_redacts_secrets_before_deduplication_and_search() {
+        let db = test_db();
+        db.record("export TOKEN=abc123", "/work", Some(0), 1).unwrap();
+        db.record("export TOKEN=def456", "/work", Some(0), 2).unwrap();
+        let history = db.search("", 10, None, None, None).unwrap();
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].command, "export [redacted]");
+        assert_eq!(history[0].run_count, 2);
+        assert!(db.search("abc123", 10, None, None, None).unwrap().is_empty());
+        let stored: String = db.conn().query_row("SELECT command FROM history", [], |row| row.get(0)).unwrap();
+        assert!(!stored.contains("abc123"));
+        assert!(!stored.contains("def456"));
+    }
+
+    #[test]
+    fn styled_secrets_are_removed_from_every_persisted_block_snapshot() {
+        let db = test_db();
+        db.record_block("b1", "s1", None, "cat config", "pass\x1b[31mword=hunter2", "password=hunter2", "<span>pass</span><span>word=hunter2</span>", Some(0), "done", 1, Some(2), "/work").unwrap();
+        let blocks = db.get_session_blocks("s1").unwrap();
+        assert_eq!(blocks[0].output_raw, "[redacted]");
+        assert_eq!(blocks[0].output_clean, "[redacted]");
+        assert!(blocks[0].output_html.is_empty());
+        db.record_block("b2", "s1", None, "ls", "\x1b[31mfile\x1b[0m", "file", "<span>file</span>", Some(0), "done", 3, Some(4), "/work").unwrap();
+        let blocks = db.get_session_blocks("s1").unwrap();
+        assert_eq!(blocks[1].output_raw, "\x1b[31mfile\x1b[0m");
+        assert_eq!(blocks[1].output_html, "<span>file</span>");
+    }
+
+    #[test]
     fn adding_command_paths_preserves_existing_version_two_history() {
         let db = test_db();
         db.create_session("s1", "saved", 0, "/work", "local", "{}").unwrap();

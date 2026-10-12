@@ -11,6 +11,7 @@ impl HistoryDb {
         exit_code: Option<i32>,
         timestamp: u64,
     ) -> Result<(), String> {
+        let command = crate::redact::redact_text(command);
         // 先查是否已有相同命令
         let existing: Option<(i64, u32)> = self
             .conn()

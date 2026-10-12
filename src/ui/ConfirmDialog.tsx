@@ -1,3 +1,5 @@
+import { useRef } from 'react';
+import { useDialogKeyboard } from './useDialogKeyboard';
 interface Props {
   open: boolean;
   title: string;
@@ -23,6 +25,8 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
 }: Props) {
+  const dialog = useRef<HTMLDivElement>(null);
+  useDialogKeyboard(dialog, open, { onClose: onCancel, onSubmit: onConfirm, initialFocus: '[data-testid="confirm-cancel"]' });
   if (!open) return null;
 
   return (
@@ -36,7 +40,7 @@ export default function ConfirmDialog({
       onClick={onCancel}
       data-testid="confirm-dialog"
     >
-      <div className="workspace-floating workspace-floating-dialog" role="dialog" aria-modal="true" aria-label={title}
+      <div ref={dialog} tabIndex={-1} className="workspace-floating workspace-floating-dialog" role="dialog" aria-modal="true" aria-label={title}
         style={{
           width: 360, maxWidth: 'calc(100vw - 40px)', padding: 16,
           display: 'flex', flexDirection: 'column', gap: 10,

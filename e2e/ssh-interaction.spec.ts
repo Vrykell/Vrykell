@@ -58,14 +58,17 @@ test('advanced saved options are retained when editing and passed to the termina
   await page.getByTestId('ssh-form-name').fill('跳板连接');
   await page.getByTestId('ssh-form-host').fill('target.example.com');
   await page.getByTestId('ssh-form-user').fill('tester');
-  await page.getByRole('button', { name: '密钥', exact: true }).click();
+  await page.getByRole('combobox', { name: '认证方式' }).click();
+  await page.getByRole('option', { name: '密钥 / SSH Agent' }).click();
   await page.getByTestId('ssh-form-identity').fill('C:/Keys/private key');
+  await page.getByTestId('ssh-section-tab-advanced').click();
   await page.getByTestId('ssh-form-jump').fill('user@jump.example.com:2222');
   await page.getByTestId('ssh-form-keepalive').fill('45');
   await page.getByTestId('ssh-save-btn').click();
   const row = page.locator('[data-testid^="ssh-row-"]', { hasText: '跳板连接' });
   await row.getByRole('button', { name: '编辑「跳板连接」' }).click();
   await expect(page.getByTestId('ssh-form-identity')).toHaveValue('C:/Keys/private key');
+  await page.getByTestId('ssh-section-tab-advanced').click();
   await expect(page.getByTestId('ssh-form-jump')).toHaveValue('user@jump.example.com:2222');
   await expect(page.getByTestId('ssh-form-keepalive')).toHaveValue('45');
   await page.getByRole('button', { name: '取消', exact: true }).click();

@@ -50,6 +50,12 @@ impl HistoryDb {
         &self, id: &str, session_id: &str, role: &str, content: &str,
         created_at: u64, parts: &str, attachments: &str, pane_id: Option<&str>,
     ) -> Result<(), String> {
+        // Same redaction policy as command blocks: a message is persisted history too.
+        let (content, parts, attachments) = (
+            crate::redact::redact_text(content),
+            crate::redact::redact_json(parts),
+            crate::redact::redact_json(attachments),
+        );
         // 会话行兜底（同 record_block）
         self.conn()
             .execute(
@@ -181,6 +187,19 @@ impl HistoryDb {
         ended_at: Option<u64>,
         cwd: &str,
     ) -> Result<(), String> {
+        // Use the parsed plain snapshot when it contains a recognizable secret. ANSI style
+        // sequences can split the secret in raw output, so independently matching raw bytes
+        // would leave a second copy in storage.
+        let clean = crate::redact::redact_text(output_clean);
+        let clean_changed = clean != output_clean;
+        let raw = if clean_changed { clean.clone() } else { crate::redact::redact_text(output_raw) };
+        let safe_html = if clean_changed || raw != output_raw
+            || crate::redact::redact_text(output_html) != output_html {
+            String::new()
+        } else { output_html.to_owned() };
+        let (command, output_raw, output_clean, output_html) = (
+            crate::redact::redact_text(command), raw, clean, safe_html,
+        );
         // 会话行可能因 create_session 的异步时序尚未落库（首个命令先于 create 到达），
         // 此处兜底 INSERT OR IGNORE 保证外键满足，块不会被静默丢弃。
         self.conn()

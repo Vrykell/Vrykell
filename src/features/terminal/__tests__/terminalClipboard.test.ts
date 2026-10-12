@@ -22,10 +22,15 @@ vi.mock('@ui/Toast', () => ({
 }));
 
 import { copyTerminalSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
-import { useTerminalStore } from '@features/terminal/stores/terminal';
+import { termInstances, useTerminalStore } from '@features/terminal/stores/terminal';
 
 function fakeTerm(selection: string): Terminal {
   return { getSelection: () => selection } as unknown as Terminal;
+}
+
+function pasteAwareTerm(): { term: Terminal; paste: ReturnType<typeof vi.fn> } {
+  const paste = vi.fn();
+  return { term: { paste } as unknown as Terminal, paste };
 }
 
 describe('terminalClipboard', () => {
@@ -35,7 +40,8 @@ describe('terminalClipboard', () => {
     ptyWriteMock.mockReset().mockResolvedValue(undefined);
     hasImageMock.mockReset().mockResolvedValue(false);
     toasts.length = 0;
-    useTerminalStore.setState({ sessions: {} });
+    useTerminalStore.setState({ sessions: {}, scenes: {} });
+    termInstances.clear();
     vi.spyOn(window, 'getSelection').mockReturnValue(null);
   });
 
@@ -62,7 +68,32 @@ describe('terminalClipboard', () => {
     expect(toasts[toasts.length - 1]).toEqual({ message: '复制失败', kind: 'error' });
   });
 
-  it('writes the clipboard text into the pane PTY', async () => {
+  it('routes the paste through the terminal so bracketed paste mode is honoured', async () => {
+    useTerminalStore.setState({ sessions: { p1: 'sess-1' } });
+    const { term, paste } = pasteAwareTerm();
+    termInstances.set('p1', term);
+    readTextMock.mockResolvedValue('line one\nline two\n');
+    await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(true);
+    expect(paste).toHaveBeenCalledWith('line one\nline two\n');
+    expect(ptyWriteMock).not.toHaveBeenCalled();
+  });
+
+  it('uses the running block terminal for paste modes and the main terminal in alternate screen', async () => {
+    useTerminalStore.setState({ sessions: { p1: 'sess-1' }, scenes: { p1: 'blockList' } });
+    const main = pasteAwareTerm();
+    const block = pasteAwareTerm();
+    termInstances.set('p1', main.term);
+    termInstances.set('block:p1', block.term);
+    readTextMock.mockResolvedValue('line one\nline two');
+    await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(true);
+    expect(block.paste).toHaveBeenCalledWith('line one\nline two');
+    expect(main.paste).not.toHaveBeenCalled();
+    useTerminalStore.setState({ scenes: { p1: 'altScreen' } });
+    await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(true);
+    expect(main.paste).toHaveBeenCalledWith('line one\nline two');
+  });
+
+  it('falls back to a raw PTY write when no terminal instance is registered', async () => {
     useTerminalStore.setState({ sessions: { p1: 'sess-1' } });
     readTextMock.mockResolvedValue('echo pasted\n');
     await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(true);

@@ -765,6 +765,11 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             ];
           case 'ssh_connections_list':
             return sshConnections;
+          case 'ssh_config_candidates':
+            return [
+              { name: 'web', host: '10.0.0.5', user: 'deploy', port: 2222, identityFile: '/keys/web', localForwards: ['8080:localhost:80'], remoteForwards: [], dynamicForwards: [] },
+              { name: 'db', host: 'db.internal', user: '', port: 22, localForwards: [], remoteForwards: [], dynamicForwards: [] },
+            ];
           case 'ssh_host_key_info':
             if (sshHost === 'changed') throw new Error('主机密钥不匹配，请核对远端主机');
             return { known: hostKnown, fingerprint: 'SHA256:e2e-verified-key', keyType: 'ed25519' };
@@ -1044,6 +1049,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
         }
       },
       // 测试可直接注入任意 PTY 输出字节（如 altScreen 序列）
+      emitPtyExit: (code: number | null) => emit('pty-exit', { id: 'e2e-session', code }),
       emitPtyOutput: (data: string) => {
         emitOutput(data);
       },

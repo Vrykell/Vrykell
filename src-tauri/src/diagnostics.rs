@@ -137,16 +137,10 @@ pub fn initialize(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(log)
 }
 
+/// Redact secrets and cap the length. The pattern is shared with history persistence
+/// ([`crate::redact`]); the length cap is a diagnostic-log concern only.
 fn redact_text(text: &str) -> String {
-    static SECRETS: OnceLock<regex::Regex> = OnceLock::new();
-    let regex = SECRETS.get_or_init(|| regex::Regex::new(
-        r#"(?i)\bBearer\s+\S+|\bsk-[\w-]+|(?:password|passphrase|api[_-]?key|token|secret|authorization)\s*[=:]\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)|-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----"#
-    ).expect("valid diagnostic redaction pattern"));
-    regex
-        .replace_all(text, "[redacted]")
-        .chars()
-        .take(4000)
-        .collect()
+    crate::redact::redact_text(text).chars().take(4000).collect()
 }
 
 fn sanitize(value: Value, key: &str, depth: usize) -> Value {

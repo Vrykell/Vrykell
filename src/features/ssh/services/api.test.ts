@@ -23,6 +23,14 @@ describe('sshApi', () => {
     expect(validateSshConnection({ name: 'n', host: 'h', jumpHost: '-oProxyCommand=bad' })).toContain('跳板机');
     expect(validateSshConnection({ name: 'n', host: 'h', jumpHost: 'user@jump.example.com:2222', identityFile: 'C:/Keys/test key', serverAliveInterval: 30 })).toBeNull();
   });
+
+  it('accepts usable port forwards and rejects option-shaped specs', () => {
+    expect(validateSshConnection({ name: 'n', host: 'h', localForwards: ['8080:localhost:80', '127.0.0.1:9000:db:5432'] })).toBeNull();
+    expect(validateSshConnection({ name: 'n', host: 'h', dynamicForwards: ['1080', '[::]:1081', '[2001:db8::1]:1082'] })).toBeNull();
+    expect(validateSshConnection({ name: 'n', host: 'h', remoteForwards: ['-oProxyCommand=x', '-:8080:localhost:80'] })).toContain('远程转发');
+    expect(validateSshConnection({ name: 'n', host: 'h', localForwards: ['8080:localhost'] })).toContain('本地转发');
+    expect(validateSshConnection({ name: 'n', host: 'h', dynamicForwards: ['70000'] })).toContain('动态转发');
+  });
   beforeEach(() => invokeMock.mockReset());
 
   it('passes the confirmed fingerprint when recording host trust', async () => {
@@ -65,7 +73,8 @@ describe('sshApi', () => {
     await sshTest({ host: 'h', port: 2222, user: 'root', password: 'pw' });
     expect(invokeMock).toHaveBeenCalledWith('ssh_test', {
       host: 'h', port: 2222, user: 'root', password: 'pw',
-      options: { identityFile: undefined, jumpHost: undefined, serverAliveInterval: undefined, shellIntegration: undefined },
+      options: { identityFile: undefined, jumpHost: undefined, serverAliveInterval: undefined, shellIntegration: undefined,
+        localForwards: undefined, remoteForwards: undefined, dynamicForwards: undefined },
     });
 
     await sshFsList('s1', '/home');

@@ -80,6 +80,8 @@ struct PtyOutput {
 #[derive(Clone, Serialize)]
 struct PtyExit {
     id: String,
+    /// Child exit code, so a session can tell a clean remote exit from a dropped connection.
+    code: Option<i32>,
 }
 
 /// read 线程 → 主循环的消息（Windows 无 poll，用 channel + recv_timeout 做空闲超时冲刷）。
@@ -552,8 +554,8 @@ pub async fn pty_spawn(
                     if debug::enabled() {
                         debug::write("reader-end", format!("id={} reason={}", tid, reason));
                     }
-                    let _ = app.emit("pty-exit", PtyExit { id: tid.clone() });
-                    reap_session(&app, &tid);
+                    let code = reap_session(&app, &tid);
+                    let _ = app.emit("pty-exit", PtyExit { id: tid.clone(), code });
                     break;
                 }
                 Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
@@ -563,8 +565,8 @@ pub async fn pty_spawn(
                     if debug::enabled() {
                         debug::write("reader-end", format!("id={} reason=channel-closed", tid));
                     }
-                    let _ = app.emit("pty-exit", PtyExit { id: tid.clone() });
-                    reap_session(&app, &tid);
+                    let code = reap_session(&app, &tid);
+                    let _ = app.emit("pty-exit", PtyExit { id: tid.clone(), code });
                     break;
                 }
                 // 空闲超时（FLUSH_INTERVAL 内无新数据）：冲刷 pending 尾巴，让最后一段输出及时上屏
@@ -577,8 +579,8 @@ pub async fn pty_spawn(
                     let session = app.state::<PtyState>().0.lock().ok().and_then(|all| all.get(&tid).cloned());
                     if session.as_ref().is_some_and(session_has_exited) {
                         if debug::enabled() { debug::write("reader-end", format!("id={} reason=child-exit", tid)); }
-                        let _ = app.emit("pty-exit", PtyExit { id: tid.clone() });
-                        reap_session(&app, &tid);
+                        let code = reap_session(&app, &tid);
+                        let _ = app.emit("pty-exit", PtyExit { id: tid.clone(), code });
                         break;
                     }
                 }
@@ -755,22 +757,27 @@ pub async fn pty_close(state: State<'_, PtyState>, kill: State<'_, KillState>, i
 
 /// 会话退出后的收敛：从状态表移除并 wait 回收子进程，释放 master/writer fd。
 /// 由读线程在读到 EOF 或出错时调用。
-fn reap_session(app: &AppHandle, id: &str) {
+/// Returns the child exit code so the session can tell a clean exit from a dropped connection.
+fn reap_session(app: &AppHandle, id: &str) -> Option<i32> {
     let session = app
         .state::<PtyState>()
         .0
         .lock()
         .ok()
         .and_then(|mut m| m.remove(id));
+    let mut code = None;
     if let Some(session) = session {
         if let Ok(mut s) = session.lock() {
-            let _ = s.child.wait();
+            if let Ok(status) = s.child.wait() {
+                code = Some(status.exit_code() as i32);
+            }
         }
     }
     // 同步清理该会话的「结束升级」状态，避免长时间使用后无限增长
     if let Ok(mut kill) = app.state::<KillState>().0.lock() {
         kill.remove(id);
     }
+    code
 }
 
 /// 允许发送的信号白名单（防止前端传任意信号乱杀无关进程）

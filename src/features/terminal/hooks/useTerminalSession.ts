@@ -109,6 +109,11 @@ const BLOCK_CONTENT_INSET_PX = 16 + 2 * COMMAND_BLOCK_CONTENT_PADDING;
 /** Output silence that marks a prompt for shells without the ready marker. */
 const SHELL_IDLE_READY_MS = 2500;
 
+/** Automatic reconnect after an unexpected drop: bounded attempts with exponential backoff. */
+const SSH_RECONNECT_MAX_ATTEMPTS = 5;
+const SSH_RECONNECT_BASE_MS = 1000;
+const SSH_RECONNECT_MAX_MS = 16000;
+
 export function useTerminalSession(
   paneId: string,
   tabId: string,
@@ -121,11 +126,32 @@ export function useTerminalSession(
   const [frame, setFrame] = useState<TerminalFrame | null>(null);
   const closeSessionRef = useRef<() => Promise<void>>(async () => {});
   const closeSession = useCallback(() => closeSessionRef.current(), []);
+  const [retry, setRetry] = useState<{ phase: 'idle' | 'waiting' | 'connecting' | 'exhausted' | 'stopped'; attempt: number; seconds: number }>({ phase: 'idle', attempt: 0, seconds: 0 });
+  const retryDeadline = useRef(0);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptsRef = useRef(0);
   const reconnect = useCallback(async () => {
+    // A manual retry supersedes a scheduled one and restarts the attempt budget.
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+    reconnectAttemptsRef.current = 0;
     await closeSessionRef.current();
     setFrame(null);
+    setRetry({ phase: 'idle', attempt: 0, seconds: 0 });
     setAttempt(value => value + 1);
   }, []);
+  const stopReconnect = useCallback(async () => {
+    await closeSessionRef.current();
+    setRetry(previous => ({ ...previous, phase: 'stopped', seconds: 0 }));
+  }, []);
+  useEffect(() => {
+    if (retry.phase !== 'waiting') return;
+    const timer = setInterval(() => setRetry(previous => ({ ...previous, seconds: Math.max(0, Math.ceil((retryDeadline.current - Date.now()) / 1000)) })), 250);
+    return () => clearInterval(timer);
+  }, [retry.phase]);
+
   const onReadyRef = useRef(onReady);
   onReadyRef.current = onReady;
   const connectionOutputRef = useRef(onConnectionOutput);
@@ -184,6 +210,11 @@ export function useTerminalSession(
     const pendingUnlisteners: Promise<UnlistenFn>[] = [];
     let focusTimer: ReturnType<typeof setTimeout> | null = null;
     const close = async () => {
+      setRetry(previous => previous.phase === 'idle' ? previous : { ...previous, phase: 'stopped', seconds: 0 });
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
       if (disposed || stopped) return;
       stopped = true;
       const id = sessionId;
@@ -209,6 +240,31 @@ export function useTerminalSession(
     const spec = tab && tab.kind === 'session'
       ? layoutLeaves(tab.layout).find((t) => t.id === paneId)
       : undefined;
+    const autoReconnect = spec?.kind === 'ssh' && spec.ssh?.autoReconnect === true;
+
+    /**
+     * Open a fresh session after an unexpected drop. A clean exit (the remote shell ended on
+     * purpose) is left to the manual reconnect button, and so is a user-initiated close: that
+     * path sets `stopped` before the exit event arrives.
+     */
+    const scheduleAutoReconnect = (code: number | null) => {
+      if (!autoReconnect || disposed || (code !== 255 && code !== null)) return;
+      if (reconnectAttemptsRef.current >= SSH_RECONNECT_MAX_ATTEMPTS) {
+        setRetry({ phase: 'exhausted', attempt: SSH_RECONNECT_MAX_ATTEMPTS, seconds: 0 }); return;
+      }
+      const delay = Math.min(SSH_RECONNECT_BASE_MS * 2 ** reconnectAttemptsRef.current, SSH_RECONNECT_MAX_MS);
+      reconnectAttemptsRef.current += 1;
+      retryDeadline.current = Date.now() + delay;
+      setRetry({ phase: 'waiting', attempt: reconnectAttemptsRef.current, seconds: delay / 1000 });
+      if (isTerminalDebugEnabled()) {
+        terminalDebug('ssh-auto-reconnect', { paneId, attempt: reconnectAttemptsRef.current, delayMs: delay });
+      }
+      reconnectTimerRef.current = setTimeout(() => {
+        reconnectTimerRef.current = null;
+        if (!disposed) { setRetry(previous => ({ ...previous, phase: 'connecting', seconds: 0 })); setAttempt(value => value + 1); }
+      }, delay);
+    };
+
     // SSH prompts use a thin insertion cursor by default; remote cursor-shape modes can still override it.
     if (spec?.kind === 'ssh') term.options.cursorStyle = 'bar';
     // 打开模式：spec.openMode 优先；老会话缺省时 SSH 回退 classic、local 按 shell 类型
@@ -351,14 +407,21 @@ export function useTerminalSession(
       clearTimeout(startupTimer);
       clearTimeout(idleFallbackTimer);
       startupComplete = true;
+      setRetry(previous => ({ ...previous, phase: 'idle', seconds: 0 }));
+      // Only a shell integration marker proves that SSH authentication completed. Output
+      // silence can also be an authentication prompt and must not renew the retry budget.
+      if (spec?.kind !== 'ssh') reconnectAttemptsRef.current = 0;
       useTerminalStore.getState().setStartupState(paneId, 'ready');
       terminalDebug('shell-input-ready', { paneId, sessionId, integrated });
     };
     const handleOutput = (events: DispatchEvent[]) => {
       controller.handleEvents(events);
+      // A real prompt marker also renews the budget after an earlier idle-readiness fallback.
+      if (events.some(event => event.kind === 'osc' && event.code === '133;B')) {
+        promptReady = true;
+        if (spec?.kind === 'ssh') reconnectAttemptsRef.current = 0;
+      }
       if (startupComplete) return;
-      // Prompt-end marker emitted by the shell hooks once the line editor accepts input.
-      if (events.some(event => event.kind === 'osc' && event.code === '133;B')) promptReady = true;
       // Non-integrated command shells have no OSC readiness marker.
       const plainShellOutput = spec?.kind === 'local' && spec.shellType === 'cmd'
         && events.some(event => event.kind === 'data' && event.text.length > 0);
@@ -408,15 +471,17 @@ export function useTerminalSession(
     );
 
     pendingUnlisteners.push(
-      onPtyExit((id) => {
+      onPtyExit((id, code) => {
         if (disposed || stopped) return;
-        if (isTerminalDebugEnabled()) terminalDebug('pty-exit', { id, sessionId });
+        if (isTerminalDebugEnabled()) terminalDebug('pty-exit', { id, sessionId, code });
         if (id === sessionId) {
           sessionId = null;
           stopped = true;
           useTerminalStore.getState().clearSession(paneId, id);
           setStatus('closed');
           writeMain(`\r\n\x1b[31m${t('terminal.processExited')}\x1b[0m\r\n`);
+          if (code !== 255 && code !== null) setRetry(previous => ({ ...previous, phase: 'idle', seconds: 0 }));
+          scheduleAutoReconnect(code);
         }
       }),
     );
@@ -428,7 +493,9 @@ export function useTerminalSession(
     const spawnOpts: PtySpawnOptions | undefined = spec?.kind === 'ssh'
       ? { ssh: { host: spec.ssh?.host ?? '', user: spec.ssh?.user, port: spec.ssh?.port,
         identityFile: spec.ssh?.identityFile, jumpHost: spec.ssh?.jumpHost,
-        serverAliveInterval: spec.ssh?.serverAliveInterval, shellIntegration: spec.ssh?.shellIntegration }, openMode }
+        serverAliveInterval: spec.ssh?.serverAliveInterval, shellIntegration: spec.ssh?.shellIntegration,
+        localForwards: spec.ssh?.localForwards, remoteForwards: spec.ssh?.remoteForwards,
+        dynamicForwards: spec.ssh?.dynamicForwards }, openMode }
       : spec?.kind === 'local'
         ? { shell: spec.shellType, openMode }
         : undefined;
@@ -444,7 +511,7 @@ export function useTerminalSession(
         const shells = await getAvailableShells();
         spawnOpts.shell = preferredShell(spec.shellType as ShellType, shells);
       }
-      if (spawnOpts?.ssh && !spawnOpts.ssh.jumpHost) {
+      if (spawnOpts?.ssh && (!spawnOpts.ssh.jumpHost || spawnOpts.ssh.jumpHost.toLowerCase() === 'none')) {
         try {
           const info = await prepareSshHost(spawnOpts.ssh.host, spawnOpts.ssh.port, startupAbort.signal);
           spawnOpts.ssh.hostKeyType = info.keyType;
@@ -492,6 +559,7 @@ export function useTerminalSession(
       })
       .catch((e) => {
         if (!disposed && !stopped) {
+          setRetry(previous => ({ ...previous, phase: 'stopped', seconds: 0 }));
           connectionFailed = true;
           useTerminalStore.getState().setStartupState(paneId, 'failed');
           setStatus('error');
@@ -746,6 +814,10 @@ export function useTerminalSession(
         clearTimeout(focusTimer);
         focusTimer = null;
       }
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
       clearTimeout(startupTimer);
       clearTimeout(idleFallbackTimer);
       frameSub?.dispose();
@@ -768,5 +840,5 @@ export function useTerminalSession(
     };
   }, [paneId, tabId, attempt]);
 
-  return { ref: containerRef, closeSession, reconnect, status, frame };
+  return { ref: containerRef, closeSession, reconnect, stopReconnect, retry, status, frame };
 }

@@ -1,4 +1,5 @@
-import { TextInput, TextArea } from '@ui/TextInput';
+import ConfigTextArea from '@ui/ConfigTextArea';
+import { TextInput } from '@ui/TextInput';
 import { useRef, type CSSProperties, type HTMLInputTypeAttribute } from 'react';
 import { useAutoSave } from '../hooks/useAutoSave';
 import SaveStatus from './SaveStatus';
@@ -49,7 +50,7 @@ export default function AutoSaveInput({ value, onCommit, placeholder, style, mul
     style: { ...inputStyle, ...controlStyle, width: '100%' },
   };
   return <div style={{ minWidth: minWidth ?? 0, flex, flexShrink, width, marginTop, marginBottom }}>
-    {multiline ? <TextArea {...props} rows={rows} /> : <TextInput {...props} type={type} min={min} max={max} step={step} />}
+    {multiline ? <ConfigTextArea {...props} rows={rows} /> : <TextInput {...props} type={type} min={min} max={max} step={step} />}
     <SaveStatus inline status={save.status} error={save.error} onRetry={() => { void save.flush(); }} />
     {onClear && <button type="button" onClick={() => { void feedback.save(async () => {
       await save.cancel();

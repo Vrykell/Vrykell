@@ -4,6 +4,7 @@ mod commands;
 mod db;
 mod files;
 mod platform;
+mod redact;
 mod remote;
 mod secret;
 mod terminal;
@@ -139,6 +140,7 @@ pub fn run() {
             terminal::debug::terminal_debug_records,
             terminal::debug::terminal_debug_log_path,
             terminal::shells::list_shells,
+            remote::ssh_config::ssh_config_candidates,
             remote::ssh::ssh_connections_list,
             remote::ssh::ssh_connection_save,
             remote::ssh::ssh_connection_delete,

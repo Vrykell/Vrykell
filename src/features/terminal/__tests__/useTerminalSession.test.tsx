@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, waitFor } from '@testing-library/react';
 
 const {
   writeMock,
@@ -15,7 +15,7 @@ const {
   onDataHandlers: [] as Array<(d: string) => void>,
   invokeMock: vi.fn(),
   ptyOutputHandlers: [] as Array<(id: string, events: unknown[]) => void>,
-  ptyExitHandlers: [] as Array<(id: string) => void>,
+  ptyExitHandlers: [] as Array<(id: string, code?: number | null) => void>,
   outputResolvers: [] as Array<(u: () => void) => void>,
   exitResolvers: [] as Array<(u: () => void) => void>,
   terminalInitOptions: [] as import('@xterm/xterm').ITerminalOptions[],
@@ -71,7 +71,7 @@ vi.mock('@platform/pty', () => ({
       outputResolvers.push(resolve);
     });
   }),
-  onPtyExit: vi.fn((cb: (id: string) => void) => {
+  onPtyExit: vi.fn((cb: (id: string, code?: number | null) => void) => {
     ptyExitHandlers.push(cb);
     return new Promise<() => void>((resolve) => {
       exitResolvers.push(resolve);
@@ -102,9 +102,17 @@ function setTab(openMode: 'classic' | 'block') {
   });
 }
 
+/** Configure an SSH tab with optional automatic reconnect. */
+function setSshTab(autoReconnect: boolean) {
+  useWorkspaceStore.setState({
+    tabs: [{ id: 't1', title: 'ssh', kind: 'session', layout: leaf({ id: 't1', kind: 'ssh', openMode: 'classic', ssh: { name: 'server', host: 'server', autoReconnect } }) }],
+    activeId: 't1',
+  });
+}
+
 function TestHarness({ tabId, onReady }: { tabId: string; onReady: (sessionId: string) => void }) {
-  const { ref, closeSession } = useTerminalSession(tabId, tabId, onReady);
-  return <><div ref={ref} data-testid="term-host" /><button onClick={() => void closeSession()}>关闭连接</button></>;
+  const { ref, closeSession, reconnect } = useTerminalSession(tabId, tabId, onReady);
+  return <><div ref={ref} data-testid="term-host" /><button onClick={() => void closeSession()}>关闭连接</button><button onClick={() => void reconnect()}>重连</button></>;
 }
 
 describe('useTerminalSession', () => {
@@ -256,6 +264,99 @@ describe('useTerminalSession', () => {
     await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
     ptyExitHandlers[0]!('sess-x');
     expect(useTerminalStore.getState().sessions.t1).toBeUndefined();
+  });
+
+  it('reopens an interrupted SSH session automatically and leaves a clean exit alone', async () => {
+    setSshTab(true);
+    render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
+    expect(mockedPtySpawn).toHaveBeenCalledTimes(1);
+
+    // A drop (the client exits non-zero) reopens the session after the first backoff step.
+    ptyExitHandlers[0]!('sess-x', 255);
+    await waitFor(() => expect(mockedPtySpawn).toHaveBeenCalledTimes(2), { timeout: 4000 });
+
+    // A clean exit (the remote shell ended on purpose) leaves the session closed.
+    await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
+    await act(async () => { ptyExitHandlers[1]!('sess-x', 0); });
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 1500)); });
+    expect(mockedPtySpawn).toHaveBeenCalledTimes(2);
+  });
+
+  it('cancels a pending automatic retry when the user disconnects', async () => {
+    setSshTab(true);
+    const { getByText } = render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
+    await act(async () => { ptyExitHandlers[0]!('sess-x', 255); });
+    fireEvent.click(getByText('关闭连接'));
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 1500)); });
+    expect(mockedPtySpawn).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry a remote command that exits with a nonzero status', async () => {
+    setSshTab(true);
+    render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
+    await act(async () => { ptyExitHandlers[0]!('sess-x', 1); });
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 1500)); });
+    expect(mockedPtySpawn).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the retry budget bounded across quiet authentication prompts and renews it on manual retry', async () => {
+    setSshTab(true);
+    const { getByText } = render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
+    vi.useFakeTimers();
+    try {
+      for (let retry = 0; retry < 6; retry += 1) {
+        await act(async () => {
+          ptyOutputHandlers[ptyOutputHandlers.length - 1]!('sess-x', [{ kind: 'data', text: 'Password:' }]);
+          await vi.advanceTimersByTimeAsync(2600);
+        });
+        await act(async () => {
+          ptyExitHandlers[ptyExitHandlers.length - 1]!('sess-x', 255);
+          await vi.advanceTimersByTimeAsync(16000);
+        });
+        expect(mockedPtySpawn).toHaveBeenCalledTimes(1 + Math.min(retry + 1, 5));
+      }
+      await act(async () => { fireEvent.click(getByText('重连')); });
+      expect(mockedPtySpawn).toHaveBeenCalledTimes(7);
+      await act(async () => {
+        ptyExitHandlers[ptyExitHandlers.length - 1]!('sess-x', 255);
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(mockedPtySpawn).toHaveBeenCalledTimes(8);
+      await act(async () => {
+        ptyOutputHandlers[ptyOutputHandlers.length - 1]!('sess-x', [{ kind: 'data', text: 'Password:' }]);
+        await vi.advanceTimersByTimeAsync(2600);
+        ptyOutputHandlers[ptyOutputHandlers.length - 1]!('sess-x', [{ kind: 'osc', code: '133;B', payload: '', raw: '\x1b]133;B\x07' }]);
+        await vi.advanceTimersByTimeAsync(200);
+        ptyExitHandlers[ptyExitHandlers.length - 1]!('sess-x', 255);
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(mockedPtySpawn).toHaveBeenCalledTimes(9);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('preflights a profile with an explicitly disabled jump host', async () => {
+    useWorkspaceStore.setState({
+      tabs: [{ id: 't1', title: 'ssh', kind: 'session', layout: leaf({ id: 't1', kind: 'ssh', openMode: 'classic', ssh: { name: 'direct', host: 'direct', jumpHost: 'none' } }) }], activeId: 't1',
+    });
+    render(<TestHarness tabId="t1" onReady={() => {}} />);
+    await waitFor(() => expect(mockedPtySpawn).toHaveBeenCalled());
+    expect(prepareSshHost).toHaveBeenCalledWith('direct', undefined, expect.any(AbortSignal));
+  });
+
+  it('does not reopen an interrupted session when the connection has no automatic reconnect', async () => {
+    setSshTab(false);
+    render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
+
+    await act(async () => { ptyExitHandlers[0]!('sess-x', 255); });
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 1500)); });
+    expect(mockedPtySpawn).toHaveBeenCalledTimes(1);
   });
 
   it('block 模式：初始即 blockList，OSC 133;A 建立 block', async () => {

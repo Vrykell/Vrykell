@@ -4,6 +4,14 @@ export interface SshOptions {
   jumpHost?: string;
   serverAliveInterval?: number;
   shellIntegration?: boolean;
+  /** `-L` specifications, e.g. `8080:localhost:80`. */
+  localForwards?: string[];
+  /** `-R` specifications, forwarded from the remote side. */
+  remoteForwards?: string[];
+  /** `-D` specifications: a local SOCKS port, e.g. `1080`. */
+  dynamicForwards?: string[];
+  /** Reconnect automatically after an unexpected drop. A clean remote exit is left alone. */
+  autoReconnect?: boolean;
   /**
    * How the spawned ssh client verifies the host key.
    * - `strict` (default): only already trusted hosts are accepted; Vrykell confirmed the key first.

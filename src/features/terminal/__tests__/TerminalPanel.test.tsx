@@ -5,8 +5,8 @@ import { useTerminalStore } from '../stores/terminal';
 import { ptyWrite } from '@platform/pty';
 import TerminalPanel from '../components/TerminalPanel';
 
-const { closeSession, reconnect, sessionView } = vi.hoisted(() => ({ closeSession: vi.fn(), reconnect: vi.fn(), sessionView: { status: 'ready', frame: { html: 'Password:', plainText: 'Password:', cols: 80, rows: 24 } } }));
-vi.mock('../hooks/useTerminalSession', () => ({ useTerminalSession: () => ({ ref: createRef<HTMLDivElement>(), closeSession, reconnect, status: sessionView.status, frame: sessionView.frame }) }));
+const { closeSession, reconnect, stopReconnect, sessionView } = vi.hoisted(() => ({ closeSession: vi.fn(), reconnect: vi.fn(), stopReconnect: vi.fn(), sessionView: { retry: { phase: 'idle', attempt: 0, seconds: 0 }, status: 'ready', frame: { html: 'Password:', plainText: 'Password:', cols: 80, rows: 24 } } }));
+vi.mock('../hooks/useTerminalSession', () => ({ useTerminalSession: () => ({ ref: createRef<HTMLDivElement>(), closeSession, reconnect, stopReconnect, retry: sessionView.retry, status: sessionView.status, frame: sessionView.frame }) }));
 vi.mock('@platform/pty', () => ({ ptyWrite: vi.fn().mockResolvedValue(undefined) }));
 afterEach(cleanup);
 beforeEach(() => {
@@ -14,6 +14,8 @@ beforeEach(() => {
   closeSession.mockReset().mockResolvedValue(undefined);
   reconnect.mockReset().mockResolvedValue(undefined);
   sessionView.status = 'ready';
+  sessionView.retry = { phase: 'idle', attempt: 0, seconds: 0 };
+  stopReconnect.mockReset().mockResolvedValue(undefined);
   sessionView.frame.plainText = 'Password:';
   sessionView.frame.html = 'Password:';
   useTerminalStore.setState({ sessions: {}, scenes: { p: 'classic' } });
@@ -26,6 +28,20 @@ function chooseInputMode(mode: '密码输入' | '直接输入') {
 }
 
 describe('SSH connection input', () => {
+  it('shows pending retries with immediate and stop actions, and reports exhaustion', async () => {
+    sessionView.status = 'closed';
+    sessionView.retry = { phase: 'waiting', attempt: 2, seconds: 4 };
+    const { rerender } = render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+    expect(screen.getByRole('status')).toHaveTextContent('第 2/5 次，4 秒后重试');
+    fireEvent.click(screen.getByRole('button', { name: '停止重试' }));
+    expect(stopReconnect).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('button', { name: '立即重试' }));
+    await waitFor(() => expect(reconnect).toHaveBeenCalledOnce());
+    sessionView.retry = { phase: 'exhausted', attempt: 5, seconds: 0 };
+    rerender(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+    expect(screen.getByRole('status')).toHaveTextContent('自动重连已结束（5 次）');
+  });
+
   it('freezes the screen while masked input is open so no terminal cursor is left behind', () => {
     sessionView.frame.plainText = 'bash-5.2$ ';
     sessionView.frame.html = 'bash-5.2$ ';
