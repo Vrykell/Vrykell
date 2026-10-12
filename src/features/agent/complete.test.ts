@@ -12,7 +12,7 @@ const { mockGenerate, invokeMock } = vi.hoisted(() => ({
 vi.mock('ai', () => ({ generateText: mockGenerate }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { completeCommand, localComplete, pathComplete, looksLikePath } from '@features/agent/services/complete';
+import { completeCommand, localComplete, localCompleteCandidates, pathComplete, looksLikePath } from '@features/agent/services/complete';
 import { useHistoryStore } from '@features/terminal/stores/history';
 import { useAgentSettings, DEFAULT_AGENT_SETTINGS } from '@features/agent/stores/agentSettings';
 import { useAiConfigStore } from '@features/agent/stores/aiConfig';
@@ -33,6 +33,25 @@ function reset() {
 const entry = (command: string) => ({ command, cwd: '/tmp', timestamp: 1, exitCode: 0 });
 
 describe('本地级（无 AI 也工作）', () => {
+  it('excludes failed commands from every completion path but preserves searchable history', async () => {
+    reset();
+    useHistoryStore.setState({ entries: [
+      { ...entry('git broken'), exitCode: 127 },
+      { ...entry('git interrupted'), exitCode: 130 },
+      entry('git status'),
+      { ...entry('git legacy'), exitCode: null },
+    ] });
+    expect(localComplete('git ')).toBe('status');
+    expect(localCompleteCandidates('git ')).toEqual(['status', 'legacy']);
+    expect(useHistoryStore.getState().search('broken')).toHaveLength(1);
+    useAiConfigStore.setState({ hasKey: true });
+    mockGenerate.mockResolvedValue({ text: 'docker ps' });
+    await completeCommand('docker', {});
+    const prompt = (mockGenerate.mock.calls[0]![0] as { prompt: string }).prompt;
+    expect(prompt).toContain('git status');
+    expect(prompt).not.toContain('git broken');
+    expect(prompt).not.toContain('git interrupted');
+  });
   it('历史前缀匹配返回后缀，最近优先', () => {
     reset();
     useHistoryStore.setState({

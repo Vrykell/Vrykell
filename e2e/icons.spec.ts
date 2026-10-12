@@ -17,7 +17,7 @@ test('small action buttons have readable targets and tab close works from the ke
   await page.getByTestId('tab-new-btn').click();
   await page.getByText('Zsh', { exact: true }).click();
   const row = page.locator('[data-tab-row-id]').last();
-  // 标签行按 shell 显示品牌图标：从弹窗选择 Zsh → 行内出现 zsh 标记
+  // Choosing a shell keeps its colored terminal mark in navigation.
   await expect(row.locator('[data-shell-mark="zsh"]')).toBeVisible();
   const close = row.getByRole('button', { name: '关闭标签', exact: true });
   await size(close, 28);
@@ -80,7 +80,7 @@ test('workspace and settings use the same themed icon family in both themes', as
   await expect(nav).toHaveAttribute('data-fui-icon');
   await expect(nav).toHaveAttribute('fill', 'currentColor');
   await gotoSetting(page, '主题');
-  const header = page.locator('.settings-content > div').first().locator('svg');
+  const header = page.locator('aside').getByRole('button', { name: '主题', exact: true }).locator('svg');
   for (const theme of ['深色', '浅色']) {
     await page.getByRole('button', { name: theme, exact: true }).click();
     await expect(header).toHaveAttribute('data-fui-icon');
@@ -90,7 +90,7 @@ test('workspace and settings use the same themed icon family in both themes', as
     const foreground = await header.evaluate(element => getComputedStyle(element).color);
     expect(foreground).toBe(await page.evaluate(() => {
       const probe = document.createElement('span');
-      probe.style.color = 'var(--text-muted)';
+      probe.style.color = 'var(--text-primary)';
       document.body.appendChild(probe);
       const color = getComputedStyle(probe).color;
       probe.remove();
@@ -104,12 +104,12 @@ test('workspace and settings use the same themed icon family in both themes', as
   }
 });
 
-test('every shell and SSH connection shows its own mark', async ({ page }) => {
+test('pickers, tabs and SSH connections retain colored shell marks', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   const dialog = page.getByRole('dialog');
   await page.getByTestId('tab-new-btn').click();
-  // 弹窗同时列出本地 shell 与 SSH 连接，各自带品牌标记
+  // The picker keeps distinct local-shell and remote-connection marks.
   await expect(dialog.locator('[data-shell-mark="zsh"]')).toBeVisible();
   await expect(dialog.locator('[data-shell-mark="bash"]')).toBeVisible();
   for (const shell of ['zsh', 'bash']) {
@@ -122,7 +122,12 @@ test('every shell and SSH connection shows its own mark', async ({ page }) => {
   await expect(dialog.locator('[data-shell-mark="ssh"]')).toBeVisible();
   await dialog.getByText('Bash', { exact: true }).click();
   await expect(page.locator('[data-tab-row-id]').last().locator('[data-shell-mark="bash"]')).toBeVisible();
-  // SSH 连接行用 SSH 标记，与 shell 标签行区分
+  // Connection marks retain their own color even when selected.
   await page.locator('[data-dock-btn="ssh"]').click();
-  await expect(page.getByTestId('ssh-row-ssh-1').locator('[data-shell-mark="ssh"]')).toBeVisible();
+  const remoteRow = page.getByTestId('ssh-row-ssh-1');
+  const remoteIcon = remoteRow.locator('[data-shell-mark="ssh"]');
+  await expect(remoteIcon).toBeVisible();
+  const color = await remoteIcon.evaluate(element => getComputedStyle(element).color);
+  await remoteRow.click();
+  await expect(remoteIcon).toHaveCSS('color', color);
 });

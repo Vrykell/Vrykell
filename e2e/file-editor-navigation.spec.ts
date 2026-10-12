@@ -32,7 +32,7 @@ test.beforeEach(async ({ page }) => {
     };
   });
   await page.goto('/');
-  await expect(page.locator('.terminal-directory:visible')).toHaveAttribute('data-tip', '/home/e2e/project');
+  await expect(page.locator('.directory-picker-trigger:visible')).toHaveAttribute('data-tip', '/home/e2e/project');
   await page.locator('[data-dock-btn="files"]').click();
   await expect(page.getByTestId('local-file-tree')).toHaveAttribute('data-path', '/home/e2e/project');
 });
@@ -41,7 +41,7 @@ for (const method of ['double-click', 'context-menu'] as const) {
   test(`opening a nested file via ${method} preserves the tree and scroll`, async ({ page }) => {
     const tree = page.getByTestId('local-file-tree');
     await emitPtyOutput(page, '\x1b]7;file://host/home/e2e/elsewhere\x07');
-    await expect(page.locator('.terminal-directory:visible')).toHaveAttribute('data-tip', '/home/e2e/elsewhere');
+    await expect(page.locator('.directory-picker-trigger:visible')).toHaveAttribute('data-tip', '/home/e2e/elsewhere');
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
     const branch = tree.locator('[data-testid="file-row"][data-path="/home/e2e/project/branch-30"]');
     await branch.locator('[data-testid="file-row-expander"]').click();
@@ -62,7 +62,7 @@ for (const method of ['double-click', 'context-menu'] as const) {
     await expect(page.locator('[data-tab-row-id]').filter({ hasText: 'nested-notes.txt' }).locator('[data-shell-mark="zsh"]')).toHaveCount(1);
     // Wait for the editor terminal's delayed cwd reports as well as the initial focus switch.
     await emitPtyOutput(page, '\x1b]7;file://host/home/e2e/project/branch-30\x07');
-    await expect(page.locator('.terminal-directory:visible')).toHaveAttribute('data-tip', '/home/e2e/project/branch-30');
+    await expect(page.locator('.directory-picker-trigger:visible')).toHaveAttribute('data-tip', '/home/e2e/project/branch-30');
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
     await expect(tree.getByText('sibling.txt', { exact: true })).toBeVisible();
     await expect.poll(() => tree.evaluate(element => element.scrollTop)).toBe(scrollTop);
@@ -73,7 +73,7 @@ for (const method of ['double-click', 'context-menu'] as const) {
     await branch.dblclick();
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/project/branch-30');
     await emitPtyOutput(page, '\x1b]7;file://host/home/e2e/project\x07');
-    await expect(page.locator('.terminal-directory:visible')).toHaveAttribute('data-tip', '/home/e2e/project');
+    await expect(page.locator('.directory-picker-trigger:visible')).toHaveAttribute('data-tip', '/home/e2e/project');
     await page.keyboard.press('Meta+1');
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/project/branch-30');
   });

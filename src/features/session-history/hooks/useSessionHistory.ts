@@ -9,6 +9,8 @@ import {
   hasSessionHistoryFilter,
   SESSION_DATE_OPTIONS,
   SESSION_TYPE_OPTIONS,
+  SESSION_MODE_OPTIONS,
+  SESSION_SORT_OPTIONS,
   type SessionHistoryFilter,
 } from '@features/session-history/model/sessionHistoryModel';
 
@@ -49,12 +51,14 @@ function loadFilter(): SessionHistoryFilter {
         query: typeof parsed.query === 'string' ? parsed.query : '',
         type: SESSION_TYPE_OPTIONS.some((item) => item.value === parsed.type) ? parsed.type! : 'all',
         date: SESSION_DATE_OPTIONS.some((item) => item.value === parsed.date) ? parsed.date! : 'all',
+        mode: SESSION_MODE_OPTIONS.some(item => item.value === parsed.mode) ? parsed.mode! : 'all',
+        sort: SESSION_SORT_OPTIONS.some(item => item.value === parsed.sort) ? parsed.sort! : 'closed-desc',
       };
     }
   } catch {
     // 损坏或不可用的 sessionStorage 回退到默认筛选。
   }
-  return { query: '', type: 'all', date: 'all' };
+  return { query: '', type: 'all', date: 'all', mode: 'all', sort: 'closed-desc' };
 }
 
 function saveFilter(filter: SessionHistoryFilter): void {

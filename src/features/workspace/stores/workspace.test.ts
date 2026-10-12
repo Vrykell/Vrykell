@@ -5,6 +5,7 @@ import {
   useWorkspaceStore, isSessionTab, getFocusedCwd, firstTerminalOf,
   terminalsOf, serializeSession, nextTerminalId,
 } from '@features/workspace/stores/workspace';
+import { resolveDisplayTitle } from '@features/workspace/model/sessionTitle';
 import { useTerminalStore } from '@features/terminal/stores/terminal';
 import { leaf } from '@features/workspace/model/windowLayout';
 
@@ -56,7 +57,7 @@ describe('workspace store', () => {
     expect(s.activeId).toBe('');
   });
 
-  it('关闭最后一个会话标签后回到会话记录视图', () => {
+  it('keeps an active settings page when the last background session closes', () => {
     const ws = useWorkspaceStore.getState();
     const sessionId = ws.tabs[0]!.id;
     ws.openSettingsTab();
@@ -64,7 +65,25 @@ describe('workspace store', () => {
 
     const state = useWorkspaceStore.getState();
     expect(state.tabs.some(isSessionTab)).toBe(false);
-    expect(state.activeId).toBe('');
+    expect(state.activeId).toBe(state.tabs.find(tab => tab.kind === 'settings')!.id);
+  });
+
+  it('reorders singleton pages with loose sessions without persisting or grouping them', () => {
+    const ws = useWorkspaceStore.getState();
+    const session = ws.tabs[0]!.id;
+    const settings = ws.addTab({ kind: 'settings' });
+    const history = ws.addTab({ kind: 'history' });
+    invokeMock.mockClear();
+    ws.moveTab(history, null, 0);
+    expect(useWorkspaceStore.getState().tabs.map(tab => tab.id)).toEqual([history, session, settings]);
+    ws.moveTab(settings, null, 1);
+    expect(useWorkspaceStore.getState().tabs.map(tab => tab.id)).toEqual([history, settings, session]);
+    ws.moveTab(settings, 'group', 0);
+    expect(useWorkspaceStore.getState().tabs.find(tab => tab.id === settings)).not.toHaveProperty('groupId');
+    expect(invokeMock).not.toHaveBeenCalled();
+    ws.activate(settings);
+    ws.closeTab(session);
+    expect(useWorkspaceStore.getState().activeId).toBe(settings);
   });
 
   it('addTab 支持指定 shell 类型', () => {
@@ -100,6 +119,43 @@ describe('workspace store', () => {
     s.openHistoryTab();
     s = useWorkspaceStore.getState();
     expect(s.tabs).toHaveLength(2);
+  });
+
+  it.each(['history', 'settings'] as const)('keeps %s singleton through direct creation and duplication', kind => {
+    const ws = useWorkspaceStore.getState();
+    const id = ws.addTab({ kind });
+    ws.activate(ws.tabs[0]!.id);
+    expect(ws.addTab({ kind })).toBe(id);
+    expect(useWorkspaceStore.getState().activeId).toBe(id);
+    ws.duplicateTab(id);
+    expect(useWorkspaceStore.getState().tabs.filter(tab => tab.kind === kind)).toHaveLength(1);
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it('allows OSC titles to override a copied manual title while retaining the copy fallback', () => {
+    const ws = useWorkspaceStore.getState();
+    const original = ws.tabs[0]!;
+    ws.renameTab(original.id, '手动标题');
+    ws.duplicateTab(original.id);
+
+    const copy = useWorkspaceStore.getState().tabs.find(tab => tab.id === useWorkspaceStore.getState().activeId)!;
+    expect(copy.title).toBe('手动标题 副本');
+    expect(copy.titleSource).toBeUndefined();
+    expect(resolveDisplayTitle(copy.title, copy.titleSource, 'running program')).toBe('running program');
+    expect(resolveDisplayTitle(copy.title, copy.titleSource, '')).toBe('手动标题 副本');
+  });
+
+  it('keeps the remaining singleton active when no terminal sessions are open', () => {
+    useWorkspaceStore.setState({ tabs: [], activeId: '' });
+    const ws = useWorkspaceStore.getState();
+    const settings = ws.addTab({ kind: 'settings' });
+    const history = ws.addTab({ kind: 'history' });
+    ws.closeTab(history);
+    expect(useWorkspaceStore.getState().activeId).toBe(settings);
+    const reopened = ws.addTab({ kind: 'history' });
+    ws.activate(settings);
+    ws.closeTab(reopened);
+    expect(useWorkspaceStore.getState().activeId).toBe(settings);
   });
 
   it('addTab 返回新标签 id，默认标题为终端类型名', () => {

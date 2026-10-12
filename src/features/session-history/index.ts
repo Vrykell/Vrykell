@@ -12,12 +12,16 @@ export {
   sshTargetOf,
   type SessionDateFilter,
   type SessionTypeFilter,
+  type SessionModeFilter,
 } from '@features/session-history/model/filter';
 
 export {
   sessionCommandCount,
   SESSION_DATE_OPTIONS,
   SESSION_TYPE_OPTIONS,
+  SESSION_MODE_OPTIONS,
+  SESSION_SORT_OPTIONS,
+  type SessionHistorySort,
   type SessionHistoryFilter,
 } from '@features/session-history/model/sessionHistoryModel';
 

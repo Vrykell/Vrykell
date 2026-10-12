@@ -12,11 +12,11 @@ import { shellTypeLabel } from '@platform/shells';
 import NewTabModal from '@features/workspace/components/NewTabModal';
 import ContextMenu, { type ContextMenuItem } from '@ui/ContextMenu';
 import SidebarItem from '@ui/sidebarItem';
+import { SshIcon, shellIconFor } from '@ui/shellIcons';
 import {
   ListReorderPlaceholder, ListReorderPreview, ListReorderZonePlaceholder,
   useListReorder, useListReorderDrag, type ListReorderDrag, type ListReorderTarget,
 } from '@ui/listReorder';
-import { SshIcon, shellIconFor } from '@ui/shellIcons';
 import { t } from '@i18n';
 
 /**
@@ -73,31 +73,36 @@ export default function PanelTabs() {
     }
     // Tab drag
     const tab = ws.tabs.find((t) => t.id === drag.id);
-    if (!tab || !isSessionTab(tab)) return;
+    if (!tab) return;
     const overTab = target?.itemId
       ? ws.tabs.find((t) => t.id === target.itemId)
       : undefined;
-    if (overTab && isSessionTab(overTab)) {
-      const groupId = overTab.groupId ?? null;
-      const scope = ws.tabs.filter((t) => isSessionTab(t) && t.id !== drag.id && (t.groupId ?? null) === groupId);
+    if (overTab) {
+      const groupId = isSessionTab(overTab) ? overTab.groupId ?? null : null;
+      if (!isSessionTab(tab) && groupId !== null) return;
+      const scope = ws.tabs.filter((t) => t.id !== drag.id && (isSessionTab(t) ? (t.groupId ?? null) === groupId : groupId === null));
       const idx = scope.findIndex((t) => t.id === overTab.id) + (target?.after ? 1 : 0);
       ws.moveTab(drag.id, groupId, Math.max(0, idx));
       return;
     }
     if (target?.zoneId) {
       const groupId = target.zoneId === UNGROUPED_ZONE ? null : target.zoneId;
-      const scope = ws.tabs.filter((t) => isSessionTab(t) && t.id !== drag.id && (t.groupId ?? null) === groupId);
+      if (!isSessionTab(tab) && groupId !== null) return;
+      const scope = ws.tabs.filter((t) => t.id !== drag.id && (isSessionTab(t) ? (t.groupId ?? null) === groupId : groupId === null));
       ws.moveTab(drag.id, groupId, scope.length);
       return;
     }
     // Dropped outside the list: a grouped tab falls back to the ungrouped end.
-    if (tab.groupId) {
-      const scope = ws.tabs.filter((t) => isSessionTab(t) && t.id !== drag.id && (t.groupId ?? null) === null);
+    if (isSessionTab(tab) && tab.groupId) {
+      const scope = ws.tabs.filter((t) => t.id !== drag.id && (!isSessionTab(t) || !t.groupId));
       ws.moveTab(drag.id, null, scope.length);
     }
   }
 
-  const startDrag = useListReorderDrag({ listId: LIST_ID, onDrop: commitDrop });
+  const startDrag = useListReorderDrag({ listId: LIST_ID, onDrop: commitDrop,
+    accepts: (dragKind, itemKind) => dragKind === 'group' ? itemKind === 'group'
+      : itemKind === 'loose-tab' || (dragKind === 'tab' && itemKind === 'tab'),
+  });
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -106,10 +111,10 @@ export default function PanelTabs() {
   }, [tabs, query]);
 
   const groupTabs = (gid: string) => filtered.filter((t) => isSessionTab(t) && t.groupId === gid);
-  const ungroupedTabs = filtered.filter((t) => isSessionTab(t) && !t.groupId);
+  const ungroupedTabs = filtered.filter((tab) => !isSessionTab(tab) || !tab.groupId);
   // 拖走的那行不参与「末尾占位」的判定（同 GroupSection）
-  const draggedTabId = useListReorder((s) => (s.drag?.kind === 'tab' ? s.drag.id : undefined));
-  const remainingUngrouped = ungroupedTabs.filter((t) => t.id !== draggedTabId);
+  const draggedTabId = useListReorder((s) => (s.drag && s.drag.kind !== 'group' ? s.drag.id : undefined));
+  const remainingUngrouped = ungroupedTabs.filter((tab) => tab.id !== draggedTabId);
   const lastUngroupedId = remainingUngrouped[remainingUngrouped.length - 1]?.id;
   const activeTab = tabs.find((t) => t.id === activeId);
   const activeGroupId = activeTab && isSessionTab(activeTab) ? activeTab.groupId : undefined;
@@ -133,18 +138,20 @@ export default function PanelTabs() {
         ...(isSessionTab(ctxTab) && ctxTab.groupId ? [{
           label: '移出分组', group: 'organize' as const,
           onClick: () => {
-            const scope = tabs.filter((t) => isSessionTab(t) && !t.groupId && t.id !== ctxTab.id);
+            const scope = tabs.filter((t) => t.id !== ctxTab.id && (!isSessionTab(t) || !t.groupId));
             useSessionStore.getState().moveTab(ctxTab.id, null, scope.length);
           },
         }] : []),
-        { label: '重命名', group: 'edit', onClick: () => { setEditId(ctxTab.id); setEditTitle(ctxTab.title); } },
-        { label: '重新生成标题', group: 'edit', onClick: () => {
-          useToastStore.getState().addToast('正在重新生成标题…', 'info');
-          void regenerateTitle(ctxTab.id).then((ok) => {
-            if (ok) useToastStore.getState().addToast('标题已更新', 'success');
-          });
-        } },
-        { label: '复制会话', group: 'primary', onClick: () => duplicateTab(ctxTab.id) },
+        ...(isSessionTab(ctxTab) ? [
+          { label: '重命名', group: 'edit' as const, onClick: () => { setEditId(ctxTab.id); setEditTitle(ctxTab.title); } },
+          { label: '重新生成标题', group: 'edit' as const, onClick: () => {
+            useToastStore.getState().addToast('正在重新生成标题…', 'info');
+            void regenerateTitle(ctxTab.id).then((ok) => {
+              if (ok) useToastStore.getState().addToast('标题已更新', 'success');
+            });
+          } },
+          { label: '复制会话', group: 'primary' as const, onClick: () => duplicateTab(ctxTab.id) },
+        ] : []),
         { label: '关闭标签', group: 'danger', onClick: () => closeTab(ctxTab.id) },
       ]
     : [];
@@ -186,7 +193,7 @@ export default function PanelTabs() {
       </div>
 
       {/* 列表：分组头与标签行同属一个重排列表 */}
-      <div data-reorder-list={LIST_ID} className="scroll-region" style={{ flex: 1, overflowY: 'auto', padding: '0 0 8px' }}>
+      <div data-reorder-list={LIST_ID} className="scroll-region" style={{ flex: 1, overflowY: 'auto', padding: '0 0 8px', display: 'flex', flexDirection: 'column' }}>
         {groups.map((g) => (
           <Fragment key={g.id}>
             <ListReorderPlaceholder listId={LIST_ID} itemId={g.id} />
@@ -228,12 +235,12 @@ export default function PanelTabs() {
           </Fragment>
         ))}
 
-        {/* 有分组时常驻「未分组」区：拖到这里的空位 = 脱离分组 */}
+        {/* The ungrouped drop zone owns the remaining space, even with no session rows. */}
         {(ungroupedTabs.length > 0 || groups.length > 0) && (
           <div
             data-reorder-zone={UNGROUPED_ZONE}
-            data-reorder-kind="tab"
-            style={{ marginTop: groups.length > 0 ? 6 : 0, display: 'flex', flexDirection: 'column', gap: 2 }}
+            data-reorder-kind="loose-tab"
+            style={{ marginTop: groups.length > 0 ? 6 : 0, display: 'flex', flexDirection: 'column', gap: 2, flex: '1 0 auto', minHeight: 44 }}
           >
             {groups.length > 0 && (
               <div style={{ padding: '0 8px 2px', fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>未分组</div>
@@ -249,10 +256,10 @@ export default function PanelTabs() {
                   setEditTitle={setEditTitle}
                   onActivate={() => activate(t.id)}
                   onClose={() => closeTab(t.id)}
-                  onStartEdit={() => { setEditId(t.id); setEditTitle(t.title); }}
+                  onStartEdit={() => { if (isSessionTab(t)) { setEditId(t.id); setEditTitle(t.title); } }}
                   onCommitEdit={() => { renameTab(t.id, editTitle); setEditId(null); }}
                   onCancelEdit={() => setEditId(null)}
-                  onPointerDown={(event) => startDrag(event, { id: t.id, kind: 'tab' })}
+                  onPointerDown={(event) => startDrag(event, { id: t.id, kind: isSessionTab(t) ? 'tab' : 'page' })}
                   onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, tabId: t.id }); }}
                 />
               </Fragment>
@@ -263,7 +270,7 @@ export default function PanelTabs() {
           </div>
         )}
 
-        {filtered.length === 0 && (
+        {filtered.length === 0 && query.trim().length > 0 && (
           <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>无匹配会话</div>
         )}
       </div>
@@ -279,14 +286,13 @@ export default function PanelTabs() {
 
       <ListReorderPreview>
         {(drag) => {
-          const tab = drag.kind === 'tab' ? tabs.find((t) => t.id === drag.id) : undefined;
+          const tab = drag.kind !== 'group' ? tabs.find((t) => t.id === drag.id) : undefined;
           const first = tab ? firstTerminalOf(tab) : null;
-          const Icon = drag.kind === 'group'
-            ? Folder
+          const Icon = drag.kind === 'group' ? Folder
             : tab?.kind === 'history' ? History
               : tab?.kind === 'settings' ? Settings
-                : first?.kind === 'ssh' ? SshIcon
-                  : shellIconFor(first?.kind === 'local' ? first.shellType : undefined);
+              : first?.kind === 'ssh' ? SshIcon
+                : shellIconFor(first?.kind === 'local' ? first.shellType : undefined);
           return <Icon size={iconSizes.row} style={{ color: drag.kind === 'group' ? 'var(--accent-warm)' : 'var(--accent)' }} />;
         }}
       </ListReorderPreview>
@@ -332,7 +338,7 @@ function GroupSection(props: {
   const remainingTabs = tabs.filter((t) => t.id !== draggedTabId);
   const lastTabId = remainingTabs[remainingTabs.length - 1]?.id;
   return (
-    <div style={{ marginBottom: 4 }}>
+    <div style={{ marginBottom: 4, flexShrink: 0 }}>
       {/* Group containers stay transparent so selection belongs to a single row. */}
       <div
         className="tab-group-container"
@@ -519,20 +525,19 @@ function TabRow({
   const typeSummary = terms.map((t) =>
     t.kind === 'ssh' ? (t.ssh?.name || t.ssh?.host || 'SSH') : (t.shellType ? shellTypeLabel(t.shellType) : '本地'),
   ).join(' + ');
-  const subtitle = tab.kind === 'history' ? '会话历史' : tab.kind === 'settings' ? '设置' : undefined;
 
   return (
     <SidebarItem
       active={active}
       icon={<Icon size={iconSizes.row} style={{ color: iconColor }} />}
       title={displayTitle}
-      subtitle={subtitle}
       tooltip={displayTitle}
       testId={`tab-row-${tab.id}`}
       reorderItemId={tab.id}
-      reorderKind="tab"
+      reorderKind={isSessionTab(tab) && tab.groupId ? 'tab' : 'loose-tab'}
       dataAttributes={{
         'data-tab-row-id': tab.id,
+        'data-tab-kind': tab.kind,
         'data-tab-group': isSessionTab(tab) ? (tab.groupId ?? '') : '',
       }}
       onClick={onActivate}

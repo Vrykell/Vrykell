@@ -6,6 +6,7 @@ import { Archive24Regular } from '@fluentui/react-icons/headless/svg/archive';
 import { ArrowLeft24Regular } from '@fluentui/react-icons/headless/svg/arrow-left';
 import { ArrowUp24Regular } from '@fluentui/react-icons/headless/svg/arrow-up';
 import { ArrowDown24Regular } from '@fluentui/react-icons/headless/svg/arrow-down';
+import { ArrowSort24Regular } from '@fluentui/react-icons/headless/svg/arrow-sort';
 import { Bot24Regular } from '@fluentui/react-icons/headless/svg/bot';
 import { Brain24Regular } from '@fluentui/react-icons/headless/svg/brain';
 import { BrainCircuit24Regular } from '@fluentui/react-icons/headless/svg/brain-circuit';
@@ -101,6 +102,7 @@ export const Archive = createAppIcon(Archive24Regular);
 export const ArrowLeft = createAppIcon(ArrowLeft24Regular);
 export const ArrowUp = createAppIcon(ArrowUp24Regular);
 export const ArrowDown = createAppIcon(ArrowDown24Regular);
+export const ArrowSort = createAppIcon(ArrowSort24Regular);
 export const DollarSign: AppIcon = forwardRef<SVGSVGElement, AppIconProps>(function DollarSign({ size = 24, style, ...props }, ref) {
   return createElement('svg', { ...props, ref, viewBox: '0 0 24 24', fill: 'none',
     style: { width: size, height: size, flexShrink: 0, ...style } }, createElement('path', {

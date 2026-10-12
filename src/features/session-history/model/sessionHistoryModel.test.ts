@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BackendSessionEntry } from '@platform/api/types';
-import { deriveSessionHistorySections, hasSessionHistoryFilter, sessionCommandCount } from '@features/session-history/model/sessionHistoryModel';
+import { deriveSessionHistorySections, hasSessionHistoryFilter, sessionCommandCount, sortHistoricalSessions, type SessionHistorySort } from '@features/session-history/model/sessionHistoryModel';
 
 function session(overrides: Partial<BackendSessionEntry>): BackendSessionEntry {
   return {
@@ -11,6 +11,26 @@ function session(overrides: Partial<BackendSessionEntry>): BackendSessionEntry {
 }
 
 describe('session history model', () => {
+  it.each([
+    ['closed-desc', ['a', 'b']], ['closed-asc', ['b', 'a']],
+    ['created-desc', ['b', 'a']], ['created-asc', ['a', 'b']],
+    ['title-asc', ['a', 'b']], ['title-desc', ['b', 'a']],
+  ] as Array<[SessionHistorySort, string[]]>)('sorts %s without changing source data', (sort, expected) => {
+    const items = [session({ id: 'a', title: 'Alpha', closed_at: 20, created_at: 1 }), session({ id: 'b', title: 'Beta', closed_at: 10, created_at: 2 })];
+    expect(sortHistoricalSessions(items, sort).map(item => item.id)).toEqual(expected);
+    expect(items.map(item => item.id)).toEqual(['a', 'b']);
+  });
+  it('keeps groups and sorts both grouped and loose results after mode filtering', () => {
+    const items = ['g', null].flatMap(group_id => [
+      session({ id: `b-${group_id}`, group_id, title: 'Beta', payload: '{"openMode":"block"}' }),
+      session({ id: `a-${group_id}`, group_id, title: 'Alpha', payload: '{"openMode":"block"}' }),
+      session({ id: `c-${group_id}`, group_id, payload: '{"openMode":"classic"}' }),
+    ]);
+    const sections = deriveSessionHistorySections(items, { query: '', type: 'all', date: 'all', mode: 'block', sort: 'title-asc' });
+    expect(sections.grouped.get('g')!.map(item => item.title)).toEqual(['Alpha', 'Beta']);
+    expect(sections.ungrouped.map(item => item.title)).toEqual(['Alpha', 'Beta']);
+    expect(hasSessionHistoryFilter({ query: '', type: 'all', date: 'all', mode: 'classic' })).toBe(true);
+  });
   it('只展示历史会话并按分组和顺序组织', () => {
     const result = deriveSessionHistorySections([
       session({ id: 'active', status: 'active' }),

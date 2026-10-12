@@ -1,0 +1,93 @@
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import PanelTabs from '../components/PanelTabs';
+import { useSessionStore } from '../model/session/store';
+import { useListReorder } from '@ui/listReorder';
+
+vi.mock('@features/agent/services/title', () => ({ regenerateTitle: vi.fn() }));
+vi.mock('../components/NewTabModal', () => ({ default: () => null }));
+const snapshot = useSessionStore.getState();
+beforeEach(() => {
+  useSessionStore.setState({
+    tabs: [
+      { id: 'local', title: 'Shell', kind: 'session', layout: { type: 'leaf', terminal: { id: 'local#0', kind: 'local', shellType: 'bash' } } },
+      { id: 'settings', title: 'Settings', kind: 'settings' },
+      { id: 'history', title: 'History', kind: 'history' },
+    ], activeId: 'settings', groups: [], loadGroups: vi.fn().mockResolvedValue(undefined),
+  });
+});
+afterEach(() => { cleanup(); useListReorder.getState().end(); useSessionStore.setState(snapshot, true); });
+
+it('leaves the tab list empty instead of showing an unmatched-search message when all tabs close', () => {
+  useSessionStore.setState({ tabs: [], activeId: '' });
+  const { container } = render(<PanelTabs />);
+  expect(container.querySelector('[data-tab-row-id]')).toBeNull();
+  expect(screen.queryByText('无匹配会话')).toBeNull();
+});
+
+it('lists singleton pages alongside sessions and switches or closes them', () => {
+  render(<PanelTabs />);
+  const settings = screen.getByTestId('tab-row-settings');
+  const history = screen.getByTestId('tab-row-history');
+  expect(settings).toHaveAttribute('data-reorder-item', 'settings');
+  expect(history).toHaveAttribute('data-reorder-kind', 'loose-tab');
+  fireEvent.click(history);
+  expect(useSessionStore.getState().activeId).toBe('history');
+  fireEvent.doubleClick(settings);
+  expect(settings.querySelector('input')).toBeNull();
+  fireEvent.contextMenu(settings);
+  expect(screen.queryByText('复制会话')).toBeNull();
+  fireEvent.click(screen.getByText('关闭标签'));
+  expect(useSessionStore.getState().tabs.some(tab => tab.kind === 'settings')).toBe(false);
+});
+
+it('filters singleton pages without hiding other rows', () => {
+  const { container } = render(<PanelTabs />);
+  const icon = screen.getByTestId('tab-row-local').querySelector('svg')!;
+  expect(icon).toHaveAttribute('data-shell-mark', 'bash');
+  expect(screen.getByTestId('tab-row-settings')).toBeVisible();
+  expect(screen.getByTestId('tab-row-history')).toBeVisible();
+  act(() => useSessionStore.getState().activate('local'));
+  expect(icon.style.color).toBe('var(--shell-bash-accent)');
+  fireEvent.change(screen.getByTestId('tab-search'), { target: { value: 'History' } });
+  expect(screen.getByTestId('tab-row-history')).toBeVisible();
+  expect(screen.queryByTestId('tab-row-settings')).toBeNull();
+  expect(container.querySelectorAll('[data-tab-row-id]')).toHaveLength(1);
+});
+
+it('keeps group rows intact through renaming and reordering', () => {
+  useSessionStore.setState({ groups: [
+    { id: 'group-a', title: 'First', collapsed: false },
+    { id: 'group-b', title: 'Second', collapsed: false },
+  ] });
+  render(<PanelTabs />);
+  const firstTile = screen.getByTestId('group-header-group-a').querySelector('span')!;
+  expect(firstTile).toHaveStyle({ width: '24px', height: '24px', background: 'var(--hover)' });
+  expect(firstTile.querySelector('svg')).not.toBeNull();
+  act(() => useSessionStore.setState({ groups: [
+    { id: 'group-b', title: 'Second', collapsed: false },
+    { id: 'group-a', title: 'Renamed', collapsed: false },
+  ] }));
+  expect(screen.getByTestId('group-header-group-a')).toHaveTextContent('Renamed');
+});
+
+it('keeps an empty session drop zone expandable and previews grouped tabs outside singleton rows', () => {
+  const moveTab = vi.fn();
+  useSessionStore.setState(state => ({
+    tabs: state.tabs.map(tab => tab.kind === 'session' ? { ...tab, groupId: 'group-a' } : tab),
+    groups: [{ id: 'group-a', title: 'Group', collapsed: false }], moveTab,
+  }));
+  const { container } = render(<PanelTabs />);
+  const zone = container.querySelector<HTMLElement>('[data-reorder-zone="ungrouped"]')!;
+  expect(zone.style.flex).toBe('1 0 auto');
+  expect(zone.style.minHeight).toBe('44px');
+  expect(zone.closest<HTMLElement>('[data-reorder-list]')!.style.display).toBe('flex');
+  expect(zone.querySelectorAll('[data-reorder-item]')).toHaveLength(2);
+  act(() => {
+    useListReorder.getState().start({ listId: 'session-tabs', id: 'local', kind: 'tab' }, { x: 10, y: 500 });
+    useListReorder.getState().hover({ itemId: 'history', after: true });
+  });
+  expect(zone.querySelector('[data-reorder-placeholder="history"]')).not.toBeNull();
+  expect(screen.getByTestId('group-header-group-a').parentElement!.querySelector('[data-reorder-placeholder]')).toBeNull();
+  expect(moveTab).not.toHaveBeenCalled();
+});
