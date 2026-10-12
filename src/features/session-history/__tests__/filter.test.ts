@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { filterSessions, isSshSession, sshTargetOf } from '@features/session-history';
+import { sessionTerminalModes } from '../model/filter';
 import type { BackendSessionEntry } from '@platform/api/types';
 
 function mk(over: Partial<BackendSessionEntry>): BackendSessionEntry {
@@ -20,6 +21,19 @@ function mk(over: Partial<BackendSessionEntry>): BackendSessionEntry {
 }
 
 const HOUR = 3600 * 1000;
+
+it('filters saved startup modes including mixed panes, SSH, cmd and legacy defaults', () => {
+  const pane = (openMode: string, kind = 'local', shellType = 'bash') => ({ type: 'leaf', terminal: { openMode, kind, shellType } });
+  const block = mk({ id: 'block', payload: JSON.stringify({ layout: pane('block') }) });
+  const classic = mk({ id: 'classic', payload: JSON.stringify({ openMode: 'classic' }) });
+  const mixed = mk({ id: 'mixed', payload: JSON.stringify({ layout: { type: 'split', first: pane('block'), second: pane('classic', 'ssh') } }) });
+  expect(filterSessions([block, classic, mixed], '', 'all', 'all', 'block')).toEqual([block, mixed]);
+  expect(filterSessions([block, classic, mixed], '', 'all', 'all', 'classic')).toEqual([classic, mixed]);
+  expect(sessionTerminalModes(mk({ kind: 'ssh' }))).toEqual(new Set(['classic']));
+  expect(sessionTerminalModes(mk({}))).toEqual(new Set(['block']));
+  expect(sessionTerminalModes(mk({ payload: JSON.stringify({ layout: pane('block', 'local', 'cmd') }) }))).toEqual(new Set(['classic']));
+  expect(sessionTerminalModes(mk({ kind: 'ssh', payload: JSON.stringify({ openMode: 'block' }) }))).toEqual(new Set(['block']));
+});
 
 describe('isSshSession / sshTargetOf', () => {
   it('识别 kind=ssh 与 payload 中的 ssh 标记', () => {

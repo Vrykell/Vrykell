@@ -213,6 +213,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   programTitles: {},
   addTab: (opts) => {
     const o = opts ?? {};
+    if (o.kind === 'history' || o.kind === 'settings') {
+      const existing = get().tabs.find(tab => tab.kind === o.kind);
+      if (existing) {
+        get().activate(existing.id);
+        return existing.id;
+      }
+    }
     const id = nextTabId();
     const isSsh = o.kind === 'ssh' || !!o.ssh;
     const ssh = isSsh ? (o.ssh ?? { name: DEFAULT_TITLE, host: '' }) : null;
@@ -292,13 +299,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (idx === -1) return;
     const closed = tabs[idx]!;
     const next = tabs.filter((t) => t.id !== id);
-    const noSessionsRemain = !next.some(isSessionTab);
-    const historyTab = next.find((tab) => tab.kind === 'history');
-    const nextActiveId = noSessionsRemain
-      ? historyTab?.id ?? ''
-      : activeId === id
-        ? next[Math.max(0, idx - 1)]?.id ?? ''
-        : activeId;
+    const nextActiveId = activeId === id ? next[Math.max(0, idx - 1)]?.id ?? '' : activeId;
     set({
       tabs: next,
       activeId: nextActiveId,
@@ -564,25 +565,28 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   moveTab: (tabId, targetGroupId, index) => {
     const { tabs } = get();
     const tab = tabs.find((t) => t.id === tabId);
-    // 视图标签（历史/设置）不可分组
-    if (!tab || !isSessionTab(tab)) return;
+    // Singleton pages can reorder among loose tabs but never acquire a group.
+    if (!tab || (!isSessionTab(tab) && targetGroupId !== null)) return;
     const without = tabs.filter((t) => t.id !== tabId);
-    const target = without.filter((t) => isSessionTab(t) && (t.groupId ?? null) === targetGroupId);
+    const inScope = (t: Tab) => isSessionTab(t) ? (t.groupId ?? null) === targetGroupId : targetGroupId === null;
+    const target = without.filter(inScope);
+    const moved: Tab = isSessionTab(tab) ? { ...tab, groupId: targetGroupId ?? undefined } : tab;
     const idx = Math.max(0, Math.min(index, target.length));
     let inserted = false;
     const next: Tab[] = [];
     let seenInTarget = 0;
     for (const t of without) {
-      const inTarget = isSessionTab(t) && (t.groupId ?? null) === targetGroupId;
+      const inTarget = inScope(t);
       if (inTarget && seenInTarget === idx) {
-        next.push({ ...tab, groupId: targetGroupId ?? undefined });
+        next.push(moved);
         inserted = true;
       }
       if (inTarget) seenInTarget += 1;
       next.push(t);
     }
-    if (!inserted) next.push({ ...tab, groupId: targetGroupId ?? undefined });
+    if (!inserted) next.push(moved);
     set({ tabs: next });
+    if (!isSessionTab(tab)) return;
     // 持久化：真实会话有后端记录
     sessionSetGroup(tabId, targetGroupId).catch((e) =>
       useToastStore.getState().addToast(`移动会话保存失败：${String((e as Error)?.message ?? e)}`, 'error'),
@@ -604,7 +608,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       id: newId,
       title: `${tab.title} 副本`,
       kind: 'session',
-      titleSource: 'manual',
+      // The copy suffix is a generated fallback, not a user rename; live OSC titles can override it.
+      titleSource: tab.titleSource === 'manual' ? undefined : tab.titleSource,
       groupId: tab.groupId,
       layout,
     };

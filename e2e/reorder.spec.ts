@@ -24,10 +24,46 @@ const sshOrder = (page: Page) =>
     .evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.reorderItem));
 
 const tabOrder = (page: Page) =>
-  page.locator('[data-reorder-item][data-reorder-kind="tab"]')
+  page.locator('[data-tab-row-id]')
     .evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.reorderItem));
 
 test.describe('侧栏列表拖拽排序', () => {
+  for (const singleton of [false, true]) {
+    test(`dragging out of a group uses the empty ungrouped area${singleton ? ' with singleton pages' : ''}`, async ({ page }) => {
+      await setupTauriMock(page);
+      await page.goto('/');
+      await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
+      await ensureTabsOpen(page);
+      const { first, groupId } = await page.evaluate(async withSingleton => {
+        const path = '/src/features/workspace/stores/workspace.ts';
+        const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
+        const store = useWorkspaceStore.getState();
+        const first = store.tabs.find(tab => tab.kind === 'session')!.id;
+        const second = store.addTab({ title: 'Grouped second' });
+        const groupId = await store.createGroupForTab(first, 'Regression group');
+        useWorkspaceStore.getState().moveTab(second, groupId, 1);
+        if (withSingleton) store.openSettingsTab();
+        return { first, groupId };
+      }, singleton);
+      const source = page.getByTestId(`tab-row-${first}`);
+      const from = (await source.boundingBox())!;
+      const list = page.locator('[data-reorder-list="session-tabs"]');
+      const viewport = (await list.boundingBox())!;
+      const loose = list.locator('[data-reorder-zone="ungrouped"]');
+      const heading = (await loose.boundingBox())!;
+      await page.mouse.move(from.x + 40, from.y + from.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(viewport.x + 40, heading.y + 5, { steps: 5 });
+      for (const y of [viewport.y + viewport.height - 120, viewport.y + viewport.height - 20]) {
+        await page.mouse.move(viewport.x + 40, y, { steps: 5 });
+        await expect(loose.locator('[data-reorder-placeholder]')).toHaveCount(1);
+        await expect(list.locator(`[data-group-id="${groupId}"] [data-reorder-placeholder]`)).toHaveCount(0);
+      }
+      await page.mouse.up();
+      await expect(source).toHaveAttribute('data-tab-group', '');
+      await expect(loose.locator(`[data-tab-row-id="${first}"]`)).toHaveCount(1);
+    });
+  }
   test('SSH 连接：拖动时源行让位并出现虚线占位，落下后顺序持久化', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');

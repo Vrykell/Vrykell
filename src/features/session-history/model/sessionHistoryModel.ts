@@ -1,10 +1,44 @@
 import type { BackendGroupEntry, BackendSessionEntry } from '@platform/api/types';
-import { filterSessions, type SessionDateFilter, type SessionTypeFilter } from '@features/session-history/model/filter';
+import { filterSessions, type SessionDateFilter, type SessionTypeFilter, type SessionModeFilter } from '@features/session-history/model/filter';
+
+export type SessionHistorySort = 'closed-desc' | 'closed-asc' | 'created-desc' | 'created-asc' | 'title-asc' | 'title-desc';
 
 export interface SessionHistoryFilter {
   query: string;
   type: SessionTypeFilter;
   date: SessionDateFilter;
+  mode?: SessionModeFilter;
+  sort?: SessionHistorySort;
+}
+
+export const SESSION_MODE_OPTIONS: Array<{ value: SessionModeFilter; label: string }> = [
+  { value: 'all', label: 'All modes' },
+  { value: 'block', label: 'Block terminal' },
+  { value: 'classic', label: 'Classic terminal' },
+];
+
+export const SESSION_SORT_OPTIONS: Array<{ value: SessionHistorySort; label: string }> = [
+  { value: 'closed-desc', label: 'Recently closed' },
+  { value: 'closed-asc', label: 'Earliest closed' },
+  { value: 'created-desc', label: 'Recently created' },
+  { value: 'created-asc', label: 'Earliest created' },
+  { value: 'title-asc', label: 'Title A–Z' },
+  { value: 'title-desc', label: 'Title Z–A' },
+];
+
+/** Stable sorting retains grouping and manual order when primary keys tie. */
+export function sortHistoricalSessions(sessions: BackendSessionEntry[], sort: SessionHistorySort = 'closed-desc'): BackendSessionEntry[] {
+  const compare = (a: BackendSessionEntry, b: BackendSessionEntry) => {
+    let order: number;
+    if (sort === 'title-asc' || sort === 'title-desc') order = a.title.localeCompare(b.title, undefined, { numeric: true }) * (sort === 'title-asc' ? 1 : -1);
+    else {
+      const aTime = sort.startsWith('created') ? a.created_at : a.closed_at ?? a.created_at;
+      const bTime = sort.startsWith('created') ? b.created_at : b.closed_at ?? b.created_at;
+      order = (aTime - bTime) * (sort.endsWith('asc') ? 1 : -1);
+    }
+    return order || a.sort_order - b.sort_order || a.id.localeCompare(b.id);
+  };
+  return [...sessions].sort(compare);
 }
 
 export const SESSION_TYPE_OPTIONS: Array<{ value: SessionTypeFilter; label: string }> = [
@@ -36,9 +70,10 @@ export function deriveSessionHistorySections(
     filter.query,
     filter.type,
     filter.date,
+    filter.mode,
   );
   const grouped = new Map<string, BackendSessionEntry[]>();
-  const ungrouped = historical.filter((session) => !session.group_id).sort((left, right) => left.sort_order - right.sort_order);
+  const ungrouped = sortHistoricalSessions(historical.filter((session) => !session.group_id), filter.sort);
 
   for (const group of historical.filter((session) => session.group_id)) {
     const groupId = group.group_id!;
@@ -47,14 +82,14 @@ export function deriveSessionHistorySections(
     grouped.set(groupId, items);
   }
   for (const [groupId, items] of grouped) {
-    grouped.set(groupId, items.sort((left, right) => left.sort_order - right.sort_order));
+    grouped.set(groupId, sortHistoricalSessions(items, filter.sort));
   }
 
   return { historical, grouped, ungrouped };
 }
 
 export function hasSessionHistoryFilter(filter: SessionHistoryFilter): boolean {
-  return filter.type !== 'all' || filter.date !== 'all';
+  return filter.type !== 'all' || filter.date !== 'all' || (filter.mode !== undefined && filter.mode !== 'all');
 }
 
 export function groupsWithHistoricalSessions(

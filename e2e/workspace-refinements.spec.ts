@@ -43,7 +43,7 @@ test('default terminal applies to new tabs and survives reload', async ({ page }
     const tab = state.tabs.find(tab => tab.id === state.activeId);
     return tab?.kind === 'session' && tab.layout.type === 'leaf' ? tab.layout.terminal.shellType : '';
   })).toBe('bash');
-  await expect(page.locator('[data-shell-mark="bash"]').first()).toHaveCSS('width', '20px');
+  await expect(page.locator('[data-tab-row-id] [data-shell-mark="bash"]').first()).toHaveCSS('width', '20px');
   await page.reload();
   await page.keyboard.press('Meta+t');
   await expect(page.getByPlaceholder(/输入命令/).last()).toBeVisible();
@@ -110,7 +110,9 @@ test('command menus use semantic groups and historical output shares the termina
   const colors = await block.evaluate(element => {
     const output = [...element.querySelectorAll<HTMLElement>('[data-selectable]')].at(-1)!;
     const pane = element.closest<HTMLElement>('.terminal-pane')!;
-    return [getComputedStyle(output).backgroundColor, getComputedStyle(pane).backgroundColor];
+    let surface: HTMLElement | null = output;
+    while (surface && getComputedStyle(surface).backgroundColor === 'rgba(0, 0, 0, 0)') surface = surface.parentElement;
+    return [surface ? getComputedStyle(surface).backgroundColor : '', getComputedStyle(pane).backgroundColor];
   });
   expect(colors[0]).toBe(colors[1]);
   await block.click({ button: 'right' });

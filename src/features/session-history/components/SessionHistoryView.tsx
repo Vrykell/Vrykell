@@ -2,7 +2,7 @@ import { t } from '@i18n';
 import { sessionCommandCount } from '../model/sessionHistoryModel';
 import { TextInput } from '@ui/TextInput';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Monitor, RotateCcw, History, Trash2, ChevronRight, Folder, Server, Search, Filter, Check } from '@ui/icons';
+import { Monitor, RotateCcw, History, Trash2, ChevronRight, Folder, Server, Search, Filter, Check, ArrowSort } from '@ui/icons';
 import type { BackendSessionEntry } from '@platform/api/types';
 import {
   isSshSession,
@@ -16,6 +16,7 @@ import {
 } from '@features/session-history';
 import { useToastStore } from '@ui/Toast';
 import ErrorBox from '@ui/ErrorBox';
+import { SESSION_MODE_OPTIONS, SESSION_SORT_OPTIONS, type SessionHistorySort, type SessionModeFilter } from '@features/session-history';
 
 const TYPE_OPTIONS = SESSION_TYPE_OPTIONS;
 
@@ -32,6 +33,7 @@ export default function SessionHistoryView() {
   // 历史页分组折叠状态（覆盖后端 collapsed，会话内本地态）
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [filterMenu, setFilterMenu] = useState<{ x: number; y: number } | null>(null);
+  const [sortMenu, setSortMenu] = useState<{ x: number; y: number } | null>(null);
   const notify = useCallback((message: string, kind: 'success' | 'error') => {
     useToastStore.getState().addToast(message, kind);
   }, []);
@@ -51,7 +53,7 @@ export default function SessionHistoryView() {
     ungrouped,
     hasFilter,
   } = useSessionHistory({ notify });
-  const { query, type: typeFilter, date: dateFilter } = filter;
+  const { query, type: typeFilter, date: dateFilter, mode = 'all', sort = 'closed-desc' } = filter;
 
   const toggleCollapsed = useCallback((id: string, initial: boolean) => {
     setCollapsed((prev) => ({ ...prev, [id]: !(prev[id] ?? initial) }));
@@ -66,7 +68,7 @@ export default function SessionHistoryView() {
     }}>
       {/* 顶栏：标题 + 搜索栏（内置筛选按钮）+ 刷新 */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
+        display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
         padding: '8px 16px', borderBottom: '1px solid var(--border)',
         fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)',
       }}>
@@ -94,8 +96,10 @@ export default function SessionHistoryView() {
           <button
             onClick={(e) => {
               const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              setSortMenu(null);
               setFilterMenu({ x: r.left, y: r.bottom + 4 });
             }}
+            type="button"
             data-tip={hasFilter ? '筛选（当前已启用，点击调整）' : '筛选'}
             data-testid="session-filter-btn"
             style={{
@@ -106,6 +110,27 @@ export default function SessionHistoryView() {
             }}
           >
             <Filter size={13} />
+          </button>
+          <button
+            onClick={(e) => {
+              const r = e.currentTarget.getBoundingClientRect();
+              setFilterMenu(null);
+              setSortMenu({ x: r.right, y: r.bottom + 4 });
+            }}
+            type="button"
+            aria-label={t('Sort sessions')}
+            aria-haspopup="menu"
+            aria-expanded={sortMenu !== null}
+            data-tip={t('Sort sessions')}
+            data-testid="session-sort-btn"
+            style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: 22, height: 22, padding: 0, border: 'none', borderRadius: 4,
+              background: 'transparent', cursor: 'pointer',
+              color: sort !== 'closed-desc' ? 'var(--accent)' : 'var(--text-muted)',
+            }}
+          >
+            <ArrowSort size={13} />
           </button>
         </div>
 
@@ -127,9 +152,17 @@ export default function SessionHistoryView() {
       {filterMenu && (
         <SessionFilterMenu
           anchor={filterMenu}
-          value={{ type: typeFilter, date: dateFilter }}
+          value={{ type: typeFilter, date: dateFilter, mode }}
           onChange={setFilter}
           onClose={() => setFilterMenu(null)}
+        />
+      )}
+      {sortMenu && (
+        <SessionSortMenu
+          anchor={sortMenu}
+          value={sort}
+          onChange={(value) => setFilter({ sort: value })}
+          onClose={() => setSortMenu(null)}
         />
       )}
 
@@ -267,10 +300,58 @@ export default function SessionHistoryView() {
   );
 }
 
-/** 筛选弹层：类型 / 日期 分组单选，点击选项即时生效（点外部或 Esc 关闭）。 */
+function SessionSortMenu({ anchor, value, onChange, onClose }: {
+  anchor: { x: number; y: number };
+  value: SessionHistorySort;
+  onChange: (value: SessionHistorySort) => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    requestAnimationFrame(() => document.addEventListener('mousedown', onDown));
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [onClose]);
+
+  const top = Math.max(8, Math.min(anchor.y, window.innerHeight - 230));
+  const left = Math.max(8, Math.min(anchor.x - 160, window.innerWidth - 168));
+
+  return (
+    <div
+      ref={ref}
+      data-testid="session-sort-menu"
+      className="workspace-floating"
+      style={{
+        position: 'fixed', zIndex: 9999, top, left, minWidth: 160,
+        padding: 4, fontSize: 'calc(12px * var(--ui-font-scale))', maxHeight: 'calc(100vh - 16px)', overflowY: 'auto',
+      }}
+    >
+      {SESSION_SORT_OPTIONS.map((option) => (
+        <FilterOption
+          key={option.value}
+          label={t(option.label)}
+          active={option.value === value}
+          onClick={() => { onChange(option.value); onClose(); }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** Grouped filters apply immediately and stay open until dismissed. */
 function SessionFilterMenu({ anchor, value, onChange, onClose }: {
   anchor: { x: number; y: number };
-  value: { type: SessionTypeFilter; date: SessionDateFilter };
+  value: { type: SessionTypeFilter; date: SessionDateFilter; mode: SessionModeFilter };
   onChange: (patch: Partial<SessionFilterState>) => void;
   onClose: () => void;
 }) {
@@ -291,7 +372,7 @@ function SessionFilterMenu({ anchor, value, onChange, onClose }: {
     };
   }, [onClose]);
 
-  const top = Math.min(anchor.y, window.innerHeight - 190);
+  const top = Math.max(8, Math.min(anchor.y, window.innerHeight - 360));
   const left = Math.min(anchor.x, window.innerWidth - 160);
 
   return (
@@ -301,7 +382,7 @@ function SessionFilterMenu({ anchor, value, onChange, onClose }: {
       className="workspace-floating"
       style={{
         position: 'fixed', zIndex: 9999, top, left, minWidth: 150,
-        padding: 4, fontSize: 'calc(12px * var(--ui-font-scale))',
+        padding: 4, fontSize: 'calc(12px * var(--ui-font-scale))', maxHeight: 'calc(100vh - 16px)', overflowY: 'auto',
       }}
     >
       <div style={{ padding: '4px 10px 2px', fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)', fontWeight: 'var(--fw-semibold)', letterSpacing: '0.04em' }}>
@@ -313,6 +394,9 @@ function SessionFilterMenu({ anchor, value, onChange, onClose }: {
           <FilterOption key={o.value} label={o.label} active={active} onClick={() => onChange({ type: o.value })} />
         );
       })}
+      <div style={{ height: 1, background: 'var(--border)', margin: '4px 8px' }} />
+      <div style={{ padding: '4px 10px 2px', fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>{t('Terminal startup mode')}</div>
+      {SESSION_MODE_OPTIONS.map(option => <FilterOption key={option.value} label={t(option.label)} active={option.value === value.mode} onClick={() => onChange({ mode: option.value })} />)}
       <div style={{ height: 1, background: 'var(--border)', margin: '4px 8px' }} />
       <div style={{ padding: '4px 10px 2px', fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)', fontWeight: 'var(--fw-semibold)', letterSpacing: '0.04em' }}>
         日期
@@ -332,6 +416,8 @@ function FilterOption({ label, active, onClick }: { label: string; active: boole
   return (
     <button className="workspace-floating-row"
       onClick={onClick}
+      type="button"
+      aria-pressed={active}
       style={{
         display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
         padding: '5px 10px', border: 'none', background: 'transparent', cursor: 'pointer',
@@ -360,6 +446,7 @@ function SessionRow({
   return (
     <div
       onClick={onOpen}
+      data-testid={`history-session-${s.id}`}
       data-tip={historical ? '点击恢复此会话' : '点击切换到该会话'}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
