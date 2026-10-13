@@ -230,6 +230,7 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
         style={{ ...inputStyle, marginTop: 8 }}
       />
       <ConfigTextArea
+        label={t('Environment variables')}
         value={env}
         placeholder={t('Environment variables, one KEY=VALUE per line')}
         onChange={(e) => change({ env: e.target.value })}

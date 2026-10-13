@@ -97,6 +97,7 @@ export function MemorySettings() {
       </div>
       <ConfigTextArea
         value={saving.value}
+        aria-label={t('Memory content')}
         disabled={organizing}
         onCompositionStart={() => saving.setComposing(true)}
         onCompositionEnd={() => saving.setComposing(false)}
@@ -152,7 +153,7 @@ function AgentCard({ a, onChanged }: { a: AgentDef; onChanged: () => void }) {
         <IconButton compact tone="danger" onClick={() => void del()} data-tip={t('Delete')} aria-label={t('Delete')}><X size={16} /></IconButton>
       </div>
       <TextInput value={description} placeholder="一句话描述何时委派给它" onChange={(e) => saving.setValue(previous => ({ ...previous, description: e.target.value }))} style={{ ...inputStyle, marginTop: 8 }} />
-      <ConfigTextArea value={prompt} placeholder={t('System prompt (behavior guidelines)')} onChange={(e) => saving.setValue(previous => ({ ...previous, prompt: e.target.value }))} rows={5} style={{ ...inputStyle, marginTop: 8, minHeight: 80, resize: 'vertical', lineHeight: 1.55 }} />
+      <ConfigTextArea label={t('System prompt')} value={prompt} onChange={(e) => saving.setValue(previous => ({ ...previous, prompt: e.target.value }))} rows={5} style={{ ...inputStyle, marginTop: 8, minHeight: 80, resize: 'vertical', lineHeight: 1.55 }} />
     </div>
   );
 }
@@ -215,7 +216,7 @@ function ScheduleCard({ s, onChanged }: { s: Schedule; onChanged: () => void }) 
         <SaveStatus inline status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
         <IconButton compact tone="danger" onClick={() => void del()} data-tip={t('Delete')} aria-label={t('Delete')}><X size={16} /></IconButton>
       </div>
-      <ConfigTextArea value={prompt} placeholder={t('Prompt to execute')} onChange={(e) => saving.setValue(previous => ({ ...previous, prompt: e.target.value }))} rows={3} style={{ ...inputStyle, marginTop: 8, minHeight: 56, resize: 'vertical', lineHeight: 1.55 }} />
+      <ConfigTextArea label={t('Prompt to execute')} value={prompt} onChange={(e) => saving.setValue(previous => ({ ...previous, prompt: e.target.value }))} rows={3} style={{ ...inputStyle, marginTop: 8, minHeight: 56, resize: 'vertical', lineHeight: 1.55 }} />
       <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', marginTop: 6 }}>
         上次执行 {s.lastRunAt ? new Date(s.lastRunAt).toLocaleString() : '从未'}
         {enabled ? ` · 下次 ${new Date(nextRun).toLocaleString()}` : ''}

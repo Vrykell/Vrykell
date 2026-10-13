@@ -25,9 +25,10 @@ interface Props {
   clearAfterSave?: boolean;
   /** Stable hook for tests; the visible copy may change. */
   testId?: string;
+  'aria-label'?: string;
 }
 
-export default function AutoSaveInput({ value, onCommit, placeholder, style, multiline, rows, type, min, max, step, disabled, trim = true, validate, normalize, onClear, clearAfterSave, testId }: Props) {
+export default function AutoSaveInput({ value, onCommit, placeholder, style, multiline, rows, type, min, max, step, disabled, trim = true, validate, normalize, onClear, clearAfterSave, testId, 'aria-label': ariaLabel }: Props) {
   const composing = useRef(false);
   const { flex, flexShrink, width, minWidth, marginTop, marginBottom, ...controlStyle } = style ?? {};
   const validateDraft = validate ?? (type === 'number'
@@ -39,7 +40,7 @@ export default function AutoSaveInput({ value, onCommit, placeholder, style, mul
     return normalize ? normalize(result) : result;
   });
   const feedback = useSettingsSave();
-  const props = { value: save.value, placeholder, disabled, 'data-testid': testId,
+  const props = { value: save.value, placeholder, disabled, 'aria-label': ariaLabel, 'data-testid': testId,
     onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => save.setValue(event.target.value, false, composing.current),
     onBlur: () => { void save.flush(); },
     onCompositionStart: () => { composing.current = true; save.setComposing(true); },
