@@ -58,6 +58,17 @@ describe('scheduleRunner', () => {
     expect(sentMessages()).toHaveLength(0);
   });
 
+  it('有对话正在生成时：本轮既不标记也不发送，留给下一次 tick 重试', async () => {
+    // The store runs one turn at a time. Marking a run that cannot start would drop the task for a
+    // whole interval, so a due task waits instead of being recorded as done.
+    useChatStore.setState({ sendingTab: 'conversation-1' });
+    invokeMock.mockResolvedValue([makeSchedule()]);
+    kickScheduleRunner();
+    await flush();
+    expect(invokeMock).not.toHaveBeenCalledWith('mark_schedule_run', expect.anything());
+    expect(sentMessages()).toHaveLength(0);
+  });
+
   it('markScheduleRun 失败时跳过本轮，不发送（防重复触发）', async () => {
     invokeMock.mockResolvedValueOnce([makeSchedule()]);
     invokeMock.mockRejectedValueOnce(new Error('db 写入失败'));

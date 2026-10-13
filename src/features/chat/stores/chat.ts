@@ -623,6 +623,11 @@ export const useChatStore = create<ChatState>((set, get) => {
   };
 });
 
+/** True while a turn is in flight: the store runs one turn at a time across all conversations. */
+export function isChatTurnActive(): boolean {
+  return useChatStore.getState().sendingTab !== null;
+}
+
 /** Automated requests get a dedicated conversation without replacing the user's current work. */
 export function sendToChat(text: string) {
   if (!text.trim()) return;
