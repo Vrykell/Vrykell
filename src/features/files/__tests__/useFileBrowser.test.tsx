@@ -88,7 +88,7 @@ describe('useFileBrowser（本地目标）', () => {
     act(() => result.current.replaceSelection(['C:/work/src', 'C:/work/a.txt']));
     expect(result.current.canGoBack).toBe(false);
 
-    act(() => result.current.navigate('C:/work/src'));
+    await act(async () => { await result.current.navigate('C:/work/src'); });
     await waitFor(() => expect(result.current.entries[0]?.name).toBe('main.ts'));
     expect(result.current.selection.size).toBe(0);
     expect(result.current.canGoBack).toBe(true);

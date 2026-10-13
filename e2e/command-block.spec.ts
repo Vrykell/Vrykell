@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, mockAnthropic, ptyWrites } from './tauri-mock';
+import { setupTauriMock, mockAnthropic, ptyWrites, ensureChatSettingsOpen } from './tauri-mock';
 
 test.describe('命令块链路', () => {
   test('bash 代码块显示运行按钮，点击后写入 PTY 并回显', async ({ page }) => {
@@ -9,7 +9,10 @@ test.describe('命令块链路', () => {
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
 
     // 切换到 AI 模式
-    await page.getByRole('button', { name: '命令', exact: true }).click();
+    await page.getByRole('button', { name: '询问 AI', exact: true }).click();
+    await ensureChatSettingsOpen(page);
+    await page.getByRole('combobox', { name: '选择执行终端' }).click();
+    await page.getByRole('listbox', { name: '选择执行终端' }).getByRole('option').filter({ hasNotText: '仅讨论' }).first().click();
     const input = page.getByPlaceholder(/自然语言描述/);
     await input.fill('给我个命令');
     await input.press('Enter');
@@ -32,7 +35,7 @@ test.describe('命令块链路', () => {
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
 
-    await page.getByRole('button', { name: '命令', exact: true }).click();
+    await page.getByRole('button', { name: '询问 AI', exact: true }).click();
     const input = page.getByPlaceholder(/自然语言描述/);
     await input.fill('写代码');
     await input.press('Enter');

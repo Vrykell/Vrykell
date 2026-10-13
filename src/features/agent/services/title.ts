@@ -22,6 +22,7 @@ import { activeModelProfile, isApiKeyConfigured } from '@features/agent/stores/a
 import { useBlockStore } from '@features/terminal';
 import { useChatStore } from '@features/chat';
 import { useSessionStore, isSessionTab } from '@features/workspace';
+import { leaves } from '@features/workspace/model/windowLayout';
 import {
   MAX_TITLE_LEN,
   normalizeCommandForTitle,
@@ -50,12 +51,20 @@ const timers = new Map<string, ReturnType<typeof setTimeout>>();
 /** Message count when a tab was last named (for the scale-triggered retitle). */
 const titledCount = new Map<string, number>();
 
+function sessionBlocks(tabId: string) {
+  const tab = useSessionStore.getState().tabs.find(item => item.id === tabId);
+  const panes = tab && isSessionTab(tab) ? leaves(tab.layout).map(pane => pane.id) : [];
+  const blocks = useBlockStore.getState().byTab;
+  return [...new Set([tabId, ...panes])].flatMap(id => blocks[id] ?? [])
+    .sort((first, second) => (first.startedAt ?? 0) - (second.startedAt ?? 0));
+}
+
 /**
  * Collect the generation context. Returns null when the signal is too thin (the sufficiency check
  * lives here); `force` relaxes it for the user-triggered regenerate.
  */
 function gatherContext(tabId: string, force = false): { prompt: string } | null {
-  const blocks = useBlockStore.getState().byTab[tabId] ?? [];
+  const blocks = sessionBlocks(tabId);
   const doneCmds = blocks
     .filter((b) => (b.status === 'done' || b.status === 'interrupted') && b.command)
     .map((b) => b.command);
@@ -88,7 +97,7 @@ export function heuristicTitle(tabId: string): string {
     const title = sanitizeTitle(line);
     if (title) return title;
   }
-  const blocks = useBlockStore.getState().byTab[tabId] ?? [];
+  const blocks = sessionBlocks(tabId);
   for (const block of blocks) {
     if (!block.command) continue;
     const label = normalizeCommandForTitle(block.command);
@@ -174,12 +183,16 @@ function noteActivity(tabId: string) {
 /** Subscribe to block/chat content changes; returns an unsubscribe (App.tsx wires it once). */
 export function initAutoTitle(): () => void {
   const unBlocks = useBlockStore.subscribe((s, prev) => {
-    for (const tabId of Object.keys(s.byTab)) {
-      if (s.byTab[tabId] !== prev.byTab[tabId]) noteActivity(tabId);
+    for (const paneId of Object.keys(s.byTab)) {
+      if (s.byTab[paneId] === prev.byTab[paneId]) continue;
+      const owner = useSessionStore.getState().tabs.find(tab => isSessionTab(tab)
+        && (tab.id === paneId || leaves(tab.layout).some(pane => pane.id === paneId)));
+      if (owner) noteActivity(owner.id);
     }
   });
   const unChat = useChatStore.subscribe((s, prev) => {
     for (const tabId of Object.keys(s.byTab)) {
+      if (!useSessionStore.getState().tabs.some(tab => tab.id === tabId && isSessionTab(tab))) continue;
       if (s.byTab[tabId] !== prev.byTab[tabId]) {
         noteActivity(tabId);
         // Once the conversation reaches a new scale, generate a fresh title (heuristic without AI).

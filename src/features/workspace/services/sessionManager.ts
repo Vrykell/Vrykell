@@ -220,14 +220,16 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
   const layout = info?.cwd ? applyLegacyCwd(parsedLayout, info.cwd) : parsedLayout;
   // Legacy records belong to the first pane; explicit split-pane ownership is retained.
   const firstPaneId = firstLeaf(layout).id;
-  useChatStore.setState((state) => ({
-    byTab: {
+  useChatStore.setState((state) => {
+    const messages = state.byTab[sessionId];
+    if (!messages) return state;
+    return { byTab: {
       ...state.byTab,
-      [sessionId]: (state.byTab[sessionId] ?? []).map((message) => ({
+      [sessionId]: messages.map((message) => ({
         ...message, paneId: !message.paneId || message.paneId === sessionId ? firstPaneId : message.paneId,
       })),
-    },
-  }));
+    } };
+  });
   const storedGroupId = info?.group_id ?? undefined;
   const hasGroupOverride = meta != null && Object.prototype.hasOwnProperty.call(meta, 'groupId');
   const knownGroupIds = new Set(useSessionStore.getState().groups.map((group) => group.id));

@@ -171,6 +171,24 @@ test('手动全屏：块内活终端搬进全屏宿主，退出后搬回卡片',
   await expect(page.getByTestId('tui-fullscreen')).toHaveCount(0);
 });
 
+test('手动全屏中进入真 alt 屏：让出可见面，显示主 xterm 的 TUI', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  await startRunningBlock(page);
+  await emitPtyOutput(page, 'tui-before-alt\r\n');
+  await page.locator('[data-testid^="running-block-"]').first().hover();
+  await page.locator('[data-tip="进入全屏交互"]').click();
+  await expect(page.getByTestId('tui-fullscreen')).toBeVisible();
+
+  // 前台程序切到备用缓冲区：内容只写主 xterm，块终端收不到任何字节。
+  // 手动全屏必须让出表面，否则遮罩用冻结的块内容盖住真正的 TUI（用户看到黑屏）。
+  await emitPtyOutput(page, '\x1b[?1049h' + 'ALT SCREEN CONTENT');
+
+  await expect(page.getByTestId('tui-fullscreen')).toHaveCount(0);
+  await expect(page.getByTestId('tui-banner')).toBeVisible();
+  await expectAnyTermContains(page, 'ALT SCREEN CONTENT', 5000);
+});
+
 test('运行中块接管滚轮：xterm 回溯时不滚动外层命令历史', async ({ page }) => {
   await setupTauriMock(page);
   // 小视口保证块列表溢出可滚（卡片高度跟随内容行数增长）

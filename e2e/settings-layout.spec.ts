@@ -7,7 +7,7 @@ for (const theme of ['深色', '浅色']) {
     await setupTauriMock(page);
     await page.goto('/');
     await gotoSetting(page, '主题');
-    await page.getByRole('button', { name: theme, exact: true }).click();
+    await page.getByRole('radio', { name: theme, exact: true }).click();
     const group = page.getByRole('group', { name: '字体与显示' });
     await expect(group.getByRole('combobox')).toHaveCount(6);
     const row = fieldOf(page, '页面字号');

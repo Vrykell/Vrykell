@@ -21,14 +21,14 @@ test('settings dropdown supports keyboard selection, cancellation and theme colo
   await trigger.press('Enter');
   await expect(trigger).toHaveText('14px');
   await trigger.click();
-  await page.getByRole('button', { name: '深色', exact: true }).click();
+  await page.getByRole('radio', { name: '深色', exact: true }).click();
   await expect(menu).toHaveCount(0);
   await page.getByRole('button', { name: '恢复默认字体设置' }).click();
   await expect(menu).toHaveCount(0);
   await expect(trigger).toHaveText('13px');
   const colors: string[] = [];
   for (const theme of ['深色', '浅色']) {
-    await page.getByRole('button', { name: theme, exact: true }).click();
+    await page.getByRole('radio', { name: theme, exact: true }).click();
     await trigger.click();
     const background = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--elevated').trim());
     await expect(menu).toHaveCSS('background-color', await page.evaluate(color => {

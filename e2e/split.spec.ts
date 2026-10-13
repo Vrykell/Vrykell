@@ -18,6 +18,28 @@ async function clickZoneCenter(page: Page, locator: Locator) {
 }
 
 test.describe('窗口分裂（二叉分裂树 + 落点选择）', () => {
+  test('horizontal panes retain usable width after divider dragging and sidebar resize', async ({ page }) => {
+    await page.keyboard.press('Meta+d');
+    await clickZoneCenter(page, page.getByTestId('placement-zone-1'));
+    const divider = page.getByTestId('terminal-divider-row');
+    const rect = (await divider.boundingBox())!;
+    const main = (await page.locator('main').boundingBox())!;
+    await page.mouse.move(rect.x + rect.width / 2, rect.y + 100);
+    await page.mouse.down(); await page.mouse.move(main.x + 5, rect.y + 100, { steps: 8 }); await page.mouse.up();
+    const checkWidths = async () => {
+      await expect.poll(() => page.locator('[data-testid^="pane-"]:visible').evaluateAll(elements =>
+        Math.min(...elements.map(element => element.getBoundingClientRect().width)))).toBeGreaterThanOrEqual(359);
+      const widths = await page.locator('[data-testid^="pane-"]:visible').evaluateAll(elements => elements.map(element => element.getBoundingClientRect().width));
+      expect(widths).toHaveLength(2);
+      for (const width of widths) expect(width).toBeGreaterThanOrEqual(359);
+    };
+    await checkWidths();
+    await page.locator('[data-dock-btn="chat"]').click();
+    await checkWidths();
+    for (const button of await page.getByRole('button', { name: '询问 AI', exact: true }).all()) await expect(button).toBeInViewport();
+    await page.setViewportSize({ width: 900, height: 800 });
+    await checkWidths();
+  });
   test('⌘D 进入落点选择，点右半屏分裂出两个终端', async ({ page }) => {
     await page.keyboard.press('Meta+d');
     // 1 个终端 → 4 个落点（左右上下半屏）

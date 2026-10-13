@@ -83,7 +83,7 @@ describe('fileMenu', () => {
     const onSyncToCwd = vi.fn();
     const withHandler = buildFileMenuItems(['sync-cwd'], ctx({ handlers: handlers({ onSyncToCwd }) }));
     expect(withHandler).toHaveLength(1);
-    expect(withHandler[0]!.label).toBe('同步到终端目录');
+    expect(withHandler[0]!.label).toBe('切换到当前终端文件目录');
     withHandler[0]!.onClick();
     expect(onSyncToCwd).toHaveBeenCalledTimes(1);
 

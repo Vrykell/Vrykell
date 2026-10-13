@@ -201,8 +201,8 @@ export function ListReorderZonePlaceholder({ listId, zoneId }: { listId: string;
 }
 
 /** Floating tile that follows the pointer while a list row is being dragged. */
-export function ListReorderPreview({ children }: { children: (drag: ListReorderDrag) => ReactNode }) {
-  const drag = useListReorder((state) => state.drag);
+export function ListReorderPreview({ listId, children }: { listId: string; children: (drag: ListReorderDrag) => ReactNode }) {
+  const drag = useListReorder((state) => (state.drag && state.drag.listId === listId ? state.drag : null));
   const position = useListReorder((state) => state.position);
   if (!drag || !position) return null;
   return createPortal(

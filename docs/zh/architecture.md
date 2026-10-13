@@ -2,7 +2,7 @@
 
 > 当前 v2 chat-first 实现（分支 `dev`）的实际架构。终端主体把终端输出抽象为**命令块（Block）**，用「Rust StreamScanner 同步扫描 + SessionController 三场景状态机 + 每 block 单离屏 xterm」组织。
 >
-> 本文记录当前实现的实际架构。（最近更新：2026-09-02，移除 StatusBar、块颜色快照落库 + HTML 双向净化、磁盘卡片；分屏、Agent、主题见 §16-§18。）
+> 本文记录当前实现的实际架构。（最近更新：2026-10-13；分屏、Agent、主题与独立 AI 对话见 §16-§19。）
 
 ---
 
@@ -26,12 +26,13 @@
 16. [分屏与窗口布局](#16-分屏与窗口布局)
 17. [Agent / AI 对话（代码代理）](#17-agent--ai-对话代码代理)
 18. [主题系统](#18-主题系统)
+19. [独立 AI 对话与终端关联](#19-独立-ai-对话与终端关联)
 
 ---
 
 ## 1. 概览与产品形态
 
-- **chat-first**：终端是主表面，输入栏在底部；AI 对话（Anthropic BYOK 直连）以内联面板显示在终端上方，无独立 Chat 侧栏。
+- **终端与 AI 对话**：终端仍是命令操作主表面；AI 面板管理独立对话，没有终端也可使用。每个对话可明确选择终端作为执行环境。
 - **Block 架构**：每个命令是一个 Block。已完成块由 React 渲染为真实 DOM（带颜色 HTML），只有**活跃命令**用隐藏的 xterm.js 处理。
 - **禁止自研终端模拟器**：VT/ANSI 解析、grid 存储全部委托给 xterm.js，我们只做 block 边界与生命周期。
 
@@ -324,7 +325,7 @@ dev 模式会自动写入 `terminal-debug.jsonl`。排查命令挂起时，按�
 | `src/features/terminal/inputVisibility.ts` | 输入框可见性状态机 |
 | `src/features/terminal/components/TerminalBlockList.tsx` | block 列表 + BlockItem/RunningItem/PendingItem |
 | `src/features/terminal/components/TerminalPanel.tsx` | 主 xterm 面板（classic / altScreen 全屏） |
-| `src/features/terminal/components/InputEditor.tsx` | 底部输入栏（命令/AI 模式、可见性消费、附件/权限） |
+| `src/features/terminal/components/InputEditor.tsx` | 底部命令输入栏和询问 AI 入口 |
 | `src/features/terminal/components/BlockOutput.tsx` | 块输出渲染（HTML/文本/高亮） |
 | `src/features/terminal/hooks/useTerminalFocus.ts` | 终端聚焦路由 |
 | `src/features/terminal/stores/terminal.ts` | 会话/尺寸/键盘路由 store + `termInstances` |
@@ -348,7 +349,7 @@ dev 模式会自动写入 `terminal-debug.jsonl`。排查命令挂起时，按�
 | `src/features/agent/model/context.ts` | 上下文策略（off/window/compact + 摘要压缩） |
 | `src/features/agent/services/skills.ts` / `src/features/agent/services/mcp.ts` | Skills / MCP 工具装配 |
 | `src/features/chat/components/PanelChat.tsx` | 全局 AI 对话面板（dock 侧栏） |
-| `src/features/chat/components/AiBlock.tsx` / `ToolRunCard.tsx` | 内联 AI 块 / 工具运行卡片 |
+| `src/features/chat/components/AiBlock.tsx` / `ToolRunCard.tsx` | 对话问答块 / 工具状态卡片 |
 | `src/features/settings/` | 设置页（AI 行为/模型/MCP/Skills/快捷键/终端打开模式/主题） |
 | `src-tauri/src/agent/` | AI 流/配置/记忆/Skills/MCP/调度/web 抓取后端 |
 | `src-tauri/src/remote/ssh.rs` | SSH/SFTP（主机指纹 TOFU、密码认证） |
@@ -430,10 +431,7 @@ dev 模式会自动写入 `terminal-debug.jsonl`。排查命令挂起时，按�
 
 ## 17. Agent / AI 对话（代码代理）
 
-AI 对话以**两种形态消费同一份 chat store**：
-
-- **内联**：`InputEditor` ⚡ 模式，回答渲染为终端上方的 `AiBlock`（AI 块，随负载分级渲染）。
-- **面板**：`PanelChat`（dock 侧栏「AI」面板，跨 pane 的会话转录，按来源 pane 分段）。
+Dock 中的 `PanelChat` 管理独立 AI 对话。终端 `InputEditor` 提交命令，也可将终端快照暂存到 AI 输入区。旧版内联 AI 历史继续显示在其来源终端。
 
 ### 流式管线（`src/features/agent/`）
 
@@ -443,14 +441,14 @@ chat store send → agentStream（AI SDK streamText）
   ├─ buildSystemPrompt + buildSkillsContext + 记忆/agent 列表（platform IPC）
   ├─ buildTools（terminal/runCommand/files/*/skill/subagent/memory/schedule/webSearch/webFetch/webCrawl）
   ├─ buildMcpTool（每 MCP server 一个工具，Rust 侧 mcp.rs 启停连接）
-  ├─ 文本 delta → onChunk（store 50ms 合批）；工具事件 → ToolRun（rail 节点卡片）
-  └─ stepCountIs(maxSteps) 循环，run_command 把命令下发到当前聚焦 pane
+  ├─ 文本 delta → onChunk（store 50ms 合批）；工具事件 → ToolRun（状态卡片）
+  └─ stepCountIs(maxSteps) 循环，run_command 使用请求开始时固定的目标 pane
 ```
 
 - **权限模式**（`permissions.ts`）：标准（按设置页逐工具判定）/ 严格（逐次问）/ 放行（危险命令仍逐次问）；Shield 状态栏 chip 循环切换。
 - **上下文策略**（`context.ts`）：off（全量）/ window（token 预算）/ compact（预算 + 自动摘要压缩），估算用 `estimateTokens`。
 - **设置分层**（`agentSettings.ts`）：global 默认 + per-model overrides（`resolve(modelId)` 合并），localStorage 持久化；key/provider/模型等连接配置仍在 Rust `config.json`。
-- **智能标题**（`agent/title.ts`）：块/对话活动足够时调用 LLM 生成标签标题（App 启动 `initAutoTitle()`）。
+- **终端标签标题**（`agent/title.ts`）：终端命令活动足够时可调用 LLM 生成标签标题（App 启动 `initAutoTitle()`）；独立对话的标题在 AI 面板管理。
 - **后端**：`src-tauri/src/agent/`（`ai.rs` SSE 流式、`skills.rs`、`memory.rs`、`mcp.rs`、`schedules.rs`、`web.rs` 抓取、`agents.rs` 自定义 agent）。
 
 ## 18. 主题系统
@@ -464,3 +462,13 @@ chat store send → agentStream（AI SDK streamText）
 
 - 配置持久化在 Rust 侧（`theme_config` 命令，JSON 文件），启动先 `applyCachedWallpaper()` 再异步 `load()`。
 - 终端配色（ANSI 调色板）在 `src/features/terminal/model/blockTypes.ts`，独立于设计 token。
+
+## 19. 独立 AI 对话与终端关联
+
+`chat` 领域持有独立对话 ID、标题、消息、执行环境和草稿。终端标签切换、关闭及设置导航不改变当前对话。AI 对话历史使用与会话历史并列的单例工作区页签，提供搜索、打开、新建和删除；打开记录时在 Dock 侧栏显示所选对话。输入区默认仅讨论；执行环境是显式选择的终端，引用快照不会自动授予终端操作权限。每次请求固定目标窗格和当时的环境信息，工具执行及回答中的代码运行都不重新读取鼠标焦点。SSH 环境不注册本地文件工具。
+
+SQLite 的 `ai_conversations` 与 `ai_messages` 通过对话 ID 关联，独立于终端 `sessions` 的生命周期。兼容旧库时，一次性将 `chat_messages` 复制到 `legacy:<session-id>` 对话；迁移标记阻止删除后的旧对话重新出现。旧终端历史继续保留，打开 AI 面板不隐藏历史或 AI 执行的命令。
+
+消息保存当时的命令、目录、退出码与输出快照，以及本轮执行环境。助手消息保存文本、工具结果、停止与失败状态；思考流仍只在内存中。未发送草稿和阅读位置在应用运行期间按对话保留。保存失败通过 ErrorBox 显示并可重试。当前仍一次处理一个 AI 请求，切换对话时显示后台工作入口；定时任务创建独立后台对话。
+
+AiBlock 沿用终端命令块的透明底色、内边距、分隔线和更多操作菜单，以整块蓝色左侧导轨标识问答；ToolRunCard 使用平铺分隔行展示工具状态、审批和输出。SafeMarkdown 将明确执行目标传递到代码块，纯讨论隐藏终端运行入口。终端 InputEditor 只提交命令，询问 AI 将最近输出或命令块快照带入对话输入区供检查后发送。

@@ -102,6 +102,23 @@ describe('createProxyFetch', () => {
     }));
   });
 
+  it('流中中止：调 llm_abort，并让本地流以 AbortError 结束（否则读取器永久挂起）', async () => {
+    const ctrl = new AbortController();
+    invokeMock.mockImplementation((cmd: string, args: { onEvent: { send: (ev: unknown) => void } }) => {
+      if (cmd === 'llm_stream') args.onEvent.send({ kind: 'started', status: 200 });
+      return Promise.resolve();
+    });
+    const res = await fetchProxy('https://x.example', { signal: ctrl.signal });
+    const reader = res.body!.getReader();
+
+    // Rust aborts the request and returns without a terminal event: the stream must settle here,
+    // otherwise the model stream never ends and the turn stays pending on screen.
+    ctrl.abort();
+
+    await expect(reader.read()).rejects.toMatchObject({ name: 'AbortError' });
+    expect(invokeMock).toHaveBeenCalledWith('llm_abort', expect.objectContaining({ id: expect.any(String) }));
+  });
+
   it('signal 已中止：直接抛 AbortError 并触发 llm_abort', async () => {
     const ctrl = new AbortController();
     ctrl.abort();

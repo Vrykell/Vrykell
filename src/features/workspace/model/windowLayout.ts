@@ -58,8 +58,10 @@ export interface Divider {
   region: Rect;
 }
 
-/** 每个终端（pane）的最小尺寸（px）——动态最小宽度的基准，尽量小以最大化拖动范围。 */
+/** Minimum vertical space for each terminal pane. */
 export const MIN_PANE_SIZE = 135;
+/** Keep the command toolbar and composer usable when a pane is narrowed. */
+export const MIN_PANE_WIDTH = 360;
 /** 分隔线厚度（px）。 */
 export const DIVIDER_SIZE = 6;
 
@@ -83,7 +85,19 @@ export function maxRowPanes(layout: WindowLayout): number {
 /** 窗口（会话容器）的最小宽度：最宽一行 × 每终端最小宽 + 分隔线厚度。 */
 export function minTerminalWidth(layout: WindowLayout): number {
   const n = maxRowPanes(layout);
-  return n * MIN_PANE_SIZE + (n - 1) * DIVIDER_SIZE;
+  return n * MIN_PANE_WIDTH + (n - 1) * DIVIDER_SIZE;
+}
+
+/** Clamp displayed splits after resizing while preserving the user's saved proportions. */
+export function fitLayoutWidth(layout: WindowLayout, width: number): WindowLayout {
+  if (layout.type === 'leaf') return layout;
+  if (layout.dir === 'col') return { ...layout, first: fitLayoutWidth(layout.first, width), second: fitLayoutWidth(layout.second, width) };
+  const firstMin = minTerminalWidth(layout.first) + DIVIDER_SIZE / 2;
+  const secondMin = minTerminalWidth(layout.second) + DIVIDER_SIZE / 2;
+  const ratio = width >= firstMin + secondMin
+    ? Math.max(firstMin / width, Math.min(1 - secondMin / width, layout.ratio))
+    : firstMin / (firstMin + secondMin);
+  return { ...layout, ratio, first: fitLayoutWidth(layout.first, width * ratio), second: fitLayoutWidth(layout.second, width * (1 - ratio)) };
 }
 
 export function leaves(layout: WindowLayout): TerminalSpec[] {

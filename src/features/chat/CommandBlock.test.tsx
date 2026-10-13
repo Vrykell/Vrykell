@@ -24,6 +24,19 @@ describe('CommandBlock', () => {
     expect(invokeMock).toHaveBeenCalledWith('pty_write', { id: 's1', data: 'ls -la\n' });
   });
 
+  it('uses an explicit target for conversation code blocks after focus changes', () => {
+    useTerminalStore.setState({ sessions: { selected: 'selected-pty', focused: 'focused-pty' }, focusedPaneId: 'focused' });
+    render(<Markdown content={'```bash\necho selected\n```'} paneId="selected" />);
+    fireEvent.click(screen.getByText('在终端运行'));
+    expect(invokeMock).toHaveBeenCalledWith('pty_write', { id: 'selected-pty', data: 'echo selected\n' });
+  });
+
+  it('offers copy without terminal execution for a discussion-only conversation', () => {
+    render(<Markdown content={'```bash\necho selected\n```'} paneId={null} />);
+    expect(screen.queryByText('在终端运行')).not.toBeInTheDocument();
+    expect(screen.getByTestId('code-copy-btn')).toBeInTheDocument();
+  });
+
   it('python 代码块没有运行按钮', () => {
     render(<Markdown content={'```python\nprint(1)\n```'} />);
     expect(screen.queryByText('在终端运行')).toBeNull();

@@ -8,6 +8,7 @@
  */
 
 import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
+import { showsPaneChatHistory } from '../model/paneHistory';
 import { useTypographyStore } from '@config/typography';
 import { useRef, useEffect, useLayoutEffect, useMemo, useState, useId } from 'react';
 import OverlayScrollbar from '@ui/OverlayScrollbar';
@@ -20,22 +21,21 @@ import { useUiStore, useDockDragStore } from '@features/workspace';
 import { useBlockStore, selectBlocks } from '@features/terminal';
 import { usePaneMessages } from '@features/chat';
 import PaneChatHistory from '@features/chat/components/PaneChatHistory';
-import { useChatPanelOpen } from '@features/workspace';
 import { useToastStore } from '@ui/Toast';
 import { useFollowBottom, registerFollowEngager, engageFollow } from '@features/terminal/hooks/useFollowBottom';
 import { useTerminalFocus } from '@features/terminal/hooks/useTerminalFocus';
 import { useTerminalPaneDrag } from '@features/terminal/hooks/useTerminalPaneDrag';
 import {
-  leaves as layoutLeaves, firstLeaf, moveTargets, dividers, collectLayoutCells, MIN_PANE_SIZE, DIVIDER_SIZE,
+  leaves as layoutLeaves, firstLeaf, moveTargets, dividers, collectLayoutCells, fitLayoutWidth, MIN_PANE_SIZE, MIN_PANE_WIDTH, DIVIDER_SIZE,
   type WindowLayout, type TerminalSpec, type DropTarget, type Rect,
 } from '@features/workspace/model/windowLayout';
 import InputEditor from '@features/terminal/components/InputEditor';
-import AiStatusBar from '@features/terminal/components/AiStatusBar';
 import TerminalBlockList, { hasVisibleContent } from '@features/terminal/components/TerminalBlockList';
 import PinnedCommand from './PinnedCommand';
 import { usePinnedCommand } from '../hooks/usePinnedCommand';
 import TerminalPanel from '@features/terminal/components/TerminalPanel';
 import { SessionHistoryView } from '@features/session-history';
+import AiHistoryView from '@features/chat/components/AiHistoryView';
 import SettingsView from '@features/settings/pages/SettingsView';
 import ContextMenu from '@ui/ContextMenu';
 import { useTerminalLayoutActions } from '@features/terminal/hooks/useTerminalLayoutActions';
@@ -83,7 +83,8 @@ export default function TerminalView() {
           );
         }
         if (tab.id !== activeId) return null; // history/settings 无 PTY，无需保活
-        return tab.kind === 'history' ? <SessionHistoryView key={tab.id} /> : <SettingsView key={tab.id} />;
+        return tab.kind === 'history' ? <SessionHistoryView key={tab.id} />
+          : tab.kind === 'ai-history' ? <AiHistoryView key={tab.id} /> : <SettingsView key={tab.id} />;
       })}
 
       {/* Manual fullscreen host for a running block, with room for the toolbar. */}
@@ -222,7 +223,18 @@ function PaneLayout(props: {
   setRatioNode: (aId: string, bId: string, ratio: number) => void;
   onPaneContextMenu: (e: React.MouseEvent) => void;
 }) {
-  const { layout, windowId, focusedTermId, setSession, setFocusedPane, setRatioNode, onPaneContextMenu } = props;
+  const { layout: savedLayout, windowId, focusedTermId, setSession, setFocusedPane, setRatioNode, onPaneContextMenu } = props;
+  const layoutRef = useRef<HTMLDivElement>(null);
+  const [layoutWidth, setLayoutWidth] = useState(0);
+  useEffect(() => {
+    const element = layoutRef.current;
+    if (!element) return;
+    const observer = new ResizeObserver(() => setLayoutWidth(element.clientWidth));
+    observer.observe(element);
+    setLayoutWidth(element.clientWidth);
+    return () => observer.disconnect();
+  }, []);
+  const layout = useMemo(() => layoutWidth > 0 ? fitLayoutWidth(savedLayout, layoutWidth) : savedLayout, [savedLayout, layoutWidth]);
   const cells = useMemo(() => {
     const collected = collectLayoutCells(layout);
     const rects = new Map(collected.map((c) => [c.terminalId, c.rect]));
@@ -236,7 +248,7 @@ function PaneLayout(props: {
   const divs = useMemo(() => dividers(layout), [layout]);
 
   return (
-    <div style={{ position: 'relative', flex: 1, minWidth: 0, minHeight: 0 }}>
+    <div ref={layoutRef} style={{ position: 'relative', flex: 1, minWidth: 0, minHeight: 0 }}>
       {cells.map((cell) => (
         <div
           key={cell.terminal.id}
@@ -287,9 +299,10 @@ function Divider({ dir, rect, region, onRatio }: { dir: 'row' | 'col'; rect: Rec
     const move = (ev: MouseEvent) => {
       const size = isRow ? regionW : regionH;
       const pos = isRow ? (ev.clientX - regionLeft) : (ev.clientY - regionTop);
-      // 像素级最小尺寸：每侧至少 MIN_PANE_SIZE，避免拖到「覆盖」内容
-      const minRatio = Math.min(0.5, MIN_PANE_SIZE / size);
-      const maxRatio = Math.max(0.5, 1 - MIN_PANE_SIZE / size);
+      // Horizontal panes reserve room for their controls; vertical splits keep their height limit.
+      const minimum = (isRow ? MIN_PANE_WIDTH : MIN_PANE_SIZE) + DIVIDER_SIZE / 2;
+      const minRatio = Math.min(0.5, minimum / size);
+      const maxRatio = Math.max(0.5, 1 - minimum / size);
       const r = Math.max(minRatio, Math.min(maxRatio, pos / size));
       onRatio(r);
     };
@@ -324,6 +337,7 @@ function Divider({ dir, rect, region, onRatio }: { dir: 'row' | 'col'; rect: Rec
   return (
     <div
       ref={ref}
+      data-testid={`terminal-divider-${dir}`}
       onMouseDown={onDown}
       onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--accent-bg)'; }}
       onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
@@ -349,10 +363,12 @@ function TerminalPane(props: {
   const { terminal, windowId, focused, setSession, setFocusedPane, onContextMenu, inner, reorderable } = props;
   const scene = useTerminalStore((s) => s.scenes[terminal.id] ?? 'classic');
   const altScreenActive = useTerminalStore((s) => s.altScreenActive);
+  // An SSH pane's classic scene is its connection/auth surface; the pane's chat
+  // history stays out of the way so that surface owns the pane.
+  const showChatHistory = showsPaneChatHistory(scene, terminal.kind);
   // Real alternate buffers use the main xterm; manual fullscreen uses the live block terminal.
   const showXterm = scene === 'classic' || (scene === 'altScreen' && !altScreenActive);
   const showBlocks = scene === 'blockList';
-  const chatPanelOpen = useChatPanelOpen();
 
   const onPaneMouseDown = useTerminalPaneDrag(terminal.id, reorderable);
 
@@ -378,9 +394,7 @@ function TerminalPane(props: {
       }}
     >
       {/* Keep xterm mounted; hide it only while the block terminal is manually fullscreened. */}
-      {/* AI 状态栏（仅 AI 模式显示，置于页面顶部） */}
-      <AiStatusBar paneId={terminal.id} />
-      {scene === 'classic' && !chatPanelOpen && <PaneChatHistory paneId={terminal.id} />}
+      {showChatHistory && <PaneChatHistory paneId={terminal.id} />}
       <div inert={!showXterm} style={showXterm
         // Keep the native terminal scrollbar flush with the pane's right edge.
         // 左边距不在这里加：它只属于终端屏幕内容（见 TerminalPanel），
@@ -660,9 +674,7 @@ function PaneBlockList({ paneId, insetLeft = 8, insetRight = 8 }: { paneId: stri
 function PaneEmptyHint({ paneId }: { paneId: string }) {
   const blocks = useBlockStore(selectBlocks(paneId));
   const aiMessages = usePaneMessages(paneId);
-  const chatPanelOpen = useChatPanelOpen();
-  // AI 面板打开时内联不显示，空态提示也不把面板里的对话算作 pane 内容
-  if (blocks.some(hasVisibleContent) || (!chatPanelOpen && aiMessages.length > 0)) return null;
+  if (blocks.some(hasVisibleContent) || aiMessages.length > 0) return null;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '32px 28px', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))', userSelect: 'none', gap: 8 }}>
       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'calc(24px * var(--ui-font-scale))', color: 'var(--text-secondary)', fontWeight: 'var(--fw-medium)', marginBottom: 4 }}>$</div>

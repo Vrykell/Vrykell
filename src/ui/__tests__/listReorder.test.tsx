@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ListReorderPlaceholder,
+  ListReorderPreview,
   useListReorder,
   useListReorderDrag,
   type ListReorderDrag,
@@ -113,6 +114,20 @@ describe('list reorder', () => {
     fireEvent.pointerUp(window, { pointerId: 1, clientX: 10, clientY: 45 });
     expect(onDrop).not.toHaveBeenCalled();
     expect(rows[0]).not.toHaveAttribute('data-reorder-dragging');
+  });
+
+  it('renders the floating preview only for the list being dragged', () => {
+    render(
+      <>
+        <Harness onDrop={vi.fn()} />
+        <ListReorderPreview listId="demo">{(drag) => <span data-testid="preview-demo">{drag.id}</span>}</ListReorderPreview>
+        <ListReorderPreview listId="other">{() => <span data-testid="preview-other">other</span>}</ListReorderPreview>
+      </>,
+    );
+    dragTo(45);
+
+    expect(screen.getByTestId('preview-demo').textContent).toBe('a');
+    expect(screen.queryByTestId('preview-other')).toBeNull();
   });
 
   it('ignores pointer downs on opt-out nodes', () => {

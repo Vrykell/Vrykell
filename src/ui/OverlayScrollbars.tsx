@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { t } from '@i18n';
 import OverlayScrollbar from './OverlayScrollbar';
 
-const candidates = 'textarea, [style*="overflow"], .scroll-region, .settings-content, .ui-select-menu, .directory-picker-list, .global-search-body, .md pre, .md .katex-display';
+const candidates = 'textarea, [style*="overflow"], .scroll-region, .settings-content, .ui-select-menu, .directory-picker-list, .global-search-body, .md pre, .md table, .md .katex-display';
 interface Surface { element: HTMLElement; ref: RefObject<HTMLElement>; host: HTMLElement; container: HTMLElement; id: string; horizontal: boolean; vertical: boolean; }
 
 /** Stacking context that owns the content, so a popup track cannot escape above other overlays. */
@@ -48,8 +48,11 @@ export default function OverlayScrollbars() {
         const host = scrollbarLayerHost(element);
         const container = layerFor(host);
         if (!existing || existing.host !== host || existing.horizontal !== horizontal || existing.vertical !== vertical) {
-          const id = element.id || `overlay-scroll-surface-${++sequence}`;
-          if (!element.id) element.id = id;
+          let id = element.id;
+          if (!id) {
+            do { id = `overlay-scroll-surface-${++sequence}`; } while (document.getElementById(id));
+            element.id = id;
+          }
           known.set(element, { element, ref: existing?.ref ?? { current: element }, host, container, id, horizontal, vertical });
         }
         if (!element.classList.contains('overlay-scroll-target')) element.classList.add('overlay-scroll-target');

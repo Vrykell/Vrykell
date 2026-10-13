@@ -217,6 +217,9 @@ export function useTerminalSession(
       }
       if (disposed || stopped) return;
       stopped = true;
+      if (isTerminalDebugEnabled()) {
+        terminalDebug('session-close-request', { paneId, tabId, hasSession: Boolean(sessionId) });
+      }
       const id = sessionId;
       try {
         if (id) await ptyClose(id);
@@ -274,6 +277,12 @@ export function useTerminalSession(
     const blockEnabled = openMode === 'block';
     // Remote authentication must remain interactive until shell integration announces its prompt.
     const initialScene: 'classic' | 'blockList' = blockEnabled && spec?.kind !== 'ssh' ? 'blockList' : 'classic';
+    if (isTerminalDebugEnabled()) {
+      // A duplicate mount for the same pane means the pane was torn down and
+      // rebuilt (SSH would then re-authenticate from scratch); correlate it with
+      // the dispose marker to spot an unexpected remount.
+      terminalDebug('session-mount', { paneId, tabId, attempt, kind: spec?.kind ?? 'none', openMode });
+    }
 
     // The local scene mirror determines whether the PTY uses full or block-list width.
     let currentScene: 'classic' | 'blockList' | 'altScreen' = initialScene;
@@ -299,9 +308,16 @@ export function useTerminalSession(
         if (focusTimer) clearTimeout(focusTimer);
         currentScene = scene;
         useTerminalStore.getState().setScene(paneId, scene);
+        // Actual alternate-buffer mode is rendered by the main xterm, so a manual fullscreen of
+        // the block terminal must give the surface back: its overlay would keep covering the live
+        // TUI with a block terminal that receives no output while the alt screen owns the pane.
+        if (scene === 'altScreen' && useTerminalStore.getState().altScreenActive) {
+          useTerminalStore.getState().setAltScreenActive(false);
+          if (isTerminalDebugEnabled()) {
+            terminalDebug('manual-fullscreen-cancelled', { paneId, reason: 'alternate-screen' });
+          }
+        }
         if (useSessionStore.getState().activeId !== tabId) return;
-        // Actual alternate-buffer mode is rendered by the main xterm, so do not mark it
-        // as a manually fullscreened block terminal or the visible TUI would be hidden.
         if (scene === 'blockList') {
           term.reset(); // 清掉 classic 残留
           useTerminalStore.getState().setKeyboardTarget('input');
@@ -808,7 +824,7 @@ export function useTerminalSession(
       if (closeSessionRef.current === close) closeSessionRef.current = async () => {};
       startupAbort.abort();
       if (isTerminalDebugEnabled()) {
-        terminalDebug('session-controller-dispose', { paneId, tabId, hasSession: Boolean(sessionId) });
+        terminalDebug('session-controller-dispose', { paneId, tabId, attempt, kind: spec?.kind ?? 'none', hasSession: Boolean(sessionId) });
       }
       if (focusTimer) {
         clearTimeout(focusTimer);

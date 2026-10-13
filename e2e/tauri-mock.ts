@@ -134,6 +134,12 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
       ? [{ id: 'archived-group', title: '已归档分组', sort_order: 0, collapsed: false, created_at: Date.now() - 3000, session_count: 0, archived: true }]
       : [];
     const mockChatMessages: Record<string, unknown>[] = [];
+    const mockConversations = JSON.parse(localStorage.getItem('e2e-conversations') || '[]') as Record<string, unknown>[];
+    const mockConversationMessages = JSON.parse(localStorage.getItem('e2e-conversation-messages') || '[]') as Record<string, unknown>[];
+    const saveConversations = () => {
+      localStorage.setItem('e2e-conversations', JSON.stringify(mockConversations));
+      localStorage.setItem('e2e-conversation-messages', JSON.stringify(mockConversationMessages));
+    };
     const sessionPayloads: { id: string; payload: string }[] = [];
     let pendingCmd = '';
     let integrationEnabled = enableIntegration;
@@ -437,14 +443,17 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             // generateText 走非流式 JSON；streamText 走 SSE（请求体带 "stream":true）
             const reqBody = (args.req as { body?: string })?.body ?? '';
             const wantsStream = /"stream"\s*:\s*true/.test(reqBody);
+            const streamId = String((args as { id?: unknown }).id ?? '');
+            const chunkDelayMs = Number((window as unknown as Record<string, number>).__AI_CHUNK_DELAY_MS__ ?? 0);
             setTimeout(() => {
               if (cbId === null) return;
               const win = window as unknown as Record<string, (msg: { index: number; message?: unknown; end?: boolean }) => void>;
               let idx = 0;
               const send = (message: unknown) => win[`_${cbId}`]?.({ index: idx++, message });
+              const pieces: unknown[] = [];
               let body: string;
               if (!wantsStream) {
-                send({ kind: 'started', status: 200, headers: [['content-type', 'application/json']] });
+                pieces.push({ kind: 'started', status: 200, headers: [['content-type', 'application/json']] });
                 const completion = {
                   id: 'chatcmpl-1', object: 'chat.completion', model: 'gpt-4o-mini',
                   choices: [{ index: 0, message: { role: 'assistant', content: text }, finish_reason: 'stop' }],
@@ -452,17 +461,40 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
                 };
                 body = JSON.stringify(completion);
               } else {
-                send({ kind: 'started', status: 200, headers: [['content-type', 'text/event-stream']] });
+                pieces.push({ kind: 'started', status: 200, headers: [['content-type', 'text/event-stream']] });
                 body = isAnthropic ? buildAnthropicSse(text) : buildOpenAiSse(text);
               }
               const b64 = btoa(unescape(encodeURIComponent(body)));
               for (let i = 0; i < b64.length; i += 64) {
-                send({ kind: 'chunk', data: b64.slice(i, i + 64) });
+                pieces.push({ kind: 'chunk', data: b64.slice(i, i + 64) });
               }
-              send({ kind: 'done' });
-              win[`_${cbId}`]?.({ index: idx, end: true });
+              pieces.push({ kind: 'done' });
+              const finish = () => win[`_${cbId}`]?.({ index: idx, end: true });
+              if (chunkDelayMs <= 0) {
+                // Default: the whole answer arrives at once.
+                for (const piece of pieces) send(piece);
+                finish();
+                return;
+              }
+              // A paced stream keeps the answer in flight long enough for a test to press Stop. An
+              // aborted request stops sending without a terminal event, exactly like the Rust proxy.
+              const flush = () => {
+                if ((window as unknown as { __LLM_ABORTED__?: Set<string> }).__LLM_ABORTED__?.has(streamId)) return;
+                const piece = pieces.shift();
+                if (piece === undefined) { finish(); return; }
+                send(piece);
+                setTimeout(flush, chunkDelayMs);
+              };
+              flush();
             }, 10);
             return new Promise(() => {});
+          }
+          case 'llm_abort': {
+            // Rust cancels the request and returns silently, so the frontend stream settles on its
+            // own through llmFetch's abort listener.
+            const aborted = ((window as unknown as { __LLM_ABORTED__?: Set<string> }).__LLM_ABORTED__ ??= new Set<string>());
+            aborted.add(String((args as { id?: unknown }).id ?? ''));
+            return undefined;
           }
           case 'get_ai_config':
             return {
@@ -745,11 +777,11 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             historyEntries.length = 0;
             return undefined;
           case 'save_attachment':
-            return { id: `att-${Date.now()}`, name: args.name as string, path: `/home/e2e/.vrykell/attachments/${args.name}`, size: 123, mime: 'image/png' };
+            return { name: args.name as string, blob_path: `/home/e2e/.vrykell/attachments/${args.name}`, text: null, size: 123, mime: 'image/png' };
           case 'import_attachment':
-            return { id: `att-${Date.now()}`, name: (args.path as string).split('/').pop() ?? 'file', path: args.path as string, size: 123, mime: 'application/octet-stream' };
+            return { name: (args.path as string).split('/').pop() ?? 'file', blob_path: args.path as string, text: 'Test attachment content', size: 123, mime: 'text/plain' };
           case 'read_attachment':
-            return 'data:image/png;base64,aW1n';
+            return 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aSFAAAAAASUVORK5CYII=';
           case 'fs_roots':
             return [
               { name: 'Documents', path: '/home/e2e/Documents', is_dir: true },
@@ -892,6 +924,36 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
           case 'update_session_payload':
             sessionPayloads.push({ id: args.id as string, payload: args.payload as string });
             return undefined;
+          case 'list_conversations': return mockConversations;
+          case 'save_conversation': {
+            const entry = { id: args.id, title: args.title, created_at: args.createdAt, updated_at: args.updatedAt, environment: args.environment };
+            const index = mockConversations.findIndex(item => item.id === args.id);
+            if (index >= 0) mockConversations[index] = entry; else mockConversations.push(entry);
+            saveConversations();
+            return undefined;
+          }
+          case 'append_conversation_message': {
+            const entry = { id: args.id, conversation_id: args.conversationId, role: args.role, content: args.content,
+              created_at: args.createdAt, parts: args.parts, attachments: args.attachments, pane_id: args.paneId, context: args.context };
+            const index = mockConversationMessages.findIndex(item => item.id === args.id);
+            if (index >= 0) mockConversationMessages[index] = entry; else mockConversationMessages.push(entry);
+            saveConversations();
+            return undefined;
+          }
+          case 'list_conversation_messages': return mockConversationMessages.filter(item => item.conversation_id === args.id);
+          case 'delete_conversation_message': {
+            const index = mockConversationMessages.findIndex(item => item.id === args.id);
+            if (index >= 0) mockConversationMessages.splice(index, 1);
+            saveConversations(); return undefined;
+          }
+          case 'delete_conversation': {
+            const index = mockConversations.findIndex(item => item.id === args.id);
+            if (index >= 0) mockConversations.splice(index, 1);
+            for (let position = mockConversationMessages.length - 1; position >= 0; position--) {
+              if (mockConversationMessages[position].conversation_id === args.id) mockConversationMessages.splice(position, 1);
+            }
+            saveConversations(); return undefined;
+          }
           case 'append_chat_message': {
             const i = mockChatMessages.findIndex((m) => m.id === args.id);
             const msg = { id: args.id, session_id: args.sessionId, role: args.role, content: args.content, created_at: args.createdAt };
@@ -1068,6 +1130,14 @@ export async function mockAnthropic(page: Page, replyText: string) {
   await page.addInitScript((text: string) => {
     (window as unknown as Record<string, string>).__AI_REPLY__ = text;
   }, replyText);
+}
+
+/** Deliver the mocked answer one piece at a time, so a test can stop it while it is still arriving.
+ *  Without this the whole answer lands at once and there is nothing left to abort. */
+export async function paceLlmStream(page: Page, delayMs: number) {
+  await page.addInitScript((ms: number) => {
+    (window as unknown as Record<string, number>).__AI_CHUNK_DELAY_MS__ = ms;
+  }, delayMs);
 }
 
 /** 读取假 PTY 收到的全部写入 */
@@ -1256,6 +1326,13 @@ export async function ensureTabsOpen(page: Page): Promise<void> {
     await page.locator('[data-dock-btn="tabs"]').click();
   }
   await search.waitFor({ state: 'visible' });
+}
+
+/** Expand the conversation configuration without changing the message draft. */
+export async function ensureChatSettingsOpen(page: Page): Promise<void> {
+  const trigger = page.getByRole('button', { name: '会话设置', exact: true });
+  if (await trigger.getAttribute('aria-expanded') !== 'true') await trigger.click();
+  await page.getByRole('region', { name: '会话设置' }).waitFor({ state: 'visible' });
 }
 
 /**

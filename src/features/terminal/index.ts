@@ -1,4 +1,5 @@
 /** 终端领域公开入口。 */
+export { watchShellCommandCompletion, type ShellCommandCompletion } from './services/commandCompletion';
 export {
   useTerminalStore,
   termInstances,

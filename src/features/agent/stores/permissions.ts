@@ -38,6 +38,9 @@ export interface GateResult {
 
 export interface ToolContext {
   signal?: AbortSignal;
+  /** A fixed execution target; null explicitly disables terminal access. */
+  paneId?: string | null;
+  remote?: boolean;
   /** 会话 id（= 工作区 tabId），会话授权的命名空间；缺省时禁用会话授权 */
   tabId?: string;
   /** 审批状态回写（agentStream 接到后 upsert ToolRun） */

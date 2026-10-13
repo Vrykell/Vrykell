@@ -67,6 +67,7 @@ export default function ShellIndicator({ shell, connected, focused, compact, lab
   return (
     <span
       className={compact ? undefined : 'terminal-chip'}
+      data-tip={label ?? info.label}
       style={compact
         ? {
             display: 'inline-flex',

@@ -11,7 +11,7 @@ import ErrorDetails from '@ui/ErrorDetails';
  * 降级策略：渲染失败不吞消息 —— 展示原始文本（等宽、可选中），
  * 并把错误 + 内容摘要打进 console 便于定位。
  */
-export default class SafeMarkdown extends Component<{ content: string }, { error: boolean; errorMessage: string; content: string }> {
+export default class SafeMarkdown extends Component<{ content: string; paneId?: string | null }, { error: boolean; errorMessage: string; content: string }> {
   state = { error: false, errorMessage: '', content: this.props.content };
 
   static getDerivedStateFromError(error: unknown) {
@@ -40,8 +40,8 @@ export default class SafeMarkdown extends Component<{ content: string }, { error
 
   // 流式期间父组件每个 chunk 都重渲染；这里只比较 content，避免已完成消息
   // 每次 token 都重跑整条 Markdown + KaTeX 解析（长对话的主要卡顿源）。
-  shouldComponentUpdate(nextProps: { content: string }) {
-    return nextProps.content !== this.props.content;
+  shouldComponentUpdate(nextProps: { content: string; paneId?: string | null }) {
+    return nextProps.content !== this.props.content || nextProps.paneId !== this.props.paneId;
   }
 
   render() {
@@ -59,6 +59,6 @@ export default class SafeMarkdown extends Component<{ content: string }, { error
         />
       );
     }
-    return <Markdown content={this.props.content} />;
+    return <Markdown content={this.props.content} paneId={this.props.paneId} />;
   }
 }

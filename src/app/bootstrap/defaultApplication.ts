@@ -1,4 +1,4 @@
-import { setDefaultStream } from '@features/chat';
+import { setDefaultStream, useChatStore } from '@features/chat';
 import { refreshAiConfig } from '@features/agent';
 import { agentStream } from '@features/agent/services/agentStream';
 import { initAutoTitle } from '@features/agent/services/title';
@@ -18,7 +18,10 @@ export function startDefaultApplication(): () => void {
     useToastStore.getState().addToast(`${message}：${String((error as Error)?.message ?? error)}`, 'error');
   };
   return createApplicationBootstrap({
-    configureAgentStream: () => setDefaultStream(agentStream),
+    configureAgentStream: () => {
+      setDefaultStream(agentStream);
+      void useChatStore.getState().loadConversations();
+    },
     refreshAiConfig,
     subscribeAutoTitle: initAutoTitle,
     startScheduleRunner: initScheduleRunner,

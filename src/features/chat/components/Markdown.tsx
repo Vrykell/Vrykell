@@ -35,7 +35,7 @@ function remarkStandaloneMathDisplay() {
   return walk;
 }
 
-export default function Markdown({ content }: { content: string }) {
+export default function Markdown({ content, paneId }: { content: string; paneId?: string | null }) {
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfmSafe, remarkMath, remarkStandaloneMathDisplay]}
@@ -43,7 +43,7 @@ export default function Markdown({ content }: { content: string }) {
       // 误判为公式；KaTeX 抛错会击穿 SafeMarkdown。容错模式下原样显示源码。
       rehypePlugins={[[rehypeKatex, { throwOnError: false, errorColor: 'var(--error)' }]]}
       components={{
-        pre: (props) => <CommandBlock {...props} />,
+        pre: (props) => <CommandBlock {...props} paneId={paneId} />,
         // 图片降级为链接文本：不加载远程图片（防追踪/外带，CSP 亦不放行 http(s) 图片源），
         // 同时避免因 CSP 拦截而裂图
         img: (props) => (

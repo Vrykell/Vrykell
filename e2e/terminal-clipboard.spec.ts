@@ -33,14 +33,15 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
 });
 
-test('终端右键菜单提供复制/粘贴并标注 Ctrl+Shift+C/V', async ({ page }) => {
+test('终端右键菜单提供复制/粘贴并标注 Ctrl+C/V', async ({ page }) => {
   await page.locator('[data-testid^="pane-"]').first().click({ button: 'right' });
   const menu = page.getByRole('menu', { name: '操作菜单' });
   await expect(menu).toBeVisible();
   await expect(menu).toContainText('复制');
-  await expect(menu).toContainText('Ctrl+C');
+  // Modifier keys render as glyphs; the accessible name carries the shortcut.
+  await expect(menu.getByLabel('Control+C')).toBeVisible();
   await expect(menu).toContainText('粘贴');
-  await expect(menu).toContainText('Ctrl+V');
+  await expect(menu.getByLabel('Control+V')).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('terminal-clipboard-menu.png') });
 });
 
@@ -52,7 +53,8 @@ test('运行中块 Ctrl+V 把剪贴板内容写入 PTY', async ({ page }) => {
 
   const before = (await ptyWrites(page)).length;
   await host.locator('.xterm-helper-textarea').press('Control+v');
-  await expect.poll(async () => (await ptyWrites(page)).slice(before)).toContain('echo pasted\n');
+  // The terminal paste path normalizes line endings to CR before the PTY write.
+  await expect.poll(async () => (await ptyWrites(page)).slice(before)).toContain('echo pasted\r');
 });
 
 test('会话请求 win32-input-mode 后 Ctrl+C 仍然复制而不是发按键记录', async ({ page }) => {

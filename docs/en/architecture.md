@@ -2,7 +2,7 @@
 
 > The actual architecture of the current v2 chat-first implementation (branch `dev`). The terminal surface abstracts terminal output into **command blocks (Block)**, organized around "synchronous Rust StreamScanner scanning + the SessionController three-scene state machine + one offscreen xterm per block".
 >
-> This document records the actual architecture of the current implementation. (Last updated: 2026-09-02; StatusBar, block color snapshot persistence + bidirectional HTML sanitization, and disk cards removed; see §16-§18 for split panes, Agent, and themes.)
+> This document records the actual architecture of the current implementation. (Last updated: 2026-10-13; see §16-§19 for split panes, Agent, themes, and independent AI conversations.)
 
 ---
 
@@ -26,12 +26,13 @@
 16. [Split Panes and Window Layout](#16-split-panes-and-window-layout)
 17. [Agent / AI Chat (Code Agent)](#17-agent--ai-chat-code-agent)
 18. [Theme System](#18-theme-system)
+19. [Independent AI conversations and terminal references](#19-independent-ai-conversations-and-terminal-references)
 
 ---
 
 ## 1. Overview and Product Form
 
-- **chat-first**: the terminal is the primary surface, with the input bar at the bottom; AI chat (Anthropic BYOK direct connection) is displayed as an inline panel above the terminal, with no separate Chat sidebar.
+- **Terminal and AI conversations**: terminals remain the primary command surface; the AI panel owns independent conversations and can be used without a terminal. Each conversation can explicitly select a terminal as its execution environment.
 - **Block architecture**: each command is a Block. Completed blocks are rendered by React as real DOM (color HTML), and only the **active command** is handled by a hidden xterm.js.
 - **No homegrown terminal emulator**: VT/ANSI parsing and grid storage are entirely delegated to xterm.js; we only handle block boundaries and lifecycle.
 
@@ -324,7 +325,7 @@ Dev mode automatically writes `terminal-debug.jsonl`. When troubleshooting a han
 | `src/features/terminal/inputVisibility.ts` | input box visibility state machine |
 | `src/features/terminal/components/TerminalBlockList.tsx` | block list + BlockItem/RunningItem/PendingItem |
 | `src/features/terminal/components/TerminalPanel.tsx` | main xterm panel (classic / altScreen full-screen) |
-| `src/features/terminal/components/InputEditor.tsx` | bottom input bar (command/AI mode, visibility consumption, attachments/permissions) |
+| `src/features/terminal/components/InputEditor.tsx` | bottom command input and Ask AI entry point |
 | `src/features/terminal/components/BlockOutput.tsx` | block output rendering (HTML/text/highlight) |
 | `src/features/terminal/hooks/useTerminalFocus.ts` | terminal focus routing |
 | `src/features/terminal/stores/terminal.ts` | session/dimensions/keyboard routing store + `termInstances` |
@@ -348,7 +349,7 @@ Dev mode automatically writes `terminal-debug.jsonl`. When troubleshooting a han
 | `src/features/agent/model/context.ts` | context strategy (off/window/compact + summary compaction) |
 | `src/features/agent/services/skills.ts` / `src/features/agent/services/mcp.ts` | Skills / MCP tool assembly |
 | `src/features/chat/components/PanelChat.tsx` | global AI chat panel (dock sidebar) |
-| `src/features/chat/components/AiBlock.tsx` / `ToolRunCard.tsx` | inline AI block / tool run card |
+| `src/features/chat/components/AiBlock.tsx` / `ToolRunCard.tsx` | conversation exchange card / tool status card |
 | `src/features/settings/` | settings page (AI behavior/model/MCP/Skills/shortcuts/terminal open mode/theme) |
 | `src-tauri/src/agent/` | AI stream/config/memory/Skills/MCP/scheduling/web scraping backend |
 | `src-tauri/src/remote/ssh.rs` | SSH/SFTP (host fingerprint TOFU, password authentication) |
@@ -430,10 +431,7 @@ Therefore:
 
 ## 17. Agent / AI Chat (Code Agent)
 
-AI chat consumes the same chat store in **two forms**:
-
-- **Inline**: `InputEditor` ⚡ mode; the answer is rendered as an `AiBlock` above the terminal (AI block, rendered at tiered levels according to load).
-- **Panel**: `PanelChat` (the "AI" panel in the dock sidebar, a cross-pane session transcript segmented by originating pane).
+`PanelChat` in the dock manages independent AI conversations. The terminal `InputEditor` submits commands and can stage a terminal snapshot in the AI composer. Legacy inline AI history remains visible in the terminal where it originated.
 
 ### Streaming Pipeline (`src/features/agent/`)
 
@@ -443,14 +441,14 @@ chat store send → agentStream (AI SDK streamText)
   ├─ buildSystemPrompt + buildSkillsContext + memory/agent lists (platform IPC)
   ├─ buildTools (terminal/runCommand/files/*/skill/subagent/memory/schedule/webSearch/webFetch/webCrawl)
   ├─ buildMcpTool (one tool per MCP server; mcp.rs on the Rust side starts/stops connections)
-  ├─ text delta → onChunk (store batches at 50ms); tool events → ToolRun (rail node card)
-  └─ stepCountIs(maxSteps) loop; run_command dispatches the command to the currently focused pane
+  ├─ text delta → onChunk (store batches at 50ms); tool events → ToolRun (status card)
+  └─ stepCountIs(maxSteps) loop; run_command targets the pane captured when the request starts
 ```
 
 - **Permission modes** (`permissions.ts`): standard (decided per tool per the settings page) / strict (ask every time) / allow (dangerous commands still ask every time); the Shield status-bar chip cycles through them.
 - **Context strategy** (`context.ts`): off (full) / window (token budget) / compact (budget + automatic summary compaction), with estimates from `estimateTokens`.
 - **Settings layering** (`agentSettings.ts`): global defaults + per-model overrides (merged by `resolve(modelId)`), persisted in localStorage; connection settings such as key/provider/model remain in the Rust `config.json`.
-- **Smart titles** (`agent/title.ts`): when there is enough block/conversation activity, an LLM is called to generate a tab title (the App calls `initAutoTitle()` on startup).
+- **Terminal tab titles** (`agent/title.ts`): when a terminal has enough command activity, an LLM can generate its tab title (the App calls `initAutoTitle()` on startup). Independent conversation titles are managed in the AI panel.
 - **Backend**: `src-tauri/src/agent/` (`ai.rs` SSE streaming, `skills.rs`, `memory.rs`, `mcp.rs`, `schedules.rs`, `web.rs` scraping, `agents.rs` custom agents).
 
 ## 18. Theme System
@@ -464,3 +462,13 @@ The theme has two layers:
 
 - Configuration is persisted on the Rust side (`theme_config` command, JSON file); on startup `applyCachedWallpaper()` runs first, then `load()` asynchronously.
 - Terminal colors (ANSI palette) are in `src/features/terminal/model/blockTypes.ts`, independent of the design tokens.
+
+## 19. Independent AI conversations and terminal references
+
+The chat domain owns conversation IDs, titles, messages, execution environments and drafts. Terminal navigation, closure and settings do not replace the selected conversation. AI conversation history uses a singleton workspace tab beside session history, with search, open, create and delete actions; opening a row shows the selected conversation in the Dock panel. Discussion is the default; terminal access requires explicit environment selection, and adding a snapshot does not grant it. Each request captures a fixed pane and environment. Tool execution and code-block actions never resolve their target from later focus changes. SSH environments do not register local file tools.
+
+SQLite links `ai_conversations` and `ai_messages` by conversation ID independently of terminal `sessions`. A compatible database migration copies legacy `chat_messages` into `legacy:<session-id>` conversations once; a migration marker prevents deleted conversations from returning. Legacy terminal history remains available, and opening the AI panel never hides history or commands executed by AI.
+
+Messages retain command, directory, exit code and output snapshots plus the request environment. Assistant persistence includes text, tools, stopped and failure states; reasoning remains in memory. Unsent drafts and reading positions are retained per conversation during the application session. ErrorBox displays save failures with retry. A single AI request runs at a time; switching conversations shows a link to background work. Schedules create dedicated background conversations.
+
+AiBlock reuses the transparent background, padding, divider and action menu of terminal command blocks, with a blue left rail for each exchange. ToolRunCard presents tool status, approval and output in flat separated rows. SafeMarkdown passes explicit execution targets to shell blocks and hides terminal execution for discussion. Terminal InputEditor submits commands; Ask AI stages recent output or a command snapshot for review before sending.

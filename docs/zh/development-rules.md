@@ -82,3 +82,4 @@
 45. **文档分层** — 规则正本 = `docs/zh/development-rules.md`（英文镜像 `docs/en/development-rules.md`，两者保持同步）；常驻摘要 = `AGENTS.md`（Codex 等 agent 先读它）；agent 规范入口 = `.agents/skills/vrykell-conventions/SKILL.md`（Command Code 与 Codex 直接读取，`.claude/skills/vrykell-conventions/SKILL.md` 是 Claude Code 的桥接）。规则变化时同步这几处，不再新增副本。
 46. **双语文档** — `docs/` 下的文档保持中英双语：中文放 `docs/zh/`、英文放 `docs/en/`，两侧文件名一一对应。新增文档必须同时提供两种语言；修改任一语言版本时同步更新另一种。`docs/audit-evidence/` 下的截图等原始证据不翻译。
 47. **安装包按需构建** — 只有用户明确要求构建安装包时，才运行 `npm run tauri build` 或其他安装包构建命令。修复、审查、测试或验证应用行为本身不代表授权构建安装包；这类任务使用测试、类型检查、架构检查或开发模式验证。
+48. **优先沿用现有设计** — 修改界面前先查看最接近的现有页面和交互，沿用其组件、间距、输入框、菜单、悬停与焦点样式。确有缺口时扩展或抽取现有实现，不为已有交互另造视觉样式；在实际运行界面的窄、宽尺寸检查结果。

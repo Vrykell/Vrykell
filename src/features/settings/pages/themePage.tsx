@@ -5,7 +5,11 @@ import { useReloadFeedback } from '@ui/useReloadFeedback';
  * Appearance, typography, wallpaper and theme files.
  */
 import { useEffect, useState } from 'react';
-import { iconSizes, Sun, Moon, Image as ImageIcon, Download, Upload, RefreshCw, FileText, Trash2  } from '@ui/icons';
+import { themes } from '@config/theme/tokens';
+import type { ThemePreference } from '@config/theme/tokens';
+import { iconSizes, Image as ImageIcon, Download, Upload, RefreshCw, FileText, Trash2  } from '@ui/icons';
+import Select from '@ui/Select';
+import { blockBackgroundValue, blockColorOptions, type BlockColorGroup } from '../model/blockColors';
 import FontSettings from '@features/settings/components/FontSettings';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
 import { openPath } from '@tauri-apps/plugin-opener';
@@ -13,12 +17,19 @@ import { invoke } from '@platform/diagnostics';
 import { useTheme } from '@app/providers/ThemeProvider';
 import { useTerminalThemeStore } from '@features/settings/model/terminalTheme';
 import { useToastStore } from '@ui/Toast';
-import { SettingsGroup, Field, btnStyle } from '@features/settings/components/ui';
+import { SettingsGroup, Field, Toggle, btnStyle } from '@features/settings/components/ui';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
 import { isWallpaperImage, wallpaperExtensions } from '../services/wallpaper';
 
+/** Appearance choices offered in order; 'system' follows the operating system. */
+const THEME_PREFERENCES: { value: ThemePreference; label: string }[] = [
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'system', label: 'Follow system' },
+];
+
 export function ThemePage() {
-  const { mode, setMode } = useTheme();
+  const { mode, preference, setMode } = useTheme();
   const config = useTerminalThemeStore((s) => s.config);
   const themeUpdate = useTerminalThemeStore((s) => s.update);
   const exportTo = useTerminalThemeStore((s) => s.exportTo);
@@ -27,6 +38,25 @@ export function ThemePage() {
   const reload = useReloadFeedback(reloadTheme);
   const [themePath, setThemePath] = useState('');
   const { save } = useSettingsSave();
+  const blockTypes: { group: BlockColorGroup; title: string; color: string; rail: string; enabled: string; defaultRail: string; defaultEnabled: boolean }[] = [
+    { group: 'ai', title: t('AI chat block'), color: '--ai-block-bg', rail: '--ai-block-rail', enabled: '--ai-block-bg-enabled', defaultRail: themes[mode].textCaret, defaultEnabled: true },
+    { group: 'command', title: t('Terminal command block'), color: '--command-block-bg', rail: '--command-block-rail', enabled: '--command-block-bg-enabled', defaultRail: themes[mode].borderStrong, defaultEnabled: false },
+    { group: 'failed', title: t('Failed command block'), color: '--failed-block-bg', rail: '--failed-block-rail', enabled: '--failed-block-bg-enabled', defaultRail: themes[mode].errorLight, defaultEnabled: true },
+  ];
+  const updateBlockVar = (key: string, value: string) => themeUpdate({ vars: { ...useTerminalThemeStore.getState().config.vars, [key]: value } });
+  // The rail carries the picked colour; the background keeps a tint of the same hue.
+  const setBlockColor = (block: typeof blockTypes[number], value: string) =>
+    themeUpdate({ vars: { ...useTerminalThemeStore.getState().config.vars, [block.rail]: value, [block.color]: blockBackgroundValue(value) } });
+  // Drop every block-appearance override so the theme palette supplies them again.
+  const resetBlockAppearance = () => {
+    const vars = { ...useTerminalThemeStore.getState().config.vars };
+    for (const block of blockTypes) {
+      delete vars[block.color];
+      delete vars[block.rail];
+      delete vars[block.enabled];
+    }
+    return themeUpdate({ vars });
+  };
 
   useEffect(() => {
     invoke<string>('get_theme_path').then(setThemePath).catch((e) => console.warn('[theme] 读取主题路径失败:', e));
@@ -97,25 +127,22 @@ export function ThemePage() {
   return (
     <>
       <SettingsGroup title={t('Appearance')}>
-        <Field title="主题" description={t('Choose a light or dark appearance.')}>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {(['dark', 'light'] as const).map((m) => {
-              const active = mode === m;
-              const Icon = m === 'dark' ? Moon : Sun;
+        <Field title={t('Theme mode')} description={t('Choose a light or dark appearance.')}>
+          <div className="settings-radio-group" role="radiogroup" aria-label={t('Theme mode')}>
+            {THEME_PREFERENCES.map(option => {
+              const active = preference === option.value;
               return (
                 <button
-                  key={m}
-                  aria-pressed={active}
-                  onClick={() => { void save(() => setMode(m)); }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '10px 16px', fontSize: 'calc(12px * var(--ui-font-scale))', cursor: 'pointer',
-                    border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-                    borderRadius: 'var(--radius-inner)', background: active ? 'var(--hover)' : 'transparent',
-                    color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  }}
+                  key={option.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  className="settings-radio"
+                  data-on={active || undefined}
+                  onClick={() => { void save(() => setMode(option.value)); }}
                 >
-                  <Icon size={iconSizes.control} /> {m === 'dark' ? '深色' : '浅色'}
+                  <span className="settings-radio-dot" aria-hidden="true" />
+                  {t(option.label)}
                 </button>
               );
             })}
@@ -168,6 +195,33 @@ export function ThemePage() {
           )}
         </Field>
 
+      </SettingsGroup>
+      <SettingsGroup title={t('Block appearance')}>
+        {blockTypes.map(block => {
+          const color = config.vars[block.rail] ?? block.defaultRail;
+          const customized = config.vars[block.rail] != null;
+          const options = blockColorOptions(block.group, color).map(option => ({
+            value: option.value,
+            swatch: option.value,
+            // An untouched block reads as "Default"; presets use their name, a custom theme its hex.
+            label: !customized && option.value === color
+              ? t('Default')
+              : option.key ? t(option.key) : option.value.toUpperCase(),
+          }));
+          return <Field key={block.color} title={block.title}
+            description={t('Adjust this block background and rail; turning it off hides both.')}>
+            <div className="block-appearance-controls">
+              <Toggle label={t('Show {{block}} background and rail', { block: block.title })}
+                on={config.vars[block.enabled] == null ? block.defaultEnabled : config.vars[block.enabled] !== '0'}
+                onChange={enabled => updateBlockVar(block.enabled, enabled ? '1' : '0')} />
+              <Select aria-label={t('Color for {{block}}', { block: block.title })} value={color} options={options}
+                onChange={value => { void save(() => setBlockColor(block, value)); }} />
+            </div>
+          </Field>;
+        })}
+        <div className="settings-record">
+          <button type="button" onClick={() => { void save(resetBlockAppearance); }} style={btnStyle}>{t('Restore default block appearance')}</button>
+        </div>
       </SettingsGroup>
       <FontSettings />
       <SettingsGroup title={t('Theme files')}>

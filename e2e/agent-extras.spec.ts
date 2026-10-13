@@ -65,7 +65,7 @@ test.describe('定时任务设置页', () => {
     await page.getByRole('button', { name: /添加任务/ }).click();
     await expect(names).toHaveCount(2);
     await names.nth(1).fill('夜间备份');
-    await page.locator('section').getByPlaceholder('要执行的提示词').nth(1).fill('执行备份脚本');
+    await page.locator('section').getByLabel('要执行的提示词', { exact: true }).nth(1).fill('执行备份脚本');
     await expect(page.locator('.settings-page-header').getByRole('status')).toHaveText('已保存');
     expect((await scheduleOps(page)).some((o) => o.op === 'save' && (o.schedule as { name: string }).name === '夜间备份')).toBe(true);
 

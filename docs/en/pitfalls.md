@@ -80,6 +80,11 @@
 - **Root cause**: the scanner matched whole strings such as `\x1b[?1049h` exactly, so a combined sequence passed through untouched into the running block's xterm, which switched to its own alternate buffer; the snapshot taken on command end then read that active buffer.
 - **Fix**: the scanner inspects every parameter instead (final byte `h`/`l` plus a 1049/1047/47 parameter), while the full raw sequence is still written to the main xterm so the other modes (bracketed paste and the like) keep their effect. The Rust scanner, the front-end test mirror and the e2e mock stay in step.
 
+### 2.11 A manual fullscreen overlay fighting a real alt screen for the surface → a black full-screen TUI (`useTerminalSession.ts`, `onSceneChanged`)
+- **Symptom**: the user first presses "Enter fullscreen interaction" on a running block; when the program then switches to the alternate buffer (cmdc/vim and the like) the whole pane goes black, and "Redraw terminal" appears to do nothing (it repaints the hidden main xterm and a block terminal that receives no output).
+- **Root cause**: bytes from a real alt buffer are written only to the main xterm (`routeData` → `sinks.writeMain`), while the manual fullscreen is exactly what hides the main xterm (`showXterm = scene==='altScreen' && !altScreenActive`) in favour of the block terminal. The old code only "did not set" the manual-fullscreen flag on a scene change — it **never cleared the one already in effect**, so the overlay kept covering the live TUI.
+- **Fix**: when the controller reports a real `altScreen` for a pane that is manually fullscreened, hand the surface back immediately (`setAltScreenActive(false)`, diagnostic marker `manual-fullscreen-cancelled`). Regression coverage: `running-term.spec.ts` ("a real alt screen under a manual fullscreen") and the matching `useTerminalSession.test.tsx` case.
+
 ---
 
 ## 3. PTY / resize / Dimensions
@@ -406,6 +411,11 @@ Fitting that clears the renderer before resizing causes an additional blank fram
 
 ### 11.8 Idempotent Prompting for Context Compression (`context.ts:103/138`)
 - When a summary is merged and updated, the prompt must state "don't repeat or ramble"; when the already-folded part is unchanged, fold only the newly added overflow messages, to avoid re-summarizing over and over.
+
+### 11.9 The proxy fetch cancels the Rust request but never settles its local stream → the UI stays "generating" after Stop (`llmFetch.ts`, `abort`)
+- **Symptom**: after pressing "Stop generating" the model request really is gone (the Rust `AbortHandle` cancels the reqwest call; `llm_abort` shows up in the log), yet the answer stays in the generating state and the send button never comes back.
+- **Root cause**: on abort Rust returns silently and sends no further `done`/`error`, while `llmFetch`'s local `ReadableStream` is never closed or errored. The AI SDK's wrapper stream only checks `abortSignal.aborted` **after** a read settles, so the reader hangs forever and the `fullStream` teardown (`finally`: clear `sendingTab`, land the terminal state) never runs.
+- **Fix**: the abort listener also calls `controller.error(new DOMException(…, 'AbortError'))` so the local stream settles immediately; `llmFetch.test.ts` ("abort mid-stream") locks the behaviour in. On the e2e side, the mock's `llm_abort` must likewise "stop sending and emit no terminal event", otherwise this class of hang cannot be reproduced.
 
 ---
 

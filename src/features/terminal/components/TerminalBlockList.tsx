@@ -80,9 +80,8 @@ export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8
             menuOpen={menuBlock?.block.id === item.block.id}
           />
         ) : (
-          <div key={item.exchange.id} style={{ padding: `0 ${insetRight}px 0 ${insetLeft}px` }}>
-            <AiBlock exchange={item.exchange} />
-          </div>
+          <AiBlock key={item.exchange.id} exchange={item.exchange} dividerBefore={index > 0}
+            style={{ paddingLeft: insetLeft + COMMAND_BLOCK_CONTENT_PADDING, paddingRight: insetRight + COMMAND_BLOCK_CONTENT_PADDING }} />
         ),
       )}
 

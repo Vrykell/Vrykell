@@ -17,9 +17,13 @@ test('AI 草稿和附件按会话保留，关闭面板后仍能继续发送', as
   await expect(page.locator('[data-tip="移除附件"]')).toHaveCount(1);
   await page.getByRole('button', { name: '新建终端', exact: true }).click();
   await page.getByRole('button', { name: /Zsh.*默认终端/ }).click();
+  await expect(input).toHaveValue('终端一的草稿');
+  await expect(page.locator('[data-tip="移除附件"]')).toHaveCount(1);
+  await page.getByRole('button', { name: '新对话', exact: true }).click();
   await expect(input).toHaveValue('');
-  await expect(page.locator('[data-tip="移除附件"]')).toHaveCount(0);
-  await input.fill('终端二的草稿');
+  await input.fill('第二个对话的草稿');
+  await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
+  await page.locator('.ai-history-list [data-testid^="conversation-row-"]').last().click();
   await page.getByTestId('tab-row-t1').click();
   await expect(input).toHaveValue('终端一的草稿');
   await expect(page.locator('[data-tip="移除附件"]')).toHaveCount(1);
@@ -31,7 +35,10 @@ test('AI 草稿和附件按会话保留，关闭面板后仍能继续发送', as
   await expect(page.getByText('任务完成', { exact: true })).toBeVisible();
   await expect(input).toHaveValue('');
   await expect(page.locator('[data-tip="移除附件"]')).toHaveCount(0);
-  await page.getByRole('button', { name: '编辑重发', exact: true }).click();
+  await page.locator('.ai-block').hover();
+  await page.locator('.ai-block').getByRole('button', { name: '更多操作' }).click();
+  await page.getByRole('button', { name: '编辑重发' }).click();
+  await page.getByRole('dialog', { name: '编辑重发' }).getByRole('button', { name: '编辑重发', exact: true }).click();
   await expect(input).toHaveValue('终端一的草稿');
   await expect(page.locator('[data-tip="移除附件"]')).toHaveCount(1);
   await input.fill('带着原附件继续');
@@ -39,7 +46,7 @@ test('AI 草稿和附件按会话保留，关闭面板后仍能继续发送', as
   await expect(page.getByText('任务完成', { exact: true })).toBeVisible();
 });
 
-test('目录加载失败显示错误，可重试并回退到上一个视图', async ({ page }) => {
+test('failed directory navigation retains the view and can be retried', async ({ page }) => {
   await setupTauriMock(page);
   await page.addInitScript(() => {
     const internals = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } }).__TAURI_INTERNALS__;
@@ -57,11 +64,12 @@ test('目录加载失败显示错误，可重试并回退到上一个视图', as
   await page.goto('/');
   await page.locator('[data-dock-btn="files"]').click();
   await page.getByText('Denied', { exact: true }).dblclick();
-  // 统一面板保留后端原文（SSH 侧依赖原文分类失败原因），不再映射为固定文案
-  await expect(page.getByRole('alert')).toContainText('denied');
+  // Failed navigation leaves the current view intact and reports the action through a toast.
+  await expect(page.getByRole('status').filter({ hasText: 'denied' })).toBeVisible();
+  await expect(page.getByText('Denied', { exact: true })).toBeVisible();
   await expect(page.getByText('空目录', { exact: true })).toHaveCount(0);
   await page.screenshot({ path: '.cache-usability.local/product-loop-proof.png' });
-  await page.getByRole('button', { name: '重试', exact: true }).click();
+  await page.getByText('Denied', { exact: true }).dblclick();
   await expect(page.getByText('恢复后的文件.txt')).toBeVisible();
   await page.getByRole('button', { name: '回到上一个视图', exact: true }).click();
   await expect(page.getByText('Denied', { exact: true })).toBeVisible();

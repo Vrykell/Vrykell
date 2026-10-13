@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState, type FC } from 'react';
 import { iconSizes, X  } from '@ui/icons';
 import { useDockStore, PANEL_DEFS, MIN_PANEL_WIDTH, type DockSide } from '@features/workspace';
-import { selectActiveSessionTab, useSessionStore } from '@features/workspace';
 import ResizeHandle from '@ui/ResizeHandle';
 import PanelTabs from '@features/workspace/components/PanelTabs';
 import PanelFiles from '@features/files/components/PanelFiles';
@@ -22,15 +21,13 @@ const PANEL_COMPONENTS: Record<string, FC> = {
 export default function SidePanel({ side }: SidePanelProps) {
   const leftPanels = useDockStore((s) => s.leftPanels);
   const rightPanels = useDockStore((s) => s.rightPanels);
-  // AI 面板与终端强相关：当前激活标签不是会话（设置/历史）时隐藏，切回会话自动恢复
-  const isSessionActive = useSessionStore((state) => selectActiveSessionTab(state) !== null);
 
   const panelIds = side === 'left' ? leftPanels : rightPanels;
   const zone = useDockStore(s => side === 'left' ? s.leftZone : s.rightZone);
   const [visited, setVisited] = useState<string[]>([]);
   useEffect(() => {
     setVisited(previous => {
-      const added = panelIds.filter(id => id !== 'chat' && !previous.includes(id));
+      const added = panelIds.filter(id => !previous.includes(id));
       return added.length ? [...previous, ...added] : previous;
     });
   }, [panelIds]);
@@ -39,7 +36,6 @@ export default function SidePanel({ side }: SidePanelProps) {
   return (
     <>
       {mountedIds.map((panelId) => {
-        if (panelId === 'chat' && !isSessionActive) return null;
         return <SinglePanel key={panelId} side={side} panelId={panelId} visible={panelIds.includes(panelId)} />;
       })}
     </>

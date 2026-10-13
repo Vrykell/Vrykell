@@ -108,6 +108,7 @@ for (const mode of ['dark', 'light'] as const) {
     await expect.poll(() => region.evaluate(element => element.scrollTop)).toBeLessThan(geometry.top - 100);
     await bar.focus();
     await bar.press('Home');
+    await expect(bar).toHaveCSS('outline-style', 'none');
     await expect.poll(() => region.evaluate(element => element.scrollTop)).toBe(0);
     await bar.press('End');
     await expect.poll(() => region.evaluate(element => element.scrollTop)).toBe(geometry.scrollHeight - geometry.height);

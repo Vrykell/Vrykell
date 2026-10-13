@@ -1,5 +1,14 @@
 import { defineConfig } from '@playwright/test';
 
+// The suite runs against a local dev server. A machine-wide npm proxy
+// (`npm_config_proxy`, injected by npm/npx) is read by Playwright's web-server
+// availability probe, so the loopback request is sent through the proxy and its
+// error response is mistaken for "port already used". Keep loopback direct.
+for (const key of ['no_proxy', 'NO_PROXY'] as const) {
+  const current = process.env[key];
+  process.env[key] = current ? `${current},127.0.0.1,localhost` : '127.0.0.1,localhost';
+}
+
 export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,

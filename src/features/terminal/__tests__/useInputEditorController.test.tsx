@@ -83,8 +83,9 @@ describe('useInputEditorController', () => {
     useInputStore.setState({ byPane: { 'pane-1': { text: '', aiMode: true } } });
     const { result } = renderHook(() => useInputEditorController({ paneId: 'pane-1' }));
     act(() => result.current.execute());
-    expect(mocks.ptyWrite).not.toHaveBeenCalled();
+    expect(mocks.ptyWrite).toHaveBeenCalledWith('pty-1', '\n');
     expect(mocks.chatSend).not.toHaveBeenCalled();
+    mocks.ptyWrite.mockClear();
     mocks.sessions = {};
     act(() => useInputStore.setState({ byPane: { 'pane-1': { text: '', aiMode: false } } }));
     act(() => result.current.execute());
@@ -150,14 +151,14 @@ describe('useInputEditorController', () => {
     useInputStore.setState({ byPane: { 'pane-1': { text: '解释这个项目', aiMode: true } } });
     const { result } = renderHook(() => useInputEditorController({ paneId: 'pane-1' }));
     act(() => useDockStore.setState({ rightPanels: ['chat'] }));
-    expect(result.current.aiMode).toBe(false);
+    expect(useInputStore.getState().byPane['pane-1']?.aiMode).toBe(false);
     expect(result.current.text).toBe('');
     act(() => result.current.execute());
     expect(mocks.ptyWrite).toHaveBeenCalledWith('pty-1', '\n');
     expect(useInputStore.getState().byPane['pane-1']?.aiDraft).toBe('解释这个项目');
     act(() => useDockStore.setState({ rightPanels: [] }));
-    act(() => result.current.toggleAiMode());
-    expect(result.current.text).toBe('解释这个项目');
+    act(() => result.current.askAi());
+    expect(result.current.text).toBe('');
   });
 
   it('restores the command draft instead of submitting the AI draft', () => {

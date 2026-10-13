@@ -172,7 +172,7 @@ test('narrow panes preserve context above multiline commands and all output', as
   await page.keyboard.press('Escape');
 });
 
-test('the more menu sends command output for AI analysis in the same pane', async ({ page }) => {
+test('the more menu stages a command snapshot for AI analysis while preserving terminal output', async ({ page }) => {
   await setupTauriMock(page);
   await mockAnthropic(page, 'Analysis complete.');
   await page.goto('/');
@@ -186,8 +186,10 @@ test('the more menu sends command output for AI analysis in the same pane', asyn
   await block.getByRole('button', { name: '更多操作' }).hover();
   await block.getByRole('button', { name: '更多操作' }).click();
   await page.getByRole('menuitem', { name: '发给 AI 分析' }).click();
+  await expect(page.locator('[data-chat-composer]')).toHaveValue('帮我分析这条命令的执行结果。');
+  await page.locator('[data-chat-composer]').press('Enter');
   await expect(page.getByRole('menu', { name: '命令块操作' })).toHaveCount(0);
-  await expect(page.locator('[data-testid^="terminal-flow-"]').first()).toContainText('分析这条命令的执行结果');
+  await expect(page.locator('.ai-chat-panel')).toContainText('帮我分析这条命令的执行结果');
   await expect(page.getByText('Analysis complete.').first()).toBeVisible();
 });
 

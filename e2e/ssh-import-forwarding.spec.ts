@@ -110,6 +110,12 @@ test('SSH multiline paste honours the active bracketed paste mode', async ({ pag
   const input = page.getByRole('textbox', { name: 'SSH 交互终端' });
   await expect(input).toBeVisible();
   await emitPtyOutput(page, '\x1b[?2004h');
+  // xterm parses writes asynchronously; wait until the bracketed-paste mode is
+  // actually applied, or the paste is sent as plain text without the wrapper.
+  await expect.poll(() => page.evaluate(() => {
+    const terms = (window as unknown as { __vrykellTerms: Map<string, { modes?: { bracketedPasteMode?: boolean } }> }).__vrykellTerms;
+    return [...terms.values()].some(term => term.modes?.bracketedPasteMode === true);
+  })).toBe(true);
   await page.evaluate(() => {
     (window as unknown as { __CLIPBOARD_TEXT__: string }).__CLIPBOARD_TEXT__ = 'line one\nline two';
   });

@@ -5,7 +5,6 @@ export {
   PANEL_DEFS,
   NAVIGATION_DEFS,
   MIN_PANEL_WIDTH,
-  useChatPanelOpen,
   type DockSide,
 } from '@features/workspace/stores/dock';
 export { useDockDragStore } from '@features/workspace/stores/dockDrag';

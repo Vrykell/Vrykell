@@ -6,6 +6,7 @@ import { useSessionStore } from '@features/workspace';
 import { findLeaf, replaceLeaf } from '@features/workspace/model/windowLayout';
 import { connectionTarget, listSshConnections, type SshConnection } from '@features/ssh/services/api';
 import { useTerminalStore } from '@features/terminal';
+import { isTerminalDebugEnabled, terminalDebug } from '../services/terminalDebug';
 
 /** Validate saved connection references before starting an authentication session. */
 export default function SshSessionGate({ connectionId, paneId, tabId, children }: {
@@ -21,7 +22,14 @@ export default function SshSessionGate({ connectionId, paneId, tabId, children }
     void listSshConnections().then(items => {
       if (!active) return;
       setConnections(items); setSelected(items[0]?.id ?? '');
-      if (!items.some(item => item.id === connectionId)) useTerminalStore.getState().setStartupState(paneId, 'failed');
+      const present = items.some(item => item.id === connectionId);
+      if (!present) useTerminalStore.getState().setStartupState(paneId, 'failed');
+      if (isTerminalDebugEnabled()) {
+        // The gate renders the recovery panel (not the terminal) while it loads.
+        // A "present: true" after a temporary false would unmount the terminal
+        // panel and restart SSH authentication from scratch.
+        terminalDebug('ssh-gate-resolved', { paneId, connectionId, count: items.length, present });
+      }
     }).catch(reason => { if (active) { setError(String(reason)); useTerminalStore.getState().setStartupState(paneId, 'failed'); } });
     return () => { active = false; };
   }, [connectionId, paneId, attempt]);

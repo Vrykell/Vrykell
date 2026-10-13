@@ -80,6 +80,11 @@
 - **根因**：扫描器只按整串精确匹配 `\x1b[?1049h` 一类，合写的序列不匹配 → 原样进入运行中块的 xterm，块自己切到备用缓冲区；命令结束时提取的快照正是当前活动的备屏。
 - **修复**：扫描器改为逐个参数识别（终止字节 `h`/`l` 且参数含 1049/1047/47 即判定），整串原始序列仍写主 xterm，保证 bracketed paste 等其余模式的语义不丢。Rust 扫描器、前端测试镜像与 e2e mock 三处保持一致。
 
+### 2.11 手动全屏遮罩与真 alt 屏争用可见面 → 全屏 TUI 黑屏（`useTerminalSession.ts` `onSceneChanged`）
+- **现象**：在运行中的块上先点「进入全屏交互」，程序随后进入 alternate buffer（cmdc/vim 等）时整屏变黑；「重绘终端」点了也没反应（它重绘的是被遮住的主 xterm 与收不到输出的块终端）。
+- **根因**：真 alt buffer 的字节只写主 xterm（`routeData` → `sinks.writeMain`），而手动全屏恰好把主 xterm 隐藏（`showXterm = scene==='altScreen' && !altScreenActive`）改用块终端显示。旧代码只在场景切换时「不设置」手动全屏标志，**不会清除已经生效的那一个**，于是遮罩一直盖着真正的 TUI。
+- **修复**：控制器报告真 `altScreen` 时，若该窗格正处在手动全屏，立即让出可见面（`setAltScreenActive(false)`，诊断标记 `manual-fullscreen-cancelled`）。回归见 `running-term.spec.ts`「手动全屏中进入真 alt 屏」与 `useTerminalSession.test.tsx` 对应用例。
+
 ---
 
 ## 三、PTY / resize / 尺寸
@@ -406,6 +411,11 @@
 
 ### 11.8 上下文压缩的幂等提示（`context.ts:103/138`)
 - 摘要合并更新时提示词必须写明「不要重复啰嗦」；已折叠部分未变时只折叠新增溢出消息，避免反复重摘。
+
+### 11.9 代理 fetch 只取消 Rust 请求、不结束本地流 → 终止后界面卡在「生成中」（`llmFetch.ts` `abort`）
+- **现象**：点「停止生成」后模型请求确实断了（Rust `AbortHandle` 取消 reqwest，日志里能看到 `llm_abort`），但界面一直停在生成中、发送键回不来。
+- **根因**：被 abort 时 Rust 静默返回、不再推 `done`/`error`，而 `llmFetch` 的本地 `ReadableStream` 从不关闭也不报错；AI SDK 的包装流只在「一次 read 落地之后」才检查 `abortSignal.aborted`，读取器于是永久挂起，`fullStream` 的收尾逻辑（`finally` 里清 `sendingTab`、落终态）永远不执行。
+- **修复**：abort 监听里同时 `controller.error(new DOMException(…, 'AbortError'))`，让本地流立即结算；`llmFetch.test.ts`「流中中止」锁死该行为。e2e 侧 `tauri-mock` 的 `llm_abort` 必须同样「停发且不发终态事件」，否则测不出这类挂起。
 
 ---
 

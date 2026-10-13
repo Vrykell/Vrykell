@@ -51,6 +51,8 @@ typechecking, architecture checks, or dev mode as appropriate.
 
 ## Shared components (reuse, never fork)
 
+- **Existing design first** — Before changing a surface, inspect its closest existing counterpart and reuse its component, spacing, input, menu, hover, and focus patterns. Extend or extract the existing implementation when needed. Do not invent a new visual treatment for an interaction the app already has. Review the result in the running UI at its actual narrow and wide sizes.
+
 - **Sidebar rows** - `src/ui/sidebarItem.tsx`. Session tab rows and SSH rows render through
   `SidebarItem`; a new list that looks like them must use it instead of hand-rolling markup.
 - **List reordering** - `src/ui/listReorder.tsx`. The mechanic matches the titlebar buttons:
