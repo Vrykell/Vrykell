@@ -4,10 +4,12 @@
 import { test, expect } from '@playwright/test';
 import { setupTauriMock, mockAnthropic, aiModelCalls, ensureChatSettingsOpen, paceLlmStream } from './tauri-mock';
 
+type MockOptions = Parameters<typeof setupTauriMock>[1];
+
 /** 每个测试独立初始化：mockAnthropic 的 init script 必须在 goto 前注册 */
-async function boot(page: import('@playwright/test').Page, reply: string) {
+async function boot(page: import('@playwright/test').Page, reply: string, options?: MockOptions) {
   await mockAnthropic(page, reply);
-  await setupTauriMock(page);
+  await setupTauriMock(page, options);
   // 种入 dock 布局：chat 面板按钮在左区（默认布局里 chat 不在任何 zone）
   await page.addInitScript(() => {
     localStorage.setItem('dock-layout-v4', JSON.stringify({
@@ -51,13 +53,15 @@ test.describe('AI 对话面板', () => {
   });
 
   test('停止生成：中断后收尾回到发送按钮（读取器不再永久挂起）', async ({ page }) => {
-    // 分块投递，让回答在点击「停止生成」时仍在飞行中。
+    // Deliver the answer piece by piece so it is still arriving when Stop is pressed, and keep the
+    // single send slot free: the default schedule seed would fire a background turn at boot.
     await paceLlmStream(page, 30);
-    await boot(page, '这是一段足够长的流式回复内容。'.repeat(12));
+    await boot(page, '这是一段足够长的流式回复内容。'.repeat(12), { schedulesSeed: [] });
     await page.locator('[data-dock-btn="chat"]').click();
     const input = page.getByPlaceholder(/自然语言描述/);
     await expect(input).toBeVisible({ timeout: 3000 });
-    // 面板要先有活跃对话，问答才会挂在它下面（否则发送回退到工作区 tab，终止键无从匹配）
+    // The panel needs an active conversation before sending: without one the request falls back to
+    // the workspace tab and the stop button has nothing to match.
     await page.waitForFunction(async () => {
       const mod = await import('/src/features/chat/stores/chat.ts') as typeof import('../src/features/chat/stores/chat');
       const state = mod.useChatStore.getState();

@@ -5,7 +5,7 @@
  * 提升到这里后，应用运行期间每 30s 检查一次所有启用的定时任务。
  */
 import { listSchedules, markScheduleRun } from '@features/agent/services/platform';
-import { sendToChat } from '@features/chat';
+import { isChatTurnActive, sendToChat } from '@features/chat';
 
 const POLL_MS = 30_000;
 
@@ -21,6 +21,10 @@ async function tick(): Promise<void> {
   for (const s of list) {
     if (!s.enabled) continue;
     if (s.lastRunAt && now - s.lastRunAt < s.intervalMinutes * 60_000) continue;
+    // One turn runs at a time, so a due task cannot start while another turn is in flight. This is
+    // checked before marking: marking first would record a run that never happened and drop the
+    // task for a whole interval, whereas waiting leaves it due for the next tick.
+    if (isChatTurnActive()) continue;
     try {
       await markScheduleRun(s.id, now);
       sendToChat(`【定时任务】${s.name}\n${s.prompt}`);

@@ -8,6 +8,8 @@ export interface TauriMockOptions {
   integration?: boolean;
   sshHost?: 'known' | 'unknown' | 'changed';
   sshTrustConfirmed?: boolean;
+  /** Scheduled-task seed; pass [] to keep the send slot for the spec (the default seed is due at boot). */
+  schedulesSeed?: Record<string, unknown>[];
   /** Simulate a remote shell with prompt hooks but no preexec hook. */
   sshPreexec?: boolean;
   /** Add one historical session under an archived group to test restoring it by itself. */
@@ -43,12 +45,18 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     { id: 'm-local', name: '本地模型', provider: 'openai-compatible', baseUrl: 'http://127.0.0.1:11434/v1', model: 'qwen2.5', capabilities: { vision: false, reasoning: false, tools: true, search: false } },
   ];
   const seedActive = opts.aiActive ?? 'm-local';
+  // Scheduled tasks: the default seed has never run, so it is due the moment the app boots. A spec
+  // that needs the single send slot for itself (asserting Stop, say) must pass [] — otherwise that
+  // background turn takes sendingTab first and the user's own send is dropped.
+  const seedSchedules = opts.schedulesSeed ?? [
+    { id: 's1', name: '每日巡检', prompt: '检查系统状态并汇报', intervalMinutes: 60, enabled: true, lastRunAt: 0 },
+  ];
   const seedSkills = opts.skills ?? [
     { name: '写单测', description: '为代码写单元测试', source: 'local', trusted: true, enabled: true, hasScripts: false, modified: false, files: ['SKILL.md'], dir: '/home/e2e/.vrykell/skills/写单测', prompt: '先看代码，再写 vitest 单测。' },
     { name: '旧脚本技能', description: '遗留技能，含脚本', source: 'market', trusted: false, enabled: false, hasScripts: true, modified: true, files: ['SKILL.md', 'scripts/run.sh', 'references/说明.md'], dir: '/home/e2e/.vrykell/skills/旧脚本技能', prompt: '运行 scripts/run.sh 完成工作。' },
   ];
   await page.addInitScript(
-    ({ enableIntegration, enableReadyMarker, models, active, skillsSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession, launchDirectory, menuSeed }) => {
+    ({ enableIntegration, enableReadyMarker, models, active, skillsSeed, scheduleSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession, launchDirectory, menuSeed }) => {
     const menu = { supported: true, available: true, enabled: false, certificateTrusted: false, certificateThumbprint: 'E2E-CERTIFICATE', ...menuSeed };
     const menuActions: string[] = [];
     (window as unknown as { __MENU_ACTIONS__: string[] }).__MENU_ACTIONS__ = menuActions;
@@ -109,9 +117,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     ];
     const agentOps: { op: string; id?: string; agent?: unknown }[] = [];
     // ── 定时任务 ──
-    const schedules: Record<string, unknown>[] = [
-      { id: 's1', name: '每日巡检', prompt: '检查系统状态并汇报', intervalMinutes: 60, enabled: true, lastRunAt: 0 },
-    ];
+    const schedules: Record<string, unknown>[] = scheduleSeed.map((item) => ({ ...item }));
     const scheduleOps: { op: string; id?: string; schedule?: unknown }[] = [];
     // ── 主题 ──
     const theme = { opacity: 1, backgroundImage: null, vars: {} as Record<string, string> };
@@ -1121,7 +1127,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
       },
     };
     localStorage.setItem('vrykell-api-key', 'sk-e2e-fake');
-  }, { enableIntegration: integration, enableReadyMarker: opts.shellReadyMarker !== false, models: seedModels, active: seedActive, skillsSeed: seedSkills, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true, sshPreexec: opts.sshPreexec ?? true, groupedHistoricalSession: opts.groupedHistoricalSession ?? false, launchDirectory: opts.launchDirectory, menuSeed: opts.contextMenu });
+  }, { enableIntegration: integration, enableReadyMarker: opts.shellReadyMarker !== false, models: seedModels, active: seedActive, skillsSeed: seedSkills, scheduleSeed: seedSchedules, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true, sshPreexec: opts.sshPreexec ?? true, groupedHistoricalSession: opts.groupedHistoricalSession ?? false, launchDirectory: opts.launchDirectory, menuSeed: opts.contextMenu });
 }
 
 /** 预置 AI 回复文本：mock 的 ai_stream 会按 chunk 流式 emit ai-chunk 事件。

@@ -29,12 +29,15 @@ export default function AiBlock({ exchange, conversationId, presentation = 'bloc
   const { question, answer } = exchange;
   const plain = presentation === 'conversation';
   const expanded = plain || !collapsed;
-  const sending = useChatStore(state => state.sendingTab !== null);
+  // The store runs one turn at a time, but that turn may belong to a background conversation: only
+  // the conversation that owns this exchange decides whether its actions are available.
+  const ownerConversation = useChatStore(state => conversationId ?? Object.entries(state.byTab)
+    .find(([, messages]) => messages.some(message => message.id === exchange.id))?.[0]);
+  const sending = useChatStore(state => ownerConversation !== undefined && state.sendingTab === ownerConversation);
   const executionPane = useChatStore(state => conversationId
     ? state.conversations.find(conversation => conversation.id === conversationId)?.environment?.paneId ?? null
     : exchange.paneId);
-  const ownerId = () => conversationId ?? Object.entries(useChatStore.getState().byTab)
-    .find(([, messages]) => messages.some(message => message.id === exchange.id))?.[0];
+  const ownerId = () => ownerConversation;
   const regenerate = () => {
     const id = ownerId();
     if (id && question) void useChatStore.getState().regenerate(id, question.id);
@@ -85,7 +88,7 @@ export default function AiBlock({ exchange, conversationId, presentation = 'bloc
     {answer && expanded && <div className={plain ? 'ai-block-answer' : 'command-block-output ai-block-answer'} data-selectable>
       {answer.reasoning && <ThinkingBlock text={answer.reasoning} streaming={answer.pending ?? false} />}
       {parts ? parts.map((part, index) => part.kind === 'tool'
-        ? <ToolRunCard key={part.tool.toolCallId} run={part.tool} paneId={answer.paneId ?? exchange.paneId} />
+        ? <ToolRunCard key={part.tool.toolCallId} run={part.tool} paneId={answer.paneId ?? exchange.paneId} framed={plain} />
         : part.text ? <div key={index} className="md"><SafeMarkdown content={part.text} paneId={executionPane} />
           {answer.pending && index === parts.length - 1 && <PendingCursor />}</div> : null)
         : answer.content ? <div className="md"><SafeMarkdown content={answer.content} paneId={executionPane} />{answer.pending && <PendingCursor />}</div> : null}
