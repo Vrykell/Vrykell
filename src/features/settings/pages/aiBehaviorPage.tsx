@@ -69,6 +69,7 @@ export function AiBehaviorPage() {
           <AutoSaveInput
             key={`prompt-${scope}`}
             multiline
+            aria-label={t('System prompt')}
             trim={false}
             value={eff.systemPrompt ?? ''}
             placeholder="留空使用内置默认提示词"

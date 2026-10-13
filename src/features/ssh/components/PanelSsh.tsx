@@ -1,6 +1,6 @@
 import { TextInput } from '@ui/TextInput';
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { Download, iconSizes, Pencil, Plus, Search } from '@ui/icons';
+import { Download, iconSizes, Pencil, Plug, Plus, Search } from '@ui/icons';
 import { SshIcon } from '@ui/shellIcons';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { t } from '@i18n';
@@ -9,7 +9,6 @@ import { useSessionStore, terminalsOf } from '@features/workspace';
 import { useTerminalStore } from '@features/terminal';
 import ContextMenu from '@ui/ContextMenu';
 import { IconBtn } from '@ui/UiBtn';
-import { TextButton } from '@ui/TextButton';
 import SidebarItem from '@ui/sidebarItem';
 import { ListReorderPlaceholder, ListReorderPreview, useListReorderDrag } from '@ui/listReorder';
 import type { SshConnection } from '@features/ssh/services/api';
@@ -112,8 +111,9 @@ export default function PanelSsh() {
       <div style={{
         display: 'flex', alignItems: 'center', gap: 4,
         padding: '6px 10px 8px',
+        position: 'relative',
       }}>
-        <div style={{
+        <div className="workspace-sidebar-search" style={{
           display: 'flex', alignItems: 'center', gap: 5, flex: 1, minWidth: 0,
           background: 'var(--chrome-field)',
           borderRadius: 'var(--radius-inner)', padding: '0 8px', height: 30,
@@ -122,7 +122,7 @@ export default function PanelSsh() {
           <TextInput
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="搜索 SSH 连接…"
+            placeholder={t('Search SSH connections…')}
             data-testid="ssh-search"
             style={{
               flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none',
@@ -130,9 +130,9 @@ export default function PanelSsh() {
             }}
           />
         </div>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 10px 8px' }}>
-        <TextButton data-testid="ssh-quick-btn" onClick={() => setQuickOpen(true)} style={{ flex: 1, justifyContent: 'flex-start' }}>{t('ssh.quick.connect')}</TextButton>
+        <IconBtn title={t('ssh.quick.connect')} data-testid="ssh-quick-btn" onClick={() => setQuickOpen(true)}>
+          <Plug size={iconSizes.control} />
+        </IconBtn>
         <IconBtn title={t('ssh.import.open')} data-testid="ssh-import-btn" onClick={() => setImportOpen(true)}><Download size={iconSizes.control} /></IconBtn>
         <IconBtn title={t('New SSH connection')} data-testid="ssh-new-btn" onClick={openNew}><Plus size={iconSizes.control} /></IconBtn>
       </div>
@@ -140,7 +140,7 @@ export default function PanelSsh() {
       <div data-reorder-list={LIST_ID} className="scroll-region" style={{ flex: 1, overflowY: 'auto', padding: '0 0 8px' }}>
         {filtered.length === 0 ? (
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>
-            {connections.length === 0 ? '暂无 SSH 连接，点击右上角 + 新建' : '无匹配连接'}
+            {connections.length === 0 ? t('No SSH connections yet. Select + to create one.') : t('No matching connections')}
           </div>
         ) : filtered.map((c) => (
           <Fragment key={c.id}>

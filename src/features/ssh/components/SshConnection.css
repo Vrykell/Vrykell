@@ -1,24 +1,29 @@
 /* Connection editing follows the workspace's flat surfaces and compact typography. */
-.ssh-form-dialog { width: min(860px, calc(100vw - 32px)); height: min(650px, calc(100dvh - 24px)); display: flex; flex-direction: column; overflow: hidden; }
-.ssh-form-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.ssh-form-dialog { width: min(720px, calc(100vw - 32px)); min-height: min(380px, calc(100dvh - 32px)); max-height: min(620px, calc(100dvh - 32px)); display: flex; flex-direction: column; overflow: hidden; }
+.ssh-form-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
 .ssh-form-header h2 { margin: 0; font-size: calc(15px * var(--ui-font-scale)); font-weight: var(--fw-semibold); }
 .ssh-form-layout { display: flex; flex: 1; min-height: 0; }
-.ssh-form-nav { display: flex; flex-direction: column; gap: 3px; padding: 12px 8px; width: 164px; flex-shrink: 0; border-right: 1px solid var(--border); }
-.ssh-form-body { flex: 1; min-width: 0; overflow-y: auto; padding: 20px; }
-.ssh-form-section { display: flex; flex-direction: column; gap: 16px; }
+.ssh-form-nav { display: flex; flex-direction: column; gap: 4px; padding: 10px 6px; width: 148px; flex-shrink: 0; border-right: 1px solid var(--border); }
+.ssh-form-body { flex: 1; min-width: 0; overflow-y: auto; padding: 16px; }
+.ssh-form-section { display: flex; flex-direction: column; gap: 12px; }
 .ssh-form-section[hidden] { display: none; }
 .ssh-form-section h3, .ssh-section-heading h3 { margin: 0; font-size: calc(13px * var(--ui-font-scale)); font-weight: var(--fw-semibold); }
 .ssh-form-section p, .ssh-section-heading p { margin: 4px 0 0; color: var(--text-muted); font-size: calc(12px * var(--ui-font-scale)); }
-.ssh-form-fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; }
-.ssh-form-fields label, .ssh-form-section > label, .ssh-forward-fields label { display: flex; flex-direction: column; gap: 6px; color: var(--text-secondary); font-size: calc(12px * var(--ui-font-scale)); }
-.ssh-form-dialog input:not([type="checkbox"]) { width: 100%; min-height: 36px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--field-bg); color: var(--text-primary); font: calc(13px * var(--ui-font-scale))/1.4 var(--font-mono); outline: none; box-shadow: none; }
+.ssh-form-fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 12px; }
+.ssh-form-fields label, .ssh-form-section > label, .ssh-forward-fields label { display: flex; flex-direction: column; gap: 6px; color: var(--text-secondary); font-size: var(--fs-caption); }
+.ssh-form-dialog input:not([type="checkbox"]) { width: 100%; min-height: 32px; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--field-bg); color: var(--text-primary); font: calc(12px * var(--ui-font-scale))/1.5 var(--font-mono); outline: none; box-shadow: none; }
 .ssh-form-dialog input:not([type="checkbox"]):focus { border-color: var(--border-strong); }
-.ssh-check-row { display: flex !important; flex-direction: row !important; align-items: flex-start; gap: 10px !important; padding: 10px 0; }
+.ssh-form-file-picker { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ssh-form-file-picker > .ssh-form-browse { flex: 0 0 auto; height: 32px; min-height: 32px; padding: 0 12px; border-radius: var(--radius-inner); white-space: nowrap; }
+.ssh-check-group { padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius-block); background: var(--surface); }
+.ssh-check-row { display: flex !important; flex-direction: row !important; align-items: flex-start; gap: 10px !important; padding: 12px 0; color: var(--text-primary) !important; font-size: var(--fs-label) !important; }
+.ssh-check-row + .ssh-check-row { border-top: 1px solid var(--border); }
 .ssh-check-row .themed-checkbox { margin-top: 2px; }
-.ssh-check-row small { display: block; margin-top: 4px; color: var(--text-muted); font-size: calc(11px * var(--ui-font-scale)); line-height: 1.6; }
-.ssh-form-footer { display: flex; align-items: center; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); flex-shrink: 0; flex-wrap: wrap; }
-.ssh-primary-action { background: var(--accent) !important; color: var(--accent-text) !important; padding: 8px 18px !important; border: none !important; }
-.ssh-inline-error { padding: 0 20px 12px; max-height: 100px; overflow-y: auto; flex-shrink: 0; }
+.ssh-check-row small { display: block; margin-top: 4px; color: var(--text-muted); font-size: var(--fs-caption); line-height: 1.5; }
+.ssh-form-footer { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--border); flex-shrink: 0; flex-wrap: wrap; }
+.ssh-form-footer .text-control { flex: 0 0 auto; height: 34px; min-height: 34px; padding: 0 12px; border-radius: var(--radius-inner); white-space: nowrap; }
+.ssh-form-footer .ssh-primary-action { padding: 0 16px; background: var(--accent); color: var(--accent-text); }
+.ssh-inline-error { padding: 0 16px 10px; max-height: 100px; overflow-y: auto; flex-shrink: 0; }
 .ssh-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .ssh-section-heading > div { flex: 1; }
 .ssh-section-heading > button { flex-shrink: 0; }
@@ -34,9 +39,9 @@
 @media (max-width: 760px) {
   .ssh-form-dialog { width: calc(100vw - 24px); }
   .ssh-form-layout { flex-direction: column; }
-  .ssh-form-nav { flex-direction: row; width: auto; padding: 6px 12px; border-right: none; border-bottom: 1px solid var(--border); }
+  .ssh-form-nav { flex-direction: row; width: auto; padding: 6px 10px; border-right: none; border-bottom: 1px solid var(--border); }
   .ssh-form-nav > div { flex: 1; }
-  .ssh-form-body { padding: 16px; }
+  .ssh-form-body { padding: 14px; }
   .ssh-forward-fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .ssh-section-heading { flex-wrap: wrap; }
   .ssh-forward-rule-heading { flex-wrap: wrap; }

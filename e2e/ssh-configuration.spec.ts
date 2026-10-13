@@ -26,7 +26,7 @@ test('GUI forwarding and text mode preserve rules, copy text, and save and conne
   await expect(page.getByTestId('ssh-forward-target-port-0')).toHaveValue('5432');
   await page.getByTestId('ssh-section-tab-advanced').click();
   await page.getByTestId('ssh-form-auto-reconnect').check();
-  await expect(page.getByTestId('ssh-form-auto-reconnect')).toHaveCSS('appearance', 'none');
+  await expect(page.getByTestId('ssh-form-auto-reconnect')).toHaveCSS('appearance', 'auto');
   await page.getByTestId('ssh-save-connect-btn').click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: { ssh?: { localForwards?: string[] } }[] }).__PTY_SPAWNS__.filter(item => item.ssh).map(item => item.ssh?.localForwards))).toEqual([['9090:db:5432']]);

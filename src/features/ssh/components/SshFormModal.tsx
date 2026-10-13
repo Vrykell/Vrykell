@@ -4,9 +4,11 @@ import { Checkbox } from '@ui/Checkbox';
 import { TextButton } from '@ui/TextButton';
 import Select from '@ui/Select';
 import SidebarItem from '@ui/sidebarItem';
+import KeyHint from '@ui/KeyHint';
 import { useDialogKeyboard } from '@ui/useDialogKeyboard';
 import { t } from '@i18n';
-import { Loader2, Plug, Trash2 } from '@ui/icons';
+import { GitBranch, iconSizes, Loader2, Plug, Server, Settings, Trash2 } from '@ui/icons';
+import { isMacOS } from '@platform/runtime';
 import { newSshId, validateSshConnection, sshTest, sshTrustHostKey, type SshConnection, type SshAuthMethod } from '../services/api';
 import { useSshStore } from '@features/ssh';
 import ConfirmDialog from '@ui/ConfirmDialog';
@@ -25,6 +27,7 @@ interface Props {
   onSaveAndConnect?: (connection: SshConnection) => void;
 }
 type Section = 'connection' | 'forwarding' | 'advanced';
+const sectionIcons = { connection: Server, forwarding: GitBranch, advanced: Settings };
 const list = (text: string) => { const rows = forwardLines(text); return rows.length ? rows : undefined; };
 
 /** Edit a profile in focused sections while retaining its drafts across section changes. */
@@ -128,7 +131,7 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
   const busy = saving || testing;
   return <div style={{ position: 'fixed', inset: 0, zIndex: 9996, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--overlay)' }} onClick={() => { if (!busy) onClose(); }}>
     <div ref={dialog} className="workspace-floating workspace-floating-dialog ssh-form-dialog" role="dialog" aria-modal="true" aria-label={t('SSH connection')} tabIndex={-1} onClick={event => event.stopPropagation()}>
-      <header className="ssh-form-header"><h2>{t(onConnect ? 'Quick SSH connection' : initial ? 'Edit SSH connection' : 'New SSH connection')}</h2><span className="ssh-hint">{t('Ctrl/⌘ + Enter to submit')}</span></header>
+      <header className="ssh-form-header"><h2>{t(onConnect ? 'Quick SSH connection' : initial ? 'Edit SSH connection' : 'New SSH connection')}</h2><KeyHint shortcut={isMacOS ? 'Meta+Enter' : 'Control+Enter'} /></header>
       <div className="ssh-form-layout">
         <nav className="ssh-form-nav" role="tablist" aria-label={t('Connection options')} onKeyDown={event => {
           const ids: Section[] = ['connection', 'forwarding', 'advanced'];
@@ -138,12 +141,15 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
           const next = event.key === 'Home' ? 0 : event.key === 'End' ? 2 : (index + (event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? 2 : 1)) % 3;
           setSection(ids[next]); event.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]')[next]?.focus();
         }}>
-          {(['connection', 'forwarding', 'advanced'] as const).map(id => <SidebarItem key={id} icon={null} compact
+          {(['connection', 'forwarding', 'advanced'] as const).map(id => {
+            const Icon = sectionIcons[id];
+            return <SidebarItem key={id} icon={<Icon size={iconSizes.row} />} compact
             active={section === id} title={t(id === 'connection' ? 'Connection' : id === 'forwarding' ? 'Port forwarding' : 'Advanced')}
             tabIndex={section === id ? 0 : -1} testId={`ssh-section-tab-${id}`} onClick={() => setSection(id)}
             dataAttributes={{ role: 'tab', 'aria-selected': String(section === id), 'aria-controls': `ssh-section-${id}` }}
             onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSection(id); } }}
-            style={{ padding: 0, flexShrink: 0 }} />)}
+            style={{ fontSize: 'var(--fs-label)', flexShrink: 0 }} />;
+          })}
         </nav>
         <div className="ssh-form-body scroll-region" data-testid="ssh-form-body">
           <section className="ssh-form-section" id="ssh-section-connection" role="tabpanel" aria-label={t('Connection')} hidden={section !== 'connection'}>
@@ -155,8 +161,21 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
               <label>{t('Account')}<TextInput value={user} placeholder="root" onChange={e => setUser(e.target.value)} data-testid="ssh-form-user" /></label>
               <label>{t('Authentication method')}<Select aria-label={t('Authentication method')} value={authMethod} onChange={value => setAuthMethod(value as SshAuthMethod)} options={[{ value: 'password', label: t('Password') }, { value: 'key', label: t('Private key / SSH Agent') }]} /></label>
             </div>
-            {authMethod === 'password' ? <label>{t('Password')}<TextInput type="password" value={password} placeholder={initial?.hasPassword ? t('Leave empty to keep the stored password') : '••••••'} onChange={e => setPassword(e.target.value)} data-testid="ssh-form-password" /></label>
-              : <label>{t('Private key file (optional)')}<div style={{ display: 'flex', gap: 8 }}><TextInput value={identityFile} onChange={e => setIdentityFile(e.target.value)} data-testid="ssh-form-identity" placeholder={t('Use default keys / SSH Agent when empty')} /><TextButton onClick={async () => { try { const path = await chooseFile({ multiple: false, directory: false, title: t('Choose SSH private key') }); if (typeof path === 'string') setIdentityFile(path); } catch (reason) { setError(String(reason)); } }}>{t('Browse…')}</TextButton></div></label>}
+            {authMethod === 'password' ? (
+              <label>{t('Password')}<TextInput type="password" value={password} placeholder={initial?.hasPassword ? t('Leave empty to keep the stored password') : '••••••'} onChange={e => setPassword(e.target.value)} data-testid="ssh-form-password" /></label>
+            ) : (
+              <label>{t('Private key file (optional)')}
+                <div className="ssh-form-file-picker">
+                  <TextInput value={identityFile} onChange={e => setIdentityFile(e.target.value)} data-testid="ssh-form-identity" placeholder={t('Use default keys / SSH Agent when empty')} style={{ flex: '1 1 0', minWidth: 0, width: 0 }} />
+                  <TextButton className="ssh-form-browse" onClick={async () => {
+                    try {
+                      const path = await chooseFile({ multiple: false, directory: false, title: t('Choose SSH private key') });
+                      if (typeof path === 'string') setIdentityFile(path);
+                    } catch (reason) { setError(String(reason)); }
+                  }}>{t('Browse…')}</TextButton>
+                </div>
+              </label>
+            )}
             <p>{t('Authentication testing checks host trust and credentials. Use a terminal connection to verify interactive access.')}</p>
           </section>
           <section className="ssh-form-section" id="ssh-section-forwarding" role="tabpanel" aria-label={t('Port forwarding')} hidden={section !== 'forwarding'}>
@@ -168,8 +187,10 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
               <label>{t('Jump host (optional)')}<TextInput value={jumpHost} onChange={e => setJumpHost(e.target.value)} data-testid="ssh-form-jump" placeholder="user@host:port" data-tip={t('Separate multiple jump hosts with commas. Use none to disable inherited jump hosts.')} /></label>
               <label>{t('Keepalive interval (seconds)')}<TextInput type="number" min={0} max={3600} value={keepalive} onChange={e => setKeepalive(e.target.value)} data-testid="ssh-form-keepalive" /></label>
             </div>
-            <label className="ssh-check-row"><Checkbox checked={shellIntegration} onChange={e => setShellIntegration(e.target.checked)} data-testid="ssh-form-integration" /><span>{t('Enable remote Shell integration (command blocks)')}<small>{t('Leave this off for menu-based servers. Enable it for shells that support command blocks.')}</small></span></label>
-            <label className="ssh-check-row"><Checkbox checked={autoReconnect} onChange={e => setAutoReconnect(e.target.checked)} data-testid="ssh-form-auto-reconnect" /><span>{t('Reconnect automatically after a drop')}<small>{t('Retry up to 5 times with backoff. Clean exits and manual disconnects are not retried.')}</small></span></label>
+            <div className="ssh-check-group">
+              <label className="ssh-check-row"><Checkbox checked={shellIntegration} onChange={e => setShellIntegration(e.target.checked)} data-testid="ssh-form-integration" /><span>{t('Enable remote Shell integration (command blocks)')}<small>{t('Leave this off for menu-based servers. Enable it for shells that support command blocks.')}</small></span></label>
+              <label className="ssh-check-row"><Checkbox checked={autoReconnect} onChange={e => setAutoReconnect(e.target.checked)} data-testid="ssh-form-auto-reconnect" /><span>{t('Reconnect automatically after a drop')}<small>{t('Retry up to 5 times with backoff. Clean exits and manual disconnects are not retried.')}</small></span></label>
+            </div>
           </section>
         </div>
       </div>

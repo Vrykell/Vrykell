@@ -78,7 +78,7 @@ for (const theme of ['深色', '浅色']) {
     await page.screenshot({ path: test.info().outputPath('model-fields.png') });
     await page.locator('aside').getByRole('button', { name: '记忆', exact: true }).click();
     const memory = page.getByPlaceholder(/持久知识/);
-    await expectFieldHierarchy(memory);
+    await expectFieldHierarchy(memory.locator('xpath=..'));
     await memory.fill('surface editing check');
     await memory.blur();
     await expect.poll(() => memoryFact(page)).toBe('surface editing check');
