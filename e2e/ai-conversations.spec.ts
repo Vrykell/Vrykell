@@ -175,7 +175,33 @@ test('tool activity stays available within the plain conversation flow', async (
     radius: getComputedStyle(element).borderRadius,
     borderTop: getComputedStyle(element).borderTopStyle,
   }));
-  expect(presentation).toEqual({ background: 'rgba(0, 0, 0, 0)', radius: '0px', borderTop: 'solid' });
+  // Rows stay flat with no divider lines above or below each tool call.
+  expect(presentation).toEqual({ background: 'rgba(0, 0, 0, 0)', radius: '0px', borderTop: 'none' });
+  // Expanded output reuses the markdown code-block frame instead of a hairline.
+  await rows.first().locator('.ai-tool-summary').click();
+  const output = rows.first().locator('.ai-tool-output');
+  await expect(output).toBeVisible();
+  const frame = await output.evaluate(element => ({
+    background: getComputedStyle(element).backgroundColor,
+    radius: getComputedStyle(element).borderRadius,
+    borderTop: getComputedStyle(element).borderTopStyle,
+    paddingLeft: getComputedStyle(element).paddingLeft,
+  }));
+  expect(frame).toMatchObject({ radius: '8px', borderTop: 'solid', paddingLeft: '12px' });
+  expect(frame.background).not.toBe('rgba(0, 0, 0, 0)');
+  // One scroll container only: the framed box scrolls, the terminal snapshot inside does not.
+  const scroll = await output.evaluate(element => ({
+    wrapper: getComputedStyle(element).overflowY,
+    inner: getComputedStyle(element.firstElementChild as HTMLElement).overflowY,
+  }));
+  expect(scroll).toEqual({ wrapper: 'auto', inner: 'hidden' });
+  // The copy target sits in the frame corner and appears with the hovered output.
+  const copy = page.getByTestId('tool-output-copy');
+  await expect(copy).toHaveCSS('opacity', '0');
+  await output.hover();
+  await expect(copy).toHaveCSS('opacity', '1');
+  await expect(copy).toHaveAttribute('data-tip', '复制输出');
+  await page.locator('.ai-chat-panel').screenshot({ path: '.cache/ai-tool-frame.png' });
   await expect(page.locator('.ai-block')).not.toHaveClass(/command-block/);
   await expect(page.locator('.ai-block-question')).toHaveCSS('word-break', 'normal');
 });

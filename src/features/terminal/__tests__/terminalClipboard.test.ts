@@ -121,4 +121,20 @@ describe('terminalClipboard', () => {
     expect(ptyWriteMock).toHaveBeenCalledExactlyOnceWith('sess-1', '\x16');
     expect(readTextMock).not.toHaveBeenCalled();
   });
+
+  it('sends the image key straight to the PTY so paste transforms cannot wrap it', async () => {
+    // The real-app case: a block terminal is registered. term.paste() applies the pasted-text
+    // transformations (bracketed-paste wrapping), so the key would arrive as text instead of the
+    // native paste key — the image path must bypass the terminal and write the PTY directly.
+    useTerminalStore.setState({ sessions: { p1: 'sess-1' }, scenes: { p1: 'blockList' } });
+    const block = pasteAwareTerm();
+    termInstances.set('block:p1', block.term);
+    hasImageMock.mockResolvedValue(true);
+    readTextMock.mockResolvedValue('alternative image text');
+
+    await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(true);
+
+    expect(ptyWriteMock).toHaveBeenCalledExactlyOnceWith('sess-1', '\x16');
+    expect(block.paste).not.toHaveBeenCalled();
+  });
 });

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { t, type I18nKey } from '@i18n';
 import { Brain, Check, ChevronRight, FileText, Folder, Globe, Pencil, Search, Terminal, Wrench } from '@ui/icons';
 import ErrorBox from '@ui/ErrorBox';
+import CopyButton from '@ui/CopyButton';
 import BlockOutput from '@features/terminal/components/BlockOutput';
 import { useBlockStore, useTerminalStore } from '@features/terminal';
 import { agentControl } from '@features/agent/services/agentControl';
@@ -23,7 +24,7 @@ function summarize(run: ToolRun): { icon: React.ReactNode; text: string } {
   const input = run.input;
   const size = { size: 13 };
   switch (run.toolName) {
-    case 'run_command': return { icon: <Terminal {...size} />, text: `$ ${str(input.command)}` };
+    case 'run_command': return { icon: <Terminal {...size} />, text: str(input.command) };
     case 'read_file': return { icon: <FileText {...size} />, text: t('Read {{path}}', { path: str(input.path) }) };
     case 'edit_file': return { icon: <Pencil {...size} />, text: t('Edit {{path}}', { path: str(input.path) }) };
     case 'write_file': return { icon: <Pencil {...size} />, text: t('Write {{path}}', { path: str(input.path) }) };
@@ -50,22 +51,42 @@ function expandBody(run: ToolRun): { exitCode?: number; body: string } {
   return { body: run.error ?? run.output ?? '' };
 }
 
-function CommandOutputBlock({ run, paneId }: { run: ToolRun; paneId?: string }) {
+/**
+ * Expanded tool output. The terminal snapshot renders at full height: the `.ai-tool-output`
+ * box is the only scroll container, so no second scrollbar appears. In the chat panel the
+ * output also drops its own terminal surface and gains a copy target in the top-right corner.
+ */
+function ToolOutput({ framed, text, children }: { framed: boolean; text: string; children: ReactNode }) {
+  return <div className="ai-tool-frame">
+    {children}
+    {framed && text.length > 0 && <CopyButton className="ai-tool-copy" testId="tool-output-copy"
+      text={text} label={t('Copy output')} />}
+  </div>;
+}
+
+function CommandOutputBlock({ run, paneId, framed }: { run: ToolRun; paneId?: string; framed: boolean }) {
   const block = useBlockStore(state => {
     const id = agentControl.blockForToolCall(run.toolCallId);
     return id && paneId ? state.byTab[paneId]?.find(item => item.id === id) : undefined;
   });
   const { body } = expandBody(run);
   const running = run.state === 'running';
-  return <div className="ai-tool-output">
-    {block?.outputHtml ? <BlockOutput text={block.outputHtml} isHtml maxHeight={240} />
-      : block?.outputText || body ? <BlockOutput text={block?.outputText || body} maxHeight={240} />
-        : <span>{t(running ? 'Command running…' : 'No output')}</span>}
-  </div>;
+  const text = block?.outputText || body;
+  return <ToolOutput framed={framed} text={text}>
+    <div className="ai-tool-output">
+      {block?.outputHtml ? <BlockOutput text={block.outputHtml} isHtml flush={framed} />
+        : text ? <BlockOutput text={text} flush={framed} />
+          : <span>{t(running ? 'Command running…' : 'No output')}</span>}
+    </div>
+  </ToolOutput>;
 }
 
-/** Tool status, approval and output share one flat row in the exchange. */
-export default function ToolRunCard({ run, paneId }: { run: ToolRun; paneId?: string }) {
+/**
+ * Tool status, approval and output share one flat row in the exchange.
+ * `framed` marks the chat panel presentation, where expanded output sits inside the
+ * shared code-block frame and therefore drops its own terminal surface.
+ */
+export default function ToolRunCard({ run, paneId, framed = false }: { run: ToolRun; paneId?: string; framed?: boolean }) {
   const [open, setOpen] = useState(false);
   const sessions = useTerminalStore(state => state.sessions);
   const { icon, text } = summarize(run);
@@ -91,8 +112,10 @@ export default function ToolRunCard({ run, paneId }: { run: ToolRun; paneId?: st
       </div>
     </div>}
     {run.state === 'error' && <ErrorBox compact details={body || undefined}>{run.error || t('Tool execution failed')}</ErrorBox>}
-    {open && run.state !== 'error' && (isCommand ? <CommandOutputBlock run={run} paneId={paneId} />
-      : <pre className="ai-tool-output" data-selectable>{truncated ? `${t('Only the end of the output is shown')}\n` : ''}{body.slice(-6000)}</pre>)}
+    {open && run.state !== 'error' && (isCommand ? <CommandOutputBlock run={run} paneId={paneId} framed={framed} />
+      : <ToolOutput framed={framed} text={body}>
+        <pre className="ai-tool-output" data-selectable>{truncated ? `${t('Only the end of the output is shown')}\n` : ''}{body.slice(-6000)}</pre>
+      </ToolOutput>)}
     {isCommand && paneId && sessions[paneId] && (open || run.state === 'approval-pending') && <button type="button" data-subtle
       className="ai-tool-terminal-link" onClick={() => showExecutionTerminal(paneId)}>{t('View terminal')}</button>}
   </div>;
