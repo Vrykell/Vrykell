@@ -28,8 +28,11 @@ fn cmd_ok(program: &str) -> bool {
 /// 统一走 `-NoProfile -NonInteractive -Command "exit 0"`，5.1 与 pwsh 都支持。
 #[cfg(target_os = "windows")]
 pub(crate) fn shell_ok(program: &str) -> bool {
+    use std::os::windows::process::CommandExt;
+
     std::process::Command::new(program)
         .args(["-NoProfile", "-NonInteractive", "-Command", "exit 0"])
+        .creation_flags(0x08000000)
         .output()
         .map(|o| o.status.success())
         .unwrap_or(false)

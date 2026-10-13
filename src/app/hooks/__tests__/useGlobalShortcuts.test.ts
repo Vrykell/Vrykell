@@ -4,8 +4,19 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const redraw = vi.hoisted(() => vi.fn());
 vi.mock('@features/terminal/services/terminalRepaint', () => ({ redrawTerminal: redraw }));
 import { useGlobalShortcuts } from '../useGlobalShortcuts';
+import { useUiStore } from '@features/workspace';
 
 beforeEach(() => redraw.mockClear());
+it('opens the palette before a focused terminal can consume the shortcut', () => {
+  useUiStore.getState().setPaletteOpen(false);
+  const { unmount } = renderHook(useGlobalShortcuts);
+  const input = document.createElement('textarea'); document.body.append(input);
+  const terminalKey = vi.fn(); input.addEventListener('keydown', terminalKey);
+  fireEvent.keyDown(input, { key: 'p', ctrlKey: true });
+  expect(useUiStore.getState().paletteOpen).toBe(true);
+  expect(terminalKey).not.toHaveBeenCalled();
+  input.remove(); unmount(); useUiStore.getState().setPaletteOpen(false);
+});
 
 it('captures both redraw shortcuts before terminal handlers or browser reload', () => {
   const { unmount } = renderHook(useGlobalShortcuts);

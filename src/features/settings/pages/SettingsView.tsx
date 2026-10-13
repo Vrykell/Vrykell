@@ -26,6 +26,7 @@ import SaveStatus from '../components/SaveStatus';
 import { SettingsSaveProvider, useSettingsSave } from '../components/SettingsSaveProvider';
 import { StartupPage } from './startupPage';
 import { LogsPage } from './logsPage';
+import { ContextMenuPage } from './contextMenuPage';
 
 /** 权限页工具中文名（与 messageParts 的 TOOL_LABEL 保持同步） */
 const PERM_TOOL_LABEL: Record<ToolName, string> = {
@@ -91,6 +92,7 @@ function SettingsContent() {
     switch (selected) {
       case 'startup': return <StartupPage />;
       case 'logs': return <LogsPage />;
+      case 'context-menu': return <ContextMenuPage />;
       case 'ai-model':
         return <AiModelPage />;
 

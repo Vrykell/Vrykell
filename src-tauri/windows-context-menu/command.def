@@ -1,0 +1,4 @@
+LIBRARY VrykellExplorerCommand
+EXPORTS
+    DllGetClassObject PRIVATE
+    DllCanUnloadNow PRIVATE

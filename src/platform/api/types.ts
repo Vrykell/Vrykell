@@ -12,6 +12,7 @@ export interface FsEntry {
   name: string;
   path: string;
   is_dir: boolean;
+  is_symlink?: boolean;
 }
 
 /** Rust fs_disks 返回的磁盘条目（「此电脑」视图小卡片展示用） */
@@ -109,6 +110,7 @@ export interface BackendWorkspaceEntry {
 
 /** Rust chat_messages 表返回 */
 export interface BackendChatMessage {
+  pane_id?: string | null;
   id: string;
   role: string;
   content: string;

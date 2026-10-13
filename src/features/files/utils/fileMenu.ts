@@ -29,8 +29,9 @@ export interface FileMenuHandlers {
   onOpenWith?: (entry: FsEntry) => void;
   onOpenTab?: (entry: FsEntry) => void;
   onWorkspaceToggle?: (entry: FsEntry, inWorkspace: boolean) => void;
-  /** 面板重新定位到当前终端 cwd（仅本地面板提供；未提供时该条目不渲染）。 */
+  /** Relocate the panel to the terminal's reported directory. */
   onSyncToCwd?: () => void;
+  onSyncToTerminal?: () => void;
   onOpenDownloads?: () => void;
   onNewTabHere?: (currentDir: string) => void;
   /** 在系统文件管理器中定位某个条目（本地专有）。 */
@@ -116,6 +117,8 @@ function itemFor(key: FileMenuItemKey, ctx: FileMenuContext): ContextMenuItem | 
       return currentDir === null ? null : { label: '从当前文件夹新建标签页', onClick: () => handlers.onNewTabHere?.(currentDir) };
     case 'sync-cwd':
       return handlers.onSyncToCwd ? { label: t('files.syncToCwd'), onClick: handlers.onSyncToCwd } : null;
+    case 'sync-terminal':
+      return handlers.onSyncToTerminal ? { label: t('Switch terminal to this directory'), onClick: handlers.onSyncToTerminal } : null;
     case 'downloads-view':
       return handlers.onOpenDownloads ? { label: '下载管理', onClick: () => handlers.onOpenDownloads?.() } : null;
     case 'collapse-all':
@@ -135,7 +138,7 @@ export function buildFileMenuItems(keys: FileMenuItemKey[], ctx: FileMenuContext
       const group: MenuGroup = key.startsWith('open-') || key === 'new-tab-here' ? 'primary'
         : clipboard.includes(key) ? 'clipboard'
           : ['new-file', 'new-folder', 'rename', 'upload-file', 'upload-dir', 'download'].includes(key) ? 'edit'
-            : ['reveal', 'sync-cwd', 'downloads-view', 'collapse-all'].includes(key) ? 'view' : 'organize';
+            : ['reveal', 'sync-terminal', 'sync-cwd', 'downloads-view', 'collapse-all'].includes(key) ? 'view' : 'organize';
       items.push({ ...item, group, order: clipboard.includes(key) ? clipboard.indexOf(key) : 0 });
     }
   }

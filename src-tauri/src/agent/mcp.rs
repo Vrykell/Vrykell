@@ -244,6 +244,8 @@ async fn spawn_server(cfg: &McpServerConfig) -> Result<McpConnection, String> {
         return Err(format!("服务器「{}」缺少 command", cfg.name));
     }
     let mut cmd = Command::new(cfg.command.trim());
+    #[cfg(windows)]
+    cmd.creation_flags(0x08000000);
     cmd.args(&cfg.args);
     cmd.envs(&cfg.env);
     cmd.stdin(std::process::Stdio::piped());

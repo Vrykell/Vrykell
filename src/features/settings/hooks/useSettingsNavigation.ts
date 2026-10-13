@@ -2,6 +2,7 @@ import { searchSettings } from '../services/registry';
 import { useMemo, useState } from 'react';
 import { BrainCircuit, FileCode, Keyboard, Settings, SquareTerminal, History, FileText, ShieldCheck, Globe, Folder, Plug, Bot, RefreshCw, Sun } from '@ui/icons';
 import type { PageId } from '../model/navigation';
+import { t } from '@i18n';
 import { useSettingsNavigationStore } from '../stores/navigation';
 export type { PageId } from '../model/navigation';
 
@@ -24,6 +25,7 @@ export const SETTINGS_GROUPS: SettingGroup[] = [
     items: [
       { id: 'startup', icon: History, label: '启动', keywords: ['启动', '标签页', '恢复', '会话记录', '默认', 'startup'] },
       { id: 'logs', icon: FileText, label: '日志与诊断', keywords: ['日志', '诊断', '导出', '自动保存', '错误', 'log', 'debug'] },
+      { id: 'context-menu', icon: Folder, label: t('Windows context menu'), keywords: ['Windows', 'context', 'menu', t('Windows context menu'), t('Open in Vrykell')] },
     ],
   },
   {

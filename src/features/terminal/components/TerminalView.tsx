@@ -19,6 +19,7 @@ import { useTerminalStore } from '@features/terminal';
 import { useUiStore, useDockDragStore } from '@features/workspace';
 import { useBlockStore, selectBlocks } from '@features/terminal';
 import { usePaneMessages } from '@features/chat';
+import PaneChatHistory from '@features/chat/components/PaneChatHistory';
 import { useChatPanelOpen } from '@features/workspace';
 import { useToastStore } from '@ui/Toast';
 import { useFollowBottom, registerFollowEngager, engageFollow } from '@features/terminal/hooks/useFollowBottom';
@@ -351,6 +352,7 @@ function TerminalPane(props: {
   // Real alternate buffers use the main xterm; manual fullscreen uses the live block terminal.
   const showXterm = scene === 'classic' || (scene === 'altScreen' && !altScreenActive);
   const showBlocks = scene === 'blockList';
+  const chatPanelOpen = useChatPanelOpen();
 
   const onPaneMouseDown = useTerminalPaneDrag(terminal.id, reorderable);
 
@@ -378,6 +380,7 @@ function TerminalPane(props: {
       {/* Keep xterm mounted; hide it only while the block terminal is manually fullscreened. */}
       {/* AI 状态栏（仅 AI 模式显示，置于页面顶部） */}
       <AiStatusBar paneId={terminal.id} />
+      {scene === 'classic' && !chatPanelOpen && <PaneChatHistory paneId={terminal.id} />}
       <div inert={!showXterm} style={showXterm
         // Keep the native terminal scrollbar flush with the pane's right edge.
         // 左边距不在这里加：它只属于终端屏幕内容（见 TerminalPanel），

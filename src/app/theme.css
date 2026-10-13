@@ -1,6 +1,8 @@
 :root {
   --ui-font-scale: 1;
   --terminal-font-size: calc(14px * var(--ui-font-scale));
+  --chat-font-size: 14px;
+  --chat-font-scale: 1;
   --terminal-row-height: 16px;
   --terminal-font-family: var(--font-mono);
   --terminal-font-weight: 400;
@@ -499,6 +501,25 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 }
 .md pre { margin: 0.45em 0; width: 100%; }
 .md pre code { background: none; border: none; padding: 0; font-size: calc(12.5px * var(--ui-font-scale)); line-height: 1.55; }
+.ai-chat-panel {
+  --chat-content-font-size: var(--chat-font-size);
+  --ui-font-scale: var(--chat-font-scale);
+  --chat-question-line-height: 1.5;
+  --fs-label: calc(13px * var(--chat-font-scale));
+  --fs-caption: calc(12px * var(--chat-font-scale));
+  --fs-micro: calc(11px * var(--chat-font-scale));
+  font-size: var(--chat-font-size);
+}
+.ai-chat-panel .md pre code { font-size: 0.9em; }
+.settings-chat-preview {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-inner);
+  color: var(--text-primary);
+  font-size: var(--chat-font-size);
+  line-height: 1.6;
+}
 /* 表格：separate 模型才能出圆角；边框收到表格外圈，格内只留行分隔 */
 .md table {
   border-collapse: separate;
@@ -555,8 +576,10 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 .scroll-region, .settings-content { scrollbar-gutter: auto; }
 [data-testid^="terminal-scroll-"] { --scrollbar-size: 10px; }
 .application-window[data-platform="macos"] { border-radius: 10px; }
-.application-window:has(.workspace-titlebar[data-fullscreen="true"]) { border-radius: 0; }
-.application-window::after { content: ""; position: fixed; inset: 0; border: 1px solid var(--border-strong); border-radius: inherit; pointer-events: none; z-index: 20000; }
+.application-window[data-platform="windows"] { border-radius: 8px; }
+.application-window:has(.workspace-titlebar[data-fullscreen="true"], [data-window-maximized="true"]) { border-radius: 0; }
+.application-window::after { content: ""; position: absolute; inset: 0; border: 1px solid var(--border-strong); border-radius: inherit; pointer-events: none; z-index: 20000; }
+.application-window[data-platform="windows"]::after { display: none; }
 .overlay-scroll-container { position: relative; display: flex; flex-direction: column; overflow: hidden; }
 .terminal-block-scroll { scrollbar-gutter: auto; scrollbar-width: none; }
 .terminal-block-scroll::-webkit-scrollbar { display: none; }

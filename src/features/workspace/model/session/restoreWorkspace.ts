@@ -20,6 +20,8 @@ export interface PersistableSession {
 }
 
 export interface RestoreWorkspaceDependencies {
+  launchDirectory?: string | null;
+  openDirectory?: (cwd: string) => void;
   startupMode?: StartupMode;
   archiveSession?: (sessionId: string) => Promise<void>;
   listSessions: () => Promise<WorkspaceSession[]>;
@@ -40,6 +42,10 @@ export async function restoreWorkspaceWithDependencies(
   dependencies: RestoreWorkspaceDependencies,
 ): Promise<void> {
   const onError = dependencies.onError ?? defaultErrorHandler;
+  if (dependencies.launchDirectory && dependencies.openDirectory) {
+    if (!dependencies.hasTabs()) dependencies.openDirectory(dependencies.launchDirectory);
+    return;
+  }
   const mode = dependencies.startupMode ?? 'restore';
   if (mode !== 'restore' && dependencies.archiveSession) {
     const saved = await dependencies.listSessions().catch((error: unknown) => {
@@ -114,10 +120,12 @@ function createDefaultSession(): PersistableSession | null {
 
 /** 默认生产适配器：连接现有 IPC、Store 和 sessionManager。 */
 export function restoreWorkspace(
-  options: { onError?: (message: string, error: unknown) => void } = {},
+  options: { onError?: (message: string, error: unknown) => void; launchDirectory?: string | null } = {},
 ): Promise<void> {
   return restoreWorkspaceWithDependencies({
     onError: options.onError,
+    launchDirectory: options.launchDirectory,
+    openDirectory: cwd => { useWorkspaceStore.getState().addTab({ cwd }); },
     startupMode: useStartupSettings.getState().mode,
     archiveSession: (id) => archiveSession(id, Date.now()),
     listSessions: async () => {

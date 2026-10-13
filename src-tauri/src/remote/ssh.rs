@@ -18,6 +18,8 @@ use std::time::Duration;
 use tauri::State;
 
 static KH_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+static FILE_SEARCHES: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<String, std::sync::Arc<std::sync::atomic::AtomicBool>>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
 
 #[derive(Clone, Serialize, Debug, PartialEq)]
 pub struct SshFsEntry {
@@ -32,6 +34,62 @@ pub struct SshFsEntry {
 pub struct SshListResponse {
     pub entries: Vec<SshFsEntry>,
     pub base: String,
+}
+
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SshSearchResponse {
+    entries: Vec<SshFsEntry>,
+    truncated: bool,
+    skipped: usize,
+}
+
+/// Search file names through a single authenticated channel with bounded work.
+fn ssh_search_sync(conn: &SshConnection, root: &str, query: &str, cancelled: &std::sync::atomic::AtomicBool) -> Result<SshSearchResponse, String> {
+    use std::sync::atomic::Ordering;
+    let mut result = SshSearchResponse::default();
+    let needle = query.trim().to_lowercase();
+    if needle.is_empty() || cancelled.load(Ordering::Relaxed) { return Ok(result); }
+    let session = connect(conn)?;
+    if cancelled.load(Ordering::Relaxed) { return Ok(result); }
+    session.set_timeout(5000);
+    let sftp = session.sftp().map_err(|e| format!("SFTP_UNAVAILABLE: {e}"))?;
+    let root = sftp.realpath(Path::new(root)).map_err(|e| format!("Could not read search directory: {e}"))?;
+    let root = root.to_string_lossy().to_string();
+    let mut queue = std::collections::VecDeque::from([(root.clone(), 0usize)]);
+    let mut visited = std::collections::HashSet::new();
+    let mut scanned = 0usize;
+    let started = std::time::Instant::now();
+    while let Some((directory, depth)) = queue.pop_front() {
+        if cancelled.load(Ordering::Relaxed) { break; }
+        if visited.len() >= 500 || scanned >= 20000 || result.entries.len() >= 200 || started.elapsed() >= Duration::from_secs(20) {
+            result.truncated = true;
+            break;
+        }
+        if !visited.insert(directory.clone()) { continue; }
+        let remaining = Duration::from_secs(20).saturating_sub(started.elapsed()).as_millis().max(1).min(5000) as u32;
+        session.set_timeout(remaining);
+        let entries = match sftp.readdir(Path::new(&directory)) {
+            Ok(entries) => entries,
+            Err(error) if directory == root => return Err(format!("Could not read search directory: {error}")),
+            Err(_) => { result.skipped += 1; continue; }
+        };
+        for (listed, stat) in entries {
+            if cancelled.load(Ordering::Relaxed) { break; }
+            scanned += 1;
+            if scanned > 20000 || result.entries.len() >= 200 { result.truncated = true; break; }
+            let Some(name) = crate::platform::path::name_from_listing(&listed.to_string_lossy(), &directory) else { continue; };
+            let path = crate::platform::path::join(&directory, &name);
+            if name.to_lowercase().contains(&needle) {
+                result.entries.push(SshFsEntry { name, path: path.clone(), is_dir: stat.is_dir() });
+            }
+            if stat.is_dir() {
+                if depth < 12 && queue.len() < 500 { queue.push_back((path, depth + 1)); }
+                else { result.truncated = true; }
+            }
+        }
+    }
+    Ok(result)
 }
 
 /// 建立 TCP 连接 + SSH 握手（不含主机密钥校验与认证）。
@@ -363,6 +421,23 @@ pub async fn ssh_list(
     tauri::async_runtime::spawn_blocking(move || ssh_list_sync(&conn, path))
         .await
         .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn ssh_search(state: State<'_, HistoryState>, id: String, path: String, text: String, request_id: String) -> Result<SshSearchResponse, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?.get_ssh_connection(&id)?;
+    let cancelled = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    FILE_SEARCHES.lock().map_err(|e| e.to_string())?.insert(request_id.clone(), cancelled.clone());
+    let result = tauri::async_runtime::spawn_blocking(move || ssh_search_sync(&conn, &path, &text, &cancelled)).await;
+    if let Ok(mut requests) = FILE_SEARCHES.lock() { requests.remove(&request_id); }
+    result.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub fn ssh_search_cancel(request_id: String) {
+    if let Ok(requests) = FILE_SEARCHES.lock() {
+        if let Some(cancelled) = requests.get(&request_id) { cancelled.store(true, std::sync::atomic::Ordering::Relaxed); }
+    }
 }
 
 /// 本地下载根目录：~/.vrykell/downloads

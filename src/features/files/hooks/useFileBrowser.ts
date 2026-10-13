@@ -3,7 +3,7 @@ import type { DiskEntry, FsEntry } from '@platform/api/types';
 import {
   DEFAULT_DIR_NAME, DEFAULT_FILE_NAME, fileOpsFor, resolveTargetDir,
 } from '@features/files/model/fileOps';
-import type { FileOpPair, FileOps, FileOpsTarget } from '@features/files/model/fileOps';
+import type { FileListResult, FileOpPair, FileOps, FileOpsTarget } from '@features/files/model/fileOps';
 import { useToastStore } from '@ui/Toast';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 import { writeClipboardFiles } from '@platform/clipboard';
@@ -88,6 +88,9 @@ export function useFileBrowser({
   const [path, setPath] = useState<string | null>(initialPath);
   const initialized = useRef(initialPath !== null);
   const requestVersion = useRef(0);
+  const navigationVersion = useRef(0);
+  const [navigationPending, setNavigationPending] = useState(false);
+  const preloaded = useRef<{ path: string | null; result: FileListResult } | null>(null);
   const alive = useRef(true);
 
   const [entries, setEntries] = useState<FsEntry[]>([]);
@@ -141,6 +144,7 @@ export function useFileBrowser({
     return () => {
       alive.current = false;
       requestVersion.current += 1;
+      navigationVersion.current += 1;
       clearLoadingTimer();
       for (const timer of childHintTimers.current.values()) clearTimeout(timer);
       childHintTimers.current.clear();
@@ -173,12 +177,15 @@ export function useFileBrowser({
     // 保留上一份列表，快速切换时原地替换而不是先闪成空白
     const kind = currentPath === null ? 'root' : 'directory';
     terminalDebug('files-load-start', { requestId: version, kind });
-    const request = ops.list(currentPath).then((result) => {
+    const cached = preloaded.current;
+    preloaded.current = null;
+    const request = (cached?.path === currentPath ? Promise.resolve(cached.result) : ops.list(currentPath)).then((result) => {
       if (version !== requestVersion.current) return;
       setLoadedPath(currentPath);
       if (currentPath === null && result.base) {
         // 目标自己解析出的起始目录（远端主目录）：静默修正，不进入回退历史
         initialized.current = true;
+        preloaded.current = { path: result.base, result };
         rememberPath(result.base);
       }
       // 本地面板的 null 路径是磁盘视图（条目为空）；其余情况直接用列表结果
@@ -291,10 +298,27 @@ export function useFileBrowser({
 
   // ── 导航与视图回退 ──
 
-  /** 导航并记住当前视图快照（目录、展开、选中、滚动）。 */
-  const navigate = useCallback((nextPath: string | null) => {
+  /** Commit navigation only after the destination can be listed. */
+  const navigate = useCallback(async (nextPath: string | null) => {
     initialized.current = true;
-    if (path === nextPath) return;
+    const version = ++navigationVersion.current;
+    if (path === nextPath && !error && settled) { setNavigationPending(false); return true; }
+    setNavigationPending(true);
+    let result: FileListResult;
+    try {
+      result = await ops.list(nextPath);
+    } catch (cause) {
+      if (alive.current && version === navigationVersion.current) {
+        toast(`${t('files.error.readDir')}: ${String((cause as Error)?.message ?? cause)}`, 'error');
+        terminalDebug('files-navigation-error', { errorType: cause instanceof Error ? cause.name : typeof cause });
+      }
+      return false;
+    } finally {
+      if (alive.current && version === navigationVersion.current) setNavigationPending(false);
+    }
+    if (!alive.current || version !== navigationVersion.current) return false;
+    const destination = result.base ?? nextPath;
+    preloaded.current = { path: destination, result };
     setHistory((stack) => [...stack, {
       path,
       expanded: expandedSet,
@@ -305,11 +329,15 @@ export function useFileBrowser({
     pendingScrollTop.current = 0;
     setSelectionState(new Set());
     setAnchorPath(null);
-    rememberPath(nextPath);
-  }, [anchorPath, expandedSet, path, rememberPath, selection]);
+    rememberPath(destination);
+    if (destination === path) load(destination);
+    return true;
+  }, [anchorPath, error, expandedSet, load, ops, path, rememberPath, selection, settled, toast]);
 
   /** 回退到上一个视图快照（而不是固定上级目录）。 */
   const goBack = useCallback(() => {
+    navigationVersion.current += 1;
+    setNavigationPending(false);
     const snapshot = history[history.length - 1];
     if (!snapshot) return;
     setHistory(history.slice(0, -1));
@@ -768,6 +796,7 @@ export function useFileBrowser({
     loadedPath,
     settled,
     loading,
+    navigationPending,
     loadingHint,
     error,
     refresh,

@@ -126,6 +126,7 @@ test('redraw shortcut, toolbar and palette preserve the TUI without sending PTY 
   await page.clock.pauseAt(new Date());
   const redraw = page.getByTestId('tui-banner').locator('[data-tip="重绘终端"]');
   await redraw.click();
+  await expect(input).toBeFocused();
   await expect(redraw).toHaveAttribute('aria-busy', 'true');
   await expect(redraw).toBeDisabled();
   await expect(redraw.locator('svg')).toHaveCSS('animation-name', 'spin');

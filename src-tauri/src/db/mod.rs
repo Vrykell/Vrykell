@@ -169,6 +169,16 @@ fn init_schema(conn: &Connection) -> Result<(), String> {
         conn.execute_batch("ALTER TABLE ssh_connections ADD COLUMN options_json TEXT NOT NULL DEFAULT '{}';")
             .map_err(|e| e.to_string())?;
     }
+    // Preserve message ownership when restoring terminal panes.
+    let has_chat_pane = conn.prepare("PRAGMA table_info(chat_messages)")
+        .map_err(|e| e.to_string())?
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|e| e.to_string())?
+        .any(|column| column.as_deref() == Ok("pane_id"));
+    if !has_chat_pane {
+        conn.execute_batch("ALTER TABLE chat_messages ADD COLUMN pane_id TEXT;")
+            .map_err(|e| e.to_string())?;
+    }
     // Keep the existing schema version to avoid resetting compatible databases.
     conn.execute_batch("PRAGMA user_version = 2;")
         .map_err(|e| format!("记录 schema 版本失败：{e}"))?;

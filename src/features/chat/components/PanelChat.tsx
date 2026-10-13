@@ -127,7 +127,7 @@ export default function PanelChat() {
 
   // Match the terminal composer context with spacing between the chips.
   return (
-    <div ref={panelRef} style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, containerType: 'inline-size' }}>
+    <div ref={panelRef} className="ai-chat-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, containerType: 'inline-size' }}>
       {/* Model and conversation mode apply to subsequent messages. */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 4,
@@ -202,7 +202,7 @@ export default function PanelChat() {
                 style={{
                   flex: 1, minWidth: 0, resize: 'none',
                   background: 'transparent', border: 'none', padding: '1px 0',
-                  fontSize: 'var(--terminal-font-size)', fontFamily: TERMINAL_FONT_FAMILY,
+                  fontSize: 'var(--chat-font-size)', fontFamily: TERMINAL_FONT_FAMILY,
                   color: 'var(--text-primary)', lineHeight: '22px', outline: 'none',
                 }}
               />

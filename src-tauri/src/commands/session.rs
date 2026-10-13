@@ -137,9 +137,13 @@ pub fn append_chat_message(
     created_at: u64,
     parts: String,
     attachments: String,
+    pane_id: Option<String>,
 ) -> Result<(), String> {
     let db = state.0.lock().map_err(|e| e.to_string())?;
-    db.append_chat_message(&id, &session_id, &role, &content, created_at, &parts, &attachments)
+    match pane_id.as_deref() {
+        Some(pane) => db.append_chat_message_for_pane(&id, &session_id, &role, &content, created_at, &parts, &attachments, Some(pane)),
+        None => db.append_chat_message(&id, &session_id, &role, &content, created_at, &parts, &attachments),
+    }
 }
 
 #[tauri::command]

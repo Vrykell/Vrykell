@@ -1,0 +1,25 @@
+# Windows context menu
+
+Settings → Application → Windows context menu manages the Windows 11 primary Explorer menu. A folder or folder background gets **Open in Vrykell**, which opens a new application window with a terminal at that directory. Saved sessions are neither restored nor archived by this explicit launch. Multiple selected folders and virtual folders are excluded.
+
+First choose **Trust this certificate**, accept the Windows administrator prompt, then choose **Enable context menu**. MSIX deployment requires trust in the local-machine Trusted People certificate store; adding trust only for the current user does not work on the tested machine. The settings page displays the bundled certificate fingerprint. Trust also permits other packages signed by the same certificate to be installed. Registration belongs to the current Windows user. **Disable context menu** removes the identity package and launch mapping. Removing certificate trust is a separate action and also needs administrator approval. Explorer may cache the menu until sign-out/sign-in.
+
+## Development and packaging
+
+Windows builds need Visual Studio C++ tools, CMake, and a Windows SDK containing MakeAppx and SignTool. Run `npm run windows:context-menu:prepare -- --test` to compile the independently implemented COM DLL, run native tests, and create the signed identity package. The existing `npm run tauri dev` and `npm run tauri build` wrapper runs preparation automatically on Windows. Set `VRYKELL_MENU_ARCH=arm64` for an ARM64 build; the DLL must match Explorer's architecture.
+
+The preparation script creates or reuses a non-exportable self-signed code-signing key in the current developer's personal certificate store. Only the public `.cer`, signed `.msix`, and DLL go into `src-tauri/windows-context-menu/generated/`; these artifacts are ignored by Git. No private key or PFX is bundled. Changing the signing certificate requires trusting the new public certificate on each target computer. Reuse the same developer identity between releases.
+
+Windows packaging uses a per-user NSIS installer with a pre-uninstall hook that unregisters the menu before removing application files. The hook checks ownership so uninstalling an older installation does not remove a menu owned by another executable. Certificate trust remains until explicitly removed in settings; uninstalling does not remove signing certificates shared with other applications. Full installers are built only on request.
+
+The identity manifest declares `windows.comServer` and `windows.fileExplorerContextMenus` for `Directory` and `Directory\Background`. The executable also embeds matching identity metadata. The COM DLL is deployed to the external application's `windows-context-menu` folder: sparse-package COM activation resolves this external path, even if a copy exists inside the identity package. A dedicated per-user launch mapping supplies the executable path without passing through a command shell. All background management processes use no-console creation flags; the administrator permission prompt is intentional.
+
+## Verification
+
+Management operations are serialized by a mutex for the current Windows user. Before replacing a registration, the external DLL is checked against the signed package and installed using a content hash in its filename, so loaded versions need not be overwritten. Signed package snapshots in `%LOCALAPPDATA%\com.vrykell.app\context-menu\packages` allow a failed update to restore the previous registration managed by this feature. Status reads cannot overwrite a newer settings action. Build caches and generated integration assets are excluded from project searches by the root `.ignore`.
+
+- Native tests cover factory lifetime, title, icon contract, selected-folder eligibility, and unavailable background sites. `ContextMenuTests.exe --registered` additionally verifies system COM activation after registration.
+- Rust tests cover absent, invalid, and existing absolute directory arguments.
+- `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-context-menu.ps1` checks enable/disable, deployment failure rollback and external DLL tampering with deployment/registry effects mocked in its own process; it never imports a certificate or prompts for UAC.
+- Unit and browser tests cover explicit trust, enable/disable, errors, status races, startup directory handling, and the absence of a Windows window stroke. Both the CSS border and the native compositor border are disabled; rounded corners are retained.
+- On a normal target machine, verify UAC approval/cancellation, signed-package installation, both Explorer menu contexts, paths with spaces and Unicode, and removal through settings and the NSIS uninstaller. Developer-mode manifest registration validates COM activation but does not substitute for validating certificate trust on a normal installation.

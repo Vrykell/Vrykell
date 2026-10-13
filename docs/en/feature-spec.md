@@ -389,9 +389,29 @@ Benchmarks and scope of application are in [Terminal Performance Verification](t
 | SB1 | Terminal history and width changes | Block history uses a 10px transparent overlay track: backgrounds and dividers span the full width without a reserved gutter. Classic mode retains the terminal renderer's transparent track and native navigation. Window, sidebar and split changes resize the PTY and reflow history without horizontal terminal scrolling | `scrollbar.spec.ts`, `block-width.spec.ts` and `follow-bottom.spec.ts` check transparency, dragging, keyboard navigation, reflow and follow state |
 | SB2 | Classic terminal scrolling | Uses the terminal's own thumb and scroll buffer; shown on hover or scroll, and history can be viewed after dragging | Output 200 lines, drag the native thumb and check the terminal buffer viewport position |
 | SB3 | Long lists and content panels | Settings, tabs, files, SSH, chat, text inputs and popup menus share transparent overlay tracks with themed rounded thumbs. Vertical and horizontal tracks preserve the full content area; tracks stay in the stacking layer of their owning page or popup, so dialogs cover background tracks. Popup tracks follow their clipped surface and dragging keeps menus open | Unit tests cover dynamic surfaces, cleanup and both axes; E2E checks dialog occlusion and restored interaction, settings/chat tracks and long directory menu dragging |
-| SB6 | Application window edge | A thin non-interactive border follows macOS window corners and becomes square in fullscreen, without consuming layout space | E2E checks border geometry and pointer behavior |
+| SB6 | Application window edge | macOS retains its thin non-interactive border. Windows hides both the CSS stroke and native compositor border, retaining rounded corners and becoming square when fullscreen/maximized | `context-menu.spec.ts` checks that Windows has no CSS stroke; native compositor configuration is logged |
 | SB4 | Input box height restore | The AI and terminal input boxes recompute their height from the text, placeholder, available width and font size; they grow taller when narrowed and shrink back when expanded, up to 120px, preserving the draft | Unit tests verify restore, external draft, hidden restore and font size changes; `composer-resize.spec.ts` actually drags the sidebar and changes the window width to verify empty input and draft restore |
 | SB5 | Running block scrollbar | The live xterm inside a running command block no longer stacks a second scrollbar (its native viewport scrollbar and custom slider are hidden), while the viewport keeps wheel scrolling active for its own scrollback and TUI mouse input; reclaiming the reserved right gutter also keeps it horizontally aligned with completed blocks | `running-terminal-usability.spec.ts` checks that the running block's xterm viewport scrollbar and custom slider are hidden; `running-term.spec.ts` checks that wheel input stays with the live terminal |
+
+## 23. Windows context menu
+
+| ID | Feature | Expected behavior | Test method |
+|---|---|---|---|
+| WC1 | Menu management | Settings exposes actual Windows 11 registration, explicit certificate trust with UAC, enable/disable and inline errors; private signing keys are never distributed | `contextMenuPage.test.tsx`, `context-menu.spec.ts`; manual UAC and signed-package installation |
+| WC2 | Explorer launch | The primary menu opens a new terminal window at a selected folder or folder background, retaining paths with spaces/Unicode and preserving saved sessions | Native COM tests, Rust directory argument tests, workspace startup tests and `context-menu.spec.ts`; manual Explorer invocation |
+| WC3 | Disable and uninstall | Per-user registration is removed by settings or the NSIS uninstall hook; certificate trust removal is explicit | Native registration smoke check; manual signed enable/disable and NSIS uninstall |
+
+See [Windows context menu](windows-context-menu.md) for prerequisites and verification limits.
+
+## 24. File panel search and conversation continuity
+
+- Directory navigation commits and persists only after a successful listing. Invalid paths retain the current view and show a notification. Read failures keep breadcrumbs and offer a return to the default directory; terminal directory actions require a successfully loaded directory.
+- Both file panels offer a search overlay from the toolbar. Search matches file names recursively, reveals selected files in their parent directory, and enters selected directories. The two terminal directory actions sit together in the overflow menu; panel navigation is labelled “Switch to the current terminal file directory”.
+- Search is bounded to 200 results, 500 directories, 20,000 entries and 12 nested levels. Local traversal skips symbolic links. Remote traversal uses one authenticated SFTP channel, supports cancellation, and reports skipped directories and partial results; its traversal budget is 20 seconds after connecting.
+- Appearance settings expose an independent AI Chat font size of 10–24 px with immediate application, persistence, preview and reset.
+- Chat persistence retains pane ownership and original timestamps. Restored legacy messages are assigned to the first pane. Inline conversation remains visible during classic SSH reconnection when the Chat panel is closed, and returns to the shared command flow in block mode.
+
+Verification checklist: invalid and inaccessible breadcrumb paths, recovery after an old invalid saved path, rapid navigation, local and remote search cancellation and partial results, filename searches with Unicode and spaces, file reveal, font persistence and reset, SSH reconnection with the Chat panel open/closed, restored legacy chat and independent split-pane conversations.
 
 ## Test Records
 

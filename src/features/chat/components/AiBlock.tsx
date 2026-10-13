@@ -137,9 +137,9 @@ export default function AiBlock({ exchange }: { exchange: ChatExchange }) {
               flex: 1,
               minWidth: 0,
               fontFamily: TERMINAL_FONT_FAMILY,
-              fontSize: 'var(--terminal-font-size)',
+              fontSize: 'var(--chat-content-font-size, var(--terminal-font-size))',
               color: 'var(--text-primary)',
-              lineHeight: '20px',
+              lineHeight: 'var(--chat-question-line-height, 20px)',
               wordBreak: 'break-word',
               whiteSpace: 'pre-wrap',
             }}
@@ -184,7 +184,7 @@ export default function AiBlock({ exchange }: { exchange: ChatExchange }) {
             paddingTop: 6,
             paddingBottom: !answer.pending && !answer.error ? 8 : 0,
             fontFamily: 'var(--font-ui)',
-            fontSize: 'calc(12px * var(--ui-font-scale))',
+            fontSize: 'var(--chat-content-font-size, calc(12px * var(--ui-font-scale)))',
             lineHeight: 1.6,
             color: 'var(--text-primary)',
           }}

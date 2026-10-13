@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 import { useWorkspaceStore } from '@features/workspace/stores/workspace';
+import { leaves } from '@features/workspace/model/windowLayout';
 import { appendChatMessage, deleteChatMessage } from '@platform/api/session';
 import {
   serializeParts,
@@ -24,7 +25,7 @@ export interface ChatMessage {
   parts?: MessagePart[];
   /** 用户消息附件（M5）：图片/文件/长文本粘贴，随消息持久化 */
   attachments?: AttachmentMeta[];
-  /** 来源 pane（分屏时区分对话线；旧持久化消息没有，仅面板可见） */
+  /** Persisted pane ownership keeps split conversations distinct after restoration. */
   paneId?: string;
   /** 模型思考过程（reasoning 流）；不持久化，仅会话内存 */
   reasoning?: string;
@@ -242,8 +243,10 @@ export const useChatStore = create<ChatState>((set, get) => {
           tabId,
           assistant.role,
           assistant.content,
-          Date.now(),
+          assistant.createdAt,
           serializeParts(assistant.parts),
+          serializeAttachments(assistant.attachments),
+          assistant.paneId,
         ).catch((e) => console.warn('[chat] 助手消息持久化失败（重启后该轮对话可能丢失）:', e));
       }
     }
@@ -350,7 +353,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     }));
     // 持久化用户消息（AI 对话是会话状态的一部分；用户消息无 parts）
     appendChatMessage(
-      userMsg.id, tabId, userMsg.role, userMsg.content, now, '', serializeAttachments(atts),
+      userMsg.id, tabId, userMsg.role, userMsg.content, now, '', serializeAttachments(atts), userMsg.paneId,
     ).catch(() => {});
     useWorkspaceStore.getState().titleFromMessage(tabId, trimmed);
     await runAssistant(tabId, assistantMsg.id, opts?.streamFn);
@@ -451,14 +454,12 @@ export function useActiveMessages(): ChatMessage[] {
   return useChatStore((s) => s.byTab[activeId] ?? EMPTY);
 }
 
-/**
- * 读取某个 pane 的对话线（块流内联用）。
- * 无 paneId 的 tab 级旧消息不进块流，只在面板可见。
- */
+/** Read the owning tab's conversation regardless of which tab is active. */
 export function usePaneMessages(paneId: string): ChatMessage[] {
-  const activeId = useWorkspaceStore((s) => s.activeId);
+  const ownerId = useWorkspaceStore((state) => state.tabs.find((tab) =>
+    tab.kind === 'session' && leaves(tab.layout).some((pane) => pane.id === paneId))?.id ?? state.activeId);
   return useChatStore(
-    useShallow((s) => (s.byTab[activeId] ?? EMPTY).filter((m) => m.paneId === paneId)),
+    useShallow((s) => (s.byTab[ownerId] ?? EMPTY).filter((m) => m.paneId === paneId)),
   );
 }
 

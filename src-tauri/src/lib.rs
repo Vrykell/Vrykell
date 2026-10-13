@@ -52,6 +52,10 @@ pub fn run() {
             if let Err(error) = terminal::debug::initialize(app.handle()) {
                 eprintln!("[terminal-debug] log initialization failed: {error}");
             }
+            #[cfg(windows)]
+            if let Some(window) = app.get_webview_window("main") {
+                platform::window_chrome::hide_border(&window);
+            }
             // 上次会话残留的可回退删除暂存项：补送入系统回收站（后台执行，不阻塞启动）
             std::thread::spawn(files::fs::sweep_undo_dir);
             if let Some(cfg) = app.try_state::<theme::ThemeState>() {
@@ -66,6 +70,9 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             greet,
+            platform::context_menu::context_menu_status,
+            platform::context_menu::context_menu_manage,
+            platform::context_menu::shell_launch_directory,
             agent::ai::set_ai_key,
             agent::ai::clear_ai_key,
             agent::ai::set_ai_base_url,
@@ -140,6 +147,8 @@ pub fn run() {
             remote::ssh::ssh_host_key_info,
             remote::ssh::ssh_trust_host_key,
             remote::ssh::ssh_list,
+            remote::ssh::ssh_search,
+            remote::ssh::ssh_search_cancel,
             remote::ssh::ssh_download,
             remote::ssh::ssh_rename,
             remote::ssh::ssh_create_file,

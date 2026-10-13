@@ -5,6 +5,7 @@ pub struct FsEntry {
     name: String,
     path: String,
     is_dir: bool,
+    is_symlink: bool,
 }
 
 /// 列出目录内容（目录在前，按名称排序）。path 为空时用 HOME。
@@ -20,6 +21,7 @@ fn fs_list_sync(path: Option<String>) -> Result<Vec<FsEntry>, String> {
         entries.push(FsEntry {
             name: entry.file_name().to_string_lossy().to_string(),
             is_dir: p.is_dir(),
+            is_symlink: entry.file_type().map(|kind| kind.is_symlink()).unwrap_or(true),
             path: p.to_string_lossy().to_string(),
         });
     }
@@ -49,6 +51,7 @@ pub fn fs_roots() -> Result<Vec<FsEntry>, String> {
                     name: format!("{}:", letter as char),
                     path: drive,
                     is_dir: true,
+                    is_symlink: false,
                 });
             }
         }
@@ -59,6 +62,7 @@ pub fn fs_roots() -> Result<Vec<FsEntry>, String> {
             name: "/".into(),
             path: "/".into(),
             is_dir: true,
+            is_symlink: false,
         });
     }
     Ok(entries)
@@ -556,10 +560,14 @@ pub(crate) fn which_cmd_sync(cmd: String) -> Result<bool, String> {
     // Windows 用 where.exe；Unix 用 /bin/sh（而非硬编码 zsh：无 zsh 的环境
     // （最小 Linux/容器）也能解析用户 PATH）
     #[cfg(windows)]
-    let out = std::process::Command::new("where.exe")
-        .arg(&cmd)
-        .output()
-        .map_err(|e| e.to_string())?;
+    let out = {
+        use std::os::windows::process::CommandExt;
+        std::process::Command::new("where.exe")
+            .arg(&cmd)
+            .creation_flags(0x08000000)
+            .output()
+            .map_err(|e| e.to_string())?
+    };
     #[cfg(not(windows))]
     let out = std::process::Command::new("/bin/sh")
         .args(["-lc", &format!("command -v -- {}", cmd)])

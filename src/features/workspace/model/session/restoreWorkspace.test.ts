@@ -14,6 +14,20 @@ function createDependencies(overrides: Partial<RestoreWorkspaceDependencies> = {
 }
 
 describe('restoreWorkspaceWithDependencies', () => {
+  it('opens a shell-requested directory without archiving or restoring saved sessions', async () => {
+    const openDirectory = vi.fn();
+    const deps = createDependencies({ launchDirectory: 'C:\\Work space\\project', openDirectory, startupMode: 'empty', archiveSession: vi.fn() });
+    await restoreWorkspaceWithDependencies(deps);
+    expect(openDirectory).toHaveBeenCalledExactlyOnceWith('C:\\Work space\\project');
+    expect(deps.listSessions).not.toHaveBeenCalled();
+    expect(deps.archiveSession).not.toHaveBeenCalled();
+    expect(deps.createDefaultSession).not.toHaveBeenCalled();
+  });
+  it('does not duplicate the requested tab when startup runs again', async () => {
+    const openDirectory = vi.fn();
+    await restoreWorkspaceWithDependencies(createDependencies({ launchDirectory: '/tmp', openDirectory, hasTabs: () => true }));
+    expect(openDirectory).not.toHaveBeenCalled();
+  });
   it('按 sortOrder 恢复 active 会话，并跳过非 active 会话', async () => {
     const restored: string[] = [];
     const deps = createDependencies({

@@ -98,6 +98,7 @@ export default function WindowControls() {
   return (
     <div
       data-testid="window-controls"
+      data-window-maximized={maximized}
       style={{ display: 'flex', alignItems: 'stretch', alignSelf: 'stretch', height: '100%', flexShrink: 0 }}
       onMouseDown={(event) => event.stopPropagation()}
     >

@@ -1,4 +1,4 @@
-import { isMacOS } from '@platform/runtime';
+import { isMacOS, isWindows } from '@platform/runtime';
 import { useCallback } from 'react';
 import { useUiStore } from '@features/workspace';
 import { useTerminalThemeStore } from '@features/settings/model/terminalTheme';
@@ -36,7 +36,7 @@ export default function AppShell() {
       />
       <div
         className="application-window"
-        data-platform={isMacOS ? 'macos' : 'other'}
+        data-platform={isMacOS ? 'macos' : isWindows ? 'windows' : 'other'}
         style={{
           position: 'relative',
           zIndex: 1,
