@@ -108,6 +108,17 @@ export function sshFsList(id: string, path?: string): Promise<SshListResponse> {
   return invoke('ssh_list', { id, path: path ?? null });
 }
 
+/** Search through one file channel and cancel obsolete requests. */
+export async function sshSearchFiles(id: string, path: string, query: string, signal: AbortSignal):
+  Promise<{ entries: FsEntry[]; truncated: boolean; skipped: number }> {
+  const requestId = crypto.randomUUID();
+  const cancel = () => { void invoke('ssh_search_cancel', { requestId }).catch(() => {}); };
+  if (signal.aborted) return { entries: [], truncated: false, skipped: 0 };
+  signal.addEventListener('abort', cancel, { once: true });
+  try { return await invoke('ssh_search', { id, path, text: query, requestId }); }
+  finally { signal.removeEventListener('abort', cancel); }
+}
+
 /** 下载远程文件到本地临时目录，返回本地路径（用于系统默认应用打开）。 */
 export function sshDownload(id: string, path: string): Promise<string> {
   return invoke('ssh_download', { id, path });

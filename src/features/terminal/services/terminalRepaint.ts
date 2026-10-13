@@ -8,6 +8,8 @@ import { terminalDebug } from './terminalDebug';
 /** Rebuild drawing surfaces from existing buffers without restarting the session. */
 export function redrawTerminal(paneId = getFocusedTerminalId()): void {
   const terminals = new Set([termInstances.get(paneId), getExecutingTerm(paneId)?.term]);
+  const activeElement = document.activeElement;
+  const focused = [...terminals].find(term => term?.element?.querySelector('.xterm-helper-textarea') === activeElement);
   let surfaces = 0;
   for (const term of terminals) {
     if (!term?.element) continue;
@@ -16,5 +18,6 @@ export function redrawTerminal(paneId = getFocusedTerminalId()): void {
     repaintTerminal(term);
     surfaces++;
   }
+  focused?.focus();
   terminalDebug('terminal-manual-repaint', { paneId, surfaces });
 }

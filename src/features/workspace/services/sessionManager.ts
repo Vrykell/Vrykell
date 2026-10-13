@@ -10,7 +10,7 @@ import { sanitizeOutputHtml } from '@utils/sanitizeHtml';
 import { useChatStore } from '@features/chat';
 import { deserializeParts } from '@features/agent/model/messageParts';
 import { deserializeAttachments } from '@features/agent/model/attachments';
-import { leaf, type WindowLayout } from '@features/workspace/model/windowLayout';
+import { firstLeaf, leaf, type WindowLayout } from '@features/workspace/model/windowLayout';
 import { sessionSetGroup } from '@platform/api/group';
 import {
   createSession,
@@ -188,7 +188,7 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
         parts: deserializeParts(c.parts),
         // 附件元数据（M5；'' / 脏数据 → undefined）
         attachments: deserializeAttachments(c.attachments),
-        // 旧持久化没有 paneId：仅面板可见，不进块流
+        paneId: c.pane_id ?? undefined,
         createdAt: c.created_at,
       }));
       useChatStore.setState((s) => ({
@@ -218,6 +218,16 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
   }
   const parsedLayout = parseLayout(info?.payload ?? '{}', sessionId);
   const layout = info?.cwd ? applyLegacyCwd(parsedLayout, info.cwd) : parsedLayout;
+  // Legacy records belong to the first pane; explicit split-pane ownership is retained.
+  const firstPaneId = firstLeaf(layout).id;
+  useChatStore.setState((state) => ({
+    byTab: {
+      ...state.byTab,
+      [sessionId]: (state.byTab[sessionId] ?? []).map((message) => ({
+        ...message, paneId: !message.paneId || message.paneId === sessionId ? firstPaneId : message.paneId,
+      })),
+    },
+  }));
   const storedGroupId = info?.group_id ?? undefined;
   const hasGroupOverride = meta != null && Object.prototype.hasOwnProperty.call(meta, 'groupId');
   const knownGroupIds = new Set(useSessionStore.getState().groups.map((group) => group.id));

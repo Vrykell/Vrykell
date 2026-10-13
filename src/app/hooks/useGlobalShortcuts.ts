@@ -23,6 +23,13 @@ export function useGlobalShortcuts() {
       e.stopImmediatePropagation();
       if (!e.repeat) redrawTerminal();
     };
+    const paletteKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey || e.isComposing
+        || e.keyCode === 229 || e.key.toLowerCase() !== 'p') return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (!e.repeat) useUiStore.getState().setPaletteOpen(true);
+    };
     const preventZoomKeys = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
       if (!['=', '+', '-', '0', 'Add', 'Subtract'].includes(e.key)
@@ -49,13 +56,6 @@ export function useGlobalShortcuts() {
           ts.setKeyboardTarget('input');
           return;
         }
-      }
-
-      // Cmd/Ctrl+P: 命令面板
-      if ((e.metaKey || e.ctrlKey) && e.key === 'p' && !e.shiftKey) {
-        e.preventDefault();
-        useUiStore.getState().setPaletteOpen(true);
-        return;
       }
 
       // Cmd/Ctrl+Shift+T: 撤销关闭标签
@@ -125,6 +125,7 @@ export function useGlobalShortcuts() {
     };
     window.addEventListener('keydown', preventZoomKeys, true);
     window.addEventListener('keydown', redrawKey, true);
+    window.addEventListener('keydown', paletteKey, true);
     window.addEventListener('wheel', preventZoomWheel, { capture: true, passive: false });
     window.addEventListener('gesturestart', preventZoomGesture, { capture: true, passive: false });
     window.addEventListener('gesturechange', preventZoomGesture, { capture: true, passive: false });
@@ -134,6 +135,7 @@ export function useGlobalShortcuts() {
     return () => {
       window.removeEventListener('keydown', preventZoomKeys, true);
       window.removeEventListener('keydown', redrawKey, true);
+      window.removeEventListener('keydown', paletteKey, true);
       window.removeEventListener('wheel', preventZoomWheel, true);
       window.removeEventListener('gesturestart', preventZoomGesture, true);
       window.removeEventListener('gesturechange', preventZoomGesture, true);

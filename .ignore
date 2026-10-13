@@ -1,0 +1,13 @@
+# Build outputs, generated integration assets, and local tool caches.
+/.git/
+/.cache/
+/.commandcode/
+/node_modules/
+/dist/
+/dist-ssr/
+/coverage/
+/test-results/
+/playwright-report/
+/src-tauri/target/
+/src-tauri/gen/
+/src-tauri/windows-context-menu/generated/

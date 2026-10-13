@@ -17,7 +17,7 @@ export type FileMenuItemKey =
   | 'workspace-add' | 'workspace-remove' | 'open-tab'
   | 'open-editor' | 'open-system' | 'open-with' | 'reveal'
   | 'copy' | 'cut' | 'paste' | 'copy-path' | 'rename' | 'download' | 'delete'
-  | 'upload-file' | 'upload-dir' | 'new-tab-here' | 'sync-cwd' | 'downloads-view' | 'collapse-all';
+  | 'upload-file' | 'upload-dir' | 'new-tab-here' | 'sync-cwd' | 'sync-terminal' | 'downloads-view' | 'collapse-all';
 
 export interface FilePanelConfig {
   variant: 'local' | 'ssh';
@@ -28,7 +28,6 @@ export interface FilePanelConfig {
     pathInput: string;
     back: string;
     more: string;
-    sync: string;
     row: (entry: FsEntry) => string;
     rowSelector: string;
     expander: string;
@@ -72,7 +71,6 @@ const LOCAL_IDS: FilePanelConfig['ids'] = {
   pathInput: 'path-input',
   back: 'local-back-btn',
   more: 'local-more-btn',
-  sync: 'local-sync-btn',
   row: () => 'file-row',
   rowSelector: '[data-file-row]',
   expander: 'file-row-expander',
@@ -84,7 +82,6 @@ const SSH_IDS: FilePanelConfig['ids'] = {
   pathInput: 'remote-path-input',
   back: 'remote-back-btn',
   more: 'remote-more-btn',
-  sync: 'remote-sync-btn',
   row: (entry) => `remote-file-${entry.name}`,
   rowSelector: '[data-file-row]',
   expander: 'remote-row-expander',
@@ -101,7 +98,7 @@ export function filePanelConfigFor(target: FileOpsTarget): FilePanelConfig {
         rowFile: ['new-file', 'new-folder', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'download', 'delete'],
         rowMulti: ['copy', 'cut', 'paste', 'download', 'delete'],
         blank: ['new-file', 'new-folder', 'paste', 'upload-file', 'upload-dir'],
-        more: ['new-file', 'new-folder', 'upload-file', 'upload-dir', 'downloads-view', 'collapse-all'],
+        more: ['new-file', 'new-folder', 'upload-file', 'upload-dir', 'sync-terminal', 'sync-cwd', 'downloads-view', 'collapse-all'],
       },
       drag: { downloadBeforeNativeDrag: true, externalDropMode: 'upload', cleanupSourceAfterNativeDrag: false },
       open: 'remote-editor',
@@ -119,7 +116,7 @@ export function filePanelConfigFor(target: FileOpsTarget): FilePanelConfig {
       rowFile: ['new-file', 'new-folder', 'open-editor', 'open-system', 'open-with', 'reveal', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'delete'],
       rowMulti: ['copy', 'cut', 'paste', 'delete'],
       blank: ['new-file', 'new-folder', 'paste', 'new-tab-here'],
-      more: ['new-file', 'new-folder', 'new-tab-here', 'sync-cwd', 'reveal', 'downloads-view', 'collapse-all'],
+      more: ['new-file', 'new-folder', 'new-tab-here', 'sync-terminal', 'sync-cwd', 'reveal', 'downloads-view', 'collapse-all'],
     },
     drag: { downloadBeforeNativeDrag: false, externalDropMode: 'move', cleanupSourceAfterNativeDrag: true },
     open: 'terminal-editor',

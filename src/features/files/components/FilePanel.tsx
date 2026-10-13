@@ -1,7 +1,7 @@
 import { TextInput } from '@ui/TextInput';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ArrowUp, ChevronRight, FolderArrowRight, MoreHorizontal, iconSizes } from '@ui/icons';
+import { ArrowUp, ChevronRight, Search, MoreHorizontal, iconSizes } from '@ui/icons';
 import { IconBtn } from '@ui/UiBtn';
 import type { DiskEntry, FsEntry } from '@platform/api/types';
 import { flattenVisible, type VisibleRow } from '@features/files/utils/fileTree';
@@ -15,6 +15,7 @@ import { useFileRowDrag } from '@features/files/hooks/useFileRowDrag';
 import { useExternalFileDrop } from '@features/files/hooks/useExternalFileDrop';
 import { useFileDragStore } from '@features/files';
 import FileDragPreview from '@features/files/components/FileDragPreview';
+import FileSearchMenu from './FileSearchMenu';
 import ContextMenu from '@ui/ContextMenu';
 import ConfirmDialog from '@ui/ConfirmDialog';
 import ErrorBox from '@ui/ErrorBox';
@@ -30,9 +31,9 @@ export interface FilePanelProps {
   onPathChange?: (path: string | null) => void;
   /** 双击 / Enter 打开文件 */
   openEntry: (entry: FsEntry) => void;
-  /** 顶栏「终端切到当前目录」 */
+  /** Switch the terminal to the validated directory from the overflow menu. */
   onSyncToTerminal?: (currentDir: string) => void;
-  /** 当前终端 cwd：「更多 → 同步到终端目录」重新定位面板（仅本地提供） */
+  /** Current terminal directory, used to relocate the file panel. */
   terminalCwd?: string | null;
   /** 面板专有菜单回调：未提供的条目不会出现在菜单里 */
   handlers?: Partial<FileMenuHandlers>;
@@ -83,6 +84,8 @@ export default function FilePanel({
     entries,
     disks,
     settled,
+    loading,
+    navigationPending,
     loadingHint,
     error,
     refresh,
@@ -93,6 +96,7 @@ export default function FilePanel({
     selection,
     anchorPath,
     selectOnly,
+    revealPath,
     toggleSelection,
     replaceSelection,
     expandedSet,
@@ -136,6 +140,9 @@ export default function FilePanel({
 
   const rows = flattenVisible(entries, expandedSet, childCache);
   const [pathDraft, setPathDraft] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchReturnFocus = useRef<HTMLElement | null>(null);
+  const directoryReady = path !== null && settled && !error && !loading && !navigationPending;
   const [externalDrop, setExternalDrop] = useState<{ rowPath: string | null; dir: string } | null>(null);
 
   // 面包屑压缩：不换行，侧栏窄时省略高层级目录
@@ -236,8 +243,11 @@ export default function FilePanel({
     onPasteInto: (dir) => void pasteInto(dir),
     onRename: (entry) => startRename(entry),
     onDelete: (targets) => confirmDelete(targets),
-    onSyncToCwd: terminalCwd != null ? () => navigate(terminalCwd) : undefined,
     ...extraHandlers,
+    onSyncToCwd: terminalCwd != null ? () => { void navigate(terminalCwd); }
+      : onSyncToTerminal ? () => useToastStore.getState().addToast(t('The terminal has not reported its working directory yet.'), 'info') : undefined,
+    onSyncToTerminal: config.syncToTerminal && onSyncToTerminal && directoryReady
+      ? () => { if (path !== null) onSyncToTerminal(path); } : undefined,
   };
 
   /** 菜单作用目标：命中行属于多选时是整组 */
@@ -331,15 +341,6 @@ export default function FilePanel({
     ? '单击选中，双击在终端里编辑'
     : '单击选中，双击在终端编辑器中打开';
 
-  // 文件服务不可用等错误：整面板让位给错误视图（远程面板的既有行为：不显示菜单与空态）
-  if (error && renderError) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', userSelect: 'none' }}>
-        {renderError(error, refresh)}
-      </div>
-    );
-  }
-
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100%',
@@ -423,16 +424,13 @@ export default function FilePanel({
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
-          {config.syncToTerminal && onSyncToTerminal && (
-            <IconBtn
-              title="终端切换到当前目录"
-              data-testid={config.ids.sync}
-              disabled={path === null}
-              onClick={() => { if (path !== null) onSyncToTerminal(path); }}
-            >
-              <FolderArrowRight size={iconSizes.control} />
-            </IconBtn>
-          )}
+          <IconBtn title={t('Search files')} data-testid={`${config.variant}-file-search-btn`}
+            disabled={!directoryReady} onClick={(event) => {
+              searchReturnFocus.current = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+              setSearchOpen(true);
+            }}>
+            <Search size={iconSizes.control} />
+          </IconBtn>
           {/* 回退 = 上一个文件树视图快照（展开 / 选中 / 滚动），不是固定上级目录 */}
           <IconBtn title="回到上一个视图" data-testid={config.ids.back} disabled={!canGoBack} onClick={goBack}>
             <ArrowUp size={iconSizes.control} />
@@ -458,11 +456,12 @@ export default function FilePanel({
           <div role="status" style={{ padding: 16, color: 'var(--text-muted)', fontSize: 'var(--fs-label)' }}>
             {config.variant === 'ssh' ? t('files.loading.ssh') : path === null ? t('files.loading.disks') : t('files.loading.directory')}
           </div>
-        ) : error ? (
-          renderError
+        ) : error ? <>
+          {renderError
             ? renderError(error, refresh)
-            : <ErrorBox style={{ margin: 12 }} actions={<button onClick={refresh} style={{ minHeight: 32 }}>重试</button>}>{error}</ErrorBox>
-        ) : path === null && renderNullPathView ? (
+            : <ErrorBox style={{ margin: 12 }} actions={<button onClick={refresh} style={{ minHeight: 32 }}>重试</button>}>{error}</ErrorBox>}
+          {path !== null && <button style={{ margin: 12 }} onClick={() => { void navigate(null); }}>{t('Return to home directory')}</button>}
+        </> : path === null && renderNullPathView ? (
           renderNullPathView({ disks, settled, navigate })
         ) : (
           <>
@@ -524,6 +523,15 @@ export default function FilePanel({
           </>
         )}
       </div>
+
+      {searchOpen && path !== null && enabled && <FileSearchMenu key={path} ops={ops} root={path}
+        returnFocus={searchReturnFocus.current}
+        onClose={() => setSearchOpen(false)} onChoose={(entry) => {
+          setSearchOpen(false);
+          void navigate(entry.is_dir ? entry.path : ops.parentOf(entry.path)).then((success) => {
+            if (success && !entry.is_dir) { selectOnly(entry.path); revealPath(entry.path); }
+          });
+        }} />}
 
       {ctxMenu && (
         <ContextMenu

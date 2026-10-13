@@ -42,6 +42,7 @@ function registerField(id: string, page: PageId, label: string, description: str
 registerField("startup", "startup", "Open on startup", "Restore sessions or open a default terminal", () => useStartupSettings.getState().mode);
 registerField('command-highlighting', 'terminal-open', 'Command syntax highlighting', 'Color commands, arguments and shell operators.', () => String(useTypographyStore.getState().commandHighlighting));
 registerField("logs", "logs", "Save diagnostic logs automatically", "Diagnostic logging and errors");
+registerField('context-menu', 'context-menu', 'Windows context menu', 'Open in Vrykell', undefined, 'Open in Vrykell');
 registerField("export-logs", "logs", "Export logs", "Diagnostic archive");
 registerField("api-key", "ai-model", "Provider API Key", "Credentials for the current model provider", () => isApiKeyConfigured() ? t('Configured') : t('Not configured'));
 registerField("model", "ai-model", "Model list", "Provider, base URL and model ID", getModel);
@@ -74,6 +75,7 @@ registerField("wallpaper", "appearance-theme", "Application background image", "
 registerField("theme-import", "appearance-theme", "Import / export theme", "Theme JSON");
 registerField("ui-font", "appearance-theme", "settings.font.pageTitle", "settings.font.pageTitle", () => String(useTypographyStore.getState().uiFontSize));
 registerField("terminal-font", "appearance-theme", "settings.font.terminalTitle", "settings.font.terminalTitle", () => String(useTypographyStore.getState().terminalFontSize));
+registerField('chat-font', 'appearance-theme', 'AI chat font size', 'Adjust text size in the AI chat panel. Changes are saved and applied immediately.', () => String(useTypographyStore.getState().chatFontSize));
 registerField('terminal-font-family', 'appearance-theme', 'Terminal font family', 'Use a font installed on your system; unavailable families use the fallback fonts.', () => useTypographyStore.getState().terminalFontPreset);
 registerField('terminal-font-weight', 'appearance-theme', 'Terminal font weight', 'Variable fonts support fine weight adjustments; static fonts use the nearest installed weight.', () => String(useTypographyStore.getState().terminalFontWeight));
 registerField('terminal-line-spacing', 'appearance-theme', 'Terminal line spacing', 'Adjust line spacing for terminal input, live output and command history.', () => String(useTypographyStore.getState().terminalLineHeight));

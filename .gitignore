@@ -10,6 +10,11 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+/test-results/
+/src-tauri/windows-context-menu/generated/*
+!/src-tauri/windows-context-menu/generated/.gitkeep
+*.pfx
+*.p12
 *.local
 
 # Editor directories and files

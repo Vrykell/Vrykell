@@ -56,4 +56,18 @@ describe('manual terminal redraw', () => {
     redrawTerminal();
     expect(renderer).not.toHaveBeenCalled();
   });
+  it('restores only the terminal input that held focus before rebuilding its renderer', () => {
+    const main = surface();
+    const input = document.createElement('textarea');
+    input.className = 'xterm-helper-textarea';
+    main.element.append(input); document.body.append(main.element);
+    const focus = vi.fn(() => input.focus());
+    terminals.set('focused', { ...main, focus } as unknown as Terminal);
+    input.focus();
+    renderer.mockImplementation(() => input.blur());
+    redrawTerminal();
+    expect(focus).toHaveBeenCalledOnce();
+    expect(document.activeElement).toBe(input);
+    main.element.remove(); renderer.mockReset();
+  });
 });

@@ -14,5 +14,17 @@
         "backgroundColor": "#00000000"
       }
     ]
+  },
+  "bundle": {
+    "targets": ["nsis"],
+    "windows": { "nsis": {
+      "installMode": "currentUser",
+      "languages": ["English", "SimpChinese"],
+      "installerHooks": "windows-context-menu/installer-hooks.nsh"
+    } },
+    "resources": {
+      "windows-context-menu/generated/": "windows-context-menu/",
+      "windows-context-menu/manage.ps1": "windows-context-menu/manage.ps1"
+    }
   }
 }

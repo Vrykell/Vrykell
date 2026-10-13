@@ -1,6 +1,8 @@
 import type { Page } from '@playwright/test';
 
 export interface TauriMockOptions {
+  launchDirectory?: string;
+  contextMenu?: { available?: boolean; enabled?: boolean; certificateTrusted?: boolean };
   /** 是否启用 OSC 133 shell integration（默认 true）。
    *  false 时 mock 保持 classic 场景，用于测试无 integration 回退。 */
   integration?: boolean;
@@ -46,7 +48,10 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     { name: '旧脚本技能', description: '遗留技能，含脚本', source: 'market', trusted: false, enabled: false, hasScripts: true, modified: true, files: ['SKILL.md', 'scripts/run.sh', 'references/说明.md'], dir: '/home/e2e/.vrykell/skills/旧脚本技能', prompt: '运行 scripts/run.sh 完成工作。' },
   ];
   await page.addInitScript(
-    ({ enableIntegration, enableReadyMarker, models, active, skillsSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession }) => {
+    ({ enableIntegration, enableReadyMarker, models, active, skillsSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession, launchDirectory, menuSeed }) => {
+    const menu = { supported: true, available: true, enabled: false, certificateTrusted: false, certificateThumbprint: 'E2E-CERTIFICATE', ...menuSeed };
+    const menuActions: string[] = [];
+    (window as unknown as { __MENU_ACTIONS__: string[] }).__MENU_ACTIONS__ = menuActions;
     let cbCounter = 0;
     const eventListeners = new Map<string, number>();
     let fullscreen = false;
@@ -717,6 +722,20 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             return [{ id: 't1', title: 'npm run dev', status: 'active', created_at: Date.now(), closed_at: null, block_count: 2, cwd: '', group_id: null, sort_order: 0, kind: 'local', payload: '{}' }];
           case 'get_search_context':
             return { cwd: args.cwd ?? '/home/e2e' };
+          case 'shell_launch_directory': return launchDirectory ?? null;
+          case 'context_menu_status': return { ...menu };
+          case 'context_menu_manage': {
+            const action = args.action as string;
+            menuActions.push(action);
+            if (action === 'trust') menu.certificateTrusted = true;
+            if (action === 'untrust') menu.certificateTrusted = false;
+            if (action === 'enable') {
+              if (!menu.certificateTrusted) throw new Error('Certificate trust required');
+              menu.enabled = true;
+            }
+            if (action === 'disable') menu.enabled = false;
+            return { ...menu };
+          }
           case 'record_history':
             historyEntries.unshift({ command: args.command, cwd: args.cwd, timestamp: args.timestamp, exit_code: args.exitCode });
             return undefined;
@@ -1034,7 +1053,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
       },
     };
     localStorage.setItem('vrykell-api-key', 'sk-e2e-fake');
-  }, { enableIntegration: integration, enableReadyMarker: opts.shellReadyMarker !== false, models: seedModels, active: seedActive, skillsSeed: seedSkills, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true, sshPreexec: opts.sshPreexec ?? true, groupedHistoricalSession: opts.groupedHistoricalSession ?? false });
+  }, { enableIntegration: integration, enableReadyMarker: opts.shellReadyMarker !== false, models: seedModels, active: seedActive, skillsSeed: seedSkills, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true, sshPreexec: opts.sshPreexec ?? true, groupedHistoricalSession: opts.groupedHistoricalSession ?? false, launchDirectory: opts.launchDirectory, menuSeed: opts.contextMenu });
 }
 
 /** 预置 AI 回复文本：mock 的 ai_stream 会按 chunk 流式 emit ai-chunk 事件。

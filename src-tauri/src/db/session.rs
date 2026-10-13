@@ -42,6 +42,14 @@ impl HistoryDb {
         parts: &str,
         attachments: &str,
     ) -> Result<(), String> {
+        self.append_chat_message_for_pane(id, session_id, role, content, created_at, parts, attachments, None)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn append_chat_message_for_pane(
+        &self, id: &str, session_id: &str, role: &str, content: &str,
+        created_at: u64, parts: &str, attachments: &str, pane_id: Option<&str>,
+    ) -> Result<(), String> {
         // 会话行兜底（同 record_block）
         self.conn()
             .execute(
@@ -51,9 +59,9 @@ impl HistoryDb {
             .map_err(|e| e.to_string())?;
         self.conn()
             .execute(
-                "INSERT INTO chat_messages (id, session_id, role, content, created_at, parts, attachments) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-                 ON CONFLICT(id) DO UPDATE SET content=excluded.content, created_at=excluded.created_at, parts=excluded.parts, attachments=excluded.attachments",
-                params![id, session_id, role, content, created_at as i64, parts, attachments],
+                "INSERT INTO chat_messages (id, session_id, role, content, created_at, parts, attachments, pane_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                 ON CONFLICT(id) DO UPDATE SET content=excluded.content, created_at=excluded.created_at, parts=excluded.parts, attachments=excluded.attachments, pane_id=COALESCE(excluded.pane_id, chat_messages.pane_id)",
+                params![id, session_id, role, content, created_at as i64, parts, attachments, pane_id],
             )
             .map_err(|e| e.to_string())?;
         Ok(())
@@ -64,7 +72,7 @@ impl HistoryDb {
         let mut stmt = self
             .conn()
             .prepare(
-                "SELECT id, role, content, created_at, parts, attachments FROM chat_messages WHERE session_id = ?1 ORDER BY created_at ASC",
+                "SELECT id, role, content, created_at, parts, attachments, pane_id FROM chat_messages WHERE session_id = ?1 ORDER BY created_at ASC, rowid ASC",
             )
             .map_err(|e| e.to_string())?;
         let rows = stmt
@@ -539,6 +547,7 @@ pub struct ChatMessageEntry {
     pub parts: String,
     /// 附件元数据 JSON（M5，'' = 无/旧数据）
     pub attachments: String,
+    pub pane_id: Option<String>,
 }
 
 fn map_chat_message(row: &rusqlite::Row) -> rusqlite::Result<ChatMessageEntry> {
@@ -549,5 +558,6 @@ fn map_chat_message(row: &rusqlite::Row) -> rusqlite::Result<ChatMessageEntry> {
         created_at: row.get::<_, i64>(3)? as u64,
         parts: row.get(4)?,
         attachments: row.get(5)?,
+        pane_id: row.get(6)?,
     })
 }

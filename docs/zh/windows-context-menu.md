@@ -1,0 +1,25 @@
+# Windows 右键菜单
+
+设置 → 应用 → Windows 右键菜单用于管理 Windows 11 资源管理器主菜单。文件夹和文件夹空白处显示 **在 Vrykell 中打开**，点击后打开一个新应用窗口，并在对应目录创建终端。此显式启动不会恢复或归档已保存会话。多选文件夹和虚拟文件夹不在支持范围内。
+
+首次选择 **信任此证书**，在 Windows 管理员权限提示中确认，再选择 **启用右键菜单**。MSIX 部署需要本机 Trusted People 证书存储中的信任；在当前测试机上，仅添加当前用户信任不能完成安装。设置页显示随包证书的指纹。信任也允许安装由同一证书签名的其他包。菜单注册仅对当前 Windows 用户生效。**停用右键菜单** 移除身份包和启动映射。移除证书信任是独立操作，也需要管理员确认。资源管理器可能缓存菜单，需要注销并重新登录才能刷新。
+
+## 开发与打包
+
+Windows 构建需要 Visual Studio C++ 工具、CMake，以及包含 MakeAppx 和 SignTool 的 Windows SDK。执行 `npm run windows:context-menu:prepare -- --test` 可编译独立实现的 COM DLL、运行原生测试并生成签名身份包。现有 `npm run tauri dev` 和 `npm run tauri build` 包装脚本在 Windows 上自动执行准备步骤。ARM64 构建设置 `VRYKELL_MENU_ARCH=arm64`；DLL 架构必须与资源管理器匹配。
+
+准备脚本在当前开发者的个人证书存储中创建或复用不可导出的自签名代码签名私钥。只有公开 `.cer`、签名 `.msix` 和 DLL 写入 `src-tauri/windows-context-menu/generated/`，这些产物不进入 Git。应用不打包私钥或 PFX。更换签名证书后，每台目标电脑需要信任新证书；版本之间应复用同一开发者签名身份。
+
+Windows 打包使用面向当前用户的 NSIS 安装器，并通过卸载前钩子在删除应用文件前注销菜单。钩子检查归属，避免卸载旧安装时移除其他可执行文件管理的菜单。证书信任保留到用户在设置中主动移除；卸载不删除可能被其他应用共享的签名证书。完整安装包仅在明确要求时构建。
+
+身份清单为 `Directory` 和 `Directory\Background` 声明 `windows.comServer` 与 `windows.fileExplorerContextMenus`，可执行文件也嵌入匹配的身份信息。COM DLL 部署到外部应用目录下的 `windows-context-menu` 文件夹：稀疏包激活 COM 时使用此外部路径，即使身份包内也有 DLL 副本。独立的当前用户启动映射提供可执行文件路径，启动过程不经过命令解释器。所有后台管理进程禁用控制台窗口；管理员权限提示是用户主动操作的预期流程。
+
+## 验证
+
+管理操作通过当前 Windows 用户的互斥锁串行执行。替换注册前校验外部 DLL 与签名包内容一致，并使用包含内容哈希的文件名部署，避免覆盖仍被加载的版本。`%LOCALAPPDATA%\com.vrykell.app\context-menu\packages` 中的签名包快照用于在更新失败时恢复本功能管理的旧注册。旧状态查询不会覆盖设置中较新的操作结果。根目录 `.ignore` 将构建缓存和集成生成资源排除在项目搜索之外。
+
+- 原生测试覆盖工厂生命周期、标题、图标接口、文件夹可用性与背景站点不可用的处理。注册后执行 `ContextMenuTests.exe --registered` 可进一步验证系统 COM 激活。
+- Rust 测试覆盖无目录参数、非法参数和已存在的绝对目录。
+- `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-context-menu.ps1` 在独立进程中模拟部署和注册表副作用，验证启用、停用、部署失败回滚以及外部 DLL 篡改；不导入证书，也不触发 UAC。
+- 单测与浏览器测试覆盖显式信任、启用与停用、错误、状态竞态、启动目录处理，以及 Windows 不显示细边框。CSS 边框和原生合成器边框均禁用，圆角保留。
+- 普通目标机器上仍需验证 UAC 确认与取消、签名包安装、两个资源管理器菜单入口、含空格与中文的路径，以及设置停用与 NSIS 卸载。开发者模式的清单注册可验证 COM 激活，但不能替代普通安装环境中的证书信任验证。

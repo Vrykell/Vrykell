@@ -225,10 +225,14 @@ fn get_search_context_sync(cwd: Option<String>) -> SearchContext {
         .unwrap_or("zsh")
         .to_string();
 
-    let git_branch = std::process::Command::new("git")
-        .args(["rev-parse", "--abbrev-ref", "HEAD"])
-        .current_dir(&cwd)
-        .output()
+    let mut git = std::process::Command::new("git");
+    git.args(["rev-parse", "--abbrev-ref", "HEAD"]).current_dir(&cwd);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        git.creation_flags(0x08000000);
+    }
+    let git_branch = git.output()
         .ok()
         .and_then(|o| {
             if o.status.success() {

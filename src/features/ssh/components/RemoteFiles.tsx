@@ -28,17 +28,17 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
   const storedPath = useRemotePathStore((state) => state.path[conn.id] ?? null);
   const [showDownloads, setShowDownloads] = useState(false);
   const paneId = sshPaneIdFor(conn.id);
+  const terminalCwd = useSessionStore((state) => paneId ? state.terminalCwds[paneId] : undefined);
 
   const toast = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
     useToastStore.getState().addToast(message, type);
   };
 
-  /** 双击 / Enter：把远端编辑器命令写进对应 SSH 终端 */
+  /** Open the selected file in the matching remote terminal pane. */
   const remoteEdit = (entry: FsEntry) => {
-    const activeId = useSessionStore.getState().activeId;
-    const sid = useTerminalStore.getState().sessions[activeId];
+    const sid = paneId ? useTerminalStore.getState().sessions[paneId] : undefined;
     if (!sid) {
-      toast('SSH 会话未就绪', 'info');
+      toast(t('SSH session is not ready'), 'info');
       return;
     }
     void ptyWrite(sid, remoteOpenCommand(loadConfig(), entry.path)).catch(() => {});
@@ -67,12 +67,13 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
       target={target}
       enabled={enabled}
       initialPath={storedPath}
+      terminalCwd={terminalCwd}
       onPathChange={(next) => useRemotePathStore.getState().set(conn.id, next)}
       openEntry={remoteEdit}
       onSyncToTerminal={(dir) => {
         const sid = paneId ? useTerminalStore.getState().sessions[paneId] : null;
         if (!sid) {
-          toast('SSH 会话未就绪', 'info');
+          toast(t('SSH session is not ready'), 'info');
           return;
         }
         void ptyWrite(sid, `cd ${shellQuote(dir)}\r`).catch((error) =>

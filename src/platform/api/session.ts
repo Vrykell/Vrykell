@@ -69,8 +69,9 @@ export function getSessionBlocks(sessionId: string): Promise<BackendBlockEntry[]
 export function appendChatMessage(
   id: string, sessionId: string, role: string, content: string, createdAt: number, parts: string,
   attachments = '',
+  paneId?: string,
 ): Promise<void> {
-  return invoke('append_chat_message', { id, sessionId, role, content, createdAt, parts, attachments });
+  return invoke('append_chat_message', { id, sessionId, role, content, createdAt, parts, attachments, paneId: paneId ?? null });
 }
 
 export function listChatMessages(sessionId: string): Promise<BackendChatMessage[]> {

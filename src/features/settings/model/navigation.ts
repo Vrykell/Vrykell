@@ -1,1 +1,1 @@
-export type PageId = 'ai-model' | 'ai-behavior' | 'ai-perms' | 'ai-web' | 'ai-skill' | 'ai-mcp' | 'ai-memory' | 'ai-agents' | 'ai-schedules' | 'terminal-open' | 'editor-local' | 'editor-remote' | 'appearance-theme' | 'shortcuts' | 'startup' | 'logs';
+export type PageId = 'ai-model' | 'ai-behavior' | 'ai-perms' | 'ai-web' | 'ai-skill' | 'ai-mcp' | 'ai-memory' | 'ai-agents' | 'ai-schedules' | 'terminal-open' | 'editor-local' | 'editor-remote' | 'appearance-theme' | 'shortcuts' | 'startup' | 'logs' | 'context-menu';

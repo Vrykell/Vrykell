@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 
 export const DEFAULT_UI_FONT_SIZE = 13;
 export const DEFAULT_TERMINAL_FONT_SIZE = 14;
+export const DEFAULT_CHAT_FONT_SIZE = 14;
 export const DEFAULT_TERMINAL_FONT_WEIGHT = 400;
 export const DEFAULT_TERMINAL_LINE_HEIGHT = 1;
 export const TERMINAL_FONT_PRESETS = ['system', 'Maple Mono NF CN', 'Maple Mono', 'Sarasa Mono SC', 'Cascadia Code', 'JetBrains Mono'] as const;
@@ -37,6 +38,7 @@ export function boundedTerminalRenderer(value: unknown, fallback: TerminalRender
 interface TypographyState {
   uiFontSize: number;
   terminalFontSize: number;
+  chatFontSize: number;
   terminalRenderer: TerminalRenderer;
   terminalFontPreset: TerminalFontPreset;
   terminalFontWeight: number;
@@ -51,6 +53,7 @@ type TypographyPreferences = Omit<TypographyState, 'update' | 'reset'>;
 const defaults: TypographyPreferences = {
   uiFontSize: DEFAULT_UI_FONT_SIZE,
   terminalFontSize: DEFAULT_TERMINAL_FONT_SIZE,
+  chatFontSize: DEFAULT_CHAT_FONT_SIZE,
   terminalRenderer: DEFAULT_TERMINAL_RENDERER,
   terminalFontPreset: 'system',
   terminalFontWeight: DEFAULT_TERMINAL_FONT_WEIGHT,
@@ -63,6 +66,7 @@ function sanitize(values: Partial<TypographyPreferences>): TypographyPreferences
   return {
     uiFontSize: boundedFontSize(values.uiFontSize, DEFAULT_UI_FONT_SIZE, 18),
     terminalFontSize: boundedFontSize(values.terminalFontSize, DEFAULT_TERMINAL_FONT_SIZE),
+    chatFontSize: boundedFontSize(values.chatFontSize, DEFAULT_CHAT_FONT_SIZE),
     terminalRenderer: boundedTerminalRenderer(values.terminalRenderer, DEFAULT_TERMINAL_RENDERER),
     terminalFontPreset: boundedFontPreset(values.terminalFontPreset),
     terminalFontWeight: Math.round(boundedNumber(values.terminalFontWeight, DEFAULT_TERMINAL_FONT_WEIGHT, 100, 900)),
@@ -94,6 +98,8 @@ function applyTypography(state: TypographyState): void {
   const root = document.documentElement.style;
   root.setProperty('--ui-font-scale', String(state.uiFontSize / DEFAULT_UI_FONT_SIZE));
   root.setProperty('--terminal-font-size', `${state.terminalFontSize}px`);
+  root.setProperty('--chat-font-size', `${state.chatFontSize}px`);
+  root.setProperty('--chat-font-scale', String(state.chatFontSize / DEFAULT_CHAT_FONT_SIZE));
   root.setProperty('--terminal-font-family', terminalFontFamily(state.terminalFontPreset));
   root.setProperty('--terminal-font-weight', String(state.terminalFontWeight));
   root.setProperty('--terminal-bold-weight', String(Math.max(700, state.terminalFontWeight)));
