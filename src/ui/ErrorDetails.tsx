@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
-import { Check, ChevronRight, Copy } from '@ui/icons';
-import { writeClipboardText } from '@platform/clipboard';
+import { useState, type CSSProperties, type MouseEvent } from 'react';
+import { t } from '@i18n';
+import { ChevronRight } from '@ui/icons';
+import CopyButton from '@ui/CopyButton';
 
 /** Hover feedback shared by the subtle header buttons. */
 const subtleHover = {
@@ -39,28 +40,6 @@ export default function ErrorDetails({
   style?: CSSProperties;
 }) {
   const [open, setOpen] = useState(defaultOpen);
-  const [copied, setCopied] = useState(false);
-  const copyTimer = useRef<number | null>(null);
-
-  useEffect(() => () => {
-    if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
-  }, []);
-
-  const handleCopy = () => {
-    void writeClipboardText(text)
-      .then(() => {
-        setCopied(true);
-        // Restart the confirmation window so rapid clicks keep the checkmark.
-        if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
-        copyTimer.current = window.setTimeout(() => {
-          copyTimer.current = null;
-          setCopied(false);
-        }, 1500);
-      })
-      .catch(() => {
-        // The text stays selectable when the clipboard is unavailable.
-      });
-  };
 
   return (
     <div data-testid={testId} style={{
@@ -93,22 +72,7 @@ export default function ErrorDetails({
           }} />
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
         </button>
-        <button
-          data-subtle
-          type="button"
-          data-testid={copyTestId}
-          data-tip={copied ? '已复制' : `复制${title}`}
-          aria-label={copied ? '已复制' : `复制${title}`}
-          onClick={handleCopy}
-          {...subtleHover}
-          style={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: 22, height: 22, padding: 0, border: 'none', borderRadius: 4, flexShrink: 0,
-            background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
-          }}
-        >
-          {copied ? <Check size={12} style={{ color: 'var(--success)' }} /> : <Copy size={12} />}
-        </button>
+        <CopyButton text={text} label={t('Copy {{name}}', { name: title })} testId={copyTestId} />
       </div>
       {open && (
         <pre data-selectable style={{

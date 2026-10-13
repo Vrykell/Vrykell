@@ -555,11 +555,41 @@ button.window-control-button {
 .ai-tool-summary > svg, .ai-tool-summary > span:last-of-type { flex-shrink: 0; }
 .ai-tool-description { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); color: var(--text-secondary); }
 .ai-tool-exit { display: flex; align-items: center; gap: 3px; }
-.ai-tool-output { max-height: 240px; overflow: auto; padding: 8px 0; margin: 4px 0 0; border: 0; border-top: 1px solid var(--block-divider); background: transparent; color: var(--text-secondary); font-family: var(--font-mono); font-size: var(--fs-micro); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ai-tool-frame { position: relative; margin: 4px 0 0; }
+.ai-tool-output { max-height: 240px; overflow: auto; padding: 8px 0; border: 0; border-top: 1px solid var(--block-divider); background: transparent; color: var(--text-secondary); font-family: var(--font-mono); font-size: var(--fs-micro); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .ai-tool-approval { padding: 8px 0 2px; color: var(--warning); font-size: var(--fs-caption); }
 .ai-tool-approval-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
 .ai-tool-approval-actions > button { padding: 4px 8px; font-size: var(--fs-micro); }
 .ai-tool-terminal-link { margin-top: 6px; padding: 3px 0; border: 0; background: transparent; color: var(--accent-blue); font-size: var(--fs-micro); }
+/* Chat panel: expanded reasoning and tool output share the markdown code-block frame
+   (flat surface, border, inner radius) instead of per-row divider lines. */
+.chat-exchange .ai-tool-card { padding: 6px 0; border-top: 0; }
+.chat-exchange .ai-thinking-body {
+  margin-top: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-inner);
+  background: var(--block);
+}
+.chat-exchange .ai-tool-frame { margin: 6px 0 0; }
+.chat-exchange .ai-tool-output {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-inner);
+  background: var(--block);
+}
+/* Copy target pinned to the frame, revealed on hover or keyboard focus. */
+.ai-tool-copy {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+.ai-tool-frame:is(:hover, :focus-within) .ai-tool-copy,
+.ai-tool-copy[data-copied="true"] { opacity: 1; pointer-events: auto; }
 .chat-references { margin: 8px 0; display: flex; flex-direction: column; gap: 4px; }
 .chat-reference { border-radius: 5px; background: var(--hover); min-width: 0; }
 .chat-reference-heading { display: flex; align-items: center; min-width: 0; padding: 2px 6px; }

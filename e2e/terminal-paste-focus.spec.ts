@@ -25,7 +25,9 @@ async function switchBack(page: Page) {
 
 test('returning to TUI focuses its input and image paste reaches the foreground process', async ({ page }) => {
   await ready(page);
-  await emitPtyOutput(page, '\x1b]133;E;dm0=\x07\x1b]133;C\x07\x1b[?1049hTUI');
+  // Bracketed paste on (what real CLIs request): the image key must still reach the PTY raw —
+  // term.paste() would wrap it in \x1b[200~…\x1b[201~ and the program would read text, not a key.
+  await emitPtyOutput(page, '\x1b]133;E;dm0=\x07\x1b]133;C\x07\x1b[?1049;2004hTUI');
   await expect(page.getByTestId('tui-banner')).toBeVisible();
   await switchBack(page);
   const input = page.locator('.xterm:visible .xterm-helper-textarea').first();

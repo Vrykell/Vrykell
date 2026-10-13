@@ -35,9 +35,10 @@ export async function copyTerminalSelection(term: Terminal | null | undefined): 
 }
 
 /**
- * Paste through the active terminal so it can apply bracketed-paste mode and normalize line endings.
- * When the clipboard contains an image, send the native paste key so the foreground process can
- * read it. If no terminal instance is registered, write text directly to the pane's PTY.
+ * Paste text through the active terminal so it can apply bracketed-paste mode and normalize line
+ * endings. When the clipboard holds an image, the native paste key is written straight to the PTY
+ * instead — the foreground process reads the image itself, and the key must not be transformed into
+ * pasted text. Text without a registered terminal instance also falls back to a raw PTY write.
  */
 export async function pasteClipboardIntoTerminal(paneId: string): Promise<boolean> {
   const sessionId = useTerminalStore.getState().sessions[paneId];
@@ -46,8 +47,9 @@ export async function pasteClipboardIntoTerminal(paneId: string): Promise<boolea
     return false;
   }
   let text = '';
+  let image = false;
   try {
-    const image = await hasClipboardImage();
+    image = await hasClipboardImage();
     text = image ? '\x16' : await readClipboardText();
     terminalDebug('terminal-clipboard-paste', { paneId, image, chars: image ? 0 : text.length });
   } catch {
@@ -55,7 +57,11 @@ export async function pasteClipboardIntoTerminal(paneId: string): Promise<boolea
     return false;
   }
   if (!text) return false;
-  const term = getPaneTerminal(paneId);
+  // An image travels as the native paste *key*, not as pasted text: paste() applies the pasted-text
+  // transformations (bracketed-paste wrapping, line-ending normalization), so a foreground program
+  // that enabled bracketed paste would receive a literal control character instead of the key that
+  // asks it to take the clipboard image. A key goes to the PTY as-is; text keeps the terminal path.
+  const term = image ? null : getPaneTerminal(paneId);
   if (term) {
     term.paste(text);
     return true;
