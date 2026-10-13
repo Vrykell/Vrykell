@@ -6,7 +6,7 @@ import { clampMenuPosition } from '@ui/menuPosition';
 import { useExclusiveMenu } from '@ui/hooks/useExclusiveMenu';
 import type { BlockMenuAnchor } from '@features/terminal/hooks/useTerminalBlockFlow';
 import { copyBlockText, rerunBlockCommand } from '@features/terminal/services/blockActions';
-import { useChatStore } from '@features/chat';
+import { askAboutTerminal } from '@features/chat/services/conversationContext';
 import { clearSessionBlocks } from '@features/terminal/hooks/useTerminalSession';
 import { fmtDuration } from '@ui/UiBtn';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
@@ -90,10 +90,10 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
 
   const sendToAI = useCallback(() => {
     const output = getOutputText().slice(0, 2000);
-    useChatStore.getState().send(
-      t('Analyze this command result:\n```\n$ {{command}}\n{{output}}\n```', { command: block.command, output }),
-      { paneId },
-    );
+    askAboutTerminal(paneId, {
+      id: block.id, paneId, label: t('Terminal output'), command: block.command, output,
+      cwd: block.cwd, exitCode: block.exitCode, createdAt: block.startedAt ?? Date.now(),
+    }, t('Help me analyze this command result.'));
   }, [block, paneId, getOutputText]);
 
   const duration = block.endedAt !== null && block.startedAt !== null

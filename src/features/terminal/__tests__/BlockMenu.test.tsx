@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import BlockMenu from '../components/BlockMenu';
 import { useChatStore } from '@features/chat';
+import { useComposerDrafts } from '@features/chat/stores/composerDrafts';
 import { useTerminalStore } from '../stores/terminal';
 import type { TermBlock } from '../services/pipeline/termBlock';
 
@@ -53,10 +54,12 @@ describe('command action menu', () => {
     expect(close).toHaveBeenCalledOnce();
   });
 
-  it('sends bounded output to the owning pane for AI analysis', () => {
+  it('stages a bounded snapshot for review without automatically submitting it', () => {
     open('x'.repeat(3000));
     fireEvent.click(screen.getByRole('menuitem', { name: '发给 AI 分析' }));
-    expect(mocks.send).toHaveBeenCalledWith(`分析这条命令的执行结果：\n\`\`\`\n$ git status\n${'x'.repeat(2000)}\n\`\`\``, { paneId: 'pane' });
+    expect(mocks.send).not.toHaveBeenCalled();
+    const id = useChatStore.getState().activeConversationId;
+    expect(useComposerDrafts.getState().byTab[id]?.references?.[0]).toMatchObject({ paneId: 'pane', command: 'git status', output: 'x'.repeat(2000), exitCode: 0 });
   });
 
   it('clears only the selected pane and displays elapsed time starting at zero', () => {

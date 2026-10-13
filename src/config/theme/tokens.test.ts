@@ -7,6 +7,9 @@ import {
   getCurrentTheme,
   getThemeOverrides,
   paletteToCssVars,
+  readThemePreference,
+  persistThemePreference,
+  resolveThemeMode,
   themes,
   TEAL_THEME_PRESET,
 } from '@config/theme/tokens';
@@ -179,6 +182,25 @@ describe('paletteToCssVars', () => {
     const vars = paletteToCssVars(themes.dark);
     expect(vars['--canvas']).toBe(themes.dark.canvas);
     expect(vars['--accent']).toBe(themes.dark.accent);
+  });
+});
+
+describe('appearance preference', () => {
+  afterEach(() => { localStorage.clear(); });
+
+  it('resolves a stored choice, following the operating system for "system"', () => {
+    expect(resolveThemeMode('dark')).toBe('dark');
+    expect(resolveThemeMode('light')).toBe('light');
+    // The jsdom matchMedia stub reports a light system appearance.
+    expect(resolveThemeMode('system')).toBe('light');
+  });
+
+  it('round-trips the stored preference and defaults to dark', () => {
+    expect(readThemePreference()).toBe('dark');
+    persistThemePreference('system');
+    expect(readThemePreference()).toBe('system');
+    persistThemePreference('light');
+    expect(readThemePreference()).toBe('light');
   });
 });
 

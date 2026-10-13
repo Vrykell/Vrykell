@@ -70,6 +70,22 @@ describe('智能标题触发', () => {
     expect(tab.titleSource).toBe('ai');
   });
 
+  it('reads command blocks owned by a pane when naming its terminal tab', async () => {
+    reset();
+    useBlockStore.setState({
+      byTab: {
+        't1#0': [
+          doneBlock('b1', 'git status'),
+          doneBlock('b2', 'cargo test'),
+          doneBlock('b3', 'git push'),
+        ],
+      },
+    });
+    expect(await maybeAutoTitle('t1')).toBe(true);
+    const prompt = (mockGenerate.mock.calls[0]![0] as { prompt: string }).prompt;
+    expect(prompt).toContain('cargo test');
+  });
+
   it('首轮 AI 回答 ≥50 字也触发（无命令块）', async () => {
     reset();
     useChatStore.setState({

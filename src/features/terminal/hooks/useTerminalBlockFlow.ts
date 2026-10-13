@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useBlockStore, selectBlocks } from '@features/terminal';
 import { usePaneMessages } from '@features/chat';
-import { useChatPanelOpen } from '@features/workspace';
 import { useSearchHighlightStore } from '@features/search';
 import { toExchanges, mergeFlow } from '@features/chat/model/exchanges';
 import { agentControl } from '@features/agent/services/agentControl';
@@ -22,7 +21,6 @@ export function useTerminalBlockFlow(tabId: string) {
   const blocks = useBlockStore(selectBlocks(tabId));
   const highlightQuery = useSearchHighlightStore((state) => state.query);
   const aiMessages = usePaneMessages(tabId);
-  const chatPanelOpen = useChatPanelOpen();
   const [menuBlock, setMenuBlock] = useState<BlockMenuState | null>(null);
 
   const completed = useMemo(
@@ -33,12 +31,16 @@ export function useTerminalBlockFlow(tabId: string) {
   );
   const running = useMemo(() => blocks.filter((block) => block.status === 'executing' || block.snapshotPending), [blocks]);
   const exchanges = useMemo(
-    () => (chatPanelOpen ? [] : toExchanges(aiMessages)),
-    [aiMessages, chatPanelOpen],
+    () => toExchanges(aiMessages),
+    [aiMessages],
   );
   const standalone = useMemo(
-    () => (chatPanelOpen ? completed : completed.filter((block) => !agentControl.hasBlock(block.id))),
-    [chatPanelOpen, completed],
+    () => {
+      const embedded = new Set(aiMessages.flatMap(message => (message.parts ?? []).flatMap(part =>
+        part.kind === 'tool' ? [agentControl.blockForToolCall(part.tool.toolCallId)] : [])));
+      return completed.filter(block => !embedded.has(block.id));
+    },
+    [aiMessages, completed],
   );
   const flow = useMemo(() => mergeFlow(standalone, exchanges), [exchanges, standalone]);
   const openMenu = useCallback((block: TermBlock, anchor: BlockMenuAnchor) => {

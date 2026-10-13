@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   leaf, splitLeaf, replaceLeaf, removeLeaf, leaves, countLeaves,
   leafRects, dropTargets, moveTargets, dividers, setRatio, findLeaf, leafDepth,
-  maxRowPanes, minTerminalWidth, MIN_PANE_SIZE, DIVIDER_SIZE,
+  maxRowPanes, minTerminalWidth, MIN_PANE_WIDTH, fitLayoutWidth, DIVIDER_SIZE,
   collectLayoutCells,
   type TerminalSpec,
 } from '@features/workspace/model/windowLayout';
@@ -205,14 +205,23 @@ describe('windowLayout 动态最小宽度', () => {
     expect(maxRowPanes(m)).toBe(2);
   });
 
-  it('minTerminalWidth：随并排数量线性增长', () => {
-    expect(minTerminalWidth(leaf(t('a')))).toBe(MIN_PANE_SIZE);
+  it('reserves usable toolbar width for every horizontal pane', () => {
+    expect(minTerminalWidth(leaf(t('a')))).toBe(MIN_PANE_WIDTH);
     const row2 = splitLeaf(leaf(t('a')), 'a', 'row', 'second', t('b'));
-    expect(minTerminalWidth(row2)).toBe(MIN_PANE_SIZE * 2 + DIVIDER_SIZE);
+    expect(minTerminalWidth(row2)).toBe(MIN_PANE_WIDTH * 2 + DIVIDER_SIZE);
     let four = splitLeaf(leaf(t('a')), 'a', 'row', 'second', t('c'));
     four = splitLeaf(four, 'a', 'col', 'second', t('b'));
     four = splitLeaf(four, 'c', 'col', 'second', t('d'));
-    expect(minTerminalWidth(four)).toBe(MIN_PANE_SIZE * 2 + DIVIDER_SIZE);
+    expect(minTerminalWidth(four)).toBe(MIN_PANE_WIDTH * 2 + DIVIDER_SIZE);
+  });
+
+  it('clamps narrow displayed panes after resize without changing saved ratios', () => {
+    const saved = splitLeaf(leaf(t('a')), 'a', 'row', 'second', t('b'), 0.1);
+    const fitted = fitLayoutWidth(saved, 1000);
+    expect(fitted.type === 'split' && fitted.ratio * 1000).toBeGreaterThanOrEqual(MIN_PANE_WIDTH + DIVIDER_SIZE / 2);
+    expect(saved.type === 'split' && saved.ratio).toBe(0.1);
+    const restored = fitLayoutWidth(saved, 4000);
+    expect(restored.type === 'split' && restored.ratio).toBe(0.1);
   });
 });
 

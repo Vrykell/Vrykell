@@ -17,6 +17,10 @@ dist-ssr
 *.p12
 *.local
 
+# Local tool caches and agent state
+/.cache/
+/.commandcode/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

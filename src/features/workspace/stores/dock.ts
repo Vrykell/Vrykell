@@ -183,17 +183,6 @@ function fitPanelSpace(s: DockState, preferred: DockSide): Pick<DockState, 'left
 
 const saved = loadLayout();
 
-/** AI 面板是否已打开（打开时终端块流不再内联 AI 回答，避免两处重复）。
- *  AI 面板与终端强相关：无终端会话（设置/历史页）时视为未打开。 */
-export function useChatPanelOpen(): boolean {
-  const isSessionActive = useWorkspaceStore((s) => {
-    const tab = s.tabs.find((t) => t.id === s.activeId);
-    return !!tab && isSessionTab(tab);
-  });
-  const chatInPanels = useDockStore((s) => s.leftPanels.includes('chat') || s.rightPanels.includes('chat'));
-  return isSessionActive && chatInPanels;
-}
-
 /** 落盘时把「拖动中折叠」的面板按「已关闭」保存（重启后保持关闭，与旧行为一致）。 */
 function toPersisted(s: DockState): PersistedLayout {
   const collapsed = new Set(s.collapsedPanels);

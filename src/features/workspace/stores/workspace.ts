@@ -28,7 +28,7 @@ import {
 
 export type { TitleSource };
 
-export type TabKind = 'session' | 'history' | 'settings';
+export type TabKind = 'session' | 'history' | 'ai-history' | 'settings';
 
 /** SSH 会话目标（终端类型=ssh 时的专属字段） */
 export interface SshTabTarget extends SshOptions {
@@ -50,11 +50,12 @@ interface TabBase {
 /**
  * 标签判别联合：
  *  - session 是「窗口」（真实会话容器，可落库、可分组、进历史），持有 1–4 个终端的布局
- *  - history / settings 是临时视图（单例复用，不落库、不可分组）
+ *  - Non-session pages are singleton views without backend sessions or groups.
  */
 export type Tab =
   | (TabBase & { kind: 'session'; groupId?: string; layout: WindowLayout })
   | (TabBase & { kind: 'history' })
+  | (TabBase & { kind: 'ai-history' })
   | (TabBase & { kind: 'settings' });
 
 export interface TabGroup {
@@ -66,8 +67,8 @@ export interface TabGroup {
 export interface AddTabOptions {
   cwd?: string;
   title?: string;
-  /** 默认 'local'；'history'/'settings' 用于视图标签 */
-  kind?: 'local' | 'ssh' | 'history' | 'settings';
+  /** Defaults to local; history and settings kinds create workspace pages. */
+  kind?: 'local' | 'ssh' | 'history' | 'ai-history' | 'settings';
   shellType?: ShellType;
   /** SSH 连接目标（kind='ssh' 时） */
   ssh?: SshTabTarget;
@@ -136,6 +137,7 @@ let counter = 0;
 const nextTabId = () => `t${ID_PREFIX}-${counter++}`;
 const DEFAULT_TITLE = '终端';
 const HISTORY_TITLE = '会话历史';
+const AI_HISTORY_TITLE = t('AI conversation history');
 const SETTINGS_TITLE = '设置';
 
 interface WorkspaceState {
@@ -144,8 +146,10 @@ interface WorkspaceState {
   /** 最近关闭的标签（撤销关闭用，不参与 UI 渲染） */
   lastClosed: Tab | null;
   addTab: (opts?: AddTabOptions) => string;
-  /** 新建一个会话历史查看标签页 */
+  /** Open the singleton session history page. */
   openHistoryTab: () => void;
+  /** Open the singleton AI conversation history page. */
+  openAiHistoryTab: () => void;
   /** 新建/复用设置标签页 */
   openSettingsTab: () => void;
   closeTab: (id: string) => void;
@@ -213,7 +217,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   programTitles: {},
   addTab: (opts) => {
     const o = opts ?? {};
-    if (o.kind === 'history' || o.kind === 'settings') {
+    if (o.kind === 'history' || o.kind === 'ai-history' || o.kind === 'settings') {
       const existing = get().tabs.find(tab => tab.kind === o.kind);
       if (existing) {
         get().activate(existing.id);
@@ -243,6 +247,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       };
     } else if (o.kind === 'history') {
       tab = { id, title: HISTORY_TITLE, kind: 'history', titleSource: 'manual' };
+    } else if (o.kind === 'ai-history') {
+      tab = { id, title: AI_HISTORY_TITLE, kind: 'ai-history', titleSource: 'manual' };
     } else if (o.kind === 'settings') {
       tab = { id, title: SETTINGS_TITLE, kind: 'settings', titleSource: 'manual' };
     } else {
@@ -285,6 +291,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
     get().addTab({ kind: 'history' });
   },
+  openAiHistoryTab: () => { get().addTab({ kind: 'ai-history' }); },
   openSettingsTab: () => {
     const existing = get().tabs.find((t) => t.kind === 'settings');
     if (existing) {
@@ -321,7 +328,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       }
       useChatStore.getState().dropTab(id);
     }
-    // 历史查看页/设置页无后端会话，跳过归档
+    // Workspace pages have no backend session to archive.
     if (isSessionTab(closed)) sessionManager.close(id);
     // 关闭标签后若分组变空则直接删除（空分组无意义）
     get().pruneEmptyGroups();
@@ -330,9 +337,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const closed = get().lastClosed;
     if (!closed) return;
     set({ lastClosed: null });
-    // 恢复真实会话；历史/设置查看页直接重建
+    // Restore a session from storage; rebuild singleton pages directly.
     if (closed.kind === 'history') {
       get().addTab({ kind: 'history' });
+    } else if (closed.kind === 'ai-history') {
+      get().addTab({ kind: 'ai-history' });
     } else if (closed.kind === 'settings') {
       get().addTab({ kind: 'settings' });
     } else {

@@ -18,6 +18,7 @@
 | T10 | Repaint on tab return | When a terminal's tab or panel was hidden and comes back, the pane repaints from the buffer: a static fullscreen TUI is no longer blank and a WebGL context lost while hidden is restored and repainted. The page returning from the background (visibilitychange) repaints too | Run a fullscreen TUI, switch to another tab for a while and back — the screen is still there; terminal-visibility.spec.ts asserts a repaint fires on return |
 | T11 | TUI multibyte encoding | A GUI-launched shell gets a UTF-8 locale (`LC_CTYPE`, plus `LANG` when it is empty), so locale-aware fullscreen programs such as vi no longer render CJK as `~X`; an environment already requesting UTF-8 anywhere is left untouched | Launch the app without `LANG`/`LC_*`, open a UTF-8 file with Chinese in `vi` and it renders correctly; Rust unit tests cover the locale decision |
 | T12 | TUI window title | A window title a foreground program sets via OSC 0/2 (a running animation, say) shows in the tab and window title while the command runs or a full-screen program owns the terminal, including on a duplicated session, and reverts to the generated title once the command ends or the full-screen program exits; a manually renamed tab is never replaced | Run a command that sets a title (a full-screen tool, say) and watch the title track it then revert; tab-title.spec.ts asserts the display, revert and duplicated-session behavior |
+| T13 | A real alt screen outranks a manual fullscreen | While a running block is manually fullscreened and its program switches to the alternate buffer, the manual fullscreen hands the surface back immediately and the main xterm shows the live TUI: no black screen, and "Redraw terminal" repaints the terminal that is actually visible | running-term.spec.ts ("a real alt screen under a manual fullscreen") and the matching useTerminalSession.test.tsx case |
 
 ## 2. Block Command Blocks
 
@@ -27,7 +28,7 @@
 | B2 | Run status | Path, duration and running indicator remain visible. Exit code, agent marker and branch appear on hover or control focus; failures have a subtle error background and inset rail without moving content. Adjacent failure rails remain continuous across dividers | E2E checks idle, hover and keyboard focus, including running commands, and rail pixels at 1x/2x density; unit tests check failure state |
 | B3 | Always-visible output | Command output cannot be collapsed; single-block and global expand/collapse controls and persistence APIs are removed. Legacy collapse flags are ignored without deleting history | Unit and Rust tests restore legacy collapsed records; E2E checks full restored output and absence of collapse controls |
 | B4 | Hover controls | Completed blocks have one more button; running interrupt, foreground-process termination and fullscreen controls appear on hover or control focus. Hover and an open menu keep the block background unchanged | Unit tests check accessible names; E2E checks hover, keyboard and stable geometry |
-| B5 | AI analysis | The more menu sends the command and up to 2000 output characters to AI in the owning pane | Unit tests check bounded output and pane routing; E2E selects the action in the menu |
+| B5 | AI analysis | The menu stages a snapshot of the command, directory, exit code and up to 2000 output characters in an independent conversation for review before sending | Unit tests verify snapshots and no automatic send; e2e verifies references and preserved command output |
 | B6 | Re-run | The more menu reruns the command in its owning terminal | Unit tests and E2E check the PTY write |
 | B7 | Copy command and output | The more menu has separate command and output copy actions | Unit tests and E2E verify clipboard text |
 | B8 | More menu | Hover or keyboard focus reveals the more button; the menu groups rerun, AI analysis, copying and clear actions. Arrow keys navigate; Escape closes and restores focus | Unit tests and E2E check keyboard operation, right-click anchoring and viewport bounds |
@@ -66,14 +67,14 @@
 | ID | Feature | Expected behavior | Test method |
 |---|---|---|---|
 | I1 | Command mode | Typing text and pressing Enter runs a command | Default `$` prompt, type `ls` and press Enter |
-| I2 | AI mode toggle | Clicking `$` switches it to ⚡, and typed text is sent to the AI | Click `$` to turn it into ⚡, type a question and press Enter |
+| I2 | Ask AI | Terminal input remains command input; Ask AI opens an independent conversation with a recent output reference | E2e verifies separate composers and no natural language PTY writes |
 | I3 | Prompt line | Shows the shell status dot + zsh + CWD + mode label | Observe the top of the input area |
 | I4 | Enter to run | Enter runs (not Shift+Enter) | Type a command and press Enter |
 | I5 | Shift+Enter newline | Inserts a newline without running | Shift+Enter for multi-line input |
 | I6 | Auto-grow | The textarea grows taller automatically for multi-line input | Type multiple lines of text |
-| I7 | Send output to AI | Clicking ⤴ sends the last 30 lines of output to the AI | Run a command then click ⤴ |
+| I7 | Reference terminal output | Ask AI and command analysis stage expandable, removable output snapshots in the composer | Inspect and send the snapshot; changing terminals does not change it |
 | I8 | Input layering | The input area uses a faint background and shows no permanent outline; the background strengthens slightly on focus, following the current theme | Click the input box |
-| I9 | Draft isolation | Commands and AI each keep their own draft; opening the AI panel restores the command draft, and natural language is never submitted as a command | Type an AI draft then open the panel, press Enter in the terminal, then close the panel and switch back to AI to check the draft |
+| I9 | Draft isolation | AI text, attachments and references belong to a conversation; terminal navigation, settings and closing the panel preserve them; edit and resend restores the complete question | Unit tests and product-loop.spec.ts cover isolation and restoration |
 | I10 | Directory display | Preserves drive letters, root directory and network path prefixes; truncates when space is insufficient and shows the full path on hover | Switch between different paths and narrow the window |
 | I11 | Unified input chips | The input-area chips (shell badge, git branch, working directory, completion hint) share the borderless gray chip; the git branch uses a blue foreground; hover or focus changes neither the background nor adds an outline | input-chips.spec.ts asserts all four chips have no border and the same background |
 
@@ -112,7 +113,7 @@
 | TB3 | Rename | Double-click or use the context menu to rename | Double-click a tab to enter editing |
 | TB4 | Copy title | Copies the tab title to the clipboard | Choose "Copy Title" from the context menu |
 | TB5 | + dropdown | Clicking + pops up new-tab options | Click the + button |
-| TB6 | First message naming | The first message of an AI conversation names the tab (it may upgrade a command-derived title but never a manual name) | Send an AI message and observe the tab title |
+| TB6 | Conversation naming | The first question names its independent conversation; terminal titles remain controlled by command activity and manual renaming | Check both titles after sending a question |
 | TB7 | Middle-click close | Middle-clicking a tab closes it | Middle-click a tab |
 | TB8 | Group header and rename width | In a narrow sidebar the group-header count ("N tabs") ellipsizes on one line instead of wrapping per character; the tab/group rename input never overflows its row | panel-header.spec.ts checks the narrow count stays on one line and the rename input's right edge stays inside the row |
 | TB9 | Empty ungrouped drop area | The ungrouped area fills the remaining list space even with no session rows or only singleton pages. Dragging below groups previews and drops outside the group instead of snapping back to its last slot; group heights do not shrink when history overflows | PanelTabs unit test covers the empty zone; reorder.spec.ts verifies near/far empty-area targets and the released tab, with and without singleton pages |
@@ -235,10 +236,21 @@
 
 | ID | Feature | Expected behavior | Test method |
 |---|---|---|---|
-| A1 | Inline display | AI answers are shown above the terminal | Ask a question in ⚡ mode |
-| A2 | Code block run | bash code blocks have a ▶ run button | The AI answer contains a bash code block |
+| A1 | Independent conversations | Creation, history, renaming and deletion do not require a terminal; history lives in a singleton workspace page and discussion remains available after closing the last terminal | ai-conversations.spec.ts, workspace and history page unit tests |
+| A2 | Code block run | Shell blocks offer execution only with a selected terminal; writes use that explicit target, disable when disconnected and never fall back to focus | CommandBlock.test.tsx checks selected targets and discussion |
 | A3 | Markdown rendering | Supports bold, tables and formulas | The AI answer contains markdown |
 | A4 | Streaming output | The answer is displayed character by character | Send an AI message and observe |
+| A5 | Execution environment | The header's expandable conversation settings select the execution terminal through the shared dropdown, including discussion and disconnected states. A passive status below the title identifies the bound terminal; focus never redirects the target | PanelChat.test.tsx, executionTarget.test.ts and ai-conversations.spec.ts |
+| A6 | SSH file boundary | The captured pane determines remote access even when older callers omit environment metadata; local file tools are never registered for SSH targets | executionTarget.test.ts |
+| A7 | Conversation presentation | The AI panel uses normal conversation flow: user questions have a quiet background and assistant answers render directly without terminal block backgrounds, rails or repeated headers. Tools retain flat transparent separated rows and message actions stay available. Historical AI content inside terminals keeps its block presentation | AiBlock unit tests and light/dark e2e verify plain answers, markdown, tools and actions |
+| A8 | Terminal reply collapse | Historical terminal replies retain an explicit collapse button; panel replies display normally without a block collapse control | AiBlock unit tests and panel e2e |
+| A9 | Reading follow | Scrolling up pauses following; the latest-reply action restores it; each conversation retains its scroll position | ai-conversations.spec.ts |
+| A10 | Tools and stopping | Command blocks or private POSIX shell markers confirm completion; quiet output remains unconfirmed and concurrent commands are rejected; empty keys with positive wait_ms wait without typing; block mode reads current command output | commandExecution.test.ts, commandCompletion.test.ts, runCommand.test.ts and terminal.test.ts |
+| A11 | Background tasks | Schedules use dedicated background conversations without replacing the current conversation; running work can be opened from the panel | conversations.test.ts |
+| A12 | Save failures | A shared error surface retains in-memory content and offers save retry | conversations.test.ts |
+| A13 | Composer layout | The header retains title, history and new conversation, plus a sliders button expanding terminal settings. The AI composer matches the original terminal composer's base height, retains heading key hints, and places files/images/references above text. Its single footer row places attachment and combined chat/approval on the left, model and a standard-size blue circular send/stop on the right. Narrow panels keep all entries available without wrapping or horizontal overflow | PanelChat.test.tsx, Select.test.tsx and chat-composer-layout.spec.ts verify ordering, matching heights, draft retention, dark/light views and narrow/wide menus |
+| A14 | Terminal minimum width | Each horizontal pane reserves 360px; divider dragging and displayed split ratios clamp after sidebar/window resizing without changing saved proportions. Long shell and directory names truncate, and narrow layouts show action icons so the footer stays inside the pane even with larger UI text | windowLayout.test.ts, split.spec.ts and chat-composer-layout.spec.ts |
+| A15 | Stop generating | After Stop the request really is interrupted: the model request is cancelled, unfinished tools land in the error state, content already received is kept and not marked as an error, and the UI returns to a sendable state at once without staying "generating" (the local reader must settle immediately) | llmFetch.test.ts covers a mid-stream abort settling the local stream; ai-chat-panel.spec.ts asserts the send button comes back after Stop |
 
 ## 13. Tab Management Enhancements
 
@@ -278,6 +290,7 @@
 | SSH17 | Port forwarding editors | Local, remote and SOCKS forwarding can be edited as GUI rows (type, listening address/port and destination host/port) or one rule per line in text mode. Switching preserves supported rules including IPv6; invalid text blocks conversion instead of dropping it. Incomplete GUI drafts are validated on save. Text areas use the shared copyable configuration input. | Model tests cover conversion and incomplete drafts; E2E edits GUI ports, switches modes, copies rules, saves and checks PTY forwarding options. |
 | SSH18 | Automatic reconnect | When enabled, an unexpected drop (a client exit code of 255 or an unknown exit code) reopens the session with exponential backoff (1/2/4/8/16 s, at most 5 attempts); a clean remote exit or a manual disconnect is not retried; the terminal displays the retry number and countdown with Retry now and Stop retrying, and reports exhaustion; a manual retry restarts the attempt budget, and a shell integration prompt-end marker resets it; quiet authentication prompts do not reset it, and sessions without integration retain the bounded budget until a manual retry | Terminal session tests cover drops, remote exits, disabled retries and cancellation of a queued retry; E2E verifies an actual retry and forwarding arguments |
 | SSH19 | Keyboard and sidebar navigation | Search occupies its own row; compact Quick connect, Import and New actions share the second row; editing stays on the connection row. Dialogs focus the first necessary input, trap Tab, close on Escape, preserve IME Enter, and submit with Ctrl/Command+Enter; section tabs support arrow navigation. New profiles are selected and scrolled into view. | Unit and E2E checks for autofocus, Escape, mode changes and connection actions |
+| SSH20 | No inline history on the connection surface | An SSH pane's classic scene is its connection/authentication surface, so the pane's inline AI chat history is not stacked on it (the conversation stays intact in the AI panel and the AI history page); local classic terminals are unaffected | Terminal model unit tests cover the decision; visual check of the SSH connection surface |
 
 ## 15. Session Lifecycle
 
@@ -285,7 +298,8 @@
 |---|---|---|---|
 | SL1 | Command block persistence | Every command block is recorded in the backend, and the block count is > 0 after the tab is closed | Run a command → close the tab → view it on the history page |
 | SL2 | Command block restore | Restoring a historical session also restores its command blocks | Click restore on the history page and observe the command blocks |
-| SL3 | AI conversation persistence | AI Q&A is persisted as session state and backfilled on restore | Send an AI message → close → restore |
+| SL3 | AI conversation persistence | SQLite stores independent conversations, messages, references and environments; legacy records are copied once and terminal deletion never removes conversations | Rust migration/deletion tests and e2e reload restoration |
+| SL3a | Singleton AI history page | A workspace tab beside session history has one instance; its list reuses the session history header, search and row style, opening a row switches the active Dock conversation, and sidebar title editing reuses workspace inline rename styling | Workspace and history page unit tests; e2e singleton, search, open, delete and rename appearance |
 | SL4 | Session delete | Historical sessions can be deleted (cascading deletion of blocks and chat) | Click delete on the history page |
 | SL5 | Exit/startup archiving | On both exit and startup active sessions are marked as history (startup catches up crashed leftovers), avoiding a dirty active state | Close the app → reopen the history page |
 | SL6 | Default naming | The title is filled by source priority: manual rename > smart title > first message > first command (noise commands such as ls/cd are skipped and a command keeps only its program plus subcommands); ssh = connection name; shell = type name | Run a command / send a message / rename in turn and confirm a lower-priority source never overwrites a higher one (sessionTitle.test.ts) |
@@ -301,16 +315,16 @@
 
 | ID | Feature | Expected behavior | Test method |
 |---|---|---|---|
-| AG1 | Agent mode | agentMode can be toggled per model: on = all tools registered; off = pure chat | Select Chat / Agent in the mode overlay on the left of the AI panel then send a message, and check per-model persistence and the tool call |
+| AG1 | Chat and approval selector | One menu on the left of the composer footer combines chat-only with standard, strict and relaxed approvals; chat-only disables tools for the active model, choosing an approval level enables tools and preserves the existing permission semantics; the check marks the selection and hover/keyboard moves a single highlight like the shared dropdown | ChatModeSelect.test.tsx and ai-chat-panel.spec.ts verify all four choices and persistence |
 | AG2 | Tool execution | Tools such as run_command/terminal/files are executed from the AI response | Ask the AI to run a command and observe the ToolRun card and the terminal output |
-| AG3 | Tool node rendering | Tool calls are displayed as node cards (ToolRunCard) on the rail, showing parameters/results | Observe after the AI calls a tool |
-| AG4 | Three permission levels | Standard (decided per tool) / Strict (asked every time) / Allow (passed straight through, dangerous commands still asked) cycle | Click the Shield chip in the status bar to cycle and observe the confirmation dialog |
-| AG5 | Smart titles | When block/conversation activity is sufficient an LLM generates the tab title (context includes the directory, git branch, commands and the first exchange); it refreshes any generated title but never a manual name, and falls back to heuristics without an API key | Send a message and observe the tab title change; title.test.ts / sessionTitle.test.ts cover the source priority |
-| AG6 | Attachments | Attachments (images etc.) can be imported/pasted/saved and are trimmed according to the model's vision capability | Click 📎 in the input bar to add an attachment then send |
-| AG7 | Context strategy | Three strategies off/window/compact; compact includes automatic summary compression | Switch the strategy on the settings page and observe the ContextRing usage ring |
+| AG3 | Tool status cards | ToolRunCard shows tool status, approvals, errors, parameters and results inside the exchange, without timeline nodes | Observe after the AI calls a tool |
+| AG4 | Approval choices | Standard uses configured tool rules; strict asks before every tool operation; relaxed still asks before dangerous commands | Select each explicit approval option and verify persisted state |
+| AG5 | Terminal tab titles | Terminal command activity can generate a tab title from the directory, git branch and commands; legacy inline exchanges may also contribute. Manual names remain protected, and the heuristic fallback works without an API key. Independent conversation titles are managed separately | Run commands and observe the terminal tab title; title.test.ts / sessionTitle.test.ts cover the source priority |
+| AG6 | Attachments | Attachments (images etc.) can be imported/pasted/saved and are trimmed according to the model's vision capability; an attachment chip highlights as a whole on hover or preview | Click 📎 in the input bar to add an attachment then send |
+| AG7 | Context strategy | Three strategies off/window/compact; compact includes automatic summary compression | Context unit tests verify budget trimming and summary compression |
 | AG8 | Deep thinking | deepThink on (thinkingLevel low/medium/high) passes reasoning parameters through | Adjust per-model deep thinking and thinking level on the model config page then send a message |
-| AG9 | Quick model selection | The ModelPill in the input bar/panel switches models; in the panel the mode is on the left and the model on the right, and the mode overlay shows descriptions and a selected background; each model has its own behavior overrides | Click the model pill to switch |
-| AG10 | AI dual form | The inline AiBlock (above the terminal) + the global AI panel (dock sidebar) sync in real time | Send inline then open the AI panel and observe |
+| AG9 | Model selection | The model picker lives on the right of the composer footer, beside send, as a rounded-square control matching the approval button; each model retains its own tool-use override | E2E verifies model switching, conversation controls and compact layouts |
+| AG10 | Independent AI conversations | The Dock AI panel manages the active conversation and explicit execution environment, while a singleton workspace page manages conversation history; Ask AI stages terminal context for review | Start a discussion without a terminal; open a conversation from history; stage a command block and inspect it before sending |
 
 ## 17. Skills
 
@@ -415,7 +429,7 @@ See [Windows context menu](windows-context-menu.md) for prerequisites and verifi
 - Both file panels offer a search overlay from the toolbar. Search matches file names recursively, reveals selected files in their parent directory, and enters selected directories. The two terminal directory actions sit together in the overflow menu; panel navigation is labelled “Switch to the current terminal file directory”.
 - Search is bounded to 200 results, 500 directories, 20,000 entries and 12 nested levels. Local traversal skips symbolic links. Remote traversal uses one authenticated SFTP channel, supports cancellation, and reports skipped directories and partial results; its traversal budget is 20 seconds after connecting.
 - Appearance settings expose an independent AI Chat font size of 10–24 px with immediate application, persistence, preview and reset.
-- Chat persistence retains pane ownership and original timestamps. Restored legacy messages are assigned to the first pane. Inline conversation remains visible during classic SSH reconnection when the Chat panel is closed, and returns to the shared command flow in block mode.
+- Independent conversations persist across terminal closure and settings navigation. Legacy messages retain their original pane and timestamps in migrated conversations; legacy inline history stays visible in its terminal regardless of whether the AI panel is open.
 
 Verification checklist: invalid and inaccessible breadcrumb paths, recovery after an old invalid saved path, rapid navigation, local and remote search cancellation and partial results, filename searches with Unicode and spaces, file reveal, font persistence and reset, SSH reconnection with the Chat panel open/closed, restored legacy chat and independent split-pane conversations.
 

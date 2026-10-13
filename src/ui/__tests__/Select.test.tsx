@@ -11,6 +11,14 @@ const options = [
 ];
 
 describe('Select', () => {
+  it('uses a concise trigger label while keeping full context in the menu', () => {
+    render(<Select aria-label="Target" value="server" onChange={vi.fn()}
+      options={[{ value: 'server', label: 'Production server · 10.21.76.61 · /srv/app', triggerLabel: '10.21.76.61' }]} />);
+    expect(screen.getByRole('combobox', { name: 'Target' })).toHaveTextContent('10.21.76.61');
+    expect(screen.getByRole('combobox', { name: 'Target' })).not.toHaveTextContent('/srv/app');
+    fireEvent.click(screen.getByRole('combobox', { name: 'Target' }));
+    expect(screen.getByRole('option', { name: 'Production server · 10.21.76.61 · /srv/app' })).toBeInTheDocument();
+  });
   it('renders a controlled value and commits a pointer selection once', async () => {
     const onChange = vi.fn();
     function Example() {
@@ -104,13 +112,22 @@ describe('Select', () => {
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 
-  it('marks the selected option with a non-character check icon', async () => {
-    render(<Select aria-label="强度" value="low" options={options} onChange={vi.fn()} />);
+  it('marks the selected option with a non-character check icon', async () => {    render(<Select aria-label="强度" value="low" options={options} onChange={vi.fn()} />);
     await userEvent.setup().click(screen.getByRole('combobox'));
     const selected = screen.getByRole('option', { name: '低' });
     const check = selected.querySelector('svg.ui-select-check');
     expect(check).not.toBeNull();
     expect(check).toHaveAttribute('aria-hidden', 'true');
     expect(screen.getByRole('option', { name: '高' }).querySelector('svg')).toBeNull();
+  });
+
+  it('renders a colour swatch in the trigger and in the option rows', async () => {
+    render(<Select aria-label="颜色" value="blue" onChange={vi.fn()}
+      options={[{ value: 'blue', label: '蓝色', swatch: '#0A84FF' }, { value: 'green', label: '绿色', swatch: '#6CE6A6' }]} />);
+    const trigger = screen.getByRole('combobox', { name: '颜色' });
+    expect(trigger.querySelector('span.ui-select-swatch')).toHaveStyle({ background: '#0A84FF' });
+    await userEvent.setup().click(trigger);
+    expect(screen.getByRole('option', { name: '蓝色' }).querySelector('span.ui-select-swatch')).toHaveStyle({ background: '#0A84FF' });
+    expect(screen.getByRole('option', { name: '绿色' }).querySelector('span.ui-select-swatch')).not.toBeNull();
   });
 });

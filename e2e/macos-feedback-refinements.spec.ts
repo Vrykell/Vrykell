@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { setupTauriMock, themeConfig } from './tauri-mock';
 import { gotoSetting } from './settings';
 
-test('model header controls align with the input while save feedback stays below it', async ({ page }) => {
+test('model header controls align with the input while save feedback lives in the page header', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await gotoSetting(page, '模型配置');
@@ -12,11 +12,17 @@ test('model header controls align with the input while save feedback stays below
       const box = (await control.boundingBox())!;
       expect(Math.abs(box.y + box.height / 2 - input.y - input.height / 2)).toBeLessThan(1);
     }
-    const status = (await header.getByRole('status').boundingBox())!;
-    expect(status.y).toBeGreaterThanOrEqual(input.y + input.height);
+    // The settings page reports saves itself, so the header keeps no inline status.
+    await expect(header.getByRole('status')).toHaveCount(0);
     await expect(header.locator('input')).toHaveCSS('font-weight', '400');
   }
-  await expect(page.locator('.settings-field').first().locator(':scope > div').first()).toHaveCSS('font-weight', '500');
+  const name = page.locator('.settings-model-header input').first();
+  await name.fill('模型 A');
+  await name.press('Enter');
+  await expect(page.locator('.settings-page-header').getByRole('status')).toHaveText('已保存');
+  // This theme resolves --fw-medium to the regular weight, so field titles are not
+  // bolder than the inputs they label.
+  await expect(page.locator('.settings-field').first().locator(':scope > div').first()).toHaveCSS('font-weight', '400');
   await page.screenshot({ path: test.info().outputPath('model-alignment.png') });
 });
 

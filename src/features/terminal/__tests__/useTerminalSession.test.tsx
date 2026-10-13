@@ -190,6 +190,20 @@ describe('useTerminalSession', () => {
     expect(writeMock).toHaveBeenCalledWith('CMD command output', expect.any(Function));
   });
 
+  it('hands the surface back when a real alternate screen starts under a manual fullscreen', async () => {
+    render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
+    // The user fullscreened the running block terminal; the foreground program then switches to
+    // the alternate buffer, whose live screen is drawn by the main xterm.
+    useTerminalStore.getState().setScene('t1', 'altScreen');
+    useTerminalStore.getState().setAltScreenActive(true);
+
+    ptyOutputHandlers[0]!('sess-x', [{ kind: 'altEnter', raw: '\x1b[?1049h' }]);
+
+    expect(useTerminalStore.getState().scenes.t1).toBe('altScreen');
+    expect(useTerminalStore.getState().altScreenActive).toBe(false);
+  });
+
   it('keeps SSH block authentication interactive until the remote prompt arrives', async () => {
     useWorkspaceStore.setState({ tabs: [{ id: 't1', title: 'ssh', kind: 'session', layout: leaf({ id: 't1', kind: 'ssh', openMode: 'block', ssh: { name: 'server', host: 'server', user: 'user' } }) }], activeId: 't1' });
     render(<TestHarness tabId="t1" onReady={() => {}} />);

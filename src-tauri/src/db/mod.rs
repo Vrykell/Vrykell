@@ -3,12 +3,14 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 pub mod download;
+pub mod conversation;
 pub mod history;
 pub mod session;
 pub mod ssh_connection;
 pub mod workspace;
 
 pub use download::DownloadEntry;
+pub use conversation::{ConversationEntry, ConversationMessageEntry};
 pub use history::HistoryEntry;
 pub use session::{BlockEntry, ChatMessageEntry, GroupEntry, SessionEntry};
 pub use ssh_connection::SshConnection;
@@ -179,6 +181,7 @@ fn init_schema(conn: &Connection) -> Result<(), String> {
         conn.execute_batch("ALTER TABLE chat_messages ADD COLUMN pane_id TEXT;")
             .map_err(|e| e.to_string())?;
     }
+    conversation::init_conversations(conn)?;
     // Keep the existing schema version to avoid resetting compatible databases.
     conn.execute_batch("PRAGMA user_version = 2;")
         .map_err(|e| format!("记录 schema 版本失败：{e}"))?;

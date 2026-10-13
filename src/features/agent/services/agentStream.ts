@@ -9,6 +9,7 @@
  */
 import { describeError } from '@features/agent/model/agentErrors';
 import { stepCountIs, streamText, type ModelMessage, type ToolSet } from 'ai';
+import { getFocusedTerminalId } from '@features/terminal';
 import { invoke } from '@platform/diagnostics';
 import type { StreamFn } from '@features/chat';
 import { createChatModel, createNativeWebSearchTool, deepThinkProviderOptions, type ProviderKind } from '@features/agent/services/provider';
@@ -24,6 +25,7 @@ import { getMemory, getMemoryJournal, listAgents } from '@features/agent/service
 import { listMcpTools, buildMcpTool } from '@features/agent/services/mcp';
 import { levelOf, type ToolContext } from '@features/agent/stores/permissions';
 import type { ToolRunState } from '@features/agent/model/messageParts';
+import { executionPaneSpec } from './executionTarget';
 
 interface AiConfigInfoRust {
   has_key: boolean;
@@ -52,6 +54,9 @@ function hasKeyFor(info: AiConfigInfoRust): boolean {
 }
 
 export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
+  // Resolve once before any asynchronous work; focus changes never redirect a running request.
+  const executionPane = ctx?.paneId === undefined ? getFocusedTerminalId() : ctx.paneId;
+  const remote = ctx?.environment?.kind === 'ssh' || executionPaneSpec(executionPane)?.kind === 'ssh';
   const info = await invoke<AiConfigInfoRust>('get_ai_config');
   if (!hasKeyFor(info)) {
     throw new Error('尚未配置 API Key，请先在设置中填入');
@@ -137,6 +142,9 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   }
   const systemPrompt = [
     buildSystemPrompt(settings.systemPrompt, plan.system),
+    executionPane === null ? 'No terminal is connected to this conversation. Answer questions using provided references. Do not claim to execute terminal commands.'
+      : `Execution terminal: ${ctx?.environment?.label ?? executionPane}. Directory at request start: ${ctx?.environment?.cwd ?? 'unknown'}. This target stays fixed for this request.`,
+    remote ? 'The execution terminal is remote. Use terminal tools for remote files; local file tools are unavailable.' : '',
     memoryContext,
     skillsContext,
     agentsContext,
@@ -169,6 +177,8 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   // approval-pending / running / denied（含危险命令原因）。本地工具与 MCP 工具共用。
   const toolContext: ToolContext = {
     signal: ctx?.signal,
+    paneId: executionPane,
+    remote,
     tabId: ctx?.tabId,
     setToolState: (toolCallId, state: ToolRunState, extra) => {
       const c = calls.get(toolCallId);

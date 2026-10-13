@@ -1,4 +1,4 @@
-import { selectActiveSessionTab, useDockStore, useSessionStore, useNavigationDrag, useNavigationButtonDrag, type DockSide } from '@features/workspace';
+import { useDockStore, useSessionStore, useNavigationDrag, useNavigationButtonDrag, type DockSide } from '@features/workspace';
 import DockButton from './DockButton';
 import { useToastStore } from '@ui/Toast';
 import NavigationDragPreview from './NavigationDragPreview';
@@ -8,11 +8,10 @@ import { Fragment } from 'react';
 export default function DockNavigation({ side }: { side: DockSide }) {
   const zone = useDockStore(state => side === 'left' ? state.leftZone : state.rightZone);
   const panels = useDockStore(state => side === 'left' ? state.leftPanels : state.rightPanels);
-  const isSession = useSessionStore(state => selectActiveSessionTab(state) !== null);
   const settingsActive = useSessionStore(state => state.tabs.some(tab => tab.id === state.activeId && tab.kind === 'settings'));
   const dragging = useNavigationDrag(state => state.id);
   const target = useNavigationDrag(state => state.target);
-  const ids = zone.filter(id => id !== 'chat' || isSession);
+  const ids = zone;
   const compact = side === 'right' && ids.length > 1;
 
   const startDrag = useNavigationButtonDrag();

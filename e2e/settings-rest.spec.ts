@@ -15,11 +15,11 @@ test.describe('主题设置页', () => {
     await gotoSetting(page, '主题');
     const theme = await page.evaluate(() => document.documentElement.dataset.theme);
     expect(theme).toBe('dark');
-    await page.getByRole('button', { name: '浅色' }).click();
+    await page.getByRole('radio', { name: '浅色' }).click();
     await expect
       .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
       .toBe('light');
-    await page.getByRole('button', { name: '深色' }).click();
+    await page.getByRole('radio', { name: '深色' }).click();
     await expect
       .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
       .toBe('dark');

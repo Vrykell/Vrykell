@@ -1,289 +1,225 @@
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { t } from '@i18n';
-import { TextArea } from '@ui/TextInput';
+import { TextArea, TextInput } from '@ui/TextInput';
 import KeyHint from '@ui/KeyHint';
+import Select from '@ui/Select';
+import ErrorBox from '@ui/ErrorBox';
 import { IconButton } from '@ui/IconButton';
-import { PermissionModeButton } from '@features/agent';
-/**
- * PanelChat — 全局 AI 对话面板（dock 面板，「会话转录」形态）。
- *
- * 与块流内联块共享同一份数据（chat store）：这里是全窗口视角的转录，
- * 跨 pane 的问答按来源 pane 分段，段首是 mono 标签（shell · cwd）。
- * 底部输入栏与终端 InputEditor 完全同构（prompt 行 + ⚡ 输入行，同度量），
- * 发送目标是当前聚焦 pane。
- */
-
-import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { iconSizes, ArrowUp, Paperclip, Sparkles, Square, Zap  } from '@ui/icons';
-import { useChatStore, useActiveMessages } from '@features/chat';
-import { usePermissions, useAttachmentComposer } from '@features/agent';
-import ChatModeSelect from '@features/chat/components/ChatModeSelect';
-import ModelPill from '@features/chat/components/ModelPill';
-import AttachmentChips from '@features/chat/components/AttachmentChips';
-import ShellIndicator from '@features/terminal/components/ShellIndicator';
-import { CurrentDir } from '@features/terminal/components/InputEditor';
-import AiBlock from '@features/chat/components/AiBlock';
-import { toExchanges, type ChatExchange } from '@features/chat/model/exchanges';
-import ContextRing from '@features/chat/components/ContextRing';
-import { useChatComposer } from '@features/chat/hooks/useChatComposer';
-import { useChatPaneContext } from '@features/chat/hooks/useChatPaneContext';
-import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
-import { EMPTY_COMPOSER_DRAFT, useComposerDrafts } from '@features/chat';
+import { ArrowDown, ArrowUp, History, Plus, SlidersHorizontal, Sparkles, Square, Zap } from '@ui/icons';
+import { useAttachmentComposer } from '@features/agent';
+import { useSessionStore } from '@features/workspace';
+import { leaves } from '@features/workspace/model/windowLayout';
+import { useTerminalStore } from '@features/terminal';
+import { useChatStore, type ChatMessage } from '../stores/chat';
+import { EMPTY_COMPOSER_DRAFT, useComposerDrafts } from '../stores/composerDrafts';
+import ChatModeSelect from './ChatModeSelect';
+import ModelPill from './ModelPill';
+import AttachmentChips from './AttachmentChips';
+import TerminalReferences from './TerminalReferences';
+import AiBlock from './AiBlock';
+import { toExchanges } from '../model/exchanges';
+import { useChatComposer } from '../hooks/useChatComposer';
+import { environmentForPane, showExecutionTerminal } from '../services/conversationContext';
 import type { AttachmentMeta } from '@features/agent/model/attachments';
 
+const EMPTY_MESSAGES: ChatMessage[] = [];
 
-/** 各 provider 的常用模型（快捷下拉；完整自由度在设置页输入） */
+/** Conversation navigation, references and execution stay independent of terminal focus. */
 export default function PanelChat() {
-  const messages = useActiveMessages();
-  const send = useChatStore((s) => s.send);
-  const sending = useChatStore((s) => s.sendingTab !== null);
-
-  /** 当前 tab 正在流式（发送键变停止键；其它 tab 的发送中只禁用发送） */
-  const {
-    activeId,
-    isSession,
-    targetPane,
-    targetInfo,
-    targetConnected,
-    targetFocused,
-    paneLabel,
-  } = useChatPaneContext();
-  const abortStream = useChatStore((s) => s.abortStream);
-  const sendingHere = useChatStore((s) => s.sendingTab !== null && s.sendingTab === activeId);
-
+  const activeId = useChatStore(state => state.activeConversationId);
+  const conversations = useChatStore(state => state.conversations);
+  const messages = useChatStore(state => state.byTab[activeId] ?? EMPTY_MESSAGES);
+  const ready = useChatStore(state => !!activeId && activeId in state.byTab);
+  const sendingTab = useChatStore(state => state.sendingTab);
+  const loading = useChatStore(state => state.conversationsLoading);
+  const loadError = useChatStore(state => state.conversationError);
+  const persistenceError = useChatStore(state => state.persistenceError);
+  const conversation = conversations.find(item => item.id === activeId);
+  const environment = conversation?.environment;
+  const sessions = useTerminalStore(state => state.sessions);
+  const startupStates = useTerminalStore(state => state.startupStates);
+  const tabs = useSessionStore(state => state.tabs);
+  const terminalCwds = useSessionStore(state => state.terminalCwds);
+  const [renaming, setRenaming] = useState(false);
+  const [title, setTitle] = useState('');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsTrigger = useRef<HTMLButtonElement>(null);
+  const [following, setFollowing] = useState(true);
+  const followRef = useRef(true);
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  const permMode = usePermissions((s) => s.mode);
-  const setPermMode = usePermissions((s) => s.setMode);
-
-  const draft = useChatStore((s) => s.draftTabId === activeId ? s.draft : '');
-  const setDraft = useChatStore((s) => s.setDraft);
-  const composerDraft = useComposerDrafts((s) => s.byTab[activeId] ?? EMPTY_COMPOSER_DRAFT);
-  const setComposerText = useCallback((text: string) => {
-    useComposerDrafts.getState().setText(activeId, text);
-  }, [activeId]);
-  const updateComposerAttachments = useCallback((update: (current: AttachmentMeta[]) => AttachmentMeta[]) => {
+  const transcriptRef = useRef<HTMLDivElement>(null);
+  const positions = useRef(new Map<string, { top: number; following: boolean }>());
+  const draft = useChatStore(state => state.draftTabId === activeId ? state.draft : '');
+  const composerDraft = useComposerDrafts(state => state.byTab[activeId] ?? EMPTY_COMPOSER_DRAFT);
+  const references = composerDraft.references ?? [];
+  const setText = useCallback((text: string) => useComposerDrafts.getState().setText(activeId, text), [activeId]);
+  const updateAttachments = useCallback((update: (current: AttachmentMeta[]) => AttachmentMeta[]) => {
     useComposerDrafts.getState().updateAttachments(activeId, update);
   }, [activeId]);
-
-  // ── M5 附件：chips 状态 + 三个来源（📎 选择 / 粘贴 / 拖拽） ──
-  const {
-    attachments: atts,
-    previewId,
-    panelRef,
-    addPastedText,
-    pickFiles,
-    addBlobs,
-    togglePreview,
-    removeAttachment,
-    clearAttachments,
-  } = useAttachmentComposer({
-    attachments: composerDraft.attachments,
-    updateAttachments: updateComposerAttachments,
-    scopeKey: activeId,
-  });
+  const clearReferences = useCallback(() => useComposerDrafts.getState().setReferences(activeId, []), [activeId]);
+  const { attachments, previewId, panelRef, addPastedText, pickFiles, addBlobs, togglePreview, removeAttachment, clearAttachments } =
+    useAttachmentComposer({ attachments: composerDraft.attachments, updateAttachments, scopeKey: activeId });
   const exchanges = useMemo(() => toExchanges(messages), [messages]);
-
-  // 新内容（条数变化 / 流式增长 / 工具动作增减或状态迁移）时吸底
-  const last = messages[messages.length - 1];
-  const lastLen = last?.content.length ?? 0;
-  const lastToolSig = (last?.parts ?? [])
-    .map((p) => (p.kind === 'tool' ? `${p.tool.toolCallId}:${p.tool.state}` : 't'))
-    .join('|');
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages.length, lastLen, lastToolSig]);
-
-  // ── ↑/↓ 翻历史提问（fish 式：以开始翻前的草稿为前缀过滤，最新在前） ──
-  const historyQuestions = useMemo(
-    () =>
-      exchanges
-        .map((ex) => ex.question?.content)
-        .filter((c): c is string => !!c && c.trim().length > 0)
-        .reverse(),
-    [exchanges],
-  );
-  const {
-    text,
-    inputRef,
-    canSend,
-    submit,
-    handleChange,
-    handleKeyDown,
-  } = useChatComposer({
-    questions: historyQuestions,
-    draft,
-    setDraft,
-    send,
-    sending,
-    isSession,
-    targetPane,
-    attachments: atts,
-    clearAttachments,
-    value: composerDraft.text,
-    onTextChange: setComposerText,
-    scopeKey: activeId,
+  const questions = useMemo(() => exchanges.map(exchange => exchange.question?.content).filter((content): content is string => !!content).reverse(), [exchanges]);
+  const composer = useChatComposer({
+    questions, draft, setDraft: useChatStore.getState().setDraft, send: useChatStore.getState().send,
+    sending: sendingTab !== null, isSession: ready && !loadError, attachments, clearAttachments,
+    conversationId: activeId, references, clearReferences, value: composerDraft.text, onTextChange: setText, scopeKey: activeId,
   });
+  const environmentOptions = useMemo(() => {
+    const available = tabs.flatMap(tab => tab.kind === 'session' ? leaves(tab.layout) : [])
+      .filter(pane => !!sessions[pane.id]).map(pane => {
+        const context = environmentForPane(pane.id)!;
+        const triggerLabel = pane.kind === 'ssh' ? pane.ssh?.host || pane.ssh?.name || context.label : t('Local terminal');
+        const host = pane.kind === 'ssh' ? pane.ssh?.host : undefined;
+        const hostLabel = host && !context.label.includes(host) ? ` · ${host}` : '';
+        const swatch = startupStates[pane.id] === 'starting' ? 'var(--accent-warm)'
+          : startupStates[pane.id] === 'failed' || startupStates[pane.id] === 'closed' ? 'var(--error)' : 'var(--success)';
+        return { value: pane.id, label: `${context.label}${hostLabel}${context.cwd ? ` · ${context.cwd}` : ''}`, triggerLabel, swatch };
+      });
+    return [
+      { value: '', label: t('Discussion only'), triggerLabel: t('Discussion'), swatch: 'var(--text-muted)' },
+      ...(environment && !available.some(option => option.value === environment.paneId)
+        ? [{ value: environment.paneId, label: `${environment.label} · ${t('Disconnected')}`, swatch: 'var(--accent-warm)', disabled: true }] : []),
+      ...available,
+    ];
+  }, [tabs, sessions, startupStates, terminalCwds, environment]);
 
-  // Match the terminal composer context with spacing between the chips.
-  return (
-    <div ref={panelRef} className="ai-chat-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, containerType: 'inline-size' }}>
-      {/* Model and conversation mode apply to subsequent messages. */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 4,
-        padding: '7px 10px 6px',
-        flexShrink: 0, userSelect: 'none',
+  useEffect(() => { void useChatStore.getState().loadConversations(); }, []);
+  useEffect(() => { setRenaming(false); }, [activeId]);
+  useLayoutEffect(() => {
+    const scroll = scrollRef.current;
+    if (!scroll) return;
+    const saved = positions.current.get(activeId);
+    followRef.current = saved?.following ?? true;
+    setFollowing(followRef.current);
+    scroll.scrollTop = saved?.following === false ? saved.top : scroll.scrollHeight;
+    return () => { positions.current.set(activeId, { top: scroll.scrollTop, following: followRef.current }); };
+  }, [activeId]);
+  useLayoutEffect(() => {
+    if (followRef.current && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages]);
+  useEffect(() => {
+    const transcript = transcriptRef.current;
+    if (!transcript || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      if (followRef.current && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    });
+    observer.observe(transcript);
+    return () => observer.disconnect();
+  }, [activeId]);
+
+  const submit = () => {
+    if (!composer.canSend) return;
+    followRef.current = true;
+    setFollowing(true);
+    composer.submit();
+  };
+  const commitTitle = () => {
+    useChatStore.getState().renameConversation(activeId, title);
+    setRenaming(false);
+  };
+  return <div ref={panelRef} className="ai-chat-panel">
+    <div className="chat-conversation-heading">
+      {renaming ? <TextInput autoFocus className="inline-rename-input" aria-label={t('Conversation title')} value={title} onChange={event => setTitle(event.target.value)}
+        onFocus={event => event.currentTarget.select()} onClick={event => event.stopPropagation()}
+        onBlur={commitTitle} onKeyDown={event => {
+          if (event.key === 'Enter') commitTitle();
+          if (event.key === 'Escape') setRenaming(false);
+        }} /> : <button type="button" data-subtle className="chat-conversation-title" data-tip={t('Rename conversation')} aria-label={t('Rename conversation')}
+          onClick={() => { setTitle(conversation?.title ?? ''); setRenaming(true); }} disabled={!conversation}>
+          {conversation?.title ?? t('AI chat')}
+        </button>}
+      <IconButton compact aria-label={t('AI conversation history')} data-tip={t('AI conversation history')}
+        onClick={() => useSessionStore.getState().openAiHistoryTab()}><History size={16} /></IconButton>
+      <IconButton compact aria-label={t('New conversation')} data-tip={t('New conversation')}
+        onClick={() => useChatStore.getState().createConversation()}><Plus size={16} /></IconButton>
+      <IconButton ref={settingsTrigger} compact aria-label={t('Conversation settings')} data-tip={t('Conversation settings')}
+        aria-expanded={settingsOpen} aria-controls="chat-conversation-settings" onClick={() => setSettingsOpen(!settingsOpen)}>
+        <SlidersHorizontal size={16} />
+      </IconButton>
+    </div>
+    {settingsOpen && <section id="chat-conversation-settings" className="chat-conversation-settings" aria-label={t('Conversation settings')}
+      onKeyDown={event => {
+        if (event.key === 'Escape' && !event.defaultPrevented) {
+          event.stopPropagation(); setSettingsOpen(false); settingsTrigger.current?.focus();
+        }
       }}>
-        <ChatModeSelect />
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'flex-end' }}>
-          <ModelPill showThinking={false} />
-        </div>
+      <div className="chat-setting-row"><span>{t('Execution terminal')}</span>
+        <Select aria-label={t('Select execution environment')} data-testid="chat-execution-target"
+          data-tip-description={environmentOptions.find(option => option.value === (environment?.paneId ?? ''))?.label}
+          value={environment?.paneId ?? ''} options={environmentOptions} disabled={!ready || sendingTab === activeId}
+          onChange={paneId => useChatStore.getState().setEnvironment(activeId, paneId ? environmentForPane(paneId) : null)} />
       </div>
-
-      {/* 转录区：按来源 pane 分段 */}
-      <div ref={scrollRef} className="scroll-region" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '4px 8px 8px' }}>
-        {exchanges.length === 0 ? (
-          <EmptyHint isSession={isSession} />
-        ) : (
-          <Transcript exchanges={exchanges} paneLabel={paneLabel} />
-        )}
+      <div className="chat-setting-links">
+        {environment && !!sessions[environment.paneId] && <button type="button" data-subtle onClick={() => showExecutionTerminal(environment.paneId)}>{t('View terminal')}</button>}
+        <button type="button" data-subtle onClick={() => useSessionStore.getState().openSettingsTab()}>{t('Open settings')}</button>
       </div>
-
-      {/* Match the terminal composer's visual boundary and spacing. */}
-      {isSession && (
-        <div style={{
-          flexShrink: 0,
-          margin: 0,
-          padding: '10px 12px 12px',
-          background: 'transparent',
-        }}>
-          <div className="terminal-composer" style={{
-            padding: '10px 12px 8px',
-          }}>
-            <div className="terminal-composer-heading"><span>{t('AI chat')}</span><span className="composer-key-hints"><KeyHint shortcut="Enter" />{t('Send')}</span></div>
-            {/* 附件 chips 行（预览/删除；随发送清空） */}
-            {atts.length > 0 && (
-              <AttachmentChips
-                atts={atts}
-                previewId={previewId}
-                onPreview={togglePreview}
-                onRemove={removeAttachment}
-              />
-            )}
-
-            {/* 输入行：⚡ prompt + textarea + 发送/停止（度量同终端输入栏） */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{
-                minWidth: iconSizes.row, height: 24, lineHeight: 1,
-                color: 'var(--accent-warm)', userSelect: 'none', flexShrink: 0,
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <Zap size={iconSizes.control} />
-              </span>
-              <TextArea
-                ref={inputRef}
-                data-chat-composer
-                value={text}
-                placeholder="自然语言描述你想做什么…"
-                rows={1}
-                onChange={handleChange}
-                onKeyDown={handleKeyDown}
-                onPaste={(e) => {
-                  // 图片/文件粘贴优先；长文本（>500 字）折叠为 chip，不糊进输入框
-                  const files = Array.from(e.clipboardData.files);
-                  if (files.length > 0) {
-                    e.preventDefault();
-                    void addBlobs(files);
-                    return;
-                  }
-                  const t = e.clipboardData.getData('text/plain');
-                  if (t && addPastedText(t)) e.preventDefault();
-                }}
-                style={{
-                  flex: 1, minWidth: 0, resize: 'none',
-                  background: 'transparent', border: 'none', padding: '1px 0',
-                  fontSize: 'var(--chat-font-size)', fontFamily: TERMINAL_FONT_FAMILY,
-                  color: 'var(--text-primary)', lineHeight: '22px', outline: 'none',
-                }}
-              />
-              <span style={{ marginRight: 6, display: 'inline-flex', alignItems: 'center' }}>
-                <ContextRing />
-              </span>
-              {/* 发送/停止按钮 — 流式中当前 tab 变 ⏹ */}
-              {sendingHere ? (
-                <IconButton data-subtle tone="accent" data-tip={t('Stop generating')} aria-label={t('Stop generating')} onClick={() => abortStream(activeId)}>
-                  <Square size={iconSizes.compact} fill="currentColor" />
-                </IconButton>
-              ) : (
-                <IconButton data-subtle tone="accent" data-tip={t('Send')} data-tip-shortcut="Enter" aria-label={t('Send')} onClick={submit} disabled={!canSend}>
-                  <ArrowUp size={iconSizes.control} />
-                </IconButton>
-              )}
-            </div>
-
-            {/* 底部状态栏：目标 pane 上下文 + 权限模式 + 附件（AI 配置已上移到顶栏） */}
-            <div className="chat-input-status" style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              minHeight: 22, marginTop: 4, paddingTop: 5,
-              fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', userSelect: 'none',
-            }}>
-              <ShellIndicator connected={targetConnected} focused={targetFocused} label={targetInfo?.shell ?? '本地'} />
-              {targetInfo?.cwd && <CurrentDir dir={targetInfo.cwd} />}
-              <div style={{ flex: 1 }} />
-              <PermissionModeButton mode={permMode} onChange={setPermMode} />
-              {/* 📎 附件 */}
-              <IconButton data-subtle data-tip={t('Add attachment')} aria-label={t('Add attachment')} onClick={() => void pickFiles()}>
-                <Paperclip size={iconSizes.control} />
-              </IconButton>
-            </div>
-          </div>
-        </div>
-      )}
-
-
-    </div>
-  );
-}
-
-
-function Transcript({ exchanges, paneLabel }: {
-  exchanges: ChatExchange[];
-  paneLabel: (paneId?: string) => string;
-}) {
-  let lastPane: string | undefined | null = null;
-  return (
-    <>
-      {exchanges.map((ex) => {
-        const showTag = ex.paneId !== lastPane;
-        lastPane = ex.paneId;
-        return (
-          <div key={ex.id}>
-            {showTag && (
-              <div style={{
-                fontFamily: 'var(--font-mono)', fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)',
-                padding: '10px 4px 2px', userSelect: 'none',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>
-                {paneLabel(ex.paneId)}
-              </div>
-            )}
-            <AiBlock exchange={ex} />
-          </div>
-        );
-      })}
-    </>
-  );
-}
-
-function EmptyHint({ isSession }: { isSession: boolean }) {
-  return (
-    <div style={{
-      height: '100%', minHeight: 140, padding: 16,
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12,
-      textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-label)', userSelect: 'none',
+    </section>}
+    {environment && <div className="chat-conversation-context" data-testid="chat-conversation-context">
+      <span className="chat-terminal-status" style={{ background: environmentOptions.find(option => option.value === environment.paneId)?.swatch }} aria-hidden="true" />
+      <span>{environmentOptions.find(option => option.value === environment.paneId)?.triggerLabel ?? environment.label}</span>
+      {!sessions[environment.paneId] && <span>{t('Disconnected')}</span>}
+    </div>}
+    {environment && !sessions[environment.paneId] && <div className="chat-environment-note">{t('Terminal disconnected. Select a terminal to continue execution.')}</div>}
+    {loadError && <ErrorBox compact actions={<button onClick={() => {
+      if (!useChatStore.getState().conversationsLoaded) void useChatStore.getState().loadConversations();
+      else if (activeId) void useChatStore.getState().selectConversation(activeId);
+    }}>{t('Retry')}</button>}>{t('Could not load conversations')}: {loadError}</ErrorBox>}
+    {persistenceError && <ErrorBox compact actions={<button onClick={() => void useChatStore.getState().retryPersistence().catch(() => {})}>{t('Retry saving')}</button>}>
+      {t('Conversation changes have not been saved')}
+    </ErrorBox>}
+    {sendingTab && sendingTab !== activeId && <div className="chat-background-task">
+      <span>{t('Another conversation is working')}</span>
+      <button type="button" data-subtle onClick={() => { void useChatStore.getState().selectConversation(sendingTab); }}>{t('View')}</button>
+    </div>}
+    <div ref={scrollRef} className="chat-transcript scroll-region" onScroll={event => {
+      const scroll = event.currentTarget;
+      const next = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight <= 24;
+      followRef.current = next;
+      setFollowing(next);
     }}>
-      <Sparkles size={24} aria-hidden="true" />
-      <span>{isSession ? '描述问题，Enter 发送' : '打开一个终端会话开始对话'}</span>
+      <div ref={transcriptRef}>
+        {exchanges.length ? exchanges.map(exchange => <AiBlock key={exchange.id} exchange={exchange} conversationId={activeId} presentation="conversation" />)
+          : <div className="chat-empty"><Sparkles size={26} /><strong>{t('What would you like to work on?')}</strong>
+            <span>{loading ? t('Loading conversations…') : t('Ask a question, attach a file, or bring in terminal output.')}</span></div>}
+      </div>
     </div>
-  );
+    {!following && <button type="button" data-subtle className="chat-jump-latest" onClick={() => {
+      followRef.current = true; setFollowing(true);
+      if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }}><ArrowDown size={14} />{t('Jump to latest reply')}</button>}
+    <div className="chat-composer-wrap">
+      <div className="terminal-composer chat-composer">
+        <div className="terminal-composer-heading"><span>{t('AI chat')}</span><span className="composer-key-hints"><KeyHint shortcut="Enter" />{t('Send')}</span></div>
+        {(references.length > 0 || attachments.length > 0) && <div className="chat-context-tray" aria-label={t('Conversation context')}>
+          {attachments.length > 0 && <AttachmentChips atts={attachments} previewId={previewId} onPreview={togglePreview} onRemove={removeAttachment} />}
+          {references.length > 0 && <TerminalReferences references={references} onRemove={id => {
+            useComposerDrafts.getState().setReferences(activeId, references.filter(reference => reference.id !== id));
+          }} />}
+        </div>}
+        <div className="chat-composer-input">
+          <Zap size={20} aria-hidden="true" className="chat-composer-lead" />
+          <TextArea ref={composer.inputRef} data-chat-composer value={composer.text} placeholder={t('Describe what you want to do…')} rows={1}
+            onChange={composer.handleChange} onKeyDown={event => {
+              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); submit(); }
+              else composer.handleKeyDown(event);
+            }} onPaste={event => {
+              const files = Array.from(event.clipboardData.files);
+              if (files.length) { event.preventDefault(); void addBlobs(files); return; }
+              if (addPastedText(event.clipboardData.getData('text/plain'))) event.preventDefault();
+            }} />
+        </div>
+        <div className="chat-input-status">
+          <IconButton compact aria-label={t('Add attachment')} data-tip={t('Add attachment')} onClick={() => void pickFiles()}><Plus size={20} /></IconButton>
+          <ChatModeSelect />
+          <span className="chat-footer-space" />
+          <ModelPill showThinking={false} />
+          {sendingTab === activeId ? <IconButton compact className="chat-send-button" tone="accent" aria-label={t('Stop generating')} data-tip={t('Stop generating')}
+            onClick={() => useChatStore.getState().abortStream(activeId)}><Square size={15} fill="currentColor" /></IconButton>
+            : <IconButton compact className="chat-send-button" tone="accent" aria-label={t('Send')} data-tip={t('Send')} data-tip-shortcut="Enter" onClick={submit} disabled={!composer.canSend}><ArrowUp size={18} /></IconButton>}
+        </div>
+      </div>
+    </div>
+  </div>;
 }

@@ -123,15 +123,16 @@ describe('runCommandAndWait', () => {
     expect(r.error).toContain('超时');
   });
 
-  it('快照降级：无块时按成功返回输出，不带 error（避免模型误判未执行）', async () => {
+  it('never treats a quiet terminal snapshot as successful completion', async () => {
     vi.useFakeTimers();
     setupPane();
     const promise = runCommandAndWait('ls');
     // 1500ms 宽限（无块）→ 快照模式；输出稳定 2×500ms 后完成
     await vi.advanceTimersByTimeAsync(3000);
     const r = await promise;
-    expect(r.ok).toBe(true);
-    expect(r.error).toBeUndefined();
+    expect(r.ok).toBe(false);
+    expect(r.completed).toBe(false);
+    expect(r.error).toContain('无法确认');
   });
 
   it('宽限期自愈：订阅错过的块在 1500ms 直扫时认领', async () => {
@@ -194,7 +195,8 @@ describe('runCommandAndWait', () => {
     const r = await promise;
     expect(agentControl.hasBlock('old')).toBe(false);
     expect(r.exitCode).toBeUndefined(); // 快照模式无退出码
-    expect(r.error).toBeUndefined();
+    expect(r.completed).toBe(false);
+    expect(r.error).toContain('无法确认');
   });
 
   it('执行中途切入 altScreen（TUI）→ 立即收口，不干等超时', async () => {

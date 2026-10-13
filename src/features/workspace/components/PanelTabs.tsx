@@ -1,7 +1,7 @@
 import { TextInput } from '@ui/TextInput';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { iconSizes,
-  History, Plus, Search, Settings,
+  History, Plus, Search, Settings, Sparkles,
   ChevronRight, Pencil, Archive, Folder, Trash2, X,
  } from '@ui/icons';
 import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, useTabDisplayTitle, type Tab, type TabGroup } from '@features/workspace';
@@ -284,12 +284,13 @@ export default function PanelTabs() {
         />
       )}
 
-      <ListReorderPreview>
+      <ListReorderPreview listId={LIST_ID}>
         {(drag) => {
           const tab = drag.kind !== 'group' ? tabs.find((t) => t.id === drag.id) : undefined;
           const first = tab ? firstTerminalOf(tab) : null;
           const Icon = drag.kind === 'group' ? Folder
             : tab?.kind === 'history' ? History
+              : tab?.kind === 'ai-history' ? Sparkles
               : tab?.kind === 'settings' ? Settings
               : first?.kind === 'ssh' ? SshIcon
                 : shellIconFor(first?.kind === 'local' ? first.shellType : undefined);
@@ -518,6 +519,7 @@ function TabRow({
   const displayTitle = useTabDisplayTitle(tab);
   const isSsh = first?.kind === 'ssh';
   const Icon = tab.kind === 'history' ? History
+    : tab.kind === 'ai-history' ? Sparkles
     : tab.kind === 'settings' ? Settings
       : isSsh ? SshIcon
         : shellIconFor(first?.kind === 'local' ? first.shellType : undefined);
@@ -546,6 +548,7 @@ function TabRow({
       onPointerDown={onPointerDown}
       renameInput={editing ? (
         <TextInput
+          className="inline-rename-input"
           autoFocus
           value={editTitle}
           onChange={(e) => setEditTitle(e.target.value)}
@@ -556,11 +559,6 @@ function TabRow({
             else if (e.key === 'Escape') onCancelEdit();
           }}
           onClick={(e) => e.stopPropagation()}
-          style={{
-            flex: 1, minWidth: 0, background: 'var(--field-bg)', border: '1px solid var(--border)',
-            borderRadius: 3, padding: '1px 4px', fontSize: 'calc(13px * var(--ui-font-scale))',
-            color: 'var(--text-primary)', outline: 'none', fontFamily: 'var(--font-ui)',
-          }}
         />
       ) : undefined}
       badge={tab.kind === 'session' && terms.length > 1 ? (

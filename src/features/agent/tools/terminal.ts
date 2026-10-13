@@ -13,6 +13,7 @@
  */
 
 import { tool } from 'ai';
+import { t } from '@i18n';
 import { DESC_READ_TERMINAL, DESC_TERMINAL_KEYS } from '@features/agent/model/toolTexts';
 import { z } from 'zod';
 import { ptyWrite } from '@platform/pty';
@@ -46,12 +47,13 @@ export function buildTerminalTools(ctx: ToolContext) {
       execute: async (_args, { toolCallId }) => {
         const g = await gate('read_terminal', {}, toolCallId, ctx);
         if (!g.proceed) return g.result;
-        const paneId = getFocusedTerminalId();
+        const paneId = ctx.paneId === undefined ? getFocusedTerminalId() : ctx.paneId;
+        if (!paneId) return { ok: false, error: t('No execution terminal is connected to this conversation.') };
         const ts = useTerminalStore.getState();
         if (!ts.sessions[paneId]) {
           return { ok: false, error: '没有可用的终端会话（请先打开一个终端）' };
         }
-        const screen = getTerminalScreen(paneId);
+        const screen = ts.scenes[paneId] === 'blockList' ? null : getTerminalScreen(paneId);
         if (screen) return { ok: true, ...screen };
         // 主 xterm 无实例（blockList）：用命令块输出拼出「画面」
         return {
@@ -80,19 +82,20 @@ export function buildTerminalTools(ctx: ToolContext) {
         if (error) {
           return { ok: false, error };
         }
-        if (normalized.length === 0) {
+        if (normalized.length === 0 && !wait_ms) {
           return { ok: false, error: '按键序列为空，请提供要发送的按键' };
         }
         if (normalized.length > 4096) {
           return { ok: false, error: '按键序列过长（>4096 字符），请分段发送' };
         }
-        const paneId = getFocusedTerminalId();
+        const paneId = ctx.paneId === undefined ? getFocusedTerminalId() : ctx.paneId;
+        if (!paneId) return { ok: false, error: t('No execution terminal is connected to this conversation.') };
         const sessionId = useTerminalStore.getState().sessions[paneId];
         if (!sessionId) {
           return { ok: false, error: '没有可用的终端会话（请先打开一个终端）' };
         }
         try {
-          await ptyWrite(sessionId, normalized);
+          if (normalized.length > 0) await ptyWrite(sessionId, normalized);
         } catch (e) {
           return { ok: false, error: `写入终端失败: ${e instanceof Error ? e.message : String(e)}` };
         }
@@ -102,6 +105,7 @@ export function buildTerminalTools(ctx: ToolContext) {
           ok: true,
           sent: normalized.length,
           decoded: normalized,
+          ...(normalized.length === 0 ? { waited_ms: wait } : {}),
           scene: useTerminalStore.getState().scenes[paneId] ?? 'classic',
         };
       },

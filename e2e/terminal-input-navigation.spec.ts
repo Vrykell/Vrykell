@@ -69,15 +69,15 @@ test('cwd menu searches folders, changes directories, and preserves the command 
   await expect(menu).toHaveCount(0);
 });
 
-test('command and AI mode icons share their size and the outer border follows window corners', async ({ page }) => {
+test('AI entry shares the command control size and the outer border follows window corners', async ({ page }) => {
   await ready(page);
-  const toggle = page.getByRole('button', { name: /切换到.*模式|切回命令模式/ });
-  await expect(toggle.locator('svg')).toHaveCSS('width', '18px');
-  const commandBounds = (await toggle.boundingBox())!;
-  await toggle.click();
+  const askAi = page.getByRole('button', { name: '询问 AI' });
+  await expect(askAi.locator('svg')).toHaveCSS('width', '18px');
+  const commandBounds = (await askAi.boundingBox())!;
+  await askAi.click();
   await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
-  await expect(toggle.locator('svg')).toHaveCSS('width', '18px');
-  const aiBounds = (await toggle.boundingBox())!;
+  await expect(askAi.locator('svg')).toHaveCSS('width', '18px');
+  const aiBounds = (await askAi.boundingBox())!;
   expect([aiBounds.width, aiBounds.height]).toEqual([commandBounds.width, commandBounds.height]);
   const border = await page.locator('.application-window').evaluate(element => {
     const style = getComputedStyle(element, '::after');

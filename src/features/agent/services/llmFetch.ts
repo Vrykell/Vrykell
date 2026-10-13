@@ -94,6 +94,14 @@ export function createProxyFetch(provider?: ProviderKind): typeof fetch {
 
     const abort = () => {
       invoke('llm_abort', { id }).catch(() => {});
+      // Rust cancels the request and returns silently, without a terminal event, so the local
+      // stream must settle here: a reader that never resolves would keep the consumer (the model
+      // stream and the turn built on it) pending forever after an abort.
+      try {
+        controller.error(new DOMException('The operation was aborted.', 'AbortError'));
+      } catch {
+        // stream already closed or errored
+      }
     };
     if (init?.signal) {
       if (init.signal.aborted) {

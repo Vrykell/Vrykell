@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, mockAnthropic, searchCalls, ptyWrites, ptyResizes } from './tauri-mock';
+import { setupTauriMock, mockAnthropic, searchCalls, ptyWrites, ptyResizes, ensureChatSettingsOpen } from './tauri-mock';
 import { gotoSetting } from './settings';
 
 test('saved custom Anthropic address is used by the next chat request', async ({ page }) => {
@@ -42,7 +42,7 @@ test('theme page font settings apply globally and are absent from other settings
   await page.getByRole('option', { name: 'DOM（边缘更干净）', exact: true }).click();
   await expect(fonts.getByRole('combobox', { name: '终端渲染器' })).toHaveText('DOM（边缘更干净）');
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('vrykell-typography')!).state.terminalRenderer)).toBe('dom');
-  await expect(page.getByRole('button', { name: '深色', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('radio', { name: '深色', exact: true })).toHaveAttribute('aria-checked', 'true');
   await expect(page.locator('aside').getByRole('button', { name: '主题', exact: true })).toHaveCSS('font-size', '15px');
   await page.keyboard.press('Meta+1');
   await expect.poll(async () => (await ptyResizes(page)).at(-1)!.cols).toBeLessThan(originalColumns);
@@ -65,7 +65,7 @@ test('theme page font settings apply globally and are absent from other settings
   await expect(fonts.getByRole('combobox', { name: '终端字号' })).toHaveText('14px');
   await expect(fonts.getByRole('combobox', { name: '终端渲染器' })).toHaveText('WebGL（默认）');
   await page.screenshot({ path: test.info().outputPath('settings.png') });
-  await page.getByRole('button', { name: '浅色', exact: true }).click();
+  await page.getByRole('radio', { name: '浅色', exact: true }).click();
   await page.screenshot({ path: test.info().outputPath('settings-light.png') });
 });
 
@@ -73,7 +73,8 @@ test('chat mode dropdown persists per model and replaces the two header toggles'
   await setupTauriMock(page);
   await page.goto('/');
   await page.locator('[data-dock-btn="chat"]').click();
-  const mode = page.getByRole('button', { name: '对话模式' });
+  const mode = page.getByRole('button', { name: '对话与审批模式' });
+  await ensureChatSettingsOpen(page);
   await page.mouse.move(0, 0);
   await expect(mode).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await expect(page.locator('[data-tip="深度思考（reasoning effort）"]')).toHaveCount(0);
@@ -82,34 +83,36 @@ test('chat mode dropdown persists per model and replaces the two header toggles'
   const modelBounds = await page.getByTestId('pill-name').boundingBox();
   expect(modeBounds!.x + modeBounds!.width).toBeLessThan(modelBounds!.x);
   await mode.press('ArrowDown');
-  const menu = page.getByRole('listbox', { name: '选择对话模式' });
-  await expect(menu).toHaveCSS('border-radius', '18px');
+  const menu = page.getByRole('listbox', { name: '对话与审批模式' });
+  // The menu uses the shared floating-surface radius.
+  await expect(menu).toHaveCSS('border-radius', '10px');
   await expect(menu.getByRole('option').first()).toHaveCSS('border-top-width', '0px');
-  await expect(menu.getByText('对话、解答与探索')).toBeVisible();
-  await expect(menu.getByText('使用工具，执行与完成任务')).toBeVisible();
-  await expect(menu.locator('svg')).toHaveCount(0);
-  const agent = menu.getByRole('option', { name: /^Agent 模式/ });
+  await expect(menu.getByText('只进行对话，不调用工具。')).toBeVisible();
+  await expect(menu.getByText('按工具设置判定。')).toBeVisible();
+  await expect(menu.getByRole('option')).toHaveCount(4);
+  const agent = menu.getByRole('option', { name: /^标准权限/ });
   await expect(agent).toBeFocused();
   await expect(agent).toHaveAttribute('aria-selected', 'true');
-  await agent.press('ArrowUp');
-  await menu.getByRole('option', { name: /^Chat 模式/ }).press('Enter');
+  await agent.press('Home');
+  await menu.getByRole('option', { name: /^纯聊天/ }).press('Enter');
   await expect(menu).toHaveCount(0);
   await expect(mode).toBeFocused();
   await page.mouse.move(0, 0);
-  await expect(mode).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(mode).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await mode.click();
   await page.mouse.move(0, 0);
   await page.screenshot({ path: test.info().outputPath('chat-mode-open.png') });
-  await page.getByRole('option', { name: /^Chat 模式/ }).press('Escape');
-  await expect(mode).toHaveText('Chat 模式');
+  await page.getByRole('option', { name: /^纯聊天/ }).press('Escape');
+  await expect(mode).toHaveAttribute('data-mode', 'chat');
   await page.reload();
-  await expect(mode).toHaveText('Chat 模式');
+  await ensureChatSettingsOpen(page);
+  await expect(mode).toHaveAttribute('data-mode', 'chat');
   await page.getByTestId('pill-name').click();
   await page.getByTestId('model-pick-m-main').click();
-  await expect(mode).toHaveText('Agent 模式');
+  await expect(mode).toHaveAttribute('data-mode', 'standard');
   await page.getByTestId('pill-name').click();
   await page.getByTestId('model-pick-m-local').click();
-  await expect(mode).toHaveText('Chat 模式');
+  await expect(mode).toHaveAttribute('data-mode', 'chat');
   await page.screenshot({ path: test.info().outputPath('chat-mode.png') });
 });
 

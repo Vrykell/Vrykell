@@ -1,14 +1,15 @@
 import { t } from '@i18n';
 /**
- * ModelPill — 模型选择胶囊（终端 AI 状态栏 / 聊天面板顶栏共用）。
+ * ModelPill — model selection control.
  *
- * 结构（约 7:3，竖线分隔）：
- *   [ 图标(稍大) · 模型名 ] | [ 思考强度 + 下拉提示 ]
- *  - 点击名称区 → 打开模型选择窗口（ModelPicker）
- *  - 点击强度区 → 原位打开思考强度下拉：宽度与胶囊一致、顶端对齐正好覆盖
- *    胶囊位置；下拉出现期间胶囊隐藏，选择完毕后关闭并恢复胶囊。
+ * Layout (about 7:3, split by a divider):
+ *   [ icon · model name ] | [ thinking level + chevron ]
+ *  - Clicking the name area opens the model picker dialog.
+ *  - Clicking the level area opens the thinking-level menu in place, matching the
+ *    control width and top edge; the control is hidden while the menu is open.
  *
- * 未悬停时胶囊透明无边框，只显示文字与图标；悬停显示背景。
+ * The control uses the same rounded-square shape as the permission button and stays
+ * transparent until hovered.
  */
 import { useEffect, useRef, useState } from 'react';
 import { iconSizes, ChevronDown, type AppIcon  } from '@ui/icons';
@@ -50,22 +51,16 @@ export default function ModelPill({ showThinking = true }: { showThinking?: bool
   return (
     <div
       ref={pillRef}
+      className="model-pill" data-picker-open={pickerOpen} data-level-open={levelOpen}
       data-testid="model-pill"
       style={{
         position: 'relative', flexShrink: showThinking ? 0 : 1, minWidth: 0, maxWidth: '100%',
         width: levelOpen && lockedWidth ? lockedWidth : 'fit-content',
         height: 32, boxSizing: 'border-box',
         display: 'flex', alignItems: 'stretch',
-        borderRadius: 999,
+        borderRadius: 8,
         overflow: levelOpen ? 'visible' : 'hidden',
-        background: 'transparent',
         transition: 'background 0.12s ease',
-      }}
-      onMouseEnter={(e) => {
-        if (!levelOpen && !pickerOpen) e.currentTarget.style.background = 'var(--button-hover)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'transparent';
       }}
     >
       {levelOpen ? (
@@ -124,11 +119,13 @@ export default function ModelPill({ showThinking = true }: { showThinking?: bool
           {/* 名称区（约 70%）：打开模型选择窗口 */}
           <button
             data-testid="pill-name"
+            aria-label={t('Choose model')}
             data-tip={t('Choose model')}
+            data-tip-description={name}
             onClick={() => setPickerOpen(true)}
             style={{
               flex: showThinking ? '0 0 auto' : '1 1 auto', minWidth: 0, display: 'flex', alignItems: 'center', gap: 6,
-              padding: '0 10px 0 12px', background: 'transparent', border: 'none',
+              padding: showThinking ? '0 10px 0 12px' : '0 10px', background: 'transparent', border: 'none',
               cursor: 'pointer',
             }}
           >
@@ -141,6 +138,7 @@ export default function ModelPill({ showThinking = true }: { showThinking?: bool
             >
               {displayName}
             </span>
+            {!showThinking && <ChevronDown size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />}
           </button>
           {showThinking && <><span
             style={{

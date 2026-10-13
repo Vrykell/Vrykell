@@ -72,9 +72,9 @@ test.describe('应用布局', () => {
   });
 
   test('底部输入栏支持 AI 模式切换', async ({ page }) => {
-    await page.getByRole('button', { name: '命令', exact: true }).click();
+    await page.getByRole('button', { name: '询问 AI', exact: true }).click();
     await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
-    await page.getByRole('button', { name: 'AI', exact: true }).click();
+    await page.locator('[data-dock-btn="chat"]').click();
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   });
 

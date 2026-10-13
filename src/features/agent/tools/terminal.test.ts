@@ -63,6 +63,7 @@ describe('read_terminal 工具', () => {
     termMock.state.sessions = { p1: 's1' };
     termMock.state.scenes = { p1: 'blockList' };
     termMock.state.dims = { p1: { cols: 100, rows: 30 } };
+    termMock.screen = { text: 'stale main buffer' };
     useBlockStore.setState({ byTab: { p1: [{ id: 'b1', command: 'ls', outputText: 'a.txt\nb.txt', status: 'done' } as never] } });
     const r = (await execOf(buildTerminalTools(CTX).read_terminal)({})) as {
       ok: boolean; scene: string; cols: number; rows: number; content: string;
@@ -83,6 +84,16 @@ describe('read_terminal 工具', () => {
 });
 
 describe('terminal_keys 工具', () => {
+  it('waits without writing when empty keys request a screen update', async () => {
+    vi.useFakeTimers();
+    try {
+      termMock.state.sessions = { p1: 's1' };
+      const result = execOf(buildTerminalTools(CTX).terminal_keys)({ keys: '', wait_ms: 3000 });
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(await result).toMatchObject({ ok: true, sent: 0, waited_ms: 3000 });
+      expect(invokeMock).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
   it('发送按键：\\xNN 归一化、wait_ms 透传、返回场景', async () => {
     termMock.state.sessions = { p1: 's1' };
     termMock.state.scenes = { p1: 'altScreen' };

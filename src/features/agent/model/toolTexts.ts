@@ -9,14 +9,12 @@
 // ── 命令执行（index.ts 的 run_command） ──
 
 export const DESC_RUN_COMMAND =
-  '在用户当前聚焦的终端 pane 中执行 shell 命令并等待完成，返回退出码与输出尾部。' +
-  '命令会显示在终端的输入块中（用户可见）。' +
-  '注意：全屏应用（vim/htop 等 altScreen）下会拒绝执行；命令执行中切入全屏界面会立即停止等待；' +
-  '无命令块信号的旧 shell 退化为输出快照（无法保证命令真正结束）；' +
-  '默认 120s 超时返回部分输出。交互式/长驻命令（如 dev server、TUI 程序）不要用此工具；' +
-  '全屏交互程序（vim/htop）改用 read_terminal + terminal_keys 驱动。' +
-  '命令文本可含 \\b、\\uXXXX 等控制字符（readline 会解析退格/清行等，如 "helo\\b" 输入为 "hel"）；' +
-  '需要真正的交互按键请用 terminal_keys。';
+  'Execute a shell command in this conversation’s selected terminal and wait for completion. ' +
+  'A completed result includes completed=true, the exit code and the output tail. ' +
+  'Classic POSIX shells report completion through a terminal marker; a quiet screen alone never proves completion. ' +
+  'If completed=false, the command may still be running: inspect it with read_terminal and do not queue another command until the shell is ready. ' +
+  'The default timeout is 120 seconds and stops waiting without terminating the process. ' +
+  'Use terminal_keys and read_terminal for interactive or long-running programs, not this tool.';
 
 // ── 文件（files.ts） ──
 
@@ -41,7 +39,8 @@ export const DESC_READ_TERMINAL =
   '注意：块列表场景返回最近命令块的输出尾部；光标只在 classic/altScreen 有意义。';
 
 export const DESC_TERMINAL_KEYS =
-  '向当前聚焦终端发送原始按键序列（驱动 vim、REPL 等交互程序）。不等待命令完成。' +
+  'Send raw keys to the selected execution terminal. This does not wait for command completion. ' +
+  'To wait for the screen to update without typing, use keys="" with a positive wait_ms (up to 3000). ' +
   '按键用转义表达，\\uXXXX 与 \\xNN 均可：\\u0000–\\u001f 对应 Ctrl+对应字符' +
   '（\\u0001=Ctrl+A、\\u0003=Ctrl+C、\\u0004=Ctrl+D、\\u0005=Ctrl+E、\\u0015=Ctrl+U、' +
   '\\u0017=Ctrl+W、\\u0018=Ctrl+X、\\u001a=Ctrl+Z）、\\b=退格、\\r=回车、\\t=Tab、\\n=换行、' +

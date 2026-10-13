@@ -4,6 +4,18 @@ import OverlayScrollbars, { scrollbarLayerHost } from '../OverlayScrollbars';
 
 beforeEach(() => vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} }));
 afterEach(() => { cleanup(); document.querySelectorAll('[data-test-surface]').forEach(element => element.remove()); vi.unstubAllGlobals(); });
+it('avoids existing surface ids after the manager remounts', async () => {
+  const first = document.createElement('textarea'); first.dataset.testSurface = ''; first.style.overflowY = 'auto'; document.body.append(first);
+  const initial = render(<OverlayScrollbars />);
+  await waitFor(() => expect(first.id).not.toBe(''));
+  const firstId = first.id;
+  initial.unmount();
+  render(<OverlayScrollbars />);
+  const second = document.createElement('textarea'); second.dataset.testSurface = ''; second.style.overflowY = 'auto'; document.body.append(second);
+  await waitFor(() => expect(second.id).not.toBe(''));
+  expect(second.id).not.toBe(firstId);
+  expect(first.id).toBe(firstId);
+});
 it('discovers dynamic scroll surfaces without wrapping their content and cleans up on unmount', async () => {
   const view = render(<OverlayScrollbars />);
   const region = document.createElement('div');

@@ -38,7 +38,8 @@ test('AI composer recovers its compact height after narrowing, widening and reop
   await expect(input).toHaveValue('测试布局恢复后的输入区域尺寸。'.repeat(3));
   await input.press('Escape');
   await expect(input).toHaveValue('');
-  await expect.poll(() => input.evaluate(element => element.clientHeight)).toBeLessThan(30);
+  // The compact composer row is line-height 22px plus 8px padding.
+  await expect.poll(() => input.evaluate(element => element.clientHeight)).toBeLessThanOrEqual(30);
 });
 
 test('terminal composer restores its height when the window width returns', async ({ page }) => {

@@ -55,7 +55,7 @@ for (const theme of ['深色', '浅色']) {
     await setupTauriMock(page);
     await page.goto('/');
     await gotoSetting(page, '主题');
-    await page.getByRole('button', { name: theme, exact: true }).click();
+    await page.getByRole('radio', { name: theme, exact: true }).click();
     await settleSurfaceColors(page);
     await page.mouse.move(0, 0);
     const preview = page.locator('.settings-terminal-preview');

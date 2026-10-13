@@ -1,40 +1,61 @@
 /**
- * 主题 Provider — 通过 React Context 管理 dark/light 切换。
- * 所有组件通过 useTheme() 获取当前模式和切换函数。
+ * 主题 Provider — 通过 React Context 管理外观偏好（深色 / 浅色 / 跟随系统）。
+ * 所有组件通过 useTheme() 获取当前生效模式与偏好。
  */
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
-import { getCurrentTheme, type ThemeMode } from '@config/theme/tokens';
+import {
+  readThemePreference, resolveThemeMode, persistThemePreference,
+  type ThemeMode, type ThemePreference,
+} from '@config/theme/tokens';
 import { applyTerminalTheme, useTerminalThemeStore } from '@features/settings/model/terminalTheme';
 
 interface ThemeCtx {
+  /** Palette mode currently applied (a 'system' preference is resolved). */
   mode: ThemeMode;
+  /** Stored choice: 'dark', 'light' or 'system'. */
+  preference: ThemePreference;
   toggle: () => void;
-  setMode: (m: ThemeMode) => void;
+  setMode: (preference: ThemePreference) => void;
 }
 
 const Ctx = createContext<ThemeCtx>({
   mode: 'dark',
+  preference: 'dark',
   toggle: () => {},
   setMode: () => {},
 });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [mode, setModeState] = useState<ThemeMode>(() => getCurrentTheme());
+  const [preference, setPreference] = useState<ThemePreference>(() => readThemePreference());
+  const [mode, setModeState] = useState<ThemeMode>(() => resolveThemeMode(readThemePreference()));
+
+  // Follow the operating system while the preference is 'system'.
+  useEffect(() => {
+    const sync = () => setModeState(resolveThemeMode(preference));
+    sync();
+    if (preference !== 'system' || typeof window.matchMedia !== 'function') return;
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    media.addEventListener('change', sync);
+    return () => media.removeEventListener('change', sync);
+  }, [preference]);
 
   useEffect(() => {
     // 明暗切换：重应用基础 palette + 背景层不透明度 + xterm 主题
     applyTerminalTheme(useTerminalThemeStore.getState().config, mode);
   }, [mode]);
 
+  const apply = useCallback((next: ThemePreference) => {
+    persistThemePreference(next);
+    setPreference(next);
+  }, []);
+
   const toggle = useCallback(() => {
-    setModeState((prev) => (prev === 'dark' ? 'light' : 'dark'));
-  }, []);
+    apply(resolveThemeMode(preference) === 'dark' ? 'light' : 'dark');
+  }, [apply, preference]);
 
-  const setMode = useCallback((m: ThemeMode) => {
-    setModeState(m);
-  }, []);
+  const setMode = useCallback((next: ThemePreference) => apply(next), [apply]);
 
-  return <Ctx.Provider value={{ mode, toggle, setMode }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ mode, preference, toggle, setMode }}>{children}</Ctx.Provider>;
 }
 
 export function useTheme(): ThemeCtx {

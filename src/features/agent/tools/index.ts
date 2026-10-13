@@ -12,6 +12,8 @@
 import { tool, type ToolSet } from 'ai';
 import { DESC_RUN_COMMAND } from '@features/agent/model/toolTexts';
 import { z } from 'zod';
+import { executionPaneSpec } from '../services/executionTarget';
+import { getFocusedTerminalId } from '@features/terminal';
 import { runCommandAndWait } from '@features/agent/tools/runCommand';
 import { buildFileTools } from '@features/agent/tools/files';
 import { buildSearchTools } from '@features/agent/tools/search';
@@ -25,6 +27,10 @@ import { gate, levelOf, ensureSkillAccess, TOOL_NAMES, type ToolContext } from '
 export type { ToolContext } from '@features/agent/stores/permissions';
 
 export function buildTools(ctx: ToolContext) {
+  // Older callers may omit the environment; the selected pane still determines file access.
+  const paneId = ctx.paneId === undefined ? getFocusedTerminalId() : ctx.paneId;
+  const pane = executionPaneSpec(paneId);
+  ctx = { ...ctx, paneId, remote: ctx.remote || pane?.kind === 'ssh' };
   const all = {
     run_command: tool({
       description: DESC_RUN_COMMAND,
@@ -36,7 +42,7 @@ export function buildTools(ctx: ToolContext) {
         if (!g.proceed) return g.result;
         const t = await ensureSkillAccess(command, toolCallId, ctx);
         if (!t.proceed) return { ok: false, denied: true, error: t.error };
-        return runCommandAndWait(command, { signal: abortSignal ?? ctx.signal, toolCallId });
+        return runCommandAndWait(command, { signal: abortSignal ?? ctx.signal, toolCallId, paneId: ctx.paneId });
       },
     }),
     ...buildFileTools(ctx),
@@ -51,6 +57,8 @@ export function buildTools(ctx: ToolContext) {
   // deny 级工具不注册（模型根本看不到，比 execute 拒绝更省 token）
   const out: ToolSet = {};
   for (const name of TOOL_NAMES) {
+    if (ctx.paneId === null && ['run_command', 'read_terminal', 'terminal_keys'].includes(name)) continue;
+    if (ctx.remote && ['read_file', 'write_file', 'edit_file', 'list_dir', 'search_files'].includes(name)) continue;
     const t = all[name];
     if (t && levelOf(name) !== 'deny') out[name] = t as ToolSet[string];
   }

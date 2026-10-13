@@ -118,6 +118,8 @@ export interface ThemePalette {
   codeBg: string;
   thBg: string;
   commandBlockBg: string;     // CommandBlock 微妙的背景
+  aiBlockBg: string;
+  failedBlockBg: string;
   scrollbarThumb: string;
   scrollbarThumbHover: string;
   apiKeyBg: string;
@@ -244,7 +246,9 @@ const dark: ThemePalette = {
   tuiBanner: '#BCBCBC',
   codeBg: 'rgba(255,255,255,0.06)',
   thBg: 'rgba(255,255,255,0.05)',
-  commandBlockBg: 'rgba(255,255,255,0.03)',
+  commandBlockBg: '#292929',
+  aiBlockBg: '#1E2B38',
+  failedBlockBg: '#392324',
   scrollbarThumb: 'rgba(255,255,255,0.12)',
   scrollbarThumbHover: 'rgba(255,255,255,0.2)',
   apiKeyBg: 'rgba(255,255,255,0.06)',
@@ -396,7 +400,9 @@ const light: ThemePalette = {
   tuiBanner: '#4F4F4F',
   codeBg: 'rgba(0,0,0,0.04)',
   thBg: 'rgba(0,0,0,0.03)',
-  commandBlockBg: 'rgba(0,0,0,0.02)',
+  commandBlockBg: '#F0F0F0',
+  aiBlockBg: '#DBEAF9',
+  failedBlockBg: '#F6E9E9',
   scrollbarThumb: 'rgba(0,0,0,0.18)',
   scrollbarThumbHover: 'rgba(0,0,0,0.3)',
   apiKeyBg: 'rgba(46,46,46,0.06)',
@@ -430,6 +436,32 @@ const light: ThemePalette = {
 export type ThemeMode = 'dark' | 'light';
 
 export const themes: Record<ThemeMode, ThemePalette> = { dark, light };
+
+/** Stored appearance choice; 'system' follows the operating system. */
+export type ThemePreference = ThemeMode | 'system';
+
+const THEME_PREFERENCE_KEY = 'vrykell-theme-mode';
+
+/** Read the persisted appearance choice; 'dark' keeps the historical default. */
+export function readThemePreference(): ThemePreference {
+  try {
+    const stored = localStorage.getItem(THEME_PREFERENCE_KEY);
+    if (stored === 'dark' || stored === 'light' || stored === 'system') return stored;
+  } catch { /* storage unavailable */ }
+  return 'dark';
+}
+
+export function persistThemePreference(preference: ThemePreference): void {
+  try { localStorage.setItem(THEME_PREFERENCE_KEY, preference); } catch { /* storage unavailable */ }
+}
+
+/** Resolve a stored choice to the palette mode that should be applied. */
+export function resolveThemeMode(preference: ThemePreference): ThemeMode {
+  if (preference !== 'system') return preference;
+  const prefersDark = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  return prefersDark ? 'dark' : 'light';
+}
 
 /** Palette → CSS 自定义属性映射 */
 export function paletteToCssVars(p: ThemePalette): Record<string, string> {
@@ -507,6 +539,8 @@ export function paletteToCssVars(p: ThemePalette): Record<string, string> {
     '--code-bg': p.codeBg,
     '--th-bg': p.thBg,
     '--command-block-bg': p.commandBlockBg,
+    '--ai-block-bg': p.aiBlockBg,
+    '--failed-block-bg': p.failedBlockBg,
     '--scrollbar-thumb': p.scrollbarThumb,
     '--scrollbar-thumb-hover': p.scrollbarThumbHover,
     '--api-key-bg': p.apiKeyBg,

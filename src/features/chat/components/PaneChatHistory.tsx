@@ -9,7 +9,8 @@ export default function PaneChatHistory({ paneId }: { paneId: string }) {
   const exchanges = useMemo(() => toExchanges(messages), [messages]);
   if (!exchanges.length) return null;
   return <div className="scroll-region" data-testid="terminal-chat-history"
-    style={{ maxHeight: '50%', minHeight: 0, flexShrink: 1, overflowY: 'auto', padding: '4px 16px 8px' }}>
-    {exchanges.map((exchange) => <AiBlock key={exchange.id} exchange={exchange} />)}
+    style={{ maxHeight: '50%', minHeight: 0, flexShrink: 1, overflowY: 'auto', padding: '4px 0 8px' }}>
+    {exchanges.map((exchange, index) => <AiBlock key={exchange.id} exchange={exchange} dividerBefore={index > 0}
+      style={{ paddingLeft: 16, paddingRight: 16 }} />)}
   </div>;
 }

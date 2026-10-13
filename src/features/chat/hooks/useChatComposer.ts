@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SendOptions } from '@features/chat/stores/chat';
 import type { AttachmentMeta } from '@features/agent/model/attachments';
+import type { TerminalReference } from '../model/conversation';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 import { useAutoSizeTextarea } from '@ui/hooks/useAutoSizeTextarea';
 
@@ -17,6 +18,9 @@ interface UseChatComposerOptions {
   value?: string;
   onTextChange?: (text: string) => void;
   scopeKey?: string;
+  conversationId?: string;
+  references?: TerminalReference[];
+  clearReferences?: () => void;
 }
 
 /** Manage composer drafts, question history, keyboard actions and submission. */
@@ -33,6 +37,9 @@ export function useChatComposer({
   value,
   onTextChange,
   scopeKey,
+  conversationId,
+  references,
+  clearReferences,
 }: UseChatComposerOptions) {
   const [localText, setLocalText] = useState('');
   const text = value ?? localText;
@@ -78,15 +85,16 @@ export function useChatComposer({
 
   const submit = useCallback(() => {
     const question = text.trim();
-    if ((!question && attachments.length === 0) || sending || !isSession) return;
+    if ((!question && attachments.length === 0 && !references?.length) || sending || !isSession) return;
     terminalDebug('chat-composer-submit', { paneId: targetPane, characters: question.length, attachmentCount: attachments.length });
 
     setText('');
     resetHistory();
     const payload = attachments.length > 0 ? attachments : undefined;
     clearAttachments();
-    void send(question, { paneId: targetPane, attachments: payload });
-  }, [attachments, clearAttachments, isSession, resetHistory, send, sending, targetPane, text, setText]);
+    clearReferences?.();
+    void send(question, { paneId: targetPane, attachments: payload, ...(conversationId ? { conversationId, references } : {}) });
+  }, [attachments, clearAttachments, clearReferences, conversationId, references, isSession, resetHistory, send, sending, targetPane, text, setText]);
 
   const handleChange = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
     resetHistory();
@@ -110,7 +118,7 @@ export function useChatComposer({
   return {
     text,
     inputRef,
-    canSend: (!!text.trim() || attachments.length > 0) && !sending && isSession,
+    canSend: (!!text.trim() || attachments.length > 0 || !!references?.length) && !sending && isSession,
     submit,
     handleChange,
     handleKeyDown,

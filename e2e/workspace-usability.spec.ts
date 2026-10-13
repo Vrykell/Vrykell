@@ -60,7 +60,7 @@ test('terminal error notifications follow the active gray theme and can be close
   });
   for (const theme of ['深色', '浅色']) {
     await gotoSetting(page, '主题');
-    await page.getByRole('button', { name: theme, exact: true }).click();
+    await page.getByRole('radio', { name: theme, exact: true }).click();
     await page.keyboard.press('Meta+1');
     const input = page.getByPlaceholder(/输入命令/);
     const command = `echo notification-${theme === '浅色' ? 'light' : 'dark'}`;
@@ -188,7 +188,7 @@ test('settings and terminal use the same color hierarchy in both themes', async 
   const darkFrame = await background('.workspace-titlebar');
   await page.locator('aside').getByRole('button', { name: '主题', exact: true }).click();
   for (const label of ['浅色', '深色']) {
-    await page.getByRole('button', { name: label, exact: true }).click();
+    await page.getByRole('radio', { name: label, exact: true }).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', label === '浅色' ? 'light' : 'dark');
     expect(await background('.workspace-titlebar')).toBe(await background('.workspace-activity-bar'));
     expect(await background('.workspace-titlebar')).not.toBe(await background('main'));
@@ -256,7 +256,7 @@ test('narrow layouts preserve command space and fit the toolbar', async ({ page 
 });
 
 test('AI drafts stay separate when opening the AI assistant', async ({ page }) => {
-  await page.getByRole('button', { name: '命令', exact: true }).click();
+  await page.getByRole('button', { name: '询问 AI', exact: true }).click();
   await page.getByPlaceholder(/自然语言描述/).fill('帮我解释这个项目');
   await page.locator('[data-dock-btn="chat"]').click();
   const command = page.getByPlaceholder(/输入命令/);
@@ -264,16 +264,16 @@ test('AI drafts stay separate when opening the AI assistant', async ({ page }) =
   await command.press('Enter');
   expect(await ptyWrites(page)).not.toContain('帮我解释这个项目\n');
   await page.locator('[data-dock-btn="chat"]').click();
-  await page.getByRole('button', { name: '命令', exact: true }).click();
+  await page.getByRole('button', { name: '询问 AI', exact: true }).click();
   await expect(page.getByPlaceholder(/自然语言描述/)).toHaveValue('帮我解释这个项目');
 });
 
 test('separate command and AI drafts survive repeated switches', async ({ page }) => {
   await page.getByPlaceholder(/输入命令/).fill('git status');
-  await page.getByRole('button', { name: '命令', exact: true }).click();
+  await page.getByRole('button', { name: '询问 AI', exact: true }).click();
   await expect(page.getByPlaceholder(/自然语言描述/)).toHaveValue('');
   await page.getByPlaceholder(/自然语言描述/).fill('解释当前修改');
-  await page.getByRole('button', { name: 'AI', exact: true }).click();
+  await page.locator('[data-dock-btn="chat"]').click();
   await expect(page.getByPlaceholder(/输入命令/)).toHaveValue('git status');
 });
 

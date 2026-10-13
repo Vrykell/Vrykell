@@ -121,7 +121,7 @@ describe('workspace store', () => {
     expect(s.tabs).toHaveLength(2);
   });
 
-  it.each(['history', 'settings'] as const)('keeps %s singleton through direct creation and duplication', kind => {
+  it.each(['history', 'ai-history', 'settings'] as const)('keeps %s singleton through direct creation and duplication', kind => {
     const ws = useWorkspaceStore.getState();
     const id = ws.addTab({ kind });
     ws.activate(ws.tabs[0]!.id);
@@ -130,6 +130,18 @@ describe('workspace store', () => {
     ws.duplicateTab(id);
     expect(useWorkspaceStore.getState().tabs.filter(tab => tab.kind === kind)).toHaveLength(1);
     expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it('opens and restores one AI history page independently of terminal sessions', () => {
+    const ws = useWorkspaceStore.getState();
+    ws.openAiHistoryTab();
+    const id = useWorkspaceStore.getState().activeId;
+    expect(useWorkspaceStore.getState().tabs.find(tab => tab.id === id)?.kind).toBe('ai-history');
+    ws.openAiHistoryTab();
+    expect(useWorkspaceStore.getState().tabs.filter(tab => tab.kind === 'ai-history')).toHaveLength(1);
+    ws.closeTab(id);
+    ws.undoCloseTab();
+    expect(useWorkspaceStore.getState().tabs.filter(tab => tab.kind === 'ai-history')).toHaveLength(1);
   });
 
   it('allows OSC titles to override a copied manual title while retaining the copy fallback', () => {

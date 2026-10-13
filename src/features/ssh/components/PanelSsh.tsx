@@ -180,7 +180,7 @@ export default function PanelSsh() {
         )}
       </div>
 
-      <ListReorderPreview>
+      <ListReorderPreview listId={LIST_ID}>
         {() => <SshIcon size={iconSizes.row} />}
       </ListReorderPreview>
 

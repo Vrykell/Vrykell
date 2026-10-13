@@ -79,13 +79,13 @@ test('native SSH recordings distinguish an empty directory from missing command 
   const blocks = page.locator('[data-testid^="command-block-"]');
   await expect(blocks).toHaveCount(4);
   await expect(blocks.nth(0).getByTestId('exit-code')).toHaveText('0');
-  await expect(blocks.nth(0).locator('[data-selectable]')).toHaveCount(1);
+  // An empty directory leaves no output region: the block keeps only its info row and command.
+  await expect(blocks.nth(0).locator('.command-block-output')).toHaveCount(0);
   await expect(page.getByText('命令未产生输出')).toHaveCount(0);
   await expect(blocks.nth(1).locator('[data-selectable]').last()).toContainText('/home/fixture');
   await expect(blocks.nth(2).locator('[data-selectable]').last()).toContainText('share');
   await expect(blocks.nth(3).locator('[data-selectable]').last()).toContainText('stderr-visible');
   await expect(blocks.nth(0).getByRole('button', { name: /展开|折叠/ })).toHaveCount(0);
-  await expect(blocks.nth(0).locator('[data-selectable]')).toHaveCount(1);
   await page.screenshot({ path: test.info().outputPath('ssh-conpty-empty-and-visible-output.png') });
 });
 

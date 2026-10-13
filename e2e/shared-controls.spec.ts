@@ -1,22 +1,23 @@
 import { test, expect } from '@playwright/test';
-import { setupTauriMock } from './tauri-mock';
+import { setupTauriMock, ensureChatSettingsOpen } from './tauri-mock';
 import { gotoSetting } from './settings';
 
 test('composer controls share permission state, theme overrides and concise hover hints', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
-  await page.getByRole('button', { name: '切换到 AI 模式', exact: true }).first().click();
-  const permission = page.getByTestId('permission-mode-button').first();
-  await expect(permission).toHaveAccessibleName('标准权限');
+  await page.getByRole('button', { name: '询问 AI', exact: true }).first().click();
+  await ensureChatSettingsOpen(page);
+  const permission = page.getByTestId('chat-approval-select').first();
+  await expect(permission).toHaveAttribute('data-mode', 'standard');
   await permission.hover();
   const tooltip = page.getByTestId('app-tooltip');
   await expect(tooltip).toContainText('按工具设置判定。');
   expect(await tooltip.textContent()).not.toMatch(/[；;（）]/);
   await permission.click();
-  await expect(permission).toHaveAccessibleName('严格权限');
-  await page.getByRole('button', { name: 'AI 助手', exact: true }).click();
-  await expect(page.getByTestId('permission-mode-button')).toHaveCount(1);
-  await expect(page.getByTestId('permission-mode-button').last()).toHaveAccessibleName('严格权限');
+  await page.getByRole('option', { name: /^严格权限/ }).click();
+  await expect(permission).toHaveAttribute('data-mode', 'strict');
+  await expect(page.getByTestId('chat-approval-select')).toHaveCount(1);
+  await expect(page.getByTestId('chat-approval-select').last()).toHaveAttribute('data-mode', 'strict');
   await page.evaluate(() => {
     document.documentElement.style.setProperty('--icon-color', '#abcdef');
     document.documentElement.style.setProperty('--control-hover-bg', '#334455');
@@ -27,8 +28,9 @@ test('composer controls share permission state, theme overrides and concise hove
   await expect(attachment).toHaveCSS('background-color', 'rgb(51, 68, 85)');
   await expect(attachment).toHaveCSS('color', 'rgb(255, 255, 255)');
   await page.getByRole('button', { name: 'AI 助手', exact: true }).click();
-  await page.getByRole('button', { name: '切换到 AI 模式', exact: true }).first().click();
-  await expect(page.getByTestId('permission-mode-button')).toHaveAccessibleName('严格权限');
+  await page.getByRole('button', { name: '询问 AI', exact: true }).first().click();
+  await ensureChatSettingsOpen(page);
+  await expect(page.getByTestId('chat-approval-select')).toHaveAttribute('data-mode', 'strict');
   const send = page.getByRole('button', { name: '发送', exact: true });
   await expect(send).toBeDisabled();
   await expect(send).toHaveAttribute('data-tip-shortcut', 'Enter');

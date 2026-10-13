@@ -1,25 +1,21 @@
 /**
- * runCommand — run_command 工具的核心：「写 PTY 等块完成」。
- *
- * 流程：
- *   1. 目标 pane = 当前聚焦 pane（terminal.getFocusedTerminalId）
- *   2. altScreen（vim/htop 等全屏 TUI）拒绝执行
- *   3. 快照现有 block id → ptyWrite(command + '\n')
- *   4. 订阅 blockStore：新 block 且 command 匹配 → 打 agent 投影标记；
- *      status 转 done/interrupted → resolve（exitCode + outputText 尾部）
- *   5. classic 降级：1500ms 内无新 block（无 OSC 133 的 shell）→ 快照模式，
- *      轮询终端缓冲尾部，输出稳定 1s 视为完成
- *   6. 默认超时 120s 返回部分输出；abort 立即停止等待（命令本身留在终端里）
- *
- * 约定：永不 throw —— 返回结构化结果，让模型自我修正。
+ * Execute against the captured terminal target and return structured results.
+ * Integrated shells complete through command blocks; classic POSIX shells use
+ * private markers parsed by the existing terminal. Quiet output is unconfirmed.
+ * Cancellation and timeout stop waiting without terminating the terminal process.
  */
 
 import { ptyWrite } from '@platform/pty';
+import { t } from '@i18n';
+import { executionPaneSpec } from '../services/executionTarget';
+import { diagnostic } from '@platform/diagnostics';
 import {
   useTerminalStore,
   useBlockStore,
   getFocusedTerminalId,
   getRecentOutputFor,
+  watchShellCommandCompletion,
+  type ShellCommandCompletion,
 } from '@features/terminal';
 import { agentControl } from '@features/agent/services/agentControl';
 
@@ -30,6 +26,7 @@ export interface RunCommandResult {
   /** 输出尾部（≤8KB） */
   output: string;
   error?: string;
+  completed?: boolean;
 }
 
 const OUTPUT_CAP = 8192;
@@ -42,13 +39,18 @@ function tail(s: string): string {
 
 export async function runCommandAndWait(
   command: string,
-  opts?: { signal?: AbortSignal; timeoutMs?: number; toolCallId?: string },
+  opts?: { signal?: AbortSignal; timeoutMs?: number; toolCallId?: string; paneId?: string | null },
 ): Promise<RunCommandResult> {
-  const paneId = getFocusedTerminalId();
+  const paneId = opts?.paneId === undefined ? getFocusedTerminalId() : opts.paneId;
+  if (!paneId) return { ok: false, output: '', error: t('No execution terminal is connected to this conversation.') };
   const ts = useTerminalStore.getState();
   const sessionId = ts.sessions[paneId];
   if (!sessionId) {
     return { ok: false, output: '', error: '没有可用的终端会话（请先打开一个终端）' };
+  }
+  if (opts?.signal?.aborted) return { ok: false, completed: false, output: '', error: t('Command cancelled before execution.') };
+  if (agentControl.isControlled(paneId) || (useBlockStore.getState().byTab[paneId] ?? []).some(block => block.status === 'executing')) {
+    return { ok: false, completed: false, output: '', error: t('The terminal is busy. Use read_terminal to inspect it before sending another command.') };
   }
   if (ts.scenes[paneId] === 'altScreen') {
     return {
@@ -66,13 +68,20 @@ export async function runCommandAndWait(
   // startedAt >= t0（preexec 时刻）才覆盖「旧 pending 块转 executing」路径。
   const t0 = Date.now();
 
+  const pane = executionPaneSpec(paneId);
+  const posix = pane?.kind === 'ssh' || ['bash', 'zsh', 'sh'].includes(pane?.shellType ?? '');
+  const completion = ts.scenes[paneId] === 'classic' && posix ? watchShellCommandCompletion(paneId) : null;
   agentControl.acquire(paneId);
+  diagnostic('agent-command-start', { paneId, completionMode: completion ? 'marker' : 'block' });
   try {
-    await ptyWrite(sessionId, command.endsWith('\n') ? command : command + '\n');
-    return await waitForCompletion(paneId, command, t0, opts?.toolCallId, opts?.signal, timeoutMs);
+    await ptyWrite(sessionId, completion ? completion.wrap(command) : command.endsWith('\n') ? command : command + '\n');
+    const result = await waitForCompletion(paneId, command, t0, opts?.toolCallId, opts?.signal, timeoutMs, completion);
+    diagnostic('agent-command-completion', { paneId, completed: result.completed ?? false, ok: result.ok, exitCode: result.exitCode, outputChars: result.output.length });
+    return result;
   } catch (e) {
     return { ok: false, output: '', error: `写入终端失败: ${e instanceof Error ? e.message : String(e)}` };
   } finally {
+    completion?.dispose();
     agentControl.release(paneId);
   }
 }
@@ -84,6 +93,7 @@ function waitForCompletion(
   toolCallId: string | undefined,
   signal: AbortSignal | undefined,
   timeoutMs: number,
+  completion: ShellCommandCompletion | null,
 ): Promise<RunCommandResult> {
   return new Promise((resolve) => {
     let settled = false;
@@ -92,12 +102,15 @@ function waitForCompletion(
     let trackedId: string | null = null;
 
     let doneGraceTimer: ReturnType<typeof setTimeout> | null = null;
+    let unsubCompletion: (() => void) | undefined;
 
     const finish = (r: RunCommandResult) => {
       if (settled) return;
       settled = true;
       unsub?.();
       unsubScene?.();
+      unsubCompletion?.();
+      signal?.removeEventListener('abort', onAbort);
       if (snapshotTimer) clearInterval(snapshotTimer);
       if (doneGraceTimer) clearTimeout(doneGraceTimer);
       clearTimeout(graceTimer);
@@ -127,6 +140,7 @@ function waitForCompletion(
       if (!b || (b.status !== 'done' && b.status !== 'interrupted')) return null;
       return {
         ok: b.status === 'done' && b.exitCode === 0,
+        completed: true,
         exitCode: b.exitCode ?? undefined,
         output: tail(b.outputText),
         error:
@@ -150,9 +164,7 @@ function waitForCompletion(
       }, 350);
     };
 
-    /** classic 降级：无 OSC 133 时轮询缓冲尾部，输出稳定视为完成。
-     *  注意：不打 error 字段——快照也是真实输出，标 error 会让模型误判
-     *  「命令没执行」并向用户道歉（快照降级已在工具 description 里声明）。 */
+    /** A quiet screen is a snapshot, never evidence of command completion. */
     const startSnapshotMode = () => {
       let last = '';
       let stable = 0;
@@ -161,7 +173,7 @@ function waitForCompletion(
         if (cur === last) {
           stable += 1;
           if (stable >= 2) {
-            finish({ ok: true, output: tail(cur) });
+            finish({ ok: false, completed: false, output: tail(cur), error: t('Command completion could not be confirmed. This is a terminal snapshot; use read_terminal and do not queue more commands until the shell is ready.') });
           }
         } else {
           last = cur;
@@ -201,23 +213,37 @@ function waitForCompletion(
           if (fallback) claim(fallback.id);
         }
         settleIfDone();
-        if (!settled && !trackedId) startSnapshotMode();
+        if (!settled && !trackedId && !completion) startSnapshotMode();
       }
     }, BLOCK_GRACE_MS);
 
     const timeoutTimer = setTimeout(() => {
       const out = getRecentOutputFor(paneId, 30);
-      finish({ ok: false, output: tail(out), error: `执行超时（${Math.round(timeoutMs / 1000)}s），以上为已有输出` });
+      finish({ ok: false, completed: false, output: tail(out), error: t('Command timed out after {{seconds}} seconds. It may still be running; use read_terminal before sending another command.', { seconds: Math.round(timeoutMs / 1000) }) });
     }, timeoutMs);
 
-    signal?.addEventListener('abort', () => {
-      finish({ ok: false, output: tail(getRecentOutputFor(paneId, 30)), error: '已中止（命令可能仍在终端中运行）' });
-    }, { once: true });
+    const onAbort = () => {
+      finish({ ok: false, completed: false, output: tail(getRecentOutputFor(paneId, 30)), error: t('Stopped waiting. The command may still be running in the terminal.') });
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
 
     // 订阅块流：认领新块（打 agent 标记）→ 等终态
     unsub = useBlockStore.subscribe(() => {
       if (!trackedId) tryClaim();
       settleIfDone();
     });
+    const settleCompletion = () => {
+      const result = completion?.result();
+      if (result) finish({ ok: result.exitCode === 0, completed: true, exitCode: result.exitCode, output: tail(result.output),
+        ...(result.exitCode !== 0 ? { error: t('Exit code: {{code}}', { code: result.exitCode }) } : {}) });
+    };
+    unsubCompletion = completion?.subscribe(settleCompletion);
+    if (signal?.aborted) onAbort();
+    else if (useTerminalStore.getState().scenes[paneId] === 'altScreen') {
+      finish({ ok: false, completed: false, output: '', error: t('The command entered an interactive screen. Use read_terminal and terminal_keys to continue.') });
+    } else {
+      settleCompletion();
+      if (!settled) { tryClaim(); settleIfDone(); }
+    }
   });
 }

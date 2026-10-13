@@ -1,5 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
-import { setupTauriMock } from './tauri-mock';
+import { setupTauriMock, ensureChatSettingsOpen } from './tauri-mock';
 import { gotoSetting } from './settings';
 
 async function surfaceStyle(surface: Locator) {
@@ -57,7 +57,7 @@ for (const theme of ['深色', '浅色']) {
     await setupTauriMock(page);
     await page.goto('/');
     await gotoSetting(page, '主题');
-    await page.getByRole('button', { name: theme, exact: true }).click();
+    await page.getByRole('radio', { name: theme, exact: true }).click();
     await page.keyboard.press('Meta+1');
     await search(page);
 
@@ -88,6 +88,7 @@ for (const theme of ['深色', '浅色']) {
     await expect(page.getByText('notes.txt', { exact: true })).toBeVisible();
 
     await page.locator('[data-dock-btn="chat"]').click();
+    await ensureChatSettingsOpen(page);
     await page.getByTestId('pill-name').first().click();
     const models = page.getByRole('dialog', { name: '选择模型' });
     await assertSurface(models, true);
@@ -97,10 +98,12 @@ for (const theme of ['深色', '浅色']) {
     await expect(models).toBeHidden();
     await assertSurface(page.getByRole('status').filter({ hasText: '已切换到' }));
     await page.locator('[data-dock-btn="chat"]').click();
-    await page.getByRole('button', { name: '命令', exact: true }).click();
-    await page.getByTestId('pill-level').first().click();
-    await assertSurface(page.getByTestId('think-level-menu'));
-    await page.getByTestId('think-option-high').click();
-    await expect(page.getByTestId('think-level-menu')).toBeHidden();
+    await page.getByRole('button', { name: '询问 AI', exact: true }).click();
+    await ensureChatSettingsOpen(page);
+    await page.getByRole('button', { name: '对话与审批模式' }).click();
+    const modes = page.getByRole('listbox', { name: '对话与审批模式' });
+    await assertSurface(modes);
+    await page.getByRole('option', { name: /^纯聊天/ }).click();
+    await expect(modes).toBeHidden();
   });
 }

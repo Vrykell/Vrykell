@@ -3,18 +3,14 @@ import { TextArea } from '@ui/TextInput';
 import KeyHint from '@ui/KeyHint';
 import { IconButton } from '@ui/IconButton';
 import { TextButton } from '@ui/TextButton';
-import { PermissionModeButton } from '@features/agent';
 /** Pane-scoped composer with separate input and context-chip rows. */
 
 import { iconSizes,
-  ArrowUp, ArrowDown, DollarSign, Columns2, GitBranch, Paperclip,
-  Square, X, Zap,
+  ArrowDown, DollarSign, Columns2, GitBranch, X, Sparkles,
  } from '@ui/icons';
-import ContextRing from '@features/chat/components/ContextRing';
 import { useUiStore } from '@features/workspace';
 import { useSessionStore } from '@features/workspace';
 import { getLongRunningHint } from '@features/terminal/inputVisibility';
-import AttachmentChips from '@features/chat/components/AttachmentChips';
 import ShellIndicator from '@features/terminal/components/ShellIndicator';
 import { useInputEditorController } from '@features/terminal/hooks/useInputEditorController';
 import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
@@ -53,37 +49,20 @@ export default function InputEditor({
   const {
     inputRef,
     text,
-    aiMode,
-    setAiMode,
-    toggleAiMode,
+    askAi,
     isFocused,
     hasSession,
     tabCwd,
     terminalLabel,
     recentGitBranch,
     visible,
-    chatOpen,
-    sendingHere,
-    activeId,
-    abortStream,
-    permMode,
-    setPermMode,
-    atts,
-    previewId,
     panelRef,
-    pickFiles,
-    addBlobs,
-    togglePreview,
-    removeAttachment,
-    canSendAi,
     ghost,
-    execute,
     handleChange,
-    handlePaste,
     handleKeyDown,
   } = useInputEditorController({ paneId, focused, isLongRunning, onEndPress });
   const commandHighlighting = useTypographyStore(state => state.commandHighlighting);
-  const highlightInput = commandHighlighting && !aiMode && !!text;
+  const highlightInput = commandHighlighting && !!text;
   const overlayRef = useRef<HTMLDivElement>(null);
 
   if (forceHidden) return null;
@@ -137,30 +116,12 @@ export default function InputEditor({
     }}>
       <div
         className="terminal-composer"
-        style={{
-          padding: '10px 12px 8px',
-        }}
-        onDragOver={(e) => { if (aiMode) e.preventDefault(); }}
-        onDrop={(e) => {
-          if (!aiMode) return;
-          e.preventDefault();
-          void addBlobs(Array.from(e.dataTransfer.files));
-        }}
+        style={{ padding: '10px 12px 8px' }}
       >
         <div className="terminal-composer-heading">
-          <span>{aiMode ? t('AI chat') : t('Command input')}</span>
-          <span className="composer-key-hints"><KeyHint shortcut="Enter" />{aiMode ? t('Send') : t('Run')}<KeyHint shortcut="Shift+Enter" />{t('New line')}</span>
+          <span>{t('Command input')}</span>
+          <span className="composer-key-hints"><KeyHint shortcut="Enter" />{t('Run')}<KeyHint shortcut="Shift+Enter" />{t('New line')}</span>
         </div>
-
-        {/* 附件 chips（仅 AI 模式，随发送清空） */}
-        {aiMode && atts.length > 0 && (
-          <AttachmentChips
-            atts={atts}
-            previewId={previewId}
-            onPreview={togglePreview}
-            onRemove={removeAttachment}
-          />
-        )}
 
         {/* 输入行 — $/⚡ prompt + textarea + ghost overlay */}
         <div
@@ -170,12 +131,7 @@ export default function InputEditor({
             gap: 4,
           }}
         >
-          {/* Center the mode toggle against the input; the chat panel locks command mode. */}
-          <IconButton data-subtle disabled={chatOpen} onClick={toggleAiMode}
-            data-tip={t(chatOpen ? 'Use the chat panel' : aiMode ? 'Switch to command mode' : 'Switch to AI mode')}
-            aria-label={t(chatOpen ? 'Use the chat panel' : aiMode ? 'Switch to command mode' : 'Switch to AI mode')}>
-            {aiMode ? <Zap size={iconSizes.control} /> : <DollarSign size={iconSizes.control} />}
-          </IconButton>
+          <span className="terminal-command-prompt" aria-hidden="true"><DollarSign size={iconSizes.control} /></span>
 
           {/* textarea + ghost overlay（绝对定位同字体同内边距，透明已输入 + muted 建议后缀）
               display:flex 让 textarea 成为 flex item，消除 inline-block 基线下方空隙（否则容器比 textarea 高 7px） */}
@@ -184,10 +140,9 @@ export default function InputEditor({
               ref={inputRef}
               data-terminal-input
               value={text}
-              placeholder={aiMode ? '自然语言描述你想做什么…' : '输入命令…'}
+              placeholder={t('Enter a command…')}
               rows={1}
               onChange={handleChange}
-              onPaste={handlePaste}
               onKeyDown={handleKeyDown}
               onScroll={event => { if (overlayRef.current) overlayRef.current.scrollTop = event.currentTarget.scrollTop; }}
               style={{
@@ -236,23 +191,7 @@ export default function InputEditor({
             )}
           </div>
 
-          {/* 上下文占用 + 发送/停止按钮（仅 AI 模式） */}
-          {aiMode && (
-            <>
-              <span style={{ marginRight: 6, display: 'inline-flex', alignItems: 'center' }}>
-                <ContextRing />
-              </span>
-              {sendingHere ? (
-              <IconButton data-subtle tone="accent" data-tip={t('Stop generating')} aria-label={t('Stop generating')} onClick={() => abortStream(activeId)}>
-                  <Square size={iconSizes.compact} fill="currentColor" />
-                </IconButton>
-            ) : (
-              <IconButton data-subtle tone="accent" data-tip={t('Send')} data-tip-shortcut="Enter" aria-label={t('Send')} onClick={execute} disabled={!canSendAi}>
-                  <ArrowUp size={iconSizes.control} />
-                </IconButton>
-            )}
-            </>
-          )}
+
         </div>
 
         {/* Keep context separate from the primary input row. */}
@@ -275,29 +214,16 @@ export default function InputEditor({
           {recentGitBranch && (
             <GitBranchLabel branch={recentGitBranch} />
           )}
-          <div style={{ flex: 1 }} />
-          {/* AI / cmd 模式 pill（AI 面板开启时锁定 cmd，显式禁用） */}
-          <TextButton disabled={chatOpen} aria-pressed={aiMode}
-            data-tip={t(chatOpen ? 'Use the chat panel' : aiMode ? 'Switch to command mode' : 'Switch to AI mode')}
-            onClick={() => setAiMode(!aiMode)}>{aiMode ? 'AI' : t('Command')}</TextButton>
-          {!aiMode && (
-            <>
-              <InputActionBtn title={t('Choose split type')} onClick={() => useUiStore.getState().openSplitPicker()}>
-                <Columns2 size={iconSizes.control} />
-              </InputActionBtn>
-              <InputActionBtn title={t('Close terminal')} onClick={() => useSessionStore.getState().closeTerminal(paneId)}>
-                <X size={iconSizes.control} />
-              </InputActionBtn>
-            </>
-          )}
-          {aiMode && (
-            <>
-              <PermissionModeButton mode={permMode} onChange={setPermMode} />
-              <IconButton data-subtle data-tip={t('Add attachment')} aria-label={t('Add attachment')} onClick={() => void pickFiles()}>
-                <Paperclip size={iconSizes.control} />
-              </IconButton>
-            </>
-          )}
+          <div style={{ flex: 1, minWidth: 0 }} />
+          <TextButton className="terminal-ask-ai" aria-label={t('Ask AI')} data-tip={t('Ask AI')} onClick={askAi}>
+            <Sparkles size={iconSizes.control} /><span>{t('Ask AI')}</span>
+          </TextButton>
+          <InputActionBtn title={t('Choose split type')} onClick={() => useUiStore.getState().openSplitPicker()}>
+            <Columns2 size={iconSizes.control} />
+          </InputActionBtn>
+          <InputActionBtn title={t('Close terminal')} onClick={() => useSessionStore.getState().closeTerminal(paneId)}>
+            <X size={iconSizes.control} />
+          </InputActionBtn>
         </div>
       </div>
 

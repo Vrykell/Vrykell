@@ -2,6 +2,7 @@
 //! 每个子模块只暴露 `#[tauri::command]`，数据访问一律走 `crate::db`。
 
 pub mod clipboard;
+pub mod conversation;
 pub mod download;
 pub mod group;
 pub mod search;

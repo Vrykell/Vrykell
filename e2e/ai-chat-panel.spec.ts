@@ -2,7 +2,7 @@
  * AI 聊天面板 e2e：面板对话 / 模型菜单 / 思考强度 / 深思与 Agent 开关 / 输入锁定。
  */
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, mockAnthropic, aiModelCalls } from './tauri-mock';
+import { setupTauriMock, mockAnthropic, aiModelCalls, ensureChatSettingsOpen, paceLlmStream } from './tauri-mock';
 
 /** 每个测试独立初始化：mockAnthropic 的 init script 必须在 goto 前注册 */
 async function boot(page: import('@playwright/test').Page, reply: string) {
@@ -29,19 +29,14 @@ test.describe('AI 对话面板', () => {
     await expect(composer).not.toBeFocused();
   });
 
-  test('chat context chips use spacing without decorative separator dots', async ({ page }) => {
+  test('conversation settings start with discussion and the composer keeps attachment controls', async ({ page }) => {
     await boot(page, 'OK');
     await page.locator('[data-dock-btn="chat"]').click();
-    await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
+    await ensureChatSettingsOpen(page);
+    await expect(page.getByRole('combobox', { name: '选择执行终端' })).toBeVisible();
     const status = page.locator('.chat-input-status');
-    await expect(status.locator('.terminal-chip')).toHaveCount(2);
-    await expect(status).not.toContainText('·');
-    await expect(status).toHaveCSS('gap', '6px');
-    const chips = await status.locator('.terminal-chip').all();
-    const shell = (await chips[0].boundingBox())!;
-    const cwd = (await chips[1].boundingBox())!;
-    expect(cwd.x - shell.x - shell.width).toBeGreaterThanOrEqual(5);
-    await expect(status.getByTestId('permission-mode-button')).toBeVisible();
+    await expect(status.getByTestId('chat-approval-select')).toBeVisible();
+    await expect(page.getByRole('region', { name: '会话设置' }).getByTestId('chat-approval-select')).toHaveCount(0);
     await expect(status.getByRole('button', { name: '添加附件' })).toBeVisible();
   });
 
@@ -55,17 +50,39 @@ test.describe('AI 对话面板', () => {
     await expect(page.getByText('面板回复内容')).toBeVisible({ timeout: 10000 });
   });
 
-  test('面板打开时终端输入栏 AI 模式被锁定', async ({ page }) => {
+  test('停止生成：中断后收尾回到发送按钮（读取器不再永久挂起）', async ({ page }) => {
+    // 分块投递，让回答在点击「停止生成」时仍在飞行中。
+    await paceLlmStream(page, 30);
+    await boot(page, '这是一段足够长的流式回复内容。'.repeat(12));
+    await page.locator('[data-dock-btn="chat"]').click();
+    const input = page.getByPlaceholder(/自然语言描述/);
+    await expect(input).toBeVisible({ timeout: 3000 });
+    // 面板要先有活跃对话，问答才会挂在它下面（否则发送回退到工作区 tab，终止键无从匹配）
+    await page.waitForFunction(async () => {
+      const mod = await import('/src/features/chat/stores/chat.ts') as typeof import('../src/features/chat/stores/chat');
+      const state = mod.useChatStore.getState();
+      return !!state.activeConversationId && state.activeConversationId in state.byTab;
+    });
+    await input.fill('写一段长回答');
+    await input.press('Enter');
+
+    const sendButton = page.locator('.chat-send-button');
+    await expect(sendButton).toHaveAttribute('aria-label', '停止生成', { timeout: 5000 });
+    await sendButton.click();
+
+    // 中断必须真正收尾：对话框回到可发送状态，而不是一直停在「生成中」。
+    await expect(sendButton).toHaveAttribute('aria-label', '发送', { timeout: 5000 });
+    await expect(input).toBeEnabled();
+  });
+
+  test('opening the AI assistant leaves command input available', async ({ page }) => {
     await boot(page, '好的');
     await page.locator('[data-dock-btn="chat"]').click();
-    await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
-    // The disabled mode control directs input to the open chat panel.
-    const pill = page.getByRole('button', { name: '命令', exact: true });
-    await expect(pill).toHaveAttribute('data-tip', '请在对话面板中提问');
-    await expect(pill).toBeDisabled();
-    await expect(page.getByPlaceholder(/自然语言描述/)).toHaveCount(1);
-    await page.locator('[data-dock-btn="chat"]').click();
-    await expect(pill).toBeEnabled();
+    await expect(page.locator('[data-chat-composer]')).toBeVisible();
+    await expect(page.locator('[data-terminal-input]')).toBeVisible();
+    await expect(page.getByRole('button', { name: '询问 AI', exact: true })).toBeEnabled();
+    await page.locator('[data-terminal-input]').fill('echo command');
+    await expect(page.locator('[data-chat-composer]')).toHaveValue('');
   });
 
   test('模型选择窗口：搜索过滤 + 能力标签过滤 + 点击选中', async ({ page }) => {
@@ -73,6 +90,7 @@ test.describe('AI 对话面板', () => {
     await page.locator('[data-dock-btn="chat"]').click();
     await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
     // 打开模型选择窗口
+    await ensureChatSettingsOpen(page);
     await page.locator('[data-tip="切换模型"]').click();
     await expect(page.getByText('选择模型', { exact: true })).toBeVisible();
     await expect(page.getByPlaceholder('搜索模型…')).toBeVisible();
@@ -108,6 +126,7 @@ test.describe('AI 对话面板', () => {
     await boot(page, '好的');
     await page.locator('[data-dock-btn="chat"]').click();
     await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
+    await ensureChatSettingsOpen(page);
     await page.locator('[data-tip="切换模型"]').click();
     const row = page.getByTestId('model-pick-m-main');
     await expect(row).toBeVisible();
@@ -119,19 +138,27 @@ test.describe('AI 对话面板', () => {
     await expect(page.getByText('选择模型', { exact: true })).toHaveCount(0);
   });
 
-  test('Chat / Agent 模式下拉框：切换后写模型覆盖', async ({ page }) => {
+  test('the unified chat and approval menu persists model and permission choices', async ({ page }) => {
     await boot(page, '好的');
     await page.locator('[data-dock-btn="chat"]').click();
     await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
-    const mode = page.getByRole('button', { name: '对话模式' });
+    const mode = page.getByRole('button', { name: '对话与审批模式' });
+    await ensureChatSettingsOpen(page);
     await mode.click();
-    await page.getByRole('option', { name: /^Chat 模式/ }).click();
+    await page.getByRole('option', { name: /^纯聊天/ }).click();
     let saved = await page.evaluate(() => localStorage.getItem('vrykell-agent-settings') ?? '');
     expect(saved).toContain('"agentMode":false');
     await mode.click();
-    await page.getByRole('option', { name: /^Agent 模式/ }).click();
+    await page.getByRole('option', { name: /^标准权限/ }).click();
     saved = await page.evaluate(() => localStorage.getItem('vrykell-agent-settings') ?? '');
     expect(saved).toContain('"agentMode":true');
+    await mode.click();
+    await page.getByRole('option', { name: /^严格权限/ }).click();
+    await expect(mode).toHaveAttribute('data-mode', 'strict');
+    await page.reload();
+    await page.locator('[data-dock-btn="chat"]').click();
+    await ensureChatSettingsOpen(page);
+    await expect(mode).toHaveAttribute('data-mode', 'strict');
     await expect(page.locator('[data-tip="深度思考（reasoning effort）"]')).toHaveCount(0);
   });
 });

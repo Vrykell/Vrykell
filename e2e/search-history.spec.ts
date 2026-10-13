@@ -12,11 +12,15 @@ test.describe('重新生成标题（标签右键菜单）', () => {
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
 
     // 发一条 AI 消息（触发首条消息命名）
-    await page.getByRole('button', { name: '命令', exact: true }).click();
+    await page.getByRole('button', { name: '询问 AI', exact: true }).click();
     const input = page.getByPlaceholder(/自然语言描述/);
     await input.fill('帮我部署服务');
     await input.press('Enter');
     await expect(page.getByText('部署服务').first()).toBeVisible({ timeout: 10000 });
+    // Terminal title generation uses terminal activity rather than the independent conversation.
+    await page.locator('[data-terminal-input]').fill('echo deploy-service');
+    await page.locator('[data-terminal-input]').press('Enter');
+    await expect(page.locator('.command-block-command').filter({ hasText: 'echo deploy-service' })).toBeVisible();
 
     // 打开标签面板，右键第一个标签 → 重新生成标题
     await ensureTabsOpen(page);

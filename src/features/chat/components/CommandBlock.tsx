@@ -1,4 +1,7 @@
 import { isValidElement, useState, type ReactNode, type ReactElement } from 'react';
+import { t } from '@i18n';
+import { ptyWrite } from '@platform/pty';
+import { useToastStore } from '@ui/Toast';
 import { Play, Copy, Check } from '@ui/icons';
 import { useTerminalStore } from '@features/terminal';
 
@@ -35,8 +38,9 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
-export default function CommandBlock({ children }: { children?: ReactNode }) {
+export default function CommandBlock({ children, paneId }: { children?: ReactNode; paneId?: string | null }) {
   const runInTerminal = useTerminalStore((s) => s.runInTerminal);
+  const sessionId = useTerminalStore(state => paneId ? state.sessions[paneId] : undefined);
   const code = extractCode(children);
   const isShell = code ? SHELL_LANGS.has(code.lang) : false;
   const [copied, setCopied] = useState(false);
@@ -72,8 +76,9 @@ export default function CommandBlock({ children }: { children?: ReactNode }) {
             {code.lang || 'code'}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-            {isShell && (
+            {isShell && paneId !== null && (
               <button
+                disabled={paneId !== undefined && !sessionId}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 4,
                   fontSize: 'calc(11px * var(--ui-font-scale))',
@@ -82,15 +87,20 @@ export default function CommandBlock({ children }: { children?: ReactNode }) {
                   border: '1px solid var(--accent-blue-dim)',
                   color: 'var(--accent)',
                 }}
-                onClick={() => runInTerminal(code.text.trim())}
+                onClick={() => {
+                  if (paneId === undefined) runInTerminal(code.text.trim());
+                  else if (sessionId) void ptyWrite(sessionId, `${code.text.trim()}\n`).catch(() => {
+                    useToastStore.getState().addToast(t('Could not run the command in the selected terminal'), 'error');
+                  });
+                }}
               >
-                <Play size={10} /> 在终端运行
+                <Play size={10} /> {t('Run in terminal')}
               </button>
             )}
             {/* 复制按钮固定在右上角（最右侧） */}
             <button
               data-testid="code-copy-btn"
-              data-tip={copied ? '已复制' : '复制代码'}
+              data-tip={t(copied ? 'Copied' : 'Copy code')}
               onClick={() => void copy()}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -99,7 +109,7 @@ export default function CommandBlock({ children }: { children?: ReactNode }) {
               }}
             >
               {copied ? <Check size={10} style={{ color: 'var(--success)' }} /> : <Copy size={10} />}
-              {copied ? '已复制' : '复制'}
+              {t(copied ? 'Copied' : 'Copy')}
             </button>
           </div>
         </div>
