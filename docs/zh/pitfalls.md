@@ -85,6 +85,11 @@
 - **根因**：真 alt buffer 的字节只写主 xterm（`routeData` → `sinks.writeMain`），而手动全屏恰好把主 xterm 隐藏（`showXterm = scene==='altScreen' && !altScreenActive`）改用块终端显示。旧代码只在场景切换时「不设置」手动全屏标志，**不会清除已经生效的那一个**，于是遮罩一直盖着真正的 TUI。
 - **修复**：控制器报告真 `altScreen` 时，若该窗格正处在手动全屏，立即让出可见面（`setAltScreenActive(false)`，诊断标记 `manual-fullscreen-cancelled`）。回归见 `running-term.spec.ts`「手动全屏中进入真 alt 屏」与 `useTerminalSession.test.tsx` 对应用例。
 
+### 2.12 图片粘贴走 `term.paste()` → 被 bracketed paste 包成一串文本（`terminalClipboard.ts`）
+- **现象**：剪贴板里有图片时，终端里按 Ctrl+V 前台 CLI（Claude Code / cmdc 等）收不到原生粘贴键，图片粘不进去；日志 `terminal-clipboard-paste` 显示 `image:true, chars:0` —— 识别是好的，坏在传输这一段。
+- **根因**：`term.paste()` 的语义是「写入**粘贴文本**」：前台程序开了 bracketed paste（DECSET 2004，真实 CLI 基本都会开）时 xterm 会把内容包成 `\x1b[200~…\x1b[201~`。而图片路径送的是**按键** `\x16`（Ctrl+V），被包起来后程序只会当成粘贴进来的文本字符。
+- **修复**：图片路径绕开终端、直接 `ptyWrite(sessionId, '\x16')`；文本仍走 `term.paste()`，保住 bracketed paste 与换行归一化。回归：`terminal-paste-focus.spec.ts` 现在先在 TUI 里开 `\x1b[?2004h`，断言 PTY 收到的就是裸 `\x16`（改回 `paste()` 会变成 `\x1b[200~\x16\x1b[201~` 而失败）；`terminalClipboard.test.ts` 补了「终端实例已注册时也必须裸写」的用例 —— 旧用例只覆盖「没有终端实例」的兜底分支，所以一直绿。
+
 ---
 
 ## 三、PTY / resize / 尺寸
@@ -416,6 +421,12 @@
 - **现象**：点「停止生成」后模型请求确实断了（Rust `AbortHandle` 取消 reqwest，日志里能看到 `llm_abort`），但界面一直停在生成中、发送键回不来。
 - **根因**：被 abort 时 Rust 静默返回、不再推 `done`/`error`，而 `llmFetch` 的本地 `ReadableStream` 从不关闭也不报错；AI SDK 的包装流只在「一次 read 落地之后」才检查 `abortSignal.aborted`，读取器于是永久挂起，`fullStream` 的收尾逻辑（`finally` 里清 `sendingTab`、落终态）永远不执行。
 - **修复**：abort 监听里同时 `controller.error(new DOMException(…, 'AbortError'))`，让本地流立即结算；`llmFetch.test.ts`「流中中止」锁死该行为。e2e 侧 `tauri-mock` 的 `llm_abort` 必须同样「停发且不发终态事件」，否则测不出这类挂起。
+
+### 11.10 全局发送态被当成「本对话在生成」，以及「先标记后发送」丢任务（`sendingTab`）
+- 存储层一次只跑一轮对话（`sendingTab` 单槽），于是有两个踩过的坑：
+  1. `AiBlock` 用 `sendingTab !== null` 判断「本回答在生成」——后台定时任务一触发，所有回答的重新生成/编辑/删除全部变灰，看起来像当前对话卡住；
+  2. `scheduleRunner` 先 `markScheduleRun` 再 `sendToChat`——发送态被占时 `sendToChat` 静默跳过，任务却被记成「已运行」，整轮（最长一小时）凭空消失。
+- **约定**：判断「本对话在生成」一律用 `sendingTab === <对话 id>`（`PanelChat` 早就如此，`AiBlock` 现在按所属对话判断）；后台任务在确认能真正开始前不得写运行时间，忙时留给下一次 tick 重试（`isChatTurnActive()`）。
 
 ---
 

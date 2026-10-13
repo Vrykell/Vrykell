@@ -85,6 +85,11 @@
 - **Root cause**: bytes from a real alt buffer are written only to the main xterm (`routeData` → `sinks.writeMain`), while the manual fullscreen is exactly what hides the main xterm (`showXterm = scene==='altScreen' && !altScreenActive`) in favour of the block terminal. The old code only "did not set" the manual-fullscreen flag on a scene change — it **never cleared the one already in effect**, so the overlay kept covering the live TUI.
 - **Fix**: when the controller reports a real `altScreen` for a pane that is manually fullscreened, hand the surface back immediately (`setAltScreenActive(false)`, diagnostic marker `manual-fullscreen-cancelled`). Regression coverage: `running-term.spec.ts` ("a real alt screen under a manual fullscreen") and the matching `useTerminalSession.test.tsx` case.
 
+### 2.12 Image paste routed through `term.paste()` → bracketed paste turns the key into text (`terminalClipboard.ts`)
+- **Symptom**: with an image on the clipboard, Ctrl+V in the terminal never reaches the foreground CLI (Claude Code, cmdc and friends), so the image is not attached. The log line `terminal-clipboard-paste` reads `image:true, chars:0` — detection is fine; the transport is what breaks.
+- **Root cause**: `term.paste()` means "write **pasted text**": when the foreground program enabled bracketed paste (DECSET 2004, which real CLIs do), xterm wraps the payload in `\x1b[200~…\x1b[201~`. The image path sends a **key** (`\x16`, Ctrl+V), and once wrapped the program only sees a pasted text character.
+- **Fix**: the image path bypasses the terminal and writes `ptyWrite(sessionId, '\x16')` directly; text keeps going through `term.paste()` so bracketed paste and line-ending normalization survive. Regression coverage: `terminal-paste-focus.spec.ts` now enables `\x1b[?2004h` in the TUI and asserts the PTY receives the bare `\x16` (reverting to `paste()` yields `\x1b[200~\x16\x1b[201~` and fails); `terminalClipboard.test.ts` gained the "a registered terminal instance must still get a raw write" case — the old test only covered the no-terminal fallback, which is why it stayed green.
+
 ---
 
 ## 3. PTY / resize / Dimensions
@@ -416,6 +421,12 @@ Fitting that clears the renderer before resizing causes an additional blank fram
 - **Symptom**: after pressing "Stop generating" the model request really is gone (the Rust `AbortHandle` cancels the reqwest call; `llm_abort` shows up in the log), yet the answer stays in the generating state and the send button never comes back.
 - **Root cause**: on abort Rust returns silently and sends no further `done`/`error`, while `llmFetch`'s local `ReadableStream` is never closed or errored. The AI SDK's wrapper stream only checks `abortSignal.aborted` **after** a read settles, so the reader hangs forever and the `fullStream` teardown (`finally`: clear `sendingTab`, land the terminal state) never runs.
 - **Fix**: the abort listener also calls `controller.error(new DOMException(…, 'AbortError'))` so the local stream settles immediately; `llmFetch.test.ts` ("abort mid-stream") locks the behaviour in. On the e2e side, the mock's `llm_abort` must likewise "stop sending and emit no terminal event", otherwise this class of hang cannot be reproduced.
+
+### 11.10 The global send state read as "this conversation is answering", and "mark before send" losing a run (`sendingTab`)
+- The store runs one turn at a time (a single `sendingTab` slot), which produced two traps:
+  1. `AiBlock` treated `sendingTab !== null` as "this reply is still generating" — a background scheduled turn greyed out Regenerate/Edit/Delete on **every** reply, as if the current conversation were stuck;
+  2. `scheduleRunner` called `markScheduleRun` before `sendToChat` — when the send slot was taken, `sendToChat` skipped silently while the task was already recorded as run, so that whole interval (up to an hour) vanished.
+- **Rule**: "this conversation is answering" is always `sendingTab === <conversation id>` (`PanelChat` always did this; `AiBlock` now scopes to the owning conversation), and background work must not write a run timestamp before it can truly start — when the slot is busy it waits for the next tick (`isChatTurnActive()`).
 
 ---
 
