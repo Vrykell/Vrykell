@@ -141,7 +141,7 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
   }, [text, open, streaming]);
   return <div className="ai-thinking">
     <button type="button" data-subtle aria-expanded={open} onClick={() => setOpen(!open)}>
-      <ChevronRight size={12} style={{ transform: open ? 'rotate(90deg)' : undefined }} /><Brain size={12} />
+      <ChevronRight size={14} style={{ transform: open ? 'rotate(90deg)' : undefined }} /><Brain size={15} />
       <span>{t('Thinking process')}</span>{!open && <small>{preview}</small>}
     </button>
     {open && <div ref={bodyRef} className="ai-thinking-body md"><SafeMarkdown content={text} paneId={null} /></div>}

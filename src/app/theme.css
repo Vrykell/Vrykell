@@ -562,9 +562,12 @@ button.window-control-button {
 .ai-block-working { display: flex; align-items: center; color: var(--text-muted); font-size: var(--fs-caption); }
 .ai-pending-cursor { display: inline-block; color: var(--chat-rail); animation: pulse 1s infinite; }
 .ai-thinking { margin-bottom: 8px; }
-.ai-thinking > button { display: flex; align-items: center; gap: 5px; max-width: 100%; padding: 3px 0; border: 0; background: transparent; color: var(--text-muted); font-size: var(--fs-micro); }
+/* The reasoning toggle mirrors a tool row: same size, font and hover lift. */
+.ai-thinking > button { display: flex; align-items: center; gap: 7px; max-width: 100%; padding: 3px 0; border: 0; background: transparent; font-family: var(--font-ui); font-size: var(--chat-content-font-size, var(--fs-caption)); color: var(--text-muted); }
 .ai-thinking > button > span { flex-shrink: 0; }
-.ai-thinking small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-thinking small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); }
+.ai-thinking:is(:hover, :focus-within) > button { color: var(--text-secondary); }
+.ai-thinking:is(:hover, :focus-within) small { color: var(--text-primary); }
 .ai-thinking-body { max-height: 260px; overflow-y: auto; padding: 8px; color: var(--text-secondary); background: var(--hover); font-size: var(--fs-caption); }
 .ai-tool-card { margin: 0; padding: 5px 0; border-top: 1px solid var(--block-divider); background: transparent; }
 /* Tool rows read at the answer's own size; hovering lifts them from gray to body brightness. */
