@@ -11,7 +11,7 @@ import { t, type I18nKey } from '@i18n';
 import { useToastStore } from '@ui/Toast';
 import { IconButton } from '@ui/IconButton';
 import Select from '@ui/Select';
-import { DataUsage, Trash2, iconSizes } from '@ui/icons';
+import { DataUsage, RefreshCw, Trash2, iconSizes } from '@ui/icons';
 import { formatLogTime, type UsageRange } from '@features/agent/model/usageStats';
 import { ALL_FILTER, useUsageStats } from '@features/agent/hooks/useUsageStats';
 import MetricsRow from './usage/MetricsRow';
@@ -47,13 +47,22 @@ function FilterSelect({ label, value, options, onChange, testId }: {
   );
 }
 
-export default function UsageView() {  const stats = useUsageStats();
+export default function UsageView() {
+  const stats = useUsageStats();
   const [tab, setTab] = useState<UsageTab>('logs');
+  const [spinning, setSpinning] = useState(false);
   const rangeLabel = t(RANGE_OPTIONS.find((option) => option.value === stats.range)!.label);
 
   const clearUsage = () => {
     stats.clear();
     useToastStore.getState().addToast(t('Usage data cleared'), 'success');
+  };
+
+  /** Refresh re-reads what the store persisted and re-derives the view, with a short spin cue. */
+  const refreshUsage = () => {
+    stats.refresh();
+    setSpinning(true);
+    window.setTimeout(() => setSpinning(false), 320);
   };
 
   return (
@@ -71,6 +80,14 @@ export default function UsageView() {  const stats = useUsageStats();
         <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
           <span data-testid="usage-record-count">{t('{{count}} records', { count: stats.records.length })}</span>
           {stats.latestAt > 0 && <span>· {t('Latest {{time}}', { time: formatLogTime(stats.latestAt) })}</span>}
+          {stats.refreshedAt > 0 && (
+            <span data-testid="usage-refreshed-at">· {t('Refreshed at {{time}}', { time: formatLogTime(stats.refreshedAt) })}</span>
+          )}
+          <IconButton compact data-testid="usage-refresh" aria-label={t('Refresh usage')} data-tip={t('Refresh usage')}
+            onClick={refreshUsage}>
+            <RefreshCw size={iconSizes.compact}
+              style={{ transform: spinning ? 'rotate(360deg)' : 'none', transition: 'transform 0.3s var(--ease)' }} />
+          </IconButton>
           <IconButton compact tone="danger" data-testid="usage-clear" disabled={stats.records.length === 0}
             aria-label={t('Clear usage data')} data-tip={t('Clear usage data')} onClick={clearUsage}>
             <Trash2 size={iconSizes.compact} />

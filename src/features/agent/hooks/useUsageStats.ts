@@ -25,10 +25,13 @@ export function useUsageStats() {
   const [range, setRange] = useState<UsageRange>('today');
   const [provider, setProvider] = useState<string>(ALL_FILTER);
   const [model, setModel] = useState<string>(ALL_FILTER);
+  /** Bumped by a manual refresh so the derived view recomputes with a fresh clock. */
+  const [revision, setRevision] = useState(0);
+  const [refreshedAt, setRefreshedAt] = useState(0);
 
-  // Recomputed when records, the range or a filter changes, which is exactly when a finished
-  // turn should appear. The clock is only read at that moment, not on every render.
-  const inRange = useMemo(() => recordsInRange(records, range, Date.now()), [records, range]);
+  // Recomputed when records, the range, a filter or a manual refresh changes, which is exactly
+  // when the numbers should move. The clock is read at that moment, not on every render.
+  const inRange = useMemo(() => recordsInRange(records, range, Date.now()), [records, range, revision]);
   const filtered = useMemo(
     () => inRange.filter((record) => (!provider || record.provider === provider) && (!model || record.model === model)),
     [inRange, provider, model],
@@ -47,16 +50,23 @@ export function useUsageStats() {
   const modelRows = useMemo(() => modelBreakdown(filtered), [filtered]);
   /** Request log: newest first. */
   const logRows = useMemo(() => [...filtered].reverse(), [filtered]);
-  const series = useMemo(() => tokensSeries(filtered, range, Date.now()), [filtered, range]);
+  const series = useMemo(() => tokensSeries(filtered, range, Date.now()), [filtered, range, revision]);
   const latestAt = useMemo(
     () => records.reduce((latest, record) => (record.at > latest ? record.at : latest), 0),
     [records],
   );
   const clear = useCallback(() => useUsageStore.getState().clear(), []);
+  /** Re-read what the store persisted and re-derive the view; cheap and side-effect free. */
+  const refresh = useCallback(() => {
+    void useUsageStore.persist.rehydrate();
+    setRevision((value) => value + 1);
+    setRefreshedAt(Date.now());
+  }, []);
 
   return {
     records, range, setRange, provider, setProvider, model, setModel,
-    providerOptions, modelOptions, totals, providerRows, modelRows, logRows, series, latestAt, clear,
+    providerOptions, modelOptions, totals, providerRows, modelRows, logRows, series, latestAt,
+    clear, refresh, refreshedAt,
   };
 }
 

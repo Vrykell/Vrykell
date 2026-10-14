@@ -756,6 +756,8 @@ const zh: Record<string, string> = {
   "Time": "时间",
   "{{count}} records": "{{count}} 条记录",
   "Latest {{time}}": "最近 {{time}}",
+  "Refresh usage": "刷新用量",
+  "Refreshed at {{time}}": "刷新于 {{time}}",
   "Page {{page}} / {{total}}": "第 {{page}} / {{total}} 页",
   "Previous page": "上一页",
   "Next page": "下一页",
