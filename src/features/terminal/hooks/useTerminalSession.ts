@@ -31,6 +31,7 @@ import { defaultOpenModeForShell } from '@features/agent/stores/agentSettings';
 import { t } from '@i18n';
 import { SessionController } from '@features/terminal/services/pipeline/sessionController';
 import { copyTerminalSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
+import { cancelTerminalInput, writeTerminalInput } from '@features/terminal/services/terminalWriteQueue';
 import { querySequences } from '@features/terminal/model/terminalQueries';
 import { getCellMetrics } from '@utils/termMetrics';
 import type { DispatchEvent } from '@core/terminal/events';
@@ -295,7 +296,7 @@ export function useTerminalSession(
       onTerminalData: data => {
         if (!sessionId || disposed || stopped) return;
         terminalDebug('block-terminal-data', { paneId, sessionId, chars: data.length, scene: currentScene });
-        void ptyWrite(sessionId, data).catch(error => {
+        void writeTerminalInput(sessionId, data).catch(error => {
           terminalDebug('pty-write-error', { paneId, sessionId, source: 'block-xterm', errorType: error instanceof Error ? error.name : typeof error });
         });
       },
@@ -491,6 +492,8 @@ export function useTerminalSession(
         if (disposed || stopped) return;
         if (isTerminalDebugEnabled()) terminalDebug('pty-exit', { id, sessionId, code });
         if (id === sessionId) {
+          // The PTY is gone: input still queued would only fail chunk by chunk.
+          cancelTerminalInput(id);
           sessionId = null;
           stopped = true;
           useTerminalStore.getState().clearSession(paneId, id);
@@ -655,7 +658,7 @@ export function useTerminalSession(
             chars: data.length,
           });
         }
-        ptyWrite(sessionId, data).then(() => {
+        writeTerminalInput(sessionId, data).then(() => {
           if (isTerminalDebugEnabled()) {
             terminalDebug('terminal-input-write-complete', { paneId, sessionId, chars: data.length });
           }
@@ -849,7 +852,11 @@ export function useTerminalSession(
       controller.dispose();
       unlisteners.forEach((u) => u());
       pendingUnlisteners.forEach((p) => p.then((u) => u()).catch(() => {}));
-      if (sessionId) ptyClose(sessionId).catch(() => {});
+      if (sessionId) {
+        // Queued input can no longer reach a session that is closing: drop it before the PTY goes.
+        cancelTerminalInput(sessionId);
+        ptyClose(sessionId).catch(() => {});
+      }
       useSessionStore.getState().setProgramTitle(paneId, '');
       unregisterTerminal(paneId, term);
       term.dispose();

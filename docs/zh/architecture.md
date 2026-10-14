@@ -331,6 +331,7 @@ dev 模式会自动写入 `terminal-debug.jsonl`。排查命令挂起时，按�
 | `src/features/terminal/stores/terminal.ts` | 会话/尺寸/键盘路由 store + `termInstances` |
 | `src/features/terminal/stores/blocks.ts` | 块 store |
 | `src/platform/pty.ts` | Tauri IPC 封装 |
+| `src/features/terminal/services/terminalWriteQueue.ts` | 终端输入写入队列：16K 码元分块、同会话串行、中断/关闭时丢弃未送出的余块 |
 | `src/features/workspace/services/sessionManager.ts` | 会话/块持久化编排 |
 | `src/utils/sanitizeHtml.ts` | outputHtml 落库/渲染双向净化（span 白名单 style + br，防注入） |
 | `src/features/workspace/model/windowLayout.ts` | 分屏布局模型（TerminalSpec / pane 分裂） |
