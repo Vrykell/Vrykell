@@ -167,6 +167,22 @@ it('hides regenerate and edit while its own conversation answers', () => {
   expect(screen.queryByRole('button', { name: '编辑重发' })).toBeNull();
 });
 
+it('explains a reply whose provider sent its tool call as plain text', () => {
+  const leaked = '<\uFF5C\uFF5CDSML\uFF5C\uFF5C calls>\n'
+    + '<\uFF5C\uFF5CDSML\uFF5C\uFF5C invoke name="run_command">\ndir\n</\uFF5C\uFF5CDSML\uFF5C\uFF5C calls>';
+  const view = (content: string) => (
+    <AiBlock conversationId="conversation" presentation="conversation"
+      exchange={{ ...exchange, answer: { ...exchange.answer!, content } }} />
+  );
+  const { container, rerender } = render(view(leaked));
+  expect(screen.getByTestId('chat-leaked-tool-call')).toHaveTextContent('本次没有执行任何工具');
+  // The raw text stays readable — the note explains it instead of hiding it.
+  expect(container.textContent).toContain('DSML');
+
+  rerender(view('I ran `dir` and it lists four files.'));
+  expect(screen.queryByTestId('chat-leaked-tool-call')).toBeNull();
+});
+
 it('shows a terminal tool row as the bare command without a prompt marker', () => {
   render(<AiBlock conversationId="conversation" presentation="conversation"
     exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [commandPart] } }} />);

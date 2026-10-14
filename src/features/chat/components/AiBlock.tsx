@@ -9,6 +9,7 @@ import CopyButton from '@ui/CopyButton';
 import ConfirmDialog from '@ui/ConfirmDialog';
 import { writeClipboardText } from '@platform/clipboard';
 import { formatMessageTime } from '@utils/formatTime';
+import { hasLeakedToolCallMarkup } from '../model/providerMarkup';
 import { useChatStore } from '../stores/chat';
 import { useComposerDrafts } from '../stores/composerDrafts';
 import SafeMarkdown from './SafeMarkdown';
@@ -103,6 +104,11 @@ export default function AiBlock({ exchange, conversationId, presentation = 'bloc
       {answer.error && <ErrorBox compact actions={question && !sending ? <button type="button" onClick={regenerate}>{t('Retry')}</button> : undefined}>
         {answer.errorText || t('The reply could not be completed')}
       </ErrorBox>}
+      {answer.content && hasLeakedToolCallMarkup(answer.content) && (
+        <div className="chat-environment-note" data-testid="chat-leaked-tool-call">
+          {t('The provider returned a tool call as plain text, so no tool ran. Use an endpoint or model that reports tool calls in the standard format.')}
+        </div>
+      )}
       {answer.stopped && <div className="chat-environment-note">{t('Reply stopped. Terminal commands may still be running.')}</div>}
     </div>}
     {plain && answer && !answer.pending && <div className="chat-answer-actions">
