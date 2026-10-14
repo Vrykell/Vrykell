@@ -418,7 +418,7 @@ Benchmarks and scope of application are in [Terminal Performance Verification](t
 
 | ID | Feature | Expected behavior | Test method |
 |---|---|---|---|
-| WC1 | Menu management | Settings exposes actual Windows 11 registration, explicit certificate trust with UAC, enable/disable and inline errors; private signing keys are never distributed | `contextMenuPage.test.tsx`, `context-menu.spec.ts`; manual UAC and signed-package installation |
+| WC1 | Menu management | Settings exposes the actual Windows 11 registration, including the "out of date, enable again" state when it still points at an older bundle or executable; explicit certificate trust with UAC, enable/disable and inline errors; the identity package declares a dedicated host instead of the application itself (otherwise a right-click terminates the running application), so enabling refreshes the extension after an update; private signing keys are never distributed | `contextMenuPage.test.tsx`, `context-menu.spec.ts`, `scripts/test-context-menu.ps1`; manual UAC and signed-package installation |
 | WC2 | Explorer launch | The primary menu opens a new terminal window at a selected folder or folder background, retaining paths with spaces/Unicode and preserving saved sessions | Native COM tests, Rust directory argument tests, workspace startup tests and `context-menu.spec.ts`; manual Explorer invocation |
 | WC3 | Disable and uninstall | Per-user registration is removed by settings or the NSIS uninstall hook; certificate trust removal is explicit | Native registration smoke check; manual signed enable/disable and NSIS uninstall |
 

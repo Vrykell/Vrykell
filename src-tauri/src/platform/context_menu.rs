@@ -8,6 +8,9 @@ pub struct ContextMenuStatus {
     supported: bool,
     available: bool,
     enabled: bool,
+    /// A registration that still points at an older package or executable; enabling refreshes it.
+    #[serde(default)]
+    stale: bool,
     certificate_trusted: bool,
     certificate_thumbprint: Option<String>,
 }

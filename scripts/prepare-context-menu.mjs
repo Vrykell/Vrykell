@@ -36,11 +36,17 @@ fs.mkdirSync(path.join(staging, 'windows-context-menu'), { recursive: true });
 const dll = path.join(build, 'Release', 'VrykellExplorerCommand.dll');
 const digest = createHash('sha256').update(fs.readFileSync(dll)).digest('hex');
 const dllName = `VrykellExplorerCommand-${digest.slice(0, 16)}.dll`;
+// The identity host carries the package's <Application>. It keeps a stable name because it is never
+// loaded by the shell, unlike the content-addressed extension DLL.
+const hostName = 'VrykellShellHost.exe';
+const host = path.join(build, 'Release', hostName);
+if (!fs.existsSync(host)) throw new Error(`${hostName} was not built.`);
 for (const directory of [output, path.join(staging, 'windows-context-menu')]) {
   for (const name of fs.readdirSync(directory)) {
     if (/^VrykellExplorerCommand(?:-[0-9a-f]{16})?\.dll$/.test(name) && name !== dllName) fs.unlinkSync(path.join(directory, name));
   }
   fs.copyFileSync(dll, path.join(directory, dllName));
+  fs.copyFileSync(host, path.join(directory, hostName));
 }
 const oldDll = path.join(staging, 'VrykellExplorerCommand.dll');
 if (fs.existsSync(oldDll)) fs.unlinkSync(oldDll);
@@ -51,6 +57,13 @@ for (const file of ['StoreLogo.png', 'Square150x150Logo.png', 'Square44x44Logo.p
 const version = `${JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version}.0`;
 const manifest = fs.readFileSync(path.join(native, 'AppxManifest.xml'), 'utf8')
   .replaceAll('__ARCH__', arch).replaceAll('__VERSION__', version).replaceAll('__DLL_NAME__', dllName);
+// Guard the crash this split fixes: declaring the application itself as the package's Application
+// gives every process with that image name the package identity, and an ended shell activation then
+// terminates the running application.
+const declared = manifest.match(/<Application [^>]*Executable="([^"]+)"/)?.[1];
+if (declared !== `windows-context-menu\\${hostName}`) {
+  throw new Error(`The identity manifest must declare the shell host, not "${declared ?? 'nothing'}".`);
+}
 fs.writeFileSync(path.join(staging, 'AppxManifest.xml'), manifest);
 run('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
   path.join(root, 'scripts', 'sign-context-menu.ps1'), '-StagingDirectory', staging, '-OutputDirectory', output]);

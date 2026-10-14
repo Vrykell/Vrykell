@@ -30,6 +30,7 @@ const zh: Record<string, string> = {
   'Requires Windows 11': '需要 Windows 11',
   'Context menu resources are unavailable': '右键菜单资源不可用',
   'Certificate trust required': '需要信任证书',
+  'Out of date: enable the context menu again': '注册已过期：请重新启用右键菜单',
   'Disable context menu': '停用右键菜单',
   'Enable context menu': '启用右键菜单',
   'Refresh status': '刷新状态',

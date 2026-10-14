@@ -102,6 +102,12 @@
 - **修复**：两端都改成按秒窗口聚合。Rust 端用 `pty-io`（`reads/read_bytes/chars/max_read/outputs/events/data_bytes/osc/alt/held/max_gap_ms`）替代 `read-chunk` + `output` + `input-response-batch`；前端用 `terminal-io` 一条记录汇总 rx（IPC 收包）/ ctl（控制器入口）/ 路由去向（main / block / early 的块数与字符数、`maxChars`、命令回显过滤）。停顿不再靠「没有记录」推断：整段静默按 1 s、2 s、4 s… 翻倍记 `read-idle`。回归：`io_window.rs` 单测、`terminalIoLog.test.ts`。
 - **教训**：日志粒度要跟着「事件频率由谁决定」走；把用户能决定大小的数据逐块记，等于把日志体积也交给用户。
 
+### 2.15 身份包的 `Application` 指向应用自身 → 右键资源管理器时正在运行的应用被系统终止（`AppxManifest.xml`、`shell_host.cpp`、`manage.ps1`）
+- **现象**：应用正在使用（终端里在跑 TUI、日志正常滚动）时，用户在**资源管理器里右键一个文件夹**（甚至还没点菜单项），整个应用窗口**直接消失**，进程干净退出：Windows 事件日志没有崩溃记录、应用自己的诊断日志也停在死亡那一刻。`Microsoft-Windows-AppModel-Runtime/Admin` 里能对上：右键瞬间创建了一次 AppX 激活（Id 210/211），一秒后该激活被终止（Id 217），运行中的应用就死在 Id 217 那一刻。实测复现：从 PowerShell 触发该包的 COM 服务器激活（`[Activator]::CreateInstance(GetTypeFromCLSID('{8D41BA19-…}'))`），**所有** `vrykell.exe` 进程（含其它 worktree 的 debug 实例）同时消失。
+- **根因**：身份清单为了挂 `windows.fileExplorerContextMenus` 必须有 `<Application>`，而当时声明的 `Executable="vrykell.exe"` **就是应用自己的可执行文件**。于是 Windows 把**任何**名为 `vrykell.exe` 的进程都当成该包的应用（`FinishPackageActivation` 事件连 worktree 里不同路径的 debug 实例都记）；而 shell 扩展的 COM 激活结束时，AppModel 会终止这个包的应用进程 —— 右键（加载扩展、随后释放）就足以杀掉正在使用的应用。又因为多个实例共用同一个 WebView2 用户数据目录（浏览器进程共享），被杀的实例还会把其它实例一起带走。
+- **修复**：给身份包一个**专用宿主** `windows-context-menu\VrykellShellHost.exe`（`shell_host.cpp`，只转发启动、不承载业务），清单的 `<Application Executable>` 指向它，应用自己的 exe 不再进入包身份。三处防回归：`prepare-context-menu.mjs` 在打包前断言清单声明的是宿主（否则构建失败）、`manage.ps1` 把「声明了别的可执行文件」判为 `available=false`（拒绝启用）、`scripts/test-context-menu.ps1` 断言启用后 `available/stale` 状态正确。同时 `manage.ps1` 现在会在启用时清理旧的内容寻址 DLL，并通过 `stale` 报告「注册指向旧包/旧可执行文件」，设置页提示重新启用（应用更新后必须重新注册，否则仍加载旧扩展）。
+- **教训**：稀疏身份包（sparse MSIX）的 `<Application Executable>` 不是「声明一下」——它把该镜像名的**所有**进程都纳入包身份与应用生命周期管理。凡是给桌面应用加 shell 集成，都要用专用宿主承载身份，绝不能让应用自身出现在身份清单里；另外「同一应用多实例」在 WebView2 下是共享浏览器进程，任何一次进程级终止都会连坐所有实例。
+
 ---
 
 ## 三、PTY / resize / 尺寸

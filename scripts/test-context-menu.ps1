@@ -65,12 +65,20 @@ try {
  $extendedAssets = '\\?\' + $assets
  $extendedExecutable = '\\?\' + $executable
  $result = (& $manager -Action status -AssetDirectory $extendedAssets -Executable $extendedExecutable) | ConvertFrom-Json
- Assert $result.available 'Extended-length resource paths were not accepted.'
+ Assert $result.available 'Extended-length resource paths were not accepted, or the signed package does not declare its identity host.'
  $result = (& $manager -Action enable -AssetDirectory $extendedAssets -Executable $extendedExecutable) | ConvertFrom-Json
- Assert $result.enabled 'The menu did not report a successful registration.'
+ Assert ($result.enabled -and !$result.stale) 'The menu did not report a successful registration.'
  Assert ($global:MenuManagementTestState.exe -eq $executable) 'The stored launch path retained its extended-length prefix.'
  $beforeBundle = $global:MenuManagementTestState.bundle
  $beforeAdds = $global:MenuManagementTestState.additions
+ # A registration that kept an older bundle must ask for the registration again instead of
+ # reporting the menu as current.
+ $global:MenuManagementTestState.bundle = 'C:\outdated\registration.msix'
+ $result = (& $manager -Action status -AssetDirectory $extendedAssets -Executable $extendedExecutable) | ConvertFrom-Json
+ Assert ($result.stale -and !$result.enabled) 'A registration that points at an outdated bundle was reported as current.'
+ $global:MenuManagementTestState.bundle = $beforeBundle
+ $result = (& $manager -Action status -AssetDirectory $extendedAssets -Executable $extendedExecutable) | ConvertFrom-Json
+ Assert (!$result.stale -and $result.enabled) 'A current registration was reported as outdated.'
  $global:MenuManagementTestState.failNext = $true
  $failed = $false
  try { & $manager -Action enable -AssetDirectory $assets -Executable $executable | Out-Null }
