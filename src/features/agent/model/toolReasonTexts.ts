@@ -8,6 +8,9 @@ import { t, type I18nKey } from '@i18n';
 
 const REASON_KEYS: Record<string, I18nKey> = {
   'policy.denied': 'Denied by the permission settings',
+  // Nobody was in front of the app, or nobody answered the system confirmation in time.
+  'policy.unattended': 'The window was not in front, so the system confirmation was skipped',
+  'policy.confirm_timeout': 'Nobody confirmed in time, so the call was denied',
 
   'danger.interpreter': 'Runs inline code through an interpreter',
   'danger.eval': 'Evaluates constructed shell code',

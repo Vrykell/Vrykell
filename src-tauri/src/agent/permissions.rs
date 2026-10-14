@@ -10,6 +10,11 @@
 //!   * dangerous and credential-touching calls are confirmed through a native system dialog
 //!     raised here, so page or tool output cannot answer the prompt for the user.
 //!
+//! A prompt nobody answers must not hold a turn open: when the window is not in front the
+//! confirmation is skipped (a modal dialog would block a window nobody is looking at) and when
+//! the answer takes too long the call is denied. Both outcomes are denials with their own reason
+//! code, so the transcript says what happened instead of appearing to stop mid-thought.
+//!
 //! Residual gap, stated plainly: the shared UI commands (the file panel, the settings pages)
 //! are reachable from the same webview and are not lease-gated, so a fully compromised
 //! renderer is still inside the trust boundary. Closing that needs a separate IPC surface per
@@ -22,11 +27,17 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
 /// How long an approved call may stay unused before it must be asked again.
 const LEASE_TTL: Duration = Duration::from_secs(600);
+
+/// Deadline of the native confirmation. Bounds the wait rather than forcing one: the webview
+/// sends its own deadline, and this is the range it may pick from.
+const CONFIRM_TIMEOUT_MIN: Duration = Duration::from_secs(30);
+const CONFIRM_TIMEOUT_MAX: Duration = Duration::from_secs(1800);
+const CONFIRM_TIMEOUT_DEFAULT: Duration = Duration::from_secs(300);
 
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
 #[serde(rename_all = "lowercase")]
@@ -441,6 +452,19 @@ pub struct AuthorizeRequest {
     pub mode: Option<String>,
     #[serde(default)]
     pub reason_hint: Option<String>,
+    /// How long the caller is willing to wait for the native confirmation, in seconds. Clamped
+    /// into the range above; only ever delays the denial, so a stale value stays fail-closed.
+    #[serde(default)]
+    pub timeout_secs: Option<u64>,
+}
+
+/// The webview's deadline for a native confirmation, clamped to the range this side accepts.
+fn confirm_timeout(request: &AuthorizeRequest) -> Duration {
+    let wanted = request
+        .timeout_secs
+        .map(Duration::from_secs)
+        .unwrap_or(CONFIRM_TIMEOUT_DEFAULT);
+    wanted.clamp(CONFIRM_TIMEOUT_MIN, CONFIRM_TIMEOUT_MAX)
 }
 
 fn args_preview(args: &Value) -> String {
@@ -448,8 +472,28 @@ fn args_preview(args: &Value) -> String {
     text.chars().take(600).collect()
 }
 
+/// Outcome of the native confirmation.
+enum Confirmation {
+    Approved,
+    Denied,
+    /// The window was not in front, so asking would have blocked a window nobody was watching.
+    Unattended,
+    /// The dialog waited past its deadline.
+    TimedOut,
+}
+
 /// Ask the user through a native dialog. Page content cannot answer this.
-async fn confirm_natively(app: &AppHandle, request: &AuthorizeRequest, reason: &str) -> bool {
+async fn confirm_natively(app: &AppHandle, request: &AuthorizeRequest, reason: &str) -> Confirmation {
+    let focused = app
+        .get_webview_window("main")
+        .and_then(|window| window.is_focused().ok())
+        .unwrap_or(false);
+    if !focused {
+        // A modal dialog on a window nobody is looking at would disable that window until it is
+        // dismissed, and a scheduled turn must not park the app. Deny, and say so in the reason.
+        record_diagnostic("tool-confirm-unattended", request);
+        return Confirmation::Unattended;
+    }
     let mut message = format!("{}\n\n{}", request.tool, reason);
     if let Some(hint) = request.reason_hint.as_deref().filter(|h| !h.trim().is_empty()) {
         message.push_str(&format!("\n\n{hint}"));
@@ -467,7 +511,23 @@ async fn confirm_natively(app: &AppHandle, request: &AuthorizeRequest, reason: &
         .show(move |approved| {
             let _ = tx.send(approved);
         });
-    rx.await.unwrap_or(false)
+    match tokio::time::timeout(confirm_timeout(request), rx).await {
+        Ok(Ok(true)) => Confirmation::Approved,
+        // Dismissed without an answer, or the dialog went away: treat both as a refusal.
+        Ok(_) => Confirmation::Denied,
+        Err(_) => {
+            record_diagnostic("tool-confirm-timeout", request);
+            Confirmation::TimedOut
+        }
+    }
+}
+
+/// Diagnostics carry no argument values here: the names say enough to explain a later denial.
+fn record_diagnostic(event: &str, request: &AuthorizeRequest) {
+    let detail = serde_json::json!({ "tool": request.tool, "command": request.command });
+    if let Err(error) = crate::diagnostics::record(event, detail) {
+        eprintln!("[permissions] could not record {event}: {error}");
+    }
 }
 
 fn gated_command(request: &AuthorizeRequest) -> String {
@@ -500,16 +560,17 @@ pub async fn authorize_tool_call(
 
     match reason {
         // Forced approval: the decision comes from a system dialog, not from the page.
-        Some(code) => {
-            if confirm_natively(&app, &request, &code).await {
-                Ok(ToolDecision::allow(
-                    Some(code),
-                    state.issue(&command, &request.args)?,
-                ))
-            } else {
-                Ok(ToolDecision::deny(Some(code)))
+        Some(code) => match confirm_natively(&app, &request, &code).await {
+            Confirmation::Approved => Ok(ToolDecision::allow(
+                Some(code),
+                state.issue(&command, &request.args)?,
+            )),
+            Confirmation::Denied => Ok(ToolDecision::deny(Some(code))),
+            Confirmation::Unattended => Ok(ToolDecision::deny(Some("policy.unattended".to_string()))),
+            Confirmation::TimedOut => {
+                Ok(ToolDecision::deny(Some("policy.confirm_timeout".to_string())))
             }
-        }
+        },
         None => {
             // The UI shortcut modulates plain calls only: deny still denies, and a reason above
             // always went through the native confirmation.
@@ -648,6 +709,20 @@ mod tests {
         for tool in ["read_file", "list_dir", "search_files", "memory", "web_fetch"] {
             assert_eq!(p.level_of(tool), Level::Allow, "{tool}");
         }
+    }
+
+    #[test]
+    fn confirmation_deadlines_are_clamped_to_the_accepted_range() {
+        let mut request = AuthorizeRequest { tool: "run_command".to_string(), ..Default::default() };
+        // No deadline from the caller: the default stands.
+        assert_eq!(confirm_timeout(&request), CONFIRM_TIMEOUT_DEFAULT);
+        // A stale or hostile value can only delay the denial, never remove it.
+        request.timeout_secs = Some(1);
+        assert_eq!(confirm_timeout(&request), CONFIRM_TIMEOUT_MIN);
+        request.timeout_secs = Some(86_400);
+        assert_eq!(confirm_timeout(&request), CONFIRM_TIMEOUT_MAX);
+        request.timeout_secs = Some(600);
+        assert_eq!(confirm_timeout(&request), Duration::from_secs(600));
     }
 
     #[test]
