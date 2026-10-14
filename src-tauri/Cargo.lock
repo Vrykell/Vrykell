@@ -5088,6 +5088,7 @@ dependencies = [
  "url",
  "uuid",
  "winapi",
+ "windows-sys 0.60.2",
  "zip",
 ]
 

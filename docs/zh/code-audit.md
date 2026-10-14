@@ -53,7 +53,7 @@ src/
 | `search.rs` | 内容匹配上下文切片未对齐 UTF-8 边界，中文文件搜索 panic | `floor/ceil_char_boundary` 对齐 |
 | `ai.rs` | SSE 按 chunk 独立 `from_utf8_lossy` 导致多字节乱码 | 字节缓冲按 `\n` 切完整行再解码 |
 | `ai.rs` | HTTP 请求无超时 | `connect_timeout(15s)` + `timeout(180s)` |
-| `ai.rs` | `config.json` 存 API key 未收紧权限 | 目录 0700、文件 0600 |
+| `ai.rs` | `config.json` 存 API key 未收紧权限 | 目录 0700、文件 0600；key 现已移出文件，改存平台密钥存储（DPAPI / 钥匙串 / 0600 文件） |
 | `fs.rs` | `which_cmd_sync` 硬编码 zsh | 改 `/bin/sh` |
 | `search/registry.ts` | 筛选源启用集合非响应式，切换后结果不更新 | 改 zustand store + 切换后重搜 |
 | `lib/sessionManager.ts` | 恢复会话丢失 shell/SSH 元数据 | `restore` 接受 `RestoreMeta`；撤销关闭路径回填 |

@@ -56,7 +56,10 @@ pub struct ModelProfile {
 
 #[derive(Serialize, Deserialize, Clone)]
 struct AiConfigInner {
-    #[serde(default)]
+    /// Key 不进 config.json（`skip_serializing`）：它们存在平台密钥存储里（Windows DPAPI /
+    /// macOS 钥匙串 / 其它平台的 0600 文件，见 `crate::secret`）。字段仍可反序列化，用于把
+    /// 旧版明文文件里的 key 一次性迁移出去。
+    #[serde(default, skip_serializing)]
     api_key: Option<String>,
     #[serde(default = "default_base_url")]
     base_url: String,
@@ -65,11 +68,11 @@ struct AiConfigInner {
     /// openai-compatible | anthropic | gemini
     #[serde(default = "default_provider")]
     provider: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing)]
     anthropic_key: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing)]
     gemini_key: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing)]
     tavily_key: Option<String>,
     /// 多模型列表（命名 profile）
     #[serde(default)]
@@ -78,6 +81,12 @@ struct AiConfigInner {
     #[serde(default)]
     active_model: String,
 }
+
+/// 平台密钥存储里的账户名（`crate::secret`）。
+const SECRET_OPENAI: &str = "ai.openai";
+const SECRET_ANTHROPIC: &str = "ai.anthropic";
+const SECRET_GEMINI: &str = "ai.gemini";
+const SECRET_TAVILY: &str = "ai.tavily";
 
 fn default_base_url() -> String {
     DEFAULT_BASE_URL.to_string()
@@ -142,35 +151,71 @@ fn config_path() -> PathBuf {
 }
 
 impl AiConfig {
-    /// 启动时从磁盘加载（文件缺失或损坏时回退默认）。
+    /// 启动时从磁盘加载（文件缺失或损坏时回退默认），并把 key 从文件迁移到平台密钥存储。
     pub fn load() -> Self {
         let mut inner = std::fs::read_to_string(config_path())
             .ok()
             .and_then(|s| serde_json::from_str::<AiConfigInner>(&s).ok())
             .unwrap_or_default();
-        inner.normalize();
-        AiConfig(Mutex::new(inner))
-    }
-
-    fn save(&self) {
-        if let Ok(c) = self.0.lock() {
-            if let Some(dir) = config_path().parent() {
-                let _ = std::fs::create_dir_all(dir);
-                #[cfg(unix)]
-                {
-                    let _ = std::fs::set_permissions(dir, std::os::unix::fs::PermissionsExt::from_mode(0o700));
-                }
-            }
-            if let Ok(s) = serde_json::to_string_pretty(&*c) {
-                let path = config_path();
-                if std::fs::write(&path, s).is_ok() {
-                    #[cfg(unix)]
-                    {
-                        // API key 敏感：写盘后收紧为 0600
-                        let _ = std::fs::set_permissions(&path, std::os::unix::fs::PermissionsExt::from_mode(0o600));
+        // 旧版把 key 明文写在 config.json；先搬进平台存储，再从存储统一读回。
+        let legacy = [
+            (SECRET_OPENAI, inner.api_key.take()),
+            (SECRET_ANTHROPIC, inner.anthropic_key.take()),
+            (SECRET_GEMINI, inner.gemini_key.take()),
+            (SECRET_TAVILY, inner.tavily_key.take()),
+        ];
+        let mut migrated = false;
+        let mut sealed_all = true;
+        for (account, value) in legacy {
+            if let Some(value) = value {
+                match crate::secret::set_secret(account, &value) {
+                    Ok(()) => migrated = true,
+                    Err(error) => {
+                        sealed_all = false;
+                        eprintln!("[ai] 迁移 API Key 到密钥存储失败：{error}");
                     }
                 }
             }
+        }
+        inner.api_key = crate::secret::get_secret(SECRET_OPENAI);
+        inner.anthropic_key = crate::secret::get_secret(SECRET_ANTHROPIC);
+        inner.gemini_key = crate::secret::get_secret(SECRET_GEMINI);
+        inner.tavily_key = crate::secret::get_secret(SECRET_TAVILY);
+        inner.normalize();
+        let cfg = AiConfig(Mutex::new(inner));
+        // 只有全部搬迁成功才重写文件：否则明文 key 会随重写一起消失。
+        if migrated && sealed_all {
+            cfg.save();
+        }
+        cfg
+    }
+
+    fn save(&self) {
+        let Ok(c) = self.0.lock() else { return };
+        // Key 只写平台密钥存储；缺省项不在这里删除（clear_* 命令负责），省掉空写的文件/钥匙串往返。
+        for (account, value) in [
+            (SECRET_OPENAI, &c.api_key),
+            (SECRET_ANTHROPIC, &c.anthropic_key),
+            (SECRET_GEMINI, &c.gemini_key),
+            (SECRET_TAVILY, &c.tavily_key),
+        ] {
+            if let Some(secret) = value {
+                if let Err(error) = crate::secret::set_secret(account, secret) {
+                    eprintln!("[ai] 保存 API Key 失败：{error}");
+                }
+            }
+        }
+        if let Some(dir) = config_path().parent() {
+            let _ = std::fs::create_dir_all(dir);
+            #[cfg(unix)]
+            {
+                let _ = std::fs::set_permissions(dir, std::os::unix::fs::PermissionsExt::from_mode(0o700));
+            }
+        }
+        if let Ok(s) = serde_json::to_string_pretty(&*c) {
+            let path = config_path();
+            // 文件里不再有 key（`skip_serializing`），权限收紧仍是纵深防御
+            let _ = std::fs::write(&path, s);
         }
     }
 }
@@ -221,6 +266,7 @@ pub fn set_ai_key(state: State<'_, AiConfig>, key: String) {
 #[tauri::command]
 pub fn clear_ai_key(state: State<'_, AiConfig>) {
     set_field(&state, |c| c.api_key = None);
+    crate::secret::delete_secret(SECRET_OPENAI);
 }
 
 #[tauri::command]
@@ -311,6 +357,11 @@ pub fn clear_provider_key(state: State<'_, AiConfig>, provider: String) {
         "gemini" => c.gemini_key = None,
         _ => c.api_key = None,
     });
+    crate::secret::delete_secret(match provider.as_str() {
+        "anthropic" => SECRET_ANTHROPIC,
+        "gemini" => SECRET_GEMINI,
+        _ => SECRET_OPENAI,
+    });
 }
 
 #[tauri::command]
@@ -325,6 +376,7 @@ pub fn set_tavily_key(state: State<'_, AiConfig>, key: String) {
 #[tauri::command]
 pub fn clear_tavily_key(state: State<'_, AiConfig>) {
     set_field(&state, |c| c.tavily_key = None);
+    crate::secret::delete_secret(SECRET_TAVILY);
 }
 
 #[tauri::command]
@@ -688,6 +740,36 @@ pub fn llm_abort(streams: State<'_, LlmStreamState>, id: String) {
         if let Some(h) = m.remove(&id) {
             h.abort();
         }
+    }
+}
+
+#[cfg(test)]
+mod config_tests {
+    use super::*;
+
+    #[test]
+    fn serialized_config_never_carries_keys() {
+        let mut inner = AiConfigInner::default();
+        inner.api_key = Some("sk-secret".into());
+        inner.anthropic_key = Some("sk-ant-secret".into());
+        inner.tavily_key = Some("tv-secret".into());
+        inner.normalize();
+        let json = serde_json::to_string(&inner).unwrap();
+        for leaked in ["sk-secret", "sk-ant-secret", "tv-secret", "api_key", "anthropic_key", "tavily_key"] {
+            assert!(!json.contains(leaked), "config.json must not carry {leaked}: {json}");
+        }
+        // 非密钥字段照常落盘
+        assert!(json.contains("base_url") || json.contains("baseUrl"));
+    }
+
+    #[test]
+    fn legacy_config_keys_still_deserialize_for_migration() {
+        let json = r#"{"api_key":"sk-old","anthropic_key":"sk-ant","gemini_key":"g","tavily_key":"t","provider":"anthropic"}"#;
+        let inner: AiConfigInner = serde_json::from_str(json).unwrap();
+        assert_eq!(inner.api_key.as_deref(), Some("sk-old"));
+        assert_eq!(inner.anthropic_key.as_deref(), Some("sk-ant"));
+        assert_eq!(inner.gemini_key.as_deref(), Some("g"));
+        assert_eq!(inner.tavily_key.as_deref(), Some("t"));
     }
 }
 

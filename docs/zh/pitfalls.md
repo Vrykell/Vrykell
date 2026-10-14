@@ -286,7 +286,7 @@
 - `restore()` 只写 `{id,title,kind,cwd}`，shellType/ssh 元数据丢失 → SSH/指定 shell 标签恢复后 spawn 成默认 shell。`RestoreMeta` 补齐；旧持久化没有 paneId 的块「仅面板可见，不进块流」（`sessionManager.ts:178`）。
 
 ### 8.9 API key 明文落 config.json 且权限全开（`security-review.md`）
-- 写盘后目录 0700、文件 0600。SSH 密码更彻底：移入系统钥匙串（`secret.rs`），库内只留脱敏标记，旧库明文自动迁移。
+- 已修：API Key 与 SSH 密码统一进平台密钥存储（`secret.rs`）——Windows 用 DPAPI 加密后写 `secrets.json`（只有当前用户能解），macOS 进钥匙串，其它平台回退 0600 文件（无系统密钥环，属已知限制）。`config.json` 用 `skip_serializing` 不再包含 key，启动时把旧明文一次性迁移；文件权限仍收紧为目录 0700 / 文件 0600 作为纵深防御。旧版本构建读不到迁移后的 key（会显示「未配置」），需要重新填入。
 
 ---
 
