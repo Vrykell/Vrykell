@@ -30,7 +30,9 @@ export function buildTools(ctx: ToolContext) {
   // Older callers may omit the environment; the selected pane still determines file access.
   const paneId = ctx.paneId === undefined ? getFocusedTerminalId() : ctx.paneId;
   const pane = executionPaneSpec(paneId);
-  ctx = { ...ctx, paneId, remote: ctx.remote || pane?.kind === 'ssh' };
+  // SSH panes run a POSIX shell on the remote host; a known local shell picks its own rule table.
+  const shellType = ctx.shellType ?? (pane?.kind === 'ssh' ? 'posix' : pane?.shellType);
+  ctx = { ...ctx, paneId, remote: ctx.remote || pane?.kind === 'ssh', shellType };
   const all = {
     run_command: tool({
       description: DESC_RUN_COMMAND,

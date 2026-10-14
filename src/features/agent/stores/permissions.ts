@@ -1,10 +1,14 @@
 /**
- * permissions — AI 权限管理（M3）。
+ * permissions — AI permission management (M3).
  *
- * 三层判定（按序）：
- *   1. 持久化默认级别（levels，设置页可改）：allow 直放行 / ask 弹审批 / deny 不注册
- *   2. 会话授权（sessionGrants，内存，重启失效）：审批卡「本会话允许」写入
- *   3. 危险命令启发式（仅 run_command）：无视 1/2 逐次询问
+ * Four layers, in order:
+ *   1. persisted default level (levels, editable in settings): allow / ask / deny
+ *   2. session grants (sessionGrants, memory only): the approval card's "allow for this
+ *      conversation"
+ *   3. danger heuristics on the values a tool actually executes (command, keys): always
+ *      asked, per call, no matter what 1 and 2 say
+ *   4. sensitive-path heuristics on the values that name a file (path, root, and again
+ *      command/keys): also always asked, so prompt injection cannot read credentials
  *
  * 审批桥：工具 execute 里 gate() 挂起等 Promise；审批卡按钮调
  * resolveApproval() 落决定。stop/abort 必须走 denyAllPending() 兜底，
@@ -41,6 +45,8 @@ export interface ToolContext {
   /** A fixed execution target; null explicitly disables terminal access. */
   paneId?: string | null;
   remote?: boolean;
+  /** Shell of the execution target: picks the danger-rule table (Windows shells also run POSIX-shaped aliases). */
+  shellType?: string | null;
   /** 会话 id（= 工作区 tabId），会话授权的命名空间；缺省时禁用会话授权 */
   tabId?: string;
   /** 审批状态回写（agentStream 接到后 upsert ToolRun） */
@@ -210,6 +216,21 @@ export async function ensureSkillAccess(
 
 type GateOutcome = { proceed: true } | { proceed: false; result: GateResult };
 
+/** Fields whose text is executed by the target shell. */
+const EXECUTED_FIELDS = ['command', 'keys'] as const;
+/** Fields that name a file the tool touches, directly or through a command. */
+const PATH_FIELDS = ['path', 'root', 'command', 'keys'] as const;
+
+/** Join the string values of the listed fields for a text scan. */
+function textOf(input: Record<string, unknown>, fields: readonly string[]): string {
+  let out = '';
+  for (const field of fields) {
+    const value = input[field];
+    if (typeof value === 'string' && value) out = out ? `${out}\n${value}` : value;
+  }
+  return out;
+}
+
 /**
  * 工具 execute 的第一行。返回 proceed:false 时直接把 result 作为工具结果返回
  * （带 denied 哨兵，agentStream 据此刻成 denied 灰环）。
@@ -227,14 +248,12 @@ export async function gate(
       result: { ok: false, denied: true, error: `工具 ${toolName} 已在权限设置中被禁用` },
     };
   }
-  // 危险命令无视授权逐次询问（ask 之前的短路对 danger 不生效）
-  const danger =
-    toolName === 'run_command' ? dangerousCommandReason(String(input.command ?? '')) : null;
-  // 敏感路径（密钥/凭据文件）同样无视授权逐次询问：防止提示注入诱导读取密钥外泄给 LLM
-  const sensitive =
-    toolName === 'read_file' || toolName === 'write_file' || toolName === 'edit_file'
-      ? sensitivePathReason(String(input.path ?? ''))
-      : null;
+  // Danger ignores any grant and is asked per call. Scan the executed fields rather than
+  // the tool name: both the run_command text and the terminal_keys payload really execute.
+  const danger = dangerousCommandReason(textOf(input, EXECUTED_FIELDS), ctx.shellType);
+  // The same for credential paths, so prompt injection cannot read keys and ship them to
+  // the provider. Path fields include command/keys: `cat ~/.ssh/id_rsa` is caught here.
+  const sensitive = sensitivePathReason(textOf(input, PATH_FIELDS));
   if (!danger && !sensitive && (level === 'allow' || hasSessionGrant(ctx.tabId, toolName))) {
     return { proceed: true };
   }
