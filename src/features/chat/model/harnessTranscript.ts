@@ -104,9 +104,19 @@ export function applyHarnessUpdate(messages: ChatMessage[], payload: Record<stri
   switch (kind) {
     case 'user_message_chunk': {
       const text = textOf(update.content);
+      const messageId = typeof update.messageId === 'string' ? update.messageId : '';
       const last = lastMessage(messages);
-      if (last && last.role === 'user') return withLast(messages, (message) => ({ ...message, content: message.content + text }));
-      return [...messages, { id: nextId('harness-user'), role: 'user', content: text, createdAt: Date.now() }];
+      if (!text) return messages;
+      if (last && last.role === 'user') {
+        // The agent may echo the prompt we already appended locally. Comparing text is what keeps
+        // the question from appearing twice; a longer echo replaces ours instead of being appended.
+        if (last.content.includes(text)) return messages;
+        if (text.startsWith(last.content)) return withLast(messages, (message) => ({ ...message, content: text }));
+        // A chunk of the same message (the protocol numbers them) continues it; a different message
+        // starts a new bubble instead of merging two questions into one.
+        if (messageId && messageId === last.id) return withLast(messages, (message) => ({ ...message, content: message.content + text }));
+      }
+      return [...messages, { id: messageId || nextId('harness-user'), role: 'user', content: text, createdAt: Date.now() }];
     }
     case 'agent_message_chunk': {
       const text = textOf(update.content);

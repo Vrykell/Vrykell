@@ -35,6 +35,38 @@ describe('applyHarnessUpdate', () => {
     expect(messages[0]!.content).toBe('run the tests');
   });
 
+  it('does not repeat the prompt the agent echoes back, and groups chunks by message id', () => {
+    // The prompt we showed locally, then the same text coming back as a chunk: one question, not two.
+    const local: ChatMessage[] = [{ id: 'q1', role: 'user', content: 'run the tests', createdAt: 1 }];
+    const echoed = applyHarnessUpdate(local, update({
+      sessionUpdate: 'user_message_chunk', content: { type: 'text', text: 'run the tests' },
+    }));
+    expect(echoed).toHaveLength(1);
+
+    // A longer echo replaces ours rather than being appended to it.
+    const longer = applyHarnessUpdate(local, update({
+      sessionUpdate: 'user_message_chunk', content: { type: 'text', text: 'run the tests and report' },
+    }));
+    expect(longer).toHaveLength(1);
+    expect(longer[0]!.content).toBe('run the tests and report');
+
+    // Chunks of one message (same id) continue it; a different id opens a new bubble.
+    let replay: ChatMessage[] = [];
+    replay = applyHarnessUpdate(replay, update({
+      sessionUpdate: 'user_message_chunk', messageId: 'm1', content: { type: 'text', text: 'first ' },
+    }));
+    replay = applyHarnessUpdate(replay, update({
+      sessionUpdate: 'user_message_chunk', messageId: 'm1', content: { type: 'text', text: 'question' },
+    }));
+    expect(replay).toHaveLength(1);
+    expect(replay[0]!.content).toBe('first question');
+
+    const two = applyHarnessUpdate(replay, update({
+      sessionUpdate: 'user_message_chunk', messageId: 'm2', content: { type: 'text', text: 'second' },
+    }));
+    expect(two).toHaveLength(2);
+  });
+
   it('upserts a tool row and lets an update keep what it does not mention', () => {
     let messages: ChatMessage[] = [];
     const call = update({
