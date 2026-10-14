@@ -16,6 +16,7 @@ import KeyHint from '@ui/KeyHint';
 import { useActiveWorkspace } from '@features/workspace';
 import { toExchanges } from '@features/chat/model/exchanges';
 import AiBlock from '@features/chat/components/AiBlock';
+import ChatComposerShell from './ChatComposerShell';
 import { bindHarnessEvents, useHarnessStore } from '../stores/harness';
 
 /**
@@ -73,43 +74,38 @@ export default function HarnessView({ tabId, harness }: { tabId: string; harness
         ))}
       </div>
 
-      <div className="chat-composer-wrap">
-        <div className="terminal-composer chat-composer">
-          <div className="terminal-composer-heading">
-            <span data-tip={activeCwd || undefined} data-tip-description={activeCwd ? t('The harness works in this directory.') : undefined}
-              style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {harness}{agent ? ` · ${agent.title || agent.name || ''}` : ''}
-            </span>
-            <span className="composer-key-hints"><KeyHint shortcut="Enter" />{t('Send')}</span>
-          </div>
-          <div className="chat-composer-input">
-            <Bot size={20} aria-hidden="true" className="chat-composer-lead" />
-            <TextArea data-testid="harness-composer" data-chat-composer value={text}
-              placeholder={t('Describe what you want to do…')} rows={1}
-              onChange={(event) => setText(event.target.value)} onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-                  event.preventDefault();
-                  submit();
-                }
-              }} />
-          </div>
-          <div className="chat-input-status">
-            {session?.opening && <span data-testid="harness-opening" style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
-              {t('Connecting…')}
-            </span>}
-            <span className="chat-footer-space" />
-            {session?.pending
-              ? <IconButton className="chat-send-button" tone="accent" aria-label={t('Stop the harness turn')}
-                data-tip={t('Stop the harness turn')} onClick={() => void useHarnessStore.getState().cancel(tabId)}>
-                <Square size={15} fill="currentColor" />
-              </IconButton>
-              : <IconButton className="chat-send-button" tone="accent" aria-label={t('Send')} data-tip={t('Send')}
-                data-tip-shortcut="Enter" data-testid="harness-send" disabled={!canSend} onClick={submit}>
-                <ArrowUp size={18} />
-              </IconButton>}
-          </div>
-        </div>
-      </div>
+      <ChatComposerShell
+        heading={<span data-tip={activeCwd || undefined} data-tip-description={activeCwd ? t('The harness works in this directory.') : undefined}
+          style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {harness}{agent ? ` · ${agent.title || agent.name || ''}` : ''}
+        </span>}
+        hints={<><KeyHint shortcut="Enter" />{t('Send')}</>}
+        status={<>
+          {session?.opening && <span data-testid="harness-opening" style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
+            {t('Connecting…')}
+          </span>}
+          <span className="chat-footer-space" />
+          {session?.pending
+            ? <IconButton className="chat-send-button" tone="accent" aria-label={t('Stop the harness turn')}
+              data-tip={t('Stop the harness turn')} onClick={() => void useHarnessStore.getState().cancel(tabId)}>
+              <Square size={15} fill="currentColor" />
+            </IconButton>
+            : <IconButton className="chat-send-button" tone="accent" aria-label={t('Send')} data-tip={t('Send')}
+              data-tip-shortcut="Enter" data-testid="harness-send" disabled={!canSend} onClick={submit}>
+              <ArrowUp size={18} />
+            </IconButton>}
+        </>}
+      >
+        <Bot size={20} aria-hidden="true" className="chat-composer-lead" />
+        <TextArea data-testid="harness-composer" data-chat-composer value={text}
+          placeholder={t('Describe what you want to do…')} rows={1}
+          onChange={(event) => setText(event.target.value)} onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              submit();
+            }
+          }} />
+      </ChatComposerShell>
     </div>
   );
 }

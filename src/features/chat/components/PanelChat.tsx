@@ -13,6 +13,7 @@ import { useTerminalStore } from '@features/terminal';
 import { useChatStore, type ChatMessage } from '../stores/chat';
 import { EMPTY_COMPOSER_DRAFT, useComposerDrafts } from '../stores/composerDrafts';
 import ChatModeSelect from './ChatModeSelect';
+import ChatComposerShell from './ChatComposerShell';
 import ModelPill from './ModelPill';
 import AttachmentChips from './AttachmentChips';
 import TerminalReferences from './TerminalReferences';
@@ -216,37 +217,35 @@ export default function PanelChat() {
         if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
       }}>{t('Jump to latest reply')}<ArrowDown size={14} /></button>
     </div>}
-    <div className="chat-composer-wrap">
-      <div className="terminal-composer chat-composer">
-        <div className="terminal-composer-heading"><span>{t('AI chat')}</span><span className="composer-key-hints"><KeyHint shortcut="Enter" />{t('Send')}</span></div>
-        {(references.length > 0 || attachments.length > 0) && <div className="chat-context-tray" aria-label={t('Conversation context')}>
-          {attachments.length > 0 && <AttachmentChips atts={attachments} previewId={previewId} onPreview={togglePreview} onRemove={removeAttachment} />}
-          {references.length > 0 && <TerminalReferences references={references} onRemove={id => {
-            useComposerDrafts.getState().setReferences(activeId, references.filter(reference => reference.id !== id));
-          }} />}
-        </div>}
-        <div className="chat-composer-input">
-          <Zap size={20} aria-hidden="true" className="chat-composer-lead" />
-          <TextArea ref={composer.inputRef} data-chat-composer value={composer.text} placeholder={t('Describe what you want to do…')} rows={1}
-            onChange={composer.handleChange} onKeyDown={event => {
-              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); submit(); }
-              else composer.handleKeyDown(event);
-            }} onPaste={event => {
-              const files = Array.from(event.clipboardData.files);
-              if (files.length) { event.preventDefault(); void addBlobs(files); return; }
-              if (addPastedText(event.clipboardData.getData('text/plain'))) event.preventDefault();
-            }} />
-        </div>
-        <div className="chat-input-status">
-          <IconButton aria-label={t('Add attachment')} data-tip={t('Add attachment')} onClick={() => void pickFiles()}><Plus size={18} /></IconButton>
-          <ChatModeSelect />
-          <span className="chat-footer-space" />
-          <ModelPill showThinking={false} />
-          {sendingTab === activeId ? <IconButton className="chat-send-button" tone="accent" aria-label={t('Stop generating')} data-tip={t('Stop generating')}
-            onClick={() => useChatStore.getState().abortStream(activeId)}><Square size={15} fill="currentColor" /></IconButton>
-            : <IconButton className="chat-send-button" tone="accent" aria-label={t('Send')} data-tip={t('Send')} data-tip-shortcut="Enter" onClick={submit} disabled={!composer.canSend}><ArrowUp size={18} /></IconButton>}
-        </div>
-      </div>
-    </div>
+    <ChatComposerShell
+      heading={<>{t('AI chat')}</>}
+      hints={<><KeyHint shortcut="Enter" />{t('Send')}</>}
+      tray={(references.length > 0 || attachments.length > 0) && <div className="chat-context-tray" aria-label={t('Conversation context')}>
+        {attachments.length > 0 && <AttachmentChips atts={attachments} previewId={previewId} onPreview={togglePreview} onRemove={removeAttachment} />}
+        {references.length > 0 && <TerminalReferences references={references} onRemove={id => {
+          useComposerDrafts.getState().setReferences(activeId, references.filter(reference => reference.id !== id));
+        }} />}
+      </div>}
+      status={<>
+        <IconButton aria-label={t('Add attachment')} data-tip={t('Add attachment')} onClick={() => void pickFiles()}><Plus size={18} /></IconButton>
+        <ChatModeSelect />
+        <span className="chat-footer-space" />
+        <ModelPill showThinking={false} />
+        {sendingTab === activeId ? <IconButton className="chat-send-button" tone="accent" aria-label={t('Stop generating')} data-tip={t('Stop generating')}
+          onClick={() => useChatStore.getState().abortStream(activeId)}><Square size={15} fill="currentColor" /></IconButton>
+          : <IconButton className="chat-send-button" tone="accent" aria-label={t('Send')} data-tip={t('Send')} data-tip-shortcut="Enter" onClick={submit} disabled={!composer.canSend}><ArrowUp size={18} /></IconButton>}
+      </>}
+    >
+      <Zap size={20} aria-hidden="true" className="chat-composer-lead" />
+      <TextArea ref={composer.inputRef} data-chat-composer value={composer.text} placeholder={t('Describe what you want to do…')} rows={1}
+        onChange={composer.handleChange} onKeyDown={event => {
+          if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); submit(); }
+          else composer.handleKeyDown(event);
+        }} onPaste={event => {
+          const files = Array.from(event.clipboardData.files);
+          if (files.length) { event.preventDefault(); void addBlobs(files); return; }
+          if (addPastedText(event.clipboardData.getData('text/plain'))) event.preventDefault();
+        }} />
+    </ChatComposerShell>
   </div>;
 }
