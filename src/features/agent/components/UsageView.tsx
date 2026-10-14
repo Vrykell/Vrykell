@@ -11,7 +11,7 @@ import { t, type I18nKey } from '@i18n';
 import { useToastStore } from '@ui/Toast';
 import { IconButton } from '@ui/IconButton';
 import Select from '@ui/Select';
-import { DataUsage, Info, Trash2, iconSizes } from '@ui/icons';
+import { DataUsage, Trash2, iconSizes } from '@ui/icons';
 import { formatLogTime, type UsageRange } from '@features/agent/model/usageStats';
 import { ALL_FILTER, useUsageStats } from '@features/agent/hooks/useUsageStats';
 import MetricsRow from './usage/MetricsRow';
@@ -47,8 +47,7 @@ function FilterSelect({ label, value, options, onChange, testId }: {
   );
 }
 
-export default function UsageView() {
-  const stats = useUsageStats();
+export default function UsageView() {  const stats = useUsageStats();
   const [tab, setTab] = useState<UsageTab>('logs');
   const rangeLabel = t(RANGE_OPTIONS.find((option) => option.value === stats.range)!.label);
 
@@ -64,12 +63,11 @@ export default function UsageView() {
     }}>
       <header style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
         <DataUsage size={iconSizes.row} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
-        <strong style={{ color: 'var(--text-primary)', fontSize: 'var(--fs-subtitle)', fontWeight: 'var(--fw-semibold)' }}>
+        <strong data-tip={t('Usage statistics')}
+          data-tip-description={t('Requests and token usage the provider reported on this machine.')}
+          style={{ color: 'var(--text-primary)', fontSize: 'var(--fs-subtitle)', fontWeight: 'var(--fw-semibold)' }}>
           {t('Usage statistics')}
         </strong>
-        <Info size={13} style={{ color: 'var(--text-muted)' }}
-          data-tip={t('Usage statistics')}
-          data-tip-description={t('Requests and token usage the provider reported on this machine.')} />
         <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
           <span data-testid="usage-record-count">{t('{{count}} records', { count: stats.records.length })}</span>
           {stats.latestAt > 0 && <span>· {t('Latest {{time}}', { time: formatLogTime(stats.latestAt) })}</span>}

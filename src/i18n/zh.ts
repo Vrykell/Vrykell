@@ -763,6 +763,7 @@ const zh: Record<string, string> = {
   "Cache hit rate is the share of prompt tokens the provider served from its cache.": "缓存命中率：提示词 token 中由服务商缓存命中的比例。",
   "Fresh input excludes the prompt tokens served from cache.": "新增输入已排除缓存命中的提示词 token。",
   "Prompt and completion tokens as the provider reported them.": "服务商返回的提示词与补全 token 合计。",
+  "Prompt tokens the provider served from its cache.": "由服务商缓存命中的提示词 token。",
   "By provider": "按服务商",
   "Model": "模型",
   "Input": "输入",
