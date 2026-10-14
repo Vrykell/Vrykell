@@ -50,6 +50,7 @@ pub fn run() {
         .manage(agent::mcp::McpState::default())
         .manage(agent::permissions::ToolPolicy::default())
         .manage(files::grants::PathGrants::load())
+        .manage(agent::acp::AcpRuntime::default())
         // Paths the operating system delivers (a drop onto the window) are the one gesture the page
         // cannot fake, so they are recorded here for the read commands to accept.
         .on_window_event(|window, event| {
@@ -208,6 +209,11 @@ pub fn run() {
             files::fs::import_attachment,
             files::grants::pick_path,
             agent::acp::acp_handshake,
+            agent::acp::acp_harnesses,
+            agent::acp::acp_open,
+            agent::acp::acp_prompt,
+            agent::acp::acp_cancel,
+            agent::acp::acp_close,
             files::file_open::file_open,
             files::file_open::file_open_with,
             commands::search::search_files,

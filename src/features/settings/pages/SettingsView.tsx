@@ -7,6 +7,7 @@ import { loadConfig, saveConfig, type FileOpenConfig } from '@features/files/ser
 import { refreshAiConfig, setTavilyKey, clearTavilyKey, useAiConfigStore } from '@features/agent';
 import SkillsSettings from '@features/settings/pages/SkillsSettings';
 import { MemorySettings, AgentsSettings, SchedulesSettings } from '@features/settings/pages/AgentExtrasSettings';
+import HarnessPage from '@features/settings/pages/harnessPage';
 import Select from '@ui/Select';
 import { useToastStore } from '@ui/Toast';
 import {
@@ -227,6 +228,9 @@ function SettingsContent() {
 
       case 'ai-schedules':
         return <SchedulesSettings />;
+
+      case 'ai-harness':
+        return <HarnessPage />;
 
       case 'terminal-open':
         return <TerminalOpenPage />;

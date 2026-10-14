@@ -38,6 +38,7 @@ import { SessionHistoryView } from '@features/session-history';
 import AiHistoryView from '@features/chat/components/AiHistoryView';
 import SettingsView from '@features/settings/pages/SettingsView';
 import UsageView from '@features/agent/components/UsageView';
+import HarnessView from '@features/chat/components/HarnessView';
 import ContextMenu from '@ui/ContextMenu';
 import { useTerminalLayoutActions } from '@features/terminal/hooks/useTerminalLayoutActions';
 import { useTuiControls } from '@features/terminal/hooks/useTuiControls';
@@ -86,7 +87,9 @@ export default function TerminalView() {
         if (tab.id !== activeId) return null; // history/settings/usage 无 PTY，无需保活
         return tab.kind === 'history' ? <SessionHistoryView key={tab.id} />
           : tab.kind === 'ai-history' ? <AiHistoryView key={tab.id} />
-            : tab.kind === 'usage' ? <UsageView key={tab.id} /> : <SettingsView key={tab.id} />;
+            : tab.kind === 'usage' ? <UsageView key={tab.id} />
+              : tab.kind === 'harness' ? <HarnessView key={tab.id} tabId={tab.id} harness={tab.harness} />
+                : <SettingsView key={tab.id} />;
       })}
 
       {/* Manual fullscreen host for a running block, with room for the toolbar. */}

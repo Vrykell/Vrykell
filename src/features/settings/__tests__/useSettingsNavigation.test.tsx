@@ -32,11 +32,11 @@ describe('useSettingsNavigation', () => {
 
   it('keeps all navigation pages visible and updates the selected page', () => {
     const { result } = renderHook(() => useSettingsNavigation());
-    expect(result.current.visibleGroups.flatMap(group => group.items)).toHaveLength(17);
+    expect(result.current.visibleGroups.flatMap(group => group.items)).toHaveLength(18);
     act(() => result.current.setSelected('terminal-open'));
     expect(result.current.selected).toBe('terminal-open');
     expect(result.current.activeLabel).toBe('打开方式');
-    expect(result.current.visibleGroups.flatMap(group => group.items)).toHaveLength(17);
+    expect(result.current.visibleGroups.flatMap(group => group.items)).toHaveLength(18);
   });
 
   it('finds individual fields using the same index as global search', () => {

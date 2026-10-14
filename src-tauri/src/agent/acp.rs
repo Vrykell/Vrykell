@@ -348,12 +348,177 @@ pub async fn acp_handshake(name: String) -> Result<Value, String> {
         .initialize("vrykell", env!("CARGO_PKG_VERSION"))
         .await
         .map_err(|e| format!("harness handshake failed: {e}"))?;
-    Ok(json!({
+    Ok(describe_agent(&info))
+}
+
+/// What a handshake tells us about an agent.
+fn describe_agent(info: &Value) -> Value {
+    json!({
         "protocolVersion": info.get("protocolVersion").cloned().unwrap_or(Value::Null),
         "agentInfo": info.get("agentInfo").cloned().unwrap_or(Value::Null),
         "agentCapabilities": info.get("agentCapabilities").cloned().unwrap_or(Value::Null),
         "authMethods": info.get("authMethods").cloned().unwrap_or(Value::Null),
+    })
+}
+
+/// The configured harnesses, for the settings list. Commands and arguments are included on purpose:
+/// the user is looking at what will run.
+#[tauri::command]
+pub fn acp_harnesses() -> Vec<HarnessConfig> {
+    HarnessFile::load().harnesses
+}
+
+/// Sessions currently open. Dropping the last reference kills the child (`kill_on_drop`).
+#[derive(Default)]
+pub struct AcpRuntime(Mutex<HashMap<String, Arc<AcpClient>>>);
+
+impl AcpRuntime {
+    fn insert(&self, session: String, client: Arc<AcpClient>) {
+        if let Ok(mut map) = self.0.lock() {
+            map.insert(session, client);
+        }
+    }
+
+    fn get(&self, session: &str) -> Result<Arc<AcpClient>, String> {
+        self.0
+            .lock()
+            .map_err(|_| "the ACP state is poisoned".to_string())?
+            .get(session)
+            .cloned()
+            .ok_or_else(|| format!("no open harness session {session}"))
+    }
+
+    fn remove(&self, session: &str) {
+        if let Ok(mut map) = self.0.lock() {
+            map.remove(session);
+        }
+    }
+}
+
+/// One event from a harness session. `kind` is one of `update`, `permission`, `stop`, `error`.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct AcpEvent {
+    session_id: String,
+    kind: String,
+    payload: Value,
+}
+
+/// Event name the frontend listens on.
+const EVENT: &str = "acp://session";
+
+fn emit<R: tauri::Runtime>(app: &tauri::AppHandle<R>, event: AcpEvent) {
+    // A closed window is not an error worth surfacing; the session is dropped with it.
+    let _ = tauri::Emitter::emit(app, EVENT, event);
+}
+
+/// Start a harness, open a session in `cwd`, and pump its notifications to the frontend.
+#[tauri::command]
+pub async fn acp_open<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    state: tauri::State<'_, AcpRuntime>,
+    name: String,
+    cwd: String,
+) -> Result<Value, String> {
+    let config = HarnessFile::load();
+    let harness = config
+        .find_enabled(&name)
+        .ok_or_else(|| format!("no enabled harness named {name}"))?
+        .clone();
+
+    // Phase 1 has no approval card for harness permissions yet, so the client refuses and tells the
+    // session what was asked for; the wire stays honest and nothing runs unapproved.
+    let permission_app = app.clone();
+    let permission: PermissionHandler = Arc::new(move |params: Value| {
+        let session = params.get("sessionId").and_then(Value::as_str).unwrap_or_default().to_string();
+        emit(
+            &permission_app,
+            AcpEvent { session_id: session, kind: "permission".to_string(), payload: params },
+        );
+        PermissionOutcome::Cancelled
+    });
+
+    let client = Arc::new(AcpClient::spawn(
+        &harness.command,
+        &harness.args,
+        if harness.cwd.trim().is_empty() { None } else { Some(Path::new(&harness.cwd)) },
+        &harness.env,
+        permission,
+    )?);
+    let info = client
+        .initialize("vrykell", env!("CARGO_PKG_VERSION"))
+        .await
+        .map_err(|e| format!("harness handshake failed: {e}"))?;
+    let session = client
+        .new_session(&cwd)
+        .await
+        .map_err(|e| format!("harness could not open a session: {e}"))?;
+
+    // Pump the agent's notifications for as long as the session lives.
+    let pump_app = app.clone();
+    let pump_session = session.clone();
+    let pump_client = client.clone();
+    tokio::spawn(async move {
+        while let Some(message) = pump_client.next_event().await {
+            emit(
+                &pump_app,
+                AcpEvent { session_id: pump_session.clone(), kind: "update".to_string(), payload: message },
+            );
+        }
+    });
+
+    state.insert(session.clone(), client);
+    Ok(json!({
+        "sessionId": session,
+        "harness": harness.name,
+        "agent": describe_agent(&info),
     }))
+}
+
+/// Send a prompt. The turn runs in the background; its content and stop reason arrive as events.
+#[tauri::command]
+pub async fn acp_prompt<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    state: tauri::State<'_, AcpRuntime>,
+    session_id: String,
+    text: String,
+) -> Result<(), String> {
+    let client = state.get(&session_id)?;
+    let app = app.clone();
+    let session = session_id.clone();
+    tokio::spawn(async move {
+        let outcome = client
+            .prompt(&session, json!([{ "type": "text", "text": text }]))
+            .await;
+        match outcome {
+            Ok(stop) => emit(
+                &app,
+                AcpEvent {
+                    session_id: session,
+                    kind: "stop".to_string(),
+                    payload: json!({ "stopReason": stop }),
+                },
+            ),
+            Err(message) => emit(
+                &app,
+                AcpEvent { session_id: session, kind: "error".to_string(), payload: json!({ "message": message }) },
+            ),
+        }
+    });
+    Ok(())
+}
+
+/// Ask the agent to stop the current turn.
+#[tauri::command]
+pub fn acp_cancel(state: tauri::State<'_, AcpRuntime>, session_id: String) -> Result<(), String> {
+    state.get(&session_id)?.cancel(&session_id)
+}
+
+/// Close a session: the agent's process goes with it.
+#[tauri::command]
+pub fn acp_close(state: tauri::State<'_, AcpRuntime>, session_id: String) -> Result<(), String> {
+    state.remove(&session_id);
+    Ok(())
 }
 
 #[cfg(test)]

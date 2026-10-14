@@ -27,6 +27,10 @@ function str(value: unknown): string { return typeof value === 'string' ? value 
 function summarize(run: ToolRun): { icon: React.ReactNode; text: string } {
   const input = run.input;
   const size = { size: 15 };
+  // A tool we do not know (an external harness reports one) still carries a human-readable title.
+  if (typeof input.title === 'string' && input.title) {
+    return { icon: <Wrench {...size} />, text: input.title };
+  }
   switch (run.toolName) {
     case 'run_command': return { icon: <TerminalPrompt {...size} />, text: str(input.command) };
     case 'read_file': return { icon: <FileText {...size} />, text: t('Read {{path}}', { path: str(input.path) }) };
