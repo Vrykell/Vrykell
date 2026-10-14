@@ -31,6 +31,8 @@ describe('UsageView', () => {
     expect(screen.getByTestId('usage-trend-chart')).toBeInTheDocument();
     expect(screen.getByText('这段时间没有记录到用量。')).toBeInTheDocument();
     expect(screen.getByTestId('usage-clear')).toBeDisabled();
+    // 页脚的口径说明整段移除（口径改挂在指标标签的悬停提示上）
+    expect(screen.queryByText(/暂未计入/)).toBeNull();
   });
 
   it('shows every metric card at once, with the counting rule on the label hover', () => {
@@ -88,15 +90,19 @@ describe('UsageView', () => {
     expect(bar).toHaveAttribute('rx', '3');
     expect(screen.queryByTestId('usage-trend-tooltip')).toBeNull();
 
-    // 悬停整列 → 显示完整时间与该项的数值
+    // 悬停整列 → 显示完整时间与该项的数值；高亮只覆盖这一根柱（宽度跟着柱走）
     fireEvent.mouseEnter(screen.getByTestId('usage-trend-slot-0'));
     const tooltip = screen.getByTestId('usage-trend-tooltip');
     expect(tooltip).toHaveTextContent(/^\d{4}\/\d{2}\/\d{2} \d{2}:00/);
     expect(tooltip).toHaveTextContent('Tokens');
     expect(tooltip).toHaveTextContent('1,500 tokens');
+    const lane = screen.getByTestId('usage-trend-hover');
+    expect(Number(lane.getAttribute('width'))).toBe(Number(bar.getAttribute('width')) + 8);
+    expect(lane).toHaveAttribute('rx', '3');
 
     fireEvent.mouseLeave(screen.getByTestId('usage-trend-chart'));
     expect(screen.queryByTestId('usage-trend-tooltip')).toBeNull();
+    expect(screen.queryByTestId('usage-trend-hover')).toBeNull();
   });
 
   it('switches the trend metric and the detail tables', () => {
@@ -196,6 +202,28 @@ describe('UsageView', () => {
     fireEvent.click(screen.getByTestId('usage-refresh'));
     await waitFor(() => expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('2'));
     expect(screen.getByTestId('usage-refreshed-at')).toHaveTextContent('刷新于');
+  });
+
+  it('groups records by source and narrows to one harness from the chip bar', () => {
+    seedSonnetTurn();
+    // 未来的 ACP harness（这里用 opencode 代指）报上来的一轮
+    useUsageStore.getState().recordTurn({
+      source: 'opencode', provider: 'anthropic', model: 'claude-sonnet-4', inputTokens: 100, outputTokens: 10,
+    });
+    render(<UsageView />);
+
+    expect(screen.getByTestId('usage-source-all')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('usage-source-vrykell')).toHaveAttribute('aria-label', 'Vrykell');
+    expect(screen.getByTestId('usage-source-vrykell')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('2');
+
+    fireEvent.click(screen.getByTestId('usage-source-opencode'));
+    expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('1');
+    expect(screen.getByTestId('usage-total-tokens')).toHaveTextContent('110');
+
+    // 再点一次回到全部来源
+    fireEvent.click(screen.getByTestId('usage-source-opencode'));
+    expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('2');
   });
 
   it('clears the records and confirms it', () => {

@@ -543,6 +543,12 @@ button.window-control-button {
 /* Usage statistics page: cards carry the chart and the tables, like the reference dashboard. */
 .usage-card { padding: 12px 14px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); min-width: 0; }
 .usage-page { font-family: var(--font-ui); }
+/* Usage filter row: the source segment bar on the left, then the by-value selects. */
+.usage-source-filter { display: inline-flex; align-items: center; gap: 2px; height: 32px; padding: 3px; border-radius: var(--radius-inner); background: var(--hover); flex-shrink: 0; }
+.usage-source-chip { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 26px; padding: 0 10px; border: 0; border-radius: var(--radius-inner); background: transparent; color: var(--text-secondary); font: var(--fw-medium) var(--fs-caption) var(--font-ui); white-space: nowrap; cursor: pointer; transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+.usage-source-chip:hover { color: var(--text-primary); }
+.usage-source-chip[aria-pressed="true"] { background: var(--surface); color: var(--text-primary); font-weight: var(--fw-semibold); }
+.usage-source-chip--icon { width: 26px; padding: 0; }
 .command-block.ai-block { min-width: 0; margin: 0; padding-left: 18px; padding-right: 18px; background: color-mix(in srgb, var(--ai-block-bg) calc(var(--ai-block-bg-enabled) * 100%), transparent); }
 .command-block.ai-block::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: color-mix(in srgb, var(--ai-block-rail) calc(var(--ai-block-bg-enabled) * 100%), transparent); pointer-events: none; z-index: 1; }
 .command-block.ai-block[data-divider-before="true"]::before { top: -1px; }

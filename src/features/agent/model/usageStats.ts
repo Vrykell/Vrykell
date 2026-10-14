@@ -11,10 +11,18 @@
 
 export type UsageRange = 'today' | '7d' | '30d' | 'all';
 
+/**
+ * Source of this app's own turns. Harnesses connected through ACP report their own name, which is
+ * then what the source filter groups by.
+ */
+export const DEFAULT_USAGE_SOURCE = 'vrykell';
+
 export interface UsageRecord {
   id: string;
   /** Epoch milliseconds when the turn finished. */
   at: number;
+  /** Which agent reported the turn: this app, or (later) a connected harness. */
+  source: string;
   provider: string;
   model: string;
   inputTokens: number;

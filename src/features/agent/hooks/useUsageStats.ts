@@ -23,6 +23,7 @@ export const ALL_FILTER = '';
 export function useUsageStats() {
   const records = useUsageStore((state) => state.records);
   const [range, setRange] = useState<UsageRange>('today');
+  const [source, setSource] = useState<string>(ALL_FILTER);
   const [provider, setProvider] = useState<string>(ALL_FILTER);
   const [model, setModel] = useState<string>(ALL_FILTER);
   /** Bumped by a manual refresh so the derived view recomputes with a fresh clock. */
@@ -33,11 +34,16 @@ export function useUsageStats() {
   // when the numbers should move. The clock is read at that moment, not on every render.
   const inRange = useMemo(() => recordsInRange(records, range, Date.now()), [records, range, revision]);
   const filtered = useMemo(
-    () => inRange.filter((record) => (!provider || record.provider === provider) && (!model || record.model === model)),
-    [inRange, provider, model],
+    () => inRange.filter((record) =>
+      (!source || record.source === source) && (!provider || record.provider === provider) && (!model || record.model === model)),
+    [inRange, source, provider, model],
   );
   const totals = useMemo(() => summarize(filtered), [filtered]);
   // Options come from the range, so a filter never offers a choice with no rows behind it.
+  const sourceOptions = useMemo(
+    () => [...new Set(inRange.map((record) => record.source))].sort((a, b) => a.localeCompare(b)),
+    [inRange],
+  );
   const providerOptions = useMemo(
     () => [...new Set(inRange.map((record) => record.provider))].sort((a, b) => a.localeCompare(b)),
     [inRange],
@@ -64,8 +70,8 @@ export function useUsageStats() {
   }, []);
 
   return {
-    records, range, setRange, provider, setProvider, model, setModel,
-    providerOptions, modelOptions, totals, providerRows, modelRows, logRows, series, latestAt,
+    records, range, setRange, source, setSource, provider, setProvider, model, setModel,
+    sourceOptions, providerOptions, modelOptions, totals, providerRows, modelRows, logRows, series, latestAt,
     clear, refresh, refreshedAt,
   };
 }

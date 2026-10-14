@@ -57,6 +57,17 @@ test.describe('usage statistics page', () => {
     await expect(tooltip).toContainText(/^\d{4}\/\d{2}\/\d{2} \d{2}:00/);
     await expect(tooltip).toContainText('Tokens');
     await expect(tooltip).toContainText('15 tokens');
+    // 高亮只覆盖这一根柱：宽度跟着柱走，不会铺满整个时间槽
+    const laneWidth = Number(await page.getByTestId('usage-trend-hover').getAttribute('width'));
+    expect(laneWidth).toBeLessThan(80);
+
+    // 来源选择条：默认「全部」，点本机来源后数据不变
+    await expect(page.getByTestId('usage-source-all')).toHaveAttribute('aria-pressed', 'true');
+    await page.getByTestId('usage-source-vrykell').click();
+    await expect(page.getByTestId('usage-source-vrykell')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('usage-total-requests')).toHaveText('1');
+    await page.getByTestId('usage-source-all').click();
+    await expect(page.getByTestId('usage-source-all')).toHaveAttribute('aria-pressed', 'true');
 
     // 刷新按钮：重读存储并给出刷新时间
     await expect(page.getByTestId('usage-refreshed-at')).toHaveCount(0);

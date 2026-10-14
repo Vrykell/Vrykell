@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   cacheHitRate,
+  DEFAULT_USAGE_SOURCE,
   formatCompact,
   formatLogFullTime,
   formatLogTime,
@@ -25,6 +26,7 @@ function record(patch: Partial<UsageRecord> = {}): UsageRecord {
   return {
     id: 'r',
     at: 0,
+    source: DEFAULT_USAGE_SOURCE,
     provider: 'anthropic',
     model: 'claude-sonnet-4',
     inputTokens: 100,

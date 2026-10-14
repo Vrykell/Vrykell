@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { DEFAULT_USAGE_SOURCE } from '@features/agent/model/usageStats';
 import { MAX_USAGE_RECORDS, useUsageStore } from './usage';
 
 beforeEach(() => {
@@ -75,5 +76,31 @@ describe('clear', () => {
     expect(useUsageStore.getState().records).toHaveLength(1);
     useUsageStore.getState().clear();
     expect(useUsageStore.getState().records).toEqual([]);
+  });
+});
+
+describe('source', () => {
+  it('records this app unless the caller names a harness', () => {
+    useUsageStore.getState().recordTurn({ provider: 'anthropic', model: 'claude-sonnet-4', inputTokens: 10 });
+    useUsageStore.getState().recordTurn({
+      source: 'opencode', provider: 'anthropic', model: 'claude-sonnet-4', inputTokens: 10,
+    });
+    expect(useUsageStore.getState().records.map((record) => record.source))
+      .toEqual([DEFAULT_USAGE_SOURCE, 'opencode']);
+  });
+
+  it('reads rows written before the source field existed as this app', async () => {
+    // 旧版本写下的载荷没有 source：合并时补上本机来源，而不是把它们归到未知来源
+    localStorage.setItem('vrykell-usage', JSON.stringify({
+      version: 2,
+      state: {
+        records: [{
+          id: 'old', at: 1, provider: 'anthropic', model: 'claude-sonnet-4', inputTokens: 10, outputTokens: 1,
+          cachedInputTokens: 0, reasoningTokens: 0, steps: 1, toolCalls: 0,
+        }],
+      },
+    }));
+    await useUsageStore.persist.rehydrate();
+    expect(useUsageStore.getState().records[0]!.source).toBe(DEFAULT_USAGE_SOURCE);
   });
 });

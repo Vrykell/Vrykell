@@ -15,6 +15,7 @@ import { DataUsage, RefreshCw, Trash2, iconSizes } from '@ui/icons';
 import { formatLogTime, type UsageRange } from '@features/agent/model/usageStats';
 import { ALL_FILTER, useUsageStats } from '@features/agent/hooks/useUsageStats';
 import MetricsRow from './usage/MetricsRow';
+import SourceFilter from './usage/SourceFilter';
 import TrendChart from './usage/TrendChart';
 import RequestLogTable from './usage/RequestLogTable';
 import { ModelStatsTable, ProviderStatsTable } from './usage/StatsTables';
@@ -34,16 +35,19 @@ const TAB_LABELS: Array<{ id: UsageTab; label: I18nKey }> = [
   { id: 'models', label: 'Models' },
 ];
 
-function FilterSelect({ label, value, options, onChange, testId }: {
+function FilterSelect({ label, tip, value, options, onChange, testId, width }: {
   label: string;
+  /** Full current value for the hover tip, since the narrow trigger truncates long names. */
+  tip?: string;
   value: string;
   options: Array<{ value: string; label: string }>;
   onChange: (next: string) => void;
   testId: string;
+  width: number;
 }) {
   return (
     <Select aria-label={label} data-testid={testId} value={value} options={options} onChange={onChange}
-      style={{ minWidth: 136, maxWidth: 220 }} />
+      data-tip={tip} style={{ width, maxWidth: 168 }} />
   );
 }
 
@@ -96,14 +100,17 @@ export default function UsageView() {
       </header>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-          <FilterSelect label={t('Provider')} testId="usage-filter-provider" value={stats.provider}
+        <SourceFilter value={stats.source} options={stats.sourceOptions} onChange={stats.setSource} />
+        <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <FilterSelect label={t('Provider')} testId="usage-filter-provider" width={132}
+            value={stats.provider} tip={stats.provider || t('All')}
             options={[{ value: ALL_FILTER, label: t('All') }, ...stats.providerOptions.map((option) => ({ value: option, label: option }))]}
             onChange={stats.setProvider} />
-          <FilterSelect label={t('Model')} testId="usage-filter-model" value={stats.model}
+          <FilterSelect label={t('Model')} testId="usage-filter-model" width={140}
+            value={stats.model} tip={stats.model || t('All')}
             options={[{ value: ALL_FILTER, label: t('All') }, ...stats.modelOptions.map((option) => ({ value: option, label: option }))]}
             onChange={stats.setModel} />
-          <FilterSelect label={t('Usage range')} testId="usage-range" value={stats.range}
+          <FilterSelect label={t('Usage range')} testId="usage-range" width={104} value={stats.range}
             options={RANGE_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))}
             onChange={(next) => stats.setRange(next as UsageRange)} />
         </span>
@@ -133,9 +140,6 @@ export default function UsageView() {
         {tab === 'logs' && <RequestLogTable rows={stats.logRows} />}
         {tab === 'providers' && <ProviderStatsTable rows={stats.providerRows} />}
         {tab === 'models' && <ModelStatsTable rows={stats.modelRows} />}
-        <p style={{ margin: '10px 2px 0', color: 'var(--text-muted)', fontSize: 'var(--fs-micro)', lineHeight: 1.6 }}>
-          {t('Counts are reported by the provider. Titles, command completion and context summaries are not counted yet.')}
-        </p>
       </section>
     </div>
   );

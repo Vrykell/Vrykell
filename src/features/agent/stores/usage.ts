@@ -7,7 +7,7 @@
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { UsageRecord } from '@features/agent/model/usageStats';
+import { DEFAULT_USAGE_SOURCE, type UsageRecord } from '@features/agent/model/usageStats';
 
 /** Newest records kept; older turns fall out of the panel. */
 export const MAX_USAGE_RECORDS = 500;
@@ -15,6 +15,8 @@ export const MAX_USAGE_RECORDS = 500;
 export interface TurnUsageInput {
   provider: string;
   model: string;
+  /** Reporting agent; defaults to this app. */
+  source?: string;
   inputTokens?: number;
   outputTokens?: number;
   cachedInputTokens?: number;
@@ -56,6 +58,7 @@ export const useUsageStore = create<UsageState>()(
           const record: UsageRecord = {
             id: `u${at}-${sequence++}`,
             at,
+            source: input.source ?? DEFAULT_USAGE_SOURCE,
             provider: input.provider,
             model: input.model,
             inputTokens,
@@ -75,12 +78,17 @@ export const useUsageStore = create<UsageState>()(
       name: 'vrykell-usage',
       version: 2,
       // A damaged payload must not leave the panel holding unknown records; rows written by an
-      // older build simply lack the newer fields and are read as zero.
+      // older build simply lack the newer fields (the source among them) and are filled in here.
       merge: (persisted, current) => {
         const saved = (persisted ?? {}) as { records?: unknown };
         return {
           ...current,
-          records: Array.isArray(saved.records) ? (saved.records as UsageRecord[]) : [],
+          records: Array.isArray(saved.records)
+            ? (saved.records as UsageRecord[]).map((record) => ({
+                ...record,
+                source: record.source || DEFAULT_USAGE_SOURCE,
+              }))
+            : [],
         };
       },
     },

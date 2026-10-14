@@ -2,9 +2,10 @@
  * TrendChart — bars per hour (today) or per day (wider ranges) with a metric switch.
  *
  * Mirrors the reference dashboard's chart card: blue bars with a small top radius, the hovered
- * column highlighted behind its bar, a tooltip card that spells out the full timestamp and the
- * value, and a Tokens / Requests switch in the header. Drawn as plain SVG in pixel space (the
- * container width is measured) so the bar radius stays round; no chart dependency.
+ * bar's own background highlighted (a lane as wide as the bar, not the whole slot), a tooltip card
+ * that spells out the full timestamp and the value, and a Tokens / Requests switch in the header.
+ * Drawn as plain SVG in pixel space (the container width is measured) so the bar radius stays
+ * round; no chart dependency.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { t } from '@i18n';
@@ -20,6 +21,8 @@ const CHART_HEIGHT = 88;
 /** Bars never grow wider than the reference's maxBarSize. */
 const MAX_BAR_WIDTH = 36;
 const BAR_RADIUS = 3;
+/** Air between the hovered bar and its highlight lane. */
+const HOVER_PADDING = 4;
 /** Logical width used before the container is measured (jsdom never measures). */
 const FALLBACK_WIDTH = 640;
 
@@ -83,7 +86,7 @@ export default function TrendChart({ buckets, unit, rangeLabel }: {
             {t('Usage trend')}
           </strong>
           <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>· {rangeLabel}</span>
-          {/* 图例：与柱同色的色块 + 当前指标 */}
+          {/* Legend: the same hue as the bars, named by the active metric. */}
           <span data-testid="usage-trend-legend" style={{
             display: 'inline-flex', alignItems: 'center', gap: 5,
             color: 'var(--text-secondary)', fontSize: 'var(--fs-caption)',
@@ -115,7 +118,7 @@ export default function TrendChart({ buckets, unit, rangeLabel }: {
       </header>
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
-        {/* 左侧刻度：峰值 / 半值 / 0，与参考面板一致 */}
+        {/* Left ticks: peak / half / zero, as on the reference card. */}
         <div aria-hidden="true" style={{
           display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
           width: 52, textAlign: 'right', color: 'var(--text-muted)', fontSize: 'var(--fs-micro)',
@@ -161,9 +164,12 @@ export default function TrendChart({ buckets, unit, rangeLabel }: {
               const left = index * slot + (slot - barWidth) / 2;
               return (
                 <g key={bucket.start}>
-                  {/* 悬停高亮整列（参考面板用 --bg-subtle，这里用同角色的 --hover） */}
+                  {/* Hover cue: the background of this one bar — a lane the width of the bar plus a
+                      little air. Tinting the whole slot would recolour most of a sparse chart. */}
                   {hovered === index && (
-                    <rect x={index * slot} y={0} width={slot} height={CHART_HEIGHT} fill="var(--hover)" />
+                    <rect data-testid="usage-trend-hover" x={left - HOVER_PADDING} y={0}
+                      width={barWidth + HOVER_PADDING * 2} height={CHART_HEIGHT} rx={BAR_RADIUS}
+                      fill="var(--hover)" />
                   )}
                   {value > 0 && (
                     <rect data-testid="usage-trend-bar" x={left} y={CHART_HEIGHT - barHeight}
@@ -171,7 +177,7 @@ export default function TrendChart({ buckets, unit, rangeLabel }: {
                       <title>{`${bucketStamp(bucket.start)} · ${formatValue(value)}`}</title>
                     </rect>
                   )}
-                  {/* 命中区：整列可悬停，空桶也能看到时间与 0 */}
+                  {/* Hit area: the whole slot, so empty buckets also answer the pointer. */}
                   <rect data-testid={`usage-trend-slot-${index}`} x={index * slot} y={0}
                     width={slot} height={CHART_HEIGHT} fill="transparent"
                     onMouseEnter={() => setHovered(index)} />
