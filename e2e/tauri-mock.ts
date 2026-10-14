@@ -160,6 +160,8 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     let pendingCmd = '';
     let integrationEnabled = enableIntegration;
     let sshSession = false;
+    /** Streamed language-model requests of this page, so a scripted tool call only runs once. */
+    let llmCalls = 0;
     (window as unknown as Record<string, unknown>).__AI_MODELS__ = aiModels;
     (window as unknown as Record<string, unknown>).__PTY_WRITES__ = writes;
     (window as unknown as Record<string, unknown>).__CLIPBOARD_TEXT__ = clipboardText;
@@ -343,6 +345,46 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
       return lines.join('\n\n') + '\n\n';
     }
 
+    /** One streamed tool call: what the mocked model asks for before it can answer. */
+    function buildAnthropicToolCallSse(name: string, input: unknown): string {
+      const start = {
+        type: 'message_start',
+        message: { id: 'msg_tool', type: 'message', role: 'assistant', content: [], model: 'claude-sonnet-5', stop_reason: null, stop_sequence: null, usage: { input_tokens: 10, output_tokens: 1 } },
+      };
+      const blockStart = { type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 'toolu_e2e', name, input: {} } };
+      const delta = {
+        type: 'content_block_delta',
+        index: 0,
+        delta: { type: 'input_json_delta', partial_json: JSON.stringify(input) },
+      };
+      const lines = [
+        `event: message_start\ndata: ${JSON.stringify(start)}`,
+        `event: content_block_start\ndata: ${JSON.stringify(blockStart)}`,
+        `event: content_block_delta\ndata: ${JSON.stringify(delta)}`,
+        `event: content_block_stop\ndata: ${JSON.stringify({ type: 'content_block_stop', index: 0 })}`,
+        `event: message_delta\ndata: ${JSON.stringify({ type: 'message_delta', delta: { stop_reason: 'tool_use', stop_sequence: null }, usage: { output_tokens: 12 } })}`,
+        'event: message_stop\ndata: {"type":"message_stop"}',
+      ];
+      return lines.join('\n\n') + '\n\n';
+    }
+
+    /** Same scripted call in the OpenAI chunk format, which is the e2e default provider. */
+    function buildOpenAiToolCallSse(name: string, input: unknown): string {
+      const call = {
+        index: 0,
+        id: 'call_e2e',
+        type: 'function',
+        function: { name, arguments: JSON.stringify(input) },
+      };
+      const lines = [
+        'data: {"id":"chatcmpl-1","object":"chat.completion.chunk","model":"gpt-4o-mini","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}',
+        `data: ${JSON.stringify({ id: 'chatcmpl-1', object: 'chat.completion.chunk', model: 'gpt-4o-mini', choices: [{ index: 0, delta: { tool_calls: [call] }, finish_reason: null }] })}`,
+        'data: {"id":"chatcmpl-1","object":"chat.completion.chunk","model":"gpt-4o-mini","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}',
+        'data: [DONE]',
+      ];
+      return lines.join('\n\n') + '\n\n';
+    }
+
     function buildAnthropicSse(text: string): string {
       const start = {
         type: 'message_start',
@@ -482,7 +524,19 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
                 body = JSON.stringify(completion);
               } else {
                 pieces.push({ kind: 'started', status: 200, headers: [['content-type', 'text/event-stream']] });
-                body = isAnthropic ? buildAnthropicSse(text) : buildOpenAiSse(text);
+                const planned = (window as unknown as Record<string, { tool: string; args: unknown } | undefined>)
+                  .__AI_TOOL_CALL__;
+                // A scripted tool call lands on the first request only; the follow-up step gets the
+                // plain reply, like a provider that answers once the tool has run.
+                if (planned && llmCalls === 0) {
+                  llmCalls += 1;
+                  body = isAnthropic
+                    ? buildAnthropicToolCallSse(planned.tool, planned.args)
+                    : buildOpenAiToolCallSse(planned.tool, planned.args);
+                } else {
+                  llmCalls += 1;
+                  body = isAnthropic ? buildAnthropicSse(text) : buildOpenAiSse(text);
+                }
               }
               const b64 = btoa(unescape(encodeURIComponent(body)));
               for (let i = 0; i < b64.length; i += 64) {
@@ -1171,6 +1225,13 @@ export async function mockAnthropic(page: Page, replyText: string) {
   await page.addInitScript((text: string) => {
     (window as unknown as Record<string, string>).__AI_REPLY__ = text;
   }, replyText);
+}
+
+/** Make the mocked model ask for one tool call before it answers (Anthropic stream only). */
+export async function mockAnthropicToolCall(page: Page, tool: string, args: Record<string, unknown>) {
+  await page.addInitScript((plan: { tool: string; args: Record<string, unknown> }) => {
+    (window as unknown as Record<string, unknown>).__AI_TOOL_CALL__ = plan;
+  }, { tool, args });
 }
 
 /** Deliver the mocked answer one piece at a time, so a test can stop it while it is still arriving.

@@ -119,6 +119,10 @@ export default function ToolRunCard({ run, paneId, framed = false }: { run: Tool
         <button type="button" onClick={() => resolveApproval(run.toolCallId, 'deny')}>{t('Deny')}</button>
       </div>
     </div>}
+    {/* A refusal keeps its reason once the buttons are gone — the deadline, or what was blocked. */}
+    {run.state === 'denied' && run.danger && (
+      <div className="ai-tool-verdict" data-testid="tool-denied-reason">{run.danger}</div>
+    )}
     {failed && open && <ErrorBox compact details={body || undefined}>{run.error || t('Tool execution failed')}</ErrorBox>}
     {open && !failed && (isCommand ? <CommandOutputBlock run={run} paneId={paneId} framed={framed} />
       : <ToolOutput framed={framed} text={body}>

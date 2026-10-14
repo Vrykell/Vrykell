@@ -586,6 +586,8 @@ button.window-control-button {
 .ai-tool-frame { position: relative; margin: 4px 0 0; }
 .ai-tool-output { max-height: 240px; overflow: auto; padding: 8px 0; border: 0; border-top: 1px solid var(--block-divider); background: transparent; color: var(--text-secondary); font-family: var(--font-mono); font-size: var(--fs-micro); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .ai-tool-approval { padding: 8px 0 2px; color: var(--warning); font-size: var(--fs-caption); }
+/* Why a call was refused stays readable after the approval buttons are gone. */
+.ai-tool-verdict { padding: 4px 0 2px; color: var(--text-muted); font-size: var(--fs-micro); line-height: 1.5; }
 .ai-tool-approval-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
 .ai-tool-approval-actions > button { padding: 4px 8px; font-size: var(--fs-micro); }
 .ai-tool-terminal-link { margin-top: 6px; padding: 3px 0; border: 0; background: transparent; color: var(--accent-blue); font-size: var(--fs-micro); }

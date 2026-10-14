@@ -6,7 +6,9 @@
  * covered by cargo tests in src-tauri/src/agent/permissions.rs.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { useToastStore } from '@ui/Toast';
 import {
+  DEFAULT_APPROVAL_TIMEOUT_SECONDS,
   DEFAULT_LEVELS,
   denyAllPending,
   gate,
@@ -23,7 +25,11 @@ const allow = (lease = 'lease-1'): ToolDecision => ({ decision: 'allow', lease }
 const ASK: ToolDecision = { decision: 'ask' };
 
 function reset() {
-  usePermissions.setState({ levels: { ...DEFAULT_LEVELS }, mode: 'standard' });
+  usePermissions.setState({
+    levels: { ...DEFAULT_LEVELS },
+    mode: 'standard',
+    approvalTimeoutSeconds: DEFAULT_APPROVAL_TIMEOUT_SECONDS,
+  });
   denyAllPending();
   setToolAuthorizer(null);
   setToolApprover(null);
@@ -129,6 +135,70 @@ describe('gate', () => {
     const g = await p;
     expect(g.proceed).toBe(false);
     expect(ctx.states.map((s) => s.state)).toEqual(['approval-pending', 'denied']);
+  });
+});
+
+describe('审批超时（无人应答）', () => {
+  it('到期自动拒绝：卡片留原因、提示条说明、轮次继续', async () => {
+    vi.useFakeTimers();
+    try {
+      reset();
+      usePermissions.setState({ approvalTimeoutSeconds: 3 });
+      setToolAuthorizer(async () => ASK);
+      useToastStore.setState({ toasts: [], timers: {} });
+      const ctx = mkCtx();
+      const p = gate('run_command', { command: 'echo hi' }, 'tc1', ctx);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(ctx.states.map((s) => s.state)).toEqual(['approval-pending']);
+
+      await vi.advanceTimersByTimeAsync(3000);
+      const g = await p;
+      expect(g.proceed).toBe(false);
+      if (!g.proceed) {
+        expect(g.result.denied).toBe(true);
+        expect(g.result.error).toContain('等待 1 分钟无人应答');
+      }
+      expect(ctx.states.map((s) => s.state)).toEqual(['approval-pending', 'denied']);
+      expect(ctx.states[1]?.extra?.danger).toContain('已自动拒绝本次操作');
+      expect(useToastStore.getState().toasts.map((toast) => toast.message))
+        .toEqual(['等待 1 分钟无人应答，已自动拒绝本次操作。']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('到期前作答照常生效，超时定时器不再触发', async () => {
+    vi.useFakeTimers();
+    try {
+      reset();
+      usePermissions.setState({ approvalTimeoutSeconds: 3 });
+      setToolAuthorizer(async () => ASK);
+      setToolApprover(async () => allow('lease-t'));
+      useToastStore.setState({ toasts: [], timers: {} });
+      const ctx = mkCtx();
+      const p = gate('write_file', { path: '/x' }, 'tc1', ctx, 'write_file_text');
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(1000);
+      resolveApproval('tc1', 'once');
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(await p).toEqual({ proceed: true, lease: 'lease-t' });
+      expect(ctx.states.map((s) => s.state)).toEqual(['approval-pending', 'running']);
+      expect(useToastStore.getState().toasts).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('设定值夹在 1–30 分钟之间', () => {
+    reset();
+    expect(usePermissions.getState().approvalTimeoutSeconds).toBe(DEFAULT_APPROVAL_TIMEOUT_SECONDS);
+    const set = usePermissions.getState().setApprovalTimeout;
+    set(600);
+    expect(usePermissions.getState().approvalTimeoutSeconds).toBe(600);
+    set(5);
+    expect(usePermissions.getState().approvalTimeoutSeconds).toBe(60);
+    set(99999);
+    expect(usePermissions.getState().approvalTimeoutSeconds).toBe(1800);
   });
 });
 

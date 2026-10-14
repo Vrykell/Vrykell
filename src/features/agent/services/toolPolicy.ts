@@ -25,6 +25,8 @@ export interface AuthorizeRequest {
   mode?: string;
   /** Localized line for the native confirmation; the tool, reason code and args come from Rust. */
   reasonHint?: string;
+  /** How long a native confirmation waits for an answer before denying the call. */
+  timeoutSecs?: number;
 }
 
 export const authorizeToolCall = (request: AuthorizeRequest) =>

@@ -14,6 +14,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { t } from '@i18n';
+import { useToastStore } from '@ui/Toast';
 import type { ToolRunState } from '@features/agent/model/messageParts';
 import { untrustedSkillFor, setSkillState } from '@features/agent/services/skills';
 import { reasonText } from '@features/agent/model/toolReasonTexts';
@@ -28,8 +29,17 @@ import {
 } from '@features/agent/services/toolPolicy';
 
 export type ToolLevel = 'allow' | 'ask' | 'deny';
-export type ApprovalDecision = 'once' | 'session' | 'deny';
+/**
+ * How an approval was answered. `timeout` never comes from a button: the bridge resolves it when
+ * the card waited past its deadline, so a turn can never hang on an empty chair.
+ */
+export type ApprovalDecision = 'once' | 'session' | 'deny' | 'timeout';
 export type PermissionMode = 'standard' | 'strict' | 'relaxed';
+
+/** How long an approval card waits for an answer before it denies itself. */
+export const DEFAULT_APPROVAL_TIMEOUT_SECONDS = 300;
+export const MIN_APPROVAL_TIMEOUT_SECONDS = 60;
+export const MAX_APPROVAL_TIMEOUT_SECONDS = 1800;
 
 /** 工具结果统一形状（与 tools/* 的结构化约定一致） */
 export interface GateResult {
@@ -104,8 +114,11 @@ interface PermissionsState {
   levels: Record<string, ToolLevel>;
   /** UI shortcut applied to plain calls: strict asks everything, relaxed allows everything. */
   mode: PermissionMode;
+  /** Seconds an approval card waits before denying itself; also passed to the native confirm. */
+  approvalTimeoutSeconds: number;
   setLevel: (tool: ToolName, level: ToolLevel) => void;
   setMode: (mode: PermissionMode) => void;
+  setApprovalTimeout: (seconds: number) => void;
   /** 后端策略回填（启动与设置页变更后） */
   applyPolicy: (levels: Record<string, ToolLevel>) => void;
 }
@@ -115,6 +128,7 @@ export const usePermissions = create<PermissionsState>()(
     (set) => ({
       levels: { ...DEFAULT_LEVELS },
       mode: 'standard',
+      approvalTimeoutSeconds: DEFAULT_APPROVAL_TIMEOUT_SECONDS,
       setLevel: (tool, level) => {
         set((s) => ({ levels: { ...s.levels, [tool]: level }, mode: 'standard' }));
         // The backend is the authority: a failed write leaves the mirror stale on purpose (the
@@ -124,19 +138,40 @@ export const usePermissions = create<PermissionsState>()(
         });
       },
       setMode: (mode) => set({ mode }),
+      setApprovalTimeout: (seconds) => set({
+        approvalTimeoutSeconds: Math.min(
+          MAX_APPROVAL_TIMEOUT_SECONDS,
+          Math.max(MIN_APPROVAL_TIMEOUT_SECONDS, Math.round(seconds)),
+        ),
+      }),
       applyPolicy: (levels) => set((s) => ({ levels: { ...s.levels, ...levels } })),
     }),
     {
       name: 'vrykell-permissions',
-      version: 2,
-      // Levels moved to the backend; only the UI shortcut stays in the browser.
+      version: 3,
+      // Levels moved to the backend; only the UI shortcut and the approval deadline stay local.
       migrate: (persisted: unknown) => {
-        const saved = (persisted ?? {}) as { mode?: PermissionMode };
-        return { levels: { ...DEFAULT_LEVELS }, mode: saved.mode ?? 'standard' };
+        const saved = (persisted ?? {}) as { mode?: PermissionMode; approvalTimeoutSeconds?: number };
+        return {
+          levels: { ...DEFAULT_LEVELS },
+          mode: saved.mode ?? 'standard',
+          approvalTimeoutSeconds: saved.approvalTimeoutSeconds ?? DEFAULT_APPROVAL_TIMEOUT_SECONDS,
+        };
       },
     },
   ),
 );
+
+/** Deadline of one approval wait, in milliseconds. */
+export function approvalTimeoutMs(): number {
+  const seconds = usePermissions.getState().approvalTimeoutSeconds;
+  return Math.max(1, seconds) * 1000;
+}
+
+/** The same deadline as whole minutes, for the copy that names it. */
+export function approvalTimeoutMinutes(): number {
+  return Math.max(1, Math.round(approvalTimeoutMs() / 60_000));
+}
 
 /** Hydrate the mirror from the backend; a failure keeps the shipped defaults. */
 export async function refreshToolPolicy(): Promise<void> {
@@ -159,8 +194,28 @@ export function levelOf(tool: string): ToolLevel {
 
 const pending = new Map<string, (d: ApprovalDecision) => void>();
 
+/**
+ * Waits for the card's answer, but not forever: nobody may be in front of the app (a scheduled
+ * turn, a locked screen), and a promise that never settles would hold the turn — and with it the
+ * single send slot — for good. The deadline denies the call and says so in the transcript.
+ */
 function requestApproval(toolCallId: string): Promise<ApprovalDecision> {
-  return new Promise((resolve) => pending.set(toolCallId, resolve));
+  return new Promise((resolve) => {
+    const minutes = Math.max(1, Math.round(approvalTimeoutMs() / 60_000));
+    const timer = window.setTimeout(() => {
+      if (!pending.has(toolCallId)) return;
+      pending.delete(toolCallId);
+      useToastStore.getState().addToast(
+        t('No answer within {{minutes}} minutes, so the request was denied automatically.', { minutes }),
+        'warning',
+      );
+      resolve('timeout');
+    }, approvalTimeoutMs());
+    pending.set(toolCallId, (decision) => {
+      window.clearTimeout(timer);
+      resolve(decision);
+    });
+  });
 }
 
 /** 审批卡按钮入口。unknown toolCallId 静默忽略（可能已被 stop 兜底清掉） */
@@ -212,6 +267,16 @@ export async function ensureTrustedSkill(
     danger: `信任技能「${skillName}」后可访问其文件与脚本`,
   });
   const decision = await requestApproval(toolCallId);
+  if (decision === 'timeout') {
+    ctx.setToolState(toolCallId, 'denied');
+    return {
+      proceed: false,
+      error: t('No answer within {{minutes}} minutes, so trusting {{skill}} was refused.', {
+        minutes: approvalTimeoutMinutes(),
+        skill: skillName,
+      }),
+    };
+  }
   if (decision === 'deny') {
     ctx.setToolState(toolCallId, 'denied');
     return { proceed: false, error: `未信任技能「${skillName}」，已拒绝访问` };
@@ -294,6 +359,8 @@ export async function gate(
       shell: ctx.shellType ?? null,
       mode,
       reasonHint: t('This operation can change your system or reach your credentials.'),
+      // The native confirmation for dangerous calls follows the same deadline as this card.
+      timeoutSecs: Math.round(approvalTimeoutMs() / 1000),
     });
   } catch (error) {
     // Fail closed: without an authorization from the backend the tool must not run.
@@ -315,6 +382,14 @@ export async function gate(
   }
   ctx.setToolState(toolCallId, 'approval-pending', reason ? { danger: reason } : undefined);
   const choice = await requestApproval(toolCallId);
+  if (choice === 'timeout') {
+    // Nobody answered: deny and say why, so the transcript explains the step that never ran.
+    const note = t('No answer within {{minutes}} minutes, so the request was denied automatically.', {
+      minutes: approvalTimeoutMinutes(),
+    });
+    ctx.setToolState(toolCallId, 'denied', { danger: note });
+    return denied(undefined, note);
+  }
   if (choice === 'deny') {
     ctx.setToolState(toolCallId, 'denied', reason ? { danger: reason } : undefined);
     return denied(undefined, '用户拒绝了本次操作');

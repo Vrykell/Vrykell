@@ -183,6 +183,16 @@ it('explains a reply whose provider sent its tool call as plain text', () => {
   expect(screen.queryByTestId('chat-leaked-tool-call')).toBeNull();
 });
 
+it('keeps the reason visible after a refusal', () => {
+  const { container } = render(<AiBlock conversationId="conversation" exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [
+    { kind: 'tool', tool: { toolCallId: 'denied', toolName: 'run_command', input: { command: 'rm -rf /' }, state: 'denied', startedAt: 1, danger: '等待 5 分钟无人应答，已自动拒绝本次操作。' } },
+  ] } }} />);
+  // The row keeps the state word and the reason once the approval buttons are gone.
+  expect(container.querySelector('.ai-tool-summary')).toHaveTextContent('已拒绝');
+  expect(screen.getByTestId('tool-denied-reason')).toHaveTextContent('已自动拒绝本次操作');
+  expect(screen.queryByRole('button', { name: '允许一次' })).toBeNull();
+});
+
 it('shows a terminal tool row as the bare command without a prompt marker', () => {
   render(<AiBlock conversationId="conversation" presentation="conversation"
     exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [commandPart] } }} />);

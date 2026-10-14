@@ -63,6 +63,7 @@ registerField("completion", "ai-behavior", "Command completion", "Terminal sugge
 registerField("completion-delay", "ai-behavior", "Completion debounce", "Delay before suggestions", () => globalValue("completeDebounceMs"));
 registerField("completion-model", "ai-behavior", "Completion model", "Model for command completion", () => globalValue("completeModel"));
 registerField("permissions", "ai-perms", "Tool permissions", "Allow, ask or deny tools");
+registerField("approval-timeout", "ai-perms", "Approval timeout", "Deny an approval nobody answers", () => `${usePermissions.getState().approvalTimeoutSeconds}`);
 registerField("session-grants", "ai-perms", "Session grants", "Clear temporary permissions");
 registerField("tavily-key", "ai-web", "Tavily API Key", "Web search credentials");
 registerField("mcp", "ai-mcp", "MCP servers", "External tool connections");

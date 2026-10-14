@@ -49,6 +49,9 @@ const PERM_TOOL_LABEL: Record<ToolName, string> = {
   subagent: '委派子代理',
 };
 
+/** Offered approval deadlines: long enough to walk back, short enough to free the turn. */
+const APPROVAL_TIMEOUT_MINUTES = [1, 3, 5, 10, 30];
+
 /** Static grouped navigation and a single page-level save summary. */
 export default function SettingsView() {
   return <SettingsSaveProvider><SettingsContent /></SettingsSaveProvider>;
@@ -83,6 +86,8 @@ function SettingsContent() {
   // AI 权限（M3）：持久化默认级别 + 内存会话授权
   const permLevels = usePermissions((s) => s.levels);
   const setPermLevel = usePermissions((s) => s.setLevel);
+  const approvalTimeoutSeconds = usePermissions((s) => s.approvalTimeoutSeconds);
+  const setApprovalTimeout = usePermissions((s) => s.setApprovalTimeout);
 
   useEffect(() => {
     refreshAiConfig();
@@ -175,6 +180,21 @@ function SettingsContent() {
                   );
                 })}
               </div>
+            </Field>
+            <Field
+              title={t('Approval timeout')}
+              description={t("Deny an approval card that nobody answers within this long.")}
+            >
+              <Select
+                aria-label={t('Approval timeout')}
+                data-testid="approval-timeout-select"
+                options={APPROVAL_TIMEOUT_MINUTES.map((minutes) => ({
+                  value: String(minutes * 60),
+                  label: t('{{count}} minutes', { count: minutes }),
+                }))}
+                value={String(approvalTimeoutSeconds)}
+                onChange={(v) => { void save(() => setApprovalTimeout(Number(v))); }}
+              />
             </Field>
             <Field
               title="会话授权"
