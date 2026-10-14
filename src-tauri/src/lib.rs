@@ -210,6 +210,7 @@ pub fn run() {
             files::grants::pick_path,
             agent::acp::acp_handshake,
             agent::acp::acp_harnesses,
+            agent::acp::acp_harness_save,
             agent::acp::acp_open,
             agent::acp::acp_prompt,
             agent::acp::acp_cancel,

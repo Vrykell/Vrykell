@@ -1,25 +1,55 @@
 ﻿/**
  * HarnessPage — the settings section for external harnesses.
  *
- * The list is read from `~/.vrykell/harnesses.json` (the file stays hand-editable), and the two
- * actions are "test connection" (a handshake that runs no tools) and "connect" (opens the workspace
- * page). The copy says what matters: a harness is a program the user adds, and adding it is the
- * authorization.
+ * The list is editable here and written back to `~/.vrykell/harnesses.json` (which stays
+ * hand-editable), and the built-in presets fill in a command line so nobody has to look it up. The
+ * copy says what matters: a harness is a program the user adds, adding it is the authorization, and
+ * no third-party program ships with the app.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { t } from '@i18n';
-import { SettingsGroup, Field, btnStyle } from '@features/settings/components/ui';
+import { useToastStore } from '@ui/Toast';
+import { SettingsGroup, Field, inputStyle, btnStyle } from '@features/settings/components/ui';
 import { useSessionStore } from '@features/workspace';
-import { acpHandshake, acpHarnesses, type AgentDescription, type HarnessConfig } from '@platform/api/acp';
+import { acpHandshake, acpHarnessSave, acpHarnesses, type AgentDescription } from '@platform/api/acp';
+import { HARNESS_PRESETS, harnessProblems, upsertPreset, type HarnessEntry } from '@config/harnessPresets';
 
 export default function HarnessPage() {
-  const [harnesses, setHarnesses] = useState<HarnessConfig[] | null>(null);
+  const [list, setList] = useState<HarnessEntry[] | null>(null);
   const [probe, setProbe] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const toast = (message: string, tone: 'success' | 'error') => useToastStore.getState().addToast(message, tone);
 
   const reload = useCallback(() => {
-    void acpHarnesses().then(setHarnesses).catch(() => setHarnesses([]));
+    void acpHarnesses()
+      .then((entries) => setList(entries.map((entry) => ({
+        name: entry.name, command: entry.command, args: entry.args, env: entry.env, cwd: entry.cwd, enabled: entry.enabled,
+      }))))
+      .catch(() => setList([]));
   }, []);
   useEffect(() => { reload(); }, [reload]);
+
+  const patch = (index: number, update: Partial<HarnessEntry>) => {
+    setList((current) => current?.map((entry, at) => (at === index ? { ...entry, ...update } : entry)) ?? current);
+  };
+
+  const save = async () => {
+    if (!list) return;
+    const problems = harnessProblems(list);
+    if (problems.length > 0) {
+      toast(t('Fix the highlighted harnesses first: {{problems}}', { problems: problems.join('; ') }), 'error');
+      return;
+    }
+    setBusy(true);
+    try {
+      await acpHarnessSave(list);
+      toast(t('Harness list saved.'), 'success');
+    } catch (error) {
+      toast(String((error as Error)?.message ?? error), 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const test = async (name: string) => {
     setProbe((current) => ({ ...current, [name]: t('Testing…') }));
@@ -38,50 +68,64 @@ export default function HarnessPage() {
   return (
     <SettingsGroup title={t('External harnesses')}>
       <Field layout="stacked" title={t('Configured harnesses')}
-        description={t('A harness is a program you add to the list. Adding it is the authorization: it runs with your account, like a command typed into the terminal.')}>
-        {harnesses === null && <span style={{ color: 'var(--text-muted)' }}>{t('Loading…')}</span>}
-        {harnesses?.length === 0 && (
+        description={t('A harness is a program you add to the list. Adding it is the authorization: it runs with your account, like a command typed into the terminal. Third-party programs are not bundled — install them yourself and follow their licences.')}>
+        {list === null && <span style={{ color: 'var(--text-muted)' }}>{t('Loading…')}</span>}
+        {list?.length === 0 && (
           <span data-testid="harness-none" style={{ color: 'var(--text-muted)' }}>
-            {t('No harness configured. Add one to ~/.vrykell/harnesses.json.')}
+            {t('No harness configured yet. Start from a preset below.')}
           </span>
         )}
-        {!!harnesses?.length && (
-          <div className="settings-option-list">
-            {harnesses.map((harness) => (
-              <div key={harness.name} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 0', borderTop: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <strong style={{ color: 'var(--text-primary)', fontSize: 'var(--fs-label)' }}>{harness.name}</strong>
-                    <span data-tip={t('The command line this harness runs')} style={{
-                      display: 'block', color: 'var(--text-muted)', fontSize: 'var(--fs-micro)',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
-                      {harness.command} {harness.args.join(' ')}
-                    </span>
-                  </span>
-                  {!harness.enabled && <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-micro)' }}>{t('This harness is disabled.')}</span>}
-                  <button style={btnStyle} data-testid={`harness-test-${harness.name}`} onClick={() => void test(harness.name)}>
-                    {t('Test connection')}
-                  </button>
-                  <button style={btnStyle} data-testid={`harness-connect-${harness.name}`} disabled={!harness.enabled}
-                    onClick={() => useSessionStore.getState().openHarnessTab(harness.name)}>
-                    {t('Connect')}
-                  </button>
-                </div>
-                {probe[harness.name] && <span data-testid={`harness-probe-${harness.name}`} style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-caption)' }}>
-                  {probe[harness.name]}
-                </span>}
+        <div className="settings-option-list">
+          {list?.map((harness, index) => (
+            <div key={`${harness.name}-${index}`} data-testid={`harness-row-${index}`} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 0', borderTop: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <input aria-label={t('Harness name')} value={harness.name} style={{ ...inputStyle, width: 150 }}
+                  onChange={(event) => patch(index, { name: event.target.value })} />
+                <input aria-label={t('Command')} value={harness.command} style={{ ...inputStyle, width: 150 }}
+                  onChange={(event) => patch(index, { command: event.target.value })} />
+                <input aria-label={t('Arguments')} value={harness.args.join(' ')} style={{ ...inputStyle, flex: 1, minWidth: 160 }}
+                  placeholder={t('Arguments, separated by spaces')}
+                  onChange={(event) => patch(index, { args: event.target.value.split(/\s+/).filter(Boolean) })} />
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--text-secondary)', fontSize: 'var(--fs-caption)' }}>
+                  <input type="checkbox" checked={harness.enabled} aria-label={t('Enabled')}
+                    onChange={(event) => patch(index, { enabled: event.target.checked })} />
+                  {t('Enabled')}
+                </label>
+                <button style={btnStyle} data-testid={`harness-test-${index}`} onClick={() => void test(harness.name)}>{t('Test connection')}</button>
+                <button style={btnStyle} data-testid={`harness-connect-${index}`} disabled={!harness.enabled}
+                  onClick={() => useSessionStore.getState().openHarnessTab(harness.name)}>{t('Connect')}</button>
+                <button style={btnStyle} data-testid={`harness-remove-${index}`}
+                  onClick={() => setList((current) => current?.filter((_entry, at) => at !== index) ?? current)}>{t('Remove')}</button>
               </div>
-            ))}
-          </div>
-        )}
-        <button style={btnStyle} onClick={reload}>{t('Reload the list')}</button>
+              {probe[harness.name] && <span data-testid={`harness-probe-${index}`} style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-caption)' }}>{probe[harness.name]}</span>}
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+          <button style={btnStyle} data-testid="harness-add" onClick={() => setList((current) => [...(current ?? []), { name: t('New harness'), command: '', args: [], env: {}, cwd: '', enabled: true }])}>
+            {t('Add an empty row')}
+          </button>
+          <button style={btnStyle} data-testid="harness-save" disabled={busy} onClick={() => void save()}>{t('Save the list')}</button>
+          <button style={btnStyle} onClick={reload}>{t('Reload')}</button>
+        </div>
       </Field>
+
+      <Field layout="stacked" title={t('Presets')}
+        description={t('Fills in the command line a harness is usually started with. The program itself still has to be installed.')}>
+        <div data-testid="harness-presets" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {HARNESS_PRESETS.map((preset) => (
+            <button key={preset.name} style={btnStyle} data-testid={`harness-preset-${preset.name}`}
+              data-tip={`${preset.command} ${preset.args.join(' ')}`} data-tip-description={preset.hint}
+              onClick={() => setList((current) => upsertPreset(current ?? [], preset))}>
+              {preset.name}
+            </button>
+          ))}
+        </div>
+      </Field>
+
       <Field title={t('Approvals')}
         description={t('Harness permissions are refused until the approval card is wired to them in the next phase; nothing a harness asks for runs unnoticed.')}>
-        <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
-          {t('Refused automatically for now.')}
-        </span>
+        <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>{t('Refused automatically for now.')}</span>
       </Field>
     </SettingsGroup>
   );

@@ -46,6 +46,9 @@ export interface AcpSessionEvent {
 
 export const acpHarnesses = () => invoke<HarnessConfig[]>('acp_harnesses');
 
+/** Replace the configured list (the settings page is the caller). */
+export const acpHarnessSave = (harnesses: HarnessConfig[]) => invoke<void>('acp_harness_save', { harnesses });
+
 /** Start a configured harness, negotiate, and let it go again: the "test connection" action. */
 export const acpHandshake = (name: string) => invoke<AgentDescription>('acp_handshake', { name });
 

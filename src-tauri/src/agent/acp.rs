@@ -320,6 +320,17 @@ impl HarnessFile {
             .unwrap_or_default()
     }
 
+    /// Write the config back. The settings page is the caller, and it is also what the built-in
+    /// presets fill in.
+    pub fn save(&self) -> Result<(), String> {
+        let path = Self::path();
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir).map_err(|e| format!("cannot create the config directory: {e}"))?;
+        }
+        let json = serde_json::to_string_pretty(self).map_err(|e| e.to_string())?;
+        std::fs::write(&path, json).map_err(|e| format!("cannot write the harness config: {e}"))
+    }
+
     /// A configured harness that is switched on, by name.
     pub fn find_enabled(&self, name: &str) -> Option<&HarnessConfig> {
         self.harnesses.iter().find(|harness| harness.name == name && harness.enabled && !harness.command.trim().is_empty())
@@ -359,6 +370,21 @@ fn describe_agent(info: &Value) -> Value {
         "agentCapabilities": info.get("agentCapabilities").cloned().unwrap_or(Value::Null),
         "authMethods": info.get("authMethods").cloned().unwrap_or(Value::Null),
     })
+}
+
+/// Replace the harness list. Validation is deliberately strict: a harness without a name or a
+/// command cannot be started, and it would only confuse the settings list.
+#[tauri::command]
+pub fn acp_harness_save(harnesses: Vec<HarnessConfig>) -> Result<(), String> {
+    for harness in &harnesses {
+        if harness.name.trim().is_empty() {
+            return Err("a harness needs a name".to_string());
+        }
+        if harness.command.trim().is_empty() {
+            return Err(format!("harness {} has no command", harness.name));
+        }
+    }
+    HarnessFile { harnesses }.save()
 }
 
 /// The configured harnesses, for the settings list. Commands and arguments are included on purpose:
