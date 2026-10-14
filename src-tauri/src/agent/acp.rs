@@ -343,6 +343,7 @@ impl HarnessFile {
 #[tauri::command]
 pub async fn acp_handshake(name: String) -> Result<Value, String> {
     let config = HarnessFile::load();
+    note("acp-handshake", json!({ "name": name, "configured": config.harnesses.len() }));
     let harness = config
         .find_enabled(&name)
         .ok_or_else(|| format!("no enabled harness named {name}"))?
@@ -354,11 +355,23 @@ pub async fn acp_handshake(name: String) -> Result<Value, String> {
         &harness.env,
         // A probe never runs a tool: anything the agent asks for is refused, fail closed.
         Arc::new(|_| PermissionOutcome::Cancelled),
-    )?;
+    )
+    .map_err(|error| {
+        note("acp-handshake-failed", json!({ "name": harness.name, "error": error }));
+        error
+    })?;
     let info = client
         .initialize("vrykell", env!("CARGO_PKG_VERSION"))
         .await
-        .map_err(|e| format!("harness handshake failed: {e}"))?;
+        .map_err(|e| {
+            let error = format!("harness handshake failed: {e}");
+            note("acp-handshake-failed", json!({ "name": harness.name, "error": error }));
+            error
+        })?;
+    note("acp-handshake-ok", json!({
+        "name": harness.name,
+        "protocolVersion": info.get("protocolVersion").cloned().unwrap_or(Value::Null),
+    }));
     Ok(describe_agent(&info))
 }
 
@@ -433,6 +446,14 @@ struct AcpEvent {
 /// Event name the frontend listens on.
 const EVENT: &str = "acp://session";
 
+/// Record what the harness commands did, so a failed attempt can be read out of the diagnostics log
+/// instead of guessed at. Metadata only: names, session ids and error text, never prompt content.
+fn note(event: &str, detail: serde_json::Value) {
+    if let Err(error) = crate::diagnostics::record(event, detail) {
+        eprintln!("[acp] could not record {event}: {error}");
+    }
+}
+
 fn emit<R: tauri::Runtime>(app: &tauri::AppHandle<R>, event: AcpEvent) {
     // A closed window is not an error worth surfacing; the session is dropped with it.
     let _ = tauri::Emitter::emit(app, EVENT, event);
@@ -447,6 +468,7 @@ pub async fn acp_open<R: tauri::Runtime>(
     cwd: String,
 ) -> Result<Value, String> {
     let config = HarnessFile::load();
+    note("acp-open", json!({ "name": name, "cwd": cwd, "configured": config.harnesses.len() }));
     let harness = config
         .find_enabled(&name)
         .ok_or_else(|| format!("no enabled harness named {name}"))?
