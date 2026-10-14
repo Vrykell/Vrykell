@@ -813,6 +813,13 @@ const zh: Record<string, string> = {
   "Environment file (may hold secrets)": "环境变量文件（.env 可能含密钥）",
   "Application configuration (may hold API keys)": "Vrykell 应用配置（可能含 API key）",
   "System account file": "系统账户文件",
+  "Rewrites long-term memory (injected into every later request)": "重写长期记忆（会注入之后的每次请求）",
+  "Appends to long-term memory (injected into every later request)": "追加长期记忆（会注入之后的每次请求）",
+  "Creates a subagent prompt that is reused later": "创建子代理提示词（之后会被复用）",
+  "Removes a subagent definition": "删除子代理定义",
+  "Arms a recurring task that runs without asking again": "创建循环任务（之后会自动运行、不再询问）",
+  "Starts or stops a recurring task": "启停循环任务",
+  "Removes a recurring task": "删除循环任务",
 };
 
 export default zh;

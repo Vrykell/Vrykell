@@ -9,6 +9,8 @@
  *      asked, per call, no matter what 1 and 2 say
  *   4. sensitive-path heuristics on the values that name a file (path, root, and again
  *      command/keys): also always asked, so prompt injection cannot read credentials
+ *   5. durable side effects (memory writes, subagent prompts, schedules): asked per call
+ *      because they outlive the turn and feed later system prompts
  *
  * 审批桥：工具 execute 里 gate() 挂起等 Promise；审批卡按钮调
  * resolveApproval() 落决定。stop/abort 必须走 denyAllPending() 兜底，
@@ -26,6 +28,7 @@ import type { ToolRunState } from '@features/agent/model/messageParts';
 import { untrustedSkillFor, setSkillState } from '@features/agent/services/skills';
 import { dangerousCommandReason } from '@features/agent/model/dangerousCommands';
 import { sensitivePathReason } from '@features/agent/model/sensitivePaths';
+import { sensitiveActionReason } from '@features/agent/model/sensitiveActions';
 
 export { dangerousCommandReason };
 export { sensitivePathReason };
@@ -88,8 +91,11 @@ const DEFAULT_LEVELS: Record<ToolName, ToolLevel> = {
   read_terminal: 'allow',
   terminal_keys: 'ask',
   use_skill: 'allow',
-  install_skill: 'allow',
-  mcp: 'allow',
+  // Installing a skill writes instructions that are trusted afterwards, so it starts at ask;
+  // users who want no prompt can lower it in settings.
+  install_skill: 'ask',
+  // MCP tools are arbitrary third-party capabilities: ask by default, like run_command.
+  mcp: 'ask',
   memory: 'allow',
   schedule: 'allow',
   subagent: 'allow',
@@ -254,7 +260,9 @@ export async function gate(
   // The same for credential paths, so prompt injection cannot read keys and ship them to
   // the provider. Path fields include command/keys: `cat ~/.ssh/id_rsa` is caught here.
   const sensitive = sensitivePathReason(textOf(input, PATH_FIELDS));
-  if (!danger && !sensitive && (level === 'allow' || hasSessionGrant(ctx.tabId, toolName))) {
+  // Durable side effects (memory, subagents, schedules) outlive the turn: ask per call too.
+  const durable = sensitiveActionReason(toolName, input);
+  if (!danger && !sensitive && !durable && (level === 'allow' || hasSessionGrant(ctx.tabId, toolName))) {
     return { proceed: true };
   }
   // ask：挂起等审批。无 setToolState/tabId 说明不在交互上下文（如测试），按拒绝处理
@@ -264,17 +272,17 @@ export async function gate(
       result: { ok: false, denied: true, error: '当前上下文无法发起审批，操作被拒绝' },
     };
   }
-  const forcedReason = danger ?? sensitive;
+  const forcedReason = danger ?? sensitive ?? durable;
   ctx.setToolState(toolCallId, 'approval-pending', forcedReason ? { danger: forcedReason } : undefined);
   const decision = await requestApproval(toolCallId);
   if (decision === 'deny') {
-    ctx.setToolState(toolCallId, 'denied', danger ? { danger } : undefined);
+    ctx.setToolState(toolCallId, 'denied', forcedReason ? { danger: forcedReason } : undefined);
     return {
       proceed: false,
       result: { ok: false, denied: true, error: '用户拒绝了本次操作' },
     };
   }
   if (decision === 'session') grantSession(ctx.tabId, toolName);
-  ctx.setToolState(toolCallId, 'running', danger ? { danger } : undefined);
+  ctx.setToolState(toolCallId, 'running', forcedReason ? { danger: forcedReason } : undefined);
   return { proceed: true };
 }

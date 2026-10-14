@@ -6,16 +6,18 @@ const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 import { buildScheduleTool } from '@features/agent/tools/schedule';
 import { usePermissions, type ToolContext } from '@features/agent/stores/permissions';
+import { approvingToolContext } from '../../../test-utils/approvingToolContext';
 
 usePermissions.setState({ levels: { schedule: 'allow' } });
-const CTX: ToolContext = {};
+// create/toggle/remove are durable actions: they ask per call even with the tool allowed.
+const CTX: ToolContext = approvingToolContext();
 
 beforeEach(() => {
   invokeMock.mockReset();
 });
 
 const exec = (args: Record<string, unknown>) =>
-  (buildScheduleTool(CTX).schedule as unknown as { execute: (a: unknown, o: unknown) => Promise<unknown> }).execute(args, {});
+  (buildScheduleTool(CTX).schedule as unknown as { execute: (a: unknown, o: unknown) => Promise<unknown> }).execute(args, { toolCallId: 'tc-schedule' });
 
 const S = { id: 's1', name: '巡检', prompt: '检查', intervalMinutes: 60, enabled: false, lastRunAt: 0 };
 

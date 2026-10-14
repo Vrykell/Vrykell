@@ -287,8 +287,22 @@ describe('gate 三层判定', () => {
     await p2;
   });
 
-  it('内容字段不参与危险扫描（写文档不会被误判）', async () => {
+  it('持久化写入即使工具放行也要逐次询问', async () => {
     reset();
+    usePermissions.getState().setLevel('memory', 'allow');
+    const ctx = mkCtx();
+    const p = gate('memory', { action: 'update', content: 'x' }, 'tc1', ctx);
+    const last = ctx.states[ctx.states.length - 1];
+    expect(last?.state).toBe('approval-pending');
+    expect(last?.extra?.danger).toContain('长期记忆');
+    resolveApproval('tc1', 'deny');
+    expect((await p).proceed).toBe(false);
+
+    // 读取类动作按工具级别直放行
+    expect((await gate('memory', { action: 'read' }, 'tc2', ctx)).proceed).toBe(true);
+  });
+
+  it('内容字段不参与危险扫描（写文档不会被误判）', async () => {    reset();
     const ctx = mkCtx();
     usePermissions.getState().setLevel('write_file', 'allow');
     const g = await gate('write_file', { path: '/tmp/notes.md', content: 'never run rm -rf / or diskpart' }, 'tc1', ctx);

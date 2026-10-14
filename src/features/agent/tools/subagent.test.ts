@@ -6,16 +6,18 @@ const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 import { buildSubagentTool } from '@features/agent/tools/subagent';
 import { usePermissions, type ToolContext } from '@features/agent/stores/permissions';
+import { approvingToolContext } from '../../../test-utils/approvingToolContext';
 
 usePermissions.setState({ levels: { subagent: 'allow' } });
-const CTX: ToolContext = {};
+// create/remove are durable actions: they ask per call even with the tool allowed.
+const CTX: ToolContext = approvingToolContext();
 
 beforeEach(() => {
   invokeMock.mockReset();
 });
 
 const exec = (args: Record<string, unknown>) =>
-  (buildSubagentTool(CTX).subagent as unknown as { execute: (a: unknown, o: unknown) => Promise<unknown> }).execute(args, {});
+  (buildSubagentTool(CTX).subagent as unknown as { execute: (a: unknown, o: unknown) => Promise<unknown> }).execute(args, { toolCallId: 'tc-subagent' });
 
 describe('subagent 工具', () => {
   it('list：格式化 / 空列表', async () => {

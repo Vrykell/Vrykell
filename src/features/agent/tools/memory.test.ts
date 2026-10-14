@@ -6,11 +6,13 @@ const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 import { buildMemoryTool } from '@features/agent/tools/memory';
 import { usePermissions, type ToolContext } from '@features/agent/stores/permissions';
+import { approvingToolContext } from '../../../test-utils/approvingToolContext';
 
 usePermissions.setState({ levels: { memory: 'allow' } });
-const CTX: ToolContext = {};
+// update/append are durable actions: they ask per call even with the tool allowed.
+const CTX: ToolContext = approvingToolContext();
 const exec = (args: Record<string, unknown>) =>
-  (buildMemoryTool(CTX).memory as unknown as { execute: (a: unknown, o: unknown) => Promise<unknown> }).execute(args, {});
+  (buildMemoryTool(CTX).memory as unknown as { execute: (a: unknown, o: unknown) => Promise<unknown> }).execute(args, { toolCallId: 'tc-memory' });
 
 describe('memory 工具', () => {
   it('read：拼持久知识 + 流水', async () => {
