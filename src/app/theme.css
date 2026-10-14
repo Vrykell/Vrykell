@@ -555,7 +555,7 @@ button.window-control-button {
 .chat-question-meta { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin: -12px 0 12px; color: var(--text-muted); font-size: var(--fs-micro); opacity: 0; transition: opacity var(--dur-fast) var(--ease); }
 .chat-exchange:has(> .ai-block-question:hover, > .chat-question-meta:hover, > .chat-question-meta:focus-within) > .chat-question-meta { opacity: 1; }
 /* Finished answers keep their actions in the open, left-aligned under the reply. */
-.chat-answer-actions { display: flex; align-items: center; justify-content: flex-start; gap: 4px; min-width: 0; margin-top: 2px; }
+.chat-answer-actions { display: flex; align-items: center; justify-content: flex-start; gap: 2px; min-width: 0; margin-top: 2px; }
 .chat-answer-actions > button.icon-button { color: var(--text-muted); }
 .chat-answer-actions > button.icon-button:hover { color: var(--text-primary); }
 .ai-block-answer { display: flow-root; color: var(--text-primary); font-family: var(--font-ui); font-size: var(--chat-content-font-size, var(--fs-caption)); line-height: 1.65; overflow-wrap: anywhere; }
