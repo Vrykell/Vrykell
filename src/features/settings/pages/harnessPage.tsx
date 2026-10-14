@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { t } from '@i18n';
 import { useToastStore } from '@ui/Toast';
 import { SettingsGroup, Field, inputStyle, btnStyle } from '@features/settings/components/ui';
+import { invoke } from '@platform/diagnostics';
 import { useSessionStore } from '@features/workspace';
 import { acpHandshake, acpHarnessSave, acpHarnesses, type AgentDescription } from '@platform/api/acp';
 import { HARNESS_PRESETS, harnessProblems, upsertPreset, type HarnessEntry } from '@config/harnessPresets';
@@ -21,6 +22,8 @@ export default function HarnessPage() {
   /** Set once the user changes anything, so the auto-save never writes the freshly loaded list. */
   const [touched, setTouched] = useState(false);
   const [problems, setProblems] = useState<string[]>([]);
+  /** command → whether the program exists on this machine. */
+  const [installed, setInstalled] = useState<Record<string, boolean>>({});
   const toast = (message: string, tone: 'success' | 'error') => useToastStore.getState().addToast(message, tone);
 
   const reload = useCallback(() => {
@@ -49,6 +52,20 @@ export default function HarnessPage() {
     }, 600);
     return () => window.clearTimeout(timer);
   }, [list, touched]);
+
+  // Ask once per command whether the program exists, so a preset that cannot run says so before the
+  // user presses anything: most presets need a program the machine may not have.
+  useEffect(() => {
+    if (!list) return;
+    for (const entry of list) {
+      const command = entry.command.trim();
+      if (!command || command in installed) continue;
+      void invoke<boolean>('which_cmd', { cmd: command })
+        .then((found) => setInstalled((current) => ({ ...current, [command]: found })))
+        // Unknown is not the same as missing: a failed probe must not accuse the user's machine.
+        .catch(() => setInstalled((current) => ({ ...current, [command]: true })));
+    }
+  }, [list, installed]);
 
   const save = async () => {
     if (!list) return;
@@ -103,6 +120,11 @@ export default function HarnessPage() {
                   onChange={(event) => patch(index, { name: event.target.value })} />
                 <input aria-label={t('Command')} value={harness.command} style={{ ...inputStyle, width: 150 }}
                   onChange={(event) => patch(index, { command: event.target.value })} />
+                {installed[harness.command.trim()] === false && (
+                  <span data-testid={`harness-missing-${index}`} style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-micro)' }}>
+                    {t('Not installed on PATH')}
+                  </span>
+                )}
                 <input aria-label={t('Arguments')} value={harness.args.join(' ')} style={{ ...inputStyle, flex: 1, minWidth: 160 }}
                   placeholder={t('Arguments, separated by spaces')}
                   onChange={(event) => patch(index, { args: event.target.value.split(/\s+/).filter(Boolean) })} />
@@ -128,6 +150,11 @@ export default function HarnessPage() {
           <button style={btnStyle} data-testid="harness-save" disabled={busy} onClick={() => void save()}>{t('Save the list')}</button>
           <button style={btnStyle} onClick={reload}>{t('Reload')}</button>
         </div>
+        {list?.some((entry) => installed[entry.command] === false) && (
+          <span style={{ color: 'var(--warning, var(--error))', fontSize: 'var(--fs-caption)' }}>
+            {t('A harness marked "not installed" needs its program on PATH (or its command line fixed) before it can run.')}
+          </span>
+        )}
       </Field>
 
       <Field layout="stacked" title={t('Presets')}

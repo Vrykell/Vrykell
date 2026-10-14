@@ -121,6 +121,8 @@ const zh: Record<string, string> = {
   "Connect": "连接",
   "Save and connect": "保存并连接",
   "Testing…": "测试中…",
+  "Not installed on PATH": "未安装",
+  "A harness marked \"not installed\" needs its program on PATH (or its command line fixed) before it can run.": "标着「未安装」的 harness：要先把程序装好（或让它在 PATH 上），或修正命令行，才能运行。",
   "Test authentication": "测试认证",
   "Confirm host fingerprint": "确认主机指纹",
   "Trust and continue": "信任并继续",
