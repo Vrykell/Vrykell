@@ -8,11 +8,24 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { t } from '@i18n';
-import { iconSizes, Bot } from '@ui/icons';
+import { ArrowUp, Bot, Square } from '@ui/icons';
+import { IconButton } from '@ui/IconButton';
+import ErrorBox from '@ui/ErrorBox';
+import { TextArea } from '@ui/TextInput';
+import KeyHint from '@ui/KeyHint';
 import { toExchanges } from '@features/chat/model/exchanges';
 import AiBlock from '@features/chat/components/AiBlock';
 import { bindHarnessEvents, useHarnessStore } from '../stores/harness';
 
+/**
+ * HarnessView — the workspace page of one external harness session.
+ *
+ * Deliberately built out of the AI panel's own vocabulary: `AiBlock` in conversation presentation
+ * gives the same question bubble, answer meta, action row and tool cards, and the composer mirrors
+ * the panel's markup (`chat-composer-wrap` / `terminal-composer` / `chat-composer-input` /
+ * `chat-input-status`) so the two surfaces read as one product. This page is where the local chat
+ * will move next, so the panel's look is the contract, not a coincidence.
+ */
 export default function HarnessView({ tabId, harness }: { tabId: string; harness: string }) {
   const session = useHarnessStore((state) => state.byTab[tabId]);
   const [text, setText] = useState('');
@@ -25,85 +38,70 @@ export default function HarnessView({ tabId, harness }: { tabId: string; harness
     if (!session) void useHarnessStore.getState().open(tabId, harness, '');
   }, [tabId, harness, session]);
 
-  // A session without a background is empty: nothing to connect to.
   const agent = session?.agent?.agentInfo;
   const exchanges = toExchanges(session?.messages ?? []);
+  const canSend = Boolean(session?.sessionId) && !session?.pending && text.trim().length > 0;
 
   useEffect(() => {
     const body = bodyRef.current;
     if (body) body.scrollTop = body.scrollHeight;
   }, [exchanges.length, session?.pending]);
 
-  const send = () => {
-    const value = text.trim();
-    if (!value || !session?.sessionId || session.pending) return;
+  const submit = () => {
+    if (!canSend) return;
+    const value = text;
     setText('');
     void useHarnessStore.getState().prompt(tabId, value);
   };
 
   return (
-    <div data-testid="harness-page" className="scroll-region" style={{
-      flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: 'var(--canvas)',
-      fontFamily: 'var(--font-ui)',
-    }}>
-      <header style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderBottom: '1px solid var(--border)' }}>
-        <Bot size={iconSizes.row} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
-        <strong style={{ color: 'var(--text-primary)', fontSize: 'var(--fs-label)', fontWeight: 'var(--fw-semibold)' }}>
-          {harness}
-        </strong>
-        {agent && <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
-          {agent.title || agent.name || ''}{agent.version ? ` ${agent.version}` : ''}
-        </span>}
-        <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-          {session?.opening && <span data-testid="harness-opening" style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
-            {t('Connecting…')}
-          </span>}
-          {session?.pending && <button type="button" data-subtle data-testid="harness-stop"
-            style={{ padding: '4px 10px' }} onClick={() => void useHarnessStore.getState().cancel(tabId)}>
-            {t('Stop the harness turn')}
-          </button>}
-        </span>
-      </header>
-
-      <div ref={bodyRef} className="scroll-region" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px 18px 18px' }}>
-        {!session && <p data-testid="harness-empty" style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
+    <div data-testid="harness-page" className="ai-chat-panel" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      <div ref={bodyRef} className="scroll-region" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 14px 4px' }}>
+        {!session && <p style={{ margin: '10px 4px', color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
           {t('Opening the harness session…')}
         </p>}
-        {session?.error && <p data-testid="harness-error" role="status" style={{ color: 'var(--error)', fontSize: 'var(--fs-caption)' }}>
-          {session.error}
-        </p>}
-        {session?.note && <p data-testid="harness-note" style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
+        {session?.error && <ErrorBox compact>{session.error}</ErrorBox>}
+        {session?.note && <p data-testid="harness-note" style={{ margin: '6px 4px', color: 'var(--text-muted)', fontSize: 'var(--fs-micro)' }}>
           {session.note}
         </p>}
         {exchanges.map((exchange) => (
-          <AiBlock key={exchange.id} exchange={exchange} presentation="block" dividerBefore={false} />
+          <AiBlock key={exchange.id} exchange={exchange} presentation="conversation" />
         ))}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, padding: '10px 18px 14px', borderTop: '1px solid var(--border)' }}>
-        <textarea
-          data-testid="harness-composer" data-chat-composer
-          value={text}
-          placeholder={t('Send a prompt to this harness…')}
-          aria-label={t('Harness prompt')}
-          onChange={(event) => setText(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey) {
-              event.preventDefault();
-              send();
-            }
-          }}
-          rows={1}
-          style={{
-            flex: 1, minHeight: 34, maxHeight: 160, resize: 'none', padding: '7px 10px',
-            border: '1px solid var(--border)', borderRadius: 'var(--radius-inner)',
-            background: 'var(--field-bg)', color: 'var(--text-primary)', font: 'inherit',
-          }}
-        />
-        <button type="button" data-subtle data-testid="harness-send" disabled={!session?.sessionId || session.pending || !text.trim()}
-          onClick={send} style={{ padding: '7px 12px', borderRadius: 'var(--radius-inner)' }}>
-          {t('Send to the harness')}
-        </button>
+      <div className="chat-composer-wrap">
+        <div className="terminal-composer chat-composer">
+          <div className="terminal-composer-heading">
+            <span>{harness}{agent ? ` · ${agent.title || agent.name || ''}` : ''}</span>
+            <span className="composer-key-hints"><KeyHint shortcut="Enter" />{t('Send')}</span>
+          </div>
+          <div className="chat-composer-input">
+            <Bot size={20} aria-hidden="true" className="chat-composer-lead" />
+            <TextArea data-testid="harness-composer" data-chat-composer value={text}
+              placeholder={t('Describe what you want to do…')} rows={1}
+              onChange={(event) => setText(event.target.value)} onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  submit();
+                }
+              }} />
+          </div>
+          <div className="chat-input-status">
+            {session?.opening && <span data-testid="harness-opening" style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
+              {t('Connecting…')}
+            </span>}
+            <span className="chat-footer-space" />
+            {session?.pending
+              ? <IconButton className="chat-send-button" tone="accent" aria-label={t('Stop the harness turn')}
+                data-tip={t('Stop the harness turn')} onClick={() => void useHarnessStore.getState().cancel(tabId)}>
+                <Square size={15} fill="currentColor" />
+              </IconButton>
+              : <IconButton className="chat-send-button" tone="accent" aria-label={t('Send')} data-tip={t('Send')}
+                data-tip-shortcut="Enter" data-testid="harness-send" disabled={!canSend} onClick={submit}>
+                <ArrowUp size={18} />
+              </IconButton>}
+          </div>
+        </div>
       </div>
     </div>
   );
