@@ -57,6 +57,16 @@ test('group actions overlay the header end instead of squeezing the title', asyn
   const renameBox = (await rename.boundingBox())!;
   const headerBox = (await header.boundingBox())!;
   expect(renameBox.x + renameBox.width).toBeLessThanOrEqual(headerBox.x + headerBox.width);
+
+  // The floating buttons carry no surface of their own: a tinted container would double the
+  // translucent hover background into a lighter block.
+  const actions = group.locator('.group-actions');
+  await expect(actions).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(actions).toHaveCSS('background-image', 'none');
+  // The title hands its content width to the buttons and ellipsizes instead of running under them.
+  const titleText = group.locator('.tab-group-title span').first();
+  expect(await titleText.evaluate((element) => element.clientWidth <= element.scrollWidth)).toBe(true);
+  expect(await titleText.evaluate((element) => element.clientWidth)).toBeLessThan(resting);
 });
 
 test('tab rename input stays inside its row', async ({ page }) => {
