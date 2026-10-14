@@ -971,8 +971,17 @@ fn import_attachment_sync(path: String) -> Result<AttachmentImport, String> {
     })
 }
 
+/// Import a file the user pointed at (picker or drop). This command hands file *contents* back to
+/// the page, so it only accepts a path an operating-system gesture produced — see
+/// [`crate::files::grants`]. The refusal is a stable code the page turns into a message.
 #[tauri::command]
-pub async fn import_attachment(path: String) -> Result<AttachmentImport, String> {
+pub async fn import_attachment(
+    state: tauri::State<'_, crate::files::grants::PathGrants>,
+    path: String,
+) -> Result<AttachmentImport, String> {
+    if !state.allows(std::path::Path::new(&path)) {
+        return Err("path-not-granted".to_string());
+    }
     tauri::async_runtime::spawn_blocking(move || import_attachment_sync(path))
         .await
         .map_err(|e| e.to_string())?

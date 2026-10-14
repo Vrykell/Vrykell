@@ -164,45 +164,6 @@ pub fn theme_import(
     Ok(cfg)
 }
 
-/// 读取本地图片为 data URL（Tauri webview 不能用 CSS url() 直接加载本地文件路径）。
-/// 同步实现（spawn_blocking 内执行）。
-fn read_image_data_url_sync(path: String) -> Result<String, String> {
-    use base64::Engine;
-    const MAX_BYTES: u64 = 20 * 1024 * 1024; // 20MB 上限
-    let meta = std::fs::metadata(&path).map_err(|e| format!("读取图片失败：{e}"))?;
-    if meta.len() > MAX_BYTES {
-        return Err(format!(
-            "图片超过 20MB 上限（{}MB）",
-            meta.len() / 1024 / 1024
-        ));
-    }
-    let bytes = std::fs::read(&path).map_err(|e| format!("读取图片失败：{e}"))?;
-    let ext = std::path::Path::new(&path)
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.to_ascii_lowercase());
-    let mime = match ext.as_deref() {
-        Some("png") => "image/png",
-        Some("jpg") | Some("jpeg") => "image/jpeg",
-        Some("gif") => "image/gif",
-        Some("webp") => "image/webp",
-        Some("svg") => "image/svg+xml",
-        Some("bmp") => "image/bmp",
-        _ => "image/png",
-    };
-    Ok(format!(
-        "data:{mime};base64,{}",
-        base64::engine::general_purpose::STANDARD.encode(&bytes)
-    ))
-}
-
-#[tauri::command]
-pub async fn read_image_data_url(path: String) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || read_image_data_url_sync(path))
-        .await
-        .map_err(|e| e.to_string())?
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -243,33 +204,5 @@ mod tests {
         let back: ThemeConfig = serde_json::from_str(&s).unwrap();
         assert_eq!(back.background_image.as_deref(), Some("/tmp/bg.png"));
         assert_eq!(back.vars.get("--canvas").map(String::as_str), Some("#101010"));
-    }
-
-    #[test]
-    fn read_image_data_url_encodes_png_bytes() {
-        let dir = std::env::temp_dir();
-        let path = dir.join("vrykell_test_bg.png");
-        std::fs::write(&path, b"fakeimage").unwrap();
-        let url = read_image_data_url_sync(path.to_string_lossy().to_string()).unwrap();
-        // "fakeimage" 的 base64
-        assert_eq!(url, "data:image/png;base64,ZmFrZWltYWdl");
-        let _ = std::fs::remove_file(&path);
-    }
-
-    #[test]
-    fn read_image_data_url_detects_mime_from_extension() {
-        let dir = std::env::temp_dir();
-        let path = dir.join("vrykell_test_bg.jpeg");
-        std::fs::write(&path, b"x").unwrap();
-        let url = read_image_data_url_sync(path.to_string_lossy().to_string()).unwrap();
-        assert!(url.starts_with("data:image/jpeg;base64,"));
-        let _ = std::fs::remove_file(&path);
-    }
-
-    #[test]
-    fn read_image_data_url_rejects_missing_file() {
-        let dir = std::env::temp_dir();
-        let path = dir.join("vrykell_test_bg_missing.png");
-        assert!(read_image_data_url_sync(path.to_string_lossy().to_string()).is_err());
     }
 }

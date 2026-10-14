@@ -49,6 +49,16 @@ pub fn run() {
         .manage(terminal::pty::KillState::default())
         .manage(agent::mcp::McpState::default())
         .manage(agent::permissions::ToolPolicy::default())
+        .manage(files::grants::PathGrants::load())
+        // Paths the operating system delivers (a drop onto the window) are the one gesture the page
+        // cannot fake, so they are recorded here for the read commands to accept.
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) = event {
+                window
+                    .state::<files::grants::PathGrants>()
+                    .grant(paths.iter().map(std::path::PathBuf::from));
+            }
+        })
         // asset 协议 scope 已收窄：启动时把已保存的壁纸文件动态授权
         .setup(|app| {
             if let Err(error) = terminal::debug::initialize(app.handle()) {
@@ -101,7 +111,6 @@ pub fn run() {
             theme::get_theme_path,
             theme::theme_export,
             theme::theme_import,
-            theme::read_image_data_url,
             agent::web::web_search,
             agent::web::web_fetch,
             agent::web::web_crawl,
@@ -197,6 +206,7 @@ pub fn run() {
             files::fs::save_attachment,
             files::fs::read_attachment,
             files::fs::import_attachment,
+            files::grants::pick_path,
             files::file_open::file_open,
             files::file_open::file_open_with,
             commands::search::search_files,
