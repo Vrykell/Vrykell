@@ -20,6 +20,8 @@ export interface UsageRecord {
   /** Input tokens served from the provider's prompt cache. */
   cachedInputTokens: number;
   reasoningTokens: number;
+  /** Estimated USD for the turn; null when the built-in price list does not know the model. */
+  costUsd: number | null;
   /** Completed model steps of the turn. */
   steps: number;
   /** Tool calls issued across those steps. */
@@ -34,6 +36,10 @@ export interface UsageTotals {
   reasoningTokens: number;
   steps: number;
   toolCalls: number;
+  /** Sum of the known turn costs. */
+  costUsd: number;
+  /** Turns whose model has no known price (excluded from `costUsd`). */
+  unknownCostTurns: number;
 }
 
 export interface ModelUsageRow {
@@ -43,7 +49,10 @@ export interface ModelUsageRow {
   turns: number;
   inputTokens: number;
   outputTokens: number;
+  cachedInputTokens: number;
   totalTokens: number;
+  costUsd: number;
+  unknownCostTurns: number;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -79,6 +88,8 @@ export function summarize(records: UsageRecord[]): UsageTotals {
     reasoningTokens: 0,
     steps: 0,
     toolCalls: 0,
+    costUsd: 0,
+    unknownCostTurns: 0,
   };
   for (const record of records) {
     totals.inputTokens += record.inputTokens;
@@ -87,6 +98,8 @@ export function summarize(records: UsageRecord[]): UsageTotals {
     totals.reasoningTokens += record.reasoningTokens;
     totals.steps += record.steps;
     totals.toolCalls += record.toolCalls;
+    if (record.costUsd == null) totals.unknownCostTurns += 1;
+    else totals.costUsd += record.costUsd;
   }
   return totals;
 }
@@ -103,12 +116,18 @@ export function modelBreakdown(records: UsageRecord[]): ModelUsageRow[] {
       turns: 0,
       inputTokens: 0,
       outputTokens: 0,
+      cachedInputTokens: 0,
       totalTokens: 0,
+      costUsd: 0,
+      unknownCostTurns: 0,
     };
     row.turns += 1;
     row.inputTokens += record.inputTokens;
     row.outputTokens += record.outputTokens;
+    row.cachedInputTokens += record.cachedInputTokens;
     row.totalTokens = row.inputTokens + row.outputTokens;
+    if (record.costUsd == null) row.unknownCostTurns += 1;
+    else row.costUsd += record.costUsd;
     rows.set(key, row);
   }
   return [...rows.values()].sort(
@@ -116,9 +135,71 @@ export function modelBreakdown(records: UsageRecord[]): ModelUsageRow[] {
   );
 }
 
+export interface CostBucket {
+  /** Bucket start, epoch milliseconds. */
+  start: number;
+  label: string;
+  costUsd: number;
+  tokens: number;
+  turns: number;
+}
+
+/** Buckets kept at most; a longer range is charted by its most recent window. */
+export const MAX_COST_BUCKETS = 60;
+
+/**
+ * Cost per hour (today) or per day (wider ranges), ready for the bar chart.
+ *
+ * The window is capped at `MAX_COST_BUCKETS` so a long history still renders: the chart shows
+ * the most recent buckets of the selected range.
+ */
+export function costSeries(
+  records: UsageRecord[],
+  range: UsageRange,
+  now: number,
+): { buckets: CostBucket[]; unit: 'hour' | 'day' } {
+  const hourly = range === 'today';
+  const inRange = recordsInRange(records, range, now);
+  const size = hourly ? 60 * 60 * 1000 : DAY_MS;
+  const anchorStart = Math.floor(now / size) * size;
+  const firstBucket = anchorStart - (MAX_COST_BUCKETS - 1) * size;
+  const count = MAX_COST_BUCKETS;
+  const buckets: CostBucket[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const start = firstBucket + i * size;
+    const hour = new Date(start).getHours();
+    buckets.push({
+      start,
+      label: hourly ? `${String(hour).padStart(2, '0')}:00` : `${new Date(start).getMonth() + 1}/${new Date(start).getDate()}`,
+      costUsd: 0,
+      tokens: 0,
+      turns: 0,
+    });
+  }
+  for (const record of inRange) {
+    const index = Math.floor((record.at - firstBucket) / size);
+    const bucket = buckets[index];
+    if (!bucket) continue;
+    bucket.costUsd += record.costUsd ?? 0;
+    bucket.tokens += record.inputTokens + record.outputTokens;
+    bucket.turns += 1;
+  }
+  // 没有用量的前导空桶对读图没帮助：从第一个有数据（或最后一个）的桶开始
+  const firstWithData = buckets.findIndex((bucket) => bucket.turns > 0);
+  const trimmed = firstWithData > 0 ? buckets.slice(firstWithData) : buckets.slice(-1);
+  return { buckets: trimmed, unit: hourly ? 'hour' : 'day' };
+}
+
 /** Thousands separators keep long token counts readable at panel width. */
 export function formatTokens(value: number): string {
   return value.toLocaleString('en-US');
+}
+
+/** Compact token counts for narrow columns: 1234 → "1.2k", 1234567 → "1.2M". */
+export function formatCompact(value: number): string {
+  if (value < 1000) return String(value);
+  if (value < 1_000_000) return `${(value / 1000).toFixed(value < 10_000 ? 1 : 0)}k`;
+  return `${(value / 1_000_000).toFixed(1)}M`;
 }
 
 /** The token total a record (or a summary) represents. */

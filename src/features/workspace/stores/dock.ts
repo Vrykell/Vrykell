@@ -21,7 +21,7 @@ export const PANEL_DEFS: Record<string, PanelDef> = {
   files: { id: 'files', icon: Folder, label: '资源', width: 200 },
   ssh:   { id: 'ssh',   icon: Server, label: 'SSH', width: 208 },
   chat:  { id: 'chat',  icon: Sparkles, label: 'AI', width: 320 },
-  usage: { id: 'usage', icon: DataUsage, label: t('Usage'), width: 240, hideButton: true },
+  usage: { id: 'usage', icon: DataUsage, label: t('Usage'), width: 400, hideButton: true },
 };
 
 export type DockSide = 'left' | 'right';

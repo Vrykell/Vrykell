@@ -21,24 +21,38 @@ describe('UsagePanel', () => {
     expect(screen.queryByTestId('usage-model-row')).toBeNull();
   });
 
-  it('shows provider counts, the per-model split and the recent turn', () => {
+  it('leads with the estimated cost and breaks it down per model', () => {
     useUsageStore.getState().recordTurn({
       provider: 'anthropic', model: 'claude-sonnet-4', inputTokens: 1200, outputTokens: 300,
       cachedInputTokens: 800, steps: 2, toolCalls: 3, at: Date.now(),
     });
     render(<UsagePanel />);
-    expect(screen.getByTestId('usage-turns')).toHaveTextContent('1');
-    expect(screen.getByTestId('usage-total-tokens')).toHaveTextContent('1,500');
-    expect(screen.getByTestId('usage-input-tokens')).toHaveTextContent('1,200');
-    expect(screen.getByTestId('usage-output-tokens')).toHaveTextContent('300');
-    expect(screen.getByTestId('usage-cached-tokens')).toHaveTextContent('800');
-    expect(screen.getByTestId('usage-tool-calls')).toHaveTextContent('3');
-    expect(screen.getByTestId('usage-steps')).toHaveTextContent('2');
-    expect(screen.getByTestId('usage-model-row')).toHaveAttribute('data-model', 'claude-sonnet-4');
-    expect(screen.getByTestId('usage-model-row')).toHaveTextContent('1 次请求');
+
+    // (400 fresh × $3 + 800 cached × $0.3 + 300 out × $15) / 1M = $0.00594
+    expect(screen.getByTestId('usage-total-cost')).toHaveTextContent('$0.0059');
+    expect(screen.getByTestId('usage-cost-caption')).toHaveTextContent('1 次请求');
+    expect(screen.getByTestId('usage-cost-caption')).toHaveTextContent('1.5k tokens');
+    expect(screen.getByTestId('usage-cost-chart')).toBeInTheDocument();
+
+    const row = screen.getByTestId('usage-model-row');
+    expect(row).toHaveAttribute('data-model', 'claude-sonnet-4');
+    expect(screen.getByTestId('usage-model-requests')).toHaveTextContent('1');
+    expect(screen.getByTestId('usage-model-input')).toHaveTextContent('1.2k');
+    expect(screen.getByTestId('usage-model-output')).toHaveTextContent('300');
+    expect(screen.getByTestId('usage-model-cost')).toHaveTextContent('$0.0059');
+    expect(screen.getByTestId('usage-model-secondary')).toHaveTextContent('anthropic');
+    expect(screen.getByTestId('usage-model-secondary')).toHaveTextContent('缓存命中 800');
     expect(screen.getByTestId('usage-recent-row')).toHaveTextContent('claude-sonnet-4');
-    // Reasoning tokens stay hidden until a model reports them.
-    expect(screen.queryByTestId('usage-reasoning-tokens')).toBeNull();
+  });
+
+  it('marks a model without a known price instead of guessing', () => {
+    useUsageStore.getState().recordTurn({
+      provider: 'openai-compatible', model: 'internal-preview-model', inputTokens: 500, at: Date.now(),
+    });
+    render(<UsagePanel />);
+    expect(screen.getByTestId('usage-total-cost')).toHaveTextContent('$0');
+    expect(screen.getByTestId('usage-model-cost')).toHaveTextContent('—');
+    expect(screen.getByTestId('usage-cost-caption')).toHaveTextContent('1 次请求未收录价格');
   });
 
   it('filters by range and keeps the older turn under "all"', () => {
@@ -46,12 +60,13 @@ describe('UsagePanel', () => {
     useUsageStore.getState().recordTurn({ provider: 'anthropic', model: 'claude-sonnet-4', inputTokens: 100, at: now });
     useUsageStore.getState().recordTurn({ provider: 'anthropic', model: 'claude-sonnet-4', inputTokens: 100, at: now - 10 * DAY });
     render(<UsagePanel />);
-    expect(screen.getByTestId('usage-turns')).toHaveTextContent('1');
+    expect(screen.getByTestId('usage-cost-caption')).toHaveTextContent('1 次请求');
 
     fireEvent.click(screen.getByRole('combobox', { name: '统计范围' }));
     fireEvent.click(screen.getByRole('option', { name: '全部' }));
-    expect(screen.getByTestId('usage-turns')).toHaveTextContent('2');
+    expect(screen.getByTestId('usage-cost-caption')).toHaveTextContent('2 次请求');
     expect(screen.getAllByTestId('usage-recent-row')).toHaveLength(2);
+    expect(screen.getByTestId('usage-model-requests')).toHaveTextContent('2');
   });
 
   it('clears the records and confirms it', () => {

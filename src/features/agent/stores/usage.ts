@@ -8,6 +8,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { UsageRecord } from '@features/agent/model/usageStats';
+import { turnCostUsd } from '@features/agent/model/pricing';
+import type { ProviderKind } from '@features/agent/services/provider';
 
 /** Newest records kept; older turns fall out of the panel. */
 export const MAX_USAGE_RECORDS = 500;
@@ -53,6 +55,13 @@ export const useUsageStore = create<UsageState>()(
           // Nothing reported (aborted before the provider answered) → no row.
           if (inputTokens + outputTokens + cachedInputTokens === 0) return state;
           const at = input.at ?? Date.now();
+          // Cost is estimated once, with the price list of the moment: a later price change must
+          // not rewrite history.
+          const costUsd = turnCostUsd(input.provider as ProviderKind, input.model, {
+            inputTokens,
+            cachedInputTokens,
+            outputTokens,
+          });
           const record: UsageRecord = {
             id: `u${at}-${sequence++}`,
             at,
@@ -62,6 +71,7 @@ export const useUsageStore = create<UsageState>()(
             outputTokens,
             cachedInputTokens,
             reasoningTokens: count(input.reasoningTokens),
+            costUsd,
             steps: count(input.steps),
             toolCalls: count(input.toolCalls),
           };
@@ -73,11 +83,16 @@ export const useUsageStore = create<UsageState>()(
     }),
     {
       name: 'vrykell-usage',
-      version: 1,
-      // A damaged payload must not leave the panel holding unknown records.
+      version: 2,
+      // A damaged payload must not leave the panel holding unknown records; version 1 rows carry
+      // no cost, so they are treated as unknown instead of silently counted as free.
       merge: (persisted, current) => {
         const saved = (persisted ?? {}) as { records?: unknown };
-        return { ...current, records: Array.isArray(saved.records) ? (saved.records as UsageRecord[]) : [] };
+        const records = Array.isArray(saved.records) ? (saved.records as UsageRecord[]) : [];
+        return {
+          ...current,
+          records: records.map((record) => ({ ...record, costUsd: record.costUsd ?? null })),
+        };
       },
     },
   ),

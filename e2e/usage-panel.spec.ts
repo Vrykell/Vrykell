@@ -40,19 +40,24 @@ test.describe('usage panel', () => {
     await input.press('Enter');
     await expect(page.getByText('已记录')).toBeVisible({ timeout: 10000 });
 
-    // Back to the panel through the same entry: 1 request, 10 input tokens, 5 output tokens.
+    // Back to the panel through the same entry: one request at the mocked rate (10 in / 5 out
+    // on gpt-4o-mini), shown as a cost headline plus the per-model breakdown.
     await openUsagePanel(page);
-    await expect(page.getByTestId('usage-turns')).toHaveText('1');
-    await expect(page.getByTestId('usage-input-tokens')).toHaveText('10');
-    await expect(page.getByTestId('usage-output-tokens')).toHaveText('5');
-    await expect(page.getByTestId('usage-total-tokens')).toHaveText('15');
-    await expect(page.getByTestId('usage-model-row')).toContainText('gpt-4o-mini');
+    await expect(page.getByTestId('usage-total-cost')).toHaveText('<$0.0001');
+    await expect(page.getByTestId('usage-cost-caption')).toContainText('1 次请求');
+    await expect(page.getByTestId('usage-cost-caption')).toContainText('15 tokens');
+    await expect(page.getByTestId('usage-cost-chart')).toBeVisible();
+    await expect(page.getByTestId('usage-model-row')).toHaveAttribute('data-model', 'gpt-4o-mini');
+    await expect(page.getByTestId('usage-model-input')).toHaveText('10');
+    await expect(page.getByTestId('usage-model-output')).toHaveText('5');
+    await expect(page.getByTestId('usage-model-cost')).toHaveText('<$0.0001');
+    expect(await page.getByTestId('usage-model-secondary').textContent()).toContain('openai-compatible');
     await expect(page.getByTestId('usage-recent-row')).toHaveCount(1);
 
     // Switching the range keeps the numbers of the current window.
     await page.getByTestId('usage-range').click();
     await page.getByRole('option', { name: '全部' }).click();
-    await expect(page.getByTestId('usage-turns')).toHaveText('1');
+    await expect(page.getByTestId('usage-model-requests')).toHaveText('1');
 
     // Clearing returns to the empty state.
     await page.getByTestId('usage-clear').click();

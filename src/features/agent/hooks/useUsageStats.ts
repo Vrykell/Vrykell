@@ -6,6 +6,7 @@
  */
 import { useCallback, useMemo, useState } from 'react';
 import {
+  costSeries,
   modelBreakdown,
   recordsInRange,
   summarize,
@@ -26,9 +27,10 @@ export function useUsageStats() {
   const totals = useMemo(() => summarize(inRange), [inRange]);
   const models = useMemo(() => modelBreakdown(inRange), [inRange]);
   const recent = useMemo(() => [...inRange].slice(-RECENT_USAGE_ROWS).reverse(), [inRange]);
+  const series = useMemo(() => costSeries(records, range, Date.now()), [records, range]);
   const clear = useCallback(() => useUsageStore.getState().clear(), []);
 
-  return { records, range, setRange, totals, models, recent, clear };
+  return { records, range, setRange, totals, models, recent, series, clear };
 }
 
 export type UsageStats = ReturnType<typeof useUsageStats>;
