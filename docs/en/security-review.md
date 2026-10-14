@@ -1,6 +1,7 @@
 # Security Review
 
-> Summary of successive security reviews of Vrykell (last updated 2026-10-14). Scope: backend Rust (Tauri commands, PTY, SSH/SFTP, SQLite, AI HTTP client, web scraping), frontend React (IPC calls, Markdown/HTML rendering, secret and configuration handling).
+> Summary of successive security reviews of Vrykell (last updated 2026-10-14). Scope: backend Rust (Tauri commands, PTY,
+> Companion: **`security-model.md`** — the threat model, the seven defences and the new-feature checklist; read it before adding features. SSH/SFTP, SQLite, AI HTTP client, web scraping), frontend React (IPC calls, Markdown/HTML rendering, secret and configuration handling).
 > Threat model: a local desktop application with no remote server; the main risk surfaces are "malicious remote endpoints (SSH/SFTP/AI/web content)", "malicious file names/paths", "secrets written to disk in plaintext", "command injection", and "intranet probing driven by LLM prompt injection (SSRF)".
 
 ---

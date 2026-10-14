@@ -175,7 +175,35 @@ What we **cannot** constrain (and what belongs in the docs and the settings copy
 In short, the model is **"a program the user added" plus "everything routed through us is visible and
 blockable"** — not a sandbox.
 
-## 9. Phases
+## 9. Security preconditions that must hold before implementation
+
+Following the checklist in `security-model.md`, these are hard requirements when ACP lands:
+
+1. **Advertise the minimum**: only capabilities we can gate. `fs.readTextFile`/`writeTextFile` are
+   both advertised, but every call has to pass our policy (level table, danger and credential
+   checks, approval card); `fs/write_text_file` is the local `write_file` tool, no exceptions.
+   `terminal` is not advertised in the first version; neither are `elicitation` or `compaction`.
+2. **Permission requests must land on our approval chain**: `session/request_permission` reuses the
+   local approval card (shape grants, deadlines, unanswered requests denying themselves), and the
+   command text in `toolCall.rawInput` goes through `danger_reason` / `sensitive_path_reason` first,
+   so a hit raises the native confirmation **whatever options the harness offered**.
+3. **New IPC commands go through the policy surface**: anything added for ACP is registered in the
+   gated-command list (a lease or an equivalent policy check), never a bare command, and `acp_*`
+   must not become a new "read/write/execute any path" entry point.
+4. **Rendering cannot bypass sanitizing**: `session/update` text uses the existing Markdown path (no
+   raw HTML; links go through `Link` to the system browser), and the diffs and text inside
+   `tool_call.content` are rendered as text — no `innerHTML` unless it passed `sanitizeOutputHtml`.
+5. **A second webview means three things at once**: command namespaces (agent versus UI), per-caller
+   authorization (the webview identity Tauri injects), and leases bound to a `webview_label` — the
+   only moment that empty dimension from `security-model.md` §3.2 can be filled.
+6. **No remote content**: the CSP allows no remote script or image; a harness that wants to show a
+   web page hands it to the system browser rather than embedding it.
+7. **A harness is a program the user adds**: the settings copy and the first-connection confirmation
+   must say that adding it is the authorization, and show the command line it will run.
+8. **Logs carry metadata only**: ACP logs record method names, session ids and update kinds, never
+   full prompts or tool arguments.
+
+## 10. Phases
 
 | Phase | Content | Verification |
 | --- | --- | --- |
@@ -185,7 +213,7 @@ blockable"** — not a sandbox.
 | **P3 experience** | `session/load` restore, display-only modes, notices/plans, context-usage bar, usage-page `source` | unit tests per layer plus e2e |
 | **P4 optional** | `terminal/*` delegation (commands through our PTY, full danger-rule coverage), MCP passthrough, elicitation | as needed |
 
-## 10. Open decisions
+## 11. Open decisions
 
 1. Advertise `fs.writeTextFile` in the first version? (Recommendation: yes — §3/§5.)
 2. Advertise `terminal` in the first version? (Recommendation: not yet; the cost is not seeing the

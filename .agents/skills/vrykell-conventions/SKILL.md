@@ -121,7 +121,9 @@ reproduction, a hand-run probe or a log by hand.**
 
 ## Workflow
 
-1. Read the owning feature and the shared component before adding code.
+1. Read the owning feature and the shared component before adding code. Read
+   `docs/zh/security-model.md` as well when the change touches IPC, rendering or third-party
+   integration.
 2. When something fails at runtime, read the app's own diagnostics first (above); ask for a
    reproduction only when the log cannot answer the question.
 3. Small focused commits; English subject with the `feat:` / `fix:` / `test:` / `refactor:` /
@@ -136,6 +138,9 @@ reproduction, a hand-run probe or a log by hand.**
 - `AGENTS.md` - the always-on summary of these rules (Codex and other agents read it first).
 - `docs/zh/development-rules.md` (mirror `docs/en/development-rules.md`) - the numbered rule book;
   this skill and that file must agree.
+- `docs/zh/security-model.md` (mirror `docs/en/security-model.md`) - the seven defences, the two
+  things that cannot be done, and the checklist every new IPC command, rendering path or
+  third-party integration must answer (read it before ACP work).
 - `docs/zh/architecture.md` - pipeline and module detail.
 - `docs/zh/pitfalls.md` - known traps worth reading before touching the terminal pipeline.
 - `docs/zh/feature-spec.md` - feature specifications and test checklist.

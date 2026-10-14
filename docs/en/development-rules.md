@@ -1,4 +1,4 @@
-# Vrykell Development Rules
+﻿# Vrykell Development Rules
 
 > Last updated: 2026-10-06
 >
@@ -84,3 +84,10 @@
 46. **Bilingual docs** — Documents under `docs/` stay bilingual: Chinese in `docs/zh/`, English in `docs/en/`, with file names matching one-to-one across the two. New documents must ship in both languages; editing either language version requires updating the other. Raw evidence such as screenshots under `docs/audit-evidence/` is not translated.
 47. **Build packages on request** — Run `npm run tauri build` or another installer/package builder only when the user explicitly asks for a package build. Requests to fix, review, test, or verify application behavior do not by themselves authorize installer builds; use tests, typechecking, architecture checks, or dev mode as appropriate.
 48. **Use existing design first** — Before changing a surface, inspect its closest existing page and interaction. Reuse its components, spacing, inputs, menus, hover, and focus patterns. Extend or extract the existing implementation when needed; do not invent a separate visual treatment for an existing interaction. Review the result in the running UI at narrow and wide sizes.
+
+## 11. Security floor
+
+49. **New IPC commands must be gated** -- A new Tauri command either goes through a lease or policy check (and is registered in the gated-command list) or does something privileged-free; a new bare "read / write / execute any path" command is not allowed. The gated list and its checks live in `src-tauri/src/agent/permissions.rs`; changes update the defences table in `docs/zh/security-model.md`.
+50. **HTML in the renderer is sanitized at one point** -- Only HTML that passed `sanitizeOutputHtml` (or an equivalent single construction point) reaches `dangerouslySetInnerHTML`. Untrusted content (model output, fetched pages, skill text, MCP results, terminal output, remote file names) takes the text / Markdown path; links in replies go through `Link` in `Markdown.tsx` (web links open in the system browser) and never navigate the app window.
+51. **Third-party integration answers the security model** -- Before adding an MCP server, a skill source or an external harness (ACP), answer the checklist in `docs/zh/security-model.md` section 4 item by item and put the conclusions in the commit message. A third-party process is always "a program the user explicitly adds", and the settings copy must say that adding it is the authorization.
+52. **Tightening beats loosening** -- Relaxing the CSP, widening the `assetProtocol` scope or adding a capability permission needs its reason in the commit message. Production CSP and development exceptions stay separate (`csp` / `devCsp`); development exceptions never reach a production build.

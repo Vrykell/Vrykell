@@ -125,7 +125,20 @@ ACP v1 只提供 **`usage_update`**：会话上下文 `used`/`size`（token）+ 
 
 结论：接入 harness 的安全模型是**「用户添加的可执行程序」＋「经我们的操作全部可见可拦」**，不是沙箱。
 
-## 9. 分阶段
+## 9. 实现前必须遵守的安全前置条件
+
+照 `security-model.md` 的自查清单，接入 ACP 时以下几条是硬要求：
+
+1. **能力声明最小化**：只声明我们能门控的。`fs.readTextFile`/`writeTextFile` 都声明，但每一次调用都必须走我们的策略（等级表 + 危险/凭据判定 + 审批卡），`fs/write_text_file` 等同本地 `write_file`，没有例外；`terminal` 第一版不声明；`elicitation` / `compaction` 不声明。
+2. **权限请求必须落到我们的审批链**：`session/request_permission` → 复用本地审批卡（形态授权、超时、无人应答自动拒绝）；`toolCall.rawInput` 里的命令文本先过 `danger_reason` / `sensitive_path_reason`，命中即系统原生确认，**与 harness 给了什么选项无关**。
+3. **新 IPC 命令一律走策略面**：为 ACP 新增的命令必须登记进受门控命令清单（租约或等价的策略校验），不做裸命令；`acp_*` 不得成为"任意路径读/写/执行"的新入口。
+4. **渲染不得绕过消毒**：`session/update` 的文本走现有 Markdown 路径（无 raw HTML、链接走 `Link` 交系统浏览器）；`tool_call.content` 里的 diff 与文本一律按文本渲染，禁止 `innerHTML`（除非过 `sanitizeOutputHtml`）。
+5. **开第二个 webview 时同批做三件事**：命令命名空间（agent 与 UI 分开）、按调用者鉴权（Tauri 注入的 webview 身份）、租约绑定 `webview_label`——这是补上 `security-model.md` §3.2 那个空维度的唯一时机。
+6. **不加载远程内容**：CSP 现状不允许远程脚本/图片；harness 要展示网页就交系统浏览器，不在应用内嵌。
+7. **harness 即"用户添加的可执行程序"**：设置页文案与首次连接确认必须写明"添加即授权"，并显示实际命令行。
+8. **日志只记元数据**：ACP 请求/响应日志记录方法名、会话 id、通知类型；不记 prompt 全文与工具参数全文。
+
+## 10. 分阶段
 
 | 阶段 | 内容 | 验证方式 |
 | --- | --- | --- |
@@ -135,7 +148,7 @@ ACP v1 只提供 **`usage_update`**：会话上下文 `used`/`size`（token）+ 
 | **P3 体验** | `session/load` 恢复、模式只读展示、notice/plan、上下文用量条、用量页 `source` | 各层单测 + e2e |
 | **P4 可选** | `terminal/*` 委托（命令经我们的 PTY，危险规则全覆盖）、MCP 透传、elicitation | 视需要 |
 
-## 10. 待定决策
+## 11. 待定决策
 
 1. 第一版是否声明 `fs.writeTextFile`？（建议：声明，理由见 §3/§5）
 2. 第一版是否声明 `terminal`？（建议：先不声明，代价是 harness 的命令我们看不到）

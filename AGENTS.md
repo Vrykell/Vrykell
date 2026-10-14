@@ -92,6 +92,7 @@ Docs are bilingual: Chinese in `docs/zh/`, English in `docs/en/` - keep both in 
 - `.agents/skills/vrykell-conventions/SKILL.md` - project conventions skill (load it)
 - `docs/zh/architecture.md` (mirror `docs/en/architecture.md`) - detailed architecture
 - `docs/zh/development-rules.md` (mirror `docs/en/development-rules.md`) - numbered development rules (source of truth)
+- `docs/zh/security-model.md` (mirror `docs/en/security-model.md`) - the security model, its defences and the checklist every new IPC command, rendering path or third-party integration must answer
 - `docs/zh/feature-spec.md` (mirror `docs/en/feature-spec.md`) - feature specifications and test checklist
 - `docs/zh/pitfalls.md` (mirror `docs/en/pitfalls.md`) - known traps
 - `docs/audit-evidence/` - screenshots referenced by the audit docs (not translated)

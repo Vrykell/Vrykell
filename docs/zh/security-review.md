@@ -1,6 +1,7 @@
 # 安全性审查
 
 > 针对 Vrykell 的历次安全审查汇总（最近更新 2026-10-14）。范围：后端 Rust（Tauri 命令、PTY、SSH/SFTP、SQLite、AI HTTP 客户端、web 抓取）、前端 React（IPC 调用、Markdown/HTML 渲染、密钥与配置处理）、Agent 工具授权。
+> 配套：**`security-model.md`**（威胁模型、七条防线、新功能自查清单——加功能前先读它）。
 > 威胁模型：本机桌面应用，无远程服务端；主要风险面是「恶意远端（SSH/SFTP/AI/网页内容）」「恶意文件名/路径」「密钥明文落盘」「命令注入」「LLM 提示注入驱动的内网探测（SSRF）」。
 
 ---
