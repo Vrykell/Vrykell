@@ -99,6 +99,10 @@ describe('UsageView', () => {
     const lane = screen.getByTestId('usage-trend-hover');
     expect(Number(lane.getAttribute('width'))).toBe(Number(bar.getAttribute('width')) + 8);
     expect(lane).toHaveAttribute('rx', '3');
+    // 左侧刻度列与绘图区等高：刻度才能落在自己的网格线上（不被标签行拉高）
+    const ticks = screen.getByTestId('usage-trend-ticks');
+    expect(ticks.style.height).toBe('88px');
+    expect([...ticks.children].map((child) => child.textContent)).toEqual(['1500', '750', '0']);
 
     fireEvent.mouseLeave(screen.getByTestId('usage-trend-chart'));
     expect(screen.queryByTestId('usage-trend-tooltip')).toBeNull();

@@ -118,9 +118,11 @@ export default function TrendChart({ buckets, unit, rangeLabel }: {
       </header>
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
-        {/* Left ticks: peak / half / zero, as on the reference card. */}
-        <div aria-hidden="true" style={{
+        {/* Left ticks: peak / half / zero, as on the reference card. The column is exactly as tall
+            as the plot so the labels sit on their gridlines. */}
+        <div aria-hidden="true" data-testid="usage-trend-ticks" style={{
           display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+          height: CHART_HEIGHT, alignSelf: 'flex-start',
           width: 52, textAlign: 'right', color: 'var(--text-muted)', fontSize: 'var(--fs-micro)',
           fontVariantNumeric: 'tabular-nums', flexShrink: 0,
         }}>
