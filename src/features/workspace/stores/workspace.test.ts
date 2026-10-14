@@ -121,7 +121,7 @@ describe('workspace store', () => {
     expect(s.tabs).toHaveLength(2);
   });
 
-  it.each(['history', 'ai-history', 'settings'] as const)('keeps %s singleton through direct creation and duplication', kind => {
+  it.each(['history', 'ai-history', 'settings', 'usage'] as const)('keeps %s singleton through direct creation and duplication', kind => {
     const ws = useWorkspaceStore.getState();
     const id = ws.addTab({ kind });
     ws.activate(ws.tabs[0]!.id);
@@ -142,6 +142,20 @@ describe('workspace store', () => {
     ws.closeTab(id);
     ws.undoCloseTab();
     expect(useWorkspaceStore.getState().tabs.filter(tab => tab.kind === 'ai-history')).toHaveLength(1);
+  });
+
+  it('opens and restores one usage page independently of terminal sessions', () => {
+    const ws = useWorkspaceStore.getState();
+    ws.openUsageTab();
+    const id = useWorkspaceStore.getState().activeId;
+    const tab = useWorkspaceStore.getState().tabs.find(item => item.id === id);
+    expect(tab?.kind).toBe('usage');
+    expect(tab?.title).toBe('用量统计');
+    ws.openUsageTab();
+    expect(useWorkspaceStore.getState().tabs.filter(item => item.kind === 'usage')).toHaveLength(1);
+    ws.closeTab(id);
+    ws.undoCloseTab();
+    expect(useWorkspaceStore.getState().tabs.filter(item => item.kind === 'usage')).toHaveLength(1);
   });
 
   it('allows OSC titles to override a copied manual title while retaining the copy fallback', () => {

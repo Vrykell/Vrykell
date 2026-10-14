@@ -174,16 +174,130 @@ export function tokensSeries(
   return { buckets: trimmed, unit: hourly ? 'hour' : 'day' };
 }
 
+/** Fresh input = input the provider actually processed after the cache hits. */
+export function freshInputTokens(counts: { inputTokens: number; cachedInputTokens: number }): number {
+  return Math.max(0, counts.inputTokens - counts.cachedInputTokens);
+}
+
+/**
+ * Cache hit rate over the reported input tokens.
+ *
+ * Our providers report `inputTokens` as the whole prompt (cached part included), so the rate is
+ * read over that single number — unlike providers that report cache reads separately.
+ */
+export function cacheHitRate(counts: { inputTokens: number; cachedInputTokens: number }): number {
+  if (counts.inputTokens <= 0) return 0;
+  return Math.min(1, Math.max(0, counts.cachedInputTokens / counts.inputTokens));
+}
+
+/** Everything the provider billed for: prompt plus completion. */
+export function realTokens(counts: { inputTokens: number; outputTokens: number }): number {
+  return counts.inputTokens + counts.outputTokens;
+}
+
+export interface ProviderUsageRow {
+  provider: string;
+  turns: number;
+  inputTokens: number;
+  outputTokens: number;
+  cachedInputTokens: number;
+  totalTokens: number;
+  steps: number;
+  toolCalls: number;
+}
+
+/** Per-provider split, heaviest first; ties keep a stable name order. */
+export function providerBreakdown(records: UsageRecord[]): ProviderUsageRow[] {
+  const rows = new Map<string, ProviderUsageRow>();
+  for (const record of records) {
+    const row = rows.get(record.provider) ?? {
+      provider: record.provider,
+      turns: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      cachedInputTokens: 0,
+      totalTokens: 0,
+      steps: 0,
+      toolCalls: 0,
+    };
+    row.turns += 1;
+    row.inputTokens += record.inputTokens;
+    row.outputTokens += record.outputTokens;
+    row.cachedInputTokens += record.cachedInputTokens;
+    row.totalTokens = row.inputTokens + row.outputTokens;
+    row.steps += record.steps;
+    row.toolCalls += record.toolCalls;
+    rows.set(record.provider, row);
+  }
+  return [...rows.values()].sort(
+    (a, b) => b.totalTokens - a.totalTokens || a.provider.localeCompare(b.provider),
+  );
+}
+
+/** Rows per table page; matches the request log's page size. */
+export const USAGE_PAGE_SIZE = 20;
+
+export interface UsagePage<T> {
+  rows: T[];
+  page: number;
+  totalPages: number;
+  total: number;
+}
+
+/** Slice one page for the tables; an out-of-range page falls back to the last one. */
+export function paginate<T>(rows: T[], page: number, pageSize: number = USAGE_PAGE_SIZE): UsagePage<T> {
+  const total = rows.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const safePage = Math.min(Math.max(0, Math.trunc(page) || 0), totalPages - 1);
+  return {
+    rows: rows.slice(safePage * pageSize, safePage * pageSize + pageSize),
+    page: safePage,
+    totalPages,
+    total,
+  };
+}
+
 /** Thousands separators keep long token counts readable at panel width. */
 export function formatTokens(value: number): string {
   return value.toLocaleString('en-US');
 }
 
-/** Compact token counts for narrow columns: 1234 → "1.2k", 1234567 → "1.2M". */
+/**
+ * Compact token counts with the Chinese units the rest of the app's copy uses:
+ * 12,300 → "1.2万", 14,000,000 → "1400万", 671,000,000 → "6.7亿".
+ */
 export function formatCompact(value: number): string {
-  if (value < 1000) return String(value);
-  if (value < 1_000_000) return `${(value / 1000).toFixed(value < 10_000 ? 1 : 0)}k`;
-  return `${(value / 1_000_000).toFixed(1)}M`;
+  if (!Number.isFinite(value) || value <= 0) return '0';
+  if (value < 10_000) return String(Math.round(value));
+  if (value < 100_000_000) {
+    const wan = value / 10_000;
+    return `${wan >= 100 ? Math.round(wan) : Number(wan.toFixed(1))}万`;
+  }
+  const yi = value / 100_000_000;
+  return `${yi >= 100 ? Math.round(yi) : Number(yi.toFixed(1))}亿`;
+}
+
+const pad2 = (value: number) => String(value).padStart(2, '0');
+
+/**
+ * Table time: today shows the clock, an older day leads with the date; the full stamp stays
+ * available through the cell's title.
+ */
+export function formatLogTime(at: number, now: number = Date.now()): string {
+  const date = new Date(at);
+  const clock = `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+  const sameDay = new Date(now);
+  const isToday =
+    date.getFullYear() === sameDay.getFullYear() &&
+    date.getMonth() === sameDay.getMonth() &&
+    date.getDate() === sameDay.getDate();
+  return isToday ? `${clock}:${pad2(date.getSeconds())}` : `${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${clock}`;
+}
+
+/** Full local stamp for the hover title. */
+export function formatLogFullTime(at: number): string {
+  const date = new Date(at);
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
 }
 
 /** The token total a record (or a summary) represents. */

@@ -6,7 +6,6 @@ import PanelTabs from '@features/workspace/components/PanelTabs';
 import PanelFiles from '@features/files/components/PanelFiles';
 import PanelSsh from '@features/ssh/components/PanelSsh';
 import PanelChat from '@features/chat/components/PanelChat';
-import UsagePanel from '@features/agent/components/UsagePanel';
 
 interface SidePanelProps {
   side: DockSide;
@@ -17,7 +16,6 @@ const PANEL_COMPONENTS: Record<string, FC> = {
   files: PanelFiles,
   ssh: PanelSsh,
   chat: PanelChat,
-  usage: UsagePanel,
 };
 
 export default function SidePanel({ side }: SidePanelProps) {

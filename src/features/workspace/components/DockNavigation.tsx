@@ -1,4 +1,4 @@
-import { useDockStore, useSessionStore, PANEL_DEFS, useNavigationDrag, useNavigationButtonDrag, type DockSide } from '@features/workspace';
+import { useDockStore, useSessionStore, useNavigationDrag, useNavigationButtonDrag, type DockSide } from '@features/workspace';
 import DockButton from './DockButton';
 import { useToastStore } from '@ui/Toast';
 import NavigationDragPreview from './NavigationDragPreview';
@@ -36,8 +36,6 @@ export default function DockNavigation({ side }: { side: DockSide }) {
       data-drop-active={!!dragging && target?.side === side}>
       <div className={side === 'left' ? 'workspace-activity-actions' : 'workspace-right-actions'}>
         {ids.map(id => {
-          // Panels without a navigation button keep their layout slot but render nothing here.
-          if (PANEL_DEFS[id]?.hideButton) return null;
           const index = zone.indexOf(id);
           const active = id === 'settings' ? settingsActive : panels.includes(id);
           const showPlaceholder = !!dragging && !target?.openPanel && target?.side === side && target.index === index;

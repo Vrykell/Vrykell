@@ -1,7 +1,7 @@
 import { TextInput } from '@ui/TextInput';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { iconSizes,
-  History, Plus, Search, Settings, Sparkles,
+  History, Plus, Search, Settings, Sparkles, DataUsage,
   ChevronRight, Pencil, Archive, Folder, Trash2, X,
  } from '@ui/icons';
 import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, useTabDisplayTitle, type Tab, type TabGroup } from '@features/workspace';
@@ -292,6 +292,7 @@ export default function PanelTabs() {
             : tab?.kind === 'history' ? History
               : tab?.kind === 'ai-history' ? Sparkles
               : tab?.kind === 'settings' ? Settings
+              : tab?.kind === 'usage' ? DataUsage
               : first?.kind === 'ssh' ? SshIcon
                 : shellIconFor(first?.kind === 'local' ? first.shellType : undefined);
           return <Icon size={iconSizes.row} style={{ color: drag.kind === 'group' ? 'var(--accent-warm)' : 'var(--accent)' }} />;
@@ -521,6 +522,7 @@ function TabRow({
   const Icon = tab.kind === 'history' ? History
     : tab.kind === 'ai-history' ? Sparkles
     : tab.kind === 'settings' ? Settings
+    : tab.kind === 'usage' ? DataUsage
       : isSsh ? SshIcon
         : shellIconFor(first?.kind === 'local' ? first.shellType : undefined);
   const iconColor = active ? 'var(--text-primary)' : 'var(--text-secondary)';

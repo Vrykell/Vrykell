@@ -4,6 +4,7 @@ import '@fluentui/react-icons/headless/styles.css';
 import { ErrorCircle24Regular } from '@fluentui/react-icons/headless/svg/error-circle';
 import { Archive24Regular } from '@fluentui/react-icons/headless/svg/archive';
 import { ArrowLeft24Regular } from '@fluentui/react-icons/headless/svg/arrow-left';
+import { ArrowRight24Regular } from '@fluentui/react-icons/headless/svg/arrow-right';
 import { ArrowUp24Regular } from '@fluentui/react-icons/headless/svg/arrow-up';
 import { ArrowDown24Regular } from '@fluentui/react-icons/headless/svg/arrow-down';
 import { ArrowSort24Regular } from '@fluentui/react-icons/headless/svg/arrow-sort';
@@ -101,6 +102,7 @@ function createAppIcon(Icon: FluentIcon): AppIcon {
 export const AlertCircle = createAppIcon(ErrorCircle24Regular);
 export const Archive = createAppIcon(Archive24Regular);
 export const ArrowLeft = createAppIcon(ArrowLeft24Regular);
+export const ArrowRight = createAppIcon(ArrowRight24Regular);
 export const ArrowUp = createAppIcon(ArrowUp24Regular);
 export const ArrowDown = createAppIcon(ArrowDown24Regular);
 export const ArrowSort = createAppIcon(ArrowSort24Regular);

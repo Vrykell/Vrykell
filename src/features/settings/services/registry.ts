@@ -6,7 +6,7 @@ import { SHELL_TYPES, shellTypeLabel } from '@platform/shells';
 import { useStartupSettings } from '../stores/startup';
 import { isApiKeyConfigured, getModel } from '@features/agent/stores/aiConfig';
 import { loadConfig } from '@features/files/services/fileOpen';
-import { useSessionStore, useDockStore } from '@features/workspace';
+import { useSessionStore } from '@features/workspace';
 import { useTypographyStore } from '@config/typography';
 import { useSettingsNavigationStore } from '../stores/navigation';
 import type { PageId } from '../model/navigation';
@@ -130,5 +130,5 @@ registerSetting({
     const totals = summarize(useUsageStore.getState().records);
     return t('{{tokens}} tokens in {{count}} requests', { tokens: formatTokens(totalTokens(totals)), count: totals.turns });
   },
-  onSelect: () => useDockStore.getState().openPanel('usage'),
+  onSelect: () => useSessionStore.getState().openUsageTab(),
 });

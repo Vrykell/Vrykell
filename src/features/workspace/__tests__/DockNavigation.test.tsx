@@ -44,14 +44,6 @@ describe('shared navigation buttons', () => {
     expect(useDockStore.getState().leftPanels).toEqual(['tabs']);
     expect(useDockStore.getState().rightPanels).toEqual([]);
   });
-  it('keeps button-less panels openable from their own entry point', () => {
-    useDockStore.setState({ rightZone: ['chat', 'usage', 'settings'] });
-    render(<><DockNavigation side="left" /><DockNavigation side="right" /></>);
-    expect(screen.queryByRole('button', { name: '用量' })).toBeNull();
-    act(() => useDockStore.getState().openPanel('usage'));
-    expect(useDockStore.getState().rightPanels).toEqual(['usage']);
-  });
-
   it('reserves a full insertion slot and restores the original layout on cancellation', () => {    render(<><DockNavigation side="left" /><DockNavigation side="right" /></>);
     const saved = localStorage.getItem('dock-layout-v4');
     act(() => {

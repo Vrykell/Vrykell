@@ -28,7 +28,7 @@ import {
 
 export type { TitleSource };
 
-export type TabKind = 'session' | 'history' | 'ai-history' | 'settings';
+export type TabKind = 'session' | 'history' | 'ai-history' | 'settings' | 'usage';
 
 /** SSH 会话目标（终端类型=ssh 时的专属字段） */
 export interface SshTabTarget extends SshOptions {
@@ -56,7 +56,8 @@ export type Tab =
   | (TabBase & { kind: 'session'; groupId?: string; layout: WindowLayout })
   | (TabBase & { kind: 'history' })
   | (TabBase & { kind: 'ai-history' })
-  | (TabBase & { kind: 'settings' });
+  | (TabBase & { kind: 'settings' })
+  | (TabBase & { kind: 'usage' });
 
 export interface TabGroup {
   id: string;
@@ -68,7 +69,7 @@ export interface AddTabOptions {
   cwd?: string;
   title?: string;
   /** Defaults to local; history and settings kinds create workspace pages. */
-  kind?: 'local' | 'ssh' | 'history' | 'ai-history' | 'settings';
+  kind?: 'local' | 'ssh' | 'history' | 'ai-history' | 'settings' | 'usage';
   shellType?: ShellType;
   /** SSH 连接目标（kind='ssh' 时） */
   ssh?: SshTabTarget;
@@ -139,6 +140,7 @@ const DEFAULT_TITLE = '终端';
 const HISTORY_TITLE = '会话历史';
 const AI_HISTORY_TITLE = t('AI conversation history');
 const SETTINGS_TITLE = '设置';
+const USAGE_TITLE = t('Usage statistics');
 
 interface WorkspaceState {
   tabs: Tab[];
@@ -150,6 +152,7 @@ interface WorkspaceState {
   openHistoryTab: () => void;
   /** Open the singleton AI conversation history page. */
   openAiHistoryTab: () => void;
+  openUsageTab: () => void;
   /** 新建/复用设置标签页 */
   openSettingsTab: () => void;
   closeTab: (id: string) => void;
@@ -217,7 +220,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   programTitles: {},
   addTab: (opts) => {
     const o = opts ?? {};
-    if (o.kind === 'history' || o.kind === 'ai-history' || o.kind === 'settings') {
+    if (o.kind === 'history' || o.kind === 'ai-history' || o.kind === 'settings' || o.kind === 'usage') {
       const existing = get().tabs.find(tab => tab.kind === o.kind);
       if (existing) {
         get().activate(existing.id);
@@ -251,6 +254,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       tab = { id, title: AI_HISTORY_TITLE, kind: 'ai-history', titleSource: 'manual' };
     } else if (o.kind === 'settings') {
       tab = { id, title: SETTINGS_TITLE, kind: 'settings', titleSource: 'manual' };
+    } else if (o.kind === 'usage') {
+      tab = { id, title: USAGE_TITLE, kind: 'usage', titleSource: 'manual' };
     } else {
       const preference = useTerminalDefaults.getState().shell;
       const shellType = o.shellType ?? (preference === 'system' ? undefined : preference);
@@ -292,6 +297,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     get().addTab({ kind: 'history' });
   },
   openAiHistoryTab: () => { get().addTab({ kind: 'ai-history' }); },
+  openUsageTab: () => { get().addTab({ kind: 'usage' }); },
   openSettingsTab: () => {
     const existing = get().tabs.find((t) => t.kind === 'settings');
     if (existing) {
@@ -344,6 +350,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       get().addTab({ kind: 'ai-history' });
     } else if (closed.kind === 'settings') {
       get().addTab({ kind: 'settings' });
+    } else if (closed.kind === 'usage') {
+      get().addTab({ kind: 'usage' });
     } else {
       // kind/payload 已随会话落库，restore 从后端读取重建
       sessionManager.restore(closed.id, closed.title);

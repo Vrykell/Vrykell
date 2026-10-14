@@ -7,7 +7,7 @@ import ErrorBox from '@ui/ErrorBox';
 import { IconButton } from '@ui/IconButton';
 import { ArrowDown, ArrowUp, History, Plus, SlidersHorizontal, Sparkles, Square, Zap } from '@ui/icons';
 import { useAttachmentComposer } from '@features/agent';
-import { useSessionStore, useDockStore } from '@features/workspace';
+import { useSessionStore } from '@features/workspace';
 import { leaves } from '@features/workspace/model/windowLayout';
 import { useTerminalStore } from '@features/terminal';
 import { useChatStore, type ChatMessage } from '../stores/chat';
@@ -170,7 +170,7 @@ export default function PanelChat() {
       </div>
       <div className="chat-setting-links">
         {environment && !!sessions[environment.paneId] && <button type="button" data-subtle onClick={() => showExecutionTerminal(environment.paneId)}>{t('View terminal')}</button>}
-        <button type="button" data-subtle data-testid="chat-usage-entry" onClick={() => useDockStore.getState().openPanel('usage')}>{t('Usage')}</button>
+        <button type="button" data-subtle data-testid="chat-usage-entry" onClick={() => useSessionStore.getState().openUsageTab()}>{t('Usage')}</button>
         <button type="button" data-subtle onClick={() => useSessionStore.getState().openSettingsTab()}>{t('Open settings')}</button>
       </div>
     </section>}

@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
+  cacheHitRate,
   formatCompact,
+  formatLogFullTime,
+  formatLogTime,
   formatTokens,
+  freshInputTokens,
   MAX_USAGE_BUCKETS,
   modelBreakdown,
+  paginate,
+  providerBreakdown,
   rangeStart,
+  realTokens,
   recordsInRange,
   summarize,
   tokensSeries,
@@ -116,12 +123,72 @@ describe('formatTokens', () => {
 });
 
 describe('formatCompact', () => {
-  it('shortens large counts for the table columns', () => {
+  it('shortens large counts with the Chinese units the copy uses', () => {
     expect(formatCompact(0)).toBe('0');
     expect(formatCompact(999)).toBe('999');
-    expect(formatCompact(1200)).toBe('1.2k');
-    expect(formatCompact(23456)).toBe('23k');
-    expect(formatCompact(2_400_000)).toBe('2.4M');
+    expect(formatCompact(1200)).toBe('1200');
+    expect(formatCompact(12345)).toBe('1.2万');
+    expect(formatCompact(20000)).toBe('2万');
+    expect(formatCompact(14_000_000)).toBe('1400万');
+    expect(formatCompact(671_000_000)).toBe('6.7亿');
+  });
+});
+
+describe('derived metrics', () => {
+  it('reads fresh input, cache hit rate and billed tokens from the reported counts', () => {
+    const counts = { inputTokens: 1200, outputTokens: 300, cachedInputTokens: 800 };
+    expect(freshInputTokens(counts)).toBe(400);
+    expect(cacheHitRate(counts)).toBeCloseTo(0.6667, 3);
+    expect(realTokens(counts)).toBe(1500);
+  });
+
+  it('stays at zero when the provider reports nothing', () => {
+    expect(freshInputTokens({ inputTokens: 0, cachedInputTokens: 10 })).toBe(0);
+    expect(cacheHitRate({ inputTokens: 0, cachedInputTokens: 0 })).toBe(0);
+    expect(realTokens({ inputTokens: 0, outputTokens: 0 })).toBe(0);
+  });
+});
+
+describe('providerBreakdown', () => {
+  it('groups per provider, heaviest first, with steps and tool calls', () => {
+    const rows = providerBreakdown([
+      record({ provider: 'anthropic', inputTokens: 100, outputTokens: 10, cachedInputTokens: 40, steps: 2, toolCalls: 1 }),
+      record({ provider: 'openai-compatible', inputTokens: 900, outputTokens: 100, steps: 3, toolCalls: 4 }),
+      record({ provider: 'anthropic', inputTokens: 50, outputTokens: 5, steps: 1 }),
+    ]);
+    expect(rows.map((row) => row.provider)).toEqual(['openai-compatible', 'anthropic']);
+    expect(rows[1]).toMatchObject({
+      turns: 2, inputTokens: 150, outputTokens: 15, totalTokens: 165, cachedInputTokens: 40, steps: 3, toolCalls: 1,
+    });
+  });
+});
+
+describe('paginate', () => {
+  const rows = Array.from({ length: 45 }, (_, index) => index);
+
+  it('slices one page and clamps an out-of-range page', () => {
+    expect(paginate(rows, 0, 20)).toMatchObject({ page: 0, totalPages: 3, total: 45 });
+    expect(paginate(rows, 0, 20).rows[0]).toBe(0);
+    expect(paginate(rows, 2, 20).rows).toEqual([40, 41, 42, 43, 44]);
+    expect(paginate(rows, 9, 20).page).toBe(2);
+    expect(paginate(rows, -3, 20).page).toBe(0);
+  });
+
+  it('keeps one empty page for an empty table', () => {
+    expect(paginate([], 0, 20)).toMatchObject({ page: 0, totalPages: 1, total: 0, rows: [] });
+  });
+});
+
+describe('log time formatting', () => {
+  const now = new Date(2026, 9, 14, 16, 0, 5).getTime();
+
+  it('shows the clock for today and the date for older rows', () => {
+    expect(formatLogTime(new Date(2026, 9, 14, 15, 38, 55).getTime(), now)).toBe('15:38:55');
+    expect(formatLogTime(new Date(2026, 8, 30, 14, 21, 5).getTime(), now)).toBe('09-30 14:21');
+  });
+
+  it('keeps a full stamp for the hover title', () => {
+    expect(formatLogFullTime(new Date(2026, 8, 30, 14, 21, 5).getTime())).toBe('2026-09-30 14:21:05');
   });
 });
 
