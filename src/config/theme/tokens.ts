@@ -26,6 +26,8 @@ export interface ThemePalette {
   brandOpenai: string;
   brandGemini: string;
   brandDeepseek: string;
+  /** Usage charts: one hue for the bars, in both themes. */
+  chartBar: string;
 
   /** Shared frame for the titlebar and primary navigation. */
   chromeBg: string;
@@ -174,6 +176,7 @@ const dark: ThemePalette = {
   brandOpenai: '#10A37F',
   brandGemini: '#7FA8F5',
   brandDeepseek: '#7C88F8',
+  chartBar: '#38BDF8',
 
   // Content, navigation, panels, overlays and fields have distinct roles; the frame is lighter than navigation.
   chromeBg: '#303030',
@@ -339,6 +342,7 @@ const light: ThemePalette = {
   brandOpenai: '#0E8F71',
   brandGemini: '#4A7FE0',
   brandDeepseek: '#5A66E8',
+  chartBar: '#0891B2',
 
   chromeBg: '#F5F5F5',
   sidebarBg: '#EFEFEF',
@@ -496,6 +500,7 @@ export function paletteToCssVars(p: ThemePalette): Record<string, string> {
     '--brand-openai': p.brandOpenai,
     '--brand-gemini': p.brandGemini,
     '--brand-deepseek': p.brandDeepseek,
+    '--chart-bar': p.chartBar,
     '--chrome-bg': p.chromeBg,
     '--sidebar-bg': p.sidebarBg,
     '--chrome-field': p.chromeField,

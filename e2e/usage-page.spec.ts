@@ -49,6 +49,21 @@ test.describe('usage statistics page', () => {
     await expect(page.getByTestId('usage-fresh-input')).toHaveText('10');
     await expect(page.getByTestId('usage-trend-chart')).toBeVisible();
 
+    // 蓝色圆角柱 + 悬停显示该桶的完整时间与数值（命中区是整列）
+    await expect(page.getByTestId('usage-trend-bar').first()).toHaveAttribute('rx', '3');
+    await page.getByTestId('usage-trend-slot-0').hover();
+    const tooltip = page.getByTestId('usage-trend-tooltip');
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toContainText(/^\d{4}\/\d{2}\/\d{2} \d{2}:00/);
+    await expect(tooltip).toContainText('Tokens');
+    await expect(tooltip).toContainText('15 tokens');
+
+    // 刷新按钮：重读存储并给出刷新时间
+    await expect(page.getByTestId('usage-refreshed-at')).toHaveCount(0);
+    await page.getByTestId('usage-refresh').click();
+    await expect(page.getByTestId('usage-refreshed-at')).toContainText('刷新于');
+    await expect(page.getByTestId('usage-total-tokens')).toHaveText('15');
+
     const logRow = page.getByTestId('usage-log-row');
     await expect(logRow).toHaveCount(1);
     await expect(logRow).toHaveAttribute('data-model', 'gpt-4o-mini');

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { useToastStore } from '@ui/Toast';
 import UsageView from '../components/UsageView';
@@ -79,6 +79,26 @@ describe('UsageView', () => {
     expect(cells[7]).toHaveTextContent('3');
   });
 
+  it('paints blue rounded bars and explains a bucket on hover', () => {
+    seedSonnetTurn();
+    render(<UsageView />);
+
+    const bar = screen.getByTestId('usage-trend-bar');
+    expect(bar).toHaveAttribute('fill', 'var(--chart-bar)');
+    expect(bar).toHaveAttribute('rx', '3');
+    expect(screen.queryByTestId('usage-trend-tooltip')).toBeNull();
+
+    // 悬停整列 → 显示完整时间与该项的数值
+    fireEvent.mouseEnter(screen.getByTestId('usage-trend-slot-0'));
+    const tooltip = screen.getByTestId('usage-trend-tooltip');
+    expect(tooltip).toHaveTextContent(/^\d{4}\/\d{2}\/\d{2} \d{2}:00/);
+    expect(tooltip).toHaveTextContent('Tokens');
+    expect(tooltip).toHaveTextContent('1,500 tokens');
+
+    fireEvent.mouseLeave(screen.getByTestId('usage-trend-chart'));
+    expect(screen.queryByTestId('usage-trend-tooltip')).toBeNull();
+  });
+
   it('switches the trend metric and the detail tables', () => {
     seedSonnetTurn();
     render(<UsageView />);
@@ -149,6 +169,33 @@ describe('UsageView', () => {
     expect(screen.getAllByTestId('usage-log-row')).toHaveLength(5);
     expect(screen.getByTestId('usage-page-label')).toHaveTextContent('第 2 / 2 页');
     expect(screen.getByTestId('usage-page-next')).toBeDisabled();
+  });
+
+  it('refreshes the view and can pick up records another instance persisted', async () => {
+    seedSonnetTurn();
+    render(<UsageView />);
+    expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('1');
+    expect(screen.queryByTestId('usage-refreshed-at')).toBeNull();
+
+    // 另一个实例写进存储的记录：刷新后应当出现在页面里
+    const stored = JSON.parse(localStorage.getItem('vrykell-usage') ?? '{}') as {
+      state?: { records?: unknown[] };
+    };
+    stored.state = {
+      ...(stored.state ?? {}),
+      records: [
+        ...((stored.state?.records ?? []) as unknown[]),
+        {
+          id: 'from-other-window', at: Date.now(), provider: 'anthropic', model: 'claude-sonnet-4',
+          inputTokens: 100, outputTokens: 10, cachedInputTokens: 0, reasoningTokens: 0, steps: 1, toolCalls: 0,
+        },
+      ],
+    };
+    localStorage.setItem('vrykell-usage', JSON.stringify(stored));
+
+    fireEvent.click(screen.getByTestId('usage-refresh'));
+    await waitFor(() => expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('2'));
+    expect(screen.getByTestId('usage-refreshed-at')).toHaveTextContent('刷新于');
   });
 
   it('clears the records and confirms it', () => {

@@ -1,12 +1,12 @@
 /**
  * TrendChart — bars per hour (today) or per day (wider ranges) with a metric switch.
  *
- * Mirrors the reference dashboard's chart card: title with the selected range, a Tokens /
- * Requests switch on the right, three grid lines with compact labels on the left and the bucket
- * labels along the bottom. Drawn as plain SVG so the page needs no chart dependency; each bar
- * carries its own hover title.
+ * Mirrors the reference dashboard's chart card: blue bars with a small top radius, the hovered
+ * column highlighted behind its bar, a tooltip card that spells out the full timestamp and the
+ * value, and a Tokens / Requests switch in the header. Drawn as plain SVG in pixel space (the
+ * container width is measured) so the bar radius stays round; no chart dependency.
  */
-import { useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { t } from '@i18n';
 import {
   formatCompact,
@@ -17,8 +17,13 @@ import {
 export type TrendMetric = 'tokens' | 'requests';
 
 const CHART_HEIGHT = 88;
+/** Bars never grow wider than the reference's maxBarSize. */
+const MAX_BAR_WIDTH = 36;
+const BAR_RADIUS = 3;
+/** Logical width used before the container is measured (jsdom never measures). */
+const FALLBACK_WIDTH = 640;
 
-/** Evenly spaced tick indexes so labels never crowd (the reference labels every bucket when they fit). */
+/** Evenly spaced tick indexes so labels never crowd. */
 function tickIndexes(count: number, max: number = 8): number[] {
   if (count <= max) return Array.from({ length: count }, (_, index) => index);
   const step = Math.ceil(count / max);
@@ -28,17 +33,47 @@ function tickIndexes(count: number, max: number = 8): number[] {
   return indexes;
 }
 
+/** Tooltip heading: 2026/10/14 06:00. */
+function bucketStamp(start: number): string {
+  const date = new Date(start);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:00`;
+}
+
 export default function TrendChart({ buckets, unit, rangeLabel }: {
   buckets: UsageBucket[];
   unit: 'hour' | 'day';
   rangeLabel: string;
 }) {
   const [metric, setMetric] = useState<TrendMetric>('tokens');
+  const [hovered, setHovered] = useState<number | null>(null);
+  const [width, setWidth] = useState(FALLBACK_WIDTH);
+  const plotRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const element = plotRef.current;
+    if (!element || typeof ResizeObserver === 'undefined') return;
+    const measure = () => {
+      const next = element.getBoundingClientRect().width;
+      if (next > 40) setWidth(next);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => setHovered(null), [buckets]);
+
   const valueOf = (bucket: UsageBucket) => (metric === 'tokens' ? bucket.tokens : bucket.turns);
+  const formatValue = (value: number) =>
+    metric === 'tokens' ? `${formatTokens(value)} tokens` : t('{{count}} requests', { count: value });
   const peak = Math.max(...buckets.map(valueOf), 0);
   const scale = peak > 0 ? peak : 1;
-  const slot = 100 / Math.max(buckets.length, 1);
+  const slot = width / Math.max(buckets.length, 1);
+  const barWidth = Math.min(MAX_BAR_WIDTH, Math.max(2, slot * 0.62));
   const ticks = tickIndexes(buckets.length);
+  const hoveredBucket = hovered === null ? null : buckets[hovered];
 
   return (
     <section className="usage-card" aria-label={t('Usage trend')} data-testid="usage-trend">
@@ -48,6 +83,16 @@ export default function TrendChart({ buckets, unit, rangeLabel }: {
             {t('Usage trend')}
           </strong>
           <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>· {rangeLabel}</span>
+          {/* 图例：与柱同色的色块 + 当前指标 */}
+          <span data-testid="usage-trend-legend" style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            color: 'var(--text-secondary)', fontSize: 'var(--fs-caption)',
+          }}>
+            <span aria-hidden="true" style={{
+              width: 9, height: 9, borderRadius: 2, background: 'var(--chart-bar)', flexShrink: 0,
+            }} />
+            {metric === 'tokens' ? t('Tokens') : t('Requests')}
+          </span>
         </span>
         <span role="tablist" aria-label={t('Chart metric')} style={{
           display: 'inline-flex', gap: 2, padding: 2, borderRadius: 'var(--radius-inner)', background: 'var(--hover)',
@@ -81,34 +126,64 @@ export default function TrendChart({ buckets, unit, rangeLabel }: {
           <span>0</span>
         </div>
 
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div ref={plotRef} style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+          {hoveredBucket && (
+            <div data-testid="usage-trend-tooltip" className="workspace-floating" style={{
+              position: 'absolute', zIndex: 2, pointerEvents: 'none',
+              left: Math.min(Math.max(0, (hovered ?? 0) * slot + slot / 2 - 70), Math.max(0, width - 148)),
+              top: -4, minWidth: 140, padding: '8px 10px',
+              color: 'var(--text-primary)', fontSize: 'var(--fs-caption)', whiteSpace: 'nowrap',
+            }}>
+              <p style={{ margin: '0 0 4px', fontWeight: 'var(--fw-semibold)' }}>{bucketStamp(hoveredBucket.start)}</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontVariantNumeric: 'tabular-nums' }}>
+                <span aria-hidden="true" style={{
+                  width: 9, height: 9, borderRadius: 2, background: 'var(--chart-bar)', flexShrink: 0,
+                }} />
+                <span style={{ color: 'var(--text-secondary)' }}>{metric === 'tokens' ? t('Tokens') : t('Requests')}</span>
+                <span style={{ marginLeft: 'auto', paddingLeft: 12 }}>{formatValue(valueOf(hoveredBucket))}</span>
+              </div>
+            </div>
+          )}
+
           <svg data-testid="usage-trend-chart" role="img"
             aria-label={t('{{metric}} over time', { metric: metric === 'tokens' ? t('Tokens') : t('Requests') })}
-            viewBox={`0 0 100 ${CHART_HEIGHT}`} preserveAspectRatio="none"
-            style={{ display: 'block', width: '100%', height: CHART_HEIGHT, overflow: 'visible' }}>
+            width={width} height={CHART_HEIGHT}
+            viewBox={`0 0 ${width} ${CHART_HEIGHT}`} preserveAspectRatio="none"
+            onMouseLeave={() => setHovered(null)}
+            style={{ display: 'block', width: '100%', height: CHART_HEIGHT }}>
             {[0, 0.5, 1].map((fraction) => (
-              <line key={fraction} x1={0} x2={100} y1={CHART_HEIGHT * fraction} y2={CHART_HEIGHT * fraction}
-                stroke="var(--border)" strokeWidth={0.4} />
+              <line key={fraction} x1={0} x2={width} y1={CHART_HEIGHT * fraction} y2={CHART_HEIGHT * fraction}
+                stroke="var(--border)" strokeWidth={1} />
             ))}
             {buckets.map((bucket, index) => {
               const value = valueOf(bucket);
-              const barHeight = value > 0 ? Math.max(1.5, (value / scale) * (CHART_HEIGHT - 1)) : 0;
+              const barHeight = value > 0 ? Math.max(2, (value / scale) * (CHART_HEIGHT - 2)) : 0;
+              const left = index * slot + (slot - barWidth) / 2;
               return (
-                <rect key={bucket.start}
-                  x={index * slot + slot * 0.28} y={CHART_HEIGHT - barHeight}
-                  width={Math.max(slot * 0.44, 0.6)} height={barHeight} rx={0.6}
-                  fill="var(--accent)" opacity={value > 0 ? 0.92 : 0}>
-                  <title>
-                    {`${bucket.label} · ${metric === 'tokens' ? `${formatTokens(bucket.tokens)} tokens` : t('{{count}} requests', { count: bucket.turns })}`}
-                  </title>
-                </rect>
+                <g key={bucket.start}>
+                  {/* 悬停高亮整列（参考面板用 --bg-subtle，这里用同角色的 --hover） */}
+                  {hovered === index && (
+                    <rect x={index * slot} y={0} width={slot} height={CHART_HEIGHT} fill="var(--hover)" />
+                  )}
+                  {value > 0 && (
+                    <rect data-testid="usage-trend-bar" x={left} y={CHART_HEIGHT - barHeight}
+                      width={barWidth} height={barHeight} rx={BAR_RADIUS} fill="var(--chart-bar)">
+                      <title>{`${bucketStamp(bucket.start)} · ${formatValue(value)}`}</title>
+                    </rect>
+                  )}
+                  {/* 命中区：整列可悬停，空桶也能看到时间与 0 */}
+                  <rect data-testid={`usage-trend-slot-${index}`} x={index * slot} y={0}
+                    width={slot} height={CHART_HEIGHT} fill="transparent"
+                    onMouseEnter={() => setHovered(index)} />
+                </g>
               );
             })}
           </svg>
+
           <div style={{ position: 'relative', height: 14, marginTop: 4 }}>
             {ticks.map((index) => (
               <span key={index} style={{
-                position: 'absolute', left: `${index * slot + slot / 2}%`, transform: 'translateX(-50%)',
+                position: 'absolute', left: `${((index + 0.5) / Math.max(buckets.length, 1)) * 100}%`, transform: 'translateX(-50%)',
                 color: 'var(--text-muted)', fontSize: 'var(--fs-micro)', whiteSpace: 'nowrap',
                 fontVariantNumeric: 'tabular-nums',
               }}>
