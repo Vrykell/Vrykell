@@ -15,11 +15,12 @@ export interface HarnessPreset {
 }
 
 export const HARNESS_PRESETS: HarnessPreset[] = [
-  { name: 'Claude Code', command: 'npx', args: ['-y', '@zed-industries/claude-code-acp'], hint: 'npx' },
+  // Verified on this machine: this one answers the handshake, so it is the first thing to try.
+  { name: 'Claude Code', command: 'npx', args: ['-y', '@zed-industries/claude-code-acp'], hint: 'npx（已实测可握手）' },
   { name: 'Codex', command: 'npx', args: ['-y', '@zed-industries/codex-acp'], hint: 'npx' },
-  { name: 'Gemini CLI', command: 'gemini', args: ['--experimental-acp'], hint: 'npm i -g @google/gemini-cli' },
-  { name: 'OpenCode', command: 'opencode', args: ['acp'], hint: 'opencode.ai' },
-  { name: 'Goose', command: 'goose', args: ['acp'], hint: 'block.github.io/goose' },
+  { name: 'Gemini CLI', command: 'npx', args: ['-y', '@google/gemini-cli', '--experimental-acp'], hint: 'npx' },
+  { name: 'OpenCode', command: 'npx', args: ['-y', 'opencode-ai', 'acp'], hint: 'npx' },
+  { name: 'Goose', command: 'goose', args: ['acp'], hint: '需要先安装 goose' },
 ];
 
 export interface HarnessEntry {
