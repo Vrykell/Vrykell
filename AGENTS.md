@@ -12,7 +12,7 @@ npm run dev          # Frontend dev server (port 1420, strict)
 npm run tauri dev    # Full Tauri app with hot reload
 npm run build        # tsc + vite build
 npm run test         # vitest run (unit tests)
-npm run test:e2e     # playwright test (e2e, starts its own dev server on 1421)
+npm run test:e2e     # playwright test (e2e; dev server port from PW_PORT, default 1421)
 cargo test           # Rust backend tests (src-tauri/)
 npx tsc --noEmit     # typecheck only
 npm run check:architecture  # import-boundary guard

@@ -61,7 +61,7 @@
 32. `src/features/settings/` — settings pages (behavior/model/MCP/Skills/shortcuts/terminal open mode/theme).
 33. `src/platform/` and `src/utils/` — Tauri IPC, PTY, runtime adapters and pure helper functions. Business services belong to their feature.
 34. `src/features/ssh/` `src/features/files/` `src/features/search/` `src/config/theme/` — SSH / local files / global search / design tokens.
-35. `e2e/` — Playwright E2E tests; `tauri-mock.ts` provides the Tauri + Anthropic mock.
+35. `e2e/` — Playwright E2E tests; `tauri-mock.ts` provides the Tauri + Anthropic mock. The suite's dev-server port comes from `PW_PORT` (default 1421): parallel worktrees each pick their own port so one run never shuts down another run's server (which shows up as a wall of `ERR_CONNECTION_REFUSED`).
 
 ## 8. Observability and logging
 
