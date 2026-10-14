@@ -55,6 +55,13 @@ describe('UsageView', () => {
     expect(card.querySelector('svg')).toBeNull();
   });
 
+  it('keeps four metric cards per row regardless of the page width', () => {
+    seedSonnetTurn();
+    render(<UsageView />);
+    // 固定四列：窗口变窄也不会挤成三列（卡片位置不跳动）
+    expect(screen.getByTestId('usage-metrics').getAttribute('style')).toContain('repeat(4, minmax(0, 1fr))');
+  });
+
   it('summarises the turn and lists it in the log', () => {
     seedSonnetTurn();
     render(<UsageView />);

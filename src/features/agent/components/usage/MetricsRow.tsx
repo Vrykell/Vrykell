@@ -2,10 +2,11 @@
  * MetricsRow — the headline numbers of the usage page.
  *
  * One card style for every metric, all visible at once: total tokens, requests, fresh input,
- * cache hit rate, output, cache reads, steps and tool calls. Cards flow with the page width
- * (`auto-fit`), so a wide window shows one row and a narrow one wraps. A card whose counting
- * rule needs explaining carries that rule on the label's hover tip; the exact number stays in
- * the value's title attribute.
+ * cache hit rate, output, cache reads, steps and tool calls. The grid stays at four columns
+ * whatever the window width (two rows), so card positions never move; a narrow page truncates
+ * the label instead, and the tooltip keeps the full text. A card whose counting rule needs
+ * explaining carries that rule on the label's hover tip; the exact number stays in the value's
+ * title attribute.
  */
 import { t } from '@i18n';
 import {
@@ -83,8 +84,8 @@ export default function MetricsRow({ totals }: { totals: UsageTotals }) {
   ];
 
   return (
-    <section aria-label={t('Usage summary')}
-      style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
+    <section aria-label={t('Usage summary')} data-testid="usage-metrics"
+      style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10 }}>
       {cards.map((card) => (
         <MetricCard key={card.key} testId={card.testId} label={card.label}
           value={card.value} exact={card.exact} hint={card.hint} />
