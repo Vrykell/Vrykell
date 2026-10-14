@@ -86,6 +86,8 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     const sshOps: { op: string; path: string; newName?: string; destDir?: string }[] = [];
     const downloads: Record<string, unknown>[] = [];
     const revealed: string[] = [];
+    /** URLs handed to the system browser (plugin:opener|open_url). */
+    const openedUrls: string[] = [];
     const aiConfig: { hasKey: boolean; baseUrl: string; model: string } = {
       hasKey: true,
       baseUrl: 'https://api.openai.com/v1',
@@ -181,6 +183,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     (window as unknown as Record<string, unknown>).__SSH_OPS__ = sshOps;
     (window as unknown as Record<string, unknown>).__DOWNLOADS__ = downloads;
     (window as unknown as Record<string, unknown>).__REVEALED__ = revealed;
+    (window as unknown as Record<string, unknown>).__OPENED_URLS__ = openedUrls;
     (window as unknown as Record<string, unknown>).__SESSION_PAYLOADS__ = sessionPayloads;
     (window as unknown as Record<string, unknown>).__AI_KEY_CALLS__ = aiKeyCalls;
     (window as unknown as Record<string, unknown>).__AI_MODEL_CALLS__ = aiModelCalls;
@@ -996,6 +999,11 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             return undefined;
           case 'plugin:opener|open_path':
             return undefined;
+          case 'plugin:opener|open_url':
+            // Recorded so a spec can prove the link left for the system browser instead of
+            // navigating the app window.
+            openedUrls.push(String(args.url ?? ''));
+            return undefined;
           case 'list_sessions':
             return mockSessions;
           case 'terminal_debug_status':
@@ -1323,6 +1331,11 @@ export function fsOps(page: Page): Promise<{ op: string; path: string; newName?:
 /** 读取远程文件面板调用的 ssh_rename / ssh_move / ssh_copy / ssh_stage_delete 等记录 */
 export function sshOps(page: Page): Promise<{ op: string; path: string; newName?: string; destDir?: string }[]> {
   return page.evaluate(() => (window as unknown as Record<string, { op: string; path: string; newName?: string }[]>).__SSH_OPS__);
+}
+
+/** URLs handed to the system browser via the opener plugin, in order. */
+export function openedUrls(page: Page): Promise<string[]> {
+  return page.evaluate(() => (window as unknown as Record<string, string[]>).__OPENED_URLS__ ?? []);
 }
 
 /** 读取下载管理里「定位」调用的 reveal 路径记录 */

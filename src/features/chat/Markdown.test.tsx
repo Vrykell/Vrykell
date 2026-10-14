@@ -1,6 +1,17 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import Markdown from '@features/chat/components/Markdown';
+import { openUrl } from '@tauri-apps/plugin-opener';
+
+vi.mock('@tauri-apps/plugin-opener', () => ({
+  openUrl: vi.fn().mockResolvedValue(undefined),
+  openPath: vi.fn().mockResolvedValue(undefined),
+  revealItemInDir: vi.fn().mockResolvedValue(undefined),
+}));
+
+const openUrlMock = vi.mocked(openUrl);
+
+beforeEach(() => openUrlMock.mockClear());
 
 describe('Markdown', () => {
   it('渲染 GFM 表格', () => {
@@ -40,5 +51,25 @@ describe('Markdown', () => {
     );
     expect(container.querySelector('a')).not.toBeInTheDocument();
     expect(container.textContent).toContain('https://example.com');
+  });
+
+  // 回归：回复里的链接曾让整个应用窗口导航到目标页（应用界面消失）。现在 web 链接交系统
+  // 浏览器打开，应用窗口原地不动。测试里 jsdom 无法真的导航，断言「交给系统」+ rel 即可。
+  it('web 链接交给系统浏览器打开，不再导航应用窗口', async () => {
+    render(<Markdown content={'[文档](https://example.com/a)'} />);
+    const link = screen.getByRole('link', { name: '文档' });
+    expect(link).toHaveAttribute('href', 'https://example.com/a');
+    expect(link).toHaveAttribute('rel', 'noreferrer noopener');
+    fireEvent.click(link);
+    await waitFor(() => expect(openUrlMock).toHaveBeenCalledWith('https://example.com/a'));
+  });
+
+  // react-markdown 的默认 URL 过滤把 file:/自定义 scheme 清成空 href；渲染层再把空 href
+  // 退化成纯文本，因此这类目标没有可点的锚点。
+  it('file 与自定义 scheme 不渲染成可点链接', () => {
+    render(<Markdown content={'[本地](file:///C:/Windows/System32/calc.exe)'} />);
+    expect(screen.queryByRole('link', { name: '本地' })).toBeNull();
+    expect(screen.getByText('本地')).toBeInTheDocument();
+    expect(openUrlMock).not.toHaveBeenCalled();
   });
 });

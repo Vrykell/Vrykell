@@ -296,6 +296,8 @@ const zh: Record<string, string> = {
   "Temporary tool approvals expire on restart or when cleared.": "临时工具授权在重启或清空后失效。",
   "Deny an approval card that nobody answers within this long.": "审批卡在这段时间内无人应答时自动拒绝。",
   "Approval timeout": "审批等待超时",
+  "Could not open the link.": "打开链接失败。",
+  "Only http, https, mailto and tel links can be opened.": "只允许打开 http、https、mailto、tel 链接，已在应用内拦截。",
   "Allow {{shape}} this conversation": "本会话允许「{{shape}}」",
   "No answer within {{minutes}} minutes, so the request was denied automatically.": "等待 {{minutes}} 分钟无人应答，已自动拒绝本次操作。",
   "No answer within {{minutes}} minutes, so trusting {{skill}} was refused.": "等待 {{minutes}} 分钟无人确认信任「{{skill}}」，已拒绝访问。",
