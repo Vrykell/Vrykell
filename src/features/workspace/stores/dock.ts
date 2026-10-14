@@ -42,16 +42,34 @@ interface PersistedLayout {
   panelWidths: Record<string, number>;
 }
 
-function isValidLayout(data: unknown): data is PersistedLayout {
-  if (!data || typeof data !== 'object') return false;
+/**
+ * Validate a saved layout and drop ids that no longer exist, so removing a panel does not reset
+ * the user's whole arrangement (the missing-id repair below re-adds whatever is still current).
+ */
+function normalizeLayout(data: unknown): PersistedLayout | null {
+  if (!data || typeof data !== 'object') return null;
   const d = data as Record<string, unknown>;
-  return (
-    Array.isArray(d.leftZone) && d.leftZone.every((v: unknown) => typeof v === 'string' && VALID_IDS.includes(v)) &&
-    Array.isArray(d.rightZone) && d.rightZone.every((v: unknown) => typeof v === 'string' && VALID_IDS.includes(v)) &&
-    Array.isArray(d.leftPanels) && d.leftPanels.every((v: unknown) => typeof v === 'string' && PANEL_IDS.includes(v)) &&
-    Array.isArray(d.rightPanels) && d.rightPanels.every((v: unknown) => typeof v === 'string' && PANEL_IDS.includes(v)) &&
-    typeof d.panelWidths === 'object' && d.panelWidths !== null
-  );
+  const zone = (value: unknown): string[] | null =>
+    Array.isArray(value)
+      ? value.filter((id): id is string => typeof id === 'string' && VALID_IDS.includes(id))
+      : null;
+  const panels = (value: unknown): string[] | null =>
+    Array.isArray(value)
+      ? value.filter((id): id is string => typeof id === 'string' && PANEL_IDS.includes(id))
+      : null;
+  const leftZone = zone(d.leftZone);
+  const rightZone = zone(d.rightZone);
+  const leftPanels = panels(d.leftPanels);
+  const rightPanels = panels(d.rightPanels);
+  if (!leftZone || !rightZone || !leftPanels || !rightPanels) return null;
+  if (typeof d.panelWidths !== 'object' || d.panelWidths === null) return null;
+  return {
+    leftZone,
+    rightZone,
+    leftPanels,
+    rightPanels,
+    panelWidths: d.panelWidths as Record<string, number>,
+  };
 }
 
 const DEFAULTS: PersistedLayout = {
@@ -70,20 +88,22 @@ function loadLayout(): PersistedLayout {
   }
   if (!raw) return DEFAULTS;
   const parsed = safeJsonParse<unknown>(raw);
-  if (!isValidLayout(parsed)) {
+  const normalized = normalizeLayout(parsed);
+  if (!normalized) {
     console.warn('[dock] layout data corrupted, resetting to defaults');
     return DEFAULTS;
   }
+  const widthPreset = (parsed as { widthPreset?: unknown } | null)?.widthPreset;
   // Preserve saved placement, repair duplicate entries, and add missing actions.
   const layout: PersistedLayout = {
-    leftZone: [...new Set(parsed.leftZone)],
-    rightZone: [...new Set(parsed.rightZone)].filter(id => !parsed.leftZone.includes(id)),
-    leftPanels: [...parsed.leftPanels],
-    rightPanels: [...parsed.rightPanels],
-    panelWidths: { ...parsed.panelWidths },
+    leftZone: [...new Set(normalized.leftZone)],
+    rightZone: [...new Set(normalized.rightZone)].filter(id => !normalized.leftZone.includes(id)),
+    leftPanels: [...normalized.leftPanels],
+    rightPanels: [...normalized.rightPanels],
+    panelWidths: { ...normalized.panelWidths },
   };
   // Apply compact defaults once to oversized legacy widths, then retain future resizing.
-  if (parsed.widthPreset !== 'compact') {
+  if (widthPreset !== 'compact') {
     for (const [id, width] of Object.entries(layout.panelWidths)) {
       const defaultWidth = PANEL_DEFS[id]?.width;
       if (defaultWidth && width > defaultWidth) layout.panelWidths[id] = defaultWidth;

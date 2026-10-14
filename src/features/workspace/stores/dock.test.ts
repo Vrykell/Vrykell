@@ -288,6 +288,22 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
     expect(reloaded.getState().rightPanels).toEqual(['chat']);
   });
 
+  it('keeps a saved layout whose panel no longer exists, dropping only that id', async () => {
+    localStorage.removeItem('dock-layout-v3');
+    localStorage.setItem('dock-layout-v4', JSON.stringify({
+      leftZone: ['tabs', 'usage'], rightZone: ['files', 'usage'],
+      leftPanels: ['usage'], rightPanels: ['files'], panelWidths: { usage: 400 }, widthPreset: 'compact',
+    }));
+    const store = await freshStore();
+    const s = store.getState();
+    // 已移除的面板被丢弃，其余位置保留；缺失的按钮按默认补齐
+    expect(s.leftZone).toEqual(['tabs', 'ssh']);
+    expect(s.rightZone).toEqual(['files', 'chat', 'settings']);
+    expect(s.leftPanels).toEqual([]);
+    expect(s.rightPanels).toEqual(['files']);
+    expect(s.panelWidths).toEqual({ usage: 400 });
+  });
+
   it('repairs duplicated buttons and places saved open panels on their configured side', async () => {
     localStorage.setItem('dock-layout-v4', JSON.stringify({
       leftZone: ['chat', 'chat'], rightZone: ['files', 'chat', 'files', 'tabs', 'ssh'],
