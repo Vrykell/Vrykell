@@ -53,7 +53,7 @@ Already split into single-file modules by domain (ai/fs/file_open/history/ssh/pt
 | `search.rs` | The content-match context slice was not aligned to UTF-8 boundaries, causing a panic when searching Chinese files | Align with `floor/ceil_char_boundary` |
 | `ai.rs` | SSE decoded each chunk independently with `from_utf8_lossy`, causing multibyte corruption | Buffer bytes, split complete lines on `\n`, then decode |
 | `ai.rs` | HTTP requests had no timeout | `connect_timeout(15s)` + `timeout(180s)` |
-| `ai.rs` | Permissions were not tightened for the API key stored in `config.json` | Directory 0700, file 0600 |
+| `ai.rs` | Permissions were not tightened for the API key stored in `config.json` | Directory 0700, file 0600; keys now live outside the file in the platform secret store (DPAPI / keychain / 0600 file) |
 | `fs.rs` | `which_cmd_sync` hardcoded zsh | Changed to `/bin/sh` |
 | `search/registry.ts` | The enabled set of filter sources was non-reactive; results did not update after toggling | Changed to a zustand store + re-search after toggling |
 | `lib/sessionManager.ts` | Restoring a session lost shell/SSH metadata | `restore` accepts `RestoreMeta`; the undo-close path backfills it |
