@@ -310,7 +310,7 @@ Fitting that clears the renderer before resizing causes an additional blank fram
 - `restore()` writes only `{id,title,kind,cwd}`, so the shellType/ssh metadata is lost → an SSH/a specified-shell tab comes back spawning the default shell. `RestoreMeta` was added to fill this in; blocks in the old persistence that lack a paneId are "visible only in the panel and don't enter the block stream" (`sessionManager.ts:178`).
 
 ### 8.9 API Keys Plaintext in config.json with Fully Open Permissions (`security-review.md`)
-- After writing to disk, the directory is 0700 and the file 0600. SSH passwords get more thorough treatment: moved into the system keychain (`secret.rs`), with only a redacted marker left in the DB, and existing plaintext in old databases migrated automatically.
+- Fixed: API keys now join SSH passwords in the platform secret store (`secret.rs`) — DPAPI-sealed into `secrets.json` on Windows (only the current user can unseal), the system keychain on macOS, and a 0600 file elsewhere (no system keyring there; a documented limitation). `config.json` uses `skip_serializing` and no longer carries keys, with the old plaintext migrated once at startup; the directory stays 0700 and the file 0600 as defence in depth. An older build cannot read migrated keys (it shows "not configured"), so the key has to be entered again there.
 
 ---
 
