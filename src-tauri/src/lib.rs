@@ -207,6 +207,7 @@ pub fn run() {
             files::fs::read_attachment,
             files::fs::import_attachment,
             files::grants::pick_path,
+            agent::acp::acp_handshake,
             files::file_open::file_open,
             files::file_open::file_open_with,
             commands::search::search_files,
