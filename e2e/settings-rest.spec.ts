@@ -135,6 +135,20 @@ test.describe('模型权限页', () => {
     expect(await runRow.getByRole('combobox').textContent()).toContain('禁止');
   });
 
+  test('审批等待超时可选并持久化', async ({ page }) => {
+    await gotoSetting(page, '模型权限');
+    const select = page.getByTestId('approval-timeout-select');
+    await expect(select).toContainText('5 分钟');
+    await select.click();
+    await page.getByRole('option', { name: '10 分钟' }).click();
+    // 设置落在本地（审批桥与原生确认共用这一个值）
+    await expect.poll(async () => page.evaluate(() => {
+      const raw = localStorage.getItem('vrykell-permissions');
+      return raw ? (JSON.parse(raw) as { state?: { approvalTimeoutSeconds?: number } }).state?.approvalTimeoutSeconds : null;
+    })).toBe(600);
+    await expect(select).toContainText('10 分钟');
+  });
+
   test('清空会话授权按钮提示成功', async ({ page }) => {
     await gotoSetting(page, '模型权限');
     await page.getByRole('button', { name: '清空会话授权' }).click();
