@@ -483,12 +483,13 @@ button.window-control-button {
 .chat-empty > svg { color: var(--chat-rail); }
 .chat-empty > strong { color: var(--text-primary); font-size: var(--fs-label); font-weight: var(--fw-semibold); }
 .chat-background-task { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 12px; background: var(--hover); color: var(--text-secondary); font-size: var(--fs-caption); }
-/* Rounded jump-to-latest control: only the label and arrow show while its strip is hovered
-   or focused, so it never parks a box or a filled mask over the transcript background. */
+/* Rounded jump-to-latest control: the slot keeps its height in both states (so pausing or
+   resuming the follow never shifts the transcript) and the button appears with the pointer. */
 .chat-jump-slot { display: flex; align-items: center; justify-content: center; flex-shrink: 0; padding: 4px 0; }
-.chat-jump-latest { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 0; border-radius: 999px; background: transparent; color: var(--text-muted); font-size: var(--fs-caption); opacity: 0; transition: opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
-.chat-jump-slot:is(:hover, :focus-within) .chat-jump-latest { opacity: 1; color: var(--text-secondary); }
-.chat-jump-latest:is(:hover, :focus-visible) { background: var(--hover); color: var(--text-primary); }
+.chat-jump-latest { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 0; border-radius: 999px; background: transparent; color: var(--text-muted); font-size: var(--fs-caption); opacity: 0; visibility: hidden; transition: opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+.chat-jump-slot[data-active] > .chat-jump-latest { visibility: visible; }
+.chat-jump-slot[data-active]:is(:hover, :focus-within) > .chat-jump-latest { opacity: 1; color: var(--text-secondary); }
+.chat-jump-slot[data-active] > .chat-jump-latest:is(:hover, :focus-visible) { background: var(--hover); color: var(--text-primary); }
 .chat-composer-wrap { padding: 8px 10px 12px; flex-shrink: 0; }
 .chat-composer { padding: 10px 12px 8px; }
 .chat-composer-input { display: flex; align-items: flex-start; gap: 10px; min-height: 32px; }

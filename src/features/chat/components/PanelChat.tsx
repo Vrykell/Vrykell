@@ -209,12 +209,15 @@ export default function PanelChat() {
             <span>{loading ? t('Loading conversations…') : t('Ask a question, attach a file, or bring in terminal output.')}</span></div>}
       </div>
     </div>
-    {!following && <div className="chat-jump-slot">
-      <button type="button" data-subtle className="chat-jump-latest" onClick={() => {
-        followRef.current = true; setFollowing(true);
-        if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-      }}>{t('Jump to latest reply')}<ArrowDown size={14} /></button>
-    </div>}
+    {/* The slot always keeps its height: mounting it only when the follow pauses would
+        shift the transcript by its own height and make sticking to the bottom jitter. */}
+    <div className="chat-jump-slot" data-active={!following || undefined}>
+      <button type="button" data-subtle className="chat-jump-latest" aria-hidden={following || undefined}
+        tabIndex={following ? -1 : 0} onClick={() => {
+          followRef.current = true; setFollowing(true);
+          if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }}>{t('Jump to latest reply')}<ArrowDown size={14} /></button>
+    </div>
     <div className="chat-composer-wrap">
       <div className="terminal-composer chat-composer">
         <div className="terminal-composer-heading"><span>{t('AI chat')}</span><span className="composer-key-hints"><KeyHint shortcut="Enter" />{t('Send')}</span></div>

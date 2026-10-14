@@ -243,6 +243,34 @@ test('reading earlier content pauses automatic scroll until the user returns to 
   await expect.poll(() => transcript.evaluate(element => element.scrollHeight - element.scrollTop - element.clientHeight)).toBeLessThan(25);
 });
 
+test('pausing and resuming the follow never shifts the transcript layout', async ({ page }) => {
+  await boot(page, Array.from({ length: 80 }, (_, index) => `Paragraph ${index}: review the project configuration.\n\n`).join(''));
+  await page.locator('[data-chat-composer]').fill('Explain the project');
+  await page.locator('[data-chat-composer]').press('Enter');
+  const transcript = page.locator('.chat-transcript');
+  const jump = page.getByRole('button', { name: '回到最新回复' });
+  await expect.poll(() => transcript.evaluate(element => element.scrollHeight - element.clientHeight)).toBeGreaterThan(200);
+  const layout = () => transcript.evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    return {
+      box: `${Math.round(rect.top)}/${Math.round(rect.height)}`,
+      slot: document.querySelector('.chat-jump-slot')?.getAttribute('data-active') ?? null,
+    };
+  });
+  const following = await layout();
+  expect(following.slot).toBeNull();
+  await expect(jump).toHaveCSS('visibility', 'hidden');
+  // Pausing the follow must not add or remove a row above the transcript: the jump target
+  // keeps its reserved height so the content cannot bob up and down.
+  await transcript.evaluate(element => { element.scrollTop -= 120; element.dispatchEvent(new Event('scroll')); });
+  await expect.poll(async () => (await layout()).slot).toBe('true');
+  expect((await layout()).box).toBe(following.box);
+  await expect(jump).toHaveCSS('visibility', 'visible');
+  await jump.click();
+  await expect.poll(async () => (await layout()).slot).toBeNull();
+  expect((await layout()).box).toBe(following.box);
+});
+
 test('a small scroll while the reply streams keeps the reading position', async ({ page }) => {
   // A mouse wheel moves far enough to leave the "still near the bottom" window, but a
   // trackpad nudges a few pixels at a time: the follow has to pause on the input itself.
