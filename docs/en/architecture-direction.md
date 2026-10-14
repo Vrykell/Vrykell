@@ -47,3 +47,7 @@ src/
 5. Clean up the compatibility layer, split lazy-loading boundaries by Feature, and address build artifact size.
 
 This phase has completed the migration of directories, aliases, entries, platform adaptation, and architecture gates as runnable vertical slices.
+
+## Related documents
+
+- [Connecting external harnesses (Agent Client Protocol)](./acp-harness-integration.md): the design for bringing external agent processes into the workspace (protocol essentials, permission mapping, usage stance, phased plan).

@@ -47,3 +47,7 @@ src/
 5. 清理兼容层，按 Feature 拆分懒加载边界，处理构建产物体积。
 
 本阶段已按可运行的垂直切片完成目录、别名、入口、平台适配和架构门禁迁移。
+
+## 相关文档
+
+- [接入外部 harness（Agent Client Protocol）](./acp-harness-integration.md)：把外部 agent 进程接进工作区的设计（协议要点、权限映射、用量口径、分阶段计划）。
