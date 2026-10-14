@@ -90,6 +90,12 @@
 - **Root cause**: `term.paste()` means "write **pasted text**": when the foreground program enabled bracketed paste (DECSET 2004, which real CLIs do), xterm wraps the payload in `\x1b[200~…\x1b[201~`. The image path sends a **key** (`\x16`, Ctrl+V), and once wrapped the program only sees a pasted text character.
 - **Fix**: the image path bypasses the terminal and writes `ptyWrite(sessionId, '\x16')` directly; text keeps going through `term.paste()` so bracketed paste and line-ending normalization survive. Regression coverage: `terminal-paste-focus.spec.ts` now enables `\x1b[?2004h` in the TUI and asserts the PTY receives the bare `\x16` (reverting to `paste()` yields `\x1b[200~\x16\x1b[201~` and fails); `terminalClipboard.test.ts` gained the "a registered terminal instance must still get a raw write" case — the old test only covered the no-terminal fallback, which is why it stayed green.
 
+### 2.13 A whole paste as one `pty_write` → the interrupt queues behind all of it (`terminalWriteQueue.ts`)
+- **Symptom**: after pasting a large block the terminal looks stuck: Ctrl+C does nothing until the whole payload has been written, and with a foreground program that never reads stdin it never happens at all.
+- **Root cause**: `term.paste()` fires one `onData`, which sent one `ptyWrite`. On the Rust side `write_all` does not return until the consumer has taken the whole payload and holds the writer lock meanwhile, so every later write of that session — `\x03` included — waits behind it. The IPC payload and the blocking thread grow with the paste too.
+- **Fix**: terminal input goes through `terminalWriteQueue` (16K code units per chunk, split on code points, serialized per session): a slow consumer only holds back the chunk in flight, and `\x03` drops the unsent remainder before it is queued. Multi-line and over-64K pastes ask first through `PasteConfirmHost`. Regression coverage: `terminalWriteQueue.test.ts`, `terminalClipboard.test.ts`, `PasteConfirmHost.test.tsx`, `terminal-paste-large.spec.ts`.
+- **Lesson**: "one action, one write" is fine while the payload is small, but once the user decides the size it wrecks cancellation — being interruptible requires the write itself to be divisible.
+
 ---
 
 ## 3. PTY / resize / Dimensions

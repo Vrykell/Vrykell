@@ -90,6 +90,12 @@
 - **根因**：`term.paste()` 的语义是「写入**粘贴文本**」：前台程序开了 bracketed paste（DECSET 2004，真实 CLI 基本都会开）时 xterm 会把内容包成 `\x1b[200~…\x1b[201~`。而图片路径送的是**按键** `\x16`（Ctrl+V），被包起来后程序只会当成粘贴进来的文本字符。
 - **修复**：图片路径绕开终端、直接 `ptyWrite(sessionId, '\x16')`；文本仍走 `term.paste()`，保住 bracketed paste 与换行归一化。回归：`terminal-paste-focus.spec.ts` 现在先在 TUI 里开 `\x1b[?2004h`，断言 PTY 收到的就是裸 `\x16`（改回 `paste()` 会变成 `\x1b[200~\x16\x1b[201~` 而失败）；`terminalClipboard.test.ts` 补了「终端实例已注册时也必须裸写」的用例 —— 旧用例只覆盖「没有终端实例」的兜底分支，所以一直绿。
 
+### 2.13 整段粘贴一次 `pty_write` → 中断排在整段后面（`terminalWriteQueue.ts`）
+- **现象**：粘一大段文本后终端像卡住：按 Ctrl+C 没反应，要等整段送完才轮到中断键；前台进程不读 stdin 时要等到会话结束。
+- **根因**：`term.paste()` 一次 `onData`、一次 `ptyWrite`。Rust 侧 `write_all` 在消费者读完这一整段之前不返回，且一直握着 writer 锁，同一会话后续写入（含 `\x03`）只能排它后面；IPC 载荷与 blocking 线程也跟整段一起涨。
+- **修复**：终端输入统一走 `terminalWriteQueue`（16K 码元分块、按码点切分、同会话串行）：慢消费者只压住当前块，`\x03` 先丢弃未送出的余块再插队；多行 / 超 64K 粘贴先经 `PasteConfirmHost` 确认。回归：`terminalWriteQueue.test.ts`、`terminalClipboard.test.ts`、`PasteConfirmHost.test.tsx`、`terminal-paste-large.spec.ts`。
+- **教训**：「一次动作一次写入」在小数据上没问题，一旦数据量由用户决定就会拖垮取消语义 —— 可中断性要求写入本身可分。
+
 ---
 
 ## 三、PTY / resize / 尺寸

@@ -500,6 +500,9 @@ const zh: Record<string, string> = {
   'terminal.clipboard.copyFailed': '复制失败',
   'terminal.clipboard.pasteFailed': '粘贴失败',
   'terminal.clipboard.noSession': '终端尚未连接，无法粘贴',
+  'terminal.clipboard.confirmPasteTitle': '粘贴大段内容？',
+  'terminal.clipboard.confirmPasteLines': '即将粘贴 {{lines}} 行、共 {{chars}} 个字符。当前程序未请求括号粘贴，内容会像键盘输入一样逐行执行。',
+  'terminal.clipboard.confirmPasteSize': '即将粘贴 {{lines}} 行、共 {{chars}} 个字符，内容较大，写入需要一些时间。',
   'terminal.processExited': '[进程已退出]',
 
   // ── SSH 连接页 ──

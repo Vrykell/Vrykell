@@ -5,6 +5,7 @@ const writeTextMock = vi.hoisted(() => vi.fn());
 const readTextMock = vi.hoisted(() => vi.fn());
 const ptyWriteMock = vi.hoisted(() => vi.fn());
 const hasImageMock = vi.hoisted(() => vi.fn());
+const requestConfirmMock = vi.hoisted(() => vi.fn());
 const toasts = vi.hoisted(() => [] as Array<{ message: string; kind: string }>);
 
 vi.mock('@platform/clipboard', () => ({
@@ -13,6 +14,7 @@ vi.mock('@platform/clipboard', () => ({
   hasClipboardImage: hasImageMock,
 }));
 vi.mock('@platform/pty', () => ({ ptyWrite: ptyWriteMock }));
+vi.mock('@features/terminal/stores/pasteConfirm', () => ({ requestPasteConfirm: requestConfirmMock }));
 vi.mock('@ui/Toast', () => ({
   useToastStore: {
     getState: () => ({
@@ -21,17 +23,25 @@ vi.mock('@ui/Toast', () => ({
   },
 }));
 
-import { copyTerminalSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
+import {
+  copyTerminalSelection,
+  pasteClipboardIntoTerminal,
+  pasteConfirmReason,
+  pasteLineCount,
+} from '@features/terminal/services/terminalClipboard';
 import { termInstances, useTerminalStore } from '@features/terminal/stores/terminal';
 
 function fakeTerm(selection: string): Terminal {
   return { getSelection: () => selection } as unknown as Terminal;
 }
 
-function pasteAwareTerm(): { term: Terminal; paste: ReturnType<typeof vi.fn> } {
+function pasteAwareTerm(bracketedPaste = false): { term: Terminal; paste: ReturnType<typeof vi.fn> } {
   const paste = vi.fn();
-  return { term: { paste } as unknown as Terminal, paste };
+  return { term: { paste, modes: { bracketedPasteMode: bracketedPaste } } as unknown as Terminal, paste };
 }
+
+/** Seven lines, the way a text editor counts them: one more than a paste carries without asking. */
+const LONG_PASTE = 'one\ntwo\nthree\nfour\nfive\nsix\n';
 
 describe('terminalClipboard', () => {
   beforeEach(() => {
@@ -39,6 +49,7 @@ describe('terminalClipboard', () => {
     readTextMock.mockReset().mockResolvedValue('');
     ptyWriteMock.mockReset().mockResolvedValue(undefined);
     hasImageMock.mockReset().mockResolvedValue(false);
+    requestConfirmMock.mockReset().mockResolvedValue(true);
     toasts.length = 0;
     useTerminalStore.setState({ sessions: {}, scenes: {} });
     termInstances.clear();
@@ -76,6 +87,8 @@ describe('terminalClipboard', () => {
     await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(true);
     expect(paste).toHaveBeenCalledWith('line one\nline two\n');
     expect(ptyWriteMock).not.toHaveBeenCalled();
+    // Three lines stay below the confirmation threshold.
+    expect(requestConfirmMock).not.toHaveBeenCalled();
   });
 
   it('uses the running block terminal for paste modes and the main terminal in alternate screen', async () => {
@@ -98,6 +111,82 @@ describe('terminalClipboard', () => {
     readTextMock.mockResolvedValue('echo pasted\n');
     await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(true);
     expect(ptyWriteMock).toHaveBeenCalledWith('sess-1', 'echo pasted\n');
+    // The fallback path is gated the same way: a single line never asks.
+    expect(requestConfirmMock).not.toHaveBeenCalled();
+  });
+
+  it('asks before a multi-line paste when the program did not request bracketed paste', async () => {
+    useTerminalStore.setState({ sessions: { p1: 'sess-1' } });
+    const { term, paste } = pasteAwareTerm(false);
+    termInstances.set('p1', term);
+    readTextMock.mockResolvedValue(LONG_PASTE);
+    let answer: ((confirmed: boolean) => void) | undefined;
+    requestConfirmMock.mockImplementation(() => new Promise<boolean>((resolve) => { answer = resolve; }));
+
+    const pasted = pasteClipboardIntoTerminal('p1');
+    await vi.waitFor(() => expect(requestConfirmMock).toHaveBeenCalledWith({ reason: 'lines', lines: 7, chars: LONG_PASTE.length }));
+    // Nothing reaches the PTY while the question is open.
+    expect(paste).not.toHaveBeenCalled();
+
+    answer!(true);
+    await expect(pasted).resolves.toBe(true);
+    expect(paste).toHaveBeenCalledWith(LONG_PASTE);
+  });
+
+  it('drops the paste when the confirmation is declined', async () => {
+    useTerminalStore.setState({ sessions: { p1: 'sess-1' } });
+    const { term, paste } = pasteAwareTerm(false);
+    termInstances.set('p1', term);
+    readTextMock.mockResolvedValue(LONG_PASTE);
+    requestConfirmMock.mockResolvedValue(false);
+
+    await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(false);
+    expect(paste).not.toHaveBeenCalled();
+    expect(ptyWriteMock).not.toHaveBeenCalled();
+  });
+
+  it('pastes several lines without asking when the program enabled bracketed paste', async () => {
+    useTerminalStore.setState({ sessions: { p1: 'sess-1' } });
+    const { term, paste } = pasteAwareTerm(true);
+    termInstances.set('p1', term);
+    readTextMock.mockResolvedValue(LONG_PASTE);
+
+    await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(true);
+    expect(paste).toHaveBeenCalledWith(LONG_PASTE);
+    expect(requestConfirmMock).not.toHaveBeenCalled();
+  });
+
+  it('asks before a very large paste even with bracketed paste enabled', async () => {
+    useTerminalStore.setState({ sessions: { p1: 'sess-1' } });
+    const { term, paste } = pasteAwareTerm(true);
+    termInstances.set('p1', term);
+    const large = 'x'.repeat(64 * 1024 + 1);
+    readTextMock.mockResolvedValue(large);
+
+    await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(true);
+    expect(requestConfirmMock).toHaveBeenCalledWith({ reason: 'size', lines: 1, chars: large.length });
+    expect(paste).toHaveBeenCalledWith(large);
+  });
+
+  it('does not confirm an image paste', async () => {
+    useTerminalStore.setState({ sessions: { p1: 'sess-1' } });
+    hasImageMock.mockResolvedValue(true);
+
+    await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(true);
+    expect(requestConfirmMock).not.toHaveBeenCalled();
+  });
+
+  it('writes the fallback PTY paste in chunks that reassemble to the payload', async () => {
+    useTerminalStore.setState({ sessions: { p1: 'sess-1' } });
+    const large = 'y'.repeat(16 * 1024 + 4);
+    readTextMock.mockResolvedValue(large);
+
+    await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(true);
+    // Below the confirmation size: the paste goes out in two chunks, in order.
+    expect(requestConfirmMock).not.toHaveBeenCalled();
+    const chunks = ptyWriteMock.mock.calls.map((call) => call[1] as string);
+    expect(chunks.map((chunk) => chunk.length)).toEqual([16 * 1024, 4]);
+    expect(chunks.join('')).toBe(large);
   });
 
   it('refuses to paste before the terminal has a session', async () => {
@@ -136,5 +225,26 @@ describe('terminalClipboard', () => {
 
     expect(ptyWriteMock).toHaveBeenCalledExactlyOnceWith('sess-1', '\x16');
     expect(block.paste).not.toHaveBeenCalled();
+  });
+});
+
+describe('paste confirmation rules', () => {
+  it('counts lines the way a text editor shows them', () => {
+    expect(pasteLineCount('one line')).toBe(1);
+    expect(pasteLineCount('one\ntwo\n')).toBe(3);
+    expect(pasteLineCount('one\r\ntwo')).toBe(2);
+  });
+
+  it('asks from six lines up when the target did not request bracketed paste', () => {
+    expect(pasteConfirmReason('one\ntwo\nthree\nfour', false)).toBeNull();
+    expect(pasteConfirmReason('one\ntwo\nthree\nfour\nfive\n', false)).toBe('lines');
+    expect(pasteConfirmReason('one\ntwo\nthree\nfour\nfive\n', true)).toBeNull();
+  });
+
+  it('asks for a paste above 64K characters whoever receives it', () => {
+    const belowLimit = 'x'.repeat(64 * 1024);
+    expect(pasteConfirmReason(belowLimit, true)).toBeNull();
+    expect(pasteConfirmReason(`${belowLimit}x`, true)).toBe('size');
+    expect(pasteConfirmReason(`${belowLimit}x`, false)).toBe('size');
   });
 });

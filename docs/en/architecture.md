@@ -331,6 +331,7 @@ Dev mode automatically writes `terminal-debug.jsonl`. When troubleshooting a han
 | `src/features/terminal/stores/terminal.ts` | session/dimensions/keyboard routing store + `termInstances` |
 | `src/features/terminal/stores/blocks.ts` | block store |
 | `src/platform/pty.ts` | Tauri IPC wrappers |
+| `src/features/terminal/services/terminalWriteQueue.ts` | terminal input write queue: 16K code units per chunk, serialized per session, drops the unsent remainder on interrupt or close |
 | `src/features/workspace/services/sessionManager.ts` | session/block persistence orchestration |
 | `src/utils/sanitizeHtml.ts` | bidirectional sanitization of outputHtml on persist/render (span whitelist style + br, injection protection) |
 | `src/features/workspace/model/windowLayout.ts` | split-pane layout model (TerminalSpec / pane splitting) |
