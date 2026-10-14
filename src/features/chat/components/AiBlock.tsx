@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '@i18n';
-import { Brain, ChevronRight, Ellipsis, Pencil, RefreshCw, Sparkles, Trash2 } from '@ui/icons';
+import { Brain, ChevronDown, Ellipsis, Pencil, RefreshCw, Sparkles, Trash2 } from '@ui/icons';
 import { IconButton } from '@ui/IconButton';
 import ContextMenu, { type ContextMenuItem } from '@ui/ContextMenu';
 import ErrorBox from '@ui/ErrorBox';
@@ -78,7 +78,7 @@ export default function AiBlock({ exchange, conversationId, presentation = 'bloc
       <span className="command-block-actions ai-block-actions">
         {answer && <IconButton compact aria-expanded={!collapsed} aria-label={t(collapsed ? 'Expand reply' : 'Collapse reply')}
           data-tip={t(collapsed ? 'Expand reply' : 'Collapse reply')} onClick={() => setCollapsed(!collapsed)}>
-          <ChevronRight size={14} style={{ transform: collapsed ? undefined : 'rotate(90deg)' }} />
+          <ChevronDown size={14} style={{ transform: collapsed ? undefined : 'rotate(180deg)', transition: 'transform 0.12s ease' }} />
         </IconButton>}
         {moreButton}
       </span>
@@ -141,7 +141,7 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
   }, [text, open, streaming]);
   return <div className="ai-thinking">
     <button type="button" data-subtle aria-expanded={open} onClick={() => setOpen(!open)}>
-      <ChevronRight size={12} style={{ transform: open ? 'rotate(90deg)' : undefined }} /><Brain size={12} />
+      <ChevronDown size={12} style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 0.12s ease' }} /><Brain size={12} />
       <span>{t('Thinking process')}</span>{!open && <small>{preview}</small>}
     </button>
     {open && <div ref={bodyRef} className="ai-thinking-body md"><SafeMarkdown content={text} paneId={null} /></div>}

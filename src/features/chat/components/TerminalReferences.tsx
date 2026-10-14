@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { t } from '@i18n';
-import { ChevronRight, Terminal, X } from '@ui/icons';
+import { ChevronDown, Terminal, X } from '@ui/icons';
 import { IconButton } from '@ui/IconButton';
 import { useTerminalStore } from '@features/terminal';
 import { showExecutionTerminal } from '../services/conversationContext';
@@ -17,7 +17,7 @@ export default function TerminalReferences({ references, onRemove }: {
       <div className="chat-reference-heading">
         <button type="button" data-subtle className="chat-reference-toggle" aria-expanded={expanded === reference.id}
           onClick={() => setExpanded(expanded === reference.id ? null : reference.id)}>
-          <ChevronRight size={12} style={{ transform: expanded === reference.id ? 'rotate(90deg)' : undefined }} />
+          <ChevronDown size={12} style={{ transform: expanded === reference.id ? 'rotate(180deg)' : undefined, transition: 'transform 0.12s ease' }} />
           <Terminal size={13} /><span>{reference.command || t('Terminal output')}</span>
         </button>
         {onRemove && <IconButton compact aria-label={t('Remove reference')} data-tip={t('Remove reference')}

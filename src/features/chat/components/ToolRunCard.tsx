@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { t, type I18nKey } from '@i18n';
-import { Brain, ChevronRight, FileText, Folder, Globe, Pencil, Search, TerminalPrompt, Wrench } from '@ui/icons';
+import { Brain, ChevronDown, FileText, Folder, Globe, Pencil, Search, TerminalPrompt, Wrench } from '@ui/icons';
 import ErrorBox from '@ui/ErrorBox';
 import CopyButton from '@ui/CopyButton';
 import BlockOutput from '@features/terminal/components/BlockOutput';
@@ -109,7 +109,7 @@ export default function ToolRunCard({ run, paneId, framed = false }: { run: Tool
       onClick={() => setToggled({ state: run.state, open: !open })}>
       {icon}<span className="ai-tool-description">{text}</span>
       {STATES_WITH_CHIP.includes(run.state) && <span style={{ color: chip.color }}>{t(chip.label)}</span>}
-      {expandable && <ChevronRight size={14} style={{ transform: open ? 'rotate(90deg)' : undefined }} />}
+      {expandable && <ChevronDown size={14} style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 0.12s ease' }} />}
     </button>
     {run.state === 'approval-pending' && <div className="ai-tool-approval">
       {run.danger && <div>{run.danger}</div>}

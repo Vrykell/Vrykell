@@ -49,6 +49,18 @@ it('keeps question selection separate from explicit reply collapse', () => {
   expect(screen.getByText('configuration')).toBeInTheDocument();
 });
 
+it('flips the disclosure chevron 180° instead of pointing it sideways', () => {
+  useChatStore.setState({ sendingTab: null });
+  const { container } = render(<AiBlock exchange={exchange} conversationId="conversation" />);
+  const arrow = () => container.querySelector('.ai-block-actions svg') as SVGElement;
+  // 展开时朝上（▴ = 朝下的箭头翻 180°），收起时朝下（▾）——AI 面板的展开箭头统一这一套
+  expect(arrow().style.transform).toBe('rotate(180deg)');
+  fireEvent.click(screen.getByRole('button', { name: '收起回答' }));
+  expect(arrow().style.transform).toBe('');
+  fireEvent.click(screen.getByRole('button', { name: '展开回答' }));
+  expect(arrow().style.transform).toBe('rotate(180deg)');
+});
+
 it('keeps approval actions and failures visible without timeline nodes', () => {
   const { container } = render(<AiBlock conversationId="conversation" exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [
     { kind: 'tool', tool: { toolCallId: 'approval', toolName: 'run_command', input: { command: 'npm run build' }, state: 'approval-pending', startedAt: 1 } },
@@ -66,10 +78,19 @@ it('collapses a failure through the row toggle after showing it by default', () 
   ] } }} />);
   // A failure is readable without expanding anything ...
   expect(screen.getByRole('alert')).toHaveTextContent('Exit code 2');
-  expect(container.querySelector('.ai-tool-summary')).toHaveAttribute('aria-expanded', 'true');
-  fireEvent.click(container.querySelector('.ai-tool-summary')!);
+  const summary = () => container.querySelector('.ai-tool-summary') as HTMLElement;
+  const arrow = () => {
+    const icons = container.querySelectorAll('.ai-tool-summary svg');
+    return icons[icons.length - 1] as SVGElement;
+  };
+  expect(summary()).toHaveAttribute('aria-expanded', 'true');
+  // ... the disclosure arrow is flipped up while expanded (the row's last icon) ...
+  expect(arrow().style.transform).toBe('rotate(180deg)');
+  // ... and collapsing it hides the failure again and points the arrow down.
+  fireEvent.click(summary());
   expect(screen.queryByRole('alert')).toBeNull();
-  expect(container.querySelector('.ai-tool-summary')).toHaveAttribute('aria-expanded', 'false');
+  expect(summary()).toHaveAttribute('aria-expanded', 'false');
+  expect(arrow().style.transform).toBe('');
 });
 
 it('reopens a failure that arrives after the row was collapsed', () => {
