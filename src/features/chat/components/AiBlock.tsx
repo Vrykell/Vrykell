@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '@i18n';
-import { Brain, ChevronRight, Ellipsis, Sparkles } from '@ui/icons';
+import { Brain, ChevronRight, Ellipsis, Pencil, RefreshCw, Sparkles, Trash2 } from '@ui/icons';
 import { IconButton } from '@ui/IconButton';
 import ContextMenu, { type ContextMenuItem } from '@ui/ContextMenu';
 import ErrorBox from '@ui/ErrorBox';
+import CopyButton from '@ui/CopyButton';
 import ConfirmDialog from '@ui/ConfirmDialog';
 import { writeClipboardText } from '@platform/clipboard';
+import { formatMessageTime } from '@utils/formatTime';
 import { useChatStore } from '../stores/chat';
 import { useComposerDrafts } from '../stores/composerDrafts';
 import SafeMarkdown from './SafeMarkdown';
@@ -82,6 +84,11 @@ export default function AiBlock({ exchange, conversationId, presentation = 'bloc
       </span>
     </div>}
     {question && <div className={plain ? 'ai-block-question' : 'command-block-command ai-block-question'} data-selectable>{question.content}</div>}
+    {plain && question && <div className="chat-question-meta">
+      <span>{formatMessageTime(question.createdAt)}</span>
+      <CopyButton className="chat-question-copy" testId="chat-question-copy" text={question.content}
+        label={t('Copy message')} style={{ width: 20, height: 20 }} />
+    </div>}
     {expanded && question?.references?.length ? <TerminalReferences references={question.references} /> : null}
     {expanded && !!question?.attachments?.length && <AttachmentChips atts={question.attachments} previewId={attPreviewId}
       onPreview={id => setAttPreviewId(attPreviewId === id ? null : id)} />}
@@ -98,7 +105,18 @@ export default function AiBlock({ exchange, conversationId, presentation = 'bloc
       </ErrorBox>}
       {answer.stopped && <div className="chat-environment-note">{t('Reply stopped. Terminal commands may still be running.')}</div>}
     </div>}
-    {plain && <div className="chat-exchange-actions">{moreButton}</div>}
+    {plain && answer && !answer.pending && <div className="chat-answer-actions">
+      <CopyButton testId="chat-answer-copy" text={answer.content ?? ''} label={t('Copy')} iconSize={18} style={{ width: 28, height: 28 }} />
+      {!sending && question && <IconButton compact aria-label={t('Regenerate')} data-tip={t('Regenerate')} onClick={regenerate}>
+        <RefreshCw size={18} />
+      </IconButton>}
+      {!sending && question && <IconButton compact aria-label={t('Edit and resend')} data-tip={t('Edit and resend')} onClick={() => setConfirmation('edit')}>
+        <Pencil size={18} />
+      </IconButton>}
+      {!sending && question && <IconButton compact tone="danger" aria-label={t('Delete')} data-tip={t('Delete')} onClick={() => setConfirmation('delete')}>
+        <Trash2 size={18} />
+      </IconButton>}
+    </div>}
     {menu && <ContextMenu anchor={menu} items={actions} onClose={() => setMenu(null)} />}
     {createPortal(<ConfirmDialog open={confirmation !== null} title={t(confirmation === 'delete' ? 'Delete' : 'Edit and resend')}
       confirmLabel={t(confirmation === 'delete' ? 'Delete' : 'Edit and resend')} cancelLabel={t('Cancel')} danger={confirmation === 'delete'}

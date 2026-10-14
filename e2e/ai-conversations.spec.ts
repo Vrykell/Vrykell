@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { mockAnthropic, setupTauriMock, ensureTabsOpen, ptyWrites, ensureChatSettingsOpen } from './tauri-mock';
+import { mockAnthropic, paceLlmStream, setupTauriMock, ensureTabsOpen, ptyWrites, ensureChatSettingsOpen } from './tauri-mock';
 
 async function boot(page: Page, reply = 'The build is fixed.') {
   await mockAnthropic(page, reply);
@@ -117,7 +117,7 @@ test('command analysis stages a reference before sending and never changes termi
 
 for (const themePalette of ['dark', 'light'] as const) {
   test(`plain conversation answers remain readable in ${themePalette}`, async ({ page }) => {
-    await mockAnthropic(page, 'The build failed because the configuration is missing.\n\n```sh\nnpm run build\n```\n\nCheck the configuration and run the build again.');
+    await mockAnthropic(page, 'The build failed because the configuration is missing.\n\n```sh\nnpm run build\n```\n\n| 监听地址 | 含义 |\n| --- | --- |\n| `0.0.0.0:80` | 全网卡、外部可达 |\n| `127.0.0.1:3306` | 仅本机 |\n\nCheck the configuration and run the build again.');
     await setupTauriMock(page);
     await page.goto('/');
     if (themePalette === 'light') {
@@ -135,15 +135,25 @@ for (const themePalette of ['dark', 'light'] as const) {
     expect(await exchange.evaluate(element => getComputedStyle(element, '::before').content)).toBe('none');
     await expect(exchange.locator('.ai-block-heading')).toHaveCount(0);
     await expect(page.locator('html')).toHaveAttribute('data-theme', themePalette);
+    // A table uses the same frame as a code block so the answer reads as one system.
+    const frames = await exchange.evaluate(element => ({
+      code: getComputedStyle(element.querySelector('.md pre')!.parentElement as HTMLElement).borderTopColor,
+      table: getComputedStyle(element.querySelector('.md table') as HTMLElement).borderTopColor,
+    }));
+    expect(frames.table).not.toBe('');
+    expect(frames.table).toBe(frames.code);
     await exchange.locator('.ai-block-question').click();
     await expect(exchange.locator('.ai-block-answer')).toBeVisible();
     await page.locator('.ai-chat-panel').screenshot({ path: `.cache/ai-chat-redesign-${themePalette}.png` });
     await expect(exchange.getByRole('button', { name: '收起回答' })).toHaveCount(0);
-    await exchange.hover();
-    await exchange.getByRole('button', { name: '更多操作' }).click();
-    await expect(page.getByRole('menu')).toBeVisible();
-    await expect(page.getByRole('menu').getByRole('button', { name: '重新生成', exact: true })).toBeVisible();
-    await page.keyboard.press('Escape');
+    // The reply's actions are expanded under the answer rather than hidden in a menu.
+    const actions = exchange.locator('.chat-answer-actions');
+    await expect(actions.getByRole('button', { name: '复制', exact: true })).toBeVisible();
+    await expect(actions.getByRole('button', { name: '重新生成', exact: true })).toBeVisible();
+    // The sent message reveals its clock time and a copy target on hover.
+    await exchange.locator('.ai-block-question').hover();
+    await expect(exchange.locator('.chat-question-meta')).toContainText(/\d{1,2}:\d{2}/);
+    await expect(exchange.getByTestId('chat-question-copy')).toHaveCSS('opacity', '1');
     await expect(exchange.locator('.ai-block-answer')).toBeVisible();
   });
 }
@@ -158,10 +168,14 @@ test('tool activity stays available within the plain conversation flow', async (
     await invoke('save_conversation', { id, title: 'Server discovery', createdAt: now, updatedAt: now, environment: 'null' });
     await invoke('append_conversation_message', { id: 'tool-question', conversationId: id, role: 'user',
       content: 'Help me inspect the services deployed on this server.', createdAt: now, parts: '', attachments: '', paneId: null, context: '{}' });
-    const parts = ['hostname; uname -a', 'ss -tulnp'].map((command, index) => ({ kind: 'tool', tool: {
-      toolCallId: `tool-${index}`, toolName: 'run_command', input: { command }, state: 'done', startedAt: now + index,
-      endedAt: now + index + 1, output: JSON.stringify({ ok: true, exitCode: 0, output: 'Example output' }),
-    } }));
+    const parts = [
+      ...['hostname; uname -a', 'ss -tulnp'].map((command, index) => ({ kind: 'tool', tool: {
+        toolCallId: `tool-${index}`, toolName: 'run_command', input: { command }, state: 'done', startedAt: now + index,
+        endedAt: now + index + 1, output: JSON.stringify({ ok: true, exitCode: 0, output: 'Example output' }),
+      } })),
+      { kind: 'tool', tool: { toolCallId: 'tool-failed', toolName: 'run_command', input: { command: 'cat /etc/hosts' },
+        state: 'error', startedAt: now + 3, error: 'Exit code 2' } },
+    ];
     await invoke('append_conversation_message', { id: 'tool-answer', conversationId: id, role: 'assistant', content: '',
       createdAt: now + 1, parts: JSON.stringify(parts), attachments: '', paneId: null, context: '{}' });
     localStorage.setItem('active-ai-conversation', id);
@@ -169,7 +183,7 @@ test('tool activity stays available within the plain conversation flow', async (
   await page.reload();
   await page.locator('[data-dock-btn="chat"]').click();
   const rows = page.locator('.ai-tool-card');
-  await expect(rows).toHaveCount(2);
+  await expect(rows).toHaveCount(3);
   const presentation = await rows.first().evaluate(element => ({
     background: getComputedStyle(element).backgroundColor,
     radius: getComputedStyle(element).borderRadius,
@@ -195,6 +209,15 @@ test('tool activity stays available within the plain conversation flow', async (
     inner: getComputedStyle(element.firstElementChild as HTMLElement).overflowY,
   }));
   expect(scroll).toEqual({ wrapper: 'auto', inner: 'hidden' });
+  // A failure is readable straight away and can be collapsed again from its own row.
+  const failed = rows.nth(2);
+  await expect(failed.getByRole('alert')).toContainText('Exit code 2');
+  await expect(failed.locator('.ai-tool-summary')).toHaveAttribute('aria-expanded', 'true');
+  await failed.locator('.ai-tool-summary').click();
+  await expect(failed.getByRole('alert')).toHaveCount(0);
+  await expect(failed.locator('.ai-tool-summary')).toHaveAttribute('aria-expanded', 'false');
+  await failed.locator('.ai-tool-summary').click();
+  await expect(failed.getByRole('alert')).toContainText('Exit code 2');
   // The copy target sits in the frame corner and appears with the hovered output.
   const copy = page.getByTestId('tool-output-copy');
   await expect(copy).toHaveCSS('opacity', '0');
@@ -218,4 +241,32 @@ test('reading earlier content pauses automatic scroll until the user returns to 
   expect(await transcript.evaluate(element => element.scrollTop)).toBeLessThan(10);
   await page.getByRole('button', { name: '回到最新回复' }).click();
   await expect.poll(() => transcript.evaluate(element => element.scrollHeight - element.scrollTop - element.clientHeight)).toBeLessThan(25);
+});
+
+test('a small scroll while the reply streams keeps the reading position', async ({ page }) => {
+  // A mouse wheel moves far enough to leave the "still near the bottom" window, but a
+  // trackpad nudges a few pixels at a time: the follow has to pause on the input itself.
+  await mockAnthropic(page, Array.from({ length: 60 }, (_, index) => `Paragraph ${index}: review the project configuration.`).join('\n\n'));
+  await paceLlmStream(page, 8);
+  await setupTauriMock(page, { schedulesSeed: [] });
+  await page.goto('/');
+  await expect(page.locator('[data-terminal-input]')).toBeVisible();
+  await page.locator('[data-dock-btn="chat"]').click();
+  const composer = page.locator('[data-chat-composer]');
+  await composer.fill('Explain the project');
+  await composer.press('Enter');
+
+  const transcript = page.locator('.chat-transcript');
+  const distance = () => transcript.evaluate(element => element.scrollHeight - element.scrollTop - element.clientHeight);
+  await expect.poll(() => transcript.evaluate(element => element.scrollHeight - element.clientHeight), { timeout: 30_000 }).toBeGreaterThan(200);
+  await transcript.hover();
+  await page.mouse.wheel(0, -18);
+
+  // Streamed content keeps arriving; the reading position must not be pulled back down.
+  await expect.poll(distance, { timeout: 10_000 }).toBeGreaterThan(100);
+  const before = await distance();
+  await page.waitForTimeout(800);
+  expect(await distance()).toBeGreaterThanOrEqual(before);
+  await expect(page.locator('.ai-pending-cursor')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: '回到最新回复' })).toBeVisible();
 });

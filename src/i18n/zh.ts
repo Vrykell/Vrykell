@@ -706,6 +706,7 @@ const zh: Record<string, string> = {
   "Terminal disconnected. Select a terminal to continue execution.": "终端已断开，选择终端后可继续执行。",
   "References are snapshots. Execution uses the selected terminal.": "引用保留当时内容，命令在所选终端执行。",
   "Regenerate": "重新生成",
+  "Copy message": "复制消息",
   "Edit and resend": "编辑重发",
   "Remove this question and later messages, then restore the question to the composer?": "删除这条问题及之后的所有对话，将问题填回输入框？",
   "Delete this exchange?": "删除这条问答？",

@@ -81,7 +81,7 @@ import { Flash24Regular } from '@fluentui/react-icons/headless/svg/flash';
 export type AppIconProps = Omit<FluentIconsProps, 'ref'> & { size?: number | string };
 export type AppIcon = ForwardRefExoticComponent<AppIconProps & RefAttributes<SVGSVGElement>>;
 
-export const iconSizes = { navigation: 24, row: 20, control: 18, compact: 16 } as const;
+export const iconSizes = { navigation: 24, row: 20, control: 18, compact: 16, copy: 14 } as const;
 
 /** Preserve native icon geometry while sharing sizing and theme inheritance. */
 function createAppIcon(Icon: FluentIcon): AppIcon {
@@ -175,6 +175,20 @@ export const Star = createAppIcon(Star24Regular);
 export const Store = createAppIcon(BuildingShop24Regular);
 export const Sun = createAppIcon(WeatherSunny24Regular);
 export const Terminal = createAppIcon(WindowConsole20Regular);
+/**
+ * Command mark for run-command rows: the shell tile silhouette (console frame with a
+ * prompt and cursor) drawn as an outline. The Fluent console icon carries a window
+ * title bar, which reads as a window rather than a terminal at row size.
+ */
+export const TerminalPrompt: AppIcon = forwardRef<SVGSVGElement, AppIconProps>(function TerminalPrompt({ size = 24, style, ...props }, ref) {
+  return createElement('svg', { ...props, ref, viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': 'true',
+    style: { width: size, height: size, flexShrink: 0, ...style } },
+    createElement('rect', { x: 1, y: 3, width: 22, height: 18, rx: 3.5, stroke: 'currentColor', strokeWidth: 2 }),
+    createElement('path', {
+      d: 'm6 8 4 4-4 4M12 16h6',
+      stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
+    }));
+});
 export const Trash2 = createAppIcon(Delete24Regular);
 export const TriangleAlert = createAppIcon(Warning24Regular);
 export const Undo2 = createAppIcon(ArrowUndo24Regular);

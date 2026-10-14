@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { t, type I18nKey } from '@i18n';
-import { Brain, Check, ChevronRight, FileText, Folder, Globe, Pencil, Search, Terminal, Wrench } from '@ui/icons';
+import { Brain, ChevronRight, FileText, Folder, Globe, Pencil, Search, TerminalPrompt, Wrench } from '@ui/icons';
 import ErrorBox from '@ui/ErrorBox';
 import CopyButton from '@ui/CopyButton';
 import BlockOutput from '@features/terminal/components/BlockOutput';
@@ -18,13 +18,17 @@ const STATE_CHIP: Record<ToolRunState, { label: I18nKey; color: string }> = {
   denied: { label: 'Denied', color: 'var(--text-muted)' },
 };
 
+/** Quiet outcomes add no text: a finished row shows the exit code, a failure its error box,
+ *  so only work in progress and blocked work need a state word. */
+const STATES_WITH_CHIP: ToolRunState[] = ['running', 'approval-pending', 'denied'];
+
 function str(value: unknown): string { return typeof value === 'string' ? value : ''; }
 
 function summarize(run: ToolRun): { icon: React.ReactNode; text: string } {
   const input = run.input;
-  const size = { size: 13 };
+  const size = { size: 15 };
   switch (run.toolName) {
-    case 'run_command': return { icon: <Terminal {...size} />, text: str(input.command) };
+    case 'run_command': return { icon: <TerminalPrompt {...size} />, text: str(input.command) };
     case 'read_file': return { icon: <FileText {...size} />, text: t('Read {{path}}', { path: str(input.path) }) };
     case 'edit_file': return { icon: <Pencil {...size} />, text: t('Edit {{path}}', { path: str(input.path) }) };
     case 'write_file': return { icon: <Pencil {...size} />, text: t('Write {{path}}', { path: str(input.path) }) };
@@ -38,17 +42,17 @@ function summarize(run: ToolRun): { icon: React.ReactNode; text: string } {
   }
 }
 
-function expandBody(run: ToolRun): { exitCode?: number; body: string } {
+/** Output body shown when a row is expanded; a structured command result carries its own field. */
+function expandBody(run: ToolRun): string {
   if (run.toolName === 'run_command' && run.output && !run.error) {
     try {
       const value: unknown = JSON.parse(run.output);
       if (typeof value === 'object' && value !== null) {
-        const record = value as Record<string, unknown>;
-        return { exitCode: typeof record.exitCode === 'number' ? record.exitCode : undefined, body: str(record.output) };
+        return str((value as Record<string, unknown>).output);
       }
     } catch { /* Unstructured output is displayed verbatim. */ }
   }
-  return { body: run.error ?? run.output ?? '' };
+  return run.error ?? run.output ?? '';
 }
 
 /**
@@ -69,7 +73,7 @@ function CommandOutputBlock({ run, paneId, framed }: { run: ToolRun; paneId?: st
     const id = agentControl.blockForToolCall(run.toolCallId);
     return id && paneId ? state.byTab[paneId]?.find(item => item.id === id) : undefined;
   });
-  const { body } = expandBody(run);
+  const body = expandBody(run);
   const running = run.state === 'running';
   const text = block?.outputText || body;
   return <ToolOutput framed={framed} text={text}>
@@ -87,21 +91,25 @@ function CommandOutputBlock({ run, paneId, framed }: { run: ToolRun; paneId?: st
  * shared code-block frame and therefore drops its own terminal surface.
  */
 export default function ToolRunCard({ run, paneId, framed = false }: { run: ToolRun; paneId?: string; framed?: boolean }) {
-  const [open, setOpen] = useState(false);
+  // A failure starts expanded so a broken call is readable at a glance; an explicit toggle
+  // wins from then on, which also lets the row be collapsed again. The toggle is recorded with
+  // the state it was made in, so a run that fails after being collapsed reopens its error.
+  const [toggled, setToggled] = useState<{ state: ToolRunState; open: boolean } | null>(null);
   const sessions = useTerminalStore(state => state.sessions);
   const { icon, text } = summarize(run);
   const chip = STATE_CHIP[run.state];
-  const { exitCode, body } = expandBody(run);
+  const body = expandBody(run);
   const isCommand = run.toolName === 'run_command';
-  const expandable = isCommand || body.length > 0;
+  const failed = run.state === 'error';
+  const open = toggled?.state === run.state ? toggled.open : failed;
+  const expandable = isCommand || body.length > 0 || failed;
   const truncated = body.length > 6000;
   return <div className="ai-tool-card" data-tool-state={run.state}>
     <button type="button" data-subtle className="ai-tool-summary" aria-expanded={open} disabled={!expandable}
-      onClick={() => setOpen(!open)}>
+      onClick={() => setToggled({ state: run.state, open: !open })}>
       {icon}<span className="ai-tool-description">{text}</span>
-      {isCommand && exitCode != null && <span className="ai-tool-exit" style={{ color: exitCode === 0 ? 'var(--success)' : 'var(--error)' }}><Check size={11} />{exitCode}</span>}
-      <span style={{ color: chip.color }}>{t(chip.label)}</span>
-      {expandable && <ChevronRight size={12} style={{ transform: open ? 'rotate(90deg)' : undefined }} />}
+      {STATES_WITH_CHIP.includes(run.state) && <span style={{ color: chip.color }}>{t(chip.label)}</span>}
+      {expandable && <ChevronRight size={14} style={{ transform: open ? 'rotate(90deg)' : undefined }} />}
     </button>
     {run.state === 'approval-pending' && <div className="ai-tool-approval">
       {run.danger && <div>{run.danger}</div>}
@@ -111,8 +119,8 @@ export default function ToolRunCard({ run, paneId, framed = false }: { run: Tool
         <button type="button" onClick={() => resolveApproval(run.toolCallId, 'deny')}>{t('Deny')}</button>
       </div>
     </div>}
-    {run.state === 'error' && <ErrorBox compact details={body || undefined}>{run.error || t('Tool execution failed')}</ErrorBox>}
-    {open && run.state !== 'error' && (isCommand ? <CommandOutputBlock run={run} paneId={paneId} framed={framed} />
+    {failed && open && <ErrorBox compact details={body || undefined}>{run.error || t('Tool execution failed')}</ErrorBox>}
+    {open && !failed && (isCommand ? <CommandOutputBlock run={run} paneId={paneId} framed={framed} />
       : <ToolOutput framed={framed} text={body}>
         <pre className="ai-tool-output" data-selectable>{truncated ? `${t('Only the end of the output is shown')}\n` : ''}{body.slice(-6000)}</pre>
       </ToolOutput>)}

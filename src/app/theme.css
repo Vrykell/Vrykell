@@ -213,6 +213,8 @@ button.chat-mode-option[data-active="true"] { background: var(--hover); }
 .settings-field[data-layout="row"] > .settings-field-control > .block-appearance-controls { justify-content: space-between; }
 /* Single-choice appearance rows: the active option gets a filled dot. */
 .settings-radio-group { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+/* The theme choices share one row: this control sizes to them instead of the default width. */
+.settings-field-control:has(.settings-radio-group) { width: auto; }
 .settings-radio { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; cursor: pointer;
   border: 1px solid var(--border); border-radius: var(--radius-inner); background: transparent; color: var(--text-secondary);
   font-size: calc(12px * var(--ui-font-scale)); transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
@@ -220,6 +222,9 @@ button.chat-mode-option[data-active="true"] { background: var(--hover); }
 .settings-radio[data-on] { border-color: var(--accent); color: var(--text-primary); }
 .settings-radio-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--text-muted); flex-shrink: 0; }
 .settings-radio[data-on] .settings-radio-dot { border-color: var(--accent); background: var(--accent); }
+/* Follow-system: the dot paints the scheme the OS resolved (the palette is already in it). */
+.settings-radio .settings-radio-dot[data-system] { border-color: var(--border-strong); background: var(--canvas); }
+.settings-radio[data-on] .settings-radio-dot[data-system] { border-color: var(--accent); }
 .settings-field-control .settings-font-row > button { max-width: 100%; }
 .settings-field[data-layout="stacked"] { grid-template-columns: minmax(0, 1fr); }
 .settings-field[data-layout="stacked"] > .settings-field-control { grid-column: 1; grid-row: auto; width: 100%; margin-top: 10px; text-align: left; }
@@ -258,7 +263,9 @@ button.state-icon-button[aria-pressed="true"]:hover { background: var(--selectio
   --workspace-side-reserve: max(var(--workspace-actions-width, 220px), calc(var(--workspace-title-inset) + 64px));
   --workspace-search-preferred: min(34vw, 420px);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) min(var(--workspace-search-preferred), max(32px, calc(100% - var(--workspace-side-reserve) * 2 - var(--workspace-title-gap) * 2))) minmax(0, 1fr);
+  /* The action cluster keeps its intrinsic width so it can never overflow onto the search
+     field (a narrow window squeezes the title instead, which truncates). */
+  grid-template-columns: minmax(0, 1fr) min(var(--workspace-search-preferred), max(32px, calc(100% - var(--workspace-side-reserve) * 2 - var(--workspace-title-gap) * 2))) minmax(max-content, 1fr);
   align-items: center; flex-shrink: 0; height: 48px;
   background: var(--chrome-bg);
   gap: var(--workspace-title-gap); user-select: none;
@@ -469,14 +476,19 @@ button.window-control-button {
 .chat-terminal-status { width: 6px; height: 6px; border-radius: 50%; background: var(--success); flex-shrink: 0; }
 .chat-approval-option-copy { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; font-size: var(--fs-caption); }
 .chat-approval-option-copy > small { color: var(--text-muted); font-size: var(--fs-micro); }
+/* Rename inputs keep their resting border while focused: the caret alone marks focus. */
 .inline-rename-input { flex: 1; min-width: 0; width: 0; background: var(--field-bg); border: 1px solid var(--border); border-radius: 3px; padding: 1px 4px; font-size: calc(13px * var(--ui-font-scale)); color: var(--text-primary); outline: none; font-family: var(--font-ui); }
-.inline-rename-input:focus-visible { border-color: var(--accent); }
 .chat-transcript { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 0 12px; }
 .chat-empty { min-height: 180px; padding: 30px 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--text-muted); text-align: center; font-size: var(--fs-caption); }
 .chat-empty > svg { color: var(--chat-rail); }
 .chat-empty > strong { color: var(--text-primary); font-size: var(--fs-label); font-weight: var(--fw-semibold); }
 .chat-background-task { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 12px; background: var(--hover); color: var(--text-secondary); font-size: var(--fs-caption); }
-.chat-jump-latest { display: flex; align-items: center; gap: 6px; align-self: center; margin: 4px; padding: 6px 10px; border: 0; color: var(--text-primary); background: var(--elevated); font-size: var(--fs-caption); }
+/* Rounded jump-to-latest control: only the label and arrow show while its strip is hovered
+   or focused, so it never parks a box or a filled mask over the transcript background. */
+.chat-jump-slot { display: flex; align-items: center; justify-content: center; flex-shrink: 0; padding: 4px 0; }
+.chat-jump-latest { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 0; border-radius: 999px; background: transparent; color: var(--text-muted); font-size: var(--fs-caption); opacity: 0; transition: opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+.chat-jump-slot:is(:hover, :focus-within) .chat-jump-latest { opacity: 1; color: var(--text-secondary); }
+.chat-jump-latest:is(:hover, :focus-visible) { background: var(--hover); color: var(--text-primary); }
 .chat-composer-wrap { padding: 8px 10px 12px; flex-shrink: 0; }
 .chat-composer { padding: 10px 12px 8px; }
 .chat-composer-input { display: flex; align-items: flex-start; gap: 10px; min-height: 32px; }
@@ -503,8 +515,8 @@ button.window-control-button {
 .chat-input-status [data-testid="pill-name"] > svg:first-child { display: none; }
 .chat-input-status [data-testid="pill-name"]:focus-visible { border-radius: 8px; }
 .chat-input-status .chat-mode-trigger { padding: 0 4px; white-space: nowrap; }
-.ai-chat-panel .chat-input-status > button.chat-send-button { border-radius: 50%; background: var(--text-caret); color: var(--error-text); }
-.ai-chat-panel .chat-input-status > button.chat-send-button:is(:hover, :focus-visible):not(:disabled) { background: color-mix(in srgb, var(--text-caret) 85%, var(--text-primary)); }
+.ai-chat-panel .chat-input-status > button.chat-send-button { border-radius: 50%; background: var(--accent-user); color: var(--text-primary); }
+.ai-chat-panel .chat-input-status > button.chat-send-button:is(:hover, :focus-visible):not(:disabled) { background: color-mix(in srgb, var(--accent-user) 85%, var(--text-primary)); }
 @container (max-width: 300px) {
   .chat-setting-row { align-items: flex-start; flex-direction: column; gap: 4px; }
   .chat-setting-row > .ui-select { flex: auto; width: 100%; }
@@ -537,10 +549,15 @@ button.window-control-button {
 .ai-block-actions { gap: 2px; }
 .ai-block-question { white-space: pre-wrap; overflow-wrap: anywhere; word-break: normal; color: var(--text-primary); font-family: var(--font-ui); font-size: var(--chat-content-font-size, var(--fs-label)); line-height: var(--chat-question-line-height, 1.6); font-weight: var(--fw-semibold); user-select: text; }
 .chat-exchange { min-width: 0; padding: 16px 18px 8px; background: transparent; }
-.chat-exchange > .ai-block-question { width: fit-content; max-width: 90%; margin: 0 0 16px auto; padding: 8px 12px; border-radius: var(--radius-inner); background: var(--hover); font-weight: var(--fw-regular); }
+.chat-exchange > .ai-block-question { width: fit-content; max-width: 90%; margin: 0 0 16px auto; padding: 8px 12px; border-radius: var(--radius-inner); background: var(--accent-user); color: var(--text-primary); font-weight: var(--fw-regular); }
 .chat-exchange > .ai-block-answer { margin: 0; }
-.chat-exchange-actions { display: flex; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; margin-top: 6px; opacity: 0; transition: opacity var(--dur-fast) var(--ease); }
-.chat-exchange:is(:hover, :focus-within, [data-menu-open="true"]) > .chat-exchange-actions { opacity: 1; }
+/* Sent messages carry their time and a copy target, revealed while the bubble is hovered. */
+.chat-question-meta { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin: -12px 0 12px; color: var(--text-muted); font-size: var(--fs-micro); opacity: 0; transition: opacity var(--dur-fast) var(--ease); }
+.chat-exchange:has(> .ai-block-question:hover, > .chat-question-meta:hover, > .chat-question-meta:focus-within) > .chat-question-meta { opacity: 1; }
+/* Finished answers keep their actions in the open, left-aligned under the reply. */
+.chat-answer-actions { display: flex; align-items: center; justify-content: flex-start; gap: 4px; min-width: 0; margin-top: 2px; }
+.chat-answer-actions > button.icon-button { color: var(--text-muted); }
+.chat-answer-actions > button.icon-button:hover { color: var(--text-primary); }
 .ai-block-answer { display: flow-root; color: var(--text-primary); font-family: var(--font-ui); font-size: var(--chat-content-font-size, var(--fs-caption)); line-height: 1.65; overflow-wrap: anywhere; }
 .ai-block-working { display: flex; align-items: center; color: var(--text-muted); font-size: var(--fs-caption); }
 .ai-pending-cursor { display: inline-block; color: var(--chat-rail); animation: pulse 1s infinite; }
@@ -550,11 +567,13 @@ button.window-control-button {
 .ai-thinking small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ai-thinking-body { max-height: 260px; overflow-y: auto; padding: 8px; color: var(--text-secondary); background: var(--hover); font-size: var(--fs-caption); }
 .ai-tool-card { margin: 0; padding: 5px 0; border-top: 1px solid var(--block-divider); background: transparent; }
-.ai-tool-summary { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; padding: 2px 0; border: 0; background: transparent; text-align: left; font-size: var(--fs-micro); color: var(--text-muted); }
+/* Tool rows read at the answer's own size; hovering lifts them from gray to body brightness. */
+.ai-tool-summary { display: flex; align-items: center; gap: 7px; width: 100%; min-width: 0; padding: 3px 0; border: 0; background: transparent; text-align: left; font-family: var(--font-ui); font-size: var(--chat-content-font-size, var(--fs-caption)); color: var(--text-muted); }
 .ai-tool-summary:disabled { opacity: 1; cursor: default; }
 .ai-tool-summary > svg, .ai-tool-summary > span:last-of-type { flex-shrink: 0; }
-.ai-tool-description { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); color: var(--text-secondary); }
-.ai-tool-exit { display: flex; align-items: center; gap: 3px; }
+.ai-tool-description { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); }
+.ai-tool-card:is(:hover, :focus-within) .ai-tool-summary { color: var(--text-secondary); }
+.ai-tool-card:is(:hover, :focus-within) .ai-tool-description { color: var(--text-primary); }
 .ai-tool-frame { position: relative; margin: 4px 0 0; }
 .ai-tool-output { max-height: 240px; overflow: auto; padding: 8px 0; border: 0; border-top: 1px solid var(--block-divider); background: transparent; color: var(--text-secondary); font-family: var(--font-mono); font-size: var(--fs-micro); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .ai-tool-approval { padding: 8px 0 2px; color: var(--warning); font-size: var(--fs-caption); }
@@ -696,15 +715,15 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
   font-size: var(--chat-font-size);
   line-height: 1.6;
 }
-/* 表格：separate 模型才能出圆角；边框收到表格外圈，格内只留行分隔 */
+/* Table: the same frame as a code block (border, radius, flat surface) with row separators only. */
 .md table {
   border-collapse: separate;
   border-spacing: 0;
   margin: 0.5em 0;
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  font-size: 0.92em;
-  /* 与命令块统一背景；撑满容器（阅读宽度上限由 .md 控制），超宽内部横向滚动 */
+  border: 1px solid var(--border);
+  border-radius: var(--radius-inner);
+  font-size: 0.9em;
+  /* Same surface as the command block; the .md reading width still caps the table. */
   background: var(--block);
   display: block;
   width: 100%;
@@ -714,12 +733,12 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 .md th, .md td {
   border: none;
   border-bottom: 1px solid var(--border);
-  padding: 6px 14px;
+  padding: 7px 12px;
   text-align: left;
   min-width: 6em;
 }
 .md tbody tr:last-child td { border-bottom: none; }
-.md th { background: var(--th-bg); font-weight: var(--fw-semibold); color: var(--text-primary); white-space: nowrap; }
+.md th { background: var(--command-block-bg); font-weight: var(--fw-semibold); color: var(--text-primary); white-space: nowrap; }
 .md thead th:first-child { border-top-left-radius: 7px; }
 .md thead th:last-child { border-top-right-radius: 7px; }
 .md tbody tr:hover td { background: var(--hover); }

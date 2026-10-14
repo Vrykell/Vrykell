@@ -435,9 +435,10 @@ export default function FilePanel({
           <IconBtn title="回到上一个视图" data-testid={config.ids.back} disabled={!canGoBack} onClick={goBack}>
             <ArrowUp size={iconSizes.control} />
           </IconBtn>
-          <IconBtn title="更多操作" data-testid={config.ids.more} onClick={openMoreMenu}>
+          {/* The recovery view owns the panel while browsing is impossible: no overflow menu. */}
+          {!error && <IconBtn title="更多操作" data-testid={config.ids.more} onClick={openMoreMenu}>
             <MoreHorizontal size={iconSizes.control} />
-          </IconBtn>
+          </IconBtn>}
         </div>
       </div>
 

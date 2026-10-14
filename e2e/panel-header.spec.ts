@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 import { setupTauriMock, ensureTabsOpen } from './tauri-mock';
 
 const tabIds = (page: import('@playwright/test').Page) =>
-  page.locator('[data-reorder-item][data-reorder-kind="tab"]')
-    .evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.reorderItem));
+  page.locator('[data-tab-row-id]')
+    .evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.tabRowId!));
 
 test('group header count stays on a single line while the header is hovered', async ({ page }) => {
   await setupTauriMock(page);

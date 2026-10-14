@@ -153,3 +153,27 @@ it('keeps a disconnected target visible and never silently chooses another termi
   expect(within(picker).queryByRole('option', { name: /closed-terminal/ })).not.toBeInTheDocument();
   expect(useChatStore.getState().conversations[0]?.environment?.paneId).toBe('closed-terminal');
 });
+
+it('pauses the follow on an upward scroll but not when an inner scroller consumes it', () => {
+  useChatStore.setState({ byTab: { conversation: [
+    { id: 'q', role: 'user', content: 'Explain the build', createdAt: 1 },
+    { id: 'a', role: 'assistant', content: 'The build is fixed.', createdAt: 2 },
+  ] } });
+  const { container } = render(<PanelChat />);
+  const transcript = container.querySelector('.chat-transcript') as HTMLElement;
+  const jumpButton = () => screen.queryByRole('button', { name: '回到最新回复' });
+  expect(jumpButton()).toBeNull();
+
+  // A scroller between the pointer and the transcript absorbs the wheel, so the wheel never
+  // reaches the transcript and the follow stays.
+  const inner = document.createElement('div');
+  inner.style.overflowY = 'auto';
+  Object.defineProperty(inner, 'scrollTop', { value: 40, configurable: true });
+  transcript.appendChild(inner);
+  fireEvent.wheel(inner, { deltaY: -100 });
+  expect(jumpButton()).toBeNull();
+
+  // A wheel the transcript itself receives pauses the follow, however small it is.
+  fireEvent.wheel(transcript, { deltaY: -18 });
+  expect(jumpButton()).not.toBeNull();
+});

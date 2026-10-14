@@ -106,7 +106,7 @@ test.describe('文件面板', () => {
     await expect(page.getByRole('button', { name: '下载管理' })).toBeVisible();
   });
 
-  test('更多菜单：同步到终端目录把面板重新定位回终端 cwd', async ({ page }) => {
+  test('更多菜单：切换到当前终端文件目录把面板重新定位回终端 cwd', async ({ page }) => {
     const tree = page.getByTestId('local-file-tree');
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
 
@@ -116,7 +116,7 @@ test.describe('文件面板', () => {
 
     // 更多 → 同步到终端目录：面板回到终端的 cwd
     await page.getByTestId('local-more-btn').click();
-    await page.getByRole('button', { name: '同步到终端目录', exact: true }).click();
+    await page.getByRole('button', { name: '切换到当前终端文件目录', exact: true }).click();
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
   });
 
