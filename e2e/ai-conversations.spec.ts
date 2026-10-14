@@ -248,7 +248,7 @@ test('pausing and resuming the follow never shifts the transcript layout', async
   await page.locator('[data-chat-composer]').fill('Explain the project');
   await page.locator('[data-chat-composer]').press('Enter');
   const transcript = page.locator('.chat-transcript');
-  const jump = page.getByRole('button', { name: '回到最新回复' });
+  const jump = page.locator('.chat-jump-latest');
   await expect.poll(() => transcript.evaluate(element => element.scrollHeight - element.clientHeight)).toBeGreaterThan(200);
   const layout = () => transcript.evaluate(element => {
     const rect = element.getBoundingClientRect();
@@ -275,7 +275,7 @@ test('a small scroll while the reply streams keeps the reading position', async 
   // A mouse wheel moves far enough to leave the "still near the bottom" window, but a
   // trackpad nudges a few pixels at a time: the follow has to pause on the input itself.
   await mockAnthropic(page, Array.from({ length: 60 }, (_, index) => `Paragraph ${index}: review the project configuration.`).join('\n\n'));
-  await paceLlmStream(page, 8);
+  await paceLlmStream(page, 60);
   await setupTauriMock(page, { schedulesSeed: [] });
   await page.goto('/');
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
@@ -290,11 +290,14 @@ test('a small scroll while the reply streams keeps the reading position', async 
   await transcript.hover();
   await page.mouse.wheel(0, -18);
 
+  // The follow pauses on the input itself rather than on the distance from the bottom.
+  const slot = page.locator('.chat-jump-slot');
+  await expect.poll(() => slot.getAttribute('data-active'), { timeout: 15_000 }).toBe('true');
   // Streamed content keeps arriving; the reading position must not be pulled back down.
-  await expect.poll(distance, { timeout: 10_000 }).toBeGreaterThan(100);
+  await expect.poll(distance, { timeout: 15_000 }).toBeGreaterThan(100);
   const before = await distance();
   await page.waitForTimeout(800);
   expect(await distance()).toBeGreaterThanOrEqual(before);
   await expect(page.locator('.ai-pending-cursor')).toHaveCount(1);
-  await expect(page.getByRole('button', { name: '回到最新回复' })).toBeVisible();
+  await expect(slot.locator('.chat-jump-latest')).toHaveCSS('visibility', 'visible');
 });
