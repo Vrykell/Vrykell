@@ -17,6 +17,7 @@ vi.mock('@tauri-apps/api/core', () => {
 
 import { invoke, Channel } from '@tauri-apps/api/core';
 import { agentStream } from '@features/agent/services/agentStream';
+import { useUsageStore } from '@features/agent/stores/usage';
 
 const mockInvoke = vi.mocked(invoke);
 
@@ -84,6 +85,26 @@ describe('agentStream（mock IPC 边界）', () => {
     await expect(agentStream([{ role: 'user', content: 'hi' }], () => {})).rejects.toThrow(
       'invalid key',
     );
+  });
+
+  it('reports provider usage into the usage store', async () => {
+    setupInvoke(
+      'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n' +
+        'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n' +
+        'data: {"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}\n\n' +
+        'data: [DONE]\n\n',
+    );
+    useUsageStore.setState({ records: [] });
+    await agentStream([{ role: 'user', content: 'hi' }], () => {});
+    expect(useUsageStore.getState().records).toHaveLength(1);
+    expect(useUsageStore.getState().records[0]).toMatchObject({
+      provider: 'openai-compatible',
+      model: 'gpt-4o-mini',
+      inputTokens: 10,
+      outputTokens: 5,
+      steps: 1,
+      toolCalls: 0,
+    });
   });
 
   it('未配 key：抛中文提示', async () => {

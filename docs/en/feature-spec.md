@@ -325,6 +325,7 @@
 | AG8 | Deep thinking | deepThink on (thinkingLevel low/medium/high) passes reasoning parameters through | Adjust per-model deep thinking and thinking level on the model config page then send a message |
 | AG9 | Model selection | The model picker lives on the right of the composer footer, beside send, as a rounded-square control matching the approval button; each model retains its own tool-use override | E2E verifies model switching, conversation controls and compact layouts |
 | AG10 | Independent AI conversations | The Dock AI panel manages the active conversation and explicit execution environment, while a singleton workspace page manages conversation history; Ask AI stages terminal context for review | Start a discussion without a terminal; open a conversation from history; stage a command block and inspect it before sending |
+| AG11 | Usage panel | The sidebar "Usage" panel aggregates assistant turns for today / last 7 days / last 30 days / all time: input, output, cached and reasoning tokens, steps and tool calls, plus a per-model split and the recent turns. Numbers come from the provider's own usage report rather than a local estimate, and the panel can be cleared in one click (the newest 500 turns are kept). The same panel opens from the "Usage" entry in global search | `usageStats.test.ts`, `usage.test.ts` and `UsagePanel.test.tsx` cover range filtering, aggregation and clearing; usage-panel.spec.ts verifies the sidebar entry, the empty state and recorded turns |
 
 ## 17. Skills
 

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { SquareStack, Folder, Server, Sparkles, Settings, type AppIcon } from '@ui/icons';
+import { SquareStack, Folder, Server, Sparkles, Settings, DataUsage, type AppIcon } from '@ui/icons';
+import { t } from '@i18n';
 import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
 import { useWorkspaceStore, isSessionTab } from '@features/workspace/stores/workspace';
 import { minTerminalWidth, MIN_PANE_SIZE } from '@features/workspace/model/windowLayout';
@@ -18,6 +19,7 @@ export const PANEL_DEFS: Record<string, PanelDef> = {
   files: { id: 'files', icon: Folder, label: '资源', width: 200 },
   ssh:   { id: 'ssh',   icon: Server, label: 'SSH', width: 208 },
   chat:  { id: 'chat',  icon: Sparkles, label: 'AI', width: 320 },
+  usage: { id: 'usage', icon: DataUsage, label: t('Usage'), width: 240 },
 };
 
 export type DockSide = 'left' | 'right';
@@ -55,7 +57,7 @@ function isValidLayout(data: unknown): data is PersistedLayout {
 }
 
 const DEFAULTS: PersistedLayout = {
-  leftZone: ['tabs', 'ssh', 'files'], rightZone: ['chat', 'settings'],
+  leftZone: ['tabs', 'ssh', 'files'], rightZone: ['chat', 'usage', 'settings'],
   // Start with the session list; auxiliary panels open on demand.
   leftPanels: ['tabs'], rightPanels: [],
   panelWidths: {},

@@ -325,6 +325,8 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
         lines.push(`data: {"id":"chatcmpl-1","object":"chat.completion.chunk","model":"gpt-4o-mini","choices":[{"index":0,"delta":{"content":${JSON.stringify(p)},"role":"assistant"},"finish_reason":null}]}`);
       }
       lines.push('data: {"id":"chatcmpl-1","object":"chat.completion.chunk","model":"gpt-4o-mini","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}');
+      // Streaming usage arrives on a final chunk without choices (the request asks for it).
+      lines.push('data: {"id":"chatcmpl-1","object":"chat.completion.chunk","model":"gpt-4o-mini","choices":[],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}');
       lines.push('data: [DONE]');
       return lines.join('\n\n') + '\n\n';
     }

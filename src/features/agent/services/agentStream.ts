@@ -24,6 +24,7 @@ import { listSkills, buildSkillsContext, availableSkillMetas } from '@features/a
 import { getMemory, getMemoryJournal, listAgents } from '@features/agent/services/platform';
 import { listMcpTools, buildMcpTool } from '@features/agent/services/mcp';
 import { levelOf, type ToolContext } from '@features/agent/stores/permissions';
+import { useUsageStore } from '@features/agent/stores/usage';
 import type { ToolRunState } from '@features/agent/model/messageParts';
 import { executionPaneSpec } from './executionTarget';
 
@@ -253,6 +254,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   // 步数上限检测：记录完成步数与最后一步 finishReason，用于在静默截断时标明原因
   const stepLimit = hasTools ? Math.max(1, Math.round(settings.maxSteps)) : 0;
   let stepCount = 0;
+  let toolCalls = 0;
   let lastFinishReason: string | undefined;
 
   for await (const part of result.fullStream) {
@@ -283,6 +285,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
         const input = (p.input ?? {}) as Record<string, unknown>;
         const startedAt = Date.now();
         calls.set(p.toolCallId, { toolName: p.toolName, input, startedAt });
+        toolCalls += 1;
         emitTool?.({
           toolCallId: p.toolCallId,
           toolName: p.toolName,
@@ -352,6 +355,27 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     onChunk(
       `\n\n> ⚠️ 已达工具调用上限（${stepLimit} 步），回复可能不完整；可在「AI 行为」页调高最大迭代步数。`,
     );
+  }
+  // Usage accounting: store the token counts the provider reported (not a local
+  // estimate) for the usage panel. Read only after a clean stream — on an aborted or
+  // failed stream the usage promise may never settle.
+  if (streamError == null) {
+    try {
+      const usage = await result.usage;
+      useUsageStore.getState().recordTurn({
+        provider: info.provider,
+        model: info.model,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        cachedInputTokens: usage.inputTokenDetails?.cacheReadTokens,
+        reasoningTokens: usage.outputTokenDetails?.reasoningTokens,
+        steps: stepCount,
+        toolCalls,
+      });
+    } catch (e) {
+      // Usage is optional: never let it fail the turn.
+      console.warn('[agentStream] Could not report token usage:', e);
+    }
   }
   if (streamError != null) {
     console.error('[agentStream] 流式请求失败:', streamError);

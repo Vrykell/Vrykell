@@ -19,6 +19,7 @@ import { SplitVertical24Regular } from '@fluentui/react-icons/headless/svg/split
 import { KeyCommand24Regular } from '@fluentui/react-icons/headless/svg/key-command';
 import { Copy24Regular } from '@fluentui/react-icons/headless/svg/copy';
 import { DeveloperBoard24Regular } from '@fluentui/react-icons/headless/svg/developer-board';
+import { DataUsage24Regular } from '@fluentui/react-icons/headless/svg/data-usage';
 import { ArrowDownload24Regular } from '@fluentui/react-icons/headless/svg/arrow-download';
 import { MoreHorizontal24Regular } from '@fluentui/react-icons/headless/svg/more-horizontal';
 import { Eye24Regular } from '@fluentui/react-icons/headless/svg/eye';
@@ -122,6 +123,7 @@ export const Columns2 = createAppIcon(SplitVertical24Regular);
 export const Command = createAppIcon(KeyCommand24Regular);
 export const Copy = createAppIcon(Copy24Regular);
 export const Cpu = createAppIcon(DeveloperBoard24Regular);
+export const DataUsage = createAppIcon(DataUsage24Regular);
 export const Download = createAppIcon(ArrowDownload24Regular);
 export const Ellipsis = createAppIcon(MoreHorizontal24Regular);
 export const Eye = createAppIcon(Eye24Regular);

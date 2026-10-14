@@ -1,11 +1,12 @@
 import { useTerminalDefaults } from '@config/terminalDefaults';
 import { t } from '@i18n';
-import { TOOL_NAMES, usePermissions, useAgentSettings, type ToolName, type AgentSettings } from '@features/agent';
+import { TOOL_NAMES, usePermissions, useAgentSettings, useUsageStore, type ToolName, type AgentSettings } from '@features/agent';
+import { summarize, totalTokens, formatTokens } from '@features/agent/model/usageStats';
 import { SHELL_TYPES, shellTypeLabel } from '@platform/shells';
 import { useStartupSettings } from '../stores/startup';
 import { isApiKeyConfigured, getModel } from '@features/agent/stores/aiConfig';
 import { loadConfig } from '@features/files/services/fileOpen';
-import { useSessionStore } from '@features/workspace';
+import { useSessionStore, useDockStore } from '@features/workspace';
 import { useTypographyStore } from '@config/typography';
 import { useSettingsNavigationStore } from '../stores/navigation';
 import type { PageId } from '../model/navigation';
@@ -117,3 +118,17 @@ for (const tool of TOOL_NAMES) {
   registerField(`permission-${tool}`, 'ai-perms', label, 'Tool permissions',
     () => usePermissions.getState().levels[tool] ?? 'ask', 'Tool permissions', t('{{tool}} permission', { tool: t(label) }));
 }
+
+// Token usage opens the side panel instead of a settings page, so the entry carries its
+// own action and reports the all-time total as its value.
+registerSetting({
+  id: 'usage',
+  label: t('Usage'),
+  desc: t('Token usage and request counts for AI calls.'),
+  keywords: ['usage', 'token', 'tokens', '用量', '用量统计', 'token 统计'],
+  getValue: () => {
+    const totals = summarize(useUsageStore.getState().records);
+    return t('{{tokens}} tokens in {{count}} requests', { tokens: formatTokens(totalTokens(totals)), count: totals.turns });
+  },
+  onSelect: () => useDockStore.getState().openPanel('usage'),
+});
