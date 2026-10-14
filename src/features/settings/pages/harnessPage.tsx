@@ -18,6 +18,9 @@ export default function HarnessPage() {
   const [list, setList] = useState<HarnessEntry[] | null>(null);
   const [probe, setProbe] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  /** Set once the user changes anything, so the auto-save never writes the freshly loaded list. */
+  const [touched, setTouched] = useState(false);
+  const [problems, setProblems] = useState<string[]>([]);
   const toast = (message: string, tone: 'success' | 'error') => useToastStore.getState().addToast(message, tone);
 
   const reload = useCallback(() => {
@@ -30,8 +33,22 @@ export default function HarnessPage() {
   useEffect(() => { reload(); }, [reload]);
 
   const patch = (index: number, update: Partial<HarnessEntry>) => {
+    setTouched(true);
     setList((current) => current?.map((entry, at) => (at === index ? { ...entry, ...update } : entry)) ?? current);
   };
+
+  // Auto-save: a row that exists on screen has to exist in the file, because the buttons beside it
+  // (test connection, connect) read the file. A broken row is never written down.
+  useEffect(() => {
+    if (!touched || !list) return;
+    const problems = harnessProblems(list);
+    setProblems(problems);
+    if (problems.length > 0) return;
+    const timer = window.setTimeout(() => {
+      void acpHarnessSave(list).catch((error) => toast(String((error as Error)?.message ?? error), 'error'));
+    }, 600);
+    return () => window.clearTimeout(timer);
+  }, [list, touched]);
 
   const save = async () => {
     if (!list) return;
@@ -70,6 +87,9 @@ export default function HarnessPage() {
       <Field layout="stacked" title={t('Configured harnesses')}
         description={t('A harness is a program you add to the list. Adding it is the authorization: it runs with your account, like a command typed into the terminal. Third-party programs are not bundled — install them yourself and follow their licences.')}>
         {list === null && <span style={{ color: 'var(--text-muted)' }}>{t('Loading…')}</span>}
+        {problems.length > 0 && (
+          <span data-testid="harness-problems" style={{ color: 'var(--error)' }}>{problems.join(' · ')}</span>
+        )}
         {list?.length === 0 && (
           <span data-testid="harness-none" style={{ color: 'var(--text-muted)' }}>
             {t('No harness configured yet. Start from a preset below.')}
@@ -95,14 +115,14 @@ export default function HarnessPage() {
                 <button style={btnStyle} data-testid={`harness-connect-${index}`} disabled={!harness.enabled}
                   onClick={() => useSessionStore.getState().openHarnessTab(harness.name)}>{t('Connect')}</button>
                 <button style={btnStyle} data-testid={`harness-remove-${index}`}
-                  onClick={() => setList((current) => current?.filter((_entry, at) => at !== index) ?? current)}>{t('Remove')}</button>
+                  onClick={() => { setTouched(true); setList((current) => current?.filter((_entry, at) => at !== index) ?? current); }}>{t('Remove')}</button>
               </div>
               {probe[harness.name] && <span data-testid={`harness-probe-${index}`} style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-caption)' }}>{probe[harness.name]}</span>}
             </div>
           ))}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-          <button style={btnStyle} data-testid="harness-add" onClick={() => setList((current) => [...(current ?? []), { name: t('New harness'), command: '', args: [], env: {}, cwd: '', enabled: true }])}>
+          <button style={btnStyle} data-testid="harness-add" onClick={() => { setTouched(true); setList((current) => [...(current ?? []), { name: t('New harness'), command: '', args: [], env: {}, cwd: '', enabled: true }]); }}>
             {t('Add an empty row')}
           </button>
           <button style={btnStyle} data-testid="harness-save" disabled={busy} onClick={() => void save()}>{t('Save the list')}</button>
@@ -116,7 +136,7 @@ export default function HarnessPage() {
           {HARNESS_PRESETS.map((preset) => (
             <button key={preset.name} style={btnStyle} data-testid={`harness-preset-${preset.name}`}
               data-tip={`${preset.command} ${preset.args.join(' ')}`} data-tip-description={preset.hint}
-              onClick={() => setList((current) => upsertPreset(current ?? [], preset))}>
+              onClick={() => { setTouched(true); setList((current) => upsertPreset(current ?? [], preset)); }}>
               {preset.name}
             </button>
           ))}
