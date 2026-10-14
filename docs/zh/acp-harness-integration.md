@@ -143,7 +143,7 @@ ACP v1 只提供 **`usage_update`**：会话上下文 `used`/`size`（token）+ 
 | 阶段 | 内容 | 状态 |
 | --- | --- | --- |
 | **P0 协议层** | `agent/acp.rs`：ndjson 编解码、请求关联、通知分发、取消、`initialize` / `session/new` / `session/prompt` / `session/cancel` / 权限应答；harness 配置（`~/.vrykell/harnesses.json`，可手改）+ `acp_handshake` 探测命令 | ✅ **已实现（2026-10-14）**：cargo 单测用内存传输（`tokio::io::duplex`）驱动脚本化假 agent，覆盖握手（并断言我们**没有**声明 fs/terminal）、一轮 prompt 的流式通知、权限请求→选择回传、取消是通知、以及"答不了的请求回 JSON-RPC 错误而不是沉默"。`fs`/`terminal` 处理器属 P2，因此现在**不声明**这两项能力 |
-| **P1 可见可用** | 工作区 harness 标签 + 设置页 harness 分组（含写配置）+ 事件 → ChatMessage/ToolRun 映射 + 停止 | 未开始（协议层的 `new_session`/`prompt`/`cancel`/`next_event` 已就绪并标了 `allow(dead_code)`，等这一阶段接线） |
+| **P1 可见可用** | 工作区 harness 标签 + 设置页 harness 分组（含写配置）+ 事件 → ChatMessage/ToolRun 映射 + 停止 | ◐ **可见的那半边已实现（2026-10-14）**：工作区新增 `harness` 标签（每个 harness 单例），设置页新增「外部 harness」分组（列出 `harnesses.json` 的可运行命令行 + 测试连接 + 连接）；`session/update` 经 `harnessTranscript` 折叠成现有 `ChatMessage[]`，用同一个 `AiBlock` 渲染；输入框 + 停止按钮就绪。**待办**：e2e（假 agent 推事件）、harness 的审批卡接入（P2）、per-message 操作菜单在 harness 下裁剪 |
 | **P2 安全接入** | permission → 审批卡（形态授权 + 超时）+ `fs/*` 走策略 + 危险命令系统确认 | cargo（策略复用）+ vitest（权限映射）+ e2e（危险命令弹确认、无人应答自动拒绝） |
 | **P3 体验** | `session/load` 恢复、模式只读展示、notice/plan、上下文用量条、用量页 `source` | 各层单测 + e2e |
 | **P4 可选** | `terminal/*` 委托（命令经我们的 PTY，危险规则全覆盖）、MCP 透传、elicitation | 视需要 |
