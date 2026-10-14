@@ -6,10 +6,10 @@
  */
 import { useCallback, useMemo, useState } from 'react';
 import {
-  costSeries,
   modelBreakdown,
   recordsInRange,
   summarize,
+  tokensSeries,
   type UsageRange,
 } from '@features/agent/model/usageStats';
 import { useUsageStore } from '@features/agent/stores/usage';
@@ -27,7 +27,7 @@ export function useUsageStats() {
   const totals = useMemo(() => summarize(inRange), [inRange]);
   const models = useMemo(() => modelBreakdown(inRange), [inRange]);
   const recent = useMemo(() => [...inRange].slice(-RECENT_USAGE_ROWS).reverse(), [inRange]);
-  const series = useMemo(() => costSeries(records, range, Date.now()), [records, range]);
+  const series = useMemo(() => tokensSeries(records, range, Date.now()), [records, range]);
   const clear = useCallback(() => useUsageStore.getState().clear(), []);
 
   return { records, range, setRange, totals, models, recent, series, clear };

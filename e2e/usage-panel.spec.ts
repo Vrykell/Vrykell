@@ -40,19 +40,21 @@ test.describe('usage panel', () => {
     await input.press('Enter');
     await expect(page.getByText('已记录')).toBeVisible({ timeout: 10000 });
 
-    // Back to the panel through the same entry: one request at the mocked rate (10 in / 5 out
-    // on gpt-4o-mini), shown as a cost headline plus the per-model breakdown.
+    // Back to the panel through the same entry: one request at the mocked rate (10 in / 5 out),
+    // shown as a token headline plus the per-model breakdown.
     await openUsagePanel(page);
-    await expect(page.getByTestId('usage-total-cost')).toHaveText('<$0.0001');
-    await expect(page.getByTestId('usage-cost-caption')).toContainText('1 次请求');
-    await expect(page.getByTestId('usage-cost-caption')).toContainText('15 tokens');
-    await expect(page.getByTestId('usage-cost-chart')).toBeVisible();
+    await expect(page.getByTestId('usage-total-tokens')).toHaveText('15');
+    await expect(page.getByTestId('usage-caption')).toContainText('1 次请求');
+    await expect(page.getByTestId('usage-caption')).toContainText('输入 10');
+    await expect(page.getByTestId('usage-caption')).toContainText('输出 5');
+    await expect(page.getByTestId('usage-chart')).toBeVisible();
     await expect(page.getByTestId('usage-model-row')).toHaveAttribute('data-model', 'gpt-4o-mini');
     await expect(page.getByTestId('usage-model-input')).toHaveText('10');
     await expect(page.getByTestId('usage-model-output')).toHaveText('5');
-    await expect(page.getByTestId('usage-model-cost')).toHaveText('<$0.0001');
     expect(await page.getByTestId('usage-model-secondary').textContent()).toContain('openai-compatible');
     await expect(page.getByTestId('usage-recent-row')).toHaveCount(1);
+    // 只按 token / 请求计量：面板里不出现金额
+    expect(await page.getByTestId('usage-panel').textContent()).not.toContain('$');
 
     // Switching the range keeps the numbers of the current window.
     await page.getByTestId('usage-range').click();

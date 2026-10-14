@@ -21,38 +21,40 @@ describe('UsagePanel', () => {
     expect(screen.queryByTestId('usage-model-row')).toBeNull();
   });
 
-  it('leads with the estimated cost and breaks it down per model', () => {
+  it('leads with the token total and breaks it down per model', () => {
     useUsageStore.getState().recordTurn({
       provider: 'anthropic', model: 'claude-sonnet-4', inputTokens: 1200, outputTokens: 300,
       cachedInputTokens: 800, steps: 2, toolCalls: 3, at: Date.now(),
     });
     render(<UsagePanel />);
 
-    // (400 fresh × $3 + 800 cached × $0.3 + 300 out × $15) / 1M = $0.00594
-    expect(screen.getByTestId('usage-total-cost')).toHaveTextContent('$0.0059');
-    expect(screen.getByTestId('usage-cost-caption')).toHaveTextContent('1 次请求');
-    expect(screen.getByTestId('usage-cost-caption')).toHaveTextContent('1.5k tokens');
-    expect(screen.getByTestId('usage-cost-chart')).toBeInTheDocument();
+    expect(screen.getByTestId('usage-total-tokens')).toHaveTextContent('1,500');
+    expect(screen.getByTestId('usage-caption')).toHaveTextContent('1 次请求');
+    expect(screen.getByTestId('usage-caption')).toHaveTextContent('输入 1.2k');
+    expect(screen.getByTestId('usage-caption')).toHaveTextContent('输出 300');
+    expect(screen.getByTestId('usage-caption')).toHaveTextContent('缓存命中 800');
+    expect(screen.getByTestId('usage-chart')).toBeInTheDocument();
 
     const row = screen.getByTestId('usage-model-row');
     expect(row).toHaveAttribute('data-model', 'claude-sonnet-4');
     expect(screen.getByTestId('usage-model-requests')).toHaveTextContent('1');
     expect(screen.getByTestId('usage-model-input')).toHaveTextContent('1.2k');
     expect(screen.getByTestId('usage-model-output')).toHaveTextContent('300');
-    expect(screen.getByTestId('usage-model-cost')).toHaveTextContent('$0.0059');
     expect(screen.getByTestId('usage-model-secondary')).toHaveTextContent('anthropic');
     expect(screen.getByTestId('usage-model-secondary')).toHaveTextContent('缓存命中 800');
     expect(screen.getByTestId('usage-recent-row')).toHaveTextContent('claude-sonnet-4');
+    // 只按 token / 请求计量：面板不出现金额
+    expect(screen.queryByText(/\$/)).toBeNull();
   });
 
-  it('marks a model without a known price instead of guessing', () => {
+  it('marks an unpriced model the same way as any other (no cost columns)', () => {
     useUsageStore.getState().recordTurn({
       provider: 'openai-compatible', model: 'internal-preview-model', inputTokens: 500, at: Date.now(),
     });
     render(<UsagePanel />);
-    expect(screen.getByTestId('usage-total-cost')).toHaveTextContent('$0');
-    expect(screen.getByTestId('usage-model-cost')).toHaveTextContent('—');
-    expect(screen.getByTestId('usage-cost-caption')).toHaveTextContent('1 次请求未收录价格');
+    expect(screen.getByTestId('usage-total-tokens')).toHaveTextContent('500');
+    expect(screen.getByTestId('usage-model-row')).toHaveAttribute('data-model', 'internal-preview-model');
+    expect(screen.getByTestId('usage-model-input')).toHaveTextContent('500');
   });
 
   it('filters by range and keeps the older turn under "all"', () => {
@@ -60,11 +62,12 @@ describe('UsagePanel', () => {
     useUsageStore.getState().recordTurn({ provider: 'anthropic', model: 'claude-sonnet-4', inputTokens: 100, at: now });
     useUsageStore.getState().recordTurn({ provider: 'anthropic', model: 'claude-sonnet-4', inputTokens: 100, at: now - 10 * DAY });
     render(<UsagePanel />);
-    expect(screen.getByTestId('usage-cost-caption')).toHaveTextContent('1 次请求');
+    expect(screen.getByTestId('usage-caption')).toHaveTextContent('1 次请求');
 
     fireEvent.click(screen.getByRole('combobox', { name: '统计范围' }));
     fireEvent.click(screen.getByRole('option', { name: '全部' }));
-    expect(screen.getByTestId('usage-cost-caption')).toHaveTextContent('2 次请求');
+    expect(screen.getByTestId('usage-caption')).toHaveTextContent('2 次请求');
+    expect(screen.getByTestId('usage-total-tokens')).toHaveTextContent('200');
     expect(screen.getAllByTestId('usage-recent-row')).toHaveLength(2);
     expect(screen.getByTestId('usage-model-requests')).toHaveTextContent('2');
   });

@@ -2,9 +2,11 @@
  * usageStats — pure aggregation behind the usage panel.
  *
  * Records are written by the streaming turn (`agentStream`) from the token counts the
- * provider reports; nothing here estimates tokens. Auxiliary calls (session titles,
- * command completion, context summaries) are not recorded yet, so the panel states
- * that limitation instead of pretending the numbers are complete.
+ * provider reports; nothing here estimates tokens. The panel counts tokens and requests
+ * only — no money: prices vary per plan and would make the numbers look authoritative
+ * when they are not. Auxiliary calls (session titles, command completion, context
+ * summaries) are not recorded yet, and the panel says so instead of pretending the totals
+ * are complete.
  */
 
 export type UsageRange = 'today' | '7d' | '30d' | 'all';
@@ -20,8 +22,6 @@ export interface UsageRecord {
   /** Input tokens served from the provider's prompt cache. */
   cachedInputTokens: number;
   reasoningTokens: number;
-  /** Estimated USD for the turn; null when the built-in price list does not know the model. */
-  costUsd: number | null;
   /** Completed model steps of the turn. */
   steps: number;
   /** Tool calls issued across those steps. */
@@ -36,10 +36,6 @@ export interface UsageTotals {
   reasoningTokens: number;
   steps: number;
   toolCalls: number;
-  /** Sum of the known turn costs. */
-  costUsd: number;
-  /** Turns whose model has no known price (excluded from `costUsd`). */
-  unknownCostTurns: number;
 }
 
 export interface ModelUsageRow {
@@ -51,8 +47,6 @@ export interface ModelUsageRow {
   outputTokens: number;
   cachedInputTokens: number;
   totalTokens: number;
-  costUsd: number;
-  unknownCostTurns: number;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -88,8 +82,6 @@ export function summarize(records: UsageRecord[]): UsageTotals {
     reasoningTokens: 0,
     steps: 0,
     toolCalls: 0,
-    costUsd: 0,
-    unknownCostTurns: 0,
   };
   for (const record of records) {
     totals.inputTokens += record.inputTokens;
@@ -98,8 +90,6 @@ export function summarize(records: UsageRecord[]): UsageTotals {
     totals.reasoningTokens += record.reasoningTokens;
     totals.steps += record.steps;
     totals.toolCalls += record.toolCalls;
-    if (record.costUsd == null) totals.unknownCostTurns += 1;
-    else totals.costUsd += record.costUsd;
   }
   return totals;
 }
@@ -118,16 +108,12 @@ export function modelBreakdown(records: UsageRecord[]): ModelUsageRow[] {
       outputTokens: 0,
       cachedInputTokens: 0,
       totalTokens: 0,
-      costUsd: 0,
-      unknownCostTurns: 0,
     };
     row.turns += 1;
     row.inputTokens += record.inputTokens;
     row.outputTokens += record.outputTokens;
     row.cachedInputTokens += record.cachedInputTokens;
     row.totalTokens = row.inputTokens + row.outputTokens;
-    if (record.costUsd == null) row.unknownCostTurns += 1;
-    else row.costUsd += record.costUsd;
     rows.set(key, row);
   }
   return [...rows.values()].sort(
@@ -135,43 +121,42 @@ export function modelBreakdown(records: UsageRecord[]): ModelUsageRow[] {
   );
 }
 
-export interface CostBucket {
+export interface UsageBucket {
   /** Bucket start, epoch milliseconds. */
   start: number;
   label: string;
-  costUsd: number;
   tokens: number;
   turns: number;
 }
 
 /** Buckets kept at most; a longer range is charted by its most recent window. */
-export const MAX_COST_BUCKETS = 60;
+export const MAX_USAGE_BUCKETS = 60;
 
 /**
- * Cost per hour (today) or per day (wider ranges), ready for the bar chart.
+ * Tokens per hour (today) or per day (wider ranges), ready for the bar chart.
  *
- * The window is capped at `MAX_COST_BUCKETS` so a long history still renders: the chart shows
+ * The window is capped at `MAX_USAGE_BUCKETS` so a long history still renders: the chart shows
  * the most recent buckets of the selected range.
  */
-export function costSeries(
+export function tokensSeries(
   records: UsageRecord[],
   range: UsageRange,
   now: number,
-): { buckets: CostBucket[]; unit: 'hour' | 'day' } {
+): { buckets: UsageBucket[]; unit: 'hour' | 'day' } {
   const hourly = range === 'today';
   const inRange = recordsInRange(records, range, now);
   const size = hourly ? 60 * 60 * 1000 : DAY_MS;
   const anchorStart = Math.floor(now / size) * size;
-  const firstBucket = anchorStart - (MAX_COST_BUCKETS - 1) * size;
-  const count = MAX_COST_BUCKETS;
-  const buckets: CostBucket[] = [];
-  for (let i = 0; i < count; i += 1) {
+  const firstBucket = anchorStart - (MAX_USAGE_BUCKETS - 1) * size;
+  const buckets: UsageBucket[] = [];
+  for (let i = 0; i < MAX_USAGE_BUCKETS; i += 1) {
     const start = firstBucket + i * size;
-    const hour = new Date(start).getHours();
+    const date = new Date(start);
     buckets.push({
       start,
-      label: hourly ? `${String(hour).padStart(2, '0')}:00` : `${new Date(start).getMonth() + 1}/${new Date(start).getDate()}`,
-      costUsd: 0,
+      label: hourly
+        ? `${String(date.getHours()).padStart(2, '0')}:00`
+        : `${date.getMonth() + 1}/${date.getDate()}`,
       tokens: 0,
       turns: 0,
     });
@@ -180,7 +165,6 @@ export function costSeries(
     const index = Math.floor((record.at - firstBucket) / size);
     const bucket = buckets[index];
     if (!bucket) continue;
-    bucket.costUsd += record.costUsd ?? 0;
     bucket.tokens += record.inputTokens + record.outputTokens;
     bucket.turns += 1;
   }

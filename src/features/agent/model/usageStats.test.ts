@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
-  costSeries,
   formatCompact,
   formatTokens,
-  MAX_COST_BUCKETS,
+  MAX_USAGE_BUCKETS,
   modelBreakdown,
   rangeStart,
   recordsInRange,
   summarize,
+  tokensSeries,
   totalTokens,
   type UsageRecord,
 } from './usageStats';
@@ -24,7 +24,6 @@ function record(patch: Partial<UsageRecord> = {}): UsageRecord {
     outputTokens: 20,
     cachedInputTokens: 0,
     reasoningTokens: 0,
-    costUsd: null,
     steps: 1,
     toolCalls: 0,
     ...patch,
@@ -58,10 +57,10 @@ describe('recordsInRange', () => {
 });
 
 describe('summarize', () => {
-  it('adds tokens, steps, tool calls and known costs', () => {
+  it('adds tokens, steps and tool calls', () => {
     const totals = summarize([
-      record({ inputTokens: 100, outputTokens: 20, cachedInputTokens: 80, reasoningTokens: 5, steps: 2, toolCalls: 1, costUsd: 0.01 }),
-      record({ inputTokens: 50, outputTokens: 10, steps: 1, toolCalls: 3, costUsd: null }),
+      record({ inputTokens: 100, outputTokens: 20, cachedInputTokens: 80, reasoningTokens: 5, steps: 2, toolCalls: 1 }),
+      record({ inputTokens: 50, outputTokens: 10, steps: 1, toolCalls: 3 }),
     ]);
     expect(totals).toEqual({
       turns: 2,
@@ -71,16 +70,13 @@ describe('summarize', () => {
       reasoningTokens: 5,
       steps: 3,
       toolCalls: 4,
-      costUsd: 0.01,
-      unknownCostTurns: 1,
     });
     expect(totalTokens(totals)).toBe(180);
   });
 
   it('reports zeros for an empty window', () => {
     expect(summarize([])).toEqual({
-      turns: 0, inputTokens: 0, outputTokens: 0, cachedInputTokens: 0, reasoningTokens: 0, steps: 0,
-      toolCalls: 0, costUsd: 0, unknownCostTurns: 0,
+      turns: 0, inputTokens: 0, outputTokens: 0, cachedInputTokens: 0, reasoningTokens: 0, steps: 0, toolCalls: 0,
     });
   });
 });
@@ -88,20 +84,17 @@ describe('summarize', () => {
 describe('modelBreakdown', () => {
   it('groups per provider and model, heaviest first', () => {
     const rows = modelBreakdown([
-      record({ provider: 'anthropic', model: 'claude-sonnet-4', inputTokens: 100, outputTokens: 10, cachedInputTokens: 60, costUsd: 0.01 }),
-      record({ provider: 'anthropic', model: 'claude-sonnet-4', inputTokens: 50, outputTokens: 5, costUsd: 0.02 }),
-      record({ provider: 'openai-compatible', model: 'gpt-4o-mini', inputTokens: 900, outputTokens: 100, costUsd: null }),
+      record({ provider: 'anthropic', model: 'claude-sonnet-4', inputTokens: 100, outputTokens: 10, cachedInputTokens: 60 }),
+      record({ provider: 'anthropic', model: 'claude-sonnet-4', inputTokens: 50, outputTokens: 5 }),
+      record({ provider: 'openai-compatible', model: 'gpt-4o-mini', inputTokens: 900, outputTokens: 100 }),
     ]);
     expect(rows.map((row) => row.key)).toEqual(['openai-compatible:gpt-4o-mini', 'anthropic:claude-sonnet-4']);
-    expect(rows[0]).toMatchObject({ turns: 1, costUsd: 0, unknownCostTurns: 1 });
     expect(rows[1]).toMatchObject({
       turns: 2,
       inputTokens: 150,
       outputTokens: 15,
       totalTokens: 165,
       cachedInputTokens: 60,
-      costUsd: expect.closeTo(0.03, 5),
-      unknownCostTurns: 0,
     });
   });
 
@@ -132,26 +125,26 @@ describe('formatCompact', () => {
   });
 });
 
-describe('costSeries', () => {
+describe('tokensSeries', () => {
   const now = new Date(2026, 9, 14, 15, 30, 0).getTime();
 
   it('buckets today by hour and drops the empty lead', () => {
-    const { buckets, unit } = costSeries(
-      [record({ at: now - 60_000, costUsd: 0.02, inputTokens: 10, outputTokens: 5 })],
+    const { buckets, unit } = tokensSeries(
+      [record({ at: now - 60_000, inputTokens: 10, outputTokens: 5 })],
       'today',
       now,
     );
     expect(unit).toBe('hour');
     expect(buckets).toHaveLength(1);
-    expect(buckets[0]).toMatchObject({ costUsd: 0.02, turns: 1, tokens: 15 });
+    expect(buckets[0]).toMatchObject({ tokens: 15, turns: 1 });
     expect(buckets[0]!.label).toBe('15:00');
   });
 
-  it('buckets wider ranges by day and keeps unpriced turns as tokens only', () => {
-    const { buckets, unit } = costSeries(
+  it('buckets wider ranges by day and sums the tokens of each day', () => {
+    const { buckets, unit } = tokensSeries(
       [
-        record({ at: now - 2 * DAY, costUsd: 0.5, inputTokens: 100, outputTokens: 0 }),
-        record({ at: now - 2 * DAY, costUsd: null, inputTokens: 40, outputTokens: 10 }),
+        record({ at: now - 2 * DAY, inputTokens: 100, outputTokens: 0 }),
+        record({ at: now - 2 * DAY, inputTokens: 40, outputTokens: 10 }),
       ],
       '7d',
       now,
@@ -159,19 +152,15 @@ describe('costSeries', () => {
     expect(unit).toBe('day');
     // 数据桶 + 之后到今天的空桶（图会展示到当前时刻）
     expect(buckets).toHaveLength(3);
-    expect(buckets[0]).toMatchObject({ costUsd: 0.5, turns: 2, tokens: 150 });
+    expect(buckets[0]).toMatchObject({ tokens: 150, turns: 2 });
     expect(buckets[0]!.label).toBe('10/12');
-    expect(buckets[1]).toMatchObject({ costUsd: 0, turns: 0 });
+    expect(buckets[1]).toMatchObject({ tokens: 0, turns: 0 });
   });
 
   it('keeps at most the last 60 buckets', () => {
-    const { buckets } = costSeries(
-      [record({ at: now - 200 * DAY, costUsd: 1 })],
-      'all',
-      now,
-    );
-    expect(buckets.length).toBeLessThanOrEqual(MAX_COST_BUCKETS);
+    const { buckets } = tokensSeries([record({ at: now - 200 * DAY })], 'all', now);
+    expect(buckets.length).toBeLessThanOrEqual(MAX_USAGE_BUCKETS);
     // 200 天前的记录落在窗口外，不显示为柱子
-    expect(buckets.every((bucket) => bucket.costUsd === 0)).toBe(true);
+    expect(buckets.every((bucket) => bucket.tokens === 0)).toBe(true);
   });
 });

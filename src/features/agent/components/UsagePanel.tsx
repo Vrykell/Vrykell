@@ -1,11 +1,11 @@
 /**
- * UsagePanel — request, token and cost accounting for AI turns.
+ * UsagePanel — token and request accounting for AI turns.
  *
- * Layout follows the web console's usage page: a total cost headline, a cost-per-hour/day
- * chart, a per-model breakdown with cost, and the recent requests. Numbers come from the
- * provider's own usage report (see `agentStream`); cost is estimated from the built-in price
- * list (`model/pricing.ts`) and a model the list does not know is left out and called out,
- * never guessed. Auxiliary calls (titles, completion, context summaries) are not counted yet.
+ * Layout follows the web console's usage page (headline → chart → per-model table → recent
+ * requests) but counts tokens and requests only: prices differ per plan and a money figure
+ * would look authoritative when it is not. Numbers come from the provider's own usage report
+ * (see `agentStream`); auxiliary calls (titles, command completion, context summaries) are not
+ * counted yet, and the panel says so instead of pretending otherwise.
  */
 import { t, type I18nKey } from '@i18n';
 import { useToastStore } from '@ui/Toast';
@@ -17,10 +17,9 @@ import {
   formatCompact,
   formatTokens,
   totalTokens,
-  type CostBucket,
+  type UsageBucket,
   type UsageRange,
 } from '@features/agent/model/usageStats';
-import { formatUsd } from '@features/agent/model/pricing';
 import { useUsageStats, type UsageStats } from '@features/agent/hooks/useUsageStats';
 
 const RANGE_OPTIONS: Array<{ value: UsageRange; label: I18nKey }> = [
@@ -45,37 +44,34 @@ function SectionTitle({ children }: { children: string }) {
   );
 }
 
-/** Total cost is the headline the console leads with, so it gets the largest type. */
-function CostHeadline({ stats }: { stats: UsageStats }) {
+/** Tokens are the headline, mirroring the console's total-cost block. */
+function TokenHeadline({ stats }: { stats: UsageStats }) {
   const { totals } = stats;
   return (
-    <div data-testid="usage-total-cost-block" style={{ padding: '4px 12px 10px' }}>
+    <div data-testid="usage-total-block" style={{ padding: '4px 12px 10px' }}>
       <div style={{ color: MUTED, fontSize: MICRO, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-        {t('Total cost')}
+        {t('Total tokens')}
       </div>
-      <div data-testid="usage-total-cost" style={{
+      <div data-testid="usage-total-tokens" style={{
         marginTop: 2, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)',
         fontSize: 'calc(24px * var(--ui-font-scale))', lineHeight: 1.2, userSelect: 'text',
       }}>
-        {formatUsd(totals.costUsd)}
+        {formatTokens(totalTokens(totals))}
       </div>
-      <div data-testid="usage-cost-caption" style={{ marginTop: 4, color: MUTED, fontSize: CAPTION }}>
-        {t('{{count}} requests', { count: totals.turns })} · {t('{{tokens}} tokens', { tokens: formatCompact(totalTokens(totals)) })}
-        {totals.unknownCostTurns > 0 && (
-          <span style={{ color: 'var(--accent-warm)' }}>
-            {' · '}{t('{{count}} requests have no known price', { count: totals.unknownCostTurns })}
-          </span>
+      <div data-testid="usage-caption" style={{ marginTop: 4, color: MUTED, fontSize: CAPTION, userSelect: 'text' }}>
+        {t('{{count}} requests', { count: totals.turns })}
+        {' · '}{t('Input')} {formatCompact(totals.inputTokens)}
+        {' · '}{t('Output')} {formatCompact(totals.outputTokens)}
+        {totals.cachedInputTokens > 0 && (
+          <span>{' · '}{t('Cache read')} {formatCompact(totals.cachedInputTokens)}</span>
         )}
       </div>
     </div>
   );
 }
 
-/**
- * Cost per hour (today) or per day (wider ranges) as bars: the console charts the same series
- * with a gradient area, and bars keep sparse data readable at panel width.
- */
-function CostChart({ buckets, unit, peak }: { buckets: CostBucket[]; unit: 'hour' | 'day'; peak: number }) {
+/** Tokens per hour (today) or per day (wider ranges) as bars. */
+function UsageChart({ buckets, unit, peak }: { buckets: UsageBucket[]; unit: 'hour' | 'day'; peak: number }) {
   const width = 100;
   const height = 32;
   const slot = width / Math.max(buckets.length, 1);
@@ -83,13 +79,13 @@ function CostChart({ buckets, unit, peak }: { buckets: CostBucket[]; unit: 'hour
   return (
     <div style={{ padding: '0 12px' }}>
       <svg
-        data-testid="usage-cost-chart" role="img" aria-label={t('Cost chart for the selected range')}
+        data-testid="usage-chart" role="img" aria-label={t('Tokens chart for the selected range')}
         viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none"
         style={{ display: 'block', width: '100%', height: 56, overflow: 'visible' }}
       >
         <rect x={0} y={height - 0.6} width={width} height={0.6} fill="var(--border)" />
         {buckets.map((bucket, index) => {
-          const barHeight = bucket.turns > 0 ? Math.max(2, (bucket.costUsd / scale) * (height - 2)) : 0.6;
+          const barHeight = bucket.turns > 0 ? Math.max(2, (bucket.tokens / scale) * (height - 2)) : 0.6;
           return (
             <rect
               key={bucket.start}
@@ -98,17 +94,19 @@ function CostChart({ buckets, unit, peak }: { buckets: CostBucket[]; unit: 'hour
               fill={bucket.turns > 0 ? 'var(--accent)' : 'var(--border)'}
               opacity={bucket.turns > 0 ? 0.9 : 0.6}
             >
-              <title>{`${bucket.label} · ${formatUsd(bucket.costUsd)} · ${formatTokens(bucket.tokens)} tokens`}</title>
+              <title>{`${bucket.label} · ${formatTokens(bucket.tokens)} tokens · ${t('{{count}} requests', { count: bucket.turns })}`}</title>
             </rect>
           );
         })}
       </svg>
       <div style={{ display: 'flex', justifyContent: 'space-between', color: MUTED, fontSize: MICRO, paddingTop: 2 }}>
         <span>{buckets[0]?.label ?? ''}</span>
-        <span data-testid="usage-cost-peak">{t('Peak {{cost}}', { cost: formatUsd(peak) })}</span>
+        <span data-testid="usage-chart-peak">{t('Peak {{tokens}} tokens', { tokens: formatCompact(peak) })}</span>
         <span>{buckets[buckets.length - 1]?.label ?? ''}</span>
       </div>
-      <div style={{ color: MUTED, fontSize: MICRO, paddingTop: 2 }}>{unit === 'hour' ? t('Hourly cost') : t('Daily cost')}</div>
+      <div style={{ color: MUTED, fontSize: MICRO, paddingTop: 2 }}>
+        {unit === 'hour' ? t('Tokens per hour') : t('Tokens per day')}
+      </div>
     </div>
   );
 }
@@ -116,10 +114,9 @@ function CostChart({ buckets, unit, peak }: { buckets: CostBucket[]; unit: 'hour
 function ModelTable({ stats }: { stats: UsageStats }) {
   const header: Array<{ label: I18nKey; align: 'left' | 'right'; width?: number }> = [
     { label: 'Model', align: 'left' },
-    { label: 'Requests', align: 'right', width: 44 },
-    { label: 'Input', align: 'right', width: 46 },
-    { label: 'Output', align: 'right', width: 46 },
-    { label: 'Cost', align: 'right', width: 58 },
+    { label: 'Requests', align: 'right', width: 48 },
+    { label: 'Input', align: 'right', width: 52 },
+    { label: 'Output', align: 'right', width: 52 },
   ];
   return (
     <div style={{ padding: '0 12px' }}>
@@ -147,17 +144,14 @@ function ModelTable({ stats }: { stats: UsageStats }) {
               {row.cachedInputTokens > 0 && ` · ${t('Cache read')} ${formatCompact(row.cachedInputTokens)}`}
             </span>
           </span>
-          <span data-testid="usage-model-requests" style={{ flex: '0 0 44px', textAlign: 'right', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: MICRO, userSelect: 'text' }}>
+          <span data-testid="usage-model-requests" style={{ flex: '0 0 48px', textAlign: 'right', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: MICRO, userSelect: 'text' }}>
             {row.turns}
           </span>
-          <span data-testid="usage-model-input" style={{ flex: '0 0 46px', textAlign: 'right', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: MICRO, userSelect: 'text' }}>
+          <span data-testid="usage-model-input" style={{ flex: '0 0 52px', textAlign: 'right', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: MICRO, userSelect: 'text' }}>
             {formatCompact(row.inputTokens)}
           </span>
-          <span data-testid="usage-model-output" style={{ flex: '0 0 46px', textAlign: 'right', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: MICRO, userSelect: 'text' }}>
+          <span data-testid="usage-model-output" style={{ flex: '0 0 52px', textAlign: 'right', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: MICRO, userSelect: 'text' }}>
             {formatCompact(row.outputTokens)}
-          </span>
-          <span data-testid="usage-model-cost" style={{ flex: '0 0 58px', textAlign: 'right', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: MICRO, userSelect: 'text' }}>
-            {row.unknownCostTurns === row.turns ? '—' : formatUsd(row.costUsd)}
           </span>
         </div>
       ))}
@@ -167,12 +161,12 @@ function ModelTable({ stats }: { stats: UsageStats }) {
 
 function UsageBody({ stats }: { stats: UsageStats }) {
   const { recent, series } = stats;
-  const peak = Math.max(...series.buckets.map((bucket) => bucket.costUsd), 0);
+  const peak = Math.max(...series.buckets.map((bucket) => bucket.tokens), 0);
   return (
     <>
-      <CostHeadline stats={stats} />
-      <SectionTitle>{series.unit === 'hour' ? t('Hourly cost') : t('Daily cost')}</SectionTitle>
-      <CostChart buckets={series.buckets} unit={series.unit} peak={peak} />
+      <TokenHeadline stats={stats} />
+      <SectionTitle>{series.unit === 'hour' ? t('Tokens per hour') : t('Tokens per day')}</SectionTitle>
+      <UsageChart buckets={series.buckets} unit={series.unit} peak={peak} />
       <SectionTitle>{t('By model')}</SectionTitle>
       <ModelTable stats={stats} />
 
@@ -184,15 +178,13 @@ function UsageBody({ stats }: { stats: UsageStats }) {
           <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-secondary)', fontSize: CAPTION }}>
             {record.model}
           </span>
-          <span style={{ flexShrink: 0, color: MUTED, fontSize: MICRO }}>
-            {formatMessageTime(record.at)} · {formatCompact(totalTokens(record))} · {record.costUsd == null ? '—' : formatUsd(record.costUsd)}
+          <span style={{ flexShrink: 0, color: MUTED, fontSize: MICRO, userSelect: 'text' }}>
+            {formatMessageTime(record.at)} · {formatCompact(totalTokens(record))} · {t('{{count}} steps', { count: record.steps })}
           </span>
         </div>
       ))}
 
       <div style={{ padding: '10px 12px 0', color: MUTED, fontSize: MICRO, lineHeight: 1.6 }}>
-        {t('Cost is estimated from the built-in price list; models without a price are left out of the total.')}
-        <br />
         {t('Counts are reported by the provider. Titles, command completion and context summaries are not counted yet.')}
       </div>
     </>
