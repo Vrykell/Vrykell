@@ -35,9 +35,7 @@ test('AI 草稿和附件按会话保留，关闭面板后仍能继续发送', as
   await expect(page.getByText('任务完成', { exact: true })).toBeVisible();
   await expect(input).toHaveValue('');
   await expect(page.locator('[data-tip="移除附件"]')).toHaveCount(0);
-  await page.locator('.ai-block').hover();
-  await page.locator('.ai-block').getByRole('button', { name: '更多操作' }).click();
-  await page.getByRole('button', { name: '编辑重发' }).click();
+  await page.locator('.ai-block').locator('.chat-answer-actions').getByRole('button', { name: '编辑重发', exact: true }).click();
   await page.getByRole('dialog', { name: '编辑重发' }).getByRole('button', { name: '编辑重发', exact: true }).click();
   await expect(input).toHaveValue('终端一的草稿');
   await expect(page.locator('[data-tip="移除附件"]')).toHaveCount(1);

@@ -26,14 +26,16 @@ test('detailed log export works with disk logging disabled by default', async ({
   expect(Array.isArray(exports[0]?.frontend)).toBe(true);
 });
 
-test('closing the final SSH tab leaves session history without a stale reconnect view', async ({ page }) => {
+test('closing the final tab leaves an empty workspace without a stale reconnect view', async ({ page }) => {
   await setupTauriMock(page, { integration: false });
   await page.addInitScript(() => localStorage.setItem('vrykell-agent-settings', JSON.stringify({ version: 8, state: { global: { sshOpenMode: 'block' }, overrides: {} } })));
   await page.goto('/');
   const initialTab = page.locator('[data-tab-row-id]').first();
   await initialTab.hover();
   await initialTab.locator('[data-testid^="tab-close-"]').click();
-  await expect(page.getByText('会话历史', { exact: true }).first()).toBeVisible();
+  // The last tab closes to the empty workspace: the history page is not opened for it (TB10).
+  await expect(page.locator('[data-tab-row-id]')).toHaveCount(0);
+  await expect(page.getByText('会话历史', { exact: true })).toHaveCount(0);
   await page.locator('[data-dock-btn="ssh"]').click();
   await page.getByTestId('ssh-row-ssh-1').dblclick();
   await expect(page.getByTestId('ssh-connection-input')).toBeVisible();
@@ -43,6 +45,5 @@ test('closing the final SSH tab leaves session history without a stale reconnect
   const closeTab = sshTab.locator('[data-testid^="tab-close-"]');
   await closeTab.click();
   await expect(page.locator('[data-tab-row-id]')).toHaveCount(0);
-  await expect(page.getByText('会话历史', { exact: true }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: '重新连接' })).toHaveCount(0);
 });

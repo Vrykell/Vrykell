@@ -32,10 +32,14 @@ test('运行中块在命令输入框获得焦点后仍保持实心光标', async
   await expect.poll(cursorClass).toContain('xterm-cursor-blink');
   await expect.poll(cursorClass).toContain('xterm-cursor-block');
 
-  // Paste the next command in the composer; focus leaves the running terminal.
-  await input.click();
-  await page.keyboard.insertText('echo next');
-  await expect.poll(() => page.evaluate(() => document.activeElement?.tagName)).toBe('TEXTAREA');
+  // Focus another input: the AI panel composer (the terminal command composer is not
+  // available while a command owns the running scene). Focus leaves the running terminal.
+  await page.locator('[data-dock-btn="chat"]').click();
+  const composer = page.locator('[data-chat-composer]');
+  await composer.click();
+  await composer.fill('echo next');
+  await expect(composer).toBeFocused();
+  await expect(page.getByTestId('running-term').locator('.xterm')).toBeVisible();
 
   // The cursor stays a solid block instead of turning into an invisible outline.
   await expect.poll(cursorClass).toContain('xterm-cursor-block');

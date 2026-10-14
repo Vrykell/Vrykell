@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
 import { t } from '@i18n';
-import { Check, Copy } from '@ui/icons';
+import { Check, Copy, iconSizes } from '@ui/icons';
 import { writeClipboardText } from '@platform/clipboard';
 
 /** Hover feedback shared by the subtle icon buttons. */
@@ -22,7 +22,7 @@ const subtleHover = {
  * (restarted on every click). `label` is the accessible name and the tooltip shown
  * before copying, for example "Copy output"; the confirmed state reads "Copied".
  */
-export default function CopyButton({ text, label, testId, className, style }: {
+export default function CopyButton({ text, label, testId, className, style, iconSize = iconSizes.copy }: {
   /** Raw text written to the clipboard. */
   text: string;
   /** Accessible name and tooltip for the idle state. */
@@ -30,6 +30,8 @@ export default function CopyButton({ text, label, testId, className, style }: {
   testId?: string;
   className?: string;
   style?: CSSProperties;
+  /** Glyph size; the control stays a square target around it. */
+  iconSize?: number;
 }) {
   const [copied, setCopied] = useState(false);
   const copyTimer = useRef<number | null>(null);
@@ -73,6 +75,6 @@ export default function CopyButton({ text, label, testId, className, style }: {
       ...style,
     }}
   >
-    {copied ? <Check size={12} style={{ color: 'var(--success)' }} /> : <Copy size={12} />}
+    {copied ? <Check size={iconSize} style={{ color: 'var(--success)' }} /> : <Copy size={iconSize} />}
   </button>;
 }

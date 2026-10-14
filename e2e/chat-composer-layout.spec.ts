@@ -122,7 +122,7 @@ test('AI composer uses the original terminal composer height with a small blue s
   const send = page.getByRole('button', { name: '发送', exact: true });
   await page.locator('[data-chat-composer]').fill('Review this');
   expect((await send.boundingBox())!.height).toBe((await page.getByRole('button', { name: '添加附件', exact: true }).boundingBox())!.height);
-  const blue = await send.evaluate(element => getComputedStyle(element).getPropertyValue('--text-caret').trim());
+  const blue = await send.evaluate(element => getComputedStyle(element).getPropertyValue('--accent-user').trim());
   await expect(send).toHaveCSS('background-color', blue.startsWith('#')
     ? `rgb(${[1, 3, 5].map(index => parseInt(blue.slice(index, index + 2), 16)).join(', ')})` : blue);
   await page.locator('.workspace-body').screenshot({ path: '.cache/composer-matched-heights.png' });
