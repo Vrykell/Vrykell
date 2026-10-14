@@ -110,9 +110,10 @@ PTY output -> Rust StreamScanner (src-tauri/src/terminal/scan.rs, synchronous)
 The app records structured diagnostics. **Read what is already recorded before asking for a
 reproduction, a hand-run probe or a log by hand.**
 
-- `%LOCALAPPDATA%\com.vrykell.app\logs\diagnostics.jsonl` - IPC calls, PTY writes, scan events,
-  terminal input, scene changes and block transitions, each with a timestamp and a `sequence`
-  number. Older records rotate to `.1` and `.2` beside it.
+- `%LOCALAPPDATA%\com.vrykell.app\logs\diagnostics-<YYYYMMDDTHH>.jsonl` - IPC calls, PTY writes,
+  scan events, terminal input, scene changes and block transitions, each with a timestamp and a
+  `sequence` number. The name carries the UTC hour, so a new segment starts every hour; the newest
+  24 segments (and at most 256 MB) are kept, older ones are pruned.
 - `%APPDATA%\com.vrykell.app\diagnostics.json` holds the `autoSave` flag. Its state belongs to
   the machine: check the records that already exist instead of turning auto-save on again for
   every run.
