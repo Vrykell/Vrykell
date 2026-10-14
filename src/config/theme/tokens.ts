@@ -17,6 +17,15 @@ export interface ThemePalette {
   shellCmdAccent: string;
   shellSshAccent: string;
   shellTileInk: string;
+  /**
+   * Model-vendor marks in the usage tables. They identify a vendor the way the terminal palette
+   * identifies a token, so they carry their brand hue in both themes (a custom theme can still
+   * override them).
+   */
+  brandAnthropic: string;
+  brandOpenai: string;
+  brandGemini: string;
+  brandDeepseek: string;
 
   /** Shared frame for the titlebar and primary navigation. */
   chromeBg: string;
@@ -160,6 +169,11 @@ const dark: ThemePalette = {
   shellCmdAccent: '#E4E8F1',
   shellSshAccent: '#61DCCB',
   shellTileInk: '#15171D',
+
+  brandAnthropic: '#D97757',
+  brandOpenai: '#10A37F',
+  brandGemini: '#7FA8F5',
+  brandDeepseek: '#7C88F8',
 
   // Content, navigation, panels, overlays and fields have distinct roles; the frame is lighter than navigation.
   chromeBg: '#303030',
@@ -320,6 +334,12 @@ const light: ThemePalette = {
   shellSshAccent: '#61DCCB',
   shellTileInk: '#15171D',
 
+  // 浅色下沿用同一品牌色，色相可辨识、作为标记（非正文）对比度足够。
+  brandAnthropic: '#C2643F',
+  brandOpenai: '#0E8F71',
+  brandGemini: '#4A7FE0',
+  brandDeepseek: '#5A66E8',
+
   chromeBg: '#F5F5F5',
   sidebarBg: '#EFEFEF',
   chromeField: '#FFFFFF',
@@ -472,6 +492,10 @@ export function paletteToCssVars(p: ThemePalette): Record<string, string> {
     '--shell-cmd-accent': p.shellCmdAccent,
     '--shell-ssh-accent': p.shellSshAccent,
     '--shell-tile-ink': p.shellTileInk,
+    '--brand-anthropic': p.brandAnthropic,
+    '--brand-openai': p.brandOpenai,
+    '--brand-gemini': p.brandGemini,
+    '--brand-deepseek': p.brandDeepseek,
     '--chrome-bg': p.chromeBg,
     '--sidebar-bg': p.sidebarBg,
     '--chrome-field': p.chromeField,

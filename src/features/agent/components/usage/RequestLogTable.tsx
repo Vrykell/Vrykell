@@ -18,6 +18,7 @@ import {
 } from '@features/agent/model/usageStats';
 import { usageTable } from './tableStyles';
 import TablePager from './TablePager';
+import VendorDot from './VendorDot';
 
 export default function RequestLogTable({ rows }: { rows: UsageRecord[] }) {
   const [page, setPage] = useState(0);
@@ -53,7 +54,7 @@ export default function RequestLogTable({ rows }: { rows: UsageRecord[] }) {
                 </td>
                 <td style={usageTable.td} title={record.provider}>{record.provider}</td>
                 <td style={{ ...usageTable.td, ...usageTable.mono, ...usageTable.primary }} title={record.model}>
-                  {record.model}
+                  <VendorDot provider={record.provider} model={record.model} />{record.model}
                 </td>
                 <td style={usageTable.td} title={formatTokens(freshInputTokens(record))}>
                   {formatCompact(freshInputTokens(record))}

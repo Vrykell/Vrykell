@@ -16,6 +16,7 @@ import {
 } from '@features/agent/model/usageStats';
 import { usageTable } from './tableStyles';
 import TablePager from './TablePager';
+import VendorDot from './VendorDot';
 
 /** Percent label: whole numbers above 99.9%, one decimal below. */
 function hitRateLabel(hits: number, inputTokens: number): string {
@@ -50,7 +51,9 @@ function ProviderTable({ rows }: { rows: ProviderUsageRow[] }) {
               </tr>
             ) : paged.rows.map((row) => (
               <tr key={row.provider} style={usageTable.row} data-testid="usage-provider-row" data-provider={row.provider}>
-                <td style={{ ...usageTable.td, ...usageTable.primary }} title={row.provider}>{row.provider}</td>
+                <td style={{ ...usageTable.td, ...usageTable.primary }} title={row.provider}>
+                  <VendorDot provider={row.provider} />{row.provider}
+                </td>
                 <td style={usageTable.td}>{formatTokens(row.turns)}</td>
                 <td style={usageTable.td} title={formatTokens(row.totalTokens)}>{formatCompact(row.totalTokens)}</td>
                 <td style={usageTable.td} title={formatTokens(row.inputTokens - row.cachedInputTokens)}>
@@ -95,7 +98,9 @@ function ModelTable({ rows }: { rows: ModelUsageRow[] }) {
               </tr>
             ) : paged.rows.map((row) => (
               <tr key={row.key} style={usageTable.row} data-testid="usage-model-row" data-model={row.model}>
-                <td style={{ ...usageTable.td, ...usageTable.mono, ...usageTable.primary }} title={row.model}>{row.model}</td>
+                <td style={{ ...usageTable.td, ...usageTable.mono, ...usageTable.primary }} title={row.model}>
+                  <VendorDot provider={row.provider} model={row.model} />{row.model}
+                </td>
                 <td style={usageTable.td} title={row.provider}>{row.provider}</td>
                 <td style={usageTable.td}>{formatTokens(row.turns)}</td>
                 <td style={usageTable.td} title={formatTokens(row.totalTokens)}>{formatCompact(row.totalTokens)}</td>

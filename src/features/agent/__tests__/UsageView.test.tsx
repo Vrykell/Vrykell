@@ -33,7 +33,7 @@ describe('UsageView', () => {
     expect(screen.getByTestId('usage-clear')).toBeDisabled();
   });
 
-  it('summarises the turn, lists it in the log and folds the extra metrics open', () => {
+  it('shows every metric card at once, with the counting rule on the label hover', () => {
     seedSonnetTurn();
     render(<UsageView />);
 
@@ -41,6 +41,23 @@ describe('UsageView', () => {
     expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('1');
     expect(screen.getByTestId('usage-fresh-input')).toHaveTextContent('400');
     expect(screen.getByTestId('usage-cache-hit')).toHaveTextContent('66.7%');
+    // 其余指标一次性展示，不再折叠
+    expect(screen.getByTestId('usage-output')).toHaveTextContent('300');
+    expect(screen.getByTestId('usage-cache-read')).toHaveTextContent('800');
+    expect(screen.getByTestId('usage-steps')).toHaveTextContent('2');
+    expect(screen.getByTestId('usage-tool-calls')).toHaveTextContent('3');
+    expect(screen.queryByTestId('usage-more-metrics')).toBeNull();
+
+    // 口径提示挂在文字上（没有额外的 ⓘ 图标）
+    const card = screen.getByTestId('usage-fresh-input').parentElement!;
+    const tip = card.querySelector('[data-tip-description]');
+    expect(tip).not.toBeNull();
+    expect(card.querySelector('svg')).toBeNull();
+  });
+
+  it('summarises the turn and lists it in the log', () => {
+    seedSonnetTurn();
+    render(<UsageView />);
 
     const row = screen.getByTestId('usage-log-row');
     expect(row).toHaveAttribute('data-model', 'claude-sonnet-4');
@@ -53,20 +70,16 @@ describe('UsageView', () => {
     expect(cells[5]).toHaveTextContent('800');
     expect(cells[6]).toHaveTextContent('2');
     expect(cells[7]).toHaveTextContent('3');
-
-    // 更多指标默认收起，展开后给出输出 / 缓存命中 / 步数 / 工具调用
-    expect(screen.queryByTestId('usage-extra-metrics')).toBeNull();
-    fireEvent.click(screen.getByTestId('usage-more-metrics'));
-    const extra = within(screen.getByTestId('usage-extra-metrics'));
-    expect(extra.getByText('输出')).toBeInTheDocument();
-    expect(extra.getByText('缓存命中')).toBeInTheDocument();
-    expect(extra.getByText('迭代步数')).toBeInTheDocument();
-    expect(extra.getByText('工具调用')).toBeInTheDocument();
   });
 
   it('switches the trend metric and the detail tables', () => {
     seedSonnetTurn();
     render(<UsageView />);
+
+    // 行首的品牌色标记：按模型家族取色（Claude → Anthropic 品牌色）
+    const dot = within(screen.getByTestId('usage-log-row')).getByTestId('usage-vendor-dot');
+    expect(dot).toHaveAttribute('data-vendor', 'Anthropic');
+    expect(dot).toHaveStyle({ background: 'var(--brand-anthropic)' });
 
     fireEvent.click(screen.getByTestId('usage-metric-requests'));
     expect(screen.getByTestId('usage-metric-requests')).toHaveAttribute('aria-selected', 'true');
@@ -76,10 +89,21 @@ describe('UsageView', () => {
     const providerRow = screen.getByTestId('usage-provider-row');
     expect(providerRow).toHaveAttribute('data-provider', 'anthropic');
     expect(within(providerRow).getAllByRole('cell')[1]).toHaveTextContent('1');
+    expect(within(providerRow).getByTestId('usage-vendor-dot')).toHaveAttribute('data-vendor', 'anthropic');
 
     fireEvent.click(screen.getByTestId('usage-tab-models'));
     expect(screen.getByTestId('usage-model-row')).toHaveAttribute('data-model', 'claude-sonnet-4');
     expect(screen.queryByTestId('usage-log-row')).toBeNull();
+  });
+
+  it('marks a gateway row with the vendor of the model it serves', () => {
+    useUsageStore.getState().recordTurn({
+      provider: 'openai-compatible', model: 'gpt-4o-mini', inputTokens: 100, outputTokens: 10, at: Date.now(),
+    });
+    render(<UsageView />);
+    const dot = within(screen.getByTestId('usage-log-row')).getByTestId('usage-vendor-dot');
+    expect(dot).toHaveAttribute('data-vendor', 'OpenAI');
+    expect(dot).toHaveStyle({ background: 'var(--brand-openai)' });
   });
 
   it('filters by provider and model, and by range', () => {
