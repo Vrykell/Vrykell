@@ -125,6 +125,23 @@ describe('gate', () => {
     if (!g.proceed) expect(g.result.error).toContain('无法发起审批');
   });
 
+  it('shape：卡片拿到后端派生的形态，作答时按形态回传', async () => {
+    reset();
+    setToolAuthorizer(async () => ({ decision: 'ask', shape: 'npm run' }));
+    setToolApprover(async (tool, command, _args, scope) => {
+      expect([tool, command, scope]).toEqual(['run_command', undefined, 'shape']);
+      return allow('lease-s');
+    });
+    const ctx = mkCtx();
+    const p = gate('run_command', { command: 'npm run build' }, 'tc1', ctx);
+    await vi.waitFor(() => expect(ctx.states).toEqual([
+      { id: 'tc1', state: 'approval-pending', extra: { shape: 'npm run' } },
+    ]));
+    resolveApproval('tc1', 'shape');
+    expect(await p).toEqual({ proceed: true, lease: 'lease-s' });
+    expect(ctx.states.map((s) => s.state)).toEqual(['approval-pending', 'running']);
+  });
+
   it('denyAllPending：挂起审批按拒绝放行（防悬挂）', async () => {
     reset();
     setToolAuthorizer(async () => ASK);

@@ -190,6 +190,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
         startedAt: c?.startedAt ?? Date.now(),
         state,
         ...(extra?.danger ? { danger: extra.danger } : {}),
+        ...(extra?.shape ? { shape: extra.shape } : {}),
       });
     },
   };

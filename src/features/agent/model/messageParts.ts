@@ -24,6 +24,8 @@ export interface ToolRun {
   error?: string;
   /** 危险命令命中原因（M3 审批卡展示「⚠ …」）；仅 run_command 可能有 */
   danger?: string;
+  /** 后端派生的命令形态（如 `npm run`）：审批卡据此提供「本会话允许这一种」 */
+  shape?: string;
   startedAt: number;
   endedAt?: number;
 }

@@ -193,6 +193,17 @@ it('keeps the reason visible after a refusal', () => {
   expect(screen.queryByRole('button', { name: '允许一次' })).toBeNull();
 });
 
+it('labels the narrowest approval with the shape and keeps the wider one out of the way', () => {
+  render(<AiBlock conversationId="conversation" exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [
+    { kind: 'tool', tool: { toolCallId: 'shape', toolName: 'run_command', input: { command: 'npm run build' }, state: 'approval-pending', startedAt: 1, shape: 'npm run' } },
+  ] } }} />);
+  expect(screen.getByTestId('tool-allow-shape')).toHaveTextContent('本会话允许「npm run」');
+  // The whole-tool approval would be wider than what the card shows, so it is not offered.
+  expect(screen.queryByRole('button', { name: '本会话允许' })).toBeNull();
+  expect(screen.getByRole('button', { name: '允许一次' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '拒绝' })).toBeInTheDocument();
+});
+
 it('shows a terminal tool row as the bare command without a prompt marker', () => {
   render(<AiBlock conversationId="conversation" presentation="conversation"
     exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [commandPart] } }} />);

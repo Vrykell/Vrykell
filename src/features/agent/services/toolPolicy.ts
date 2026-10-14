@@ -14,6 +14,11 @@ export interface ToolDecision {
   reason?: string;
   /** Single-use token the gated command must present. */
   lease?: string;
+  /**
+   * Command shape an `ask` may be approved for the rest of the session ("npm run"). Rust derives
+   * it, so the label on the card and the grant it makes cannot disagree.
+   */
+  shape?: string | null;
 }
 
 export interface AuthorizeRequest {
@@ -38,7 +43,7 @@ export const approveToolCall = (
   tool: string,
   command: string | undefined,
   args: Record<string, unknown>,
-  scope: 'once' | 'session',
+  scope: 'once' | 'session' | 'shape',
 ) => invoke<ToolDecision>('approve_tool_call', { tool, command: command ?? null, args, scope });
 
 export const loadToolPolicy = () => invoke<Record<string, ToolLevel>>('tool_policy_get');

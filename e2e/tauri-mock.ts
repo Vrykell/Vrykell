@@ -116,6 +116,18 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
       install_skill: 'ask', mcp: 'ask', memory: 'allow', schedule: 'allow', subagent: 'allow',
     };
     const policyOps: { op: string; tool?: string; level?: string }[] = [];
+    /** Session approvals (whole tool or one command shape), mirroring the Rust sets. */
+    const sessionGrants = new Set<string>();
+    const shapeGrants = new Set<string>();
+    const approvalScopes: string[] = [];
+    /** Shape the card would be labelled with; the real derivation lives in Rust and is unit-tested there. */
+    const mockShape = (tool: string, args: Record<string, unknown>): string | null => {
+      if (tool !== 'run_command') return null;
+      const command = String(args.command ?? '').trim();
+      const words = command.split(/\s+/).filter((word) => word && !word.startsWith('-'));
+      if (words.length === 0) return null;
+      return words.length > 1 ? `${words[0]} ${words[1]}` : words[0];
+    };
     let leaseCounter = 0;
     const nextLease = () => `e2e-lease-${++leaseCounter}`;
     // ── 记忆 ──
@@ -160,8 +172,6 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     let pendingCmd = '';
     let integrationEnabled = enableIntegration;
     let sshSession = false;
-    /** Streamed language-model requests of this page, so a scripted tool call only runs once. */
-    let llmCalls = 0;
     (window as unknown as Record<string, unknown>).__AI_MODELS__ = aiModels;
     (window as unknown as Record<string, unknown>).__PTY_WRITES__ = writes;
     (window as unknown as Record<string, unknown>).__CLIPBOARD_TEXT__ = clipboardText;
@@ -187,6 +197,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     (window as unknown as Record<string, unknown>).__SEARCH_CALLS__ = searchCalls;
     (window as unknown as Record<string, unknown>).__POLICY_OPS__ = policyOps;
     (window as unknown as Record<string, unknown>).__POLICY_LEVELS__ = policyLevels;
+    (window as unknown as Record<string, unknown>).__APPROVAL_SCOPES__ = approvalScopes;
 
     const A = '\x1b]133;A\x07';
     const C = '\x1b]133;C\x07';
@@ -524,17 +535,18 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
                 body = JSON.stringify(completion);
               } else {
                 pieces.push({ kind: 'started', status: 200, headers: [['content-type', 'text/event-stream']] });
-                const planned = (window as unknown as Record<string, { tool: string; args: unknown } | undefined>)
+                const plan = (window as unknown as Record<string, { tool: string; args: unknown; arm?: number } | undefined>)
                   .__AI_TOOL_CALL__;
-                // A scripted tool call lands on the first request only; the follow-up step gets the
-                // plain reply, like a provider that answers once the tool has run.
-                if (planned && llmCalls === 0) {
-                  llmCalls += 1;
+                // A scripted tool call lands on a streaming request while the plan is armed and the
+                // request carries no tool result yet; the follow-up step then gets the plain reply,
+                // like a provider that answers once the tool has run. Tests arm it per turn.
+                const hasToolResult = /"type"\s*:\s*"tool_result"|"role"\s*:\s*"tool"/.test(reqBody);
+                if (plan && (plan.arm ?? 0) > 0 && !hasToolResult) {
+                  plan.arm = (plan.arm ?? 0) - 1;
                   body = isAnthropic
-                    ? buildAnthropicToolCallSse(planned.tool, planned.args)
-                    : buildOpenAiToolCallSse(planned.tool, planned.args);
+                    ? buildAnthropicToolCallSse(plan.tool, plan.args)
+                    : buildOpenAiToolCallSse(plan.tool, plan.args);
                 } else {
-                  llmCalls += 1;
                   body = isAnthropic ? buildAnthropicSse(text) : buildOpenAiSse(text);
                 }
               }
@@ -578,20 +590,35 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             return undefined;
           case 'tool_policy_clear_session_grants':
             policyOps.push({ op: 'clear-grants' });
+            sessionGrants.clear();
+            shapeGrants.clear();
             return undefined;
           case 'authorize_tool_call': {
-            // Mirrors the Rust table: deny → deny, allow → lease, ask → the approval card. The
-            // danger/credential heuristics live in Rust and are covered by cargo tests.
-            const request = (args as { request?: { tool?: string; mode?: string } }).request ?? {};
+            // Mirrors the Rust table: deny → deny, allow → lease, ask → the approval card, and a
+            // session approval (whole tool or one command shape) answers without the card. The
+            // danger/credential heuristics and the shape derivation live in Rust (cargo tests).
+            const request = (args as { request?: { tool?: string; mode?: string; args?: Record<string, unknown> } }).request ?? {};
             const tool = String(request.tool ?? '');
             const mode = request.mode ?? 'standard';
             const level = mode === 'relaxed' ? 'allow' : mode === 'strict' ? 'ask' : (policyLevels[tool] ?? 'ask');
             if (level === 'deny') return { decision: 'deny', reason: 'policy.denied' };
             if (level === 'allow') return { decision: 'allow', lease: nextLease() };
-            return { decision: 'ask' };
+            const shape = mockShape(tool, request.args ?? {});
+            if (sessionGrants.has(tool) || (shape && shapeGrants.has(shape))) {
+              return { decision: 'allow', lease: nextLease() };
+            }
+            return { decision: 'ask', shape };
           }
-          case 'approve_tool_call':
+          case 'approve_tool_call': {
+            const scope = String(args.scope ?? 'once');
+            approvalScopes.push(scope);
+            if (scope === 'session') sessionGrants.add(String(args.tool ?? ''));
+            if (scope === 'shape') {
+              const shape = mockShape(String(args.tool ?? ''), (args.args ?? {}) as Record<string, unknown>);
+              if (shape) shapeGrants.add(shape);
+            }
             return { decision: 'allow', lease: nextLease() };
+          }
           case 'get_ai_config':            return {
               has_key: aiConfig.hasKey,
               base_url: aiConfig.baseUrl,
@@ -1227,11 +1254,26 @@ export async function mockAnthropic(page: Page, replyText: string) {
   }, replyText);
 }
 
-/** Make the mocked model ask for one tool call before it answers (Anthropic stream only). */
-export async function mockAnthropicToolCall(page: Page, tool: string, args: Record<string, unknown>) {
-  await page.addInitScript((plan: { tool: string; args: Record<string, unknown> }) => {
+/** Make the mocked model ask for one tool call before it answers; `times` scripts several turns. */
+export async function mockAnthropicToolCall(
+  page: Page, tool: string, args: Record<string, unknown>, times = 1,
+) {
+  await page.addInitScript((plan: { tool: string; args: Record<string, unknown>; arm: number }) => {
     (window as unknown as Record<string, unknown>).__AI_TOOL_CALL__ = plan;
-  }, { tool, args });
+  }, { tool, args, arm: times });
+}
+
+/** Arm the scripted tool call again, for a later turn in the same page. */
+export function armToolCall(page: Page, times = 1): Promise<void> {
+  return page.evaluate((count: number) => {
+    const plan = (window as unknown as Record<string, { arm?: number } | undefined>).__AI_TOOL_CALL__;
+    if (plan) plan.arm = count;
+  }, times);
+}
+
+/** Approval scopes the app recorded ("once" / "session" / "shape"), in order. */
+export function approvalScopes(page: Page): Promise<string[]> {
+  return page.evaluate(() => (window as unknown as Record<string, string[]>).__APPROVAL_SCOPES__);
 }
 
 /** Deliver the mocked answer one piece at a time, so a test can stop it while it is still arriving.

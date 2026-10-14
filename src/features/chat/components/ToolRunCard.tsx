@@ -115,7 +115,14 @@ export default function ToolRunCard({ run, paneId, framed = false }: { run: Tool
       {run.danger && <div>{run.danger}</div>}
       <div className="ai-tool-approval-actions">
         <button type="button" onClick={() => resolveApproval(run.toolCallId, 'once')}>{t('Allow once')}</button>
-        <button type="button" onClick={() => resolveApproval(run.toolCallId, 'session')}>{t('Allow for this conversation')}</button>
+        {/* With a shape the narrowest grant is offered (this kind of command only); the whole-tool
+            session approval stays a deliberate choice on the permissions page. */}
+        {run.shape ? <button type="button" data-testid="tool-allow-shape"
+          onClick={() => resolveApproval(run.toolCallId, 'shape')}>
+          {t('Allow {{shape}} this conversation', { shape: run.shape })}
+        </button> : <button type="button" onClick={() => resolveApproval(run.toolCallId, 'session')}>
+          {t('Allow for this conversation')}
+        </button>}
         <button type="button" onClick={() => resolveApproval(run.toolCallId, 'deny')}>{t('Deny')}</button>
       </div>
     </div>}

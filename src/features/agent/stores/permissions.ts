@@ -31,9 +31,10 @@ import {
 export type ToolLevel = 'allow' | 'ask' | 'deny';
 /**
  * How an approval was answered. `timeout` never comes from a button: the bridge resolves it when
- * the card waited past its deadline, so a turn can never hang on an empty chair.
+ * the card waited past its deadline, so a turn can never hang on an empty chair. `shape` approves
+ * one kind of command for the rest of the session, the narrowest of the three grants.
  */
-export type ApprovalDecision = 'once' | 'session' | 'deny' | 'timeout';
+export type ApprovalDecision = 'once' | 'session' | 'deny' | 'timeout' | 'shape';
 export type PermissionMode = 'standard' | 'strict' | 'relaxed';
 
 /** How long an approval card waits for an answer before it denies itself. */
@@ -57,8 +58,8 @@ export interface ToolContext {
   shellType?: string | null;
   /** 会话 id（= 工作区 tabId），审批卡的落点 */
   tabId?: string;
-  /** 审批状态回写（agentStream 接到后 upsert ToolRun） */
-  setToolState?: (toolCallId: string, state: ToolRunState, extra?: { danger?: string }) => void;
+  /** 审批状态回写（agentStream 接到后 upsert ToolRun）；shape 用于卡片上的「本会话允许这一种」 */
+  setToolState?: (toolCallId: string, state: ToolRunState, extra?: { danger?: string; shape?: string }) => void;
 }
 
 /** 全部受管工具（设置页表格也用它渲染，新增工具别漏） */
@@ -234,8 +235,9 @@ export function denyAllPending() {
 export function clearSessionGrants() {
   // The mirror only holds what the card granted; without it there is nothing to revoke, and
   // skipping the round trip keeps callers that run on every tab close cheap.
-  if (sessionGrantTools.size === 0) return;
+  if (sessionGrantTools.size === 0 && sessionGrantShapes.size === 0) return;
   sessionGrantTools.clear();
+  sessionGrantShapes.clear();
   void clearToolSessionGrants().catch((error: unknown) => {
     console.warn('[permissions] Could not clear session grants:', error);
   });
@@ -244,8 +246,15 @@ export function clearSessionGrants() {
 /** Session approvals the card granted, mirrored so revoking them stays a local decision. */
 const sessionGrantTools = new Set<string>();
 
+/** Command shapes the card approved for this session, mirrored for the same reason. */
+const sessionGrantShapes = new Set<string>();
+
 function noteSessionGrant(tool: string) {
   sessionGrantTools.add(tool);
+}
+
+function noteShapeGrant(shape: string) {
+  sessionGrantShapes.add(shape);
 }
 
 /**
@@ -312,7 +321,7 @@ export type ToolApprover = (
   tool: string,
   command: string | undefined,
   args: Record<string, unknown>,
-  scope: 'once' | 'session',
+  scope: 'once' | 'session' | 'shape',
 ) => Promise<ToolDecision>;
 
 const backendAuthorizer: ToolAuthorizer = (request) => authorizeToolCall(request);
@@ -380,7 +389,11 @@ export async function gate(
   if (!toolCallId || !ctx.setToolState || !ctx.tabId) {
     return denied(undefined, '当前上下文无法发起审批，操作被拒绝');
   }
-  ctx.setToolState(toolCallId, 'approval-pending', reason ? { danger: reason } : undefined);
+  // The shape Rust derived for this call labels the card's narrowest choice; without one the card
+  // offers the whole-tool session approval instead.
+  const shape = decision.shape ?? undefined;
+  const cardExtra = { ...(reason ? { danger: reason } : {}), ...(shape ? { shape } : {}) };
+  ctx.setToolState(toolCallId, 'approval-pending', Object.keys(cardExtra).length > 0 ? cardExtra : undefined);
   const choice = await requestApproval(toolCallId);
   if (choice === 'timeout') {
     // Nobody answered: deny and say why, so the transcript explains the step that never ran.
@@ -403,6 +416,7 @@ export async function gate(
     return denied(reason, '审批未能完成，操作已拒绝');
   }
   if (choice === 'session') noteSessionGrant(toolName);
+  if (choice === 'shape' && shape) noteShapeGrant(shape);
   ctx.setToolState(toolCallId, 'running', reason ? { danger: reason } : undefined);
   return { proceed: true, ...(approved.lease ? { lease: approved.lease } : {}) };
 }
