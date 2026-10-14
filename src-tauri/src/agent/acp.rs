@@ -31,6 +31,62 @@ pub const PROTOCOL_VERSION: u64 = 1;
 /// How long a request may take before the caller is told it will never finish.
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// Windows cannot start a `.cmd` shim (`npx`, and most CLIs installed through npm) directly, and
+/// `CreateProcess` does not apply `PATHEXT` either: the same preset that works in a terminal fails
+/// with "program not found" from the app. Resolve the program the way a shell would.
+#[cfg(windows)]
+fn resolve_program(command: &str) -> Option<PathBuf> {
+    let direct = Path::new(command);
+    if direct.components().count() > 1 {
+        return direct.is_file().then(|| direct.to_path_buf());
+    }
+    let extensions: Vec<String> = std::env::var("PATHEXT")
+        .unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".to_string())
+        .split(';')
+        .map(|extension| extension.trim().to_ascii_lowercase())
+        .filter(|extension| !extension.is_empty())
+        .collect();
+    for dir in std::env::split_paths(&std::env::var("PATH").unwrap_or_default()) {
+        let plain = dir.join(command);
+        if plain.is_file() {
+            return Some(plain);
+        }
+        for extension in &extensions {
+            let candidate = dir.join(format!("{command}{extension}"));
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+    None
+}
+
+/// A command script has to be run by the command interpreter, not started as a program.
+fn is_command_script(program: &Path) -> bool {
+    matches!(
+        program.extension().and_then(|extension| extension.to_str()).map(str::to_ascii_lowercase).as_deref(),
+        Some("cmd") | Some("bat")
+    )
+}
+
+/// The program to start and the arguments to start it with, after the platform's own resolution.
+fn launch_command(command: &str, args: &[String]) -> (String, Vec<String>) {
+    #[cfg(windows)]
+    {
+        if let Some(resolved) = resolve_program(command) {
+            if is_command_script(&resolved) {
+                let mut wrapped = vec!["/c".to_string(), resolved.to_string_lossy().to_string()];
+                wrapped.extend(args.iter().cloned());
+                return ("cmd".to_string(), wrapped);
+            }
+            let mut direct = args.to_vec();
+            direct.insert(0, resolved.to_string_lossy().to_string());
+            return (resolved.to_string_lossy().to_string(), direct);
+        }
+    }
+    let _ = is_command_script;
+    (command.to_string(), args.to_vec())
+}
 /// What we tell an agent we can do. Small on purpose: a capability we advertise but cannot gate is
 /// a capability we should not have. The `fs` handlers (which must run our path policy and approval
 /// chain) are not implemented yet, so they are not claimed; `terminal` is a later phase.
@@ -182,8 +238,11 @@ impl AcpClient {
         env: &HashMap<String, String>,
         permission: PermissionHandler,
     ) -> Result<Self, String> {
-        let mut cmd = Command::new(command);
-        cmd.args(args)
+        // The platform's own resolution decides what actually starts: a `.cmd` shim has to go
+        // through the command interpreter (see `launch_command`).
+        let (program, program_args) = launch_command(command, args);
+        let mut cmd = Command::new(&program);
+        cmd.args(&program_args)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::null())
@@ -788,8 +847,7 @@ mod tests {
     }
 
     #[test]
-    fn harness_config_finds_only_enabled_programs() {
-        let file = HarnessFile {
+    fn harness_config_finds_only_enabled_programs() {        let file = HarnessFile {
             harnesses: vec![
                 HarnessConfig { name: "off".into(), command: "x".into(), enabled: false, ..Default::default() },
                 HarnessConfig { name: "empty".into(), command: "  ".into(), enabled: true, ..Default::default() },
