@@ -205,10 +205,10 @@ Following the checklist in `security-model.md`, these are hard requirements when
 
 ## 10. Phases
 
-| Phase | Content | Verification |
+| Phase | Content | Status |
 | --- | --- | --- |
-| **P0 protocol** | `agent/acp.rs`: ndjson codec, request correlation, notification fan-out, cancellation, `initialize` / `session/new` / `session/prompt` / `session/cancel` / permission answers; harness config plus the `acp_handshake` probe | cargo tests: an in-memory transport (`tokio::io::duplex`) driving a scripted fake agent, covering the handshake, one prompt turn, the notification stream, a permission request and the cancel path |
-| **P1 visible** | workspace harness tab, settings group, event → ChatMessage/ToolRun mapping, stop | vitest (mapping and store) and an e2e with a fake agent (open a tab, send a turn, watch the stream, press stop) |
+| **P0 protocol** | `agent/acp.rs`: ndjson codec, request correlation, notification fan-out, cancellation, `initialize` / `session/new` / `session/prompt` / `session/cancel` / permission answers; harness config (`~/.vrykell/harnesses.json`, editable by hand) plus the `acp_handshake` probe | ✅ **Implemented (2026-10-14)**: cargo tests drive a scripted fake agent over an in-memory transport (`tokio::io::duplex`), covering the handshake (and asserting we do **not** advertise fs or terminal), a prompt turn's streamed notifications, a permission request answered with a selected option, cancellation being a notification, and an unanswerable request receiving a JSON-RPC error instead of silence. The `fs` and `terminal` handlers belong to P2, so those capabilities are not claimed yet |
+| **P1 visible** | workspace harness tab, settings group (which also writes the config), event → ChatMessage/ToolRun mapping, stop | Not started (the protocol layer's `new_session`/`prompt`/`cancel`/`next_event` are ready and marked `allow(dead_code)` until this phase wires them) |
 | **P2 safety** | permission → approval card (shape grant, deadline), `fs/*` through the policy, native confirmation for dangerous commands | cargo (policy reuse), vitest (permission mapping), e2e (dangerous command asks natively, an unanswered card is denied) |
 | **P3 experience** | `session/load` restore, display-only modes, notices/plans, context-usage bar, usage-page `source` | unit tests per layer plus e2e |
 | **P4 optional** | `terminal/*` delegation (commands through our PTY, full danger-rule coverage), MCP passthrough, elicitation | as needed |

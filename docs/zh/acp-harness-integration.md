@@ -140,10 +140,10 @@ ACP v1 只提供 **`usage_update`**：会话上下文 `used`/`size`（token）+ 
 
 ## 10. 分阶段
 
-| 阶段 | 内容 | 验证方式 |
+| 阶段 | 内容 | 状态 |
 | --- | --- | --- |
-| **P0 协议层** | `agent/acp.rs`：ndjson 编解码、请求关联、通知分发、取消、`initialize` / `session/new` / `session/prompt` / `session/cancel` / 权限应答；harness 配置读写 + `acp_handshake` 探测命令 | cargo 单测：用内存传输（`tokio::io::duplex`）驱动一个脚本化假 agent，覆盖握手、一轮 prompt、流式通知、权限请求与取消路径 |
-| **P1 可见可用** | 工作区 harness 标签 + 设置页 harness 分组 + 事件 → ChatMessage/ToolRun 映射 + 停止 | vitest（映射与 store）+ e2e（假 agent：开标签、发一轮、看流式、点停止） |
+| **P0 协议层** | `agent/acp.rs`：ndjson 编解码、请求关联、通知分发、取消、`initialize` / `session/new` / `session/prompt` / `session/cancel` / 权限应答；harness 配置（`~/.vrykell/harnesses.json`，可手改）+ `acp_handshake` 探测命令 | ✅ **已实现（2026-10-14）**：cargo 单测用内存传输（`tokio::io::duplex`）驱动脚本化假 agent，覆盖握手（并断言我们**没有**声明 fs/terminal）、一轮 prompt 的流式通知、权限请求→选择回传、取消是通知、以及"答不了的请求回 JSON-RPC 错误而不是沉默"。`fs`/`terminal` 处理器属 P2，因此现在**不声明**这两项能力 |
+| **P1 可见可用** | 工作区 harness 标签 + 设置页 harness 分组（含写配置）+ 事件 → ChatMessage/ToolRun 映射 + 停止 | 未开始（协议层的 `new_session`/`prompt`/`cancel`/`next_event` 已就绪并标了 `allow(dead_code)`，等这一阶段接线） |
 | **P2 安全接入** | permission → 审批卡（形态授权 + 超时）+ `fs/*` 走策略 + 危险命令系统确认 | cargo（策略复用）+ vitest（权限映射）+ e2e（危险命令弹确认、无人应答自动拒绝） |
 | **P3 体验** | `session/load` 恢复、模式只读展示、notice/plan、上下文用量条、用量页 `source` | 各层单测 + e2e |
 | **P4 可选** | `terminal/*` 委托（命令经我们的 PTY，危险规则全覆盖）、MCP 透传、elicitation | 视需要 |

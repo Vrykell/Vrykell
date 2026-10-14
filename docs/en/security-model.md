@@ -72,6 +72,7 @@ not pretend to protect "the renderer itself" or "the programs the user installs"
 | Gap | Cost |
 | --- | --- |
 | `opener`'s `open_path` scope is `**` (the file panel must be able to open any user file; by design, and no worse than the PTY) | — |
+| Starting an external harness (`acp_handshake`) | A **documented class**, not a gap: it only starts a program the user **enabled** in `~/.vrykell/harnesses.json`, a probe **runs no tools** (every permission request is refused), and it does not widen the surface — the same webview can already run anything through the PTY. The phase-1 settings copy says that adding a harness is the authorization |
 | Capability-based file access for the whole panel (paths must come from a user gesture or the shell's cwd) | 3–6 weeks, changes product semantics, still does not stop the PTY → not doing it |
 | Moving the agent out of the webview | 2–4 months (Rust) / 2–4 weeks (sidecar), still does not stop the PTY → not doing it |
 
