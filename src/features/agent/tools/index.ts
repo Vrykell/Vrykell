@@ -10,6 +10,7 @@
  */
 
 import { tool, type ToolSet } from 'ai';
+import { isWindows } from '@platform/runtime';
 import { DESC_RUN_COMMAND } from '@features/agent/model/toolTexts';
 import { z } from 'zod';
 import { executionPaneSpec } from '../services/executionTarget';
@@ -26,12 +27,28 @@ import { gate, levelOf, ensureSkillAccess, TOOL_NAMES, type ToolContext } from '
 
 export type { ToolContext } from '@features/agent/stores/permissions';
 
+/**
+ * Shell family used for the danger rules.
+ *
+ * A pane created with the default "system" preference carries no shellType, but on Windows the
+ * platform shell is still cmd or PowerShell — leaving it unknown silently disabled every
+ * Windows rule (a permanent `Remove-Item -Force` sailed through with no approval reason).
+ * SSH panes always run a POSIX shell on the remote host.
+ */
+export function shellFamilyForPane(
+  pane: { kind?: string; shellType?: string | null } | undefined,
+  windows: boolean = isWindows,
+): string {
+  if (pane?.shellType) return pane.shellType;
+  if (pane?.kind === 'ssh') return 'posix';
+  return windows ? 'powershell' : 'posix';
+}
+
 export function buildTools(ctx: ToolContext) {
   // Older callers may omit the environment; the selected pane still determines file access.
   const paneId = ctx.paneId === undefined ? getFocusedTerminalId() : ctx.paneId;
   const pane = executionPaneSpec(paneId);
-  // SSH panes run a POSIX shell on the remote host; a known local shell picks its own rule table.
-  const shellType = ctx.shellType ?? (pane?.kind === 'ssh' ? 'posix' : pane?.shellType);
+  const shellType = ctx.shellType ?? shellFamilyForPane(pane);
   ctx = { ...ctx, paneId, remote: ctx.remote || pane?.kind === 'ssh', shellType };
   const all = {
     run_command: tool({

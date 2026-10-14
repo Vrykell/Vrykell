@@ -81,8 +81,89 @@ describe('runCommandAndWait', () => {
     expect(agentControl.isControlled(paneId)).toBe(false);
   });
 
-  it('块模式：非零退出码 → ok:false 带错误说明', async () => {
+  // Regression: one submitted script can become several blocks (PowerShell runs a multi-line
+  // script statement by statement). Returning a single block handed the model just its last line.
+  it('块模式：多行脚本拆成多个块时返回每个块的命令与输出', async () => {
     const paneId = setupPane();
+    const promise = runCommandAndWait('$f = "x"\nSet-Content $f "hi"\nRemove-Item $f -Force');
+    await tick();
+
+    useBlockStore.getState().addBlock(paneId, mkBlock({ id: 'b1', command: '$f = "x"' }));
+    await tick();
+    useBlockStore.getState().updateBlock(paneId, 'b1', { status: 'done', exitCode: 0 });
+    useBlockStore.getState().addBlock(paneId, mkBlock({ id: 'b2', command: 'Set-Content $f "hi"' }));
+    await tick();
+    useBlockStore.getState().updateBlock(paneId, 'b2', { status: 'done', exitCode: 0, outputText: '写入完成' });
+    useBlockStore.getState().addBlock(paneId, mkBlock({ id: 'b3', command: 'Remove-Item $f -Force' }));
+    await tick();
+    useBlockStore.getState().updateBlock(paneId, 'b3', { status: 'done', exitCode: 0, outputText: '删除成功' });
+
+    await new Promise((r) => setTimeout(r, 400));
+    const r = await promise;
+    expect(r).toMatchObject({ ok: true, completed: true, exitCode: 0 });
+    expect(r.output).toContain('$ $f = "x"');
+    expect(r.output).toContain('$ Set-Content $f "hi"\n写入完成');
+    expect(r.output).toContain('$ Remove-Item $f -Force\n删除成功');
+    for (const id of ['b1', 'b2', 'b3']) expect(agentControl.hasBlock(id)).toBe(true);
+  });
+
+  it('块模式：本次提交之外的块不计入结果', async () => {
+    const paneId = setupPane();
+    const promise = runCommandAndWait('echo mine');
+    await tick();
+    useBlockStore.getState().addBlock(paneId, mkBlock({ id: 'mine', command: 'echo mine' }));
+    // 用户并发敲的命令：不属于本次提交，不能并进模型看到的结果
+    useBlockStore.getState().addBlock(paneId, mkBlock({ id: 'user', command: 'git status' }));
+    await tick();
+    useBlockStore.getState().updateBlock(paneId, 'mine', { status: 'done', exitCode: 0, outputText: 'mine' });
+    useBlockStore.getState().updateBlock(paneId, 'user', { status: 'done', exitCode: 0, outputText: 'user output' });
+
+    await new Promise((r) => setTimeout(r, 400));
+    const r = await promise;
+    expect(r.output).toBe('mine');
+    expect(agentControl.hasBlock('user')).toBe(false);
+    expect(agentControl.hasBlock('mine')).toBe(true);
+  });
+
+  it('块模式：多块之中有一步失败 → ok:false 并给出该步退出码', async () => {    const paneId = setupPane();
+    const promise = runCommandAndWait('step one\nstep two');
+    await tick();
+    useBlockStore.getState().addBlock(paneId, mkBlock({ id: 'b1', command: 'step one' }));
+    await tick();
+    useBlockStore.getState().updateBlock(paneId, 'b1', { status: 'done', exitCode: 0, outputText: 'ok' });
+    useBlockStore.getState().addBlock(paneId, mkBlock({ id: 'b2', command: 'step two' }));
+    await tick();
+    useBlockStore.getState().updateBlock(paneId, 'b2', { status: 'done', exitCode: 3, outputText: 'missing' });
+
+    await new Promise((r) => setTimeout(r, 400));
+    const r = await promise;
+    expect(r.ok).toBe(false);
+    expect(r.completed).toBe(true);
+    expect(r.exitCode).toBe(3);
+    expect(r.error).toContain('3');
+  });
+
+  it('超长输出保留头部与尾部，并标明省略', async () => {
+    const paneId = setupPane();
+    const promise = runCommandAndWait('big');
+    await tick();
+    useBlockStore.getState().addBlock(paneId, mkBlock({ id: 'b1', command: 'big' }));
+    await tick();
+    useBlockStore.getState().updateBlock(paneId, 'b1', {
+      status: 'done',
+      exitCode: 0,
+      outputText: `HEAD-MARKER\n${'x'.repeat(20_000)}\nTAIL-MARKER`,
+    });
+
+    await new Promise((r) => setTimeout(r, 400));
+    const r = await promise;
+    expect(r.output).toContain('HEAD-MARKER');
+    expect(r.output).toContain('TAIL-MARKER');
+    expect(r.output).toContain('字符已省略');
+    expect(r.output.length).toBeLessThan(8300);
+  });
+
+  it('块模式：非零退出码 → ok:false 带错误说明', async () => {    const paneId = setupPane();
     const promise = runCommandAndWait('ls');
     await tick();
     useBlockStore.getState().addBlock(paneId, mkBlock({}));

@@ -30,11 +30,24 @@ export interface RunCommandResult {
 }
 
 const OUTPUT_CAP = 8192;
+/** Head kept when output has to be shortened: command echo, paths and early lines live there. */
+const OUTPUT_HEAD = 2048;
 const BLOCK_GRACE_MS = 1500;
 const DEFAULT_TIMEOUT_MS = 120_000;
 
 function tail(s: string): string {
   return s.length > OUTPUT_CAP ? s.slice(-OUTPUT_CAP) : s;
+}
+
+/**
+ * Shorten long output to the head and the tail with an explicit gap marker. Keeping only the
+ * tail used to hide the first lines of a run (paths, early failures) and made the model re-run
+ * the command to see them; the marker tells it what happened instead.
+ */
+function capOutput(s: string): string {
+  if (s.length <= OUTPUT_CAP) return s;
+  const omitted = s.length - OUTPUT_HEAD - (OUTPUT_CAP - OUTPUT_HEAD);
+  return `${s.slice(0, OUTPUT_HEAD)}\n…（中间 ${omitted} 字符已省略，可用 read_terminal 查看终端画面）…\n${s.slice(-(OUTPUT_CAP - OUTPUT_HEAD))}`;
 }
 
 export async function runCommandAndWait(
@@ -99,7 +112,12 @@ function waitForCompletion(
     let settled = false;
     let unsub: (() => void) | null = null;
     let snapshotTimer: ReturnType<typeof setInterval> | null = null;
-    let trackedId: string | null = null;
+    /**
+     * Blocks this submission produced, in start order. A shell that splits a multi-statement
+     * script into one block per statement (PowerShell in block mode does) must not be reduced
+     * to a single block: doing so returned just the last statement's line to the model.
+     */
+    const tracked: string[] = [];
 
     let doneGraceTimer: ReturnType<typeof setTimeout> | null = null;
     let unsubCompletion: (() => void) | undefined;
@@ -133,33 +151,43 @@ function waitForCompletion(
       }
     });
 
-    /** 从被跟踪块构建结果（读取当下 outputText） */
-    const resultFromBlock = (): RunCommandResult | null => {
-      if (!trackedId) return null;
-      const b = (useBlockStore.getState().byTab[paneId] ?? []).find((x) => x.id === trackedId);
-      if (!b || (b.status !== 'done' && b.status !== 'interrupted')) return null;
+    const blockById = (id: string) => (useBlockStore.getState().byTab[paneId] ?? []).find((x) => x.id === id);
+    const isTerminal = (status: string | undefined) => status === 'done' || status === 'interrupted';
+
+    /** 从被跟踪块构建结果（读取当下 outputText）；单块保持原样，多块按「命令 + 输出」拼接 */
+    const resultFromBlocks = (): RunCommandResult | null => {
+      if (tracked.length === 0) return null;
+      const list = tracked.map(blockById);
+      if (list.some((b) => !b || !isTerminal(b.status))) return null;
+      const blocks = list as NonNullable<ReturnType<typeof blockById>>[];
+      const last = blocks[blocks.length - 1]!;
+      const failed = blocks.find((b) => b.status === 'interrupted' || (b.exitCode ?? 0) !== 0);
+      const body =
+        blocks.length === 1
+          ? blocks[0]!.outputText
+          : blocks.map((b) => `$ ${b.command}${b.outputText ? `\n${b.outputText}` : ''}`).join('\n\n');
       return {
-        ok: b.status === 'done' && b.exitCode === 0,
+        ok: !failed && last.status === 'done',
         completed: true,
-        exitCode: b.exitCode ?? undefined,
-        output: tail(b.outputText),
+        exitCode: last.exitCode ?? undefined,
+        output: capOutput(body),
         error:
-          b.status === 'interrupted'
+          last.status === 'interrupted' || failed?.status === 'interrupted'
             ? '命令被中断'
-            : b.exitCode !== 0
-              ? `退出码 ${b.exitCode}`
+            : failed?.exitCode
+              ? `退出码 ${failed.exitCode}`
               : undefined,
       };
     };
 
     const settleIfDone = (): void => {
-      if (!trackedId || doneGraceTimer) return;
-      if (!resultFromBlock()) return;
+      if (tracked.length === 0 || doneGraceTimer) return;
+      if (!resultFromBlocks()) return;
       // finishBlock 先推 done 样式、再经 xterm write('') FIFO 回调异步提取输出
       // 快照（sessionController.finishBlock）——此刻 outputText 多半还是 ''。
       // 给快照提取一个宽限再收口，否则模型会拿到空输出误判「目录为空」。
       doneGraceTimer = setTimeout(() => {
-        const r = resultFromBlock();
+        const r = resultFromBlocks();
         if (r) finish(r);
       }, 350);
     };
@@ -182,38 +210,54 @@ function waitForCompletion(
       }, 500);
     };
 
-    /** 认领新块：登记 ⚡ 真源 + 记录 toolCall→block 映射（内嵌命令块渲染用）
+    /** 认领块：登记 ⚡ 真源 + 记录 toolCall→block 映射（内嵌命令块渲染用）
      *  + 立即补一记 updateBlock 让徽标即时出现 */
     const claim = (blockId: string) => {
-      trackedId = blockId;
+      if (tracked.includes(blockId)) return;
+      tracked.push(blockId);
       agentControl.markBlock(blockId);
       if (toolCallId) agentControl.linkToolCall(toolCallId, blockId);
       useBlockStore.getState().updateBlock(paneId, blockId, { agent: true });
     };
 
-    const tryClaim = (): void => {
+    /** 本次提交的候选命令回显：整条命令 + 各非空行（多行脚本会被拆成一句一块）。 */
+    const submitted = new Set(
+      [command.trim(), ...command.split('\n').map((line) => line.trim()).filter(Boolean)],
+    );
+
+    /** 收集本次提交产生的所有块（按开始时间顺序）；不相关块（用户并发输入）不并入。 */
+    const collectBlocks = (): void => {
       const blocks = useBlockStore.getState().byTab[paneId] ?? [];
-      // 命令匹配 + preexec 在写入之后（覆盖「预存在 pending 块转 executing」）。
-      // 数组按时间序，find 取最早一个匹配。
-      const fresh = blocks.find(
-        (b) => b.command.trim() === command.trim() && b.startedAt != null && b.startedAt >= t0,
-      );
-      if (fresh) claim(fresh.id);
+      for (const b of blocks) {
+        if (b.startedAt == null || b.startedAt < t0) continue;
+        const echo = b.command.trim();
+        // 回显缺失（shell integration 未提供 133;E）时按空回显兜底
+        if (echo && !submitted.has(echo)) continue;
+        claim(b.id);
+      }
+    };
+
+    /** 首块认领：优先命令回显完全一致的块，否则取本次提交最早的块（回显缺失时兜底）。 */
+    const tryClaim = (): void => {
+      if (tracked.length > 0) return;
+      const blocks = useBlockStore.getState().byTab[paneId] ?? [];
+      const fresh = blocks.filter((b) => b.startedAt != null && b.startedAt >= t0);
+      if (fresh.length === 0) return;
+      const exact = fresh.find((b) => b.command.trim() === command.trim());
+      const known = fresh.find((b) => {
+        const echo = b.command.trim();
+        return !echo || submitted.has(echo);
+      });
+      claim((exact ?? known ?? fresh[0]!).id);
     };
 
     const graceTimer = setTimeout(() => {
-      if (!trackedId) {
+      if (tracked.length === 0) {
         // 自愈：宽限期结束时绕过订阅直扫一次（事件可能因时序错过）
         tryClaim();
-        // 兜底：命令比对不上（integration 缺 133;E、command 恒空）时，
-        // 认领宽限内最新启动的块 —— 写入后 1.5s 内的新执行块几乎必是我们的
-        if (!trackedId) {
-          const blocks = useBlockStore.getState().byTab[paneId] ?? [];
-          const fallback = blocks.filter((b) => b.startedAt != null && b.startedAt >= t0).pop();
-          if (fallback) claim(fallback.id);
-        }
+        collectBlocks();
         settleIfDone();
-        if (!settled && !trackedId && !completion) startSnapshotMode();
+        if (!settled && tracked.length === 0 && !completion) startSnapshotMode();
       }
     }, BLOCK_GRACE_MS);
 
@@ -227,14 +271,15 @@ function waitForCompletion(
     };
     signal?.addEventListener('abort', onAbort, { once: true });
 
-    // 订阅块流：认领新块（打 agent 标记）→ 等终态
+    // 订阅块流：认领本次提交的块（打 agent 标记）→ 等终态
     unsub = useBlockStore.subscribe(() => {
-      if (!trackedId) tryClaim();
+      tryClaim();
+      collectBlocks();
       settleIfDone();
     });
     const settleCompletion = () => {
       const result = completion?.result();
-      if (result) finish({ ok: result.exitCode === 0, completed: true, exitCode: result.exitCode, output: tail(result.output),
+      if (result) finish({ ok: result.exitCode === 0, completed: true, exitCode: result.exitCode, output: capOutput(result.output),
         ...(result.exitCode !== 0 ? { error: t('Exit code: {{code}}', { code: result.exitCode }) } : {}) });
     };
     unsubCompletion = completion?.subscribe(settleCompletion);
@@ -243,7 +288,7 @@ function waitForCompletion(
       finish({ ok: false, completed: false, output: '', error: t('The command entered an interactive screen. Use read_terminal and terminal_keys to continue.') });
     } else {
       settleCompletion();
-      if (!settled) { tryClaim(); settleIfDone(); }
+      if (!settled) { tryClaim(); collectBlocks(); settleIfDone(); }
     }
   });
 }
