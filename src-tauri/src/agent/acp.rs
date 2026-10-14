@@ -357,7 +357,9 @@ pub async fn acp_handshake(name: String) -> Result<Value, String> {
         Arc::new(|_| PermissionOutcome::Cancelled),
     )
     .map_err(|error| {
-        note("acp-handshake-failed", json!({ "name": harness.name, "error": error }));
+        // Say which program was missing: "program not found" alone leaves the user guessing.
+        let error = format!("{error} (command: {})", harness.command);
+        note("acp-handshake-failed", json!({ "name": harness.name, "command": harness.command, "error": error }));
         error
     })?;
     let info = client
@@ -492,7 +494,13 @@ pub async fn acp_open<R: tauri::Runtime>(
         if harness.cwd.trim().is_empty() { None } else { Some(Path::new(&harness.cwd)) },
         &harness.env,
         permission,
-    )?);
+    )
+    .map_err(|error| {
+        // Same reason as the handshake: name the program that could not be started.
+        let error = format!("{error} (command: {})", harness.command);
+        note("acp-open-failed", json!({ "name": harness.name, "command": harness.command, "error": error }));
+        error
+    })?);
     let info = client
         .initialize("vrykell", env!("CARGO_PKG_VERSION"))
         .await
