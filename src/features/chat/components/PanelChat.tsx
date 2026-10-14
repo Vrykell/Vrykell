@@ -24,6 +24,10 @@ import type { AttachmentMeta } from '@features/agent/model/attachments';
 
 const EMPTY_MESSAGES: ChatMessage[] = [];
 
+/** Only a position this close to the bottom counts as "back at the latest reply": a wider
+ *  window would let a small upward nudge be swallowed and re-engage the follow right away. */
+const FOLLOW_THRESHOLD_PX = 4;
+
 /**
  * True when a scroll surface between the wheel target and the transcript can absorb the
  * upward scroll itself, so the wheel never reaches the transcript and must not pause it.
@@ -195,7 +199,7 @@ export default function PanelChat() {
         window, while a nested scroller that consumes the wheel leaves it alone. */}
     <div ref={scrollRef} className="chat-transcript scroll-region" onScroll={event => {
       const scroll = event.currentTarget;
-      const next = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight <= 24;
+      const next = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight <= FOLLOW_THRESHOLD_PX;
       followRef.current = next;
       setFollowing(next);
     }}
