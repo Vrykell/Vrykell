@@ -297,6 +297,9 @@ struct PolicyState {
     levels: HashMap<String, Level>,
     /// Approvals for the rest of the session ("allow for this conversation").
     session_grants: HashSet<String>,
+    /// Command shapes approved for the rest of the session ("always allow `npm run`"). Danger and
+    /// credential checks run before these are consulted, so a grant never widens those.
+    shape_grants: HashSet<String>,
     leases: HashMap<String, Lease>,
 }
 
@@ -327,6 +330,7 @@ impl Default for ToolPolicy {
         ToolPolicy(Mutex::new(PolicyState {
             levels,
             session_grants: HashSet::new(),
+            shape_grants: HashSet::new(),
             leases: HashMap::new(),
         }))
     }
@@ -379,6 +383,12 @@ impl ToolPolicy {
         Ok(())
     }
 
+    fn grant_shape(&self, shape: &str) -> Result<(), String> {
+        let mut state = self.0.lock().map_err(|e| e.to_string())?;
+        state.shape_grants.insert(shape.to_string());
+        Ok(())
+    }
+
     fn save_levels(&self) -> Result<(), String> {
         let levels = {
             let state = self.0.lock().map_err(|e| e.to_string())?;
@@ -405,6 +415,9 @@ pub struct ToolDecision {
     pub reason: Option<String>,
     /// Single-use token the target command must present when the call is allowed.
     pub lease: Option<String>,
+    /// Shape an "ask" may be granted for the rest of the session ("npm run"); the card labels its
+    /// third choice with it. Derived here so the label and the grant cannot disagree.
+    pub shape: Option<String>,
 }
 
 impl ToolDecision {
@@ -413,13 +426,15 @@ impl ToolDecision {
             decision: "deny".to_string(),
             reason,
             lease: None,
+            shape: None,
         }
     }
-    fn ask(reason: Option<String>) -> Self {
+    fn ask(reason: Option<String>, shape: Option<String>) -> Self {
         Self {
             decision: "ask".to_string(),
             reason,
             lease: None,
+            shape,
         }
     }
     fn allow(reason: Option<String>, lease: String) -> Self {
@@ -427,6 +442,7 @@ impl ToolDecision {
             decision: "allow".to_string(),
             reason,
             lease: Some(lease),
+            shape: None,
         }
     }
 }
@@ -538,6 +554,103 @@ fn gated_command(request: &AuthorizeRequest) -> String {
         .unwrap_or_else(|| request.tool.clone())
 }
 
+/// Programs that exist to run text handed to them: a shape approval on one of these would approve
+/// everything it could be told to do, so they only ever get the per-call (or whole-tool) approval.
+const NO_SHAPE_PROGRAMS: &[&str] = &[
+    "cmd", "powershell", "pwsh", "sh", "bash", "zsh", "dash", "ksh", "env", "nohup", "time",
+    "xargs", "wsl", "sudo", "doas", "runas", "start", "call",
+];
+
+/// `VAR=value` prefixes are environment, not the program being run.
+fn is_assignment(word: &str) -> bool {
+    let Some((name, _)) = word.split_once('=') else {
+        return false;
+    };
+    !name.is_empty() && !name.starts_with('-') && name.chars().all(|c| c.is_alphanumeric() || c == '_')
+}
+
+/// A program that may own a shape: not a shell or an interpreter launcher, whatever path it came by.
+fn shape_safe_program(program: &str) -> bool {
+    let name = program
+        .rsplit(['\\', '/'])
+        .next()
+        .unwrap_or(program)
+        .to_ascii_lowercase();
+    !NO_SHAPE_PROGRAMS.contains(&name.strip_suffix(".exe").unwrap_or(name.as_str()))
+}
+
+/// Shape of a command for the session approval behind "always allow this kind": the program plus
+/// its first word that is neither a switch nor an assignment (`npm run build` → `npm run`,
+/// `git status --short` → `git status`, `cat /etc/hosts` → `cat /etc/hosts`), or the program alone
+/// when there is no such word. Later words are never part of the shape, so approving one build
+/// approves the same kind of call for the rest of the session; a path in the second position only
+/// narrows what the shape covers.
+///
+/// Only the execution tool has a shape; every other tool keeps the whole-tool session approval.
+/// Danger and credential checks decide before a grant is consulted, so a shape can never carry a
+/// call past them.
+fn command_shape(tool: &str, args: &Value) -> Option<String> {
+    if tool != "run_command" {
+        return None;
+    }
+    let command = args.get("command")?.as_str()?.trim();
+    let mut words = command
+        .split_whitespace()
+        .map(|word| word.trim_matches(['"', '\'']).to_string())
+        .filter(|word| !word.is_empty());
+    let program = loop {
+        let word = words.next()?;
+        if !is_assignment(&word) {
+            break word;
+        }
+    };
+    if !shape_safe_program(&program) {
+        return None;
+    }
+    let plain = |word: &str| {
+        !word.is_empty()
+            && !word.starts_with('-')
+            // `/b`, `/q`: a short switch rather than the path it looks like on Windows.
+            && !(word.starts_with('/') && word.len() <= 3)
+            && !is_assignment(word)
+    };
+    match words.find(|word| plain(word)) {
+        Some(word) => Some(format!("{program} {word}")),
+        None => Some(program),
+    }
+}
+
+/// The decision for a call that raised no reason: the level table, then the session approvals that
+/// the approval card granted (the whole tool, or one command shape inside it). The shape travels
+/// back either way, so the card can label its "always allow this kind" choice.
+fn plain_decision(
+    policy: &ToolPolicy,
+    tool: &str,
+    shape: Option<String>,
+    mode: Option<&str>,
+) -> (bool, Option<String>) {
+    // The UI shortcut modulates plain calls only: deny still denies, and a reason above always
+    // went through the native confirmation.
+    let level = if mode == Some("strict") {
+        Level::Ask
+    } else if mode == Some("relaxed") {
+        Level::Allow
+    } else {
+        policy.level_of(tool)
+    };
+    let granted = policy
+        .0
+        .lock()
+        .map(|s| {
+            s.session_grants.contains(tool)
+                || shape
+                    .as_ref()
+                    .is_some_and(|shape| s.shape_grants.contains(shape))
+        })
+        .unwrap_or(false);
+    (level == Level::Allow || granted, shape)
+}
+
 /// Decide a tool call. `ask` means the webview shows its approval card and then calls
 /// `approve_tool_call`; dangerous and credential-touching calls are confirmed here instead.
 #[tauri::command]
@@ -557,6 +670,7 @@ pub async fn authorize_tool_call(
         .or_else(|| sensitive_path_reason(&paths))
         .or_else(|| durable_action_reason(tool, &request.args));
     let command = gated_command(&request);
+    let shape = command_shape(tool, &request.args);
 
     match reason {
         // Forced approval: the decision comes from a system dialog, not from the page.
@@ -572,26 +686,11 @@ pub async fn authorize_tool_call(
             }
         },
         None => {
-            // The UI shortcut modulates plain calls only: deny still denies, and a reason above
-            // always went through the native confirmation.
-            let strict = request.mode.as_deref() == Some("strict");
-            let relaxed = request.mode.as_deref() == Some("relaxed");
-            let level = if strict {
-                Level::Ask
-            } else if relaxed {
-                Level::Allow
-            } else {
-                state.level_of(tool)
-            };
-            let granted = state
-                .0
-                .lock()
-                .map(|s| s.session_grants.contains(tool))
-                .unwrap_or(false);
-            if level == Level::Allow || granted {
+            let (allowed, shape) = plain_decision(&state, tool, shape, request.mode.as_deref());
+            if allowed {
                 Ok(ToolDecision::allow(None, state.issue(&command, &request.args)?))
             } else {
-                Ok(ToolDecision::ask(None))
+                Ok(ToolDecision::ask(None, shape))
             }
         }
     }
@@ -611,6 +710,14 @@ pub fn approve_tool_call(
     }
     if scope.as_deref() == Some("session") {
         state.grant_session(&tool)?;
+    }
+    if scope.as_deref() == Some("shape") {
+        // A shape approval only ever covers what the card labelled; without a derivable shape
+        // there is nothing to grant, and asking again would loop, so the call is denied.
+        match command_shape(&tool, &args) {
+            Some(shape) => state.grant_shape(&shape)?,
+            None => return Ok(ToolDecision::deny(Some("policy.denied".to_string()))),
+        }
     }
     let fence = command
         .filter(|c| !c.trim().is_empty())
@@ -678,12 +785,10 @@ pub fn tool_policy_set_level(
 
 #[tauri::command]
 pub fn tool_policy_clear_session_grants(state: tauri::State<'_, ToolPolicy>) -> Result<(), String> {
-    state
-        .0
-        .lock()
-        .map_err(|e| e.to_string())?
-        .session_grants
-        .clear();
+    let mut guard = state.0.lock().map_err(|e| e.to_string())?;
+    guard.session_grants.clear();
+    // Shapes are session approvals too, so clearing one clears both.
+    guard.shape_grants.clear();
     Ok(())
 }
 
@@ -696,6 +801,7 @@ mod tests {
         ToolPolicy(Mutex::new(PolicyState {
             levels: HashMap::new(),
             session_grants: HashSet::new(),
+            shape_grants: HashSet::new(),
             leases: HashMap::new(),
         }))
     }
@@ -723,6 +829,60 @@ mod tests {
         assert_eq!(confirm_timeout(&request), CONFIRM_TIMEOUT_MAX);
         request.timeout_secs = Some(600);
         assert_eq!(confirm_timeout(&request), Duration::from_secs(600));
+    }
+
+    #[test]
+    fn command_shapes_name_one_kind_of_call() {
+        let shape = |command: &str| command_shape("run_command", &json!({ "command": command }));
+        // Program plus its first non-switch word: the same kind, not the same invocation.
+        assert_eq!(shape("npm run build").as_deref(), Some("npm run"));
+        assert_eq!(shape("npm run test -- --watch").as_deref(), Some("npm run"));
+        assert_eq!(shape("git status --short").as_deref(), Some("git status"));
+        assert_eq!(shape("cat /etc/hosts").as_deref(), Some("cat /etc/hosts"));
+        // Switches and assignments are skipped, so a shape never keys on an option value.
+        assert_eq!(shape("ls -la /tmp").as_deref(), Some("ls /tmp"));
+        assert_eq!(shape("dir /b").as_deref(), Some("dir"));
+        assert_eq!(shape("FOO=1 node build.js").as_deref(), Some("node build.js"));
+        // Shells and interpreter launchers run whatever they are handed: no shape at all.
+        assert_eq!(shape("cmd /c echo hi"), None);
+        assert_eq!(shape("C:\\Windows\\System32\\cmd.exe /c echo hi"), None);
+        assert_eq!(shape("powershell -c Get-ChildItem"), None);
+        assert_eq!(shape("env FOO=1 ls"), None);
+        // Only the execution tool has a shape, and only when it names a command.
+        assert_eq!(command_shape("write_file", &json!({ "path": "/x" })), None);
+        assert_eq!(shape("   "), None);
+    }
+
+    #[test]
+    fn session_approvals_cover_one_shape_but_not_the_next() {
+        let p = policy();
+        let decide = |command: &str, mode: Option<&str>| {
+            plain_decision(
+                &p,
+                "run_command",
+                command_shape("run_command", &json!({ "command": command })),
+                mode,
+            )
+        };
+        // `run_command` ships at ask, and the shape travels back for the card to label.
+        let (allowed, shape) = decide("npm run build", None);
+        assert!(!allowed);
+        assert_eq!(shape.as_deref(), Some("npm run"));
+
+        p.grant_shape("npm run").expect("grant");
+        assert!(decide("npm run test", None).0, "the approved kind runs on its own");
+        assert!(!decide("npm publish", None).0, "another kind still asks");
+
+        // A shell has no shape, so it cannot ride on the grant.
+        let (allowed, shape) = decide("cmd /c npm run build", None);
+        assert!(!allowed);
+        assert_eq!(shape, None);
+
+        // The whole-tool approval from the card still covers everything the tool does, and it
+        // outlives the shortcut that was active when it was granted.
+        p.grant_session("run_command").expect("grant");
+        assert!(decide("npm publish", None).0);
+        assert!(decide("npm publish", Some("strict")).0);
     }
 
     #[test]
