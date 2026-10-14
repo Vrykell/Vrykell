@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { pickPath } from '@platform/api/fs';
 import { useToastStore } from '@ui/Toast';
 import {
   LIMITS,
@@ -62,9 +62,9 @@ export function useAttachmentComposer(state?: AttachmentComposerState) {
 
   const pickFiles = useCallback(async () => {
     try {
-      const selected = await openDialog({ multiple: true });
-      if (!selected) return;
-      await importPaths(Array.isArray(selected) ? selected : [selected]);
+      const selected = await pickPath('files');
+      if (selected.length === 0) return;
+      await importPaths(selected);
     } catch (error) {
       toastError(String((error as Error)?.message ?? error));
     }

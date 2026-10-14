@@ -298,6 +298,7 @@ const zh: Record<string, string> = {
   "Approval timeout": "审批等待超时",
   "Could not open the link.": "打开链接失败。",
   "Only http, https, mailto and tel links can be opened.": "只允许打开 http、https、mailto、tel 链接，已在应用内拦截。",
+  "This file was not chosen by you. Pick it through the dialog or drop it onto the window.": "这个文件不是你选过的：请通过「选择文件」或把文件拖进窗口再试。",
   "Allow {{shape}} this conversation": "本会话允许「{{shape}}」",
   "No answer within {{minutes}} minutes, so the request was denied automatically.": "等待 {{minutes}} 分钟无人应答，已自动拒绝本次操作。",
   "No answer within {{minutes}} minutes, so trusting {{skill}} was refused.": "等待 {{minutes}} 分钟无人确认信任「{{skill}}」，已拒绝访问。",

@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+﻿import type { Page } from '@playwright/test';
 
 export interface TauriMockOptions {
   launchDirectory?: string;
@@ -88,6 +88,8 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     const revealed: string[] = [];
     /** URLs handed to the system browser (plugin:opener|open_url). */
     const openedUrls: string[] = [];
+    /** Native picker invocations the page made, so a spec can assert the mode it asked for. */
+    const pickCalls: { mode: string }[] = [];
     const aiConfig: { hasKey: boolean; baseUrl: string; model: string } = {
       hasKey: true,
       baseUrl: 'https://api.openai.com/v1',
@@ -184,6 +186,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     (window as unknown as Record<string, unknown>).__DOWNLOADS__ = downloads;
     (window as unknown as Record<string, unknown>).__REVEALED__ = revealed;
     (window as unknown as Record<string, unknown>).__OPENED_URLS__ = openedUrls;
+    (window as unknown as Record<string, unknown>).__PICK_CALLS__ = pickCalls;
     (window as unknown as Record<string, unknown>).__SESSION_PAYLOADS__ = sessionPayloads;
     (window as unknown as Record<string, unknown>).__AI_KEY_CALLS__ = aiKeyCalls;
     (window as unknown as Record<string, unknown>).__AI_MODEL_CALLS__ = aiModelCalls;
@@ -1004,6 +1007,15 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             // navigating the app window.
             openedUrls.push(String(args.url ?? ''));
             return undefined;
+          case 'pick_path': {
+            // The real command opens a native picker and records the choice. The mock answers with
+            // a scripted path (or an empty list when a spec never configures one) and replays the
+            // grant the runtime would have made, so attachment flows keep working in tests.
+            const scripted = (window as unknown as Record<string, string[] | undefined>).__PICK_PATHS__;
+            const picked = scripted ?? [];
+            pickCalls.push({ mode: String((args.request as { mode?: string } | undefined)?.mode ?? 'file') });
+            return picked;
+          }
           case 'list_sessions':
             return mockSessions;
           case 'terminal_debug_status':
@@ -1331,6 +1343,11 @@ export function fsOps(page: Page): Promise<{ op: string; path: string; newName?:
 /** 读取远程文件面板调用的 ssh_rename / ssh_move / ssh_copy / ssh_stage_delete 等记录 */
 export function sshOps(page: Page): Promise<{ op: string; path: string; newName?: string; destDir?: string }[]> {
   return page.evaluate(() => (window as unknown as Record<string, { op: string; path: string; newName?: string }[]>).__SSH_OPS__);
+}
+
+/** Native picker modes the page asked for, in order. */
+export function pickCalls(page: Page): Promise<{ mode: string }[]> {
+  return page.evaluate(() => (window as unknown as Record<string, { mode: string }[]>).__PICK_CALLS__ ?? []);
 }
 
 /** URLs handed to the system browser via the opener plugin, in order. */

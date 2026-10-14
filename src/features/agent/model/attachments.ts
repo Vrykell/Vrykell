@@ -15,6 +15,7 @@
  * textContent 随元数据入库（重开后仍在）；blobPath 指向附件目录文件。
  */
 
+import { t } from '@i18n';
 import { invoke } from '@platform/diagnostics';
 import type { ProviderKind } from '@features/agent/services/provider';
 
@@ -63,10 +64,18 @@ export function importToMeta(r: AttachmentImport, kind: AttachmentMeta['kind']):
   };
 }
 
-/** 选择/导入本地文件为附件 */
+/** 选择/导入本地文件为附件。路径必须来自系统级用户动作（选择器或拖放），否则后端拒绝。 */
 export async function importFileAsAttachment(path: string): Promise<AttachmentMeta> {
-  const r = await invoke<AttachmentImport>('import_attachment', { path });
-  return importToMeta(r, r.mime.startsWith('image/') ? 'image' : 'file');
+  try {
+    const r = await invoke<AttachmentImport>('import_attachment', { path });
+    return importToMeta(r, r.mime.startsWith('image/') ? 'image' : 'file');
+  } catch (error) {
+    // 后端只回稳定错误码，文案在这里落到 i18n。
+    if (String(error).includes('path-not-granted')) {
+      throw new Error(t('This file was not chosen by you. Pick it through the dialog or drop it onto the window.'));
+    }
+    throw error;
+  }
 }
 
 /** 保存粘贴/拖入的二进制（File/Blob 已读成 base64）为附件 */

@@ -6,6 +6,26 @@ import type { FsEntry, DiskEntry } from '@platform/api/types';
 export type { FsEntry, DiskEntry };
 
 /**
+ * 打开系统原生选择器（文件 / 多文件 / 目录 / 保存）并**在 Rust 侧登记**用户选中的路径。
+ *
+ * 为什么不让网页自己调 dialog 插件：读文件内容的命令（附件导入等）只接受"用户动作产生的
+ * 路径"，而只有 Rust 亲自打开选择器才知道那次选择真的来自用户——网页拿到的是路径，不是
+ * 随便指名路径的权力。返回值是后端规范化后的绝对路径。
+ */
+export function pickPath(
+  mode: 'file' | 'files' | 'directory' | 'save' = 'file',
+  options?: { extensions?: string[]; fileName?: string },
+): Promise<string[]> {
+  return invoke<string[]>('pick_path', {
+    request: {
+      mode,
+      extensions: options?.extensions ?? null,
+      fileName: options?.fileName ?? null,
+    },
+  });
+}
+
+/**
  * 本地文件系统 API —— 所有跨 IPC 边界的路径都在这里归一化：
  * 入参路径先规范成前端统一的 `/` 形式再 invoke，后端返回的路径（条目、磁盘、主目录）
  * 也先规范化再交给业务层。业务层直接使用规范路径，不再自行处理分隔符与盘符根。
