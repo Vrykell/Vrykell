@@ -396,7 +396,7 @@ function GroupSection(props: {
               }}
             />
           ) : (
-            <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <span data-testid={`group-title-${group.id}`} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
               <span style={{
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 fontSize: 'calc(13px * var(--ui-font-scale))', lineHeight: '18px', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)',

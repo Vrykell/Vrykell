@@ -466,8 +466,20 @@ button.window-control-button {
   color: var(--error-text);
 }
 
-/* 分组头：hover 时才显示操作按钮（重命名/删除） */
-.group-actions { opacity: 0; transition: opacity var(--dur) var(--ease); }
+/* 分组头：hover 时才显示操作按钮（重命名/删除）。按钮浮在标题行右端而不是占位，
+   否则窄侧栏下三个 28px 按钮会把标题挤到只剩一个字。 */
+.group-actions {
+  position: absolute;
+  top: 50%;
+  /* 让开右侧的内边距 + chevron 与它前面的间距（8 + 16 + 8）。 */
+  right: 32px;
+  z-index: 1;
+  transform: translateY(-50%);
+  /* 覆盖在标题上时用同一层表面遮住文字，避免图标与文字叠在一起。 */
+  background: var(--tab-hover);
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+}
 [data-group-header-id]:hover .group-actions { opacity: 1; }
 
 .ai-chat-panel { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 0; container-type: inline-size; }
@@ -640,6 +652,7 @@ button.window-control-button {
 }
 
 .tab-group-header {
+  position: relative;
   background: transparent;
   border: none;
   border-radius: var(--tab-radius);
