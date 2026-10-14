@@ -106,15 +106,15 @@ export default function AiBlock({ exchange, conversationId, presentation = 'bloc
       {answer.stopped && <div className="chat-environment-note">{t('Reply stopped. Terminal commands may still be running.')}</div>}
     </div>}
     {plain && answer && !answer.pending && <div className="chat-answer-actions">
-      <CopyButton testId="chat-answer-copy" text={answer.content ?? ''} label={t('Copy')} iconSize={18} style={{ width: 28, height: 28 }} />
-      {!sending && question && <IconButton compact aria-label={t('Regenerate')} data-tip={t('Regenerate')} onClick={regenerate}>
-        <RefreshCw size={18} />
+      <CopyButton testId="chat-answer-copy" text={answer.content ?? ''} label={t('Copy')} iconSize={16} style={{ width: 24, height: 24 }} />
+      {!sending && question && <IconButton compact style={{ width: 24, height: 24 }} aria-label={t('Regenerate')} data-tip={t('Regenerate')} onClick={regenerate}>
+        <RefreshCw size={16} />
       </IconButton>}
-      {!sending && question && <IconButton compact aria-label={t('Edit and resend')} data-tip={t('Edit and resend')} onClick={() => setConfirmation('edit')}>
-        <Pencil size={18} />
+      {!sending && question && <IconButton compact style={{ width: 24, height: 24 }} aria-label={t('Edit and resend')} data-tip={t('Edit and resend')} onClick={() => setConfirmation('edit')}>
+        <Pencil size={16} />
       </IconButton>}
-      {!sending && question && <IconButton compact tone="danger" aria-label={t('Delete')} data-tip={t('Delete')} onClick={() => setConfirmation('delete')}>
-        <Trash2 size={18} />
+      {!sending && question && <IconButton compact style={{ width: 24, height: 24 }} tone="danger" aria-label={t('Delete')} data-tip={t('Delete')} onClick={() => setConfirmation('delete')}>
+        <Trash2 size={16} />
       </IconButton>}
     </div>}
     {menu && <ContextMenu anchor={menu} items={actions} onClose={() => setMenu(null)} />}
