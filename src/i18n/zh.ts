@@ -624,6 +624,21 @@ const zh: Record<string, string> = {
   'files.upload.plainDone': '已上传',
   'files.upload.plainDoneCount': '已上传 {{n}} 项',
 
+  // ── File properties ──
+  'Properties': '属性',
+  'Name': '名称',
+  'Type': '类型',
+  'Location': '位置',
+  'Size': '大小',
+  'Modified time': '修改时间',
+  'Created time': '创建时间',
+  'Folder': '文件夹',
+  'File': '文件',
+  '{{ext}} file': '{{ext}} 文件',
+  'Reading properties…': '正在读取属性…',
+  'Could not read properties': '无法读取文件属性',
+  'Could not open the file': '无法打开文件',
+
   // ── 打开方式设置 ──
   'settings.openMode.title': '各 Shell 打开模式',
   'settings.openMode.description': '经典模式输出直进终端；块模式生成命令块。',

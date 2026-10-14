@@ -3,7 +3,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ArrowUp, ChevronRight, Search, MoreHorizontal, iconSizes } from '@ui/icons';
 import { IconBtn } from '@ui/UiBtn';
-import type { DiskEntry, FsEntry } from '@platform/api/types';
+import type { DiskEntry, FsEntry, FileStat } from '@platform/api/types';
 import { flattenVisible, type VisibleRow } from '@features/files/utils/fileTree';
 import { fileIcon } from '@features/files/utils/fileIcon';
 import { compactPathSegments } from '@features/files/utils/breadcrumb';
@@ -15,6 +15,7 @@ import { useFileRowDrag } from '@features/files/hooks/useFileRowDrag';
 import { useExternalFileDrop } from '@features/files/hooks/useExternalFileDrop';
 import { useFileDragStore } from '@features/files';
 import FileDragPreview from '@features/files/components/FileDragPreview';
+import FilePropertiesDialog from '@features/files/components/FilePropertiesDialog';
 import FileSearchMenu from './FileSearchMenu';
 import ContextMenu from '@ui/ContextMenu';
 import ConfirmDialog from '@ui/ConfirmDialog';
@@ -141,6 +142,8 @@ export default function FilePanel({
   const rows = flattenVisible(entries, expandedSet, childCache);
   const [pathDraft, setPathDraft] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [propertiesTarget, setPropertiesTarget] = useState<FsEntry | null>(null);
+  const pathBarRequest = useRef(0);
   const searchReturnFocus = useRef<HTMLElement | null>(null);
   const directoryReady = path !== null && settled && !error && !loading && !navigationPending;
   const [externalDrop, setExternalDrop] = useState<{ rowPath: string | null; dir: string } | null>(null);
@@ -226,13 +229,6 @@ export default function FilePanel({
   /** 面包屑 → 可编辑路径：进入即全选，回车跳转，Esc / 失焦取消 */
   const beginPathEdit = () => setPathDraft(path ?? '');
   const cancelPathEdit = () => setPathDraft(null);
-  const commitPathEdit = () => {
-    // 容忍带引号的粘贴（「复制为路径」风格）
-    const next = (pathDraft ?? '').trim().replace(/^"(.*)"$/, '$1');
-    cancelPathEdit();
-    if (!next || next === path) return;
-    navigate(ops.joinSegments(ops.segments(next)));
-  };
 
   /** 菜单回调：核心动作由面板实现，专有动作由上层注入 */
   const handlers: FileMenuHandlers = {
@@ -243,11 +239,44 @@ export default function FilePanel({
     onPasteInto: (dir) => void pasteInto(dir),
     onRename: (entry) => startRename(entry),
     onDelete: (targets) => confirmDelete(targets),
+    onProperties: (entry) => setPropertiesTarget(entry),
     ...extraHandlers,
     onSyncToCwd: terminalCwd != null ? () => { void navigate(terminalCwd); }
       : onSyncToTerminal ? () => useToastStore.getState().addToast(t('The terminal has not reported its working directory yet.'), 'info') : undefined,
     onSyncToTerminal: config.syncToTerminal && onSyncToTerminal && directoryReady
       ? () => { if (path !== null) onSyncToTerminal(path); } : undefined,
+  };
+
+  /**
+   * Path bar commit: directories navigate as usual, while a file path opens
+   * instead of failing with a read-directory error. The panel configuration
+   * picks the opening route (local: system default app, remote: editor).
+   */
+  const commitPathEdit = () => {
+    // Tolerate quoted pastes (the "Copy as path" style).
+    const next = (pathDraft ?? '').trim().replace(/^"(.*)"$/, '$1');
+    cancelPathEdit();
+    if (!next || next === path) return;
+    void openTypedPath(ops.joinSegments(ops.segments(next)));
+  };
+
+  const openTypedPath = async (destination: string) => {
+    const request = ++pathBarRequest.current;
+    let info: FileStat | null = null;
+    try {
+      info = await ops.stat(destination);
+    } catch {
+      // Missing or unreadable: fall through to navigation, which reports the usual error.
+    }
+    // A newer commit replaced this one while the metadata was loading.
+    if (request !== pathBarRequest.current) return;
+    if (info && !info.is_dir) {
+      const entry: FsEntry = { name: info.name, path: info.path, is_dir: false, is_symlink: info.is_symlink };
+      if (config.pathBarFile === 'system-app' && handlers.onOpenSystem) handlers.onOpenSystem(entry);
+      else openEntry(entry);
+      return;
+    }
+    void navigate(destination);
   };
 
   /** 菜单作用目标：命中行属于多选时是整组 */
@@ -608,6 +637,15 @@ export default function FilePanel({
         onConfirm={confirmAction}
         onCancel={cancelConfirm}
       />
+
+      {propertiesTarget && (
+        <FilePropertiesDialog
+          entry={propertiesTarget}
+          location={ops.parentOf(propertiesTarget.path) ?? config.rootLabel}
+          stat={ops.stat}
+          onClose={() => setPropertiesTarget(null)}
+        />
+      )}
     </div>
   );
 }

@@ -89,6 +89,8 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     const sshOps: { op: string; path: string; newName?: string; destDir?: string }[] = [];
     const downloads: Record<string, unknown>[] = [];
     const revealed: string[] = [];
+    /** Paths handed to the system default application (plugin:opener|open_path). */
+    const opened: string[] = [];
     const aiConfig: { hasKey: boolean; baseUrl: string; model: string } = {
       hasKey: true,
       baseUrl: 'https://api.openai.com/v1',
@@ -162,6 +164,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     (window as unknown as Record<string, unknown>).__SSH_OPS__ = sshOps;
     (window as unknown as Record<string, unknown>).__DOWNLOADS__ = downloads;
     (window as unknown as Record<string, unknown>).__REVEALED__ = revealed;
+    (window as unknown as Record<string, unknown>).__OPENED__ = opened;
     (window as unknown as Record<string, unknown>).__SESSION_PAYLOADS__ = sessionPayloads;
     (window as unknown as Record<string, unknown>).__AI_KEY_CALLS__ = aiKeyCalls;
     (window as unknown as Record<string, unknown>).__AI_MODEL_CALLS__ = aiModelCalls;
@@ -859,6 +862,22 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
               ],
             };
           }
+          case 'ssh_stat': {
+            const path = args.path as string;
+            const created = createdEntries.find((item) => item.path === path);
+            // app.log is the one file every mocked remote directory lists; other
+            // unknown paths are treated as directories so navigation still works.
+            const isDir = created ? created.is_dir : !path.endsWith('/app.log');
+            return {
+              name: path.split('/').filter(Boolean).pop() ?? path,
+              path,
+              is_dir: isDir,
+              is_symlink: false,
+              size: isDir ? 0 : 2048,
+              created_ms: null,
+              modified_ms: Date.UTC(2026, 0, 5, 6, 7, 8),
+            };
+          }
           case 'ssh_download': {
             const name = (args.path as string).split('/').pop() ?? 'file';
             const rec = {
@@ -883,6 +902,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             revealed.push(...(args.paths as string[]));
             return undefined;
           case 'plugin:opener|open_path':
+            opened.push(args.path as string);
             return undefined;
           case 'list_sessions':
             return mockSessions;
@@ -993,6 +1013,22 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
               { name: 'e2e-root', path: '/', total_bytes: 500 * 1024 ** 3, free_bytes: 250 * 1024 ** 3 },
               { name: 'Backup', path: '/Volumes/Backup', total_bytes: 2 * 1024 ** 4, free_bytes: 1.5 * 1024 ** 4 },
             ];
+          case 'fs_stat': {
+            const path = args.path as string;
+            const created = createdEntries.find((item) => item.path === path);
+            // The mock serves the same flat layout for every directory: only the
+            // listed files count as files so typed directory paths keep navigating.
+            const isDir = created ? created.is_dir : path !== '/home/e2e/notes.txt';
+            return {
+              name: path.split('/').filter(Boolean).pop() ?? path,
+              path,
+              is_dir: isDir,
+              is_symlink: false,
+              size: isDir ? 0 : 1536,
+              created_ms: Date.UTC(2026, 0, 2, 3, 4, 5),
+              modified_ms: Date.UTC(2026, 0, 2, 3, 4, 5),
+            };
+          }
           case 'fs_rename': {
             fsOps.push({ op: 'rename', path: args.oldPath as string, newName: args.newName as string });
             const oldPath = args.oldPath as string;
@@ -1198,6 +1234,11 @@ export function sshOps(page: Page): Promise<{ op: string; path: string; newName?
 /** 读取下载管理里「定位」调用的 reveal 路径记录 */
 export function revealedPaths(page: Page): Promise<string[]> {
   return page.evaluate(() => (window as unknown as Record<string, string[]>).__REVEALED__);
+}
+
+/** Paths handed to the system default application (plugin:opener|open_path). */
+export function openedPaths(page: Page): Promise<string[]> {
+  return page.evaluate(() => (window as unknown as Record<string, string[]>).__OPENED__);
 }
 
 /** 读取 update_session_payload 记录（分屏布局持久化断言用） */

@@ -423,6 +423,60 @@ pub async fn ssh_list(
         .map_err(|e| e.to_string())?
 }
 
+/// Metadata for one remote path (path bar file/directory detection and the
+/// properties dialog). SFTP v3 exposes no creation time, so it stays None.
+#[derive(Clone, Serialize, Debug, PartialEq)]
+pub struct SshStat {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+    pub is_symlink: bool,
+    pub size: u64,
+    pub created_ms: Option<u64>,
+    pub modified_ms: Option<u64>,
+}
+
+/// Map one SFTP metadata record onto the frontend stat shape.
+fn ssh_stat_from(path: String, name: String, meta: &ssh2::FileStat, is_symlink: bool) -> SshStat {
+    SshStat {
+        path,
+        name,
+        is_dir: meta.is_dir(),
+        is_symlink,
+        size: if meta.is_dir() { 0 } else { meta.size.unwrap_or(0) },
+        created_ms: None,
+        modified_ms: meta.mtime.map(|seconds| seconds.saturating_mul(1000)),
+    }
+}
+
+fn ssh_stat_sync(conn: &SshConnection, path: &str) -> Result<SshStat, String> {
+    let sess = connect(conn)?;
+    let sftp = sess.sftp().map_err(|e| format!("SFTP_UNAVAILABLE: {e}"))?;
+    // stat follows symlinks (target metadata); lstat only flags the link itself.
+    let meta = sftp
+        .stat(Path::new(path))
+        .map_err(|e| format!("Failed to read remote metadata: {e}"))?;
+    let is_symlink = sftp
+        .lstat(Path::new(path))
+        .map(|link| link.file_type().is_symlink())
+        .unwrap_or(false);
+    let name = crate::platform::path::file_name(path).unwrap_or_else(|| path.to_string());
+    Ok(ssh_stat_from(path.to_string(), name, &meta, is_symlink))
+}
+
+/// Read metadata for one remote path (path bar quick open and properties dialog).
+#[tauri::command]
+pub async fn ssh_stat(
+    state: State<'_, HistoryState>,
+    id: String,
+    path: String,
+) -> Result<SshStat, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?.get_ssh_connection(&id)?;
+    tauri::async_runtime::spawn_blocking(move || ssh_stat_sync(&conn, &path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub async fn ssh_search(state: State<'_, HistoryState>, id: String, path: String, text: String, request_id: String) -> Result<SshSearchResponse, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?.get_ssh_connection(&id)?;
@@ -1043,6 +1097,41 @@ mod tests {
         assert!(json.contains("\"name\":\"a\""));
         assert!(json.contains("\"is_dir\":true"));
         assert!(json.contains("\"path\":\"/a\""));
+    }
+
+    #[test]
+    fn ssh_stat_maps_sftp_metadata() {
+        let file_meta = ssh2::FileStat {
+            size: Some(2048),
+            uid: Some(1000),
+            gid: Some(1000),
+            perm: Some(0o100644),
+            atime: Some(1_700_000_000),
+            mtime: Some(1_700_000_001),
+        };
+        let file_stat = ssh_stat_from("/home/u/a.txt".into(), "a.txt".into(), &file_meta, false);
+        assert_eq!(file_stat.path, "/home/u/a.txt");
+        assert_eq!(file_stat.name, "a.txt");
+        assert!(!file_stat.is_dir);
+        assert!(!file_stat.is_symlink);
+        assert_eq!(file_stat.size, 2048);
+        assert_eq!(file_stat.modified_ms, Some(1_700_000_001_000));
+        assert_eq!(file_stat.created_ms, None);
+
+        // Directories report size 0; missing attributes map to None instead of panicking.
+        let dir_meta = ssh2::FileStat {
+            size: Some(4096),
+            uid: None,
+            gid: None,
+            perm: Some(0o040555),
+            atime: None,
+            mtime: None,
+        };
+        let dir_stat = ssh_stat_from("/home/u/docs".into(), "docs".into(), &dir_meta, true);
+        assert!(dir_stat.is_dir);
+        assert!(dir_stat.is_symlink);
+        assert_eq!(dir_stat.size, 0);
+        assert_eq!(dir_stat.modified_ms, None);
     }
 
     // 说明：connect / ssh_list_sync 依赖真实 SSH 服务，无法离线单测，

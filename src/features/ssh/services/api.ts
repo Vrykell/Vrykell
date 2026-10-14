@@ -1,6 +1,6 @@
 import { t } from '@i18n';
 import { invoke } from '@platform/diagnostics';
-import type { FsEntry } from '@platform/api/types';
+import type { FsEntry, FileStat } from '@platform/api/types';
 import type { SshOptions } from '@core/ssh';
 
 /**
@@ -148,6 +148,11 @@ export function sshTrustHostKey(host: string, port: number | undefined, expected
 /** 列出远程目录（按连接 id，密码由后端解析）。返回条目 + 实际目录真实路径。 */
 export function sshFsList(id: string, path?: string): Promise<SshListResponse> {
   return invoke('ssh_list', { id, path: path ?? null });
+}
+
+/** Read metadata for one remote path (path bar file detection and the properties dialog). */
+export function sshStat(id: string, path: string): Promise<FileStat> {
+  return invoke('ssh_stat', { id, path });
 }
 
 /** Search through one file channel and cancel obsolete requests. */
