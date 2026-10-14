@@ -13,6 +13,7 @@ import { IconButton } from '@ui/IconButton';
 import ErrorBox from '@ui/ErrorBox';
 import { TextArea } from '@ui/TextInput';
 import KeyHint from '@ui/KeyHint';
+import { useActiveWorkspace } from '@features/workspace';
 import { toExchanges } from '@features/chat/model/exchanges';
 import AiBlock from '@features/chat/components/AiBlock';
 import { bindHarnessEvents, useHarnessStore } from '../stores/harness';
@@ -28,6 +29,9 @@ import { bindHarnessEvents, useHarnessStore } from '../stores/harness';
  */
 export default function HarnessView({ tabId, harness }: { tabId: string; harness: string }) {
   const session = useHarnessStore((state) => state.byTab[tabId]);
+  // The session works where the user's terminal is: the workspace already knows that directory, and
+  // the backend falls back to its own only when there is no terminal to ask.
+  const { activeCwd } = useActiveWorkspace();
   const [text, setText] = useState('');
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -35,8 +39,8 @@ export default function HarnessView({ tabId, harness }: { tabId: string; harness
   useEffect(() => () => { void useHarnessStore.getState().close(tabId); }, [tabId]);
   // Opening is idempotent: a tab that already has a session keeps it.
   useEffect(() => {
-    if (!session) void useHarnessStore.getState().open(tabId, harness, '');
-  }, [tabId, harness, session]);
+    if (!session) void useHarnessStore.getState().open(tabId, harness, activeCwd ?? '');
+  }, [tabId, harness, session, activeCwd]);
 
   const agent = session?.agent?.agentInfo;
   const exchanges = toExchanges(session?.messages ?? []);
@@ -72,7 +76,10 @@ export default function HarnessView({ tabId, harness }: { tabId: string; harness
       <div className="chat-composer-wrap">
         <div className="terminal-composer chat-composer">
           <div className="terminal-composer-heading">
-            <span>{harness}{agent ? ` · ${agent.title || agent.name || ''}` : ''}</span>
+            <span data-tip={activeCwd || undefined} data-tip-description={activeCwd ? t('The harness works in this directory.') : undefined}
+              style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {harness}{agent ? ` · ${agent.title || agent.name || ''}` : ''}
+            </span>
             <span className="composer-key-hints"><KeyHint shortcut="Enter" />{t('Send')}</span>
           </div>
           <div className="chat-composer-input">
