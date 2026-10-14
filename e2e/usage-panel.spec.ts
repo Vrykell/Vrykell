@@ -1,37 +1,47 @@
 /**
- * Usage panel e2e: sidebar entry, empty state, provider-reported tokens landing in the
- * panel, range switching and clearing.
- *
- * Sending a message can take over the right side (the chat panel replaces an open sidebar
- * panel), so the panel is reopened after the turn before the numbers are asserted.
+ * Usage panel e2e: the conversation-settings entry, the empty state, provider-reported
+ * tokens landing in the panel, range switching and clearing.
  */
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, mockAnthropic } from './tauri-mock';
+import { setupTauriMock, mockAnthropic, ensureChatSettingsOpen } from './tauri-mock';
+
+/** Opens the AI panel's conversation settings, reusing the panel when it is already visible. */
+async function openConversationSettings(page: import('@playwright/test').Page) {
+  const trigger = page.getByRole('button', { name: '会话设置', exact: true });
+  // The activity-bar button toggles the panel, so only press it when the chat panel is hidden.
+  if (!(await trigger.isVisible().catch(() => false))) await page.locator('[data-dock-btn="chat"]').click();
+  await ensureChatSettingsOpen(page);
+}
+
+async function openUsagePanel(page: import('@playwright/test').Page) {
+  await openConversationSettings(page);
+  await page.getByTestId('chat-usage-entry').click();
+  await expect(page.getByTestId('usage-panel')).toBeVisible();
+}
 
 test.describe('usage panel', () => {
-  test('records the tokens of one turn and opens from the sidebar', async ({ page }) => {
+  test('opens from conversation settings and records the tokens of one turn', async ({ page }) => {
     await mockAnthropic(page, '已记录');
     // The default schedule seed is due at boot and would record a turn of its own.
     await setupTauriMock(page, { schedulesSeed: [] });
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
 
-    // Sidebar button opens the panel: empty state, nothing to clear yet.
-    const usageButton = page.locator('[data-dock-btn="usage"]');
-    await usageButton.click();
-    await expect(page.getByTestId('usage-panel')).toBeVisible();
+    // Conversation settings → Usage: empty state, nothing to clear yet.
+    await openUsagePanel(page);
     await expect(page.getByTestId('usage-empty')).toBeVisible();
     await expect(page.getByTestId('usage-clear')).toBeDisabled();
 
-    // One turn: the mocked stream reports prompt_tokens 10 / completion_tokens 5.
-    await page.getByRole('button', { name: '询问 AI', exact: true }).click();
+    // One turn from the AI panel: the mocked stream reports prompt_tokens 10 / completion_tokens 5.
+    await page.locator('[data-dock-btn="chat"]').click();
     const input = page.getByPlaceholder(/自然语言描述/);
+    await expect(input).toBeVisible({ timeout: 3000 });
     await input.fill('统计一下用量');
     await input.press('Enter');
     await expect(page.getByText('已记录')).toBeVisible({ timeout: 10000 });
 
-    // Reopen the panel: 1 request, 10 input tokens, 5 output tokens.
-    if (!(await page.getByTestId('usage-turns').isVisible().catch(() => false))) await usageButton.click();
+    // Back to the panel through the same entry: 1 request, 10 input tokens, 5 output tokens.
+    await openUsagePanel(page);
     await expect(page.getByTestId('usage-turns')).toHaveText('1');
     await expect(page.getByTestId('usage-input-tokens')).toHaveText('10');
     await expect(page.getByTestId('usage-output-tokens')).toHaveText('5');
