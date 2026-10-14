@@ -79,6 +79,26 @@ describe('fileMenu', () => {
     expect(buildFileMenuItems(['reveal'], ctx())).toHaveLength(0);
   });
 
+  it('offers properties for a single row only, and calls the handler with that entry', () => {
+    const onProperties = vi.fn();
+    const file = entry('a.txt', '/work/a.txt');
+
+    const row = buildFileMenuItems(['properties'], ctx({ entry: file, targets: [file], handlers: handlers({ onProperties }) }));
+    expect(row).toHaveLength(1);
+    expect(row[0]!.label).toBe('属性');
+    row[0]!.onClick();
+    expect(onProperties).toHaveBeenCalledWith(file);
+
+    // No handler (panel does not support it) or a group hit renders nothing
+    expect(buildFileMenuItems(['properties'], ctx({ entry: file, targets: [file] }))).toHaveLength(0);
+    expect(buildFileMenuItems(['properties'], ctx({
+      entry: file,
+      targets: [file, entry('b.txt', '/work/b.txt')],
+      handlers: handlers({ onProperties }),
+    }))).toHaveLength(0);
+    expect(buildFileMenuItems(['properties'], ctx({ handlers: handlers({ onProperties }) }))).toHaveLength(0);
+  });
+
   it('offers sync-to-cwd only when the panel provides a handler', () => {
     const onSyncToCwd = vi.fn();
     const withHandler = buildFileMenuItems(['sync-cwd'], ctx({ handlers: handlers({ onSyncToCwd }) }));

@@ -112,6 +112,25 @@ test.describe('SSH 远程连接管理侧栏', () => {
     expect(await revealedPaths(page)).toContain('/tmp/Documents');
   });
 
+  test('远程面板：右键属性显示远端元数据且没有创建时间', async ({ page }) => {
+    await page.getByText('生产服务器').dblclick();
+    await page.locator('[data-dock-btn="files"]').click();
+    await expect(page.locator('[data-testid="remote-file-app.log"]')).toBeVisible({ timeout: 5000 });
+
+    await page.locator('[data-testid="remote-file-app.log"]').click({ button: 'right' });
+    await page.getByRole('button', { name: '属性', exact: true }).click();
+
+    await expect(page.getByTestId('file-property-name')).toHaveText('app.log');
+    await expect(page.getByTestId('file-property-type')).toHaveText('LOG 文件');
+    await expect(page.getByTestId('file-property-location')).toHaveText('/home/root');
+    await expect(page.getByTestId('file-property-size')).toHaveText('2.0 KB');
+    // SFTP provides no creation time: the row is not rendered
+    await expect(page.getByTestId('file-property-created')).toHaveCount(0);
+
+    await page.getByTestId('properties-close').click();
+    await expect(page.getByTestId('file-properties-dialog')).toHaveCount(0);
+  });
+
   test('远程面板：单击选中、Ctrl 加选、双击进入、回退还原视图与选中', async ({ page }) => {
     await page.getByText('生产服务器').dblclick();
     await page.locator('[data-dock-btn="files"]').click();

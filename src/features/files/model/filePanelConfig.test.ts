@@ -22,4 +22,20 @@ describe('filePanelConfig menus', () => {
     expect(ssh.menus.rowFolder).not.toContain('reveal');
     expect(ssh.menus.more).not.toContain('reveal');
   });
+
+  it('offers properties on single rows of both panels and routes path bar files per target', () => {
+    const local = filePanelConfigFor({ kind: 'local' });
+    const ssh = filePanelConfigFor({ kind: 'ssh', connectionId: 'c1' });
+
+    expect(local.menus.rowFile).toContain('properties');
+    expect(local.menus.rowFolder).toContain('properties');
+    expect(ssh.menus.rowFile).toContain('properties');
+    expect(ssh.menus.rowFolder).toContain('properties');
+    // Multi-selection shows no properties entry: there is no single entry to describe.
+    expect(local.menus.rowMulti).not.toContain('properties');
+    expect(ssh.menus.rowMulti).not.toContain('properties');
+
+    expect(local.pathBarFile).toBe('system-app');
+    expect(ssh.pathBarFile).toBe('editor');
+  });
 });

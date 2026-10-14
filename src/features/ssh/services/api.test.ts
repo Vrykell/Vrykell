@@ -11,6 +11,7 @@ import {
   touchSshConnection,
   sshTest,
   sshFsList,
+  sshStat,
   sshDownload,
   newSshId,
   sshHostKeyInfo,
@@ -81,6 +82,9 @@ describe('sshApi', () => {
     expect(invokeMock).toHaveBeenCalledWith('ssh_list', { id: 's1', path: '/home' });
     await sshFsList('s1');
     expect(invokeMock).toHaveBeenCalledWith('ssh_list', { id: 's1', path: null });
+
+    await sshStat('s1', '/home/app.log');
+    expect(invokeMock).toHaveBeenCalledWith('ssh_stat', { id: 's1', path: '/home/app.log' });
 
     await sshDownload('s1', '/home/app.log');
     expect(invokeMock).toHaveBeenCalledWith('ssh_download', { id: 's1', path: '/home/app.log' });

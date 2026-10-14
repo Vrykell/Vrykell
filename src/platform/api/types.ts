@@ -23,6 +23,18 @@ export interface DiskEntry {
   free_bytes: number;
 }
 
+/** Single-path metadata from fs_stat / ssh_stat (path bar detection and properties dialog). */
+export interface FileStat {
+  name: string;
+  path: string;
+  is_dir: boolean;
+  is_symlink: boolean;
+  size: number;
+  /** Unix milliseconds; null when the platform or protocol cannot provide it (SFTP has no creation time). */
+  created_ms: number | null;
+  modified_ms: number | null;
+}
+
 // ── 历史命令 ──
 export interface BackendHistoryEntry {
   id: number;

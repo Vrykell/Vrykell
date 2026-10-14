@@ -1,6 +1,6 @@
 import {
   sshFsList, sshSearchFiles, sshRename, sshCreateFile, sshCreateDir, sshMove, sshCopy,
-  sshStageDelete, sshRestoreStaged, sshPurgeStaged, sshSweepUndo, sshUpload, sshDownload,
+  sshStageDelete, sshRestoreStaged, sshPurgeStaged, sshSweepUndo, sshUpload, sshDownload, sshStat,
 } from '@features/ssh/services/api';
 import { normalizeRemotePath, parentOfRemote, joinRemote } from '@features/ssh/utils/remotePath';
 import type { FileOpOutcome, FileOps } from '@features/files/model/fileOps';
@@ -24,6 +24,7 @@ export function createSshFileOps(connectionId: string): FileOps {
 
   return {
     search: (root, query, signal) => sshSearchFiles(connectionId, root, query, signal),
+    stat: (path) => sshStat(connectionId, path),
     list: (dir) => sshFsList(connectionId, dir ?? undefined)
       .then((response) => ({
         base: response.base ? normalizeRemotePath(response.base) : null,
