@@ -231,6 +231,54 @@ test('运行中块接管滚轮：xterm 回溯时不滚动外层命令历史', as
   await expect.poll(() => parent.evaluate((el) => el.scrollTop)).toBe(parentTop);
 });
 
+test('运行块挂载前到达的输出不破坏首次滚轮回溯', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.setViewportSize({ width: 1000, height: 520 });
+  await page.goto('/');
+  const input = page.getByPlaceholder(/输入命令/);
+  await expect(input).toBeVisible({ timeout: 5000 });
+  await page.waitForFunction(async () => {
+    const path = '/src/features/terminal/stores/terminal.ts';
+    const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+    return Object.values(useTerminalStore.getState().startupStates).includes('ready');
+  });
+
+  // Output that overflows the screen arrives right after the command starts, while the
+  // running block has not mounted yet and the live terminal is still written headless.
+  await emitPtyOutput(page, `\x1b]133;E;${btoa('sleep 100')}\x07\x1b]133;C\x07`);
+  await emitPtyOutput(
+    page,
+    Array.from({ length: 120 }, (_, i) => `pre-${i} ${'x'.repeat(60)}`).join('\r\n') + '\r\n',
+  );
+
+  const host = page.getByTestId('running-term');
+  await expect(host.locator('.xterm')).toBeVisible({ timeout: 8000 });
+  await page.waitForTimeout(600);
+
+  const blockScroll = () => page.evaluate(() => {
+    const terms = (window as unknown as { __vrykellTerms?: Map<string, RunningTermScrollProbe> }).__vrykellTerms;
+    const key = [...(terms?.keys() ?? [])].find((entry) => entry.startsWith('block:'));
+    const term = key ? terms?.get(key) : undefined;
+    return { viewportY: term?.buffer.active.viewportY ?? -1, baseY: term?.buffer.active.baseY ?? -1 };
+  });
+  const before = await blockScroll();
+  expect(before.baseY).toBeGreaterThan(30);
+
+  const screen = host.locator('.xterm-screen');
+  const screenBox = await screen.boundingBox();
+  expect(screenBox).not.toBeNull();
+  await screen.hover({ position: { x: screenBox!.width / 2, y: screenBox!.height / 2 } });
+  await page.mouse.wheel(0, -80);
+  await page.waitForTimeout(300);
+
+  // The first wheel-up must walk up from the bottom instead of collapsing to the start of
+  // the scrollback: a stale scrollbar model turns the wheel delta into a jump to line 0.
+  const after = await blockScroll();
+  expect(after.viewportY).toBeLessThan(before.viewportY);
+  expect(after.viewportY).toBeGreaterThan(0);
+  expect(before.viewportY - after.viewportY).toBeLessThanOrEqual(20);
+});
+
 test('块终端与页面同色且无圆角，裁剪仍落在 el', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');

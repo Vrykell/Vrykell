@@ -190,6 +190,12 @@ Fitting that clears the renderer before resizing causes an additional blank fram
 
 - Content growth and browser anchoring can change the offset before a resize callback; keep the following latch during layout scroll events and tolerate fractional programmatic offsets. Save the latch separately from the position across remounts, because detached output may grow before restoration. Observe the entire output wrapper. Apply committed history geometry in a layout effect and resize-observer following before paint; postponing a resize snap to another animation frame exposes a one-frame jump. Avoid estimated intrinsic heights for wrapped output, since becoming visible can change the height of the whole history tree.
 
+### 5.4 First Wheel-Up After Pre-Mount Output Jumps to the Top of the Scrollback (scrollbar model out of sync with the buffer, `TerminalBlockList.tsx` RunningTerm)
+- **Symptom**: when more than a screen of output arrives within the first two seconds of a command (before the running block mounts), the first wheel-up over the live terminal collapses the view to the very top of the scrollback; the viewport leaves the bottom and new output stops following until the user scrolls back down.
+- **Root cause**: the block's live terminal is written before it is opened (headless writes). While headless the render dimensions are 0, so every output scroll writes `viewport line x cell height (0) = 0` into the scrollbar model: the model stays at the top while the buffer is already at the bottom. Opening the terminal (or a size change) only updates the model's range, never its position, so the first wheel computes from position 0 and clamps there. Any real scroll after mount (even one line of output) heals it; waiting alone does not.
+- **Fix**: on the first frame after mount, when the viewport is at the bottom, force two real scrolls (`scrollToTop()` + `scrollToBottom()`) so the correct position is written back; `scrollToBottom()` alone is a no-op at the bottom because it computes a zero-line delta. Scheduling sits outside the `term.element` check so the second StrictMode mount still schedules it.
+- **Regression**: `running-term.spec.ts` "运行块挂载前到达的输出不破坏首次滚轮回溯".
+
 ---
 
 ## 6. Cross-Platform
