@@ -82,14 +82,14 @@ const POSIX_RULES: &[(&str, &str)] = &[
         r"\brm\s+(-[a-zA-Z]*[rf][a-zA-Z]*\s|--(recursive|force)\b)",
         "danger.recursive_delete",
     ),
-    (r"(^|[;&|(]\s*)sudo\b", "danger.sudo"),
+    (r"(^|[;&|(\n]\s*)sudo\b", "danger.sudo"),
     (r"\b(dd|mkfs|fdisk|diskutil)\s", "danger.disk_operation"),
     (r"(?i)\bgit\s+push\b[^&|;]*(\s-f\b|--force)", "danger.force_push"),
     (r"(?i)\bgit\s+(reset\s+--hard|clean\s+-[a-zA-Z]*f)", "danger.discard_changes"),
-    (r"(^|[;&|(]\s*)(pkill|killall)\b", "danger.kill_by_name"),
+    (r"(^|[;&|(\n]\s*)(pkill|killall)\b", "danger.kill_by_name"),
     (r"\bkill\s+-(9|KILL)\b", "danger.sigkill"),
     (
-        r"(^|[;&|(]\s*)(shutdown|reboot|halt|poweroff)\b",
+        r"(^|[;&|(\n]\s*)(shutdown|reboot|halt|poweroff)\b",
         "danger.power",
     ),
     (r"\bchmod\s+(-[a-zA-Z]*R[a-zA-Z]*\s+)?777\b", "danger.chmod_777"),
@@ -119,26 +119,26 @@ const WINDOWS_RULES: &[(&str, &str)] = &[
 ];
 
 /// Credential locations (name check only; public certificates are deliberately not listed).
+/// Separators accept both `/` and `\` so Windows spellings are caught too; a file name may be
+/// followed by end-of-text, whitespace, a quote, a redirect or a shell separator (it is often
+/// part of a longer command), which the trailing class covers.
 const PATH_RULES: &[(&str, &str)] = &[
-    (r"(^|/)\.ssh/", "path.ssh_dir"),
-    (r"(^|/)\.aws/", "path.aws_dir"),
-    (r"(^|/)\.gnupg/", "path.gnupg_dir"),
-    (r"(^|/)\.kube/", "path.kube_dir"),
-    (r"(^|/)\.config/gcloud/", "path.gcloud_dir"),
-    (r"(^|/)\.docker/config\.json$", "path.docker_credentials"),
-    (r"(^|/)id_(rsa|dsa|ecdsa|ed25519)$", "path.private_key"),
-    (r"(?i)\.(p12|pfx|kdbx)$", "path.key_store"),
-    (r"(^|/)\.git-credentials$", "path.git_credentials"),
-    (r"(^|/)\.netrc$", "path.netrc"),
-    (r"(^|/)\.npmrc$", "path.npmrc"),
-    (r"(^|/)\.pypirc$", "path.pypirc"),
-    (r"(^|/)credentials\.json$", "path.service_account"),
-    (r"(^|/)\.env($|\.)", "path.env_file"),
-    (
-        r"(^|/)\.vrykell/(config|secrets)\.json$",
-        "path.app_config",
-    ),
-    (r"/etc/(shadow|passwd)\b", "path.system_accounts"),
+    (r"(^|[\\/])\.ssh[\\/]", "path.ssh_dir"),
+    (r"(^|[\\/])\.aws[\\/]", "path.aws_dir"),
+    (r"(^|[\\/])\.gnupg[\\/]", "path.gnupg_dir"),
+    (r"(^|[\\/])\.kube[\\/]", "path.kube_dir"),
+    (r"(^|[\\/])\.config[\\/]gcloud[\\/]", "path.gcloud_dir"),
+    (r"(?i)(^|[\\/])\.docker[\\/]config\.json($|[\s'|;&)>,])", "path.docker_credentials"),
+    (r"(?i)(^|[\\/])id_(rsa|dsa|ecdsa|ed25519)($|[\s'|;&)>,])", "path.private_key"),
+    (r"(?i)\.(p12|pfx|kdbx)($|[\s'|;&)>,])", "path.key_store"),
+    (r"(?i)(^|[\\/])\.git-credentials($|[\s'|;&)>,])", "path.git_credentials"),
+    (r"(?i)(^|[\\/])\.netrc($|[\s'|;&)>,])", "path.netrc"),
+    (r"(?i)(^|[\\/])\.npmrc($|[\s'|;&)>,])", "path.npmrc"),
+    (r"(?i)(^|[\\/])\.pypirc($|[\s'|;&)>,])", "path.pypirc"),
+    (r"(?i)(^|[\\/])credentials\.json($|[\s'|;&)>,])", "path.service_account"),
+    (r"(?i)(^|[\\/])\.env($|[.\s'|;&)>,])", "path.env_file"),
+    (r"(?i)(^|[\\/])\.vrykell[\\/](config|secrets)\.json($|[\s'|;&)>,])", "path.app_config"),
+    (r"(?i)[\\/]etc[\\/](shadow|passwd)\b", "path.system_accounts"),
 ];
 
 /// Durable side effects: writes that outlive the turn, some of which feed later system prompts.
@@ -155,6 +155,31 @@ const DURABLE_ACTIONS: &[(&str, &str, &str)] = &[
     ("schedule", "toggle", "durable.schedule_toggle"),
     ("schedule", "remove", "durable.schedule_remove"),
 ];
+
+/// Wrapper invocations that run the rest of the line in a nested shell (`cmd /c`, `powershell
+/// -c "…"`, `sh -c …`) plus the harmless prefix commands (`env`, `nohup`, `time`, `xargs`). The
+/// trailing quote is part of the match so the inner command lands on a fresh line where the
+/// position-anchored rules can see it. `sudo` is deliberately absent: it is itself a flagged
+/// command, so stripping it would hide the very thing the rules look for.
+const WRAPPER_PATTERN: &str = r#"(?i)(^|[;&|({\n]\s*)((cmd(\.exe)?\s+/[ck]|powershell(\.exe)?\s+-(c|command|encodedcommand)|pwsh(\.exe)?\s+-(c|command|encodedcommand)|(ba|z|k|da)?sh\s+-(c|e)|env(\s+\w+=\S+)*|nohup|time|xargs)\s+)['"]?"#;
+
+/// Rewrites wrapper prefixes into line breaks so position-anchored rules still match the command
+/// they hide: `cmd /c shutdown` must be as visible as `shutdown`. Two passes cover
+/// `cmd /c powershell -c "…"`.
+fn normalize_wrappers(text: &str) -> String {
+    let Ok(re) = regex::Regex::new(WRAPPER_PATTERN) else {
+        return text.to_string();
+    };
+    let mut current = text.to_string();
+    for _ in 0..3 {
+        let next = re.replace_all(&current, "$1\n").into_owned();
+        if next == current {
+            break;
+        }
+        current = next;
+    }
+    current
+}
 
 fn is_windows_shell(shell: Option<&str>) -> bool {
     matches!(
@@ -174,18 +199,32 @@ fn first_match(text: &str, rules: &[(&str, &str)]) -> Option<String> {
     None
 }
 
-/// Reason code for text the target shell will execute.
-pub fn danger_reason(command: &str, shell: Option<&str>) -> Option<String> {
-    if let Some(code) = first_match(command, INDIRECTION_RULES) {
+fn scan_rules(text: &str, shell: Option<&str>) -> Option<String> {
+    if let Some(code) = first_match(text, INDIRECTION_RULES) {
         return Some(code);
     }
-    if let Some(code) = first_match(command, POSIX_RULES) {
+    if let Some(code) = first_match(text, POSIX_RULES) {
         return Some(code);
     }
     if is_windows_shell(shell) {
-        if let Some(code) = first_match(command, WINDOWS_RULES) {
+        if let Some(code) = first_match(text, WINDOWS_RULES) {
             return Some(code);
         }
+    }
+    None
+}
+
+/// Reason code for text the target shell will execute.
+///
+/// The original text is scanned first (it yields the clearest reason), then the wrapper-normalized
+/// form, because `cmd /c shutdown` hides a position-anchored rule behind the wrapper.
+pub fn danger_reason(command: &str, shell: Option<&str>) -> Option<String> {
+    if let Some(code) = scan_rules(command, shell) {
+        return Some(code);
+    }
+    let normalized = normalize_wrappers(command);
+    if normalized != command {
+        return scan_rules(&normalized, shell);
     }
     None
 }
@@ -650,6 +689,26 @@ mod tests {
     }
 
     #[test]
+    fn wrapper_shells_do_not_hide_the_command() {
+        for command in [
+            "cmd /c shutdown /s /t 0",
+            "cmd /C rd /s /q C:\\temp",
+            "cmd /c powershell -c \"Remove-Item -Recurse -Force C:\\x\"",
+            "powershell -Command \"Stop-Computer\"",
+            "bash -c 'sudo whoami'",
+            "env sudo rm -rf /tmp/x",
+            "xargs sudo cat /etc/shadow",
+            "nohup sudo systemctl stop nginx",
+        ] {
+            assert!(danger_reason(command, Some("powershell")).is_some(), "{command}");
+        }
+        // 包装器之外仍不误报
+        assert_eq!(danger_reason("grep -rn shutdown docs/", Some("bash")), None);
+        assert_eq!(danger_reason("echo \"sudo is required\"", Some("bash")), None);
+        assert_eq!(danger_reason("env | grep PATH", Some("bash")), None);
+    }
+
+    #[test]
     fn credential_paths_are_named_not_scanned() {
         for (value, code) in [
             ("~/.ssh/id_rsa", "path.ssh_dir"),
@@ -660,6 +719,10 @@ mod tests {
             ("cat /etc/shadow", "path.system_accounts"),
             ("/home/u/backup/id_ed25519", "path.private_key"),
             ("/home/u/keys/vault.kdbx", "path.key_store"),
+            // Windows 写法（反斜杠）同样命中
+            (r"type C:\Users\u\.ssh\id_rsa", "path.ssh_dir"),
+            (r"copy C:\proj\.env D:\tmp\env.txt", "path.env_file"),
+            (r"Get-Content C:\Users\u\.vrykell\config.json", "path.app_config"),
         ] {
             assert_eq!(sensitive_path_reason(value).as_deref(), Some(code), "{value}");
         }
