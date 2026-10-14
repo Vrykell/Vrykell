@@ -479,9 +479,7 @@ export function useTerminalSession(
           return;
         }
         if (id === sessionId) {
-          if (isTerminalDebugEnabled()) {
-            terminalDebug('pty-output', { id, events: events.length, kinds: events.map((event) => event.kind) });
-          }
+          controller.ioLog.received(events);
           handleOutput(events);
         }
       }),

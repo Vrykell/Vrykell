@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 
 export interface TauriMockOptions {
   launchDirectory?: string;
-  contextMenu?: { available?: boolean; enabled?: boolean; certificateTrusted?: boolean };
+  contextMenu?: { available?: boolean; enabled?: boolean; stale?: boolean; certificateTrusted?: boolean };
   /** 是否启用 OSC 133 shell integration（默认 true）。
    *  false 时 mock 保持 classic 场景，用于测试无 integration 回退。 */
   integration?: boolean;
@@ -57,7 +57,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
   ];
   await page.addInitScript(
     ({ enableIntegration, enableReadyMarker, models, active, skillsSeed, scheduleSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession, launchDirectory, menuSeed }) => {
-    const menu = { supported: true, available: true, enabled: false, certificateTrusted: false, certificateThumbprint: 'E2E-CERTIFICATE', ...menuSeed };
+    const menu = { supported: true, available: true, enabled: false, stale: false, certificateTrusted: false, certificateThumbprint: 'E2E-CERTIFICATE', ...menuSeed };
     const menuActions: string[] = [];
     (window as unknown as { __MENU_ACTIONS__: string[] }).__MENU_ACTIONS__ = menuActions;
     let cbCounter = 0;
@@ -67,11 +67,14 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     const sshTrusts: Record<string, unknown>[] = [];
     const dialogs: Record<string, unknown>[] = [];
     const diagnosticsExports: Record<string, unknown>[] = [];
+    /** Frontend diagnostic records the app sent, exposed so specs can check what the log keeps. */
+    const diagnosticRecords: Record<string, unknown>[] = [];
     const spawns: Record<string, unknown>[] = [];
     const closes: Record<string, unknown>[] = [];
     (window as unknown as Record<string, unknown>).__SSH_TRUSTS__ = sshTrusts;
     (window as unknown as Record<string, unknown>).__SSH_DIALOGS__ = dialogs;
     (window as unknown as Record<string, unknown>).__DIAGNOSTICS_EXPORTS__ = diagnosticsExports;
+    (window as unknown as Record<string, unknown>).__DIAGNOSTIC_RECORDS__ = diagnosticRecords;
     (window as unknown as Record<string, unknown>).__PTY_SPAWNS__ = spawns;
     (window as unknown as Record<string, unknown>).__PTY_CLOSES__ = closes;
     let hostKnown = sshHost === 'known';
@@ -770,6 +773,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             if (action === 'enable') {
               if (!menu.certificateTrusted) throw new Error('Certificate trust required');
               menu.enabled = true;
+              menu.stale = false;
             }
             if (action === 'disable') menu.enabled = false;
             return { ...menu };
@@ -888,7 +892,11 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
           case 'terminal_debug_set':
             return args.enabled;
           case 'terminal_debug_record':
+            diagnosticRecords.push(args);
+            return undefined;
           case 'terminal_debug_records':
+            diagnosticRecords.push(...(args.records as Record<string, unknown>[]));
+            return undefined;
           case 'diagnostics_export':
             diagnosticsExports.push(args);
             return undefined;
