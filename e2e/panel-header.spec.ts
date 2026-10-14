@@ -20,11 +20,43 @@ test('group header count stays on a single line while the header is hovered', as
 
   const group = page.locator('[data-group-id]').first();
   await expect(group).toBeVisible();
-  // Hovering reveals the group action buttons and squeezes the title column to its narrowest.
+  // Hovering reveals the group action buttons.
   await group.locator('.tab-group-header').hover();
   const count = page.getByTestId(/^group-count-/).first();
   await expect(count).toHaveCSS('white-space', 'nowrap');
   expect(await count.evaluate((element) => element.getClientRects().length)).toBe(1);
+});
+
+test('group actions overlay the header end instead of squeezing the title', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
+  await page.keyboard.press('Meta+t');
+  await ensureTabsOpen(page);
+
+  const first = (await tabIds(page))[0]!;
+  await page.getByTestId(`tab-row-${first}`).click({ button: 'right' });
+  await page.getByRole('button', { name: '新建分组', exact: true }).click();
+  await page.keyboard.press('Enter');
+
+  const group = page.locator('[data-group-id]').first();
+  const header = group.locator('.tab-group-header');
+  const title = page.getByTestId(/^group-title-/).first();
+  await expect(title).toBeVisible();
+
+  // The mouse resting outside the header: this is the width the title column owns.
+  await page.mouse.move(700, 300);
+  const resting = (await title.boundingBox())!.width;
+  await header.hover();
+  const hovered = (await title.boundingBox())!.width;
+  // The action buttons must not take title space: revealing them changes nothing.
+  expect(hovered).toBeGreaterThanOrEqual(resting - 1);
+
+  const rename = group.getByRole('button', { name: '重命名分组' });
+  await expect(rename).toBeVisible();
+  const renameBox = (await rename.boundingBox())!;
+  const headerBox = (await header.boundingBox())!;
+  expect(renameBox.x + renameBox.width).toBeLessThanOrEqual(headerBox.x + headerBox.width);
 });
 
 test('tab rename input stays inside its row', async ({ page }) => {
