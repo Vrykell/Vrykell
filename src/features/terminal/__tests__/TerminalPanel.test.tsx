@@ -161,6 +161,21 @@ describe('SSH connection input', () => {
     expect(screen.queryByLabelText('SSH 认证响应')).toBeNull();
     expect(screen.getByTestId('ssh-terminal-screen')).toHaveStyle({ visibility: 'visible' });
   });
+  // 回归：SSH 画面快照同样走 dangerouslySetInnerHTML。快照由自家渲染器生成（文本转义），
+  // 但它会落库、恢复时重新渲染，所以这一层也要像命令块那样过净化。
+  it('strips tags and handlers out of a tampered screen snapshot', () => {
+    // 快照只在密码提示遮挡屏幕时渲染，所以这里让屏幕看起来正在等密码。
+    sessionView.frame.plainText = 'Password:';
+    sessionView.frame.html = 'user@host:<br><img src=x onerror="alert(1)"><script>alert(2)</script>Password:';
+    render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+    const snapshot = screen.getByTestId('ssh-terminal-screen');
+    expect(snapshot.querySelector('img')).toBeNull();
+    expect(snapshot.querySelector('script')).toBeNull();
+    expect(snapshot.querySelector('[onerror]')).toBeNull();
+    // 文本内容保留（净化是解包标签，不是丢字）
+    expect(snapshot.textContent).toContain('Password:');
+    expect(snapshot.querySelector('br')).not.toBeNull();
+  });
   it('reopens secret input after a rejected password and lets the user return to direct terminal input', () => {
     useTerminalStore.setState({ sessions: { p: 'session' } });
     const { rerender } = render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);

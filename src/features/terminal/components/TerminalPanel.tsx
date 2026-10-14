@@ -2,11 +2,12 @@ import SshSessionGate from './SshSessionGate';
 import { TextInput } from '@ui/TextInput';
 import '@xterm/xterm/css/xterm.css';
 import { useTerminalSession } from '../hooks/useTerminalSession';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTerminalStore } from '@features/terminal';
 import { ptyWrite } from '@platform/pty';
 import ErrorBox from '@ui/ErrorBox';
 import Select from '@ui/Select';
+import { sanitizeOutputHtml } from '@utils/sanitizeHtml';
 import { secretResponsePrompt, secretResponseWasRejected } from '../model/terminalFrame';
 import { t } from '@i18n';
 import { terminalDebug } from '../services/terminalDebug';
@@ -27,6 +28,9 @@ export default function TerminalPanel(props: TerminalPanelProps) {
 
 function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = false, sshTarget }: TerminalPanelProps) {
   const { ref, closeSession, reconnect, stopReconnect, retry, status, frame } = useTerminalSession(paneId, tabId, onReady);
+  // The screen snapshot is built by our own renderer, but it is also persisted and restored, so it
+  // goes through the same sanitizing the command blocks use before it reaches the DOM.
+  const frameHtml = useMemo(() => (frame?.html ? sanitizeOutputHtml(frame.html) : ''), [frame?.html]);
   const [response, setResponse] = useState('');
   const [error, setError] = useState('');
   const [cancellation, setCancellation] = useState<'idle' | 'pending' | 'done'>('idle');
@@ -131,7 +135,7 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
         {/* 密码框开着（secret）时屏幕只读，点它也不会把输入交给终端 */}
         <div ref={ref} data-testid={showSnapshot ? undefined : 'ssh-terminal-screen'} style={{ position: 'absolute', inset: 0, overflow: 'auto', visibility: showSnapshot || disconnected ? 'hidden' : 'visible', pointerEvents: showSnapshot || disconnected || secret ? 'none' : 'auto', paddingLeft: 8 }} />
           {/* data-selectable：页面整体禁选，但屏幕内容必须能选中，否则连不上时无法复制报错 */}
-          {showSnapshot && frame?.html && <pre data-selectable data-testid="ssh-terminal-screen" style={{ position: 'absolute', inset: 0, overflow: 'auto', margin: 0, whiteSpace: 'pre', color: 'var(--text-primary)', paddingLeft: 8 }} dangerouslySetInnerHTML={{ __html: frame.html }} />}
+          {showSnapshot && frameHtml && <pre data-selectable data-testid="ssh-terminal-screen" style={{ position: 'absolute', inset: 0, overflow: 'auto', margin: 0, whiteSpace: 'pre', color: 'var(--text-primary)', paddingLeft: 8 }} dangerouslySetInnerHTML={{ __html: frameHtml }} />}
         {/* 连接中：居中转圈 + 细进度条（不写解释性小字） */}
         {!disconnected && status === 'connecting' && (
           <div data-testid="ssh-connecting" aria-hidden="true" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, pointerEvents: 'none' }}>
