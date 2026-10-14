@@ -96,6 +96,12 @@
 - **Fix**: terminal input goes through `terminalWriteQueue` (16K code units per chunk, split on code points, serialized per session): a slow consumer only holds back the chunk in flight, and `\x03` drops the unsent remainder before it is queued. Multi-line and over-64K pastes ask first through `PasteConfirmHost`. Regression coverage: `terminalWriteQueue.test.ts`, `terminalClipboard.test.ts`, `PasteConfirmHost.test.tsx`, `terminal-paste-large.spec.ts`.
 - **Lesson**: "one action, one write" is fine while the payload is small, but once the user decides the size it wrecks cancellation — being interruptible requires the write itself to be divisible.
 
+### 2.14 One log record per output chunk → a full-screen TUI writes megabytes per minute (`io_window.rs`, `sessionController.ts`, `useTerminalSession.ts`)
+- **Symptom**: a full-screen CLI session inflates the log by megabytes per minute — one 4.5-minute session wrote 87,919 records / 23.9 MB at ~420 records/s in busy seconds (876/s at the peak) and five to seven records per output chunk (`read-chunk`, `output`, `pty-output`, `controller-events`, `route-data`); the diagnostics writer lagged 1.5 s behind at p95 (36 ms median), and another 13-minute session reached 84 MB. During a 3.8 MB paste the input-to-next-paint gaps reached 6.3 s / 12.3 s / 10.2 s — part of the "frozen" feel was the logging itself, and the flood also pushed the useful records out of the in-memory ring.
+- **Root cause**: one output chunk was counted at five stages while the chunk rate is decided by the foreground program (a full-screen app sends one per frame), so log volume tracked the frame rate: whoever runs a TUI writes the log dry.
+- **Fix**: both halves aggregate into a one-second window. Rust `pty-io` (`reads/read_bytes/chars/max_read/outputs/events/data_bytes/osc/alt/held/max_gap_ms`) replaces `read-chunk` + `output` + `input-response-batch`; the frontend `terminal-io` record sums rx (IPC intake), ctl (controller intake) and the routing destinations (chunks and characters for main / block / early, `maxChars`, command-echo filtering). A stall no longer has to be inferred from missing records: silence is written as `read-idle` at 1 s, 2 s, 4 s, … Regression coverage: `io_window.rs` unit tests, `terminalIoLog.test.ts`.
+- **Lesson**: pick the logging granularity from whoever decides the event rate; recording user-sized data chunk by chunk hands the log size to the user.
+
 ---
 
 ## 3. PTY / resize / Dimensions

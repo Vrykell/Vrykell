@@ -96,6 +96,12 @@
 - **修复**：终端输入统一走 `terminalWriteQueue`（16K 码元分块、按码点切分、同会话串行）：慢消费者只压住当前块，`\x03` 先丢弃未送出的余块再插队；多行 / 超 64K 粘贴先经 `PasteConfirmHost` 确认。回归：`terminalWriteQueue.test.ts`、`terminalClipboard.test.ts`、`PasteConfirmHost.test.tsx`、`terminal-paste-large.spec.ts`。
 - **教训**：「一次动作一次写入」在小数据上没问题，一旦数据量由用户决定就会拖垮取消语义 —— 可中断性要求写入本身可分。
 
+### 2.14 每个输出块各写一条终端日志 → 整屏 TUI 把日志写到分钟级 MB（`io_window.rs`、`sessionController.ts`、`useTerminalSession.ts`）
+- **现象**：整屏 CLI 一跑起来日志就按分钟膨胀：实测一段 4.5 分钟的会话写出 87,919 条 / 23.9 MB，繁忙秒约 420 条、峰值 876 条/秒，每个输出块 5–7 条记录（`read-chunk`、`output`、`pty-output`、`controller-events`、`route-data`）；诊断写盘队列积压到 1.5 s（p95，中位 36 ms），另一段 13 分钟的会话写到 84 MB。粘贴 3.8 MB 时「输入到下一帧」间隔出现 6.3 s / 12.3 s / 10.2 s —— 卡顿感有一部分就是日志自己造出来的，也把真正有用的记录挤出内存环。
+- **根因**：同一个输出块在流水线上被数了五次，而块的频率由前台程序决定（整屏应用每帧一块）—— 于是日志量正比于帧率，谁跑 TUI 谁就把日志写爆。
+- **修复**：两端都改成按秒窗口聚合。Rust 端用 `pty-io`（`reads/read_bytes/chars/max_read/outputs/events/data_bytes/osc/alt/held/max_gap_ms`）替代 `read-chunk` + `output` + `input-response-batch`；前端用 `terminal-io` 一条记录汇总 rx（IPC 收包）/ ctl（控制器入口）/ 路由去向（main / block / early 的块数与字符数、`maxChars`、命令回显过滤）。停顿不再靠「没有记录」推断：整段静默按 1 s、2 s、4 s… 翻倍记 `read-idle`。回归：`io_window.rs` 单测、`terminalIoLog.test.ts`。
+- **教训**：日志粒度要跟着「事件频率由谁决定」走；把用户能决定大小的数据逐块记，等于把日志体积也交给用户。
+
 ---
 
 ## 三、PTY / resize / 尺寸
