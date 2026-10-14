@@ -566,8 +566,18 @@ pub async fn acp_open<R: tauri::Runtime>(
         .initialize("vrykell", env!("CARGO_PKG_VERSION"))
         .await
         .map_err(|e| format!("harness handshake failed: {e}"))?;
+    // The protocol requires an absolute working directory, and an empty one is refused by the agent
+    // ("cwd must be an absolute path"). Fall back to the directory the app itself runs in; a caller
+    // that knows the project directory (the workspace does) should pass it.
+    let session_cwd = if cwd.trim().is_empty() {
+        std::env::current_dir()
+            .map(|dir| dir.to_string_lossy().to_string())
+            .unwrap_or_else(|_| dirs::home_dir().unwrap_or_default().to_string_lossy().to_string())
+    } else {
+        cwd.clone()
+    };
     let session = client
-        .new_session(&cwd)
+        .new_session(&session_cwd)
         .await
         .map_err(|e| format!("harness could not open a session: {e}"))?;
 
