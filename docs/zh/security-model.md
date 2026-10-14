@@ -26,6 +26,7 @@
 | 命令级授权（租约） | ✅ 4 个受门控命令（`read_file_text`/`write_file_text`/`edit_file_text`/`fs_search`）必须出示**与命令+参数摘要绑定的一次性租约**，否则失败关闭 | `src-tauri/src/agent/permissions.rs` | `cargo test --lib` 的租约用例 |
 | 危险操作不可代答确认 | ✅ 危险命令/凭据路径/持久化写入命中即弹**系统原生对话框**；窗口不在前台直接拒绝；审批卡有超时 | 同上 + `agent/permissions.rs` | cargo 单测 + e2e `approval-timeout` |
 | 授权粒度 | ✅ 等级表（允许/询问/禁止）+ **形态级会话授权**（`npm run` 只放开这一类）+ 危险规则在授予之前判定 | 同上 | cargo 形态派生用例 + e2e `approval-shape` |
+| 路径授权（任意读收口） | ✅ 会把文件内容交给页面的命令（附件导入）只接受**系统级用户动作**产生的路径：Rust 侧授权登记表（`files/grants.rs`，持久化在 `~/.vrykell/approved-paths.json`）；选择器改由我们的 `pick_path` 打开（只有 Rust 亲自打开才知道选择来自用户），窗口拖放由 `WindowEvent::DragDrop` 登记；应用自有目录（附件、技能）无需手势；无人调用的 `read_image_data_url` 已删除 | `files/grants.rs`、`lib.rs` | cargo 单测（授权文件/目录/自有目录/未授权拒绝） |
 | 内容渲染消毒 | ✅ Markdown 不启用 raw HTML、裸 URL 不 linkify、远程图片降级为文本、链接不导航应用窗口（外链交系统浏览器）；终端/命令块与 SSH 画面快照全部过 `sanitizeOutputHtml`（白名单只有 `<span>`+安全 style+`<br>`，且把"本地 DB 被篡改"写进威胁模型） | `Markdown.tsx`、`sanitizeHtml.ts`、`TerminalPanel.tsx` | vitest（Markdown 链接、快照消毒）+ e2e `chat-links` |
 | CSP 与资源范围 | ✅ 生产 CSP：`default-src 'self'`、`script-src 'self'`（Tauri 自注入脚本走 hash）、`style-src 'self' 'unsafe-inline'`（React 内联样式需要）、`object-src 'none'`、`form-action 'none'`、`frame-ancestors 'none'`、img 只允许 self/data/asset、connect 只允许 ipc；dev 例外（HMR 的 ws 与内联脚本）只在 `devCsp` | `src-tauri/tauri.conf.json` | `npm run build` 后确认 `dist/index.html` 无内联脚本；改动 CSP 需重启应用 |
 | 密钥与凭据 | ✅ API key / SSH 密码加密落盘（DPAPI/钥匙串/0600），**模型请求走 Rust 代理，key 从不进渲染进程**；附件读取锁死在附件目录 | `secret.rs`、`files/fs.rs` | 实机检查 `secrets.json`；`config.json` 无 key |
@@ -50,7 +51,6 @@
 
 | 缺口 | 成本 |
 | --- | --- |
-| 任意读收口（`import_attachment` / `read_image_data_url` 要求路径来自系统级用户动作） | 1–2 人日 |
 | `opener` 的 `open_path` scope 为 `**`（面板必须能打开任意用户文件，属既定设计，等同 PTY 级别） | — |
 | 面板能力化文件系统（路径必须来自用户动作或 shell cwd） | 3–6 周，改产品语义，仍挡不住 PTY → 不做 |
 | agent 移出 webview | 2–4 月 / sidecar 2–4 周，仍挡不住 PTY → 不做 |
