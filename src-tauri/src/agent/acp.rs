@@ -47,8 +47,10 @@ fn resolve_program(command: &str) -> Option<PathBuf> {
         .filter(|extension| !extension.is_empty())
         .collect();
     for dir in std::env::split_paths(&std::env::var("PATH").unwrap_or_default()) {
+        // npm ships a POSIX `npx` next to `npx.cmd`; a file without a Windows executable extension is
+        // a shim for another platform and cannot be started here, so it is skipped.
         let plain = dir.join(command);
-        if plain.is_file() {
+        if plain.is_file() && plain.extension().is_some() {
             return Some(plain);
         }
         for extension in &extensions {
