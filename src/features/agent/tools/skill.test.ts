@@ -8,9 +8,10 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import { buildSkillTool, buildInstallSkillTool } from '@features/agent/tools/skill';
 import { usePermissions, type ToolContext } from '@features/agent/stores/permissions';
+import { approvingToolContext } from '../../../test-utils/approvingToolContext';
 
 usePermissions.setState({ levels: { use_skill: 'allow', install_skill: 'allow' } });
-const CTX: ToolContext = {};
+const CTX: ToolContext = approvingToolContext();
 
 beforeEach(() => {
   invokeMock.mockReset();

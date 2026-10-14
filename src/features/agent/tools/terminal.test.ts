@@ -24,10 +24,11 @@ vi.mock('@features/terminal/stores/terminal', () => ({
 
 import { buildTerminalTools } from '@features/agent/tools/terminal';
 import { usePermissions, type ToolContext } from '@features/agent/stores/permissions';
+import { approvingToolContext } from '../../../test-utils/approvingToolContext';
 import { useBlockStore } from '@features/terminal/stores/blocks';
 
 usePermissions.setState({ levels: { read_terminal: 'allow', terminal_keys: 'allow' } });
-const CTX: ToolContext = {};
+const CTX: ToolContext = approvingToolContext();
 
 type Exec = (args: Record<string, unknown>) => Promise<unknown>;
 const execOf = (t: unknown): Exec => {

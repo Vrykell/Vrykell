@@ -48,6 +48,7 @@ pub fn run() {
         .manage(agent::ai::LlmStreamState::default())
         .manage(terminal::pty::KillState::default())
         .manage(agent::mcp::McpState::default())
+        .manage(agent::permissions::ToolPolicy::default())
         // asset 协议 scope 已收窄：启动时把已保存的壁纸文件动态授权
         .setup(|app| {
             if let Err(error) = terminal::debug::initialize(app.handle()) {
@@ -130,6 +131,11 @@ pub fn run() {
             agent::mcp::mcp_disconnect,
             agent::mcp::mcp_list_all_tools,
             agent::mcp::mcp_call_tool,
+            agent::permissions::authorize_tool_call,
+            agent::permissions::approve_tool_call,
+            agent::permissions::tool_policy_get,
+            agent::permissions::tool_policy_set_level,
+            agent::permissions::tool_policy_clear_session_grants,
             terminal::pty::pty_spawn,
             diagnostics::diagnostics_set_auto_save,
             diagnostics::diagnostics_export,

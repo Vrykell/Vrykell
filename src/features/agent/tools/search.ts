@@ -55,15 +55,11 @@ export function buildSearchTools(ctx: ToolContext) {
         max_results: z.number().optional().describe('结果上限，默认 100'),
       }),
       execute: async ({ root, query, content, max_results }, { toolCallId }) => {
-        const g = await gate('search_files', { root, query }, toolCallId, ctx);
+        const args = { root, query, content: content ?? false, maxResults: max_results ?? null };
+        const g = await gate('search_files', args, toolCallId, ctx, 'fs_search');
         if (!g.proceed) return g.result;
         try {
-          const hits = await invoke<FsSearchHit[]>('fs_search', {
-            root,
-            query,
-            content: content ?? false,
-            maxResults: max_results ?? null,
-          });
+          const hits = await invoke<FsSearchHit[]>('fs_search', { ...args, lease: g.lease ?? null });
           const result =
             hits.length === 0
               ? '（无匹配）'

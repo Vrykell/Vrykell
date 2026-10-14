@@ -14,6 +14,7 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 import { buildFileTools } from '@features/agent/tools/files';
 import { buildSearchTools } from '@features/agent/tools/search';
 import { usePermissions, type ToolContext } from '@features/agent/stores/permissions';
+import { approvingToolContext } from '../../../test-utils/approvingToolContext';
 
 // 本文件测 invoke 参数/结果映射，不测门控（门控见 permissions.test.ts）：
 // 全部工具置 allow，ctx 留空
@@ -23,7 +24,7 @@ usePermissions.setState({
     list_dir: 'allow', search_files: 'allow', web_search: 'allow',
   },
 });
-const CTX: ToolContext = {};
+const CTX: ToolContext = approvingToolContext();
 
 // AI SDK tool() 包的 execute 签名较繁，这里只关心入参→结果映射；
 // 第二参（{toolCallId, abortSignal}）给空对象即可（gate 在 allow 级不碰它）
@@ -37,7 +38,7 @@ describe('buildFileTools', () => {
   it('read_file：透传 path/maxBytes（camelCase），返回内容', async () => {
     invokeMock.mockResolvedValue('file body');
     const r = await execOf(buildFileTools(CTX).read_file)({ path: '/tmp/a.txt', max_bytes: 100 });
-    expect(invokeMock).toHaveBeenCalledWith('read_file_text', { path: '/tmp/a.txt', maxBytes: 100 });
+    expect(invokeMock).toHaveBeenCalledWith('read_file_text', { path: '/tmp/a.txt', maxBytes: 100, lease: 'test-lease' });
     expect(r).toEqual({ ok: true, result: 'file body' });
   });
 
@@ -59,6 +60,7 @@ describe('buildFileTools', () => {
       path: '/tmp/a.ts',
       oldString: 'foo',
       newString: 'bar',
+      lease: 'test-lease',
     });
     expect(r.ok).toBe(true);
   });
@@ -95,6 +97,7 @@ describe('buildSearchTools', () => {
       query: 'x',
       content: true,
       maxResults: null,
+      lease: 'test-lease',
     });
     expect(r.result).toBe('/p/a.ts:3  const x = 1\n/p/b.ts');
   });

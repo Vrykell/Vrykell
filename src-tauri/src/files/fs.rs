@@ -612,7 +612,19 @@ fn read_file_text_sync(path: String, max_bytes: Option<usize>) -> Result<String,
 }
 
 #[tauri::command]
-pub async fn read_file_text(path: String, max_bytes: Option<usize>) -> Result<String, String> {
+pub async fn read_file_text(
+    policy: tauri::State<'_, crate::agent::permissions::ToolPolicy>,
+    path: String,
+    max_bytes: Option<usize>,
+    lease: Option<String>,
+) -> Result<String, String> {
+    // Agent-only command: the caller must present the lease Rust issued for exactly these args.
+    crate::agent::permissions::require_lease(
+        &policy,
+        lease,
+        "read_file_text",
+        &serde_json::json!({ "path": path, "maxBytes": max_bytes }),
+    )?;
     tauri::async_runtime::spawn_blocking(move || read_file_text_sync(path, max_bytes))
         .await
         .map_err(|e| e.to_string())?
@@ -655,7 +667,18 @@ fn write_file_text_sync(path: String, content: String) -> Result<String, String>
 }
 
 #[tauri::command]
-pub async fn write_file_text(path: String, content: String) -> Result<String, String> {
+pub async fn write_file_text(
+    policy: tauri::State<'_, crate::agent::permissions::ToolPolicy>,
+    path: String,
+    content: String,
+    lease: Option<String>,
+) -> Result<String, String> {
+    crate::agent::permissions::require_lease(
+        &policy,
+        lease,
+        "write_file_text",
+        &serde_json::json!({ "path": path, "content": content }),
+    )?;
     tauri::async_runtime::spawn_blocking(move || write_file_text_sync(path, content))
         .await
         .map_err(|e| e.to_string())?
@@ -688,10 +711,18 @@ fn edit_file_text_sync(
 
 #[tauri::command]
 pub async fn edit_file_text(
+    policy: tauri::State<'_, crate::agent::permissions::ToolPolicy>,
     path: String,
     old_string: String,
     new_string: String,
+    lease: Option<String>,
 ) -> Result<String, String> {
+    crate::agent::permissions::require_lease(
+        &policy,
+        lease,
+        "edit_file_text",
+        &serde_json::json!({ "path": path, "oldString": old_string, "newString": new_string }),
+    )?;
     tauri::async_runtime::spawn_blocking(move || edit_file_text_sync(path, old_string, new_string))
         .await
         .map_err(|e| e.to_string())?
@@ -783,11 +814,19 @@ fn fs_search_sync(
 
 #[tauri::command]
 pub async fn fs_search(
+    policy: tauri::State<'_, crate::agent::permissions::ToolPolicy>,
     root: String,
     query: String,
     content: bool,
     max_results: Option<usize>,
+    lease: Option<String>,
 ) -> Result<Vec<FsSearchHit>, String> {
+    crate::agent::permissions::require_lease(
+        &policy,
+        lease,
+        "fs_search",
+        &serde_json::json!({ "root": root, "query": query, "content": content, "maxResults": max_results }),
+    )?;
     tauri::async_runtime::spawn_blocking(move || fs_search_sync(root, query, content, max_results))
         .await
         .map_err(|e| e.to_string())?

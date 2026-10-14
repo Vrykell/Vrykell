@@ -813,6 +813,8 @@ const zh: Record<string, string> = {
   "Environment file (may hold secrets)": "环境变量文件（.env 可能含密钥）",
   "Application configuration (may hold API keys)": "Vrykell 应用配置（可能含 API key）",
   "System account file": "系统账户文件",
+  "Denied by the permission settings": "已按权限设置拒绝",
+  "This operation can change your system or reach your credentials.": "该操作可能改动你的系统或触及凭据信息。",
   "Rewrites long-term memory (injected into every later request)": "重写长期记忆（会注入之后的每次请求）",
   "Appends to long-term memory (injected into every later request)": "追加长期记忆（会注入之后的每次请求）",
   "Creates a subagent prompt that is reused later": "创建子代理提示词（之后会被复用）",

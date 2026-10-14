@@ -1,40 +1,35 @@
 /**
- * permissions — AI permission management (M3).
+ * permissions — the webview side of tool authorization.
  *
- * Four layers, in order:
- *   1. persisted default level (levels, editable in settings): allow / ask / deny
- *   2. session grants (sessionGrants, memory only): the approval card's "allow for this
- *      conversation"
- *   3. danger heuristics on the values a tool actually executes (command, keys): always
- *      asked, per call, no matter what 1 and 2 say
- *   4. sensitive-path heuristics on the values that name a file (path, root, and again
- *      command/keys): also always asked, so prompt injection cannot read credentials
- *   5. durable side effects (memory writes, subagent prompts, schedules): asked per call
- *      because they outlive the turn and feed later system prompts
+ * The policy itself lives in Rust (`src-tauri/src/agent/permissions.rs`): the level table (it
+ * persists `~/.vrykell/permissions.json`), the danger / credential / durable-action heuristics,
+ * and the single-use leases. This module keeps a mirror of the levels for the settings UI and
+ * for the synchronous "which tools exist" decisions, drives the approval card, and hands the
+ * lease back to the caller so the gated command can present it.
  *
- * 审批桥：工具 execute 里 gate() 挂起等 Promise；审批卡按钮调
- * resolveApproval() 落决定。stop/abort 必须走 denyAllPending() 兜底，
- * 否则 execute 永远悬挂（AI SDK 步进卡死）。
- *
- * 视觉契约：gate 通过 ctx.setToolState 把 ToolRun 打到 approval-pending
- * （静态暖色环）→ 决定后回 running（脉冲）或 denied（灰环）；denied 的
- * 结构化结果带 denied:true 哨兵，agentStream 据此保持灰环不被 tool-result
- * 覆盖成 done。
+ * Decisions come back as "allow" (with a lease), "ask" (the card below decides) or "deny".
+ * Dangerous and credential-touching calls are confirmed by Rust through a native system dialog
+ * instead of the card, so rendered content cannot answer them.
  */
-
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { t } from '@i18n';
 import type { ToolRunState } from '@features/agent/model/messageParts';
 import { untrustedSkillFor, setSkillState } from '@features/agent/services/skills';
-import { dangerousCommandReason } from '@features/agent/model/dangerousCommands';
-import { sensitivePathReason } from '@features/agent/model/sensitivePaths';
-import { sensitiveActionReason } from '@features/agent/model/sensitiveActions';
-
-export { dangerousCommandReason };
-export { sensitivePathReason };
+import { reasonText } from '@features/agent/model/toolReasonTexts';
+import {
+  approveToolCall,
+  authorizeToolCall,
+  clearToolSessionGrants,
+  loadToolPolicy,
+  setToolPolicyLevel,
+  type AuthorizeRequest,
+  type ToolDecision,
+} from '@features/agent/services/toolPolicy';
 
 export type ToolLevel = 'allow' | 'ask' | 'deny';
 export type ApprovalDecision = 'once' | 'session' | 'deny';
+export type PermissionMode = 'standard' | 'strict' | 'relaxed';
 
 /** 工具结果统一形状（与 tools/* 的结构化约定一致） */
 export interface GateResult {
@@ -50,7 +45,7 @@ export interface ToolContext {
   remote?: boolean;
   /** Shell of the execution target: picks the danger-rule table (Windows shells also run POSIX-shaped aliases). */
   shellType?: string | null;
-  /** 会话 id（= 工作区 tabId），会话授权的命名空间；缺省时禁用会话授权 */
+  /** 会话 id（= 工作区 tabId），审批卡的落点 */
   tabId?: string;
   /** 审批状态回写（agentStream 接到后 upsert ToolRun） */
   setToolState?: (toolCallId: string, state: ToolRunState, extra?: { danger?: string }) => void;
@@ -78,7 +73,11 @@ export const TOOL_NAMES = [
 ] as const;
 export type ToolName = (typeof TOOL_NAMES)[number];
 
-const DEFAULT_LEVELS: Record<ToolName, ToolLevel> = {
+/**
+ * Shipped defaults, mirrored from the Rust table so the UI can render before the backend
+ * answers. Rust stays the authority for decisions and for what gets persisted.
+ */
+export const DEFAULT_LEVELS: Record<ToolName, ToolLevel> = {
   run_command: 'ask',
   read_file: 'allow',
   write_file: 'ask',
@@ -91,10 +90,9 @@ const DEFAULT_LEVELS: Record<ToolName, ToolLevel> = {
   read_terminal: 'allow',
   terminal_keys: 'ask',
   use_skill: 'allow',
-  // Installing a skill writes instructions that are trusted afterwards, so it starts at ask;
-  // users who want no prompt can lower it in settings.
+  // Installing a skill writes instructions that are trusted afterwards.
   install_skill: 'ask',
-  // MCP tools are arbitrary third-party capabilities: ask by default, like run_command.
+  // MCP tools are arbitrary third-party capabilities.
   mcp: 'ask',
   memory: 'allow',
   schedule: 'allow',
@@ -102,15 +100,14 @@ const DEFAULT_LEVELS: Record<ToolName, ToolLevel> = {
 };
 
 interface PermissionsState {
+  /** Mirror of the backend table; render only — decisions come from Rust. */
   levels: Record<string, ToolLevel>;
-  /** 快捷权限模式（状态栏一键切换）：
-   *  standard = 按 levels 逐工具判定（设置页可调）；
-   *  strict   = 全部工具逐次询问；
-   *  relaxed  = 全部放行（危险命令启发式仍逐次询问，不受放行影响）。
-   *  在设置页单独调整某工具级别会回落到 standard。 */
-  mode: 'standard' | 'strict' | 'relaxed';
+  /** UI shortcut applied to plain calls: strict asks everything, relaxed allows everything. */
+  mode: PermissionMode;
   setLevel: (tool: ToolName, level: ToolLevel) => void;
-  setMode: (mode: 'standard' | 'strict' | 'relaxed') => void;
+  setMode: (mode: PermissionMode) => void;
+  /** 后端策略回填（启动与设置页变更后） */
+  applyPolicy: (levels: Record<string, ToolLevel>) => void;
 }
 
 export const usePermissions = create<PermissionsState>()(
@@ -118,39 +115,44 @@ export const usePermissions = create<PermissionsState>()(
     (set) => ({
       levels: { ...DEFAULT_LEVELS },
       mode: 'standard',
-      setLevel: (tool, level) =>
-        set((s) => ({ levels: { ...s.levels, [tool]: level }, mode: 'standard' })),
+      setLevel: (tool, level) => {
+        set((s) => ({ levels: { ...s.levels, [tool]: level }, mode: 'standard' }));
+        // The backend is the authority: a failed write leaves the mirror stale on purpose (the
+        // next refresh repairs it), whereas failing open would silently widen access.
+        void setToolPolicyLevel(tool, level).catch((error: unknown) => {
+          console.warn('[permissions] Could not persist the tool level:', error);
+        });
+      },
       setMode: (mode) => set({ mode }),
+      applyPolicy: (levels) => set((s) => ({ levels: { ...s.levels, ...levels } })),
     }),
-    { name: 'vrykell-permissions' },
+    {
+      name: 'vrykell-permissions',
+      version: 2,
+      // Levels moved to the backend; only the UI shortcut stays in the browser.
+      migrate: (persisted: unknown) => {
+        const saved = (persisted ?? {}) as { mode?: PermissionMode };
+        return { levels: { ...DEFAULT_LEVELS }, mode: saved.mode ?? 'standard' };
+      },
+    },
   ),
 );
+
+/** Hydrate the mirror from the backend; a failure keeps the shipped defaults. */
+export async function refreshToolPolicy(): Promise<void> {
+  try {
+    const levels = await loadToolPolicy();
+    if (levels && typeof levels === 'object') usePermissions.getState().applyPolicy(levels);
+  } catch (error) {
+    console.warn('[permissions] Could not read the tool policy:', error);
+  }
+}
 
 export function levelOf(tool: string): ToolLevel {
   const s = usePermissions.getState();
   if (s.mode === 'strict') return 'ask';
   if (s.mode === 'relaxed') return 'allow';
   return s.levels[tool] ?? 'ask';
-}
-
-// ── 会话授权（内存，重启即失效） ──
-
-const sessionGrants = new Map<string, Set<string>>();
-
-export function hasSessionGrant(tabId: string | undefined, tool: string): boolean {
-  return !!tabId && (sessionGrants.get(tabId)?.has(tool) ?? false);
-}
-
-function grantSession(tabId: string, tool: string) {
-  let set = sessionGrants.get(tabId);
-  if (!set) sessionGrants.set(tabId, (set = new Set()));
-  set.add(tool);
-}
-
-/** 设置页「清空本会话授权」：不传 tabId 清空全部 */
-export function clearSessionGrants(tabId?: string) {
-  if (tabId) sessionGrants.delete(tabId);
-  else sessionGrants.clear();
 }
 
 // ── 审批桥 ──
@@ -173,9 +175,27 @@ export function denyAllPending() {
   pending.clear();
 }
 
+/** 设置页「清空本会话授权」：后端持有会话授权，清空即撤销 */
+export function clearSessionGrants() {
+  // The mirror only holds what the card granted; without it there is nothing to revoke, and
+  // skipping the round trip keeps callers that run on every tab close cheap.
+  if (sessionGrantTools.size === 0) return;
+  sessionGrantTools.clear();
+  void clearToolSessionGrants().catch((error: unknown) => {
+    console.warn('[permissions] Could not clear session grants:', error);
+  });
+}
+
+/** Session approvals the card granted, mirrored so revoking them stays a local decision. */
+const sessionGrantTools = new Set<string>();
+
+function noteSessionGrant(tool: string) {
+  sessionGrantTools.add(tool);
+}
+
 /**
  * 未信任技能的访问确认：agent 要读/写/运行某个未信任技能的文件或脚本时调用。
- * 复用审批桥（打 approval-pending）；允许则放行（由调用方持久化信任），拒绝则阻断。
+ * 复用审批卡；允许则放行（由调用方持久化信任），拒绝则阻断。
  */
 export async function ensureTrustedSkill(
   skillName: string,
@@ -217,28 +237,44 @@ export async function ensureSkillAccess(
   return { proceed: true };
 }
 
+// ── 授权入口（Rust 决定） ──
 
-// ── 门控 ──
+/** Injectable for tests: the backend call that decides a tool call. */
+export type ToolAuthorizer = (request: AuthorizeRequest) => Promise<ToolDecision>;
 
-type GateOutcome = { proceed: true } | { proceed: false; result: GateResult };
+/** Injectable for tests: the backend call that records the card's decision and mints the lease. */
+export type ToolApprover = (
+  tool: string,
+  command: string | undefined,
+  args: Record<string, unknown>,
+  scope: 'once' | 'session',
+) => Promise<ToolDecision>;
 
-/** Fields whose text is executed by the target shell. */
-const EXECUTED_FIELDS = ['command', 'keys'] as const;
-/** Fields that name a file the tool touches, directly or through a command. */
-const PATH_FIELDS = ['path', 'root', 'command', 'keys'] as const;
+const backendAuthorizer: ToolAuthorizer = (request) => authorizeToolCall(request);
+const backendApprover: ToolApprover = (tool, command, args, scope) =>
+  approveToolCall(tool, command, args, scope);
 
-/** Join the string values of the listed fields for a text scan. */
-function textOf(input: Record<string, unknown>, fields: readonly string[]): string {
-  let out = '';
-  for (const field of fields) {
-    const value = input[field];
-    if (typeof value === 'string' && value) out = out ? `${out}\n${value}` : value;
-  }
-  return out;
+let authorizer: ToolAuthorizer = backendAuthorizer;
+let approver: ToolApprover = backendApprover;
+
+/** Tests install stubs instead of mocking the whole IPC layer. */
+export function setToolAuthorizer(next: ToolAuthorizer | null) {
+  authorizer = next ?? backendAuthorizer;
+}
+
+export function setToolApprover(next: ToolApprover | null) {
+  approver = next ?? backendApprover;
+}
+
+export type GateOutcome = { proceed: true; lease?: string } | { proceed: false; result: GateResult };
+
+function denied(reason: string | undefined, fallback: string): GateOutcome {
+  return { proceed: false, result: { ok: false, denied: true, error: reason ?? fallback } };
 }
 
 /**
- * 工具 execute 的第一行。返回 proceed:false 时直接把 result 作为工具结果返回
+ * 工具 execute 的第一行。`command` 是受门控的后端命令名（read_file_text / fs_search …），
+ * 租约与参数一并绑定到它；返回 proceed:false 时直接把 result 作为工具结果返回
  * （带 denied 哨兵，agentStream 据此刻成 denied 灰环）。
  */
 export async function gate(
@@ -246,43 +282,52 @@ export async function gate(
   input: Record<string, unknown>,
   toolCallId: string | undefined,
   ctx: ToolContext,
+  command?: string,
 ): Promise<GateOutcome> {
-  const level = levelOf(toolName);
-  if (level === 'deny') {
-    return {
-      proceed: false,
-      result: { ok: false, denied: true, error: `工具 ${toolName} 已在权限设置中被禁用` },
-    };
+  const mode = usePermissions.getState().mode;
+  let decision: ToolDecision;
+  try {
+    decision = await authorizer({
+      tool: toolName,
+      command,
+      args: input,
+      shell: ctx.shellType ?? null,
+      mode,
+      reasonHint: t('This operation can change your system or reach your credentials.'),
+    });
+  } catch (error) {
+    // Fail closed: without an authorization from the backend the tool must not run.
+    console.warn('[permissions] Authorization unavailable:', error);
+    return denied(undefined, '无法获取授权（后端不可用），操作已拒绝');
   }
-  // Danger ignores any grant and is asked per call. Scan the executed fields rather than
-  // the tool name: both the run_command text and the terminal_keys payload really execute.
-  const danger = dangerousCommandReason(textOf(input, EXECUTED_FIELDS), ctx.shellType);
-  // The same for credential paths, so prompt injection cannot read keys and ship them to
-  // the provider. Path fields include command/keys: `cat ~/.ssh/id_rsa` is caught here.
-  const sensitive = sensitivePathReason(textOf(input, PATH_FIELDS));
-  // Durable side effects (memory, subagents, schedules) outlive the turn: ask per call too.
-  const durable = sensitiveActionReason(toolName, input);
-  if (!danger && !sensitive && !durable && (level === 'allow' || hasSessionGrant(ctx.tabId, toolName))) {
-    return { proceed: true };
+
+  const reason = reasonText(decision.reason);
+  if (decision.decision === 'deny') {
+    if (toolCallId) ctx.setToolState?.(toolCallId, 'denied', reason ? { danger: reason } : undefined);
+    return denied(reason, '操作被拒绝');
+  }
+  if (decision.decision === 'allow') {
+    return { proceed: true, ...(decision.lease ? { lease: decision.lease } : {}) };
   }
   // ask：挂起等审批。无 setToolState/tabId 说明不在交互上下文（如测试），按拒绝处理
   if (!toolCallId || !ctx.setToolState || !ctx.tabId) {
-    return {
-      proceed: false,
-      result: { ok: false, denied: true, error: '当前上下文无法发起审批，操作被拒绝' },
-    };
+    return denied(undefined, '当前上下文无法发起审批，操作被拒绝');
   }
-  const forcedReason = danger ?? sensitive ?? durable;
-  ctx.setToolState(toolCallId, 'approval-pending', forcedReason ? { danger: forcedReason } : undefined);
-  const decision = await requestApproval(toolCallId);
-  if (decision === 'deny') {
-    ctx.setToolState(toolCallId, 'denied', forcedReason ? { danger: forcedReason } : undefined);
-    return {
-      proceed: false,
-      result: { ok: false, denied: true, error: '用户拒绝了本次操作' },
-    };
+  ctx.setToolState(toolCallId, 'approval-pending', reason ? { danger: reason } : undefined);
+  const choice = await requestApproval(toolCallId);
+  if (choice === 'deny') {
+    ctx.setToolState(toolCallId, 'denied', reason ? { danger: reason } : undefined);
+    return denied(undefined, '用户拒绝了本次操作');
   }
-  if (decision === 'session') grantSession(ctx.tabId, toolName);
-  ctx.setToolState(toolCallId, 'running', forcedReason ? { danger: forcedReason } : undefined);
-  return { proceed: true };
+  const approved = await approver(toolName, command, input, choice).catch((error: unknown) => {
+    console.warn('[permissions] Could not record the approval:', error);
+    return { decision: 'deny' } as ToolDecision;
+  });
+  if (approved.decision !== 'allow') {
+    ctx.setToolState(toolCallId, 'denied', reason ? { danger: reason } : undefined);
+    return denied(reason, '审批未能完成，操作已拒绝');
+  }
+  if (choice === 'session') noteSessionGrant(toolName);
+  ctx.setToolState(toolCallId, 'running', reason ? { danger: reason } : undefined);
+  return { proceed: true, ...(approved.lease ? { lease: approved.lease } : {}) };
 }

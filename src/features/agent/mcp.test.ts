@@ -9,9 +9,10 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import { buildMcpTool, type McpExposedTool } from '@features/agent/services/mcp';
 import { usePermissions, type ToolContext } from '@features/agent/stores/permissions';
+import { approvingToolContext } from '../../test-utils/approvingToolContext';
 
 usePermissions.setState({ levels: { mcp: 'allow' } });
-const CTX: ToolContext = {};
+const CTX: ToolContext = approvingToolContext();
 
 type Exec = (args: Record<string, unknown>) => Promise<unknown>;
 const execOf = (t: unknown): Exec => {

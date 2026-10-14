@@ -30,11 +30,12 @@ export function buildFileTools(ctx: ToolContext) {
         max_bytes: z.number().optional().describe('读取上限字节数，默认 256KB'),
       }),
       execute: async ({ path, max_bytes }, { toolCallId }) => {
-        const g = await gate('read_file', { path }, toolCallId, ctx);
+        const args = { path, maxBytes: max_bytes ?? null };
+        const g = await gate('read_file', args, toolCallId, ctx, 'read_file_text');
         if (!g.proceed) return g.result;
         const t = await ensureSkillAccess(path, toolCallId, ctx);
         if (!t.proceed) return { ok: false, denied: true, error: t.error };
-        return call(() => invoke<string>('read_file_text', { path, maxBytes: max_bytes ?? null }));
+        return call(() => invoke<string>('read_file_text', { ...args, lease: g.lease ?? null }));
       },
     }),
 
@@ -45,11 +46,12 @@ export function buildFileTools(ctx: ToolContext) {
         content: z.string().describe('完整文件内容'),
       }),
       execute: async ({ path, content }, { toolCallId }) => {
-        const g = await gate('write_file', { path }, toolCallId, ctx);
+        const args = { path, content };
+        const g = await gate('write_file', args, toolCallId, ctx, 'write_file_text');
         if (!g.proceed) return g.result;
         const t = await ensureSkillAccess(path, toolCallId, ctx);
         if (!t.proceed) return { ok: false, denied: true, error: t.error };
-        return call(() => invoke<string>('write_file_text', { path, content }));
+        return call(() => invoke<string>('write_file_text', { ...args, lease: g.lease ?? null }));
       },
     }),
 
@@ -61,13 +63,12 @@ export function buildFileTools(ctx: ToolContext) {
         new_string: z.string().describe('替换后的新内容'),
       }),
       execute: async ({ path, old_string, new_string }, { toolCallId }) => {
-        const g = await gate('edit_file', { path }, toolCallId, ctx);
+        const args = { path, oldString: old_string, newString: new_string };
+        const g = await gate('edit_file', args, toolCallId, ctx, 'edit_file_text');
         if (!g.proceed) return g.result;
         const t = await ensureSkillAccess(path, toolCallId, ctx);
         if (!t.proceed) return { ok: false, denied: true, error: t.error };
-        return call(() =>
-          invoke<string>('edit_file_text', { path, oldString: old_string, newString: new_string }),
-        );
+        return call(() => invoke<string>('edit_file_text', { ...args, lease: g.lease ?? null }));
       },
     }),
   };

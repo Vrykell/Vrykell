@@ -108,6 +108,16 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
       { name: '文件系统', command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem'], url: '', env: {}, enabled: true, connected: true, toolCount: 3 },
     ];
     const mcpOps: { op: string; name: string; config?: unknown }[] = [];
+    // ── 工具授权（Rust 侧策略的镜像） ──
+    const policyLevels: Record<string, string> = {
+      run_command: 'ask', read_file: 'allow', write_file: 'ask', edit_file: 'ask',
+      list_dir: 'allow', search_files: 'allow', web_search: 'allow', web_fetch: 'allow',
+      web_crawl: 'allow', read_terminal: 'allow', terminal_keys: 'ask', use_skill: 'allow',
+      install_skill: 'ask', mcp: 'ask', memory: 'allow', schedule: 'allow', subagent: 'allow',
+    };
+    const policyOps: { op: string; tool?: string; level?: string }[] = [];
+    let leaseCounter = 0;
+    const nextLease = () => `e2e-lease-${++leaseCounter}`;
     // ── 记忆 ──
     const memory = { fact: '用户偏好：优先用 Rust。\n项目约定：单测覆盖核心逻辑。', journal: '2025-06-01 修复了工具注册 bug\n2025-06-02 补了 e2e 测试' };
     const memoryOps: { op: string; content?: string; text?: string }[] = [];
@@ -173,6 +183,8 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     (window as unknown as Record<string, unknown>).__SCHEDULE_OPS__ = scheduleOps;
     (window as unknown as Record<string, unknown>).__THEME__ = theme;
     (window as unknown as Record<string, unknown>).__SEARCH_CALLS__ = searchCalls;
+    (window as unknown as Record<string, unknown>).__POLICY_OPS__ = policyOps;
+    (window as unknown as Record<string, unknown>).__POLICY_LEVELS__ = policyLevels;
 
     const A = '\x1b]133;A\x07';
     const C = '\x1b]133;C\x07';
@@ -504,8 +516,29 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             aborted.add(String((args as { id?: unknown }).id ?? ''));
             return undefined;
           }
-          case 'get_ai_config':
-            return {
+          case 'tool_policy_get':
+            return { ...policyLevels };
+          case 'tool_policy_set_level':
+            policyOps.push({ op: 'set', tool: args.tool as string, level: args.level as string });
+            policyLevels[args.tool as string] = args.level as string;
+            return undefined;
+          case 'tool_policy_clear_session_grants':
+            policyOps.push({ op: 'clear-grants' });
+            return undefined;
+          case 'authorize_tool_call': {
+            // Mirrors the Rust table: deny → deny, allow → lease, ask → the approval card. The
+            // danger/credential heuristics live in Rust and are covered by cargo tests.
+            const request = (args as { request?: { tool?: string; mode?: string } }).request ?? {};
+            const tool = String(request.tool ?? '');
+            const mode = request.mode ?? 'standard';
+            const level = mode === 'relaxed' ? 'allow' : mode === 'strict' ? 'ask' : (policyLevels[tool] ?? 'ask');
+            if (level === 'deny') return { decision: 'deny', reason: 'policy.denied' };
+            if (level === 'allow') return { decision: 'allow', lease: nextLease() };
+            return { decision: 'ask' };
+          }
+          case 'approve_tool_call':
+            return { decision: 'allow', lease: nextLease() };
+          case 'get_ai_config':            return {
               has_key: aiConfig.hasKey,
               base_url: aiConfig.baseUrl,
               model: aiConfig.model,
@@ -1230,6 +1263,15 @@ export function mcpServers(page: Page): Promise<Record<string, unknown>[]> {
 }
 export function mcpOps(page: Page): Promise<{ op: string; name: string; config?: unknown }[]> {
   return page.evaluate(() => (window as unknown as { __MCP_OPS__: { op: string; name: string; config?: unknown }[] }).__MCP_OPS__);
+}
+
+/** 读取工具权限的写入记录与当前表（Rust 侧策略的镜像） */
+export function policyOps(page: Page): Promise<{ op: string; tool?: string; level?: string }[]> {
+  return page.evaluate(() => (window as unknown as { __POLICY_OPS__: { op: string; tool?: string; level?: string }[] }).__POLICY_OPS__);
+}
+
+export function policyLevels(page: Page): Promise<Record<string, string>> {
+  return page.evaluate(() => (window as unknown as { __POLICY_LEVELS__: Record<string, string> }).__POLICY_LEVELS__);
 }
 
 /** 读取记忆操作记录 */

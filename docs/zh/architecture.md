@@ -445,6 +445,7 @@ chat store send → agentStream（AI SDK streamText）
   └─ stepCountIs(maxSteps) 循环，run_command 使用请求开始时固定的目标 pane
 ```
 
+- **工具授权**（前端 `permissions.ts` + 后端 `src-tauri/src/agent/permissions.rs`）：请求由后端裁决。等级表存 `~/.vrykell/permissions.json`，危险命令 / 凭据路径 / 持久化写入的判断都实现在 Rust，命中时用系统原生对话框确认（网页内容无法代替用户点它）；放行后签发与「命令 + 参数摘要」绑定的一次性租约，受门控的后端命令（`read_file_text`/`write_file_text`/`edit_file_text`/`fs_search`）必须出示租约，漏掉授权的调用会失败关闭。前端只保留等级镜像（渲染设置页与决定注册哪些工具）、审批卡与「本会话允许」的会话授权。共享 UI 命令（文件面板、设置页）尚未纳入门控，这是下一步。
 - **权限模式**（`permissions.ts`）：标准（按设置页逐工具判定）/ 严格（逐次问）/ 放行（危险命令仍逐次问）；Shield 状态栏 chip 循环切换。
 - **上下文策略**（`context.ts`）：off（全量）/ window（token 预算）/ compact（预算 + 自动摘要压缩），估算用 `estimateTokens`。
 - **设置分层**（`agentSettings.ts`）：global 默认 + per-model overrides（`resolve(modelId)` 合并），localStorage 持久化；key/provider/模型等连接配置仍在 Rust `config.json`。

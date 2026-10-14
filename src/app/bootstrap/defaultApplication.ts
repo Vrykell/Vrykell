@@ -1,5 +1,5 @@
 import { setDefaultStream, useChatStore } from '@features/chat';
-import { refreshAiConfig } from '@features/agent';
+import { refreshAiConfig, refreshToolPolicy } from '@features/agent';
 import { agentStream } from '@features/agent/services/agentStream';
 import { initAutoTitle } from '@features/agent/services/title';
 import { initScheduleRunner } from '@features/agent/services/scheduleRunner';
@@ -23,6 +23,7 @@ export function startDefaultApplication(): () => void {
       void useChatStore.getState().loadConversations();
     },
     refreshAiConfig,
+    refreshToolPolicy,
     subscribeAutoTitle: initAutoTitle,
     startScheduleRunner: initScheduleRunner,
     restoreWorkspace: async () => {

@@ -374,7 +374,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     if (get().sendingTab === id || pendingConversationDeletes.has(id)) return;
     const current = get().conversations.find(conversation => conversation.id === id);
     if (!current) return;
-    if (current.environment?.paneId !== environment?.paneId) clearSessionGrants(id);
+    if (current.environment?.paneId !== environment?.paneId) clearSessionGrants();
     const updated = { ...current, environment, updatedAt: Date.now() };
     set(state => ({ conversations: state.conversations.map(conversation => conversation.id === id ? updated : conversation) }));
     void persistConversation(updated);
@@ -612,7 +612,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     abortControllers.delete(tabId);
     if (get().sendingTab === tabId) denyAllPending();
     clearCompactionCache(tabId); // 清理该 tab 的上下文摘要缓存
-    clearSessionGrants(tabId);
+    clearSessionGrants();
     set((s) => {
       if (!(tabId in s.byTab) && s.sendingTab !== tabId) return s;
       const byTab = { ...s.byTab };

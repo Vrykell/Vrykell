@@ -2,7 +2,7 @@
  * 主题 / 打开方式 / 快捷键说明 / 网络搜索 / 权限 设置页 e2e。
  */
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, themeConfig, aiKeyCalls } from './tauri-mock';
+import { setupTauriMock, themeConfig, aiKeyCalls, policyOps, policyLevels } from './tauri-mock';
 import { gotoSetting, fieldOf, rowOf } from './settings';
 
 test.beforeEach(async ({ page }) => {
@@ -119,20 +119,20 @@ test.describe('网络搜索页', () => {
 });
 
 test.describe('模型权限页', () => {
-  test('工具权限分级切换持久化', async ({ page }) => {
+  test('工具权限分级切换写入后端策略', async ({ page }) => {
     await gotoSetting(page, '模型权限');
     // 执行终端命令 → 禁止
     const runRow = rowOf(page, '执行终端命令');
     await runRow.getByRole('combobox', { name: '执行终端命令 权限' }).click();
     await page.getByRole('option', { name: '禁止', exact: true }).click();
-    let saved = await page.evaluate(() => localStorage.getItem('vrykell-permissions') ?? '');
-    expect(saved).toContain('"run_command":"deny"');
+    await expect.poll(async () => (await policyLevels(page)).run_command).toBe('deny');
     // 联网搜索 → 每次询问
     const webRow = rowOf(page, '联网搜索');
     await webRow.getByRole('combobox', { name: '联网搜索 权限' }).click();
     await page.getByRole('option', { name: '每次询问', exact: true }).click();
-    saved = await page.evaluate(() => localStorage.getItem('vrykell-permissions') ?? '');
-    expect(saved).toContain('"web_search":"ask"');
+    const ops = await policyOps(page);
+    expect(ops).toContainEqual({ op: 'set', tool: 'web_search', level: 'ask' });
+    expect(await runRow.getByRole('combobox').textContent()).toContain('禁止');
   });
 
   test('清空会话授权按钮提示成功', async ({ page }) => {

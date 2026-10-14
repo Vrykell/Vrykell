@@ -11,6 +11,7 @@ export type ApplicationCleanup = () => void;
 export interface ApplicationBootstrapDependencies {
   configureAgentStream: ApplicationTask;
   refreshAiConfig: ApplicationTask;
+  refreshToolPolicy: ApplicationTask;
   subscribeAutoTitle: () => ApplicationCleanup;
   startScheduleRunner: () => ApplicationCleanup;
   restoreWorkspace: ApplicationTask;
@@ -62,6 +63,7 @@ export function createApplicationBootstrap(
 
   runTask('配置 Agent 流', dependencies.configureAgentStream, onError);
   runTask('刷新 AI 配置', dependencies.refreshAiConfig, onError);
+  runTask('刷新工具权限', dependencies.refreshToolPolicy, onError);
   registerCleanup(cleanups, '初始化智能标题', dependencies.subscribeAutoTitle, onError);
   registerCleanup(cleanups, '启动定时任务', dependencies.startScheduleRunner, onError);
   runTask('恢复工作区会话', dependencies.restoreWorkspace, onError);

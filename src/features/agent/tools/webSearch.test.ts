@@ -10,10 +10,11 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import { buildTavilySearchTool, formatResults } from '@features/agent/tools/webSearch';
 import { usePermissions, type ToolContext } from '@features/agent/stores/permissions';
+import { approvingToolContext } from '../../../test-utils/approvingToolContext';
 
 // 本文件测 invoke 参数/结果映射，不测门控（门控见 permissions.test.ts）
 usePermissions.setState({ levels: { web_search: 'allow' } });
-const CTX: ToolContext = {};
+const CTX: ToolContext = approvingToolContext();
 
 type Exec = (
   args: Record<string, unknown>,

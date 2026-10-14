@@ -5,6 +5,7 @@ function createDependencies(): ApplicationBootstrapDependencies {
   return {
     configureAgentStream: vi.fn(),
     refreshAiConfig: vi.fn(),
+    refreshToolPolicy: vi.fn(),
     subscribeAutoTitle: vi.fn(() => vi.fn()),
     startScheduleRunner: vi.fn(() => vi.fn()),
     restoreWorkspace: vi.fn(),
@@ -20,6 +21,7 @@ describe('createApplicationBootstrap', () => {
     const names: Array<keyof ApplicationBootstrapDependencies> = [
       'configureAgentStream',
       'refreshAiConfig',
+      'refreshToolPolicy',
       'subscribeAutoTitle',
       'startScheduleRunner',
       'restoreWorkspace',
@@ -45,6 +47,7 @@ describe('createApplicationBootstrap', () => {
     expect(order).toEqual([
       'configureAgentStream',
       'refreshAiConfig',
+      'refreshToolPolicy',
       'subscribeAutoTitle',
       'startScheduleRunner',
       'restoreWorkspace',

@@ -8,9 +8,10 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import { buildWebSearchTool, buildWebFetchTool, buildWebCrawlTool } from '@features/agent/tools/webFetch';
 import { usePermissions, type ToolContext } from '@features/agent/stores/permissions';
+import { approvingToolContext } from '../../../test-utils/approvingToolContext';
 
 usePermissions.setState({ levels: { web_search: 'allow', web_fetch: 'allow', web_crawl: 'allow' } });
-const CTX: ToolContext = {};
+const CTX: ToolContext = approvingToolContext();
 
 beforeEach(() => {
   invokeMock.mockReset();
