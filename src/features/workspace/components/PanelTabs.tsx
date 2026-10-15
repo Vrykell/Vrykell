@@ -4,7 +4,9 @@ import { iconSizes,
   History, Plus, Search, Settings, Sparkles,
   ChevronRight, Pencil, Archive, Folder, Trash2, X,
  } from '@ui/icons';
-import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, useTabDisplayTitle, type Tab, type TabGroup } from '@features/workspace';
+import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, useTabDisplayTitle, tabIconKey, tabIconColor, type Tab, type TabGroup } from '@features/workspace';
+import { useIconColorStore } from '@config/iconColors';
+import { HistoryColorChoices } from '@ui/HistoryColorPalette';
 import { regenerateTitle } from '@features/agent/services/title';
 import { useToastStore } from '@ui/Toast';
 import { IconBtn } from '@ui/UiBtn';
@@ -34,6 +36,7 @@ const UNGROUPED_ZONE = 'ungrouped';
 
 export default function PanelTabs() {
   const tabs = useSessionStore((s) => s.tabs);
+  const iconColors = useIconColorStore(state => state.colors);
   const activeId = useSessionStore((s) => s.activeId);
   const groups = useSessionStore((s) => s.groups);
   const activate = useSessionStore((s) => s.activate);
@@ -150,7 +153,7 @@ export default function PanelTabs() {
           } },
           { label: '复制会话', group: 'primary' as const, onClick: () => duplicateTab(ctxTab.id) },
         ] : []),
-        { label: '关闭标签', group: 'danger', onClick: () => closeTab(ctxTab.id) },
+        { label: t('Close this tab'), danger: true, onClick: () => closeTab(ctxTab.id) },
       ]
     : [];
 
@@ -279,6 +282,13 @@ export default function PanelTabs() {
         <ContextMenu
           anchor={{ x: ctxMenu.x, y: ctxMenu.y }}
           items={ctxItems}
+          footer={ctxTab && <>
+            <div className="history-menu-color-label">{t('Icon color')}</div>
+            <HistoryColorChoices menu label={t('Icon color')} value={iconColors[tabIconKey(ctxTab)] ?? null}
+              testId="tab-icon-color" onSelect={color => {
+                useIconColorStore.getState().setColor(tabIconKey(ctxTab), color); setCtxMenu(null);
+              }} />
+          </>}
           onClose={() => setCtxMenu(null)}
         />
       )}
@@ -293,7 +303,7 @@ export default function PanelTabs() {
               : tab?.kind === 'settings' ? Settings
               : first?.kind === 'ssh' ? SshIcon
                 : shellIconFor(first?.kind === 'local' ? first.shellType : undefined);
-          return <Icon size={iconSizes.row} style={{ color: drag.kind === 'group' ? 'var(--accent-warm)' : 'var(--accent)' }} />;
+          return <Icon size={iconSizes.row} style={{ color: tab ? tabIconColor(tab, iconColors) : 'var(--accent-warm)' }} />;
         }}
       </ListReorderPreview>
 
@@ -523,7 +533,8 @@ function TabRow({
     : tab.kind === 'settings' ? Settings
       : isSsh ? SshIcon
         : shellIconFor(first?.kind === 'local' ? first.shellType : undefined);
-  const iconColor = active ? 'var(--text-primary)' : 'var(--text-secondary)';
+  const iconColors = useIconColorStore(state => state.colors);
+  const iconColor = tabIconColor(tab, iconColors) ?? (isSessionTab(tab) ? undefined : active ? 'var(--text-primary)' : 'var(--text-secondary)');
   const typeSummary = terms.map((t) =>
     t.kind === 'ssh' ? (t.ssh?.name || t.ssh?.host || 'SSH') : (t.shellType ? shellTypeLabel(t.shellType) : '本地'),
   ).join(' + ');

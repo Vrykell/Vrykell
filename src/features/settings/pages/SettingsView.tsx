@@ -2,7 +2,7 @@ import { OutlineButton } from '@ui/OutlineButton';
 import { t } from '@i18n';
 import SidebarItem from '@ui/sidebarItem';
 import { TextInput } from '@ui/TextInput';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { iconSizes, Search  } from '@ui/icons';
 import { loadConfig, saveConfig, type FileOpenConfig } from '@features/files/services/fileOpen';
 import { refreshAiConfig, setTavilyKey, clearTavilyKey, useAiConfigStore } from '@features/agent';
@@ -56,6 +56,16 @@ export default function SettingsView() {
 }
 
 function SettingsContent() {
+  const navigationRef = useRef<HTMLElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  useEffect(() => {
+    const outside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !navigationRef.current?.contains(event.target)) setSearchOpen(false);
+    };
+    document.addEventListener('pointerdown', outside);
+    return () => document.removeEventListener('pointerdown', outside);
+  }, []);
   const { save, status, retry } = useSettingsSave();
   const {
     selected,
@@ -276,7 +286,21 @@ function SettingsContent() {
     }}>
       <div className="settings-layout">
         {/* Navigation shares the available settings width with the content. */}
-        <aside className="settings-navigation" style={{
+        <aside ref={navigationRef} className="settings-navigation" data-search-open={searchOpen && Boolean(normalizedQuery)}
+          onBlur={event => {
+            if (event.relatedTarget instanceof Node && !event.currentTarget.contains(event.relatedTarget)) setSearchOpen(false);
+          }}
+          onKeyDown={event => {
+            if (event.key === 'Escape' && searchOpen) {
+              event.preventDefault(); event.stopPropagation(); searchRef.current?.focus(); setSearchOpen(false);
+            } else if (['ArrowDown', 'ArrowUp'].includes(event.key) && event.target instanceof Element
+              && event.target.closest('.settings-navigation-list')) {
+              event.preventDefault(); event.stopPropagation();
+              const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('.settings-navigation-list button:not(:disabled)')];
+              const current = buttons.indexOf(document.activeElement as HTMLButtonElement);
+              buttons[(current + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length]?.focus();
+            }
+          }} style={{
           background: 'var(--sidebar-bg)',
           display: 'flex', flexDirection: 'column', minHeight: 0,
         }}>
@@ -288,9 +312,18 @@ function SettingsContent() {
             }}>
               <Search size={iconSizes.compact} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
               <TextInput
+                ref={searchRef}
                 aria-label={t('Search settings…')}
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onFocus={() => setSearchOpen(true)}
+                onClick={() => setSearchOpen(true)}
+                onChange={(e) => { setQuery(e.target.value); setSearchOpen(true); }}
+                onKeyDown={event => {
+                  if (event.key === 'ArrowDown' && normalizedQuery) {
+                    event.preventDefault(); setSearchOpen(true);
+                    requestAnimationFrame(() => navigationRef.current?.querySelector<HTMLButtonElement>('.settings-navigation-list button')?.focus());
+                  }
+                }}
                 placeholder={t('Search settings…')}
                 style={{
                   flex: 1, minWidth: 0, background: 'transparent', border: 'none',
@@ -310,7 +343,7 @@ function SettingsContent() {
             {normalizedQuery && matchingSettings.map(setting => (
               <button key={setting.id} className="settings-search-result" onClick={() => { setting.onSelect(); setQuery(''); }}>
                 <span>{setting.label}</span>
-                <small>{setting.desc}</small>
+                <small>{SETTINGS_GROUPS.flatMap(group => group.items).find(item => item.id === setting.page)?.label ?? activeLabel} · {setting.desc}</small>
               </button>
             ))}
             {(!normalizedQuery || matchingSettings.length === 0) && visibleGroups.map((g) => {

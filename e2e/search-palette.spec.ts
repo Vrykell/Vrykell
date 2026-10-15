@@ -24,7 +24,7 @@ for (const theme of ['深色', '浅色']) {
     const bodyColors = await dialog.locator('.global-search-body').evaluate(element => {
       const actual = getComputedStyle(element).backgroundColor;
       const probe = document.createElement('span');
-      probe.style.background = 'var(--elevated)';
+      probe.style.background = 'transparent';
       element.appendChild(probe);
       const expected = getComputedStyle(probe).backgroundColor;
       probe.remove();

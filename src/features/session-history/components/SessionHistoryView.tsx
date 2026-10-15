@@ -10,6 +10,7 @@ import HistoryGroupCard from '@ui/HistoryGroupCard';
 import HistoryPage from '@ui/HistoryPage';
 import HistoryTextPrompt from '@ui/HistoryTextPrompt';
 import SidebarItem from '@ui/sidebarItem';
+import { iconColorCss, iconColorKey, useIconColorStore } from '@config/iconColors';
 import type { BackendSessionEntry } from '@platform/api/types';
 import {
   isSshSession,
@@ -298,6 +299,7 @@ function SessionRow({ s, starred, note, locked, onOpen, onDelete, busy, onMenu }
   busy: boolean;
   onMenu: (anchor: MenuAnchor) => void;
 }) {
+  const iconColor = useIconColorStore(state => iconColorCss(state.colors[iconColorKey('session', s.id)]));
   const historical = s.status === 'historical';
   const closedDate = historical && s.closed_at ? new Date(s.closed_at).toLocaleString(undefined,
     { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
@@ -312,7 +314,7 @@ function SessionRow({ s, starred, note, locked, onOpen, onDelete, busy, onMenu }
     : historical ? <HistorySmall size={16} aria-hidden="true" /> : <MonitorSmall size={16} aria-hidden="true" />;
 
   return <SidebarItem
-    icon={<span className="history-row-icon">{icon}</span>}
+    icon={<span className="history-row-icon" style={{ color: iconColor }}>{icon}</span>}
     title={s.title || t('Untitled session')}
     subtitle={subtitle}
     subtitleFontFamily="var(--font-ui)"

@@ -238,7 +238,7 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
         rows={3}
         style={{
           ...inputStyle, marginTop: 8, minHeight: 52, resize: 'vertical',
-          fontFamily: 'var(--font-mono)', lineHeight: 1.5,
+          fontFamily: 'var(--font-ui)', lineHeight: 1.5,
         }}
       />
     </div>

@@ -20,6 +20,8 @@ import AiBlock from './AiBlock';
 import { toExchanges } from '../model/exchanges';
 import { useChatComposer } from '../hooks/useChatComposer';
 import { environmentForPane, showExecutionTerminal } from '../services/conversationContext';
+import { useIconColorStore } from '@config/iconColors';
+import { tabIconColor } from '@features/workspace';
 import type { AttachmentMeta } from '@features/agent/model/attachments';
 
 const EMPTY_MESSAGES: ChatMessage[] = [];
@@ -55,6 +57,7 @@ export default function PanelChat() {
   const sessions = useTerminalStore(state => state.sessions);
   const startupStates = useTerminalStore(state => state.startupStates);
   const tabs = useSessionStore(state => state.tabs);
+  const iconColors = useIconColorStore(state => state.colors);
   const terminalCwds = useSessionStore(state => state.terminalCwds);
   const [renaming, setRenaming] = useState(false);
   const [title, setTitle] = useState('');
@@ -83,14 +86,14 @@ export default function PanelChat() {
     conversationId: activeId, references, clearReferences, value: composerDraft.text, onTextChange: setText, scopeKey: activeId,
   });
   const environmentOptions = useMemo(() => {
-    const available = tabs.flatMap(tab => tab.kind === 'session' ? leaves(tab.layout) : [])
-      .filter(pane => !!sessions[pane.id]).map(pane => {
+    const available = tabs.flatMap(tab => tab.kind === 'session' ? leaves(tab.layout).map(pane => ({ pane, tab })) : [])
+      .filter(({ pane }) => !!sessions[pane.id]).map(({ pane, tab }) => {
         const context = environmentForPane(pane.id)!;
         const triggerLabel = pane.kind === 'ssh' ? pane.ssh?.host || pane.ssh?.name || context.label : t('Local terminal');
         const host = pane.kind === 'ssh' ? pane.ssh?.host : undefined;
         const hostLabel = host && !context.label.includes(host) ? ` · ${host}` : '';
         const swatch = startupStates[pane.id] === 'starting' ? 'var(--accent-warm)'
-          : startupStates[pane.id] === 'failed' || startupStates[pane.id] === 'closed' ? 'var(--error)' : 'var(--success)';
+          : startupStates[pane.id] === 'failed' || startupStates[pane.id] === 'closed' ? 'var(--error)' : tabIconColor(tab, iconColors) ?? 'var(--success)';
         return { value: pane.id, label: `${context.label}${hostLabel}${context.cwd ? ` · ${context.cwd}` : ''}`, triggerLabel, swatch };
       });
     return [
@@ -99,7 +102,7 @@ export default function PanelChat() {
         ? [{ value: environment.paneId, label: `${environment.label} · ${t('Disconnected')}`, swatch: 'var(--accent-warm)', disabled: true }] : []),
       ...available,
     ];
-  }, [tabs, sessions, startupStates, terminalCwds, environment]);
+  }, [tabs, sessions, startupStates, terminalCwds, environment, iconColors]);
 
   useEffect(() => { void useChatStore.getState().loadConversations(); }, []);
   useEffect(() => { setRenaming(false); }, [activeId]);

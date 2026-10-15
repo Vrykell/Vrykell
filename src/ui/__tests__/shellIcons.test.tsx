@@ -37,11 +37,11 @@ describe('shellIconFor', () => {
     expect(svg).toHaveAttribute('width', '20');
   });
 
-  it('pins the SSH mark to the theme color even when a caller passes one', () => {
-    const { container } = render(createElement(SshIcon, { size: 20, style: { color: 'red' } }));
+  it('allows an explicit color while keeping the SSH mark geometry', () => {
+    const { container } = render(createElement(SshIcon, { size: 20, style: { color: 'var(--group-rose)' } }));
     const svg = container.querySelector('svg') as SVGElement;
     expect(svg).toHaveAttribute('data-shell-mark', 'ssh');
-    expect(svg.style.color).toBe('var(--shell-ssh-accent)');
+    expect(svg.style.color).toBe('var(--group-rose)');
   });
 
   it.each(['zsh', 'bash'])('keeps the %s mark readable through the theme color', (shell) => {
