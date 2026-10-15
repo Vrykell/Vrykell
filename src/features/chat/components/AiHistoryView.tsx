@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { t } from '@i18n';
-import { ArrowSort, Ellipsis, Filter, Grid, History, Lock, Sparkles, Star } from '@ui/icons';
+import { ArrowSort, Ellipsis, Filter, Grid, History, LockSmall as Lock, SparklesSmall as Sparkles, StarSmall as Star, Undo2, X } from '@ui/icons';
 import { IconButton } from '@ui/IconButton';
 import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/ContextMenu';
 import HistoryOptionMenu, { type HistoryMenuSection } from '@ui/HistoryOptionMenu';
@@ -9,6 +9,7 @@ import HistoryGroupCard from '@ui/HistoryGroupCard';
 import HistoryPage from '@ui/HistoryPage';
 import HistoryTextPrompt from '@ui/HistoryTextPrompt';
 import SidebarItem from '@ui/sidebarItem';
+import { historyDirectory } from '@utils/historyDirectory';
 import ErrorBox from '@ui/ErrorBox';
 import { useDockStore } from '@features/workspace';
 import type { Conversation } from '../model/conversation';
@@ -185,7 +186,7 @@ export default function AiHistoryView() {
   const groupItems = (items: readonly Conversation[]): ContextMenuItem[] => [
     { label: t('Open most recent conversation'), disabled: !items.length,
       onClick: () => { const recent = [...items].sort((a, b) => b.updatedAt - a.updatedAt)[0]; if (recent) open(recent.id); } },
-    { label: t('Copy matching conversations as Markdown'), group: 'clipboard', disabled: batchBusy, onClick: () => { void copyMarkdown(items); } },
+    { label: t('Copy as Markdown'), group: 'clipboard', disabled: batchBusy, onClick: () => { void copyMarkdown(items); } },
     { label: t('Delete {{count}} matching conversations…', { count: deletable(items).length }), danger: true,
       disabled: batchBusy || !deletable(items).length, onClick: () => { void deleteMatching(items); } },
   ];
@@ -342,14 +343,16 @@ export default function AiHistoryView() {
         {...groupOperations.forGroup(group.id, group.title, group.items.map(item => item.id))}
         timestamp={group.items.reduce((latest, item) => Math.max(latest, conversationHistoryTimestamp(item, filter.sort, dateField)), 0)}
         count={t('{{count}} conversations', { count: group.items.length })}
-        actions={groupItems(group.items)}
-        primaryAction={{ label: t('Copy as Markdown'), disabled: batchBusy, onClick: () => { void copyMarkdown(group.items); } }}>
+        actions={groupItems(group.items)}>
         {group.items.map(item => <SidebarItem key={item.id}
-          icon={<span className="history-row-icon"><Sparkles size={14} aria-hidden="true" /></span>}
+          icon={<span className="history-row-icon"><Sparkles size={16} aria-hidden="true" /></span>}
           title={item.title}
           subtitle={[
             item.environment?.label ?? t('Discussion only'),
-            new Date(item.updatedAt).toLocaleDateString(),
+            item.environment && (item.environment.cwd || item.environment.ssh?.host)
+              ? historyDirectory(item.environment, t('Working directory not recorded')).title : null,
+            t('Updated {{date}}', { date: new Date(item.updatedAt).toLocaleString(undefined,
+              { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }),
             notes[noteKey(item.id)] ? t('Note: {{note}}', { note: notes[noteKey(item.id)] }) : null,
           ].filter(Boolean).join(' · ')}
           subtitleFontFamily="var(--font-ui)"
@@ -357,14 +360,26 @@ export default function AiHistoryView() {
           compact
           active={item.id === activeId} testId={`conversation-row-${item.id}`} tabIndex={0}
           tooltip={t('Open conversation')} onClick={() => open(item.id)}
+          leadingActions={[
+            { icon: <X size={16} aria-hidden="true" />, label: t('Delete conversation'),
+              title: t(lockedRecords[noteKey(item.id)] ? 'Locked record' : 'Delete conversation'),
+              disabled: batchBusy || sendingId === item.id || Boolean(lockedRecords[noteKey(item.id)]),
+              testId: `conversation-delete-${item.id}`, onClick: () => { void remove(item.id); } },
+            { icon: <Undo2 size={16} aria-hidden="true" />, label: t('Open conversation'),
+              testId: `conversation-open-${item.id}`, onClick: () => open(item.id) },
+          ]}
+          onContextMenu={event => {
+            event.preventDefault(); event.stopPropagation();
+            openRowMenu(item.id, { x: event.clientX, y: event.clientY, trigger: event.currentTarget });
+          }}
           onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); open(item.id); } }}
           badge={starredIds.has(item.id) || sendingId === item.id || lockedRecords[noteKey(item.id)] ? <span className="history-row-flags">
-            {lockedRecords[noteKey(item.id)] && <span className="history-row-lock" data-tip={t('Locked record')}><Lock size={12} aria-hidden="true" /></span>}
-            {starredIds.has(item.id) && <span className="history-row-star" data-tip={t('Starred')} data-testid={`conversation-star-${item.id}`}><Star size={12} aria-hidden="true" /></span>}
+            {lockedRecords[noteKey(item.id)] && <span className="history-row-lock" data-tip={t('Locked record')}><Lock size={16} aria-hidden="true" /></span>}
+            {starredIds.has(item.id) && <span className="history-row-star" data-tip={t('Starred')} data-testid={`conversation-star-${item.id}`}><Star size={16} aria-hidden="true" /></span>}
             {sendingId === item.id && <span className="ai-history-working">{t('Working')}</span>}
           </span> : undefined}
           action={sendingId === item.id ? undefined : {
-            icon: <Ellipsis size={14} aria-hidden="true" />,
+            icon: <Ellipsis size={16} aria-hidden="true" />,
             label: t('More actions'),
             title: t('More actions'),
             testId: `conversation-menu-${item.id}`,

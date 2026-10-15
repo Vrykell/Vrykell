@@ -82,7 +82,7 @@ function SkillFileBrowser({ skillName, files }: { skillName: string; files: stri
           ) : (
             <FileText size={12} style={{ marginLeft: 11 }} />
           )}
-          <span style={{ fontFamily: n.isDir ? 'var(--font-ui)' : 'var(--font-mono)' }}>{n.name}</span>
+          <span style={{ fontFamily: n.isDir ? 'var(--font-ui)' : 'var(--font-ui)' }}>{n.name}</span>
         </div>
         {n.isDir && open.has(n.path) && n.children && render(n.children, depth + 1)}
       </div>
@@ -104,7 +104,7 @@ function SkillFileBrowser({ skillName, files }: { skillName: string; files: stri
         <pre style={{
           margin: 0, padding: '8px 10px', maxHeight: 180, overflow: 'auto',
           background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-inner)',
-          fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-ui)', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
           color: 'var(--text-secondary)',
         }}>
           {content}
@@ -167,10 +167,10 @@ function SkillDetailPanel({ skill, onClose, onChanged }: {
       </div>
       {skill.allowedTools && (
         <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', marginTop: 6 }}>
-          允许工具：<span style={{ fontFamily: 'var(--font-mono)' }}>{skill.allowedTools}</span>
+          允许工具：<span style={{ fontFamily: 'var(--font-ui)' }}>{skill.allowedTools}</span>
         </div>
       )}
-      <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginTop: 6, wordBreak: 'break-all' }}>
+      <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', fontFamily: 'var(--font-ui)', marginTop: 6, wordBreak: 'break-all' }}>
         {skill.dir}
       </div>
 
@@ -184,7 +184,7 @@ function SkillDetailPanel({ skill, onClose, onChanged }: {
         <pre style={{
           margin: 0, padding: '8px 10px', maxHeight: 240, overflow: 'auto',
           background: 'var(--hover)', borderRadius: 'var(--radius-inner)',
-          fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-ui)', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
           color: 'var(--text-secondary)',
         }}>
           {skill.prompt || '正文为空'}

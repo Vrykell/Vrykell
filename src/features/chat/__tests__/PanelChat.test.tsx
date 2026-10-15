@@ -6,6 +6,7 @@ import { useTerminalStore } from '@features/terminal';
 import { useChatStore } from '../stores/chat';
 import { useComposerDrafts } from '../stores/composerDrafts';
 import PanelChat from '../components/PanelChat';
+import { useIconColorStore } from '@config/iconColors';
 
 vi.mock('@platform/api/conversation', () => ({
   listConversations: vi.fn().mockResolvedValue([]), saveConversation: vi.fn().mockResolvedValue(undefined),
@@ -20,9 +21,24 @@ const paneId = 'chat-tab#0';
 const openSettings = () => fireEvent.click(screen.getByRole('button', { name: '会话设置' }));
 
 beforeEach(() => {
+  useIconColorStore.setState({ colors: {} });
   useSessionStore.setState({ tabs: [{ id: 'chat-tab', title: 'Build', kind: 'session', layout: leaf({ id: paneId, kind: 'local', shellType: 'bash', cwd: '/work' }) }], activeId: 'chat-tab', terminalCwds: {} });
   useTerminalStore.setState({ focusedPaneId: paneId, sessions: { [paneId]: 'pty-chat' } });
   useChatStore.setState({ conversationsLoaded: true, activeConversationId: 'conversation', conversations: [{ id: 'conversation', title: 'Build issue', createdAt: 1, updatedAt: 1, environment: null }], byTab: { conversation: [] } });
+});
+
+it('uses the workspace icon color in execution targets while preserving failure status', () => {
+  render(<PanelChat />);
+  openSettings();
+  act(() => useIconColorStore.getState().setColor('session:chat-tab', 'cyan'));
+  const selector = screen.getByRole('combobox', { name: '选择执行终端' });
+  fireEvent.click(selector);
+  const target = screen.getByRole('option', { name: /Build/ });
+  expect(target.querySelector('.ui-select-swatch')).toHaveStyle({ background: 'var(--group-cyan)' });
+  fireEvent.click(target);
+  expect(selector.querySelector('.ui-select-swatch')).toHaveStyle({ background: 'var(--group-cyan)' });
+  act(() => useTerminalStore.setState({ startupStates: { [paneId]: 'failed' } }));
+  expect(selector.querySelector('.ui-select-swatch')).toHaveStyle({ background: 'var(--error)' });
 });
 afterEach(() => {
   cleanup(); useSessionStore.setState(workspace, true); useTerminalStore.setState(terminal, true);

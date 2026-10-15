@@ -115,7 +115,7 @@ export function MemorySettings() {
           <pre style={{
             margin: 0, padding: '8px 10px', maxHeight: 180, overflow: 'auto',
             background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-inner)',
-            fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+            fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-ui)', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
             color: 'var(--text-secondary)',
           }}>
             {jlines.join('\n')}

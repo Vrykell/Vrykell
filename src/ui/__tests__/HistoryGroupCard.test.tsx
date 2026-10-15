@@ -7,6 +7,19 @@ import { historyGroupColor } from '../historyGroupColor';
 afterEach(cleanup);
 
 describe('HistoryGroupCard', () => {
+  it('opens the same group actions on right click without collapsing the records', () => {
+    const restore = vi.fn();
+    render(<HistoryGroupCard id="project" title="Project" count="2 sessions"
+      actions={[{ label: 'Restore group', onClick: restore }]}><div>Record</div></HistoryGroupCard>);
+    expect(screen.queryByRole('button', { name: 'Restore group' })).toBeNull();
+    fireEvent.contextMenu(screen.getByRole('heading', { name: 'Project' }), { clientX: 24, clientY: 40 });
+    expect(screen.getByText('Record')).toBeVisible();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Restore group' }));
+    expect(restore).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(screen.getByTestId('history-group-menu-project')).toHaveFocus();
+  });
+
   it('shows a grouped count and collapses the card rows', () => {
     render(<HistoryGroupCard id="today" title="Today" count="2 sessions"><div>Session row</div></HistoryGroupCard>);
     const toggle = screen.getByRole('button', { name: 'Today' });
