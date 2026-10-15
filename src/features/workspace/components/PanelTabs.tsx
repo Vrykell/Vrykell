@@ -1,13 +1,12 @@
 import { TextInput } from '@ui/TextInput';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { iconSizes,
-  History, Plus, Search, Settings, Sparkles,
-  ChevronRight, Pencil, Archive, Folder, Trash2, X,
+  Plus, Search, History, SettingsSolid, HistorySolid, ChatSparkleSolid,
+  ChevronRight, Pencil, Archive, FolderSolid, FolderOpenSolid, Trash2, X,
  } from '@ui/icons';
 import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, useTabDisplayTitle, tabIconKey, tabIconColor, pageIconColor, type Tab, type TabGroup } from '@features/workspace';
 import { iconColorCss, iconColorKey, useIconColorStore } from '@config/iconColors';
 import { HistoryColorChoices } from '@ui/HistoryColorPalette';
-import IconTile from '@ui/IconTile';
 import { regenerateTitle } from '@features/agent/services/title';
 import { useToastStore } from '@ui/Toast';
 import { IconBtn } from '@ui/UiBtn';
@@ -298,17 +297,16 @@ export default function PanelTabs() {
         {(drag) => {
           const tab = drag.kind !== 'group' ? tabs.find((t) => t.id === drag.id) : undefined;
           const first = tab ? firstTerminalOf(tab) : null;
-          const Icon = drag.kind === 'group' ? Folder
-            : tab?.kind === 'history' ? History
-              : tab?.kind === 'ai-history' ? Sparkles
-              : tab?.kind === 'settings' ? Settings
+          const Icon = drag.kind === 'group' ? (groups.find(group => group.id === drag.id)?.collapsed ? FolderSolid : FolderOpenSolid)
+            : tab?.kind === 'history' ? HistorySolid
+              : tab?.kind === 'ai-history' ? ChatSparkleSolid
+              : tab?.kind === 'settings' ? SettingsSolid
               : first?.kind === 'ssh' ? SshIcon
                 : shellIconFor(first?.kind === 'local' ? first.shellType : undefined);
           const color = drag.kind === 'group' ? iconColorCss(iconColors[iconColorKey('group', drag.id)]) ?? 'var(--group-amber)'
             : tab ? tabIconColor(tab, iconColors) ?? pageIconColor(tab.kind) : 'var(--group-blue)';
-          return drag.kind === 'group' || (tab && !isSessionTab(tab))
-            ? <IconTile icon={Icon} color={color} size={iconSizes.row} />
-            : <Icon size={iconSizes.row} style={{ color: tab ? tabIconColor(tab, iconColors) : undefined }} />;
+          return <Icon size={iconSizes.row} style={{ color: drag.kind === 'group' || (tab && !isSessionTab(tab))
+            ? color : tab ? tabIconColor(tab, iconColors) : undefined }} />;
         }}
       </ListReorderPreview>
 
@@ -348,6 +346,7 @@ function GroupSection(props: {
   const colors = useIconColorStore(state => state.colors);
   const colorKey = iconColorKey('group', group.id);
   const collapsed = group.collapsed;
+  const GroupIcon = collapsed ? FolderSolid : FolderOpenSolid;
   const empty = useSessionStore(state => !state.tabs.some(tab => isSessionTab(tab) && tab.groupId === group.id));
   const anyMemberActive = tabs.some((t) => t.id === activeId);
   const dragging = useListReorder((s) => s.drag?.id === group.id);
@@ -405,7 +404,8 @@ function GroupSection(props: {
             padding: '6px 8px', minHeight: 40, cursor: 'pointer',
           }}
         >
-          <IconTile icon={Folder} size={24} color={iconColorCss(colors[colorKey]) ?? 'var(--group-amber)'} />
+          <GroupIcon size={24} aria-hidden="true" data-group-icon={collapsed ? 'closed' : 'open'}
+            style={{ color: iconColorCss(colors[colorKey]) ?? 'var(--group-amber)' }} />
           {props.renamingGroupId === group.id ? (
             <TextInput
               autoFocus
@@ -557,9 +557,9 @@ function TabRow({
   const terms = terminalsOf(tab);
   const displayTitle = useTabDisplayTitle(tab);
   const isSsh = first?.kind === 'ssh';
-  const Icon = tab.kind === 'history' ? History
-    : tab.kind === 'ai-history' ? Sparkles
-    : tab.kind === 'settings' ? Settings
+  const Icon = tab.kind === 'history' ? HistorySolid
+    : tab.kind === 'ai-history' ? ChatSparkleSolid
+      : tab.kind === 'settings' ? SettingsSolid
       : isSsh ? SshIcon
         : shellIconFor(first?.kind === 'local' ? first.shellType : undefined);
   const iconColors = useIconColorStore(state => state.colors);
@@ -571,8 +571,8 @@ function TabRow({
   return (
     <SidebarItem
       active={active}
-      icon={isSessionTab(tab) ? <Icon size={iconSizes.row} style={{ color: iconColor }} />
-        : <IconTile icon={Icon} color={iconColor ?? pageIconColor(tab.kind)} size={iconSizes.row} />}
+      icon={<Icon size={iconSizes.row} aria-hidden="true"
+        style={{ color: iconColor ?? (isSessionTab(tab) ? undefined : pageIconColor(tab.kind)) }} />}
       title={displayTitle}
       tooltip={displayTitle}
       testId={`tab-row-${tab.id}`}

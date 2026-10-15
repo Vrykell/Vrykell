@@ -1,6 +1,8 @@
 import { OutlineButton } from '@ui/OutlineButton';
 import { t } from '@i18n';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { IconButton } from '@ui/IconButton';
+import { Navigation, iconSizes } from '@ui/icons';
 import { loadConfig, saveConfig, type FileOpenConfig } from '@features/files/services/fileOpen';
 import { refreshAiConfig, setTavilyKey, clearTavilyKey, useAiConfigStore } from '@features/agent';
 import SkillsSettings from '@features/settings/pages/SkillsSettings';
@@ -57,6 +59,9 @@ function SettingsContent() {
   const { save, status, retry } = useSettingsSave();
   const navigation = useSettingsNavigation();
   const { selected, activeLabel } = navigation;
+  const [navigationOpen, setNavigationOpen] = useState(false);
+  const navigationTrigger = useRef<HTMLButtonElement>(null);
+  const closeNavigation = useCallback(() => setNavigationOpen(false), []);
 
   // 文件打开配置（localStorage）
   const [fileCfg, setFileCfg] = useState<FileOpenConfig>(() => loadConfig());
@@ -264,13 +269,20 @@ function SettingsContent() {
       flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row',
       background: 'var(--canvas)', userSelect: 'none',
     }}>
-      <div className="settings-layout">
-        <SettingsNavigation navigation={navigation} />
+      <div className="settings-layout" data-navigation-open={navigationOpen}>
+        {navigationOpen && <div className="settings-navigation-backdrop" aria-hidden="true" />}
+        <SettingsNavigation navigation={navigation} open={navigationOpen} onClose={closeNavigation} trigger={navigationTrigger} />
 
         {/* Content retains a readable width before falling back to horizontal scrolling. */}
         <section className="settings-content">
           <header className="settings-page-header">
-            <h1>{activeLabel}</h1>
+            <div className="settings-page-heading">
+              <IconButton ref={navigationTrigger} className="settings-navigation-toggle" compact
+                aria-label={t('Show settings navigation')} data-tip={t('Show settings navigation')}
+                aria-expanded={navigationOpen} aria-controls="settings-navigation"
+                onClick={() => setNavigationOpen(value => !value)}><Navigation size={iconSizes.control} /></IconButton>
+              <h1>{activeLabel}</h1>
+            </div>
             <div className="settings-save-hint">
               <span>{t('Options save immediately; text saves after you stop typing.')}</span>
               <SaveStatus status={status} onRetry={retry} />

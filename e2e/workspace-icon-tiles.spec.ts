@@ -3,7 +3,7 @@ import { setupTauriMock, ensureTabsOpen } from './tauri-mock';
 import { gotoSetting } from './settings';
 
 for (const theme of ['深色', '浅色']) {
-  test(`group tiles share inherited colors with members and AI targets in ${theme}`, async ({ page }, testInfo) => {
+  test(`folder silhouettes share inherited colors with members and AI targets in ${theme}`, async ({ page }, testInfo) => {
     await setupTauriMock(page);
     await page.goto('/');
     await gotoSetting(page, '主题');
@@ -21,10 +21,15 @@ for (const theme of ['深色', '浅色']) {
     await menu.getByRole('menuitemradio', { name: '紫色', exact: true }).click();
     await expect(header).toHaveAttribute('aria-expanded', 'true');
     await expect(header).toBeFocused();
-    const tile = header.locator('.icon-tile');
-    const selected = await tile.evaluate(element => getComputedStyle(element).backgroundColor);
+    const icon = header.locator('[data-group-icon]');
+    await expect(icon).toHaveAttribute('data-group-icon', 'open');
+    const selected = await icon.evaluate(element => getComputedStyle(element).color);
     await expect(member.locator('.sidebar-row-icon svg')).toHaveCSS('color', selected);
-    expect(await tile.evaluate(element => getComputedStyle(element).color)).not.toBe(selected);
+    await header.press('Enter');
+    await expect(icon).toHaveAttribute('data-group-icon', 'closed');
+    await expect(icon).toHaveCSS('color', selected);
+    await header.press('Enter');
+    await expect(icon).toHaveAttribute('data-group-icon', 'open');
     const groupId = (await header.getAttribute('data-group-header-id'))!;
     expect(await page.evaluate(id => JSON.parse(localStorage.getItem('vrykell-icon-colors')!).state.colors[`group:${id}`], groupId)).toBe('violet');
     await page.locator('[data-dock-btn="chat"]').click();
@@ -44,7 +49,7 @@ for (const theme of ['深色', '浅色']) {
     await expect(member.locator('.sidebar-row-icon svg')).toHaveCSS('color', explicit);
     await member.click({ button: 'right' });
     await page.getByTestId('tab-icon-color-auto').click();
-    const inherited = await tile.evaluate(element => getComputedStyle(element).backgroundColor);
+    const inherited = await icon.evaluate(element => getComputedStyle(element).color);
     await expect(member.locator('.sidebar-row-icon svg')).toHaveCSS('color', inherited);
     await expect(target.locator('.ui-select-swatch')).toHaveCSS('background-color', inherited);
     await page.locator('[data-dock-btn="chat"]').click();

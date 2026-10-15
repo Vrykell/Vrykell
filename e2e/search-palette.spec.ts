@@ -106,9 +106,9 @@ test('prefixes scope results temporarily and settings search focuses individual 
   expect(await result.evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
   await result.click();
   await expect(page.getByRole('combobox', { name: '终端字号', exact: true })).toBeFocused();
-  const sidebar = page.locator('aside');
-  await sidebar.getByPlaceholder('搜索设置…').fill('补全防抖');
-  await sidebar.locator('.settings-search-result').filter({ hasText: '补全防抖' }).click();
+  await page.getByTestId('global-search-trigger').click();
+  await input.fill('@ 补全防抖');
+  await dialog.locator('[data-search-result]').filter({ hasText: '补全防抖' }).click();
   await expect(page.locator('.settings-field[data-setting-title="补全防抖"]')).toHaveAttribute('data-setting-title', '补全防抖');
   await page.getByTestId('global-search-trigger').click();
   await input.fill('>');
