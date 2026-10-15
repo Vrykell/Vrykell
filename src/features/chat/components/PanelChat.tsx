@@ -11,6 +11,7 @@ import { useSessionStore } from '@features/workspace';
 import { leaves } from '@features/workspace/model/windowLayout';
 import { useTerminalStore } from '@features/terminal';
 import { useChatStore, type ChatMessage } from '../stores/chat';
+import { chatScrollProbe } from '../model/scrollProbe';
 import { EMPTY_COMPOSER_DRAFT, useComposerDrafts } from '../stores/composerDrafts';
 import ChatModeSelect from './ChatModeSelect';
 import ChatComposerShell from './ChatComposerShell';
@@ -57,6 +58,9 @@ export default function PanelChat() {
   const [title, setTitle] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsTrigger = useRef<HTMLButtonElement>(null);
+  // Temporary probe for the transcript jump: counts renders and scroll events, one log line a second.
+  chatScrollProbe.renders += 1;
+  chatScrollProbe.tick();
   const [following, setFollowing] = useState(true);
   const followRef = useRef(true);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -134,6 +138,7 @@ export default function PanelChat() {
   };
   /** Drop the follow so streamed content stops moving the view the user is reading. */
   const pauseFollow = () => {
+    chatScrollProbe.off();
     followRef.current = false;
     setFollowing(false);
   };
@@ -203,6 +208,8 @@ export default function PanelChat() {
     <div ref={scrollRef} className="chat-transcript scroll-region" onScroll={event => {
       const scroll = event.currentTarget;
       const ours = Math.abs(scroll.scrollTop - lastTopRef.current) <= 1;
+      chatScrollProbe.scrolls += 1;
+      if (ours) chatScrollProbe.ours += 1;
       lastTopRef.current = scroll.scrollTop;
       // Our own jump: nothing to decide.
       if (ours) return;
@@ -215,6 +222,7 @@ export default function PanelChat() {
       // Stopped at the bottom: hand the follow back, but only after the movement has stopped.
       settleRef.current = window.setTimeout(() => {
         settleRef.current = null;
+        chatScrollProbe.on();
         followRef.current = true;
         setFollowing(true);
         if (scrollRef.current) {
