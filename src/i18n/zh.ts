@@ -898,6 +898,8 @@ const zh: Record<string, string> = {
   'Session duration': '会话时长',
   'Close SSH status': '关闭 SSH 状态',
   'Copy connection address': '复制连接地址',
+  'Show password': '显示密码',
+  'Hide password': '隐藏密码',
   'Connection status': '连接状态',
   'Connected for': '连接时长',
   'Reconnect attempts': '重连尝试次数',

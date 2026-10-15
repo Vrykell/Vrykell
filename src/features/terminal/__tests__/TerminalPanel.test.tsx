@@ -137,6 +137,22 @@ describe('SSH connection input', () => {
     expect(ptyWrite).toHaveBeenCalledWith('session', 'response\r');
     expect(input).toHaveValue('');
   });
+  it('reveals the masked response through the themed toggle and keeps the blue submit action', () => {
+    useTerminalStore.setState({ sessions: { p: 'session' } });
+    render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+    const input = screen.getByLabelText('SSH 认证响应');
+    expect(input).toHaveAttribute('type', 'password');
+    const reveal = screen.getByTestId('ssh-auth-reveal');
+    expect(reveal).toHaveAttribute('aria-label', '显示密码');
+    expect(reveal).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(reveal);
+    expect(reveal).toHaveAttribute('aria-label', '隐藏密码');
+    expect(reveal).toHaveAttribute('aria-pressed', 'true');
+    expect(input).toHaveAttribute('type', 'text');
+    fireEvent.click(reveal);
+    expect(input).toHaveAttribute('type', 'password');
+    expect(screen.getByRole('button', { name: '发送' })).toHaveClass('ssh-auth-submit');
+  });
   it('closes the connection, clears the secret and disables authentication after cancellation', async () => {
     useTerminalStore.setState({ sessions: { p: 'session' } });
     render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);

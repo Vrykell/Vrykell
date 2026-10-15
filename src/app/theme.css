@@ -377,6 +377,11 @@ input.ssh-auth-response { padding: 0; line-height: 32px; font-size: calc(20px * 
 /* Empty inputs use the same font metrics as their placeholder. */
 input.ssh-auth-response:placeholder-shown { font-size: calc(13px * var(--ui-font-scale)); letter-spacing: normal; }
 input.ssh-auth-response::placeholder { font-size: inherit; letter-spacing: inherit; }
+/* The authentication row carries its own reveal toggle: hide the browser-painted eye so the
+   WebView's oversized native button does not compete with the themed control. */
+input.ssh-auth-response::-ms-reveal, input.ssh-auth-response::-ms-clear { display: none; }
+input.ssh-auth-response::-webkit-credentials-auto-fill-button,
+input.ssh-auth-response::-webkit-strong-password-auto-fill-button { display: none; }
 .terminal-composer-heading { display: flex; justify-content: space-between; gap: 12px; color: var(--text-secondary); font-size: calc(11px * var(--ui-font-scale)); margin-bottom: 6px; }
 .terminal-composer-heading span:last-child { color: var(--text-muted); white-space: nowrap; }
 .terminal-composer-heading .composer-key-hints { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); }
@@ -454,6 +459,10 @@ button:not([data-subtle]) {
 }
 button:where(:not([data-subtle]):enabled):hover { background: var(--button-hover); }
 button:disabled { opacity: 0.45; cursor: default; }
+
+/* The SSH authentication submit follows the AI composer's blue send action. */
+button.ssh-auth-submit { border: 0; background: var(--accent-user); color: var(--text-primary); }
+button.ssh-auth-submit:enabled:is(:hover, :focus-visible) { background: color-mix(in srgb, var(--accent-user) 85%, var(--text-primary)); }
 
 button.outline-button { padding: 5px 12px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: transparent; color: var(--text-secondary); font-family: var(--font-ui); font-size: calc(12px * var(--ui-font-scale)); cursor: pointer; transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease); }
 button.outline-button:enabled:is(:hover, :focus) { background: var(--button-hover); }
