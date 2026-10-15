@@ -21,6 +21,9 @@ export {
   SESSION_TYPE_OPTIONS,
   SESSION_MODE_OPTIONS,
   SESSION_SORT_OPTIONS,
+  SESSION_GROUP_BY_OPTIONS,
+  groupHistoricalSessions,
+  type SessionHistoryGroupBy,
   type SessionHistorySort,
   type SessionHistoryFilter,
 } from '@features/session-history/model/sessionHistoryModel';

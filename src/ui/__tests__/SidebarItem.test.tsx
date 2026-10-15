@@ -50,6 +50,16 @@ describe('SidebarItem', () => {
     expect(screen.getByText('会话一').style.fontWeight).toBe('var(--fw-semibold)');
   });
 
+  it('allows history rows to use the UI font for subtitles', () => {
+    renderItem({ subtitle: '已关闭', subtitleFontFamily: 'var(--font-ui)' });
+    expect(screen.getByText('已关闭').style.fontFamily).toBe('var(--font-ui)');
+  });
+
+  it('keeps the monospace subtitle default for other sidebar rows', () => {
+    renderItem({ subtitle: 'metadata' });
+    expect(screen.getByText('metadata').style.fontFamily).toBe('var(--font-mono)');
+  });
+
   it('runs the action without activating the row', () => {
     const { onAction, onClick } = renderItem({ active: true });
     fireEvent.click(screen.getByRole('button', { name: '关闭标签' }));
@@ -69,5 +79,40 @@ describe('SidebarItem', () => {
     expect(row).toHaveAttribute('data-reorder-item', 'tab-1');
     expect(row).toHaveAttribute('data-reorder-kind', 'tab');
     expect(row).toHaveAttribute('data-tip', '会话提示');
+  });
+
+  it.each(['default', 'history'] as const)('preserves the standard row height and text sizing for %s two-line records', variant => {
+    renderItem({ variant, subtitle: 'Closed', testId: 'standard-row' });
+    const row = screen.getByTestId('standard-row');
+    expect(row).toHaveStyle({ padding: '2px 6px' });
+    expect(row.firstElementChild).toHaveStyle({ minHeight: '40px', padding: '8px 10px' });
+    expect(screen.getByText('会话一')).toHaveStyle({ lineHeight: '18px' });
+    expect(screen.getByText('Closed')).toHaveStyle({ fontSize: 'calc(11px * var(--ui-font-scale))', lineHeight: '14px' });
+  });
+
+  it('reveals history actions during keyboard focus and hides them when focus leaves', () => {
+    renderItem({ variant: 'history', compact: true, active: true, tabIndex: 0, subtitle: 'Closed', testId: 'history-row' });
+    const row = screen.getByTestId('history-row');
+    const action = screen.getByRole('button', { name: '关闭标签' });
+    expect(action).toHaveStyle({ opacity: '0', pointerEvents: 'none' });
+    fireEvent.focus(row);
+    expect(action).toHaveStyle({ opacity: '1' });
+    fireEvent.blur(row, { relatedTarget: action });
+    fireEvent.focus(action);
+    expect(action).toHaveStyle({ opacity: '1' });
+    fireEvent.blur(action, { relatedTarget: document.body });
+    expect(action).toHaveStyle({ opacity: '0', pointerEvents: 'none' });
+    expect(screen.getByText('会话一')).toHaveAttribute('data-tip', '会话一');
+    expect(screen.getByText('Closed')).toHaveAttribute('data-tip', 'Closed');
+  });
+
+  it('keeps compact history metadata available in the tooltip and accessible description', () => {
+    renderItem({ variant: 'history', compact: true, title: 'Project review', subtitle: 'Closed · /home/project', testId: 'compact-history-row' });
+    const row = screen.getByTestId('compact-history-row');
+    expect(screen.getByText('Closed · /home/project')).not.toBeVisible();
+    expect(row).toHaveAccessibleDescription('Closed · /home/project');
+    expect(row).toHaveAttribute('data-tip', 'Project review');
+    expect(row).toHaveAttribute('data-tip-description', 'Closed · /home/project');
+    expect(screen.getByText('Project review')).toHaveAttribute('data-tip-description', 'Closed · /home/project');
   });
 });

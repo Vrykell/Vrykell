@@ -1,8 +1,9 @@
+import { OutlineButton } from '@ui/OutlineButton';
 import { useEffect, useRef, useState } from 'react';
 import { useT } from '@i18n';
 import { getContextMenuStatus, manageContextMenu, type ContextMenuAction, type ContextMenuStatus } from '@platform/contextMenu';
 import ErrorBox from '@ui/ErrorBox';
-import { Field, SettingsGroup, btnStyle } from '../components/ui';
+import { Field, SettingsGroup } from '../components/ui';
 
 /** Manage the per-user shell registration and its explicit certificate trust step. */
 export function ContextMenuPage() {
@@ -44,11 +45,11 @@ export function ContextMenuPage() {
     <Field layout="stacked" title={t('Open in Vrykell')} description={t('Open a terminal in the selected folder or folder background from the Windows 11 context menu.')}>
       <div aria-live="polite" data-testid="context-menu-status">{t(state)}</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
-        <button style={btnStyle} disabled={busy || !status?.supported || (!status.enabled && (!status.available || !status.certificateTrusted))}
+        <OutlineButton disabled={busy || !status?.supported || (!status.enabled && (!status.available || !status.certificateTrusted))}
           onClick={() => void run(status?.enabled ? 'disable' : 'enable')}>
           {t(status?.enabled ? 'Disable context menu' : 'Enable context menu')}
-        </button>
-        <button style={btnStyle} disabled={busy} onClick={() => void refresh()}>{t('Refresh status')}</button>
+        </OutlineButton>
+        <OutlineButton disabled={busy} onClick={() => void refresh()}>{t('Refresh status')}</OutlineButton>
       </div>
       {status?.supported && <p className="settings-description">{t('After enabling or disabling the context menu, restart Windows to ensure the change takes effect.')}</p>}
     </Field>
@@ -56,14 +57,14 @@ export function ContextMenuPage() {
       <div>{t(status.certificateTrusted ? 'Certificate trusted' : 'Certificate trust required')}</div>
       <p className="settings-description">{t('Windows requires administrator approval to add or remove certificate trust. Accept the Windows permission prompt to continue.')}</p>
       {status.certificateThumbprint && <div style={{ overflowWrap: 'anywhere', marginTop: 8 }}>{t('Certificate fingerprint')}: {status.certificateThumbprint}</div>}
-      <button style={{ ...btnStyle, marginTop: 12 }} disabled={busy || status.enabled}
+      <OutlineButton style={{ marginTop: 12 }} disabled={busy || status.enabled}
         onClick={() => void run(status.certificateTrusted ? 'untrust' : 'trust')}>
         {t(status.certificateTrusted ? 'Remove certificate trust' : 'Trust this certificate')}
-      </button>
+      </OutlineButton>
       <p className="settings-description">{t('Trust allows packages signed by this certificate to be installed. Disable the menu before removing trust. The signing private key is never included in the application.')}</p>
     </Field>}
     {error && <ErrorBox title={t('Could not update the context menu')} details={error} detailsTitle={t('Technical details')}
-      actions={<button style={btnStyle} disabled={busy} onClick={() => void refresh()}>{t('Retry')}</button>}>
+      actions={<OutlineButton disabled={busy} onClick={() => void refresh()}>{t('Retry')}</OutlineButton>}>
       {t('Check the certificate trust and package availability, then try again.')}
     </ErrorBox>}
   </SettingsGroup>;

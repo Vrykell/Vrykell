@@ -6,26 +6,27 @@
   min-width: 0;
   min-height: 32px;
   padding: 6px 10px;
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius-inner);
   background: var(--field-bg);
   color: var(--text-primary);
   font: calc(12px * var(--ui-font-scale))/1.5 var(--font-ui);
   text-align: left;
   cursor: pointer;
-  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+  transition: background var(--dur-fast) var(--ease);
 }
 .ui-select:hover:not(:disabled) { background: var(--button-hover); }
 .ui-select[aria-expanded="true"] { background: var(--button-hover); }
 .ui-select:focus-visible { outline: none; background: var(--button-hover); }
 .ui-select-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Optional swatch for colour options; the value keeps the remaining width. */
-.ui-select-swatch { width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--border); flex-shrink: 0; }
+.ui-select-swatch { width: 14px; height: 14px; border-radius: 4px; border: 0; flex-shrink: 0; }
 /* Dropdown rows mark each colour with a dot so the option list reads as a palette. */
 .ui-select-option .ui-select-swatch { border-radius: 50%; }
 .ui-select-chevron { flex-shrink: 0; color: var(--text-muted); transition: transform var(--dur-fast) var(--ease); }
 .ui-select[aria-expanded="true"] .ui-select-chevron { transform: rotate(180deg); }
 .ui-select-menu { position: fixed; z-index: 10000; padding: 4px; overflow-y: auto; overscroll-behavior: contain; }
+.workspace-floating.ui-select-menu { background: var(--elevated); }
 .ui-select-option {
   display: flex;
   align-items: center;

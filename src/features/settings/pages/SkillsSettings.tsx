@@ -1,3 +1,4 @@
+import { OutlineButton } from '@ui/OutlineButton';
 import { t } from '@i18n';
 import { IconButton } from '@ui/IconButton';
 import { TextInput } from '@ui/TextInput';
@@ -39,9 +40,7 @@ const marketplaceOptions = [{ value: '', label: '自定义…' }, ...MARKETPLACE
 // ── 样式 ──
 
 const btn: React.CSSProperties = {
-  padding: '4px 10px', fontSize: 'calc(12px * var(--ui-font-scale))', border: '1px solid var(--border)',
-  borderRadius: 'var(--radius-inner)', background: 'transparent',
-  color: 'var(--text-secondary)', cursor: 'pointer',
+  padding: '4px 10px',
 };
 
 const input: React.CSSProperties = { ...inputStyle, width: 'auto', flex: 1 };
@@ -142,16 +141,16 @@ function SkillDetailPanel({ skill, onClose, onChanged }: {
       display: 'flex', flexDirection: 'column', overflow: 'auto', padding: '14px 18px',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <button onClick={onClose} style={{ ...btn }}>← 返回</button>
+        <OutlineButton onClick={onClose} style={{ ...btn }}>← 返回</OutlineButton>
         <div style={{ flex: 1 }} />
-        <button onClick={() => void fileOpenWith(skill.dir)} style={btn}>打开文件夹</button>
-        <button onClick={() => void toggleTrust()} style={btn}>
+        <OutlineButton onClick={() => void fileOpenWith(skill.dir)} style={btn}>打开文件夹</OutlineButton>
+        <OutlineButton onClick={() => void toggleTrust()} style={btn}>
           {skill.trusted ? '取消信任' : '信任'}
-        </button>
-        <button onClick={() => void toggleEnabled()} style={btn}>
+        </OutlineButton>
+        <OutlineButton onClick={() => void toggleEnabled()} style={btn}>
           {skill.enabled ? '禁用' : '启用'}
-        </button>
-        <button onClick={() => void del()} style={{ ...btn, color: 'var(--error-light)' }}>删除</button>
+        </OutlineButton>
+        <OutlineButton onClick={() => void del()} style={{ ...btn, color: 'var(--error-light)' }}>删除</OutlineButton>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -245,7 +244,7 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
       display: 'flex', flexDirection: 'column', padding: '14px 18px', overflow: 'hidden',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <button onClick={onClose} style={{ ...btn }}>← 返回</button>
+        <OutlineButton onClick={onClose} style={{ ...btn }}>← 返回</OutlineButton>
         <span style={{ fontSize: 'calc(14px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)' }}>技能市场</span>
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>第三方技能默认未信任，安装后可查看来源再信任</span>
@@ -261,9 +260,9 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
           onKeyDown={(e) => { if (e.key === 'Enter') void browse(); }}
           style={input}
         />
-        <button onClick={() => void browse()} disabled={browsing} style={{ ...btn, flexShrink: 0 }}>
+        <OutlineButton onClick={() => void browse()} disabled={browsing} style={{ ...btn, flexShrink: 0 }}>
           {browsing ? '加载中…' : '浏览'}
-        </button>
+        </OutlineButton>
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
@@ -298,9 +297,9 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
               {installed ? (
                 <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 10px', borderRadius: 4, color: 'var(--success)', background: 'var(--success-bg)', flexShrink: 0 }}>已安装</span>
               ) : (
-                <button onClick={() => void install(r)} disabled={installing.has(r.name)} style={{ ...btn, flexShrink: 0 }}>
+                <OutlineButton onClick={() => void install(r)} disabled={installing.has(r.name)} style={{ ...btn, flexShrink: 0 }}>
                   {installing.has(r.name) ? '安装中…' : '安装'}
-                </button>
+                </OutlineButton>
               )}
             </div>
           );
@@ -356,20 +355,20 @@ export default function SkillsSettings() {
           onKeyDown={(e) => { if (e.key === 'Enter') void doImportUrl(); }}
           style={input}
         />
-        <button onClick={() => void doImportUrl()} disabled={importing} style={{ ...btn, flexShrink: 0 }}>
+        <OutlineButton onClick={() => void doImportUrl()} disabled={importing} style={{ ...btn, flexShrink: 0 }}>
           {importing ? '导入中…' : '导入'}
-        </button>
+        </OutlineButton>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        <button onClick={() => void doImportPath(true)} disabled={importing} style={{ ...btn, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <OutlineButton onClick={() => void doImportPath(true)} disabled={importing} style={{ ...btn, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
           <Download size={13} /> 导入文件夹
-        </button>
-        <button onClick={() => void doImportPath(false)} disabled={importing} style={{ ...btn, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        </OutlineButton>
+        <OutlineButton onClick={() => void doImportPath(false)} disabled={importing} style={{ ...btn, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
           <Download size={13} /> 导入压缩包
-        </button>
-        <button onClick={() => setMarket(true)} style={{ ...btn, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        </OutlineButton>
+        <OutlineButton onClick={() => setMarket(true)} style={{ ...btn, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
           <Store size={13} /> 技能市场
-        </button>
+        </OutlineButton>
       </div>
 
       {market && (
@@ -407,12 +406,12 @@ export default function SkillsSettings() {
             <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>{m.source || '本地'}</span>
             <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>{m.files.length} 个文件</span>
             <div style={{ flex: 1 }} />
-            <button onClick={(e) => { e.stopPropagation(); void toggleTrust(m); }} style={btn}>
+            <OutlineButton onClick={(e) => { e.stopPropagation(); void toggleTrust(m); }} style={btn}>
               {m.trusted ? '取消信任' : '信任'}
-            </button>
-            <button onClick={(e) => { e.stopPropagation(); void toggleEnabled(m); }} style={btn}>
+            </OutlineButton>
+            <OutlineButton onClick={(e) => { e.stopPropagation(); void toggleEnabled(m); }} style={btn}>
               {m.enabled ? '禁用' : '启用'}
-            </button>
+            </OutlineButton>
             <IconButton compact tone="danger" onClick={(e) => { e.stopPropagation(); void del(m.name); }} data-tip={t('Delete skill')} aria-label={t('Delete skill')}><Trash2 size={16} /></IconButton>
           </div>
           <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)', marginTop: 4 }}>

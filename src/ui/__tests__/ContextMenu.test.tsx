@@ -23,4 +23,25 @@ describe('independent action menus', () => {
     fireEvent.pointerDown(document.body, { button: 2 });
     expect(screen.queryByRole('menu')).toBeNull();
   });
+
+  it('navigates enabled actions and returns keyboard focus to its trigger', () => {
+    function Example() {
+      const [anchor, setAnchor] = useState<{ x: number; y: number; trigger: HTMLElement } | null>(null);
+      return <><button onClick={event => setAnchor({ x: 0, y: 0, trigger: event.currentTarget })}>Actions</button>
+        {anchor && <ContextMenu anchor={anchor} itemRole="menuitem" onClose={() => setAnchor(null)} items={[
+          { label: 'First', onClick: () => {} }, { label: 'Unavailable', disabled: true, onClick: () => {} }, { label: 'Last', onClick: () => {} },
+        ]} />}</>;
+    }
+    render(<Example />);
+    const trigger = screen.getByRole('button', { name: 'Actions' });
+    fireEvent.click(trigger);
+    expect(screen.getByRole('menuitem', { name: 'First' })).toHaveFocus();
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' });
+    expect(screen.getByRole('menuitem', { name: 'Last' })).toHaveFocus();
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' });
+    expect(screen.getByRole('menuitem', { name: 'First' })).toHaveFocus();
+    fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(trigger).toHaveFocus();
+  });
 });

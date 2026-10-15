@@ -22,6 +22,15 @@ function mk(over: Partial<BackendSessionEntry>): BackendSessionEntry {
 
 const HOUR = 3600 * 1000;
 
+it('matches annotation text without bypassing type, date or starred filters', () => {
+  const local = mk({ id: 'local' });
+  const remote = mk({ id: 'remote', kind: 'ssh' });
+  const annotations = new Map([['local', 'Servers'], ['remote', 'Servers']]);
+  expect(filterSessions([local, remote], 'servers', 'ssh', 'all', 'all', 'closed', null, annotations).map(item => item.id)).toEqual(['remote']);
+  expect(filterSessions([local, { ...remote, closed_at: 0 }], 'servers', 'ssh', 'today', 'all', 'closed', null, annotations)).toEqual([]);
+  expect(filterSessions([remote], 'servers', 'ssh', 'all', 'all', 'closed', new Set(['local']), annotations)).toEqual([]);
+});
+
 it('filters saved startup modes including mixed panes, SSH, cmd and legacy defaults', () => {
   const pane = (openMode: string, kind = 'local', shellType = 'bash') => ({ type: 'leaf', terminal: { openMode, kind, shellType } });
   const block = mk({ id: 'block', payload: JSON.stringify({ layout: pane('block') }) });
@@ -90,6 +99,12 @@ describe('filterSessions', () => {
     expect(filterSessions(sessions, '不存在', 'ssh', '30d')).toEqual([]);
     // 类型冲突时为空
     expect(filterSessions(sessions, 'prod', 'local', '30d')).toEqual([]);
+  });
+
+  it('restricts to starred ids when a starred set is provided', () => {
+    expect(filterSessions(sessions, '', 'all', 'all', 'all', 'closed', new Set(['local-1']))).toEqual([local]);
+    expect(filterSessions(sessions, 'prod', 'ssh', '30d', 'all', 'closed', new Set(['local-1']))).toEqual([]);
+    expect(filterSessions(sessions, '', 'all', 'all', 'all', 'closed', new Set())).toEqual([]);
   });
 });
 

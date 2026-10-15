@@ -1,3 +1,4 @@
+import { OutlineButton } from '@ui/OutlineButton';
 import { t } from '@i18n';
 import { TextInput } from '@ui/TextInput';
 import { useReloadFeedback } from '@ui/useReloadFeedback';
@@ -17,7 +18,7 @@ import { invoke } from '@platform/diagnostics';
 import { useTheme } from '@app/providers/ThemeProvider';
 import { useTerminalThemeStore } from '@features/settings/model/terminalTheme';
 import { useToastStore } from '@ui/Toast';
-import { SettingsGroup, Field, Toggle, btnStyle } from '@features/settings/components/ui';
+import { SettingsGroup, Field, Toggle } from '@features/settings/components/ui';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
 import { isWallpaperImage, wallpaperExtensions } from '../services/wallpaper';
 
@@ -172,17 +173,17 @@ export function ThemePage() {
 
         <Field title="应用背景图片" description={t('Choose an application wallpaper.')}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <button onClick={() => void pickBackground()} style={btnStyle}>
+            <OutlineButton onClick={() => void pickBackground()} >
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 <ImageIcon size={iconSizes.control} /> 选择图片
               </span>
-            </button>
+            </OutlineButton>
             {config.backgroundImage && (
-              <button onClick={() => void clearBackground()} style={btnStyle}>
+              <OutlineButton onClick={() => void clearBackground()} >
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                   <Trash2 size={iconSizes.control} /> 清除图片
                 </span>
-              </button>
+              </OutlineButton>
             )}
           </div>
           {config.backgroundImage && (
@@ -220,38 +221,38 @@ export function ThemePage() {
           </Field>;
         })}
         <div className="settings-record">
-          <button type="button" onClick={() => { void save(resetBlockAppearance); }} style={btnStyle}>{t('Restore default block appearance')}</button>
+          <OutlineButton type="button" onClick={() => { void save(resetBlockAppearance); }} >{t('Restore default block appearance')}</OutlineButton>
         </div>
       </SettingsGroup>
       <FontSettings />
       <SettingsGroup title={t('Theme files')}>
         <Field title="主题导入 / 导出" description={t('Save or load a theme as JSON.')}>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => void doExport()} style={btnStyle}>
+            <OutlineButton onClick={() => void doExport()} >
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 <Download size={iconSizes.control} /> 导出主题
               </span>
-            </button>
-            <button onClick={() => void doImport()} style={btnStyle}>
+            </OutlineButton>
+            <OutlineButton onClick={() => void doImport()} >
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 <Upload size={iconSizes.control} /> 导入主题
               </span>
-            </button>
+            </OutlineButton>
           </div>
         </Field>
 
         <Field layout="stacked" title="配置文件" description={t('Edit theme.json to customize theme variables.')}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button onClick={() => void openConfig()} style={btnStyle}>
+            <OutlineButton onClick={() => void openConfig()} >
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 <FileText size={iconSizes.control} /> 打开配置文件
               </span>
-            </button>
-            <button onClick={() => void reload.run()} disabled={reload.busy} aria-busy={reload.busy} style={btnStyle}>
+            </OutlineButton>
+            <OutlineButton onClick={() => void reload.run()} disabled={reload.busy} aria-busy={reload.busy} >
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 <RefreshCw size={iconSizes.control} className={reload.busy ? 'reload-spin' : undefined} /> {t('Reload')}
               </span>
-            </button>
+            </OutlineButton>
             {themePath && (
               <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}>
                 {themePath}

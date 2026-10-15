@@ -83,7 +83,8 @@ test('rename and delete manage conversation history independently of terminals',
   await page.getByTestId('ai-history-search').fill('Build investigation');
   await expect(row).toBeVisible();
   await row.hover();
-  await row.getByRole('button', { name: '删除对话' }).click();
+  await row.getByRole('button', { name: '更多操作' }).click();
+  await page.getByRole('menuitem', { name: '删除对话', exact: true }).click();
   await expect(row).toHaveCount(0);
   await expect(page.locator('[data-tab-kind="session"]')).toHaveCount(1);
   await page.locator('[data-tab-kind="session"]').click();

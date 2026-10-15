@@ -150,6 +150,23 @@ describe('默认调色板（中性灰色）', () => {
 });
 
 describe('paletteToCssVars', () => {
+  it.each(['dark', 'light'] as const)('%s provides distinct, readable categorical group colors', mode => {
+    const vars = paletteToCssVars(themes[mode]);
+    const colors = ['blue', 'green', 'violet', 'amber', 'cyan', 'rose', 'orange', 'coral'].map(color => vars[`--group-${color}`]);
+    expect(new Set(colors).size).toBe(colors.length);
+    const luminance = (hex: string) => {
+      const channels = [1, 3, 5].map(offset => {
+        const value = parseInt(hex.slice(offset, offset + 2), 16) / 255;
+        return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+      });
+      return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+    };
+    for (const color of colors) {
+      const values = [luminance(color), luminance(themes[mode].surface)];
+      expect((Math.max(...values) + 0.05) / (Math.min(...values) + 0.05)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
   it.each(['dark', 'light'] as const)('%s uses neutral grays and separates navigation from the lighter frame', (mode) => {
     const vars = paletteToCssVars(themes[mode]);
     for (const key of ['--chrome-bg', '--sidebar-bg', '--chrome-field', '--selection-bg', '--canvas', '--surface', '--field-bg', '--block', '--elevated', '--border', '--border-strong', '--text-primary', '--text-secondary', '--text-muted', '--xterm-bg']) {

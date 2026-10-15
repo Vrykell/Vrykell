@@ -511,4 +511,42 @@ mod tests {
         assert_eq!(local.kind, "local");
         assert_eq!(local.payload, "{}");
     }
+
+    #[test]
+    fn partial_restore_reopens_original_group_without_restoring_other_members() {
+        let db = test_db();
+        db.create_group("g1", "Project", 1).unwrap();
+        for id in ["one", "two"] {
+            db.create_session(id, id, 1, "", "local", "{}").unwrap();
+            db.session_set_group(id, Some("g1")).unwrap();
+        }
+        db.sessions_reorder(Some("g1"), &["two".into(), "one".into()]).unwrap();
+        db.session_set_group("two", Some("g1")).unwrap();
+        assert_eq!(db.get_session("two").unwrap().sort_order, 0);
+        db.archive_group("g1", 2).unwrap();
+        db.restore_session("one").unwrap();
+        db.sessions_reorder(Some("g1"), &["one".into()]).unwrap();
+        assert_eq!(db.get_session("one").unwrap().sort_order, 1);
+        assert_eq!(db.get_session("two").unwrap().sort_order, 0);
+        let groups = db.list_groups().unwrap();
+        assert!(!groups[0].archived);
+        assert_eq!(groups[0].title, "Project");
+        assert_eq!(groups[0].session_count, 1);
+        assert_eq!(db.get_session("one").unwrap().group_id.as_deref(), Some("g1"));
+        assert_eq!(db.get_session("two").unwrap().status, "historical");
+        assert_eq!(db.get_session("two").unwrap().group_id.as_deref(), Some("g1"));
+    }
+
+    #[test]
+    fn failed_group_reopen_keeps_the_session_historical() {
+        let db = test_db();
+        db.create_group("g1", "Project", 1).unwrap();
+        db.create_session("one", "One", 1, "", "local", "{}").unwrap();
+        db.session_set_group("one", Some("g1")).unwrap();
+        db.archive_group("g1", 2).unwrap();
+        db.conn().execute_batch("CREATE TRIGGER reject_reopen BEFORE UPDATE OF archived ON groups BEGIN SELECT RAISE(ABORT, 'blocked'); END;").unwrap();
+        assert!(db.restore_session("one").is_err());
+        assert_eq!(db.get_session("one").unwrap().status, "historical");
+        assert!(db.list_groups().unwrap()[0].archived);
+    }
 }

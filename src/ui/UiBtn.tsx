@@ -30,11 +30,12 @@ interface MenuItemProps {
   label: string;
   onClick: () => void;
   danger?: boolean;
+  disabled?: boolean;
   /** Shortcut badge displayed at the end of the row. */
   shortcut?: string;
 }
 
-export function MenuItem({ label, onClick, danger, shortcut, role }: MenuItemProps) {
+export function MenuItem({ label, onClick, danger, shortcut, role, disabled }: MenuItemProps) {
   const style: CSSProperties = shortcut
     ? { ...menuItemStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24 }
     : menuItemStyle;
@@ -42,6 +43,7 @@ export function MenuItem({ label, onClick, danger, shortcut, role }: MenuItemPro
     <button
       onClick={onClick}
       role={role}
+      disabled={disabled}
       data-subtle
       className="workspace-floating-row"
       style={danger ? { ...style, color: 'var(--error)' } : style}
