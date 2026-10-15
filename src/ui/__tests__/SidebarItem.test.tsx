@@ -66,6 +66,11 @@ describe('SidebarItem', () => {
     expect(screen.getByRole('button', { name: '关闭标签' })).toHaveStyle({ opacity: '1' });
   });
 
+  it('preserves page navigation semantics supplied by the owner', () => {
+    renderItem({ active: true, testId: 'settings-page', dataAttributes: { 'aria-current': 'page' } });
+    expect(screen.getByTestId('settings-page')).toHaveAttribute('aria-current', 'page');
+  });
+
   it('uses theme typography for a selected label without forcing bold text', () => {
     renderItem({ active: true });
     expect(screen.getByText('会话一').style.fontWeight).toBe('var(--fw-semibold)');

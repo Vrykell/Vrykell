@@ -39,6 +39,17 @@ describe('useSettingsNavigation', () => {
     expect(result.current.visibleGroups.flatMap(group => group.items)).toHaveLength(17);
   });
 
+  it('clears search when selecting a page so compact navigation returns to the content', () => {
+    const { result } = renderHook(() => useSettingsNavigation());
+    act(() => result.current.setQuery('模型'));
+    expect(result.current.normalizedQuery).toBe('模型');
+    act(() => result.current.setSelected('editor-local'));
+    expect(result.current.selected).toBe('editor-local');
+    expect(result.current.query).toBe('');
+    expect(result.current.matchingSettings).toEqual([]);
+    expect(result.current.visibleGroups.flatMap(group => group.items)).toHaveLength(17);
+  });
+
   it('finds individual fields using the same index as global search', () => {
     const { result } = renderHook(() => useSettingsNavigation());
     act(() => result.current.setQuery('补全防抖'));
