@@ -308,6 +308,9 @@ const zh: Record<string, string> = {
   "Export recent diagnostics. Passwords, keys and terminal or conversation content are excluded.": "导出近期诊断记录，过滤密码、密钥和终端及对话正文。",
   "Files rotate at 5 MB. Keep the current file and two backups.": "每份日志最多 5 MB，保留当前文件和两份备份。",
   "New tab": "新建标签页",
+  'Search tab types…': '搜索标签页类型…',
+  'No matching tab types': '无匹配类型',
+  'Set as default terminal': '设为默认终端',
   "Reopen closed tab": "撤销关闭标签",
   "Close tab": "关闭标签页",
   "Switch to numbered tab": "切换到指定标签",
@@ -548,6 +551,12 @@ const zh: Record<string, string> = {
   'ssh.form.dynamicHint': '每行一条，例如 1080',
   'ssh.form.autoReconnect': '断线后自动重连',
   'ssh.form.autoReconnectHint': '仅在 SSH 客户端报告连接失败或意外中断时重连，最多 5 次（退避 1/2/4/8/16 秒）；远端正常退出或手动断开不会重连。',
+  'Edit connection': '编辑连接',
+  'Delete connection': '删除连接',
+  'Shell integration': 'Shell 集成',
+  'Auto reconnect': '自动重连',
+  'Could not save the SSH connection: {{error}}': '无法保存 SSH 连接：{{error}}',
+  'Could not delete the SSH connection: {{error}}': '无法删除 SSH 连接：{{error}}',
 
   // ── 设置：字号与终端渲染 ──
   'Terminal font family': '终端字体',

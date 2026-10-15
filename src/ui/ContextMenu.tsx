@@ -12,8 +12,10 @@ export interface ContextMenuItem {
   danger?: boolean;
   group?: MenuGroup;
   order?: number;
-  /** 可选的快捷键提示，显示在行尾。 */
+  /** Optional shortcut badge displayed at the end of the row. */
   shortcut?: string;
+  /** Radio/switch state; renders a leading mark and exposes menuitemradio semantics. */
+  checked?: boolean;
 }
 
 interface Props {
@@ -89,8 +91,10 @@ export default function ContextMenu({ anchor, items, onClose }: Props) {
 /** All action menus share ordering, group boundaries and row controls. */
 export function ContextMenuItems({ items, onClose, itemRole }: { items: ContextMenuItem[]; onClose: () => void; itemRole?: 'menuitem' }) {
   const ordered = orderMenuItems(items);
+  // Menus that show radio marks keep one mark column so every label starts at the same x.
+  const indent = ordered.some((item) => item.checked !== undefined);
   return <>{ordered.map((item, index) => <Fragment key={`${menuGroup(item)}-${item.label}`}>
     {index > 0 && menuGroup(item) !== menuGroup(ordered[index - 1]!) && <div role="separator" className="context-menu-separator" />}
-    <MenuItem role={itemRole} label={item.label} danger={item.danger} shortcut={item.shortcut} onClick={() => { item.onClick(); onClose(); }} />
+    <MenuItem role={itemRole} label={item.label} danger={item.danger} shortcut={item.shortcut} checked={item.checked} indent={indent} onClick={() => { item.onClick(); onClose(); }} />
   </Fragment>)}</>;
 }

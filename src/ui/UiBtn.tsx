@@ -1,4 +1,5 @@
 import KeyHint from './KeyHint';
+import { Check } from './icons';
 import { IconButton } from './IconButton';
 import { TextButton } from './TextButton';
 /** Shared themed controls and formatting helpers. */
@@ -32,26 +33,33 @@ interface MenuItemProps {
   danger?: boolean;
   /** Shortcut badge displayed at the end of the row. */
   shortcut?: string;
+  /** Radio/switch state; renders a leading mark and exposes menuitemradio semantics. */
+  checked?: boolean;
+  /** Reserves the mark column on plain rows of a menu that also shows radio rows. */
+  indent?: boolean;
 }
 
-export function MenuItem({ label, onClick, danger, shortcut, role }: MenuItemProps) {
+export function MenuItem({ label, onClick, danger, shortcut, role, checked, indent }: MenuItemProps) {
+  const showSlot = checked !== undefined || indent === true;
   const style: CSSProperties = shortcut
     ? { ...menuItemStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24 }
     : menuItemStyle;
   return (
     <button
       onClick={onClick}
-      role={role}
+      role={checked !== undefined ? 'menuitemradio' : role}
+      aria-checked={checked !== undefined ? checked : undefined}
       data-subtle
       className="workspace-floating-row"
       style={danger ? { ...style, color: 'var(--error)' } : style}
     >
-      {shortcut ? (
-        <>
-          <span>{label}</span>
-          <KeyHint shortcut={shortcut} />
-        </>
+      {showSlot ? (
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+          <span aria-hidden="true" data-check-slot style={checkSlotStyle}>{checked === true ? <Check size={12} /> : null}</span>
+          {label}
+        </span>
       ) : label}
+      {shortcut && <KeyHint shortcut={shortcut} />}
     </button>
   );
 }
@@ -60,6 +68,12 @@ const menuItemStyle: CSSProperties = {
   display: 'block', width: '100%', textAlign: 'left' as const,
   padding: '6px 12px', border: 'none',
   color: 'var(--text-primary)', cursor: 'pointer', fontSize: 'calc(12px * var(--ui-font-scale))',
+};
+
+/** Rows with a check state keep one mark column so labels stay aligned. */
+const checkSlotStyle: CSSProperties = {
+  width: 12, display: 'inline-flex', justifyContent: 'center',
+  color: 'var(--accent)', flexShrink: 0,
 };
 
 // Shared sidebar icon controls keep a comfortable pointer target.
