@@ -89,7 +89,7 @@ export default function AiBlock({ exchange, conversationId, presentation = 'bloc
       <CopyButton className="chat-question-copy" testId="chat-question-copy" text={question.content}
         label={t('Copy message')} style={{ width: 20, height: 20 }} />
     </div>}
-    {expanded && question?.references?.length ? <TerminalReferences references={question.references} /> : null}
+    {expanded && question?.references?.length ? <TerminalReferences references={question.references} framed={plain} /> : null}
     {expanded && !!question?.attachments?.length && <AttachmentChips atts={question.attachments} previewId={attPreviewId}
       onPreview={id => setAttPreviewId(attPreviewId === id ? null : id)} />}
     {answer && expanded && <div className={plain ? 'ai-block-answer' : 'command-block-output ai-block-answer'} data-selectable>

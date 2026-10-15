@@ -3,14 +3,22 @@ import { setupTauriMock, ensureTabsOpen } from './tauri-mock';
 import { gotoSetting } from './settings';
 
 for (const theme of ['深色', '浅色']) {
-  test(`folder silhouettes share inherited colors with members and AI targets in ${theme}`, async ({ page }, testInfo) => {
+  test(`only terminal tabs expose icon colors while group actions remain available in ${theme}`, async ({ page }, testInfo) => {
     await setupTauriMock(page);
+    await page.addInitScript(() => localStorage.setItem('vrykell-icon-colors', JSON.stringify({ state: {
+      colors: { 'page:settings': 'coral', 'group:team': 'violet' },
+    }, version: 0 })));
     await page.goto('/');
     await gotoSetting(page, '主题');
     await page.getByRole('radio', { name: theme, exact: true }).click();
     await ensureTabsOpen(page);
+    const settings = page.locator('[data-tab-kind="settings"]');
+    await settings.click({ button: 'right' });
+    await expect(page.getByRole('menuitemradio')).toHaveCount(0);
+    await expect(settings.locator('.sidebar-row-icon svg')).toHaveAttribute('style', /color: var\(--group-blue\)/);
+    await page.keyboard.press('Escape');
     const member = page.locator('[data-tab-kind="session"]').first();
-    await member.click();
+    const original = await member.locator('.sidebar-row-icon svg').evaluate(element => getComputedStyle(element).color);
     await member.click({ button: 'right' });
     await page.getByRole('button', { name: '新建分组', exact: true }).click();
     const header = page.locator('[data-group-header-id]').first();
@@ -18,49 +26,19 @@ for (const theme of ['深色', '浅色']) {
     await header.click({ button: 'right' });
     const menu = page.getByRole('menu', { name: '分组操作' });
     await expect(menu.getByRole('button', { name: '归档分组', exact: true })).toBeVisible();
-    await menu.getByRole('menuitemradio', { name: '紫色', exact: true }).click();
-    await expect(header).toHaveAttribute('aria-expanded', 'true');
+    await expect(menu.getByRole('menuitemradio')).toHaveCount(0);
+    await page.keyboard.press('Escape');
     await expect(header).toBeFocused();
-    const icon = header.locator('[data-group-icon]');
-    await expect(icon).toHaveAttribute('data-group-icon', 'open');
-    const selected = await icon.evaluate(element => getComputedStyle(element).color);
-    await expect(member.locator('.sidebar-row-icon svg')).toHaveCSS('color', selected);
     await header.press('Enter');
-    await expect(icon).toHaveAttribute('data-group-icon', 'closed');
-    await expect(icon).toHaveCSS('color', selected);
+    await expect(header.locator('[data-group-icon]')).toHaveAttribute('data-group-icon', 'closed');
     await header.press('Enter');
-    await expect(icon).toHaveAttribute('data-group-icon', 'open');
-    const groupId = (await header.getAttribute('data-group-header-id'))!;
-    expect(await page.evaluate(id => JSON.parse(localStorage.getItem('vrykell-icon-colors')!).state.colors[`group:${id}`], groupId)).toBe('violet');
-    await page.locator('[data-dock-btn="chat"]').click();
-    await page.getByRole('button', { name: '会话设置', exact: true }).click();
-    const target = page.getByTestId('chat-execution-target');
-    await target.click();
-    const option = page.getByRole('option').filter({ has: page.locator('.ui-select-swatch') }).last();
-    await expect(option.locator('.ui-select-swatch')).toHaveCSS('background-color', selected);
-    await option.click();
-    await expect(target.locator('.ui-select-swatch')).toHaveCSS('background-color', selected);
-    await page.screenshot({ path: testInfo.outputPath('group-icon-tiles.png'), animations: 'disabled' });
     await member.click({ button: 'right' });
-    await page.getByRole('menuitemradio', { name: '青色', exact: true }).click();
-    const explicit = await member.locator('.sidebar-row-icon svg').evaluate(element => getComputedStyle(element).color);
-    await header.click({ button: 'right' });
-    await menu.getByRole('menuitemradio', { name: '绿色', exact: true }).click();
-    await expect(member.locator('.sidebar-row-icon svg')).toHaveCSS('color', explicit);
+    await page.getByRole('menuitemradio', { name: '紫色', exact: true }).click();
+    await expect(member.locator('.sidebar-row-icon svg')).not.toHaveCSS('color', original);
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('vrykell-icon-colors')!).state.colors['page:settings'])).toBeUndefined();
+    await page.screenshot({ path: testInfo.outputPath('terminal-only-icon-colors.png'), animations: 'disabled' });
     await member.click({ button: 'right' });
     await page.getByTestId('tab-icon-color-auto').click();
-    const inherited = await icon.evaluate(element => getComputedStyle(element).color);
-    await expect(member.locator('.sidebar-row-icon svg')).toHaveCSS('color', inherited);
-    await expect(target.locator('.ui-select-swatch')).toHaveCSS('background-color', inherited);
-    await page.locator('[data-dock-btn="chat"]').click();
-    await page.setViewportSize({ width: 700, height: 760 });
-    await ensureTabsOpen(page);
-    await page.screenshot({ path: testInfo.outputPath('compact-before-group-menu.png'), animations: 'disabled' });
-    await header.scrollIntoViewIfNeeded();
-    await header.click({ button: 'right' });
-    const bounds = (await menu.boundingBox())!;
-    expect(bounds.x).toBeGreaterThanOrEqual(0);
-    expect(bounds.x + bounds.width).toBeLessThanOrEqual(700);
-    await page.screenshot({ path: testInfo.outputPath('compact-group-menu.png'), animations: 'disabled' });
+    await expect(member.locator('.sidebar-row-icon svg')).toHaveCSS('color', original);
   });
 }

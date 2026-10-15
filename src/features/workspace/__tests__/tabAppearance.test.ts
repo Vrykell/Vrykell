@@ -1,16 +1,14 @@
 import { expect, it } from 'vitest';
 import { tabIconKey, tabIconColor } from '../model/tabAppearance';
 
-it('keeps singleton colors when a page reopens with a new tab id', () => {
-  const first = { id: 'one', kind: 'settings' as const };
-  const reopened = { id: 'two', kind: 'settings' as const };
-  expect(tabIconKey(first)).toBe(tabIconKey(reopened));
-  expect(tabIconColor(reopened, { [tabIconKey(first)]: 'blue' })).toBe('var(--group-blue)');
+it('ignores legacy singleton colors and session keys assigned to a page', () => {
+  const page = { id: 'one', kind: 'settings' as const };
+  expect(tabIconColor(page, { 'page:settings': 'blue', 'session:one': 'violet' })).toBeUndefined();
 });
 
-it('inherits the group color only when the session has no explicit override', () => {
+it('uses only explicit session colors without inheriting retired group overrides', () => {
   const tab = { id: 'one', kind: 'session' as const, groupId: 'team' };
-  expect(tabIconColor(tab, { 'group:team': 'violet' })).toBe('var(--group-violet)');
+  expect(tabIconColor(tab, { 'group:team': 'violet' })).toBeUndefined();
   expect(tabIconColor(tab, { 'group:team': 'violet', 'session:one': 'cyan' })).toBe('var(--group-cyan)');
   expect(tabIconColor({ id: 'one', kind: 'settings', groupId: 'team' }, { 'group:team': 'violet' })).toBeUndefined();
 });

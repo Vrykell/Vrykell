@@ -733,8 +733,8 @@ button.history-prompt-action[data-primary] { border-color: var(--accent); backgr
   border-radius: var(--radius-inner);
   background: var(--block);
 }
-.chat-exchange .ai-tool-frame { margin: 6px 0 0; }
-.chat-exchange .ai-tool-output {
+.ai-tool-frame[data-framed="true"] { margin: 6px 0 0; }
+.ai-tool-frame[data-framed="true"] .ai-tool-output {
   margin: 0;
   padding: 10px 12px;
   border: 1px solid var(--border);
@@ -753,13 +753,14 @@ button.history-prompt-action[data-primary] { border-color: var(--accent); backgr
 .ai-tool-frame:is(:hover, :focus-within) .ai-tool-copy,
 .ai-tool-copy[data-copied="true"] { opacity: 1; pointer-events: auto; }
 .chat-references { margin: 8px 0; display: flex; flex-direction: column; gap: 4px; }
-.chat-reference { border-radius: 5px; background: var(--hover); min-width: 0; }
-.chat-reference-heading { display: flex; align-items: center; min-width: 0; padding: 2px 6px; }
-.chat-reference-toggle { display: flex; align-items: center; gap: 5px; min-width: 0; flex: 1; padding: 4px 0; border: 0; background: transparent; color: var(--text-secondary); font-size: var(--fs-micro); }
-.chat-reference-toggle > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); }
-.chat-reference-toggle > svg { flex-shrink: 0; }
-.chat-reference-body { padding: 6px 8px; color: var(--text-muted); font-size: var(--fs-micro); }
-.chat-reference-body > pre { margin: 6px 0; max-height: 180px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-secondary); font-family: var(--font-mono); }
+.chat-reference { min-width: 0; }
+.chat-reference-heading { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.chat-reference-toggle { flex: 1; }
+.chat-reference-toggle .ai-tool-description { flex-shrink: 1; }
+.chat-reference-meta { display: flex; flex-wrap: wrap; gap: 2px 12px; padding: 2px 0; color: var(--text-muted); font-size: var(--fs-micro); overflow-wrap: anywhere; }
+.chat-reference-body { min-width: 0; }
+.chat-reference .ai-tool-output { margin: 0; }
+.chat-context-tray .chat-reference .ai-tool-output { max-height: none; overflow: visible; }
 .terminal-command-prompt { display: inline-flex; align-items: center; justify-content: center; width: var(--control-size); height: var(--control-size); flex-shrink: 0; color: var(--text-muted); }
 
 /* Group surfaces stay transparent; only the selected or hovered row changes. */

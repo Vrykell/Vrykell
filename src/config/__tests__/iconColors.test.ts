@@ -18,6 +18,12 @@ it('ignores invalid persisted colors and preserves store actions during hydratio
     'session:one': 'cyan', 'page:settings': 'violet', 'group:team': 'green', 'session:bad': 'url(unsafe)', invalid: 'blue',
   } }, version: 0 }));
   await useIconColorStore.persist.rehydrate();
-  expect(useIconColorStore.getState().colors).toEqual({ 'session:one': 'cyan', 'page:settings': 'violet', 'group:team': 'green' });
+  expect(useIconColorStore.getState().colors).toEqual({ 'session:one': 'cyan' });
   expect(useIconColorStore.getState().setColor).toBeTypeOf('function');
+});
+
+it('rejects new singleton and group overrides', () => {
+  useIconColorStore.getState().setColor('page:settings', 'violet');
+  useIconColorStore.getState().setColor('group:team', 'blue');
+  expect(useIconColorStore.getState().colors).toEqual({});
 });

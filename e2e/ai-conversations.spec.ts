@@ -108,7 +108,7 @@ test('command analysis stages a reference before sending and never changes termi
   await expect(page.getByText('This is a command snapshot.', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '会话设置' })).toBeVisible();
   await expect(page.getByTestId('chat-conversation-context')).toHaveCount(0);
-  await page.locator('.chat-composer .chat-reference-toggle').click();
+  await expect(page.locator('.chat-composer .chat-reference-toggle')).toHaveAttribute('aria-expanded', 'true');
   await expect(page.locator('.chat-composer .chat-reference-body')).toContainText('reference-source');
   await composer.press('Enter');
   await expect(page.getByText('This is a command snapshot.', { exact: true })).toBeVisible();
