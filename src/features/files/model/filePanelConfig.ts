@@ -99,7 +99,8 @@ export function filePanelConfigFor(target: FileOpsTarget): FilePanelConfig {
         rowFolder: ['new-file', 'new-folder', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'download', 'properties', 'delete'],
         rowFile: ['new-file', 'new-folder', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'download', 'properties', 'delete'],
         rowMulti: ['copy', 'cut', 'paste', 'download', 'delete'],
-        blank: ['new-file', 'new-folder', 'paste', 'upload-file', 'upload-dir'],
+        // 空白处与 ⋯ 菜单提供同一套操作（远端多出上传），只是落点固定为当前目录
+        blank: ['paste', 'new-file', 'new-folder', 'upload-file', 'upload-dir', 'sync-terminal', 'sync-cwd', 'downloads-view', 'collapse-all'],
         more: ['new-file', 'new-folder', 'upload-file', 'upload-dir', 'sync-terminal', 'sync-cwd', 'downloads-view', 'collapse-all'],
       },
       drag: { downloadBeforeNativeDrag: true, externalDropMode: 'upload', cleanupSourceAfterNativeDrag: false },
@@ -118,7 +119,8 @@ export function filePanelConfigFor(target: FileOpsTarget): FilePanelConfig {
       rowFolder: ['new-file', 'new-folder', 'workspace-add', 'workspace-remove', 'open-tab', 'reveal', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'properties', 'delete'],
       rowFile: ['new-file', 'new-folder', 'open-editor', 'open-system', 'open-with', 'reveal', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'properties', 'delete'],
       rowMulti: ['copy', 'cut', 'paste', 'delete'],
-      blank: ['new-file', 'new-folder', 'paste', 'new-tab-here'],
+      // 空白处与 ⋯ 菜单提供同一套操作，只是落点固定为当前目录
+      blank: ['paste', 'new-file', 'new-folder', 'new-tab-here', 'sync-terminal', 'sync-cwd', 'reveal', 'downloads-view', 'collapse-all'],
       more: ['new-file', 'new-folder', 'new-tab-here', 'sync-terminal', 'sync-cwd', 'reveal', 'downloads-view', 'collapse-all'],
     },
     drag: { downloadBeforeNativeDrag: false, externalDropMode: 'move', cleanupSourceAfterNativeDrag: true },
