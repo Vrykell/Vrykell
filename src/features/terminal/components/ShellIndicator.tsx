@@ -96,7 +96,7 @@ export default function ShellIndicator({ shell, connected, focused, compact, lab
           }}
         />
       )}
-      <span>{label ?? info.label}</span>
+      <span className="shell-indicator-label">{label ?? info.label}</span>
     </span>
   );
 }

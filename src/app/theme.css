@@ -924,7 +924,17 @@ button.text-control:disabled:hover { background: transparent; color: var(--contr
   line-height: 18px; white-space: nowrap;
 }
 button.terminal-chip.text-control { min-height: 20px; padding: 1px 7px; background: var(--hover); font-family: var(--font-mono); font-size: calc(11px * var(--ui-font-scale)); line-height: 18px; }
-button.terminal-chip.text-control:hover, button.terminal-chip.text-control:focus-visible, button.terminal-chip.text-control[aria-expanded="true"] { background: var(--control-hover-bg); }
+/* Clickable chips: hovering or focusing clears the resting gray and brightens the label, while the
+   open (expanded) state keeps the pressed tint. The :not(:disabled) guard keeps disabled chips
+   inert; static spans never match, so status-only chips stay quiet. */
+button.terminal-chip:not(:disabled) { cursor: pointer; transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+button.terminal-chip:not(:disabled) .shell-indicator-label { transition: color var(--dur-fast) var(--ease); }
+button.terminal-chip:not(:disabled):is(:hover, :focus-visible) { background: transparent; color: var(--text-primary); }
+button.terminal-chip:not(:disabled):is(:hover, :focus-visible) .shell-indicator-label { color: var(--text-primary); }
+button.terminal-chip:not(:disabled)[aria-expanded="true"] { background: var(--control-active-bg); color: var(--text-primary); }
+button.terminal-chip:not(:disabled)[aria-expanded="true"] .shell-indicator-label { color: var(--text-primary); }
+/* Keep disabled chips inert even for the shared text-control disabled hover. */
+button.terminal-chip:disabled:hover { background: var(--hover); }
 /* Scope tags share the same quiet appearance in the input and recent searches. */
 .search-scope-chip { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; max-width: 45%; padding: 4px 7px; border-radius: 5px; background: var(--hover); color: var(--text-primary); font-size: var(--fs-caption); }
 .search-scope-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
