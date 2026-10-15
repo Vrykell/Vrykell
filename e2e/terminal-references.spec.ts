@@ -20,12 +20,17 @@ for (const theme of ['深色', '浅色']) {
         conversations: [{ id: 'reference-test', title: 'Reference review', createdAt: 1, updatedAt: 2, environment: null }],
         byTab: { 'reference-test': [
           { id: 'q', role: 'user', content: 'Review this terminal snapshot', createdAt: 1, references: [reference] },
-          { id: 'a', role: 'assistant', content: '', createdAt: 2, parts: [{ kind: 'tool', tool: {
+          { id: 'a', role: 'assistant', content: '', createdAt: 2,
+            reasoning: 'Inspect the terminal snapshot and compare it with the current build configuration before running the next command.',
+            parts: [{ kind: 'tool', tool: {
             toolCallId: 'build-result', toolName: 'run_command', input: { command: 'npm run test' }, state: 'done' as const,
             output: JSON.stringify({ output: 'Tests passed' }), startedAt: 1,
           } }] },
         ] } });
       useComposerDrafts.getState().setReferences('reference-test', [{ ...reference, id: 'draft', command: 'codex resume', output: '' }]);
+      useComposerDrafts.getState().updateAttachments('reference-test', () => [{
+        id: 'image', kind: 'image', name: 'reference.png', mime: 'image/png', size: 100,
+      }]);
     });
     const draft = page.locator('.chat-composer .chat-reference');
     const sent = page.locator('.chat-exchange .chat-reference');
@@ -33,10 +38,23 @@ for (const theme of ['深色', '浅色']) {
     await expect(sent.locator('.chat-reference-toggle')).toHaveAttribute('aria-expanded', 'true');
     await expect(draft.locator('.ai-tool-output')).toContainText('无输出');
     await expect(sent.locator('.ai-tool-output')).toHaveText('Build succeeded');
-    const tool = page.locator('.chat-exchange .ai-tool-card:not(.chat-reference)');
+    const tool = page.locator('.chat-exchange .ai-tool-card:not(.chat-reference):not(.ai-thinking)');
     await tool.locator('.ai-tool-summary').click();
     expect(await sent.locator('.ai-tool-summary > svg').first().innerHTML()).toBe(await tool.locator('.ai-tool-summary > svg').first().innerHTML());
     await expect(sent).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await page.mouse.move(0, 0);
+    await expect(draft).toHaveCSS('background-color', await page.locator('.chat-composer .chat-attachment-chip').evaluate(element => getComputedStyle(element).backgroundColor));
+    await expect(draft.locator('.ai-tool-output')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(draft.locator('.ai-tool-output')).toHaveCSS('border-top-width', '0px');
+    const thinking = page.locator('.ai-thinking');
+    const summary = thinking.locator('.ai-tool-summary');
+    for (const property of ['font-size', 'padding', 'gap', 'width'] as const) {
+      await expect(summary).toHaveCSS(property, await tool.locator('.ai-tool-summary').evaluate((element, key) => getComputedStyle(element).getPropertyValue(key), property));
+    }
+    expect(await summary.evaluate(element => element.lastElementChild?.tagName.toLowerCase())).toBe('svg');
+    await summary.click();
+    await expect(thinking.locator('.ai-thinking-body')).toBeVisible();
+    await summary.click();
     for (const property of ['background-color', 'border-radius', 'font-size'] as const) {
       await expect(sent.locator('.ai-tool-output')).toHaveCSS(property, await tool.locator('.ai-tool-output').evaluate((element, key) => getComputedStyle(element).getPropertyValue(key), property));
     }

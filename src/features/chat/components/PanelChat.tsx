@@ -93,7 +93,7 @@ export default function PanelChat() {
         const host = pane.kind === 'ssh' ? pane.ssh?.host : undefined;
         const hostLabel = host && !context.label.includes(host) ? ` · ${host}` : '';
         const swatch = startupStates[pane.id] === 'starting' ? 'var(--accent-warm)'
-          : startupStates[pane.id] === 'failed' || startupStates[pane.id] === 'closed' ? 'var(--error)' : tabIconColor(tab, iconColors) ?? 'var(--success)';
+          : startupStates[pane.id] === 'failed' || startupStates[pane.id] === 'closed' ? 'var(--error)' : tabIconColor(tab, iconColors, pane) ?? 'var(--success)';
         return { value: pane.id, label: `${context.label}${hostLabel}${context.cwd ? ` · ${context.cwd}` : ''}`, triggerLabel, swatch };
       });
     return [
