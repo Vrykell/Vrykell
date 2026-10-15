@@ -21,6 +21,23 @@ const exchange: ChatExchange = { id: 'question', createdAt: 1,
   answer: { id: 'answer', role: 'assistant', content: 'Check the **configuration**.', createdAt: 2 },
 };
 
+it('uses the tool summary treatment for reasoning and keeps its disclosure usable', () => {
+  const reasoning = 'Inspect the build configuration first.\n\nThen check the dependencies.';
+  const { container } = render(<AiBlock exchange={{ ...exchange, answer: { ...exchange.answer!, reasoning } }}
+    presentation="conversation" conversationId="conversation" />);
+  const thinking = container.querySelector('.ai-thinking')!;
+  expect(thinking).toHaveClass('ai-tool-card');
+  const summary = within(thinking as HTMLElement).getByRole('button', { name: /思考过程/ });
+  expect(summary).toHaveClass('ai-tool-summary');
+  expect(summary.lastElementChild?.tagName.toLowerCase()).toBe('svg');
+  expect(summary).toHaveAttribute('aria-expanded', 'false');
+  fireEvent.click(summary);
+  expect(summary).toHaveAttribute('aria-expanded', 'true');
+  expect(within(thinking as HTMLElement).getByText('Then check the dependencies.')).toBeVisible();
+  fireEvent.click(summary);
+  expect(container.querySelector('.ai-thinking-body')).toBeNull();
+});
+
 it('renders panel answers as plain conversation content with message actions', () => {
   useChatStore.setState({ sendingTab: null });
   const { container } = render(<AiBlock exchange={exchange} conversationId="conversation" presentation="conversation" />);
