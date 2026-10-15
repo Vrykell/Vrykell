@@ -116,8 +116,6 @@ export default function PanelTabs() {
   const draggedTabId = useListReorder((s) => (s.drag && s.drag.kind !== 'group' ? s.drag.id : undefined));
   const remainingUngrouped = ungroupedTabs.filter((tab) => tab.id !== draggedTabId);
   const lastUngroupedId = remainingUngrouped[remainingUngrouped.length - 1]?.id;
-  const activeTab = tabs.find((t) => t.id === activeId);
-  const activeGroupId = activeTab && isSessionTab(activeTab) ? activeTab.groupId : undefined;
 
   const ctxTab = ctxMenu ? tabs.find((t) => t.id === ctxMenu.tabId) : undefined;
   const ctxItems: ContextMenuItem[] = ctxMenu && ctxTab
@@ -187,7 +185,8 @@ export default function PanelTabs() {
         <IconBtn title="会话历史" data-testid="tab-history-btn" onClick={openHistoryTab}>
           <History size={iconSizes.control} />
         </IconBtn>
-        <IconBtn title="新建终端" data-testid="tab-new-btn" onClick={() => { setModalGroupId(activeGroupId); setModalOpen(true); }}>
+        {/* The panel button always creates ungrouped tabs; only a group's own + assigns that group. */}
+        <IconBtn title="新建终端" data-testid="tab-new-btn" onClick={() => { setModalGroupId(undefined); setModalOpen(true); }}>
           <Plus size={iconSizes.control} />
         </IconBtn>
       </div>
