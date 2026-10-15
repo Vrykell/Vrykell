@@ -271,6 +271,8 @@ const zh: Record<string, string> = {
   'Send to AI for analysis': '发给 AI 分析',
   'Rerun command': '重新运行',
   'Release to open {{panel}}': '松手打开{{panel}}',
+  'At most 4 terminals': '最多 4 个终端',
+  'A single terminal cannot be moved': '只有一个终端，无法更换位置',
 
   'Checking saved connection…': '正在检查保存的连接…',
   'Could not load SSH connections': '无法加载 SSH 连接',

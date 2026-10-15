@@ -277,13 +277,30 @@ test('separate command and AI drafts survive repeated switches', async ({ page }
   await expect(page.getByPlaceholder(/输入命令/)).toHaveValue('git status');
 });
 
-test('split placement explains selection and cancellation before hover', async ({ page }) => {
+test('split placement previews the hovered slot and closes with Escape', async ({ page }) => {
   await page.locator('[data-tip="选择类型分裂"]').click();
   await page.getByTestId('new-tab-option-shell:zsh').click();
-  await expect(page.getByTestId('placement-hint')).toBeVisible();
-  await expect(page.getByTestId('placement-hint')).toContainText('Esc 取消');
+  const overlay = page.getByTestId('placement-overlay');
+  await expect(overlay).toBeVisible();
+  // 覆盖层不显示提示文案：悬停前为空，悬停后只出现指针下的灰色预览
+  await expect(overlay).toBeEmpty();
   await page.keyboard.press('Escape');
-  await expect(page.getByTestId('placement-hint')).toHaveCount(0);
+  await expect(overlay).toHaveCount(0);
+  await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
+});
+
+test('split placement closes when it loses focus', async ({ page }) => {
+  // 点击覆盖层之外的侧栏按钮 → 自动取消
+  await page.keyboard.press('Meta+d');
+  await expect(page.getByTestId('placement-overlay')).toBeVisible();
+  await page.locator('[data-dock-btn="files"]').click();
+  await expect(page.getByTestId('placement-overlay')).toHaveCount(0);
+
+  // 窗口失焦 → 自动取消
+  await page.keyboard.press('Meta+d');
+  await expect(page.getByTestId('placement-overlay')).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+  await expect(page.getByTestId('placement-overlay')).toHaveCount(0);
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
 });
 
