@@ -205,7 +205,7 @@ export default function PanelChat() {
     {/* Streaming content must never yank the view away from what is being read: any upward
         scroll input pauses the follow, even one too small to leave the "near the bottom"
         window, while a nested scroller that consumes the wheel leaves it alone. */}
-    <div className="chat-transcript-wrap" style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', paddingBottom: 32 }}>
+    <div className="chat-transcript-wrap" style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
     <div ref={scrollRef} className="chat-transcript scroll-region" onScroll={event => {
       const scroll = event.currentTarget;
       const ours = Math.abs(scroll.scrollTop - lastTopRef.current) <= 1;
