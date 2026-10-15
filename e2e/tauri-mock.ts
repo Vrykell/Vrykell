@@ -809,7 +809,8 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
               { id: 'bash', label: 'Bash', default: false },
             ];
           case 'ssh_connections_list':
-            return sshConnections;
+            // Real IPC serializes results; hand out copies so the UI never shares state with the mock.
+            return sshConnections.map((c) => ({ ...c }));
           case 'ssh_config_candidates':
             return [
               { name: 'web', host: '10.0.0.5', user: 'deploy', port: 2222, identityFile: '/keys/web', localForwards: ['8080:localhost:80'], remoteForwards: [], dynamicForwards: [] },
