@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { setupTauriMock, themeConfig } from './tauri-mock';
 import { gotoSetting } from './settings';
+import { focusedPane, hoverPlacementZone } from './placement';
 
 test('model header controls align with the input while save feedback lives in the page header', async ({ page }) => {
   await setupTauriMock(page);
@@ -83,14 +84,17 @@ test('the full panel preview accepts release and shares its surface with split p
   await page.mouse.up();
   await expect(page.locator('.workspace-side-panel[data-side="right"]').getByText('notes.txt')).toBeVisible();
   await page.keyboard.press('Meta+d');
+  await hoverPlacementZone(page, focusedPane(page), 'right');
   const zone = page.getByTestId('placement-zone-1');
   await expect(zone).toBeVisible();
-  const split = (await zone.boundingBox())!;
-  await page.mouse.move(split.x + split.width / 2, split.y + split.height / 2);
   await expect(zone).toHaveAttribute('data-active', 'true');
   await expect(zone).toHaveCSS('background-color', colors.background);
   await expect(zone).toHaveCSS('border-color', colors.border);
   await expect(zone).toHaveCSS('border-radius', colors.radius);
-  await page.keyboard.press('Escape');
+  // 指针离开布局区后预览消失，不残留网格描边
+  const dock = (await page.locator('[data-dock-btn="files"]').boundingBox())!;
+  await page.mouse.move(dock.x + dock.width / 2, dock.y + dock.height / 2);
   await expect(zone).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('placement-overlay')).toHaveCount(0);
 });
