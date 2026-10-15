@@ -99,7 +99,10 @@ function upsertTool(messages: ChatMessage[], run: ToolRun): ChatMessage[] {
  * grows, and a newer agent must not break the view.
  */
 export function applyHarnessUpdate(messages: ChatMessage[], payload: Record<string, unknown>): ChatMessage[] {
-  const update = (payload.update ?? {}) as Record<string, unknown>;
+  // The agent's notification arrives whole (jsonrpc/method/params) and some agents hand the params
+  // object itself; accepting both is what keeps a live transcript from silently staying empty.
+  const params = ((payload.params ?? payload) ?? {}) as Record<string, unknown>;
+  const update = (params.update ?? {}) as Record<string, unknown>;
   const kind = update.sessionUpdate;
   switch (kind) {
     case 'user_message_chunk': {

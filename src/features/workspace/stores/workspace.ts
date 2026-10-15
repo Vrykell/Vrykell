@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import type { SshOptions } from '@core/ssh';
 import { useToastStore } from '@ui/Toast';
 import { t } from '@i18n';
+import { useHarnessStore } from '@features/chat/stores/harness';
 import * as sessionManager from '@features/workspace/services/sessionManager';
 import {
   groupsList, groupCreate, groupRename, groupSetCollapsed, groupDelete,
@@ -58,8 +59,9 @@ export type Tab =
   | (TabBase & { kind: 'ai-history' })
   | (TabBase & { kind: 'settings' })
   | (TabBase & { kind: 'usage' })
-  /** An external harness session; one tab per configured harness. */
-  | (TabBase & { kind: 'harness'; harness: string })
+  /** An external harness session; one tab per configured harness. The directory is captured when the
+   *  tab is opened (the page is not a terminal, so it has none of its own to ask). */
+  | (TabBase & { kind: 'harness'; harness: string; cwd?: string })
   /** The hub that lists configured harnesses and starts their sessions. */
   | (TabBase & { kind: 'harness-hub' });
 
@@ -76,6 +78,8 @@ export interface AddTabOptions {
   kind?: 'local' | 'ssh' | 'history' | 'ai-history' | 'settings' | 'usage' | 'harness' | 'harness-hub';
   /** Configured harness this page belongs to (kind='harness'). */
   harness?: string;
+  /** Directory the harness works in (kind='harness'); resolved when the tab is opened. */
+  harnessCwd?: string;
   shellType?: ShellType;
   /** SSH 连接目标（kind='ssh' 时） */
   ssh?: SshTabTarget;
@@ -161,7 +165,7 @@ interface WorkspaceState {
   openAiHistoryTab: () => void;
   openUsageTab: () => void;
   /** Open (or focus) the session page of a configured harness. */
-  openHarnessTab: (name: string) => void;
+  openHarnessTab: (name: string, cwd?: string) => void;
   /** Open (or focus) the hub that lists configured harnesses. */
   openHarnessHubTab: () => void;
   /** 新建/复用设置标签页 */
@@ -277,7 +281,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       tab = { id, title: USAGE_TITLE, kind: 'usage', titleSource: 'manual' };
     } else if (o.kind === 'harness') {
       const harness = o.harness ?? '';
-      tab = { id, title: harness || 'Harness', kind: 'harness', harness, titleSource: 'manual' };
+      tab = { id, title: harness || 'Harness', kind: 'harness', harness, cwd: o.harnessCwd, titleSource: 'manual' };
     } else if (o.kind === 'harness-hub') {
       tab = { id, title: HARNESS_HUB_TITLE, kind: 'harness-hub', titleSource: 'manual' };
     } else {
@@ -322,7 +326,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
   openAiHistoryTab: () => { get().addTab({ kind: 'ai-history' }); },
   openUsageTab: () => { get().addTab({ kind: 'usage' }); },
-  openHarnessTab: (name) => { get().addTab({ kind: 'harness', harness: name }); },
+  openHarnessTab: (name, cwd) => {
+    // The harness should work where the user was, and the tab it opens is not a terminal: the
+    // directory has to be read from the active session before the switch happens.
+    const state = get();
+    const active = state.tabs.find((tab) => tab.id === state.activeId);
+    const spec = active && isSessionTab(active) ? firstLeaf(active.layout) : null;
+    const directory = cwd ?? (spec ? state.terminalCwds[spec.id] ?? spec.cwd : undefined);
+    get().addTab({ kind: 'harness', harness: name, harnessCwd: directory });
+  },
   openHarnessHubTab: () => { get().addTab({ kind: 'harness-hub' }); },
   openSettingsTab: () => {
     const existing = get().tabs.find((t) => t.kind === 'settings');
@@ -362,6 +374,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
     // Workspace pages have no backend session to archive.
     if (isSessionTab(closed)) sessionManager.close(id);
+    // A harness page owns a session and a process: closing the tab is what ends them, so it must not
+    // depend on the page being unmounted (it is not, while the app keeps tabs alive).
+    if (closed.kind === 'harness') void useHarnessStore.getState().close(id);
     // 关闭标签后若分组变空则直接删除（空分组无意义）
     get().pruneEmptyGroups();
   },

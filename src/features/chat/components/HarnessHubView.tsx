@@ -79,6 +79,19 @@ export default function HarnessHubView() {
     }
   };
 
+  /** A connect click must not race the debounced save: the harness has to be on disk before it runs. */
+  const connect = async (name: string) => {
+    if (touched && list && harnessProblems(list).length === 0) {
+      try {
+        await acpHarnessSave(list);
+      } catch (error) {
+        toast(String((error as Error)?.message ?? error), 'error');
+        return;
+      }
+    }
+    useSessionStore.getState().openHarnessTab(name);
+  };
+
   const visible = (list ?? []).map((entry, index) => ({ entry, index }))
     .filter(({ entry }) => selected === ALL || entry.name === selected);
 
@@ -142,7 +155,7 @@ export default function HarnessHubView() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                 <button data-testid={`harness-connect-${index}`} disabled={!entry.enabled}
-                  onClick={() => useSessionStore.getState().openHarnessTab(entry.name)} style={{
+                  onClick={() => { void connect(entry.name); }} style={{
                     padding: '6px 14px', border: 0, borderRadius: 'var(--radius-inner)', cursor: entry.enabled ? 'pointer' : 'default',
                     background: entry.enabled ? 'var(--accent)' : 'var(--hover)', color: entry.enabled ? 'var(--canvas)' : 'var(--text-muted)',
                     font: `${'var(--fs-caption)'} var(--font-ui)`,

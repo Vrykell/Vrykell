@@ -496,8 +496,14 @@ pub fn acp_harnesses() -> Vec<HarnessConfig> {
 #[derive(Default)]
 pub struct AcpRuntime {
     sessions: Mutex<HashMap<String, Arc<AcpClient>>>,
-    /// Permission requests waiting for the page's answer, keyed by tool call id.
+    /// Permission requests waiting for the page's answer, keyed by session and tool call id: two
+    /// sessions may use the same tool call id, and an answer must only reach the one that asked.
     pending: Arc<Mutex<HashMap<String, oneshot::Sender<PermissionOutcome>>>>,
+}
+
+/// Key of a pending permission request: the session and the tool call id it belongs to.
+fn pending_key(session: &str, tool_call_id: &str) -> String {
+    format!("{session}::{tool_call_id}")
 }
 
 impl AcpRuntime {
@@ -520,16 +526,23 @@ impl AcpRuntime {
         if let Ok(mut map) = self.sessions.lock() {
             map.remove(session);
         }
+        // Requests this session was waiting on cannot be answered any more; drop them with it so a
+        // stale id cannot resolve later.
+        if let Ok(mut pending) = self.pending.lock() {
+            let prefix = format!("{session}::");
+            pending.retain(|key, _| !key.starts_with(&prefix));
+        }
     }
 
     /// Answer a pending permission request. `option_id` is one of the options the agent offered;
     /// `None` answers the protocol's own "cancelled".
-    fn answer(&self, tool_call_id: &str, option_id: Option<String>) -> Result<(), String> {
+    fn answer(&self, session: &str, tool_call_id: &str, option_id: Option<String>) -> Result<(), String> {
+        let key = pending_key(session, tool_call_id);
         let sender = self
             .pending
             .lock()
             .map_err(|_| "the ACP state is poisoned".to_string())?
-            .remove(tool_call_id)
+            .remove(&key)
             .ok_or_else(|| format!("no permission request is waiting for {tool_call_id}"))?;
         let outcome = match option_id {
             Some(option) => PermissionOutcome::Selected(option),
@@ -544,11 +557,12 @@ impl AcpRuntime {
 #[tauri::command]
 pub fn acp_answer_permission(
     state: tauri::State<'_, AcpRuntime>,
+    session_id: String,
     tool_call_id: String,
     option_id: Option<String>,
 ) -> Result<(), String> {
-    let answered = state.answer(&tool_call_id, option_id.clone());
-    note("acp-permission-answered", json!({ "toolCallId": tool_call_id, "optionId": option_id }));
+    let answered = state.answer(&session_id, &tool_call_id, option_id.clone());
+    note("acp-permission-answered", json!({ "sessionId": session_id, "toolCallId": tool_call_id, "optionId": option_id }));
     answered
 }
 
@@ -604,7 +618,7 @@ pub async fn acp_open<R: tauri::Runtime>(
         let session = params.get("sessionId").and_then(Value::as_str).unwrap_or_default().to_string();
         let (sender, receiver) = oneshot::channel();
         if let Ok(mut map) = pending_handle.lock() {
-            map.insert(tool_call_id.clone(), sender);
+            map.insert(pending_key(&session, &tool_call_id), sender);
         }
         emit(
             &permission_app,
@@ -650,9 +664,13 @@ pub async fn acp_open<R: tauri::Runtime>(
     let pump_name = harness.name.clone();
     let mut saw_update = false;
     let pump_session = session.clone();
-    let pump_client = client.clone();
+    let pump_client = Arc::downgrade(&client);
     tokio::spawn(async move {
-        while let Some(message) = pump_client.next_event().await {
+        loop {
+            // A weak handle on purpose: closing the session drops the last strong reference, this pump
+            // ends, and the child is then killed by `kill_on_drop` instead of running on unreachable.
+            let Some(pump_client) = pump_client.upgrade() else { break };
+            let Some(message) = pump_client.next_event().await else { break };
             // The first notification is the interesting one for diagnosis: an open session that
             // never speaks means the agent found nothing to report, not that the wire is broken.
             if !saw_update {

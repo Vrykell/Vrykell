@@ -209,8 +209,8 @@ export default function HarnessPage() {
       </Field>
 
       <Field title={t('Approvals')}
-        description={t('Harness permissions are refused until the approval card is wired to them in the next phase; nothing a harness asks for runs unnoticed.')}>
-        <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>{t('Refused automatically for now.')}</span>
+        description={t('When a harness asks to run something, the request appears as a card in its conversation and waits for your answer; nothing a harness asks for runs unnoticed.')}>
+        <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>{t('An unanswered card is refused after ten minutes.')}</span>
       </Field>
     </SettingsGroup>
   );

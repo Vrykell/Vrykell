@@ -60,7 +60,7 @@ describe('harness permission answers', () => {
 
     await useHarnessStore.getState().answerPermission(TAB, 1, 'allow');
 
-    expect(acpAnswerPermission).toHaveBeenCalledWith('call-1', 'allow');
+    expect(acpAnswerPermission).toHaveBeenCalledWith('s1', 'call-1', 'allow');
     expect(useHarnessStore.getState().byTab[TAB]!.permission).toBeNull();
   });
 

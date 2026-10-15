@@ -28,7 +28,7 @@ import { bindHarnessEvents, useHarnessStore } from '../stores/harness';
  * `chat-input-status`) so the two surfaces read as one product. This page is where the local chat
  * will move next, so the panel's look is the contract, not a coincidence.
  */
-export default function HarnessView({ tabId, harness }: { tabId: string; harness: string }) {
+export default function HarnessView({ tabId, harness, cwd }: { tabId: string; harness: string; cwd?: string }) {
   const session = useHarnessStore((state) => state.byTab[tabId]);
   // The session works where the user's terminal is: the workspace already knows that directory, and
   // the backend falls back to its own only when there is no terminal to ask.
@@ -41,14 +41,13 @@ export default function HarnessView({ tabId, harness }: { tabId: string; harness
   const opening = useRef<string | null>(null);
 
   useEffect(() => { bindHarnessEvents(); }, []);
-  useEffect(() => () => { void useHarnessStore.getState().close(tabId); }, [tabId]);
   useEffect(() => {
     if (session || opening.current === tabId) return;
     opening.current = tabId;
-    void useHarnessStore.getState().open(tabId, harness, activeCwd ?? '').finally(() => {
+    void useHarnessStore.getState().open(tabId, harness, cwd ?? activeCwd ?? '').finally(() => {
       if (opening.current === tabId) opening.current = null;
     });
-  }, [tabId, harness, session, activeCwd]);
+  }, [tabId, harness, session, activeCwd, cwd]);
 
   const agent = session?.agent?.agentInfo;
   const exchanges = toExchanges(session?.messages ?? []);

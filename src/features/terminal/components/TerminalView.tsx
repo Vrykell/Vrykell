@@ -90,7 +90,7 @@ export default function TerminalView() {
           : tab.kind === 'ai-history' ? <AiHistoryView key={tab.id} />
             : tab.kind === 'usage' ? <UsageView key={tab.id} />
               : tab.kind === 'harness-hub' ? <HarnessHubView key={tab.id} />
-                : tab.kind === 'harness' ? <HarnessView key={tab.id} tabId={tab.id} harness={tab.harness} />
+                : tab.kind === 'harness' ? <HarnessView key={tab.id} tabId={tab.id} harness={tab.harness} cwd={tab.cwd} />
                   : <SettingsView key={tab.id} />;
       })}
 

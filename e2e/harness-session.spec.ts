@@ -38,6 +38,8 @@ test.describe('harness session', () => {
     await page.getByText('外部 harness', { exact: true }).first().click();
     await page.getByTestId('harness-connect-0').click();
     await expect(page.getByTestId('harness-send')).toBeVisible({ timeout: 10000 });
+    // One tab opens one session, however many times the effects run.
+    expect((await acpCalls(page)).filter((call) => call.startsWith('acp_open'))).toEqual(['acp_open:Fake ACP']);
     // 回归：严格模式下 effect 会被跑两遍，但会话只能开一次
     await expect(page.getByTestId('harness-page')).toBeVisible();
 

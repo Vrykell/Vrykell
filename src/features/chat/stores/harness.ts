@@ -86,17 +86,18 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     try {
       const result = await acpOpen(harness, cwd);
       tabOfSession.set(result.sessionId, tabId);
-      // Recreate the entry if the mount cleanup removed it while this was in flight: React's
-      // double-invoked effects close and reopen, and a late patch must not be dropped silently.
-      set((state) => {
-        const current = state.byTab[tabId] ?? fresh(harness);
-        return {
-          byTab: {
-            ...state.byTab,
-            [tabId]: { ...current, opening: false, sessionId: result.sessionId, agent: result.agent, error: null },
-          },
-        };
-      });
+      const known = get().byTab[tabId];
+      if (!known) {
+        // The tab was closed while this open was in flight: do not resurrect it, and do not leave a
+        // process running with no page behind it. (A React remount keeps the entry, so it lands in
+        // the branch below instead.)
+        await acpClose(result.sessionId).catch(() => undefined);
+        tabOfSession.delete(result.sessionId);
+        return;
+      }
+      patch(tabId, (current) => ({
+        ...current, opening: false, sessionId: result.sessionId, agent: result.agent, error: null,
+      }));
     } catch (error) {
       patch(tabId, (session) => ({ ...session, opening: false, error: String((error as Error)?.message ?? error) }));
     }
@@ -141,14 +142,15 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
   answerPermission: async (tabId, generation, optionId) => {
     const session = get().byTab[tabId];
     const request = session?.permission;
-    if (!request) return;
+    // The answer names the session it belongs to: another harness may be using the same tool call id.
+    if (!request || !session?.sessionId) return;
     // A newer request for the same tool call replaced the card this click was drawn on: the answer
     // belongs to the card that is gone, so it is dropped instead of applied to the new one.
     if (request.generation !== generation) return;
     // Clear it first: a card that is answered twice would answer an already-resolved request.
     patch(tabId, (current) => ({ ...current, permission: null }));
     try {
-      await acpAnswerPermission(request.toolCallId, optionId);
+      await acpAnswerPermission(session.sessionId, request.toolCallId, optionId);
     } catch (error) {
       patch(tabId, (current) => ({ ...current, error: String((error as Error)?.message ?? error) }));
     }
