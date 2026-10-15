@@ -42,8 +42,28 @@ for (const theme of ['dark', 'light'] as const) {
     expect(Math.abs(await centerY(card.getByRole('heading')) - await centerY(card.locator('.history-group-count')))).toBeLessThan(3);
     const row = page.getByTestId('history-session-hist-group-1');
     await page.mouse.move(2, 2);
+    const restore = page.getByTestId('session-restore-hist-group-1');
+    await expect(restore).toBeHidden();
+    await expect(row.locator('.sidebar-row-subtitle')).toBeVisible();
+    await expect(row.locator('.sidebar-row-subtitle')).toContainText('/project/docs');
     await row.hover();
-    await expect(row.getByRole('button')).toHaveCount(1);
+    await expect(restore).toBeVisible();
+    await expect(row.getByRole('button')).toHaveCount(3);
+    await expect(row.getByText('恢复', { exact: true })).toHaveCount(0);
+    const quick = row.locator('.history-row-quick-actions');
+    const quickBox = (await quick.boundingBox())!;
+    const listBox = (await page.locator('.history-list').boundingBox())!;
+    expect(quickBox.x).toBeGreaterThanOrEqual(listBox.x);
+    for (const button of await quick.getByRole('button').all()) {
+      const box = (await button.boundingBox())!;
+      expect(box.width).toBe(24);
+      expect(box.height).toBe(24);
+      expect(Math.abs(await centerY(button) - await centerY(row.locator('.sidebar-row-title')))).toBeLessThan(1);
+      await expect(button).toHaveCSS('border-top-width', '0px');
+    }
+    await restore.hover();
+    await expect(restore).toBeVisible();
+    await row.hover();
     await expect(row.locator('.sidebar-row-title')).toHaveCSS('font-size', '14px');
     await expect(row.locator('.sidebar-row-title')).toHaveCSS('text-decoration-line', 'underline');
     const channels = await row.locator('.sidebar-row-title').evaluate(element => getComputedStyle(element).color.match(/[0-9.]+/g)!.slice(0, 3).map(Number));
@@ -59,6 +79,8 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(page.getByRole('menuitem', { name: '删除此会话', exact: true })).toBeDisabled();
     await page.keyboard.press('Escape');
     await row.hover();
+    await expect(page.getByTestId('session-delete-hist-group-1')).toBeDisabled();
+    await expect(restore).toBeEnabled();
     for (const flag of ['.history-row-star', '.history-row-lock']) {
       await expect(row.locator(`${flag} svg`)).toHaveCSS('width', '16px');
       await expect(row.locator(`${flag} svg`)).toHaveAttribute('viewBox', '0 0 16 16');
@@ -93,11 +115,14 @@ for (const theme of ['dark', 'light'] as const) {
     await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
     const aiCard = page.getByTestId('ai-history-page').locator('.history-group-card');
     const selected = page.getByTestId('conversation-row-review');
-    await selected.click();
+    await expect(selected.locator('.sidebar-row-subtitle')).toBeVisible();
+    await expect(selected.locator('.sidebar-row-subtitle')).toContainText('更新于');
+    await selected.hover();
+    await page.getByTestId('conversation-open-review').click();
     await expect(selected).toHaveAttribute('aria-current', 'true');
     if (await page.locator('[data-chat-composer]').isVisible()) await page.locator('[data-dock-btn="chat"]').click();
     await selected.hover();
-    await expect(selected.getByRole('button')).toHaveCount(1);
+    await expect(selected.getByRole('button')).toHaveCount(3);
     await expect(selected.locator('.sidebar-row-content')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await expect(selected.locator('.sidebar-row-title')).toHaveCSS('text-decoration-line', 'underline');
     await page.screenshot({ path: testInfo.outputPath(`ai-history-hover-${theme}.png`), animations: 'disabled' });
@@ -105,9 +130,34 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(menu.getByRole('menuitem', { name: '复制为 Markdown', exact: true })).toBeVisible();
     await page.keyboard.press('Escape');
     const notes = page.getByTestId('conversation-row-notes');
-    await notes.click({ button: 'right' });
-    await page.getByRole('menuitem', { name: '删除对话', exact: true }).click();
+    await notes.hover();
+    await page.getByTestId('conversation-delete-notes').click();
     await expect(notes).toHaveCount(0);
     await expect(selected).toHaveAttribute('aria-current', 'true');
   });
 }
+
+test('quick controls restore one original member with the keyboard and delete without restoring', async ({ page }) => {
+  await setupTauriMock(page, { schedulesSeed: [], groupedHistoricalSession: true });
+  await page.goto('/');
+  await ensureTabsOpen(page);
+  await page.getByTestId('tab-history-btn').click();
+  const first = page.getByTestId('history-session-hist-group-1');
+  await first.focus();
+  await page.keyboard.press('Tab');
+  await expect(page.getByTestId('session-delete-hist-group-1')).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByTestId('session-restore-hist-group-1')).toBeFocused();
+  await page.keyboard.press('Enter');
+  await ensureTabsOpen(page);
+  await expect(page.getByTestId('tab-row-hist-group-1')).toHaveAttribute('data-tab-group', 'archived-group');
+  await expect(page.getByTestId('tab-row-hist-group-2')).toHaveCount(0);
+  await page.getByTestId('tab-history-btn').click();
+  await expect(first).toHaveCount(0);
+  const second = page.getByTestId('history-session-hist-group-2');
+  await second.hover();
+  await page.getByTestId('session-delete-hist-group-2').click();
+  await expect(second).toHaveCount(0);
+  await expect(page.getByTestId('tab-row-hist-group-2')).toHaveCount(0);
+  await expect(page.getByTestId('history-session-hist-group-3')).toBeVisible();
+});

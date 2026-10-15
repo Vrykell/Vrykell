@@ -1,10 +1,11 @@
 import { useId, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { useListReorder } from './listReorder';
 import { sidebarRowSpacing, sidebarRowContent, sidebarRowIcon, sidebarRowTitle } from './sidebarRow';
+import { IconButton } from './IconButton';
 
 export interface SidebarItemAction {
   icon: ReactNode;
-  /** Accessible name of the trailing action button. */
+  /** Accessible name of the action button. */
   label: string;
   title?: string;
   /** Receives the click event so callers can anchor floating menus on the button. */
@@ -28,6 +29,7 @@ export default function SidebarItem({
   subtitleFontFamily = 'var(--font-mono)',
   badge,
   action,
+  leadingActions,
   renameInput,
   active,
   onClick,
@@ -52,6 +54,8 @@ export default function SidebarItem({
   /** Optional trailing content between the title and the action button. */
   badge?: ReactNode;
   action?: SidebarItemAction;
+  /** Compact history actions appear beside the row on hover or keyboard focus. */
+  leadingActions?: readonly SidebarItemAction[];
   /** Replaces the title area while an inline rename is active. */
   renameInput?: ReactNode;
   active: boolean;
@@ -110,6 +114,17 @@ export default function SidebarItem({
       data-reorder-dragging={dragging ? 'true' : undefined}
       style={{ ...sidebarRowSpacing, ...(compact ? { padding: '0 6px' } : {}), ...style }}
     >
+      {leadingActions?.length ? <span className="history-row-quick-actions" data-visible={actionVisible}
+        onPointerDown={event => event.stopPropagation()}
+        onClick={event => event.stopPropagation()}
+        onDoubleClick={event => event.stopPropagation()}
+        onContextMenu={event => event.stopPropagation()}>
+        {leadingActions.map(item => <IconButton key={item.label} compact data-subtle
+          aria-label={item.label} data-tip={item.title ?? item.label}
+          data-testid={item.testId} disabled={item.disabled} onClick={item.onClick}>
+          {item.icon}
+        </IconButton>)}
+      </span> : null}
       <div className="sidebar-row-content" style={{
         ...sidebarRowContent,
         ...(historyCompact ? { minHeight: 34, padding: '5px 10px', alignItems: 'flex-start' } : compact ? { minHeight: 32, padding: '5px 10px' } : {}),
@@ -125,11 +140,12 @@ export default function SidebarItem({
                 ...(historyCompact ? { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, whiteSpace: 'normal', overflowWrap: 'anywhere', fontSize: 'var(--fs-body)', lineHeight: 'calc(22px * var(--ui-font-scale))' } : {}),
                 fontWeight: active ? 'var(--fw-semibold)' : 'var(--fw-regular)' }}>{title}</span>
             {subtitle && (
-              <span className="sidebar-row-subtitle" id={subtitleId} hidden={historyCompact}
+              <span className="sidebar-row-subtitle" id={subtitleId}
                 data-tip={variant === 'history' ? subtitle : undefined} style={{
                 fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', lineHeight: '14px',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 fontFamily: subtitleFontFamily,
+                ...(historyCompact ? { fontSize: 'var(--fs-caption)', lineHeight: 'calc(16px * var(--ui-font-scale))' } : {}),
               }}>
                 {subtitle}
               </span>
