@@ -61,15 +61,17 @@ button.ssh-status-reconnect.text-control:not(:disabled):is(:hover, :focus-visibl
 .ssh-status-cpu-history circle { fill: currentColor; }
 .ssh-status-panel [data-stale="true"] { opacity: .6; }
 /* Collapsible groups: one full-bleed hairline per group, a label row that brightens on hover
-   and a chevron that turns with the open state. */
+   and a chevron that turns with the open state. Pointer hover stays quiet; the filled band is
+   kept for keyboard focus so the row stays visibly reachable without a pointer. */
 .ssh-status-details { border-top: 1px solid var(--border); color: var(--text-secondary); font-size: var(--fs-caption); }
 .ssh-status-details > summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 38px; padding: 0 14px; cursor: pointer; list-style: none; color: var(--text-secondary); font-size: var(--fs-label); font-weight: var(--fw-medium); transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
 .ssh-status-details > summary::-webkit-details-marker { display: none; }
-.ssh-status-details > summary:is(:hover, :focus-visible) { color: var(--text-primary); outline: none; background: var(--hover); }
+.ssh-status-details > summary:is(:hover, :focus-visible) { color: var(--text-primary); outline: none; }
+.ssh-status-details > summary:focus-visible { background: var(--hover); }
 .ssh-status-details > summary > svg { flex-shrink: 0; color: var(--text-muted); transition: transform var(--dur-fast) var(--ease); }
 .ssh-status-details > summary:is(:hover, :focus-visible) > svg { color: inherit; }
 .ssh-status-details[open] > summary > svg { transform: rotate(90deg); }
-.ssh-status-details-body { padding: 0 14px 12px; }
+.ssh-status-details-body { padding: 8px 14px 12px; }
 .ssh-status-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-height: 28px; }
 .ssh-status-row > span { color: var(--text-secondary); }
 .ssh-status-row strong { color: var(--text-primary); font-weight: var(--fw-medium); font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
