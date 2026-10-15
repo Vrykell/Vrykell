@@ -90,3 +90,7 @@
 50. **渲染层的 HTML 必须单点消毒** —— 只有经过 `sanitizeOutputHtml`（或等价的单点构造）的 HTML 才能进 `dangerouslySetInnerHTML`。不可信内容（模型输出、抓取网页、技能文本、MCP 结果、终端输出、远端文件名）优先走文本 / Markdown 路径；回复里的链接一律走 `Markdown.tsx` 的 `Link`（web 链接交系统浏览器），不得让应用窗口导航。
 51. **第三方接入按安全模型自查** —— 新增 MCP 服务器、技能来源、外部 harness（ACP）等第三方代码或内容前，先按 `docs/zh/security-model.md` 第 4 节清单逐条作答，并把结论写进提交说明。第三方进程一律是"用户显式添加的可执行程序"，设置页文案必须写明添加即授权。
 52. **收紧优先于放宽** —— 放宽 CSP、扩大 `assetProtocol` scope、增加 capability 权限，都要在提交说明里给出理由。生产 CSP 与开发例外分开（`csp` / `devCsp`），不把开发例外带进生产构建。
+
+## 十二、工具用法
+
+53. **源码一律用编辑工具修改** —— 禁止用 shell 重定向 / `Set-Content` / 整文件正则脚本重写源码文本：PowerShell 默认编码会把非 ASCII 写成乱码，2026-10-14 与 10-15 已两次因此弄坏文件。批量调整用编辑工具逐处修改；shell 只用于读取、检索与 git 操作。

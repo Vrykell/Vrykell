@@ -132,6 +132,9 @@ reproduction, a hand-run probe or a log by hand.**
 5. Definition of done: typecheck, unit tests and the architecture guard are green; e2e covers
    touched interactions; no dead code, unused imports or commented-out blocks remain; every
    comment you wrote or edited is English (constraint 3) while user-visible copy stays Chinese.
+6. Edit source files with the edit tool; never rewrite file text through shell redirection,
+   `Set-Content` or whole-file regex scripts (rule 53) - PowerShell's default encoding has
+   broken files twice. The shell is for reading, searching and git.
 
 ## Deep references
 

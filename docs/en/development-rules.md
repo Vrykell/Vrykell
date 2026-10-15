@@ -91,3 +91,7 @@
 50. **HTML in the renderer is sanitized at one point** -- Only HTML that passed `sanitizeOutputHtml` (or an equivalent single construction point) reaches `dangerouslySetInnerHTML`. Untrusted content (model output, fetched pages, skill text, MCP results, terminal output, remote file names) takes the text / Markdown path; links in replies go through `Link` in `Markdown.tsx` (web links open in the system browser) and never navigate the app window.
 51. **Third-party integration answers the security model** -- Before adding an MCP server, a skill source or an external harness (ACP), answer the checklist in `docs/zh/security-model.md` section 4 item by item and put the conclusions in the commit message. A third-party process is always "a program the user explicitly adds", and the settings copy must say that adding it is the authorization.
 52. **Tightening beats loosening** -- Relaxing the CSP, widening the `assetProtocol` scope or adding a capability permission needs its reason in the commit message. Production CSP and development exceptions stay separate (`csp` / `devCsp`); development exceptions never reach a production build.
+
+## 12. Tooling
+
+53. **Edit source files with the edit tool only** -- Never rewrite source text through shell redirection / `Set-Content` / whole-file regex scripts: PowerShell's default encoding mangles non-ASCII, and that broke files twice (2026-10-14 and 10-15). Use the edit tool for every change; keep the shell for reading, searching and git operations.

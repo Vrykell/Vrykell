@@ -190,6 +190,13 @@ Fitting that clears the renderer before resizing causes an additional blank fram
 
 - Content growth and browser anchoring can change the offset before a resize callback; keep the following latch during layout scroll events and tolerate fractional programmatic offsets. Save the latch separately from the position across remounts, because detached output may grow before restoration. Observe the entire output wrapper. Apply committed history geometry in a layout effect and resize-observer following before paint; postponing a resize snap to another animation frame exposes a one-frame jump. Avoid estimated intrinsic heights for wrapped output, since becoming visible can change the height of the whole history tree.
 
+### 5.4 The "Jump to Latest" Slot Shakes — Self-Oscillation When Layout Feeds Its Own Input (`c52ceb2` -> `6d012e8` -> `1c2da4f` -> `8f39e10` -> `e5e22f1` -> `cd28681` -> `f3f46e7` -> `9b5dc51`)
+- **Symptom**: the AI side panel shook violently when the scrollbar was dragged to the bottom, and later it shook while just sitting there; the shake happened exactly at the slot that holds the "jump to latest reply" button.
+- **Misdiagnosis chain**: "the follow logic fights the drag" (`c52ceb2`) -> "the ResizeObserver also writes scrollTop" plus "browser scroll anchoring interferes" (`1c2da4f`). Each step only reduced it. The true root cause was found after one sentence from the user: "the shake happens at the back-to-bottom button."
+- **True root cause**: the follow flag flips -> the slot appears/disappears -> the transcript's height changes by ~34px -> the "at the bottom" check flips -> the follow flag flips again: **the layout feeds its own input**, so it oscillates without any outside action.
+- **Fix**: (1) make the slot not affect layout (constant reserved strip, then an absolutely positioned overlay, and finally a constant padding band above the input with a 30px round button); (2) keep a single writer of scrollTop (removed the ResizeObserver write); (3) `overflow-anchor: none` to switch off browser scroll anchoring; (4) add a temporary probe first (`14753da`) and remove it once located (`80adc4f`).
+- **Lesson**: any control whose appearance changes a container's height (a slot, a badge, a notice bar) that also feeds a check like "is at the bottom / is hovered" can self-oscillate. Fix it by taking it out of layout instead of tuning thresholds; a scroll container gets exactly one hand that writes scrollTop.
+
 ---
 
 ## 6. Cross-Platform
