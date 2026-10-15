@@ -94,6 +94,7 @@ test('SSH status uses real session state and does not write probes into the term
   await expect(panel).toContainText('12%');
   await panel.getByRole('button', { name: '刷新远端资源' }).click();
   await expect(panel.getByRole('img', { name: '近期 CPU 使用率' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/ssh-status-dark.png' });
   await expect(panel.locator('.ssh-status-connection')).not.toHaveAttribute('open');
   const connectionSummary = panel.locator('.ssh-status-connection > summary');
   await connectionSummary.hover();

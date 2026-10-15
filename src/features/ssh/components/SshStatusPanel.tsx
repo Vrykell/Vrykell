@@ -41,17 +41,24 @@ export function cpuUsage(previous: SshSystemStatus | null, current: SshSystemSta
   return total > 0 && idle >= 0 && idle <= total ? 100 * (total - idle) / total : null;
 }
 
-function Metric({ label, used, total, percentage, history }: { label: string; used?: number | null; total?: number | null; percentage?: number | null; history?: readonly CpuSample[] }) {
+function Metric({ label, used, total, percentage, history, hint }: { label: string; used?: number | null; total?: number | null; percentage?: number | null; history?: readonly CpuSample[]; hint?: ReactNode }) {
   const percent = percentage !== undefined ? percentage : used != null && total != null && total > 0 ? used / total * 100 : null;
+  const reading = used != null && total != null ? `${fmtSize(used)} / ${fmtSize(total)}` : null;
   return <div className="ssh-status-metric">
-    <div className="ssh-status-row"><span>{label}</span><div className="ssh-status-metric-reading">
-      {history && history.length >= 2 && <SshCpuTrend samples={history} />}
-      <strong>{percent == null ? t('Unavailable') : `${Math.round(percent)}%`}</strong>
-    </div></div>
+    <div className="ssh-status-metric-head">
+      <span className="ssh-status-metric-label">{label}</span>
+      <div className="ssh-status-metric-reading">
+        {history && history.length >= 2 && <SshCpuTrend samples={history} />}
+        <strong className="ssh-status-metric-value" data-empty={percent == null || undefined}>{percent == null ? t('Unavailable') : `${Math.round(percent)}%`}</strong>
+      </div>
+    </div>
     <div className="ssh-status-meter" role={percent == null ? undefined : 'meter'} aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent == null ? undefined : Math.round(percent)}>
       <i data-level={percent == null ? 'unknown' : percent >= 90 ? 'critical' : percent >= 80 ? 'warning' : 'normal'} style={{ width: `${Math.max(0, Math.min(100, percent ?? 0))}%` }} />
     </div>
-    {used != null && total != null && <div className="ssh-status-caption">{fmtSize(used)} / {fmtSize(total)}</div>}
+    <div className="ssh-status-metric-foot">
+      {reading && <span className="ssh-status-caption ssh-status-metric-caption">{reading}</span>}
+      {hint}
+    </div>
   </div>;
 }
 
@@ -232,51 +239,65 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
         if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); event.stopPropagation(); nudgeWidth(event.key === 'ArrowLeft' ? 16 : -16); }
         if (event.key === 'Escape') { event.stopPropagation(); close(); }
       }}><ResizeHandle axis="x" edge="left" onDelta={resize} onUp={commitResize} testId="ssh-status-resize-handle" /></div>}
-      <aside id={panelId} aria-label={t('SSH status')} data-testid="ssh-status-panel" className="ssh-status-panel scroll-region" style={{ display: folded ? 'none' : undefined }} onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); close(); } }}>
-        <header><strong>{t('Remote resources')}</strong><div className="ssh-status-header-actions">
-          <IconBtn title={t('Refresh remote resources')} disabled={!connected || !!unsupported || busy} onClick={() => { setPaused(false); setRefresh(value => value + 1); }}><RefreshCw size={iconSizes.compact} /></IconBtn>
-          <IconBtn title={t('Close SSH status')} onClick={close}><X size={iconSizes.control} /></IconBtn>
-        </div></header>
-        <section className="ssh-status-overview">
-          <div className="ssh-status-identity-row"><div className="ssh-status-identity">{target.name || target.host}</div><span className="ssh-status-phase" data-tip={t('Connection status')}><i className="ssh-status-dot" data-phase={state.phase} />{state.retrying ? t('Reconnecting…') : t(phaseLabels[state.phase])}</span></div>
-          <div className="ssh-status-address"><span data-tip={address}>{address}</span><IconBtn title={t('Copy connection address')} onClick={() => { void writeClipboardText(address).catch(reason => useToastStore.getState().addToast(String(reason), 'error')); }}><Copy size={iconSizes.compact} /></IconBtn></div>
-          {onReconnect && (state.phase === 'disconnected' || state.retrying) && <TextButton disabled={reconnecting} onClick={() => {
-            setReconnecting(true);
-            void onReconnect().catch(reason => useToastStore.getState().addToast(String(reason), 'error')).finally(() => setReconnecting(false));
-          }}>{t('Reconnect SSH session')}</TextButton>}
-        </section>
-        <section>
-          {unsupported ? <ErrorBox tone="info">{unsupported}</ErrorBox> : <>
-            {error && <ErrorBox title={t(authenticationFailed ? 'Saved SSH authentication failed' : 'Resource collection failed')} details={error} detailsTitle={t('Technical details')} actions={authenticationFailed && target.connectionId ? <TextButton onClick={() => requestSshAuthentication({ ...target, connectionId: target.connectionId! })}>{t('Authenticate services')}</TextButton> : undefined}>{t(authenticationFailed ? 'Authenticate these services with the working server password or private key passphrase. The terminal session stays connected.' : 'The terminal connection is independent of resource monitoring.')}</ErrorBox>}
-            {!sample && <p className="ssh-status-caption">{!connected ? t('Resources are collected after connecting.') : busy ? t('Collecting remote resources…') : t('No resource sample yet.')}</p>}
-            {sample && <div data-stale={stale}>
-              <Metric label={t('CPU usage')} percentage={cpu} history={cpuHistory} />
-              {cpu == null && sample.cpuTotal != null && <p className="ssh-status-caption">{t('CPU usage requires two samples.')}</p>}
-              <Metric label={t('Memory usage')} used={sample.memoryTotal != null && sample.memoryAvailable != null ? sample.memoryTotal - sample.memoryAvailable : null} total={sample.memoryTotal} />
-              <Metric label={t('Root disk usage')} used={sample.diskUsed} total={sample.diskTotal} />
-              <details className="ssh-status-details">
-                <summary>{t('System details')}<ChevronRight size={iconSizes.compact} /></summary>
-                <div className="ssh-status-system" data-tip={`${sample.system} · ${sample.hostname}`}>{sample.system} · {sample.hostname}</div>
-                <div className="ssh-status-row"><span>{t('System uptime')}</span><strong>{sample.uptimeSeconds == null ? t('Unavailable') : statusDuration(sample.uptimeSeconds)}</strong></div>
-                <div className="ssh-status-row"><span>{t('System load')}</span><strong>{sample.load || t('Unavailable')}</strong></div>
-              </details>
-            </div>}
-          </>}
-        </section>
-        <details className="ssh-status-details ssh-status-connection">
-          <summary>{t('Connection details')}<ChevronRight size={iconSizes.compact} /></summary>
-          <div className="ssh-status-row"><span>{state.phase === 'interactive' ? t('Session duration') : t('Connected for')}</span><strong>{connectedAt == null ? '—' : statusDuration((now - connectedAt) / 1000)}</strong></div>
-          <div className="ssh-status-row"><span>{t('Reconnect attempts')}</span><strong>{state.reconnectAttempt}</strong></div>
-          {temporaryAuthentication && target.connectionId && <TextButton onClick={() => { void forgetSshAuthentication(target.connectionId!).catch(reason => useToastStore.getState().addToast(String(reason), 'error')); }}>{t('Clear temporary credentials')}</TextButton>}
-          {sample && <div className="ssh-status-row" data-tip={t('Measured on a separate SSH connection.')}><span>{t('Probe latency')}</span><strong>{sample.latencyMs} ms</strong></div>}
-        </details>
-        <details className="ssh-status-details ssh-status-history"><summary>{t('Connection log')}<ChevronRight size={iconSizes.compact} /></summary>
-          <div className="ssh-status-log scroll-region" ref={logRef}>
-            {state.log.length === 0
-              ? <p className="ssh-status-caption">{t('No connection output yet.')}</p>
-              : <ol className="ssh-status-events">{state.log.map((entry, index) => <li key={`${entry.time}-${index}`}><time>{new Date(entry.time).toLocaleTimeString()}</time><span>{entry.text}</span></li>)}</ol>}
-          </div>
-        </details>
+      <aside id={panelId} aria-label={t('SSH status')} data-testid="ssh-status-panel" className="ssh-status-panel" style={{ display: folded ? 'none' : undefined }} onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); close(); } }}>
+        <div className="ssh-status-scroll scroll-region">
+          <header><strong>{t('Remote resources')}</strong><div className="ssh-status-header-actions">
+            <IconBtn title={t('Refresh remote resources')} disabled={!connected || !!unsupported || busy} onClick={() => { setPaused(false); setRefresh(value => value + 1); }}><RefreshCw size={iconSizes.compact} /></IconBtn>
+            <IconBtn title={t('Close SSH status')} onClick={close}><X size={iconSizes.control} /></IconBtn>
+          </div></header>
+          <section className="ssh-status-overview">
+            <div className="ssh-status-identity-row"><div className="ssh-status-identity">{target.name || target.host}</div><span className="ssh-status-phase" data-tip={t('Connection status')}><i className="ssh-status-dot" data-phase={state.phase} />{state.retrying ? t('Reconnecting…') : t(phaseLabels[state.phase])}</span></div>
+            <div className="ssh-status-address"><span data-tip={address}>{address}</span><IconBtn title={t('Copy connection address')} onClick={() => { void writeClipboardText(address).catch(reason => useToastStore.getState().addToast(String(reason), 'error')); }}><Copy size={iconSizes.compact} /></IconBtn></div>
+            {onReconnect && (state.phase === 'disconnected' || state.retrying) && <TextButton className="ssh-status-reconnect" disabled={reconnecting} onClick={() => {
+              setReconnecting(true);
+              void onReconnect().catch(reason => useToastStore.getState().addToast(String(reason), 'error')).finally(() => setReconnecting(false));
+            }}>{t('Reconnect SSH session')}</TextButton>}
+          </section>
+          <section className="ssh-status-resource">
+            {unsupported ? <div className="ssh-status-state"><ErrorBox tone="info">{unsupported}</ErrorBox></div> : <>
+              {(error || !sample) && <div className="ssh-status-state">
+                {error && <ErrorBox title={t(authenticationFailed ? 'Saved SSH authentication failed' : 'Resource collection failed')} details={error} detailsTitle={t('Technical details')} actions={authenticationFailed && target.connectionId ? <TextButton onClick={() => requestSshAuthentication({ ...target, connectionId: target.connectionId! })}>{t('Authenticate services')}</TextButton> : undefined}>{t(authenticationFailed ? 'Authenticate these services with the working server password or private key passphrase. The terminal session stays connected.' : 'The terminal connection is independent of resource monitoring.')}</ErrorBox>}
+                {!sample && <p className="ssh-status-caption">{!connected ? t('Resources are collected after connecting.') : busy ? t('Collecting remote resources…') : t('No resource sample yet.')}</p>}
+              </div>}
+              {sample && <div className="ssh-status-sample" data-stale={stale}>
+                <div className="ssh-status-metrics">
+                  <Metric label={t('CPU usage')} percentage={cpu} history={cpuHistory} hint={cpu == null && sample.cpuTotal != null ? <p className="ssh-status-caption ssh-status-metric-hint">{t('CPU usage requires two samples.')}</p> : undefined} />
+                  <Metric label={t('Memory usage')} used={sample.memoryTotal != null && sample.memoryAvailable != null ? sample.memoryTotal - sample.memoryAvailable : null} total={sample.memoryTotal} />
+                  <Metric label={t('Root disk usage')} used={sample.diskUsed} total={sample.diskTotal} />
+                </div>
+                <details className="ssh-status-details">
+                  <summary>{t('System details')}<ChevronRight size={iconSizes.compact} /></summary>
+                  <div className="ssh-status-details-body">
+                    <div className="ssh-status-system" data-tip={`${sample.system} · ${sample.hostname}`}>{sample.system} · {sample.hostname}</div>
+                    <div className="ssh-status-row"><span>{t('System uptime')}</span><strong>{sample.uptimeSeconds == null ? t('Unavailable') : statusDuration(sample.uptimeSeconds)}</strong></div>
+                    <div className="ssh-status-row"><span>{t('System load')}</span><strong>{sample.load || t('Unavailable')}</strong></div>
+                  </div>
+                </details>
+              </div>}
+            </>}
+          </section>
+          <section className="ssh-status-groups">
+            <details className="ssh-status-details ssh-status-connection">
+              <summary>{t('Connection details')}<ChevronRight size={iconSizes.compact} /></summary>
+              <div className="ssh-status-details-body">
+                <div className="ssh-status-row"><span>{state.phase === 'interactive' ? t('Session duration') : t('Connected for')}</span><strong>{connectedAt == null ? '—' : statusDuration((now - connectedAt) / 1000)}</strong></div>
+                <div className="ssh-status-row"><span>{t('Reconnect attempts')}</span><strong>{state.reconnectAttempt}</strong></div>
+                {temporaryAuthentication && target.connectionId && <TextButton onClick={() => { void forgetSshAuthentication(target.connectionId!).catch(reason => useToastStore.getState().addToast(String(reason), 'error')); }}>{t('Clear temporary credentials')}</TextButton>}
+                {sample && <div className="ssh-status-row" data-tip={t('Measured on a separate SSH connection.')}><span>{t('Probe latency')}</span><strong>{sample.latencyMs} ms</strong></div>}
+              </div>
+            </details>
+            <details className="ssh-status-details ssh-status-history">
+              <summary>{t('Connection log')}<ChevronRight size={iconSizes.compact} /></summary>
+              <div className="ssh-status-details-body">
+                <div className="ssh-status-log scroll-region" ref={logRef}>
+                  {state.log.length === 0
+                    ? <p className="ssh-status-caption">{t('No connection output yet.')}</p>
+                    : <ol className="ssh-status-events">{state.log.map((entry, index) => <li key={`${entry.time}-${index}`}><time>{new Date(entry.time).toLocaleTimeString()}</time><span>{entry.text}</span></li>)}</ol>}
+                </div>
+              </div>
+            </details>
+          </section>
+        </div>
         <footer className="ssh-status-controls">
           <TextButton disabled={!connected || !!unsupported} onClick={() => setPaused(value => !value)}>{paused ? t('Resume monitoring') : t('Pause monitoring')}</TextButton>
           <div>
