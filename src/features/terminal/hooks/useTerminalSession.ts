@@ -809,6 +809,31 @@ export function useTerminalSession(
         applyWidth();
       }
     });
+    // The preferred face can finish loading after this terminal was created, so its first
+    // measurement may hold a fallback advance that xterm keeps until an option changes (it does
+    // not re-measure on resize). Re-apply the font options once the fonts settle and refit, so
+    // the cell grid and the PTY columns follow the font that actually renders.
+    if (typeof document !== 'undefined' && document.fonts) {
+      void document.fonts.ready.then(() => {
+        if (disposed) return;
+        const wanted = getTerminalFontOptions();
+        const changed = term.options.fontSize !== wanted.fontSize
+          || term.options.fontFamily !== wanted.fontFamily
+          || term.options.fontWeight !== wanted.fontWeight
+          || term.options.letterSpacing !== wanted.letterSpacing;
+        if (!changed) return;
+        Object.assign(term.options, wanted);
+        cachedDomCellWidth = 0;
+        if (isTerminalDebugEnabled()) {
+          terminalDebug('terminal-font-refresh', { paneId, fontSize: wanted.fontSize, letterSpacing: wanted.letterSpacing });
+        }
+        if (el.offsetWidth > 0 && el.offsetHeight > 0) {
+          fitTerminal(term, fit);
+          useTerminalStore.getState().setDims(paneId, term.cols, term.rows);
+          applyWidth();
+        }
+      });
+    }
 
     // A pane hidden with display:none (inactive tab or panel) or a page backgrounded by the
     // OS can come back blank: a static alternate-screen application prints nothing to trigger
