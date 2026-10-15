@@ -15,6 +15,7 @@ import { modelIcon, providerLabel } from '@features/agent/components/modelIcon';
 import Select from '@ui/Select';
 import { useToastStore } from '@ui/Toast';
 import { SettingsGroup, Field, ModelTextInput, btnStyle } from '@features/settings/components/ui';
+import { MODEL_PRESETS, applyModelPreset, type ModelPreset } from '@config/modelPresets';
 import ModelThinkingSettings from '@features/settings/components/ModelThinkingSettings';
 import AutoSaveInput from '../components/AutoSaveInput';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
@@ -168,12 +169,42 @@ function ModelListField() {
     ));
   };
 
+  /** A preset is a head start: the row it adds stays an ordinary editable model. */
+  const addPreset = (preset: ModelPreset) => {
+    void save(async () => {
+      const state = useAiConfigStore.getState();
+      const next = applyModelPreset(
+        state.models, preset,
+        () => `m${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`,
+      );
+      if (next.models !== state.models) await commitModels(() => next.models);
+      await selectModel(next.id);
+    });
+  };
+
   return (
     <Field
       layout="stacked"
       title="模型列表"
       description={t('Configure models and choose the active one. Models from the same provider share an API key.')}
     >
+      {/* Pick a vendor and the endpoint, the model id and the provider are filled in; the row stays editable. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+        <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-caption)' }}>{t('Presets')}</span>
+        <div data-testid="model-presets" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {MODEL_PRESETS.map((preset) => (
+            <button key={preset.name} type="button" style={btnStyle} data-testid={`model-preset-${preset.name}`}
+              data-tip={preset.baseUrl || t('The vendor default endpoint')}
+              data-tip-description={`${preset.model} · ${t(preset.hint)}`}
+              onClick={() => addPreset(preset)}>
+              {preset.name}
+            </button>
+          ))}
+        </div>
+        <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-micro)' }}>
+          {t('Vendor names and endpoints are listed as data so a model can be filled in quickly; the app ships no third-party program, key or brand asset.')}
+        </span>
+      </div>
       <div className="settings-record-list">
         {models.map((m) => (
           <div
