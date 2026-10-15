@@ -65,11 +65,14 @@ it('copies the filtered group without including unrelated conversations', async 
   expect(vi.mocked(writeClipboardText).mock.calls[0]![0]).not.toContain('Database question');
 });
 
-it('deletes from the gutter without opening the record and protects locked conversations', async () => {
+it('deletes from the record menu without opening it and protects locked conversations', async () => {
   useHistoryMetaStore.getState().setLocked(['conversation:first'], true);
   render(<AiHistoryView />);
-  expect(screen.getByTestId('conversation-delete-first')).toBeDisabled();
-  fireEvent.click(screen.getByTestId('conversation-delete-second'));
+  fireEvent.contextMenu(screen.getByTestId('conversation-row-first'), { clientX: 30, clientY: 50 });
+  expect(screen.getByRole('menuitem', { name: '删除对话' })).toBeDisabled();
+  fireEvent.keyDown(window, { key: 'Escape' });
+  fireEvent.contextMenu(screen.getByTestId('conversation-row-second'), { clientX: 30, clientY: 80 });
+  fireEvent.click(screen.getByRole('menuitem', { name: '删除对话' }));
   await waitFor(() => expect(conversationApi.deleteConversation).toHaveBeenCalledWith('second'));
   expect(useChatStore.getState().activeConversationId).toBe('first');
 });

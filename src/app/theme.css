@@ -611,15 +611,9 @@ button.window-control-button {
 @media (max-width: 900px) { .history-list { padding: 16px 32px; } }
 .history-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 120px; padding: 24px; color: var(--text-muted); text-align: center; font-size: calc(12px * var(--ui-font-scale)); }
 .history-empty > svg { color: var(--text-muted); opacity: 0.55; }
-.history-row { position: relative; }
 .history-row:focus-visible { outline: none; }
 .history-row > .sidebar-row-content { background: transparent; }
 .history-row:is(:hover, :focus-visible) .sidebar-row-title { color: var(--history-link-color); text-decoration: underline; text-underline-offset: 3px; }
-.history-row-hover-actions { position: absolute; right: calc(100% - 4px); top: 0; display: flex; align-items: center; justify-content: flex-end; gap: 4px; min-height: 34px; width: 34px; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity var(--dur-fast) var(--ease); }
-.history-row:is(:hover, :focus-within) > .history-row-hover-actions { opacity: 1; visibility: visible; pointer-events: auto; }
-button.history-row-remove { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border: 1px solid var(--border); border-radius: 5px; background: var(--menu-bg); color: var(--text-secondary); cursor: pointer; }
-button.history-row-remove:enabled:is(:hover, :focus-visible) { background: var(--action-button-hover-bg); color: var(--text-primary); }
-.history-row-hover-dot { width: 4px; height: 4px; flex-shrink: 0; border: 1px solid var(--text-muted); border-radius: 50%; }
 .history-row .sidebar-row-icon { align-self: flex-start; }
 .history-row .sidebar-row-title { color: var(--text-primary); }
 .history-row-icon { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 100%; flex-shrink: 0; color: var(--text-secondary); }

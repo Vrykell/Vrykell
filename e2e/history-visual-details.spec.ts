@@ -8,7 +8,7 @@ async function centerY(element: Locator) {
 }
 
 for (const theme of ['dark', 'light'] as const) {
-  test(`history details use clear actions, single-line headers and gutter controls in ${theme}`, async ({ page }, testInfo) => {
+  test(`history details use clear actions, single-line headers and scoped menus in ${theme}`, async ({ page }, testInfo) => {
     test.setTimeout(60_000);
     await setupTauriMock(page, { schedulesSeed: [], groupedHistoricalSession: true });
     await page.goto('/');
@@ -41,33 +41,29 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(card.locator('.history-group-primary')).toHaveCount(0);
     expect(Math.abs(await centerY(card.getByRole('heading')) - await centerY(card.locator('.history-group-count')))).toBeLessThan(3);
     const row = page.getByTestId('history-session-hist-group-1');
-    const remove = page.getByTestId('session-delete-hist-group-1');
     await page.mouse.move(2, 2);
-    await expect(remove).toBeHidden();
     await row.hover();
-    await expect(remove).toBeVisible();
+    await expect(row.getByRole('button')).toHaveCount(1);
     await expect(row.locator('.sidebar-row-title')).toHaveCSS('font-size', '14px');
     await expect(row.locator('.sidebar-row-title')).toHaveCSS('text-decoration-line', 'underline');
     const channels = await row.locator('.sidebar-row-title').evaluate(element => getComputedStyle(element).color.match(/[0-9.]+/g)!.slice(0, 3).map(Number));
     expect(channels[2]!).toBeGreaterThan(channels[0]!);
     await expect(row.locator('.history-row-icon svg')).toHaveCSS('width', '16px');
     await expect(row.locator('.sidebar-row-content')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-    const rowBox = (await row.boundingBox())!;
-    const removeBox = (await remove.boundingBox())!;
-    expect(removeBox.x).toBeLessThan(rowBox.x);
-    expect(removeBox.x).toBeGreaterThanOrEqual(0);
     await row.click({ button: 'right' });
     await expect(page.getByRole('menu', { name: '分组操作' })).toHaveCount(0);
     await page.getByRole('menuitem', { name: '加星标', exact: true }).click();
     await row.click({ button: 'right' });
     await page.getByRole('menuitem', { name: '锁定记录', exact: true }).click();
+    await row.click({ button: 'right' });
+    await expect(page.getByRole('menuitem', { name: '删除此会话', exact: true })).toBeDisabled();
+    await page.keyboard.press('Escape');
     await row.hover();
-    await expect(remove).toBeDisabled();
     for (const flag of ['.history-row-star', '.history-row-lock']) {
       await expect(row.locator(`${flag} svg`)).toHaveCSS('width', '16px');
       await expect(row.locator(`${flag} svg`)).toHaveAttribute('viewBox', '0 0 16 16');
     }
-    await page.screenshot({ path: testInfo.outputPath(`history-gutter-${theme}.png`), animations: 'disabled' });
+    await page.screenshot({ path: testInfo.outputPath(`history-record-${theme}.png`), animations: 'disabled' });
 
     await card.getByRole('heading').click({ button: 'right' });
     const menu = page.getByRole('menu', { name: '分组操作' });
@@ -101,6 +97,7 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(selected).toHaveAttribute('aria-current', 'true');
     if (await page.locator('[data-chat-composer]').isVisible()) await page.locator('[data-dock-btn="chat"]').click();
     await selected.hover();
+    await expect(selected.getByRole('button')).toHaveCount(1);
     await expect(selected.locator('.sidebar-row-content')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await expect(selected.locator('.sidebar-row-title')).toHaveCSS('text-decoration-line', 'underline');
     await page.screenshot({ path: testInfo.outputPath(`ai-history-hover-${theme}.png`), animations: 'disabled' });
@@ -108,8 +105,8 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(menu.getByRole('menuitem', { name: '复制为 Markdown', exact: true })).toBeVisible();
     await page.keyboard.press('Escape');
     const notes = page.getByTestId('conversation-row-notes');
-    await notes.hover();
-    await page.getByTestId('conversation-delete-notes').click();
+    await notes.click({ button: 'right' });
+    await page.getByRole('menuitem', { name: '删除对话', exact: true }).click();
     await expect(notes).toHaveCount(0);
     await expect(selected).toHaveAttribute('aria-current', 'true');
   });

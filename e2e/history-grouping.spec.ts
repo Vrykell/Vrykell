@@ -10,7 +10,7 @@ async function expectStableRecordHover(record: Locator) {
   await expect(record.locator('.sidebar-row-action')).toHaveCSS('opacity', '1');
   await expect(content).toHaveCSS('background-color', background);
   await expect(record.locator('.sidebar-row-title')).toHaveCSS('text-decoration-line', 'underline');
-  await expect(record.locator('.history-row-remove')).toBeVisible();
+  await expect(record.getByRole('button')).toHaveCount(1);
 }
 
 async function expectResponsiveTimestamp(card: Locator) {
