@@ -1,3 +1,4 @@
+import { OutlineButton } from '@ui/OutlineButton';
 import { Checkbox } from '@ui/Checkbox';
 import { useDialogKeyboard } from '@ui/useDialogKeyboard';
 import './SshConnection.css';
@@ -49,9 +50,7 @@ const hint: React.CSSProperties = { fontSize: 'calc(11px * var(--ui-font-scale))
 const ghostBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
   padding: '6px 12px', minHeight: 34, flexShrink: 0,
-  fontSize: 'calc(12px * var(--ui-font-scale))', border: '1px solid var(--border)',
-  borderRadius: 'var(--radius-inner)', background: 'transparent',
-  color: 'var(--text-secondary)', cursor: 'pointer',
+  fontSize: 'calc(12px * var(--ui-font-scale))',
 };
 
 /**
@@ -215,7 +214,7 @@ export default function SshImportModal({ open, onClose, onImported }: Props) {
 
         {Object.keys(failures).length > 0 && <ErrorBox compact tone="info">{t('Imported {{n}}. Failed {{failed}}. Retry the selected failed hosts.', { n: done.size, failed: Object.keys(failures).length })}</ErrorBox>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <button
+          <OutlineButton
             type="button"
             style={ghostBtn}
             data-testid="ssh-import-select-all"
@@ -223,9 +222,9 @@ export default function SshImportModal({ open, onClose, onImported }: Props) {
             disabled={importing || importable.length === 0}
           >
             {t('ssh.import.selectAll')}
-          </button>
+          </OutlineButton>
           <div style={{ flex: 1 }} />
-          <button type="button" style={ghostBtn} onClick={onClose} disabled={importing}>{t('Dismiss')}</button>
+          <OutlineButton type="button" style={ghostBtn} onClick={onClose} disabled={importing}>{t('Dismiss')}</OutlineButton>
           <button
             type="button"
             data-testid="ssh-import-confirm"

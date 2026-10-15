@@ -17,7 +17,10 @@ export function environmentForPane(paneId: string): ChatEnvironment | null {
     if (!pane) continue;
     const name = pane.kind === 'ssh' ? pane.ssh?.name || pane.ssh?.host || 'SSH' : pane.shellType ? shellTypeLabel(pane.shellType) : t('Local terminal');
     const splitLabel = panes.length > 1 ? ` · ${t('Pane {{number}}', { number: panes.indexOf(pane) + 1 })}` : '';
-    return { paneId, kind: pane.kind, label: `${tab.title} · ${name}${splitLabel}`, cwd: workspace.terminalCwds[paneId] ?? pane.cwd };
+    return { paneId, kind: pane.kind, label: `${tab.title} · ${name}${splitLabel}`, cwd: workspace.terminalCwds[paneId] ?? pane.cwd,
+      ...(pane.shellType ? { shellType: pane.shellType } : {}),
+      ...(pane.kind === 'ssh' && pane.ssh ? { ssh: { host: pane.ssh.host, user: pane.ssh.user, port: pane.ssh.port } } : {}),
+    };
   }
   return null;
 }

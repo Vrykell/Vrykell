@@ -1,3 +1,4 @@
+import { OutlineButton } from '@ui/OutlineButton';
 import { IconButton } from '@ui/IconButton';
 /**
  * Provider credentials and configured models.
@@ -14,7 +15,7 @@ import { detectCapabilities, type ModelCapability } from '@features/agent/model/
 import { modelIcon, providerLabel } from '@features/agent/components/modelIcon';
 import Select from '@ui/Select';
 import { useToastStore } from '@ui/Toast';
-import { SettingsGroup, Field, ModelTextInput, btnStyle } from '@features/settings/components/ui';
+import { SettingsGroup, Field, ModelTextInput } from '@features/settings/components/ui';
 import ModelThinkingSettings from '@features/settings/components/ModelThinkingSettings';
 import AutoSaveInput from '../components/AutoSaveInput';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
@@ -208,9 +209,9 @@ function ModelListField() {
                   当前
                 </span>
               ) : (
-                <button data-subtle onClick={() => { void save(() => selectModel(m.id)); }} style={btnStyle}>
+                <OutlineButton data-subtle onClick={() => { void save(() => selectModel(m.id)); }} >
                   设为当前
-                </button>
+                </OutlineButton>
               )}
               <IconButton tone="danger" onClick={() => remove(m.id)} data-tip={t('Delete model')} aria-label={t('Delete model')}><X size={16} /></IconButton>
             </div>
@@ -242,13 +243,13 @@ function ModelListField() {
             <ModelThinkingSettings modelId={m.id} name={m.name || m.model} />
           </div>
         ))}
-        <button
+        <OutlineButton
           data-subtle
           onClick={add}
-          style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}
         >
           <Plus size={12} /> 添加模型
-        </button>
+        </OutlineButton>
       </div>
     </Field>
   );

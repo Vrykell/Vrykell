@@ -1,3 +1,4 @@
+import { OutlineButton } from '@ui/OutlineButton';
 import { useSettingsNavigationStore } from '../stores/navigation';
 import { t } from '@i18n';
 import KeyHint from '@ui/KeyHint';
@@ -8,7 +9,7 @@ import { useState } from 'react';
 import { useAiConfigStore, useAgentSettings, type AgentSettings, type ModelBehaviorSettings } from '@features/agent';
 import Select from '@ui/Select';
 import { ModelScopeBar } from '@features/chat/components/ModelPicker';
-import { SettingsGroup, Field, Toggle, NumberInput, inputStyle, btnStyle } from '@features/settings/components/ui';
+import { SettingsGroup, Field, Toggle, NumberInput, inputStyle } from '@features/settings/components/ui';
 import AutoSaveInput from '../components/AutoSaveInput';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
 
@@ -54,9 +55,9 @@ export function AiBehaviorPage() {
             <span>{hasOverride ? `已覆盖 ${overrideKeys.length} 项` : '跟随全局默认'}</span>
             <div style={{ flex: 1 }} />
             {hasOverride && (
-              <button data-subtle onClick={() => agentSettings.resetModel(model.id)} style={btnStyle}>
+              <OutlineButton data-subtle onClick={() => agentSettings.resetModel(model.id)} >
                 重置为全局默认
-              </button>
+              </OutlineButton>
             )}
           </div>
         )}
