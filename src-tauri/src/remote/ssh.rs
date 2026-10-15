@@ -885,6 +885,7 @@ fn unique_remote_path(sftp: &Sftp, dir: &str, name: &str) -> String {
 
 /// 重命名远程文件/目录；目标名被占用时自动加序号，返回最终路径。
 fn ssh_rename_sync(conn: &SshConnection, path: &str, new_name: &str) -> Result<String, String> {
+    validate_remote_name(new_name)?;
     let sess = connect(conn)?;
     let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
     let parent = crate::platform::path::parent(path).ok_or("无法定位父目录")?;
@@ -920,6 +921,7 @@ fn ssh_move_sync(conn: &SshConnection, path: &str, dest_dir: &str) -> Result<Str
 
 /// 新建远程文件（空文件）或目录；同名时自动加序号，返回最终路径。
 fn ssh_create_sync(conn: &SshConnection, dir: &str, name: &str, is_dir: bool) -> Result<String, String> {
+    validate_remote_name(name)?;
     let sess = connect(conn)?;
     let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
     if sftp.stat(Path::new(dir)).is_err() {
@@ -945,6 +947,16 @@ fn ssh_create_sync(conn: &SshConnection, dir: &str, name: &str, is_dir: bool) ->
 /// 远端 shell 单引号转义（与前端 shellQuote 同规则）。
 fn shell_quote_remote(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\\''"))
+}
+
+/// Reject names that would step outside the directory the user pointed at: remote rename and
+/// create must accept exactly one path component, like the local file operations do.
+fn validate_remote_name(name: &str) -> Result<(), String> {
+    if crate::platform::path::is_safe_component(name) {
+        Ok(())
+    } else {
+        Err("名称只能是一个文件名，不能包含路径分隔符或为 . / ..".into())
+    }
 }
 
 /// 远端暂存目录（可回退删除）：<home>/.vrykell/undo
@@ -1349,6 +1361,15 @@ mod tests {
         assert!(validate_confirmed_fingerprint("SHA256:abc", "SHA256:abc=").is_ok());
         assert!(validate_confirmed_fingerprint("SHA256:changed", "SHA256:abc").is_err());
         assert!(validate_confirmed_fingerprint("unknown", "unknown").is_err());
+    }
+
+    #[test]
+    fn remote_rename_and_create_names_stay_single_components() {
+        assert!(validate_remote_name("notes.txt").is_ok());
+        assert!(validate_remote_name("reports 2026").is_ok());
+        for bad in ["", ".", "..", "../escape", "a/b", "a\\b"] {
+            assert!(validate_remote_name(bad).is_err(), "{bad} should be rejected");
+        }
     }
 
     #[test]
