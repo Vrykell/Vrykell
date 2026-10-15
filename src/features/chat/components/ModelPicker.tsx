@@ -1,3 +1,4 @@
+import { OutlineButton } from '@ui/OutlineButton';
 import { TextInput } from '@ui/TextInput';
 /**
  * ModelPicker — 页面化模型选择窗口。
@@ -27,9 +28,8 @@ const CAP_ORDER: ModelCapability[] = ['vision', 'reasoning', 'tools', 'search'];
 // ── 样式 ──
 
 const pill: React.CSSProperties = {
-  padding: '3px 10px', fontSize: 'calc(11px * var(--ui-font-scale))', border: '1px solid var(--border)',
-  borderRadius: 999, background: 'transparent', color: 'var(--text-secondary)',
-  cursor: 'pointer', flexShrink: 0,
+  padding: '3px 10px', fontSize: 'calc(11px * var(--ui-font-scale))',
+  borderRadius: 999, flexShrink: 0,
 };
 const pillOn: React.CSSProperties = {
   ...pill,
@@ -182,8 +182,9 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
             const TagIcon =
               cap === 'vision' ? Eye : cap === 'reasoning' ? BrainCircuit : cap === 'tools' ? Wrench : Globe;
             return (
-              <button
+              <OutlineButton
                 key={cap}
+                aria-pressed={tags.has(cap)}
                 onClick={() => toggleTag(cap)}
                 style={{
                   ...(tags.has(cap) ? pillOn : pill),
@@ -192,7 +193,7 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
               >
                 <TagIcon size={iconSizes.compact} />
                 {CAPABILITY_LABELS[cap]}
-              </button>
+              </OutlineButton>
             );
           })}
         </div>

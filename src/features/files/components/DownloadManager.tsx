@@ -1,3 +1,4 @@
+import { OutlineButton } from '@ui/OutlineButton';
 import { useEffect, useState, useCallback } from 'react';
 import { ArrowLeft, FolderOpen, Trash2 } from '@ui/icons';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
@@ -113,16 +114,14 @@ export default function DownloadManager({ onBack }: { onBack: () => void }) {
                   {entry.connectionName ? ` · ${entry.connectionName}` : ''}
                 </span>
               </div>
-              <button onClick={() => reveal(entry)} data-testid={`download-reveal-${entry.name}`}
+              <OutlineButton onClick={() => reveal(entry)} data-testid={`download-reveal-${entry.name}`}
                 data-tip="在文件管理器中显示"
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
-                  fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', border: '1px solid var(--border)',
-                  borderRadius: 4, background: 'transparent', color: 'var(--text-secondary)',
-                  cursor: 'pointer',
+                  fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', borderRadius: 4,
                 }}>
                 <FolderOpen size={12} /> 定位
-              </button>
+              </OutlineButton>
             </div>
           );
         })}

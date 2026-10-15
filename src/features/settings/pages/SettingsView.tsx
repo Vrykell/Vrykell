@@ -1,3 +1,4 @@
+import { OutlineButton } from '@ui/OutlineButton';
 import { t } from '@i18n';
 import SidebarItem from '@ui/sidebarItem';
 import { TextInput } from '@ui/TextInput';
@@ -13,7 +14,7 @@ import {
   usePermissions, clearSessionGrants, TOOL_NAMES,
   type ToolLevel, type ToolName,
 } from '@features/agent';
-import { SettingsGroup, Field, TemplateListEditor, btnStyle } from '@features/settings/components/ui';
+import { SettingsGroup, Field, TemplateListEditor } from '@features/settings/components/ui';
 import { AiModelPage } from '@features/settings/pages/aiModelPage';
 import { AiBehaviorPage } from '@features/settings/pages/aiBehaviorPage';
 import { McpPage } from '@features/settings/pages/mcpPage';
@@ -180,15 +181,15 @@ function SettingsContent() {
               title="会话授权"
               description={t("Temporary tool approvals expire on restart or when cleared.")}
             >
-              <button
-                style={btnStyle}
+              <OutlineButton
+
                 onClick={() => {
                   clearSessionGrants();
                   toast('已清空全部会话授权', 'success');
                 }}
               >
                 清空会话授权
-              </button>
+              </OutlineButton>
             </Field>
           </SettingsGroup>
         );

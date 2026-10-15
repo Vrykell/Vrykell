@@ -1,3 +1,4 @@
+import { OutlineButton } from '@ui/OutlineButton';
 import { t } from '@i18n';
 import { IconButton } from '@ui/IconButton';
 import { useSettingsNavigationStore } from '../stores/navigation';
@@ -11,8 +12,8 @@ import AutoSaveInput from './AutoSaveInput';
 import { useAutoSave } from '../hooks/useAutoSave';
 import SaveStatus from './SaveStatus';
 import { useSettingsSave } from './SettingsSaveProvider';
-import { inputStyle, btnStyle } from './formStyles';
-export { inputStyle, btnStyle } from './formStyles';
+import { inputStyle } from './formStyles';
+export { inputStyle } from './formStyles';
 
 export function SettingsGroup({ title, children }: { title: string; children: ReactNode }) {
   const id = useId();
@@ -148,12 +149,12 @@ export function TemplateListEditor({ value, onChange, placeholder }: {
           <IconButton compact tone="danger" onClick={() => sync(rows.filter((_, j) => j !== i), true)} data-tip={t('Delete row')} aria-label={t('Delete row')}><X size={iconSizes.compact} /></IconButton>
         </div>
       ))}
-      <button
+      <OutlineButton
         onClick={() => sync([...rows, { ext: '', cmd: '' }])}
-        style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
       >
         <Plus size={iconSizes.compact} /> 添加
-      </button>
+      </OutlineButton>
       <div><SaveStatus inline status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} /></div>
     </div>
   );

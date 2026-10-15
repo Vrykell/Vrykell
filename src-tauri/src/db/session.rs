@@ -97,20 +97,28 @@ impl HistoryDb {
     }
 
     pub fn restore_session(&self, id: &str) -> Result<(), String> {
-        // 确保 session 行存在（可能因在 sessionManager 集成之前创建而不存在）
-        self.conn()
+        let transaction = self.conn().unchecked_transaction().map_err(|e| e.to_string())?;
+        // Legacy sessions may predate persistent session rows.
+        transaction
             .execute(
                 "INSERT OR IGNORE INTO sessions (id, title, status, created_at) VALUES (?1, '', 'active', 0)",
                 params![id],
             )
             .map_err(|e| e.to_string())?;
-        self.conn()
+        transaction
             .execute(
                 "UPDATE sessions SET status = 'active', closed_at = NULL WHERE id = ?1",
                 params![id],
             )
             .map_err(|e| e.to_string())?;
-        Ok(())
+        // Reopen the container without restoring its other historical members.
+        transaction
+            .execute(
+                "UPDATE groups SET archived = 0 WHERE id = (SELECT group_id FROM sessions WHERE id = ?1)",
+                params![id],
+            )
+            .map_err(|e| e.to_string())?;
+        transaction.commit().map_err(|e| e.to_string())
     }
 
     pub fn update_session_title(&self, id: &str, title: &str) -> Result<(), String> {
@@ -413,16 +421,26 @@ impl HistoryDb {
             .map_err(|e| e.to_string())?;
         self.conn()
             .execute(
-                "UPDATE sessions SET group_id = ?1, sort_order = ?2 WHERE id = ?3",
+                "UPDATE sessions SET group_id = ?1, sort_order = ?2 WHERE id = ?3 AND group_id IS NOT ?1",
                 params![group_id, next, session_id],
             )
             .map_err(|e| e.to_string())?;
         Ok(())
     }
 
-    /// 重排某分组（或未分组）内的会话：按 ids 顺序写回 sort_order。
+    /// Reorder selected members within their saved slots, retaining hidden historical members.
     pub fn sessions_reorder(&self, group_id: Option<&str>, ids: &[String]) -> Result<(), String> {
-        for (i, id) in ids.iter().enumerate() {
+        let mut statement = self.conn().prepare("SELECT id FROM sessions WHERE group_id IS ?1 ORDER BY sort_order, id")
+            .map_err(|e| e.to_string())?;
+        let current = statement.query_map(params![group_id], |row| row.get::<_, String>(0))
+            .map_err(|e| e.to_string())?
+            .collect::<rusqlite::Result<Vec<_>>>().map_err(|e| e.to_string())?;
+        let current_ids: std::collections::HashSet<_> = current.iter().collect();
+        let mut selected = std::collections::HashSet::new();
+        let requested: Vec<_> = ids.iter().filter(|id| current_ids.contains(id) && selected.insert(*id)).collect();
+        let mut requested = requested.into_iter();
+        let ordered = current.iter().map(|id| if selected.contains(id) { requested.next().unwrap() } else { id });
+        for (i, id) in ordered.enumerate() {
             self.conn()
                 .execute(
                     "UPDATE sessions SET sort_order = ?1 WHERE id = ?2 AND group_id IS ?3",

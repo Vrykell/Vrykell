@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
+import { useId, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { useListReorder } from './listReorder';
 import { sidebarRowSpacing, sidebarRowContent, sidebarRowIcon, sidebarRowTitle } from './sidebarRow';
 
@@ -7,7 +7,8 @@ export interface SidebarItemAction {
   /** Accessible name of the trailing action button. */
   label: string;
   title?: string;
-  onClick: () => void;
+  /** Receives the click event so callers can anchor floating menus on the button. */
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   testId?: string;
 }
 
@@ -23,6 +24,7 @@ export default function SidebarItem({
   icon,
   title,
   subtitle,
+  subtitleFontFamily = 'var(--font-mono)',
   badge,
   action,
   renameInput,
@@ -40,10 +42,12 @@ export default function SidebarItem({
   dataAttributes,
   style,
   compact = false,
+  variant = 'default',
 }: {
   icon: ReactNode;
   title: string;
   subtitle?: string;
+  subtitleFontFamily?: CSSProperties['fontFamily'];
   /** Optional trailing content between the title and the action button. */
   badge?: ReactNode;
   action?: SidebarItemAction;
@@ -64,17 +68,26 @@ export default function SidebarItem({
   /** List-specific data attributes (test hooks such as `data-tab-row-id`). */
   dataAttributes?: Record<string, string | undefined>;
   style?: CSSProperties;
-  /** Compact single-line rows use the same 32px height as file lists. */
+  /** Compact rows reduce padding; history metadata moves into the row description. */
   compact?: boolean;
+  /** History records use neutral titles and can show metadata as a compact description. */
+  variant?: 'default' | 'history';
 }) {
   const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const subtitleId = useId();
+  const historyCompact = variant === 'history' && compact;
   const dragging = useListReorder((state) => !!reorderItemId && state.drag?.id === reorderItemId);
   const background = active ? 'var(--selection-bg)' : hovered ? 'var(--hover)' : 'transparent';
-  const actionVisible = active || hovered;
+  const actionVisible = hovered || focused || (variant !== 'history' && active);
 
   return (
     <div
       {...dataAttributes}
+      className={variant === 'history' ? 'sidebar-row history-row' : 'sidebar-row'}
+      data-active={active ? 'true' : 'false'}
+      data-compact={historyCompact ? 'true' : undefined}
+      aria-describedby={historyCompact && subtitle ? subtitleId : undefined}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
@@ -82,29 +95,39 @@ export default function SidebarItem({
       onPointerDown={onPointerDown}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={event => {
+        if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setFocused(false);
+      }}
       tabIndex={tabIndex}
-      data-tip={tooltip}
+      data-tip={historyCompact ? title : tooltip}
+      data-tip-description={historyCompact ? subtitle : undefined}
       data-testid={testId}
       data-reorder-item={reorderItemId}
       data-reorder-kind={reorderKind}
       data-reorder-dragging={dragging ? 'true' : undefined}
       style={{ ...sidebarRowSpacing, ...(compact ? { padding: '0 6px' } : {}), ...style }}
     >
-      <div style={{
+      <div className="sidebar-row-content" style={{
         ...sidebarRowContent,
-        ...(compact ? { minHeight: 32, padding: '5px 10px' } : {}),
-        background,
+        ...(historyCompact ? { minHeight: 28, padding: '2px 10px', alignItems: 'flex-start' } : compact ? { minHeight: 32, padding: '5px 10px' } : {}),
+        background: variant === 'history' ? undefined : background,
         color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
       }}>
-        <span style={sidebarRowIcon}>{icon}</span>
+        <span className="sidebar-row-icon" style={sidebarRowIcon}>{icon}</span>
         {renameInput ?? (
           <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <span style={{ ...sidebarRowTitle, fontWeight: active ? 'var(--fw-semibold)' : 'var(--fw-regular)' }}>{title}</span>
+            <span className="sidebar-row-title" data-tip={variant === 'history' ? title : undefined}
+              data-tip-description={historyCompact ? subtitle : undefined}
+              style={{ ...sidebarRowTitle,
+                ...(historyCompact ? { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, whiteSpace: 'normal', overflowWrap: 'anywhere' } : {}),
+                fontWeight: active && variant !== 'history' ? 'var(--fw-semibold)' : 'var(--fw-regular)' }}>{title}</span>
             {subtitle && (
-              <span style={{
+              <span className="sidebar-row-subtitle" id={subtitleId} hidden={historyCompact}
+                data-tip={variant === 'history' ? subtitle : undefined} style={{
                 fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', lineHeight: '14px',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                fontFamily: 'var(--font-mono)',
+                fontFamily: subtitleFontFamily,
               }}>
                 {subtitle}
               </span>
@@ -122,12 +145,13 @@ export default function SidebarItem({
             data-tip={action.title ?? action.label}
             data-testid={action.testId}
             onDoubleClick={(event) => event.stopPropagation()}
-            onClick={(event) => { event.stopPropagation(); action.onClick(); }}
+            onClick={(event) => { event.stopPropagation(); action.onClick(event); }}
             style={{
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              width: 28, height: 28, padding: 0, border: 'none', borderRadius: 4,
+              width: historyCompact ? 24 : 28, height: historyCompact ? 24 : 28, padding: 0, border: 'none', borderRadius: 4,
               flexShrink: 0, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
               opacity: actionVisible ? 1 : 0,
+              pointerEvents: variant === 'history' && !actionVisible ? 'none' : undefined,
               transition: 'opacity 0.12s ease',
             }}
             onMouseEnter={(event) => {
