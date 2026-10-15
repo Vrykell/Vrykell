@@ -137,7 +137,7 @@ describe('SSH connection input', () => {
     expect(ptyWrite).toHaveBeenCalledWith('session', 'response\r');
     expect(input).toHaveValue('');
   });
-  it('reveals the masked response through the themed toggle and keeps the blue submit action', () => {
+  it('reveals the masked response through the eye icon toggle and keeps the blue submit action', () => {
     useTerminalStore.setState({ sessions: { p: 'session' } });
     render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
     const input = screen.getByLabelText('SSH 认证响应');
@@ -145,12 +145,16 @@ describe('SSH connection input', () => {
     const reveal = screen.getByTestId('ssh-auth-reveal');
     expect(reveal).toHaveAttribute('aria-label', '显示密码');
     expect(reveal).toHaveAttribute('aria-pressed', 'false');
+    const openIcon = reveal.innerHTML;
     fireEvent.click(reveal);
     expect(reveal).toHaveAttribute('aria-label', '隐藏密码');
     expect(reveal).toHaveAttribute('aria-pressed', 'true');
     expect(input).toHaveAttribute('type', 'text');
+    // The state shows through the swapped icon, not a pressed background.
+    expect(reveal.innerHTML).not.toBe(openIcon);
     fireEvent.click(reveal);
     expect(input).toHaveAttribute('type', 'password');
+    expect(reveal.innerHTML).toBe(openIcon);
     expect(screen.getByRole('button', { name: '发送' })).toHaveClass('ssh-auth-submit');
   });
   it('closes the connection, clears the secret and disables authentication after cancellation', async () => {

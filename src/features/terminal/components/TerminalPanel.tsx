@@ -10,7 +10,7 @@ import ErrorBox from '@ui/ErrorBox';
 import Select from '@ui/Select';
 import { TextButton } from '@ui/TextButton';
 import { IconButton } from '@ui/IconButton';
-import { Eye, iconSizes } from '@ui/icons';
+import { Eye, EyeOff, iconSizes } from '@ui/icons';
 import { secretResponsePrompt, secretResponseWasRejected } from '../model/terminalFrame';
 import { t } from '@i18n';
 import { terminalDebug } from '../services/terminalDebug';
@@ -187,7 +187,7 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
           void ptyWrite(sessionId, `${value}\r`).catch(reason => { setManualSecret(true); setError(`发送失败：${String(reason)}`); });
         }} className="terminal-composer" style={{ display: 'flex', gap: 8, alignItems: 'center', padding: 12, width: '100%' }}>
           <TextInput ref={responseRef} type={reveal ? 'text' : 'password'} autoComplete="off" aria-label="SSH 认证响应" placeholder="输入密码、密钥口令或验证响应" value={response} onChange={e => setResponse(e.target.value)} disabled={inputDisabled} className="ssh-auth-response" style={{ flex: 1, minWidth: 0, height: 36, background: 'transparent', border: 'none', outline: 'none' }} />
-          <IconButton compact data-subtle data-testid="ssh-auth-reveal" aria-pressed={reveal} aria-label={t(reveal ? 'Hide password' : 'Show password')} data-tip={t(reveal ? 'Hide password' : 'Show password')} onClick={() => { setReveal(value => !value); responseRef.current?.focus(); }}><Eye size={iconSizes.compact} /></IconButton>
+          <IconButton compact data-subtle className="ssh-auth-reveal" data-testid="ssh-auth-reveal" aria-pressed={reveal} aria-label={t(reveal ? 'Hide password' : 'Show password')} data-tip={t(reveal ? 'Hide password' : 'Show password')} onClick={() => { setReveal(value => !value); responseRef.current?.focus(); }}>{reveal ? <EyeOff size={iconSizes.compact} /> : <Eye size={iconSizes.compact} />}</IconButton>
           <button type="submit" className="ssh-auth-submit" disabled={inputDisabled} style={{ padding: '8px 16px' }}>发送</button>
         </form>
       </div>}
