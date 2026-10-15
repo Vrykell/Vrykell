@@ -647,10 +647,21 @@ pub async fn acp_open<R: tauri::Runtime>(
 
     // Pump the agent's notifications for as long as the session lives.
     let pump_app = app.clone();
+    let pump_name = harness.name.clone();
+    let mut saw_update = false;
     let pump_session = session.clone();
     let pump_client = client.clone();
     tokio::spawn(async move {
         while let Some(message) = pump_client.next_event().await {
+            // The first notification is the interesting one for diagnosis: an open session that
+            // never speaks means the agent found nothing to report, not that the wire is broken.
+            if !saw_update {
+                saw_update = true;
+                note("acp-open-first-update", json!({
+                    "name": pump_name,
+                    "kind": message.pointer("/params/update/sessionUpdate").cloned().unwrap_or(Value::Null),
+                }));
+            }
             emit(
                 &pump_app,
                 AcpEvent { session_id: pump_session.clone(), kind: "update".to_string(), payload: message },
@@ -659,6 +670,7 @@ pub async fn acp_open<R: tauri::Runtime>(
     });
 
     state.insert(session.clone(), client);
+    note("acp-open-ok", json!({ "name": harness.name, "sessionId": session, "cwd": session_cwd }));
     Ok(json!({
         "sessionId": session,
         "harness": harness.name,
