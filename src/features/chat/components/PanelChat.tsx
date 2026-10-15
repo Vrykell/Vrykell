@@ -100,6 +100,9 @@ export default function PanelChat() {
 
   useEffect(() => { void useChatStore.getState().loadConversations(); }, []);
   useEffect(() => { setRenaming(false); }, [activeId]);
+  /** Where the app last put the view. A scroll that moves above it is the user taking over, and a
+   *  scrollbar drag is exactly that: it fires no wheel, which is why the follow used to fight it. */
+  const lastTopRef = useRef(0);
   useLayoutEffect(() => {
     const scroll = scrollRef.current;
     if (!scroll) return;
@@ -107,16 +110,23 @@ export default function PanelChat() {
     followRef.current = saved?.following ?? true;
     setFollowing(followRef.current);
     scroll.scrollTop = saved?.following === false ? saved.top : scroll.scrollHeight;
+    lastTopRef.current = scroll.scrollTop;
     return () => { positions.current.set(activeId, { top: scroll.scrollTop, following: followRef.current }); };
   }, [activeId]);
   useLayoutEffect(() => {
-    if (followRef.current && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (followRef.current && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      lastTopRef.current = scrollRef.current.scrollTop;
+    }
   }, [messages]);
   useEffect(() => {
     const transcript = transcriptRef.current;
     if (!transcript || typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(() => {
-      if (followRef.current && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      if (followRef.current && scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        lastTopRef.current = scrollRef.current.scrollTop;
+      }
     });
     observer.observe(transcript);
     return () => observer.disconnect();
@@ -198,9 +208,14 @@ export default function PanelChat() {
         window, while a nested scroller that consumes the wheel leaves it alone. */}
     <div ref={scrollRef} className="chat-transcript scroll-region" onScroll={event => {
       const scroll = event.currentTarget;
-      const next = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight <= 24;
-      followRef.current = next;
-      setFollowing(next);
+      const atBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight <= 24;
+      const movedUp = scroll.scrollTop < lastTopRef.current - 1;
+      lastTopRef.current = scroll.scrollTop;
+      // Dragging the scrollbar up means the user wants to read something: hand the view over and keep
+      // it until they come back down to the bottom.
+      if (movedUp) { pauseFollow(); return; }
+      followRef.current = atBottom;
+      setFollowing(atBottom);
     }}
       onWheel={event => {
         if (event.deltaY < 0 && !innerScrollerHoldsUpward(event.target, event.currentTarget)) pauseFollow();
@@ -215,7 +230,10 @@ export default function PanelChat() {
     {!following && <div className="chat-jump-slot">
       <button type="button" data-subtle className="chat-jump-latest" onClick={() => {
         followRef.current = true; setFollowing(true);
-        if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+          lastTopRef.current = scrollRef.current.scrollTop;
+        }
       }}>{t('Jump to latest reply')}<ArrowDown size={14} /></button>
     </div>}
     <ChatComposerShell

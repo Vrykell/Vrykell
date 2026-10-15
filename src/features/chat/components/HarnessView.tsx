@@ -55,7 +55,8 @@ export default function HarnessView({ tabId, harness, cwd }: { tabId: string; ha
 
   useEffect(() => {
     const body = bodyRef.current;
-    if (body) body.scrollTop = body.scrollHeight;
+    // Only follow while the view is already at the bottom: a scrollbar dragged upwards stays put.
+    if (body && body.scrollHeight - body.scrollTop - body.clientHeight <= 24) body.scrollTop = body.scrollHeight;
   }, [exchanges.length, session?.pending]);
 
   const submit = () => {
