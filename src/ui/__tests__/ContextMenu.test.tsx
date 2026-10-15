@@ -4,6 +4,16 @@ import { describe, expect, it } from 'vitest';
 import ContextMenu from '../ContextMenu';
 
 describe('independent action menus', () => {
+  it('uses the destructive text treatment for both explicit danger and removal groups', () => {
+    render(<ContextMenu anchor={{ x: 0, y: 0 }} items={[
+      { label: 'Delete record', danger: true, onClick: () => {} },
+      { label: 'Close tab', group: 'danger', onClick: () => {} },
+      { label: 'Copy', onClick: () => {} },
+    ]} onClose={() => {}} />);
+    expect(screen.getByRole('button', { name: 'Delete record' })).toHaveStyle({ color: 'var(--error)' });
+    expect(screen.getByRole('button', { name: 'Close tab' })).toHaveStyle({ color: 'var(--error)' });
+    expect(screen.getByRole('button', { name: 'Copy' })).toHaveStyle({ color: 'var(--text-primary)' });
+  });
   it('replaces an existing menu even when opened without a pointer press', () => {
     function Example() {
       const [first, setFirst] = useState(true);

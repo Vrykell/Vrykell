@@ -111,7 +111,7 @@ input, textarea, [contenteditable="true"] { caret-color: var(--text-caret); }
   background: var(--elevated); color: var(--text-primary);
   border: 1px solid var(--border-strong); border-radius: 6px;
   box-shadow: var(--shadow-md);
-  font: calc(11px * var(--ui-font-scale))/1.5 var(--font-mono);
+  font: var(--fs-caption)/1.5 var(--font-ui);
   overflow-wrap: anywhere;
   animation: app-tooltip-in var(--dur-fast) var(--ease);
 }
@@ -154,7 +154,7 @@ input, textarea, [contenteditable="true"] { caret-color: var(--text-caret); }
 button.global-search-filter { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 8px; border: none; border-radius: 6px; background: transparent; color: var(--text-secondary); font: var(--fs-caption) var(--font-ui); cursor: pointer; }
 button.global-search-filter:hover, button.global-search-filter[aria-expanded="true"] { background: var(--control-hover-bg); }
 .global-search-source-count { font: var(--fs-micro) var(--font-mono); color: var(--text-muted); }
-.global-search-body { overflow-y: auto; min-height: 0; padding: 8px; background: var(--elevated); flex: 1; max-height: min(350px, 48vh); }
+.global-search-body { overflow-y: auto; min-height: 0; padding: 8px; background: transparent; flex: 1; max-height: min(350px, 48vh); }
 .global-search-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; color: var(--text-muted); font-size: var(--fs-micro); }
 .global-search-section-heading > span:first-child { display: inline-flex; align-items: center; gap: 6px; }
 .global-search-clear { min-height: 28px; padding: 0 4px; font: inherit; }
@@ -209,11 +209,11 @@ button.chat-mode-option[data-active="true"] { background: var(--hover); }
 }
 @container settings-layout (max-width: 560px) {
   .settings-layout { flex-direction: column; }
-  .settings-navigation { width: 100%; flex-shrink: 1; }
+  .settings-navigation { width: 100%; flex-shrink: 1; position: relative; z-index: 2; }
   .settings-navigation-tools { flex-direction: row; }
   .settings-compact-navigation { display: block; }
   .settings-navigation-list { display: none; }
-  .settings-navigation-list[data-searching="true"] { display: block; flex: none; max-height: min(200px, 30vh); }
+  .settings-navigation[data-search-open="true"] .settings-navigation-list[data-searching="true"] { display: block; position: absolute; top: 100%; left: 8px; right: 8px; flex: none; max-height: min(320px, 50vh); padding: 4px; border-radius: var(--radius-inner); background: var(--elevated); box-shadow: var(--shadow-md); }
 }
 .settings-page-header { margin-bottom: 28px; }
 .settings-page-header h1 { margin: 0 0 10px; font-size: calc(24px * var(--ui-font-scale)); font-weight: var(--fw-medium); color: var(--text-primary); }
@@ -800,6 +800,7 @@ input, textarea {
   outline: none;
 }
 input::placeholder, textarea::placeholder { color: var(--text-muted); }
+.settings-view :is(input, textarea)::placeholder { font-family: var(--font-ui); font-size: inherit; opacity: 1; }
 
 /* chat 区内 markdown 排版（GitHub-dark 风格化） */
 /* 长 token（URL/路径/长命令）随窗口缩放折行，而不是撑出整段横向滚动 */
@@ -1122,4 +1123,5 @@ input.themed-checkbox:disabled { opacity: .55; cursor: default; }
 .config-text-area { position: relative; min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--field-bg); }
 .config-text-area-copy { position: absolute; top: 6px; right: 6px; z-index: 1; }
 textarea.config-text-input { display: block; width: 100% !important; border: none !important; border-radius: 0 !important; margin: 0 !important; padding: 10px 40px 10px 10px !important; background: transparent !important; color: var(--text-primary); font: calc(13px * var(--ui-font-scale))/1.6 var(--font-mono) !important; resize: vertical; min-height: 90px; outline: none; box-shadow: none !important; }
+.settings-view textarea.config-text-input { font-family: var(--font-ui) !important; }
 .config-text-area:focus-within { border-color: var(--border-strong); }

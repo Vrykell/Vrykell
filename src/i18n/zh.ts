@@ -332,6 +332,8 @@ const zh: Record<string, string> = {
   'File open-with': '文件打开方式',
   'Search settings…': '搜索设置…',
   'Settings page': '设置页面',
+  'Icon color': '图标颜色',
+  'Close this tab': '关闭标签',
   'No matching settings': '无匹配设置',
 
   '{{tool}} permission': '{{tool}} 权限',

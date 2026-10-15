@@ -80,7 +80,7 @@ export function AiBehaviorPage() {
               ...inputStyle,
               minHeight: 130,
               resize: 'vertical',
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-ui)',
               lineHeight: 1.6,
             }}
           />

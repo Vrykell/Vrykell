@@ -51,17 +51,18 @@ export default function HistoryColorPalette({ anchor, value, onSelect, onClose, 
 }
 
 /** Shared swatches for the floating picker and the bottom of a group action menu. */
-export function HistoryColorChoices({ value, onSelect, testId, menu = false }: {
+export function HistoryColorChoices({ value, onSelect, testId, menu = false, label = t('Group color') }: {
   value: HistoryGroupColor | null;
   onSelect: (color: HistoryGroupColor | null) => void;
   testId: string;
   menu?: boolean;
+  label?: string;
 }) {
   const state = (selected: boolean) => menu
     ? { role: 'menuitemradio' as const, 'aria-checked': selected }
     : { 'aria-pressed': selected };
   return <>
-    <div className="history-palette-swatches" data-menu={menu ? 'true' : undefined} role="group" aria-label={t('Group color')}
+    <div className="history-palette-swatches" data-menu={menu ? 'true' : undefined} role="group" aria-label={label}
       onKeyDown={event => {
         if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
         event.preventDefault(); event.stopPropagation();

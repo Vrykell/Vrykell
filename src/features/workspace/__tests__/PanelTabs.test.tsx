@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import PanelTabs from '../components/PanelTabs';
 import { useSessionStore } from '../model/session/store';
 import { useListReorder } from '@ui/listReorder';
+import { useIconColorStore } from '@config/iconColors';
 
 vi.mock('@features/agent/services/title', () => ({ regenerateTitle: vi.fn() }));
 vi.mock('../components/NewTabModal', () => ({
@@ -11,6 +12,7 @@ vi.mock('../components/NewTabModal', () => ({
 }));
 const snapshot = useSessionStore.getState();
 beforeEach(() => {
+  useIconColorStore.setState({ colors: {} });
   useSessionStore.setState({
     tabs: [
       { id: 'local', title: 'Shell', kind: 'session', layout: { type: 'leaf', terminal: { id: 'local#0', kind: 'local', shellType: 'bash' } } },
@@ -18,6 +20,19 @@ beforeEach(() => {
       { id: 'history', title: 'History', kind: 'history' },
     ], activeId: 'settings', groups: [], loadGroups: vi.fn().mockResolvedValue(undefined),
   });
+});
+
+it.each(['local', 'settings', 'history'])('colors the %s icon from its context menu without activating the tab', id => {
+  render(<PanelTabs />);
+  const row = screen.getByTestId(`tab-row-${id}`);
+  fireEvent.contextMenu(row);
+  const palette = screen.getByRole('group', { name: '图标颜色' });
+  fireEvent.click(palette.querySelector('[data-color="violet"]')!);
+  expect(row.querySelector('svg')!.style.color).toBe('var(--group-violet)');
+  expect(useSessionStore.getState().activeId).toBe('settings');
+  fireEvent.contextMenu(row);
+  fireEvent.click(screen.getByTestId('tab-icon-color-auto'));
+  expect(row.querySelector('svg')!.style.color).toBe(id === 'local' ? 'var(--shell-bash-accent)' : id === 'settings' ? 'var(--text-primary)' : 'var(--text-secondary)');
 });
 afterEach(() => { cleanup(); useListReorder.getState().end(); useSessionStore.setState(snapshot, true); });
 

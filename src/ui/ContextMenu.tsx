@@ -109,6 +109,6 @@ export function ContextMenuItems({ items, onClose, itemRole }: { items: ContextM
   const indent = ordered.some((item) => item.checked !== undefined);
   return <>{ordered.map((item, index) => <Fragment key={`${menuGroup(item)}-${item.label}`}>
     {index > 0 && menuGroup(item) !== menuGroup(ordered[index - 1]!) && <div role="separator" className="context-menu-separator" />}
-    <MenuItem role={itemRole} disabled={item.disabled} label={item.label} danger={item.danger} shortcut={item.shortcut} checked={item.checked} indent={indent} onClick={() => { item.onClick(); onClose(); }} />
+    <MenuItem role={itemRole} disabled={item.disabled} label={item.label} danger={item.danger ?? item.group === 'danger'} shortcut={item.shortcut} checked={item.checked} indent={indent} onClick={() => { item.onClick(); onClose(); }} />
   </Fragment>)}</>;
 }
