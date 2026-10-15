@@ -27,7 +27,15 @@ export interface HarnessSession {
   /** The last thing worth telling the user (a refused permission, a stop reason, ...). */
   note: string | null;
   /** A permission request waiting for the user, rendered as a card in the transcript. */
-  permission: { toolCallId: string; title: string; options: Array<{ optionId: string; name: string }> } | null;
+  permission: {
+    toolCallId: string;
+    /** How many requests this tool call has produced; a card may only answer the instance it drew. */
+    generation: number;
+    title: string;
+    options: Array<{ optionId: string; name: string }>;
+  } | null;
+  /** Counts the permission requests this session has shown, so every card has its own instance. */
+  permissionGeneration: number;
 }
 
 interface HarnessStore {
@@ -36,13 +44,14 @@ interface HarnessStore {
   prompt: (tabId: string, text: string) => Promise<void>;
   cancel: (tabId: string) => Promise<void>;
   close: (tabId: string) => Promise<void>;
-  /** Answer the waiting permission request; `null` refuses it. */
-  answerPermission: (tabId: string, optionId: string | null) => Promise<void>;
+  /** Answer the waiting permission request; `null` refuses it. `generation` is the card's own, so a
+   *  click that lands after a newer request replaced the card cannot answer the wrong one. */
+  answerPermission: (tabId: string, generation: number, optionId: string | null) => Promise<void>;
   applyEvent: (event: AcpSessionEvent) => void;
 }
 
 const fresh = (harness: string): HarnessSession => ({
-  harness, sessionId: null, agent: null, messages: [], pending: false, opening: false, error: null, note: null, permission: null,
+  harness, sessionId: null, agent: null, messages: [], pending: false, opening: false, error: null, note: null, permission: null, permissionGeneration: 0,
 });
 
 /** sessionId → tabId, so an event finds its page. */
@@ -129,10 +138,13 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     });
   },
 
-  answerPermission: async (tabId, optionId) => {
+  answerPermission: async (tabId, generation, optionId) => {
     const session = get().byTab[tabId];
     const request = session?.permission;
     if (!request) return;
+    // A newer request for the same tool call replaced the card this click was drawn on: the answer
+    // belongs to the card that is gone, so it is dropped instead of applied to the new one.
+    if (request.generation !== generation) return;
     // Clear it first: a card that is answered twice would answer an already-resolved request.
     patch(tabId, (current) => ({ ...current, permission: null }));
     try {
@@ -167,8 +179,10 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
           return {
             ...session,
             note: null,
+            permissionGeneration: session.permissionGeneration + 1,
             permission: {
               toolCallId,
+              generation: session.permissionGeneration + 1,
               title: String(toolCall.title ?? toolCallId),
               options: options.map((option) => {
                 const entry = (option ?? {}) as Record<string, unknown>;

@@ -87,12 +87,12 @@ export default function HarnessView({ tabId, harness }: { tabId: string; harness
             <div className="ai-tool-approval-actions">
               {session.permission.options.map((option) => (
                 <button key={option.optionId} type="button" data-testid={`harness-option-${option.optionId}`} data-subtle
-                  onClick={() => void useHarnessStore.getState().answerPermission(tabId, option.optionId)}>
+                  onClick={() => void useHarnessStore.getState().answerPermission(tabId, session.permission!.generation, option.optionId)}>
                   {option.name}
                 </button>
               ))}
               <button type="button" data-testid="harness-option-deny" data-subtle
-                onClick={() => void useHarnessStore.getState().answerPermission(tabId, null)}>
+                onClick={() => void useHarnessStore.getState().answerPermission(tabId, session.permission!.generation, null)}>
                 {t('Deny')}
               </button>
             </div>
