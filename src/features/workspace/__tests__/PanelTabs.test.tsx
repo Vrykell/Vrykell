@@ -42,7 +42,7 @@ it.each(['settings', 'history'])('leaves the %s icon on its theme color without 
   const row = screen.getByTestId(`tab-row-${id}`);
   fireEvent.contextMenu(row);
   expect(screen.queryByRole('group', { name: '图标颜色' })).toBeNull();
-  expect(row.querySelector('svg')!.style.color).toBe(id === 'settings' ? 'var(--group-blue)' : 'var(--group-amber)');
+  expect(row.querySelector('svg')!.style.color).toBe(id === 'settings' ? 'var(--text-primary)' : 'var(--text-secondary)');
 });
 afterEach(() => { cleanup(); useListReorder.getState().end(); useSessionStore.setState(snapshot, true); });
 

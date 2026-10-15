@@ -15,7 +15,7 @@ for (const theme of ['深色', '浅色']) {
     const settings = page.locator('[data-tab-kind="settings"]');
     await settings.click({ button: 'right' });
     await expect(page.getByRole('menuitemradio')).toHaveCount(0);
-    await expect(settings.locator('.sidebar-row-icon svg')).toHaveAttribute('style', /color: var\(--group-blue\)/);
+    await expect(settings.locator('.sidebar-row-icon svg')).toHaveAttribute('style', /color: var\(--text-primary\)/);
     await page.keyboard.press('Escape');
     const member = page.locator('[data-tab-kind="session"]').first();
     const original = await member.locator('.sidebar-row-icon svg').evaluate(element => getComputedStyle(element).color);

@@ -8,7 +8,3 @@ export function tabIconKey(tab: Pick<Tab, 'id' | 'kind'>): string {
 export function tabIconColor(tab: Pick<Tab, 'id' | 'kind'> & { groupId?: string }, colors: IconColors): string | undefined {
   return tab.kind === 'session' ? iconColorCss(colors[tabIconKey(tab)]) : undefined;
 }
-
-export function pageIconColor(kind: Tab['kind']): string {
-  return kind === 'history' ? 'var(--group-amber)' : kind === 'ai-history' ? 'var(--group-violet)' : 'var(--group-blue)';
-}
