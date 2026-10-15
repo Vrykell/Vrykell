@@ -293,7 +293,17 @@ button.state-icon-button[aria-pressed="true"]:hover { background: var(--selectio
 .workspace-body { display: flex; flex: 1; min-height: 0; position: relative; padding: 0 var(--workspace-gap) var(--workspace-gap) 0; background: var(--chrome-bg); }
 .workspace-main { margin-left: var(--workspace-gap); background: var(--canvas); border-radius: var(--radius-block); overflow: hidden; }
 /* The terminal squares off the edge it shares with a docked right sidebar. */
-.workspace-main:has(~ .workspace-side-panel[data-side="right"][data-visible="true"]) { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.workspace-main:has(~ .workspace-side-panel[data-side="right"][data-visible="true"], ~ .workspace-ssh-status-slot:not(:empty)) { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.workspace-body:has(> .workspace-ssh-status-slot:not(:empty)) > .workspace-side-panel[data-side="right"] { display: none !important; }
+.workspace-ssh-status-slot { display: flex; flex-shrink: 0; min-width: 0; min-height: 0; border-radius: 0 var(--radius-block) var(--radius-block) 0; overflow: hidden; }
+.workspace-ssh-status-slot:empty { display: none; }
+/* A folded status panel shrinks to nothing; keep its resize edge unclipped so it can be dragged back out. */
+.workspace-body:has(> .workspace-ssh-status-slot > .ssh-status-frame[data-folded]) > .workspace-ssh-status-slot { overflow: visible; }
+@media (max-width: 860px) {
+  .workspace-body:has(> .workspace-ssh-status-slot:not(:empty)) { --workspace-left-panel-width: 0px !important; --workspace-frame-width: 16px !important; }
+  .workspace-body:has(> .workspace-ssh-status-slot:not(:empty)) > .workspace-side-panel[data-side="left"] { display: none !important; }
+  .workspace-body:has(> .workspace-ssh-status-slot:not(:empty)) .workspace-main { margin-left: var(--workspace-gap) !important; border-top-left-radius: var(--radius-block) !important; border-bottom-left-radius: var(--radius-block) !important; }
+}
 .workspace-body:has(.workspace-side-panel[data-side="left"][data-visible="true"]) .workspace-main { margin-left: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; }
 /* Round the outer navigation edge while the shared resize boundary stays flush. */
 .workspace-side-panel[data-side="left"] { border-radius: var(--radius-block) 0 0 var(--radius-block); overflow: visible; }
@@ -796,6 +806,7 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 
 /* xterm 容器贴边：取消全屏终端的边缘内边距；连字会把多个字符画成一格，终端里必须关掉 */
 .xterm { padding: 0; font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
+.ssh-terminal-frame { font-family: var(--terminal-font-family); font-size: var(--terminal-font-size); font-weight: var(--terminal-font-weight); line-height: var(--terminal-row-height); letter-spacing: var(--terminal-letter-spacing, 0px); font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; color: var(--xterm-foreground); }
 
 /* xterm viewport 默认纯黑 #000：canvas 取整残差（容器宽 − cols×cellWidth）区域
  * 会显出比终端背景更黑的竖条。统一为终端背景色 --xterm-bg（残差区与终端同色）。
@@ -893,6 +904,8 @@ button.text-control:disabled:hover { background: transparent; color: var(--contr
   font-family: var(--font-mono); font-size: calc(11px * var(--ui-font-scale));
   line-height: 18px; white-space: nowrap;
 }
+button.terminal-chip.text-control { min-height: 20px; padding: 1px 7px; background: var(--hover); font-family: var(--font-mono); font-size: calc(11px * var(--ui-font-scale)); line-height: 18px; }
+button.terminal-chip.text-control:hover, button.terminal-chip.text-control:focus-visible, button.terminal-chip.text-control[aria-expanded="true"] { background: var(--control-hover-bg); }
 /* Scope tags share the same quiet appearance in the input and recent searches. */
 .search-scope-chip { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; max-width: 45%; padding: 4px 7px; border-radius: 5px; background: var(--hover); color: var(--text-primary); font-size: var(--fs-caption); }
 .search-scope-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

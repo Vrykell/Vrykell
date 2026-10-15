@@ -10,7 +10,7 @@
 import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
 import { showsPaneChatHistory } from '../model/paneHistory';
 import { useTypographyStore } from '@config/typography';
-import { useRef, useEffect, useLayoutEffect, useMemo, useState, useId } from 'react';
+import { useRef, useEffect, useLayoutEffect, useMemo, useState, useId, useCallback } from 'react';
 import OverlayScrollbar from '@ui/OverlayScrollbar';
 import { CircleX, Minimize2, Square } from '@ui/icons';
 import { STATUS_ACTION_ICON_SIZE, StatusActionButton, TerminalStatusBar } from '@features/terminal/components/TerminalStatusBar';
@@ -37,13 +37,17 @@ import TerminalPanel from '@features/terminal/components/TerminalPanel';
 import { SessionHistoryView } from '@features/session-history';
 import AiHistoryView from '@features/chat/components/AiHistoryView';
 import SettingsView from '@features/settings/pages/SettingsView';
-import ContextMenu from '@ui/ContextMenu';
+import ContextMenu, { type ContextMenuItem } from '@ui/ContextMenu';
+import ErrorBox from '@ui/ErrorBox';
+import { TextButton } from '@ui/TextButton';
 import { useTerminalLayoutActions } from '@features/terminal/hooks/useTerminalLayoutActions';
 import { useTuiControls } from '@features/terminal/hooks/useTuiControls';
 import { copyTerminalSelection, getPaneTerminal, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
 import { t } from '@i18n';
 import { focusSessionInput } from '../services/terminalFocus';
 import { TerminalRedrawButton } from './TerminalRedrawButton';
+import SshStatusPanel from '@features/ssh/components/SshStatusPanel';
+import type { SshSessionStatus } from '@core/ssh';
 
 export default function TerminalView() {
   const tabs = useSessionStore((s) => s.tabs);
@@ -53,7 +57,7 @@ export default function TerminalView() {
   const focusedPaneId = useTerminalStore((s) => s.focusedPaneId);
   const sessions = useTerminalStore((s) => s.sessions);
   const altScreenActive = useTerminalStore((s) => s.altScreenActive);
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; sshActions?: ContextMenuItem[] } | null>(null);
 
   const activeTab = tabs.find((t) => t.id === activeId);
   const isSession = activeTab?.kind === 'session';
@@ -78,7 +82,7 @@ export default function TerminalView() {
               active={tab.id === activeId}
               setSession={setSession}
               setFocusedPane={setFocusedPane}
-              onPaneContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY }); }}
+              onPaneContextMenu={(e, sshActions) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, sshActions }); }}
             />
           );
         }
@@ -100,6 +104,7 @@ export default function TerminalView() {
           anchor={ctxMenu}
           onClose={() => setCtxMenu(null)}
           items={[
+            ...(ctxMenu.sshActions ?? []),
             { label: t('terminal.menu.copy'), group: 'clipboard', shortcut: 'Ctrl+C', onClick: () => { void copyTerminalSelection(getPaneTerminal(focusedTermId)); } },
             { label: t('terminal.menu.paste'), group: 'clipboard', shortcut: 'Ctrl+V', onClick: () => { void pasteClipboardIntoTerminal(focusedTermId); } },
             { label: '分裂终端（选位置）', group: 'view', onClick: () => useUiStore.getState().beginSplit(null) },
@@ -122,7 +127,7 @@ function SessionTabView(props: {
   active: boolean;
   setSession: (id: string, sid: string) => void;
   setFocusedPane: (id: string) => void;
-  onPaneContextMenu: (e: React.MouseEvent) => void;
+  onPaneContextMenu: (e: React.MouseEvent, sshActions?: ContextMenuItem[]) => void;
 }) {
   const { tab, active, setSession, setFocusedPane, onPaneContextMenu } = props;
   const windowId = tab.id;
@@ -221,7 +226,7 @@ function PaneLayout(props: {
   setSession: (id: string, sid: string) => void;
   setFocusedPane: (id: string) => void;
   setRatioNode: (aId: string, bId: string, ratio: number) => void;
-  onPaneContextMenu: (e: React.MouseEvent) => void;
+  onPaneContextMenu: (e: React.MouseEvent, sshActions?: ContextMenuItem[]) => void;
 }) {
   const { layout: savedLayout, windowId, focusedTermId, setSession, setFocusedPane, setRatioNode, onPaneContextMenu } = props;
   const layoutRef = useRef<HTMLDivElement>(null);
@@ -356,49 +361,54 @@ function TerminalPane(props: {
   focused: boolean;
   setSession: (id: string, sid: string) => void;
   setFocusedPane: (id: string) => void;
-  onContextMenu: (e: React.MouseEvent) => void;
+  onContextMenu: (e: React.MouseEvent, sshActions?: ContextMenuItem[]) => void;
   inner: InnerEdges;
   reorderable: boolean;
 }) {
   const { terminal, windowId, focused, setSession, setFocusedPane, onContextMenu, inner, reorderable } = props;
+  const [sshState, setSshState] = useState<SshSessionStatus>({ phase: 'connecting', reconnectAttempt: 0, retrying: false, log: [] });
+  const [sshStatusWidth, setSshStatusWidth] = useState(300);
+  const [sshToolbarHost, setSshToolbarHost] = useState<HTMLDivElement | null>(null);
+  const [sshStatusTrigger, setSshStatusTrigger] = useState<HTMLButtonElement | null>(null);
+  const [sshStatusToggleRequest, setSshStatusToggleRequest] = useState(0);
+  const [sshPanelOpen, setSshPanelOpen] = useState(false);
+  const [sshStatusOpenRequest, setSshStatusOpenRequest] = useState(0);
+  const reconnectAction = useRef<(() => Promise<void>) | null>(null);
+  const disconnectAction = useRef<(() => Promise<void>) | null>(null);
+  const registerDisconnect = useCallback((action: (() => Promise<void>) | null) => { disconnectAction.current = action; }, []);
+  const registerReconnect = useCallback((action: (() => Promise<void>) | null) => { reconnectAction.current = action; }, []);
+  const activeTabId = useSessionStore(s => s.activeId);
   const scene = useTerminalStore((s) => s.scenes[terminal.id] ?? 'classic');
+  const [enteredBlockMode, setEnteredBlockMode] = useState(false);
+  useEffect(() => { setEnteredBlockMode(false); }, [terminal.ssh?.connectionId, terminal.ssh?.host, terminal.openMode]);
+  useEffect(() => { if (scene === 'blockList') setEnteredBlockMode(true); }, [scene]);
   const altScreenActive = useTerminalStore((s) => s.altScreenActive);
   // An SSH pane's classic scene is its connection/auth surface; the pane's chat
   // history stays out of the way so that surface owns the pane.
   const showChatHistory = showsPaneChatHistory(scene, terminal.kind);
   // Real alternate buffers use the main xterm; manual fullscreen uses the live block terminal.
-  const showXterm = scene === 'classic' || (scene === 'altScreen' && !altScreenActive);
-  const showBlocks = scene === 'blockList';
+  const disconnectedBlock = terminal.kind === 'ssh' && terminal.openMode === 'block' && enteredBlockMode && sshState.phase === 'disconnected';
+  const showXterm = !disconnectedBlock && (scene === 'classic' || (scene === 'altScreen' && !altScreenActive));
+  const showBlocks = scene === 'blockList' || disconnectedBlock;
+  const blockPresentation = terminal.kind === 'ssh' && terminal.openMode === 'block' && (scene === 'blockList' || (scene === 'altScreen' && enteredBlockMode) || disconnectedBlock);
+  const reconnectSsh = async () => { await reconnectAction.current?.(); };
+  const sshActions: ContextMenuItem[] = blockPresentation ? [
+    { label: t('SSH status'), group: 'view', onClick: () => setSshStatusOpenRequest(value => value + 1) },
+    { label: t(sshState.phase === 'disconnected' || sshState.retrying ? 'Reconnect SSH session' : 'ssh.action.disconnect'), group: 'primary', onClick: () => {
+      const action = sshState.phase === 'disconnected' || sshState.retrying ? reconnectAction.current : disconnectAction.current;
+      void action?.().catch(reason => useToastStore.getState().addToast(String(reason), 'error'));
+    } },
+  ] : [];
 
   const onPaneMouseDown = useTerminalPaneDrag(terminal.id, reorderable);
 
-  return (
-    <div
-      data-testid={`pane-${terminal.id}`}
-      className="terminal-pane"
-      data-focused={focused ? 'true' : 'false'}
-      onClick={() => setFocusedPane(terminal.id)}
-      onMouseDown={onPaneMouseDown}
-      onContextMenu={(e) => { setFocusedPane(terminal.id); onContextMenu(e); }}
-      style={{
-        flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column',
-        position: 'relative',
-        // Match terminal output, pane padding and block history to the classic background.
-        background: 'var(--xterm-bg)',
-        // Interior pane dividers keep the same appearance when focus moves.
-        borderTop: inner.top ? '1px solid var(--border)' : 'none',
-        borderBottom: inner.bottom ? '1px solid var(--border)' : 'none',
-        borderLeft: inner.left ? '1px solid var(--border)' : 'none',
-        borderRight: inner.right ? '1px solid var(--border)' : 'none',
-        overflow: 'hidden',
-      }}
-    >
+  const paneContent = (
+    <div className="ssh-pane-content" style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
       {/* Keep xterm mounted; hide it only while the block terminal is manually fullscreened. */}
       {showChatHistory && <PaneChatHistory paneId={terminal.id} />}
       <div inert={!showXterm} style={showXterm
         // Keep the native terminal scrollbar flush with the pane's right edge.
-        // 左边距不在这里加：它只属于终端屏幕内容（见 TerminalPanel），
-        // 否则认证输入条等整宽元素会被一起推右，出现左右不对称。
+        // Keep left padding on terminal output so authentication inputs stay centered.
         ? { flex: 1, minHeight: 0, position: 'relative', padding: '8px 0 0 0', paddingTop: scene === 'altScreen' ? 28 : 8, background: 'transparent' }
         : { position: 'absolute', inset: 0, opacity: 0, pointerEvents: 'none' }}>
         <TerminalPanel
@@ -408,6 +418,14 @@ function TerminalPane(props: {
           connectionId={terminal.ssh?.connectionId}
           sshTarget={terminal.ssh ? `${terminal.ssh.user ? `${terminal.ssh.user}@` : ''}${terminal.ssh.host}` : undefined}
           onReady={(sid) => setSession(terminal.id, sid)}
+          onSshStateChange={setSshState}
+          onReconnectReady={registerReconnect}
+          toolbarHost={sshToolbarHost}
+          showToolbar={!blockPresentation}
+          onSessionStatusClick={() => setSshStatusToggleRequest(value => value + 1)}
+          onSessionStatusReady={setSshStatusTrigger}
+          sessionStatusOpen={sshPanelOpen}
+          onDisconnectReady={registerDisconnect}
         />
       </div>
 
@@ -421,9 +439,46 @@ function TerminalPane(props: {
           focused={focused}
           insetLeft={inner.left ? 4 : 8}
           insetRight={inner.right ? 4 : 8}
+          onSessionStatusClick={blockPresentation ? () => setSshStatusToggleRequest(value => value + 1) : undefined}
+          onSessionStatusReady={blockPresentation ? setSshStatusTrigger : undefined}
+          sessionStatusOpen={sshPanelOpen}
+          sessionNotice={blockPresentation && sshState.phase === 'disconnected' ? <ErrorBox compact tone="info" style={{ margin: '0 8px 8px' }} actions={<TextButton onClick={() => { void reconnectSsh().catch(reason => useToastStore.getState().addToast(String(reason), 'error')); }}>{t('Reconnect SSH session')}</TextButton>}>{t('Disconnected')}</ErrorBox> : undefined}
         />
       )}
       {scene === 'altScreen' && !altScreenActive && <TuiBanner tabId={terminal.id} />}
+    </div>
+  );
+
+  return (
+    <div
+      data-testid={`pane-${terminal.id}`}
+      className="terminal-pane"
+      data-focused={focused ? 'true' : 'false'}
+      onClick={() => setFocusedPane(terminal.id)}
+      onMouseDown={onPaneMouseDown}
+      onContextMenu={(e) => { setFocusedPane(terminal.id); onContextMenu(e, sshActions); }}
+      style={{
+        flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column',
+        position: 'relative',
+        // Match terminal output, pane padding and block history to the classic background.
+        background: 'var(--xterm-bg)',
+        // Interior pane dividers keep the same appearance when focus moves.
+        borderTop: inner.top ? '1px solid var(--border)' : 'none',
+        borderBottom: inner.bottom ? '1px solid var(--border)' : 'none',
+        borderLeft: inner.left ? '1px solid var(--border)' : 'none',
+        borderRight: inner.right ? '1px solid var(--border)' : 'none',
+        overflow: 'hidden',
+      }}
+    >
+      {terminal.kind === 'ssh' && terminal.ssh ? <SshStatusPanel
+        key={`${terminal.ssh.connectionId ?? ''}:${terminal.ssh.host}:${terminal.ssh.port ?? 22}`}
+        paneId={terminal.id} target={terminal.ssh} state={sshState} active={activeTabId === windowId} focused={focused}
+        width={sshStatusWidth} onWidthChange={setSshStatusWidth}
+        onToolbarReady={setSshToolbarHost} compact={blockPresentation}
+        statusTrigger={sshStatusTrigger} openRequest={sshStatusOpenRequest}
+        toggleRequest={sshStatusToggleRequest} onOpenChange={setSshPanelOpen}
+        onReconnect={reconnectSsh}
+      >{paneContent}</SshStatusPanel> : paneContent}
     </div>
   );
 }
@@ -626,7 +681,7 @@ function TuiBanner({ tabId }: { tabId: string }) {
 // ═══════════════════════════════════════════════════════════
 // PaneInputEditor（终端 pane 的独立输入栏） ═══════════════════════════════════════════════════════════
 
-function PaneInputEditor({ paneId, focused, insetLeft = 8, insetRight = 8 }: { paneId: string; focused: boolean; insetLeft?: number; insetRight?: number }) {
+function PaneInputEditor({ paneId, focused, insetLeft = 8, insetRight = 8, onSessionStatusClick, onSessionStatusReady, sessionNotice, sessionStatusOpen }: { paneId: string; focused: boolean; insetLeft?: number; insetRight?: number; onSessionStatusClick?: () => void; onSessionStatusReady?: (trigger: HTMLButtonElement | null) => void; sessionStatusOpen?: boolean; sessionNotice?: React.ReactNode }) {
   const blocks = useBlockStore(selectBlocks(paneId));
   const hasRunningBlock = blocks.some((b) => b.status === 'executing' && b.wasLongRunning);
   const runningCommand = [...blocks].reverse().find((b) => b.status === 'executing')?.command ?? '';
@@ -638,6 +693,10 @@ function PaneInputEditor({ paneId, focused, insetLeft = 8, insetRight = 8 }: { p
       insetRight={insetRight}
       isLongRunning={hasRunningBlock}
       runningCommand={runningCommand}
+      onSessionStatusClick={onSessionStatusClick}
+      onSessionStatusReady={onSessionStatusReady}
+      sessionStatusOpen={sessionStatusOpen}
+      sessionNotice={sessionNotice}
       onEndPress={() => { engageFollow(paneId); useTerminalStore.getState().setKeyboardTarget('input'); }}
     />
   );

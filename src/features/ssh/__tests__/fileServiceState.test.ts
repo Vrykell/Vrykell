@@ -15,4 +15,11 @@ describe('file service status', () => {
     expect(describeFileServiceFailure('主机密钥不匹配').kind).toBe('error');
     expect(describeFileServiceFailure('密码认证失败').kind).toBe('authentication');
   });
+  it('identifies rejected saved credentials before describing SFTP capability', () => {
+    const failure = describeFileServiceFailure('[Session(-18)] Authentication failed (username/password)');
+    expect(failure.kind).toBe('authentication');
+    expect(failure.title).toBe('已保存的 SSH 认证信息被拒绝');
+    expect(failure.message).toContain('认证这两个服务');
+    expect(describeFileServiceFailure('[Session(-18)] Username/PublicKey combination invalid').kind).toBe('authentication');
+  });
 });

@@ -7,10 +7,12 @@ import { findLeaf, replaceLeaf } from '@features/workspace/model/windowLayout';
 import { connectionTarget, listSshConnections, type SshConnection } from '@features/ssh/services/api';
 import { useTerminalStore } from '@features/terminal';
 import { isTerminalDebugEnabled, terminalDebug } from '../services/terminalDebug';
+import type { SshSessionStatus } from '@core/ssh';
 
 /** Validate saved connection references before starting an authentication session. */
-export default function SshSessionGate({ connectionId, paneId, tabId, children }: {
+export default function SshSessionGate({ connectionId, paneId, tabId, children, onSshStateChange }: {
   connectionId: string; paneId: string; tabId: string; children: ReactNode;
+  onSshStateChange?: (state: SshSessionStatus) => void;
 }) {
   const [connections, setConnections] = useState<SshConnection[] | null>(null);
   const [error, setError] = useState('');
@@ -19,20 +21,27 @@ export default function SshSessionGate({ connectionId, paneId, tabId, children }
   useEffect(() => {
     let active = true;
     setConnections(null); setError('');
+    onSshStateChange?.({ phase: 'connecting', reconnectAttempt: 0, retrying: false, log: [] });
     void listSshConnections().then(items => {
       if (!active) return;
       setConnections(items); setSelected(items[0]?.id ?? '');
       const present = items.some(item => item.id === connectionId);
-      if (!present) useTerminalStore.getState().setStartupState(paneId, 'failed');
+      if (!present) {
+        useTerminalStore.getState().setStartupState(paneId, 'failed');
+        onSshStateChange?.({ phase: 'unavailable', reconnectAttempt: 0, retrying: false, log: [] });
+      }
       if (isTerminalDebugEnabled()) {
         // The gate renders the recovery panel (not the terminal) while it loads.
         // A "present: true" after a temporary false would unmount the terminal
         // panel and restart SSH authentication from scratch.
         terminalDebug('ssh-gate-resolved', { paneId, connectionId, count: items.length, present });
       }
-    }).catch(reason => { if (active) { setError(String(reason)); useTerminalStore.getState().setStartupState(paneId, 'failed'); } });
+    }).catch(reason => { if (active) {
+      setError(String(reason)); useTerminalStore.getState().setStartupState(paneId, 'failed');
+      onSshStateChange?.({ phase: 'unavailable', reconnectAttempt: 0, retrying: false, log: [] });
+    } });
     return () => { active = false; };
-  }, [connectionId, paneId, attempt]);
+  }, [connectionId, paneId, attempt, onSshStateChange]);
   if (connections?.some(item => item.id === connectionId)) return children;
   const replaceConnection = (connection?: SshConnection) => {
     const workspace = useSessionStore.getState();

@@ -16,7 +16,9 @@ import {
   newSshId,
   sshHostKeyInfo,
   sshTrustHostKey,
+  sshAuthenticateSession,
 } from '@features/ssh/services/api';
+import { diagnosticSnapshot } from '@platform/diagnostics';
 
 describe('sshApi', () => {
   it('validates keepalive and jump destinations before saving', () => {
@@ -33,6 +35,21 @@ describe('sshApi', () => {
     expect(validateSshConnection({ name: 'n', host: 'h', dynamicForwards: ['70000'] })).toContain('动态转发');
   });
   beforeEach(() => invokeMock.mockReset());
+
+  it('redacts temporary passwords and key passphrases from IPC diagnostics', async () => {
+    invokeMock.mockResolvedValue(undefined);
+    const target = { connectionId: 's1', host: 'server.test', user: 'tester' };
+    await sshAuthenticateSession(target, 'password', 'dummy-password-for-redaction');
+    await sshAuthenticateSession(target, 'keyPassphrase', 'dummy-passphrase-for-redaction');
+    expect(invokeMock).toHaveBeenCalledWith('ssh_authenticate_session', expect.objectContaining({
+      password: 'dummy-password-for-redaction', passphrase: '',
+    }));
+    expect(invokeMock).toHaveBeenCalledWith('ssh_authenticate_session', expect.objectContaining({
+      password: '', passphrase: 'dummy-passphrase-for-redaction',
+    }));
+    expect(JSON.stringify(diagnosticSnapshot())).not.toContain('dummy-password-for-redaction');
+    expect(JSON.stringify(diagnosticSnapshot())).not.toContain('dummy-passphrase-for-redaction');
+  });
 
   it('passes the confirmed fingerprint when recording host trust', async () => {
     invokeMock.mockResolvedValue(undefined);

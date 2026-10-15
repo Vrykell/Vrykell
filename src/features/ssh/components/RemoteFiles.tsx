@@ -16,6 +16,7 @@ import { getPaneTerminal } from '@features/terminal/services/terminalClipboard';
 import { useToastStore } from '@ui/Toast';
 import { t } from '@i18n';
 import ErrorBox from '@ui/ErrorBox';
+import { requestSshAuthentication, useSshAuthenticationRevision } from '../hooks/useSessionAuthentication';
 
 /**
  * RemoteFiles — SSH 文件面板。
@@ -25,6 +26,7 @@ import ErrorBox from '@ui/ErrorBox';
  * 与文件服务失败说明。
  */
 export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnection; enabled?: boolean }) {
+  const authenticationRevision = useSshAuthenticationRevision(conn.id);
   const target = useMemo<FileOpsTarget>(() => ({ kind: 'ssh', connectionId: conn.id }), [conn.id]);
   const ops = useMemo(() => fileOpsFor(target), [target]);
   const storedPath = useRemotePathStore((state) => state.path[conn.id] ?? null);
@@ -82,12 +84,13 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
     <FilePanel
       target={target}
       enabled={enabled}
+      reloadRevision={authenticationRevision}
       initialPath={storedPath}
       terminalCwd={terminalCwd}
       onPathChange={(next) => useRemotePathStore.getState().set(conn.id, next)}
       openEntry={remoteEdit}
       onSyncToTerminal={(dir) => writeTerminalCommand(`cd ${shellQuote(dir)}\r`, 'sync-directory')}
-      pendingLabel={`远程文件 · ${conn.name}`}
+      pendingLabel={t('Remote files · {{name}}', { name: conn.name })}
       renderError={(error, retry) => {
         const failure = describeFileServiceFailure(error);
         return (
@@ -97,13 +100,14 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
             details={error}
             style={{ margin: 16, overflowWrap: 'anywhere' }}
             actions={<>
+              {failure.kind === 'authentication' && <button style={{ minHeight: 36 }} onClick={() => requestSshAuthentication({ connectionId: conn.id, host: conn.host, port: conn.port, user: conn.user, identityFile: conn.identityFile })}>{t('Authenticate services')}</button>}
               <button style={{ minHeight: 36 }} onClick={() => {
                 const dock = useDockStore.getState();
                 const side = dock.leftPanels.includes('files') ? 'left' : 'right';
                 dock.togglePanel(side, 'files');
                 if (paneId) termInstances.get(paneId)?.focus();
-              }}>继续使用终端</button>
-              <button style={{ minHeight: 36 }} onClick={retry}>重试文件服务</button>
+              }}>{t('Continue using terminal')}</button>
+              <button style={{ minHeight: 36 }} onClick={retry}>{t('Retry file service')}</button>
             </>}
           >
             {failure.message}

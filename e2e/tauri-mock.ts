@@ -850,6 +850,15 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
           case 'ssh_test':
             if (args.host === 'bad.example.com') throw new Error('连接超时');
             return '连接成功';
+          case 'ssh_system_status': {
+            const globals = window as unknown as Record<string, unknown>;
+            globals.__SSH_STATUS_CALLS__ = Number(globals.__SSH_STATUS_CALLS__ ?? 0) + 1;
+            if (globals.__SSH_STATUS_ERROR__) throw new Error(String(globals.__SSH_STATUS_ERROR__));
+            return { system: 'Linux 6.8', hostname: 'production-api', latencyMs: 42, uptimeSeconds: 1047600,
+              load: '0.12 0.08 0.05', cpuTotal: Number(globals.__SSH_STATUS_CALLS__) * 1000,
+              cpuIdle: Number(globals.__SSH_STATUS_CALLS__) * 880, memoryTotal: 8589934592,
+              memoryAvailable: 6335076762, diskTotal: 107374182400, diskUsed: 40802189312 };
+          }
           case 'ssh_list': {
             if (!hostKnown) throw new Error('HOST_KEY_UNKNOWN:SHA256:e2e-verified-key');
             const base = (args.path as string) || '/home/root';
