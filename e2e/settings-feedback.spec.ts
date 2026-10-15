@@ -7,15 +7,16 @@ test('settings navigation has static headings and save feedback appears once the
   await gotoSetting(page, '模型配置');
   const nav = page.locator('aside');
   await expect(nav.locator('.settings-nav-heading')).toHaveCount(6);
-  await expect(nav.getByRole('button')).toHaveCount(17);
+  const rows = nav.locator('.settings-navigation-list').getByRole('button');
+  await expect(rows).toHaveCount(17);
   await expect(nav.locator('.settings-navigation-list [aria-expanded]')).toHaveCount(0);
-  await expect(nav.getByRole('button').locator('svg')).toHaveCount(17);
+  await expect(rows.locator('svg')).toHaveCount(17);
   await expect(nav).toHaveCSS('width', '224px');
-  for (const row of await nav.getByRole('button').all()) expect((await row.boundingBox())!.height).toBe(32);
+  for (const row of await rows.all()) expect((await row.boundingBox())!.height).toBe(32);
   await page.locator('[data-dock-btn="files"]').click();
   const fileRow = page.locator('[data-file-row="true"]').first();
   await expect(fileRow).toBeVisible();
-  expect((await nav.getByRole('button').first().boundingBox())!.height).toBe((await fileRow.boundingBox())!.height);
+  expect((await rows.first().boundingBox())!.height).toBe((await fileRow.boundingBox())!.height);
   await expect(page.getByRole('status')).toHaveCount(0);
   await page.getByPlaceholder('模型名称').first().fill('One summary');
   await page.getByPlaceholder('服务地址 (Base URL)').first().fill('https://example.test/v1');
@@ -25,6 +26,6 @@ test('settings navigation has static headings and save feedback appears once the
   await nav.getByRole('button', { name: '主题', exact: true }).press('Enter');
   await expect(nav.getByRole('button', { name: '主题', exact: true })).toHaveAttribute('aria-current', 'page');
   await expect(nav.getByRole('button', { name: '主题', exact: true })).toHaveCSS('outline-style', 'none');
-  await nav.locator('.scroll-region').evaluate(element => { element.scrollTop = 0; });
+  await nav.locator('.settings-navigation-list').evaluate(element => { element.scrollTop = 0; });
   await page.screenshot({ path: test.info().outputPath('static-settings-navigation.png') });
 });

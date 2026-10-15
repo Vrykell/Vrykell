@@ -15,9 +15,9 @@ it('persists explicit colors and removes overrides for automatic color', () => {
 
 it('ignores invalid persisted colors and preserves store actions during hydration', async () => {
   localStorage.setItem('vrykell-icon-colors', JSON.stringify({ state: { colors: {
-    'session:one': 'cyan', 'page:settings': 'violet', 'session:bad': 'url(unsafe)', invalid: 'blue',
+    'session:one': 'cyan', 'page:settings': 'violet', 'group:team': 'green', 'session:bad': 'url(unsafe)', invalid: 'blue',
   } }, version: 0 }));
   await useIconColorStore.persist.rehydrate();
-  expect(useIconColorStore.getState().colors).toEqual({ 'session:one': 'cyan', 'page:settings': 'violet' });
+  expect(useIconColorStore.getState().colors).toEqual({ 'session:one': 'cyan', 'page:settings': 'violet', 'group:team': 'green' });
   expect(useIconColorStore.getState().setColor).toBeTypeOf('function');
 });

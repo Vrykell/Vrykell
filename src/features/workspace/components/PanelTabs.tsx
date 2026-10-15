@@ -4,15 +4,16 @@ import { iconSizes,
   History, Plus, Search, Settings, Sparkles,
   ChevronRight, Pencil, Archive, Folder, Trash2, X,
  } from '@ui/icons';
-import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, useTabDisplayTitle, tabIconKey, tabIconColor, type Tab, type TabGroup } from '@features/workspace';
-import { useIconColorStore } from '@config/iconColors';
+import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, useTabDisplayTitle, tabIconKey, tabIconColor, pageIconColor, type Tab, type TabGroup } from '@features/workspace';
+import { iconColorCss, iconColorKey, useIconColorStore } from '@config/iconColors';
 import { HistoryColorChoices } from '@ui/HistoryColorPalette';
+import IconTile from '@ui/IconTile';
 import { regenerateTitle } from '@features/agent/services/title';
 import { useToastStore } from '@ui/Toast';
 import { IconBtn } from '@ui/UiBtn';
 import { shellTypeLabel } from '@platform/shells';
 import NewTabModal from '@features/workspace/components/NewTabModal';
-import ContextMenu, { type ContextMenuItem } from '@ui/ContextMenu';
+import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/ContextMenu';
 import SidebarItem from '@ui/sidebarItem';
 import { SshIcon, shellIconFor } from '@ui/shellIcons';
 import {
@@ -218,7 +219,7 @@ export default function PanelTabs() {
               onStartRenameGroup={() => { setRenamingGroupId(g.id); setRenamingGroupTitle(g.title); }}
               onCommitRenameGroup={() => { if (renamingGroupId) renameGroup(renamingGroupId, renamingGroupTitle); setRenamingGroupId(null); }}
               onDeleteGroup={() => {
-                const hasTabs = groupTabs(g.id).length > 0;
+                const hasTabs = tabs.some(tab => isSessionTab(tab) && tab.groupId === g.id);
                 if (!hasTabs) { void deleteGroup(g.id, false); return; }
                 const ok = window.confirm(`归档分组「${g.title}」？组内标签将关闭并移入会话历史。`);
                 if (!ok) return;
@@ -303,7 +304,11 @@ export default function PanelTabs() {
               : tab?.kind === 'settings' ? Settings
               : first?.kind === 'ssh' ? SshIcon
                 : shellIconFor(first?.kind === 'local' ? first.shellType : undefined);
-          return <Icon size={iconSizes.row} style={{ color: tab ? tabIconColor(tab, iconColors) : 'var(--accent-warm)' }} />;
+          const color = drag.kind === 'group' ? iconColorCss(iconColors[iconColorKey('group', drag.id)]) ?? 'var(--group-amber)'
+            : tab ? tabIconColor(tab, iconColors) ?? pageIconColor(tab.kind) : 'var(--group-blue)';
+          return drag.kind === 'group' || (tab && !isSessionTab(tab))
+            ? <IconTile icon={Icon} color={color} size={iconSizes.row} />
+            : <Icon size={iconSizes.row} style={{ color: tab ? tabIconColor(tab, iconColors) : undefined }} />;
         }}
       </ListReorderPreview>
 
@@ -339,8 +344,11 @@ function GroupSection(props: {
   onAddTab: () => void;
 }) {
   const { group, tabs, activeId } = props;
+  const [menu, setMenu] = useState<MenuAnchor | null>(null);
+  const colors = useIconColorStore(state => state.colors);
+  const colorKey = iconColorKey('group', group.id);
   const collapsed = group.collapsed;
-  const empty = tabs.length === 0;
+  const empty = useSessionStore(state => !state.tabs.some(tab => isSessionTab(tab) && tab.groupId === group.id));
   const anyMemberActive = tabs.some((t) => t.id === activeId);
   const dragging = useListReorder((s) => s.drag?.id === group.id);
   // 末尾占位对应当前可见的最后一行（拖走的那行不参与，否则拖末行时占位对不上）
@@ -368,6 +376,23 @@ function GroupSection(props: {
           data-reorder-item={group.id}
           data-reorder-kind="group"
           data-reorder-dragging={dragging ? 'true' : undefined}
+          tabIndex={0}
+          role="button"
+          aria-expanded={!collapsed}
+          aria-label={group.title}
+          onContextMenu={event => {
+            event.preventDefault(); event.stopPropagation();
+            setMenu({ x: event.clientX, y: event.clientY, trigger: event.currentTarget });
+          }}
+          onKeyDown={event => {
+            if (event.target !== event.currentTarget) return;
+            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); props.onToggleCollapse(); }
+            if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+              event.preventDefault();
+              const rect = event.currentTarget.getBoundingClientRect();
+              setMenu({ x: rect.left, y: rect.bottom, trigger: event.currentTarget });
+            }
+          }}
           onClick={() => { if (!props.renamingGroupId) props.onToggleCollapse(); }}
           onDoubleClick={() => {
             // 双击重命名（两次 click 已把折叠状态抵消回原样）
@@ -380,13 +405,7 @@ function GroupSection(props: {
             padding: '6px 8px', minHeight: 40, cursor: 'pointer',
           }}
         >
-          <span style={{
-            width: 24, height: 24, borderRadius: 6, flexShrink: 0,
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            background: 'var(--hover)', color: 'var(--text-secondary)',
-          }}>
-            <Folder size={iconSizes.row} />
-          </span>
+          <IconTile icon={Folder} size={24} color={iconColorCss(colors[colorKey]) ?? 'var(--group-amber)'} />
           {props.renamingGroupId === group.id ? (
             <TextInput
               autoFocus
@@ -462,6 +481,16 @@ function GroupSection(props: {
           </div>
         )}
       </div>
+      {menu && <ContextMenu anchor={menu} label={t('Group actions')} onClose={() => setMenu(null)} items={[
+        { label: t('Add terminal to group'), onClick: props.onAddTab },
+        { label: t('Rename tab group'), group: 'edit', onClick: props.onStartRenameGroup },
+        { label: t(collapsed ? 'Expand group' : 'Collapse group'), group: 'view', onClick: props.onToggleCollapse },
+        { label: t(empty ? 'Delete empty group' : 'Archive tab group'), danger: empty, group: 'danger', onClick: props.onDeleteGroup },
+      ]} footer={<>
+        <div className="history-menu-color-label">{t('Group color')}</div>
+        <HistoryColorChoices menu value={colors[colorKey] ?? null} testId={`tab-group-color-${group.id}`}
+          onSelect={color => { useIconColorStore.getState().setColor(colorKey, color); menu.trigger?.focus(); setMenu(null); }} />
+      </>} />}
     </div>
   );
 }
@@ -534,7 +563,7 @@ function TabRow({
       : isSsh ? SshIcon
         : shellIconFor(first?.kind === 'local' ? first.shellType : undefined);
   const iconColors = useIconColorStore(state => state.colors);
-  const iconColor = tabIconColor(tab, iconColors) ?? (isSessionTab(tab) ? undefined : active ? 'var(--text-primary)' : 'var(--text-secondary)');
+  const iconColor = tabIconColor(tab, iconColors);
   const typeSummary = terms.map((t) =>
     t.kind === 'ssh' ? (t.ssh?.name || t.ssh?.host || 'SSH') : (t.shellType ? shellTypeLabel(t.shellType) : '本地'),
   ).join(' + ');
@@ -542,7 +571,8 @@ function TabRow({
   return (
     <SidebarItem
       active={active}
-      icon={<Icon size={iconSizes.row} style={{ color: iconColor }} />}
+      icon={isSessionTab(tab) ? <Icon size={iconSizes.row} style={{ color: iconColor }} />
+        : <IconTile icon={Icon} color={iconColor ?? pageIconColor(tab.kind)} size={iconSizes.row} />}
       title={displayTitle}
       tooltip={displayTitle}
       testId={`tab-row-${tab.id}`}
