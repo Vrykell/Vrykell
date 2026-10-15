@@ -72,6 +72,25 @@ export default function HarnessView({ tabId, harness }: { tabId: string; harness
         {exchanges.map((exchange) => (
           <AiBlock key={exchange.id} exchange={exchange} presentation="conversation" />
         ))}
+        {/* The approval card sits at the end of the transcript, where the turn is: it reuses the
+            app's own approval styling, and its buttons are the options the harness offered. */}
+        {session?.permission && (
+          <div data-testid="harness-permission" className="ai-tool-approval" style={{ margin: '10px 4px', padding: '8px 10px' }}>
+            <div>{t('The harness is waiting for your decision:')} {session.permission.title}</div>
+            <div className="ai-tool-approval-actions">
+              {session.permission.options.map((option) => (
+                <button key={option.optionId} type="button" data-testid={`harness-option-${option.optionId}`} data-subtle
+                  onClick={() => void useHarnessStore.getState().answerPermission(tabId, option.optionId)}>
+                  {option.name}
+                </button>
+              ))}
+              <button type="button" data-testid="harness-option-deny" data-subtle
+                onClick={() => void useHarnessStore.getState().answerPermission(tabId, null)}>
+                {t('Deny')}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <ChatComposerShell

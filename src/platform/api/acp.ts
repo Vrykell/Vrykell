@@ -61,6 +61,10 @@ export const acpPrompt = (sessionId: string, text: string) => invoke<void>('acp_
 /** Ask the agent to stop the current turn. */
 export const acpCancel = (sessionId: string) => invoke<void>('acp_cancel', { sessionId });
 
+/** Answer a permission request: an option the agent offered, or `null` for the protocol's cancel. */
+export const acpAnswerPermission = (toolCallId: string, optionId: string | null) =>
+  invoke<void>('acp_answer_permission', { toolCallId, optionId });
+
 /** Close a session; the harness process goes with it. */
 export const acpClose = (sessionId: string) => invoke<void>('acp_close', { sessionId });
 

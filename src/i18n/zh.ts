@@ -302,7 +302,7 @@ const zh: Record<string, string> = {
   "Harness stopped.": "已停止这个 harness 的当前轮次。",
   "The harness stopped the turn: {{reason}}": "harness 结束了本轮：{{reason}}",
   "The harness failed.": "harness 执行失败。",
-  "The harness asked for permission. Approvals for harnesses arrive in the next phase, so it was refused.": "这个 harness 请求了授权：harness 的审批卡在下一阶段接上，本次已自动拒绝。",
+  "The harness is waiting for your decision:": "这个 harness 在等你的选择：",
   "Connecting…": "正在连接…",
   "Stop the harness turn": "停止本轮",
   "Opening the harness session…": "正在打开 harness 会话…",

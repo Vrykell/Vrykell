@@ -10,7 +10,7 @@ import { t } from '@i18n';
 import type { ChatMessage } from '@features/chat';
 import { applyHarnessUpdate } from '@features/chat/model/harnessTranscript';
 import {
-  acpCancel, acpClose, acpOpen, acpPrompt, onAcpSession,
+  acpAnswerPermission, acpCancel, acpClose, acpOpen, acpPrompt, onAcpSession,
   type AcpSessionEvent, type AgentDescription,
 } from '@platform/api/acp';
 
@@ -26,6 +26,8 @@ export interface HarnessSession {
   error: string | null;
   /** The last thing worth telling the user (a refused permission, a stop reason, ...). */
   note: string | null;
+  /** A permission request waiting for the user, rendered as a card in the transcript. */
+  permission: { toolCallId: string; title: string; options: Array<{ optionId: string; name: string }> } | null;
 }
 
 interface HarnessStore {
@@ -34,11 +36,13 @@ interface HarnessStore {
   prompt: (tabId: string, text: string) => Promise<void>;
   cancel: (tabId: string) => Promise<void>;
   close: (tabId: string) => Promise<void>;
+  /** Answer the waiting permission request; `null` refuses it. */
+  answerPermission: (tabId: string, optionId: string | null) => Promise<void>;
   applyEvent: (event: AcpSessionEvent) => void;
 }
 
 const fresh = (harness: string): HarnessSession => ({
-  harness, sessionId: null, agent: null, messages: [], pending: false, opening: false, error: null, note: null,
+  harness, sessionId: null, agent: null, messages: [], pending: false, opening: false, error: null, note: null, permission: null,
 });
 
 /** sessionId → tabId, so an event finds its page. */
@@ -117,6 +121,19 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     });
   },
 
+  answerPermission: async (tabId, optionId) => {
+    const session = get().byTab[tabId];
+    const request = session?.permission;
+    if (!request) return;
+    // Clear it first: a card that is answered twice would answer an already-resolved request.
+    patch(tabId, (current) => ({ ...current, permission: null }));
+    try {
+      await acpAnswerPermission(request.toolCallId, optionId);
+    } catch (error) {
+      patch(tabId, (current) => ({ ...current, error: String((error as Error)?.message ?? error) }));
+    }
+  },
+
   applyEvent: (event) => {
     const tabId = tabOfSession.get(event.sessionId);
     if (!tabId) return;
@@ -134,21 +151,23 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
         case 'error':
           return { ...session, pending: false, error: String(event.payload.message ?? t('The harness failed.')) };
         case 'permission': {
-          // Phase 1 has no approval card for harnesses, and the backend refuses; say so on the row
-          // instead of leaving the user wondering why a tool never ran.
-          const note = t('The harness asked for permission. Approvals for harnesses arrive in the next phase, so it was refused.');
+          // The card waits for the user; the backend holds the agent until the answer comes back.
           const toolCall = (event.payload.toolCall ?? {}) as Record<string, unknown>;
           const toolCallId = String(toolCall.toolCallId ?? '');
-          const messages = session.messages.map((message) => {
-            if (!message.parts) return message;
-            return {
-              ...message,
-              parts: message.parts.map((part) => part.kind === 'tool' && part.tool.toolCallId === toolCallId
-                ? { kind: 'tool' as const, tool: { ...part.tool, state: 'denied' as const, danger: note } }
-                : part),
-            };
-          });
-          return { ...session, messages, note };
+          if (!toolCallId) return session;
+          const options = Array.isArray(event.payload.options) ? event.payload.options : [];
+          return {
+            ...session,
+            note: null,
+            permission: {
+              toolCallId,
+              title: String(toolCall.title ?? toolCallId),
+              options: options.map((option) => {
+                const entry = (option ?? {}) as Record<string, unknown>;
+                return { optionId: String(entry.optionId ?? ''), name: String(entry.name ?? entry.optionId ?? '') };
+              }).filter((option) => option.optionId),
+            },
+          };
         }
         default:
           return session;
