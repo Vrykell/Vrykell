@@ -28,6 +28,8 @@ export interface FilePanelProps {
   /** 执行目标：本地文件面板与 SSH 文件面板只是这个状态变量的不同取值。 */
   target: FileOpsTarget;
   enabled?: boolean;
+  /** Reload after external authentication without discarding navigation or undo history. */
+  reloadRevision?: number;
   initialPath?: string | null;
   onPathChange?: (path: string | null) => void;
   /** 双击 / Enter 打开文件 */
@@ -64,6 +66,7 @@ export interface FilePanelProps {
 export default function FilePanel({
   target,
   enabled = true,
+  reloadRevision = 0,
   initialPath = null,
   onPathChange,
   openEntry,
@@ -138,6 +141,13 @@ export default function FilePanel({
     cancelConfirm,
     confirmAction,
   } = useFileBrowser({ target, enabled, initialPath, onPathChange, openEntry });
+
+  const seenReloadRevision = useRef(reloadRevision);
+  useEffect(() => {
+    if (seenReloadRevision.current === reloadRevision) return;
+    seenReloadRevision.current = reloadRevision;
+    if (enabled) refresh();
+  }, [reloadRevision, enabled, refresh]);
 
   const rows = flattenVisible(entries, expandedSet, childCache);
   const [pathDraft, setPathDraft] = useState<string | null>(null);

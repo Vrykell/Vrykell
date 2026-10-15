@@ -3,11 +3,13 @@ import DockButton from './DockButton';
 import { useToastStore } from '@ui/Toast';
 import NavigationDragPreview from './NavigationDragPreview';
 import { Fragment } from 'react';
+import { dismissSshStatus, useSshStatusOwner } from '../hooks/useAuxiliarySidebar';
 
 /** Navigation order and sidebar placement share one persisted source of truth. */
 export default function DockNavigation({ side }: { side: DockSide }) {
   const zone = useDockStore(state => side === 'left' ? state.leftZone : state.rightZone);
   const panels = useDockStore(state => side === 'left' ? state.leftPanels : state.rightPanels);
+  const sshStatusOwner = useSshStatusOwner();
   const settingsActive = useSessionStore(state => state.tabs.some(tab => tab.id === state.activeId && tab.kind === 'settings'));
   const dragging = useNavigationDrag(state => state.id);
   const target = useNavigationDrag(state => state.target);
@@ -21,6 +23,11 @@ export default function DockNavigation({ side }: { side: DockSide }) {
       return;
     }
     const dock = useDockStore.getState();
+    if (sshStatusOwner && (side === 'right' || window.innerWidth <= 860)) {
+      dismissSshStatus();
+      dock.openPanel(id);
+      return;
+    }
     const wasOpen = dock.leftPanels.includes(id) || dock.rightPanels.includes(id);
     dock.togglePanel(side, id);
     const next = useDockStore.getState();
@@ -37,7 +44,7 @@ export default function DockNavigation({ side }: { side: DockSide }) {
       <div className={side === 'left' ? 'workspace-activity-actions' : 'workspace-right-actions'}>
         {ids.map(id => {
           const index = zone.indexOf(id);
-          const active = id === 'settings' ? settingsActive : panels.includes(id);
+          const active = id === 'settings' ? settingsActive : panels.includes(id) && !(sshStatusOwner && (side === 'right' || window.innerWidth <= 860));
           const showPlaceholder = !!dragging && !target?.openPanel && target?.side === side && target.index === index;
           return (
             <Fragment key={id}>

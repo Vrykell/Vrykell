@@ -46,8 +46,8 @@ test('the connection screen keeps no scrollbar of its own', async ({ page }) => 
   await emitPtyOutput(page, 'ready\r\n');
   const surface = page.getByTestId('ssh-connection-input');
   await expect(surface.locator('.xterm-viewport')).toHaveCSS('scrollbar-width', 'none');
-  const mode = surface.getByTestId('ssh-input-mode');
-  const disconnect = surface.getByRole('button', { name: '断开连接', exact: true });
+  const mode = page.getByTestId('ssh-input-mode').last();
+  const disconnect = page.getByTestId('ssh-session-toolbar').last().getByRole('button', { name: '断开连接', exact: true });
   await expect(mode).toHaveCSS('height', '32px');
   await expect(disconnect).toHaveCSS('height', '32px');
 });
@@ -65,6 +65,38 @@ test('the connection screen snaps its character cells to whole pixels', async ({
   });
   expect(cellWidth).toBeGreaterThan(0);
   expect(Number.isInteger(cellWidth)).toBe(true);
+});
+
+test('SSH authentication snapshots and disconnected output follow the terminal typography', async ({ page }) => {
+  await openSsh(page, 'known');
+  await emitPtyOutput(page, "user@server's password: ");
+  const snapshot = page.locator('pre[data-testid="ssh-terminal-screen"]');
+  await expect(snapshot).toBeVisible();
+  await expect(snapshot).toHaveCSS('font-size', '14px');
+  await page.evaluate(async () => {
+    const path = '/src/config/typography.ts';
+    const { useTypographyStore } = await import(path) as typeof import('../src/config/typography');
+    useTypographyStore.getState().update({ terminalFontPreset: 'Cascadia Code', terminalFontSize: 18, terminalFontWeight: 600, terminalLineHeight: 1.2 });
+  });
+  await expect(snapshot).toHaveCSS('font-size', '18px');
+  await expect(snapshot).toHaveCSS('font-weight', '600');
+  await expect.poll(() => snapshot.evaluate(element => getComputedStyle(element).fontFamily)).toContain('Cascadia Code');
+  const metrics = await snapshot.evaluate(element => {
+    const css = getComputedStyle(element);
+    const root = getComputedStyle(document.documentElement);
+    return { spacing: css.letterSpacing, expectedSpacing: root.getPropertyValue('--terminal-letter-spacing').trim(), height: css.lineHeight, expectedHeight: root.getPropertyValue('--terminal-row-height').trim() };
+  });
+  expect(metrics.height).toBe(metrics.expectedHeight);
+  expect(metrics.spacing === 'normal' ? '0px' : metrics.spacing).toBe(metrics.expectedSpacing);
+  await page.screenshot({ path: 'test-results/ssh-auth-font-wide.png' });
+  await page.setViewportSize({ width: 720, height: 800 });
+  await expect(snapshot).toHaveCSS('font-size', '18px');
+  await page.screenshot({ path: 'test-results/ssh-auth-font-narrow.png' });
+  await page.getByTestId('ssh-session-toolbar').last().getByRole('button', { name: '取消认证' }).click();
+  const ended = page.getByTestId('ssh-terminal-ended');
+  await expect(ended).toHaveCSS('font-size', '18px');
+  await expect(ended).toHaveCSS('font-weight', '600');
+  await expect.poll(() => ended.evaluate(element => getComputedStyle(element).fontFamily)).toContain('Cascadia Code');
 });
 
 test('native SSH recordings distinguish an empty directory from missing command output', async ({ page }) => {
@@ -134,8 +166,8 @@ test('canceling authentication closes the PTY and leaves no editable password fi
   await response.fill('unsent-secret');
   await expect(response).toHaveCSS('font-size', '20px');
   await expect(response).toHaveCSS('letter-spacing', '2px');
-  await surface.getByRole('button', { name: '取消认证' }).click();
-  await expect(surface.getByRole('status')).toHaveText('已取消认证，SSH 连接已关闭');
+  await page.getByTestId('ssh-session-toolbar').last().getByRole('button', { name: '取消认证' }).click();
+  await expect(page.getByTestId('ssh-session-toolbar').last().getByRole('status')).toHaveText('已取消认证，SSH 连接已关闭');
   expect(await ipcRecords(page, '__PTY_CLOSES__')).toContainEqual({ id: 'e2e-session' });
   await expect(response).toHaveCount(0);
   expect(await ptyWrites(page)).not.toContain('unsent-secret\r');
@@ -168,18 +200,18 @@ test('SSH block mode remains directly interactive when the remote server has no 
 
   // A forced-command/chat server can redraw its normal screen without emitting OSC 133.
   await emitPtyOutput(page, '\r\n\x1b[2J\x1b[H已登录交互程序\r\n方向键选择，Enter 确认，Esc 退出\r\nuser@server\'s password: ');
-  await expect(surface.getByRole('status')).toHaveText('SSH 交互会话');
+  await expect(page.getByTestId('ssh-session-toolbar').last().getByRole('status')).toHaveText('SSH 交互会话');
   await expect(surface.getByLabel('SSH 认证响应')).toHaveCount(0);
   await expect(surface.locator('.xterm-screen')).toBeVisible();
 
   // 输入方式是显式单选（共享 Select），不再是会翻转文字的按钮
-  await surface.getByTestId('ssh-input-mode').click();
+  await page.getByTestId('ssh-input-mode').last().click();
   await page.getByRole('option', { name: '密码输入' }).click();
   await expect(surface.getByLabel('SSH 认证响应')).toBeVisible();
   // 屏幕冻结成快照（live 渲染停下，不会再留下终端光标）
   await expect(surface.locator('pre[data-testid="ssh-terminal-screen"]')).toBeVisible();
   await expect(surface.locator('.xterm-screen')).toBeHidden();
-  await surface.getByTestId('ssh-input-mode').click();
+  await page.getByTestId('ssh-input-mode').last().click();
   await page.getByRole('option', { name: '直接输入' }).click();
 
   await surface.getByRole('textbox', { name: 'SSH 交互终端' }).click();
@@ -187,8 +219,8 @@ test('SSH block mode remains directly interactive when the remote server has no 
   await page.keyboard.press('Enter');
   await page.keyboard.press('Escape');
   expect(await ptyWrites(page)).toEqual(expect.arrayContaining(['\x1b[B', '\r', '\x1b']));
-  await surface.getByRole('button', { name: '断开连接' }).click();
-  await expect(surface.getByRole('status')).toHaveText('已断开 SSH 连接');
+  await page.getByTestId('ssh-session-toolbar').last().getByRole('button', { name: '断开连接' }).click();
+  await expect(page.getByTestId('ssh-session-toolbar').last().getByRole('status')).toHaveText('已断开 SSH 连接');
   // 原因直接印在屏幕上，不用展开任何折叠区
   await expect(surface.getByTestId('ssh-terminal-ended')).toContainText('已登录交互程序');
 });

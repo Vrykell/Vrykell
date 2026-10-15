@@ -35,6 +35,8 @@ import { cancelTerminalInput, writeTerminalInput } from '@features/terminal/serv
 import { querySequences } from '@features/terminal/model/terminalQueries';
 import { getCellMetrics } from '@utils/termMetrics';
 import type { DispatchEvent } from '@core/terminal/events';
+import type { SshLogEntry } from '@core/ssh';
+import { appendLogEntry, connectionLogLines, isSshClientNotice } from '../model/connectionLog';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import { getTerminalFontOptions, measureTerminalDomCellWidth } from '@features/terminal/model/terminalFont';
 import { prepareSshHost } from '@features/ssh/services/hostTrust';
@@ -124,6 +126,8 @@ export function useTerminalSession(
   const containerRef = useRef<HTMLDivElement>(null);
   const [attempt, setAttempt] = useState(0);
   const [status, setStatus] = useState<'connecting' | 'ready' | 'closed' | 'error'>('connecting');
+  const [sshAuthenticated, setSshAuthenticated] = useState(false);
+  const [sshLog, setSshLog] = useState<SshLogEntry[]>([]);
   const [frame, setFrame] = useState<TerminalFrame | null>(null);
   const closeSessionRef = useRef<() => Promise<void>>(async () => {});
   const closeSession = useCallback(() => closeSessionRef.current(), []);
@@ -162,6 +166,7 @@ export function useTerminalSession(
     const el = containerRef.current;
     if (!el) return;
     setStatus('connecting');
+    setSshAuthenticated(false);
     useTerminalStore.getState().setStartupState(paneId, 'starting');
 
     const term = new Terminal({
@@ -433,10 +438,22 @@ export function useTerminalSession(
     };
     const handleOutput = (events: DispatchEvent[]) => {
       controller.handleEvents(events);
+      if (spec?.kind === 'ssh') {
+        // Shell output must never enter the connection log, including non-integrated sessions.
+        const output = events
+          .filter((event): event is Extract<DispatchEvent, { kind: 'data' }> => event.kind === 'data')
+          .map((event) => event.text)
+          .join('');
+        const time = Date.now();
+        const lines = output ? connectionLogLines(output).filter(isSshClientNotice) : [];
+        if (lines.length) setSshLog(entries => lines.reduce((log, line) => appendLogEntry(log, { time, text: line }), entries));
+      }
       // A real prompt marker also renews the budget after an earlier idle-readiness fallback.
       if (events.some(event => event.kind === 'osc' && event.code === '133;B')) {
         promptReady = true;
+        if (spec?.kind === 'ssh') setSshAuthenticated(true);
         if (spec?.kind === 'ssh') reconnectAttemptsRef.current = 0;
+        if (spec?.kind === 'ssh') setSshLog(entries => appendLogEntry(entries, { time: Date.now(), text: t('Shell ready') }));
       }
       if (startupComplete) return;
       // Non-integrated command shells have no OSC readiness marker.
@@ -497,6 +514,7 @@ export function useTerminalSession(
           useTerminalStore.getState().clearSession(paneId, id);
           setStatus('closed');
           writeMain(`\r\n\x1b[31m${t('terminal.processExited')}\x1b[0m\r\n`);
+          if (spec?.kind === 'ssh') setSshLog(entries => appendLogEntry(entries, { time: Date.now(), text: code == null ? t('Connection ended') : t('Connection ended (exit code {{code}})', { code }) }));
           if (code !== 255 && code !== null) setRetry(previous => ({ ...previous, phase: 'idle', seconds: 0 }));
           scheduleAutoReconnect(code);
         }
@@ -861,5 +879,5 @@ export function useTerminalSession(
     };
   }, [paneId, tabId, attempt]);
 
-  return { ref: containerRef, closeSession, reconnect, stopReconnect, retry, status, frame };
+  return { ref: containerRef, closeSession, reconnect, stopReconnect, retry, status, frame, sshAuthenticated, sshLog };
 }
