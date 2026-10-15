@@ -19,7 +19,7 @@ import DirectoryPicker from './DirectoryPicker';
 import CommandSyntax from './CommandSyntax';
 import CompletionControl from './CompletionControl';
 import { useTypographyStore } from '@config/typography';
-import { useRef } from 'react';
+import { useRef, type ReactNode } from 'react';
 
 
 interface Props {
@@ -31,6 +31,10 @@ interface Props {
   runningCommand?: string;
   onEndPress?: () => void;
   forceHidden?: boolean;
+  onSessionStatusClick?: () => void;
+  onSessionStatusReady?: (trigger: HTMLButtonElement | null) => void;
+  sessionNotice?: ReactNode;
+  sessionStatusOpen?: boolean;
   /** 左右缩进（与命令块一致：内边 4 / 外缘 8） */
   insetLeft?: number;
   insetRight?: number;
@@ -43,6 +47,10 @@ export default function InputEditor({
   runningCommand,
   onEndPress,
   forceHidden,
+  onSessionStatusClick,
+  onSessionStatusReady,
+  sessionNotice,
+  sessionStatusOpen,
   insetLeft = 8,
   insetRight = 8,
 }: Props) {
@@ -70,6 +78,8 @@ export default function InputEditor({
   if (!visible) {
     const hint = getLongRunningHint(runningCommand || '');
     return (
+      <>
+      {sessionNotice}
       <div
         ref={panelRef}
         style={{
@@ -96,12 +106,14 @@ export default function InputEditor({
             flexShrink: 0,
           }}
         />
+        {onSessionStatusClick && <TextButton ref={onSessionStatusReady} className="terminal-chip" aria-expanded={sessionStatusOpen ?? false} data-testid="ssh-status-toggle" aria-label={t('SSH status')} data-tip={t(sessionStatusOpen ? 'Close SSH status' : 'Open SSH status')} onClick={onSessionStatusClick}><ShellIndicator compact connected={hasSession} focused={isFocused} label={terminalLabel} /></TextButton>}
         <span style={{ flex: 1 }}>{hint}</span>
         <IconButton compact data-subtle onClick={onEndPress} data-tip={t('Jump to latest output')}
           data-tip-shortcut="End" aria-label={t('Jump to latest output')}>
           <ArrowDown size={iconSizes.compact} />
         </IconButton>
       </div>
+      </>
     );
   }
 
@@ -114,6 +126,7 @@ export default function InputEditor({
       padding: `10px ${insetRight + 4}px 12px ${insetLeft + 4}px`,
       background: 'var(--xterm-bg)',
     }}>
+      {sessionNotice}
       <div
         className="terminal-composer"
         style={{ padding: '10px 12px 8px' }}
@@ -209,7 +222,7 @@ export default function InputEditor({
             userSelect: 'none',
           }}
         >
-          <ShellIndicator connected={hasSession} focused={isFocused} label={terminalLabel} />
+          {onSessionStatusClick ? <TextButton ref={onSessionStatusReady} className="terminal-chip" aria-expanded={sessionStatusOpen ?? false} data-testid="ssh-status-toggle" aria-label={t('SSH status')} data-tip={t(sessionStatusOpen ? 'Close SSH status' : 'Open SSH status')} onClick={onSessionStatusClick}><ShellIndicator compact connected={hasSession} focused={isFocused} label={terminalLabel} /></TextButton> : <ShellIndicator connected={hasSession} focused={isFocused} label={terminalLabel} />}
           <DirectoryPicker paneId={paneId} dir={tabCwd} />
           {recentGitBranch && (
             <GitBranchLabel branch={recentGitBranch} />

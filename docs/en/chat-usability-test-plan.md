@@ -36,7 +36,7 @@ For each case record steps, actual outcome, pass/fail/limited status, screenshot
 | C22 | Rename a conversation, find it in history and reload | Empty/long title and cancel | Clear naming behavior; navigation remains visible; restored name agrees |
 | C23 | Close/reopen the panel and reload | Unsent draft, messages and attachments | Panel toggling retains content; reload behavior matches product promises |
 | C24 | Select a terminal, change workspace and close the selected terminal | Discussion, disconnection and another live terminal | No silent retargeting; clear disconnection; discussion remains usable |
-| C25 | Inspect tool execution and approval results | Running, pending approval, failed and stopped | Readable state/results; reachable actions; plain assistant content |
+| C25 | Inspect tool execution and approval results | Running, pending approval, failed and stopped | Readable state/results without extra words: a success stays quiet (no state word and no exit code), a failure shows its red error box, and running, awaiting approval and denied stay labelled; a failure opens expanded and can be collapsed again from its row; reachable actions; plain assistant content |
 | C26 | Resize the panel/window and increase UI font size | 180/320/480px panel, 720px window, 150% font | No offscreen controls; sensible truncation; usable dialogs and menus |
 | C27 | Switch conversations during send, regenerate or editing | Other draft and background request | Clear working-conversation indicator; actions target the correct conversation |
 | C28 | Inspect persistence errors and retry saving | Question, answer or deletion save failure | Retained in-memory content; clear error; reload agrees after successful retry |

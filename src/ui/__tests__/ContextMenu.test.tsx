@@ -44,4 +44,28 @@ describe('independent action menus', () => {
     expect(screen.queryByRole('menu')).toBeNull();
     expect(trigger).toHaveFocus();
   });
+
+  it('marks the current option of a radio-style group', () => {
+    render(<ContextMenu anchor={{ x: 0, y: 0 }} items={[
+      { label: 'Classic mode', checked: true, onClick: () => {} },
+      { label: 'Block mode', checked: false, onClick: () => {} },
+    ]} onClose={() => {}} />);
+    expect(screen.getByRole('menuitemradio', { name: 'Classic mode' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('menuitemradio', { name: 'Block mode' })).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('keeps one mark column across radio and plain rows', () => {
+    render(<ContextMenu anchor={{ x: 0, y: 0 }} items={[
+      { label: 'Edit', onClick: () => {} },
+      { label: 'Classic mode', checked: true, onClick: () => {} },
+    ]} onClose={() => {}} />);
+    const rows = screen.getByRole('menu').querySelectorAll('.workspace-floating-row');
+    expect(rows).toHaveLength(2);
+    for (const row of rows) expect(row.querySelector('[data-check-slot]')).not.toBeNull();
+  });
+
+  it('adds no mark column to menus without radio rows', () => {
+    render(<ContextMenu anchor={{ x: 0, y: 0 }} items={[{ label: 'Copy', onClick: () => {} }]} onClose={() => {}} />);
+    expect(screen.getByRole('menu').querySelector('[data-check-slot]')).toBeNull();
+  });
 });

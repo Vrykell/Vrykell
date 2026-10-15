@@ -85,4 +85,12 @@ test('continuous classic output does not extract HTML frames or delay native key
   expect(timings.keys).toBe(12);
   expect(timings.maximumInputFrameMs).toBeLessThan(250);
   await expectAnyTermContains(page, 'continuous-output');
+  // One second of the data path is one aggregated record: a burst of 100 output batches must not
+  // write hundreds of them (it did before the window: five records per batch).
+  await page.waitForTimeout(1100);
+  const log = await page.evaluate(() => (window as unknown as { __DIAGNOSTIC_RECORDS__: { event: string; detail: Record<string, unknown> }[] }).__DIAGNOSTIC_RECORDS__);
+  const pipeline = log.filter(record => record.event === 'terminal-io');
+  expect(pipeline.length).toBeGreaterThan(0);
+  expect(pipeline.length).toBeLessThan(5);
+  expect(pipeline.reduce((sum, record) => sum + Number(record.detail.rxBatches), 0)).toBeGreaterThanOrEqual(100);
 });

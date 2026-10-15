@@ -29,7 +29,7 @@ vi.mock('@xterm/xterm', () => ({
     cols = 80;
     rows = 24;
     options = { fontSize: 13 };
-    buffer = { active: { viewportY: 0, baseY: 0, cursorY: 0 } };
+    buffer = { active: { viewportY: 0, baseY: 0, cursorY: 0, getLine: () => undefined, getNullCell: () => ({}) } };
     element = document.createElement('div');
     parser = { registerOscHandler: () => {} };
     loadAddon() {}
@@ -111,8 +111,8 @@ function setSshTab(autoReconnect: boolean) {
 }
 
 function TestHarness({ tabId, onReady }: { tabId: string; onReady: (sessionId: string) => void }) {
-  const { ref, closeSession, reconnect } = useTerminalSession(tabId, tabId, onReady);
-  return <><div ref={ref} data-testid="term-host" /><button onClick={() => void closeSession()}>关闭连接</button><button onClick={() => void reconnect()}>重连</button></>;
+  const { ref, closeSession, reconnect, sshAuthenticated, sshLog } = useTerminalSession(tabId, tabId, onReady);
+  return <><div ref={ref} data-testid="term-host" /><output data-testid="ssh-auth-state">{sshAuthenticated ? 'authenticated' : 'unconfirmed'}</output><output data-testid="ssh-log">{sshLog.map(entry => entry.text).join(' | ')}</output><button onClick={() => void closeSession()}>关闭连接</button><button onClick={() => void reconnect()}>重连</button></>;
 }
 
 describe('useTerminalSession', () => {
@@ -145,6 +145,45 @@ describe('useTerminalSession', () => {
   it('configures a 10px native scrollbar so fitting uses the same width', () => {
     render(<TestHarness tabId="t1" onReady={() => {}} />);
     expect(terminalInitOptions[0]?.overviewRuler).toEqual({ width: 10, showTopBorder: false, showBottomBorder: false });
+  });
+
+  it('confirms SSH authentication only after a remote prompt marker and resets on reconnect', async () => {
+    setSshTab(false);
+    const view = render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
+    expect(view.getByTestId('ssh-auth-state')).toHaveTextContent('unconfirmed');
+    vi.useFakeTimers();
+    try {
+      await act(async () => {
+        ptyOutputHandlers[0]!('sess-x', [{ kind: 'data', text: 'Password:' }]);
+        await vi.advanceTimersByTimeAsync(2600);
+      });
+      expect(useTerminalStore.getState().startupStates.t1).toBe('ready');
+      expect(view.getByTestId('ssh-auth-state')).toHaveTextContent('unconfirmed');
+      await act(async () => { ptyOutputHandlers[0]!('sess-x', [{ kind: 'osc', code: '133;B', payload: '', raw: '\x1b]133;B\x07' }]); });
+      expect(view.getByTestId('ssh-auth-state')).toHaveTextContent('authenticated');
+      await act(async () => { fireEvent.click(view.getByText('重连')); });
+      expect(view.getByTestId('ssh-auth-state')).toHaveTextContent('unconfirmed');
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('logs real client output, shell readiness and the exit code', async () => {
+    setSshTab(false);
+    const view = render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
+    const log = () => view.getByTestId('ssh-log').textContent ?? '';
+    await act(async () => { ptyOutputHandlers[0]!('sess-x', [{ kind: 'data', text: 'private-shell-output-before-any-marker\r\n' }]); });
+    expect(log()).not.toContain('private-shell-output-before-any-marker');
+    await act(async () => { ptyOutputHandlers[0]!('sess-x', [{ kind: 'data', text: '\x1b[31mWarning: Permanently added server to the list of known hosts.\x1b[0m\r\n' }]); });
+    expect(log()).toContain('Warning: Permanently added server');
+    await act(async () => { ptyOutputHandlers[0]!('sess-x', [{ kind: 'osc', code: '133;B', payload: '', raw: '\x1b]133;B\x07' }]); });
+    expect(log()).toContain('远端 Shell 就绪');
+    await act(async () => { ptyOutputHandlers[0]!('sess-x', [{ kind: 'data', text: 'deploy@server$ ls\r\n' }]); });
+    expect(log()).not.toContain('deploy@server$ ls');
+    await act(async () => { ptyOutputHandlers[0]!('sess-x', [{ kind: 'data', text: 'Connection to server closed.\r\n' }]); });
+    expect(log()).toContain('Connection to server closed.');
+    await act(async () => { ptyExitHandlers[0]!('sess-x', 0); });
+    expect(log()).toContain('连接结束（退出码 0）');
   });
 
   it('keeps startup pending until the shell emits its prompt-end marker', async () => {

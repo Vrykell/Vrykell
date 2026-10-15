@@ -22,6 +22,8 @@ export interface ContextMenuItem {
   disabled?: boolean;
   /** Optional keyboard shortcut displayed at the end of the row. */
   shortcut?: string;
+  /** Radio/switch state; renders a leading mark and exposes menuitemradio semantics. */
+  checked?: boolean;
 }
 
 interface Props {
@@ -35,7 +37,7 @@ interface Props {
 }
 
 /** Shared action menu with viewport placement and keyboard navigation. */
-export default function ContextMenu({ anchor, items, onClose, label = t('More actions'), description, itemRole, footer }: Props) {
+export default function ContextMenu({ anchor, items, onClose, label = t('Action menu'), description, itemRole, footer }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   useExclusiveMenu(ref, onClose, anchor.trigger);
   const position = useFloatingPanelPosition(ref, anchor);
@@ -103,8 +105,10 @@ export default function ContextMenu({ anchor, items, onClose, label = t('More ac
 /** All action menus share ordering, group boundaries and row controls. */
 export function ContextMenuItems({ items, onClose, itemRole }: { items: ContextMenuItem[]; onClose: () => void; itemRole?: 'menuitem' }) {
   const ordered = orderMenuItems(items);
+  // Menus that show radio marks keep one mark column so every label starts at the same x.
+  const indent = ordered.some((item) => item.checked !== undefined);
   return <>{ordered.map((item, index) => <Fragment key={`${menuGroup(item)}-${item.label}`}>
     {index > 0 && menuGroup(item) !== menuGroup(ordered[index - 1]!) && <div role="separator" className="context-menu-separator" />}
-    <MenuItem role={itemRole} disabled={item.disabled} label={item.label} danger={item.danger} shortcut={item.shortcut} onClick={() => { item.onClick(); onClose(); }} />
+    <MenuItem role={itemRole} disabled={item.disabled} label={item.label} danger={item.danger} shortcut={item.shortcut} checked={item.checked} indent={indent} onClick={() => { item.onClick(); onClose(); }} />
   </Fragment>)}</>;
 }

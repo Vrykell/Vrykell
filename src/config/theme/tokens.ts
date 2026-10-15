@@ -126,7 +126,6 @@ export interface ThemePalette {
   // 特殊
   tuiBanner: string;
   codeBg: string;
-  thBg: string;
   commandBlockBg: string;     // CommandBlock 微妙的背景
   aiBlockBg: string;
   failedBlockBg: string;
@@ -218,8 +217,8 @@ const dark: ThemePalette = {
   accentWarmDim: 'rgba(188,188,188,0.18)',
 
   // 用户消息：浅灰
-  accentUser: '#A5A5A5',
-  accentUserDim: 'rgba(165,165,165,0.15)',
+  accentUser: '#173E76',
+  accentUserDim: 'rgba(23,62,118,0.25)',
 
   // Semantic colors remain independent from decorative accents.
   success: '#89D185',
@@ -264,7 +263,6 @@ const dark: ThemePalette = {
 
   tuiBanner: '#BCBCBC',
   codeBg: 'rgba(255,255,255,0.06)',
-  thBg: 'rgba(255,255,255,0.05)',
   commandBlockBg: '#292929',
   aiBlockBg: '#1E2B38',
   failedBlockBg: '#392324',
@@ -383,8 +381,8 @@ const light: ThemePalette = {
   accentWarm: '#4F4F4F',
   accentWarmDim: 'rgba(79,79,79,0.12)',
 
-  accentUser: '#5D5D5D',
-  accentUserDim: 'rgba(93,93,93,0.12)',
+  accentUser: '#D9E4F7',
+  accentUserDim: 'rgba(23,62,118,0.12)',
 
   success: '#2F8132',
   successDim: 'rgba(47,129,50,0.12)',
@@ -427,7 +425,6 @@ const light: ThemePalette = {
 
   tuiBanner: '#4F4F4F',
   codeBg: 'rgba(0,0,0,0.04)',
-  thBg: 'rgba(0,0,0,0.03)',
   commandBlockBg: '#F0F0F0',
   aiBlockBg: '#DBEAF9',
   failedBlockBg: '#F6E9E9',
@@ -573,7 +570,6 @@ export function paletteToCssVars(p: ThemePalette): Record<string, string> {
     '--error-badge-bg': p.errorBadgeBg,
     '--tui-banner': p.tuiBanner,
     '--code-bg': p.codeBg,
-    '--th-bg': p.thBg,
     '--command-block-bg': p.commandBlockBg,
     '--ai-block-bg': p.aiBlockBg,
     '--failed-block-bg': p.failedBlockBg,

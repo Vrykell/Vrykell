@@ -116,8 +116,6 @@ export default function PanelTabs() {
   const draggedTabId = useListReorder((s) => (s.drag && s.drag.kind !== 'group' ? s.drag.id : undefined));
   const remainingUngrouped = ungroupedTabs.filter((tab) => tab.id !== draggedTabId);
   const lastUngroupedId = remainingUngrouped[remainingUngrouped.length - 1]?.id;
-  const activeTab = tabs.find((t) => t.id === activeId);
-  const activeGroupId = activeTab && isSessionTab(activeTab) ? activeTab.groupId : undefined;
 
   const ctxTab = ctxMenu ? tabs.find((t) => t.id === ctxMenu.tabId) : undefined;
   const ctxItems: ContextMenuItem[] = ctxMenu && ctxTab
@@ -187,7 +185,8 @@ export default function PanelTabs() {
         <IconBtn title="会话历史" data-testid="tab-history-btn" onClick={openHistoryTab}>
           <History size={iconSizes.control} />
         </IconBtn>
-        <IconBtn title="新建终端" data-testid="tab-new-btn" onClick={() => { setModalGroupId(activeGroupId); setModalOpen(true); }}>
+        {/* The panel button always creates ungrouped tabs; only a group's own + assigns that group. */}
+        <IconBtn title="新建终端" data-testid="tab-new-btn" onClick={() => { setModalGroupId(undefined); setModalOpen(true); }}>
           <Plus size={iconSizes.control} />
         </IconBtn>
       </div>
@@ -354,6 +353,7 @@ function GroupSection(props: {
           className="tab-group-header"
           data-group-header-id={group.id}
           data-header-selected={(collapsed && anyMemberActive) ? 'true' : 'false'}
+          data-renaming={props.renamingGroupId === group.id ? 'true' : undefined}
           data-testid={`group-header-${group.id}`}
           data-reorder-item={group.id}
           data-reorder-kind="group"
@@ -396,7 +396,7 @@ function GroupSection(props: {
               }}
             />
           ) : (
-            <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <span data-testid={`group-title-${group.id}`} className="tab-group-title" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
               <span style={{
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 fontSize: 'calc(13px * var(--ui-font-scale))', lineHeight: '18px', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)',

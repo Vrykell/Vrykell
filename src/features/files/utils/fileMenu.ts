@@ -38,6 +38,8 @@ export interface FileMenuHandlers {
   onReveal?: (entry: FsEntry) => void;
   /** 在系统文件管理器中定位当前文件夹（⋯ 菜单，本地专有）。 */
   onRevealDir?: (dir: string) => void;
+  /** Show the properties dialog for a single entry. */
+  onProperties?: (entry: FsEntry) => void;
 }
 
 export interface FileMenuContext {
@@ -101,6 +103,11 @@ function itemFor(key: FileMenuItemKey, ctx: FileMenuContext): ContextMenuItem | 
         return { label: t('files.reveal.dir'), onClick: () => handlers.onRevealDir!(dir) };
       }
       return null;
+    case 'properties':
+      // Single entry only: a multi-selection has no single set of properties to show.
+      return single && count === 1 && handlers.onProperties
+        ? { label: t('Properties'), onClick: () => handlers.onProperties!(single) }
+        : null;
     case 'rename':
       return single ? { label: '重命名', onClick: () => handlers.onRename(single) } : null;
     case 'download':

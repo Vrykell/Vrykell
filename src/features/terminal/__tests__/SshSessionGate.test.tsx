@@ -9,7 +9,9 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); useSessionStore.setState({ ta
 it('does not mount the connecting terminal for a deleted profile and lets the user reconnect independently', async () => {
   vi.mocked(listSshConnections).mockResolvedValue([]);
   useSessionStore.setState({ tabs: [{ id: 'tab', title: 'Saved', kind: 'session', layout: leaf({ id: 'pane', kind: 'ssh', ssh: { name: 'Saved', host: 'saved.test', connectionId: 'deleted' } }) }], activeId: 'tab' });
-  await act(async () => { render(<SshSessionGate connectionId="deleted" paneId="pane" tabId="tab"><div>Connecting terminal</div></SshSessionGate>); });
+  const stateChanged = vi.fn();
+  await act(async () => { render(<SshSessionGate connectionId="deleted" paneId="pane" tabId="tab" onSshStateChange={stateChanged}><div>Connecting terminal</div></SshSessionGate>); });
+  expect(stateChanged).toHaveBeenLastCalledWith({ phase: 'unavailable', reconnectAttempt: 0, retrying: false, log: [] });
   expect(screen.queryByText('Connecting terminal')).not.toBeInTheDocument();
   expect(screen.getByText('原 SSH 连接已被删除')).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: '使用历史地址连接' }));
@@ -24,8 +26,11 @@ it('mounts the terminal only after the connection reference is verified', async 
 it('offers a retry when profile lookup fails and can verify the reference on the next attempt', async () => {
   vi.mocked(listSshConnections).mockRejectedValueOnce(new Error('lookup unavailable'))
     .mockResolvedValueOnce([{ id: 'live', name: 'Live', host: 'live.test', user: '', authMethod: 'key' }]);
-  await act(async () => { render(<SshSessionGate connectionId="live" paneId="pane" tabId="tab"><div>Connected terminal</div></SshSessionGate>); });
+  const stateChanged = vi.fn();
+  await act(async () => { render(<SshSessionGate connectionId="live" paneId="pane" tabId="tab" onSshStateChange={stateChanged}><div>Connected terminal</div></SshSessionGate>); });
+  expect(stateChanged).toHaveBeenLastCalledWith({ phase: 'unavailable', reconnectAttempt: 0, retrying: false, log: [] });
   expect(screen.queryByText('Connected terminal')).not.toBeInTheDocument();
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '重试' })); });
+  expect(stateChanged).toHaveBeenLastCalledWith({ phase: 'connecting', reconnectAttempt: 0, retrying: false, log: [] });
   expect(screen.getByText('Connected terminal')).toBeVisible();
 });

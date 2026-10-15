@@ -10,14 +10,182 @@ use crate::files::fs::{FileOpOutcome, FileOpPair};
 use crate::terminal::ssh_command::SshOptions;
 use base64::Engine;
 use serde::Serialize;
-use ssh2::{CheckResult, HostKeyType, KnownHostFileKind, KnownHostKeyFormat, Session, Sftp};
+use ssh2::{CheckResult, ExtendedData, HostKeyType, KnownHostFileKind, KnownHostKeyFormat, Session, Sftp};
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::path::Path;
 use std::time::Duration;
 use tauri::State;
+use super::session_auth::{AuthMethod, Credential, AUTH_CACHE};
+use zeroize::Zeroizing;
 
 static KH_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SshSystemStatus {
+    system: String,
+    hostname: String,
+    latency_ms: u128,
+    uptime_seconds: Option<f64>,
+    load: String,
+    cpu_total: Option<f64>,
+    cpu_idle: Option<f64>,
+    memory_total: Option<f64>,
+    memory_available: Option<f64>,
+    disk_total: Option<f64>,
+    disk_used: Option<f64>,
+}
+
+const STATUS_COMMAND: &str = r#"printf 'system=%s\n' "$(uname -sr 2>/dev/null)"
+printf 'hostname=%s\n' "$(hostname 2>/dev/null)"
+if [ -r /proc/uptime ]; then awk '{print "uptime=" $1}' /proc/uptime; fi
+if [ -r /proc/loadavg ]; then awk '{print "load=" $1 " " $2 " " $3}' /proc/loadavg; fi
+if [ -r /proc/stat ]; then awk '/^cpu / {total=0; for(i=2;i<=9;i++) total+=$i; printf "cpuTotal=%.0f\ncpuIdle=%.0f\n", total, $5+$6; exit}' /proc/stat; fi
+if [ -r /proc/meminfo ]; then awk '/^MemTotal:/ {printf "memoryTotal=%.0f\n", $2*1024} /^MemAvailable:/ {printf "memoryAvailable=%.0f\n", $2*1024}' /proc/meminfo; fi
+LC_ALL=C df -Pk / 2>/dev/null | awk 'NR==2 {printf "diskTotal=%.0f\ndiskUsed=%.0f\n", $2*1024, $3*1024}'
+"#;
+
+fn parse_system_status(output: &str, latency_ms: u128) -> SshSystemStatus {
+    let fields: std::collections::HashMap<&str, &str> = output.lines().filter_map(|line| line.split_once('=')).collect();
+    let number = |key: &str| fields.get(key).and_then(|value| value.parse::<f64>().ok()).filter(|value| value.is_finite() && *value >= 0.0);
+    let string = |key: &str| fields.get(key).copied().unwrap_or_default().to_owned();
+    SshSystemStatus { system: string("system"), hostname: string("hostname"), latency_ms,
+        uptime_seconds: number("uptime"), load: string("load"), cpu_total: number("cpuTotal"), cpu_idle: number("cpuIdle"),
+        memory_total: number("memoryTotal"), memory_available: number("memoryAvailable"), disk_total: number("diskTotal"), disk_used: number("diskUsed") }
+}
+
+fn ssh_system_status_sync(conn: &SshConnection) -> Result<SshSystemStatus, String> {
+    let session = connect_with_timeout(conn, Some(Duration::from_secs(5)))?;
+    session.set_timeout(5000);
+    let started = std::time::Instant::now();
+    let mut probe = session.channel_session().map_err(|error| error.to_string())?;
+    probe.handle_extended_data(ExtendedData::Merge).map_err(|error| error.to_string())?;
+    probe.exec("true").map_err(|error| error.to_string())?;
+    probe.send_eof().map_err(|error| error.to_string())?;
+    let discarded = std::io::copy(&mut (&mut probe).take(16385), &mut std::io::sink()).map_err(|error| error.to_string())?;
+    if discarded > 16384 { return Err("Probe response exceeded the size limit".into()); }
+    probe.wait_eof().map_err(|error| error.to_string())?;
+    probe.close().map_err(|error| error.to_string())?;
+    probe.wait_close().map_err(|error| error.to_string())?;
+    let latency = started.elapsed().as_millis();
+    let mut channel = session.channel_session().map_err(|error| error.to_string())?;
+    channel.handle_extended_data(ExtendedData::Merge).map_err(|error| error.to_string())?;
+    channel.exec("sh -s").map_err(|error| error.to_string())?;
+    channel.write_all(STATUS_COMMAND.as_bytes()).map_err(|error| error.to_string())?;
+    channel.send_eof().map_err(|error| error.to_string())?;
+    let mut output = String::new();
+    // Bound remote output even when the server replaces the requested command.
+    (&mut channel).take(16385).read_to_string(&mut output).map_err(|error| error.to_string())?;
+    if output.len() > 16384 { return Err("Resource response exceeded the size limit".into()); }
+    channel.wait_eof().map_err(|error| error.to_string())?;
+    channel.close().map_err(|error| error.to_string())?;
+    channel.wait_close().map_err(|error| error.to_string())?;
+    if channel.exit_status().map_err(|error| error.to_string())? != 0 { return Err("Remote resource command failed".into()); }
+    let status = parse_system_status(&output, latency);
+    if status.system.is_empty() { return Err("Remote system does not support resource collection".into()); }
+    Ok(status)
+}
+
+/// Read system metadata independently of the interactive terminal.
+#[tauri::command]
+pub async fn ssh_system_status(state: State<'_, HistoryState>, id: String, host: String, port: u16, user: Option<String>) -> Result<SshSystemStatus, String> {
+    let conn = {
+        let db = state.0.lock().map_err(|error| error.to_string())?;
+        db.get_ssh_connection(&id)?
+    };
+    if conn.host != host || conn.port.unwrap_or(22) != port || user.as_ref().is_some_and(|user| *user != conn.user) {
+        return Err("Saved connection address changed. Reopen the terminal to monitor its resources.".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || connection_stage(&conn, "resource-collection", || ssh_system_status_sync(&conn)))
+        .await.map_err(|error| error.to_string())?
+}
+
+#[cfg(test)]
+mod status_tests {
+    use super::{connect_with_timeout, parse_system_status, ssh_system_status_sync, STATUS_COMMAND};
+
+    #[test]
+    #[ignore = "Requires VRYKELL_SSH_PROFILE_ID and a reachable saved SSH profile"]
+    fn saved_profile_supports_sftp_and_resource_collection() -> Result<(), String> {
+        let id = std::env::var("VRYKELL_SSH_PROFILE_ID").map_err(|error| error.to_string())?;
+        let home = dirs::home_dir().ok_or("Home directory is unavailable")?;
+        let database = rusqlite::Connection::open_with_flags(
+            home.join(".vrykell/history.db"), rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        ).map_err(|error| error.to_string())?;
+        let profile = database.query_row(
+            "SELECT name, host, port, user, auth_method, options_json FROM ssh_connections WHERE id = ?1",
+            rusqlite::params![id],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, Option<u16>>(2)?,
+                row.get::<_, String>(3)?, row.get::<_, String>(4)?, row.get::<_, String>(5)?)),
+        ).map_err(|error| error.to_string())?;
+        let connection = crate::db::SshConnection {
+            password: crate::secret::get_secret(&id).unwrap_or_default(), id, name: profile.0,
+            host: profile.1, port: profile.2, user: profile.3, auth_method: profile.4,
+            options: serde_json::from_str(&profile.5).map_err(|error| error.to_string())?,
+            last_opened_at: None, has_password: false,
+        };
+        let session = connect_with_timeout(&connection, Some(std::time::Duration::from_secs(5)))?;
+        session.set_timeout(5000);
+        println!("Authentication: succeeded");
+        let files = session.sftp().map_err(|error| error.to_string()).and_then(|sftp| {
+            let directory = sftp.realpath(std::path::Path::new(".")).map_err(|error| error.to_string())?;
+            sftp.readdir(&directory).map(|entries| entries.len()).map_err(|error| error.to_string())
+        });
+        match &files {
+            Ok(count) => println!("SFTP: succeeded ({count} directory entries)"),
+            Err(error) => println!("SFTP: failed: {error}"),
+        }
+        drop(session);
+        let resources = ssh_system_status_sync(&connection);
+        match &resources {
+            Ok(status) => println!("Resources: succeeded (CPU={}, memory={}, disk={})",
+                status.cpu_total.is_some(), status.memory_total.is_some(), status.disk_total.is_some()),
+            Err(error) => println!("Resources: failed: {error}"),
+        }
+        files?;
+        resources?;
+        Ok(())
+    }
+
+    #[test]
+    fn collects_system_metadata_from_a_script_on_standard_input() {
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+        #[cfg(windows)]
+        let shell = std::path::Path::new("C:/Program Files/Git/usr/bin/sh.exe");
+        #[cfg(windows)]
+        if !shell.exists() { return; }
+        #[cfg(not(windows))]
+        let shell = std::path::Path::new("sh");
+        let mut child = Command::new(shell).arg("-s")
+            .env("PATH", "/usr/bin:/bin")
+            .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped())
+            .spawn().expect("A POSIX shell is required for the collection test");
+        child.stdin.take().unwrap().write_all(STATUS_COMMAND.as_bytes()).unwrap();
+        let output = child.wait_with_output().unwrap();
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        let status = parse_system_status(&String::from_utf8_lossy(&output.stdout), 0);
+        assert!(!status.system.is_empty());
+        assert!(!status.hostname.is_empty());
+    }
+
+    #[test]
+    fn parses_resource_samples_and_keeps_missing_values_unavailable() {
+        let status = parse_system_status("system=Linux 6.8\nhostname=node\nuptime=90.5\nload=0.1 0.2 0.3\ncpuTotal=1000\ncpuIdle=700\nmemoryTotal=8192\nmemoryAvailable=4096\ndiskTotal=10000\ndiskUsed=3000", 42);
+        assert_eq!(status.system, "Linux 6.8");
+        assert_eq!(status.latency_ms, 42);
+        assert_eq!(status.uptime_seconds, Some(90.5));
+        assert_eq!(status.cpu_idle, Some(700.0));
+        assert_eq!(status.memory_available, Some(4096.0));
+        assert_eq!(status.disk_used, Some(3000.0));
+        let missing = parse_system_status("system=Darwin\nmemoryTotal=NaN\ncpuTotal=-1\ndiskUsed=invalid", 1);
+        assert_eq!(missing.memory_total, None);
+        assert_eq!(missing.cpu_total, None);
+        assert_eq!(missing.disk_used, None);
+        assert_eq!(missing.uptime_seconds, None);
+    }
+}
 static FILE_SEARCHES: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<String, std::sync::Arc<std::sync::atomic::AtomicBool>>>> =
     std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
 
@@ -94,22 +262,68 @@ fn ssh_search_sync(conn: &SshConnection, root: &str, query: &str, cancelled: &st
 
 /// 建立 TCP 连接 + SSH 握手（不含主机密钥校验与认证）。
 fn tcp_handshake(conn: &SshConnection) -> Result<Session, String> {
+    tcp_handshake_with_timeout(conn, None)
+}
+
+fn tcp_handshake_with_timeout(conn: &SshConnection, timeout: Option<Duration>) -> Result<Session, String> {
     let host = conn.host.as_str();
     let port = conn.port.unwrap_or(22);
 
-    let tcp = TcpStream::connect((host, port))
+    let tcp = if let Some(timeout) = timeout {
+        use std::net::ToSocketAddrs;
+        let addresses = (host, port).to_socket_addrs().map_err(|error| error.to_string())?;
+        let started = std::time::Instant::now();
+        let mut result = Err(std::io::Error::new(std::io::ErrorKind::TimedOut, "Resource connection timed out"));
+        for address in addresses {
+            let remaining = timeout.saturating_sub(started.elapsed());
+            if remaining.is_zero() { break; }
+            result = TcpStream::connect_timeout(&address, remaining);
+            if result.is_ok() { break; }
+        }
+        result
+    } else { TcpStream::connect((host, port)) }
         .map_err(|e| format!("连接 {host}:{port} 失败：{e}"))?;
     tcp.set_read_timeout(Some(Duration::from_secs(15))).ok();
     tcp.set_write_timeout(Some(Duration::from_secs(15))).ok();
 
     let mut sess = Session::new().map_err(|e| format!("初始化 SSH 失败：{e}"))?;
     sess.set_tcp_stream(tcp);
+    if let Some(timeout) = timeout { sess.set_timeout(timeout.as_millis() as u32); }
     sess.handshake().map_err(|e| format!("SSH 握手失败：{e}"))?;
     Ok(sess)
 }
 
 /// 建立 TCP 连接 + SSH 握手 + 主机密钥校验 + 认证，返回已认证的会话。
 fn connect(conn: &SshConnection) -> Result<Session, String> {
+    connect_with_timeout(conn, None)
+}
+
+/// Record connection stages without storing credentials, key paths or command output.
+fn connection_stage<T>(conn: &SshConnection, stage: &str, action: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
+    let started = std::time::Instant::now();
+    let result = action();
+    let _ = crate::diagnostics::record("ssh-backend-stage", serde_json::json!({
+        "connectionId": conn.id, "stage": stage, "savedProfile": !conn.id.is_empty(),
+        "authMethod": conn.auth_method, "hasPassword": !conn.password.is_empty(),
+        "hasIdentityFile": conn.options.identity_file.is_some(),
+        "durationMs": started.elapsed().as_millis(), "succeeded": result.is_ok(),
+        "error": result.as_ref().err(),
+    }));
+    result
+}
+
+fn connect_with_timeout(conn: &SshConnection, timeout: Option<Duration>) -> Result<Session, String> {
+    let credential = AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.get(conn);
+    let result = connect_authenticated(conn, timeout, credential.as_deref());
+    if result.as_ref().err().is_some_and(|error| error.starts_with("SSH_AUTH_FAILED:")) {
+        if let Some(credential) = &credential {
+            AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.reject(&conn.id, credential);
+        }
+    }
+    result
+}
+
+fn connect_authenticated(conn: &SshConnection, timeout: Option<Duration>, credential: Option<&Credential>) -> Result<Session, String> {
     if conn.options.jump_host.as_deref().is_some_and(|jump| !jump.eq_ignore_ascii_case("none")) {
         return Err("跳板机连接请使用交互终端；文件管理暂不支持跳板机".into());
     }
@@ -118,11 +332,11 @@ fn connect(conn: &SshConnection) -> Result<Session, String> {
     if user.is_empty() {
         return Err("用户名不能为空".to_string());
     }
-    let sess = tcp_handshake(conn)?;
-    verify_host_key(&sess, &conn.host, conn.port.unwrap_or(22))?;
-    authenticate(&sess, conn, user)?;
+    let sess = connection_stage(conn, "handshake", || tcp_handshake_with_timeout(conn, timeout))?;
+    connection_stage(conn, "host-trust", || verify_host_key(&sess, &conn.host, conn.port.unwrap_or(22)))?;
+    connection_stage(conn, "authentication", || authenticate(&sess, conn, user, credential))?;
     if !sess.authenticated() {
-        return Err("认证失败".to_string());
+        return Err("SSH_AUTH_FAILED: Additional authentication is required".to_string());
     }
     Ok(sess)
 }
@@ -214,16 +428,27 @@ fn host_key_format(t: HostKeyType) -> KnownHostKeyFormat {
     }
 }
 
-fn authenticate(sess: &Session, conn: &SshConnection, user: &str) -> Result<(), String> {
+fn authenticate(sess: &Session, conn: &SshConnection, user: &str, credential: Option<&Credential>) -> Result<(), String> {
+    if let Some(credential) = credential {
+        return match credential.method {
+            AuthMethod::Password => sess.userauth_password(user, &credential.secret)
+                .map_err(|error| format!("SSH_AUTH_FAILED: Password authentication failed: {error}")),
+            AuthMethod::KeyPassphrase => {
+                let identity = conn.options.identity_file.as_deref().ok_or("SSH_AUTH_FAILED: No private key is configured")?;
+                sess.userauth_pubkey_file(user, None, Path::new(identity), Some(&credential.secret))
+                    .map_err(|error| format!("SSH_AUTH_FAILED: Private key authentication failed: {error}"))
+            }
+        };
+    }
     if let Some(identity) = &conn.options.identity_file {
         sess.userauth_pubkey_file(user, None, Path::new(identity), None)
-            .map_err(|e| format!("指定私钥认证失败（加密私钥请在终端输入口令）：{e}"))?;
+            .map_err(|error| format!("SSH_AUTH_FAILED: Private key authentication failed: {error}"))?;
         return Ok(());
     }
     // 密码认证
     if conn.auth_method == "password" && !conn.password.is_empty() {
         sess.userauth_password(user, &conn.password)
-            .map_err(|e| format!("密码认证失败：{e}"))?;
+            .map_err(|error| format!("SSH_AUTH_FAILED: Password authentication failed: {error}"))?;
         return Ok(());
     }
 
@@ -244,7 +469,7 @@ fn authenticate(sess: &Session, conn: &SshConnection, user: &str) -> Result<(), 
             }
         }
     }
-    Err("认证失败：请配置 SSH 密钥（~/.ssh）或改用密码认证".to_string())
+    Err("SSH_AUTH_FAILED: No accepted SSH credentials are available".to_string())
 }
 
 fn ssh_test_sync(conn: &SshConnection) -> Result<String, String> {
@@ -254,7 +479,7 @@ fn ssh_test_sync(conn: &SshConnection) -> Result<String, String> {
 
 fn ssh_list_sync(conn: &SshConnection, path: Option<String>) -> Result<SshListResponse, String> {
     let sess = connect(conn)?;
-    let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
+    let sftp = connection_stage(conn, "sftp-open", || sess.sftp().map_err(|error| format!("SFTP_UNAVAILABLE: {error}")))?;
 
     let dir = path.unwrap_or_default();
     // 空路径 → 远程 home（SFTP 的当前目录即登录主目录）；其它路径 realpath 规范化
@@ -295,13 +520,60 @@ pub fn ssh_connections_list(state: State<'_, HistoryState>) -> Result<Vec<SshCon
 #[tauri::command]
 pub fn ssh_connection_save(state: State<'_, HistoryState>, conn: SshConnection) -> Result<(), String> {
     let db = state.0.lock().map_err(|e| e.to_string())?;
-    db.save_ssh_connection(&conn)
+    db.save_ssh_connection(&conn)?;
+    AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.clear(&conn.id);
+    Ok(())
 }
 
 #[tauri::command]
 pub fn ssh_connection_delete(state: State<'_, HistoryState>, id: String) -> Result<(), String> {
     let db = state.0.lock().map_err(|e| e.to_string())?;
-    db.delete_ssh_connection(&id)
+    db.delete_ssh_connection(&id)?;
+    AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.clear(&id);
+    Ok(())
+}
+
+/// Validate a temporary credential against the displayed profile before retaining it in memory.
+#[tauri::command]
+pub async fn ssh_authenticate_session(
+    state: State<'_, HistoryState>, id: String, host: String, port: u16, user: String,
+    method: AuthMethod, password: String, passphrase: String,
+) -> Result<(), String> {
+    let password = Zeroizing::new(password);
+    let passphrase = Zeroizing::new(passphrase);
+    let secret = match method { AuthMethod::Password => password, AuthMethod::KeyPassphrase => passphrase };
+    if secret.is_empty() || secret.len() > 4096 { return Err("Enter a credential between 1 and 4096 bytes".into()); }
+    let (conn, revision) = {
+        let db = state.0.lock().map_err(|error| error.to_string())?;
+        let conn = db.get_ssh_connection(&id)?;
+        if conn.host != host || conn.port.unwrap_or(22) != port || conn.user != user {
+            return Err("Saved SSH connection changed. Reopen the panel before authenticating.".into());
+        }
+        if matches!(method, AuthMethod::KeyPassphrase) && conn.options.identity_file.is_none() {
+            return Err("No private key is configured for this connection".into());
+        }
+        let revision = AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.begin(&id);
+        (conn, revision)
+    };
+    let credential = std::sync::Arc::new(Credential { method, secret });
+    let validated = std::sync::Arc::clone(&credential);
+    let tested = conn.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        connect_authenticated(&tested, Some(Duration::from_secs(5)), Some(&validated)).map(|_| ())
+    }).await.map_err(|error| error.to_string())??;
+    // Saving, deleting or clearing during validation invalidates the revision under the same lock order.
+    let db = state.0.lock().map_err(|error| error.to_string())?;
+    db.get_ssh_connection(&id)?;
+    if !AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.store(&conn, revision, credential) {
+        return Err("SSH authentication was cancelled or the connection changed. Retry authentication.".into());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn ssh_forget_session_auth(id: String) -> Result<(), String> {
+    AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.clear(&id);
+    Ok(())
 }
 
 #[tauri::command]
@@ -419,6 +691,60 @@ pub async fn ssh_list(
         db.get_ssh_connection(&id)?
     };
     tauri::async_runtime::spawn_blocking(move || ssh_list_sync(&conn, path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Metadata for one remote path (path bar file/directory detection and the
+/// properties dialog). SFTP v3 exposes no creation time, so it stays None.
+#[derive(Clone, Serialize, Debug, PartialEq)]
+pub struct SshStat {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+    pub is_symlink: bool,
+    pub size: u64,
+    pub created_ms: Option<u64>,
+    pub modified_ms: Option<u64>,
+}
+
+/// Map one SFTP metadata record onto the frontend stat shape.
+fn ssh_stat_from(path: String, name: String, meta: &ssh2::FileStat, is_symlink: bool) -> SshStat {
+    SshStat {
+        path,
+        name,
+        is_dir: meta.is_dir(),
+        is_symlink,
+        size: if meta.is_dir() { 0 } else { meta.size.unwrap_or(0) },
+        created_ms: None,
+        modified_ms: meta.mtime.map(|seconds| seconds.saturating_mul(1000)),
+    }
+}
+
+fn ssh_stat_sync(conn: &SshConnection, path: &str) -> Result<SshStat, String> {
+    let sess = connect(conn)?;
+    let sftp = sess.sftp().map_err(|e| format!("SFTP_UNAVAILABLE: {e}"))?;
+    // stat follows symlinks (target metadata); lstat only flags the link itself.
+    let meta = sftp
+        .stat(Path::new(path))
+        .map_err(|e| format!("Failed to read remote metadata: {e}"))?;
+    let is_symlink = sftp
+        .lstat(Path::new(path))
+        .map(|link| link.file_type().is_symlink())
+        .unwrap_or(false);
+    let name = crate::platform::path::file_name(path).unwrap_or_else(|| path.to_string());
+    Ok(ssh_stat_from(path.to_string(), name, &meta, is_symlink))
+}
+
+/// Read metadata for one remote path (path bar quick open and properties dialog).
+#[tauri::command]
+pub async fn ssh_stat(
+    state: State<'_, HistoryState>,
+    id: String,
+    path: String,
+) -> Result<SshStat, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?.get_ssh_connection(&id)?;
+    tauri::async_runtime::spawn_blocking(move || ssh_stat_sync(&conn, &path))
         .await
         .map_err(|e| e.to_string())?
 }
@@ -1043,6 +1369,41 @@ mod tests {
         assert!(json.contains("\"name\":\"a\""));
         assert!(json.contains("\"is_dir\":true"));
         assert!(json.contains("\"path\":\"/a\""));
+    }
+
+    #[test]
+    fn ssh_stat_maps_sftp_metadata() {
+        let file_meta = ssh2::FileStat {
+            size: Some(2048),
+            uid: Some(1000),
+            gid: Some(1000),
+            perm: Some(0o100644),
+            atime: Some(1_700_000_000),
+            mtime: Some(1_700_000_001),
+        };
+        let file_stat = ssh_stat_from("/home/u/a.txt".into(), "a.txt".into(), &file_meta, false);
+        assert_eq!(file_stat.path, "/home/u/a.txt");
+        assert_eq!(file_stat.name, "a.txt");
+        assert!(!file_stat.is_dir);
+        assert!(!file_stat.is_symlink);
+        assert_eq!(file_stat.size, 2048);
+        assert_eq!(file_stat.modified_ms, Some(1_700_000_001_000));
+        assert_eq!(file_stat.created_ms, None);
+
+        // Directories report size 0; missing attributes map to None instead of panicking.
+        let dir_meta = ssh2::FileStat {
+            size: Some(4096),
+            uid: None,
+            gid: None,
+            perm: Some(0o040555),
+            atime: None,
+            mtime: None,
+        };
+        let dir_stat = ssh_stat_from("/home/u/docs".into(), "docs".into(), &dir_meta, true);
+        assert!(dir_stat.is_dir);
+        assert!(dir_stat.is_symlink);
+        assert_eq!(dir_stat.size, 0);
+        assert_eq!(dir_stat.modified_ms, None);
     }
 
     // 说明：connect / ssh_list_sync 依赖真实 SSH 服务，无法离线单测，

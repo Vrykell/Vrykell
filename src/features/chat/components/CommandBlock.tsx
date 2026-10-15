@@ -2,7 +2,7 @@ import { isValidElement, useState, type ReactNode, type ReactElement } from 'rea
 import { t } from '@i18n';
 import { ptyWrite } from '@platform/pty';
 import { useToastStore } from '@ui/Toast';
-import { Play, Copy, Check } from '@ui/icons';
+import { Play, Copy, Check, iconSizes } from '@ui/icons';
 import { useTerminalStore } from '@features/terminal';
 
 const SHELL_LANGS = new Set(['bash', 'sh', 'zsh', 'shell']);
@@ -108,7 +108,7 @@ export default function CommandBlock({ children, paneId }: { children?: ReactNod
                 background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
               }}
             >
-              {copied ? <Check size={10} style={{ color: 'var(--success)' }} /> : <Copy size={10} />}
+              {copied ? <Check size={iconSizes.copy} style={{ color: 'var(--success)' }} /> : <Copy size={iconSizes.copy} />}
               {t(copied ? 'Copied' : 'Copy')}
             </button>
           </div>

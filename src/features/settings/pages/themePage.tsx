@@ -142,7 +142,8 @@ export function ThemePage() {
                   data-on={active || undefined}
                   onClick={() => { void save(() => setMode(option.value)); }}
                 >
-                  <span className="settings-radio-dot" aria-hidden="true" />
+                  <span className="settings-radio-dot" aria-hidden="true"
+                    data-system={option.value === 'system' && preference === 'system' ? 'true' : undefined} />
                   {t(option.label)}
                 </button>
               );

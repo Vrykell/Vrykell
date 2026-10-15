@@ -1,9 +1,10 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { writeClipboardText } from '@platform/clipboard';
 import AiBlock from '../components/AiBlock';
 import { useChatStore } from '../stores/chat';
 import type { ChatExchange } from '../model/exchanges';
+import type { ToolRun } from '@features/agent/model/messageParts';
 
 vi.mock('@platform/clipboard', () => ({
   writeClipboardText: vi.fn().mockResolvedValue(undefined),
@@ -28,8 +29,13 @@ it('renders panel answers as plain conversation content with message actions', (
   expect(container.querySelector('.ai-block-heading')).toBeNull();
   expect(screen.getByText('configuration')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '收起回答' })).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: '更多操作' }));
-  expect(screen.getByRole('menu')).toBeInTheDocument();
+  // The reply's actions stay in the open instead of hiding in a menu.
+  const actions = container.querySelector('.chat-answer-actions')!;
+  expect(within(actions as HTMLElement).getAllByRole('button').map(button => button.getAttribute('aria-label')))
+    .toEqual(['复制', '重新生成', '编辑重发', '删除']);
+  // The sent message carries its clock time and a copy target.
+  expect(container.querySelector('.chat-question-meta')).toHaveTextContent(/\d{1,2}:\d{2}/);
+  expect(screen.getByTestId('chat-question-copy')).toBeInTheDocument();
 });
 
 it('keeps question selection separate from explicit reply collapse', () => {
@@ -52,6 +58,33 @@ it('keeps approval actions and failures visible without timeline nodes', () => {
   expect(screen.getByRole('alert')).toHaveTextContent('Missing file');
   expect(container.querySelectorAll('.ai-tool-card')).toHaveLength(2);
   expect(container.querySelector('[style*="position: absolute"]')).toBeNull();
+});
+
+it('collapses a failure through the row toggle after showing it by default', () => {
+  const { container } = render(<AiBlock conversationId="conversation" presentation="conversation" exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [
+    { kind: 'tool', tool: { toolCallId: 'failure', toolName: 'run_command', input: { command: 'cat /etc/hosts' }, state: 'error', startedAt: 1, error: 'Exit code 2' } },
+  ] } }} />);
+  // A failure is readable without expanding anything ...
+  expect(screen.getByRole('alert')).toHaveTextContent('Exit code 2');
+  expect(container.querySelector('.ai-tool-summary')).toHaveAttribute('aria-expanded', 'true');
+  fireEvent.click(container.querySelector('.ai-tool-summary')!);
+  expect(screen.queryByRole('alert')).toBeNull();
+  expect(container.querySelector('.ai-tool-summary')).toHaveAttribute('aria-expanded', 'false');
+});
+
+it('reopens a failure that arrives after the row was collapsed', () => {
+  const running: ToolRun = { toolCallId: 'late', toolName: 'run_command', input: { command: 'npm run build' }, state: 'running', startedAt: 1 };
+  const view = (tool: ToolRun) => (
+    <AiBlock conversationId="conversation" presentation="conversation"
+      exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [{ kind: 'tool', tool }] } }} />
+  );
+  // The row is collapsed while the command is still running ...
+  const { container, rerender } = render(view(running));
+  fireEvent.click(container.querySelector('.ai-tool-summary')!);
+  expect(screen.queryByRole('alert')).toBeNull();
+  // ... and its failure still has to be visible when it arrives.
+  rerender(view({ ...running, state: 'error', error: 'Exit code 2' }));
+  expect(screen.getByRole('alert')).toHaveTextContent('Exit code 2');
 });
 
 const commandPart = { kind: 'tool' as const, tool: {
@@ -102,17 +135,15 @@ it('keeps this exchange actionable while a background conversation answers', () 
   // The single send slot is taken by a scheduled (background) conversation: this exchange is idle.
   useChatStore.setState({ sendingTab: 'background-conversation' });
   render(<AiBlock exchange={exchange} conversationId="conversation" presentation="conversation" />);
-  fireEvent.click(screen.getByRole('button', { name: '更多操作' }));
-  expect(screen.getByText('重新生成')).toBeInTheDocument();
-  expect(screen.getByText('编辑重发')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '重新生成' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '编辑重发' })).toBeInTheDocument();
 });
 
 it('hides regenerate and edit while its own conversation answers', () => {
   useChatStore.setState({ sendingTab: 'conversation' });
   render(<AiBlock exchange={exchange} conversationId="conversation" presentation="conversation" />);
-  fireEvent.click(screen.getByRole('button', { name: '更多操作' }));
-  expect(screen.queryByText('重新生成')).toBeNull();
-  expect(screen.queryByText('编辑重发')).toBeNull();
+  expect(screen.queryByRole('button', { name: '重新生成' })).toBeNull();
+  expect(screen.queryByRole('button', { name: '编辑重发' })).toBeNull();
 });
 
 it('shows a terminal tool row as the bare command without a prompt marker', () => {

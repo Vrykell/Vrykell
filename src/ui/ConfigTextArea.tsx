@@ -30,7 +30,7 @@ export default function ConfigTextArea({ value, label, className = '', style, ..
     <div className="config-text-area" style={{ marginTop: style?.marginTop }}>
       <TextArea {...props} id={inputId} aria-label={inputLabel} value={value} className={`config-text-input ${className}`} style={style} />
       <IconButton compact className="config-text-area-copy" disabled={!text} aria-label={copyLabel} data-tip={copyLabel} onClick={() => void copy()}>
-        {copied ? <Check size={iconSizes.compact} /> : <Copy size={iconSizes.compact} />}
+        {copied ? <Check size={iconSizes.copy} /> : <Copy size={iconSizes.copy} />}
       </IconButton>
     </div>
   </>;

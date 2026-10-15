@@ -9,6 +9,18 @@ for (const key of ['no_proxy', 'NO_PROXY'] as const) {
   process.env[key] = current ? `${current},127.0.0.1,localhost` : '127.0.0.1,localhost';
 }
 
+/**
+ * Port for the suite's dev server. Parallel worktrees each set their own `PW_PORT` so no
+ * run can shut down another run's server; the historical default stays 1421.
+ */
+function e2ePort(): number {
+  const configured = Number(process.env.PW_PORT);
+  return Number.isInteger(configured) && configured > 0 && configured < 65_536 ? configured : 1421;
+}
+
+const port = e2ePort();
+const origin = `http://127.0.0.1:${port}`;
+
 export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,
@@ -18,12 +30,12 @@ export default defineConfig({
   use: {
     // Match the desktop browser: native scrollbars must be visible and draggable.
     launchOptions: { ignoreDefaultArgs: ['--hide-scrollbars'] },
-    baseURL: 'http://127.0.0.1:1421',
+    baseURL: origin,
     viewport: { width: 1240, height: 800 },
   },
   webServer: {
-    command: 'npm run dev -- --port 1421 --host 127.0.0.1',
-    url: 'http://127.0.0.1:1421',
+    command: `npm run dev -- --port ${port} --host 127.0.0.1`,
+    url: origin,
     reuseExistingServer: false,
     timeout: 60_000,
   },

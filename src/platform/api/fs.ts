@@ -1,9 +1,9 @@
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { invoke } from '@platform/diagnostics';
 import { normPath } from '@platform/path';
-import type { FsEntry, DiskEntry } from '@platform/api/types';
+import type { FsEntry, DiskEntry, FileStat } from '@platform/api/types';
 
-export type { FsEntry, DiskEntry };
+export type { FsEntry, DiskEntry, FileStat };
 
 /**
  * 本地文件系统 API —— 所有跨 IPC 边界的路径都在这里归一化：
@@ -26,6 +26,12 @@ export function fsDisks(): Promise<DiskEntry[]> {
 /** 用户主目录路径。 */
 export function fsHome(): Promise<string> {
   return invoke<string>('fs_home').then((home) => normPath(home));
+}
+
+/** Read metadata for one local path (path bar file detection and the properties dialog). */
+export function fsStat(path: string): Promise<FileStat> {
+  return invoke<FileStat>('fs_stat', { path: normPath(path) })
+    .then((stat) => ({ ...stat, path: normPath(stat.path) }));
 }
 
 /** 重命名：目标名被占用时后端自动加序号，返回最终路径。 */

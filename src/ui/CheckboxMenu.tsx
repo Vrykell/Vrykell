@@ -1,5 +1,5 @@
 import { useEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react';
-import { Check } from '@ui/icons';
+import { Checkbox } from './Checkbox';
 
 /**
  * CheckboxMenu — a themed multi-select list used by floating filters.
@@ -97,15 +97,7 @@ export default function CheckboxMenu<Id extends string>({ title, options, onTogg
             cursor: 'pointer', fontSize: 'calc(12px * var(--ui-font-scale))', fontFamily: 'var(--font-ui)',
           }}
         >
-          {!compact && <span aria-hidden="true" style={{
-            width: 16, height: 16, borderRadius: 3,
-            border: `1.5px solid ${option.checked ? 'var(--accent)' : 'var(--border)'}`,
-            background: option.checked ? 'var(--accent)' : 'transparent',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'var(--accent-text)', flexShrink: 0,
-          }}>
-            {option.checked ? <Check size={10} /> : ''}
-          </span>}
+          {!compact && <Checkbox checked={option.checked} readOnly tabIndex={-1} aria-hidden="true" style={{ pointerEvents: 'none' }} />}
           <span style={{ flex: 1, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             {option.icon}{option.displayLabel ?? option.label}
           </span>

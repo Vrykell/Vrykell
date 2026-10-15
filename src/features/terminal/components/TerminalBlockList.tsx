@@ -338,8 +338,20 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
       return;
     }
 
+    let openResyncRaf = 0;
     host.appendChild(el);
     if (!term.element) term.open(el);
+    // Output can arrive before the terminal is opened (headless writes). The buffer then
+    // follows the tail while the scrollbar model stays at the top, so the first wheel-up
+    // jumps to the start of the scrollback instead of scrolling from the bottom. Re-sync
+    // the model on the first frame of this mount; the pair is a no-op unless the view is
+    // at the bottom and the geometry is measured (open() measures synchronously).
+    openResyncRaf = requestAnimationFrame(() => {
+      if (term.buffer.active.viewportY === term.buffer.active.baseY) {
+        term.scrollToTop();
+        term.scrollToBottom();
+      }
+    });
     applyTerminalRenderer(term, useTypographyStore.getState().terminalRenderer);
     configureTerminalInput(term);
     if (isTerminalDebugEnabled()) {
@@ -479,6 +491,7 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
       renderSub?.dispose();
       unsubscribeActiveTab();
       cancelAnimationFrame(restoreRaf);
+      cancelAnimationFrame(openResyncRaf);
       widthRo.disconnect();
       visibilityRo.disconnect();
       document.removeEventListener('visibilitychange', onVisibilityChange);

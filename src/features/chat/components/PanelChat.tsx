@@ -24,6 +24,22 @@ import type { AttachmentMeta } from '@features/agent/model/attachments';
 
 const EMPTY_MESSAGES: ChatMessage[] = [];
 
+/** Only a position this close to the bottom counts as "back at the latest reply": a wider
+ *  window would let a small upward nudge be swallowed and re-engage the follow right away. */
+const FOLLOW_THRESHOLD_PX = 4;
+
+/**
+ * True when a scroll surface between the wheel target and the transcript can absorb the
+ * upward scroll itself, so the wheel never reaches the transcript and must not pause it.
+ */
+function innerScrollerHoldsUpward(target: EventTarget | null, boundary: Element): boolean {
+  for (let node = target instanceof HTMLElement ? target : null; node && node !== boundary; node = node.parentElement) {
+    const overflowY = getComputedStyle(node).overflowY;
+    if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollTop > 0) return true;
+  }
+  return false;
+}
+
 /** Conversation navigation, references and execution stay independent of terminal focus. */
 export default function PanelChat() {
   const activeId = useChatStore(state => state.activeConversationId);
@@ -115,6 +131,11 @@ export default function PanelChat() {
     setFollowing(true);
     composer.submit();
   };
+  /** Drop the follow so streamed content stops moving the view the user is reading. */
+  const pauseFollow = () => {
+    followRef.current = false;
+    setFollowing(false);
+  };
   const commitTitle = () => {
     useChatStore.getState().renameConversation(activeId, title);
     setRenaming(false);
@@ -173,22 +194,34 @@ export default function PanelChat() {
       <span>{t('Another conversation is working')}</span>
       <button type="button" data-subtle onClick={() => { void useChatStore.getState().selectConversation(sendingTab); }}>{t('View')}</button>
     </div>}
+    {/* Streaming content must never yank the view away from what is being read: any upward
+        scroll input pauses the follow, even one too small to leave the "near the bottom"
+        window, while a nested scroller that consumes the wheel leaves it alone. */}
     <div ref={scrollRef} className="chat-transcript scroll-region" onScroll={event => {
       const scroll = event.currentTarget;
-      const next = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight <= 24;
+      const next = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight <= FOLLOW_THRESHOLD_PX;
       followRef.current = next;
       setFollowing(next);
-    }}>
+    }}
+      onWheel={event => {
+        if (event.deltaY < 0 && !innerScrollerHoldsUpward(event.target, event.currentTarget)) pauseFollow();
+      }}
+      onTouchMove={pauseFollow}>
       <div ref={transcriptRef}>
         {exchanges.length ? exchanges.map(exchange => <AiBlock key={exchange.id} exchange={exchange} conversationId={activeId} presentation="conversation" />)
           : <div className="chat-empty"><Sparkles size={26} /><strong>{t('What would you like to work on?')}</strong>
             <span>{loading ? t('Loading conversations…') : t('Ask a question, attach a file, or bring in terminal output.')}</span></div>}
       </div>
     </div>
-    {!following && <button type="button" data-subtle className="chat-jump-latest" onClick={() => {
-      followRef.current = true; setFollowing(true);
-      if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }}><ArrowDown size={14} />{t('Jump to latest reply')}</button>}
+    {/* The slot always keeps its height: mounting it only when the follow pauses would
+        shift the transcript by its own height and make sticking to the bottom jitter. */}
+    <div className="chat-jump-slot" data-active={!following || undefined}>
+      <button type="button" data-subtle className="chat-jump-latest" aria-hidden={following || undefined}
+        tabIndex={following ? -1 : 0} onClick={() => {
+          followRef.current = true; setFollowing(true);
+          if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }}>{t('Jump to latest reply')}<ArrowDown size={14} /></button>
+    </div>
     <div className="chat-composer-wrap">
       <div className="terminal-composer chat-composer">
         <div className="terminal-composer-heading"><span>{t('AI chat')}</span><span className="composer-key-hints"><KeyHint shortcut="Enter" />{t('Send')}</span></div>
@@ -211,13 +244,13 @@ export default function PanelChat() {
             }} />
         </div>
         <div className="chat-input-status">
-          <IconButton compact aria-label={t('Add attachment')} data-tip={t('Add attachment')} onClick={() => void pickFiles()}><Plus size={20} /></IconButton>
+          <IconButton aria-label={t('Add attachment')} data-tip={t('Add attachment')} onClick={() => void pickFiles()}><Plus size={18} /></IconButton>
           <ChatModeSelect />
           <span className="chat-footer-space" />
           <ModelPill showThinking={false} />
-          {sendingTab === activeId ? <IconButton compact className="chat-send-button" tone="accent" aria-label={t('Stop generating')} data-tip={t('Stop generating')}
+          {sendingTab === activeId ? <IconButton className="chat-send-button" tone="accent" aria-label={t('Stop generating')} data-tip={t('Stop generating')}
             onClick={() => useChatStore.getState().abortStream(activeId)}><Square size={15} fill="currentColor" /></IconButton>
-            : <IconButton compact className="chat-send-button" tone="accent" aria-label={t('Send')} data-tip={t('Send')} data-tip-shortcut="Enter" onClick={submit} disabled={!composer.canSend}><ArrowUp size={18} /></IconButton>}
+            : <IconButton className="chat-send-button" tone="accent" aria-label={t('Send')} data-tip={t('Send')} data-tip-shortcut="Enter" onClick={submit} disabled={!composer.canSend}><ArrowUp size={18} /></IconButton>}
         </div>
       </div>
     </div>

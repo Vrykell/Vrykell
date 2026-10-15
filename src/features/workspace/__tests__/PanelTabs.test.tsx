@@ -5,7 +5,10 @@ import { useSessionStore } from '../model/session/store';
 import { useListReorder } from '@ui/listReorder';
 
 vi.mock('@features/agent/services/title', () => ({ regenerateTitle: vi.fn() }));
-vi.mock('../components/NewTabModal', () => ({ default: () => null }));
+vi.mock('../components/NewTabModal', () => ({
+  default: ({ open, groupId }: { open: boolean; groupId?: string }) =>
+    <div data-testid="new-tab-modal" data-open={String(open)} data-group={groupId ?? ''} />,
+}));
 const snapshot = useSessionStore.getState();
 beforeEach(() => {
   useSessionStore.setState({
@@ -23,6 +26,26 @@ it('leaves the tab list empty instead of showing an unmatched-search message whe
   const { container } = render(<PanelTabs />);
   expect(container.querySelector('[data-tab-row-id]')).toBeNull();
   expect(screen.queryByText('无匹配会话')).toBeNull();
+});
+
+it('creates ungrouped tabs from the panel button and keeps only the group button scoped', () => {
+  useSessionStore.setState({
+    tabs: [
+      { id: 'grouped', title: 'Grouped', kind: 'session', groupId: 'group-a', layout: { type: 'leaf', terminal: { id: 'grouped#0', kind: 'local', shellType: 'bash' } } },
+    ],
+    activeId: 'grouped',
+    groups: [{ id: 'group-a', title: 'Group', collapsed: false }],
+  });
+  render(<PanelTabs />);
+
+  // Even with a grouped tab active, the panel button opens an ungrouped pick.
+  fireEvent.click(screen.getByTestId('tab-new-btn'));
+  expect(screen.getByTestId('new-tab-modal')).toHaveAttribute('data-open', 'true');
+  expect(screen.getByTestId('new-tab-modal')).toHaveAttribute('data-group', '');
+
+  // The group's own + keeps the new tab inside that group.
+  fireEvent.click(screen.getByRole('button', { name: '在此分组新建终端' }));
+  expect(screen.getByTestId('new-tab-modal')).toHaveAttribute('data-group', 'group-a');
 });
 
 it('lists singleton pages alongside sessions and switches or closes them', () => {

@@ -3,6 +3,7 @@ import { SquareStack, Folder, Server, Sparkles, Settings, type AppIcon } from '@
 import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
 import { useWorkspaceStore, isSessionTab } from '@features/workspace/stores/workspace';
 import { minTerminalWidth, MIN_PANE_SIZE } from '@features/workspace/model/windowLayout';
+import { useAuxiliarySidebarStore } from './auxiliarySidebar';
 
 // ── 面板定义（可扩展）──
 
@@ -167,6 +168,7 @@ export function workspaceFrameWidth(s: Pick<DockState, 'leftPanels'>): number {
 
 /** Reserve useful command space and close the older side when both do not fit. */
 function fitPanelSpace(s: DockState, preferred: DockSide): Pick<DockState, 'leftPanels' | 'rightPanels'> {
+  if (useAuxiliarySidebarStore.getState().sshStatusOwner) return { leftPanels: s.leftPanels, rightPanels: s.rightPanels };
   const available = window.innerWidth - ACTIVITY_BAR_WIDTH - workspaceFrameWidth(s) - Math.max(360, currentTerminalMinWidth());
   if (available < MIN_PANEL_WIDTH) return { leftPanels: [], rightPanels: [] };
   const panelWidth = (ids: string[]) => ids.reduce((sum, id) => sum + (s.collapsedPanels.includes(id) ? 0 : (s.panelWidths[id] ?? PANEL_DEFS[id]?.width ?? 200)), 0);

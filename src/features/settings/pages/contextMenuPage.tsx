@@ -39,7 +39,8 @@ export function ContextMenuPage() {
     finally { if (request === revision.current) setBusy(false); }
   };
   const state = !status ? 'Checking context menu status…' : !status.supported ? 'Requires Windows 11' :
-    status.enabled ? 'Enabled' : !status.available ? 'Context menu resources are unavailable' :
+    status.enabled ? 'Enabled' : status.stale ? 'Out of date: enable the context menu again' :
+    !status.available ? 'Context menu resources are unavailable' :
     !status.certificateTrusted ? 'Certificate trust required' : 'Disabled';
   return <SettingsGroup title={t('Windows context menu')}>
     <Field layout="stacked" title={t('Open in Vrykell')} description={t('Open a terminal in the selected folder or folder background from the Windows 11 context menu.')}>

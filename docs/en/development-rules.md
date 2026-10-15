@@ -61,7 +61,7 @@
 32. `src/features/settings/` — settings pages (behavior/model/MCP/Skills/shortcuts/terminal open mode/theme).
 33. `src/platform/` and `src/utils/` — Tauri IPC, PTY, runtime adapters and pure helper functions. Business services belong to their feature.
 34. `src/features/ssh/` `src/features/files/` `src/features/search/` `src/config/theme/` — SSH / local files / global search / design tokens.
-35. `e2e/` — Playwright E2E tests; `tauri-mock.ts` provides the Tauri + Anthropic mock.
+35. `e2e/` — Playwright E2E tests; `tauri-mock.ts` provides the Tauri + Anthropic mock. The suite's dev-server port comes from `PW_PORT` (default 1421): parallel worktrees each pick their own port so one run never shuts down another run's server (which shows up as a wall of `ERR_CONNECTION_REFUSED`).
 
 ## 8. Observability and logging
 
@@ -69,8 +69,8 @@
 37. **Log metadata first** — Record session/block IDs, state, duration, byte counts and error types; do not log raw commands, terminal output, prompts, credentials or unredacted user paths.
 38. **Reuse the diagnostic interfaces** — The frontend uses `terminalDebug`, the Rust terminal layer uses `terminal::debug::write`; new event names should be stable and describe the operation stage, avoiding per-character or high-frequency output logging.
 39. **Log according to the existing config** — The shared test machine currently has detailed diagnostic auto-save enabled; check existing records first and do not re-enable it on every test run. Other environments decide for themselves, and new environments default to auto-save off. For background tasks or new IPC flows, make sure the entry point and failure branches leave correlatable logs.
-40. **Check existing logs first** — Check `%LOCALAPPDATA%\com.vrykell.app\logs\diagnostics.jsonl` first; once the file hits the rotation cap, older records live in `.1`, `.2` files in the same directory. Configuration lives in `%APPDATA%\com.vrykell.app\diagnostics.json`, and its enabled state is a test-machine setting — do not infer new-user defaults from it.
-41. **Logging must not block I/O** — High-frequency records are batched on the frontend and written by a buffered backend thread, keeping detailed events; flush pending records before exporting or changing auto-save config. New diagnostic logic must not reintroduce synchronous per-keystroke disk writes.
+40. **Check existing logs first** — Check `%LOCALAPPDATA%\com.vrykell.app\logs\diagnostics-<YYYYMMDDTHH>.jsonl` first; the file name carries the UTC hour, so logs rotate hourly and older segments stay beside it (newest 24 / 256 MB kept). Configuration lives in `%APPDATA%\com.vrykell.app\diagnostics.json`, and its enabled state is a test-machine setting — do not infer new-user defaults from it.
+41. **Logging must not block I/O** — High-frequency records are batched on the frontend and written by a buffered backend thread, keeping detailed events; flush pending records before exporting or changing auto-save config. Readings of the terminal data path (reads, output flushes, IPC intake, controller intake, routing destinations) aggregate into one `pty-io` / `terminal-io` record per second, and growing silence becomes `read-idle` at 1 s, 2 s, 4 s, …; new diagnostic logic must not reintroduce per-keystroke or per-chunk disk writes.
 
 ## 9. Window and title bar
 
