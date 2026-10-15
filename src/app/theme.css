@@ -486,7 +486,7 @@ button.window-control-button {
 /* Rounded jump-to-latest control: only the label and arrow show while its strip is hovered
    or focused, so it never parks a box or a filled mask over the transcript background. */
 .chat-jump-slot { position: absolute; left: 0; right: 0; bottom: 8px; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-.chat-jump-latest { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text-secondary); font-size: var(--fs-caption); pointer-events: auto; box-shadow: 0 4px 12px rgb(0 0 0 / 0.22); transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+.chat-jump-latest { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text-secondary); font-size: var(--fs-caption); pointer-events: auto; box-shadow: 0 4px 12px rgb(0 0 0 / 0.22); transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
 .chat-jump-latest:is(:hover, :focus-visible) { background: var(--hover); color: var(--text-primary); }
 .chat-composer-wrap { padding: 8px 10px 12px; flex-shrink: 0; }
 .chat-composer { padding: 10px 12px 8px; }

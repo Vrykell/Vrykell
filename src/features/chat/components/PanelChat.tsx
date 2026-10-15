@@ -246,13 +246,14 @@ export default function PanelChat() {
         transcript's height, and then the content and this button trade places on every scroll event —
         that loop is what made the bottom of the panel jump. Only the slot's visibility changes. */}
     <div className="chat-jump-slot" style={{ visibility: following ? 'hidden' : 'visible' }} aria-hidden={following}>
-      <button type="button" data-subtle className="chat-jump-latest" onClick={() => {
+      <button type="button" data-subtle className="chat-jump-latest" aria-label={t('Jump to latest reply')}
+        data-tip={t('Jump to latest reply')} onClick={() => {
         followRef.current = true; setFollowing(true);
         if (scrollRef.current) {
           scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
           lastTopRef.current = scrollRef.current.scrollTop;
         }
-      }}>{t('Jump to latest reply')}<ArrowDown size={14} /></button>
+      }}><ArrowDown size={16} /></button>
     </div>
     </div>
     <ChatComposerShell
