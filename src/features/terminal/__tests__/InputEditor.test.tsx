@@ -1,6 +1,8 @@
 import { cleanup, render, fireEvent, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import InputEditor from '../components/InputEditor';
+import { useSessionStore } from '@features/workspace';
+import { useTerminalStore } from '@features/terminal';
 
 vi.mock('../hooks/useInputEditorController', () => ({
   useInputEditorController: () => ({
@@ -9,10 +11,12 @@ vi.mock('../hooks/useInputEditorController', () => ({
     tabCwd: '/work', recentGitBranch: 'dev', ghost: '',
   }),
 }));
-vi.mock('../components/DirectoryPicker', () => ({
-  default: () => <span className="terminal-chip terminal-directory">/work</span>,
-}));
-afterEach(cleanup);
+const stores = [useSessionStore.getState(), useTerminalStore.getState()] as const;
+afterEach(() => {
+  cleanup();
+  useSessionStore.setState(stores[0], true);
+  useTerminalStore.setState(stores[1], true);
+});
 
 it('uses the existing host chip as the status entry without adding a separate icon button', () => {
   const open = vi.fn();
@@ -33,4 +37,17 @@ it('separates shell, directory and branch chips with spacing instead of dots', (
   expect(status.querySelectorAll('.terminal-chip')).toHaveLength(3);
   expect(status.style.gap).toBe('6px');
   expect(status.querySelector('.terminal-chip > span[style]')).not.toBeNull();
+});
+
+it('renders clickable chips as buttons and keeps the git branch chip a static span', () => {
+  useTerminalStore.setState({ sessions: { pane: 'pty' } });
+  useSessionStore.setState({ tabs: [{ id: 'tab', kind: 'session', title: 'Shell', layout: { type: 'leaf', terminal: { id: 'pane', kind: 'local', shellType: 'bash' } } }] });
+  const { container } = render(<InputEditor paneId="pane" onSessionStatusClick={() => {}} />);
+  const entry = screen.getByTestId('ssh-status-toggle');
+  expect(entry.tagName).toBe('BUTTON');
+  expect(entry).not.toBeDisabled();
+  const directory = container.querySelector<HTMLButtonElement>('.directory-picker-trigger');
+  expect(directory?.tagName).toBe('BUTTON');
+  expect(directory).not.toBeDisabled();
+  expect(container.querySelector('.terminal-branch')?.tagName).toBe('SPAN');
 });
