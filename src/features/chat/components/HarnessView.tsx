@@ -35,16 +35,19 @@ export default function HarnessView({ tabId, harness }: { tabId: string; harness
   const { activeCwd } = useActiveWorkspace();
   const [text, setText] = useState('');
   const bodyRef = useRef<HTMLDivElement>(null);
-  /** Opening must happen once per tab: React's double-invoked effects used to spawn two sessions. */
+  /** Opening must happen once at a time per tab: React's double-invoked effects spawned two sessions.
+   *  The guard is released when the attempt settles, so a remount (which an unmount cleanup closed)
+   *  can open again. */
   const opening = useRef<string | null>(null);
 
   useEffect(() => { bindHarnessEvents(); }, []);
   useEffect(() => () => { void useHarnessStore.getState().close(tabId); }, [tabId]);
-  // Opening is idempotent: a tab that already has a session keeps it.
   useEffect(() => {
     if (session || opening.current === tabId) return;
     opening.current = tabId;
-    void useHarnessStore.getState().open(tabId, harness, activeCwd ?? '');
+    void useHarnessStore.getState().open(tabId, harness, activeCwd ?? '').finally(() => {
+      if (opening.current === tabId) opening.current = null;
+    });
   }, [tabId, harness, session, activeCwd]);
 
   const agent = session?.agent?.agentInfo;

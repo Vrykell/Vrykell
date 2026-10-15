@@ -88,6 +88,8 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     const revealed: string[] = [];
     /** URLs handed to the system browser (plugin:opener|open_url). */
     const openedUrls: string[] = [];
+    /** Permission answers the page sent, so a spec can assert what the click produced. */
+    const answered: { toolCallId: string; optionId: string | null }[] = [];
     /** Native picker invocations the page made, so a spec can assert the mode it asked for. */
     const pickCalls: { mode: string }[] = [];
     const aiConfig: { hasKey: boolean; baseUrl: string; model: string } = {
@@ -186,6 +188,9 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     (window as unknown as Record<string, unknown>).__DOWNLOADS__ = downloads;
     (window as unknown as Record<string, unknown>).__REVEALED__ = revealed;
     (window as unknown as Record<string, unknown>).__OPENED_URLS__ = openedUrls;
+    (window as unknown as Record<string, unknown>).__ACP_ANSWERED__ = answered;
+    // Lets a spec push exactly what the backend would push for a harness session.
+    (window as unknown as Record<string, unknown>).__EMIT_EVENT__ = (event: string, payload: unknown) => emit(event, payload);
     (window as unknown as Record<string, unknown>).__PICK_CALLS__ = pickCalls;
     (window as unknown as Record<string, unknown>).__SESSION_PAYLOADS__ = sessionPayloads;
     (window as unknown as Record<string, unknown>).__AI_KEY_CALLS__ = aiKeyCalls;
@@ -1007,6 +1012,26 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             // navigating the app window.
             openedUrls.push(String(args.url ?? ''));
             return undefined;
+          case 'acp_harnesses':
+            return [{ name: 'Fake ACP', command: 'node', args: ['scripts/fake-acp-agent.mjs'], env: {}, cwd: '', enabled: true }];
+          case 'acp_open':
+            return {
+              sessionId: 'sess_e2e',
+              harness: 'Fake ACP',
+              agent: {
+                protocolVersion: 1,
+                agentInfo: { name: 'fake-acp', title: 'Fake ACP agent', version: '0.1.0' },
+                agentCapabilities: {},
+                authMethods: [],
+              },
+            };
+          case 'acp_prompt':
+          case 'acp_cancel':
+          case 'acp_close':
+            return undefined;
+          case 'acp_answer_permission':
+            answered.push({ toolCallId: String(args.toolCallId ?? ''), optionId: (args.optionId ?? null) as string | null });
+            return undefined;
           case 'pick_path': {
             // The real command opens a native picker and records the choice. The mock answers with
             // a scripted path (or an empty list when a spec never configures one) and replays the
@@ -1353,6 +1378,24 @@ export function pickCalls(page: Page): Promise<{ mode: string }[]> {
 /** URLs handed to the system browser via the opener plugin, in order. */
 export function openedUrls(page: Page): Promise<string[]> {
   return page.evaluate(() => (window as unknown as Record<string, string[]>).__OPENED_URLS__ ?? []);
+}
+
+/** Permission answers the page sent, in order. */
+export function acpAnswered(page: Page): Promise<{ toolCallId: string; optionId: string | null }[]> {
+  return page.evaluate(() => (window as unknown as Record<string, { toolCallId: string; optionId: string | null }[]>).__ACP_ANSWERED__ ?? []);
+}
+
+/** Push one harness session event exactly as the backend would. */
+export function emitAcpSession(page: Page, event: Record<string, unknown>): Promise<void> {
+  return page.evaluate((payload) => {
+    const emit = (window as unknown as Record<string, (name: string, data: unknown) => void>).__EMIT_EVENT__;
+    emit?.('acp://session', payload);
+  }, event);
+}
+
+/** One session update, shaped like the protocol's notification. */
+export function acpUpdate(sessionId: string, update: Record<string, unknown>): Record<string, unknown> {
+  return { sessionId, kind: 'update', payload: { sessionId, update } };
 }
 
 /** 读取下载管理里「定位」调用的 reveal 路径记录 */
