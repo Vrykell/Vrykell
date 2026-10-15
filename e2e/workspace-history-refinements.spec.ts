@@ -115,7 +115,7 @@ test('session startup-mode filters combine with sorting and survive reopening', 
   await page.keyboard.press('Escape');
   await expect.poll(rows).toEqual(['history-session-block-b', 'history-session-block-a']);
   const sortButton = page.getByTestId('session-sort-btn');
-  await expect(sortButton).toHaveCSS('width', '22px');
+  await expect(sortButton).toHaveCSS('width', '28px');
   await sortButton.click();
   const sortMenu = page.getByTestId('session-sort-menu');
   await sortMenu.getByRole('button', { name: '标题正序' }).click();

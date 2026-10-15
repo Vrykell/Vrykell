@@ -14,7 +14,7 @@ import { useRef, useEffect, useLayoutEffect, useMemo, useState, useId, useCallba
 import OverlayScrollbar from '@ui/OverlayScrollbar';
 import { CircleX, Minimize2, Square } from '@ui/icons';
 import { STATUS_ACTION_ICON_SIZE, StatusActionButton, TerminalStatusBar } from '@features/terminal/components/TerminalStatusBar';
-import DropPlacementPreview from '@ui/DropPlacementPreview';
+import { MoveDragLayer, PlacementOverlay } from './TerminalPlacementOverlay';
 import { useSessionStore, type Tab } from '@features/workspace';
 import { useTerminalStore } from '@features/terminal';
 import { useUiStore, useDockDragStore } from '@features/workspace';
@@ -26,8 +26,8 @@ import { useFollowBottom, registerFollowEngager, engageFollow } from '@features/
 import { useTerminalFocus } from '@features/terminal/hooks/useTerminalFocus';
 import { useTerminalPaneDrag } from '@features/terminal/hooks/useTerminalPaneDrag';
 import {
-  leaves as layoutLeaves, firstLeaf, moveTargets, dividers, collectLayoutCells, fitLayoutWidth, MIN_PANE_SIZE, MIN_PANE_WIDTH, DIVIDER_SIZE,
-  type WindowLayout, type TerminalSpec, type DropTarget, type Rect,
+  leaves as layoutLeaves, firstLeaf, dividers, collectLayoutCells, fitLayoutWidth, MIN_PANE_SIZE, MIN_PANE_WIDTH, DIVIDER_SIZE,
+  type WindowLayout, type TerminalSpec, type Rect,
 } from '@features/workspace/model/windowLayout';
 import InputEditor from '@features/terminal/components/InputEditor';
 import TerminalBlockList, { hasVisibleContent } from '@features/terminal/components/TerminalBlockList';
@@ -181,22 +181,22 @@ function SessionTabView(props: {
           onPaneContextMenu={onPaneContextMenu}
         />
 
-        {/* 分裂落点选择覆盖层（相对布局区域定位，忠实反映未来区域） */}
+        {/* Split slot picker (anchored to the layout area so it mirrors the future regions). */}
         {active && splitPlacement.open && (
           <PlacementOverlay targets={placementTargets} onPick={commitPlacement} onCancel={cancelSplit} />
         )}
 
-        {/* 更换位置落点选择覆盖层（菜单触发，等同拖动重排） */}
+        {/* Replace-position picker (menu entry, same slots as dragging a pane). */}
         {active && movePlacement.open && (
           <PlacementOverlay
             targets={movePlacementTargets}
-            emptyMessage="只有一个终端，无法更换位置"
+            emptyMessage={t('A single terminal cannot be moved')}
             onPick={completeMove}
             onCancel={cancelMove}
           />
         )}
 
-        {/* 拖动终端调整位置的落点覆盖层 */}
+        {/* Pane drag placement layer. */}
         {active && draggingId && (
           <MoveDragLayer layout={layout} draggingId={draggingId} onCommit={commitMove} />
         )}
@@ -479,169 +479,6 @@ function TerminalPane(props: {
         toggleRequest={sshStatusToggleRequest} onOpenChange={setSshPanelOpen}
         onReconnect={reconnectSsh}
       >{paneContent}</SshStatusPanel> : paneContent}
-    </div>
-  );
-}
-
-/** 根据归一化坐标 (0..1) 挑出光标所在落点：取「深入未来区域最深」者，解决半屏重叠歧义。 */
-function pickDropZone(targets: DropTarget[], nx: number, ny: number): number | null {
-  let best: number | null = null;
-  let bestScore = -Infinity;
-  for (let i = 0; i < targets.length; i++) {
-    const t = targets[i]!;
-    const r = t.rect;
-    if (nx < r.x - 1e-6 || nx > r.x + r.w + 1e-6) continue;
-    if (ny < r.y - 1e-6 || ny > r.y + r.h + 1e-6) continue;
-    const score = t.dir === 'row'
-      ? (t.position === 'first' ? (r.x + r.w) - nx : nx - r.x)
-      : (t.position === 'first' ? (r.y + r.h) - ny : ny - r.y);
-    if (score > bestScore) { bestScore = score; best = i; }
-  }
-  return best;
-}
-
-// ── 分裂落点选择覆盖层 ──
-
-function PlacementOverlay({ targets, onPick, onCancel, emptyMessage = '最多 4 个终端' }: {
-  targets: DropTarget[];
-  onPick: (t: DropTarget) => void;
-  onCancel: () => void;
-  emptyMessage?: string;
-}) {
-  const [hovered, setHovered] = useState<number | null>(null);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (targets.length === 0) {
-      useToastStore.getState().addToast(emptyMessage, 'info');
-      onCancel();
-      return;
-    }
-    // Esc 取消（捕获阶段，优先于全局快捷键）
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopPropagation();
-        onCancel();
-      }
-    };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [targets.length, emptyMessage, onCancel]);
-
-  const locate = (clientX: number, clientY: number): number | null => {
-    const rect = ref.current?.getBoundingClientRect();
-    if (!rect || rect.width === 0 || rect.height === 0) return null;
-    return pickDropZone(targets, (clientX - rect.left) / rect.width, (clientY - rect.top) / rect.height);
-  };
-
-  return (
-    <div
-      ref={ref}
-      onClick={(e) => {
-        const idx = locate(e.clientX, e.clientY);
-        if (idx != null) onPick(targets[idx]!);
-        else onCancel();
-      }}
-      onMouseMove={(e) => setHovered(locate(e.clientX, e.clientY))}
-      onMouseLeave={() => setHovered(null)}
-      style={{ position: 'absolute', inset: 0, zIndex: 80, cursor: 'crosshair' }}
-    >
-      <div data-testid="placement-hint" className="workspace-floating" style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 1, padding: '8px 12px', fontSize: 'calc(12px * var(--ui-font-scale))', whiteSpace: 'nowrap' }}>
-        点击区域选择位置 · Esc 取消
-      </div>
-      {/* A visible grid explains the placement mode before the pointer moves. */}
-      {targets.map((t, i) => (
-        <DropPlacementPreview
-          key={i}
-          data-testid={`placement-zone-${i}`}
-          active={hovered === i}
-          style={{
-            position: 'absolute',
-            left: `${t.rect.x * 100}%`, top: `${t.rect.y * 100}%`,
-            width: `${t.rect.w * 100}%`, height: `${t.rect.h * 100}%`,
-          }}
-        >
-          <span style={{ position: 'absolute', fontSize: 'calc(12px * var(--ui-font-scale))', color: hovered === i ? 'var(--text-primary)' : 'var(--text-secondary)',
-            left: t.dir === 'col' ? '50%' : t.position === 'first' ? 16 : undefined,
-            right: t.dir === 'row' && t.position === 'second' ? 16 : undefined,
-            top: t.dir === 'row' ? '50%' : t.position === 'first' ? 66 : undefined,
-            bottom: t.dir === 'col' && t.position === 'second' ? 20 : undefined,
-            transform: t.dir === 'row' ? 'translateY(-50%)' : 'translateX(-50%)',
-          }}>{t.dir === 'row' ? (t.position === 'first' ? '左侧' : '右侧') : (t.position === 'first' ? '上方' : '下方')}</span>
-        </DropPlacementPreview>
-      ))}
-    </div>
-  );
-}
-
-// ── 拖动终端调整位置的落点覆盖层 ──
-
-function MoveDragLayer({ layout, draggingId, onCommit }: {
-  layout: WindowLayout;
-  draggingId: string;
-  onCommit: (dragId: string, zone: DropTarget) => void;
-}) {
-  // 可移动落点：对其它每个终端给出上/下/左/右四个边沿落点
-  const targets = useMemo(
-    () => moveTargets(layout, draggingId),
-    [layout, draggingId],
-  );
-  const [hovered, setHovered] = useState<number | null>(null);
-  const hoveredRef = useRef<number | null>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      const rect = overlayRef.current?.getBoundingClientRect();
-      let idx: number | null = null;
-      if (rect && rect.width > 0 && rect.height > 0) {
-        idx = pickDropZone(targets, (e.clientX - rect.left) / rect.width, (e.clientY - rect.top) / rect.height);
-      }
-      hoveredRef.current = idx;
-      setHovered(idx);
-    };
-    const onUp = () => {
-      const idx = hoveredRef.current;
-      const zone = idx != null ? targets[idx] : undefined;
-      if (zone) onCommit(draggingId, zone);
-      useDockDragStore.getState().end();
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopPropagation();
-        useDockDragStore.getState().end();
-      }
-    };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-    window.addEventListener('keydown', onKey, true);
-    return () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      window.removeEventListener('keydown', onKey, true);
-    };
-  }, [targets, draggingId, onCommit]);
-
-  if (targets.length === 0) {
-    // 单终端没有可移动落点，直接结束
-    return null;
-  }
-
-  return (
-    <div ref={overlayRef} style={{ position: 'absolute', inset: 0, zIndex: 79, cursor: 'grabbing' }}>
-      {targets.map((t, i) => (
-        <DropPlacementPreview
-          key={i}
-          data-testid={`move-placement-zone-${i}`}
-          active={hovered === i}
-          style={{
-            position: 'absolute',
-            left: `${t.rect.x * 100}%`, top: `${t.rect.y * 100}%`,
-            width: `${t.rect.w * 100}%`, height: `${t.rect.h * 100}%`,
-          }}
-        />
-      ))}
     </div>
   );
 }

@@ -84,15 +84,49 @@ describe('sessionManager.restore（窗口布局）', () => {
     expect(isSessionTab(tab) && tab.groupId).toBe('g1');
   });
 
-  it('does not keep an archived group id when restoring only one session', async () => {
+  it('reopens the original group when restoring only one session', async () => {
     const session = mockSession({ id: 'g-tab', group_id: 'archived-group', payload: '{}' });
-    mockedInvoke.mockImplementation(async (cmd: string) => (cmd === 'get_session' ? session : defaultInvoke(cmd)));
+    mockedInvoke.mockImplementation(async (cmd: string) => cmd === 'get_session' ? session
+      : cmd === 'groups_list' ? [{ id: 'archived-group', title: 'Project', collapsed: false, archived: false, session_count: 1 }]
+      : defaultInvoke(cmd));
 
     await sessionManager.restore('g-tab', 't');
 
     const tab = useWorkspaceStore.getState().tabs.find((item) => item.id === 'g-tab')!;
-    expect(isSessionTab(tab) ? tab.groupId : undefined).toBeUndefined();
-    expect(mockedInvoke).toHaveBeenCalledWith('session_set_group', { sessionId: 'g-tab', groupId: null });
+    expect(isSessionTab(tab) && tab.groupId).toBe('archived-group');
+    expect(useWorkspaceStore.getState().groups).toEqual([{ id: 'archived-group', title: 'Project', collapsed: false }]);
+    expect(mockedInvoke).not.toHaveBeenCalledWith('session_set_group', expect.anything());
+    expect(mockedInvoke).not.toHaveBeenCalledWith('group_restore', expect.anything());
+  });
+
+  it('inserts partial restores in their saved order and retains membership if the group lookup fails', async () => {
+    const first = mockSession({ id: 'first', group_id: 'g1', sort_order: 0 });
+    const last = mockSession({ id: 'last', group_id: 'g1', sort_order: 2 });
+    mockedInvoke.mockImplementation(async (cmd: string, args?: unknown) => {
+      if (cmd === 'get_session') return (args as { id: string }).id === 'first' ? first : last;
+      if (cmd === 'groups_list') return [{ id: 'g1', title: 'Project', collapsed: false }];
+      if (cmd === 'list_sessions') return [first, last];
+      return defaultInvoke(cmd);
+    });
+    await sessionManager.restore('last', 'Last');
+    await sessionManager.restore('first', 'First');
+    expect(useWorkspaceStore.getState().tabs.map(tab => tab.id)).toEqual(['first', 'last']);
+
+    useWorkspaceStore.setState(initialWorkspace, true);
+    mockedInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === 'get_session') return first;
+      if (cmd === 'groups_list') throw new Error('Unavailable');
+      return defaultInvoke(cmd);
+    });
+    await sessionManager.restore('first', 'First');
+    expect(useWorkspaceStore.getState().tabs.some(tab => tab.id === 'first')).toBe(true);
+    expect(mockedInvoke).not.toHaveBeenCalledWith('session_set_group', expect.anything());
+  });
+
+  it('does not create a visible tab when persisting restoration fails', async () => {
+    mockedInvoke.mockRejectedValue(new Error('Unavailable'));
+    await expect(sessionManager.restore('failed', 'Failed')).rejects.toThrow('Unavailable');
+    expect(useWorkspaceStore.getState().tabs).toHaveLength(0);
   });
 
   it('payload 损坏时降级为单本地终端', async () => {

@@ -31,6 +31,7 @@ interface MenuItemProps {
   label: string;
   onClick: () => void;
   danger?: boolean;
+  disabled?: boolean;
   /** Shortcut badge displayed at the end of the row. */
   shortcut?: string;
   /** Radio/switch state; renders a leading mark and exposes menuitemradio semantics. */
@@ -39,7 +40,7 @@ interface MenuItemProps {
   indent?: boolean;
 }
 
-export function MenuItem({ label, onClick, danger, shortcut, role, checked, indent }: MenuItemProps) {
+export function MenuItem({ label, onClick, danger, shortcut, role, disabled, checked, indent }: MenuItemProps) {
   const showSlot = checked !== undefined || indent === true;
   const style: CSSProperties = shortcut
     ? { ...menuItemStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24 }
@@ -47,6 +48,7 @@ export function MenuItem({ label, onClick, danger, shortcut, role, checked, inde
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       role={checked !== undefined ? 'menuitemradio' : role}
       aria-checked={checked !== undefined ? checked : undefined}
       data-subtle

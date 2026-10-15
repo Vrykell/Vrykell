@@ -1,5 +1,6 @@
-import { test, expect, type Locator, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
+import { focusedPane, hoverPlacementZone, pickPlacementZone } from './placement';
 
 test.beforeEach(async ({ page }) => {
   await setupTauriMock(page);
@@ -8,19 +9,13 @@ test.beforeEach(async ({ page }) => {
 });
 
 /**
- * 落点现在是「透明完整区域」+ 覆盖层根节点按光标坐标判定，zone 元素本身 pointer-events:none，
- * 因此用真实鼠标坐标点击其中心（命中覆盖层根节点 → 按坐标选出对应落点）。
+ * 落点覆盖层按指针所在半屏判定：悬停时只渲染该落点的灰色预览（带方位与动作提示），
+ * 点击确认。悬停坐标从窗格几何推出（placement.ts），不再渲染全部落点的网格。
  */
-async function clickZoneCenter(page: Page, locator: Locator) {
-  const box = await locator.boundingBox();
-  if (!box) throw new Error('zone has no bounding box');
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-}
-
 test.describe('窗口分裂（二叉分裂树 + 落点选择）', () => {
   test('horizontal panes retain usable width after divider dragging and sidebar resize', async ({ page }) => {
     await page.keyboard.press('Meta+d');
-    await clickZoneCenter(page, page.getByTestId('placement-zone-1'));
+    await pickPlacementZone(page, focusedPane(page), 'right');
     const divider = page.getByTestId('terminal-divider-row');
     const rect = (await divider.boundingBox())!;
     const main = (await page.locator('main').boundingBox())!;
@@ -42,9 +37,12 @@ test.describe('窗口分裂（二叉分裂树 + 落点选择）', () => {
   });
   test('⌘D 进入落点选择，点右半屏分裂出两个终端', async ({ page }) => {
     await page.keyboard.press('Meta+d');
-    // 1 个终端 → 4 个落点（左右上下半屏）
-    await expect(page.getByTestId('placement-zone-1')).toBeVisible();
-    await clickZoneCenter(page, page.getByTestId('placement-zone-1'));
+    // 1 个终端 → 4 个半屏落点；悬停右半屏时只显示这一个灰色预览
+    const point = await hoverPlacementZone(page, focusedPane(page), 'right');
+    const preview = page.getByTestId('placement-zone-1');
+    await expect(preview).toBeVisible();
+    await expect(preview).toBeEmpty();
+    await page.mouse.click(point.x, point.y);
     await expect(page.locator('[data-testid^="pane-"]')).toHaveCount(2);
     await expect(page.getByPlaceholder(/输入命令/)).toHaveCount(2);
 
@@ -62,7 +60,7 @@ test.describe('窗口分裂（二叉分裂树 + 落点选择）', () => {
 
   test('新建终端（新窗口）不自动加入当前窗口布局', async ({ page }) => {
     await page.keyboard.press('Meta+d');
-    await clickZoneCenter(page, page.getByTestId('placement-zone-1'));
+    await pickPlacementZone(page, focusedPane(page), 'right');
     await expect(page.locator('[data-testid^="pane-"]:visible')).toHaveCount(2);
     await page.keyboard.press('Meta+t');
     // 旧 tab 保活（display:none 而非卸载），只数可见 pane
@@ -71,7 +69,7 @@ test.describe('窗口分裂（二叉分裂树 + 落点选择）', () => {
 
   test('⌘] / ⌘[ 在当前窗口的终端间切换焦点', async ({ page }) => {
     await page.keyboard.press('Meta+d');
-    await clickZoneCenter(page, page.getByTestId('placement-zone-1'));
+    await pickPlacementZone(page, focusedPane(page), 'right');
     const panes = page.locator('[data-testid^="pane-"]');
     await expect(panes).toHaveCount(2);
     await expect(panes.nth(1)).toHaveAttribute('data-focused', 'true');
@@ -88,22 +86,27 @@ test.describe('窗口分裂（二叉分裂树 + 落点选择）', () => {
     await expect(page.getByText('新建标签页')).toBeVisible();
     await page.getByText('生产服务器').click();
     // 进入落点选择
-    await expect(page.getByTestId('placement-zone-1')).toBeVisible();
-    await clickZoneCenter(page, page.getByTestId('placement-zone-1'));
+    await expect(page.getByTestId('placement-overlay')).toBeVisible();
+    await pickPlacementZone(page, focusedPane(page), 'right');
     await expect(page.locator('[data-testid^="pane-"]')).toHaveCount(2);
   });
 
   test('分裂到 4 个终端后不再分裂', async ({ page }) => {
-    // 分裂 3 次到 4 个终端
-    for (let i = 0; i < 3; i++) {
-      await page.keyboard.press('Meta+d');
-      // 选一个可见落点（不同阶段落点数量不同，都点第一个）
-      await clickZoneCenter(page, page.locator('[data-testid^="placement-zone-"]').first());
-    }
-    await expect(page.locator('[data-testid^="pane-"]')).toHaveCount(4);
-    // 再分裂：无落点，应保持 4 个
+    const panes = page.locator('[data-testid^="pane-"]:visible');
+    // 1 → 2：右半屏；2 → 3：左窗格上半屏；3 → 4：右窗格上半屏
     await page.keyboard.press('Meta+d');
+    await pickPlacementZone(page, focusedPane(page), 'right');
+    await expect(panes).toHaveCount(2);
+    await page.keyboard.press('Meta+d');
+    await pickPlacementZone(page, panes.nth(0), 'top');
+    await expect(panes).toHaveCount(3);
+    await page.keyboard.press('Meta+d');
+    await pickPlacementZone(page, panes.nth(2), 'top');
+    await expect(panes).toHaveCount(4);
+    // 再分裂：深一层的叶子没有落点，提示后保持 4 个
+    await page.keyboard.press('Meta+d');
+    await expect(page.getByText('最多 4 个终端')).toBeVisible();
     await expect(page.locator('[data-testid^="placement-zone-"]')).toHaveCount(0);
-    await expect(page.locator('[data-testid^="pane-"]')).toHaveCount(4);
+    await expect(panes).toHaveCount(4);
   });
 });

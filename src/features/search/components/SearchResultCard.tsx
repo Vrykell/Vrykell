@@ -1,3 +1,4 @@
+import { OutlineButton } from '@ui/OutlineButton';
 import {
   Command, History, Monitor, Settings, SquareTerminal, Undo2, type AppIcon,
 } from '@ui/icons';
@@ -196,7 +197,7 @@ export default function SearchResultCard({
 
 function RestoreBtn({ onClick }: { onClick: (e: React.MouseEvent) => void }) {
   return (
-    <button
+    <OutlineButton
       onClick={onClick}
       data-tip="恢复此会话"
       aria-label="恢复此会话"
@@ -204,11 +205,7 @@ function RestoreBtn({ onClick }: { onClick: (e: React.MouseEvent) => void }) {
         flexShrink: 0,
         width: 22, height: 22,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        border: '1px solid var(--border)',
         borderRadius: 4,
-        background: 'transparent',
-        color: 'var(--text-secondary)',
-        cursor: 'pointer',
         fontSize: 'calc(10px * var(--ui-font-scale))',
         padding: 0,
         marginTop: -1,
@@ -222,7 +219,7 @@ function RestoreBtn({ onClick }: { onClick: (e: React.MouseEvent) => void }) {
       }}
     >
       <Undo2 size={11} />
-    </button>
+    </OutlineButton>
   );
 }
 

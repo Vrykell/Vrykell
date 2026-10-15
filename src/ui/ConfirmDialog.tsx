@@ -1,3 +1,4 @@
+import { OutlineButton } from '@ui/OutlineButton';
 import { useRef } from 'react';
 import { useDialogKeyboard } from './useDialogKeyboard';
 interface Props {
@@ -55,11 +56,7 @@ export default function ConfirmDialog({
           </div>
         )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button onClick={onCancel} data-testid="confirm-cancel" style={{
-            padding: '5px 12px', fontSize: 'calc(12px * var(--ui-font-scale))', border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-inner)', background: 'transparent',
-            color: 'var(--text-secondary)', cursor: 'pointer',
-          }}>{cancelLabel}</button>
+          <OutlineButton onClick={onCancel} data-testid="confirm-cancel">{cancelLabel}</OutlineButton>
           <button onClick={onConfirm} data-testid="confirm-ok" style={{
             padding: '5px 16px', fontSize: 'calc(12px * var(--ui-font-scale))', border: 'none',
             borderRadius: 'var(--radius-inner)',

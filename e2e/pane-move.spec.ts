@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { setupTauriMock, emitPtyOutput, expectAnyTermContains } from './tauri-mock';
+import { focusedPane, hoverPlacementZone, pickPlacementZone } from './placement';
 
 test('a single pane ignores reordering gestures and remains ready for splitting', async ({ page }) => {
   await setupTauriMock(page);
@@ -11,9 +12,10 @@ test('a single pane ignores reordering gestures and remains ready for splitting'
   await page.mouse.move(pane!.x + pane!.width / 2 + 50, pane!.y + 100);
   await page.mouse.up();
   await page.keyboard.press('Meta+d');
+  // 悬停右半屏预览该落点后点击确认
+  const point = await hoverPlacementZone(page, focusedPane(page), 'right');
   await expect(page.getByTestId('placement-zone-1')).toBeVisible();
-  const zone = await page.getByTestId('placement-zone-1').boundingBox();
-  await page.mouse.click(zone!.x + zone!.width / 2, zone!.y + zone!.height / 2);
+  await page.mouse.click(point.x, point.y);
   await expect(page.locator('[data-testid^="pane-"]')).toHaveCount(2);
 });
 
@@ -32,10 +34,8 @@ test('拖动终端重排：运行中块的 PTY 保活（不重挂、命令不退
 
   // 分裂出第二个终端（点右半屏落点）；后分裂的 pane 持有运行中块
   await page.keyboard.press('Meta+d');
-  await expect(page.getByTestId('placement-zone-1')).toBeVisible({ timeout: 5000 });
-  const zone = await page.getByTestId('placement-zone-1').boundingBox();
-  expect(zone).not.toBeNull();
-  await page.mouse.click(zone!.x + zone!.width / 2, zone!.y + zone!.height / 2);
+  await expect(page.getByTestId('placement-overlay')).toBeVisible({ timeout: 5000 });
+  await pickPlacementZone(page, focusedPane(page), 'right');
   const panes = page.locator('[data-testid^="pane-"]');
   await expect(panes).toHaveCount(2);
 
@@ -56,9 +56,44 @@ test('拖动终端重排：运行中块的 PTY 保活（不重挂、命令不退
   await page.mouse.move(first!.x + first!.width * 0.5 + 50, first!.y + first!.height * 0.5, { steps: 5 });
   const vp = page.viewportSize()!;
   await page.mouse.move(vp.width * 0.75, vp.height * 0.5, { steps: 10 });
+  // 拖动中只显示指针下的落点预览（无文字）
+  await expect(page.getByTestId('move-placement-zone-1')).toBeVisible();
   await page.mouse.up();
 
   // 布局重排后：运行中块仍活着（PTY 未退出、块未重挂、内容未丢失）
   await expect(page.locator('[data-tip="终止命令"]')).toHaveCount(1, { timeout: 5000 });
   await expectAnyTermContains(page, 'keep-alive-marker', 3000);
+});
+
+test('更换位置：悬停目标落点后点击即可移动窗格', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
+  await page.keyboard.press('Meta+d');
+  await pickPlacementZone(page, focusedPane(page), 'right');
+  const panes = page.locator('[data-testid^="pane-"]');
+  await expect(panes).toHaveCount(2);
+
+  // 右键第一个窗格 → 更换位置：被移动的窗格在剩余区域的落点里悬停并点击
+  const movedId = await panes.first().getAttribute('data-testid');
+  await panes.first().click({ button: 'right' });
+  await page.getByText('更换位置', { exact: true }).click();
+  await expect(page.getByTestId('placement-overlay')).toBeVisible();
+  await pickPlacementZone(page, panes.first(), 'bottom');
+
+  // 原窗格换到下方并重新获得焦点
+  const moved = (await page.locator(`[data-testid="${movedId}"]`).boundingBox())!;
+  const other = (await panes.first().boundingBox())!;
+  expect(moved.y).toBeGreaterThan(other.y);
+  await expect(page.locator(`[data-testid="${movedId}"]`)).toHaveAttribute('data-focused', 'true');
+});
+
+test('更换位置在只有一个终端时提示并保持原状', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
+  await page.locator('[data-testid^="pane-"]').first().click({ button: 'right' });
+  await page.getByText('更换位置', { exact: true }).click();
+  await expect(page.getByText('只有一个终端，无法更换位置')).toBeVisible();
+  await expect(page.getByTestId('placement-overlay')).toHaveCount(0);
 });
