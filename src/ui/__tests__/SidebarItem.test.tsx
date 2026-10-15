@@ -20,6 +20,21 @@ function renderItem(overrides: Partial<Parameters<typeof SidebarItem>[0]> = {}) 
 }
 
 describe('SidebarItem', () => {
+  it('runs the history gutter action without activating the record and preserves disabled guards', () => {
+    const remove = vi.fn();
+    const activate = vi.fn();
+    const props = { active: true, variant: 'history' as const, compact: true, icon: <span />, title: 'History record', onClick: activate,
+      testId: 'record', leadingAction: { icon: <span />, label: 'Delete record', onClick: remove } };
+    const { rerender } = render(<SidebarItem {...props} />);
+    expect(screen.getByTestId('record')).toHaveAttribute('aria-current', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Delete record' }));
+    expect(remove).toHaveBeenCalledOnce();
+    expect(activate).not.toHaveBeenCalled();
+    rerender(<SidebarItem {...props} leadingAction={{ ...props.leadingAction, disabled: true }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete record' }));
+    expect(remove).toHaveBeenCalledOnce();
+  });
+
   it('keeps compact rows selectable with the same title and action behavior', () => {
     const { onClick, onAction } = renderItem({ compact: true, active: true });
     fireEvent.click(screen.getByText('会话一'));

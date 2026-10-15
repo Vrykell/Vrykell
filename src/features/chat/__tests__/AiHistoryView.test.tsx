@@ -57,10 +57,28 @@ it('shows new conversations without replacing the history page', () => {
 it('copies the filtered group without including unrelated conversations', async () => {
   render(<AiHistoryView />);
   fireEvent.change(screen.getByRole('textbox', { name: '搜索对话' }), { target: { value: 'Build' } });
-  fireEvent.click(screen.getByRole('button', { name: '复制为 Markdown' }));
+  expect(screen.queryByRole('button', { name: '复制为 Markdown' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: '分组操作' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: '复制为 Markdown' }));
   await waitFor(() => expect(writeClipboardText).toHaveBeenCalled());
   expect(vi.mocked(writeClipboardText).mock.calls[0]![0]).toContain('# Build investigation');
   expect(vi.mocked(writeClipboardText).mock.calls[0]![0]).not.toContain('Database question');
+});
+
+it('deletes from the gutter without opening the record and protects locked conversations', async () => {
+  useHistoryMetaStore.getState().setLocked(['conversation:first'], true);
+  render(<AiHistoryView />);
+  expect(screen.getByTestId('conversation-delete-first')).toBeDisabled();
+  fireEvent.click(screen.getByTestId('conversation-delete-second'));
+  await waitFor(() => expect(conversationApi.deleteConversation).toHaveBeenCalledWith('second'));
+  expect(useChatStore.getState().activeConversationId).toBe('first');
+});
+
+it('opens record actions on right click without opening group actions', () => {
+  render(<AiHistoryView />);
+  fireEvent.contextMenu(screen.getByTestId('conversation-row-first'), { clientX: 30, clientY: 50 });
+  expect(screen.getByRole('menuitem', { name: '打开对话' })).toBeVisible();
+  expect(screen.queryByRole('menuitem', { name: '收起分组' })).toBeNull();
 });
 
 it('keeps locked and failed records while deleting the other records in a group', async () => {

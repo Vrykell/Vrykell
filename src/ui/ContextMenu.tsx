@@ -96,7 +96,7 @@ export default function ContextMenu({ anchor, items, onClose, label = t('Action 
     >
       {description && <div className="context-menu-description">{description}</div>}
       <ContextMenuItems items={items} onClose={closeWithFocus} itemRole={itemRole} />
-      {footer && <div className="context-menu-footer">{footer}</div>}
+      {footer && <><div role="separator" className="context-menu-separator" /><div className="context-menu-footer">{footer}</div></>}
     </div>,
     document.body,
   );

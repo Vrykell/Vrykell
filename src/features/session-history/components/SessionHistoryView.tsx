@@ -2,7 +2,7 @@ import { t } from '@i18n';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { sessionCommandCount, sessionHistoryDateField, sessionHistoryDirectories, sessionHistoryTimestamp, sessionSummaryText } from '../model/sessionHistoryModel';
 import { useCallback, useMemo, useState } from 'react';
-import { Monitor, History, Server, Ellipsis, Filter, ArrowSort, Grid, Lock, Star } from '@ui/icons';
+import { Monitor, MonitorSmall, History, HistorySmall, ServerSmall, Ellipsis, Filter, ArrowSort, Grid, LockSmall as Lock, StarSmall as Star, X } from '@ui/icons';
 import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/ContextMenu';
 import { IconButton } from '@ui/IconButton';
 import HistoryOptionMenu, { type HistoryMenuSection } from '@ui/HistoryOptionMenu';
@@ -88,8 +88,8 @@ export default function SessionHistoryView() {
     if (await ask(t('Delete {{count}} matching sessions and their history? Locked records are excluded.', { count: targets.length }),
       { title: t('Delete sessions'), kind: 'warning' })) await deleteSessions(targets);
   };
-  const groupItems = (items: readonly BackendSessionEntry[]): ContextMenuItem[] => [
-    { label: t('Restore {{count}} matching sessions', { count: items.length }), disabled: batchBusy, onClick: () => { void restoreSessions(items); } },
+  const groupItems = (items: readonly BackendSessionEntry[], restoreLabel: string): ContextMenuItem[] => [
+    { label: restoreLabel, disabled: batchBusy, onClick: () => { void restoreSessions(items); } },
     { label: t('Copy matching session summaries'), group: 'clipboard', onClick: () => copySummaries(items) },
     { label: t('Delete {{count}} matching sessions…', { count: deletable(items).length }), danger: true,
       disabled: batchBusy || !deletable(items).length, onClick: () => { void deleteMatching(items); } },
@@ -272,28 +272,30 @@ export default function SessionHistoryView() {
                 label: t('Restore original group ({{count}} sessions)', { count: group.totalCount ?? 0 }), disabled: batchBusy,
                 onClick: () => { void restoreSessions(sessions.filter(session => session.status === 'historical' && session.group_id === group.originalGroup!.id)); },
               }] : []),
-              ...groupItems(group.sessions),
-            ]}
-            primaryAction={{ label: t(group.originalGroup
-              ? group.totalCount === group.sessions.length ? 'Restore group' : 'Restore matching' : 'Restore all'),
-              disabled: batchBusy, onClick: () => { void restoreSessions(group.sessions); } }}>
+              ...groupItems(group.sessions, t(group.originalGroup
+                ? group.totalCount === group.sessions.length ? 'Restore group' : 'Restore matching' : 'Restore all')),
+            ]}>
             {group.sessions.map(session => <SessionRow key={session.id} s={session}
               starred={starredIds.has(session.id)}
               note={notes[noteKey(session.id)]}
               locked={Boolean(lockedRecords[noteKey(session.id)])}
               onOpen={() => openSession(session)}
+              onDelete={() => deleteHistoricalSession(session)}
+              deleteDisabled={batchBusy}
               onMenu={anchor => openRowMenu(session, anchor)} />)}
           </HistoryGroupCard>)
         )}
   </HistoryPage>);
 }
 
-function SessionRow({ s, starred, note, locked, onOpen, onMenu }: {
+function SessionRow({ s, starred, note, locked, onOpen, onDelete, deleteDisabled, onMenu }: {
   s: BackendSessionEntry;
   starred: boolean;
   note?: string;
   locked: boolean;
   onOpen: () => void;
+  onDelete: () => void;
+  deleteDisabled: boolean;
   onMenu: (anchor: MenuAnchor) => void;
 }) {
   const historical = s.status === 'historical';
@@ -306,8 +308,8 @@ function SessionRow({ s, starred, note, locked, onOpen, onMenu }: {
     note ? t('Note: {{note}}', { note }) : null,
   ].filter(Boolean).join(' · ');
   const openLabel = historical ? t('Restore') : t('Open');
-  const icon = isSshSession(s) ? <Server size={14} aria-hidden="true" />
-    : historical ? <History size={14} aria-hidden="true" /> : <Monitor size={14} aria-hidden="true" />;
+  const icon = isSshSession(s) ? <ServerSmall size={16} aria-hidden="true" />
+    : historical ? <HistorySmall size={16} aria-hidden="true" /> : <MonitorSmall size={16} aria-hidden="true" />;
 
   return <SidebarItem
     icon={<span className="history-row-icon">{icon}</span>}
@@ -317,8 +319,8 @@ function SessionRow({ s, starred, note, locked, onOpen, onMenu }: {
     variant="history"
     compact
     badge={starred || locked ? <span className="history-row-flags">
-      {locked && <span className="history-row-lock" data-tip={t('Locked record')}><Lock size={12} aria-hidden="true" /></span>}
-      {starred && <span className="history-row-star" data-tip={t('Starred')} data-testid={`session-star-${s.id}`}><Star size={12} aria-hidden="true" /></span>}
+      {locked && <span className="history-row-lock" data-tip={t('Locked record')}><Lock size={16} aria-hidden="true" /></span>}
+      {starred && <span className="history-row-star" data-tip={t('Starred')} data-testid={`session-star-${s.id}`}><Star size={16} aria-hidden="true" /></span>}
       <span className="history-row-status">{openLabel}</span>
     </span> : <span className="history-row-status">{openLabel}</span>}
     active={false}
@@ -326,9 +328,18 @@ function SessionRow({ s, starred, note, locked, onOpen, onMenu }: {
     testId={`history-session-${s.id}`}
     tooltip={historical ? t('Restore session') : t('Open session')}
     onClick={onOpen}
+    onContextMenu={event => {
+      event.preventDefault(); event.stopPropagation();
+      onMenu({ x: event.clientX, y: event.clientY, trigger: event.currentTarget });
+    }}
+    leadingAction={historical ? {
+      icon: <X size={16} aria-hidden="true" />, label: t('Delete this session'),
+      disabled: locked || deleteDisabled, title: t(locked ? 'Locked record' : 'Delete this session'),
+      testId: `session-delete-${s.id}`, onClick: onDelete,
+    } : undefined}
     onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onOpen(); } }}
     action={{
-      icon: <Ellipsis size={14} aria-hidden="true" />,
+      icon: <Ellipsis size={16} aria-hidden="true" />,
       label: t('More actions'),
       title: t('More actions'),
       testId: `session-menu-${s.id}`,

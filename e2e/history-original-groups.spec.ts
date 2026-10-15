@@ -27,9 +27,10 @@ test('original groups remain intact across classifications, filters and persiste
   await page.getByTestId('session-filter-input').fill('Backend');
   await expect(card.locator('.history-row')).toHaveCount(1);
   await expect(card.locator('.history-group-count')).toHaveText('1 / 3 个会话');
-  await expect(card.getByRole('button', { name: '恢复匹配项', exact: true })).toBeVisible();
+  await expect(card.getByRole('button', { name: '恢复匹配项', exact: true })).toHaveCount(0);
   await expect(card.locator('.history-group-subtitle')).toHaveText('原标签组 · 多个工作目录');
   await card.getByRole('button', { name: '分组操作' }).click();
+  await expect(page.getByRole('menuitem', { name: '恢复匹配项', exact: true })).toBeVisible();
   await expect(page.getByRole('menuitem', { name: '恢复原组全部 3 个会话' })).toBeVisible();
   await page.getByRole('menuitem', { name: '重命名分组…' }).click();
   const name = page.getByRole('textbox', { name: '分组名称' });
@@ -49,7 +50,8 @@ test('original groups remain intact across classifications, filters and persiste
 test('filtered and whole-group restores retain original membership and order after closing each tab', async ({ page }, testInfo) => {
   const card = page.getByTestId('history-group-card-source:archived-group');
   await page.getByTestId('session-filter-input').fill('Backend');
-  await card.getByRole('button', { name: '恢复匹配项', exact: true }).click();
+  await card.getByRole('button', { name: '分组操作' }).click();
+  await page.getByRole('menuitem', { name: '恢复匹配项', exact: true }).click();
   await ensureTabsOpen(page);
   await expect(page.getByTestId('tab-row-hist-group-2')).toHaveAttribute('data-tab-group', 'archived-group');
   await expect(page.getByTestId('tab-row-hist-group-1')).toHaveCount(0);

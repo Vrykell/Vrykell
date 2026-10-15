@@ -9,7 +9,8 @@ async function expectStableRecordHover(record: Locator) {
   await record.hover();
   await expect(record.locator('.sidebar-row-action')).toHaveCSS('opacity', '1');
   await expect(content).toHaveCSS('background-color', background);
-  await expect(record.locator('.sidebar-row-title')).toHaveCSS('text-decoration-line', 'none');
+  await expect(record.locator('.sidebar-row-title')).toHaveCSS('text-decoration-line', 'underline');
+  await expect(record.locator('.history-row-remove')).toBeVisible();
 }
 
 async function expectResponsiveTimestamp(card: Locator) {
