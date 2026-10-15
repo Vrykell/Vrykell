@@ -299,7 +299,8 @@ function SessionRow({ s, starred, note, locked, onOpen, onDelete, busy, onMenu }
   busy: boolean;
   onMenu: (anchor: MenuAnchor) => void;
 }) {
-  const iconColor = useIconColorStore(state => iconColorCss(state.colors[iconColorKey('session', s.id)]));
+  const iconColor = useIconColorStore(state => iconColorCss(state.colors[iconColorKey('session', s.id)]
+    ?? (s.group_id ? state.colors[iconColorKey('group', s.group_id)] : undefined)));
   const historical = s.status === 'historical';
   const closedDate = historical && s.closed_at ? new Date(s.closed_at).toLocaleString(undefined,
     { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;

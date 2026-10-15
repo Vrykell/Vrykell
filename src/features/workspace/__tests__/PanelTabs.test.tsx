@@ -28,11 +28,13 @@ it.each(['local', 'settings', 'history'])('colors the %s icon from its context m
   fireEvent.contextMenu(row);
   const palette = screen.getByRole('group', { name: '图标颜色' });
   fireEvent.click(palette.querySelector('[data-color="violet"]')!);
-  expect(row.querySelector('svg')!.style.color).toBe('var(--group-violet)');
+  if (id === 'local') expect(row.querySelector('svg')!.style.color).toBe('var(--group-violet)');
+  else expect(row.querySelector('.icon-tile')).toHaveStyle({ background: 'var(--group-violet)' });
   expect(useSessionStore.getState().activeId).toBe('settings');
   fireEvent.contextMenu(row);
   fireEvent.click(screen.getByTestId('tab-icon-color-auto'));
-  expect(row.querySelector('svg')!.style.color).toBe(id === 'local' ? 'var(--shell-bash-accent)' : id === 'settings' ? 'var(--text-primary)' : 'var(--text-secondary)');
+  if (id === 'local') expect(row.querySelector('svg')!.style.color).toBe('var(--shell-bash-accent)');
+  else expect(row.querySelector('.icon-tile')).toHaveStyle({ background: id === 'settings' ? 'var(--group-blue)' : 'var(--group-amber)' });
 });
 afterEach(() => { cleanup(); useListReorder.getState().end(); useSessionStore.setState(snapshot, true); });
 
@@ -100,13 +102,56 @@ it('keeps group rows intact through renaming and reordering', () => {
   ] });
   render(<PanelTabs />);
   const firstTile = screen.getByTestId('group-header-group-a').querySelector('span')!;
-  expect(firstTile).toHaveStyle({ width: '24px', height: '24px', background: 'var(--hover)' });
+  expect(firstTile).toHaveStyle({ width: '24px', height: '24px', background: 'var(--group-amber)' });
   expect(firstTile.querySelector('svg')).not.toBeNull();
   act(() => useSessionStore.setState({ groups: [
     { id: 'group-b', title: 'Second', collapsed: false },
     { id: 'group-a', title: 'Renamed', collapsed: false },
   ] }));
   expect(screen.getByTestId('group-header-group-a')).toHaveTextContent('Renamed');
+});
+
+it('colors groups from a keyboard-accessible menu and inherits color until a member overrides it', () => {
+  useSessionStore.setState(state => ({
+    tabs: state.tabs.map(tab => tab.kind === 'session' ? { ...tab, groupId: 'group-a' } : tab),
+    groups: [{ id: 'group-a', title: 'Group', collapsed: false }],
+  }));
+  render(<PanelTabs />);
+  const header = screen.getByTestId('group-header-group-a');
+  const member = screen.getByTestId('tab-row-local');
+  fireEvent.keyDown(header, { key: 'F10', shiftKey: true });
+  fireEvent.click(screen.getByRole('menuitemradio', { name: '紫色' }));
+  expect(header.querySelector('.icon-tile')).toHaveStyle({ background: 'var(--group-violet)' });
+  expect(member.querySelector('svg')!.style.color).toBe('var(--group-violet)');
+  expect(useSessionStore.getState().groups[0].collapsed).toBe(false);
+  expect(header).toHaveFocus();
+  fireEvent.contextMenu(member);
+  fireEvent.click(screen.getByRole('menuitemradio', { name: '青色' }));
+  expect(member.querySelector('svg')!.style.color).toBe('var(--group-cyan)');
+  fireEvent.contextMenu(header);
+  fireEvent.click(screen.getByRole('menuitemradio', { name: '绿色' }));
+  expect(member.querySelector('svg')!.style.color).toBe('var(--group-cyan)');
+  fireEvent.contextMenu(member);
+  fireEvent.click(screen.getByTestId('tab-icon-color-auto'));
+  expect(member.querySelector('svg')!.style.color).toBe('var(--group-green)');
+});
+
+it('keeps a filtered nonempty group protected by the archive confirmation', () => {
+  const archiveGroup = vi.fn();
+  const deleteGroup = vi.fn();
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  useSessionStore.setState(state => ({
+    tabs: state.tabs.map(tab => tab.kind === 'session' ? { ...tab, groupId: 'group-a' } : tab),
+    groups: [{ id: 'group-a', title: 'Group', collapsed: false }], archiveGroup, deleteGroup,
+  }));
+  render(<PanelTabs />);
+  fireEvent.change(screen.getByTestId('tab-search'), { target: { value: 'History' } });
+  fireEvent.contextMenu(screen.getByTestId('group-header-group-a'));
+  fireEvent.click(screen.getByText('归档分组'));
+  expect(confirm).toHaveBeenCalledOnce();
+  expect(deleteGroup).not.toHaveBeenCalled();
+  expect(archiveGroup).not.toHaveBeenCalled();
+  confirm.mockRestore();
 });
 
 it('keeps an empty session drop zone expandable and previews grouped tabs outside singleton rows', () => {

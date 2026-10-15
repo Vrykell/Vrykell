@@ -334,6 +334,10 @@ const zh: Record<string, string> = {
   'Settings page': '设置页面',
   'Icon color': '图标颜色',
   'Close this tab': '关闭标签',
+  'Add terminal to group': '在此分组新建终端',
+  'Rename tab group': '重命名分组',
+  'Archive tab group': '归档分组',
+  'Delete empty group': '删除空分组',
   'No matching settings': '无匹配设置',
 
   '{{tool}} permission': '{{tool}} 权限',

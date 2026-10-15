@@ -42,7 +42,10 @@ for (const theme of ['深色', '浅色']) {
     await page.keyboard.press('Meta+,');
     await settings.click({ button: 'right' });
     await menu.getByRole('menuitemradio', { name: '蓝色', exact: true }).click();
-    await expect(settings.locator('.sidebar-row-icon svg')).not.toHaveCSS('color', original);
+    const tile = settings.locator('.icon-tile');
+    await expect(tile).toHaveAttribute('style', /background: var\(--group-blue\)/);
+    await expect(tile).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await page.screenshot({ path: testInfo.outputPath('singleton-icon-tiles.png'), animations: 'disabled' });
   });
 
   test(`settings text, hover hints and compact search remain consistent in ${theme}`, async ({ page }, testInfo) => {
@@ -68,21 +71,26 @@ for (const theme of ['深色', '浅色']) {
     await page.setViewportSize({ width: 600, height: 760 });
     const content = page.locator('.settings-content');
     const before = (await content.boundingBox())!;
-    const search = navigation.getByRole('textbox', { name: '搜索设置…', exact: true });
+    const search = navigation.getByRole('textbox', { name: '搜索设置…', exact: true, includeHidden: true });
+    const trigger = navigation.getByRole('button', { name: '搜索设置…', exact: true });
+    await expect(search).toBeHidden();
+    await trigger.click();
     await search.fill('f');
-    const results = navigation.locator('.settings-navigation-list');
+    const results = navigation.locator('.settings-search-results');
     await expect(results).toBeVisible();
     const after = (await content.boundingBox())!;
     expect(after.y).toBe(before.y);
     expect(after.height).toBe(before.height);
-    expect((await results.boundingBox())!.y).toBeGreaterThanOrEqual((await navigation.boundingBox())!.y + (await navigation.boundingBox())!.height);
+    const bounds = (await results.boundingBox())!;
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(600);
+    expect(bounds.height).toBeLessThanOrEqual(320);
     await expect(results.locator('.settings-search-result').first().locator('small')).toContainText(' · ');
     await search.press('ArrowDown');
     await expect(results.locator('.settings-search-result').first()).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(results).toBeHidden();
-    await expect(search).toBeFocused();
-    await search.click();
+    await expect(trigger).toBeFocused();
+    await trigger.click();
     await expect(results).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('compact-settings-search.png'), animations: 'disabled' });
     await results.locator('.settings-search-result').first().click();
@@ -92,6 +100,8 @@ for (const theme of ['深色', '浅色']) {
     const palette = page.locator('.global-search-dialog');
     await expect(palette).toBeVisible();
     await expect(palette.locator('.global-search-body')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(palette.locator('.global-search-query')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(palette.getByRole('textbox')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await page.screenshot({ path: testInfo.outputPath('unified-global-search.png'), animations: 'disabled' });
   });
 }

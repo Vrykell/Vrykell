@@ -1,9 +1,6 @@
 import { OutlineButton } from '@ui/OutlineButton';
 import { t } from '@i18n';
-import SidebarItem from '@ui/sidebarItem';
-import { TextInput } from '@ui/TextInput';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { iconSizes, Search  } from '@ui/icons';
+import { useEffect, useState, type ReactNode } from 'react';
 import { loadConfig, saveConfig, type FileOpenConfig } from '@features/files/services/fileOpen';
 import { refreshAiConfig, setTavilyKey, clearTavilyKey, useAiConfigStore } from '@features/agent';
 import SkillsSettings from '@features/settings/pages/SkillsSettings';
@@ -21,9 +18,10 @@ import { McpPage } from '@features/settings/pages/mcpPage';
 import { TerminalOpenPage } from '@features/settings/pages/terminalOpenPage';
 import { ThemePage } from '@features/settings/pages/themePage';
 import { ShortcutPage } from '@features/settings/pages/shortcutPage';
-import { SETTINGS_GROUPS, useSettingsNavigation } from '@features/settings/hooks/useSettingsNavigation';
+import { useSettingsNavigation } from '@features/settings/hooks/useSettingsNavigation';
 import AutoSaveInput from '../components/AutoSaveInput';
 import SaveStatus from '../components/SaveStatus';
+import SettingsNavigation from '../components/SettingsNavigation';
 import { SettingsSaveProvider, useSettingsSave } from '../components/SettingsSaveProvider';
 import { StartupPage } from './startupPage';
 import { LogsPage } from './logsPage';
@@ -56,27 +54,9 @@ export default function SettingsView() {
 }
 
 function SettingsContent() {
-  const navigationRef = useRef<HTMLElement>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
-  const [searchOpen, setSearchOpen] = useState(false);
-  useEffect(() => {
-    const outside = (event: PointerEvent) => {
-      if (event.target instanceof Node && !navigationRef.current?.contains(event.target)) setSearchOpen(false);
-    };
-    document.addEventListener('pointerdown', outside);
-    return () => document.removeEventListener('pointerdown', outside);
-  }, []);
   const { save, status, retry } = useSettingsSave();
-  const {
-    selected,
-    setSelected,
-    query,
-    setQuery,
-    normalizedQuery,
-    visibleGroups,
-    matchingSettings,
-    activeLabel,
-  } = useSettingsNavigation();
+  const navigation = useSettingsNavigation();
+  const { selected, activeLabel } = navigation;
 
   // 文件打开配置（localStorage）
   const [fileCfg, setFileCfg] = useState<FileOpenConfig>(() => loadConfig());
@@ -285,92 +265,7 @@ function SettingsContent() {
       background: 'var(--canvas)', userSelect: 'none',
     }}>
       <div className="settings-layout">
-        {/* Navigation shares the available settings width with the content. */}
-        <aside ref={navigationRef} className="settings-navigation" data-search-open={searchOpen && Boolean(normalizedQuery)}
-          onBlur={event => {
-            if (event.relatedTarget instanceof Node && !event.currentTarget.contains(event.relatedTarget)) setSearchOpen(false);
-          }}
-          onKeyDown={event => {
-            if (event.key === 'Escape' && searchOpen) {
-              event.preventDefault(); event.stopPropagation(); searchRef.current?.focus(); setSearchOpen(false);
-            } else if (['ArrowDown', 'ArrowUp'].includes(event.key) && event.target instanceof Element
-              && event.target.closest('.settings-navigation-list')) {
-              event.preventDefault(); event.stopPropagation();
-              const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('.settings-navigation-list button:not(:disabled)')];
-              const current = buttons.indexOf(document.activeElement as HTMLButtonElement);
-              buttons[(current + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length]?.focus();
-            }
-          }} style={{
-          background: 'var(--sidebar-bg)',
-          display: 'flex', flexDirection: 'column', minHeight: 0,
-        }}>
-          <div className="settings-navigation-tools">
-            <div className="settings-navigation-search" style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '6px 8px',
-              borderRadius: 'var(--radius-inner)', background: 'var(--field-bg)',
-            }}>
-              <Search size={iconSizes.compact} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-              <TextInput
-                ref={searchRef}
-                aria-label={t('Search settings…')}
-                value={query}
-                onFocus={() => setSearchOpen(true)}
-                onClick={() => setSearchOpen(true)}
-                onChange={(e) => { setQuery(e.target.value); setSearchOpen(true); }}
-                onKeyDown={event => {
-                  if (event.key === 'ArrowDown' && normalizedQuery) {
-                    event.preventDefault(); setSearchOpen(true);
-                    requestAnimationFrame(() => navigationRef.current?.querySelector<HTMLButtonElement>('.settings-navigation-list button')?.focus());
-                  }
-                }}
-                placeholder={t('Search settings…')}
-                style={{
-                  flex: 1, minWidth: 0, background: 'transparent', border: 'none',
-                  outline: 'none', fontSize: 'var(--fs-label)', color: 'var(--text-primary)',
-                }}
-              />
-            </div>
-            <div className="settings-compact-navigation">
-              <Select aria-label={t('Settings page')} value={selected}
-                options={SETTINGS_GROUPS.flatMap(group => group.items.map(item => ({
-                  value: item.id, label: `${group.label} · ${item.label}`, triggerLabel: item.label,
-                })))}
-                onChange={setSelected} style={{ width: '100%' }} />
-            </div>
-          </div>
-          <div className="settings-navigation-list scroll-region" data-searching={Boolean(normalizedQuery)}>
-            {normalizedQuery && matchingSettings.map(setting => (
-              <button key={setting.id} className="settings-search-result" onClick={() => { setting.onSelect(); setQuery(''); }}>
-                <span>{setting.label}</span>
-                <small>{SETTINGS_GROUPS.flatMap(group => group.items).find(item => item.id === setting.page)?.label ?? activeLabel} · {setting.desc}</small>
-              </button>
-            ))}
-            {(!normalizedQuery || matchingSettings.length === 0) && visibleGroups.map((g) => {
-              return (
-                <div key={g.id} className="settings-nav-group">
-                  <div className="settings-nav-heading">{g.label}</div>
-                  {g.items.map(item => {
-                    const Icon = item.icon;
-                    return <SidebarItem compact key={item.id} icon={<Icon size={iconSizes.row} />}
-                      title={item.label} tooltip={item.label} active={selected === item.id} tabIndex={0}
-                      style={{ fontSize: 'var(--fs-label)' }}
-                      dataAttributes={{ role: 'button', 'aria-label': item.label, 'aria-current': selected === item.id ? 'page' : undefined }}
-                      onClick={() => setSelected(item.id)}
-                      onKeyDown={event => {
-                        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelected(item.id); }
-                      }} />;
-                  })}
-                </div>
-              );
-            })}
-            {normalizedQuery && matchingSettings.length === 0 && visibleGroups.length === 0 && (
-              <div style={{ padding: 16, textAlign: 'center', fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>
-                {t('No matching settings')}
-              </div>
-            )}
-          </div>
-        </aside>
+        <SettingsNavigation navigation={navigation} />
 
         {/* Content retains a readable width before falling back to horizontal scrolling. */}
         <section className="settings-content">
