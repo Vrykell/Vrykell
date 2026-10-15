@@ -44,7 +44,7 @@ for (const theme of ['深色', '浅色']) {
     await expect(menu.getByRole('group', { name: '图标颜色' })).toHaveCount(0);
     await page.keyboard.press('Escape');
     const icon = settings.locator('.sidebar-row-icon svg');
-    await expect(icon).toHaveAttribute('style', /color: var\(--group-blue\)/);
+    await expect(icon).toHaveAttribute('style', /color: var\(--text-primary\)/);
     await expect(settings.locator('.sidebar-row-icon')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await page.getByTestId('tab-history-btn').click();
     await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
