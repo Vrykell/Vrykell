@@ -241,7 +241,10 @@ export default function PanelChat() {
             <span>{loading ? t('Loading conversations…') : t('Ask a question, attach a file, or bring in terminal output.')}</span></div>}
       </div>
     </div>
-    {!following && <div className="chat-jump-slot">
+    {/* Always in the layout on purpose: a slot that comes and goes with the follow state changes the
+        transcript's height, and then the content and this button trade places on every scroll event —
+        that loop is what made the bottom of the panel jump. Only the slot's visibility changes. */}
+    <div className="chat-jump-slot" style={{ visibility: following ? 'hidden' : 'visible' }} aria-hidden={following}>
       <button type="button" data-subtle className="chat-jump-latest" onClick={() => {
         followRef.current = true; setFollowing(true);
         if (scrollRef.current) {
@@ -249,7 +252,7 @@ export default function PanelChat() {
           lastTopRef.current = scrollRef.current.scrollTop;
         }
       }}>{t('Jump to latest reply')}<ArrowDown size={14} /></button>
-    </div>}
+    </div>
     <ChatComposerShell
       heading={<>{t('AI chat')}</>}
       hints={<><KeyHint shortcut="Enter" />{t('Send')}</>}
