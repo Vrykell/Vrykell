@@ -179,6 +179,8 @@ describe('SSH status panel', () => {
     open();
     await screen.findByText('已保存的 SSH 认证信息被拒绝');
     expect(screen.getByText(/认证这两个服务/)).toBeInTheDocument();
+    // The action matches the file panel's rendering of the same error.
+    expect(screen.getByRole('button', { name: '认证服务' })).toHaveStyle({ minHeight: '36px' });
     expect(screen.getByRole('button', { name: '暂停监控' })).toBeEnabled();
   });
 
