@@ -133,13 +133,7 @@ export function restoreWorkspace(
       return sessions.map(toWorkspaceSession);
     },
     loadGroups: () => useWorkspaceStore.getState().loadGroups(),
-    restoreSession: (session) => {
-      const hasRestoredGroup = session.groupId != null
-        && useWorkspaceStore.getState().groups.some((group) => group.id === session.groupId);
-      return sessionManager.restore(session.id, session.title, {
-        groupId: hasRestoredGroup ? session.groupId : null,
-      });
-    },
+    restoreSession: (session) => sessionManager.restore(session.id, session.title),
     hasTabs: () => useWorkspaceStore.getState().tabs.length !== 0,
     createDefaultSession,
   });

@@ -12,7 +12,7 @@ export interface TauriMockOptions {
   schedulesSeed?: Record<string, unknown>[];
   /** Simulate a remote shell with prompt hooks but no preexec hook. */
   sshPreexec?: boolean;
-  /** Add one historical session under an archived group to test restoring it by itself. */
+  /** Seed an archived tab group with members spanning directories and dates. */
   groupedHistoricalSession?: boolean;
   /** Keep the prompt but omit the OSC 133;B ready marker (older hooks / exotic shells). */
   shellReadyMarker?: boolean;
@@ -139,7 +139,11 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     const mockSessions: Record<string, unknown>[] = [
       { id: 't1', title: '终端', status: 'active', created_at: Date.now(), closed_at: null, block_count: 2, cwd: '', group_id: null, sort_order: 0, kind: 'local', payload: '{}' },
       { id: 'hist-1', title: '旧的调试会话', status: 'historical', created_at: Date.now() - 1000, closed_at: Date.now() - 500, block_count: 5, cwd: '', group_id: null, sort_order: 0, kind: 'local', payload: '{}' },
-      ...(groupedHistoricalSession ? [{ id: 'hist-group-1', title: '归档分组中的会话', status: 'historical', created_at: Date.now() - 2000, closed_at: Date.now() - 1000, block_count: 1, cwd: '', group_id: 'archived-group', sort_order: 0, kind: 'local', payload: '{}' }] : []),
+      ...(groupedHistoricalSession ? [
+        { id: 'hist-group-1', title: '归档分组中的会话', status: 'historical', created_at: Date.now() - 2000, closed_at: Date.now() - 1000, block_count: 1, cwd: '/project/docs', group_id: 'archived-group', sort_order: 0, kind: 'local', payload: '{}' },
+        { id: 'hist-group-2', title: 'Backend', status: 'historical', created_at: Date.now() - 3000, closed_at: Date.now() - 10 * 86400000, block_count: 0, cwd: '/srv/backend', group_id: 'archived-group', sort_order: 1, kind: 'ssh', payload: '{"ssh":{"host":"project.test","user":"dev"}}' },
+        { id: 'hist-group-3', title: 'Frontend', status: 'historical', created_at: Date.now() - 4000, closed_at: Date.now() - 2000, block_count: 0, cwd: '/project/web', group_id: 'archived-group', sort_order: 2, kind: 'local', payload: '{}' },
+      ] : []),
     ];
     const mockGroups: Record<string, unknown>[] = groupedHistoricalSession
       ? [{ id: 'archived-group', title: '已归档分组', sort_order: 0, collapsed: false, created_at: Date.now() - 3000, session_count: 0, archived: true }]
@@ -935,19 +939,45 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
           case 'plugin:dialog|save':
             return (args.options as Record<string, unknown> | undefined)?.defaultPath ?? '/home/e2e/vrykell-diagnostics.jsonl';
           case 'archive_session':
-            { const session = mockSessions.find(item => item.id === args.id); if (session) session.status = 'historical'; }
+            { const session = mockSessions.find(item => item.id === args.id); if (session) { session.status = 'historical'; session.closed_at = args.timestamp as number; } }
             return undefined;
+          case 'restore_session': {
+            const session = mockSessions.find(item => item.id === args.id);
+            if (session) {
+              session.status = 'active'; session.closed_at = null;
+              const group = mockGroups.find(item => item.id === session.group_id);
+              if (group) group.archived = false;
+            }
+            return undefined;
+          }
           case 'get_session':
             return mockSessions.find((s) => s.id === args.id) ?? null;
           case 'groups_list':
-            return mockGroups;
+            return mockGroups.map(group => ({ ...group, session_count: mockSessions.filter(session => session.group_id === group.id && session.status === 'active').length }));
+          case 'group_rename': {
+            const group = mockGroups.find(item => item.id === args.id);
+            if (group) group.title = args.title;
+            return undefined;
+          }
+          case 'group_archive': {
+            const group = mockGroups.find(item => item.id === args.id);
+            if (group) group.archived = true;
+            for (const session of mockSessions.filter(item => item.group_id === args.id && item.status === 'active')) {
+              session.status = 'historical'; session.closed_at = args.timestamp as number;
+            }
+            return undefined;
+          }
+          case 'sessions_reorder':
+            (args.ids as string[]).forEach((id, index) => {
+              const session = mockSessions.find(item => item.id === id && item.group_id === args.groupId);
+              if (session) session.sort_order = index;
+            });
+            return undefined;
           case 'group_create':
-          case 'group_rename':
           case 'group_set_collapsed':
           case 'group_delete':
           case 'group_delete_with_sessions':
           case 'groups_reorder':
-          case 'sessions_reorder':
           case 'group_restore':
             return undefined;
           case 'session_set_group': {

@@ -1,7 +1,8 @@
+import { OutlineButton } from '@ui/OutlineButton';
 import { TERMINAL_FONT_PRESETS, useTypographyStore } from '@config/typography';
 import Select from '@ui/Select';
 import { t } from '@i18n';
-import { SettingsGroup, Field, btnStyle } from './ui';
+import { SettingsGroup, Field } from './ui';
 import { useSettingsSave } from './SettingsSaveProvider';
 
 const pageSizes = Array.from({ length: 9 }, (_, index) => ({ value: index + 10, label: `${index + 10}px` }));
@@ -60,7 +61,7 @@ export default function FontSettings() {
         <div className="settings-chat-preview" data-selectable aria-label={t('AI chat font preview')}>
           {t('AI chat font preview')} — AaBb 0123
         </div>
-        <button type="button" onClick={() => { void save(reset); }} style={{ ...btnStyle, marginTop: 12 }}>{t('Restore default typography')}</button>
+        <OutlineButton type="button" onClick={() => { void save(reset); }} style={{ marginTop: 12 }}>{t('Restore default typography')}</OutlineButton>
       </div>
     </SettingsGroup>
   </div>;

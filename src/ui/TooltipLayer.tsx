@@ -16,8 +16,6 @@ const SHOW_DELAY_MS = 300;
 const GAP_PX = 6;
 /** Keeps the hint clear of the viewport edges. */
 const EDGE_PX = 6;
-/** Room required above a trigger before the hint flips below it. */
-const FLIP_ABOVE_PX = 34;
 
 interface Hint {
   text: string;
@@ -115,10 +113,15 @@ export default function TooltipLayer() {
   useLayoutEffect(() => {
     if (!hint || placement || !bubbleRef.current) return;
     const bubble = bubbleRef.current.getBoundingClientRect();
-    const above = hint.rect.top >= FLIP_ABOVE_PX;
+    const aboveTop = hint.rect.top - GAP_PX - bubble.height;
+    const belowTop = hint.rect.bottom + GAP_PX;
+    const aboveFits = aboveTop >= EDGE_PX;
+    const belowFits = belowTop + bubble.height <= window.innerHeight - EDGE_PX;
+    const above = aboveFits || (!belowFits && hint.rect.top > window.innerHeight - hint.rect.bottom);
     const maxLeft = window.innerWidth - EDGE_PX - bubble.width;
     const left = Math.max(EDGE_PX, Math.min(hint.rect.left + hint.rect.width / 2 - bubble.width / 2, maxLeft));
-    const top = above ? hint.rect.top - GAP_PX - bubble.height : hint.rect.bottom + GAP_PX;
+    const maxTop = Math.max(EDGE_PX, window.innerHeight - EDGE_PX - bubble.height);
+    const top = Math.max(EDGE_PX, Math.min(above ? aboveTop : belowTop, maxTop));
     setPlacement({ top, left });
   }, [hint, placement]);
 
