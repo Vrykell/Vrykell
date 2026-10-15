@@ -52,7 +52,7 @@ test.describe('标签页管理侧栏', () => {
     await page.locator('[data-testid="tab-history-btn"]').click();
     // 主区域渲染会话历史视图（仅历史会话，mock 返回 1 个历史 + 1 个活跃）
     await expect(page.getByText('旧的调试会话')).toBeVisible();
-    await expect(page.getByText('1 个会话')).toBeVisible();
+    await expect(page.getByTestId('session-history-page').locator('.history-count')).toHaveText('· 1 个会话');
   });
 
   test('标签右键菜单靠近窗口边缘时仍完整显示', async ({ page }) => {

@@ -164,7 +164,7 @@ export function ThemePage() {
               style={{ flex: 1, accentColor: 'var(--accent-warm)' }}
             />
             <span style={{
-              fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)',
+              fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)',
               minWidth: 40, textAlign: 'right',
             }}>
               {Math.round(config.opacity * 100)}%
@@ -190,7 +190,7 @@ export function ThemePage() {
           {config.backgroundImage && (
             <div style={{
               marginTop: 8, fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)',
-              fontFamily: 'var(--font-mono)', wordBreak: 'break-all',
+              fontFamily: 'var(--font-ui)', wordBreak: 'break-all',
             }}>
               {config.backgroundImage}
             </div>
@@ -255,7 +255,7 @@ export function ThemePage() {
               </span>
             </OutlineButton>
             {themePath && (
-              <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}>
+              <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', fontFamily: 'var(--font-ui)', wordBreak: 'break-all' }}>
                 {themePath}
               </span>
             )}

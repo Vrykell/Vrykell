@@ -1,9 +1,8 @@
 import { OutlineButton } from '@ui/OutlineButton';
 import { t } from '@i18n';
-import SidebarItem from '@ui/sidebarItem';
-import { TextInput } from '@ui/TextInput';
-import { useEffect, useState, type ReactNode } from 'react';
-import { iconSizes, Search  } from '@ui/icons';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { IconButton } from '@ui/IconButton';
+import { Navigation, iconSizes } from '@ui/icons';
 import { loadConfig, saveConfig, type FileOpenConfig } from '@features/files/services/fileOpen';
 import { refreshAiConfig, setTavilyKey, clearTavilyKey, useAiConfigStore } from '@features/agent';
 import SkillsSettings from '@features/settings/pages/SkillsSettings';
@@ -24,6 +23,7 @@ import { ShortcutPage } from '@features/settings/pages/shortcutPage';
 import { useSettingsNavigation } from '@features/settings/hooks/useSettingsNavigation';
 import AutoSaveInput from '../components/AutoSaveInput';
 import SaveStatus from '../components/SaveStatus';
+import SettingsNavigation from '../components/SettingsNavigation';
 import { SettingsSaveProvider, useSettingsSave } from '../components/SettingsSaveProvider';
 import { StartupPage } from './startupPage';
 import { LogsPage } from './logsPage';
@@ -57,16 +57,11 @@ export default function SettingsView() {
 
 function SettingsContent() {
   const { save, status, retry } = useSettingsSave();
-  const {
-    selected,
-    setSelected,
-    query,
-    setQuery,
-    normalizedQuery,
-    visibleGroups,
-    matchingSettings,
-    activeLabel,
-  } = useSettingsNavigation();
+  const navigation = useSettingsNavigation();
+  const { selected, activeLabel } = navigation;
+  const [navigationOpen, setNavigationOpen] = useState(false);
+  const navigationTrigger = useRef<HTMLButtonElement>(null);
+  const closeNavigation = useCallback(() => setNavigationOpen(false), []);
 
   // 文件打开配置（localStorage）
   const [fileCfg, setFileCfg] = useState<FileOpenConfig>(() => loadConfig());
@@ -274,75 +269,30 @@ function SettingsContent() {
       flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row',
       background: 'var(--canvas)', userSelect: 'none',
     }}>
-      {/* 侧栏 */}
-      <aside className="settings-navigation" style={{
-        width: 224, flexShrink: 0, background: 'var(--sidebar-bg)',
-        display: 'flex', flexDirection: 'column', minHeight: 0,
-      }}>
-        <div style={{ padding: 8 }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '6px 8px',
-            borderRadius: 'var(--radius-inner)', background: 'var(--field-bg)',
-          }}>
-            <Search size={iconSizes.compact} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-            <TextInput
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t('Search settings…')}
-              style={{
-                flex: 1, minWidth: 0, background: 'transparent', border: 'none',
-                outline: 'none', fontSize: 'var(--fs-label)', color: 'var(--text-primary)',
-              }}
-            />
-          </div>
-        </div>
-        <div className="scroll-region" style={{ flex: 1, overflowY: 'auto', padding: '0 6px 8px' }}>
-          {normalizedQuery && matchingSettings.map(setting => (
-            <button key={setting.id} className="settings-search-result" onClick={setting.onSelect}>
-              <span>{setting.label}</span>
-              <small>{setting.desc}</small>
-            </button>
-          ))}
-          {(!normalizedQuery || matchingSettings.length === 0) && visibleGroups.map((g) => {
-            return (
-              <div key={g.id} className="settings-nav-group">
-                <div className="settings-nav-heading">{g.label}</div>
-                {g.items.map(item => {
-                  const Icon = item.icon;
-                  return <SidebarItem compact key={item.id} icon={<Icon size={iconSizes.row} />}
-                    title={item.label} tooltip={item.label} active={selected === item.id} tabIndex={0}
-                    style={{ fontSize: 'var(--fs-label)' }}
-                    dataAttributes={{ role: 'button', 'aria-label': item.label, 'aria-current': selected === item.id ? 'page' : undefined }}
-                    onClick={() => setSelected(item.id)}
-                    onKeyDown={event => {
-                      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelected(item.id); }
-                    }} />;
-                })}
-              </div>
-            );
-          })}
-          {normalizedQuery && matchingSettings.length === 0 && visibleGroups.length === 0 && (
-            <div style={{ padding: 16, textAlign: 'center', fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>
-              {t('No matching settings')}
-            </div>
-          )}
-        </div>
-      </aside>
+      <div className="settings-layout" data-navigation-open={navigationOpen}>
+        {navigationOpen && <div className="settings-navigation-backdrop" aria-hidden="true" />}
+        <SettingsNavigation navigation={navigation} open={navigationOpen} onClose={closeNavigation} trigger={navigationTrigger} />
 
-      {/* 内容区 */}
-      <section className="settings-content" style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '24px 28px', background: 'var(--canvas)' }}>
-        <header className="settings-page-header">
-          <h1>{activeLabel}</h1>
-          <div className="settings-save-hint">
-            <span>{t('Options save immediately; text saves after you stop typing.')}</span>
-            <SaveStatus status={status} onRetry={retry} />
+        {/* Content retains a readable width before falling back to horizontal scrolling. */}
+        <section className="settings-content">
+          <header className="settings-page-header">
+            <div className="settings-page-heading">
+              <IconButton ref={navigationTrigger} className="settings-navigation-toggle" compact
+                aria-label={t('Show settings navigation')} data-tip={t('Show settings navigation')}
+                aria-expanded={navigationOpen} aria-controls="settings-navigation"
+                onClick={() => setNavigationOpen(value => !value)}><Navigation size={iconSizes.control} /></IconButton>
+              <h1>{activeLabel}</h1>
+            </div>
+            <div className="settings-save-hint">
+              <span>{t('Options save immediately; text saves after you stop typing.')}</span>
+              <SaveStatus status={status} onRetry={retry} />
+            </div>
+          </header>
+          <div className="settings-page-body">
+            {renderPage()}
           </div>
-        </header>
-        <div className="settings-page-body">
-          {renderPage()}
-        </div>
-      </section>
+        </section>
+      </div>
     </div>
   );
 }

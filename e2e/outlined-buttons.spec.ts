@@ -2,10 +2,22 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { ensureChatSettingsOpen, ensureTabsOpen, setupTauriMock } from './tauri-mock';
 import { gotoSetting } from './settings';
 
+async function themeColor(page: Page, variable: string) {
+  return page.evaluate(variable => {
+    const probe = document.createElement('span');
+    probe.style.backgroundColor = `var(${variable})`;
+    document.body.appendChild(probe);
+    const color = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return color;
+  }, variable);
+}
+
 async function checkFeedback(page: Page, button: Locator, gray: string) {
+  const resting = await themeColor(page, '--action-button-bg');
   await button.evaluate(element => (element as HTMLButtonElement).blur());
   await page.mouse.move(2, 2);
-  await expect(button).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(button).toHaveCSS('background-color', resting);
   await button.hover();
   await expect(button).toHaveCSS('background-color', gray);
   await page.mouse.move(2, 2);
@@ -13,20 +25,12 @@ async function checkFeedback(page: Page, button: Locator, gray: string) {
   await expect(button).toBeFocused();
   await expect(button).toHaveCSS('background-color', gray);
   await button.evaluate(element => (element as HTMLButtonElement).blur());
-  await expect(button).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(button).toHaveCSS('background-color', resting);
 }
 
 async function auditOutlinedActions(page: Page, scope: Locator, gray: string) {
   const labels: string[] = [];
-  for (const button of await scope.locator('button:visible:enabled').all()) {
-    await button.evaluate(element => (element as HTMLButtonElement).blur());
-    await page.mouse.move(2, 2);
-    const outlined = await button.evaluate(element => {
-      const style = getComputedStyle(element);
-      return parseFloat(style.borderTopWidth) > 0 && style.borderTopStyle === 'solid'
-        && style.backgroundColor === 'rgba(0, 0, 0, 0)';
-    });
-    if (!outlined) continue;
+  for (const button of await scope.locator('button.outline-button:visible:enabled').all()) {
     await checkFeedback(page, button, gray);
     labels.push((await button.textContent())?.trim() || (await button.getAttribute('aria-label')) || '');
   }
@@ -40,7 +44,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.goto('/');
     await gotoSetting(page, '主题');
     await page.getByRole('radio', { name: theme === 'dark' ? '深色' : '浅色', exact: true }).click();
-    const gray = theme === 'dark' ? 'rgb(69, 69, 69)' : 'rgb(242, 242, 242)';
+    const gray = await themeColor(page, '--action-button-hover-bg');
     const report: Record<string, string[]> = {};
     const body = page.locator('.settings-page-body');
     report['主题'] = await auditOutlinedActions(page, body, gray);
@@ -99,7 +103,7 @@ for (const theme of ['dark', 'light'] as const) {
     const disabled = dialog.getByTestId('ssh-import-select-all');
     await expect(disabled).toBeDisabled();
     await disabled.hover();
-    await expect(disabled).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(disabled).toHaveCSS('background-color', await themeColor(page, '--action-button-bg'));
     await disabled.focus();
     await expect(disabled).not.toBeFocused();
     await dialog.getByRole('button', { name: '取消', exact: true }).click();

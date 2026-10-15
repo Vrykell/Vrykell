@@ -9,7 +9,9 @@ async function expectStableRecordHover(record: Locator) {
   await record.hover();
   await expect(record.locator('.sidebar-row-action')).toHaveCSS('opacity', '1');
   await expect(content).toHaveCSS('background-color', background);
-  await expect(record.locator('.sidebar-row-title')).toHaveCSS('text-decoration-line', 'none');
+  await expect(record.locator('.sidebar-row-title')).toHaveCSS('text-decoration-line', 'underline');
+  await expect(record.locator('.history-row-quick-actions button')).toHaveCount(2);
+  await expect(record.locator('.sidebar-row-subtitle')).toBeVisible();
 }
 
 async function expectResponsiveTimestamp(card: Locator) {
@@ -164,7 +166,7 @@ test('AI history groups by working directory and conversation type and uses sett
   await expect(page.locator('.history-group-card')).toHaveCount(1);
   expect(await markerColor(localCard)).toBe(color);
   const record = page.getByTestId('conversation-row-history-no-cwd');
-  await expect(record.locator('.sidebar-row-subtitle')).toBeHidden();
+  await expect(record.locator('.sidebar-row-subtitle')).toBeVisible();
   await expect(record).toHaveAccessibleDescription(/Local terminal/);
   const remove = record.getByRole('button', { name: '更多操作' });
   await expect(remove).toHaveCSS('opacity', '0');

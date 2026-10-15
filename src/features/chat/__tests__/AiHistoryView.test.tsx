@@ -57,10 +57,57 @@ it('shows new conversations without replacing the history page', () => {
 it('copies the filtered group without including unrelated conversations', async () => {
   render(<AiHistoryView />);
   fireEvent.change(screen.getByRole('textbox', { name: '搜索对话' }), { target: { value: 'Build' } });
-  fireEvent.click(screen.getByRole('button', { name: '复制为 Markdown' }));
+  expect(screen.queryByRole('button', { name: '复制为 Markdown' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: '分组操作' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: '复制为 Markdown' }));
   await waitFor(() => expect(writeClipboardText).toHaveBeenCalled());
   expect(vi.mocked(writeClipboardText).mock.calls[0]![0]).toContain('# Build investigation');
   expect(vi.mocked(writeClipboardText).mock.calls[0]![0]).not.toContain('Database question');
+});
+
+it('deletes from the record menu without opening it and protects locked conversations', async () => {
+  useHistoryMetaStore.getState().setLocked(['conversation:first'], true);
+  render(<AiHistoryView />);
+  fireEvent.contextMenu(screen.getByTestId('conversation-row-first'), { clientX: 30, clientY: 50 });
+  expect(screen.getByRole('menuitem', { name: '删除对话' })).toBeDisabled();
+  fireEvent.keyDown(window, { key: 'Escape' });
+  fireEvent.contextMenu(screen.getByTestId('conversation-row-second'), { clientX: 30, clientY: 80 });
+  fireEvent.click(screen.getByRole('menuitem', { name: '删除对话' }));
+  await waitFor(() => expect(conversationApi.deleteConversation).toHaveBeenCalledWith('second'));
+  expect(useChatStore.getState().activeConversationId).toBe('first');
+});
+
+it('opens record actions on right click without opening group actions', () => {
+  render(<AiHistoryView />);
+  fireEvent.contextMenu(screen.getByTestId('conversation-row-first'), { clientX: 30, clientY: 50 });
+  expect(screen.getByRole('menuitem', { name: '打开对话' })).toBeVisible();
+  expect(screen.queryByRole('menuitem', { name: '收起分组' })).toBeNull();
+});
+
+it('shows remote context without hover and opens from the quick action', () => {
+  useChatStore.setState(state => ({ conversations: state.conversations.map(item => item.id === 'second'
+    ? { ...item, environment: { paneId: 'remote', label: 'Production', kind: 'ssh' as const,
+      cwd: '/srv/app', ssh: { host: 'server.test', user: 'dev', port: 2222 } } } : item) }));
+  render(<AiHistoryView />);
+  const row = screen.getByTestId('conversation-row-second');
+  expect(row.querySelector('.sidebar-row-subtitle')).toBeVisible();
+  expect(row).toHaveTextContent('dev@server.test:2222 · /srv/app');
+  expect(row).toHaveTextContent('更新于');
+  fireEvent.click(screen.getByTestId('conversation-open-second'));
+  expect(useChatStore.getState().activeConversationId).toBe('second');
+  expect(useDockStore.getState().rightPanels).toContain('chat');
+});
+
+it('prevents quick deletion of locked or working conversations without activating them', async () => {
+  useHistoryMetaStore.getState().setLocked(['conversation:first'], true);
+  render(<AiHistoryView />);
+  expect(screen.getByTestId('conversation-delete-first')).toBeDisabled();
+  act(() => useChatStore.setState({ sendingTab: 'second' }));
+  expect(screen.getByTestId('conversation-delete-second')).toBeDisabled();
+  act(() => useChatStore.setState({ sendingTab: null }));
+  fireEvent.click(screen.getByTestId('conversation-delete-second'));
+  await waitFor(() => expect(conversationApi.deleteConversation).toHaveBeenCalledWith('second'));
+  expect(useChatStore.getState().activeConversationId).toBe('first');
 });
 
 it('keeps locked and failed records while deleting the other records in a group', async () => {

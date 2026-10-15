@@ -2,13 +2,28 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import PanelSsh from '../components/PanelSsh';
 import { useSshStore } from '../stores/store';
+import { useIconColorStore } from '@config/iconColors';
 
 const snapshot = useSshStore.getState();
 beforeEach(() => {
+  useIconColorStore.setState({ colors: {} });
   useSshStore.setState({
     loaded: true,
     connections: [{ id: 'remote', name: 'Remote', host: 'example.invalid', user: 'tester', authMethod: 'key' }],
   });
+});
+
+it('selects and resets persistent connection colors from its keyboard menu', () => {
+  render(<PanelSsh />);
+  const row = screen.getByTestId('ssh-row-remote');
+  fireEvent.keyDown(row, { key: 'F10', shiftKey: true });
+  fireEvent.click(screen.getByRole('menuitemradio', { name: '紫色' }));
+  expect(row.querySelector('svg')!.style.color).toBe('var(--group-violet)');
+  expect(useIconColorStore.getState().colors['ssh:remote']).toBe('violet');
+  expect(row).toHaveFocus();
+  fireEvent.contextMenu(row);
+  fireEvent.click(screen.getByTestId('ssh-icon-color-auto'));
+  expect(row.querySelector('svg')!.style.color).toBe('var(--shell-ssh-accent)');
 });
 afterEach(() => { cleanup(); useSshStore.setState(snapshot, true); });
 

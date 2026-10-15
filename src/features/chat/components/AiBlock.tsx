@@ -89,7 +89,7 @@ export default function AiBlock({ exchange, conversationId, presentation = 'bloc
       <CopyButton className="chat-question-copy" testId="chat-question-copy" text={question.content}
         label={t('Copy message')} style={{ width: 20, height: 20 }} />
     </div>}
-    {expanded && question?.references?.length ? <TerminalReferences references={question.references} /> : null}
+    {expanded && question?.references?.length ? <TerminalReferences references={question.references} framed={plain} /> : null}
     {expanded && !!question?.attachments?.length && <AttachmentChips atts={question.attachments} previewId={attPreviewId}
       onPreview={id => setAttPreviewId(attPreviewId === id ? null : id)} />}
     {answer && expanded && <div className={plain ? 'ai-block-answer' : 'command-block-output ai-block-answer'} data-selectable>
@@ -139,10 +139,11 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
   useEffect(() => {
     if (open && streaming && bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
   }, [text, open, streaming]);
-  return <div className="ai-thinking">
-    <button type="button" data-subtle aria-expanded={open} onClick={() => setOpen(!open)}>
-      <ChevronRight size={14} style={{ transform: open ? 'rotate(90deg)' : undefined }} /><Brain size={15} />
-      <span>{t('Thinking process')}</span>{!open && <small>{preview}</small>}
+  return <div className="ai-thinking ai-tool-card">
+    <button type="button" data-subtle className="ai-tool-summary" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <Brain size={15} aria-hidden="true" />
+      <span className="ai-tool-description"><span>{t('Thinking process')}</span>{!open && <small>{preview}</small>}</span>
+      <ChevronRight size={14} aria-hidden="true" style={{ transform: open ? 'rotate(90deg)' : undefined }} />
     </button>
     {open && <div ref={bodyRef} className="ai-thinking-body md"><SafeMarkdown content={text} paneId={null} /></div>}
   </div>;

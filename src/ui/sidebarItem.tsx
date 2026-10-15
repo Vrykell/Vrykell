@@ -1,15 +1,17 @@
 import { useId, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { useListReorder } from './listReorder';
 import { sidebarRowSpacing, sidebarRowContent, sidebarRowIcon, sidebarRowTitle } from './sidebarRow';
+import { IconButton } from './IconButton';
 
 export interface SidebarItemAction {
   icon: ReactNode;
-  /** Accessible name of the trailing action button. */
+  /** Accessible name of the action button. */
   label: string;
   title?: string;
   /** Receives the click event so callers can anchor floating menus on the button. */
   onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   testId?: string;
+  disabled?: boolean;
 }
 
 /**
@@ -27,6 +29,7 @@ export default function SidebarItem({
   subtitleFontFamily = 'var(--font-mono)',
   badge,
   action,
+  leadingActions,
   renameInput,
   active,
   onClick,
@@ -51,6 +54,8 @@ export default function SidebarItem({
   /** Optional trailing content between the title and the action button. */
   badge?: ReactNode;
   action?: SidebarItemAction;
+  /** Compact history actions appear beside the row on hover or keyboard focus. */
+  leadingActions?: readonly SidebarItemAction[];
   /** Replaces the title area while an inline rename is active. */
   renameInput?: ReactNode;
   active: boolean;
@@ -86,6 +91,7 @@ export default function SidebarItem({
       {...dataAttributes}
       className={variant === 'history' ? 'sidebar-row history-row' : 'sidebar-row'}
       data-active={active ? 'true' : 'false'}
+      {...(variant === 'history' && active ? { 'aria-current': true as const } : {})}
       data-compact={historyCompact ? 'true' : undefined}
       aria-describedby={historyCompact && subtitle ? subtitleId : undefined}
       onClick={onClick}
@@ -108,26 +114,38 @@ export default function SidebarItem({
       data-reorder-dragging={dragging ? 'true' : undefined}
       style={{ ...sidebarRowSpacing, ...(compact ? { padding: '0 6px' } : {}), ...style }}
     >
+      {leadingActions?.length ? <span className="history-row-quick-actions" data-visible={actionVisible}
+        onPointerDown={event => event.stopPropagation()}
+        onClick={event => event.stopPropagation()}
+        onDoubleClick={event => event.stopPropagation()}
+        onContextMenu={event => event.stopPropagation()}>
+        {leadingActions.map(item => <IconButton key={item.label} compact data-subtle
+          aria-label={item.label} data-tip={item.title ?? item.label}
+          data-testid={item.testId} disabled={item.disabled} onClick={item.onClick}>
+          {item.icon}
+        </IconButton>)}
+      </span> : null}
       <div className="sidebar-row-content" style={{
         ...sidebarRowContent,
-        ...(historyCompact ? { minHeight: 28, padding: '2px 10px', alignItems: 'flex-start' } : compact ? { minHeight: 32, padding: '5px 10px' } : {}),
+        ...(historyCompact ? { minHeight: 34, padding: '5px 10px', alignItems: 'flex-start' } : compact ? { minHeight: 32, padding: '5px 10px' } : {}),
         background: variant === 'history' ? undefined : background,
         color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
       }}>
-        <span className="sidebar-row-icon" style={sidebarRowIcon}>{icon}</span>
+        <span className="sidebar-row-icon" style={{ ...sidebarRowIcon, ...(historyCompact ? { width: 20, height: 'calc(22px * var(--ui-font-scale))' } : {}) }}>{icon}</span>
         {renameInput ?? (
           <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
             <span className="sidebar-row-title" data-tip={variant === 'history' ? title : undefined}
               data-tip-description={historyCompact ? subtitle : undefined}
               style={{ ...sidebarRowTitle,
-                ...(historyCompact ? { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, whiteSpace: 'normal', overflowWrap: 'anywhere' } : {}),
-                fontWeight: active && variant !== 'history' ? 'var(--fw-semibold)' : 'var(--fw-regular)' }}>{title}</span>
+                ...(historyCompact ? { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, whiteSpace: 'normal', overflowWrap: 'anywhere', fontSize: 'var(--fs-body)', lineHeight: 'calc(22px * var(--ui-font-scale))' } : {}),
+                fontWeight: active ? 'var(--fw-semibold)' : 'var(--fw-regular)' }}>{title}</span>
             {subtitle && (
-              <span className="sidebar-row-subtitle" id={subtitleId} hidden={historyCompact}
+              <span className="sidebar-row-subtitle" id={subtitleId}
                 data-tip={variant === 'history' ? subtitle : undefined} style={{
                 fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', lineHeight: '14px',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 fontFamily: subtitleFontFamily,
+                ...(historyCompact ? { fontSize: 'var(--fs-caption)', lineHeight: 'calc(16px * var(--ui-font-scale))' } : {}),
               }}>
                 {subtitle}
               </span>
@@ -142,6 +160,7 @@ export default function SidebarItem({
             data-no-drag
             className="sidebar-row-action"
             aria-label={action.label}
+            disabled={action.disabled}
             data-tip={action.title ?? action.label}
             data-testid={action.testId}
             onDoubleClick={(event) => event.stopPropagation()}
@@ -150,6 +169,7 @@ export default function SidebarItem({
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               width: historyCompact ? 24 : 28, height: historyCompact ? 24 : 28, padding: 0, border: 'none', borderRadius: 4,
               flexShrink: 0, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+              alignSelf: historyCompact ? 'center' : undefined,
               opacity: actionVisible ? 1 : 0,
               pointerEvents: variant === 'history' && !actionVisible ? 'none' : undefined,
               transition: 'opacity 0.12s ease',

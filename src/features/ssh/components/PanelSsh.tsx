@@ -8,6 +8,8 @@ import { ensureSshLoaded, useSshStore } from '@features/ssh';
 import { useSessionStore, terminalsOf } from '@features/workspace';
 import { useTerminalStore } from '@features/terminal';
 import ContextMenu from '@ui/ContextMenu';
+import { iconColorKey, iconColorCss, useIconColorStore } from '@config/iconColors';
+import { HistoryColorChoices } from '@ui/HistoryColorPalette';
 import { IconBtn } from '@ui/UiBtn';
 import SidebarItem from '@ui/sidebarItem';
 import { ListReorderPlaceholder, ListReorderPreview, useListReorderDrag } from '@ui/listReorder';
@@ -26,6 +28,7 @@ const LIST_ID = 'ssh-connections';
  */
 export default function PanelSsh() {
   const connections = useSshStore((s) => s.connections);
+  const iconColors = useIconColorStore(state => state.colors);
   const touch = useSshStore((s) => s.touch);
   const remove = useSshStore((s) => s.remove);
   const reorder = useSshStore((s) => s.reorder);
@@ -35,7 +38,7 @@ export default function PanelSsh() {
   const [quickOpen, setQuickOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<SshConnection | null>(null);
-  const [menu, setMenu] = useState<{ x: number; y: number; conn: SshConnection } | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; conn: SshConnection; trigger: HTMLElement } | null>(null);
 
   useEffect(() => { ensureSshLoaded(); }, []);
 
@@ -147,7 +150,7 @@ export default function PanelSsh() {
             <ListReorderPlaceholder listId={LIST_ID} itemId={c.id} />
             <SidebarItem
               active={c.id === selectedId}
-              icon={<SshIcon size={iconSizes.row} />}
+              icon={<SshIcon size={iconSizes.row} style={{ color: iconColorCss(iconColors[iconColorKey('ssh', c.id)]) }} />}
               title={c.name}
               tooltip={`${c.user ? `${c.user}@` : ''}${c.host}:${c.port ?? 22}；双击连接，右键编辑 / 删除，拖拽排序`}
               testId={`ssh-row-${c.id}`}
@@ -159,12 +162,17 @@ export default function PanelSsh() {
               onContextMenu={(event) => {
                 event.preventDefault();
                 setSelectedId(c.id);
-                setMenu({ x: event.clientX, y: event.clientY, conn: c });
+                setMenu({ x: event.clientX, y: event.clientY, conn: c, trigger: event.currentTarget });
               }}
               onKeyDown={(event) => {
                 if (event.target !== event.currentTarget) return;
                 if (event.key === 'Enter') { event.preventDefault(); openConnection(c); }
                 if (event.key === ' ') { event.preventDefault(); setSelectedId(c.id); }
+                if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+                  event.preventDefault(); setSelectedId(c.id);
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  setMenu({ x: rect.left, y: rect.bottom, conn: c, trigger: event.currentTarget });
+                }
               }}
               onPointerDown={(event) => startDrag(event, { id: c.id, kind: 'ssh' })}
               action={{
@@ -181,18 +189,26 @@ export default function PanelSsh() {
       </div>
 
       <ListReorderPreview listId={LIST_ID}>
-        {() => <SshIcon size={iconSizes.row} />}
+        {drag => <SshIcon size={iconSizes.row} style={{ color: iconColorCss(iconColors[iconColorKey('ssh', drag.id)]) }} />}
       </ListReorderPreview>
 
       {/* 右键菜单：编辑 / 删除 */}
       {menu && (
         <ContextMenu
-          anchor={{ x: menu.x, y: menu.y }}
+          anchor={{ x: menu.x, y: menu.y, trigger: menu.trigger }}
           onClose={() => setMenu(null)}
           items={[
             { label: '编辑', group: 'edit', onClick: () => editConn(menu.conn) },
             { label: '删除', danger: true, onClick: () => void removeConn(menu.conn) },
           ]}
+          footer={<>
+            <div className="history-menu-color-label">{t('Icon color')}</div>
+            <HistoryColorChoices menu label={t('Icon color')} value={iconColors[iconColorKey('ssh', menu.conn.id)] ?? null}
+              testId="ssh-icon-color" onSelect={color => {
+                useIconColorStore.getState().setColor(iconColorKey('ssh', menu.conn.id), color);
+                menu.trigger.focus(); setMenu(null);
+              }} />
+          </>}
         />
       )}
 
