@@ -18,6 +18,18 @@ beforeEach(() => { vi.clearAllMocks(); useSessionAuthenticationStore.setState({ 
 afterEach(() => vi.useRealTimers());
 
 describe('SSH status panel', () => {
+  it('lists one meter per resource with its percentage and used/total reading', async () => {
+    render(<SshStatusPanel target={target} state={connected} active />);
+    open();
+    await screen.findByText('Linux 6.8 · node');
+    const meters = screen.getAllByRole('meter').map(meter => [meter.getAttribute('aria-label'), meter.getAttribute('aria-valuenow')]);
+    expect(meters).toEqual([['内存使用率', '50'], ['根分区使用率', '30']]);
+    // CPU needs two samples: its reading stays unavailable instead of a zero-filled meter.
+    expect(screen.getByText('不可用')).toBeInTheDocument();
+    expect(screen.getByText('4.0 KB / 8.0 KB')).toBeInTheDocument();
+    expect(screen.getByText('2.9 KB / 9.8 KB')).toBeInTheDocument();
+  });
+
   it('shows the real connection log inside its box and expands from the empty state', () => {
     const log = [
       { time: 1_700_000_000_000, text: 'Warning: Permanently added host to the list of known hosts.' },
