@@ -718,7 +718,11 @@ button.history-prompt-action[data-primary] { border-color: var(--accent); backgr
 .ai-tool-approval { padding: 8px 0 2px; color: var(--warning); font-size: var(--fs-caption); }
 .ai-tool-approval-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
 .ai-tool-approval-actions > button { padding: 4px 8px; font-size: var(--fs-micro); }
-.ai-tool-terminal-link { margin-top: 6px; padding: 3px 0; border: 0; background: transparent; color: var(--accent-blue); font-size: var(--fs-micro); }
+.ai-tool-terminal-link.text-control { justify-content: flex-start; min-height: 28px; margin-top: 8px; padding: 0 9px; border: 1px solid transparent; border-radius: 6px; background: var(--action-button-bg); color: var(--text-primary); font-size: var(--fs-caption); box-shadow: var(--shadow-sm); transition: background var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease); }
+.ai-tool-terminal-link.text-control > svg { color: var(--accent-blue); }
+.ai-tool-terminal-link.text-control:hover { background: var(--action-button-hover-bg); box-shadow: var(--shadow-md); }
+.ai-tool-terminal-link.text-control:active { background: var(--control-active-bg); transform: translateY(1px); box-shadow: none; }
+.ai-tool-terminal-link.text-control:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 /* Chat panel: expanded reasoning and tool output share the markdown code-block frame
    (flat surface, border, inner radius) instead of per-row divider lines. */
 .chat-exchange .ai-tool-card { padding: 6px 0; border-top: 0; }
