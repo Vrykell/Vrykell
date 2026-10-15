@@ -238,8 +238,8 @@ describe('SSH status panel', () => {
     expect(cpuUsage(null, sample)).toBeNull();
     expect(cpuUsage(sample, { ...sample, cpuTotal: 100 })).toBeNull();
     expect(cpuUsage(sample, { ...sample, cpuIdle: null })).toBeNull();
-    expect(statusDuration(90)).toBe('1m 30s');
-    expect(statusDuration(3660)).toBe('1h 1m');
-    expect(statusDuration(90000)).toBe('1d 1h');
+    expect(statusDuration(90)).toBe('1 分 30 秒');
+    expect(statusDuration(3660)).toBe('1 小时 1 分');
+    expect(statusDuration(90000)).toBe('1 天 1 小时');
   });
 });
