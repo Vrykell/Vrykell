@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, emitPtyOutput, expectAnyTermContains, ptyWrites } from './tauri-mock';
+import { setupTauriMock, emitPtyOutput, expectAnyTermContains, clipboardText, ptyWrites } from './tauri-mock';
 
 interface RunningTermScrollProbe {
   buffer: { active: { viewportY: number; baseY: number } };
@@ -169,6 +169,51 @@ test('手动全屏：块内活终端搬进全屏宿主，退出后搬回卡片',
   await page.locator('[data-tip="退出全屏"]').click();
   await expect(cardHost.locator('.xterm')).toBeVisible();
   await expect(page.getByTestId('tui-fullscreen')).toHaveCount(0);
+});
+
+test('全屏终端右键菜单提供快捷操作与复制/粘贴', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  await startRunningBlock(page);
+  await page.locator('[data-testid^="running-block-"]').first().hover();
+  await page.locator('[data-tip="进入全屏交互"]').click();
+  const fs = page.getByTestId('tui-fullscreen');
+  await expect(fs.locator('.xterm')).toBeVisible();
+
+  await emitPtyOutput(page, '\x1b[2;1Hfullscreen-copy-target');
+  await expectAnyTermContains(page, 'fullscreen-copy-target');
+
+  await fs.locator('.xterm').click({ button: 'right' });
+  const menu = page.getByRole('menu', { name: '操作菜单' });
+  await expect(menu).toBeVisible();
+  for (const [index, label] of ['重绘终端', '终止命令', '结束前台应用', '退出全屏', '复制', '粘贴'].entries()) {
+    await expect(menu.getByRole('button').nth(index)).toContainText(label);
+  }
+  await expect(menu.getByLabel('Control+C').first()).toBeVisible();
+  await expect(menu.getByLabel('Control+V').first()).toBeVisible();
+
+  // Copy reads the terminal the fullscreen host displays; the hidden main terminal has no selection.
+  const target = 'fullscreen-copy-target';
+  await page.evaluate((text) => {
+    const terms = (window as unknown as {
+      __vrykellTerms?: Map<string, { select: (column: number, row: number, length: number) => void }>;
+    }).__vrykellTerms!;
+    const key = [...terms.keys()].find((entry) => entry.startsWith('block:'))!;
+    terms.get(key)!.select(0, 1, text.length);
+  }, target);
+  await menu.getByRole('button', { name: '复制' }).click();
+  await expect.poll(() => clipboardText(page)).toBe(target);
+
+  // The menu keeps the toolbar actions working from the fullscreen surface.
+  const before = (await ptyWrites(page)).length;
+  await fs.locator('.xterm').click({ button: 'right' });
+  await menu.getByRole('button', { name: '终止命令' }).click();
+  await expect.poll(async () => (await ptyWrites(page)).slice(before)).toContain('\x03');
+
+  await fs.locator('.xterm').click({ button: 'right' });
+  await menu.getByRole('button', { name: '退出全屏' }).click();
+  await expect(page.getByTestId('tui-fullscreen')).toHaveCount(0);
+  await expect(page.locator('[data-testid^="running-block-"]').first()).toBeVisible();
 });
 
 test('手动全屏中进入真 alt 屏：让出可见面，显示主 xterm 的 TUI', async ({ page }) => {
