@@ -2,7 +2,7 @@ import { t } from '@i18n';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { sessionCommandCount, sessionHistoryDateField, sessionHistoryDirectories, sessionHistoryTimestamp, sessionSummaryText } from '../model/sessionHistoryModel';
 import { useCallback, useMemo, useState } from 'react';
-import { Monitor, MonitorSmall, History, HistorySmall, ServerSmall, Ellipsis, Filter, ArrowSort, Grid, LockSmall as Lock, StarSmall as Star, X } from '@ui/icons';
+import { Monitor, MonitorSmall, History, HistorySmall, ServerSmall, Ellipsis, Filter, ArrowSort, Grid, LockSmall as Lock, StarSmall as Star } from '@ui/icons';
 import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/ContextMenu';
 import { IconButton } from '@ui/IconButton';
 import HistoryOptionMenu, { type HistoryMenuSection } from '@ui/HistoryOptionMenu';
@@ -280,22 +280,18 @@ export default function SessionHistoryView() {
               note={notes[noteKey(session.id)]}
               locked={Boolean(lockedRecords[noteKey(session.id)])}
               onOpen={() => openSession(session)}
-              onDelete={() => deleteHistoricalSession(session)}
-              deleteDisabled={batchBusy}
               onMenu={anchor => openRowMenu(session, anchor)} />)}
           </HistoryGroupCard>)
         )}
   </HistoryPage>);
 }
 
-function SessionRow({ s, starred, note, locked, onOpen, onDelete, deleteDisabled, onMenu }: {
+function SessionRow({ s, starred, note, locked, onOpen, onMenu }: {
   s: BackendSessionEntry;
   starred: boolean;
   note?: string;
   locked: boolean;
   onOpen: () => void;
-  onDelete: () => void;
-  deleteDisabled: boolean;
   onMenu: (anchor: MenuAnchor) => void;
 }) {
   const historical = s.status === 'historical';
@@ -332,11 +328,6 @@ function SessionRow({ s, starred, note, locked, onOpen, onDelete, deleteDisabled
       event.preventDefault(); event.stopPropagation();
       onMenu({ x: event.clientX, y: event.clientY, trigger: event.currentTarget });
     }}
-    leadingAction={historical ? {
-      icon: <X size={16} aria-hidden="true" />, label: t('Delete this session'),
-      disabled: locked || deleteDisabled, title: t(locked ? 'Locked record' : 'Delete this session'),
-      testId: `session-delete-${s.id}`, onClick: onDelete,
-    } : undefined}
     onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onOpen(); } }}
     action={{
       icon: <Ellipsis size={16} aria-hidden="true" />,

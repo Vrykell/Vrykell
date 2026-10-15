@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { t } from '@i18n';
-import { ArrowSort, Ellipsis, Filter, Grid, History, LockSmall as Lock, SparklesSmall as Sparkles, StarSmall as Star, X } from '@ui/icons';
+import { ArrowSort, Ellipsis, Filter, Grid, History, LockSmall as Lock, SparklesSmall as Sparkles, StarSmall as Star } from '@ui/icons';
 import { IconButton } from '@ui/IconButton';
 import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/ContextMenu';
 import HistoryOptionMenu, { type HistoryMenuSection } from '@ui/HistoryOptionMenu';
@@ -359,12 +359,6 @@ export default function AiHistoryView() {
           onContextMenu={event => {
             event.preventDefault(); event.stopPropagation();
             openRowMenu(item.id, { x: event.clientX, y: event.clientY, trigger: event.currentTarget });
-          }}
-          leadingAction={sendingId === item.id ? undefined : {
-            icon: <X size={16} aria-hidden="true" />, label: t('Delete conversation'),
-            disabled: batchBusy || Boolean(lockedRecords[noteKey(item.id)]),
-            title: t(lockedRecords[noteKey(item.id)] ? 'Locked record' : 'Delete conversation'),
-            testId: `conversation-delete-${item.id}`, onClick: () => { void remove(item.id); },
           }}
           onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); open(item.id); } }}
           badge={starredIds.has(item.id) || sendingId === item.id || lockedRecords[noteKey(item.id)] ? <span className="history-row-flags">

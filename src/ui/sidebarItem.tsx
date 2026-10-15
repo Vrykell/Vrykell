@@ -28,7 +28,6 @@ export default function SidebarItem({
   subtitleFontFamily = 'var(--font-mono)',
   badge,
   action,
-  leadingAction,
   renameInput,
   active,
   onClick,
@@ -53,8 +52,6 @@ export default function SidebarItem({
   /** Optional trailing content between the title and the action button. */
   badge?: ReactNode;
   action?: SidebarItemAction;
-  /** History rows reveal this action in the gutter on hover or keyboard focus. */
-  leadingAction?: SidebarItemAction;
   /** Replaces the title area while an inline rename is active. */
   renameInput?: ReactNode;
   active: boolean;
@@ -113,17 +110,6 @@ export default function SidebarItem({
       data-reorder-dragging={dragging ? 'true' : undefined}
       style={{ ...sidebarRowSpacing, ...(compact ? { padding: '0 6px' } : {}), ...style }}
     >
-      {leadingAction && <span className="history-row-hover-actions">
-        <button type="button" data-subtle className="history-row-remove"
-          aria-label={leadingAction.label} data-tip={leadingAction.title ?? leadingAction.label}
-          data-testid={leadingAction.testId} disabled={leadingAction.disabled}
-          onPointerDown={event => event.stopPropagation()}
-          onDoubleClick={event => event.stopPropagation()}
-          onClick={event => { event.stopPropagation(); leadingAction.onClick(event); }}>
-          {leadingAction.icon}
-        </button>
-        <span className="history-row-hover-dot" aria-hidden="true" />
-      </span>}
       <div className="sidebar-row-content" style={{
         ...sidebarRowContent,
         ...(historyCompact ? { minHeight: 34, padding: '5px 10px', alignItems: 'flex-start' } : compact ? { minHeight: 32, padding: '5px 10px' } : {}),
