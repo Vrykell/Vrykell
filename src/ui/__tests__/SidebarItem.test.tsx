@@ -20,6 +20,27 @@ function renderItem(overrides: Partial<Parameters<typeof SidebarItem>[0]> = {}) 
 }
 
 describe('SidebarItem', () => {
+  it('keeps quick actions separate from row activation and honors disabled actions', () => {
+    const remove = vi.fn();
+    const restore = vi.fn();
+    const { onClick } = renderItem({ variant: 'history', compact: true, testId: 'record', leadingActions: [
+      { icon: <span />, label: 'Delete record', onClick: remove, disabled: true },
+      { icon: <span />, label: 'Restore record', onClick: restore },
+    ] });
+    const actions = screen.getByRole('button', { name: 'Restore record' }).parentElement!;
+    expect(actions).toHaveAttribute('data-visible', 'false');
+    fireEvent.mouseOver(screen.getByTestId('record'));
+    expect(actions).toHaveAttribute('data-visible', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Delete record' }));
+    expect(remove).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Restore record' }));
+    expect(restore).toHaveBeenCalledOnce();
+    expect(onClick).not.toHaveBeenCalled();
+    fireEvent.mouseOut(screen.getByTestId('record'));
+    expect(actions).toHaveAttribute('data-visible', 'false');
+    fireEvent.focus(screen.getByTestId('record'));
+    expect(actions).toHaveAttribute('data-visible', 'true');
+  });
   it('keeps compact rows selectable with the same title and action behavior', () => {
     const { onClick, onAction } = renderItem({ compact: true, active: true });
     fireEvent.click(screen.getByText('会话一'));
@@ -106,10 +127,10 @@ describe('SidebarItem', () => {
     expect(screen.getByText('Closed')).toHaveAttribute('data-tip', 'Closed');
   });
 
-  it('keeps compact history metadata available in the tooltip and accessible description', () => {
+  it('shows basic history metadata without hover and retains the complete accessible description', () => {
     renderItem({ variant: 'history', compact: true, title: 'Project review', subtitle: 'Closed · /home/project', testId: 'compact-history-row' });
     const row = screen.getByTestId('compact-history-row');
-    expect(screen.getByText('Closed · /home/project')).not.toBeVisible();
+    expect(screen.getByText('Closed · /home/project')).toBeVisible();
     expect(row).toHaveAccessibleDescription('Closed · /home/project');
     expect(row).toHaveAttribute('data-tip', 'Project review');
     expect(row).toHaveAttribute('data-tip-description', 'Closed · /home/project');

@@ -84,6 +84,32 @@ it('opens record actions on right click without opening group actions', () => {
   expect(screen.queryByRole('menuitem', { name: '收起分组' })).toBeNull();
 });
 
+it('shows remote context without hover and opens from the quick action', () => {
+  useChatStore.setState(state => ({ conversations: state.conversations.map(item => item.id === 'second'
+    ? { ...item, environment: { paneId: 'remote', label: 'Production', kind: 'ssh' as const,
+      cwd: '/srv/app', ssh: { host: 'server.test', user: 'dev', port: 2222 } } } : item) }));
+  render(<AiHistoryView />);
+  const row = screen.getByTestId('conversation-row-second');
+  expect(row.querySelector('.sidebar-row-subtitle')).toBeVisible();
+  expect(row).toHaveTextContent('dev@server.test:2222 · /srv/app');
+  expect(row).toHaveTextContent('更新于');
+  fireEvent.click(screen.getByTestId('conversation-open-second'));
+  expect(useChatStore.getState().activeConversationId).toBe('second');
+  expect(useDockStore.getState().rightPanels).toContain('chat');
+});
+
+it('prevents quick deletion of locked or working conversations without activating them', async () => {
+  useHistoryMetaStore.getState().setLocked(['conversation:first'], true);
+  render(<AiHistoryView />);
+  expect(screen.getByTestId('conversation-delete-first')).toBeDisabled();
+  act(() => useChatStore.setState({ sendingTab: 'second' }));
+  expect(screen.getByTestId('conversation-delete-second')).toBeDisabled();
+  act(() => useChatStore.setState({ sendingTab: null }));
+  fireEvent.click(screen.getByTestId('conversation-delete-second'));
+  await waitFor(() => expect(conversationApi.deleteConversation).toHaveBeenCalledWith('second'));
+  expect(useChatStore.getState().activeConversationId).toBe('first');
+});
+
 it('keeps locked and failed records while deleting the other records in a group', async () => {
   useChatStore.setState(state => ({ conversations: [...state.conversations,
     { id: 'third', title: 'Successful deletion', createdAt: 3, updatedAt: 5, environment: null }] }));

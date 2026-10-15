@@ -788,6 +788,7 @@ const zh: Record<string, string> = {
   "Restore default block appearance": "恢复默认块外观",
   "Default": "默认",
   "Discussion only": "仅讨论 · 不操作终端",
+  "Updated {{date}}": "更新于 {{date}}",
   "Disconnected": "已断开",
   "Terminal disconnected. Select a terminal to continue execution.": "终端已断开，选择终端后可继续执行。",
   "References are snapshots. Execution uses the selected terminal.": "引用保留当时内容，命令在所选终端执行。",

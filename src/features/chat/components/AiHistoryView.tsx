@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { t } from '@i18n';
-import { ArrowSort, Ellipsis, Filter, Grid, History, LockSmall as Lock, SparklesSmall as Sparkles, StarSmall as Star } from '@ui/icons';
+import { ArrowSort, Ellipsis, Filter, Grid, History, LockSmall as Lock, SparklesSmall as Sparkles, StarSmall as Star, Undo2, X } from '@ui/icons';
 import { IconButton } from '@ui/IconButton';
 import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/ContextMenu';
 import HistoryOptionMenu, { type HistoryMenuSection } from '@ui/HistoryOptionMenu';
@@ -9,6 +9,7 @@ import HistoryGroupCard from '@ui/HistoryGroupCard';
 import HistoryPage from '@ui/HistoryPage';
 import HistoryTextPrompt from '@ui/HistoryTextPrompt';
 import SidebarItem from '@ui/sidebarItem';
+import { historyDirectory } from '@utils/historyDirectory';
 import ErrorBox from '@ui/ErrorBox';
 import { useDockStore } from '@features/workspace';
 import type { Conversation } from '../model/conversation';
@@ -348,7 +349,10 @@ export default function AiHistoryView() {
           title={item.title}
           subtitle={[
             item.environment?.label ?? t('Discussion only'),
-            new Date(item.updatedAt).toLocaleDateString(),
+            item.environment && (item.environment.cwd || item.environment.ssh?.host)
+              ? historyDirectory(item.environment, t('Working directory not recorded')).title : null,
+            t('Updated {{date}}', { date: new Date(item.updatedAt).toLocaleString(undefined,
+              { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }),
             notes[noteKey(item.id)] ? t('Note: {{note}}', { note: notes[noteKey(item.id)] }) : null,
           ].filter(Boolean).join(' · ')}
           subtitleFontFamily="var(--font-ui)"
@@ -356,6 +360,14 @@ export default function AiHistoryView() {
           compact
           active={item.id === activeId} testId={`conversation-row-${item.id}`} tabIndex={0}
           tooltip={t('Open conversation')} onClick={() => open(item.id)}
+          leadingActions={[
+            { icon: <X size={16} aria-hidden="true" />, label: t('Delete conversation'),
+              title: t(lockedRecords[noteKey(item.id)] ? 'Locked record' : 'Delete conversation'),
+              disabled: batchBusy || sendingId === item.id || Boolean(lockedRecords[noteKey(item.id)]),
+              testId: `conversation-delete-${item.id}`, onClick: () => { void remove(item.id); } },
+            { icon: <Undo2 size={16} aria-hidden="true" />, label: t('Open conversation'),
+              testId: `conversation-open-${item.id}`, onClick: () => open(item.id) },
+          ]}
           onContextMenu={event => {
             event.preventDefault(); event.stopPropagation();
             openRowMenu(item.id, { x: event.clientX, y: event.clientY, trigger: event.currentTarget });

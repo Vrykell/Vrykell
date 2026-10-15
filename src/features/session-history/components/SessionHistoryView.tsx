@@ -2,7 +2,7 @@ import { t } from '@i18n';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { sessionCommandCount, sessionHistoryDateField, sessionHistoryDirectories, sessionHistoryTimestamp, sessionSummaryText } from '../model/sessionHistoryModel';
 import { useCallback, useMemo, useState } from 'react';
-import { Monitor, MonitorSmall, History, HistorySmall, ServerSmall, Ellipsis, Filter, ArrowSort, Grid, LockSmall as Lock, StarSmall as Star } from '@ui/icons';
+import { Monitor, MonitorSmall, History, HistorySmall, ServerSmall, Ellipsis, Filter, ArrowSort, Grid, LockSmall as Lock, StarSmall as Star, Undo2, X } from '@ui/icons';
 import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/ContextMenu';
 import { IconButton } from '@ui/IconButton';
 import HistoryOptionMenu, { type HistoryMenuSection } from '@ui/HistoryOptionMenu';
@@ -280,30 +280,34 @@ export default function SessionHistoryView() {
               note={notes[noteKey(session.id)]}
               locked={Boolean(lockedRecords[noteKey(session.id)])}
               onOpen={() => openSession(session)}
+              onDelete={() => deleteHistoricalSession(session)}
+              busy={batchBusy}
               onMenu={anchor => openRowMenu(session, anchor)} />)}
           </HistoryGroupCard>)
         )}
   </HistoryPage>);
 }
 
-function SessionRow({ s, starred, note, locked, onOpen, onMenu }: {
+function SessionRow({ s, starred, note, locked, onOpen, onDelete, busy, onMenu }: {
   s: BackendSessionEntry;
   starred: boolean;
   note?: string;
   locked: boolean;
   onOpen: () => void;
+  onDelete: () => void;
+  busy: boolean;
   onMenu: (anchor: MenuAnchor) => void;
 }) {
   const historical = s.status === 'historical';
-  const closedDate = historical && s.closed_at ? new Date(s.closed_at).toLocaleDateString() : null;
+  const closedDate = historical && s.closed_at ? new Date(s.closed_at).toLocaleString(undefined,
+    { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
   const commandCount = sessionCommandCount(s);
   const subtitle = [
-    closedDate ? t('Closed {{date}}', { date: closedDate }) : t('Active'),
     ...sessionHistoryDirectories(s).map(directory => directory.title),
     commandCount === null ? null : t('{{count}} command blocks', { count: commandCount }),
+    closedDate ? t('Closed {{date}}', { date: closedDate }) : t('Active'),
     note ? t('Note: {{note}}', { note }) : null,
   ].filter(Boolean).join(' · ');
-  const openLabel = historical ? t('Restore') : t('Open');
   const icon = isSshSession(s) ? <ServerSmall size={16} aria-hidden="true" />
     : historical ? <HistorySmall size={16} aria-hidden="true" /> : <MonitorSmall size={16} aria-hidden="true" />;
 
@@ -317,13 +321,19 @@ function SessionRow({ s, starred, note, locked, onOpen, onMenu }: {
     badge={starred || locked ? <span className="history-row-flags">
       {locked && <span className="history-row-lock" data-tip={t('Locked record')}><Lock size={16} aria-hidden="true" /></span>}
       {starred && <span className="history-row-star" data-tip={t('Starred')} data-testid={`session-star-${s.id}`}><Star size={16} aria-hidden="true" /></span>}
-      <span className="history-row-status">{openLabel}</span>
-    </span> : <span className="history-row-status">{openLabel}</span>}
+    </span> : undefined}
     active={false}
     tabIndex={0}
     testId={`history-session-${s.id}`}
     tooltip={historical ? t('Restore session') : t('Open session')}
     onClick={onOpen}
+    leadingActions={historical ? [
+      { icon: <X size={16} aria-hidden="true" />, label: t('Delete this session'),
+        title: t(locked ? 'Locked record' : 'Delete this session'), disabled: locked || busy,
+        testId: `session-delete-${s.id}`, onClick: onDelete },
+      { icon: <Undo2 size={16} aria-hidden="true" />, label: t('Restore session'), disabled: busy,
+        testId: `session-restore-${s.id}`, onClick: onOpen },
+    ] : undefined}
     onContextMenu={event => {
       event.preventDefault(); event.stopPropagation();
       onMenu({ x: event.clientX, y: event.clientY, trigger: event.currentTarget });
