@@ -330,8 +330,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     // The harness should work where the user was, and the tab it opens is not a terminal: the
     // directory has to be read from the active session before the switch happens.
     const state = get();
+    // Connecting from a page (the hub) means the active tab is not a terminal, so the most recent
+    // session tab is the fallback: the harness should still start where the user was working.
     const active = state.tabs.find((tab) => tab.id === state.activeId);
-    const spec = active && isSessionTab(active) ? firstLeaf(active.layout) : null;
+    const spec = (active && isSessionTab(active) ? firstLeaf(active.layout) : null)
+      ?? state.tabs.map((tab) => (isSessionTab(tab) ? firstLeaf(tab.layout) : null)).filter((leaf) => leaf !== null).at(-1);
     const directory = cwd ?? (spec ? state.terminalCwds[spec.id] ?? spec.cwd : undefined);
     get().addTab({ kind: 'harness', harness: name, harnessCwd: directory });
   },
