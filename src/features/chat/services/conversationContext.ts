@@ -3,6 +3,7 @@ import { useWorkspaceStore } from '@features/workspace/stores/workspace';
 import { leaves } from '@features/workspace/model/windowLayout';
 import { useDockStore } from '@features/workspace/stores/dock';
 import { useTerminalStore, useBlockStore, getRecentOutputFor } from '@features/terminal';
+import { focusSessionInput } from '@features/terminal/services/terminalFocus';
 import { shellTypeLabel } from '@platform/shells';
 import { useChatStore } from '../stores/chat';
 import { useComposerDrafts } from '../stores/composerDrafts';
@@ -31,6 +32,9 @@ export function showExecutionTerminal(paneId: string): void {
   if (!tab) return;
   workspace.activate(tab.id);
   useTerminalStore.getState().setFocusedPane(paneId);
+  window.requestAnimationFrame(() => {
+    if (useWorkspaceStore.getState().activeId === tab.id) focusSessionInput(paneId);
+  });
 }
 
 /** Bring a snapshot into a compatible conversation without submitting or granting terminal access. */
