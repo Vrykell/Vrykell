@@ -32,9 +32,11 @@ export function pasteConfirmReason(text: string, bracketedPaste: boolean): Paste
 export function getPaneTerminal(paneId: string): Terminal | null {
   const main = termInstances.get(paneId);
   const block = termInstances.get(`block:${paneId}`);
-  return useTerminalStore.getState().scenes[paneId] === 'blockList'
-    ? block ?? main ?? null
-    : main ?? block ?? null;
+  const { scenes, altScreenActive } = useTerminalStore.getState();
+  // A manually fullscreened running block keeps showing its own terminal; only a real
+  // alternate buffer hands the pane back to the main terminal.
+  const blockSurface = scenes[paneId] === 'blockList' || (scenes[paneId] === 'altScreen' && altScreenActive);
+  return blockSurface ? block ?? main ?? null : main ?? block ?? null;
 }
 
 /**
