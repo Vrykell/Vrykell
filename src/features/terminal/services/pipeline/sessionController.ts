@@ -13,6 +13,7 @@ import { createBlockTerm, extractSnapshotFromBuffer } from '@features/terminal/m
 import type { DispatchEvent } from '@core/terminal/events';
 import type { TermBlock, BlockStatus } from '@features/terminal/services/pipeline/termBlock';
 import { isTerminalDebugEnabled, terminalDebug } from '@features/terminal/services/terminalDebug';
+import { TerminalIoLog } from '@features/terminal/services/terminalIoLog';
 import { workingDirectoryFromUri } from '@features/terminal/services/pipeline/workingDirectory';
 import { trackBufferTruncation, type BufferTruncationTracker } from '@features/terminal/services/pipeline/bufferTruncation';
 import { getTerminalFontSize, measureTerminalDomCellWidth } from '@features/terminal/model/terminalFont';
@@ -73,6 +74,8 @@ export class SessionController {
   private lastCwd: string | undefined;
   /** 当前前台程序设置的窗口标题（OSC 0/2）；空串=未设置，仅在程序占用终端时有效 */
   private programTitle = '';
+  /** Pipeline counters of this pane; the session hook feeds the receive stage into the same window. */
+  readonly ioLog: TerminalIoLog;
 
   constructor(
     private tabId: string,
@@ -85,8 +88,7 @@ export class SessionController {
     /** 块系统开关；false = 经典模式（传统终端） */
     blockEnabled = true,
   ) {
-    // tabId 保留给未来调试/持久化使用
-    void this.tabId;
+    this.ioLog = new TerminalIoLog(tabId);
     this._scene = initialScene;
     this.preAltScene = initialScene;
     this.blockEnabled = blockEnabled;
@@ -116,18 +118,7 @@ export class SessionController {
   // ── 事件入口 ──
 
   handleEvents(events: DispatchEvent[]): void {
-    if (isTerminalDebugEnabled()) {
-      terminalDebug('controller-events', {
-        tabId: this.tabId,
-        scene: this._scene,
-        count: events.length,
-        events: events.map((event) => event.kind === 'data'
-          ? { kind: event.kind, chars: event.text.length }
-          : event.kind === 'osc'
-            ? { kind: event.kind, code: event.code, payloadChars: event.payload.length }
-            : { kind: event.kind }),
-      });
-    }
+    this.ioLog.consumed(events, this._scene);
     if (!this.blockEnabled) {
       // 经典模式：传统终端，所有输出直进主 xterm（不建块、不切场景、TUI 由 xterm 原生处理）
       for (const ev of events) {
@@ -157,9 +148,7 @@ export class SessionController {
 
   private routeData(text: string): void {
     if (this._scene === 'classic' || this._scene === 'altScreen') {
-      if (isTerminalDebugEnabled()) {
-        terminalDebug('route-data', { tabId: this.tabId, scene: this._scene, chars: text.length, target: 'main' });
-      }
+      this.ioLog.routed('main', text.length);
       this.sinks.writeMain(text);
       return;
     }
@@ -171,19 +160,13 @@ export class SessionController {
     }
     if (!ab) return;
     if (ab.status === 'executing') {
-      if (isTerminalDebugEnabled()) {
-        terminalDebug('route-data', {
-          tabId: this.tabId,
-          scene: this._scene,
-          blockId: ab.id,
-          blockStatus: ab.status,
-          chars: text.length,
-          target: 'block',
-          outputTermReady: ab.outputTerm !== null,
-          pendingEchoFilter: ab._pendingCommandEcho !== null,
-        });
-      }
+      const echoArmed = ab._pendingCommandEcho !== null;
       const output = this.stripCommandEcho(ab, text);
+      this.ioLog.routed('block', text.length, {
+        blockNotReady: ab.outputTerm === null,
+        echoArmed,
+        echoFiltered: !output,
+      });
       if (!output) return;
       ab.outputTerm?.write(output);
       // Trim only after crossing 2× the cap to avoid repeated full-string copies.
@@ -192,16 +175,7 @@ export class SessionController {
         ab.outputRaw = ab.outputRaw.slice(-RAW_CAP);
       }
     } else {
-      if (isTerminalDebugEnabled()) {
-        terminalDebug('route-data', {
-          tabId: this.tabId,
-          scene: this._scene,
-          blockId: ab.id,
-          blockStatus: ab.status,
-          chars: text.length,
-          target: 'early-buffer',
-        });
-      }
+      this.ioLog.routed('early', text.length, { blockNotReady: ab.outputTerm === null });
       ab.earlyBuf += text;
     }
   }
@@ -766,6 +740,9 @@ export class SessionController {
 
   dispose(): void {
     this._disposed = true;
+    // The pane keeps its last counter window even though the pipeline stops here.
+    this.ioLog.flush();
+    this.ioLog.dispose();
     if (this.longRunningTimer) {
       clearTimeout(this.longRunningTimer);
       this.longRunningTimer = null;

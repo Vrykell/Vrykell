@@ -1,0 +1,290 @@
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import type { SshOptions, SshSessionStatus } from '@core/ssh';
+import { t } from '@i18n';
+import { ChevronRight, Copy, RefreshCw, X, iconSizes } from '@ui/icons';
+import { IconBtn, fmtSize } from '@ui/UiBtn';
+import { TextButton } from '@ui/TextButton';
+import ErrorBox from '@ui/ErrorBox';
+import ResizeHandle from '@ui/ResizeHandle';
+import { writeClipboardText } from '@platform/clipboard';
+import { useToastStore } from '@ui/Toast';
+import { hideSshStatus, showSshStatus, useSshStatusDismissRequest } from '@features/workspace/hooks/useAuxiliarySidebar';
+import { sshSystemStatus, type SshSystemStatus } from '../services/api';
+import { isSshAuthenticationFailure } from '../model/fileServiceState';
+import SshCpuTrend, { type CpuSample } from './SshCpuTrend';
+import './SshStatusPanel.css';
+import { forgetSshAuthentication, requestSshAuthentication, useHasTemporarySshAuthentication, useSshAuthenticationRevision } from '../hooks/useSessionAuthentication';
+
+type Target = SshOptions & { name: string; host: string; user?: string; port?: number; connectionId?: string };
+function StatusPlacement({ children }: { children: ReactNode }) {
+  const host = document.getElementById('ssh-status-sidebar-host');
+  return host ? createPortal(children, host) : children;
+}
+const phaseLabels = { connecting: 'Connecting…', connected: 'Connected', interactive: 'SSH interactive session', authenticating: 'Authenticating…', disconnected: 'Disconnected', unavailable: 'Connection unavailable' } as const;
+/** Status width bounds. Dragging to the minimum folds the panel; releasing there closes it. */
+const MIN_STATUS_WIDTH = 240;
+/** Ceiling used only while the workspace geometry cannot be measured; real drags stop where the terminal hits its minimum width. */
+const FALLBACK_STATUS_MAX = 560;
+
+export function statusDuration(seconds: number): string {
+  const value = Math.max(0, Math.floor(seconds));
+  if (value >= 86400) return `${Math.floor(value / 86400)}d ${Math.floor(value % 86400 / 3600)}h`;
+  if (value >= 3600) return `${Math.floor(value / 3600)}h ${Math.floor(value % 3600 / 60)}m`;
+  return `${Math.floor(value / 60)}m ${value % 60}s`;
+}
+
+export function cpuUsage(previous: SshSystemStatus | null, current: SshSystemStatus): number | null {
+  if (previous?.cpuTotal == null || previous.cpuIdle == null || current.cpuTotal == null || current.cpuIdle == null) return null;
+  const total = current.cpuTotal - previous.cpuTotal;
+  const idle = current.cpuIdle - previous.cpuIdle;
+  return total > 0 && idle >= 0 && idle <= total ? 100 * (total - idle) / total : null;
+}
+
+function Metric({ label, used, total, percentage, history }: { label: string; used?: number | null; total?: number | null; percentage?: number | null; history?: readonly CpuSample[] }) {
+  const percent = percentage !== undefined ? percentage : used != null && total != null && total > 0 ? used / total * 100 : null;
+  return <div className="ssh-status-metric">
+    <div className="ssh-status-row"><span>{label}</span><div className="ssh-status-metric-reading">
+      {history && history.length >= 2 && <SshCpuTrend samples={history} />}
+      <strong>{percent == null ? t('Unavailable') : `${Math.round(percent)}%`}</strong>
+    </div></div>
+    <div className="ssh-status-meter" role={percent == null ? undefined : 'meter'} aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent == null ? undefined : Math.round(percent)}>
+      <i data-level={percent == null ? 'unknown' : percent >= 90 ? 'critical' : percent >= 80 ? 'warning' : 'normal'} style={{ width: `${Math.max(0, Math.min(100, percent ?? 0))}%` }} />
+    </div>
+    {used != null && total != null && <div className="ssh-status-caption">{fmtSize(used)} / {fmtSize(total)}</div>}
+  </div>;
+}
+
+export default function SshStatusPanel({ paneId, target, state, active, focused = true, onReconnect, width = 300, onWidthChange, onToolbarReady, compact = false, statusTrigger, openRequest = 0, toggleRequest = 0, onOpenChange, children }: { paneId?: string; target: Target; state: SshSessionStatus; active: boolean; focused?: boolean; onReconnect?: () => Promise<void>; width?: number; onWidthChange?: (width: number) => void; onToolbarReady?: (host: HTMLDivElement | null) => void; compact?: boolean; statusTrigger?: HTMLButtonElement | null; openRequest?: number; toggleRequest?: number; onOpenChange?: (open: boolean) => void; children?: ReactNode }) {
+  const authenticationRevision = useSshAuthenticationRevision(target.connectionId);
+  const temporaryAuthentication = useHasTemporarySshAuthentication(target.connectionId);
+  const [open, setOpen] = useState(false);
+  const fallbackId = useId();
+  const sidebarOwner = paneId ?? fallbackId;
+  const displayOpen = open && active && focused;
+  useEffect(() => { onOpenChange?.(displayOpen); }, [displayOpen, onOpenChange]);
+  useEffect(() => {
+    if (!displayOpen) return;
+    showSshStatus(sidebarOwner);
+    return () => hideSshStatus(sidebarOwner);
+  }, [displayOpen, sidebarOwner]);
+  const dismissRequest = useSshStatusDismissRequest();
+  const seenDismissRequest = useRef(dismissRequest);
+  useEffect(() => {
+    if (dismissRequest === seenDismissRequest.current) return;
+    seenDismissRequest.current = dismissRequest;
+    if (displayOpen) setOpen(false);
+  }, [dismissRequest, displayOpen]);
+  const [paused, setPaused] = useState(false);
+  const [refresh, setRefresh] = useState(0);
+  const [sample, setSample] = useState<SshSystemStatus | null>(null);
+  const [cpu, setCpu] = useState<number | null>(null);
+  const [cpuHistory, setCpuHistory] = useState<CpuSample[]>([]);
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const [sampleValid, setSampleValid] = useState(false);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
+  const [now, setNow] = useState(Date.now);
+  const [connectedAt, setConnectedAt] = useState<number | null>(null);
+  const previous = useRef<SshSystemStatus | null>(null);
+  const inFlight = useRef(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
+  const logRef = useRef<HTMLDivElement>(null);
+  const panelId = useId();
+  const [folded, setFolded] = useState(false);
+  const [maxWidth, setMaxWidth] = useState(FALLBACK_STATUS_MAX);
+  const [liveWidth, setLiveWidth] = useState(width);
+  const widthRef = useRef(width);
+  const committedWidth = useRef(width);
+  const dragPaneWidth = useRef<number | null>(null);
+  const dragMaximum = useRef(FALLBACK_STATUS_MAX);
+  useEffect(() => { widthRef.current = width; setLiveWidth(width); }, [width]);
+  useEffect(() => { if (openRequest > 0) setOpen(true); }, [openRequest]);
+  useEffect(() => { if (toggleRequest > 0) setOpen(value => !value); }, [toggleRequest]);
+  const connected = (state.phase === 'connected' || state.phase === 'interactive') && !state.retrying;
+  const address = `${target.user ? `${target.user}@` : ''}${target.host}:${target.port ?? 22}`;
+  const unsupported = !target.connectionId ? t('Save this connection to monitor remote resources.') : target.jumpHost && target.jumpHost.toLowerCase() !== 'none' ? t('Resource monitoring is unavailable for jump hosts.') : null;
+
+  useEffect(() => {
+    const time = Date.now();
+    setConnectedAt(connected ? time : null);
+    setSampleValid(false);
+    previous.current = null;
+  }, [state.phase, connected]);
+
+  // Follow the newest log line; the box keeps a bounded history.
+  useEffect(() => { const element = logRef.current; if (element) element.scrollTop = element.scrollHeight; }, [state.log.length]);
+
+  useEffect(() => {
+    if (!displayOpen) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [displayOpen]);
+
+  useEffect(() => {
+    if (!displayOpen || !connected || paused || unsupported || !target.connectionId) return;
+    let disposed = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const collect = async () => {
+      if (document.hidden || inFlight.current) { timer = setTimeout(() => void collect(), 1000); return; }
+      inFlight.current = true;
+      setBusy(true);
+      let nextDelay = 15000;
+      let retryAllowed = true;
+      try {
+        const result = await sshSystemStatus(target.connectionId!, target.host, target.port ?? 22, target.user ?? '');
+        if (!disposed) {
+          const usage = cpuUsage(previous.current, result);
+          const time = Date.now();
+          setCpu(usage); previous.current = result;
+          setSample(result); setSampleValid(true); setUpdatedAt(time); setNow(time); setError('');
+          setCpuHistory(values => {
+            const recent = values.filter(value => time - value.time <= 300000);
+            return usage == null ? recent : [...recent, { time, value: usage }].slice(-21);
+          });
+        }
+      } catch (reason) { if (!disposed) { setError(String(reason)); nextDelay = 30000; retryAllowed = !isSshAuthenticationFailure(String(reason)); } }
+      finally {
+        inFlight.current = false;
+        setBusy(false);
+        if (!disposed && retryAllowed) { timer = setTimeout(() => void collect(), nextDelay); }
+      }
+    };
+    void collect();
+    return () => { disposed = true; clearTimeout(timer); };
+  }, [displayOpen, connected, paused, unsupported, target.connectionId, target.host, target.port, target.user, refresh, authenticationRevision]);
+
+  const close = () => { setOpen(false); (statusTrigger ?? trigger.current)?.focus(); };
+  // The live width stays local: publishing it per drag frame would re-render the terminal pane subtree and make the drag jitter.
+  const applyWidth = (next: number) => { widthRef.current = next; setLiveWidth(next); };
+  const publishWidth = (next: number) => onWidthChange?.(next);
+  const workspaceTerminalMin = () => {
+    const body = document.querySelector<HTMLElement>('.workspace-body');
+    const value = Number.parseFloat(body ? getComputedStyle(body).getPropertyValue('--workspace-terminal-min-width') : '');
+    return Number.isFinite(value) ? Math.max(360, value) : 360;
+  };
+  /** Grow until the workspace terminal reaches its minimum width, like every other side panel. */
+  const maximumWidth = (paneWidth: number) => paneWidth <= 0 ? FALLBACK_STATUS_MAX : Math.max(MIN_STATUS_WIDTH, Math.round(paneWidth - workspaceTerminalMin()));
+  /** Terminal and panel share one width budget; the terminal measurement plus the panel width recovers it. */
+  const paneWidthAt = () => {
+    const workspaceWidth = document.querySelector<HTMLElement>('.workspace-main')?.getBoundingClientRect().width;
+    return workspaceWidth != null ? workspaceWidth + widthRef.current : frameRef.current?.closest('.terminal-pane')?.getBoundingClientRect().width ?? 0;
+  };
+  const dragStep = (delta: number) => {
+    const next = Math.round(widthRef.current - delta);
+    // Reaching the minimum folds the panel: it stays mounted and hidden, so dragging back out before release restores it.
+    if (next <= MIN_STATUS_WIDTH) { applyWidth(MIN_STATUS_WIDTH); setFolded(true); return; }
+    applyWidth(Math.min(dragMaximum.current, next));
+    setFolded(false);
+  };
+  const resize = (delta: number) => {
+    if (dragPaneWidth.current == null) {
+      // Start from the rendered width: the window may have clamped the panel since the last drag.
+      const measured = frameRef.current?.getBoundingClientRect().width;
+      if (measured) widthRef.current = Math.round(measured);
+      dragPaneWidth.current = paneWidthAt();
+      // Measure the limit once per drag; reading computed styles on every move forces a style flush.
+      dragMaximum.current = maximumWidth(dragPaneWidth.current);
+      setMaxWidth(dragMaximum.current);
+    }
+    dragStep(delta);
+  };
+  const commitResize = () => {
+    dragPaneWidth.current = null;
+    if (widthRef.current <= MIN_STATUS_WIDTH) {
+      // Released at the minimum: close the panel, keep the last stable width for the next open and return focus to the entry.
+      const restore = committedWidth.current;
+      applyWidth(restore);
+      publishWidth(restore);
+      setFolded(false);
+      setOpen(false);
+      (statusTrigger ?? trigger.current)?.focus();
+      return;
+    }
+    committedWidth.current = widthRef.current;
+    publishWidth(widthRef.current);
+    setFolded(false);
+  };
+  const nudgeWidth = (step: number) => {
+    const maximum = maximumWidth(paneWidthAt());
+    setMaxWidth(maximum);
+    const next = Math.max(MIN_STATUS_WIDTH, Math.min(maximum, widthRef.current + step));
+    applyWidth(next);
+    committedWidth.current = next;
+    publishWidth(next);
+  };
+  const stale = !sampleValid || !connected || !!error || paused || (updatedAt != null && now - updatedAt > 30000);
+  const authenticationFailed = isSshAuthenticationFailure(error);
+  return <div className="ssh-status-shell" data-open={displayOpen} data-active={active} data-compact={compact}>
+    {!compact && <div className="ssh-status-toolbar" onMouseDown={event => event.stopPropagation()} onContextMenu={event => event.stopPropagation()}>
+      <div className="ssh-session-toolbar-slot" ref={onToolbarReady}>
+        {(!onToolbarReady || !statusTrigger || state.phase === 'unavailable') && <TextButton ref={trigger} className="ssh-session-status" data-testid="ssh-status-toggle" aria-label={t('SSH status')} data-tip={t(displayOpen ? 'Close SSH status' : 'Open SSH status')} aria-expanded={displayOpen} aria-controls={panelId} onClick={() => setOpen(value => !value)}>
+          <i className="ssh-status-dot" data-phase={state.phase} /><span role="status">{t(phaseLabels[state.phase])}</span>
+        </TextButton>}
+      </div>
+    </div>}
+    <div className="ssh-status-body">
+      {children}
+      {displayOpen && <StatusPlacement><div ref={frameRef} className="ssh-status-frame" data-folded={folded || undefined} style={{ width: folded ? 0 : liveWidth }} onMouseDown={event => event.stopPropagation()} onContextMenu={event => event.stopPropagation()}>
+      {onWidthChange && <div role="separator" aria-label={t('Resize SSH status')} aria-orientation="vertical" aria-valuemin={MIN_STATUS_WIDTH} aria-valuemax={maxWidth} aria-valuenow={liveWidth} tabIndex={0} className="ssh-status-resize" onKeyDown={event => {
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); event.stopPropagation(); nudgeWidth(event.key === 'ArrowLeft' ? 16 : -16); }
+        if (event.key === 'Escape') { event.stopPropagation(); close(); }
+      }}><ResizeHandle axis="x" edge="left" onDelta={resize} onUp={commitResize} testId="ssh-status-resize-handle" /></div>}
+      <aside id={panelId} aria-label={t('SSH status')} data-testid="ssh-status-panel" className="ssh-status-panel scroll-region" style={{ display: folded ? 'none' : undefined }} onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); close(); } }}>
+        <header><strong>{t('Remote resources')}</strong><div className="ssh-status-header-actions">
+          <IconBtn title={t('Refresh remote resources')} disabled={!connected || !!unsupported || busy} onClick={() => { setPaused(false); setRefresh(value => value + 1); }}><RefreshCw size={iconSizes.compact} /></IconBtn>
+          <IconBtn title={t('Close SSH status')} onClick={close}><X size={iconSizes.control} /></IconBtn>
+        </div></header>
+        <section className="ssh-status-overview">
+          <div className="ssh-status-identity-row"><div className="ssh-status-identity">{target.name || target.host}</div><span className="ssh-status-phase" data-tip={t('Connection status')}><i className="ssh-status-dot" data-phase={state.phase} />{state.retrying ? t('Reconnecting…') : t(phaseLabels[state.phase])}</span></div>
+          <div className="ssh-status-address"><span data-tip={address}>{address}</span><IconBtn title={t('Copy connection address')} onClick={() => { void writeClipboardText(address).catch(reason => useToastStore.getState().addToast(String(reason), 'error')); }}><Copy size={iconSizes.compact} /></IconBtn></div>
+          {onReconnect && (state.phase === 'disconnected' || state.retrying) && <TextButton disabled={reconnecting} onClick={() => {
+            setReconnecting(true);
+            void onReconnect().catch(reason => useToastStore.getState().addToast(String(reason), 'error')).finally(() => setReconnecting(false));
+          }}>{t('Reconnect SSH session')}</TextButton>}
+        </section>
+        <section>
+          {unsupported ? <ErrorBox tone="info">{unsupported}</ErrorBox> : <>
+            {error && <ErrorBox title={t(authenticationFailed ? 'Saved SSH authentication failed' : 'Resource collection failed')} details={error} detailsTitle={t('Technical details')} actions={authenticationFailed && target.connectionId ? <TextButton onClick={() => requestSshAuthentication({ ...target, connectionId: target.connectionId! })}>{t('Authenticate services')}</TextButton> : undefined}>{t(authenticationFailed ? 'Authenticate these services with the working server password or private key passphrase. The terminal session stays connected.' : 'The terminal connection is independent of resource monitoring.')}</ErrorBox>}
+            {!sample && <p className="ssh-status-caption">{!connected ? t('Resources are collected after connecting.') : busy ? t('Collecting remote resources…') : t('No resource sample yet.')}</p>}
+            {sample && <div data-stale={stale}>
+              <Metric label={t('CPU usage')} percentage={cpu} history={cpuHistory} />
+              {cpu == null && sample.cpuTotal != null && <p className="ssh-status-caption">{t('CPU usage requires two samples.')}</p>}
+              <Metric label={t('Memory usage')} used={sample.memoryTotal != null && sample.memoryAvailable != null ? sample.memoryTotal - sample.memoryAvailable : null} total={sample.memoryTotal} />
+              <Metric label={t('Root disk usage')} used={sample.diskUsed} total={sample.diskTotal} />
+              <details className="ssh-status-details">
+                <summary>{t('System details')}<ChevronRight size={iconSizes.compact} /></summary>
+                <div className="ssh-status-system" data-tip={`${sample.system} · ${sample.hostname}`}>{sample.system} · {sample.hostname}</div>
+                <div className="ssh-status-row"><span>{t('System uptime')}</span><strong>{sample.uptimeSeconds == null ? t('Unavailable') : statusDuration(sample.uptimeSeconds)}</strong></div>
+                <div className="ssh-status-row"><span>{t('System load')}</span><strong>{sample.load || t('Unavailable')}</strong></div>
+              </details>
+            </div>}
+          </>}
+        </section>
+        <details className="ssh-status-details ssh-status-connection">
+          <summary>{t('Connection details')}<ChevronRight size={iconSizes.compact} /></summary>
+          <div className="ssh-status-row"><span>{state.phase === 'interactive' ? t('Session duration') : t('Connected for')}</span><strong>{connectedAt == null ? '—' : statusDuration((now - connectedAt) / 1000)}</strong></div>
+          <div className="ssh-status-row"><span>{t('Reconnect attempts')}</span><strong>{state.reconnectAttempt}</strong></div>
+          {temporaryAuthentication && target.connectionId && <TextButton onClick={() => { void forgetSshAuthentication(target.connectionId!).catch(reason => useToastStore.getState().addToast(String(reason), 'error')); }}>{t('Clear temporary credentials')}</TextButton>}
+          {sample && <div className="ssh-status-row" data-tip={t('Measured on a separate SSH connection.')}><span>{t('Probe latency')}</span><strong>{sample.latencyMs} ms</strong></div>}
+        </details>
+        <details className="ssh-status-details ssh-status-history"><summary>{t('Connection log')}<ChevronRight size={iconSizes.compact} /></summary>
+          <div className="ssh-status-log scroll-region" ref={logRef}>
+            {state.log.length === 0
+              ? <p className="ssh-status-caption">{t('No connection output yet.')}</p>
+              : <ol className="ssh-status-events">{state.log.map((entry, index) => <li key={`${entry.time}-${index}`}><time>{new Date(entry.time).toLocaleTimeString()}</time><span>{entry.text}</span></li>)}</ol>}
+          </div>
+        </details>
+        <footer className="ssh-status-controls">
+          <TextButton disabled={!connected || !!unsupported} onClick={() => setPaused(value => !value)}>{paused ? t('Resume monitoring') : t('Pause monitoring')}</TextButton>
+          <div>
+            {updatedAt && <p className="ssh-status-caption">{stale ? t('Last sample') : t('Updated')} · {t('{{seconds}}s ago', { seconds: Math.max(0, Math.floor((now - updatedAt) / 1000)) })}</p>}
+            {paused && <p className="ssh-status-caption">{t('Monitoring paused')}</p>}
+          </div>
+        </footer>
+      </aside></div></StatusPlacement>}
+    </div>
+  </div>;
+}

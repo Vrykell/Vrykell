@@ -38,6 +38,14 @@ describe('CheckboxMenu', () => {
     expect(screen.getByText('3')).toBeInTheDocument();
   });
 
+  it('shows the shared themed checkbox in filter rows', () => {
+    render(<CheckboxMenu title="搜索范围" options={options} onToggle={vi.fn()} onClose={vi.fn()} />);
+    const checked = screen.getByRole('menuitemcheckbox', { name: /命令历史/ }).querySelector<HTMLInputElement>('input.themed-checkbox');
+    const unchecked = screen.getByRole('menuitemcheckbox', { name: '文件' }).querySelector<HTMLInputElement>('input.themed-checkbox');
+    expect(checked?.checked).toBe(true);
+    expect(unchecked?.checked).toBe(false);
+  });
+
   it('closes when it loses focus or on Escape', () => {
     vi.useFakeTimers();
     const onClose = vi.fn();

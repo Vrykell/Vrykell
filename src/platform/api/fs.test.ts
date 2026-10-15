@@ -5,7 +5,7 @@ import { describe, it, expect, vi } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 import {
-  fsList, fsDisks, fsHome, fsRename, fsCreateFile, fsCreateDir, fsCopy, fsMove, fsStageDelete, fsRestoreStaged, fsPurgeStaged, fileOpenWith,
+  fsList, fsDisks, fsHome, fsRename, fsCreateFile, fsCreateDir, fsCopy, fsMove, fsStageDelete, fsRestoreStaged, fsPurgeStaged, fsStat, fileOpenWith,
 } from '@platform/api/fs';
 
 describe('api/fs 封装', () => {
@@ -88,5 +88,16 @@ describe('api/fs 封装', () => {
     invokeMock.mockResolvedValueOnce(undefined);
     await fsPurgeStaged(['C:\\s\\old.txt']);
     expect(invokeMock).toHaveBeenLastCalledWith('fs_purge_staged', { paths: ['C:/s/old.txt'] });
+  });
+
+  it('fsStat 透传并归一化返回路径', async () => {
+    invokeMock.mockResolvedValueOnce({
+      name: 'notes.txt', path: 'C:\\Users\\37863\\notes.txt', is_dir: false, is_symlink: false,
+      size: 42, created_ms: 1, modified_ms: 2,
+    });
+    await expect(fsStat('C:\\Users\\37863\\notes.txt')).resolves.toMatchObject({
+      name: 'notes.txt', path: 'C:/Users/37863/notes.txt', size: 42, modified_ms: 2,
+    });
+    expect(invokeMock).toHaveBeenLastCalledWith('fs_stat', { path: 'C:/Users/37863/notes.txt' });
   });
 });

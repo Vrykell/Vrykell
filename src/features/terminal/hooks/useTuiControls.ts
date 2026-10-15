@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ptyWrite } from '@platform/pty';
+import { writeTerminalInput } from '@features/terminal/services/terminalWriteQueue';
 import { killForeground, ESCALATE_WINDOW_MS } from '@utils/killForeground';
 import { useToastStore } from '@ui/Toast';
 import { useBlockStore, useTerminalStore, selectBlocks } from '@features/terminal';
@@ -26,7 +26,8 @@ export function useTuiControls(tabId: string) {
 
   const sendCtrlC = useCallback(() => {
     const sessionId = sessions[tabId];
-    if (sessionId) ptyWrite(sessionId, '\x03').catch(() => {});
+    // Goes through the input queue: an interrupt leads whatever paste is still streaming.
+    if (sessionId) writeTerminalInput(sessionId, '\x03').catch(() => {});
   }, [sessions, tabId]);
 
   const killApp = useCallback(() => {

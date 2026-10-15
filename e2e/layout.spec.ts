@@ -11,7 +11,7 @@ test.describe('应用布局', () => {
     // Navigation actions remain discoverable in the activity bar.
     await expect(page.locator('[data-dock-btn="tabs"]')).toBeVisible();
     await expect(page.locator('[data-dock-btn="files"]')).toBeVisible();
-    await expect(page.locator('[data-tip^="设置"]')).toBeVisible();
+    await expect(page.locator('[data-dock-btn="settings"]')).toBeVisible();
     await expect(page.locator('[data-testid="tab-search"]')).toBeVisible();
     await expect(page.getByText('Documents')).toHaveCount(0);
     await expect(page.locator('[data-testid="ssh-search"]')).toHaveCount(0);

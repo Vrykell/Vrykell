@@ -11,11 +11,14 @@ import {
   touchSshConnection,
   sshTest,
   sshFsList,
+  sshStat,
   sshDownload,
   newSshId,
   sshHostKeyInfo,
   sshTrustHostKey,
+  sshAuthenticateSession,
 } from '@features/ssh/services/api';
+import { diagnosticSnapshot } from '@platform/diagnostics';
 
 describe('sshApi', () => {
   it('validates keepalive and jump destinations before saving', () => {
@@ -32,6 +35,21 @@ describe('sshApi', () => {
     expect(validateSshConnection({ name: 'n', host: 'h', dynamicForwards: ['70000'] })).toContain('动态转发');
   });
   beforeEach(() => invokeMock.mockReset());
+
+  it('redacts temporary passwords and key passphrases from IPC diagnostics', async () => {
+    invokeMock.mockResolvedValue(undefined);
+    const target = { connectionId: 's1', host: 'server.test', user: 'tester' };
+    await sshAuthenticateSession(target, 'password', 'dummy-password-for-redaction');
+    await sshAuthenticateSession(target, 'keyPassphrase', 'dummy-passphrase-for-redaction');
+    expect(invokeMock).toHaveBeenCalledWith('ssh_authenticate_session', expect.objectContaining({
+      password: 'dummy-password-for-redaction', passphrase: '',
+    }));
+    expect(invokeMock).toHaveBeenCalledWith('ssh_authenticate_session', expect.objectContaining({
+      password: '', passphrase: 'dummy-passphrase-for-redaction',
+    }));
+    expect(JSON.stringify(diagnosticSnapshot())).not.toContain('dummy-password-for-redaction');
+    expect(JSON.stringify(diagnosticSnapshot())).not.toContain('dummy-passphrase-for-redaction');
+  });
 
   it('passes the confirmed fingerprint when recording host trust', async () => {
     invokeMock.mockResolvedValue(undefined);
@@ -81,6 +99,9 @@ describe('sshApi', () => {
     expect(invokeMock).toHaveBeenCalledWith('ssh_list', { id: 's1', path: '/home' });
     await sshFsList('s1');
     expect(invokeMock).toHaveBeenCalledWith('ssh_list', { id: 's1', path: null });
+
+    await sshStat('s1', '/home/app.log');
+    expect(invokeMock).toHaveBeenCalledWith('ssh_stat', { id: 's1', path: '/home/app.log' });
 
     await sshDownload('s1', '/home/app.log');
     expect(invokeMock).toHaveBeenCalledWith('ssh_download', { id: 's1', path: '/home/app.log' });

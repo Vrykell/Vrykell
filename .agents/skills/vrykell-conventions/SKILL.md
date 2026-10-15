@@ -23,7 +23,7 @@ English strings in code with Chinese entries in `src/i18n`; all code comments ar
 | Full desktop app with hot reload | `npm run tauri dev` |
 | Typecheck | `npx tsc --noEmit` |
 | Unit tests (vitest, jsdom) | `npm run test` |
-| E2E (playwright, starts its own server on 1421) | `npm run test:e2e` |
+| E2E (playwright; dev server port from `PW_PORT`, default 1421) | `npm run test:e2e` |
 | Architecture boundaries | `npm run check:architecture` |
 | Rust tests | `cargo test` in `src-tauri/` |
 
@@ -98,7 +98,8 @@ PTY output -> Rust StreamScanner (src-tauri/src/terminal/scan.rs, synchronous)
 
 - Every feature gets vitest unit tests in the owning `__tests__/` directory.
 - Every interactive feature gets Playwright e2e in `e2e/` (Tauri + Anthropic mocks live in
-  `e2e/tauri-mock.ts`; the suite runs with a single worker).
+  `e2e/tauri-mock.ts`; the suite runs with a single worker). Its dev server takes `PW_PORT`
+  (default 1421) so parallel worktrees never shut down each other's server.
 - Assert user-visible behavior (labels, test ids, persisted settings), not implementation
   details. Coverage gates: 80% statements/functions/lines, 75% branches.
 - When a refactor moves markup, either keep the existing hooks (`data-testid`,
@@ -109,9 +110,10 @@ PTY output -> Rust StreamScanner (src-tauri/src/terminal/scan.rs, synchronous)
 The app records structured diagnostics. **Read what is already recorded before asking for a
 reproduction, a hand-run probe or a log by hand.**
 
-- `%LOCALAPPDATA%\com.vrykell.app\logs\diagnostics.jsonl` - IPC calls, PTY writes, scan events,
-  terminal input, scene changes and block transitions, each with a timestamp and a `sequence`
-  number. Older records rotate to `.1` and `.2` beside it.
+- `%LOCALAPPDATA%\com.vrykell.app\logs\diagnostics-<YYYYMMDDTHH>.jsonl` - IPC calls, PTY writes,
+  scan events, terminal input, scene changes and block transitions, each with a timestamp and a
+  `sequence` number. The name carries the UTC hour, so a new segment starts every hour; the newest
+  24 segments (and at most 256 MB) are kept, older ones are pruned.
 - `%APPDATA%\com.vrykell.app\diagnostics.json` holds the `autoSave` flag. Its state belongs to
   the machine: check the records that already exist instead of turning auto-save on again for
   every run.

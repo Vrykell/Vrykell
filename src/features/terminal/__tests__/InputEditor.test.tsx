@@ -1,4 +1,4 @@
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, render, fireEvent, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import InputEditor from '../components/InputEditor';
 
@@ -13,6 +13,18 @@ vi.mock('../components/DirectoryPicker', () => ({
   default: () => <span className="terminal-chip terminal-directory">/work</span>,
 }));
 afterEach(cleanup);
+
+it('uses the existing host chip as the status entry without adding a separate icon button', () => {
+  const open = vi.fn();
+  const { container } = render(<InputEditor paneId="pane" onSessionStatusClick={open} />);
+  const entry = screen.getByTestId('ssh-status-toggle');
+  expect(entry).toHaveTextContent('Bash');
+  expect(entry).toHaveClass('terminal-chip');
+  expect(entry).toHaveAttribute('data-tip', '查看 SSH 连接状态与资源');
+  expect(container.querySelectorAll('.terminal-input-status .terminal-chip')).toHaveLength(3);
+  fireEvent.click(entry);
+  expect(open).toHaveBeenCalledOnce();
+});
 
 it('separates shell, directory and branch chips with spacing instead of dots', () => {
   const { container } = render(<InputEditor paneId="pane" />);

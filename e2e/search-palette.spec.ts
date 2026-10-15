@@ -33,12 +33,32 @@ for (const theme of ['深色', '浅色']) {
     expect(bodyColors.actual).toBe(bodyColors.expected);
     await expect(dialog.getByText('6 个搜索来源')).toBeVisible();
     await expect(dialog.locator('.global-search-sources > button')).toHaveCount(6);
+    // 指令字符卡片：无边框 + 灰色底
+    const prefixBadge = dialog.locator('.global-search-sources kbd').first();
+    await expect(prefixBadge).toHaveCSS('border-top-style', 'none');
+    const badgeBackground = await prefixBadge.evaluate(element => {
+      const actual = getComputedStyle(element).backgroundColor;
+      const probe = document.createElement('span');
+      probe.style.background = 'var(--hover)';
+      element.appendChild(probe);
+      const expected = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return { actual, expected };
+    });
+    expect(badgeBackground.actual).toBe(badgeBackground.expected);
     await dialog.screenshot({ path: test.info().outputPath('search-empty.png'), animations: 'disabled' });
     await dialog.getByTestId('search-filter-button').click();
     const history = dialog.getByRole('menuitemcheckbox', { name: /命令历史/ });
+    // 勾选框与 SSH 连接面板一致：主题化原生复选框，16px 尺寸
+    const historyBox = history.locator('input.themed-checkbox');
+    await expect(historyBox).toBeChecked();
+    expect(await historyBox.evaluate(el => { const r = el.getBoundingClientRect(); return { width: r.width, height: r.height }; }))
+      .toEqual({ width: 16, height: 16 });
     await history.click();
     await expect(history).toHaveAttribute('aria-checked', 'false');
+    await expect(history.locator('input.themed-checkbox')).not.toBeChecked();
     await expect(dialog.getByRole('menuitemcheckbox', { name: /文件/ })).toHaveAttribute('aria-checked', 'true');
+    await expect(dialog.getByRole('menuitemcheckbox', { name: /文件/ }).locator('input.themed-checkbox')).toBeChecked();
     await expect(dialog.getByText('5 个搜索来源')).toBeVisible();
     await page.screenshot({ path: test.info().outputPath('search-scope.png'), animations: 'disabled' });
     await input.press('Escape');

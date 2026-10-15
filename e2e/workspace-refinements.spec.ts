@@ -110,8 +110,17 @@ test('command menus use semantic groups and historical output shares the termina
   const colors = await block.evaluate(element => {
     const output = [...element.querySelectorAll<HTMLElement>('[data-selectable]')].at(-1)!;
     const pane = element.closest<HTMLElement>('.terminal-pane')!;
+    // A transparent surface serializes as either rgba(…, 0) or color(srgb … / 0).
+    const alpha = (color: string) => {
+      const slash = color.match(/\/\s*([\d.]+)\s*\)/);
+      if (slash) return Number(slash[1]);
+      const parts = color.match(/rgba?\(([^)]+)\)/);
+      if (!parts) return color === 'transparent' ? 0 : 1;
+      const values = parts[1].split(',').map(part => part.trim());
+      return values.length > 3 ? Number(values[3]) : 1;
+    };
     let surface: HTMLElement | null = output;
-    while (surface && getComputedStyle(surface).backgroundColor === 'rgba(0, 0, 0, 0)') surface = surface.parentElement;
+    while (surface && alpha(getComputedStyle(surface).backgroundColor) === 0) surface = surface.parentElement;
     return [surface ? getComputedStyle(surface).backgroundColor : '', getComputedStyle(pane).backgroundColor];
   });
   expect(colors[0]).toBe(colors[1]);

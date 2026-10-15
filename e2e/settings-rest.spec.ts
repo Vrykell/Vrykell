@@ -25,6 +25,23 @@ test.describe('主题设置页', () => {
       .toBe('dark');
   });
 
+  test('主题模式三个选项并排，跟随系统的圆点显示系统配色', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await gotoSetting(page, '主题');
+    const group = page.getByRole('radiogroup', { name: '主题模式' });
+    await expect(group.getByRole('radio')).toHaveCount(3);
+    await group.getByRole('radio', { name: '跟随系统', exact: true }).click();
+    // One row: every option shares the same vertical position.
+    const tops = await group.getByRole('radio')
+      .evaluateAll(elements => elements.map(element => Math.round(element.getBoundingClientRect().top)));
+    expect(new Set(tops).size).toBe(1);
+    // The follow-system dot paints the resolved scheme and follows a system change.
+    const dot = group.getByRole('radio', { name: '跟随系统', exact: true }).locator('.settings-radio-dot');
+    const dark = await dot.evaluate(element => getComputedStyle(element).backgroundColor);
+    await page.emulateMedia({ colorScheme: 'light' });
+    await expect.poll(() => dot.evaluate(element => getComputedStyle(element).backgroundColor)).not.toBe(dark);
+  });
+
   test('不透明度滑块更新后端配置与百分比显示', async ({ page }) => {
     await gotoSetting(page, '主题');
     const slider = page.locator('input[type="range"]');
@@ -75,8 +92,10 @@ test.describe('快捷键说明页', () => {
     await expect(page.getByText('新建标签页')).toBeVisible();
     await expect(page.getByText('全局搜索')).toBeVisible();
     await expect(page.getByText('打开设置')).toBeVisible();
-    await expect(page.getByLabel('Meta+T', { exact: true })).toBeVisible();
-    await expect(page.getByRole('main').getByLabel('Meta+F', { exact: true })).toBeVisible();
+    // Shortcut badges follow the platform modifier the app advertises.
+    const mod = await page.evaluate(() => /Mac/.test(navigator.userAgent) ? 'Meta' : 'Control');
+    await expect(page.getByLabel(`${mod}+T`, { exact: true })).toBeVisible();
+    await expect(page.getByRole('main').getByLabel(`${mod}+F`, { exact: true })).toBeVisible();
   });
 });
 

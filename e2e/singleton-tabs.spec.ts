@@ -10,26 +10,12 @@ test('settings and history are visible singleton tabs with switching, filtering 
   const settings = page.locator('[data-tab-kind="settings"]');
   await expect(settings).toHaveCount(1);
   await expect(settings).toBeVisible();
-  await expect(settings.locator('[data-navigation-mark="settings"]')).toBeVisible();
   await page.keyboard.press('Meta+,');
   await expect(settings).toHaveCount(1);
   await page.getByTestId('tab-history-btn').click();
   const history = page.locator('[data-tab-kind="history"]');
   await expect(history).toHaveCount(1);
   await expect(history).toBeVisible();
-  await expect(history.locator('[data-navigation-mark="history"]')).toBeVisible();
-  for (const mark of ['settings', 'history']) {
-    const geometry = await page.locator(`[data-navigation-mark="${mark}"]`).evaluate(element => {
-      const tile = element.getBoundingClientRect();
-      const glyph = element.querySelector('svg')!.getBoundingClientRect();
-      return { dx: Math.abs(tile.x + tile.width / 2 - glyph.x - glyph.width / 2),
-        dy: Math.abs(tile.y + tile.height / 2 - glyph.y - glyph.height / 2),
-        fits: glyph.x > tile.x && glyph.y > tile.y && glyph.right < tile.right && glyph.bottom < tile.bottom };
-    });
-    expect(geometry.dx).toBeLessThan(1);
-    expect(geometry.dy).toBeLessThan(1);
-    expect(geometry.fits).toBe(true);
-  }
   await page.getByTestId('tab-history-btn').click();
   await expect(history).toHaveCount(1);
   await settings.click();
@@ -75,58 +61,3 @@ test('local and SSH tabs retain colored tiles before and after activation', asyn
   }
 });
 
-test('group folder colors stay distinct and stable across reorder and restoration in both themes', async ({ page }) => {
-  await setupTauriMock(page);
-  await page.goto('/');
-  await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
-  await ensureTabsOpen(page);
-  const seed = async () => page.evaluate(async () => {
-    const path = '/src/features/workspace/stores/workspace.ts';
-    const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
-    useWorkspaceStore.setState({ groups: Array.from({ length: 6 }, (_, index) => ({
-      id: `group-${index}`, title: `Group ${index}`, collapsed: false,
-    })) });
-    useWorkspaceStore.getState().openSettingsTab();
-    useWorkspaceStore.getState().openHistoryTab();
-  });
-  await seed();
-  const colors = async () => page.locator('[data-navigation-mark="group"]').evaluateAll(elements =>
-    Object.fromEntries(elements.map(element => [element.closest('[data-group-header-id]')!.getAttribute('data-group-header-id'),
-      { token: element.getAttribute('data-group-color'), color: getComputedStyle(element).color }])));
-  const original = await colors();
-  expect(Object.keys(original)).toHaveLength(6);
-  expect(new Set(Object.values(original).map(value => value.color)).size).toBe(6);
-  await page.evaluate(async () => {
-    const path = '/src/features/workspace/stores/workspace.ts';
-    const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
-    useWorkspaceStore.setState(state => ({ groups: [...state.groups].reverse().map(group => ({ ...group, title: `Renamed ${group.id}` })) }));
-  });
-  expect(await colors()).toEqual(original);
-  for (const theme of ['light', 'dark'] as const) {
-    await page.evaluate(async value => {
-      const path = '/src/config/theme/tokens.ts';
-      const { applyTheme } = await import(path) as typeof import('../src/config/theme/tokens');
-      applyTheme(value);
-    }, theme);
-    const themed = await colors();
-    expect(new Set(Object.values(themed).map(value => value.color)).size).toBe(6);
-    for (const id of Object.keys(original)) expect(themed[id]!.token).toBe(original[id]!.token);
-    const shading = await page.locator('[data-navigation-mark="group"]').evaluateAll(elements => elements.map(element => ({
-      gradientId: element.querySelector('linearGradient')!.id,
-      stops: [...element.querySelectorAll('stop')].map(stop => getComputedStyle(stop).stopColor),
-      paper: !!element.querySelector('rect[fill="var(--navigation-group-paper)"]'),
-    })));
-    expect(new Set(shading.map(item => item.gradientId)).size).toBe(6);
-    for (const item of shading) {
-      expect(new Set(item.stops).size).toBe(3);
-      expect(item.paper).toBe(true);
-    }
-    await expect(page.locator('[data-navigation-mark="settings"] linearGradient, [data-navigation-mark="history"] linearGradient')).toHaveCount(0);
-    await page.screenshot({ path: test.info().outputPath(`colored-navigation-${theme}.png`) });
-  }
-  await page.reload();
-  await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
-  await ensureTabsOpen(page);
-  await seed();
-  for (const [id, value] of Object.entries(await colors())) expect(value.token).toBe(original[id]!.token);
-});

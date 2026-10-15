@@ -31,9 +31,12 @@ import { defaultOpenModeForShell } from '@features/agent/stores/agentSettings';
 import { t } from '@i18n';
 import { SessionController } from '@features/terminal/services/pipeline/sessionController';
 import { copyTerminalSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
+import { cancelTerminalInput, writeTerminalInput } from '@features/terminal/services/terminalWriteQueue';
 import { querySequences } from '@features/terminal/model/terminalQueries';
 import { getCellMetrics } from '@utils/termMetrics';
 import type { DispatchEvent } from '@core/terminal/events';
+import type { SshLogEntry } from '@core/ssh';
+import { appendLogEntry, connectionLogLines, isSshClientNotice } from '../model/connectionLog';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import { getTerminalFontOptions, measureTerminalDomCellWidth } from '@features/terminal/model/terminalFont';
 import { prepareSshHost } from '@features/ssh/services/hostTrust';
@@ -123,6 +126,8 @@ export function useTerminalSession(
   const containerRef = useRef<HTMLDivElement>(null);
   const [attempt, setAttempt] = useState(0);
   const [status, setStatus] = useState<'connecting' | 'ready' | 'closed' | 'error'>('connecting');
+  const [sshAuthenticated, setSshAuthenticated] = useState(false);
+  const [sshLog, setSshLog] = useState<SshLogEntry[]>([]);
   const [frame, setFrame] = useState<TerminalFrame | null>(null);
   const closeSessionRef = useRef<() => Promise<void>>(async () => {});
   const closeSession = useCallback(() => closeSessionRef.current(), []);
@@ -161,6 +166,7 @@ export function useTerminalSession(
     const el = containerRef.current;
     if (!el) return;
     setStatus('connecting');
+    setSshAuthenticated(false);
     useTerminalStore.getState().setStartupState(paneId, 'starting');
 
     const term = new Terminal({
@@ -295,7 +301,7 @@ export function useTerminalSession(
       onTerminalData: data => {
         if (!sessionId || disposed || stopped) return;
         terminalDebug('block-terminal-data', { paneId, sessionId, chars: data.length, scene: currentScene });
-        void ptyWrite(sessionId, data).catch(error => {
+        void writeTerminalInput(sessionId, data).catch(error => {
           terminalDebug('pty-write-error', { paneId, sessionId, source: 'block-xterm', errorType: error instanceof Error ? error.name : typeof error });
         });
       },
@@ -432,10 +438,22 @@ export function useTerminalSession(
     };
     const handleOutput = (events: DispatchEvent[]) => {
       controller.handleEvents(events);
+      if (spec?.kind === 'ssh') {
+        // Shell output must never enter the connection log, including non-integrated sessions.
+        const output = events
+          .filter((event): event is Extract<DispatchEvent, { kind: 'data' }> => event.kind === 'data')
+          .map((event) => event.text)
+          .join('');
+        const time = Date.now();
+        const lines = output ? connectionLogLines(output).filter(isSshClientNotice) : [];
+        if (lines.length) setSshLog(entries => lines.reduce((log, line) => appendLogEntry(log, { time, text: line }), entries));
+      }
       // A real prompt marker also renews the budget after an earlier idle-readiness fallback.
       if (events.some(event => event.kind === 'osc' && event.code === '133;B')) {
         promptReady = true;
+        if (spec?.kind === 'ssh') setSshAuthenticated(true);
         if (spec?.kind === 'ssh') reconnectAttemptsRef.current = 0;
+        if (spec?.kind === 'ssh') setSshLog(entries => appendLogEntry(entries, { time: Date.now(), text: t('Shell ready') }));
       }
       if (startupComplete) return;
       // Non-integrated command shells have no OSC readiness marker.
@@ -478,9 +496,7 @@ export function useTerminalSession(
           return;
         }
         if (id === sessionId) {
-          if (isTerminalDebugEnabled()) {
-            terminalDebug('pty-output', { id, events: events.length, kinds: events.map((event) => event.kind) });
-          }
+          controller.ioLog.received(events);
           handleOutput(events);
         }
       }),
@@ -491,11 +507,14 @@ export function useTerminalSession(
         if (disposed || stopped) return;
         if (isTerminalDebugEnabled()) terminalDebug('pty-exit', { id, sessionId, code });
         if (id === sessionId) {
+          // The PTY is gone: input still queued would only fail chunk by chunk.
+          cancelTerminalInput(id);
           sessionId = null;
           stopped = true;
           useTerminalStore.getState().clearSession(paneId, id);
           setStatus('closed');
           writeMain(`\r\n\x1b[31m${t('terminal.processExited')}\x1b[0m\r\n`);
+          if (spec?.kind === 'ssh') setSshLog(entries => appendLogEntry(entries, { time: Date.now(), text: code == null ? t('Connection ended') : t('Connection ended (exit code {{code}})', { code }) }));
           if (code !== 255 && code !== null) setRetry(previous => ({ ...previous, phase: 'idle', seconds: 0 }));
           scheduleAutoReconnect(code);
         }
@@ -655,7 +674,7 @@ export function useTerminalSession(
             chars: data.length,
           });
         }
-        ptyWrite(sessionId, data).then(() => {
+        writeTerminalInput(sessionId, data).then(() => {
           if (isTerminalDebugEnabled()) {
             terminalDebug('terminal-input-write-complete', { paneId, sessionId, chars: data.length });
           }
@@ -849,12 +868,16 @@ export function useTerminalSession(
       controller.dispose();
       unlisteners.forEach((u) => u());
       pendingUnlisteners.forEach((p) => p.then((u) => u()).catch(() => {}));
-      if (sessionId) ptyClose(sessionId).catch(() => {});
+      if (sessionId) {
+        // Queued input can no longer reach a session that is closing: drop it before the PTY goes.
+        cancelTerminalInput(sessionId);
+        ptyClose(sessionId).catch(() => {});
+      }
       useSessionStore.getState().setProgramTitle(paneId, '');
       unregisterTerminal(paneId, term);
       term.dispose();
     };
   }, [paneId, tabId, attempt]);
 
-  return { ref: containerRef, closeSession, reconnect, stopReconnect, retry, status, frame };
+  return { ref: containerRef, closeSession, reconnect, stopReconnect, retry, status, frame, sshAuthenticated, sshLog };
 }

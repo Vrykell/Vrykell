@@ -7,6 +7,7 @@ import {
   type SshConnection,
 } from '@features/ssh/services/api';
 import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
+import { clearSshAuthenticationMetadata } from './sessionAuthentication';
 
 const ORDER_KEY = 'vrykell-ssh-order';
 
@@ -61,11 +62,13 @@ export const useSshStore = create<SshState>((set, get) => ({
 
   save: async (conn) => {
     await saveSshConnection(conn);
+    clearSshAuthenticationMetadata(conn.id);
     await get().load();
   },
 
   remove: async (id) => {
     await deleteSshConnection(id);
+    clearSshAuthenticationMetadata(id);
     await get().load();
   },
 
