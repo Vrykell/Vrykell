@@ -1,46 +1,47 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, expect, it, vi } from 'vitest';
+import { useCallback, useRef, useState } from 'react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, expect, it } from 'vitest';
 import SettingsNavigation from '../components/SettingsNavigation';
 import { useSettingsNavigation } from '../hooks/useSettingsNavigation';
 import { useSettingsNavigationStore } from '../stores/navigation';
-import { useSessionStore } from '@features/workspace';
 
-function Navigation() { return <SettingsNavigation navigation={useSettingsNavigation()} />; }
-afterEach(() => { cleanup(); vi.restoreAllMocks(); useSettingsNavigationStore.setState({ selected: 'ai-model' }); });
+function Navigation() {
+  const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  const navigation = useSettingsNavigation();
+  return <div data-testid="layout" data-open={open}>
+    <button ref={trigger} onClick={() => setOpen(true)}>Open directory</button>
+    <SettingsNavigation navigation={navigation} open={open} onClose={close} trigger={trigger} />
+    <button>Content control</button>
+  </div>;
+}
+afterEach(() => { cleanup(); useSettingsNavigationStore.setState({ selected: 'ai-model' }); });
 
-it('keeps every page accessible while searching and closes search when switching pages', async () => {
-  const { container } = render(<Navigation />);
-  const trigger = screen.getByRole('button', { name: '搜索设置…' });
+it('shows the full directory without a local search and returns focus after selecting a page', () => {
+  render(<Navigation />);
+  expect(screen.queryByRole('textbox')).toBeNull();
+  const trigger = screen.getByText('Open directory');
   fireEvent.click(trigger);
-  const search = screen.getByRole('textbox', { name: '搜索设置…' });
-  await waitFor(() => expect(search).toHaveFocus());
-  fireEvent.change(search, { target: { value: '补全防抖' } });
-  expect(container.querySelectorAll('.settings-search-result')).toHaveLength(1);
-  const pages = container.querySelectorAll('.settings-navigation-list [role="button"]');
-  expect(pages).toHaveLength(17);
-  fireEvent.click(screen.getByRole('button', { name: '模型配置' }));
-  expect(search).toHaveValue('');
-  expect(container.querySelector('aside')).toHaveAttribute('data-search-open', 'false');
+  expect(screen.getByRole('button', { name: '模型配置' })).toHaveFocus();
+  expect(screen.getByRole('complementary', { name: '设置目录' }).querySelectorAll('.sidebar-row')).toHaveLength(17);
+  fireEvent.keyDown(screen.getByRole('button', { name: '模型行为' }), { key: 'Enter' });
+  expect(useSettingsNavigationStore.getState().selected).toBe('ai-behavior');
+  expect(screen.getByTestId('layout')).toHaveAttribute('data-open', 'false');
+  expect(trigger).toHaveFocus();
 });
 
-it('navigates results by keyboard, returns focus on Escape and opens the indexed field', async () => {
-  const open = vi.spyOn(useSessionStore.getState(), 'openSettingsTab').mockImplementation(() => {});
-  const { container } = render(<Navigation />);
-  const trigger = screen.getByRole('button', { name: '搜索设置…' });
-  const search = screen.getByRole('textbox', { name: '搜索设置…' });
+it('dismisses on Escape, outside press and keyboard focus leaving the directory', () => {
+  render(<Navigation />);
+  const trigger = screen.getByText('Open directory');
   fireEvent.click(trigger);
-  fireEvent.change(search, { target: { value: '补全防抖' } });
-  const result = container.querySelector<HTMLButtonElement>('.settings-search-result')!;
-  fireEvent.keyDown(search, { key: 'ArrowDown' });
-  await waitFor(() => expect(result).toHaveFocus());
-  fireEvent.keyDown(result, { key: 'ArrowUp' });
-  expect(result).toHaveFocus();
-  fireEvent.keyDown(result, { key: 'Escape' });
+  fireEvent.keyDown(window, { key: 'Escape' });
   expect(trigger).toHaveFocus();
-  expect(container.querySelector('aside')).toHaveAttribute('data-search-open', 'false');
+  expect(screen.getByTestId('layout')).toHaveAttribute('data-open', 'false');
   fireEvent.click(trigger);
-  fireEvent.click(result);
-  expect(open).toHaveBeenCalledOnce();
-  expect(useSettingsNavigationStore.getState().selected).toBe('ai-behavior');
-  expect(search).toHaveValue('');
+  fireEvent.pointerDown(screen.getByText('Content control'));
+  expect(screen.getByTestId('layout')).toHaveAttribute('data-open', 'false');
+  fireEvent.click(trigger);
+  fireEvent.blur(screen.getByRole('button', { name: '模型配置' }), { relatedTarget: screen.getByText('Content control') });
+  expect(screen.getByTestId('layout')).toHaveAttribute('data-open', 'false');
 });

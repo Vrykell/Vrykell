@@ -28,13 +28,12 @@ it.each(['local', 'settings', 'history'])('colors the %s icon from its context m
   fireEvent.contextMenu(row);
   const palette = screen.getByRole('group', { name: '图标颜色' });
   fireEvent.click(palette.querySelector('[data-color="violet"]')!);
-  if (id === 'local') expect(row.querySelector('svg')!.style.color).toBe('var(--group-violet)');
-  else expect(row.querySelector('.icon-tile')).toHaveStyle({ background: 'var(--group-violet)' });
+  expect(row.querySelector('svg')!.style.color).toBe('var(--group-violet)');
   expect(useSessionStore.getState().activeId).toBe('settings');
   fireEvent.contextMenu(row);
   fireEvent.click(screen.getByTestId('tab-icon-color-auto'));
   if (id === 'local') expect(row.querySelector('svg')!.style.color).toBe('var(--shell-bash-accent)');
-  else expect(row.querySelector('.icon-tile')).toHaveStyle({ background: id === 'settings' ? 'var(--group-blue)' : 'var(--group-amber)' });
+  else expect(row.querySelector('svg')!.style.color).toBe(id === 'settings' ? 'var(--group-blue)' : 'var(--group-amber)');
 });
 afterEach(() => { cleanup(); useListReorder.getState().end(); useSessionStore.setState(snapshot, true); });
 
@@ -101,9 +100,9 @@ it('keeps group rows intact through renaming and reordering', () => {
     { id: 'group-b', title: 'Second', collapsed: false },
   ] });
   render(<PanelTabs />);
-  const firstTile = screen.getByTestId('group-header-group-a').querySelector('span')!;
-  expect(firstTile).toHaveStyle({ width: '24px', height: '24px', background: 'var(--group-amber)' });
-  expect(firstTile.querySelector('svg')).not.toBeNull();
+  const firstIcon = screen.getByTestId('group-header-group-a').querySelector('[data-group-icon]')!;
+  expect(firstIcon).toHaveStyle({ width: '24px', height: '24px', color: 'var(--group-amber)' });
+  expect(firstIcon).toHaveAttribute('data-group-icon', 'open');
   act(() => useSessionStore.setState({ groups: [
     { id: 'group-b', title: 'Second', collapsed: false },
     { id: 'group-a', title: 'Renamed', collapsed: false },
@@ -121,7 +120,7 @@ it('colors groups from a keyboard-accessible menu and inherits color until a mem
   const member = screen.getByTestId('tab-row-local');
   fireEvent.keyDown(header, { key: 'F10', shiftKey: true });
   fireEvent.click(screen.getByRole('menuitemradio', { name: '紫色' }));
-  expect(header.querySelector('.icon-tile')).toHaveStyle({ background: 'var(--group-violet)' });
+  expect(header.querySelector('[data-group-icon]')).toHaveStyle({ color: 'var(--group-violet)' });
   expect(member.querySelector('svg')!.style.color).toBe('var(--group-violet)');
   expect(useSessionStore.getState().groups[0].collapsed).toBe(false);
   expect(header).toHaveFocus();

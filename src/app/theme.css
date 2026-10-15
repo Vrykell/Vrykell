@@ -195,43 +195,27 @@ button.chat-mode-option:hover, button.chat-mode-option[data-selected="true"],
 button.chat-mode-option:focus-visible { background: transparent; }
 button.chat-mode-option[data-active="true"] { background: var(--hover); }
 
-.settings-view { container: settings-layout / inline-size; min-width: 0; }
+.settings-view { container: settings-layout / inline-size; min-width: 0; position: relative; }
 .settings-layout { display: flex; flex: 1; min-width: 0; min-height: 0; }
-.settings-navigation { width: clamp(144px, calc(100cqw - 480px), 224px); flex-shrink: 0; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--sidebar-bg); }
-.settings-navigation-tools { display: flex; flex-direction: column; gap: 8px; padding: 8px; flex-shrink: 0; min-width: 0; }
-.settings-navigation-search { display: flex; align-items: center; gap: 6px; min-width: 0; height: 32px; padding: 6px 8px; border-radius: var(--radius-inner); background: var(--field-bg); }
-.settings-navigation-search > svg { color: var(--text-muted); flex-shrink: 0; }
-.settings-navigation-search input { width: 0; flex: 1; min-width: 0; padding: 0; background: transparent; border: none; outline: none; font: var(--fs-label) var(--font-ui); color: var(--text-primary); }
-.settings-navigation .settings-search-trigger { display: none; }
+.settings-navigation { width: clamp(144px, calc(100cqw - 480px), 224px); flex-shrink: 0; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding-top: 8px; background: var(--sidebar-bg); }
 .settings-navigation-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 6px 8px; }
-.settings-search-results { display: none; flex: 1; min-height: 0; overflow-y: auto; padding: 0 6px 8px; }
-.settings-navigation[data-searching="true"] .settings-navigation-list { display: none; }
-.settings-navigation[data-searching="true"] .settings-search-results { display: block; }
-.settings-search-empty { padding: 16px; color: var(--text-muted); font-size: var(--fs-caption); text-align: center; }
+.settings-navigation-header, .settings-navigation-backdrop, .settings-view .settings-navigation-toggle { display: none; }
 .settings-content { container: settings / inline-size; flex: 1; min-width: 0; min-height: 0; overflow: auto; padding: 24px 28px; background: var(--canvas); }
 .settings-page-body, .settings-page-header { min-width: calc(280px * var(--ui-font-scale)); max-width: 900px; margin-inline: auto; }
+.settings-page-header { margin-bottom: 28px; }
+.settings-page-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.settings-page-header h1 { margin: 0; font-size: calc(24px * var(--ui-font-scale)); font-weight: var(--fw-medium); color: var(--text-primary); }
 @container settings-layout (max-width: 704px) {
   .settings-content { padding: 16px; }
 }
 @container settings-layout (max-width: 560px) {
-  .settings-navigation { width: 56px; position: relative; z-index: 2; }
-  .settings-navigation-tools { align-items: center; min-height: 48px; }
-  .settings-navigation .settings-search-trigger { display: inline-flex; }
-  .settings-navigation-search { display: none; }
-  .settings-navigation[data-search-open="true"] .settings-navigation-search { display: flex; position: absolute; top: 8px; left: 8px; width: calc(100cqw - 16px); box-shadow: var(--shadow-sm); }
-  .settings-navigation .settings-navigation-list { display: block; padding-inline: 4px; }
-  .settings-navigation .settings-nav-heading { display: none; }
-  .settings-navigation .settings-nav-group { margin-bottom: 8px; }
-  .settings-navigation .sidebar-row { padding: 0 !important; }
-  .settings-navigation .sidebar-row-content { justify-content: center; padding: 6px 0 !important; min-height: 36px !important; }
-  .settings-navigation .sidebar-row-content > span:has(> .sidebar-row-title) { display: none !important; }
-  .settings-navigation[data-search-open="false"] .settings-search-results { display: none; }
-  .settings-navigation[data-search-open="true"][data-searching="true"] .settings-search-results { display: block; position: absolute; top: 48px; left: 8px; width: calc(100cqw - 16px); max-height: min(320px, 50vh); padding: 4px; border-radius: var(--radius-inner); background: var(--elevated); box-shadow: var(--shadow-md); }
+  .settings-navigation { display: none; }
+  .settings-layout[data-navigation-open="true"] .settings-navigation { display: flex; position: absolute; z-index: 4; top: 8px; bottom: 8px; left: 8px; width: min(224px, calc(100cqw - 16px)); padding-top: 0; border-radius: var(--radius-block); box-shadow: var(--shadow-md); }
+  .settings-navigation-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; font-size: var(--fs-label); font-weight: var(--fw-semibold); }
+  .settings-navigation-backdrop { display: block; position: absolute; z-index: 3; inset: 0; padding: 0; border: none; border-radius: inherit; background: var(--overlay-light); }
+  .settings-view .settings-navigation-toggle { display: inline-flex; flex-shrink: 0; }
   .settings-content { padding: 12px; }
 }
-.icon-tile { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 5px; color: var(--accent-text); }
-.settings-page-header { margin-bottom: 28px; }
-.settings-page-header h1 { margin: 0 0 10px; font-size: calc(24px * var(--ui-font-scale)); font-weight: var(--fw-medium); color: var(--text-primary); }
 .settings-save-hint { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: var(--fs-caption); color: var(--text-muted); }
 .settings-group { margin-bottom: 28px; min-width: 0; }
 .settings-group-title { margin: 0 0 12px; font-size: var(--fs-label); font-weight: var(--fw-medium); color: var(--text-primary); }
@@ -1008,9 +992,6 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 
 button.global-search-source { border: none; background: transparent; padding: 0; text-align: left; font: inherit; }
 .global-search-source > span { flex: 1; }
-.settings-search-result { display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 8px 10px; text-align: left; }
-button.settings-search-result { background: transparent; border: none; border-radius: var(--radius-inner); }
-.settings-search-result small { color: var(--text-secondary); font-size: var(--fs-micro); }
 .ssh-form-dialog :is(input, textarea):focus, .ssh-form-dialog :is(input, textarea):focus-visible { outline: none; box-shadow: none; border-color: var(--border); }
 
 /* Shared flat controls and key badges inherit the active palette. */

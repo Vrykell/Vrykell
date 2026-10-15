@@ -12,7 +12,7 @@ async function expectReadableContent(content: Locator) {
 }
 
 for (const theme of ['深色', '浅色']) {
-  test(`settings shrink navigation before content and retain search in compact mode in ${theme}`, async ({ page }, testInfo) => {
+  test(`settings collapse navigation completely and reveal the directory on demand in ${theme}`, async ({ page }, testInfo) => {
     await setupTauriMock(page);
     await page.goto('/');
     await gotoSetting(page, '主题');
@@ -30,29 +30,40 @@ for (const theme of ['深色', '浅色']) {
     await page.screenshot({ path: testInfo.outputPath('settings-shrunk-navigation.png'), animations: 'disabled' });
 
     await page.setViewportSize({ width: 480, height: 760 });
-    expect((await navigation.boundingBox())!.width).toBe(56);
+    await expect(navigation).toBeHidden();
     await expect(navigation.getByRole('combobox')).toHaveCount(0);
-    await expect(navigation.locator('.settings-navigation-list')).toBeVisible();
-    await expect(navigation.locator('.sidebar-row-title').first()).toBeHidden();
+    await expect(navigation.getByRole('textbox')).toHaveCount(0);
+    const view = page.locator('.settings-view');
+    const closed = (await content.boundingBox())!;
+    expect(closed.x).toBe((await view.boundingBox())!.x);
+    expect(closed.width).toBe((await view.boundingBox())!.width);
     await expectReadableContent(content);
+    const toggle = page.getByRole('button', { name: '展开设置目录', exact: true });
+    await toggle.click();
+    await expect(navigation).toBeVisible();
+    const opacity = await page.locator('.settings-navigation-backdrop').evaluate(element =>
+      Number(getComputedStyle(element).backgroundColor.split(',').at(-1)?.replace(')', '')));
+    expect(opacity).toBeGreaterThan(0);
+    expect(opacity).toBeLessThan(1);
+    await expect(navigation.getByRole('button', { name: '模型配置', exact: true })).toBeFocused();
+    expect((await content.boundingBox())!.width).toBe(closed.width);
+    await page.screenshot({ path: testInfo.outputPath('settings-open-directory.png'), animations: 'disabled' });
     await navigation.getByRole('button', { name: '模型行为', exact: true }).click();
     await expect(content.getByRole('heading', { name: '模型行为', exact: true })).toBeVisible();
-    const search = navigation.getByRole('textbox', { name: '搜索设置…', exact: true, includeHidden: true });
-    await expect(search).toBeHidden();
-    await navigation.getByRole('button', { name: '搜索设置…', exact: true }).click();
-    await search.fill('补全防抖');
-    await expect(navigation.locator('.settings-search-results')).toBeVisible();
-    await navigation.locator('.settings-search-result').first().click();
-    await expect(content.getByRole('heading', { name: '模型行为', exact: true })).toBeVisible();
-    await expect(search).toHaveValue('');
-    await expect(navigation.locator('.settings-search-results')).toBeHidden();
-    await expect.poll(() => content.evaluate(element => element.contains(document.activeElement))).toBe(true);
+    await expect(navigation).toBeHidden();
+    await expect(toggle).toBeFocused();
+    await toggle.click();
+    await page.keyboard.press('Escape');
+    await expect(navigation).toBeHidden();
+    await expect(toggle).toBeFocused();
+    await toggle.click();
     await navigation.getByRole('button', { name: '模型配置', exact: true }).click();
+    await content.evaluate(element => { element.scrollTop = 0; });
     await expectReadableContent(content);
     await page.screenshot({ path: testInfo.outputPath('settings-compact-navigation.png'), animations: 'disabled' });
 
     await page.setViewportSize({ width: 1240, height: 800 });
-    await expect(navigation.getByRole('button', { name: '搜索设置…', exact: true })).toBeHidden();
+    await expect(toggle).toBeHidden();
     await expect(navigation.getByRole('button', { name: '模型配置', exact: true })).toHaveAttribute('aria-current', 'page');
     expect((await navigation.boundingBox())!.width).toBe(wide);
   });
@@ -73,7 +84,7 @@ test('settings adapt to dock compression and keep oversized controls horizontall
   await page.mouse.move(box.x - 400, box.y + box.height / 2, { steps: 20 });
   await page.mouse.up();
   await expect.poll(async () => (await view.boundingBox())!.width).toBeLessThanOrEqual(560);
-  expect((await page.locator('.settings-navigation').boundingBox())!.width).toBe(56);
+  await expect(page.locator('.settings-navigation')).toBeHidden();
   await expect(page.getByRole('combobox', { name: '设置页面', exact: true })).toHaveCount(0);
   await expectReadableContent(content);
   await page.screenshot({ path: testInfo.outputPath('settings-dock-compression.png'), animations: 'disabled' });

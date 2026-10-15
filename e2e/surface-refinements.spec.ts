@@ -42,13 +42,19 @@ for (const theme of ['深色', '浅色']) {
     await page.keyboard.press('Meta+,');
     await settings.click({ button: 'right' });
     await menu.getByRole('menuitemradio', { name: '蓝色', exact: true }).click();
-    const tile = settings.locator('.icon-tile');
-    await expect(tile).toHaveAttribute('style', /background: var\(--group-blue\)/);
-    await expect(tile).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-    await page.screenshot({ path: testInfo.outputPath('singleton-icon-tiles.png'), animations: 'disabled' });
+    const icon = settings.locator('.sidebar-row-icon svg');
+    await expect(icon).toHaveAttribute('style', /color: var\(--group-blue\)/);
+    await expect(settings.locator('.sidebar-row-icon')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await page.getByTestId('tab-history-btn').click();
+    await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
+    const marks = await page.locator('[data-tab-kind]:not([data-tab-kind="session"]) .sidebar-row-icon svg').evaluateAll(elements =>
+      elements.map(element => [...element.querySelectorAll('path')].map(path => path.getAttribute('d')).join(' ')));
+    expect(new Set(marks).size).toBe(3);
+    await settings.click();
+    await page.screenshot({ path: testInfo.outputPath('singleton-icons.png'), animations: 'disabled' });
   });
 
-  test(`settings text, hover hints and compact search remain consistent in ${theme}`, async ({ page }, testInfo) => {
+  test(`settings text, hover hints and collapsed navigation remain consistent in ${theme}`, async ({ page }, testInfo) => {
     await setupTauriMock(page);
     await page.goto('/');
     await gotoSetting(page, '主题');
@@ -71,31 +77,24 @@ for (const theme of ['深色', '浅色']) {
     await page.setViewportSize({ width: 600, height: 760 });
     const content = page.locator('.settings-content');
     const before = (await content.boundingBox())!;
-    const search = navigation.getByRole('textbox', { name: '搜索设置…', exact: true, includeHidden: true });
-    const trigger = navigation.getByRole('button', { name: '搜索设置…', exact: true });
-    await expect(search).toBeHidden();
+    const trigger = page.getByRole('button', { name: '展开设置目录', exact: true });
+    await expect(navigation).toBeHidden();
     await trigger.click();
-    await search.fill('f');
-    const results = navigation.locator('.settings-search-results');
-    await expect(results).toBeVisible();
+    await expect(navigation).toBeVisible();
     const after = (await content.boundingBox())!;
     expect(after.y).toBe(before.y);
     expect(after.height).toBe(before.height);
-    const bounds = (await results.boundingBox())!;
+    expect(after.width).toBe(before.width);
+    const bounds = (await navigation.boundingBox())!;
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(600);
-    expect(bounds.height).toBeLessThanOrEqual(320);
-    await expect(results.locator('.settings-search-result').first().locator('small')).toContainText(' · ');
-    await search.press('ArrowDown');
-    await expect(results.locator('.settings-search-result').first()).toBeFocused();
     await page.keyboard.press('Escape');
-    await expect(results).toBeHidden();
+    await expect(navigation).toBeHidden();
     await expect(trigger).toBeFocused();
     await trigger.click();
-    await expect(results).toBeVisible();
-    await page.screenshot({ path: testInfo.outputPath('compact-settings-search.png'), animations: 'disabled' });
-    await results.locator('.settings-search-result').first().click();
-    await expect(search).toHaveValue('');
-    await expect(results).toBeHidden();
+    await navigation.getByRole('button', { name: '模型配置', exact: true }).click();
+    await expect(navigation).toBeHidden();
+    await content.evaluate(element => { element.scrollTop = 0; });
+    await page.screenshot({ path: testInfo.outputPath('collapsed-settings-navigation.png'), animations: 'disabled' });
     await page.getByTestId('global-search-trigger').click();
     const palette = page.locator('.global-search-dialog');
     await expect(palette).toBeVisible();
