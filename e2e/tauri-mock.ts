@@ -90,6 +90,8 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     const openedUrls: string[] = [];
     /** Permission answers the page sent, so a spec can assert what the click produced. */
     const answered: { toolCallId: string; optionId: string | null }[] = [];
+    /** Harness commands the page invoked, in order: one open per tab, never two. */
+    const acpCalls: string[] = [];
     /** Native picker invocations the page made, so a spec can assert the mode it asked for. */
     const pickCalls: { mode: string }[] = [];
     const aiConfig: { hasKey: boolean; baseUrl: string; model: string } = {
@@ -189,6 +191,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     (window as unknown as Record<string, unknown>).__REVEALED__ = revealed;
     (window as unknown as Record<string, unknown>).__OPENED_URLS__ = openedUrls;
     (window as unknown as Record<string, unknown>).__ACP_ANSWERED__ = answered;
+    (window as unknown as Record<string, unknown>).__ACP_CALLS__ = acpCalls;
     // Lets a spec push exactly what the backend would push for a harness session.
     (window as unknown as Record<string, unknown>).__EMIT_EVENT__ = (event: string, payload: unknown) => emit(event, payload);
     (window as unknown as Record<string, unknown>).__PICK_CALLS__ = pickCalls;
@@ -1013,8 +1016,10 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             openedUrls.push(String(args.url ?? ''));
             return undefined;
           case 'acp_harnesses':
+            acpCalls.push('acp_harnesses');
             return [{ name: 'Fake ACP', command: 'node', args: ['scripts/fake-acp-agent.mjs'], env: {}, cwd: '', enabled: true }];
           case 'acp_open':
+            acpCalls.push(`acp_open:${String(args.name ?? '')}`);
             return {
               sessionId: 'sess_e2e',
               harness: 'Fake ACP',
@@ -1378,6 +1383,11 @@ export function pickCalls(page: Page): Promise<{ mode: string }[]> {
 /** URLs handed to the system browser via the opener plugin, in order. */
 export function openedUrls(page: Page): Promise<string[]> {
   return page.evaluate(() => (window as unknown as Record<string, string[]>).__OPENED_URLS__ ?? []);
+}
+
+/** Harness commands the page invoked, in order. */
+export function acpCalls(page: Page): Promise<string[]> {
+  return page.evaluate(() => (window as unknown as Record<string, string[]>).__ACP_CALLS__ ?? []);
 }
 
 /** Permission answers the page sent, in order. */

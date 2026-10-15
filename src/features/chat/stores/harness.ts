@@ -77,9 +77,17 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     try {
       const result = await acpOpen(harness, cwd);
       tabOfSession.set(result.sessionId, tabId);
-      patch(tabId, (session) => ({
-        ...session, opening: false, sessionId: result.sessionId, agent: result.agent, error: null,
-      }));
+      // Recreate the entry if the mount cleanup removed it while this was in flight: React's
+      // double-invoked effects close and reopen, and a late patch must not be dropped silently.
+      set((state) => {
+        const current = state.byTab[tabId] ?? fresh(harness);
+        return {
+          byTab: {
+            ...state.byTab,
+            [tabId]: { ...current, opening: false, sessionId: result.sessionId, agent: result.agent, error: null },
+          },
+        };
+      });
     } catch (error) {
       patch(tabId, (session) => ({ ...session, opening: false, error: String((error as Error)?.message ?? error) }));
     }
