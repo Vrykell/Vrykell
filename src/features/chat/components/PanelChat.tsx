@@ -100,9 +100,12 @@ export default function PanelChat() {
 
   useEffect(() => { void useChatStore.getState().loadConversations(); }, []);
   useEffect(() => { setRenaming(false); }, [activeId]);
-  /** Where the app last put the view. A scroll that moves above it is the user taking over, and a
-   *  scrollbar drag is exactly that: it fires no wheel, which is why the follow used to fight it. */
+  /** Where the app last put the view. A scroll event that lands anywhere else came from the reader,
+   *  and while that is true the app must not touch the position: fighting a held scrollbar is the
+   *  shake. The follow comes back only once the position has settled at the bottom. */
   const lastTopRef = useRef(0);
+  const settleRef = useRef<number | null>(null);
+  useEffect(() => () => { if (settleRef.current !== null) window.clearTimeout(settleRef.current); }, []);
   useLayoutEffect(() => {
     const scroll = scrollRef.current;
     if (!scroll) return;
@@ -208,14 +211,26 @@ export default function PanelChat() {
         window, while a nested scroller that consumes the wheel leaves it alone. */}
     <div ref={scrollRef} className="chat-transcript scroll-region" onScroll={event => {
       const scroll = event.currentTarget;
-      const atBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight <= 24;
-      const movedUp = scroll.scrollTop < lastTopRef.current - 1;
+      const ours = Math.abs(scroll.scrollTop - lastTopRef.current) <= 1;
       lastTopRef.current = scroll.scrollTop;
-      // Dragging the scrollbar up means the user wants to read something: hand the view over and keep
-      // it until they come back down to the bottom.
-      if (movedUp) { pauseFollow(); return; }
-      followRef.current = atBottom;
-      setFollowing(atBottom);
+      // Our own jump: nothing to decide.
+      if (ours) return;
+      // The reader moved the view, by any means, including a scrollbar drag that fires no wheel.
+      pauseFollow();
+      const atBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight <= 24;
+      if (settleRef.current !== null) window.clearTimeout(settleRef.current);
+      settleRef.current = null;
+      if (!atBottom) return;
+      // Stopped at the bottom: hand the follow back, but only after the movement has stopped.
+      settleRef.current = window.setTimeout(() => {
+        settleRef.current = null;
+        followRef.current = true;
+        setFollowing(true);
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+          lastTopRef.current = scrollRef.current.scrollTop;
+        }
+      }, 160);
     }}
       onWheel={event => {
         if (event.deltaY < 0 && !innerScrollerHoldsUpward(event.target, event.currentTarget)) pauseFollow();
