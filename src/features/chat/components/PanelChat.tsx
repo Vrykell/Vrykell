@@ -122,19 +122,10 @@ export default function PanelChat() {
       lastTopRef.current = scrollRef.current.scrollTop;
     }
   }, [messages]);
-  useEffect(() => {
-    const transcript = transcriptRef.current;
-    if (!transcript || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(() => {
-      if (followRef.current && scrollRef.current) {
-        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        lastTopRef.current = scrollRef.current.scrollTop;
-      }
-    });
-    observer.observe(transcript);
-    return () => observer.disconnect();
-  }, [activeId]);
-
+  // Nothing scrolls from a resize callback on purpose: growing content and the app both moving the
+  // view is what made the transcript jump, and the browser's scroll anchoring (disabled for this
+  // element in the stylesheet) was a third hand on the same scrollbar. New messages pin the view
+  // when it is following, and nothing else writes a scroll position.
   const submit = () => {
     if (!composer.canSend) return;
     followRef.current = true;
