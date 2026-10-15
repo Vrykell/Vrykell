@@ -29,9 +29,9 @@ const FALLBACK_STATUS_MAX = 560;
 
 export function statusDuration(seconds: number): string {
   const value = Math.max(0, Math.floor(seconds));
-  if (value >= 86400) return `${Math.floor(value / 86400)}d ${Math.floor(value % 86400 / 3600)}h`;
-  if (value >= 3600) return `${Math.floor(value / 3600)}h ${Math.floor(value % 3600 / 60)}m`;
-  return `${Math.floor(value / 60)}m ${value % 60}s`;
+  if (value >= 86400) return t('{{d}}d {{h}}h', { d: Math.floor(value / 86400), h: Math.floor(value % 86400 / 3600) });
+  if (value >= 3600) return t('{{h}}h {{m}}m', { h: Math.floor(value / 3600), m: Math.floor(value % 3600 / 60) });
+  return t('{{m}}m {{s}}s', { m: Math.floor(value / 60), s: value % 60 });
 }
 
 export function cpuUsage(previous: SshSystemStatus | null, current: SshSystemStatus): number | null {
@@ -270,7 +270,7 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
                   <div className="ssh-status-details-body">
                     <div className="ssh-status-system" data-tip={`${sample.system} · ${sample.hostname}`}>{sample.system} · {sample.hostname}</div>
                     <div className="ssh-status-row"><span>{t('System uptime')}</span><strong>{sample.uptimeSeconds == null ? t('Unavailable') : statusDuration(sample.uptimeSeconds)}</strong></div>
-                    <div className="ssh-status-row"><span>{t('System load')}</span><strong>{sample.load || t('Unavailable')}</strong></div>
+                    <div className="ssh-status-row" data-tip={t('Average load over the last 1, 5 and 15 minutes.')}><span>{t('System load')}</span><strong>{sample.load || t('Unavailable')}</strong></div>
                   </div>
                 </details>
               </div>}

@@ -254,15 +254,15 @@ test('command password prompts preserve the connected state, duration and monito
   const panel = page.getByTestId('ssh-status-panel');
   await expect(panel).toContainText('Linux 6.8');
   const duration = panel.locator('.ssh-status-row').filter({ hasText: '连接时长' });
-  await expect(duration).not.toContainText('0m 0s');
+  await expect(duration).not.toContainText('0 分 0 秒');
   await emitPtyOutput(page, '\x1b[2J\x1b[H[sudo] password for deploy:');
   await expect(page.getByLabel('SSH 认证响应')).toBeVisible();
   await expect(page.getByTestId('ssh-session-toolbar').last().getByRole('status')).toContainText('已连接');
-  await expect(duration).not.toContainText('0m 0s');
+  await expect(duration).not.toContainText('0 分 0 秒');
   await expect(panel.getByRole('button', { name: '刷新远端资源' })).toBeEnabled();
   await emitPtyOutput(page, '\x1b[2J\x1b[Hdeploy@host $ ');
   await expect(page.getByLabel('SSH 认证响应')).toHaveCount(0);
-  await expect(duration).not.toContainText('0m 0s');
+  await expect(duration).not.toContainText('0 分 0 秒');
   await expect(panel.locator('.ssh-status-log')).toContainText('远端 Shell 就绪');
   await expect(panel.locator('.ssh-status-log')).not.toContainText('password for deploy');
 });
