@@ -21,7 +21,7 @@ import { McpPage } from '@features/settings/pages/mcpPage';
 import { TerminalOpenPage } from '@features/settings/pages/terminalOpenPage';
 import { ThemePage } from '@features/settings/pages/themePage';
 import { ShortcutPage } from '@features/settings/pages/shortcutPage';
-import { useSettingsNavigation } from '@features/settings/hooks/useSettingsNavigation';
+import { SETTINGS_GROUPS, useSettingsNavigation } from '@features/settings/hooks/useSettingsNavigation';
 import AutoSaveInput from '../components/AutoSaveInput';
 import SaveStatus from '../components/SaveStatus';
 import { SettingsSaveProvider, useSettingsSave } from '../components/SettingsSaveProvider';
@@ -274,75 +274,85 @@ function SettingsContent() {
       flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row',
       background: 'var(--canvas)', userSelect: 'none',
     }}>
-      {/* 侧栏 */}
-      <aside className="settings-navigation" style={{
-        width: 224, flexShrink: 0, background: 'var(--sidebar-bg)',
-        display: 'flex', flexDirection: 'column', minHeight: 0,
-      }}>
-        <div style={{ padding: 8 }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '6px 8px',
-            borderRadius: 'var(--radius-inner)', background: 'var(--field-bg)',
-          }}>
-            <Search size={iconSizes.compact} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-            <TextInput
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t('Search settings…')}
-              style={{
-                flex: 1, minWidth: 0, background: 'transparent', border: 'none',
-                outline: 'none', fontSize: 'var(--fs-label)', color: 'var(--text-primary)',
-              }}
-            />
-          </div>
-        </div>
-        <div className="scroll-region" style={{ flex: 1, overflowY: 'auto', padding: '0 6px 8px' }}>
-          {normalizedQuery && matchingSettings.map(setting => (
-            <button key={setting.id} className="settings-search-result" onClick={setting.onSelect}>
-              <span>{setting.label}</span>
-              <small>{setting.desc}</small>
-            </button>
-          ))}
-          {(!normalizedQuery || matchingSettings.length === 0) && visibleGroups.map((g) => {
-            return (
-              <div key={g.id} className="settings-nav-group">
-                <div className="settings-nav-heading">{g.label}</div>
-                {g.items.map(item => {
-                  const Icon = item.icon;
-                  return <SidebarItem compact key={item.id} icon={<Icon size={iconSizes.row} />}
-                    title={item.label} tooltip={item.label} active={selected === item.id} tabIndex={0}
-                    style={{ fontSize: 'var(--fs-label)' }}
-                    dataAttributes={{ role: 'button', 'aria-label': item.label, 'aria-current': selected === item.id ? 'page' : undefined }}
-                    onClick={() => setSelected(item.id)}
-                    onKeyDown={event => {
-                      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelected(item.id); }
-                    }} />;
-                })}
-              </div>
-            );
-          })}
-          {normalizedQuery && matchingSettings.length === 0 && visibleGroups.length === 0 && (
-            <div style={{ padding: 16, textAlign: 'center', fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>
-              {t('No matching settings')}
+      <div className="settings-layout">
+        {/* Navigation shares the available settings width with the content. */}
+        <aside className="settings-navigation" style={{
+          background: 'var(--sidebar-bg)',
+          display: 'flex', flexDirection: 'column', minHeight: 0,
+        }}>
+          <div className="settings-navigation-tools">
+            <div className="settings-navigation-search" style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '6px 8px',
+              borderRadius: 'var(--radius-inner)', background: 'var(--field-bg)',
+            }}>
+              <Search size={iconSizes.compact} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+              <TextInput
+                aria-label={t('Search settings…')}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t('Search settings…')}
+                style={{
+                  flex: 1, minWidth: 0, background: 'transparent', border: 'none',
+                  outline: 'none', fontSize: 'var(--fs-label)', color: 'var(--text-primary)',
+                }}
+              />
             </div>
-          )}
-        </div>
-      </aside>
-
-      {/* 内容区 */}
-      <section className="settings-content" style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '24px 28px', background: 'var(--canvas)' }}>
-        <header className="settings-page-header">
-          <h1>{activeLabel}</h1>
-          <div className="settings-save-hint">
-            <span>{t('Options save immediately; text saves after you stop typing.')}</span>
-            <SaveStatus status={status} onRetry={retry} />
+            <div className="settings-compact-navigation">
+              <Select aria-label={t('Settings page')} value={selected}
+                options={SETTINGS_GROUPS.flatMap(group => group.items.map(item => ({
+                  value: item.id, label: `${group.label} · ${item.label}`, triggerLabel: item.label,
+                })))}
+                onChange={setSelected} style={{ width: '100%' }} />
+            </div>
           </div>
-        </header>
-        <div className="settings-page-body">
-          {renderPage()}
-        </div>
-      </section>
+          <div className="settings-navigation-list scroll-region" data-searching={Boolean(normalizedQuery)}>
+            {normalizedQuery && matchingSettings.map(setting => (
+              <button key={setting.id} className="settings-search-result" onClick={() => { setting.onSelect(); setQuery(''); }}>
+                <span>{setting.label}</span>
+                <small>{setting.desc}</small>
+              </button>
+            ))}
+            {(!normalizedQuery || matchingSettings.length === 0) && visibleGroups.map((g) => {
+              return (
+                <div key={g.id} className="settings-nav-group">
+                  <div className="settings-nav-heading">{g.label}</div>
+                  {g.items.map(item => {
+                    const Icon = item.icon;
+                    return <SidebarItem compact key={item.id} icon={<Icon size={iconSizes.row} />}
+                      title={item.label} tooltip={item.label} active={selected === item.id} tabIndex={0}
+                      style={{ fontSize: 'var(--fs-label)' }}
+                      dataAttributes={{ role: 'button', 'aria-label': item.label, 'aria-current': selected === item.id ? 'page' : undefined }}
+                      onClick={() => setSelected(item.id)}
+                      onKeyDown={event => {
+                        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelected(item.id); }
+                      }} />;
+                  })}
+                </div>
+              );
+            })}
+            {normalizedQuery && matchingSettings.length === 0 && visibleGroups.length === 0 && (
+              <div style={{ padding: 16, textAlign: 'center', fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>
+                {t('No matching settings')}
+              </div>
+            )}
+          </div>
+        </aside>
+
+        {/* Content retains a readable width before falling back to horizontal scrolling. */}
+        <section className="settings-content">
+          <header className="settings-page-header">
+            <h1>{activeLabel}</h1>
+            <div className="settings-save-hint">
+              <span>{t('Options save immediately; text saves after you stop typing.')}</span>
+              <SaveStatus status={status} onRetry={retry} />
+            </div>
+          </header>
+          <div className="settings-page-body">
+            {renderPage()}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

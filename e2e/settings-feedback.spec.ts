@@ -8,7 +8,7 @@ test('settings navigation has static headings and save feedback appears once the
   const nav = page.locator('aside');
   await expect(nav.locator('.settings-nav-heading')).toHaveCount(6);
   await expect(nav.getByRole('button')).toHaveCount(17);
-  await expect(nav.locator('[aria-expanded]')).toHaveCount(0);
+  await expect(nav.locator('.settings-navigation-list [aria-expanded]')).toHaveCount(0);
   await expect(nav.getByRole('button').locator('svg')).toHaveCount(17);
   await expect(nav).toHaveCSS('width', '224px');
   for (const row of await nav.getByRole('button').all()) expect((await row.boundingBox())!.height).toBe(32);

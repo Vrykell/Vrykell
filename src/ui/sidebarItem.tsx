@@ -91,7 +91,7 @@ export default function SidebarItem({
       {...dataAttributes}
       className={variant === 'history' ? 'sidebar-row history-row' : 'sidebar-row'}
       data-active={active ? 'true' : 'false'}
-      aria-current={variant === 'history' && active ? 'true' : undefined}
+      {...(variant === 'history' && active ? { 'aria-current': true as const } : {})}
       data-compact={historyCompact ? 'true' : undefined}
       aria-describedby={historyCompact && subtitle ? subtitleId : undefined}
       onClick={onClick}

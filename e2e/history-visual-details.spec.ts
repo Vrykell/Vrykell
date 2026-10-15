@@ -51,6 +51,7 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(row.getByRole('button')).toHaveCount(3);
     await expect(row.getByText('恢复', { exact: true })).toHaveCount(0);
     const quick = row.locator('.history-row-quick-actions');
+    await expect(quick).toHaveCSS('background-color', await card.evaluate(element => getComputedStyle(element).backgroundColor));
     const quickBox = (await quick.boundingBox())!;
     const listBox = (await page.locator('.history-list').boundingBox())!;
     expect(quickBox.x).toBeGreaterThanOrEqual(listBox.x);

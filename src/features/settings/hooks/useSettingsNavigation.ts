@@ -66,8 +66,9 @@ export const SETTINGS_GROUPS: SettingGroup[] = [
 /** Filter the settings index while keeping every navigation group visible. */
 export function useSettingsNavigation() {
   const selected = useSettingsNavigationStore(state => state.selected);
-  const setSelected = useSettingsNavigationStore(state => state.setSelected);
+  const setPage = useSettingsNavigationStore(state => state.setSelected);
   const [query, setQuery] = useState('');
+  const setSelected = (page: PageId) => { setPage(page); setQuery(''); };
   const normalizedQuery = query.trim().toLowerCase();
 
   const matchingSettings = useMemo(() => normalizedQuery ? searchSettings(query) : [], [normalizedQuery, query]);
