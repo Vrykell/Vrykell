@@ -5,7 +5,7 @@
  * between the app following the bottom and the reader moving the view. Metadata only: counts, never
  * message text or geometry beyond what an event already carries.
  */
-import { terminalDebug } from '@platform/diagnostics';
+import { terminalDebug } from '@features/terminal/services/terminalDebug';
 
 const WINDOW_MS = 1000;
 
