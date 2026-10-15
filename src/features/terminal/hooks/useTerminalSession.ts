@@ -195,14 +195,21 @@ export function useTerminalSession(
     // The connection frame is captured when output arrives; a pure resize changes the
     // terminal's column count without writing, so it is refreshed on layout changes too to
     // keep the frozen authentication screen at the pane's current width.
-    const scheduleFrameCapture = () => {
+    const scheduleFrameCapture = (reason: 'write' | 'resize') => {
       if (spec?.kind !== 'ssh' || frameRaf) return;
       frameRaf = requestAnimationFrame(() => {
         frameRaf = 0;
-        setFrame(previous => captureConnectionFrame(term, previous, stopped || connectionFailed));
+        setFrame(previous => {
+          const next = captureConnectionFrame(term, previous, stopped || connectionFailed);
+          if (isTerminalDebugEnabled()) {
+            terminalDebug('ssh-frame-capture', { paneId, reason, cols: term.cols, rows: term.rows,
+              previousCols: previous?.cols ?? null, previousRows: previous?.rows ?? null, reused: next === previous });
+          }
+          return next;
+        });
       });
     };
-    const frameSub = term.onWriteParsed?.(scheduleFrameCapture);
+    const frameSub = term.onWriteParsed?.(() => scheduleFrameCapture('write'));
     fitTerminal(term, fit);
     registerTerminal(paneId, term);
     useTerminalStore.getState().setDims(paneId, term.cols, term.rows);
@@ -766,7 +773,7 @@ export function useTerminalSession(
         fitTerminal(term, fit);
         const sizeChanged = previousCols !== term.cols || previousRows !== term.rows;
         // A resize re-lays the buffer; re-capture so the frozen connection frame follows it.
-        if (sizeChanged) scheduleFrameCapture();
+        if (sizeChanged) scheduleFrameCapture('resize');
         if (isTerminalDebugEnabled() && sizeChanged) {
           const screen = term.element?.querySelector('.xterm-screen')?.getBoundingClientRect();
           const host = el.getBoundingClientRect();

@@ -13,7 +13,7 @@ import { IconButton } from '@ui/IconButton';
 import { Eye, EyeOff, iconSizes } from '@ui/icons';
 import { secretResponsePrompt, secretResponseWasRejected } from '../model/terminalFrame';
 import { t } from '@i18n';
-import { terminalDebug } from '../services/terminalDebug';
+import { isTerminalDebugEnabled, terminalDebug } from '../services/terminalDebug';
 import type { SshSessionStatus } from '@core/ssh';
 
 /** Render an interactive SSH session with xterm so screen contents and cursor stay in sync. */
@@ -98,6 +98,40 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
   }, [connectionInput, onReconnectReady, restart]);
   // 只要密码框开着就把屏幕冻结成快照：live xterm 会画自己的光标，看着像还有输入焦点
   const showSnapshot = !disconnected && secret;
+  // Diagnostics: record the rendered snapshot geometry so a width mismatch between the
+  // canvas grid and the DOM frame can be traced from the recorded log.
+  const snapshotRef = useRef<HTMLPreElement>(null);
+  useEffect(() => {
+    if (!showSnapshot || !frame?.html || !isTerminalDebugEnabled()) return;
+    const raf = requestAnimationFrame(() => {
+      const pre = snapshotRef.current;
+      if (!pre) return;
+      const style = getComputedStyle(pre);
+      const probe = document.createElement('span');
+      probe.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:pre;';
+      probe.style.fontFamily = style.fontFamily;
+      probe.style.fontSize = style.fontSize;
+      probe.style.fontWeight = style.fontWeight;
+      probe.style.letterSpacing = style.letterSpacing;
+      probe.textContent = 'W'.repeat(100);
+      document.body.appendChild(probe);
+      const advance = Math.round(probe.getBoundingClientRect().width);
+      probe.remove();
+      const root = getComputedStyle(document.documentElement);
+      terminalDebug('ssh-snapshot-frame', {
+        paneId,
+        cols: frame.cols, rows: frame.rows,
+        clientWidth: pre.clientWidth, scrollWidth: pre.scrollWidth,
+        hostWidth: ref.current?.clientWidth ?? null,
+        advancePer100Cells: advance,
+        letterSpacing: style.letterSpacing, fontSize: style.fontSize,
+        cssLetterSpacing: root.getPropertyValue('--terminal-letter-spacing').trim(),
+        cssFontSize: root.getPropertyValue('--terminal-font-size').trim(),
+        devicePixelRatio: window.devicePixelRatio,
+      });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [showSnapshot, frame]);
   const retryPhase = retry?.phase ?? 'idle';
   const retryWaiting = retryPhase === 'waiting';
   const retryConnecting = retryPhase === 'connecting';
@@ -162,7 +196,7 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
         {/* 密码框开着（secret）时屏幕只读，点它也不会把输入交给终端 */}
         <div ref={ref} data-testid={showSnapshot ? undefined : 'ssh-terminal-screen'} style={{ position: 'absolute', inset: 0, overflow: 'auto', visibility: showSnapshot || disconnected ? 'hidden' : 'visible', pointerEvents: showSnapshot || disconnected || secret ? 'none' : 'auto', paddingLeft: 8 }} />
           {/* data-selectable：页面整体禁选，但屏幕内容必须能选中，否则连不上时无法复制报错 */}
-          {showSnapshot && frame?.html && <pre data-selectable data-testid="ssh-terminal-screen" className="ssh-terminal-frame" style={{ position: 'absolute', inset: 0, overflow: 'auto', margin: 0, whiteSpace: 'pre', paddingLeft: 8 }} dangerouslySetInnerHTML={{ __html: frame.html }} />}
+          {showSnapshot && frame?.html && <pre ref={snapshotRef} data-selectable data-testid="ssh-terminal-screen" className="ssh-terminal-frame" style={{ position: 'absolute', inset: 0, overflow: 'auto', margin: 0, whiteSpace: 'pre', paddingLeft: 8 }} dangerouslySetInnerHTML={{ __html: frame.html }} />}
         {/* 连接中：居中转圈 + 细进度条（不写解释性小字） */}
         {!disconnected && status === 'connecting' && (
           <div data-testid="ssh-connecting" aria-hidden="true" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, pointerEvents: 'none' }}>
