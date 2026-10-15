@@ -991,6 +991,9 @@ button.icon-button[data-tone="danger"] { color: var(--control-danger-color); }
 button.icon-button[aria-pressed="true"] { background: var(--control-active-bg); color: var(--icon-hover-color); }
 button.icon-button:disabled { color: var(--control-disabled-color); cursor: default; opacity: 0.55; }
 button.icon-button:disabled:hover { background: transparent; color: var(--control-disabled-color); }
+/* The authentication reveal toggle shows its state through the eye icon itself, not a fill. */
+button.ssh-auth-reveal[aria-pressed="true"] { background: transparent; }
+button.ssh-auth-reveal[aria-pressed="true"]:is(:hover, :focus-visible) { background: var(--control-hover-bg); }
 button.text-control { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 28px; padding: 0 8px; border: none; border-radius: 5px; background: transparent; color: var(--icon-color); font: var(--fs-caption) var(--font-ui); cursor: pointer; }
 button.text-control:hover { background: var(--control-hover-bg); color: var(--icon-hover-color); }
 button.text-control[aria-pressed="true"] { background: var(--control-active-bg); color: var(--text-primary); }

@@ -22,6 +22,7 @@ import { DeveloperBoard24Regular } from '@fluentui/react-icons/headless/svg/deve
 import { ArrowDownload24Regular } from '@fluentui/react-icons/headless/svg/arrow-download';
 import { MoreHorizontal24Regular } from '@fluentui/react-icons/headless/svg/more-horizontal';
 import { Eye24Regular } from '@fluentui/react-icons/headless/svg/eye';
+import { EyeOff24Regular } from '@fluentui/react-icons/headless/svg/eye-off';
 import { Document24Regular } from '@fluentui/react-icons/headless/svg/document';
 import { FolderZip24Regular } from '@fluentui/react-icons/headless/svg/folder-zip';
 import { DocumentCode16Regular } from '@fluentui/react-icons/headless/svg/document-code';
@@ -128,6 +129,7 @@ export const Cpu = createAppIcon(DeveloperBoard24Regular);
 export const Download = createAppIcon(ArrowDownload24Regular);
 export const Ellipsis = createAppIcon(MoreHorizontal24Regular);
 export const Eye = createAppIcon(Eye24Regular);
+export const EyeOff = createAppIcon(EyeOff24Regular);
 export const File = createAppIcon(Document24Regular);
 export const FileArchive = createAppIcon(FolderZip24Regular);
 export const FileCode = createAppIcon(DocumentCode16Regular);

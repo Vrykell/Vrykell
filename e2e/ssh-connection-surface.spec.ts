@@ -20,6 +20,14 @@ test('the frozen authentication frame follows a pane resize instead of scrolling
   // The recaptured frame must fit the narrower pane instead of keeping its old capture width.
   await expect.poll(async () => frame.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(16);
   await expect(frame).toContainText("password:");
+  // Widening the dock panel narrows the pane without a window resize; the frame follows it too.
+  await page.locator('[data-dock-btn="tabs"]').click();
+  const handle = (await page.getByTestId('resize-handle-tabs').boundingBox())!;
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + 120);
+  await page.mouse.down();
+  await page.mouse.move(handle.x + handle.width / 2 + 120, handle.y + 120, { steps: 4 });
+  await page.mouse.up();
+  await expect.poll(async () => frame.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(16);
   await page.screenshot({ path: 'test-results/ssh-auth-snapshot-resized.png' });
 });
 
@@ -29,9 +37,14 @@ test('the authentication row uses a compact reveal toggle and the blue send acti
   const input = page.getByRole('textbox', { name: 'SSH 认证响应' });
   await expect(input).toHaveAttribute('type', 'password');
   const reveal = page.getByTestId('ssh-auth-reveal');
+  const openIcon = await reveal.evaluate(element => element.innerHTML);
   await reveal.click();
   await expect(input).toHaveAttribute('type', 'text');
   await expect(reveal).toHaveAttribute('aria-label', '隐藏密码');
+  // The toggle swaps its icon instead of painting a pressed fill.
+  expect(await reveal.evaluate(element => element.innerHTML)).not.toBe(openIcon);
+  await page.mouse.move(0, 0);
+  await expect(reveal).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   const accentUser = await page.evaluate(() => {
     const probe = document.createElement('div');
     probe.style.backgroundColor = 'var(--accent-user)';
