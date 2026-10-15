@@ -19,6 +19,8 @@ beforeEach(() => {
   stopReconnect.mockReset().mockResolvedValue(undefined);
   sessionView.frame.plainText = 'Password:';
   sessionView.frame.html = 'Password:';
+  delete (sessionView.frame as { cellWidth?: number; snapshotSpacing?: number }).cellWidth;
+  delete (sessionView.frame as { cellWidth?: number; snapshotSpacing?: number }).snapshotSpacing;
   useTerminalStore.setState({ sessions: {}, scenes: { p: 'classic' } });
 });
 
@@ -126,6 +128,15 @@ describe('SSH connection input', () => {
     expect(screen.getByTestId('ssh-terminal-screen').tagName).toBe('PRE');
     expect(screen.getByLabelText('SSH 认证响应')).toBeVisible();
     expect(screen.queryByTestId('ssh-screen-cursor')).not.toBeInTheDocument();
+  });
+  it('lays frozen rows out at the renderer cell width and never scrolls sideways', () => {
+    useTerminalStore.setState({ sessions: { p: 'session' } });
+    (sessionView.frame as { snapshotSpacing?: number }).snapshotSpacing = -0.21;
+    render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+    const snapshot = screen.getByTestId('ssh-terminal-screen');
+    expect(snapshot.tagName).toBe('PRE');
+    expect(snapshot.style.overflowX).toBe('hidden');
+    expect(snapshot.style.letterSpacing).toContain('-0.21px');
   });
   it('masks and clears the response after sending it to the connected PTY', () => {
     useTerminalStore.setState({ sessions: { p: 'session' } });

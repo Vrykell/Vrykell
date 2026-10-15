@@ -123,6 +123,7 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
         cols: frame.cols, rows: frame.rows,
         clientWidth: pre.clientWidth, scrollWidth: pre.scrollWidth,
         hostWidth: ref.current?.clientWidth ?? null,
+        cellWidth: frame.cellWidth ?? null, snapshotSpacing: frame.snapshotSpacing ?? null,
         advancePer100Cells: advance,
         letterSpacing: style.letterSpacing, fontSize: style.fontSize,
         cssLetterSpacing: root.getPropertyValue('--terminal-letter-spacing').trim(),
@@ -192,11 +193,13 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
       {/* 终端区常驻：xterm 宿主必须一直在，否则重连时没有宿主可挂载；断开后宿主隐藏、原因直接印在屏幕上 */}
       <div role="textbox" aria-label="SSH 交互终端" aria-multiline="true"
         aria-disabled={inputDisabled || secret} tabIndex={inputDisabled || secret ? -1 : 0}
-        onFocus={focusTerminal} onMouseDown={focusTerminal} style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'auto', outline: 'none', cursor: 'text' }}>
+        onFocus={focusTerminal} onMouseDown={focusTerminal} style={{ flex: 1, minHeight: 0, position: 'relative', overflowX: 'hidden', overflowY: 'auto', outline: 'none', cursor: 'text' }}>
         {/* 密码框开着（secret）时屏幕只读，点它也不会把输入交给终端 */}
-        <div ref={ref} data-testid={showSnapshot ? undefined : 'ssh-terminal-screen'} style={{ position: 'absolute', inset: 0, overflow: 'auto', visibility: showSnapshot || disconnected ? 'hidden' : 'visible', pointerEvents: showSnapshot || disconnected || secret ? 'none' : 'auto', paddingLeft: 8 }} />
-          {/* data-selectable：页面整体禁选，但屏幕内容必须能选中，否则连不上时无法复制报错 */}
-          {showSnapshot && frame?.html && <pre ref={snapshotRef} data-selectable data-testid="ssh-terminal-screen" className="ssh-terminal-frame" style={{ position: 'absolute', inset: 0, overflow: 'auto', margin: 0, whiteSpace: 'pre', paddingLeft: 8 }} dangerouslySetInnerHTML={{ __html: frame.html }} />}
+        <div ref={ref} data-testid={showSnapshot ? undefined : 'ssh-terminal-screen'} style={{ position: 'absolute', inset: 0, overflowX: 'hidden', overflowY: 'auto', visibility: showSnapshot || disconnected ? 'hidden' : 'visible', pointerEvents: showSnapshot || disconnected || secret ? 'none' : 'auto', paddingLeft: 8 }} />
+          {/* data-selectable：页面整体禁选，但屏幕内容必须能选中，否则连不上时无法复制报错。
+              Rows advance at the renderer's own cell width and never scroll sideways; a
+              horizontal scrollbar would steal height and make the terminal bounce. */}
+          {showSnapshot && frame?.html && <pre ref={snapshotRef} data-selectable data-testid="ssh-terminal-screen" className="ssh-terminal-frame" style={{ position: 'absolute', inset: 0, overflowX: 'hidden', overflowY: 'auto', letterSpacing: frame.snapshotSpacing != null ? `calc(var(--terminal-letter-spacing, 0px) + ${frame.snapshotSpacing}px)` : undefined, margin: 0, whiteSpace: 'pre', paddingLeft: 8 }} dangerouslySetInnerHTML={{ __html: frame.html }} />}
         {/* 连接中：居中转圈 + 细进度条（不写解释性小字） */}
         {!disconnected && status === 'connecting' && (
           <div data-testid="ssh-connecting" aria-hidden="true" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, pointerEvents: 'none' }}>
