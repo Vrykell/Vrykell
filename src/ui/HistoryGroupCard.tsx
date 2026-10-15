@@ -1,12 +1,11 @@
-import { useId, useState, type ReactNode } from 'react';
+import { useId, useRef, useState, type ReactNode } from 'react';
 import { t } from '@i18n';
-import { ChevronRight, Ellipsis, Lock, Pin } from './icons';
+import { ChevronRight, Ellipsis, LockSmall as Lock, Pin } from './icons';
 import { historyGroupColor, type HistoryGroupColor } from './historyGroupColor';
 import { IconButton } from './IconButton';
 import ContextMenu, { type ContextMenuItem, type MenuAnchor } from './ContextMenu';
 import HistoryColorPalette, { HistoryColorChoices } from './HistoryColorPalette';
 import HistoryTextPrompt from './HistoryTextPrompt';
-import { TextButton } from './TextButton';
 
 /** Shared settings-colored card used to visually group history rows. */
 export default function HistoryGroupCard({
@@ -28,7 +27,6 @@ export default function HistoryGroupCard({
   onCollapsedChange,
   recordActions = [],
   actions = [],
-  primaryAction,
   menuDescription,
   children,
 }: {
@@ -52,7 +50,6 @@ export default function HistoryGroupCard({
   onCollapsedChange?: (value: boolean) => void;
   recordActions?: ContextMenuItem[];
   actions?: ContextMenuItem[];
-  primaryAction?: { label: string; onClick: () => void; disabled?: boolean };
   menuDescription?: string;
   children: ReactNode;
 }) {
@@ -60,6 +57,7 @@ export default function HistoryGroupCard({
   const collapsed = controlledCollapsed ?? localCollapsed;
   const setCollapsed = (value: boolean) => { setLocalCollapsed(value); onCollapsedChange?.(value); };
   const [menu, setMenu] = useState<MenuAnchor | null>(null);
+  const menuTrigger = useRef<HTMLButtonElement>(null);
   const [palette, setPalette] = useState<{ x: number; y: number } | null>(null);
   const [editor, setEditor] = useState<{ kind: 'title' | 'note'; anchor: MenuAnchor } | null>(null);
   const headingId = useId();
@@ -83,7 +81,13 @@ export default function HistoryGroupCard({
 
   return <section className="history-group-card" aria-labelledby={headingId} data-group-color={effectiveColor}
     data-collapsed={collapsed ? 'true' : 'false'} data-pinned={pinned ? 'true' : undefined}
-    data-testid={`history-group-card-${id}`}>
+    data-testid={`history-group-card-${id}`}
+    onContextMenu={event => {
+      if (event.target instanceof Element && event.target.closest('.history-row')) return;
+      event.preventDefault(); event.stopPropagation();
+      setPalette(null); setEditor(null);
+      setMenu({ x: event.clientX, y: event.clientY, trigger: menuTrigger.current ?? undefined });
+    }}>
     <div className="history-group-card-header">
       <div className="history-group-heading">
         {onSelectColor
@@ -106,11 +110,11 @@ export default function HistoryGroupCard({
           </span>}
           <span className="history-group-count">{count}</span>
           {lockedCount > 0 && <span className="history-group-lock" data-tip={t('{{count}} locked records', { count: lockedCount })}
-            data-testid={`history-group-lock-${id}`}><Lock size={12} aria-hidden="true" /></span>}
+            data-testid={`history-group-lock-${id}`}><Lock size={16} aria-hidden="true" /></span>}
           {hasDate && <time className="history-group-date" dateTime={date.toISOString()}>{date.toLocaleString(undefined, {
             year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
           })}</time>}
-          {(onTogglePin || onSelectColor || onRename || onNote || actions.length > 0 || recordActions.length > 0) && <IconButton compact data-subtle className="history-group-menu-button"
+          {(onTogglePin || onSelectColor || onRename || onNote || actions.length > 0 || recordActions.length > 0) && <IconButton ref={menuTrigger} compact data-subtle className="history-group-menu-button"
             aria-label={t('Group actions')} aria-haspopup="menu" aria-expanded={menu !== null}
             data-tip={t('Group actions')} data-testid={`history-group-menu-${id}`}
             onClick={event => { setPalette(null); setEditor(null); const anchor = anchorAt(event.currentTarget); setMenu(current => current ? null : anchor); }}>
@@ -121,8 +125,6 @@ export default function HistoryGroupCard({
             <ChevronRight size={14} aria-hidden="true" data-collapsed={collapsed ? 'true' : 'false'} />
           </IconButton>
         </div>
-        {primaryAction && <TextButton className="history-group-primary" disabled={primaryAction.disabled}
-          onClick={primaryAction.onClick}>{primaryAction.label}</TextButton>}
       </div>
     </div>
     {menu && <ContextMenu anchor={menu} itemRole="menuitem" onClose={() => setMenu(null)} items={menuItems} label={t('Group actions')}

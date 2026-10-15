@@ -145,7 +145,8 @@ test('filtered group deletion protects locked records across regrouping and rest
   await expect(page.getByTestId('history-session-beta')).toHaveCount(0);
   await expect(page.getByTestId('history-session-alpha')).toBeVisible();
   expect(await page.evaluate(() => (window as Probe).__HISTORY_CALLS__)).toEqual([{ command: 'delete_session', id: 'beta' }]);
-  await card.getByRole('button', { name: '全部恢复', exact: true }).click();
+  await card.getByRole('button', { name: '分组操作' }).click();
+  await page.getByRole('menuitem', { name: '全部恢复', exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as Probe).__HISTORY_CALLS__)).toEqual([
     { command: 'delete_session', id: 'beta' }, { command: 'restore_session', id: 'alpha' },
   ]);
@@ -166,7 +167,8 @@ test('AI group copy and deletion use the filtered set while retaining locked and
   await openAiHistory(page);
   await page.getByTestId('ai-history-search').fill('Deploy');
   const card = page.locator('.history-group-card');
-  await card.getByRole('button', { name: '复制为 Markdown', exact: true }).click();
+  await card.getByRole('button', { name: '分组操作' }).click();
+  await page.getByRole('menuitem', { name: '复制为 Markdown', exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as Probe).__CLIPBOARD_TEXT__)).toContain('# Deploy Alpha');
   const copied = await page.evaluate(() => (window as Probe).__CLIPBOARD_TEXT__);
   expect(copied).toContain('# Deploy Beta');

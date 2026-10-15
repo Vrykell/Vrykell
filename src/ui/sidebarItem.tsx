@@ -10,6 +10,7 @@ export interface SidebarItemAction {
   /** Receives the click event so callers can anchor floating menus on the button. */
   onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   testId?: string;
+  disabled?: boolean;
 }
 
 /**
@@ -27,6 +28,7 @@ export default function SidebarItem({
   subtitleFontFamily = 'var(--font-mono)',
   badge,
   action,
+  leadingAction,
   renameInput,
   active,
   onClick,
@@ -51,6 +53,8 @@ export default function SidebarItem({
   /** Optional trailing content between the title and the action button. */
   badge?: ReactNode;
   action?: SidebarItemAction;
+  /** History rows reveal this action in the gutter on hover or keyboard focus. */
+  leadingAction?: SidebarItemAction;
   /** Replaces the title area while an inline rename is active. */
   renameInput?: ReactNode;
   active: boolean;
@@ -86,6 +90,7 @@ export default function SidebarItem({
       {...dataAttributes}
       className={variant === 'history' ? 'sidebar-row history-row' : 'sidebar-row'}
       data-active={active ? 'true' : 'false'}
+      aria-current={variant === 'history' && active ? 'true' : undefined}
       data-compact={historyCompact ? 'true' : undefined}
       aria-describedby={historyCompact && subtitle ? subtitleId : undefined}
       onClick={onClick}
@@ -108,20 +113,31 @@ export default function SidebarItem({
       data-reorder-dragging={dragging ? 'true' : undefined}
       style={{ ...sidebarRowSpacing, ...(compact ? { padding: '0 6px' } : {}), ...style }}
     >
+      {leadingAction && <span className="history-row-hover-actions">
+        <button type="button" data-subtle className="history-row-remove"
+          aria-label={leadingAction.label} data-tip={leadingAction.title ?? leadingAction.label}
+          data-testid={leadingAction.testId} disabled={leadingAction.disabled}
+          onPointerDown={event => event.stopPropagation()}
+          onDoubleClick={event => event.stopPropagation()}
+          onClick={event => { event.stopPropagation(); leadingAction.onClick(event); }}>
+          {leadingAction.icon}
+        </button>
+        <span className="history-row-hover-dot" aria-hidden="true" />
+      </span>}
       <div className="sidebar-row-content" style={{
         ...sidebarRowContent,
-        ...(historyCompact ? { minHeight: 28, padding: '2px 10px', alignItems: 'flex-start' } : compact ? { minHeight: 32, padding: '5px 10px' } : {}),
+        ...(historyCompact ? { minHeight: 34, padding: '5px 10px', alignItems: 'flex-start' } : compact ? { minHeight: 32, padding: '5px 10px' } : {}),
         background: variant === 'history' ? undefined : background,
         color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
       }}>
-        <span className="sidebar-row-icon" style={sidebarRowIcon}>{icon}</span>
+        <span className="sidebar-row-icon" style={{ ...sidebarRowIcon, ...(historyCompact ? { width: 20, height: 'calc(22px * var(--ui-font-scale))' } : {}) }}>{icon}</span>
         {renameInput ?? (
           <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
             <span className="sidebar-row-title" data-tip={variant === 'history' ? title : undefined}
               data-tip-description={historyCompact ? subtitle : undefined}
               style={{ ...sidebarRowTitle,
-                ...(historyCompact ? { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, whiteSpace: 'normal', overflowWrap: 'anywhere' } : {}),
-                fontWeight: active && variant !== 'history' ? 'var(--fw-semibold)' : 'var(--fw-regular)' }}>{title}</span>
+                ...(historyCompact ? { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, whiteSpace: 'normal', overflowWrap: 'anywhere', fontSize: 'var(--fs-body)', lineHeight: 'calc(22px * var(--ui-font-scale))' } : {}),
+                fontWeight: active ? 'var(--fw-semibold)' : 'var(--fw-regular)' }}>{title}</span>
             {subtitle && (
               <span className="sidebar-row-subtitle" id={subtitleId} hidden={historyCompact}
                 data-tip={variant === 'history' ? subtitle : undefined} style={{
@@ -142,6 +158,7 @@ export default function SidebarItem({
             data-no-drag
             className="sidebar-row-action"
             aria-label={action.label}
+            disabled={action.disabled}
             data-tip={action.title ?? action.label}
             data-testid={action.testId}
             onDoubleClick={(event) => event.stopPropagation()}
@@ -150,6 +167,7 @@ export default function SidebarItem({
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               width: historyCompact ? 24 : 28, height: historyCompact ? 24 : 28, padding: 0, border: 'none', borderRadius: 4,
               flexShrink: 0, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+              alignSelf: historyCompact ? 'center' : undefined,
               opacity: actionVisible ? 1 : 0,
               pointerEvents: variant === 'history' && !actionVisible ? 'none' : undefined,
               transition: 'opacity 0.12s ease',
