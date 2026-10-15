@@ -1,11 +1,14 @@
 import { invoke } from '@platform/diagnostics';
 import { listen } from '@tauri-apps/api/event';
 import { create } from 'zustand';
+import { safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
 import type { StreamFn } from '@features/chat';
 import type { ProviderKind } from '@features/agent/services/provider';
 
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_MODEL = 'gpt-4o-mini';
+/** Where the model page remembers the last provider row the user picked. */
+const PROVIDER_SELECTION_KEY = 'vrykell-ai-provider';
 
 import type { ModelCapabilities } from '@features/agent/model/capabilities';
 
@@ -35,6 +38,10 @@ interface AiConfigState {
   models: ModelProfile[];
   /** 当前生效模型 id */
   activeModel: string;
+  /** Provider row selected on the model page (session state). */
+  selectedProvider: string | null;
+  /** Provider row the user picked last; restored on the next visit. */
+  lastSelectedProvider: string | null;
 }
 
 export const useAiConfigStore = create<AiConfigState>(() => ({
@@ -47,6 +54,8 @@ export const useAiConfigStore = create<AiConfigState>(() => ({
   hasTavilyKey: false,
   models: [],
   activeModel: '',
+  selectedProvider: null,
+  lastSelectedProvider: safeLocalStorageGet(PROVIDER_SELECTION_KEY) || null,
 }));
 
 /** 当前生效模型的完整 profile；列表为空时回退到镜像字段（旧配置/未刷新）。 */
@@ -171,6 +180,12 @@ export async function setActiveModel(id: string): Promise<void> {
     baseUrl: active?.baseUrl ?? DEFAULT_BASE_URL,
     model: active?.model ?? DEFAULT_MODEL,
   });
+}
+
+/** Remember which provider row the model page shows; the pick survives a reload. */
+export function selectProvider(id: string | null): void {
+  useAiConfigStore.setState({ selectedProvider: id, lastSelectedProvider: id });
+  safeLocalStorageSet(PROVIDER_SELECTION_KEY, id ?? '');
 }
 
 /** 按 provider 设置 key（'openai-compatible' 等价于 setApiKey） */

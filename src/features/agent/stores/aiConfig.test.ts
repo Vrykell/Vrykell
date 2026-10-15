@@ -7,7 +7,7 @@ const { invokeMock, listenMock } = vi.hoisted(() => ({
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 vi.mock('@tauri-apps/api/event', () => ({ listen: listenMock }));
 
-import { anthropicStream, activeModelProfile, isApiKeyConfigured, getModel, getAiBaseUrl, useAiConfigStore, refreshAiConfig, setApiKey, clearApiKey, setAiBaseUrl, setAiModel, setAiProvider, setAiModels, setActiveModel, setProviderKey, clearProviderKey, setTavilyKey, clearTavilyKey } from '@features/agent/stores/aiConfig';
+import { anthropicStream, activeModelProfile, isApiKeyConfigured, getModel, getAiBaseUrl, useAiConfigStore, refreshAiConfig, setApiKey, clearApiKey, setAiBaseUrl, setAiModel, setAiProvider, setAiModels, setActiveModel, setProviderKey, clearProviderKey, setTavilyKey, clearTavilyKey, selectProvider } from '@features/agent/stores/aiConfig';
 
 describe('anthropicStream', () => {
   beforeEach(() => {
@@ -194,5 +194,17 @@ describe('ai 镜像函数（新增）', () => {
     expect(invokeMock).toHaveBeenCalledTimes(1);
     await clearTavilyKey();
     expect(useAiConfigStore.getState().hasTavilyKey).toBe(false);
+  });
+
+  it('selectProvider：记住选择并写入 localStorage，null 清空', () => {
+    selectProvider('anthropic|https://api.anthropic.com/v1');
+    const s = useAiConfigStore.getState();
+    expect(s.selectedProvider).toBe('anthropic|https://api.anthropic.com/v1');
+    expect(s.lastSelectedProvider).toBe('anthropic|https://api.anthropic.com/v1');
+    expect(localStorage.getItem('vrykell-ai-provider')).toBe('anthropic|https://api.anthropic.com/v1');
+    selectProvider(null);
+    expect(useAiConfigStore.getState().selectedProvider).toBeNull();
+    expect(useAiConfigStore.getState().lastSelectedProvider).toBeNull();
+    expect(localStorage.getItem('vrykell-ai-provider')).toBe('');
   });
 });
