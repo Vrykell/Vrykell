@@ -1,6 +1,6 @@
 import { useTypographyStore } from '@config/typography';
 import { afterEach, describe, expect, it } from 'vitest';
-import { cellHeightFromLineBox, getTerminalFontOptions, measureTerminalDomCellHeight, snapLetterSpacing } from '../terminalFont';
+import { cellHeightFromLineBox, getTerminalFontOptions, measureTerminalDomCellHeight, snapLetterSpacing, snapshotLetterSpacing } from '../terminalFont';
 
 describe('terminal cell width snapping', () => {
   it('absorbs the fractional part of the measured advance', () => {
@@ -15,6 +15,32 @@ describe('terminal cell width snapping', () => {
     expect(snapLetterSpacing(0)).toBe(0);
     expect(snapLetterSpacing(Number.NaN)).toBe(0);
     expect(snapLetterSpacing(-3)).toBe(0);
+  });
+});
+
+describe('snapshot grid correction', () => {
+  it('compensates a DOM advance that is wider than the renderer cell', () => {
+    // The user-facing case: a 15 px face renders 8.789 px per glyph while the renderer cell
+    // kept 8 px, so rows drift wider than the pane unless the snapshot corrects the spacing.
+    expect(snapshotLetterSpacing(8, 8.789 + 0.211)).toBeCloseTo(-1, 5);
+    expect(snapshotLetterSpacing(8, 8.789)).toBeCloseTo(-0.789, 5);
+  });
+
+  it('adds tracking when the DOM advance is narrower than the cell', () => {
+    expect(snapshotLetterSpacing(9, 8.5)).toBeCloseTo(0.5, 5);
+  });
+
+  it('stays neutral when the two already agree', () => {
+    expect(snapshotLetterSpacing(9, 9)).toBe(0);
+    // A rounding artifact far below a pixel must not add tracking.
+    expect(snapshotLetterSpacing(9, 9.001)).toBe(0);
+  });
+
+  it('ignores unusable measurements', () => {
+    expect(snapshotLetterSpacing(0, 9)).toBe(0);
+    expect(snapshotLetterSpacing(Number.NaN, 9)).toBe(0);
+    expect(snapshotLetterSpacing(9, 0)).toBe(0);
+    expect(snapshotLetterSpacing(9, Number.NaN)).toBe(0);
   });
 });
 
