@@ -77,14 +77,32 @@ fn write_map(map: &serde_json::Map<String, serde_json::Value>) -> Result<(), Str
     let path = fallback_path();
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700));
+        }
     }
     let json = serde_json::to_string_pretty(map).map_err(|e| e.to_string())?;
-    std::fs::write(&path, json).map_err(|e| format!("写入密钥文件失败：{e}"))?;
+    // Create the file already private under Unix: a plain write would leave it world-readable
+    // until the permission fix below lands.
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
+        use std::io::Write;
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+        let written = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&path)
+            .and_then(|mut file| file.write_all(json.as_bytes()));
+        written.map_err(|e| format!("写入密钥文件失败：{e}"))?;
+        // Tighten a file that already existed with wider permissions.
         let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
     }
+    #[cfg(not(unix))]
+    std::fs::write(&path, json).map_err(|e| format!("写入密钥文件失败：{e}"))?;
     Ok(())
 }
 

@@ -88,6 +88,13 @@ pub fn is_within(child: &str, ancestor: &str) -> bool {
     child.starts_with(&prefix)
 }
 
+/// A file name that stays inside its directory on a remote (POSIX) host: exactly one component,
+/// no separators and no dot segments. Mirrors the local rename/create guard so a remote file
+/// operation can never place a name outside the directory the user pointed at.
+pub fn is_safe_component(name: &str) -> bool {
+    !name.is_empty() && name != "." && name != ".." && !name.contains('/') && !name.contains('\\')
+}
+
 /// 在目录内生成带序号的安全名：`name (1).ext`、`Documents (1)`（序号在扩展名前）。
 /// `exists` 由调用方提供（本地磁盘 / 远端 stat）。
 pub fn numbered_name<F: Fn(&str) -> bool>(name: &str, exists: F) -> String {
@@ -156,6 +163,18 @@ mod tests {
         assert_eq!(normalize("/home/user/../docs"), "/home/docs");
         assert_eq!(normalize("/.."), "/");
         assert_eq!(normalize(""), "/");
+    }
+
+    #[test]
+    fn safe_components_exclude_dot_segments_and_separators() {
+        assert!(is_safe_component("notes.txt"));
+        assert!(is_safe_component("a b"));
+        assert!(!is_safe_component(""));
+        assert!(!is_safe_component("."));
+        assert!(!is_safe_component(".."));
+        assert!(!is_safe_component("../x"));
+        assert!(!is_safe_component("a/b"));
+        assert!(!is_safe_component("a\\b"));
     }
 
     #[test]

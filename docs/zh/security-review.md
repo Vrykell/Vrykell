@@ -1,6 +1,6 @@
 # 安全性审查
 
-> 针对 Vrykell 的历次安全审查汇总（最近更新 2026-08-26）。范围：后端 Rust（Tauri 命令、PTY、SSH/SFTP、SQLite、AI HTTP 客户端、web 抓取）、前端 React（IPC 调用、Markdown/HTML 渲染、密钥与配置处理）。
+> 针对 Vrykell 的历次安全审查汇总（最近更新 2026-10-16）。范围：后端 Rust（Tauri 命令、PTY、SSH/SFTP、SQLite、AI HTTP 客户端、web 抓取）、前端 React（IPC 调用、Markdown/HTML 渲染、密钥与配置处理）。
 > 威胁模型：本机桌面应用，无远程服务端；主要风险面是「恶意远端（SSH/SFTP/AI/网页内容）」「恶意文件名/路径」「密钥明文落盘」「命令注入」「LLM 提示注入驱动的内网探测（SSRF）」。
 
 ---
@@ -35,6 +35,8 @@
 | **`HistoryDb::open().expect()` 启动 panic** | 中 | 打开失败降级为内存库（历史不可用，应用继续跑） |
 | **迁移吞 ALTER 错误碰运气** | 中 | `PRAGMA user_version` 版本化 + `ensure_column` 逐列检查，真实迁移失败会报错 |
 | 技能市场 GitHub URL 解析（`/tree/main`、`.git` 后缀误判） | 低 | 改用 `url` crate 标准解析，只取 owner/repo |
+| **远端重命名/新建未校验单一组件名**（`..`/分隔符可把文件写出目标目录） | 中 | `platform::path::is_safe_component`：`ssh_rename`/`ssh_create_file`/`ssh_create_dir` 与本地同规则拒绝 `.`/`..`/含 `/` `\` 的名称（下载路径此前已加固，本次补齐命令行一侧） |
+| **回退密钥文件先写后收紧权限**（写入瞬间存在短暂宽权限窗口） | 低 | 非 macOS 回退存储改为以 0600 直接创建、`.vrykell` 目录收紧 0700，并保留写后 0600 校正以覆盖旧文件；macOS 走钥匙串不受影响 |
 
 前端未发现高危 XSS：AI 输出经 `react-markdown`（未启用 `rehype-raw`）渲染，原始 HTML 会被转义；`BlockOutput` 的 `dangerouslySetInnerHTML` 仅用于渲染**本应用自己从 xterm buffer 生成的** HTML 快照（所有 cell 文本经 `escapeHtml`），非外部输入。
 
@@ -52,4 +54,4 @@
 
 ## 结论
 
-本应用为本地桌面工具，攻击面有限且已系统性加固：SSRF（DNS 钉扎 + 代理感知 + mapped IPv6 + 响应体上限 + 重定向白名单）、SSH（TOFU 确认 + 密码 Keychain + known_hosts 锁 + 参数注入）、WebView（CSP + asset scope 收窄 + 零远程资源）、Agent（敏感路径强制询问 + 危险命令启发式 + 权限三档）。当前无高优先级遗留项。
+本应用为本地桌面工具，攻击面有限且已系统性加固：SSRF（DNS 钉扎 + 代理感知 + mapped IPv6 + 响应体上限 + 重定向白名单）、SSH（TOFU 确认 + 密码 Keychain + known_hosts 锁 + 参数注入 + 文件名单一组件校验）、WebView（CSP + asset scope 收窄 + 零远程资源）、Agent（敏感路径强制询问 + 危险命令启发式 + 权限三档）。当前无高优先级遗留项。
