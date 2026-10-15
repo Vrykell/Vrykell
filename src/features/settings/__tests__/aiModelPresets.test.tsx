@@ -32,6 +32,7 @@ describe('AiModelPage presets', () => {
   it('fills a new model row from the preset and makes it active', async () => {
     render(<AiModelPage />);
 
+    fireEvent.click(await screen.findByTestId('provider-add'));
     fireEvent.click(await screen.findByTestId('model-preset-DeepSeek'));
 
     await waitFor(() => {
@@ -49,6 +50,7 @@ describe('AiModelPage presets', () => {
     });
     render(<AiModelPage />);
 
+    fireEvent.click(await screen.findByTestId('provider-add'));
     fireEvent.click(await screen.findByTestId('model-preset-DeepSeek'));
 
     await waitFor(() => expect(useAiConfigStore.getState().activeModel).toBe('mine'));

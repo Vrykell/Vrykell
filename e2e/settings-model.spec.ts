@@ -1,5 +1,9 @@
 /**
- * 设置页 e2e：模型配置（API Key + 模型列表）。
+ * 设置页 e2e：模型配置（服务商列 + API Key + 按服务商过滤的模型列表）。
+ *
+ * 种子数据：m-main（主力模型，Anthropic 端点）在前，m-local（本地模型，
+ * OpenAI 兼容 @ 127.0.0.1:11434）在后且为当前生效模型；mock 只预置了
+ * openai-compatible 的密钥。
  */
 import { test, expect } from '@playwright/test';
 import { setupTauriMock, aiKeyCalls, aiModelCalls } from './tauri-mock';
@@ -12,8 +16,27 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('模型配置页', () => {
-  test('API Key：默认已配置，清除后未配置，再保存恢复', async ({ page }) => {
-    // mock 默认预置 key，页面显示已配置
+  test('服务商列：默认选中第一行、搜索过滤、Escape 清空、切换选中', async ({ page }) => {
+    const rows = page.locator('.settings-provider-row');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.first()).toHaveAttribute('aria-current', 'true');
+    // 搜索过滤行，Escape 清空
+    const search = page.getByPlaceholder('搜索服务商…');
+    await search.fill('anth');
+    await expect(rows).toHaveCount(1);
+    await search.press('Escape');
+    await expect(rows).toHaveCount(2);
+    // 切换选中
+    await rows.nth(1).click();
+    await expect(rows.nth(1)).toHaveAttribute('aria-current', 'true');
+    await expect(rows.first()).not.toHaveAttribute('aria-current', 'true');
+  });
+
+  test('API Key：按服务商配置，清除后未配置，再保存恢复', async ({ page }) => {
+    // 默认第一行（Anthropic 端点）没有密钥；预置密钥属于本地那个 OpenAI 兼容端点
+    const rows = page.locator('.settings-provider-row');
+    await expect(fieldOf(page, '服务商 API Key').getByText('未配置')).toBeVisible();
+    await rows.nth(1).click();
     const keyField = fieldOf(page, '服务商 API Key');
     await expect(keyField.getByText('已配置')).toBeVisible();
     // 清除
@@ -29,37 +52,57 @@ test.describe('模型配置页', () => {
     expect(calls.some((c) => c.provider === 'openai-compatible' && c.key === 'sk-e2e-key')).toBe(true);
   });
 
-  test('模型列表：两个预置模型、设为当前、添加/改名/删除', async ({ page }) => {
-    // 两个模型卡（名称在 input value 里）
+  test('模型列表：按服务商过滤，设为当前、添加/改名/删除', async ({ page }) => {
+    const rows = page.locator('.settings-provider-row');
     const nameInputs = page.getByPlaceholder('模型名称');
-    await expect(nameInputs).toHaveCount(2);
-    await expect(nameInputs.nth(0)).toHaveValue('主力模型');
-    await expect(nameInputs.nth(1)).toHaveValue('本地模型');
-
-    // 默认生效模型是本地模型（mock 种子），第一张卡有「设为当前」
-    await expect(nameInputs.nth(1).locator('xpath=../../..').getByText('当前')).toBeVisible();
-    const mainCard = nameInputs.nth(0).locator('xpath=../../..');
+    // 默认（Anthropic 行）只显示主力模型
+    await expect(nameInputs).toHaveCount(1);
+    await expect(nameInputs.first()).toHaveValue('主力模型');
+    // 本地端点行显示本地模型，而它是当前生效模型
+    await rows.nth(1).click();
+    await expect(nameInputs).toHaveCount(1);
+    await expect(nameInputs.first()).toHaveValue('本地模型');
+    await expect(nameInputs.first().locator('xpath=../../..').getByText('当前')).toBeVisible();
+    // 回到 Anthropic 行，把主力模型设为当前
+    await rows.first().click();
+    const mainCard = nameInputs.first().locator('xpath=../../..');
     await mainCard.getByRole('button', { name: '设为当前' }).click();
     await expect(mainCard.getByText('当前')).toBeVisible();
     const activeCalls = await aiModelCalls(page);
     expect(activeCalls.some((c) => c.kind === 'set_active' && c.id === 'm-main')).toBe(true);
-
-    // 添加模型 → 第 3 个卡，改名提交
+    // 添加模型 → 该服务商多一张卡，改名提交
     await page.getByRole('button', { name: /添加模型/ }).click();
-    await expect(nameInputs).toHaveCount(3);
-    await nameInputs.nth(2).fill('新模型');
-    await nameInputs.nth(2).press('Enter');
+    await expect(nameInputs).toHaveCount(2);
+    await nameInputs.nth(1).fill('新模型');
+    await nameInputs.nth(1).press('Enter');
     await expect(page.locator('.settings-page-header').getByRole('status')).toHaveText('已保存');
-    await expect(nameInputs.nth(2)).toHaveValue('新模型');
+    await expect(nameInputs.nth(1)).toHaveValue('新模型');
     const setModels = await aiModelCalls(page);
     const addCall = setModels.filter((c) => c.kind === 'set_models').pop();
     expect(addCall?.models).toHaveLength(3);
     expect((addCall?.models as { name: string }[])[2]?.name).toBe('新模型');
-
-    // 删除新模型 → 回 2 个
-    const newCard = nameInputs.nth(2).locator('xpath=../../..');
+    // 删除新模型 → 回一张卡
+    const newCard = nameInputs.nth(1).locator('xpath=../../..');
     await newCard.locator('[data-tip="删除模型"]').click();
-    await expect(page.getByPlaceholder('模型名称')).toHaveCount(2);
+    await expect(page.getByPlaceholder('模型名称')).toHaveCount(1);
+  });
+
+  test('添加服务商：预设落盘为新行并选中该服务商', async ({ page }) => {
+    const rows = page.locator('.settings-provider-row');
+    await page.getByTestId('provider-add').click();
+    await page.getByTestId('model-preset-DeepSeek').click();
+    await expect(rows).toHaveCount(3);
+    const deepseek = rows.filter({ hasText: 'DeepSeek' });
+    await expect(deepseek).toHaveAttribute('aria-current', 'true');
+    await expect(page.getByPlaceholder('模型名称')).toHaveCount(1);
+    await expect(page.getByPlaceholder('模型名称')).toHaveValue('DeepSeek');
+  });
+
+  test('服务商选择跨重载保持（lastSelectedProvider）', async ({ page }) => {
+    await page.locator('.settings-provider-row').nth(1).click();
+    await page.reload();
+    await openSettings(page);
+    await expect(page.locator('.settings-provider-row').nth(1)).toHaveAttribute('aria-current', 'true');
   });
 
   test('settings search filters individual results and focuses the selected control', async ({ page }) => {

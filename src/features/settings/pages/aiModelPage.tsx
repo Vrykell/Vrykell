@@ -1,11 +1,15 @@
-import { IconButton } from '@ui/IconButton';
 /**
- * Provider credentials and configured models.
+ * Provider credentials and configured models, in two panes: the provider rail on the left
+ * (see ProviderRail) and the selected provider's key and model rows on the right. A provider
+ * is an endpoint (API family plus effective base URL); the rail, selection and the row
+ * filtering all derive from the model list itself (see providerList).
  */
+import { useMemo, useRef } from 'react';
+import { IconButton } from '@ui/IconButton';
 import { Plus, X } from '@ui/icons';
 import { t } from '@i18n';
 import {
-  setProviderKey, clearProviderKey, setAiModels, setActiveModel, useAiConfigStore,
+  setProviderKey, clearProviderKey, setAiModels, setActiveModel, selectProvider, useAiConfigStore,
   type ModelProfile,
 } from '@features/agent';
 import type { ProviderKind } from '@features/agent/services/provider';
@@ -15,16 +19,18 @@ import { modelIcon, providerLabel } from '@features/agent/components/modelIcon';
 import Select from '@ui/Select';
 import { useToastStore } from '@ui/Toast';
 import { SettingsGroup, Field, ModelTextInput, btnStyle } from '@features/settings/components/ui';
-import { MODEL_PRESETS, applyModelPreset, type ModelPreset } from '@config/modelPresets';
+import { applyModelPreset, type ModelPreset } from '@config/modelPresets';
 import ModelThinkingSettings from '@features/settings/components/ModelThinkingSettings';
+import ProviderRail, { type ProviderRailEntry } from '@features/settings/components/ProviderRail';
+import { providerHasKey, providerId, providerList, type ProviderRow } from '@features/settings/model/providerList';
+import HarnessBadge from '../components/HarnessBadge';
 import AutoSaveInput from '../components/AutoSaveInput';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
 
-const PROVIDERS: { id: ProviderKind; label: string }[] = [
-  { id: 'openai-compatible', label: 'OpenAI 兼容' },
-  { id: 'anthropic', label: 'Anthropic' },
-  { id: 'gemini', label: 'Gemini' },
-];
+/** API families a model row can use, in the order the select offers them. */
+const PROVIDER_KINDS: ProviderKind[] = ['openai-compatible', 'anthropic', 'gemini'];
+
+const newModelId = () => `m${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
 
 /** Serialize model edits and merge each patch with the latest persisted list. */
 let modelWrites = Promise.resolve();
@@ -44,17 +50,17 @@ function selectModel(id: string) {
   return write;
 }
 
-/** 能力徽标行（视觉/推理/工具/搜索，探测结果） */
+/** Capability chips (vision / reasoning / tools / search, as detected). */
 function CapChips({ profile }: { profile: ModelProfile }) {
   const caps = profile.capabilities ?? detectCapabilities(profile.provider, profile.model);
   return (
     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
       {(
         [
-          ['vision', '视觉'],
-          ['reasoning', '推理'],
-          ['tools', '工具'],
-          ['search', '搜索'],
+          ['vision', t('Vision')],
+          ['reasoning', t('Reasoning')],
+          ['tools', t('Tools')],
+          ['search', t('Search')],
         ] as [ModelCapability, string][]
       ).map(([cap, label]) => (
         <span
@@ -76,60 +82,179 @@ function CapChips({ profile }: { profile: ModelProfile }) {
 
 export function AiModelPage() {
   const aiCfg = useAiConfigStore();
-  const provider = aiCfg.provider;
-  const keySet =
-    provider === 'anthropic' ? aiCfg.hasAnthropicKey
-    : provider === 'gemini' ? aiCfg.hasGeminiKey
-    : aiCfg.hasKey;
+  const { save } = useSettingsSave();
+  const detailRef = useRef<HTMLDivElement>(null);
   const toast = (msg: string, type: 'info' | 'success' | 'error') =>
     useToastStore.getState().addToast(msg, type);
 
-  return (
-    <>
-      <SettingsGroup title={t('Provider credentials')}>
-        <Field
-          layout="stacked"
-          title="服务商 API Key"
-          description={t('Models from the current provider share one key, stored only on this device.')}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <span style={{
-              fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', borderRadius: 4,
-              color: keySet ? 'var(--success)' : 'var(--text-muted)',
-              background: keySet ? 'var(--success-bg)' : 'var(--hover)',
-            }}>
-              {keySet ? '已配置' : '未配置'}
-            </span>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <AutoSaveInput
-              key={provider}
-              type="password"
-              value=""
-              placeholder={keySet ? '输入以覆盖，留空不改动' : '输入 API Key'}
-              onCommit={key => setProviderKey(provider, key)}
-              clearAfterSave
-              onClear={keySet ? async () => { await clearProviderKey(provider); toast('已清除 API Key', 'success'); } : undefined}
-              validate={key => key.trim() ? undefined : '留空不改动'}
-              style={{ flex: 1 }}
-            />
-          </div>
-        </Field>
+  const models = aiCfg.models;
+  const rows = useMemo(() => providerList(models), [models]);
+  const selectedId = useMemo(() => {
+    const wanted = aiCfg.selectedProvider ?? aiCfg.lastSelectedProvider;
+    if (wanted && rows.some((row) => row.id === wanted)) return wanted;
+    return rows[0]?.id ?? null;
+  }, [rows, aiCfg.selectedProvider, aiCfg.lastSelectedProvider]);
+  const selected = rows.find((row) => row.id === selectedId) ?? null;
 
-      </SettingsGroup>
-      <SettingsGroup title={t('Available models')}>
-          <ModelListField />
-      </SettingsGroup>
-    </>
+  const entries: ProviderRailEntry[] = rows.map((row) => ({
+    id: row.id,
+    kind: row.kind,
+    name: row.name,
+    hasKey: providerHasKey(row.kind, aiCfg),
+  }));
+
+  /** A preset adds its first model row and selects the vendor it belongs to. */
+  const addPreset = (preset: ModelPreset) => {
+    void save(async () => {
+      let target = '';
+      await commitModels((current) => {
+        const next = applyModelPreset(current, preset, newModelId);
+        target = next.id;
+        return next.models;
+      });
+      if (target) await selectModel(target);
+      selectProvider(providerId(preset.provider, preset.baseUrl));
+    });
+  };
+
+  const setCurrentProvider = (rowId: string) => {
+    const row = rows.find((entry) => entry.id === rowId);
+    if (!row) return;
+    selectProvider(rowId);
+    const target = row.models.find((model) => model.id === aiCfg.activeModel) ?? row.models[0];
+    if (target && target.id !== aiCfg.activeModel) void save(() => selectModel(target.id));
+  };
+
+  const editProviderKey = (rowId: string) => {
+    selectProvider(rowId);
+    requestAnimationFrame(() => {
+      detailRef.current?.querySelector<HTMLInputElement>('input[type="password"]')?.focus();
+    });
+  };
+
+  /** Deleting a provider removes its rows; the list never becomes empty. */
+  const removeProvider = (rowId: string) => {
+    const row = rows.find((entry) => entry.id === rowId);
+    if (!row) return;
+    if (models.length - row.models.length <= 0) {
+      toast(t('Keep at least one model'), 'info');
+      return;
+    }
+    const removed = new Set(row.models.map((model) => model.id));
+    void save(() => commitModels((current) => current.filter((model) => !removed.has(model.id))));
+    if (selectedId === rowId) selectProvider(null);
+  };
+
+  return (
+    <div className="settings-provider-page">
+      <ProviderRail
+        entries={entries}
+        selectedId={selectedId}
+        onSelect={selectProvider}
+        onSetCurrent={setCurrentProvider}
+        onEditKey={editProviderKey}
+        onDelete={removeProvider}
+        onAddPreset={addPreset}
+      />
+      <div ref={detailRef} style={{ flex: 1, minWidth: 0 }}>
+        {selected ? (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, minWidth: 0 }}>
+              <HarnessBadge name={selected.name || providerLabel(selected.kind)} size={24} />
+              <span style={{
+                fontWeight: 'var(--fw-medium)', minWidth: 0, overflow: 'hidden',
+                whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+              }}>
+                {selected.name || providerLabel(selected.kind)}
+              </span>
+              <span
+                data-tip={selected.baseUrl}
+                style={{
+                  color: 'var(--text-muted)', fontSize: 'var(--fs-caption)', minWidth: 0,
+                  overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+                }}
+              >
+                {selected.baseUrl}
+              </span>
+              {/* Read-only: a provider counts as enabled while it has models. */}
+              <span
+                style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}
+                data-tip={t('Enabled while this provider has models.')}
+              >
+                <span
+                  role="switch"
+                  aria-checked="true"
+                  aria-disabled="true"
+                  aria-label={t('Enabled while this provider has models.')}
+                  data-testid="provider-enabled"
+                  style={{ width: 38, height: 22, borderRadius: 10, background: 'var(--accent)', position: 'relative', display: 'inline-block' }}
+                >
+                  <span style={{
+                    position: 'absolute', top: 3, left: 19, width: 16, height: 16,
+                    borderRadius: '50%', background: 'var(--accent-text)',
+                  }} />
+                </span>
+              </span>
+            </div>
+            <ProviderCredentials row={selected} toast={toast} />
+            <ProviderModels row={selected} toast={toast} />
+          </>
+        ) : (
+          <div className="settings-provider-empty">{t('No providers yet.')}</div>
+        )}
+      </div>
+    </div>
   );
 }
 
-function ModelListField() {
-  const models = useAiConfigStore((s) => s.models);
-  const activeId = useAiConfigStore((s) => s.activeModel);
+function ProviderCredentials({ row, toast }: {
+  row: ProviderRow<ModelProfile>;
+  toast: (msg: string, type: 'info' | 'success' | 'error') => void;
+}) {
+  const aiCfg = useAiConfigStore();
+  const keySet = providerHasKey(row.kind, aiCfg);
+  return (
+    <SettingsGroup title={t('Provider credentials')}>
+      <Field
+        layout="stacked"
+        title={t('Provider API Key')}
+        description={t('Models from the current provider share one key, stored only on this device.')}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <span style={{
+            fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', borderRadius: 4,
+            color: keySet ? 'var(--success)' : 'var(--text-muted)',
+            background: keySet ? 'var(--success-bg)' : 'var(--hover)',
+          }}>
+            {keySet ? t('Configured') : t('Not configured')}
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <AutoSaveInput
+            key={row.kind}
+            type="password"
+            value=""
+            placeholder={keySet ? t('Type to replace; leave empty to keep') : t('Enter API key')}
+            onCommit={key => setProviderKey(row.kind, key)}
+            clearAfterSave
+            onClear={keySet ? async () => { await clearProviderKey(row.kind); toast(t('API key cleared'), 'success'); } : undefined}
+            validate={key => key.trim() ? undefined : t('Type to replace; leave empty to keep')}
+            style={{ flex: 1 }}
+          />
+        </div>
+      </Field>
+    </SettingsGroup>
+  );
+}
+
+function ProviderModels({ row, toast }: {
+  row: ProviderRow<ModelProfile>;
+  toast: (msg: string, type: 'info' | 'success' | 'error') => void;
+}) {
+  const aiCfg = useAiConfigStore();
   const { save } = useSettingsSave();
-  const toast = (msg: string, type: 'info' | 'success' | 'error') =>
-    useToastStore.getState().addToast(msg, type);
+  const models = aiCfg.models;
+  const activeId = aiCfg.activeModel;
 
   const update = (id: string, patch: Partial<ModelProfile>) =>
     commitModels(
@@ -146,141 +271,112 @@ function ModelListField() {
 
   const remove = (id: string) => {
     if (models.length <= 1) {
-      toast('至少保留一个模型', 'info');
+      toast(t('Keep at least one model'), 'info');
       return;
     }
     void save(() => commitModels(current => current.filter((m) => m.id !== id)));
   };
 
   const add = () => {
-    const id = `m${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
     void save(() => commitModels(
       current => [
         ...current,
         {
-          id,
-          name: `模型 ${models.length + 1}`,
-          provider: 'openai-compatible',
-          baseUrl: 'https://api.openai.com/v1',
+          id: newModelId(),
+          name: t('Model {{index}}', { index: current.length + 1 }),
+          provider: row.kind,
+          baseUrl: row.baseUrl,
           model: '',
-          capabilities: detectCapabilities('openai-compatible', ''),
+          capabilities: detectCapabilities(row.kind, ''),
         },
       ],
     ));
   };
 
-  /** A preset is a head start: the row it adds stays an ordinary editable model. */
-  const addPreset = (preset: ModelPreset) => {
-    void save(async () => {
-      const state = useAiConfigStore.getState();
-      const next = applyModelPreset(
-        state.models, preset,
-        () => `m${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`,
-      );
-      if (next.models !== state.models) await commitModels(() => next.models);
-      await selectModel(next.id);
-    });
-  };
-
   return (
-    <Field
-      layout="stacked"
-      title="模型列表"
-      description={t('Configure models and choose the active one. Models from the same provider share an API key.')}
-    >
-      {/* Pick a vendor and the endpoint, the model id and the provider are filled in; the row stays editable. */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
-        <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-caption)' }}>{t('Presets')}</span>
-        <div data-testid="model-presets" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {MODEL_PRESETS.map((preset) => (
-            <button key={preset.name} type="button" style={btnStyle} data-testid={`model-preset-${preset.name}`}
-              data-tip={preset.baseUrl || t('The vendor default endpoint')}
-              data-tip-description={`${preset.model} · ${t(preset.hint)}`}
-              onClick={() => addPreset(preset)}>
-              {preset.name}
-            </button>
-          ))}
-        </div>
-        <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-micro)' }}>
-          {t('Vendor names and endpoints are listed as data so a model can be filled in quickly; the app ships no third-party program, key or brand asset.')}
-        </span>
-      </div>
-      <div className="settings-record-list">
-        {models.map((m) => (
-          <div
-            key={m.id}
-            className="settings-record"
-          >
-            <div className="settings-model-header">
-              <span
-                data-tip={providerLabel(m.provider)}
-                style={{
-                  width: 28, height: 32, borderRadius: 7, flexShrink: 0,
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'var(--block)', color: 'var(--text-secondary)',
-                }}
-              >
-                {(() => {
-                  const Icon = modelIcon(m.provider, m.model);
-                  return <Icon size={14} />;
-                })()}
-              </span>
-              <ModelTextInput
-                value={m.name}
-                placeholder="模型名称"
-                onCommit={(v) => update(m.id, { name: v })}
-                style={{ flex: 1, fontWeight: 'var(--fw-medium)' }}
-              />
-              {m.id === activeId ? (
-                <span className="settings-model-active" style={{
-                  fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', borderRadius: 4, flexShrink: 0,
-                  color: 'var(--success)', background: 'var(--success-bg)',
-                }}>
-                  当前
+    <SettingsGroup title={t('Available models')}>
+      <Field
+        layout="stacked"
+        title={t('Model list')}
+        description={t('Configure models and choose the active one. Models from the same provider share an API key.')}
+      >
+        <div className="settings-record-list">
+          {row.models.map((m) => (
+            <div
+              key={m.id}
+              className="settings-record"
+            >
+              <div className="settings-model-header">
+                <span
+                  data-tip={providerLabel(m.provider)}
+                  style={{
+                    width: 28, height: 32, borderRadius: 7, flexShrink: 0,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'var(--block)', color: 'var(--text-secondary)',
+                  }}
+                >
+                  {(() => {
+                    const Icon = modelIcon(m.provider, m.model);
+                    return <Icon size={14} />;
+                  })()}
                 </span>
-              ) : (
-                <button data-subtle onClick={() => { void save(() => selectModel(m.id)); }} style={btnStyle}>
-                  设为当前
-                </button>
-              )}
-              <IconButton tone="danger" onClick={() => remove(m.id)} data-tip={t('Delete model')} aria-label={t('Delete model')}><X size={16} /></IconButton>
+                <ModelTextInput
+                  value={m.name}
+                  placeholder={t('Model name')}
+                  onCommit={(v) => update(m.id, { name: v })}
+                  style={{ flex: 1, fontWeight: 'var(--fw-medium)' }}
+                />
+                {m.id === activeId ? (
+                  <span className="settings-model-active" style={{
+                    fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', borderRadius: 4, flexShrink: 0,
+                    color: 'var(--success)', background: 'var(--success-bg)',
+                  }}>
+                    {t('Current')}
+                  </span>
+                ) : (
+                  <button data-subtle onClick={() => { void save(() => selectModel(m.id)); }} style={btnStyle}>
+                    {t('Set as current')}
+                  </button>
+                )}
+                <IconButton tone="danger" onClick={() => remove(m.id)} data-tip={t('Delete model')} aria-label={t('Delete model')}><X size={16} /></IconButton>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                <Select
+                  aria-label={t('{{name}} provider', { name: m.name || t('Unnamed model') })}
+                  options={PROVIDER_KINDS.map((kind) => ({ value: kind, label: providerLabel(kind) }))}
+                  value={m.provider}
+                  onChange={(v) => { void save(() => update(m.id, { provider: v, baseUrl: baseUrlForProvider(m.baseUrl, v) })); }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <ModelTextInput
+                  value={m.baseUrl}
+                  placeholder={t('Endpoint (base URL)')}
+                  onCommit={(v) => update(m.id, { baseUrl: v })}
+                  style={{ flex: 1 }}
+                />
+                <ModelTextInput
+                  value={m.model}
+                  placeholder={t('Model ID')}
+                  onCommit={(v) => update(m.id, { model: v })}
+                  style={{ flex: 1 }}
+                />
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <CapChips profile={m} />
+              </div>
+              <ModelThinkingSettings modelId={m.id} name={m.name || m.model} />
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-              <Select
-                aria-label={`${m.name || '未命名模型'} 提供方`}
-                options={PROVIDERS.map((p) => ({ value: p.id, label: p.label }))}
-                value={m.provider}
-                onChange={(v) => { void save(() => update(m.id, { provider: v, baseUrl: baseUrlForProvider(m.baseUrl, v) })); }}
-              />
-            </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-              <ModelTextInput
-                value={m.baseUrl}
-                placeholder="服务地址 (Base URL)"
-                onCommit={(v) => update(m.id, { baseUrl: v })}
-                style={{ flex: 1 }}
-              />
-              <ModelTextInput
-                value={m.model}
-                placeholder="模型 ID"
-                onCommit={(v) => update(m.id, { model: v })}
-                style={{ flex: 1 }}
-              />
-            </div>
-            <div style={{ marginTop: 8 }}>
-              <CapChips profile={m} />
-            </div>
-            <ModelThinkingSettings modelId={m.id} name={m.name || m.model} />
-          </div>
-        ))}
-        <button
-          data-subtle
-          onClick={add}
-          style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}
-        >
-          <Plus size={12} /> 添加模型
-        </button>
-      </div>
-    </Field>
+          ))}
+          <button
+            data-subtle
+            onClick={add}
+            style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}
+          >
+            <Plus size={12} /> {t('Add model')}
+          </button>
+        </div>
+      </Field>
+    </SettingsGroup>
   );
 }

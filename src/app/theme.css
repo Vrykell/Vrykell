@@ -962,6 +962,24 @@ button.state-icon-button { color: var(--icon-color); }
 .settings-model-header input, .settings-model-header > button, .settings-model-active { height: 32px; }
 .settings-model-active { display: inline-flex; align-items: center; }
 
+/* Provider rail: the provider column of the model page (ProviderRail.tsx). */
+.settings-provider-page { display: flex; align-items: flex-start; gap: 20px; }
+.settings-provider-rail { display: flex; flex-direction: column; gap: 8px; width: 248px; flex-shrink: 0; padding-right: 16px; border-right: 1px solid var(--border); }
+.settings-provider-list { display: flex; flex-direction: column; gap: 2px; }
+.settings-provider-row { position: relative; display: flex; align-items: center; gap: 8px; width: 100%; box-sizing: border-box; padding: 5px 8px; border: 1px solid transparent; border-radius: var(--radius-inner); background: transparent; color: var(--text-primary); font-size: var(--fs-label); cursor: pointer; text-align: left; }
+.settings-provider-row:is(:hover, :focus-visible) { background: var(--hover); }
+.settings-provider-row[aria-current="true"] { background: var(--hover); border-color: var(--border); }
+.settings-provider-name { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.settings-provider-row[aria-current="true"] .settings-provider-name { font-weight: var(--fw-medium); }
+.settings-provider-tail { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; flex-shrink: 0; }
+.settings-provider-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
+.settings-provider-dot[data-empty] { background: transparent; border: 1px solid var(--border-strong); }
+.settings-provider-kebab { position: absolute; inset: 0; display: inline-flex; align-items: center; justify-content: center; opacity: 0; }
+.settings-provider-row:is(:hover, :focus-within) .settings-provider-dot { visibility: hidden; }
+.settings-provider-row:is(:hover, :focus-within) .settings-provider-kebab { opacity: 1; }
+.settings-provider-empty { padding: 10px 8px; text-align: center; color: var(--text-muted); font-size: var(--fs-caption); }
+.settings-provider-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+
 .context-menu-separator { height: 1px; margin: 4px 8px; background: var(--border); }
 
 .ssh-recovery-action { height: var(--control-size); padding: 0 12px; color: var(--text-primary); }
