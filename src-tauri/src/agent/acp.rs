@@ -110,8 +110,23 @@ pub enum PermissionOutcome {
     Cancelled,
 }
 
-/// Decides permission requests. The caller installs one; the local approval chain lives behind it.
-pub type PermissionHandler = Arc<dyn Fn(Value) -> PermissionOutcome + Send + Sync>;
+/// Decides permission requests. `None` answers immediately (a probe never runs a tool); `Some`
+/// means the decision comes later, from the page, and the client waits for it.
+pub type PermissionHandler = Arc<dyn Fn(Value) -> Option<oneshot::Receiver<PermissionOutcome>> + Send + Sync>;
+
+/// How long a pending permission may hold a turn before it answers itself with the protocol's own
+/// "no". The page normally answers long before this; the deadline exists so an unattended session
+/// cannot hang for ever, which is the same rule the approval card follows.
+pub const PERMISSION_TIMEOUT: Duration = Duration::from_secs(600);
+
+/// Wait for a decision, or refuse when the deadline passes.
+async fn await_permission(receiver: oneshot::Receiver<PermissionOutcome>, timeout: Duration) -> PermissionOutcome {
+    match tokio::time::timeout(timeout, receiver).await {
+        Ok(Ok(outcome)) => outcome,
+        // A dropped sender means nobody will ever answer.
+        _ => PermissionOutcome::Cancelled,
+    }
+}
 
 /// Requests that arrive from the agent while a turn is running.
 type Pending = Arc<Mutex<HashMap<u64, oneshot::Sender<Result<Value, String>>>>>;
@@ -176,7 +191,14 @@ impl AcpClient {
                         (Some(id), m) => {
                             let reply = if m == "session/request_permission" {
                                 let params = message.get("params").cloned().unwrap_or(Value::Null);
-                                match permission(params) {
+                                // Waiting here is safe: the protocol is sequential at this point (the
+                                // agent holds the turn until it has an answer), and the deadline
+                                // keeps an unattended session from hanging.
+                                let outcome = match permission(params.clone()) {
+                                    Some(receiver) => await_permission(receiver, PERMISSION_TIMEOUT).await,
+                                    None => PermissionOutcome::Cancelled,
+                                };
+                                match outcome {
                                     PermissionOutcome::Selected(option) => json!({
                                         "outcome": { "outcome": "selected", "optionId": option }
                                     }),
@@ -415,7 +437,7 @@ pub async fn acp_handshake(name: String) -> Result<Value, String> {
         if harness.cwd.trim().is_empty() { None } else { Some(Path::new(&harness.cwd)) },
         &harness.env,
         // A probe never runs a tool: anything the agent asks for is refused, fail closed.
-        Arc::new(|_| PermissionOutcome::Cancelled),
+        Arc::new(|_| None),
     )
     .map_err(|error| {
         // Say which program was missing: "program not found" alone leaves the user guessing.
@@ -472,17 +494,21 @@ pub fn acp_harnesses() -> Vec<HarnessConfig> {
 
 /// Sessions currently open. Dropping the last reference kills the child (`kill_on_drop`).
 #[derive(Default)]
-pub struct AcpRuntime(Mutex<HashMap<String, Arc<AcpClient>>>);
+pub struct AcpRuntime {
+    sessions: Mutex<HashMap<String, Arc<AcpClient>>>,
+    /// Permission requests waiting for the page's answer, keyed by tool call id.
+    pending: Arc<Mutex<HashMap<String, oneshot::Sender<PermissionOutcome>>>>,
+}
 
 impl AcpRuntime {
     fn insert(&self, session: String, client: Arc<AcpClient>) {
-        if let Ok(mut map) = self.0.lock() {
+        if let Ok(mut map) = self.sessions.lock() {
             map.insert(session, client);
         }
     }
 
     fn get(&self, session: &str) -> Result<Arc<AcpClient>, String> {
-        self.0
+        self.sessions
             .lock()
             .map_err(|_| "the ACP state is poisoned".to_string())?
             .get(session)
@@ -491,10 +517,39 @@ impl AcpRuntime {
     }
 
     fn remove(&self, session: &str) {
-        if let Ok(mut map) = self.0.lock() {
+        if let Ok(mut map) = self.sessions.lock() {
             map.remove(session);
         }
     }
+
+    /// Answer a pending permission request. `option_id` is one of the options the agent offered;
+    /// `None` answers the protocol's own "cancelled".
+    fn answer(&self, tool_call_id: &str, option_id: Option<String>) -> Result<(), String> {
+        let sender = self
+            .pending
+            .lock()
+            .map_err(|_| "the ACP state is poisoned".to_string())?
+            .remove(tool_call_id)
+            .ok_or_else(|| format!("no permission request is waiting for {tool_call_id}"))?;
+        let outcome = match option_id {
+            Some(option) => PermissionOutcome::Selected(option),
+            None => PermissionOutcome::Cancelled,
+        };
+        sender.send(outcome).map_err(|_| "the request is no longer waiting".to_string())
+    }
+}
+
+/// Answer a permission request the harness sent (the card's buttons land here). The tool call id is
+/// what the request was keyed by, and an unknown one is refused rather than ignored.
+#[tauri::command]
+pub fn acp_answer_permission(
+    state: tauri::State<'_, AcpRuntime>,
+    tool_call_id: String,
+    option_id: Option<String>,
+) -> Result<(), String> {
+    let answered = state.answer(&tool_call_id, option_id.clone());
+    note("acp-permission-answered", json!({ "toolCallId": tool_call_id, "optionId": option_id }));
+    answered
 }
 
 /// One event from a harness session. `kind` is one of `update`, `permission`, `stop`, `error`.
@@ -537,16 +592,25 @@ pub async fn acp_open<R: tauri::Runtime>(
         .ok_or_else(|| format!("no enabled harness named {name}"))?
         .clone();
 
-    // Phase 1 has no approval card for harness permissions yet, so the client refuses and tells the
-    // session what was asked for; the wire stays honest and nothing runs unapproved.
+    // Phase 1 shows the request in the transcript; the answer comes back through
+    // `acp_answer_permission`, and an unanswered request refuses itself when the deadline passes.
     let permission_app = app.clone();
+    let pending = state.pending.clone();
+    // Cloned up front: the handler runs on the reader task and cannot borrow the command's state.
+    let pending_handle = pending.clone();
     let permission: PermissionHandler = Arc::new(move |params: Value| {
+        let tool_call = params.get("toolCall").cloned().unwrap_or(Value::Null);
+        let tool_call_id = tool_call.get("toolCallId").and_then(Value::as_str).unwrap_or_default().to_string();
         let session = params.get("sessionId").and_then(Value::as_str).unwrap_or_default().to_string();
+        let (sender, receiver) = oneshot::channel();
+        if let Ok(mut map) = pending_handle.lock() {
+            map.insert(tool_call_id.clone(), sender);
+        }
         emit(
             &permission_app,
             AcpEvent { session_id: session, kind: "permission".to_string(), payload: params },
         );
-        PermissionOutcome::Cancelled
+        Some(receiver)
     });
 
     let client = Arc::new(AcpClient::spawn(
@@ -751,7 +815,10 @@ mod tests {
             seen.clone(),
             Arc::new(move |params: Value| {
                 asked_for_handler.lock().unwrap().push(params);
-                PermissionOutcome::Selected("allow-once".to_string())
+                // The answer travels through a channel, which is how the page answers too.
+                let (sender, receiver) = oneshot::channel();
+                let _ = sender.send(PermissionOutcome::Selected("allow-once".to_string()));
+                Some(receiver)
             }),
         );
 
@@ -808,7 +875,7 @@ mod tests {
         // The fake agent asks for a file the client never advertised.
         let (theirs, ours) = tokio::io::duplex(4096);
         let (read, write) = tokio::io::split(ours);
-        let client = AcpClient::over(read, write, Arc::new(|_| PermissionOutcome::Cancelled));
+        let client = AcpClient::over(read, write, Arc::new(|_| None));
 
         let agent = tokio::spawn(async move {
             let mut ours = theirs;
@@ -836,7 +903,7 @@ mod tests {
     #[tokio::test]
     async fn a_cancelled_turn_is_a_notification_the_agent_sees() {
         let seen: Arc<Mutex<Vec<Value>>> = Arc::new(Mutex::new(Vec::new()));
-        let (client, agent) = client_pair(seen.clone(), Arc::new(|_| PermissionOutcome::Cancelled));
+        let (client, agent) = client_pair(seen.clone(), Arc::new(|_| None));
         client.initialize("vrykell", "0.1.0").await.expect("handshake");
         client.cancel("sess_1").expect("cancel");
         tokio::time::sleep(Duration::from_millis(50)).await;
@@ -856,6 +923,29 @@ mod tests {
             "session/cancel is a notification, never a request"
         );
         agent.abort();
+    }
+
+    #[tokio::test]
+    async fn a_permission_nobody_answers_times_out_as_cancelled() {
+        // A dropped sender is an answer that can never arrive: the wait ends instead of hanging.
+        let (sender, receiver) = oneshot::channel();
+        drop(sender);
+        assert_eq!(await_permission(receiver, Duration::from_millis(50)).await, PermissionOutcome::Cancelled);
+
+        // The deadline wins when the answer never comes: the sender is alive but silent, so only the
+        // clock can end the wait.
+        let (sender, receiver) = oneshot::channel();
+        assert_eq!(await_permission(receiver, Duration::from_millis(20)).await, PermissionOutcome::Cancelled);
+        drop(sender);
+
+        // ... and an answer that arrives in time wins over the deadline, which is the case that
+        // matters: the page's click decides, not the clock.
+        let (sender, receiver) = oneshot::channel();
+        let _ = sender.send(PermissionOutcome::Selected("allow-once".to_string()));
+        assert_eq!(
+            await_permission(receiver, Duration::from_millis(500)).await,
+            PermissionOutcome::Selected("allow-once".to_string())
+        );
     }
 
     #[test]

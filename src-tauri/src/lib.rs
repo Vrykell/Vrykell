@@ -215,6 +215,7 @@ pub fn run() {
             agent::acp::acp_prompt,
             agent::acp::acp_cancel,
             agent::acp::acp_close,
+            agent::acp::acp_answer_permission,
             files::file_open::file_open,
             files::file_open::file_open_with,
             commands::search::search_files,
