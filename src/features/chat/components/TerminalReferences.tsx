@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { t } from '@i18n';
 import { ChevronRight, TerminalPrompt, X } from '@ui/icons';
 import { IconButton } from '@ui/IconButton';
+import { TextButton } from '@ui/TextButton';
 import { useTerminalStore } from '@features/terminal';
 import BlockOutput from '@features/terminal/components/BlockOutput';
 import { showExecutionTerminal } from '../services/conversationContext';
@@ -43,8 +44,8 @@ export default function TerminalReferences({ references, onRemove, framed = true
               {reference.output ? <BlockOutput text={reference.output} flush={framed} /> : <span>{t('No output')}</span>}
             </div>
           </ToolOutput>
-          {!!sessions[reference.paneId] && <button type="button" data-subtle className="ai-tool-terminal-link"
-            onClick={() => showExecutionTerminal(reference.paneId)}>{t('View terminal')}</button>}
+          {!!sessions[reference.paneId] && <TextButton className="ai-tool-terminal-link"
+            onClick={() => showExecutionTerminal(reference.paneId)}><TerminalPrompt size={14} aria-hidden="true" />{t('View terminal')}</TextButton>}
         </div>}
       </div>;
     })}

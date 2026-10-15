@@ -7,6 +7,7 @@ import BlockOutput from '@features/terminal/components/BlockOutput';
 import { useBlockStore, useTerminalStore } from '@features/terminal';
 import { agentControl } from '@features/agent/services/agentControl';
 import { resolveApproval } from '@features/agent';
+import { TextButton } from '@ui/TextButton';
 import { showExecutionTerminal } from '../services/conversationContext';
 import type { ToolRun, ToolRunState } from '@features/agent/model/messageParts';
 
@@ -111,7 +112,7 @@ export default function ToolRunCard({ run, paneId, framed = false }: { run: Tool
       : <ToolOutput framed={framed} text={body}>
         <pre className="ai-tool-output" data-selectable>{truncated ? `${t('Only the end of the output is shown')}\n` : ''}{body.slice(-6000)}</pre>
       </ToolOutput>)}
-    {isCommand && paneId && sessions[paneId] && (open || run.state === 'approval-pending') && <button type="button" data-subtle
-      className="ai-tool-terminal-link" onClick={() => showExecutionTerminal(paneId)}>{t('View terminal')}</button>}
+    {isCommand && paneId && sessions[paneId] && (open || run.state === 'approval-pending') && <TextButton
+      className="ai-tool-terminal-link" onClick={() => showExecutionTerminal(paneId)}><TerminalPrompt size={14} aria-hidden="true" />{t('View terminal')}</TextButton>}
   </div>;
 }
