@@ -1,8 +1,8 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { t, type I18nKey } from '@i18n';
 import { Brain, ChevronRight, FileText, Folder, Globe, Pencil, Search, TerminalPrompt, Wrench } from '@ui/icons';
 import ErrorBox from '@ui/ErrorBox';
-import CopyButton from '@ui/CopyButton';
+import ToolOutput from './ToolOutput';
 import BlockOutput from '@features/terminal/components/BlockOutput';
 import { useBlockStore, useTerminalStore } from '@features/terminal';
 import { agentControl } from '@features/agent/services/agentControl';
@@ -53,19 +53,6 @@ function expandBody(run: ToolRun): string {
     } catch { /* Unstructured output is displayed verbatim. */ }
   }
   return run.error ?? run.output ?? '';
-}
-
-/**
- * Expanded tool output. The terminal snapshot renders at full height: the `.ai-tool-output`
- * box is the only scroll container, so no second scrollbar appears. In the chat panel the
- * output also drops its own terminal surface and gains a copy target in the top-right corner.
- */
-function ToolOutput({ framed, text, children }: { framed: boolean; text: string; children: ReactNode }) {
-  return <div className="ai-tool-frame">
-    {children}
-    {framed && text.length > 0 && <CopyButton className="ai-tool-copy" testId="tool-output-copy"
-      text={text} label={t('Copy output')} />}
-  </div>;
 }
 
 function CommandOutputBlock({ run, paneId, framed }: { run: ToolRun; paneId?: string; framed: boolean }) {

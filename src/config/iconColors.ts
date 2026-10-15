@@ -5,7 +5,7 @@ import { isHistoryGroupColor, type HistoryGroupColor } from '@ui/historyGroupCol
 export type IconColors = Record<string, HistoryGroupColor>;
 
 /** Stable entity keys keep colors across navigation, archive and restoration. */
-export const iconColorKey = (scope: 'session' | 'page' | 'group', id: string) => `${scope}:${id}`;
+export const iconColorKey = (scope: 'session', id: string) => `${scope}:${id}`;
 
 export function iconColorCss(color: HistoryGroupColor | null | undefined): string | undefined {
   return color ? color === 'neutral' ? 'var(--text-secondary)' : `var(--group-${color})` : undefined;
@@ -15,7 +15,7 @@ function sanitizeColors(value: unknown): IconColors {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   const colors: IconColors = {};
   for (const [key, color] of Object.entries(value)) {
-    if (/^(session|page|group):.+/.test(key) && isHistoryGroupColor(color)) colors[key] = color;
+    if (/^session:.+/.test(key) && isHistoryGroupColor(color)) colors[key] = color;
   }
   return colors;
 }
@@ -28,6 +28,7 @@ interface IconColorState {
 export const useIconColorStore = create<IconColorState>()(persist((set) => ({
   colors: {},
   setColor: (key, color) => set(state => {
+    if (!/^session:.+/.test(key)) return state;
     const colors = { ...state.colors };
     if (color && isHistoryGroupColor(color)) colors[key] = color;
     else delete colors[key];

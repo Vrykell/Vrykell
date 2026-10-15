@@ -22,7 +22,8 @@ beforeEach(() => {
   });
 });
 
-it.each(['local', 'settings', 'history'])('colors the %s icon from its context menu without activating the tab', id => {
+it('colors terminal icons from their context menu without activating the tab', () => {
+  const id = 'local';
   render(<PanelTabs />);
   const row = screen.getByTestId(`tab-row-${id}`);
   fireEvent.contextMenu(row);
@@ -32,8 +33,16 @@ it.each(['local', 'settings', 'history'])('colors the %s icon from its context m
   expect(useSessionStore.getState().activeId).toBe('settings');
   fireEvent.contextMenu(row);
   fireEvent.click(screen.getByTestId('tab-icon-color-auto'));
-  if (id === 'local') expect(row.querySelector('svg')!.style.color).toBe('var(--shell-bash-accent)');
-  else expect(row.querySelector('svg')!.style.color).toBe(id === 'settings' ? 'var(--group-blue)' : 'var(--group-amber)');
+  expect(row.querySelector('svg')!.style.color).toBe('var(--shell-bash-accent)');
+});
+
+it.each(['settings', 'history'])('leaves the %s icon on its theme color without a palette', id => {
+  useIconColorStore.setState({ colors: { 'page:settings': 'coral', 'page:history': 'coral' } });
+  render(<PanelTabs />);
+  const row = screen.getByTestId(`tab-row-${id}`);
+  fireEvent.contextMenu(row);
+  expect(screen.queryByRole('group', { name: '图标颜色' })).toBeNull();
+  expect(row.querySelector('svg')!.style.color).toBe(id === 'settings' ? 'var(--group-blue)' : 'var(--group-amber)');
 });
 afterEach(() => { cleanup(); useListReorder.getState().end(); useSessionStore.setState(snapshot, true); });
 
@@ -101,7 +110,7 @@ it('keeps group rows intact through renaming and reordering', () => {
   ] });
   render(<PanelTabs />);
   const firstIcon = screen.getByTestId('group-header-group-a').querySelector('[data-group-icon]')!;
-  expect(firstIcon).toHaveStyle({ width: '24px', height: '24px', color: 'var(--group-amber)' });
+  expect(firstIcon).toHaveStyle({ width: '24px', height: '24px', color: 'var(--text-secondary)' });
   expect(firstIcon).toHaveAttribute('data-group-icon', 'open');
   act(() => useSessionStore.setState({ groups: [
     { id: 'group-b', title: 'Second', collapsed: false },
@@ -110,29 +119,28 @@ it('keeps group rows intact through renaming and reordering', () => {
   expect(screen.getByTestId('group-header-group-a')).toHaveTextContent('Renamed');
 });
 
-it('colors groups from a keyboard-accessible menu and inherits color until a member overrides it', () => {
+it('keeps group actions keyboard-accessible without group colors or member inheritance', () => {
   useSessionStore.setState(state => ({
     tabs: state.tabs.map(tab => tab.kind === 'session' ? { ...tab, groupId: 'group-a' } : tab),
     groups: [{ id: 'group-a', title: 'Group', collapsed: false }],
   }));
   render(<PanelTabs />);
+  act(() => useIconColorStore.setState({ colors: { 'group:group-a': 'violet' } }));
   const header = screen.getByTestId('group-header-group-a');
   const member = screen.getByTestId('tab-row-local');
   fireEvent.keyDown(header, { key: 'F10', shiftKey: true });
-  fireEvent.click(screen.getByRole('menuitemradio', { name: '紫色' }));
-  expect(header.querySelector('[data-group-icon]')).toHaveStyle({ color: 'var(--group-violet)' });
-  expect(member.querySelector('svg')!.style.color).toBe('var(--group-violet)');
+  expect(screen.queryByRole('menuitemradio')).toBeNull();
+  fireEvent.keyDown(window, { key: 'Escape' });
+  expect(header.querySelector('[data-group-icon]')).toHaveStyle({ color: 'var(--text-secondary)' });
+  expect(member.querySelector('svg')!.style.color).toBe('var(--shell-bash-accent)');
   expect(useSessionStore.getState().groups[0].collapsed).toBe(false);
   expect(header).toHaveFocus();
   fireEvent.contextMenu(member);
   fireEvent.click(screen.getByRole('menuitemradio', { name: '青色' }));
   expect(member.querySelector('svg')!.style.color).toBe('var(--group-cyan)');
-  fireEvent.contextMenu(header);
-  fireEvent.click(screen.getByRole('menuitemradio', { name: '绿色' }));
-  expect(member.querySelector('svg')!.style.color).toBe('var(--group-cyan)');
   fireEvent.contextMenu(member);
   fireEvent.click(screen.getByTestId('tab-icon-color-auto'));
-  expect(member.querySelector('svg')!.style.color).toBe('var(--group-green)');
+  expect(member.querySelector('svg')!.style.color).toBe('var(--shell-bash-accent)');
 });
 
 it('keeps a filtered nonempty group protected by the archive confirmation', () => {

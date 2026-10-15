@@ -5,7 +5,7 @@ import { iconSizes,
   ChevronRight, Pencil, Archive, FolderSolid, FolderOpenSolid, Trash2, X,
  } from '@ui/icons';
 import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, useTabDisplayTitle, tabIconKey, tabIconColor, pageIconColor, type Tab, type TabGroup } from '@features/workspace';
-import { iconColorCss, iconColorKey, useIconColorStore } from '@config/iconColors';
+import { useIconColorStore } from '@config/iconColors';
 import { HistoryColorChoices } from '@ui/HistoryColorPalette';
 import { regenerateTitle } from '@features/agent/services/title';
 import { useToastStore } from '@ui/Toast';
@@ -282,7 +282,7 @@ export default function PanelTabs() {
         <ContextMenu
           anchor={{ x: ctxMenu.x, y: ctxMenu.y }}
           items={ctxItems}
-          footer={ctxTab && <>
+          footer={ctxTab && isSessionTab(ctxTab) && <>
             <div className="history-menu-color-label">{t('Icon color')}</div>
             <HistoryColorChoices menu label={t('Icon color')} value={iconColors[tabIconKey(ctxTab)] ?? null}
               testId="tab-icon-color" onSelect={color => {
@@ -303,7 +303,7 @@ export default function PanelTabs() {
               : tab?.kind === 'settings' ? SettingsSolid
               : first?.kind === 'ssh' ? SshIcon
                 : shellIconFor(first?.kind === 'local' ? first.shellType : undefined);
-          const color = drag.kind === 'group' ? iconColorCss(iconColors[iconColorKey('group', drag.id)]) ?? 'var(--group-amber)'
+          const color = drag.kind === 'group' ? 'var(--text-secondary)'
             : tab ? tabIconColor(tab, iconColors) ?? pageIconColor(tab.kind) : 'var(--group-blue)';
           return <Icon size={iconSizes.row} style={{ color: drag.kind === 'group' || (tab && !isSessionTab(tab))
             ? color : tab ? tabIconColor(tab, iconColors) : undefined }} />;
@@ -343,8 +343,6 @@ function GroupSection(props: {
 }) {
   const { group, tabs, activeId } = props;
   const [menu, setMenu] = useState<MenuAnchor | null>(null);
-  const colors = useIconColorStore(state => state.colors);
-  const colorKey = iconColorKey('group', group.id);
   const collapsed = group.collapsed;
   const GroupIcon = collapsed ? FolderSolid : FolderOpenSolid;
   const empty = useSessionStore(state => !state.tabs.some(tab => isSessionTab(tab) && tab.groupId === group.id));
@@ -405,7 +403,7 @@ function GroupSection(props: {
           }}
         >
           <GroupIcon size={24} aria-hidden="true" data-group-icon={collapsed ? 'closed' : 'open'}
-            style={{ color: iconColorCss(colors[colorKey]) ?? 'var(--group-amber)' }} />
+            style={{ color: 'var(--text-secondary)' }} />
           {props.renamingGroupId === group.id ? (
             <TextInput
               autoFocus
@@ -486,11 +484,7 @@ function GroupSection(props: {
         { label: t('Rename tab group'), group: 'edit', onClick: props.onStartRenameGroup },
         { label: t(collapsed ? 'Expand group' : 'Collapse group'), group: 'view', onClick: props.onToggleCollapse },
         { label: t(empty ? 'Delete empty group' : 'Archive tab group'), danger: empty, group: 'danger', onClick: props.onDeleteGroup },
-      ]} footer={<>
-        <div className="history-menu-color-label">{t('Group color')}</div>
-        <HistoryColorChoices menu value={colors[colorKey] ?? null} testId={`tab-group-color-${group.id}`}
-          onSelect={color => { useIconColorStore.getState().setColor(colorKey, color); menu.trigger?.focus(); setMenu(null); }} />
-      </>} />}
+      ]} />}
     </div>
   );
 }
