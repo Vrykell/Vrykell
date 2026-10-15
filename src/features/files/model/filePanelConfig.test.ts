@@ -38,4 +38,16 @@ describe('filePanelConfig menus', () => {
     expect(local.pathBarFile).toBe('system-app');
     expect(ssh.pathBarFile).toBe('editor');
   });
+
+  it('offers everything the overflow menu does when right-clicking the blank area', () => {
+    const local = filePanelConfigFor({ kind: 'local' });
+    const ssh = filePanelConfigFor({ kind: 'ssh', connectionId: 'c1' });
+
+    for (const config of [local, ssh]) {
+      expect(config.menus.blank).toEqual(expect.arrayContaining(config.menus.more));
+    }
+    // 空白处多出「粘贴」（落点是当前目录），本地还多「从当前文件夹新建标签页」
+    expect(local.menus.blank).toEqual(expect.arrayContaining(['paste', 'new-tab-here']));
+    expect(ssh.menus.blank).toEqual(expect.arrayContaining(['paste', 'upload-file', 'upload-dir']));
+  });
 });

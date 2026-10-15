@@ -373,6 +373,27 @@ test.describe('文件面板', () => {
     expect(ops).toContainEqual({ op: 'rename', path: '/home/e2e/notes.txt', newName: 'renamed.txt' });
   });
 
+  test('空白处右键菜单与 ⋯ 菜单列出同一套操作', async ({ page }) => {
+    const tree = page.getByTestId('local-file-tree');
+    const menu = page.getByRole('menu', { name: '操作菜单' });
+    const menuItems = () => menu.evaluate((el) => [...el.querySelectorAll('button')]
+      .map((button) => (button as HTMLElement).innerText.trim()).filter(Boolean));
+
+    await page.getByTestId('local-more-btn').click();
+    const fromMore = await menuItems();
+    await page.keyboard.press('Escape');
+    expect(fromMore.length).toBeGreaterThan(0);
+
+    const box = (await tree.boundingBox())!;
+    await page.mouse.click(box.x + 40, box.y + box.height - 12, { button: 'right' });
+    await expect(menu).toBeVisible();
+    // 空白处不再缺项：⋯ 菜单有的这里都有（剪贴板为空时不多出「粘贴」）
+    expect(await menuItems()).toEqual(fromMore);
+    await expect(menu.getByRole('button', { name: '下载管理', exact: true })).toBeVisible();
+    await expect(menu.getByRole('button', { name: '收起全部文件夹', exact: true })).toBeVisible();
+    await expect(menu.getByRole('button', { name: '切换到当前终端文件目录', exact: true })).toBeVisible();
+  });
+
   test('右键新建按落点决定目录，建好立即重命名，重名自动加序号且回退用真实路径', async ({ page }) => {
     const tree = page.getByTestId('local-file-tree');
     /** 面板空白处右键（用元素范围定位，避免落到行上） */
