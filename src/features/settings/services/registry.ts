@@ -133,3 +133,13 @@ registerSetting({
   },
   onSelect: () => useSessionStore.getState().openUsageTab(),
 });
+
+// The harness hub is a workspace page too, so its entry carries its own action as well.
+registerSetting({
+  id: 'harness',
+  label: t('External harnesses'),
+  desc: t('External coding agents you add yourself; connecting runs the program you configure.'),
+  keywords: ['harness', 'acp', 'agent', 'claude', 'codex', 'gemini', 'harness 中心', '外部 harness'],
+  getValue: () => t('Open the hub to add or connect'),
+  onSelect: () => useSessionStore.getState().openHarnessHubTab(),
+});

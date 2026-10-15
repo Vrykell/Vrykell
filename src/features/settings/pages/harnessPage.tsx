@@ -105,6 +105,15 @@ export default function HarnessPage() {
       <Field layout="stacked" title={t('Configured harnesses')}
         description={t('A harness is a program you add to the list. Adding it is the authorization: it runs with your account, like a command typed into the terminal. Third-party programs are not bundled — install them yourself and follow their licences.')}>
         {list === null && <span style={{ color: 'var(--text-muted)' }}>{t('Loading…')}</span>}
+        <button type="button" data-testid="harness-open-hub"
+          onClick={() => useSessionStore.getState().openHarnessHubTab()}
+          style={{
+            alignSelf: 'flex-start', padding: '6px 14px', border: 0, borderRadius: 'var(--radius-inner)',
+            background: 'var(--accent)', color: 'var(--canvas)', cursor: 'pointer',
+            font: `${'var(--fs-caption)'} var(--font-ui)`,
+          }}>
+          {t('Open the harness hub')}
+        </button>
         {problems.length > 0 && (
           <span data-testid="harness-problems" style={{ color: 'var(--error)' }}>{problems.join(' · ')}</span>
         )}

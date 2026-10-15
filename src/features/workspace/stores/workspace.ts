@@ -28,7 +28,7 @@ import {
 
 export type { TitleSource };
 
-export type TabKind = 'session' | 'history' | 'ai-history' | 'settings' | 'usage' | 'harness';
+export type TabKind = 'session' | 'history' | 'ai-history' | 'settings' | 'usage' | 'harness' | 'harness-hub';
 
 /** SSH 会话目标（终端类型=ssh 时的专属字段） */
 export interface SshTabTarget extends SshOptions {
@@ -59,7 +59,9 @@ export type Tab =
   | (TabBase & { kind: 'settings' })
   | (TabBase & { kind: 'usage' })
   /** An external harness session; one tab per configured harness. */
-  | (TabBase & { kind: 'harness'; harness: string });
+  | (TabBase & { kind: 'harness'; harness: string })
+  /** The hub that lists configured harnesses and starts their sessions. */
+  | (TabBase & { kind: 'harness-hub' });
 
 export interface TabGroup {
   id: string;
@@ -71,7 +73,7 @@ export interface AddTabOptions {
   cwd?: string;
   title?: string;
   /** Defaults to local; history and settings kinds create workspace pages. */
-  kind?: 'local' | 'ssh' | 'history' | 'ai-history' | 'settings' | 'usage' | 'harness';
+  kind?: 'local' | 'ssh' | 'history' | 'ai-history' | 'settings' | 'usage' | 'harness' | 'harness-hub';
   /** Configured harness this page belongs to (kind='harness'). */
   harness?: string;
   shellType?: ShellType;
@@ -145,6 +147,7 @@ const HISTORY_TITLE = '会话历史';
 const AI_HISTORY_TITLE = t('AI conversation history');
 const SETTINGS_TITLE = '设置';
 const USAGE_TITLE = t('Usage statistics');
+const HARNESS_HUB_TITLE = t('Harness hub');
 
 interface WorkspaceState {
   tabs: Tab[];
@@ -159,6 +162,8 @@ interface WorkspaceState {
   openUsageTab: () => void;
   /** Open (or focus) the session page of a configured harness. */
   openHarnessTab: (name: string) => void;
+  /** Open (or focus) the hub that lists configured harnesses. */
+  openHarnessHubTab: () => void;
   /** 新建/复用设置标签页 */
   openSettingsTab: () => void;
   closeTab: (id: string) => void;
@@ -226,7 +231,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   programTitles: {},
   addTab: (opts) => {
     const o = opts ?? {};
-    if (o.kind === 'history' || o.kind === 'ai-history' || o.kind === 'settings' || o.kind === 'usage') {
+    if (o.kind === 'history' || o.kind === 'ai-history' || o.kind === 'settings' || o.kind === 'usage' || o.kind === 'harness-hub') {
       const existing = get().tabs.find(tab => tab.kind === o.kind);
       if (existing) {
         get().activate(existing.id);
@@ -273,6 +278,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     } else if (o.kind === 'harness') {
       const harness = o.harness ?? '';
       tab = { id, title: harness || 'Harness', kind: 'harness', harness, titleSource: 'manual' };
+    } else if (o.kind === 'harness-hub') {
+      tab = { id, title: HARNESS_HUB_TITLE, kind: 'harness-hub', titleSource: 'manual' };
     } else {
       const preference = useTerminalDefaults.getState().shell;
       const shellType = o.shellType ?? (preference === 'system' ? undefined : preference);
@@ -316,6 +323,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   openAiHistoryTab: () => { get().addTab({ kind: 'ai-history' }); },
   openUsageTab: () => { get().addTab({ kind: 'usage' }); },
   openHarnessTab: (name) => { get().addTab({ kind: 'harness', harness: name }); },
+  openHarnessHubTab: () => { get().addTab({ kind: 'harness-hub' }); },
   openSettingsTab: () => {
     const existing = get().tabs.find((t) => t.kind === 'settings');
     if (existing) {
@@ -372,6 +380,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       get().addTab({ kind: 'usage' });
     } else if (closed.kind === 'harness') {
       get().addTab({ kind: 'harness', harness: closed.harness });
+    } else if (closed.kind === 'harness-hub') {
+      get().addTab({ kind: 'harness-hub' });
     } else {
       // kind/payload 已随会话落库，restore 从后端读取重建
       sessionManager.restore(closed.id, closed.title);
