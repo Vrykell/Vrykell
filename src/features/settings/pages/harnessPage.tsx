@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { t } from '@i18n';
 import { useToastStore } from '@ui/Toast';
 import { SettingsGroup, Field, inputStyle, btnStyle } from '@features/settings/components/ui';
+import HarnessBadge from '@features/settings/components/HarnessBadge';
 import { invoke } from '@platform/diagnostics';
 import { useSessionStore } from '@features/workspace';
 import { acpHandshake, acpHarnessSave, acpHarnesses, type AgentDescription } from '@platform/api/acp';
@@ -114,31 +115,59 @@ export default function HarnessPage() {
         )}
         <div className="settings-option-list">
           {list?.map((harness, index) => (
-            <div key={`${harness.name}-${index}`} data-testid={`harness-row-${index}`} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 0', borderTop: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                <input aria-label={t('Harness name')} value={harness.name} style={{ ...inputStyle, width: 150 }}
-                  onChange={(event) => patch(index, { name: event.target.value })} />
-                <input aria-label={t('Command')} value={harness.command} style={{ ...inputStyle, width: 150 }}
-                  onChange={(event) => patch(index, { command: event.target.value })} />
-                {installed[harness.command.trim()] === false && (
-                  <span data-testid={`harness-missing-${index}`} style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-micro)' }}>
-                    {t('Not installed on PATH')}
+            <div key={`${harness.name}-${index}`} data-testid={`harness-row-${index}`} style={{
+              display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 14px', marginTop: 8,
+              border: '1px solid var(--border)', borderRadius: 16,
+              background: harness.enabled ? 'var(--surface)' : 'var(--hover)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                <HarnessBadge name={harness.name} size={32} />
+                <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                    <input aria-label={t('Harness name')} value={harness.name}
+                      style={{ ...inputStyle, width: 150, fontWeight: 'var(--fw-semibold)' }}
+                      onChange={(event) => patch(index, { name: event.target.value })} />
+                    {installed[harness.command.trim()] === false && (
+                      <span data-testid={`harness-missing-${index}`} style={{
+                        color: 'var(--warning, var(--text-muted))', fontSize: 'var(--fs-micro)',
+                        padding: '1px 6px', borderRadius: 4, background: 'var(--hover)',
+                      }}>
+                        {t('Not installed on PATH')}
+                      </span>
+                    )}
                   </span>
-                )}
-                <input aria-label={t('Arguments')} value={harness.args.join(' ')} style={{ ...inputStyle, flex: 1, minWidth: 160 }}
-                  placeholder={t('Arguments, separated by spaces')}
-                  onChange={(event) => patch(index, { args: event.target.value.split(/\s+/).filter(Boolean) })} />
+                  <span data-tip={t('The command line this harness runs')} style={{
+                    color: 'var(--text-muted)', fontSize: 'var(--fs-micro)', marginTop: 2,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {harness.command} {harness.args.join(' ')}
+                  </span>
+                </span>
                 <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--text-secondary)', fontSize: 'var(--fs-caption)' }}>
                   <input type="checkbox" checked={harness.enabled} aria-label={t('Enabled')}
                     onChange={(event) => patch(index, { enabled: event.target.checked })} />
                   {t('Enabled')}
                 </label>
+                <button data-subtle data-testid={`harness-connect-${index}`} disabled={!harness.enabled}
+                  onClick={() => useSessionStore.getState().openHarnessTab(harness.name)} style={{
+                    padding: '5px 12px', border: 0, borderRadius: 'var(--radius-inner)', cursor: harness.enabled ? 'pointer' : 'default',
+                    background: harness.enabled ? 'var(--accent)' : 'var(--hover)', color: harness.enabled ? 'var(--canvas)' : 'var(--text-muted)',
+                    font: `${'var(--fs-caption)'} var(--font-ui)`,
+                  }}>{t('Connect')}</button>
                 <button style={btnStyle} data-testid={`harness-test-${index}`} onClick={() => void test(harness.name)}>{t('Test connection')}</button>
-                <button style={btnStyle} data-testid={`harness-connect-${index}`} disabled={!harness.enabled}
-                  onClick={() => useSessionStore.getState().openHarnessTab(harness.name)}>{t('Connect')}</button>
-                <button style={btnStyle} data-testid={`harness-remove-${index}`}
-                  onClick={() => { setTouched(true); setList((current) => current?.filter((_entry, at) => at !== index) ?? current); }}>{t('Remove')}</button>
               </div>
+              <details>
+                <summary style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-caption)', cursor: 'pointer' }}>{t('Command and arguments')}</summary>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                  <input aria-label={t('Command')} value={harness.command} style={{ ...inputStyle, width: 150 }}
+                    onChange={(event) => patch(index, { command: event.target.value })} />
+                  <input aria-label={t('Arguments')} value={harness.args.join(' ')} style={{ ...inputStyle, flex: 1, minWidth: 160 }}
+                    placeholder={t('Arguments, separated by spaces')}
+                    onChange={(event) => patch(index, { args: event.target.value.split(/\s+/).filter(Boolean) })} />
+                  <button style={btnStyle} data-testid={`harness-remove-${index}`}
+                    onClick={() => { setTouched(true); setList((current) => current?.filter((_entry, at) => at !== index) ?? current); }}>{t('Remove')}</button>
+                </div>
+              </details>
               {probe[harness.name] && <span data-testid={`harness-probe-${index}`} style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-caption)' }}>{probe[harness.name]}</span>}
             </div>
           ))}
