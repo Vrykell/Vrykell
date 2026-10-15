@@ -231,11 +231,11 @@ export default function PanelChat() {
       <div ref={transcriptRef}>
         {exchanges.length ? exchanges.map(exchange => <AiBlock key={exchange.id} exchange={exchange} conversationId={activeId} presentation="conversation" />)
           : <div className="chat-empty"><Sparkles size={26} /><strong>{t('What would you like to work on?')}</strong>
-            <span>{loading ? t('Loading conversationsâ€?) : t('Ask a question, attach a file, or bring in terminal output.')}</span></div>}
+            <span>{loading ? t('Loading conversationsâ€¦') : t('Ask a question, attach a file, or bring in terminal output.')}</span></div>}
       </div>
     </div>
     {/* Always in the layout on purpose: a slot that comes and goes with the follow state changes the
-        transcript's height, and then the content and this button trade places on every scroll event â€?
+        transcript's height, and then the content and this button trade places on every scroll event â€”
         that loop is what made the bottom of the panel jump. Only the slot's visibility changes. */}
     <div className="chat-jump-slot" style={{ visibility: following ? 'hidden' : 'visible' }} aria-hidden={following}>
       <button type="button" data-subtle className="chat-jump-latest" aria-label={t('Jump to latest reply')}
@@ -268,7 +268,7 @@ export default function PanelChat() {
       </>}
     >
       <Zap size={20} aria-hidden="true" className="chat-composer-lead" />
-      <TextArea ref={composer.inputRef} data-chat-composer value={composer.text} placeholder={t('Describe what you want to doâ€?)} rows={1}
+      <TextArea ref={composer.inputRef} data-chat-composer value={composer.text} placeholder={t('Describe what you want to doâ€¦')} rows={1}
         onChange={composer.handleChange} onKeyDown={event => {
           if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); submit(); }
           else composer.handleKeyDown(event);
