@@ -30,6 +30,8 @@ export default defineConfig(async () => ({
   },
 
   test: {
+    // Test discovery is limited to project source, excluding downloaded design references.
+    include: ["src/**/*.{test,spec}.{ts,tsx,js,jsx}"],
     environment: "jsdom",
     setupFiles: "./src/test-utils/setup.ts",
     globals: true,
