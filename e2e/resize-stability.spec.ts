@@ -31,6 +31,34 @@ for (const renderer of ['dom', 'webgl']) {
   });
 }
 
+test('a held divider drag keeps the local grid live and notifies the remote once, on release', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.addInitScript(() => {
+    localStorage.setItem('vrykell-agent-settings', JSON.stringify({ version: 8, state: { global: { openModeByShell: { zsh: 'classic' } }, overrides: {} } }));
+  });
+  await page.goto('/');
+  const screen = page.locator('.xterm-screen').first();
+  await expect(screen).toBeVisible();
+  const handleLocator = page.getByTestId('resize-handle-tabs');
+  if (!(await handleLocator.isVisible())) await page.locator('[data-dock-btn="tabs"]').click();
+  await expect(handleLocator).toBeVisible();
+  const handle = (await handleLocator.boundingBox())!;
+  const widthBefore = (await screen.boundingBox())!.width;
+  const resizesBefore = (await ptyResizes(page)).length;
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + 140);
+  await page.mouse.down();
+  for (const delta of [20, 40, 60, 80]) {
+    await page.mouse.move(handle.x + handle.width / 2 + delta, handle.y + 140, { steps: 3 });
+    await page.waitForTimeout(50);
+  }
+  // The local grid follows the pointer live; nothing has reached the remote PTY yet.
+  await expect.poll(async () => (await screen.boundingBox())!.width).toBeLessThan(widthBefore);
+  expect((await ptyResizes(page)).length).toBe(resizesBefore);
+  await page.mouse.up();
+  // Releasing the drag delivers exactly the final size once.
+  await expect.poll(async () => (await ptyResizes(page)).length).toBe(resizesBefore + 1);
+});
+
 test('short commands complete without mounting a temporary live output canvas', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');

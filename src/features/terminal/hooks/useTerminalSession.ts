@@ -41,6 +41,7 @@ import type { UnlistenFn } from '@tauri-apps/api/event';
 import { getTerminalFontOptions, measureTerminalDomCellWidth } from '@features/terminal/model/terminalFont';
 import { prepareSshHost } from '@features/ssh/services/hostTrust';
 import { terminalTypographyChanged, useTypographyStore } from '@config/typography';
+import { isLayoutResizeDragActive, onLayoutResizeDragEnd } from '@ui/layoutResizeDrag';
 
 /** Live session references shared across development reloads. */
 interface SessionRegistry {
@@ -215,7 +216,7 @@ export function useTerminalSession(
     useTerminalStore.getState().setDims(paneId, term.cols, term.rows);
 
     let sessionId: string | null = null;
-    const resizeQueue = createResizeQueue((cols, rows) => sessionId ? ptyResize(sessionId, cols, rows) : Promise.resolve());
+    const resizeQueue = createResizeQueue((cols, rows) => sessionId ? ptyResize(sessionId, cols, rows) : Promise.resolve(), 120);
     let disposed = false;
     let stopped = false;
     let connectionFailed = false;
@@ -762,6 +763,16 @@ export function useTerminalSession(
     };
 
     let widthRaf = 0;
+    let deferredPtySize: { cols: number; rows: number } | null = null;
+    // The local grid keeps following the pointer, but a held layout drag tells the remote PTY
+    // nothing until the pointer is released: every SIGWINCH makes the remote redraw its prompt,
+    // so a per-step notification moves the visible content on each column and leaves reprint
+    // artifacts in the scrollback. The final size is sent once the drag ends.
+    const requestPtySize = (cols: number, rows: number) => {
+      if (!sessionId) return;
+      if (isLayoutResizeDragActive()) { deferredPtySize = { cols, rows }; return; }
+      resizeQueue.request(cols, rows);
+    };
     const applyWidth = () => {
       if (widthRaf) return;
       widthRaf = requestAnimationFrame(() => {
@@ -787,18 +798,24 @@ export function useTerminalSession(
         if (scene === 'altScreen') {
           // 全屏是纯 xterm 画布：让 fit 使用渲染器实测尺寸，避免字体回退后的
           // 私有 cellWidth 与 canvas 实际 cell 不一致。
-          if (sessionId) resizeQueue.request(term.cols, term.rows);
+          requestPtySize(term.cols, term.rows);
           controller.resize(term.cols, term.rows);
           return;
         }
         const cols = effectiveCols();
         const rows = effectiveRows();
         if (cols <= 0 || rows <= 0) return;
-        if (sessionId) resizeQueue.request(cols, rows);
+        requestPtySize(cols, rows);
         controller.resize(cols, rows);
       });
     };
     widthSyncs.set(paneId, applyWidth);
+    const unsubscribeLayoutDrag = onLayoutResizeDragEnd(() => {
+      if (disposed || !deferredPtySize) return;
+      const size = deferredPtySize;
+      deferredPtySize = null;
+      resizeQueue.request(size.cols, size.rows);
+    });
     const unsubscribeTypography = useTypographyStore.subscribe((state, previous) => {
       if (!terminalTypographyChanged(state, previous)) return;
       Object.assign(term.options, getTerminalFontOptions());
@@ -898,6 +915,7 @@ export function useTerminalSession(
       dataSub.dispose();
       inputRenderSub?.dispose();
       resizeQueue.dispose();
+      unsubscribeLayoutDrag();
       cancelAnimationFrame(widthRaf);
       ro.disconnect();
       document.removeEventListener('visibilitychange', onVisibilityChange);

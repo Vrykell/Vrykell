@@ -65,4 +65,29 @@ describe('terminal resizing', () => {
     await Promise.resolve();
     expect(send).toHaveBeenCalledTimes(1);
   });
+
+  it('coalesces a rapid size stream to one notification per interval and keeps the last size', async () => {
+    vi.useFakeTimers();
+    try {
+      const send = vi.fn(() => Promise.resolve());
+      const queue = createResizeQueue(send, 120);
+      queue.request(80, 24);
+      expect(send).toHaveBeenCalledTimes(1);
+      queue.request(79, 24);
+      queue.request(78, 24);
+      expect(send).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(120);
+      expect(send).toHaveBeenCalledTimes(2);
+      expect(send).toHaveBeenLastCalledWith(78, 24);
+      queue.request(77, 24);
+      await vi.advanceTimersByTimeAsync(120);
+      expect(send).toHaveBeenLastCalledWith(77, 24);
+      queue.dispose();
+      queue.request(70, 24);
+      await vi.advanceTimersByTimeAsync(500);
+      expect(send).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
