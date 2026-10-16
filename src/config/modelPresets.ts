@@ -2,9 +2,8 @@
  * modelPresets — one-click fills for the model list.
  *
  * An endpoint and a model identifier are data, not logic: vendors ship new models constantly, so
- * each preset is one editable line in this table. The vendor names are labels for the endpoints they
- * name (with marks drawn locally to point at them), no key is bundled, and install and license what
- * you use yourself.
+ * each preset is one editable line in this table. The vendor names and marks point at the endpoints
+ * they name, no key is bundled, and install and license what you use yourself.
  */
 export type ModelPresetProvider = 'openai-compatible' | 'anthropic' | 'gemini';
 

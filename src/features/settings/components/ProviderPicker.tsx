@@ -86,7 +86,7 @@ export default function ProviderPicker({ entries, selectedId, onSelect, onAddPre
             );
           })}
           <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-micro)' }}>
-            {t('Vendor names, endpoints and marks are listed as references so a model can be filled in quickly; the marks are drawn locally and the app ships no third-party program or key.')}
+            {t('Vendor names, endpoints and marks identify the services they name so a model can be filled in quickly; the app ships no third-party program or key.')}
           </span>
         </div>
       )}
