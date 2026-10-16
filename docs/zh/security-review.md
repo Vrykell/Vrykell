@@ -13,7 +13,7 @@
 | SFTP 目录下载 `download_dir_recursive` 未校验远端条目名，`..`/含分隔符可路径遍历逃逸下载目录 | 高 | 拒绝 `.`/`..`/含 `/` `\` 的名称 |
 | SSH 用户名为空时默认 `root` 登录 | 高 | 改为报错「用户名不能为空」 |
 | `which_cmd_sync` 命令探测注入 | 高 | 保留白名单（字母数字 + `-._+`），并改用 `/bin/sh` |
-| AI API key 明文写入 `~/.vrykell/config.json` 且未收紧权限 | 中 | key 移出 `config.json`，与 SSH 密码统一进平台密钥存储（Windows DPAPI 加密 / macOS 钥匙串 / 其它平台 0600 文件）；旧明文由启动清理封存后才可读，运行时只接受可解密的密文（未封存或损坏的值按缺失处理），目录 0700 / 文件 0600 仍保留作纵深防御 |
+| AI API key 明文写入 `~/.vrykell/config.json` 且未收紧权限 | 中 | key 移出 `config.json`，与 SSH 密码统一进平台密钥存储（Windows DPAPI 加密 / macOS 钥匙串 / 其它平台 0600 文件）；不做明文迁移，运行时只接受可解密的密文（未封存或损坏的值按缺失处理，重输一次即加密覆盖），目录 0700 / 文件 0600 仍保留作纵深防御 |
 | `ai_stream` 无超时（网络挂起会无限等待） | 中 | 加 `connect_timeout(15s)` + 总 `timeout(180s)` |
 | SSE 多字节字符跨 chunk 截断乱码（非安全，属健壮性） | 低 | 字节缓冲按 `\n` 切完整行再解码 |
 | 迁移顺序错误导致启动 panic（`no such column: group_id`） | 高（可用性） | 索引创建移到 ALTER 之后 |

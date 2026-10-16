@@ -59,11 +59,6 @@ pub fn run() {
             }
             // 上次会话残留的可回退删除暂存项：补送入系统回收站（后台执行，不阻塞启动）
             std::thread::spawn(files::fs::sweep_undo_dir);
-            // 旧版明文密钥：升级成平台加密形式（Windows DPAPI）
-            let upgraded = secret::seal_pending_values();
-            if upgraded > 0 {
-                eprintln!("[secret] upgraded {upgraded} stored secret(s) to the platform seal");
-            }
             if let Some(cfg) = app.try_state::<theme::ThemeState>() {
                 let path = cfg.0.lock().ok().map(|c| c.background_image.clone());
                 if let Some(Some(p)) = path {

@@ -231,8 +231,8 @@ fn write_secret(account: &str, secret: &str) -> Result<(), String> {
     write_map(&map)
 }
 
-/// Windows 只接受能解密的密文：旧明文与损坏的密文一律按“缺失”处理（旧明文由
-/// seal_pending_values 在启动时封存后才可读），运行时绝不把未封存的原串当作密钥使用。
+/// Windows 只接受能解密的密文：旧明文与损坏的密文一律按“缺失”处理，绝不把未封存的原串
+/// 当作密钥使用（不做迁移——重新输入一次即会以密文覆盖）。
 #[cfg(windows)]
 fn read_secret(account: &str) -> Option<String> {
     let raw = read_map()
@@ -276,37 +276,7 @@ pub fn delete_secret(account: &str) {
     remove_secret(account);
 }
 
-/// 启动时一次性升级：把文件里仍是明文的旧值改写成平台加密形式（幂等，返回升级条数）。
-#[cfg(windows)]
-pub fn seal_pending_values() -> usize {
-    let Ok(_guard) = STORE_LOCK.lock() else { return 0 };
-    let mut map = read_map();
-    let mut upgraded = 0usize;
-    for value in map.values_mut() {
-        let Some(text) = value.as_str() else { continue };
-        if text.starts_with(SEALED_PREFIX) {
-            continue;
-        }
-        match seal(text) {
-            Ok(sealed) => {
-                *value = serde_json::Value::String(sealed);
-                upgraded += 1;
-            }
-            Err(error) => eprintln!("[secret] 加密旧值失败：{error}"),
-        }
-    }
-    if upgraded > 0 {
-        let _ = write_map(&map);
-    }
-    upgraded
-}
-
 /// macOS 把值放在钥匙串里，文件不参与；其它平台没有系统密钥环，保持原样。
-#[cfg(not(windows))]
-pub fn seal_pending_values() -> usize {
-    0
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -347,7 +317,7 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn legacy_plaintext_is_migrated_by_the_sweep_and_never_used_raw() {
+    fn legacy_plaintext_reads_as_missing_and_is_left_untouched() {
         let account = format!("legacy-{}", std::process::id());
         {
             let _guard = STORE_LOCK.lock().unwrap();
@@ -355,11 +325,14 @@ mod tests {
             map.insert(account.clone(), serde_json::Value::String("old-plain-value".into()));
             write_map(&map).unwrap();
         }
-        // 运行时只接受能解密的密文：未封存的旧明文不算“有值”
+        // 运行时只接受能解密的密文：旧明文按缺失处理，且不做任何迁移
         assert_eq!(read_secret(&account), None);
-        // 启动清理把它封存，之后即可读回原值
-        assert!(seal_pending_values() >= 1);
-        assert_eq!(read_secret(&account).as_deref(), Some("old-plain-value"));
+        let stored = read_map()
+            .get(&account)
+            .and_then(|v| v.as_str())
+            .map(str::to_string)
+            .unwrap();
+        assert_eq!(stored, "old-plain-value", "no migration may rewrite the stored value");
         // 篡改/损坏的密文同样按缺失处理，不会把原始串当作密钥
         {
             let _guard = STORE_LOCK.lock().unwrap();
