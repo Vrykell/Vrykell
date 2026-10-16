@@ -51,7 +51,7 @@ describe('terminalClipboard', () => {
     hasImageMock.mockReset().mockResolvedValue(false);
     requestConfirmMock.mockReset().mockResolvedValue(true);
     toasts.length = 0;
-    useTerminalStore.setState({ sessions: {}, scenes: {} });
+    useTerminalStore.setState({ sessions: {}, scenes: {}, altScreenActive: false });
     termInstances.clear();
     vi.spyOn(window, 'getSelection').mockReturnValue(null);
   });
@@ -91,8 +91,8 @@ describe('terminalClipboard', () => {
     expect(requestConfirmMock).not.toHaveBeenCalled();
   });
 
-  it('uses the running block terminal for paste modes and the main terminal in alternate screen', async () => {
-    useTerminalStore.setState({ sessions: { p1: 'sess-1' }, scenes: { p1: 'blockList' } });
+  it('uses the running block terminal for paste modes and the main terminal only for a real alternate buffer', async () => {
+    useTerminalStore.setState({ sessions: { p1: 'sess-1' }, scenes: { p1: 'blockList' }, altScreenActive: false });
     const main = pasteAwareTerm();
     const block = pasteAwareTerm();
     termInstances.set('p1', main.term);
@@ -101,9 +101,17 @@ describe('terminalClipboard', () => {
     await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(true);
     expect(block.paste).toHaveBeenCalledWith('line one\nline two');
     expect(main.paste).not.toHaveBeenCalled();
-    useTerminalStore.setState({ scenes: { p1: 'altScreen' } });
+
+    // A manual fullscreen keeps the running block as the interactive surface.
+    useTerminalStore.setState({ scenes: { p1: 'altScreen' }, altScreenActive: true });
     await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(true);
-    expect(main.paste).toHaveBeenCalledWith('line one\nline two');
+    expect(block.paste).toHaveBeenCalledTimes(2);
+    expect(main.paste).not.toHaveBeenCalled();
+
+    // Only a real alternate buffer hands the pane back to the main terminal.
+    useTerminalStore.setState({ altScreenActive: false });
+    await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(true);
+    expect(main.paste).toHaveBeenCalledTimes(1);
   });
 
   it('falls back to a raw PTY write when no terminal instance is registered', async () => {
