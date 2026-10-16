@@ -66,6 +66,18 @@ if ($available) {
   if (!$identity -or $identity.GetAttribute('Name') -ne 'Vrykell.ContextMenu' -or $identity.GetAttribute('Publisher') -ne 'CN=Vrykell') { throw 'Unexpected package identity.' }
   $class = $manifest.SelectSingleNode("//*[local-name()='Class' and @Id='8D41BA19-3B2F-4D6D-A96B-FE3AD0EC5821']")
   if (!$class) { throw 'The extension class is missing.' }
+  # The package must identity its own host: declaring the application itself makes Windows grant the
+  # package identity to every process with that image name, and an ended shell activation then
+  # terminates the running application.
+  $application = $manifest.SelectSingleNode("/*[local-name()='Package']/*[local-name()='Applications']/*[local-name()='Application']")
+  $declaredHost = $(if ($application) { $application.GetAttribute('Executable') } else { '' })
+  if ($declaredHost -ne 'windows-context-menu\VrykellShellHost.exe') { throw 'The package does not declare its identity host.' }
+  $hostName = [IO.Path]::GetFileName($declaredHost)
+  $hostPath = Join-Path $AssetDirectory $hostName
+  $hostPayload = $archive.GetEntry($declaredHost.Replace('\', '/'))
+  if (!$hostPayload) { throw 'The signed package is missing its identity host.' }
+  $stream = $hostPayload.Open()
+  try { $expectedHostHash = Get-StreamHash $stream } finally { $stream.Dispose() }
   $relativePath = $class.GetAttribute('Path')
   if ($relativePath -notmatch '^windows-context-menu\\VrykellExplorerCommand-[0-9a-f]{16}\.dll$') { throw 'Invalid extension path.' }
   $dllName = [IO.Path]::GetFileName($relativePath)
@@ -75,7 +87,7 @@ if ($available) {
   $stream = $payload.Open()
   try { $expectedDllHash = Get-StreamHash $stream } finally { $stream.Dispose() }
   if ($dllName -ne "VrykellExplorerCommand-$($expectedDllHash.Substring(0,16)).dll") { throw 'Invalid extension digest.' }
-  $available = Test-Path -LiteralPath $dllPath
+  $available = (Test-Path -LiteralPath $dllPath) -and (Test-Path -LiteralPath $hostPath)
  } catch { $available = $false }
  finally { if ($archive) { $archive.Dispose() } }
 }
@@ -116,13 +128,27 @@ if ($Action -eq 'enable') {
  if (!(Test-Path -LiteralPath $Executable -PathType Leaf)) { throw 'The application executable is missing.' }
  Assert-PackageSignature
  if ((Get-FileDigest $dllPath) -ne $expectedDllHash) { throw 'The extension differs from the signed package.' }
+ if ((Get-FileDigest $hostPath) -ne $expectedHostHash) { throw 'The identity host differs from the signed package.' }
  $externalDirectory = [IO.Path]::GetDirectoryName($Executable)
  $dllDirectory = Join-Path $externalDirectory 'windows-context-menu'
+ $hostDestination = Join-Path $dllDirectory $hostName
+ if ([IO.Path]::GetFullPath($hostDestination) -ne [IO.Path]::GetFullPath($hostPath) -and
+     (!(Test-Path -LiteralPath $hostDestination) -or (Get-FileDigest $hostDestination) -ne $expectedHostHash)) {
+  $null = [IO.Directory]::CreateDirectory($dllDirectory)
+  Copy-Item -LiteralPath $hostPath -Destination $hostDestination -Force
+ }
  $destination = Join-Path $dllDirectory $dllName
  if ([IO.Path]::GetFullPath($destination) -ne [IO.Path]::GetFullPath($dllPath) -and
      (!(Test-Path -LiteralPath $destination) -or (Get-FileDigest $destination) -ne $expectedDllHash)) {
   $null = [IO.Directory]::CreateDirectory($dllDirectory)
   Copy-Item -LiteralPath $dllPath -Destination $destination -Force
+ }
+ # Every build names its extension after its digest; drop the ones this package no longer uses so
+ # the application folder does not accumulate them (an extension the shell still has loaded keeps
+ # working from memory and can be removed once it is released).
+ foreach ($staleFile in Get-ChildItem -LiteralPath $dllDirectory -Filter 'VrykellExplorerCommand-*.dll' -File -ErrorAction SilentlyContinue) {
+  if ($staleFile.Name -eq $dllName) { continue }
+  try { Remove-Item -LiteralPath $staleFile.FullName -Force -ErrorAction Stop } catch { }
  }
  $null = [IO.Directory]::CreateDirectory($snapshotDirectory)
  $digest = Get-FileDigest $packagePath
@@ -178,8 +204,14 @@ if ($Action -eq 'untrust') {
 }
 $packages = @(Get-AppxPackage -Name 'Vrykell.ContextMenu' | Where-Object { $_.Publisher -eq 'CN=Vrykell' })
 $registeredExe = (Get-ItemProperty -LiteralPath $key -Name Executable -ErrorAction SilentlyContinue).Executable
-@{ supported = $supported; available = $available; enabled = ($packages.Count -gt 0 -and $registeredExe -eq $Executable);
- certificateTrusted = (Get-Trust); certificateThumbprint = $(if ($certificate) { $certificate.Thumbprint } else { $null }) } | ConvertTo-Json -Compress
+$registeredBundle = (Get-ItemProperty -LiteralPath $key -Name Bundle -ErrorAction SilentlyContinue).Bundle
+# A registration that points at another executable or at a bundle other than the one shipped with
+# this application keeps an older extension (and an older launch path) alive: report the menu as
+# needing registration instead of as enabled, so the settings offer the update.
+$shippedBundle = $(if (Test-Path -LiteralPath $packagePath) { Join-Path $snapshotDirectory "$(Get-FileDigest $packagePath).msix" } else { $null })
+$stale = $packages.Count -gt 0 -and ($registeredExe -ne $Executable -or $registeredBundle -ne $shippedBundle)
+@{ supported = $supported; available = $available; enabled = ($packages.Count -gt 0 -and $registeredExe -eq $Executable -and !$stale);
+ stale = $stale; certificateTrusted = (Get-Trust); certificateThumbprint = $(if ($certificate) { $certificate.Thumbprint } else { $null }) } | ConvertTo-Json -Compress
 } finally {
  if ($mutex) { if ($locked) { $mutex.ReleaseMutex() }; $mutex.Dispose() }
 }

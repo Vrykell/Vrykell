@@ -186,6 +186,60 @@ pub fn fs_home() -> Result<String, String> {
         .ok_or_else(|| "无法定位用户主目录".to_string())
 }
 
+/// Metadata for one path, used by the path bar (file vs directory) and the
+/// properties dialog. Times are Unix milliseconds; unavailable times stay None.
+#[derive(Clone, Serialize)]
+pub struct FsStat {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+    pub is_symlink: bool,
+    pub size: u64,
+    pub created_ms: Option<u64>,
+    pub modified_ms: Option<u64>,
+}
+
+/// Milliseconds since the Unix epoch for a metadata time; unsupported values stay None.
+fn time_ms(value: std::io::Result<std::time::SystemTime>) -> Option<u64> {
+    value
+        .ok()
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|elapsed| elapsed.as_millis() as u64)
+}
+
+/// Read one path's metadata; a symlink reports its target (dangling links fall back
+/// to the link itself). Directory size is not summed: it is reported as 0.
+fn fs_stat_sync(path: String) -> Result<FsStat, String> {
+    let target = std::path::PathBuf::from(&path);
+    let link_meta = std::fs::symlink_metadata(&target).map_err(|e| format!("{path}: {e}"))?;
+    let is_symlink = link_meta.file_type().is_symlink();
+    let meta = if is_symlink {
+        std::fs::metadata(&target).unwrap_or(link_meta)
+    } else {
+        link_meta
+    };
+    let name = target
+        .file_name()
+        .map(|value| value.to_string_lossy().to_string())
+        .unwrap_or_else(|| path.clone());
+    Ok(FsStat {
+        name,
+        path,
+        is_dir: meta.is_dir(),
+        is_symlink,
+        size: if meta.is_dir() { 0 } else { meta.len() },
+        created_ms: time_ms(meta.created()),
+        modified_ms: time_ms(meta.modified()),
+    })
+}
+
+#[tauri::command]
+pub async fn fs_stat(path: String) -> Result<FsStat, String> {
+    tauri::async_runtime::spawn_blocking(move || fs_stat_sync(path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 /// 重命名本地文件/目录：old_path → 同目录 new_name。
 /// 目标名被占用时按 `name (1)` 递增避让（不产生重名），返回最终路径。
 fn fs_rename_sync(old_path: String, new_name: String) -> Result<String, String> {
@@ -999,6 +1053,30 @@ mod tests {
         if let Some(idx) = first_file {
             assert!(entries[..idx].iter().all(|e| e.is_dir));
         }
+    }
+
+    #[test]
+    fn fs_stat_reports_file_and_directory_metadata() {
+        let root = temp_workspace("stat");
+        let file = root.join("info.txt");
+        std::fs::write(&file, "hello").unwrap();
+
+        let file_stat = super::fs_stat_sync(file.to_string_lossy().to_string()).unwrap();
+        assert_eq!(file_stat.name, "info.txt");
+        assert_eq!(file_stat.path, file.to_string_lossy());
+        assert!(!file_stat.is_dir);
+        assert!(!file_stat.is_symlink);
+        assert_eq!(file_stat.size, 5);
+        assert!(file_stat.modified_ms.is_some());
+
+        let dir_stat = super::fs_stat_sync(root.to_string_lossy().to_string()).unwrap();
+        assert!(dir_stat.is_dir);
+        assert_eq!(dir_stat.size, 0);
+        assert_eq!(dir_stat.name, root.file_name().unwrap().to_string_lossy());
+
+        // Missing paths reject instead of returning placeholder data
+        assert!(super::fs_stat_sync(root.join("missing").to_string_lossy().to_string()).is_err());
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[cfg(target_os = "windows")]

@@ -2,7 +2,7 @@
 
 export interface TauriMockOptions {
   launchDirectory?: string;
-  contextMenu?: { available?: boolean; enabled?: boolean; certificateTrusted?: boolean };
+  contextMenu?: { available?: boolean; enabled?: boolean; stale?: boolean; certificateTrusted?: boolean };
   /** 是否启用 OSC 133 shell integration（默认 true）。
    *  false 时 mock 保持 classic 场景，用于测试无 integration 回退。 */
   integration?: boolean;
@@ -12,7 +12,7 @@ export interface TauriMockOptions {
   schedulesSeed?: Record<string, unknown>[];
   /** Simulate a remote shell with prompt hooks but no preexec hook. */
   sshPreexec?: boolean;
-  /** Add one historical session under an archived group to test restoring it by itself. */
+  /** Seed an archived tab group with members spanning directories and dates. */
   groupedHistoricalSession?: boolean;
   /** Keep the prompt but omit the OSC 133;B ready marker (older hooks / exotic shells). */
   shellReadyMarker?: boolean;
@@ -57,7 +57,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
   ];
   await page.addInitScript(
     ({ enableIntegration, enableReadyMarker, models, active, skillsSeed, scheduleSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession, launchDirectory, menuSeed }) => {
-    const menu = { supported: true, available: true, enabled: false, certificateTrusted: false, certificateThumbprint: 'E2E-CERTIFICATE', ...menuSeed };
+    const menu = { supported: true, available: true, enabled: false, stale: false, certificateTrusted: false, certificateThumbprint: 'E2E-CERTIFICATE', ...menuSeed };
     const menuActions: string[] = [];
     (window as unknown as { __MENU_ACTIONS__: string[] }).__MENU_ACTIONS__ = menuActions;
     let cbCounter = 0;
@@ -67,11 +67,14 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     const sshTrusts: Record<string, unknown>[] = [];
     const dialogs: Record<string, unknown>[] = [];
     const diagnosticsExports: Record<string, unknown>[] = [];
+    /** Frontend diagnostic records the app sent, exposed so specs can check what the log keeps. */
+    const diagnosticRecords: Record<string, unknown>[] = [];
     const spawns: Record<string, unknown>[] = [];
     const closes: Record<string, unknown>[] = [];
     (window as unknown as Record<string, unknown>).__SSH_TRUSTS__ = sshTrusts;
     (window as unknown as Record<string, unknown>).__SSH_DIALOGS__ = dialogs;
     (window as unknown as Record<string, unknown>).__DIAGNOSTICS_EXPORTS__ = diagnosticsExports;
+    (window as unknown as Record<string, unknown>).__DIAGNOSTIC_RECORDS__ = diagnosticRecords;
     (window as unknown as Record<string, unknown>).__PTY_SPAWNS__ = spawns;
     (window as unknown as Record<string, unknown>).__PTY_CLOSES__ = closes;
     let hostKnown = sshHost === 'known';
@@ -88,6 +91,8 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     const revealed: string[] = [];
     /** URLs handed to the system browser (plugin:opener|open_url). */
     const openedUrls: string[] = [];
+    /** Paths handed to the system default application (plugin:opener|open_path). */
+    const opened: string[] = [];
     /** Permission answers the page sent, so a spec can assert what the click produced. */
     const answered: { toolCallId: string; optionId: string | null }[] = [];
     /** Harness commands the page invoked, in order: one open per tab, never two. */
@@ -164,7 +169,11 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     const mockSessions: Record<string, unknown>[] = [
       { id: 't1', title: '终端', status: 'active', created_at: Date.now(), closed_at: null, block_count: 2, cwd: '', group_id: null, sort_order: 0, kind: 'local', payload: '{}' },
       { id: 'hist-1', title: '旧的调试会话', status: 'historical', created_at: Date.now() - 1000, closed_at: Date.now() - 500, block_count: 5, cwd: '', group_id: null, sort_order: 0, kind: 'local', payload: '{}' },
-      ...(groupedHistoricalSession ? [{ id: 'hist-group-1', title: '归档分组中的会话', status: 'historical', created_at: Date.now() - 2000, closed_at: Date.now() - 1000, block_count: 1, cwd: '', group_id: 'archived-group', sort_order: 0, kind: 'local', payload: '{}' }] : []),
+      ...(groupedHistoricalSession ? [
+        { id: 'hist-group-1', title: '归档分组中的会话', status: 'historical', created_at: Date.now() - 2000, closed_at: Date.now() - 1000, block_count: 1, cwd: '/project/docs', group_id: 'archived-group', sort_order: 0, kind: 'local', payload: '{}' },
+        { id: 'hist-group-2', title: 'Backend', status: 'historical', created_at: Date.now() - 3000, closed_at: Date.now() - 10 * 86400000, block_count: 0, cwd: '/srv/backend', group_id: 'archived-group', sort_order: 1, kind: 'ssh', payload: '{"ssh":{"host":"project.test","user":"dev"}}' },
+        { id: 'hist-group-3', title: 'Frontend', status: 'historical', created_at: Date.now() - 4000, closed_at: Date.now() - 2000, block_count: 0, cwd: '/project/web', group_id: 'archived-group', sort_order: 2, kind: 'local', payload: '{}' },
+      ] : []),
     ];
     const mockGroups: Record<string, unknown>[] = groupedHistoricalSession
       ? [{ id: 'archived-group', title: '已归档分组', sort_order: 0, collapsed: false, created_at: Date.now() - 3000, session_count: 0, archived: true }]
@@ -190,6 +199,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     (window as unknown as Record<string, unknown>).__DOWNLOADS__ = downloads;
     (window as unknown as Record<string, unknown>).__REVEALED__ = revealed;
     (window as unknown as Record<string, unknown>).__OPENED_URLS__ = openedUrls;
+    (window as unknown as Record<string, unknown>).__OPENED__ = opened;
     (window as unknown as Record<string, unknown>).__ACP_ANSWERED__ = answered;
     (window as unknown as Record<string, unknown>).__ACP_CALLS__ = acpCalls;
     // Lets a spec push exactly what the backend would push for a harness session.
@@ -900,6 +910,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             if (action === 'enable') {
               if (!menu.certificateTrusted) throw new Error('Certificate trust required');
               menu.enabled = true;
+              menu.stale = false;
             }
             if (action === 'disable') menu.enabled = false;
             return { ...menu };
@@ -932,7 +943,8 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
               { id: 'bash', label: 'Bash', default: false },
             ];
           case 'ssh_connections_list':
-            return sshConnections;
+            // Real IPC serializes results; hand out copies so the UI never shares state with the mock.
+            return sshConnections.map((c) => ({ ...c }));
           case 'ssh_config_candidates':
             return [
               { name: 'web', host: '10.0.0.5', user: 'deploy', port: 2222, identityFile: '/keys/web', localForwards: ['8080:localhost:80'], remoteForwards: [], dynamicForwards: [] },
@@ -973,6 +985,15 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
           case 'ssh_test':
             if (args.host === 'bad.example.com') throw new Error('连接超时');
             return '连接成功';
+          case 'ssh_system_status': {
+            const globals = window as unknown as Record<string, unknown>;
+            globals.__SSH_STATUS_CALLS__ = Number(globals.__SSH_STATUS_CALLS__ ?? 0) + 1;
+            if (globals.__SSH_STATUS_ERROR__) throw new Error(String(globals.__SSH_STATUS_ERROR__));
+            return { system: 'Linux 6.8', hostname: 'production-api', latencyMs: 42, uptimeSeconds: 1047600,
+              load: '0.12 0.08 0.05', cpuTotal: Number(globals.__SSH_STATUS_CALLS__) * 1000,
+              cpuIdle: Number(globals.__SSH_STATUS_CALLS__) * 880, memoryTotal: 8589934592,
+              memoryAvailable: 6335076762, diskTotal: 107374182400, diskUsed: 40802189312 };
+          }
           case 'ssh_list': {
             if (!hostKnown) throw new Error('HOST_KEY_UNKNOWN:SHA256:e2e-verified-key');
             const base = (args.path as string) || '/home/root';
@@ -983,6 +1004,22 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
                 { name: 'app.log', path: `${base}/app.log`, is_dir: false },
                 ...createdEntries,
               ],
+            };
+          }
+          case 'ssh_stat': {
+            const path = args.path as string;
+            const created = createdEntries.find((item) => item.path === path);
+            // app.log is the one file every mocked remote directory lists; other
+            // unknown paths are treated as directories so navigation still works.
+            const isDir = created ? created.is_dir : !path.endsWith('/app.log');
+            return {
+              name: path.split('/').filter(Boolean).pop() ?? path,
+              path,
+              is_dir: isDir,
+              is_symlink: false,
+              size: isDir ? 0 : 2048,
+              created_ms: null,
+              modified_ms: Date.UTC(2026, 0, 5, 6, 7, 8),
             };
           }
           case 'ssh_download': {
@@ -1009,6 +1046,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             revealed.push(...(args.paths as string[]));
             return undefined;
           case 'plugin:opener|open_path':
+            opened.push(args.path as string);
             return undefined;
           case 'plugin:opener|open_url':
             // Recorded so a spec can prove the link left for the system browser instead of
@@ -1054,7 +1092,11 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
           case 'terminal_debug_set':
             return args.enabled;
           case 'terminal_debug_record':
+            diagnosticRecords.push(args);
+            return undefined;
           case 'terminal_debug_records':
+            diagnosticRecords.push(...(args.records as Record<string, unknown>[]));
+            return undefined;
           case 'diagnostics_export':
             diagnosticsExports.push(args);
             return undefined;
@@ -1063,19 +1105,45 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
           case 'plugin:dialog|save':
             return (args.options as Record<string, unknown> | undefined)?.defaultPath ?? '/home/e2e/vrykell-diagnostics.jsonl';
           case 'archive_session':
-            { const session = mockSessions.find(item => item.id === args.id); if (session) session.status = 'historical'; }
+            { const session = mockSessions.find(item => item.id === args.id); if (session) { session.status = 'historical'; session.closed_at = args.timestamp as number; } }
             return undefined;
+          case 'restore_session': {
+            const session = mockSessions.find(item => item.id === args.id);
+            if (session) {
+              session.status = 'active'; session.closed_at = null;
+              const group = mockGroups.find(item => item.id === session.group_id);
+              if (group) group.archived = false;
+            }
+            return undefined;
+          }
           case 'get_session':
             return mockSessions.find((s) => s.id === args.id) ?? null;
           case 'groups_list':
-            return mockGroups;
+            return mockGroups.map(group => ({ ...group, session_count: mockSessions.filter(session => session.group_id === group.id && session.status === 'active').length }));
+          case 'group_rename': {
+            const group = mockGroups.find(item => item.id === args.id);
+            if (group) group.title = args.title;
+            return undefined;
+          }
+          case 'group_archive': {
+            const group = mockGroups.find(item => item.id === args.id);
+            if (group) group.archived = true;
+            for (const session of mockSessions.filter(item => item.group_id === args.id && item.status === 'active')) {
+              session.status = 'historical'; session.closed_at = args.timestamp as number;
+            }
+            return undefined;
+          }
+          case 'sessions_reorder':
+            (args.ids as string[]).forEach((id, index) => {
+              const session = mockSessions.find(item => item.id === id && item.group_id === args.groupId);
+              if (session) session.sort_order = index;
+            });
+            return undefined;
           case 'group_create':
-          case 'group_rename':
           case 'group_set_collapsed':
           case 'group_delete':
           case 'group_delete_with_sessions':
           case 'groups_reorder':
-          case 'sessions_reorder':
           case 'group_restore':
             return undefined;
           case 'session_set_group': {
@@ -1151,6 +1219,22 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
               { name: 'e2e-root', path: '/', total_bytes: 500 * 1024 ** 3, free_bytes: 250 * 1024 ** 3 },
               { name: 'Backup', path: '/Volumes/Backup', total_bytes: 2 * 1024 ** 4, free_bytes: 1.5 * 1024 ** 4 },
             ];
+          case 'fs_stat': {
+            const path = args.path as string;
+            const created = createdEntries.find((item) => item.path === path);
+            // The mock serves the same flat layout for every directory: only the
+            // listed files count as files so typed directory paths keep navigating.
+            const isDir = created ? created.is_dir : path !== '/home/e2e/notes.txt';
+            return {
+              name: path.split('/').filter(Boolean).pop() ?? path,
+              path,
+              is_dir: isDir,
+              is_symlink: false,
+              size: isDir ? 0 : 1536,
+              created_ms: Date.UTC(2026, 0, 2, 3, 4, 5),
+              modified_ms: Date.UTC(2026, 0, 2, 3, 4, 5),
+            };
+          }
           case 'fs_rename': {
             fsOps.push({ op: 'rename', path: args.oldPath as string, newName: args.newName as string });
             const oldPath = args.oldPath as string;
@@ -1411,6 +1495,11 @@ export function acpUpdate(sessionId: string, update: Record<string, unknown>): R
 /** 读取下载管理里「定位」调用的 reveal 路径记录 */
 export function revealedPaths(page: Page): Promise<string[]> {
   return page.evaluate(() => (window as unknown as Record<string, string[]>).__REVEALED__);
+}
+
+/** Paths handed to the system default application (plugin:opener|open_path). */
+export function openedPaths(page: Page): Promise<string[]> {
+  return page.evaluate(() => (window as unknown as Record<string, string[]>).__OPENED__);
 }
 
 /** 读取 update_session_payload 记录（分屏布局持久化断言用） */

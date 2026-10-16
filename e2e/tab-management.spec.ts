@@ -52,7 +52,7 @@ test.describe('标签页管理侧栏', () => {
     await page.locator('[data-testid="tab-history-btn"]').click();
     // 主区域渲染会话历史视图（仅历史会话，mock 返回 1 个历史 + 1 个活跃）
     await expect(page.getByText('旧的调试会话')).toBeVisible();
-    await expect(page.getByText('1 个会话')).toBeVisible();
+    await expect(page.getByTestId('session-history-page').locator('.history-count')).toHaveText('· 1 个会话');
   });
 
   test('标签右键菜单靠近窗口边缘时仍完整显示', async ({ page }) => {
@@ -77,6 +77,37 @@ test.describe('标签页管理侧栏', () => {
     expect(bounds!.y).toBeGreaterThanOrEqual(0);
     expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport!.width);
     expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(viewport!.height);
+  });
+
+  test('顶部 + 新建的标签进入未分组，只有分组 + 才进分组', async ({ page }) => {
+    await page.keyboard.press('Meta+t');
+    const rows = page.locator('[data-tab-row-id]');
+    await expect(rows).toHaveCount(2);
+
+    // 在第一个标签上建组，并让组内标签成为活跃标签
+    await rows.first().click({ button: 'right' });
+    await page.getByRole('button', { name: '新建分组', exact: true }).click();
+    await page.keyboard.press('Escape');
+    const group = page.locator('[data-group-id]').first();
+    await expect(group).toBeVisible();
+    const groupedId = (await group.locator('[data-tab-row-id]').first().getAttribute('data-tab-row-id'))!;
+    await group.locator(`[data-testid="tab-row-${groupedId}"]`).click();
+
+    const ids = () => page.locator('[data-tab-row-id]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-tab-row-id')!));
+    const before = await ids();
+    await page.getByTestId('tab-new-btn').click();
+    await page.getByTestId('new-tab-option-shell:zsh').click();
+    await expect(page.locator('[data-tab-row-id]')).toHaveCount(before.length + 1);
+    const added = (await ids()).find((id) => !before.includes(id))!;
+    await expect(page.locator(`[data-testid="tab-row-${added}"]`)).toHaveAttribute('data-tab-group', '');
+
+    // 分组自带的 + 才把新标签加入该分组
+    await group.locator('[data-group-header-id]').hover();
+    await group.getByRole('button', { name: '在此分组新建终端' }).click();
+    await page.getByTestId('new-tab-option-shell:zsh').click();
+    await expect(page.locator('[data-tab-row-id]')).toHaveCount(before.length + 2);
+    const inGroup = (await ids()).find((id) => id !== added && !before.includes(id))!;
+    await expect(group.locator(`[data-testid="tab-row-${inGroup}"]`)).toHaveCount(1);
   });
 
   test('非活跃标签悬停时才显示关闭按钮', async ({ page }) => {

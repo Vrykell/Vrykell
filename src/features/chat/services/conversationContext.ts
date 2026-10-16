@@ -3,6 +3,7 @@ import { useWorkspaceStore } from '@features/workspace/stores/workspace';
 import { leaves } from '@features/workspace/model/windowLayout';
 import { useDockStore } from '@features/workspace/stores/dock';
 import { useTerminalStore, useBlockStore, getRecentOutputFor } from '@features/terminal';
+import { focusSessionInput } from '@features/terminal/services/terminalFocus';
 import { shellTypeLabel } from '@platform/shells';
 import { useChatStore } from '../stores/chat';
 import { useComposerDrafts } from '../stores/composerDrafts';
@@ -17,7 +18,10 @@ export function environmentForPane(paneId: string): ChatEnvironment | null {
     if (!pane) continue;
     const name = pane.kind === 'ssh' ? pane.ssh?.name || pane.ssh?.host || 'SSH' : pane.shellType ? shellTypeLabel(pane.shellType) : t('Local terminal');
     const splitLabel = panes.length > 1 ? ` · ${t('Pane {{number}}', { number: panes.indexOf(pane) + 1 })}` : '';
-    return { paneId, kind: pane.kind, label: `${tab.title} · ${name}${splitLabel}`, cwd: workspace.terminalCwds[paneId] ?? pane.cwd };
+    return { paneId, kind: pane.kind, label: `${tab.title} · ${name}${splitLabel}`, cwd: workspace.terminalCwds[paneId] ?? pane.cwd,
+      ...(pane.shellType ? { shellType: pane.shellType } : {}),
+      ...(pane.kind === 'ssh' && pane.ssh ? { ssh: { host: pane.ssh.host, user: pane.ssh.user, port: pane.ssh.port } } : {}),
+    };
   }
   return null;
 }
@@ -28,6 +32,9 @@ export function showExecutionTerminal(paneId: string): void {
   if (!tab) return;
   workspace.activate(tab.id);
   useTerminalStore.getState().setFocusedPane(paneId);
+  window.requestAnimationFrame(() => {
+    if (useWorkspaceStore.getState().activeId === tab.id) focusSessionInput(paneId);
+  });
 }
 
 /** Bring a snapshot into a compatible conversation without submitting or granting terminal access. */

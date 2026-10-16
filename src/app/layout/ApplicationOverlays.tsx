@@ -1,5 +1,6 @@
 import CommandPalette from '@app/overlays/CommandPalette';
 import GlobalSearch from '@features/search/components/GlobalSearch';
+import PasteConfirmHost from '@features/terminal/components/PasteConfirmHost';
 import NewTabModal from '@features/workspace/components/NewTabModal';
 import ToastContainer from '@ui/Toast';
 import TooltipLayer from '@ui/TooltipLayer';
@@ -24,6 +25,7 @@ export default function ApplicationOverlays({ onPickSplit }: ApplicationOverlays
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <GlobalSearch open={globalSearchOpen} onClose={() => setGlobalSearchOpen(false)} />
       <NewTabModal open={splitPickerOpen} onClose={closeSplitPicker} onPick={onPickSplit} />
+      <PasteConfirmHost />
       <ToastContainer />
       <TooltipLayer />
     </>

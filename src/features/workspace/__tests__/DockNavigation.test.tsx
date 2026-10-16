@@ -3,9 +3,11 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useDockStore } from '../stores/dock';
 import DockNavigation from '../components/DockNavigation';
 import { useSessionStore, useNavigationDrag, leaf } from '@features/workspace';
+import { useAuxiliarySidebarStore } from '../stores/auxiliarySidebar';
 
 beforeEach(() => {
   useNavigationDrag.getState().end();
+  useAuxiliarySidebarStore.setState({ sshStatusOwner: null, dismissRequest: 0 });
   useSessionStore.setState({ activeId: 'session', tabs: [{ id: 'session', title: '终端', kind: 'session', layout: leaf({ id: 'terminal', kind: 'local' }) }] });
   useDockStore.setState({
   leftZone: ['tabs', 'ssh', 'files'], rightZone: ['chat', 'settings'],
@@ -44,7 +46,19 @@ describe('shared navigation buttons', () => {
     expect(useDockStore.getState().leftPanels).toEqual(['tabs']);
     expect(useDockStore.getState().rightPanels).toEqual([]);
   });
-  it('reserves a full insertion slot and restores the original layout on cancellation', () => {    render(<><DockNavigation side="left" /><DockNavigation side="right" /></>);
+  it('returns to the existing right panel when its navigation button is clicked', () => {
+    useDockStore.setState({ rightPanels: ['chat'] });
+    render(<DockNavigation side="right" />);
+    const ai = screen.getByRole('button', { name: 'AI 助手' });
+    act(() => useAuxiliarySidebarStore.getState().showSshStatus('ssh-pane'));
+    expect(ai).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(ai);
+    expect(useAuxiliarySidebarStore.getState().sshStatusOwner).toBeNull();
+    expect(useDockStore.getState().rightPanels).toEqual(['chat']);
+    expect(ai).toHaveAttribute('aria-pressed', 'true');
+  });
+  it('reserves a full insertion slot and restores the original layout on cancellation', () => {
+    render(<><DockNavigation side="left" /><DockNavigation side="right" /></>);
     const saved = localStorage.getItem('dock-layout-v4');
     act(() => {
       useNavigationDrag.getState().start('files', { x: 500, y: 24 });

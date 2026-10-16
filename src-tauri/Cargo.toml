@@ -38,6 +38,7 @@ sha2 = "0.10"
 futures-util = "0.3"
 base64 = "0.22"
 ssh2 = "0.9"
+zeroize = "1"
 trash = "5"
 tauri-plugin-drag = "2.1.1"
 

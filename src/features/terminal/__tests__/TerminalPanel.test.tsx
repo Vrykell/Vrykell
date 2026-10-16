@@ -5,8 +5,8 @@ import { useTerminalStore } from '../stores/terminal';
 import { ptyWrite } from '@platform/pty';
 import TerminalPanel from '../components/TerminalPanel';
 
-const { closeSession, reconnect, stopReconnect, sessionView } = vi.hoisted(() => ({ closeSession: vi.fn(), reconnect: vi.fn(), stopReconnect: vi.fn(), sessionView: { retry: { phase: 'idle', attempt: 0, seconds: 0 }, status: 'ready', frame: { html: 'Password:', plainText: 'Password:', cols: 80, rows: 24 } } }));
-vi.mock('../hooks/useTerminalSession', () => ({ useTerminalSession: () => ({ ref: createRef<HTMLDivElement>(), closeSession, reconnect, stopReconnect, retry: sessionView.retry, status: sessionView.status, frame: sessionView.frame }) }));
+const { closeSession, reconnect, stopReconnect, sessionView } = vi.hoisted(() => ({ closeSession: vi.fn(), reconnect: vi.fn(), stopReconnect: vi.fn(), sessionView: { sshAuthenticated: false, sshLog: [] as { time: number; text: string }[], retry: { phase: 'idle', attempt: 0, seconds: 0 }, status: 'ready', frame: { html: 'Password:', plainText: 'Password:', cols: 80, rows: 24 } } }));
+vi.mock('../hooks/useTerminalSession', () => ({ useTerminalSession: () => ({ ref: createRef<HTMLDivElement>(), closeSession, reconnect, stopReconnect, sshAuthenticated: sessionView.sshAuthenticated, sshLog: sessionView.sshLog, retry: sessionView.retry, status: sessionView.status, frame: sessionView.frame }) }));
 vi.mock('@platform/pty', () => ({ ptyWrite: vi.fn().mockResolvedValue(undefined) }));
 afterEach(cleanup);
 beforeEach(() => {
@@ -14,6 +14,7 @@ beforeEach(() => {
   closeSession.mockReset().mockResolvedValue(undefined);
   reconnect.mockReset().mockResolvedValue(undefined);
   sessionView.status = 'ready';
+  sessionView.sshAuthenticated = false;
   sessionView.retry = { phase: 'idle', attempt: 0, seconds: 0 };
   stopReconnect.mockReset().mockResolvedValue(undefined);
   sessionView.frame.plainText = 'Password:';
@@ -28,6 +29,49 @@ function chooseInputMode(mode: '密码输入' | '直接输入') {
 }
 
 describe('SSH connection input', () => {
+  it('opens status from the connection card and exposes a themed hover hint', () => {
+    const toggle = vi.fn();
+    const ready = vi.fn();
+    const view = render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput onSessionStatusClick={toggle} onSessionStatusReady={ready} />);
+    const entry = screen.getByTestId('ssh-status-toggle');
+    expect(entry).toContainElement(screen.getByRole('status'));
+    expect(entry).toHaveAttribute('data-tip', '查看 SSH 连接状态与资源');
+    expect(entry).toHaveAttribute('aria-expanded', 'false');
+    expect(ready).toHaveBeenCalledWith(entry);
+    fireEvent.click(entry);
+    expect(toggle).toHaveBeenCalledOnce();
+    view.rerender(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput onSessionStatusClick={toggle} sessionStatusOpen />);
+    expect(entry).toHaveAttribute('aria-expanded', 'true');
+    expect(entry).toHaveAttribute('data-tip', '关闭 SSH 状态');
+  });
+  it('renders one classic toolbar in the shared host and removes it in block mode', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    useTerminalStore.setState({ sessions: { p: 'session' }, scenes: { p: 'blockList' } });
+    const view = render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput toolbarHost={host} />);
+    expect(screen.getAllByTestId('ssh-session-toolbar')).toHaveLength(1);
+    expect(host).toContainElement(screen.getByTestId('ssh-session-toolbar'));
+    expect(screen.getByTestId('ssh-session-toolbar')).toBeVisible();
+    expect(screen.getByTestId('ssh-connection-input')).not.toContainElement(screen.getByTestId('ssh-session-toolbar'));
+    view.rerender(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput toolbarHost={host} showToolbar={false} />);
+    expect(screen.queryByTestId('ssh-session-toolbar')).not.toBeInTheDocument();
+    host.remove();
+  });
+  it('keeps the connected phase while an authenticated shell requests a command password', () => {
+    sessionView.sshAuthenticated = true;
+    sessionView.frame.plainText = '[sudo] password for deploy:';
+    useTerminalStore.setState({ sessions: { p: 'session' } });
+    const stateChanged = vi.fn();
+    render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput onSshStateChange={stateChanged} />);
+    expect(screen.getByLabelText('SSH 认证响应')).toBeVisible();
+    expect(stateChanged).toHaveBeenLastCalledWith({ phase: 'connected', reconnectAttempt: 0, retrying: false, log: [] });
+  });
+
+  it('reports the initial password request as authentication before a remote prompt is confirmed', () => {
+    const stateChanged = vi.fn();
+    render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput onSshStateChange={stateChanged} />);
+    expect(stateChanged).toHaveBeenLastCalledWith({ phase: 'authenticating', reconnectAttempt: 0, retrying: false, log: [] });
+  });
   it('shows pending retries with immediate and stop actions, and reports exhaustion', async () => {
     sessionView.status = 'closed';
     sessionView.retry = { phase: 'waiting', attempt: 2, seconds: 4 };
@@ -51,6 +95,7 @@ describe('SSH connection input', () => {
     expect(screen.getByLabelText('SSH 认证响应')).toHaveAttribute('type', 'password');
     // 冻结成快照：live xterm 会自己画光标，看起来像还能在屏幕上输入
     expect(screen.getByTestId('ssh-terminal-screen').tagName).toBe('PRE');
+    expect(screen.getByTestId('ssh-terminal-screen')).toHaveClass('ssh-terminal-frame');
     expect(screen.queryByText('正在连接远端主机…')).not.toBeInTheDocument();
   });
   it('reports a manual interactive disconnect without calling it authentication cancellation', async () => {

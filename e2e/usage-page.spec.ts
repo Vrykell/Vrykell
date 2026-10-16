@@ -94,7 +94,7 @@ test.describe('usage statistics page', () => {
 
     // Range and filter stay consistent.
     await page.getByTestId('usage-range').click();
-    await page.getByRole('option', { name: '全部' }).click();
+    await page.getByRole('option', { name: '全部时间' }).click();
     await expect(page.getByTestId('usage-total-requests')).toHaveText('1');
     await page.getByTestId('usage-filter-model').click();
     await page.getByRole('option', { name: 'gpt-4o-mini' }).click();

@@ -12,7 +12,7 @@ npm run dev          # Frontend dev server (port 1420, strict)
 npm run tauri dev    # Full Tauri app with hot reload
 npm run build        # tsc + vite build
 npm run test         # vitest run (unit tests)
-npm run test:e2e     # playwright test (e2e, starts its own dev server on 1421)
+npm run test:e2e     # playwright test (e2e; dev server port from PW_PORT, default 1421)
 cargo test           # Rust backend tests (src-tauri/)
 npx tsc --noEmit     # typecheck only
 npm run check:architecture  # import-boundary guard
@@ -55,7 +55,8 @@ that file consistent when rules change.
 ## Diagnosing Runtime Problems
 
 The app records structured diagnostics; read them before asking for a reproduction:
-`%LOCALAPPDATA%\com.vrykell.app\logs\diagnostics.jsonl` (older records rotate to `.1`, `.2`; the
+`%LOCALAPPDATA%\com.vrykell.app\logs\diagnostics-<YYYYMMDDTHH>.jsonl` (the name carries the UTC
+hour, so segments rotate hourly and the newest 24 / 256 MB are kept; the
 `autoSave` flag lives in `%APPDATA%\com.vrykell.app\diagnostics.json`). Only metadata is
 recorded - command text, terminal output and key payloads are redacted - so when a question needs
 something the log cannot give, add a stable `terminalDebug(...)` marker and read the log again.

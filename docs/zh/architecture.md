@@ -305,7 +305,7 @@ T4   渲染帧
        → TerminalBlockList 渲染 BlockItem（DOM + outputHtml）
 ```
 
-dev 模式会自动写入 `terminal-debug.jsonl`。排查命令挂起时，按时间关联 `command-submit`、`command-start`、`route-data`、`terminal-scene-focus`、`terminal-input`、`terminal-input-write-complete` 和 `command-done`；日志只保留长度、状态和错误类型，不记录命令或终端原文。`session-controller-register/dispose` 与 `command-pending-deferred` 用于定位热更新或生命周期竞态。
+开启「自动保存日志」后，记录按 UTC 小时写入日志目录的 `diagnostics-<YYYYMMDDTHH>.jsonl`。排查命令挂起时，按时间关联 `command-submit`、`command-start`、`pty-io`、`terminal-io`、`terminal-scene-focus`、`terminal-input`、`terminal-input-write-complete` 和 `command-done`；日志只保留长度、状态和错误类型，不记录命令或终端原文。终端数据通路读数按秒聚合：Rust 侧 `pty-io` 汇总读取与输出冲刷（块数、字节、最大单块、最大间隔），前端 `terminal-io` 汇总收包、控制器入口与路由去向；整段静默按 1 s、2 s、4 s… 翻倍记 `read-idle`，所以「没有输出」本身也是可查的。`session-controller-register/dispose` 与 `command-pending-deferred` 用于定位热更新或生命周期竞态。
 
 ## 15. 关键文件索引
 
@@ -331,6 +331,7 @@ dev 模式会自动写入 `terminal-debug.jsonl`。排查命令挂起时，按�
 | `src/features/terminal/stores/terminal.ts` | 会话/尺寸/键盘路由 store + `termInstances` |
 | `src/features/terminal/stores/blocks.ts` | 块 store |
 | `src/platform/pty.ts` | Tauri IPC 封装 |
+| `src/features/terminal/services/terminalWriteQueue.ts` | 终端输入写入队列：16K 码元分块、同会话串行、中断/关闭时丢弃未送出的余块 |
 | `src/features/workspace/services/sessionManager.ts` | 会话/块持久化编排 |
 | `src/utils/sanitizeHtml.ts` | outputHtml 落库/渲染双向净化（span 白名单 style + br，防注入） |
 | `src/features/workspace/model/windowLayout.ts` | 分屏布局模型（TerminalSpec / pane 分裂） |

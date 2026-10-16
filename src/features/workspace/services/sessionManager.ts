@@ -11,7 +11,7 @@ import { useChatStore } from '@features/chat';
 import { deserializeParts } from '@features/agent/model/messageParts';
 import { deserializeAttachments } from '@features/agent/model/attachments';
 import { firstLeaf, leaf, type WindowLayout } from '@features/workspace/model/windowLayout';
-import { sessionSetGroup } from '@platform/api/group';
+import { groupsList, sessionSetGroup } from '@platform/api/group';
 import {
   createSession,
   archiveSession,
@@ -20,6 +20,7 @@ import {
   updateSessionCwd,
   updateSessionPayload,
   getSession,
+  listSessions,
   deleteSession,
   recordBlock,
   getSessionBlocks,
@@ -128,11 +129,8 @@ export async function close(tabId: string): Promise<void> {
 /** 恢复会话（撤销关闭 / 搜索恢复 — 标记 active + 加载 blocks + 添加 tab）。 */
 export async function restore(sessionId: string, title: string, meta?: RestoreMeta): Promise<void> {
   let degraded = false;
-  // 1. 后端标记 active
-  await restoreSession(sessionId).catch((e) => {
-    degraded = true;
-    console.warn('sessionManager.restore: restore_session failed:', e);
-  });
+  // Persist restoration before changing the visible workspace.
+  await restoreSession(sessionId);
 
   // 2. 加载该会话所有 block
   let backendBlocks: BackendBlockEntry[] = [];
@@ -232,14 +230,23 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
   });
   const storedGroupId = info?.group_id ?? undefined;
   const hasGroupOverride = meta != null && Object.prototype.hasOwnProperty.call(meta, 'groupId');
+  if (!hasGroupOverride && storedGroupId && !useSessionStore.getState().groups.some(group => group.id === storedGroupId)) {
+    try {
+      const group = (await groupsList()).find(item => item.id === storedGroupId);
+      if (group) useSessionStore.setState(state => ({ groups: state.groups.some(item => item.id === group.id) ? state.groups
+        : [...state.groups, { id: group.id, title: group.title, collapsed: false }] }));
+    } catch (error) {
+      degraded = true;
+      console.warn('sessionManager.restore: groups_list failed:', error);
+    }
+  }
   const knownGroupIds = new Set(useSessionStore.getState().groups.map((group) => group.id));
   const groupId = hasGroupOverride
     ? meta.groupId ?? undefined
     : storedGroupId && knownGroupIds.has(storedGroupId) ? storedGroupId : undefined;
 
-  // A restored session must not point at an archived or unloaded group, or the tab sidebar
-  // cannot render it. Keep valid active groups; otherwise persist it as ungrouped.
-  if ((hasGroupOverride || storedGroupId) && (storedGroupId ?? null) !== (groupId ?? null)) {
+  // Only an explicit move changes persisted membership. A failed group lookup must not erase it.
+  if (hasGroupOverride && (storedGroupId ?? null) !== (groupId ?? null)) {
     await sessionSetGroup(sessionId, groupId ?? null).catch((e) => {
       console.warn('sessionManager.restore: session_set_group failed:', e);
     });
@@ -254,12 +261,32 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
     layout,
   };
 
+  // Insert partial restores in the saved tab order even when history uses another sort.
+  let groupOrder = new Map<string, number>();
+  if (groupId && useSessionStore.getState().tabs.some(item => item.kind === 'session' && item.groupId === groupId)) {
+    try {
+      groupOrder = new Map((await listSessions()).filter(item => item.group_id === groupId).map(item => [item.id, item.sort_order]));
+    } catch (error) {
+      console.warn('sessionManager.restore: list_sessions failed:', error);
+    }
+  }
+
   const ws = useSessionStore.getState();
   if (!ws.tabs.some((t) => t.id === sessionId)) {
-    useSessionStore.setState((s) => ({
-      tabs: [...s.tabs, tab],
-      activeId: sessionId,
-    }));
+    useSessionStore.setState((state) => {
+      const tabs = [...state.tabs];
+      const before = groupId ? tabs.findIndex(item => item.kind === 'session' && item.groupId === groupId
+        && (groupOrder.get(item.id) ?? -Infinity) > (info?.sort_order ?? Infinity)) : -1;
+      let index = before;
+      if (index < 0 && groupId) {
+        for (let i = tabs.length - 1; i >= 0; i--) {
+          const item = tabs[i];
+          if (item.kind === 'session' && item.groupId === groupId) { index = i + 1; break; }
+        }
+      }
+      tabs.splice(index < 0 ? tabs.length : index, 0, tab);
+      return { tabs, activeId: sessionId };
+    });
   } else {
     useSessionStore.setState((s) => ({
       tabs: s.tabs.map((existing) => existing.id === sessionId && existing.kind === 'session'

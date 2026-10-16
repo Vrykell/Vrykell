@@ -1,3 +1,4 @@
+import { OutlineButton } from '@ui/OutlineButton';
 import ConfigTextArea from '@ui/ConfigTextArea';
 import { IconButton } from '@ui/IconButton';
 import { t } from '@i18n';
@@ -14,7 +15,7 @@ import {
 } from '@features/agent/services/mcp';
 import { useToastStore } from '@ui/Toast';
 import ErrorBox from '@ui/ErrorBox';
-import { SettingsGroup, Field, Toggle, inputStyle, btnStyle } from '@features/settings/components/ui';
+import { SettingsGroup, Field, Toggle, inputStyle } from '@features/settings/components/ui';
 import { useAutoSave } from '../hooks/useAutoSave';
 import SaveStatus from '../components/SaveStatus';
 
@@ -123,12 +124,12 @@ export function McpPage() {
             onCancel={() => dropDraft(k)}
           />
         ))}
-        <button
+        <OutlineButton
           onClick={addNew}
-          style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}
         >
           <Plus size={12} /> 添加服务器
-        </button>
+        </OutlineButton>
       </div>
     </Field></SettingsGroup>
   );
@@ -195,15 +196,15 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
         {s && <Toggle on={enabled} onChange={enabled => change({ enabled }, true)} />}
         <SaveStatus inline status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
         {s && s.connected && (
-          <button onClick={() => { void saving.flush().then(() => { if (!saving.hasPending()) onDisconnect(savedName.current); }); }} disabled={busy} style={{ ...btnStyle, flexShrink: 0 }}>断开</button>
+          <OutlineButton onClick={() => { void saving.flush().then(() => { if (!saving.hasPending()) onDisconnect(savedName.current); }); }} disabled={busy} style={{ flexShrink: 0 }}>断开</OutlineButton>
         )}
         {s && !s.connected && (
-          <button onClick={() => { void saving.flush().then(() => { if (!saving.hasPending()) onConnect(savedName.current); }); }} disabled={busy} style={{ ...btnStyle, flexShrink: 0 }}>
+          <OutlineButton onClick={() => { void saving.flush().then(() => { if (!saving.hasPending()) onConnect(savedName.current); }); }} disabled={busy} style={{ flexShrink: 0 }}>
             {busy ? '连接中…' : '连接'}
-          </button>
+          </OutlineButton>
         )}
         {draft && onCancel && (
-          <button onClick={() => { void discard(onCancel); }} style={{ ...btnStyle, flexShrink: 0 }}>取消</button>
+          <OutlineButton onClick={() => { void discard(onCancel); }} style={{ flexShrink: 0 }}>取消</OutlineButton>
         )}
         {s && (
           <IconButton compact tone="danger" onClick={() => { void discard(() => onDelete(savedName.current)); }} data-tip={t('Delete server')} aria-label={t('Delete server')}><X size={16} /></IconButton>
@@ -237,7 +238,7 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
         rows={3}
         style={{
           ...inputStyle, marginTop: 8, minHeight: 52, resize: 'vertical',
-          fontFamily: 'var(--font-mono)', lineHeight: 1.5,
+          fontFamily: 'var(--font-ui)', lineHeight: 1.5,
         }}
       />
     </div>

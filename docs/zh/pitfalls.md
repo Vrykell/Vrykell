@@ -90,6 +90,24 @@
 - **根因**：`term.paste()` 的语义是「写入**粘贴文本**」：前台程序开了 bracketed paste（DECSET 2004，真实 CLI 基本都会开）时 xterm 会把内容包成 `\x1b[200~…\x1b[201~`。而图片路径送的是**按键** `\x16`（Ctrl+V），被包起来后程序只会当成粘贴进来的文本字符。
 - **修复**：图片路径绕开终端、直接 `ptyWrite(sessionId, '\x16')`；文本仍走 `term.paste()`，保住 bracketed paste 与换行归一化。回归：`terminal-paste-focus.spec.ts` 现在先在 TUI 里开 `\x1b[?2004h`，断言 PTY 收到的就是裸 `\x16`（改回 `paste()` 会变成 `\x1b[200~\x16\x1b[201~` 而失败）；`terminalClipboard.test.ts` 补了「终端实例已注册时也必须裸写」的用例 —— 旧用例只覆盖「没有终端实例」的兜底分支，所以一直绿。
 
+### 2.13 整段粘贴一次 `pty_write` → 中断排在整段后面（`terminalWriteQueue.ts`）
+- **现象**：粘一大段文本后终端像卡住：按 Ctrl+C 没反应，要等整段送完才轮到中断键；前台进程不读 stdin 时要等到会话结束。
+- **根因**：`term.paste()` 一次 `onData`、一次 `ptyWrite`。Rust 侧 `write_all` 在消费者读完这一整段之前不返回，且一直握着 writer 锁，同一会话后续写入（含 `\x03`）只能排它后面；IPC 载荷与 blocking 线程也跟整段一起涨。
+- **修复**：终端输入统一走 `terminalWriteQueue`（16K 码元分块、按码点切分、同会话串行）：慢消费者只压住当前块，`\x03` 先丢弃未送出的余块再插队；多行 / 超 64K 粘贴先经 `PasteConfirmHost` 确认。回归：`terminalWriteQueue.test.ts`、`terminalClipboard.test.ts`、`PasteConfirmHost.test.tsx`、`terminal-paste-large.spec.ts`。
+- **教训**：「一次动作一次写入」在小数据上没问题，一旦数据量由用户决定就会拖垮取消语义 —— 可中断性要求写入本身可分。
+
+### 2.14 每个输出块各写一条终端日志 → 整屏 TUI 把日志写到分钟级 MB（`io_window.rs`、`sessionController.ts`、`useTerminalSession.ts`）
+- **现象**：整屏 CLI 一跑起来日志就按分钟膨胀：实测一段 4.5 分钟的会话写出 87,919 条 / 23.9 MB，繁忙秒约 420 条、峰值 876 条/秒，每个输出块 5–7 条记录（`read-chunk`、`output`、`pty-output`、`controller-events`、`route-data`）；诊断写盘队列积压到 1.5 s（p95，中位 36 ms），另一段 13 分钟的会话写到 84 MB。粘贴 3.8 MB 时「输入到下一帧」间隔出现 6.3 s / 12.3 s / 10.2 s —— 卡顿感有一部分就是日志自己造出来的，也把真正有用的记录挤出内存环。
+- **根因**：同一个输出块在流水线上被数了五次，而块的频率由前台程序决定（整屏应用每帧一块）—— 于是日志量正比于帧率，谁跑 TUI 谁就把日志写爆。
+- **修复**：两端都改成按秒窗口聚合。Rust 端用 `pty-io`（`reads/read_bytes/chars/max_read/outputs/events/data_bytes/osc/alt/held/max_gap_ms`）替代 `read-chunk` + `output` + `input-response-batch`；前端用 `terminal-io` 一条记录汇总 rx（IPC 收包）/ ctl（控制器入口）/ 路由去向（main / block / early 的块数与字符数、`maxChars`、命令回显过滤）。停顿不再靠「没有记录」推断：整段静默按 1 s、2 s、4 s… 翻倍记 `read-idle`。回归：`io_window.rs` 单测、`terminalIoLog.test.ts`。
+- **教训**：日志粒度要跟着「事件频率由谁决定」走；把用户能决定大小的数据逐块记，等于把日志体积也交给用户。
+
+### 2.15 身份包的 `Application` 指向应用自身 → 右键资源管理器时正在运行的应用被系统终止（`AppxManifest.xml`、`shell_host.cpp`、`manage.ps1`）
+- **现象**：应用正在使用（终端里在跑 TUI、日志正常滚动）时，用户在**资源管理器里右键一个文件夹**（甚至还没点菜单项），整个应用窗口**直接消失**，进程干净退出：Windows 事件日志没有崩溃记录、应用自己的诊断日志也停在死亡那一刻。`Microsoft-Windows-AppModel-Runtime/Admin` 里能对上：右键瞬间创建了一次 AppX 激活（Id 210/211），一秒后该激活被终止（Id 217），运行中的应用就死在 Id 217 那一刻。实测复现：从 PowerShell 触发该包的 COM 服务器激活（`[Activator]::CreateInstance(GetTypeFromCLSID('{8D41BA19-…}'))`），**所有** `vrykell.exe` 进程（含其它 worktree 的 debug 实例）同时消失。
+- **根因**：身份清单为了挂 `windows.fileExplorerContextMenus` 必须有 `<Application>`，而当时声明的 `Executable="vrykell.exe"` **就是应用自己的可执行文件**。于是 Windows 把**任何**名为 `vrykell.exe` 的进程都当成该包的应用（`FinishPackageActivation` 事件连 worktree 里不同路径的 debug 实例都记）；而 shell 扩展的 COM 激活结束时，AppModel 会终止这个包的应用进程 —— 右键（加载扩展、随后释放）就足以杀掉正在使用的应用。又因为多个实例共用同一个 WebView2 用户数据目录（浏览器进程共享），被杀的实例还会把其它实例一起带走。
+- **修复**：给身份包一个**专用宿主** `windows-context-menu\VrykellShellHost.exe`（`shell_host.cpp`，只转发启动、不承载业务），清单的 `<Application Executable>` 指向它，应用自己的 exe 不再进入包身份。三处防回归：`prepare-context-menu.mjs` 在打包前断言清单声明的是宿主（否则构建失败）、`manage.ps1` 把「声明了别的可执行文件」判为 `available=false`（拒绝启用）、`scripts/test-context-menu.ps1` 断言启用后 `available/stale` 状态正确。同时 `manage.ps1` 现在会在启用时清理旧的内容寻址 DLL，并通过 `stale` 报告「注册指向旧包/旧可执行文件」，设置页提示重新启用（应用更新后必须重新注册，否则仍加载旧扩展）。
+- **教训**：稀疏身份包（sparse MSIX）的 `<Application Executable>` 不是「声明一下」——它把该镜像名的**所有**进程都纳入包身份与应用生命周期管理。凡是给桌面应用加 shell 集成，都要用专用宿主承载身份，绝不能让应用自身出现在身份清单里；另外「同一应用多实例」在 WebView2 下是共享浏览器进程，任何一次进程级终止都会连坐所有实例。
+
 ---
 
 ## 三、PTY / resize / 尺寸
@@ -196,6 +214,17 @@
 - **真根因**：跟随状态翻转 → 槽位出现/消失 → 对话区高度 ±34px → 「是否在底部」的判定输入跟着翻 → 跟随状态再翻：**布局参与了自己的判定输入**，无需任何外部动作即可自振荡。
 - **修复**：① 让槽位不参与布局（先「恒定占位」、再改绝对定位浮层，最后落在输入框正上方一条**恒定**的内边距带里，按钮为 30px 圆形）；② 滚动容器只留一个 scrollTop 写入源（删掉 ResizeObserver 里的那次写）；③ `overflow-anchor: none` 关掉浏览器滚动锚定；④ 先加临时探针取证（`14753da`），定位后删除（`80adc4f`）。
 - **教训**：任何「出现/消失会改变容器高度」的控件（槽位、徽标、提示条），若又参与「是否在底部 / 是否悬停」之类判定，都可能自振荡——修法是让它不参与布局，而不是反复调阈值；一个滚动容器只允许一只手写 scrollTop。
+### 5.5 运行块「挂载前输出」后首次上滚跳到回溯顶部（滚动模型与 buffer 脱同步，`TerminalBlockList.tsx` RunningTerm）
+- **现象**：命令开始 2 秒内（运行块挂载前）输出超过一屏，之后第一次在活终端上滚会直接跳到回溯最顶；视口不再在底部，新输出不再跟随，需手动滚回底部。
+- **根因**：块内活终端「先写入、后 open」（headless 写入）。无头期间渲染尺寸为 0，输出滚屏时写给滚动模型的位置是 `视口行号 × 行高(0) = 0`，模型停在顶部而 buffer 已在底部；open/尺寸变化只更新模型范围、不写位置，首次滚轮以模型位置 0 为基准计算 → 钳到 0 → 视口被拉到最顶。挂载后发生任何真实滚动（哪怕一行输出滚屏）都会自愈，纯等待不会。
+- **修复**：首次挂载后一帧，若视口在底部则 `scrollToTop()` + `scrollToBottom()` 强制两次真实滚动把正确位置写回模型；单独 `scrollToBottom()` 在底部算出 0 行差是 no-op。调度放在 `term.element` 判断之外，StrictMode 双挂载下第二次挂载仍会调度。
+- **回归**：`running-term.spec.ts`「运行块挂载前到达的输出不破坏首次滚轮回溯」。
+
+### 5.6 `color-mix()` 让 `getComputedStyle` 的颜色变成 `color(srgb …)` —— 朴素数字解析读成 0-1（`--menu-bg` 浮层配方）
+- **现象**：`field-surfaces.spec.ts` 断言「字段比面板亮 ≤36 阶」，合并 dev 后深浅两色全挂（差值 58.9 / 254.1）：面板通道被当成 0。
+- **根因**：dev 把浮层背景改为 `--menu-bg: color-mix(in srgb, var(--canvas) 50%, var(--surface))`；Chromium 对 `color-mix()` 结果返回 `color(srgb 0.14 0.14 0.14)` 形式，旧解析器 `color.match(/\d+/g).slice(0,3)` 把 0-1 分量当 0-255 用。
+- **修复**：解析器先匹配 `color(srgb …)` 并 ×255；浮层断言同步为 dev 的新配方（背景 `--menu-bg`、无边框，仅阴影分隔）。
+- **教训**：`getComputedStyle` 颜色有 `rgb()` / `color(srgb …)` 两种序列化形式，比较或解析前先归一，别假设 `rgb()`。
 
 ---
 

@@ -21,6 +21,8 @@ import AiBlock from './AiBlock';
 import { toExchanges } from '../model/exchanges';
 import { useChatComposer } from '../hooks/useChatComposer';
 import { environmentForPane, showExecutionTerminal } from '../services/conversationContext';
+import { useIconColorStore } from '@config/iconColors';
+import { tabIconColor } from '@features/workspace';
 import type { AttachmentMeta } from '@features/agent/model/attachments';
 
 const EMPTY_MESSAGES: ChatMessage[] = [];
@@ -52,6 +54,7 @@ export default function PanelChat() {
   const sessions = useTerminalStore(state => state.sessions);
   const startupStates = useTerminalStore(state => state.startupStates);
   const tabs = useSessionStore(state => state.tabs);
+  const iconColors = useIconColorStore(state => state.colors);
   const terminalCwds = useSessionStore(state => state.terminalCwds);
   const [renaming, setRenaming] = useState(false);
   const [title, setTitle] = useState('');
@@ -80,14 +83,14 @@ export default function PanelChat() {
     conversationId: activeId, references, clearReferences, value: composerDraft.text, onTextChange: setText, scopeKey: activeId,
   });
   const environmentOptions = useMemo(() => {
-    const available = tabs.flatMap(tab => tab.kind === 'session' ? leaves(tab.layout) : [])
-      .filter(pane => !!sessions[pane.id]).map(pane => {
+    const available = tabs.flatMap(tab => tab.kind === 'session' ? leaves(tab.layout).map(pane => ({ pane, tab })) : [])
+      .filter(({ pane }) => !!sessions[pane.id]).map(({ pane, tab }) => {
         const context = environmentForPane(pane.id)!;
         const triggerLabel = pane.kind === 'ssh' ? pane.ssh?.host || pane.ssh?.name || context.label : t('Local terminal');
         const host = pane.kind === 'ssh' ? pane.ssh?.host : undefined;
         const hostLabel = host && !context.label.includes(host) ? ` · ${host}` : '';
         const swatch = startupStates[pane.id] === 'starting' ? 'var(--accent-warm)'
-          : startupStates[pane.id] === 'failed' || startupStates[pane.id] === 'closed' ? 'var(--error)' : 'var(--success)';
+          : startupStates[pane.id] === 'failed' || startupStates[pane.id] === 'closed' ? 'var(--error)' : tabIconColor(tab, iconColors, pane) ?? 'var(--success)';
         return { value: pane.id, label: `${context.label}${hostLabel}${context.cwd ? ` · ${context.cwd}` : ''}`, triggerLabel, swatch };
       });
     return [
@@ -96,7 +99,7 @@ export default function PanelChat() {
         ? [{ value: environment.paneId, label: `${environment.label} · ${t('Disconnected')}`, swatch: 'var(--accent-warm)', disabled: true }] : []),
       ...available,
     ];
-  }, [tabs, sessions, startupStates, terminalCwds, environment]);
+  }, [tabs, sessions, startupStates, terminalCwds, environment, iconColors]);
 
   useEffect(() => { void useChatStore.getState().loadConversations(); }, []);
   useEffect(() => { setRenaming(false); }, [activeId]);
@@ -209,7 +212,9 @@ export default function PanelChat() {
       if (ours) return;
       // The reader moved the view, by any means, including a scrollbar drag that fires no wheel.
       pauseFollow();
-      const atBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight <= 24;
+      // Only an exact return to the bottom hands the follow back: a small wheel or trackpad
+      // nudge upward stays paused while content keeps streaming.
+      const atBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight <= 4;
       if (settleRef.current !== null) window.clearTimeout(settleRef.current);
       settleRef.current = null;
       if (!atBottom) return;
@@ -237,7 +242,7 @@ export default function PanelChat() {
     {/* Always in the layout on purpose: a slot that comes and goes with the follow state changes the
         transcript's height, and then the content and this button trade places on every scroll event —
         that loop is what made the bottom of the panel jump. Only the slot's visibility changes. */}
-    <div className="chat-jump-slot" style={{ visibility: following ? 'hidden' : 'visible' }} aria-hidden={following}>
+    <div className="chat-jump-slot" data-active={following ? undefined : 'true'} style={{ visibility: following ? 'hidden' : 'visible' }} aria-hidden={following}>
       <button type="button" data-subtle className="chat-jump-latest" aria-label={t('Jump to latest reply')}
         data-tip={t('Jump to latest reply')} onClick={() => {
         followRef.current = true; setFollowing(true);

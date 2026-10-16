@@ -83,7 +83,8 @@ test('rename and delete manage conversation history independently of terminals',
   await page.getByTestId('ai-history-search').fill('Build investigation');
   await expect(row).toBeVisible();
   await row.hover();
-  await row.getByRole('button', { name: '删除对话' }).click();
+  await row.getByRole('button', { name: '更多操作' }).click();
+  await page.getByRole('menuitem', { name: '删除对话', exact: true }).click();
   await expect(row).toHaveCount(0);
   await expect(page.locator('[data-tab-kind="session"]')).toHaveCount(1);
   await page.locator('[data-tab-kind="session"]').click();
@@ -107,7 +108,7 @@ test('command analysis stages a reference before sending and never changes termi
   await expect(page.getByText('This is a command snapshot.', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '会话设置' })).toBeVisible();
   await expect(page.getByTestId('chat-conversation-context')).toHaveCount(0);
-  await page.locator('.chat-composer .chat-reference-toggle').click();
+  await expect(page.locator('.chat-composer .chat-reference-toggle')).toHaveAttribute('aria-expanded', 'true');
   await expect(page.locator('.chat-composer .chat-reference-body')).toContainText('reference-source');
   await composer.press('Enter');
   await expect(page.getByText('This is a command snapshot.', { exact: true })).toBeVisible();
@@ -243,11 +244,39 @@ test('reading earlier content pauses automatic scroll until the user returns to 
   await expect.poll(() => transcript.evaluate(element => element.scrollHeight - element.scrollTop - element.clientHeight)).toBeLessThan(25);
 });
 
+test('pausing and resuming the follow never shifts the transcript layout', async ({ page }) => {
+  await boot(page, Array.from({ length: 80 }, (_, index) => `Paragraph ${index}: review the project configuration.\n\n`).join(''));
+  await page.locator('[data-chat-composer]').fill('Explain the project');
+  await page.locator('[data-chat-composer]').press('Enter');
+  const transcript = page.locator('.chat-transcript');
+  const jump = page.locator('.chat-jump-latest');
+  await expect.poll(() => transcript.evaluate(element => element.scrollHeight - element.clientHeight)).toBeGreaterThan(200);
+  const layout = () => transcript.evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    return {
+      box: `${Math.round(rect.top)}/${Math.round(rect.height)}`,
+      slot: document.querySelector('.chat-jump-slot')?.getAttribute('data-active') ?? null,
+    };
+  });
+  const following = await layout();
+  expect(following.slot).toBeNull();
+  await expect(jump).toHaveCSS('visibility', 'hidden');
+  // Pausing the follow must not add or remove a row above the transcript: the jump target
+  // keeps its reserved height so the content cannot bob up and down.
+  await transcript.evaluate(element => { element.scrollTop -= 120; element.dispatchEvent(new Event('scroll')); });
+  await expect.poll(async () => (await layout()).slot).toBe('true');
+  expect((await layout()).box).toBe(following.box);
+  await expect(jump).toHaveCSS('visibility', 'visible');
+  await jump.click();
+  await expect.poll(async () => (await layout()).slot).toBeNull();
+  expect((await layout()).box).toBe(following.box);
+});
+
 test('a small scroll while the reply streams keeps the reading position', async ({ page }) => {
   // A mouse wheel moves far enough to leave the "still near the bottom" window, but a
   // trackpad nudges a few pixels at a time: the follow has to pause on the input itself.
   await mockAnthropic(page, Array.from({ length: 60 }, (_, index) => `Paragraph ${index}: review the project configuration.`).join('\n\n'));
-  await paceLlmStream(page, 8);
+  await paceLlmStream(page, 60);
   await setupTauriMock(page, { schedulesSeed: [] });
   await page.goto('/');
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
@@ -262,11 +291,14 @@ test('a small scroll while the reply streams keeps the reading position', async 
   await transcript.hover();
   await page.mouse.wheel(0, -18);
 
+  // The follow pauses on the input itself rather than on the distance from the bottom.
+  const slot = page.locator('.chat-jump-slot');
+  await expect.poll(() => slot.getAttribute('data-active'), { timeout: 15_000 }).toBe('true');
   // Streamed content keeps arriving; the reading position must not be pulled back down.
-  await expect.poll(distance, { timeout: 10_000 }).toBeGreaterThan(100);
+  await expect.poll(distance, { timeout: 15_000 }).toBeGreaterThan(100);
   const before = await distance();
   await page.waitForTimeout(800);
   expect(await distance()).toBeGreaterThanOrEqual(before);
   await expect(page.locator('.ai-pending-cursor')).toHaveCount(1);
-  await expect(page.getByRole('button', { name: '回到最新回复' })).toBeVisible();
+  await expect(slot.locator('.chat-jump-latest')).toHaveCSS('visibility', 'visible');
 });

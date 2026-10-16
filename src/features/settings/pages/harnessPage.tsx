@@ -9,7 +9,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { t } from '@i18n';
 import { useToastStore } from '@ui/Toast';
-import { SettingsGroup, Field, inputStyle, btnStyle } from '@features/settings/components/ui';
+import { SettingsGroup, Field, inputStyle } from '@features/settings/components/ui';
+import { OutlineButton } from '@ui/OutlineButton';
 import HarnessBadge from '@features/settings/components/HarnessBadge';
 import { invoke } from '@platform/diagnostics';
 import { useSessionStore } from '@features/workspace';
@@ -163,7 +164,7 @@ export default function HarnessPage() {
                     background: harness.enabled ? 'var(--accent)' : 'var(--hover)', color: harness.enabled ? 'var(--canvas)' : 'var(--text-muted)',
                     font: `${'var(--fs-caption)'} var(--font-ui)`,
                   }}>{t('Connect')}</button>
-                <button style={btnStyle} data-testid={`harness-test-${index}`} onClick={() => void test(harness.name)}>{t('Test connection')}</button>
+                <OutlineButton data-testid={`harness-test-${index}`} onClick={() => void test(harness.name)}>{t('Test connection')}</OutlineButton>
               </div>
               <details>
                 <summary style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-caption)', cursor: 'pointer' }}>{t('Command and arguments')}</summary>
@@ -173,8 +174,8 @@ export default function HarnessPage() {
                   <input aria-label={t('Arguments')} value={harness.args.join(' ')} style={{ ...inputStyle, flex: 1, minWidth: 160 }}
                     placeholder={t('Arguments, separated by spaces')}
                     onChange={(event) => patch(index, { args: event.target.value.split(/\s+/).filter(Boolean) })} />
-                  <button style={btnStyle} data-testid={`harness-remove-${index}`}
-                    onClick={() => { setTouched(true); setList((current) => current?.filter((_entry, at) => at !== index) ?? current); }}>{t('Remove')}</button>
+                  <OutlineButton data-testid={`harness-remove-${index}`}
+                    onClick={() => { setTouched(true); setList((current) => current?.filter((_entry, at) => at !== index) ?? current); }}>{t('Remove')}</OutlineButton>
                 </div>
               </details>
               {probe[harness.name] && <span data-testid={`harness-probe-${index}`} style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-caption)' }}>{probe[harness.name]}</span>}
@@ -182,11 +183,11 @@ export default function HarnessPage() {
           ))}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-          <button style={btnStyle} data-testid="harness-add" onClick={() => { setTouched(true); setList((current) => [...(current ?? []), { name: t('New harness'), command: '', args: [], env: {}, cwd: '', enabled: true }]); }}>
+          <OutlineButton data-testid="harness-add" onClick={() => { setTouched(true); setList((current) => [...(current ?? []), { name: t('New harness'), command: '', args: [], env: {}, cwd: '', enabled: true }]); }}>
             {t('Add an empty row')}
-          </button>
-          <button style={btnStyle} data-testid="harness-save" disabled={busy} onClick={() => void save()}>{t('Save the list')}</button>
-          <button style={btnStyle} onClick={reload}>{t('Reload')}</button>
+          </OutlineButton>
+          <OutlineButton data-testid="harness-save" disabled={busy} onClick={() => void save()}>{t('Save the list')}</OutlineButton>
+          <OutlineButton onClick={reload}>{t('Reload')}</OutlineButton>
         </div>
         {list?.some((entry) => installed[entry.command] === false) && (
           <span style={{ color: 'var(--warning, var(--error))', fontSize: 'var(--fs-caption)' }}>
@@ -199,11 +200,11 @@ export default function HarnessPage() {
         description={t('Fills in the command line a harness is usually started with. The program itself still has to be installed.')}>
         <div data-testid="harness-presets" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {HARNESS_PRESETS.map((preset) => (
-            <button key={preset.name} style={btnStyle} data-testid={`harness-preset-${preset.name}`}
+            <OutlineButton key={preset.name} data-testid={`harness-preset-${preset.name}`}
               data-tip={`${preset.command} ${preset.args.join(' ')}`} data-tip-description={preset.hint}
               onClick={() => { setTouched(true); setList((current) => upsertPreset(current ?? [], preset)); }}>
               {preset.name}
-            </button>
+            </OutlineButton>
           ))}
         </div>
       </Field>

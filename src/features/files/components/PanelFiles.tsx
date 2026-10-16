@@ -19,6 +19,7 @@ import { parentOf } from '@platform/path';
 import { shellQuote } from '@features/ssh/utils/remotePath';
 import { waitForTerminalStartup } from '@features/terminal/services/terminalStartup';
 import { useToastStore } from '@ui/Toast';
+import { t } from '@i18n';
 import { ensureSshLoaded, useSshStore } from '@features/ssh';
 import RemoteFiles from '@features/ssh/components/RemoteFiles';
 
@@ -50,6 +51,12 @@ function LocalFiles() {
   const workspaceDirs = useWorkspaceDirsStore();
   // 起始目录只取一次终端 cwd；之后导航与终端解耦
   const { focusedPaneId: focused, activeCwd, sessions } = useActiveWorkspace();
+
+  /** Open a local file with the system default application (menu item and path bar). */
+  const openWithSystemApp = (path: string) => {
+    void openPath(path).catch((error) =>
+      useToastStore.getState().addToast(`${t('Could not open the file')}: ${String((error as Error)?.message ?? error)}`, 'error'));
+  };
 
   /** 在终端编辑器中打开（本地专有语义） */
   const openFileInTerminal = async (entry: FsEntry) => {
@@ -122,7 +129,7 @@ function LocalFiles() {
       )}
       handlers={{
         onOpenEditor: (entry) => void openFileInTerminal(entry),
-        onOpenSystem: (entry) => void openPath(entry.path).catch(() => {}),
+        onOpenSystem: (entry) => openWithSystemApp(entry.path),
         onOpenWith: (entry) => void fileOpenWith(entry.path).catch((error) =>
           useToastStore.getState().addToast(String((error as Error)?.message ?? error), 'error')),
         onOpenTab: (entry) => useSessionStore.getState().addTab({ cwd: entry.path, title: entry.name }),

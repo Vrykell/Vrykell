@@ -14,7 +14,7 @@ import { MODEL_PRESETS, type ModelPreset } from '@config/modelPresets';
 import { Plus } from '@ui/icons';
 import type { ProviderKind } from '@features/agent/services/provider';
 import { providerLabel } from '@features/agent/components/modelIcon';
-import { btnStyle } from './formStyles';
+import { OutlineButton } from '@ui/OutlineButton';
 import HarnessBadge from './HarnessBadge';
 
 export interface ProviderPickerEntry {
@@ -56,29 +56,27 @@ export default function ProviderPicker({ entries, selectedId, onSelect, onAddPre
           );
         })}
       </div>
-      <button
-        type="button"
+      <OutlineButton
         data-subtle
         data-testid="provider-add"
         onClick={() => setPresetsOpen((open) => !open)}
-        style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
+        style={{ flexShrink: 0 }}
       >
         <Plus size={12} /> {t('Add provider')}
-      </button>
+      </OutlineButton>
       {presetsOpen && (
         <div data-testid="model-presets" className="settings-provider-presets">
           {MODEL_PRESETS.map((preset) => (
-            <button
+            <OutlineButton
               key={preset.name}
-              type="button"
-              style={btnStyle}
+              data-subtle
               data-testid={`model-preset-${preset.name}`}
               data-tip={preset.baseUrl || t('The vendor default endpoint')}
               data-tip-description={`${preset.model} · ${t(preset.hint)}`}
               onClick={() => onAddPreset(preset)}
             >
               {preset.name}
-            </button>
+            </OutlineButton>
           ))}
           <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-micro)' }}>
             {t('Vendor names and endpoints are listed as data so a model can be filled in quickly; the app ships no third-party program, key or brand asset.')}

@@ -24,3 +24,23 @@ test('remote file double click opens the editor in the ready SSH pane', async ({
   await expect.poll(() => ptyWrites(page)).toContain("vim '/home/root/app.log'\n");
   await expect(page.getByText('SSH 会话未就绪', { exact: true })).toHaveCount(0);
 });
+
+test('remote path bar opens a typed file in the editor instead of reporting a directory error', async ({ page }) => {
+  await setupTauriMock(page, { sshHost: 'known' });
+  await page.goto('/');
+  await page.locator('[data-dock-btn="ssh"]').click();
+  await page.getByTestId('ssh-row-ssh-1').dblclick();
+  await page.getByRole('button', { name: '断开连接', exact: true }).waitFor();
+  await page.locator('[data-dock-btn="files"]').click();
+  await page.getByTestId('remote-file-app.log').waitFor();
+
+  // Remote file typed into the path bar opens in the remote editor (the system app cannot open remote files)
+  await page.getByTestId('remote-crumb-bar').click();
+  const input = page.getByTestId('remote-path-input');
+  await input.fill('/home/root/app.log');
+  await input.press('Enter');
+
+  await expect.poll(() => ptyWrites(page)).toContain("vim '/home/root/app.log'\n");
+  // Opening a file keeps the panel view: it stays in the directory it was in
+  await expect(page.getByTestId('remote-file-tree')).toHaveAttribute('data-path', '/home/root');
+});

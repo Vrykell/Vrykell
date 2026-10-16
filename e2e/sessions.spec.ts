@@ -32,12 +32,10 @@ test.describe('会话历史管理', () => {
     const menu = page.locator('[data-testid="session-filter-menu"]');
     await menu.getByRole('button', { name: 'SSH' }).click();
     await expect(page.getByText('旧的调试会话')).toHaveCount(0);
-    // 切回全部（类型组的第一个「全部」）
-    await page.locator('[data-testid="session-filter-btn"]').click();
+    // Filter choices stay open until dismissed or their trigger is toggled.
     await page.locator('[data-testid="session-filter-menu"]').getByRole('button', { name: '全部' }).first().click();
     await expect(page.getByText('旧的调试会话')).toBeVisible();
-    // sessionStorage 记忆：刷新页面后筛选状态保留
-    await page.locator('[data-testid="session-filter-btn"]').click();
+    // The selected filters survive a reload in the same application session.
     await page.locator('[data-testid="session-filter-menu"]').getByRole('button', { name: 'SSH' }).click();
     await page.reload();
     // 幂等打开会话历史页（面板状态可能已被持久化，避免 toggle 关掉它）
@@ -53,7 +51,13 @@ test.describe('会话历史管理', () => {
   test('历史会话可删除', async ({ page }) => {
     await openHistory(page);
     await expect(page.getByText('旧的调试会话')).toBeVisible();
-    await page.locator('[data-testid="session-delete-hist-1"]').click();
+    const record = page.getByTestId('history-session-hist-1');
+    const remove = page.getByTestId('session-menu-hist-1');
+    await expect(remove).toHaveCSS('opacity', '0');
+    await record.focus();
+    await expect(remove).toHaveCSS('opacity', '1');
+    await remove.click();
+    await page.getByRole('menuitem', { name: '删除此会话', exact: true }).click();
     await expect(page.getByText('旧的调试会话')).toHaveCount(0);
     await expect(page.getByText('暂无历史会话')).toBeVisible();
   });
@@ -79,7 +83,7 @@ test.describe('会话历史管理', () => {
     await ensureTabsOpen(page);
     const restoredTab = page.locator('[data-testid="tab-row-hist-group-1"]');
     await expect(restoredTab).toBeVisible();
-    await expect(restoredTab).toHaveAttribute('data-tab-group', '');
+    await expect(restoredTab).toHaveAttribute('data-tab-group', 'archived-group');
   });
 });
 

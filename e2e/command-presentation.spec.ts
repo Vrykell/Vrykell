@@ -62,7 +62,9 @@ test('command coloring is optional, persists and leaves native input editing int
   await expect(page.locator('.command-block-command [data-kind]')).toHaveCount(0);
   await gotoSetting(page, '主题');
   await page.getByRole('radio', { name: '浅色', exact: true }).click();
-  await expect(page.getByPlaceholder('搜索设置…')).toHaveCSS('caret-color', 'rgb(0, 111, 219)');
+  // The caret follows the theme wherever text is typed; the palette input is the plainest probe.
+  await page.getByTestId('global-search-trigger').click();
+  await expect(page.getByRole('dialog', { name: '全局搜索' }).getByRole('textbox')).toHaveCSS('caret-color', 'rgb(0, 111, 219)');
 });
 
 test('completion stays anchored while typing and its acceptance keys persist', async ({ page }) => {

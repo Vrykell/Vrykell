@@ -1,4 +1,4 @@
-import type { DiskEntry, FsEntry } from '@platform/api/types';
+import type { DiskEntry, FsEntry, FileStat } from '@platform/api/types';
 import { createLocalFileOps } from '@features/files/services/localFileOps';
 import { createSshFileOps } from '@features/ssh/services/fileOps';
 
@@ -35,6 +35,8 @@ export type FileOpsTarget = { kind: 'local' } | { kind: 'ssh'; connectionId: str
 export interface FileOps {
   /** Optional optimized traversal on the target's file channel. */
   search?(root: string, query: string, signal: AbortSignal): Promise<{ entries: FsEntry[]; truncated: boolean; skipped: number }>;
+  /** Single-path metadata: the path bar detects files with it and the properties dialog reads it. */
+  stat(path: string): Promise<FileStat>;
   /** 列出目录；dir 为 null 时用目标的默认起始目录（远端会返回解析后的 base）。 */
   list(dir: string | null): Promise<FileListResult>;
   /** 路径语义（本地与远端分隔符规则不同，统一由实现提供）。 */

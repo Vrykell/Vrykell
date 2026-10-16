@@ -1,513 +1,355 @@
 import { t } from '@i18n';
-import { sessionCommandCount } from '../model/sessionHistoryModel';
-import { TextInput } from '@ui/TextInput';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Monitor, RotateCcw, History, Trash2, ChevronRight, Folder, Server, Search, Filter, Check, ArrowSort } from '@ui/icons';
+import { ask } from '@tauri-apps/plugin-dialog';
+import { sessionCommandCount, sessionHistoryDateField, sessionHistoryDirectories, sessionHistoryTimestamp, sessionSummaryText } from '../model/sessionHistoryModel';
+import { useCallback, useMemo, useState } from 'react';
+import { Monitor, MonitorSmall, History, HistorySmall, ServerSmall, Ellipsis, Filter, ArrowSort, Grid, LockSmall as Lock, StarSmall as Star, Undo2, X } from '@ui/icons';
+import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/ContextMenu';
+import { IconButton } from '@ui/IconButton';
+import HistoryOptionMenu, { type HistoryMenuSection } from '@ui/HistoryOptionMenu';
+import HistoryGroupCard from '@ui/HistoryGroupCard';
+import HistoryPage from '@ui/HistoryPage';
+import HistoryTextPrompt from '@ui/HistoryTextPrompt';
+import SidebarItem from '@ui/sidebarItem';
+import { iconColorCss, iconColorKey, useIconColorStore } from '@config/iconColors';
 import type { BackendSessionEntry } from '@platform/api/types';
 import {
   isSshSession,
-  sshTargetOf,
   SESSION_DATE_OPTIONS,
   SESSION_TYPE_OPTIONS,
+  SESSION_MODE_OPTIONS,
+  SESSION_SORT_OPTIONS,
+  SESSION_GROUP_BY_OPTIONS,
+  groupHistoricalSessions,
   useSessionHistory,
-  type SessionDateFilter,
-  type SessionHistoryFilter,
-  type SessionTypeFilter,
 } from '@features/session-history';
 import { useToastStore } from '@ui/Toast';
 import ErrorBox from '@ui/ErrorBox';
-import { SESSION_MODE_OPTIONS, SESSION_SORT_OPTIONS, type SessionHistorySort, type SessionModeFilter } from '@features/session-history';
+import { writeClipboardText } from '@platform/clipboard';
+import { historyGroupKey, historyRecordKey, useHistoryMetaStore } from '@utils/historyMeta';
+import { useHistoryGroupActions } from '@ui/hooks/useHistoryGroupActions';
 
-const TYPE_OPTIONS = SESSION_TYPE_OPTIONS;
-
-const DATE_OPTIONS = SESSION_DATE_OPTIONS;
-
-type SessionFilterState = SessionHistoryFilter;
-
-/**
- * SessionHistoryView — 「会话历史查看」标签页内容。
- * 按分组浏览历史会话；分组可「恢复分组」（重建组内全部历史会话为标签页）
- * 或「删除分组及历史」（删除组 + 组内全部会话）。
- */
+/** Displays historical sessions grouped with restore, annotation and deletion actions. */
 export default function SessionHistoryView() {
-  // 历史页分组折叠状态（覆盖后端 collapsed，会话内本地态）
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [filterMenu, setFilterMenu] = useState<{ x: number; y: number } | null>(null);
   const [sortMenu, setSortMenu] = useState<{ x: number; y: number } | null>(null);
+  const [groupMenu, setGroupMenu] = useState<{ x: number; y: number } | null>(null);
+  const [actionsMenu, setActionsMenu] = useState<{ x: number; y: number } | null>(null);
+  const [rowMenu, setRowMenu] = useState<{ id: string; anchor: MenuAnchor } | null>(null);
+  const [notePrompt, setNotePrompt] = useState<{ id: string; anchor: { x: number; y: number } } | null>(null);
   const notify = useCallback((message: string, kind: 'success' | 'error') => {
     useToastStore.getState().addToast(message, kind);
   }, []);
   const {
-    groups,
     loading,
     loadError,
     filter,
     setFilter,
+    starredIds,
     load,
     openSession,
     deleteHistoricalSession,
-    restoreGroup,
-    deleteGroup,
+    restoreSessions,
+    deleteSessions,
+    batchBusy,
+    sessions,
+    originalGroups,
+    renameOriginalGroup,
     historical,
-    grouped,
-    ungrouped,
     hasFilter,
   } = useSessionHistory({ notify });
-  const { query, type: typeFilter, date: dateFilter, mode = 'all', sort = 'closed-desc' } = filter;
+  const { query, type: typeFilter, date: dateFilter, mode = 'all', sort = 'closed-desc', groupBy = 'day', starredOnly = false } = filter;
+  const dateField = filter.dateField ?? sessionHistoryDateField(sort);
+  const groupOperations = useHistoryGroupActions('session', groupBy);
+  const originalOperations = useHistoryGroupActions('session', 'original');
+  const { meta, pinnedIds } = groupOperations;
+  const { notes, lockedRecords } = meta;
+  const historyGroups = useMemo(
+    () => groupHistoricalSessions(historical, groupBy, sort, dateField, new Set([...pinnedIds, ...originalOperations.pinnedIds]),
+      { groups: originalGroups, sessions }),
+    [historical, groupBy, sort, dateField, pinnedIds, originalOperations.pinnedIds, originalGroups, sessions],
+  );
 
-  const toggleCollapsed = useCallback((id: string, initial: boolean) => {
-    setCollapsed((prev) => ({ ...prev, [id]: !(prev[id] ?? initial) }));
-  }, []);
+  const noteKey = (id: string) => historyRecordKey('session', id);
+  const closeSharedMenus = () => { setFilterMenu(null); setSortMenu(null); setGroupMenu(null); setActionsMenu(null); };
+  const openRowMenu = (session: BackendSessionEntry, anchor: MenuAnchor) => {
+    closeSharedMenus();
+    setNotePrompt(null);
+    setRowMenu(current => current?.id === session.id ? null : { id: session.id, anchor });
+  };
+  const copySummaries = (items: readonly BackendSessionEntry[]) => {
+    void writeClipboardText(items.map(session => sessionSummaryText(session)).join('\n\n---\n\n'))
+      .then(() => notify(t('Copied'), 'success'))
+      .catch(() => notify(t('Copy failed'), 'error'));
+  };
+  const deletable = (items: readonly BackendSessionEntry[]) => items.filter(item => item.status === 'historical'
+    && !useHistoryMetaStore.getState().lockedRecords[noteKey(item.id)]);
+  const deleteMatching = async (items: readonly BackendSessionEntry[]) => {
+    const targets = deletable(items);
+    if (batchBusy || !targets.length) return;
+    if (await ask(t('Delete {{count}} matching sessions and their history? Locked records are excluded.', { count: targets.length }),
+      { title: t('Delete sessions'), kind: 'warning' })) await deleteSessions(targets);
+  };
+  const groupItems = (items: readonly BackendSessionEntry[], restoreLabel: string): ContextMenuItem[] => [
+    { label: restoreLabel, disabled: batchBusy, onClick: () => { void restoreSessions(items); } },
+    { label: t('Copy matching session summaries'), group: 'clipboard', onClick: () => copySummaries(items) },
+    { label: t('Delete {{count}} matching sessions…', { count: deletable(items).length }), danger: true,
+      disabled: batchBusy || !deletable(items).length, onClick: () => { void deleteMatching(items); } },
+  ];
+  const rowMenuSession = rowMenu ? historical.find(item => item.id === rowMenu.id) ?? null : null;
+  const notePromptSession = notePrompt ? historical.find(item => item.id === notePrompt.id) ?? null : null;
+  const rowMenuItems: ContextMenuItem[] = [];
+  if (rowMenu && rowMenuSession) {
+    rowMenuItems.push(
+      { label: rowMenuSession.status === 'historical' ? t('Restore session') : t('Open session'), onClick: () => openSession(rowMenuSession) },
+      { label: t('Copy summary'), group: 'clipboard', onClick: () => copySummaries([rowMenuSession]) },
+      { label: notes[noteKey(rowMenuSession.id)] ? t('Edit note…') : t('Add note…'), group: 'edit',
+        onClick: () => { setRowMenu(null); setNotePrompt({ id: rowMenuSession.id, anchor: rowMenu.anchor }); } },
+      { label: starredIds.has(rowMenuSession.id) ? t('Unstar') : t('Star'), group: 'view',
+        onClick: () => useHistoryMetaStore.getState().toggleStar(noteKey(rowMenuSession.id)) },
+      { label: t(lockedRecords[noteKey(rowMenuSession.id)] ? 'Unlock record' : 'Lock record'), group: 'organize',
+        onClick: () => meta.setLocked([noteKey(rowMenuSession.id)], !lockedRecords[noteKey(rowMenuSession.id)]) },
+    );
+    if (rowMenuSession.status === 'historical') {
+      rowMenuItems.push({ label: t('Delete this session'), danger: true, disabled: batchBusy || Boolean(lockedRecords[noteKey(rowMenuSession.id)]), onClick: () => deleteHistoricalSession(rowMenuSession) });
+    }
+  }
 
-  const groupSessions = useCallback((groupId: string) => grouped.get(groupId) ?? [], [grouped]);
+  const filterSections: HistoryMenuSection[] = [
+    {
+      label: t('Type'),
+      options: SESSION_TYPE_OPTIONS.map(option => ({
+        label: t(option.label), active: option.value === typeFilter,
+        onSelect: () => setFilter({ type: option.value }),
+      })),
+    },
+    {
+      label: t('Terminal startup mode'),
+      options: SESSION_MODE_OPTIONS.map(option => ({
+        label: t(option.label), active: option.value === mode,
+        onSelect: () => setFilter({ mode: option.value }),
+      })),
+    },
+    {
+      label: t('Date field'),
+      options: (['closed', 'created'] as const).map(value => ({
+        label: t(value === 'created' ? 'Created date' : 'Closed date'), active: value === dateField,
+        onSelect: () => setFilter({ dateField: value }),
+      })),
+    },
+    {
+      label: t(dateField === 'created' ? 'Created date' : 'Closed date'),
+      options: SESSION_DATE_OPTIONS.map(option => ({
+        label: t(option.label), active: option.value === dateFilter,
+        onSelect: () => setFilter({ date: option.value }),
+      })),
+    },
+    {
+      label: t('Favorites'),
+      options: [{
+        label: t('Starred only'), active: starredOnly === true,
+        onSelect: () => setFilter({ starredOnly: starredOnly !== true }),
+      }],
+    },
+  ];
+  const sortSections: HistoryMenuSection[] = [{
+    label: t(groupBy === 'none' ? 'Sort records' : 'Sort within groups'),
+    options: SESSION_SORT_OPTIONS.map(option => ({
+      label: t(option.label), active: option.value === sort,
+      onSelect: () => { setFilter({ sort: option.value }); setSortMenu(null); },
+    })),
+  }];
+  const groupSections: HistoryMenuSection[] = [{
+    label: t('Group by'),
+    options: SESSION_GROUP_BY_OPTIONS.map(option => ({
+      label: t(option.label), active: option.value === groupBy,
+      onSelect: () => { setFilter({ groupBy: option.value }); setGroupMenu(null); },
+    })),
+  }];
 
-  return (
-    <div style={{
-      flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column',
-      background: 'var(--surface)', userSelect: 'none',
-    }}>
-      {/* 顶栏：标题 + 搜索栏（内置筛选按钮）+ 刷新 */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
-        padding: '8px 16px', borderBottom: '1px solid var(--border)',
-        fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)',
-      }}>
-        <History size={13} />
-        <span style={{ fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)', flexShrink: 0 }}>会话历史</span>
-        <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>· {historical.length} 个会话</span>
+  const anchorFrom = (element: HTMLButtonElement, align: 'start' | 'end' = 'start') => {
+    const rect = element.getBoundingClientRect();
+    return { x: align === 'end' ? rect.right : rect.left, y: rect.bottom + 4, trigger: element };
+  };
+  const actionMenuAnchorFrom = (element: HTMLButtonElement) => {
+    const rect = element.getBoundingClientRect();
+    return { x: rect.right - 180, y: rect.bottom + 4, trigger: element };
+  };
 
-        {/* 搜索栏（含筛选按钮） */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 4,
-          flex: 1, minWidth: 140,
-          background: 'var(--field-bg)', borderRadius: 6, padding: '0 4px 0 8px', height: 26,
-        }}>
-          <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-          <TextInput
-            value={query}
-            onChange={(e) => setFilter({ query: e.target.value })}
-            placeholder="搜索标题 / SSH 目标…"
-            data-testid="session-filter-input"
-            style={{
-              flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none',
-              fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
-            }}
-          />
-          <button
-            onClick={(e) => {
-              const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-              setSortMenu(null);
-              setFilterMenu({ x: r.left, y: r.bottom + 4 });
-            }}
-            type="button"
-            data-tip={hasFilter ? '筛选（当前已启用，点击调整）' : '筛选'}
-            data-testid="session-filter-btn"
-            style={{
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              width: 22, height: 22, padding: 0, border: 'none', borderRadius: 4,
-              background: 'transparent', cursor: 'pointer',
-              color: hasFilter ? 'var(--accent)' : 'var(--text-muted)',
-            }}
-          >
-            <Filter size={13} />
-          </button>
-          <button
-            onClick={(e) => {
-              const r = e.currentTarget.getBoundingClientRect();
-              setFilterMenu(null);
-              setSortMenu({ x: r.right, y: r.bottom + 4 });
-            }}
-            type="button"
-            aria-label={t('Sort sessions')}
-            aria-haspopup="menu"
-            aria-expanded={sortMenu !== null}
-            data-tip={t('Sort sessions')}
-            data-testid="session-sort-btn"
-            style={{
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              width: 22, height: 22, padding: 0, border: 'none', borderRadius: 4,
-              background: 'transparent', cursor: 'pointer',
-              color: sort !== 'closed-desc' ? 'var(--accent)' : 'var(--text-muted)',
-            }}
-          >
-            <ArrowSort size={13} />
-          </button>
-        </div>
-
-        <button
-          onClick={load}
-          data-tip="刷新"
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            fontSize: 'calc(11px * var(--ui-font-scale))', padding: '3px 8px', border: '1px solid var(--border)',
-            borderRadius: 4, background: 'transparent', color: 'var(--text-secondary)',
-            cursor: 'pointer', flexShrink: 0,
-          }}
-        >
-          <RotateCcw size={11} /> 刷新
-        </button>
-      </div>
-
-      {/* 筛选弹层 */}
-      {filterMenu && (
-        <SessionFilterMenu
-          anchor={filterMenu}
-          value={{ type: typeFilter, date: dateFilter, mode }}
-          onChange={setFilter}
-          onClose={() => setFilterMenu(null)}
-        />
-      )}
-      {sortMenu && (
-        <SessionSortMenu
-          anchor={sortMenu}
-          value={sort}
-          onChange={(value) => setFilter({ sort: value })}
-          onClose={() => setSortMenu(null)}
-        />
-      )}
-
-      {/* 列表 */}
-      <div className="scroll-region" style={{ flex: 1, overflowY: 'auto', padding: '8px 8px 8px' }}>
+  return (<HistoryPage
+    busy={batchBusy}
+    pageTestId="session-history-page"
+    listLabel={t('Session history')}
+    icon={<History size={13} aria-hidden="true" />}
+    title={t('Session history')}
+    count={`${t('{{count}} sessions', { count: historical.length })}${batchBusy ? ` · ${t('Working')}` : ''}`}
+    query={query}
+    onQueryChange={value => setFilter({ query: value })}
+    searchLabel={t('Search sessions')}
+    searchPlaceholder={t('Search sessions…')}
+    searchTestId="session-filter-input"
+    headerActions={<>
+      <IconButton compact className="toolbar-icon-button history-icon-button" aria-label={t('Filter sessions')}
+        aria-haspopup="menu" aria-expanded={filterMenu !== null}
+        data-tip={hasFilter ? t('Filters are active') : t('Filter sessions')}
+        data-active={hasFilter ? 'true' : undefined} data-testid="session-filter-btn"
+        onClick={event => { closeSharedMenus(); setRowMenu(null); setNotePrompt(null); if (!filterMenu) setFilterMenu(anchorFrom(event.currentTarget)); }}>
+        <Filter size={16} aria-hidden="true" />
+      </IconButton>
+      <IconButton compact className="toolbar-icon-button history-icon-button" aria-label={t('Sort sessions')}
+        aria-haspopup="menu" aria-expanded={sortMenu !== null}
+        data-tip={t('Sort sessions')}
+        data-active={sort !== 'closed-desc' ? 'true' : undefined} data-testid="session-sort-btn"
+        onClick={event => { closeSharedMenus(); setRowMenu(null); setNotePrompt(null); if (!sortMenu) setSortMenu(anchorFrom(event.currentTarget, 'end')); }}>
+        <ArrowSort size={16} aria-hidden="true" />
+      </IconButton>
+      <IconButton compact className="toolbar-icon-button history-icon-button" aria-label={t('Group by')}
+        aria-haspopup="menu" aria-expanded={groupMenu !== null}
+        data-tip={t('Group by')}
+        data-tip-description={t('Time groups use the selected date field. Other groups are ordered by name; sorting applies within each group.')}
+        data-active={groupBy !== 'day' ? 'true' : undefined} data-testid="session-history-group-by"
+        onClick={event => { closeSharedMenus(); setRowMenu(null); setNotePrompt(null); if (!groupMenu) setGroupMenu(anchorFrom(event.currentTarget, 'end')); }}>
+        <Grid size={16} aria-hidden="true" />
+      </IconButton>
+    </>}
+    searchActions={<IconButton compact className="toolbar-icon-button history-icon-button" aria-label={t('More actions')}
+      aria-haspopup="menu" aria-expanded={actionsMenu !== null} data-tip={t('More actions')}
+      data-testid="session-history-actions-menu-button"
+      onClick={event => { closeSharedMenus(); setRowMenu(null); setNotePrompt(null); if (!actionsMenu) setActionsMenu(actionMenuAnchorFrom(event.currentTarget)); }}>
+      <Ellipsis size={16} aria-hidden="true" />
+    </IconButton>}
+    overlays={<>
+      {actionsMenu && <ContextMenu anchor={actionsMenu} itemRole="menuitem"
+        items={[
+          { label: t('Refresh'), disabled: batchBusy, onClick: () => { void load(); } },
+          { label: t('Restore {{count}} matching sessions', { count: historical.length }), disabled: batchBusy || !historical.length, onClick: () => { void restoreSessions(historical); } },
+          { label: t('Copy matching session summaries'), group: 'clipboard', disabled: !historical.length, onClick: () => copySummaries(historical) },
+          ...groupOperations.pageItems(historyGroups.filter(group => !group.originalGroup).map(group => group.id),
+            historyGroups.filter(group => group.originalGroup).map(group => historyGroupKey('session', 'original', group.id))),
+        ]}
+        onClose={() => setActionsMenu(null)} />}
+      {rowMenu && rowMenuSession && <ContextMenu anchor={rowMenu.anchor} items={rowMenuItems} itemRole="menuitem"
+        onClose={() => setRowMenu(null)} />}
+      {notePrompt && notePromptSession && <HistoryTextPrompt anchor={notePrompt.anchor} label={t('Note')}
+        placeholder={t('Write a note…')} value={notes[noteKey(notePromptSession.id)] ?? ''} multiline saveLabel={t('Save')}
+        testId={`session-note-${notePromptSession.id}`}
+        onSave={text => useHistoryMetaStore.getState().setNote(noteKey(notePromptSession.id), text)}
+        onClose={() => setNotePrompt(null)} />}
+      {filterMenu && <HistoryOptionMenu anchor={filterMenu} testId="session-filter-menu" sections={filterSections}
+        onClose={() => setFilterMenu(null)} width={184} maxHeight={360} />}
+      {sortMenu && <HistoryOptionMenu anchor={sortMenu} testId="session-sort-menu" sections={sortSections}
+        onClose={() => setSortMenu(null)} width={184} maxHeight={300} align="end" />}
+      {groupMenu && <HistoryOptionMenu anchor={groupMenu} testId="session-group-menu" sections={groupSections}
+        onClose={() => setGroupMenu(null)} width={184} maxHeight={360} align="end" />}
+    </>}
+  >
         {loading ? (
-          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>加载中…</div>
+          <div className="history-empty">{t('Loading sessions…')}</div>
         ) : loadError ? (
           <ErrorBox
             style={{ margin: 8 }}
-            actions={<button onClick={() => void load()} style={{ minHeight: 32 }}>重试</button>}
+            actions={<button onClick={() => void load()} style={{ minHeight: 32 }}>{t('Retry')}</button>}
           >
             {loadError}
           </ErrorBox>
         ) : historical.length === 0 ? (
-          <div style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-            paddingTop: '14vh', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))',
-          }}>
-            <Monitor size={22} style={{ opacity: 0.4 }} />
-            <span>暂无历史会话</span>
+          <div className="history-empty">
+            <Monitor size={22} aria-hidden="true" />
+            <span>{query || hasFilter ? t('No matching sessions') : t('No sessions yet')}</span>
           </div>
         ) : (
-          <>
-            {groups.map((g) => {
-              const gs = groupSessions(g.id);
-              if (gs.length === 0) return null;
-              const isCollapsed = collapsed[g.id] ?? g.collapsed;
-              return (
-                <div key={g.id} style={{ marginBottom: 4 }}>
-                  {/* 分组容器 + 分组头 + 组内会话，结构对齐标签面板 */}
-                  <div className="tab-group-container" style={{ overflow: 'hidden' }}>
-                    <div
-                      className="tab-group-header"
-                      onClick={() => toggleCollapsed(g.id, g.collapsed)}
-                      data-tip="点击折叠/展开"
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 8,
-                        padding: '6px 8px', minHeight: 40, cursor: 'pointer',
-                      }}
-                    >
-                      <span style={{
-                        width: 24, height: 24, borderRadius: 6, flexShrink: 0,
-                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                        background: 'var(--hover)', color: 'var(--text-secondary)',
-                      }}>
-                        <Folder size={14} />
-                      </span>
-                      <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                        <span style={{
-                          fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)',
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        }}>
-                          {g.title}
-                        </span>
-                        <span data-testid={`history-group-count-${g.id}`} style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>{t('panel.sessionGroup.count', { n: gs.length })}</span>
-                      </span>
-                      <button
-                        data-subtle
-                        data-tip="恢复分组（重建组内历史会话为标签页）"
-                        aria-label="恢复分组（重建组内历史会话为标签页）"
-                        onClick={(e) => { e.stopPropagation(); void restoreGroup(g); }}
-                        style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 4,
-                          fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', border: '1px solid var(--border)',
-                          borderRadius: 4, background: 'transparent', color: 'var(--text-secondary)',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <RotateCcw size={11} /> 恢复
-                      </button>
-                      <button
-                        data-subtle
-                        data-tip="删除分组及其全部会话历史"
-                        aria-label="删除分组及其全部会话历史"
-                        onClick={(e) => { e.stopPropagation(); void deleteGroup(g); }}
-                        style={{
-                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                          width: 22, height: 22, padding: 0, border: 'none', borderRadius: 4,
-                          background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--error-light)'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                      <ChevronRight
-                        size={13}
-                        style={{
-                          color: 'var(--text-muted)', flexShrink: 0,
-                          transition: 'transform 0.12s ease',
-                          transform: isCollapsed ? 'none' : 'rotate(90deg)',
-                        }}
-                      />
-                    </div>
-
-                    {/* 组内会话与组内标签一样左缩进 12px，体现层级 */}
-                    {!isCollapsed && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 0 4px' }}>
-                        {gs.map((s) => (
-                          <div key={s.id} style={{ padding: '0 4px 0 12px' }}>
-                            <SessionRow
-                              s={s}
-                              onOpen={() => openSession(s)}
-                              onDelete={s.status === 'historical' ? () => deleteHistoricalSession(s) : undefined}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-
-            {ungrouped.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {groups.length > 0 && (
-                  <div style={{ padding: '0 8px 2px', fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>未分组</div>
-                )}
-                {ungrouped.map((s) => (
-                  <SessionRow
-                    key={s.id}
-                    s={s}
-                    onOpen={() => openSession(s)}
-                    onDelete={s.status === 'historical' ? () => deleteHistoricalSession(s) : undefined}
-                  />
-                ))}
-              </div>
-            )}
-          </>
+          historyGroups.map(group => <HistoryGroupCard key={group.id} id={group.id}
+            {...(group.originalGroup ? originalOperations : groupOperations).forGroup(group.id, group.title, group.sessions.map(session => session.id))}
+            {...(group.originalGroup ? { title: group.title, originalTitle: undefined,
+              onRename: (value: string) => { void renameOriginalGroup(group.originalGroup!.id, value); } } : {})}
+            subtitle={group.originalGroup ? [t('Original tab group'), group.categoryTitle].filter(Boolean).join(' · ') : undefined}
+            menuDescription={group.originalGroup
+              ? t('Matching actions affect visible records. Restoring the original group also includes hidden members. Locked records cannot be deleted.') : undefined}
+            timestamp={group.timestamp ?? group.sessions.reduce((latest, session) => Math.max(latest, sessionHistoryTimestamp(session, sort, dateField)), 0)}
+            count={group.totalCount && group.totalCount !== group.sessions.length
+              ? t('{{matching}} of {{total}} sessions', { matching: group.sessions.length, total: group.totalCount })
+              : t('{{count}} sessions', { count: group.sessions.length })}
+            actions={[
+              ...(group.originalGroup && group.totalCount !== group.sessions.length ? [{
+                label: t('Restore original group ({{count}} sessions)', { count: group.totalCount ?? 0 }), disabled: batchBusy,
+                onClick: () => { void restoreSessions(sessions.filter(session => session.status === 'historical' && session.group_id === group.originalGroup!.id)); },
+              }] : []),
+              ...groupItems(group.sessions, t(group.originalGroup
+                ? group.totalCount === group.sessions.length ? 'Restore group' : 'Restore matching' : 'Restore all')),
+            ]}>
+            {group.sessions.map(session => <SessionRow key={session.id} s={session}
+              starred={starredIds.has(session.id)}
+              note={notes[noteKey(session.id)]}
+              locked={Boolean(lockedRecords[noteKey(session.id)])}
+              onOpen={() => openSession(session)}
+              onDelete={() => deleteHistoricalSession(session)}
+              busy={batchBusy}
+              onMenu={anchor => openRowMenu(session, anchor)} />)}
+          </HistoryGroupCard>)
         )}
-      </div>
-    </div>
-  );
+  </HistoryPage>);
 }
 
-function SessionSortMenu({ anchor, value, onChange, onClose }: {
-  anchor: { x: number; y: number };
-  value: SessionHistorySort;
-  onChange: (value: SessionHistorySort) => void;
-  onClose: () => void;
+function SessionRow({ s, starred, note, locked, onOpen, onDelete, busy, onMenu }: {
+  s: BackendSessionEntry;
+  starred: boolean;
+  note?: string;
+  locked: boolean;
+  onOpen: () => void;
+  onDelete: () => void;
+  busy: boolean;
+  onMenu: (anchor: MenuAnchor) => void;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    requestAnimationFrame(() => document.addEventListener('mousedown', onDown));
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [onClose]);
-
-  const top = Math.max(8, Math.min(anchor.y, window.innerHeight - 230));
-  const left = Math.max(8, Math.min(anchor.x - 160, window.innerWidth - 168));
-
-  return (
-    <div
-      ref={ref}
-      data-testid="session-sort-menu"
-      className="workspace-floating"
-      style={{
-        position: 'fixed', zIndex: 9999, top, left, minWidth: 160,
-        padding: 4, fontSize: 'calc(12px * var(--ui-font-scale))', maxHeight: 'calc(100vh - 16px)', overflowY: 'auto',
-      }}
-    >
-      {SESSION_SORT_OPTIONS.map((option) => (
-        <FilterOption
-          key={option.value}
-          label={t(option.label)}
-          active={option.value === value}
-          onClick={() => { onChange(option.value); onClose(); }}
-        />
-      ))}
-    </div>
-  );
-}
-
-/** Grouped filters apply immediately and stay open until dismissed. */
-function SessionFilterMenu({ anchor, value, onChange, onClose }: {
-  anchor: { x: number; y: number };
-  value: { type: SessionTypeFilter; date: SessionDateFilter; mode: SessionModeFilter };
-  onChange: (patch: Partial<SessionFilterState>) => void;
-  onClose: () => void;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    requestAnimationFrame(() => document.addEventListener('mousedown', onDown));
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [onClose]);
-
-  const top = Math.max(8, Math.min(anchor.y, window.innerHeight - 360));
-  const left = Math.min(anchor.x, window.innerWidth - 160);
-
-  return (
-    <div
-      ref={ref}
-      data-testid="session-filter-menu"
-      className="workspace-floating"
-      style={{
-        position: 'fixed', zIndex: 9999, top, left, minWidth: 150,
-        padding: 4, fontSize: 'calc(12px * var(--ui-font-scale))', maxHeight: 'calc(100vh - 16px)', overflowY: 'auto',
-      }}
-    >
-      <div style={{ padding: '4px 10px 2px', fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)', fontWeight: 'var(--fw-semibold)', letterSpacing: '0.04em' }}>
-        类型
-      </div>
-      {TYPE_OPTIONS.map((o) => {
-        const active = o.value === value.type;
-        return (
-          <FilterOption key={o.value} label={o.label} active={active} onClick={() => onChange({ type: o.value })} />
-        );
-      })}
-      <div style={{ height: 1, background: 'var(--border)', margin: '4px 8px' }} />
-      <div style={{ padding: '4px 10px 2px', fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>{t('Terminal startup mode')}</div>
-      {SESSION_MODE_OPTIONS.map(option => <FilterOption key={option.value} label={t(option.label)} active={option.value === value.mode} onClick={() => onChange({ mode: option.value })} />)}
-      <div style={{ height: 1, background: 'var(--border)', margin: '4px 8px' }} />
-      <div style={{ padding: '4px 10px 2px', fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)', fontWeight: 'var(--fw-semibold)', letterSpacing: '0.04em' }}>
-        日期
-      </div>
-      {DATE_OPTIONS.map((o) => {
-        const active = o.value === value.date;
-        return (
-          <FilterOption key={o.value} label={o.label} active={active} onClick={() => onChange({ date: o.value })} />
-        );
-      })}
-    </div>
-  );
-}
-
-/** 筛选菜单单选行（选中打勾 + 强调色）。 */
-function FilterOption({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button className="workspace-floating-row"
-      onClick={onClick}
-      type="button"
-      aria-pressed={active}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
-        padding: '5px 10px', border: 'none', background: 'transparent', cursor: 'pointer',
-        color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-        fontSize: 'calc(12px * var(--ui-font-scale))',
-      }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-    >
-      <span style={{ flex: 1 }}>{label}</span>
-      {active && <Check size={12} style={{ color: 'var(--accent)', flexShrink: 0 }} />}
-    </button>
-  );
-}
-
-function SessionRow({
-  s, onOpen, onDelete,
-}: { s: BackendSessionEntry; onOpen: () => void; onDelete?: () => void }) {
+  const iconColor = useIconColorStore(state => iconColorCss(state.colors[iconColorKey('session', s.id)]));
   const historical = s.status === 'historical';
-  const [hovered, setHovered] = useState(false);
-  const when = historical && s.closed_at
-    ? `已关闭 · ${new Date(s.closed_at).toLocaleDateString()}`
-    : '活跃中';
-  const sshTarget = sshTargetOf(s);
+  const closedDate = historical && s.closed_at ? new Date(s.closed_at).toLocaleString(undefined,
+    { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
   const commandCount = sessionCommandCount(s);
-  return (
-    <div
-      onClick={onOpen}
-      data-testid={`history-session-${s.id}`}
-      data-tip={historical ? '点击恢复此会话' : '点击切换到该会话'}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        padding: 8, borderRadius: 'var(--tab-radius)', cursor: 'pointer',
-        border: '1px solid transparent',
-        background: hovered ? 'var(--tab-hover)' : 'transparent',
-        transition: 'background 0.12s ease',
-      }}
-    >
-      <span style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 24, height: 24, borderRadius: 6, flexShrink: 0,
-        background: historical ? 'var(--hover)' : 'var(--success-bg)',
-        color: historical ? 'var(--text-muted)' : 'var(--success)',
-      }}>
-        {isSshSession(s) ? <Server size={14} /> : historical ? <History size={14} /> : <Monitor size={14} />}
-      </span>
-      <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-        <span style={{
-          display: 'block', fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-primary)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {s.title || '(未命名会话)'}
-        </span>
-        <span style={{
-          display: 'block', fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {[when, sshTarget, commandCount === null ? null : t('{{count}} command blocks', { count: commandCount })].filter(Boolean).join(' · ')}
-        </span>
-      </span>
-      <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', flexShrink: 0 }}>
-        {historical ? '恢复' : '打开'}
-      </span>
-      {onDelete && (
-        <button
-          data-subtle
-          data-tip="删除此会话"
-          aria-label="删除此会话"
-          data-testid={`session-delete-${s.id}`}
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          style={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: 20, height: 20, padding: 0, border: 'none', borderRadius: 4,
-            background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
-            flexShrink: 0, opacity: hovered ? 1 : 0, transition: 'opacity 0.12s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'var(--button-hover)';
-            e.currentTarget.style.color = 'var(--error-light)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent';
-            e.currentTarget.style.color = 'var(--text-muted)';
-          }}
-        >
-          <Trash2 size={12} />
-        </button>
-      )}
-    </div>
-  );
+  const subtitle = [
+    ...sessionHistoryDirectories(s).map(directory => directory.title),
+    commandCount === null ? null : t('{{count}} command blocks', { count: commandCount }),
+    closedDate ? t('Closed {{date}}', { date: closedDate }) : t('Active'),
+    note ? t('Note: {{note}}', { note }) : null,
+  ].filter(Boolean).join(' · ');
+  const icon = isSshSession(s) ? <ServerSmall size={16} aria-hidden="true" />
+    : historical ? <HistorySmall size={16} aria-hidden="true" /> : <MonitorSmall size={16} aria-hidden="true" />;
+
+  return <SidebarItem
+    icon={<span className="history-row-icon" style={{ color: iconColor }}>{icon}</span>}
+    title={s.title || t('Untitled session')}
+    subtitle={subtitle}
+    subtitleFontFamily="var(--font-ui)"
+    variant="history"
+    compact
+    badge={starred || locked ? <span className="history-row-flags">
+      {locked && <span className="history-row-lock" data-tip={t('Locked record')}><Lock size={16} aria-hidden="true" /></span>}
+      {starred && <span className="history-row-star" data-tip={t('Starred')} data-testid={`session-star-${s.id}`}><Star size={16} aria-hidden="true" /></span>}
+    </span> : undefined}
+    active={false}
+    tabIndex={0}
+    testId={`history-session-${s.id}`}
+    tooltip={historical ? t('Restore session') : t('Open session')}
+    onClick={onOpen}
+    leadingActions={historical ? [
+      { icon: <X size={16} aria-hidden="true" />, label: t('Delete this session'),
+        title: t(locked ? 'Locked record' : 'Delete this session'), disabled: locked || busy,
+        testId: `session-delete-${s.id}`, onClick: onDelete },
+      { icon: <Undo2 size={16} aria-hidden="true" />, label: t('Restore session'), disabled: busy,
+        testId: `session-restore-${s.id}`, onClick: onOpen },
+    ] : undefined}
+    onContextMenu={event => {
+      event.preventDefault(); event.stopPropagation();
+      onMenu({ x: event.clientX, y: event.clientY, trigger: event.currentTarget });
+    }}
+    onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onOpen(); } }}
+    action={{
+      icon: <Ellipsis size={16} aria-hidden="true" />,
+      label: t('More actions'),
+      title: t('More actions'),
+      testId: `session-menu-${s.id}`,
+      onClick: event => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        onMenu({ x: rect.right - 180, y: rect.bottom + 4, trigger: event.currentTarget });
+      },
+    }}
+  />;
 }

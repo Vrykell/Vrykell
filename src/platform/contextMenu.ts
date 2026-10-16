@@ -4,6 +4,8 @@ export interface ContextMenuStatus {
   supported: boolean;
   available: boolean;
   enabled: boolean;
+  /** A registration that still points at an older package or executable: enabling updates it. */
+  stale: boolean;
   certificateTrusted: boolean;
   certificateThumbprint: string | null;
 }

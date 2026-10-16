@@ -5,7 +5,7 @@ import { ContextMenuPage } from '../pages/contextMenuPage';
 import { getContextMenuStatus, manageContextMenu, type ContextMenuStatus } from '@platform/contextMenu';
 
 vi.mock('@platform/contextMenu', () => ({ getContextMenuStatus: vi.fn(), manageContextMenu: vi.fn() }));
-const initial: ContextMenuStatus = { supported: true, available: true, enabled: false, certificateTrusted: false, certificateThumbprint: 'ABCD' };
+const initial: ContextMenuStatus = { supported: true, available: true, enabled: false, stale: false, certificateTrusted: false, certificateThumbprint: 'ABCD' };
 beforeEach(() => { vi.clearAllMocks(); vi.mocked(getContextMenuStatus).mockResolvedValue({ ...initial }); });
 it('does not let an old status read undo a later trust action', async () => {
   let finish!: (status: ContextMenuStatus) => void;
@@ -61,4 +61,16 @@ it('disables registration when the signed resources are unavailable', async () =
   await screen.findByText('右键菜单资源不可用');
   expect(screen.getByRole('button', { name: '启用右键菜单' })).toBeDisabled();
   expect(screen.queryByRole('button', { name: '信任此证书' })).not.toBeInTheDocument();
+});
+
+it('offers the update when the registration still points at an older package', async () => {
+  vi.mocked(getContextMenuStatus).mockResolvedValue({ ...initial, stale: true, certificateTrusted: true });
+  vi.mocked(manageContextMenu).mockResolvedValue({ ...initial, enabled: true, certificateTrusted: true });
+  render(<ContextMenuPage />);
+  expect(await screen.findByTestId('context-menu-status')).toHaveTextContent('注册已过期');
+  const enable = screen.getByRole('button', { name: '启用右键菜单' });
+  expect(enable).toBeEnabled();
+  fireEvent.click(enable);
+  await screen.findByRole('button', { name: '停用右键菜单' });
+  expect(vi.mocked(manageContextMenu).mock.calls.map(([action]) => action)).toEqual(['enable']);
 });

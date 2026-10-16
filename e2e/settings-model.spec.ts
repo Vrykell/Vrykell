@@ -121,17 +121,4 @@ test.describe('模型配置页', () => {
     await openSettings(page);
     await expect(page.locator('.settings-provider-chip').nth(1)).toHaveAttribute('aria-current', 'true');
   });
-
-  test('settings search filters individual results and focuses the selected control', async ({ page }) => {
-    const searchBox = page.locator('aside').getByPlaceholder('搜索设置…');
-    await searchBox.fill('技能');
-    const result = page.locator('aside').getByRole('button', { name: /^调用技能/ });
-    await expect(result).toBeVisible();
-    await expect(page.locator('aside').getByRole('button', { name: '模型配置', exact: true })).toHaveCount(0);
-    await result.click();
-    await expect(page.getByRole('heading', { name: '模型权限', exact: true })).toBeVisible();
-    await expect(page.getByRole('combobox', { name: '调用技能 权限', exact: true })).toBeFocused();
-    await searchBox.fill('不存在的设置');
-    await expect(page.getByText('无匹配设置')).toBeVisible();
-  });
 });

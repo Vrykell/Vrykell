@@ -1,14 +1,17 @@
-import { useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
+import { useId, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { useListReorder } from './listReorder';
 import { sidebarRowSpacing, sidebarRowContent, sidebarRowIcon, sidebarRowTitle } from './sidebarRow';
+import { IconButton } from './IconButton';
 
 export interface SidebarItemAction {
   icon: ReactNode;
-  /** Accessible name of the trailing action button. */
+  /** Accessible name of the action button. */
   label: string;
   title?: string;
-  onClick: () => void;
+  /** Receives the click event so callers can anchor floating menus on the button. */
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   testId?: string;
+  disabled?: boolean;
 }
 
 /**
@@ -23,8 +26,10 @@ export default function SidebarItem({
   icon,
   title,
   subtitle,
+  subtitleFontFamily = 'var(--font-mono)',
   badge,
   action,
+  leadingActions,
   renameInput,
   active,
   onClick,
@@ -40,13 +45,17 @@ export default function SidebarItem({
   dataAttributes,
   style,
   compact = false,
+  variant = 'default',
 }: {
   icon: ReactNode;
   title: string;
   subtitle?: string;
+  subtitleFontFamily?: CSSProperties['fontFamily'];
   /** Optional trailing content between the title and the action button. */
   badge?: ReactNode;
   action?: SidebarItemAction;
+  /** Compact history actions appear beside the row on hover or keyboard focus. */
+  leadingActions?: readonly SidebarItemAction[];
   /** Replaces the title area while an inline rename is active. */
   renameInput?: ReactNode;
   active: boolean;
@@ -64,17 +73,27 @@ export default function SidebarItem({
   /** List-specific data attributes (test hooks such as `data-tab-row-id`). */
   dataAttributes?: Record<string, string | undefined>;
   style?: CSSProperties;
-  /** Compact single-line rows use the same 32px height as file lists. */
+  /** Compact rows reduce padding; history metadata moves into the row description. */
   compact?: boolean;
+  /** History records use neutral titles and can show metadata as a compact description. */
+  variant?: 'default' | 'history';
 }) {
   const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const subtitleId = useId();
+  const historyCompact = variant === 'history' && compact;
   const dragging = useListReorder((state) => !!reorderItemId && state.drag?.id === reorderItemId);
   const background = active ? 'var(--selection-bg)' : hovered ? 'var(--hover)' : 'transparent';
-  const actionVisible = active || hovered;
+  const actionVisible = hovered || focused || (variant !== 'history' && active);
 
   return (
     <div
       {...dataAttributes}
+      className={variant === 'history' ? 'sidebar-row history-row' : 'sidebar-row'}
+      data-active={active ? 'true' : 'false'}
+      {...(variant === 'history' && active ? { 'aria-current': true as const } : {})}
+      data-compact={historyCompact ? 'true' : undefined}
+      aria-describedby={historyCompact && subtitle ? subtitleId : undefined}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
@@ -82,29 +101,51 @@ export default function SidebarItem({
       onPointerDown={onPointerDown}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={event => {
+        if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setFocused(false);
+      }}
       tabIndex={tabIndex}
-      data-tip={tooltip}
+      data-tip={historyCompact ? title : tooltip}
+      data-tip-description={historyCompact ? subtitle : undefined}
       data-testid={testId}
       data-reorder-item={reorderItemId}
       data-reorder-kind={reorderKind}
       data-reorder-dragging={dragging ? 'true' : undefined}
       style={{ ...sidebarRowSpacing, ...(compact ? { padding: '0 6px' } : {}), ...style }}
     >
-      <div style={{
+      {leadingActions?.length ? <span className="history-row-quick-actions" data-visible={actionVisible}
+        onPointerDown={event => event.stopPropagation()}
+        onClick={event => event.stopPropagation()}
+        onDoubleClick={event => event.stopPropagation()}
+        onContextMenu={event => event.stopPropagation()}>
+        {leadingActions.map(item => <IconButton key={item.label} compact data-subtle
+          aria-label={item.label} data-tip={item.title ?? item.label}
+          data-testid={item.testId} disabled={item.disabled} onClick={item.onClick}>
+          {item.icon}
+        </IconButton>)}
+      </span> : null}
+      <div className="sidebar-row-content" style={{
         ...sidebarRowContent,
-        ...(compact ? { minHeight: 32, padding: '5px 10px' } : {}),
-        background,
+        ...(historyCompact ? { minHeight: 34, padding: '5px 10px', alignItems: 'flex-start' } : compact ? { minHeight: 32, padding: '5px 10px' } : {}),
+        background: variant === 'history' ? undefined : background,
         color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
       }}>
-        <span style={sidebarRowIcon}>{icon}</span>
+        <span className="sidebar-row-icon" style={{ ...sidebarRowIcon, ...(historyCompact ? { width: 20, height: 'calc(22px * var(--ui-font-scale))' } : {}) }}>{icon}</span>
         {renameInput ?? (
           <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <span style={{ ...sidebarRowTitle, fontWeight: active ? 'var(--fw-semibold)' : 'var(--fw-regular)' }}>{title}</span>
+            <span className="sidebar-row-title" data-tip={variant === 'history' ? title : undefined}
+              data-tip-description={historyCompact ? subtitle : undefined}
+              style={{ ...sidebarRowTitle,
+                ...(historyCompact ? { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, whiteSpace: 'normal', overflowWrap: 'anywhere', fontSize: 'var(--fs-body)', lineHeight: 'calc(22px * var(--ui-font-scale))' } : {}),
+                fontWeight: active ? 'var(--fw-semibold)' : 'var(--fw-regular)' }}>{title}</span>
             {subtitle && (
-              <span style={{
+              <span className="sidebar-row-subtitle" id={subtitleId}
+                data-tip={variant === 'history' ? subtitle : undefined} style={{
                 fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', lineHeight: '14px',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                fontFamily: 'var(--font-mono)',
+                fontFamily: subtitleFontFamily,
+                ...(historyCompact ? { fontSize: 'var(--fs-caption)', lineHeight: 'calc(16px * var(--ui-font-scale))' } : {}),
               }}>
                 {subtitle}
               </span>
@@ -119,15 +160,18 @@ export default function SidebarItem({
             data-no-drag
             className="sidebar-row-action"
             aria-label={action.label}
+            disabled={action.disabled}
             data-tip={action.title ?? action.label}
             data-testid={action.testId}
             onDoubleClick={(event) => event.stopPropagation()}
-            onClick={(event) => { event.stopPropagation(); action.onClick(); }}
+            onClick={(event) => { event.stopPropagation(); action.onClick(event); }}
             style={{
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              width: 28, height: 28, padding: 0, border: 'none', borderRadius: 4,
+              width: historyCompact ? 24 : 28, height: historyCompact ? 24 : 28, padding: 0, border: 'none', borderRadius: 4,
               flexShrink: 0, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+              alignSelf: historyCompact ? 'center' : undefined,
               opacity: actionVisible ? 1 : 0,
+              pointerEvents: variant === 'history' && !actionVisible ? 'none' : undefined,
               transition: 'opacity 0.12s ease',
             }}
             onMouseEnter={(event) => {

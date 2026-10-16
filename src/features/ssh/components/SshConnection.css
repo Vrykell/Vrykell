@@ -1,4 +1,7 @@
 /* Connection editing follows the workspace's flat surfaces and compact typography. */
+.ssh-auth-overlay { position: fixed; inset: 0; z-index: 9997; display: flex; align-items: center; justify-content: center; background: var(--overlay); animation: overlayIn 180ms var(--ease); }
+.ssh-auth-dialog { width: min(440px, calc(100vw - 32px)); min-height: 0; animation: modalIn 220ms var(--ease-out); }
+.ssh-auth-address { overflow-wrap: anywhere; font-family: var(--font-mono); }
 .ssh-form-dialog { width: min(720px, calc(100vw - 32px)); min-height: min(380px, calc(100dvh - 32px)); max-height: min(620px, calc(100dvh - 32px)); display: flex; flex-direction: column; overflow: hidden; }
 .ssh-form-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
 .ssh-form-header h2 { margin: 0; font-size: calc(15px * var(--ui-font-scale)); font-weight: var(--fw-semibold); }
@@ -46,3 +49,4 @@
   .ssh-section-heading { flex-wrap: wrap; }
   .ssh-forward-rule-heading { flex-wrap: wrap; }
 }
+.ssh-form-dialog.ssh-auth-dialog { width: min(440px, calc(100vw - 32px)); min-height: 0; }

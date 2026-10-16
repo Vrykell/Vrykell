@@ -9,7 +9,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { t } from '@i18n';
 import { useToastStore } from '@ui/Toast';
-import { Field, inputStyle, btnStyle } from '@features/settings/components/ui';
+import { Field, inputStyle } from '@features/settings/components/ui';
+import { OutlineButton } from '@ui/OutlineButton';
 import HarnessBadge from '@features/settings/components/HarnessBadge';
 import { useSessionStore } from '@features/workspace';
 import { acpHandshake, acpHarnessSave, acpHarnesses, type AgentDescription } from '@platform/api/acp';
@@ -160,7 +161,7 @@ export default function HarnessHubView() {
                     background: entry.enabled ? 'var(--accent)' : 'var(--hover)', color: entry.enabled ? 'var(--canvas)' : 'var(--text-muted)',
                     font: `${'var(--fs-caption)'} var(--font-ui)`,
                   }}>{t('Connect')}</button>
-                <button style={btnStyle} data-testid={`harness-test-${index}`} onClick={() => void test(entry.name)}>{t('Test connection')}</button>
+                <OutlineButton data-testid={`harness-test-${index}`} onClick={() => void test(entry.name)}>{t('Test connection')}</OutlineButton>
                 <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--text-secondary)', fontSize: 'var(--fs-caption)' }}>
                   <input type="checkbox" checked={entry.enabled} aria-label={t('Enabled')} onChange={(event) => patch(index, { enabled: event.target.checked })} />
                   {t('Enabled')}
@@ -175,8 +176,8 @@ export default function HarnessHubView() {
                   <input aria-label={t('Arguments')} value={entry.args.join(' ')} style={{ ...inputStyle, flex: 1, minWidth: 140 }}
                     placeholder={t('Arguments, separated by spaces')}
                     onChange={(event) => patch(index, { args: event.target.value.split(/\s+/).filter(Boolean) })} />
-                  <button style={btnStyle} data-testid={`harness-remove-${index}`}
-                    onClick={() => { setTouched(true); setList((current) => current?.filter((_entry, at) => at !== index) ?? current); }}>{t('Remove')}</button>
+                  <OutlineButton data-testid={`harness-remove-${index}`}
+                    onClick={() => { setTouched(true); setList((current) => current?.filter((_entry, at) => at !== index) ?? current); }}>{t('Remove')}</OutlineButton>
                 </div>
               </details>
             </section>
@@ -195,11 +196,11 @@ export default function HarnessHubView() {
         <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-label)' }}>{t('Presets')}</span>
         <div data-testid="harness-presets" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {HARNESS_PRESETS.map((preset) => (
-            <button key={preset.name} style={btnStyle} data-testid={`harness-preset-${preset.name}`}
+            <OutlineButton key={preset.name} data-testid={`harness-preset-${preset.name}`}
               data-tip={`${preset.command} ${preset.args.join(' ')}`} data-tip-description={preset.hint}
               onClick={() => { setTouched(true); setList((current) => upsertPreset(current ?? [], preset)); }}>
               <HarnessBadge name={preset.name} size={18} /> {preset.name}
-            </button>
+            </OutlineButton>
           ))}
         </div>
         <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-micro)' }}>

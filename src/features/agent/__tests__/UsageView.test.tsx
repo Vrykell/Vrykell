@@ -154,7 +154,7 @@ describe('UsageView', () => {
     expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('1');
 
     fireEvent.click(screen.getByTestId('usage-range'));
-    fireEvent.click(screen.getByRole('option', { name: '全部' }));
+    fireEvent.click(screen.getByRole('option', { name: '全部时间' }));
     expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('2');
 
     fireEvent.click(screen.getByTestId('usage-filter-provider'));

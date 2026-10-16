@@ -15,7 +15,7 @@ import type { FileOpsTarget } from '@features/files/model/fileOps';
 export type FileMenuItemKey =
   | 'new-file' | 'new-folder'
   | 'workspace-add' | 'workspace-remove' | 'open-tab'
-  | 'open-editor' | 'open-system' | 'open-with' | 'reveal'
+  | 'open-editor' | 'open-system' | 'open-with' | 'reveal' | 'properties'
   | 'copy' | 'cut' | 'paste' | 'copy-path' | 'rename' | 'download' | 'delete'
   | 'upload-file' | 'upload-dir' | 'new-tab-here' | 'sync-cwd' | 'sync-terminal' | 'downloads-view' | 'collapse-all';
 
@@ -54,6 +54,8 @@ export interface FilePanelConfig {
   };
   /** 打开文件的语义 */
   open: 'terminal-editor' | 'remote-editor';
+  /** Opening a file typed into the path bar: system default app locally, the panel editor remotely. */
+  pathBarFile: 'system-app' | 'editor';
   /** 是否提供「终端切到当前目录」按钮 */
   syncToTerminal: boolean;
   /** 面包屑首段（本地「此电脑」/ 远程「/」） */
@@ -94,14 +96,16 @@ export function filePanelConfigFor(target: FileOpsTarget): FilePanelConfig {
       variant: 'ssh',
       ids: SSH_IDS,
       menus: {
-        rowFolder: ['new-file', 'new-folder', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'download', 'delete'],
-        rowFile: ['new-file', 'new-folder', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'download', 'delete'],
+        rowFolder: ['new-file', 'new-folder', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'download', 'properties', 'delete'],
+        rowFile: ['new-file', 'new-folder', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'download', 'properties', 'delete'],
         rowMulti: ['copy', 'cut', 'paste', 'download', 'delete'],
-        blank: ['new-file', 'new-folder', 'paste', 'upload-file', 'upload-dir'],
+        // 空白处与 ⋯ 菜单提供同一套操作（远端多出上传），只是落点固定为当前目录
+        blank: ['paste', 'new-file', 'new-folder', 'upload-file', 'upload-dir', 'sync-terminal', 'sync-cwd', 'downloads-view', 'collapse-all'],
         more: ['new-file', 'new-folder', 'upload-file', 'upload-dir', 'sync-terminal', 'sync-cwd', 'downloads-view', 'collapse-all'],
       },
       drag: { downloadBeforeNativeDrag: true, externalDropMode: 'upload', cleanupSourceAfterNativeDrag: false },
       open: 'remote-editor',
+      pathBarFile: 'editor',
       syncToTerminal: true,
       rootLabel: '/',
       rootPath: '/',
@@ -112,14 +116,16 @@ export function filePanelConfigFor(target: FileOpsTarget): FilePanelConfig {
     variant: 'local',
     ids: LOCAL_IDS,
     menus: {
-      rowFolder: ['new-file', 'new-folder', 'workspace-add', 'workspace-remove', 'open-tab', 'reveal', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'delete'],
-      rowFile: ['new-file', 'new-folder', 'open-editor', 'open-system', 'open-with', 'reveal', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'delete'],
+      rowFolder: ['new-file', 'new-folder', 'workspace-add', 'workspace-remove', 'open-tab', 'reveal', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'properties', 'delete'],
+      rowFile: ['new-file', 'new-folder', 'open-editor', 'open-system', 'open-with', 'reveal', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'properties', 'delete'],
       rowMulti: ['copy', 'cut', 'paste', 'delete'],
-      blank: ['new-file', 'new-folder', 'paste', 'new-tab-here'],
+      // 空白处与 ⋯ 菜单提供同一套操作，只是落点固定为当前目录
+      blank: ['paste', 'new-file', 'new-folder', 'new-tab-here', 'sync-terminal', 'sync-cwd', 'reveal', 'downloads-view', 'collapse-all'],
       more: ['new-file', 'new-folder', 'new-tab-here', 'sync-terminal', 'sync-cwd', 'reveal', 'downloads-view', 'collapse-all'],
     },
     drag: { downloadBeforeNativeDrag: false, externalDropMode: 'move', cleanupSourceAfterNativeDrag: true },
     open: 'terminal-editor',
+    pathBarFile: 'system-app',
     syncToTerminal: true,
     rootLabel: '此电脑',
     rootPath: null,

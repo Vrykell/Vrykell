@@ -305,7 +305,7 @@ T4   Render frame
        → TerminalBlockList renders BlockItem (DOM + outputHtml)
 ```
 
-Dev mode automatically writes `terminal-debug.jsonl`. When troubleshooting a hanging command, correlate `command-submit`, `command-start`, `route-data`, `terminal-scene-focus`, `terminal-input`, `terminal-input-write-complete`, and `command-done` by time; the log keeps only lengths, statuses, and error types, and does not record commands or raw terminal content. `session-controller-register/dispose` and `command-pending-deferred` are used to locate hot-update or lifecycle races.
+With auto-save enabled, records go to `diagnostics-<YYYYMMDDTHH>.jsonl` in the log directory, rotated by UTC hour. When troubleshooting a hanging command, correlate `command-submit`, `command-start`, `pty-io`, `terminal-io`, `terminal-scene-focus`, `terminal-input`, `terminal-input-write-complete`, and `command-done` by time; the log keeps only lengths, statuses, and error types, and does not record commands or raw terminal content. The terminal data path is counted in one-second windows: `pty-io` (Rust) summarizes reads and output flushes (chunks, bytes, largest chunk, longest gap) and `terminal-io` (frontend) summarizes IPC intake, controller intake and routing destinations; growing silence is written as `read-idle` at 1 s, 2 s, 4 s, … so a missing-output stretch is visible on its own. `session-controller-register/dispose` and `command-pending-deferred` are used to locate hot-update or lifecycle races.
 
 ## 15. Key File Index
 
@@ -331,6 +331,7 @@ Dev mode automatically writes `terminal-debug.jsonl`. When troubleshooting a han
 | `src/features/terminal/stores/terminal.ts` | session/dimensions/keyboard routing store + `termInstances` |
 | `src/features/terminal/stores/blocks.ts` | block store |
 | `src/platform/pty.ts` | Tauri IPC wrappers |
+| `src/features/terminal/services/terminalWriteQueue.ts` | terminal input write queue: 16K code units per chunk, serialized per session, drops the unsent remainder on interrupt or close |
 | `src/features/workspace/services/sessionManager.ts` | session/block persistence orchestration |
 | `src/utils/sanitizeHtml.ts` | bidirectional sanitization of outputHtml on persist/render (span whitelist style + br, injection protection) |
 | `src/features/workspace/model/windowLayout.ts` | split-pane layout model (TerminalSpec / pane splitting) |

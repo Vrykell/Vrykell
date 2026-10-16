@@ -10,11 +10,11 @@
 import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
 import { showsPaneChatHistory } from '../model/paneHistory';
 import { useTypographyStore } from '@config/typography';
-import { useRef, useEffect, useLayoutEffect, useMemo, useState, useId } from 'react';
+import { useRef, useEffect, useLayoutEffect, useMemo, useState, useId, useCallback } from 'react';
 import OverlayScrollbar from '@ui/OverlayScrollbar';
 import { CircleX, Minimize2, Square } from '@ui/icons';
 import { STATUS_ACTION_ICON_SIZE, StatusActionButton, TerminalStatusBar } from '@features/terminal/components/TerminalStatusBar';
-import DropPlacementPreview from '@ui/DropPlacementPreview';
+import { MoveDragLayer, PlacementOverlay } from './TerminalPlacementOverlay';
 import { useSessionStore, type Tab } from '@features/workspace';
 import { useTerminalStore } from '@features/terminal';
 import { useUiStore, useDockDragStore } from '@features/workspace';
@@ -25,9 +25,10 @@ import { useToastStore } from '@ui/Toast';
 import { useFollowBottom, registerFollowEngager, engageFollow } from '@features/terminal/hooks/useFollowBottom';
 import { useTerminalFocus } from '@features/terminal/hooks/useTerminalFocus';
 import { useTerminalPaneDrag } from '@features/terminal/hooks/useTerminalPaneDrag';
+import { useRunningCommandActions } from '@features/terminal/hooks/useRunningCommandActions';
 import {
-  leaves as layoutLeaves, firstLeaf, moveTargets, dividers, collectLayoutCells, fitLayoutWidth, MIN_PANE_SIZE, MIN_PANE_WIDTH, DIVIDER_SIZE,
-  type WindowLayout, type TerminalSpec, type DropTarget, type Rect,
+  leaves as layoutLeaves, firstLeaf, dividers, collectLayoutCells, fitLayoutWidth, MIN_PANE_SIZE, MIN_PANE_WIDTH, DIVIDER_SIZE,
+  type WindowLayout, type TerminalSpec, type Rect,
 } from '@features/workspace/model/windowLayout';
 import InputEditor from '@features/terminal/components/InputEditor';
 import TerminalBlockList, { hasVisibleContent } from '@features/terminal/components/TerminalBlockList';
@@ -37,16 +38,20 @@ import TerminalPanel from '@features/terminal/components/TerminalPanel';
 import { SessionHistoryView } from '@features/session-history';
 import AiHistoryView from '@features/chat/components/AiHistoryView';
 import SettingsView from '@features/settings/pages/SettingsView';
+import ContextMenu, { type ContextMenuItem } from '@ui/ContextMenu';
+import ErrorBox from '@ui/ErrorBox';
+import { TextButton } from '@ui/TextButton';
 import UsageView from '@features/agent/components/UsageView';
 import HarnessView from '@features/chat/components/HarnessView';
 import HarnessHubView from '@features/chat/components/HarnessHubView';
-import ContextMenu from '@ui/ContextMenu';
 import { useTerminalLayoutActions } from '@features/terminal/hooks/useTerminalLayoutActions';
 import { useTuiControls } from '@features/terminal/hooks/useTuiControls';
 import { copyTerminalSelection, getPaneTerminal, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
 import { t } from '@i18n';
 import { focusSessionInput } from '../services/terminalFocus';
 import { TerminalRedrawButton } from './TerminalRedrawButton';
+import SshStatusPanel from '@features/ssh/components/SshStatusPanel';
+import type { SshSessionStatus } from '@core/ssh';
 
 export default function TerminalView() {
   const tabs = useSessionStore((s) => s.tabs);
@@ -56,7 +61,7 @@ export default function TerminalView() {
   const focusedPaneId = useTerminalStore((s) => s.focusedPaneId);
   const sessions = useTerminalStore((s) => s.sessions);
   const altScreenActive = useTerminalStore((s) => s.altScreenActive);
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; sshActions?: ContextMenuItem[]; fullscreen?: boolean } | null>(null);
 
   const activeTab = tabs.find((t) => t.id === activeId);
   const isSession = activeTab?.kind === 'session';
@@ -66,6 +71,29 @@ export default function TerminalView() {
         ? focusedPaneId
         : firstLeaf(activeTab!.layout).id)
     : activeId;
+
+  // Running commands expose the status-bar actions through the context menu as well.
+  const focusedScene = useTerminalStore((s) => s.scenes[focusedTermId] ?? 'classic');
+  const focusedBlocks = useBlockStore(selectBlocks(focusedTermId));
+  const hasRunningBlock = focusedScene === 'blockList' && focusedBlocks.some((block) => block.status === 'executing');
+  const fullscreenMenu = ctxMenu?.fullscreen === true;
+  const runningActions = useRunningCommandActions(focusedTermId, fullscreenMenu ? 'fullscreen' : 'block');
+  const copySelection = () => { void copyTerminalSelection(getPaneTerminal(focusedTermId)); };
+  const pasteIntoPane = () => { void pasteClipboardIntoTerminal(focusedTermId); };
+  const ctxMenuItems: ContextMenuItem[] = !ctxMenu ? [] : fullscreenMenu ? [
+    ...runningActions,
+    { label: t('terminal.menu.copy'), group: 'clipboard', shortcut: 'Ctrl+C', onClick: copySelection },
+    { label: t('terminal.menu.paste'), group: 'clipboard', shortcut: 'Ctrl+V', onClick: pasteIntoPane },
+  ] : [
+    ...(hasRunningBlock ? runningActions : []),
+    ...(ctxMenu.sshActions ?? []),
+    { label: t('terminal.menu.copy'), group: 'clipboard', shortcut: 'Ctrl+C', onClick: copySelection },
+    { label: t('terminal.menu.paste'), group: 'clipboard', shortcut: 'Ctrl+V', onClick: pasteIntoPane },
+    { label: t('Split terminal (choose position)'), group: 'view', onClick: () => useUiStore.getState().beginSplit(null) },
+    { label: t('Choose split type'), group: 'view', onClick: () => useUiStore.getState().openSplitPicker() },
+    { label: t('Move terminal'), group: 'view', onClick: () => useUiStore.getState().beginMove(focusedTermId) },
+    { label: t('Close this terminal'), danger: true, onClick: () => useSessionStore.getState().closeFocusedTerminal() },
+  ];
 
   return (
     <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
@@ -81,7 +109,7 @@ export default function TerminalView() {
               active={tab.id === activeId}
               setSession={setSession}
               setFocusedPane={setFocusedPane}
-              onPaneContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY }); }}
+              onPaneContextMenu={(e, sshActions) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, sshActions }); }}
             />
           );
         }
@@ -96,7 +124,15 @@ export default function TerminalView() {
 
       {/* Manual fullscreen host for a running block, with room for the toolbar. */}
       {altScreenActive && (
-        <div data-testid="tui-fullscreen" style={{ position: 'absolute', inset: 0, zIndex: 100, background: 'var(--xterm-bg)', paddingTop: 28 }}>
+        <div
+          data-testid="tui-fullscreen"
+          onContextMenu={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setCtxMenu({ x: event.clientX, y: event.clientY, fullscreen: true });
+          }}
+          style={{ position: 'absolute', inset: 0, zIndex: 100, background: 'var(--xterm-bg)', paddingTop: 28 }}
+        >
           <TuiBanner tabId={focusedTermId} />
         </div>
       )}
@@ -106,14 +142,7 @@ export default function TerminalView() {
         <ContextMenu
           anchor={ctxMenu}
           onClose={() => setCtxMenu(null)}
-          items={[
-            { label: t('terminal.menu.copy'), group: 'clipboard', shortcut: 'Ctrl+C', onClick: () => { void copyTerminalSelection(getPaneTerminal(focusedTermId)); } },
-            { label: t('terminal.menu.paste'), group: 'clipboard', shortcut: 'Ctrl+V', onClick: () => { void pasteClipboardIntoTerminal(focusedTermId); } },
-            { label: '分裂终端（选位置）', group: 'view', onClick: () => useUiStore.getState().beginSplit(null) },
-            { label: '选择类型分裂', group: 'view', onClick: () => useUiStore.getState().openSplitPicker() },
-            { label: '更换位置', group: 'view', onClick: () => useUiStore.getState().beginMove(focusedTermId) },
-            { label: '关闭终端', danger: true, onClick: () => useSessionStore.getState().closeFocusedTerminal() },
-          ]}
+          items={ctxMenuItems}
         />
       )}
     </div>
@@ -129,7 +158,7 @@ function SessionTabView(props: {
   active: boolean;
   setSession: (id: string, sid: string) => void;
   setFocusedPane: (id: string) => void;
-  onPaneContextMenu: (e: React.MouseEvent) => void;
+  onPaneContextMenu: (e: React.MouseEvent, sshActions?: ContextMenuItem[]) => void;
 }) {
   const { tab, active, setSession, setFocusedPane, onPaneContextMenu } = props;
   const windowId = tab.id;
@@ -183,22 +212,22 @@ function SessionTabView(props: {
           onPaneContextMenu={onPaneContextMenu}
         />
 
-        {/* 分裂落点选择覆盖层（相对布局区域定位，忠实反映未来区域） */}
+        {/* Split slot picker (anchored to the layout area so it mirrors the future regions). */}
         {active && splitPlacement.open && (
           <PlacementOverlay targets={placementTargets} onPick={commitPlacement} onCancel={cancelSplit} />
         )}
 
-        {/* 更换位置落点选择覆盖层（菜单触发，等同拖动重排） */}
+        {/* Replace-position picker (menu entry, same slots as dragging a pane). */}
         {active && movePlacement.open && (
           <PlacementOverlay
             targets={movePlacementTargets}
-            emptyMessage="只有一个终端，无法更换位置"
+            emptyMessage={t('A single terminal cannot be moved')}
             onPick={completeMove}
             onCancel={cancelMove}
           />
         )}
 
-        {/* 拖动终端调整位置的落点覆盖层 */}
+        {/* Pane drag placement layer. */}
         {active && draggingId && (
           <MoveDragLayer layout={layout} draggingId={draggingId} onCommit={commitMove} />
         )}
@@ -228,7 +257,7 @@ function PaneLayout(props: {
   setSession: (id: string, sid: string) => void;
   setFocusedPane: (id: string) => void;
   setRatioNode: (aId: string, bId: string, ratio: number) => void;
-  onPaneContextMenu: (e: React.MouseEvent) => void;
+  onPaneContextMenu: (e: React.MouseEvent, sshActions?: ContextMenuItem[]) => void;
 }) {
   const { layout: savedLayout, windowId, focusedTermId, setSession, setFocusedPane, setRatioNode, onPaneContextMenu } = props;
   const layoutRef = useRef<HTMLDivElement>(null);
@@ -363,49 +392,54 @@ function TerminalPane(props: {
   focused: boolean;
   setSession: (id: string, sid: string) => void;
   setFocusedPane: (id: string) => void;
-  onContextMenu: (e: React.MouseEvent) => void;
+  onContextMenu: (e: React.MouseEvent, sshActions?: ContextMenuItem[]) => void;
   inner: InnerEdges;
   reorderable: boolean;
 }) {
   const { terminal, windowId, focused, setSession, setFocusedPane, onContextMenu, inner, reorderable } = props;
+  const [sshState, setSshState] = useState<SshSessionStatus>({ phase: 'connecting', reconnectAttempt: 0, retrying: false, log: [] });
+  const [sshStatusWidth, setSshStatusWidth] = useState(300);
+  const [sshToolbarHost, setSshToolbarHost] = useState<HTMLDivElement | null>(null);
+  const [sshStatusTrigger, setSshStatusTrigger] = useState<HTMLButtonElement | null>(null);
+  const [sshStatusToggleRequest, setSshStatusToggleRequest] = useState(0);
+  const [sshPanelOpen, setSshPanelOpen] = useState(false);
+  const [sshStatusOpenRequest, setSshStatusOpenRequest] = useState(0);
+  const reconnectAction = useRef<(() => Promise<void>) | null>(null);
+  const disconnectAction = useRef<(() => Promise<void>) | null>(null);
+  const registerDisconnect = useCallback((action: (() => Promise<void>) | null) => { disconnectAction.current = action; }, []);
+  const registerReconnect = useCallback((action: (() => Promise<void>) | null) => { reconnectAction.current = action; }, []);
+  const activeTabId = useSessionStore(s => s.activeId);
   const scene = useTerminalStore((s) => s.scenes[terminal.id] ?? 'classic');
+  const [enteredBlockMode, setEnteredBlockMode] = useState(false);
+  useEffect(() => { setEnteredBlockMode(false); }, [terminal.ssh?.connectionId, terminal.ssh?.host, terminal.openMode]);
+  useEffect(() => { if (scene === 'blockList') setEnteredBlockMode(true); }, [scene]);
   const altScreenActive = useTerminalStore((s) => s.altScreenActive);
   // An SSH pane's classic scene is its connection/auth surface; the pane's chat
   // history stays out of the way so that surface owns the pane.
   const showChatHistory = showsPaneChatHistory(scene, terminal.kind);
   // Real alternate buffers use the main xterm; manual fullscreen uses the live block terminal.
-  const showXterm = scene === 'classic' || (scene === 'altScreen' && !altScreenActive);
-  const showBlocks = scene === 'blockList';
+  const disconnectedBlock = terminal.kind === 'ssh' && terminal.openMode === 'block' && enteredBlockMode && sshState.phase === 'disconnected';
+  const showXterm = !disconnectedBlock && (scene === 'classic' || (scene === 'altScreen' && !altScreenActive));
+  const showBlocks = scene === 'blockList' || disconnectedBlock;
+  const blockPresentation = terminal.kind === 'ssh' && terminal.openMode === 'block' && (scene === 'blockList' || (scene === 'altScreen' && enteredBlockMode) || disconnectedBlock);
+  const reconnectSsh = async () => { await reconnectAction.current?.(); };
+  const sshActions: ContextMenuItem[] = blockPresentation ? [
+    { label: t('SSH status'), group: 'view', onClick: () => setSshStatusOpenRequest(value => value + 1) },
+    { label: t(sshState.phase === 'disconnected' || sshState.retrying ? 'Reconnect SSH session' : 'ssh.action.disconnect'), group: 'primary', onClick: () => {
+      const action = sshState.phase === 'disconnected' || sshState.retrying ? reconnectAction.current : disconnectAction.current;
+      void action?.().catch(reason => useToastStore.getState().addToast(String(reason), 'error'));
+    } },
+  ] : [];
 
   const onPaneMouseDown = useTerminalPaneDrag(terminal.id, reorderable);
 
-  return (
-    <div
-      data-testid={`pane-${terminal.id}`}
-      className="terminal-pane"
-      data-focused={focused ? 'true' : 'false'}
-      onClick={() => setFocusedPane(terminal.id)}
-      onMouseDown={onPaneMouseDown}
-      onContextMenu={(e) => { setFocusedPane(terminal.id); onContextMenu(e); }}
-      style={{
-        flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column',
-        position: 'relative',
-        // Match terminal output, pane padding and block history to the classic background.
-        background: 'var(--xterm-bg)',
-        // Interior pane dividers keep the same appearance when focus moves.
-        borderTop: inner.top ? '1px solid var(--border)' : 'none',
-        borderBottom: inner.bottom ? '1px solid var(--border)' : 'none',
-        borderLeft: inner.left ? '1px solid var(--border)' : 'none',
-        borderRight: inner.right ? '1px solid var(--border)' : 'none',
-        overflow: 'hidden',
-      }}
-    >
+  const paneContent = (
+    <div className="ssh-pane-content" style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
       {/* Keep xterm mounted; hide it only while the block terminal is manually fullscreened. */}
       {showChatHistory && <PaneChatHistory paneId={terminal.id} />}
       <div inert={!showXterm} style={showXterm
         // Keep the native terminal scrollbar flush with the pane's right edge.
-        // 左边距不在这里加：它只属于终端屏幕内容（见 TerminalPanel），
-        // 否则认证输入条等整宽元素会被一起推右，出现左右不对称。
+        // Keep left padding on terminal output so authentication inputs stay centered.
         ? { flex: 1, minHeight: 0, position: 'relative', padding: '8px 0 0 0', paddingTop: scene === 'altScreen' ? 28 : 8, background: 'transparent' }
         : { position: 'absolute', inset: 0, opacity: 0, pointerEvents: 'none' }}>
         <TerminalPanel
@@ -415,6 +449,14 @@ function TerminalPane(props: {
           connectionId={terminal.ssh?.connectionId}
           sshTarget={terminal.ssh ? `${terminal.ssh.user ? `${terminal.ssh.user}@` : ''}${terminal.ssh.host}` : undefined}
           onReady={(sid) => setSession(terminal.id, sid)}
+          onSshStateChange={setSshState}
+          onReconnectReady={registerReconnect}
+          toolbarHost={sshToolbarHost}
+          showToolbar={!blockPresentation}
+          onSessionStatusClick={() => setSshStatusToggleRequest(value => value + 1)}
+          onSessionStatusReady={setSshStatusTrigger}
+          sessionStatusOpen={sshPanelOpen}
+          onDisconnectReady={registerDisconnect}
         />
       </div>
 
@@ -428,172 +470,46 @@ function TerminalPane(props: {
           focused={focused}
           insetLeft={inner.left ? 4 : 8}
           insetRight={inner.right ? 4 : 8}
+          onSessionStatusClick={blockPresentation ? () => setSshStatusToggleRequest(value => value + 1) : undefined}
+          onSessionStatusReady={blockPresentation ? setSshStatusTrigger : undefined}
+          sessionStatusOpen={sshPanelOpen}
+          sessionNotice={blockPresentation && sshState.phase === 'disconnected' ? <ErrorBox compact tone="info" style={{ margin: '0 8px 8px' }} actions={<TextButton onClick={() => { void reconnectSsh().catch(reason => useToastStore.getState().addToast(String(reason), 'error')); }}>{t('Reconnect SSH session')}</TextButton>}>{t('Disconnected')}</ErrorBox> : undefined}
         />
       )}
       {scene === 'altScreen' && !altScreenActive && <TuiBanner tabId={terminal.id} />}
     </div>
   );
-}
-
-/** 根据归一化坐标 (0..1) 挑出光标所在落点：取「深入未来区域最深」者，解决半屏重叠歧义。 */
-function pickDropZone(targets: DropTarget[], nx: number, ny: number): number | null {
-  let best: number | null = null;
-  let bestScore = -Infinity;
-  for (let i = 0; i < targets.length; i++) {
-    const t = targets[i]!;
-    const r = t.rect;
-    if (nx < r.x - 1e-6 || nx > r.x + r.w + 1e-6) continue;
-    if (ny < r.y - 1e-6 || ny > r.y + r.h + 1e-6) continue;
-    const score = t.dir === 'row'
-      ? (t.position === 'first' ? (r.x + r.w) - nx : nx - r.x)
-      : (t.position === 'first' ? (r.y + r.h) - ny : ny - r.y);
-    if (score > bestScore) { bestScore = score; best = i; }
-  }
-  return best;
-}
-
-// ── 分裂落点选择覆盖层 ──
-
-function PlacementOverlay({ targets, onPick, onCancel, emptyMessage = '最多 4 个终端' }: {
-  targets: DropTarget[];
-  onPick: (t: DropTarget) => void;
-  onCancel: () => void;
-  emptyMessage?: string;
-}) {
-  const [hovered, setHovered] = useState<number | null>(null);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (targets.length === 0) {
-      useToastStore.getState().addToast(emptyMessage, 'info');
-      onCancel();
-      return;
-    }
-    // Esc 取消（捕获阶段，优先于全局快捷键）
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopPropagation();
-        onCancel();
-      }
-    };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [targets.length, emptyMessage, onCancel]);
-
-  const locate = (clientX: number, clientY: number): number | null => {
-    const rect = ref.current?.getBoundingClientRect();
-    if (!rect || rect.width === 0 || rect.height === 0) return null;
-    return pickDropZone(targets, (clientX - rect.left) / rect.width, (clientY - rect.top) / rect.height);
-  };
 
   return (
     <div
-      ref={ref}
-      onClick={(e) => {
-        const idx = locate(e.clientX, e.clientY);
-        if (idx != null) onPick(targets[idx]!);
-        else onCancel();
+      data-testid={`pane-${terminal.id}`}
+      className="terminal-pane"
+      data-focused={focused ? 'true' : 'false'}
+      onClick={() => setFocusedPane(terminal.id)}
+      onMouseDown={onPaneMouseDown}
+      onContextMenu={(e) => { setFocusedPane(terminal.id); onContextMenu(e, sshActions); }}
+      style={{
+        flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column',
+        position: 'relative',
+        // Match terminal output, pane padding and block history to the classic background.
+        background: 'var(--xterm-bg)',
+        // Interior pane dividers keep the same appearance when focus moves.
+        borderTop: inner.top ? '1px solid var(--border)' : 'none',
+        borderBottom: inner.bottom ? '1px solid var(--border)' : 'none',
+        borderLeft: inner.left ? '1px solid var(--border)' : 'none',
+        borderRight: inner.right ? '1px solid var(--border)' : 'none',
+        overflow: 'hidden',
       }}
-      onMouseMove={(e) => setHovered(locate(e.clientX, e.clientY))}
-      onMouseLeave={() => setHovered(null)}
-      style={{ position: 'absolute', inset: 0, zIndex: 80, cursor: 'crosshair' }}
     >
-      <div data-testid="placement-hint" className="workspace-floating" style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 1, padding: '8px 12px', fontSize: 'calc(12px * var(--ui-font-scale))', whiteSpace: 'nowrap' }}>
-        点击区域选择位置 · Esc 取消
-      </div>
-      {/* A visible grid explains the placement mode before the pointer moves. */}
-      {targets.map((t, i) => (
-        <DropPlacementPreview
-          key={i}
-          data-testid={`placement-zone-${i}`}
-          active={hovered === i}
-          style={{
-            position: 'absolute',
-            left: `${t.rect.x * 100}%`, top: `${t.rect.y * 100}%`,
-            width: `${t.rect.w * 100}%`, height: `${t.rect.h * 100}%`,
-          }}
-        >
-          <span style={{ position: 'absolute', fontSize: 'calc(12px * var(--ui-font-scale))', color: hovered === i ? 'var(--text-primary)' : 'var(--text-secondary)',
-            left: t.dir === 'col' ? '50%' : t.position === 'first' ? 16 : undefined,
-            right: t.dir === 'row' && t.position === 'second' ? 16 : undefined,
-            top: t.dir === 'row' ? '50%' : t.position === 'first' ? 66 : undefined,
-            bottom: t.dir === 'col' && t.position === 'second' ? 20 : undefined,
-            transform: t.dir === 'row' ? 'translateY(-50%)' : 'translateX(-50%)',
-          }}>{t.dir === 'row' ? (t.position === 'first' ? '左侧' : '右侧') : (t.position === 'first' ? '上方' : '下方')}</span>
-        </DropPlacementPreview>
-      ))}
-    </div>
-  );
-}
-
-// ── 拖动终端调整位置的落点覆盖层 ──
-
-function MoveDragLayer({ layout, draggingId, onCommit }: {
-  layout: WindowLayout;
-  draggingId: string;
-  onCommit: (dragId: string, zone: DropTarget) => void;
-}) {
-  // 可移动落点：对其它每个终端给出上/下/左/右四个边沿落点
-  const targets = useMemo(
-    () => moveTargets(layout, draggingId),
-    [layout, draggingId],
-  );
-  const [hovered, setHovered] = useState<number | null>(null);
-  const hoveredRef = useRef<number | null>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      const rect = overlayRef.current?.getBoundingClientRect();
-      let idx: number | null = null;
-      if (rect && rect.width > 0 && rect.height > 0) {
-        idx = pickDropZone(targets, (e.clientX - rect.left) / rect.width, (e.clientY - rect.top) / rect.height);
-      }
-      hoveredRef.current = idx;
-      setHovered(idx);
-    };
-    const onUp = () => {
-      const idx = hoveredRef.current;
-      const zone = idx != null ? targets[idx] : undefined;
-      if (zone) onCommit(draggingId, zone);
-      useDockDragStore.getState().end();
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopPropagation();
-        useDockDragStore.getState().end();
-      }
-    };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-    window.addEventListener('keydown', onKey, true);
-    return () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      window.removeEventListener('keydown', onKey, true);
-    };
-  }, [targets, draggingId, onCommit]);
-
-  if (targets.length === 0) {
-    // 单终端没有可移动落点，直接结束
-    return null;
-  }
-
-  return (
-    <div ref={overlayRef} style={{ position: 'absolute', inset: 0, zIndex: 79, cursor: 'grabbing' }}>
-      {targets.map((t, i) => (
-        <DropPlacementPreview
-          key={i}
-          data-testid={`move-placement-zone-${i}`}
-          active={hovered === i}
-          style={{
-            position: 'absolute',
-            left: `${t.rect.x * 100}%`, top: `${t.rect.y * 100}%`,
-            width: `${t.rect.w * 100}%`, height: `${t.rect.h * 100}%`,
-          }}
-        />
-      ))}
+      {terminal.kind === 'ssh' && terminal.ssh ? <SshStatusPanel
+        key={`${terminal.ssh.connectionId ?? ''}:${terminal.ssh.host}:${terminal.ssh.port ?? 22}`}
+        paneId={terminal.id} target={terminal.ssh} state={sshState} active={activeTabId === windowId} focused={focused}
+        width={sshStatusWidth} onWidthChange={setSshStatusWidth}
+        onToolbarReady={setSshToolbarHost} compact={blockPresentation}
+        statusTrigger={sshStatusTrigger} openRequest={sshStatusOpenRequest}
+        toggleRequest={sshStatusToggleRequest} onOpenChange={setSshPanelOpen}
+        onReconnect={reconnectSsh}
+      >{paneContent}</SshStatusPanel> : paneContent}
     </div>
   );
 }
@@ -633,7 +549,7 @@ function TuiBanner({ tabId }: { tabId: string }) {
 // ═══════════════════════════════════════════════════════════
 // PaneInputEditor（终端 pane 的独立输入栏） ═══════════════════════════════════════════════════════════
 
-function PaneInputEditor({ paneId, focused, insetLeft = 8, insetRight = 8 }: { paneId: string; focused: boolean; insetLeft?: number; insetRight?: number }) {
+function PaneInputEditor({ paneId, focused, insetLeft = 8, insetRight = 8, onSessionStatusClick, onSessionStatusReady, sessionNotice, sessionStatusOpen }: { paneId: string; focused: boolean; insetLeft?: number; insetRight?: number; onSessionStatusClick?: () => void; onSessionStatusReady?: (trigger: HTMLButtonElement | null) => void; sessionStatusOpen?: boolean; sessionNotice?: React.ReactNode }) {
   const blocks = useBlockStore(selectBlocks(paneId));
   const hasRunningBlock = blocks.some((b) => b.status === 'executing' && b.wasLongRunning);
   const runningCommand = [...blocks].reverse().find((b) => b.status === 'executing')?.command ?? '';
@@ -645,6 +561,10 @@ function PaneInputEditor({ paneId, focused, insetLeft = 8, insetRight = 8 }: { p
       insetRight={insetRight}
       isLongRunning={hasRunningBlock}
       runningCommand={runningCommand}
+      onSessionStatusClick={onSessionStatusClick}
+      onSessionStatusReady={onSessionStatusReady}
+      sessionStatusOpen={sessionStatusOpen}
+      sessionNotice={sessionNotice}
       onEndPress={() => { engageFollow(paneId); useTerminalStore.getState().setKeyboardTarget('input'); }}
     />
   );

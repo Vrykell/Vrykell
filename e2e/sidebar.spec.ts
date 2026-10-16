@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, fsOps, revealedPaths, ensureTabsOpen } from './tauri-mock';
+import { setupTauriMock, fsOps, revealedPaths, openedPaths, ensureTabsOpen } from './tauri-mock';
 
 test.beforeEach(async ({ page }) => {
   await setupTauriMock(page);
@@ -78,6 +78,41 @@ test.describe('文件面板', () => {
     await tree.getByText('notes.txt').click();
     await expect(input).toHaveCount(0);
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/Documents');
+  });
+
+  test('路径栏输入文件路径用系统默认应用打开，目录路径仍然导航', async ({ page }) => {
+    const tree = page.getByTestId('local-file-tree');
+    const bar = page.getByTestId('crumb-bar');
+    await bar.locator('[data-tip="单击编辑路径，回车跳转"]').click();
+    await page.getByTestId('path-input').fill('/home/e2e/notes.txt');
+    await page.getByTestId('path-input').press('Enter');
+
+    // The system app receives the file path; the panel keeps its view and shows no read error
+    await expect.poll(() => openedPaths(page)).toContain('/home/e2e/notes.txt');
+    await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
+    await expect(page.getByRole('alert')).toHaveCount(0);
+
+    // Directory paths keep navigating as before
+    await bar.locator('[data-tip="单击编辑路径，回车跳转"]').click();
+    await page.getByTestId('path-input').fill('/home/e2e/Documents');
+    await page.getByTestId('path-input').press('Enter');
+    await expect(tree).toHaveAttribute('data-path', '/home/e2e/Documents');
+  });
+
+  test('右键属性显示文件基本信息', async ({ page }) => {
+    await page.locator('[data-testid="file-row"][data-path="/home/e2e/notes.txt"]').click({ button: 'right' });
+    await page.getByRole('button', { name: '属性', exact: true }).click();
+
+    const dialog = page.getByTestId('file-properties-dialog');
+    await expect(dialog).toBeVisible();
+    await expect(page.getByTestId('file-property-name')).toHaveText('notes.txt');
+    await expect(page.getByTestId('file-property-type')).toHaveText('TXT 文件');
+    await expect(page.getByTestId('file-property-location')).toHaveText('/home/e2e');
+    await expect(page.getByTestId('file-property-size')).toHaveText('1.5 KB');
+    await expect(page.getByTestId('file-property-modified')).toContainText('2026');
+
+    await page.getByTestId('properties-close').click();
+    await expect(dialog).toHaveCount(0);
   });
 
   test('更多菜单：只提供本地可用操作，可从当前文件夹新建标签页', async ({ page }) => {
@@ -336,6 +371,27 @@ test.describe('文件面板', () => {
     await page.locator('[data-testid="confirm-ok"]').click();
     const ops = await fsOps(page);
     expect(ops).toContainEqual({ op: 'rename', path: '/home/e2e/notes.txt', newName: 'renamed.txt' });
+  });
+
+  test('空白处右键菜单与 ⋯ 菜单列出同一套操作', async ({ page }) => {
+    const tree = page.getByTestId('local-file-tree');
+    const menu = page.getByRole('menu', { name: '操作菜单' });
+    const menuItems = () => menu.evaluate((el) => [...el.querySelectorAll('button')]
+      .map((button) => (button as HTMLElement).innerText.trim()).filter(Boolean));
+
+    await page.getByTestId('local-more-btn').click();
+    const fromMore = await menuItems();
+    await page.keyboard.press('Escape');
+    expect(fromMore.length).toBeGreaterThan(0);
+
+    const box = (await tree.boundingBox())!;
+    await page.mouse.click(box.x + 40, box.y + box.height - 12, { button: 'right' });
+    await expect(menu).toBeVisible();
+    // 空白处不再缺项：⋯ 菜单有的这里都有（剪贴板为空时不多出「粘贴」）
+    expect(await menuItems()).toEqual(fromMore);
+    await expect(menu.getByRole('button', { name: '下载管理', exact: true })).toBeVisible();
+    await expect(menu.getByRole('button', { name: '收起全部文件夹', exact: true })).toBeVisible();
+    await expect(menu.getByRole('button', { name: '切换到当前终端文件目录', exact: true })).toBeVisible();
   });
 
   test('右键新建按落点决定目录，建好立即重命名，重名自动加序号且回退用真实路径', async ({ page }) => {

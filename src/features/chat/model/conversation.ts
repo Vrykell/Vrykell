@@ -3,6 +3,8 @@ export interface ChatEnvironment {
   label: string;
   kind: 'local' | 'ssh';
   cwd?: string;
+  shellType?: string;
+  ssh?: { host: string; user?: string; port?: number };
 }
 
 export interface TerminalReference {
@@ -30,7 +32,15 @@ export function parseEnvironment(raw: string): ChatEnvironment | null {
     if (typeof value !== 'object' || value === null) return null;
     const entry = value as Record<string, unknown>;
     if (typeof entry.paneId !== 'string' || typeof entry.label !== 'string' || (entry.kind !== 'local' && entry.kind !== 'ssh')) return null;
-    return { paneId: entry.paneId, label: entry.label, kind: entry.kind, cwd: typeof entry.cwd === 'string' ? entry.cwd : undefined };
+    const ssh = typeof entry.ssh === 'object' && entry.ssh !== null ? entry.ssh as Record<string, unknown> : null;
+    return { paneId: entry.paneId, label: entry.label, kind: entry.kind, cwd: typeof entry.cwd === 'string' ? entry.cwd : undefined,
+      ...(typeof entry.shellType === 'string' ? { shellType: entry.shellType } : {}),
+      ...(entry.kind === 'ssh' && typeof ssh?.host === 'string' ? { ssh: {
+        host: ssh.host,
+        ...(typeof ssh.user === 'string' ? { user: ssh.user } : {}),
+        ...(typeof ssh.port === 'number' && Number.isFinite(ssh.port) ? { port: ssh.port } : {}),
+      } } : {}),
+    };
   } catch { return null; }
 }
 

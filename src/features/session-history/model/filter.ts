@@ -1,4 +1,5 @@
 import type { BackendSessionEntry } from '@platform/api/types';
+import { sessionHistoryTerminals } from './sessionMetadata';
 
 export type SessionTypeFilter = 'all' | 'local' | 'ssh';
 export type SessionDateFilter = 'all' | 'today' | '7d' | '30d' | '90d';
@@ -6,52 +7,17 @@ export type SessionModeFilter = 'all' | 'block' | 'classic';
 
 /** Use saved pane modes, with the original defaults for legacy session metadata. */
 export function sessionTerminalModes(session: BackendSessionEntry): Set<Exclude<SessionModeFilter, 'all'>> {
-  const modes = new Set<Exclude<SessionModeFilter, 'all'>>();
-  const terminalMode = (value: Record<string, unknown>) => {
-    if (value.shellType === 'cmd') modes.add('classic');
-    else if (value.openMode === 'block' || value.openMode === 'classic') modes.add(value.openMode);
-    else modes.add(value.kind === 'ssh' || value.ssh || session.kind === 'ssh' ? 'classic' : 'block');
-  };
-  const visit = (value: unknown) => {
-    if (!value || typeof value !== 'object') return;
-    const node = value as Record<string, unknown>;
-    if (node.type === 'leaf' && node.terminal && typeof node.terminal === 'object') terminalMode(node.terminal as Record<string, unknown>);
-    else if (node.type === 'split') { visit(node.first); visit(node.second); }
-  };
-  try {
-    const payload: unknown = JSON.parse(session.payload);
-    if (payload && typeof payload === 'object') {
-      const node = payload as Record<string, unknown>;
-      if (node.layout) visit(node.layout);
-      if (modes.size === 0) terminalMode(node);
-    }
-  } catch { /* Legacy metadata falls back to its saved session kind. */ }
-  if (modes.size === 0) terminalMode({});
-  return modes;
-}
-
-/** Read legacy targets and modern pane layouts without depending on JSON formatting. */
-function sshTargets(session: BackendSessionEntry): Array<{ host?: string; user?: string | null }> {
-  const targets: Array<{ host?: string; user?: string | null }> = [];
-  const visit = (value: unknown) => {
-    if (!value || typeof value !== 'object') return;
-    const node = value as Record<string, unknown>;
-    if (node.ssh && typeof node.ssh === 'object') targets.push(node.ssh as { host?: string; user?: string | null });
-    if (node.layout) visit(node.layout);
-    if (node.terminal) visit(node.terminal);
-    if (node.type === 'split') { visit(node.first); visit(node.second); }
-  };
-  try { visit(JSON.parse(session.payload)); } catch { /* Invalid legacy metadata has no target. */ }
-  return targets;
+  return new Set(sessionHistoryTerminals(session).map(terminal => terminal.shellType === 'cmd' ? 'classic'
+    : terminal.openMode ?? (terminal.kind === 'ssh' ? 'classic' : 'block')));
 }
 
 export function isSshSession(session: BackendSessionEntry): boolean {
-  return session.kind === 'ssh' || sshTargets(session).length > 0;
+  return sessionHistoryTerminals(session).some(terminal => terminal.kind === 'ssh');
 }
 
 export function sshTargetOf(session: BackendSessionEntry): string | null {
-  const targets = sshTargets(session).filter(target => typeof target.host === 'string' && target.host);
-  return targets.length ? targets.map(target => target.user ? `${target.user}@${target.host}` : target.host).join(', ') : null;
+  const targets = sessionHistoryTerminals(session).flatMap(terminal => terminal.ssh?.host ? [terminal.ssh] : []);
+  return targets.length ? [...new Set(targets.map(target => `${target.user ? `${target.user}@` : ''}${target.host}${target.port && target.port !== 22 ? `:${target.port}` : ''}`))].join(', ') : null;
 }
 
 const DATE_MS: Record<Exclude<SessionDateFilter, 'all' | 'today'>, number> = {
@@ -60,10 +26,9 @@ const DATE_MS: Record<Exclude<SessionDateFilter, 'all' | 'today'>, number> = {
   '90d': 90 * 24 * 60 * 60 * 1000,
 };
 
-function matchesDate(session: BackendSessionEntry, range: SessionDateFilter): boolean {
+function matchesDate(session: BackendSessionEntry, range: SessionDateFilter, dateField: 'created' | 'closed'): boolean {
   if (range === 'all') return true;
-  const timestamp = session.status === 'historical' ? session.closed_at : session.created_at;
-  if (!timestamp) return false;
+  const timestamp = dateField === 'created' ? session.created_at : session.closed_at ?? session.created_at;
   if (range === 'today') {
     const dayStart = new Date();
     dayStart.setHours(0, 0, 0, 0);
@@ -78,15 +43,20 @@ export function filterSessions(
   type: SessionTypeFilter,
   range: SessionDateFilter,
   mode: SessionModeFilter = 'all',
+  dateField: 'created' | 'closed' = 'closed',
+  /** When provided, only records whose id is in this set are kept (starred-only filtering). */
+  starredIds: ReadonlySet<string> | null = null,
+  searchAnnotations: ReadonlyMap<string, string> | null = null,
 ): BackendSessionEntry[] {
   const normalizedQuery = query.trim().toLowerCase();
   return sessions.filter((session) => {
-    if (type === 'ssh' && !isSshSession(session)) return false;
-    if (type === 'local' && isSshSession(session)) return false;
+    if (starredIds && !starredIds.has(session.id)) return false;
+    const terminals = sessionHistoryTerminals(session);
+    if (type !== 'all' && !terminals.some(terminal => terminal.kind === type)) return false;
     if (mode !== 'all' && !sessionTerminalModes(session).has(mode)) return false;
-    if (!matchesDate(session, range)) return false;
+    if (!matchesDate(session, range, dateField)) return false;
     if (!normalizedQuery) return true;
-    const haystack = [session.title, sshTargetOf(session) ?? '', session.cwd].join(' ').toLowerCase();
+    const haystack = [session.title, sshTargetOf(session) ?? '', searchAnnotations?.get(session.id) ?? '', ...terminals.map(terminal => terminal.cwd ?? '')].join(' ').toLowerCase();
     return haystack.includes(normalizedQuery);
   });
 }

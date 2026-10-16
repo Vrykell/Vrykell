@@ -1,6 +1,7 @@
 import { test, expect, type Locator } from '@playwright/test';
 import { setupTauriMock, ensureTabsOpen } from './tauri-mock';
 import { gotoSetting } from './settings';
+import { focusedPane, pickPlacementZone } from './placement';
 
 async function expectQuietFocus(control: Locator) {
   const border = await control.evaluate(element => getComputedStyle(element).borderColor);
@@ -83,10 +84,7 @@ for (const theme of ['深色', '浅色']) {
     await page.getByTestId('rename-input').press('Escape');
     await page.getByPlaceholder(/输入命令/).focus();
     await page.keyboard.press('Meta+d');
-    const zone = page.getByTestId('placement-zone-1');
-    await expect(zone).toBeVisible();
-    const rect = (await zone.boundingBox())!;
-    await page.mouse.click(rect.x + rect.width / 2, rect.y + rect.height / 2);
+    await pickPlacementZone(page, focusedPane(page), 'right');
     const panes = page.locator('.terminal-pane');
     await expect(panes).toHaveCount(2);
     const borders = () => panes.evaluateAll(elements => elements.map(element => {

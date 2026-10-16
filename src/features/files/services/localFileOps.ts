@@ -1,6 +1,6 @@
 import {
   fsList, fsDisks, fsHome, fsRename, fsCreateFile, fsCreateDir,
-  fsCopy, fsMove, fsStageDelete, fsRestoreStaged, fsPurgeStaged,
+  fsCopy, fsMove, fsStageDelete, fsRestoreStaged, fsPurgeStaged, fsStat,
 } from '@platform/api/fs';
 import { parentOf, pathSegments, segmentsToPath } from '@platform/path';
 import type { FileOps } from '@features/files/model/fileOps';
@@ -8,6 +8,7 @@ import type { FileOps } from '@features/files/model/fileOps';
 /** 本地磁盘实现：路径语义来自 @platform/path，操作全部走后端文件命令。 */
 export function createLocalFileOps(): FileOps {
   return {
+    stat: (path) => fsStat(path),
     list: (dir) => fsList(dir).then((entries) => ({ base: null, entries })),
     parentOf,
     segments: pathSegments,

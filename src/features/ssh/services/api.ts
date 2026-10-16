@@ -1,7 +1,7 @@
 import { t } from '@i18n';
 import { invoke } from '@platform/diagnostics';
-import type { FsEntry } from '@platform/api/types';
-import type { SshOptions } from '@core/ssh';
+import type { FsEntry, FileStat } from '@platform/api/types';
+import type { SshAuthenticationTarget, SshOptions } from '@core/ssh';
 
 /**
  * SSH 连接 API —— 存储与 CRUD 均在后端（SQLite），前端只调用命令。
@@ -148,6 +148,40 @@ export function sshTrustHostKey(host: string, port: number | undefined, expected
 /** 列出远程目录（按连接 id，密码由后端解析）。返回条目 + 实际目录真实路径。 */
 export function sshFsList(id: string, path?: string): Promise<SshListResponse> {
   return invoke('ssh_list', { id, path: path ?? null });
+}
+
+/** Read metadata for one remote path (path bar file detection and the properties dialog). */
+export function sshStat(id: string, path: string): Promise<FileStat> {
+  return invoke('ssh_stat', { id, path });
+}
+
+export interface SshSystemStatus {
+  system: string;
+  hostname: string;
+  latencyMs: number;
+  uptimeSeconds: number | null;
+  load: string;
+  cpuTotal: number | null;
+  cpuIdle: number | null;
+  memoryTotal: number | null;
+  memoryAvailable: number | null;
+  diskTotal: number | null;
+  diskUsed: number | null;
+}
+
+/** Collect metadata through a separate authenticated connection. */
+export function sshSystemStatus(id: string, host: string, port: number, user?: string): Promise<SshSystemStatus> {
+  return invoke('ssh_system_status', { id, host, port, user: user ?? null });
+}
+
+/** Submit secrets through redacted fields; neither profiles nor diagnostics retain them. */
+export function sshAuthenticateSession(target: SshAuthenticationTarget, method: 'password' | 'keyPassphrase', secret: string): Promise<void> {
+  return invoke('ssh_authenticate_session', { id: target.connectionId, host: target.host, port: target.port ?? 22,
+    user: target.user ?? '', method, password: method === 'password' ? secret : '', passphrase: method === 'keyPassphrase' ? secret : '' });
+}
+
+export function sshForgetSessionAuth(id: string): Promise<void> {
+  return invoke('ssh_forget_session_auth', { id });
 }
 
 /** Search through one file channel and cancel obsolete requests. */

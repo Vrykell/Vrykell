@@ -1,3 +1,4 @@
+import { OutlineButton } from '@ui/OutlineButton';
 /**
  * Provider credentials and configured models, in two panes: the provider rail on the left
  * (see ProviderRail) and the selected provider's key and model rows on the right. A provider
@@ -19,7 +20,7 @@ import { detectCapabilities, type ModelCapability } from '@features/agent/model/
 import { modelIcon, providerLabel } from '@features/agent/components/modelIcon';
 import Select from '@ui/Select';
 import { useToastStore } from '@ui/Toast';
-import { SettingsGroup, Field, ModelTextInput, btnStyle } from '@features/settings/components/ui';
+import { SettingsGroup, Field, ModelTextInput } from '@features/settings/components/ui';
 import { applyModelPreset, type ModelPreset } from '@config/modelPresets';
 import ModelThinkingSettings from '@features/settings/components/ModelThinkingSettings';
 import ProviderPicker, { type ProviderPickerEntry } from '@features/settings/components/ProviderPicker';
@@ -354,9 +355,9 @@ function ProviderModels({ row, toast }: {
                     {t('Current')}
                   </span>
                 ) : (
-                  <button data-subtle onClick={() => { void save(() => selectModel(m.id)); }} style={btnStyle}>
+                  <OutlineButton data-subtle onClick={() => { void save(() => selectModel(m.id)); }}>
                     {t('Set as current')}
-                  </button>
+                  </OutlineButton>
                 )}
                 <IconButton tone="danger" onClick={() => remove(m.id)} data-tip={t('Delete model')} aria-label={t('Delete model')}><X size={16} /></IconButton>
               </div>
@@ -388,13 +389,13 @@ function ProviderModels({ row, toast }: {
               <ModelThinkingSettings modelId={m.id} name={m.name || m.model} />
             </div>
           ))}
-          <button
+          <OutlineButton
             data-subtle
             onClick={add}
-            style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}
           >
             <Plus size={12} /> {t('Add model')}
-          </button>
+          </OutlineButton>
         </div>
       </Field>
     </SettingsGroup>

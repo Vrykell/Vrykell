@@ -1,12 +1,13 @@
 import { createRef } from 'react';
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { Brain, ChevronDown, FileCode, Folder, Search, Server, Settings, SquareTerminal } from '../icons';
+import { Brain, ChevronDown, FileCode, Folder, Search, Server, Settings, SquareTerminal, Navigation } from '../icons';
 
 describe('shared icon family', () => {
   it.each([
     [Brain, 24], [ChevronDown, 24], [Folder, 24], [Search, 24],
     [Server, 24], [Settings, 24], [SquareTerminal, 20],
+    [Navigation, 24],
   ] as const)('renders themed vector icons at the requested size', (Icon, intrinsicSize) => {
     const { container } = render(<Icon size={16} style={{ color: 'var(--text-secondary)' }} />);
     const svg = container.querySelector('svg')!;

@@ -9,6 +9,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use uuid::Uuid;
 
 use crate::terminal::{debug, shell_integration};
+use crate::terminal::io_window::{OutputStats, ReaderWindow};
 use crate::terminal::scan::{ScanEvent, StreamScanner};
 
 /// 流式 UTF-8 解码器：跨 read 边界缓冲不完整的多字节序列。
@@ -516,15 +517,15 @@ pub async fn pty_spawn(
         let mut pending: Vec<ScanEvent> = Vec::new();
         let mut pending_bytes = 0usize;
         let mut batch = super::output_batch::OutputBatchWindow::new(std::time::Instant::now());
+        let mut window = ReaderWindow::new(std::time::Instant::now());
         loop {
             match rx.recv_timeout(batch.wait_timeout(std::time::Instant::now())) {
                 Ok(ReadMsg::Data(bytes)) => {
+                    let now = std::time::Instant::now();
                     let data = decoder.push(&bytes);
-                    if debug::enabled() {
-                        debug::write(
-                            "read-chunk",
-                            format!("id={} bytes={} decoded_chars={}", tid, bytes.len(), data.len()),
-                        );
+                    window.read(now, bytes.len(), data.len());
+                    if let Some(line) = window.take(now, &tid) {
+                        debug::write("pty-io", line);
                     }
                     if data.is_empty() {
                         continue; // 不完整尾部，等下次 read
@@ -536,20 +537,24 @@ pub async fn pty_spawn(
                     pending_bytes += data.len();
                     pending.extend(events);
                     // Hold only the short input burst so an intermediate repaint is not exposed.
-                    let now = std::time::Instant::now();
                     if input_pending.swap(false, Ordering::AcqRel) {
                         batch.input_response(now);
-                        if debug::enabled() { debug::write("input-response-batch", format!("id={} window_ms=2 bytes={}", tid, pending_bytes)); }
+                        window.held();
                     }
                     if batch.should_flush(pending_bytes, now) {
-                        flush_output(&app, &tid, &mut pending, &mut pending_bytes);
+                        if let Some(stats) = flush_output(&app, &tid, &mut pending, &mut pending_bytes) {
+                            window.output(stats);
+                        }
                         batch.flushed(std::time::Instant::now());
                     }
                 }
                 // EOF / 出错 / 读线程意外断开：冲刷剩余，收敛会话
                 Ok(ReadMsg::End(reason)) => {
-                    if !pending.is_empty() {
-                        flush_output(&app, &tid, &mut pending, &mut pending_bytes);
+                    if let Some(stats) = flush_output(&app, &tid, &mut pending, &mut pending_bytes) {
+                        window.output(stats);
+                    }
+                    if let Some(line) = window.finish(std::time::Instant::now(), &tid) {
+                        debug::write("pty-io", line);
                     }
                     if debug::enabled() {
                         debug::write("reader-end", format!("id={} reason={}", tid, reason));
@@ -559,8 +564,11 @@ pub async fn pty_spawn(
                     break;
                 }
                 Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
-                    if !pending.is_empty() {
-                        flush_output(&app, &tid, &mut pending, &mut pending_bytes);
+                    if let Some(stats) = flush_output(&app, &tid, &mut pending, &mut pending_bytes) {
+                        window.output(stats);
+                    }
+                    if let Some(line) = window.finish(std::time::Instant::now(), &tid) {
+                        debug::write("pty-io", line);
                     }
                     if debug::enabled() {
                         debug::write("reader-end", format!("id={} reason=channel-closed", tid));
@@ -571,9 +579,18 @@ pub async fn pty_spawn(
                 }
                 // 空闲超时（FLUSH_INTERVAL 内无新数据）：冲刷 pending 尾巴，让最后一段输出及时上屏
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    let now = std::time::Instant::now();
                     if !pending.is_empty() {
-                        flush_output(&app, &tid, &mut pending, &mut pending_bytes);
-                        batch.flushed(std::time::Instant::now());
+                        if let Some(stats) = flush_output(&app, &tid, &mut pending, &mut pending_bytes) {
+                            window.output(stats);
+                        }
+                        batch.flushed(now);
+                    }
+                    if let Some(line) = window.take(now, &tid) {
+                        debug::write("pty-io", line);
+                    }
+                    if let Some(line) = window.idle(now, &tid) {
+                        debug::write("read-idle", line);
                     }
                     // A retained console handle can keep its reader open after the child exits.
                     let session = app.state::<PtyState>().0.lock().ok().and_then(|all| all.get(&tid).cloned());
@@ -609,37 +626,24 @@ fn shell_kind(value: &str) -> &'static str {
 }
 
 /// 冲刷累积输出（结构化事件）；emit 失败（窗口已关闭）时顺手收敛会话。
+/// Returns what the batch carried, for the per-second window; `None` when there was nothing.
 fn flush_output(
     app: &AppHandle,
     id: &str,
     pending: &mut Vec<ScanEvent>,
     pending_bytes: &mut usize,
-) {
+) -> Option<OutputStats> {
     if pending.is_empty() {
-        return;
+        return None;
     }
-    if debug::enabled() {
-        let mut data_bytes = 0usize;
-        let mut osc = 0usize;
-        let mut alt = 0usize;
-        for event in pending.iter() {
-            match event {
-                ScanEvent::Data { text } => data_bytes += text.len(),
-                ScanEvent::Osc { .. } => osc += 1,
-                ScanEvent::AltEnter { .. } | ScanEvent::AltExit { .. } => alt += 1,
-            }
+    let mut stats = OutputStats::default();
+    for event in pending.iter() {
+        stats.events += 1;
+        match event {
+            ScanEvent::Data { text } => stats.data_bytes += text.len(),
+            ScanEvent::Osc { .. } => stats.osc += 1,
+            ScanEvent::AltEnter { .. } | ScanEvent::AltExit { .. } => stats.alt += 1,
         }
-        debug::write(
-            "output",
-            format!(
-                "id={} events={} data_bytes={} osc={} alt={}",
-                id,
-                pending.len(),
-                data_bytes,
-                osc,
-                alt,
-            ),
-        );
     }
     let events = std::mem::take(pending);
     *pending_bytes = 0;
@@ -647,6 +651,7 @@ fn flush_output(
         // 窗口已关闭：清掉 session，避免残留
         reap_session(app, id);
     }
+    Some(stats)
 }
 
 #[tauri::command]

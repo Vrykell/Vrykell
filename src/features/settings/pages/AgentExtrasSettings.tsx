@@ -1,3 +1,4 @@
+import { OutlineButton } from '@ui/OutlineButton';
 import ConfigTextArea from '@ui/ConfigTextArea';
 import { t } from '@i18n';
 import { IconButton } from '@ui/IconButton';
@@ -26,9 +27,7 @@ const toast = (msg: string, type: 'info' | 'success' | 'error') =>
   useToastStore.getState().addToast(msg, type);
 
 const btnStyle: React.CSSProperties = {
-  padding: '4px 10px', fontSize: 'calc(12px * var(--ui-font-scale))', border: '1px solid var(--border)',
-  borderRadius: 'var(--radius-inner)', background: 'transparent',
-  color: 'var(--text-secondary)', cursor: 'pointer', flexShrink: 0,
+  padding: '4px 10px', flexShrink: 0,
 };
 
 // ── 记忆 ──
@@ -91,9 +90,9 @@ export function MemorySettings() {
         <span style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', flex: 1 }}>
           持久知识会注入每次对话；AI 可用「记忆」工具自行读写与整理，也可一键让 AI 整理。
         </span>
-        <button onClick={() => void organize()} disabled={organizing} style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <OutlineButton onClick={() => void organize()} disabled={organizing} style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
           <Sparkles size={12} /> {organizing ? '整理中…' : '让 AI 整理'}
-        </button>
+        </OutlineButton>
       </div>
       <ConfigTextArea
         value={saving.value}
@@ -108,7 +107,7 @@ export function MemorySettings() {
       />
       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
         <SaveStatus inline status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
-        <button onClick={() => void clear()} disabled={organizing} style={{ ...btnStyle, color: 'var(--error-light)' }}>清空</button>
+        <OutlineButton onClick={() => void clear()} disabled={organizing} style={{ ...btnStyle, color: 'var(--error-light)' }}>清空</OutlineButton>
       </div>
       {jlines.length > 0 && (
         <div style={{ marginTop: 12 }}>
@@ -116,7 +115,7 @@ export function MemorySettings() {
           <pre style={{
             margin: 0, padding: '8px 10px', maxHeight: 180, overflow: 'auto',
             background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-inner)',
-            fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+            fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-ui)', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
             color: 'var(--text-secondary)',
           }}>
             {jlines.join('\n')}
@@ -177,9 +176,9 @@ export function AgentsSettings() {
       </div>
       <div className="settings-record-list">
         {agents.map((a) => <AgentCard key={a.id} a={a} onChanged={refresh} />)}
-        <button onClick={() => void add()} style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}>
+        <OutlineButton onClick={() => void add()} style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}>
           <Plus size={12} /> 添加子代理
-        </button>
+        </OutlineButton>
       </div>
     </div></SettingsGroup>
   );
@@ -212,7 +211,7 @@ function ScheduleCard({ s, onChanged }: { s: Schedule; onChanged: () => void }) 
         <TextInput value={name} placeholder="名称" onChange={(e) => saving.setValue(previous => ({ ...previous, name: e.target.value }))} style={{ ...inputStyle, flex: 1, fontWeight: 'var(--fw-semibold)' }} />
         <TextInput type="number" min={1} value={interval} onChange={(e) => saving.setValue(previous => ({ ...previous, intervalMinutes: Number(e.target.value) }))} style={{ ...inputStyle, width: 70, flexShrink: 0 }} />
         <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>分钟</span>
-        <button onClick={() => saving.setValue(previous => ({ ...previous, enabled: !previous.enabled }), true)} style={{ ...btnStyle }}>{enabled ? '停用' : '启用'}</button>
+        <OutlineButton onClick={() => saving.setValue(previous => ({ ...previous, enabled: !previous.enabled }), true)} style={{ ...btnStyle }}>{enabled ? '停用' : '启用'}</OutlineButton>
         <SaveStatus inline status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
         <IconButton compact tone="danger" onClick={() => void del()} data-tip={t('Delete')} aria-label={t('Delete')}><X size={16} /></IconButton>
       </div>
@@ -247,9 +246,9 @@ export function SchedulesSettings() {
       </div>
       <div className="settings-record-list">
         {schedules.map((s) => <ScheduleCard key={s.id} s={s} onChanged={refresh} />)}
-        <button onClick={() => void add()} style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}>
+        <OutlineButton onClick={() => void add()} style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}>
           <Plus size={12} /> 添加任务
-        </button>
+        </OutlineButton>
       </div>
     </div></SettingsGroup>
   );

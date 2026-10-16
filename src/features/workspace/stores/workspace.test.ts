@@ -282,7 +282,7 @@ describe('workspace store', () => {
     expect(getFocusedCwd()).toBe('/main');
   });
 
-  it('pruneEmptyGroups 只删除没有任何标签的空分组', () => {
+  it('hides empty active groups without deleting their historical membership', () => {
     useWorkspaceStore.setState({
       tabs: [
         { id: 't0', title: 'a', kind: 'session', groupId: 'g1', layout: leaf({ id: 't0#0', kind: 'local' }) },
@@ -295,6 +295,7 @@ describe('workspace store', () => {
     });
     useWorkspaceStore.getState().pruneEmptyGroups();
     expect(useWorkspaceStore.getState().groups.map((g) => g.id)).toEqual(['g1']);
+    expect(invokeMock).not.toHaveBeenCalledWith('group_delete', expect.anything());
   });
 });
 
@@ -341,6 +342,7 @@ describe('workspace store 扩展', () => {
   });
 
   it('undoCloseTab：恢复会话标签 / 历史标签重建 / 无可撤销 no-op', async () => {
+    invokeMock.mockImplementation(async command => ['get_session_blocks', 'list_chat_messages'].includes(command) ? [] : undefined);
     const ws = useWorkspaceStore.getState();
     const only = ws.tabs[0]!.id;
     ws.closeTab(only);
@@ -348,7 +350,7 @@ describe('workspace store 扩展', () => {
     ws.undoCloseTab();
     // restore 是异步的（undoCloseTab 不 await），等微任务+定时器排空
     await new Promise((r) => setTimeout(r, 20));
-    // restore 从后端读取（invoke 失败走默认布局），tab 重建
+    // Missing legacy payloads use the default layout after the restore is persisted.
     const s = useWorkspaceStore.getState();
     expect(s.tabs.some((t) => t.id === only)).toBe(true);
     expect(s.lastClosed).toBeNull();
@@ -363,6 +365,16 @@ describe('workspace store 扩展', () => {
     const before = useWorkspaceStore.getState().tabs.length;
     ws.undoCloseTab();
     expect(useWorkspaceStore.getState().tabs.length).toBe(before);
+  });
+
+  it('keeps a failed undo available without creating a tab', async () => {
+    const ws = useWorkspaceStore.getState();
+    const id = ws.tabs[0].id;
+    ws.closeTab(id);
+    ws.undoCloseTab();
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(useWorkspaceStore.getState().lastClosed?.id).toBe(id);
+    expect(useWorkspaceStore.getState().tabs.some(tab => tab.id === id)).toBe(false);
   });
 
   it('titleFromMessage：截断 14 字；已定名/视图标签不覆盖', () => {
@@ -596,6 +608,7 @@ describe('workspace store 扩展', () => {
   });
 
   it('archiveGroup：组内标签关闭、activeId 回落；全部归档后保持空工作区', async () => {
+    invokeMock.mockResolvedValue(undefined);
     const ws = useWorkspaceStore.getState();
     const a = ws.addTab({ title: 'a' });
     const b = ws.addTab({ title: 'b' });
@@ -613,5 +626,16 @@ describe('workspace store 扩展', () => {
     expect(s.tabs.some((t) => t.id === a || t.id === b)).toBe(false);
     expect(s.tabs).toHaveLength(0);
     expect(s.activeId).toBe('');
+    expect(invokeMock).toHaveBeenCalledWith('sessions_reorder', { groupId: 'g1', ids: [initialTab, a, b] });
+  });
+
+  it('keeps the group and tabs visible when archiving fails', async () => {
+    const ws = useWorkspaceStore.getState();
+    const id = ws.tabs[0].id;
+    useWorkspaceStore.setState({ groups: [{ id: 'g1', title: 'Project', collapsed: false }],
+      tabs: [{ ...ws.tabs[0], groupId: 'g1' } as typeof ws.tabs[number]] });
+    await ws.archiveGroup('g1');
+    expect(useWorkspaceStore.getState().groups[0].id).toBe('g1');
+    expect(useWorkspaceStore.getState().tabs[0].id).toBe(id);
   });
 });

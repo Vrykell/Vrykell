@@ -29,6 +29,16 @@ export interface ThemePalette {
   /** Usage charts: one hue for the bars, in both themes. */
   chartBar: string;
 
+  /** Categorical colors keep group identity separate from status and active controls. */
+  groupBlue: string;
+  groupGreen: string;
+  groupViolet: string;
+  groupAmber: string;
+  groupCyan: string;
+  groupRose: string;
+  groupOrange: string;
+  groupCoral: string;
+
   /** Shared frame for the titlebar and primary navigation. */
   chromeBg: string;
   /** Secondary navigation rests on a darker level than the window frame. */
@@ -177,6 +187,14 @@ const dark: ThemePalette = {
   brandGemini: '#7FA8F5',
   brandDeepseek: '#7C88F8',
   chartBar: '#38BDF8',
+  groupBlue: '#79B8FF',
+  groupGreen: '#7DD3A7',
+  groupViolet: '#BEA6FF',
+  groupAmber: '#E8C675',
+  groupCyan: '#70CBD6',
+  groupRose: '#E4A0C4',
+  groupOrange: '#E7AD78',
+  groupCoral: '#DF9692',
 
   // Content, navigation, panels, overlays and fields have distinct roles; the frame is lighter than navigation.
   chromeBg: '#303030',
@@ -249,9 +267,9 @@ const dark: ThemePalette = {
 
   overlay: 'rgba(0,0,0,0.55)',
   overlayLight: 'rgba(0,0,0,0.32)',
-  shadowSm: '0 1px 3px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04)',
-  shadowMd: '0 4px 14px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06)',
-  shadowLg: '0 10px 30px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.06)',
+  shadowSm: '0 1px 3px rgba(0,0,0,0.45)',
+  shadowMd: '0 4px 14px rgba(0,0,0,0.55)',
+  shadowLg: '0 10px 30px rgba(0,0,0,0.65)',
 
   accentBg: 'rgba(255,255,255,0.06)',
   accentBgStrong: '#454545',
@@ -343,6 +361,14 @@ const light: ThemePalette = {
   brandGemini: '#4A7FE0',
   brandDeepseek: '#5A66E8',
   chartBar: '#0891B2',
+  groupBlue: '#2F639E',
+  groupGreen: '#316C51',
+  groupViolet: '#6C4FA7',
+  groupAmber: '#7D5D1D',
+  groupCyan: '#286F7D',
+  groupRose: '#8F486E',
+  groupOrange: '#865529',
+  groupCoral: '#984445',
 
   chromeBg: '#F5F5F5',
   sidebarBg: '#EFEFEF',
@@ -409,9 +435,9 @@ const light: ThemePalette = {
 
   overlay: 'rgba(0,0,0,0.15)',
   overlayLight: 'rgba(0,0,0,0.1)',
-  shadowSm: '0 1px 3px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.5)',
-  shadowMd: '0 4px 14px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.6)',
-  shadowLg: '0 10px 30px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.6)',
+  shadowSm: '0 1px 3px rgba(0,0,0,0.10)',
+  shadowMd: '0 4px 14px rgba(0,0,0,0.14)',
+  shadowLg: '0 10px 30px rgba(0,0,0,0.18)',
 
   accentBg: 'rgba(46,46,46,0.06)',
   accentBgStrong: '#D8D8D8',
@@ -501,6 +527,14 @@ export function paletteToCssVars(p: ThemePalette): Record<string, string> {
     '--brand-gemini': p.brandGemini,
     '--brand-deepseek': p.brandDeepseek,
     '--chart-bar': p.chartBar,
+    '--group-blue': p.groupBlue,
+    '--group-green': p.groupGreen,
+    '--group-violet': p.groupViolet,
+    '--group-amber': p.groupAmber,
+    '--group-cyan': p.groupCyan,
+    '--group-rose': p.groupRose,
+    '--group-orange': p.groupOrange,
+    '--group-coral': p.groupCoral,
     '--chrome-bg': p.chromeBg,
     '--sidebar-bg': p.sidebarBg,
     '--chrome-field': p.chromeField,

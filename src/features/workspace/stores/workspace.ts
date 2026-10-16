@@ -217,7 +217,7 @@ interface WorkspaceState {
   moveTab: (tabId: string, targetGroupId: string | null, index: number) => void;
   /** 复制会话：以相同终端配置（类型/SSH 目标/cwd/布局）克隆一个新标签页 */
   duplicateTab: (tabId: string) => void;
-  /** 清理没有任何活跃标签的空分组（空分组无意义，直接删除） */
+  /** Hide groups without active tabs while retaining their historical membership. */
   pruneEmptyGroups: () => void;
   /** 恢复分组内全部历史会话为标签页 */
   restoreGroup: (id: string) => Promise<void>;
@@ -381,7 +381,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     // A harness page owns a session and a process: closing the tab is what ends them, so it must not
     // depend on the page being unmounted (it is not, while the app keeps tabs alive).
     if (closed.kind === 'harness') void useHarnessStore.getState().close(id);
-    // 关闭标签后若分组变空则直接删除（空分组无意义）
+    // Historical members still belong to their original group after its last tab closes.
     get().pruneEmptyGroups();
   },
   undoCloseTab: () => {
@@ -402,8 +402,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     } else if (closed.kind === 'harness-hub') {
       get().addTab({ kind: 'harness-hub' });
     } else {
-      // kind/payload 已随会话落库，restore 从后端读取重建
-      sessionManager.restore(closed.id, closed.title);
+      // Keep a failed undo available for retry and report success only after restoration.
+      void sessionManager.restore(closed.id, closed.title).then(() => {
+        useToastStore.getState().addToast(t('toast.tabRestored'), 'success');
+      }).catch((error: unknown) => {
+        set(state => ({ lastClosed: state.lastClosed ?? closed }));
+        useToastStore.getState().addToast(t('Could not restore session: {{error}}', { error: String(error) }), 'error');
+      });
+      return;
     }
     useToastStore.getState().addToast(t('toast.tabRestored'), 'success');
   },
@@ -695,9 +701,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       .map((g) => g.id);
     if (emptyIds.length === 0) return;
     set((s) => ({ groups: s.groups.filter((g) => !emptyIds.includes(g.id)) }));
-    for (const id of emptyIds) groupDelete(id).catch((e) =>
-      console.warn('[workspace] 清理空分组失败:', id, e),
-    );
   },
 
   restoreGroup: async (id) => {
@@ -708,18 +711,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   archiveGroup: async (id) => {
-    // 1) 先确保组内会话的 group_id 已落库（此前可能只做了视觉分组）
+    // Persist membership and visible tab order before archiving the container.
     const groupTabs = get().tabs.filter(isSessionTab).filter((t) => t.groupId === id);
-    for (const t of groupTabs) {
-      await sessionSetGroup(t.id, id).catch((e) =>
-        useToastStore.getState().addToast(`归档前保存分组归属失败：${String((e as Error)?.message ?? e)}`, 'error'),
-      );
+    try {
+      for (const tab of groupTabs) await sessionSetGroup(tab.id, id);
+      await sessionsReorder(id, groupTabs.map(tab => tab.id));
+      await groupArchive(id, Date.now());
+    } catch (error) {
+      useToastStore.getState().addToast(t('Could not archive group: {{error}}', { error: String(error) }), 'error');
+      return;
     }
-    // 2) 后端按 group_id 批量归档组内会话 + 标记组为已归档
-    await groupArchive(id, Date.now()).catch((e) =>
-      useToastStore.getState().addToast(String((e as Error)?.message ?? e), 'error'),
-    );
-    // 3) 从活跃分组列表移除 + 关闭组内标签（会话已归档，不再作为活跃标签）
+    // Remove the archived tabs and release their in-memory terminal state.
     const { tabs, activeId } = get();
     const groupTabIds = groupTabs.map((t) => t.id);
     let next = tabs.filter((t) => !(isSessionTab(t) && t.groupId === id));

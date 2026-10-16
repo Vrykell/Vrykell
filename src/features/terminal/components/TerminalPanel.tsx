@@ -3,14 +3,17 @@ import { TextInput } from '@ui/TextInput';
 import '@xterm/xterm/css/xterm.css';
 import { useTerminalSession } from '../hooks/useTerminalSession';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTerminalStore } from '@features/terminal';
 import { ptyWrite } from '@platform/pty';
 import ErrorBox from '@ui/ErrorBox';
 import Select from '@ui/Select';
 import { sanitizeOutputHtml } from '@utils/sanitizeHtml';
+import { TextButton } from '@ui/TextButton';
 import { secretResponsePrompt, secretResponseWasRejected } from '../model/terminalFrame';
 import { t } from '@i18n';
 import { terminalDebug } from '../services/terminalDebug';
+import type { SshSessionStatus } from '@core/ssh';
 
 /** Render an interactive SSH session with xterm so screen contents and cursor stay in sync. */
 interface TerminalPanelProps {
@@ -18,16 +21,24 @@ interface TerminalPanelProps {
   /** 连接页状态行显示的目标（用户@主机），由标签的 SSH 目标传入。 */
   sshTarget?: string;
   connectionId?: string;
+  toolbarHost?: HTMLDivElement | null;
+  showToolbar?: boolean;
+  onDisconnectReady?: (action: (() => Promise<void>) | null) => void;
+  onSessionStatusClick?: () => void;
+  onSessionStatusReady?: (button: HTMLButtonElement | null) => void;
+  sessionStatusOpen?: boolean;
+  onSshStateChange?: (state: SshSessionStatus) => void;
+  onReconnectReady?: (action: (() => Promise<void>) | null) => void;
 }
 
 export default function TerminalPanel(props: TerminalPanelProps) {
-  return props.connectionId ? <SshSessionGate connectionId={props.connectionId} paneId={props.paneId} tabId={props.tabId}>
+  return props.connectionId ? <SshSessionGate connectionId={props.connectionId} paneId={props.paneId} tabId={props.tabId} onSshStateChange={props.onSshStateChange}>
     <ConnectedTerminalPanel key={props.connectionId} {...props} />
   </SshSessionGate> : <ConnectedTerminalPanel key="direct" {...props} />;
 }
 
-function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = false, sshTarget }: TerminalPanelProps) {
-  const { ref, closeSession, reconnect, stopReconnect, retry, status, frame } = useTerminalSession(paneId, tabId, onReady);
+function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = false, sshTarget, onSshStateChange, onReconnectReady, toolbarHost, showToolbar = true, onDisconnectReady, onSessionStatusClick, onSessionStatusReady, sessionStatusOpen }: TerminalPanelProps) {
+  const { ref, closeSession, reconnect, stopReconnect, retry, status, frame, sshAuthenticated, sshLog } = useTerminalSession(paneId, tabId, onReady);
   // The screen snapshot is built by our own renderer, but it is also persisted and restored, so it
   // goes through the same sanitizing the command blocks use before it reaches the DOM.
   const frameHtml = useMemo(() => (frame?.html ? sanitizeOutputHtml(frame.html) : ''), [frame?.html]);
@@ -64,7 +75,7 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
   const cancelAuthentication = async () => {
     if (!sessionId || cancellingRef.current) return;
     cancellingRef.current = true;
-    setCancelledAuthentication(secret);
+    setCancelledAuthentication(secret && !sshAuthenticated);
     setCancellation('pending'); setResponse(''); setError('');
     try { await closeSession(); setCancellation('done'); }
     catch (reason) { cancellingRef.current = false; setCancellation('idle'); setError(`取消失败：${String(reason)}`); }
@@ -76,6 +87,16 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
     try { await reconnect(); cancellingRef.current = false; setCancellation('idle'); }
     catch (reason) { setCancellation('idle'); setError(`重连失败：${String(reason)}`); }
   };
+  useEffect(() => {
+    if (!connectionInput) return;
+    onDisconnectReady?.(async () => { await closeSession(); setCancelledAuthentication(false); setCancellation('done'); });
+    return () => onDisconnectReady?.(null);
+  }, [connectionInput, closeSession, onDisconnectReady]);
+  useEffect(() => {
+    if (!connectionInput) return;
+    onReconnectReady?.(restart);
+    return () => onReconnectReady?.(null);
+  }, [connectionInput, onReconnectReady, restart]);
   // 只要密码框开着就把屏幕冻结成快照：live xterm 会画自己的光标，看着像还有输入焦点
   const showSnapshot = !disconnected && secret;
   const retryPhase = retry?.phase ?? 'idle';
@@ -85,25 +106,27 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
     ? (cancelledAuthentication ? t('ssh.state.authCancelled') : t('ssh.state.manualClosed'))
     : disconnected ? t('ssh.state.disconnected')
       : status === 'connecting' ? t('ssh.state.connecting')
-        : secret ? t('ssh.state.authenticating')
-          : t('ssh.state.connected');
-  const stateColor = disconnected ? 'var(--error)' : (secret || status === 'connecting') ? 'var(--accent-warm)' : 'var(--accent)';
+        : secret && !sshAuthenticated ? t('ssh.state.authenticating')
+          : sshAuthenticated ? t('Connected') : t('ssh.state.connected');
+  const stateColor = disconnected ? 'var(--error)' : (!sshAuthenticated && (secret || status === 'connecting')) ? 'var(--accent-warm)' : 'var(--accent)';
+  const connectionPhase = disconnected ? 'disconnected' : sshAuthenticated ? 'connected' : secret ? 'authenticating' : status === 'connecting' ? 'connecting' : 'interactive';
+  useEffect(() => {
+    if (connectionInput) onSshStateChange?.({ phase: connectionPhase, reconnectAttempt: retry.attempt, retrying: retry.phase === 'waiting' || retry.phase === 'connecting', log: sshLog });
+  }, [connectionInput, connectionPhase, retry.attempt, retry.phase, onSshStateChange, sshLog]);
   // 断线后把最后几行输出直接印在屏幕上（就是 ssh 给出的原因），不做卡片、也不回放整屏历史
   const outputTail = disconnected
     ? [text.split('\n').map((line) => line.trimEnd()).filter((line) => line.trim().length > 0).slice(-8).join('\n'), exitNoticeShown ? '' : exitNotice].filter(Boolean).join('\n')
     : '';
   // 选择器显示「现在用哪种输入」：输密码框可见就是密码输入，否则是直接输入
   const inputMode = secret ? 'secret' : 'direct';
-  return <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-    {!connectionInput && <div ref={ref} style={{ position: 'absolute', inset: 0, minHeight: 0, background: 'transparent', paddingLeft: 8 }} />}
-    {connectionInput && <div data-testid="ssh-connection-input" style={{ position: 'absolute', inset: 0, display: interactive ? 'flex' : 'none', flexDirection: 'column', gap: 8 }}>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0, padding: '4px 8px', fontSize: 'calc(12px * var(--ui-font-scale))' }}>
-        <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: stateColor }} />
-        <span role="status" style={{ color: 'var(--text-primary)' }}>{retryWaiting ? t('Retry {{n}}/5 in {{seconds}} seconds', { n: retry.attempt, seconds: retry.seconds }) : retryConnecting ? t('Reconnecting ({{n}}/5)…', { n: retry.attempt }) : retryPhase === 'exhausted' ? t('Automatic reconnect ended after 5 attempts') : retryPhase === 'stopped' ? t('Automatic reconnect stopped') : stateLabel}</span>
-        {sshTarget && <span style={{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sshTarget}</span>}
+  const connectionStatus = <><span aria-hidden="true" className="ssh-status-dot" style={{ background: stateColor }} />
+    <span role="status" className="ssh-session-toolbar-state" style={{ color: 'var(--text-primary)' }}>{retryWaiting ? t('Retry {{n}}/5 in {{seconds}} seconds', { n: retry.attempt, seconds: retry.seconds }) : retryConnecting ? t('Reconnecting ({{n}}/5)…', { n: retry.attempt }) : retryPhase === 'exhausted' ? t('Automatic reconnect ended after 5 attempts') : retryPhase === 'stopped' ? t('Automatic reconnect stopped') : stateLabel}</span></>;
+  const toolbar = <div data-testid="ssh-session-toolbar" style={{ minWidth: 0, width: "100%", display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0, padding: toolbarHost ? '0' : '4px 8px', fontSize: 'calc(12px * var(--ui-font-scale))' }}>
+        {onSessionStatusClick ? <TextButton ref={onSessionStatusReady} className="ssh-session-status" data-testid="ssh-status-toggle" aria-label={t('SSH status')} aria-expanded={sessionStatusOpen ?? false} data-tip={t(sessionStatusOpen ? 'Close SSH status' : 'Open SSH status')} onClick={onSessionStatusClick}>{connectionStatus}</TextButton> : connectionStatus}
+        {sshTarget && <span className="ssh-session-toolbar-target" data-tip={sshTarget} style={{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sshTarget}</span>}
         <span style={{ flex: 1 }} />
-        {/* 输入方式：显式单选，不再用会翻转文字的按钮 */}
-        {!disconnected && sessionId && (
+        {/* Input mode uses an explicit selection. */}
+        {interactive && !disconnected && sessionId && (
           <Select
             aria-label={t('ssh.input.mode')}
             data-testid="ssh-input-mode"
@@ -126,8 +149,13 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
         {(retryWaiting || retryConnecting) && <button type="button" onClick={() => void stopReconnect()} style={{ height: 'var(--control-size)', padding: '0 12px' }}>{t('Stop retrying')}</button>}
         {disconnected
           ? <button type="button" disabled={cancellation === 'pending'} onClick={() => void restart()} style={{ height: 'var(--control-size)', padding: '0 12px' }}>{retryWaiting ? t('Retry now') : t('ssh.action.reconnect')}</button>
-          : <button type="button" disabled={inputDisabled} onClick={() => void cancelAuthentication()} style={{ height: 'var(--control-size)', padding: '0 12px' }}>{cancellation === 'pending' ? t('ssh.action.cancelling') : secret ? t('ssh.action.cancelAuth') : status === 'connecting' ? t('ssh.action.cancelConnect') : t('ssh.action.disconnect')}</button>}
-      </div>
+          : <button type="button" disabled={inputDisabled} onClick={() => void cancelAuthentication()} style={{ height: 'var(--control-size)', padding: '0 12px' }}>{cancellation === 'pending' ? t('ssh.action.cancelling') : secret && !sshAuthenticated ? t('ssh.action.cancelAuth') : status === 'connecting' ? t('ssh.action.cancelConnect') : t('ssh.action.disconnect')}</button>}
+      </div>;
+  return <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+    {connectionInput && showToolbar && toolbarHost && createPortal(toolbar, toolbarHost)}
+    {!connectionInput && <div ref={ref} style={{ position: 'absolute', inset: 0, minHeight: 0, background: 'transparent', paddingLeft: 8 }} />}
+    {connectionInput && <div data-testid="ssh-connection-input" style={{ position: 'absolute', inset: 0, display: interactive ? 'flex' : 'none', flexDirection: 'column', gap: 8 }}>
+      {showToolbar && !toolbarHost && toolbar}
       {/* 终端区常驻：xterm 宿主必须一直在，否则重连时没有宿主可挂载；断开后宿主隐藏、原因直接印在屏幕上 */}
       <div role="textbox" aria-label="SSH 交互终端" aria-multiline="true"
         aria-disabled={inputDisabled || secret} tabIndex={inputDisabled || secret ? -1 : 0}
@@ -135,7 +163,7 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
         {/* 密码框开着（secret）时屏幕只读，点它也不会把输入交给终端 */}
         <div ref={ref} data-testid={showSnapshot ? undefined : 'ssh-terminal-screen'} style={{ position: 'absolute', inset: 0, overflow: 'auto', visibility: showSnapshot || disconnected ? 'hidden' : 'visible', pointerEvents: showSnapshot || disconnected || secret ? 'none' : 'auto', paddingLeft: 8 }} />
           {/* data-selectable：页面整体禁选，但屏幕内容必须能选中，否则连不上时无法复制报错 */}
-          {showSnapshot && frameHtml && <pre data-selectable data-testid="ssh-terminal-screen" style={{ position: 'absolute', inset: 0, overflow: 'auto', margin: 0, whiteSpace: 'pre', color: 'var(--text-primary)', paddingLeft: 8 }} dangerouslySetInnerHTML={{ __html: frameHtml }} />}
+          {showSnapshot && frameHtml && <pre data-selectable data-testid="ssh-terminal-screen" className="ssh-terminal-frame" style={{ position: 'absolute', inset: 0, overflow: 'auto', margin: 0, whiteSpace: 'pre', color: 'var(--text-primary)', paddingLeft: 8 }} dangerouslySetInnerHTML={{ __html: frameHtml }} />}
         {/* 连接中：居中转圈 + 细进度条（不写解释性小字） */}
         {!disconnected && status === 'connecting' && (
           <div data-testid="ssh-connecting" aria-hidden="true" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, pointerEvents: 'none' }}>
@@ -146,7 +174,7 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
         )}
         {/* 连接已结束：原因就当终端输出印在屏幕上，不加卡片、不回放整屏 */}
         {disconnected && (
-          <pre data-selectable data-testid="ssh-terminal-ended" style={{ position: 'absolute', inset: 0, overflow: 'auto', margin: 0, padding: '0 8px', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'var(--font-mono)', fontSize: 'calc(12.5px * var(--ui-font-scale))', lineHeight: 1.55, color: 'var(--text-primary)' }}>{outputTail}</pre>
+          <pre data-selectable data-testid="ssh-terminal-ended" className="ssh-terminal-frame" style={{ position: 'absolute', inset: 0, overflow: 'auto', margin: 0, padding: '0 8px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{outputTail}</pre>
         )}
       </div>
       {/* 认证输入条：与终端区左右保持一致的 8px 边距（对称，不再贴边或被单侧推偏） */}
