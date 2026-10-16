@@ -7,7 +7,7 @@ target_compile_definitions(VrykellExplorerCommand PRIVATE UNICODE _UNICODE WIN32
 target_compile_options(VrykellExplorerCommand PRIVATE /W4 /WX /EHsc)
 target_link_libraries(VrykellExplorerCommand PRIVATE ole32 shell32 shlwapi advapi32 uuid)
 # Identity host: the manifest's <Application> points here, never at the real application.
-add_executable(VrykellShellHost shell_host.cpp)
+add_executable(VrykellShellHost shell_host.cpp shell_host.manifest)
 set_target_properties(VrykellShellHost PROPERTIES WIN32_EXECUTABLE ON)
 target_compile_definitions(VrykellShellHost PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_compile_options(VrykellShellHost PRIVATE /W4 /WX /EHsc)
