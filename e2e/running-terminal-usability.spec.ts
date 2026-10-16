@@ -70,6 +70,32 @@ test('运行块在重画为更小帧后收敛高度，不再留下整屏黑尾',
   await expect.poll(async () => (await block.boundingBox())!.height).toBeLessThan(tallHeight - 100);
 });
 
+test('重绘循环的中间态不会让运行块高度来回跳', async ({ page }) => {
+  const block = page.locator('[data-testid^="running-block-"]').first();
+  const frame = Array.from({ length: 24 }, (_, index) => `frame row ${index}`).join('\r\n') + '\r\n';
+  await emitPtyOutput(page, frame);
+  await expect.poll(async () => (await block.boundingBox())!.height).toBeGreaterThan(150);
+  const tallHeight = (await block.boundingBox())!.height;
+  // A TUI repaint erases and redraws: between the two writes the measurement reads small.
+  // Sample per frame while several repaint cycles land to pin that the block never adopts them.
+  await page.evaluate(() => {
+    const element = document.querySelector<HTMLElement>('[data-testid^="running-block-"]')!;
+    const samples: number[] = [];
+    (window as unknown as Record<string, unknown>).__repaintHeightSamples = samples;
+    const step = () => { samples.push(element.getBoundingClientRect().height); if (samples.length < 80) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  });
+  for (let cycle = 0; cycle < 3; cycle++) {
+    await emitPtyOutput(page, '\x1b[2J\x1b[H');
+    await page.waitForTimeout(120);
+    await emitPtyOutput(page, '\x1b[H' + frame);
+    await page.waitForTimeout(130);
+  }
+  const samples = await page.evaluate(() => (window as unknown as { __repaintHeightSamples: number[] }).__repaintHeightSamples);
+  expect(Math.min(...samples)).toBeGreaterThan(tallHeight - 1);
+  expect((await block.boundingBox())!.height).toBe(tallHeight);
+});
+
 test('split repaint frames during typing do not shrink the running terminal or resend its size', async ({ page }) => {
   const host = page.getByTestId('running-term');
   await emitPtyOutput(page, '\x1b[20;1Hinput-ready');

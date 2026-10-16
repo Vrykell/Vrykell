@@ -370,16 +370,19 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
     // Preserve occupied space across partial clear-and-repaint frames, but let a smaller frame
     // settle: a TUI that clears and rewrites itself into fewer rows (for example after a resize)
     // otherwise keeps the old height as a black tail that the follow position shows on screen.
-    // 80 ms covers the split writes of one repaint (output arrives in ~16 ms batches) while a
-    // frame that really settled smaller adopts its height almost immediately.
+    // The shrink is adopted only after the writes go quiet: mid-repaint readings (erase before
+    // redraw) are transient, and adopting them makes the block height flap at the repaint rate.
     const cellHeight = (): number => getCellMetrics(term).height;
     // Track the row count the style currently holds: the first crop must land even when the
     // measurement equals the initial one, otherwise the element keeps its uncropped natural height.
     let appliedRows: number | null = null;
-    const applyHeight = () => {
+    const applyHeight = (cause: 'grow' | 'settle') => {
       appliedRows = occupiedRowsRef.current;
       // The xterm element has 4px of vertical padding on each side.
       el.style.height = `${occupiedRowsRef.current * cellHeight() + 8}px`;
+      if (isTerminalDebugEnabled()) {
+        terminalDebug('running-terminal-height-applied', { tabId, blockId, rows: occupiedRowsRef.current, cause });
+      }
     };
     let shrinkTimer: ReturnType<typeof setTimeout> | null = null;
     let visibleOutputLogged = false;
@@ -388,19 +391,19 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
       if (occupied >= occupiedRowsRef.current) {
         if (shrinkTimer) { clearTimeout(shrinkTimer); shrinkTimer = null; }
         occupiedRowsRef.current = occupied;
-        if (appliedRows !== occupied) applyHeight();
-      } else if (!shrinkTimer) {
+        if (appliedRows !== occupied) applyHeight('grow');
+      } else {
+        // Restart the quiet window on every write so only a frame that actually holds still
+        // is adopted; a repaint that is still landing keeps the window open.
+        if (shrinkTimer) clearTimeout(shrinkTimer);
         shrinkTimer = setTimeout(() => {
           shrinkTimer = null;
           const settled = measureRunningTerminalRows(term.buffer.active, term.rows, 1);
           if (settled < occupiedRowsRef.current) {
             occupiedRowsRef.current = settled;
-            applyHeight();
-            if (isTerminalDebugEnabled()) {
-              terminalDebug('running-terminal-height-settled', { tabId, blockId, rows: settled });
-            }
+            applyHeight('settle');
           }
-        }, 80);
+        }, 300);
       }
       if (!visibleOutputLogged && occupiedRowsRef.current > 1 && isTerminalDebugEnabled()) {
         visibleOutputLogged = true;
