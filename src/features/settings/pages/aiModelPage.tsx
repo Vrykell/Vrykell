@@ -17,7 +17,7 @@ import {
 import type { ProviderKind } from '@features/agent/services/provider';
 import { baseUrlForProvider } from '@features/agent/services/provider';
 import { detectCapabilities, type ModelCapability } from '@features/agent/model/capabilities';
-import { modelIcon, providerLabel } from '@features/agent/components/modelIcon';
+import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
 import Select from '@ui/Select';
 import { useToastStore } from '@ui/Toast';
 import { SettingsGroup, Field, ModelTextInput } from '@features/settings/components/ui';
@@ -25,7 +25,6 @@ import { applyModelPreset, type ModelPreset } from '@config/modelPresets';
 import ModelThinkingSettings from '@features/settings/components/ModelThinkingSettings';
 import ProviderPicker, { type ProviderPickerEntry } from '@features/settings/components/ProviderPicker';
 import { providerHasKey, providerId, providerList, type ProviderRow } from '@features/settings/model/providerList';
-import HarnessBadge from '../components/HarnessBadge';
 import AutoSaveInput from '../components/AutoSaveInput';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
 
@@ -98,12 +97,15 @@ export function AiModelPage() {
     return rows[0]?.id ?? null;
   }, [rows, aiCfg.selectedProvider, aiCfg.lastSelectedProvider]);
   const selected = rows.find((row) => row.id === selectedId) ?? null;
+  const SelectedMark = selected ? modelMark(selected.kind, '', selected.baseUrl) : null;
+  const selectedHue = selected ? modelHue(selected.kind, '', selected.baseUrl) : '';
 
   const entries: ProviderPickerEntry[] = rows.map((row) => ({
     id: row.id,
     kind: row.kind,
     name: row.name,
     hasKey: providerHasKey(row.kind, aiCfg),
+    baseUrl: row.baseUrl,
   }));
 
   /** A preset adds its first model row and selects the vendor it belongs to. */
@@ -160,7 +162,7 @@ export function AiModelPage() {
         {selected ? (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, minWidth: 0 }}>
-              <HarnessBadge name={selected.name || providerLabel(selected.kind)} size={24} />
+              {SelectedMark && <SelectedMark size={22} aria-hidden="true" style={{ color: selectedHue }} />}
               <span style={{
                 fontWeight: 'var(--fw-medium)', minWidth: 0, overflow: 'hidden',
                 whiteSpace: 'nowrap', textOverflow: 'ellipsis',
@@ -337,8 +339,8 @@ function ProviderModels({ row, toast }: {
                   }}
                 >
                   {(() => {
-                    const Icon = modelIcon(m.provider, m.model);
-                    return <Icon size={14} />;
+                    const Mark = modelMark(m.provider, m.model, m.baseUrl);
+                    return <Mark size={14} style={{ color: modelHue(m.provider, m.model, m.baseUrl) }} />;
                   })()}
                 </span>
                 <ModelTextInput

@@ -135,7 +135,7 @@ const zh: Record<string, string> = {
   "Official endpoint: paste a key from the vendor console.": "官方端点：在厂商控制台取 Key 填入。",
   "Aggregator: one key reaches many vendors.": "聚合站：一个 Key 可达多家厂商。",
   "Local server: usually runs without a key.": "本地服务：通常无需 Key。",
-  "Vendor names and endpoints are listed as data so a model can be filled in quickly; the app ships no third-party program, key or brand asset.": "厂商名称与端点只是数据，用来一键填入模型；应用不随附任何第三方程序、密钥或品牌素材。",
+  "Vendor names, endpoints and marks are listed as references so a model can be filled in quickly; the marks are drawn locally and the app ships no third-party program or key.": "厂商名称、端点与标记仅作指认参考，便于一键填入模型；标记为本地绘制，应用不随附任何第三方程序或密钥。",
   "External coding agents you add yourself; connecting runs the program you configure.": "自己添加的外部编码代理；点「连接」即运行你配置的程序。",
   "When a harness asks to run something, the request appears as a card in its conversation and waits for your answer; nothing a harness asks for runs unnoticed.": "harness 要运行东西时会先发一张卡到对话里等你作答；它问的每件事都不会悄悄执行。",
   "An unanswered card is refused after ten minutes.": "十分钟不作答的卡会按拒绝处理。",

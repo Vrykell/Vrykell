@@ -1,19 +1,22 @@
 /**
- * VendorDot — the small brand-coloured mark that leads a provider or model cell.
+ * VendorDot — the vendor mark that leads a provider or model cell in the usage tables.
  *
- * Mirrors the reference dashboard's coloured app column: a fixed hue per vendor so a table of
- * rows is scannable at a glance. The hue comes from the theme palette (`--brand-*`).
+ * A fixed drawn mark and hue per vendor so a table of rows is scannable at a glance; the hue comes
+ * from the theme palette (`--brand-*`) where one exists, neutral ink otherwise.
  */
 import { vendorMark } from './vendorColor';
 
 export default function VendorDot({ provider, model }: { provider: string; model?: string }) {
   const mark = vendorMark(provider, model ?? '');
+  const Mark = mark.icon;
   return (
     <span data-testid="usage-vendor-dot" data-vendor={mark.label} title={mark.label}
       aria-label={mark.label} role="img"
       style={{
-        display: 'inline-block', width: 7, height: 7, marginRight: 6, borderRadius: '50%',
-        background: mark.color, flexShrink: 0, verticalAlign: 'middle',
-      }} />
+        display: 'inline-flex', alignItems: 'center', flexShrink: 0, marginRight: 6,
+        color: mark.color, verticalAlign: 'middle',
+      }}>
+      <Mark size={13} />
+    </span>
   );
 }

@@ -13,9 +13,8 @@ import { t } from '@i18n';
 import { MODEL_PRESETS, type ModelPreset } from '@config/modelPresets';
 import { Plus } from '@ui/icons';
 import type { ProviderKind } from '@features/agent/services/provider';
-import { providerLabel } from '@features/agent/components/modelIcon';
+import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
 import { OutlineButton } from '@ui/OutlineButton';
-import HarnessBadge from './HarnessBadge';
 
 export interface ProviderPickerEntry {
   id: string;
@@ -23,6 +22,8 @@ export interface ProviderPickerEntry {
   /** Preset name or endpoint host; '' falls back to the family label. */
   name: string;
   hasKey: boolean;
+  /** Effective base URL of the provider; decides the vendor mark. */
+  baseUrl: string;
 }
 
 interface Props {
@@ -39,6 +40,8 @@ export default function ProviderPicker({ entries, selectedId, onSelect, onAddPre
       <div className="settings-provider-bar" role="group" aria-label={t('Provider')}>
         {entries.map((entry) => {
           const label = entry.name || providerLabel(entry.kind);
+          const Mark = modelMark(entry.kind, '', entry.baseUrl);
+          const hue = modelHue(entry.kind, '', entry.baseUrl);
           return (
             <button
               key={entry.id}
@@ -49,7 +52,7 @@ export default function ProviderPicker({ entries, selectedId, onSelect, onAddPre
               data-tip={label}
               onClick={() => onSelect(entry.id)}
             >
-              <HarnessBadge name={label} size={18} />
+              <Mark size={16} aria-hidden="true" style={{ color: hue }} />
               <span className="settings-provider-name">{label}</span>
               <span className="settings-provider-dot" data-empty={entry.hasKey ? undefined : 'true'} aria-hidden="true" />
             </button>
@@ -66,20 +69,24 @@ export default function ProviderPicker({ entries, selectedId, onSelect, onAddPre
       </OutlineButton>
       {presetsOpen && (
         <div data-testid="model-presets" className="settings-provider-presets">
-          {MODEL_PRESETS.map((preset) => (
-            <OutlineButton
-              key={preset.name}
-              data-subtle
-              data-testid={`model-preset-${preset.name}`}
-              data-tip={preset.baseUrl || t('The vendor default endpoint')}
-              data-tip-description={`${preset.model} · ${t(preset.hint)}`}
-              onClick={() => onAddPreset(preset)}
-            >
-              {preset.name}
-            </OutlineButton>
-          ))}
+          {MODEL_PRESETS.map((preset) => {
+            const Mark = modelMark(preset.provider, preset.model, preset.baseUrl);
+            const hue = modelHue(preset.provider, preset.model, preset.baseUrl);
+            return (
+              <OutlineButton
+                key={preset.name}
+                data-subtle
+                data-testid={`model-preset-${preset.name}`}
+                data-tip={preset.baseUrl || t('The vendor default endpoint')}
+                data-tip-description={`${preset.model} · ${t(preset.hint)}`}
+                onClick={() => onAddPreset(preset)}
+              >
+                <Mark size={13} aria-hidden="true" style={{ color: hue }} /> {preset.name}
+              </OutlineButton>
+            );
+          })}
           <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-micro)' }}>
-            {t('Vendor names and endpoints are listed as data so a model can be filled in quickly; the app ships no third-party program, key or brand asset.')}
+            {t('Vendor names, endpoints and marks are listed as references so a model can be filled in quickly; the marks are drawn locally and the app ships no third-party program or key.')}
           </span>
         </div>
       )}

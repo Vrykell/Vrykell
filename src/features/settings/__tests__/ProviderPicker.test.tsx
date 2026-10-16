@@ -7,8 +7,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import ProviderPicker, { type ProviderPickerEntry } from '@features/settings/components/ProviderPicker';
 
 const ENTRIES: ProviderPickerEntry[] = [
-  { id: 'anthropic|https://api.anthropic.com/v1', kind: 'anthropic', name: 'Anthropic', hasKey: false },
-  { id: 'openai-compatible|http://127.0.0.1:11434/v1', kind: 'openai-compatible', name: '127.0.0.1:11434', hasKey: true },
+  { id: 'anthropic|https://api.anthropic.com/v1', kind: 'anthropic', name: 'Anthropic', hasKey: false, baseUrl: 'https://api.anthropic.com/v1' },
+  { id: 'openai-compatible|http://127.0.0.1:11434/v1', kind: 'openai-compatible', name: '127.0.0.1:11434', hasKey: true, baseUrl: 'http://127.0.0.1:11434/v1' },
 ];
 
 function renderPicker(selectedId: string | null = ENTRIES[0]!.id) {
@@ -24,6 +24,8 @@ describe('ProviderPicker', () => {
     const spies = renderPicker();
     const anthropic = screen.getByRole('button', { name: 'Anthropic' });
     expect(anthropic.getAttribute('aria-current')).toBe('true');
+    // 芯片带真实服务商标记（本地绘制的品牌图标），而不是字母块
+    expect(anthropic.querySelector('svg')).toBeTruthy();
     expect(screen.getByRole('button', { name: '127.0.0.1:11434' }).getAttribute('aria-current')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '127.0.0.1:11434' }));
     expect(spies.onSelect).toHaveBeenCalledWith('openai-compatible|http://127.0.0.1:11434/v1');

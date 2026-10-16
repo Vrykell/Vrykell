@@ -19,7 +19,7 @@ import {
   CAPABILITY_LABELS, detectCapabilities, hasCapability,
   type ModelCapability,
 } from '@features/agent/model/capabilities';
-import { modelIcon, providerLabel } from '@features/agent/components/modelIcon';
+import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
 import { useToastStore } from '@ui/Toast';
 import Select from '@ui/Select';
 
@@ -206,7 +206,8 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
             </div>
           )}
           {list.map((m) => {
-            const Icon = modelIcon(m.provider, m.model);
+            const Mark = modelMark(m.provider, m.model, m.baseUrl);
+            const markHue = modelHue(m.provider, m.model, m.baseUrl);
             const caps = m.capabilities ?? detectCapabilities(m.provider, m.model);
             const active = m.id === activeModel;
             return (
@@ -235,7 +236,7 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
                     color: active ? 'var(--text-primary)' : 'var(--text-muted)',
                   }}
                 >
-                  <Icon size={iconSizes.row} />
+                  <Mark size={iconSizes.row} style={{ color: markHue }} />
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

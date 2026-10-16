@@ -14,7 +14,7 @@ import { t } from '@i18n';
 import { useEffect, useRef, useState } from 'react';
 import { iconSizes, ChevronDown, type AppIcon  } from '@ui/icons';
 import { useAiConfigStore, useAgentSettings } from '@features/agent';
-import { modelIcon } from '@features/agent/components/modelIcon';
+import { modelHue, modelMark } from '@features/agent/components/modelIcon';
 import ModelPicker from '@features/chat/components/ModelPicker';
 
 const LEVEL_LABEL: Record<string, string> = { low: '低', medium: '中', high: '高' };
@@ -31,7 +31,8 @@ export default function ModelPill({ showThinking = true }: { showThinking?: bool
   const pillRef = useRef<HTMLDivElement>(null);
   const [lockedWidth, setLockedWidth] = useState<number | null>(null);
 
-  const Icon: AppIcon = modelIcon(aiCfg.provider, aiCfg.model);
+  const Icon: AppIcon = modelMark(aiCfg.provider, aiCfg.model, aiCfg.baseUrl);
+  const iconHue = modelHue(aiCfg.provider, aiCfg.model, aiCfg.baseUrl);
   const name = aiCfg.models.find((m) => m.id === activeModel)?.name || aiCfg.model || '模型';
   /** 模型名最长 35 字符，超出截断加省略号 */
   const MAX_NAME_LEN = 35;
@@ -129,7 +130,7 @@ export default function ModelPill({ showThinking = true }: { showThinking?: bool
               cursor: 'pointer',
             }}
           >
-            <Icon size={iconSizes.row} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+            <Icon size={iconSizes.row} style={{ color: iconHue, flexShrink: 0 }} />
             <span
               style={{
                 fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-medium)', color: 'var(--text-primary)',

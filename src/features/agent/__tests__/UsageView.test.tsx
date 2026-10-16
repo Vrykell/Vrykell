@@ -113,10 +113,10 @@ describe('UsageView', () => {
     seedSonnetTurn();
     render(<UsageView />);
 
-    // 行首的品牌色标记：按模型家族取色（Claude → Anthropic 品牌色）
+    // 行首的品牌标记：按模型家族取色（Claude → Anthropic 品牌色）
     const dot = within(screen.getByTestId('usage-log-row')).getByTestId('usage-vendor-dot');
     expect(dot).toHaveAttribute('data-vendor', 'Anthropic');
-    expect(dot).toHaveStyle({ background: 'var(--brand-anthropic)' });
+    expect(dot).toHaveStyle({ color: 'var(--brand-anthropic)' });
 
     fireEvent.click(screen.getByTestId('usage-metric-requests'));
     expect(screen.getByTestId('usage-metric-requests')).toHaveAttribute('aria-selected', 'true');
@@ -126,7 +126,7 @@ describe('UsageView', () => {
     const providerRow = screen.getByTestId('usage-provider-row');
     expect(providerRow).toHaveAttribute('data-provider', 'anthropic');
     expect(within(providerRow).getAllByRole('cell')[1]).toHaveTextContent('1');
-    expect(within(providerRow).getByTestId('usage-vendor-dot')).toHaveAttribute('data-vendor', 'anthropic');
+    expect(within(providerRow).getByTestId('usage-vendor-dot')).toHaveAttribute('data-vendor', 'Anthropic');
 
     fireEvent.click(screen.getByTestId('usage-tab-models'));
     expect(screen.getByTestId('usage-model-row')).toHaveAttribute('data-model', 'claude-sonnet-4');
@@ -140,7 +140,7 @@ describe('UsageView', () => {
     render(<UsageView />);
     const dot = within(screen.getByTestId('usage-log-row')).getByTestId('usage-vendor-dot');
     expect(dot).toHaveAttribute('data-vendor', 'OpenAI');
-    expect(dot).toHaveStyle({ background: 'var(--brand-openai)' });
+    expect(dot).toHaveStyle({ color: 'var(--brand-openai)' });
   });
 
   it('filters by provider and model, and by range', () => {
