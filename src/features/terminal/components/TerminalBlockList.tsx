@@ -367,17 +367,40 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
     const w = window as unknown as { __vrykellTerms?: Map<string, unknown> };
     w.__vrykellTerms?.set(`block:${tabId}`, term);
 
-    // Preserve occupied space across partial clear-and-repaint frames.
+    // Preserve occupied space across partial clear-and-repaint frames, but let a smaller frame
+    // settle: a TUI that clears and rewrites itself into fewer rows (for example after a resize)
+    // otherwise keeps the old height as a black tail that the follow position shows on screen.
     const cellHeight = (): number => getCellMetrics(term).height;
+    const applyHeight = () => {
+      // The xterm element has 4px of vertical padding on each side.
+      el.style.height = `${occupiedRowsRef.current * cellHeight() + 8}px`;
+    };
+    let shrinkTimer: ReturnType<typeof setTimeout> | null = null;
     let visibleOutputLogged = false;
     const updateHeight = () => {
-      const visible = measureRunningTerminalRows(term.buffer.active, term.rows, occupiedRowsRef.current);
-      occupiedRowsRef.current = visible;
-      // The xterm element has 4px of vertical padding on each side.
-      el.style.height = `${visible * cellHeight() + 8}px`;
-      if (!visibleOutputLogged && visible > 1 && isTerminalDebugEnabled()) {
+      const occupied = measureRunningTerminalRows(term.buffer.active, term.rows, 1);
+      if (occupied >= occupiedRowsRef.current) {
+        if (shrinkTimer) { clearTimeout(shrinkTimer); shrinkTimer = null; }
+        if (occupied !== occupiedRowsRef.current) {
+          occupiedRowsRef.current = occupied;
+          applyHeight();
+        }
+      } else if (!shrinkTimer) {
+        shrinkTimer = setTimeout(() => {
+          shrinkTimer = null;
+          const settled = measureRunningTerminalRows(term.buffer.active, term.rows, 1);
+          if (settled < occupiedRowsRef.current) {
+            occupiedRowsRef.current = settled;
+            applyHeight();
+            if (isTerminalDebugEnabled()) {
+              terminalDebug('running-terminal-height-settled', { tabId, blockId, rows: settled });
+            }
+          }
+        }, 260);
+      }
+      if (!visibleOutputLogged && occupiedRowsRef.current > 1 && isTerminalDebugEnabled()) {
         visibleOutputLogged = true;
-        terminalDebug('running-terminal-output-visible', { tabId, blockId, rows: visible });
+        terminalDebug('running-terminal-output-visible', { tabId, blockId, rows: occupiedRowsRef.current });
       }
     };
 
@@ -489,6 +512,7 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
         w.__vrykellTerms.delete(`block:${tabId}`);
       }
       renderSub?.dispose();
+      if (shrinkTimer) { clearTimeout(shrinkTimer); shrinkTimer = null; }
       unsubscribeActiveTab();
       cancelAnimationFrame(restoreRaf);
       cancelAnimationFrame(openResyncRaf);
