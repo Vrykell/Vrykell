@@ -58,6 +58,18 @@ test('运行中块不再叠加第二个 xterm 滚动条', async ({ page }) => {
   await expect(host.locator('.xterm-scrollable-element > .scrollbar.horizontal')).toHaveCSS('display', 'none');
 });
 
+test('运行块在重画为更小帧后收敛高度，不再留下整屏黑尾', async ({ page }) => {
+  const block = page.locator('[data-testid^="running-block-"]').first();
+  await emitPtyOutput(page, Array.from({ length: 30 }, (_, index) => `frame row ${index}`).join('\r\n') + '\r\n');
+  await expect.poll(async () => (await block.boundingBox())!.height).toBeGreaterThan(200);
+  const tallHeight = (await block.boundingBox())!.height;
+  // A TUI rewrites itself into fewer rows (as after a resize): the block settles to the smaller
+  // frame instead of keeping the old height as a black tail under the content. Split repaint
+  // frames are covered by the typing test above; this only pins the settle result.
+  await emitPtyOutput(page, '\x1b[2J\x1b[H' + 'short frame 1\r\nshort frame 2\r\nshort frame 3\r\n');
+  await expect.poll(async () => (await block.boundingBox())!.height).toBeLessThan(tallHeight - 100);
+});
+
 test('split repaint frames during typing do not shrink the running terminal or resend its size', async ({ page }) => {
   const host = page.getByTestId('running-term');
   await emitPtyOutput(page, '\x1b[20;1Hinput-ready');
