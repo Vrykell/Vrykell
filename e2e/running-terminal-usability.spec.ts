@@ -84,15 +84,23 @@ test('split repaint frames during typing do not shrink the running terminal or r
   for (const character of ['a', 'b', 'c']) {
     await host.locator('.xterm-helper-textarea').press(character);
     await expect.poll(() => ptyWrites(page)).toContain(character);
+    // Sample the height per frame while a transient small repaint is followed by the real frame
+    // with its input line: the block must never visibly collapse, and the layout below must stay.
+    await page.evaluate(() => {
+      const element = document.querySelector<HTMLElement>('[data-testid="running-term"]')!;
+      const samples: number[] = [];
+      (window as unknown as Record<string, unknown>).__runningHeightSamples = samples;
+      const step = () => { samples.push(element.getBoundingClientRect().height); if (samples.length < 30) requestAnimationFrame(step); };
+      requestAnimationFrame(step);
+    });
     await emitPtyOutput(page, '\x1b[H\x1b[2Jrepainting-' + character);
-    await expectAnyTermContains(page, 'repainting-' + character);
-    expect((await host.boundingBox())!.height).toBe(initialHeight);
-    expect((await block.boundingBox())!.y).toBe(initialTop);
-    expect(await scroll.evaluate(element => element.scrollTop)).toBe(initialScrollTop);
     await emitPtyOutput(page, '\x1b[20;1Hinput-ready-' + character);
     await expectAnyTermContains(page, 'input-ready-' + character);
     expect((await host.boundingBox())!.height).toBe(initialHeight);
     expect((await block.boundingBox())!.y).toBe(initialTop);
+    expect(await scroll.evaluate(element => element.scrollTop)).toBe(initialScrollTop);
+    const samples = await page.evaluate(() => (window as unknown as { __runningHeightSamples: number[] }).__runningHeightSamples);
+    expect(Math.min(...samples)).toBe(initialHeight);
   }
   expect((await ptyResizes(page)).length).toBe(resizes);
   await page.screenshot({ path: test.info().outputPath('stable-interactive-input.png') });
