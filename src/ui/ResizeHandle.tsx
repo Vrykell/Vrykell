@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { beginLayoutResizeDrag, endLayoutResizeDrag } from './layoutResizeDrag';
 
 interface ResizeHandleProps {
   axis: 'x' | 'y';
@@ -54,6 +55,7 @@ export default function ResizeHandle({ axis, edge = 'right', onDelta, onUp, test
         e.preventDefault();
         e.stopPropagation();
         cleanupRef.current(); // Defensive: a repeated mousedown must release the previous listeners first.
+        beginLayoutResizeDrag();
         startRef.current = { clientX: e.clientX, clientY: e.clientY };
         paintLine('var(--border-strong)');
         document.body.style.cursor = cursor;
@@ -78,6 +80,7 @@ export default function ResizeHandle({ axis, edge = 'right', onDelta, onUp, test
           document.removeEventListener('mousemove', onMove);
           document.removeEventListener('mouseup', onUp);
           paintLine('var(--resize-divider)');
+          endLayoutResizeDrag();
         };
         document.addEventListener('mousemove', onMove);
         document.addEventListener('mouseup', onUp);

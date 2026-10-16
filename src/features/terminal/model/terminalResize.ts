@@ -41,19 +41,32 @@ export function resizeTerminal(term: Terminal, cols: number, rows: number): void
 }
 
 /** Send the first size immediately and retain only the latest size while IPC is busy. */
-export function createResizeQueue(send: (cols: number, rows: number) => Promise<unknown>) {
+export function createResizeQueue(send: (cols: number, rows: number) => Promise<unknown>, minIntervalMs = 0) {
   let pending: { cols: number; rows: number } | null = null;
   let last = '';
   let busy = false;
   let disposed = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let lastSentAt = 0;
   const flush = () => {
     if (busy || disposed || !pending) return;
+    // A window-edge drag arrives as a stream of sizes. Waiting out the interval folds a burst
+    // into one notification, and the size the drag ends on is still delivered by the trailing
+    // flush. The local grid is unaffected: it follows the pointer every frame.
+    if (minIntervalMs > 0) {
+      const wait = minIntervalMs - (Date.now() - lastSentAt);
+      if (wait > 0) {
+        if (!timer) timer = setTimeout(() => { timer = null; flush(); }, wait);
+        return;
+      }
+    }
     const size = pending;
     pending = null;
     const key = `${size.cols}:${size.rows}`;
     if (key === last) return;
     last = key;
     busy = true;
+    lastSentAt = Date.now();
     void send(size.cols, size.rows).catch(() => { last = ''; }).finally(() => {
       busy = false;
       flush();
@@ -65,6 +78,10 @@ export function createResizeQueue(send: (cols: number, rows: number) => Promise<
       pending = { cols, rows };
       flush();
     },
-    dispose() { disposed = true; pending = null; },
+    dispose() {
+      disposed = true;
+      pending = null;
+      if (timer) { clearTimeout(timer); timer = null; }
+    },
   };
 }

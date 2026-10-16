@@ -8,6 +8,7 @@
  */
 
 import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
+import { beginLayoutResizeDrag, endLayoutResizeDrag } from '@ui/layoutResizeDrag';
 import { showsPaneChatHistory } from '../model/paneHistory';
 import { useTypographyStore } from '@config/typography';
 import { useRef, useEffect, useLayoutEffect, useMemo, useState, useId, useCallback } from 'react';
@@ -295,6 +296,7 @@ function Divider({ dir, rect, region, onRatio }: { dir: 'row' | 'col'; rect: Rec
     e.preventDefault();
     const container = ref.current?.parentElement;
     if (!container) return;
+    beginLayoutResizeDrag();
     const cRect = container.getBoundingClientRect();
     // 嵌套分隔线以自身 split 区域（region）为准换算比例，而非整个布局区
     const regionLeft = cRect.left + region.x * cRect.width;
@@ -314,6 +316,7 @@ function Divider({ dir, rect, region, onRatio }: { dir: 'row' | 'col'; rect: Rec
     const up = () => {
       document.removeEventListener('mousemove', move);
       document.removeEventListener('mouseup', up);
+      endLayoutResizeDrag();
     };
     document.addEventListener('mousemove', move);
     document.addEventListener('mouseup', up);
