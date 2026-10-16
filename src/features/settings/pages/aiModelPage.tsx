@@ -4,9 +4,10 @@
  * is an endpoint (API family plus effective base URL); the rail, selection and the row
  * filtering all derive from the model list itself (see providerList).
  */
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { IconButton } from '@ui/IconButton';
-import { Plus, X } from '@ui/icons';
+import ContextMenu from '@ui/ContextMenu';
+import { Ellipsis, Plus, X } from '@ui/icons';
 import { t } from '@i18n';
 import {
   setProviderKey, clearProviderKey, setAiModels, setActiveModel, selectProvider, useAiConfigStore,
@@ -21,7 +22,7 @@ import { useToastStore } from '@ui/Toast';
 import { SettingsGroup, Field, ModelTextInput, btnStyle } from '@features/settings/components/ui';
 import { applyModelPreset, type ModelPreset } from '@config/modelPresets';
 import ModelThinkingSettings from '@features/settings/components/ModelThinkingSettings';
-import ProviderRail, { type ProviderRailEntry } from '@features/settings/components/ProviderRail';
+import ProviderPicker, { type ProviderPickerEntry } from '@features/settings/components/ProviderPicker';
 import { providerHasKey, providerId, providerList, type ProviderRow } from '@features/settings/model/providerList';
 import HarnessBadge from '../components/HarnessBadge';
 import AutoSaveInput from '../components/AutoSaveInput';
@@ -84,6 +85,7 @@ export function AiModelPage() {
   const aiCfg = useAiConfigStore();
   const { save } = useSettingsSave();
   const detailRef = useRef<HTMLDivElement>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const toast = (msg: string, type: 'info' | 'success' | 'error') =>
     useToastStore.getState().addToast(msg, type);
 
@@ -96,7 +98,7 @@ export function AiModelPage() {
   }, [rows, aiCfg.selectedProvider, aiCfg.lastSelectedProvider]);
   const selected = rows.find((row) => row.id === selectedId) ?? null;
 
-  const entries: ProviderRailEntry[] = rows.map((row) => ({
+  const entries: ProviderPickerEntry[] = rows.map((row) => ({
     id: row.id,
     kind: row.kind,
     name: row.name,
@@ -147,16 +149,13 @@ export function AiModelPage() {
 
   return (
     <div className="settings-provider-page">
-      <ProviderRail
+      <ProviderPicker
         entries={entries}
         selectedId={selectedId}
         onSelect={selectProvider}
-        onSetCurrent={setCurrentProvider}
-        onEditKey={editProviderKey}
-        onDelete={removeProvider}
         onAddPreset={addPreset}
       />
-      <div ref={detailRef} style={{ flex: 1, minWidth: 0 }}>
+      <div ref={detailRef} style={{ minWidth: 0 }}>
         {selected ? (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, minWidth: 0 }}>
@@ -176,23 +175,33 @@ export function AiModelPage() {
               >
                 {selected.baseUrl}
               </span>
-              {/* Read-only: a provider counts as enabled while it has models. */}
-              <span
-                style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}
-                data-tip={t('Enabled while this provider has models.')}
-              >
-                <span
-                  role="switch"
-                  aria-checked="true"
-                  aria-disabled="true"
-                  aria-label={t('Enabled while this provider has models.')}
-                  data-testid="provider-enabled"
-                  style={{ width: 38, height: 22, borderRadius: 10, background: 'var(--accent)', position: 'relative', display: 'inline-block' }}
+              {/* Actions on the selected provider, then the read-only enable state. */}
+              <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                <IconButton
+                  compact
+                  data-tip={t('More actions')}
+                  aria-label={t('More actions')}
+                  onClick={(event) => {
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    setMenu({ x: rect.left, y: rect.bottom + 4 });
+                  }}
                 >
-                  <span style={{
-                    position: 'absolute', top: 3, left: 19, width: 16, height: 16,
-                    borderRadius: '50%', background: 'var(--accent-text)',
-                  }} />
+                  <Ellipsis size={14} />
+                </IconButton>
+                <span data-tip={t('Enabled while this provider has models.')}>
+                  <span
+                    role="switch"
+                    aria-checked="true"
+                    aria-disabled="true"
+                    aria-label={t('Enabled while this provider has models.')}
+                    data-testid="provider-enabled"
+                    style={{ width: 38, height: 22, borderRadius: 10, background: 'var(--accent)', position: 'relative', display: 'inline-block' }}
+                  >
+                    <span style={{
+                      position: 'absolute', top: 3, left: 19, width: 16, height: 16,
+                      borderRadius: '50%', background: 'var(--accent-text)',
+                    }} />
+                  </span>
                 </span>
               </span>
             </div>
@@ -203,6 +212,17 @@ export function AiModelPage() {
           <div className="settings-provider-empty">{t('No providers yet.')}</div>
         )}
       </div>
+      {menu && selected && (
+        <ContextMenu
+          anchor={menu}
+          items={[
+            { label: t('Set as current'), onClick: () => setCurrentProvider(selected.id) },
+            { label: t('Edit key'), onClick: () => editProviderKey(selected.id) },
+            { label: t('Delete provider'), danger: true, onClick: () => removeProvider(selected.id) },
+          ]}
+          onClose={() => setMenu(null)}
+        />
+      )}
     </div>
   );
 }
