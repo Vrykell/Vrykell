@@ -370,8 +370,14 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
     // Preserve occupied space across partial clear-and-repaint frames, but let a smaller frame
     // settle: a TUI that clears and rewrites itself into fewer rows (for example after a resize)
     // otherwise keeps the old height as a black tail that the follow position shows on screen.
+    // 80 ms covers the split writes of one repaint (output arrives in ~16 ms batches) while a
+    // frame that really settled smaller adopts its height almost immediately.
     const cellHeight = (): number => getCellMetrics(term).height;
+    // Track the row count the style currently holds: the first crop must land even when the
+    // measurement equals the initial one, otherwise the element keeps its uncropped natural height.
+    let appliedRows: number | null = null;
     const applyHeight = () => {
+      appliedRows = occupiedRowsRef.current;
       // The xterm element has 4px of vertical padding on each side.
       el.style.height = `${occupiedRowsRef.current * cellHeight() + 8}px`;
     };
@@ -381,10 +387,8 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
       const occupied = measureRunningTerminalRows(term.buffer.active, term.rows, 1);
       if (occupied >= occupiedRowsRef.current) {
         if (shrinkTimer) { clearTimeout(shrinkTimer); shrinkTimer = null; }
-        if (occupied !== occupiedRowsRef.current) {
-          occupiedRowsRef.current = occupied;
-          applyHeight();
-        }
+        occupiedRowsRef.current = occupied;
+        if (appliedRows !== occupied) applyHeight();
       } else if (!shrinkTimer) {
         shrinkTimer = setTimeout(() => {
           shrinkTimer = null;
@@ -396,7 +400,7 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
               terminalDebug('running-terminal-height-settled', { tabId, blockId, rows: settled });
             }
           }
-        }, 260);
+        }, 80);
       }
       if (!visibleOutputLogged && occupiedRowsRef.current > 1 && isTerminalDebugEnabled()) {
         visibleOutputLogged = true;
