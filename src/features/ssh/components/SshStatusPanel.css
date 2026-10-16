@@ -47,7 +47,8 @@ button.ssh-status-reconnect.text-control:not(:disabled):is(:hover, :focus-visibl
 .ssh-status-metric-reading { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .ssh-status-metric-value { color: var(--text-primary); font-size: var(--fs-subtitle); font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums; line-height: 1.2; }
 .ssh-status-metric-value[data-empty] { color: var(--text-muted); font-size: var(--fs-label); font-weight: var(--fw-medium); }
-.ssh-status-meter { height: 6px; overflow: hidden; border-radius: 999px; background: var(--border); }
+/* The bar read as a stray progress bar; the value and the trend carry the reading. */
+.ssh-status-meter { display: none; }
 .ssh-status-meter i { display: block; height: 100%; border-radius: inherit; background: var(--success); transition: width 150ms var(--ease); }
 .ssh-status-meter i[data-level="warning"] { background: var(--accent-warm); }
 .ssh-status-meter i[data-level="critical"] { background: var(--error); }
