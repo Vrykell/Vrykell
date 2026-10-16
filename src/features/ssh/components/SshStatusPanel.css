@@ -72,6 +72,8 @@ button.ssh-status-reconnect.text-control:not(:disabled):is(:hover, :focus-visibl
 .ssh-status-details > summary:is(:hover, :focus-visible) > svg { color: inherit; }
 .ssh-status-details[open] > summary > svg { transform: rotate(90deg); }
 .ssh-status-details-body { padding: 8px 14px 12px; }
+.ssh-status-facts { display: flex; flex-direction: column; gap: 2px; padding: 10px 14px 12px; border-top: 1px solid var(--border); }
+.ssh-status-facts .ssh-status-system { margin-bottom: 4px; }
 .ssh-status-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-height: 28px; }
 .ssh-status-row > span { color: var(--text-secondary); }
 .ssh-status-row strong { color: var(--text-primary); font-weight: var(--fw-medium); font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
@@ -89,6 +91,7 @@ button.ssh-status-reconnect.text-control:not(:disabled):is(:hover, :focus-visibl
 .ssh-status-controls .text-control { flex-shrink: 0; font-size: var(--fs-caption); }
 .ssh-status-controls .ssh-status-caption { margin: 0; text-align: right; }
 .ssh-status-controls > div { min-width: 0; }
+.ssh-status-controls-actions { display: flex; align-items: center; gap: 8px; min-width: 0; }
 @container ssh-pane (max-width: 620px) {
   .ssh-session-toolbar-target { display: none; }
 }

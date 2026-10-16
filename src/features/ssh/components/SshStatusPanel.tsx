@@ -87,6 +87,8 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
   const [sample, setSample] = useState<SshSystemStatus | null>(null);
   const [cpu, setCpu] = useState<number | null>(null);
   const [cpuHistory, setCpuHistory] = useState<CpuSample[]>([]);
+  const [memoryHistory, setMemoryHistory] = useState<CpuSample[]>([]);
+  const [diskHistory, setDiskHistory] = useState<CpuSample[]>([]);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [sampleValid, setSampleValid] = useState(false);
   const [error, setError] = useState('');
@@ -151,6 +153,15 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
             const recent = values.filter(value => time - value.time <= 300000);
             return usage == null ? recent : [...recent, { time, value: usage }].slice(-21);
           });
+          const pushPercent = (setter: typeof setCpuHistory, used: number | null | undefined, total: number | null | undefined) => {
+            setter(values => {
+              const recent = values.filter(value => time - value.time <= 300000);
+              const percent = used != null && total != null && total > 0 ? used / total * 100 : null;
+              return percent == null ? recent : [...recent, { time, value: percent }].slice(-21);
+            });
+          };
+          pushPercent(setMemoryHistory, result.memoryTotal != null && result.memoryAvailable != null ? result.memoryTotal - result.memoryAvailable : null, result.memoryTotal);
+          pushPercent(setDiskHistory, result.diskUsed, result.diskTotal);
         }
       } catch (reason) { if (!disposed) { setError(String(reason)); nextDelay = 30000; retryAllowed = !isSshAuthenticationFailure(String(reason)); } }
       finally {
@@ -262,30 +273,23 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
               {sample && <div className="ssh-status-sample" data-stale={stale}>
                 <div className="ssh-status-metrics">
                   <Metric label={t('CPU usage')} percentage={cpu} history={cpuHistory} hint={cpu == null && sample.cpuTotal != null ? <p className="ssh-status-caption ssh-status-metric-hint">{t('CPU usage requires two samples.')}</p> : undefined} />
-                  <Metric label={t('Memory usage')} used={sample.memoryTotal != null && sample.memoryAvailable != null ? sample.memoryTotal - sample.memoryAvailable : null} total={sample.memoryTotal} />
-                  <Metric label={t('Root disk usage')} used={sample.diskUsed} total={sample.diskTotal} />
+                  <Metric label={t('Memory usage')} used={sample.memoryTotal != null && sample.memoryAvailable != null ? sample.memoryTotal - sample.memoryAvailable : null} total={sample.memoryTotal} history={memoryHistory} />
+                  <Metric label={t('Root disk usage')} used={sample.diskUsed} total={sample.diskTotal} history={diskHistory} />
                 </div>
-                <details className="ssh-status-details">
-                  <summary>{t('System details')}<ChevronRight size={iconSizes.compact} /></summary>
-                  <div className="ssh-status-details-body">
-                    <div className="ssh-status-system" data-tip={`${sample.system} · ${sample.hostname}`}>{sample.system} · {sample.hostname}</div>
-                    <div className="ssh-status-row"><span>{t('System uptime')}</span><strong>{sample.uptimeSeconds == null ? t('Unavailable') : statusDuration(sample.uptimeSeconds)}</strong></div>
-                    <div className="ssh-status-row" data-tip={t('Average load over the last 1, 5 and 15 minutes.')}><span>{t('System load')}</span><strong>{sample.load || t('Unavailable')}</strong></div>
-                  </div>
-                </details>
+                <div className="ssh-status-facts">
+                  <div className="ssh-status-system" data-tip={`${sample.system} · ${sample.hostname}`}>{sample.system} · {sample.hostname}</div>
+                  <div className="ssh-status-row"><span>{t('System uptime')}</span><strong>{sample.uptimeSeconds == null ? t('Unavailable') : statusDuration(sample.uptimeSeconds)}</strong></div>
+                  <div className="ssh-status-row" data-tip={t('Average load over the last 1, 5 and 15 minutes.')}><span>{t('System load')}</span><strong>{sample.load || t('Unavailable')}</strong></div>
+                </div>
               </div>}
             </>}
           </section>
           <section className="ssh-status-groups">
-            <details className="ssh-status-details ssh-status-connection">
-              <summary>{t('Connection details')}<ChevronRight size={iconSizes.compact} /></summary>
-              <div className="ssh-status-details-body">
-                <div className="ssh-status-row"><span>{state.phase === 'interactive' ? t('Session duration') : t('Connected for')}</span><strong>{connectedAt == null ? '—' : statusDuration((now - connectedAt) / 1000)}</strong></div>
-                <div className="ssh-status-row"><span>{t('Reconnect attempts')}</span><strong>{state.reconnectAttempt}</strong></div>
-                {temporaryAuthentication && target.connectionId && <TextButton onClick={() => { void forgetSshAuthentication(target.connectionId!).catch(reason => useToastStore.getState().addToast(String(reason), 'error')); }}>{t('Clear temporary credentials')}</TextButton>}
-                {sample && <div className="ssh-status-row" data-tip={t('Measured on a separate SSH connection.')}><span>{t('Probe latency')}</span><strong>{sample.latencyMs} ms</strong></div>}
-              </div>
-            </details>
+            <div className="ssh-status-facts">
+              <div className="ssh-status-row"><span>{state.phase === 'interactive' ? t('Session duration') : t('Connected for')}</span><strong>{connectedAt == null ? '—' : statusDuration((now - connectedAt) / 1000)}</strong></div>
+              <div className="ssh-status-row"><span>{t('Reconnect attempts')}</span><strong>{state.reconnectAttempt}</strong></div>
+              {sample && <div className="ssh-status-row" data-tip={t('Measured on a separate SSH connection.')}><span>{t('Probe latency')}</span><strong>{sample.latencyMs} ms</strong></div>}
+            </div>
             <details className="ssh-status-details ssh-status-history">
               <summary>{t('Connection log')}<ChevronRight size={iconSizes.compact} /></summary>
               <div className="ssh-status-details-body">
@@ -299,7 +303,10 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
           </section>
         </div>
         <footer className="ssh-status-controls">
-          <TextButton disabled={!connected || !!unsupported} onClick={() => setPaused(value => !value)}>{paused ? t('Resume monitoring') : t('Pause monitoring')}</TextButton>
+          <div className="ssh-status-controls-actions">
+            <TextButton disabled={!connected || !!unsupported} onClick={() => setPaused(value => !value)}>{paused ? t('Resume monitoring') : t('Pause monitoring')}</TextButton>
+            {temporaryAuthentication && target.connectionId && <TextButton onClick={() => { void forgetSshAuthentication(target.connectionId!).catch(reason => useToastStore.getState().addToast(String(reason), 'error')); }}>{t('Clear temporary credentials')}</TextButton>}
+          </div>
           <div>
             {updatedAt && <p className="ssh-status-caption">{stale ? t('Last sample') : t('Updated')} · {t('{{seconds}}s ago', { seconds: Math.max(0, Math.floor((now - updatedAt) / 1000)) })}</p>}
             {paused && <p className="ssh-status-caption">{t('Monitoring paused')}</p>}
