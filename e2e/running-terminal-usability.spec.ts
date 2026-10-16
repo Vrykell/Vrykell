@@ -51,6 +51,33 @@ test('运行中命令块以图标显示统一尺寸的操作按钮', async ({ pa
   await page.screenshot({ path: test.info().outputPath('termination-armed.png') });
 });
 
+test('运行中块右键菜单前置工具栏快捷操作并可直接触发', async ({ page }) => {
+  const block = page.locator('[data-testid^="running-block-"]').first();
+  await block.click({ button: 'right' });
+  const menu = page.getByRole('menu', { name: '操作菜单' });
+  await expect(menu).toBeVisible();
+
+  // The toolbar actions come first, then copy/paste and the pane actions.
+  const labels = ['重绘终端', '终止命令', '结束前台应用', '进入全屏交互', '复制', '粘贴', '分裂终端（选位置）'];
+  for (const [index, label] of labels.entries()) {
+    await expect(menu.getByRole('button').nth(index)).toContainText(label);
+  }
+  await expect(menu.getByLabel('Control+C').first()).toBeVisible();
+
+  // Interrupt runs the same write the toolbar performs and closes the menu.
+  const before = (await ptyWrites(page)).length;
+  await menu.getByRole('button', { name: '终止命令' }).click();
+  await expect.poll(async () => (await ptyWrites(page)).slice(before)).toContain('\x03');
+  await expect(menu).toHaveCount(0);
+
+  // The menu can raise the manual fullscreen surface as well.
+  await block.click({ button: 'right' });
+  await menu.getByRole('button', { name: '进入全屏交互' }).click();
+  await expect(page.getByTestId('tui-fullscreen')).toBeVisible();
+  await page.locator('[data-tip="退出全屏"]').click();
+  await expect(page.getByTestId('tui-fullscreen')).toHaveCount(0);
+});
+
 test('运行中块不再叠加第二个 xterm 滚动条', async ({ page }) => {
   const host = page.getByTestId('running-term');
   await expect(host.locator('.xterm-viewport')).toHaveCSS('overflow-y', 'hidden');

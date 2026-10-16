@@ -26,6 +26,7 @@ import { useToastStore } from '@ui/Toast';
 import { useFollowBottom, registerFollowEngager, engageFollow } from '@features/terminal/hooks/useFollowBottom';
 import { useTerminalFocus } from '@features/terminal/hooks/useTerminalFocus';
 import { useTerminalPaneDrag } from '@features/terminal/hooks/useTerminalPaneDrag';
+import { useRunningCommandActions } from '@features/terminal/hooks/useRunningCommandActions';
 import {
   leaves as layoutLeaves, firstLeaf, dividers, collectLayoutCells, fitLayoutWidth, MIN_PANE_SIZE, MIN_PANE_WIDTH, DIVIDER_SIZE,
   type WindowLayout, type TerminalSpec, type Rect,
@@ -58,7 +59,7 @@ export default function TerminalView() {
   const focusedPaneId = useTerminalStore((s) => s.focusedPaneId);
   const sessions = useTerminalStore((s) => s.sessions);
   const altScreenActive = useTerminalStore((s) => s.altScreenActive);
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; sshActions?: ContextMenuItem[] } | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; sshActions?: ContextMenuItem[]; fullscreen?: boolean } | null>(null);
 
   const activeTab = tabs.find((t) => t.id === activeId);
   const isSession = activeTab?.kind === 'session';
@@ -68,6 +69,29 @@ export default function TerminalView() {
         ? focusedPaneId
         : firstLeaf(activeTab!.layout).id)
     : activeId;
+
+  // Running commands expose the status-bar actions through the context menu as well.
+  const focusedScene = useTerminalStore((s) => s.scenes[focusedTermId] ?? 'classic');
+  const focusedBlocks = useBlockStore(selectBlocks(focusedTermId));
+  const hasRunningBlock = focusedScene === 'blockList' && focusedBlocks.some((block) => block.status === 'executing');
+  const fullscreenMenu = ctxMenu?.fullscreen === true;
+  const runningActions = useRunningCommandActions(focusedTermId, fullscreenMenu ? 'fullscreen' : 'block');
+  const copySelection = () => { void copyTerminalSelection(getPaneTerminal(focusedTermId)); };
+  const pasteIntoPane = () => { void pasteClipboardIntoTerminal(focusedTermId); };
+  const ctxMenuItems: ContextMenuItem[] = !ctxMenu ? [] : fullscreenMenu ? [
+    ...runningActions,
+    { label: t('terminal.menu.copy'), group: 'clipboard', shortcut: 'Ctrl+C', onClick: copySelection },
+    { label: t('terminal.menu.paste'), group: 'clipboard', shortcut: 'Ctrl+V', onClick: pasteIntoPane },
+  ] : [
+    ...(hasRunningBlock ? runningActions : []),
+    ...(ctxMenu.sshActions ?? []),
+    { label: t('terminal.menu.copy'), group: 'clipboard', shortcut: 'Ctrl+C', onClick: copySelection },
+    { label: t('terminal.menu.paste'), group: 'clipboard', shortcut: 'Ctrl+V', onClick: pasteIntoPane },
+    { label: t('Split terminal (choose position)'), group: 'view', onClick: () => useUiStore.getState().beginSplit(null) },
+    { label: t('Choose split type'), group: 'view', onClick: () => useUiStore.getState().openSplitPicker() },
+    { label: t('Move terminal'), group: 'view', onClick: () => useUiStore.getState().beginMove(focusedTermId) },
+    { label: t('Close this terminal'), danger: true, onClick: () => useSessionStore.getState().closeFocusedTerminal() },
+  ];
 
   return (
     <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
@@ -94,7 +118,15 @@ export default function TerminalView() {
 
       {/* Manual fullscreen host for a running block, with room for the toolbar. */}
       {altScreenActive && (
-        <div data-testid="tui-fullscreen" style={{ position: 'absolute', inset: 0, zIndex: 100, background: 'var(--xterm-bg)', paddingTop: 28 }}>
+        <div
+          data-testid="tui-fullscreen"
+          onContextMenu={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setCtxMenu({ x: event.clientX, y: event.clientY, fullscreen: true });
+          }}
+          style={{ position: 'absolute', inset: 0, zIndex: 100, background: 'var(--xterm-bg)', paddingTop: 28 }}
+        >
           <TuiBanner tabId={focusedTermId} />
         </div>
       )}
@@ -104,15 +136,7 @@ export default function TerminalView() {
         <ContextMenu
           anchor={ctxMenu}
           onClose={() => setCtxMenu(null)}
-          items={[
-            ...(ctxMenu.sshActions ?? []),
-            { label: t('terminal.menu.copy'), group: 'clipboard', shortcut: 'Ctrl+C', onClick: () => { void copyTerminalSelection(getPaneTerminal(focusedTermId)); } },
-            { label: t('terminal.menu.paste'), group: 'clipboard', shortcut: 'Ctrl+V', onClick: () => { void pasteClipboardIntoTerminal(focusedTermId); } },
-            { label: '分裂终端（选位置）', group: 'view', onClick: () => useUiStore.getState().beginSplit(null) },
-            { label: '选择类型分裂', group: 'view', onClick: () => useUiStore.getState().openSplitPicker() },
-            { label: '更换位置', group: 'view', onClick: () => useUiStore.getState().beginMove(focusedTermId) },
-            { label: '关闭终端', danger: true, onClick: () => useSessionStore.getState().closeFocusedTerminal() },
-          ]}
+          items={ctxMenuItems}
         />
       )}
     </div>
