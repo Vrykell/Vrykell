@@ -25,6 +25,8 @@ Xcode Command Line Tools, Perl and Make are required (`xcode-select --install`).
 
 **Existing design first:** inspect the closest existing UI and reuse its components, spacing, input, menu, hover, and focus patterns. Extend or extract existing code instead of inventing another visual treatment. Review narrow and wide layouts in the running UI.
 
+**Menu hierarchy:** color palettes always sit directly below actions in the shared menu footer. Use meaningful submenus for multiple related choices; keep single settings destinations and switches directly accessible without a generic Settings parent.
+
 1. **No custom terminal emulator** - xterm.js for all VT/ANSI parsing; it stays invisible (PTY + parsing only).
 2. **No regex lookbehind** - macOS WKWebView rejects `(?<=...)` and `(?<!...)`.
 3. **i18n for user-visible text** - never hardcode user-visible Chinese in code: write the string in English and add its Chinese entry to the i18n catalog (`src/i18n`). Code comments in new or edited code are English, generic terms, no brand names.
