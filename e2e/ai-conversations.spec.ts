@@ -143,6 +143,14 @@ for (const themePalette of ['dark', 'light'] as const) {
     }));
     expect(frames.table).not.toBe('');
     expect(frames.table).toBe(frames.code);
+    // The frame ends where the columns end: a stretched block would paint an empty surface next
+    // to the table at a wide panel.
+    const widths = await exchange.evaluate(element => {
+      const table = element.querySelector('.md table') as HTMLElement;
+      const row = table.querySelector('tr') as HTMLElement;
+      return { box: table.getBoundingClientRect().width, row: row.getBoundingClientRect().width };
+    });
+    expect(widths.box - widths.row).toBeLessThanOrEqual(4);
     await exchange.locator('.ai-block-question').click();
     await expect(exchange.locator('.ai-block-answer')).toBeVisible();
     await page.locator('.ai-chat-panel').screenshot({ path: `.cache/ai-chat-redesign-${themePalette}.png` });
