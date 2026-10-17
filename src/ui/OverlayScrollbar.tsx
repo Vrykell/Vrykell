@@ -56,11 +56,23 @@ export default function OverlayScrollbar({ scrollRef, controlsId, label, horizon
             clipRight = Math.max(clipRight, left + scroll.clientWidth - bounds.left - parent.clientLeft - parent.clientWidth);
           }
         }
+        // A track covers only the trailing edge of its surface, so its clip insets differ from the
+        // surface's own: a horizontal track sits 10px above the surface's bottom edge, a vertical one
+        // 10px left of its right edge. Both axes are clipped, otherwise a surface that scrolled out of
+        // an ancestor keeps painting its track over the neighbouring panels.
+        const trackSize = 10;
+        const acrossStart = Math.max(0, (horizontal ? clipTop : clipLeft) - ((horizontal ? scroll.clientHeight : scroll.clientWidth) - trackSize));
+        const acrossEnd = horizontal ? clipBottom : clipRight;
+        const alongStart = horizontal ? clipLeft : clipTop;
+        const alongEnd = horizontal ? clipRight : clipBottom;
+        const clipPath = horizontal
+          ? `inset(${acrossStart}px ${alongEnd}px ${acrossEnd}px ${alongStart}px)`
+          : `inset(${alongStart}px ${acrossEnd}px ${alongEnd}px ${acrossStart}px)`;
         const nextPlacement: CSSProperties = horizontal
-          ? { position: 'fixed', top: top + scroll.clientHeight - 10, left, width: scroll.clientWidth, height: 10,
-            bottom: 'auto', right: 'auto', clipPath: `inset(0 ${Math.max(0, clipRight)}px 0 ${Math.max(0, clipLeft)}px)`, zIndex }
-          : { position: 'fixed', top, left: left + scroll.clientWidth - 10, width: 10, height: scroll.clientHeight,
-            bottom: 'auto', right: 'auto', clipPath: `inset(${Math.max(0, clipTop)}px 0 ${Math.max(0, clipBottom)}px 0)`, zIndex };
+          ? { position: 'fixed', top: top + scroll.clientHeight - trackSize, left, width: scroll.clientWidth, height: trackSize,
+            bottom: 'auto', right: 'auto', clipPath, zIndex }
+          : { position: 'fixed', top, left: left + scroll.clientWidth - trackSize, width: trackSize, height: scroll.clientHeight,
+            bottom: 'auto', right: 'auto', clipPath, zIndex };
         if (ownedLayer) {
           // The layer lives in the host's coordinate space, which may be transformed, so map viewport pixels into it.
           const hostBounds = layerHost.getBoundingClientRect();
@@ -70,7 +82,9 @@ export default function OverlayScrollbar({ scrollRef, controlsId, label, horizon
           nextPlacement.left = (Number(nextPlacement.left) - hostBounds.left) / scaleX - layerHost.clientLeft + layerHost.scrollLeft;
           nextPlacement.top = (Number(nextPlacement.top) - hostBounds.top) / scaleY - layerHost.clientTop + layerHost.scrollTop;
         }
-        if (!scroll.getClientRects().length || (horizontal ? clipTop + clipBottom >= scroll.clientHeight : clipLeft + clipRight >= scroll.clientWidth)) nextPlacement.display = 'none';
+        if (!scroll.getClientRects().length
+          || acrossStart + acrossEnd >= trackSize
+          || alongStart + alongEnd >= (horizontal ? scroll.clientWidth : scroll.clientHeight)) nextPlacement.display = 'none';
         setPlacement(previous => JSON.stringify(previous) === JSON.stringify(nextPlacement) ? previous : nextPlacement);
       }
     };
