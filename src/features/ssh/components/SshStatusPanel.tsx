@@ -7,7 +7,6 @@ import { IconBtn, fmtSize } from '@ui/UiBtn';
 import { TextButton } from '@ui/TextButton';
 import ErrorBox from '@ui/ErrorBox';
 import ResizeHandle from '@ui/ResizeHandle';
-import Select from '@ui/Select';
 import { writeClipboardText } from '@platform/clipboard';
 import { useToastStore } from '@ui/Toast';
 import { hideSshStatus, showSshStatus, useSshStatusDismissRequest } from '@features/workspace/hooks/useAuxiliarySidebar';
@@ -17,7 +16,6 @@ import SshResourceChart, { RESOURCE_HISTORY_MS, type ResourceSample } from './Ss
 import SshNetworkProbe from './SshNetworkProbe';
 import SshNetworkRates from './SshNetworkRates';
 import { networkRates, type NetworkRateSample } from '../model/networkRates';
-import { useResourceDisplay, type ResourceDisplay } from '../stores/resourceDisplay';
 import './SshStatusPanel.css';
 import { forgetSshAuthentication, requestSshAuthentication, useHasTemporarySshAuthentication, useSshAuthenticationRevision } from '../hooks/useSessionAuthentication';
 
@@ -46,19 +44,16 @@ export function cpuUsage(previous: SshSystemStatus | null, current: SshSystemSta
   return total > 0 && idle >= 0 && idle <= total ? 100 * (total - idle) / total : null;
 }
 
-function Metric({ resource = 'cpu', label, used, total, percentage, history, hint, display, now }: { resource?: 'cpu' | 'memory' | 'disk'; label: string; used?: number | null; total?: number | null; percentage?: number | null; history: readonly ResourceSample[]; hint?: ReactNode; display: ResourceDisplay; now: number }) {
+function Metric({ resource = 'cpu', label, used, total, percentage, hint }: { resource?: 'cpu' | 'memory' | 'disk'; label: string; used?: number | null; total?: number | null; percentage?: number | null; hint?: ReactNode }) {
   const percent = percentage !== undefined ? percentage : used != null && total != null && total > 0 ? used / total * 100 : null;
   const reading = used != null && total != null ? `${fmtSize(used)} / ${fmtSize(total)}` : null;
-  return <div className="ssh-status-metric" data-display={display} data-resource={resource}>
-    <div className="ssh-status-metric-head">
-      <span className="ssh-status-metric-label">{label}</span>
-      <strong className="ssh-status-metric-value" data-empty={percent == null || undefined}>{percent == null ? t('Unavailable') : <>{Math.round(percent)}<small>%</small></>}</strong>
-    </div>
-    {reading && <span className="ssh-status-caption ssh-status-metric-caption">{reading}</span>}
-    {display === 'chart' ? <SshResourceChart samples={history} endTime={now} label={t('{{resource}} history', { resource: label })} />
-      : <div className="ssh-status-meter" data-empty={percent == null || undefined} role={percent == null ? undefined : 'meter'} aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent == null ? undefined : Math.round(percent)}>
+  return <div className="ssh-status-metric" data-resource={resource}>
+    <span className="ssh-status-metric-label" data-tip={label}>{label}</span>
+    <div className="ssh-status-meter" data-empty={percent == null || undefined} role={percent == null ? undefined : 'meter'} aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent == null ? undefined : Math.round(percent)}>
       <i data-level={percent == null ? 'unknown' : percent >= 90 ? 'critical' : percent >= 80 ? 'warning' : 'normal'} style={{ width: `${Math.max(0, Math.min(100, percent ?? 0))}%` }} />
-    </div>}
+    </div>
+    <strong className="ssh-status-metric-value" data-empty={percent == null || undefined}>{percent == null ? t('Unavailable') : `${Math.round(percent)}%`}</strong>
+    {reading && <span className="ssh-status-caption ssh-status-metric-caption">{reading}</span>}
     {hint}
   </div>;
 }
@@ -91,8 +86,6 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
   const [memoryHistory, setMemoryHistory] = useState<ResourceSample[]>([]);
   const [diskHistory, setDiskHistory] = useState<ResourceSample[]>([]);
   const [trafficHistory, setTrafficHistory] = useState<NetworkRateSample[]>([]);
-  const display = useResourceDisplay(value => value.display);
-  const setDisplay = useResourceDisplay(value => value.setDisplay);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [sampleValid, setSampleValid] = useState(false);
   const [error, setError] = useState('');
@@ -250,6 +243,11 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
   };
   const stale = !sampleValid || !connected || !!error || paused || (updatedAt != null && now - updatedAt > 30000);
   const authenticationFailed = isSshAuthenticationFailure(error);
+  const resourceSeries = [
+    { label: 'CPU', samples: cpuHistory, color: 'var(--resource-accent)' },
+    { label: t('Memory'), samples: memoryHistory, color: 'var(--group-violet)' },
+    { label: t('Root disk'), samples: diskHistory, color: 'var(--group-amber)' },
+  ];
   return <div className="ssh-status-shell" data-open={displayOpen} data-active={active} data-compact={compact}>
     {!compact && <div className="ssh-status-toolbar" onMouseDown={event => event.stopPropagation()} onContextMenu={event => event.stopPropagation()}>
       <div className="ssh-session-toolbar-slot" ref={onToolbarReady}>
@@ -280,25 +278,27 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
             }}>{t('Reconnect SSH session')}</TextButton>}
           </section>
           <SshNetworkProbe host={target.host} port={target.port ?? 22} jumpHost={target.jumpHost} paused={paused} revision={refresh}>
-            {sample && <SshNetworkRates samples={trafficHistory} now={now} display={display} available={sample.networkReceived != null || sample.networkTransmitted != null} />}
+            {sample && <SshNetworkRates samples={trafficHistory} now={now} available={sample.networkReceived != null || sample.networkTransmitted != null} />}
           </SshNetworkProbe>
           <section className="ssh-status-resource">
-            <div className="ssh-status-section-heading"><h3>{t('Resource usage')}</h3>
-              <Select aria-label={t('Resource display')} value={display} onChange={setDisplay} options={[
-                { value: 'bars', label: t('Progress bars') }, { value: 'chart', label: t('Charts') },
-              ]} />
-            </div>
+            <div className="ssh-status-section-heading"><h3>{t('Resource usage')}</h3></div>
             {unsupported ? <div className="ssh-status-state"><ErrorBox tone="info">{unsupported}</ErrorBox></div> : <>
               {(error || !sample) && <div className="ssh-status-state">
                 {error && <ErrorBox style={{ overflowWrap: 'anywhere' }} title={t(authenticationFailed ? 'Saved SSH authentication failed' : 'Resource collection failed')} details={error} detailsTitle={t('Technical details')} actions={authenticationFailed && target.connectionId ? <button style={{ minHeight: 36 }} onClick={() => requestSshAuthentication({ ...target, connectionId: target.connectionId! })}>{t('Authenticate services')}</button> : undefined}>{t(authenticationFailed ? 'Authenticate these services with the working server password or private key passphrase. The terminal session stays connected.' : 'The terminal connection is independent of resource monitoring.')}</ErrorBox>}
                 {!sample && <p className="ssh-status-caption">{!connected ? t('Resources are collected after connecting.') : busy ? t('Collecting remote resources…') : t('No resource sample yet.')}</p>}
               </div>}
               {sample && <div className="ssh-status-sample" data-stale={stale}>
-                <div className="ssh-status-metrics">
-                  <Metric label={t('CPU usage')} percentage={cpu} history={cpuHistory} display={display} now={now} hint={cpu == null && sample.cpuTotal != null ? <p className="ssh-status-caption ssh-status-metric-hint">{t('CPU usage requires two samples.')}</p> : undefined} />
-                  <Metric resource="memory" label={t('Memory usage')} used={sample.memoryTotal != null && sample.memoryAvailable != null ? sample.memoryTotal - sample.memoryAvailable : null} total={sample.memoryTotal} history={memoryHistory} display={display} now={now} />
-                  <Metric resource="disk" label={t('Root disk usage')} used={sample.diskUsed} total={sample.diskTotal} history={diskHistory} display={display} now={now} />
-                  {display === 'chart' && <div className="ssh-status-time-axis" aria-hidden="true"><span>{t('5 min ago')}</span><span>{t('Now')}</span></div>}
+                <div className="ssh-status-resource-summary">
+                  <ul className="ssh-resource-legend" aria-label={t('Resource chart legend')}>
+                    {resourceSeries.map(series => <li key={series.label}><i style={{ background: series.color }} aria-hidden="true" />{series.label}</li>)}
+                  </ul>
+                  <SshResourceChart series={resourceSeries} endTime={now} label={t('Resource usage history')} />
+                  <div className="ssh-status-time-axis" aria-hidden="true"><span>{t('5 min ago')}</span><span>{t('Now')}</span></div>
+                  <div className="ssh-status-metrics">
+                    <Metric label={t('CPU usage')} percentage={cpu} hint={cpu == null && sample.cpuTotal != null ? <p className="ssh-status-caption ssh-status-metric-hint">{t('CPU usage requires two samples.')}</p> : undefined} />
+                    <Metric resource="memory" label={t('Memory usage')} used={sample.memoryTotal != null && sample.memoryAvailable != null ? sample.memoryTotal - sample.memoryAvailable : null} total={sample.memoryTotal} />
+                    <Metric resource="disk" label={t('Root disk usage')} used={sample.diskUsed} total={sample.diskTotal} />
+                  </div>
                 </div>
                 <details className="ssh-status-system-section ssh-status-details">
                   <summary>{t('System information')}<ChevronRight size={iconSizes.compact} /></summary>

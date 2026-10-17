@@ -2,8 +2,10 @@ import { expect, test } from '@playwright/test';
 import { setupTauriMock, ptyWrites } from './tauri-mock';
 
 for (const theme of ['dark', 'light'] as const) {
-  test(`resource cards switch presentation, retain it and fit narrow and wide panels in ${theme} mode`, async ({ page }, testInfo) => {
+  test(`combined resource history and compact meters stay together at narrow and wide widths in ${theme} mode`, async ({ page }, testInfo) => {
+    test.setTimeout(60_000);
     await setupTauriMock(page);
+    await page.addInitScript(value => localStorage.setItem('vrykell-ssh-resource-display', value), theme === 'dark' ? 'bars' : 'chart');
     await page.clock.setFixedTime(new Date('2026-10-17T06:00:00Z'));
     await page.setViewportSize({ width: 1500, height: 1000 });
     await page.goto('/');
@@ -47,35 +49,59 @@ for (const theme of ['dark', 'light'] as const) {
       await expect.poll(() => page.evaluate(() => (window as unknown as Record<string, number>).__SSH_STATUS_CALLS__)).toBeGreaterThan(before);
       await expect(panel.getByRole('button', { name: '刷新远端资源' })).toBeEnabled();
     }
-    const calls = await page.evaluate(() => (window as unknown as Record<string, number>).__SSH_STATUS_CALLS__);
-    const display = panel.getByRole('combobox', { name: '资源显示方式' });
-    await display.focus();
-    await page.keyboard.press('ArrowDown');
-    await page.getByRole('option', { name: '图表', exact: true }).click();
-    await expect(panel.getByRole('meter')).toHaveCount(0);
-    await expect(panel.getByRole('img', { name: '内存使用率趋势' })).toBeVisible();
-    await expect(panel.getByRole('img', { name: '根分区使用率趋势' })).toBeVisible();
+    const chart = panel.getByRole('img', { name: '资源使用率趋势' });
+    await expect(chart).toHaveCount(1);
+    await expect(chart.locator('[data-series]')).toHaveCount(3);
+    await expect(panel.getByRole('meter')).toHaveCount(3);
+    await expect(panel.getByRole('combobox')).toHaveCount(0);
     const traffic = panel.getByRole('img', { name: '上传与下载趋势' });
     await expect(traffic).toHaveCount(1);
     await expect(traffic.locator('[data-series]')).toHaveCount(2);
-    const colors = await panel.locator('.ssh-status-metric [data-series]').evaluateAll(elements => elements.map(element => getComputedStyle(element).color));
+    const colors = await chart.locator('[data-series]').evaluateAll(elements => elements.map(element => getComputedStyle(element).color));
     expect(new Set(colors).size).toBe(3);
-    expect(await page.evaluate(() => (window as unknown as Record<string, number>).__SSH_STATUS_CALLS__)).toBe(calls);
+    for (const plot of [chart, traffic]) {
+      const bounds = await plot.evaluate(element => {
+        const frame = element.parentElement!.getBoundingClientRect();
+        const svg = element.getBoundingClientRect();
+        const axis = element.parentElement!.querySelector('.ssh-resource-chart-axis')!.getBoundingClientRect();
+        return { frame: frame.width, plot: svg.width, rightInset: svg.right - axis.right, leftInset: axis.left - svg.left };
+      });
+      expect(Math.abs(bounds.frame - bounds.plot)).toBeLessThanOrEqual(1);
+      expect(bounds.rightInset).toBeGreaterThanOrEqual(0);
+      expect(bounds.rightInset).toBeLessThanOrEqual(3);
+      expect(bounds.leftInset).toBeGreaterThanOrEqual(0);
+    }
     await page.screenshot({ path: testInfo.outputPath(`resources-chart-${theme}-300.png`) });
     await panel.locator('.ssh-status-resource').scrollIntoViewIfNeeded();
     await page.screenshot({ path: testInfo.outputPath(`resources-chart-${theme}-detail.png`) });
+    const summary = panel.locator('.ssh-status-resource-summary');
+    const summaryBounds = (await summary.boundingBox())!;
+    const chartBounds = (await chart.boundingBox())!;
+    expect(summaryBounds.height).toBeLessThanOrEqual(300);
+    for (const meter of await panel.getByRole('meter').all()) {
+      const box = (await meter.boundingBox())!;
+      expect(box.y).toBeGreaterThanOrEqual(chartBounds.y + chartBounds.height);
+      expect(box.width).toBeLessThan(chartBounds.width * .7);
+      expect(box.width).toBeGreaterThan(40);
+      expect(box.height).toBe(10);
+    }
+    await summary.screenshot({ path: testInfo.outputPath(`combined-resources-${theme}-300.png`) });
+    await network.screenshot({ path: testInfo.outputPath(`network-full-width-${theme}-300.png`) });
     const separator = page.getByRole('separator', { name: '调整 SSH 状态面板宽度' });
     await separator.focus();
     for (let index = 0; index < 19; index++) await page.keyboard.press('ArrowLeft');
     await expect.poll(async () => Math.round((await panel.boundingBox())!.width)).toBe(604);
+    await summary.screenshot({ path: testInfo.outputPath(`combined-resources-${theme}-604.png`) });
     await page.screenshot({ path: testInfo.outputPath(`resources-chart-${theme}-604.png`) });
     for (let index = 0; index < 23; index++) await page.keyboard.press('ArrowRight');
     await expect.poll(async () => Math.round((await panel.boundingBox())!.width)).toBe(240);
     expect(await panel.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+    await summary.screenshot({ path: testInfo.outputPath(`combined-resources-${theme}-240.png`) });
     await page.screenshot({ path: testInfo.outputPath(`resources-chart-${theme}-240.png`) });
     await panel.getByRole('button', { name: '关闭 SSH 状态' }).click();
     await page.getByTestId('ssh-status-toggle').last().click();
-    await expect(display).toHaveText('图表');
+    await expect(chart).toBeVisible();
+    await expect(panel.getByRole('meter')).toHaveCount(3);
     expect(await ptyWrites(page)).toEqual(writes);
     await page.reload();
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
@@ -83,10 +109,8 @@ for (const theme of ['dark', 'light'] as const) {
     if (!await page.getByTestId('ssh-row-ssh-1').isVisible()) await sshButton.click();
     await page.getByTestId('ssh-row-ssh-1').dblclick();
     await page.getByTestId('ssh-status-toggle').last().click();
-    await expect(display).toHaveText('图表');
-    await display.click();
-    await page.getByRole('option', { name: '进度条', exact: true }).click();
-    await expect(panel.getByRole('img')).toHaveCount(0);
+    await expect(chart).toBeVisible();
+    await expect(panel.getByRole('combobox')).toHaveCount(0);
     await expect(panel.getByRole('meter', { name: '内存使用率' })).toBeVisible();
   });
 }
