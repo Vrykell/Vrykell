@@ -61,6 +61,7 @@
   --primary-button-bg: var(--primary-action);
   --primary-button-text: #ffffff;
   --primary-button-hover-bg: color-mix(in srgb, var(--primary-action) 85%, var(--primary-button-text));
+  --resource-accent: color-mix(in srgb, var(--group-blue) 80%, var(--primary-action));
   --history-link-color: var(--group-blue);
   --key-hint-bg: var(--chrome-field);
   --control-active-bg: var(--accent-dim);

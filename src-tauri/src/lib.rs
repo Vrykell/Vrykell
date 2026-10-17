@@ -172,6 +172,7 @@ pub fn run() {
             remote::ssh::ssh_connection_touch,
             remote::ssh::ssh_test,
             remote::ssh::ssh_system_status,
+            remote::network::ssh_network_probe,
             remote::ssh::ssh_authenticate_session,
             remote::ssh::ssh_forget_session_auth,
             remote::ssh::ssh_host_key_info,

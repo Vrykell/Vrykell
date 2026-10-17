@@ -5,23 +5,24 @@ import type { SshSystemStatus } from '../services/api';
 import { useState } from 'react';
 import { useAuxiliarySidebarStore } from '@features/workspace/stores/auxiliarySidebar';
 import { finishSshAuthentication, useSessionAuthenticationStore } from '../stores/sessionAuthentication';
+import { useResourceDisplay } from '../stores/resourceDisplay';
 
-const mocks = vi.hoisted(() => ({ collect: vi.fn(), copy: vi.fn() }));
-vi.mock('../services/api', () => ({ sshSystemStatus: mocks.collect }));
+const mocks = vi.hoisted(() => ({ collect: vi.fn(), copy: vi.fn(), probe: vi.fn() }));
+vi.mock('../services/api', () => ({ sshSystemStatus: mocks.collect, sshNetworkProbe: mocks.probe }));
 vi.mock('@platform/clipboard', () => ({ writeClipboardText: mocks.copy }));
 const sample: SshSystemStatus = { system: 'Linux 6.8', hostname: 'node', latencyMs: 42, uptimeSeconds: 90, load: '0.1 0.2 0.3', cpuTotal: 1000, cpuIdle: 700, memoryTotal: 8192, memoryAvailable: 4096, diskTotal: 10000, diskUsed: 3000 };
 const target = { name: 'Production', host: 'example.com', user: 'deploy', connectionId: 'saved' };
 const connected = { phase: 'connected' as const, reconnectAttempt: 0, retrying: false, log: [] };
 const open = () => fireEvent.click(screen.getByTestId('ssh-status-toggle'));
 
-beforeEach(() => { vi.clearAllMocks(); useSessionAuthenticationStore.setState({ request: null, revisions: {}, temporary: {} }); useAuxiliarySidebarStore.setState({ sshStatusOwner: null, dismissRequest: 0 }); mocks.collect.mockResolvedValue(sample); mocks.copy.mockResolvedValue(undefined); });
+beforeEach(() => { vi.clearAllMocks(); mocks.probe.mockResolvedValue({ dnsMs: 1, attempts: [] }); useResourceDisplay.setState({ display: 'bars' }); useSessionAuthenticationStore.setState({ request: null, revisions: {}, temporary: {} }); useAuxiliarySidebarStore.setState({ sshStatusOwner: null, dismissRequest: 0 }); mocks.collect.mockResolvedValue(sample); mocks.copy.mockResolvedValue(undefined); });
 afterEach(() => vi.useRealTimers());
 
 describe('SSH status panel', () => {
   it('lists one meter per resource with its percentage and used/total reading', async () => {
     render(<SshStatusPanel target={target} state={connected} active />);
     open();
-    await screen.findByText('Linux 6.8 · node');
+    await screen.findByText('Linux 6.8');
     const meters = screen.getAllByRole('meter').map(meter => [meter.getAttribute('aria-label'), meter.getAttribute('aria-valuenow')]);
     expect(meters).toEqual([['内存使用率', '50'], ['根分区使用率', '30']]);
     // CPU needs two samples: its reading stays unavailable instead of a zero-filled meter.
@@ -44,6 +45,47 @@ describe('SSH status panel', () => {
     expect(box).toHaveTextContent('暂无连接输出。');
   });
 
+  it('switches between resource bars and correctly labeled charts without collecting again', async () => {
+    render(<SshStatusPanel target={target} state={connected} active />);
+    open(); await screen.findByText('Linux 6.8');
+    fireEvent.click(screen.getByRole('combobox', { name: '资源显示方式' }));
+    fireEvent.click(screen.getByRole('option', { name: '图表' }));
+    expect(screen.queryByRole('meter')).not.toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '内存使用率趋势' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '根分区使用率趋势' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'CPU 使用率趋势' })).toBeInTheDocument();
+    expect(screen.getAllByText('等待采样…').length).toBeGreaterThan(0);
+    expect(mocks.collect).toHaveBeenCalledTimes(1);
+    open(); open();
+    expect(screen.getByRole('combobox', { name: '资源显示方式' })).toHaveTextContent('图表');
+    expect(localStorage.getItem('vrykell-ssh-resource-display')).toBe('chart');
+  });
+
+  it('separates system identity and load periods from collapsible connection facts', async () => {
+    render(<SshStatusPanel target={target} state={connected} active />);
+    open(); await screen.findByText('Linux 6.8');
+    expect(screen.getByText('node')).toBeInTheDocument();
+    const system = screen.getByText('系统信息').closest('details')!;
+    expect(system).not.toHaveAttribute('open');
+    fireEvent.click(system.querySelector('summary')!);
+    expect(screen.getByText('1 分钟')).toBeInTheDocument();
+    expect(screen.getByText('5 分钟')).toBeInTheDocument();
+    expect(screen.getByText('15 分钟')).toBeInTheDocument();
+    const connection = screen.getByText('连接详情').closest('details')!;
+    expect(connection).not.toHaveAttribute('open');
+    fireEvent.click(connection.querySelector('summary')!);
+    expect(screen.getByText('探测延迟')).toBeVisible();
+  });
+
+  it('clears previous resource samples when the connection target changes', async () => {
+    const view = render(<SshStatusPanel target={target} state={connected} active />);
+    open(); await screen.findByText('Linux 6.8');
+    mocks.collect.mockReturnValue(new Promise(() => {}));
+    view.rerender(<SshStatusPanel target={{ ...target, connectionId: 'other', host: 'other.example.com' }} state={connected} active />);
+    expect(screen.queryByText('Linux 6.8')).not.toBeInTheDocument();
+    expect(screen.queryByRole('meter')).not.toBeInTheDocument();
+  });
+
   it('keeps the status entry available before the classic toolbar mounts', () => {
     const toolbarReady = vi.fn();
     render(<SshStatusPanel target={target} state={{ ...connected, phase: 'connecting' }} active onToolbarReady={toolbarReady} />);
@@ -57,7 +99,7 @@ describe('SSH status panel', () => {
     const host = document.createElement('div'); host.id = 'ssh-status-sidebar-host'; document.body.append(host);
     const view = render(<SshStatusPanel paneId="ssh-pane" target={target} state={connected} active><div data-testid="terminal-content">Terminal</div></SshStatusPanel>);
     try {
-      open(); await screen.findByText('Linux 6.8 · node');
+      open(); await screen.findByText('Linux 6.8');
       const panel = screen.getByTestId('ssh-status-panel');
       expect(panel.parentElement?.parentElement).toBe(host);
       expect(screen.getByTestId('terminal-content')).toBeVisible();
@@ -148,9 +190,9 @@ describe('SSH status panel', () => {
     render(<SshStatusPanel target={target} state={connected} active />);
     expect(mocks.collect).not.toHaveBeenCalled();
     open();
-    await screen.findByText('Linux 6.8 · node');
+    await screen.findByText('Linux 6.8');
     expect(mocks.collect).toHaveBeenCalledWith('saved', 'example.com', 22, 'deploy');
-    expect(screen.getByText('50%')).toBeInTheDocument();
+    expect(screen.getByRole('meter', { name: '内存使用率' })).toHaveAttribute('aria-valuenow', '50');
     fireEvent.click(screen.getByRole('button', { name: '复制连接地址' }));
     expect(mocks.copy).toHaveBeenCalledWith('deploy@example.com:22');
     fireEvent.keyDown(screen.getByTestId('ssh-status-panel'), { key: 'Escape' });
@@ -160,14 +202,14 @@ describe('SSH status panel', () => {
 
   it('keeps the last sample after disconnect and does not treat resource errors as terminal errors', async () => {
     const view = render(<SshStatusPanel target={target} state={connected} active />);
-    open(); await screen.findByText('Linux 6.8 · node');
+    open(); await screen.findByText('Linux 6.8');
     mocks.collect.mockRejectedValueOnce(new Error('permission denied'));
     fireEvent.click(screen.getByRole('button', { name: '刷新远端资源' }));
     await screen.findByText('资源采集失败');
     expect(screen.getByText('终端连接与资源监控相互独立。')).toBeInTheDocument();
     expect(screen.queryByText('监控已暂停')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '暂停监控' })).toBeEnabled();
-    expect(screen.getByText('Linux 6.8 · node').closest('[data-stale]')).toHaveAttribute('data-stale', 'true');
+    expect(screen.getByText('Linux 6.8').closest('[data-stale]')).toHaveAttribute('data-stale', 'true');
     view.rerender(<SshStatusPanel target={target} state={{ ...connected, phase: 'disconnected' }} active />);
     expect(screen.getByRole('button', { name: '刷新远端资源' })).toBeDisabled();
     expect(screen.getByText('最后一次采样', { exact: false })).toBeInTheDocument();
@@ -196,7 +238,7 @@ describe('SSH status panel', () => {
     const requestId = useSessionAuthenticationStore.getState().request!.requestId;
     mocks.collect.mockResolvedValue(sample);
     act(() => finishSshAuthentication(requestId));
-    await screen.findByText('Linux 6.8 · node');
+    await screen.findByText('Linux 6.8');
     expect(mocks.collect).toHaveBeenCalledTimes(2);
   });
 
@@ -212,7 +254,7 @@ describe('SSH status panel', () => {
 
   it('pauses polling and resumes it without overlapping requests', async () => {
     render(<SshStatusPanel target={target} state={connected} active />);
-    open(); await screen.findByText('Linux 6.8 · node');
+    open(); await screen.findByText('Linux 6.8');
     fireEvent.click(screen.getByRole('button', { name: '暂停监控' }));
     vi.useFakeTimers();
     await act(async () => { vi.advanceTimersByTime(30000); });
@@ -228,9 +270,9 @@ describe('SSH status panel', () => {
     render(<SshStatusPanel target={target} state={connected} active />);
     open(); open();
     await act(async () => resolve(sample));
-    expect(screen.queryByText('Linux 6.8 · node')).not.toBeInTheDocument();
+    expect(screen.queryByText('Linux 6.8')).not.toBeInTheDocument();
     mocks.collect.mockResolvedValue(sample);
-    open(); await screen.findByText('Linux 6.8 · node');
+    open(); await screen.findByText('Linux 6.8');
   });
 
   it('derives CPU usage from consecutive counters and handles reboot or missing values', () => {
