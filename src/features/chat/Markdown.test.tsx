@@ -14,10 +14,13 @@ const openUrlMock = vi.mocked(openUrl);
 beforeEach(() => openUrlMock.mockClear());
 
 describe('Markdown', () => {
-  it('去掉未闭合的强调标记，同时保留成对的加粗', () => {
-    const stray = render(<Markdown content={'关键位置：现价距 **52 周高点 348.15 与 200 日均线（292.46）。'} />);
-    expect(stray.container.textContent).toContain('52 周高点');
-    expect(stray.container.textContent).not.toContain('**');
+  // 回归：`**` 是正文的一部分（glob、幂运算、模型漏掉的闭合符），渲染层不得吞掉。
+  it('保留字面量星号串，只把成对的解析为加粗', () => {
+    const glob = render(<Markdown content={'删除 src/**/*.ts'} />);
+    expect(glob.container.textContent).toContain('src/**/*.ts');
+
+    const power = render(<Markdown content={'执行 2**10 次'} />);
+    expect(power.container.textContent).toContain('2**10');
 
     const bold = render(<Markdown content={'**重点**内容'} />);
     expect(bold.container.querySelector('strong')?.textContent).toBe('重点');
