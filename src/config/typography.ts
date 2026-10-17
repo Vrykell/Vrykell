@@ -6,7 +6,7 @@ export const DEFAULT_TERMINAL_FONT_SIZE = 14;
 export const DEFAULT_CHAT_FONT_SIZE = 14;
 export const DEFAULT_TERMINAL_FONT_WEIGHT = 400;
 export const DEFAULT_TERMINAL_LINE_HEIGHT = 1;
-export const TERMINAL_FONT_PRESETS = ['system', 'Maple Mono NF CN', 'Maple Mono', 'Sarasa Mono SC', 'Cascadia Code', 'JetBrains Mono'] as const;
+export const TERMINAL_FONT_PRESETS = ['system', 'Sarasa Term SC', 'Sarasa Mono SC', 'Maple Mono NF CN', 'Maple Mono', 'Cascadia Code', 'JetBrains Mono', 'NSimSun'] as const;
 export type TerminalFontPreset = typeof TERMINAL_FONT_PRESETS[number];
 const fallbackFonts = '"Cascadia Mono", "Cascadia Code", Menlo, Monaco, "JetBrains Mono", "Sarasa Mono SC", "Noto Sans Mono CJK SC", "Noto Sans Mono", "DejaVu Sans Mono", "Symbols Nerd Font Mono", monospace, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"';
 
