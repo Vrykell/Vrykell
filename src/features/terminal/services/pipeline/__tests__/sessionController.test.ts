@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { SessionController, type SessionSinks } from '@features/terminal/services/pipeline/sessionController';
+import { blockTerminalFor } from '@features/terminal/services/terminalRepaint';
 import { ScanHelper } from '@features/terminal/services/pipeline/__tests__/scanHelper';
 
 function wire(tabId = 't1') {
@@ -105,6 +106,17 @@ describe('SessionController', () => {
     await waitFor(() => st.completed.length === 1);
     expect(ctrl.blocks[0]?.snapshotPending).toBe(false);
     expect(ctrl.blocks[0]?.outputText).toBe('Documents');
+    ctrl.dispose();
+  });
+
+  it('registers the live block terminal for app-wide drawing operations', async () => {
+    const { st, ctrl, feed } = wire('registry');
+    feed(`${A}${E('ls')}${C}`);
+    expect(blockTerminalFor('registry')).toBe(ctrl.executingTerm?.term);
+    feed(`Documents\r\n${D(0)}`);
+    await waitFor(() => st.completed.length === 1);
+    // The surface is unregistered as soon as the completed snapshot replaces the live terminal.
+    expect(blockTerminalFor('registry')).toBeNull();
     ctrl.dispose();
   });
   it('hands terminal-control OSC to the running block terminal instead of dropping it', () => {

@@ -8,8 +8,9 @@ describe('terminal resizing', () => {
     const refresh = vi.fn();
     const clearTextureAtlas = vi.fn();
     repaintTerminal({ rows: 24, refresh, clearTextureAtlas } as unknown as Terminal);
-    expect(clearTextureAtlas).toHaveBeenCalledOnce();
-    expect(clearTextureAtlas.mock.invocationCallOrder[0]).toBeLessThan(refresh.mock.invocationCallOrder[0]!);
+    // The shared glyph atlas is never cleared from a single terminal: the other terminals hold
+    // texture coordinates into it. App-wide resets go through the surface service.
+    expect(clearTextureAtlas).not.toHaveBeenCalled();
     expect(refresh).toHaveBeenCalledWith(0, 23);
     // A terminal that has not laid out yet has no rows to repaint.
     repaintTerminal({ rows: 0, refresh } as unknown as Terminal);

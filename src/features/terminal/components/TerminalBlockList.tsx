@@ -23,6 +23,7 @@ import { TerminalRedrawButton } from './TerminalRedrawButton';
 import { getCellMetrics } from '@utils/termMetrics';
 import { getExecutingTerm, resizeExecutingTerm, syncTermWidth } from '@features/terminal/hooks/useTerminalSession';
 import { isTerminalDebugEnabled, terminalDebug } from '@features/terminal/services/terminalDebug';
+import { recoverTerminalSurfaces } from '@features/terminal/services/terminalRepaint';
 import BlockMenu from '@features/terminal/components/BlockMenu';
 import BlockOutput from '@features/terminal/components/BlockOutput';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
@@ -511,7 +512,10 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
       restoreSurface();
     });
     visibilityRo.observe(el);
-    const onVisibilityChange = () => { if (!document.hidden) restoreSurface(); };
+    // Coming back from a backgrounded window is a shared-atlas reset: the renderer reset and the
+    // repaint cover every live terminal, because a single terminal must never clear the glyph
+    // atlas that the others hold texture coordinates into.
+    const onVisibilityChange = () => { if (!document.hidden) recoverTerminalSurfaces(); };
     document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {

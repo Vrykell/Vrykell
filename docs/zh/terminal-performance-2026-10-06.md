@@ -47,6 +47,8 @@
 
 本机已安装 `@xterm/xterm` 6.0.0，npm 当日 `latest` 也是 6.0.0，`beta` 为 6.1.0-beta.304。fit 0.11.0、web-links 0.12.0、webgl 0.19.0 均与当前版本配套。本轮保留稳定版，未引入测试版依赖。
 
+**后续更新（2026-10-17）**：稳定版 `@xterm/addon-webgl` 0.19.0 的共享字形图集在 `clearTexture()` 之后不会通知其它渲染器（上游 #6014 / #6038），并且丢弃渲染器时不释放 GPU 上下文（#6068），表现为全屏 TUI 偶发花屏。为吞下上游修复，终端渲染依赖整体升到对应 beta 线：`@xterm/xterm` 6.1.0-beta.315、`@xterm/addon-webgl` 0.20.0-beta.309、`@xterm/addon-fit` 0.12.0-beta.311、`@xterm/addon-web-links` 0.13.0-beta.310、`@xterm/addon-search` 0.17.0-beta.310（四个 addon 的 peer 都要求同一核心里程碑）。应用侧策略见 `docs/zh/pitfalls.md` §4.9/§4.10：普通重绘不清图集、图集级重置刷新全部活终端、丢弃渲染器时交还 GPU 上下文。升级回归点：三处私有访问——`src/utils/termMetrics.ts`（`_renderService.dimensions`）、`terminalResize.ts`（`_renderService._renderRows`）、`model/xtermRenderer.ts`（addon 的 `_renderer._gl` 取 `WEBGL_lose_context`）——以及 `scrollbar` 选项（beta 把 `overviewRuler` 移入 `scrollbar.width`）。`@xterm/addon-search` 目前没有任何应用代码引用，随核心版本一起对齐只是为避免 peer 依赖不一致。
+
 ## 最终验证
 
 `tsc`、生产构建及架构检查通过；Vitest 843 项通过、1 项跳过；Rust 112 项通过、2 项手工联网测试忽略；停止源码修改后全量 Playwright 201 项通过。最终全量运行的历史场景新增输出等待为 187ms，连续输出场景最长输入帧等待为 68.7ms；不同运行中的计时有正常波动。

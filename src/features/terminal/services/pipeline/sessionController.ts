@@ -17,6 +17,7 @@ import { TerminalIoLog } from '@features/terminal/services/terminalIoLog';
 import { workingDirectoryFromUri } from '@features/terminal/services/pipeline/workingDirectory';
 import { trackBufferTruncation, type BufferTruncationTracker } from '@features/terminal/services/pipeline/bufferTruncation';
 import { getTerminalFontSize, measureTerminalDomCellWidth } from '@features/terminal/model/terminalFont';
+import { registerBlockTerminal, unregisterBlockTerminal } from '@features/terminal/services/terminalRepaint';
 import { getCellMetrics } from '@utils/termMetrics';
 
 export type Scene = 'classic' | 'blockList' | 'altScreen';
@@ -363,6 +364,8 @@ export class SessionController {
     const blk = createBlockTerm(this.cols, this.rows);
     ab.outputTerm = blk.term;
     ab.outputEl = blk.el;
+    // Track the live block terminal for app-wide drawing operations (shared glyph atlas resets).
+    registerBlockTerminal(this.tabId, blk.term);
     // Subscribe before the first write. UI mounting can follow a scene transition,
     // otherwise early capability replies are lost or arrive after the editor timeout.
     const inputSub = blk.term.onData(data => {
@@ -370,7 +373,12 @@ export class SessionController {
     });
     const tracker = trackBufferTruncation(blk.term, lines => { ab.linesTruncated += lines; });
     ab._truncationTracker = tracker;
-    ab._outputDispose = () => { inputSub.dispose(); tracker.dispose(); blk.dispose(); };
+    ab._outputDispose = () => {
+      inputSub.dispose();
+      tracker.dispose();
+      unregisterBlockTerminal(this.tabId, blk.term);
+      blk.dispose();
+    };
     if (isTerminalDebugEnabled()) {
       terminalDebug('block-terminal-ready', { tabId: this.tabId, blockId: ab.id, cols: blk.term.cols, rows: blk.term.rows });
     }

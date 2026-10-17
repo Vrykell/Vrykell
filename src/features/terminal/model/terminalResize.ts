@@ -14,16 +14,20 @@ export function fitTerminal(term: Terminal, fit: FitAddon): void {
 /**
  * Repaint the whole viewport from the buffer.
  *
- * A pane that was hidden (display:none while its tab or panel was inactive) comes back
- * with an unpainted surface: a static alternate-screen application produces no output to
- * trigger a repaint, and a WebGL context lost while hidden steps down to the DOM renderer
- * without drawing any rows. Repainting on the hidden-to-visible transition restores it.
+ * A pane that was hidden (display:none while its tab or panel was inactive) comes back with an
+ * unpainted surface: a static alternate-screen application produces no output to trigger a
+ * repaint, and a WebGL context lost while hidden steps down to the DOM renderer without drawing
+ * any rows. Repainting on the hidden-to-visible transition restores it.
+ *
+ * The repaint deliberately leaves the glyph atlas alone. Every WebGL terminal with the same
+ * font, theme and device pixel ratio shares one atlas, so clearing it from a single terminal
+ * invalidates the texture coordinates every other terminal already holds; those surfaces then
+ * draw whatever glyphs the next rasterization puts into the cleared pages. Atlas-level resets
+ * are an app-wide operation and live in the terminal surface service, which rebuilds every live
+ * terminal in the same pass.
  */
 export function repaintTerminal(term: Terminal): void {
   if (term.rows <= 0) return;
-  // Invalidate cached GPU cells as well as requesting rows: a restored canvas may
-  // be empty even though the renderer's model still matches the terminal buffer.
-  term.clearTextureAtlas?.();
   term.refresh(0, term.rows - 1);
 }
 

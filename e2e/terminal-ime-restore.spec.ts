@@ -125,15 +125,16 @@ test('returning to a static TUI repaints its canvas without new PTY output', asy
   const originalPixels = await page.screenshot({ clip, animations: 'disabled' });
   await page.evaluate(() => {
     const terms = (window as unknown as { __vrykellTerms: Map<string, import('@xterm/xterm').Terminal> }).__vrykellTerms;
+    const state = window as unknown as { __surfaceRepaints: number };
+    state.__surfaceRepaints = 0;
     for (const [id, term] of terms) {
       if (id.startsWith('block:')) continue;
-      const clear = term.clearTextureAtlas.bind(term);
-      term.clearTextureAtlas = () => {
-        (window as unknown as { __surfaceRestores: number }).__surfaceRestores++;
-        clear();
+      const refresh = term.refresh.bind(term);
+      term.refresh = (start: number, end: number) => {
+        state.__surfaceRepaints++;
+        refresh(start, end);
       };
     }
-    (window as unknown as { __surfaceRestores: number }).__surfaceRestores = 0;
   });
   const other = await page.evaluate(async () => {
     const path = '/src/features/workspace/stores/workspace.ts';
@@ -147,10 +148,10 @@ test('returning to a static TUI repaints its canvas without new PTY output', asy
     useWorkspaceStore.getState().activate(id);
   }, original);
   await expect(canvas).toBeVisible();
-  await expect.poll(() => page.evaluate(() => (window as unknown as { __surfaceRestores: number }).__surfaceRestores)).toBeGreaterThan(0);
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __surfaceRepaints: number }).__surfaceRepaints)).toBeGreaterThan(0);
   await expectAnyTermContains(page, 'STATIC TUI');
   expect(await page.screenshot({ clip, animations: 'disabled' })).toEqual(originalPixels);
-  const restored = await page.evaluate(() => (window as unknown as { __surfaceRestores: number }).__surfaceRestores);
+  const restored = await page.evaluate(() => (window as unknown as { __surfaceRepaints: number }).__surfaceRepaints);
   await page.evaluate(async ({ original, other }) => {
     const path = '/src/features/workspace/stores/workspace.ts';
     const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
@@ -158,7 +159,7 @@ test('returning to a static TUI repaints its canvas without new PTY output', asy
     useWorkspaceStore.getState().activate(other);
     useWorkspaceStore.getState().activate(original);
   }, { original, other });
-  await expect.poll(() => page.evaluate(() => (window as unknown as { __surfaceRestores: number }).__surfaceRestores)).toBeGreaterThan(restored);
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __surfaceRepaints: number }).__surfaceRepaints)).toBeGreaterThan(restored);
   await canvas.screenshot({ path: test.info().outputPath('restored-static-tui.png') });
 });
 

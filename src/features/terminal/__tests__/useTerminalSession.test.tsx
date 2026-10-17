@@ -149,7 +149,7 @@ describe('useTerminalSession', () => {
 
   it('configures a 10px native scrollbar so fitting uses the same width', () => {
     render(<TestHarness tabId="t1" onReady={() => {}} />);
-    expect(terminalInitOptions[0]?.overviewRuler).toEqual({ width: 10, showTopBorder: false, showBottomBorder: false });
+    expect(terminalInitOptions[0]?.scrollbar).toEqual({ width: 10, overviewRuler: { showTopBorder: false, showBottomBorder: false } });
   });
 
   it('re-applies the settled font options so a late-loaded face re-measures the terminal grid', async () => {
