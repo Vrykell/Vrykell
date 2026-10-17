@@ -74,18 +74,16 @@ export default function FilePropertiesDialog({ entry, location, stat, onClose }:
       )}
 
       {state.status === 'ready' && (
-        <div style={{ display: 'flex', justifyContent: 'center', userSelect: 'text' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: '100%' }}>
-            {rows.map((row) => (
-              <div key={row.key} style={{ display: 'flex', gap: 10, alignItems: 'baseline', fontSize: 'calc(12px * var(--ui-font-scale))', lineHeight: 1.5 }}>
-                <span style={{ width: 64, flexShrink: 0, color: 'var(--text-muted)' }}>{row.label}</span>
-                <span
-                  data-testid={`file-property-${row.key}`}
-                  style={{ flex: 1, minWidth: 0, color: 'var(--text-primary)', wordBreak: 'break-all' }}
-                >{row.value}</span>
-              </div>
-            ))}
-          </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, userSelect: 'text' }}>
+          {rows.map((row) => (
+            <div key={row.key} style={{ display: 'flex', gap: 10, alignItems: 'baseline', fontSize: 'calc(12px * var(--ui-font-scale))', lineHeight: 1.5 }}>
+              <span style={{ width: 64, flexShrink: 0, color: 'var(--text-muted)' }}>{row.label}</span>
+              <span
+                data-testid={`file-property-${row.key}`}
+                style={{ flex: 1, minWidth: 0, color: 'var(--text-primary)', wordBreak: 'break-all' }}
+              >{row.value}</span>
+            </div>
+          ))}
         </div>
       )}
     </ToolDialog>
