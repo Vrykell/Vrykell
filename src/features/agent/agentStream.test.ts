@@ -22,6 +22,7 @@ vi.mock('@platform/diagnostics', async (importOriginal) => {
 
 import { invoke, Channel } from '@tauri-apps/api/core';
 import { diagnostic } from '@platform/diagnostics';
+import { useAgentSettings } from '@features/agent/stores/agentSettings';
 import { agentStream } from '@features/agent/services/agentStream';
 import { useUsageStore } from '@features/agent/stores/usage';
 
@@ -118,6 +119,40 @@ describe('agentStream（mock IPC 边界）', () => {
       steps: 1,
       toolCalls: 0,
     });
+  });
+
+  it('anthropic 兼容端点：请求体不携带 thinking（官方端点才发）', async () => {
+    const bodies: string[] = [];
+    mockInvoke.mockImplementation(async (cmd, args) => {
+      if (cmd === 'get_ai_config') {
+        return {
+          has_key: false, has_anthropic_key: true,
+          base_url: 'https://api.deepseek.com/anthropic',
+          model: 'deepseek-flash', provider: 'anthropic',
+          has_gemini_key: false, has_tavily_key: false,
+          models: [{ id: 'default', name: '默认', provider: 'anthropic', baseUrl: 'https://api.deepseek.com/anthropic', model: 'deepseek-flash', capabilities: { vision: false, reasoning: false, tools: true, search: false } }],
+          active_model: 'default',
+        } as never;
+      }
+      if (cmd === 'llm_stream') {
+        bodies.push(String((args as { req?: { body?: string } })?.req?.body ?? ''));
+        const ch = (args as { onEvent: Channel<unknown> }).onEvent;
+        const send = ch.onmessage as (ev: unknown) => void;
+        send({ kind: 'started', status: 200, headers: [['content-type', 'text/event-stream']] });
+        for (const c of toChunks('data: {"type":"message_start"}\n\ndata: [DONE]\n\n', 7)) send({ kind: 'chunk', data: c });
+        send({ kind: 'done' });
+        return undefined as never;
+      }
+      throw new Error(`unexpected invoke: ${cmd}`);
+    });
+    const before = useAgentSettings.getState().global;
+    useAgentSettings.setState({ global: { ...before, deepThink: true, thinkingLevel: 'high' } });
+    try {
+      await agentStream([{ role: 'user', content: 'hi' }], () => {}).catch(() => {});
+    } finally {
+      useAgentSettings.setState({ global: before });
+    }
+    expect(bodies.join('\n')).not.toContain('"thinking"');
   });
 
   it('未配 key：抛中文提示', async () => {

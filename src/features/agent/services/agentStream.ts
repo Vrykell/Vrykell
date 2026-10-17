@@ -229,6 +229,12 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   }
   const hasTools = Object.keys(tools).length > 0;
 
+  // 深思考：只有真正支持回传 thinking 的端点才发送选项（否则兼容端点会 400）。
+  const thinkingOptions = settings.deepThink
+    ? deepThinkProviderOptions(info.provider, settings.thinkingLevel, info.base_url)
+    : undefined;
+  const thinkingOn = thinkingOptions != null && Object.keys(thinkingOptions).length > 0;
+
   // AI SDK v7 的流不 reject：错误走 onError 回调 + fullStream 的 error part，
   // 迭代静默结束。这里捕获后重抛，维持 chat store「catch → 显示出错了」的行为。
   let streamError: unknown = null;
@@ -241,11 +247,11 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     abortSignal: ctx?.signal,
     // M6 深思考：providerOptions 透传（openai-compatible → reasoning_effort）。
     // anthropic thinking 要求 maxOutputTokens > budgetTokens(8000)。
-    providerOptions: settings.deepThink ? deepThinkProviderOptions(info.provider, settings.thinkingLevel) : undefined,
+    providerOptions: thinkingOn ? thinkingOptions : undefined,
     maxOutputTokens:
       settings.maxOutputTokens > 0
         ? settings.maxOutputTokens
-        : settings.deepThink && info.provider === 'anthropic'
+        : thinkingOn && info.provider === 'anthropic'
           ? (settings.thinkingLevel === 'low' ? 8000 : settings.thinkingLevel === 'medium' ? 16000 : 32000)
           : undefined,
     temperature: settings.temperature != null ? settings.temperature : undefined,
