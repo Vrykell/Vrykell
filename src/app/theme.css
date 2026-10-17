@@ -924,7 +924,9 @@ input.text-input-field:disabled { opacity: 0.55; }
   font-size: var(--chat-font-size);
   line-height: 1.6;
 }
-/* Table: the same frame as a code block (border, radius, flat surface) with row separators only. */
+/* Table: the same frame as a code block (border, radius, flat surface) with row separators only.
+   The frame hugs its content (fit-content) and only clamps at the reading width, so a wide panel
+   never paints an empty surface next to the columns; wider-than-panel tables scroll horizontally. */
 .md table {
   border-collapse: separate;
   border-spacing: 0;
@@ -932,10 +934,10 @@ input.text-input-field:disabled { opacity: 0.55; }
   border: 1px solid var(--border);
   border-radius: var(--radius-inner);
   font-size: 0.9em;
-  /* Same surface as the command block; the .md reading width still caps the table. */
+  /* Same surface as the command block. */
   background: var(--block);
   display: block;
-  width: 100%;
+  width: fit-content;
   overflow-x: auto;
   max-width: 100%;
 }
