@@ -26,10 +26,6 @@ import type { AttachmentMeta } from '@features/agent/model/attachments';
 
 const EMPTY_MESSAGES: ChatMessage[] = [];
 
-/** Only a position this close to the bottom counts as "back at the latest reply": a wider
- *  window would let a small upward nudge be swallowed and re-engage the follow right away. */
-const FOLLOW_THRESHOLD_PX = 4;
-
 /**
  * True when a scroll surface between the wheel target and the transcript can absorb the
  * upward scroll itself, so the wheel never reaches the transcript and must not pause it.
@@ -106,6 +102,12 @@ export default function PanelChat() {
 
   useEffect(() => { void useChatStore.getState().loadConversations(); }, []);
   useEffect(() => { setRenaming(false); }, [activeId]);
+  /** Where the app last put the view. A scroll event that lands anywhere else came from the reader,
+   *  and while that is true the app must not touch the position: fighting a held scrollbar is the
+   *  shake. The follow comes back only once the position has settled at the bottom. */
+  const lastTopRef = useRef(0);
+  const settleRef = useRef<number | null>(null);
+  useEffect(() => () => { if (settleRef.current !== null) window.clearTimeout(settleRef.current); }, []);
   useLayoutEffect(() => {
     const scroll = scrollRef.current;
     if (!scroll) return;
@@ -113,20 +115,19 @@ export default function PanelChat() {
     followRef.current = saved?.following ?? true;
     setFollowing(followRef.current);
     scroll.scrollTop = saved?.following === false ? saved.top : scroll.scrollHeight;
+    lastTopRef.current = scroll.scrollTop;
     return () => { positions.current.set(activeId, { top: scroll.scrollTop, following: followRef.current }); };
   }, [activeId]);
   useLayoutEffect(() => {
-    if (followRef.current && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (followRef.current && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      lastTopRef.current = scrollRef.current.scrollTop;
+    }
   }, [messages]);
-  useEffect(() => {
-    const transcript = transcriptRef.current;
-    if (!transcript || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(() => {
-      if (followRef.current && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    });
-    observer.observe(transcript);
-    return () => observer.disconnect();
-  }, [activeId]);
+  // Nothing scrolls from a resize callback on purpose: growing content and the app both moving the
+  // view is what made the transcript jump, and the browser's scroll anchoring (disabled for this
+  // element in the stylesheet) was a third hand on the same scrollbar. New messages pin the view
+  // when it is following, and nothing else writes a scroll position.
 
   const submit = () => {
     if (!composer.canSend) return;
@@ -200,11 +201,31 @@ export default function PanelChat() {
     {/* Streaming content must never yank the view away from what is being read: any upward
         scroll input pauses the follow, even one too small to leave the "near the bottom"
         window, while a nested scroller that consumes the wheel leaves it alone. */}
+    <div className="chat-transcript-wrap" style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
     <div ref={scrollRef} className="chat-transcript scroll-region" onScroll={event => {
       const scroll = event.currentTarget;
-      const next = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight <= FOLLOW_THRESHOLD_PX;
-      followRef.current = next;
-      setFollowing(next);
+      const ours = Math.abs(scroll.scrollTop - lastTopRef.current) <= 1;
+      lastTopRef.current = scroll.scrollTop;
+      // Our own jump: nothing to decide.
+      if (ours) return;
+      // The reader moved the view, by any means, including a scrollbar drag that fires no wheel.
+      pauseFollow();
+      // Only an exact return to the bottom hands the follow back: a small wheel or trackpad
+      // nudge upward stays paused while content keeps streaming.
+      const atBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight <= 4;
+      if (settleRef.current !== null) window.clearTimeout(settleRef.current);
+      settleRef.current = null;
+      if (!atBottom) return;
+      // Stopped at the bottom: hand the follow back, but only after the movement has stopped.
+      settleRef.current = window.setTimeout(() => {
+        settleRef.current = null;
+        followRef.current = true;
+        setFollowing(true);
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+          lastTopRef.current = scrollRef.current.scrollTop;
+        }
+      }, 160);
     }}
       onWheel={event => {
         if (event.deltaY < 0 && !innerScrollerHoldsUpward(event.target, event.currentTarget)) pauseFollow();
@@ -216,14 +237,19 @@ export default function PanelChat() {
             <span>{loading ? t('Loading conversations…') : t('Ask a question, attach a file, or bring in terminal output.')}</span></div>}
       </div>
     </div>
-    {/* The slot always keeps its height: mounting it only when the follow pauses would
-        shift the transcript by its own height and make sticking to the bottom jitter. */}
-    <div className="chat-jump-slot" data-active={!following || undefined}>
-      <button type="button" data-subtle className="chat-jump-latest" aria-hidden={following || undefined}
-        tabIndex={following ? -1 : 0} onClick={() => {
-          followRef.current = true; setFollowing(true);
-          if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }}>{t('Jump to latest reply')}<ArrowDown size={14} /></button>
+    {/* Always in the layout on purpose: a slot that comes and goes with the follow state changes the
+        transcript's height, and then the content and this button trade places on every scroll event —
+        that loop is what made the bottom of the panel jump. Only the slot's visibility changes. */}
+    <div className="chat-jump-slot" data-active={following ? undefined : 'true'} style={{ visibility: following ? 'hidden' : 'visible' }} aria-hidden={following}>
+      <button type="button" data-subtle className="chat-jump-latest" aria-label={t('Jump to latest reply')}
+        data-tip={t('Jump to latest reply')} onClick={() => {
+        followRef.current = true; setFollowing(true);
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+          lastTopRef.current = scrollRef.current.scrollTop;
+        }
+      }}><ArrowDown size={16} /></button>
+    </div>
     </div>
     <div className="chat-composer-wrap">
       <div className="terminal-composer chat-composer">

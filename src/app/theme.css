@@ -564,18 +564,16 @@ button.window-control-button {
 .chat-approval-option-copy > small { color: var(--text-muted); font-size: var(--fs-micro); }
 /* Rename inputs keep their resting border while focused: the caret alone marks focus. */
 .inline-rename-input { flex: 1; min-width: 0; width: 0; background: var(--field-bg); border: 1px solid var(--border); border-radius: 3px; padding: 1px 4px; font-size: calc(13px * var(--ui-font-scale)); color: var(--text-primary); outline: none; font-family: var(--font-ui); }
-.chat-transcript { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 0 12px; }
+.chat-transcript { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 0 40px; overflow-anchor: none; }
 .chat-empty { min-height: 180px; padding: 30px 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--text-muted); text-align: center; font-size: var(--fs-caption); }
 .chat-empty > svg { color: var(--chat-rail); }
 .chat-empty > strong { color: var(--text-primary); font-size: var(--fs-label); font-weight: var(--fw-semibold); }
 .chat-background-task { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 12px; background: var(--hover); color: var(--text-secondary); font-size: var(--fs-caption); }
-/* Rounded jump-to-latest control: the slot keeps its height in both states (so pausing or
-   resuming the follow never shifts the transcript) and the button appears with the pointer. */
-.chat-jump-slot { display: flex; align-items: center; justify-content: center; flex-shrink: 0; padding: 4px 0; }
-.chat-jump-latest { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 0; border-radius: 999px; background: transparent; color: var(--text-muted); font-size: var(--fs-caption); opacity: 0; visibility: hidden; transition: opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
-.chat-jump-slot[data-active] > .chat-jump-latest { visibility: visible; }
-.chat-jump-slot[data-active]:is(:hover, :focus-within) > .chat-jump-latest { opacity: 1; color: var(--text-secondary); }
-.chat-jump-slot[data-active] > .chat-jump-latest:is(:hover, :focus-visible) { background: var(--hover); color: var(--text-primary); }
+/* Rounded jump-to-latest control: it floats over the transcript's own bottom padding band, so it
+   never occupies layout or masks message content. */
+.chat-jump-slot { position: absolute; left: 0; right: 0; bottom: 8px; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+.chat-jump-latest { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text-secondary); font-size: var(--fs-caption); pointer-events: auto; box-shadow: 0 4px 12px rgb(0 0 0 / 0.22); transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+.chat-jump-latest:is(:hover, :focus-visible) { background: var(--hover); color: var(--text-primary); }
 .chat-composer-wrap { padding: 8px 10px 12px; flex-shrink: 0; }
 .chat-composer { padding: 10px 12px 8px; }
 .chat-composer-input { display: flex; align-items: flex-start; gap: 10px; min-height: 32px; }
