@@ -1,10 +1,9 @@
 import { t } from '@i18n';
 import { fmtSize } from '@ui/UiBtn';
 import type { NetworkRateSample } from '../model/networkRates';
-import type { ResourceDisplay } from '../stores/resourceDisplay';
 import SshResourceChart from './SshResourceChart';
 
-export default function SshNetworkRates({ samples, now, display, available }: { samples: readonly NetworkRateSample[]; now: number; display: ResourceDisplay; available: boolean }) {
+export default function SshNetworkRates({ samples, now, available }: { samples: readonly NetworkRateSample[]; now: number; available: boolean }) {
   const latest = samples[samples.length - 1];
   const series = (['download', 'upload'] as const).map(direction => ({
     direction, label: t(direction === 'download' ? 'Download' : 'Upload'),
@@ -19,10 +18,8 @@ export default function SshNetworkRates({ samples, now, display, available }: { 
         <span><i style={{ background: color }} />{label}</span><strong>{current == null ? '—' : `${fmtSize(current)}/s`}</strong>
       </div>;
     })}</div>
-    {display === 'chart' && <>
-      <SshResourceChart series={series} endTime={now} label={t('Upload and download history')} maximum={maximum} maximumLabel={`${fmtSize(maximum)}/s`} minimumLabel="0" />
-      <div className="ssh-status-time-axis" aria-hidden="true"><span>{t('5 min ago')}</span><span>{t('Now')}</span></div>
-    </>}
+    <SshResourceChart series={series} endTime={now} label={t('Upload and download history')} maximum={maximum} maximumLabel={`${fmtSize(maximum)}/s`} minimumLabel="0" />
+    <div className="ssh-status-time-axis" aria-hidden="true"><span>{t('5 min ago')}</span><span>{t('Now')}</span></div>
     {latest && latest.download == null && latest.upload == null && <p className="ssh-status-caption">{t(available ? 'Transfer rates require two recent samples.' : 'Transfer rates are unavailable on this server.')}</p>}
   </div>;
 }

@@ -36,33 +36,35 @@ button.ssh-status-reconnect.text-control:not(:disabled):is(:hover, :focus-visibl
 .ssh-status-resource { border-top: 1px solid var(--border); }
 .ssh-status-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px 0; }
 .ssh-status-panel h3 { margin: 0; color: var(--text-secondary); font-size: var(--fs-label); font-weight: var(--fw-semibold); }
-.ssh-status-section-heading .ui-select { min-height: 28px; padding: 3px 8px; font-size: var(--fs-caption); }
 .ssh-status-state { padding: 14px; }
 .ssh-status-state > .ssh-status-caption { margin: 0; }
 .ssh-status-state > [role] + .ssh-status-caption { margin-top: 8px; }
-.ssh-status-metrics { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px 16px; }
-.ssh-status-state + .ssh-status-sample > .ssh-status-metrics { padding-top: 4px; }
-.ssh-status-metric { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 12px; border-radius: var(--radius-inner); background: var(--surface); }
-.ssh-status-metric[data-resource="memory"] { --chart-accent: var(--group-violet); }
-.ssh-status-metric[data-resource="disk"] { --chart-accent: var(--group-amber); }
-.ssh-status-metric-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-width: 0; }
-.ssh-status-metric-label { min-width: 0; color: var(--text-secondary); font-size: var(--fs-label); }
-.ssh-status-metric-value { flex-shrink: 0; color: var(--text-primary); font-size: calc(22px * var(--ui-font-scale)); font-weight: var(--fw-medium); font-variant-numeric: tabular-nums; line-height: 1.2; }
-.ssh-status-metric-value small { margin-left: 2px; color: var(--text-secondary); font-size: var(--fs-caption); }
+.ssh-status-resource-summary { margin: 12px 14px 16px; padding: 12px; border-radius: var(--radius-inner); background: var(--surface); }
+.ssh-resource-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0 0 10px; padding: 0; list-style: none; color: var(--text-secondary); font-size: var(--fs-caption); }
+.ssh-resource-legend li { display: inline-flex; align-items: center; gap: 5px; }
+.ssh-resource-legend i { width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0; }
+.ssh-status-resource-summary > .ssh-status-time-axis { margin-top: 4px; padding-inline: 0; }
+.ssh-status-metrics { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.ssh-status-metric { display: grid; grid-template-columns: minmax(0, 1fr) minmax(40px, .95fr) auto; align-items: center; gap: 2px 8px; min-width: 0; }
+.ssh-status-metric[data-resource="memory"] { --metric-accent: var(--group-violet); }
+.ssh-status-metric[data-resource="disk"] { --metric-accent: var(--group-amber); }
+.ssh-status-metric-label { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--text-secondary); font-size: var(--fs-caption); }
+.ssh-status-metric-value { color: var(--text-primary); font-size: var(--fs-label); font-weight: var(--fw-medium); font-variant-numeric: tabular-nums; line-height: 1.4; text-align: right; }
 .ssh-status-metric-value[data-empty] { color: var(--text-muted); font-size: var(--fs-label); font-weight: var(--fw-medium); }
-.ssh-status-meter { height: 10px; flex-shrink: 0; margin-top: 2px; overflow: hidden; border-radius: 5px; background: var(--hover); }
-.ssh-status-meter i { display: block; height: 100%; min-width: 0; border-radius: inherit; background: var(--resource-accent); transition: width 150ms var(--ease); }
+.ssh-status-meter { height: 10px; min-width: 0; overflow: hidden; border-radius: 5px; background: var(--hover); }
+.ssh-status-meter i { display: block; height: 100%; min-width: 0; border-radius: inherit; background: var(--metric-accent, var(--resource-accent)); transition: width 150ms var(--ease); }
 .ssh-status-meter i[data-level="warning"] { background: var(--accent-warm); }
 .ssh-status-meter i[data-level="critical"] { background: var(--error); }
-.ssh-status-metric .ssh-status-metric-caption { margin: -4px 0 0; font-variant-numeric: tabular-nums; }
-.ssh-status-metric .ssh-status-metric-hint { margin: 0; }
-.ssh-resource-chart { position: relative; height: 80px; margin-top: 2px; padding-right: 30px; }
+.ssh-status-metric .ssh-status-metric-caption { grid-column: 1 / -1; margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.ssh-status-metric .ssh-status-metric-hint { grid-column: 1 / -1; margin: 0; }
+.ssh-resource-chart { position: relative; height: 80px; margin-top: 2px; }
 .ssh-resource-chart svg { display: block; width: 100%; height: 100%; overflow: visible; color: var(--resource-accent); }
 .ssh-resource-chart polyline { stroke: currentColor; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .ssh-resource-chart circle { fill: currentColor; }
 .ssh-resource-chart .ssh-resource-chart-area { fill: currentColor; opacity: .12; }
 .ssh-resource-chart-grid { stroke: var(--border); stroke-width: 1; stroke-dasharray: 2 4; }
-.ssh-resource-chart-axis { position: absolute; top: 0; right: 0; bottom: 0; display: flex; flex-direction: column; justify-content: space-between; color: var(--text-muted); font-size: var(--fs-micro); line-height: 1.2; text-align: right; }
+.ssh-resource-chart-axis { position: absolute; top: 0; right: 2px; bottom: 0; display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; pointer-events: none; color: var(--text-muted); font-size: var(--fs-micro); line-height: 1.2; text-align: right; }
+.ssh-resource-chart-axis > span { padding-left: 4px; background: var(--surface); }
 .ssh-resource-chart-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-muted); font-size: var(--fs-caption); }
 .ssh-status-time-axis { display: flex; justify-content: space-between; padding-inline: 12px; margin-top: -6px; color: var(--text-muted); font-size: var(--fs-micro); }
 .ssh-status-network { padding-bottom: 14px; border-top: 1px solid var(--border); }
@@ -76,7 +78,7 @@ button.ssh-status-reconnect.text-control:not(:disabled):is(:hover, :focus-visibl
 .ssh-network-rate > span { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: var(--fs-caption); }
 .ssh-network-rate i { width: 7px; height: 7px; flex-shrink: 0; border-radius: 2px; }
 .ssh-network-rate > strong { color: var(--text-primary); font-size: var(--fs-body); font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.ssh-network-rates > .ssh-resource-chart { margin-top: 12px; padding-right: 56px; }
+.ssh-network-rates > .ssh-resource-chart { margin-top: 12px; }
 .ssh-network-rates .ssh-status-time-axis { margin-top: 4px; padding-inline: 0; }
 .ssh-network-note, .ssh-network-error { margin: 8px 14px 0; }
 .ssh-network-result { margin: 10px 14px 0; padding: 12px; border-radius: var(--radius-inner); background: var(--surface); }

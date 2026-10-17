@@ -5,7 +5,6 @@ import type { SshSystemStatus } from '../services/api';
 import { useState } from 'react';
 import { useAuxiliarySidebarStore } from '@features/workspace/stores/auxiliarySidebar';
 import { finishSshAuthentication, useSessionAuthenticationStore } from '../stores/sessionAuthentication';
-import { useResourceDisplay } from '../stores/resourceDisplay';
 
 const mocks = vi.hoisted(() => ({ collect: vi.fn(), copy: vi.fn(), probe: vi.fn() }));
 vi.mock('../services/api', () => ({ sshSystemStatus: mocks.collect, sshNetworkProbe: mocks.probe }));
@@ -15,7 +14,7 @@ const target = { name: 'Production', host: 'example.com', user: 'deploy', connec
 const connected = { phase: 'connected' as const, reconnectAttempt: 0, retrying: false, log: [] };
 const open = () => fireEvent.click(screen.getByTestId('ssh-status-toggle'));
 
-beforeEach(() => { vi.clearAllMocks(); mocks.probe.mockResolvedValue({ dnsMs: 1, attempts: [] }); useResourceDisplay.setState({ display: 'bars' }); useSessionAuthenticationStore.setState({ request: null, revisions: {}, temporary: {} }); useAuxiliarySidebarStore.setState({ sshStatusOwner: null, dismissRequest: 0 }); mocks.collect.mockResolvedValue(sample); mocks.copy.mockResolvedValue(undefined); });
+beforeEach(() => { vi.clearAllMocks(); mocks.probe.mockResolvedValue({ dnsMs: 1, attempts: [] }); useSessionAuthenticationStore.setState({ request: null, revisions: {}, temporary: {} }); useAuxiliarySidebarStore.setState({ sshStatusOwner: null, dismissRequest: 0 }); mocks.collect.mockResolvedValue(sample); mocks.copy.mockResolvedValue(undefined); });
 afterEach(() => vi.useRealTimers());
 
 describe('SSH status panel', () => {
@@ -45,20 +44,30 @@ describe('SSH status panel', () => {
     expect(box).toHaveTextContent('暂无连接输出。');
   });
 
-  it('switches between resource bars and correctly labeled charts without collecting again', async () => {
+  it('keeps one combined resource chart and current meters visible together without a view switch', async () => {
     render(<SshStatusPanel target={target} state={connected} active />);
     open(); await screen.findByText('Linux 6.8');
-    fireEvent.click(screen.getByRole('combobox', { name: '资源显示方式' }));
-    fireEvent.click(screen.getByRole('option', { name: '图表' }));
-    expect(screen.queryByRole('meter')).not.toBeInTheDocument();
-    expect(screen.getByRole('img', { name: '内存使用率趋势' })).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: '根分区使用率趋势' })).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'CPU 使用率趋势' })).toBeInTheDocument();
-    expect(screen.getAllByText('等待采样…').length).toBeGreaterThan(0);
+    const chart = screen.getByRole('img', { name: '资源使用率趋势' });
+    expect(chart.querySelectorAll('[data-series]')).toHaveLength(3);
+    expect(chart.querySelector('[data-series="CPU"] circle')).not.toBeInTheDocument();
+    expect(screen.getByRole('list', { name: '资源图例' })).toHaveTextContent('CPU内存根分区');
+    expect(screen.getByRole('meter', { name: '内存使用率' })).toHaveAttribute('aria-valuenow', '50');
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     expect(mocks.collect).toHaveBeenCalledTimes(1);
     open(); open();
-    expect(screen.getByRole('combobox', { name: '资源显示方式' })).toHaveTextContent('图表');
-    expect(localStorage.getItem('vrykell-ssh-resource-display')).toBe('chart');
+    expect(screen.getByRole('img', { name: '资源使用率趋势' })).toBeInTheDocument();
+    expect(screen.getByRole('meter', { name: '内存使用率' })).toBeInTheDocument();
+  });
+
+  it('updates the combined chart and all current readings from the same sample', async () => {
+    render(<SshStatusPanel target={target} state={connected} active />);
+    open(); await screen.findByText('Linux 6.8');
+    mocks.collect.mockResolvedValueOnce({ ...sample, cpuTotal: 1200, cpuIdle: 800, memoryAvailable: 2048 });
+    fireEvent.click(screen.getByRole('button', { name: '刷新远端资源' }));
+    await waitFor(() => expect(screen.getByRole('meter', { name: 'CPU 使用率' })).toHaveAttribute('aria-valuenow', '50'));
+    expect(screen.getByRole('meter', { name: '内存使用率' })).toHaveAttribute('aria-valuenow', '75');
+    expect(screen.getByRole('meter', { name: '根分区使用率' })).toHaveAttribute('aria-valuenow', '30');
+    expect(screen.getByRole('img', { name: '资源使用率趋势' }).querySelector('[data-series="CPU"] circle')).toBeInTheDocument();
   });
 
   it('separates system identity and load periods from collapsible connection facts', async () => {
