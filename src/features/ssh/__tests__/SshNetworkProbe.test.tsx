@@ -22,7 +22,9 @@ it('automatically probes and displays measured connectivity and latency', async 
   expect(mocks.probe).toHaveBeenCalledWith('example.com', 22);
   expect(screen.getByText('100%')).toBeInTheDocument();
   expect(screen.getByText('30.0 ms')).toBeInTheDocument();
-  expect(screen.getByText('20.0 ms / 40.0 ms')).toBeInTheDocument();
+  expect(screen.getByText('20.0 ms / 40.0 ms')).toBeVisible();
+  expect(screen.getByText('2/2 次成功')).toBeVisible();
+  expect(screen.getByText('2/2 次成功')).toHaveAttribute('data-tip', '1 · 20.0 ms\n2 · 40.0 ms');
   expect(screen.getByRole('button', { name: '重新探测' })).toBeEnabled();
 });
 
@@ -31,8 +33,8 @@ it('shows interrupted connectivity without treating TCP failures as zero latency
   render(<SshNetworkProbe host="host" port={2222} />);
   await screen.findByText('连接不稳定');
   expect(screen.getByText('50%')).toBeInTheDocument();
-  expect(screen.getByText('1/2 次成功')).toBeInTheDocument();
-  expect(document.querySelector('[data-success="false"]')).toHaveAttribute('data-tip', '2 · 连接超时');
+  expect(screen.getByText('1/2 次成功')).toBeVisible();
+  expect(screen.getByText('1/2 次成功')).toHaveAttribute('data-tip', '1 · 20.0 ms\n2 · 连接超时');
 });
 
 it('disables overlapping requests, resets on target changes and discards late results', async () => {

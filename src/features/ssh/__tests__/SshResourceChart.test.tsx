@@ -30,6 +30,18 @@ it('plots real readings on a fixed five-minute axis and bounds percentages', () 
   expect(resourceTrendSegments([], 0)).toEqual([]);
 });
 
+it('frames the measured range with horizontal and vertical grid lines', () => {
+  render(<SshResourceChart samples={[]} endTime={0} label="Usage grid" />);
+  const chart = screen.getByRole('img', { name: 'Usage grid' });
+  const frame = chart.querySelector('rect')!;
+  expect(frame).toHaveAttribute('x', '2');
+  expect(frame).toHaveAttribute('width', '276');
+  expect(frame).toHaveAttribute('height', '68');
+  const grid = [...chart.querySelectorAll('line')];
+  expect(grid.filter(line => line.getAttribute('x1') === line.getAttribute('x2'))).toHaveLength(7);
+  expect(grid.filter(line => line.getAttribute('y1') === line.getAttribute('y2'))).toHaveLength(3);
+});
+
 it('leaves gaps after interruptions and discards expired, future and invalid readings', () => {
   expect(resourceTrendSegments([{ time: 0, value: 10 }, { time: 15000, value: 20 }, { time: 75000, value: 30 }], 75000)).toHaveLength(2);
   expect(resourceTrendSegments([{ time: -1, value: 10 }, { time: 300001, value: 20 }, { time: 300000, value: NaN }], 300000)).toEqual([]);

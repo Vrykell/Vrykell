@@ -18,13 +18,14 @@ beforeEach(() => { vi.clearAllMocks(); mocks.probe.mockResolvedValue({ dnsMs: 1,
 afterEach(() => vi.useRealTimers());
 
 describe('SSH status panel', () => {
-  it('lists one meter per resource with its percentage and used/total reading', async () => {
+  it('lists text percentages and detail readings without utilization bars', async () => {
     render(<SshStatusPanel target={target} state={connected} active />);
     open();
     await screen.findByText('Linux 6.8');
-    const meters = screen.getAllByRole('meter').map(meter => [meter.getAttribute('aria-label'), meter.getAttribute('aria-valuenow')]);
-    expect(meters).toEqual([['内存使用率', '50'], ['根分区使用率', '30']]);
-    // CPU needs two samples: its reading stays unavailable instead of a zero-filled meter.
+    expect(screen.getByTestId('ssh-resource-memory')).toHaveTextContent('50%');
+    expect(screen.getByTestId('ssh-resource-disk')).toHaveTextContent('30%');
+    expect(screen.queryByRole('meter')).not.toBeInTheDocument();
+    // CPU needs two samples before its percentage is available.
     expect(screen.getByText('不可用')).toBeInTheDocument();
     expect(screen.getByText('4.0 KB / 8.0 KB')).toBeInTheDocument();
     expect(screen.getByText('2.9 KB / 9.8 KB')).toBeInTheDocument();
@@ -44,19 +45,19 @@ describe('SSH status panel', () => {
     expect(box).toHaveTextContent('暂无连接输出。');
   });
 
-  it('keeps one combined resource chart and current meters visible together without a view switch', async () => {
+  it('keeps one combined resource chart and current text readings visible together', async () => {
     render(<SshStatusPanel target={target} state={connected} active />);
     open(); await screen.findByText('Linux 6.8');
     const chart = screen.getByRole('img', { name: '资源使用率趋势' });
     expect(chart.querySelectorAll('[data-series]')).toHaveLength(3);
     expect(chart.querySelector('[data-series="CPU"] circle')).not.toBeInTheDocument();
     expect(screen.getByRole('list', { name: '资源图例' })).toHaveTextContent('CPU内存根分区');
-    expect(screen.getByRole('meter', { name: '内存使用率' })).toHaveAttribute('aria-valuenow', '50');
+    expect(screen.getByTestId('ssh-resource-memory')).toHaveTextContent('50%');
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     expect(mocks.collect).toHaveBeenCalledTimes(1);
     open(); open();
     expect(screen.getByRole('img', { name: '资源使用率趋势' })).toBeInTheDocument();
-    expect(screen.getByRole('meter', { name: '内存使用率' })).toBeInTheDocument();
+    expect(screen.getByTestId('ssh-resource-memory')).toBeInTheDocument();
   });
 
   it('updates the combined chart and all current readings from the same sample', async () => {
@@ -64,15 +65,15 @@ describe('SSH status panel', () => {
     open(); await screen.findByText('Linux 6.8');
     mocks.collect.mockResolvedValueOnce({ ...sample, cpuTotal: 1200, cpuIdle: 800, memoryAvailable: 2048 });
     fireEvent.click(screen.getByRole('button', { name: '刷新远端资源' }));
-    await waitFor(() => expect(screen.getByRole('meter', { name: 'CPU 使用率' })).toHaveAttribute('aria-valuenow', '50'));
-    expect(screen.getByRole('meter', { name: '内存使用率' })).toHaveAttribute('aria-valuenow', '75');
-    expect(screen.getByRole('meter', { name: '根分区使用率' })).toHaveAttribute('aria-valuenow', '30');
+    await waitFor(() => expect(screen.getByTestId('ssh-resource-cpu')).toHaveTextContent('50%'));
+    expect(screen.getByTestId('ssh-resource-memory')).toHaveTextContent('75%');
+    expect(screen.getByTestId('ssh-resource-disk')).toHaveTextContent('30%');
     expect(screen.getByText('50% 空闲')).toHaveClass('ssh-status-metric-caption');
     expect(document.querySelectorAll('.ssh-status-metric-caption')).toHaveLength(3);
     expect(screen.getByRole('img', { name: '资源使用率趋势' }).querySelector('[data-series="CPU"] circle')).toBeInTheDocument();
     mocks.collect.mockResolvedValueOnce({ ...sample, cpuTotal: 1400, cpuIdle: 899 });
     fireEvent.click(screen.getByRole('button', { name: '刷新远端资源' }));
-    await waitFor(() => expect(screen.getByRole('meter', { name: 'CPU 使用率' })).toHaveAttribute('aria-valuenow', '51'));
+    await waitFor(() => expect(screen.getByTestId('ssh-resource-cpu')).toHaveTextContent('51%'));
     expect(screen.getByText('49% 空闲')).toBeInTheDocument();
   });
 
@@ -107,7 +108,7 @@ describe('SSH status panel', () => {
     mocks.collect.mockReturnValue(new Promise(() => {}));
     view.rerender(<SshStatusPanel target={{ ...target, connectionId: 'other', host: 'other.example.com' }} state={connected} active />);
     expect(screen.queryByText('Linux 6.8')).not.toBeInTheDocument();
-    expect(screen.queryByRole('meter')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ssh-resource-memory')).not.toBeInTheDocument();
   });
 
   it('keeps the status entry available before the classic toolbar mounts', () => {
@@ -216,7 +217,7 @@ describe('SSH status panel', () => {
     open();
     await screen.findByText('Linux 6.8');
     expect(mocks.collect).toHaveBeenCalledWith('saved', 'example.com', 22, 'deploy');
-    expect(screen.getByRole('meter', { name: '内存使用率' })).toHaveAttribute('aria-valuenow', '50');
+    expect(screen.getByTestId('ssh-resource-memory')).toHaveTextContent('50%');
     fireEvent.click(screen.getByRole('button', { name: '复制连接地址' }));
     expect(mocks.copy).toHaveBeenCalledWith('deploy@example.com:22');
     fireEvent.keyDown(screen.getByTestId('ssh-status-panel'), { key: 'Escape' });
@@ -256,6 +257,7 @@ describe('SSH status panel', () => {
     open(); await screen.findByText('已保存的 SSH 认证信息被拒绝');
     vi.useFakeTimers();
     await act(async () => { vi.advanceTimersByTime(90000); });
+    await act(async () => { document.dispatchEvent(new Event('visibilitychange')); });
     expect(mocks.collect).toHaveBeenCalledTimes(1);
     vi.useRealTimers();
     fireEvent.click(screen.getByRole('button', { name: '认证服务' }));
@@ -286,6 +288,41 @@ describe('SSH status panel', () => {
     vi.useRealTimers();
     fireEvent.click(screen.getByRole('button', { name: '恢复监控' }));
     await waitFor(() => expect(mocks.collect).toHaveBeenCalledTimes(2));
+  });
+
+  it('appends automatic samples and keeps the plotted time fixed between responses', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    mocks.collect.mockImplementation(async () => {
+      const count = mocks.collect.mock.calls.length;
+      return { ...sample, cpuTotal: count * 1000, cpuIdle: count * 880, networkReceived: count * 153600, networkTransmitted: count * 76800 };
+    });
+    const view = render(<SshStatusPanel target={target} state={connected} active />);
+    open(); await act(async () => {});
+    expect(mocks.collect).toHaveBeenCalledTimes(1);
+    const chart = screen.getByRole('img', { name: '资源使用率趋势' });
+    await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
+    expect(mocks.collect).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId('ssh-resource-cpu')).toHaveTextContent('12%');
+    const points = chart.querySelector('[data-series="CPU"] circle')!.getAttribute('cx');
+    const frame = chart.closest('.ssh-resource-chart')!;
+    expect(frame).toHaveAttribute('data-end-time', '15000');
+    await act(async () => { await vi.advanceTimersByTimeAsync(5_000); });
+    expect(frame).toHaveAttribute('data-end-time', '15000');
+    expect(chart.querySelector('[data-series="CPU"] circle')).toHaveAttribute('cx', points);
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+    expect(mocks.collect).toHaveBeenCalledTimes(3);
+    expect(chart.querySelector('[data-series="CPU"] polyline')!.getAttribute('points')!.split(' ')).toHaveLength(2);
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(mocks.collect).toHaveBeenCalledTimes(3);
+    hidden.mockReturnValue(false);
+    await act(async () => { document.dispatchEvent(new Event('visibilitychange')); });
+    expect(mocks.collect).toHaveBeenCalledTimes(4);
+    hidden.mockRestore();
+    view.unmount();
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(mocks.collect).toHaveBeenCalledTimes(4);
   });
 
   it('discards late responses when closed', async () => {

@@ -59,11 +59,7 @@ export default function SshNetworkProbe({ host, port, jumpHost, paused = false, 
     {children}
     {summary && result && <div className="ssh-network-result" data-testid="ssh-network-result" data-connectivity={summary.status} data-stale={!!error || paused || busy} aria-busy={busy}>
       {error && <p className="ssh-status-caption">{t('Previous probe result')}</p>}
-      <div className="ssh-network-result-heading"><strong role="status">{t(statusLabels[summary.status])}</strong><span>{t('{{success}}/{{total}} succeeded', { success: summary.succeeded, total: summary.total })}</span></div>
-      <div className="ssh-network-attempts" aria-label={t('Probe attempts')}>
-        {result.attempts.map((attempt, index) => <span key={index} data-success={attempt.latencyMs != null}
-          data-tip={`${index + 1} · ${attempt.latencyMs == null ? t(failureLabels[attempt.errorKind ?? 'unreachable']) : milliseconds(attempt.latencyMs)}`} />)}
-      </div>
+      <div className="ssh-network-result-heading"><strong role="status">{t(statusLabels[summary.status])}</strong><span data-tip={result.attempts.map((attempt, index) => `${index + 1} · ${attempt.latencyMs == null ? t(failureLabels[attempt.errorKind ?? 'unreachable']) : milliseconds(attempt.latencyMs)}`).join('\n')}>{t('{{success}}/{{total}} succeeded', { success: summary.succeeded, total: summary.total })}</span></div>
       <dl className="ssh-status-facts">
         <div className="ssh-status-row"><dt>{t('Connection success rate')}</dt><dd>{summary.successRate}%</dd></div>
         <div className="ssh-status-row"><dt>{t('Average TCP connect time')}</dt><dd>{milliseconds(summary.average)}</dd></div>

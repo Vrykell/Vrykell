@@ -19,12 +19,11 @@ button.ssh-session-status.text-control:not(:disabled)[aria-expanded="true"] { ba
 .ssh-status-panel header { position: sticky; top: 0; z-index: 1; background: var(--sidebar-bg); display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 4px 8px 4px 14px; border-bottom: 1px solid var(--border); }
 .ssh-status-panel header > strong { font-size: var(--fs-label); font-weight: var(--fw-semibold); }
 .ssh-status-header-actions { display: flex; align-items: center; }
-/* Identity block: the connection name leads, the phase follows as a quiet chip and the
-   address sits on a field surface so the panel opens with its main value. */
+/* The connection name leads, followed by quiet session state and a copyable address. */
 .ssh-status-overview { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px 14px; }
 .ssh-status-identity-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 8px; }
 .ssh-status-identity { min-width: 0; font-size: var(--fs-body); font-weight: var(--fw-semibold); overflow-wrap: anywhere; }
-.ssh-status-phase { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 2px 8px; border-radius: 5px; background: var(--hover); color: var(--text-secondary); font-size: var(--fs-caption); white-space: nowrap; }
+.ssh-status-phase { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; color: var(--text-secondary); font-size: var(--fs-caption); white-space: nowrap; }
 .ssh-status-dot { display: inline-block; width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: var(--text-muted); }
 .ssh-status-dot[data-phase="connected"], .ssh-status-dot[data-phase="interactive"] { background: var(--success); }
 .ssh-status-dot[data-phase="connecting"], .ssh-status-dot[data-phase="authenticating"] { background: var(--accent-warm); }
@@ -39,30 +38,24 @@ button.ssh-status-reconnect.text-control:not(:disabled):is(:hover, :focus-visibl
 .ssh-status-state { padding: 14px; }
 .ssh-status-state > .ssh-status-caption { margin: 0; }
 .ssh-status-state > [role] + .ssh-status-caption { margin-top: 8px; }
-.ssh-status-resource-summary { margin: 12px 14px 16px; padding: 12px; border-radius: var(--radius-inner); background: var(--surface); }
-.ssh-resource-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0 0 10px; padding: 0; list-style: none; color: var(--text-secondary); font-size: var(--fs-caption); }
+.ssh-status-resource-summary { margin: 12px 14px 16px; }
+.ssh-resource-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0 0 6px; padding: 0; list-style: none; color: var(--text-secondary); font-size: var(--fs-caption); }
 .ssh-resource-legend li { display: inline-flex; align-items: center; gap: 5px; }
-.ssh-resource-legend i { width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0; }
-.ssh-status-metrics { display: grid; grid-template-columns: minmax(0, 1fr) minmax(40px, 1fr) max-content; align-items: center; gap: 2px 8px; margin-top: 12px; }
+.ssh-resource-legend i { width: 12px; height: 2px; flex-shrink: 0; }
+.ssh-status-metrics { display: grid; grid-template-columns: max-content max-content minmax(0, 1fr); align-items: baseline; gap: 6px 10px; margin: 10px 0 0; padding: 0; }
 .ssh-status-metric { display: contents; }
-.ssh-status-metric + .ssh-status-metric > :is(.ssh-status-metric-label, .ssh-status-meter, .ssh-status-metric-value) { margin-top: 4px; }
-.ssh-status-metric[data-resource="memory"] { --metric-accent: var(--chart-violet); }
-.ssh-status-metric[data-resource="disk"] { --metric-accent: var(--chart-amber); }
-.ssh-status-metric-label { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--text-secondary); font-size: var(--fs-caption); }
-.ssh-status-metric-value { color: var(--text-primary); font-size: var(--fs-label); font-weight: var(--fw-medium); font-variant-numeric: tabular-nums; line-height: 1.4; text-align: right; }
+.ssh-status-metric-label { margin: 0; color: var(--text-secondary); font-size: var(--fs-caption); }
+.ssh-status-metric-value { margin: 0; color: var(--text-primary); font-size: var(--fs-label); font-weight: var(--fw-medium); font-variant-numeric: tabular-nums; line-height: 1.4; text-align: right; }
 .ssh-status-metric-value[data-empty] { color: var(--text-muted); font-size: var(--fs-label); font-weight: var(--fw-medium); }
-.ssh-status-meter { height: 6px; min-width: 0; overflow: hidden; border-radius: 3px; background: var(--hover); }
-.ssh-status-meter i { display: block; height: 100%; min-width: 0; border-radius: inherit; background: var(--metric-accent, var(--chart-blue)); transition: width 150ms var(--ease); }
-.ssh-status-meter i[data-level="warning"] { background: var(--accent-warm); }
-.ssh-status-meter i[data-level="critical"] { background: var(--error); }
-.ssh-status-metric .ssh-status-metric-caption { grid-column: 1 / -1; margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.ssh-status-metric .ssh-status-metric-caption { min-width: 0; margin: 0; text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .ssh-resource-chart { display: flex; flex-direction: column; gap: 3px; margin-top: 2px; min-width: 0; }
-.ssh-resource-chart-plot { position: relative; height: 64px; min-width: 0; }
+.ssh-resource-chart-plot { position: relative; height: 160px; min-width: 0; }
 .ssh-resource-chart svg { display: block; width: 100%; height: 100%; overflow: hidden; color: var(--chart-blue); }
-.ssh-resource-chart polyline { stroke: currentColor; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.ssh-resource-chart polyline { stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
 .ssh-resource-chart circle { fill: currentColor; }
 .ssh-resource-chart .ssh-resource-chart-area { fill: currentColor; opacity: .08; }
-.ssh-resource-chart-grid { stroke: var(--border); stroke-width: 1; stroke-dasharray: 2 4; }
+.ssh-resource-chart-frame { stroke: var(--border-strong); stroke-width: 1; }
+.ssh-resource-chart-grid { stroke: var(--border); stroke-width: 1; opacity: .6; }
 .ssh-resource-chart-axis { color: var(--text-muted); font-size: var(--fs-micro); line-height: 1.2; text-align: right; }
 .ssh-resource-chart-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-muted); font-size: var(--fs-caption); }
 .ssh-status-time-axis { display: flex; justify-content: space-between; gap: 8px; color: var(--text-muted); font-size: var(--fs-micro); line-height: 1.2; }
@@ -71,26 +64,27 @@ button.ssh-status-reconnect.text-control:not(:disabled):is(:hover, :focus-visibl
 .ssh-status-network .text-control { font-size: var(--fs-caption); }
 .ssh-network-route { display: flex; gap: 6px; min-width: 0; padding-inline: 14px; margin-top: 2px; }
 .ssh-network-route > span { min-width: 0; overflow-wrap: anywhere; }
-.ssh-network-rates { margin: 12px 14px 0; padding: 12px; border-radius: var(--radius-inner); background: var(--surface); }
+.ssh-network-rates { margin: 12px 14px 0; }
 .ssh-network-rate-readings { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
-.ssh-network-rate { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ssh-network-rate { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .ssh-network-rate > span { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: var(--fs-caption); }
-.ssh-network-rate i { width: 7px; height: 7px; flex-shrink: 0; border-radius: 2px; }
+.ssh-network-rate i { width: 12px; height: 2px; flex-shrink: 0; }
 .ssh-network-rate > strong { color: var(--text-primary); font-size: var(--fs-body); font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .ssh-network-rates > .ssh-resource-chart { margin-top: 12px; }
 .ssh-network-note, .ssh-network-error { margin: 8px 14px 0; }
-.ssh-network-result { margin: 10px 14px 0; padding: 12px; border-radius: var(--radius-inner); background: var(--surface); }
+.ssh-network-result { margin: 12px 14px 0; padding-top: 10px; border-top: 1px solid var(--border); }
 .ssh-network-result-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 8px; font-size: var(--fs-caption); }
 .ssh-network-result-heading strong { color: var(--text-primary); font-weight: var(--fw-semibold); }
 .ssh-network-result-heading > span { color: var(--text-muted); }
+.ssh-network-result-heading strong { display: inline-flex; align-items: center; gap: 6px; }
+.ssh-network-result-heading strong::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--success); }
+.ssh-network-result[data-connectivity="partial"] .ssh-network-result-heading strong::before { background: var(--warning); }
+.ssh-network-result[data-connectivity="unreachable"] .ssh-network-result-heading strong::before { background: var(--error-light); }
 .ssh-network-result[data-connectivity="unreachable"] .ssh-network-result-heading strong { color: var(--error-light); }
 .ssh-network-result[data-connectivity="partial"] .ssh-network-result-heading strong { color: var(--warning); }
-.ssh-network-attempts { display: flex; gap: 4px; margin-block: 10px 12px; }
-.ssh-network-attempts > span { flex: 1; height: 8px; border-radius: 3px; background: var(--resource-accent); }
-.ssh-network-attempts > span[data-success="false"] { background: var(--error-light); }
-.ssh-network-result .ssh-status-facts { padding: 0; gap: 6px; }
+.ssh-network-result .ssh-status-facts { padding: 8px 0 0; gap: 4px; }
 .ssh-status-panel [data-stale="true"] .ssh-status-metric-value { color: var(--text-muted); }
-.ssh-status-panel [data-stale="true"] :is(.ssh-status-meter i, .ssh-resource-chart svg) { opacity: .65; }
+.ssh-status-panel [data-stale="true"] .ssh-resource-chart svg { opacity: .65; }
 /* Collapsible groups: one full-bleed hairline per group, a label row that brightens on hover
    and a chevron that turns with the open state. Pointer hover stays quiet; the filled band is
    kept for keyboard focus so the row stays visibly reachable without a pointer. */

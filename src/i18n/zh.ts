@@ -1085,6 +1085,7 @@ const zh: Record<string, string> = {
   'Last {{minutes}} min': '最近 {{minutes}} 分钟',
   '{{percent}}% idle': '{{percent}}% 空闲',
   'Usage details unavailable': '用量详情不可用',
+  'Current resource readings': '当前资源读数',
   'Resource chart legend': '资源图例',
   'Memory': '内存',
   'Root disk': '根分区',
