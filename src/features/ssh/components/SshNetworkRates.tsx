@@ -1,0 +1,28 @@
+import { t } from '@i18n';
+import { fmtSize } from '@ui/UiBtn';
+import type { NetworkRateSample } from '../model/networkRates';
+import type { ResourceDisplay } from '../stores/resourceDisplay';
+import SshResourceChart from './SshResourceChart';
+
+export default function SshNetworkRates({ samples, now, display, available }: { samples: readonly NetworkRateSample[]; now: number; display: ResourceDisplay; available: boolean }) {
+  const latest = samples[samples.length - 1];
+  const series = (['download', 'upload'] as const).map(direction => ({
+    direction, label: t(direction === 'download' ? 'Download' : 'Upload'),
+    samples: samples.flatMap(sample => sample[direction] == null ? [] : [{ time: sample.time, value: sample[direction]! }]),
+    color: direction === 'download' ? 'var(--group-cyan)' : 'var(--group-violet)',
+  }));
+  const maximum = Math.max(1024, 2 ** Math.ceil(Math.log2(Math.max(1, ...series.flatMap(line => line.samples.map(sample => sample.value))))));
+  return <div className="ssh-network-rates" aria-label={t('Server network transfer')} data-tip={t('Combined traffic on the server’s non-loopback network interfaces.')}>
+    <div className="ssh-network-rate-readings">{series.map(({ direction, label, color }) => {
+      const current = latest?.[direction];
+      return <div className="ssh-network-rate" key={direction}>
+        <span><i style={{ background: color }} />{label}</span><strong>{current == null ? '—' : `${fmtSize(current)}/s`}</strong>
+      </div>;
+    })}</div>
+    {display === 'chart' && <>
+      <SshResourceChart series={series} endTime={now} label={t('Upload and download history')} maximum={maximum} maximumLabel={`${fmtSize(maximum)}/s`} minimumLabel="0" />
+      <div className="ssh-status-time-axis" aria-hidden="true"><span>{t('5 min ago')}</span><span>{t('Now')}</span></div>
+    </>}
+    {latest && latest.download == null && latest.upload == null && <p className="ssh-status-caption">{t(available ? 'Transfer rates require two recent samples.' : 'Transfer rates are unavailable on this server.')}</p>}
+  </div>;
+}

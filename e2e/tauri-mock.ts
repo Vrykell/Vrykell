@@ -941,6 +941,12 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'ssh_test':
             if (args.host === 'bad.example.com') throw new Error('连接超时');
             return '连接成功';
+          case 'ssh_network_probe': {
+            const globals = window as unknown as Record<string, unknown>;
+            globals.__NETWORK_PROBE_CALLS__ = Number(globals.__NETWORK_PROBE_CALLS__ ?? 0) + 1;
+            if (globals.__NETWORK_PROBE_ERROR__) throw new Error(String(globals.__NETWORK_PROBE_ERROR__));
+            return globals.__NETWORK_PROBE_RESULT__ ?? { dnsMs: 1.2, attempts: [36, 42, 38, 40, 39].map(latencyMs => ({ latencyMs, errorKind: null })) };
+          }
           case 'ssh_system_status': {
             const globals = window as unknown as Record<string, unknown>;
             globals.__SSH_STATUS_CALLS__ = Number(globals.__SSH_STATUS_CALLS__ ?? 0) + 1;
@@ -948,6 +954,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             return { system: 'Linux 6.8', hostname: 'production-api', latencyMs: 42, uptimeSeconds: 1047600,
               load: '0.12 0.08 0.05', cpuTotal: Number(globals.__SSH_STATUS_CALLS__) * 1000,
               cpuIdle: Number(globals.__SSH_STATUS_CALLS__) * 880, memoryTotal: 8589934592,
+              networkReceived: Number(globals.__SSH_STATUS_CALLS__) * 153600, networkTransmitted: Number(globals.__SSH_STATUS_CALLS__) * 76800,
               memoryAvailable: 6335076762, diskTotal: 107374182400, diskUsed: 40802189312 };
           }
           case 'ssh_list': {

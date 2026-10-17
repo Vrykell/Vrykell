@@ -35,6 +35,8 @@ pub struct SshSystemStatus {
     memory_available: Option<f64>,
     disk_total: Option<f64>,
     disk_used: Option<f64>,
+    network_received: Option<f64>,
+    network_transmitted: Option<f64>,
 }
 
 const STATUS_COMMAND: &str = r#"printf 'system=%s\n' "$(uname -sr 2>/dev/null)"
@@ -44,6 +46,7 @@ if [ -r /proc/loadavg ]; then awk '{print "load=" $1 " " $2 " " $3}' /proc/loada
 if [ -r /proc/stat ]; then awk '/^cpu / {total=0; for(i=2;i<=9;i++) total+=$i; printf "cpuTotal=%.0f\ncpuIdle=%.0f\n", total, $5+$6; exit}' /proc/stat; fi
 if [ -r /proc/meminfo ]; then awk '/^MemTotal:/ {printf "memoryTotal=%.0f\n", $2*1024} /^MemAvailable:/ {printf "memoryAvailable=%.0f\n", $2*1024}' /proc/meminfo; fi
 LC_ALL=C df -Pk / 2>/dev/null | awk 'NR==2 {printf "diskTotal=%.0f\ndiskUsed=%.0f\n", $2*1024, $3*1024}'
+if [ -r /proc/net/dev ]; then awk 'NR>2 {split($0, parts, ":"); iface=parts[1]; gsub(/[[:space:]]/, "", iface); if(iface!="lo") {split(parts[2], bytes); received+=bytes[1]; transmitted+=bytes[9]}} END {printf "networkReceived=%.0f\nnetworkTransmitted=%.0f\n", received, transmitted}' /proc/net/dev; fi
 "#;
 
 fn parse_system_status(output: &str, latency_ms: u128) -> SshSystemStatus {
@@ -52,7 +55,8 @@ fn parse_system_status(output: &str, latency_ms: u128) -> SshSystemStatus {
     let string = |key: &str| fields.get(key).copied().unwrap_or_default().to_owned();
     SshSystemStatus { system: string("system"), hostname: string("hostname"), latency_ms,
         uptime_seconds: number("uptime"), load: string("load"), cpu_total: number("cpuTotal"), cpu_idle: number("cpuIdle"),
-        memory_total: number("memoryTotal"), memory_available: number("memoryAvailable"), disk_total: number("diskTotal"), disk_used: number("diskUsed") }
+        memory_total: number("memoryTotal"), memory_available: number("memoryAvailable"), disk_total: number("diskTotal"), disk_used: number("diskUsed"),
+        network_received: number("networkReceived"), network_transmitted: number("networkTransmitted") }
 }
 
 fn ssh_system_status_sync(conn: &SshConnection) -> Result<SshSystemStatus, String> {
@@ -172,18 +176,22 @@ mod status_tests {
 
     #[test]
     fn parses_resource_samples_and_keeps_missing_values_unavailable() {
-        let status = parse_system_status("system=Linux 6.8\nhostname=node\nuptime=90.5\nload=0.1 0.2 0.3\ncpuTotal=1000\ncpuIdle=700\nmemoryTotal=8192\nmemoryAvailable=4096\ndiskTotal=10000\ndiskUsed=3000", 42);
+        let status = parse_system_status("system=Linux 6.8\nhostname=node\nuptime=90.5\nload=0.1 0.2 0.3\ncpuTotal=1000\ncpuIdle=700\nmemoryTotal=8192\nmemoryAvailable=4096\ndiskTotal=10000\ndiskUsed=3000\nnetworkReceived=123456\nnetworkTransmitted=654321", 42);
         assert_eq!(status.system, "Linux 6.8");
         assert_eq!(status.latency_ms, 42);
         assert_eq!(status.uptime_seconds, Some(90.5));
         assert_eq!(status.cpu_idle, Some(700.0));
         assert_eq!(status.memory_available, Some(4096.0));
         assert_eq!(status.disk_used, Some(3000.0));
+        assert_eq!(status.network_received, Some(123456.0));
+        assert_eq!(status.network_transmitted, Some(654321.0));
         let missing = parse_system_status("system=Darwin\nmemoryTotal=NaN\ncpuTotal=-1\ndiskUsed=invalid", 1);
         assert_eq!(missing.memory_total, None);
         assert_eq!(missing.cpu_total, None);
         assert_eq!(missing.disk_used, None);
         assert_eq!(missing.uptime_seconds, None);
+        assert_eq!(missing.network_received, None);
+        assert_eq!(missing.network_transmitted, None);
     }
 }
 static FILE_SEARCHES: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<String, std::sync::Arc<std::sync::atomic::AtomicBool>>>> =

@@ -17,10 +17,16 @@ import {
   sshHostKeyInfo,
   sshTrustHostKey,
   sshAuthenticateSession,
+  sshNetworkProbe,
 } from '@features/ssh/services/api';
 import { diagnosticSnapshot } from '@platform/diagnostics';
 
 describe('sshApi', () => {
+  it('probes only the supplied TCP endpoint without sending credentials', async () => {
+    invokeMock.mockResolvedValue({ dnsMs: 1, attempts: [] });
+    await sshNetworkProbe('::1', 2222);
+    expect(invokeMock).toHaveBeenCalledWith('ssh_network_probe', { host: '::1', port: 2222 });
+  });
   it('validates keepalive and jump destinations before saving', () => {
     expect(validateSshConnection({ name: 'n', host: 'h', serverAliveInterval: -1 })).toContain('保活');
     expect(validateSshConnection({ name: 'n', host: 'h', jumpHost: '-oProxyCommand=bad' })).toContain('跳板机');
