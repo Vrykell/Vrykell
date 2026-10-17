@@ -6,6 +6,7 @@ import PanelCommandHistory from '../components/PanelCommandHistory';
 import { listCommandHistory, getHistoryPreferences, saveHistoryPreferences, mutateHistoryCommand } from '@platform/api/commandHistory';
 import { fillHistoryCommand, runHistoryCommand, hasCommandDraft } from '../services/execution';
 import { commandKey, emptyPreferences } from '../model/commands';
+import { COMMAND_COLLAPSE_KEY } from '../model/collapse';
 import type { HistoryCommandPreferences } from '@core/commandHistory';
 
 vi.mock('../hooks/useProjectScope', () => ({ useProjectScope: () => ({ context: { target: 'local', root: '/app', cwd: '/app', scope: 'scope', paneId: 'pane', spec: { id: 'pane', kind: 'local', shellType: 'bash' } },
@@ -19,6 +20,7 @@ beforeEach(() => {
   useCommandHistorySettings.setState({ runIn: 'new', doubleClick: 'insert', migrated: true });
   localStorage.removeItem('command-history-detail-collapsed');
   localStorage.removeItem('command-history-sort');
+  localStorage.removeItem(COMMAND_COLLAPSE_KEY);
   vi.clearAllMocks(); saved = emptyPreferences();
   vi.mocked(getHistoryPreferences).mockImplementation(async () => saved);
   vi.mocked(saveHistoryPreferences).mockImplementation(async (_scope, value) => { saved = value; });
@@ -152,6 +154,61 @@ it('keeps collapsed favorites out of keyboard navigation and expands them for se
   expect(screen.getByTestId('command-history-test')).toHaveFocus();
   fireEvent.change(search, { target: { value: 'Production' } });
   expect(favorite).toBeVisible();
+});
+
+it('remembers folded sections and groups for the next panel load', async () => {
+  saved.favorites = [{ id: 'favorite-build', command: 'npm run build', cwd: '/app', shell: 'bash', name: 'Production build' }];
+  saved.groups = [{ id: 'release', name: 'Release', commandKeys: [commandKey({ shell: 'bash', cwd: '/app/src-tauri', command: 'cargo test' })] }];
+  const first = render(<PanelCommandHistory />);
+  await screen.findByTestId('command-history-favorite-build');
+  fireEvent.click(screen.getByRole('button', { name: t('Collapse favorites') }));
+  fireEvent.click(within(screen.getByTestId('command-group-release')).getByRole('button', { name: 'Release' }));
+  expect(screen.getByTestId('command-history-favorite-build')).not.toBeVisible();
+  expect(screen.getByTestId('command-history-test')).not.toBeVisible();
+  expect(new Set(JSON.parse(localStorage.getItem(COMMAND_COLLAPSE_KEY)!))).toEqual(new Set(['favorites', 'release']));
+  first.unmount();
+  render(<PanelCommandHistory />);
+  await screen.findByTestId('command-history-favorite-build');
+  expect(screen.getByRole('button', { name: t('Expand favorites') })).toBeVisible();
+  expect(screen.getByTestId('command-history-favorite-build')).not.toBeVisible();
+  expect(screen.getByTestId('command-history-test')).not.toBeVisible();
+});
+
+it('reveals folded sections during search and returns to the saved layout afterwards', async () => {
+  saved.groups = [{ id: 'release', name: 'Release', commandKeys: [commandKey({ shell: 'bash', cwd: '/app', command: 'npm run build' })] }];
+  render(<PanelCommandHistory />);
+  const row = await screen.findByTestId('command-history-build');
+  const title = () => within(screen.getByTestId('command-group-release')).getByRole('button', { name: 'Release' });
+  fireEvent.click(title());
+  expect(row).not.toBeVisible();
+  const search = screen.getByRole('textbox', { name: t('Search command history') });
+  fireEvent.change(search, { target: { value: 'npm' } });
+  expect(row).toBeVisible();
+  fireEvent.change(search, { target: { value: '' } });
+  expect(row).not.toBeVisible();
+  fireEvent.change(search, { target: { value: 'npm' } });
+  expect(row).toBeVisible();
+  fireEvent.click(title());
+  expect(row).not.toBeVisible();
+  fireEvent.change(search, { target: { value: 'npm run' } });
+  expect(row).not.toBeVisible();
+  fireEvent.change(search, { target: { value: '' } });
+  expect(row).not.toBeVisible();
+});
+
+it('stores the whole layout from the expand and collapse all actions', async () => {
+  saved.groups = [{ id: 'release', name: 'Release', commandKeys: [] }];
+  render(<PanelCommandHistory />);
+  await screen.findByTestId('command-history-build');
+  fireEvent.click(screen.getByRole('button', { name: t('Command history actions') }));
+  fireEvent.click(screen.getByRole('button', { name: t('Collapse all command groups') }));
+  expect(screen.getByTestId('command-history-build')).not.toBeVisible();
+  expect(screen.getByTestId('command-history-test')).not.toBeVisible();
+  expect(new Set(JSON.parse(localStorage.getItem(COMMAND_COLLAPSE_KEY)!))).toEqual(new Set(['favorites', 'release', 'history']));
+  fireEvent.click(screen.getByRole('button', { name: t('Command history actions') }));
+  fireEvent.click(screen.getByRole('button', { name: t('Expand all command groups') }));
+  expect(screen.getByTestId('command-history-build')).toBeVisible();
+  expect(JSON.parse(localStorage.getItem(COMMAND_COLLAPSE_KEY)!)).toEqual([]);
 });
 
 it('remembers frequency sorting and keeps it separate from status and directory filters', async () => {

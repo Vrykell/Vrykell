@@ -18,6 +18,7 @@ import { safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
 import { ListReorderPreview, useListReorder, useListReorderDrag } from '@ui/listReorder';
 import { useProjectScope } from '../hooks/useProjectScope';
 import { useCommandLibrary } from '../hooks/useCommandLibrary';
+import { readCommandCollapse, writeCommandCollapse } from '../model/collapse';
 import { commandKey, projectItems, type CommandItem, type CommandSort } from '../model/commands';
 import { fillHistoryCommand, hasCommandDraft, runHistoryCommand, type ExecutionContext } from '../services/execution';
 import { copyCommand, importLegacyCommands, openCommandSettings, openCommandModelSettings } from '../services/libraryActions';
@@ -73,11 +74,12 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
   const [directory, setDirectory] = useState('project');
   const [organizedOnly, setOrganizedOnly] = useState(false);
   const [sort, setSort] = useState<CommandSort>(() => { const saved = safeLocalStorageGet(SORT_KEY); return saved === 'frequent' || saved === 'manual' ? saved : 'recent'; });
-  const [favoritesCollapsed, setFavoritesCollapsed] = useState(false);
-  const [historyCollapsed, setHistoryCollapsed] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const detailsId = useId();
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  /** Section and group ids that stay folded; the saved layout survives restarts. */
+  const [collapsed, setCollapsed] = useState<Set<string>>(readCommandCollapse);
+  /** Ids a running search reveals; clearing the query returns to the saved layout. */
+  const [searchRevealed, setSearchRevealed] = useState<Set<string>>(() => new Set());
   const [renamingGroup, setRenamingGroup] = useState<{ id: string; name: string } | null>(null);
   const [removingGroup, setRemovingGroup] = useState<string | null>(null);
   const [filterMenu, setFilterMenu] = useState<MenuAnchor | null>(null);
@@ -95,14 +97,36 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
   const listId = `command-history:${context.scope}`;
   const draggingCommand = useListReorder(state => state.drag?.listId === listId && state.drag.kind === 'command-history');
   useEffect(() => { if (!visible) { setRulesMenu(null); setFilterMenu(null); setActionsMenu(null); setMenu(null); setRenamingGroup(null); } }, [visible]);
+  const isFolded = (id: string) => collapsed.has(id) && !searchRevealed.has(id);
+  /** Folding follows what the panel currently shows and stores the resulting layout for later launches. */
+  const toggleFold = (id: string, folded: boolean) => {
+    const next = new Set(collapsed);
+    if (folded) next.delete(id); else next.add(id);
+    setCollapsed(next);
+    writeCommandCollapse(next);
+    if (searchRevealed.has(id)) { const shown = new Set(searchRevealed); shown.delete(id); setSearchRevealed(shown); }
+  };
+  /** A running search reveals every section so matches stay reachable without changing the saved layout. */
+  const changeQuery = (value: string) => {
+    setQuery(value);
+    if (!value.trim()) { if (searchRevealed.size) setSearchRevealed(new Set()); return; }
+    if (!query.trim()) setSearchRevealed(new Set(collapsed));
+  };
+  /** Page actions replace the whole saved layout. */
+  const foldAll = (folded: boolean) => {
+    const next = folded ? new Set(['favorites', 'history', ...preferences.groups?.map(group => group.id) ?? []]) : new Set<string>();
+    setCollapsed(next);
+    writeCommandCollapse(next);
+    if (searchRevealed.size) setSearchRevealed(new Set());
+  };
   const result = projectItems(library.ready ? library.history : [], preferences, query, status, directory === 'current' ? context.cwd : undefined, sort, organizedOnly);
   const allItems = projectItems(library.history, preferences, '', 'all');
   const groupable = [...allItems.favorites, ...allItems.history];
   const grouped = commandGroups(result.favorites, result.history, preferences);
   const sections = [
-    { id: 'favorites', title: t('Favorites'), items: grouped.favorites, collapsed: favoritesCollapsed, custom: false },
-    ...grouped.groups.map(group => ({ ...group, title: group.name, collapsed: collapsedGroups.has(group.id), custom: true })),
-    { id: 'history', title: t('Ungrouped commands'), items: grouped.history, collapsed: historyCollapsed, custom: false },
+    { id: 'favorites', title: t('Favorites'), items: grouped.favorites, collapsed: isFolded('favorites'), custom: false },
+    ...grouped.groups.map(group => ({ ...group, title: group.name, collapsed: isFolded(group.id), custom: true })),
+    { id: 'history', title: t('Ungrouped commands'), items: grouped.history, collapsed: isFolded('history'), custom: false },
   ].sort((a, b) => commandGroupOrder(preferences).indexOf(a.id) - commandGroupOrder(preferences).indexOf(b.id))
     .filter(group => draggingCommand || group.items.length > 0 || group.custom && !organizedOnly && !query.trim() && status === 'all' && directory === 'project'
     || group.id === 'history' && !organizedOnly && (status !== 'all' || directory !== 'project'));
@@ -124,7 +148,7 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
     ...(organizedOnly ? [{ id: 'collection', label: t('Starred or grouped commands'), remove: () => setOrganizedOnly(false) }] : []),
     ...(directory === 'current' ? [{ id: 'directory', label: t('Current directory'), remove: () => setDirectory('project') }] : []),
   ];
-  const resetFilters = () => { setQuery(''); setStatus('all'); setDirectory('project'); setOrganizedOnly(false); };
+  const resetFilters = () => { changeQuery(''); setStatus('all'); setDirectory('project'); setOrganizedOnly(false); };
   const favorite = (item: CommandItem) => update(value => value.favorites.some(entry => commandKey(entry) === commandKey(item)) ? value : {
     ...value, favorites: [...value.favorites, { id: crypto.randomUUID(), name: item.name, command: item.command, cwd: item.cwd, shell: item.shell }],
   });
@@ -135,7 +159,7 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
     let name = base;
     for (let suffix = 2; names.has(name); suffix += 1) name = `${base} ${suffix}`;
     const id = crypto.randomUUID();
-    setQuery(''); setStatus('all'); setDirectory('project'); setOrganizedOnly(false);
+    changeQuery(''); setStatus('all'); setDirectory('project'); setOrganizedOnly(false);
     update(value => prependCommandGroup(value, { id, name, commandKeys: item ? [commandKey(item)] : [] }));
     setRenamingGroup({ id, name });
   };
@@ -203,7 +227,7 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
   };
   return <>
     <SidebarToolbar search={{ 'aria-label': t('Search command history'), placeholder: t('Search command history…'), value: query,
-      disabled: !library.ready, onChange: event => { setQuery(event.target.value); if (event.target.value.trim()) { setFavoritesCollapsed(false); setHistoryCollapsed(false); setCollapsedGroups(new Set()); } },
+      disabled: !library.ready, onChange: event => changeQuery(event.target.value),
       onKeyDown: event => { if (event.key === 'ArrowDown' && !event.nativeEvent.isComposing) { event.preventDefault(); commandRows(listRef.current)[0]?.focus(); } } }}>
       <IconBtn title={t('Write with AI')} disabled={!library.ready} aria-haspopup="dialog" onClick={openComposer}><Sparkles size={iconSizes.control} /></IconBtn>
       <IconBtn title={t('New command')} disabled={!library.ready} onClick={() => setEditor({ item: null })}><Plus size={iconSizes.control} /></IconBtn>
@@ -238,8 +262,8 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
       { label: t('New command group'), onClick: () => createGroup() },
       { label: t('AI auto-group'), disabled: !groupable.length, onClick: openGrouping },
       sortOptions,
-      { label: t('Expand all command groups'), group: 'view', onClick: () => { setFavoritesCollapsed(false); setHistoryCollapsed(false); setCollapsedGroups(new Set()); } },
-      { label: t('Collapse all command groups'), group: 'view', onClick: () => { setFavoritesCollapsed(true); setHistoryCollapsed(true); setCollapsedGroups(new Set(preferences.groups?.map(group => group.id))); } },
+      { label: t('Expand all command groups'), group: 'view', onClick: () => foldAll(false) },
+      { label: t('Collapse all command groups'), group: 'view', onClick: () => foldAll(true) },
       { label: t('Import older commands'), onClick: () => { void importLegacyCommands(context).then(setLegacy).catch(reason => setError(String(reason))); } },
       { label: t('Command history settings'), group: 'view', onClick: openCommandSettings },
       { label: t('Hidden commands and exclusion rules'), group: 'organize', onClick: () => setRulesMenu({}) },
@@ -278,9 +302,8 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
               onClick: () => update(value => ({ ...value, groups: value.groups?.map(entry => entry.id === group.id ? { ...entry, commandKeys: [] } : entry) })) },
           ] : [])]}
           color={preferences.groupColors?.[group.id]} collapsed={group.collapsed}
-          onToggle={group.id === 'history' ? () => setHistoryCollapsed(value => !value) : group.id === 'favorites' ? () => setFavoritesCollapsed(value => !value)
-            : () => setCollapsedGroups(value => { const next = new Set(value); if (next.has(group.id)) next.delete(group.id); else next.add(group.id); return next; })}
-          toggleLabel={group.id === 'favorites' ? t(favoritesCollapsed ? 'Expand favorites' : 'Collapse favorites') : undefined}
+          onToggle={() => toggleFold(group.id, group.collapsed)}
+          toggleLabel={group.id === 'favorites' ? t(group.collapsed ? 'Expand favorites' : 'Collapse favorites') : undefined}
           onColor={group.id === 'history' ? undefined : color => update(value => { const groupColors = { ...value.groupColors }; if (color) groupColors[group.id] = color; else delete groupColors[group.id]; return { ...value, groupColors }; })}
           onRename={group.custom ? () => setRenamingGroup({ id: group.id, name: group.title }) : undefined}
           renaming={renamingGroup !== null && renamingGroup.id === group.id}
@@ -337,7 +360,7 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
       command: editor.item.command, cwd: editor.item.cwd, shell: editor.item.shell } : { name: '', command: '', cwd: context.cwd, shell: commandEnvironment(context.spec).shell }}
       initialFocus={editor.focus === 'name' ? '[data-command-editor-name]' : undefined}
       creating={!editor.item} root={context.root} onClose={() => setEditor(null)} onSave={async draft => {
-        await library.saveCommand(editor.item, draft); setQuery(''); setStatus('all'); setDirectory('project');
+        await library.saveCommand(editor.item, draft); changeQuery(''); setStatus('all'); setDirectory('project');
         if (editor.groupId) update(value => moveCommandToGroup(value, commandKey(draft), editor.groupId!));
       }} />}
     <ConfirmDialog open={!!removing} title={t('Delete command?')} message={t('Delete “{{name}}” from command history and favorites? This cannot be undone.', { name: removing?.name ?? '' })}

@@ -197,6 +197,30 @@ test('keeps command rows compact, reveals details without execution and expands 
   await page.screenshot({ path: test.info().outputPath('compact-command-favorites.png') });
 });
 
+test('remembers folded sections and groups across reloads while saving them after search', async ({ page }) => {
+  const panel = page.getByTestId('command-history-panel');
+  const history = page.getByTestId('command-group-history');
+  await panel.getByRole('button', { name: '历史命令操作', exact: true }).click();
+  await page.getByRole('button', { name: '新建命令分组', exact: true }).click();
+  const name = page.getByRole('textbox', { name: '重命名命令分组', exact: true });
+  await name.fill('Release');
+  await name.press('Enter');
+  const group = panel.locator('.command-history-group').filter({ has: page.getByRole('button', { name: 'Release', exact: true }) });
+  await group.getByRole('button', { name: 'Release', exact: true }).click();
+  await history.getByRole('button', { name: '未分组命令', exact: true }).click();
+  await expect(page.getByTestId('command-history-build')).toBeHidden();
+  await page.screenshot({ path: test.info().outputPath('command-sections-folded.png') });
+  await page.reload();
+  await expect(history.getByRole('button', { name: '未分组命令', exact: true })).toHaveAttribute('aria-expanded', 'false');
+  await expect(group.getByRole('button', { name: 'Release', exact: true })).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByTestId('command-history-build')).toBeHidden();
+  const search = panel.getByRole('textbox', { name: '搜索历史命令', exact: true });
+  await search.fill('npm');
+  await expect(page.getByTestId('command-history-build')).toBeVisible();
+  await search.fill('');
+  await expect(page.getByTestId('command-history-build')).toBeHidden();
+});
+
 test('sorts by frequency across reloads and displays full long commands in a narrow sidebar', async ({ page }) => {
   const command = 'npm run build -- --mode production --base /preview/ --outDir dist/production';
   await page.evaluate(command => {
@@ -257,6 +281,8 @@ test('persists command groups, colors and membership through edits and group del
   await panel.getByRole('textbox', { name: '搜索历史命令', exact: true }).fill('npm');
   await expect(group.getByTestId('command-history-build')).toBeVisible();
   await panel.getByRole('textbox', { name: '搜索历史命令', exact: true }).fill('');
+  await expect(row).toBeHidden();
+  await group.getByRole('button', { name: 'Release', exact: true }).click();
   await row.hover();
   await row.getByRole('button', { name: '命令操作', exact: true }).click();
   await page.getByRole('button', { name: '编辑命令', exact: true }).click();
