@@ -141,7 +141,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     /* 子代理读取失败：跳过 */
   }
   const systemPrompt = [
-    buildSystemPrompt(settings.systemPrompt, plan.system),
+    buildSystemPrompt(settings.systemPrompt, plan.system, agentMode),
     executionPane === null ? 'No terminal is connected to this conversation. Answer questions using provided references. Do not claim to execute terminal commands.'
       : `Execution terminal: ${ctx?.environment?.label ?? executionPane}. Directory at request start: ${ctx?.environment?.cwd ?? 'unknown'}. This target stays fixed for this request.`,
     remote ? 'The execution terminal is remote. Use terminal tools for remote files; local file tools are unavailable.' : '',

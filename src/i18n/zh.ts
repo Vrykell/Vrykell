@@ -841,6 +841,7 @@ const zh: Record<string, string> = {
   'Conversation interrupted': '对话中断',
   'Stopped waiting; the terminal command may still be running': '已停止等待，终端命令可能仍在运行',
   'Reply stopped. Terminal commands may still be running.': '回复已停止。终端命令可能仍在运行。',
+  'The provider returned a tool call as plain text, so no tool ran. Use an endpoint or model that reports tool calls in the standard format.': '服务商把工具调用当成纯文本返回了，本次没有执行任何工具。请改用按标准格式返回工具调用的端点或模型。',
   'No execution terminal is connected to this conversation.': '没有可用的终端会话，请为对话选择执行终端。',
   "New conversation": "新对话",
   "Local terminal": "本地终端",
