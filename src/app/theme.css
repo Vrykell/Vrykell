@@ -1062,6 +1062,23 @@ input.text-input-field:disabled { opacity: 0.55; }
 /* Input helpers retain their geometry for native composition but never paint text. */
 .xterm .xterm-helper-textarea { opacity: 0 !important; color: transparent !important; -webkit-text-fill-color: transparent !important; background: transparent !important; border: none !important; box-shadow: none !important; }
 .xterm .xterm-helpers .composition-view { background: var(--xterm-bg); color: var(--xterm-foreground); }
+/* The preedit mirror carries no caret of its own - the native one lives in the invisible
+ * helper textarea - and it covers the block cursor, so an active composition would show
+ * text with no insertion point. Reserve a cell after the text and paint the terminal
+ * cursor colour into it, blinking on the renderer's one-second cycle. The caret is
+ * positioned against the box edge on purpose: newer terminal builds lay this overlay out
+ * right-to-left, where an in-flow element would land before the text. */
+.xterm .xterm-helpers .composition-view.active { padding-right: 1ch; }
+.xterm .xterm-helpers .composition-view.active::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1ch;
+  background: var(--xterm-cursor);
+  animation: cursor-blink 1s step-end infinite;
+}
 /* The overview border otherwise cuts through selected cells near the right edge. */
 .xterm .xterm-decoration-overview-ruler { display: none; }
 

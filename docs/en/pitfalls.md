@@ -189,6 +189,13 @@ Fitting that clears the renderer before resizing causes an additional blank fram
 - **Residual risk (not fixed)**: East Asian "ambiguous width" characters (`█▀▄─│`, U+2580–259F) render as **full-width** glyphs in the browser (measured 14px = 2 cells) while xterm accounts for them as one cell (`getCell().getWidth() === 1`). A TUI that draws with block characters therefore overflows the row and wraps in a snapshot; the CLI in this report paints with reverse-video spaces and never triggers it. Fixing it means forcing the cell advance inside the snapshot (or changing the font stack) — far larger blast radius than this row-height change, so it is left as a separate change.
 - **Lesson**: a row height is not "font size × a factor". A terminal is a grid, so the size must come from the same measurement as the canvas; wherever a canvas and the DOM have to reproduce one grid, neither may derive it from a formula of its own.
 
+### 4.8 The Preedit Mirror Carries No Caret and Covers the Block Cursor → Composing Text Shows No Insertion Point; Once Newer Terminal Builds Lay It Out Right-to-Left, an In-Flow `::after` Lands Before the Text (`theme.css` composition-view rules, `terminal-ime-restore.spec.ts`)
+- **Symptom**: while an East Asian IME composes (pinyin preedit "ni'hao") the terminal shows the preedit with no cursor after it; outside composition the block cursor in the same cell is visible.
+- **Root cause**: the preedit is drawn by the parser's own mirror layer (`.composition-view`), which has no caret element, while the native caret lives in the hidden helper textarea — and that one has to stay `opacity: 0`, otherwise the terminal paints the text twice. The mirror is anchored on the block cursor's cell with an opaque background, so it hides the block cursor and the visible insertion point goes with it.
+- **Fix**: while the mirror is active, reserve one cell at the box edge in the inline direction (`padding-right: 1ch`) and paint an absolutely positioned `::after` block in the terminal cursor colour, blinking on the renderer's one-second cycle.
+- **Trap**: newer terminal builds lay the mirror out with `direction: rtl` (so a long preedit keeps its end visible). An **in-flow** `::after` is then ordered by the bidi algorithm *before* the text, which reads as a caret in front of the preedit; only an absolutely positioned caret against the **physical** right edge (`right: 0` plus the reserved cell) holds in both writing directions.
+- **Regression**: `terminal-ime-restore.spec.ts` keeps a caret after an active preedit, asserting the preedit text, the caret styles and the pixels (the caret cell must not equal an empty cell).
+
 ---
 
 ## 5. Scrolling / Viewport
