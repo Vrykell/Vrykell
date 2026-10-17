@@ -527,12 +527,16 @@ button.outline-button > svg { flex-shrink: 0; }
 button.outline-button:enabled:is(:hover, :focus) { background: var(--action-button-hover-bg); }
 button.outline-button:disabled { opacity: 0.45; cursor: default; }
 
-/* Windows/Linux 鏃犳湁鍘熺敓鏍囬鏍忔椂鐨勭獥鍙ｆ帶鍒舵寜閽?*/
+/* Window controls fill the titlebar edge on platforms without a native one. The buttons
+   opt out of the default button surface: a pointer click focuses them, so the generic
+   focus tint would linger after the pointer leaves. Their own rules paint only while the
+   pointer is over them or the keyboard focus is visible. */
 button.window-control-button {
   background: transparent;
   color: var(--text-secondary);
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
-.window-control-button:hover {
+.window-control-button:is(:hover, :focus-visible) {
   background: var(--button-hover);
   color: var(--text-primary);
 }
