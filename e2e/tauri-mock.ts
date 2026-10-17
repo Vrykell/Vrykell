@@ -1,6 +1,8 @@
-import type { Page } from '@playwright/test';
+import type { BrowserContext, Page } from '@playwright/test';
 
 export interface TauriMockOptions {
+  /** Use each terminal's requested directory for its initial prompt. */
+  terminalDirectories?: boolean;
   launchDirectory?: string;
   contextMenu?: { available?: boolean; enabled?: boolean; stale?: boolean; certificateTrusted?: boolean };
   /** 是否启用 OSC 133 shell integration（默认 true）。
@@ -38,7 +40,7 @@ export interface TauriMockOptions {
  * invoke → __TAURI_INTERNALS__.invoke(cmd, args)
  * listen → transformCallback 注册 window[`_${id}`]，再 invoke('plugin:event|listen', {event, handler: id})
  */
-export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
+export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMockOptions = {}) {
   const integration = opts.integration !== false;
   const seedModels = opts.aiModels ?? [
     { id: 'm-main', name: '主力模型', provider: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', model: 'claude-sonnet-5', capabilities: { vision: true, reasoning: true, tools: true, search: true } },
@@ -56,12 +58,36 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
     { name: '旧脚本技能', description: '遗留技能，含脚本', source: 'market', trusted: false, enabled: false, hasScripts: true, modified: true, files: ['SKILL.md', 'scripts/run.sh', 'references/说明.md'], dir: '/home/e2e/.vrykell/skills/旧脚本技能', prompt: '运行 scripts/run.sh 完成工作。' },
   ];
   await page.addInitScript(
-    ({ enableIntegration, enableReadyMarker, models, active, skillsSeed, scheduleSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession, launchDirectory, menuSeed }) => {
+    ({ enableIntegration, enableReadyMarker, models, active, skillsSeed, scheduleSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession, launchDirectory, menuSeed, terminalDirectories }) => {
     const menu = { supported: true, available: true, enabled: false, stale: false, certificateTrusted: false, certificateThumbprint: 'E2E-CERTIFICATE', ...menuSeed };
     const menuActions: string[] = [];
     (window as unknown as { __MENU_ACTIONS__: string[] }).__MENU_ACTIONS__ = menuActions;
     let cbCounter = 0;
     const eventListeners = new Map<string, number>();
+    const toolListeners = new Map<string, number>();
+    let windowToken = new URLSearchParams(location.search).get('toolWindow') ?? (window.name.startsWith('tool-') ? window.name.slice(5) : null);
+    let windowLabel = windowToken ? `tool-${windowToken}` : 'main';
+    const toolChannel = new BroadcastChannel('mock-tool-windows');
+    const toolPopups = new Map<string, Window>();
+    const windowOps: { command: string; label?: string; value?: unknown }[] = [];
+    (window as unknown as { __WINDOW_OPS__: typeof windowOps }).__WINDOW_OPS__ = windowOps;
+    const receiveTool = (data: { event: string; label: string; payload: unknown }) => {
+      windowOps.push({ command: `received:${data.event}`, label: data.label, value: data.event === 'tauri://destroyed' ? data.payload : undefined });
+      if (data.label === windowLabel) emit(data.event, data.payload);
+      const callback = toolListeners.get(`${data.event}:${data.label}`);
+      if (callback !== undefined) (window as unknown as Record<string, (event: unknown) => void>)[`_${callback}`]?.({ event: data.event, id: 0, payload: data.payload });
+    };
+    toolChannel.onmessage = ({ data }: MessageEvent<{ event: string; label: string; payload: unknown }>) => receiveTool(data);
+    (window as unknown as { __RECEIVE_TOOL__: typeof receiveTool }).__RECEIVE_TOOL__ = receiveTool;
+    const sendTool = (data: { event: string; label: string; payload: unknown }) => {
+      const target = data.label === 'main' ? window.opener as Window | null : toolPopups.get(data.label);
+      const receive = target && (target as unknown as { __RECEIVE_TOOL__?: typeof receiveTool }).__RECEIVE_TOOL__;
+      if (receive) receive(data); else toolChannel.postMessage(data);
+    };
+    let nativeFocused = true;
+    let nativeMinimized = false;
+    window.addEventListener('blur', () => { nativeFocused = false; if (windowToken) emit('tauri://blur', null); });
+    window.addEventListener('focus', () => { nativeFocused = true; nativeMinimized = false; if (windowToken) emit('tauri://focus', null); });
     let fullscreen = false;
     const writes: string[] = [];
     const sshTrusts: Record<string, unknown>[] = [];
@@ -149,6 +175,10 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
       ? [{ id: 'archived-group', title: '已归档分组', sort_order: 0, collapsed: false, created_at: Date.now() - 3000, session_count: 0, archived: true }]
       : [];
     const mockChatMessages: Record<string, unknown>[] = [];
+    const createdSessions = new Map<string, Record<string, unknown>>();
+    const savedGroups = localStorage.getItem('mock-reviewed-tab-groups');
+    const savedSessions = localStorage.getItem('mock-reviewed-tab-sessions');
+    if (savedGroups && savedSessions) { mockGroups.splice(0, mockGroups.length, ...JSON.parse(savedGroups)); mockSessions.splice(0, mockSessions.length, ...JSON.parse(savedSessions)); }
     const mockConversations = JSON.parse(localStorage.getItem('e2e-conversations') || '[]') as Record<string, unknown>[];
     const mockConversationMessages = JSON.parse(localStorage.getItem('e2e-conversation-messages') || '[]') as Record<string, unknown>[];
     const saveConversations = () => {
@@ -278,10 +308,10 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
 
     /** 发送初始 prompt，把场景从 classic 切到 blockList。
      *  顺序与真实 RC 一致（shell_integration.rs：OSC7 → D → A → G），防 cwd 归属回归。 */
-    function emitInitialPrompt() {
+    function emitInitialPrompt(cwd = '/home/e2e/project') {
       if (!integrationEnabled) return;
       const ready = enableReadyMarker ? '\x1b]133;B\x07' : '';
-      emitOutput(`${OSC7('/home/e2e/project')}${A}~/project${G('main')} $ ${ready}`);
+      emitOutput(`${OSC7(cwd)}${A}~/project${G('main')} $ ${ready}`);
     }
 
     /** 发送 OSC 133 序列模拟 shell integration 输出 */
@@ -360,8 +390,13 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
       return lines.join('\n\n') + '\n\n';
     }
 
+    (window as unknown as Record<string, unknown>).__TAURI_EVENT_PLUGIN_INTERNALS__ = {
+      unregisterListener: (_event: string, eventId: number) => {
+        for (const [key, id] of eventListeners) if (id === eventId) eventListeners.delete(key);
+      },
+    };
     (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {
-      metadata: { currentWindow: { label: 'main' }, windows: [{ label: 'main' }] },
+      metadata: { currentWindow: { label: windowLabel }, currentWebview: { label: windowLabel }, windows: [{ label: windowLabel }] },
       transformCallback: (cb: (r: unknown) => void, once = false) => {
         const id = ++cbCounter;
         (window as unknown as Record<string, unknown>)[`_${id}`] = (response: unknown) => {
@@ -376,12 +411,63 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
       convertFileSrc: (p: string) => p,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       invoke: async (cmd: string, args: any) => {
+        windowToken = new URLSearchParams(location.search).get('toolWindow');
+        windowLabel = windowToken ? `tool-${windowToken}` : 'main';
+        const metadata = (window as unknown as { __TAURI_INTERNALS__: { metadata: { currentWindow: { label: string }; currentWebview: { label: string } } } }).__TAURI_INTERNALS__.metadata;
+        metadata.currentWindow.label = windowLabel; metadata.currentWebview.label = windowLabel;
         switch (cmd) {
+          case 'command_history_context':
+            return { root: args.root || String(args.cwd).replace(/\/src-tauri\/?$/, ''), platform: args.connectionId ? 'remote POSIX' : 'linux', files: args.includeFiles ? [{ path: 'package.json', text: '{"scripts":{"build":"vite build"}}' }] : [] };
+          case 'command_history_preferences':
+            return JSON.parse(localStorage.getItem(`mock-command-history-preferences:${args.scope}`) || 'null');
+          case 'command_history_save_preferences':
+            localStorage.setItem(`mock-command-history-preferences:${args.scope}`, JSON.stringify(args.payload));
+            return undefined;
+          case 'command_history_record': {
+            const runs = JSON.parse(localStorage.getItem('mock-command-history-runs') || '[]') as Record<string, unknown>[];
+            const removed = JSON.parse(localStorage.getItem('mock-command-history-removed-runs') || '[]') as string[];
+            if (removed.includes(args.entry.id)) return undefined;
+            const index = runs.findIndex(run => run.id === args.entry.id);
+            if (index >= 0) runs[index] = args.entry; else runs.push(args.entry);
+            localStorage.setItem('mock-command-history-runs', JSON.stringify(runs));
+            return undefined;
+          }
+          case 'command_history_mutate': {
+            const change = args.change as { target: string; root: string; scope: string; original: { shell: string; cwd: string; command: string } | null;
+              draft: { name: string; shell: string; cwd: string; command: string } | null; preferences: unknown };
+            let runs = JSON.parse(localStorage.getItem('mock-command-history-runs') || '[]') as Record<string, unknown>[];
+            const matches = (run: Record<string, unknown>, key: NonNullable<typeof change.original>) =>
+              run.target === change.target && run.shell === key.shell && run.cwd === key.cwd && run.command === key.command;
+            const previous = change.original ? runs.filter(run => matches(run, change.original!)) : [];
+            const same = change.original && change.draft && change.original.shell === change.draft.shell && change.original.cwd === change.draft.cwd && change.original.command === change.draft.command;
+            if (change.draft && change.original && !previous.length) throw new Error('This command no longer exists. Refresh the history and try again.');
+            if (change.draft && !same && runs.some(run => matches(run, change.draft!))) throw new Error('A command with this text already exists in this directory.');
+            if (same) runs = runs.map(run => previous.includes(run) ? { ...run, name: change.draft!.name } : run);
+            else {
+              const removed = JSON.parse(localStorage.getItem('mock-command-history-removed-runs') || '[]') as string[];
+              localStorage.setItem('mock-command-history-removed-runs', JSON.stringify([...new Set([...removed, ...previous.map(run => String(run.id))])]));
+              runs = runs.filter(run => !previous.includes(run));
+              if (change.draft) runs.push({ id: `manual:${crypto.randomUUID()}`, target: change.target, ...change.draft, timestamp: Date.now(), runCount: 0, status: 'unknown', exitCode: null });
+            }
+            localStorage.setItem('mock-command-history-runs', JSON.stringify(runs));
+            localStorage.setItem(`mock-command-history-preferences:${change.scope}`, JSON.stringify(change.preferences));
+            return change.preferences;
+          }
+          case 'command_history_list': {
+            const runs = JSON.parse(localStorage.getItem('mock-command-history-runs') || '[]') as Record<string, unknown>[];
+            const merged = new Map<string, Record<string, unknown>>();
+            for (const run of runs.filter(run => run.target === args.target && (run.cwd === args.root || String(run.cwd).startsWith(`${args.root}/`)))) {
+              const key = JSON.stringify([run.shell, run.cwd, run.command]);
+              const previous = merged.get(key);
+              merged.set(key, { ...(Number(previous?.timestamp ?? 0) > Number(run.timestamp) ? previous : run), name: String(run.name || previous?.name || ''), runCount: Number(previous?.runCount ?? 0) + Number(run.runCount ?? 1) });
+            }
+            return [...merged.values()].sort((a, b) => Number(b.timestamp) - Number(a.timestamp));
+          }
           case 'pty_spawn': {
             spawns.push(args);
             sshSession = Boolean(args.ssh);
             // 注册完 listener 后再发初始 prompt，避免瞬间丢失
-            setTimeout(emitInitialPrompt, 20);
+            setTimeout(() => emitInitialPrompt(terminalDirectories ? args.cwd || '/home/e2e/project' : undefined), 20);
             return 'e2e-session';
           }
           case 'pty_write': {
@@ -941,6 +1027,9 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
           case 'archive_session':
             { const session = mockSessions.find(item => item.id === args.id); if (session) { session.status = 'historical'; session.closed_at = args.timestamp as number; } }
             return undefined;
+          case 'create_session':
+            createdSessions.set(args.id, { id: args.id, title: args.title, status: 'active', created_at: args.timestamp, closed_at: null, block_count: 0, cwd: args.cwd ?? '', group_id: null, sort_order: 0, kind: args.kind, payload: args.payload });
+            return undefined;
           case 'restore_session': {
             const session = mockSessions.find(item => item.id === args.id);
             if (session) {
@@ -954,6 +1043,20 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
             return mockSessions.find((s) => s.id === args.id) ?? null;
           case 'groups_list':
             return mockGroups.map(group => ({ ...group, session_count: mockSessions.filter(session => session.group_id === group.id && session.status === 'active').length }));
+          case 'groups_apply_plan': {
+            const plan = args.groups as { id: string; title: string; itemIds: string[] }[];
+            if (plan.some(group => group.itemIds.some(id => !mockSessions.some(session => session.id === id && session.status === 'active') && !createdSessions.has(id)))) throw new Error('A session changed.');
+            for (const [index, group] of plan.entries()) {
+              if (!mockGroups.some(entry => entry.id === group.id)) mockGroups.push({ id: group.id, title: group.title, sort_order: mockGroups.length + index, collapsed: false, archived: false, created_at: Date.now(), session_count: 0 });
+              group.itemIds.forEach((id, order) => {
+                let session = mockSessions.find(session => session.id === id);
+                if (!session) { session = createdSessions.get(id)!; mockSessions.push(session); }
+                session.group_id = group.id; session.sort_order = order;
+              });
+            }
+            localStorage.setItem('mock-reviewed-tab-groups', JSON.stringify(mockGroups)); localStorage.setItem('mock-reviewed-tab-sessions', JSON.stringify(mockSessions));
+            return undefined;
+          }
           case 'group_rename': {
             const group = mockGroups.find(item => item.id === args.id);
             if (group) group.title = args.title;
@@ -1190,8 +1293,58 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
           case 'ssh_sweep_undo':
             return undefined;
           case 'plugin:event|listen':
+            if ((args.target as { label?: string })?.label?.startsWith('tool-') && (args.target as { label: string }).label !== windowLabel) {
+              toolListeners.set(`${args.event}:${(args.target as { label: string }).label}`, args.handler as number);
+              return 0;
+            }
             eventListeners.set(args.event as string, args.handler as number);
             return 0;
+          case 'plugin:event|emit_to': {
+            windowOps.push({ command: `sent:${args.event}`, label: (args.target as { label: string }).label });
+            const label = (args.target as { label: string }).label;
+            if (label === windowLabel) emit(args.event as string, args.payload);
+            else sendTool({ event: args.event as string, label, payload: args.payload });
+            return undefined;
+          }
+          case 'plugin:webview|create_webview_window': {
+            const options = args.options as { url: string; label: string; width: number; height: number };
+            windowOps.push({ command: cmd, label: options.label, value: options });
+            const popup = window.open(options.url, options.label, `popup,width=${options.width},height=${options.height}`);
+            if (!popup) throw new Error('Popup blocked');
+            toolPopups.set(options.label, popup);
+            return undefined;
+          }
+          case 'plugin:window|close':
+            windowOps.push({ command: cmd, label: args.label as string });
+            if (windowToken) emit('tauri://close-requested', null);
+            else for (const popup of toolPopups.values()) popup.close();
+            return undefined;
+          case 'plugin:window|destroy':
+            windowOps.push({ command: cmd, label: args.label as string,
+              value: (window as unknown as { __LLM_ABORTED__?: Set<string> }).__LLM_ABORTED__?.size ?? 0 });
+            if (windowToken) { sendTool({ label: windowLabel, event: 'tauri://destroyed', payload: { aborted: (window as unknown as { __LLM_ABORTED__?: Set<string> }).__LLM_ABORTED__?.size ?? 0 } }); setTimeout(() => window.close(), 0); }
+            return undefined;
+          case 'plugin:window|minimize':
+            nativeMinimized = true;
+            windowOps.push({ command: cmd, label: args.label as string });
+            return undefined;
+          case 'plugin:window|is_focused': return nativeFocused;
+          case 'plugin:window|is_minimized': return nativeMinimized;
+          case 'plugin:window|unminimize':
+            nativeMinimized = false;
+            toolPopups.get(args.label as string)?.dispatchEvent(new Event('focus'));
+            windowOps.push({ command: cmd, label: args.label as string });
+            return undefined;
+          case 'plugin:window|set_focus':
+            nativeFocused = true; nativeMinimized = false;
+            toolPopups.get(args.label as string)?.dispatchEvent(new Event('focus'));
+            windowOps.push({ command: cmd, label: args.label as string });
+            return undefined;
+          case 'plugin:window|show':
+          case 'plugin:window|set_always_on_top':
+          case 'plugin:window|start_dragging':
+            windowOps.push({ command: cmd, label: args.label as string, value: args.alwaysOnTop });
+            return undefined;
           case 'plugin:event|unlisten':
             return undefined;
           case 'plugin:window|is_fullscreen':
@@ -1211,7 +1364,7 @@ export async function setupTauriMock(page: Page, opts: TauriMockOptions = {}) {
       },
     };
     localStorage.setItem('vrykell-api-key', 'sk-e2e-fake');
-  }, { enableIntegration: integration, enableReadyMarker: opts.shellReadyMarker !== false, models: seedModels, active: seedActive, skillsSeed: seedSkills, scheduleSeed: seedSchedules, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true, sshPreexec: opts.sshPreexec ?? true, groupedHistoricalSession: opts.groupedHistoricalSession ?? false, launchDirectory: opts.launchDirectory, menuSeed: opts.contextMenu });
+  }, { enableIntegration: integration, enableReadyMarker: opts.shellReadyMarker !== false, models: seedModels, active: seedActive, skillsSeed: seedSkills, scheduleSeed: seedSchedules, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true, sshPreexec: opts.sshPreexec ?? true, groupedHistoricalSession: opts.groupedHistoricalSession ?? false, launchDirectory: opts.launchDirectory, menuSeed: opts.contextMenu, terminalDirectories: opts.terminalDirectories ?? false });
 }
 
 /** 预置 AI 回复文本：mock 的 ai_stream 会按 chunk 流式 emit ai-chunk 事件。

@@ -5,6 +5,7 @@ use std::sync::Mutex;
 pub mod download;
 pub mod conversation;
 pub mod history;
+pub mod command_history;
 pub mod session;
 pub mod ssh_connection;
 pub mod workspace;
@@ -182,6 +183,7 @@ fn init_schema(conn: &Connection) -> Result<(), String> {
             .map_err(|e| e.to_string())?;
     }
     conversation::init_conversations(conn)?;
+    command_history::init(conn)?;
     // Keep the existing schema version to avoid resetting compatible databases.
     conn.execute_batch("PRAGMA user_version = 2;")
         .map_err(|e| format!("记录 schema 版本失败：{e}"))?;

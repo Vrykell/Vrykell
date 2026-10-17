@@ -39,6 +39,11 @@ describe('toRgba', () => {
 });
 
 describe('默认调色板（中性灰色）', () => {
+  it.each(['dark', 'light'] as const)('%s primary actions keep the same blue independently of message bubbles', mode => {
+    expect(themes[mode].primaryAction).toBe(themes.dark.accentUser);
+    expect(paletteToCssVars(themes[mode])['--primary-action']).toBe(themes.dark.primaryAction);
+    if (mode === 'light') expect(themes[mode].primaryAction).not.toBe(themes[mode].accentUser);
+  });
   it.each(['dark', 'light'] as const)('%s keeps blue text carets separate from terminal cursors', mode => {
     const cursor = themes[mode].textCaret;
     const channels = [1, 3, 5].map(offset => parseInt(cursor.slice(offset, offset + 2), 16));

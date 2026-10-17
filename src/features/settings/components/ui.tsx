@@ -60,14 +60,14 @@ export function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boo
       onClick={() => { void save(() => onChange(!on)); }}
       style={{
         width: 38, height: 22, borderRadius: 10, border: 'none', cursor: 'pointer',
-        background: on ? 'var(--accent)' : 'var(--hover)', position: 'relative', flexShrink: 0,
+        background: on ? 'var(--primary-button-bg)' : 'var(--hover)', position: 'relative', flexShrink: 0,
       }}
     >
       <span
         style={{
           position: 'absolute', top: 3, left: on ? 19 : 3, width: 16, height: 16,
           borderRadius: '50%', transition: 'left 0.16s var(--ease)',
-          background: on ? 'var(--accent-text)' : 'var(--text-muted)',
+          background: on ? 'var(--primary-button-text)' : 'var(--text-muted)',
         }}
       />
     </button><span aria-hidden="true">{on ? '已开启' : '已关闭'}</span></span>

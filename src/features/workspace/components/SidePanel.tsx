@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState, type FC } from 'react';
 import { iconSizes, X  } from '@ui/icons';
-import { useDockStore, PANEL_DEFS, MIN_PANEL_WIDTH, type DockSide } from '@features/workspace';
+import { useDockStore, PANEL_DEFS, MIN_PANEL_WIDTH, useNavigationButtonDrag, useNavigationDrag, type DockSide } from '@features/workspace';
 import ResizeHandle from '@ui/ResizeHandle';
 import PanelTabs from '@features/workspace/components/PanelTabs';
 import PanelFiles from '@features/files/components/PanelFiles';
 import PanelSsh from '@features/ssh/components/PanelSsh';
 import PanelChat from '@features/chat/components/PanelChat';
+import PanelCommandHistory from '@features/command-history/components/PanelCommandHistory';
 
 interface SidePanelProps {
   side: DockSide;
@@ -16,6 +17,7 @@ const PANEL_COMPONENTS: Record<string, FC> = {
   files: PanelFiles,
   ssh: PanelSsh,
   chat: PanelChat,
+  'command-history': PanelCommandHistory,
 };
 
 export default function SidePanel({ side }: SidePanelProps) {
@@ -43,6 +45,8 @@ export default function SidePanel({ side }: SidePanelProps) {
 }
 
 function SinglePanel({ side, panelId, visible }: { side: DockSide; panelId: string; visible: boolean }) {
+  const startDrag = useNavigationButtonDrag();
+  const dragging = useNavigationDrag(state => state.id === panelId);
   const setPanelWidth = useDockStore((s) => s.setPanelWidth);
   const commitPanelWidth = useDockStore((s) => s.commitPanelWidth);
   const panelWidths = useDockStore((s) => s.panelWidths);
@@ -100,7 +104,8 @@ function SinglePanel({ side, panelId, visible }: { side: DockSide; panelId: stri
         background: 'var(--sidebar-bg)',
         borderRadius: 'inherit', overflow: 'hidden',
       }}>
-        <div className="workspace-panel-heading">
+        <div className="workspace-panel-heading" data-testid={`panel-drag-handle-${panelId}`} data-dragging={dragging}
+          onPointerDown={event => startDrag(event, panelId)}>
           <span>{panelId === 'chat' ? 'AI 助手' : def.label}</span>
           <button data-subtle className="workspace-panel-close" aria-label={`关闭${panelId === 'chat' ? 'AI 助手' : def.label}面板`}
             onClick={() => useDockStore.getState().togglePanel(side, panelId)}><X size={iconSizes.control} /></button>

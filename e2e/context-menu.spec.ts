@@ -31,13 +31,15 @@ test('a shell launch opens exactly one terminal at the requested path even with 
   })).toBe(1);
 });
 
-test('Windows hides the window border and retains native corner geometry', async ({ page }) => {
+test('Windows leaves corner clipping to the compositor and fills the control edges', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   const root = page.locator('.application-window');
   await root.evaluate(element => element.setAttribute('data-platform', 'windows'));
-  await expect(root).toHaveCSS('border-top-right-radius', '8px');
+  await expect(root).toHaveCSS('border-top-right-radius', '0px');
   expect(await root.evaluate(element => getComputedStyle(element, '::after').display)).toBe('none');
+  await page.getByTestId('window-close').hover();
+  expect(await page.getByTestId('window-close').evaluate(element => element.contains(document.elementFromPoint(window.innerWidth - 1, 0)))).toBe(true);
   await page.screenshot({ path: test.info().outputPath('window-corner.png'), clip: { x: 1160, y: 0, width: 80, height: 80 } });
   await page.getByTestId('window-controls').evaluate(element => element.setAttribute('data-window-maximized', 'true'));
   await expect(root).toHaveCSS('border-top-right-radius', '0px');

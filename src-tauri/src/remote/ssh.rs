@@ -312,7 +312,7 @@ fn connection_stage<T>(conn: &SshConnection, stage: &str, action: impl FnOnce() 
     result
 }
 
-fn connect_with_timeout(conn: &SshConnection, timeout: Option<Duration>) -> Result<Session, String> {
+pub(crate) fn connect_with_timeout(conn: &SshConnection, timeout: Option<Duration>) -> Result<Session, String> {
     let credential = AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.get(conn);
     let result = connect_authenticated(conn, timeout, credential.as_deref());
     if result.as_ref().err().is_some_and(|error| error.starts_with("SSH_AUTH_FAILED:")) {

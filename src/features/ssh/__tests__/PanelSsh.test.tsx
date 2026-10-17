@@ -17,6 +17,8 @@ it('selects and resets persistent connection colors from its keyboard menu', () 
   render(<PanelSsh />);
   const row = screen.getByTestId('ssh-row-remote');
   fireEvent.keyDown(row, { key: 'F10', shiftKey: true });
+  expect(screen.queryByRole('menuitem', { name: '图标颜色' })).toBeNull();
+  expect(screen.getByRole('group', { name: '图标颜色' }).closest('.context-menu-footer')).not.toBeNull();
   fireEvent.click(screen.getByRole('menuitemradio', { name: '紫色' }));
   expect(row.querySelector('svg')!.style.color).toBe('var(--group-violet)');
   expect(useIconColorStore.getState().colors['ssh:remote']).toBe('violet');

@@ -97,7 +97,9 @@ for (const theme of ['dark', 'light'] as const) {
     const primary = dialog.getByTestId('ssh-import-confirm');
     const primaryColor = await primary.evaluate(element => getComputedStyle(element).backgroundColor);
     await primary.focus();
-    await expect(primary).toHaveCSS('background-color', primaryColor);
+    expect(primaryColor).toBe(await themeColor(page, '--primary-button-bg'));
+    await expect(primary).toHaveCSS('background-color', await themeColor(page, '--primary-button-hover-bg'));
+    await page.screenshot({ path: testInfo.outputPath(`blue-primary-${theme}.png`), animations: 'disabled' });
     await primary.click();
     await page.getByTestId('ssh-import-btn').click();
     const disabled = dialog.getByTestId('ssh-import-select-all');

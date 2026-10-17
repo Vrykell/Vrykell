@@ -72,6 +72,9 @@ typechecking, architecture checks, or dev mode as appropriate.
   controls keep an `aria-label` as their accessible name.
 - **Multi-select menus** use `src/ui/CheckboxMenu.tsx`: toggling keeps the menu open and
   it closes only when it loses focus (outside press or Escape).
+- **Menu hierarchy and colors** - color palettes in action menus always appear directly below the actions
+  in the shared footer, never in a submenu. Use a meaningful submenu for multiple related
+  choices; keep single destinations and switches directly accessible, without a generic Settings parent.
 - **One implementation per surface** - local and SSH file panels share the `FileOps`
   interface plus `filePanelConfig`; view code must not branch on the target or bypass the
   interface (rule 24 in `docs/zh/development-rules.md`).

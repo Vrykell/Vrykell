@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type RefObject, type PointerEvent, type CSSProperties } from 'react';
 import { scrollbarGeometry, scrollbarOffset } from './scrollbarGeometry';
 
+const TRACK_INSET = 4;
+
 interface Props {
   scrollRef: RefObject<HTMLElement | null>;
   controlsId: string;
@@ -21,6 +23,7 @@ export default function OverlayScrollbar({ scrollRef, controlsId, label, horizon
     horizontal ? scroll.clientWidth : scroll.clientHeight,
     horizontal ? scroll.scrollWidth : scroll.scrollHeight,
     horizontal ? scroll.scrollLeft : scroll.scrollTop,
+    Math.max(0, (horizontal ? scroll.clientWidth : scroll.clientHeight) - TRACK_INSET * 2),
   );
 
   useEffect(() => {
@@ -95,7 +98,7 @@ export default function OverlayScrollbar({ scrollRef, controlsId, label, horizon
     if (!scroll) return;
     const current = readGeometry(scroll);
     const bounds = event.currentTarget.getBoundingClientRect();
-    const value = scrollbarOffset((horizontal ? event.clientX - bounds.left : event.clientY - bounds.top) - offset, current);
+    const value = scrollbarOffset((horizontal ? event.clientX - bounds.left : event.clientY - bounds.top) - TRACK_INSET - offset, current);
     if (horizontal) scroll.scrollLeft = value;
     else scroll.scrollTop = value;
   };
@@ -104,7 +107,7 @@ export default function OverlayScrollbar({ scrollRef, controlsId, label, horizon
   return <div
     className="overlay-scrollbar"
     data-horizontal={horizontal}
-    style={placement}
+    style={{ ...placement, '--scrollbar-inset': `${TRACK_INSET}px` } as CSSProperties}
     data-no-drag
     data-dragging={dragging}
     role="scrollbar"
@@ -122,7 +125,7 @@ export default function OverlayScrollbar({ scrollRef, controlsId, label, horizon
       if (!floating) event.currentTarget.focus({ preventScroll: true });
       const offset = event.target === event.currentTarget ? geometry.height / 2
         : (horizontal ? event.clientX - event.currentTarget.getBoundingClientRect().left
-          : event.clientY - event.currentTarget.getBoundingClientRect().top) - geometry.top;
+          : event.clientY - event.currentTarget.getBoundingClientRect().top) - TRACK_INSET - geometry.top;
       drag.current = { pointer: event.pointerId, offset };
       event.currentTarget.setPointerCapture(event.pointerId);
       setDragging(true);
@@ -172,8 +175,8 @@ export default function OverlayScrollbar({ scrollRef, controlsId, label, horizon
       else scroll.scrollTop = next;
     }}
   >
-    <div className="overlay-scrollbar-thumb" style={horizontal
+    <div className="overlay-scrollbar-track"><div className="overlay-scrollbar-thumb" style={horizontal
       ? { width: geometry.height, transform: `translateX(${geometry.top}px)` }
-      : { height: geometry.height, transform: `translateY(${geometry.top}px)` }} />
+      : { height: geometry.height, transform: `translateY(${geometry.top}px)` }} /></div>
   </div>;
 }

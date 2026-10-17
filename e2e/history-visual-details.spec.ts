@@ -95,7 +95,9 @@ for (const theme of ['dark', 'light'] as const) {
     expect(widths.length).toBeGreaterThan(2);
     expect(new Set(widths).size).toBe(1);
     expect(parseFloat(widths[0]!)).toBeGreaterThan(0);
+    await expect(menu.getByRole('menuitem', { name: '分组颜色', exact: true })).toHaveCount(0);
     await expect(menu.locator('.context-menu-footer')).toHaveCSS('border-top-width', '0px');
+    await expect(menu.getByRole('menuitemradio', { name: '蓝色', exact: true })).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath(`history-group-menu-${theme}.png`), animations: 'disabled' });
     await page.keyboard.press('Escape');
 

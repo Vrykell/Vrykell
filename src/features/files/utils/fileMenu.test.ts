@@ -40,7 +40,7 @@ describe('fileMenu', () => {
       handlers: handlers({ onPasteInto }),
     }));
 
-    items[0]!.onClick();
+    items[0]!.onClick?.();
 
     expect(onPasteInto).toHaveBeenCalledWith('/work/sub');
   });
@@ -66,12 +66,12 @@ describe('fileMenu', () => {
 
     const row = buildFileMenuItems(['reveal'], ctx({ entry: file, targets: [file], handlers: handlers({ onReveal, onRevealDir }) }));
     expect(row).toHaveLength(1);
-    row[0]!.onClick();
+    row[0]!.onClick?.();
     expect(onReveal).toHaveBeenCalledWith(file);
 
     const more = buildFileMenuItems(['reveal'], ctx({ handlers: handlers({ onReveal, onRevealDir }) }));
     expect(more).toHaveLength(1);
-    more[0]!.onClick();
+    more[0]!.onClick?.();
     expect(onRevealDir).toHaveBeenCalledWith('/work');
 
     // 没有对应 handler（面板不支持，例如远端）时不渲染
@@ -86,7 +86,7 @@ describe('fileMenu', () => {
     const row = buildFileMenuItems(['properties'], ctx({ entry: file, targets: [file], handlers: handlers({ onProperties }) }));
     expect(row).toHaveLength(1);
     expect(row[0]!.label).toBe('属性');
-    row[0]!.onClick();
+    row[0]!.onClick?.();
     expect(onProperties).toHaveBeenCalledWith(file);
 
     // No handler (panel does not support it) or a group hit renders nothing
@@ -104,7 +104,7 @@ describe('fileMenu', () => {
     const withHandler = buildFileMenuItems(['sync-cwd'], ctx({ handlers: handlers({ onSyncToCwd }) }));
     expect(withHandler).toHaveLength(1);
     expect(withHandler[0]!.label).toBe('切换到当前终端文件目录');
-    withHandler[0]!.onClick();
+    withHandler[0]!.onClick?.();
     expect(onSyncToCwd).toHaveBeenCalledTimes(1);
 
     // 远程面板不提供 handler → 不渲染

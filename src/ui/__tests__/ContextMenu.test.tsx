@@ -1,9 +1,48 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import ContextMenu from '../ContextMenu';
 
 describe('independent action menus', () => {
+  it('opens nested settings by pointer or keyboard and closes one level at a time', () => {
+    const apply = vi.fn(); const close = vi.fn();
+    render(<ContextMenu anchor={{ x: 0, y: 0 }} itemRole="menuitem" onClose={close} items={[
+      { label: 'Settings', submenu: { items: [
+        { label: 'Opening mode', submenu: { items: [{ label: 'Block', checked: true, onClick: apply }] } },
+      ] } },
+      { label: 'Disabled', disabled: true, submenu: { items: [{ label: 'Hidden' }] } },
+      { label: 'Copy', onClick: vi.fn() },
+    ]} />);
+    const settings = screen.getByRole('menuitem', { name: 'Settings' });
+    expect(settings).toHaveAttribute('aria-haspopup', 'menu');
+    fireEvent.keyDown(settings, { key: 'ArrowRight' });
+    const mode = screen.getByRole('menuitem', { name: 'Opening mode' });
+    expect(mode).toHaveFocus();
+    fireEvent.keyDown(mode, { key: 'ArrowRight' });
+    expect(screen.getByRole('menuitemradio', { name: 'Block' })).toHaveFocus();
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowLeft' });
+    expect(mode).toHaveFocus(); expect(screen.getAllByRole('menu')).toHaveLength(2);
+    fireEvent.keyDown(mode, { key: 'Escape' });
+    expect(settings).toHaveFocus(); expect(close).not.toHaveBeenCalled();
+    fireEvent.pointerEnter(settings);
+    fireEvent.pointerEnter(screen.getByRole('menuitem', { name: 'Opening mode' }));
+    fireEvent.pointerDown(screen.getByRole('menuitemradio', { name: 'Block' }));
+    expect(close).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Block' }));
+    expect(apply).toHaveBeenCalledOnce(); expect(close).toHaveBeenCalledOnce();
+  });
+
+  it('keeps color choices below actions and removes deeper surfaces when another action is hovered', () => {
+    render(<ContextMenu anchor={{ x: 0, y: 0 }} onClose={vi.fn()} items={[
+      { label: 'View', submenu: { items: [{ label: 'Compact', onClick: vi.fn() }] } }, { label: 'Copy', onClick: vi.fn() },
+    ]} footer={<button>Blue</button>} />);
+    expect(screen.getByRole('button', { name: 'Blue' })).toBeVisible();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'View' }));
+    expect(screen.getByRole('button', { name: 'Compact' })).toHaveFocus();
+    fireEvent.pointerEnter(screen.getByRole('button', { name: 'Copy' }));
+    expect(screen.queryByText('Compact')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Blue' })).toBeVisible();
+  });
   it('uses the destructive text treatment for both explicit danger and removal groups', () => {
     render(<ContextMenu anchor={{ x: 0, y: 0 }} items={[
       { label: 'Delete record', danger: true, onClick: () => {} },
