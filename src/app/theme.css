@@ -967,7 +967,7 @@ input.text-input-field:disabled { opacity: 0.55; }
 ::-webkit-scrollbar-track:vertical { margin-block: 4px; }
 ::-webkit-scrollbar-track:horizontal { margin-inline: 4px; }
 /* Terminals keep exactly one scrollbar: the themed DOM one (`.xterm-scrollable-element >
-   .scrollbar`, styled below). The native one on the viewport doubles up with it, and inside
+   .xterm-scrollbar`, styled below). The native one on the viewport doubles up with it, and inside
    its 8px lane the thumb shrinks to a ~4px light sliver that reads as a stray line beside a
    selection. Wheel, trackpad and keyboard scrolling are unaffected. This covers every xterm
    surface: pane, connection page and fullscreen TUI. */
@@ -1024,10 +1024,10 @@ input.text-input-field:disabled { opacity: 0.55; }
 .xterm .xterm-screen { flex-shrink: 0; }
 
 /* Preserve the terminal's own scrollbar visibility and drag behavior. */
-[data-testid^="pane-"] .xterm .xterm-scrollable-element > .scrollbar > .slider {
+[data-testid^="pane-"] .xterm .xterm-scrollable-element > .xterm-scrollbar > .xterm-slider {
   border-radius: 4px;
 }
-.xterm .xterm-scrollable-element > .scrollbar.vertical > .slider { clip-path: inset(4px 0 round 4px); }
+.xterm .xterm-scrollable-element > .xterm-scrollbar.xterm-vertical > .xterm-slider { clip-path: inset(4px 0 round 4px); }
 
 @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes toastOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(8px); } }
@@ -1057,7 +1057,7 @@ input.text-input-field:disabled { opacity: 0.55; }
  * own xterm scroll surfaces would only stack a second, redundant scrollbar (and an asymmetric
  * right gutter) on top of the block-list scroller. */
 [data-testid="running-term"] .xterm .xterm-viewport { overflow-y: hidden; }
-[data-testid="running-term"] .xterm .xterm-scrollable-element > .scrollbar { display: none; }
+[data-testid="running-term"] .xterm .xterm-scrollable-element > .xterm-scrollbar { display: none; }
 
 /* Input helpers retain their geometry for native composition but never paint text. */
 .xterm .xterm-helper-textarea { opacity: 0 !important; color: transparent !important; -webkit-text-fill-color: transparent !important; background: transparent !important; border: none !important; box-shadow: none !important; }

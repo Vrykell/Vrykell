@@ -76,7 +76,9 @@ test('an active preedit keeps a caret after the composition text', async ({ page
     await new Promise(resolve => setTimeout(resolve, 30));
   });
   const view = page.locator('.xterm:visible .composition-view.active');
-  await expect(view).toHaveText("ni'hao");
+  // The renderer wraps the preedit in invisible directional marks so a mixed-direction preedit
+  // keeps its order; strip format characters before comparing the text the user composed.
+  await expect.poll(() => view.evaluate(node => (node.textContent ?? '').replace(/\p{Cf}/gu, ''))).toBe("ni'hao");
   const caret = await view.evaluate(node => {
     const style = getComputedStyle(node, '::after');
     const box = node.getBoundingClientRect();

@@ -81,8 +81,8 @@ test('运行中块右键菜单前置工具栏快捷操作并可直接触发', as
 test('运行中块不再叠加第二个 xterm 滚动条', async ({ page }) => {
   const host = page.getByTestId('running-term');
   await expect(host.locator('.xterm-viewport')).toHaveCSS('overflow-y', 'hidden');
-  await expect(host.locator('.xterm-scrollable-element > .scrollbar.vertical')).toHaveCSS('display', 'none');
-  await expect(host.locator('.xterm-scrollable-element > .scrollbar.horizontal')).toHaveCSS('display', 'none');
+  await expect(host.locator('.xterm-scrollable-element > .xterm-scrollbar.xterm-vertical')).toHaveCSS('display', 'none');
+  await expect(host.locator('.xterm-scrollable-element > .xterm-scrollbar.xterm-horizontal')).toHaveCSS('display', 'none');
 });
 
 test('运行块在重画为更小帧后收敛高度，不再留下整屏黑尾', async ({ page }) => {

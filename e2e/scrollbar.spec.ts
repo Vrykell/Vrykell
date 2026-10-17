@@ -157,9 +157,9 @@ test('classic terminal retains its native themed scrollbar and drag navigation',
   await expect.poll(() => viewport().then(value => value.lastLine)).toBe('classic-row-199');
   const originalTop = (await viewport()).top;
   await terminal.hover();
-  const slider = terminal.locator('.scrollbar.vertical > .slider');
+  const slider = terminal.locator('.xterm-scrollbar.xterm-vertical > .xterm-slider');
   await expect(slider).toBeVisible();
-  const bar = terminal.locator('.scrollbar.vertical');
+  const bar = terminal.locator('.xterm-scrollbar.xterm-vertical');
   await expect(bar).toHaveCSS('width', '10px');
   await expect(slider).toHaveCSS('width', '10px');
   const pane = page.locator('.terminal-pane:visible');
