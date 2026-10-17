@@ -57,7 +57,7 @@ export function useInputEditorController({ paneId, focused, isLongRunning, onEnd
   }, [isFocused, visible]);
   const resetHeight = useCallback(() => { if (inputRef.current) inputRef.current.style.height = 'auto'; }, []);
   const { ghost, clearGhost, acceptCompletion, restoreCompletion } = useCommandCompletion({ text, aiMode: false, isFocused, visible, cwd: tabCwd, inputRef, setText });
-  const { reset: resetHistNav, navigate: navHistory } = useCommandHistoryNavigation({ text, setText, inputRef, onNavigate: clearGhost });
+  const { reset: resetHistNav, navigate: navHistory } = useCommandHistoryNavigation({ paneId, text, setText, inputRef, onNavigate: clearGhost });
 
   const execute = useCallback(() => {
     const latest = selectPaneInput(paneId)(useInputStore.getState());

@@ -35,6 +35,42 @@ test('empty and repeat Enter submissions keep normal directory blocks with no ou
   expect((await ptyWrites(page)).at(-1)).toBe('\n\n\n');
 });
 
+test('up and down recall only the commands of the current terminal', async ({ page }) => {
+  await ready(page);
+  const input = page.getByPlaceholder(/输入命令/);
+  // App-wide history and another pane's commands must not leak into this terminal's recall.
+  await page.evaluate(async () => {
+    const { useHistoryStore } = await import('/src/features/terminal/stores/history.ts');
+    const { useBlockStore } = await import('/src/features/terminal/stores/blocks.ts');
+    useHistoryStore.setState({ entries: [{ command: 'echo app-wide', cwd: '/home/e2e/project', timestamp: 1, exitCode: 0 }] });
+    useBlockStore.setState((state) => ({ byTab: { ...state.byTab, 'other-pane': [{
+      id: 'foreign', command: 'echo other-pane', cwd: '/home/e2e/project', status: 'done', exitCode: 0,
+      startedAt: 1, endedAt: 2, wasLongRunning: false, outputHtml: '', outputText: '', outputRaw: '', linesTruncated: 0,
+    }] } }));
+  });
+  await input.focus();
+  await input.press('ArrowUp');
+  await expect(input).toHaveValue('');
+
+  await input.fill('echo local-one');
+  await input.press('Enter');
+  await expect(page.locator('.command-block-command').filter({ hasText: 'echo local-one' })).toBeVisible();
+  await input.fill('echo local-two');
+  await input.press('Enter');
+  await expect(page.locator('.command-block-command').filter({ hasText: 'echo local-two' })).toBeVisible();
+
+  await input.press('ArrowUp');
+  await expect(input).toHaveValue('echo local-two');
+  await input.press('ArrowUp');
+  await expect(input).toHaveValue('echo local-one');
+  await input.press('ArrowUp');
+  await expect(input).toHaveValue('echo local-one');
+  await input.press('ArrowDown');
+  await expect(input).toHaveValue('echo local-two');
+  await input.press('ArrowDown');
+  await expect(input).toHaveValue('');
+});
+
 test('cwd menu searches folders, changes directories, and preserves the command draft', async ({ page }) => {
   await ready(page);
   const input = page.getByPlaceholder(/输入命令/);
