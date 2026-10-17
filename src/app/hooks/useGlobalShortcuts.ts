@@ -41,6 +41,8 @@ export function useGlobalShortcuts() {
       if (e.ctrlKey || e.metaKey) e.preventDefault();
     };
     const preventZoomGesture = (e: Event) => e.preventDefault();
+    // App-wide native-menu suppression: downstream handlers always see
+    // `defaultPrevented`, so menu ownership travels through stopPropagation.
     const preventNativeContextMenu = (e: MouseEvent) => e.preventDefault();
 
     const handler = (e: KeyboardEvent) => {

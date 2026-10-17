@@ -186,7 +186,12 @@ export default function PanelTabs() {
       </SidebarToolbar>
 
       {/* 列表：分组头与标签行同属一个重排列表 */}
-      <div data-reorder-list={LIST_ID} className="scroll-region" onContextMenu={event => { if (!event.defaultPrevented) { event.preventDefault(); setPanelMenu({ x: event.clientX, y: event.clientY, trigger: event.currentTarget }); } }}
+      <div data-reorder-list={LIST_ID} className="scroll-region" onContextMenu={event => {
+        // The webview policy cancels every native context menu before React runs, so
+        // `defaultPrevented` is always true here; nested menus stop propagation instead.
+        event.preventDefault();
+        setPanelMenu({ x: event.clientX, y: event.clientY, trigger: event.currentTarget });
+      }}
         style={{ flex: 1, overflowY: 'auto', padding: '0 0 8px', display: 'flex', flexDirection: 'column' }}>
         {groups.map((g) => (
           <Fragment key={g.id}>
