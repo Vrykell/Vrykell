@@ -366,9 +366,10 @@ the single state variable "execution target".
 | `src/features/files/services/localFileOps.ts` | local implementation: `@platform/api/fs` + `@platform/path` |
 | `src/features/ssh/services/fileOps.ts` | remote implementation: SSH commands + POSIX path utilities |
 | `src/features/files/model/filePanelConfig.ts` | panel configuration: menu item key lists (row/multi-select/blank/more), drag-and-drop semantics (whether dragging out downloads first, whether dragging in moves or uploads), open semantics, test identifiers — the parts that "vary by state" live only here |
-| `src/features/files/hooks/useFileBrowser.ts` | shared browsing and operation state machine: directory loading, tree lazy loading, selection, view snapshot undo, clipboard, undo history (≤20 steps), create/rename/delete |
+| `src/features/files/hooks/useFileBrowser.ts` | shared browsing and operation state machine: directory loading, tree lazy loading, selection, visit trail with back/forward (one record per directory), clipboard, undo history (≤20 steps), create/rename/delete |
 | `src/features/files/components/FilePanel.tsx` | shared view: top bar breadcrumb (editable), file tree, right-click/blank/more menus, confirmation modal, drag-and-drop wiring |
 | `src/features/files/components/PanelFiles.tsx` / `src/features/ssh/components/RemoteFiles.tsx` | thin wrappers: provide only their respective specialized menu callbacks, icons, error views, and download management entry points |
+| `src/features/files/services/localPath.ts` | session-only memory of the local panel directory: a remount (SSH view swap, download manager round trip, panel moved to the other side) restores the browsed directory without persisting; the remote equivalent is `@features/ssh/utils/remotePath.ts` |
 
 Conventions:
 

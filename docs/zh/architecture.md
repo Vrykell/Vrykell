@@ -366,9 +366,10 @@ T4   渲染帧
 | `src/features/files/services/localFileOps.ts` | 本地实现：`@platform/api/fs` + `@platform/path` |
 | `src/features/ssh/services/fileOps.ts` | 远程实现：SSH 命令 + POSIX 路径工具 |
 | `src/features/files/model/filePanelConfig.ts` | 面板配置：菜单条目 key 列表（行/多选/空白/更多）、拖放语义（拖出是否先下载、拖入是移动还是上传）、打开语义、测试标识 —— 「因状态而异」的部分只在这里 |
-| `src/features/files/hooks/useFileBrowser.ts` | 共用的浏览与操作状态机：目录加载、树形懒加载、选中、视图快照回退、剪贴板、回退历史（≤20 步）、新建/重命名/删除 |
+| `src/features/files/hooks/useFileBrowser.ts` | 共用的浏览与操作状态机：目录加载、树形懒加载、选中、访问轨迹回退/前进（每个目录一条记录）、剪贴板、回退历史（≤20 步）、新建/重命名/删除 |
 | `src/features/files/components/FilePanel.tsx` | 共用视图：顶栏面包屑（可编辑）、文件树、右键/空白/更多菜单、确认弹窗、拖放接线 |
 | `src/features/files/components/PanelFiles.tsx` / `src/features/ssh/components/RemoteFiles.tsx` | 薄封装：仅提供各自专有的菜单回调、图标、错误视图与下载管理入口 |
+| `src/features/files/services/localPath.ts` | 本地面板目录的会话内记忆：面板重挂载（SSH 视图切换 / 下载管理往返 / 移到另一侧）时恢复浏览目录，不落盘；远程面板的等价物是 `@features/ssh/utils/remotePath.ts` |
 
 约定：
 

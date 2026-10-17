@@ -10,6 +10,7 @@ import FilePanel from '@features/files/components/FilePanel';
 import DownloadManager from '@features/files/components/DownloadManager';
 import { openFile } from '@features/files/services/fileOpen';
 import { useWorkspaceDirsStore } from '@features/files/services/workspaceDirs';
+import { useLocalPathStore } from '@features/files/services/localPath';
 import type { FileOpsTarget } from '@features/files/model/fileOps';
 import { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
 import { useDockStore, useSessionStore } from '@features/workspace';
@@ -49,7 +50,9 @@ export default function PanelFiles() {
 function LocalFiles() {
   const [showDownloads, setShowDownloads] = useState(false);
   const workspaceDirs = useWorkspaceDirsStore();
-  // 起始目录只取一次终端 cwd；之后导航与终端解耦
+  const rememberedPath = useLocalPathStore((state) => state.remembered);
+  // Start directory: the session's remembered location, otherwise the focused terminal cwd.
+  // Navigation stays decoupled from the terminal afterwards.
   const { focusedPaneId: focused, activeCwd, sessions } = useActiveWorkspace();
 
   /** Open a local file with the system default application (menu item and path bar). */
@@ -92,7 +95,9 @@ function LocalFiles() {
   return (
     <FilePanel
       target={LOCAL_TARGET}
-      initialPath={activeCwd ?? null}
+      initialPath={rememberedPath ? rememberedPath.path : activeCwd ?? null}
+      initialResolved={rememberedPath !== null}
+      onPathChange={(next) => useLocalPathStore.getState().remember(next)}
       terminalCwd={activeCwd ?? null}
       openEntry={(entry) => void openFileInTerminal(entry)}
       onSyncToTerminal={(dir) => {

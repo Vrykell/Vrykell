@@ -141,6 +141,19 @@ test.describe('文件面板', () => {
     await expect(page.getByRole('button', { name: '下载管理' })).toBeVisible();
   });
 
+  test('下载管理往返后文件树停留在原目录（会话内记忆），而不是回到终端 cwd', async ({ page }) => {
+    const tree = page.getByTestId('local-file-tree');
+    await tree.locator('[data-testid="file-row"][data-path="/home/e2e/Documents"]').dblclick();
+    await expect(tree).toHaveAttribute('data-path', '/home/e2e/Documents');
+
+    // 打开下载管理再返回：文件树组件重新挂载，恢复记忆的目录
+    await page.getByTestId('local-more-btn').click();
+    await page.getByRole('button', { name: '下载管理' }).click();
+    await expect(page.getByTestId('downloads-back')).toBeVisible();
+    await page.getByTestId('downloads-back').click();
+    await expect(tree).toHaveAttribute('data-path', '/home/e2e/Documents');
+  });
+
   test('更多菜单：切换到当前终端文件目录把面板重新定位回终端 cwd', async ({ page }) => {
     const tree = page.getByTestId('local-file-tree');
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
