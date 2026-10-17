@@ -238,6 +238,19 @@ Fitting that clears the renderer before resizing causes an additional blank fram
 - **Fix**: on the first frame after mount, when the viewport is at the bottom, force two real scrolls (`scrollToTop()` + `scrollToBottom()`) so the correct position is written back; `scrollToBottom()` alone is a no-op at the bottom because it computes a zero-line delta. Scheduling sits outside the `term.element` check so the second StrictMode mount still schedules it.
 - **Regression**: `running-term.spec.ts` "运行块挂载前到达的输出不破坏首次滚轮回溯".
 
+### 5.5 The Syntax-Highlight Mirror Only Listened to the textarea's scroll Event → Typed Characters Stay Invisible When Content Grows Without Moving the Offset (`InputEditor.tsx`, `command-presentation.spec.ts`)
+- **Symptom**: with "Command syntax highlighting" on, pressing Shift+Enter a few times and then typing letters shows **no** new characters, although the input really holds them (Enter still submits); with highlighting off everything looks normal.
+- **Root cause**: the colored text is painted by a same-font mirror layer above the textarea, whose own text is transparent; the mirror only re-synced its scroll position from the textarea's `scroll` event. Once the content passes the capped height (120px) the caret line is still inside the viewport, so further typing does **not** change `scrollTop` and fires no scroll event; the mirror content had already grown but stayed parked at its earlier (clamped) offset, leaving the new line below the visible area — "typed in but not rendered".
+- **Secondary**: `white-space: pre-wrap` creates no line box for a **trailing newline** while the textarea still reserves that caret line, so the two layers' `scrollHeight` differ by one line and the synced offset clamps permanently short.
+- **Fix**: (1) re-sync the mirror's `scrollTop` from a layout effect on every text/completion-suffix change (the scroll-event path stays for user and browser scrolling); (2) append a zero-width space whenever the text ends with a newline, restoring the caret line box so both layers share the same scroll geometry.
+- **Regression**: `command-presentation.spec.ts` "the colored input mirror stays aligned while multiline content overflows the capped height" asserts equal `scrollTop`/`scrollHeight` and probes pixels to prove the typed line is painted.
+
+### 5.6 A Long Completion Suffix Glues to the Last Word as One Unbreakable Token → the Typed Character Wraps Below the Clip and Disappears (`theme.css` `.command-completion-suffix`, `command-presentation.spec.ts`)
+- **Symptom**: with command syntax highlighting on, when history holds a command starting with `cd C…` (a long path), typing `cd C` shows **no** `C`; the text is really there (Enter runs it, and the `composer-input-change` lengths in diagnostics agree).
+- **Root cause**: the highlight mirror renders the typed text plus the completion suffix as one inline flow. A long suffix offers no space to break at, so it glues to the just-typed `C` into a single unbreakable word; `overflow-wrap: break-word` only breaks inside a word when the line has **no other acceptable break point**, and the line still has the space after `cd` — so the whole word moves to the next line and only then splits. The mirror box is exactly the textarea's height (one line), so the second line is clipped by `overflow: hidden` and the typed character with every following one lands on a clipped line.
+- **Fix**: let `.command-completion-suffix` break at any character (`word-break: break-all`), so the suffix can never push typed text to another line.
+- **Regression**: `command-presentation.spec.ts` "a long completion suffix cannot push the typed word out of the visible mirror line" asserts the typed character's bounding box stays inside the mirror box (before the fix it sat below it) and that both layers share the same scroll offset.
+
 ---
 
 ## 6. Cross-Platform

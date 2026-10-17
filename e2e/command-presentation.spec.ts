@@ -116,3 +116,74 @@ test('completion stays anchored while typing and its acceptance keys persist', a
   await input.press('ArrowRight');
   await expect(input).toHaveValue('npm run dev');
 });
+
+test('the colored input mirror stays aligned while multiline content overflows the capped height', async ({ page }) => {
+  await setupTauriMock(page); await page.goto('/');
+  await gotoSetting(page, '打开方式');
+  const toggle = page.locator('.settings-field').filter({ has: page.getByText('命令语法高亮', { exact: true }) }).getByRole('switch');
+  await toggle.click();
+  await page.keyboard.press('Meta+1');
+  const input = page.getByPlaceholder(/输入命令/);
+  await input.focus();
+  for (let index = 0; index < 6; index += 1) await page.keyboard.press('Shift+Enter');
+  const geometry = () => input.evaluate(node => {
+    const textarea = node as HTMLTextAreaElement;
+    const overlay = textarea.parentElement!.querySelector<HTMLElement>('.command-input-overlay')!;
+    return { offset: textarea.scrollTop, mirrorOffset: overlay.scrollTop, height: textarea.scrollHeight, mirrorHeight: overlay.scrollHeight };
+  });
+  // The caret line overflows the cap: both layers must share the scroll geometry, including the
+  // reserved caret line the trailing newline needs in the mirror.
+  const scrolled = await geometry();
+  expect(scrolled.offset).toBeGreaterThan(0);
+  expect(scrolled.mirrorOffset).toBe(scrolled.offset);
+  expect(scrolled.mirrorHeight).toBe(scrolled.height);
+  // Typing must paint on that caret line instead of leaving the mirror parked above it. The probe
+  // avoids the caret column so only the glyphs decide whether the band changed.
+  const box = (await input.boundingBox())!;
+  const probe = { x: box.x + 2, y: box.y + box.height - 21, width: 40, height: 19 };
+  const empty = await page.screenshot({ clip: probe, animations: 'disabled' });
+  await page.keyboard.type('typing');
+  await expect(input).toHaveValue('\n\n\n\n\n\ntyping');
+  expect(await page.screenshot({ clip: probe, animations: 'disabled' })).not.toEqual(empty);
+  const typed = await geometry();
+  expect(typed.mirrorOffset).toBe(typed.offset);
+});
+
+test('a long completion suffix cannot push the typed word out of the visible mirror line', async ({ page }) => {
+  await setupTauriMock(page); await page.goto('/');
+  await page.evaluate(async () => {
+    const path = '/src/config/typography.ts';
+    const { useTypographyStore } = await import(path) as typeof import('../src/config/typography');
+    useTypographyStore.getState().update({ commandHighlighting: true, terminalFontSize: 15 });
+  });
+  const input = page.getByPlaceholder(/输入命令/);
+  // A long history path matching the typed prefix glues an unbreakable word to the last character.
+  await page.evaluate(async () => {
+    const path = '/src/features/terminal/stores/history.ts';
+    const { useHistoryStore } = await import(path) as typeof import('../src/features/terminal/stores/history');
+    useHistoryStore.setState({ entries: [{
+      command: 'cd C:\\Users\\37863\\.local\\share\\opencode\\worktree\\ac4358\\integration-verify-chip-panel',
+      cwd: '/home/e2e/project', timestamp: 1, exitCode: 0,
+    }] });
+  });
+  await page.setViewportSize({ width: 900, height: 800 });
+  await input.focus();
+  await page.keyboard.type('cd ');
+  await expect(page.locator('.command-completion-suffix')).toContainText('integration-verify-chip-panel');
+  await page.keyboard.type('C');
+  await expect(input).toHaveValue('cd C');
+  // The typed character must stay inside the capped mirror box instead of wrapping below it.
+  const geometry = await input.evaluate(node => {
+    const textarea = node as HTMLTextAreaElement;
+    const overlay = textarea.parentElement!.querySelector<HTMLElement>('.command-input-overlay')!;
+    const token = overlay.querySelector<HTMLElement>('.command-token[data-kind="argument"]')!;
+    const inputRect = textarea.getBoundingClientRect();
+    const tokenRect = token.getBoundingClientRect();
+    return {
+      tokenInsideInput: tokenRect.y + tokenRect.height <= inputRect.y + inputRect.height + 1,
+      offset: textarea.scrollTop, mirrorOffset: overlay.scrollTop,
+    };
+  });
+  expect(geometry.tokenInsideInput).toBe(true);
+  expect(geometry.mirrorOffset).toBe(geometry.offset);
+});

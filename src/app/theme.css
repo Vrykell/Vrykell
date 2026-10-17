@@ -102,7 +102,10 @@ input, textarea, [contenteditable="true"] { caret-color: var(--text-caret); }
 .command-token[data-kind="string"] { color: var(--cmd-string); }
 .command-token[data-kind="operator"] { color: var(--cmd-pipe); }
 .command-token[data-kind="comment"] { color: var(--text-muted); }
-.command-completion-suffix { color: var(--text-muted); opacity: 0.65; }
+/* The muted completion suffix may break at any character: an unbroken long path glues to the
+ * word the user just typed, and the line breaker then moves that whole word to the next line —
+ * below the mirror's clipped height — so the character would never paint. */
+.command-completion-suffix { color: var(--text-muted); opacity: 0.65; word-break: break-all; }
 .command-completion-action { display: inline-block; vertical-align: middle; margin-left: 8px; pointer-events: auto; line-height: 1; }
 .command-completion-trigger { justify-content: center; height: 20px; }
 .command-completion-trigger .key-hint, .checkbox-menu-compact .key-hint { min-height: 16px; padding: 0; background: transparent; color: inherit; }

@@ -238,6 +238,19 @@
 - **修复**：首次挂载后一帧，若视口在底部则 `scrollToTop()` + `scrollToBottom()` 强制两次真实滚动把正确位置写回模型；单独 `scrollToBottom()` 在底部算出 0 行差是 no-op。调度放在 `term.element` 判断之外，StrictMode 双挂载下第二次挂载仍会调度。
 - **回归**：`running-term.spec.ts`「运行块挂载前到达的输出不破坏首次滚轮回溯」。
 
+### 5.5 语法高亮镜像层只被 textarea 的滚动事件驱动 → 内容增高而偏移不变时，新打的字不显示（`InputEditor.tsx`，`command-presentation.spec.ts`）
+- **现象**：打开「命令语法高亮」后，在输入栏连按几次 Shift+Enter 换行、再打字母，新字符**看不见**——内容其实已进入输入框（回车仍可提交）；关闭高亮则正常。
+- **根因**：高亮文字由 textarea 上方同字号的镜像层绘制，textarea 自身文字被设为透明；镜像层的滚动位置只在 textarea 触发 `scroll` 事件时同步。输入内容超过高度上限（120px）后，光标行仍在视口内，继续输入**不改变 `scrollTop`**，于是没有滚动事件；镜像层内容已变长，却停在此前（还被 clamp 过）的滚动位置，新行落在可视区下方——表现为「字输进去了但没渲染出来」。
+- **次因**：`white-space: pre-wrap` 不为**行尾换行**生成行盒，而 textarea 会为光标预留那一行，两层 `scrollHeight` 相差一行，同步值被 clamp 后长期错位。
+- **修复**：① 每次文本/补全后缀变化后用 layout effect 主动同步镜像层 `scrollTop`（保留原有滚动事件路径处理用户与浏览器的滚动）；② 行尾换行时在镜像层补一个零宽空格，恢复光标行的行盒，使两层滚动几何一致。
+- **回归**：`command-presentation.spec.ts`「the colored input mirror stays aligned while multiline content overflows the capped height」断言两层 `scrollTop`/`scrollHeight` 一致，并用像素探针验证换行后新打的字确实被绘制。
+
+### 5.6 长补全后缀与最后一个词黏成一个不可断词 → 新打的字被换行裁掉看不见（`theme.css` `.command-completion-suffix`，`command-presentation.spec.ts`）
+- **现象**：开着「命令语法高亮」时，如果历史里有一条以 `cd C…`（长路径）开头的命令，在输入框里打 `cd C`，**C 不显示**；内容其实已经输入（回车能执行，诊断里 `composer-input-change` 的长度也对得上）。
+- **根因**：高亮镜像层把「已输入文本 + 补全后缀」渲染在同一行内流里。长后缀没有空格可断，与刚打的 `C` 黏成一个不可断长词；`overflow-wrap: break-word` 只在**本行没有其它可断点**时才允许词内断行，而本行还有 `cd` 后的空格可断——于是整词先被移到下一行，再在行内断开。镜像盒高等于 textarea 当前高度（单行），第二行被 `overflow: hidden` 裁掉，刚打的字与随后所有输入都落在被裁的行上。
+- **修复**：`.command-completion-suffix` 允许在任意字符处断行（`word-break: break-all`），补全后缀不再能把已输入文本挤到下一行。
+- **回归**：`command-presentation.spec.ts`「a long completion suffix cannot push the typed word out of the visible mirror line」断言已输入字符的边界框仍落在镜像盒内（修复前在盒下方），且两层滚动位置一致。
+
 ---
 
 ## 六、跨平台

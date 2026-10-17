@@ -1,21 +1,32 @@
 import { cleanup, render, fireEvent, screen } from '@testing-library/react';
+import { useRef, useState } from 'react';
 import { afterEach, expect, it, vi } from 'vitest';
 import InputEditor from '../components/InputEditor';
 import { useSessionStore } from '@features/workspace';
 import { useTerminalStore } from '@features/terminal';
+import { useTypographyStore } from '@config/typography';
+
+const controller = vi.hoisted(() => ({ setText: null as null | ((value: string) => void) }));
 
 vi.mock('../hooks/useInputEditorController', () => ({
-  useInputEditorController: () => ({
-    inputRef: { current: null }, panelRef: { current: null }, text: '', aiMode: false,
-    visible: true, isFocused: true, hasSession: true, terminalLabel: 'Bash',
-    tabCwd: '/work', recentGitBranch: 'dev', ghost: '',
-  }),
+  useInputEditorController: () => {
+    const [text, setText] = useState('');
+    const inputRef = useRef<HTMLTextAreaElement>(null);
+    controller.setText = setText;
+    return {
+      inputRef, panelRef: useRef(null), text, aiMode: false,
+      visible: true, isFocused: true, hasSession: true, terminalLabel: 'Bash',
+      tabCwd: '/work', recentGitBranch: 'dev', ghost: '',
+      handleChange: (event: { target: { value: string } }) => setText(event.target.value),
+    };
+  },
 }));
 const stores = [useSessionStore.getState(), useTerminalStore.getState()] as const;
 afterEach(() => {
   cleanup();
   useSessionStore.setState(stores[0], true);
   useTerminalStore.setState(stores[1], true);
+  useTypographyStore.setState({ commandHighlighting: false });
 });
 
 it('uses the existing host chip as the status entry without adding a separate icon button', () => {
@@ -50,4 +61,28 @@ it('renders clickable chips as buttons and keeps the git branch chip a static sp
   expect(directory?.tagName).toBe('BUTTON');
   expect(directory).not.toBeDisabled();
   expect(container.querySelector('.terminal-branch')?.tagName).toBe('SPAN');
+});
+
+it('re-syncs the colored mirror after content changes when the input is scrolled', () => {
+  useTypographyStore.setState({ commandHighlighting: true });
+  render(<InputEditor paneId="pane" />);
+  const input = screen.getByPlaceholderText(/输入命令/) as HTMLTextAreaElement;
+  fireEvent.change(input, { target: { value: 'line one\nline two' } });
+  const overlay = document.querySelector<HTMLElement>('.command-input-overlay')!;
+  // A capped height keeps the offset while the caret stays on the visible last line, so the
+  // next edit fires no scroll event: the mirror has to be re-synced by the component itself.
+  input.scrollTop = 30;
+  fireEvent.change(input, { target: { value: 'line one\nline two\nline three' } });
+  expect(overlay.scrollTop).toBe(30);
+});
+
+it('reserves the caret line after a trailing newline in the colored mirror', () => {
+  useTypographyStore.setState({ commandHighlighting: true });
+  render(<InputEditor paneId="pane" />);
+  const input = screen.getByPlaceholderText(/输入命令/);
+  fireEvent.change(input, { target: { value: 'line\n' } });
+  const overlay = document.querySelector<HTMLElement>('.command-input-overlay')!;
+  // `pre-wrap` drops the trailing newline's line box; the zero-width space restores it so the
+  // mirror keeps the same scroll height as the textarea.
+  expect(overlay.textContent).toBe('line\n\u200b');
 });
