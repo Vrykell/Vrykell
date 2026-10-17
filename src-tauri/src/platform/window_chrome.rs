@@ -1,14 +1,17 @@
 //! Window frame chrome for the native compositor.
 //!
-//! The desktop window is undecorated yet keeps the native frame, so the compositor draws the
-//! drop shadow and the rounded corners. That frame owns the outermost pixel ring of the
-//! visible window: Windows 11 paints a one pixel border there, and its rounded corner areas
-//! are only drawn for an opaque window. The Windows window is therefore opaque, and the
-//! border is painted in the color of the content that touches it, so the frame reads as part
-//! of the application. The frontend resolves that color and calls [`apply_window_frame`].
+//! The desktop window is undecorated and transparent: the application paints its own surface,
+//! and anything it leaves translucent shows the desktop (wallpapers, shader effects). Keeping
+//! the native frame for the compositor drop shadow would inset the client area by one pixel,
+//! and on a transparent window that pixel ring and the frame's rounded corner areas have no
+//! surface to draw on, so the desktop leaks through around the frame. The window therefore
+//! runs without the native frame (`shadow: false`): the webview covers the whole window and
+//! its content is clipped by the rounded corners the window explicitly asks for.
 //!
-//! The `DWMWA_COLOR_NONE` sentinel is not used for the border: some Windows builds render it
-//! as a dark fallback line instead of removing the border.
+//! The border the compositor paints along the window edge is colored with the window surface
+//! through [`apply_window_frame`]; the frontend resolves that color from the theme. The
+//! `DWMWA_COLOR_NONE` sentinel is not used: some Windows builds render it as a dark fallback
+//! line instead of removing the border.
 
 #[cfg(windows)]
 use std::ffi::c_void;
@@ -64,7 +67,9 @@ fn parse_border_color(value: &str) -> Option<u32> {
 fn apply_frame(window: &tauri::WebviewWindow, color: u32) -> Result<(), String> {
     let handle = window.hwnd().map_err(|error| error.to_string())?;
     const BORDER_COLOR: u32 = 34;
-    // The border value is a four-byte sentinel and stays alive for the synchronous call.
+    const WINDOW_CORNER_PREFERENCE: u32 = 33;
+    const CORNER_ROUND: u32 = 2;
+    // The values are four-byte sentinels and stay alive for the synchronous calls.
     let border = unsafe {
         DwmSetWindowAttribute(
             handle.0 as *mut c_void,
@@ -73,31 +78,31 @@ fn apply_frame(window: &tauri::WebviewWindow, color: u32) -> Result<(), String> 
             4,
         )
     };
-    // The window is opaque on Windows, so the frame's corner areas and anything the webview
-    // leaves translucent rest on this color instead of the desktop.
-    let rgba = tauri::window::Color(
-        (color & 0xFF) as u8,
-        ((color >> 8) & 0xFF) as u8,
-        ((color >> 16) & 0xFF) as u8,
-        255,
-    );
-    let background = window.set_background_color(Some(rgba));
+    // The window content covers the whole window (see the module docs), which costs the
+    // automatic corner rounding of an undecorated window, so it is requested explicitly.
+    let corners = unsafe {
+        DwmSetWindowAttribute(
+            handle.0 as *mut c_void,
+            WINDOW_CORNER_PREFERENCE,
+            (&CORNER_ROUND as *const u32).cast(),
+            4,
+        )
+    };
     crate::diagnostics::record(
         "window-frame-configured",
         serde_json::json!({
             "windowLabel": window.label(),
             "color": color,
             "borderResult": border,
-            "backgroundOk": background.is_ok(),
+            "cornerResult": corners,
         }),
     )
     .ok();
-    if border >= 0 && background.is_ok() {
+    if border >= 0 && corners >= 0 {
         Ok(())
     } else {
         Err(format!(
-            "window frame update failed: border {border}, background {:?}",
-            background.err()
+            "window frame update failed: border {border}, corners {corners}"
         ))
     }
 }
@@ -107,7 +112,7 @@ fn apply_frame(_window: &tauri::WebviewWindow, _color: u32) -> Result<(), String
     Ok(())
 }
 
-/// Paint the native window frame border in the given CSS color and rest the content on it.
+/// Paint the native window border in the given CSS color and round the window corners.
 #[tauri::command]
 pub fn apply_window_frame(window: tauri::WebviewWindow, color: String) -> Result<(), String> {
     let Some(value) = parse_border_color(&color) else {

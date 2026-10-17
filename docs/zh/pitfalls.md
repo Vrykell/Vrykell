@@ -309,11 +309,11 @@
 - **教训**：已运行实例处理外部请求时，事件只是唤醒信号，数据要放在可重放的队列里；single-instance 插件还必须最先注册，让第二次启动在其他初始化之前就被拦截。
 
 ### 7.11 Windows 11 会给每个窗口画 1px 边框，`DWMWA_COLOR_NONE` 并不能真正去掉它（`platform/window_chrome.rs`）
-- **现象**：主窗口和工具窗口（`decorations: false`）顶部边缘有一条 1px 缝；窗口透明时圆角处还会透出桌面。
-- **根因**：窗口最外一圈像素属于系统 frame（`shadow: true` 时 tao 把客户区按 frame 内缩）：Windows 11 在这里画 1px 边框。`DWMWA_BORDER_COLOR = DWMWA_COLOR_NONE`（0xFFFFFFFE）在部分系统版本上不会去掉边框，而是退回深色默认色（暗色约 #1A2129），看起来就是那条缝；圆角外的 frame 区在**透明窗口**上没有可绘制内容，于是透出桌面。
-- **修复**：不做 WM_NCCALCSIZE / 圆角 hack，保留 `shadow: true` 的系统阴影与圆角；Windows 配置改为**不透明窗口**（`transparent: false`，让 DWM 正常绘制 frame 的圆角区），前端把贴边色（主窗口 `--chrome-bg`、工具窗口 `--surface`）通过 `apply_window_frame` 交给后端，Rust 用 `DWMWA_BORDER_COLOR` 把 1px 边框染成同色并用 `set_background_color` 让窗口底色一致；主题切换时 `applyTerminalTheme` 重新同步。
-- **取舍**：Windows 上不再使用透明窗口，壁纸 + 不透明度的“透出桌面”效果在 Windows 不生效（应用自己绘制的壁纸不受影响）。
-- **教训**：未装饰窗口最外一圈像素属于系统绘制，只能染色不能吞掉；透明窗口的圆角 frame 区必然漏背景——要么接受系统绘制的那 1px，要么让窗口不透明。别把 `DWMWA_COLOR_NONE` 当「去掉边框」用。
+- **现象**：主窗口（透明 + `decorations: false`）顶部边缘有一条 1px 缝，圆角处还会漏出桌面。
+- **根因**：最外一圈像素属于系统 frame——`shadow: true` 时 tao 把客户区按 frame 内缩（顶部 1px，侧面是看不见的 resize 边框），Windows 11 在这圈上画 1px 边框。`DWMWA_BORDER_COLOR = DWMWA_COLOR_NONE`（0xFFFFFFFE）在部分系统版本上不会去掉边框，而是退回深色默认线（暗色约 #1A2129），看起来就是那条缝；透明窗口的圆角 frame 区没有任何表面可绘制，于是直接透出桌面。
+- **修复**：主窗口改 `shadow: false`，客户区铺满整窗，webview 内容直达圆角（窗口保持 `transparent: true`，应用自己的半透明/着色器仍能透出桌面）；客户区铺满后系统不再自动倒圆角，因此显式请求 `DWMWA_WINDOW_CORNER_PREFERENCE = DWMWCP_ROUND`；再把 `DWMWA_BORDER_COLOR` 染成窗口贴边色（主窗口 `--chrome-bg`、工具窗口 `--surface`，前端 `syncWindowFrame` 在启动与主题切换时同步）。工具窗口保持不透明 + 系统 frame，圆角区由 DWM 正常绘制。
+- **取舍**：主窗口不再有系统阴影（tao 的 `shadow` 开关把 frame 一起去掉）；需要投影时用应用自己的 CSS/着色器补。
+- **教训**：未装饰窗口最外一圈像素属于系统绘制，只能染色不能吞掉；透明窗口的圆角 frame 区必然漏背景——要么让客户区铺满整窗、要么接受系统绘制。别把 `DWMWA_COLOR_NONE` 当「去掉边框」用。
 
 ---
 
