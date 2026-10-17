@@ -79,4 +79,16 @@ describe('useRunningCommandActions', () => {
     expect(useTerminalStore.getState().altScreenActive).toBe(false);
     expect(useTerminalStore.getState().scenes['pane-1']).toBe('blockList');
   });
+
+  it('keeps a real alternate-screen TUI to the banner actions without a fullscreen toggle', () => {
+    useTerminalStore.setState({ scenes: { 'pane-1': 'altScreen' }, altScreenActive: false });
+    const { result } = renderHook(() => useRunningCommandActions('pane-1', 'altScreen'));
+
+    expect(result.current.map((item) => item.label)).toEqual(['重绘终端', '终止命令', '结束前台应用']);
+
+    act(() => result.current[0]!.onClick?.());
+    expect(mocks.redrawTerminal).toHaveBeenCalledExactlyOnceWith('pane-1');
+    act(() => result.current[1]!.onClick?.());
+    expect(mocks.ptyWrite).toHaveBeenCalledWith('session-1', '\x03');
+  });
 });

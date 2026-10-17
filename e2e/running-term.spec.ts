@@ -234,6 +234,30 @@ test('手动全屏中进入真 alt 屏：让出可见面，显示主 xterm 的 T
   await expectAnyTermContains(page, 'ALT SCREEN CONTENT', 5000);
 });
 
+test('真 alt 屏 TUI 的窗格右键菜单提供顶栏快捷操作', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  await startRunningBlock(page);
+  await emitPtyOutput(page, '\x1b[?1049h' + 'ALT SCREEN CONTENT');
+  await expect(page.getByTestId('tui-banner')).toBeVisible();
+  await expectAnyTermContains(page, 'ALT SCREEN CONTENT', 5000);
+
+  // Right-click the TUI surface: the banner actions lead the pane menu.
+  await page.locator('.terminal-pane .xterm').first().click({ button: 'right' });
+  const menu = page.getByRole('menu', { name: '操作菜单' });
+  await expect(menu).toBeVisible();
+  const labels = ['重绘终端', '终止命令', '结束前台应用', '复制', '粘贴', '分裂终端（选位置）'];
+  for (const [index, label] of labels.entries()) {
+    await expect(menu.getByRole('button').nth(index)).toContainText(label);
+  }
+  // The alternate screen already owns the surface, so no fullscreen toggle is offered.
+  await expect(menu.getByRole('button', { name: '进入全屏交互' })).toHaveCount(0);
+
+  const before = (await ptyWrites(page)).length;
+  await menu.getByRole('button', { name: '终止命令' }).click();
+  await expect.poll(async () => (await ptyWrites(page)).slice(before)).toContain('\x03');
+});
+
 test('运行中块接管滚轮：xterm 回溯时不滚动外层命令历史', async ({ page }) => {
   await setupTauriMock(page);
   // 小视口保证块列表溢出可滚（卡片高度跟随内容行数增长）
