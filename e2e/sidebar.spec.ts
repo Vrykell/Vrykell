@@ -407,6 +407,33 @@ test.describe('文件面板', () => {
     await expect(menu.getByRole('button', { name: '切换到当前终端文件目录', exact: true })).toBeVisible();
   });
 
+  test('refresh re-reads the current directory from both panel menus', async ({ page }) => {
+    const tree = page.getByTestId('local-file-tree');
+    const menu = page.getByRole('menu', { name: '操作菜单' });
+    const externalRow = tree.locator('[data-testid="file-row"][data-path="/home/e2e/project/terminal.log"]');
+
+    // A file created outside the panel only shows up on the next read.
+    await page.evaluate(() => {
+      (window as unknown as { __FS_EXTRA_ENTRIES__: { name: string; path: string; is_dir: boolean }[] }).__FS_EXTRA_ENTRIES__ =
+        [{ name: 'terminal.log', path: '/home/e2e/project/terminal.log', is_dir: false }];
+    });
+    await expect(externalRow).toHaveCount(0);
+
+    // ⋯ menu: re-read in place, without navigating away from the current directory.
+    await page.getByTestId('local-more-btn').click();
+    await menu.getByRole('button', { name: '刷新', exact: true }).click();
+    await expect(externalRow).toBeVisible();
+    await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
+
+    // Blank-area right click: an entry removed outside disappears.
+    await page.evaluate(() => { (window as unknown as { __FS_EXTRA_ENTRIES__: unknown[] }).__FS_EXTRA_ENTRIES__ = []; });
+    await expect(externalRow).toBeVisible();
+    const box = (await tree.boundingBox())!;
+    await page.mouse.click(box.x + 40, box.y + box.height - 12, { button: 'right' });
+    await menu.getByRole('button', { name: '刷新', exact: true }).click();
+    await expect(externalRow).toHaveCount(0);
+  });
+
   test('右键新建按落点决定目录，建好立即重命名，重名自动加序号且回退用真实路径', async ({ page }) => {
     const tree = page.getByTestId('local-file-tree');
     /** 面板空白处右键（用元素范围定位，避免落到行上） */

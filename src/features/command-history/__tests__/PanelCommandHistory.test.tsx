@@ -114,6 +114,30 @@ it('persists favorites and hidden commands and restores a hidden entry', async (
   fireEvent.click(screen.getByRole('button', { name: t('Restore') }));
   expect(await screen.findByTestId('command-history-test')).toBeVisible();
 });
+it('refreshes preferences and history from the actions menu and the list background', async () => {
+  const { container } = render(<PanelCommandHistory />);
+  await screen.findByTestId('command-history-build');
+  expect(getHistoryPreferences).toHaveBeenCalledTimes(1);
+  expect(listCommandHistory).toHaveBeenCalledTimes(1);
+
+  // A run recorded elsewhere reaches the panel through the menu refresh
+  vi.mocked(listCommandHistory).mockResolvedValue([
+    { id: 'deploy', target: 'local', shell: 'bash', command: 'npm run deploy', cwd: '/app', status: 'success', exitCode: 0, timestamp: 3, runCount: 1 },
+  ]);
+  fireEvent.click(screen.getByTestId('command-history-more'));
+  fireEvent.click(screen.getByRole('button', { name: t('Refresh') }));
+  expect(await screen.findByTestId('command-history-deploy')).toBeVisible();
+  await waitFor(() => expect(getHistoryPreferences).toHaveBeenCalledTimes(2));
+  expect(listCommandHistory).toHaveBeenCalledTimes(2);
+
+  // The blank area under the list opens the same panel menu
+  vi.mocked(listCommandHistory).mockResolvedValue([]);
+  fireEvent.contextMenu(container.querySelector('.command-history-body')!);
+  fireEvent.click(screen.getByRole('button', { name: t('Refresh') }));
+  await waitFor(() => expect(screen.queryByTestId('command-history-deploy')).toBeNull());
+  expect(listCommandHistory).toHaveBeenCalledTimes(3);
+});
+
 it('filters by name and status and lets users select the execution terminal', async () => {
   render(<PanelCommandHistory />);
   const row = await screen.findByTestId('command-history-build');

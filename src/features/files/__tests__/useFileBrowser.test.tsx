@@ -369,6 +369,22 @@ describe('useFileBrowser（本地目标）', () => {
     expect(result.current.childCache['C:/work/src']).toBeDefined();
   });
 
+  it('manual refresh re-reads the current directory so external changes show up', async () => {
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(2));
+
+    fsMocks.fsList.mockImplementation(() => Promise.resolve([
+      entry('src', 'C:/work/src', true), entry('a.txt', 'C:/work/a.txt'), entry('new.txt', 'C:/work/new.txt'),
+    ]));
+    await act(async () => { result.current.refresh(); });
+
+    await waitFor(() => expect(result.current.entries).toHaveLength(3));
+    expect(fsMocks.fsList).toHaveBeenLastCalledWith('C:/work');
+    // Refresh re-reads the current directory only: no trail entry, no view change.
+    expect(result.current.path).toBe('C:/work');
+    expect(result.current.canGoBack).toBe(false);
+  });
+
   it('新建可回退：回退新建把刚建出来的条目移入暂存', async () => {
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));

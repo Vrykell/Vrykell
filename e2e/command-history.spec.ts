@@ -70,6 +70,34 @@ test('uses purposeful sorting submenus and direct settings in wide and narrow hi
   }
 });
 
+test('refreshes the library from the actions menu and the blank list background', async ({ page }) => {
+  const panel = page.getByTestId('command-history-panel');
+  const menu = page.getByRole('menu', { name: '历史命令操作', exact: true });
+  const external = page.getByTestId('command-history-deploy');
+  await page.evaluate(() => {
+    const runs = JSON.parse(localStorage.getItem('mock-command-history-runs')!) as Record<string, unknown>[];
+    runs.push({ id: 'deploy', target: 'local', shell: 'system', command: 'npm run deploy', cwd: '/home/e2e/project', status: 'success', exitCode: 0, timestamp: 4000, runCount: 1 });
+    localStorage.setItem('mock-command-history-runs', JSON.stringify(runs));
+  });
+  await expect(external).toHaveCount(0);
+
+  // The ⋯ menu re-reads preferences and recorded runs
+  await panel.getByRole('button', { name: '历史命令操作', exact: true }).click();
+  await menu.getByRole('button', { name: '刷新', exact: true }).click();
+  await expect(external).toBeVisible({ timeout: 2500 });
+
+  // The blank area below the list opens the same panel menu
+  await page.evaluate(() => {
+    const runs = JSON.parse(localStorage.getItem('mock-command-history-runs')!) as { id: string }[];
+    localStorage.setItem('mock-command-history-runs', JSON.stringify(runs.filter(run => run.id !== 'deploy')));
+  });
+  await expect(external).toBeVisible();
+  const body = (await panel.locator('.command-history-body').boundingBox())!;
+  await page.mouse.click(body.x + 40, body.y + body.height - 10, { button: 'right' });
+  await menu.getByRole('button', { name: '刷新', exact: true }).click();
+  await expect(external).toHaveCount(0, { timeout: 2500 });
+});
+
 test('browses, fills, favorites, renames and restores hidden project commands across reloads', async ({ page }) => {
   const panel = page.getByTestId('command-history-panel');
   const before = await page.evaluate(() => (window as unknown as { __PTY_WRITES__: string[] }).__PTY_WRITES__?.length ?? 0);

@@ -1167,6 +1167,8 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
               { name: 'notes.txt', path: '/home/e2e/notes.txt', is_dir: false },
               // 新建出来的条目出现在列表里（模拟真实文件系统）
               ...createdEntries,
+              // Changes made outside the panel (test-injected), visible after a refresh.
+              ...((window as unknown as { __FS_EXTRA_ENTRIES__?: { name: string; path: string; is_dir: boolean }[] }).__FS_EXTRA_ENTRIES__ ?? []),
             ];
           case 'fs_disks':
             return [

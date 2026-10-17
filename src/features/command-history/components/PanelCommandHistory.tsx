@@ -261,6 +261,7 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
     {visible && actionsMenu && <ContextMenu anchor={actionsMenu} label={t('Command history actions')} onClose={() => setActionsMenu(null)} items={[
       { label: t('New command group'), onClick: () => createGroup() },
       { label: t('AI auto-group'), disabled: !groupable.length, onClick: openGrouping },
+      { label: t('Refresh'), group: 'view', onClick: library.refresh },
       sortOptions,
       { label: t('Expand all command groups'), group: 'view', onClick: () => foldAll(false) },
       { label: t('Collapse all command groups'), group: 'view', onClick: () => foldAll(true) },
@@ -268,7 +269,13 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
       { label: t('Command history settings'), group: 'view', onClick: openCommandSettings },
       { label: t('Hidden commands and exclusion rules'), group: 'organize', onClick: () => setRulesMenu({}) },
     ]} />}
-    <div className="command-history-body scroll-region" onScroll={() => { if (menu) setMenu(null); }}>
+    <div className="command-history-body scroll-region" onScroll={() => { if (menu) setMenu(null); }} onContextMenu={event => {
+      // Blank areas only: rows, group headings and portaled overlays keep their own menus.
+      const target = event.target instanceof Element ? event.target : null;
+      if (!target || target.closest('[data-command-history], .command-history-section, [role="dialog"], [role="menu"], [role="listbox"]')) return;
+      event.preventDefault();
+      setActionsMenu({ x: event.clientX, y: event.clientY, trigger: event.currentTarget });
+    }}>
       {visible && rulesMenu && <CommandRulesDialog initialRule={rulesMenu.initialRule} preferences={preferences}
         onChange={library.persistPreferences} onClose={() => setRulesMenu(null)} />}
       {legacy && <section className="command-history-management" aria-label={t('Import older commands')}>
@@ -278,9 +285,7 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
         }}>{t('Import')}</TextButton></div>)}
         <TextButton onClick={() => setLegacy(null)}>{t('Close')}</TextButton>
       </section>}
-      <div ref={listRef} data-reorder-list={listId} onContextMenu={event => {
-        if (event.defaultPrevented) return; event.preventDefault(); setActionsMenu({ x: event.clientX, y: event.clientY, trigger: event.currentTarget });
-      }} onKeyDown={event => {
+      <div ref={listRef} data-reorder-list={listId} onKeyDown={event => {
         if ((event.key !== 'ArrowDown' && event.key !== 'ArrowUp') || event.nativeEvent.isComposing) return;
         const rows = commandRows(event.currentTarget);
         const index = rows.indexOf(document.activeElement as HTMLElement);

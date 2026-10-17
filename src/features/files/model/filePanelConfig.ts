@@ -17,7 +17,8 @@ export type FileMenuItemKey =
   | 'workspace-add' | 'workspace-remove' | 'open-tab'
   | 'open-editor' | 'open-system' | 'open-with' | 'reveal' | 'properties'
   | 'copy' | 'cut' | 'paste' | 'copy-path' | 'rename' | 'download' | 'delete'
-  | 'upload-file' | 'upload-dir' | 'new-tab-here' | 'sync-cwd' | 'sync-terminal' | 'downloads-view' | 'collapse-all';
+  | 'upload-file' | 'upload-dir' | 'new-tab-here' | 'sync-cwd' | 'sync-terminal' | 'downloads-view' | 'collapse-all'
+  | 'refresh';
 
 export interface FilePanelConfig {
   variant: 'local' | 'ssh';
@@ -103,8 +104,8 @@ export function filePanelConfigFor(target: FileOpsTarget): FilePanelConfig {
         rowFile: ['new-file', 'new-folder', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'download', 'properties', 'delete'],
         rowMulti: ['copy', 'cut', 'paste', 'download', 'delete'],
         // 空白处与 ⋯ 菜单提供同一套操作（远端多出上传），只是落点固定为当前目录
-        blank: ['paste', 'new-file', 'new-folder', 'upload-file', 'upload-dir', 'sync-terminal', 'sync-cwd', 'downloads-view', 'collapse-all'],
-        more: ['new-file', 'new-folder', 'upload-file', 'upload-dir', 'sync-terminal', 'sync-cwd', 'downloads-view', 'collapse-all'],
+        blank: ['paste', 'new-file', 'new-folder', 'upload-file', 'upload-dir', 'sync-terminal', 'sync-cwd', 'downloads-view', 'collapse-all', 'refresh'],
+        more: ['new-file', 'new-folder', 'upload-file', 'upload-dir', 'sync-terminal', 'sync-cwd', 'downloads-view', 'collapse-all', 'refresh'],
       },
       drag: { downloadBeforeNativeDrag: true, externalDropMode: 'upload', cleanupSourceAfterNativeDrag: false },
       open: 'remote-editor',
@@ -123,8 +124,8 @@ export function filePanelConfigFor(target: FileOpsTarget): FilePanelConfig {
       rowFile: ['new-file', 'new-folder', 'open-editor', 'open-system', 'open-with', 'reveal', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'properties', 'delete'],
       rowMulti: ['copy', 'cut', 'paste', 'delete'],
       // 空白处与 ⋯ 菜单提供同一套操作，只是落点固定为当前目录
-      blank: ['paste', 'new-file', 'new-folder', 'new-tab-here', 'sync-terminal', 'sync-cwd', 'reveal', 'downloads-view', 'collapse-all'],
-      more: ['new-file', 'new-folder', 'new-tab-here', 'sync-terminal', 'sync-cwd', 'reveal', 'downloads-view', 'collapse-all'],
+      blank: ['paste', 'new-file', 'new-folder', 'new-tab-here', 'sync-terminal', 'sync-cwd', 'reveal', 'downloads-view', 'collapse-all', 'refresh'],
+      more: ['new-file', 'new-folder', 'new-tab-here', 'sync-terminal', 'sync-cwd', 'reveal', 'downloads-view', 'collapse-all', 'refresh'],
     },
     drag: { downloadBeforeNativeDrag: false, externalDropMode: 'move', cleanupSourceAfterNativeDrag: true },
     open: 'terminal-editor',

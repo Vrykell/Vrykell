@@ -40,6 +40,8 @@ export interface FileMenuHandlers {
   onRevealDir?: (dir: string) => void;
   /** Show the properties dialog for a single entry. */
   onProperties?: (entry: FsEntry) => void;
+  /** Re-read the current directory from the backend (⋯ and blank-area menus). */
+  onRefresh?: () => void;
 }
 
 export interface FileMenuContext {
@@ -130,6 +132,8 @@ function itemFor(key: FileMenuItemKey, ctx: FileMenuContext): ContextMenuItem | 
       return handlers.onOpenDownloads ? { label: '下载管理', onClick: () => handlers.onOpenDownloads?.() } : null;
     case 'collapse-all':
       return handlers.onCollapseAll ? { label: t('files.collapseAll'), onClick: handlers.onCollapseAll } : null;
+    case 'refresh':
+      return handlers.onRefresh ? { label: t('Refresh'), onClick: handlers.onRefresh } : null;
     default:
       return null;
   }
@@ -145,7 +149,7 @@ export function buildFileMenuItems(keys: FileMenuItemKey[], ctx: FileMenuContext
       const group: MenuGroup = key.startsWith('open-') || key === 'new-tab-here' ? 'primary'
         : clipboard.includes(key) ? 'clipboard'
           : ['new-file', 'new-folder', 'rename', 'upload-file', 'upload-dir', 'download'].includes(key) ? 'edit'
-            : ['reveal', 'sync-terminal', 'sync-cwd', 'downloads-view', 'collapse-all'].includes(key) ? 'view' : 'organize';
+            : ['reveal', 'sync-terminal', 'sync-cwd', 'downloads-view', 'collapse-all', 'refresh'].includes(key) ? 'view' : 'organize';
       items.push({ ...item, group, order: clipboard.includes(key) ? clipboard.indexOf(key) : 0 });
     }
   }

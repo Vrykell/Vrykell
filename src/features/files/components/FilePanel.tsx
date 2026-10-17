@@ -255,6 +255,8 @@ export default function FilePanel({
     onRename: (entry) => startRename(entry),
     onDelete: (targets) => confirmDelete(targets),
     onProperties: (entry) => setPropertiesTarget(entry),
+    // Both panel-level menus (⋯ and blank area) re-read the current directory from the backend.
+    onRefresh: refresh,
     ...extraHandlers,
     onSyncToCwd: terminalCwd != null ? () => { void navigate(terminalCwd); }
       : onSyncToTerminal ? () => useToastStore.getState().addToast(t('The terminal has not reported its working directory yet.'), 'info') : undefined,

@@ -91,9 +91,11 @@ export function useCommandLibrary(context: ExecutionContext, visible: boolean) {
         original: { shell: item.shell, command: item.command, cwd: item.cwd }, draft: null, preferences }));
     announceCommandHistory();
   };
-  return { history, preferences, ready, error, update, persistPreferences, saveCommand, deleteCommand, retry: () => {
-    if (!ready) { setAttempt(value => value + 1); return; }
-    update(value => value);
-    void listCommandHistory(context.target, context.root).then(setHistory).catch(reason => setError(String(reason)));
-  } };
+  /**
+   * Re-read preferences and the recorded runs from the backend, then restart the
+   * watch timer. Both effects key off `attempt`, so one bump reloads the whole
+   * library; the panel menu and the error box share it.
+   */
+  const refresh = useCallback(() => setAttempt(value => value + 1), []);
+  return { history, preferences, ready, error, update, persistPreferences, saveCommand, deleteCommand, refresh, retry: refresh };
 }
