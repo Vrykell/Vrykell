@@ -62,7 +62,7 @@ const zh: Record<string, string> = {
   'Delete command group': '删除命令分组',
   'Delete command group?': '删除命令分组？',
   'Commands in this group will remain in the project.': '组内命令将保留在项目中。',
-  'Group name': '分组名称',
+  'New group': '新分组',
   'Custom order': '自定义顺序',
   'Drag commands here': '将命令拖到这里',
   'Remove commands from group': '移出组内全部命令',

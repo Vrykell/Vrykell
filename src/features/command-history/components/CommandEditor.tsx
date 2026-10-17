@@ -9,8 +9,10 @@ import ToolDialog from '@ui/ToolDialog';
 import { isWithin } from '../model/commands';
 
 /** Edit reusable command text and its directory without submitting terminal input. */
-export default function CommandEditor({ initial, root, creating, onSave, onClose }: {
+export default function CommandEditor({ initial, root, creating, initialFocus = '[data-command-editor-text]', onSave, onClose }: {
   initial: HistoryCommandDraft; root: string; creating: boolean;
+  /** Selector of the field that receives focus when the dialog opens. */
+  initialFocus?: string;
   onSave: (draft: HistoryCommandDraft) => Promise<void>; onClose: () => void;
 }) {
   const [draft, setDraft] = useState(initial);
@@ -29,9 +31,9 @@ export default function CommandEditor({ initial, root, creating, onSave, onClose
     finally { saving.current = false; setBusy(false); }
   };
   const title = t(creating ? 'New command' : 'Edit command');
-  return <ToolDialog label={title} onClose={onClose} onSubmit={() => { void save(); }} busy={busy} initialFocus="[data-command-editor-text]">
+  return <ToolDialog label={title} onClose={onClose} onSubmit={() => { void save(); }} busy={busy} initialFocus={initialFocus}>
     <div className="command-history-editor">
-      <label>{t('Command name (optional)')}<TextInput variant="field" value={draft.name} disabled={busy} onChange={event => setDraft({ ...draft, name: event.target.value })} /></label>
+      <label>{t('Command name (optional)')}<TextInput variant="field" data-command-editor-name value={draft.name} disabled={busy} onChange={event => setDraft({ ...draft, name: event.target.value })} /></label>
       <ConfigTextArea label={t('Command')} data-command-editor-text rows={5} value={draft.command} disabled={busy} onChange={event => setDraft({ ...draft, command: event.target.value })} />
       <label>{t('Execution directory')}<TextInput variant="field" value={draft.cwd} disabled={busy} onChange={event => setDraft({ ...draft, cwd: event.target.value })} /></label>
       <p className="command-history-editor-note">{t('Saving a command does not execute it.')}</p>

@@ -82,8 +82,11 @@ test('browses, fills, favorites, renames and restores hidden project commands ac
   await favorite.hover();
   await favorite.getByRole('button', { name: '命令操作' }).click();
   await page.getByRole('button', { name: '重命名命令', exact: true }).click();
-  await page.getByRole('textbox', { name: '重命名命令', exact: true }).fill('发布构建');
-  await page.getByTestId('command-history-edit-save').click();
+  const nameEditor = page.getByRole('dialog', { name: '编辑命令', exact: true });
+  const nameField = nameEditor.getByRole('textbox', { name: '命令名称（可选）', exact: true });
+  await expect(nameField).toBeFocused();
+  await nameField.fill('发布构建');
+  await nameEditor.getByRole('button', { name: '保存', exact: true }).click();
   await expect(panel.getByText('发布构建', { exact: true })).toBeVisible();
   await page.getByTestId('command-history-noise').hover();
   await page.getByTestId('command-history-noise').getByRole('button', { name: '命令操作' }).click();
@@ -231,8 +234,9 @@ test('persists command groups, colors and membership through edits and group del
   const row = page.getByTestId('command-history-build');
   await panel.getByRole('button', { name: '历史命令操作', exact: true }).click();
   await page.getByRole('button', { name: '新建命令分组', exact: true }).click();
-  await page.getByRole('textbox', { name: '新建命令分组', exact: true }).fill('Release');
-  await page.getByTestId('command-history-group-edit-save').click();
+  const createGroup = page.getByRole('textbox', { name: '重命名命令分组', exact: true });
+  await createGroup.fill('Release');
+  await createGroup.press('Enter');
   const group = panel.locator('.command-history-group').filter({ has: page.getByRole('button', { name: 'Release', exact: true }) });
   await dragTo(page, row, group.locator('.command-history-section'));
   await expect(group.getByTestId('command-history-build')).toBeVisible();
@@ -266,8 +270,9 @@ test('persists command groups, colors and membership through edits and group del
   await group.locator('.command-history-section').hover();
   await group.getByRole('button', { name: '分组操作', exact: true }).click();
   await page.getByRole('button', { name: '重命名分组…', exact: true }).click();
-  await page.getByRole('textbox', { name: '重命名命令分组', exact: true }).fill('Deploy');
-  await page.getByTestId('command-history-group-edit-save').click();
+  const renameGroup = page.getByRole('textbox', { name: '重命名命令分组', exact: true });
+  await renameGroup.fill('Deploy');
+  await renameGroup.press('Enter');
   const renamed = panel.locator('.command-history-group').filter({ has: page.getByRole('button', { name: 'Deploy', exact: true }) });
   await renamed.locator('.command-history-section').hover();
   await renamed.getByRole('button', { name: '分组操作', exact: true }).click();
@@ -282,8 +287,9 @@ test('drags commands and groups, filters collected commands and remembers inspec
   const createGroup = async (name: string) => {
     await panel.getByRole('button', { name: '历史命令操作', exact: true }).click();
     await page.getByRole('button', { name: '新建命令分组', exact: true }).click();
-    await page.getByRole('textbox', { name: '新建命令分组', exact: true }).fill(name);
-    await page.getByTestId('command-history-group-edit-save').click();
+    const input = page.getByRole('textbox', { name: '重命名命令分组', exact: true });
+    await input.fill(name);
+    await input.press('Enter');
     return panel.locator('.command-history-group').filter({ has: page.getByRole('button', { name, exact: true }) });
   };
   const release = await createGroup('Release');
@@ -458,8 +464,14 @@ test('creates groups at the front from ungrouped command menus and page actions 
   await expect(page.getByRole('button', { name: '新建命令分组', exact: true })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('ungrouped-new-group-menu.png') });
   await page.getByRole('button', { name: '新建命令分组', exact: true }).click();
-  await page.getByRole('textbox', { name: '新建命令分组', exact: true }).fill('Build tools');
-  await page.getByTestId('command-history-group-edit-save').click();
+  const firstGroupName = page.getByRole('textbox', { name: '重命名命令分组', exact: true });
+  await expect(firstGroupName).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('group-rename-inline.png') });
+  await page.setViewportSize({ width: 680, height: 800 });
+  await page.screenshot({ path: test.info().outputPath('group-rename-inline-narrow.png') });
+  await page.setViewportSize({ width: 1240, height: 800 });
+  await firstGroupName.fill('Build tools');
+  await firstGroupName.press('Enter');
   const groups = panel.locator('.command-history-group');
   await expect(groups.first().getByRole('button', { name: 'Build tools', exact: true })).toBeVisible();
   await expect(groups.first().getByTestId('command-history-build')).toBeVisible();
@@ -469,8 +481,9 @@ test('creates groups at the front from ungrouped command menus and page actions 
   await page.keyboard.press('Escape');
   await panel.getByRole('button', { name: '历史命令操作', exact: true }).click();
   await page.getByRole('button', { name: '新建命令分组', exact: true }).click();
-  await page.getByRole('textbox', { name: '新建命令分组', exact: true }).fill('Latest group');
-  await page.getByTestId('command-history-group-edit-save').click();
+  const secondGroupName = page.getByRole('textbox', { name: '重命名命令分组', exact: true });
+  await secondGroupName.fill('Latest group');
+  await secondGroupName.press('Enter');
   await expect(groups.first().getByRole('button', { name: 'Latest group', exact: true })).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { __PTY_WRITES__: string[] }).__PTY_WRITES__.length)).toBe(writes);
   await page.reload();
