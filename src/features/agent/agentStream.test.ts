@@ -15,7 +15,13 @@ vi.mock('@tauri-apps/api/core', () => {
   };
 });
 
+vi.mock('@platform/diagnostics', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@platform/diagnostics')>();
+  return { ...actual, diagnostic: vi.fn(actual.diagnostic) };
+});
+
 import { invoke, Channel } from '@tauri-apps/api/core';
+import { diagnostic } from '@platform/diagnostics';
 import { agentStream } from '@features/agent/services/agentStream';
 import { useUsageStore } from '@features/agent/stores/usage';
 
@@ -67,6 +73,7 @@ describe('agentStream（mock IPC 边界）', () => {
   // mock 自身作为返回值，vitest 会把返回值当 cleanup 钩子在测试后零参调用。
   beforeEach(() => {
     mockInvoke.mockClear();
+    vi.mocked(diagnostic).mockClear();
   });
 
   it('正常流式：onChunk 收到完整文本', async () => {
@@ -80,11 +87,17 @@ describe('agentStream（mock IPC 边界）', () => {
     expect(text).toBe('你好，世界');
   });
 
-  it('HTTP 错误：抛出含服务端消息的错误', async () => {
-    setupInvoke('{"error":{"message":"invalid key"}}', 401);
+  it('HTTP 错误：抛出含服务端消息的错误，并把失败写进诊断', async () => {
+    setupInvoke('{"error":{"message":"The `content[].thinking` in the thinking mode must be passed back to the API."}}', 400);
     await expect(agentStream([{ role: 'user', content: 'hi' }], () => {})).rejects.toThrow(
-      'invalid key',
+      'thinking mode must be passed back',
     );
+    expect(vi.mocked(diagnostic)).toHaveBeenCalledWith('agent-stream-error', expect.objectContaining({
+      provider: 'openai-compatible',
+      model: 'gpt-4o-mini',
+      baseUrl: 'https://api.openai.com/v1',
+      error: expect.stringContaining('thinking mode must be passed back'),
+    }));
   });
 
   it('reports provider usage into the usage store', async () => {

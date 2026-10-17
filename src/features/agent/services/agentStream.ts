@@ -20,6 +20,7 @@ import { buildTools } from '@features/agent/tools';
 import { buildTavilySearchTool } from '@features/agent/tools/webSearch';
 import { buildWebSearchTool, buildWebFetchTool, buildWebCrawlTool } from '@features/agent/tools/webFetch';
 import { buildSystemPrompt } from '@features/agent/model/systemPrompt';
+import { terminalDebug } from '@features/terminal/services/terminalDebug';
 import { listSkills, buildSkillsContext, availableSkillMetas } from '@features/agent/services/skills';
 import { getMemory, getMemoryJournal, listAgents } from '@features/agent/services/platform';
 import { listMcpTools, buildMcpTool } from '@features/agent/services/mcp';
@@ -380,6 +381,18 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   }
   if (streamError != null) {
     console.error('[agentStream] 流式请求失败:', streamError);
+    // Persist the failure in the diagnostics stream: the transcript only shows the final message,
+    // so a failed turn needs a record afterwards (provider, endpoint, step and the server text).
+    terminalDebug('agent-stream-error', {
+      provider: info.provider,
+      model: info.model,
+      baseUrl: info.base_url,
+      steps: stepCount,
+      toolCalls,
+      tools: hasTools,
+      deepThink: settings.deepThink,
+      error: describeError(streamError),
+    });
     throw new Error(describeError(streamError));
   }
 };
