@@ -30,27 +30,46 @@ test('model header controls align with the input while save feedback lives in th
 test('wallpaper picker filters images and rejects both documents and renamed invalid images', async ({ page }) => {
   await setupTauriMock(page);
   await page.addInitScript(() => {
-    const target = window as unknown as { __TAURI_INTERNALS__: { invoke: (cmd: string, args: Record<string, unknown>) => Promise<unknown> }; __WALLPAPER_DIALOGS__: Record<string, unknown>[] };
+    const target = window as unknown as {
+      __TAURI_INTERNALS__: { invoke: (cmd: string, args: Record<string, unknown>) => Promise<unknown> };
+      __WALLPAPER_DIALOGS__: Record<string, unknown>[];
+      __WALLPAPER_READS__: string[];
+    };
     const original = target.__TAURI_INTERNALS__.invoke;
     const paths = ['/wallpaper.txt', '/invalid-wallpaper.png', '/valid-wallpaper.png', null];
     target.__WALLPAPER_DIALOGS__ = [];
+    target.__WALLPAPER_READS__ = [];
     target.__TAURI_INTERNALS__.invoke = async (cmd, args) => {
       if (cmd === 'plugin:dialog|open') { target.__WALLPAPER_DIALOGS__.push(args); return paths.shift(); }
+      // The candidate is read by the backend, so the test answers that call instead of
+      // serving the asset-protocol URL the picker must not depend on.
+      if (cmd === 'read_image_data_url') {
+        target.__WALLPAPER_READS__.push(args.path as string);
+        if (args.path === '/valid-wallpaper.png') {
+          return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
+        }
+        return `data:image/png;base64,${btoa('This is a document')}`;
+      }
       return original(cmd, args);
     };
   });
-  await page.route('**/invalid-wallpaper.png', route => route.fulfill({ body: 'This is a document', contentType: 'image/png' }));
-  await page.route('**/valid-wallpaper.png', route => route.fulfill({
-    body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64'), contentType: 'image/png',
-  }));
   await page.goto('/');
   await gotoSetting(page, '主题');
   const select = page.getByRole('button', { name: '选择图片', exact: true });
+  // Toasts are the only floating status surfaces; the page header also reports saves.
+  const toast = page.locator('[role="status"].workspace-floating');
+  const dismissToast = async () => {
+    await expect(toast).toHaveCount(1);
+    await toast.getByRole('button', { name: '关闭通知' }).click();
+    await expect(toast).toHaveCount(0);
+  };
   await select.click();
-  await expect(page.getByText('请选择有效的图片文件。', { exact: true })).toBeVisible();
+  await dismissToast();
   expect((await themeConfig(page)).backgroundImage).toBeNull();
+  expect(await page.evaluate(() => (window as unknown as { __WALLPAPER_READS__: string[] }).__WALLPAPER_READS__)).toHaveLength(0);
   await select.click();
-  await expect.poll(async () => (await page.evaluate(() => (window as unknown as { __WALLPAPER_DIALOGS__: unknown[] }).__WALLPAPER_DIALOGS__)).length).toBe(2);
+  await expect.poll(async () => (await page.evaluate(() => (window as unknown as { __WALLPAPER_READS__: string[] }).__WALLPAPER_READS__))[0]).toBe('/invalid-wallpaper.png');
+  await dismissToast();
   await expect(page.getByText('/invalid-wallpaper.png', { exact: true })).toHaveCount(0);
   expect((await themeConfig(page)).backgroundImage).toBeNull();
   await select.click();
@@ -61,6 +80,8 @@ test('wallpaper picker filters images and rejects both documents and renamed inv
   expect(dialogs[0].options.filters).toHaveLength(1);
   expect(dialogs[0].options.filters[0].extensions).toContain('png');
   expect(dialogs[0].options.filters[0].extensions).not.toContain('txt');
+  const reads = await page.evaluate(() => (window as unknown as { __WALLPAPER_READS__: string[] }).__WALLPAPER_READS__);
+  expect(reads).toEqual(['/invalid-wallpaper.png', '/valid-wallpaper.png']);
 });
 
 test('the full panel preview accepts release and shares its surface with split placement', async ({ page }) => {

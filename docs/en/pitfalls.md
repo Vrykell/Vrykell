@@ -358,6 +358,8 @@ Fitting that clears the renderer before resizing causes an additional blank fram
 
 ### 9.10 WebView With No CSP + asset scope `$HOME/**` Wide Open (`c7700b8`)
 - Fix: CSP (script only self/inline, connect only ipc, no remote img, object/frame forbidden); asset scope narrowed to `$APPDATA/**`; wallpapers are dynamically `allow_file`-authorized based on the user's choice.
+- **Wallpaper validation must read through the backend**: the asset protocol serves only authorized paths (`$APPDATA/**` or an already saved wallpaper), so decoding a not-yet-saved candidate through its asset URL gets a 403 and is misreported as "not a valid image". The candidate is read by `read_image_data_url` before decoding, and the asset URL reaches the background layer only after `set_theme_config` authorized the file, otherwise the one-shot image request is denied.
+- **Windows production builds need `http://asset.localhost` in `img-src`**: on Windows the asset protocol is served from `http://asset.localhost` while the CSP source `asset:` only matches `asset://` (macOS); omitting it blocks even authorized wallpapers.
 - **Remaining trade-offs**: script-src includes `'unsafe-inline'` (needed by Vite HMR in dev mode); remote images in markdown are all downgraded to link text (exfiltration/tracking surface).
 
 ### 9.11 LIKE Wildcards Not Escaped (`code-audit.md`)

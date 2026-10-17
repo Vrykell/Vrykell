@@ -186,6 +186,7 @@ fn read_image_data_url_sync(path: String) -> Result<String, String> {
         Some("jpg") | Some("jpeg") => "image/jpeg",
         Some("gif") => "image/gif",
         Some("webp") => "image/webp",
+        Some("avif") => "image/avif",
         Some("svg") => "image/svg+xml",
         Some("bmp") => "image/bmp",
         _ => "image/png",
@@ -259,11 +260,17 @@ mod tests {
     #[test]
     fn read_image_data_url_detects_mime_from_extension() {
         let dir = std::env::temp_dir();
-        let path = dir.join("vrykell_test_bg.jpeg");
-        std::fs::write(&path, b"x").unwrap();
-        let url = read_image_data_url_sync(path.to_string_lossy().to_string()).unwrap();
-        assert!(url.starts_with("data:image/jpeg;base64,"));
-        let _ = std::fs::remove_file(&path);
+        for (name, mime) in [
+            ("vrykell_test_bg.jpeg", "image/jpeg"),
+            ("vrykell_test_bg.JPG", "image/jpeg"),
+            ("vrykell_test_bg.avif", "image/avif"),
+        ] {
+            let path = dir.join(name);
+            std::fs::write(&path, b"x").unwrap();
+            let url = read_image_data_url_sync(path.to_string_lossy().to_string()).unwrap();
+            assert!(url.starts_with(&format!("data:{mime};base64,")), "{name}: {url}");
+            let _ = std::fs::remove_file(&path);
+        }
     }
 
     #[test]

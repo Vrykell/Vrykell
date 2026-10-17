@@ -135,15 +135,17 @@ export const useTerminalThemeStore = create<TerminalThemeState>((set, get) => ({
     const config = { ...prev, ...patch };
     set({ config });
     applyTerminalTheme(config);
+    try {
+      // Persist first: the backend authorizes the new wallpaper file, and the webview must not
+      // request its asset URL before that, or the one-shot image request is denied (403).
+      await invoke('set_theme_config', { config });
+    } catch {
+      /* Ignore when the backend is unavailable: the frontend state already applied. */
+    }
     if (config.backgroundImage !== prev.backgroundImage) {
       const wallpaperDataUrl = resolveWallpaperUrl(config.backgroundImage);
       cacheWallpaper(wallpaperDataUrl);
       set({ wallpaperDataUrl });
-    }
-    try {
-      await invoke('set_theme_config', { config });
-    } catch {
-      /* 后端不可用时忽略（前端已即时生效） */
     }
   },
 

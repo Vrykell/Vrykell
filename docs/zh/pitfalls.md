@@ -358,6 +358,8 @@
 
 ### 9.10 WebView 无 CSP + asset scope `$HOME/**` 全开（`c7700b8`）
 - 修复：CSP（script 仅 self/inline、connect 仅 ipc、无远程 img、禁 object/frame）；asset scope 收窄 `$APPDATA/**`；壁纸按用户选择动态 `allow_file` 授权。
+- **壁纸校验必须经后端读取**：asset 协议只服务已授权的路径（`$APPDATA/**` 或已保存的壁纸），用 asset URL 解码未保存的候选文件会拿到 403，被误判成「不是有效图片」；候选文件改由 `read_image_data_url` 读取后再解码，且 `set_theme_config` 授权完成后才把 asset URL 交给背景层，否则一次性图片请求会被拒绝。
+- **Windows 生产构建的 `img-src` 需要 `http://asset.localhost`**：Windows 上 asset 协议地址是 `http://asset.localhost`，CSP 的 `asset:` 只匹配 `asset://`（macOS），漏写会让已授权的壁纸同样被拦截。
 - **残留取舍**：script-src 含 `'unsafe-inline'`（dev 模式 Vite HMR 需要）；markdown 远程图片一律降级为链接文本（外带/追踪面）。
 
 ### 9.11 LIKE 通配符未转义（`code-audit.md`）
