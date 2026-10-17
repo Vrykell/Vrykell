@@ -1095,13 +1095,15 @@ button.text-control:disabled:hover { background: transparent; color: var(--contr
 /* Canonical quiet chip: no border, only a gray background. Shared by the shell badge,
    git branch, working-directory and completion chips so the input row stays uniform. */
 .terminal-chip {
-  display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; min-width: 0;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px; flex-shrink: 0; min-width: 0;
   padding: 1px 7px; border: none; border-radius: 5px;
   background: var(--hover); color: var(--text-secondary);
   font-family: var(--font-mono); font-size: calc(11px * var(--ui-font-scale));
-  line-height: 18px; white-space: nowrap;
+  min-height: calc(20px * var(--ui-font-scale)); line-height: calc(18px * var(--ui-font-scale)); white-space: nowrap;
 }
-button.terminal-chip.text-control { min-height: 20px; padding: 1px 7px; background: var(--hover); font-family: var(--font-mono); font-size: calc(11px * var(--ui-font-scale)); line-height: 18px; }
+.terminal-chip > svg { display: block; flex-shrink: 0; }
+.terminal-chip > span { min-width: 0; line-height: inherit; }
+button.terminal-chip.text-control { min-height: calc(20px * var(--ui-font-scale)); padding: 1px 7px; background: var(--hover); font-family: var(--font-mono); font-size: calc(11px * var(--ui-font-scale)); line-height: calc(18px * var(--ui-font-scale)); }
 /* Clickable chips: hovering or focusing clears the resting gray and brightens the label, while the
    open (expanded) state keeps the pressed tint. The :not(:disabled) guard keeps disabled chips
    inert; static spans never match, so status-only chips stay quiet. */
