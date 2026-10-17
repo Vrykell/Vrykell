@@ -19,11 +19,17 @@ describe('deepThinkProviderOptions', () => {
       (high.anthropic as { thinking: { budgetTokens: number } }).thinking.budgetTokens,
     );
   });
-  it('anthropic 兼容端点不发送 thinking，官方端点才发', () => {
-    expect(deepThinkProviderOptions('anthropic', 'high', 'https://api.deepseek.com/anthropic')).toEqual({});
+  it('anthropic 兼容端点显式关闭 thinking，官方端点才按开关发送', () => {
+    expect(deepThinkProviderOptions('anthropic', 'high', 'https://api.deepseek.com/anthropic')).toEqual({
+      anthropic: { thinking: { type: 'disabled' } },
+    });
+    expect(deepThinkProviderOptions('anthropic', 'high', 'https://api.deepseek.com/anthropic', false)).toEqual({
+      anthropic: { thinking: { type: 'disabled' } },
+    });
     expect(deepThinkProviderOptions('anthropic', 'high', 'https://api.anthropic.com')).toEqual({
       anthropic: { thinking: { type: 'enabled', budgetTokens: 16000 } },
     });
+    expect(deepThinkProviderOptions('anthropic', 'high', 'https://api.anthropic.com', false)).toEqual({});
   });
   it('gemini → thinkingBudget 按档位递增', () => {
     const low = deepThinkProviderOptions('gemini', 'low');

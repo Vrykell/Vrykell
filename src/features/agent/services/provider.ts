@@ -95,31 +95,41 @@ type Jsonish = string | number | boolean | { [k: string]: Jsonish };
 
 export type ThinkingLevel = 'low' | 'medium' | 'high';
 
+/** The only endpoint whose thinking blocks the SDK can echo back reliably. An empty base URL is
+ *  the vendor default, i.e. the official endpoint. */
+export function supportsThinkingPassback(baseUrl: string): boolean {
+  if (!baseUrl) return true;
+  try {
+    return new URL(baseUrl).host.toLowerCase() === 'api.anthropic.com';
+  } catch {
+    return false;
+  }
+}
+
 export function deepThinkProviderOptions(
   provider: ProviderKind,
   level: ThinkingLevel = 'high',
   baseUrl = '',
+  wanted = true,
 ): Record<string, Record<string, Jsonish>> {
   switch (provider) {
     case 'anthropic': {
-      // Thinking blocks must be echoed back on the next request. Only the official endpoint does
-      // that reliably; a compatibility endpoint (DeepSeek's shim, say) answers a follow-up that
-      // carries thinking with HTTP 400 "content[].thinking ... must be passed back", so those
-      // endpoints fall back to a plain request instead of failing the turn. An empty base URL is
-      // the vendor default, i.e. the official endpoint.
-      const host = (() => {
-        try {
-          return new URL(baseUrl).host.toLowerCase();
-        } catch {
-          return '';
-        }
-      })();
-      if (host && host !== 'api.anthropic.com') return {};
+      // Thinking blocks must be echoed back on every follow-up request once tools are in play.
+      // A compatibility endpoint (DeepSeek's shim, say) cannot round-trip them, and leaving the
+      // option out does not turn its thinking mode off — the model's default still produces
+      // reasoning and the follow-up then fails with HTTP 400 "content[].thinking ... must be
+      // passed back". Those endpoints get an explicit disable instead.
+      if (!supportsThinkingPassback(baseUrl)) {
+        return { anthropic: { thinking: { type: 'disabled' } } };
+      }
+      if (!wanted) return {};
       return { anthropic: { thinking: { type: 'enabled', budgetTokens: level === 'low' ? 4000 : level === 'medium' ? 8000 : 16000 } } };
     }
     case 'gemini':
+      if (!wanted) return {};
       return { google: { thinkingConfig: { thinkingBudget: level === 'low' ? 4096 : level === 'medium' ? 8192 : 16384 } } };
     default:
+      if (!wanted) return {};
       return { vrykell: { reasoning_effort: level } };
   }
 }
