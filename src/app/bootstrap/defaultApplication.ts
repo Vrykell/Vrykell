@@ -5,7 +5,7 @@ import { initAutoTitle } from '@features/agent/services/title';
 import { initScheduleRunner } from '@features/agent/services/scheduleRunner';
 import { useWorkspaceDirsStore } from '@features/files/services/workspaceDirs';
 import { useHistoryStore } from '@features/terminal/stores/history';
-import { restoreWorkspace } from '@features/workspace';
+import { initForwardedLaunch, restoreWorkspace } from '@features/workspace';
 import { createApplicationBootstrap } from '@app/bootstrap/applicationBootstrap';
 import { useToastStore } from '@ui/Toast';
 import { getShellLaunchDirectory } from '@platform/contextMenu';
@@ -31,6 +31,9 @@ export function startDefaultApplication(): () => void {
         return null;
       });
       await restoreWorkspace({ onError: reportFailure, launchDirectory });
+      // Subscribe only after the explicit launch is placed: a redirect that arrived meanwhile
+      // waits in the queue and becomes its own tab instead of hiding the requested directory.
+      await initForwardedLaunch(reportFailure);
     },
     loadWorkspaceDirs: () => useWorkspaceDirsStore.getState().load(),
     hydrateHistory: () => useHistoryStore.getState().hydrate(),

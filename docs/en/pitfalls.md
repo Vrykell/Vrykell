@@ -280,6 +280,11 @@ Fitting that clears the renderer before resizing causes an additional blank fram
 - **Fix**: `merge_locale_env` sits next to `merge_term_env` in `spawn_pty` — when nothing in the environment requests UTF-8 it supplies `LC_CTYPE` (`en_US.UTF-8` on macOS, `C.UTF-8` on other Unix), plus `LANG` when it is empty; an existing UTF-8 setting is left alone so the message language is preserved.
 - **Lesson**: a GUI launch is missing not only PATH/TERM but also the locale; for any "fine locally, broken in the app" text issue, check `LANG`/`LC_CTYPE` first.
 
+### 7.10 A Single-Instance Redirect Must Be Queued Before Its Signal (`platform/context_menu.rs`)
+- **Symptom**: the second start (context menu) handed its directory to the frontend through an event alone. When the window had just started and the webview had not subscribed yet, the event was lost: the user picked "Open in Vrykell" and nothing happened.
+- **Fix**: the Rust side queues the directory first and only then emits a wake-up signal; the frontend drains the queue once right after subscribing. The drain is atomic (one side takes an entry), so the event path and the catch-up path never open the same tab twice.
+- **Lesson**: when a running instance must serve an external request, the event is only a wake-up call and the data belongs in a replayable queue. The single-instance plugin also has to be registered before the other plugins, so a second start is intercepted before the rest of the setup runs.
+
 ---
 
 ## 8. SQLite / Persistence

@@ -4,6 +4,8 @@ export interface TauriMockOptions {
   /** Use each terminal's requested directory for its initial prompt. */
   terminalDirectories?: boolean;
   launchDirectory?: string;
+  /** Directories a second process forwarded before the window could listen (drains at startup). */
+  pendingLaunchDirectories?: string[];
   contextMenu?: { available?: boolean; enabled?: boolean; stale?: boolean; certificateTrusted?: boolean };
   /** 是否启用 OSC 133 shell integration（默认 true）。
    *  false 时 mock 保持 classic 场景，用于测试无 integration 回退。 */
@@ -58,10 +60,12 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
     { name: '旧脚本技能', description: '遗留技能，含脚本', source: 'market', trusted: false, enabled: false, hasScripts: true, modified: true, files: ['SKILL.md', 'scripts/run.sh', 'references/说明.md'], dir: '/home/e2e/.vrykell/skills/旧脚本技能', prompt: '运行 scripts/run.sh 完成工作。' },
   ];
   await page.addInitScript(
-    ({ enableIntegration, enableReadyMarker, models, active, skillsSeed, scheduleSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession, launchDirectory, menuSeed, terminalDirectories }) => {
+    ({ enableIntegration, enableReadyMarker, models, active, skillsSeed, scheduleSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession, launchDirectory, pendingDirs, menuSeed, terminalDirectories }) => {
     const menu = { supported: true, available: true, enabled: false, stale: false, certificateTrusted: false, certificateThumbprint: 'E2E-CERTIFICATE', ...menuSeed };
     const menuActions: string[] = [];
     (window as unknown as { __MENU_ACTIONS__: string[] }).__MENU_ACTIONS__ = menuActions;
+    const pendingLaunchDirectories = [...pendingDirs];
+    (window as unknown as { __PENDING_LAUNCH_DIRECTORIES__: string[] }).__PENDING_LAUNCH_DIRECTORIES__ = pendingLaunchDirectories;
     let cbCounter = 0;
     const eventListeners = new Map<string, number>();
     const toolListeners = new Map<string, number>();
@@ -857,6 +861,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'get_search_context':
             return { cwd: args.cwd ?? '/home/e2e' };
           case 'shell_launch_directory': return launchDirectory ?? null;
+          case 'shell_take_forwarded_directories': return pendingLaunchDirectories.splice(0);
           case 'context_menu_status': return { ...menu };
           case 'context_menu_manage': {
             const action = args.action as string;
@@ -1362,6 +1367,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
       },
       // 测试可直接注入任意 PTY 输出字节（如 altScreen 序列）
       emitPtyExit: (code: number | null) => emit('pty-exit', { id: 'e2e-session', code }),
+      emitEvent: (event: string, payload: unknown) => emit(event, payload),
       emitPtyOutput: (data: string) => {
         emitOutput(data);
       },
@@ -1371,7 +1377,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
       },
     };
     localStorage.setItem('vrykell-api-key', 'sk-e2e-fake');
-  }, { enableIntegration: integration, enableReadyMarker: opts.shellReadyMarker !== false, models: seedModels, active: seedActive, skillsSeed: seedSkills, scheduleSeed: seedSchedules, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true, sshPreexec: opts.sshPreexec ?? true, groupedHistoricalSession: opts.groupedHistoricalSession ?? false, launchDirectory: opts.launchDirectory, menuSeed: opts.contextMenu, terminalDirectories: opts.terminalDirectories ?? false });
+  }, { enableIntegration: integration, enableReadyMarker: opts.shellReadyMarker !== false, models: seedModels, active: seedActive, skillsSeed: seedSkills, scheduleSeed: seedSchedules, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true, sshPreexec: opts.sshPreexec ?? true, groupedHistoricalSession: opts.groupedHistoricalSession ?? false, launchDirectory: opts.launchDirectory, pendingDirs: opts.pendingLaunchDirectories ?? [], menuSeed: opts.contextMenu, terminalDirectories: opts.terminalDirectories ?? false });
 }
 
 /** 预置 AI 回复文本：mock 的 ai_stream 会按 chunk 流式 emit ai-chunk 事件。
@@ -1454,6 +1460,18 @@ export async function emitPtyOutput(page: Page, data: string): Promise<void> {
     const internals = (window as unknown as Record<string, (data: string) => void>).__TAURI_INTERNALS__;
     internals?.emitPtyOutput(d);
   }, data);
+}
+
+/** Simulate a second process forwarding a context-menu launch to the running window. */
+export async function forwardLaunchDirectory(page: Page, directory: string): Promise<void> {
+  await page.evaluate((dir) => {
+    const globals = window as unknown as {
+      __PENDING_LAUNCH_DIRECTORIES__: string[];
+      __TAURI_INTERNALS__: { emitEvent: (event: string, payload: unknown) => void };
+    };
+    globals.__PENDING_LAUNCH_DIRECTORIES__.push(dir);
+    globals.__TAURI_INTERNALS__.emitEvent('shell-launch-forwarded', null);
+  }, directory);
 }
 
 /** 读取 set_provider_key / set_tavily_key 调用记录 */

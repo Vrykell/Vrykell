@@ -37,6 +37,10 @@ pub fn run() {
     let history_state = HistoryState(Mutex::new(history_db));
 
     let app = tauri::Builder::default()
+        // Single instance first: a second launch is detected here and handed to the running window.
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            platform::context_menu::handle_secondary_launch(app, args);
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -47,6 +51,7 @@ pub fn run() {
         .manage(theme::ThemeState::load())
         .manage(agent::ai::LlmStreamState::default())
         .manage(terminal::pty::KillState::default())
+        .manage(platform::context_menu::ForwardedLaunchDirectories::default())
         .on_page_load(|webview, _payload| {
             #[cfg(windows)]
             if platform::window_chrome::is_tool_window(webview.label()) {
@@ -99,6 +104,7 @@ pub fn run() {
             platform::context_menu::context_menu_status,
             platform::context_menu::context_menu_manage,
             platform::context_menu::shell_launch_directory,
+            platform::context_menu::shell_take_forwarded_directories,
             agent::ai::set_ai_key,
             agent::ai::clear_ai_key,
             agent::ai::set_ai_base_url,

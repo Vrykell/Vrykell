@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { setupTauriMock } from './tauri-mock';
+import { setupTauriMock, forwardLaunchDirectory } from './tauri-mock';
 import { gotoSetting } from './settings';
 
 test('settings require certificate trust and manage registration explicitly', async ({ page }) => {
@@ -29,6 +29,28 @@ test('a shell launch opens exactly one terminal at the requested path even with 
     const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
     return useWorkspaceStore.getState().tabs.filter(tab => tab.kind === 'session').length;
   })).toBe(1);
+});
+
+test('a shell launch forwarded to the running window opens a tab instead of a second window', async ({ page }) => {
+  const cwd = 'C:\\转发 & notes\\项目';
+  await setupTauriMock(page);
+  await page.goto('/');
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: { cwd?: string }[] }).__PTY_SPAWNS__.length)).toBeGreaterThan(0);
+
+  await forwardLaunchDirectory(page, cwd);
+
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: { cwd?: string }[] }).__PTY_SPAWNS__.some(spawn => spawn.cwd === 'C:\\转发 & notes\\项目'))).toBe(true);
+  expect(await page.evaluate(async () => {
+    const path = '/src/features/workspace/stores/workspace.ts';
+    const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
+    return useWorkspaceStore.getState().tabs.filter(tab => tab.kind === 'session').length;
+  })).toBe(2);
+});
+
+test('a launch forwarded before the window listened still opens its tab', async ({ page }) => {
+  await setupTauriMock(page, { pendingLaunchDirectories: ['C:\\early'] });
+  await page.goto('/');
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: { cwd?: string }[] }).__PTY_SPAWNS__.some(spawn => spawn.cwd === 'C:\\early'))).toBe(true);
 });
 
 test('Windows leaves corner clipping to the compositor and fills the control edges', async ({ page }) => {

@@ -41,6 +41,8 @@ ssh2 = "0.9"
 zeroize = "1"
 trash = "5"
 tauri-plugin-drag = "2.1.1"
+# Second launch hands its arguments to the running window; context-menu directories open there.
+tauri-plugin-single-instance = "2.4"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSUserDefaults", "NSString"] }

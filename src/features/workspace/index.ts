@@ -31,6 +31,7 @@ export {
   type RestoreWorkspaceDependencies,
   type WorkspaceSession,
 } from '@features/workspace/model/session/restoreWorkspace';
+export { initForwardedLaunch } from '@features/workspace/services/forwardedLaunch';
 export {
   selectActiveSessionTab,
   selectSessionTabs,
