@@ -19,6 +19,33 @@ describe('Markdown', () => {
     expect(container.querySelector('.katex')).toBeInTheDocument();
   });
 
+  it('wraps display math in a focusable scroll surface while keeping positioning styles', () => {
+    const { container } = render(<Markdown content={String.raw`$$\nabla^2\mathbf{E}-\frac{1}{c^2}\frac{\partial^2\mathbf{E}}{\partial t^2}=0,\quad c=\frac{1}{\sqrt{\varepsilon_0\mu_0}}$$`} />);
+    const formula = screen.getByRole('region', { name: '数学公式' });
+    expect(formula).toHaveAttribute('tabindex', '0');
+    expect(formula.querySelector('.katex-display')).toBeInTheDocument();
+    expect(formula.querySelector('.vlist [style]')).toBeInTheDocument();
+    expect(container.querySelector('p > div')).not.toBeInTheDocument();
+    expect(container.querySelector('p')).not.toBeInTheDocument();
+  });
+
+  it('keeps inline math inline and wraps multiline display math once', () => {
+    const { container } = render(<Markdown content={'Inline $x^2$ here.\n\n$$\n\\frac{a}{b}\n$$'} />);
+    expect(container.querySelector('p .katex')).toBeInTheDocument();
+    expect(screen.getAllByRole('region', { name: '数学公式' })).toHaveLength(1);
+    expect(container.querySelector('.md-math-scroll .md-math-scroll')).not.toBeInTheDocument();
+  });
+
+  it('keeps the formula scroll surface mounted while later answer text streams', () => {
+    const content = '$$x^2+y^2=z^2$$';
+    const view = render(<Markdown content={content} />);
+    const formula = screen.getByRole('region', { name: '数学公式' });
+    formula.scrollLeft = 30;
+    view.rerender(<Markdown content={`${content}\n\nMore answer text`} />);
+    expect(screen.getByRole('region', { name: '数学公式' })).toBe(formula);
+    expect(formula.scrollLeft).toBe(30);
+  });
+
   it('渲染代码块', () => {
     const { container } = render(<Markdown content={'```python\nprint(1)\n```'} />);
     expect(container.querySelector('pre code')).toBeInTheDocument();
