@@ -189,10 +189,12 @@ it('creates, assigns, colors, renames and deletes a group while retaining its co
   await screen.findByTestId('command-history-build');
   fireEvent.click(screen.getByRole('button', { name: t('Command history actions') }));
   fireEvent.click(screen.getByRole('button', { name: t('New command group') }));
-  expect(screen.getByTestId('command-history-group-edit-save')).toBeDisabled();
-  fireEvent.change(screen.getByRole('textbox', { name: t('New command group') }), { target: { value: 'Release' } });
-  fireEvent.click(screen.getByTestId('command-history-group-edit-save'));
+  const createInput = screen.getByRole('textbox', { name: t('Rename command group') });
+  expect(createInput).toHaveValue(t('New group'));
+  fireEvent.change(createInput, { target: { value: 'Release' } });
+  fireEvent.keyDown(createInput, { key: 'Enter' });
   await waitFor(() => expect(saved.groups?.[0]?.name).toBe('Release'));
+  expect(screen.queryByRole('textbox', { name: t('Rename command group') })).toBeNull();
   const groupId = saved.groups![0]!.id;
   const group = screen.getByTestId(`command-group-${groupId}`);
   const row = screen.getByTestId('command-history-build');
@@ -210,8 +212,12 @@ it('creates, assigns, colors, renames and deletes a group while retaining its co
   expect(group).toHaveAttribute('data-group-color', 'blue');
   fireEvent.click(within(group).getByRole('button', { name: t('Group actions') }));
   fireEvent.click(screen.getByRole('button', { name: t('Rename group…') }));
-  fireEvent.change(screen.getByRole('textbox', { name: t('Rename command group') }), { target: { value: 'Deploy' } });
-  fireEvent.click(screen.getByTestId('command-history-group-edit-save'));
+  const renameInput = screen.getByRole('textbox', { name: t('Rename command group') });
+  expect(renameInput).toHaveValue('Release');
+  fireEvent.change(renameInput, { target: { value: 'Deploy' } });
+  fireEvent.blur(renameInput);
+  expect(screen.queryByRole('textbox', { name: t('Rename command group') })).toBeNull();
+  await waitFor(() => expect(saved.groups?.[0]?.name).toBe('Deploy'));
   expect(within(group).getByRole('button', { name: 'Deploy' })).toBeVisible();
   fireEvent.click(within(group).getByRole('button', { name: t('Group actions') }));
   fireEvent.click(screen.getByRole('button', { name: t('Delete command group') }));
@@ -219,6 +225,23 @@ it('creates, assigns, colors, renames and deletes a group while retaining its co
   await waitFor(() => expect(saved.groups).toEqual([]));
   expect(screen.queryByTestId(`command-group-${groupId}`)).toBeNull();
   expect(screen.getByTestId('command-history-build')).toBeVisible();
+  expect(fillHistoryCommand).not.toHaveBeenCalled();
+  expect(runHistoryCommand).not.toHaveBeenCalled();
+});
+
+it('opens the command editor focused on the name field from the rename action', async () => {
+  render(<PanelCommandHistory />);
+  await menu('build');
+  fireEvent.click(screen.getByRole('button', { name: t('Rename command') }));
+  const dialog = screen.getByRole('dialog', { name: t('Edit command') });
+  const name = within(dialog).getByRole('textbox', { name: t('Command name (optional)') });
+  await waitFor(() => expect(name).toHaveFocus());
+  fireEvent.change(name, { target: { value: 'Release build' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: t('Save') }));
+  await waitFor(() => expect(mutateHistoryCommand).toHaveBeenCalledWith(expect.objectContaining({
+    draft: expect.objectContaining({ name: 'Release build', command: 'npm run build', cwd: '/app', shell: 'bash' }),
+  })));
+  expect(screen.queryByRole('dialog', { name: t('Edit command') })).toBeNull();
   expect(fillHistoryCommand).not.toHaveBeenCalled();
   expect(runHistoryCommand).not.toHaveBeenCalled();
 });
@@ -269,8 +292,10 @@ it('creates a leading group from an ungrouped command context menu and includes 
   render(<PanelCommandHistory />);
   fireEvent.contextMenu(await screen.findByTestId('command-history-build'));
   fireEvent.click(screen.getByRole('button', { name: t('New command group') }));
-  fireEvent.change(screen.getByRole('textbox', { name: t('New command group') }), { target: { value: 'Build tools' } });
-  fireEvent.click(screen.getByTestId('command-history-group-edit-save'));
+  const createInput = screen.getByRole('textbox', { name: t('Rename command group') });
+  expect(createInput).toHaveValue(t('New group'));
+  fireEvent.change(createInput, { target: { value: 'Build tools' } });
+  fireEvent.keyDown(createInput, { key: 'Enter' });
   await waitFor(() => expect(saved.groups?.[0]?.name).toBe('Build tools'));
   const id = saved.groups![0]!.id;
   expect(saved.groups![0]!.commandKeys).toEqual([commandKey({ shell: 'bash', cwd: '/app', command: 'npm run build' })]);

@@ -13,7 +13,6 @@ import { Ellipsis, Filter, Folder, iconSizes, Plus, Sparkles, Terminal } from '@
 import ErrorBox from '@ui/ErrorBox';
 import ContextMenu, { type MenuAnchor } from '@ui/ContextMenu';
 import ConfirmDialog from '@ui/ConfirmDialog';
-import HistoryTextPrompt from '@ui/HistoryTextPrompt';
 import HistoryOptionMenu from '@ui/HistoryOptionMenu';
 import { safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
 import { ListReorderPreview, useListReorder, useListReorderDrag } from '@ui/listReorder';
@@ -79,15 +78,14 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
   const [expanded, setExpanded] = useState<string | null>(null);
   const detailsId = useId();
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
-  const [groupPrompt, setGroupPrompt] = useState<{ id: string | null; anchor: MenuAnchor; item?: CommandItem } | null>(null);
+  const [renamingGroup, setRenamingGroup] = useState<{ id: string; name: string } | null>(null);
   const [removingGroup, setRemovingGroup] = useState<string | null>(null);
   const [filterMenu, setFilterMenu] = useState<MenuAnchor | null>(null);
   const [actionsMenu, setActionsMenu] = useState<MenuAnchor | null>(null);
   const [rulesMenu, setRulesMenu] = useState<{ initialRule?: string } | null>(null);
   const [error, setError] = useState('');
   const [menu, setMenu] = useState<{ item: CommandItem; anchor: MenuAnchor } | null>(null);
-  const [edit, setEdit] = useState<{ item: CommandItem; anchor: MenuAnchor } | null>(null);
-  const [editor, setEditor] = useState<{ item: CommandItem | null; groupId?: string } | null>(null);
+  const [editor, setEditor] = useState<{ item: CommandItem | null; groupId?: string; focus?: 'name' } | null>(null);
   const [removing, setRemoving] = useState<CommandItem | null>(null);
   const mutation = useRef(false);
   const [replace, setReplace] = useState<{ item: CommandItem; context: ExecutionContext } | null>(null);
@@ -96,7 +94,7 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
   const listRef = useRef<HTMLDivElement>(null);
   const listId = `command-history:${context.scope}`;
   const draggingCommand = useListReorder(state => state.drag?.listId === listId && state.drag.kind === 'command-history');
-  useEffect(() => { if (!visible) { setRulesMenu(null); setFilterMenu(null); setActionsMenu(null); setMenu(null); setGroupPrompt(null); } }, [visible]);
+  useEffect(() => { if (!visible) { setRulesMenu(null); setFilterMenu(null); setActionsMenu(null); setMenu(null); setRenamingGroup(null); } }, [visible]);
   const result = projectItems(library.ready ? library.history : [], preferences, query, status, directory === 'current' ? context.cwd : undefined, sort, organizedOnly);
   const allItems = projectItems(library.history, preferences, '', 'all');
   const groupable = [...allItems.favorites, ...allItems.history];
@@ -130,6 +128,25 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
   const favorite = (item: CommandItem) => update(value => value.favorites.some(entry => commandKey(entry) === commandKey(item)) ? value : {
     ...value, favorites: [...value.favorites, { id: crypto.randomUUID(), name: item.name, command: item.command, cwd: item.cwd, shell: item.shell }],
   });
+  /** New groups start with a unique default name and open their inline rename right away. */
+  const createGroup = (item?: CommandItem) => {
+    const base = t('New group');
+    const names = new Set(preferences.groups?.map(group => group.name) ?? []);
+    let name = base;
+    for (let suffix = 2; names.has(name); suffix += 1) name = `${base} ${suffix}`;
+    const id = crypto.randomUUID();
+    setQuery(''); setStatus('all'); setDirectory('project'); setOrganizedOnly(false);
+    update(value => prependCommandGroup(value, { id, name, commandKeys: item ? [commandKey(item)] : [] }));
+    setRenamingGroup({ id, name });
+  };
+  const commitGroupRename = () => {
+    if (!renamingGroup) return;
+    const name = renamingGroup.name.trim();
+    if (name && name !== preferences.groups?.find(group => group.id === renamingGroup.id)?.name) {
+      update(value => ({ ...value, groups: value.groups?.map(group => group.id === renamingGroup.id ? { ...group, name } : group) }));
+    }
+    setRenamingGroup(null);
+  };
   const fill = (item: CommandItem) => {
     if (hasCommandDraft(context.paneId)) { setReplace({ item, context }); return; }
     try { fillHistoryCommand(context, item); } catch (reason) { setError(String(reason)); }
@@ -218,7 +235,7 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
         .map(option => ({ label: option.label, active: directory === option.value, onSelect: () => setDirectory(option.value) })) },
     ]} onClose={() => setFilterMenu(null)} />}
     {visible && actionsMenu && <ContextMenu anchor={actionsMenu} label={t('Command history actions')} onClose={() => setActionsMenu(null)} items={[
-      { label: t('New command group'), onClick: () => setGroupPrompt({ id: null, anchor: actionsMenu }) },
+      { label: t('New command group'), onClick: () => createGroup() },
       { label: t('AI auto-group'), disabled: !groupable.length, onClick: openGrouping },
       sortOptions,
       { label: t('Expand all command groups'), group: 'view', onClick: () => { setFavoritesCollapsed(false); setHistoryCollapsed(false); setCollapsedGroups(new Set()); } },
@@ -265,7 +282,11 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
             : () => setCollapsedGroups(value => { const next = new Set(value); if (next.has(group.id)) next.delete(group.id); else next.add(group.id); return next; })}
           toggleLabel={group.id === 'favorites' ? t(favoritesCollapsed ? 'Expand favorites' : 'Collapse favorites') : undefined}
           onColor={group.id === 'history' ? undefined : color => update(value => { const groupColors = { ...value.groupColors }; if (color) groupColors[group.id] = color; else delete groupColors[group.id]; return { ...value, groupColors }; })}
-          onRename={group.custom ? anchor => setGroupPrompt({ id: group.id, anchor }) : undefined}
+          onRename={group.custom ? () => setRenamingGroup({ id: group.id, name: group.title }) : undefined}
+          renaming={renamingGroup !== null && renamingGroup.id === group.id}
+          renameValue={renamingGroup !== null && renamingGroup.id === group.id ? renamingGroup.name : ''}
+          onRenameChange={value => setRenamingGroup(current => current ? { ...current, name: value } : current)}
+          onRenameCommit={commitGroupRename} onRenameCancel={() => setRenamingGroup(null)}
           onDelete={group.custom ? () => setRemovingGroup(group.id) : undefined}>
             {group.items.map(item => <HistoryCommandRow key={item.id} item={item} active={menu?.item.id === item.id || expanded === item.id}
               selected={selected?.id === item.id} detailsId={detailsId} showCount={!favoriteIds.has(item.id) && sort === 'frequent'} listId={listId}
@@ -291,11 +312,11 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
       { label: t('Fill terminal input'), shortcut: 'Enter', onClick: () => fill(menu.item) },
       { label: t('Run command'), disabled: running, onClick: () => run(menu.item) },
       { label: t('Copy command'), group: 'clipboard', onClick: () => { void copyCommand(menu.item.command).catch(reason => setError(String(reason))); } },
-      { label: t('Rename command'), group: 'edit', onClick: () => setEdit(menu) },
+      { label: t('Rename command'), group: 'edit', onClick: () => setEditor({ item: menu.item, focus: 'name' }) },
       { label: t('Edit command'), group: 'edit', onClick: () => setEditor({ item: menu.item }) },
       { label: t('AI auto-group'), group: 'organize', onClick: openGrouping },
       ...(!preferences.groups?.some(group => group.commandKeys.includes(commandKey(menu.item))) ? [
-        { label: t('New command group'), group: 'organize' as const, onClick: () => setGroupPrompt({ id: null, anchor: menu.anchor, item: menu.item }) },
+        { label: t('New command group'), group: 'organize' as const, onClick: () => createGroup(menu.item) },
       ] : []),
       ...(preferences.favorites.some(item => item.id === menu.item.id) ? [
         { label: t('Remove favorite'), group: 'organize' as const, onClick: () => update(value => ({ ...value, favorites: value.favorites.filter(item => item.id !== menu.item.id) })) },
@@ -306,25 +327,15 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
       ]),
       { label: t('Delete command'), danger: true, onClick: () => setRemoving(menu.item) },
     ]} />}
-    {visible && groupPrompt && <HistoryTextPrompt anchor={groupPrompt.anchor} label={t(groupPrompt.id ? 'Rename command group' : 'New command group')}
-      placeholder={t('Group name')} value={preferences.groups?.find(group => group.id === groupPrompt.id)?.name ?? ''} allowEmpty={false}
-      saveLabel={t('Save')} testId="command-history-group-edit" onClose={() => setGroupPrompt(null)} onSave={text => {
-        const name = text.trim(); if (!name) return;
-        const id = groupPrompt.id ?? crypto.randomUUID();
-        update(value => groupPrompt.id ? { ...value, groups: value.groups?.map(group => group.id === id ? { ...group, name } : group) }
-          : prependCommandGroup(value, { id, name, commandKeys: groupPrompt.item ? [commandKey(groupPrompt.item)] : [] }));
-      }} />}
     <ConfirmDialog open={!!removingGroup} title={t('Delete command group?')} message={t('Commands in this group will remain in the project.')}
       confirmLabel={t('Delete')} cancelLabel={t('Cancel')} onCancel={() => setRemovingGroup(null)} onConfirm={() => {
         update(value => { const groupColors = { ...value.groupColors }; if (removingGroup) delete groupColors[removingGroup];
           return { ...value, groups: value.groups?.filter(group => group.id !== removingGroup), groupColors }; });
         setRemovingGroup(null);
       }} />
-    {edit && <HistoryTextPrompt anchor={edit.anchor} label={t('Rename command')} placeholder={t('Command')}
-      value={edit.item.name} saveLabel={t('Save')} testId="command-history-edit"
-      onSave={text => { void library.saveCommand(edit.item, { name: text.trim(), command: edit.item.command, cwd: edit.item.cwd, shell: edit.item.shell }).catch(reason => setError(String(reason))); }} onClose={() => setEdit(null)} />}
     {editor && <CommandEditor initial={editor.item ? { name: editor.item.name === editor.item.command ? '' : editor.item.name,
       command: editor.item.command, cwd: editor.item.cwd, shell: editor.item.shell } : { name: '', command: '', cwd: context.cwd, shell: commandEnvironment(context.spec).shell }}
+      initialFocus={editor.focus === 'name' ? '[data-command-editor-name]' : undefined}
       creating={!editor.item} root={context.root} onClose={() => setEditor(null)} onSave={async draft => {
         await library.saveCommand(editor.item, draft); setQuery(''); setStatus('all'); setDirectory('project');
         if (editor.groupId) update(value => moveCommandToGroup(value, commandKey(draft), editor.groupId!));

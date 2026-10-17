@@ -16,6 +16,8 @@
 .command-history-section[data-collapsible="true"] { flex-wrap: nowrap; }
 .command-history-section > button.command-history-group-title { flex: 0 1 auto; min-width: 0; color: var(--text-secondary); font-size: var(--fs-body); }
 .command-history-group-title > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* Inline rename keeps the title row's geometry; the header keeps marker, count and menu. */
+.command-history-group-rename { display: inline-flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; padding: 2px 6px; }
 .command-history-section > .history-group-marker { width: 16px; height: 28px; }
 .command-history-section > .history-group-marker::before { width: 8px; height: 8px; }
 .command-history-group-count { flex-shrink: 0; }
