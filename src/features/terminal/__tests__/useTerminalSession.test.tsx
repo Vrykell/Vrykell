@@ -168,6 +168,15 @@ describe('useTerminalSession', () => {
     }
   });
 
+  it('keeps the shared block cursor for SSH sessions', () => {
+    setSshTab(false);
+    render(<TestHarness tabId="t1" onReady={() => {}} />);
+    // An SSH session renders through the same terminal setup, so the cursor stays the
+    // default blinking block instead of switching to a thin insertion bar.
+    expect(terminalInitOptions[terminalInitOptions.length - 1]?.cursorStyle).toBeUndefined();
+    expect(terminalInstances[terminalInstances.length - 1]?.options.cursorStyle).toBeUndefined();
+  });
+
   it('confirms SSH authentication only after a remote prompt marker and resets on reconnect', async () => {
     setSshTab(false);
     const view = render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);

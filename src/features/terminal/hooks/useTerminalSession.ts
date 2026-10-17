@@ -286,8 +286,6 @@ export function useTerminalSession(
       }, delay);
     };
 
-    // SSH prompts use a thin insertion cursor by default; remote cursor-shape modes can still override it.
-    if (spec?.kind === 'ssh') term.options.cursorStyle = 'bar';
     // 打开模式：spec.openMode 优先；老会话缺省时 SSH 回退 classic、local 按 shell 类型
     // Shells without integration must remain interactive, including restored sessions.
     const openMode = spec?.kind === 'local' && spec.shellType === 'cmd' ? 'classic'
