@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import FilePropertiesDialog from '@features/files/components/FilePropertiesDialog';
+import { t } from '@i18n';
 import type { FileStat } from '@platform/api/types';
 
 /** A resolved stat record; tests override just the fields under test. */
@@ -21,6 +22,7 @@ describe('FilePropertiesDialog', () => {
   it('shows the metadata rows once stat resolves', async () => {
     render(<FilePropertiesDialog entry={file} location="/home/e2e" stat={async () => stat()} onClose={() => {}} />);
 
+    expect(screen.getByRole('dialog', { name: t('Properties') })).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('正在读取属性…');
     await waitFor(() => expect(screen.getByTestId('file-property-name')).toHaveTextContent('notes.txt'));
     expect(screen.getByTestId('file-property-type')).toHaveTextContent('TXT 文件');
@@ -58,9 +60,9 @@ describe('FilePropertiesDialog', () => {
     const onClose = vi.fn();
     render(<FilePropertiesDialog entry={file} location="/home/e2e" stat={async () => stat()} onClose={onClose} />);
 
-    fireEvent.click(screen.getByTestId('properties-close'));
+    fireEvent.click(screen.getByRole('button', { name: t('Close') }));
     expect(onClose).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByTestId('file-properties-dialog'));
+    fireEvent.click(document.querySelector('.tool-dialog-overlay')!);
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 });

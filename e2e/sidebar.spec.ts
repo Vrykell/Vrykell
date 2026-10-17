@@ -103,7 +103,7 @@ test.describe('文件面板', () => {
     await page.locator('[data-testid="file-row"][data-path="/home/e2e/notes.txt"]').click({ button: 'right' });
     await page.getByRole('button', { name: '属性', exact: true }).click();
 
-    const dialog = page.getByTestId('file-properties-dialog');
+    const dialog = page.getByRole('dialog', { name: '属性' });
     await expect(dialog).toBeVisible();
     await expect(page.getByTestId('file-property-name')).toHaveText('notes.txt');
     await expect(page.getByTestId('file-property-type')).toHaveText('TXT 文件');
@@ -111,7 +111,7 @@ test.describe('文件面板', () => {
     await expect(page.getByTestId('file-property-size')).toHaveText('1.5 KB');
     await expect(page.getByTestId('file-property-modified')).toContainText('2026');
 
-    await page.getByTestId('properties-close').click();
+    await dialog.getByRole('button', { name: '关闭', exact: true }).click();
     await expect(dialog).toHaveCount(0);
   });
 

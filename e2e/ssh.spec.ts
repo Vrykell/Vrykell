@@ -120,6 +120,7 @@ test.describe('SSH 远程连接管理侧栏', () => {
     await page.locator('[data-testid="remote-file-app.log"]').click({ button: 'right' });
     await page.getByRole('button', { name: '属性', exact: true }).click();
 
+    const dialog = page.getByRole('dialog', { name: '属性' });
     await expect(page.getByTestId('file-property-name')).toHaveText('app.log');
     await expect(page.getByTestId('file-property-type')).toHaveText('LOG 文件');
     await expect(page.getByTestId('file-property-location')).toHaveText('/home/root');
@@ -127,8 +128,8 @@ test.describe('SSH 远程连接管理侧栏', () => {
     // SFTP provides no creation time: the row is not rendered
     await expect(page.getByTestId('file-property-created')).toHaveCount(0);
 
-    await page.getByTestId('properties-close').click();
-    await expect(page.getByTestId('file-properties-dialog')).toHaveCount(0);
+    await dialog.getByRole('button', { name: '关闭', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
   });
 
   test('远程面板：单击选中、Ctrl 加选、双击进入、回退还原视图与选中', async ({ page }) => {
