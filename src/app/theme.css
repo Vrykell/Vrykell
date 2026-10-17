@@ -10,7 +10,7 @@
   --terminal-bold-weight: 700;
   --terminal-command-weight: 500;
   --scrollbar-size: 8px;
-  --font-ui: -apple-system, "SF Pro Text", "PingFang SC", "Segoe UI", sans-serif;
+  --font-ui: -apple-system, "SF Pro Text", "PingFang SC", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
   /* Ligature-free mono first, then a monospace CJK face, then the generic before the
      emoji fallbacks (an emoji face is proportional and breaks terminal alignment). */
   --font-mono: "Cascadia Mono", "Cascadia Code", Menlo, Monaco, "JetBrains Mono", "Sarasa Mono SC", "Noto Sans Mono CJK SC", "Noto Sans Mono", "DejaVu Sans Mono", monospace, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
