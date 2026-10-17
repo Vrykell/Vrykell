@@ -12,7 +12,7 @@ import { useToastStore } from '@ui/Toast';
 import { hideSshStatus, showSshStatus, useSshStatusDismissRequest } from '@features/workspace/hooks/useAuxiliarySidebar';
 import { sshSystemStatus, type SshSystemStatus } from '../services/api';
 import { isSshAuthenticationFailure } from '../model/fileServiceState';
-import SshResourceChart, { RESOURCE_HISTORY_MS, type ResourceSample } from './SshResourceChart';
+import SshResourceChart, { RESOURCE_HISTORY_MS, resourceHistoryWindow, type ResourceSample } from './SshResourceChart';
 import SshNetworkProbe from './SshNetworkProbe';
 import SshNetworkRates from './SshNetworkRates';
 import { networkRates, type NetworkRateSample } from '../model/networkRates';
@@ -44,17 +44,16 @@ export function cpuUsage(previous: SshSystemStatus | null, current: SshSystemSta
   return total > 0 && idle >= 0 && idle <= total ? 100 * (total - idle) / total : null;
 }
 
-function Metric({ resource = 'cpu', label, used, total, percentage, hint }: { resource?: 'cpu' | 'memory' | 'disk'; label: string; used?: number | null; total?: number | null; percentage?: number | null; hint?: ReactNode }) {
+function Metric({ resource = 'cpu', label, used, total, percentage, detail }: { resource?: 'cpu' | 'memory' | 'disk'; label: string; used?: number | null; total?: number | null; percentage?: number | null; detail?: string }) {
   const percent = percentage !== undefined ? percentage : used != null && total != null && total > 0 ? used / total * 100 : null;
   const reading = used != null && total != null ? `${fmtSize(used)} / ${fmtSize(total)}` : null;
   return <div className="ssh-status-metric" data-resource={resource}>
-    <span className="ssh-status-metric-label" data-tip={label}>{label}</span>
+    <span className="ssh-status-metric-label" data-tip={label}>{resource === 'cpu' ? 'CPU' : t(resource === 'memory' ? 'Memory' : 'Root disk')}</span>
     <div className="ssh-status-meter" data-empty={percent == null || undefined} role={percent == null ? undefined : 'meter'} aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent == null ? undefined : Math.round(percent)}>
       <i data-level={percent == null ? 'unknown' : percent >= 90 ? 'critical' : percent >= 80 ? 'warning' : 'normal'} style={{ width: `${Math.max(0, Math.min(100, percent ?? 0))}%` }} />
     </div>
     <strong className="ssh-status-metric-value" data-empty={percent == null || undefined}>{percent == null ? t('Unavailable') : `${Math.round(percent)}%`}</strong>
-    {reading && <span className="ssh-status-caption ssh-status-metric-caption">{reading}</span>}
-    {hint}
+    <span className="ssh-status-caption ssh-status-metric-caption">{detail ?? reading ?? t('Usage details unavailable')}</span>
   </div>;
 }
 
@@ -243,10 +242,11 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
   };
   const stale = !sampleValid || !connected || !!error || paused || (updatedAt != null && now - updatedAt > 30000);
   const authenticationFailed = isSshAuthenticationFailure(error);
+  const historyWindow = resourceHistoryWindow(trafficHistory[0]?.time, now);
   const resourceSeries = [
-    { label: 'CPU', samples: cpuHistory, color: 'var(--resource-accent)' },
-    { label: t('Memory'), samples: memoryHistory, color: 'var(--group-violet)' },
-    { label: t('Root disk'), samples: diskHistory, color: 'var(--group-amber)' },
+    { label: 'CPU', samples: cpuHistory, color: 'var(--chart-blue)' },
+    { label: t('Memory'), samples: memoryHistory, color: 'var(--chart-violet)' },
+    { label: t('Root disk'), samples: diskHistory, color: 'var(--chart-amber)' },
   ];
   return <div className="ssh-status-shell" data-open={displayOpen} data-active={active} data-compact={compact}>
     {!compact && <div className="ssh-status-toolbar" onMouseDown={event => event.stopPropagation()} onContextMenu={event => event.stopPropagation()}>
@@ -278,7 +278,7 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
             }}>{t('Reconnect SSH session')}</TextButton>}
           </section>
           <SshNetworkProbe host={target.host} port={target.port ?? 22} jumpHost={target.jumpHost} paused={paused} revision={refresh}>
-            {sample && <SshNetworkRates samples={trafficHistory} now={now} available={sample.networkReceived != null || sample.networkTransmitted != null} />}
+            {sample && <SshNetworkRates samples={trafficHistory} now={now} windowMs={historyWindow} available={sample.networkReceived != null || sample.networkTransmitted != null} />}
           </SshNetworkProbe>
           <section className="ssh-status-resource">
             <div className="ssh-status-section-heading"><h3>{t('Resource usage')}</h3></div>
@@ -292,10 +292,9 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
                   <ul className="ssh-resource-legend" aria-label={t('Resource chart legend')}>
                     {resourceSeries.map(series => <li key={series.label}><i style={{ background: series.color }} aria-hidden="true" />{series.label}</li>)}
                   </ul>
-                  <SshResourceChart series={resourceSeries} endTime={now} label={t('Resource usage history')} />
-                  <div className="ssh-status-time-axis" aria-hidden="true"><span>{t('5 min ago')}</span><span>{t('Now')}</span></div>
+                  <SshResourceChart series={resourceSeries} endTime={now} windowMs={historyWindow} label={t('Resource usage history')} />
                   <div className="ssh-status-metrics">
-                    <Metric label={t('CPU usage')} percentage={cpu} hint={cpu == null && sample.cpuTotal != null ? <p className="ssh-status-caption ssh-status-metric-hint">{t('CPU usage requires two samples.')}</p> : undefined} />
+                    <Metric label={t('CPU usage')} percentage={cpu} detail={cpu != null ? t('{{percent}}% idle', { percent: 100 - Math.round(cpu) }) : t(sample.cpuTotal != null ? 'CPU usage requires two samples.' : 'Usage details unavailable')} />
                     <Metric resource="memory" label={t('Memory usage')} used={sample.memoryTotal != null && sample.memoryAvailable != null ? sample.memoryTotal - sample.memoryAvailable : null} total={sample.memoryTotal} />
                     <Metric resource="disk" label={t('Root disk usage')} used={sample.diskUsed} total={sample.diskTotal} />
                   </div>

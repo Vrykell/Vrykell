@@ -22,8 +22,8 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(panel.getByRole('meter', { name: 'CPU 使用率' })).toHaveAttribute('aria-valuenow', '12');
     const writes = await ptyWrites(page);
     const meter = panel.locator('.ssh-status-meter').first();
-    expect((await meter.boundingBox())!.height).toBe(10);
-    await expect(meter.locator('i')).toHaveCSS('background-color', await panel.evaluate(element => getComputedStyle(element).getPropertyValue('--resource-accent').trim()).then(async color => page.evaluate(value => {
+    expect((await meter.boundingBox())!.height).toBe(6);
+    await expect(meter.locator('i')).toHaveCSS('background-color', await panel.evaluate(element => getComputedStyle(element).getPropertyValue('--chart-blue').trim()).then(async color => page.evaluate(value => {
       const probe = document.createElement('div'); probe.style.color = value; document.body.append(probe);
       const resolved = getComputedStyle(probe).color; probe.remove(); return resolved;
     }, color)));
@@ -59,17 +59,39 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(traffic.locator('[data-series]')).toHaveCount(2);
     const colors = await chart.locator('[data-series]').evaluateAll(elements => elements.map(element => getComputedStyle(element).color));
     expect(new Set(colors).size).toBe(3);
+    const tones = await panel.evaluate(element => {
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d')!;
+      const brightness = (color: string) => {
+        context.fillStyle = color; context.fillRect(0, 0, 1, 1);
+        return Array.from(context.getImageData(0, 0, 1, 1).data).slice(0, 3).reduce((sum, value) => sum + value, 0);
+      };
+      const probe = document.createElement('span'); element.append(probe);
+      const baselines = ['--resource-accent', '--group-violet', '--group-amber', '--group-cyan', '--group-violet'];
+      const lines = [...element.querySelectorAll('.ssh-status-resource-summary [data-series]'), ...element.querySelectorAll('.ssh-network-rates [data-series]')];
+      const values = lines.map((line, index) => {
+        probe.style.color = `var(${baselines[index]})`;
+        return { actual: brightness(getComputedStyle(line).color), baseline: brightness(getComputedStyle(probe).color) };
+      });
+      probe.remove(); return values;
+    });
+    expect(tones).toHaveLength(5);
+    for (const tone of tones) expect(tone.actual).toBeLessThan(tone.baseline);
     for (const plot of [chart, traffic]) {
       const bounds = await plot.evaluate(element => {
-        const frame = element.parentElement!.getBoundingClientRect();
+        const chart = element.closest('.ssh-resource-chart')!;
+        const frame = chart.getBoundingClientRect();
         const svg = element.getBoundingClientRect();
-        const axis = element.parentElement!.querySelector('.ssh-resource-chart-axis')!.getBoundingClientRect();
-        return { frame: frame.width, plot: svg.width, rightInset: svg.right - axis.right, leftInset: axis.left - svg.left };
+        const axis = chart.querySelector('.ssh-resource-chart-axis')!.getBoundingClientRect();
+        const footer = chart.querySelector('.ssh-status-time-axis')!.getBoundingClientRect();
+        return { frame: frame.width, plot: svg.width, rightInset: svg.right - axis.right, leftInset: axis.left - svg.left, scaleBottom: axis.bottom, plotTop: svg.top, plotBottom: svg.bottom, footerTop: footer.top };
       });
       expect(Math.abs(bounds.frame - bounds.plot)).toBeLessThanOrEqual(1);
       expect(bounds.rightInset).toBeGreaterThanOrEqual(0);
       expect(bounds.rightInset).toBeLessThanOrEqual(3);
       expect(bounds.leftInset).toBeGreaterThanOrEqual(0);
+      expect(bounds.scaleBottom).toBeLessThanOrEqual(bounds.plotTop);
+      expect(bounds.footerTop).toBeGreaterThanOrEqual(bounds.plotBottom);
     }
     await page.screenshot({ path: testInfo.outputPath(`resources-chart-${theme}-300.png`) });
     await panel.locator('.ssh-status-resource').scrollIntoViewIfNeeded();
@@ -83,7 +105,7 @@ for (const theme of ['dark', 'light'] as const) {
       expect(box.y).toBeGreaterThanOrEqual(chartBounds.y + chartBounds.height);
       expect(box.width).toBeLessThan(chartBounds.width * .7);
       expect(box.width).toBeGreaterThan(40);
-      expect(box.height).toBe(10);
+      expect(box.height).toBe(6);
     }
     await summary.screenshot({ path: testInfo.outputPath(`combined-resources-${theme}-300.png`) });
     await network.screenshot({ path: testInfo.outputPath(`network-full-width-${theme}-300.png`) });
@@ -114,6 +136,67 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(panel.getByRole('meter', { name: '内存使用率' })).toBeVisible();
   });
 }
+
+test('resource tracks stay aligned with mixed percentage widths and larger UI text', async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
+  await setupTauriMock(page);
+  await page.clock.setFixedTime(new Date('2026-10-17T06:00:00Z'));
+  await page.setViewportSize({ width: 1500, height: 1000 });
+  await page.goto('/');
+  await page.evaluate(() => {
+    const internals = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } }).__TAURI_INTERNALS__;
+    const invoke = internals.invoke;
+    internals.invoke = async (command, args) => {
+      const result = await invoke(command, args);
+      if (command !== 'ssh_system_status') return result;
+      const sample = result as import('../src/features/ssh/services/api').SshSystemStatus;
+      return { ...sample, cpuIdle: sample.cpuTotal! * .99, memoryAvailable: sample.memoryTotal! * .88, diskUsed: sample.diskTotal };
+    };
+  });
+  await page.locator('[data-dock-btn="ssh"]').click();
+  await page.getByTestId('ssh-row-ssh-1').dblclick();
+  await page.getByTestId('ssh-status-toggle').last().click();
+  const panel = page.getByTestId('ssh-status-panel');
+  await expect(panel.getByRole('meter', { name: '内存使用率' })).toHaveAttribute('aria-valuenow', '12');
+  for (const seconds of [15, 30, 45]) {
+    await page.clock.setFixedTime(new Date(Date.parse('2026-10-17T06:00:00Z') + seconds * 1000));
+    await panel.getByRole('button', { name: '刷新远端资源' }).click();
+    await expect(panel.getByRole('button', { name: '刷新远端资源' })).toBeEnabled();
+  }
+  await expect(panel.getByRole('meter', { name: 'CPU 使用率' })).toHaveAttribute('aria-valuenow', '1');
+  await expect(panel.getByRole('meter', { name: '根分区使用率' })).toHaveAttribute('aria-valuenow', '100');
+  const summary = panel.locator('.ssh-status-resource-summary');
+  for (const fontSize of [14, 18]) {
+    await page.evaluate(async uiFontSize => {
+      const { useTypographyStore } = await import('/src/config/typography.ts') as typeof import('../src/config/typography');
+      useTypographyStore.getState().update({ uiFontSize });
+    }, fontSize);
+    const separator = page.getByRole('separator', { name: '调整 SSH 状态面板宽度' });
+    await separator.focus();
+    for (let index = 0; index < (fontSize === 14 ? 3 : 7); index++) await page.keyboard.press(fontSize === 14 ? 'ArrowLeft' : 'ArrowRight');
+    const expectedWidth = fontSize === 14 ? 348 : 240;
+    await expect.poll(async () => Math.round((await panel.boundingBox())!.width)).toBe(expectedWidth);
+    const tracks = await panel.getByRole('meter').evaluateAll(elements => elements.map(element => {
+      const box = element.getBoundingClientRect();
+      const reading = element.nextElementSibling!.getBoundingClientRect();
+      return { x: box.x, width: box.width, readingRight: reading.right };
+    }));
+    for (const track of tracks) {
+      expect(Math.abs(track.x - tracks[0].x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(track.width - tracks[0].width)).toBeLessThanOrEqual(1);
+      expect(Math.abs(track.readingRight - tracks[0].readingRight)).toBeLessThanOrEqual(1);
+    }
+    const details = summary.locator('.ssh-status-metric-caption');
+    await expect(details).toHaveCount(3);
+    await expect(details.first()).toHaveText('99% 空闲');
+    for (const detail of await details.all()) expect((await detail.boundingBox())!.height).toBeGreaterThan(0);
+    expect(await summary.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+    await expect(summary.locator('.ssh-resource-chart')).toHaveAttribute('data-window-ms', '60000');
+    await expect(panel.locator('.ssh-network-rates .ssh-resource-chart')).toHaveAttribute('data-window-ms', '60000');
+    await summary.screenshot({ path: testInfo.outputPath(`aligned-resources-${fontSize}-${expectedWidth}.png`) });
+    await panel.locator('.ssh-network-rates').screenshot({ path: testInfo.outputPath(`network-scale-${fontSize}-${expectedWidth}.png`) });
+  }
+});
 
 test('automatic probes respect pause and visibility and retain actionable failures', async ({ page }, testInfo) => {
   await setupTauriMock(page, { schedulesSeed: [] });
