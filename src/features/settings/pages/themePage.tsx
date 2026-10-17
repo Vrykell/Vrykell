@@ -156,7 +156,7 @@ export function ThemePage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <TextInput
               type="range"
-              min={0.05}
+              min={0.5}
               max={1}
               step={0.05}
               value={config.opacity}

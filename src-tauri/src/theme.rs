@@ -4,7 +4,7 @@
 //! `theme_import` / `theme_export`（由前端 file dialog 提供路径）。
 //!
 //! 结构：
-//!   - `opacity`：终端背景不透明度（0.05..=1.0，1 = 完全不透明）。
+//!   - `opacity`: application opacity (0.5..=1.0; 1 = fully opaque).
 //!   - `backgroundImage`：终端背景图片绝对路径（None = 无图片）。
 //!   - `vars`：CSS 变量覆盖表（`--canvas` / `--xterm-bg` 等），用于调整终端主题外观。
 
@@ -14,9 +14,9 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{Manager, State};
 
-/// 终端背景最小不透明度（再低文字几乎不可读）。
-const MIN_OPACITY: f32 = 0.05;
-/// 默认不透明度（1 = 完全不透明，无视觉变化）。
+/// Minimum application opacity (lower values make the content unreadable).
+const MIN_OPACITY: f32 = 0.5;
+/// Default application opacity (1 = fully opaque, no visual change).
 const DEFAULT_OPACITY: f32 = 1.0;
 
 pub struct ThemeState(pub Mutex<ThemeConfig>);
@@ -24,7 +24,7 @@ pub struct ThemeState(pub Mutex<ThemeConfig>);
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ThemeConfig {
-    /// 终端背景不透明度 0.05..=1.0。
+    /// Application opacity, 0.5..=1.0.
     #[serde(default = "default_opacity")]
     pub opacity: f32,
     /// 终端背景图片绝对路径；None = 纯色背景。
@@ -223,6 +223,11 @@ mod tests {
         assert_eq!(cfg.opacity, MIN_OPACITY);
 
         cfg.opacity = f32::NAN;
+        cfg.normalize();
+        assert_eq!(cfg.opacity, MIN_OPACITY);
+
+        // Positive values below the floor are raised too: the UI must stay readable.
+        cfg.opacity = 0.3;
         cfg.normalize();
         assert_eq!(cfg.opacity, MIN_OPACITY);
 

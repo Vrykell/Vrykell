@@ -405,7 +405,7 @@
 | ID | Feature | Expected behavior | Test method |
 |---|---|---|---|
 | TP1 | Wallpaper background | Set a wallpaper data URL, with a fixed full-cover background layer and a uniform content layer opacity | Set a wallpaper and observe |
-| TP2 | Transparency | App opacity (only applied when there is a wallpaper) | Adjust the transparency and observe |
+| TP2 | Transparency | App opacity (only applied when there is a wallpaper; the 50% floor keeps content readable) | Adjust the transparency and observe; input below the floor clamps to it |
 | TP3 | Import/export | Export the theme JSON to a file / import from a file | Export then import to restore |
 | TP4 | Persistence | Theme configuration is stored as JSON on the Rust side, and at startup `applyCachedWallpaper` runs before async loading to prevent a black screen | Restart the app and observe the wallpaper echo |
 

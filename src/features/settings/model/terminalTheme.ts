@@ -21,7 +21,7 @@ import { readXtermTheme } from '@features/terminal/model/xtermTheme';
 import { syncWindowFrame } from '@platform/windowChrome';
 
 export interface TerminalThemeConfig {
-  /** 应用整体不透明度 0.05..=1.0（1 = 完全不透明） */
+  /** Application opacity, 0.5..=1 (1 = fully opaque). */
   opacity: number;
   /** 应用壁纸本地绝对路径；null = 纯色背景 */
   backgroundImage: string | null;
