@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { boundedFontSize, boundedTerminalRenderer, useTypographyStore } from '../typography';
+import { boundedFontSize, boundedTerminalRenderer, terminalFontFamily, useTypographyStore } from '../typography';
 
 describe('font preferences', () => {
   beforeEach(() => {
     useTypographyStore.getState().reset();
     useTypographyStore.getState().update({ commandHighlighting: false, commandTitleCollapsed: false });
+  });
+
+  it('offers the installed CJK monospace presets in the family stack', () => {
+    expect(terminalFontFamily('Sarasa Term SC')).toContain('"Sarasa Term SC"');
+    expect(terminalFontFamily('NSimSun')).toContain('"NSimSun"');
   });
 
   it('bounds and validates saved font sizes', () => {
