@@ -6,5 +6,6 @@ pub mod conversation;
 pub mod download;
 pub mod group;
 pub mod search;
+pub mod command_history;
 pub mod session;
 pub mod workspace;

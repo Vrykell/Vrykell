@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { useListReorder } from '../listReorder';
 import { describe, expect, it, vi } from 'vitest';
 import SidebarItem from '../sidebarItem';
 
@@ -20,6 +21,41 @@ function renderItem(overrides: Partial<Parameters<typeof SidebarItem>[0]> = {}) 
 }
 
 describe('SidebarItem', () => {
+  it('hides only the source list while accepting a compatible drag kind', () => {
+    renderItem({ testId: 'source', reorderItemId: 'history', reorderKind: 'loose-tab', reorderListId: 'tabs' });
+    act(() => useListReorder.getState().start({ listId: 'commands', id: 'history', kind: 'command-history-group' }, { x: 0, y: 0 }));
+    expect(screen.getByTestId('source')).not.toHaveAttribute('data-reorder-dragging');
+    act(() => useListReorder.getState().start({ listId: 'tabs', id: 'history', kind: 'page' }, { x: 0, y: 0 }));
+    expect(screen.getByTestId('source')).toHaveAttribute('data-reorder-dragging', 'true');
+    act(() => useListReorder.getState().end());
+  });
+  it('keeps shared trailing controls independent from single and double row activation', () => {
+    const activate = vi.fn();
+    const copy = vi.fn();
+    renderItem({ variant: 'command', active: true, onDoubleClick: activate,
+      trailingActions: [{ label: 'Copy', control: <button onClick={copy}>Copy</button> }] });
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
+    fireEvent.doubleClick(screen.getByRole('button', { name: 'Copy' }));
+    expect(copy).toHaveBeenCalledOnce();
+    expect(activate).not.toHaveBeenCalled();
+  });
+  it('renders compact commands without an icon or metadata line and exposes actions on keyboard focus', () => {
+    const run = vi.fn();
+    const { onClick } = renderItem({ variant: 'command', icon: undefined, title: 'git status --short', testId: 'command-row', tabIndex: 0,
+      trailingActions: [{ icon: <span />, label: 'Run command', onClick: run }] });
+    const row = screen.getByTestId('command-row');
+    expect(row.querySelector('.sidebar-row-icon')).toBeNull();
+    expect(row.querySelector('.sidebar-row-subtitle')).toBeNull();
+    expect(row.firstElementChild).toHaveStyle({ minHeight: '28px', padding: '2px 10px' });
+    expect(screen.getByText('git status --short')).toHaveStyle({ fontFamily: 'var(--font-mono)' });
+    expect(row).toHaveAttribute('data-actions-visible', 'false');
+    fireEvent.focus(row);
+    expect(row).toHaveAttribute('data-actions-visible', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Run command' }));
+    expect(run).toHaveBeenCalledOnce();
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
   it('keeps quick actions separate from row activation and honors disabled actions', () => {
     const remove = vi.fn();
     const restore = vi.fn();

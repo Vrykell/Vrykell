@@ -1,10 +1,10 @@
 import KeyHint from './KeyHint';
-import { Check } from './icons';
+import { Check, ChevronRight } from './icons';
 import { IconButton } from './IconButton';
 import { TextButton } from './TextButton';
 /** Shared themed controls and formatting helpers. */
 
-import type { CSSProperties, MouseEvent } from 'react';
+import type { CSSProperties, MouseEvent, KeyboardEvent } from 'react';
 
 // Compact text controls share the same hover and focus rules.
 
@@ -24,12 +24,12 @@ export function InputBtn({ title, onClick, children }: HBtnProps) {
   return <HBtn title={title} onClick={onClick}>{children}</HBtn>;
 }
 
-// ── 下拉/右键菜单项 ──
+// Shared dropdown and context menu rows.
 
 interface MenuItemProps {
   role?: 'menuitem';
   label: string;
-  onClick: () => void;
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   danger?: boolean;
   disabled?: boolean;
   /** Shortcut badge displayed at the end of the row. */
@@ -38,19 +38,30 @@ interface MenuItemProps {
   checked?: boolean;
   /** Reserves the mark column on plain rows of a menu that also shows radio rows. */
   indent?: boolean;
+  submenu?: boolean;
+  expanded?: boolean;
+  controls?: string;
+  onPointerEnter?: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onKeyDown?: (event: KeyboardEvent<HTMLButtonElement>) => void;
 }
 
-export function MenuItem({ label, onClick, danger, shortcut, role, disabled, checked, indent }: MenuItemProps) {
+export function MenuItem({ label, onClick, danger, shortcut, role, disabled, checked, indent, submenu, expanded, controls, onPointerEnter, onKeyDown }: MenuItemProps) {
   const showSlot = checked !== undefined || indent === true;
-  const style: CSSProperties = shortcut
+  const style: CSSProperties = shortcut || submenu
     ? { ...menuItemStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24 }
     : menuItemStyle;
   return (
     <button
       onClick={onClick}
+      onPointerEnter={onPointerEnter}
+      onKeyDown={onKeyDown}
       disabled={disabled}
       role={checked !== undefined ? 'menuitemradio' : role}
       aria-checked={checked !== undefined ? checked : undefined}
+      aria-haspopup={submenu ? 'menu' : undefined}
+      aria-expanded={submenu ? expanded : undefined}
+      aria-controls={expanded ? controls : undefined}
+      data-submenu-open={expanded || undefined}
       data-subtle
       className="workspace-floating-row"
       style={danger ? { ...style, color: 'var(--error)' } : style}
@@ -62,6 +73,7 @@ export function MenuItem({ label, onClick, danger, shortcut, role, disabled, che
         </span>
       ) : label}
       {shortcut && <KeyHint shortcut={shortcut} />}
+      {submenu && <ChevronRight size={14} aria-hidden="true" style={{ flexShrink: 0 }} />}
     </button>
   );
 }

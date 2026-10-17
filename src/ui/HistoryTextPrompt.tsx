@@ -8,13 +8,14 @@ import { useFloatingPanelPosition } from './hooks/useFloatingPanelPosition';
 import type { MenuAnchor } from './ContextMenu';
 
 /** Floating single-value editor used by history notes; Enter (or Ctrl+Enter in the text area) saves. */
-export default function HistoryTextPrompt({ anchor, label, placeholder, value, multiline = false, saveLabel, onSave, onClose, testId }: {
+export default function HistoryTextPrompt({ anchor, label, placeholder, value, multiline = false, allowEmpty = true, saveLabel, onSave, onClose, testId }: {
   anchor: MenuAnchor;
   label: string;
   placeholder: string;
   /** Initial text; saving an empty value removes the annotation. */
   value: string;
   multiline?: boolean;
+  allowEmpty?: boolean;
   saveLabel: string;
   onSave: (text: string) => void;
   onClose: () => void;
@@ -36,6 +37,7 @@ export default function HistoryTextPrompt({ anchor, label, placeholder, value, m
   const width = 264;
   const position = useFloatingPanelPosition(ref, anchor);
   const save = () => {
+    if (!allowEmpty && !text.trim()) return;
     onSave(text);
     close();
   };
@@ -55,7 +57,7 @@ export default function HistoryTextPrompt({ anchor, label, placeholder, value, m
         value={text} onChange={event => setText(event.target.value)} onKeyDown={onKeyDown} />}
     <div className="history-prompt-actions">
       <OutlineButton className="history-prompt-action" data-testid={`${testId}-cancel`} onClick={close}>{t('Cancel')}</OutlineButton>
-      <button type="button" className="history-prompt-action" data-primary data-testid={`${testId}-save`} onClick={save}>{saveLabel}</button>
+      <button type="button" className="history-prompt-action" data-primary disabled={!allowEmpty && !text.trim()} data-testid={`${testId}-save`} onClick={save}>{saveLabel}</button>
     </div>
   </div>, document.body);
 }

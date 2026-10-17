@@ -10,6 +10,7 @@ import { getSources } from '@features/search/services/registry';
 import FilterPopover from './FilterPopover';
 import SearchResultCard from './SearchResultCard';
 import ErrorBox from '@ui/ErrorBox';
+import FilterChip from '@ui/FilterChip';
 
 interface Props {
   open: boolean;
@@ -37,11 +38,10 @@ export default function GlobalSearch({ open, onClose }: Props) {
           <div className="global-search-input-row">
             <div className="global-search-query">
               <Search size={18} />
-              {activeSource && <span className="search-scope-chip" data-testid="search-scope-chip">
-                <activeSource.icon size={14} /><span>{activeSource.label}</span>
-                <button data-subtle aria-label={t('Clear search scope')} data-tip={t('Clear search scope')}
-                  onClick={() => { handleInput(query.term); inputRef.current?.focus(); }}><X size={12} /></button>
-              </span>}
+              {activeSource && <FilterChip testId="search-scope-chip" icon={<activeSource.icon size={14} />} removeLabel={t('Clear search scope')}
+                onRemove={() => { handleInput(query.term); inputRef.current?.focus(); }}>
+                {activeSource.label}
+              </FilterChip>}
               <TextInput ref={inputRef} value={query.source ? query.term : input} onChange={event => handleInput(query.source ? `${query.prefix} ${event.target.value}` : event.target.value)}
                 aria-label={t('Search workspace')} placeholder={t('Search files, commands, settings…')} />
             </div>

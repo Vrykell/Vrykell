@@ -7,7 +7,7 @@ import { t } from '@i18n';
 import { useToastStore } from './Toast';
 
 /** Editable configuration text with the same copy confirmation used by diagnostic details. */
-export default function ConfigTextArea({ value, label, className = '', style, ...props }: ComponentPropsWithoutRef<'textarea'> & { label?: string }) {
+export default function ConfigTextArea({ value, label, font = 'mono', className = '', style, ...props }: ComponentPropsWithoutRef<'textarea'> & { label?: string; font?: 'mono' | 'ui' }) {
   const generatedId = useId();
   const inputId = props.id ?? generatedId;
   const [copied, setCopied] = useState(false);
@@ -28,7 +28,7 @@ export default function ConfigTextArea({ value, label, className = '', style, ..
   return <>
     {title && <label htmlFor={inputId} className="config-text-area-label">{title}</label>}
     <div className="config-text-area" style={{ marginTop: style?.marginTop }}>
-      <TextArea {...props} id={inputId} aria-label={inputLabel} value={value} className={`config-text-input ${className}`} style={style} />
+      <TextArea {...props} id={inputId} aria-label={inputLabel} value={value} data-font={font} className={`config-text-input ${className}`} style={style} />
       <IconButton compact className="config-text-area-copy" disabled={!text} aria-label={copyLabel} data-tip={copyLabel} onClick={() => void copy()}>
         {copied ? <Check size={iconSizes.copy} /> : <Copy size={iconSizes.copy} />}
       </IconButton>

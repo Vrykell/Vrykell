@@ -1,6 +1,11 @@
 use crate::db::{GroupEntry, HistoryState};
 
 #[tauri::command]
+pub fn groups_apply_plan(state: tauri::State<'_, HistoryState>, groups: Vec<crate::db::session::GroupAssignment>) -> Result<(), String> {
+    state.0.lock().map_err(|e| e.to_string())?.apply_group_plan(&groups)
+}
+
+#[tauri::command]
 pub fn groups_list(state: tauri::State<'_, HistoryState>) -> Result<Vec<GroupEntry>, String> {
     let db = state.0.lock().map_err(|e| e.to_string())?;
     db.list_groups()

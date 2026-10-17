@@ -57,11 +57,11 @@ export default function ConfirmDialog({
         )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <OutlineButton onClick={onCancel} data-testid="confirm-cancel">{cancelLabel}</OutlineButton>
-          <button onClick={onConfirm} data-testid="confirm-ok" style={{
+          <button className={danger ? undefined : 'primary-button'} onClick={onConfirm} data-testid="confirm-ok" style={{
             padding: '5px 16px', fontSize: 'calc(12px * var(--ui-font-scale))', border: 'none',
             borderRadius: 'var(--radius-inner)',
-            background: danger ? 'var(--error)' : 'var(--accent)',
-            color: danger ? 'var(--error-text)' : 'var(--accent-text)', cursor: 'pointer',
+            background: danger ? 'var(--error)' : 'var(--primary-button-bg)',
+            color: danger ? 'var(--error-text)' : 'var(--primary-button-text)', cursor: 'pointer',
           }}>{confirmLabel}</button>
         </div>
       </div>

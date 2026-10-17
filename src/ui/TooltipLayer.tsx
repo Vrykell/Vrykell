@@ -68,6 +68,7 @@ export default function TooltipLayer() {
     };
 
     const onOver = (event: Event) => {
+      if (document.querySelector('[data-reorder-dragging="true"]')) return;
       const holder = titleHolder(event.target);
       if (!holder || holder === ownerRef.current) return;
       clearTimer();
@@ -98,6 +99,7 @@ export default function TooltipLayer() {
     document.addEventListener('focusout', hide, true);
     window.addEventListener('scroll', hide, true);
     window.addEventListener('blur', hide);
+    window.addEventListener('list-reorder-start', hide);
     return () => {
       document.removeEventListener('mouseover', onOver, true);
       document.removeEventListener('mouseout', onOut, true);
@@ -105,6 +107,7 @@ export default function TooltipLayer() {
       document.removeEventListener('focusout', hide, true);
       window.removeEventListener('scroll', hide, true);
       window.removeEventListener('blur', hide);
+      window.removeEventListener('list-reorder-start', hide);
       clearTimer();
     };
   }, [clearTimer, hide]);

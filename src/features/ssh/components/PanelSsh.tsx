@@ -1,6 +1,5 @@
-import { TextInput } from '@ui/TextInput';
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { Download, iconSizes, Pencil, Plug, Plus, Search } from '@ui/icons';
+import { Download, iconSizes, Pencil, Plug, Plus } from '@ui/icons';
 import { SshIcon } from '@ui/shellIcons';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { t } from '@i18n';
@@ -11,6 +10,7 @@ import ContextMenu from '@ui/ContextMenu';
 import { iconColorKey, iconColorCss, useIconColorStore } from '@config/iconColors';
 import { HistoryColorChoices } from '@ui/HistoryColorPalette';
 import { IconBtn } from '@ui/UiBtn';
+import SidebarToolbar from '@ui/SidebarToolbar';
 import SidebarItem from '@ui/sidebarItem';
 import { ListReorderPlaceholder, ListReorderPreview, useListReorderDrag } from '@ui/listReorder';
 import type { SshConnection } from '@features/ssh/services/api';
@@ -110,35 +110,14 @@ export default function PanelSsh() {
       display: 'flex', flexDirection: 'column', height: '100%',
       userSelect: 'none', background: 'transparent',
     }}>
-      {/* 顶栏：搜索 + 编辑 + 新建 */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 4,
-        padding: '6px 10px 8px',
-        position: 'relative',
-      }}>
-        <div className="workspace-sidebar-search" style={{
-          display: 'flex', alignItems: 'center', gap: 5, flex: 1, minWidth: 0,
-          background: 'var(--chrome-field)',
-          borderRadius: 'var(--radius-inner)', padding: '0 8px', height: 30,
-        }}>
-          <Search size={iconSizes.compact} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-          <TextInput
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t('Search SSH connections…')}
-            data-testid="ssh-search"
-            style={{
-              flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none',
-              fontSize: 'calc(13px * var(--ui-font-scale))', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
-            }}
-          />
-        </div>
+      <SidebarToolbar search={{ value: query, onChange: event => setQuery(event.target.value),
+        placeholder: t('Search SSH connections…'), 'data-testid': 'ssh-search' }}>
         <IconBtn title={t('ssh.quick.connect')} data-testid="ssh-quick-btn" onClick={() => setQuickOpen(true)}>
           <Plug size={iconSizes.control} />
         </IconBtn>
         <IconBtn title={t('ssh.import.open')} data-testid="ssh-import-btn" onClick={() => setImportOpen(true)}><Download size={iconSizes.control} /></IconBtn>
         <IconBtn title={t('New SSH connection')} data-testid="ssh-new-btn" onClick={openNew}><Plus size={iconSizes.control} /></IconBtn>
-      </div>
+      </SidebarToolbar>
       {/* 连接列表：拖动时源行让位，落点用虚线占位 */}
       <div data-reorder-list={LIST_ID} className="scroll-region" style={{ flex: 1, overflowY: 'auto', padding: '0 0 8px' }}>
         {filtered.length === 0 ? (
@@ -155,6 +134,7 @@ export default function PanelSsh() {
               tooltip={`${c.user ? `${c.user}@` : ''}${c.host}:${c.port ?? 22}；双击连接，右键编辑 / 删除，拖拽排序`}
               testId={`ssh-row-${c.id}`}
               reorderItemId={c.id}
+              reorderListId={LIST_ID}
               reorderKind="ssh"
               tabIndex={0}
               onClick={() => setSelectedId(c.id)}

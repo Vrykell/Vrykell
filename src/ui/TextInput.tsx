@@ -8,9 +8,9 @@ export const literalInputProps = {
   autoComplete: 'off',
 } as const;
 
-export const TextInput = forwardRef<HTMLInputElement, ComponentPropsWithoutRef<'input'>>(
-  function TextInput(props, ref) {
-    return <input {...props} {...literalInputProps} ref={ref} />;
+export const TextInput = forwardRef<HTMLInputElement, ComponentPropsWithoutRef<'input'> & { variant?: 'plain' | 'field' }>(
+  function TextInput({ variant = 'plain', className, ...props }, ref) {
+    return <input {...props} {...literalInputProps} ref={ref} className={variant === 'field' ? `text-input-field ${className ?? ''}` : className} />;
   },
 );
 

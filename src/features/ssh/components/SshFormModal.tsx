@@ -201,7 +201,7 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
         <span style={{ flex: 1 }} />
         <TextButton onClick={onClose} disabled={busy}>{t('Cancel')}</TextButton>
         {!onConnect && onSaveAndConnect && <TextButton onClick={() => void doSave(true)} disabled={busy} data-testid="ssh-save-connect-btn">{t('Save and connect')}</TextButton>}
-        <TextButton className="ssh-primary-action" onClick={() => void doSave()} disabled={busy} data-testid={onConnect ? 'ssh-connect-btn' : 'ssh-save-btn'}>{t(saving ? 'Saving…' : onConnect ? 'Connect' : 'Save')}</TextButton>
+        <TextButton className="ssh-primary-action user-primary-action" onClick={() => void doSave()} disabled={busy} data-testid={onConnect ? 'ssh-connect-btn' : 'ssh-save-btn'}>{t(saving ? 'Saving…' : onConnect ? 'Connect' : 'Save')}</TextButton>
       </footer>
     </div>
     {pendingTrust && <ConfirmDialog open title={t('Confirm host fingerprint')} message={pendingTrust.fingerprint} confirmLabel={t('Trust and continue')} cancelLabel={t('Cancel')} onConfirm={() => void confirmTrust()} onCancel={() => setPendingTrust(null)} />}

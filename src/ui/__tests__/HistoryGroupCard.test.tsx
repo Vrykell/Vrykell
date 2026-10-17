@@ -97,12 +97,13 @@ describe('HistoryGroupCard', () => {
     expect(onSelectColor).toHaveBeenLastCalledWith(null);
   });
 
-  it('places direct color choices after every action and supports keyboard selection and reset', () => {
+  it('places color choices under the actions and supports keyboard selection and reset', () => {
     const select = vi.fn();
     render(<HistoryGroupCard id="day:1" title="Today" count="3 sessions" color="green" onSelectColor={select}
       actions={[{ label: 'Delete records', danger: true, onClick: () => {} }]}><span>rows</span></HistoryGroupCard>);
     const trigger = screen.getByTestId('history-group-menu-day:1');
     fireEvent.click(trigger);
+    expect(screen.queryByRole('menuitem', { name: t('Group color') })).toBeNull();
     const blue = screen.getByRole('menuitemradio', { name: t('Blue') });
     expect(screen.getByRole('menuitemradio', { name: t('Green') })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('menuitem', { name: 'Delete records' }).compareDocumentPosition(blue)

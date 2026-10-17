@@ -47,6 +47,25 @@ pub fn run() {
         .manage(theme::ThemeState::load())
         .manage(agent::ai::LlmStreamState::default())
         .manage(terminal::pty::KillState::default())
+        .on_page_load(|webview, _payload| {
+            #[cfg(windows)]
+            if platform::window_chrome::is_tool_window(webview.label()) {
+                if let Some(window) = webview.app_handle().get_webview_window(webview.label()) {
+                    platform::window_chrome::hide_border(&window);
+                }
+            }
+            #[cfg(not(windows))]
+            let _ = webview;
+        })
+        .on_window_event(|window, event| {
+            if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
+                for (label, tool) in window.app_handle().webview_windows() {
+                    if label.starts_with("tool-") {
+                        let _ = tool.destroy();
+                    }
+                }
+            }
+        })
         .manage(agent::mcp::McpState::default())
         // asset 协议 scope 已收窄：启动时把已保存的壁纸文件动态授权
         .setup(|app| {
@@ -71,6 +90,12 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             greet,
+            commands::command_history::command_history_record,
+            commands::command_history::command_history_list,
+            commands::command_history::command_history_mutate,
+            commands::command_history::command_history_preferences,
+            commands::command_history::command_history_save_preferences,
+            commands::command_history::command_history_context,
             platform::context_menu::context_menu_status,
             platform::context_menu::context_menu_manage,
             platform::context_menu::shell_launch_directory,
@@ -222,6 +247,7 @@ pub fn run() {
             commands::session::list_sessions,
             commands::session::get_session_blocks,
             commands::group::groups_list,
+            commands::group::groups_apply_plan,
             commands::group::group_create,
             commands::group::group_rename,
             commands::group::group_set_collapsed,
