@@ -19,7 +19,9 @@ for (const theme of ['深色', '浅色']) {
     const danger = await close.evaluate(element => getComputedStyle(element).color);
     expect(danger).not.toBe(await menu.getByRole('button', { name: '复制会话', exact: true }).evaluate(element => getComputedStyle(element).color));
     await expect(menu.getByRole('group', { name: '图标颜色' })).toBeVisible();
-    await menu.getByRole('menuitemradio', { name: '紫色', exact: true }).click();
+    await expect(menu.getByRole('menuitem', { name: '图标颜色', exact: true })).toHaveCount(0);
+    await page.screenshot({ path: testInfo.outputPath('tab-color-footer.png') });
+    await page.getByRole('menuitemradio', { name: '紫色', exact: true }).click();
     const selected = await row.locator('.sidebar-row-icon svg').evaluate(element => getComputedStyle(element).color);
     expect(selected).not.toBe(original);
     await page.locator('[data-dock-btn="chat"]').click();

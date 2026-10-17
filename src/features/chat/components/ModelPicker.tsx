@@ -33,7 +33,7 @@ const pill: React.CSSProperties = {
 };
 const pillOn: React.CSSProperties = {
   ...pill,
-  background: 'var(--accent)', borderColor: 'var(--accent)', color: 'var(--accent-text)',
+  background: 'var(--primary-button-bg)', borderColor: 'var(--primary-button-bg)', color: 'var(--primary-button-text)',
 };
 
 function CapBadge({ on, label }: { on: boolean; label: string }) {

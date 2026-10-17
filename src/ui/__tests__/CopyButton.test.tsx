@@ -11,6 +11,14 @@ vi.mock('@platform/clipboard', () => ({
 const writeClipboardTextMock = vi.mocked(writeClipboardText);
 
 describe('CopyButton', () => {
+  it('keeps the row surface transparent when quiet hover feedback is requested', () => {
+    render(<CopyButton quiet text="npm run build" label="Copy command" />);
+    const button = screen.getByRole('button', { name: 'Copy command' });
+    fireEvent.mouseEnter(button);
+    expect(button).toHaveStyle({ background: 'transparent' });
+    fireEvent.mouseLeave(button);
+    expect(button).toHaveStyle({ background: 'transparent' });
+  });
   beforeEach(() => {
     writeClipboardTextMock.mockReset().mockResolvedValue(undefined);
   });

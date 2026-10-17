@@ -1,0 +1,21 @@
+import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, expect, it, vi } from 'vitest';
+import CommandDetails from '../components/CommandDetails';
+const props = { item: { id: 'one', name: 'Build', command: 'npm run build', cwd: '/app', shell: 'bash' }, id: 'details', running: false, runLabel: 'Run', onFill: vi.fn(), onRun: vi.fn(), onClose: vi.fn() };
+beforeEach(() => localStorage.clear());
+it('collapses at the lower drag limit, remembers it and can expand without losing the saved height', () => {
+  localStorage.setItem('command-history-detail-height', '240');
+  const first = render(<CommandDetails {...props} />);
+  const details = screen.getByRole('region');
+  vi.spyOn(details, 'getBoundingClientRect').mockReturnValue({ height: 240 } as DOMRect);
+  fireEvent.mouseDown(screen.getByTestId('resize-command-details'), { clientY: 200 });
+  fireEvent.mouseMove(document, { clientY: 450 }); fireEvent.mouseUp(document);
+  expect(details).toHaveAttribute('data-collapsed', 'true');
+  expect(localStorage.getItem('command-history-detail-collapsed')).toBe('true');
+  expect(localStorage.getItem('command-history-detail-height')).toBe('240');
+  first.unmount(); render(<CommandDetails {...props} />);
+  expect(screen.getByRole('region')).toHaveAttribute('data-collapsed', 'true');
+  fireEvent.click(screen.getByRole('button', { name: '命令详情' }));
+  expect(screen.getByRole('region')).toHaveAttribute('data-collapsed', 'false');
+  expect(screen.getByText('npm run build')).toBeVisible();
+});

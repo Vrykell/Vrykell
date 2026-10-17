@@ -21,6 +21,7 @@ import { registerTerminal, unregisterTerminal, useTerminalStore } from '@feature
 import { getRecentOutputFor } from '@features/terminal/stores/terminal';
 import { useBlockStore } from '@features/terminal';
 import { useHistoryStore } from '@features/terminal/stores/history';
+import { captureHistoryCommand } from '@features/command-history/services/recording';
 import { isTerminalDebugEnabled, terminalDebug } from '@features/terminal/services/terminalDebug';
 import { readXtermTheme } from '@features/terminal/model/xtermTheme';
 import { useSessionStore } from '@features/workspace';
@@ -353,6 +354,7 @@ export function useTerminalSession(
         useSessionStore.getState().setProgramTitle(paneId, title);
       },
       onBlockStart: (block) => {
+        if (spec) captureHistoryCommand(spec, paneId, block);
         sessionManager.record(tabId, paneId, block, 'start');
         // 惯用命名：标题跟随「聚焦终端」的首条命令（未定名时）
         if (block.command && paneId === useTerminalStore.getState().focusedPaneId) {
@@ -360,6 +362,7 @@ export function useTerminalSession(
         }
       },
       onBlockComplete: (block) => {
+        if (spec) captureHistoryCommand(spec, paneId, block);
         useHistoryStore.getState().record(block.command, block.cwd ?? '', block.exitCode);
         sessionManager.record(tabId, paneId, block, 'complete');
         // Return a manually fullscreened running block to the block list when it ends.

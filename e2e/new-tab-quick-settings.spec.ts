@@ -2,6 +2,31 @@ import { expect, test } from '@playwright/test';
 import { setupTauriMock, ensureTabsOpen } from './tauri-mock';
 
 test.describe('新建标签类型快捷配置', () => {
+  test('restored default shell icons follow the resolved default and nested settings stay on screen', async ({ page }, info) => {
+    await ensureTabsOpen(page);
+    const restored = page.locator('[data-tab-kind="session"]').first().locator('.sidebar-row-icon svg');
+    await expect(restored).toHaveAttribute('data-shell-mark', 'zsh');
+    await page.getByTestId('tab-new-btn').click();
+    await page.getByTestId('new-tab-option-shell:bash').click({ button: 'right' });
+    const settings = page.getByRole('menuitem', { name: '打开方式', exact: true });
+    await settings.press('ArrowRight');
+    await expect(page.getByRole('menuitemradio', { name: '经典模式' })).toBeFocused();
+    for (const width of [1240, 600]) {
+      await page.setViewportSize({ width, height: 800 });
+      for (const menu of await page.getByRole('menu').all()) {
+        const bounds = (await menu.boundingBox())!;
+        expect(bounds.x).toBeGreaterThanOrEqual(8); expect(bounds.x + bounds.width).toBeLessThanOrEqual(width - 8);
+      }
+      await page.screenshot({ path: info.outputPath(`nested-settings-${width}.png`) });
+    }
+    await page.keyboard.press('ArrowLeft');
+    await expect(settings).toBeFocused();
+    await page.getByRole('menuitemradio', { name: '设为默认终端' }).click();
+    await expect(restored).toHaveAttribute('data-shell-mark', 'bash');
+    await page.reload(); await ensureTabsOpen(page);
+    await expect(restored).toHaveAttribute('data-shell-mark', 'bash');
+    await page.screenshot({ path: info.outputPath('restored-default-color.png') });
+  });
   test.beforeEach(async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
@@ -15,13 +40,16 @@ test.describe('新建标签类型快捷配置', () => {
 
     await zsh.click({ button: 'right' });
     const menu = page.getByRole('menu', { name: '操作菜单' });
-    await expect(menu.getByRole('menuitemradio', { name: '经典模式' })).toHaveAttribute('aria-checked', 'false');
-    await menu.getByRole('menuitemradio', { name: '经典模式' }).click();
+    await menu.getByRole('menuitem', { name: '打开方式', exact: true }).click();
+    await expect(page.getByRole('menuitemradio', { name: '经典模式' })).toHaveAttribute('aria-checked', 'false');
+    await page.getByRole('menuitemradio', { name: '经典模式' }).click();
     await expect(page.getByRole('menu', { name: '操作菜单' })).toHaveCount(0);
 
     // 重新打开菜单，选中项已切换
     await zsh.click({ button: 'right' });
+    await page.getByRole('menuitem', { name: '打开方式', exact: true }).click();
     await expect(page.getByRole('menuitemradio', { name: '经典模式' })).toHaveAttribute('aria-checked', 'true');
+    await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
     await expect(page.getByRole('menu', { name: '操作菜单' })).toHaveCount(0);
 
@@ -51,9 +79,11 @@ test.describe('新建标签类型快捷配置', () => {
 
     await row.click({ button: 'right' });
     const menu = page.getByRole('menu', { name: '操作菜单' });
-    await expect(menu.getByRole('menuitemradio', { name: '经典模式' })).toHaveAttribute('aria-checked', 'true');
-    await expect(menu.getByRole('menuitemradio', { name: 'Shell 集成' })).toHaveAttribute('aria-checked', 'true');
-    await menu.getByRole('menuitemradio', { name: '自动重连' }).click();
+    await menu.getByRole('menuitem', { name: '打开方式', exact: true }).click();
+    await expect(page.getByRole('menuitemradio', { name: '经典模式' })).toHaveAttribute('aria-checked', 'true');
+    await page.keyboard.press('ArrowLeft');
+    await expect(page.getByRole('menuitemradio', { name: 'Shell 集成' })).toHaveAttribute('aria-checked', 'true');
+    await page.getByRole('menuitemradio', { name: '自动重连' }).click();
 
     // 保存完成后再打开菜单，勾选状态已更新
     await expect.poll(async () => {

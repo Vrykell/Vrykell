@@ -1,5 +1,8 @@
 import { invoke } from '@platform/diagnostics';
 import type { BackendGroupEntry } from '@platform/api/types';
+import type { TabGroupAssignment } from '@core/grouping';
+
+export const applyTabGroups = (groups: TabGroupAssignment[]) => invoke<void>('groups_apply_plan', { groups });
 
 export function groupsList(): Promise<BackendGroupEntry[]> {
   return invoke('groups_list');

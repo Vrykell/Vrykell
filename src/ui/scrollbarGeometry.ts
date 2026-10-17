@@ -1,8 +1,8 @@
 /** Map scroll offsets to an overlay thumb without reserving content width. */
-export function scrollbarGeometry(viewport: number, extent: number, offset: number) {
+export function scrollbarGeometry(viewport: number, extent: number, offset: number, trackLength = viewport) {
   const maximum = Math.max(0, extent - viewport);
-  const height = extent > 0 ? Math.min(viewport, Math.max(28, viewport * viewport / extent)) : 0;
-  const travel = Math.max(0, viewport - height);
+  const height = extent > 0 ? Math.min(trackLength, Math.max(28, trackLength * viewport / extent)) : 0;
+  const travel = Math.max(0, trackLength - height);
   const value = Math.max(0, Math.min(maximum, offset));
   return { maximum, height, travel, value, top: maximum > 0 ? travel * value / maximum : 0 };
 }

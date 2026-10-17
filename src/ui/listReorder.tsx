@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { closeActiveMenu } from './hooks/useExclusiveMenu';
 
 export interface ListReorderDrag {
   /** Container id; rows opt in with `data-reorder-list` on the list element. */
@@ -8,6 +9,7 @@ export interface ListReorderDrag {
   id: string;
   /** Item kind; the default matcher only accepts targets of the same kind. */
   kind: string;
+  height?: number;
 }
 
 export interface ListReorderTarget {
@@ -62,17 +64,15 @@ function locateTarget(
 ): ListReorderTarget | null | undefined {
   const hit = document.elementFromPoint(x, y);
   if (!hit) return null;
-  const list = hit.closest<HTMLElement>(`[data-reorder-list="${listId}"]`);
-  if (!list) return null;
+  const list = hit.closest<HTMLElement>('[data-reorder-list]');
+  if (!list || list.dataset.reorderList !== listId) return null;
   if (hit.closest('[data-reorder-placeholder]')) return undefined;
-  // 指针所在的分区（分组容器 / 未分组区）：行与分区都接受这次拖动时，
-  // 只在该分区内找最近的行，空位才会落在指针所在的分组里（拖动本身仍按几何位置
-  // 判定，行与行之间的间隙也算在相邻行上）；分区里一行都没有（收起或空分区）时
-  // 才退回「追加到该分区」。
+  // Resolve rows within the hovered zone, falling back to the zone itself
+  // when its rows are hidden or empty.
   const zone = hit.closest<HTMLElement>('[data-reorder-zone]');
   const area = zone && list.contains(zone) && accepts(dragKind, zone.dataset.reorderKind ?? '') ? zone : null;
   const items = Array.from((area ?? list).querySelectorAll<HTMLElement>('[data-reorder-item]:not([data-reorder-dragging="true"])'))
-    .filter((item) => accepts(dragKind, item.dataset.reorderKind ?? ''));
+    .filter((item) => !item.closest('[hidden]') && accepts(dragKind, item.dataset.reorderKind ?? ''));
   for (const item of items) {
     const rect = item.getBoundingClientRect();
     if (y < rect.top + rect.height / 2) return { itemId: item.dataset.reorderItem, after: false };
@@ -100,10 +100,14 @@ export function useListReorderDrag({ listId, accepts, onDrop }: {
   return (event: ReactPointerEvent<HTMLElement>, item: { id: string; kind: string }) => {
     if (event.button !== 0 || event.isPrimary === false) return;
     // Rows stay clickable: inputs, action buttons and opt-out nodes never start a drag.
-    if ((event.target as HTMLElement).closest('input, button, [data-no-drag]')) return;
+    const target = event.target as HTMLElement;
+    if (target.closest('input, [data-no-drag]') || target.closest('button') && !target.closest('[data-reorder-handle]')) return;
     event.stopPropagation();
     cleanupRef.current?.();
-    const source = event.currentTarget;
+    const source = target.closest<HTMLElement>('[data-reorder-handle]') ?? event.currentTarget;
+    const container = event.currentTarget.dataset.reorderMeasure === 'container' ? event.currentTarget.closest<HTMLElement>('[data-reorder-container]') : null;
+    const bounds = (container ?? event.currentTarget).getBoundingClientRect();
+    const dimensions = bounds.height > 0 ? { height: bounds.height } : {};
     const { pointerId, clientX, clientY } = event;
     let started = false;
     let canceled = false;
@@ -123,7 +127,9 @@ export function useListReorderDrag({ listId, accepts, onDrop }: {
       if (!started && Math.hypot(next.clientX - clientX, next.clientY - clientY) < 6) return;
       if (!started) {
         started = true;
-        useListReorder.getState().start({ listId, id: item.id, kind: item.kind }, { x: next.clientX, y: next.clientY });
+        closeActiveMenu();
+        window.dispatchEvent(new Event('list-reorder-start'));
+        useListReorder.getState().start({ listId, id: item.id, kind: item.kind, ...dimensions }, { x: next.clientX, y: next.clientY });
       }
       next.preventDefault();
       preview(next.clientX, next.clientY);
@@ -154,7 +160,7 @@ export function useListReorderDrag({ listId, accepts, onDrop }: {
       if (next.pointerId !== pointerId) return;
       if (started && !canceled) {
         preview(next.clientX, next.clientY);
-        dropRef.current({ listId, id: item.id, kind: item.kind }, useListReorder.getState().target);
+        dropRef.current({ listId, id: item.id, kind: item.kind, ...dimensions }, useListReorder.getState().target);
       }
       clean();
     };
@@ -190,14 +196,16 @@ export function ListReorderPlaceholder({ listId, itemId, after = false }: {
 }) {
   const show = useListReorder((state) =>
     !!state.drag && state.drag.listId === listId && state.target?.itemId === itemId && !!state.target.after === after);
-  return show ? <div className="sidebar-reorder-placeholder" data-reorder-placeholder={itemId} aria-hidden="true" /> : null;
+  const height = useListReorder(state => state.drag?.height);
+  return show ? <div className="sidebar-reorder-placeholder" style={height ? { height } : undefined} data-reorder-placeholder={itemId} aria-hidden="true" /> : null;
 }
 
 /** Dashed gap for container drops (append into a group or the ungrouped area). */
 export function ListReorderZonePlaceholder({ listId, zoneId }: { listId: string; zoneId: string }) {
   const show = useListReorder((state) =>
     !!state.drag && state.drag.listId === listId && state.target?.zoneId === zoneId);
-  return show ? <div className="sidebar-reorder-placeholder" data-reorder-placeholder={zoneId} aria-hidden="true" /> : null;
+  const height = useListReorder(state => state.drag?.height);
+  return show ? <div className="sidebar-reorder-placeholder" style={height ? { height } : undefined} data-reorder-placeholder={zoneId} aria-hidden="true" /> : null;
 }
 
 /** Floating tile that follows the pointer while a list row is being dragged. */

@@ -41,7 +41,7 @@ test.describe('窗口分裂（二叉分裂树 + 落点选择）', () => {
     const point = await hoverPlacementZone(page, focusedPane(page), 'right');
     const preview = page.getByTestId('placement-zone-1');
     await expect(preview).toBeVisible();
-    await expect(preview).toBeEmpty();
+    await expect(preview).toHaveText('点击此处分裂终端');
     await page.mouse.click(point.x, point.y);
     await expect(page.locator('[data-testid^="pane-"]')).toHaveCount(2);
     await expect(page.getByPlaceholder(/输入命令/)).toHaveCount(2);

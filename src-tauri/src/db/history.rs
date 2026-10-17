@@ -112,7 +112,7 @@ impl HistoryDb {
     /// 清空命令历史（与前端 in-memory 缓存一致，消除双写漂移）。
     pub fn clear_history(&self) -> Result<(), String> {
         self.conn()
-            .execute("DELETE FROM history", [])
+            .execute_batch("DELETE FROM history; DELETE FROM command_history_runs;")
             .map_err(|e| e.to_string())?;
         Ok(())
     }

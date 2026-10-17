@@ -24,7 +24,7 @@ test.describe('应用布局', () => {
     await expect(controls.locator('button')).toHaveCount(3);
     const controlRight = await controls.evaluate((element) => element.getBoundingClientRect().right);
     const viewportRight = await page.evaluate(() => window.innerWidth);
-    expect(Math.abs(viewportRight - controlRight)).toBeLessThanOrEqual(1);
+    expect(viewportRight - controlRight).toBe(0);
     for (const width of [1240, 720]) {
       await page.setViewportSize({ width, height: 800 });
       const titlebar = await page.locator('.workspace-titlebar').boundingBox();
@@ -52,6 +52,8 @@ test.describe('应用布局', () => {
       .not.toBe('rgba(0, 0, 0, 0)');
     const dangerHover = await close.evaluate((element) => getComputedStyle(element).backgroundColor);
     expect(dangerHover).not.toBe(neutralHover);
+    expect(await close.evaluate(element => element.contains(document.elementFromPoint(window.innerWidth - 1, 0)))).toBe(true);
+    await page.screenshot({ path: test.info().outputPath('window-controls-flush.png'), clip: { x: page.viewportSize()!.width - 180, y: 0, width: 180, height: 70 } });
 
     await controls.locator('[data-testid="window-minimize"]').click();
     await controls.locator('[data-testid="window-maximize"]').click();

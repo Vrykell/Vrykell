@@ -58,7 +58,7 @@ function AuthenticationDialog({ target }: { target: SshAuthenticationTarget & { 
         {hasTemporary && <TextButton disabled={busy} onClick={() => { void forgetSshAuthentication(target.connectionId).then(cancel).catch(reason => setError(String(reason))); }}>{t('Clear temporary credentials')}</TextButton>}
         <div style={{ flex: 1 }} />
         <TextButton disabled={busy} onClick={cancel}>{t('Cancel')}</TextButton>
-        <TextButton className="ssh-primary-action" disabled={busy || !secret} onClick={() => { void submit(); }}>{t(busy ? 'Authenticating…' : 'Authenticate')}</TextButton>
+        <TextButton className="ssh-primary-action user-primary-action" disabled={busy || !secret} onClick={() => { void submit(); }}>{t(busy ? 'Authenticating…' : 'Authenticate')}</TextButton>
       </footer>
     </div>
   </div>, document.body);

@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { TriangleAlert } from '@ui/icons';
 import ErrorDetails from '@ui/ErrorDetails';
+import { t } from '@i18n';
 
 interface Props {
   children: ReactNode;
@@ -93,14 +94,15 @@ function DefaultFallback({ error, componentStack, onReset }: {
         />
       )}
       <button
+        className="primary-button"
         onClick={onReset}
         style={{
           marginTop: 8, padding: '8px 24px', fontSize: 'calc(13px * var(--ui-font-scale))',
-          background: 'var(--accent)', border: 'none', borderRadius: 6,
-          color: 'var(--accent-text)', cursor: 'pointer',
+          background: 'var(--primary-button-bg)', border: 'none', borderRadius: 6,
+          color: 'var(--primary-button-text)', cursor: 'pointer',
         }}
       >
-        重试
+        {t('Retry')}
       </button>
     </div>
   );

@@ -228,12 +228,13 @@ export default function SshImportModal({ open, onClose, onImported }: Props) {
           <button
             type="button"
             data-testid="ssh-import-confirm"
+            className="primary-button"
             onClick={() => void doImport()}
             disabled={importing || selected.size === 0}
             style={{
               minHeight: 34, padding: '6px 18px', fontSize: 'calc(13px * var(--ui-font-scale))', border: 'none',
-              borderRadius: 'var(--radius-inner)', background: 'var(--accent)',
-              color: 'var(--accent-text)', cursor: 'pointer',
+              borderRadius: 'var(--radius-inner)', background: 'var(--primary-button-bg)',
+              color: 'var(--primary-button-text)', cursor: 'pointer',
             }}
           >
             {importing ? t('Importing {{n}}/{{total}}…', { n: progress.completed, total: progress.total }) : Object.keys(failures).length ? t('Retry failed imports') : t('ssh.import.action')}
