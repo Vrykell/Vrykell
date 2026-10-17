@@ -139,6 +139,9 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
           fontFamily: 'var(--font-mono)',
           color: 'var(--block-cmd-text)',
           display: 'block',
+          // Long commands ellipsize here; without a cap their unbroken line would
+          // stretch the whole menu up to the viewport limit.
+          maxWidth: 340,
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',

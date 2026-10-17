@@ -172,6 +172,28 @@ test('narrow panes preserve context above multiline commands and all output', as
   await page.keyboard.press('Escape');
 });
 
+test('long commands truncate in the action menu header instead of widening the menu', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  const input = page.getByPlaceholder(/输入命令/);
+  const command = `Get-Date; ${'"ISO: " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss zzz"); '.repeat(4)}echo tail`;
+  await input.fill(command);
+  await input.press('Enter');
+  const block = page.locator('[data-testid^="command-block-"]').last();
+  await expect(block).toContainText('echo tail');
+  await block.hover();
+  await block.getByRole('button', { name: '更多操作' }).click();
+  const menu = page.getByRole('menu', { name: '命令块操作' });
+  const bounds = (await menu.boundingBox())!;
+  // The summary line ellipsizes at a compact width; it never stretches the menu to the viewport.
+  expect(bounds.width).toBeLessThanOrEqual(400);
+  const code = await menu.locator('code').evaluate((element) => ({
+    client: element.clientWidth,
+    scroll: element.scrollWidth,
+  }));
+  expect(code.scroll).toBeGreaterThan(code.client);
+});
+
 test('the more menu stages a command snapshot for AI analysis while preserving terminal output', async ({ page }) => {
   await setupTauriMock(page);
   await mockAnthropic(page, 'Analysis complete.');
