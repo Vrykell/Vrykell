@@ -1080,6 +1080,7 @@ const zh: Record<string, string> = {
   'Connected for': '连接时长',
   'Reconnect attempts': '重连尝试次数',
   'Remote resources': '远端资源',
+  'Math formula': '数学公式',
   'System details': '系统详情',
   'Connection details': '连接详情',
   'Recent CPU usage': '近期 CPU 使用率',

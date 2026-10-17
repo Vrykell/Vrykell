@@ -942,8 +942,12 @@ input.text-input-field:disabled { opacity: 0.55; }
 .md thead th:last-child { border-top-right-radius: 7px; }
 .md tbody tr:hover td { background: var(--hover); }
 .md hr { border: none; border-top: 1px solid var(--border); margin: 0.8em 0; }
-.md .katex-display { margin: 0.5em 0; overflow-x: auto; }
-.md .katex { color: var(--text-primary); }
+/* Scroll the padded outer box, keeping tall glyphs and both ends of wide formulas reachable. */
+.md .md-math-scroll { display: block; max-width: 100%; margin: 0.5em 0; padding: 1em 0.3em; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; }
+.md .md-math-scroll:focus-visible { outline: 1px solid var(--border-strong); outline-offset: -1px; border-radius: 4px; }
+.md .katex-display { width: max-content; min-width: 100%; margin: 0; padding-inline: 0.15em; overflow: visible; }
+.md .katex { color: var(--text-primary); font-synthesis: none; letter-spacing: normal; word-spacing: normal; word-break: normal; overflow-wrap: normal; }
+.md .katex-display > .katex { font-size: max(1.25em, 16px); }
 
 /* Overflowing content shares a compact themed scrollbar in both directions. */
 ::-webkit-scrollbar { width: var(--scrollbar-size); height: var(--scrollbar-size); }
