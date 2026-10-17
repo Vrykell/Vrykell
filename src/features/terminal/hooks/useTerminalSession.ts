@@ -645,10 +645,12 @@ export function useTerminalSession(
       return true;
     });
 
-    // ── Alt buffer 滚轮降级：滚轮 → 方向键 ──
-    // alt buffer 无 scrollback，xterm 内置滚轮处理在其中是 no-op（TUI 里滚轮「没反应」）。
-    // 应用未开鼠标上报时把滚轮按行折算成 ↑/↓ 发给 PTY（iTerm2 同款降级）；
-    // 开了鼠标上报（vim mouse=a、htop 等）则放行，由 xterm 默认逻辑转发鼠标事件。
+    // ── Alternate-buffer wheel fallback: wheel → arrow keys ──
+    // The alternate buffer has no scrollback, so the built-in wheel handling is a no-op
+    // there (in a TUI the wheel appears to do nothing). While the foreground program has
+    // not enabled mouse reporting, translate wheel movement into line-by-line ↑/↓ keys
+    // for the PTY; with mouse reporting enabled the events pass through to xterm's
+    // default handling.
     let wheelResidual = 0;
     term.attachCustomWheelEventHandler((e) => {
       if (term.buffer.active.type !== 'alternate' || term.modes.mouseTrackingMode !== 'none') {

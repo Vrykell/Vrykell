@@ -2,7 +2,7 @@
 
 ## Decision
 
-Going forward, Vrykell adopts an architecture centered on business Features. Referencing Lithe-IDEA's way of organizing, it avoids further expanding the mixed layers of `app / entities / widgets / features / legacy business directories`.
+Going forward, Vrykell adopts an architecture centered on business Features. The feature-first organization keeps the codebase from further expanding the mixed layers of `app / entities / widgets / features / legacy business directories`.
 
 Current structure:
 

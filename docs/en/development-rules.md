@@ -1,6 +1,6 @@
 # Vrykell Development Rules
 
-> Last updated: 2026-10-06
+> Last updated: 2026-10-17
 >
 > This file (`docs/en/development-rules.md`) is the English mirror of the rule book; the canonical
 > Chinese version is `docs/zh/development-rules.md`. `AGENTS.md` is the always-on summary, and
@@ -9,7 +9,7 @@
 
 ## 1. Code style
 
-1. **Comments and naming** — New or edited code comments are English (JSDoc, inline, CSS and Rust comments alike); comments and identifiers describe behavior in generic terms and avoid third-party product or brand names.
+1. **Comments and naming** — New or edited code comments are English (JSDoc, inline, CSS and Rust comments alike); comments and identifiers describe behavior in generic terms and avoid third-party product or brand names. Docs and commit messages follow the same rule; model and agent-harness names are excepted.
 2. **Independent implementation** — Implement features your own way; never copy third-party source.
 3. **User-visible copy goes through i18n** — Never hardcode user-visible Chinese in code: write the string in English and add its Chinese entry to `src/i18n`.
 4. **TypeScript strict** — Zero TS errors; do not use `any` unless necessary and annotated with `// eslint-disable-next-line`.

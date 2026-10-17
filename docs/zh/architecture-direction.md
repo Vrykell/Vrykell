@@ -2,7 +2,7 @@
 
 ## 决策
 
-Vrykell 后续采用以业务 Feature 为中心的架构。参考 Lithe-IDEA 的组织方式，避免继续扩张 `app / entities / widgets / features / 旧业务目录` 的混合层。
+Vrykell 后续采用以业务 Feature 为中心的架构。以「功能优先」的方式组织代码，避免继续扩张 `app / entities / widgets / features / 旧业务目录` 的混合层。
 
 当前结构：
 

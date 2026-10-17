@@ -38,7 +38,7 @@
 - **根因**：解析器把三类不认识的序列翻译成了**别的合法序列**：
   - `ESC ( B`（字符集指定）只跳过 designator 字节，最终的 `B` 泄进文本流；
   - `CSI > 4 m`（xterm modifyOtherKeys）被当成 SGR(4)，后续全文下划线；
-  - `CSI < u` / `CSI > u`（kitty keyboard protocol）被当成 RestoreCursor，光标瞬移到陈旧位置——这就是 Claude 帧被打散、「多光标」的真凶。
+  - `CSI < u` / `CSI > u`（扩展键盘协议）被当成 RestoreCursor，光标瞬移到陈旧位置——这就是 Claude 帧被打散、「多光标」的真凶。
 - **修复**：带 `> < =` 参数前缀的 CSI 整体忽略；charset 指定跳两个字节；`ESC 7/8` 正确映射 Save/RestoreCursor；ITU 冒号子参数（`SGR 38:5:220`）按分号处理。**并用真实捕获的 Claude Code 启动帧（100×30）做端到端回放测试断言零垃圾。**
 - **教训**：解析器「尽力猜」不如「明确忽略」；误译比丢弃危害大得多。
 
@@ -55,8 +55,8 @@
 - **修复**：altActive 时只暴露 alt screen，退出恢复（xterm 语义）。
 
 ### 2.6 resize 只 clamp 光标、不 reflow → 历史输出永远保持旧折行（`2f52a0c`）
-- 需要在 `TerminalLine.wrapped` 上跟踪软换行链，宽度变化时 iTerm2 式 reflow：链合并重切、不劈宽字符、硬换行保留、光标跟随逻辑位置。
-- **后续反转**：v1 后期又改为 **no-rewrap resize（xterm 语义）**（`529ca65`）——Ink 式 TUI 的「向上重绘 N 行」记账依赖行数恒定，reflow 会破坏它；过长行改为渲染期裁剪（`b732817`）。两种语义各有适用对象，最终选边 xterm/Windows Terminal 行为。
+- 需要在 `TerminalLine.wrapped` 上跟踪软换行链，宽度变化时按逻辑行 reflow：链合并重切、不劈宽字符、硬换行保留、光标跟随逻辑位置。
+- **后续反转**：v1 后期又改为 **no-rewrap resize（xterm 语义）**（`529ca65`）——自刷新式 TUI 的「向上重绘 N 行」记账依赖行数恒定，reflow 会破坏它；过长行改为渲染期裁剪（`b732817`）。两种语义各有适用对象，最终选边 xterm 及主流终端的行为。
 
 ### 2.7 宽字符双换行 + wrapped 标志中毒（`123f515`）
 - **现象**：反复拖窗后 TUI 画面重复/错位。
@@ -160,7 +160,7 @@
 ### 4.1 手写 charWidth 表与 TUI 的 string-width 记账不一致 → 光标劈成两半（`69061f4`、`3eb3b7e`）
 - **现象一**：零宽修饰符（VS16 U+FE0F、ZWJ、组合记号）被算 1 列写进 cell → 渲染出 `?` 垃圾。
 - **现象二**：emoji presentation 字符（✨ ⏸）算 1 列而 TUI 算 2 列 → 整行右移、幻影折行，TUI 的 erase-lines 重绘永远擦不掉旧帧（96 列欢迎框残影在 140 列重绘后仍在）。
-- **现象三**：手工挑的 BMP emoji 段漏掉 `▶ ◀ ⚠ © ® ™`（Ink/string-width 算 2 列），每漏一个该行少算 1 列 → TUI 垫到恰好 cols 的行在我们这是 cols+1 → 折行 → 插入幻影行把光标「劈成两半」。
+- **现象三**：手工挑的 BMP emoji 段漏掉 `▶ ◀ ⚠ © ® ™`（按 string-width 语义算 2 列），每漏一个该行少算 1 列 → TUI 垫到恰好 cols 的行在我们这是 cols+1 → 折行 → 插入幻影行把光标「劈成两半」。
 - **最终修复**：**不再手写**——用 string-width@7 对每个 emoji 码点实测生成权威表，测试锁死两侧（2 列：▶◀⚠©®™；1 列：❯●⧉←·✘✦）；`©®` 在 CJK cutoff 之下、必须在 `< 0x1100` 早返回**之前**检查。另加 dev 模式 wrap forensics：alt screen 内任何自动换行（TUI 帧本不该折行）console.warn 行尾码点。
 - **教训**：与外部程序共享「列数」这一记账单位时，宽度表必须来自同一权威实现，手工挑必漏。
 
@@ -276,7 +276,7 @@
 
 ### 7.9 GUI 启动的 shell 没有 locale → vi 等全屏程序中文乱码（`pty.rs:merge_locale_env`）
 - **现象**：GUI 启动（Finder/Dock，无 `LANG`/`LC_*`）时，`vi` 打开 UTF-8 文件，中文显示成 `~H`、`~@`、`~C` 之类；`cat`/`ls` 却正常。
-- **根因**：区域感知的程序按 `LC_CTYPE`（缺省 C）选择编码。vim 于是按 latin1 读取文件，把每个 UTF-8 汉字的 C1 高位字节画成 `~X`；只透传字节的程序不查 locale，所以看起来没问题。Terminal.app/iTerm 会自己设置 locale，所以同一个命令在别的终端正常。
+- **根因**：区域感知的程序按 `LC_CTYPE`（缺省 C）选择编码。vim 于是按 latin1 读取文件，把每个 UTF-8 汉字的 C1 高位字节画成 `~X`；只透传字节的程序不查 locale，所以看起来没问题。有的终端模拟器会自己设置 locale，所以同一个命令在别的终端正常。
 - **修复**：`spawn_pty` 里 `merge_locale_env` 与 `merge_term_env` 并列——环境里没有任何 UTF-8 请求时补 `LC_CTYPE`（macOS 用 `en_US.UTF-8`，其它 Unix 用 `C.UTF-8`），`LANG` 为空时一并补；已有 UTF-8 时不动，保持用户语言。
 - **教训**：GUI 启动缺的不止 PATH/TERM，还有 locale；凡是「本地正常、GUI 异常」的文本问题，先看 `LANG`/`LC_CTYPE`。
 
@@ -498,7 +498,7 @@
 
 ### 13.2 ConPTY 环境伪影：node stub 测不了 resize（`1658043`）
 - Windows e2e 用 node 做 TUI stub 不可行：ConPTY 下 node **收不到 resize 事件**，且全宽输出突发撞上 ConPTY deferred-wrap 怪癖——两者都是环境伪影（用 eventLog 验证发生在我们代码之下）。
-- **替代**：PowerShell 轮询 stub（`[Console]::WindowWidth` + `\e[4A` 重绘）模拟 Ink 的行数记账。
+- **替代**：PowerShell 轮询 stub（`[Console]::WindowWidth` + `\e[4A` 重绘）模拟自刷新 TUI 的行数记账。
 
 ### 13.3 e2e mock 必须复刻 @tauri-apps/api v2 内部契约（`e2e/tauri-mock.ts` 头注释）
 - `invoke → __TAURI_INTERNALS__.invoke(cmd, args)`；`listen → transformCallback 注册 window[_${id}] 再 invoke('plugin:event|listen')`。mock 走真实库代码路径而不是打桩库本身，API 升级时契约变化会被 e2e 抓住。
@@ -622,7 +622,7 @@
 - **框线/表格错位先查字体，不要先怀疑渲染器**：根因通常是 CJK 回退字体的字宽不是 2 个拉丁单元 —— 字体栈必须能命中一个等宽 CJK 字体（Sarasa Mono SC / Noto Sans Mono CJK SC），否则 `│ 名称 │` 这类表格的右边框逐行错开。无头 e2e 环境通常没有这些字体，**不能据此判断渲染器好坏**。
 - WebGL 渲染器在无 GPU 的环境（无头浏览器 / SwiftShader）截不到画面：`.xterm-rows` 为空、截图全黑（选区被画进 canvas 纹理，不是 DOM）。比较渲染器必须在真机跑。
 - 已量到的几何事实：WebGL 画布按设备像素对齐（CSS 宽 × dpr 恰为整数），所以「画布取整」这条推断不成立；怀疑边缘亮线前，先量 `screen` / `region` / `canvas` 三者的 rect 再下结论。
-- **字符格取整（Windows Terminal 的做法）**：等宽字体的 advance 常是小数（14px 字号下约 8.4px），`cols × cellWidth` 就落在非整数上，画布右边缘会剩一条亚像素列 —— 拖动窗口时「有时有、有时没有」正是这个取整。做法是给 xterm 设置 `letterSpacing = round(实测格宽) − 实测格宽`（每格最多半个像素），格宽锁到整数、网格落在设备像素上；`useTerminalSession` 与 `createBlockTerm` 都在创建时设置、并在字号变化时重算（`terminalFont.ts` 的 `snapLetterSpacing` 有单测）。
+- **字符格取整（主流终端的做法）**：等宽字体的 advance 常是小数（14px 字号下约 8.4px），`cols × cellWidth` 就落在非整数上，画布右边缘会剩一条亚像素列 —— 拖动窗口时「有时有、有时没有」正是这个取整。做法是给 xterm 设置 `letterSpacing = round(实测格宽) − 实测格宽`（每格最多半个像素），格宽锁到整数、网格落在设备像素上；`useTerminalSession` 与 `createBlockTerm` 都在创建时设置、并在字号变化时重算（`terminalFont.ts` 的 `snapLetterSpacing` 有单测）。
 - **win32-input-mode 的按键捕获会顺手吞掉复制/粘贴**：`attachWin32KeyCapture` 在**捕获阶段**就 `preventDefault + stopPropagation`，会话一旦请求该模式，Ctrl+C 会被编码成按键记录发进 PTY，复制直接失效 —— 而 e2e 默认不开这个模式，所以「本机不触发、用户机上必现」。判定必须拿到终端本身：Ctrl+V 永远放行；Ctrl+C 只在**有选区**时放行（无选区仍要编码，否则会话丢了中断键）。回归覆盖见 `terminal-clipboard.spec.ts` 的「win32-input-mode 下 Ctrl+C 仍然复制」。
 - **终端「选区旁边一条细线」= 终端自带的滚动条**：`.xterm-viewport` 比 `.xterm-screen` 宽 8px（那 8px 是原生滚动条滑道），全局 `::-webkit-scrollbar-thumb` 的 `2px 透明边框 + padding-box` 让它只剩中间约 4px 的浅色细条，紧贴选区时就像渲染瑕疵。运行块早就用 `display: none` 关掉了自己的滚动条，pane 现在也关（滚轮/触控板/键盘滚动不受影响）。切换渲染器（WebGL/DOM）**不会**改变这个现象，别把它当成渲染器问题。
 

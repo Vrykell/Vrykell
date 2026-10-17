@@ -1,6 +1,6 @@
 # Vrykell 开发规则
 
-> 最后更新: 2026-10-06
+> 最后更新: 2026-10-17
 >
 > 本文件（`docs/zh/development-rules.md`）是规则正本，英文镜像为 `docs/en/development-rules.md`。
 > `AGENTS.md` 是常驻摘要，`.agents/skills/vrykell-conventions/SKILL.md` 是面向 agent 的规范入口
@@ -8,7 +8,7 @@
 
 ## 一、代码规范
 
-1. **注释与命名** — 新增或修改的代码注释统一使用英文（包括 JSDoc、行内注释、CSS 和 Rust 注释）；注释与变量名使用通用术语描述功能，避免第三方产品或品牌名。
+1. **注释与命名** — 新增或修改的代码注释统一使用英文（包括 JSDoc、行内注释、CSS 和 Rust 注释）；注释与变量名使用通用术语描述功能，避免第三方产品或品牌名。文档与提交信息同样适用，模型与 agent harness 名称除外。
 2. **独立实现** — 用自己的方式实现功能，不照抄任何第三方源码。
 3. **用户可见文案走 i18n** — 不在代码中硬编码用户可见中文：代码里写英文，并在 `src/i18n` 补上对应中文条目。
 4. **TypeScript 严格** — 零 TS 错误，不使用 `any` 除非必要且标注 `// eslint-disable-next-line`。
