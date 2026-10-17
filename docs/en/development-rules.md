@@ -84,7 +84,6 @@
 46. **Bilingual docs** — Documents under `docs/` stay bilingual: Chinese in `docs/zh/`, English in `docs/en/`, with file names matching one-to-one across the two. New documents must ship in both languages; editing either language version requires updating the other. Raw evidence such as screenshots under `docs/audit-evidence/` is not translated.
 47. **Build packages on request** — Run `npm run tauri build` or another installer/package builder only when the user explicitly asks for a package build. Requests to fix, review, test, or verify application behavior do not by themselves authorize installer builds; use tests, typechecking, architecture checks, or dev mode as appropriate.
 48. **Use existing design first** — Before changing a surface, inspect its closest existing page and interaction. Reuse its components, spacing, inputs, menus, hover, and focus patterns. Extend or extract the existing implementation when needed; do not invent a separate visual treatment for an existing interaction. Review the result in the running UI at narrow and wide sizes.
-
 ## 11. Security floor
 
 49. **New IPC commands must be gated** -- A new Tauri command either goes through a lease or policy check (and is registered in the gated-command list) or does something privileged-free; a new bare "read / write / execute any path" command is not allowed. The gated list and its checks live in `src-tauri/src/agent/permissions.rs`; changes update the defences table in `docs/zh/security-model.md`.
@@ -95,3 +94,7 @@
 ## 12. Tooling
 
 53. **Edit source files with the edit tool only** -- Never rewrite source text through shell redirection / `Set-Content` / whole-file regex scripts: PowerShell's default encoding mangles non-ASCII, and that broke files twice (2026-10-14 and 10-15). Use the edit tool for every change; keep the shell for reading, searching and git operations.
+
+## 13. Menus and palettes
+
+54. **Menu hierarchy and color palettes** — All menu color palettes appear directly below shared actions in the footer, never in a submenu. Use a meaningful submenu only for multiple related choices; keep single settings destinations and switches directly accessible without a generic Settings parent or one-option submenu.

@@ -47,6 +47,25 @@ pub fn run() {
         .manage(theme::ThemeState::load())
         .manage(agent::ai::LlmStreamState::default())
         .manage(terminal::pty::KillState::default())
+        .on_page_load(|webview, _payload| {
+            #[cfg(windows)]
+            if platform::window_chrome::is_tool_window(webview.label()) {
+                if let Some(window) = webview.app_handle().get_webview_window(webview.label()) {
+                    platform::window_chrome::hide_border(&window);
+                }
+            }
+            #[cfg(not(windows))]
+            let _ = webview;
+        })
+        .on_window_event(|window, event| {
+            if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
+                for (label, tool) in window.app_handle().webview_windows() {
+                    if label.starts_with("tool-") {
+                        let _ = tool.destroy();
+                    }
+                }
+            }
+        })
         .manage(agent::mcp::McpState::default())
         .manage(agent::permissions::ToolPolicy::default())
         .manage(files::grants::PathGrants::load())
@@ -71,11 +90,6 @@ pub fn run() {
             }
             // 上次会话残留的可回退删除暂存项：补送入系统回收站（后台执行，不阻塞启动）
             std::thread::spawn(files::fs::sweep_undo_dir);
-            // 旧版明文密钥：升级成平台加密形式（Windows DPAPI）
-            let upgraded = secret::seal_pending_values();
-            if upgraded > 0 {
-                eprintln!("[secret] upgraded {upgraded} stored secret(s) to the platform seal");
-            }
             if let Some(cfg) = app.try_state::<theme::ThemeState>() {
                 let path = cfg.0.lock().ok().map(|c| c.background_image.clone());
                 if let Some(Some(p)) = path {
@@ -88,6 +102,12 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             greet,
+            commands::command_history::command_history_record,
+            commands::command_history::command_history_list,
+            commands::command_history::command_history_mutate,
+            commands::command_history::command_history_preferences,
+            commands::command_history::command_history_save_preferences,
+            commands::command_history::command_history_context,
             platform::context_menu::context_menu_status,
             platform::context_menu::context_menu_manage,
             platform::context_menu::shell_launch_directory,
@@ -168,6 +188,7 @@ pub fn run() {
             remote::ssh::ssh_connection_touch,
             remote::ssh::ssh_test,
             remote::ssh::ssh_system_status,
+            remote::network::ssh_network_probe,
             remote::ssh::ssh_authenticate_session,
             remote::ssh::ssh_forget_session_auth,
             remote::ssh::ssh_host_key_info,
@@ -252,6 +273,7 @@ pub fn run() {
             commands::session::list_sessions,
             commands::session::get_session_blocks,
             commands::group::groups_list,
+            commands::group::groups_apply_plan,
             commands::group::group_create,
             commands::group::group_rename,
             commands::group::group_set_collapsed,

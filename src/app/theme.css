@@ -51,13 +51,22 @@
   /* Group header hover actions: three 28px buttons plus their 2px gaps. */
   --group-actions-width: 88px;
   --composer-bg: var(--field-bg);
-  --placement-bg: color-mix(in srgb, var(--hover) 25%, transparent);
-  --placement-hover: color-mix(in srgb, var(--hover) 85%, transparent);
+  --placement-bg: color-mix(in srgb, var(--surface) 92%, transparent);
+  --placement-hover: color-mix(in srgb, var(--surface) 96%, transparent);
   --control-size: 32px;
   --control-size-compact: 28px;
   --control-hover-bg: var(--hover);
   --action-button-bg: color-mix(in srgb, var(--text-primary) 10%, var(--surface));
   --action-button-hover-bg: color-mix(in srgb, var(--text-primary) 16%, var(--surface));
+  --primary-button-bg: var(--primary-action);
+  --primary-button-text: #ffffff;
+  --primary-button-hover-bg: color-mix(in srgb, var(--primary-action) 85%, var(--primary-button-text));
+  --resource-accent: color-mix(in srgb, var(--group-blue) 80%, var(--primary-action));
+  --chart-shade: #181a1f;
+  --chart-blue: color-mix(in srgb, var(--resource-accent) 78%, var(--chart-shade));
+  --chart-violet: color-mix(in srgb, var(--group-violet) 78%, var(--chart-shade));
+  --chart-amber: color-mix(in srgb, var(--group-amber) 78%, var(--chart-shade));
+  --chart-cyan: color-mix(in srgb, var(--group-cyan) 78%, var(--chart-shade));
   --history-link-color: var(--group-blue);
   --key-hint-bg: var(--chrome-field);
   --control-active-bg: var(--accent-dim);
@@ -125,11 +134,34 @@ input, textarea, [contenteditable="true"] { caret-color: var(--text-caret); }
   box-shadow: var(--shadow-md); font: calc(12px * var(--ui-font-scale))/1.5 var(--font-ui);
 }
 .workspace-floating-dialog { border-radius: var(--radius-block); box-shadow: var(--shadow-lg); }
+.tool-dialog-overlay { position: fixed; inset: 0; z-index: 9996; display: flex; align-items: center; justify-content: center; background: var(--overlay); animation: overlayIn 180ms var(--ease); }
+.tool-dialog { display: flex; flex-direction: column; max-width: calc(100vw - 40px); max-height: calc(100vh - 40px); min-height: 0; animation: modalIn 220ms var(--ease-out); }
+.tool-dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-shrink: 0; padding: 8px 8px 0 16px; }
+.tool-dialog-heading > strong { min-width: 0; font-size: var(--fs-body); font-weight: var(--fw-semibold); }
+.tool-dialog-body { min-height: 0; overflow-y: auto; padding: 12px 16px 16px; }
+html[data-tool-window="true"], html[data-tool-window="true"] body, html[data-tool-window="true"] #root { width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; }
+.tool-window { display: flex; flex-direction: column; width: 100%; height: 100dvh; min-height: 0; border: 0; border-radius: 0; box-shadow: none; background: var(--surface); color: var(--text-primary); font: var(--fs-caption)/1.5 var(--font-ui); }
+.tool-window-heading { cursor: grab; user-select: none; touch-action: none; -webkit-app-region: no-drag; gap: 0; padding: 0 0 0 16px; height: 40px; }
+.tool-window-heading:active { cursor: grabbing; }
+.tool-window-heading > strong { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tool-window-controls { display: flex; align-self: stretch; align-items: stretch; }
+.tool-window-heading .tool-window-controls > button.icon-button { width: 36px; height: 100%; border-radius: 0; }
+.tool-window-controls > button.tool-window-close:hover { background: var(--error); color: var(--error-text); }
+.tool-window-body { flex: 1 1 auto; }
+.tool-window-footer { flex-shrink: 0; padding: 12px 16px; border-top: 1px solid var(--border); }
+.auto-group-dialog { display: flex; flex-direction: column; gap: 12px; }
+.auto-group-dialog p { margin: 0; line-height: 1.6; color: var(--text-secondary); }
+.auto-group-preview section + section { margin-top: 12px; }
+.auto-group-preview h3 { margin: 0 0 4px; font-size: var(--fs-body); color: var(--text-primary); }
+.auto-group-preview h3 span { color: var(--text-muted); font-size: var(--fs-caption); font-weight: var(--fw-regular); }
+.auto-group-preview ul { margin: 0; padding-left: 20px; }
+.auto-group-preview li { line-height: 1.8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.auto-group-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .workspace-floating-row {
   border: none; border-radius: var(--radius-inner); background: transparent;
   transition: background var(--dur-fast) var(--ease);
 }
-.workspace-floating-row:hover, .workspace-floating-row[data-selected="true"] { background: var(--hover); }
+.workspace-floating-row:hover, .workspace-floating-row[data-selected="true"], .workspace-floating-row[data-submenu-open="true"] { background: var(--hover); }
 .workspace-floating :is(input, textarea, select):focus-visible { outline: none; }
 .workspace-floating button:focus-visible { outline: none; background: var(--hover); }
 
@@ -354,6 +386,7 @@ button.state-icon-button[aria-pressed="true"]:hover { background: var(--selectio
 }
 /* Sidebar list reorder: the dragged row leaves its slot for a dashed placeholder. */
 [data-reorder-dragging="true"] { position: absolute; visibility: hidden; pointer-events: none; }
+[data-reorder-dragging="true"], [data-reorder-dragging="true"] * { visibility: hidden !important; pointer-events: none !important; }
 .sidebar-reorder-placeholder {
   height: 44px; flex-shrink: 0; box-sizing: border-box; margin: 0 6px;
   border: 1px dashed var(--border-strong); border-radius: var(--radius-inner); background: var(--hover);
@@ -376,6 +409,12 @@ button.activity-button:hover { background: var(--control-hover-bg) !important; c
 button.activity-button[aria-pressed="true"] { background: var(--chrome-field) !important; color: var(--text-primary) !important; }
 .workspace-search:focus-visible, .activity-button:focus-visible, .workspace-settings:focus-visible, .workspace-panel-close:focus-visible { outline: none; background: var(--hover); }
 .workspace-panel-heading { display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 4px 8px 4px 12px; font-size: calc(13px * var(--ui-font-scale)); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.workspace-panel-heading { cursor: grab; user-select: none; touch-action: none; -webkit-app-region: no-drag; }
+.workspace-panel-heading[data-dragging="true"] { cursor: grabbing; }
+.workspace-sidebar-toolbar { display: flex; align-items: center; gap: 4px; padding: 6px 10px 8px; position: relative; flex-shrink: 0; }
+.workspace-sidebar-search { position: relative; flex: 1; min-width: 0; height: 30px; }
+.workspace-sidebar-search > svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
+.workspace-sidebar-search > input { display: block; box-sizing: border-box; width: 100%; height: 100%; min-width: 0; background: var(--chrome-field); border: 0; border-radius: var(--radius-inner); outline: none; padding: 0 10px 0 31px; font: calc(13px * var(--ui-font-scale)) var(--font-ui); color: var(--text-primary); }
 .terminal-composer { border: none; border-radius: 8px; background: var(--composer-bg); transition: background var(--dur) var(--ease); }
 .terminal-composer:focus-within { box-shadow: none; }
 /* SSH 连接页：连接中的转圈与细进度条（15s 为 ConnectTimeout 的上限，仅作节奏参考） */
@@ -396,6 +435,11 @@ input.ssh-auth-response { padding: 0; line-height: 32px; font-size: calc(20px * 
 /* Empty inputs use the same font metrics as their placeholder. */
 input.ssh-auth-response:placeholder-shown { font-size: calc(13px * var(--ui-font-scale)); letter-spacing: normal; }
 input.ssh-auth-response::placeholder { font-size: inherit; letter-spacing: inherit; }
+/* The authentication row carries its own reveal toggle: hide the browser-painted eye so the
+   WebView's oversized native button does not compete with the themed control. */
+input.ssh-auth-response::-ms-reveal, input.ssh-auth-response::-ms-clear { display: none; }
+input.ssh-auth-response::-webkit-credentials-auto-fill-button,
+input.ssh-auth-response::-webkit-strong-password-auto-fill-button { display: none; }
 .terminal-composer-heading { display: flex; justify-content: space-between; gap: 12px; color: var(--text-secondary); font-size: calc(11px * var(--ui-font-scale)); margin-bottom: 6px; }
 .terminal-composer-heading span:last-child { color: var(--text-muted); white-space: nowrap; }
 .terminal-composer-heading .composer-key-hints { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); }
@@ -473,6 +517,10 @@ button:not([data-subtle]) {
 }
 button:where(:not([data-subtle]):enabled):hover { background: var(--button-hover); }
 button:disabled { opacity: 0.45; cursor: default; }
+
+/* The SSH authentication submit follows the AI composer's blue send action. */
+button.ssh-auth-submit { border: 0; background: var(--accent-user); color: var(--text-primary); }
+button.ssh-auth-submit:enabled:is(:hover, :focus-visible) { background: color-mix(in srgb, var(--accent-user) 85%, var(--text-primary)); }
 
 button.outline-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 5px 12px; border: 1px solid transparent; border-radius: var(--radius-inner); background: var(--action-button-bg); color: var(--text-primary); font-family: var(--font-ui); font-size: calc(12px * var(--ui-font-scale)); cursor: pointer; transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease); }
 button.outline-button > svg { flex-shrink: 0; }
@@ -567,8 +615,9 @@ button.window-control-button {
 .chat-input-status [data-testid="pill-name"] > svg:first-child { display: none; }
 .chat-input-status [data-testid="pill-name"]:focus-visible { border-radius: 8px; }
 .chat-input-status .chat-mode-trigger { padding: 0 4px; white-space: nowrap; }
-.ai-chat-panel .chat-input-status > button.chat-send-button { border-radius: 50%; background: var(--accent-user); color: var(--text-primary); }
-.ai-chat-panel .chat-input-status > button.chat-send-button:is(:hover, :focus-visible):not(:disabled) { background: color-mix(in srgb, var(--accent-user) 85%, var(--text-primary)); }
+.ai-chat-panel .chat-input-status > button.chat-send-button { border-radius: 50%; background: var(--primary-button-bg); color: var(--primary-button-text); }
+button.primary-button, button.user-primary-action.text-control { background: var(--primary-button-bg); color: var(--primary-button-text); border-color: transparent; }
+.ai-chat-panel .chat-input-status > button.chat-send-button:is(:hover, :focus):not(:disabled), button.primary-button:is(:hover, :focus):not(:disabled), button.user-primary-action.text-control:is(:hover, :focus):not(:disabled) { --primary-button-bg: var(--primary-button-hover-bg); background: var(--primary-button-bg); }
 @container (max-width: 300px) {
   .chat-setting-row { align-items: flex-start; flex-direction: column; gap: 4px; }
   .chat-setting-row > .ui-select { flex: auto; width: 100%; }
@@ -625,6 +674,14 @@ button.window-control-button {
 @media (max-width: 900px) { .history-list { padding: 16px 40px; } }
 .history-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 120px; padding: 24px; color: var(--text-muted); text-align: center; font-size: calc(12px * var(--ui-font-scale)); }
 .history-empty > svg { color: var(--text-muted); opacity: 0.55; }
+.command-row .sidebar-row-inline-actions, .command-row .sidebar-row-action { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity var(--dur-fast) var(--ease); }
+.command-row[data-actions-visible="true"] .sidebar-row-inline-actions, .command-row[data-actions-visible="true"] .sidebar-row-action { opacity: 1; visibility: visible; pointer-events: auto; }
+.command-row[data-actions-visible="true"] .sidebar-row-title { padding-right: var(--sidebar-action-width); }
+.command-row .sidebar-row-title { font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
+@media (pointer: coarse) {
+  .command-row .sidebar-row-inline-actions, .command-row .sidebar-row-action { opacity: 1; visibility: visible; pointer-events: auto; }
+  .command-row .sidebar-row-title { padding-right: var(--sidebar-action-width); }
+}
 .history-row { position: relative; }
 .history-row:focus-visible { outline: none; }
 .history-row > .sidebar-row-content { background: transparent; }
@@ -676,7 +733,8 @@ button.history-palette-auto { display: flex; align-items: center; justify-conten
 .history-prompt-actions { display: flex; justify-content: flex-end; gap: 6px; }
 button.history-prompt-action { min-height: 26px; padding: 4px 10px; border: 1px solid transparent; border-radius: 6px; background: var(--action-button-bg); color: var(--text-primary); font-size: calc(12px * var(--ui-font-scale)); cursor: pointer; }
 button.history-prompt-action:is(:hover, :focus) { background: var(--hover); color: var(--text-primary); }
-button.history-prompt-action[data-primary] { border-color: var(--accent); background: var(--accent-dim); color: var(--text-primary); }
+button.history-prompt-action[data-primary] { border-color: transparent; background: var(--primary-button-bg); color: var(--primary-button-text); }
+button.history-prompt-action[data-primary]:enabled:is(:hover, :focus-visible) { background: var(--primary-button-hover-bg); }
 .ai-history-working { color: var(--text-muted); font-size: var(--fs-micro); }
 .ai-history-empty { padding: 24px; text-align: center; color: var(--text-muted); font-size: calc(12px * var(--ui-font-scale)); }
 /* Usage statistics page: cards carry the chart and the tables, like the reference dashboard. */
@@ -811,6 +869,9 @@ input, textarea {
   outline: none;
 }
 input::placeholder, textarea::placeholder { color: var(--text-muted); }
+input.text-input-field { box-sizing: border-box; width: 100%; min-width: 0; min-height: 32px; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--field-bg); color: var(--text-primary); font: calc(12px * var(--ui-font-scale))/1.5 var(--font-ui); outline: none; }
+input.text-input-field:focus { border-color: var(--border-strong); }
+input.text-input-field:disabled { opacity: 0.55; }
 .settings-view :is(input, textarea)::placeholder { font-family: var(--font-ui); font-size: inherit; opacity: 1; }
 
 /* chat 区内 markdown 排版（GitHub-dark 风格化） */
@@ -900,12 +961,18 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 .md thead th:last-child { border-top-right-radius: 7px; }
 .md tbody tr:hover td { background: var(--hover); }
 .md hr { border: none; border-top: 1px solid var(--border); margin: 0.8em 0; }
-.md .katex-display { margin: 0.5em 0; overflow-x: auto; }
-.md .katex { color: var(--text-primary); }
+/* Scroll the padded outer box, keeping tall glyphs and both ends of wide formulas reachable. */
+.md .md-math-scroll { display: block; max-width: 100%; margin: 0.5em 0; padding: 1em 0.3em; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; }
+.md .md-math-scroll:focus-visible { outline: 1px solid var(--border-strong); outline-offset: -1px; border-radius: 4px; }
+.md .katex-display { width: max-content; min-width: 100%; margin: 0; padding-inline: 0.15em; overflow: visible; }
+.md .katex { color: var(--text-primary); font-synthesis: none; letter-spacing: normal; word-spacing: normal; word-break: normal; overflow-wrap: normal; }
+.md .katex-display > .katex { font-size: max(1.25em, 16px); }
 
 /* Overflowing content shares a compact themed scrollbar in both directions. */
 ::-webkit-scrollbar { width: var(--scrollbar-size); height: var(--scrollbar-size); }
 ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-track:vertical { margin-block: 4px; }
+::-webkit-scrollbar-track:horizontal { margin-inline: 4px; }
 /* Terminals keep exactly one scrollbar: the themed DOM one (`.xterm-scrollable-element >
    .scrollbar`, styled below). The native one on the viewport doubles up with it, and inside
    its 8px lane the thumb shrinks to a ~4px light sliver that reads as a stray line beside a
@@ -929,7 +996,8 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 .scroll-region, .settings-content { scrollbar-gutter: auto; }
 [data-testid^="terminal-scroll-"] { --scrollbar-size: 10px; }
 .application-window[data-platform="macos"] { border-radius: 10px; }
-.application-window[data-platform="windows"] { border-radius: 8px; }
+/* The native compositor clips Windows corners; a second CSS mask leaves a thin inset. */
+.application-window[data-platform="windows"] { border-radius: 0; }
 .application-window:has(.workspace-titlebar[data-fullscreen="true"], [data-window-maximized="true"]) { border-radius: 0; }
 .application-window::after { content: ""; position: absolute; inset: 0; border: 1px solid var(--border-strong); border-radius: inherit; pointer-events: none; z-index: 20000; }
 .application-window[data-platform="windows"]::after { display: none; }
@@ -938,10 +1006,12 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 .terminal-block-scroll::-webkit-scrollbar { display: none; }
 [data-scroll-overlay-layer] { position: absolute; top: 0; left: 0; width: 0; height: 0; overflow: visible; pointer-events: none; }
 .overlay-scrollbar { position: absolute; top: 0; bottom: 0; right: 0; width: 10px; z-index: 1; background: transparent; touch-action: none; user-select: none; pointer-events: auto; }
-.overlay-scrollbar-thumb { width: 6px; margin: 0 2px; border-radius: 999px; background: var(--scrollbar-thumb); }
+.overlay-scrollbar-track { position: absolute; inset: var(--scrollbar-inset) 0; pointer-events: none; }
+.overlay-scrollbar-thumb { width: 6px; margin: 0 2px; border-radius: 999px; background: var(--scrollbar-thumb); pointer-events: auto; }
 .overlay-scroll-target { scrollbar-width: none; scrollbar-gutter: auto; }
 .overlay-scroll-target::-webkit-scrollbar { display: none; }
 .overlay-scrollbar[data-horizontal="true"] { top: auto; left: 0; width: auto; height: 10px; }
+.overlay-scrollbar[data-horizontal="true"] .overlay-scrollbar-track { inset: 0 var(--scrollbar-inset); }
 .overlay-scrollbar[data-horizontal="true"] .overlay-scrollbar-thumb { height: 6px; margin: 2px 0; }
 .overlay-scrollbar:hover .overlay-scrollbar-thumb, .overlay-scrollbar[data-dragging="true"] .overlay-scrollbar-thumb { background: var(--scrollbar-thumb-hover); }
 .overlay-scrollbar:focus-visible { outline: none; }
@@ -964,6 +1034,7 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 [data-testid^="pane-"] .xterm .xterm-scrollable-element > .scrollbar > .slider {
   border-radius: 4px;
 }
+.xterm .xterm-scrollable-element > .scrollbar.vertical > .slider { clip-path: inset(4px 0 round 4px); }
 
 @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes toastOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(8px); } }
@@ -1014,8 +1085,13 @@ button.icon-button[data-tone="accent"] { color: var(--control-accent-color); }
 button.icon-button[data-tone="warning"] { color: var(--control-warning-color); }
 button.icon-button[data-tone="danger"] { color: var(--control-danger-color); }
 button.icon-button[aria-pressed="true"] { background: var(--control-active-bg); color: var(--icon-hover-color); }
+button.tool-window-pin[aria-pressed="true"] { background: transparent; color: var(--icon-color); }
+button.tool-window-pin[aria-pressed="true"]:is(:hover, :focus-visible) { background: var(--control-hover-bg); color: var(--icon-hover-color); }
 button.icon-button:disabled { color: var(--control-disabled-color); cursor: default; opacity: 0.55; }
 button.icon-button:disabled:hover { background: transparent; color: var(--control-disabled-color); }
+/* The authentication reveal toggle shows its state through the eye icon itself, not a fill. */
+button.ssh-auth-reveal[aria-pressed="true"] { background: transparent; }
+button.ssh-auth-reveal[aria-pressed="true"]:is(:hover, :focus-visible) { background: var(--control-hover-bg); }
 button.text-control { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 28px; padding: 0 8px; border: none; border-radius: 5px; background: transparent; color: var(--icon-color); font: var(--fs-caption) var(--font-ui); cursor: pointer; }
 button.text-control:hover { background: var(--control-hover-bg); color: var(--icon-hover-color); }
 button.text-control[aria-pressed="true"] { background: var(--control-active-bg); color: var(--text-primary); }
@@ -1038,17 +1114,30 @@ button.text-control:disabled:hover { background: transparent; color: var(--contr
 /* Canonical quiet chip: no border, only a gray background. Shared by the shell badge,
    git branch, working-directory and completion chips so the input row stays uniform. */
 .terminal-chip {
-  display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; min-width: 0;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px; flex-shrink: 0; min-width: 0;
   padding: 1px 7px; border: none; border-radius: 5px;
   background: var(--hover); color: var(--text-secondary);
   font-family: var(--font-mono); font-size: calc(11px * var(--ui-font-scale));
-  line-height: 18px; white-space: nowrap;
+  min-height: calc(20px * var(--ui-font-scale)); line-height: calc(18px * var(--ui-font-scale)); white-space: nowrap;
 }
-button.terminal-chip.text-control { min-height: 20px; padding: 1px 7px; background: var(--hover); font-family: var(--font-mono); font-size: calc(11px * var(--ui-font-scale)); line-height: 18px; }
-button.terminal-chip.text-control:hover, button.terminal-chip.text-control:focus-visible, button.terminal-chip.text-control[aria-expanded="true"] { background: var(--control-hover-bg); }
+.terminal-chip > svg { display: block; flex-shrink: 0; }
+.terminal-chip > span { min-width: 0; line-height: inherit; }
+button.terminal-chip.text-control { min-height: calc(20px * var(--ui-font-scale)); padding: 1px 7px; background: var(--hover); font-family: var(--font-mono); font-size: calc(11px * var(--ui-font-scale)); line-height: calc(18px * var(--ui-font-scale)); }
+/* Clickable chips: hovering or focusing clears the resting gray and brightens the label, while the
+   open (expanded) state keeps the pressed tint. The :not(:disabled) guard keeps disabled chips
+   inert; static spans never match, so status-only chips stay quiet. */
+button.terminal-chip:not(:disabled) { cursor: pointer; transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+button.terminal-chip:not(:disabled) .shell-indicator-label { transition: color var(--dur-fast) var(--ease); }
+button.terminal-chip:not(:disabled):is(:hover, :focus-visible) { background: transparent; color: var(--text-primary); }
+button.terminal-chip:not(:disabled):is(:hover, :focus-visible) .shell-indicator-label { color: var(--text-primary); }
+button.terminal-chip:not(:disabled)[aria-expanded="true"] { background: var(--control-active-bg); color: var(--text-primary); }
+button.terminal-chip:not(:disabled)[aria-expanded="true"] .shell-indicator-label { color: var(--text-primary); }
+/* Keep disabled chips inert even for the shared text-control disabled hover. */
+button.terminal-chip:disabled:hover { background: var(--hover); }
 /* Scope tags share the same quiet appearance in the input and recent searches. */
 .search-scope-chip { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; max-width: 45%; padding: 4px 7px; border-radius: 5px; background: var(--hover); color: var(--text-primary); font-size: var(--fs-caption); }
 .search-scope-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.search-scope-chip > button, .search-scope-chip svg { flex-shrink: 0; }
 .search-scope-chip > button { display: inline-flex; align-items: center; padding: 2px; border: none; background: transparent; color: var(--icon-color); }
 .search-scope-chip > button:hover { color: var(--icon-hover-color); }
 .global-search-history .search-scope-chip { max-width: 40%; padding: 0; background: transparent; color: var(--text-secondary); }
@@ -1102,9 +1191,9 @@ button.toolbar-icon-button { -webkit-app-region: no-drag; }
 button.toolbar-icon-button[data-active="true"] { color: var(--accent); }
 button.state-icon-button { color: var(--icon-color); }
 
-.drop-placement-preview { box-sizing: border-box; pointer-events: none; border-radius: var(--radius-inner); background: var(--placement-bg); border: 1px solid var(--border); color: var(--text-primary); transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
+.drop-placement-preview { box-sizing: border-box; pointer-events: none; border-radius: var(--radius-inner); background: var(--placement-bg); border: 1px solid var(--border); color: var(--text-primary); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; padding: 12px; text-align: center; font-size: var(--fs-caption); transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
 .drop-placement-preview[data-active="true"] { background: var(--placement-hover); border-color: var(--border-strong); }
-.workspace-panel-drop-preview { position: fixed; z-index: 9000; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; font-size: var(--fs-caption); }
+.workspace-panel-drop-preview { position: fixed; z-index: 9000; }
 .settings-model-header { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto 32px; align-items: start; gap: 8px; }
 .settings-model-header input, .settings-model-header > button, .settings-model-active { height: 32px; }
 .settings-model-active { display: inline-flex; align-items: center; }
@@ -1145,4 +1234,5 @@ input.themed-checkbox:disabled { opacity: .55; cursor: default; }
 .config-text-area-copy { position: absolute; top: 6px; right: 6px; z-index: 1; }
 textarea.config-text-input { display: block; width: 100% !important; border: none !important; border-radius: 0 !important; margin: 0 !important; padding: 10px 40px 10px 10px !important; background: transparent !important; color: var(--text-primary); font: calc(13px * var(--ui-font-scale))/1.6 var(--font-mono) !important; resize: vertical; min-height: 90px; outline: none; box-shadow: none !important; }
 .settings-view textarea.config-text-input { font-family: var(--font-ui) !important; }
+textarea.config-text-input[data-font="ui"] { font-family: var(--font-ui) !important; }
 .config-text-area:focus-within { border-color: var(--border-strong); }

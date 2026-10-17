@@ -165,18 +165,13 @@ fn seal(plain: &str) -> Result<String, String> {
     Ok(plain.to_string())
 }
 
-/// 加密串 → 明文；不是加密串（旧明文）返回 None，由调用方按原文处理。
+/// 加密串 → 明文；不是加密串（旧明文）或解不开的密文都返回 None。
 #[cfg(windows)]
 fn unseal(stored: &str) -> Option<String> {
     let encoded = stored.strip_prefix(SEALED_PREFIX)?;
     let sealed = base64::engine::general_purpose::STANDARD.decode(encoded).ok()?;
     let plain = dpapi::unprotect(&sealed).ok()?;
     String::from_utf8(plain).ok()
-}
-
-#[cfg(all(not(windows), not(target_os = "macos")))]
-fn unseal(_stored: &str) -> Option<String> {
-    None
 }
 
 /// 其它平台：本地文件（值按平台加密；unix 上收紧为 0600） ──
@@ -199,14 +194,32 @@ fn write_map(map: &serde_json::Map<String, serde_json::Value>) -> Result<(), Str
     let path = fallback_path();
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700));
+        }
     }
     let json = serde_json::to_string_pretty(map).map_err(|e| e.to_string())?;
-    std::fs::write(&path, json).map_err(|e| format!("写入密钥文件失败：{e}"))?;
+    // Create the file already private under Unix: a plain write would leave it world-readable
+    // until the permission fix below lands.
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
+        use std::io::Write;
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+        let written = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&path)
+            .and_then(|mut file| file.write_all(json.as_bytes()));
+        written.map_err(|e| format!("写入密钥文件失败：{e}"))?;
+        // Tighten a file that already existed with wider permissions.
         let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
     }
+    #[cfg(not(unix))]
+    std::fs::write(&path, json).map_err(|e| format!("写入密钥文件失败：{e}"))?;
     Ok(())
 }
 
@@ -218,14 +231,24 @@ fn write_secret(account: &str, secret: &str) -> Result<(), String> {
     write_map(&map)
 }
 
-#[cfg(not(target_os = "macos"))]
+/// Windows 只接受能解密的密文：旧明文与损坏的密文一律按“缺失”处理，绝不把未封存的原串
+/// 当作密钥使用（不做迁移——重新输入一次即会以密文覆盖）。
+#[cfg(windows)]
 fn read_secret(account: &str) -> Option<String> {
     let raw = read_map()
         .get(account)
         .and_then(|v| v.as_str())
         .map(|s| s.to_string())?;
-    // 加密值解成明文；旧明文（或本平台不加密）按原样返回
-    Some(unseal(&raw).unwrap_or(raw))
+    unseal(&raw)
+}
+
+/// 其它平台没有系统密钥环：值按原文保存与读回，依赖文件权限（已知限制）。
+#[cfg(all(not(windows), not(target_os = "macos")))]
+fn read_secret(account: &str) -> Option<String> {
+    read_map()
+        .get(account)
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -253,37 +276,7 @@ pub fn delete_secret(account: &str) {
     remove_secret(account);
 }
 
-/// 启动时一次性升级：把文件里仍是明文的旧值改写成平台加密形式（幂等，返回升级条数）。
-#[cfg(windows)]
-pub fn seal_pending_values() -> usize {
-    let Ok(_guard) = STORE_LOCK.lock() else { return 0 };
-    let mut map = read_map();
-    let mut upgraded = 0usize;
-    for value in map.values_mut() {
-        let Some(text) = value.as_str() else { continue };
-        if text.starts_with(SEALED_PREFIX) {
-            continue;
-        }
-        match seal(text) {
-            Ok(sealed) => {
-                *value = serde_json::Value::String(sealed);
-                upgraded += 1;
-            }
-            Err(error) => eprintln!("[secret] 加密旧值失败：{error}"),
-        }
-    }
-    if upgraded > 0 {
-        let _ = write_map(&map);
-    }
-    upgraded
-}
-
 /// macOS 把值放在钥匙串里，文件不参与；其它平台没有系统密钥环，保持原样。
-#[cfg(not(windows))]
-pub fn seal_pending_values() -> usize {
-    0
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -305,7 +298,8 @@ mod tests {
     fn stored_value_never_keeps_the_plaintext() {
         // macOS 在钥匙串里，文件路径不适用
         let sealed = seal("sk-do-not-leak").unwrap();
-        if cfg!(windows) {
+        #[cfg(windows)]
+        {
             assert!(!sealed.contains("sk-do-not-leak"), "sealed value must not embed the plaintext");
             assert!(sealed.starts_with(SEALED_PREFIX));
             assert_eq!(unseal(&sealed).as_deref(), Some("sk-do-not-leak"));
@@ -313,7 +307,9 @@ mod tests {
             let mut broken = sealed.clone();
             broken.push('A');
             assert_eq!(unseal(&broken), None);
-        } else {
+        }
+        #[cfg(not(windows))]
+        {
             // 其它平台没有系统密钥环：值原样保存，依赖文件权限
             assert_eq!(sealed, "sk-do-not-leak");
         }
@@ -321,24 +317,30 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn legacy_plaintext_values_stay_readable() {
+    fn legacy_plaintext_reads_as_missing_and_is_left_untouched() {
         let account = format!("legacy-{}", std::process::id());
-        // Hold the store lock across the raw write and the reads so the other tests in this
-        // file cannot clobber the file in between.
-        let _guard = STORE_LOCK.lock().unwrap();
-        let mut map = read_map();
-        map.insert(account.clone(), serde_json::Value::String("old-plain-value".into()));
-        write_map(&map).unwrap();
-        assert_eq!(read_secret(&account).as_deref(), Some("old-plain-value"));
-        // 下一次写入即升级为加密形式
-        write_secret(&account, "old-plain-value").unwrap();
+        {
+            let _guard = STORE_LOCK.lock().unwrap();
+            let mut map = read_map();
+            map.insert(account.clone(), serde_json::Value::String("old-plain-value".into()));
+            write_map(&map).unwrap();
+        }
+        // 运行时只接受能解密的密文：旧明文按缺失处理，且不做任何迁移
+        assert_eq!(read_secret(&account), None);
         let stored = read_map()
             .get(&account)
             .and_then(|v| v.as_str())
             .map(str::to_string)
             .unwrap();
-        assert!(stored.starts_with(SEALED_PREFIX), "value must be sealed after a write");
-        assert_eq!(read_secret(&account).as_deref(), Some("old-plain-value"));
-        remove_secret(&account);
+        assert_eq!(stored, "old-plain-value", "no migration may rewrite the stored value");
+        // 篡改/损坏的密文同样按缺失处理，不会把原始串当作密钥
+        {
+            let _guard = STORE_LOCK.lock().unwrap();
+            let mut map = read_map();
+            map.insert(account.clone(), serde_json::Value::String("dpapi:broken".into()));
+            write_map(&map).unwrap();
+        }
+        assert_eq!(read_secret(&account), None);
+        delete_secret(&account);
     }
 }

@@ -94,18 +94,38 @@ function createFontProbe(fontSize: number, lineHeight: string): HTMLSpanElement 
 }
 
 /**
+ * Extra letter spacing that lays a frozen snapshot row out at the renderer's cell advance.
+ * The renderer grid and the DOM text can disagree — a canvas that measured a fallback face
+ * before the preferred font loaded, or the renderer's own cell rounding — and then a
+ * full-width row overflows the pane it is drawn into.
+ */
+export function snapshotLetterSpacing(cellWidth: number, effectiveAdvance: number): number {
+  if (!Number.isFinite(cellWidth) || cellWidth <= 0) return 0;
+  if (!Number.isFinite(effectiveAdvance) || effectiveAdvance <= 0) return 0;
+  const spacing = Math.round((cellWidth - effectiveAdvance) * 1000) / 1000;
+  return Math.abs(spacing) < 0.01 ? 0 : spacing;
+}
+
+/**
  * Publish the metrics a completed snapshot needs but cannot read from preferences: the snapped
  * cell advance and the measured cell height. Both follow the resolved font, so historical output
  * keeps the grid the canvas drew.
  */
 function applyMeasuredMetrics(): number {
   const spacing = terminalLetterSpacing();
+  const state = useTypographyStore.getState();
   if (typeof document !== 'undefined' && document.body) {
     const root = document.documentElement.style;
     const spacingValue = `${spacing}px`;
     if (root.getPropertyValue('--terminal-letter-spacing') !== spacingValue) root.setProperty('--terminal-letter-spacing', spacingValue);
     const heightValue = `${measureTerminalDomCellHeight()}px`;
     if (root.getPropertyValue('--terminal-row-height') !== heightValue) root.setProperty('--terminal-row-height', heightValue);
+  }
+  // Warm the face for canvas-based measurements: a canvas font resolution that runs before the
+  // preferred face is loaded silently keeps a generic fallback, and the cell it measured then
+  // is never refreshed. Loading the face up front keeps new terminals on the real grid.
+  if (typeof document !== 'undefined' && document.fonts && typeof document.fonts.load === 'function') {
+    void document.fonts.load(`${state.terminalFontSize}px ${terminalFontFamily(state.terminalFontPreset)}`).catch(() => {});
   }
   return spacing;
 }

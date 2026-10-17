@@ -167,6 +167,18 @@ export interface SshSystemStatus {
   memoryAvailable: number | null;
   diskTotal: number | null;
   diskUsed: number | null;
+  networkReceived?: number | null;
+  networkTransmitted?: number | null;
+}
+
+export interface NetworkProbe {
+  dnsMs: number;
+  attempts: { latencyMs: number | null; errorKind: 'timeout' | 'refused' | 'unreachable' | null }[];
+}
+
+/** Connect directly to the target port from this machine without SSH authentication. */
+export function sshNetworkProbe(host: string, port: number): Promise<NetworkProbe> {
+  return invoke('ssh_network_probe', { host, port });
 }
 
 /** Collect metadata through a separate authenticated connection. */

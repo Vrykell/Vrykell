@@ -25,7 +25,7 @@
 .ssh-check-row small { display: block; margin-top: 4px; color: var(--text-muted); font-size: var(--fs-caption); line-height: 1.5; }
 .ssh-form-footer { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--border); flex-shrink: 0; flex-wrap: wrap; }
 .ssh-form-footer .text-control { flex: 0 0 auto; height: 34px; min-height: 34px; padding: 0 12px; border-radius: var(--radius-inner); white-space: nowrap; }
-.ssh-form-footer .ssh-primary-action { padding: 0 16px; background: var(--accent); color: var(--accent-text); }
+.ssh-form-footer .ssh-primary-action { padding: 0 16px; }
 .ssh-inline-error { padding: 0 16px 10px; max-height: 100px; overflow-y: auto; flex-shrink: 0; }
 .ssh-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .ssh-section-heading > div { flex: 1; }

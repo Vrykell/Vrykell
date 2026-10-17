@@ -1,7 +1,7 @@
 import { TextInput } from '@ui/TextInput';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { iconSizes,
-  Plus, Search, History, Settings, Sparkles, DataUsage,
+  Plus, History, Settings, Sparkles, DataUsage,
   ChevronRight, Pencil, Archive, Folder, Trash2, X,
  } from '@ui/icons';
 import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, useTabDisplayTitle, tabIconKey, tabIconColor, type Tab, type TabGroup } from '@features/workspace';
@@ -10,7 +10,9 @@ import { HistoryColorChoices } from '@ui/HistoryColorPalette';
 import { regenerateTitle } from '@features/agent/services/title';
 import { useToastStore } from '@ui/Toast';
 import { IconBtn } from '@ui/UiBtn';
-import { shellTypeLabel } from '@platform/shells';
+import SidebarToolbar from '@ui/SidebarToolbar';
+import { shellTypeLabel, type ShellType } from '@platform/shells';
+import { useDefaultShellType } from '../hooks/useDefaultShellType';
 import NewTabModal from '@features/workspace/components/NewTabModal';
 import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/ContextMenu';
 import SidebarItem from '@ui/sidebarItem';
@@ -20,6 +22,9 @@ import {
   useListReorder, useListReorderDrag, type ListReorderDrag, type ListReorderTarget,
 } from '@ui/listReorder';
 import { t } from '@i18n';
+import type { GroupingProposal } from '@features/agent/services/autoGrouping';
+import { useToolWindow } from '@ui/hooks/useToolWindow';
+import { applySessionGrouping } from '../services/autoGrouping';
 
 /**
  * Session navigation with filtering, grouping, renaming and drag ordering.
@@ -35,6 +40,7 @@ const LIST_ID = 'session-tabs';
 const UNGROUPED_ZONE = 'ungrouped';
 
 export default function PanelTabs() {
+  const defaultShellType = useDefaultShellType();
   const tabs = useSessionStore((s) => s.tabs);
   const iconColors = useIconColorStore(state => state.colors);
   const activeId = useSessionStore((s) => s.activeId);
@@ -52,6 +58,12 @@ export default function PanelTabs() {
   const toggleGroupCollapse = useSessionStore((s) => s.toggleGroupCollapse);
 
   const [query, setQuery] = useState('');
+  const openGrouping = useToolWindow({ key: 'grouping:session-tabs', kind: 'grouping', title: t('AI auto-group'),
+    input: { kind: 'session tabs', items: tabs.filter(isSessionTab).map(tab => ({ id: tab.id, label: tab.title,
+      detail: terminalsOf(tab).map(term => `${term.kind} · ${term.cwd ?? ''}`).join('\n') })) },
+    onError: reason => { useToastStore.getState().addToast(String(reason), 'error'); },
+    onAction: async (action: { type: 'apply'; groups: GroupingProposal[] }) => applySessionGrouping(action.groups) });
+  const [panelMenu, setPanelMenu] = useState<MenuAnchor | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -153,6 +165,7 @@ export default function PanelTabs() {
           } },
           { label: '复制会话', group: 'primary' as const, onClick: () => duplicateTab(ctxTab.id) },
         ] : []),
+        { label: t('AI auto-group'), group: 'organize', disabled: !tabs.some(isSessionTab), onClick: openGrouping },
         { label: t('Close this tab'), danger: true, onClick: () => closeTab(ctxTab.id) },
       ]
     : [];
@@ -162,29 +175,7 @@ export default function PanelTabs() {
       display: 'flex', flexDirection: 'column', height: '100%',
       userSelect: 'none', background: 'transparent',
     }}>
-      {/* 顶栏 */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 4,
-        padding: '6px 10px 8px',
-        position: 'relative',
-      }}>
-        <div className="workspace-sidebar-search" style={{
-          display: 'flex', alignItems: 'center', gap: 5, flex: 1, minWidth: 0,
-          background: 'var(--chrome-field)',
-          borderRadius: 'var(--radius-inner)', padding: '0 8px', height: 30,
-        }}>
-          <Search size={iconSizes.compact} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-          <TextInput
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="搜索会话…"
-            data-testid="tab-search"
-            style={{
-              flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none',
-              fontSize: 'calc(13px * var(--ui-font-scale))', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
-            }}
-          />
-        </div>
+      <SidebarToolbar search={{ value: query, onChange: event => setQuery(event.target.value), placeholder: t('Search session titles…'), 'data-testid': 'tab-search' }}>
         <IconBtn title="会话历史" data-testid="tab-history-btn" onClick={openHistoryTab}>
           <History size={iconSizes.control} />
         </IconBtn>
@@ -192,14 +183,16 @@ export default function PanelTabs() {
         <IconBtn title="新建终端" data-testid="tab-new-btn" onClick={() => { setModalGroupId(undefined); setModalOpen(true); }}>
           <Plus size={iconSizes.control} />
         </IconBtn>
-      </div>
+      </SidebarToolbar>
 
       {/* 列表：分组头与标签行同属一个重排列表 */}
-      <div data-reorder-list={LIST_ID} className="scroll-region" style={{ flex: 1, overflowY: 'auto', padding: '0 0 8px', display: 'flex', flexDirection: 'column' }}>
+      <div data-reorder-list={LIST_ID} className="scroll-region" onContextMenu={event => { if (!event.defaultPrevented) { event.preventDefault(); setPanelMenu({ x: event.clientX, y: event.clientY, trigger: event.currentTarget }); } }}
+        style={{ flex: 1, overflowY: 'auto', padding: '0 0 8px', display: 'flex', flexDirection: 'column' }}>
         {groups.map((g) => (
           <Fragment key={g.id}>
             <ListReorderPlaceholder listId={LIST_ID} itemId={g.id} />
             <GroupSection
+              defaultShellType={defaultShellType}
               group={g}
               tabs={groupTabs(g.id)}
               activeId={activeId}
@@ -228,6 +221,7 @@ export default function PanelTabs() {
               onPointerDownGroup={(event) => startDrag(event, { id: g.id, kind: 'group' })}
               onContextMenuTab={(e, tabId) => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, tabId }); }}
               onAddTab={() => { setModalGroupId(g.id); setModalOpen(true); }}
+              onAutoGroup={openGrouping}
             />
             <ListReorderPlaceholder listId={LIST_ID} itemId={g.id} after />
             {/* 收起/空分组没有可插入的行：悬停分组头时在组末尾占位（追加进组） */}
@@ -251,6 +245,7 @@ export default function PanelTabs() {
               <Fragment key={t.id}>
                 <ListReorderPlaceholder listId={LIST_ID} itemId={t.id} />
                 <TabRow
+                  defaultShellType={defaultShellType}
                   tab={t}
                   active={t.id === activeId}
                   editing={editId === t.id}
@@ -303,13 +298,16 @@ export default function PanelTabs() {
               : tab?.kind === 'settings' ? Settings
               : tab?.kind === 'usage' ? DataUsage
               : first?.kind === 'ssh' ? SshIcon
-                : shellIconFor(first?.kind === 'local' ? first.shellType : undefined);
+                : shellIconFor(first?.kind === 'local' ? first.shellType ?? defaultShellType : undefined);
           return <Icon size={iconSizes.row} style={{ color: tab && isSessionTab(tab)
             ? tabIconColor(tab, iconColors) : 'var(--text-secondary)' }} />;
         }}
       </ListReorderPreview>
 
       <NewTabModal open={modalOpen} groupId={modalGroupId} onClose={() => setModalOpen(false)} />
+      {panelMenu && <ContextMenu anchor={panelMenu} onClose={() => setPanelMenu(null)} items={[
+        { label: t('AI auto-group'), disabled: !tabs.some(isSessionTab), onClick: openGrouping },
+      ]} />}
     </div>
   );
 }
@@ -317,6 +315,7 @@ export default function PanelTabs() {
 // ── 分组 section ──
 
 function GroupSection(props: {
+  defaultShellType?: ShellType;
   group: TabGroup;
   tabs: Tab[];
   activeId: string;
@@ -339,13 +338,14 @@ function GroupSection(props: {
   onPointerDownGroup: (e: React.PointerEvent<HTMLElement>) => void;
   onContextMenuTab: (e: React.MouseEvent, tabId: string) => void;
   onAddTab: () => void;
+  onAutoGroup: () => void;
 }) {
   const { group, tabs, activeId } = props;
   const [menu, setMenu] = useState<MenuAnchor | null>(null);
   const collapsed = group.collapsed;
   const empty = useSessionStore(state => !state.tabs.some(tab => isSessionTab(tab) && tab.groupId === group.id));
   const anyMemberActive = tabs.some((t) => t.id === activeId);
-  const dragging = useListReorder((s) => s.drag?.id === group.id);
+  const dragging = useListReorder((s) => s.drag?.listId === LIST_ID && s.drag.id === group.id);
   // 末尾占位对应当前可见的最后一行（拖走的那行不参与，否则拖末行时占位对不上）
   const draggedTabId = useListReorder((s) => (s.drag?.kind === 'tab' ? s.drag.id : undefined));
   const remainingTabs = tabs.filter((t) => t.id !== draggedTabId);
@@ -355,6 +355,8 @@ function GroupSection(props: {
       {/* Group containers stay transparent so selection belongs to a single row. */}
       <div
         className="tab-group-container"
+        data-reorder-container=""
+        data-reorder-dragging={dragging ? 'true' : undefined}
         data-group-id={group.id}
         data-group-active={anyMemberActive ? 'true' : 'false'}
         data-reorder-zone={group.id}
@@ -364,6 +366,7 @@ function GroupSection(props: {
         {/* 分组头：图标徽章 + 名称 + 副标题 + 折叠 chevron */}
         <div
           className="tab-group-header"
+          data-reorder-measure="container"
           data-group-header-id={group.id}
           data-header-selected={(collapsed && anyMemberActive) ? 'true' : 'false'}
           data-renaming={props.renamingGroupId === group.id ? 'true' : undefined}
@@ -460,6 +463,7 @@ function GroupSection(props: {
                 <ListReorderPlaceholder listId={LIST_ID} itemId={t.id} />
                 <div style={{ padding: '0 4px 0 12px' }}>
                   <TabRow
+                    defaultShellType={props.defaultShellType}
                     tab={t}
                     active={t.id === activeId}
                     editing={props.editId === t.id}
@@ -481,6 +485,7 @@ function GroupSection(props: {
         )}
       </div>
       {menu && <ContextMenu anchor={menu} label={t('Group actions')} onClose={() => setMenu(null)} items={[
+        { label: t('AI auto-group'), onClick: props.onAutoGroup },
         { label: t('Add terminal to group'), onClick: props.onAddTab },
         { label: t('Rename tab group'), group: 'edit', onClick: props.onStartRenameGroup },
         { label: t(collapsed ? 'Expand group' : 'Collapse group'), group: 'view', onClick: props.onToggleCollapse },
@@ -532,10 +537,11 @@ const actionStyle: React.CSSProperties = {
 // ── 标签行 ──
 
 function TabRow({
-  tab, active, editing, editTitle, setEditTitle,
+  tab, active, editing, editTitle, setEditTitle, defaultShellType,
   onActivate, onClose, onStartEdit, onCommitEdit, onCancelEdit, onPointerDown, onContextMenu,
 }: {
   tab: Tab;
+  defaultShellType?: ShellType;
   active: boolean;
   editing: boolean;
   editTitle: string;
@@ -557,7 +563,7 @@ function TabRow({
       : tab.kind === 'settings' ? Settings
       : tab.kind === 'usage' ? DataUsage
       : isSsh ? SshIcon
-        : shellIconFor(first?.kind === 'local' ? first.shellType : undefined);
+        : shellIconFor(first?.kind === 'local' ? first.shellType ?? defaultShellType : undefined);
   const iconColors = useIconColorStore(state => state.colors);
   const iconColor = tabIconColor(tab, iconColors);
   const typeSummary = terms.map((t) =>
@@ -573,6 +579,7 @@ function TabRow({
       tooltip={displayTitle}
       testId={`tab-row-${tab.id}`}
       reorderItemId={tab.id}
+      reorderListId={LIST_ID}
       reorderKind={isSessionTab(tab) && tab.groupId ? 'tab' : 'loose-tab'}
       dataAttributes={{
         'data-tab-row-id': tab.id,

@@ -10,6 +10,7 @@ const {
   outputResolvers,
   exitResolvers,
   terminalInitOptions,
+  terminalInstances,
 } = vi.hoisted(() => ({
   writeMock: vi.fn(),
   onDataHandlers: [] as Array<(d: string) => void>,
@@ -19,16 +20,18 @@ const {
   outputResolvers: [] as Array<(u: () => void) => void>,
   exitResolvers: [] as Array<(u: () => void) => void>,
   terminalInitOptions: [] as import('@xterm/xterm').ITerminalOptions[],
+  terminalInstances: [] as Array<{ options: Record<string, unknown> }>,
 }));
 
 vi.mock('@xterm/xterm', () => ({
   Terminal: class {
     constructor(options: import('@xterm/xterm').ITerminalOptions) {
       terminalInitOptions.push(options);
+      terminalInstances.push(this);
     }
     cols = 80;
     rows = 24;
-    options = { fontSize: 13 };
+    options: Record<string, unknown> = { fontSize: 13 };
     buffer = { active: { viewportY: 0, baseY: 0, cursorY: 0, getLine: () => undefined, getNullCell: () => ({}) } };
     element = document.createElement('div');
     parser = { registerOscHandler: () => {} };
@@ -91,6 +94,7 @@ import { useTerminalStore } from '@features/terminal/stores/terminal';
 import { useBlockStore } from '@features/terminal/stores/blocks';
 import { useWorkspaceStore } from '@features/workspace/stores/workspace';
 import { leaf } from '@features/workspace/model/windowLayout';
+import { useTypographyStore } from '@config/typography';
 import { onPtyOutput as mockedOnPtyOutput, ptySpawn as mockedPtySpawn, ptyWrite, ptyClose } from '@platform/pty';
 import { prepareSshHost } from '@features/ssh/services/hostTrust';
 
@@ -118,6 +122,7 @@ function TestHarness({ tabId, onReady }: { tabId: string; onReady: (sessionId: s
 describe('useTerminalSession', () => {
   beforeEach(() => {
     terminalInitOptions.length = 0;
+    terminalInstances.length = 0;
     vi.mocked(mockedPtySpawn).mockClear();
     vi.mocked(ptyClose).mockClear();
     vi.mocked(ptyWrite).mockClear();
@@ -145,6 +150,22 @@ describe('useTerminalSession', () => {
   it('configures a 10px native scrollbar so fitting uses the same width', () => {
     render(<TestHarness tabId="t1" onReady={() => {}} />);
     expect(terminalInitOptions[0]?.overviewRuler).toEqual({ width: 10, showTopBorder: false, showBottomBorder: false });
+  });
+
+  it('re-applies the settled font options so a late-loaded face re-measures the terminal grid', async () => {
+    let resolveReady!: () => void;
+    Object.defineProperty(document, 'fonts', { value: { ready: new Promise<void>(resolve => { resolveReady = resolve; }) }, configurable: true });
+    try {
+      render(<TestHarness tabId="t1" onReady={() => {}} />);
+      const term = terminalInstances[terminalInstances.length - 1]!;
+      // The terminal was created with pre-load options, as a fallback face measured at creation.
+      expect(term.options.fontSize).toBe(13);
+      await act(async () => { resolveReady(); await Promise.resolve(); });
+      expect(term.options.fontSize).toBe(useTypographyStore.getState().terminalFontSize);
+      expect(term.options.letterSpacing).toBeTypeOf('number');
+    } finally {
+      Reflect.deleteProperty(document, 'fonts');
+    }
   });
 
   it('confirms SSH authentication only after a remote prompt marker and resets on reconnect', async () => {

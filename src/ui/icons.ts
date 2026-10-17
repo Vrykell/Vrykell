@@ -24,6 +24,7 @@ import { DataUsage24Regular } from '@fluentui/react-icons/headless/svg/data-usag
 import { ArrowDownload24Regular } from '@fluentui/react-icons/headless/svg/arrow-download';
 import { MoreHorizontal24Regular } from '@fluentui/react-icons/headless/svg/more-horizontal';
 import { Eye24Regular } from '@fluentui/react-icons/headless/svg/eye';
+import { EyeOff24Regular } from '@fluentui/react-icons/headless/svg/eye-off';
 import { Document24Regular } from '@fluentui/react-icons/headless/svg/document';
 import { FolderZip24Regular } from '@fluentui/react-icons/headless/svg/folder-zip';
 import { DocumentCode16Regular } from '@fluentui/react-icons/headless/svg/document-code';
@@ -71,9 +72,9 @@ import { Options24Regular } from '@fluentui/react-icons/headless/svg/options';
 import { Sparkle16Regular, Sparkle24Regular } from '@fluentui/react-icons/headless/svg/sparkle';
 import { Square24Regular } from '@fluentui/react-icons/headless/svg/square';
 import { TabDesktopMultiple24Regular } from '@fluentui/react-icons/headless/svg/tab-desktop-multiple';
-import { WindowConsole20Regular } from '@fluentui/react-icons/headless/svg/window-console';
 import { Star16Regular, Star24Regular } from '@fluentui/react-icons/headless/svg/star';
 import { Pin24Regular } from '@fluentui/react-icons/headless/svg/pin';
+import { PinOff24Regular } from '@fluentui/react-icons/headless/svg/pin-off';
 import { BuildingShop24Regular } from '@fluentui/react-icons/headless/svg/building-shop';
 import { WeatherSunny24Regular } from '@fluentui/react-icons/headless/svg/weather-sunny';
 import { Delete24Regular } from '@fluentui/react-icons/headless/svg/delete';
@@ -133,6 +134,7 @@ export const DataUsage = createAppIcon(DataUsage24Regular);
 export const Download = createAppIcon(ArrowDownload24Regular);
 export const Ellipsis = createAppIcon(MoreHorizontal24Regular);
 export const Eye = createAppIcon(Eye24Regular);
+export const EyeOff = createAppIcon(EyeOff24Regular);
 export const File = createAppIcon(Document24Regular);
 export const FileArchive = createAppIcon(FolderZip24Regular);
 export const FileCode = createAppIcon(DocumentCode16Regular);
@@ -186,27 +188,26 @@ export const Sparkles = createAppIcon(Sparkle24Regular);
 export const SparklesSmall = createAppIcon(Sparkle16Regular);
 export const Square = createAppIcon(Square24Regular);
 export const SquareStack = createAppIcon(TabDesktopMultiple24Regular);
-export const SquareTerminal = createAppIcon(WindowConsole20Regular);
 export const Star = createAppIcon(Star24Regular);
 export const StarSmall = createAppIcon(Star16Regular);
 export const Pin = createAppIcon(Pin24Regular);
+export const PinOff = createAppIcon(PinOff24Regular);
 export const Store = createAppIcon(BuildingShop24Regular);
 export const Sun = createAppIcon(WeatherSunny24Regular);
-export const Terminal = createAppIcon(WindowConsole20Regular);
-/**
- * Command mark for run-command rows: the shell tile silhouette (console frame with a
- * prompt and cursor) drawn as an outline. The Fluent console icon carries a window
- * title bar, which reads as a window rather than a terminal at row size.
- */
-export const TerminalPrompt: AppIcon = forwardRef<SVGSVGElement, AppIconProps>(function TerminalPrompt({ size = 24, style, ...props }, ref) {
-  return createElement('svg', { ...props, ref, viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': 'true',
-    style: { width: size, height: size, flexShrink: 0, ...style } },
-    createElement('rect', { x: 1, y: 3, width: 22, height: 18, rx: 3.5, stroke: 'currentColor', strokeWidth: 2 }),
+/** Shared console frame, prompt and cursor for terminal and command surfaces. */
+export const TerminalPrompt: AppIcon = forwardRef<SVGSVGElement, AppIconProps>(function TerminalPrompt({ size = 24, color = 'currentColor', style, title, ...props }, ref) {
+  const label = props['aria-label'] ?? title;
+  return createElement('svg', { focusable: false, 'aria-hidden': label ? undefined : true, role: label ? 'img' : undefined,
+    ...props, 'aria-label': label, ref, viewBox: '0 0 24 24', fill: 'none',
+    style: { width: props.width ?? size, height: props.height ?? size, color, flexShrink: 0, ...style } },
+    createElement('rect', { x: 3.5, y: 3.5, width: 17, height: 17, rx: 1.75, stroke: 'currentColor', strokeWidth: 1.5 }),
     createElement('path', {
-      d: 'm6 8 4 4-4 4M12 16h6',
-      stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
+      d: 'm7 9 3.5 3-3.5 3M12.5 15H17',
+      stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round',
     }));
 });
+export const Terminal = TerminalPrompt;
+export const SquareTerminal = TerminalPrompt;
 export const Trash2 = createAppIcon(Delete24Regular);
 export const TriangleAlert = createAppIcon(Warning24Regular);
 export const Undo2 = createAppIcon(ArrowUndo24Regular);

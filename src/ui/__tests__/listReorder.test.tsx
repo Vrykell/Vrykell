@@ -36,23 +36,25 @@ function DemoRow({ id, start }: {
     >
       {id}
       <span data-testid={`opt-out-${id}`} data-no-drag>opt</span>
+      <button data-testid={`handle-${id}`} data-reorder-handle>drag</button>
     </div>
   );
 }
 
-function Harness({ onDrop }: {
+function Harness({ onDrop, listId = 'demo' }: {
   onDrop: (drag: ListReorderDrag, target: ListReorderTarget | null) => void;
+  listId?: string;
 }) {
-  const start = useListReorderDrag({ listId: 'demo', onDrop });
+  const start = useListReorderDrag({ listId, onDrop });
   return (
-    <div data-reorder-list="demo">
+    <div data-reorder-list={listId}>
       {['a', 'b', 'c'].map((id) => (
         <Fragment key={id}>
-          <ListReorderPlaceholder listId="demo" itemId={id} />
+          <ListReorderPlaceholder listId={listId} itemId={id} />
           <DemoRow id={id} start={start} />
         </Fragment>
       ))}
-      <ListReorderPlaceholder listId="demo" itemId="c" after />
+      <ListReorderPlaceholder listId={listId} itemId="c" after />
     </div>
   );
 }
@@ -86,6 +88,7 @@ describe('list reorder', () => {
     expect(rows[0]).toHaveAttribute('data-reorder-dragging', 'true');
     expect(useListReorder.getState().target).toEqual({ itemId: 'b', after: false });
     expect(document.querySelector('[data-reorder-placeholder="b"]')).not.toBeNull();
+    expect(document.querySelector<HTMLElement>('[data-reorder-placeholder="b"]')!.style.height).toBe('40px');
   });
 
   it('resolves the end of the list past the last row and drops there', () => {
@@ -98,7 +101,7 @@ describe('list reorder', () => {
     fireEvent.pointerUp(window, { pointerId: 1, clientX: 10, clientY: 110 });
 
     expect(onDrop).toHaveBeenCalledWith(
-      { listId: 'demo', id: 'a', kind: 'demo' },
+      { listId: 'demo', id: 'a', kind: 'demo', height: 40 },
       { itemId: 'c', after: true },
     );
     expect(useListReorder.getState().drag).toBeNull();
@@ -139,5 +142,31 @@ describe('list reorder', () => {
 
     expect(useListReorder.getState().drag).toBeNull();
     expect(onDrop).not.toHaveBeenCalled();
+  });
+
+  it('resolves list ids containing quoted project scopes', () => {
+    const listId = 'commands:["local","D:/project"]';
+    render(<Harness listId={listId} onDrop={vi.fn()} />);
+    dragTo(45);
+    expect(useListReorder.getState().drag?.listId).toBe(listId);
+    expect(useListReorder.getState().target).toEqual({ itemId: 'b', after: false });
+  });
+
+  it('skips hidden rows when resolving a drop', () => {
+    render(<Harness onDrop={vi.fn()} />);
+    screen.getByTestId('row-b').hidden = true;
+    dragTo(45);
+    expect(useListReorder.getState().target).toEqual({ itemId: 'c', after: false });
+  });
+
+  it('captures an opt-in button handle without redirecting its normal click to the row', () => {
+    render(<Harness onDrop={vi.fn()} />);
+    const button = screen.getByTestId('handle-a');
+    const capture = vi.fn();
+    Object.defineProperty(button, 'setPointerCapture', { configurable: true, value: capture });
+    fireEvent.pointerDown(button, { pointerId: 1, button: 0, isPrimary: true, clientX: 10, clientY: 10 });
+    expect(capture).toHaveBeenCalledWith(1);
+    fireEvent.pointerUp(window, { pointerId: 1 });
+    expect(useListReorder.getState().drag).toBeNull();
   });
 });

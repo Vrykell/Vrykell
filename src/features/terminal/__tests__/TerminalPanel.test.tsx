@@ -19,6 +19,8 @@ beforeEach(() => {
   stopReconnect.mockReset().mockResolvedValue(undefined);
   sessionView.frame.plainText = 'Password:';
   sessionView.frame.html = 'Password:';
+  delete (sessionView.frame as { cellWidth?: number; snapshotSpacing?: number }).cellWidth;
+  delete (sessionView.frame as { cellWidth?: number; snapshotSpacing?: number }).snapshotSpacing;
   useTerminalStore.setState({ sessions: {}, scenes: { p: 'classic' } });
 });
 
@@ -127,6 +129,15 @@ describe('SSH connection input', () => {
     expect(screen.getByLabelText('SSH 认证响应')).toBeVisible();
     expect(screen.queryByTestId('ssh-screen-cursor')).not.toBeInTheDocument();
   });
+  it('lays frozen rows out at the renderer cell width and never scrolls sideways', () => {
+    useTerminalStore.setState({ sessions: { p: 'session' } });
+    (sessionView.frame as { snapshotSpacing?: number }).snapshotSpacing = -0.21;
+    render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+    const snapshot = screen.getByTestId('ssh-terminal-screen');
+    expect(snapshot.tagName).toBe('PRE');
+    expect(snapshot.style.overflowX).toBe('hidden');
+    expect(snapshot.style.letterSpacing).toContain('-0.21px');
+  });
   it('masks and clears the response after sending it to the connected PTY', () => {
     useTerminalStore.setState({ sessions: { p: 'session' } });
     render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
@@ -136,6 +147,26 @@ describe('SSH connection input', () => {
     fireEvent.submit(input.closest('form')!);
     expect(ptyWrite).toHaveBeenCalledWith('session', 'response\r');
     expect(input).toHaveValue('');
+  });
+  it('reveals the masked response through the eye icon toggle and keeps the blue submit action', () => {
+    useTerminalStore.setState({ sessions: { p: 'session' } });
+    render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+    const input = screen.getByLabelText('SSH 认证响应');
+    expect(input).toHaveAttribute('type', 'password');
+    const reveal = screen.getByTestId('ssh-auth-reveal');
+    expect(reveal).toHaveAttribute('aria-label', '显示密码');
+    expect(reveal).toHaveAttribute('aria-pressed', 'false');
+    const openIcon = reveal.innerHTML;
+    fireEvent.click(reveal);
+    expect(reveal).toHaveAttribute('aria-label', '隐藏密码');
+    expect(reveal).toHaveAttribute('aria-pressed', 'true');
+    expect(input).toHaveAttribute('type', 'text');
+    // The state shows through the swapped icon, not a pressed background.
+    expect(reveal.innerHTML).not.toBe(openIcon);
+    fireEvent.click(reveal);
+    expect(input).toHaveAttribute('type', 'password');
+    expect(reveal.innerHTML).toBe(openIcon);
+    expect(screen.getByRole('button', { name: '发送' })).toHaveClass('ssh-auth-submit');
   });
   it('closes the connection, clears the secret and disables authentication after cancellation', async () => {
     useTerminalStore.setState({ sessions: { p: 'session' } });

@@ -33,10 +33,9 @@ function MetricCard({ label, value, exact, hint, testId }: {
   testId: string;
 }) {
   return (
-    <div style={{
+    <div className="usage-card" style={{
       display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 6,
-      minWidth: 0, minHeight: 76, padding: '12px 14px',
-      border: '1px solid var(--border)', borderRadius: 'var(--radius-block)', background: 'var(--surface)',
+      minWidth: 0, minHeight: 76,
     }}>
       <span data-tip={hint ? label : undefined} data-tip-description={hint}
         style={{ display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 0, color: 'var(--text-secondary)', fontSize: 'var(--fs-caption)' }}>

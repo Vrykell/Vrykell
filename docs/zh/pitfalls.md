@@ -106,7 +106,8 @@
 - **现象**：应用正在使用（终端里在跑 TUI、日志正常滚动）时，用户在**资源管理器里右键一个文件夹**（甚至还没点菜单项），整个应用窗口**直接消失**，进程干净退出：Windows 事件日志没有崩溃记录、应用自己的诊断日志也停在死亡那一刻。`Microsoft-Windows-AppModel-Runtime/Admin` 里能对上：右键瞬间创建了一次 AppX 激活（Id 210/211），一秒后该激活被终止（Id 217），运行中的应用就死在 Id 217 那一刻。实测复现：从 PowerShell 触发该包的 COM 服务器激活（`[Activator]::CreateInstance(GetTypeFromCLSID('{8D41BA19-…}'))`），**所有** `vrykell.exe` 进程（含其它 worktree 的 debug 实例）同时消失。
 - **根因**：身份清单为了挂 `windows.fileExplorerContextMenus` 必须有 `<Application>`，而当时声明的 `Executable="vrykell.exe"` **就是应用自己的可执行文件**。于是 Windows 把**任何**名为 `vrykell.exe` 的进程都当成该包的应用（`FinishPackageActivation` 事件连 worktree 里不同路径的 debug 实例都记）；而 shell 扩展的 COM 激活结束时，AppModel 会终止这个包的应用进程 —— 右键（加载扩展、随后释放）就足以杀掉正在使用的应用。又因为多个实例共用同一个 WebView2 用户数据目录（浏览器进程共享），被杀的实例还会把其它实例一起带走。
 - **修复**：给身份包一个**专用宿主** `windows-context-menu\VrykellShellHost.exe`（`shell_host.cpp`，只转发启动、不承载业务），清单的 `<Application Executable>` 指向它，应用自己的 exe 不再进入包身份。三处防回归：`prepare-context-menu.mjs` 在打包前断言清单声明的是宿主（否则构建失败）、`manage.ps1` 把「声明了别的可执行文件」判为 `available=false`（拒绝启用）、`scripts/test-context-menu.ps1` 断言启用后 `available/stale` 状态正确。同时 `manage.ps1` 现在会在启用时清理旧的内容寻址 DLL，并通过 `stale` 报告「注册指向旧包/旧可执行文件」，设置页提示重新启用（应用更新后必须重新注册，否则仍加载旧扩展）。
-- **教训**：稀疏身份包（sparse MSIX）的 `<Application Executable>` 不是「声明一下」——它把该镜像名的**所有**进程都纳入包身份与应用生命周期管理。凡是给桌面应用加 shell 集成，都要用专用宿主承载身份，绝不能让应用自身出现在身份清单里；另外「同一应用多实例」在 WebView2 下是共享浏览器进程，任何一次进程级终止都会连坐所有实例。
+- **后续遗漏**：将 `<Application Executable>` 改为宿主后，主程序嵌入的 `application.manifest` 仍保留匹配的 `<msix>` 身份声明，宿主反而没有该声明。原生清单元数据也是获取包身份的途径，因此主进程仍可能取得 shell 包身份。应从主清单移除该元数据，通过宿主目标嵌入 `shell_host.manifest`，并在主程序构建时拒绝 shell 身份。`contextMenuIdentity.test.ts` 检查两份清单及宿主构建接线，不激活 COM，也不启动应用。本次后续遗漏通过静态分析发现；考虑到可能终止智能体所在应用，刻意没有尝试真实右键复现。
+- **教训**：必须同时隔离身份包的 `<Application Executable>` 和可执行文件内嵌的 `<msix>` 元数据。主程序的原生清单仍请求 shell 包身份时，仅增加专用宿主不能完成隔离。多个实例共享浏览器进程时，进程终止的影响还可能扩散到其他实例。
 
 ---
 
@@ -322,7 +323,7 @@
 - `restore()` 只写 `{id,title,kind,cwd}`，shellType/ssh 元数据丢失 → SSH/指定 shell 标签恢复后 spawn 成默认 shell。`RestoreMeta` 补齐；旧持久化没有 paneId 的块「仅面板可见，不进块流」（`sessionManager.ts:178`）。
 
 ### 8.9 API key 明文落 config.json 且权限全开（`security-review.md`）
-- 已修：API Key 与 SSH 密码统一进平台密钥存储（`secret.rs`）——Windows 用 DPAPI 加密后写 `secrets.json`（只有当前用户能解），macOS 进钥匙串，其它平台回退 0600 文件（无系统密钥环，属已知限制）。`config.json` 用 `skip_serializing` 不再包含 key，启动时把旧明文一次性迁移；文件权限仍收紧为目录 0700 / 文件 0600 作为纵深防御。旧版本构建读不到迁移后的 key（会显示「未配置」），需要重新填入。
+- 已修：API Key 与 SSH 密码统一进平台密钥存储（`secret.rs`）——Windows 用 DPAPI 加密后写 `secrets.json`（只有当前用户能解），macOS 进钥匙串，其它平台回退 0600 文件（无系统密钥环，属已知限制）。`config.json` 用 `skip_serializing` 不再包含 key；不做明文迁移——运行时只接受能解密的密文，未封存（旧明文）或损坏的值一律按缺失处理、不作密钥使用，重新输入一次即会加密覆盖；文件权限仍收紧为目录 0700 / 文件 0600 作为纵深防御。旧版本构建读不到迁移后的 key（会显示「未配置」），需要重新填入。
 
 ---
 

@@ -119,6 +119,11 @@ test('prefixes scope results temporarily and settings search focuses individual 
   await dialog.getByRole('button', { name: '清除搜索范围' }).click();
   await input.fill('/ config');
   await expect(dialog.getByTestId('search-scope-chip')).toContainText('文件');
+  await expect(dialog.locator('[data-search-result]').first()).toBeVisible();
+  for (const theme of ['dark', 'light'] as const) {
+    await page.evaluate(async theme => { const { applyTheme } = await import('/src/config/theme/tokens.ts'); applyTheme(theme); }, theme);
+    await dialog.screenshot({ path: test.info().outputPath(`shared-filter-chip-${theme}.png`), animations: 'disabled' });
+  }
   await input.press('Escape');
   await page.getByTestId('global-search-trigger').click();
   const history = dialog.locator('.global-search-history').first();

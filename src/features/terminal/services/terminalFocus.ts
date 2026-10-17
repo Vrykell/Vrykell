@@ -22,6 +22,11 @@ export function focusSessionInput(paneId: string): void {
   const secret = pane.querySelector<HTMLInputElement>('.ssh-auth-response');
   if (available(secret)) { secret.focus({ preventScroll: true }); return; }
   const scene = useTerminalStore.getState().scenes[paneId] ?? 'classic';
+  const input = pane.querySelector<HTMLTextAreaElement>('[data-terminal-input]');
+  if (scene !== 'altScreen' && useTerminalStore.getState().keyboardTarget === 'input' && available(input)) {
+    input.focus({ preventScroll: true });
+    return;
+  }
   const main = termInstances.get(paneId);
   const live = getExecutingTerm(paneId)?.term;
   const term = scene === 'classic' || main?.buffer.active.type === 'alternate' ? main : live;
@@ -30,7 +35,6 @@ export function focusSessionInput(paneId: string): void {
     terminalDebug('terminal-tab-focus', { paneId, scene, target: term === main ? 'main' : 'running' });
     return;
   }
-  const input = pane.querySelector<HTMLTextAreaElement>('[data-terminal-input]');
   if (available(input)) {
     input.focus({ preventScroll: true });
     terminalDebug('terminal-tab-focus', { paneId, scene, target: 'command' });

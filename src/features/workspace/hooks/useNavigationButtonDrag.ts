@@ -45,8 +45,10 @@ export function useNavigationButtonDrag() {
   const cleanupRef = useRef<(() => void) | null>(null);
   useEffect(() => () => cleanupRef.current?.(), []);
 
-  return (event: ReactPointerEvent<HTMLButtonElement>, id: string) => {
+  return (event: ReactPointerEvent<HTMLElement>, id: string) => {
     if (event.button !== 0 || event.isPrimary === false) return;
+    const control = event.target instanceof Element ? event.target.closest('button, input, textarea, select, a, [role="button"], [data-no-drag]') : null;
+    if (control && control !== event.currentTarget) return;
     event.stopPropagation();
     cleanupRef.current?.();
     const source = event.currentTarget;

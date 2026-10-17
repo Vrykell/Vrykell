@@ -21,6 +21,7 @@ import { registerTerminal, unregisterTerminal, useTerminalStore } from '@feature
 import { getRecentOutputFor } from '@features/terminal/stores/terminal';
 import { useBlockStore } from '@features/terminal';
 import { useHistoryStore } from '@features/terminal/stores/history';
+import { captureHistoryCommand } from '@features/command-history/services/recording';
 import { isTerminalDebugEnabled, terminalDebug } from '@features/terminal/services/terminalDebug';
 import { readXtermTheme } from '@features/terminal/model/xtermTheme';
 import { useSessionStore } from '@features/workspace';
@@ -41,6 +42,7 @@ import type { UnlistenFn } from '@tauri-apps/api/event';
 import { getTerminalFontOptions, measureTerminalDomCellWidth } from '@features/terminal/model/terminalFont';
 import { prepareSshHost } from '@features/ssh/services/hostTrust';
 import { terminalTypographyChanged, useTypographyStore } from '@config/typography';
+import { isLayoutResizeDragActive, onLayoutResizeDragEnd } from '@ui/layoutResizeDrag';
 
 /** Live session references shared across development reloads. */
 interface SessionRegistry {
@@ -192,20 +194,30 @@ export function useTerminalSession(
     term.open(el);
     configureTerminalInput(term);
     let frameRaf = 0;
-    const frameSub = term.onWriteParsed?.(() => {
-      if (spec?.kind !== 'ssh') return;
-      if (frameRaf) return;
+    // The connection frame is captured when output arrives; a pure resize changes the
+    // terminal's column count without writing, so it is refreshed on layout changes too to
+    // keep the frozen authentication screen at the pane's current width.
+    const scheduleFrameCapture = (reason: 'write' | 'resize') => {
+      if (spec?.kind !== 'ssh' || frameRaf) return;
       frameRaf = requestAnimationFrame(() => {
         frameRaf = 0;
-        setFrame(previous => captureConnectionFrame(term, previous, stopped || connectionFailed));
+        setFrame(previous => {
+          const next = captureConnectionFrame(term, previous, stopped || connectionFailed);
+          if (isTerminalDebugEnabled()) {
+            terminalDebug('ssh-frame-capture', { paneId, reason, cols: term.cols, rows: term.rows,
+              previousCols: previous?.cols ?? null, previousRows: previous?.rows ?? null, reused: next === previous });
+          }
+          return next;
+        });
       });
-    });
+    };
+    const frameSub = term.onWriteParsed?.(() => scheduleFrameCapture('write'));
     fitTerminal(term, fit);
     registerTerminal(paneId, term);
     useTerminalStore.getState().setDims(paneId, term.cols, term.rows);
 
     let sessionId: string | null = null;
-    const resizeQueue = createResizeQueue((cols, rows) => sessionId ? ptyResize(sessionId, cols, rows) : Promise.resolve());
+    const resizeQueue = createResizeQueue((cols, rows) => sessionId ? ptyResize(sessionId, cols, rows) : Promise.resolve(), 120);
     let disposed = false;
     let stopped = false;
     let connectionFailed = false;
@@ -353,6 +365,7 @@ export function useTerminalSession(
         useSessionStore.getState().setProgramTitle(paneId, title);
       },
       onBlockStart: (block) => {
+        if (spec) captureHistoryCommand(spec, paneId, block);
         sessionManager.record(tabId, paneId, block, 'start');
         // 惯用命名：标题跟随「聚焦终端」的首条命令（未定名时）
         if (block.command && paneId === useTerminalStore.getState().focusedPaneId) {
@@ -360,6 +373,7 @@ export function useTerminalSession(
         }
       },
       onBlockComplete: (block) => {
+        if (spec) captureHistoryCommand(spec, paneId, block);
         useHistoryStore.getState().record(block.command, block.cwd ?? '', block.exitCode);
         sessionManager.record(tabId, paneId, block, 'complete');
         // Return a manually fullscreened running block to the block list when it ends.
@@ -752,6 +766,16 @@ export function useTerminalSession(
     };
 
     let widthRaf = 0;
+    let deferredPtySize: { cols: number; rows: number } | null = null;
+    // The local grid keeps following the pointer, but a held layout drag tells the remote PTY
+    // nothing until the pointer is released: every SIGWINCH makes the remote redraw its prompt,
+    // so a per-step notification moves the visible content on each column and leaves reprint
+    // artifacts in the scrollback. The final size is sent once the drag ends.
+    const requestPtySize = (cols: number, rows: number) => {
+      if (!sessionId) return;
+      if (isLayoutResizeDragActive()) { deferredPtySize = { cols, rows }; return; }
+      resizeQueue.request(cols, rows);
+    };
     const applyWidth = () => {
       if (widthRaf) return;
       widthRaf = requestAnimationFrame(() => {
@@ -761,7 +785,10 @@ export function useTerminalSession(
         const previousCols = term.cols;
         const previousRows = term.rows;
         fitTerminal(term, fit);
-        if (isTerminalDebugEnabled() && (previousCols !== term.cols || previousRows !== term.rows)) {
+        const sizeChanged = previousCols !== term.cols || previousRows !== term.rows;
+        // A resize re-lays the buffer; re-capture so the frozen connection frame follows it.
+        if (sizeChanged) scheduleFrameCapture('resize');
+        if (isTerminalDebugEnabled() && sizeChanged) {
           const screen = term.element?.querySelector('.xterm-screen')?.getBoundingClientRect();
           const host = el.getBoundingClientRect();
           terminalDebug('terminal-resize-frame', { paneId, scene: currentScene, previousCols, previousRows,
@@ -774,18 +801,24 @@ export function useTerminalSession(
         if (scene === 'altScreen') {
           // 全屏是纯 xterm 画布：让 fit 使用渲染器实测尺寸，避免字体回退后的
           // 私有 cellWidth 与 canvas 实际 cell 不一致。
-          if (sessionId) resizeQueue.request(term.cols, term.rows);
+          requestPtySize(term.cols, term.rows);
           controller.resize(term.cols, term.rows);
           return;
         }
         const cols = effectiveCols();
         const rows = effectiveRows();
         if (cols <= 0 || rows <= 0) return;
-        if (sessionId) resizeQueue.request(cols, rows);
+        requestPtySize(cols, rows);
         controller.resize(cols, rows);
       });
     };
     widthSyncs.set(paneId, applyWidth);
+    const unsubscribeLayoutDrag = onLayoutResizeDragEnd(() => {
+      if (disposed || !deferredPtySize) return;
+      const size = deferredPtySize;
+      deferredPtySize = null;
+      resizeQueue.request(size.cols, size.rows);
+    });
     const unsubscribeTypography = useTypographyStore.subscribe((state, previous) => {
       if (!terminalTypographyChanged(state, previous)) return;
       Object.assign(term.options, getTerminalFontOptions());
@@ -796,6 +829,31 @@ export function useTerminalSession(
         applyWidth();
       }
     });
+    // The preferred face can finish loading after this terminal was created, so its first
+    // measurement may hold a fallback advance that xterm keeps until an option changes (it does
+    // not re-measure on resize). Re-apply the font options once the fonts settle and refit, so
+    // the cell grid and the PTY columns follow the font that actually renders.
+    if (typeof document !== 'undefined' && document.fonts) {
+      void document.fonts.ready.then(() => {
+        if (disposed) return;
+        const wanted = getTerminalFontOptions();
+        const changed = term.options.fontSize !== wanted.fontSize
+          || term.options.fontFamily !== wanted.fontFamily
+          || term.options.fontWeight !== wanted.fontWeight
+          || term.options.letterSpacing !== wanted.letterSpacing;
+        if (!changed) return;
+        Object.assign(term.options, wanted);
+        cachedDomCellWidth = 0;
+        if (isTerminalDebugEnabled()) {
+          terminalDebug('terminal-font-refresh', { paneId, fontSize: wanted.fontSize, letterSpacing: wanted.letterSpacing });
+        }
+        if (el.offsetWidth > 0 && el.offsetHeight > 0) {
+          fitTerminal(term, fit);
+          useTerminalStore.getState().setDims(paneId, term.cols, term.rows);
+          applyWidth();
+        }
+      });
+    }
 
     // A pane hidden with display:none (inactive tab or panel) or a page backgrounded by the
     // OS can come back blank: a static alternate-screen application prints nothing to trigger
@@ -860,6 +918,7 @@ export function useTerminalSession(
       dataSub.dispose();
       inputRenderSub?.dispose();
       resizeQueue.dispose();
+      unsubscribeLayoutDrag();
       cancelAnimationFrame(widthRaf);
       ro.disconnect();
       document.removeEventListener('visibilitychange', onVisibilityChange);

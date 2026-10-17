@@ -8,6 +8,7 @@
  */
 
 import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
+import { beginLayoutResizeDrag, endLayoutResizeDrag } from '@ui/layoutResizeDrag';
 import { showsPaneChatHistory } from '../model/paneHistory';
 import { useTypographyStore } from '@config/typography';
 import { useRef, useEffect, useLayoutEffect, useMemo, useState, useId, useCallback } from 'react';
@@ -16,7 +17,7 @@ import { CircleX, Minimize2, Square } from '@ui/icons';
 import { STATUS_ACTION_ICON_SIZE, StatusActionButton, TerminalStatusBar } from '@features/terminal/components/TerminalStatusBar';
 import { MoveDragLayer, PlacementOverlay } from './TerminalPlacementOverlay';
 import { useSessionStore, type Tab } from '@features/workspace';
-import { useTerminalStore } from '@features/terminal';
+import { useTerminalStore, useInputStore } from '@features/terminal';
 import { useUiStore, useDockDragStore } from '@features/workspace';
 import { useBlockStore, selectBlocks } from '@features/terminal';
 import { usePaneMessages } from '@features/chat';
@@ -214,7 +215,7 @@ function SessionTabView(props: {
 
         {/* Split slot picker (anchored to the layout area so it mirrors the future regions). */}
         {active && splitPlacement.open && (
-          <PlacementOverlay targets={placementTargets} onPick={commitPlacement} onCancel={cancelSplit} />
+          <PlacementOverlay targets={placementTargets} onPick={commitPlacement} onCancel={cancelSplit} hint={t('Click here to split the terminal')} />
         )}
 
         {/* Replace-position picker (menu entry, same slots as dragging a pane). */}
@@ -326,6 +327,7 @@ function Divider({ dir, rect, region, onRatio }: { dir: 'row' | 'col'; rect: Rec
     e.preventDefault();
     const container = ref.current?.parentElement;
     if (!container) return;
+    beginLayoutResizeDrag();
     const cRect = container.getBoundingClientRect();
     // 嵌套分隔线以自身 split 区域（region）为准换算比例，而非整个布局区
     const regionLeft = cRect.left + region.x * cRect.width;
@@ -345,6 +347,7 @@ function Divider({ dir, rect, region, onRatio }: { dir: 'row' | 'col'; rect: Rec
     const up = () => {
       document.removeEventListener('mousemove', move);
       document.removeEventListener('mouseup', up);
+      endLayoutResizeDrag();
     };
     document.addEventListener('mousemove', move);
     document.addEventListener('mouseup', up);
@@ -397,6 +400,7 @@ function TerminalPane(props: {
   reorderable: boolean;
 }) {
   const { terminal, windowId, focused, setSession, setFocusedPane, onContextMenu, inner, reorderable } = props;
+  const commandDraft = useInputStore(state => state.byPane[terminal.id]?.text ?? '');
   const [sshState, setSshState] = useState<SshSessionStatus>({ phase: 'connecting', reconnectAttempt: 0, retrying: false, log: [] });
   const [sshStatusWidth, setSshStatusWidth] = useState(300);
   const [sshToolbarHost, setSshToolbarHost] = useState<HTMLDivElement | null>(null);
@@ -464,7 +468,7 @@ function TerminalPane(props: {
       <div inert={!showBlocks} style={{ display: showBlocks ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column' }}>
         <PaneBlockList paneId={terminal.id} insetLeft={inner.left ? 4 : 8} insetRight={inner.right ? 4 : 8} />
       </div>
-      {showBlocks && (
+      {(showBlocks || (scene === 'classic' && commandDraft.length > 0)) && (
         <PaneInputEditor
           paneId={terminal.id}
           focused={focused}

@@ -1,4 +1,5 @@
 import { useTerminalDefaults } from '@config/terminalDefaults';
+import { useCommandHistorySettings } from '@config/commandHistory';
 import { t } from '@i18n';
 import { TOOL_NAMES, usePermissions, useAgentSettings, useUsageStore, type ToolName, type AgentSettings } from '@features/agent';
 import { summarize, totalTokens, formatTokens } from '@features/agent/model/usageStats';
@@ -41,6 +42,8 @@ function registerField(id: string, page: PageId, label: string, description: str
 }
 
 registerField("startup", "startup", "Open on startup", "Restore sessions or open a default terminal", () => useStartupSettings.getState().mode);
+registerField('history-run-target', 'command-history', 'Command execution target', 'Choose where commands run from the history panel.', () => useCommandHistorySettings.getState().runIn);
+registerField('history-double-click', 'command-history', 'Double-click command', 'Double-click inserts the command by default. Execution follows the selected target.', () => useCommandHistorySettings.getState().doubleClick);
 registerField('command-highlighting', 'terminal-open', 'Command syntax highlighting', 'Color commands, arguments and shell operators.', () => String(useTypographyStore.getState().commandHighlighting));
 registerField("logs", "logs", "Save diagnostic logs automatically", "Diagnostic logging and errors");
 registerField('context-menu', 'context-menu', 'Windows context menu', 'Open in Vrykell', undefined, 'Open in Vrykell');

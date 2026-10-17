@@ -10,9 +10,11 @@ import ErrorBox from '@ui/ErrorBox';
 import Select from '@ui/Select';
 import { sanitizeOutputHtml } from '@utils/sanitizeHtml';
 import { TextButton } from '@ui/TextButton';
+import { IconButton } from '@ui/IconButton';
+import { Eye, EyeOff, iconSizes } from '@ui/icons';
 import { secretResponsePrompt, secretResponseWasRejected } from '../model/terminalFrame';
 import { t } from '@i18n';
-import { terminalDebug } from '../services/terminalDebug';
+import { isTerminalDebugEnabled, terminalDebug } from '../services/terminalDebug';
 import type { SshSessionStatus } from '@core/ssh';
 
 /** Render an interactive SSH session with xterm so screen contents and cursor stay in sync. */
@@ -48,6 +50,7 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
   const [cancelledAuthentication, setCancelledAuthentication] = useState(false);
   const [manualSecret, setManualSecret] = useState(false);
   const [directInput, setDirectInput] = useState(false);
+  const [reveal, setReveal] = useState(false);
   const [dismissedPrompt, setDismissedPrompt] = useState<string | null>(null);
   const cancellingRef = useRef(false);
   const responseRef = useRef<HTMLInputElement>(null);
@@ -99,6 +102,41 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
   }, [connectionInput, onReconnectReady, restart]);
   // 只要密码框开着就把屏幕冻结成快照：live xterm 会画自己的光标，看着像还有输入焦点
   const showSnapshot = !disconnected && secret;
+  // Diagnostics: record the rendered snapshot geometry so a width mismatch between the
+  // canvas grid and the DOM frame can be traced from the recorded log.
+  const snapshotRef = useRef<HTMLPreElement>(null);
+  useEffect(() => {
+    if (!showSnapshot || !frame?.html || !isTerminalDebugEnabled()) return;
+    const raf = requestAnimationFrame(() => {
+      const pre = snapshotRef.current;
+      if (!pre) return;
+      const style = getComputedStyle(pre);
+      const probe = document.createElement('span');
+      probe.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:pre;';
+      probe.style.fontFamily = style.fontFamily;
+      probe.style.fontSize = style.fontSize;
+      probe.style.fontWeight = style.fontWeight;
+      probe.style.letterSpacing = style.letterSpacing;
+      probe.textContent = 'W'.repeat(100);
+      document.body.appendChild(probe);
+      const advance = Math.round(probe.getBoundingClientRect().width);
+      probe.remove();
+      const root = getComputedStyle(document.documentElement);
+      terminalDebug('ssh-snapshot-frame', {
+        paneId,
+        cols: frame.cols, rows: frame.rows,
+        clientWidth: pre.clientWidth, scrollWidth: pre.scrollWidth,
+        hostWidth: ref.current?.clientWidth ?? null,
+        cellWidth: frame.cellWidth ?? null, snapshotSpacing: frame.snapshotSpacing ?? null,
+        advancePer100Cells: advance,
+        letterSpacing: style.letterSpacing, fontSize: style.fontSize,
+        cssLetterSpacing: root.getPropertyValue('--terminal-letter-spacing').trim(),
+        cssFontSize: root.getPropertyValue('--terminal-font-size').trim(),
+        devicePixelRatio: window.devicePixelRatio,
+      });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [showSnapshot, frame]);
   const retryPhase = retry?.phase ?? 'idle';
   const retryWaiting = retryPhase === 'waiting';
   const retryConnecting = retryPhase === 'connecting';
@@ -159,11 +197,13 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
       {/* 终端区常驻：xterm 宿主必须一直在，否则重连时没有宿主可挂载；断开后宿主隐藏、原因直接印在屏幕上 */}
       <div role="textbox" aria-label="SSH 交互终端" aria-multiline="true"
         aria-disabled={inputDisabled || secret} tabIndex={inputDisabled || secret ? -1 : 0}
-        onFocus={focusTerminal} onMouseDown={focusTerminal} style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'auto', outline: 'none', cursor: 'text' }}>
+        onFocus={focusTerminal} onMouseDown={focusTerminal} style={{ flex: 1, minHeight: 0, position: 'relative', overflowX: 'hidden', overflowY: 'auto', outline: 'none', cursor: 'text' }}>
         {/* 密码框开着（secret）时屏幕只读，点它也不会把输入交给终端 */}
-        <div ref={ref} data-testid={showSnapshot ? undefined : 'ssh-terminal-screen'} style={{ position: 'absolute', inset: 0, overflow: 'auto', visibility: showSnapshot || disconnected ? 'hidden' : 'visible', pointerEvents: showSnapshot || disconnected || secret ? 'none' : 'auto', paddingLeft: 8 }} />
-          {/* data-selectable：页面整体禁选，但屏幕内容必须能选中，否则连不上时无法复制报错 */}
-          {showSnapshot && frameHtml && <pre data-selectable data-testid="ssh-terminal-screen" className="ssh-terminal-frame" style={{ position: 'absolute', inset: 0, overflow: 'auto', margin: 0, whiteSpace: 'pre', color: 'var(--text-primary)', paddingLeft: 8 }} dangerouslySetInnerHTML={{ __html: frameHtml }} />}
+        <div ref={ref} data-testid={showSnapshot ? undefined : 'ssh-terminal-screen'} style={{ position: 'absolute', inset: 0, overflowX: 'hidden', overflowY: 'auto', visibility: showSnapshot || disconnected ? 'hidden' : 'visible', pointerEvents: showSnapshot || disconnected || secret ? 'none' : 'auto', paddingLeft: 8 }} />
+          {/* data-selectable：页面整体禁选，但屏幕内容必须能选中，否则连不上时无法复制报错。
+              Rows advance at the renderer's own cell width and never scroll sideways; a
+              horizontal scrollbar would steal height and make the terminal bounce. */}
+          {showSnapshot && frameHtml && <pre ref={snapshotRef} data-selectable data-testid="ssh-terminal-screen" className="ssh-terminal-frame" style={{ position: 'absolute', inset: 0, overflowX: 'hidden', overflowY: 'auto', letterSpacing: frame?.snapshotSpacing != null ? `calc(var(--terminal-letter-spacing, 0px) + ${frame.snapshotSpacing}px)` : undefined, margin: 0, whiteSpace: 'pre', color: 'var(--text-primary)', paddingLeft: 8 }} dangerouslySetInnerHTML={{ __html: frameHtml }} />}
         {/* 连接中：居中转圈 + 细进度条（不写解释性小字） */}
         {!disconnected && status === 'connecting' && (
           <div data-testid="ssh-connecting" aria-hidden="true" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, pointerEvents: 'none' }}>
@@ -187,8 +227,9 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
           setResponse(''); setError(''); setManualSecret(false); setDirectInput(false); setDismissedPrompt(secretPrompt ?? text);
           void ptyWrite(sessionId, `${value}\r`).catch(reason => { setManualSecret(true); setError(`发送失败：${String(reason)}`); });
         }} className="terminal-composer" style={{ display: 'flex', gap: 8, alignItems: 'center', padding: 12, width: '100%' }}>
-          <TextInput ref={responseRef} type="password" autoComplete="off" aria-label="SSH 认证响应" placeholder="输入密码、密钥口令或验证响应" value={response} onChange={e => setResponse(e.target.value)} disabled={inputDisabled} className="ssh-auth-response" style={{ flex: 1, minWidth: 0, height: 36, background: 'transparent', border: 'none', outline: 'none' }} />
-          <button type="submit" disabled={inputDisabled} style={{ padding: '8px 16px' }}>发送</button>
+          <TextInput ref={responseRef} type={reveal ? 'text' : 'password'} autoComplete="off" aria-label="SSH 认证响应" placeholder="输入密码、密钥口令或验证响应" value={response} onChange={e => setResponse(e.target.value)} disabled={inputDisabled} className="ssh-auth-response" style={{ flex: 1, minWidth: 0, height: 36, background: 'transparent', border: 'none', outline: 'none' }} />
+          <IconButton compact data-subtle className="ssh-auth-reveal" data-testid="ssh-auth-reveal" aria-pressed={reveal} aria-label={t(reveal ? 'Hide password' : 'Show password')} data-tip={t(reveal ? 'Hide password' : 'Show password')} onClick={() => { setReveal(value => !value); responseRef.current?.focus(); }}>{reveal ? <EyeOff size={iconSizes.compact} /> : <Eye size={iconSizes.compact} />}</IconButton>
+          <button type="submit" className="ssh-auth-submit" disabled={inputDisabled} style={{ padding: '8px 16px' }}>发送</button>
         </form>
       </div>}
       {error && <ErrorBox compact style={{ flexShrink: 0 }}>{error}</ErrorBox>}

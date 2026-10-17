@@ -1,5 +1,9 @@
 use std::ffi::c_void;
 
+pub fn is_tool_window(label: &str) -> bool {
+    label.starts_with("tool-") && label.len() > "tool-".len()
+}
+
 #[link(name = "dwmapi")]
 extern "system" {
     fn DwmSetWindowAttribute(
@@ -26,7 +30,21 @@ pub fn hide_border(window: &tauri::WebviewWindow) {
     };
     crate::diagnostics::record(
         "window-border-configured",
-        serde_json::json!({ "success": result >= 0, "result": result }),
+        serde_json::json!({ "windowLabel": window.label(), "success": result >= 0, "result": result }),
     )
     .ok();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_tool_window;
+
+    #[test]
+    fn tool_chrome_covers_recreated_native_windows() {
+        assert!(is_tool_window("tool-first"));
+        assert!(is_tool_window("tool-recreated"));
+        assert!(!is_tool_window("main"));
+        assert!(!is_tool_window("tool-"));
+        assert!(!is_tool_window("devtools"));
+    }
 }

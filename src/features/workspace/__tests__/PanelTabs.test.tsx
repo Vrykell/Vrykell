@@ -4,6 +4,12 @@ import PanelTabs from '../components/PanelTabs';
 import { useSessionStore } from '../model/session/store';
 import { useListReorder } from '@ui/listReorder';
 import { useIconColorStore } from '@config/iconColors';
+import { useTerminalDefaults } from '@config/terminalDefaults';
+import { getAvailableShells } from '@platform/shells';
+
+vi.mock('@platform/shells', async original => ({ ...await original<typeof import('@platform/shells')>(), getAvailableShells: vi.fn().mockResolvedValue([
+  { id: 'zsh', label: 'Zsh', default: true }, { id: 'bash', label: 'Bash', default: false },
+]) }));
 
 vi.mock('@features/agent/services/title', () => ({ regenerateTitle: vi.fn() }));
 vi.mock('../components/NewTabModal', () => ({
@@ -12,6 +18,7 @@ vi.mock('../components/NewTabModal', () => ({
 }));
 const snapshot = useSessionStore.getState();
 beforeEach(() => {
+  useTerminalDefaults.setState({ shell: 'system' });
   useIconColorStore.setState({ colors: {} });
   useSessionStore.setState({
     tabs: [
@@ -22,12 +29,32 @@ beforeEach(() => {
   });
 });
 
+it('colors a restored unspecified shell from the machine default and preserves explicit shell colors', async () => {
+  useSessionStore.setState({ tabs: [
+    { id: 'restored', title: 'Terminal', kind: 'session', layout: { type: 'leaf', terminal: { id: 'restored#0', kind: 'local' } } },
+    ...useSessionStore.getState().tabs,
+  ] });
+  render(<PanelTabs />);
+  await screen.findByTestId('tab-row-restored');
+  const { waitFor } = await import('@testing-library/react');
+  await waitFor(() => expect(screen.getByTestId('tab-row-restored').querySelector('svg')).toHaveAttribute('data-shell-mark', 'zsh'));
+  expect(screen.getByTestId('tab-row-restored').querySelector('svg')!.style.color).toBe('var(--shell-zsh-accent)');
+  act(() => useTerminalDefaults.getState().setShell('bash'));
+  expect(screen.getByTestId('tab-row-restored').querySelector('svg')).toHaveAttribute('data-shell-mark', 'bash');
+  expect(screen.getByTestId('tab-row-local').querySelector('svg')).toHaveAttribute('data-shell-mark', 'bash');
+  expect(getAvailableShells).toHaveBeenCalled();
+  const spec = useSessionStore.getState().tabs[0];
+  expect(spec?.kind === 'session' && spec.layout.type === 'leaf' && spec.layout.terminal.shellType).toBeUndefined();
+});
+
 it('colors terminal icons from their context menu without activating the tab', () => {
   const id = 'local';
   render(<PanelTabs />);
   const row = screen.getByTestId(`tab-row-${id}`);
   fireEvent.contextMenu(row);
   const palette = screen.getByRole('group', { name: '图标颜色' });
+  expect(screen.queryByRole('menuitem', { name: '图标颜色' })).toBeNull();
+  expect(palette.closest('.context-menu-footer')).not.toBeNull();
   fireEvent.click(palette.querySelector('[data-color="violet"]')!);
   expect(row.querySelector('svg')!.style.color).toBe('var(--group-violet)');
   expect(useSessionStore.getState().activeId).toBe('settings');

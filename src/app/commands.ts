@@ -69,3 +69,4 @@ registerCommand({ id: 'open-terminal-debug-log', label: '打开终端诊断日�
     .catch(() => useToastStore.getState().addToast('无法打开终端诊断日志', 'error'));
 } });
 registerCommand({ id: 'global-search', label: '全局搜索', desc: '搜索文件、命令、设置等', keys: '⌘F', keywords: ['search', 'find'], action: () => useUiStore.getState().setGlobalSearchOpen(true) });
+registerCommand({ id: 'command-history', label: t('Command history'), desc: t('Browse, save and write commands for the current project'), keywords: ['history', 'project', 'build', 'run', 'commands'], action: () => useDockStore.getState().openPanel('command-history') });

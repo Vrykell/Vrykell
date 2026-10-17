@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { SquareStack, Folder, Server, Sparkles, Settings, type AppIcon } from '@ui/icons';
+import { SquareStack, Folder, Server, Sparkles, Settings, Terminal, type AppIcon } from '@ui/icons';
+import { t } from '@i18n';
 import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
 import { useWorkspaceStore, isSessionTab } from '@features/workspace/stores/workspace';
 import { minTerminalWidth, MIN_PANE_SIZE } from '@features/workspace/model/windowLayout';
@@ -19,6 +20,7 @@ export const PANEL_DEFS: Record<string, PanelDef> = {
   files: { id: 'files', icon: Folder, label: '资源', width: 200 },
   ssh:   { id: 'ssh',   icon: Server, label: 'SSH', width: 208 },
   chat:  { id: 'chat',  icon: Sparkles, label: 'AI', width: 320 },
+  'command-history': { id: 'command-history', icon: Terminal, label: t('Command history'), width: 300 },
 };
 
 export type DockSide = 'left' | 'right';
@@ -74,7 +76,7 @@ function normalizeLayout(data: unknown): PersistedLayout | null {
 }
 
 const DEFAULTS: PersistedLayout = {
-  leftZone: ['tabs', 'ssh', 'files'], rightZone: ['chat', 'settings'],
+  leftZone: ['tabs', 'ssh', 'files', 'command-history'], rightZone: ['chat', 'settings'],
   // Start with the session list; auxiliary panels open on demand.
   leftPanels: ['tabs'], rightPanels: [],
   panelWidths: {},
@@ -88,7 +90,7 @@ function loadLayout(): PersistedLayout {
     migratingLegacy = !!raw;
   }
   if (!raw) return DEFAULTS;
-  const parsed = safeJsonParse<unknown>(raw);
+  const parsed = safeJsonParse<unknown>(raw.split('"project-commands"').join('"command-history"'));
   const normalized = normalizeLayout(parsed);
   if (!normalized) {
     console.warn('[dock] layout data corrupted, resetting to defaults');

@@ -36,4 +36,18 @@ describe('ResizeHandle', () => {
     fireEvent.mouseMove(document, { clientX: 260, clientY: 70 });
     expect(onDelta).toHaveBeenCalledOnce();
   });
+
+  it('provides keyboard resizing and reset for a labelled separator', () => {
+    const onDelta = vi.fn(); const onUp = vi.fn(); const onReset = vi.fn();
+    const { getByRole } = render(<ResizeHandle axis="y" label="Resize details" onDelta={onDelta} onUp={onUp} onReset={onReset} />);
+    const handle = getByRole('separator', { name: 'Resize details' });
+    expect(handle).toHaveAttribute('aria-orientation', 'horizontal');
+    fireEvent.keyDown(handle, { key: 'ArrowUp' });
+    fireEvent.keyDown(handle, { key: 'ArrowDown' });
+    expect(onDelta.mock.calls).toEqual([[-16], [16]]);
+    expect(onUp).toHaveBeenCalledTimes(2);
+    fireEvent.keyDown(handle, { key: 'Home' });
+    fireEvent.doubleClick(handle);
+    expect(onReset).toHaveBeenCalledTimes(2);
+  });
 });

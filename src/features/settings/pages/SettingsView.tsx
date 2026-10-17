@@ -19,6 +19,7 @@ import { AiModelPage } from '@features/settings/pages/aiModelPage';
 import { AiBehaviorPage } from '@features/settings/pages/aiBehaviorPage';
 import { McpPage } from '@features/settings/pages/mcpPage';
 import { TerminalOpenPage } from '@features/settings/pages/terminalOpenPage';
+import { CommandHistoryPage } from './commandHistoryPage';
 import { ThemePage } from '@features/settings/pages/themePage';
 import { ShortcutPage } from '@features/settings/pages/shortcutPage';
 import { useSettingsNavigation } from '@features/settings/hooks/useSettingsNavigation';
@@ -230,6 +231,8 @@ function SettingsContent() {
 
       case 'terminal-open':
         return <TerminalOpenPage />;
+      case 'command-history':
+        return <CommandHistoryPage />;
 
       case 'editor-local':
         return (
