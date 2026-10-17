@@ -4,6 +4,7 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import { t } from '@i18n';
 import { useToastStore } from '@ui/Toast';
 import remarkGfmSafe from '@features/chat/model/remarkGfmSafe';
+import remarkStripStrayEmphasis from '@features/chat/model/remarkStripStrayEmphasis';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import CommandBlock from '@features/chat/components/CommandBlock';
@@ -80,7 +81,7 @@ function MathSpan({ node: _node, className, children, ...props }: ComponentProps
 export default function Markdown({ content, paneId }: { content: string; paneId?: string | null }) {
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfmSafe, remarkMath, remarkStandaloneMathDisplay]}
+      remarkPlugins={[remarkGfmSafe, remarkStripStrayEmphasis, remarkMath, remarkStandaloneMathDisplay]}
       // Incomplete or non-mathematical dollar fragments remain readable during streaming.
       rehypePlugins={[[rehypeKatex, { throwOnError: false, errorColor: 'var(--error)' }]]}
       components={{

@@ -14,6 +14,15 @@ const openUrlMock = vi.mocked(openUrl);
 beforeEach(() => openUrlMock.mockClear());
 
 describe('Markdown', () => {
+  it('去掉未闭合的强调标记，同时保留成对的加粗', () => {
+    const stray = render(<Markdown content={'关键位置：现价距 **52 周高点 348.15 与 200 日均线（292.46）。'} />);
+    expect(stray.container.textContent).toContain('52 周高点');
+    expect(stray.container.textContent).not.toContain('**');
+
+    const bold = render(<Markdown content={'**重点**内容'} />);
+    expect(bold.container.querySelector('strong')?.textContent).toBe('重点');
+  });
+
   it('渲染 GFM 表格', () => {
     const { container } = render(<Markdown content={'| a | b |\n|---|---|\n| 1 | 2 |'} />);
     expect(container.querySelector('table')).toBeInTheDocument();
