@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "tool-windows",
+  "description": "Local AI tool windows with independent focus, minimization and pin controls",
+  "windows": ["tool-*"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-close",
+    "core:window:allow-destroy",
+    "core:window:allow-minimize",
+    "core:window:allow-set-always-on-top",
+    "clipboard-manager:allow-write-text",
+    "opener:default"
+  ]
+}

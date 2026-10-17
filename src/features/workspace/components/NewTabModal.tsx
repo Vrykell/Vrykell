@@ -167,36 +167,28 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
     if (state.option.kind === 'shell') {
       const shell = state.option.shellType;
       const mode = shell === 'cmd' ? 'classic' : openModeByShell[shell];
-      const items: ContextMenuItem[] = [
+      const modes: ContextMenuItem[] = [
+        { label: t('settings.openMode.classic'), checked: mode === 'classic', onClick: () => setShellMode(shell, 'classic') },
+        ...(shell === 'cmd' ? [] : [{ label: t('settings.openMode.block'), checked: mode === 'block', onClick: () => setShellMode(shell, 'block') }]),
+      ];
+      return [
         {
           label: t('Set as default terminal'),
           checked: shell === preferredShell(defaultShell, shells),
           onClick: () => useTerminalDefaults.getState().setShell(shell),
         },
-        {
-          label: t('settings.openMode.classic'),
-          group: 'view',
-          checked: mode === 'classic',
-          onClick: () => setShellMode(shell, 'classic'),
-        },
+        ...(modes.length > 1 ? [{ label: t('Opening mode'), group: 'view' as const, submenu: { items: modes } }]
+          : modes.map(item => ({ ...item, group: 'view' as const, disabled: true }))),
       ];
-      // CMD is always classic; the settings page hides its block option the same way.
-      if (shell !== 'cmd') {
-        items.push({
-          label: t('settings.openMode.block'),
-          group: 'view',
-          checked: mode === 'block',
-          onClick: () => setShellMode(shell, 'block'),
-        });
-      }
-      return items;
     }
     const conn = state.conn;
     if (!conn) return [];
     return [
       { label: t('Edit connection'), group: 'edit', onClick: () => setEditing(conn) },
-      { label: t('settings.openMode.classic'), group: 'view', checked: sshOpenMode === 'classic', onClick: () => setSshMode('classic') },
-      { label: t('settings.openMode.block'), group: 'view', checked: sshOpenMode === 'block', onClick: () => setSshMode('block') },
+      { label: t('Opening mode'), group: 'view', submenu: { items: [
+        { label: t('settings.openMode.classic'), checked: sshOpenMode === 'classic', onClick: () => setSshMode('classic') },
+        { label: t('settings.openMode.block'), checked: sshOpenMode === 'block', onClick: () => setSshMode('block') },
+      ] } },
       // Missing flags follow the form defaults: shell integration on, auto reconnect off.
       { label: t('Shell integration'), group: 'organize', checked: conn.shellIntegration ?? true, onClick: () => saveConnection(conn, { shellIntegration: !(conn.shellIntegration ?? true) }) },
       { label: t('Auto reconnect'), group: 'organize', checked: conn.autoReconnect ?? false, onClick: () => saveConnection(conn, { autoReconnect: !(conn.autoReconnect ?? false) }) },

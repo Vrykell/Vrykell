@@ -2,7 +2,31 @@ use super::HistoryDb;
 use rusqlite::params;
 use serde::Serialize;
 
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GroupAssignment { pub id: String, pub title: String, pub item_ids: Vec<String> }
+
 impl HistoryDb {
+    /// Apply reviewed membership in one transaction, preserving unrelated sessions.
+    pub fn apply_group_plan(&self, groups: &[GroupAssignment]) -> Result<(), String> {
+        if groups.is_empty() || groups.len() > 20 { return Err("Invalid group plan".into()); }
+        let tx = self.conn().unchecked_transaction().map_err(|e| e.to_string())?;
+        let next: i64 = tx.query_row("SELECT COALESCE(MAX(sort_order), -1) + 1 FROM groups", [], |row| row.get(0)).map_err(|e| e.to_string())?;
+        let mut ids = std::collections::HashSet::new();
+        let mut members = std::collections::HashSet::new();
+        for (offset, group) in groups.iter().enumerate() {
+            if group.id.is_empty() || !ids.insert(&group.id) || group.title.trim().is_empty() || group.title.len() > 320 || group.item_ids.is_empty() { return Err("Invalid group plan".into()); }
+            tx.execute("INSERT INTO groups(id,title,sort_order,collapsed,created_at) VALUES(?1,?2,?3,0,CAST(strftime('%s','now') AS INTEGER)*1000)
+                ON CONFLICT(id) DO UPDATE SET title=excluded.title", params![group.id, group.title.trim(), next + offset as i64]).map_err(|e| e.to_string())?;
+            let start: i64 = tx.query_row("SELECT COALESCE(MAX(sort_order), -1) + 1 FROM sessions WHERE group_id=?1", [&group.id], |row| row.get(0)).map_err(|e| e.to_string())?;
+            for (index, id) in group.item_ids.iter().enumerate() {
+                if !members.insert(id) || members.len() > 200 { return Err("Invalid group membership".into()); }
+                let changed = tx.execute("UPDATE sessions SET group_id=?1,sort_order=?2 WHERE id=?3 AND status='active'", params![group.id, start + index as i64, id]).map_err(|e| e.to_string())?;
+                if changed != 1 { return Err("A session changed. Generate a new grouping plan.".into()); }
+            }
+        }
+        tx.commit().map_err(|e| e.to_string())
+    }
     // ── 会话 CRUD ──
 
     pub fn create_session(&self, id: &str, title: &str, timestamp: u64, cwd: &str, kind: &str, payload: &str) -> Result<(), String> {
@@ -597,4 +621,23 @@ fn map_chat_message(row: &rusqlite::Row) -> rusqlite::Result<ChatMessageEntry> {
         attachments: row.get(5)?,
         pane_id: row.get(6)?,
     })
+}
+
+#[cfg(test)]
+mod grouping_tests {
+    use super::*;
+    #[test]
+    fn reviewed_grouping_is_atomic_and_preserves_other_sessions() {
+        let db = HistoryDb::open_in_memory();
+        for id in ["one", "two"] { db.create_session(id, id, 1, "/app", "local", "{}").unwrap(); }
+        let proposal = |ids: Vec<&str>| GroupAssignment { id: "work".into(), title: "Work".into(), item_ids: ids.into_iter().map(str::to_owned).collect() };
+        assert!(db.apply_group_plan(&[proposal(vec!["one", "missing"])]).is_err());
+        assert!(db.list_groups().unwrap().is_empty());
+        let group: Option<String> = db.conn().query_row("SELECT group_id FROM sessions WHERE id='one'", [], |row| row.get(0)).unwrap();
+        assert!(group.is_none());
+        db.apply_group_plan(&[proposal(vec!["one"])]).unwrap();
+        assert_eq!(db.list_groups().unwrap()[0].title, "Work");
+        let other: Option<String> = db.conn().query_row("SELECT group_id FROM sessions WHERE id='two'", [], |row| row.get(0)).unwrap();
+        assert!(other.is_none());
+    }
 }

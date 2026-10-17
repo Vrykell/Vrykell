@@ -76,6 +76,8 @@ export interface ThemePalette {
   // 用户消息强调
   accentUser: string;
   accentUserDim: string;
+  /** Primary actions keep the send-button blue in both palette modes. */
+  primaryAction: string;
 
   // 语义色
   success: string;
@@ -219,6 +221,7 @@ const dark: ThemePalette = {
   // 用户消息：浅灰
   accentUser: '#173E76',
   accentUserDim: 'rgba(23,62,118,0.25)',
+  primaryAction: '#173E76',
 
   // Semantic colors remain independent from decorative accents.
   success: '#89D185',
@@ -383,6 +386,7 @@ const light: ThemePalette = {
 
   accentUser: '#D9E4F7',
   accentUserDim: 'rgba(23,62,118,0.12)',
+  primaryAction: '#173E76',
 
   success: '#2F8132',
   successDim: 'rgba(47,129,50,0.12)',
@@ -536,6 +540,7 @@ export function paletteToCssVars(p: ThemePalette): Record<string, string> {
     '--accent-warm-dim': p.accentWarmDim,
     '--accent-user': p.accentUser,
     '--accent-user-dim': p.accentUserDim,
+    '--primary-action': p.primaryAction,
     '--success': p.success,
     '--success-dim': p.successDim,
     '--error': p.error,

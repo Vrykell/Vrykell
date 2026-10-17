@@ -1,19 +1,7 @@
-import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { t } from '@i18n';
 import { Check, Copy, iconSizes } from '@ui/icons';
 import { writeClipboardText } from '@platform/clipboard';
-
-/** Hover feedback shared by the subtle icon buttons. */
-const subtleHover = {
-  onMouseEnter: (event: MouseEvent<HTMLButtonElement>) => {
-    event.currentTarget.style.background = 'var(--hover)';
-    event.currentTarget.style.color = 'var(--text-secondary)';
-  },
-  onMouseLeave: (event: MouseEvent<HTMLButtonElement>) => {
-    event.currentTarget.style.background = 'transparent';
-    event.currentTarget.style.color = 'var(--text-muted)';
-  },
-};
 
 /**
  * CopyButton — icon-only copy control with a checkmark confirmation.
@@ -22,7 +10,7 @@ const subtleHover = {
  * (restarted on every click). `label` is the accessible name and the tooltip shown
  * before copying, for example "Copy output"; the confirmed state reads "Copied".
  */
-export default function CopyButton({ text, label, testId, className, style, iconSize = iconSizes.copy }: {
+export default function CopyButton({ text, label, testId, className, style, quiet = false, iconSize = iconSizes.copy }: {
   /** Raw text written to the clipboard. */
   text: string;
   /** Accessible name and tooltip for the idle state. */
@@ -30,6 +18,8 @@ export default function CopyButton({ text, label, testId, className, style, icon
   testId?: string;
   className?: string;
   style?: CSSProperties;
+  /** Rows can keep the existing surface and use only glyph feedback on hover. */
+  quiet?: boolean;
   /** Glyph size; the control stays a square target around it. */
   iconSize?: number;
 }) {
@@ -67,7 +57,8 @@ export default function CopyButton({ text, label, testId, className, style, icon
     data-copied={copied}
     className={className}
     onClick={handleCopy}
-    {...subtleHover}
+    onMouseEnter={event => { event.currentTarget.style.background = quiet ? 'transparent' : 'var(--hover)'; event.currentTarget.style.color = 'var(--text-secondary)'; }}
+    onMouseLeave={event => { event.currentTarget.style.background = 'transparent'; event.currentTarget.style.color = 'var(--text-muted)'; }}
     style={{
       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
       width: 22, height: 22, padding: 0, border: 'none', borderRadius: 4, flexShrink: 0,

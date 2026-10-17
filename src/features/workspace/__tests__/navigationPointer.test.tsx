@@ -14,6 +14,10 @@ function Harness() {
     <nav data-dock-zone="right"><div data-dock-slot="chat">助手</div></nav>
   </>;
 }
+function HeadingHarness() {
+  const start = useNavigationButtonDrag();
+  return <><div data-testid="heading" onPointerDown={event => start(event, 'tabs')}><span>Panel heading</span><button onClick={clicked}>Close</button></div><nav data-dock-zone="right"><div data-dock-slot="chat">Target</div></nav></>;
+}
 function pointer(type: string, x: number, y: number, target: HTMLElement | Window = window, button = 0) {
   const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button });
   Object.defineProperty(event, 'pointerId', { value: 1 });
@@ -36,6 +40,19 @@ afterEach(() => {
 });
 
 describe('navigation pointer gestures', () => {
+  it('uses the same drag gesture from a panel heading while leaving its close button independent', () => {
+    render(<HeadingHarness />); hit = screen.getByText('Target');
+    pointer('pointerdown', 10, 10, screen.getByRole('button', { name: 'Close' }));
+    pointer('pointermove', 100, 10); pointer('pointerup', 100, 10);
+    expect(useNavigationDrag.getState().id).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' })); expect(clicked).toHaveBeenCalledOnce();
+    pointer('pointerdown', 10, 10, screen.getByText('Panel heading'));
+    pointer('pointermove', 100, 10);
+    expect(useNavigationDrag.getState().id).toBe('tabs');
+    pointer('pointerup', 100, 10);
+    expect(useDockStore.getState().rightPanels).toEqual(['tabs']);
+    expect(useDockStore.getState().rightZone).toEqual(['chat', 'tabs']);
+  });
   it('keeps ordinary clicks and tiny pointer movements from reordering', () => {
     render(<Harness />);
     const button = screen.getByText('标签');

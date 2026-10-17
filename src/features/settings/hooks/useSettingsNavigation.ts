@@ -41,7 +41,7 @@ export const SETTINGS_GROUPS: SettingGroup[] = [
   },
   {
     id: 'terminal', label: '终端',
-    items: [{ id: 'terminal-open', icon: SquareTerminal, label: '打开方式' }],
+    items: [{ id: 'terminal-open', icon: SquareTerminal, label: '打开方式' }, { id: 'command-history', icon: SquareTerminal, label: t('Command history') }],
   },
   {
     id: 'editor', label: '编辑器',

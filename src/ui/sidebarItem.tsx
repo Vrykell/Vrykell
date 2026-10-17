@@ -1,4 +1,4 @@
-import { useId, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
+import { Fragment, useId, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { useListReorder } from './listReorder';
 import { sidebarRowSpacing, sidebarRowContent, sidebarRowIcon, sidebarRowTitle } from './sidebarRow';
 import { IconButton } from './IconButton';
@@ -14,6 +14,9 @@ export interface SidebarItemAction {
   disabled?: boolean;
 }
 
+/** Existing shared controls can occupy a trailing action slot. */
+type SidebarItemControl = SidebarItemAction | { label: string; control: ReactNode };
+
 /**
  * SidebarItem — one row of a sidebar list (session tabs, SSH connections).
  *
@@ -26,10 +29,12 @@ export default function SidebarItem({
   icon,
   title,
   subtitle,
+  titleFontFamily,
   subtitleFontFamily = 'var(--font-mono)',
   badge,
   action,
   leadingActions,
+  trailingActions,
   renameInput,
   active,
   onClick,
@@ -42,13 +47,15 @@ export default function SidebarItem({
   testId,
   reorderItemId,
   reorderKind,
+  reorderListId,
   dataAttributes,
   style,
   compact = false,
   variant = 'default',
 }: {
-  icon: ReactNode;
+  icon?: ReactNode;
   title: string;
+  titleFontFamily?: CSSProperties['fontFamily'];
   subtitle?: string;
   subtitleFontFamily?: CSSProperties['fontFamily'];
   /** Optional trailing content between the title and the action button. */
@@ -56,6 +63,8 @@ export default function SidebarItem({
   action?: SidebarItemAction;
   /** Compact history actions appear beside the row on hover or keyboard focus. */
   leadingActions?: readonly SidebarItemAction[];
+  /** Actions inside the row remain reachable in narrow, clipped sidebars. */
+  trailingActions?: readonly SidebarItemControl[];
   /** Replaces the title area while an inline rename is active. */
   renameInput?: ReactNode;
   active: boolean;
@@ -70,27 +79,30 @@ export default function SidebarItem({
   /** Stable id consumed by the shared list-reorder hook. */
   reorderItemId?: string;
   reorderKind?: string;
+  reorderListId?: string;
   /** List-specific data attributes (test hooks such as `data-tab-row-id`). */
   dataAttributes?: Record<string, string | undefined>;
   style?: CSSProperties;
   /** Compact rows reduce padding; history metadata moves into the row description. */
   compact?: boolean;
   /** History records use neutral titles and can show metadata as a compact description. */
-  variant?: 'default' | 'history';
+  variant?: 'default' | 'history' | 'command';
 }) {
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const subtitleId = useId();
   const historyCompact = variant === 'history' && compact;
-  const dragging = useListReorder((state) => !!reorderItemId && state.drag?.id === reorderItemId);
+  const command = variant === 'command';
+  const dragging = useListReorder((state) => !!reorderItemId && state.drag?.id === reorderItemId && (!reorderListId || state.drag.listId === reorderListId));
   const background = active ? 'var(--selection-bg)' : hovered ? 'var(--hover)' : 'transparent';
   const actionVisible = hovered || focused || (variant !== 'history' && active);
 
   return (
     <div
       {...dataAttributes}
-      className={variant === 'history' ? 'sidebar-row history-row' : 'sidebar-row'}
+      className={variant === 'history' ? 'sidebar-row history-row' : command ? 'sidebar-row command-row' : 'sidebar-row'}
       data-active={active ? 'true' : 'false'}
+      data-actions-visible={command ? actionVisible : undefined}
       {...(variant === 'history' && active ? { 'aria-current': true as const } : {})}
       data-compact={historyCompact ? 'true' : undefined}
       aria-describedby={historyCompact && subtitle ? subtitleId : undefined}
@@ -112,7 +124,8 @@ export default function SidebarItem({
       data-reorder-item={reorderItemId}
       data-reorder-kind={reorderKind}
       data-reorder-dragging={dragging ? 'true' : undefined}
-      style={{ ...sidebarRowSpacing, ...(compact ? { padding: '0 6px' } : {}), ...style }}
+      style={{ ...sidebarRowSpacing, ...(compact || command ? { padding: '0 6px' } : {}),
+        ...(command ? { '--sidebar-action-width': `${((trailingActions?.length ?? 0) + (action ? 1 : 0)) * 24 + 4}px` } : {}), ...style } as CSSProperties}
     >
       {leadingActions?.length ? <span className="history-row-quick-actions" data-visible={actionVisible}
         onPointerDown={event => event.stopPropagation()}
@@ -128,17 +141,20 @@ export default function SidebarItem({
       <div className="sidebar-row-content" style={{
         ...sidebarRowContent,
         ...(historyCompact ? { minHeight: 34, padding: '5px 10px', alignItems: 'flex-start' } : compact ? { minHeight: 32, padding: '5px 10px' } : {}),
-        background: variant === 'history' ? undefined : background,
+        ...(command ? { position: 'relative', minHeight: 28, padding: '2px 10px', gap: 6 } : {}),
+        background: variant === 'history' ? undefined : command && focused && !active ? 'var(--hover)' : background,
         color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
       }}>
-        <span className="sidebar-row-icon" style={{ ...sidebarRowIcon, ...(historyCompact ? { width: 20, height: 'calc(22px * var(--ui-font-scale))' } : {}) }}>{icon}</span>
+        {icon && <span className="sidebar-row-icon" style={{ ...sidebarRowIcon, ...(historyCompact ? { width: 20, height: 'calc(22px * var(--ui-font-scale))' } : {}),
+          ...(command ? { width: 14, height: 14 } : {}) }}>{icon}</span>}
         {renameInput ?? (
           <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
             <span className="sidebar-row-title" data-tip={variant === 'history' ? title : undefined}
               data-tip-description={historyCompact ? subtitle : undefined}
               style={{ ...sidebarRowTitle,
+                fontFamily: titleFontFamily ?? (command ? 'var(--font-mono)' : undefined),
                 ...(historyCompact ? { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, whiteSpace: 'normal', overflowWrap: 'anywhere', fontSize: 'var(--fs-body)', lineHeight: 'calc(22px * var(--ui-font-scale))' } : {}),
-                fontWeight: active ? 'var(--fw-semibold)' : 'var(--fw-regular)' }}>{title}</span>
+                fontWeight: active && !command ? 'var(--fw-semibold)' : 'var(--fw-regular)' }}>{title}</span>
             {subtitle && (
               <span className="sidebar-row-subtitle" id={subtitleId}
                 data-tip={variant === 'history' ? subtitle : undefined} style={{
@@ -153,6 +169,15 @@ export default function SidebarItem({
           </span>
         )}
         {badge}
+        {trailingActions?.length ? <span className={command ? 'sidebar-row-inline-actions' : undefined}
+          style={{ display: 'inline-flex', alignSelf: 'center', flexShrink: 0,
+          ...(command ? { position: 'absolute', right: action ? 30 : 6, top: '50%', transform: 'translateY(-50%)', background: 'transparent' } : { opacity: actionVisible ? 1 : 0 }),
+          transition: 'opacity 0.12s ease' }}
+          onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}
+          onDoubleClick={event => event.stopPropagation()}>
+          {trailingActions.map(item => <Fragment key={item.label}>{'control' in item ? item.control : <IconButton compact data-subtle aria-label={item.label}
+            data-tip={item.title ?? item.label} disabled={item.disabled} onClick={item.onClick}>{item.icon}</IconButton>}</Fragment>)}
+        </span> : null}
         {action && (
           <button
             type="button"
@@ -167,10 +192,11 @@ export default function SidebarItem({
             onClick={(event) => { event.stopPropagation(); action.onClick(event); }}
             style={{
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              width: historyCompact ? 24 : 28, height: historyCompact ? 24 : 28, padding: 0, border: 'none', borderRadius: 4,
+              width: historyCompact || command ? 24 : 28, height: historyCompact || command ? 24 : 28, padding: 0, border: 'none', borderRadius: 4,
               flexShrink: 0, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+              ...(command ? { position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)' } : {}),
               alignSelf: historyCompact ? 'center' : undefined,
-              opacity: actionVisible ? 1 : 0,
+              opacity: command ? undefined : actionVisible ? 1 : 0,
               pointerEvents: variant === 'history' && !actionVisible ? 'none' : undefined,
               transition: 'opacity 0.12s ease',
             }}

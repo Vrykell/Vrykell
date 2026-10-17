@@ -55,4 +55,12 @@ describe('session activation focus', () => {
     const secret = document.createElement('input'); secret.className = 'ssh-auth-response'; pane.append(secret);
     focusSessionInput('p1'); expect(secret).toHaveFocus();
   });
+  it('focuses an explicitly prepared command draft beside a classic terminal', () => {
+    const main = terminal('normal');
+    termInstances.set('p1', main as unknown as Terminal);
+    useTerminalStore.setState({ scenes: { p1: 'classic' }, keyboardTarget: 'input' });
+    focusSessionInput('p1');
+    expect(document.querySelector('[data-terminal-input]')).toHaveFocus();
+    expect(main.focus).not.toHaveBeenCalled();
+  });
 });

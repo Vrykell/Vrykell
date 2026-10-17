@@ -9,6 +9,8 @@ interface ResizeHandleProps {
   /** Release callback, e.g. to commit a collapsed width. */
   onUp?: () => void;
   testId?: string;
+  label?: string;
+  onReset?: () => void;
 }
 
 /** Grab strip thickness (px). The strip stays transparent; only its hairline is painted. */
@@ -30,7 +32,7 @@ const LINE_THICKNESS = 1;
  * document-level listeners must keep working until the button is released so the user
  * can drag back out of the collapse.
  */
-export default function ResizeHandle({ axis, edge = 'right', onDelta, onUp, testId }: ResizeHandleProps) {
+export default function ResizeHandle({ axis, edge = 'right', onDelta, onUp, testId, label, onReset }: ResizeHandleProps) {
   const startRef = useRef<{ clientX: number; clientY: number } | null>(null);
   const cleanupRef = useRef<() => void>(() => {});
   const lineRef = useRef<HTMLDivElement>(null);
@@ -50,6 +52,19 @@ export default function ResizeHandle({ axis, edge = 'right', onDelta, onUp, test
   return (
     <div
       data-testid={testId}
+      role={label ? 'separator' : undefined}
+      aria-label={label}
+      aria-orientation={label ? isX ? 'vertical' : 'horizontal' : undefined}
+      tabIndex={label ? 0 : undefined}
+      data-tip={label}
+      onDoubleClick={onReset}
+      onKeyDown={event => {
+        if (!label) return;
+        if (event.key === 'Home' && onReset) { event.preventDefault(); onReset(); return; }
+        const negative = isX ? 'ArrowLeft' : 'ArrowUp';
+        const positive = isX ? 'ArrowRight' : 'ArrowDown';
+        if (event.key === negative || event.key === positive) { event.preventDefault(); onDelta(event.key === negative ? -16 : 16); onUp?.(); }
+      }}
       onMouseDown={(e) => {
         e.preventDefault();
         e.stopPropagation();

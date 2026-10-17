@@ -31,6 +31,14 @@ afterEach(() => {
 });
 
 describe('PlacementOverlay', () => {
+  it('shows the supplied split action inside the hovered target', () => {
+    const pick = vi.fn();
+    render(<PlacementOverlay targets={[left, right]} hint="Click here to split the terminal" onPick={pick} onCancel={vi.fn()} />);
+    fireEvent.mouseMove(screen.getByTestId('placement-overlay'), { clientX: 960, clientY: 400 });
+    expect(screen.getByTestId('placement-zone-1')).toHaveTextContent('Click here to split the terminal');
+    fireEvent.click(screen.getByTestId('placement-overlay'), { clientX: 960, clientY: 400 });
+    expect(pick).toHaveBeenCalledWith(right);
+  });
   it('previews only the slot under the pointer, without labels', () => {
     const onPick = vi.fn();
     const onCancel = vi.fn();

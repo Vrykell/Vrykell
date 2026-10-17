@@ -3,7 +3,7 @@
  *
  * The picker (⌘D split or "replace position") commits on click; dragging a pane
  * commits on release. Both preview only the slot under the pointer — like the
- * sidebar's panel drop preview — as a plain gray surface without labels.
+ * sidebar's panel drop preview. Click pickers can show a contextual action hint.
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -16,6 +16,7 @@ import {
   type WindowLayout,
 } from '@features/workspace/model/windowLayout';
 import { t } from '@i18n';
+import { Terminal, iconSizes } from '@ui/icons';
 
 /** Pick the slot containing the normalized pointer position (0..1); the deepest zone wins overlaps. */
 function pickDropZone(targets: DropTarget[], nx: number, ny: number): number | null {
@@ -35,7 +36,7 @@ function pickDropZone(targets: DropTarget[], nx: number, ny: number): number | n
 }
 
 /** The one preview the pointer currently expects, surfaced on the shared gray placement surface. */
-function ZonePreview({ target, testId }: { target: DropTarget; testId: string }) {
+function ZonePreview({ target, testId, hint }: { target: DropTarget; testId: string; hint?: string }) {
   return (
     <DropPlacementPreview
       data-testid={testId}
@@ -46,16 +47,19 @@ function ZonePreview({ target, testId }: { target: DropTarget; testId: string })
         width: `${target.rect.w * 100}%`,
         height: `${target.rect.h * 100}%`,
       }}
-    />
+    >
+      {hint && <><Terminal size={iconSizes.navigation} /><span>{hint}</span></>}
+    </DropPlacementPreview>
   );
 }
 
 /** Click picker: hovering underlines the expected slot, clicking places the terminal there. */
-export function PlacementOverlay({ targets, onPick, onCancel, emptyMessage }: {
+export function PlacementOverlay({ targets, onPick, onCancel, emptyMessage, hint }: {
   targets: DropTarget[];
   onPick: (target: DropTarget) => void;
   onCancel: () => void;
   emptyMessage?: string;
+  hint?: string;
 }) {
   const [hovered, setHovered] = useState<number | null>(null);
   const ref = useRef<HTMLDivElement>(null);
@@ -111,7 +115,7 @@ export function PlacementOverlay({ targets, onPick, onCancel, emptyMessage }: {
       style={{ position: 'absolute', inset: 0, zIndex: 80 }}
     >
       {hovered != null && targets[hovered] && (
-        <ZonePreview testId={`placement-zone-${hovered}`} target={targets[hovered]!} />
+        <ZonePreview testId={`placement-zone-${hovered}`} target={targets[hovered]!} hint={hint} />
       )}
     </div>
   );
