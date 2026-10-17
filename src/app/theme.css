@@ -62,6 +62,11 @@
   --primary-button-text: #ffffff;
   --primary-button-hover-bg: color-mix(in srgb, var(--primary-action) 85%, var(--primary-button-text));
   --resource-accent: color-mix(in srgb, var(--group-blue) 80%, var(--primary-action));
+  --chart-shade: #181a1f;
+  --chart-blue: color-mix(in srgb, var(--resource-accent) 78%, var(--chart-shade));
+  --chart-violet: color-mix(in srgb, var(--group-violet) 78%, var(--chart-shade));
+  --chart-amber: color-mix(in srgb, var(--group-amber) 78%, var(--chart-shade));
+  --chart-cyan: color-mix(in srgb, var(--group-cyan) 78%, var(--chart-shade));
   --history-link-color: var(--group-blue);
   --key-hint-bg: var(--chrome-field);
   --control-active-bg: var(--accent-dim);

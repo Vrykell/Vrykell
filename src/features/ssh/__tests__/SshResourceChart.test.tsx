@@ -1,6 +1,27 @@
 import { render, screen } from '@testing-library/react';
 import { expect, it } from 'vitest';
-import SshResourceChart, { resourceTrendSegments } from '../components/SshResourceChart';
+import SshResourceChart, { resourceHistoryWindow, resourceTrendSegments } from '../components/SshResourceChart';
+
+it('grows the visible range by real elapsed minutes up to the retained five-minute limit', () => {
+  expect(resourceHistoryWindow(undefined, 0)).toBe(60_000);
+  expect(resourceHistoryWindow(0, 45_000)).toBe(60_000);
+  expect(resourceHistoryWindow(0, 75_000)).toBe(120_000);
+  expect(resourceHistoryWindow(0, 600_000)).toBe(300_000);
+  expect(resourceHistoryWindow(60_000, 0)).toBe(60_000);
+});
+
+it('uses the visible minute range without stretching samples into unmeasured time', () => {
+  expect(resourceTrendSegments([{ time: 0, value: 0 }, { time: 15_000, value: 50 }, { time: 30_000, value: 100 }], 30_000, 100, 60_000))
+    .toEqual(['140.0,74.0 209.0,40.0 278.0,6.0']);
+  const view = render(<SshResourceChart samples={[{ time: 0, value: 100 }, { time: 15_000, value: 0 }]} endTime={15_000} label="Usage" />);
+  const frame = screen.getByRole('img', { name: 'Usage' }).closest('.ssh-resource-chart')!;
+  expect(frame).toHaveAttribute('data-window-ms', '60000');
+  expect(frame.querySelector('.ssh-resource-chart-axis')).toHaveTextContent('100%');
+  expect(frame.querySelector('.ssh-status-time-axis')).toHaveTextContent('最近 1 分钟0%');
+  view.rerender(<SshResourceChart samples={[{ time: 0, value: 100 }]} endTime={90_000} label="Usage" />);
+  expect(frame).toHaveAttribute('data-window-ms', '120000');
+  expect(frame.querySelector('.ssh-status-time-axis')).toHaveTextContent('最近 2 分钟0%');
+});
 
 it('plots real readings on a fixed five-minute axis and bounds percentages', () => {
   expect(resourceTrendSegments([{ time: 270000, value: 0 }, { time: 285000, value: 50 }, { time: 300000, value: 100 }], 300000))

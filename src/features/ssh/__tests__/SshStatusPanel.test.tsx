@@ -67,7 +67,22 @@ describe('SSH status panel', () => {
     await waitFor(() => expect(screen.getByRole('meter', { name: 'CPU 使用率' })).toHaveAttribute('aria-valuenow', '50'));
     expect(screen.getByRole('meter', { name: '内存使用率' })).toHaveAttribute('aria-valuenow', '75');
     expect(screen.getByRole('meter', { name: '根分区使用率' })).toHaveAttribute('aria-valuenow', '30');
+    expect(screen.getByText('50% 空闲')).toHaveClass('ssh-status-metric-caption');
+    expect(document.querySelectorAll('.ssh-status-metric-caption')).toHaveLength(3);
     expect(screen.getByRole('img', { name: '资源使用率趋势' }).querySelector('[data-series="CPU"] circle')).toBeInTheDocument();
+    mocks.collect.mockResolvedValueOnce({ ...sample, cpuTotal: 1400, cpuIdle: 899 });
+    fireEvent.click(screen.getByRole('button', { name: '刷新远端资源' }));
+    await waitFor(() => expect(screen.getByRole('meter', { name: 'CPU 使用率' })).toHaveAttribute('aria-valuenow', '51'));
+    expect(screen.getByText('49% 空闲')).toBeInTheDocument();
+  });
+
+  it('keeps a detail row for every resource when its measurements are unavailable', async () => {
+    mocks.collect.mockResolvedValueOnce({ ...sample, cpuTotal: null, cpuIdle: null, memoryTotal: null, memoryAvailable: null, diskUsed: null, diskTotal: null });
+    render(<SshStatusPanel target={target} state={connected} active />);
+    open(); await screen.findByText('Linux 6.8');
+    expect(document.querySelectorAll('.ssh-status-metric-caption')).toHaveLength(3);
+    expect(screen.getAllByText('用量详情不可用')).toHaveLength(3);
+    expect(screen.queryByRole('meter')).not.toBeInTheDocument();
   });
 
   it('separates system identity and load periods from collapsible connection facts', async () => {
