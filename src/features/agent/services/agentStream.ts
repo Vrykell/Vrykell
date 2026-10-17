@@ -12,7 +12,7 @@ import { stepCountIs, streamText, type ModelMessage, type ToolSet } from 'ai';
 import { getFocusedTerminalId } from '@features/terminal';
 import { invoke } from '@platform/diagnostics';
 import type { StreamFn } from '@features/chat';
-import { createChatModel, createNativeWebSearchTool, deepThinkProviderOptions, type ProviderKind } from '@features/agent/services/provider';
+import { createChatModel, createNativeWebSearchTool, deepThinkProviderOptions, supportsThinkingPassback, type ProviderKind } from '@features/agent/services/provider';
 import { useAgentSettings } from '@features/agent/stores/agentSettings';
 import { estimateTokens, planContext, IMAGE_TOKEN_ESTIMATE, type SizedMessage } from '@features/agent/model/context';
 import { attachmentsForModel, supportsVision } from '@features/agent/model/attachments';
@@ -229,11 +229,10 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   }
   const hasTools = Object.keys(tools).length > 0;
 
-  // 深思考：只有真正支持回传 thinking 的端点才发送选项（否则兼容端点会 400）。
-  const thinkingOptions = settings.deepThink
-    ? deepThinkProviderOptions(info.provider, settings.thinkingLevel, info.base_url)
-    : undefined;
-  const thinkingOn = thinkingOptions != null && Object.keys(thinkingOptions).length > 0;
+  // 深思考：兼容端点无法回传 thinking，显式关闭；官方端点按开关发送。
+  const thinkingOptions = deepThinkProviderOptions(info.provider, settings.thinkingLevel, info.base_url, settings.deepThink);
+  const thinkingOn = Object.keys(thinkingOptions).length > 0;
+  const thinkingEnabled = info.provider === 'anthropic' && settings.deepThink && supportsThinkingPassback(info.base_url);
 
   // AI SDK v7 的流不 reject：错误走 onError 回调 + fullStream 的 error part，
   // 迭代静默结束。这里捕获后重抛，维持 chat store「catch → 显示出错了」的行为。
@@ -251,7 +250,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     maxOutputTokens:
       settings.maxOutputTokens > 0
         ? settings.maxOutputTokens
-        : thinkingOn && info.provider === 'anthropic'
+        : thinkingEnabled
           ? (settings.thinkingLevel === 'low' ? 8000 : settings.thinkingLevel === 'medium' ? 16000 : 32000)
           : undefined,
     temperature: settings.temperature != null ? settings.temperature : undefined,

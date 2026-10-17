@@ -121,7 +121,7 @@ describe('agentStream（mock IPC 边界）', () => {
     });
   });
 
-  it('anthropic 兼容端点：请求体不携带 thinking（官方端点才发）', async () => {
+  it('anthropic 兼容端点：请求体显式关闭 thinking（官方端点才开启）', async () => {
     const bodies: string[] = [];
     mockInvoke.mockImplementation(async (cmd, args) => {
       if (cmd === 'get_ai_config') {
@@ -152,7 +152,8 @@ describe('agentStream（mock IPC 边界）', () => {
     } finally {
       useAgentSettings.setState({ global: before });
     }
-    expect(bodies.join('\n')).not.toContain('"thinking"');
+    expect(bodies.join('\n')).toContain('"thinking":{"type":"disabled"}');
+    expect(bodies.join('\n')).not.toContain('"budgetTokens"');
   });
 
   it('未配 key：抛中文提示', async () => {
