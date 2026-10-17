@@ -15,7 +15,14 @@ vi.mock('@tauri-apps/api/core', () => {
   };
 });
 
+vi.mock('@platform/diagnostics', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@platform/diagnostics')>();
+  return { ...actual, diagnostic: vi.fn(actual.diagnostic) };
+});
+
 import { invoke, Channel } from '@tauri-apps/api/core';
+import { diagnostic } from '@platform/diagnostics';
+import { useAgentSettings } from '@features/agent/stores/agentSettings';
 import { agentStream } from '@features/agent/services/agentStream';
 
 const mockInvoke = vi.mocked(invoke);
@@ -66,6 +73,7 @@ describe('agentStream（mock IPC 边界）', () => {
   // mock 自身作为返回值，vitest 会把返回值当 cleanup 钩子在测试后零参调用。
   beforeEach(() => {
     mockInvoke.mockClear();
+    vi.mocked(diagnostic).mockClear();
   });
 
   it('正常流式：onChunk 收到完整文本', async () => {
@@ -79,11 +87,51 @@ describe('agentStream（mock IPC 边界）', () => {
     expect(text).toBe('你好，世界');
   });
 
-  it('HTTP 错误：抛出含服务端消息的错误', async () => {
-    setupInvoke('{"error":{"message":"invalid key"}}', 401);
+  it('HTTP 错误：抛出含服务端消息的错误，并把失败写进诊断', async () => {
+    setupInvoke('{"error":{"message":"The `content[].thinking` in the thinking mode must be passed back to the API."}}', 400);
     await expect(agentStream([{ role: 'user', content: 'hi' }], () => {})).rejects.toThrow(
-      'invalid key',
+      'thinking mode must be passed back',
     );
+    expect(vi.mocked(diagnostic)).toHaveBeenCalledWith('agent-stream-error', expect.objectContaining({
+      provider: 'openai-compatible',
+      model: 'gpt-4o-mini',
+      baseUrl: 'https://api.openai.com/v1',
+      error: expect.stringContaining('thinking mode must be passed back'),
+    }));
+  });
+
+  it('anthropic 兼容端点：请求体不携带 thinking（官方端点才发）', async () => {
+    const bodies: string[] = [];
+    mockInvoke.mockImplementation(async (cmd, args) => {
+      if (cmd === 'get_ai_config') {
+        return {
+          has_key: false, has_anthropic_key: true,
+          base_url: 'https://api.deepseek.com/anthropic',
+          model: 'deepseek-flash', provider: 'anthropic',
+          has_gemini_key: false, has_tavily_key: false,
+          models: [{ id: 'default', name: '默认', provider: 'anthropic', baseUrl: 'https://api.deepseek.com/anthropic', model: 'deepseek-flash', capabilities: { vision: false, reasoning: false, tools: true, search: false } }],
+          active_model: 'default',
+        } as never;
+      }
+      if (cmd === 'llm_stream') {
+        bodies.push(String((args as { req?: { body?: string } })?.req?.body ?? ''));
+        const ch = (args as { onEvent: Channel<unknown> }).onEvent;
+        const send = ch.onmessage as (ev: unknown) => void;
+        send({ kind: 'started', status: 200, headers: [['content-type', 'text/event-stream']] });
+        for (const c of toChunks('data: {"type":"message_start"}\n\ndata: [DONE]\n\n', 7)) send({ kind: 'chunk', data: c });
+        send({ kind: 'done' });
+        return undefined as never;
+      }
+      throw new Error(`unexpected invoke: ${cmd}`);
+    });
+    const before = useAgentSettings.getState().global;
+    useAgentSettings.setState({ global: { ...before, deepThink: true, thinkingLevel: 'high' } });
+    try {
+      await agentStream([{ role: 'user', content: 'hi' }], () => {}).catch(() => {});
+    } finally {
+      useAgentSettings.setState({ global: before });
+    }
+    expect(bodies.join('\n')).not.toContain('"thinking"');
   });
 
   it('未配 key：抛中文提示', async () => {

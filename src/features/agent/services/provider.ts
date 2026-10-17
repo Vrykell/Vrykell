@@ -98,10 +98,25 @@ export type ThinkingLevel = 'low' | 'medium' | 'high';
 export function deepThinkProviderOptions(
   provider: ProviderKind,
   level: ThinkingLevel = 'high',
+  baseUrl = '',
 ): Record<string, Record<string, Jsonish>> {
   switch (provider) {
-    case 'anthropic':
+    case 'anthropic': {
+      // Thinking blocks must be echoed back on the next request. Only the official endpoint does
+      // that reliably; a compatibility endpoint (DeepSeek's shim, say) answers a follow-up that
+      // carries thinking with HTTP 400 "content[].thinking ... must be passed back", so those
+      // endpoints fall back to a plain request instead of failing the turn. An empty base URL is
+      // the vendor default, i.e. the official endpoint.
+      const host = (() => {
+        try {
+          return new URL(baseUrl).host.toLowerCase();
+        } catch {
+          return '';
+        }
+      })();
+      if (host && host !== 'api.anthropic.com') return {};
       return { anthropic: { thinking: { type: 'enabled', budgetTokens: level === 'low' ? 4000 : level === 'medium' ? 8000 : 16000 } } };
+    }
     case 'gemini':
       return { google: { thinkingConfig: { thinkingBudget: level === 'low' ? 4096 : level === 'medium' ? 8192 : 16384 } } };
     default:

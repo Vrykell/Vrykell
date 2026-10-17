@@ -13,6 +13,7 @@ import { getFocusedTerminalId } from '@features/terminal';
 import { invoke } from '@platform/diagnostics';
 import type { StreamFn } from '@features/chat';
 import { createChatModel, createNativeWebSearchTool, deepThinkProviderOptions, type ProviderKind } from '@features/agent/services/provider';
+import { terminalDebug } from '@features/terminal/services/terminalDebug';
 import { useAgentSettings } from '@features/agent/stores/agentSettings';
 import { estimateTokens, planContext, IMAGE_TOKEN_ESTIMATE, type SizedMessage } from '@features/agent/model/context';
 import { attachmentsForModel, supportsVision } from '@features/agent/model/attachments';
@@ -226,6 +227,12 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   }
   const hasTools = Object.keys(tools).length > 0;
 
+  // 深思考：只有真正支持回传 thinking 的端点才发送选项（否则兼容端点会 400）。
+  const thinkingOptions = settings.deepThink
+    ? deepThinkProviderOptions(info.provider, settings.thinkingLevel, info.base_url)
+    : undefined;
+  const thinkingOn = thinkingOptions != null && Object.keys(thinkingOptions).length > 0;
+
   // AI SDK v7 的流不 reject：错误走 onError 回调 + fullStream 的 error part，
   // 迭代静默结束。这里捕获后重抛，维持 chat store「catch → 显示出错了」的行为。
   let streamError: unknown = null;
@@ -238,11 +245,11 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     abortSignal: ctx?.signal,
     // M6 深思考：providerOptions 透传（openai-compatible → reasoning_effort）。
     // anthropic thinking 要求 maxOutputTokens > budgetTokens(8000)。
-    providerOptions: settings.deepThink ? deepThinkProviderOptions(info.provider, settings.thinkingLevel) : undefined,
+    providerOptions: thinkingOn ? thinkingOptions : undefined,
     maxOutputTokens:
       settings.maxOutputTokens > 0
         ? settings.maxOutputTokens
-        : settings.deepThink && info.provider === 'anthropic'
+        : thinkingOn && info.provider === 'anthropic'
           ? (settings.thinkingLevel === 'low' ? 8000 : settings.thinkingLevel === 'medium' ? 16000 : 32000)
           : undefined,
     temperature: settings.temperature != null ? settings.temperature : undefined,
@@ -355,6 +362,17 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   }
   if (streamError != null) {
     console.error('[agentStream] 流式请求失败:', streamError);
+    // Persist the failure in the diagnostics stream: the transcript only shows the final message,
+    // so a failed turn needs a record afterwards (provider, endpoint, step and the server text).
+    terminalDebug('agent-stream-error', {
+      provider: info.provider,
+      model: info.model,
+      baseUrl: info.base_url,
+      steps: stepCount,
+      tools: hasTools,
+      deepThink: settings.deepThink,
+      error: describeError(streamError),
+    });
     throw new Error(describeError(streamError));
   }
 };
