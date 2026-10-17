@@ -777,6 +777,8 @@ const zh: Record<string, string> = {
   'Search limit reached. Use a narrower directory or a more specific file name.': '已达到搜索范围上限，请缩小目录范围或输入更具体的文件名。',
   'Some subdirectories could not be read.': '部分子目录无法读取，搜索结果可能不完整。',
   'Return to home directory': '返回默认目录',
+  'Return to the previous view': '回到上一个视图',
+  'Return to the next view': '回到下一个视图',
   'SSH session is not ready': 'SSH 会话未就绪',
   'The terminal has not reported its working directory yet.': '终端尚未上报工作目录，请等待目录信息或启用 Shell 集成后重试。',
   'files.undo.cut': '移动',

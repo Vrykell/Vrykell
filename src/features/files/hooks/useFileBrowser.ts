@@ -32,13 +32,43 @@ export interface FileUndo {
 /** 回退历史最多保留的步数（更早的步进会把暂存删除项永久清理）。 */
 const MAX_UNDO_STEPS = 20;
 
-/** 视图快照：回退按钮回到上一个文件树视图。 */
+/**
+ * A directory's saved view: what the tree showed when the directory was last
+ * left. Back, forward and revisits restore this state.
+ */
 interface ViewSnapshot {
-  path: string | null;
   expanded: ReadonlySet<string>;
   selection: ReadonlySet<string>;
   anchorPath: string | null;
   scrollTop: number;
+}
+
+/**
+ * One entry of the visit trail: every visited directory appears once, in
+ * first-visit order. Navigating to a directory that is already on the trail
+ * moves the cursor to its entry instead of appending, so back never replays a
+ * branch the user jumped out of.
+ */
+interface TrailEntry {
+  path: string | null;
+  view: ViewSnapshot;
+}
+
+/** The visit trail plus the cursor position of the directory on screen. */
+interface TrailState {
+  entries: TrailEntry[];
+  cursor: number;
+}
+
+/** Beyond this many directories the oldest trail entries are dropped. */
+const MAX_TRAIL_ENTRIES = 50;
+
+/**
+ * View of a directory that is being entered for the first time: nothing
+ * selected and the list at the top (expansion follows the global state).
+ */
+function freshView(expanded: ReadonlySet<string>): ViewSnapshot {
+  return { expanded, selection: new Set(), anchorPath: null, scrollTop: 0 };
 }
 
 /**
@@ -53,6 +83,8 @@ export interface UseFileBrowserOptions {
   enabled?: boolean;
   /** 初始目录（本地：终端 cwd / null = 主目录；远程：记忆的目录 / null = 远端主目录）。 */
   initialPath?: string | null;
+  /** True when `initialPath` is already final: `null` then means the drive view, not "resolve home". */
+  initialResolved?: boolean;
   /** 目录变化时持久化（远程面板按连接记忆目录）。 */
   onPathChange?: (path: string | null) => void;
   /** 双击 / Enter 打开文件（本地：终端编辑器；远程：远端编辑器）。 */
@@ -81,12 +113,17 @@ export function useFileBrowser({
   target,
   enabled = true,
   initialPath = null,
+  initialResolved = false,
   onPathChange,
   openEntry,
 }: UseFileBrowserOptions) {
   const ops: FileOps = useMemo(() => fileOpsFor(target), [target]);
-  const [path, setPath] = useState<string | null>(initialPath);
-  const initialized = useRef(initialPath !== null);
+  const [trail, setTrail] = useState<TrailState>(() => ({
+    entries: [{ path: initialPath, view: freshView(new Set()) }],
+    cursor: 0,
+  }));
+  const path = trail.entries[trail.cursor]?.path ?? null;
+  const initialized = useRef(initialPath !== null || initialResolved);
   const requestVersion = useRef(0);
   const navigationVersion = useRef(0);
   const [navigationPending, setNavigationPending] = useState(false);
@@ -100,7 +137,6 @@ export function useFileBrowser({
   const [loading, setLoading] = useState(false);
   const [loadingHint, setLoadingHint] = useState(false);
   const loadingHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [history, setHistory] = useState<ViewSnapshot[]>([]);
   const [selection, setSelectionState] = useState<ReadonlySet<string>>(new Set());
   const [anchorPath, setAnchorPath] = useState<string | null>(null);
   const [expandedSet, setExpandedSet] = useState<ReadonlySet<string>>(new Set());
@@ -159,8 +195,13 @@ export function useFileBrowser({
    */
   const onPathChangeRef = useRef(onPathChange);
   onPathChangeRef.current = onPathChange;
-  const rememberPath = useCallback((next: string | null) => {
-    setPath(next);
+
+  /** Correct the current entry's path in place; a resolved start directory is not a navigation. */
+  const correctPath = useCallback((next: string | null) => {
+    setTrail((prev) => ({
+      entries: prev.entries.map((entry, index) => (index === prev.cursor ? { ...entry, path: next } : entry)),
+      cursor: prev.cursor,
+    }));
     onPathChangeRef.current?.(next);
   }, []);
 
@@ -183,10 +224,10 @@ export function useFileBrowser({
       if (version !== requestVersion.current) return;
       setLoadedPath(currentPath);
       if (currentPath === null && result.base) {
-        // 目标自己解析出的起始目录（远端主目录）：静默修正，不进入回退历史
+        // The target resolved its own start directory (remote home): correct silently, no trail entry.
         initialized.current = true;
         preloaded.current = { path: result.base, result };
-        rememberPath(result.base);
+        correctPath(result.base);
       }
       // 本地面板的 null 路径是磁盘视图（条目为空）；其余情况直接用列表结果
       const showDisks = currentPath === null && ops.disks !== undefined;
@@ -210,9 +251,9 @@ export function useFileBrowser({
       setLoading(false);
       setLoadingHint(false);
     });
-  }, [clearLoadingTimer, ops, rememberPath]);
+  }, [clearLoadingTimer, correctPath, ops]);
 
-  // 初始目录：外部给定则直接用；本地面板未给定 cwd 时落到主目录
+  // Start directory: use the one given from outside; a local panel without a cwd falls back to home.
   useEffect(() => {
     if (!enabled || initialized.current) return;
     if (initialPath !== null) {
@@ -223,9 +264,9 @@ export function useFileBrowser({
     void ops.home().then((home) => {
       if (!alive.current || initialized.current) return;
       initialized.current = true;
-      rememberPath(home);
+      correctPath(home);
     }).catch(() => {});
-  }, [enabled, initialPath, ops, rememberPath]);
+  }, [correctPath, enabled, initialPath, ops]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -296,9 +337,50 @@ export function useFileBrowser({
     setAnchorPath(anchor ?? (next.size > 0 ? Array.from(next).pop()! : null));
   }, []);
 
-  // ── 导航与视图回退 ──
+  // ── Navigation and the visit trail ──
 
-  /** Commit navigation only after the destination can be listed. */
+  /** Save the live view of the entry being left; it is restored on return. */
+  const captureView = useCallback((): ViewSnapshot => ({
+    expanded: expandedSet,
+    selection,
+    anchorPath,
+    scrollTop: scrollRef.current?.scrollTop ?? 0,
+  }), [anchorPath, expandedSet, selection]);
+
+  /** Put a saved view back on screen (the list reloads because `path` changes). */
+  const restoreView = useCallback((view: ViewSnapshot) => {
+    setExpandedSet(new Set(view.expanded));
+    setSelectionState(new Set(view.selection));
+    setAnchorPath(view.anchorPath);
+    pendingScrollTop.current = view.scrollTop;
+  }, []);
+
+  /** Move the cursor to another trail entry: save the live view, then restore the target's. */
+  const moveCursor = useCallback((nextCursor: number) => {
+    const target = trail.entries[nextCursor];
+    if (!target) return;
+    navigationVersion.current += 1;
+    setNavigationPending(false);
+    const snapshot = captureView();
+    setTrail((prev) => ({
+      entries: prev.entries.map((entry, index) => (index === prev.cursor ? { ...entry, view: snapshot } : entry)),
+      cursor: nextCursor,
+    }));
+    restoreView(target.view);
+    onPathChangeRef.current?.(target.path);
+  }, [captureView, restoreView, trail.entries]);
+
+  const goBack = useCallback(() => moveCursor(trail.cursor - 1), [moveCursor, trail.cursor]);
+  const goForward = useCallback(() => moveCursor(trail.cursor + 1), [moveCursor, trail.cursor]);
+
+  /**
+   * Commit navigation only after the destination can be listed.
+   *
+   * A directory that is already on the trail is a history jump: the cursor
+   * moves to its entry and the forward side stays intact. A new directory
+   * drops the forward side, becomes the trail head and starts from a blank
+   * view.
+   */
   const navigate = useCallback(async (nextPath: string | null) => {
     initialized.current = true;
     const version = ++navigationVersion.current;
@@ -319,34 +401,36 @@ export function useFileBrowser({
     if (!alive.current || version !== navigationVersion.current) return false;
     const destination = result.base ?? nextPath;
     preloaded.current = { path: destination, result };
-    setHistory((stack) => [...stack, {
-      path,
-      expanded: expandedSet,
-      selection,
-      anchorPath,
-      scrollTop: scrollRef.current?.scrollTop ?? 0,
-    }]);
+    const target = trail.entries.findIndex((entry) => entry.path === destination);
+    const snapshot = captureView();
+
+    if (target !== -1 && target !== trail.cursor) {
+      setTrail((prev) => ({
+        entries: prev.entries.map((entry, index) => (index === prev.cursor ? { ...entry, view: snapshot } : entry)),
+        cursor: target,
+      }));
+      restoreView(trail.entries[target]!.view);
+      onPathChangeRef.current?.(destination);
+      return true;
+    }
+    if (target === trail.cursor) {
+      // The path resolved to the directory already on screen: reload it.
+      load(destination);
+      return true;
+    }
+    const view = freshView(expandedSet);
+    setTrail((prev) => {
+      const saved = prev.entries.map((entry, index) => (index === prev.cursor ? { ...entry, view: snapshot } : entry));
+      const next = [...saved.slice(0, prev.cursor + 1), { path: destination, view }];
+      const entries = next.length > MAX_TRAIL_ENTRIES ? next.slice(next.length - MAX_TRAIL_ENTRIES) : next;
+      return { entries, cursor: entries.length - 1 };
+    });
     pendingScrollTop.current = 0;
     setSelectionState(new Set());
     setAnchorPath(null);
-    rememberPath(destination);
-    if (destination === path) load(destination);
+    onPathChangeRef.current?.(destination);
     return true;
-  }, [anchorPath, error, expandedSet, load, ops, path, rememberPath, selection, settled, toast]);
-
-  /** 回退到上一个视图快照（而不是固定上级目录）。 */
-  const goBack = useCallback(() => {
-    navigationVersion.current += 1;
-    setNavigationPending(false);
-    const snapshot = history[history.length - 1];
-    if (!snapshot) return;
-    setHistory(history.slice(0, -1));
-    setExpandedSet(new Set(snapshot.expanded));
-    setSelectionState(new Set(snapshot.selection));
-    setAnchorPath(snapshot.anchorPath);
-    pendingScrollTop.current = snapshot.scrollTop;
-    rememberPath(snapshot.path);
-  }, [history, rememberPath]);
+  }, [captureView, error, expandedSet, load, ops, path, restoreView, settled, toast, trail.entries, trail.cursor]);
 
   // ── 树形展开 ──
 
@@ -803,7 +887,9 @@ export function useFileBrowser({
     load,
     navigate,
     goBack,
-    canGoBack: history.length > 0,
+    goForward,
+    canGoBack: trail.cursor > 0,
+    canGoForward: trail.cursor < trail.entries.length - 1,
     selection,
     anchorPath,
     selectOnly,

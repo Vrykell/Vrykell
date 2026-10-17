@@ -141,3 +141,38 @@ test('going back returns to the previous view, not the parent folder', async ({ 
   await expect(nestedDir).toHaveAttribute('data-selected', 'true');
   await expect(page.getByTestId('local-back-btn')).toBeDisabled();
 });
+
+test('the visit trail jumps to visited directories and never replays an abandoned branch', async ({ page }) => {
+  const tree = page.getByTestId('local-file-tree');
+  const branch30 = tree.locator('[data-testid="file-row"][data-path="/home/e2e/project/branch-30"]');
+  const branch31 = tree.locator('[data-testid="file-row"][data-path="/home/e2e/project/branch-31"]');
+
+  // Enter a directory for the first time: it becomes the trail head.
+  await branch30.dblclick();
+  await expect(tree).toHaveAttribute('data-path', '/home/e2e/project/branch-30');
+  await expect(page.getByTestId('local-forward-btn')).toBeDisabled();
+
+  // Jump back to the already visited project through the path bar: the tree
+  // jump moves the cursor to its trail entry, so back cannot re-descend into
+  // branch-30 and forward returns to it.
+  await page.getByTestId('crumb-bar').locator('[data-tip="单击编辑路径，回车跳转"]').click();
+  const input = page.getByTestId('path-input');
+  await input.fill('/home/e2e/project');
+  await input.press('Enter');
+  await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
+  await expect(page.getByTestId('local-back-btn')).toBeDisabled();
+  await expect(page.getByTestId('local-forward-btn')).toBeEnabled();
+
+  await page.getByTestId('local-forward-btn').click();
+  await expect(tree).toHaveAttribute('data-path', '/home/e2e/project/branch-30');
+  await expect(page.getByTestId('local-forward-btn')).toBeDisabled();
+  await page.getByTestId('local-back-btn').click();
+  await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
+
+  // Entering a directory that is not on the trail drops the forward side.
+  await branch31.dblclick();
+  await expect(tree).toHaveAttribute('data-path', '/home/e2e/project/branch-31');
+  await expect(page.getByTestId('local-forward-btn')).toBeDisabled();
+  await page.getByTestId('local-back-btn').click();
+  await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
+});

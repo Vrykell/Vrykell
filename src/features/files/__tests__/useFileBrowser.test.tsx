@@ -58,6 +58,13 @@ describe('useFileBrowser（本地目标）', () => {
     await waitFor(() => expect(noCwd.result.current.path).toBe('C:/Users/test'));
   });
 
+  it('initialResolved 为 true 时 null 表示盘符视图，不再解析主目录', async () => {
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: null, initialResolved: true, openEntry }));
+    await waitFor(() => expect(fsMocks.fsDisks).toHaveBeenCalled());
+    expect(fsMocks.fsHome).not.toHaveBeenCalled();
+    expect(result.current.path).toBeNull();
+  });
+
   it('调用方每次渲染换新回调时不重新拉取目录（如调整面板宽度导致的重渲染）', async () => {
     const { result, rerender } = renderHook(
       ({ tick }: { tick: number }) => useFileBrowser({
@@ -97,6 +104,87 @@ describe('useFileBrowser（本地目标）', () => {
     await waitFor(() => expect(result.current.entries[0]?.name).toBe('src'));
     expect([...result.current.selection].sort()).toEqual(['C:/work/a.txt', 'C:/work/src']);
     expect(result.current.canGoBack).toBe(false);
+  });
+
+  it('回到访问过的目录是轨迹跳转：回退不折返旧分支，前进回到跳转来源', async () => {
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(2));
+
+    await act(async () => { await result.current.navigate('C:/work/src'); });
+    await waitFor(() => expect(result.current.path).toBe('C:/work/src'));
+
+    // 回跳已经访问过的根目录：光标移回已有条目，不产生重复记录
+    await act(async () => { await result.current.navigate('C:/work'); });
+    await waitFor(() => expect(result.current.path).toBe('C:/work'));
+    expect(result.current.canGoBack).toBe(false);
+    expect(result.current.canGoForward).toBe(true);
+
+    // 前进 = 回到跳转来源；再回退仍只沿轨迹移动
+    act(() => result.current.goForward());
+    await waitFor(() => expect(result.current.path).toBe('C:/work/src'));
+    expect(result.current.canGoForward).toBe(false);
+    act(() => result.current.goBack());
+    await waitFor(() => expect(result.current.path).toBe('C:/work'));
+  });
+
+  it('再次进入访问过的目录恢复上次离开时的选中', async () => {
+    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
+      dir === 'C:/work/src' ? [entry('main.ts', 'C:/work/src/main.ts')] : [entry('src', 'C:/work/src', true), entry('a.txt', 'C:/work/a.txt')],
+    ));
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(2));
+
+    await act(async () => { await result.current.navigate('C:/work/src'); });
+    await waitFor(() => expect(result.current.path).toBe('C:/work/src'));
+    act(() => result.current.selectOnly('C:/work/src/main.ts'));
+
+    // 离开 src 时保存它的视图，再次进入时恢复
+    await act(async () => { await result.current.navigate('C:/work'); });
+    await waitFor(() => expect(result.current.path).toBe('C:/work'));
+    await act(async () => { await result.current.navigate('C:/work/src'); });
+    await waitFor(() => expect(result.current.path).toBe('C:/work/src'));
+    expect([...result.current.selection]).toEqual(['C:/work/src/main.ts']);
+  });
+
+  it('进入新目录丢弃前进侧历史', async () => {
+    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
+      dir === 'C:/work/archive' ? [entry('old.txt', 'C:/work/archive/old.txt')] : [entry('src', 'C:/work/src', true), entry('a.txt', 'C:/work/a.txt')],
+    ));
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(2));
+
+    await act(async () => { await result.current.navigate('C:/work/src'); });
+    await act(async () => { await result.current.navigate('C:/work'); });
+    expect(result.current.canGoForward).toBe(true);
+
+    await act(async () => { await result.current.navigate('C:/work/archive'); });
+    await waitFor(() => expect(result.current.path).toBe('C:/work/archive'));
+    expect(result.current.canGoForward).toBe(false);
+    expect(result.current.canGoBack).toBe(true);
+
+    act(() => result.current.goBack());
+    await waitFor(() => expect(result.current.path).toBe('C:/work'));
+  });
+
+  it('轨迹超过上限时丢弃最旧目录', async () => {
+    fsMocks.fsList.mockResolvedValue([]);
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
+    await waitFor(() => expect(result.current.path).toBe('C:/work'));
+
+    for (let index = 0; index < 55; index += 1) {
+      await act(async () => { await result.current.navigate(`C:/work/d${index}`); });
+    }
+    expect(result.current.canGoBack).toBe(true);
+
+    let steps = 0;
+    while (result.current.canGoBack && steps < 80) {
+      act(() => result.current.goBack());
+      await waitFor(() => expect(result.current.canGoForward).toBe(true));
+      steps += 1;
+    }
+    // 轨迹保持 50 条：起点（C:/work）已被挤出，只能退到第 6 个目录
+    expect(steps).toBe(49);
+    expect(result.current.path).toBe('C:/work/d5');
   });
 
   it('展开目录时懒加载子项并缓存，重复展开不再请求', async () => {

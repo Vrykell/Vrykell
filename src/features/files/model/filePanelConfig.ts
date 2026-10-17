@@ -27,6 +27,7 @@ export interface FilePanelConfig {
     crumbBar: string;
     pathInput: string;
     back: string;
+    forward: string;
     more: string;
     row: (entry: FsEntry) => string;
     rowSelector: string;
@@ -72,6 +73,7 @@ const LOCAL_IDS: FilePanelConfig['ids'] = {
   crumbBar: 'crumb-bar',
   pathInput: 'path-input',
   back: 'local-back-btn',
+  forward: 'local-forward-btn',
   more: 'local-more-btn',
   row: () => 'file-row',
   rowSelector: '[data-file-row]',
@@ -83,6 +85,7 @@ const SSH_IDS: FilePanelConfig['ids'] = {
   crumbBar: 'remote-crumb-bar',
   pathInput: 'remote-path-input',
   back: 'remote-back-btn',
+  forward: 'remote-forward-btn',
   more: 'remote-more-btn',
   row: (entry) => `remote-file-${entry.name}`,
   rowSelector: '[data-file-row]',
