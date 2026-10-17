@@ -163,6 +163,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
       { command: 'echo hello-e2e', cwd: '/home/e2e', timestamp: Date.now() - 3000, exit_code: 0 },
     ];
     const searchCalls: { cmd: string; args: Record<string, unknown> }[] = [];
+    const windowFrameCalls: { label: string; color: string }[] = [];
     const sshConnections: Record<string, unknown>[] = [
       { id: 'ssh-1', name: '生产服务器', host: 'prod.example.com', port: 22, user: 'root', password: '', authMethod: 'password', lastOpenedAt: null, hasPassword: true },
     ];
@@ -217,6 +218,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
     (window as unknown as Record<string, unknown>).__SCHEDULE_OPS__ = scheduleOps;
     (window as unknown as Record<string, unknown>).__THEME__ = theme;
     (window as unknown as Record<string, unknown>).__SEARCH_CALLS__ = searchCalls;
+    (window as unknown as Record<string, unknown>).__WINDOW_FRAME_CALLS__ = windowFrameCalls;
 
     const A = '\x1b]133;A\x07';
     const C = '\x1b]133;C\x07';
@@ -831,6 +833,9 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             return undefined;
           }
           // ── 主题 ──
+          case 'apply_window_frame':
+            windowFrameCalls.push({ label: windowLabel, color: String(args.color) });
+            return undefined;
           case 'get_theme_config':
             return theme;
           case 'set_theme_config':
@@ -1520,6 +1525,11 @@ export function searchCalls(page: Page): Promise<{ cmd: string; args: Record<str
 /** 读取主题配置（get_theme_config / set_theme_config 之后的状态） */
 export function themeConfig(page: Page): Promise<{ opacity: number; backgroundImage: string | null; vars: Record<string, string> }> {
   return page.evaluate(() => (window as unknown as { __THEME__: { opacity: number; backgroundImage: string | null; vars: Record<string, string> } }).__THEME__);
+}
+
+/** 读取窗口边框颜色同步记录（apply_window_frame） */
+export function windowFrameCalls(page: Page): Promise<{ label: string; color: string }[]> {
+  return page.evaluate(() => (window as unknown as { __WINDOW_FRAME_CALLS__: { label: string; color: string }[] }).__WINDOW_FRAME_CALLS__);
 }
 
 /** 读取记忆当前内容（FACT） */

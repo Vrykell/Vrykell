@@ -18,6 +18,7 @@ import {
 } from '@config/theme/tokens';
 import { termInstances } from '@features/terminal';
 import { readXtermTheme } from '@features/terminal/model/xtermTheme';
+import { syncWindowFrame } from '@platform/windowChrome';
 
 export interface TerminalThemeConfig {
   /** 应用整体不透明度 0.05..=1.0（1 = 完全不透明） */
@@ -100,6 +101,8 @@ export function applyTerminalTheme(config: TerminalThemeConfig, mode?: ThemeMode
   setThemeOverrides(config.vars ?? {});
   applyTheme(mode ?? getCurrentTheme());
   reapplyXtermTheme();
+  // The native window frame follows the color that touches it.
+  syncWindowFrame();
 }
 
 interface TerminalThemeState {

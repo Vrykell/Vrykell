@@ -308,6 +308,13 @@ Fitting that clears the renderer before resizing causes an additional blank fram
 - **Fix**: the Rust side queues the directory first and only then emits a wake-up signal; the frontend drains the queue once right after subscribing. The drain is atomic (one side takes an entry), so the event path and the catch-up path never open the same tab twice.
 - **Lesson**: when a running instance must serve an external request, the event is only a wake-up call and the data belongs in a replayable queue. The single-instance plugin also has to be registered before the other plugins, so a second start is intercepted before the rest of the setup runs.
 
+### 7.11 Windows 11 Draws a 1px Border Around Every Window and `DWMWA_COLOR_NONE` Does Not Remove It (`platform/window_chrome.rs`)
+- **Symptom**: the main window and the tool windows (`decorations: false`) showed a one pixel seam along the top edge, and a transparent window also leaked the desktop through its rounded corners.
+- **Root cause**: the outermost pixel ring of the window belongs to the native frame (with `shadow: true` tao insets the client by the frame), and Windows 11 paints a one pixel border there. `DWMWA_BORDER_COLOR = DWMWA_COLOR_NONE` (0xFFFFFFFE) fails to remove that border on some system builds and falls back to a dark default color (about #1A2129 in dark mode), which reads exactly as a seam; the frame area outside the rounding has nothing to draw on a **transparent** window, so the desktop shows through at the corners.
+- **Fix**: no WM_NCCALCSIZE or corner-preference tricks; the system shadow and rounded corners stay (`shadow: true`). The Windows window becomes **opaque** (`transparent: false`, so DWM paints the frame's corner areas), and the frontend hands the color that touches the frame (the main window's `--chrome-bg`, a tool window's `--surface`) to `apply_window_frame`; the backend paints the 1px border through `DWMWA_BORDER_COLOR` and keeps the window background on the same color with `set_background_color`. `applyTerminalTheme` resynchronizes it whenever the theme changes.
+- **Trade-off**: Windows no longer uses a transparent window, so the wallpaper plus opacity "see the desktop through" effect does not apply there (the wallpaper the app draws itself is unaffected).
+- **Lesson**: the outermost pixel ring of an undecorated window belongs to the system and can only be recolored, not removed; on a transparent window the frame area outside the rounding is bound to leak the background. Either accept that system-drawn pixel or make the window opaque. Do not use `DWMWA_COLOR_NONE` as a way to hide the border.
+
 ---
 
 ## 8. SQLite / Persistence

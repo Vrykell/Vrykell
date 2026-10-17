@@ -52,16 +52,6 @@ pub fn run() {
         .manage(agent::ai::LlmStreamState::default())
         .manage(terminal::pty::KillState::default())
         .manage(platform::context_menu::ForwardedLaunchDirectories::default())
-        .on_page_load(|webview, _payload| {
-            #[cfg(windows)]
-            if platform::window_chrome::is_tool_window(webview.label()) {
-                if let Some(window) = webview.app_handle().get_webview_window(webview.label()) {
-                    platform::window_chrome::hide_border(&window);
-                }
-            }
-            #[cfg(not(windows))]
-            let _ = webview;
-        })
         .on_window_event(|window, event| {
             if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
                 for (label, tool) in window.app_handle().webview_windows() {
@@ -76,10 +66,6 @@ pub fn run() {
         .setup(|app| {
             if let Err(error) = terminal::debug::initialize(app.handle()) {
                 eprintln!("[terminal-debug] log initialization failed: {error}");
-            }
-            #[cfg(windows)]
-            if let Some(window) = app.get_webview_window("main") {
-                platform::window_chrome::hide_border(&window);
             }
             // 上次会话残留的可回退删除暂存项：补送入系统回收站（后台执行，不阻塞启动）
             std::thread::spawn(files::fs::sweep_undo_dir);
@@ -105,6 +91,7 @@ pub fn run() {
             platform::context_menu::context_menu_manage,
             platform::context_menu::shell_launch_directory,
             platform::context_menu::shell_take_forwarded_directories,
+            platform::window_chrome::apply_window_frame,
             agent::ai::set_ai_key,
             agent::ai::clear_ai_key,
             agent::ai::set_ai_base_url,

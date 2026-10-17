@@ -2,11 +2,13 @@ import { applyCachedWallpaper, useTerminalThemeStore } from '@features/settings/
 import { applyTheme, readThemePreference, resolveThemeMode } from '@config/theme/tokens';
 import { installGlobalErrorHandlers } from '@utils/errorHandler';
 import { initializeDiagnostics } from '@platform/diagnostics';
+import { syncWindowFrame } from '@platform/windowChrome';
 
 /** 在 React 挂载前完成不会依赖 React 树的启动工作，减少首屏闪烁。 */
 export function preloadApplication(): void {
   initializeDiagnostics();
   applyTheme(resolveThemeMode(readThemePreference()));
+  syncWindowFrame();
   applyCachedWallpaper();
   void useTerminalThemeStore.getState().load();
   installGlobalErrorHandlers();
