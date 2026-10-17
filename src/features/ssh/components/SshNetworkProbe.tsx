@@ -48,12 +48,10 @@ export default function SshNetworkProbe({ host, port, jumpHost, paused = false, 
     return () => { disposed = true; clearTimeout(timer); request.current++; };
   }, [host, probe, paused, revision, refresh]);
   const summary = result && summarizeNetworkProbe(result);
-  const address = `${host.includes(':') && !host.startsWith('[') ? `[${host}]` : host}:${port}`;
   return <section className="ssh-status-network" aria-label={t('Network connectivity')}>
-    <div className="ssh-status-section-heading"><h3>{t('Network connectivity')}</h3>
+    <div className="ssh-status-section-heading"><h3 data-tip={t('TCP connection checks from this computer. No SSH login is performed.')}>{t('Network connectivity')}</h3>
       <TextButton disabled={busy || !host || paused} onClick={() => setRefresh(value => value + 1)}>{t(busy ? 'Probing…' : result ? 'Probe again' : 'Start probe')}</TextButton>
     </div>
-    <p className="ssh-status-caption ssh-network-route" data-tip={t('TCP connection checks from this computer. No SSH login is performed.')}>{t('This computer')} → <span>{address}</span></p>
     {jumpHost && jumpHost.toLowerCase() !== 'none' && <p className="ssh-status-caption ssh-network-note">{t('Tests the direct route to the target, without the jump host.')}</p>}
     {error && <div className="ssh-network-error"><ErrorBox title={t('Network probe failed')} details={error}>{t('Check the server address, network and firewall, then try again.')}</ErrorBox></div>}
     {children}

@@ -10,6 +10,7 @@ it('keeps measured rates and the combined transfer chart visible together', () =
   const chart = screen.getByRole('img', { name: '上传与下载趋势' });
   expect(screen.getAllByRole('img')).toHaveLength(1);
   expect(chart.querySelectorAll('[data-series]')).toHaveLength(2);
+  expect(screen.getByText('吞吐量')).toBeInTheDocument();
 });
 
 it('distinguishes a missing baseline from unsupported counters without inventing zeros', () => {

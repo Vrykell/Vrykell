@@ -1,5 +1,35 @@
-import { expect, test } from '@playwright/test';
-import { setupTauriMock, ptyWrites } from './tauri-mock';
+import { expect, test, type Locator } from '@playwright/test';
+import { setupTauriMock, ptyWrites, clipboardText } from './tauri-mock';
+
+async function expectConnectionTitle(panel: Locator) {
+  const overview = panel.locator('header');
+  await expect(overview.getByText('root@prod.example.com:22', { exact: true })).toHaveCount(1);
+  await expect(panel.locator('.ssh-status-overview')).toHaveCount(0);
+  await expect(panel.getByText('已连接', { exact: true })).toHaveCount(0);
+  await expect(panel.getByText('远端资源', { exact: true })).toHaveCount(0);
+  await expect(overview.locator('.ssh-status-address')).toHaveCount(0);
+  await expect(panel.locator('.ssh-network-route')).toHaveCount(0);
+  await expect(overview).toHaveCSS('border-bottom-width', '0px');
+  await expect(overview.getByRole('button', { name: '复制连接地址' })).toHaveAttribute('data-compact', 'true');
+  const spacing = await overview.evaluate(element => {
+    const heading = getComputedStyle(element);
+    const sidebar = getComputedStyle(document.querySelector('.workspace-panel-heading')!);
+    const keys = ['minHeight', 'paddingTop', 'paddingBottom', 'paddingLeft', 'paddingRight', 'fontSize'] as const;
+    return keys.map(key => [heading[key], sidebar[key]]);
+  });
+  for (const [actual, expected] of spacing) expect(actual).toBe(expected);
+  await overview.scrollIntoViewIfNeeded();
+  const row = await overview.boundingBox();
+  const address = await overview.locator('.ssh-status-identity').boundingBox();
+  const copy = await overview.getByRole('button', { name: '复制连接地址' }).boundingBox();
+  const actions = await overview.locator('.ssh-status-header-actions').boundingBox();
+  expect(Math.abs(copy!.y + copy!.height / 2 - address!.y - address!.height / 2)).toBeLessThanOrEqual(1);
+  expect(Math.abs(copy!.y + copy!.height / 2 - actions!.y - actions!.height / 2)).toBeLessThanOrEqual(1);
+  expect(copy!.x - address!.x - address!.width).toBeGreaterThanOrEqual(4);
+  expect(copy!.x - address!.x - address!.width).toBeLessThanOrEqual(5);
+  expect(actions!.x + actions!.width).toBeLessThanOrEqual(row!.x + row!.width + 1);
+  expect(await overview.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+}
 
 for (const theme of ['dark', 'light'] as const) {
   test(`resource history and text readings stay together at narrow and wide widths in ${theme} mode`, async ({ page }, testInfo) => {
@@ -17,6 +47,10 @@ for (const theme of ['dark', 'light'] as const) {
     await page.getByTestId('ssh-status-toggle').last().click();
     const panel = page.getByTestId('ssh-status-panel');
     await expect(panel.getByTestId('ssh-resource-memory')).toHaveText('26%');
+    await expectConnectionTitle(panel);
+    await panel.getByRole('button', { name: '复制连接地址' }).click();
+    await expect.poll(() => clipboardText(page)).toBe('root@prod.example.com:22');
+    await panel.locator('header').screenshot({ path: testInfo.outputPath(`connection-title-${theme}-300.png`) });
     await page.clock.setFixedTime(new Date('2026-10-17T06:00:15Z'));
     await panel.getByRole('button', { name: '刷新远端资源' }).click();
     await expect(panel.getByTestId('ssh-resource-cpu')).toHaveText('12%');
@@ -52,6 +86,9 @@ for (const theme of ['dark', 'light'] as const) {
     const traffic = panel.getByRole('img', { name: '上传与下载趋势' });
     await expect(traffic).toHaveCount(1);
     await expect(traffic.locator('[data-series]')).toHaveCount(2);
+    await expect(chart.locator('xpath=../..').locator('.ssh-resource-chart-caption')).toHaveText('资源使用率');
+    await expect(traffic.locator('xpath=../..').locator('.ssh-resource-chart-caption')).toHaveText('吞吐量');
+    await expect(panel.getByTestId('ssh-network-result')).toHaveCSS('border-top-width', '0px');
     const colors = await chart.locator('[data-series]').evaluateAll(elements => elements.map(element => getComputedStyle(element).color));
     expect(new Set(colors).size).toBe(3);
     const tones = await panel.evaluate(element => {
@@ -79,7 +116,9 @@ for (const theme of ['dark', 'light'] as const) {
         const svg = element.getBoundingClientRect();
         const axis = chart.querySelector('.ssh-resource-chart-axis')!.getBoundingClientRect();
         const footer = chart.querySelector('.ssh-status-time-axis')!.getBoundingClientRect();
-        return { frame: frame.width, plot: svg.width, rightInset: svg.right - axis.right, leftInset: axis.left - svg.left, scaleBottom: axis.bottom, plotTop: svg.top, plotBottom: svg.bottom, footerTop: footer.top };
+        const caption = chart.querySelector('.ssh-resource-chart-caption')!.getBoundingClientRect();
+        const maximum = chart.querySelector('.ssh-resource-chart-axis > span:last-child')!.getBoundingClientRect();
+        return { frame: frame.width, plot: svg.width, rightInset: svg.right - axis.right, leftInset: axis.left - svg.left, scaleBottom: axis.bottom, plotTop: svg.top, plotBottom: svg.bottom, footerTop: footer.top, captionLeft: caption.left - svg.left, labelGap: maximum.left - caption.right };
       });
       expect(Math.abs(bounds.frame - bounds.plot)).toBeLessThanOrEqual(1);
       expect(bounds.rightInset).toBeGreaterThanOrEqual(0);
@@ -87,6 +126,8 @@ for (const theme of ['dark', 'light'] as const) {
       expect(bounds.leftInset).toBeGreaterThanOrEqual(0);
       expect(bounds.scaleBottom).toBeLessThanOrEqual(bounds.plotTop);
       expect(bounds.footerTop).toBeGreaterThanOrEqual(bounds.plotBottom);
+      expect(bounds.captionLeft).toBeGreaterThanOrEqual(0);
+      expect(bounds.labelGap).toBeGreaterThanOrEqual(12);
       expect((await plot.boundingBox())!.height).toBe(160);
       await expect(plot.locator('.ssh-resource-chart-frame')).toHaveCount(1);
     }
@@ -110,10 +151,14 @@ for (const theme of ['dark', 'light'] as const) {
     await separator.focus();
     for (let index = 0; index < 19; index++) await page.keyboard.press('ArrowLeft');
     await expect.poll(async () => Math.round((await panel.boundingBox())!.width)).toBe(604);
+    await expectConnectionTitle(panel);
+    await panel.locator('header').screenshot({ path: testInfo.outputPath(`connection-title-${theme}-604.png`) });
     await summary.screenshot({ path: testInfo.outputPath(`combined-resources-${theme}-604.png`) });
     await page.screenshot({ path: testInfo.outputPath(`resources-chart-${theme}-604.png`) });
     for (let index = 0; index < 23; index++) await page.keyboard.press('ArrowRight');
     await expect.poll(async () => Math.round((await panel.boundingBox())!.width)).toBe(240);
+    await expectConnectionTitle(panel);
+    await panel.locator('header').screenshot({ path: testInfo.outputPath(`connection-title-${theme}-240.png`) });
     expect(await panel.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
     await summary.screenshot({ path: testInfo.outputPath(`combined-resources-${theme}-240.png`) });
     await page.screenshot({ path: testInfo.outputPath(`resources-chart-${theme}-240.png`) });
@@ -174,6 +219,8 @@ test('resource text stays aligned with mixed percentage widths and larger UI tex
     for (let index = 0; index < (fontSize === 14 ? 3 : 7); index++) await page.keyboard.press(fontSize === 14 ? 'ArrowLeft' : 'ArrowRight');
     const expectedWidth = fontSize === 14 ? 348 : 240;
     await expect.poll(async () => Math.round((await panel.boundingBox())!.width)).toBe(expectedWidth);
+    await expectConnectionTitle(panel);
+    await panel.locator('header').screenshot({ path: testInfo.outputPath(`connection-title-${fontSize}-${expectedWidth}.png`) });
     const readingEdges = await panel.locator('.ssh-status-metric-value').evaluateAll(elements => elements.map(element => element.getBoundingClientRect().right));
     for (const edge of readingEdges) expect(Math.abs(edge - readingEdges[0])).toBeLessThanOrEqual(1);
     await expect(panel.getByRole('meter')).toHaveCount(0);
@@ -227,7 +274,11 @@ test('resource plots append samples automatically and never drift while waiting 
   await expect.poll(calls).toBe(initialCalls + 4);
   await page.clock.fastForward(15_000);
   await expect.poll(calls).toBe(initialCalls + 5);
-  await expect(panel.getByText('10.0 KB/s', { exact: true })).toBeVisible();
+  const download = panel.locator('.ssh-network-rate-readings .ssh-network-rate').first().locator('strong');
+  await expect(download).toContainText('KB/s');
+  // The installed clock also advances while asynchronous assertions settle.
+  await expect.poll(async () => Number.parseFloat(await download.innerText())).toBeGreaterThan(9);
+  expect(Number.parseFloat(await download.innerText())).toBeLessThanOrEqual(10);
   await panel.locator('.ssh-status-resource-summary').screenshot({ path: testInfo.outputPath('automatic-samples.png') });
 });
 

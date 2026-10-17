@@ -10,6 +10,14 @@ it('grows the visible range by real elapsed minutes up to the retained five-minu
   expect(resourceHistoryWindow(60_000, 0)).toBe(60_000);
 });
 
+it('names the metric beside its maximum scale without changing the accessible chart name', () => {
+  render(<SshResourceChart endTime={0} label="Transfer history" caption="Throughput" maximumLabel="4 KB/s" />);
+  const chart = screen.getByRole('img', { name: 'Transfer history' });
+  const scale = chart.closest('.ssh-resource-chart')!.querySelector('.ssh-resource-chart-axis')!;
+  expect(scale.firstElementChild).toHaveTextContent('Throughput');
+  expect(scale.lastElementChild).toHaveTextContent('4 KB/s');
+});
+
 it('uses the visible minute range without stretching samples into unmeasured time', () => {
   expect(resourceTrendSegments([{ time: 0, value: 0 }, { time: 15_000, value: 50 }, { time: 30_000, value: 100 }], 30_000, 100, 60_000))
     .toEqual(['140.0,74.0 209.0,40.0 278.0,6.0']);

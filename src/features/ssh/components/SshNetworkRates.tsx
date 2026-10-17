@@ -18,7 +18,7 @@ export default function SshNetworkRates({ samples, now, available, windowMs }: {
         <span><i style={{ background: color }} />{label}</span><strong>{current == null ? '—' : `${fmtSize(current)}/s`}</strong>
       </div>;
     })}</div>
-    <SshResourceChart series={series} endTime={now} windowMs={windowMs} label={t('Upload and download history')} maximum={maximum} maximumLabel={`${fmtSize(maximum)}/s`} minimumLabel="0" />
+    <SshResourceChart series={series} endTime={now} windowMs={windowMs} label={t('Upload and download history')} caption={t('Throughput')} maximum={maximum} maximumLabel={`${fmtSize(maximum)}/s`} minimumLabel="0" />
     {latest && latest.download == null && latest.upload == null && <p className="ssh-status-caption">{t(available ? 'Transfer rates require two recent samples.' : 'Transfer rates are unavailable on this server.')}</p>}
   </div>;
 }

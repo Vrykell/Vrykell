@@ -26,6 +26,8 @@ it('automatically probes and displays measured connectivity and latency', async 
   expect(screen.getByText('2/2 次成功')).toBeVisible();
   expect(screen.getByText('2/2 次成功')).toHaveAttribute('data-tip', '1 · 20.0 ms\n2 · 40.0 ms');
   expect(screen.getByRole('button', { name: '重新探测' })).toBeEnabled();
+  expect(screen.getByRole('heading', { name: '网络连通性' })).toHaveAttribute('data-tip', '从本机测试 TCP 连接，不进行 SSH 登录。');
+  expect(screen.queryByText('本机')).not.toBeInTheDocument();
 });
 
 it('shows interrupted connectivity without treating TCP failures as zero latency', async () => {
@@ -43,11 +45,14 @@ it('disables overlapping requests, resets on target changes and discards late re
   const view = render(<SshNetworkProbe host="old" port={22} />);
   expect(screen.getByRole('button', { name: '探测中…' })).toBeDisabled();
   view.rerender(<SshNetworkProbe host="::1" port={2222} jumpHost="bastion" paused />);
-  expect(screen.getByText('[::1]:2222')).toBeInTheDocument();
   expect(screen.getByText('探测目标的直连路径，不经过跳板机。')).toBeInTheDocument();
   await act(async () => resolve(result));
   expect(screen.queryByText('可连通')).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: '开始探测' })).toBeDisabled();
+  mocks.probe.mockResolvedValue(result);
+  view.rerender(<SshNetworkProbe host="::1" port={2222} jumpHost="bastion" />);
+  await screen.findByText('可连通');
+  expect(mocks.probe).toHaveBeenLastCalledWith('::1', 2222);
 });
 
 it('keeps a previous result with a readable error and allows retry', async () => {

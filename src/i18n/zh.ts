@@ -1082,6 +1082,8 @@ const zh: Record<string, string> = {
   'Remote resources': '远端资源',
   'Resource usage': '资源用量',
   'Resource usage history': '资源使用率趋势',
+  'Resource utilization': '资源使用率',
+  'Throughput': '吞吐量',
   'Last {{minutes}} min': '最近 {{minutes}} 分钟',
   '{{percent}}% idle': '{{percent}}% 空闲',
   'Usage details unavailable': '用量详情不可用',

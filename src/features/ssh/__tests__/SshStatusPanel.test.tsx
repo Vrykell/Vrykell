@@ -218,11 +218,33 @@ describe('SSH status panel', () => {
     await screen.findByText('Linux 6.8');
     expect(mocks.collect).toHaveBeenCalledWith('saved', 'example.com', 22, 'deploy');
     expect(screen.getByTestId('ssh-resource-memory')).toHaveTextContent('50%');
+    const address = screen.getByText('deploy@example.com:22');
+    expect(address.tagName).toBe('STRONG');
+    expect(address.closest('header')).not.toBeNull();
+    expect(address).toHaveAttribute('data-tip', 'deploy@example.com:22');
+    expect(screen.queryByText('Production')).not.toBeInTheDocument();
+    expect(screen.queryByText('远端资源')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ssh-status-panel')).not.toHaveTextContent('已连接');
+    expect(screen.queryByText('本机')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '复制连接地址' })).toHaveAttribute('data-compact', 'true');
     fireEvent.click(screen.getByRole('button', { name: '复制连接地址' }));
     expect(mocks.copy).toHaveBeenCalledWith('deploy@example.com:22');
     fireEvent.keyDown(screen.getByTestId('ssh-status-panel'), { key: 'Escape' });
     expect(screen.queryByTestId('ssh-status-panel')).not.toBeInTheDocument();
     expect(screen.getByTestId('ssh-status-toggle')).toHaveFocus();
+  });
+
+  it.each([
+    { host: '10.21.76.57', user: 'topview', port: 2222, address: 'topview@10.21.76.57:2222' },
+    { host: '::1', user: undefined, port: 22, address: '[::1]:22' },
+    { host: '[2001:db8::1]', user: 'deploy', port: 2222, address: 'deploy@[2001:db8::1]:2222' },
+  ])('shows and copies the complete endpoint $address', async ({ address, ...endpoint }) => {
+    render(<SshStatusPanel target={{ ...target, ...endpoint }} state={connected} active />);
+    open();
+    await screen.findByText('Linux 6.8');
+    expect(screen.getByText(address).tagName).toBe('STRONG');
+    fireEvent.click(screen.getByRole('button', { name: '复制连接地址' }));
+    expect(mocks.copy).toHaveBeenCalledWith(address);
   });
 
   it('keeps the last sample after disconnect and does not treat resource errors as terminal errors', async () => {

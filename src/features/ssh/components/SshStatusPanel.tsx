@@ -108,7 +108,8 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
   useEffect(() => { if (openRequest > 0) setOpen(true); }, [openRequest]);
   useEffect(() => { if (toggleRequest > 0) setOpen(value => !value); }, [toggleRequest]);
   const connected = (state.phase === 'connected' || state.phase === 'interactive') && !state.retrying;
-  const address = `${target.user ? `${target.user}@` : ''}${target.host}:${target.port ?? 22}`;
+  const host = target.host.includes(':') && !target.host.startsWith('[') ? `[${target.host}]` : target.host;
+  const address = `${target.user ? `${target.user}@` : ''}${host}:${target.port ?? 22}`;
   const unsupported = !target.connectionId ? t('Save this connection to monitor remote resources.') : target.jumpHost && target.jumpHost.toLowerCase() !== 'none' ? t('Resource monitoring is unavailable for jump hosts.') : null;
 
   useEffect(() => {
@@ -281,18 +282,18 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
       }}><ResizeHandle axis="x" edge="left" onDelta={resize} onUp={commitResize} testId="ssh-status-resize-handle" /></div>}
       <aside id={panelId} aria-label={t('SSH status')} data-testid="ssh-status-panel" className="ssh-status-panel" style={{ display: folded ? 'none' : undefined }} onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); close(); } }}>
         <div className="ssh-status-scroll scroll-region">
-          <header><strong>{t('Remote resources')}</strong><div className="ssh-status-header-actions">
+          <header className="sidebar-heading">
+            <div className="ssh-status-endpoint"><strong className="ssh-status-identity" data-tip={address}>{address}</strong><IconBtn compact title={t('Copy connection address')} onClick={() => { void writeClipboardText(address).catch(reason => useToastStore.getState().addToast(String(reason), 'error')); }}><Copy size={iconSizes.copy} /></IconBtn></div>
+            <div className="ssh-status-header-actions">
             <IconBtn title={t('Refresh remote resources')} disabled={!connected || !!unsupported || busy} onClick={() => { setPaused(false); setRefresh(value => value + 1); }}><RefreshCw size={iconSizes.compact} /></IconBtn>
             <IconBtn title={t('Close SSH status')} onClick={close}><X size={iconSizes.control} /></IconBtn>
           </div></header>
-          <section className="ssh-status-overview">
-            <div className="ssh-status-identity-row"><div className="ssh-status-identity">{target.name || target.host}</div><span className="ssh-status-phase" data-tip={t('Connection status')}><i className="ssh-status-dot" data-phase={state.phase} />{state.retrying ? t('Reconnecting…') : t(phaseLabels[state.phase])}</span></div>
-            <div className="ssh-status-address"><span data-tip={address}>{address}</span><IconBtn title={t('Copy connection address')} onClick={() => { void writeClipboardText(address).catch(reason => useToastStore.getState().addToast(String(reason), 'error')); }}><Copy size={iconSizes.compact} /></IconBtn></div>
-            {onReconnect && (state.phase === 'disconnected' || state.retrying) && <TextButton className="ssh-status-reconnect" disabled={reconnecting} onClick={() => {
+          {onReconnect && (state.phase === 'disconnected' || state.retrying) && <section className="ssh-status-overview">
+            <TextButton className="ssh-status-reconnect" disabled={reconnecting} onClick={() => {
               setReconnecting(true);
               void onReconnect().catch(reason => useToastStore.getState().addToast(String(reason), 'error')).finally(() => setReconnecting(false));
-            }}>{t('Reconnect SSH session')}</TextButton>}
-          </section>
+            }}>{t('Reconnect SSH session')}</TextButton>
+          </section>}
           <SshNetworkProbe host={target.host} port={target.port ?? 22} jumpHost={target.jumpHost} paused={paused} revision={refresh}>
             {sample && <SshNetworkRates samples={trafficHistory} now={chartTime} windowMs={historyWindow} available={sample.networkReceived != null || sample.networkTransmitted != null} />}
           </SshNetworkProbe>
@@ -308,7 +309,7 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
                   <ul className="ssh-resource-legend" aria-label={t('Resource chart legend')}>
                     {resourceSeries.map(series => <li key={series.label}><i style={{ background: series.color }} aria-hidden="true" />{series.label}</li>)}
                   </ul>
-                  <SshResourceChart series={resourceSeries} endTime={chartTime} windowMs={historyWindow} label={t('Resource usage history')} />
+                  <SshResourceChart series={resourceSeries} endTime={chartTime} windowMs={historyWindow} label={t('Resource usage history')} caption={t('Resource utilization')} />
                   <dl className="ssh-status-metrics" aria-label={t('Current resource readings')}>
                     <Metric label={t('CPU usage')} percentage={cpu} detail={cpu != null ? t('{{percent}}% idle', { percent: 100 - Math.round(cpu) }) : t(sample.cpuTotal != null ? 'CPU usage requires two samples.' : 'Usage details unavailable')} />
                     <Metric resource="memory" label={t('Memory usage')} used={sample.memoryTotal != null && sample.memoryAvailable != null ? sample.memoryTotal - sample.memoryAvailable : null} total={sample.memoryTotal} />
