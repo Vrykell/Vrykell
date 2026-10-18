@@ -125,6 +125,7 @@ pub fn run() {
             theme::get_theme_path,
             theme::theme_export,
             theme::theme_import,
+            theme::read_image_data_url,
             agent::web::web_search,
             agent::web::web_fetch,
             agent::web::web_crawl,
