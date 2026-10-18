@@ -13,6 +13,7 @@ import {
   acpAnswerPermission, acpCancel, acpClose, acpOpen, acpPrompt, onAcpSession,
   type AcpSessionEvent, type AgentDescription,
 } from '@platform/api/acp';
+import { useUsageStore } from '@features/agent/stores/usage';
 
 export interface HarnessSession {
   harness: string;
@@ -159,6 +160,9 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
   applyEvent: (event) => {
     const tabId = tabOfSession.get(event.sessionId);
     if (!tabId) return;
+    const session = get().byTab[tabId];
+    // The usage panel counts what the ACP servers report about their own sessions.
+    if (session) recordAcpEvent(session.harness, event);
     patch(tabId, (session) => {
       switch (event.kind) {
         case 'update':
@@ -199,3 +203,33 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     });
   },
 }));
+
+/**
+ * Feed the usage panel from the ACP event stream.
+ *
+ * ACP reports the context window and the cumulative cost, never a per-turn token split, so only
+ * the facts the protocol carries are recorded: turns, tool calls, context use and cost.
+ */
+function recordAcpEvent(source: string, event: AcpSessionEvent) {
+  const usage = useUsageStore.getState();
+  if (event.kind === 'stop') {
+    usage.acpTurn(source);
+    return;
+  }
+  if (event.kind !== 'update') return;
+  const payload = (event.payload ?? {}) as Record<string, unknown>;
+  const update = String(payload.sessionUpdate ?? '');
+  if (update === 'tool_call') {
+    usage.acpToolCall(source);
+    return;
+  }
+  if (update === 'usage_update') {
+    const cost = payload.cost as Record<string, unknown> | undefined;
+    usage.acpUsage(source, {
+      used: Number(payload.used ?? 0),
+      size: Number(payload.size ?? 0),
+      cost: cost ? Number(cost.amount ?? 0) : undefined,
+      currency: cost ? String(cost.currency ?? '') : undefined,
+    });
+  }
+}

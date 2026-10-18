@@ -192,9 +192,6 @@ export default function HarnessPage() {
             style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <Plus size={12} /> {t('Add server')}
           </OutlineButton>
-          <OutlineButton data-testid="harness-open-hub" onClick={() => useSessionStore.getState().openHarnessHubTab()}>
-            {t('Open the harness hub')}
-          </OutlineButton>
           <span style={{ flex: 1 }} />
           <OutlineButton data-testid="harness-save" disabled={busy} onClick={() => void save()}>{t('Save the list')}</OutlineButton>
           <IconButton compact aria-label={t('Reload')} data-tip={t('Reload')} onClick={reload}><RefreshCw size={14} /></IconButton>

@@ -15,6 +15,7 @@ import { DataUsage, RefreshCw, Trash2, iconSizes } from '@ui/icons';
 import { formatLogTime, type UsageRange } from '@features/agent/model/usageStats';
 import { ALL_FILTER, useUsageStats } from '@features/agent/hooks/useUsageStats';
 import MetricsRow from './usage/MetricsRow';
+import AcpUsageSection from './usage/AcpUsageSection';
 import SourceFilter from './usage/SourceFilter';
 import TrendChart from './usage/TrendChart';
 import RequestLogTable from './usage/RequestLogTable';
@@ -119,6 +120,8 @@ export default function UsageView() {
       <MetricsRow totals={stats.totals} />
 
       <TrendChart buckets={stats.series.buckets} unit={stats.series.unit} rangeLabel={rangeLabel} />
+
+      <AcpUsageSection rows={stats.acpRows} />
 
       <section className="usage-card" style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <div role="tablist" aria-label={t('Usage details')} style={{ display: 'flex', gap: 4, paddingBottom: 8 }}>

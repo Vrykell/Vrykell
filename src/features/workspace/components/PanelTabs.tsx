@@ -1,13 +1,15 @@
 import { TextInput } from '@ui/TextInput';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { iconSizes,
-  Plus, History, Settings, Sparkles, DataUsage,
+  Plus, History, Settings, Sparkles, DataUsage, Bot,
   ChevronRight, Pencil, Archive, Folder, Trash2, X,
  } from '@ui/icons';
 import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, useTabDisplayTitle, tabIconKey, tabIconColor, type Tab, type TabGroup } from '@features/workspace';
 import { useIconColorStore } from '@config/iconColors';
 import { HistoryColorChoices } from '@ui/HistoryColorPalette';
 import { regenerateTitle } from '@features/agent/services/title';
+import AcpLauncher from '@features/chat/components/AcpLauncher';
+import { harnessMark } from '@features/settings/components/HarnessBadge';
 import { useToastStore } from '@ui/Toast';
 import { IconBtn } from '@ui/UiBtn';
 import SidebarToolbar from '@ui/SidebarToolbar';
@@ -69,6 +71,7 @@ export default function PanelTabs() {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalGroupId, setModalGroupId] = useState<string | undefined>(undefined);
   const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null);
+  const [acpOpen, setAcpOpen] = useState(false);
   const [renamingGroupTitle, setRenamingGroupTitle] = useState('');
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; tabId: string } | null>(null);
 
@@ -179,11 +182,15 @@ export default function PanelTabs() {
         <IconBtn title="会话历史" data-testid="tab-history-btn" onClick={openHistoryTab}>
           <History size={iconSizes.control} />
         </IconBtn>
+        <IconBtn title={t('ACP')} data-testid="tab-acp-btn" onClick={() => setAcpOpen(true)}>
+          <Bot size={iconSizes.control} />
+        </IconBtn>
         {/* The panel button always creates ungrouped tabs; only a group's own + assigns that group. */}
         <IconBtn title="新建终端" data-testid="tab-new-btn" onClick={() => { setModalGroupId(undefined); setModalOpen(true); }}>
           <Plus size={iconSizes.control} />
         </IconBtn>
       </SidebarToolbar>
+      <AcpLauncher open={acpOpen} onClose={() => setAcpOpen(false)} />
 
       {/* 列表：分组头与标签行同属一个重排列表 */}
       <div data-reorder-list={LIST_ID} className="scroll-region" onContextMenu={event => {
@@ -567,6 +574,7 @@ function TabRow({
     : tab.kind === 'ai-history' ? Sparkles
       : tab.kind === 'settings' ? Settings
       : tab.kind === 'usage' ? DataUsage
+      : tab.kind === 'harness' ? harnessMark(tab.harness)
       : isSsh ? SshIcon
         : shellIconFor(first?.kind === 'local' ? first.shellType ?? defaultShellType : undefined);
   const iconColors = useIconColorStore(state => state.colors);

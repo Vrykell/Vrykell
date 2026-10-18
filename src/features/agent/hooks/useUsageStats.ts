@@ -22,6 +22,7 @@ export const ALL_FILTER = '';
 
 export function useUsageStats() {
   const records = useUsageStore((state) => state.records);
+  const acp = useUsageStore((state) => state.acp);
   const [range, setRange] = useState<UsageRange>('today');
   const [source, setSource] = useState<string>(ALL_FILTER);
   const [provider, setProvider] = useState<string>(ALL_FILTER);
@@ -56,6 +57,8 @@ export function useUsageStats() {
   const modelRows = useMemo(() => modelBreakdown(filtered), [filtered]);
   /** Request log: newest first. */
   const logRows = useMemo(() => [...filtered].reverse(), [filtered]);
+  /** ACP servers, most recently active first; the protocol reports context and cost, not tokens. */
+  const acpRows = useMemo(() => Object.values(acp).sort((a, b) => b.at - a.at), [acp]);
   const series = useMemo(() => tokensSeries(filtered, range, Date.now()), [filtered, range, revision]);
   const latestAt = useMemo(
     () => records.reduce((latest, record) => (record.at > latest ? record.at : latest), 0),
@@ -72,6 +75,7 @@ export function useUsageStats() {
   return {
     records, range, setRange, source, setSource, provider, setProvider, model, setModel,
     sourceOptions, providerOptions, modelOptions, totals, providerRows, modelRows, logRows, series, latestAt,
+    acpRows,
     clear, refresh, refreshedAt,
   };
 }

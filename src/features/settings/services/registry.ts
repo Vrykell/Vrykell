@@ -139,12 +139,15 @@ registerSetting({
   onSelect: () => useSessionStore.getState().openUsageTab(),
 });
 
-// The harness hub is a workspace page too, so its entry carries its own action as well.
+// The ACP page is a settings destination like the others; the launcher lives in the sidebar.
 registerSetting({
   id: 'harness',
   label: t('ACP'),
   desc: t('External coding agents you add yourself; connecting runs the program you configure.'),
   keywords: ['harness', 'acp', 'agent', 'claude', 'codex', 'gemini', 'harness 中心', '外部 harness'],
-  getValue: () => t('Open the hub to add or connect'),
-  onSelect: () => useSessionStore.getState().openHarnessHubTab(),
+  getValue: () => t('Add or connect a server'),
+  onSelect: () => {
+    useSettingsNavigationStore.getState().openField('ai-harness', t('ACP'));
+    useSessionStore.getState().openSettingsTab();
+  },
 });

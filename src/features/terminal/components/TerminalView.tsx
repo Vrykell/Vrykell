@@ -44,7 +44,6 @@ import ErrorBox from '@ui/ErrorBox';
 import { TextButton } from '@ui/TextButton';
 import UsageView from '@features/agent/components/UsageView';
 import HarnessView from '@features/chat/components/HarnessView';
-import HarnessHubView from '@features/chat/components/HarnessHubView';
 import { useTerminalLayoutActions } from '@features/terminal/hooks/useTerminalLayoutActions';
 import { useTuiControls } from '@features/terminal/hooks/useTuiControls';
 import { copyTerminalSelection, getPaneTerminal, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
@@ -121,8 +120,7 @@ export default function TerminalView() {
         return tab.kind === 'history' ? <SessionHistoryView key={tab.id} />
           : tab.kind === 'ai-history' ? <AiHistoryView key={tab.id} />
             : tab.kind === 'usage' ? <UsageView key={tab.id} />
-              : tab.kind === 'harness-hub' ? <HarnessHubView key={tab.id} />
-                : tab.kind === 'harness' ? <HarnessView key={tab.id} tabId={tab.id} harness={tab.harness} cwd={tab.cwd} />
+              : tab.kind === 'harness' ? <HarnessView key={tab.id} tabId={tab.id} harness={tab.harness} cwd={tab.cwd} />
                   : <SettingsView key={tab.id} />;
       })}
 

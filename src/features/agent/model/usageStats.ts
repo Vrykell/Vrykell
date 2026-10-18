@@ -46,6 +46,25 @@ export interface UsageTotals {
   toolCalls: number;
 }
 
+/** What one ACP server reported about its sessions; see the protocol's `usage_update`. */
+export interface AcpUsageRecord {
+  /** The ACP server (harness) name. */
+  source: string;
+  /** Epoch milliseconds of the latest update. */
+  at: number;
+  /** Prompt turns finished. */
+  turns: number;
+  /** Tool calls seen. */
+  toolCalls: number;
+  /** Context tokens in use, as the agent last reported. */
+  contextUsed: number;
+  /** The context window the agent reported (0 when it reports none). */
+  contextSize: number;
+  /** Cumulative cost the agent reported, or null when it reports none. */
+  cost: number | null;
+  currency: string;
+}
+
 export interface ModelUsageRow {
   key: string;
   provider: string;
