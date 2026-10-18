@@ -754,6 +754,7 @@ button.history-prompt-action[data-primary]:enabled:is(:hover, :focus-visible) { 
 .usage-source-chip:hover { color: var(--text-primary); }
 .usage-source-chip[aria-pressed="true"] { background: var(--surface); color: var(--text-primary); font-weight: var(--fw-semibold); }
 .usage-source-chip--icon { width: 26px; padding: 0; }
+.usage-source-app { display: block; }
 .command-block.ai-block { min-width: 0; margin: 0; padding-left: 18px; padding-right: 18px; background: color-mix(in srgb, var(--ai-block-bg) calc(var(--ai-block-bg-enabled) * 100%), transparent); }
 .command-block.ai-block::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: color-mix(in srgb, var(--ai-block-rail) calc(var(--ai-block-bg-enabled) * 100%), transparent); pointer-events: none; z-index: 1; }
 .command-block.ai-block[data-divider-before="true"]::before { top: -1px; }

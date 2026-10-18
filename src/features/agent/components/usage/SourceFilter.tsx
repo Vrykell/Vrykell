@@ -7,7 +7,7 @@
  * with the name in the hover tip.
  */
 import { t } from '@i18n';
-import { Bot, iconSizes } from '@ui/icons';
+import { iconSizes } from '@ui/icons';
 import { harnessMark } from '@features/agent/components/HarnessBadge';
 import { ALL_FILTER } from '@features/agent/hooks/useUsageStats';
 import { DEFAULT_USAGE_SOURCE } from '@features/agent/model/usageStats';
@@ -29,14 +29,17 @@ export default function SourceFilter({ value, options, onChange }: {
         {t('All')}
       </button>
       {options.map((source) => {
-        // This app's own turns keep its glyph; an ACP server shows the agent's own mark.
-        const Glyph = source === DEFAULT_USAGE_SOURCE ? Bot : harnessMark(source);
+        // This app's own turns wear the app icon; an ACP server shows the agent's own mark.
+        const Glyph = harnessMark(source);
         const label = sourceLabel(source);
+        const own = source === DEFAULT_USAGE_SOURCE;
         return (
           <button key={source} type="button" data-subtle className="usage-source-chip usage-source-chip--icon"
             data-testid={`usage-source-${source}`} aria-label={label} aria-pressed={value === source}
             data-tip={label} onClick={() => onChange(value === source ? ALL_FILTER : source)}>
-            <Glyph size={iconSizes.compact} />
+            {own
+              ? <img className="usage-source-app" src="/app-icon.svg" alt="" width={iconSizes.compact} height={iconSizes.compact} />
+              : <Glyph size={iconSizes.compact} />}
           </button>
         );
       })}
