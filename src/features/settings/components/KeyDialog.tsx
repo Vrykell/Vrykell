@@ -3,7 +3,7 @@
  *
  * The key never sits on the page: the dialog writes it straight through the provider store and
  * the caller keeps showing the masked form the backend returns. The eye toggles the field's
- * visibility for this edit only.
+ * visibility for this edit only; a rejected write keeps the dialog open and reports why.
  */
 import { useEffect, useState } from 'react';
 import { t } from '@i18n';
@@ -12,15 +12,18 @@ import { TextInput } from '@ui/TextInput';
 import { IconButton } from '@ui/IconButton';
 import { Eye, EyeOff } from '@ui/icons';
 import { setProviderKey, type ModelProfile } from '@features/agent';
-import { modelAvatar, modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
+import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
 import type { ProviderRow } from '@features/settings/model/providerList';
 import { inputStyle } from './formStyles';
 import SettingsDialog from './SettingsDialog';
 
-export default function KeyDialog({ open, row, hasKey, onClose }: {
+type Toast = (msg: string, type: 'info' | 'success' | 'error') => void;
+
+export default function KeyDialog({ open, row, hasKey, toast, onClose }: {
   open: boolean;
   row: ProviderRow<ModelProfile>;
   hasKey: boolean;
+  toast: Toast;
   onClose: () => void;
 }) {
   const [value, setValue] = useState('');
@@ -34,8 +37,7 @@ export default function KeyDialog({ open, row, hasKey, onClose }: {
     }
   }, [open]);
 
-  const avatar = modelAvatar(row.kind, '', row.baseUrl);
-  const Mark = avatar?.mark ?? modelMark(row.kind, '', row.baseUrl);
+  const Mark = modelMark(row.kind, '', row.baseUrl);
   const name = row.name || providerLabel(row.kind);
   const canSave = value.trim().length > 0 && !saving;
 
@@ -45,6 +47,8 @@ export default function KeyDialog({ open, row, hasKey, onClose }: {
     try {
       await setProviderKey(row.kind, value);
       onClose();
+    } catch (error) {
+      toast(String((error as Error)?.message ?? error), 'error');
     } finally {
       setSaving(false);
     }
@@ -59,12 +63,10 @@ export default function KeyDialog({ open, row, hasKey, onClose }: {
       onClose={onClose}
       icon={
         <span style={{
-          width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          background: avatar?.background ?? 'var(--block)',
-          color: avatar?.color ?? modelHue(row.kind, '', row.baseUrl),
+          width: 24, height: 24, flexShrink: 0, display: 'inline-flex', alignItems: 'center',
+          justifyContent: 'center', color: modelHue(row.kind, '', row.baseUrl),
         }}>
-          <Mark size={14} aria-hidden="true" />
+          <Mark size={20} aria-hidden="true" />
         </span>
       }
       footer={<>

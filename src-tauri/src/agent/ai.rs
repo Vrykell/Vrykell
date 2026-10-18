@@ -49,6 +49,9 @@ pub struct ModelProfile {
     pub base_url: String,
     #[serde(default = "default_model")]
     pub model: String,
+    /// 自定义分组名；缺省按厂商自动分组
+    #[serde(default)]
+    pub group: Option<String>,
     /// 能力标记（缺省 = 未探测，前端按名字启发式兜底）
     #[serde(default)]
     pub capabilities: Option<ModelCapabilities>,
@@ -124,6 +127,7 @@ impl AiConfigInner {
                 provider: self.provider.clone(),
                 base_url: self.base_url.clone(),
                 model: self.model.clone(),
+                group: None,
                 capabilities: None,
             });
         }

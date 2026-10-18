@@ -21,6 +21,8 @@
 .ui-select-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Optional swatch for colour options; the value keeps the remaining width. */
 .ui-select-swatch { width: 14px; height: 14px; border-radius: 4px; border: 0; flex-shrink: 0; }
+.ui-select-icon { display: inline-flex; align-items: center; flex-shrink: 0; }
+.ui-select-badge { display: inline-flex; align-items: center; flex-shrink: 0; }
 /* Dropdown rows share the trigger's rounded-square swatch. */
 .ui-select-chevron { flex-shrink: 0; color: var(--text-muted); transition: transform var(--dur-fast) var(--ease); }
 .ui-select[aria-expanded="true"] .ui-select-chevron { transform: rotate(180deg); }

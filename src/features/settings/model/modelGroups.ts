@@ -19,16 +19,23 @@ export interface ModelGroup {
 /** A model whose identifier is not filled in yet stays in its own group until it can be told apart. */
 const UNASSIGNED = 'unassigned';
 
-/** Group one provider's models by their vendor, in the order the first entry appears. */
+/**
+ * Group one provider's models by their vendor, in the order the first entry appears. A model with
+ * its own group label keeps that label instead, so a list can be split up the way the user thinks
+ * about it rather than only by the detected vendor.
+ */
 export function groupModelsByVendor(models: ModelProfile[]): ModelGroup[] {
   const groups = new Map<string, ModelGroup>();
   for (const model of models) {
-    const vendor = model.model.trim() ? modelVendor(model.provider, model.model, model.baseUrl) : UNASSIGNED;
+    const custom = model.group?.trim() ?? '';
+    const vendor = custom
+      ? `custom:${custom}`
+      : model.model.trim() ? modelVendor(model.provider, model.model, model.baseUrl) : UNASSIGNED;
     const group = groups.get(vendor) ?? {
       key: vendor,
-      label: vendor === UNASSIGNED
+      label: custom || (vendor === UNASSIGNED
         ? t('Unassigned')
-        : modelVendorInfo(model.provider, model.model, model.baseUrl).label,
+        : modelVendorInfo(model.provider, model.model, model.baseUrl).label),
       models: [],
     };
     group.models.push(model);

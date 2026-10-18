@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { iconSizes, Check, ChevronDown, Plus } from '@ui/icons';
 import './Select.css';
@@ -9,8 +9,12 @@ export interface SelectOption<Value extends string | number> {
   /** Optional concise label for the trigger; the list retains the full option label. */
   triggerLabel?: string;
   disabled?: boolean;
+  /** Optional mark rendered before the label (the list and the trigger share it). */
+  icon?: ReactNode;
   /** Optional colour swatch rendered before the label. */
   swatch?: string;
+  /** Optional trailing status node (the list and the trigger share it). */
+  badge?: ReactNode;
 }
 
 /** Trailing action pinned below the options (e.g. "New tab"); the arrow keys reach it. */
@@ -32,12 +36,14 @@ interface SelectProps<Value extends string | number> {
   disabled?: boolean;
   placeholder?: string;
   style?: CSSProperties;
+  /** Extra class on the trigger, for a surface that is not a plain form control. */
+  triggerClassName?: string;
   action?: SelectAction;
 }
 
 /** A controlled select with a themed, viewport-aware listbox. */
 export default function Select<Value extends string | number>({
-  value, options, onChange, disabled = false, placeholder = '请选择', style, id, action,
+  value, options, onChange, disabled = false, placeholder = '请选择', style, id, action, triggerClassName,
   'aria-label': label, 'aria-describedby': description, 'data-testid': testId,
   'data-tip': tip, 'data-tip-description': tipDescription,
 }: SelectProps<Value>) {
@@ -159,14 +165,16 @@ export default function Select<Value extends string | number>({
   };
 
   return <>
-    <button ref={trigger} id={id} type="button" data-subtle data-testid={testId} data-tip={tip} data-tip-description={tipDescription} className="ui-select" style={style}
+    <button ref={trigger} id={id} type="button" data-subtle data-testid={testId} data-tip={tip} data-tip-description={tipDescription} className={triggerClassName ? `ui-select ${triggerClassName}` : 'ui-select'} style={style}
       role="combobox" aria-label={label} aria-describedby={description} aria-haspopup="listbox"
       aria-expanded={expanded} aria-controls={expanded ? listId : undefined}
       aria-activedescendant={expanded ? `${listId}-${activeIndex}` : undefined} disabled={unavailable}
       onClick={() => expanded ? setOpen(false) : show()} onKeyDown={onKeyDown} onBlur={() => setOpen(false)}>
+      {options[selected]?.icon && <span className="ui-select-icon" aria-hidden="true">{options[selected]!.icon}</span>}
       {options[selected]?.swatch && <span className="ui-select-swatch" aria-hidden="true"
         style={{ background: options[selected]!.swatch }} />}
       <span className="ui-select-value">{options[selected]?.triggerLabel ?? options[selected]?.label ?? placeholder}</span>
+      {options[selected]?.badge && <span className="ui-select-badge">{options[selected]!.badge}</span>}
       <ChevronDown size={iconSizes.compact} aria-hidden="true" className="ui-select-chevron" />
     </button>
     {expanded && createPortal(<div ref={menu}
@@ -177,8 +185,10 @@ export default function Select<Value extends string | number>({
           aria-selected={index === selected} aria-disabled={option.disabled || undefined}
           className="ui-select-option" data-active={index === activeIndex}
           onPointerMove={() => { if (!option.disabled) setActive(index); }} onClick={() => choose(index)}>
+          {option.icon && <span className="ui-select-icon" aria-hidden="true">{option.icon}</span>}
           {option.swatch && <span className="ui-select-swatch" aria-hidden="true" style={{ background: option.swatch }} />}
           <span className="ui-select-option-label">{option.label}</span>
+          {option.badge && <span className="ui-select-badge">{option.badge}</span>}
           {index === selected && <Check size={iconSizes.compact} aria-hidden="true" className="ui-select-check" />}
         </div>)}
       </div>

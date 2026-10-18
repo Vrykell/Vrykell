@@ -145,6 +145,7 @@ export default function ProviderKeyCard({ row, toast, keyEditRequest = 0 }: {
         open={dialogOpen}
         row={row}
         hasKey={keySet}
+        toast={toast}
         onClose={() => {
           setDialogOpen(false);
           setRevision(current => current + 1);

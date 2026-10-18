@@ -1,5 +1,5 @@
 /**
- * 设置页 e2e：模型配置（服务商芯片条 + API Key + 端点 + 按服务商过滤的模型列表）。
+ * 设置页 e2e：模型配置（服务商下拉 + API Key + 端点 + 按服务商过滤的模型列表）。
  *
  * 种子数据：m-main（主力模型，Anthropic 端点）在前，m-local（本地模型，
  * OpenAI 兼容 @ 127.0.0.1:11434）在后且为当前生效模型；mock 只预置了
@@ -16,13 +16,17 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('模型配置页', () => {
-  test('服务商条：默认选中、切换选中、⋯ 菜单三项', async ({ page }) => {
-    const chips = page.locator('.settings-provider-chip');
-    await expect(chips).toHaveCount(2);
-    await expect(chips.first()).toHaveAttribute('aria-current', 'true');
-    await chips.nth(1).click();
-    await expect(chips.nth(1)).toHaveAttribute('aria-current', 'true');
-    await expect(chips.first()).not.toHaveAttribute('aria-current', 'true');
+  test('服务商下拉：默认选中、切换、添加动作与 ⋯ 菜单三项', async ({ page }) => {
+    const select = page.getByTestId('provider-select');
+    await expect(select.locator('.ui-select-value')).toHaveText('Anthropic');
+    await select.click();
+    const options = page.getByRole('option');
+    await expect(options).toHaveCount(2);
+    await expect(options.first()).toHaveAttribute('aria-selected', 'true');
+    // 添加服务商收在下拉里
+    await expect(page.getByRole('button', { name: '添加服务商' })).toBeVisible();
+    await options.nth(1).click();
+    await expect(select.locator('.ui-select-value')).toHaveText('127.0.0.1:11434');
     // 右侧详情头部的 ⋯ 菜单
     await page.locator('.settings-content').getByLabel('更多操作').click();
     const menu = page.getByRole('menu');
@@ -36,20 +40,20 @@ test.describe('模型配置页', () => {
     await expect(page.getByTestId('key-dialog')).toHaveCount(0);
   });
 
-  test('⋯ 删除服务商：移除其模型行；只剩一个时拒绝', async ({ page }) => {
-    const chips = page.locator('.settings-provider-chip');
+  test('⋯ 删除服务商：先确认，移除其模型行；只剩一个时拒绝', async ({ page }) => {
+    const select = page.getByTestId('provider-select');
     await page.locator('.settings-content').getByLabel('更多操作').click();
     await page.getByRole('menu').getByText('删除服务商').click();
-    await expect(chips).toHaveCount(1);
-    await expect(chips.first()).toContainText('127.0.0.1');
+    await page.getByTestId('confirm-ok').click();
+    await expect(select.locator('.ui-select-value')).toHaveText('127.0.0.1:11434');
     const setModels = await aiModelCalls(page);
     const last = setModels.filter((call) => call.kind === 'set_models').pop();
     expect(last?.models).toHaveLength(1);
-    // 保底：最后一个服务商不可删
+    // 保底：最后一个服务商不可删（不弹确认）
     await page.locator('.settings-content').getByLabel('更多操作').click();
     await page.getByRole('menu').getByText('删除服务商').click();
     await expect(page.getByText('至少保留一个模型')).toBeVisible();
-    await expect(chips).toHaveCount(1);
+    await expect(page.getByTestId('confirm-dialog')).toHaveCount(0);
   });
 
   test('API Key：按服务商配置，掩码显示、查看/复制/清除、保存恢复', async ({ page }) => {
@@ -71,9 +75,9 @@ test.describe('模型配置页', () => {
     await expect(keyField.getByTestId('provider-key-value')).toBeVisible();
     const savedKeys = await aiKeyCalls(page);
     expect(savedKeys.some((c) => c.provider === 'anthropic' && c.key === 'sk-anthropic-key')).toBe(true);
-    // 本地那个 OpenAI 兼容端点已配置：掩码 + 查看/复制
-    const chips = page.locator('.settings-provider-chip');
-    await chips.nth(1).click();
+    // 切到本地那个 OpenAI 兼容端点：掩码 + 查看/复制
+    await page.getByTestId('provider-select').click();
+    await page.getByRole('option', { name: /127\.0\.0\.1:11434/ }).click();
     await expect(keyField.getByTestId('provider-key-value')).toHaveText('sk-********abcd');
     await keyField.getByTestId('provider-key-reveal').click();
     await expect(keyField.getByTestId('provider-key-value')).toHaveText('sk-test-key-1234abcd');
@@ -92,7 +96,8 @@ test.describe('模型配置页', () => {
     // 预览行给出请求真正到达的地址
     await expect(page.getByTestId('provider-endpoint-preview')).toContainText('https://api.anthropic.com/v1/messages');
     // 本地端点已配置密钥：检测走模型列表请求并回报数量
-    await page.locator('.settings-provider-chip').nth(1).click();
+    await page.getByTestId('provider-select').click();
+    await page.getByRole('option', { name: /127\.0\.0\.1:11434/ }).click();
     await page.getByTestId('provider-check').click();
     await expect(page.getByRole('status').filter({ hasText: '连接正常' })).toBeVisible();
     // 同步把端点新增的模型并入列表
@@ -103,27 +108,37 @@ test.describe('模型配置页', () => {
   });
 
   test('模型列表：按服务商过滤，设为当前、添加/改名/删除', async ({ page }) => {
-    const chips = page.locator('.settings-provider-chip');
+    const select = page.getByTestId('provider-select');
     const names = page.getByTestId('model-name');
     // 默认（Anthropic 行）只显示主力模型
     await expect(names).toHaveCount(1);
     await expect(names.first()).toHaveText('主力模型');
     // 本地端点行显示本地模型，而它是当前生效模型
-    await chips.nth(1).click();
+    await select.click();
+    await page.getByRole('option', { name: /127\.0\.0\.1:11434/ }).click();
     await expect(names).toHaveCount(1);
     await expect(names.first()).toHaveText('本地模型');
     await expect(page.getByTestId('model-row').first().getByText('当前', { exact: true })).toBeVisible();
     // 回到 Anthropic 行，把主力模型设为当前
-    await chips.first().click();
+    await select.click();
+    await page.getByRole('option', { name: 'Anthropic', exact: true }).click();
     const mainRow = page.getByTestId('model-row').first();
     await mainRow.getByRole('button', { name: '设为当前' }).click();
     await expect(mainRow.getByText('当前', { exact: true })).toBeVisible();
     const activeCalls = await aiModelCalls(page);
     expect(activeCalls.some((c) => c.kind === 'set_active' && c.id === 'm-main')).toBe(true);
-    // 添加模型 → 未指定分组多一行；齿轮打开中央编辑器改名
+    // 添加模型：中央表单填 ID（必填）→ 落盘到对应厂商分组
     await page.getByTestId('model-add').click();
+    const addDialog = page.getByTestId('add-model-dialog');
+    await expect(addDialog).toBeVisible();
+    await expect(addDialog.getByTestId('add-model-confirm')).toBeDisabled();
+    await addDialog.getByTestId('add-model-id').fill('deepseek-chat');
+    await addDialog.getByTestId('add-model-group').fill('对话模型');
+    await addDialog.getByTestId('add-model-confirm').click();
+    await expect(addDialog).toHaveCount(0);
     await expect(names).toHaveCount(2);
-    await expect(page.getByTestId('model-group-unassigned')).toBeVisible();
+    await expect(page.getByTestId('model-group-custom:对话模型')).toBeVisible();
+    // 齿轮打开中央编辑器改名
     await page.getByTestId('model-row').nth(1).getByTestId('model-settings').click();
     const dialog = page.getByTestId('model-settings-dialog');
     await expect(dialog).toBeVisible();
@@ -137,28 +152,32 @@ test.describe('模型配置页', () => {
     const addCall = setModels.filter((c) => c.kind === 'set_models').pop();
     expect(addCall?.models).toHaveLength(3);
     expect((addCall?.models as { name: string }[])[2]?.name).toBe('新模型');
-    // 删除新模型 → 回一行
+    // 删除新模型：先确认 → 回一行
     await page.getByTestId('model-row').nth(1).getByTestId('model-remove').click();
+    await page.getByTestId('confirm-ok').click();
     await expect(page.getByTestId('model-name')).toHaveCount(1);
   });
 
-  test('添加服务商：预设落盘为新行并选中该服务商', async ({ page }) => {
-    const chips = page.locator('.settings-provider-chip');
-    await page.getByTestId('provider-add').click();
+  test('添加服务商：下拉动作打开中央预设网格并选中新服务商', async ({ page }) => {
+    const select = page.getByTestId('provider-select');
+    await select.click();
+    await page.getByRole('button', { name: '添加服务商' }).click();
     await expect(page.getByTestId('add-provider-dialog')).toBeVisible();
     await page.getByTestId('model-preset-DeepSeek').click();
     await expect(page.getByTestId('add-provider-dialog')).toHaveCount(0);
-    await expect(chips).toHaveCount(3);
-    const deepseek = chips.filter({ hasText: 'DeepSeek' });
-    await expect(deepseek).toHaveAttribute('aria-current', 'true');
+    await expect(select.locator('.ui-select-value')).toHaveText('DeepSeek');
+    await select.click();
+    await expect(page.getByRole('option')).toHaveCount(3);
+    await page.keyboard.press('Escape');
     await expect(page.getByTestId('model-name')).toHaveCount(1);
     await expect(page.getByTestId('model-name')).toHaveText('DeepSeek');
   });
 
   test('服务商选择跨重载保持（lastSelectedProvider）', async ({ page }) => {
-    await page.locator('.settings-provider-chip').nth(1).click();
+    await page.getByTestId('provider-select').click();
+    await page.getByRole('option', { name: /127\.0\.0\.1:11434/ }).click();
     await page.reload();
     await openSettings(page);
-    await expect(page.locator('.settings-provider-chip').nth(1)).toHaveAttribute('aria-current', 'true');
+    await expect(page.getByTestId('provider-select').locator('.ui-select-value')).toHaveText('127.0.0.1:11434');
   });
 });

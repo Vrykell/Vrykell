@@ -1,20 +1,26 @@
 /**
  * ProviderModelList — one provider's models: a searchable, vendor-grouped list with the sync
  * action that pulls the endpoint's own model list, and a centred editor behind each row's gear.
+ *
+ * The list closes its own loops: adding a model asks for its identifier before the row exists,
+ * a model without one cannot be set as current, and deleting a row asks first because its
+ * overrides cannot be recovered.
  */
 import { useMemo, useState } from 'react';
 import { t } from '@i18n';
 import { IconButton } from '@ui/IconButton';
 import { OutlineButton } from '@ui/OutlineButton';
 import { TextInput } from '@ui/TextInput';
+import ConfirmDialog from '@ui/ConfirmDialog';
 import { ChevronDown, Eye, Filter, Globe, Lightbulb, Minus, Plus, RefreshCw, Search, Settings, Wrench, X, type AppIcon } from '@ui/icons';
 import { detectCapabilities, type ModelCapability } from '@features/agent/model/capabilities';
-import { modelAvatar, modelHue, modelMark } from '@features/agent/components/modelIcon';
+import { modelHue, modelMark } from '@features/agent/components/modelIcon';
 import { providerFetchModels, useAiConfigStore, type ModelProfile } from '@features/agent';
-import { commitModels, newModelId, selectModel } from '@features/settings/model/modelWrites';
+import { commitModels, selectModel } from '@features/settings/model/modelWrites';
 import { filterModels, groupModelsByVendor } from '@features/settings/model/modelGroups';
 import type { ProviderRow } from '@features/settings/model/providerList';
 import { SettingsGroup, Field } from './ui';
+import AddModelDialog from './AddModelDialog';
 import ModelSettingsDialog from './ModelSettingsDialog';
 import { useSettingsSave } from './SettingsSaveProvider';
 
@@ -55,25 +61,24 @@ function CapabilityChips({ profile }: { profile: ModelProfile }) {
   );
 }
 
-function ModelRow({ model, active, onRemove, onSetCurrent }: {
+function ModelRow({ model, active, onRemove, onSetCurrent, onIncomplete }: {
   model: ModelProfile;
   active: boolean;
   onRemove: () => void;
   onSetCurrent: () => void;
+  onIncomplete: () => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const avatar = modelAvatar(model.provider, model.model, model.baseUrl);
-  const Glyph = avatar?.mark ?? modelMark(model.provider, model.model, model.baseUrl);
+  const Mark = modelMark(model.provider, model.model, model.baseUrl);
+  const usable = model.model.trim().length > 0;
   return (
     <div data-testid="model-row" style={{ borderTop: '1px solid var(--border)', padding: '6px 10px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
         <span style={{
-          width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          background: avatar?.background ?? 'var(--block)',
-          color: avatar?.color ?? modelHue(model.provider, model.model, model.baseUrl),
+          width: 28, height: 28, flexShrink: 0, display: 'inline-flex', alignItems: 'center',
+          justifyContent: 'center', color: modelHue(model.provider, model.model, model.baseUrl),
         }}>
-          <Glyph size={16} aria-hidden="true" />
+          <Mark size={20} aria-hidden="true" />
         </span>
         <span data-testid="model-name" style={{
           flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -89,7 +94,9 @@ function ModelRow({ model, active, onRemove, onSetCurrent }: {
             {t('Current')}
           </span>
         ) : (
-          <OutlineButton data-subtle onClick={onSetCurrent}>{t('Set as current')}</OutlineButton>
+          <OutlineButton data-subtle onClick={() => (usable ? onSetCurrent() : onIncomplete())}>
+            {t('Set as current')}
+          </OutlineButton>
         )}
         <IconButton compact data-testid="model-settings" aria-expanded={editing}
           aria-label={t('Model settings')} data-tip={t('Model settings')} onClick={() => setEditing(true)}>
@@ -117,6 +124,8 @@ export default function ProviderModelList({ row, toast }: {
   const [capability, setCapability] = useState<ModelCapability | 'all'>('all');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [syncing, setSyncing] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<ModelProfile | null>(null);
 
   const models = row.models;
   const activeId = aiCfg.activeModel;
@@ -132,25 +141,18 @@ export default function ProviderModelList({ row, toast }: {
   });
   const toggleAll = () => setCollapsed(allCollapsed ? new Set() : new Set(groups.map(group => group.key)));
 
-  const remove = (id: string) => {
+  const requestRemove = (model: ModelProfile) => {
     if (models.length <= 1) {
       toast(t('Keep at least one model'), 'info');
       return;
     }
-    void save(() => commitModels(current => current.filter(model => model.id !== id)));
+    setConfirmRemove(model);
   };
-
-  const add = () => void save(() => commitModels(current => [
-    ...current,
-    {
-      id: newModelId(),
-      name: t('Model {{index}}', { index: current.length + 1 }),
-      provider: row.kind,
-      baseUrl: row.baseUrl,
-      model: '',
-      capabilities: detectCapabilities(row.kind, ''),
-    },
-  ]));
+  const removeConfirmed = () => {
+    const target = confirmRemove;
+    setConfirmRemove(null);
+    if (target) void save(() => commitModels(current => current.filter(model => model.id !== target.id)));
+  };
 
   /** Pull the endpoint's own list and add the ids the list does not have yet. */
   const sync = async () => {
@@ -166,7 +168,8 @@ export default function ProviderModelList({ row, toast }: {
       await save(() => commitModels(current => [
         ...current,
         ...missing.map(id => ({
-          id: newModelId(), name: id, provider: row.kind, baseUrl: row.baseUrl, model: id,
+          id: `${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`,
+          name: id, provider: row.kind, baseUrl: row.baseUrl, model: id,
           capabilities: detectCapabilities(row.kind, id),
         })),
       ]));
@@ -205,7 +208,7 @@ export default function ProviderModelList({ row, toast }: {
             style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <RefreshCw size={12} /> {syncing ? t('Syncing…') : t('Sync models')}
           </OutlineButton>
-          <IconButton compact data-testid="model-add" aria-label={t('Add model')} data-tip={t('Add model')} onClick={add}>
+          <IconButton compact data-testid="model-add" aria-label={t('Add model')} data-tip={t('Add model')} onClick={() => setAddOpen(true)}>
             <Plus size={14} />
           </IconButton>
         </div>
@@ -277,14 +280,33 @@ export default function ProviderModelList({ row, toast }: {
                   key={model.id}
                   model={model}
                   active={model.id === activeId}
-                  onRemove={() => remove(model.id)}
+                  onRemove={() => requestRemove(model)}
                   onSetCurrent={() => { void save(() => selectModel(model.id)); }}
+                  onIncomplete={() => toast(t('Fill in the model ID first.'), 'info')}
                 />
               ))}
             </section>
           );
         })}
       </Field>
+      <AddModelDialog
+        open={addOpen}
+        row={row}
+        onClose={() => setAddOpen(false)}
+        onAdd={(model) => { void save(() => commitModels(current => [...current, model])); }}
+      />
+      <ConfirmDialog
+        open={confirmRemove !== null}
+        title={t('Delete model')}
+        message={confirmRemove
+          ? t('Remove {{name}} and its settings?', { name: confirmRemove.name || confirmRemove.model || t('Unnamed model') })
+          : ''}
+        confirmLabel={t('Delete')}
+        cancelLabel={t('Cancel')}
+        danger
+        onConfirm={removeConfirmed}
+        onCancel={() => setConfirmRemove(null)}
+      />
     </SettingsGroup>
   );
 }

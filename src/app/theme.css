@@ -1227,15 +1227,14 @@ button.state-icon-button { color: var(--icon-color); }
 
 /* Provider picker: the model page's provider bar (ProviderPicker.tsx). */
 .settings-provider-page { display: flex; flex-direction: column; gap: 12px; }
-.settings-provider-bar-wrap { display: flex; align-items: flex-start; gap: 8px; }
-.settings-provider-bar { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; }
-.settings-provider-chip { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text-secondary); font: var(--fw-medium) var(--fs-caption) var(--font-ui); cursor: pointer; min-width: 0; transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
-.settings-provider-chip:hover { color: var(--text-primary); border-color: var(--border-strong); }
-.settings-provider-chip[aria-current="true"] { background: color-mix(in srgb, var(--primary-action) 26%, var(--surface)); border-color: color-mix(in srgb, var(--primary-action) 65%, var(--text-primary)); color: var(--text-primary); font-weight: var(--fw-semibold); }
-.settings-provider-chip .settings-provider-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.settings-provider-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); flex-shrink: 0; box-sizing: border-box; }
-.settings-provider-dot[data-empty] { background: transparent; border: 1px solid var(--border-strong); }
 .settings-provider-empty { padding: 10px 8px; text-align: center; color: var(--text-muted); font-size: var(--fs-caption); }
+/* Provider switcher: a button that opens a floating menu, with the brand mark, the provider name
+   and the key status. It keeps the standard control surface — a grey resting background that
+   brightens on hover — and hugs its content instead of filling the row. */
+.ui-select.provider-select-trigger { gap: 8px; }
+.ui-select.provider-select-trigger .ui-select-value { flex: 0 1 auto; max-width: 260px; }
+.provider-key-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-sizing: border-box; }
+.provider-key-dot[data-empty] { background: transparent; border: 1px solid var(--border-strong); }
 .settings-preset-cell { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text-secondary); font: var(--fw-medium) var(--fs-caption) var(--font-ui); cursor: pointer; text-align: left; min-width: 0; transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
 .settings-preset-cell:hover { color: var(--text-primary); border-color: var(--border-strong); }
 .settings-preset-cell span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

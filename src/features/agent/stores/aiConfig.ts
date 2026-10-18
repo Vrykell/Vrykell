@@ -19,6 +19,8 @@ export interface ModelProfile {
   provider: ProviderKind;
   baseUrl: string;
   model: string;
+  /** 自定义分组名；缺省按厂商自动分组 */
+  group?: string;
   /** 创建时自动探测的能力（视觉/推理/工具/搜索）；旧数据缺省 */
   capabilities?: ModelCapabilities;
 }

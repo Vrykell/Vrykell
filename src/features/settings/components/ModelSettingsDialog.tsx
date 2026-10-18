@@ -2,29 +2,33 @@
  * ModelSettingsDialog — the centred editor for one model entry.
  *
  * The fields save the way the rest of the settings do (on blur, with the field's own status), so
- * the dialog is only a surface: closing it keeps whatever was already committed.
+ * the dialog is only a surface: closing it keeps whatever was already committed. A row that was
+ * just added opens here with the model identifier focused, because that is the one field it
+ * cannot work without.
  */
 import { t } from '@i18n';
 import Select from '@ui/Select';
 import { detectCapabilities } from '@features/agent/model/capabilities';
 import type { ModelProfile } from '@features/agent';
-import { modelAvatar, modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
+import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
 import { baseUrlForProvider, type ProviderKind } from '@features/agent/services/provider';
 import { updateModel } from '@features/settings/model/modelWrites';
 import { ModelTextInput } from './ui';
+import AutoSaveInput from './AutoSaveInput';
 import ModelThinkingSettings from './ModelThinkingSettings';
 import SettingsDialog from './SettingsDialog';
 
 /** API families a model row can use, in the order the select offers them. */
 const PROVIDER_KINDS: ProviderKind[] = ['openai-compatible', 'anthropic', 'gemini'];
 
-export default function ModelSettingsDialog({ open, model, onClose }: {
+export default function ModelSettingsDialog({ open, model, focusModelId = false, onClose }: {
   open: boolean;
   model: ModelProfile;
+  /** Focus the identifier field first (a freshly added row needs it). */
+  focusModelId?: boolean;
   onClose: () => void;
 }) {
-  const avatar = modelAvatar(model.provider, model.model, model.baseUrl);
-  const Mark = avatar?.mark ?? modelMark(model.provider, model.model, model.baseUrl);
+  const Mark = modelMark(model.provider, model.model, model.baseUrl);
   const name = model.name || model.model || t('Unnamed model');
 
   return (
@@ -33,15 +37,14 @@ export default function ModelSettingsDialog({ open, model, onClose }: {
       testId="model-settings-dialog"
       title={name}
       width={480}
+      initialFocus={focusModelId ? '[data-testid="model-id-input"]' : undefined}
       onClose={onClose}
       icon={
         <span style={{
-          width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          background: avatar?.background ?? 'var(--block)',
-          color: avatar?.color ?? modelHue(model.provider, model.model, model.baseUrl),
+          width: 24, height: 24, flexShrink: 0, display: 'inline-flex', alignItems: 'center',
+          justifyContent: 'center', color: modelHue(model.provider, model.model, model.baseUrl),
         }}>
-          <Mark size={14} aria-hidden="true" />
+          <Mark size={20} aria-hidden="true" />
         </span>
       }
       footer={
@@ -62,6 +65,8 @@ export default function ModelSettingsDialog({ open, model, onClose }: {
     >
       <ModelTextInput value={model.name} placeholder={t('Model name')}
         onCommit={value => updateModel(model.id, { name: value })} />
+      <ModelTextInput value={model.group ?? ''} placeholder={t('Group')}
+        onCommit={value => updateModel(model.id, { group: value.trim() || undefined })} />
       <Select
         aria-label={t('{{name}} provider', { name })}
         options={PROVIDER_KINDS.map(kind => ({ value: kind, label: providerLabel(kind) }))}
@@ -71,7 +76,8 @@ export default function ModelSettingsDialog({ open, model, onClose }: {
       <div style={{ display: 'flex', gap: 8 }}>
         <ModelTextInput value={model.baseUrl} placeholder={t('Endpoint (base URL)')}
           onCommit={value => updateModel(model.id, { baseUrl: value })} style={{ flex: 1 }} />
-        <ModelTextInput value={model.model} placeholder={t('Model ID')}
+        <AutoSaveInput value={model.model} aria-label={t('Model ID')} placeholder={t('Model ID')}
+          testId="model-id-input"
           onCommit={value => updateModel(model.id, { model: value, capabilities: detectCapabilities(model.provider, value) })}
           style={{ flex: 1 }} />
       </div>

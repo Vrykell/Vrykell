@@ -11,18 +11,20 @@ import { IconButton } from '@ui/IconButton';
 import { X } from '@ui/icons';
 import { useDialogKeyboard } from '@ui/useDialogKeyboard';
 
-export default function SettingsDialog({ open, title, icon, width = 440, onClose, children, footer, testId }: {
+export default function SettingsDialog({ open, title, icon, width = 440, initialFocus, onClose, children, footer, testId }: {
   open: boolean;
   title: string;
   icon?: ReactNode;
   width?: number;
+  /** Selector for the control the dialog should focus first. */
+  initialFocus?: string;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
   testId?: string;
 }) {
   const dialog = useRef<HTMLDivElement>(null);
-  useDialogKeyboard(dialog, open, { onClose });
+  useDialogKeyboard(dialog, open, { onClose, initialFocus });
   if (!open) return null;
 
   return (
