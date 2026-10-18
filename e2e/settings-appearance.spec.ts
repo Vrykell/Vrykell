@@ -61,7 +61,7 @@ test('follow system tracks the operating system appearance', async ({ page }) =>
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 });
 
-test('a block colour row shows a swatch and name, dots in the menu, and the switch to its left', async ({ page }) => {
+test('a block colour row shows a swatch and name, matching swatches in the menu, and the switch to its left', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await gotoSetting(page, '主题');
@@ -75,7 +75,7 @@ test('a block colour row shows a swatch and name, dots in the menu, and the swit
   expect(switchBox.x + switchBox.width).toBeLessThanOrEqual(colorBox.x);
 
   await color.click();
-  await expect(page.getByRole('option', { name: /青色/ }).locator('.ui-select-swatch')).toHaveCSS('border-radius', '50%');
+  await expect(page.getByRole('option', { name: /青色/ }).locator('.ui-select-swatch')).toHaveCSS('border-radius', '4px');
   await page.getByRole('option', { name: /青色/ }).click();
   await expect(color).toContainText('青色');
   await expect(color).not.toContainText('#');
