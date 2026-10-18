@@ -6,7 +6,7 @@
  */
 import { t } from '@i18n';
 import { formatCompact, type AcpUsageRecord } from '@features/agent/model/usageStats';
-import HarnessBadge from '@features/settings/components/HarnessBadge';
+import HarnessBadge from '@features/agent/components/HarnessBadge';
 
 export default function AcpUsageSection({ rows }: { rows: AcpUsageRecord[] }) {
   if (rows.length === 0) return null;

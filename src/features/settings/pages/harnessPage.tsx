@@ -15,7 +15,7 @@ import { IconButton } from '@ui/IconButton';
 import { OutlineButton } from '@ui/OutlineButton';
 import ConfirmDialog from '@ui/ConfirmDialog';
 import { Minus, Plus, RefreshCw, Settings } from '@ui/icons';
-import HarnessBadge from '@features/settings/components/HarnessBadge';
+import HarnessBadge from '@features/agent/components/HarnessBadge';
 import HarnessDialog from '@features/settings/components/HarnessDialog';
 import { invoke } from '@platform/diagnostics';
 import { useSessionStore } from '@features/workspace';

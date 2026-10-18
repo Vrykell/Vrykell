@@ -6,7 +6,7 @@
  */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import AcpLauncher from '@features/chat/components/AcpLauncher';
+import AcpLauncher from '@features/workspace/components/AcpLauncher';
 import { useSessionStore } from '@features/workspace';
 
 const invokeMock = vi.hoisted(() => vi.fn());

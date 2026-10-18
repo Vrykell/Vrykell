@@ -8,8 +8,8 @@ import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, useTabDisp
 import { useIconColorStore } from '@config/iconColors';
 import { HistoryColorChoices } from '@ui/HistoryColorPalette';
 import { regenerateTitle } from '@features/agent/services/title';
-import AcpLauncher from '@features/chat/components/AcpLauncher';
-import { harnessMark } from '@features/settings/components/HarnessBadge';
+import AcpLauncher from './AcpLauncher';
+import { harnessMark } from '@features/agent/components/HarnessBadge';
 import { useToastStore } from '@ui/Toast';
 import { IconBtn } from '@ui/UiBtn';
 import SidebarToolbar from '@ui/SidebarToolbar';

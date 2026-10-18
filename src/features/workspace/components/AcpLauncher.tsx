@@ -10,7 +10,7 @@ import { t } from '@i18n';
 import { IconButton } from '@ui/IconButton';
 import { X } from '@ui/icons';
 import { useDialogKeyboard } from '@ui/useDialogKeyboard';
-import HarnessBadge from '@features/settings/components/HarnessBadge';
+import HarnessBadge from '@features/agent/components/HarnessBadge';
 import { useSessionStore } from '@features/workspace';
 import { acpHarnesses } from '@platform/api/acp';
 import { invoke } from '@platform/diagnostics';
