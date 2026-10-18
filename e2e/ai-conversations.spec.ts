@@ -68,6 +68,21 @@ test('the execution environment stays fixed and a closed terminal stays disconne
   await expect(page.getByText('终端已断开，选择终端后可继续执行。')).toBeVisible();
 });
 
+test('the picker creates a terminal tab and binds it to the conversation', async ({ page }) => {
+  await boot(page);
+  await ensureChatSettingsOpen(page);
+  const target = page.getByRole('combobox', { name: '选择执行终端' });
+  await expect(target).toContainText('仅讨论');
+  await ensureTabsOpen(page);
+  const tabsBefore = await page.locator('[data-tab-kind="session"]').count();
+  await target.click();
+  await page.locator('.ui-select-menu').getByRole('button', { name: '新建标签页' }).click();
+  // A session tab joined the workspace and the conversation runs in it now.
+  await expect(page.locator('[data-tab-kind="session"]')).toHaveCount(tabsBefore + 1);
+  await expect(target).not.toContainText('仅讨论');
+  await expect(page.getByTestId('chat-conversation-context')).toBeVisible();
+});
+
 test('rename and delete manage conversation history independently of terminals', async ({ page }) => {
   await boot(page);
   await page.getByRole('button', { name: '重命名对话' }).click();

@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { useSessionStore } from '@features/workspace';
+import { firstTerminalOf, useSessionStore } from '@features/workspace';
 import { leaf } from '@features/workspace/model/windowLayout';
 import { useTerminalStore } from '@features/terminal';
 import { useChatStore } from '../stores/chat';
@@ -27,13 +27,15 @@ beforeEach(() => {
   useChatStore.setState({ conversationsLoaded: true, activeConversationId: 'conversation', conversations: [{ id: 'conversation', title: 'Build issue', createdAt: 1, updatedAt: 1, environment: null }], byTab: { conversation: [] } });
 });
 
-it('uses the workspace icon color in execution targets while preserving failure status', () => {
+it('uses the tab colour in execution targets while preserving failure status', () => {
   render(<PanelChat />);
   openSettings();
-  act(() => useIconColorStore.getState().setColor('session:chat-tab', 'cyan'));
   const selector = screen.getByRole('combobox', { name: '选择执行终端' });
   fireEvent.click(selector);
   const target = screen.getByRole('option', { name: /Build/ });
+  // A tab without a colour of its own keeps the muted default, not a green badge.
+  expect(target.querySelector('.ui-select-swatch')).toHaveStyle({ background: 'var(--text-secondary)' });
+  act(() => useIconColorStore.getState().setColor('session:chat-tab', 'cyan'));
   expect(target.querySelector('.ui-select-swatch')).toHaveStyle({ background: 'var(--group-cyan)' });
   fireEvent.click(target);
   expect(selector.querySelector('.ui-select-swatch')).toHaveStyle({ background: 'var(--group-cyan)' });
@@ -139,7 +141,20 @@ it('switches and clears the target through conversation settings without losing 
   expect(input).toHaveValue('Keep this draft');
 });
 
-it('shows a concise server badge and retains its full host context in the picker', () => {
+it('creates a terminal tab from the picker and binds it to the conversation', () => {
+  render(<PanelChat />);
+  openSettings();
+  fireEvent.click(screen.getByRole('combobox', { name: '选择执行终端' }));
+  fireEvent.click(screen.getByRole('button', { name: '新建标签页' }));
+  expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  const created = useSessionStore.getState().tabs.find(tab => tab.id !== 'chat-tab');
+  expect(created).toBeDefined();
+  const createdPane = firstTerminalOf(created!)?.id;
+  expect(createdPane).toBeTruthy();
+  expect(useChatStore.getState().conversations[0]?.environment?.paneId).toBe(createdPane);
+});
+
+it('shows a concise server badge and keeps the host context in the trigger tooltip', () => {
   useSessionStore.setState({ tabs: [{ id: 'chat-tab', title: 'Server', kind: 'session', layout: leaf({
     id: paneId, kind: 'ssh', ssh: { name: 'Production', host: '10.21.76.61' },
   }) }], terminalCwds: { [paneId]: '/srv/app' } });
@@ -151,8 +166,10 @@ it('shows a concise server badge and retains its full host context in the picker
   const target = screen.getByRole('combobox', { name: '选择执行终端' });
   expect(target).toHaveTextContent('10.21.76.61');
   expect(target).not.toHaveTextContent('/srv/app');
+  // The full context travels in the tooltip; the row itself carries the session name only.
+  expect(target).toHaveAttribute('data-tip-description', 'Server · Production · 10.21.76.61 · /srv/app');
   fireEvent.click(target);
-  expect(screen.getByRole('option', { name: 'Server · Production · 10.21.76.61 · /srv/app' })).toBeInTheDocument();
+  expect(screen.getByRole('option', { name: 'Server' })).toBeInTheDocument();
 });
 
 it('keeps a disconnected target visible and never silently chooses another terminal', () => {

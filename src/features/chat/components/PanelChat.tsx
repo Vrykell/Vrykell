@@ -21,7 +21,7 @@ import { toExchanges } from '../model/exchanges';
 import { useChatComposer } from '../hooks/useChatComposer';
 import { environmentForPane, showExecutionTerminal } from '../services/conversationContext';
 import { useIconColorStore } from '@config/iconColors';
-import { tabIconColor } from '@features/workspace';
+import { firstTerminalOf, isSessionTab, tabIconColor } from '@features/workspace';
 import type { AttachmentMeta } from '@features/agent/model/attachments';
 
 const EMPTY_MESSAGES: ChatMessage[] = [];
@@ -81,16 +81,20 @@ export default function PanelChat() {
     sending: sendingTab !== null, isSession: ready && !loadError, attachments, clearAttachments,
     conversationId: activeId, references, clearReferences, value: composerDraft.text, onTextChange: setText, scopeKey: activeId,
   });
-  const environmentOptions = useMemo(() => {
-    const available = tabs.flatMap(tab => tab.kind === 'session' ? leaves(tab.layout).map(pane => ({ pane, tab })) : [])
-      .filter(({ pane }) => !!sessions[pane.id]).map(({ pane, tab }) => {
+  const environmentOptions = useMemo((): Array<{ value: string; label: string; triggerLabel?: string; description?: string; swatch?: string; disabled?: boolean }> => {
+    const available = tabs.flatMap(tab => tab.kind === 'session' ? leaves(tab.layout).map((pane, index, panes) => ({ pane, tab, index, count: panes.length })) : [])
+      .filter(({ pane }) => !!sessions[pane.id]).map(({ pane, tab, index, count }) => {
         const context = environmentForPane(pane.id)!;
         const triggerLabel = pane.kind === 'ssh' ? pane.ssh?.host || pane.ssh?.name || context.label : t('Local terminal');
         const host = pane.kind === 'ssh' ? pane.ssh?.host : undefined;
         const hostLabel = host && !context.label.includes(host) ? ` · ${host}` : '';
+        // Rows carry the session name — the same identity the tab shows. The shell, host and
+        // directory stay in the trigger's tooltip instead of crowding every row; the dot uses the
+        // tab's own colour, and a tab with no colour keeps the default muted tone.
+        const name = `${tab.title}${count > 1 ? ` · ${t('Pane {{number}}', { number: index + 1 })}` : ''}`;
         const swatch = startupStates[pane.id] === 'starting' ? 'var(--accent-warm)'
-          : startupStates[pane.id] === 'failed' || startupStates[pane.id] === 'closed' ? 'var(--error)' : tabIconColor(tab, iconColors, pane) ?? 'var(--success)';
-        return { value: pane.id, label: `${context.label}${hostLabel}${context.cwd ? ` · ${context.cwd}` : ''}`, triggerLabel, swatch };
+          : startupStates[pane.id] === 'failed' || startupStates[pane.id] === 'closed' ? 'var(--error)' : tabIconColor(tab, iconColors, pane) ?? 'var(--text-secondary)';
+        return { value: pane.id, label: name, triggerLabel, description: `${context.label}${hostLabel}${context.cwd ? ` · ${context.cwd}` : ''}`, swatch };
       });
     return [
       { value: '', label: t('Discussion only'), triggerLabel: t('Discussion'), swatch: 'var(--text-muted)' },
@@ -99,6 +103,13 @@ export default function PanelChat() {
       ...available,
     ];
   }, [tabs, sessions, startupStates, terminalCwds, environment, iconColors]);
+  /** The picker's own shortcut: a fresh terminal tab bound to this conversation. */
+  const createTerminalTab = () => {
+    const tabId = useSessionStore.getState().addTab({ kind: 'local' });
+    const tab = useSessionStore.getState().tabs.find(item => item.id === tabId);
+    const paneId = tab && isSessionTab(tab) ? firstTerminalOf(tab)?.id : undefined;
+    if (paneId) useChatStore.getState().setEnvironment(activeId, environmentForPane(paneId));
+  };
 
   useEffect(() => { void useChatStore.getState().loadConversations(); }, []);
   useEffect(() => { setRenaming(false); }, [activeId]);
@@ -172,8 +183,9 @@ export default function PanelChat() {
       }}>
       <div className="chat-setting-row"><span>{t('Execution terminal')}</span>
         <Select aria-label={t('Select execution environment')} data-testid="chat-execution-target"
-          data-tip-description={environmentOptions.find(option => option.value === (environment?.paneId ?? ''))?.label}
+          data-tip-description={environmentOptions.find(option => option.value === (environment?.paneId ?? ''))?.description}
           value={environment?.paneId ?? ''} options={environmentOptions} disabled={!ready || sendingTab === activeId}
+          action={{ label: t('New tab'), onSelect: createTerminalTab }}
           onChange={paneId => useChatStore.getState().setEnvironment(activeId, paneId ? environmentForPane(paneId) : null)} />
       </div>
       <div className="chat-setting-links">
