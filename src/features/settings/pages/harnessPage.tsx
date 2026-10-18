@@ -213,7 +213,7 @@ export default function HarnessPage() {
             <OutlineButton key={preset.name} data-testid={`harness-preset-${preset.name}`}
               data-tip={`${preset.command} ${preset.args.join(' ')}`} data-tip-description={preset.hint}
               onClick={() => { setTouched(true); setList((current) => upsertPreset(current ?? [], preset)); }}>
-              <HarnessBadge name={preset.name} size={16} /> {preset.name}
+              <HarnessBadge name={preset.name} size={19} /> {preset.name}
             </OutlineButton>
           ))}
         </div>

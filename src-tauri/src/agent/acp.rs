@@ -31,6 +31,10 @@ pub const PROTOCOL_VERSION: u64 = 1;
 /// How long a request may take before the caller is told it will never finish.
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// The first request of a connection also pays for the program's start-up — and for `npx` presets,
+/// a one-time package download — so it gets a much longer budget than the rest.
+const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(180);
+
 /// Windows cannot start a `.cmd` shim (`npx`, and most CLIs installed through npm) directly, and
 /// `CreateProcess` does not apply `PATHEXT` either: the same preset that works in a terminal fails
 /// with "program not found" from the app. Resolve the program the way a shell would.
@@ -292,6 +296,11 @@ impl AcpClient {
 
     /// A request that waits for its own answer, bounded by [`REQUEST_TIMEOUT`].
     pub async fn request(&self, method: &str, params: Value) -> Result<Value, String> {
+        self.request_with_timeout(method, params, REQUEST_TIMEOUT).await
+    }
+
+    /// The same, with an explicit budget: the handshake pays for the program's start-up.
+    pub async fn request_with_timeout(&self, method: &str, params: Value, budget: Duration) -> Result<Value, String> {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let (tx, rx) = oneshot::channel();
         {
@@ -299,7 +308,7 @@ impl AcpClient {
             map.insert(id, tx);
         }
         self.send_line(json!({ "jsonrpc": "2.0", "id": id, "method": method, "params": params }))?;
-        match tokio::time::timeout(REQUEST_TIMEOUT, rx).await {
+        match tokio::time::timeout(budget, rx).await {
             Ok(Ok(outcome)) => outcome,
             Ok(Err(_)) => Err(format!("{method} answered nothing")),
             Err(_) => {
@@ -324,13 +333,14 @@ impl AcpClient {
 
     /// Negotiate versions and capabilities. The result carries what the agent can do.
     pub async fn initialize(&self, client_name: &str, client_version: &str) -> Result<Value, String> {
-        self.request(
+        self.request_with_timeout(
             "initialize",
             json!({
                 "protocolVersion": PROTOCOL_VERSION,
                 "clientCapabilities": client_capabilities(),
                 "clientInfo": { "name": client_name, "title": "Vrykell", "version": client_version },
             }),
+            HANDSHAKE_TIMEOUT,
         )
         .await
     }

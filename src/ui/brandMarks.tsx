@@ -44,12 +44,14 @@ import CrewAIColor from '@lobehub/icons/es/CrewAI/components/Color.js';
 import GithubCopilotMono from '@lobehub/icons/es/GithubCopilot/components/Mono.js';
 import HermesAgentMono from '@lobehub/icons/es/HermesAgent/components/Mono.js';
 import JunieColor from '@lobehub/icons/es/Junie/components/Color.js';
+import KimiColor from '@lobehub/icons/es/Kimi/components/Color.js';
 import KiroColor from '@lobehub/icons/es/Kiro/components/Color.js';
 import KwaipilotColor from '@lobehub/icons/es/Kwaipilot/components/Color.js';
 import ManusMono from '@lobehub/icons/es/Manus/components/Mono.js';
 import OpenClawColor from '@lobehub/icons/es/OpenClaw/components/Color.js';
 import OpenHandsColor from '@lobehub/icons/es/OpenHands/components/Color.js';
 import PhindMono from '@lobehub/icons/es/Phind/components/Mono.js';
+import PiMono from '@lobehub/icons/es/Pi/components/Mono.js';
 import QoderColor from '@lobehub/icons/es/Qoder/components/Color.js';
 import TraeColor from '@lobehub/icons/es/Trae/components/Color.js';
 import ZencoderColor from '@lobehub/icons/es/Zencoder/components/Color.js';
@@ -98,11 +100,15 @@ export const AGENT_MARKS: Record<string, AppIcon> = {
   hermesagent: HermesAgentMono as unknown as AppIcon,
   junie: JunieColor as unknown as AppIcon,
   kiro: KiroColor as unknown as AppIcon,
+  kirocli: KiroColor as unknown as AppIcon,
+  kimi: KimiColor as unknown as AppIcon,
+  kimicli: KimiColor as unknown as AppIcon,
   kwaipilot: KwaipilotColor as unknown as AppIcon,
   manus: ManusMono as unknown as AppIcon,
   openclaw: OpenClawColor as unknown as AppIcon,
   openhands: OpenHandsColor as unknown as AppIcon,
   phind: PhindMono as unknown as AppIcon,
+  pi: PiMono as unknown as AppIcon,
   qoder: QoderColor as unknown as AppIcon,
   trae: TraeColor as unknown as AppIcon,
   zencoder: ZencoderColor as unknown as AppIcon,

@@ -17,10 +17,19 @@ export interface HarnessPreset {
 export const HARNESS_PRESETS: HarnessPreset[] = [
   // Verified on this machine: this one answers the handshake, so it is the first thing to try.
   { name: 'Claude Code', command: 'npx', args: ['-y', '@zed-industries/claude-code-acp'], hint: 'npx（已实测可握手）' },
-  { name: 'Codex', command: 'npx', args: ['-y', '@zed-industries/codex-acp'], hint: 'npx' },
+  { name: 'Codex', command: 'npx', args: ['-y', '@agentclientprotocol/codex-acp'], hint: 'npx' },
   { name: 'Gemini CLI', command: 'npx', args: ['-y', '@google/gemini-cli', '--experimental-acp'], hint: 'npx' },
-  { name: 'OpenCode', command: 'npx', args: ['-y', 'opencode-ai', 'acp'], hint: 'npx' },
+  // Verified on this machine: `opencode acp` starts the protocol server directly.
+  { name: 'OpenCode', command: 'opencode', args: ['acp'], hint: '需要先安装 opencode（npm i -g opencode-ai）' },
+  // Verified on this machine: `--acp` starts the agent in ACP mode.
+  { name: 'Qwen Code', command: 'qwen', args: ['--acp'], hint: '需要先安装 qwen（npm i -g @qwen-code/qwen-code）' },
+  { name: 'Cursor', command: 'cursor-agent', args: ['acp'], hint: '需要先安装 cursor-agent' },
+  // Verified on this machine: the `acp` tool group serves the protocol.
+  { name: 'OpenClaw', command: 'openclaw', args: ['acp'], hint: '需要先安装 openclaw' },
+  { name: 'Kiro CLI', command: 'kiro-cli', args: ['acp'], hint: '需要先安装 kiro-cli' },
+  { name: 'Kimi CLI', command: 'kimi', args: ['acp'], hint: '需要先安装 kimi-cli' },
   { name: 'Goose', command: 'goose', args: ['acp'], hint: '需要先安装 goose' },
+  { name: 'Pi', command: 'npx', args: ['-y', 'pi-acp'], hint: 'npx' },
 ];
 
 export interface HarnessEntry {
