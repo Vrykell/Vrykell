@@ -462,7 +462,7 @@ chat store send → agentStream（AI SDK streamText）
 | 层 | 内容 |
 |---|---|
 | 设计 tokens（`src/config/theme/tokens.ts`） | 亮/暗两套 CSS 变量（`--canvas/--text-primary/--border/...`），`applyTheme` 首帧同步写入防 FOUC |
-| 外观主题（`src/features/settings/model/terminalTheme.ts` + Rust `theme.rs`） | 壁纸（data URL，背景层固定铺满 zIndex 0）+ 应用不透明度（有壁纸才生效）+ 主题导入/导出 JSON |
+| 外观主题（`src/features/settings/model/terminalTheme.ts` + Rust `theme.rs`） | 壁纸（data URL，背景层固定铺满 zIndex 0）+ 应用不透明度（有壁纸才生效；挂载在 body 的浮层经根变量继承同一数值）+ 主题导入/导出 JSON |
 
 - 配置持久化在 Rust 侧（`theme_config` 命令，JSON 文件），启动先 `applyCachedWallpaper()` 再异步 `load()`。
 - 终端配色（ANSI 调色板）在 `src/features/terminal/model/blockTypes.ts`，独立于设计 token。

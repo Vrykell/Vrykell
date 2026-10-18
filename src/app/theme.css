@@ -130,11 +130,16 @@ input, textarea, [contenteditable="true"] { caret-color: var(--text-caret); }
 @keyframes app-tooltip-in { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .app-tooltip { animation: none; } }
 
+/* Portaled surfaces mount under the document body, outside the window element that carries the
+   application opacity, so the surface mirrors the value itself; a wrapper would have to own a
+   stacking level to stay above the window, which a bare portal container does not have. */
+body > :not(#root) { --app-portal-opacity: var(--app-opacity, 1); }
 /* Floating surfaces use the workspace palette and an outer shadow for separation. */
 .workspace-floating {
   background: var(--menu-bg); color: var(--text-primary);
   border: 0; border-radius: 10px;
   box-shadow: var(--shadow-md); font: calc(12px * var(--ui-font-scale))/1.5 var(--font-ui);
+  opacity: var(--app-portal-opacity, 1);
 }
 .workspace-floating-dialog { border-radius: var(--radius-block); box-shadow: var(--shadow-lg); }
 .tool-dialog-overlay { position: fixed; inset: 0; z-index: 9996; display: flex; align-items: center; justify-content: center; background: var(--overlay); animation: overlayIn 180ms var(--ease); }
@@ -1036,7 +1041,7 @@ input.text-input-field:disabled { opacity: 0.55; }
 
 @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes toastOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(8px); } }
-@keyframes modalIn { from { opacity: 0; transform: translateY(-8px) scale(0.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes modalIn { from { opacity: 0; transform: translateY(-8px) scale(0.985); } to { opacity: var(--app-portal-opacity, 1); transform: translateY(0) scale(1); } }
 @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 @keyframes cursor-blink { 50% { opacity: 0; } }

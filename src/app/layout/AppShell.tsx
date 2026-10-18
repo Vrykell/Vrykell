@@ -1,5 +1,5 @@
 import { isMacOS, isWindows } from '@platform/runtime';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useUiStore } from '@features/workspace';
 import { useTerminalThemeStore } from '@features/settings/model/terminalTheme';
 import type { TerminalSpec } from '@features/workspace/model/windowLayout';
@@ -17,6 +17,14 @@ export default function AppShell() {
     useUiStore.getState().closeSplitPicker();
     useUiStore.getState().beginSplit(spec);
   }, []);
+
+  // Surfaces portaled to the document body sit outside the window element, so the window opacity
+  // cannot reach them; publish the applied value for those surfaces to mirror.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--app-opacity', String(effectiveOpacity));
+    return () => { root.style.removeProperty('--app-opacity'); };
+  }, [effectiveOpacity]);
 
   return (
     <>

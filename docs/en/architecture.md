@@ -462,7 +462,7 @@ The theme has two layers:
 | Layer | Contents |
 |---|---|
 | Design tokens (`src/config/theme/tokens.ts`) | Two sets of CSS variables, light/dark (`--canvas/--text-primary/--border/...`); `applyTheme` writes them synchronously on the first frame to prevent FOUC |
-| Appearance theme (`src/features/settings/model/terminalTheme.ts` + Rust `theme.rs`) | wallpaper (data URL, a background layer fixed to fill at zIndex 0) + app opacity (only takes effect when a wallpaper exists) + theme import/export JSON |
+| Appearance theme (`src/features/settings/model/terminalTheme.ts` + Rust `theme.rs`) | wallpaper (data URL, a background layer fixed to fill at zIndex 0) + app opacity (only takes effect when a wallpaper exists; surfaces portaled to the document body inherit the same value through a root variable) + theme import/export JSON |
 
 - Configuration is persisted on the Rust side (`theme_config` command, JSON file); on startup `applyCachedWallpaper()` runs first, then `load()` asynchronously.
 - Terminal colors (ANSI palette) are in `src/features/terminal/model/blockTypes.ts`, independent of the design tokens.

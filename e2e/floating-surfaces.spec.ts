@@ -1,5 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
-import { setupTauriMock, ensureChatSettingsOpen } from './tauri-mock';
+import { setupTauriMock, ensureChatSettingsOpen, themeConfig } from './tauri-mock';
 import { gotoSetting } from './settings';
 
 async function surfaceStyle(surface: Locator) {
@@ -106,3 +106,51 @@ for (const theme of ['深色', '浅色']) {
     await expect(modes).toBeHidden();
   });
 }
+
+test('portaled menus and pickers mirror the application opacity', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.addInitScript(() => {
+    const target = window as unknown as {
+      __TAURI_INTERNALS__: { invoke: (cmd: string, args: Record<string, unknown>) => Promise<unknown> };
+    };
+    const original = target.__TAURI_INTERNALS__.invoke;
+    target.__TAURI_INTERNALS__.invoke = async (cmd, args) => {
+      if (cmd === 'plugin:dialog|open') return '/wallpaper.png';
+      if (cmd === 'read_image_data_url') {
+        return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
+      }
+      return original(cmd, args);
+    };
+  });
+  await page.goto('/');
+  await gotoSetting(page, '主题');
+  await page.getByRole('button', { name: '选择图片', exact: true }).click();
+  await expect.poll(async () => (await themeConfig(page)).backgroundImage).toBe('/wallpaper.png');
+  await page.locator('input[type="range"]').fill('0.6');
+  await expect.poll(async () => (await themeConfig(page)).opacity).toBe(0.6);
+  await expect(page.locator('.application-window')).toHaveCSS('opacity', '0.6');
+
+  // A dropdown lives on the document body, so it mirrors the window opacity itself.
+  await page.locator('.ui-select').first().click();
+  const picker = page.locator('.ui-select-menu');
+  await expect(picker).toBeVisible();
+  await expect(picker).toHaveCSS('opacity', '0.6');
+  await page.keyboard.press('Escape');
+  await expect(picker).toBeHidden();
+
+  await page.keyboard.press('Meta+1');
+  await page.locator('[data-dock-btn="files"]').click();
+  await page.getByText('notes.txt', { exact: true }).click({ button: 'right' });
+  const menu = page.getByRole('menu', { name: '操作菜单' });
+  await expect(menu).toBeVisible();
+  await expect(menu).toHaveCSS('opacity', '0.6');
+  await page.screenshot({ path: test.info().outputPath('translucent-menu.png') });
+
+  // A dialog rendered inside the window keeps one opacity: the window already carries it.
+  await menu.getByRole('button', { name: '删除', exact: true }).click();
+  const confirmation = page.getByRole('dialog', { name: '确认删除' });
+  await expect(confirmation).toBeVisible();
+  await expect(confirmation).toHaveCSS('opacity', '1');
+  await confirmation.getByRole('button', { name: '取消', exact: true }).click();
+  await expect(confirmation).toBeHidden();
+});
