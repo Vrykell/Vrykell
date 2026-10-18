@@ -634,16 +634,16 @@ pub async fn ai_stream(
     id: String,
     messages: Vec<AiMessage>,
 ) -> Result<(), String> {
-    let (api_key, base_url, model) = {
+    let (provider_id, base_url, model) = {
         let c = state.0.lock().map_err(|e| e.to_string())?;
-        (
-            c.api_key
-                .clone()
-                .ok_or_else(|| "尚未配置 API Key，请先在设置中填入".to_string())?,
-            c.base_url.clone(),
-            c.model.clone(),
-        )
+        let (provider, base) = c.models.iter()
+            .find(|m| m.id == c.active_model)
+            .map(|m| (m.provider.clone(), m.base_url.clone()))
+            .unwrap_or_else(|| (c.provider.clone(), c.base_url.clone()));
+        (provider_identity(&provider, &base), base, c.model.clone())
     };
+    let api_key = read_provider_key(&provider_id)
+        .ok_or_else(|| "尚未配置 API Key，请先在设置中填入".to_string())?;
 
     let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
     let body = serde_json::json!({
@@ -785,8 +785,9 @@ fn provider_auth(provider: &str) -> Result<ProviderAuth, String> {
     }
 }
 
-// The requested provider selects its key only after validating the saved endpoint.
-fn classify(url: &str, cfg: &AiConfigInner, requested: Option<&str>) -> Result<(reqwest::Url, ProviderAuth), String> {
+// The requested provider selects its key only after validating the saved endpoint; the returned
+// identity is the endpoint (family + effective base) the key is stored under.
+fn classify(url: &str, cfg: &AiConfigInner, requested: Option<&str>) -> Result<(reqwest::Url, ProviderAuth, String), String> {
     let parsed = reqwest::Url::parse(url).map_err(|e| format!("无效 URL：{e}"))?;
     let host = parsed.host_str().ok_or_else(|| "无效 URL：缺少 host".to_string())?;
     let local = matches!(host, "localhost" | "127.0.0.1" | "::1");
@@ -801,7 +802,8 @@ fn classify(url: &str, cfg: &AiConfigInner, requested: Option<&str>) -> Result<(
     if let Some(provider) = official {
         if requested.is_none() || requested == Some(provider) {
             let auth = provider_auth(provider)?;
-            return Ok((parsed, auth));
+            let identity = request_identity(&parsed, cfg, provider);
+            return Ok((parsed, auth, identity));
         }
     }
     let configured = cfg.models.iter().find(|model| {
@@ -815,7 +817,21 @@ fn classify(url: &str, cfg: &AiConfigInner, requested: Option<&str>) -> Result<(
         } else { None }
     }).ok_or_else(|| format!("目标地址 {host} 不在当前服务商的 AI 服务白名单内"))?;
     let auth = provider_auth(provider)?;
-    Ok((parsed, auth))
+    let identity = request_identity(&parsed, cfg, provider);
+    Ok((parsed, auth, identity))
+}
+
+/// The provider identity a request belongs to: the configured model whose endpoint contains the
+/// URL first, else the family's default endpoint. Keys are stored per identity, so this is what
+/// the proxy reads before attaching the auth header.
+fn request_identity(url: &reqwest::Url, cfg: &AiConfigInner, kind: &str) -> String {
+    if let Some(model) = cfg.models.iter().find(|m| m.provider == kind && matches_endpoint(url, &m.base_url)) {
+        return provider_identity(&model.provider, &model.base_url);
+    }
+    if cfg.provider == kind && matches_endpoint(url, &cfg.base_url) {
+        return provider_identity(&cfg.provider, &cfg.base_url);
+    }
+    provider_identity(kind, "")
 }
 
 async fn run_proxy(
@@ -823,13 +839,9 @@ async fn run_proxy(
     req: LlmProxyRequest,
     on_event: &Channel<LlmStreamEvent>,
 ) -> Result<(), String> {
-    let (url, auth) = classify(&req.url, &cfg, req.provider.as_deref())?;
-    let key = match auth {
-        ProviderAuth::OpenAI => cfg.api_key.clone(),
-        ProviderAuth::Anthropic => cfg.anthropic_key.clone(),
-        ProviderAuth::Gemini => cfg.gemini_key.clone(),
-    }
-    .ok_or_else(|| "当前服务尚未配置 API Key，请先在设置中填入".to_string())?;
+    let (url, auth, provider_id) = classify(&req.url, &cfg, req.provider.as_deref())?;
+    let key = read_provider_key(&provider_id)
+        .ok_or_else(|| "当前服务尚未配置 API Key，请先在设置中填入".to_string())?;
 
     let method = reqwest::Method::from_bytes(req.method.as_deref().unwrap_or("POST").as_bytes())
         .map_err(|e| format!("无效 HTTP 方法：{e}"))?;
