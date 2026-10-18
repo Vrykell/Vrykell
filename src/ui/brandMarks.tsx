@@ -22,6 +22,19 @@ import QwenColor from '@lobehub/icons/es/Qwen/components/Color.js';
 import SiliconCloudColor from '@lobehub/icons/es/SiliconCloud/components/Color.js';
 import XAIMono from '@lobehub/icons/es/XAI/components/Mono.js';
 import ZhipuColor from '@lobehub/icons/es/Zhipu/components/Color.js';
+import AmpColor from '@lobehub/icons/es/Amp/components/Color.js';
+import ClaudeCodeColor from '@lobehub/icons/es/ClaudeCode/components/Color.js';
+import ClineMono from '@lobehub/icons/es/Cline/components/Mono.js';
+import CodexColor from '@lobehub/icons/es/Codex/components/Color.js';
+import CursorMono from '@lobehub/icons/es/Cursor/components/Mono.js';
+import DevinColor from '@lobehub/icons/es/Devin/components/Color.js';
+import GeminiCLIColor from '@lobehub/icons/es/GeminiCLI/components/Color.js';
+import GooseMono from '@lobehub/icons/es/Goose/components/Mono.js';
+import KiloCodeMono from '@lobehub/icons/es/KiloCode/components/Mono.js';
+import OpenCodeMono from '@lobehub/icons/es/OpenCode/components/Mono.js';
+import RooCodeMono from '@lobehub/icons/es/RooCode/components/Mono.js';
+import WindsurfMono from '@lobehub/icons/es/Windsurf/components/Mono.js';
+import ZeroOneColor from '@lobehub/icons/es/ZeroOne/components/Color.js';
 import type { AppIcon } from './icons';
 
 export const AnthropicMark = AnthropicMono as unknown as AppIcon;
@@ -37,3 +50,24 @@ export const GroqMark = GroqMono as unknown as AppIcon;
 export const XaiMark = XAIMono as unknown as AppIcon;
 export const MistralMark = MistralColor as unknown as AppIcon;
 export const OllamaMark = OllamaMono as unknown as AppIcon;
+
+/**
+ * Marks of the ACP-capable agents, keyed by the normalised name a harness entry carries (lowercase,
+ * letters and digits only — see harnessPresets). These are the agents' own icons, which is what a
+ * server list should show; a name that is not here falls back to the vendor detection.
+ */
+export const AGENT_MARKS: Record<string, AppIcon> = {
+  claudecode: ClaudeCodeColor as unknown as AppIcon,
+  codex: CodexColor as unknown as AppIcon,
+  geminicli: GeminiCLIColor as unknown as AppIcon,
+  opencode: OpenCodeMono as unknown as AppIcon,
+  goose: GooseMono as unknown as AppIcon,
+  cline: ClineMono as unknown as AppIcon,
+  cursor: CursorMono as unknown as AppIcon,
+  amp: AmpColor as unknown as AppIcon,
+  kilocode: KiloCodeMono as unknown as AppIcon,
+  roocode: RooCodeMono as unknown as AppIcon,
+  windsurf: WindsurfMono as unknown as AppIcon,
+  devin: DevinColor as unknown as AppIcon,
+  '01': ZeroOneColor as unknown as AppIcon,
+};
