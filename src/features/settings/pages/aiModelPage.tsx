@@ -15,7 +15,6 @@ import { selectProvider, useAiConfigStore, type ModelProfile } from '@features/a
 import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
 import { useToastStore } from '@ui/Toast';
 import { applyModelPreset, type ModelPreset } from '@config/modelPresets';
-import AddProviderDialog from '@features/settings/components/AddProviderDialog';
 import ProviderDialog from '@features/settings/components/ProviderDialog';
 import ProviderKeyCard from '@features/settings/components/ProviderKeyCard';
 import ProviderEndpointCard from '@features/settings/components/ProviderEndpointCard';
@@ -29,7 +28,6 @@ export function AiModelPage() {
   const { save } = useSettingsSave();
   const detailRef = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
-  const [addOpen, setAddOpen] = useState(false);
   const [providerOpen, setProviderOpen] = useState(false);
   const [confirmProvider, setConfirmProvider] = useState<ProviderRow<ModelProfile> | null>(null);
   /** Bumped when the provider menu asks to edit the selected provider's key. */
@@ -165,13 +163,8 @@ export function AiModelPage() {
         selectedId={selectedId}
         flags={aiCfg}
         onSelect={selectProvider}
-        onAddProvider={() => setAddOpen(true)}
-        onClose={() => setProviderOpen(false)}
-      />
-      <AddProviderDialog
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
         onAddPreset={addPreset}
+        onClose={() => setProviderOpen(false)}
       />
       <ConfirmDialog
         open={confirmProvider !== null}

@@ -165,17 +165,26 @@ test.describe('模型配置页', () => {
     await expect(page.getByTestId('model-name')).toHaveCount(1);
   });
 
-  test('添加服务商：浮层动作打开中央预设网格并选中新服务商', async ({ page }) => {
+  test('添加服务商：同一浮层内切到预设网格，返回键可回到列表', async ({ page }) => {
     const switcher = page.getByTestId('provider-switch');
     await switcher.click();
+    const dialog = page.getByTestId('provider-dialog');
+    await expect(dialog).toBeVisible();
     await page.getByTestId('provider-dialog-add').click();
-    await expect(page.getByTestId('add-provider-dialog')).toBeVisible();
+    // 预设网格出现在同一个浮层里，返回键回到服务商列表
+    await expect(page.getByTestId('model-preset-DeepSeek')).toBeVisible();
+    await page.getByTestId('dialog-back').click();
+    await expect(page.getByTestId('model-preset-DeepSeek')).toHaveCount(0);
+    await expect(page.locator('[data-testid^="provider-option-"]')).toHaveCount(2);
+    // 再进一次并选中 DeepSeek：回到列表且新服务商已选中
+    await page.getByTestId('provider-dialog-add').click();
     await page.getByTestId('model-preset-DeepSeek').click();
-    await expect(page.getByTestId('add-provider-dialog')).toHaveCount(0);
-    await expect(switcher.locator('.provider-switch-name')).toHaveText('DeepSeek');
-    await switcher.click();
+    await expect(page.getByTestId('model-preset-DeepSeek')).toHaveCount(0);
+    await expect(dialog).toBeVisible();
     await expect(page.locator('[data-testid^="provider-option-"]')).toHaveCount(3);
-    await page.keyboard.press('Escape');
+    await page.getByTestId('provider-dialog-close').click();
+    await expect(dialog).toHaveCount(0);
+    await expect(switcher.locator('.provider-switch-name')).toHaveText('DeepSeek');
     await expect(page.getByTestId('model-name')).toHaveCount(1);
     await expect(page.getByTestId('model-name')).toHaveText('DeepSeek');
   });

@@ -8,16 +8,18 @@
 import { useRef, type ReactNode } from 'react';
 import { t } from '@i18n';
 import { IconButton } from '@ui/IconButton';
-import { X } from '@ui/icons';
+import { ArrowLeft, X } from '@ui/icons';
 import { useDialogKeyboard } from '@ui/useDialogKeyboard';
 
-export default function SettingsDialog({ open, title, icon, width = 440, initialFocus, onClose, children, footer, testId }: {
+export default function SettingsDialog({ open, title, icon, width = 440, initialFocus, onBack, onClose, children, footer, testId }: {
   open: boolean;
   title: string;
   icon?: ReactNode;
   width?: number;
   /** Selector for the control the dialog should focus first. */
   initialFocus?: string;
+  /** Shows a back control before the title (a view switch inside the same dialog). */
+  onBack?: () => void;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
@@ -52,6 +54,11 @@ export default function SettingsDialog({ open, title, icon, width = 440, initial
         onClick={(event) => event.stopPropagation()}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {onBack && (
+            <IconButton compact data-testid="dialog-back" aria-label={t('Back')} data-tip={t('Back')} onClick={onBack}>
+              <ArrowLeft size={14} />
+            </IconButton>
+          )}
           {icon}
           <span style={{
             fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)',

@@ -1230,9 +1230,10 @@ button.state-icon-button { color: var(--icon-color); }
 .settings-provider-empty { padding: 10px 8px; text-align: center; color: var(--text-muted); font-size: var(--fs-caption); }
 /* Provider switcher: a grey button that brightens on hover and opens the centred provider menu. */
 .provider-switch { display: inline-flex; align-items: center; gap: 8px; max-width: 340px; min-height: 32px; padding: 6px 10px; border: 0; border-radius: var(--radius-inner); background: var(--field-bg); color: var(--text-primary); font: var(--fw-medium) var(--fs-caption) var(--font-ui); cursor: pointer; transition: background var(--dur-fast) var(--ease); }
-.provider-switch:hover, .provider-switch[aria-expanded="true"] { background: var(--button-hover); }
+.provider-switch:hover, .provider-switch[aria-expanded="true"] { background: color-mix(in srgb, var(--field-bg) 84%, var(--text-primary)); }
 .provider-switch-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.provider-key-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-sizing: border-box; }
+/* Optical nudge: the text's visual centre sits above its line box centre. */
+.provider-key-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-sizing: border-box; transform: translateY(-1px); }
 .provider-key-dot[data-empty] { background: transparent; border: 1px solid var(--border-strong); }
 /* Rows of the centred provider menu: a neutral tile behind the mark, the current one lifted. */
 .provider-option-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 42px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text-primary); font: var(--fw-medium) var(--fs-caption) var(--font-ui); cursor: pointer; text-align: left; transition: background var(--dur-fast) var(--ease); }

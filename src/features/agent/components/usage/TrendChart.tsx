@@ -132,12 +132,14 @@ export default function TrendChart({ buckets, unit, rangeLabel }: {
         </div>
 
         <div ref={plotRef} style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+          {/* The plot wrapper keeps the tooltip's offset measurable from the SVG's own bottom. */}
+          <div style={{ position: 'relative' }}>
           {hoveredBucket && (
             <div data-testid="usage-trend-tooltip" className="workspace-floating" style={{
               position: 'absolute', zIndex: 2, pointerEvents: 'none',
               left: Math.min(Math.max(0, (hovered ?? 0) * slot + slot / 2 - 70), Math.max(0, width - 148)),
-              // Sit just above the hovered bar so the card never covers it.
-              bottom: Math.min(CHART_HEIGHT, peak > 0 ? CHART_HEIGHT * (valueOf(hoveredBucket) / peak) : 0) + 10,
+              // Mirror the bar's own height so the card sits just above it.
+              bottom: (valueOf(hoveredBucket) > 0 ? Math.max(2, (valueOf(hoveredBucket) / scale) * (CHART_HEIGHT - 2)) : 0) + 10,
               minWidth: 140, padding: '8px 10px',
               color: 'var(--text-primary)', fontSize: 'var(--fs-caption)', whiteSpace: 'nowrap',
             }}>
@@ -189,6 +191,7 @@ export default function TrendChart({ buckets, unit, rangeLabel }: {
               );
             })}
           </svg>
+          </div>
 
           <div style={{ position: 'relative', height: 14, marginTop: 4 }}>
             {ticks.map((index) => (
