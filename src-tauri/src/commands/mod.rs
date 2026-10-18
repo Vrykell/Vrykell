@@ -5,6 +5,8 @@ pub mod clipboard;
 pub mod conversation;
 pub mod download;
 pub mod group;
+pub mod git;
+pub mod editor;
 pub mod search;
 pub mod command_history;
 pub mod session;

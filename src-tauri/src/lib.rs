@@ -78,6 +78,18 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::git::git_snapshot,
+            commands::git::git_diff,
+            commands::git::git_change_file,
+            commands::git::git_operate,
+            commands::git::git_commit_context,
+            commands::git::git_branches,
+            commands::git::git_worktrees,
+            commands::git::git_references,
+            commands::git::git_edit_reference,
+            commands::editor::editor_read_file,
+            commands::editor::editor_save_file,
+            commands::git::git_switch_branch,
             commands::command_history::command_history_record,
             commands::command_history::command_history_list,
             commands::command_history::command_history_mutate,
