@@ -57,7 +57,7 @@
 29. `src/ui/` — 无业务语义的通用 UI 组件。
 30. `src/features/chat/` — AI 对话渲染（AiBlock、ModelPill、ToolRunCard、Markdown、PanelChat）。
 31. `src/features/agent/` — AI 代理逻辑（agentStream、工具、权限、Skills、MCP、上下文、记忆、调度、智能标题）。
-32. `src/features/settings/` — 设置页（行为/模型/MCP/Skills/快捷键/终端打开模式/主题）。
+32. `src/features/settings/` — 设置页（行为/模型/MCP/Skills/快捷键/终端打开模式/外观：主题、块外观、字体与显示、主题文件）。
 33. `src/platform/` 与 `src/utils/` — Tauri IPC、PTY、运行时适配与纯工具函数。业务服务归属对应 Feature。
 34. `src/features/ssh/` `src/features/files/` `src/features/search/` `src/config/theme/` — SSH / 本地文件 / 全局搜索 / 设计 token。
 35. `e2e/` — Playwright E2E 测试，`tauri-mock.ts` 提供 Tauri + Anthropic mock。测试用 dev server 的端口由 `PW_PORT` 决定（缺省 1421）：多个 worktree 并行跑测试时各自指定不同端口，避免一个 run 关掉另一个 run 的 dev server（表现为整片 `ERR_CONNECTION_REFUSED`）。

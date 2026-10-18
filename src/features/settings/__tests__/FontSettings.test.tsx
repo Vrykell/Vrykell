@@ -1,10 +1,10 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import FontSettings from '../components/FontSettings';
 import { useTypographyStore } from '@config/typography';
 
 describe('theme font settings', () => {
-  beforeEach(() => useTypographyStore.getState().reset());
+  beforeEach(() => { useTypographyStore.getState().reset(); useTypographyStore.getState().update({ commandHighlighting: false }); });
   it('updates global page and terminal fonts independently and restores defaults', () => {
     render(<FontSettings />);
     fireEvent.click(screen.getByRole('combobox', { name: '页面字号' }));
@@ -25,6 +25,18 @@ describe('theme font settings', () => {
     expect(useTypographyStore.getState().terminalRenderer).toBe('dom');
     fireEvent.click(screen.getByRole('button', { name: '恢复默认字体设置' }));
     expect(useTypographyStore.getState().terminalRenderer).toBe('webgl');
+  });
+
+  it('toggles command syntax highlighting without the font reset clearing it', async () => {
+    render(<FontSettings />);
+    const toggle = screen.getByRole('switch', { name: '命令语法高亮' });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(toggle);
+    await waitFor(() => expect(useTypographyStore.getState().commandHighlighting).toBe(true));
+    fireEvent.click(screen.getByRole('button', { name: '恢复默认字体设置' }));
+    expect(useTypographyStore.getState().commandHighlighting).toBe(true);
+    fireEvent.click(toggle);
+    await waitFor(() => expect(useTypographyStore.getState().commandHighlighting).toBe(false));
   });
 });
 

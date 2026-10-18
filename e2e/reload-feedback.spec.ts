@@ -5,7 +5,7 @@ import { gotoSetting } from './settings';
 test('theme reload spins until loading completes and honors reduced motion', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
-  await gotoSetting(page, '主题');
+  await gotoSetting(page, '主题文件');
   await page.evaluate(() => {
     const scope = window as unknown as {
       __TAURI_INTERNALS__: { invoke: (cmd: string, args: Record<string, unknown>) => Promise<unknown> };

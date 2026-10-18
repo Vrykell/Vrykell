@@ -21,11 +21,14 @@ import { McpPage } from '@features/settings/pages/mcpPage';
 import { TerminalOpenPage } from '@features/settings/pages/terminalOpenPage';
 import { CommandHistoryPage } from './commandHistoryPage';
 import { ThemePage } from '@features/settings/pages/themePage';
+import { BlockAppearancePage } from '@features/settings/pages/blockAppearancePage';
+import { ThemeFilesPage } from '@features/settings/pages/themeFilesPage';
 import { ShortcutPage } from '@features/settings/pages/shortcutPage';
 import { useSettingsNavigation } from '@features/settings/hooks/useSettingsNavigation';
 import AutoSaveInput from '../components/AutoSaveInput';
 import SaveStatus from '../components/SaveStatus';
 import SettingsNavigation from '../components/SettingsNavigation';
+import FontSettings from '../components/FontSettings';
 import { SettingsSaveProvider, useSettingsSave } from '../components/SettingsSaveProvider';
 import { StartupPage } from './startupPage';
 import { LogsPage } from './logsPage';
@@ -265,6 +268,15 @@ function SettingsContent() {
 
       case 'appearance-theme':
         return <ThemePage />;
+
+      case 'appearance-blocks':
+        return <BlockAppearancePage />;
+
+      case 'appearance-typography':
+        return <FontSettings />;
+
+      case 'appearance-files':
+        return <ThemeFilesPage />;
 
       case 'shortcuts':
         return <ShortcutPage />;

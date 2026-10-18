@@ -64,7 +64,7 @@ test('follow system tracks the operating system appearance', async ({ page }) =>
 test('a block colour row shows a swatch and name, matching swatches in the menu, and the switch to its left', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
-  await gotoSetting(page, '主题');
+  await gotoSetting(page, '块外观');
   const field = blockField(page, 'AI 对话块');
   const color = field.getByRole('combobox');
   await expect(color.locator('.ui-select-swatch')).toBeVisible();
@@ -84,7 +84,7 @@ test('a block colour row shows a swatch and name, matching swatches in the menu,
 test('the three block types never offer the same colour', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
-  await gotoSetting(page, '主题');
+  await gotoSetting(page, '块外观');
   const palettes: string[] = [];
   for (const title of ['AI 对话块', '终端命令块', '失败命令块']) {
     const color = blockField(page, title).getByRole('combobox');
@@ -101,7 +101,7 @@ test('the three block types never offer the same colour', async ({ page }) => {
 test('the rail keeps the picked colour while the background stays a tint of it', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
-  await gotoSetting(page, '主题');
+  await gotoSetting(page, '块外观');
   await injectBlock(page, 'command-block ai-block', 'probe-ai-block');
   await injectBlock(page, 'command-block', 'probe-command-block');
 

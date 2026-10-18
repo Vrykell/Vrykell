@@ -353,7 +353,7 @@ T4   渲染帧
 | `src/features/agent/services/skills.ts` / `src/features/agent/services/mcp.ts` | Skills / MCP 工具装配 |
 | `src/features/chat/components/PanelChat.tsx` | 全局 AI 对话面板（dock 侧栏） |
 | `src/features/chat/components/AiBlock.tsx` / `ToolRunCard.tsx` | 对话问答块 / 工具状态卡片 |
-| `src/features/settings/` | 设置页（AI 行为/模型/MCP/Skills/快捷键/终端打开模式/主题） |
+| `src/features/settings/` | 设置页（AI 行为/模型/MCP/Skills/快捷键/终端打开模式/外观：主题、块外观、字体与显示、主题文件） |
 | `src-tauri/src/agent/` | AI 流/配置/记忆/Skills/MCP/调度/web 抓取后端 |
 | `src-tauri/src/remote/ssh.rs` | SSH/SFTP（主机指纹 TOFU、密码认证） |
 

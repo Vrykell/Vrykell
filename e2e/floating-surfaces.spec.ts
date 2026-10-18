@@ -131,6 +131,7 @@ test('portaled menus and pickers mirror the application opacity', async ({ page 
   await expect(page.locator('.application-window')).toHaveCSS('opacity', '0.6');
 
   // A dropdown lives on the document body, so it mirrors the window opacity itself.
+  await page.locator('aside').getByRole('button', { name: '字体与显示', exact: true }).click();
   await page.locator('.ui-select').first().click();
   const picker = page.locator('.ui-select-menu');
   await expect(picker).toBeVisible();

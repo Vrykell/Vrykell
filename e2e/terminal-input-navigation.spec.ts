@@ -210,7 +210,7 @@ test('font family, weight and spacing update existing terminal history and persi
   await expect(command).toHaveCSS('font-weight', '500');
   const output = page.locator('.command-block-output [data-selectable]').first();
   await expect(output).toHaveCSS('font-weight', '400');
-  await gotoSetting(page, '主题');
+  await gotoSetting(page, '字体与显示');
   for (const [name, option] of [['终端字体', 'Maple Mono NF CN'], ['终端字重', '350'], ['终端行距', '1.2×']]) {
     await page.getByRole('combobox', { name, exact: true }).click();
     await page.getByRole('option', { name: option, exact: true }).click();
@@ -239,7 +239,7 @@ test('font family, weight and spacing update existing terminal history and persi
     const active = [...(scope.__vrykellSessionRegistry?.controllers.values() ?? [])][0]?.activeBlock;
     return active?.outputTerm?.options.fontWeight;
   })).toBe(350);
-  await gotoSetting(page, '主题');
+  await gotoSetting(page, '字体与显示');
   await page.getByRole('combobox', { name: '终端字重', exact: true }).click();
   await page.getByRole('option', { name: '300', exact: true }).click();
   await expect.poll(() => page.evaluate(() => {
@@ -253,7 +253,7 @@ test('font family, weight and spacing update existing terminal history and persi
   await page.reload();
   await expect(input).toHaveCSS('font-weight', '350');
   await expect(input).toHaveCSS('font-family', /Maple Mono NF CN/);
-  await gotoSetting(page, '主题');
+  await gotoSetting(page, '字体与显示');
   await page.getByRole('button', { name: '恢复默认字体设置' }).click();
   await expect(preview).toHaveCSS('font-weight', '400');
   await expect(preview).toHaveCSS('line-height', `${await terminalRowHeight(page)}px`);

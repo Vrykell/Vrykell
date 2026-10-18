@@ -79,10 +79,12 @@ test('workspace and settings use the same themed icon family in both themes', as
   const nav = page.locator('[data-dock-btn="tabs"] svg');
   await expect(nav).toHaveAttribute('data-fui-icon');
   await expect(nav).toHaveAttribute('fill', 'currentColor');
-  await gotoSetting(page, '主题');
-  const header = page.locator('aside').getByRole('button', { name: '主题', exact: true }).locator('svg');
+  await gotoSetting(page, '字体与显示');
+  const header = page.locator('aside').getByRole('button', { name: '字体与显示', exact: true }).locator('svg');
   for (const theme of ['深色', '浅色']) {
+    await page.locator('aside').getByRole('button', { name: '主题', exact: true }).click();
     await page.getByRole('radio', { name: theme, exact: true }).click();
+    await page.locator('aside').getByRole('button', { name: '字体与显示', exact: true }).click();
     await expect(header).toHaveAttribute('data-fui-icon');
     await expect(header).toHaveAttribute('viewBox', '0 0 24 24');
     await expect(header).toHaveAttribute('fill', 'currentColor');

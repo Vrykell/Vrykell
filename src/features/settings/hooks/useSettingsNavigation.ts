@@ -1,4 +1,4 @@
-import { BrainCircuit, FileCode, Keyboard, Settings, SquareTerminal, History, FileText, ShieldCheck, Globe, Folder, Plug, Bot, RefreshCw, Sun } from '@ui/icons';
+import { BrainCircuit, FileCode, Keyboard, Settings, SquareTerminal, History, FileText, ShieldCheck, Globe, Folder, Plug, Bot, RefreshCw, Sun, Palette, TextFont } from '@ui/icons';
 import type { PageId } from '../model/navigation';
 import { t } from '@i18n';
 import { useSettingsNavigationStore } from '../stores/navigation';
@@ -54,7 +54,12 @@ export const SETTINGS_GROUPS: SettingGroup[] = [
   },
   {
     id: 'appearance', label: '外观',
-    items: [{ id: 'appearance-theme', icon: Sun, label: '主题' }],
+    items: [
+      { id: 'appearance-theme', icon: Sun, label: t('Theme') },
+      { id: 'appearance-blocks', icon: Palette, label: t('Block appearance') },
+      { id: 'appearance-typography', icon: TextFont, label: t('Typography') },
+      { id: 'appearance-files', icon: FileText, label: t('Theme files') },
+    ],
   },
   {
     id: 'shortcuts', label: '快捷键',

@@ -14,6 +14,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.goto('/');
     await gotoSetting(page, '主题');
     await page.getByRole('radio', { name: theme === 'dark' ? '深色' : '浅色', exact: true }).click();
+    await page.locator('aside').getByRole('button', { name: '字体与显示', exact: true }).click();
     const settingsCard = page.locator('.settings-group-panel').first();
     await expect(settingsCard).toHaveCSS('border-top-width', '0px');
     expect(await settingsCard.evaluate(element => getComputedStyle(element).boxShadow)).not.toBe('none');

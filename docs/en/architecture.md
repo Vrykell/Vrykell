@@ -353,7 +353,7 @@ With auto-save enabled, records go to `diagnostics-<YYYYMMDDTHH>.jsonl` in the l
 | `src/features/agent/services/skills.ts` / `src/features/agent/services/mcp.ts` | Skills / MCP tool assembly |
 | `src/features/chat/components/PanelChat.tsx` | global AI chat panel (dock sidebar) |
 | `src/features/chat/components/AiBlock.tsx` / `ToolRunCard.tsx` | conversation exchange card / tool status card |
-| `src/features/settings/` | settings page (AI behavior/model/MCP/Skills/shortcuts/terminal open mode/theme) |
+| `src/features/settings/` | settings page (AI behavior/model/MCP/Skills/shortcuts/terminal open mode/appearance: theme, block appearance, typography, theme files) |
 | `src-tauri/src/agent/` | AI stream/config/memory/Skills/MCP/scheduling/web scraping backend |
 | `src-tauri/src/remote/ssh.rs` | SSH/SFTP (host fingerprint TOFU, password authentication) |
 

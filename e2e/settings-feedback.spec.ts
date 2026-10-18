@@ -8,9 +8,9 @@ test('settings navigation has static headings and save feedback appears once the
   const nav = page.locator('aside');
   await expect(nav.locator('.settings-nav-heading')).toHaveCount(6);
   const rows = nav.locator('.settings-navigation-list').getByRole('button');
-  await expect(rows).toHaveCount(19);
+  await expect(rows).toHaveCount(23);
   await expect(nav.locator('.settings-navigation-list [aria-expanded]')).toHaveCount(0);
-  await expect(rows.locator('svg')).toHaveCount(19);
+  await expect(rows.locator('svg')).toHaveCount(23);
   await expect(nav).toHaveCSS('width', '224px');
   for (const row of await rows.all()) expect((await row.boundingBox())!.height).toBe(32);
   await page.locator('[data-dock-btn="files"]').click();
