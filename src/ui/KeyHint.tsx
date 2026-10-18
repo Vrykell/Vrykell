@@ -31,7 +31,7 @@ export function shortcutKeys(shortcut: string): string[] {
 /** Modifier and navigation keys use glyphs, while letter keys retain their labels. */
 export default function KeyHint({ shortcut }: { shortcut: string }) {
   const keys = shortcutKeys(shortcut);
-  return <kbd className="key-hint" aria-label={keys.join('+')}>
+  return <kbd className="key-hint" role="img" aria-label={keys.join('+')}>
     {keys.map((key, index) => key === 'Meta'
       ? <Command key={index} size={14} aria-hidden="true" data-key-icon={key} />
       : paths[key] ? <svg key={index} width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" data-key-icon={key}>
