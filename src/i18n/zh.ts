@@ -634,6 +634,7 @@ const zh: Record<string, string> = {
   'Not configured': '未配置',
   '{{name}} · {{action}}': '{{name}} · {{action}}',
   'The key is stored only on this device and never leaves the backend.': '密钥只保存在本机，不会离开后端。',
+  'Enter an API key first.': '请先输入 API 密钥。',
   'For example deepseek-chat': '例如 deepseek-chat',
   'Defaults to the model ID': '默认与模型 ID 相同',
   'Group': '分组',

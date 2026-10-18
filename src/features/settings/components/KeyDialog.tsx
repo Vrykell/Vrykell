@@ -39,10 +39,14 @@ export default function KeyDialog({ open, row, hasKey, toast, onClose }: {
 
   const Mark = modelMark(row.kind, '', row.baseUrl);
   const name = row.name || providerLabel(row.kind);
-  const canSave = value.trim().length > 0 && !saving;
 
   const save = async () => {
-    if (!canSave) return;
+    if (!value.trim()) {
+      // A disabled primary gives no feedback; say what is missing.
+      toast(t('Enter an API key first.'), 'info');
+      return;
+    }
+    if (saving) return;
     setSaving(true);
     try {
       await setProviderKey(row.id, value);
@@ -74,14 +78,13 @@ export default function KeyDialog({ open, row, hasKey, toast, onClose }: {
         <button
           type="button"
           className="primary-button"
-          disabled={!canSave}
           onClick={() => void save()}
           data-testid="key-dialog-save"
           style={{
             padding: '5px 16px', fontSize: 'calc(12px * var(--ui-font-scale))', border: 'none',
             borderRadius: 'var(--radius-inner)', background: 'var(--primary-button-bg)',
-            color: 'var(--primary-button-text)', cursor: canSave ? 'pointer' : 'default',
-            opacity: canSave ? 1 : 0.5,
+            color: 'var(--primary-button-text)', cursor: 'pointer',
+            opacity: value.trim() ? 1 : 0.6,
           }}
         >
           {t('Save and close')}

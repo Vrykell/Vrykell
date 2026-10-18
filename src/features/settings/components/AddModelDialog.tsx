@@ -19,9 +19,10 @@ import SettingsDialog from './SettingsDialog';
 
 const fieldStyle = { ...inputStyle, minWidth: 0 };
 
-export default function AddModelDialog({ open, row, onClose, onAdd }: {
+export default function AddModelDialog({ open, row, toast, onClose, onAdd }: {
   open: boolean;
   row: ProviderRow<ModelProfile>;
+  toast: (msg: string, type: 'info' | 'success' | 'error') => void;
   onClose: () => void;
   onAdd: (model: ModelProfile) => void;
 }) {
@@ -40,7 +41,12 @@ export default function AddModelDialog({ open, row, onClose, onAdd }: {
   const canAdd = modelId.trim().length > 0;
 
   const add = () => {
-    if (!canAdd) return;
+    if (!canAdd) {
+      // A disabled primary gives no feedback; say what is missing and put the caret there.
+      toast(t('Fill in the model ID first.'), 'info');
+      document.getElementById('add-model-id')?.focus();
+      return;
+    }
     const id = modelId.trim();
     onAdd({
       id: newModelId(),
@@ -67,14 +73,13 @@ export default function AddModelDialog({ open, row, onClose, onAdd }: {
         <button
           type="button"
           className="primary-button"
-          disabled={!canAdd}
           onClick={add}
           data-testid="add-model-confirm"
           style={{
             padding: '5px 16px', fontSize: 'calc(12px * var(--ui-font-scale))', border: 'none',
             borderRadius: 'var(--radius-inner)', background: 'var(--primary-button-bg)',
-            color: 'var(--primary-button-text)', cursor: canAdd ? 'pointer' : 'default',
-            opacity: canAdd ? 1 : 0.5,
+            color: 'var(--primary-button-text)', cursor: 'pointer',
+            opacity: canAdd ? 1 : 0.6,
           }}
         >
           {t('Add model')}

@@ -138,7 +138,9 @@ test.describe('模型配置页', () => {
     await page.getByTestId('model-add').click();
     const addDialog = page.getByTestId('add-model-dialog');
     await expect(addDialog).toBeVisible();
-    await expect(addDialog.getByTestId('add-model-confirm')).toBeDisabled();
+    // 空 ID 直接点「添加模型」→ 明确提示（而不是禁用无反馈）
+    await addDialog.getByTestId('add-model-confirm').click();
+    await expect(page.getByRole('status').filter({ hasText: '先填写模型 ID' })).toBeVisible();
     await addDialog.getByTestId('add-model-id').fill('deepseek-chat');
     await addDialog.getByTestId('add-model-group').fill('对话模型');
     await addDialog.getByTestId('add-model-confirm').click();

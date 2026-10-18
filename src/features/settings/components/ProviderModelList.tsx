@@ -292,6 +292,7 @@ export default function ProviderModelList({ row, toast }: {
       <AddModelDialog
         open={addOpen}
         row={row}
+        toast={toast}
         onClose={() => setAddOpen(false)}
         onAdd={(model) => { void save(() => commitModels(current => [...current, model])); }}
       />
