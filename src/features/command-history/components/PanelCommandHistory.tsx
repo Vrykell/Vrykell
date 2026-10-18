@@ -73,6 +73,7 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
   const [status, setStatus] = useState('all');
   const [directory, setDirectory] = useState('project');
   const [organizedOnly, setOrganizedOnly] = useState(false);
+  const [sameEnvironment, setSameEnvironment] = useState(false);
   const [sort, setSort] = useState<CommandSort>(() => { const saved = safeLocalStorageGet(SORT_KEY); return saved === 'frequent' || saved === 'manual' ? saved : 'recent'; });
   const [expanded, setExpanded] = useState<string | null>(null);
   const detailsId = useId();
@@ -119,7 +120,9 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
     writeCommandCollapse(next);
     if (searchRevealed.size) setSearchRevealed(new Set());
   };
-  const result = projectItems(library.ready ? library.history : [], preferences, query, status, directory === 'current' ? context.cwd : undefined, sort, organizedOnly);
+  const environment = commandEnvironment(context.spec);
+  const result = projectItems(library.ready ? library.history : [], preferences, query, status, directory === 'current' ? context.cwd : undefined, sort, organizedOnly,
+    sameEnvironment ? environment.shell : undefined);
   const allItems = projectItems(library.history, preferences, '', 'all');
   const groupable = [...allItems.favorites, ...allItems.history];
   const grouped = commandGroups(result.favorites, result.history, preferences);
@@ -128,8 +131,8 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
     ...grouped.groups.map(group => ({ ...group, title: group.name, collapsed: isFolded(group.id), custom: true })),
     { id: 'history', title: t('Ungrouped commands'), items: grouped.history, collapsed: isFolded('history'), custom: false },
   ].sort((a, b) => commandGroupOrder(preferences).indexOf(a.id) - commandGroupOrder(preferences).indexOf(b.id))
-    .filter(group => draggingCommand || group.items.length > 0 || group.custom && !organizedOnly && !query.trim() && status === 'all' && directory === 'project'
-    || group.id === 'history' && !organizedOnly && (status !== 'all' || directory !== 'project'));
+    .filter(group => draggingCommand || group.items.length > 0 || group.custom && !organizedOnly && !query.trim() && status === 'all' && directory === 'project' && !sameEnvironment
+    || group.id === 'history' && !organizedOnly && (status !== 'all' || directory !== 'project' || sameEnvironment));
   const selected = sections.filter(group => !group.collapsed).flatMap(group => group.items).find(item => item.id === expanded);
   const favoriteIds = new Set(preferences.favorites.map(item => item.id));
   const closeDetails = () => {
@@ -140,15 +143,16 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
   const sortOptions = { label: t('Sort commands'), group: 'view' as const, submenu: { items:
     [{ value: 'recent' as const, label: t('Recent commands') }, { value: 'frequent' as const, label: t('Most used commands') }, { value: 'manual' as const, label: t('Custom order') }]
       .map(option => ({ label: option.label, checked: sort === option.value, onClick: () => changeSort(option.value) })) } };
-  const filtered = status !== 'all' || directory !== 'project' || organizedOnly;
+  const filtered = status !== 'all' || directory !== 'project' || organizedOnly || sameEnvironment;
   const statusLabel = t(status === 'success' ? 'Succeeded' : 'Failed');
-  const environment = `${context.spec.kind === 'ssh' ? context.spec.ssh?.name || context.spec.ssh?.host || 'SSH' : t('Local')} · ${commandEnvironment(context.spec).shell}`;
+  const environmentLabel = `${context.spec.kind === 'ssh' ? context.spec.ssh?.name || context.spec.ssh?.host || 'SSH' : t('Local')} · ${environment.shell}`;
   const filters = [
     ...(status !== 'all' ? [{ id: 'status', label: statusLabel, remove: () => setStatus('all') }] : []),
     ...(organizedOnly ? [{ id: 'collection', label: t('Starred or grouped commands'), remove: () => setOrganizedOnly(false) }] : []),
     ...(directory === 'current' ? [{ id: 'directory', label: t('Current directory'), remove: () => setDirectory('project') }] : []),
+    ...(sameEnvironment ? [{ id: 'environment', label: t('Same environment only'), remove: () => setSameEnvironment(false) }] : []),
   ];
-  const resetFilters = () => { changeQuery(''); setStatus('all'); setDirectory('project'); setOrganizedOnly(false); };
+  const resetFilters = () => { changeQuery(''); setStatus('all'); setDirectory('project'); setOrganizedOnly(false); setSameEnvironment(false); };
   const favorite = (item: CommandItem) => update(value => value.favorites.some(entry => commandKey(entry) === commandKey(item)) ? value : {
     ...value, favorites: [...value.favorites, { id: crypto.randomUUID(), name: item.name, command: item.command, cwd: item.cwd, shell: item.shell }],
   });
@@ -159,7 +163,7 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
     let name = base;
     for (let suffix = 2; names.has(name); suffix += 1) name = `${base} ${suffix}`;
     const id = crypto.randomUUID();
-    changeQuery(''); setStatus('all'); setDirectory('project'); setOrganizedOnly(false);
+    changeQuery(''); setStatus('all'); setDirectory('project'); setOrganizedOnly(false); setSameEnvironment(false);
     update(value => prependCommandGroup(value, { id, name, commandKeys: item ? [commandKey(item)] : [] }));
     setRenamingGroup({ id, name });
   };
@@ -234,7 +238,7 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
     </SidebarToolbar>
     <div className="command-history-context">
       <TextButton className="command-history-root" aria-label={t('Set project root')} aria-haspopup="dialog" data-tip={context.root}
-        data-tip-description={environment} onClick={onChooseRoot}>
+        data-tip-description={environmentLabel} onClick={onChooseRoot}>
         <Folder size={iconSizes.compact} aria-hidden="true" />
         <span>{context.root}</span>
       </TextButton>
@@ -257,6 +261,8 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
         { label: t('Starred or grouped commands'), active: organizedOnly, onSelect: () => setOrganizedOnly(true) }] },
       { label: t('Command scope'), options: [{ value: 'project', label: t('Entire project') }, { value: 'current', label: t('Current directory') }]
         .map(option => ({ label: option.label, active: directory === option.value, onSelect: () => setDirectory(option.value) })) },
+      { label: t('Command environment'), options: [{ label: t('All environments'), active: !sameEnvironment, onSelect: () => setSameEnvironment(false) },
+        { label: t('Same environment only'), active: sameEnvironment, onSelect: () => setSameEnvironment(true) }] },
     ]} onClose={() => setFilterMenu(null)} />}
     {visible && actionsMenu && <ContextMenu anchor={actionsMenu} label={t('Command history actions')} onClose={() => setActionsMenu(null)} items={[
       { label: t('New command group'), onClick: () => createGroup() },
@@ -365,7 +371,7 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
       command: editor.item.command, cwd: editor.item.cwd, shell: editor.item.shell } : { name: '', command: '', cwd: context.cwd, shell: commandEnvironment(context.spec).shell }}
       initialFocus={editor.focus === 'name' ? '[data-command-editor-name]' : undefined}
       creating={!editor.item} root={context.root} onClose={() => setEditor(null)} onSave={async draft => {
-        await library.saveCommand(editor.item, draft); changeQuery(''); setStatus('all'); setDirectory('project');
+        await library.saveCommand(editor.item, draft); changeQuery(''); setStatus('all'); setDirectory('project'); setSameEnvironment(false);
         if (editor.groupId) update(value => moveCommandToGroup(value, commandKey(draft), editor.groupId!));
       }} />}
     <ConfirmDialog open={!!removing} title={t('Delete command?')} message={t('Delete “{{name}}” from command history and favorites? This cannot be undone.', { name: removing?.name ?? '' })}

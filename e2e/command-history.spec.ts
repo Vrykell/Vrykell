@@ -171,6 +171,32 @@ test('filters history, generates and revises AI drafts, and offers a choice of e
   await expect.poll(() => page.evaluate(() => (window as unknown as { __PTY_WRITES__: string[] }).__PTY_WRITES__.includes('cargo test\n'))).toBe(true);
 });
 
+test('filters commands to the current terminal environment and restores them from the card', async ({ page }, info) => {
+  await page.evaluate(() => {
+    const runs = JSON.parse(localStorage.getItem('mock-command-history-runs')!) as Record<string, unknown>[];
+    runs.push({ id: 'pwsh-shortcut', target: 'local', shell: 'pwsh', command: 'Get-ChildItem', cwd: '/home/e2e/project', status: 'success', exitCode: 0, timestamp: 5000, runCount: 1 });
+    localStorage.setItem('mock-command-history-runs', JSON.stringify(runs));
+  });
+  await page.reload();
+  const panel = page.getByTestId('command-history-panel');
+  const otherShell = page.getByTestId('command-history-pwsh-shortcut');
+  await expect(otherShell).toBeVisible();
+  await panel.getByRole('button', { name: '筛选命令', exact: true }).click();
+  const filterMenu = page.getByTestId('command-history-filter-menu');
+  await expect(filterMenu.getByRole('button', { name: '全部环境', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await filterMenu.getByRole('button', { name: '仅相同环境', exact: true }).click();
+  await page.screenshot({ path: info.outputPath('history-environment-menu.png') });
+  await expect(otherShell).toHaveCount(0);
+  await expect(page.getByTestId('command-history-build')).toBeVisible();
+  await page.keyboard.press('Escape');
+  const card = panel.getByTestId('command-history-filter-environment');
+  await expect(card).toContainText('仅相同环境');
+  await page.screenshot({ path: info.outputPath('history-environment-filter.png') });
+  await card.getByRole('button').click();
+  await expect(otherShell).toBeVisible();
+  await expect(card).toHaveCount(0);
+});
+
 test('keeps SSH and local history separate and fits wide and narrow sidebars', async ({ page }) => {
   const panel = page.getByTestId('command-history-panel');
   await page.evaluate(async () => {
@@ -476,10 +502,10 @@ test('removes filter cards independently in wide and minimum-width layouts', asy
   await page.getByRole('button', { name: '保存到收藏', exact: true }).click();
   await panel.getByRole('button', { name: '筛选命令', exact: true }).click();
   const menu = page.getByTestId('command-history-filter-menu');
-  for (const label of ['成功', '仅星标或已分组', '当前目录']) await menu.getByRole('button', { name: label, exact: true }).click();
+  for (const label of ['成功', '仅星标或已分组', '当前目录', '仅相同环境']) await menu.getByRole('button', { name: label, exact: true }).click();
   await page.keyboard.press('Escape');
   const cards = panel.getByTestId('command-history-filter-chips');
-  await expect(cards.getByRole('button')).toHaveCount(3);
+  await expect(cards.getByRole('button')).toHaveCount(4);
   await expect(panel.getByRole('button', { name: '清除筛选', exact: true })).toHaveCount(0);
   await page.screenshot({ path: test.info().outputPath('filter-cards-wide.png') });
   const sidebar = page.locator('.workspace-side-panel').filter({ has: panel });
@@ -496,15 +522,17 @@ test('removes filter cards independently in wide and minimum-width layouts', asy
     await page.screenshot({ path: test.info().outputPath(`filter-cards-minimum-${theme}.png`) });
   }
   await cards.getByRole('button', { name: '移除筛选：成功', exact: true }).click();
-  await expect(cards.getByRole('button')).toHaveCount(2);
+  await expect(cards.getByRole('button')).toHaveCount(3);
   await expect(panel.getByTestId('command-history-filter-status')).toHaveCount(0);
   await expect(panel.getByTestId('command-history-filter-directory')).toBeVisible();
   await cards.getByRole('button', { name: '移除筛选：仅星标或已分组', exact: true }).click();
   await expect(page.getByTestId('command-history-tests')).toHaveCount(0);
   await expect(page.getByTestId('command-history-noise')).toBeVisible();
   await cards.getByRole('button', { name: '移除筛选：当前目录', exact: true }).click();
-  await expect(cards).toHaveCount(0);
+  await expect(cards.getByRole('button')).toHaveCount(1);
   await expect(page.getByTestId('command-history-tests')).toBeVisible();
+  await cards.getByRole('button', { name: '移除筛选：仅相同环境', exact: true }).click();
+  await expect(cards).toHaveCount(0);
 });
 
 test('creates groups at the front from ungrouped command menus and page actions across reloads', async ({ page }) => {
