@@ -217,17 +217,22 @@ function recordAcpEvent(source: string, event: AcpSessionEvent) {
     return;
   }
   if (event.kind !== 'update') return;
+  // The notification arrives whole (jsonrpc/method/params) and some agents hand the params object
+  // itself, so the update sits under `params.update` or `update` — the same shapes the transcript
+  // folding accepts.
   const payload = (event.payload ?? {}) as Record<string, unknown>;
-  const update = String(payload.sessionUpdate ?? '');
-  if (update === 'tool_call') {
+  const params = (payload.params ?? payload) as Record<string, unknown>;
+  const update = (params.update ?? {}) as Record<string, unknown>;
+  const kind = String(update.sessionUpdate ?? '');
+  if (kind === 'tool_call') {
     usage.acpToolCall(source);
     return;
   }
-  if (update === 'usage_update') {
-    const cost = payload.cost as Record<string, unknown> | undefined;
+  if (kind === 'usage_update') {
+    const cost = update.cost as Record<string, unknown> | undefined;
     usage.acpUsage(source, {
-      used: Number(payload.used ?? 0),
-      size: Number(payload.size ?? 0),
+      used: Number(update.used ?? 0),
+      size: Number(update.size ?? 0),
       cost: cost ? Number(cost.amount ?? 0) : undefined,
       currency: cost ? String(cost.currency ?? '') : undefined,
     });
