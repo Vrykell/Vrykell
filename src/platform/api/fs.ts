@@ -82,8 +82,8 @@ export function fsMove(paths: string[], destDir: string): Promise<FileOpOutcome>
 }
 
 /** 可回退删除：先把内容移动到应用暂存区，返回 原始→暂存 映射。 */
-export function fsStageDelete(paths: string[]): Promise<FileOpPair[]> {
-  return invoke<FileOpPair[]>('fs_stage_delete', { paths: paths.map(normPath) })
+export function fsStageDelete(paths: string[], undoEnabled = true): Promise<FileOpPair[]> {
+  return invoke<FileOpPair[]>('fs_stage_delete', { paths: paths.map(normPath), ...(undoEnabled ? {} : { undoEnabled: false }) })
     .then((pairs) => pairs.map(normalizePair));
 }
 

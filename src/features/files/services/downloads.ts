@@ -23,6 +23,10 @@ export function downloadsClear(): Promise<void> {
   return invoke('downloads_clear');
 }
 
+export function downloadsDelete(id: number): Promise<void> {
+  return invoke('downloads_delete', { id });
+}
+
 /** 丢弃拖出取消后遗留的本地下载副本：后端删除文件并移除对应下载历史。 */
 export function downloadsDiscard(paths: string[]): Promise<void> {
   return invoke('downloads_discard', { paths });

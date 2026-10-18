@@ -98,16 +98,19 @@ test.describe('SSH 远程连接管理侧栏', () => {
     await page.getByText('生产服务器').dblclick();
     await page.locator('[data-dock-btn="files"]').click();
     await expect(page.locator('[data-testid="remote-file-Documents"]')).toBeVisible({ timeout: 5000 });
-    // 右键远程目录 → 下载文件夹到本地
+    // ⋯ 菜单可直接打开下载管理，返回后回到文件浏览
+    await page.locator('[data-testid="remote-more-btn"]').click();
+    await page.getByRole('button', { name: '下载管理' }).click();
+    await expect(page.getByText('暂无传输记录')).toBeVisible();
+    await page.getByTestId('downloads-back').click();
+    // 右键远程目录 → 下载文件夹到本地；下载开始后面板自动切到下载管理
     await page.locator('[data-testid="remote-file-Documents"]').click({ button: 'right' });
     await page.getByRole('button', { name: '下载文件夹到本地' }).click();
     await expect(page.getByText(/已下载到/)).toBeVisible();
-    // 进入下载管理（⋯ 菜单）
-    await page.locator('[data-testid="remote-more-btn"]').click();
-    await page.getByRole('button', { name: '下载管理' }).click();
     await expect(page.getByText('下载管理')).toBeVisible();
     await expect(page.locator('[data-testid="download-item-Documents"]')).toBeVisible();
-    // 定位到系统文件管理器
+    // 定位到系统文件管理器（行操作按钮悬停才显现）
+    await page.locator('[data-testid="download-item-Documents"]').hover();
     await page.locator('[data-testid="download-reveal-Documents"]').click();
     expect(await revealedPaths(page)).toContain('/tmp/Documents');
   });

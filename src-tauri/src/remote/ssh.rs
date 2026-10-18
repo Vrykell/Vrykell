@@ -774,17 +774,23 @@ pub fn ssh_search_cancel(request_id: String) {
     }
 }
 
-/// 本地下载根目录：~/.vrykell/downloads
+/// Local downloads root. Resolving the path creates nothing, so cleanup never resurrects
+/// a directory the user removed.
+pub(crate) fn downloads_root() -> Result<std::path::PathBuf, String> {
+    dirs::home_dir()
+        .map(|home| home.join(".vrykell").join("downloads"))
+        .ok_or("Unable to locate the home directory".to_string())
+}
+
+/// Local downloads root, created when missing.
 pub(crate) fn downloads_dir() -> Result<std::path::PathBuf, String> {
-    let dir = dirs::home_dir()
-        .ok_or("无法定位主目录".to_string())?
-        .join(".vrykell")
-        .join("downloads");
-    std::fs::create_dir_all(&dir).map_err(|e| format!("创建下载目录失败：{e}"))?;
+    let dir = downloads_root()?;
+    std::fs::create_dir_all(&dir).map_err(|e| format!("Unable to create the downloads directory: {e}"))?;
     Ok(dir)
 }
 
 /// 递归下载远程目录到本地 dest，返回累计字节数。
+#[cfg(test)]
 fn download_dir_recursive(sftp: &Sftp, remote: &Path, local: &Path, depth: u32) -> Result<u64, String> {
     if depth > 40 {
         return Err("目录层级过深，已中止下载".to_string());
@@ -811,18 +817,15 @@ fn download_dir_recursive(sftp: &Sftp, remote: &Path, local: &Path, depth: u32) 
             let mut file = sftp
                 .open(&p)
                 .map_err(|e| format!("打开远程文件失败：{e}"))?;
-            let mut buf = Vec::new();
-            file.read_to_end(&mut buf)
-                .map_err(|e| format!("下载 {} 失败：{e}", p.display()))?;
-            std::fs::write(&local_child, &buf)
-                .map_err(|e| format!("写入本地文件失败：{e}"))?;
-            total += buf.len() as u64;
+            let mut output = std::fs::File::create(&local_child).map_err(|e| e.to_string())?;
+            total += std::io::copy(&mut file, &mut output).map_err(|e| e.to_string())?;
         }
     }
     Ok(total)
 }
 
 /// 下载远程文件/目录到 ~/.vrykell/downloads，返回 (本地路径, 字节数)。
+#[cfg(test)]
 fn ssh_download_sync(conn: &SshConnection, remote_path: &str) -> Result<(String, u64), String> {
     let sess = connect(conn)?;
     let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
@@ -843,48 +846,23 @@ fn ssh_download_sync(conn: &SshConnection, remote_path: &str) -> Result<(String,
         let mut file = sftp
             .open(Path::new(remote_path))
             .map_err(|e| format!("打开远程文件失败：{e}"))?;
-        let mut buf = Vec::new();
-        file.read_to_end(&mut buf).map_err(|e| format!("下载失败：{e}"))?;
-        std::fs::write(&dest, &buf).map_err(|e| format!("写入本地文件失败：{e}"))?;
-        Ok((dest.to_string_lossy().to_string(), buf.len() as u64))
+        let mut output = std::fs::File::create(&dest).map_err(|e| e.to_string())?;
+        let bytes = std::io::copy(&mut file, &mut output).map_err(|e| e.to_string())?;
+        Ok((dest.to_string_lossy().to_string(), bytes))
     }
 }
 
 /// 下载远程文件/目录，返回本地路径，并写入下载历史。
 #[tauri::command]
-pub async fn ssh_download(
-    state: State<'_, HistoryState>,
-    id: String,
-    path: String,
-) -> Result<String, String> {
-    let (conn, conn_name) = {
-        let db = state.0.lock().map_err(|e| e.to_string())?;
-        let c = db.get_ssh_connection(&id)?;
-        let name = c.name.clone();
-        (c, name)
-    };
-    let file_name = Path::new(&path)
-        .file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_else(|| path.clone());
-    let remote_path = path.clone();
-    let (local_path, size) = tauri::async_runtime::spawn_blocking(move || ssh_download_sync(&conn, &path))
-        .await
-        .map_err(|e| e.to_string())??;
-
-    let is_dir = std::path::Path::new(&local_path).is_dir();
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or(0);
-    let db = state.0.lock().map_err(|e| e.to_string())?;
-    db.record_download(&file_name, &local_path, &remote_path, &conn_name, is_dir, size, now)?;
-    Ok(local_path)
+pub async fn ssh_download(app: tauri::AppHandle, state: State<'_, HistoryState>, id: String, path: String) -> Result<String, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?.get_ssh_connection(&id)?;
+    tauri::async_runtime::spawn_blocking(move || super::transfer::start(app, conn, path, String::new(), false))
+        .await.map_err(|e| e.to_string())?
 }
 
 /// 远端目录里为 name 找可用路径：同名时按 `name (1)`、`name (2)`… 递增（保留扩展名）。
 /// 序号规则来自平台层（`crate::platform::path::numbered_name`），远端只负责判断是否存在。
-fn unique_remote_path(sftp: &Sftp, dir: &str, name: &str) -> String {
+pub(super) fn unique_remote_path(sftp: &Sftp, dir: &str, name: &str) -> String {
     let candidate = crate::platform::path::numbered_name(name, |candidate| {
         sftp.stat(Path::new(&crate::platform::path::join(dir, candidate))).is_ok()
     });
@@ -989,7 +967,7 @@ fn ensure_remote_dir(sftp: &Sftp, dir: &str) -> Result<(), String> {
 
 /// 递归删除远端路径（目录先清空再 rmdir；用于暂存项清理）。
 fn remove_remote_recursive(sftp: &Sftp, target: &str) -> Result<(), String> {
-    let stat = sftp.stat(Path::new(target)).map_err(|e| format!("读取远端信息失败：{e}"))?;
+    let stat = sftp.lstat(Path::new(target)).map_err(|e| format!("读取远端信息失败：{e}"))?;
     if stat.is_dir() {
         if let Ok(children) = sftp.readdir(Path::new(target)) {
             for (child, _) in children {
@@ -1067,6 +1045,8 @@ fn ssh_stage_delete_sync(conn: &SshConnection, paths: Vec<String>) -> Result<Fil
     let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
     let dir = ssh_undo_dir(&sftp)?;
     ensure_remote_dir(&sftp, &dir)?;
+    sftp.setstat(Path::new(&dir), ssh2::FileStat { size: None, uid: None, gid: None, perm: Some(0o700), atime: None, mtime: None })
+        .map_err(|e| format!("Failed to restrict staging permissions: {e}"))?;
 
     let mut completed = Vec::new();
     let mut errors = Vec::new();
@@ -1112,20 +1092,6 @@ fn ssh_purge_staged_sync(conn: &SshConnection, paths: Vec<String>) {
     }
 }
 
-/// 清理远端暂存目录残留（面板挂载时调用一次）。
-fn ssh_sweep_undo_sync(conn: &SshConnection) {
-    let Ok(sess) = connect(conn) else { return };
-    let Ok(sftp) = sess.sftp() else { return };
-    let Ok(dir) = ssh_undo_dir(&sftp) else { return };
-    let Ok(children) = sftp.readdir(Path::new(&dir)) else { return };
-    for (child, _) in children {
-        let Some(name) = crate::platform::path::name_from_listing(&child.to_string_lossy(), &dir) else {
-            continue;
-        };
-        let _ = remove_remote_recursive(&sftp, &crate::platform::path::join(&dir, &name));
-    }
-}
-
 #[tauri::command]
 pub async fn ssh_copy(
     state: State<'_, HistoryState>,
@@ -1147,12 +1113,28 @@ pub async fn ssh_stage_delete(
     state: State<'_, HistoryState>,
     id: String,
     paths: Vec<String>,
+    undo_enabled: Option<bool>,
 ) -> Result<FileOpOutcome, String> {
     let conn = {
         let db = state.0.lock().map_err(|e| e.to_string())?;
         db.get_ssh_connection(&id)?
     };
-    tauri::async_runtime::spawn_blocking(move || ssh_stage_delete_sync(&conn, paths))
+    tauri::async_runtime::spawn_blocking(move || {
+        if undo_enabled != Some(false) { return ssh_stage_delete_sync(&conn, paths); }
+        let sess = connect(&conn)?;
+        let sftp = sess.sftp().map_err(|e| e.to_string())?;
+        let mut outcome = FileOpOutcome { completed: Vec::new(), errors: Vec::new() };
+        for path in paths {
+            if path.trim_matches('/').is_empty() || path.split('/').any(|p| p == ".." || p == ".") {
+                outcome.errors.push("Unsafe deletion path".into()); continue;
+            }
+            match remove_remote_recursive(&sftp, &path) {
+                Ok(()) => outcome.completed.push(FileOpPair { from: path, to: String::new() }),
+                Err(e) => outcome.errors.push(e),
+            }
+        }
+        Ok(outcome)
+    })
         .await
         .map_err(|e| e.to_string())?
 }
@@ -1186,87 +1168,6 @@ pub async fn ssh_purge_staged(
         .await
         .map_err(|e| e.to_string())?;
     Ok(())
-}
-
-#[tauri::command]
-pub async fn ssh_sweep_undo(state: State<'_, HistoryState>, id: String) -> Result<(), String> {
-    let conn = {
-        let db = state.0.lock().map_err(|e| e.to_string())?;
-        db.get_ssh_connection(&id)?
-    };
-    tauri::async_runtime::spawn_blocking(move || ssh_sweep_undo_sync(&conn))
-        .await
-        .map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-/// 递归上传本地目录到远程目录，返回上传文件数（远端路径按 POSIX 拼接，本地路径用 std）。
-fn upload_dir_recursive(sftp: &Sftp, local: &Path, remote: &str, depth: u32) -> Result<u64, String> {
-    if depth > 40 {
-        return Err("目录层级过深，已中止上传".to_string());
-    }
-    let mut count = 0u64;
-    let rd = std::fs::read_dir(local).map_err(|e| format!("读取本地目录失败：{e}"))?;
-    for entry in rd.flatten() {
-        let p = entry.path();
-        let name = entry.file_name().to_string_lossy().to_string();
-        let remote_child = crate::platform::path::join(remote, &name);
-        let ft = entry.file_type().map_err(|e| format!("读取文件类型失败：{e}"))?;
-        if ft.is_dir() {
-            sftp.mkdir(Path::new(&remote_child), 0o755)
-                .map_err(|e| format!("创建远程目录失败：{e}"))?;
-            count += upload_dir_recursive(sftp, &p, &remote_child, depth + 1)?;
-        } else if ft.is_file() {
-            let bytes = std::fs::read(&p).map_err(|e| format!("读取本地文件失败：{e}"))?;
-            let mut file = sftp
-                .create(Path::new(&remote_child))
-                .map_err(|e| format!("创建远程文件失败：{e}"))?;
-            file.write_all(&bytes).map_err(|e| format!("上传失败：{e}"))?;
-            count += 1;
-        }
-    }
-    Ok(count)
-}
-
-/// Upload a local file or directory into a remote directory (empty `remote_dir` means the remote home).
-/// Returns the final remote path (a sequence number may have been added to avoid an existing name).
-fn ssh_upload_sync(conn: &SshConnection, remote_dir: &str, local_path: &str) -> Result<String, String> {
-    // Local side uses host platform rules to get the file name
-    let name = Path::new(local_path)
-        .file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .ok_or("无法定位文件名")?;
-
-    let sess = connect(conn)?;
-    let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
-    let base = if remote_dir.is_empty() {
-        sftp.realpath(Path::new("."))
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_else(|_| "/".to_string())
-    } else {
-        remote_dir.to_string()
-    };
-    // 远程已有同名项时自动加序号，上传不静默覆盖
-    let direct = crate::platform::path::join(&base, &name);
-    let remote_path = if sftp.stat(Path::new(&direct)).is_ok() {
-        unique_remote_path(&sftp, &base, &name)
-    } else {
-        direct
-    };
-
-    let meta = std::fs::metadata(local_path).map_err(|e| format!("读取本地文件信息失败：{e}"))?;
-    if meta.is_dir() {
-        sftp.mkdir(Path::new(&remote_path), 0o755)
-            .map_err(|e| format!("创建远程目录失败：{e}"))?;
-        upload_dir_recursive(&sftp, Path::new(local_path), &remote_path, 0)?;
-    } else {
-        let bytes = std::fs::read(local_path).map_err(|e| format!("读取本地文件失败：{e}"))?;
-        let mut file = sftp
-            .create(Path::new(&remote_path))
-            .map_err(|e| format!("创建远程文件失败：{e}"))?;
-        file.write_all(&bytes).map_err(|e| format!("上传失败：{e}"))?;
-    }
-    Ok(remote_path)
 }
 
 #[tauri::command]
@@ -1334,19 +1235,10 @@ pub async fn ssh_create_dir(
 }
 
 #[tauri::command]
-pub async fn ssh_upload(
-    state: State<'_, HistoryState>,
-    id: String,
-    remote_dir: String,
-    local_path: String,
-) -> Result<String, String> {
-    let conn = {
-        let db = state.0.lock().map_err(|e| e.to_string())?;
-        db.get_ssh_connection(&id)?
-    };
-    tauri::async_runtime::spawn_blocking(move || ssh_upload_sync(&conn, &remote_dir, &local_path))
-        .await
-        .map_err(|e| e.to_string())?
+pub async fn ssh_upload(app: tauri::AppHandle, state: State<'_, HistoryState>, id: String, remote_dir: String, local_path: String) -> Result<String, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?.get_ssh_connection(&id)?;
+    tauri::async_runtime::spawn_blocking(move || super::transfer::start(app, conn, local_path, remote_dir, true))
+        .await.map_err(|e| e.to_string())?
 }
 
 #[cfg(test)]

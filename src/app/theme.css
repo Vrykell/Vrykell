@@ -1236,3 +1236,8 @@ textarea.config-text-input { display: block; width: 100% !important; border: non
 .settings-view textarea.config-text-input { font-family: var(--font-ui) !important; }
 textarea.config-text-input[data-font="ui"] { font-family: var(--font-ui) !important; }
 .config-text-area:focus-within { border-color: var(--border-strong); }
+.transfer-record { position: relative; box-sizing: border-box; min-height: 56px; border-radius: var(--radius-inner); transition: background 120ms var(--ease); }
+.transfer-record:is(:hover, :focus-within) { background: var(--hover); }
+.transfer-actions { position: absolute; top: 50%; right: 10px; display: flex; align-items: center; gap: 2px; opacity: 0; pointer-events: none; transform: translateY(-50%); transition: opacity 120ms var(--ease); }
+.transfer-record:is(:hover, :focus-within) .transfer-actions { opacity: 1; pointer-events: auto; }
+.transfer-actions .transfer-action { flex: 0 0 auto; }

@@ -1,3 +1,4 @@
+import { useFileUndoSettings } from '@config/fileUndo';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useFileBrowser } from '@features/files/hooks/useFileBrowser';
@@ -14,7 +15,6 @@ const sshMocks = vi.hoisted(() => ({
   sshStageDelete: vi.fn(),
   sshRestoreStaged: vi.fn(),
   sshPurgeStaged: vi.fn(),
-  sshSweepUndo: vi.fn(),
   sshUpload: vi.fn(),
   sshDownload: vi.fn(),
 }));
@@ -29,6 +29,7 @@ describe('useFileBrowser（SSH 目标）', () => {
   const onPathChange = vi.fn();
 
   beforeEach(() => {
+    useFileUndoSettings.setState({ local: true, remote: true });
     sshMocks.sshFsList.mockReset().mockResolvedValue({
       base: '/home/tester',
       entries: [entry('src', '/home/tester/src', true), entry('a.txt', '/home/tester/a.txt')],
@@ -41,7 +42,6 @@ describe('useFileBrowser（SSH 目标）', () => {
     sshMocks.sshStageDelete.mockReset().mockResolvedValue({ completed: [], errors: [] });
     sshMocks.sshRestoreStaged.mockReset().mockResolvedValue({ completed: [], errors: [] });
     sshMocks.sshPurgeStaged.mockReset().mockResolvedValue(undefined);
-    sshMocks.sshSweepUndo.mockReset().mockResolvedValue(undefined);
     sshMocks.sshUpload.mockReset().mockResolvedValue(undefined);
     sshMocks.sshDownload.mockReset().mockResolvedValue('C:/Downloads/file');
     onPathChange.mockReset();
@@ -66,9 +66,10 @@ describe('useFileBrowser（SSH 目标）', () => {
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
   });
 
-  it('挂载时清理远端暂存目录残留', async () => {
-    renderHook(() => useFileBrowser({ target: SSH_TARGET, openEntry }));
-    await waitFor(() => expect(sshMocks.sshSweepUndo).toHaveBeenCalledWith('ssh-1'));
+  it('preserves remote staged files on mount', async () => {
+    const { result } = renderHook(() => useFileBrowser({ target: SSH_TARGET, openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(2));
+    expect(sshMocks.sshPurgeStaged).not.toHaveBeenCalled();
   });
 
   it('选中的条目移动到目标目录：回退对记录后端返回的真实路径', async () => {
@@ -139,4 +140,19 @@ describe('useFileBrowser（SSH 目标）', () => {
     expect(result.current.renameTarget?.path).toBe('/home/tester/src/Untitled');
     expect(result.current.expandedSet.has('/home/tester/src')).toBe(true);
   });
+  it('disables remote staging and clears undo without purging staged files', async () => {
+    const { result } = renderHook(() => useFileBrowser({ target: SSH_TARGET, openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(2));
+    await act(async () => { await result.current.transferInto(['/home/tester/a.txt'], '/home/tester/archive', 'move'); });
+    expect(result.current.undoCount).toBe(1);
+    act(() => useFileUndoSettings.getState().update({ remote: false }));
+    expect(result.current.undoCount).toBe(0);
+    sshMocks.sshStageDelete.mockResolvedValue({ completed: [{ from: '/home/tester/a.txt', to: '' }], errors: [] });
+    act(() => result.current.confirmDelete([entry('a.txt', '/home/tester/a.txt')]));
+    await act(async () => { result.current.confirmAction(); });
+    expect(sshMocks.sshStageDelete).toHaveBeenCalledWith('ssh-1', ['/home/tester/a.txt'], false);
+    expect(sshMocks.sshPurgeStaged).not.toHaveBeenCalled();
+    expect(result.current.undo).toBeNull();
+  });
+
 });

@@ -53,12 +53,10 @@ export interface FileOps {
   rename(path: string, newName: string): Promise<string>;
   move(paths: string[], destDir: string): Promise<FileOpOutcome>;
   copy(paths: string[], destDir: string): Promise<FileOpOutcome>;
-  /** 可回退删除：先移到暂存区，返回 原始→暂存 映射。 */
+  /** Delete according to the target's undo preference; disabled undo returns empty staging paths. */
   stageDelete(paths: string[]): Promise<FileOpOutcome>;
   restoreStaged(pairs: FileOpPair[]): Promise<FileOpOutcome>;
   purgeStaged(paths: string[]): Promise<void>;
-  /** 清理上次会话残留的暂存项（远端需要，本地由后端启动时处理）。 */
-  sweepUndo?(): Promise<void>;
   /** 本地面板的起始目录（远端由 list 自行解析）。 */
   home?(): Promise<string>;
   /** 本地专有：磁盘视图（path 为 null 时展示）。 */

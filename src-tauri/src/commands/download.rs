@@ -14,6 +14,11 @@ pub fn downloads_clear(state: tauri::State<'_, HistoryState>) -> Result<(), Stri
     db.clear_downloads()
 }
 
+#[tauri::command]
+pub fn downloads_delete(state: tauri::State<'_, HistoryState>, id: i64) -> Result<(), String> {
+    state.0.lock().map_err(|e| e.to_string())?.remove_download_id(id)
+}
+
 /// Discard the local download copies left behind when a native drag-out is cancelled.
 /// Only paths inside the downloads root are removed, so a stray path can never delete a user file.
 #[tauri::command]

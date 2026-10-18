@@ -478,3 +478,14 @@ Verification checklist: invalid and inaccessible breadcrumb paths, recovery afte
 | Date | Tester | Passed | Failed | Notes |
 |---|---|---|---|---|
 | | | | | |
+
+### File transfer tasks and undo preferences
+
+- [x] Local and remote file undo have independent, persistent switches under File operations. Defaults preserve existing undo behavior. Turning a switch off clears that panel's undo stack and stops recording new operations; it does not purge existing staged files.
+- [x] With undo disabled, local deletion uses the system trash directly and remote deletion is permanent after confirmation. Neither path creates an application undo directory. Startup cleanup does not create a local undo directory merely to inspect it.
+- [x] Remote panels never sweep the shared staging directory on mount. Enabled remote staging restricts its directory to owner access.
+- [x] Upload management and download management have separate pages, titles and menu entries, sharing the task-list implementation without a direction switch. Existing download history remains available; clearing completed records keeps unfinished jobs and all files.
+- [x] File and directory transfers use bounded 256 KiB buffers, byte progress, speed, estimated remaining time, pause, resume and cancellation. Pausing releases the connection and file handles; resuming reconnects and reads the partial file offset. These are sequential streaming chunks, not concurrent multipart requests.
+- [x] Task manifests and checkpoints persist locally. Interrupted tasks can be resumed manually after restart, provided the source and destination remain available. Resume rejects changed source size or modification time and edited connection destinations. Completed files publish without replacing an existing destination; symbolic links and special files are rejected.
+- [x] Partial files use task-specific suffixes beside their destinations. Paused, cancelled and failed tasks keep them for recovery; cancellation stops work without deleting partial data. Deleting a record removes that task's partial files too: locally inside the downloads directory for downloads, and on the original destination for uploads, which keeps the record when the remote cleanup fails so the delete can be retried once the connection is back. Completed records skip the remote cleanup. File-operation undo history remains scoped to its existing panel lifetime.
+- [x] Validation: transfer-manager and undo-preference unit tests, native chunk/offset/interruption, checkpoint persistence and staged-file cleanup tests, plus file-transfers browser tests cover controls, persisted opt-outs, deleting records and narrow/wide layouts. Live remote interoperability requires a reachable test server.

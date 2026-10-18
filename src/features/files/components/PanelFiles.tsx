@@ -1,3 +1,4 @@
+import UploadManager from '@features/files/components/UploadManager';
 import { preferredShell, useTerminalDefaults } from '@config/terminalDefaults';
 import { useEffect, useState } from 'react';
 import { openPath } from '@tauri-apps/plugin-opener';
@@ -48,7 +49,7 @@ export default function PanelFiles() {
 
 /** 本地面板：只提供本地专有的菜单项、图标与磁盘视图。 */
 function LocalFiles() {
-  const [showDownloads, setShowDownloads] = useState(false);
+  const [transferPage, setTransferPage] = useState<'upload' | 'download' | null>(null);
   const workspaceDirs = useWorkspaceDirsStore();
   const rememberedPath = useLocalPathStore((state) => state.remembered);
   // Start directory: the session's remembered location, otherwise the focused terminal cwd.
@@ -90,7 +91,8 @@ function LocalFiles() {
     }
   };
 
-  if (showDownloads) return <DownloadManager onBack={() => setShowDownloads(false)} />;
+  if (transferPage === 'upload') return <UploadManager onBack={() => setTransferPage(null)} />;
+  if (transferPage === 'download') return <DownloadManager onBack={() => setTransferPage(null)} />;
 
   return (
     <FilePanel
@@ -147,7 +149,8 @@ function LocalFiles() {
           }
         },
         onNewTabHere: (dir) => useSessionStore.getState().addTab({ cwd: dir, title: dir.split(/[\\/]/).filter(Boolean).pop() ?? dir }),
-        onOpenDownloads: () => setShowDownloads(true),
+        onOpenDownloads: () => setTransferPage('download'),
+        onOpenUploads: () => setTransferPage('upload'),
         onReveal: (entry) => void fileRevealInDir(entry.path).catch((error) =>
           useToastStore.getState().addToast(String((error as Error)?.message ?? error), 'error')),
         onRevealDir: (dir) => void fileRevealInDir(dir).catch((error) =>

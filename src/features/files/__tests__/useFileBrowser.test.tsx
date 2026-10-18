@@ -1,3 +1,5 @@
+import { useFileUndoSettings } from '@config/fileUndo';
+import { useToastStore } from '@ui/Toast';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useFileBrowser } from '@features/files/hooks/useFileBrowser';
@@ -33,6 +35,7 @@ describe('useFileBrowser（本地目标）', () => {
   const openEntry = vi.fn();
 
   beforeEach(() => {
+    useFileUndoSettings.setState({ local: true, remote: true });
     fsMocks.fsHome.mockReset().mockResolvedValue('C:/Users/test');
     fsMocks.fsDisks.mockReset().mockResolvedValue([]);
     fsMocks.fsList.mockReset().mockResolvedValue([entry('src', 'C:/work/src', true), entry('a.txt', 'C:/work/a.txt')]);
@@ -472,4 +475,29 @@ describe('useFileBrowser（本地目标）', () => {
     expect(result.current.undoCount).toBe(0);
     expect([...result.current.selection]).toEqual(['C:/work/a.txt']);
   });
+  it('deletes without staging when local undo is disabled', async () => {
+    useFileUndoSettings.getState().update({ local: false });
+    fsMocks.fsStageDelete.mockResolvedValue([{ from: 'C:/work/a.txt', to: '' }]);
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(2));
+    act(() => result.current.confirmDelete([entry('a.txt', 'C:/work/a.txt')]));
+    await act(async () => { result.current.confirmAction(); });
+    expect(fsMocks.fsStageDelete).toHaveBeenCalledWith(['C:/work/a.txt'], false);
+    expect(result.current.undoCount).toBe(0);
+    expect(result.current.undo).toBeNull();
+    expect(fsMocks.fsPurgeStaged).not.toHaveBeenCalled();
+  });
+
+  it('moves dragged-out sources without promising an undo step when local undo is disabled', async () => {
+    useFileUndoSettings.getState().update({ local: false });
+    fsMocks.fsStageDelete.mockResolvedValue([{ from: 'C:/work/a.txt', to: '' }]);
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(2));
+    await act(async () => { await result.current.removeAfterTransfer([entry('a.txt', 'C:/work/a.txt')]); });
+    expect(fsMocks.fsStageDelete).toHaveBeenCalledWith(['C:/work/a.txt'], false);
+    expect(result.current.undoCount).toBe(0);
+    const toasts = useToastStore.getState().toasts;
+    expect(toasts[toasts.length - 1]?.message).toBe('已移动到系统，不保留应用撤销记录');
+  });
+
 });

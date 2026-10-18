@@ -3,16 +3,19 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import type FilePanel from '@features/files/components/FilePanel';
 
-const mocks = vi.hoisted(() => ({ write: vi.fn(), toast: vi.fn(), focus: vi.fn(), debug: vi.fn() }));
+const mocks = vi.hoisted(() => ({ write: vi.fn(), toast: vi.fn(), focus: vi.fn(), debug: vi.fn(), upload: vi.fn(), download: vi.fn() }));
 vi.mock('@platform/pty', () => ({ ptyWrite: mocks.write }));
 vi.mock('@ui/Toast', () => ({ useToastStore: { getState: () => ({ addToast: mocks.toast }) } }));
 vi.mock('@features/terminal/services/terminalDebug', () => ({ terminalDebug: mocks.debug }));
 vi.mock('@features/terminal/services/terminalClipboard', () => ({ getPaneTerminal: (id: string) => ({ focus: () => mocks.focus(id) }) }));
-vi.mock('@features/files/model/fileOps', () => ({ fileOpsFor: () => ({}) }));
+vi.mock('@features/files/model/fileOps', () => ({ fileOpsFor: () => ({ upload: mocks.upload, download: mocks.download }) }));
 vi.mock('@features/files/components/FilePanel', () => ({
   default: (props: ComponentProps<typeof FilePanel>) => <>
     <button onClick={() => props.openEntry?.({ name: 'config.txt', path: '/home/test/config.txt', is_dir: false })}>Open remote file</button>
     <button onClick={() => props.onSyncToTerminal?.('/home/test')}>Sync directory</button>
+    <button onClick={() => props.onExternalDrop?.(['/local/item.zip'], { rowPath: null, dir: '/home/test' })}>Drop upload</button>
+    <button onClick={() => props.handlers?.onDownload?.([{ name: 'item.zip', path: '/home/test/item.zip', is_dir: false }])}>Download item</button>
+    <button onClick={() => void props.prepareNativeDrag?.([{ name: 'drag.zip', path: '/home/test/drag.zip', is_dir: false }])}>Drag download</button>
   </>,
 }));
 
@@ -27,11 +30,31 @@ const sshPane = (id: string, connectionId = 'ssh-1') => leaf({ id, kind: 'ssh', 
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.write.mockResolvedValue(undefined);
+  mocks.upload.mockResolvedValue(undefined);
+  mocks.download.mockResolvedValue('/Downloads/item.zip');
   useSessionStore.setState({ activeId: 'tab', tabs: [{ id: 'tab', kind: 'session', title: 'SSH', layout: sshPane('tab#0') }] });
   useTerminalStore.setState({ focusedPaneId: 'tab#0', sessions: { 'tab#0': 'ssh-session' } });
 });
 
 describe('remote file terminal routing', () => {
+  it('opens the upload manager immediately for dropped files', async () => {
+    mocks.upload.mockReturnValue(new Promise(() => {}));
+    render(<RemoteFiles conn={conn} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Drop upload' }));
+    expect(await screen.findByRole('button', { name: '返回文件浏览' })).toBeVisible();
+  });
+
+  it('opens the download manager for menu and native drag downloads', async () => {
+    mocks.download.mockReturnValue(new Promise(() => {}));
+    const view = render(<RemoteFiles conn={conn} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Download item' }));
+    expect(await screen.findByRole('button', { name: '返回文件浏览' })).toBeVisible();
+    view.unmount();
+    render(<RemoteFiles conn={conn} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Drag download' }));
+    expect(await screen.findByRole('button', { name: '返回文件浏览' })).toBeVisible();
+  });
+
   it('opens a remote file through the pane session rather than the tab id', async () => {
     render(<RemoteFiles conn={conn} />);
     fireEvent.click(screen.getByRole('button', { name: 'Open remote file' }));

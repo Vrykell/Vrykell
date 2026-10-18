@@ -1,3 +1,4 @@
+import { useFileUndoSettings } from '@config/fileUndo';
 import { TextInput } from '@ui/TextInput';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -84,6 +85,7 @@ export default function FilePanel({
   onExternalDrop,
   prepareNativeDrag,
 }: FilePanelProps) {
+  const undoEnabled = useFileUndoSettings(state => target.kind === 'ssh' ? state.remote : state.local);
   const config = useMemo(() => filePanelConfigFor(target), [target]);
   const {
     ops,
@@ -647,7 +649,7 @@ export default function FilePanel({
         message={
           confirm
             ? confirm.kind === 'delete'
-              ? confirm.entries.length > 1
+              ? !undoEnabled ? t('Delete selected items without application undo? Remote deletion is permanent; local deletion uses the system trash.') : confirm.entries.length > 1
                 ? `确定要删除选中的 ${confirm.entries.length} 项吗？删除后可在「更多 → 回退删除」恢复。`
                 : `确定要删除「${confirm.entries[0]!.name}」吗？删除后可在「更多 → 回退删除」恢复。`
               : `确定要将「${confirm.entry.name}」重命名为「${confirm.newName}」吗？`

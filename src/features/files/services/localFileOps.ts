@@ -1,3 +1,4 @@
+import { useFileUndoSettings } from '@config/fileUndo';
 import {
   fsList, fsDisks, fsHome, fsRename, fsCreateFile, fsCreateDir,
   fsCopy, fsMove, fsStageDelete, fsRestoreStaged, fsPurgeStaged, fsStat,
@@ -19,7 +20,7 @@ export function createLocalFileOps(): FileOps {
     rename: (path, newName) => fsRename(path, newName),
     move: (paths, destDir) => fsMove(paths, destDir),
     copy: (paths, destDir) => fsCopy(paths, destDir),
-    stageDelete: (paths) => fsStageDelete(paths).then((pairs) => ({ completed: pairs, errors: [] })),
+    stageDelete: (paths) => (useFileUndoSettings.getState().local ? fsStageDelete(paths) : fsStageDelete(paths, false)).then((pairs) => ({ completed: pairs, errors: [] })),
     restoreStaged: (pairs) => fsRestoreStaged(pairs),
     purgeStaged: (paths) => fsPurgeStaged(paths),
     home: () => fsHome(),

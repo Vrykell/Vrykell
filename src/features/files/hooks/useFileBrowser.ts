@@ -1,3 +1,4 @@
+import { useFileUndoSettings } from '@config/fileUndo';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { DiskEntry, FsEntry } from '@platform/api/types';
 import {
@@ -148,6 +149,7 @@ export function useFileBrowser({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const pendingScrollTop = useRef<number | null>(null);
   const [clipboard, setClipboard] = useState<FileClipboard | null>(null);
+  const undoEnabled = useFileUndoSettings(state => target.kind === 'ssh' ? state.remote : state.local);
   const [undoStack, setUndoStack] = useState<FileUndo[]>([]);
   const undoStackRef = useRef<FileUndo[]>([]);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; entry: FsEntry } | null>(null);
@@ -273,12 +275,6 @@ export function useFileBrowser({
     load(path);
     return () => { requestVersion.current += 1; };
   }, [enabled, load, path]);
-
-  // 挂载时清掉上一次会话残留的暂存项（可回退窗口已结束；远端需要，本地由后端启动时清理）
-  useEffect(() => {
-    if (!enabled || !ops.sweepUndo) return;
-    void ops.sweepUndo().catch(() => {});
-  }, [enabled, ops]);
 
   // 目标目录加载完成后还原快照里的滚动位置（此前的提交仍是上一个目录）
   useLayoutEffect(() => {
@@ -530,6 +526,7 @@ export function useFileBrowser({
 
   /** 记录一步可回退操作；被挤出历史的暂存删除项永久清理（回退窗口结束）。 */
   const pushUndo = useCallback((entry: FileUndo) => {
+    if (!(target.kind === 'ssh' ? useFileUndoSettings.getState().remote : useFileUndoSettings.getState().local)) return;
     const next = [entry, ...undoStackRef.current];
     for (const dropped of next.splice(MAX_UNDO_STEPS)) {
       if (dropped.kind === 'delete') {
@@ -537,7 +534,9 @@ export function useFileBrowser({
       }
     }
     setUndo(next);
-  }, [ops, setUndo]);
+  }, [ops, setUndo, target.kind]);
+
+  useEffect(() => { if (!undoEnabled) setUndo([]); }, [undoEnabled, setUndo]);
 
   /** 该步被消耗后出栈（无论成功与否）。 */
   const popUndo = useCallback(() => {
@@ -552,6 +551,7 @@ export function useFileBrowser({
    * 「提示 + 移除该步」，让计数始终跟着实际剩余步数走。
    */
   const runUndo = useCallback(async () => {
+    if (!(target.kind === 'ssh' ? useFileUndoSettings.getState().remote : useFileUndoSettings.getState().local)) return;
     const current = undoStackRef.current[0];
     if (!current) return;
     let done = 0;
@@ -617,7 +617,7 @@ export function useFileBrowser({
     }
     // 回退同样会改动已展开目录里的内容：按涉及的路径刷新父目录与目标目录
     refreshAffected(current.pairs.flatMap((pair) => [pair.from, pair.to]));
-  }, [ops, popUndo, refreshAffected, replaceSelection, toast]);
+  }, [ops, popUndo, refreshAffected, replaceSelection, toast, target.kind]);
 
   // ── 迁移（粘贴 / 拖拽共用） ──
 
@@ -756,7 +756,7 @@ export function useFileBrowser({
       if (outcome.completed.length > 0) {
         pushUndo({ kind: 'delete', labelKey: 'files.undo.moveOut', pairs: outcome.completed });
         toast(
-          outcome.completed.length > 1
+          !undoEnabled ? t('Moved to the system without application undo') : outcome.completed.length > 1
             ? `已移动 ${outcome.completed.length} 项到系统，可在更多菜单回退`
             : '已移动到系统，可在更多菜单回退',
           'success',
@@ -769,35 +769,7 @@ export function useFileBrowser({
       terminalDebug('files-op', { op: 'move-out-failed', itemCount: entries.length, errorType: (error as Error)?.name ?? typeof error });
       refreshAffected(entries.map((entry) => entry.path));
     }
-  }, [ops, pushUndo, refreshAffected, replaceSelection, toast]);
-
-  /**
-   * 上传本地文件/目录到当前远端目录（系统拖入面板、菜单上传共用）。
-   * 上传是「复制到远端」：源文件不动，新增的远端条目进回退历史（回退上传 = 移入远端暂存）。
-   */
-  const uploadInto = useCallback(async (localPaths: string[], dir: string) => {
-    if (!ops.upload || localPaths.length === 0) return;
-    toast(localPaths.length > 1 ? t('files.upload.startCount', { n: localPaths.length }) : t('files.upload.start'), 'info');
-    const created: FileOpPair[] = [];
-    const failures: string[] = [];
-    for (const localPath of localPaths) {
-      try {
-        const remotePath = await ops.upload(dir, localPath);
-        // 后端返回真实远端路径（可能带序号）时才记录回退；未返回时只上传
-        if (typeof remotePath === 'string' && remotePath) created.push({ from: remotePath, to: remotePath });
-      } catch (error) {
-        failures.push(`${localPath}：${String((error as Error)?.message ?? error)}`);
-      }
-    }
-    terminalDebug('files-op', { op: 'upload', itemCount: localPaths.length, doneCount: created.length, errorCount: failures.length });
-    if (created.length > 0) pushUndo({ kind: 'remove', labelKey: 'files.undo.upload', pairs: created });
-    if (failures.length > 0) toast(failures[0]!, 'error');
-    if (created.length > 0) {
-      toast(created.length > 1 ? t('files.upload.doneCount', { n: created.length }) : t('files.upload.done'), 'success');
-      replaceSelection(created.map((pair) => pair.to));
-    }
-    refreshAffected([], dir);
-  }, [ops, pushUndo, refreshAffected, replaceSelection, toast]);
+  }, [ops, pushUndo, refreshAffected, replaceSelection, toast, undoEnabled]);
 
   /** 删除 = 移到暂存区（可回退）；回退窗口结束或挤出历史后永久清理。 */
   const doDelete = useCallback(async (list: FsEntry[]) => {
@@ -808,7 +780,7 @@ export function useFileBrowser({
       if (outcome.completed.length > 0) {
         pushUndo({ kind: 'delete', labelKey: 'files.undo.delete', pairs: outcome.completed });
         toast(
-          outcome.completed.length > 1
+          !undoEnabled ? t('Deleted without application undo') : outcome.completed.length > 1
             ? `已删除 ${outcome.completed.length} 项，可在更多菜单回退`
             : '已删除，可在更多菜单回退',
           'success',
@@ -820,7 +792,7 @@ export function useFileBrowser({
     } catch (error) {
       toast(String((error as Error)?.message ?? error), 'error');
     }
-  }, [ops, pushUndo, refreshAffected, replaceSelection, toast]);
+  }, [ops, pushUndo, refreshAffected, replaceSelection, toast, undoEnabled]);
 
   // ── 菜单与确认 ──
 
@@ -906,7 +878,7 @@ export function useFileBrowser({
     revealPath,
     clipboard,
     cutPaths,
-    undo: undoStack[0] ?? null,
+    undo: undoEnabled ? undoStack[0] ?? null : null,
     undoCount: undoStack.length,
     runUndo,
     copySelection: copyEntries,
@@ -916,7 +888,6 @@ export function useFileBrowser({
     transferInto,
     createEntry,
     removeAfterTransfer,
-    uploadInto,
     collapseAll,
     openEntry,
     ctxMenu,

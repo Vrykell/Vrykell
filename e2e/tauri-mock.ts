@@ -1010,6 +1010,10 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             downloads.unshift(rec);
             return rec.localPath;
           }
+          case 'transfers_list': return [];
+          case 'transfers_clear': return undefined;
+          case 'transfers_control': return undefined;
+          case 'transfers_delete': return undefined;
           case 'downloads_list':
             return downloads;
           case 'downloads_clear':
@@ -1309,8 +1313,6 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             for (const path of args.paths as string[]) sshOps.push({ op: 'purge', path });
             return undefined;
           }
-          case 'ssh_sweep_undo':
-            return undefined;
           case 'plugin:event|listen':
             if ((args.target as { label?: string })?.label?.startsWith('tool-') && (args.target as { label: string }).label !== windowLabel) {
               toolListeners.set(`${args.event}:${(args.target as { label: string }).label}`, args.handler as number);
