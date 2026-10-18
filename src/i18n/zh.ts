@@ -499,6 +499,7 @@ const zh: Record<string, string> = {
   'Remove {{name}} from the list?': '从列表中移除「{{name}}」？',
   'For example npx': '例如 npx',
   'Adding a server is the authorization: it runs with your account, like a command typed into the terminal.': '添加服务器即视为授权：它和你在终端里输入的命令一样，以你的账户身份运行。',
+  'Servers are added, edited and enabled on the ACP settings page; this surface only starts and probes them.': '服务器的添加、编辑与启用在「设置 → ACP」里；这里只负责启动与探测。',
   "Test connection": "测试连接",
   "No harness configured. Add one to ~/.vrykell/harnesses.json.": "还没有配置 harness：在 ~/.vrykell/harnesses.json 里添加一条（可手改）。",
   "This harness is disabled.": "这个 harness 已停用。",
