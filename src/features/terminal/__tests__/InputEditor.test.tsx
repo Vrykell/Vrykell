@@ -50,7 +50,7 @@ it('separates shell, directory and branch chips with spacing instead of dots', (
   expect(status.querySelector('.terminal-chip > span[style]')).not.toBeNull();
 });
 
-it('renders clickable chips as buttons and keeps the git branch chip a static span', () => {
+it('renders directory and branch chips as interactive buttons', () => {
   useTerminalStore.setState({ sessions: { pane: 'pty' } });
   useSessionStore.setState({ tabs: [{ id: 'tab', kind: 'session', title: 'Shell', layout: { type: 'leaf', terminal: { id: 'pane', kind: 'local', shellType: 'bash' } } }] });
   const { container } = render(<InputEditor paneId="pane" onSessionStatusClick={() => {}} />);
@@ -60,7 +60,8 @@ it('renders clickable chips as buttons and keeps the git branch chip a static sp
   const directory = container.querySelector<HTMLButtonElement>('.directory-picker-trigger');
   expect(directory?.tagName).toBe('BUTTON');
   expect(directory).not.toBeDisabled();
-  expect(container.querySelector('.terminal-branch')?.tagName).toBe('SPAN');
+  expect(container.querySelector('.terminal-branch')?.tagName).toBe('BUTTON');
+  expect(container.querySelector('.terminal-branch')).toHaveAttribute('aria-haspopup', 'menu');
 });
 
 it('re-syncs the colored mirror after content changes when the input is scrolled', () => {

@@ -465,6 +465,7 @@ input.ssh-auth-response::-webkit-strong-password-auto-fill-button { display: non
 .directory-picker :is(.directory-picker-parent, [role="option"]):is(:hover, :focus-visible), .directory-picker-list button[aria-selected="true"] { background: var(--hover); }
 .directory-picker p { margin: 0; padding: 8px 10px; color: var(--text-muted); }
 .terminal-branch { min-width: 0; max-width: 22%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.terminal-branch > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .terminal-pane { container-type: inline-size; }
 @container (max-width: 520px) {
   .terminal-ask-ai.text-control { width: var(--control-size); padding: 0; }

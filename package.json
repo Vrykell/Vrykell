@@ -40,6 +40,7 @@
     "micromark-extension-gfm-strikethrough": "^2.1.0",
     "micromark-extension-gfm-table": "^2.1.1",
     "micromark-extension-gfm-task-list-item": "^2.1.0",
+    "monaco-editor": "0.52.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-markdown": "^10.1.0",

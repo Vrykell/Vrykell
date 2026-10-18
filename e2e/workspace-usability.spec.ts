@@ -334,7 +334,7 @@ test('panel headings close their own content without affecting the other side', 
 test('dragging a navigation action preserves panel placement and order', async ({ page }) => {
   await page.locator('[data-dock-btn="files"]').dragTo(page.locator('[data-dock-btn="ssh"]'));
   const ids = await page.getByRole('navigation', { name: '工作区导航' }).locator('[data-dock-btn]').evaluateAll(elements => elements.map(el => el.getAttribute('data-dock-btn')));
-  expect(ids).toEqual(['tabs', 'files', 'ssh', 'command-history']);
+  expect(ids).toEqual(['tabs', 'files', 'ssh', 'git', 'command-history']);
   await page.locator('[data-dock-btn="files"]').click();
   await expect(page.getByText('notes.txt')).toBeVisible();
   await expect(page.getByTestId('tab-search')).toBeHidden();

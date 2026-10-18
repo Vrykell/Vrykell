@@ -144,7 +144,7 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
     localStorage.removeItem('dock-layout-v4');
     localStorage.removeItem('dock-layout-v3');
     const store = await freshStore();
-    expect(store.getState().leftZone).toEqual(['tabs', 'ssh', 'files', 'command-history']);
+    expect(store.getState().leftZone).toEqual(['tabs', 'ssh', 'files', 'git', 'command-history']);
     expect(store.getState().rightZone).toEqual(['chat', 'settings']);
     expect(store.getState().leftPanels).toEqual(['tabs']);
     expect(store.getState().rightPanels).toEqual([]);
@@ -155,7 +155,7 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
     localStorage.setItem('dock-layout-v4', 'not-json');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const store = await freshStore();
-    expect(store.getState().leftZone).toEqual(['tabs', 'ssh', 'files', 'command-history']);
+    expect(store.getState().leftZone).toEqual(['tabs', 'ssh', 'files', 'git', 'command-history']);
     expect(store.getState().leftPanels).toEqual(['tabs']);
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
@@ -170,7 +170,7 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
     }));
     const store = await freshStore();
     const s = store.getState();
-    expect(s.leftZone).toEqual(['tabs', 'files', 'ssh', 'command-history']);
+    expect(s.leftZone).toEqual(['tabs', 'files', 'ssh', 'command-history', 'git']);
     expect(s.rightZone).toEqual(['chat', 'settings']);
   });
 
@@ -198,7 +198,7 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
     expect(store.getState().leftPanels).toEqual(['files']);
     expect(store.getState().rightPanels).toEqual(['chat']);
     const reloaded = await freshStore();
-    expect(reloaded.getState().leftZone).toEqual(['settings', 'files', 'tabs', 'ssh', 'command-history']);
+    expect(reloaded.getState().leftZone).toEqual(['settings', 'files', 'tabs', 'ssh', 'command-history', 'git']);
     expect(reloaded.getState().rightZone).toEqual(['chat']);
     reloaded.getState().moveButton('settings', 'right', 0);
     expect((await freshStore()).getState().rightZone).toEqual(['settings', 'chat']);
@@ -250,7 +250,7 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
       widthPreset: 'compact',
     }));
     const store = await freshStore();
-    expect(store.getState().leftZone).toEqual(['chat', 'ssh', 'tabs', 'command-history']);
+    expect(store.getState().leftZone).toEqual(['chat', 'ssh', 'tabs', 'command-history', 'git']);
     expect(store.getState().rightZone).toEqual(['files', 'settings']);
     expect(store.getState().leftPanels).toEqual(['chat']);
     expect(store.getState().rightPanels).toEqual(['files']);
@@ -266,7 +266,7 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
     }));
     const store = await freshStore();
     const s = store.getState();
-    expect(s.leftZone).toEqual(['tabs', 'ssh', 'command-history']);
+    expect(s.leftZone).toEqual(['tabs', 'ssh', 'command-history', 'git']);
     expect(s.rightZone).toEqual(['files', 'chat', 'settings']);
     expect(s.leftPanels).toEqual(['tabs']);
     expect(s.rightPanels).toEqual([]);
@@ -294,7 +294,7 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
       leftPanels: ['files'], rightPanels: ['chat'], panelWidths: {}, widthPreset: 'compact',
     }));
     const store = await freshStore();
-    expect(store.getState().leftZone).toEqual(['chat', 'command-history']);
+    expect(store.getState().leftZone).toEqual(['chat', 'command-history', 'git']);
     expect(store.getState().rightZone).toEqual(['files', 'tabs', 'ssh', 'settings']);
     expect(store.getState().leftPanels).toEqual(['chat']);
     expect(store.getState().rightPanels).toEqual(['files']);

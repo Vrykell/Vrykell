@@ -422,6 +422,100 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
         const metadata = (window as unknown as { __TAURI_INTERNALS__: { metadata: { currentWindow: { label: string }; currentWebview: { label: string } } } }).__TAURI_INTERNALS__.metadata;
         metadata.currentWindow.label = windowLabel; metadata.currentWebview.label = windowLabel;
         switch (cmd) {
+          case 'editor_read_file': {
+            const target = args.target as { path: string; connectionId?: string };
+            const key = JSON.stringify([target.connectionId || '', target.path]);
+            const files = JSON.parse(localStorage.getItem('mock-editor-files') || '{}') as Record<string, string>;
+            const text = files[key] ?? 'export const value = "working";\n';
+            return { kind: target.path.endsWith('.png') ? 'binary' : target.path.endsWith('.large') ? 'tooLarge' : 'text', text, revision: `mock:${text}` };
+          }
+          case 'editor_save_file': {
+            const target = args.target as { path: string; connectionId?: string };
+            const key = JSON.stringify([target.connectionId || '', target.path]);
+            const files = JSON.parse(localStorage.getItem('mock-editor-files') || '{}') as Record<string, string>;
+            const before = files[key] ?? 'export const value = "working";\n';
+            if (localStorage.getItem('mock-editor-save-error') || args.expected !== `mock:${before}`) throw new Error('The file changed on disk. Reload it before saving; your unsaved text is kept.');
+            files[key] = String(args.text); localStorage.setItem('mock-editor-files', JSON.stringify(files)); return `mock:${String(args.text)}`;
+          }
+          case 'git_snapshot': {
+            const error = localStorage.getItem('mock-git-error');
+            if (error) throw new Error(error);
+            const snapshots = JSON.parse(localStorage.getItem('mock-git-snapshots') || '{}') as Record<string, unknown>;
+            const target = args.target as { cwd: string };
+            if (snapshots[target.cwd]) return snapshots[target.cwd];
+            return JSON.parse(localStorage.getItem('mock-git-snapshot') ?? JSON.stringify({
+              root: '/home/e2e/project', branch: 'main', remotes: ['origin'], upstream: 'origin/main', ahead: 1, behind: 2, entries: [
+                { path: 'src/main.ts', previousPath: null, indexStatus: 'M', worktreeStatus: 'M' },
+                { path: 'new file.ts', previousPath: null, indexStatus: '?', worktreeStatus: '?' },
+                { path: 'image.png', previousPath: null, indexStatus: ' ', worktreeStatus: 'M' },
+                { path: 'conflict.ts', previousPath: null, indexStatus: 'U', worktreeStatus: 'U' },
+              ],
+            }));
+          }
+          case 'git_diff':
+            return { original: args.scope === 'staged' ? 'export const value = "base";\n' : 'export const value = "staged";\n',
+              modified: args.scope === 'staged' ? 'export const value = "staged";\n' : 'export const value = "working";\n',
+              kind: args.path === 'image.png' ? 'binary' : 'text' };
+          case 'git_change_file': {
+            const repository = await (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args: unknown) => Promise<{ entries: { path: string; indexStatus: string; worktreeStatus: string }[] }> } }).__TAURI_INTERNALS__.invoke('git_snapshot', { target: args.target });
+            const entry = repository.entries.find(entry => entry.path === args.path);
+            if (entry) {
+              if (args.action === 'stage' || args.action === 'resolve') { entry.indexStatus = entry.indexStatus === '?' ? 'A' : 'M'; entry.worktreeStatus = ' '; }
+              else if (args.action === 'discard') {
+                if (entry.indexStatus === '?') repository.entries = repository.entries.filter(item => item.path !== args.path);
+                else { entry.worktreeStatus = ' '; if (entry.indexStatus === ' ') repository.entries = repository.entries.filter(item => item.path !== args.path); }
+              } else { entry.worktreeStatus = entry.indexStatus === 'A' ? '?' : 'M'; entry.indexStatus = entry.indexStatus === 'A' ? '?' : ' '; }
+            }
+            localStorage.setItem('mock-git-snapshot', JSON.stringify(repository));
+            return;
+          }
+          case 'git_commit_context': return 'Staged files:\nM src/main.ts\n\nStaged patch:\n-export const value = "base";\n+export const value = "staged";';
+          case 'git_branches': return ['main', 'feature/review'];
+          case 'git_references': return JSON.parse(localStorage.getItem('mock-git-references') || JSON.stringify([
+            { name: 'refs/heads/main', shortName: 'main', kind: 'branch', hash: 'a'.repeat(40) },
+            { name: 'refs/heads/feature/review', shortName: 'feature/review', kind: 'branch', hash: 'b'.repeat(40) },
+            { name: 'refs/remotes/origin/main', shortName: 'origin/main', kind: 'remote', hash: 'c'.repeat(40) },
+            { name: 'refs/tags/v1.0', shortName: 'v1.0', kind: 'tag', hash: 'a'.repeat(40) },
+          ]));
+          case 'git_edit_reference': {
+            const operations = JSON.parse(localStorage.getItem('mock-git-ref-operations') || '[]') as unknown[];
+            operations.push(args); localStorage.setItem('mock-git-ref-operations', JSON.stringify(operations));
+            const repository = JSON.parse(localStorage.getItem('mock-git-snapshot') || '{}') as Record<string, unknown>;
+            const error = localStorage.getItem('mock-git-ref-error');
+            if (error) { if (args.action === 'merge' || args.action === 'rebase') repository.operation = args.action; localStorage.setItem('mock-git-snapshot', JSON.stringify(repository)); throw new Error(error); }
+            if (args.action === 'abortMerge' || args.action === 'abortRebase' || args.action === 'continueRebase') repository.operation = null;
+            localStorage.setItem('mock-git-snapshot', JSON.stringify(repository)); return;
+          }
+          case 'git_worktrees': return JSON.parse(localStorage.getItem('mock-git-worktrees') || JSON.stringify([
+            { path: '/home/e2e/project', branch: 'main', head: 'abc', detached: false, bare: false, locked: null, prunable: null },
+            { path: '/home/e2e/feature', branch: 'feature/review', head: 'def', detached: false, bare: false, locked: 'in use', prunable: null },
+          ]));
+          case 'git_switch_branch': {
+            const repository = JSON.parse(localStorage.getItem('mock-git-snapshot') || '{}') as Record<string, unknown>;
+            repository.branch = args.branch; localStorage.setItem('mock-git-snapshot', JSON.stringify(repository)); return;
+          }
+          case 'git_operate': {
+            const operations = JSON.parse(localStorage.getItem('mock-git-operations') || '[]') as unknown[];
+            operations.push(args); localStorage.setItem('mock-git-operations', JSON.stringify(operations));
+            const error = localStorage.getItem('mock-git-operation-error');
+            if (error) throw new Error(error);
+            const repository = await (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args: unknown) => Promise<{ entries: { path: string; indexStatus: string; worktreeStatus: string }[]; ahead: number; behind: number }> } }).__TAURI_INTERNALS__.invoke('git_snapshot', { target: args.target });
+            if (args.operation === 'commit') {
+              repository.entries = repository.entries.filter(entry => {
+                if (entry.indexStatus === ' ' || entry.indexStatus === '?') return true;
+                entry.indexStatus = ' '; return entry.worktreeStatus !== ' ';
+              });
+              repository.ahead = (repository.ahead ?? 0) + 1;
+            } else if (args.operation === 'stageAll') {
+              repository.entries.forEach(entry => { entry.indexStatus = entry.indexStatus === '?' ? 'A' : 'M'; entry.worktreeStatus = ' '; });
+            } else if (args.operation === 'unstageAll') {
+              repository.entries.forEach(entry => { if (entry.indexStatus !== ' ' && entry.indexStatus !== '?') { entry.worktreeStatus = entry.indexStatus === 'A' ? '?' : 'M'; entry.indexStatus = entry.indexStatus === 'A' ? '?' : ' '; } });
+            } else if (args.operation === 'push') repository.ahead = 0;
+            else if (args.operation === 'pull') repository.behind = 0;
+            else if (args.operation === 'sync') { repository.ahead = 0; repository.behind = 0; }
+            localStorage.setItem('mock-git-snapshot', JSON.stringify(repository));
+            return;
+          }
           case 'command_history_context':
             return { root: args.root || String(args.cwd).replace(/\/src-tauri\/?$/, ''), platform: args.connectionId ? 'remote POSIX' : 'linux', files: args.includeFiles ? [{ path: 'package.json', text: '{"scripts":{"build":"vite build"}}' }] : [] };
           case 'command_history_preferences':
@@ -837,7 +931,8 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             windowFrameCalls.push({ label: windowLabel, color: String(args.color) });
             return undefined;
           case 'get_theme_config':
-            return theme;
+            // Real IPC serializes results; hand out copies so the store never aliases the mock.
+            return { ...theme, vars: { ...theme.vars } };
           case 'set_theme_config':
             Object.assign(theme, args.config);
             return undefined;
@@ -846,7 +941,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'theme_import': {
             const cfg = args.config ?? theme;
             Object.assign(theme, cfg);
-            return theme;
+            return { ...theme, vars: { ...theme.vars } };
           }
           case 'get_theme_path':
             return '/home/e2e/.vrykell/theme.json';

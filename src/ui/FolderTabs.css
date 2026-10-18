@@ -1,0 +1,22 @@
+.folder-header { display: flex; align-items: stretch; min-width: 0; flex-shrink: 0; min-height: 34px; background: var(--surface); container-type: inline-size; }
+.folder-tab-list { display: flex; align-items: stretch; flex: 1; min-width: 0; padding-left: 12px; overflow-x: auto; scrollbar-width: none; }
+.folder-tab-list::-webkit-scrollbar { display: none; }
+.folder-tab-spacer { flex: 1; }
+.folder-tab { display: flex; align-items: center; flex-shrink: 0; max-width: 280px; padding-right: 4px; color: var(--text-muted); border-radius: var(--radius-inner) var(--radius-inner) 0 0; }
+.folder-tab[data-active="true"] { background: var(--canvas); color: var(--text-primary); }
+.folder-tab[data-active="true"] { position: relative; z-index: 1; }
+.folder-tab[data-active="true"]::before, .folder-tab[data-active="true"]::after { content: ''; position: absolute; bottom: 0; width: 10px; height: 10px; pointer-events: none; }
+.folder-tab[data-active="true"]::before { left: -10px; border-bottom-right-radius: 10px; box-shadow: 5px 0 0 var(--canvas); }
+.folder-tab[data-active="true"]::after { right: -10px; border-bottom-left-radius: 10px; box-shadow: -5px 0 0 var(--canvas); }
+.folder-tab:not([data-active="true"]):hover { background: var(--hover); border-radius: var(--radius-inner); }
+.folder-tab > button[role="tab"] { display: flex; align-items: center; gap: 8px; min-width: 0; height: 34px; padding: 0 10px; border: 0; border-radius: 0; background: transparent; color: inherit; font: var(--fs-caption)/1.5 var(--font-ui); cursor: pointer; touch-action: none; }
+.folder-tab > button[role="tab"] > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder-tab > button[role="tab"] > svg { flex-shrink: 0; }
+.folder-actions { display: flex; align-items: center; gap: 2px; padding: 0 6px; flex-shrink: 0; }
+.folder-tab-list .sidebar-reorder-placeholder { margin: 0; border-radius: var(--radius-inner); }
+.folder-path { display: flex; align-items: center; gap: 6px; height: 24px; flex-shrink: 0; min-width: 0; padding: 0 12px; background: var(--canvas); color: var(--text-muted); font: var(--fs-micro)/1.5 var(--font-ui); }
+.folder-path > span:first-of-type { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder-path > span:last-child:not(:first-child) { flex-shrink: 0; }
+.folder-path > svg { flex-shrink: 0; }
+.folder-path-scope::before { content: '· '; }
+@container (max-width: 560px) { .folder-actions .folder-action-secondary { display: none; } }

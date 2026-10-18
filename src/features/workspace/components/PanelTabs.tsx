@@ -1,7 +1,7 @@
 import { TextInput } from '@ui/TextInput';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { iconSizes,
-  Plus, History, Settings, Sparkles,
+  Plus, History, Settings, Sparkles, GitBranch,
   ChevronRight, Pencil, Archive, Folder, Trash2, X,
  } from '@ui/icons';
 import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, useTabDisplayTitle, tabIconKey, tabIconColor, type Tab, type TabGroup } from '@features/workspace';
@@ -22,6 +22,7 @@ import {
   useListReorder, useListReorderDrag, type ListReorderDrag, type ListReorderTarget,
 } from '@ui/listReorder';
 import { t } from '@i18n';
+import { fileIcon } from '@features/files';
 import type { GroupingProposal } from '@features/agent/services/autoGrouping';
 import { useToolWindow } from '@ui/hooks/useToolWindow';
 import { applySessionGrouping } from '../services/autoGrouping';
@@ -563,6 +564,8 @@ function TabRow({
   const displayTitle = useTabDisplayTitle(tab);
   const isSsh = first?.kind === 'ssh';
   const Icon = tab.kind === 'history' ? History
+    : tab.kind === 'git-diff' ? tab.comparisons ? GitBranch : fileIcon(tab.selection.path)
+    : tab.kind === 'editor' ? fileIcon(tab.selected.path)
     : tab.kind === 'ai-history' ? Sparkles
       : tab.kind === 'settings' ? Settings
       : isSsh ? SshIcon

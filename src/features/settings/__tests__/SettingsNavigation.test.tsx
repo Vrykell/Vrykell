@@ -24,7 +24,8 @@ it('shows the full directory without a local search and returns focus after sele
   const trigger = screen.getByText('Open directory');
   fireEvent.click(trigger);
   expect(screen.getByRole('button', { name: '模型配置' })).toHaveFocus();
-  expect(screen.getByRole('complementary', { name: '设置目录' }).querySelectorAll('.sidebar-row')).toHaveLength(19);
+  expect(screen.getByRole('complementary', { name: '设置目录' }).querySelectorAll('.sidebar-row')).toHaveLength(20);
+  expect(screen.getByRole('button', { name: '版本控制' })).toBeVisible();
   expect(screen.getByRole('button', { name: '历史命令' })).toBeVisible();
   fireEvent.keyDown(screen.getByRole('button', { name: '模型行为' }), { key: 'Enter' });
   expect(useSettingsNavigationStore.getState().selected).toBe('ai-behavior');

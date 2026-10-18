@@ -2,6 +2,7 @@ import { Fragment, useId, useState, type CSSProperties, type KeyboardEvent, type
 import { useListReorder } from './listReorder';
 import { sidebarRowSpacing, sidebarRowContent, sidebarRowIcon, sidebarRowTitle } from './sidebarRow';
 import { IconButton } from './IconButton';
+import { ChevronRight, iconSizes } from './icons';
 
 export interface SidebarItemAction {
   icon: ReactNode;
@@ -27,6 +28,7 @@ type SidebarItemControl = SidebarItemAction | { label: string; control: ReactNod
  */
 export default function SidebarItem({
   icon,
+  tree,
   title,
   subtitle,
   titleFontFamily,
@@ -54,6 +56,7 @@ export default function SidebarItem({
   variant = 'default',
 }: {
   icon?: ReactNode;
+  tree?: { depth: number; expanded?: boolean; onToggle?: () => void };
   title: string;
   titleFontFamily?: CSSProperties['fontFamily'];
   subtitle?: string;
@@ -86,21 +89,22 @@ export default function SidebarItem({
   /** Compact rows reduce padding; history metadata moves into the row description. */
   compact?: boolean;
   /** History records use neutral titles and can show metadata as a compact description. */
-  variant?: 'default' | 'history' | 'command';
+  variant?: 'default' | 'history' | 'command' | 'resource';
 }) {
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const subtitleId = useId();
   const historyCompact = variant === 'history' && compact;
   const command = variant === 'command';
+  const resource = variant === 'resource';
   const dragging = useListReorder((state) => !!reorderItemId && state.drag?.id === reorderItemId && (!reorderListId || state.drag.listId === reorderListId));
   const background = active ? 'var(--selection-bg)' : hovered ? 'var(--hover)' : 'transparent';
-  const actionVisible = hovered || focused || (variant !== 'history' && active);
+  const actionVisible = hovered || focused || (variant !== 'history' && !resource && active);
 
   return (
     <div
       {...dataAttributes}
-      className={variant === 'history' ? 'sidebar-row history-row' : command ? 'sidebar-row command-row' : 'sidebar-row'}
+      className={variant === 'history' ? 'sidebar-row history-row' : command ? 'sidebar-row command-row' : resource ? 'sidebar-row resource-row' : 'sidebar-row'}
       data-active={active ? 'true' : 'false'}
       data-actions-visible={command ? actionVisible : undefined}
       {...(variant === 'history' && active ? { 'aria-current': true as const } : {})}
@@ -142,13 +146,17 @@ export default function SidebarItem({
         ...sidebarRowContent,
         ...(historyCompact ? { minHeight: 34, padding: '5px 10px', alignItems: 'flex-start' } : compact ? { minHeight: 32, padding: '5px 10px' } : {}),
         ...(command ? { position: 'relative', minHeight: 28, padding: '2px 10px', gap: 6 } : {}),
+        ...(tree ? { minHeight: 32, padding: `5px 10px 5px ${4 + tree.depth * 14}px`, gap: 4 } : {}),
         background: variant === 'history' ? undefined : command && focused && !active ? 'var(--hover)' : background,
         color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
       }}>
-        {icon && <span className="sidebar-row-icon" style={{ ...sidebarRowIcon, ...(historyCompact ? { width: 20, height: 'calc(22px * var(--ui-font-scale))' } : {}),
+        {tree && <span data-row-expander style={{ width: iconSizes.compact, flexShrink: 0, display: 'inline-flex', justifyContent: 'center', color: 'var(--text-muted)',
+          visibility: tree.expanded === undefined ? 'hidden' : 'visible', transform: tree.expanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.12s ease' }}
+          onClick={event => { event.stopPropagation(); tree.onToggle?.(); }}><ChevronRight size={iconSizes.compact} /></span>}
+        {icon && <span className="sidebar-row-icon" style={{ ...sidebarRowIcon, ...(tree ? { width: 20 } : {}), ...(historyCompact ? { width: 20, height: 'calc(22px * var(--ui-font-scale))' } : {}),
           ...(command ? { width: 14, height: 14 } : {}) }}>{icon}</span>}
         {renameInput ?? (
-          <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: resource ? 'row' : 'column', alignItems: resource ? 'center' : undefined, gap: resource ? 6 : 1 }}>
             <span className="sidebar-row-title" data-tip={variant === 'history' ? title : undefined}
               data-tip-description={historyCompact ? subtitle : undefined}
               style={{ ...sidebarRowTitle,
@@ -168,7 +176,7 @@ export default function SidebarItem({
             )}
           </span>
         )}
-        {badge}
+        {!resource && badge}
         {trailingActions?.length ? <span className={command ? 'sidebar-row-inline-actions' : undefined}
           style={{ display: 'inline-flex', alignSelf: 'center', flexShrink: 0,
           ...(command ? { position: 'absolute', right: action ? 30 : 6, top: '50%', transform: 'translateY(-50%)', background: 'transparent' } : { opacity: actionVisible ? 1 : 0 }),
@@ -178,6 +186,7 @@ export default function SidebarItem({
           {trailingActions.map(item => <Fragment key={item.label}>{'control' in item ? item.control : <IconButton compact data-subtle aria-label={item.label}
             data-tip={item.title ?? item.label} disabled={item.disabled} onClick={item.onClick}>{item.icon}</IconButton>}</Fragment>)}
         </span> : null}
+        {resource && badge}
         {action && (
           <button
             type="button"

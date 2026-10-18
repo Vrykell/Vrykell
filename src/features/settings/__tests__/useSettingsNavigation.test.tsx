@@ -20,11 +20,16 @@ it('opens the globally indexed page before mounting and updates an existing sett
 
 it('keeps all pages available and clears field targets when choosing a page', () => {
   const { result } = renderHook(() => useSettingsNavigation());
-  expect(result.current.groups.flatMap(group => group.items)).toHaveLength(19);
+  expect(result.current.groups.flatMap(group => group.items)).toHaveLength(20);
   act(() => useSettingsNavigationStore.getState().openField('ai-perms', 'Permissions'));
   act(() => result.current.setSelected('terminal-open'));
   expect(result.current.selected).toBe('terminal-open');
   expect(result.current.activeLabel).toBe('打开方式');
   expect(useSettingsNavigationStore.getState().targetField).toBeNull();
   expect(result.current.groups).toHaveLength(6);
+});
+it('opens the diff page preference through the global settings index', () => {
+  vi.spyOn(useSessionStore.getState(), 'openSettingsTab').mockImplementation(() => {});
+  getSettings().find(setting => setting.id === 'git-diff-pages')!.onSelect();
+  expect(useSettingsNavigationStore.getState()).toMatchObject({ selected: 'source-control', targetField: '差异页面' });
 });

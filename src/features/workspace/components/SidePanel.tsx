@@ -7,6 +7,7 @@ import PanelFiles from '@features/files/components/PanelFiles';
 import PanelSsh from '@features/ssh/components/PanelSsh';
 import PanelChat from '@features/chat/components/PanelChat';
 import PanelCommandHistory from '@features/command-history/components/PanelCommandHistory';
+import PanelGit from '@features/git/components/PanelGit';
 
 interface SidePanelProps {
   side: DockSide;
@@ -18,6 +19,7 @@ const PANEL_COMPONENTS: Record<string, FC> = {
   ssh: PanelSsh,
   chat: PanelChat,
   'command-history': PanelCommandHistory,
+  git: PanelGit,
 };
 
 export default function SidePanel({ side }: SidePanelProps) {
@@ -87,7 +89,7 @@ function SinglePanel({ side, panelId, visible }: { side: DockSide; panelId: stri
   if (!def || !PanelContent) return null;
 
   return (
-    <div className="workspace-side-panel" data-side={side} data-visible={visible ? 'true' : 'false'} style={{
+    <div className="workspace-side-panel" role="complementary" aria-label={`${panelId === 'chat' ? 'AI 助手' : def.label}面板`} data-side={side} data-visible={visible ? 'true' : 'false'} style={{
       display: visible ? 'block' : 'none',
       position: 'relative',
       flexShrink: 0,

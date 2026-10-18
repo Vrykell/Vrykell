@@ -1,5 +1,7 @@
 import { useTerminalDefaults } from '@config/terminalDefaults';
 import { useCommandHistorySettings } from '@config/commandHistory';
+import { useGitPreferences } from '@config/git';
+import { useEditorPreferences } from '@config/editor';
 import { t } from '@i18n';
 import { TOOL_NAMES, usePermissions, useAgentSettings, type ToolName, type AgentSettings } from '@features/agent';
 import { SHELL_TYPES, shellTypeLabel } from '@platform/shells';
@@ -42,6 +44,9 @@ function registerField(id: string, page: PageId, label: string, description: str
 
 registerField('local-file-undo', 'file-operations', 'Local file undo', 'File operations');
 registerField('remote-file-undo', 'file-operations', 'Remote file undo', 'File operations');
+registerField('git-diff-pages', 'source-control', 'Diff pages', 'Source control', () => useGitPreferences.getState().diffMode);
+registerField('preferred-file-editor', 'editor-local', 'Preferred file editor', 'Opening files', () => useEditorPreferences.getState().localOpenMode);
+registerField('embedded-editor-pages', 'editor-local', 'Editor pages', 'Opening files', () => useEditorPreferences.getState().pageMode);
 registerField("startup", "startup", "Open on startup", "Restore sessions or open a default terminal", () => useStartupSettings.getState().mode);
 registerField('history-run-target', 'command-history', 'Command execution target', 'Choose where commands run from the history panel.', () => useCommandHistorySettings.getState().runIn);
 registerField('history-double-click', 'command-history', 'Double-click command', 'Double-click inserts the command by default. Execution follows the selected target.', () => useCommandHistorySettings.getState().doubleClick);

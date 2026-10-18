@@ -12,7 +12,17 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(async () => ({
   // Icons compiles `~icons/<collection>/<name>` imports at build time, so only
   // the shell brand marks we actually use end up in the bundle.
-  plugins: [react(), Icons({ compiler: "jsx", jsx: "react" })],
+  plugins: [react(), Icons({ compiler: "jsx", jsx: "react" }), {
+    name: "embedded-control-messages",
+    enforce: "pre",
+    resolveId(source, importer) {
+      if (importer?.replaceAll("\\", "/").includes("/node_modules/monaco-editor/esm/") && /(?:^|\/)nls\.js$/.test(source)) {
+        return `${sourceRoot}/ui/code/localize.ts`;
+      }
+    },
+  }],
+  // Embedded controls use the application catalog rather than a separate language setting.
+  optimizeDeps: { exclude: ["monaco-editor"] },
 
   // Keep runtime imports aligned with tsconfig paths in Vite and Vitest.
   resolve: {

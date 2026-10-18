@@ -41,11 +41,12 @@ function DemoRow({ id, start }: {
   );
 }
 
-function Harness({ onDrop, listId = 'demo' }: {
+function Harness({ onDrop, listId = 'demo', axis }: {
   onDrop: (drag: ListReorderDrag, target: ListReorderTarget | null) => void;
   listId?: string;
+  axis?: 'vertical' | 'horizontal';
 }) {
-  const start = useListReorderDrag({ listId, onDrop });
+  const start = useListReorderDrag({ listId, onDrop, axis });
   return (
     <div data-reorder-list={listId}>
       {['a', 'b', 'c'].map((id) => (
@@ -74,6 +75,18 @@ function dragTo(y: number) {
 describe('list reorder', () => {
   beforeEach(() => {
     useListReorder.getState().end();
+  });
+  it('uses horizontal midpoints and preserves the dragged tab width', () => {
+    const onDrop = vi.fn(); render(<Harness onDrop={onDrop} axis="horizontal" />);
+    const rows = ['a', 'b', 'c'].map(id => screen.getByTestId(`row-${id}`));
+    rows.forEach((row, index) => vi.spyOn(row, 'getBoundingClientRect').mockReturnValue({ ...rowRect(0), x: index * 120, left: index * 120, right: (index + 1) * 120 }));
+    Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: vi.fn(() => rows[1]) });
+    fireEvent.pointerDown(rows[0]!, { pointerId: 1, button: 0, isPrimary: true, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 200, clientY: 10 });
+    expect(useListReorder.getState().target).toEqual({ itemId: 'c', after: false });
+    expect(useListReorder.getState().drag).toMatchObject({ width: 120 });
+    fireEvent.pointerUp(window, { pointerId: 1, clientX: 200, clientY: 10 });
+    expect(onDrop).toHaveBeenCalledWith(expect.objectContaining({ id: 'a' }), { itemId: 'c', after: false });
   });
 
   afterEach(() => {

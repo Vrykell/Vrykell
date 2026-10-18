@@ -10,6 +10,7 @@ export interface ListReorderDrag {
   /** Item kind; the default matcher only accepts targets of the same kind. */
   kind: string;
   height?: number;
+  width?: number;
 }
 
 export interface ListReorderTarget {
@@ -35,9 +36,9 @@ function sameTarget(a: ListReorderTarget | null, b: ListReorderTarget | null): b
 }
 
 /**
- * Shared transient state for pointer-driven list reordering. Mirrors the
- * titlebar navigation drag: the source row is hidden, a dashed placeholder
- * reserves the expected drop slot, and a small preview follows the pointer.
+ * Shared transient state for pointer-driven list reordering. The source row
+ * leaves its slot, a dashed placeholder marks the expected drop position,
+ * and a small preview follows the pointer.
  */
 export const useListReorder = create<ListReorderState>((set) => ({
   drag: null,
@@ -49,18 +50,14 @@ export const useListReorder = create<ListReorderState>((set) => ({
   end: () => set({ drag: null, target: null, position: null }),
 }));
 
-/**
- * Resolve the drop target under the pointer.
- *
- * Returns `undefined` when the pointer is over the placeholder itself — the
- * gap must stay stable while hovering it, otherwise the slot flickers.
- */
+/** Keep the destination stable while the pointer is over its placeholder. */
 function locateTarget(
   listId: string,
   dragKind: string,
   accepts: (dragKind: string, itemKind: string) => boolean,
   x: number,
   y: number,
+  axis: 'vertical' | 'horizontal',
 ): ListReorderTarget | null | undefined {
   const hit = document.elementFromPoint(x, y);
   if (!hit) return null;
@@ -75,7 +72,7 @@ function locateTarget(
     .filter((item) => !item.closest('[hidden]') && accepts(dragKind, item.dataset.reorderKind ?? ''));
   for (const item of items) {
     const rect = item.getBoundingClientRect();
-    if (y < rect.top + rect.height / 2) return { itemId: item.dataset.reorderItem, after: false };
+    if (axis === 'horizontal' ? x < rect.left + rect.width / 2 : y < rect.top + rect.height / 2) return { itemId: item.dataset.reorderItem, after: false };
   }
   const last = items[items.length - 1];
   if (last) return { itemId: last.dataset.reorderItem, after: true };
@@ -83,9 +80,10 @@ function locateTarget(
   return null;
 }
 
-/** Pointer gesture for reordering one list. Same behaviour as the titlebar buttons. */
-export function useListReorderDrag({ listId, accepts, onDrop }: {
+/** Pointer gesture shared by horizontal and vertical lists. */
+export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical' }: {
   listId: string;
+  axis?: 'vertical' | 'horizontal';
   /** Item-kind matcher; defaults to "same kind only". */
   accepts?: (dragKind: string, itemKind: string) => boolean;
   onDrop: (drag: ListReorderDrag, target: ListReorderTarget | null) => void;
@@ -107,7 +105,7 @@ export function useListReorderDrag({ listId, accepts, onDrop }: {
     const source = target.closest<HTMLElement>('[data-reorder-handle]') ?? event.currentTarget;
     const container = event.currentTarget.dataset.reorderMeasure === 'container' ? event.currentTarget.closest<HTMLElement>('[data-reorder-container]') : null;
     const bounds = (container ?? event.currentTarget).getBoundingClientRect();
-    const dimensions = bounds.height > 0 ? { height: bounds.height } : {};
+    const dimensions = bounds.height > 0 ? { height: bounds.height, ...(axis === 'horizontal' ? { width: bounds.width } : {}) } : {};
     const { pointerId, clientX, clientY } = event;
     let started = false;
     let canceled = false;
@@ -118,7 +116,13 @@ export function useListReorderDrag({ listId, accepts, onDrop }: {
       (acceptsRef.current ?? ((drag: string, over: string) => drag === over))(dragKind, itemKind);
     const preview = (x: number, y: number) => {
       useListReorder.getState().movePointer(x, y);
-      const target = locateTarget(listId, item.kind, match, x, y);
+      const list = axis === 'horizontal' ? Array.from(document.querySelectorAll<HTMLElement>('[data-reorder-list]')).find(element => element.dataset.reorderList === listId) : null;
+      if (axis === 'horizontal' && list) {
+        const bounds = list.getBoundingClientRect();
+        if (x > bounds.right - 28) list.scrollLeft += 20;
+        else if (x < bounds.left + 28) list.scrollLeft -= 20;
+      }
+      const target = locateTarget(listId, item.kind, match, x, y, axis);
       if (target === undefined) return;
       useListReorder.getState().hover(target);
     };
@@ -188,35 +192,24 @@ export function useListReorderDrag({ listId, accepts, onDrop }: {
   };
 }
 
-/** Dashed gap rendered before/after the hovered item. */
-export function ListReorderPlaceholder({ listId, itemId, after = false }: {
-  listId: string;
-  itemId: string;
-  after?: boolean;
-}) {
-  const show = useListReorder((state) =>
-    !!state.drag && state.drag.listId === listId && state.target?.itemId === itemId && !!state.target.after === after);
-  const height = useListReorder(state => state.drag?.height);
-  return show ? <div className="sidebar-reorder-placeholder" style={height ? { height } : undefined} data-reorder-placeholder={itemId} aria-hidden="true" /> : null;
+/** Dashed gap rendered before or after the hovered item. */
+export function ListReorderPlaceholder({ listId, itemId, after = false }: { listId: string; itemId: string; after?: boolean }) {
+  const show = useListReorder(state => !!state.drag && state.drag.listId === listId && state.target?.itemId === itemId && !!state.target.after === after);
+  const height = useListReorder(state => state.drag?.height); const width = useListReorder(state => state.drag?.width);
+  return show ? <div className="sidebar-reorder-placeholder" style={height ? { height, ...(width ? { width } : {}) } : undefined} data-reorder-placeholder={itemId} aria-hidden="true" /> : null;
 }
 
-/** Dashed gap for container drops (append into a group or the ungrouped area). */
+/** Empty and collapsed groups remain available as append destinations. */
 export function ListReorderZonePlaceholder({ listId, zoneId }: { listId: string; zoneId: string }) {
-  const show = useListReorder((state) =>
-    !!state.drag && state.drag.listId === listId && state.target?.zoneId === zoneId);
+  const show = useListReorder(state => !!state.drag && state.drag.listId === listId && state.target?.zoneId === zoneId);
   const height = useListReorder(state => state.drag?.height);
   return show ? <div className="sidebar-reorder-placeholder" style={height ? { height } : undefined} data-reorder-placeholder={zoneId} aria-hidden="true" /> : null;
 }
 
-/** Floating tile that follows the pointer while a list row is being dragged. */
+/** Small icon tile follows the pointer without intercepting drop targets. */
 export function ListReorderPreview({ listId, children }: { listId: string; children: (drag: ListReorderDrag) => ReactNode }) {
-  const drag = useListReorder((state) => (state.drag && state.drag.listId === listId ? state.drag : null));
-  const position = useListReorder((state) => state.position);
+  const drag = useListReorder(state => state.drag?.listId === listId ? state.drag : null);
+  const position = useListReorder(state => state.position);
   if (!drag || !position) return null;
-  return createPortal(
-    <div className="sidebar-reorder-preview" aria-hidden="true" style={{ left: position.x, top: position.y }}>
-      {children(drag)}
-    </div>,
-    document.body,
-  );
+  return createPortal(<div className="sidebar-reorder-preview" aria-hidden="true" style={{ left: position.x, top: position.y }}>{children(drag)}</div>, document.body);
 }

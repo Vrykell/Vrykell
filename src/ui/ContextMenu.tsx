@@ -6,7 +6,7 @@ import { useExclusiveMenu } from './hooks/useExclusiveMenu';
 import { useFloatingPanelPosition } from './hooks/useFloatingPanelPosition';
 import { t } from '@i18n';
 
-export interface MenuAnchor { x: number; y: number; trigger?: HTMLElement }
+export interface MenuAnchor { x: number; y: number; trigger?: HTMLElement; above?: HTMLElement }
 export interface ContextMenuItem {
   label: string;
   onClick?: () => void;
@@ -89,7 +89,7 @@ function MenuSurface({ anchor, submenuOf, label, focus, children, onClose, onBac
         : (current + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length;
       buttons[next]?.focus();
     }} style={{ ...position, position: 'fixed', zIndex: 9999, width: 'max-content', minWidth: 'min(180px, calc(100vw - 16px))',
-      maxWidth: 'calc(100vw - 16px)', maxHeight: 'calc(100vh - 16px)', overflowY: 'auto', boxSizing: 'border-box', padding: 4,
+      maxWidth: 'calc(100vw - 16px)', maxHeight: position.maxHeight ?? 'calc(100vh - 16px)', overflowY: 'auto', boxSizing: 'border-box', padding: 4,
       fontSize: 'calc(12px * var(--ui-font-scale))' }}>{children}</div>;
 }
 

@@ -26,7 +26,7 @@ test('input chips share the quiet no-border gray style', async ({ page }) => {
   }
 });
 
-test('clickable chips clear the gray fill on hover while the branch chip stays quiet', async ({ page }) => {
+test('clickable chips clear the gray fill on hover and expose their pressed state', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   const input = page.getByPlaceholder(/输入命令/);
@@ -61,7 +61,7 @@ test('clickable chips clear the gray fill on hover while the branch chip stays q
   await page.keyboard.press('Escape');
   await expect(directory).toHaveAttribute('aria-expanded', 'false');
 
-  // Inject a branch so the static chip joins the row, then check it never reacts to hover.
+  // Inject a branch and verify that repository actions share the chip interaction.
   await page.evaluate(async () => {
     const path = '/src/features/terminal/stores/blocks.ts';
     const { useBlockStore } = await import(path) as typeof import('../src/features/terminal/stores/blocks');
@@ -75,6 +75,8 @@ test('clickable chips clear the gray fill on hover while the branch chip stays q
   const branchResting = await branch.evaluate(element => getComputedStyle(element).backgroundColor);
   expect(branchResting).not.toBe('rgba(0, 0, 0, 0)');
   await branch.hover();
-  await expect(branch).toHaveCSS('background-color', branchResting);
-  expect(await branch.evaluate(element => getComputedStyle(element).cursor)).not.toBe('pointer');
+  await expect(branch).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(branch).toHaveCSS('cursor', 'pointer');
+  await branch.click(); await expect(branch).toHaveAttribute('aria-expanded', 'true');
+  await expect(branch).toHaveCSS('background-color', activeBg);
 });

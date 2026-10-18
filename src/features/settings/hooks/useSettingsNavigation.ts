@@ -23,6 +23,7 @@ export const SETTINGS_GROUPS: SettingGroup[] = [
       { id: 'startup', icon: History, label: '启动' },
       { id: 'logs', icon: FileText, label: '日志与诊断' },
       { id: 'file-operations', icon: Folder, label: t('File operations') },
+      { id: 'source-control', icon: FileCode, label: t('Source control') },
       { id: 'context-menu', icon: Folder, label: t('Windows context menu') },
     ],
   },

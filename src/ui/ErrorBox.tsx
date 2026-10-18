@@ -1,5 +1,8 @@
-import type { CSSProperties, ReactNode } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import ErrorDetails from '@ui/ErrorDetails';
+import { IconButton } from './IconButton';
+import { X } from './icons';
+import { t } from '@i18n';
 
 export type ErrorBoxTone = 'error' | 'info' | 'success';
 
@@ -22,10 +25,12 @@ export default function ErrorBox({
   children,
   actions,
   details,
-  detailsTitle = '技术详情',
+  detailsTitle = t('Technical details'),
   compact = false,
   testId,
   style,
+  onDismiss,
+  dismissible,
 }: {
   tone?: ErrorBoxTone;
   title?: ReactNode;
@@ -36,7 +41,14 @@ export default function ErrorBox({
   compact?: boolean;
   testId?: string;
   style?: CSSProperties;
+  onDismiss?: () => void;
+  dismissible?: boolean;
 }) {
+  const [dismissed, setDismissed] = useState<string | null>(null);
+  const identity = JSON.stringify([tone, typeof title === 'string' ? title : '', typeof children === 'string' ? children : '', details]);
+  const close = (dismissible ?? tone === 'error') ? <IconButton compact aria-label={t('Dismiss error')} data-tip={t('Dismiss error')}
+    onClick={() => { setDismissed(identity); onDismiss?.(); }}><X size={14} /></IconButton> : null;
+  if (dismissed === identity) return null;
   const palette = TONE[tone];
   const base: CSSProperties = {
     background: palette.background,
@@ -56,6 +68,7 @@ export default function ErrorBox({
       >
         <span style={{ flex: 1, minWidth: 0 }}>{children}</span>
         {actions}
+        {close}
       </div>
     );
   }
@@ -66,7 +79,9 @@ export default function ErrorBox({
       data-testid={testId}
       style={{ ...base, display: 'flex', flexDirection: 'column', gap: 8, padding: 12 }}
     >
-      {title && <div style={{ fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)' }}>{title}</div>}
+      {(title || close) && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ flex: 1, minWidth: 0, fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)' }}>{title}</div>{close}
+      </div>}
       {children && <div style={{ lineHeight: 1.6 }}>{children}</div>}
       {actions && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{actions}</div>}
       {details && <ErrorDetails title={detailsTitle} text={details} preStyle={{ maxHeight: 160 }} />}

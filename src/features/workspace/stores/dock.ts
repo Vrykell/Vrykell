@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { SquareStack, Folder, Server, Sparkles, Settings, Terminal, type AppIcon } from '@ui/icons';
+import { SquareStack, Folder, Server, Sparkles, Settings, Terminal, GitBranch, type AppIcon } from '@ui/icons';
 import { t } from '@i18n';
 import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
 import { useWorkspaceStore, isSessionTab } from '@features/workspace/stores/workspace';
@@ -21,6 +21,7 @@ export const PANEL_DEFS: Record<string, PanelDef> = {
   ssh:   { id: 'ssh',   icon: Server, label: 'SSH', width: 208 },
   chat:  { id: 'chat',  icon: Sparkles, label: 'AI', width: 320 },
   'command-history': { id: 'command-history', icon: Terminal, label: t('Command history'), width: 300 },
+  git: { id: 'git', icon: GitBranch, label: t('Source control'), width: 280 },
 };
 
 export type DockSide = 'left' | 'right';
@@ -58,7 +59,7 @@ function isValidLayout(data: unknown): data is PersistedLayout {
 }
 
 const DEFAULTS: PersistedLayout = {
-  leftZone: ['tabs', 'ssh', 'files', 'command-history'], rightZone: ['chat', 'settings'],
+  leftZone: ['tabs', 'ssh', 'files', 'git', 'command-history'], rightZone: ['chat', 'settings'],
   // Start with the session list; auxiliary panels open on demand.
   leftPanels: ['tabs'], rightPanels: [],
   panelWidths: {},
