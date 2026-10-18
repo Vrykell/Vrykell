@@ -191,21 +191,6 @@ export function AiModelPage() {
                 >
                   <Ellipsis size={14} />
                 </IconButton>
-                <span data-tip={t('Enabled while this provider has models.')}>
-                  <span
-                    role="switch"
-                    aria-checked="true"
-                    aria-disabled="true"
-                    aria-label={t('Enabled while this provider has models.')}
-                    data-testid="provider-enabled"
-                    style={{ width: 38, height: 22, borderRadius: 10, background: 'var(--accent)', position: 'relative', display: 'inline-block' }}
-                  >
-                    <span style={{
-                      position: 'absolute', top: 3, left: 19, width: 16, height: 16,
-                      borderRadius: '50%', background: 'var(--accent-text)',
-                    }} />
-                  </span>
-                </span>
               </span>
             </div>
             <ProviderCredentials row={selected} toast={toast} />

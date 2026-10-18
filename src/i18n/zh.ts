@@ -602,7 +602,6 @@ const zh: Record<string, string> = {
   'Edit key': '编辑密钥',
   'Delete provider': '删除服务商',
   'No providers yet.': '还没有服务商。',
-  'Enabled while this provider has models.': '该服务商存在模型时即视为启用。',
   'Vision': '视觉',
   'Reasoning': '推理',
   'Tools': '工具',
