@@ -111,7 +111,14 @@ test.describe('文件面板', () => {
     await expect(page.getByTestId('file-property-size')).toHaveText('1.5 KB');
     await expect(page.getByTestId('file-property-modified')).toContainText('2026');
 
-    await dialog.getByRole('button', { name: '关闭', exact: true }).click();
+    // The labeled close action sits in a footer at the bottom left of the panel.
+    const close = dialog.getByRole('button', { name: '关闭', exact: true });
+    const dialogBounds = (await dialog.boundingBox())!;
+    const closeBounds = (await close.boundingBox())!;
+    expect(closeBounds.y).toBeGreaterThan(dialogBounds.y + dialogBounds.height / 2);
+    expect(closeBounds.x + closeBounds.width / 2).toBeLessThan(dialogBounds.x + dialogBounds.width / 2);
+
+    await close.click();
     await expect(dialog).toHaveCount(0);
   });
 

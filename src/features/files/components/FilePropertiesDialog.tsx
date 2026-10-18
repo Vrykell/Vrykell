@@ -60,7 +60,7 @@ export default function FilePropertiesDialog({ entry, location, stat, onClose }:
   }
 
   return (
-    <ToolDialog label={t('Properties')} onClose={onClose} width={380}>
+    <ToolDialog label={t('Properties')} onClose={onClose} width={380} closePlacement="footer">
       {state.status === 'loading' && (
         <div role="status" style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>
           {t('Reading properties…')}

@@ -56,11 +56,15 @@ describe('FilePropertiesDialog', () => {
     expect(box).toHaveTextContent('permission denied');
   });
 
-  it('closes from the close button and from the overlay', async () => {
+  it('closes from the labeled footer button and from the overlay', async () => {
     const onClose = vi.fn();
     render(<FilePropertiesDialog entry={file} location="/home/e2e" stat={async () => stat()} onClose={onClose} />);
 
-    fireEvent.click(screen.getByRole('button', { name: t('Close') }));
+    // One labeled close action replaces the heading icon.
+    const buttons = screen.getAllByRole('button');
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0]).toHaveTextContent(t('Close'));
+    fireEvent.click(buttons[0]);
     expect(onClose).toHaveBeenCalledTimes(1);
     fireEvent.click(document.querySelector('.tool-dialog-overlay')!);
     expect(onClose).toHaveBeenCalledTimes(2);
