@@ -9,8 +9,8 @@ import { TextInput } from '@ui/TextInput';
 import { useEffect, useState } from 'react';
 import { Plus, X, Sparkles } from '@ui/icons';
 import { generateText } from 'ai';
-import { invoke } from '@platform/diagnostics';
-import { createChatModel, type ProviderKind } from '@features/agent/services/provider';
+import { createChatModel } from '@features/agent/services/provider';
+import { activeModelProfile, refreshAiConfig } from '@features/agent';
 import {
   getMemory, setMemory, getMemoryJournal,
   listAgents, saveAgent, removeAgent, type AgentDef,
@@ -63,8 +63,9 @@ export function MemorySettings() {
       if (saving.hasPending()) throw new Error('请先完成记忆保存');
       const curFact = await getMemory();
       const curJournal = await getMemoryJournal();
-      const info = await invoke<{ base_url: string; model: string; provider: ProviderKind }>('get_ai_config');
-      const model = createChatModel({ provider: info.provider, baseUrl: info.base_url, model: info.model });
+      await refreshAiConfig();
+      const profile = activeModelProfile();
+      const model = createChatModel({ provider: profile.provider, baseUrl: profile.baseUrl, model: profile.model });
       const { text } = await generateText({
         model,
         system:

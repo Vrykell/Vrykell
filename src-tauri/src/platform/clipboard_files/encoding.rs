@@ -70,6 +70,11 @@ pub fn windows_preferred_drop_effect(mode: ClipMode) -> Vec<u8> {
     mode.drop_effect().to_le_bytes().to_vec()
 }
 
+#[cfg(test)]
+fn xml_escape(value: &str) -> String {
+    value.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+}
+
 /// macOS NSFilenamesPboardType payload: an XML property list array of POSIX paths.
 ///
 /// macOS writes through the system pasteboard (see `macos`), which builds this flavour itself;
@@ -115,27 +120,6 @@ pub fn linux_gnome_copied_files(paths: &[String], mode: ClipMode) -> String {
     out
 }
 
-/// Parse a `text/uri-list` payload back into local paths (skips `#` comment lines).
-#[cfg(any(test, target_os = "linux"))]
-pub fn parse_uri_list(text: &str) -> Vec<String> {
-    let mut paths = Vec::new();
-    for raw in text.lines() {
-        let line = raw.trim();
-        if line.is_empty() || line.starts_with('#') {
-            continue;
-        }
-        if let Some(path) = decode_file_uri(line) {
-            paths.push(path);
-        }
-    }
-    paths
-}
-
-#[cfg(test)]
-fn xml_escape(value: &str) -> String {
-    value.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
-}
-
 /// Percent-encoded `file://` URI for an absolute path.
 #[cfg(any(test, target_os = "macos", target_os = "linux"))]
 fn file_uri(path: &str) -> String {
@@ -149,26 +133,6 @@ fn file_uri(path: &str) -> String {
         }
     }
     out
-}
-
-/// Inverse of [`file_uri`] for the URI forms we emit.
-#[cfg(any(test, target_os = "linux"))]
-fn decode_file_uri(uri: &str) -> Option<String> {
-    let rest = uri.strip_prefix("file://")?;
-    let mut bytes = Vec::with_capacity(rest.len());
-    let mut chars = rest.bytes();
-    while let Some(byte) = chars.next() {
-        if byte == b'%' {
-            let hi = chars.next()?;
-            let lo = chars.next()?;
-            let pair = [hi, lo];
-            let hex = std::str::from_utf8(&pair).ok()?;
-            bytes.push(u8::from_str_radix(hex, 16).ok()?);
-        } else {
-            bytes.push(byte);
-        }
-    }
-    String::from_utf8(bytes).ok()
 }
 
 #[cfg(test)]
@@ -235,14 +199,6 @@ mod tests {
             "cut\nfile:///home/me/a\n"
         );
         assert!(linux_gnome_copied_files(&["/home/me/a".to_string()], ClipMode::Copy).starts_with("copy\n"));
-    }
-
-    #[test]
-    fn parse_uri_list_round_trips_our_output() {
-        let original = vec!["/home/me/a b".to_string(), "/home/me/c".to_string()];
-        assert_eq!(parse_uri_list(&linux_uri_list(&original)), original);
-        // Comments and blank lines are ignored.
-        assert_eq!(parse_uri_list("# comment\r\n\r\nfile:///x\r\n"), vec!["/x".to_string()]);
     }
 
     #[test]

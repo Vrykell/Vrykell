@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { diagnostic, diagnosticSnapshot, exportDiagnostics, flushDiagnostics, invoke, redactText, reportFrameGap, reportWindowFocus, sanitizeDiagnostic, setDiagnosticAutoSave, useDiagnosticSettings } from './diagnostics';
+import { diagnostic, diagnosticSnapshot, diagnosticsLogDirectory, diagnosticsLogPath, exportDiagnostics, flushDiagnostics, invoke, redactText, reportFrameGap, reportWindowFocus, sanitizeDiagnostic, setDiagnosticAutoSave, useDiagnosticSettings } from './diagnostics';
 
 describe('diagnostics', () => {
   beforeEach(async () => {
@@ -51,7 +51,7 @@ describe('diagnostics', () => {
     useDiagnosticSettings.setState({ autoSave: true });
     for (let index = 0; index < 130; index++) diagnostic('input-fixture', { index, password: 'private-value' });
     await flushDiagnostics();
-    const calls = invokeMock.mock.calls.filter(([command]) => command === 'terminal_debug_records');
+    const calls = invokeMock.mock.calls.filter(([command]) => command === 'diagnostics_records');
     expect(calls).toHaveLength(3);
     const records = calls.flatMap(([, args]) => args.records);
     expect(records.map(record => record.detail.index)).toEqual(Array.from({ length: 130 }, (_, index) => index));
@@ -64,10 +64,10 @@ describe('diagnostics', () => {
     diagnostic('first-input');
     expect(invokeMock).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(50);
-    expect(invokeMock).toHaveBeenCalledWith('terminal_debug_records', expect.any(Object));
+    expect(invokeMock).toHaveBeenCalledWith('diagnostics_records', expect.any(Object));
     diagnostic('last-input');
     await exportDiagnostics('/tmp/fixture.jsonl');
-    expect(invokeMock.mock.calls.map(([command]) => command)).toEqual(['terminal_debug_records', 'terminal_debug_records', 'diagnostics_export']);
+    expect(invokeMock.mock.calls.map(([command]) => command)).toEqual(['diagnostics_records', 'diagnostics_records', 'diagnostics_export']);
   });
 
   it('surfaces write failures and still delivers later diagnostic batches', async () => {
@@ -79,6 +79,15 @@ describe('diagnostics', () => {
     diagnostic('next-batch');
     await flushDiagnostics();
     expect(invokeMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('resolves the log segment path and directory through the platform wrappers', async () => {
+    invokeMock.mockResolvedValueOnce('/home/user/.vrykell/logs/diagnostics-20261014T07.jsonl');
+    await expect(diagnosticsLogPath()).resolves.toBe('/home/user/.vrykell/logs/diagnostics-20261014T07.jsonl');
+    expect(invokeMock).toHaveBeenLastCalledWith('diagnostics_log_path');
+    invokeMock.mockResolvedValueOnce('/home/user/.vrykell/logs');
+    await expect(diagnosticsLogDirectory()).resolves.toBe('/home/user/.vrykell/logs');
+    expect(invokeMock).toHaveBeenLastCalledWith('diagnostics_log_directory');
   });
 
   it('separates a stalled main thread from a paused window in the frame gaps', () => {

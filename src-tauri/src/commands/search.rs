@@ -3,7 +3,6 @@ use ignore::WalkBuilder;
 use regex::RegexBuilder;
 use serde::Serialize;
 use std::fs;
-use std::path::PathBuf;
 
 /// 文件匹配结果
 #[derive(Clone, Serialize, Debug)]
@@ -15,16 +14,6 @@ pub struct FileMatch {
     pub modified: u64,
     pub match_type: String, // "name" | "content" | "path"
     pub content_snippet: Option<String>,
-}
-
-/// 搜索上下文
-#[derive(Clone, Serialize, Debug, Default)]
-pub struct SearchContext {
-    pub cwd: String,
-    pub home: String,
-    pub shell: String,
-    pub git_branch: Option<String>,
-    pub project_name: Option<String>,
 }
 
 /// 文件系统搜索 — 使用 ripgrep 的 `ignore` crate 进行遍历：
@@ -206,99 +195,6 @@ pub fn search_history(
     )
 }
 
-/// 获取搜索上下文（环境元数据）。
-/// cwd 由前端传入活跃终端 tab 的工作目录；缺省时回退到进程启动目录。
-fn get_search_context_sync(cwd: Option<String>) -> SearchContext {
-    let cwd = cwd
-        .filter(|c| !c.is_empty())
-        .or_else(|| {
-            std::env::current_dir()
-                .map(|p| p.to_string_lossy().to_string())
-                .ok()
-        })
-        .unwrap_or_default();
-    let home = std::env::var("HOME").unwrap_or_default();
-    let shell = std::env::var("SHELL")
-        .unwrap_or_else(|_| "/bin/zsh".to_string())
-        .split('/')
-        .next_back()
-        .unwrap_or("zsh")
-        .to_string();
-
-    let mut git = std::process::Command::new("git");
-    git.args(["rev-parse", "--abbrev-ref", "HEAD"]).current_dir(&cwd);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        git.creation_flags(0x08000000);
-    }
-    let git_branch = git.output()
-        .ok()
-        .and_then(|o| {
-            if o.status.success() {
-                Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
-            } else {
-                None
-            }
-        });
-
-    let project_name = detect_project_name(&cwd);
-
-    SearchContext {
-        cwd,
-        home,
-        shell,
-        git_branch,
-        project_name,
-    }
-}
-
-#[tauri::command]
-pub async fn get_search_context(cwd: Option<String>) -> SearchContext {
-    // spawn git rev-parse 是阻塞调用，移出 async runtime worker
-    tauri::async_runtime::spawn_blocking(move || get_search_context_sync(cwd))
-        .await
-        .unwrap_or_default()
-}
-
-fn detect_project_name(cwd: &str) -> Option<String> {
-    let cwd = PathBuf::from(cwd);
-
-    if let Ok(content) = fs::read_to_string(cwd.join("Cargo.toml")) {
-        for line in content.lines() {
-            if let Some(name) = line.strip_prefix("name = \"") {
-                if let Some(end) = name.find('"') {
-                    return Some(name[..end].to_string());
-                }
-            }
-        }
-    }
-
-    if let Ok(content) = fs::read_to_string(cwd.join("package.json")) {
-        if let Some(name) = extract_json_field(&content, "name") {
-            return Some(name);
-        }
-    }
-
-    cwd.file_name()
-        .and_then(|n| n.to_str())
-        .map(|s| s.to_string())
-}
-
-fn extract_json_field(json: &str, field: &str) -> Option<String> {
-    let pattern = format!("\"{}\"", field);
-    let pos = json.find(&pattern)?;
-    let after = &json[pos + pattern.len()..];
-    let after_colon = after.find(':')?;
-    let value_start = &after[after_colon + 1..].trim_start();
-    if let Some(stripped) = value_start.strip_prefix('"') {
-        let end = stripped.find('"')?;
-        Some(value_start[1..=end].to_string())
-    } else {
-        None
-    }
-}
-
 /// 记录命令到 SQLite 历史
 #[tauri::command]
 pub fn record_history(
@@ -310,16 +206,6 @@ pub fn record_history(
 ) -> Result<(), String> {
     let db = state.0.lock().map_err(|e| e.to_string())?;
     db.record(&command, &cwd, exit_code, timestamp)
-}
-
-/// 获取命令统计
-#[tauri::command]
-pub fn history_stats(
-    state: tauri::State<'_, HistoryState>,
-    top_n: usize,
-) -> Result<Vec<HistoryEntry>, String> {
-    let db = state.0.lock().map_err(|e| e.to_string())?;
-    db.stats(top_n)
 }
 
 /// 清空命令历史

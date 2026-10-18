@@ -14,9 +14,8 @@ import { blockBackgroundValue, blockColorOptions, type BlockColorGroup } from '.
 import FontSettings from '@features/settings/components/FontSettings';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
 import { openPath } from '@tauri-apps/plugin-opener';
-import { invoke } from '@platform/diagnostics';
 import { useTheme } from '@app/providers/ThemeProvider';
-import { useTerminalThemeStore } from '@features/settings/model/terminalTheme';
+import { getThemePath, useTerminalThemeStore } from '@features/settings/model/terminalTheme';
 import { useToastStore } from '@ui/Toast';
 import { SettingsGroup, Field, Toggle } from '@features/settings/components/ui';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
@@ -60,7 +59,7 @@ export function ThemePage() {
   };
 
   useEffect(() => {
-    invoke<string>('get_theme_path').then(setThemePath).catch((e) => console.warn('[theme] 读取主题路径失败:', e));
+    getThemePath().then(setThemePath).catch((e) => console.warn('[theme] 读取主题路径失败:', e));
   }, []);
 
   const toast = (msg: string, type: 'info' | 'success' | 'error') =>

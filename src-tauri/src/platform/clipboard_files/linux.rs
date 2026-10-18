@@ -56,21 +56,3 @@ pub fn write(paths: &[String], mode: ClipMode) -> Result<(), String> {
         last_error
     })
 }
-
-pub fn read() -> Vec<String> {
-    for tool in ["wl-paste", "xclip"] {
-        let output = if tool == "wl-paste" {
-            Command::new(tool).args(["--no-newline", "--type", "text/uri-list"]).output()
-        } else {
-            Command::new(tool).args(["-selection", "clipboard", "-o", "-t", "text/uri-list"]).output()
-        };
-        let Ok(output) = output else { continue };
-        if !output.status.success() {
-            continue;
-        }
-        if let Ok(text) = String::from_utf8(output.stdout) {
-            return encoding::parse_uri_list(&text);
-        }
-    }
-    Vec::new()
-}

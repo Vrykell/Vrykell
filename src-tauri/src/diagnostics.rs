@@ -295,6 +295,12 @@ pub fn record(event: &str, detail: Value) -> Result<(), String> {
     Ok(())
 }
 
+/// The current auto-save flag (the frontend mirrors it once at startup).
+#[tauri::command]
+pub fn diagnostics_auto_save() -> bool {
+    auto_save()
+}
+
 #[tauri::command]
 pub fn diagnostics_set_auto_save(enabled: bool) -> Result<bool, String> {
     let (log, config) = PATHS.get().ok_or("日志尚未初始化")?;
@@ -312,6 +318,22 @@ pub fn diagnostics_set_auto_save(enabled: bool) -> Result<bool, String> {
     .map_err(|e| e.to_string())?;
     AUTO_SAVE.store(enabled, Ordering::Relaxed);
     Ok(enabled)
+}
+
+/// Append a batch of frontend records in one call; order is preserved.
+#[tauri::command]
+pub fn diagnostics_records(records: Vec<Value>) -> Result<(), String> {
+    for entry in records {
+        let event = entry.get("event").and_then(Value::as_str).unwrap_or("frontend-event").to_owned();
+        record(&event, entry)?;
+    }
+    Ok(())
+}
+
+/// The current log segment's file path (initializes the log directory on first use).
+#[tauri::command]
+pub fn diagnostics_log_path(app: AppHandle) -> Result<String, String> {
+    initialize(&app).map(|path| path.to_string_lossy().into_owned())
 }
 
 #[tauri::command]

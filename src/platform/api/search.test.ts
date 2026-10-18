@@ -7,8 +7,8 @@ const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import {
-  searchFiles, searchHistory, getSearchContext, recordHistory,
-  historyStats, clearHistory, searchBlocks, searchSessions,
+  searchFiles, searchHistory, recordHistory,
+  clearHistory, searchBlocks, searchSessions,
 } from '@platform/api/search';
 
 describe('api/search', () => {
@@ -38,21 +38,10 @@ describe('api/search', () => {
     });
   });
 
-  it('getSearchContext / recordHistory / historyStats / clearHistory / searchBlocks / searchSessions', async () => {
-    invokeMock.mockResolvedValueOnce({});
-    await getSearchContext('/cwd');
-    expect(invokeMock).toHaveBeenLastCalledWith('get_search_context', { cwd: '/cwd' });
-    invokeMock.mockResolvedValueOnce({});
-    await getSearchContext();
-    expect(invokeMock).toHaveBeenLastCalledWith('get_search_context', { cwd: null });
-
+  it('recordHistory / clearHistory / searchBlocks / searchSessions', async () => {
     invokeMock.mockResolvedValueOnce(undefined);
     await recordHistory('echo hi', '/w', 0, 123);
     expect(invokeMock).toHaveBeenLastCalledWith('record_history', { command: 'echo hi', cwd: '/w', exitCode: 0, timestamp: 123 });
-
-    invokeMock.mockResolvedValueOnce([]);
-    await historyStats(5);
-    expect(invokeMock).toHaveBeenLastCalledWith('history_stats', { topN: 5 });
 
     invokeMock.mockResolvedValueOnce(undefined);
     await clearHistory();

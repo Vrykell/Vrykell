@@ -29,22 +29,3 @@ pub fn write(paths: &[String], mode: ClipMode) -> Result<(), String> {
     }
     Ok(())
 }
-
-pub fn read() -> Vec<String> {
-    let script = "set out to \"\"\n\
-        repeat with f in (the clipboard as list)\n\
-        try\n\
-        set out to out & (POSIX path of f) & linefeed\n\
-        end try\n\
-        end repeat\n\
-        return out";
-    let Ok(output) = Command::new("osascript").args(["-e", script]).output() else {
-        return Vec::new();
-    };
-    if !output.status.success() {
-        return Vec::new();
-    }
-    String::from_utf8(output.stdout)
-        .map(|text| text.lines().map(str::trim).filter(|line| !line.is_empty()).map(str::to_string).collect())
-        .unwrap_or_default()
-}

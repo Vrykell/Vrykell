@@ -15,11 +15,6 @@ use db::HistoryState;
 use std::sync::Mutex;
 use tauri::Manager;
 
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg(target_os = "macos")]
@@ -83,7 +78,6 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            greet,
             commands::command_history::command_history_record,
             commands::command_history::command_history_list,
             commands::command_history::command_history_mutate,
@@ -154,13 +148,11 @@ pub fn run() {
             terminal::pty::pty_spawn,
             terminal::pty::pty_close_all,
             diagnostics::diagnostics_set_auto_save,
+            diagnostics::diagnostics_auto_save,
+            diagnostics::diagnostics_records,
+            diagnostics::diagnostics_log_path,
             diagnostics::diagnostics_export,
             diagnostics::diagnostics_log_directory,
-            terminal::debug::terminal_debug_set,
-            terminal::debug::terminal_debug_status,
-            terminal::debug::terminal_debug_record,
-            terminal::debug::terminal_debug_records,
-            terminal::debug::terminal_debug_log_path,
             terminal::shells::list_shells,
             remote::ssh_config::ssh_config_candidates,
             remote::ssh::ssh_connections_list,
@@ -193,7 +185,6 @@ pub fn run() {
             terminal::pty::pty_close,
             terminal::pty::pty_kill_foreground,
             files::fs::fs_list,
-            files::fs::fs_roots,
             files::fs::fs_disks,
             files::fs::fs_home,
             files::fs::fs_stat,
@@ -205,7 +196,6 @@ pub fn run() {
             files::fs::fs_stage_delete,
             files::fs::fs_restore_staged,
             files::fs::fs_purge_staged,
-            files::fs::which_cmd,
             files::fs::read_file_text,
             files::fs::write_file_text,
             files::fs::edit_file_text,
@@ -217,9 +207,7 @@ pub fn run() {
             files::file_open::file_open_with,
             commands::search::search_files,
             commands::search::search_history,
-            commands::search::get_search_context,
             commands::search::record_history,
-            commands::search::history_stats,
             commands::search::clear_history,
             commands::search::search_blocks,
             commands::search::search_sessions,
@@ -267,7 +255,6 @@ pub fn run() {
             commands::download::downloads_delete,
             commands::download::downloads_discard,
             commands::clipboard::clipboard_write_files,
-            commands::clipboard::clipboard_read_files,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

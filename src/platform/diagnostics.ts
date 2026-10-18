@@ -30,7 +30,7 @@ export function flushDiagnostics(): Promise<void> {
     writeQueue = writeQueue.then(async () => {
       for (let offset = 0; offset < batch.length; offset += 64) {
         try {
-          await rawInvoke('terminal_debug_records', { records: batch.slice(offset, offset + 64) });
+          await rawInvoke('diagnostics_records', { records: batch.slice(offset, offset + 64) });
         } catch (error) {
           useDiagnosticSettings.setState({ error: `日志写入失败：${redactText(String(error))}` });
         }
@@ -174,7 +174,7 @@ export function initializeDiagnostics(): void {
   window.requestAnimationFrame(watchFrame);
   window.addEventListener('pagehide', () => { void flushDiagnostics(); });
   const initialSettingsRevision = autoSaveRevision;
-  void rawInvoke<boolean>('terminal_debug_status').then(autoSave => {
+  void rawInvoke<boolean>('diagnostics_auto_save').then(autoSave => {
     if (initialSettingsRevision !== autoSaveRevision) return;
     useDiagnosticSettings.setState({ autoSave: autoSave === true });
     diagnostic('diagnostics-ready', { autoSave: autoSave === true }, 'info');
@@ -184,4 +184,14 @@ export function initializeDiagnostics(): void {
 export async function exportDiagnostics(path: string): Promise<void> {
   await flushDiagnostics();
   await rawInvoke('diagnostics_export', { path, frontend: diagnosticSnapshot(), context: { userAgent: navigator.userAgent, viewport: { width: innerWidth, height: innerHeight }, devicePixelRatio, build: import.meta.env.MODE } });
+}
+
+/** Absolute path of the directory that holds the hourly log segments. */
+export function diagnosticsLogDirectory(): Promise<string> {
+  return rawInvoke<string>('diagnostics_log_directory');
+}
+
+/** Absolute path of the current log segment file. */
+export function diagnosticsLogPath(): Promise<string> {
+  return rawInvoke<string>('diagnostics_log_path');
 }

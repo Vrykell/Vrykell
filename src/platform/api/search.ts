@@ -1,8 +1,7 @@
 import { invoke } from '@platform/diagnostics';
 import { normPath } from '@platform/path';
 import type {
-  BackendHistoryEntry, BackendFileMatch, BackendSearchContext,
-  BackendBlockEntry, BackendSessionEntry,
+  BackendHistoryEntry, BackendFileMatch, BackendBlockEntry, BackendSessionEntry,
 } from '@platform/api/types';
 
 /** 搜索文件系统；搜索根与结果路径在边界处归一化。 */
@@ -39,11 +38,6 @@ export function searchHistory(
   });
 }
 
-/** 获取搜索上下文（环境元数据）；cwd 传活跃终端 tab 的工作目录 */
-export function getSearchContext(cwd?: string): Promise<BackendSearchContext> {
-  return invoke('get_search_context', { cwd: cwd ?? null });
-}
-
 /** 记录命令到后端 SQLite 历史 */
 export function recordHistory(
   command: string,
@@ -52,11 +46,6 @@ export function recordHistory(
   timestamp: number,
 ): Promise<void> {
   return invoke('record_history', { command, cwd, exitCode, timestamp });
-}
-
-/** 获取命令统计（最常用命令） */
-export function historyStats(topN = 20): Promise<BackendHistoryEntry[]> {
-  return invoke('history_stats', { topN });
 }
 
 /** 清空命令历史 */

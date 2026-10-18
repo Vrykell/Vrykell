@@ -509,8 +509,6 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             (window as unknown as Record<string, unknown>).__CLIPBOARD_FILES__ = clipboardFiles;
             return undefined;
           }
-          case 'clipboard_read_files':
-            return clipboardFiles?.paths ?? [];
           case 'pty_kill_foreground': {
             const id = args.id as string;
             const now = Date.now();
@@ -865,8 +863,6 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'search_sessions':
             searchCalls.push({ cmd: 'search_sessions', args });
             return [{ id: 't1', title: 'npm run dev', status: 'active', created_at: Date.now(), closed_at: null, block_count: 2, cwd: '', group_id: null, sort_order: 0, kind: 'local', payload: '{}' }];
-          case 'get_search_context':
-            return { cwd: args.cwd ?? '/home/e2e' };
           case 'shell_launch_directory': return launchDirectory ?? null;
           case 'shell_take_forwarded_directories': return pendingLaunchDirectories.splice(0);
           case 'context_menu_status': return { ...menu };
@@ -886,8 +882,6 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'record_history':
             historyEntries.unshift({ command: args.command, cwd: args.cwd, timestamp: args.timestamp, exit_code: args.exitCode });
             return undefined;
-          case 'history_stats':
-            return historyEntries.slice(0, args.topN ?? 20);
           case 'clear_history':
             historyEntries.length = 0;
             return undefined;
@@ -897,12 +891,6 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             return { name: (args.path as string).split('/').pop() ?? 'file', blob_path: args.path as string, text: 'Test attachment content', size: 123, mime: 'text/plain' };
           case 'read_attachment':
             return 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aSFAAAAAASUVORK5CYII=';
-          case 'fs_roots':
-            return [
-              { name: 'Documents', path: '/home/e2e/Documents', is_dir: true },
-              { name: 'Downloads', path: '/home/e2e/Downloads', is_dir: true },
-              { name: 'notes.txt', path: '/home/e2e/notes.txt', is_dir: false },
-            ];
           case 'fs_home':
             return '/home/e2e';
           case 'list_shells':
@@ -1029,20 +1017,18 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             return undefined;
           case 'list_sessions':
             return mockSessions;
-          case 'terminal_debug_status':
+          case 'diagnostics_auto_save':
             return false;
           case 'diagnostics_set_auto_save':
-          case 'terminal_debug_set':
             return args.enabled;
-          case 'terminal_debug_record':
-            diagnosticRecords.push(args);
-            return undefined;
-          case 'terminal_debug_records':
+          case 'diagnostics_records':
             diagnosticRecords.push(...(args.records as Record<string, unknown>[]));
             return undefined;
           case 'diagnostics_export':
             diagnosticsExports.push(args);
             return undefined;
+          case 'diagnostics_log_path':
+            return '/home/e2e/.vrykell/logs/diagnostics-20261014T07.jsonl';
           case 'diagnostics_log_directory':
             return '/home/e2e/.vrykell/logs';
           case 'plugin:dialog|save':
