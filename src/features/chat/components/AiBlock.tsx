@@ -9,6 +9,7 @@ import CopyButton from '@ui/CopyButton';
 import ConfirmDialog from '@ui/ConfirmDialog';
 import { writeClipboardText } from '@platform/clipboard';
 import { formatMessageTime } from '@utils/formatTime';
+import { partsToHistoryText } from '@features/agent/model/messageParts';
 import { hasLeakedToolCallMarkup } from '../model/providerMarkup';
 import { useChatStore } from '../stores/chat';
 import { useComposerDrafts } from '../stores/composerDrafts';
@@ -58,13 +59,16 @@ export default function AiBlock({ exchange, conversationId, presentation = 'bloc
     useChatStore.getState().deleteExchange(id, question.id);
   };
   const parts = answer?.parts;
+  // A stopped (or still tool-running) reply can have no answer text yet: fall back to the
+  // one-line tool log so the copy target is never an empty string.
+  const answerCopyText = answer ? answer.content || partsToHistoryText(parts).trim() : '';
   const actions: ContextMenuItem[] = [
     ...(!sending && question && answer ? [{ label: t('Regenerate'), onClick: regenerate }] : []),
     ...(!sending && question ? [
       { label: t('Edit and resend'), onClick: () => setConfirmation('edit') },
       { label: t('Delete'), danger: true, onClick: () => setConfirmation('delete') },
     ] : []),
-    { label: t('Copy'), onClick: () => void writeClipboardText(answer?.content || question?.content || '').catch(() => {}) },
+    { label: t('Copy'), onClick: () => void writeClipboardText(answerCopyText || question?.content || '').catch(() => {}) },
   ];
   const moreButton = <IconButton ref={moreTrigger} compact aria-label={t('More actions')} data-tip={t('More actions')} aria-haspopup="menu" aria-expanded={menu !== null}
     onClick={event => { const rect = event.currentTarget.getBoundingClientRect(); setMenu({ x: rect.left, y: rect.bottom + 4 }); }}>
@@ -112,7 +116,7 @@ export default function AiBlock({ exchange, conversationId, presentation = 'bloc
       {answer.stopped && <div className="chat-environment-note">{t('Reply stopped. Terminal commands may still be running.')}</div>}
     </div>}
     {plain && answer && !answer.pending && <div className="chat-answer-actions">
-      <CopyButton testId="chat-answer-copy" text={answer.content ?? ''} label={t('Copy')} iconSize={16} style={{ width: 24, height: 24 }} />
+      <CopyButton testId="chat-answer-copy" text={answerCopyText} label={t('Copy')} iconSize={16} style={{ width: 24, height: 24 }} />
       {!sending && question && <IconButton compact style={{ width: 24, height: 24 }} aria-label={t('Regenerate')} data-tip={t('Regenerate')} onClick={regenerate}>
         <RefreshCw size={16} />
       </IconButton>}

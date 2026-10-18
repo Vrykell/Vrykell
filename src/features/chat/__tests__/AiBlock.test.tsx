@@ -169,6 +169,14 @@ it('copies the panel tool output from the frame corner', async () => {
   expect(copy).toHaveAttribute('data-tip', '已复制');
 });
 
+it('copies the tool log when a stopped reply has no answer text yet', async () => {
+  writeClipboardTextMock.mockClear();
+  render(<AiBlock conversationId="conversation" presentation="conversation"
+    exchange={{ ...exchange, answer: { ...exchange.answer!, content: '', stopped: true, parts: [commandPart] } }} />);
+  fireEvent.click(screen.getByTestId('chat-answer-copy'));
+  await waitFor(() => expect(writeClipboardTextMock).toHaveBeenCalledWith('[执行命令: npm run build → 成功]'));
+});
+
 it('keeps this exchange actionable while a background conversation answers', () => {
   // The single send slot is taken by a scheduled (background) conversation: this exchange is idle.
   useChatStore.setState({ sendingTab: 'background-conversation' });

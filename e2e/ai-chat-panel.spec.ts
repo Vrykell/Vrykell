@@ -2,7 +2,7 @@
  * AI 聊天面板 e2e：面板对话 / 模型菜单 / 思考强度 / 深思与 Agent 开关 / 输入锁定。
  */
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, mockAnthropic, aiModelCalls, ensureChatSettingsOpen, paceLlmStream } from './tauri-mock';
+import { setupTauriMock, mockAnthropic, aiModelCalls, ensureChatSettingsOpen, paceLlmStream, mockAnthropicToolCall, clipboardText } from './tauri-mock';
 
 type MockOptions = Parameters<typeof setupTauriMock>[1];
 
@@ -77,6 +77,30 @@ test.describe('AI 对话面板', () => {
     // 中断必须真正收尾：对话框回到可发送状态，而不是一直停在「生成中」。
     await expect(sendButton).toHaveAttribute('aria-label', '发送', { timeout: 5000 });
     await expect(input).toBeEnabled();
+  });
+
+  test('复制被终止的回复：还没有正文时复制工具日志，而不是空串', async ({ page }) => {
+    await mockAnthropic(page, '收尾文字');
+    await mockAnthropicToolCall(page, 'run_command', { command: 'npm run build' });
+    await setupTauriMock(page, { schedulesSeed: [] });
+    await page.goto('/');
+    await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
+    await page.locator('[data-dock-btn="chat"]').click();
+    const input = page.getByPlaceholder(/自然语言描述/);
+    await expect(input).toBeVisible({ timeout: 3000 });
+    // run_command needs the conversation's terminal, and it waits on the approval card.
+    await ensureChatSettingsOpen(page);
+    await page.getByRole('combobox', { name: '选择执行终端' }).click();
+    await page.getByRole('option').filter({ hasNotText: '仅讨论' }).first().click();
+    await input.fill('跑构建');
+    await input.press('Enter');
+    await expect(page.getByRole('button', { name: '允许一次' })).toBeVisible({ timeout: 10000 });
+
+    // Stop while the reply holds no answer text: only the tool has been produced.
+    await page.locator('.chat-send-button').click();
+    await expect(page.getByRole('button', { name: '发送' })).toBeVisible({ timeout: 5000 });
+    await page.getByTestId('chat-answer-copy').click();
+    expect(await clipboardText(page)).toContain('[执行命令: npm run build');
   });
 
   test('opening the AI assistant leaves command input available', async ({ page }) => {
