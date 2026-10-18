@@ -14,8 +14,11 @@ test.describe('新建标签类型快捷配置', () => {
     for (const width of [1240, 600]) {
       await page.setViewportSize({ width, height: 800 });
       for (const menu of await page.getByRole('menu').all()) {
-        const bounds = (await menu.boundingBox())!;
-        expect(bounds.x).toBeGreaterThanOrEqual(8); expect(bounds.x + bounds.width).toBeLessThanOrEqual(width - 8);
+        // Menus reposition on resize; poll until the new placement settles.
+        await expect.poll(async () => {
+          const bounds = (await menu.boundingBox())!;
+          return bounds.x >= 8 && bounds.x + bounds.width <= width - 8;
+        }, { message: `menu stays on screen at ${width}px` }).toBe(true);
       }
       await page.screenshot({ path: info.outputPath(`nested-settings-${width}.png`) });
     }
