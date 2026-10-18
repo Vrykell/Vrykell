@@ -35,6 +35,18 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 /// a one-time package download — so it gets a much longer budget than the rest.
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(180);
 
+/// A readable line from a JSON-RPC error: the message it carries, which is what a user can act on.
+/// Agents put their own error objects under `data`, so the raw value is only the last resort.
+fn format_agent_error(error: &Value) -> String {
+    let message = error.get("message").and_then(Value::as_str).unwrap_or("").trim();
+    let code = error.get("code").and_then(Value::as_i64);
+    match (message.is_empty(), code) {
+        (false, Some(code)) => format!("agent error ({code}): {message}"),
+        (false, None) => format!("agent error: {message}"),
+        (true, _) => format!("agent error: {error}"),
+    }
+}
+
 /// Windows cannot start a `.cmd` shim (`npx`, and most CLIs installed through npm) directly, and
 /// `CreateProcess` does not apply `PATHEXT` either: the same preset that works in a terminal fails
 /// with "program not found" from the app. Resolve the program the way a shell would.
@@ -239,7 +251,7 @@ impl AcpClient {
                     let waiter = reader_pending.lock().ok().and_then(|mut map| map.remove(&id));
                     if let Some(waiter) = waiter {
                         let outcome = match message.get("error") {
-                            Some(error) => Err(format!("agent error: {error}")),
+                            Some(error) => Err(format_agent_error(error)),
                             None => Ok(message.get("result").cloned().unwrap_or(Value::Null)),
                         };
                         let _ = waiter.send(outcome);
@@ -757,6 +769,23 @@ mod tests {
     use super::*;
     use serde_json::json;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    #[test]
+    fn reads_a_readable_line_from_a_jsonrpc_error() {
+        // The shape an agent sends when its own upstream refuses: the message is the actionable part.
+        let error = json!({
+            "code": -32603,
+            "message": "Internal error: Forbidden, gateway detected abuse traffic",
+            "data": { "errorName": "APIError", "service": "session" },
+        });
+        assert_eq!(
+            format_agent_error(&error),
+            "agent error (-32603): Internal error: Forbidden, gateway detected abuse traffic",
+        );
+
+        assert_eq!(format_agent_error(&json!({ "message": "boom" })), "agent error: boom");
+        assert_eq!(format_agent_error(&json!({ "code": 1 })), "agent error: {\"code\":1}");
+    }
 
     /// A scripted agent: answers the handshake, creates a session, streams a turn, asks for
     /// permission, and records what it saw. Everything it does is what the specification says an
