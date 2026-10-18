@@ -30,8 +30,10 @@ test('settings dropdown supports keyboard selection, cancellation and theme colo
   for (const theme of ['深色', '浅色']) {
     await page.getByRole('radio', { name: theme, exact: true }).click();
     await trigger.click();
+    // The floating surface carries the background; the listbox inside only scrolls.
+    const surface = page.locator('.ui-select-menu');
     const background = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--elevated').trim());
-    await expect(menu).toHaveCSS('background-color', await page.evaluate(color => {
+    await expect(surface).toHaveCSS('background-color', await page.evaluate(color => {
       const sample = document.createElement('div');
       sample.style.color = color;
       document.body.appendChild(sample);
@@ -39,7 +41,7 @@ test('settings dropdown supports keyboard selection, cancellation and theme colo
       sample.remove();
       return result;
     }, background));
-    colors.push(await menu.evaluate(element => getComputedStyle(element).backgroundColor));
+    colors.push(await surface.evaluate(element => getComputedStyle(element).backgroundColor));
     await page.screenshot({ path: test.info().outputPath(`select-${theme}.png`) });
     await trigger.press('Escape');
   }

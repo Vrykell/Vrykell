@@ -13,7 +13,7 @@ import { captureConnectionFrame, type TerminalFrame } from '../model/terminalFra
 import { projectBlocks } from '../model/blockProjection';
 import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
 import { Terminal } from '@xterm/xterm';
-import { applyTerminalRenderer, loadWebglRenderer } from '@features/terminal/model/xtermRenderer';
+import { applyTerminalRenderer, loadWebglRenderer, releaseTerminalRenderer } from '@features/terminal/model/xtermRenderer';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { ptySpawn, ptyWrite, ptyResize, ptyClose, onPtyOutput, onPtyExit, type PtySpawnOptions } from '@platform/pty';
@@ -31,6 +31,7 @@ import { agentControl } from '@features/agent/services/agentControl';
 import { defaultOpenModeForShell } from '@features/agent/stores/agentSettings';
 import { t } from '@i18n';
 import { SessionController } from '@features/terminal/services/pipeline/sessionController';
+import { recoverTerminalSurfaces } from '@features/terminal/services/terminalRepaint';
 import { copyTerminalSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
 import { cancelTerminalInput, writeTerminalInput } from '@features/terminal/services/terminalWriteQueue';
 import { querySequences } from '@features/terminal/model/terminalQueries';
@@ -178,8 +179,8 @@ export function useTerminalSession(
       // the default hairline outline reads as a vanished cursor on Retina displays.
       cursorInactiveStyle: 'block',
       scrollback: 5000,
-      // The public ruler width also sizes the native scrollbar and fit calculation.
-      overviewRuler: { width: 10, showTopBorder: false, showBottomBorder: false },
+      // The scrollbar width also sizes the overview ruler lane and the fit calculation.
+      scrollbar: { width: 10, overviewRuler: { showTopBorder: false, showBottomBorder: false } },
       allowTransparency: false,
       theme: readXtermTheme(),
     });
@@ -286,8 +287,6 @@ export function useTerminalSession(
       }, delay);
     };
 
-    // SSH prompts use a thin insertion cursor by default; remote cursor-shape modes can still override it.
-    if (spec?.kind === 'ssh') term.options.cursorStyle = 'bar';
     // 打开模式：spec.openMode 优先；老会话缺省时 SSH 回退 classic、local 按 shell 类型
     // Shells without integration must remain interactive, including restored sessions.
     const openMode = spec?.kind === 'local' && spec.shellType === 'cmd' ? 'classic'
@@ -645,10 +644,12 @@ export function useTerminalSession(
       return true;
     });
 
-    // ── Alt buffer 滚轮降级：滚轮 → 方向键 ──
-    // alt buffer 无 scrollback，xterm 内置滚轮处理在其中是 no-op（TUI 里滚轮「没反应」）。
-    // 应用未开鼠标上报时把滚轮按行折算成 ↑/↓ 发给 PTY（iTerm2 同款降级）；
-    // 开了鼠标上报（vim mouse=a、htop 等）则放行，由 xterm 默认逻辑转发鼠标事件。
+    // ── Alternate-buffer wheel fallback: wheel → arrow keys ──
+    // The alternate buffer has no scrollback, so the built-in wheel handling is a no-op
+    // there (in a TUI the wheel appears to do nothing). While the foreground program has
+    // not enabled mouse reporting, translate wheel movement into line-by-line ↑/↓ keys
+    // for the PTY; with mouse reporting enabled the events pass through to xterm's
+    // default handling.
     let wheelResidual = 0;
     term.attachCustomWheelEventHandler((e) => {
       if (term.buffer.active.type !== 'alternate' || term.modes.mouseTrackingMode !== 'none') {
@@ -855,10 +856,10 @@ export function useTerminalSession(
       });
     }
 
-    // A pane hidden with display:none (inactive tab or panel) or a page backgrounded by the
-    // OS can come back blank: a static alternate-screen application prints nothing to trigger
-    // a repaint, and a WebGL context lost while hidden steps down to the DOM renderer without
-    // drawing any rows. Restore the surface on the way back and repaint from the buffer.
+    // A pane hidden with display:none (inactive tab or panel) can come back blank: a static
+    // alternate-screen application prints nothing to trigger a repaint, and a WebGL context lost
+    // while hidden steps down to the DOM renderer without drawing any rows. Restore the surface
+    // on the way back and repaint from the buffer, leaving the shared glyph atlas alone.
     const restoreSurface = () => {
       if (disposed || el.offsetWidth === 0 || el.offsetHeight === 0) return;
       applyTerminalRenderer(term, useTypographyStore.getState().terminalRenderer);
@@ -888,7 +889,10 @@ export function useTerminalSession(
       applyWidth();
     });
     ro.observe(el);
-    const onVisibilityChange = () => { if (!document.hidden) restoreSurface(); };
+    // Coming back from a backgrounded window is a shared-atlas reset: the renderer reset and the
+    // repaint cover every live terminal, because a single terminal must never clear the glyph
+    // atlas that the others hold texture coordinates into.
+    const onVisibilityChange = () => { if (!document.hidden) recoverTerminalSurfaces(); };
     document.addEventListener('visibilitychange', onVisibilityChange);
 
     // ── 清理 ──
@@ -934,6 +938,9 @@ export function useTerminalSession(
       }
       useSessionStore.getState().setProgramTitle(paneId, '');
       unregisterTerminal(paneId, term);
+      // Disposing the terminal disposes its addons, which drop the canvas but keep the GPU
+      // context; hand it back so long sessions do not accumulate contexts.
+      releaseTerminalRenderer(term);
       term.dispose();
     };
   }, [paneId, tabId, attempt]);

@@ -81,7 +81,7 @@ test('SSH status uses real session state and does not write probes into the term
   await toggle.click();
   const panel = page.getByTestId('ssh-status-panel');
   await expect(rightPanel).toBeHidden();
-  await expect(page.locator('#ssh-status-sidebar-host')).toContainText('远端资源');
+  await expect(page.locator('#ssh-status-sidebar-host header')).toContainText('root@prod.example.com:22');
   await expect.poll(async () => Math.round((await panel.boundingBox())!.y - (await page.locator('.terminal-pane:visible').last().boundingBox())!.y)).toBe(0);
   await expect(page.getByTestId('ssh-session-toolbar')).toHaveCount(1);
   expect(await page.getByTestId('ssh-connection-input').getByTestId('ssh-session-toolbar').count()).toBe(0);
@@ -95,7 +95,7 @@ test('SSH status uses real session state and does not write probes into the term
   await expect(panel).toContainText('12%');
   await panel.getByRole('button', { name: '刷新远端资源' }).click();
   await expect(panel.getByRole('img', { name: '资源使用率趋势' })).toBeVisible();
-  await expect(panel.getByRole('meter', { name: 'CPU 使用率' })).toBeVisible();
+  await expect(panel.getByTestId('ssh-resource-cpu')).toBeVisible();
   await page.screenshot({ path: 'test-results/ssh-status-dark.png' });
   await expect(panel.locator('.ssh-status-connection')).not.toHaveAttribute('open');
   const connectionSummary = panel.locator('.ssh-status-connection > summary');

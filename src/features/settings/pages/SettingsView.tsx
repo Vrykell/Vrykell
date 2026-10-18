@@ -1,3 +1,4 @@
+import { FileOperationsPage } from './fileOperationsPage';
 import { OutlineButton } from '@ui/OutlineButton';
 import { t } from '@i18n';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -93,6 +94,7 @@ function SettingsContent() {
 
   const renderPage = (): ReactNode => {
     switch (selected) {
+      case 'file-operations': return <FileOperationsPage />;
       case 'startup': return <StartupPage />;
       case 'logs': return <LogsPage />;
       case 'context-menu': return <ContextMenuPage />;

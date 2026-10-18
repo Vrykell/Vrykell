@@ -103,7 +103,7 @@ test.describe('文件面板', () => {
     await page.locator('[data-testid="file-row"][data-path="/home/e2e/notes.txt"]').click({ button: 'right' });
     await page.getByRole('button', { name: '属性', exact: true }).click();
 
-    const dialog = page.getByTestId('file-properties-dialog');
+    const dialog = page.getByRole('dialog', { name: '属性' });
     await expect(dialog).toBeVisible();
     await expect(page.getByTestId('file-property-name')).toHaveText('notes.txt');
     await expect(page.getByTestId('file-property-type')).toHaveText('TXT 文件');
@@ -111,7 +111,14 @@ test.describe('文件面板', () => {
     await expect(page.getByTestId('file-property-size')).toHaveText('1.5 KB');
     await expect(page.getByTestId('file-property-modified')).toContainText('2026');
 
-    await page.getByTestId('properties-close').click();
+    // The labeled close action sits in a footer at the bottom right of the panel.
+    const close = dialog.getByRole('button', { name: '关闭', exact: true });
+    const dialogBounds = (await dialog.boundingBox())!;
+    const closeBounds = (await close.boundingBox())!;
+    expect(closeBounds.y).toBeGreaterThan(dialogBounds.y + dialogBounds.height / 2);
+    expect(closeBounds.x + closeBounds.width / 2).toBeGreaterThan(dialogBounds.x + dialogBounds.width / 2);
+
+    await close.click();
     await expect(dialog).toHaveCount(0);
   });
 
@@ -139,6 +146,19 @@ test.describe('文件面板', () => {
     await page.getByTestId('local-more-btn').click();
     await expect(page.getByRole('button', { name: '从当前文件夹新建标签页' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '下载管理' })).toBeVisible();
+  });
+
+  test('下载管理往返后文件树停留在原目录（会话内记忆），而不是回到终端 cwd', async ({ page }) => {
+    const tree = page.getByTestId('local-file-tree');
+    await tree.locator('[data-testid="file-row"][data-path="/home/e2e/Documents"]').dblclick();
+    await expect(tree).toHaveAttribute('data-path', '/home/e2e/Documents');
+
+    // 打开下载管理再返回：文件树组件重新挂载，恢复记忆的目录
+    await page.getByTestId('local-more-btn').click();
+    await page.getByRole('button', { name: '下载管理' }).click();
+    await expect(page.getByTestId('downloads-back')).toBeVisible();
+    await page.getByTestId('downloads-back').click();
+    await expect(tree).toHaveAttribute('data-path', '/home/e2e/Documents');
   });
 
   test('更多菜单：切换到当前终端文件目录把面板重新定位回终端 cwd', async ({ page }) => {
@@ -392,6 +412,33 @@ test.describe('文件面板', () => {
     await expect(menu.getByRole('button', { name: '下载管理', exact: true })).toBeVisible();
     await expect(menu.getByRole('button', { name: '收起全部文件夹', exact: true })).toBeVisible();
     await expect(menu.getByRole('button', { name: '切换到当前终端文件目录', exact: true })).toBeVisible();
+  });
+
+  test('refresh re-reads the current directory from both panel menus', async ({ page }) => {
+    const tree = page.getByTestId('local-file-tree');
+    const menu = page.getByRole('menu', { name: '操作菜单' });
+    const externalRow = tree.locator('[data-testid="file-row"][data-path="/home/e2e/project/terminal.log"]');
+
+    // A file created outside the panel only shows up on the next read.
+    await page.evaluate(() => {
+      (window as unknown as { __FS_EXTRA_ENTRIES__: { name: string; path: string; is_dir: boolean }[] }).__FS_EXTRA_ENTRIES__ =
+        [{ name: 'terminal.log', path: '/home/e2e/project/terminal.log', is_dir: false }];
+    });
+    await expect(externalRow).toHaveCount(0);
+
+    // ⋯ menu: re-read in place, without navigating away from the current directory.
+    await page.getByTestId('local-more-btn').click();
+    await menu.getByRole('button', { name: '刷新', exact: true }).click();
+    await expect(externalRow).toBeVisible();
+    await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
+
+    // Blank-area right click: an entry removed outside disappears.
+    await page.evaluate(() => { (window as unknown as { __FS_EXTRA_ENTRIES__: unknown[] }).__FS_EXTRA_ENTRIES__ = []; });
+    await expect(externalRow).toBeVisible();
+    const box = (await tree.boundingBox())!;
+    await page.mouse.click(box.x + 40, box.y + box.height - 12, { button: 'right' });
+    await menu.getByRole('button', { name: '刷新', exact: true }).click();
+    await expect(externalRow).toHaveCount(0);
   });
 
   test('右键新建按落点决定目录，建好立即重命名，重名自动加序号且回退用真实路径', async ({ page }) => {

@@ -149,7 +149,7 @@ describe('useTerminalSession', () => {
 
   it('configures a 10px native scrollbar so fitting uses the same width', () => {
     render(<TestHarness tabId="t1" onReady={() => {}} />);
-    expect(terminalInitOptions[0]?.overviewRuler).toEqual({ width: 10, showTopBorder: false, showBottomBorder: false });
+    expect(terminalInitOptions[0]?.scrollbar).toEqual({ width: 10, overviewRuler: { showTopBorder: false, showBottomBorder: false } });
   });
 
   it('re-applies the settled font options so a late-loaded face re-measures the terminal grid', async () => {
@@ -166,6 +166,15 @@ describe('useTerminalSession', () => {
     } finally {
       Reflect.deleteProperty(document, 'fonts');
     }
+  });
+
+  it('keeps the shared block cursor for SSH sessions', () => {
+    setSshTab(false);
+    render(<TestHarness tabId="t1" onReady={() => {}} />);
+    // An SSH session renders through the same terminal setup, so the cursor stays the
+    // default blinking block instead of switching to a thin insertion bar.
+    expect(terminalInitOptions[terminalInitOptions.length - 1]?.cursorStyle).toBeUndefined();
+    expect(terminalInstances[terminalInstances.length - 1]?.options.cursorStyle).toBeUndefined();
   });
 
   it('confirms SSH authentication only after a remote prompt marker and resets on reconnect', async () => {

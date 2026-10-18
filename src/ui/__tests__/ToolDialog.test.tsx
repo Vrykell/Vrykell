@@ -14,6 +14,17 @@ it('focuses the requested field and exposes a modal tool with shared dismissal b
   expect(close).toHaveBeenCalledOnce();
 });
 
+it('replaces the heading close icon with one labeled footer button when asked', () => {
+  const close = vi.fn();
+  render(<ToolDialog label="Properties" onClose={close} closePlacement="footer">Body</ToolDialog>);
+
+  const buttons = screen.getAllByRole('button');
+  expect(buttons).toHaveLength(1);
+  expect(buttons[0]).toHaveTextContent(t('Close'));
+  fireEvent.click(buttons[0]);
+  expect(close).toHaveBeenCalledOnce();
+});
+
 it('prevents dismissal while a save is pending', () => {
   const close = vi.fn();
   render(<ToolDialog label="Edit root" onClose={close} busy><input /></ToolDialog>);

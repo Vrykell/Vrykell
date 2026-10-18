@@ -15,11 +15,12 @@ import ShellIndicator from '@features/terminal/components/ShellIndicator';
 import { useInputEditorController } from '@features/terminal/hooks/useInputEditorController';
 import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
 import { normalizeWorkingDirectory } from '@features/terminal/services/pipeline/workingDirectory';
+import { terminalDebug } from '@features/terminal/services/terminalDebug';
 import DirectoryPicker from './DirectoryPicker';
 import CommandSyntax from './CommandSyntax';
 import CompletionControl from './CompletionControl';
 import { useTypographyStore } from '@config/typography';
-import { useRef, type ReactNode } from 'react';
+import { useRef, useLayoutEffect, useCallback, type ReactNode } from 'react';
 
 
 interface Props {
@@ -72,6 +73,42 @@ export default function InputEditor({
   const commandHighlighting = useTypographyStore(state => state.commandHighlighting);
   const highlightInput = commandHighlighting && !!text;
   const overlayRef = useRef<HTMLDivElement>(null);
+
+  // The mirror only hears about scroll events while the textarea's own offset moves. Content can
+  // grow past the capped height without moving it (the caret line is already on screen), so the
+  // freshly typed line would stay below the mirror's parked position and never paint. Re-run the
+  // sync after every content change to keep the visible text on top of the real input.
+  useLayoutEffect(() => {
+    const element = inputRef.current;
+    const overlay = overlayRef.current;
+    if (!element || !overlay) return;
+    overlay.scrollTop = element.scrollTop;
+    // Geometry and lengths only: the mirror must keep both the text and the box of the real input.
+    terminalDebug('composer-mirror-sync', {
+      paneId,
+      chars: text.length,
+      mirrorChars: overlay.firstElementChild?.textContent?.length ?? -1,
+      inputScroll: element.scrollTop,
+      mirrorScroll: overlay.scrollTop,
+      inputHeight: element.scrollHeight,
+      mirrorHeight: overlay.scrollHeight,
+      inputWidth: element.clientWidth,
+      mirrorWidth: overlay.clientWidth,
+    });
+  }, [paneId, text, ghost, highlightInput]);
+
+  // Focus routing decides whether typing reaches the composer at all; record the destination
+  // without any key or text payload.
+  const logComposerFocus = useCallback((focused: boolean) => {
+    const record = () => {
+      const active = document.activeElement as HTMLElement | null;
+      terminalDebug('composer-focus', {
+        paneId, focused, target: active?.tagName ?? null,
+        terminal: !!active && (active.hasAttribute('data-terminal-input') || !!active.closest('.xterm')),
+      });
+    };
+    if (focused) record(); else setTimeout(record, 0);
+  }, [paneId]);
 
   if (forceHidden) return null;
 
@@ -156,6 +193,8 @@ export default function InputEditor({
               placeholder={t('Enter a command…')}
               rows={1}
               onChange={handleChange}
+              onFocus={() => logComposerFocus(true)}
+              onBlur={() => logComposerFocus(false)}
               onKeyDown={handleKeyDown}
               onScroll={event => { if (overlayRef.current) overlayRef.current.scrollTop = event.currentTarget.scrollTop; }}
               style={{
@@ -194,7 +233,10 @@ export default function InputEditor({
                   overflow: 'hidden',
                 }}
               >
-                <span aria-hidden style={{ color: highlightInput ? 'var(--text-primary)' : 'transparent' }}>{highlightInput ? <CommandSyntax text={text} /> : text}</span>
+                {/* The textarea reserves a line for the caret after a trailing newline, while
+                    `pre-wrap` drops that line box; a zero-width space restores it so both
+                    layers keep the same scroll height and the mirror can track exactly. */}
+                <span aria-hidden style={{ color: highlightInput ? 'var(--text-primary)' : 'transparent' }}>{highlightInput ? <CommandSyntax text={text} /> : text}{text.endsWith('\n') ? '\u200b' : null}</span>
                 <span aria-hidden className="command-completion-suffix">{ghost}</span>
                 {ghost && <span className="command-completion-action"
                   onClick={event => event.stopPropagation()} onMouseDown={event => event.stopPropagation()}>

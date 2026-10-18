@@ -233,7 +233,7 @@ for (const theme of ['深色', '浅色'] as const) {
     await ensureChatSettingsOpen(page);
     const target = page.getByRole('combobox', { name: '选择执行终端' });
     await target.click();
-    await page.getByRole('option', { name: /Server.*10.21.76.61/ }).click();
+    await page.getByRole('option', { name: 'Server', exact: true }).click();
     await expect(target).toHaveText('10.21.76.61');
     await page.getByRole('button', { name: '对话与审批模式' }).click();
     await page.getByRole('option', { name: /^严格权限/ }).click();

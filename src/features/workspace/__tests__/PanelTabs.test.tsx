@@ -188,6 +188,31 @@ it('keeps a filtered nonempty group protected by the archive confirmation', () =
   confirm.mockRestore();
 });
 
+it('opens the panel menu on a blank-area right click even while the native menu is cancelled globally', () => {
+  // The webview policy cancels every native context menu in the capture phase, so a
+  // handler must not gate on `defaultPrevented` (it is already true when React runs).
+  // Menu ownership travels through stopPropagation instead.
+  const cancelNativeMenu = (event: Event) => event.preventDefault();
+  window.addEventListener('contextmenu', cancelNativeMenu, true);
+  try {
+    const { container } = render(<PanelTabs />);
+    fireEvent.contextMenu(container.querySelector<HTMLElement>('[data-reorder-list="session-tabs"]')!);
+    // The blank-area menu is the panel one, so no row action is offered.
+    expect(screen.getByText('AI 自动分组')).toBeVisible();
+    expect(screen.queryByText('关闭标签')).toBeNull();
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByText('AI 自动分组')).toBeNull();
+
+    // A row keeps its own menu: it stops propagation, so no second panel menu appears.
+    fireEvent.contextMenu(screen.getByTestId('tab-row-settings'));
+    expect(screen.getByText('关闭标签')).toBeVisible();
+    expect(screen.getAllByRole('menu')).toHaveLength(1);
+  } finally {
+    window.removeEventListener('contextmenu', cancelNativeMenu, true);
+  }
+});
+
 it('keeps an empty session drop zone expandable and previews grouped tabs outside singleton rows', () => {
   const moveTab = vi.fn();
   useSessionStore.setState(state => ({

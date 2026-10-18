@@ -43,7 +43,8 @@ typechecking, architecture checks, or dev mode as appropriate.
    tricks that rely on it either.
 3. Never hardcode user-visible Chinese: write the string in English and add its Chinese entry
    to `src/i18n`. New or edited comments (JSDoc, inline, CSS, Rust) are English and use generic
-   terms - no third-party brand names.
+   terms - no third-party product or brand names. Docs and commit messages follow the same ban;
+   model and agent-harness names are exempt.
 4. TypeScript strict: zero errors; avoid `any` unless unavoidable.
 5. Colors come from `theme.css` variables - no hardcoded colors (ANSI palette excepted).
    Animations are 100 ms or slower.
@@ -135,8 +136,9 @@ reproduction, a hand-run probe or a log by hand.**
    `docs:` prefix, details as body bullets.
 4. New features update the test checklist in `docs/zh/feature-spec.md` (mirror `docs/en/feature-spec.md`).
 5. Definition of done: typecheck, unit tests and the architecture guard are green; e2e covers
-   touched interactions; no dead code, unused imports or commented-out blocks remain; every
-   comment you wrote or edited is English (constraint 3) while user-visible copy stays Chinese.
+   touched interactions; no dead code, unused imports or commented-out blocks remain; every comment
+   you wrote or edited is English and brand-free, and so are your doc changes and commit messages
+   (constraint 3), while user-visible copy stays Chinese.
 6. Edit source files with the edit tool; never rewrite file text through shell redirection,
    `Set-Content` or whole-file regex scripts (rule 53) - PowerShell's default encoding has
    broken files twice. The shell is for reading, searching and git.

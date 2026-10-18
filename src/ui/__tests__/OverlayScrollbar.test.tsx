@@ -83,6 +83,45 @@ it('places floating tracks above the scroll surface itself', () => {
   expect(screen.getByRole('scrollbar')).toHaveStyle({ position: 'fixed', zIndex: '401', left: '300px', top: '180px' });
 });
 
+/** A clipping ancestor with its own content box, the shape a chat transcript has. */
+function clippedSurface(options: { width: number; height: number; clipWidth: number; clipHeight: number }) {
+  const viewport = document.createElement('div');
+  viewport.style.overflowX = 'hidden';
+  viewport.style.overflowY = 'hidden';
+  Object.defineProperties(viewport, {
+    clientWidth: { value: options.clipWidth }, clientHeight: { value: options.clipHeight },
+    clientTop: { value: 0 }, clientLeft: { value: 0 },
+    getBoundingClientRect: { value: () => new DOMRect(0, 0, options.clipWidth, options.clipHeight) },
+  });
+  const scroll = document.createElement('div');
+  viewport.append(scroll);
+  Object.defineProperties(scroll, {
+    clientWidth: { value: options.width }, clientHeight: { value: options.height },
+    scrollWidth: { value: options.width * 3 }, scrollHeight: { value: options.height * 3 },
+    getClientRects: { value: () => [new DOMRect(0, 0, options.width, options.height)] },
+    getBoundingClientRect: { value: () => new DOMRect(0, 0, options.width, options.height) },
+  });
+  return scroll;
+}
+
+it('clips a floating horizontal track against the viewport edge that hides its bottom', () => {
+  const scroll = clippedSurface({ width: 300, height: 300, clipWidth: 300, clipHeight: 294 });
+  render(<OverlayScrollbar horizontal floating scrollRef={{ current: scroll }} controlsId="code" label="Scroll code" />);
+  expect(screen.getByRole('scrollbar')).toHaveStyle({ clipPath: 'inset(0px 0px 6px 0px)' });
+});
+
+it('drops a floating horizontal track once the clipping viewport hides its whole band', () => {
+  const scroll = clippedSurface({ width: 300, height: 300, clipWidth: 300, clipHeight: 280 });
+  render(<OverlayScrollbar horizontal floating scrollRef={{ current: scroll }} controlsId="code" label="Scroll code" />);
+  expect(screen.queryByRole('scrollbar')).toBeNull();
+});
+
+it('clips a floating vertical track against the same viewport edge', () => {
+  const scroll = clippedSurface({ width: 300, height: 300, clipWidth: 294, clipHeight: 300 });
+  render(<OverlayScrollbar floating scrollRef={{ current: scroll }} controlsId="panel" label="Scroll panel" />);
+  expect(screen.getByRole('scrollbar')).toHaveStyle({ clipPath: 'inset(0px 6px 0px 0px)' });
+});
+
 it('maps a hosted track into the owning layer so transformed popups stay aligned', () => {
   const host = document.createElement('div');
   host.style.position = 'fixed'; host.style.zIndex = '10000';

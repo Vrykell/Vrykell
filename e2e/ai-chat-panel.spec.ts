@@ -103,6 +103,32 @@ test.describe('AI 对话面板', () => {
     expect(await clipboardText(page)).toContain('[执行命令: npm run build');
   });
 
+  test('复制被终止的回复：停止后复制按钮给出已经收到的正文', async ({ page }) => {
+    // 流式放慢，保证点「停止」时正文只到了一部分。
+    await paceLlmStream(page, 60);
+    await boot(page, '这是一段足够长的流式回复内容。'.repeat(40), { schedulesSeed: [] });
+    await page.locator('[data-dock-btn="chat"]').click();
+    const input = page.getByPlaceholder(/自然语言描述/);
+    await expect(input).toBeVisible({ timeout: 3000 });
+    await page.waitForFunction(async () => {
+      const mod = await import('/src/features/chat/stores/chat.ts') as typeof import('../src/features/chat/stores/chat');
+      const state = mod.useChatStore.getState();
+      return !!state.activeConversationId && state.activeConversationId in state.byTab;
+    });
+    await input.fill('写一段长回答');
+    await input.press('Enter');
+
+    const sendButton = page.locator('.chat-send-button');
+    await expect(sendButton).toHaveAttribute('aria-label', '停止生成', { timeout: 5000 });
+    // 等第一部分正文到达再中断，此时回答里已经有可复制的内容。
+    await expect(page.locator('.ai-block-answer')).toContainText('流式回复内容', { timeout: 5000 });
+    await sendButton.click();
+    await expect(sendButton).toHaveAttribute('aria-label', '发送', { timeout: 5000 });
+
+    await page.getByTestId('chat-answer-copy').click();
+    expect(await clipboardText(page)).toContain('流式回复内容');
+  });
+
   test('opening the AI assistant leaves command input available', async ({ page }) => {
     await boot(page, '好的');
     await page.locator('[data-dock-btn="chat"]').click();

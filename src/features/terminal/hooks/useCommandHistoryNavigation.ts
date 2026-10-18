@@ -1,16 +1,32 @@
 import { useCallback, useRef } from 'react';
 import type { RefObject } from 'react';
-import { useHistoryStore } from '@features/terminal';
+import { useBlockStore } from '@features/terminal';
 
 interface UseCommandHistoryNavigationOptions {
+  paneId: string;
   text: string;
   setText: (text: string) => void;
   inputRef: RefObject<HTMLTextAreaElement | null>;
   onNavigate?: () => void;
 }
 
-/** 管理终端输入框的前缀历史导航，并保留用户翻页前的草稿。 */
+/** Unique commands executed in this pane, newest first: navigation follows one terminal, not the app. */
+function paneCommands(paneId: string): string[] {
+  const blocks = useBlockStore.getState().byTab[paneId] ?? [];
+  const seen = new Set<string>();
+  const commands: string[] = [];
+  for (let index = blocks.length - 1; index >= 0; index -= 1) {
+    const command = blocks[index]!.command;
+    if (!command.trim() || seen.has(command)) continue;
+    seen.add(command);
+    commands.push(command);
+  }
+  return commands;
+}
+
+/** Navigate one terminal pane's command history by prefix, keeping the draft typed before paging. */
 export function useCommandHistoryNavigation({
+  paneId,
   text,
   setText,
   inputRef,
@@ -23,17 +39,17 @@ export function useCommandHistoryNavigation({
   }, []);
 
   const navigate = useCallback((direction: 1 | -1) => {
-    const entries = useHistoryStore.getState().entries;
+    const commands = paneCommands(paneId);
     const navigation = navigationRef.current;
     const base = navigation.index === -1 ? text : navigation.base;
-    const candidates = entries.filter(
-      (entry) => entry.command.startsWith(base) && entry.command.length > base.length,
+    const candidates = commands.filter(
+      (command) => command.startsWith(base) && command.length > base.length,
     );
     const nextIndex = navigation.index + direction;
     if (nextIndex < -1 || nextIndex >= candidates.length) return false;
 
     navigationRef.current = { index: nextIndex, base };
-    setText(nextIndex === -1 ? base : candidates[nextIndex]!.command);
+    setText(nextIndex === -1 ? base : candidates[nextIndex]!);
     onNavigate?.();
 
     const element = inputRef.current;
@@ -43,7 +59,7 @@ export function useCommandHistoryNavigation({
       });
     }
     return true;
-  }, [inputRef, onNavigate, setText, text]);
+  }, [inputRef, onNavigate, paneId, setText, text]);
 
   return { reset, navigate };
 }

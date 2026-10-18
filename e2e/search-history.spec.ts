@@ -74,8 +74,10 @@ test.describe('命令历史（↑/↓ 翻历史）', () => {
     const input = page.getByPlaceholder(/输入命令/);
     await expect(input).toBeVisible({ timeout: 5000 });
 
-    // 本地历史从 search_history 水合（mock 预置 3 条）
-    await page.waitForTimeout(500);
+    // 召回范围是本窗格执行过的命令（不再用应用级历史）：先执行一条，再按前缀翻阅。
+    await input.fill('git status');
+    await input.press('Enter');
+    await expect(page.locator('.command-block-command').filter({ hasText: 'git status' })).toBeVisible();
     await input.fill('git st');
     await input.press('ArrowUp');
     await expect(input).toHaveValue('git status');

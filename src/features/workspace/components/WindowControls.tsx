@@ -104,6 +104,7 @@ export default function WindowControls() {
     >
       <button
         type="button"
+        data-subtle
         data-testid="window-minimize"
         className="window-control-button"
         aria-label="最小化窗口"
@@ -115,6 +116,7 @@ export default function WindowControls() {
       </button>
       <button
         type="button"
+        data-subtle
         data-testid="window-maximize"
         className="window-control-button"
         aria-label={maximized ? '还原窗口' : '最大化窗口'}
@@ -126,6 +128,7 @@ export default function WindowControls() {
       </button>
       <button
         type="button"
+        data-subtle
         data-testid="window-close"
         className="window-control-button"
         data-danger="true"

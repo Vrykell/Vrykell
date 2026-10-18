@@ -1,7 +1,8 @@
+import { useFileUndoSettings } from '@config/fileUndo';
 import { TextInput } from '@ui/TextInput';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ArrowUp, ChevronRight, Search, MoreHorizontal, iconSizes } from '@ui/icons';
+import { ArrowDown, ArrowUp, ChevronRight, Search, MoreHorizontal, iconSizes } from '@ui/icons';
 import { IconBtn } from '@ui/UiBtn';
 import type { DiskEntry, FsEntry, FileStat } from '@platform/api/types';
 import { flattenVisible, type VisibleRow } from '@features/files/utils/fileTree';
@@ -31,6 +32,8 @@ export interface FilePanelProps {
   /** Reload after external authentication without discarding navigation or undo history. */
   reloadRevision?: number;
   initialPath?: string | null;
+  /** Set when `initialPath` is a remembered location: `null` then means the drive view. */
+  initialResolved?: boolean;
   onPathChange?: (path: string | null) => void;
   /** 双击 / Enter 打开文件 */
   openEntry: (entry: FsEntry) => void;
@@ -68,6 +71,7 @@ export default function FilePanel({
   enabled = true,
   reloadRevision = 0,
   initialPath = null,
+  initialResolved = false,
   onPathChange,
   openEntry,
   onSyncToTerminal,
@@ -81,6 +85,7 @@ export default function FilePanel({
   onExternalDrop,
   prepareNativeDrag,
 }: FilePanelProps) {
+  const undoEnabled = useFileUndoSettings(state => target.kind === 'ssh' ? state.remote : state.local);
   const config = useMemo(() => filePanelConfigFor(target), [target]);
   const {
     ops,
@@ -96,7 +101,9 @@ export default function FilePanel({
     load,
     navigate,
     goBack,
+    goForward,
     canGoBack,
+    canGoForward,
     selection,
     anchorPath,
     selectOnly,
@@ -140,7 +147,7 @@ export default function FilePanel({
     confirmDelete,
     cancelConfirm,
     confirmAction,
-  } = useFileBrowser({ target, enabled, initialPath, onPathChange, openEntry });
+  } = useFileBrowser({ target, enabled, initialPath, initialResolved, onPathChange, openEntry });
 
   const seenReloadRevision = useRef(reloadRevision);
   useEffect(() => {
@@ -250,6 +257,8 @@ export default function FilePanel({
     onRename: (entry) => startRename(entry),
     onDelete: (targets) => confirmDelete(targets),
     onProperties: (entry) => setPropertiesTarget(entry),
+    // Both panel-level menus (⋯ and blank area) re-read the current directory from the backend.
+    onRefresh: refresh,
     ...extraHandlers,
     onSyncToCwd: terminalCwd != null ? () => { void navigate(terminalCwd); }
       : onSyncToTerminal ? () => useToastStore.getState().addToast(t('The terminal has not reported its working directory yet.'), 'info') : undefined,
@@ -470,9 +479,13 @@ export default function FilePanel({
             }}>
             <Search size={iconSizes.control} />
           </IconBtn>
-          {/* 回退 = 上一个文件树视图快照（展开 / 选中 / 滚动），不是固定上级目录 */}
-          <IconBtn title="回到上一个视图" data-testid={config.ids.back} disabled={!canGoBack} onClick={goBack}>
+          {/* Back / forward walk the visit trail: every directory keeps its expansion, selection and scroll,
+              and a jumped-out branch is reached through forward instead of replayed by back. */}
+          <IconBtn title={t('Return to the previous view')} data-testid={config.ids.back} disabled={!canGoBack} onClick={goBack}>
             <ArrowUp size={iconSizes.control} />
+          </IconBtn>
+          <IconBtn title={t('Return to the next view')} data-testid={config.ids.forward} disabled={!canGoForward} onClick={goForward}>
+            <ArrowDown size={iconSizes.control} />
           </IconBtn>
           {/* The recovery view owns the panel while browsing is impossible: no overflow menu. */}
           {!error && <IconBtn title="更多操作" data-testid={config.ids.more} onClick={openMoreMenu}>
@@ -636,7 +649,7 @@ export default function FilePanel({
         message={
           confirm
             ? confirm.kind === 'delete'
-              ? confirm.entries.length > 1
+              ? !undoEnabled ? t('Delete selected items without application undo? Remote deletion is permanent; local deletion uses the system trash.') : confirm.entries.length > 1
                 ? `确定要删除选中的 ${confirm.entries.length} 项吗？删除后可在「更多 → 回退删除」恢复。`
                 : `确定要删除「${confirm.entries[0]!.name}」吗？删除后可在「更多 → 回退删除」恢复。`
               : `确定要将「${confirm.entry.name}」重命名为「${confirm.newName}」吗？`

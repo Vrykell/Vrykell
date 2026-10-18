@@ -76,9 +76,12 @@ export default function TerminalView() {
   // Running commands expose the status-bar actions through the context menu as well.
   const focusedScene = useTerminalStore((s) => s.scenes[focusedTermId] ?? 'classic');
   const focusedBlocks = useBlockStore(selectBlocks(focusedTermId));
-  const hasRunningBlock = focusedScene === 'blockList' && focusedBlocks.some((block) => block.status === 'executing');
   const fullscreenMenu = ctxMenu?.fullscreen === true;
-  const runningActions = useRunningCommandActions(focusedTermId, fullscreenMenu ? 'fullscreen' : 'block');
+  // A real alternate screen renders the TUI on the main terminal and shows its banner in
+  // the pane, so those toolbar actions join the pane menu as well.
+  const tuiInPane = focusedScene === 'altScreen' && !altScreenActive;
+  const hasRunningCommand = (focusedScene === 'blockList' || tuiInPane) && focusedBlocks.some((block) => block.status === 'executing');
+  const runningActions = useRunningCommandActions(focusedTermId, fullscreenMenu ? 'fullscreen' : tuiInPane ? 'altScreen' : 'block');
   const copySelection = () => { void copyTerminalSelection(getPaneTerminal(focusedTermId)); };
   const pasteIntoPane = () => { void pasteClipboardIntoTerminal(focusedTermId); };
   const ctxMenuItems: ContextMenuItem[] = !ctxMenu ? [] : fullscreenMenu ? [
@@ -86,7 +89,7 @@ export default function TerminalView() {
     { label: t('terminal.menu.copy'), group: 'clipboard', shortcut: 'Ctrl+C', onClick: copySelection },
     { label: t('terminal.menu.paste'), group: 'clipboard', shortcut: 'Ctrl+V', onClick: pasteIntoPane },
   ] : [
-    ...(hasRunningBlock ? runningActions : []),
+    ...(hasRunningCommand ? runningActions : []),
     ...(ctxMenu.sshActions ?? []),
     { label: t('terminal.menu.copy'), group: 'clipboard', shortcut: 'Ctrl+C', onClick: copySelection },
     { label: t('terminal.menu.paste'), group: 'clipboard', shortcut: 'Ctrl+V', onClick: pasteIntoPane },

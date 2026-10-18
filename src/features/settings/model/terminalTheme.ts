@@ -18,9 +18,10 @@ import {
 } from '@config/theme/tokens';
 import { termInstances } from '@features/terminal';
 import { readXtermTheme } from '@features/terminal/model/xtermTheme';
+import { syncWindowFrame } from '@platform/windowChrome';
 
 export interface TerminalThemeConfig {
-  /** 应用整体不透明度 0.05..=1.0（1 = 完全不透明） */
+  /** Application opacity, 0.5..=1 (1 = fully opaque). */
   opacity: number;
   /** 应用壁纸本地绝对路径；null = 纯色背景 */
   backgroundImage: string | null;
@@ -100,6 +101,8 @@ export function applyTerminalTheme(config: TerminalThemeConfig, mode?: ThemeMode
   setThemeOverrides(config.vars ?? {});
   applyTheme(mode ?? getCurrentTheme());
   reapplyXtermTheme();
+  // The native window frame follows the color that touches it.
+  syncWindowFrame();
 }
 
 interface TerminalThemeState {
@@ -135,15 +138,17 @@ export const useTerminalThemeStore = create<TerminalThemeState>((set, get) => ({
     const config = { ...prev, ...patch };
     set({ config });
     applyTerminalTheme(config);
+    try {
+      // Persist first: the backend authorizes the new wallpaper file, and the webview must not
+      // request its asset URL before that, or the one-shot image request is denied (403).
+      await invoke('set_theme_config', { config });
+    } catch {
+      /* Ignore when the backend is unavailable: the frontend state already applied. */
+    }
     if (config.backgroundImage !== prev.backgroundImage) {
       const wallpaperDataUrl = resolveWallpaperUrl(config.backgroundImage);
       cacheWallpaper(wallpaperDataUrl);
       set({ wallpaperDataUrl });
-    }
-    try {
-      await invoke('set_theme_config', { config });
-    } catch {
-      /* 后端不可用时忽略（前端已即时生效） */
     }
   },
 

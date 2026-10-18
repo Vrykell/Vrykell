@@ -28,16 +28,18 @@ export function resourceTrendSegments(samples: readonly ResourceSample[], endTim
   return segments;
 }
 
-export default function SshResourceChart({ samples = [], series, endTime, label, maximum = 100, maximumLabel = '100%', minimumLabel = '0%', windowMs }: { samples?: readonly ResourceSample[]; series?: readonly ChartSeries[]; endTime: number; label: string; maximum?: number; maximumLabel?: string; minimumLabel?: string; windowMs?: number }) {
+export default function SshResourceChart({ samples = [], series, endTime, label, caption = label, maximum = 100, maximumLabel = '100%', minimumLabel = '0%', windowMs }: { samples?: readonly ResourceSample[]; series?: readonly ChartSeries[]; endTime: number; label: string; caption?: string; maximum?: number; maximumLabel?: string; minimumLabel?: string; windowMs?: number }) {
   const source = series ?? [{ label, samples, color: 'var(--chart-blue)' }];
   const start = Math.min(...source.flatMap(line => line.samples.filter(sample => Number.isFinite(sample.value) && sample.time <= endTime).map(sample => sample.time)));
   const duration = windowMs ?? resourceHistoryWindow(Number.isFinite(start) ? start : undefined, endTime);
   const lines = source.map(line => ({ ...line, segments: resourceTrendSegments(line.samples, endTime, maximum, duration) }));
   const empty = lines.every(line => !line.segments.length);
-  return <div className="ssh-resource-chart" data-window-ms={duration}>
-    <div className="ssh-resource-chart-axis" aria-hidden="true">{maximumLabel}</div>
+  return <div className="ssh-resource-chart" data-window-ms={duration} data-end-time={endTime}>
+    <div className="ssh-resource-chart-axis" aria-hidden="true"><span className="ssh-resource-chart-caption" data-tip={caption}>{caption}</span><span>{maximumLabel}</span></div>
     <div className="ssh-resource-chart-plot"><svg viewBox="0 0 280 80" preserveAspectRatio="none" role="img" aria-label={label}>
-      {[6, 40, 74].map(y => <line key={y} className="ssh-resource-chart-grid" x1="2" x2="278" y1={y} y2={y} vectorEffect="non-scaling-stroke" />)}
+      <rect className="ssh-resource-chart-frame" x="2" y="6" width="276" height="68" fill="none" vectorEffect="non-scaling-stroke" />
+      {[23, 40, 57].map(y => <line key={`y-${y}`} className="ssh-resource-chart-grid" x1="2" x2="278" y1={y} y2={y} vectorEffect="non-scaling-stroke" />)}
+      {[36.5, 71, 105.5, 140, 174.5, 209, 243.5].map(x => <line key={`x-${x}`} className="ssh-resource-chart-grid" x1={x} x2={x} y1="6" y2="74" vectorEffect="non-scaling-stroke" />)}
       {lines.map(line => <g key={line.label} data-series={line.label} style={{ color: line.color }}>{line.segments.map((points, index) => {
         const positions = points.split(' ');
         return positions.length > 1 ? <g key={index}>

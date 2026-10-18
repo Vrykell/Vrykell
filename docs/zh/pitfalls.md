@@ -38,7 +38,7 @@
 - **根因**：解析器把三类不认识的序列翻译成了**别的合法序列**：
   - `ESC ( B`（字符集指定）只跳过 designator 字节，最终的 `B` 泄进文本流；
   - `CSI > 4 m`（xterm modifyOtherKeys）被当成 SGR(4)，后续全文下划线；
-  - `CSI < u` / `CSI > u`（kitty keyboard protocol）被当成 RestoreCursor，光标瞬移到陈旧位置——这就是 Claude 帧被打散、「多光标」的真凶。
+  - `CSI < u` / `CSI > u`（扩展键盘协议）被当成 RestoreCursor，光标瞬移到陈旧位置——这就是 Claude 帧被打散、「多光标」的真凶。
 - **修复**：带 `> < =` 参数前缀的 CSI 整体忽略；charset 指定跳两个字节；`ESC 7/8` 正确映射 Save/RestoreCursor；ITU 冒号子参数（`SGR 38:5:220`）按分号处理。**并用真实捕获的 Claude Code 启动帧（100×30）做端到端回放测试断言零垃圾。**
 - **教训**：解析器「尽力猜」不如「明确忽略」；误译比丢弃危害大得多。
 
@@ -55,8 +55,8 @@
 - **修复**：altActive 时只暴露 alt screen，退出恢复（xterm 语义）。
 
 ### 2.6 resize 只 clamp 光标、不 reflow → 历史输出永远保持旧折行（`2f52a0c`）
-- 需要在 `TerminalLine.wrapped` 上跟踪软换行链，宽度变化时 iTerm2 式 reflow：链合并重切、不劈宽字符、硬换行保留、光标跟随逻辑位置。
-- **后续反转**：v1 后期又改为 **no-rewrap resize（xterm 语义）**（`529ca65`）——Ink 式 TUI 的「向上重绘 N 行」记账依赖行数恒定，reflow 会破坏它；过长行改为渲染期裁剪（`b732817`）。两种语义各有适用对象，最终选边 xterm/Windows Terminal 行为。
+- 需要在 `TerminalLine.wrapped` 上跟踪软换行链，宽度变化时按逻辑行 reflow：链合并重切、不劈宽字符、硬换行保留、光标跟随逻辑位置。
+- **后续反转**：v1 后期又改为 **no-rewrap resize（xterm 语义）**（`529ca65`）——自刷新式 TUI 的「向上重绘 N 行」记账依赖行数恒定，reflow 会破坏它；过长行改为渲染期裁剪（`b732817`）。两种语义各有适用对象，最终选边 xterm 及主流终端的行为。
 
 ### 2.7 宽字符双换行 + wrapped 标志中毒（`123f515`）
 - **现象**：反复拖窗后 TUI 画面重复/错位。
@@ -160,7 +160,7 @@
 ### 4.1 手写 charWidth 表与 TUI 的 string-width 记账不一致 → 光标劈成两半（`69061f4`、`3eb3b7e`）
 - **现象一**：零宽修饰符（VS16 U+FE0F、ZWJ、组合记号）被算 1 列写进 cell → 渲染出 `?` 垃圾。
 - **现象二**：emoji presentation 字符（✨ ⏸）算 1 列而 TUI 算 2 列 → 整行右移、幻影折行，TUI 的 erase-lines 重绘永远擦不掉旧帧（96 列欢迎框残影在 140 列重绘后仍在）。
-- **现象三**：手工挑的 BMP emoji 段漏掉 `▶ ◀ ⚠ © ® ™`（Ink/string-width 算 2 列），每漏一个该行少算 1 列 → TUI 垫到恰好 cols 的行在我们这是 cols+1 → 折行 → 插入幻影行把光标「劈成两半」。
+- **现象三**：手工挑的 BMP emoji 段漏掉 `▶ ◀ ⚠ © ® ™`（按 string-width 语义算 2 列），每漏一个该行少算 1 列 → TUI 垫到恰好 cols 的行在我们这是 cols+1 → 折行 → 插入幻影行把光标「劈成两半」。
 - **最终修复**：**不再手写**——用 string-width@7 对每个 emoji 码点实测生成权威表，测试锁死两侧（2 列：▶◀⚠©®™；1 列：❯●⧉←·✘✦）；`©®` 在 CJK cutoff 之下、必须在 `< 0x1100` 早返回**之前**检查。另加 dev 模式 wrap forensics：alt screen 内任何自动换行（TUI 帧本不该折行）console.warn 行尾码点。
 - **教训**：与外部程序共享「列数」这一记账单位时，宽度表必须来自同一权威实现，手工挑必漏。
 
@@ -188,6 +188,29 @@
 - **修复**：`--terminal-row-height` 改为**按解析后的字体实测**：`floor(自然行高 × lineHeight)`——与 xterm 的推导一致（8 个字号 × 3 个行距的实测矩阵全部吻合），由终端层在字体加载完成和字体设置变化时发布；字号公式只作无测量 DOM（单测）时的兜底。`config/typography.ts` 不再猜这个值。
 - **残留风险（未修）**：东亚「歧义宽度」字符（`█▀▄─│` 等 U+2580–259F）在浏览器里按**整宽**字形渲染（实测 14px = 2 格），而 xterm 按 1 格记账（`getCell().getWidth() === 1`）。若某个 TUI 用块字符作画，快照的该行会横向溢出并换行；本例的 CLI 用反白空格作画，未触发。修它需要在快照里强制单元格步进（或换字体栈），代价与影响面都比这次的行高大得多，留作独立改动。
 - **教训**：行高不是「字号 × 一个系数」。终端是一张网格，尺寸必须来自与画布同一次的实测；凡是「画布与 DOM 要还原同一张网格」的地方，都不能各自用公式推。
+
+### 4.8 预编辑镜像自身没有光标、还会盖住块光标 → 组合输入时看不到插入点；新终端版本改成 RTL 布局后行内 `::after` 会落到文字前面（`theme.css` 组合视图规则，`terminal-ime-restore.spec.ts`）
+- **现象**：中文输入法组合过程中（拼音预编辑「ni'hao」）终端里只有预编辑文字，文字后面没有光标；不组合时同一位置的块光标正常。
+- **根因**：预编辑由解析器自己的镜像层（`.composition-view`）绘制，它没有光标元素；真正的原生光标在隐藏的 helper textarea 里，而它必须保持 `opacity: 0`（否则终端会把文字画两遍）。镜像层锚在块光标所在单元格且底色不透明，于是块光标被盖住，可见插入点随之消失。
+- **修复**：镜像层激活时在盒子行尾方向预留一格（`padding-right: 1ch`），用绝对定位的 `::after` 画一块终端光标色方块，按渲染器同频（1s step-end）闪烁。
+- **坑**：新终端版本把镜像层改为 `direction: rtl`（长预编辑时保持结尾可见）。此时**行内**的 `::after` 会被 bidi 排到文字前面，光标看起来出现在预编辑之前；只能绝对定位、贴**物理**右边缘（`right: 0` + 预留格），两种书写方向下才都成立。
+- **回归**：`terminal-ime-restore.spec.ts`「组合输入保持预编辑后的光标」断言预编辑文字、光标样式，以及像素（光标格不得等于空白格）。
+
+### 4.9 共享 WebGL 字形图集被单个终端清空 → 其它终端持久花屏（`terminalRepaint.ts`、`terminalResize.ts`、`xtermRenderer.ts`；上游 xtermjs/xterm.js#6014、#6042、#6055）
+- **现象**：长时间运行的全屏 TUI（大量 CJK 文本）偶发花屏：**部分行被别处的文字叠印**、另一些行正常，画面「花」而不是空白；「重绘终端」一点就恢复；同一屏文本越多越容易出现。
+- **根因**（三层叠加）：
+  1. 字体、主题、DPR、单元格尺寸相同的终端**共用一个字形图集**（渲染层按配置缓存图集）。本应用所有 pane 主终端与运行中块终端恰好同配置 → 十几张画布共用一个 GPU 图集。
+  2. `term.clearTextureAtlas()` 清空的是**整个共享图集**（所有 page + 字形缓存），但只让**调用它的那个**渲染器重建自己的顶点数据；稳定版 0.19.0 不通知其它渲染器（上游 #6014，7.0 里程碑才由 #6042/#6055 修掉）。其余终端仍持有指向刚被清空页面的字形坐标，下一帧绘制时就从图集里取到**别的终端后来写进去的字形** → 逐行错字、叠印。
+  3. 全屏 TUI 每帧只重写变化的那几行，未重写的行永远不重建 → 花屏**不会自愈**，必须对该终端做一次全量刷新（手动重绘、resize、切回标签）才恢复。
+- **放大器**：旧实现把「清图集」塞进**单终端**的重绘里，而重绘入口很多且互相踩——切标签 / pane 重新可见、`visibilitychange`（每个终端各挂一个监听，最后一个刷完的赢，**它之前的终端全部变花**）、运行块终端挂载（每次命令启动清一次）、手动重绘（先主终端后块终端，块终端把主终端刚刷好的图集又清掉）。文本越多，图集里被占用的槽位越多，清空后这些槽位被别的字形填上的概率越高——这就是「字越多越容易触发」。
+- **修复**：图集级操作收敛为**应用级动作** `resetTerminalSurfaces()`（`terminalRepaint.ts`）：清空一次共享图集 → **同一 tick 内刷新全部活终端**（pane 主终端 + 用 `registerBlockTerminal` 注册的运行中块终端）；普通重绘 `repaintTerminal()` 只 `refresh`，**绝不清图集**；`visibilitychange` 的多终端监听用 `recoverTerminalSurfaces()` 合并成一次重置。同时把依赖升到带上游修复的版本（`@xterm/xterm` 6.1.0-beta、`@xterm/addon-webgl` 0.20.0-beta：`clearTexture()` 会 bump `pageLayoutVersion`，每个渲染器各自比对、各自失效）。诊断标记：`terminal-atlas-reset`（含 reason/paneId/rendererRebuilds/terminals）。
+- **教训**：共享 GPU 资源的失效必须按应用级生命周期处理；「修我自己」的动作不能在背后破坏别人。
+
+### 4.10 WebGL 上下文只借不还 → 触碰上限后随机终端花屏（`xtermRenderer.ts`；上游 xtermjs/xterm.js#6068）
+- **现象**：偶发、且常常出现在**用户没动过**的终端上（空白或错字），控制台可见「Too many active WebGL contexts」。
+- **根因**：WebGL addon 的 `dispose()` 只移除 canvas、**不释放 WebGL2 上下文**；浏览器对每个 document 的存活上下文有上限（约 16 个），超限会丢弃**最老的存活上下文**——它可能属于任意一个正在正常使用的终端。本应用每次手动重绘（dom→webgl 重建）、渲染器设置切换、运行块结束销毁终端都会消耗一个上下文。
+- **修复**：`xtermRenderer.ts` 在丢弃渲染器时统一显式交还上下文（`WEBGL_lose_context.loseContext()`，扩展缺失或上下文已丢失时忽略），终端销毁前也先释放；诊断标记 `terminal-webgl-context-released` 记录累计释放次数。
+- **教训**：GPU 资源必须显式归还；`dispose` 不等于释放。
 
 ---
 
@@ -221,7 +244,20 @@
 - **修复**：首次挂载后一帧，若视口在底部则 `scrollToTop()` + `scrollToBottom()` 强制两次真实滚动把正确位置写回模型；单独 `scrollToBottom()` 在底部算出 0 行差是 no-op。调度放在 `term.element` 判断之外，StrictMode 双挂载下第二次挂载仍会调度。
 - **回归**：`running-term.spec.ts`「运行块挂载前到达的输出不破坏首次滚轮回溯」。
 
-### 5.6 `color-mix()` 让 `getComputedStyle` 的颜色变成 `color(srgb …)` —— 朴素数字解析读成 0-1（`--menu-bg` 浮层配方）
+### 5.6 语法高亮镜像层只被 textarea 的滚动事件驱动 → 内容增高而偏移不变时，新打的字不显示（`InputEditor.tsx`，`command-presentation.spec.ts`）
+- **现象**：打开「命令语法高亮」后，在输入栏连按几次 Shift+Enter 换行、再打字母，新字符**看不见**——内容其实已进入输入框（回车仍可提交）；关闭高亮则正常。
+- **根因**：高亮文字由 textarea 上方同字号的镜像层绘制，textarea 自身文字被设为透明；镜像层的滚动位置只在 textarea 触发 `scroll` 事件时同步。输入内容超过高度上限（120px）后，光标行仍在视口内，继续输入**不改变 `scrollTop`**，于是没有滚动事件；镜像层内容已变长，却停在此前（还被 clamp 过）的滚动位置，新行落在可视区下方——表现为「字输进去了但没渲染出来」。
+- **次因**：`white-space: pre-wrap` 不为**行尾换行**生成行盒，而 textarea 会为光标预留那一行，两层 `scrollHeight` 相差一行，同步值被 clamp 后长期错位。
+- **修复**：① 每次文本/补全后缀变化后用 layout effect 主动同步镜像层 `scrollTop`（保留原有滚动事件路径处理用户与浏览器的滚动）；② 行尾换行时在镜像层补一个零宽空格，恢复光标行的行盒，使两层滚动几何一致。
+- **回归**：`command-presentation.spec.ts`「the colored input mirror stays aligned while multiline content overflows the capped height」断言两层 `scrollTop`/`scrollHeight` 一致，并用像素探针验证换行后新打的字确实被绘制。
+
+### 5.7 长补全后缀与最后一个词黏成一个不可断词 → 新打的字被换行裁掉看不见（`theme.css` `.command-completion-suffix`，`command-presentation.spec.ts`）
+- **现象**：开着「命令语法高亮」时，如果历史里有一条以 `cd C…`（长路径）开头的命令，在输入框里打 `cd C`，**C 不显示**；内容其实已经输入（回车能执行，诊断里 `composer-input-change` 的长度也对得上）。
+- **根因**：高亮镜像层把「已输入文本 + 补全后缀」渲染在同一行内流里。长后缀没有空格可断，与刚打的 `C` 黏成一个不可断长词；`overflow-wrap: break-word` 只在**本行没有其它可断点**时才允许词内断行，而本行还有 `cd` 后的空格可断——于是整词先被移到下一行，再在行内断开。镜像盒高等于 textarea 当前高度（单行），第二行被 `overflow: hidden` 裁掉，刚打的字与随后所有输入都落在被裁的行上。
+- **修复**：`.command-completion-suffix` 允许在任意字符处断行（`word-break: break-all`），补全后缀不再能把已输入文本挤到下一行。
+- **回归**：`command-presentation.spec.ts`「a long completion suffix cannot push the typed word out of the visible mirror line」断言已输入字符的边界框仍落在镜像盒内（修复前在盒下方），且两层滚动位置一致。
+
+### 5.8 `color-mix()` 让 `getComputedStyle` 的颜色变成 `color(srgb …)` —— 朴素数字解析读成 0-1（`--menu-bg` 浮层配方）
 - **现象**：`field-surfaces.spec.ts` 断言「字段比面板亮 ≤36 阶」，合并 dev 后深浅两色全挂（差值 58.9 / 254.1）：面板通道被当成 0。
 - **根因**：dev 把浮层背景改为 `--menu-bg: color-mix(in srgb, var(--canvas) 50%, var(--surface))`；Chromium 对 `color-mix()` 结果返回 `color(srgb 0.14 0.14 0.14)` 形式，旧解析器 `color.match(/\d+/g).slice(0,3)` 把 0-1 分量当 0-255 用。
 - **修复**：解析器先匹配 `color(srgb …)` 并 ×255；浮层断言同步为 dev 的新配方（背景 `--menu-bg`、无边框，仅阴影分隔）。
@@ -288,9 +324,21 @@
 
 ### 7.9 GUI 启动的 shell 没有 locale → vi 等全屏程序中文乱码（`pty.rs:merge_locale_env`）
 - **现象**：GUI 启动（Finder/Dock，无 `LANG`/`LC_*`）时，`vi` 打开 UTF-8 文件，中文显示成 `~H`、`~@`、`~C` 之类；`cat`/`ls` 却正常。
-- **根因**：区域感知的程序按 `LC_CTYPE`（缺省 C）选择编码。vim 于是按 latin1 读取文件，把每个 UTF-8 汉字的 C1 高位字节画成 `~X`；只透传字节的程序不查 locale，所以看起来没问题。Terminal.app/iTerm 会自己设置 locale，所以同一个命令在别的终端正常。
+- **根因**：区域感知的程序按 `LC_CTYPE`（缺省 C）选择编码。vim 于是按 latin1 读取文件，把每个 UTF-8 汉字的 C1 高位字节画成 `~X`；只透传字节的程序不查 locale，所以看起来没问题。有的终端模拟器会自己设置 locale，所以同一个命令在别的终端正常。
 - **修复**：`spawn_pty` 里 `merge_locale_env` 与 `merge_term_env` 并列——环境里没有任何 UTF-8 请求时补 `LC_CTYPE`（macOS 用 `en_US.UTF-8`，其它 Unix 用 `C.UTF-8`），`LANG` 为空时一并补；已有 UTF-8 时不动，保持用户语言。
 - **教训**：GUI 启动缺的不止 PATH/TERM，还有 locale；凡是「本地正常、GUI 异常」的文本问题，先看 `LANG`/`LC_CTYPE`。
+
+### 7.10 单实例转发的目录必须先排队再发信号（`platform/context_menu.rs`）
+- **现象**：第二次启动（右键菜单）只靠事件把目录交给前端。窗口刚启动、webview 还没订阅事件时事件丢失——用户点了「在 Vrykell 中打开」却什么都没有发生。
+- **修复**：Rust 侧先入队再发唤醒信号，前端订阅后立即补排空一次；排空是原子操作（同一队列只有一方取到），事件与补漏两条路径不会让同一个目录开两次标签页。
+- **教训**：已运行实例处理外部请求时，事件只是唤醒信号，数据要放在可重放的队列里；single-instance 插件还必须最先注册，让第二次启动在其他初始化之前就被拦截。
+
+### 7.11 Windows 11 会给每个窗口画 1px 边框，`DWMWA_COLOR_NONE` 并不能真正去掉它（`platform/window_chrome.rs`）
+- **现象**：主窗口（透明 + `decorations: false`）顶部边缘有一条 1px 缝，圆角处还会漏出桌面。
+- **根因**：最外一圈像素属于系统 frame——`shadow: true` 时 tao 把客户区按 frame 内缩（顶部 1px，侧面是看不见的 resize 边框），Windows 11 在这圈上画 1px 边框。`DWMWA_BORDER_COLOR = DWMWA_COLOR_NONE`（0xFFFFFFFE）在部分系统版本上不会去掉边框，而是退回深色默认线（暗色约 #1A2129），看起来就是那条缝；透明窗口的圆角 frame 区没有任何表面可绘制，于是直接透出桌面。
+- **修复**：主窗口改 `shadow: false`，客户区铺满整窗，webview 内容直达圆角（窗口保持 `transparent: true`，应用自己的半透明/着色器仍能透出桌面）；客户区铺满后系统不再自动倒圆角，因此显式请求 `DWMWA_WINDOW_CORNER_PREFERENCE = DWMWCP_ROUND`；再把 `DWMWA_BORDER_COLOR` 染成窗口贴边色（主窗口 `--chrome-bg`、工具窗口 `--surface`，前端 `syncWindowFrame` 在启动与主题切换时同步）。工具窗口保持不透明 + 系统 frame，圆角区由 DWM 正常绘制。
+- **取舍**：主窗口不再有系统阴影（tao 的 `shadow` 开关把 frame 一起去掉）；需要投影时用应用自己的 CSS/着色器补。
+- **教训**：未装饰窗口最外一圈像素属于系统绘制，只能染色不能吞掉；透明窗口的圆角 frame 区必然漏背景——要么让客户区铺满整窗、要么接受系统绘制。别把 `DWMWA_COLOR_NONE` 当「去掉边框」用。
 
 ---
 
@@ -365,6 +413,8 @@
 
 ### 9.10 WebView 无 CSP + asset scope `$HOME/**` 全开（`c7700b8`）
 - 修复：CSP（script 仅 self/inline、connect 仅 ipc、无远程 img、禁 object/frame）；asset scope 收窄 `$APPDATA/**`；壁纸按用户选择动态 `allow_file` 授权。
+- **壁纸校验必须经后端读取**：asset 协议只服务已授权的路径（`$APPDATA/**` 或已保存的壁纸），用 asset URL 解码未保存的候选文件会拿到 403，被误判成「不是有效图片」；候选文件改由 `read_image_data_url` 读取后再解码，且 `set_theme_config` 授权完成后才把 asset URL 交给背景层，否则一次性图片请求会被拒绝。
+- **Windows 生产构建的 `img-src` 需要 `http://asset.localhost`**：Windows 上 asset 协议地址是 `http://asset.localhost`，CSP 的 `asset:` 只匹配 `asset://`（macOS），漏写会让已授权的壁纸同样被拦截。
 - **残留取舍**：script-src 含 `'unsafe-inline'`（dev 模式 Vite HMR 需要）；markdown 远程图片一律降级为链接文本（外带/追踪面）。
 
 ### 9.11 LIKE 通配符未转义（`code-audit.md`）
@@ -503,7 +553,7 @@
 
 ### 13.2 ConPTY 环境伪影：node stub 测不了 resize（`1658043`）
 - Windows e2e 用 node 做 TUI stub 不可行：ConPTY 下 node **收不到 resize 事件**，且全宽输出突发撞上 ConPTY deferred-wrap 怪癖——两者都是环境伪影（用 eventLog 验证发生在我们代码之下）。
-- **替代**：PowerShell 轮询 stub（`[Console]::WindowWidth` + `\e[4A` 重绘）模拟 Ink 的行数记账。
+- **替代**：PowerShell 轮询 stub（`[Console]::WindowWidth` + `\e[4A` 重绘）模拟自刷新 TUI 的行数记账。
 
 ### 13.3 e2e mock 必须复刻 @tauri-apps/api v2 内部契约（`e2e/tauri-mock.ts` 头注释）
 - `invoke → __TAURI_INTERNALS__.invoke(cmd, args)`；`listen → transformCallback 注册 window[_${id}] 再 invoke('plugin:event|listen')`。mock 走真实库代码路径而不是打桩库本身，API 升级时契约变化会被 e2e 抓住。
@@ -627,7 +677,7 @@
 - **框线/表格错位先查字体，不要先怀疑渲染器**：根因通常是 CJK 回退字体的字宽不是 2 个拉丁单元 —— 字体栈必须能命中一个等宽 CJK 字体（Sarasa Mono SC / Noto Sans Mono CJK SC），否则 `│ 名称 │` 这类表格的右边框逐行错开。无头 e2e 环境通常没有这些字体，**不能据此判断渲染器好坏**。
 - WebGL 渲染器在无 GPU 的环境（无头浏览器 / SwiftShader）截不到画面：`.xterm-rows` 为空、截图全黑（选区被画进 canvas 纹理，不是 DOM）。比较渲染器必须在真机跑。
 - 已量到的几何事实：WebGL 画布按设备像素对齐（CSS 宽 × dpr 恰为整数），所以「画布取整」这条推断不成立；怀疑边缘亮线前，先量 `screen` / `region` / `canvas` 三者的 rect 再下结论。
-- **字符格取整（Windows Terminal 的做法）**：等宽字体的 advance 常是小数（14px 字号下约 8.4px），`cols × cellWidth` 就落在非整数上，画布右边缘会剩一条亚像素列 —— 拖动窗口时「有时有、有时没有」正是这个取整。做法是给 xterm 设置 `letterSpacing = round(实测格宽) − 实测格宽`（每格最多半个像素），格宽锁到整数、网格落在设备像素上；`useTerminalSession` 与 `createBlockTerm` 都在创建时设置、并在字号变化时重算（`terminalFont.ts` 的 `snapLetterSpacing` 有单测）。
+- **字符格取整（主流终端的做法）**：等宽字体的 advance 常是小数（14px 字号下约 8.4px），`cols × cellWidth` 就落在非整数上，画布右边缘会剩一条亚像素列 —— 拖动窗口时「有时有、有时没有」正是这个取整。做法是给 xterm 设置 `letterSpacing = round(实测格宽) − 实测格宽`（每格最多半个像素），格宽锁到整数、网格落在设备像素上；`useTerminalSession` 与 `createBlockTerm` 都在创建时设置、并在字号变化时重算（`terminalFont.ts` 的 `snapLetterSpacing` 有单测）。
 - **win32-input-mode 的按键捕获会顺手吞掉复制/粘贴**：`attachWin32KeyCapture` 在**捕获阶段**就 `preventDefault + stopPropagation`，会话一旦请求该模式，Ctrl+C 会被编码成按键记录发进 PTY，复制直接失效 —— 而 e2e 默认不开这个模式，所以「本机不触发、用户机上必现」。判定必须拿到终端本身：Ctrl+V 永远放行；Ctrl+C 只在**有选区**时放行（无选区仍要编码，否则会话丢了中断键）。回归覆盖见 `terminal-clipboard.spec.ts` 的「win32-input-mode 下 Ctrl+C 仍然复制」。
 - **终端「选区旁边一条细线」= 终端自带的滚动条**：`.xterm-viewport` 比 `.xterm-screen` 宽 8px（那 8px 是原生滚动条滑道），全局 `::-webkit-scrollbar-thumb` 的 `2px 透明边框 + padding-box` 让它只剩中间约 4px 的浅色细条，紧贴选区时就像渲染瑕疵。运行块早就用 `display: none` 关掉了自己的滚动条，pane 现在也关（滚轮/触控板/键盘滚动不受影响）。切换渲染器（WebGL/DOM）**不会**改变这个现象，别把它当成渲染器问题。
 

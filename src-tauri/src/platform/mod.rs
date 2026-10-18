@@ -6,5 +6,4 @@
 pub mod clipboard_files;
 pub mod path;
 pub mod context_menu;
-#[cfg(windows)]
 pub mod window_chrome;

@@ -10,6 +10,7 @@ import { indexToCss } from '@features/terminal/model/blockTypes';
 import { getTerminalFontOptions } from '@features/terminal/model/terminalFont';
 import { terminalTypographyChanged, useTypographyStore } from '@config/typography';
 import { readXtermTheme } from '@features/terminal/model/xtermTheme';
+import { releaseTerminalRenderer } from '@features/terminal/model/xtermRenderer';
 
 function getFgCss(cell: IBufferCell): string | null {
   if (cell.isFgDefault()) return null;
@@ -264,6 +265,9 @@ export function createBlockTerm(
     dispose: () => {
       themeObserver.disconnect();
       unsubscribeTypography();
+      // Terminals dispose their addons internally, which drops the canvas but not the GPU
+      // context; hand it back before the terminal goes.
+      releaseTerminalRenderer(term);
       term.dispose();
       el.remove();
     },

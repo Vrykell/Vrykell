@@ -29,7 +29,7 @@ Xcode Command Line Tools, Perl and Make are required (`xcode-select --install`).
 
 1. **No custom terminal emulator** - xterm.js for all VT/ANSI parsing; it stays invisible (PTY + parsing only).
 2. **No regex lookbehind** - macOS WKWebView rejects `(?<=...)` and `(?<!...)`.
-3. **i18n for user-visible text** - never hardcode user-visible Chinese in code: write the string in English and add its Chinese entry to the i18n catalog (`src/i18n`). Code comments in new or edited code are English, generic terms, no brand names.
+3. **i18n for user-visible text** - never hardcode user-visible Chinese in code: write the string in English and add its Chinese entry to the i18n catalog (`src/i18n`). Code comments in new or edited code are English, generic terms, no brand names - the same ban covers docs and commit messages (model and agent-harness names are exempt).
 4. **TypeScript strict** - zero errors, avoid `any`.
 5. **Theme variables only** - colors via `theme.css` (ANSI excepted); animations >= 100 ms.
 6. **Independent implementation** - never copy third-party source.

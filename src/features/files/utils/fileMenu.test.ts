@@ -110,4 +110,16 @@ describe('fileMenu', () => {
     // 远程面板不提供 handler → 不渲染
     expect(buildFileMenuItems(['sync-cwd'], ctx())).toHaveLength(0);
   });
+
+  it('offers refresh only when the panel provides a handler', () => {
+    const onRefresh = vi.fn();
+    const withHandler = buildFileMenuItems(['refresh'], ctx({ handlers: handlers({ onRefresh }) }));
+    expect(withHandler).toHaveLength(1);
+    expect(withHandler[0]!.label).toBe('刷新');
+    withHandler[0]!.onClick?.();
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+
+    // No handler (panel does not support it) means no item.
+    expect(buildFileMenuItems(['refresh'], ctx())).toHaveLength(0);
+  });
 });

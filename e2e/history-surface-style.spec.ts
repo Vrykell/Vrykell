@@ -29,7 +29,9 @@ for (const theme of ['dark', 'light'] as const) {
         return channels.reduce((sum, channel) => sum + channel, 0) / (color.startsWith('color(') ? 1 : 255);
       };
       const panel = document.querySelector('.settings-group-panel')!;
-      return tone(getComputedStyle(element).backgroundColor) > tone(getComputedStyle(panel).backgroundColor);
+      // The floating surface carries the background; the listbox inside only scrolls.
+      const surface = element.closest('.ui-select-menu') ?? element;
+      return tone(getComputedStyle(surface).backgroundColor) > tone(getComputedStyle(panel).backgroundColor);
     })).toBe(true);
     await page.screenshot({ path: testInfo.outputPath(`settings-clean-edges-${theme}.png`), animations: 'disabled' });
     await page.keyboard.press('Escape');

@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import ErrorBox from '@ui/ErrorBox';
-import { useDialogKeyboard } from '@ui/useDialogKeyboard';
+import ToolDialog from '@ui/ToolDialog';
 import { fmtSize } from '@ui/UiBtn';
 import { t } from '@i18n';
 import type { FileStat, FsEntry } from '@platform/api/types';
@@ -31,9 +31,7 @@ function extOf(name: string): string {
  * metadata reader, so this view never branches on the target.
  */
 export default function FilePropertiesDialog({ entry, location, stat, onClose }: Props) {
-  const dialog = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<StatState>({ status: 'loading' });
-  useDialogKeyboard(dialog, true, { onClose, initialFocus: '[data-testid="properties-close"]' });
 
   useEffect(() => {
     let alive = true;
@@ -62,72 +60,32 @@ export default function FilePropertiesDialog({ entry, location, stat, onClose }:
   }
 
   return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 9997,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'var(--overlay)',
-        animation: 'overlayIn 0.18s var(--ease)',
-      }}
-      onClick={onClose}
-      data-testid="file-properties-dialog"
-    >
-      <div
-        ref={dialog}
-        tabIndex={-1}
-        className="workspace-floating workspace-floating-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-label={t('Properties')}
-        style={{
-          width: 380, maxWidth: 'calc(100vw - 40px)', padding: 16,
-          display: 'flex', flexDirection: 'column', gap: 12,
-          animation: 'modalIn 0.22s var(--ease-out)',
-        }}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div style={{ fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)' }}>
-          {t('Properties')}
+    <ToolDialog label={t('Properties')} onClose={onClose} width={380} closePlacement="footer">
+      {state.status === 'loading' && (
+        <div role="status" style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>
+          {t('Reading properties…')}
         </div>
+      )}
 
-        {state.status === 'loading' && (
-          <div role="status" style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>
-            {t('Reading properties…')}
-          </div>
-        )}
+      {state.status === 'error' && (
+        <ErrorBox tone="error" title={t('Could not read properties')} style={{ overflowWrap: 'anywhere' }}>
+          {state.message}
+        </ErrorBox>
+      )}
 
-        {state.status === 'error' && (
-          <ErrorBox tone="error" title={t('Could not read properties')} style={{ overflowWrap: 'anywhere' }}>
-            {state.message}
-          </ErrorBox>
-        )}
-
-        {state.status === 'ready' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, userSelect: 'text' }}>
-            {rows.map((row) => (
-              <div key={row.key} style={{ display: 'flex', gap: 10, alignItems: 'baseline', fontSize: 'calc(12px * var(--ui-font-scale))', lineHeight: 1.5 }}>
-                <span style={{ width: 64, flexShrink: 0, color: 'var(--text-muted)' }}>{row.label}</span>
-                <span
-                  data-testid={`file-property-${row.key}`}
-                  style={{ flex: 1, minWidth: 0, color: 'var(--text-primary)', wordBreak: 'break-all' }}
-                >{row.value}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <button
-            onClick={onClose}
-            data-testid="properties-close"
-            style={{
-              padding: '5px 12px', fontSize: 'calc(12px * var(--ui-font-scale))', border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-inner)', background: 'transparent',
-              color: 'var(--text-secondary)', cursor: 'pointer',
-            }}
-          >{t('Close')}</button>
+      {state.status === 'ready' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, userSelect: 'text' }}>
+          {rows.map((row) => (
+            <div key={row.key} style={{ display: 'flex', gap: 10, alignItems: 'baseline', fontSize: 'calc(12px * var(--ui-font-scale))', lineHeight: 1.5 }}>
+              <span style={{ width: 64, flexShrink: 0, color: 'var(--text-muted)' }}>{row.label}</span>
+              <span
+                data-testid={`file-property-${row.key}`}
+                style={{ flex: 1, minWidth: 0, color: 'var(--text-primary)', wordBreak: 'break-all' }}
+              >{row.value}</span>
+            </div>
+          ))}
         </div>
-      </div>
-    </div>
+      )}
+    </ToolDialog>
   );
 }

@@ -224,6 +224,8 @@ pending ──(输入栏提交 / 133;C)──▶ executing ──(133;D)──�
 
 终端宽度随窗口、侧栏及分屏布局更新，调用 PTY 和活 xterm 的 resize，不使用横向滚动容器替代尺寸同步。完成块提取快照时仅按 xterm buffer 的 `isWrapped` 合并软换行，保留显式换行、空行、间距和颜色；历史输出随当前容器宽度重新换行。认证与屏幕快照仍保留物理网格行。终端历史使用纵向主题滚动条，提前预留滑块区域，避免溢出时列宽变化。
 
+画面刷新与 GPU 资源有独立约定（`services/terminalRepaint.ts`）：普通重绘（切回标签、pane 重新可见、块终端挂载）只从缓冲区 `refresh`，**不清空字形图集**——字体/主题/DPR 相同的终端共用一个图集，清空必须是应用级动作：清空一次并刷新全部活终端（pane 主终端 + 运行中块终端），页面从后台恢复（`visibilitychange`）走同一条路径并按事件合并为一次。丢弃渲染器（手动重绘、切换渲染器偏好、终端销毁）时显式交还 WebGL 上下文，避免触碰浏览器存活上下文上限后随机终端花屏。细节与上游修复见 `docs/zh/pitfalls.md` §4.9/§4.10。
+
 `TerminalBlockList` 按状态分组：
 
 | 分组 | 条件 | 渲染 |
@@ -366,9 +368,10 @@ T4   渲染帧
 | `src/features/files/services/localFileOps.ts` | 本地实现：`@platform/api/fs` + `@platform/path` |
 | `src/features/ssh/services/fileOps.ts` | 远程实现：SSH 命令 + POSIX 路径工具 |
 | `src/features/files/model/filePanelConfig.ts` | 面板配置：菜单条目 key 列表（行/多选/空白/更多）、拖放语义（拖出是否先下载、拖入是移动还是上传）、打开语义、测试标识 —— 「因状态而异」的部分只在这里 |
-| `src/features/files/hooks/useFileBrowser.ts` | 共用的浏览与操作状态机：目录加载、树形懒加载、选中、视图快照回退、剪贴板、回退历史（≤20 步）、新建/重命名/删除 |
+| `src/features/files/hooks/useFileBrowser.ts` | 共用的浏览与操作状态机：目录加载、树形懒加载、选中、访问轨迹回退/前进（每个目录一条记录）、剪贴板、回退历史（≤20 步）、新建/重命名/删除 |
 | `src/features/files/components/FilePanel.tsx` | 共用视图：顶栏面包屑（可编辑）、文件树、右键/空白/更多菜单、确认弹窗、拖放接线 |
 | `src/features/files/components/PanelFiles.tsx` / `src/features/ssh/components/RemoteFiles.tsx` | 薄封装：仅提供各自专有的菜单回调、图标、错误视图与下载管理入口 |
+| `src/features/files/services/localPath.ts` | 本地面板目录的会话内记忆：面板重挂载（SSH 视图切换 / 下载管理往返 / 移到另一侧）时恢复浏览目录，不落盘；远程面板的等价物是 `@features/ssh/utils/remotePath.ts` |
 
 约定：
 

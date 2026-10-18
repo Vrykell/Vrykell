@@ -1,3 +1,4 @@
+import UploadManager from '@features/files/components/UploadManager';
 import { preferredShell, useTerminalDefaults } from '@config/terminalDefaults';
 import { useEffect, useState } from 'react';
 import { openPath } from '@tauri-apps/plugin-opener';
@@ -10,6 +11,7 @@ import FilePanel from '@features/files/components/FilePanel';
 import DownloadManager from '@features/files/components/DownloadManager';
 import { openFile } from '@features/files/services/fileOpen';
 import { useWorkspaceDirsStore } from '@features/files/services/workspaceDirs';
+import { useLocalPathStore } from '@features/files/services/localPath';
 import type { FileOpsTarget } from '@features/files/model/fileOps';
 import { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
 import { useDockStore, useSessionStore } from '@features/workspace';
@@ -47,9 +49,11 @@ export default function PanelFiles() {
 
 /** 本地面板：只提供本地专有的菜单项、图标与磁盘视图。 */
 function LocalFiles() {
-  const [showDownloads, setShowDownloads] = useState(false);
+  const [transferPage, setTransferPage] = useState<'upload' | 'download' | null>(null);
   const workspaceDirs = useWorkspaceDirsStore();
-  // 起始目录只取一次终端 cwd；之后导航与终端解耦
+  const rememberedPath = useLocalPathStore((state) => state.remembered);
+  // Start directory: the session's remembered location, otherwise the focused terminal cwd.
+  // Navigation stays decoupled from the terminal afterwards.
   const { focusedPaneId: focused, activeCwd, sessions } = useActiveWorkspace();
 
   /** Open a local file with the system default application (menu item and path bar). */
@@ -87,12 +91,15 @@ function LocalFiles() {
     }
   };
 
-  if (showDownloads) return <DownloadManager onBack={() => setShowDownloads(false)} />;
+  if (transferPage === 'upload') return <UploadManager onBack={() => setTransferPage(null)} />;
+  if (transferPage === 'download') return <DownloadManager onBack={() => setTransferPage(null)} />;
 
   return (
     <FilePanel
       target={LOCAL_TARGET}
-      initialPath={activeCwd ?? null}
+      initialPath={rememberedPath ? rememberedPath.path : activeCwd ?? null}
+      initialResolved={rememberedPath !== null}
+      onPathChange={(next) => useLocalPathStore.getState().remember(next)}
       terminalCwd={activeCwd ?? null}
       openEntry={(entry) => void openFileInTerminal(entry)}
       onSyncToTerminal={(dir) => {
@@ -142,7 +149,8 @@ function LocalFiles() {
           }
         },
         onNewTabHere: (dir) => useSessionStore.getState().addTab({ cwd: dir, title: dir.split(/[\\/]/).filter(Boolean).pop() ?? dir }),
-        onOpenDownloads: () => setShowDownloads(true),
+        onOpenDownloads: () => setTransferPage('download'),
+        onOpenUploads: () => setTransferPage('upload'),
         onReveal: (entry) => void fileRevealInDir(entry.path).catch((error) =>
           useToastStore.getState().addToast(String((error as Error)?.message ?? error), 'error')),
         onRevealDir: (dir) => void fileRevealInDir(dir).catch((error) =>

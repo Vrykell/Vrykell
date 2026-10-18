@@ -46,10 +46,15 @@ test.describe('主题设置页', () => {
     await gotoSetting(page, '主题');
     const slider = page.locator('input[type="range"]');
     await expect(page.getByText('100%')).toBeVisible();
-    await slider.fill('0.45');
-    await expect(page.getByText('45%')).toBeVisible({ timeout: 3000 });
+    await slider.fill('0.65');
+    await expect(page.getByText('65%')).toBeVisible({ timeout: 3000 });
     const cfg = await themeConfig(page);
-    expect(cfg.opacity).toBeCloseTo(0.45, 1);
+    expect(cfg.opacity).toBeCloseTo(0.65, 1);
+    // The floor keeps the content readable: Home moves the slider to its minimum.
+    await slider.focus();
+    await page.keyboard.press('Home');
+    await expect(page.getByText('50%')).toBeVisible({ timeout: 3000 });
+    expect((await themeConfig(page)).opacity).toBeCloseTo(0.5, 1);
   });
 
   test('配置文件路径显示与重新加载不报错', async ({ page }) => {

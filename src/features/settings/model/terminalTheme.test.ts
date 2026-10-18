@@ -64,6 +64,18 @@ describe('terminalTheme store', () => {
     expect(useTerminalThemeStore.getState().config.opacity).toBe(0.3);
   });
 
+  it('update：后端授权完成前不应用壁纸 URL', async () => {
+    convertFileSrcMock.mockReturnValue('asset:///late.jpg');
+    let release: () => void = () => {};
+    invokeMock.mockImplementation(() => new Promise<void>(resolve => { release = () => resolve(); }));
+    const pending = useTerminalThemeStore.getState().update({ backgroundImage: '/c/late.jpg' });
+    expect(useTerminalThemeStore.getState().wallpaperDataUrl).toBeNull();
+    release();
+    await pending;
+    expect(useTerminalThemeStore.getState().wallpaperDataUrl).toBe('asset:///late.jpg');
+    expect(localStorage.getItem('vrykell-wallpaper-url')).toBe('asset:///late.jpg');
+  });
+
   it('exportTo / importFrom 透传后端', async () => {
     convertFileSrcMock.mockReturnValue('asset:///imp.jpg');
     invokeMock.mockResolvedValueOnce(undefined);

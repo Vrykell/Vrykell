@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-#[cfg(windows)]
-use tauri::Manager;
+use std::ffi::OsString;
+use tauri::{AppHandle, Emitter, Manager};
 
 #[derive(Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -119,7 +119,7 @@ pub async fn context_menu_manage(
 }
 
 fn directory_argument(
-    args: impl Iterator<Item = std::ffi::OsString>,
+    args: impl Iterator<Item = OsString>,
 ) -> Result<Option<String>, String> {
     let mut args = args.skip(1);
     while let Some(arg) = args.next() {
@@ -151,6 +151,70 @@ pub fn shell_launch_directory() -> Result<Option<String>, String> {
     result
 }
 
+/// Directories requested by a launch that was redirected to this already-running window.
+///
+/// The queue is the single source of truth: the frontend drains it when `shell-launch-forwarded`
+/// arrives, and the startup drain also picks up a request that landed before the webview could
+/// listen. Whoever takes an entry first is the only one to open it.
+#[derive(Default)]
+pub struct ForwardedLaunchDirectories(std::sync::Mutex<Vec<String>>);
+
+impl ForwardedLaunchDirectories {
+    fn push(&self, directory: String) {
+        if let Ok(mut directories) = self.0.lock() {
+            directories.push(directory);
+        }
+    }
+
+    fn take(&self) -> Vec<String> {
+        match self.0.lock() {
+            Ok(mut directories) => std::mem::take(&mut *directories),
+            Err(_) => Vec::new(),
+        }
+    }
+}
+
+/// Handles a second application launch that the single-instance plugin redirected here: the window
+/// comes to the front, and a `--open-directory` request waits in the queue for the frontend.
+pub fn handle_secondary_launch(app: &AppHandle, args: Vec<String>) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+    let directory = directory_argument(args.into_iter().map(OsString::from));
+    let requested = directory
+        .as_ref()
+        .map(|value| value.is_some())
+        .unwrap_or(true);
+    let queued = match directory {
+        Ok(Some(directory)) => match app.try_state::<ForwardedLaunchDirectories>() {
+            Some(pending) => {
+                pending.push(directory);
+                true
+            }
+            None => false,
+        },
+        Ok(None) | Err(_) => false,
+    };
+    if queued {
+        let _ = app.emit("shell-launch-forwarded", ());
+    }
+    crate::diagnostics::record(
+        "context-menu-forward",
+        serde_json::json!({ "requested": requested, "success": queued || !requested }),
+    )
+    .ok();
+}
+
+/// Drains directories forwarded to this window; the frontend opens one terminal tab per entry.
+#[tauri::command]
+pub fn shell_take_forwarded_directories(
+    state: tauri::State<'_, ForwardedLaunchDirectories>,
+) -> Vec<String> {
+    state.take()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -178,5 +242,13 @@ mod tests {
             directory_argument(args(&["app", "--open-directory", path])).unwrap(),
             Some(path.into())
         );
+    }
+    #[test]
+    fn forwarded_directories_drain_in_arrival_order() {
+        let pending = ForwardedLaunchDirectories::default();
+        pending.push("C:\\first".into());
+        pending.push("C:\\second".into());
+        assert_eq!(pending.take(), ["C:\\first", "C:\\second"]);
+        assert!(pending.take().is_empty());
     }
 }

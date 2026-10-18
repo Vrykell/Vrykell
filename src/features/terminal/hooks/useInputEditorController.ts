@@ -57,7 +57,7 @@ export function useInputEditorController({ paneId, focused, isLongRunning, onEnd
   }, [isFocused, visible]);
   const resetHeight = useCallback(() => { if (inputRef.current) inputRef.current.style.height = 'auto'; }, []);
   const { ghost, clearGhost, acceptCompletion, restoreCompletion } = useCommandCompletion({ text, aiMode: false, isFocused, visible, cwd: tabCwd, inputRef, setText });
-  const { reset: resetHistNav, navigate: navHistory } = useCommandHistoryNavigation({ text, setText, inputRef, onNavigate: clearGhost });
+  const { reset: resetHistNav, navigate: navHistory } = useCommandHistoryNavigation({ paneId, text, setText, inputRef, onNavigate: clearGhost });
 
   const execute = useCallback(() => {
     const latest = selectPaneInput(paneId)(useInputStore.getState());
@@ -88,7 +88,17 @@ export function useInputEditorController({ paneId, focused, isLongRunning, onEnd
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [visible, onEndPress]);
-  const handleChange = useCallback((event: ChangeEvent<HTMLTextAreaElement>) => { resetHistNav(); setText(event.target.value); }, [resetHistNav, setText]);
+  const handleChange = useCallback((event: ChangeEvent<HTMLTextAreaElement>) => {
+    resetHistNav();
+    const value = event.target.value;
+    const previous = useInputStore.getState().byPane[paneId]?.text ?? '';
+    // Command text never lands in diagnostics: lengths, the delta and the composition flag only.
+    terminalDebug('composer-input-change', {
+      paneId, chars: value.length, delta: value.length - previous.length,
+      composing: Boolean((event.nativeEvent as InputEvent).isComposing),
+    });
+    setText(value);
+  }, [paneId, resetHistNav, setText]);
   const handleKeyDown = useCallback((event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (!text.includes('\n') && (event.key === 'ArrowUp' || event.key === 'ArrowDown') && navHistory(event.key === 'ArrowUp' ? 1 : -1)) {
       event.preventDefault(); return;

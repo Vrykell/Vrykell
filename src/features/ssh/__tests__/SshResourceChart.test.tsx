@@ -10,6 +10,14 @@ it('grows the visible range by real elapsed minutes up to the retained five-minu
   expect(resourceHistoryWindow(60_000, 0)).toBe(60_000);
 });
 
+it('names the metric beside its maximum scale without changing the accessible chart name', () => {
+  render(<SshResourceChart endTime={0} label="Transfer history" caption="Throughput" maximumLabel="4 KB/s" />);
+  const chart = screen.getByRole('img', { name: 'Transfer history' });
+  const scale = chart.closest('.ssh-resource-chart')!.querySelector('.ssh-resource-chart-axis')!;
+  expect(scale.firstElementChild).toHaveTextContent('Throughput');
+  expect(scale.lastElementChild).toHaveTextContent('4 KB/s');
+});
+
 it('uses the visible minute range without stretching samples into unmeasured time', () => {
   expect(resourceTrendSegments([{ time: 0, value: 0 }, { time: 15_000, value: 50 }, { time: 30_000, value: 100 }], 30_000, 100, 60_000))
     .toEqual(['140.0,74.0 209.0,40.0 278.0,6.0']);
@@ -28,6 +36,18 @@ it('plots real readings on a fixed five-minute axis and bounds percentages', () 
     .toEqual(['250.4,74.0 264.2,40.0 278.0,6.0']);
   expect(resourceTrendSegments([{ time: 0, value: 120 }], 0)).toEqual(['278.0,6.0']);
   expect(resourceTrendSegments([], 0)).toEqual([]);
+});
+
+it('frames the measured range with horizontal and vertical grid lines', () => {
+  render(<SshResourceChart samples={[]} endTime={0} label="Usage grid" />);
+  const chart = screen.getByRole('img', { name: 'Usage grid' });
+  const frame = chart.querySelector('rect')!;
+  expect(frame).toHaveAttribute('x', '2');
+  expect(frame).toHaveAttribute('width', '276');
+  expect(frame).toHaveAttribute('height', '68');
+  const grid = [...chart.querySelectorAll('line')];
+  expect(grid.filter(line => line.getAttribute('x1') === line.getAttribute('x2'))).toHaveLength(7);
+  expect(grid.filter(line => line.getAttribute('y1') === line.getAttribute('y2'))).toHaveLength(3);
 });
 
 it('leaves gaps after interruptions and discards expired, future and invalid readings', () => {

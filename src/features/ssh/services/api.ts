@@ -250,8 +250,8 @@ export function sshCopy(id: string, paths: string[], destDir: string): Promise<S
 }
 
 /** 可回退删除：把远程条目移动到远端暂存目录，返回 原始→暂存 映射。 */
-export function sshStageDelete(id: string, paths: string[]): Promise<SshOpOutcome> {
-  return invoke('ssh_stage_delete', { id, paths });
+export function sshStageDelete(id: string, paths: string[], undoEnabled = true): Promise<SshOpOutcome> {
+  return invoke('ssh_stage_delete', { id, paths, ...(undoEnabled ? {} : { undoEnabled: false }) });
 }
 
 /** 回退删除：把暂存项移回原位。 */
@@ -262,11 +262,6 @@ export function sshRestoreStaged(id: string, items: SshOpPair[]): Promise<SshOpO
 /** 把暂存项永久删除（回退窗口结束后）。 */
 export function sshPurgeStaged(id: string, paths: string[]): Promise<void> {
   return invoke('ssh_purge_staged', { id, paths });
-}
-
-/** 清理远端暂存目录残留（面板挂载时调用一次）。 */
-export function sshSweepUndo(id: string): Promise<void> {
-  return invoke('ssh_sweep_undo', { id });
 }
 
 /** Upload a local path into a remote directory; resolves with the final remote path. */

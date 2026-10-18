@@ -65,6 +65,54 @@ test('native punctuation after composition does not replay the previous commit',
   expect((await ptyWrites(page)).slice(before)).toEqual(['你好', '，']);
 });
 
+test('an active preedit keeps a caret after the composition text', async ({ page }) => {
+  const input = page.locator('.xterm:visible .xterm-helper-textarea').first();
+  await input.evaluate(async node => {
+    const textarea = node as HTMLTextAreaElement;
+    textarea.focus();
+    textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+    textarea.value = "ni'hao";
+    textarea.dispatchEvent(new CompositionEvent('compositionupdate', { bubbles: true, data: "ni'hao" }));
+    await new Promise(resolve => setTimeout(resolve, 30));
+  });
+  const view = page.locator('.xterm:visible .composition-view.active');
+  // The renderer wraps the preedit in invisible directional marks so a mixed-direction preedit
+  // keeps its order; strip format characters before comparing the text the user composed.
+  await expect.poll(() => view.evaluate(node => (node.textContent ?? '').replace(/\p{Cf}/gu, ''))).toBe("ni'hao");
+  const caret = await view.evaluate(node => {
+    const style = getComputedStyle(node, '::after');
+    const box = node.getBoundingClientRect();
+    return {
+      content: style.content,
+      width: Number.parseFloat(style.width),
+      background: style.backgroundColor,
+      animation: style.animationName,
+      reserved: Number.parseFloat(getComputedStyle(node).paddingRight),
+      box: { right: Math.round(box.right), top: Math.round(box.top), height: Math.round(box.height) },
+    };
+  });
+  const cursorColor = await page.evaluate(() => {
+    const raw = getComputedStyle(document.documentElement).getPropertyValue('--xterm-cursor').trim();
+    return `rgb(${[1, 3, 5].map(offset => Number.parseInt(raw.slice(offset, offset + 2), 16)).join(', ')})`;
+  });
+  expect(caret.content).toBe('""');
+  expect(caret.width).toBeGreaterThan(0);
+  // The caret cell is reserved after the text, not painted over it.
+  expect(caret.reserved).toBeGreaterThanOrEqual(caret.width);
+  expect(caret.background).toBe(cursorColor);
+  expect(caret.animation).toBe('cursor-blink');
+  // The caret is actually painted: its cell differs from untouched cells beside it.
+  const caretCell = {
+    x: caret.box.right - caret.width / 2 - 1,
+    y: caret.box.top + 2,
+    width: 3,
+    height: Math.max(4, caret.box.height - 4),
+  };
+  const emptyCell = { ...caretCell, x: caret.box.right + 24 };
+  expect(await page.screenshot({ clip: caretCell, animations: 'disabled' }))
+    .not.toEqual(await page.screenshot({ clip: emptyCell, animations: 'disabled' }));
+});
+
 test('returning to a static TUI repaints its canvas without new PTY output', async ({ page }) => {
   const original = await page.evaluate(async () => {
     const path = '/src/features/workspace/stores/workspace.ts';
@@ -79,15 +127,16 @@ test('returning to a static TUI repaints its canvas without new PTY output', asy
   const originalPixels = await page.screenshot({ clip, animations: 'disabled' });
   await page.evaluate(() => {
     const terms = (window as unknown as { __vrykellTerms: Map<string, import('@xterm/xterm').Terminal> }).__vrykellTerms;
+    const state = window as unknown as { __surfaceRepaints: number };
+    state.__surfaceRepaints = 0;
     for (const [id, term] of terms) {
       if (id.startsWith('block:')) continue;
-      const clear = term.clearTextureAtlas.bind(term);
-      term.clearTextureAtlas = () => {
-        (window as unknown as { __surfaceRestores: number }).__surfaceRestores++;
-        clear();
+      const refresh = term.refresh.bind(term);
+      term.refresh = (start: number, end: number) => {
+        state.__surfaceRepaints++;
+        refresh(start, end);
       };
     }
-    (window as unknown as { __surfaceRestores: number }).__surfaceRestores = 0;
   });
   const other = await page.evaluate(async () => {
     const path = '/src/features/workspace/stores/workspace.ts';
@@ -101,10 +150,10 @@ test('returning to a static TUI repaints its canvas without new PTY output', asy
     useWorkspaceStore.getState().activate(id);
   }, original);
   await expect(canvas).toBeVisible();
-  await expect.poll(() => page.evaluate(() => (window as unknown as { __surfaceRestores: number }).__surfaceRestores)).toBeGreaterThan(0);
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __surfaceRepaints: number }).__surfaceRepaints)).toBeGreaterThan(0);
   await expectAnyTermContains(page, 'STATIC TUI');
   expect(await page.screenshot({ clip, animations: 'disabled' })).toEqual(originalPixels);
-  const restored = await page.evaluate(() => (window as unknown as { __surfaceRestores: number }).__surfaceRestores);
+  const restored = await page.evaluate(() => (window as unknown as { __surfaceRepaints: number }).__surfaceRepaints);
   await page.evaluate(async ({ original, other }) => {
     const path = '/src/features/workspace/stores/workspace.ts';
     const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
@@ -112,7 +161,7 @@ test('returning to a static TUI repaints its canvas without new PTY output', asy
     useWorkspaceStore.getState().activate(other);
     useWorkspaceStore.getState().activate(original);
   }, { original, other });
-  await expect.poll(() => page.evaluate(() => (window as unknown as { __surfaceRestores: number }).__surfaceRestores)).toBeGreaterThan(restored);
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __surfaceRepaints: number }).__surfaceRepaints)).toBeGreaterThan(restored);
   await canvas.screenshot({ path: test.info().outputPath('restored-static-tui.png') });
 });
 

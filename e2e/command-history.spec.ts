@@ -70,6 +70,34 @@ test('uses purposeful sorting submenus and direct settings in wide and narrow hi
   }
 });
 
+test('refreshes the library from the actions menu and the blank list background', async ({ page }) => {
+  const panel = page.getByTestId('command-history-panel');
+  const menu = page.getByRole('menu', { name: '历史命令操作', exact: true });
+  const external = page.getByTestId('command-history-deploy');
+  await page.evaluate(() => {
+    const runs = JSON.parse(localStorage.getItem('mock-command-history-runs')!) as Record<string, unknown>[];
+    runs.push({ id: 'deploy', target: 'local', shell: 'system', command: 'npm run deploy', cwd: '/home/e2e/project', status: 'success', exitCode: 0, timestamp: 4000, runCount: 1 });
+    localStorage.setItem('mock-command-history-runs', JSON.stringify(runs));
+  });
+  await expect(external).toHaveCount(0);
+
+  // The ⋯ menu re-reads preferences and recorded runs
+  await panel.getByRole('button', { name: '历史命令操作', exact: true }).click();
+  await menu.getByRole('button', { name: '刷新', exact: true }).click();
+  await expect(external).toBeVisible({ timeout: 2500 });
+
+  // The blank area below the list opens the same panel menu
+  await page.evaluate(() => {
+    const runs = JSON.parse(localStorage.getItem('mock-command-history-runs')!) as { id: string }[];
+    localStorage.setItem('mock-command-history-runs', JSON.stringify(runs.filter(run => run.id !== 'deploy')));
+  });
+  await expect(external).toBeVisible();
+  const body = (await panel.locator('.command-history-body').boundingBox())!;
+  await page.mouse.click(body.x + 40, body.y + body.height - 10, { button: 'right' });
+  await menu.getByRole('button', { name: '刷新', exact: true }).click();
+  await expect(external).toHaveCount(0, { timeout: 2500 });
+});
+
 test('browses, fills, favorites, renames and restores hidden project commands across reloads', async ({ page }) => {
   const panel = page.getByTestId('command-history-panel');
   const before = await page.evaluate(() => (window as unknown as { __PTY_WRITES__: string[] }).__PTY_WRITES__?.length ?? 0);
@@ -197,6 +225,30 @@ test('keeps command rows compact, reveals details without execution and expands 
   await page.screenshot({ path: test.info().outputPath('compact-command-favorites.png') });
 });
 
+test('remembers folded sections and groups across reloads while saving them after search', async ({ page }) => {
+  const panel = page.getByTestId('command-history-panel');
+  const history = page.getByTestId('command-group-history');
+  await panel.getByRole('button', { name: '历史命令操作', exact: true }).click();
+  await page.getByRole('button', { name: '新建命令分组', exact: true }).click();
+  const name = page.getByRole('textbox', { name: '重命名命令分组', exact: true });
+  await name.fill('Release');
+  await name.press('Enter');
+  const group = panel.locator('.command-history-group').filter({ has: page.getByRole('button', { name: 'Release', exact: true }) });
+  await group.getByRole('button', { name: 'Release', exact: true }).click();
+  await history.getByRole('button', { name: '未分组命令', exact: true }).click();
+  await expect(page.getByTestId('command-history-build')).toBeHidden();
+  await page.screenshot({ path: test.info().outputPath('command-sections-folded.png') });
+  await page.reload();
+  await expect(history.getByRole('button', { name: '未分组命令', exact: true })).toHaveAttribute('aria-expanded', 'false');
+  await expect(group.getByRole('button', { name: 'Release', exact: true })).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByTestId('command-history-build')).toBeHidden();
+  const search = panel.getByRole('textbox', { name: '搜索历史命令', exact: true });
+  await search.fill('npm');
+  await expect(page.getByTestId('command-history-build')).toBeVisible();
+  await search.fill('');
+  await expect(page.getByTestId('command-history-build')).toBeHidden();
+});
+
 test('sorts by frequency across reloads and displays full long commands in a narrow sidebar', async ({ page }) => {
   const command = 'npm run build -- --mode production --base /preview/ --outDir dist/production';
   await page.evaluate(command => {
@@ -257,6 +309,8 @@ test('persists command groups, colors and membership through edits and group del
   await panel.getByRole('textbox', { name: '搜索历史命令', exact: true }).fill('npm');
   await expect(group.getByTestId('command-history-build')).toBeVisible();
   await panel.getByRole('textbox', { name: '搜索历史命令', exact: true }).fill('');
+  await expect(row).toBeHidden();
+  await group.getByRole('button', { name: 'Release', exact: true }).click();
   await row.hover();
   await row.getByRole('button', { name: '命令操作', exact: true }).click();
   await page.getByRole('button', { name: '编辑命令', exact: true }).click();

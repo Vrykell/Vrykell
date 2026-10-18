@@ -1,6 +1,7 @@
+import { useFileUndoSettings } from '@config/fileUndo';
 import {
   sshFsList, sshSearchFiles, sshRename, sshCreateFile, sshCreateDir, sshMove, sshCopy,
-  sshStageDelete, sshRestoreStaged, sshPurgeStaged, sshSweepUndo, sshUpload, sshDownload, sshStat,
+  sshStageDelete, sshRestoreStaged, sshPurgeStaged, sshUpload, sshDownload, sshStat,
 } from '@features/ssh/services/api';
 import { normalizeRemotePath, parentOfRemote, joinRemote } from '@features/ssh/utils/remotePath';
 import type { FileOpOutcome, FileOps } from '@features/files/model/fileOps';
@@ -39,10 +40,9 @@ export function createSshFileOps(connectionId: string): FileOps {
     rename: (path, newName) => sshRename(connectionId, path, newName),
     move,
     copy: (paths, destDir) => sshCopy(connectionId, paths, destDir),
-    stageDelete: (paths) => sshStageDelete(connectionId, paths),
+    stageDelete: (paths) => useFileUndoSettings.getState().remote ? sshStageDelete(connectionId, paths) : sshStageDelete(connectionId, paths, false),
     restoreStaged: (pairs) => sshRestoreStaged(connectionId, pairs),
     purgeStaged: (paths) => sshPurgeStaged(connectionId, paths),
-    sweepUndo: () => sshSweepUndo(connectionId),
     upload: (dir, localPath) => sshUpload(connectionId, dir, localPath),
     download: (path) => sshDownload(connectionId, path),
   };

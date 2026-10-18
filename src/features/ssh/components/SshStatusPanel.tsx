@@ -16,6 +16,7 @@ import SshResourceChart, { RESOURCE_HISTORY_MS, resourceHistoryWindow, type Reso
 import SshNetworkProbe from './SshNetworkProbe';
 import SshNetworkRates from './SshNetworkRates';
 import { networkRates, type NetworkRateSample } from '../model/networkRates';
+import { terminalDebug } from '@features/terminal/services/terminalDebug';
 import './SshStatusPanel.css';
 import { forgetSshAuthentication, requestSshAuthentication, useHasTemporarySshAuthentication, useSshAuthenticationRevision } from '../hooks/useSessionAuthentication';
 
@@ -46,14 +47,11 @@ export function cpuUsage(previous: SshSystemStatus | null, current: SshSystemSta
 
 function Metric({ resource = 'cpu', label, used, total, percentage, detail }: { resource?: 'cpu' | 'memory' | 'disk'; label: string; used?: number | null; total?: number | null; percentage?: number | null; detail?: string }) {
   const percent = percentage !== undefined ? percentage : used != null && total != null && total > 0 ? used / total * 100 : null;
-  const reading = used != null && total != null ? `${fmtSize(used)} / ${fmtSize(total)}` : null;
+  const reading = used != null && total != null ? `${fmtSize(used).replace(/ /g, '\u00a0')} / ${fmtSize(total).replace(/ /g, '\u00a0')}` : null;
   return <div className="ssh-status-metric" data-resource={resource}>
-    <span className="ssh-status-metric-label" data-tip={label}>{resource === 'cpu' ? 'CPU' : t(resource === 'memory' ? 'Memory' : 'Root disk')}</span>
-    <div className="ssh-status-meter" data-empty={percent == null || undefined} role={percent == null ? undefined : 'meter'} aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent == null ? undefined : Math.round(percent)}>
-      <i data-level={percent == null ? 'unknown' : percent >= 90 ? 'critical' : percent >= 80 ? 'warning' : 'normal'} style={{ width: `${Math.max(0, Math.min(100, percent ?? 0))}%` }} />
-    </div>
-    <strong className="ssh-status-metric-value" data-empty={percent == null || undefined}>{percent == null ? t('Unavailable') : `${Math.round(percent)}%`}</strong>
-    <span className="ssh-status-caption ssh-status-metric-caption">{detail ?? reading ?? t('Usage details unavailable')}</span>
+    <dt className="ssh-status-metric-label" data-tip={label}>{resource === 'cpu' ? 'CPU' : t(resource === 'memory' ? 'Memory' : 'Root disk')}</dt>
+    <dd className="ssh-status-metric-value" data-testid={`ssh-resource-${resource}`} data-empty={percent == null || undefined}>{percent == null ? t('Unavailable') : `${Math.round(percent)}%`}</dd>
+    <dd className="ssh-status-caption ssh-status-metric-caption">{detail ?? reading ?? t('Usage details unavailable')}</dd>
   </div>;
 }
 
@@ -110,7 +108,8 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
   useEffect(() => { if (openRequest > 0) setOpen(true); }, [openRequest]);
   useEffect(() => { if (toggleRequest > 0) setOpen(value => !value); }, [toggleRequest]);
   const connected = (state.phase === 'connected' || state.phase === 'interactive') && !state.retrying;
-  const address = `${target.user ? `${target.user}@` : ''}${target.host}:${target.port ?? 22}`;
+  const host = target.host.includes(':') && !target.host.startsWith('[') ? `[${target.host}]` : target.host;
+  const address = `${target.user ? `${target.user}@` : ''}${host}:${target.port ?? 22}`;
   const unsupported = !target.connectionId ? t('Save this connection to monitor remote resources.') : target.jumpHost && target.jumpHost.toLowerCase() !== 'none' ? t('Resource monitoring is unavailable for jump hosts.') : null;
 
   useEffect(() => {
@@ -137,11 +136,21 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
   }, [displayOpen]);
 
   useEffect(() => {
+    terminalDebug('ssh-resource-poll', { phase: 'effect', visible: displayOpen, connected, paused, unsupported: !!unsupported });
     if (!displayOpen || !connected || paused || unsupported || !target.connectionId) return;
     let disposed = false;
+    let blocked = false;
+    let authenticationBlocked = false;
     let timer: ReturnType<typeof setTimeout>;
     const collect = async () => {
-      if (document.hidden || inFlight.current) { timer = setTimeout(() => void collect(), 1000); return; }
+      if (disposed || authenticationBlocked) return;
+      if (document.hidden || inFlight.current) {
+        if (!blocked) terminalDebug('ssh-resource-poll', { phase: 'waiting', hidden: document.hidden, inFlight: inFlight.current });
+        blocked = true;
+        timer = setTimeout(() => void collect(), 1000); return;
+      }
+      blocked = false;
+      terminalDebug('ssh-resource-poll', { phase: 'request' });
       inFlight.current = true;
       setBusy(true);
       let nextDelay = 15000;
@@ -170,15 +179,22 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
           pushPercent(setMemoryHistory, result.memoryTotal != null && result.memoryAvailable != null ? result.memoryTotal - result.memoryAvailable : null, result.memoryTotal);
           pushPercent(setDiskHistory, result.diskUsed, result.diskTotal);
         }
-      } catch (reason) { if (!disposed) { setError(String(reason)); nextDelay = 30000; retryAllowed = !isSshAuthenticationFailure(String(reason)); } }
+      } catch (reason) { if (!disposed) { setError(String(reason)); nextDelay = 30000; retryAllowed = !isSshAuthenticationFailure(String(reason)); authenticationBlocked = !retryAllowed; } }
       finally {
         inFlight.current = false;
         setBusy(false);
-        if (!disposed && retryAllowed) { timer = setTimeout(() => void collect(), nextDelay); }
+        if (!disposed && retryAllowed) {
+          terminalDebug('ssh-resource-poll', { phase: 'scheduled', delayMs: nextDelay });
+          timer = setTimeout(() => void collect(), nextDelay);
+        }
       }
     };
+    const resumeVisible = () => {
+      if (!document.hidden && !inFlight.current) { clearTimeout(timer); void collect(); }
+    };
+    document.addEventListener('visibilitychange', resumeVisible);
     void collect();
-    return () => { disposed = true; clearTimeout(timer); };
+    return () => { disposed = true; clearTimeout(timer); document.removeEventListener('visibilitychange', resumeVisible); terminalDebug('ssh-resource-poll', { phase: 'stopped' }); };
   }, [displayOpen, connected, paused, unsupported, target.connectionId, target.host, target.port, target.user, refresh, authenticationRevision]);
 
   const close = () => { setOpen(false); (statusTrigger ?? trigger.current)?.focus(); };
@@ -242,7 +258,8 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
   };
   const stale = !sampleValid || !connected || !!error || paused || (updatedAt != null && now - updatedAt > 30000);
   const authenticationFailed = isSshAuthenticationFailure(error);
-  const historyWindow = resourceHistoryWindow(trafficHistory[0]?.time, now);
+  const chartTime = updatedAt ?? now;
+  const historyWindow = resourceHistoryWindow(trafficHistory[0]?.time, chartTime);
   const resourceSeries = [
     { label: 'CPU', samples: cpuHistory, color: 'var(--chart-blue)' },
     { label: t('Memory'), samples: memoryHistory, color: 'var(--chart-violet)' },
@@ -265,20 +282,20 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
       }}><ResizeHandle axis="x" edge="left" onDelta={resize} onUp={commitResize} testId="ssh-status-resize-handle" /></div>}
       <aside id={panelId} aria-label={t('SSH status')} data-testid="ssh-status-panel" className="ssh-status-panel" style={{ display: folded ? 'none' : undefined }} onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); close(); } }}>
         <div className="ssh-status-scroll scroll-region">
-          <header><strong>{t('Remote resources')}</strong><div className="ssh-status-header-actions">
+          <header className="sidebar-heading">
+            <div className="ssh-status-endpoint"><strong className="ssh-status-identity" data-tip={address}>{address}</strong><IconBtn compact title={t('Copy connection address')} onClick={() => { void writeClipboardText(address).catch(reason => useToastStore.getState().addToast(String(reason), 'error')); }}><Copy size={iconSizes.copy} /></IconBtn></div>
+            <div className="ssh-status-header-actions">
             <IconBtn title={t('Refresh remote resources')} disabled={!connected || !!unsupported || busy} onClick={() => { setPaused(false); setRefresh(value => value + 1); }}><RefreshCw size={iconSizes.compact} /></IconBtn>
             <IconBtn title={t('Close SSH status')} onClick={close}><X size={iconSizes.control} /></IconBtn>
           </div></header>
-          <section className="ssh-status-overview">
-            <div className="ssh-status-identity-row"><div className="ssh-status-identity">{target.name || target.host}</div><span className="ssh-status-phase" data-tip={t('Connection status')}><i className="ssh-status-dot" data-phase={state.phase} />{state.retrying ? t('Reconnecting…') : t(phaseLabels[state.phase])}</span></div>
-            <div className="ssh-status-address"><span data-tip={address}>{address}</span><IconBtn title={t('Copy connection address')} onClick={() => { void writeClipboardText(address).catch(reason => useToastStore.getState().addToast(String(reason), 'error')); }}><Copy size={iconSizes.compact} /></IconBtn></div>
-            {onReconnect && (state.phase === 'disconnected' || state.retrying) && <TextButton className="ssh-status-reconnect" disabled={reconnecting} onClick={() => {
+          {onReconnect && (state.phase === 'disconnected' || state.retrying) && <section className="ssh-status-overview">
+            <TextButton className="ssh-status-reconnect" disabled={reconnecting} onClick={() => {
               setReconnecting(true);
               void onReconnect().catch(reason => useToastStore.getState().addToast(String(reason), 'error')).finally(() => setReconnecting(false));
-            }}>{t('Reconnect SSH session')}</TextButton>}
-          </section>
+            }}>{t('Reconnect SSH session')}</TextButton>
+          </section>}
           <SshNetworkProbe host={target.host} port={target.port ?? 22} jumpHost={target.jumpHost} paused={paused} revision={refresh}>
-            {sample && <SshNetworkRates samples={trafficHistory} now={now} windowMs={historyWindow} available={sample.networkReceived != null || sample.networkTransmitted != null} />}
+            {sample && <SshNetworkRates samples={trafficHistory} now={chartTime} windowMs={historyWindow} available={sample.networkReceived != null || sample.networkTransmitted != null} />}
           </SshNetworkProbe>
           <section className="ssh-status-resource">
             <div className="ssh-status-section-heading"><h3>{t('Resource usage')}</h3></div>
@@ -292,12 +309,12 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
                   <ul className="ssh-resource-legend" aria-label={t('Resource chart legend')}>
                     {resourceSeries.map(series => <li key={series.label}><i style={{ background: series.color }} aria-hidden="true" />{series.label}</li>)}
                   </ul>
-                  <SshResourceChart series={resourceSeries} endTime={now} windowMs={historyWindow} label={t('Resource usage history')} />
-                  <div className="ssh-status-metrics">
+                  <SshResourceChart series={resourceSeries} endTime={chartTime} windowMs={historyWindow} label={t('Resource usage history')} caption={t('Resource utilization')} />
+                  <dl className="ssh-status-metrics" aria-label={t('Current resource readings')}>
                     <Metric label={t('CPU usage')} percentage={cpu} detail={cpu != null ? t('{{percent}}% idle', { percent: 100 - Math.round(cpu) }) : t(sample.cpuTotal != null ? 'CPU usage requires two samples.' : 'Usage details unavailable')} />
                     <Metric resource="memory" label={t('Memory usage')} used={sample.memoryTotal != null && sample.memoryAvailable != null ? sample.memoryTotal - sample.memoryAvailable : null} total={sample.memoryTotal} />
                     <Metric resource="disk" label={t('Root disk usage')} used={sample.diskUsed} total={sample.diskTotal} />
-                  </div>
+                  </dl>
                 </div>
                 <details className="ssh-status-system-section ssh-status-details">
                   <summary>{t('System information')}<ChevronRight size={iconSizes.compact} /></summary>

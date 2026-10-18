@@ -41,6 +41,8 @@ function registerField(id: string, page: PageId, label: string, description: str
   } });
 }
 
+registerField('local-file-undo', 'file-operations', 'Local file undo', 'File operations');
+registerField('remote-file-undo', 'file-operations', 'Remote file undo', 'File operations');
 registerField("startup", "startup", "Open on startup", "Restore sessions or open a default terminal", () => useStartupSettings.getState().mode);
 registerField('history-run-target', 'command-history', 'Command execution target', 'Choose where commands run from the history panel.', () => useCommandHistorySettings.getState().runIn);
 registerField('history-double-click', 'command-history', 'Double-click command', 'Double-click inserts the command by default. Execution follows the selected target.', () => useCommandHistorySettings.getState().doubleClick);

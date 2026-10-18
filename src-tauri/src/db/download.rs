@@ -55,6 +55,11 @@ impl HistoryDb {
             .map_err(|e| e.to_string())?;
         Ok(())
     }
+
+    pub fn remove_download_id(&self, id: i64) -> Result<(), String> {
+        self.conn().execute("DELETE FROM downloads WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
+        Ok(())
+    }
 }
 
 /// 下载历史记录（文件管理「下载管理」页使用）。

@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800" fill="none">
+  <title>Vrykell — Geometric Flat App Icon</title>
+  <desc>Hand-constructed flat brand mark: three geometric components with two clipped color insets. The 800x620 artwork is centered on a square canvas so the same source drives the desktop icon bundle and the browser favicon. No raster, filters, tracing, glow, or strokes.</desc>
+  <!-- Regenerate with `npm run tauri -- icon src-tauri/icons/icon.svg`; keep only the desktop outputs and mirror the source to public/app-icon.svg. -->
+
+  <!-- The three module outlines are the single sources of truth for the silhouettes. -->
+  <defs>
+    <path id="left-body"
+      d="M104.74 45
+         H237.29
+         A58 58 0 0 1 288.08 75
+         L503.4 465.53
+         A74.5 74.5 0 0 1 438.16 576
+         H379.72
+         A64.5 64.5 0 0 1 323.24 542.64
+         L75.84 93.93
+         A33 33 0 0 1 104.74 45 Z"/>
+    <path id="upper-body"
+      d="M500 41
+         C483 41 466 54 466 72
+         V110
+         C466 125 472 136 485 145
+         L591 210
+         C541 246 498 289 474.72 322.87
+         A28 28 0 0 0 473.18 352.08
+         L529 455
+         C537 470 547 469 556 455
+         L710 228
+         C726 205 724 185 704 171
+         L520 47
+         C513 43 506 41 500 41 Z"/>
+    <clipPath id="left-crop"><use href="#left-body"/></clipPath>
+    <clipPath id="upper-crop"><use href="#upper-body"/></clipPath>
+  </defs>
+
+  <!-- Square icon canvas: the original 800x620 artwork stays untouched and is centered vertically. -->
+  <g transform="translate(0 90)">
+    <!-- 01 | Geometric diagonal stem: one silhouette, two flat curved panels -->
+    <g id="stem" transform="translate(-7 0)">
+      <use href="#left-body" fill="#169AF0"/>
+      <g clip-path="url(#left-crop)">
+        <path id="stem-middle"
+          d="M107 169
+             C227 163 359 234 449 367
+             C419 431 363 480 301 508
+             L270 660 H-30 V164 Z"
+          fill="#145BD9"/>
+        <path id="stem-bottom"
+          d="M449 367
+             C419 431 363 480 301 508
+             L347 660 H660 V360 Z"
+          fill="#19349F"/>
+      </g>
+    </g>
+
+    <!-- 02 | Angular upper ribbon, with a rounded outer turn -->
+    <g id="prompt-chevron" transform="translate(7 -7)">
+      <use href="#upper-body" fill="#089FDC"/>
+      <g clip-path="url(#upper-crop)">
+        <path id="chevron-cyan"
+          d="M440 12 H651 V101
+             C646 155 624 191 591 210
+             L420 150 Z"
+          fill="#14CADA"/>
+        <path id="chevron-blue"
+          d="M591 210
+             C621 240 638 292 638 351
+             L579 485 H454 L448 335
+             C491 278 539 241 591 210 Z"
+          fill="#0885CC"/>
+      </g>
+    </g>
+
+    <!-- 03 | Secondary prompt cursor: flat angled capsule -->
+    <path id="cursor" transform="translate(10 8)"
+      d="M622 433 H727
+         C745 433 753 448 745 462
+         L701 537
+         C692 553 678 560 661 560
+         H560
+         C543 560 536 546 543 531
+         L590 453
+         C599 440 607 433 622 433 Z"
+      fill="#08C9B0"/>
+  </g>
+</svg>

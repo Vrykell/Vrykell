@@ -102,7 +102,10 @@ input, textarea, [contenteditable="true"] { caret-color: var(--text-caret); }
 .command-token[data-kind="string"] { color: var(--cmd-string); }
 .command-token[data-kind="operator"] { color: var(--cmd-pipe); }
 .command-token[data-kind="comment"] { color: var(--text-muted); }
-.command-completion-suffix { color: var(--text-muted); opacity: 0.65; }
+/* The muted completion suffix may break at any character: an unbroken long path glues to the
+ * word the user just typed, and the line breaker then moves that whole word to the next line —
+ * below the mirror's clipped height — so the character would never paint. */
+.command-completion-suffix { color: var(--text-muted); opacity: 0.65; word-break: break-all; }
 .command-completion-action { display: inline-block; vertical-align: middle; margin-left: 8px; pointer-events: auto; line-height: 1; }
 .command-completion-trigger { justify-content: center; height: 20px; }
 .command-completion-trigger .key-hint, .checkbox-menu-compact .key-hint { min-height: 16px; padding: 0; background: transparent; color: inherit; }
@@ -139,6 +142,7 @@ input, textarea, [contenteditable="true"] { caret-color: var(--text-caret); }
 .tool-dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-shrink: 0; padding: 8px 8px 0 16px; }
 .tool-dialog-heading > strong { min-width: 0; font-size: var(--fs-body); font-weight: var(--fw-semibold); }
 .tool-dialog-body { min-height: 0; overflow-y: auto; padding: 12px 16px 16px; }
+.tool-dialog-footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-shrink: 0; padding: 0 16px 12px; }
 html[data-tool-window="true"], html[data-tool-window="true"] body, html[data-tool-window="true"] #root { width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; }
 .tool-window { display: flex; flex-direction: column; width: 100%; height: 100dvh; min-height: 0; border: 0; border-radius: 0; box-shadow: none; background: var(--surface); color: var(--text-primary); font: var(--fs-caption)/1.5 var(--font-ui); }
 .tool-window-heading { cursor: grab; user-select: none; touch-action: none; -webkit-app-region: no-drag; gap: 0; padding: 0 0 0 16px; height: 40px; }
@@ -408,7 +412,7 @@ button.activity-button {
 button.activity-button:hover { background: var(--control-hover-bg) !important; color: var(--icon-hover-color) !important; }
 button.activity-button[aria-pressed="true"] { background: var(--chrome-field) !important; color: var(--text-primary) !important; }
 .workspace-search:focus-visible, .activity-button:focus-visible, .workspace-settings:focus-visible, .workspace-panel-close:focus-visible { outline: none; background: var(--hover); }
-.workspace-panel-heading { display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 4px 8px 4px 12px; font-size: calc(13px * var(--ui-font-scale)); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.workspace-panel-heading, .sidebar-heading { display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 4px 8px 4px 12px; font-size: calc(13px * var(--ui-font-scale)); font-weight: var(--fw-semibold); color: var(--text-primary); }
 .workspace-panel-heading { cursor: grab; user-select: none; touch-action: none; -webkit-app-region: no-drag; }
 .workspace-panel-heading[data-dragging="true"] { cursor: grabbing; }
 .workspace-sidebar-toolbar { display: flex; align-items: center; gap: 4px; padding: 6px 10px 8px; position: relative; flex-shrink: 0; }
@@ -527,12 +531,16 @@ button.outline-button > svg { flex-shrink: 0; }
 button.outline-button:enabled:is(:hover, :focus) { background: var(--action-button-hover-bg); }
 button.outline-button:disabled { opacity: 0.45; cursor: default; }
 
-/* Windows/Linux 鏃犳湁鍘熺敓鏍囬鏍忔椂鐨勭獥鍙ｆ帶鍒舵寜閽?*/
+/* Window controls fill the titlebar edge on platforms without a native one. The buttons
+   opt out of the default button surface: a pointer click focuses them, so the generic
+   focus tint would linger after the pointer leaves. Their own rules paint only while the
+   pointer is over them or the keyboard focus is visible. */
 button.window-control-button {
   background: transparent;
   color: var(--text-secondary);
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
-.window-control-button:hover {
+.window-control-button:is(:hover, :focus-visible) {
   background: var(--button-hover);
   color: var(--text-primary);
 }
@@ -976,7 +984,7 @@ input.text-input-field:disabled { opacity: 0.55; }
 ::-webkit-scrollbar-track:vertical { margin-block: 4px; }
 ::-webkit-scrollbar-track:horizontal { margin-inline: 4px; }
 /* Terminals keep exactly one scrollbar: the themed DOM one (`.xterm-scrollable-element >
-   .scrollbar`, styled below). The native one on the viewport doubles up with it, and inside
+   .xterm-scrollbar`, styled below). The native one on the viewport doubles up with it, and inside
    its 8px lane the thumb shrinks to a ~4px light sliver that reads as a stray line beside a
    selection. Wheel, trackpad and keyboard scrolling are unaffected. This covers every xterm
    surface: pane, connection page and fullscreen TUI. */
@@ -1033,10 +1041,10 @@ input.text-input-field:disabled { opacity: 0.55; }
 .xterm .xterm-screen { flex-shrink: 0; }
 
 /* Preserve the terminal's own scrollbar visibility and drag behavior. */
-[data-testid^="pane-"] .xterm .xterm-scrollable-element > .scrollbar > .slider {
+[data-testid^="pane-"] .xterm .xterm-scrollable-element > .xterm-scrollbar > .xterm-slider {
   border-radius: 4px;
 }
-.xterm .xterm-scrollable-element > .scrollbar.vertical > .slider { clip-path: inset(4px 0 round 4px); }
+.xterm .xterm-scrollable-element > .xterm-scrollbar.xterm-vertical > .xterm-slider { clip-path: inset(4px 0 round 4px); }
 
 @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes toastOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(8px); } }
@@ -1066,11 +1074,28 @@ input.text-input-field:disabled { opacity: 0.55; }
  * own xterm scroll surfaces would only stack a second, redundant scrollbar (and an asymmetric
  * right gutter) on top of the block-list scroller. */
 [data-testid="running-term"] .xterm .xterm-viewport { overflow-y: hidden; }
-[data-testid="running-term"] .xterm .xterm-scrollable-element > .scrollbar { display: none; }
+[data-testid="running-term"] .xterm .xterm-scrollable-element > .xterm-scrollbar { display: none; }
 
 /* Input helpers retain their geometry for native composition but never paint text. */
 .xterm .xterm-helper-textarea { opacity: 0 !important; color: transparent !important; -webkit-text-fill-color: transparent !important; background: transparent !important; border: none !important; box-shadow: none !important; }
 .xterm .xterm-helpers .composition-view { background: var(--xterm-bg); color: var(--xterm-foreground); }
+/* The preedit mirror carries no caret of its own - the native one lives in the invisible
+ * helper textarea - and it covers the block cursor, so an active composition would show
+ * text with no insertion point. Reserve a cell after the text and paint the terminal
+ * cursor colour into it, blinking on the renderer's one-second cycle. The caret is
+ * positioned against the box edge on purpose: newer terminal builds lay this overlay out
+ * right-to-left, where an in-flow element would land before the text. */
+.xterm .xterm-helpers .composition-view.active { padding-right: 1ch; }
+.xterm .xterm-helpers .composition-view.active::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1ch;
+  background: var(--xterm-cursor);
+  animation: cursor-blink 1s step-end infinite;
+}
 /* The overview border otherwise cuts through selected cells near the right edge. */
 .xterm .xterm-decoration-overview-ruler { display: none; }
 
@@ -1238,3 +1263,8 @@ textarea.config-text-input { display: block; width: 100% !important; border: non
 .settings-view textarea.config-text-input { font-family: var(--font-ui) !important; }
 textarea.config-text-input[data-font="ui"] { font-family: var(--font-ui) !important; }
 .config-text-area:focus-within { border-color: var(--border-strong); }
+.transfer-record { position: relative; box-sizing: border-box; min-height: 56px; border-radius: var(--radius-inner); transition: background 120ms var(--ease); }
+.transfer-record:is(:hover, :focus-within) { background: var(--hover); }
+.transfer-actions { position: absolute; top: 50%; right: 10px; display: flex; align-items: center; gap: 2px; opacity: 0; pointer-events: none; transform: translateY(-50%); transition: opacity 120ms var(--ease); }
+.transfer-record:is(:hover, :focus-within) .transfer-actions { opacity: 1; pointer-events: auto; }
+.transfer-actions .transfer-action { flex: 0 0 auto; }

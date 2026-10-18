@@ -50,4 +50,17 @@ describe('filePanelConfig menus', () => {
     expect(local.menus.blank).toEqual(expect.arrayContaining(['paste', 'new-tab-here']));
     expect(ssh.menus.blank).toEqual(expect.arrayContaining(['paste', 'upload-file', 'upload-dir']));
   });
+
+  it('offers refresh in both panel-level menus of both panels, but not in the row menus', () => {
+    const local = filePanelConfigFor({ kind: 'local' });
+    const ssh = filePanelConfigFor({ kind: 'ssh', connectionId: 'c1' });
+
+    for (const config of [local, ssh]) {
+      expect(config.menus.more).toContain('refresh');
+      expect(config.menus.blank).toContain('refresh');
+      expect(config.menus.rowFile).not.toContain('refresh');
+      expect(config.menus.rowFolder).not.toContain('refresh');
+      expect(config.menus.rowMulti).not.toContain('refresh');
+    }
+  });
 });

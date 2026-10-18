@@ -4,6 +4,8 @@ export interface TauriMockOptions {
   /** Use each terminal's requested directory for its initial prompt. */
   terminalDirectories?: boolean;
   launchDirectory?: string;
+  /** Directories a second process forwarded before the window could listen (drains at startup). */
+  pendingLaunchDirectories?: string[];
   contextMenu?: { available?: boolean; enabled?: boolean; stale?: boolean; certificateTrusted?: boolean };
   /** 是否启用 OSC 133 shell integration（默认 true）。
    *  false 时 mock 保持 classic 场景，用于测试无 integration 回退。 */
@@ -58,10 +60,12 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
     { name: '旧脚本技能', description: '遗留技能，含脚本', source: 'market', trusted: false, enabled: false, hasScripts: true, modified: true, files: ['SKILL.md', 'scripts/run.sh', 'references/说明.md'], dir: '/home/e2e/.vrykell/skills/旧脚本技能', prompt: '运行 scripts/run.sh 完成工作。' },
   ];
   await page.addInitScript(
-    ({ enableIntegration, enableReadyMarker, models, active, skillsSeed, scheduleSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession, launchDirectory, menuSeed, terminalDirectories }) => {
+    ({ enableIntegration, enableReadyMarker, models, active, skillsSeed, scheduleSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession, launchDirectory, pendingDirs, menuSeed, terminalDirectories }) => {
     const menu = { supported: true, available: true, enabled: false, stale: false, certificateTrusted: false, certificateThumbprint: 'E2E-CERTIFICATE', ...menuSeed };
     const menuActions: string[] = [];
     (window as unknown as { __MENU_ACTIONS__: string[] }).__MENU_ACTIONS__ = menuActions;
+    const pendingLaunchDirectories = [...pendingDirs];
+    (window as unknown as { __PENDING_LAUNCH_DIRECTORIES__: string[] }).__PENDING_LAUNCH_DIRECTORIES__ = pendingLaunchDirectories;
     let cbCounter = 0;
     const eventListeners = new Map<string, number>();
     const toolListeners = new Map<string, number>();
@@ -189,6 +193,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
       { command: 'echo hello-e2e', cwd: '/home/e2e', timestamp: Date.now() - 3000, exit_code: 0 },
     ];
     const searchCalls: { cmd: string; args: Record<string, unknown> }[] = [];
+    const windowFrameCalls: { label: string; color: string }[] = [];
     const sshConnections: Record<string, unknown>[] = [
       { id: 'ssh-1', name: '生产服务器', host: 'prod.example.com', port: 22, user: 'root', password: '', authMethod: 'password', lastOpenedAt: null, hasPassword: true },
     ];
@@ -252,6 +257,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
     (window as unknown as Record<string, unknown>).__POLICY_OPS__ = policyOps;
     (window as unknown as Record<string, unknown>).__POLICY_LEVELS__ = policyLevels;
     (window as unknown as Record<string, unknown>).__APPROVAL_SCOPES__ = approvalScopes;
+    (window as unknown as Record<string, unknown>).__WINDOW_FRAME_CALLS__ = windowFrameCalls;
 
     const A = '\x1b]133;A\x07';
     const C = '\x1b]133;C\x07';
@@ -957,6 +963,9 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             return undefined;
           }
           // ── 主题 ──
+          case 'apply_window_frame':
+            windowFrameCalls.push({ label: windowLabel, color: String(args.color) });
+            return undefined;
           case 'get_theme_config':
             return theme;
           case 'set_theme_config':
@@ -987,6 +996,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'get_search_context':
             return { cwd: args.cwd ?? '/home/e2e' };
           case 'shell_launch_directory': return launchDirectory ?? null;
+          case 'shell_take_forwarded_directories': return pendingLaunchDirectories.splice(0);
           case 'context_menu_status': return { ...menu };
           case 'context_menu_manage': {
             const action = args.action as string;
@@ -1130,6 +1140,10 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             downloads.unshift(rec);
             return rec.localPath;
           }
+          case 'transfers_list': return [];
+          case 'transfers_clear': return undefined;
+          case 'transfers_control': return undefined;
+          case 'transfers_delete': return undefined;
           case 'downloads_list':
             return downloads;
           case 'downloads_clear':
@@ -1323,6 +1337,8 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
               { name: 'notes.txt', path: '/home/e2e/notes.txt', is_dir: false },
               // 新建出来的条目出现在列表里（模拟真实文件系统）
               ...createdEntries,
+              // Changes made outside the panel (test-injected), visible after a refresh.
+              ...((window as unknown as { __FS_EXTRA_ENTRIES__?: { name: string; path: string; is_dir: boolean }[] }).__FS_EXTRA_ENTRIES__ ?? []),
             ];
           case 'fs_disks':
             return [
@@ -1463,8 +1479,6 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             for (const path of args.paths as string[]) sshOps.push({ op: 'purge', path });
             return undefined;
           }
-          case 'ssh_sweep_undo':
-            return undefined;
           case 'plugin:event|listen':
             if ((args.target as { label?: string })?.label?.startsWith('tool-') && (args.target as { label: string }).label !== windowLabel) {
               toolListeners.set(`${args.event}:${(args.target as { label: string }).label}`, args.handler as number);
@@ -1528,6 +1542,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
       },
       // 测试可直接注入任意 PTY 输出字节（如 altScreen 序列）
       emitPtyExit: (code: number | null) => emit('pty-exit', { id: 'e2e-session', code }),
+      emitEvent: (event: string, payload: unknown) => emit(event, payload),
       emitPtyOutput: (data: string) => {
         emitOutput(data);
       },
@@ -1537,7 +1552,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
       },
     };
     localStorage.setItem('vrykell-api-key', 'sk-e2e-fake');
-  }, { enableIntegration: integration, enableReadyMarker: opts.shellReadyMarker !== false, models: seedModels, active: seedActive, skillsSeed: seedSkills, scheduleSeed: seedSchedules, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true, sshPreexec: opts.sshPreexec ?? true, groupedHistoricalSession: opts.groupedHistoricalSession ?? false, launchDirectory: opts.launchDirectory, menuSeed: opts.contextMenu, terminalDirectories: opts.terminalDirectories ?? false });
+  }, { enableIntegration: integration, enableReadyMarker: opts.shellReadyMarker !== false, models: seedModels, active: seedActive, skillsSeed: seedSkills, scheduleSeed: seedSchedules, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true, sshPreexec: opts.sshPreexec ?? true, groupedHistoricalSession: opts.groupedHistoricalSession ?? false, launchDirectory: opts.launchDirectory, pendingDirs: opts.pendingLaunchDirectories ?? [], menuSeed: opts.contextMenu, terminalDirectories: opts.terminalDirectories ?? false });
 }
 
 /** 预置 AI 回复文本：mock 的 ai_stream 会按 chunk 流式 emit ai-chunk 事件。
@@ -1677,6 +1692,18 @@ export async function emitPtyOutput(page: Page, data: string): Promise<void> {
   }, data);
 }
 
+/** Simulate a second process forwarding a context-menu launch to the running window. */
+export async function forwardLaunchDirectory(page: Page, directory: string): Promise<void> {
+  await page.evaluate((dir) => {
+    const globals = window as unknown as {
+      __PENDING_LAUNCH_DIRECTORIES__: string[];
+      __TAURI_INTERNALS__: { emitEvent: (event: string, payload: unknown) => void };
+    };
+    globals.__PENDING_LAUNCH_DIRECTORIES__.push(dir);
+    globals.__TAURI_INTERNALS__.emitEvent('shell-launch-forwarded', null);
+  }, directory);
+}
+
 /** 读取 set_provider_key / set_tavily_key 调用记录 */
 export function aiKeyCalls(page: Page): Promise<{ provider: string; key?: string }[]> {
   return page.evaluate(() => (window as unknown as { __AI_KEY_CALLS__: { provider: string; key?: string }[] }).__AI_KEY_CALLS__);
@@ -1732,6 +1759,11 @@ export function searchCalls(page: Page): Promise<{ cmd: string; args: Record<str
 /** 读取主题配置（get_theme_config / set_theme_config 之后的状态） */
 export function themeConfig(page: Page): Promise<{ opacity: number; backgroundImage: string | null; vars: Record<string, string> }> {
   return page.evaluate(() => (window as unknown as { __THEME__: { opacity: number; backgroundImage: string | null; vars: Record<string, string> } }).__THEME__);
+}
+
+/** 读取窗口边框颜色同步记录（apply_window_frame） */
+export function windowFrameCalls(page: Page): Promise<{ label: string; color: string }[]> {
+  return page.evaluate(() => (window as unknown as { __WINDOW_FRAME_CALLS__: { label: string; color: string }[] }).__WINDOW_FRAME_CALLS__);
 }
 
 /** 读取记忆当前内容（FACT） */

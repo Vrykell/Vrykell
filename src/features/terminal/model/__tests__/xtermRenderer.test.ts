@@ -1,15 +1,26 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Terminal } from '@xterm/xterm';
-import { applyTerminalRenderer, loadWebglRenderer } from '../xtermRenderer';
 
 const mocked = vi.hoisted(() => ({
   handlers: [] as Array<() => void>,
   disposed: 0,
   fail: false,
+  extensions: [] as string[],
+  loseContext: vi.fn(),
+  debug: vi.fn(),
 }));
 
 vi.mock('@xterm/addon-webgl', () => ({
   WebglAddon: class {
+    // Mirrors the private renderer handle the terminal surface adapter reaches for.
+    readonly _renderer = {
+      _gl: {
+        getExtension: (name: string) => {
+          mocked.extensions.push(name);
+          return { loseContext: mocked.loseContext };
+        },
+      },
+    };
     constructor() {
       if (mocked.fail) throw new Error('no webgl');
     }
@@ -23,10 +34,17 @@ vi.mock('@xterm/addon-webgl', () => ({
   },
 }));
 
+vi.mock('@features/terminal/services/terminalDebug', () => ({ terminalDebug: mocked.debug }));
+
+import { applyTerminalRenderer, loadWebglRenderer, releaseTerminalRenderer } from '../xtermRenderer';
+
 function reset(): void {
   mocked.handlers.length = 0;
   mocked.disposed = 0;
   mocked.fail = false;
+  mocked.extensions.length = 0;
+  mocked.loseContext.mockClear();
+  mocked.debug.mockClear();
 }
 
 function fakeTerminal(): { term: Terminal; loadAddon: ReturnType<typeof vi.fn> } {
@@ -79,5 +97,37 @@ describe('loadWebglRenderer', () => {
 
     applyTerminalRenderer(term, 'webgl');
     expect(loadAddon).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('WebGL context lifetime', () => {
+  beforeEach(reset);
+
+  it('hands the GPU context back when the renderer is dropped', () => {
+    const { term } = fakeTerminal();
+    loadWebglRenderer(term, 'webgl');
+    applyTerminalRenderer(term, 'dom');
+    // The context is explicitly released: browsers cap live contexts per document and drop the
+    // oldest one, which blanks a terminal nobody touched.
+    expect(mocked.extensions).toEqual(['WEBGL_lose_context']);
+    expect(mocked.loseContext).toHaveBeenCalledOnce();
+    expect(mocked.debug).toHaveBeenCalledWith('terminal-webgl-context-released', { released: expect.any(Number) });
+  });
+
+  it('releases the context of a terminal that is about to be disposed, and only once', () => {
+    const { term } = fakeTerminal();
+    loadWebglRenderer(term, 'webgl');
+    releaseTerminalRenderer(term);
+    releaseTerminalRenderer(term);
+    expect(mocked.disposed).toBe(1);
+    expect(mocked.loseContext).toHaveBeenCalledOnce();
+  });
+
+  it('keeps working when the context is already gone', () => {
+    const { term } = fakeTerminal();
+    loadWebglRenderer(term, 'webgl');
+    mocked.loseContext.mockImplementation(() => { throw new Error('context lost'); });
+    expect(() => applyTerminalRenderer(term, 'dom')).not.toThrow();
+    expect(mocked.disposed).toBe(1);
   });
 });

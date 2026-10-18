@@ -554,7 +554,8 @@ fn purge_staged(paths: Vec<String>) {
 
 /// 启动时清理上次会话残留的暂存项：它们已经被用户删除，只是没来得及进回收站。
 pub fn sweep_undo_dir() {
-    let Ok(dir) = undo_dir() else { return };
+    let Some(home) = dirs::home_dir() else { return };
+    let dir = home.join(".vrykell").join("undo");
     if let Ok(rd) = std::fs::read_dir(&dir) {
         for entry in rd.flatten() {
             let _ = trash::delete(entry.path());
@@ -577,8 +578,16 @@ pub async fn fs_move(paths: Vec<String>, dest_dir: String) -> Result<FileOpOutco
 }
 
 #[tauri::command]
-pub async fn fs_stage_delete(paths: Vec<String>) -> Result<Vec<FileOpPair>, String> {
+pub async fn fs_stage_delete(paths: Vec<String>, undo_enabled: Option<bool>) -> Result<Vec<FileOpPair>, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        if undo_enabled == Some(false) {
+            let mut completed = Vec::new();
+            for path in paths {
+                trash::delete(&path).map_err(|e| e.to_string())?;
+                completed.push(FileOpPair { from: path, to: String::new() });
+            }
+            return Ok(completed);
+        }
         let dir = undo_dir()?;
         stage_delete_into(&dir, paths)
     })

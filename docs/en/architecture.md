@@ -224,6 +224,8 @@ The live terminal uses the character height measured by xterm, avoiding clipping
 
 Terminal width updates with the window, the sidebars, and the split-pane layout, calling resize on the PTY and the live xterm; a horizontal scroll container is not used as a substitute for size synchronization. When extracting the snapshot of a completed block, only soft wraps are merged according to the xterm buffer's `isWrapped`, preserving explicit newlines, blank lines, spacing, and colors; historical output re-wraps with the current container width. Authentication and screen snapshots still retain the physical grid rows. Terminal history uses a vertical themed scrollbar, with the thumb area reserved in advance, avoiding column-width changes when it overflows.
 
+Surface repaints and GPU resources follow their own contract (`services/terminalRepaint.ts`): an ordinary repaint (tab return, pane becoming visible again, block-terminal mount) only calls `refresh` from the buffer and **never clears the glyph atlas** — terminals with the same font, theme and device pixel ratio share one atlas, so clearing it is an app-wide action: clear once and refresh every live terminal (pane terminals plus running-block terminals), and the page returning from the background (`visibilitychange`) takes the same path, coalesced into one run per event. Dropping a renderer (manual redraw, renderer preference change, terminal disposal) hands its WebGL context back explicitly, so the browser's live-context cap cannot blank a terminal the user never touched. Details and the upstream fixes are in `docs/en/pitfalls.md` §4.9/§4.10.
+
 `TerminalBlockList` groups by status:
 
 | Group | Condition | Rendering |
@@ -366,9 +368,10 @@ the single state variable "execution target".
 | `src/features/files/services/localFileOps.ts` | local implementation: `@platform/api/fs` + `@platform/path` |
 | `src/features/ssh/services/fileOps.ts` | remote implementation: SSH commands + POSIX path utilities |
 | `src/features/files/model/filePanelConfig.ts` | panel configuration: menu item key lists (row/multi-select/blank/more), drag-and-drop semantics (whether dragging out downloads first, whether dragging in moves or uploads), open semantics, test identifiers — the parts that "vary by state" live only here |
-| `src/features/files/hooks/useFileBrowser.ts` | shared browsing and operation state machine: directory loading, tree lazy loading, selection, view snapshot undo, clipboard, undo history (≤20 steps), create/rename/delete |
+| `src/features/files/hooks/useFileBrowser.ts` | shared browsing and operation state machine: directory loading, tree lazy loading, selection, visit trail with back/forward (one record per directory), clipboard, undo history (≤20 steps), create/rename/delete |
 | `src/features/files/components/FilePanel.tsx` | shared view: top bar breadcrumb (editable), file tree, right-click/blank/more menus, confirmation modal, drag-and-drop wiring |
 | `src/features/files/components/PanelFiles.tsx` / `src/features/ssh/components/RemoteFiles.tsx` | thin wrappers: provide only their respective specialized menu callbacks, icons, error views, and download management entry points |
+| `src/features/files/services/localPath.ts` | session-only memory of the local panel directory: a remount (SSH view swap, download manager round trip, panel moved to the other side) restores the browsed directory without persisting; the remote equivalent is `@features/ssh/utils/remotePath.ts` |
 
 Conventions:
 

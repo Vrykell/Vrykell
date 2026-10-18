@@ -79,6 +79,20 @@ test.describe('标签页管理侧栏', () => {
     expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(viewport!.height);
   });
 
+  test('标签列表空白处右键打开面板菜单', async ({ page }) => {
+    const list = page.locator('[data-reorder-list="session-tabs"]');
+    const box = (await list.boundingBox())!;
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height - 12, { button: 'right' });
+
+    const menu = page.getByRole('menu', { name: '操作菜单' });
+    await expect(menu).toBeVisible();
+    // The panel menu owns blank areas only, so it carries no row actions.
+    await expect(menu.getByRole('button', { name: 'AI 自动分组', exact: true })).toBeVisible();
+    await expect(menu.getByRole('button', { name: '关闭标签', exact: true })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+  });
+
   test('顶部 + 新建的标签进入未分组，只有分组 + 才进分组', async ({ page }) => {
     await page.keyboard.press('Meta+t');
     const rows = page.locator('[data-tab-row-id]');

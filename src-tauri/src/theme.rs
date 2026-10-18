@@ -4,7 +4,7 @@
 //! `theme_import` / `theme_export`（由前端 file dialog 提供路径）。
 //!
 //! 结构：
-//!   - `opacity`：终端背景不透明度（0.05..=1.0，1 = 完全不透明）。
+//!   - `opacity`: application opacity (0.5..=1.0; 1 = fully opaque).
 //!   - `backgroundImage`：终端背景图片绝对路径（None = 无图片）。
 //!   - `vars`：CSS 变量覆盖表（`--canvas` / `--xterm-bg` 等），用于调整终端主题外观。
 
@@ -14,9 +14,9 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{Manager, State};
 
-/// 终端背景最小不透明度（再低文字几乎不可读）。
-const MIN_OPACITY: f32 = 0.05;
-/// 默认不透明度（1 = 完全不透明，无视觉变化）。
+/// Minimum application opacity (lower values make the content unreadable).
+const MIN_OPACITY: f32 = 0.5;
+/// Default application opacity (1 = fully opaque, no visual change).
 const DEFAULT_OPACITY: f32 = 1.0;
 
 pub struct ThemeState(pub Mutex<ThemeConfig>);
@@ -24,7 +24,7 @@ pub struct ThemeState(pub Mutex<ThemeConfig>);
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ThemeConfig {
-    /// 终端背景不透明度 0.05..=1.0。
+    /// Application opacity, 0.5..=1.0.
     #[serde(default = "default_opacity")]
     pub opacity: f32,
     /// 终端背景图片绝对路径；None = 纯色背景。
@@ -164,6 +164,46 @@ pub fn theme_import(
     Ok(cfg)
 }
 
+/// 读取本地图片为 data URL（Tauri webview 不能用 CSS url() 直接加载本地文件路径）。
+/// 同步实现（spawn_blocking 内执行）。
+fn read_image_data_url_sync(path: String) -> Result<String, String> {
+    use base64::Engine;
+    const MAX_BYTES: u64 = 20 * 1024 * 1024; // 20MB 上限
+    let meta = std::fs::metadata(&path).map_err(|e| format!("读取图片失败：{e}"))?;
+    if meta.len() > MAX_BYTES {
+        return Err(format!(
+            "图片超过 20MB 上限（{}MB）",
+            meta.len() / 1024 / 1024
+        ));
+    }
+    let bytes = std::fs::read(&path).map_err(|e| format!("读取图片失败：{e}"))?;
+    let ext = std::path::Path::new(&path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase());
+    let mime = match ext.as_deref() {
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("gif") => "image/gif",
+        Some("webp") => "image/webp",
+        Some("avif") => "image/avif",
+        Some("svg") => "image/svg+xml",
+        Some("bmp") => "image/bmp",
+        _ => "image/png",
+    };
+    Ok(format!(
+        "data:{mime};base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(&bytes)
+    ))
+}
+
+#[tauri::command]
+pub async fn read_image_data_url(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || read_image_data_url_sync(path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -186,6 +226,11 @@ mod tests {
         cfg.normalize();
         assert_eq!(cfg.opacity, MIN_OPACITY);
 
+        // Positive values below the floor are raised too: the UI must stay readable.
+        cfg.opacity = 0.3;
+        cfg.normalize();
+        assert_eq!(cfg.opacity, MIN_OPACITY);
+
         cfg.opacity = 0.5;
         cfg.normalize();
         assert_eq!(cfg.opacity, 0.5);
@@ -204,5 +249,39 @@ mod tests {
         let back: ThemeConfig = serde_json::from_str(&s).unwrap();
         assert_eq!(back.background_image.as_deref(), Some("/tmp/bg.png"));
         assert_eq!(back.vars.get("--canvas").map(String::as_str), Some("#101010"));
+    }
+
+    #[test]
+    fn read_image_data_url_encodes_png_bytes() {
+        let dir = std::env::temp_dir();
+        let path = dir.join("vrykell_test_bg.png");
+        std::fs::write(&path, b"fakeimage").unwrap();
+        let url = read_image_data_url_sync(path.to_string_lossy().to_string()).unwrap();
+        // "fakeimage" 的 base64
+        assert_eq!(url, "data:image/png;base64,ZmFrZWltYWdl");
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn read_image_data_url_detects_mime_from_extension() {
+        let dir = std::env::temp_dir();
+        for (name, mime) in [
+            ("vrykell_test_bg.jpeg", "image/jpeg"),
+            ("vrykell_test_bg.JPG", "image/jpeg"),
+            ("vrykell_test_bg.avif", "image/avif"),
+        ] {
+            let path = dir.join(name);
+            std::fs::write(&path, b"x").unwrap();
+            let url = read_image_data_url_sync(path.to_string_lossy().to_string()).unwrap();
+            assert!(url.starts_with(&format!("data:{mime};base64,")), "{name}: {url}");
+            let _ = std::fs::remove_file(&path);
+        }
+    }
+
+    #[test]
+    fn read_image_data_url_rejects_missing_file() {
+        let dir = std::env::temp_dir();
+        let path = dir.join("vrykell_test_bg_missing.png");
+        assert!(read_image_data_url_sync(path.to_string_lossy().to_string()).is_err());
     }
 }

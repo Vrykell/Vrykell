@@ -32,6 +32,7 @@ export interface FileMenuHandlers {
   /** Relocate the panel to the terminal's reported directory. */
   onSyncToCwd?: () => void;
   onSyncToTerminal?: () => void;
+  onOpenUploads?: () => void;
   onOpenDownloads?: () => void;
   onNewTabHere?: (currentDir: string) => void;
   /** 在系统文件管理器中定位某个条目（本地专有）。 */
@@ -40,6 +41,8 @@ export interface FileMenuHandlers {
   onRevealDir?: (dir: string) => void;
   /** Show the properties dialog for a single entry. */
   onProperties?: (entry: FsEntry) => void;
+  /** Re-read the current directory from the backend (⋯ and blank-area menus). */
+  onRefresh?: () => void;
 }
 
 export interface FileMenuContext {
@@ -126,10 +129,14 @@ function itemFor(key: FileMenuItemKey, ctx: FileMenuContext): ContextMenuItem | 
       return handlers.onSyncToCwd ? { label: t('files.syncToCwd'), onClick: handlers.onSyncToCwd } : null;
     case 'sync-terminal':
       return handlers.onSyncToTerminal ? { label: t('Switch terminal to this directory'), onClick: handlers.onSyncToTerminal } : null;
+    case 'uploads-view':
+      return handlers.onOpenUploads ? { label: t('Upload manager'), onClick: handlers.onOpenUploads } : null;
     case 'downloads-view':
-      return handlers.onOpenDownloads ? { label: '下载管理', onClick: () => handlers.onOpenDownloads?.() } : null;
+      return handlers.onOpenDownloads ? { label: t('Download manager'), onClick: handlers.onOpenDownloads } : null;
     case 'collapse-all':
       return handlers.onCollapseAll ? { label: t('files.collapseAll'), onClick: handlers.onCollapseAll } : null;
+    case 'refresh':
+      return handlers.onRefresh ? { label: t('Refresh'), onClick: handlers.onRefresh } : null;
     default:
       return null;
   }
@@ -145,7 +152,7 @@ export function buildFileMenuItems(keys: FileMenuItemKey[], ctx: FileMenuContext
       const group: MenuGroup = key.startsWith('open-') || key === 'new-tab-here' ? 'primary'
         : clipboard.includes(key) ? 'clipboard'
           : ['new-file', 'new-folder', 'rename', 'upload-file', 'upload-dir', 'download'].includes(key) ? 'edit'
-            : ['reveal', 'sync-terminal', 'sync-cwd', 'downloads-view', 'collapse-all'].includes(key) ? 'view' : 'organize';
+            : ['reveal', 'sync-terminal', 'sync-cwd', 'downloads-view', 'uploads-view', 'collapse-all', 'refresh'].includes(key) ? 'view' : 'organize';
       items.push({ ...item, group, order: clipboard.includes(key) ? clipboard.indexOf(key) : 0 });
     }
   }

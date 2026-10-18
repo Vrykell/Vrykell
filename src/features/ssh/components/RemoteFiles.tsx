@@ -1,3 +1,4 @@
+import UploadManager from '@features/files/components/UploadManager';
 import { useMemo, useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import type { FsEntry } from '@platform/api/types';
@@ -30,7 +31,7 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
   const target = useMemo<FileOpsTarget>(() => ({ kind: 'ssh', connectionId: conn.id }), [conn.id]);
   const ops = useMemo(() => fileOpsFor(target), [target]);
   const storedPath = useRemotePathStore((state) => state.path[conn.id] ?? null);
-  const [showDownloads, setShowDownloads] = useState(false);
+  const [transferPage, setTransferPage] = useState<'upload' | 'download' | null>(null);
   const paneId = sshPaneIdFor(conn.id);
   const terminalCwd = useSessionStore((state) => paneId ? state.terminalCwds[paneId] : undefined);
 
@@ -64,7 +65,8 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
 
   /** 上传（菜单与系统拖入共用）：逐个上传并汇总结果 */
   const uploadPaths = async (paths: string[], dir: string) => {
-    if (!ops.upload) return;
+    if (!ops.upload || paths.length === 0) return;
+    setTransferPage('upload');
     toast(paths.length > 1 ? t('files.upload.startCount', { n: paths.length }) : t('files.upload.start'), 'info');
     let succeeded = 0;
     for (const localPath of paths) {
@@ -78,7 +80,8 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
     if (succeeded > 0) toast(succeeded > 1 ? t('files.upload.plainDoneCount', { n: succeeded }) : t('files.upload.plainDone'), 'success');
   };
 
-  if (showDownloads) return <DownloadManager onBack={() => setShowDownloads(false)} />;
+  if (transferPage === 'upload') return <UploadManager onBack={() => setTransferPage(null)} />;
+  if (transferPage === 'download') return <DownloadManager onBack={() => setTransferPage(null)} />;
 
   return (
     <FilePanel
@@ -117,11 +120,13 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
       handlers={{
         onDownload: (targets) => {
           void (async () => {
-            if (!ops.download) return;
-            toast(targets.some((entry) => entry.is_dir) ? '正在下载文件夹…' : '正在下载…', 'info');
+            if (!ops.download || targets.length === 0) return;
+            setTransferPage('download');
+            toast(targets.some((entry) => entry.is_dir) ? t('files.download.startFolder') : t('files.download.start'), 'info');
             for (const entry of targets) {
               try {
-                toast(`已下载到 ${await ops.download(entry.path)}`, 'success');
+                const localPath = await ops.download(entry.path);
+                toast(t('files.download.doneTo', { path: localPath }), 'success');
               } catch (error) {
                 toast(String((error as Error)?.message ?? error), 'error');
               }
@@ -138,12 +143,14 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
             await uploadPaths(picked, storedPath);
           })();
         },
-        onOpenDownloads: () => setShowDownloads(true),
+        onOpenDownloads: () => setTransferPage('download'),
+        onOpenUploads: () => setTransferPage('upload'),
       }}
       onExternalDrop={(paths, dropTarget) => { void uploadPaths(paths, dropTarget.dir); }}
       prepareNativeDrag={async (items) => {
-        if (!ops.download) return null;
-        toast('正在下载…', 'info');
+        if (!ops.download || items.length === 0) return null;
+        setTransferPage('download');
+        toast(t('files.download.start'), 'info');
         const locals: string[] = [];
         for (const item of items) {
           try {
@@ -153,8 +160,8 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
           }
         }
         if (locals.length === 0) return null;
-        toast(locals.length > 1 ? `已下载 ${locals.length} 项` : '已下载', 'success');
-        // 拖出 = 移动：本地副本交给系统拖拽；远端源文件在拖放成功后被移除（见面板的移出收尾）
+        toast(locals.length > 1 ? t('files.download.plainDoneCount', { n: locals.length }) : t('files.download.plainDone'), 'success');
+        // 拖出 = 下载副本交给系统拖拽（系统按移动接收）；远端源文件保留，移出收尾只用于本地面板
         return { paths: locals, mode: 'move' as const };
       }}
     />
