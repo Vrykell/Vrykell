@@ -34,10 +34,12 @@ function reset() {
   mockGenerate.mockResolvedValue({ text: '「Rust 学习笔记」。\n' });
   useAgentSettings.setState({ global: { ...DEFAULT_AGENT_SETTINGS, autoTitle: true, titleModel: '' }, overrides: {} });
   useAiConfigStore.setState({
-    hasKey: true,
+    providerKeys: ['openai-compatible|https://api.example.com/v1'],
     provider: 'openai-compatible',
     baseUrl: 'https://api.example.com/v1',
     model: 'gpt-4o-mini',
+    models: [],
+    activeModel: '',
   });
   useBlockStore.setState({ byTab: {} });
   useChatStore.setState({ byTab: {} });
@@ -143,7 +145,7 @@ describe('智能标题触发', () => {
 
   it('无 key → 启发式总结（首个提问首行）', async () => {
     reset();
-    useAiConfigStore.setState({ hasKey: false });
+    useAiConfigStore.setState({ providerKeys: [] });
     setThreeDoneBlocks('t1');
     useChatStore.setState({
       byTab: {

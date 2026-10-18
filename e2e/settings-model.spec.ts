@@ -1,13 +1,15 @@
 /**
- * 设置页 e2e：模型配置（服务商下拉 + API Key + 端点 + 按服务商过滤的模型列表）。
+ * 设置页 e2e：模型配置（服务商切换按钮 + 中央浮层 + API Key + 端点 + 模型列表）。
  *
  * 种子数据：m-main（主力模型，Anthropic 端点）在前，m-local（本地模型，
- * OpenAI 兼容 @ 127.0.0.1:11434）在后且为当前生效模型；mock 只预置了
- * openai-compatible 的密钥。
+ * OpenAI 兼容 @ 127.0.0.1:11434）在后且为当前生效模型；mock 只预置了本地端点的密钥。
  */
 import { test, expect } from '@playwright/test';
 import { setupTauriMock, aiKeyCalls, aiModelCalls, clipboardText } from './tauri-mock';
 import { openSettings, fieldOf } from './settings';
+
+const LOCAL_ID = 'openai-compatible|http://127.0.0.1:11434/v1';
+const ANTHROPIC_ID = 'anthropic|https://api.anthropic.com/v1';
 
 test.beforeEach(async ({ page }) => {
   await setupTauriMock(page);
@@ -16,17 +18,19 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('模型配置页', () => {
-  test('服务商下拉：默认选中、切换、添加动作与 ⋯ 菜单三项', async ({ page }) => {
-    const select = page.getByTestId('provider-select');
-    await expect(select.locator('.ui-select-value')).toHaveText('Anthropic');
-    await select.click();
-    const options = page.getByRole('option');
-    await expect(options).toHaveCount(2);
-    await expect(options.first()).toHaveAttribute('aria-selected', 'true');
-    // 添加服务商收在下拉里
-    await expect(page.getByRole('button', { name: '添加服务商' })).toBeVisible();
-    await options.nth(1).click();
-    await expect(select.locator('.ui-select-value')).toHaveText('127.0.0.1:11434');
+  test('服务商按钮：默认选中、中央浮层切换、添加动作与 ⋯ 菜单三项', async ({ page }) => {
+    const switcher = page.getByTestId('provider-switch');
+    await expect(switcher.locator('.provider-switch-name')).toHaveText('Anthropic');
+    await switcher.click();
+    const dialog = page.getByTestId('provider-dialog');
+    await expect(dialog).toBeVisible();
+    await expect(page.locator('[data-testid^="provider-option-"]')).toHaveCount(2);
+    await expect(page.getByTestId(`provider-option-${ANTHROPIC_ID}`)).toHaveAttribute('aria-current', 'true');
+    // 添加服务商收在同一个浮层里
+    await expect(page.getByTestId('provider-dialog-add')).toBeVisible();
+    await page.getByTestId(`provider-option-${LOCAL_ID}`).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(switcher.locator('.provider-switch-name')).toHaveText('127.0.0.1:11434');
     // 右侧详情头部的 ⋯ 菜单
     await page.locator('.settings-content').getByLabel('更多操作').click();
     const menu = page.getByRole('menu');
@@ -41,11 +45,11 @@ test.describe('模型配置页', () => {
   });
 
   test('⋯ 删除服务商：先确认，移除其模型行；只剩一个时拒绝', async ({ page }) => {
-    const select = page.getByTestId('provider-select');
+    const switcher = page.getByTestId('provider-switch');
     await page.locator('.settings-content').getByLabel('更多操作').click();
     await page.getByRole('menu').getByText('删除服务商').click();
     await page.getByTestId('confirm-ok').click();
-    await expect(select.locator('.ui-select-value')).toHaveText('127.0.0.1:11434');
+    await expect(switcher.locator('.provider-switch-name')).toHaveText('127.0.0.1:11434');
     const setModels = await aiModelCalls(page);
     const last = setModels.filter((call) => call.kind === 'set_models').pop();
     expect(last?.models).toHaveLength(1);
@@ -56,7 +60,7 @@ test.describe('模型配置页', () => {
     await expect(page.getByTestId('confirm-dialog')).toHaveCount(0);
   });
 
-  test('API Key：按服务商配置，掩码显示、查看/复制/清除、保存恢复', async ({ page }) => {
+  test('API Key：按服务商各存各的，掩码显示、查看/复制/清除、保存恢复', async ({ page }) => {
     // 默认第一行（Anthropic 端点）没有密钥：未配置 + 添加入口，检测不可用
     const keyField = fieldOf(page, '服务商 API Key');
     await expect(keyField.getByText('未配置')).toBeVisible();
@@ -74,10 +78,10 @@ test.describe('模型配置页', () => {
     await expect(dialog).toHaveCount(0);
     await expect(keyField.getByTestId('provider-key-value')).toBeVisible();
     const savedKeys = await aiKeyCalls(page);
-    expect(savedKeys.some((c) => c.provider === 'anthropic' && c.key === 'sk-anthropic-key')).toBe(true);
-    // 切到本地那个 OpenAI 兼容端点：掩码 + 查看/复制
-    await page.getByTestId('provider-select').click();
-    await page.getByRole('option', { name: /127\.0\.0\.1:11434/ }).click();
+    expect(savedKeys.some((c) => c.provider === ANTHROPIC_ID && c.key === 'sk-anthropic-key')).toBe(true);
+    // 切到本地端点：它有自己的密钥，掩码 + 查看/复制
+    await page.getByTestId('provider-switch').click();
+    await page.getByTestId(`provider-option-${LOCAL_ID}`).click();
     await expect(keyField.getByTestId('provider-key-value')).toHaveText('sk-********abcd');
     await keyField.getByTestId('provider-key-reveal').click();
     await expect(keyField.getByTestId('provider-key-value')).toHaveText('sk-test-key-1234abcd');
@@ -89,15 +93,19 @@ test.describe('模型配置页', () => {
     await keyField.getByTestId('provider-key-clear').click();
     await expect(keyField.getByText('未配置')).toBeVisible();
     const clears = await aiKeyCalls(page);
-    expect(clears.some((c) => c.provider === 'openai-compatible' && !c.key)).toBe(true);
+    expect(clears.some((c) => c.provider === LOCAL_ID && !c.key)).toBe(true);
+    // 切回 Anthropic：它自己的密钥还在
+    await page.getByTestId('provider-switch').click();
+    await page.getByTestId(`provider-option-${ANTHROPIC_ID}`).click();
+    await expect(keyField.getByTestId('provider-key-value')).toBeVisible();
   });
 
   test('端点与连接：预览行、检测、同步模型', async ({ page }) => {
     // 预览行给出请求真正到达的地址
     await expect(page.getByTestId('provider-endpoint-preview')).toContainText('https://api.anthropic.com/v1/messages');
     // 本地端点已配置密钥：检测走模型列表请求并回报数量
-    await page.getByTestId('provider-select').click();
-    await page.getByRole('option', { name: /127\.0\.0\.1:11434/ }).click();
+    await page.getByTestId('provider-switch').click();
+    await page.getByTestId(`provider-option-${LOCAL_ID}`).click();
     await page.getByTestId('provider-check').click();
     await expect(page.getByRole('status').filter({ hasText: '连接正常' })).toBeVisible();
     // 同步把端点新增的模型并入列表
@@ -108,26 +116,25 @@ test.describe('模型配置页', () => {
   });
 
   test('模型列表：按服务商过滤，设为当前、添加/改名/删除', async ({ page }) => {
-    const select = page.getByTestId('provider-select');
     const names = page.getByTestId('model-name');
     // 默认（Anthropic 行）只显示主力模型
     await expect(names).toHaveCount(1);
     await expect(names.first()).toHaveText('主力模型');
     // 本地端点行显示本地模型，而它是当前生效模型
-    await select.click();
-    await page.getByRole('option', { name: /127\.0\.0\.1:11434/ }).click();
+    await page.getByTestId('provider-switch').click();
+    await page.getByTestId(`provider-option-${LOCAL_ID}`).click();
     await expect(names).toHaveCount(1);
     await expect(names.first()).toHaveText('本地模型');
     await expect(page.getByTestId('model-row').first().getByText('当前', { exact: true })).toBeVisible();
     // 回到 Anthropic 行，把主力模型设为当前
-    await select.click();
-    await page.getByRole('option', { name: 'Anthropic', exact: true }).click();
+    await page.getByTestId('provider-switch').click();
+    await page.getByTestId(`provider-option-${ANTHROPIC_ID}`).click();
     const mainRow = page.getByTestId('model-row').first();
     await mainRow.getByRole('button', { name: '设为当前' }).click();
     await expect(mainRow.getByText('当前', { exact: true })).toBeVisible();
     const activeCalls = await aiModelCalls(page);
     expect(activeCalls.some((c) => c.kind === 'set_active' && c.id === 'm-main')).toBe(true);
-    // 添加模型：中央表单填 ID（必填）→ 落盘到对应厂商分组
+    // 添加模型：中央表单填 ID（必填）与分组
     await page.getByTestId('model-add').click();
     const addDialog = page.getByTestId('add-model-dialog');
     await expect(addDialog).toBeVisible();
@@ -158,26 +165,26 @@ test.describe('模型配置页', () => {
     await expect(page.getByTestId('model-name')).toHaveCount(1);
   });
 
-  test('添加服务商：下拉动作打开中央预设网格并选中新服务商', async ({ page }) => {
-    const select = page.getByTestId('provider-select');
-    await select.click();
-    await page.getByRole('button', { name: '添加服务商' }).click();
+  test('添加服务商：浮层动作打开中央预设网格并选中新服务商', async ({ page }) => {
+    const switcher = page.getByTestId('provider-switch');
+    await switcher.click();
+    await page.getByTestId('provider-dialog-add').click();
     await expect(page.getByTestId('add-provider-dialog')).toBeVisible();
     await page.getByTestId('model-preset-DeepSeek').click();
     await expect(page.getByTestId('add-provider-dialog')).toHaveCount(0);
-    await expect(select.locator('.ui-select-value')).toHaveText('DeepSeek');
-    await select.click();
-    await expect(page.getByRole('option')).toHaveCount(3);
+    await expect(switcher.locator('.provider-switch-name')).toHaveText('DeepSeek');
+    await switcher.click();
+    await expect(page.locator('[data-testid^="provider-option-"]')).toHaveCount(3);
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('model-name')).toHaveCount(1);
     await expect(page.getByTestId('model-name')).toHaveText('DeepSeek');
   });
 
   test('服务商选择跨重载保持（lastSelectedProvider）', async ({ page }) => {
-    await page.getByTestId('provider-select').click();
-    await page.getByRole('option', { name: /127\.0\.0\.1:11434/ }).click();
+    await page.getByTestId('provider-switch').click();
+    await page.getByTestId(`provider-option-${LOCAL_ID}`).click();
     await page.reload();
     await openSettings(page);
-    await expect(page.getByTestId('provider-select').locator('.ui-select-value')).toHaveText('127.0.0.1:11434');
+    await expect(page.getByTestId('provider-switch').locator('.provider-switch-name')).toHaveText('127.0.0.1:11434');
   });
 });

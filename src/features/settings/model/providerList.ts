@@ -7,18 +7,9 @@
  * empty base URL counts as the vendor default it resolves to. Rows keep the list's own order.
  */
 import { MODEL_PRESETS } from '@config/modelPresets';
-import { baseUrlForProvider, type ProviderKind } from '@features/agent/services/provider';
+import { effectiveBaseUrl, providerId, type ProviderKind } from '@features/agent/services/provider';
 
-/** The base URL a request will actually use: defaults resolved, trailing slashes trimmed. */
-export function effectiveBaseUrl(kind: ProviderKind, baseUrl: string): string {
-  const trimmed = baseUrl.trim().replace(/\/+$/, '');
-  return baseUrlForProvider(trimmed, kind).replace(/\/+$/, '');
-}
-
-/** Stable identity of one provider row. */
-export function providerId(kind: ProviderKind, baseUrl: string): string {
-  return `${kind}|${effectiveBaseUrl(kind, baseUrl)}`;
-}
+export { effectiveBaseUrl, providerId };
 
 function endpointHost(url: string): string {
   try {
@@ -70,12 +61,7 @@ export function providerList<T extends { provider: ProviderKind; baseUrl: string
   return [...rows.values()];
 }
 
-/** Whether the key of this provider's API family is configured. */
-export function providerHasKey(
-  kind: ProviderKind,
-  flags: { hasKey: boolean; hasAnthropicKey: boolean; hasGeminiKey: boolean },
-): boolean {
-  if (kind === 'anthropic') return flags.hasAnthropicKey;
-  if (kind === 'gemini') return flags.hasGeminiKey;
-  return flags.hasKey;
+/** Whether this provider (endpoint) has its own key configured. */
+export function providerHasKey(id: string, flags: { providerKeys: string[] }): boolean {
+  return flags.providerKeys.includes(id);
 }

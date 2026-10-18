@@ -106,7 +106,7 @@ export default function TrendChart({ buckets, unit, rangeLabel }: {
               onClick={() => setMetric(option)}
               style={{
                 padding: '3px 10px', border: 0, borderRadius: 'var(--radius-inner)',
-                background: metric === option ? 'var(--surface)' : 'transparent',
+                background: metric === option ? 'color-mix(in srgb, var(--primary-action) 60%, transparent)' : 'transparent',
                 color: metric === option ? 'var(--text-primary)' : 'var(--text-secondary)',
                 font: `${'var(--fs-caption)'} var(--font-ui)`, cursor: 'pointer',
                 transition: 'background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease)',
@@ -136,7 +136,9 @@ export default function TrendChart({ buckets, unit, rangeLabel }: {
             <div data-testid="usage-trend-tooltip" className="workspace-floating" style={{
               position: 'absolute', zIndex: 2, pointerEvents: 'none',
               left: Math.min(Math.max(0, (hovered ?? 0) * slot + slot / 2 - 70), Math.max(0, width - 148)),
-              top: -4, minWidth: 140, padding: '8px 10px',
+              // Sit just above the hovered bar so the card never covers it.
+              bottom: Math.min(CHART_HEIGHT, peak > 0 ? CHART_HEIGHT * (valueOf(hoveredBucket) / peak) : 0) + 10,
+              minWidth: 140, padding: '8px 10px',
               color: 'var(--text-primary)', fontSize: 'var(--fs-caption)', whiteSpace: 'nowrap',
             }}>
               <p style={{ margin: '0 0 4px', fontWeight: 'var(--fw-semibold)' }}>{bucketStamp(hoveredBucket.start)}</p>

@@ -45,7 +45,7 @@ export default function KeyDialog({ open, row, hasKey, toast, onClose }: {
     if (!canSave) return;
     setSaving(true);
     try {
-      await setProviderKey(row.kind, value);
+      await setProviderKey(row.id, value);
       onClose();
     } catch (error) {
       toast(String((error as Error)?.message ?? error), 'error');

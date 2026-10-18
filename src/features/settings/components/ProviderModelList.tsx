@@ -158,7 +158,7 @@ export default function ProviderModelList({ row, toast }: {
   const sync = async () => {
     setSyncing(true);
     try {
-      const ids = await providerFetchModels(row.kind, row.baseUrl);
+      const ids = await providerFetchModels(row.id, row.kind, row.baseUrl);
       const known = new Set(models.map(model => model.model));
       const missing = ids.filter(id => id && !known.has(id));
       if (missing.length === 0) {

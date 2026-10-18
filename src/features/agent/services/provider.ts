@@ -25,6 +25,17 @@ export function baseUrlForProvider(baseUrl: string, provider: ProviderKind): str
     ? DEFAULT_BASE_URLS[provider] : baseUrl;
 }
 
+/** The base URL a request will actually use: defaults resolved, trailing slashes trimmed. */
+export function effectiveBaseUrl(kind: ProviderKind, baseUrl: string): string {
+  const trimmed = baseUrl.trim().replace(/\/+$/, '');
+  return baseUrlForProvider(trimmed, kind).replace(/\/+$/, '');
+}
+
+/** Stable identity of one provider (endpoint): the API family plus the effective base URL. */
+export function providerId(kind: ProviderKind, baseUrl: string): string {
+  return `${kind}|${effectiveBaseUrl(kind, baseUrl)}`;
+}
+
 /**
  * The request URL a model call actually reaches: the provider SDK appends this path to the
  * configured base, so the settings page can show where requests really go.

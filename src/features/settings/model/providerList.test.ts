@@ -72,11 +72,11 @@ describe('providerList', () => {
 });
 
 describe('providerHasKey / providerId', () => {
-  it('按家族取密钥标记', () => {
-    const flags = { hasKey: false, hasAnthropicKey: true, hasGeminiKey: false };
-    expect(providerHasKey('anthropic', flags)).toBe(true);
-    expect(providerHasKey('openai-compatible', flags)).toBe(false);
-    expect(providerHasKey('gemini', flags)).toBe(false);
+  it('按 provider 身份取密钥标记', () => {
+    const flags = { providerKeys: ['anthropic|https://api.anthropic.com/v1'] };
+    expect(providerHasKey('anthropic|https://api.anthropic.com/v1', flags)).toBe(true);
+    expect(providerHasKey('openai-compatible|https://api.openai.com/v1', flags)).toBe(false);
+    expect(providerHasKey('gemini|https://generativelanguage.googleapis.com/v1beta', flags)).toBe(false);
   });
 
   it('id 与端点归一化一致', () => {

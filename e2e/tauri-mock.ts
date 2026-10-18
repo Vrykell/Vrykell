@@ -138,8 +138,8 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
     const aiModels: { id: string; name: string; provider: string; baseUrl: string; model: string }[] = models;
     let aiActive = active;
     let aiProvider: string = 'openai-compatible';
-    let aiHasAnthropic = false;
-    let aiHasGemini = false;
+    /** Providers (endpoint ids) that hold a key in this mock; the local endpoint starts with one. */
+    const aiProviderKeys = new Set<string>(['openai-compatible|http://127.0.0.1:11434/v1']);
     let aiHasTavily = false;
     const aiKeyCalls: { provider: string; key?: string }[] = [];
     const aiModelCalls: { kind: string; models?: unknown[]; active?: string; id?: string }[] = [];
@@ -736,12 +736,13 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             return { decision: 'allow', lease: nextLease() };
           }
           case 'get_ai_config':            return {
-              has_key: aiConfig.hasKey,
+              has_key: [...aiProviderKeys].some((id) => id.startsWith('openai-compatible|')),
               base_url: aiConfig.baseUrl,
               model: aiConfig.model,
               provider: aiProvider,
-              has_anthropic_key: aiHasAnthropic,
-              has_gemini_key: aiHasGemini,
+              has_anthropic_key: [...aiProviderKeys].some((id) => id.startsWith('anthropic|')),
+              has_gemini_key: [...aiProviderKeys].some((id) => id.startsWith('gemini|')),
+              provider_keys: [...aiProviderKeys],
               has_tavily_key: aiHasTavily,
               models: aiModels,
               active_model: aiActive,
@@ -785,27 +786,19 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             return undefined;
           }
           case 'set_provider_key': {
-            aiKeyCalls.push({ provider: args.provider as string, key: args.key as string });
-            if (args.provider === 'anthropic') aiHasAnthropic = true;
-            else if (args.provider === 'gemini') aiHasGemini = true;
-            else aiConfig.hasKey = true;
+            aiKeyCalls.push({ provider: args.providerId as string, key: args.key as string });
+            aiProviderKeys.add(args.providerId as string);
             return undefined;
           }
           case 'clear_provider_key': {
-            aiKeyCalls.push({ provider: args.provider as string });
-            if (args.provider === 'anthropic') aiHasAnthropic = false;
-            else if (args.provider === 'gemini') aiHasGemini = false;
-            else aiConfig.hasKey = false;
+            aiKeyCalls.push({ provider: args.providerId as string });
+            aiProviderKeys.delete(args.providerId as string);
             return undefined;
           }
-          case 'provider_key_hint': {
-            const has = args.provider === 'anthropic' ? aiHasAnthropic : args.provider === 'gemini' ? aiHasGemini : aiConfig.hasKey;
-            return has ? 'sk-********abcd' : null;
-          }
-          case 'provider_key_reveal': {
-            const has = args.provider === 'anthropic' ? aiHasAnthropic : args.provider === 'gemini' ? aiHasGemini : aiConfig.hasKey;
-            return has ? 'sk-test-key-1234abcd' : null;
-          }
+          case 'provider_key_hint':
+            return aiProviderKeys.has(args.providerId as string) ? 'sk-********abcd' : null;
+          case 'provider_key_reveal':
+            return aiProviderKeys.has(args.providerId as string) ? 'sk-test-key-1234abcd' : null;
           case 'provider_fetch_models':
             searchCalls.push({ cmd: 'provider_fetch_models', args });
             return ['gpt-4o', 'deepseek-chat', 'gemini-2.5-pro'];

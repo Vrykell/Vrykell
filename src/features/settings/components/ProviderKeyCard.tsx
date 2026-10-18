@@ -2,9 +2,11 @@
  * ProviderKeyCard — one provider's API key row: the masked value with actions that appear on
  * hover, plus a connection check that asks the provider for its model list.
  *
- * The plaintext never arrives for the display: the masked form and the reveal both come from the
- * backend, and the reveal is fetched only while the user asks to see it. Adding or replacing a
- * key opens the centred editor, so the page itself never shows an empty secret field.
+ * Keys belong to the provider (endpoint), not to the API family: each one is stored and read
+ * under its own id, so switching providers switches keys. The plaintext never arrives for the
+ * display — the masked form and the reveal both come from the backend, and the reveal is fetched
+ * only while the user asks to see it. Adding or replacing a key opens the centred editor, so the
+ * page itself never shows an empty secret field.
  */
 import { useEffect, useState } from 'react';
 import { t } from '@i18n';
@@ -29,7 +31,7 @@ export default function ProviderKeyCard({ row, toast, keyEditRequest = 0 }: {
   keyEditRequest?: number;
 }) {
   const aiCfg = useAiConfigStore();
-  const keySet = providerHasKey(row.kind, aiCfg);
+  const keySet = providerHasKey(row.id, aiCfg);
   const [hint, setHint] = useState<string | null>(null);
   const [revealed, setRevealed] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -44,11 +46,11 @@ export default function ProviderKeyCard({ row, toast, keyEditRequest = 0 }: {
       setHint(null);
       return;
     }
-    void providerKeyHint(row.kind)
+    void providerKeyHint(row.id)
       .then((value) => { if (!cancelled) setHint(value); })
       .catch(() => { if (!cancelled) setHint(null); });
     return () => { cancelled = true; };
-  }, [row.kind, keySet, revision]);
+  }, [row.id, keySet, revision]);
 
   // The provider menu's "edit key" opens the editor for the selected provider.
   useEffect(() => {
@@ -61,7 +63,7 @@ export default function ProviderKeyCard({ row, toast, keyEditRequest = 0 }: {
       return;
     }
     try {
-      setRevealed(await providerKeyReveal(row.kind));
+      setRevealed(await providerKeyReveal(row.id));
     } catch (error) {
       toast(String((error as Error)?.message ?? error), 'error');
     }
@@ -69,7 +71,7 @@ export default function ProviderKeyCard({ row, toast, keyEditRequest = 0 }: {
 
   const copy = async () => {
     try {
-      const key = revealed ?? await providerKeyReveal(row.kind);
+      const key = revealed ?? await providerKeyReveal(row.id);
       await writeClipboardText(key ?? '');
       toast(t('API key copied'), 'success');
     } catch (error) {
@@ -78,7 +80,7 @@ export default function ProviderKeyCard({ row, toast, keyEditRequest = 0 }: {
   };
 
   const clear = async () => {
-    await clearProviderKey(row.kind);
+    await clearProviderKey(row.id);
     toast(t('API key cleared'), 'success');
   };
 
@@ -86,7 +88,7 @@ export default function ProviderKeyCard({ row, toast, keyEditRequest = 0 }: {
   const check = async () => {
     setChecking(true);
     try {
-      const models = await providerFetchModels(row.kind, row.baseUrl);
+      const models = await providerFetchModels(row.id, row.kind, row.baseUrl);
       toast(t('Connection works: {{count}} models', { count: models.length }), 'success');
     } catch (error) {
       toast(String((error as Error)?.message ?? error), 'error');

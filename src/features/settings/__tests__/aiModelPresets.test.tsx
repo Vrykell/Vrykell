@@ -32,8 +32,8 @@ describe('AiModelPage presets', () => {
   it('fills a new model row from the preset and makes it active', async () => {
     render(<AiModelPage />);
 
-    fireEvent.click(await screen.findByTestId('provider-select'));
-    fireEvent.click(await screen.findByRole('button', { name: '添加服务商' }));
+    fireEvent.click(await screen.findByTestId('provider-switch'));
+    fireEvent.click(await screen.findByTestId('provider-dialog-add'));
     fireEvent.click(await screen.findByTestId('model-preset-DeepSeek'));
 
     await waitFor(() => {
@@ -51,8 +51,8 @@ describe('AiModelPage presets', () => {
     });
     render(<AiModelPage />);
 
-    fireEvent.click(await screen.findByTestId('provider-select'));
-    fireEvent.click(await screen.findByRole('button', { name: '添加服务商' }));
+    fireEvent.click(await screen.findByTestId('provider-switch'));
+    fireEvent.click(await screen.findByTestId('provider-dialog-add'));
     fireEvent.click(await screen.findByTestId('model-preset-DeepSeek'));
 
     await waitFor(() => expect(useAiConfigStore.getState().activeModel).toBe('mine'));

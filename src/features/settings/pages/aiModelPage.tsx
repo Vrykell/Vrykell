@@ -1,22 +1,22 @@
 /**
- * Provider credentials and configured models, in one column: the provider dropdown in the header
- * picks the endpoint the page shows (and carries the add-provider entry), the ··· menu acts on
- * the selected provider, and the key, endpoint and model blocks below edit it. A provider is an
- * endpoint (API family plus effective base URL); the dropdown, the selection and the row
- * filtering all derive from the model list itself (see providerList).
+ * Provider credentials and configured models, in one column: the provider button in the header
+ * opens a centred menu that picks the endpoint the page shows (and carries the add-provider
+ * entry), the ··· menu acts on the selected provider, and the key, endpoint and model blocks
+ * below edit it. A provider is an endpoint (API family plus effective base URL); the menu, the
+ * selection and the row filtering all derive from the model list itself (see providerList).
  */
 import { useMemo, useRef, useState } from 'react';
 import { IconButton } from '@ui/IconButton';
 import ContextMenu from '@ui/ContextMenu';
 import ConfirmDialog from '@ui/ConfirmDialog';
-import Select from '@ui/Select';
-import { Ellipsis } from '@ui/icons';
+import { ChevronDown, Ellipsis } from '@ui/icons';
 import { t } from '@i18n';
 import { selectProvider, useAiConfigStore, type ModelProfile } from '@features/agent';
 import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
 import { useToastStore } from '@ui/Toast';
 import { applyModelPreset, type ModelPreset } from '@config/modelPresets';
 import AddProviderDialog from '@features/settings/components/AddProviderDialog';
+import ProviderDialog from '@features/settings/components/ProviderDialog';
 import ProviderKeyCard from '@features/settings/components/ProviderKeyCard';
 import ProviderEndpointCard from '@features/settings/components/ProviderEndpointCard';
 import ProviderModelList from '@features/settings/components/ProviderModelList';
@@ -30,6 +30,7 @@ export function AiModelPage() {
   const detailRef = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [providerOpen, setProviderOpen] = useState(false);
   const [confirmProvider, setConfirmProvider] = useState<ProviderRow<ModelProfile> | null>(null);
   /** Bumped when the provider menu asks to edit the selected provider's key. */
   const [keyEditRequest, setKeyEditRequest] = useState(0);
@@ -44,26 +45,7 @@ export function AiModelPage() {
     return rows[0]?.id ?? null;
   }, [rows, aiCfg.selectedProvider, aiCfg.lastSelectedProvider]);
   const selected = rows.find((row) => row.id === selectedId) ?? null;
-
-  const options = rows.map((row) => {
-    const Mark = modelMark(row.kind, '', row.baseUrl);
-    return {
-      value: row.id,
-      label: row.name || providerLabel(row.kind),
-      icon: (
-        <span style={{ display: 'inline-flex', color: modelHue(row.kind, '', row.baseUrl) }}>
-          <Mark size={14} aria-hidden="true" />
-        </span>
-      ),
-      badge: (
-        <span
-          className="provider-key-dot"
-          data-empty={providerHasKey(row.kind, aiCfg) ? undefined : 'true'}
-          aria-hidden="true"
-        />
-      ),
-    };
-  });
+  const SelectedMark = selected ? modelMark(selected.kind, '', selected.baseUrl) : null;
 
   /** A preset adds its first model row and selects the vendor it belongs to. */
   const addPreset = (preset: ModelPreset) => {
@@ -77,7 +59,7 @@ export function AiModelPage() {
       if (target) await selectModel(target);
       selectProvider(providerId(preset.provider, preset.baseUrl));
     });
-    if (!providerHasKey(preset.provider, aiCfg)) {
+    if (!providerHasKey(providerId(preset.provider, preset.baseUrl), aiCfg)) {
       toast(t('{{name}} added. Configure its API key before sending.', { name: preset.name }), 'info');
     }
   };
@@ -122,17 +104,28 @@ export function AiModelPage() {
       <div ref={detailRef} style={{ minWidth: 0 }}>
         {selected ? (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, minWidth: 0 }}>
-              <Select
-                value={selected.id}
-                options={options}
-                onChange={(id) => selectProvider(id)}
-                aria-label={t('Provider')}
-                data-testid="provider-select"
-                triggerClassName="provider-select-trigger"
-                style={{ maxWidth: 380 }}
-                action={{ label: t('Add provider'), onSelect: () => setAddOpen(true) }}
-              />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, minWidth: 0 }}>
+              <button
+                type="button"
+                className="provider-switch"
+                data-testid="provider-switch"
+                aria-haspopup="dialog"
+                aria-expanded={providerOpen}
+                onClick={() => setProviderOpen(true)}
+              >
+                {SelectedMark && (
+                  <span style={{ display: 'inline-flex', color: modelHue(selected.kind, '', selected.baseUrl) }}>
+                    <SelectedMark size={16} aria-hidden="true" />
+                  </span>
+                )}
+                <span className="provider-switch-name">{selected.name || providerLabel(selected.kind)}</span>
+                <span
+                  className="provider-key-dot"
+                  data-empty={providerHasKey(selected.id, aiCfg) ? undefined : 'true'}
+                  aria-hidden="true"
+                />
+                <ChevronDown size={12} aria-hidden="true" style={{ color: 'var(--text-muted)' }} />
+              </button>
               {/* Actions on the selected provider. */}
               <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
                 <IconButton
@@ -167,6 +160,15 @@ export function AiModelPage() {
           onClose={() => setMenu(null)}
         />
       )}
+      <ProviderDialog
+        open={providerOpen}
+        rows={rows}
+        selectedId={selectedId}
+        flags={aiCfg}
+        onSelect={selectProvider}
+        onAddProvider={() => setAddOpen(true)}
+        onClose={() => setProviderOpen(false)}
+      />
       <AddProviderDialog
         open={addOpen}
         onClose={() => setAddOpen(false)}

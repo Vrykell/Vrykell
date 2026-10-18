@@ -23,10 +23,12 @@ function reset() {
   useHistoryStore.setState({ entries: [] });
   useAgentSettings.setState({ global: { ...DEFAULT_AGENT_SETTINGS, completeModel: '' }, overrides: {} });
   useAiConfigStore.setState({
-    hasKey: false,
+    providerKeys: [],
     provider: 'openai-compatible',
     baseUrl: 'https://api.example.com/v1',
     model: 'gpt-4o-mini',
+    models: [],
+    activeModel: '',
   });
 }
 
@@ -44,7 +46,7 @@ describe('本地级（无 AI 也工作）', () => {
     expect(localComplete('git ')).toBe('status');
     expect(localCompleteCandidates('git ')).toEqual(['status', 'legacy']);
     expect(useHistoryStore.getState().search('broken')).toHaveLength(1);
-    useAiConfigStore.setState({ hasKey: true });
+    useAiConfigStore.setState({ providerKeys: ['openai-compatible|https://api.example.com/v1'] });
     mockGenerate.mockResolvedValue({ text: 'docker ps' });
     await completeCommand('docker', {});
     const prompt = (mockGenerate.mock.calls[0]![0] as { prompt: string }).prompt;
@@ -101,7 +103,7 @@ describe('本地级（无 AI 也工作）', () => {
 describe('AI 增强', () => {
   it('本地无结果且有 key → generateText，前缀校验通过才给后缀', async () => {
     reset();
-    useAiConfigStore.setState({ hasKey: true });
+    useAiConfigStore.setState({ providerKeys: ['openai-compatible|https://api.example.com/v1'] });
     mockGenerate.mockResolvedValue({ text: 'kubectl get pods -n prod' });
     const r = await completeCommand('kubectl get po', {});
     expect(r).toBe('ds -n prod');
@@ -111,7 +113,7 @@ describe('AI 增强', () => {
 
   it('AI 返回不以前缀开头 → null（不误导）', async () => {
     reset();
-    useAiConfigStore.setState({ hasKey: true });
+    useAiConfigStore.setState({ providerKeys: ['openai-compatible|https://api.example.com/v1'] });
     mockGenerate.mockResolvedValue({ text: '完全不同的命令' });
     expect(await completeCommand('kubectl', {})).toBeNull();
   });
@@ -127,7 +129,7 @@ describe('AI 增强', () => {
 
   it('completeModel 覆盖聊天模型', async () => {
     reset();
-    useAiConfigStore.setState({ hasKey: true, model: 'big-model' });
+    useAiConfigStore.setState({ providerKeys: ['openai-compatible|https://api.example.com/v1'], model: 'big-model' });
     useAgentSettings.setState({ global: { ...DEFAULT_AGENT_SETTINGS, completeModel: 'small-fast' }, overrides: {} });
     mockGenerate.mockResolvedValue({ text: 'xyz-done' });
     await completeCommand('xyz', {});
@@ -138,7 +140,7 @@ describe('AI 增强', () => {
 
   it('abort 后返回 null', async () => {
     reset();
-    useAiConfigStore.setState({ hasKey: true });
+    useAiConfigStore.setState({ providerKeys: ['openai-compatible|https://api.example.com/v1'] });
     mockGenerate.mockImplementation(({ abortSignal }: { abortSignal: AbortSignal }) => {
       abortSignal.dispatchEvent(new Event('abort'));
       return Promise.resolve({ text: 'kubectl get pods' });

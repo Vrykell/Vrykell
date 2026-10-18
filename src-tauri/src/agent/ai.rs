@@ -83,6 +83,9 @@ struct AiConfigInner {
     /// 当前生效模型 id（对应 models 里某一项）
     #[serde(default)]
     active_model: String,
+    /// 已配置密钥的 provider 身份列表（`kind|生效端点`）；密钥本体在平台密钥存储里。
+    #[serde(default)]
+    provider_keys: Vec<String>,
 }
 
 /// 平台密钥存储里的账户名（`crate::secret`）。
@@ -90,6 +93,49 @@ const SECRET_OPENAI: &str = "ai.openai";
 const SECRET_ANTHROPIC: &str = "ai.anthropic";
 const SECRET_GEMINI: &str = "ai.gemini";
 const SECRET_TAVILY: &str = "ai.tavily";
+
+/// 各家族的官方端点，与前端 `providerList` 的默认值一致：provider 身份由它们补齐。
+const DEFAULT_BASE_URL_ANTHROPIC: &str = "https://api.anthropic.com/v1";
+const DEFAULT_BASE_URL_GEMINI: &str = "https://generativelanguage.googleapis.com/v1beta";
+
+fn default_base_url_for(kind: &str) -> &'static str {
+    match kind {
+        "anthropic" => DEFAULT_BASE_URL_ANTHROPIC,
+        "gemini" => DEFAULT_BASE_URL_GEMINI,
+        _ => DEFAULT_BASE_URL,
+    }
+}
+
+fn is_default_base_url(url: &str) -> bool {
+    url == DEFAULT_BASE_URL || url == DEFAULT_BASE_URL_ANTHROPIC || url == DEFAULT_BASE_URL_GEMINI
+}
+
+/// provider 身份（家族 + 生效端点），与前端 `providerList.providerId` 的算法一致；
+/// 密钥按这个身份各存各的，换服务商就换密钥。
+fn provider_identity(kind: &str, base_url: &str) -> String {
+    let trimmed = base_url.trim().trim_end_matches('/');
+    let effective = if trimmed.is_empty() || is_default_base_url(trimmed) {
+        default_base_url_for(kind)
+    } else {
+        trimmed
+    };
+    format!("{kind}|{effective}")
+}
+
+/// 平台密钥存储里的账户名：按 provider 身份的稳定散列命名，URL 不进文件名。
+fn provider_secret_name(provider_id: &str) -> String {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in provider_id.as_bytes() {
+        hash ^= *byte as u64;
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    format!("ai.provider.{hash:016x}")
+}
+
+/// 某个 provider 的 key：只读平台密钥存储（明文不进配置文件）。
+fn read_provider_key(provider_id: &str) -> Option<String> {
+    crate::secret::get_secret(&provider_secret_name(provider_id)).filter(|key| !key.trim().is_empty())
+}
 
 fn default_base_url() -> String {
     DEFAULT_BASE_URL.to_string()
@@ -113,6 +159,7 @@ impl Default for AiConfigInner {
             tavily_key: None,
             models: Vec::new(),
             active_model: String::new(),
+            provider_keys: Vec::new(),
         }
     }
 }
@@ -181,14 +228,45 @@ impl AiConfig {
                 }
             }
         }
-        inner.api_key = crate::secret::get_secret(SECRET_OPENAI);
-        inner.anthropic_key = crate::secret::get_secret(SECRET_ANTHROPIC);
-        inner.gemini_key = crate::secret::get_secret(SECRET_GEMINI);
-        inner.tavily_key = crate::secret::get_secret(SECRET_TAVILY);
         inner.normalize();
+        // 旧版按家族共用一把 key（`ai.openai` 等）：搬成按 provider 各存各的，
+        // 家族键覆盖该家族现有的每个端点，随后删除老账户名。
+        let family_keys = [
+            ("openai-compatible", crate::secret::get_secret(SECRET_OPENAI)),
+            ("anthropic", crate::secret::get_secret(SECRET_ANTHROPIC)),
+            ("gemini", crate::secret::get_secret(SECRET_GEMINI)),
+        ];
+        let mut family_migrated = false;
+        for (kind, value) in family_keys {
+            let Some(value) = value else { continue };
+            let mut carried = false;
+            for model in &inner.models {
+                if model.provider != kind {
+                    continue;
+                }
+                let id = provider_identity(&model.provider, &model.base_url);
+                if read_provider_key(&id).is_none()
+                    && crate::secret::set_secret(&provider_secret_name(&id), &value).is_ok()
+                {
+                    if !inner.provider_keys.iter().any(|entry| entry == &id) {
+                        inner.provider_keys.push(id);
+                    }
+                    family_migrated = true;
+                }
+                carried = true;
+            }
+            if carried {
+                crate::secret::delete_secret(match kind {
+                    "anthropic" => SECRET_ANTHROPIC,
+                    "gemini" => SECRET_GEMINI,
+                    _ => SECRET_OPENAI,
+                });
+            }
+        }
+        inner.tavily_key = crate::secret::get_secret(SECRET_TAVILY);
         let cfg = AiConfig(Mutex::new(inner));
         // 只有全部搬迁成功才重写文件：否则明文 key 会随重写一起消失。
-        if migrated && sealed_all {
+        if (migrated && sealed_all) || family_migrated {
             cfg.save();
         }
         cfg
@@ -233,6 +311,8 @@ pub struct AiConfigInfo {
     pub has_anthropic_key: bool,
     pub has_gemini_key: bool,
     pub has_tavily_key: bool,
+    /// 已配置密钥的 provider 身份列表
+    pub provider_keys: Vec<String>,
     /// 多模型列表
     pub models: Vec<ModelProfile>,
     /// 当前生效模型 id
@@ -340,42 +420,28 @@ pub fn set_active_model(state: State<'_, AiConfig>, id: String) {
     });
 }
 
-/// 按 provider 设置 key（openai-compatible 即 api_key）。
+/// 按 provider（身份 = `kind|生效端点`）设置 key：密钥只进平台密钥存储，配置文件只记身份。
 #[tauri::command]
-pub fn set_provider_key(state: State<'_, AiConfig>, provider: String, key: String) {
+pub fn set_provider_key(state: State<'_, AiConfig>, provider_id: String, key: String) {
     let k = key.trim().to_string();
     if k.is_empty() {
         return;
     }
-    set_field(&state, |c| match provider.as_str() {
-        "anthropic" => c.anthropic_key = Some(k.clone()),
-        "gemini" => c.gemini_key = Some(k.clone()),
-        _ => c.api_key = Some(k.clone()),
+    if let Err(error) = crate::secret::set_secret(&provider_secret_name(&provider_id), &k) {
+        eprintln!("[ai] 保存 API Key 失败：{error}");
+        return;
+    }
+    set_field(&state, |c| {
+        if !c.provider_keys.iter().any(|id| id == &provider_id) {
+            c.provider_keys.push(provider_id.clone());
+        }
     });
 }
 
 #[tauri::command]
-pub fn clear_provider_key(state: State<'_, AiConfig>, provider: String) {
-    set_field(&state, |c| match provider.as_str() {
-        "anthropic" => c.anthropic_key = None,
-        "gemini" => c.gemini_key = None,
-        _ => c.api_key = None,
-    });
-    crate::secret::delete_secret(match provider.as_str() {
-        "anthropic" => SECRET_ANTHROPIC,
-        "gemini" => SECRET_GEMINI,
-        _ => SECRET_OPENAI,
-    });
-}
-
-/// 取某个 provider 的 key（trim 后为空视作未配置）。
-fn provider_key(c: &AiConfigInner, provider: &str) -> Option<String> {
-    let key = match provider {
-        "anthropic" => c.anthropic_key.clone(),
-        "gemini" => c.gemini_key.clone(),
-        _ => c.api_key.clone(),
-    };
-    key.filter(|k| !k.trim().is_empty())
+pub fn clear_provider_key(state: State<'_, AiConfig>, provider_id: String) {
+    crate::secret::delete_secret(&provider_secret_name(&provider_id));
+    set_field(&state, |c| c.provider_keys.retain(|id| id != &provider_id));
 }
 
 /// 密钥掩码：保留头尾便于辨认，中间用固定长度的星号；过短的 key 整体遮蔽。
@@ -391,16 +457,14 @@ fn mask_key(key: &str) -> String {
 
 /// 设置页展示用的掩码密钥；明文只经 provider_key_reveal 显式返回。
 #[tauri::command]
-pub fn provider_key_hint(state: State<'_, AiConfig>, provider: String) -> Option<String> {
-    let c = state.0.lock().ok()?;
-    provider_key(&c, &provider).map(|k| mask_key(&k))
+pub fn provider_key_hint(provider_id: String) -> Option<String> {
+    read_provider_key(&provider_id).map(|key| mask_key(&key))
 }
 
 /// 用户显式查看时返回明文密钥（前端只用于当前会话的展示/复制）。
 #[tauri::command]
-pub fn provider_key_reveal(state: State<'_, AiConfig>, provider: String) -> Option<String> {
-    let c = state.0.lock().ok()?;
-    provider_key(&c, &provider)
+pub fn provider_key_reveal(provider_id: String) -> Option<String> {
+    read_provider_key(&provider_id)
 }
 
 /// 模型列表请求的地址与认证头（检测与同步共用；与聊天请求同一 base 约定）。
@@ -446,14 +510,12 @@ fn parse_models(body: &str) -> Vec<String> {
 /// 用已存密钥向服务商拉取模型列表：「检测」验证密钥，「同步」把新模型并入列表。
 #[tauri::command]
 pub async fn provider_fetch_models(
-    state: State<'_, AiConfig>,
+    provider_id: String,
     provider: String,
     base_url: String,
 ) -> Result<Vec<String>, String> {
-    let key = {
-        let c = state.0.lock().map_err(|_| "配置暂不可用".to_string())?;
-        provider_key(&c, &provider).ok_or_else(|| "这个服务商还没有配置 API Key".to_string())?
-    };
+    let key = read_provider_key(&provider_id)
+        .ok_or_else(|| "这个服务商还没有配置 API Key".to_string())?;
     let (url, headers) = models_request(&provider, &base_url, &key)?;
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(20))
@@ -494,13 +556,14 @@ pub fn get_ai_config(state: State<'_, AiConfig>) -> AiConfigInfo {
         .0
         .lock()
         .map(|c| AiConfigInfo {
-            has_key: c.api_key.is_some(),
+            has_key: c.provider_keys.iter().any(|id| id.starts_with("openai-compatible|")),
             base_url: c.base_url.clone(),
             model: c.model.clone(),
             provider: c.provider.clone(),
-            has_anthropic_key: c.anthropic_key.is_some(),
-            has_gemini_key: c.gemini_key.is_some(),
+            has_anthropic_key: c.provider_keys.iter().any(|id| id.starts_with("anthropic|")),
+            has_gemini_key: c.provider_keys.iter().any(|id| id.starts_with("gemini|")),
             has_tavily_key: c.tavily_key.is_some(),
+            provider_keys: c.provider_keys.clone(),
             models: c.models.clone(),
             active_model: c.active_model.clone(),
         })
@@ -512,6 +575,7 @@ pub fn get_ai_config(state: State<'_, AiConfig>) -> AiConfigInfo {
             has_anthropic_key: false,
             has_gemini_key: false,
             has_tavily_key: false,
+            provider_keys: Vec::new(),
             models: Vec::new(),
             active_model: String::new(),
         })
@@ -942,5 +1006,30 @@ mod proxy_endpoint_tests {
 
         assert_eq!(parse_models(r#"{"data":[{"id":"a"},{"id":"a"}]}"#), vec!["a".to_string()]);
         assert!(parse_models("not json").is_empty());
+    }
+
+    #[test]
+    fn provider_identity_matches_the_frontend_rule() {
+        assert_eq!(provider_identity("anthropic", ""), "anthropic|https://api.anthropic.com/v1");
+        assert_eq!(
+            provider_identity("anthropic", "https://api.anthropic.com/v1/"),
+            "anthropic|https://api.anthropic.com/v1"
+        );
+        assert_eq!(
+            provider_identity("openai-compatible", "https://api.deepseek.com/v1/"),
+            "openai-compatible|https://api.deepseek.com/v1"
+        );
+        assert_eq!(
+            provider_identity("gemini", "https://generativelanguage.googleapis.com/v1beta"),
+            "gemini|https://generativelanguage.googleapis.com/v1beta"
+        );
+    }
+
+    #[test]
+    fn provider_secret_names_are_stable_and_distinct() {
+        let name = provider_secret_name("anthropic|https://api.anthropic.com/v1");
+        assert_eq!(name, provider_secret_name("anthropic|https://api.anthropic.com/v1"));
+        assert_ne!(name, provider_secret_name("openai-compatible|https://api.anthropic.com/v1"));
+        assert!(name.starts_with("ai.provider."));
     }
 }

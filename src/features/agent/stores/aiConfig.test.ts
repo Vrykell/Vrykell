@@ -55,11 +55,14 @@ describe('ai 镜像函数（新增）', () => {
   });
 
   it('isApiKeyConfigured：按 provider 检查 key', () => {
-    useAiConfigStore.setState({ hasKey: true, provider: 'openai-compatible' });
+    useAiConfigStore.setState({
+      providerKeys: ['openai-compatible|https://api.openai.com/v1'],
+      provider: 'openai-compatible', baseUrl: 'https://api.openai.com/v1', models: [], activeModel: '',
+    });
     expect(isApiKeyConfigured()).toBe(true);
-    useAiConfigStore.setState({ hasKey: false, hasAnthropicKey: true, provider: 'anthropic' });
+    useAiConfigStore.setState({ providerKeys: ['anthropic|https://api.anthropic.com/v1'], provider: 'anthropic', baseUrl: '' });
     expect(isApiKeyConfigured()).toBe(true);
-    useAiConfigStore.setState({ hasKey: false, hasAnthropicKey: false, provider: 'anthropic' });
+    useAiConfigStore.setState({ providerKeys: [] });
     expect(isApiKeyConfigured()).toBe(false);
   });
 
@@ -84,23 +87,26 @@ describe('ai 镜像函数（新增）', () => {
   });
 
   it('isApiKeyConfigured：gemini 分支', () => {
-    useAiConfigStore.setState({ hasGeminiKey: true, provider: 'gemini' });
+    useAiConfigStore.setState({
+      providerKeys: ['gemini|https://generativelanguage.googleapis.com/v1beta'],
+      provider: 'gemini', baseUrl: '', models: [], activeModel: '',
+    });
     expect(isApiKeyConfigured()).toBe(true);
-    useAiConfigStore.setState({ hasGeminiKey: false, provider: 'gemini' });
+    useAiConfigStore.setState({ providerKeys: [] });
     expect(isApiKeyConfigured()).toBe(false);
-    
   });
 
   it('refreshAiConfig：同步 Rust 配置；后端不可用时保持默认', async () => {
     invokeMock.mockResolvedValue({
       has_key: true, base_url: 'u', model: 'm', provider: 'anthropic',
       has_anthropic_key: true, has_gemini_key: false, has_tavily_key: true,
+      provider_keys: ['anthropic|u'],
       models: [{ id: 'x', name: 'X', provider: 'anthropic', baseUrl: 'u', model: 'm' }],
       active_model: 'x',
     });
     await refreshAiConfig();
     const s = useAiConfigStore.getState();
-    expect(s.hasKey).toBe(true);
+    expect(s.providerKeys).toEqual(['anthropic|u']);
     expect(s.provider).toBe('anthropic');
     expect(s.hasTavilyKey).toBe(true);
     expect(s.models[0].id).toBe('x');
@@ -118,14 +124,20 @@ describe('ai 镜像函数（新增）', () => {
   });
 
   it('setApiKey / clearApiKey / setAiBaseUrl / setAiModel / setAiProvider', async () => {
+    useAiConfigStore.setState({
+      provider: 'openai-compatible', baseUrl: 'https://api.openai.com/v1',
+      models: [], activeModel: '', providerKeys: [],
+    });
     await setApiKey('  sk-abc  ');
-    expect(invokeMock).toHaveBeenCalledWith('set_ai_key', { key: 'sk-abc' });
-    expect(useAiConfigStore.getState().hasKey).toBe(true);
+    expect(invokeMock).toHaveBeenCalledWith('set_provider_key', {
+      providerId: 'openai-compatible|https://api.openai.com/v1', key: 'sk-abc',
+    });
+    expect(useAiConfigStore.getState().providerKeys).toEqual(['openai-compatible|https://api.openai.com/v1']);
     await setApiKey('   ');
     expect(invokeMock).toHaveBeenCalledTimes(1);
     await clearApiKey();
-    expect(invokeMock).toHaveBeenCalledWith('clear_ai_key');
-    expect(useAiConfigStore.getState().hasKey).toBe(false);
+    expect(invokeMock).toHaveBeenCalledWith('clear_provider_key', { providerId: 'openai-compatible|https://api.openai.com/v1' });
+    expect(useAiConfigStore.getState().providerKeys).toEqual([]);
     await setAiBaseUrl('  http://x  ');
     expect(invokeMock).toHaveBeenCalledWith('set_ai_base_url', { baseUrl: 'http://x' });
     expect(useAiConfigStore.getState().baseUrl).toBe('http://x');
@@ -167,23 +179,22 @@ describe('ai 镜像函数（新增）', () => {
     expect(useAiConfigStore.getState().provider).toBe('openai-compatible');
   });
 
-  it('setProviderKey / clearProviderKey：按 provider 分支', async () => {
-    await setProviderKey('anthropic', ' key-a ');
-    expect(invokeMock).toHaveBeenCalledWith('set_provider_key', { provider: 'anthropic', key: 'key-a' });
-    expect(useAiConfigStore.getState().hasAnthropicKey).toBe(true);
-    await setProviderKey('gemini', 'k');
-    expect(useAiConfigStore.getState().hasGeminiKey).toBe(true);
-    await setProviderKey('openai-compatible', 'k');
-    expect(useAiConfigStore.getState().hasKey).toBe(true);
-    await setProviderKey('anthropic', '  ');
+  it('setProviderKey / clearProviderKey：按 provider 身份各存各的', async () => {
+    await setProviderKey('anthropic|https://api.anthropic.com/v1', ' key-a ');
+    expect(invokeMock).toHaveBeenCalledWith('set_provider_key', {
+      providerId: 'anthropic|https://api.anthropic.com/v1', key: 'key-a',
+    });
+    expect(useAiConfigStore.getState().providerKeys).toEqual(['anthropic|https://api.anthropic.com/v1']);
+    await setProviderKey('gemini|https://generativelanguage.googleapis.com/v1beta', 'k');
+    await setProviderKey('openai-compatible|https://api.deepseek.com/v1', 'k');
+    expect(useAiConfigStore.getState().providerKeys).toHaveLength(3);
+    await setProviderKey('anthropic|https://api.anthropic.com/v1', '  ');
     expect(invokeMock).toHaveBeenCalledTimes(3);
-    await clearProviderKey('gemini');
-    expect(invokeMock).toHaveBeenCalledWith('clear_provider_key', { provider: 'gemini' });
-    expect(useAiConfigStore.getState().hasGeminiKey).toBe(false);
-    await clearProviderKey('anthropic');
-    expect(useAiConfigStore.getState().hasAnthropicKey).toBe(false);
-    await clearProviderKey('openai-compatible');
-    expect(useAiConfigStore.getState().hasKey).toBe(false);
+    await clearProviderKey('gemini|https://generativelanguage.googleapis.com/v1beta');
+    expect(invokeMock).toHaveBeenCalledWith('clear_provider_key', { providerId: 'gemini|https://generativelanguage.googleapis.com/v1beta' });
+    expect(useAiConfigStore.getState().providerKeys).toHaveLength(2);
+    await clearProviderKey('openai-compatible|https://api.deepseek.com/v1');
+    expect(useAiConfigStore.getState().providerKeys).toEqual(['anthropic|https://api.anthropic.com/v1']);
   });
 
   it('setTavilyKey / clearTavilyKey', async () => {

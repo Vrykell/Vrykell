@@ -752,7 +752,7 @@ button.history-prompt-action[data-primary]:enabled:is(:hover, :focus-visible) { 
 .usage-source-filter { display: inline-flex; align-items: center; gap: 2px; height: 32px; padding: 3px; border-radius: var(--radius-inner); background: var(--hover); flex-shrink: 0; }
 .usage-source-chip { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 26px; padding: 0 10px; border: 0; border-radius: var(--radius-inner); background: transparent; color: var(--text-secondary); font: var(--fw-medium) var(--fs-caption) var(--font-ui); white-space: nowrap; cursor: pointer; transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
 .usage-source-chip:hover { color: var(--text-primary); }
-.usage-source-chip[aria-pressed="true"] { background: var(--surface); color: var(--text-primary); font-weight: var(--fw-semibold); }
+.usage-source-chip[aria-pressed="true"] { background: color-mix(in srgb, var(--primary-action) 60%, transparent); color: var(--text-primary); font-weight: var(--fw-semibold); }
 .usage-source-chip--icon { width: 26px; padding: 0; }
 .command-block.ai-block { min-width: 0; margin: 0; padding-left: 18px; padding-right: 18px; background: color-mix(in srgb, var(--ai-block-bg) calc(var(--ai-block-bg-enabled) * 100%), transparent); }
 .command-block.ai-block::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: color-mix(in srgb, var(--ai-block-rail) calc(var(--ai-block-bg-enabled) * 100%), transparent); pointer-events: none; z-index: 1; }
@@ -1228,13 +1228,16 @@ button.state-icon-button { color: var(--icon-color); }
 /* Provider picker: the model page's provider bar (ProviderPicker.tsx). */
 .settings-provider-page { display: flex; flex-direction: column; gap: 12px; }
 .settings-provider-empty { padding: 10px 8px; text-align: center; color: var(--text-muted); font-size: var(--fs-caption); }
-/* Provider switcher: a button that opens a floating menu, with the brand mark, the provider name
-   and the key status. It keeps the standard control surface — a grey resting background that
-   brightens on hover — and hugs its content instead of filling the row. */
-.ui-select.provider-select-trigger { gap: 8px; }
-.ui-select.provider-select-trigger .ui-select-value { flex: 0 1 auto; max-width: 260px; }
+/* Provider switcher: a grey button that brightens on hover and opens the centred provider menu. */
+.provider-switch { display: inline-flex; align-items: center; gap: 8px; max-width: 340px; min-height: 32px; padding: 6px 10px; border: 0; border-radius: var(--radius-inner); background: var(--field-bg); color: var(--text-primary); font: var(--fw-medium) var(--fs-caption) var(--font-ui); cursor: pointer; transition: background var(--dur-fast) var(--ease); }
+.provider-switch:hover, .provider-switch[aria-expanded="true"] { background: var(--button-hover); }
+.provider-switch-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .provider-key-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-sizing: border-box; }
 .provider-key-dot[data-empty] { background: transparent; border: 1px solid var(--border-strong); }
+/* Rows of the centred provider menu. */
+.provider-option-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 38px; padding: 0 10px; border: 0; border-radius: var(--radius-inner); background: transparent; color: var(--text-primary); font: var(--fw-medium) var(--fs-caption) var(--font-ui); cursor: pointer; text-align: left; transition: background var(--dur-fast) var(--ease); }
+.provider-option-row:hover, .provider-option-row[aria-current="true"] { background: var(--hover); }
+.provider-option-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .settings-preset-cell { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text-secondary); font: var(--fw-medium) var(--fs-caption) var(--font-ui); cursor: pointer; text-align: left; min-width: 0; transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
 .settings-preset-cell:hover { color: var(--text-primary); border-color: var(--border-strong); }
 .settings-preset-cell span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

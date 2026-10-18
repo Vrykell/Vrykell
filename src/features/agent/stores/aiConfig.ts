@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
 import type { StreamFn } from '@features/chat';
 import type { ProviderKind } from '@features/agent/services/provider';
+import { providerId } from '@features/agent/services/provider';
 
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_MODEL = 'gpt-4o-mini';
@@ -29,12 +30,11 @@ export interface ModelProfile {
 // 前端用 zustand store 镜像一份供 UI 订阅（状态栏模型名等需要响应式）；key 本身不回显。
 // provider/baseUrl/model 是「当前生效模型」的镜像字段，方便旧代码与状态栏直接读取。
 interface AiConfigState {
-  hasKey: boolean;
   baseUrl: string;
   model: string;
   provider: ProviderKind;
-  hasAnthropicKey: boolean;
-  hasGeminiKey: boolean;
+  /** Providers (endpoint ids) that hold their own API key. */
+  providerKeys: string[];
   hasTavilyKey: boolean;
   /** 多模型列表（命名 profile） */
   models: ModelProfile[];
@@ -47,12 +47,10 @@ interface AiConfigState {
 }
 
 export const useAiConfigStore = create<AiConfigState>(() => ({
-  hasKey: false,
   baseUrl: DEFAULT_BASE_URL,
   model: DEFAULT_MODEL,
   provider: 'openai-compatible',
-  hasAnthropicKey: false,
-  hasGeminiKey: false,
+  providerKeys: [],
   hasTavilyKey: false,
   models: [],
   activeModel: '',
@@ -75,16 +73,11 @@ export function activeModelProfile(): ModelProfile {
   );
 }
 
+/** Whether the active model's provider has its own key configured. */
 export function isApiKeyConfigured(): boolean {
   const s = useAiConfigStore.getState();
-  switch (s.provider) {
-    case 'anthropic':
-      return s.hasAnthropicKey;
-    case 'gemini':
-      return s.hasGeminiKey;
-    default:
-      return s.hasKey;
-  }
+  const active = activeModelProfile();
+  return s.providerKeys.includes(providerId(active.provider, active.baseUrl));
 }
 
 export function getModel(): string {
@@ -103,6 +96,8 @@ interface AiConfigInfoRust {
   has_anthropic_key: boolean;
   has_gemini_key: boolean;
   has_tavily_key: boolean;
+  /** Providers (endpoint ids) that hold their own API key. */
+  provider_keys: string[];
   models: ModelProfile[];
   active_model: string;
 }
@@ -112,12 +107,10 @@ export async function refreshAiConfig(): Promise<void> {
   try {
     const info = await invoke<AiConfigInfoRust>('get_ai_config');
     useAiConfigStore.setState({
-      hasKey: info.has_key,
       baseUrl: info.base_url,
       model: info.model,
       provider: info.provider,
-      hasAnthropicKey: info.has_anthropic_key,
-      hasGeminiKey: info.has_gemini_key,
+      providerKeys: info.provider_keys ?? [],
       hasTavilyKey: info.has_tavily_key,
       models: info.models ?? [],
       activeModel: info.active_model ?? '',
@@ -127,16 +120,15 @@ export async function refreshAiConfig(): Promise<void> {
   }
 }
 
+/** Set the active model's provider key (the single-key entry points kept for older callers). */
 export async function setApiKey(key: string): Promise<void> {
-  const k = key.trim();
-  if (!k) return;
-  await invoke('set_ai_key', { key: k });
-  useAiConfigStore.setState({ hasKey: true });
+  const active = activeModelProfile();
+  await setProviderKey(providerId(active.provider, active.baseUrl), key);
 }
 
 export async function clearApiKey(): Promise<void> {
-  await invoke('clear_ai_key');
-  useAiConfigStore.setState({ hasKey: false });
+  const active = activeModelProfile();
+  await clearProviderKey(providerId(active.provider, active.baseUrl));
 }
 
 export async function setAiBaseUrl(baseUrl: string): Promise<void> {
@@ -190,44 +182,35 @@ export function selectProvider(id: string | null): void {
   safeLocalStorageSet(PROVIDER_SELECTION_KEY, id ?? '');
 }
 
-/** 按 provider 设置 key（'openai-compatible' 等价于 setApiKey） */
-export async function setProviderKey(provider: ProviderKind, key: string): Promise<void> {
+/** Set one provider's key; the backend seals it and the store records the provider id. */
+export async function setProviderKey(provider: string, key: string): Promise<void> {
   const k = key.trim();
   if (!k) return;
-  await invoke('set_provider_key', { provider, key: k });
-  const patch =
-    provider === 'anthropic'
-      ? { hasAnthropicKey: true }
-      : provider === 'gemini'
-        ? { hasGeminiKey: true }
-        : { hasKey: true };
-  useAiConfigStore.setState(patch);
+  await invoke('set_provider_key', { providerId: provider, key: k });
+  const keys = useAiConfigStore.getState().providerKeys;
+  if (!keys.includes(provider)) useAiConfigStore.setState({ providerKeys: [...keys, provider] });
 }
 
-export async function clearProviderKey(provider: ProviderKind): Promise<void> {
-  await invoke('clear_provider_key', { provider });
-  const patch =
-    provider === 'anthropic'
-      ? { hasAnthropicKey: false }
-      : provider === 'gemini'
-        ? { hasGeminiKey: false }
-        : { hasKey: false };
-  useAiConfigStore.setState(patch);
+export async function clearProviderKey(provider: string): Promise<void> {
+  await invoke('clear_provider_key', { providerId: provider });
+  useAiConfigStore.setState({
+    providerKeys: useAiConfigStore.getState().providerKeys.filter((id) => id !== provider),
+  });
 }
 
 /** The masked provider key for the settings display; the plaintext stays in the backend. */
-export async function providerKeyHint(provider: ProviderKind): Promise<string | null> {
-  return invoke<string | null>('provider_key_hint', { provider });
+export async function providerKeyHint(provider: string): Promise<string | null> {
+  return invoke<string | null>('provider_key_hint', { providerId: provider });
 }
 
 /** The plaintext provider key, fetched only when the user explicitly asks to see or copy it. */
-export async function providerKeyReveal(provider: ProviderKind): Promise<string | null> {
-  return invoke<string | null>('provider_key_reveal', { provider });
+export async function providerKeyReveal(provider: string): Promise<string | null> {
+  return invoke<string | null>('provider_key_reveal', { providerId: provider });
 }
 
-/** Ask the provider for its model list with the stored key: the connection check and the model sync share this. */
-export async function providerFetchModels(provider: ProviderKind, baseUrl: string): Promise<string[]> {
-  return invoke<string[]>('provider_fetch_models', { provider, baseUrl });
+/** Ask the provider for its model list with its own key: the connection check and the model sync share this. */
+export async function providerFetchModels(id: string, kind: ProviderKind, baseUrl: string): Promise<string[]> {
+  return invoke<string[]>('provider_fetch_models', { providerId: id, provider: kind, baseUrl });
 }
 
 export async function setTavilyKey(key: string): Promise<void> {
