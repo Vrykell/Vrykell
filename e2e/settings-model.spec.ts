@@ -126,13 +126,13 @@ test.describe('模型配置页', () => {
     await page.getByTestId(`provider-option-${LOCAL_ID}`).click();
     await expect(names).toHaveCount(1);
     await expect(names.first()).toHaveText('本地模型');
-    await expect(page.getByTestId('model-row').first().getByTestId('model-current')).toBeVisible();
-    // 回到 Anthropic 行：它不是当前模型，行内不再提供「设为当前」
+    await expect(page.getByTestId('model-row').first().getByText('当前', { exact: true })).toHaveCount(0);
+    // 回到 Anthropic 行：行内既没有「设为当前」，也没有「当前」提示
     await page.getByTestId('provider-switch').click();
     await page.getByTestId(`provider-option-${ANTHROPIC_ID}`).click();
     const mainRow = page.getByTestId('model-row').first();
-    await expect(mainRow.getByTestId('model-current')).toHaveCount(0);
     await expect(mainRow.getByRole('button', { name: '设为当前' })).toHaveCount(0);
+    await expect(mainRow.getByText('当前', { exact: true })).toHaveCount(0);
     // 添加模型：中央表单填 ID（必填）与分组
     await page.getByTestId('model-add').click();
     const addDialog = page.getByTestId('add-model-dialog');

@@ -83,14 +83,6 @@ function ModelRow({ model, active, onRemove }: {
           </span>
         </span>
         <CapabilityChips profile={model} />
-        {active && (
-          <span
-            data-testid="model-current"
-            style={{ color: 'var(--text-muted)', fontSize: 'calc(11px * var(--ui-font-scale))', flexShrink: 0 }}
-          >
-            {t('Current')}
-          </span>
-        )}
         <IconButton compact data-testid="model-settings" aria-expanded={editing}
           aria-label={t('Model settings')} data-tip={t('Model settings')} onClick={() => setEditing(true)}>
           <Settings size={14} />
