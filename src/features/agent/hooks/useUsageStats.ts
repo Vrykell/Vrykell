@@ -40,10 +40,12 @@ export function useUsageStats() {
     [inRange, source, provider, model],
   );
   const totals = useMemo(() => summarize(filtered), [filtered]);
-  // Options come from the range, so a filter never offers a choice with no rows behind it.
+  // Options come from the range, so a filter never offers a choice with no rows behind it; ACP
+  // servers count as sources too, even though their usage is reported per session.
   const sourceOptions = useMemo(
-    () => [...new Set(inRange.map((record) => record.source))].sort((a, b) => a.localeCompare(b)),
-    [inRange],
+    () => [...new Set([...inRange.map((record) => record.source), ...Object.keys(acp)])]
+      .sort((a, b) => a.localeCompare(b)),
+    [inRange, acp],
   );
   const providerOptions = useMemo(
     () => [...new Set(inRange.map((record) => record.provider))].sort((a, b) => a.localeCompare(b)),
@@ -57,8 +59,11 @@ export function useUsageStats() {
   const modelRows = useMemo(() => modelBreakdown(filtered), [filtered]);
   /** Request log: newest first. */
   const logRows = useMemo(() => [...filtered].reverse(), [filtered]);
-  /** ACP servers, most recently active first; the protocol reports context and cost, not tokens. */
-  const acpRows = useMemo(() => Object.values(acp).sort((a, b) => b.at - a.at), [acp]);
+  /** ACP servers, most recently active first; the source filter narrows them like the records. */
+  const acpRows = useMemo(
+    () => Object.values(acp).filter((row) => !source || row.source === source).sort((a, b) => b.at - a.at),
+    [acp, source],
+  );
   const series = useMemo(() => tokensSeries(filtered, range, Date.now()), [filtered, range, revision]);
   const latestAt = useMemo(
     () => records.reduce((latest, record) => (record.at > latest ? record.at : latest), 0),

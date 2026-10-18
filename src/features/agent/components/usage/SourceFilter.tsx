@@ -7,7 +7,8 @@
  * with the name in the hover tip.
  */
 import { t } from '@i18n';
-import { Bot, Terminal, iconSizes } from '@ui/icons';
+import { Bot, iconSizes } from '@ui/icons';
+import { harnessMark } from '@features/agent/components/HarnessBadge';
 import { ALL_FILTER } from '@features/agent/hooks/useUsageStats';
 import { DEFAULT_USAGE_SOURCE } from '@features/agent/model/usageStats';
 
@@ -28,8 +29,8 @@ export default function SourceFilter({ value, options, onChange }: {
         {t('All')}
       </button>
       {options.map((source) => {
-        // A connected harness has no mark of its own yet, so it shares a generic one.
-        const Glyph = source === DEFAULT_USAGE_SOURCE ? Bot : Terminal;
+        // This app's own turns keep its glyph; an ACP server shows the agent's own mark.
+        const Glyph = source === DEFAULT_USAGE_SOURCE ? Bot : harnessMark(source);
         const label = sourceLabel(source);
         return (
           <button key={source} type="button" data-subtle className="usage-source-chip usage-source-chip--icon"
