@@ -7,7 +7,7 @@ import { useUsageStore } from '../stores/usage';
 const DAY = 24 * 60 * 60 * 1000;
 
 beforeEach(() => {
-  useUsageStore.setState({ records: [] });
+  useUsageStore.setState({ records: [], acp: {} });
   useToastStore.setState({ toasts: [], timers: {} });
 });
 
@@ -219,6 +219,8 @@ describe('UsageView', () => {
     expect(screen.getByTestId('usage-source-all')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('usage-source-vrykell')).toHaveAttribute('aria-label', 'Vrykell');
     expect(screen.getByTestId('usage-source-vrykell')).toHaveAttribute('aria-pressed', 'false');
+    // 本机来源用应用图标，而不是通用 glyph
+    expect(screen.getByTestId('usage-source-vrykell').querySelector('img')).toHaveAttribute('src', '/app-icon.svg');
     expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('2');
 
     fireEvent.click(screen.getByTestId('usage-source-opencode'));
@@ -228,6 +230,37 @@ describe('UsageView', () => {
     // 再点一次回到全部来源
     fireEvent.click(screen.getByTestId('usage-source-opencode'));
     expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('2');
+  });
+
+  it('shows only what an ACP server reports while it is the selected source', () => {
+    seedSonnetTurn();
+    const usage = useUsageStore.getState();
+    usage.acpUsage('Claude Code', { used: 12_000, size: 200_000, cost: 0.0042, currency: 'USD' });
+    usage.acpTurn('Claude Code');
+    usage.acpToolCall('Claude Code');
+    render(<UsageView />);
+
+    fireEvent.click(screen.getByTestId('usage-source-Claude Code'));
+
+    // 只显示协议真正带回来的数字：轮数、工具调用、上下文占用与累计费用
+    expect(screen.getByTestId('usage-acp-turns')).toHaveTextContent('1');
+    expect(screen.getByTestId('usage-acp-tool-calls')).toHaveTextContent('1');
+    expect(screen.getByTestId('usage-acp-context')).toHaveTextContent('1.2万/20万');
+    expect(screen.getByTestId('usage-acp-cost')).toHaveTextContent('0.0042');
+    // token 卡片、趋势图、token 表格与只作用于 token 记录的筛选器整块不出现
+    expect(screen.queryByTestId('usage-metrics')).toBeNull();
+    expect(screen.queryByTestId('usage-trend-chart')).toBeNull();
+    expect(screen.queryByTestId('usage-tab-logs')).toBeNull();
+    expect(screen.queryByTestId('usage-filter-provider')).toBeNull();
+    expect(screen.queryByTestId('usage-range')).toBeNull();
+    expect(screen.queryByTestId('usage-record-count')).toBeNull();
+    // 有 ACP 数据时清空按钮可用（清空同样会清掉 ACP 记录）
+    expect(screen.getByTestId('usage-clear')).toBeEnabled();
+
+    // 回到全部来源，token 视图恢复
+    fireEvent.click(screen.getByTestId('usage-source-all'));
+    expect(screen.getByTestId('usage-metrics')).toBeInTheDocument();
+    expect(screen.getByTestId('usage-record-count')).toBeInTheDocument();
   });
 
   it('clears the records and confirms it', () => {

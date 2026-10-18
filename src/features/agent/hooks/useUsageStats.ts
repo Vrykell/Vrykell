@@ -65,6 +65,8 @@ export function useUsageStats() {
     [acp, source],
   );
   const series = useMemo(() => tokensSeries(filtered, range, Date.now()), [filtered, range, revision]);
+  /** Whether any ACP server has reported at all — the clear button clears those too. */
+  const hasAcp = useMemo(() => Object.keys(acp).length > 0, [acp]);
   const latestAt = useMemo(
     () => records.reduce((latest, record) => (record.at > latest ? record.at : latest), 0),
     [records],
@@ -80,7 +82,7 @@ export function useUsageStats() {
   return {
     records, range, setRange, source, setSource, provider, setProvider, model, setModel,
     sourceOptions, providerOptions, modelOptions, totals, providerRows, modelRows, logRows, series, latestAt,
-    acpRows,
+    acpRows, hasAcp,
     clear, refresh, refreshedAt,
   };
 }

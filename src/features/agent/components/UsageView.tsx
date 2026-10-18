@@ -16,6 +16,7 @@ import { formatLogTime, type UsageRange } from '@features/agent/model/usageStats
 import { ALL_FILTER, useUsageStats } from '@features/agent/hooks/useUsageStats';
 import MetricsRow from './usage/MetricsRow';
 import AcpUsageSection from './usage/AcpUsageSection';
+import AcpUsageView from './usage/AcpUsageView';
 import SourceFilter from './usage/SourceFilter';
 import TrendChart from './usage/TrendChart';
 import RequestLogTable from './usage/RequestLogTable';
@@ -57,6 +58,10 @@ export default function UsageView() {
   const [tab, setTab] = useState<UsageTab>('logs');
   const [spinning, setSpinning] = useState(false);
   const rangeLabel = t(RANGE_OPTIONS.find((option) => option.value === stats.range)!.label);
+  // One ACP server as the source: it reports sessions, not tokens, so the page drops the token
+  // cards, the trend and the token tables instead of showing them all at zero.
+  const acpRow = stats.source === ALL_FILTER ? undefined : stats.acpRows.find((row) => row.source === stats.source);
+  const acpOnly = acpRow !== undefined;
 
   const clearUsage = () => {
     stats.clear();
@@ -78,13 +83,16 @@ export default function UsageView() {
       <header style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
         <DataUsage size={iconSizes.row} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
         <strong data-tip={t('Usage statistics')}
-          data-tip-description={t('Requests and token usage the provider reported on this machine.')}
+          data-tip-description={acpOnly
+            ? t('What the selected ACP server reported about its sessions.')
+            : t('Requests and token usage the provider reported on this machine.')}
           style={{ color: 'var(--text-primary)', fontSize: 'var(--fs-subtitle)', fontWeight: 'var(--fw-semibold)' }}>
           {t('Usage statistics')}
         </strong>
         <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
-          <span data-testid="usage-record-count">{t('{{count}} records', { count: stats.records.length })}</span>
-          {stats.latestAt > 0 && <span>· {t('Latest {{time}}', { time: formatLogTime(stats.latestAt) })}</span>}
+          {/* The record count and the latest time describe the token log, which this view does not show. */}
+          {!acpOnly && <span data-testid="usage-record-count">{t('{{count}} records', { count: stats.records.length })}</span>}
+          {!acpOnly && stats.latestAt > 0 && <span>· {t('Latest {{time}}', { time: formatLogTime(stats.latestAt) })}</span>}
           {stats.refreshedAt > 0 && (
             <span data-testid="usage-refreshed-at">· {t('Refreshed at {{time}}', { time: formatLogTime(stats.refreshedAt) })}</span>
           )}
@@ -93,7 +101,7 @@ export default function UsageView() {
             <RefreshCw size={iconSizes.compact}
               style={{ transform: spinning ? 'rotate(360deg)' : 'none', transition: 'transform 0.3s var(--ease)' }} />
           </IconButton>
-          <IconButton compact tone="danger" data-testid="usage-clear" disabled={stats.records.length === 0}
+          <IconButton compact tone="danger" data-testid="usage-clear" disabled={stats.records.length === 0 && !stats.hasAcp}
             aria-label={t('Clear usage data')} data-tip={t('Clear usage data')} onClick={clearUsage}>
             <Trash2 size={iconSizes.compact} />
           </IconButton>
@@ -102,48 +110,56 @@ export default function UsageView() {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <SourceFilter value={stats.source} options={stats.sourceOptions} onChange={stats.setSource} />
-        <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <FilterSelect label={t('Provider')} testId="usage-filter-provider" width={132}
-            value={stats.provider} tip={stats.provider || t('All')}
-            options={[{ value: ALL_FILTER, label: t('All') }, ...stats.providerOptions.map((option) => ({ value: option, label: option }))]}
-            onChange={stats.setProvider} />
-          <FilterSelect label={t('Model')} testId="usage-filter-model" width={140}
-            value={stats.model} tip={stats.model || t('All')}
-            options={[{ value: ALL_FILTER, label: t('All') }, ...stats.modelOptions.map((option) => ({ value: option, label: option }))]}
-            onChange={stats.setModel} />
-          <FilterSelect label={t('Usage range')} testId="usage-range" width={104} value={stats.range}
-            options={RANGE_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))}
-            onChange={(next) => stats.setRange(next as UsageRange)} />
-        </span>
+        {/* Provider, model and range narrow the token records; an ACP server reports cumulative
+            session totals, so none of the three applies while it is the selected source. */}
+        {!acpOnly && (
+          <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <FilterSelect label={t('Provider')} testId="usage-filter-provider" width={132}
+              value={stats.provider} tip={stats.provider || t('All')}
+              options={[{ value: ALL_FILTER, label: t('All') }, ...stats.providerOptions.map((option) => ({ value: option, label: option }))]}
+              onChange={stats.setProvider} />
+            <FilterSelect label={t('Model')} testId="usage-filter-model" width={140}
+              value={stats.model} tip={stats.model || t('All')}
+              options={[{ value: ALL_FILTER, label: t('All') }, ...stats.modelOptions.map((option) => ({ value: option, label: option }))]}
+              onChange={stats.setModel} />
+            <FilterSelect label={t('Usage range')} testId="usage-range" width={104} value={stats.range}
+              options={RANGE_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))}
+              onChange={(next) => stats.setRange(next as UsageRange)} />
+          </span>
+        )}
       </div>
 
-      <MetricsRow totals={stats.totals} />
+      {acpRow ? <AcpUsageView row={acpRow} /> : (
+        <>
+          <MetricsRow totals={stats.totals} />
 
-      <TrendChart buckets={stats.series.buckets} unit={stats.series.unit} rangeLabel={rangeLabel} />
+          <TrendChart buckets={stats.series.buckets} unit={stats.series.unit} rangeLabel={rangeLabel} />
 
-      <AcpUsageSection rows={stats.acpRows} />
+          <AcpUsageSection rows={stats.acpRows} />
 
-      <section className="usage-card" style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <div role="tablist" aria-label={t('Usage details')} style={{ display: 'flex', gap: 4, paddingBottom: 8 }}>
-          {TAB_LABELS.map(({ id, label }) => (
-            <button key={id} type="button" role="tab" aria-selected={tab === id} data-subtle
-              data-testid={`usage-tab-${id}`} onClick={() => setTab(id)}
-              style={{
-                padding: '4px 10px', border: 0, borderRadius: 'var(--radius-inner)',
-                background: tab === id ? 'var(--hover)' : 'transparent',
-                color: tab === id ? 'var(--text-primary)' : 'var(--text-secondary)',
-                font: `${tab === id ? 'var(--fw-medium)' : 'var(--fw-regular)'} var(--fs-label) var(--font-ui)`,
-                cursor: 'pointer',
-                transition: 'background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease)',
-              }}>
-              {t(label)}
-            </button>
-          ))}
-        </div>
-        {tab === 'logs' && <RequestLogTable rows={stats.logRows} />}
-        {tab === 'providers' && <ProviderStatsTable rows={stats.providerRows} />}
-        {tab === 'models' && <ModelStatsTable rows={stats.modelRows} />}
-      </section>
+          <section className="usage-card" style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <div role="tablist" aria-label={t('Usage details')} style={{ display: 'flex', gap: 4, paddingBottom: 8 }}>
+              {TAB_LABELS.map(({ id, label }) => (
+                <button key={id} type="button" role="tab" aria-selected={tab === id} data-subtle
+                  data-testid={`usage-tab-${id}`} onClick={() => setTab(id)}
+                  style={{
+                    padding: '4px 10px', border: 0, borderRadius: 'var(--radius-inner)',
+                    background: tab === id ? 'var(--hover)' : 'transparent',
+                    color: tab === id ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    font: `${tab === id ? 'var(--fw-medium)' : 'var(--fw-regular)'} var(--fs-label) var(--font-ui)`,
+                    cursor: 'pointer',
+                    transition: 'background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease)',
+                  }}>
+                  {t(label)}
+                </button>
+              ))}
+            </div>
+            {tab === 'logs' && <RequestLogTable rows={stats.logRows} />}
+            {tab === 'providers' && <ProviderStatsTable rows={stats.providerRows} />}
+            {tab === 'models' && <ModelStatsTable rows={stats.modelRows} />}
+          </section>
+        </>
+      )}
     </div>
   );
 }

@@ -1,9 +1,10 @@
 /**
  * Usage statistics page e2e: the conversation-settings entry, the metric cards, the trend chart,
- * the request log / providers / models tables, the filters and clearing.
+ * the request log / providers / models tables, the filters and clearing — plus the view an ACP
+ * server gets when it is the selected source.
  */
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, mockAnthropic, ensureChatSettingsOpen } from './tauri-mock';
+import { setupTauriMock, mockAnthropic, ensureChatSettingsOpen, emitAcpSession, acpUpdate } from './tauri-mock';
 
 /** Opens the usage page from the AI panel's conversation settings, reusing the panel when visible. */
 async function openUsagePage(page: import('@playwright/test').Page) {
@@ -61,8 +62,12 @@ test.describe('usage statistics page', () => {
     const laneWidth = Number(await page.getByTestId('usage-trend-hover').getAttribute('width'));
     expect(laneWidth).toBeLessThan(80);
 
-    // 来源选择条：默认「全部」，点本机来源后数据不变
+    // 来源选择条：默认「全部」，点本机来源后数据不变；本机来源 chip 用应用图标且真实加载
     await expect(page.getByTestId('usage-source-all')).toHaveAttribute('aria-pressed', 'true');
+    const appIcon = page.getByTestId('usage-source-vrykell').locator('img');
+    await expect(appIcon).toHaveAttribute('src', '/app-icon.svg');
+    // 资源真实可达：图片加载完成后 naturalWidth 才会大于 0
+    await expect.poll(() => appIcon.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
     await page.getByTestId('usage-source-vrykell').click();
     await expect(page.getByTestId('usage-source-vrykell')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByTestId('usage-total-requests')).toHaveText('1');
@@ -104,5 +109,48 @@ test.describe('usage statistics page', () => {
     await page.getByTestId('usage-clear').click();
     await expect(page.getByTestId('usage-total-requests')).toHaveText('0');
     await expect(page.getByRole('status')).toContainText('已清空用量数据');
+  });
+
+  test('shows only the ACP numbers when a server is the selected source', async ({ page }) => {
+    await setupTauriMock(page, { schedulesSeed: [] });
+    await page.goto('/');
+    await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
+
+    // Connect the configured server, then let it report a session the way the backend forwards it.
+    await page.keyboard.press('Control+,');
+    await page.getByText('ACP', { exact: true }).first().click();
+    await page.getByTestId('harness-connect-0').click();
+    await expect(page.getByTestId('harness-send')).toBeVisible({ timeout: 10000 });
+    const session = 'sess_e2e';
+    await emitAcpSession(page, acpUpdate(session, {
+      sessionUpdate: 'tool_call', toolCallId: 'call_1', title: 'Run the tests', status: 'pending',
+    }));
+    await emitAcpSession(page, acpUpdate(session, {
+      sessionUpdate: 'usage_update', used: 12_000, size: 200_000, cost: { amount: 0.0042, currency: 'USD' },
+    }));
+    await emitAcpSession(page, { sessionId: session, kind: 'stop', payload: { stopReason: 'end_turn' } });
+
+    await openUsagePage(page);
+    await page.getByTestId('usage-source-Fake ACP').click();
+
+    // 只显示协议带回来的数字：轮数、工具调用、上下文占用、累计费用
+    await expect(page.getByTestId('usage-acp-turns')).toHaveText('1');
+    await expect(page.getByTestId('usage-acp-tool-calls')).toHaveText('1');
+    await expect(page.getByTestId('usage-acp-context')).toHaveText('1.2万/20万');
+    await expect(page.getByTestId('usage-acp-cost')).toHaveText('0.0042');
+    await expect(page.getByTestId('usage-acp-updated')).toContainText('最近更新');
+    // token 卡片、趋势图、token 表格与只作用于 token 记录的筛选器都不出现
+    await expect(page.getByTestId('usage-metrics')).toHaveCount(0);
+    await expect(page.getByTestId('usage-trend-chart')).toHaveCount(0);
+    await expect(page.getByTestId('usage-tab-logs')).toHaveCount(0);
+    await expect(page.getByTestId('usage-filter-provider')).toHaveCount(0);
+    await expect(page.getByTestId('usage-range')).toHaveCount(0);
+    await expect(page.getByTestId('usage-record-count')).toHaveCount(0);
+
+    // 回到全部来源：token 视图回来，ACP 区块以汇总行出现
+    await page.getByTestId('usage-source-all').click();
+    await expect(page.getByTestId('usage-metrics')).toBeVisible();
+    await expect(page.getByTestId('usage-acp')).toContainText('Fake ACP');
+    await expect(page.getByTestId('usage-acp')).toContainText('1 轮 · 1 次工具调用');
   });
 });
