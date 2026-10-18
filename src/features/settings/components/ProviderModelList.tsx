@@ -16,7 +16,7 @@ import { ChevronDown, Eye, Filter, Globe, Lightbulb, Minus, Plus, RefreshCw, Sea
 import { detectCapabilities, type ModelCapability } from '@features/agent/model/capabilities';
 import { modelHue, modelMark } from '@features/agent/components/modelIcon';
 import { providerFetchModels, useAiConfigStore, type ModelProfile } from '@features/agent';
-import { commitModels, selectModel } from '@features/settings/model/modelWrites';
+import { commitModels } from '@features/settings/model/modelWrites';
 import { filterModels, groupModelsByVendor } from '@features/settings/model/modelGroups';
 import type { ProviderRow } from '@features/settings/model/providerList';
 import { SettingsGroup, Field } from './ui';
@@ -58,16 +58,13 @@ function CapabilityChips({ profile }: { profile: ModelProfile }) {
   );
 }
 
-function ModelRow({ model, active, onRemove, onSetCurrent, onIncomplete }: {
+function ModelRow({ model, active, onRemove }: {
   model: ModelProfile;
   active: boolean;
   onRemove: () => void;
-  onSetCurrent: () => void;
-  onIncomplete: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const Mark = modelMark(model.provider, model.model, model.baseUrl);
-  const usable = model.model.trim().length > 0;
   return (
     <div data-testid="model-row" style={{ borderTop: '1px solid var(--border)', padding: '6px 10px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
@@ -86,17 +83,13 @@ function ModelRow({ model, active, onRemove, onSetCurrent, onIncomplete }: {
           </span>
         </span>
         <CapabilityChips profile={model} />
-        {active ? (
+        {active && (
           <span
             data-testid="model-current"
             style={{ color: 'var(--text-muted)', fontSize: 'calc(11px * var(--ui-font-scale))', flexShrink: 0 }}
           >
             {t('Current')}
           </span>
-        ) : (
-          <OutlineButton data-subtle onClick={() => (usable ? onSetCurrent() : onIncomplete())}>
-            {t('Set as current')}
-          </OutlineButton>
         )}
         <IconButton compact data-testid="model-settings" aria-expanded={editing}
           aria-label={t('Model settings')} data-tip={t('Model settings')} onClick={() => setEditing(true)}>
@@ -281,8 +274,6 @@ export default function ProviderModelList({ row, toast }: {
                   model={model}
                   active={model.id === activeId}
                   onRemove={() => requestRemove(model)}
-                  onSetCurrent={() => { void save(() => selectModel(model.id)); }}
-                  onIncomplete={() => toast(t('Fill in the model ID first.'), 'info')}
                 />
               ))}
             </section>

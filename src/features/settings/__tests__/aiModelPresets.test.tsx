@@ -9,10 +9,14 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AiModelPage } from '@features/settings/pages/aiModelPage';
 import { useAiConfigStore } from '@features/agent';
+import { MODEL_PRESETS } from '@config/modelPresets';
 
 const invokeMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@platform/diagnostics', () => ({ invoke: invokeMock }));
+
+/** The preset under test, read from the data file so refreshing ids never breaks the test. */
+const DEEPSEEK = MODEL_PRESETS.find((preset) => preset.name === 'DeepSeek')!;
 
 const SEED = {
   id: 'm0', name: 'Seeded', provider: 'openai-compatible' as const,
@@ -38,15 +42,15 @@ describe('AiModelPage presets', () => {
 
     await waitFor(() => {
       const models = useAiConfigStore.getState().models;
-      expect(models.some((m) => m.baseUrl === 'https://api.deepseek.com/v1' && m.model === 'deepseek-chat')).toBe(true);
+      expect(models.some((m) => m.baseUrl === DEEPSEEK.baseUrl && m.model === DEEPSEEK.model)).toBe(true);
     });
-    const added = useAiConfigStore.getState().models.find((m) => m.model === 'deepseek-chat');
+    const added = useAiConfigStore.getState().models.find((m) => m.model === DEEPSEEK.model);
     expect(useAiConfigStore.getState().activeModel).toBe(added?.id);
   });
 
   it('reuses the row a preset already matches', async () => {
     useAiConfigStore.setState({
-      models: [{ id: 'mine', name: 'Mine', provider: 'openai-compatible', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat' }],
+      models: [{ id: 'mine', name: 'Mine', provider: 'openai-compatible', baseUrl: DEEPSEEK.baseUrl, model: DEEPSEEK.model }],
       activeModel: 'm0',
     });
     render(<AiModelPage />);

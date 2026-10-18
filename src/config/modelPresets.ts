@@ -2,8 +2,10 @@
  * modelPresets — one-click fills for the model list.
  *
  * The endpoint table is data, not logic: it lives in `modelPresets.json` next to this file, so a
- * vendor's endpoint or model id can change without touching code. The vendor names and marks point
- * at the endpoints they name, no key is bundled, and install and license what you use yourself.
+ * vendor's endpoint or model id can change without touching code. Model ids were last refreshed
+ * from the public model catalog in October 2026; the in-app "Sync models" action is the authority
+ * for the endpoints a user actually configured. The vendor names and marks point at the endpoints
+ * they name, no key is bundled, and install and license what you use yourself.
  */
 import presetData from './modelPresets.json';
 

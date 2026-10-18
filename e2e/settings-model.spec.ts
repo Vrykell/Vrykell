@@ -127,14 +127,12 @@ test.describe('模型配置页', () => {
     await expect(names).toHaveCount(1);
     await expect(names.first()).toHaveText('本地模型');
     await expect(page.getByTestId('model-row').first().getByTestId('model-current')).toBeVisible();
-    // 回到 Anthropic 行，把主力模型设为当前
+    // 回到 Anthropic 行：它不是当前模型，行内不再提供「设为当前」
     await page.getByTestId('provider-switch').click();
     await page.getByTestId(`provider-option-${ANTHROPIC_ID}`).click();
     const mainRow = page.getByTestId('model-row').first();
-    await mainRow.getByRole('button', { name: '设为当前' }).click();
-    await expect(mainRow.getByTestId('model-current')).toBeVisible();
-    const activeCalls = await aiModelCalls(page);
-    expect(activeCalls.some((c) => c.kind === 'set_active' && c.id === 'm-main')).toBe(true);
+    await expect(mainRow.getByTestId('model-current')).toHaveCount(0);
+    await expect(mainRow.getByRole('button', { name: '设为当前' })).toHaveCount(0);
     // 添加模型：中央表单填 ID（必填）与分组
     await page.getByTestId('model-add').click();
     const addDialog = page.getByTestId('add-model-dialog');
