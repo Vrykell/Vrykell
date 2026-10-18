@@ -1232,9 +1232,11 @@ button.state-icon-button { color: var(--icon-color); }
 .provider-switch { display: inline-flex; align-items: center; gap: 8px; max-width: 340px; min-height: 32px; padding: 6px 10px; border: 0; border-radius: var(--radius-inner); background: var(--field-bg); color: var(--text-primary); font: var(--fw-medium) var(--fs-caption) var(--font-ui); cursor: pointer; transition: background var(--dur-fast) var(--ease); }
 .provider-switch:hover, .provider-switch[aria-expanded="true"] { background: color-mix(in srgb, var(--field-bg) 84%, var(--text-primary)); }
 .provider-switch-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Optical nudge: the text's visual centre sits above its line box centre. */
-.provider-key-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-sizing: border-box; transform: translateY(-1px); }
-.provider-key-dot[data-empty] { background: transparent; border: 1px solid var(--border-strong); }
+/* Key status dot: its box is one em tall and flex-centred, so it lines up with the text's own
+   middle instead of the line box's. */
+.provider-key-dot { width: 1em; height: 1em; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.provider-key-dot::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-sizing: border-box; }
+.provider-key-dot[data-empty]::before { background: transparent; border: 1px solid var(--border-strong); }
 /* Rows of the centred provider menu: flat at rest, a soft highlight on hover, and the shown
    provider lifted onto the grey field surface so the check is not the only cue. The `button.`
    prefix outranks the app-wide `button:not([data-subtle])` chrome. */
@@ -1255,13 +1257,16 @@ button.provider-option-add:hover { color: var(--text-primary); }
 .settings-model-filter-chip { display: inline-flex; align-items: center; gap: 4px; min-height: 26px; padding: 2px 10px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--text-secondary); cursor: pointer; font-size: var(--fs-caption); transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
 .settings-model-filter-chip:hover { color: var(--text-primary); border-color: var(--border-strong); }
 .settings-model-filter-chip[aria-pressed="true"] { border-color: transparent; background: var(--control-active-bg); color: var(--text-primary); }
+/* Capability marks: the icon carries the colour, the chip only answers the pointer. */
+.model-cap-chip { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px; background: transparent; transition: background var(--dur-fast) var(--ease); }
+.model-cap-chip:hover { background: var(--hover); }
 
 /* Provider key row: the masked value with actions that appear on hover or focus. */
 .settings-key-row { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; min-height: 32px; padding: 0 4px 0 10px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--field-bg); }
 .settings-key-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: calc(12px * var(--ui-font-scale)); color: var(--text-primary); }
 .settings-key-actions { display: inline-flex; align-items: center; gap: 2px; opacity: 0; transition: opacity var(--dur-fast) var(--ease); }
 .settings-key-row:hover .settings-key-actions, .settings-key-row:focus-within .settings-key-actions { opacity: 1; }
-.settings-key-empty { justify-content: space-between; cursor: pointer; font: var(--fw-medium) var(--fs-caption) var(--font-ui); color: var(--text-muted); }
+.settings-key-empty { justify-content: center; gap: 6px; cursor: pointer; font: var(--fw-medium) var(--fs-caption) var(--font-ui); color: var(--text-muted); }
 .settings-key-empty:hover { color: var(--text-primary); border-color: var(--border-strong); }
 .settings-key-add-label { color: var(--text-primary); }
 

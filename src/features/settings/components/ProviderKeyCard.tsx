@@ -12,7 +12,7 @@ import { useEffect, useState } from 'react';
 import { t } from '@i18n';
 import { IconButton } from '@ui/IconButton';
 import { OutlineButton } from '@ui/OutlineButton';
-import { Copy, Eye, EyeOff, Pencil, Trash2 } from '@ui/icons';
+import { Copy, Eye, EyeOff, Key, Pencil, Trash2 } from '@ui/icons';
 import { writeClipboardText } from '@platform/clipboard';
 import {
   clearProviderKey, providerFetchModels, providerKeyHint, providerKeyReveal,
@@ -134,7 +134,7 @@ export default function ProviderKeyCard({ row, toast, keyEditRequest = 0 }: {
           ) : (
             <button type="button" data-testid="provider-key-add" className="settings-key-row settings-key-empty"
               onClick={() => setDialogOpen(true)}>
-              <span>{t('Not configured')}</span>
+              <Key size={14} aria-hidden="true" />
               <span className="settings-key-add-label">{t('Add API key')}</span>
             </button>
           )}

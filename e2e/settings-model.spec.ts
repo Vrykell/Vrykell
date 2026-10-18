@@ -61,9 +61,10 @@ test.describe('模型配置页', () => {
   });
 
   test('API Key：按服务商各存各的，掩码显示、查看/复制/清除、保存恢复', async ({ page }) => {
-    // 默认第一行（Anthropic 端点）没有密钥：未配置 + 添加入口，检测不可用
+    // 默认第一行（Anthropic 端点）没有密钥：显示「添加 API 密钥」入口，检测不可用
     const keyField = fieldOf(page, '服务商 API Key');
-    await expect(keyField.getByText('未配置')).toBeVisible();
+    await expect(keyField.getByTestId('provider-key-add')).toBeVisible();
+    await expect(keyField.getByTestId('provider-key-add')).toContainText('添加 API 密钥');
     await expect(keyField.getByTestId('provider-check')).toBeDisabled();
     // 添加：中央浮层里输入，眼睛切换明文，保存并关闭
     await keyField.getByTestId('provider-key-add').click();
@@ -89,9 +90,9 @@ test.describe('模型配置页', () => {
     await expect(keyField.getByTestId('provider-key-value')).toHaveText('sk-********abcd');
     await keyField.getByTestId('provider-key-copy').click();
     expect(await clipboardText(page)).toBe('sk-test-key-1234abcd');
-    // 清除 → 回到未配置
+    // 清除 → 回到添加入口
     await keyField.getByTestId('provider-key-clear').click();
-    await expect(keyField.getByText('未配置')).toBeVisible();
+    await expect(keyField.getByTestId('provider-key-add')).toBeVisible();
     const clears = await aiKeyCalls(page);
     expect(clears.some((c) => c.provider === LOCAL_ID && !c.key)).toBe(true);
     // 切回 Anthropic：它自己的密钥还在
@@ -125,13 +126,13 @@ test.describe('模型配置页', () => {
     await page.getByTestId(`provider-option-${LOCAL_ID}`).click();
     await expect(names).toHaveCount(1);
     await expect(names.first()).toHaveText('本地模型');
-    await expect(page.getByTestId('model-row').first().getByText('当前', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('model-row').first().getByTestId('model-current')).toBeVisible();
     // 回到 Anthropic 行，把主力模型设为当前
     await page.getByTestId('provider-switch').click();
     await page.getByTestId(`provider-option-${ANTHROPIC_ID}`).click();
     const mainRow = page.getByTestId('model-row').first();
     await mainRow.getByRole('button', { name: '设为当前' }).click();
-    await expect(mainRow.getByText('当前', { exact: true })).toBeVisible();
+    await expect(mainRow.getByTestId('model-current')).toBeVisible();
     const activeCalls = await aiModelCalls(page);
     expect(activeCalls.some((c) => c.kind === 'set_active' && c.id === 'm-main')).toBe(true);
     // 添加模型：中央表单填 ID（必填）与分组

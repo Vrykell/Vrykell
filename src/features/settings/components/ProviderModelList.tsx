@@ -29,12 +29,12 @@ type Toast = (msg: string, type: 'info' | 'success' | 'error') => void;
 /** The filter chips, in the order they appear. */
 const FILTERS: (ModelCapability | 'all')[] = ['all', 'vision', 'reasoning', 'tools', 'search'];
 
-/** Capability chips: only the capabilities the model has, each in its own tinted tile. */
-const CAPABILITIES: [ModelCapability, string, AppIcon, string][] = [
-  ['vision', t('Vision'), Eye, 'var(--group-green)'],
-  ['reasoning', t('Reasoning'), Lightbulb, 'var(--group-violet)'],
-  ['tools', t('Tools'), Wrench, 'var(--group-orange)'],
-  ['search', t('Search'), Globe, 'var(--group-blue)'],
+/** Capability marks: metadata, so they stay quiet and answer the pointer instead of shouting. */
+const CAPABILITIES: [ModelCapability, string, AppIcon][] = [
+  ['vision', t('Vision'), Eye],
+  ['reasoning', t('Reasoning'), Lightbulb],
+  ['tools', t('Tools'), Wrench],
+  ['search', t('Search'), Globe],
 ];
 
 function CapabilityChips({ profile }: { profile: ModelProfile }) {
@@ -42,19 +42,16 @@ function CapabilityChips({ profile }: { profile: ModelProfile }) {
   const present = CAPABILITIES.filter(([cap]) => caps[cap]);
   if (present.length === 0) return null;
   return (
-    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-      {present.map(([cap, label, Icon, hue]) => (
+    <div style={{ display: 'flex', gap: 2, flexShrink: 0, color: 'var(--text-muted)' }}>
+      {present.map(([cap, label, Icon]) => (
         <span
           key={cap}
           data-testid={`model-cap-${cap}`}
           data-tip={label}
           aria-label={label}
-          style={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22,
-            borderRadius: 6, background: `color-mix(in srgb, ${hue} 18%, transparent)`, color: hue, flexShrink: 0,
-          }}
+          className="model-cap-chip"
         >
-          <Icon size={13} aria-hidden="true" />
+          <Icon size={14} aria-hidden="true" />
         </span>
       ))}
     </div>
@@ -80,17 +77,20 @@ function ModelRow({ model, active, onRemove, onSetCurrent, onIncomplete }: {
         }}>
           <Mark size={20} aria-hidden="true" />
         </span>
-        <span data-testid="model-name" style={{
-          flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {model.name || model.model || t('Unnamed model')}
+        <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span data-testid="model-name" style={{
+            minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            fontWeight: active ? 'var(--fw-semibold)' : undefined,
+          }}>
+            {model.name || model.model || t('Unnamed model')}
+          </span>
         </span>
         <CapabilityChips profile={model} />
         {active ? (
-          <span className="settings-model-active" style={{
-            fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', borderRadius: 4, flexShrink: 0,
-            color: 'var(--success)', background: 'var(--success-bg)',
-          }}>
+          <span
+            data-testid="model-current"
+            style={{ color: 'var(--text-muted)', fontSize: 'calc(11px * var(--ui-font-scale))', flexShrink: 0 }}
+          >
             {t('Current')}
           </span>
         ) : (
