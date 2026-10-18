@@ -35,7 +35,7 @@ test.describe('harness session', () => {
 
     // Connect the configured harness from the settings section.
     await page.keyboard.press('Control+,');
-    await page.getByText('外部 harness', { exact: true }).first().click();
+    await page.getByText('ACP', { exact: true }).first().click();
     await page.getByTestId('harness-connect-0').click();
     await expect(page.getByTestId('harness-send')).toBeVisible({ timeout: 10000 });
     // One tab opens one session, however many times the effects run.

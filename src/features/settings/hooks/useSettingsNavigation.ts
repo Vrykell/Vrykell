@@ -38,7 +38,7 @@ export const SETTINGS_GROUPS: SettingGroup[] = [
       { id: 'ai-memory', icon: FileText, label: '记忆' },
       { id: 'ai-agents', icon: Bot, label: '子代理' },
       { id: 'ai-schedules', icon: RefreshCw, label: '定时任务' },
-      { id: 'ai-harness', icon: Bot, label: t('External harnesses') },
+      { id: 'ai-harness', icon: Bot, label: t('ACP') },
     ],
   },
   {

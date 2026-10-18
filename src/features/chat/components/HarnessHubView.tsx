@@ -105,7 +105,7 @@ export default function HarnessHubView() {
         <strong style={{ color: 'var(--text-primary)', fontSize: 'var(--fs-subtitle)', fontWeight: 'var(--fw-semibold)' }}>
           {t('Harness hub')}
         </strong>
-        <span data-tip={t('External harnesses')}
+        <span data-tip={t('ACP')}
           data-tip-description={t('A harness is a program you add: adding it is the authorization. Nothing third-party ships with the app.')}
           style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
           · {t('{{count}} configured', { count: list?.length ?? 0 })}
