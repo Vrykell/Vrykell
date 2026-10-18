@@ -79,6 +79,21 @@ describe('terminal surface resets', () => {
     expect(renderer).not.toHaveBeenCalled();
   });
 
+  it('records the reset cost per phase for the diagnostics', () => {
+    const main = surface();
+    terminals.set('focused', main as unknown as Terminal);
+    redrawTerminal();
+    expect(debug).toHaveBeenCalledWith('terminal-atlas-reset', expect.objectContaining({
+      reason: 'manual',
+      rendererRebuilds: 1,
+      terminals: 1,
+      syncMs: expect.any(Number),
+      rebuildMs: expect.any(Number),
+      wipeMs: expect.any(Number),
+      repaintMs: expect.any(Number),
+    }));
+  });
+
   it('restores only the terminal input that held focus before rebuilding its renderer', () => {
     const main = surface();
     const input = document.createElement('textarea');

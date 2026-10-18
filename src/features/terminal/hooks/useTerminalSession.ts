@@ -13,7 +13,7 @@ import { captureConnectionFrame, type TerminalFrame } from '../model/terminalFra
 import { projectBlocks } from '../model/blockProjection';
 import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
 import { Terminal } from '@xterm/xterm';
-import { applyTerminalRenderer, loadWebglRenderer, releaseTerminalRenderer } from '@features/terminal/model/xtermRenderer';
+import { applyTerminalRenderer, hasWebglRenderer, loadWebglRenderer, releaseTerminalRenderer } from '@features/terminal/model/xtermRenderer';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { ptySpawn, ptyWrite, ptyResize, ptyClose, onPtyOutput, onPtyExit, type PtySpawnOptions } from '@platform/pty';
@@ -31,7 +31,7 @@ import { agentControl } from '@features/agent/services/agentControl';
 import { defaultOpenModeForShell } from '@features/agent/stores/agentSettings';
 import { t } from '@i18n';
 import { SessionController } from '@features/terminal/services/pipeline/sessionController';
-import { recoverTerminalSurfaces } from '@features/terminal/services/terminalRepaint';
+import { blockTerminalFor, recoverTerminalSurfaces } from '@features/terminal/services/terminalRepaint';
 import { copyTerminalSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
 import { cancelTerminalInput, writeTerminalInput } from '@features/terminal/services/terminalWriteQueue';
 import { querySequences } from '@features/terminal/model/terminalQueries';
@@ -63,6 +63,9 @@ const sessionControllers = sessionRegistry.controllers;
 const pendingUiCommands = sessionRegistry.pendingUiCommands;
 const widthSyncs = sessionRegistry.widthSyncs;
 const PENDING_COMMAND_TTL_MS = 30_000;
+
+/** A write whose parse callback is delayed this long reports the backlog it sat behind. */
+const TERMINAL_PARSE_LAG_REPORT_MS = 250;
 
 /** Bound the startup buffer so a stale session flooding output cannot grow it forever. */
 const PRE_SESSION_MAX_BATCHES = 512;
@@ -305,11 +308,21 @@ export function useTerminalSession(
 
     // The local scene mirror determines whether the PTY uses full or block-list width.
     let currentScene: 'classic' | 'blockList' | 'altScreen' = initialScene;
-    const writeMain = (data: string) => term.write(data, () => {
-      if (spec?.kind === 'ssh' && currentScene === 'classic') {
-        connectionOutputRef.current?.(getRecentOutputFor(paneId, 100));
-      }
-    });
+    const writeMain = (data: string) => {
+      const queuedAt = performance.now();
+      term.write(data, () => {
+        // The callback runs once the parser has drained up to this write, so its delay is the
+        // backlog the output sat behind - what a stalled or throttled main thread turns into
+        // seconds of lag.
+        const lagMs = performance.now() - queuedAt;
+        if (isTerminalDebugEnabled() && lagMs >= TERMINAL_PARSE_LAG_REPORT_MS) {
+          terminalDebug('terminal-parse-lag', { paneId, chars: data.length, lagMs: Math.round(lagMs), scene: currentScene });
+        }
+        if (spec?.kind === 'ssh' && currentScene === 'classic') {
+          connectionOutputRef.current?.(getRecentOutputFor(paneId, 100));
+        }
+      });
+    };
     const controller = new SessionController(paneId, term.cols, {      writeMain,
       onTerminalData: data => {
         if (!sessionId || disposed || stopped) return;
@@ -899,6 +912,31 @@ export function useTerminalSession(
     // atlas that the others hold texture coordinates into.
     const onVisibilityChange = () => { if (!document.hidden) recoverTerminalSurfaces(); };
     document.addEventListener('visibilitychange', onVisibilityChange);
+    // The platform does not always deliver a visibility change when the window leaves and comes
+    // back, so the return is also observed through focus. The record carries how long the app was
+    // away and which renderer each surface came back with, which makes a silent step down to the
+    // DOM renderer visible.
+    let blurredAt: number | null = null;
+    const onWindowBlur = () => { blurredAt = performance.now(); };
+    const onWindowFocus = () => {
+      if (disposed) return;
+      const awayMs = blurredAt === null ? null : Math.round(performance.now() - blurredAt);
+      blurredAt = null;
+      const block = blockTerminalFor(paneId);
+      terminalDebug('terminal-window-return', {
+        paneId,
+        awayMs,
+        scene: currentScene,
+        cols: term.cols,
+        rows: term.rows,
+        visibility: document.visibilityState,
+        focused: document.hasFocus(),
+        webgl: hasWebglRenderer(term),
+        blockWebgl: block ? hasWebglRenderer(block) : null,
+      });
+    };
+    window.addEventListener('blur', onWindowBlur);
+    window.addEventListener('focus', onWindowFocus);
 
     // ── 清理 ──
 
@@ -931,6 +969,8 @@ export function useTerminalSession(
       cancelAnimationFrame(widthRaf);
       ro.disconnect();
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('blur', onWindowBlur);
+      window.removeEventListener('focus', onWindowFocus);
       if (widthSyncs.get(paneId) === applyWidth) widthSyncs.delete(paneId);
       if (sessionControllers.get(paneId) === controller) sessionControllers.delete(paneId);
       pendingUiCommands.delete(paneId);

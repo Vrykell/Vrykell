@@ -36,7 +36,7 @@ vi.mock('@xterm/addon-webgl', () => ({
 
 vi.mock('@features/terminal/services/terminalDebug', () => ({ terminalDebug: mocked.debug }));
 
-import { applyTerminalRenderer, loadWebglRenderer, releaseTerminalRenderer } from '../xtermRenderer';
+import { applyTerminalRenderer, hasWebglRenderer, loadWebglRenderer, releaseTerminalRenderer } from '../xtermRenderer';
 
 function reset(): void {
   mocked.handlers.length = 0;
@@ -129,5 +129,16 @@ describe('WebGL context lifetime', () => {
     mocked.loseContext.mockImplementation(() => { throw new Error('context lost'); });
     expect(() => applyTerminalRenderer(term, 'dom')).not.toThrow();
     expect(mocked.disposed).toBe(1);
+  });
+
+  it('reports a context loss and the renderer the terminal falls back to', () => {
+    const { term } = fakeTerminal();
+    loadWebglRenderer(term, 'webgl');
+    expect(hasWebglRenderer(term)).toBe(true);
+    mocked.handlers[0]!();
+    // The loss is recorded apart from an ordinary release so a silent step down to the DOM
+    // renderer can be told from a terminal that was disposed on purpose.
+    expect(mocked.debug).toHaveBeenCalledWith('terminal-webgl-context-lost', { released: expect.any(Number), attached: false });
+    expect(hasWebglRenderer(term)).toBe(false);
   });
 });

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { diagnostic, diagnosticSnapshot, exportDiagnostics, flushDiagnostics, invoke, redactText, sanitizeDiagnostic, setDiagnosticAutoSave, useDiagnosticSettings } from './diagnostics';
+import { diagnostic, diagnosticSnapshot, exportDiagnostics, flushDiagnostics, invoke, redactText, reportFrameGap, reportWindowFocus, sanitizeDiagnostic, setDiagnosticAutoSave, useDiagnosticSettings } from './diagnostics';
 
 describe('diagnostics', () => {
   beforeEach(async () => {
@@ -79,5 +79,25 @@ describe('diagnostics', () => {
     diagnostic('next-batch');
     await flushDiagnostics();
     expect(invokeMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('separates a stalled main thread from a paused window in the frame gaps', () => {
+    const before = diagnosticSnapshot().length;
+    reportFrameGap(120);
+    reportFrameGap(300);
+    reportFrameGap(9000);
+    const records = diagnosticSnapshot().slice(before);
+    expect(records.map(record => record.event)).toEqual(['frame-stall', 'frame-pause']);
+    expect(records[0]!.detail).toMatchObject({ gapMs: 300, visibility: expect.any(String), hasFocus: expect.any(Boolean) });
+    expect(records[1]!.detail).toMatchObject({ gapMs: 9000 });
+  });
+
+  it('records the window focus transitions with the platform visibility', () => {
+    const before = diagnosticSnapshot().length;
+    reportWindowFocus(false);
+    reportWindowFocus(true);
+    const records = diagnosticSnapshot().slice(before);
+    expect(records.map(record => record.event)).toEqual(['window-blur', 'window-focus']);
+    expect(records[0]!.detail).toMatchObject({ visibility: expect.any(String), hasFocus: expect.any(Boolean) });
   });
 });
