@@ -1,5 +1,5 @@
 /**
- * 设置页 e2e：模型配置（服务商芯片条 + API Key + 按服务商过滤的模型列表）。
+ * 设置页 e2e：模型配置（服务商芯片条 + API Key + 端点 + 按服务商过滤的模型列表）。
  *
  * 种子数据：m-main（主力模型，Anthropic 端点）在前，m-local（本地模型，
  * OpenAI 兼容 @ 127.0.0.1:11434）在后且为当前生效模型；mock 只预置了
@@ -29,11 +29,11 @@ test.describe('模型配置页', () => {
     await expect(menu.getByText('设为当前')).toBeVisible();
     await expect(menu.getByText('编辑密钥')).toBeVisible();
     await expect(menu.getByText('删除服务商')).toBeVisible();
-    // 编辑密钥 → 展开替换输入框并聚焦
+    // 编辑密钥 → 中央浮层编辑器
     await menu.getByText('编辑密钥').click();
-    await expect(page.getByLabel('服务商 API Key')).toBeFocused();
+    await expect(page.getByTestId('key-dialog')).toBeVisible();
     await page.keyboard.press('Escape');
-    await expect(page.getByRole('menu')).toHaveCount(0);
+    await expect(page.getByTestId('key-dialog')).toHaveCount(0);
   });
 
   test('⋯ 删除服务商：移除其模型行；只剩一个时拒绝', async ({ page }) => {
@@ -53,10 +53,24 @@ test.describe('模型配置页', () => {
   });
 
   test('API Key：按服务商配置，掩码显示、查看/复制/清除、保存恢复', async ({ page }) => {
-    // 默认第一行（Anthropic 端点）没有密钥：直接是输入框，检测不可用
+    // 默认第一行（Anthropic 端点）没有密钥：未配置 + 添加入口，检测不可用
     const keyField = fieldOf(page, '服务商 API Key');
-    await expect(keyField.getByPlaceholder('输入 API Key')).toBeVisible();
+    await expect(keyField.getByText('未配置')).toBeVisible();
     await expect(keyField.getByTestId('provider-check')).toBeDisabled();
+    // 添加：中央浮层里输入，眼睛切换明文，保存并关闭
+    await keyField.getByTestId('provider-key-add').click();
+    const dialog = page.getByTestId('key-dialog');
+    await expect(dialog).toBeVisible();
+    await dialog.getByTestId('key-dialog-input').fill('sk-anthropic-key');
+    await dialog.getByTestId('key-dialog-reveal').click();
+    await expect(dialog.getByTestId('key-dialog-input')).toHaveAttribute('type', 'text');
+    await dialog.getByTestId('key-dialog-reveal').click();
+    await expect(dialog.getByTestId('key-dialog-input')).toHaveAttribute('type', 'password');
+    await dialog.getByTestId('key-dialog-save').click();
+    await expect(dialog).toHaveCount(0);
+    await expect(keyField.getByTestId('provider-key-value')).toBeVisible();
+    const savedKeys = await aiKeyCalls(page);
+    expect(savedKeys.some((c) => c.provider === 'anthropic' && c.key === 'sk-anthropic-key')).toBe(true);
     // 本地那个 OpenAI 兼容端点已配置：掩码 + 查看/复制
     const chips = page.locator('.settings-provider-chip');
     await chips.nth(1).click();
@@ -67,17 +81,11 @@ test.describe('模型配置页', () => {
     await expect(keyField.getByTestId('provider-key-value')).toHaveText('sk-********abcd');
     await keyField.getByTestId('provider-key-copy').click();
     expect(await clipboardText(page)).toBe('sk-test-key-1234abcd');
-    // 清除 → 回到输入框
+    // 清除 → 回到未配置
     await keyField.getByTestId('provider-key-clear').click();
-    await expect(keyField.getByPlaceholder('输入 API Key')).toBeVisible();
+    await expect(keyField.getByText('未配置')).toBeVisible();
     const clears = await aiKeyCalls(page);
     expect(clears.some((c) => c.provider === 'openai-compatible' && !c.key)).toBe(true);
-    // 重新保存 → 掩码回来
-    await keyField.getByPlaceholder('输入 API Key').fill('sk-e2e-key');
-    await keyField.getByPlaceholder('输入 API Key').press('Enter');
-    await expect(keyField.getByTestId('provider-key-value')).toBeVisible();
-    const calls = await aiKeyCalls(page);
-    expect(calls.some((c) => c.provider === 'openai-compatible' && c.key === 'sk-e2e-key')).toBe(true);
   });
 
   test('端点与连接：预览行、检测、同步模型', async ({ page }) => {
@@ -112,29 +120,34 @@ test.describe('模型配置页', () => {
     await expect(mainRow.getByText('当前', { exact: true })).toBeVisible();
     const activeCalls = await aiModelCalls(page);
     expect(activeCalls.some((c) => c.kind === 'set_active' && c.id === 'm-main')).toBe(true);
-    // 添加模型 → 该服务商多一行；齿轮展开后改名提交
+    // 添加模型 → 未指定分组多一行；齿轮打开中央编辑器改名
     await page.getByTestId('model-add').click();
     await expect(names).toHaveCount(2);
-    const newRow = page.getByTestId('model-row').nth(1);
-    await newRow.getByTestId('model-settings').click();
-    const nameInput = newRow.getByPlaceholder('模型名称');
+    await expect(page.getByTestId('model-group-unassigned')).toBeVisible();
+    await page.getByTestId('model-row').nth(1).getByTestId('model-settings').click();
+    const dialog = page.getByTestId('model-settings-dialog');
+    await expect(dialog).toBeVisible();
+    const nameInput = dialog.getByPlaceholder('模型名称');
     await nameInput.fill('新模型');
     await nameInput.press('Enter');
     await expect(page.locator('.settings-page-header').getByRole('status')).toHaveText('已保存');
-    await expect(newRow.getByTestId('model-name')).toHaveText('新模型');
+    await dialog.getByTestId('model-settings-done').click();
+    await expect(page.getByTestId('model-name').nth(1)).toHaveText('新模型');
     const setModels = await aiModelCalls(page);
     const addCall = setModels.filter((c) => c.kind === 'set_models').pop();
     expect(addCall?.models).toHaveLength(3);
     expect((addCall?.models as { name: string }[])[2]?.name).toBe('新模型');
     // 删除新模型 → 回一行
-    await newRow.getByTestId('model-remove').click();
+    await page.getByTestId('model-row').nth(1).getByTestId('model-remove').click();
     await expect(page.getByTestId('model-name')).toHaveCount(1);
   });
 
   test('添加服务商：预设落盘为新行并选中该服务商', async ({ page }) => {
     const chips = page.locator('.settings-provider-chip');
     await page.getByTestId('provider-add').click();
+    await expect(page.getByTestId('add-provider-dialog')).toBeVisible();
     await page.getByTestId('model-preset-DeepSeek').click();
+    await expect(page.getByTestId('add-provider-dialog')).toHaveCount(0);
     await expect(chips).toHaveCount(3);
     const deepseek = chips.filter({ hasText: 'DeepSeek' });
     await expect(deepseek).toHaveAttribute('aria-current', 'true');

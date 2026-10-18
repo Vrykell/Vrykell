@@ -1227,16 +1227,34 @@ button.state-icon-button { color: var(--icon-color); }
 
 /* Provider picker: the model page's provider bar (ProviderPicker.tsx). */
 .settings-provider-page { display: flex; flex-direction: column; gap: 12px; }
-.settings-provider-bar-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.settings-provider-bar { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 3px; border-radius: var(--radius-inner); background: var(--hover); min-width: 0; }
-.settings-provider-chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px 0 6px; border: 0; border-radius: var(--radius-inner); background: transparent; color: var(--text-secondary); font: var(--fw-medium) var(--fs-caption) var(--font-ui); white-space: nowrap; cursor: pointer; min-width: 0; transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
-.settings-provider-chip:hover { color: var(--text-primary); }
-.settings-provider-chip[aria-current="true"] { background: var(--surface); color: var(--text-primary); font-weight: var(--fw-semibold); }
-.settings-provider-chip .settings-provider-name { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.settings-provider-bar-wrap { display: flex; align-items: flex-start; gap: 8px; }
+.settings-provider-bar { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; }
+.settings-provider-chip { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text-secondary); font: var(--fw-medium) var(--fs-caption) var(--font-ui); cursor: pointer; min-width: 0; transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+.settings-provider-chip:hover { color: var(--text-primary); border-color: var(--border-strong); }
+.settings-provider-chip[aria-current="true"] { background: color-mix(in srgb, var(--primary-action) 26%, var(--surface)); border-color: color-mix(in srgb, var(--primary-action) 65%, var(--text-primary)); color: var(--text-primary); font-weight: var(--fw-semibold); }
+.settings-provider-chip .settings-provider-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .settings-provider-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); flex-shrink: 0; box-sizing: border-box; }
 .settings-provider-dot[data-empty] { background: transparent; border: 1px solid var(--border-strong); }
 .settings-provider-empty { padding: 10px 8px; text-align: center; color: var(--text-muted); font-size: var(--fs-caption); }
-.settings-provider-presets { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; }
+.settings-preset-cell { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text-secondary); font: var(--fw-medium) var(--fs-caption) var(--font-ui); cursor: pointer; text-align: left; min-width: 0; transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+.settings-preset-cell:hover { color: var(--text-primary); border-color: var(--border-strong); }
+.settings-preset-cell span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Model list: the vendor groups and their header strip (ProviderModelList.tsx). */
+.settings-model-group { margin-bottom: 8px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.settings-model-group-header { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 0; background: color-mix(in srgb, var(--canvas) 55%, var(--surface)); color: var(--text-primary); cursor: pointer; text-align: left; font: var(--fw-medium) var(--fs-caption) var(--font-ui); }
+.settings-model-filter-chip { display: inline-flex; align-items: center; gap: 4px; min-height: 26px; padding: 2px 10px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--text-secondary); cursor: pointer; font-size: var(--fs-caption); transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+.settings-model-filter-chip:hover { color: var(--text-primary); border-color: var(--border-strong); }
+.settings-model-filter-chip[aria-pressed="true"] { border-color: transparent; background: color-mix(in srgb, var(--primary-action) 60%, transparent); color: var(--text-primary); }
+
+/* Provider key row: the masked value with actions that appear on hover or focus. */
+.settings-key-row { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; min-height: 32px; padding: 0 4px 0 10px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--field-bg); }
+.settings-key-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: calc(12px * var(--ui-font-scale)); color: var(--text-primary); }
+.settings-key-actions { display: inline-flex; align-items: center; gap: 2px; opacity: 0; transition: opacity var(--dur-fast) var(--ease); }
+.settings-key-row:hover .settings-key-actions, .settings-key-row:focus-within .settings-key-actions { opacity: 1; }
+.settings-key-empty { justify-content: space-between; cursor: pointer; font: var(--fw-medium) var(--fs-caption) var(--font-ui); color: var(--text-muted); }
+.settings-key-empty:hover { color: var(--text-primary); border-color: var(--border-strong); }
+.settings-key-add-label { color: var(--text-primary); }
 
 .context-menu-separator { height: 0; margin: 5px 8px; border: 0; border-top: 1px solid var(--border); flex-shrink: 0; }
 .context-menu-footer { padding: 8px; }

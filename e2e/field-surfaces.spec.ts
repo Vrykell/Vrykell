@@ -82,6 +82,7 @@ for (const theme of ['深色', '浅色']) {
     await page.getByTestId('model-settings').first().click();
     await expectFieldHierarchy(page.getByPlaceholder('模型名称').first());
     await page.screenshot({ path: test.info().outputPath('model-fields.png') });
+    await page.keyboard.press('Escape');
     await page.locator('aside').getByRole('button', { name: '记忆', exact: true }).click();
     const memory = page.getByPlaceholder(/持久知识/);
     await expectFieldHierarchy(memory.locator('xpath=..'));

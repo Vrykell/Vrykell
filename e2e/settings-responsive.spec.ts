@@ -96,6 +96,6 @@ test('settings adapt to dock compression and keep oversized controls horizontall
   await expect.poll(() => body.evaluate(element => element.clientWidth)).toBeGreaterThanOrEqual(387);
   await content.evaluate(element => { element.scrollLeft = element.scrollWidth; });
   await expect.poll(() => content.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
-  expect((await content.locator('input[type="password"]').boundingBox())!.width).toBeGreaterThan(140);
+  expect((await content.getByTestId('provider-endpoint-input').boundingBox())!.width).toBeGreaterThan(140);
   await page.screenshot({ path: testInfo.outputPath('settings-minimum-width.png'), animations: 'disabled' });
 });

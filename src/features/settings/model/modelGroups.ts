@@ -6,6 +6,7 @@
  * sections instead of a single flat list.
  */
 import type { ModelProfile } from '@features/agent';
+import { t } from '@i18n';
 import { modelVendor, modelVendorInfo } from '@features/agent/components/modelIcon';
 import { detectCapabilities, type ModelCapability } from '@features/agent/model/capabilities';
 
@@ -15,13 +16,21 @@ export interface ModelGroup {
   models: ModelProfile[];
 }
 
+/** A model whose identifier is not filled in yet stays in its own group until it can be told apart. */
+const UNASSIGNED = 'unassigned';
+
 /** Group one provider's models by their vendor, in the order the first entry appears. */
 export function groupModelsByVendor(models: ModelProfile[]): ModelGroup[] {
   const groups = new Map<string, ModelGroup>();
   for (const model of models) {
-    const vendor = modelVendor(model.provider, model.model, model.baseUrl);
-    const group = groups.get(vendor)
-      ?? { key: vendor, label: modelVendorInfo(model.provider, model.model, model.baseUrl).label, models: [] };
+    const vendor = model.model.trim() ? modelVendor(model.provider, model.model, model.baseUrl) : UNASSIGNED;
+    const group = groups.get(vendor) ?? {
+      key: vendor,
+      label: vendor === UNASSIGNED
+        ? t('Unassigned')
+        : modelVendorInfo(model.provider, model.model, model.baseUrl).label,
+      models: [],
+    };
     group.models.push(model);
     groups.set(vendor, group);
   }

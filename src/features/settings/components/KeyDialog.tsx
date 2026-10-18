@@ -1,0 +1,120 @@
+/**
+ * KeyDialog — the centred editor for one provider's API key.
+ *
+ * The key never sits on the page: the dialog writes it straight through the provider store and
+ * the caller keeps showing the masked form the backend returns. The eye toggles the field's
+ * visibility for this edit only.
+ */
+import { useEffect, useState } from 'react';
+import { t } from '@i18n';
+import { OutlineButton } from '@ui/OutlineButton';
+import { TextInput } from '@ui/TextInput';
+import { IconButton } from '@ui/IconButton';
+import { Eye, EyeOff } from '@ui/icons';
+import { setProviderKey, type ModelProfile } from '@features/agent';
+import { modelAvatar, modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
+import type { ProviderRow } from '@features/settings/model/providerList';
+import { inputStyle } from './formStyles';
+import SettingsDialog from './SettingsDialog';
+
+export default function KeyDialog({ open, row, hasKey, onClose }: {
+  open: boolean;
+  row: ProviderRow<ModelProfile>;
+  hasKey: boolean;
+  onClose: () => void;
+}) {
+  const [value, setValue] = useState('');
+  const [visible, setVisible] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setValue('');
+      setVisible(false);
+    }
+  }, [open]);
+
+  const avatar = modelAvatar(row.kind, '', row.baseUrl);
+  const Mark = avatar?.mark ?? modelMark(row.kind, '', row.baseUrl);
+  const name = row.name || providerLabel(row.kind);
+  const canSave = value.trim().length > 0 && !saving;
+
+  const save = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    try {
+      await setProviderKey(row.kind, value);
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <SettingsDialog
+      open={open}
+      testId="key-dialog"
+      title={t('{{name}} · {{action}}', { name, action: t(hasKey ? 'Edit API key' : 'Add API key') })}
+      width={460}
+      onClose={onClose}
+      icon={
+        <span style={{
+          width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          background: avatar?.background ?? 'var(--block)',
+          color: avatar?.color ?? modelHue(row.kind, '', row.baseUrl),
+        }}>
+          <Mark size={14} aria-hidden="true" />
+        </span>
+      }
+      footer={<>
+        <OutlineButton onClick={onClose} data-testid="key-dialog-cancel">{t('Cancel')}</OutlineButton>
+        <button
+          type="button"
+          className="primary-button"
+          disabled={!canSave}
+          onClick={() => void save()}
+          data-testid="key-dialog-save"
+          style={{
+            padding: '5px 16px', fontSize: 'calc(12px * var(--ui-font-scale))', border: 'none',
+            borderRadius: 'var(--radius-inner)', background: 'var(--primary-button-bg)',
+            color: 'var(--primary-button-text)', cursor: canSave ? 'pointer' : 'default',
+            opacity: canSave ? 1 : 0.5,
+          }}
+        >
+          {t('Save and close')}
+        </button>
+      </>}
+    >
+      <div style={{ ...inputStyle, display: 'flex', alignItems: 'center', gap: 6, padding: '0 6px 0 10px', minHeight: 34 }}>
+        <TextInput
+          autoFocus
+          type={visible ? 'text' : 'password'}
+          value={value}
+          aria-label={t('Provider API Key')}
+          placeholder={t('Enter API key')}
+          data-testid="key-dialog-input"
+          onChange={(event) => setValue(event.target.value)}
+          onKeyDown={(event) => { if (event.key === 'Enter') void save(); }}
+          style={{
+            flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none',
+            color: 'var(--text-primary)', fontFamily: 'var(--font-mono)',
+            fontSize: 'calc(12px * var(--ui-font-scale))',
+          }}
+        />
+        <IconButton
+          compact
+          data-testid="key-dialog-reveal"
+          aria-label={t(visible ? 'Hide API key' : 'Reveal API key')}
+          data-tip={t(visible ? 'Hide API key' : 'Reveal API key')}
+          onClick={() => setVisible(current => !current)}
+        >
+          {visible ? <EyeOff size={14} /> : <Eye size={14} />}
+        </IconButton>
+      </div>
+      <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-micro)' }}>
+        {t('The key is stored only on this device and never leaves the backend.')}
+      </span>
+    </SettingsDialog>
+  );
+}

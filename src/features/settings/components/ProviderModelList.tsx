@@ -1,39 +1,34 @@
 /**
  * ProviderModelList — one provider's models: a searchable, vendor-grouped list with the sync
- * action that pulls the endpoint's own model list, and the per-row editor behind the settings gear.
+ * action that pulls the endpoint's own model list, and a centred editor behind each row's gear.
  */
 import { useMemo, useState } from 'react';
 import { t } from '@i18n';
 import { IconButton } from '@ui/IconButton';
 import { OutlineButton } from '@ui/OutlineButton';
 import { TextInput } from '@ui/TextInput';
-import Select from '@ui/Select';
-import { Brain, ChevronDown, Eye, Filter, Minus, Plus, RefreshCw, Search, Settings, Wrench, X, type AppIcon } from '@ui/icons';
+import { ChevronDown, Eye, Filter, Globe, Lightbulb, Minus, Plus, RefreshCw, Search, Settings, Wrench, X, type AppIcon } from '@ui/icons';
 import { detectCapabilities, type ModelCapability } from '@features/agent/model/capabilities';
-import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
+import { modelAvatar, modelHue, modelMark } from '@features/agent/components/modelIcon';
 import { providerFetchModels, useAiConfigStore, type ModelProfile } from '@features/agent';
-import { baseUrlForProvider, type ProviderKind } from '@features/agent/services/provider';
 import { commitModels, newModelId, selectModel } from '@features/settings/model/modelWrites';
 import { filterModels, groupModelsByVendor } from '@features/settings/model/modelGroups';
 import type { ProviderRow } from '@features/settings/model/providerList';
-import { SettingsGroup, Field, ModelTextInput } from './ui';
-import ModelThinkingSettings from './ModelThinkingSettings';
+import { SettingsGroup, Field } from './ui';
+import ModelSettingsDialog from './ModelSettingsDialog';
 import { useSettingsSave } from './SettingsSaveProvider';
 
 type Toast = (msg: string, type: 'info' | 'success' | 'error') => void;
 
-/** API families a model row can use, in the order the select offers them. */
-const PROVIDER_KINDS: ProviderKind[] = ['openai-compatible', 'anthropic', 'gemini'];
-
 /** The filter chips, in the order they appear. */
 const FILTERS: (ModelCapability | 'all')[] = ['all', 'vision', 'reasoning', 'tools', 'search'];
 
-/** Capability chips: only the capabilities the model has, as small icon tiles. */
+/** Capability chips: only the capabilities the model has, each in its own tinted tile. */
 const CAPABILITIES: [ModelCapability, string, AppIcon, string][] = [
   ['vision', t('Vision'), Eye, 'var(--group-green)'],
-  ['reasoning', t('Reasoning'), Brain, 'var(--group-violet)'],
+  ['reasoning', t('Reasoning'), Lightbulb, 'var(--group-violet)'],
   ['tools', t('Tools'), Wrench, 'var(--group-orange)'],
-  ['search', t('Search'), Search, 'var(--group-blue)'],
+  ['search', t('Search'), Globe, 'var(--group-blue)'],
 ];
 
 function CapabilityChips({ profile }: { profile: ModelProfile }) {
@@ -50,7 +45,7 @@ function CapabilityChips({ profile }: { profile: ModelProfile }) {
           aria-label={label}
           style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22,
-            borderRadius: 6, background: 'var(--hover)', color: hue, flexShrink: 0,
+            borderRadius: 6, background: `color-mix(in srgb, ${hue} 18%, transparent)`, color: hue, flexShrink: 0,
           }}
         >
           <Icon size={13} aria-hidden="true" />
@@ -60,24 +55,25 @@ function CapabilityChips({ profile }: { profile: ModelProfile }) {
   );
 }
 
-function ModelRow({ model, active, onUpdate, onRemove, onSetCurrent }: {
+function ModelRow({ model, active, onRemove, onSetCurrent }: {
   model: ModelProfile;
   active: boolean;
-  onUpdate: (patch: Partial<ModelProfile>) => void;
   onRemove: () => void;
   onSetCurrent: () => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const Mark = modelMark(model.provider, model.model, model.baseUrl);
+  const avatar = modelAvatar(model.provider, model.model, model.baseUrl);
+  const Glyph = avatar?.mark ?? modelMark(model.provider, model.model, model.baseUrl);
   return (
     <div data-testid="model-row" style={{ borderTop: '1px solid var(--border)', padding: '6px 10px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
         <span style={{
-          width: 28, height: 28, borderRadius: 7, flexShrink: 0,
+          width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          background: 'var(--block)', color: modelHue(model.provider, model.model, model.baseUrl),
+          background: avatar?.background ?? 'var(--block)',
+          color: avatar?.color ?? modelHue(model.provider, model.model, model.baseUrl),
         }}>
-          <Mark size={15} aria-hidden="true" />
+          <Glyph size={16} aria-hidden="true" />
         </span>
         <span data-testid="model-name" style={{
           flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -96,7 +92,7 @@ function ModelRow({ model, active, onUpdate, onRemove, onSetCurrent }: {
           <OutlineButton data-subtle onClick={onSetCurrent}>{t('Set as current')}</OutlineButton>
         )}
         <IconButton compact data-testid="model-settings" aria-expanded={editing}
-          aria-label={t('Model settings')} data-tip={t('Model settings')} onClick={() => setEditing(value => !value)}>
+          aria-label={t('Model settings')} data-tip={t('Model settings')} onClick={() => setEditing(true)}>
           <Settings size={14} />
         </IconButton>
         <IconButton compact tone="danger" data-testid="model-remove"
@@ -104,24 +100,7 @@ function ModelRow({ model, active, onUpdate, onRemove, onSetCurrent }: {
           <Minus size={14} />
         </IconButton>
       </div>
-      {editing && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-          <ModelTextInput value={model.name} placeholder={t('Model name')} onCommit={value => onUpdate({ name: value })} />
-          <Select
-            aria-label={t('{{name}} provider', { name: model.name || t('Unnamed model') })}
-            options={PROVIDER_KINDS.map(kind => ({ value: kind, label: providerLabel(kind) }))}
-            value={model.provider}
-            onChange={value => onUpdate({ provider: value, baseUrl: baseUrlForProvider(model.baseUrl, value) })}
-          />
-          <div style={{ display: 'flex', gap: 8 }}>
-            <ModelTextInput value={model.baseUrl} placeholder={t('Endpoint (base URL)')}
-              onCommit={value => onUpdate({ baseUrl: value })} style={{ flex: 1 }} />
-            <ModelTextInput value={model.model} placeholder={t('Model ID')}
-              onCommit={value => onUpdate({ model: value })} style={{ flex: 1 }} />
-          </div>
-          <ModelThinkingSettings modelId={model.id} name={model.name || model.model} />
-        </div>
-      )}
+      <ModelSettingsDialog open={editing} model={model} onClose={() => setEditing(false)} />
     </div>
   );
 }
@@ -152,16 +131,6 @@ export default function ProviderModelList({ row, toast }: {
     return next;
   });
   const toggleAll = () => setCollapsed(allCollapsed ? new Set() : new Set(groups.map(group => group.key)));
-
-  const update = (id: string, patch: Partial<ModelProfile>) => commitModels(current => current.map((model) => {
-    if (model.id !== id) return model;
-    const next = { ...model, ...patch };
-    // Recalculate capabilities when the provider or model identifier changes.
-    if (patch.model !== undefined || patch.provider !== undefined) {
-      next.capabilities = detectCapabilities(next.provider, next.model);
-    }
-    return next;
-  }));
 
   const remove = (id: string) => {
     if (models.length <= 1) {
@@ -266,24 +235,17 @@ export default function ProviderModelList({ row, toast }: {
             {FILTERS.map((cap) => {
               const label = cap === 'all' ? t('All') : CAPABILITIES.find(([value]) => value === cap)![1];
               const count = filterModels(models, '', cap).length;
-              const selected = capability === cap;
               return (
                 <button
                   key={cap}
                   type="button"
                   data-subtle
                   data-testid={`model-filter-${cap}`}
-                  aria-pressed={selected}
+                  aria-pressed={capability === cap}
                   onClick={() => setCapability(cap)}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 4, minHeight: 26, padding: '2px 10px',
-                    border: `1px solid ${selected ? 'transparent' : 'var(--border)'}`, borderRadius: 999,
-                    background: selected ? 'var(--control-active-bg)' : 'transparent',
-                    color: selected ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: 'pointer',
-                    fontSize: 'var(--fs-caption)',
-                  }}
+                  className="settings-model-filter-chip"
                 >
-                  {label}<span style={{ color: 'var(--text-muted)' }}>{count}</span>
+                  {label}<span style={{ opacity: 0.7 }}>{count}</span>
                 </button>
               );
             })}
@@ -298,20 +260,9 @@ export default function ProviderModelList({ row, toast }: {
         {groups.map((group) => {
           const open = !collapsed.has(group.key);
           return (
-            <section
-              key={group.key}
-              data-testid={`model-group-${group.key}`}
-              style={{
-                border: '1px solid var(--border)', borderRadius: 12, background: 'var(--surface)',
-                marginBottom: 8, overflow: 'hidden',
-              }}
-            >
+            <section key={group.key} data-testid={`model-group-${group.key}`} className="settings-model-group">
               <button type="button" data-subtle aria-expanded={open} onClick={() => toggleGroup(group.key)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 10px',
-                  border: 0, background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer',
-                  textAlign: 'left', fontWeight: 'var(--fw-medium)',
-                }}>
+                className="settings-model-group-header">
                 <ChevronDown size={14} style={{
                   transform: open ? undefined : 'rotate(-90deg)', transition: 'transform 0.12s var(--ease)',
                   color: 'var(--text-muted)',
@@ -326,7 +277,6 @@ export default function ProviderModelList({ row, toast }: {
                   key={model.id}
                   model={model}
                   active={model.id === activeId}
-                  onUpdate={patch => update(model.id, patch)}
                   onRemove={() => remove(model.id)}
                   onSetCurrent={() => { void save(() => selectModel(model.id)); }}
                 />

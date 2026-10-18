@@ -30,4 +30,14 @@ describe('model list grouping', () => {
     expect(filterModels(models, '', 'all')).toHaveLength(2);
     expect(filterModels(models, 'nothing', 'all')).toHaveLength(0);
   });
+
+  it('keeps a model without an identifier in its own group', () => {
+    const models = [
+      model('1', 'A', 'deepseek-chat'),
+      model('2', 'New', ''),
+    ];
+    const groups = groupModelsByVendor(models);
+    expect(groups.map(group => group.key)).toEqual(['deepseek', 'unassigned']);
+    expect(groups[1]!.models.map(item => item.id)).toEqual(['2']);
+  });
 });

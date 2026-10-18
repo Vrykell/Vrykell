@@ -5,6 +5,7 @@
  * every write is queued and merged with the latest persisted list instead of a stale snapshot.
  */
 import { setAiModels, setActiveModel, useAiConfigStore, type ModelProfile } from '@features/agent';
+import { detectCapabilities } from '@features/agent/model/capabilities';
 
 let modelWrites = Promise.resolve();
 
@@ -16,6 +17,18 @@ export function commitModels(transform: (models: ModelProfile[]) => ModelProfile
   });
   modelWrites = write.catch(() => {});
   return write;
+}
+
+/** Patch one model row; a provider or identifier change recalculates its capabilities. */
+export function updateModel(id: string, patch: Partial<ModelProfile>) {
+  return commitModels(current => current.map(model => {
+    if (model.id !== id) return model;
+    const next = { ...model, ...patch };
+    if (patch.model !== undefined || patch.provider !== undefined) {
+      next.capabilities = detectCapabilities(next.provider, next.model);
+    }
+    return next;
+  }));
 }
 
 export function selectModel(id: string) {

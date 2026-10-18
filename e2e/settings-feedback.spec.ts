@@ -18,9 +18,9 @@ test('settings navigation has static headings and save feedback appears once the
   await expect(fileRow).toBeVisible();
   expect((await rows.first().boundingBox())!.height).toBe((await fileRow.boundingBox())!.height);
   await expect(page.getByRole('status')).toHaveCount(0);
+  await page.getByTestId('provider-endpoint-input').fill('https://example.test/v1');
   await page.getByTestId('model-settings').first().click();
   await page.getByPlaceholder('模型名称').first().fill('One summary');
-  await page.getByTestId('provider-endpoint-input').fill('https://example.test/v1');
   await expect(page.getByRole('status')).toHaveCount(1);
   await expect(page.locator('.settings-page-header').getByRole('status')).toHaveText('已保存');
   await expect(page.getByRole('status')).toHaveCount(0);

@@ -9,6 +9,7 @@
 import {
   AnthropicMark, DeepSeekMark, GeminiMark, GroqMark, MistralMark, MoonshotMark, OllamaMark,
   OpenAIMark, OpenRouterMark, QwenMark, SiliconFlowMark, XaiMark, ZhipuMark,
+  AVATAR_PAINT, MONO_MARKS,
 } from '@ui/brandMarks';
 import { Cpu, Server, type AppIcon } from '@ui/icons';
 import type { ProviderKind } from '@features/agent/services/provider';
@@ -116,6 +117,21 @@ export function modelMark(kind: string, model: string, baseUrl = ''): AppIcon {
 
 export function modelHue(kind: string, model: string, baseUrl = ''): string {
   return modelVendorInfo(kind, model, baseUrl).hue;
+}
+
+export interface VendorAvatar {
+  /** The monochrome mark, drawn in the disc's ink. */
+  mark: AppIcon;
+  background: string;
+  color: string;
+}
+
+/** The avatar a model row shows: the monochrome mark on the vendor's own disc, or null. */
+export function modelAvatar(kind: string, model: string, baseUrl = ''): VendorAvatar | null {
+  const vendor = modelVendor(kind, model, baseUrl);
+  const paint = AVATAR_PAINT[vendor] as { background: string; color: string } | undefined;
+  const mark = MONO_MARKS[vendor] as AppIcon | undefined;
+  return paint && mark ? { mark, background: paint.background, color: paint.color } : null;
 }
 
 export function providerLabel(provider: ProviderKind): string {

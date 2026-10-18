@@ -1,20 +1,20 @@
 /**
  * ProviderPicker — the model page's provider bar.
  *
- * One chip per provider the model list is made of (see providerList): a brand-tinted tile with
- * the first letter, the provider's name and a key dot. The bar wraps at narrow widths instead
- * of taking a column of its own, which is what the width here allows. The presets behind
- * "+ Add provider" are how a provider gets added; actions on the selected provider (set as
- * current / edit key / delete) live on the page header, so this component only renders and
- * reports.
+ * One cell per provider the model list is made of (see providerList): a brand mark, the
+ * provider's name and a key dot, laid out on an even grid so a wrapped row never leaves a ragged
+ * gap. The presets behind "+ Add provider" open in a centred panel; actions on the selected
+ * provider (set as current / edit key / delete) live on the page header, so this component only
+ * renders and reports.
  */
 import { useState } from 'react';
 import { t } from '@i18n';
-import { MODEL_PRESETS, type ModelPreset } from '@config/modelPresets';
+import type { ModelPreset } from '@config/modelPresets';
 import { Plus } from '@ui/icons';
 import type { ProviderKind } from '@features/agent/services/provider';
-import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
+import { modelMark, providerLabel } from '@features/agent/components/modelIcon';
 import { OutlineButton } from '@ui/OutlineButton';
+import AddProviderDialog from './AddProviderDialog';
 
 export interface ProviderPickerEntry {
   id: string;
@@ -41,7 +41,6 @@ export default function ProviderPicker({ entries, selectedId, onSelect, onAddPre
         {entries.map((entry) => {
           const label = entry.name || providerLabel(entry.kind);
           const Mark = modelMark(entry.kind, '', entry.baseUrl);
-          const hue = modelHue(entry.kind, '', entry.baseUrl);
           return (
             <button
               key={entry.id}
@@ -52,7 +51,7 @@ export default function ProviderPicker({ entries, selectedId, onSelect, onAddPre
               data-tip={label}
               onClick={() => onSelect(entry.id)}
             >
-              <Mark size={16} aria-hidden="true" style={{ color: hue }} />
+              <Mark size={16} aria-hidden="true" />
               <span className="settings-provider-name">{label}</span>
               <span className="settings-provider-dot" data-empty={entry.hasKey ? undefined : 'true'} aria-hidden="true" />
             </button>
@@ -62,34 +61,16 @@ export default function ProviderPicker({ entries, selectedId, onSelect, onAddPre
       <OutlineButton
         data-subtle
         data-testid="provider-add"
-        onClick={() => setPresetsOpen((open) => !open)}
+        onClick={() => setPresetsOpen(true)}
         style={{ flexShrink: 0 }}
       >
         <Plus size={12} /> {t('Add provider')}
       </OutlineButton>
-      {presetsOpen && (
-        <div data-testid="model-presets" className="settings-provider-presets">
-          {MODEL_PRESETS.map((preset) => {
-            const Mark = modelMark(preset.provider, preset.model, preset.baseUrl);
-            const hue = modelHue(preset.provider, preset.model, preset.baseUrl);
-            return (
-              <OutlineButton
-                key={preset.name}
-                data-subtle
-                data-testid={`model-preset-${preset.name}`}
-                data-tip={preset.baseUrl || t('The vendor default endpoint')}
-                data-tip-description={`${preset.model} · ${t(preset.hint)}`}
-                onClick={() => onAddPreset(preset)}
-              >
-                <Mark size={13} aria-hidden="true" style={{ color: hue }} /> {preset.name}
-              </OutlineButton>
-            );
-          })}
-          <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-micro)' }}>
-            {t('Vendor names, endpoints and marks identify the services they name so a model can be filled in quickly; the app ships no third-party program or key.')}
-          </span>
-        </div>
-      )}
+      <AddProviderDialog
+        open={presetsOpen}
+        onClose={() => setPresetsOpen(false)}
+        onAddPreset={onAddPreset}
+      />
     </div>
   );
 }
