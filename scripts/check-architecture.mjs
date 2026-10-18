@@ -54,6 +54,7 @@ function collectFiles(directory) {
 }
 
 const violations = [];
+const invokedCommands = new Map();
 for (const file of collectFiles(root)) {
   const relativeFile = path.relative(root, file).replaceAll(path.sep, '/');
   const topLevel = relativeFile.split('/')[0];
@@ -81,6 +82,49 @@ for (const file of collectFiles(root)) {
       violations.push(`${location}\n  视图层不得直接依赖领域 Store`);
     }
   });
+
+  // Every command name the frontend invokes must exist in the Rust registration list, or the
+  // call only fails at runtime (the e2e mock answers unknown commands with null). The scan sees
+  // comments too, so a stale name in a comment is reported as well - keep them in sync.
+  for (const match of source.matchAll(/\b(?:rawInvoke|invoke)\s*(?:<[^()]*>)?\s*\(\s*(['"`])([^'"`$]+)\1/g)) {
+    const name = match[2];
+    if (!/^[a-z][a-z0-9_]*$/.test(name)) continue; // plugin commands ("plugin:…") are not app commands
+    if (!invokedCommands.has(name)) {
+      invokedCommands.set(name, { file: path.relative(process.cwd(), file), line: source.slice(0, match.index).split('\n').length });
+    }
+  }
+}
+
+// The Rust registration list is the single source of truth for the IPC surface.
+const libFile = path.resolve(root, '..', 'src-tauri', 'src', 'lib.rs');
+const relativeLib = path.relative(process.cwd(), libFile);
+const registeredCommands = new Set();
+let libSource = '';
+try {
+  libSource = fs.readFileSync(libFile, 'utf8');
+} catch {
+  violations.push(`${relativeLib}: 无法读取 Rust 命令注册表`);
+}
+const handler = libSource.match(/tauri::generate_handler!\[([\s\S]*?)\]/);
+if (!handler) {
+  violations.push(`${relativeLib}: 未找到 tauri::generate_handler! 注册块`);
+} else {
+  for (const entry of handler[1].split(',')) {
+    const name = entry.trim().split('::').pop();
+    if (/^[a-z][a-z0-9_]*$/.test(name)) registeredCommands.add(name);
+  }
+}
+
+for (const [name, site] of invokedCommands) {
+  if (!registeredCommands.has(name)) {
+    violations.push(`${site.file}:${site.line}\n  IPC 命令 ${name} 未在 lib.rs 的 generate_handler! 中注册`);
+  }
+}
+
+// Registered but never invoked in src/: dead surface or a dynamic call site to double-check.
+const unusedCommands = [...registeredCommands].filter((name) => !invokedCommands.has(name));
+if (unusedCommands.length > 0) {
+  console.warn(`提示：以下 IPC 命令已注册但 src/ 内没有调用点，请确认是否仍在使用：\n- ${unusedCommands.join('\n- ')}`);
 }
 
 if (violations.length > 0) {
@@ -88,5 +132,5 @@ if (violations.length > 0) {
   for (const violation of violations) console.error(`- ${violation}`);
   process.exitCode = 1;
 } else {
-  console.log('架构边界检查通过：目标目录、依赖方向和视图边界均正常。');
+  console.log('架构边界检查通过：目标目录、依赖方向、视图边界与 IPC 命令注册表均正常。');
 }

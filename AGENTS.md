@@ -15,7 +15,7 @@ npm run test         # vitest run (unit tests)
 npm run test:e2e     # playwright test (e2e; dev server port from PW_PORT, default 1421)
 cargo test           # Rust backend tests (src-tauri/)
 npx tsc --noEmit     # typecheck only
-npm run check:architecture  # import-boundary guard
+npm run check:architecture  # import boundaries + IPC command registry guard
 ```
 
 macOS builds `libssh2` + OpenSSL from source for SSH, without Homebrew or system OpenSSL.
