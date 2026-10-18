@@ -35,6 +35,24 @@ import OpenCodeMono from '@lobehub/icons/es/OpenCode/components/Mono.js';
 import RooCodeMono from '@lobehub/icons/es/RooCode/components/Mono.js';
 import WindsurfMono from '@lobehub/icons/es/Windsurf/components/Mono.js';
 import ZeroOneColor from '@lobehub/icons/es/ZeroOne/components/Color.js';
+import AntigravityColor from '@lobehub/icons/es/Antigravity/components/Color.js';
+import CodeBuddyColor from '@lobehub/icons/es/CodeBuddy/components/Color.js';
+import CodeGeeXColor from '@lobehub/icons/es/CodeGeeX/components/Color.js';
+import CommandCodeColor from '@lobehub/icons/es/CommandCode/components/Color.js';
+import CopilotColor from '@lobehub/icons/es/Copilot/components/Color.js';
+import CrewAIColor from '@lobehub/icons/es/CrewAI/components/Color.js';
+import GithubCopilotMono from '@lobehub/icons/es/GithubCopilot/components/Mono.js';
+import HermesAgentMono from '@lobehub/icons/es/HermesAgent/components/Mono.js';
+import JunieColor from '@lobehub/icons/es/Junie/components/Color.js';
+import KiroColor from '@lobehub/icons/es/Kiro/components/Color.js';
+import KwaipilotColor from '@lobehub/icons/es/Kwaipilot/components/Color.js';
+import ManusMono from '@lobehub/icons/es/Manus/components/Mono.js';
+import OpenClawColor from '@lobehub/icons/es/OpenClaw/components/Color.js';
+import OpenHandsColor from '@lobehub/icons/es/OpenHands/components/Color.js';
+import PhindMono from '@lobehub/icons/es/Phind/components/Mono.js';
+import QoderColor from '@lobehub/icons/es/Qoder/components/Color.js';
+import TraeColor from '@lobehub/icons/es/Trae/components/Color.js';
+import ZencoderColor from '@lobehub/icons/es/Zencoder/components/Color.js';
 import type { AppIcon } from './icons';
 
 export const AnthropicMark = AnthropicMono as unknown as AppIcon;
@@ -70,4 +88,22 @@ export const AGENT_MARKS: Record<string, AppIcon> = {
   windsurf: WindsurfMono as unknown as AppIcon,
   devin: DevinColor as unknown as AppIcon,
   '01': ZeroOneColor as unknown as AppIcon,
+  antigravity: AntigravityColor as unknown as AppIcon,
+  codebuddy: CodeBuddyColor as unknown as AppIcon,
+  codegeex: CodeGeeXColor as unknown as AppIcon,
+  commandcode: CommandCodeColor as unknown as AppIcon,
+  copilot: CopilotColor as unknown as AppIcon,
+  githubcopilot: GithubCopilotMono as unknown as AppIcon,
+  crewai: CrewAIColor as unknown as AppIcon,
+  hermesagent: HermesAgentMono as unknown as AppIcon,
+  junie: JunieColor as unknown as AppIcon,
+  kiro: KiroColor as unknown as AppIcon,
+  kwaipilot: KwaipilotColor as unknown as AppIcon,
+  manus: ManusMono as unknown as AppIcon,
+  openclaw: OpenClawColor as unknown as AppIcon,
+  openhands: OpenHandsColor as unknown as AppIcon,
+  phind: PhindMono as unknown as AppIcon,
+  qoder: QoderColor as unknown as AppIcon,
+  trae: TraeColor as unknown as AppIcon,
+  zencoder: ZencoderColor as unknown as AppIcon,
 };
