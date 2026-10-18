@@ -1,10 +1,10 @@
 /**
  * ProviderDialog — the centred menu behind the provider button, shaped like the model picker.
  *
- * It keeps both steps in one surface: the provider rows (a mark tile, the name and a meta line
- * with the API family and the key dot, the shown provider lifted) and, one view deeper, the
- * preset grid behind the add-provider row. Switching views never stacks a second dialog, so
- * closing always returns to the page rather than leaving an empty shell behind.
+ * It keeps both steps in one surface: the provider rows (a grey surface, a mark tile, the name
+ * and a meta line with the API family and the key status; the shown provider is lifted further
+ * and carries a check) and, one view deeper, the preset grid behind the add-provider row.
+ * Switching views never stacks a second dialog, so closing always returns to the page.
  */
 import { useEffect, useState, type CSSProperties } from 'react';
 import { t } from '@i18n';
@@ -16,19 +16,15 @@ import { providerHasKey, type ProviderRow } from '@features/settings/model/provi
 import type { ModelProfile } from '@features/agent';
 import SettingsDialog from './SettingsDialog';
 
-const rowStyle: CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-  padding: '9px 10px', borderRadius: 8, cursor: 'pointer', marginBottom: 2, textAlign: 'left',
-};
-
 const metaStyle: CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 6, marginTop: 3,
   fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)',
 };
 
-const tileStyle: CSSProperties = {
-  width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+const nameStyle: CSSProperties = {
+  display: 'block', fontSize: 'calc(12px * var(--ui-font-scale))',
+  fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)',
+  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
 };
 
 export default function ProviderDialog({ open, rows, selectedId, flags, onSelect, onAddPreset, onClose }: {
@@ -66,7 +62,7 @@ export default function ProviderDialog({ open, rows, selectedId, flags, onSelect
               <button
                 key={row.id}
                 type="button"
-                className="workspace-floating-row"
+                className="provider-option-row"
                 data-testid={`provider-option-${row.id}`}
                 data-selected={selected}
                 aria-current={selected ? 'true' : undefined}
@@ -74,23 +70,12 @@ export default function ProviderDialog({ open, rows, selectedId, flags, onSelect
                   onSelect(row.id);
                   onClose();
                 }}
-                style={rowStyle}
               >
-                <span style={{
-                  ...tileStyle,
-                  background: selected ? 'var(--hover)' : 'var(--block)',
-                  color: selected ? 'var(--text-primary)' : 'var(--text-muted)',
-                }}>
+                <span className="provider-option-mark">
                   <Mark size={iconSizes.row} style={{ color: modelHue(row.kind, '', row.baseUrl) }} />
                 </span>
                 <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{
-                    display: 'block', fontSize: 'calc(12px * var(--ui-font-scale))',
-                    fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>
-                    {row.name || providerLabel(row.kind)}
-                  </span>
+                  <span style={nameStyle}>{row.name || providerLabel(row.kind)}</span>
                   <span style={metaStyle}>
                     {providerLabel(row.kind)}
                     <span style={{
@@ -110,17 +95,12 @@ export default function ProviderDialog({ open, rows, selectedId, flags, onSelect
           })}
           <button
             type="button"
-            className="workspace-floating-row"
+            className="provider-option-row provider-option-add"
             data-testid="provider-dialog-add"
             onClick={() => setView('presets')}
-            style={rowStyle}
           >
-            <span style={{ ...tileStyle, background: 'var(--block)', color: 'var(--text-muted)' }}>
-              <Plus size={iconSizes.compact} />
-            </span>
-            <span style={{ flex: 1, minWidth: 0, fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)' }}>
-              {t('Add provider')}
-            </span>
+            <span className="provider-option-mark"><Plus size={iconSizes.compact} /></span>
+            <span className="provider-option-name">{t('Add provider')}</span>
           </button>
         </div>
       ) : (

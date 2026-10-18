@@ -54,11 +54,6 @@ export default function SettingsDialog({ open, title, icon, width = 440, initial
         onClick={(event) => event.stopPropagation()}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {onBack && (
-            <IconButton compact data-testid="dialog-back" aria-label={t('Back')} data-tip={t('Back')} onClick={onBack}>
-              <ArrowLeft size={14} />
-            </IconButton>
-          )}
           {icon}
           <span style={{
             fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)',
@@ -67,7 +62,12 @@ export default function SettingsDialog({ open, title, icon, width = 440, initial
           }}>
             {title}
           </span>
-          <span style={{ marginLeft: 'auto', display: 'inline-flex', flexShrink: 0 }}>
+          <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            {onBack && (
+              <IconButton compact data-testid="dialog-back" aria-label={t('Back')} data-tip={t('Back')} onClick={onBack}>
+                <ArrowLeft size={14} />
+              </IconButton>
+            )}
             <IconButton compact data-testid="dialog-close" aria-label={t('Close')} data-tip={t('Close')} onClick={onClose}>
               <X size={14} />
             </IconButton>
