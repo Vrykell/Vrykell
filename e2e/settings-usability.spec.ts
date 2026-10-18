@@ -7,12 +7,12 @@ test('saved custom Anthropic address is used by the next chat request', async ({
   await mockAnthropic(page, '地址设置已生效');
   await page.goto('/');
   await gotoSetting(page, '模型配置');
-  const card = page.getByPlaceholder('模型名称').first().locator('xpath=../../..');
-  await card.getByRole('combobox', { name: /提供方/ }).click();
+  await page.getByTestId('model-settings').first().click();
+  await page.getByRole('combobox', { name: /提供方/ }).click();
   await page.getByRole('option', { name: 'Anthropic', exact: true }).click();
-  await card.getByPlaceholder('服务地址 (Base URL)').fill('https://gateway.example/v1');
-  await card.getByPlaceholder('服务地址 (Base URL)').press('Enter');
-  await card.getByRole('button', { name: '设为当前' }).click();
+  await page.getByTestId('provider-endpoint-input').fill('https://gateway.example/v1');
+  await page.getByTestId('provider-endpoint-input').press('Enter');
+  await page.getByTestId('model-row').first().getByRole('button', { name: '设为当前' }).click();
   await page.locator('.settings-content input[type="password"]').fill('test-placeholder-key');
   await expect(page.locator('.settings-page-header').getByRole('status')).toHaveText('已保存');
   const previousCalls = (await searchCalls(page)).length;

@@ -25,6 +25,22 @@ export function baseUrlForProvider(baseUrl: string, provider: ProviderKind): str
     ? DEFAULT_BASE_URLS[provider] : baseUrl;
 }
 
+/**
+ * The request URL a model call actually reaches: the provider SDK appends this path to the
+ * configured base, so the settings page can show where requests really go.
+ */
+export function effectiveEndpoint(kind: ProviderKind, baseUrl: string, model = ''): string {
+  const base = (baseUrl.trim() || DEFAULT_BASE_URLS[kind]).replace(/\/+$/, '');
+  switch (kind) {
+    case 'anthropic':
+      return `${base}/messages`;
+    case 'gemini':
+      return `${base}/models/${model.trim() || '{model}'}:generateContent`;
+    default:
+      return `${base}/chat/completions`;
+  }
+}
+
 export interface ChatModelConfig {
   provider: ProviderKind;
   baseUrl: string;

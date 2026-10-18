@@ -23,11 +23,13 @@ test('numeric feedback shows the actual saved value after bounds and rounding', 
 test('model text waits for a pause and saves edits to different fields together', async ({ page }) => {
   await gotoSetting(page, '模型配置');
   const before = (await aiModelCalls(page)).length;
+  // 名称在行编辑（齿轮）里，地址在端点卡片里
+  await page.getByTestId('model-settings').first().click();
   const name = page.getByPlaceholder('模型名称').first();
   await name.fill('新的模型名称');
   await expect(page.locator('.settings-page-header').getByRole('status')).toHaveText('待保存…');
   expect((await aiModelCalls(page)).length).toBe(before);
-  await page.getByPlaceholder('服务地址 (Base URL)').first().fill('https://new.example/v1');
+  await page.getByTestId('provider-endpoint-input').fill('https://new.example/v1');
   await expect(page.locator('.settings-page-header').getByRole('status')).toHaveText('已保存');
   await expect(page.getByRole('status')).toHaveCount(1);
   const last = (await aiModelCalls(page)).filter(call => call.kind === 'set_models').at(-1)!;
@@ -62,6 +64,8 @@ test('save failures keep the draft visible and allow retry', async ({ page }) =>
     };
   });
   await gotoSetting(page, '模型配置');
+  // 名称在行编辑（齿轮）里
+  await page.getByTestId('model-settings').first().click();
   const name = page.getByPlaceholder('模型名称').first();
   await name.fill('失败时保留的草稿');
   const field = name.locator('xpath=..');

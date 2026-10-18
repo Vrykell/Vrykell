@@ -50,7 +50,7 @@ test.describe('全局快捷键', () => {
   test('Cmd+, 打开设置页', async ({ page }) => {
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
     await page.keyboard.press('Meta+,');
-    await expect(page.getByPlaceholder('服务地址 (Base URL)').first()).toBeVisible();
+    await expect(page.getByTestId('provider-endpoint-input').first()).toBeVisible();
   });
 
   test('Cmd+P 打开命令面板', async ({ page }) => {

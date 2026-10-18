@@ -213,6 +213,21 @@ export async function clearProviderKey(provider: ProviderKind): Promise<void> {
   useAiConfigStore.setState(patch);
 }
 
+/** The masked provider key for the settings display; the plaintext stays in the backend. */
+export async function providerKeyHint(provider: ProviderKind): Promise<string | null> {
+  return invoke<string | null>('provider_key_hint', { provider });
+}
+
+/** The plaintext provider key, fetched only when the user explicitly asks to see or copy it. */
+export async function providerKeyReveal(provider: ProviderKind): Promise<string | null> {
+  return invoke<string | null>('provider_key_reveal', { provider });
+}
+
+/** Ask the provider for its model list with the stored key: the connection check and the model sync share this. */
+export async function providerFetchModels(provider: ProviderKind, baseUrl: string): Promise<string[]> {
+  return invoke<string[]>('provider_fetch_models', { provider, baseUrl });
+}
+
 export async function setTavilyKey(key: string): Promise<void> {
   const k = key.trim();
   if (!k) return;

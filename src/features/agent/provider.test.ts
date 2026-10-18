@@ -4,7 +4,7 @@
 import { describe, it, expect, vi } from 'vitest';
 const proxy = vi.hoisted(() => vi.fn<typeof fetch>());
 vi.mock('@features/agent/services/llmFetch', () => ({ createProxyFetch: () => proxy }));
-import { deepThinkProviderOptions, createChatModel, baseUrlForProvider } from '@features/agent/services/provider';
+import { deepThinkProviderOptions, createChatModel, baseUrlForProvider, effectiveEndpoint } from '@features/agent/services/provider';
 
 describe('deepThinkProviderOptions', () => {
   it('openai-compatible → reasoning_effort 按档位', () => {
@@ -52,6 +52,12 @@ describe('configured provider endpoints', () => {
     expect(baseUrlForProvider('https://api.openai.com/v1/', 'anthropic')).toBe('https://api.anthropic.com/v1');
     expect(baseUrlForProvider('', 'gemini')).toBe('https://generativelanguage.googleapis.com/v1beta');
     expect(baseUrlForProvider('https://gateway.example/v1', 'anthropic')).toBe('https://gateway.example/v1');
+  });
+  it('spells out the endpoint a request really reaches', () => {
+    expect(effectiveEndpoint('anthropic', 'https://api.anthropic.com/v1/')).toBe('https://api.anthropic.com/v1/messages');
+    expect(effectiveEndpoint('openai-compatible', 'https://gateway.example/v1')).toBe('https://gateway.example/v1/chat/completions');
+    expect(effectiveEndpoint('gemini', 'https://gateway.example/v1beta', 'gemini-2.5-pro')).toBe('https://gateway.example/v1beta/models/gemini-2.5-pro:generateContent');
+    expect(effectiveEndpoint('gemini', '')).toBe('https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent');
   });
   it.each([
     ['anthropic', 'https://gateway.example/v1/messages'],

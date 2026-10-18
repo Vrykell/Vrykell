@@ -27,6 +27,7 @@ test.describe('模型行为页', () => {
 
     await expect(page.locator('.settings-content').getByText('深度思考', { exact: true })).toHaveCount(0);
     await page.locator('aside').getByRole('button', { name: '模型配置', exact: true }).click();
+    await page.getByTestId('model-settings').first().click();
     const thinking = page.getByLabel('主力模型的思考设置');
     const thinkSwitch = thinking.getByRole('switch');
     await thinkSwitch.click();
@@ -38,6 +39,7 @@ test.describe('模型行为页', () => {
 
   test('思考强度切换为低并持久化', async ({ page }) => {
     await page.locator('aside').getByRole('button', { name: '模型配置', exact: true }).click();
+    await page.getByTestId('model-settings').first().click();
     const thinking = page.getByLabel('主力模型的思考设置');
     await thinking.getByRole('switch').click();
     await thinking.getByRole('combobox', { name: '主力模型的思考强度' }).click();

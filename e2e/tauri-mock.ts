@@ -798,6 +798,17 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             else aiConfig.hasKey = false;
             return undefined;
           }
+          case 'provider_key_hint': {
+            const has = args.provider === 'anthropic' ? aiHasAnthropic : args.provider === 'gemini' ? aiHasGemini : aiConfig.hasKey;
+            return has ? 'sk-********abcd' : null;
+          }
+          case 'provider_key_reveal': {
+            const has = args.provider === 'anthropic' ? aiHasAnthropic : args.provider === 'gemini' ? aiHasGemini : aiConfig.hasKey;
+            return has ? 'sk-test-key-1234abcd' : null;
+          }
+          case 'provider_fetch_models':
+            searchCalls.push({ cmd: 'provider_fetch_models', args });
+            return ['gpt-4o', 'deepseek-chat', 'gemini-2.5-pro'];
           case 'set_tavily_key':
             aiHasTavily = true;
             aiKeyCalls.push({ provider: 'tavily', key: args.key as string });

@@ -36,7 +36,7 @@ for (const width of [720, 1240]) {
     await expect(page.getByPlaceholder(/搜索文件、命令、设置/)).toBeVisible();
     await page.keyboard.press('Escape');
     await page.locator('[data-dock-btn="settings"]').click();
-    await expect(page.getByPlaceholder('服务地址 (Base URL)').first()).toBeVisible();
+    await expect(page.getByTestId('provider-endpoint-input').first()).toBeVisible();
   });
 }
 

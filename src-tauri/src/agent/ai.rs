@@ -364,6 +364,111 @@ pub fn clear_provider_key(state: State<'_, AiConfig>, provider: String) {
     });
 }
 
+/// 取某个 provider 的 key（trim 后为空视作未配置）。
+fn provider_key(c: &AiConfigInner, provider: &str) -> Option<String> {
+    let key = match provider {
+        "anthropic" => c.anthropic_key.clone(),
+        "gemini" => c.gemini_key.clone(),
+        _ => c.api_key.clone(),
+    };
+    key.filter(|k| !k.trim().is_empty())
+}
+
+/// 密钥掩码：保留头尾便于辨认，中间用固定长度的星号；过短的 key 整体遮蔽。
+fn mask_key(key: &str) -> String {
+    let chars: Vec<char> = key.chars().collect();
+    if chars.len() <= 8 {
+        return "•".repeat(chars.len().max(1));
+    }
+    let head: String = chars[..3].iter().collect();
+    let tail: String = chars[chars.len() - 4..].iter().collect();
+    format!("{head}********{tail}")
+}
+
+/// 设置页展示用的掩码密钥；明文只经 provider_key_reveal 显式返回。
+#[tauri::command]
+pub fn provider_key_hint(state: State<'_, AiConfig>, provider: String) -> Option<String> {
+    let c = state.0.lock().ok()?;
+    provider_key(&c, &provider).map(|k| mask_key(&k))
+}
+
+/// 用户显式查看时返回明文密钥（前端只用于当前会话的展示/复制）。
+#[tauri::command]
+pub fn provider_key_reveal(state: State<'_, AiConfig>, provider: String) -> Option<String> {
+    let c = state.0.lock().ok()?;
+    provider_key(&c, &provider)
+}
+
+/// 模型列表请求的地址与认证头（检测与同步共用；与聊天请求同一 base 约定）。
+fn models_request(provider: &str, base_url: &str, key: &str) -> Result<(String, Vec<(&'static str, String)>), String> {
+    let base = base_url.trim().trim_end_matches('/');
+    if base.is_empty() {
+        return Err("请先填写 API 地址".to_string());
+    }
+    let headers = match provider {
+        "anthropic" => vec![
+            ("x-api-key", key.to_string()),
+            ("anthropic-version", "2023-06-01".to_string()),
+        ],
+        "gemini" => vec![("x-goog-api-key", key.to_string())],
+        _ => vec![("authorization", format!("Bearer {key}"))],
+    };
+    Ok((format!("{base}/models"), headers))
+}
+
+/// 解析模型列表响应：OpenAI/Anthropic 的 `data[].id` 与 Gemini 的 `models[].name` 都认。
+fn parse_models(body: &str) -> Vec<String> {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(body) else { return Vec::new() };
+    let mut ids: Vec<String> = Vec::new();
+    if let Some(items) = value.get("data").and_then(|v| v.as_array()) {
+        for item in items {
+            if let Some(id) = item.get("id").and_then(|v| v.as_str()) {
+                ids.push(id.to_string());
+            }
+        }
+    }
+    if let Some(items) = value.get("models").and_then(|v| v.as_array()) {
+        for item in items {
+            if let Some(name) = item.get("name").and_then(|v| v.as_str()) {
+                ids.push(name.strip_prefix("models/").unwrap_or(name).to_string());
+            }
+        }
+    }
+    ids.sort();
+    ids.dedup();
+    ids
+}
+
+/// 用已存密钥向服务商拉取模型列表：「检测」验证密钥，「同步」把新模型并入列表。
+#[tauri::command]
+pub async fn provider_fetch_models(
+    state: State<'_, AiConfig>,
+    provider: String,
+    base_url: String,
+) -> Result<Vec<String>, String> {
+    let key = {
+        let c = state.0.lock().map_err(|_| "配置暂不可用".to_string())?;
+        provider_key(&c, &provider).ok_or_else(|| "这个服务商还没有配置 API Key".to_string())?
+    };
+    let (url, headers) = models_request(&provider, &base_url, &key)?;
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .build()
+        .map_err(|e| format!("创建请求失败：{e}"))?;
+    let mut request = client.get(&url);
+    for (name, value) in headers {
+        request = request.header(name, value);
+    }
+    let response = request.send().await.map_err(|e| format!("请求失败：{e}"))?;
+    let status = response.status();
+    let body = response.text().await.map_err(|e| format!("读取响应失败：{e}"))?;
+    if !status.is_success() {
+        let snippet: String = body.chars().take(200).collect();
+        return Err(format!("服务商返回 {status}：{snippet}"));
+    }
+    Ok(parse_models(&body))
+}
+
 #[tauri::command]
 pub fn set_tavily_key(state: State<'_, AiConfig>, key: String) {
     let k = key.trim().to_string();
@@ -798,5 +903,40 @@ mod proxy_endpoint_tests {
         assert!(classify("http://localhost:8001/v1/messages", &cfg, Some("anthropic")).is_err());
         assert!(classify("http://localhost:8000/v1/messages", &cfg, Some("gemini")).is_err());
         assert!(classify("http://localhost:8000/v1/messages", &cfg, Some("anthropic")).is_ok());
+    }
+
+    #[test]
+    fn masks_keys_keeping_head_and_tail() {
+        assert_eq!(mask_key("sk-1234567890abcdef"), "sk-********cdef");
+        assert_eq!(mask_key("short"), "•••••");
+    }
+
+    #[test]
+    fn models_request_builds_url_and_headers_per_family() {
+        let (url, headers) = models_request("anthropic", "https://api.example.com/v1/", "k").unwrap();
+        assert_eq!(url, "https://api.example.com/v1/models");
+        assert!(headers.iter().any(|(name, value)| *name == "x-api-key" && value == "k"));
+        assert!(headers.iter().any(|(name, _)| *name == "anthropic-version"));
+
+        let (url, headers) = models_request("openai-compatible", "https://api.example.com/v1", "k").unwrap();
+        assert_eq!(url, "https://api.example.com/v1/models");
+        assert!(headers.iter().any(|(name, value)| *name == "authorization" && value == "Bearer k"));
+
+        let (_, headers) = models_request("gemini", "https://generativelanguage.googleapis.com/v1beta", "k").unwrap();
+        assert!(headers.iter().any(|(name, value)| *name == "x-goog-api-key" && value == "k"));
+
+        assert!(models_request("anthropic", "   ", "k").is_err());
+    }
+
+    #[test]
+    fn parses_model_lists_from_both_shapes() {
+        let openai = r#"{"data":[{"id":"gpt-4o"},{"id":"gpt-4o-mini"}]}"#;
+        assert_eq!(parse_models(openai), vec!["gpt-4o".to_string(), "gpt-4o-mini".to_string()]);
+
+        let gemini = r#"{"models":[{"name":"models/gemini-2.5-pro"},{"name":"models/gemini-2.5-flash"}]}"#;
+        assert_eq!(parse_models(gemini), vec!["gemini-2.5-flash".to_string(), "gemini-2.5-pro".to_string()]);
+
+        assert_eq!(parse_models(r#"{"data":[{"id":"a"},{"id":"a"}]}"#), vec!["a".to_string()]);
+        assert!(parse_models("not json").is_empty());
     }
 }
