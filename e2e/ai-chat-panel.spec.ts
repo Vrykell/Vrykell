@@ -2,7 +2,7 @@
  * AI 聊天面板 e2e：面板对话 / 模型菜单 / 思考强度 / 深思与 Agent 开关 / 输入锁定。
  */
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, mockAnthropic, aiModelCalls, ensureChatSettingsOpen, paceLlmStream } from './tauri-mock';
+import { setupTauriMock, mockAnthropic, aiModelCalls, ensureChatSettingsOpen, paceLlmStream, clipboardText } from './tauri-mock';
 
 type MockOptions = Parameters<typeof setupTauriMock>[1];
 
@@ -77,6 +77,32 @@ test.describe('AI 对话面板', () => {
     // 中断必须真正收尾：对话框回到可发送状态，而不是一直停在「生成中」。
     await expect(sendButton).toHaveAttribute('aria-label', '发送', { timeout: 5000 });
     await expect(input).toBeEnabled();
+  });
+
+  test('复制被终止的回复：停止后复制按钮给出已经收到的正文', async ({ page }) => {
+    // 流式放慢，保证点「停止」时正文只到了一部分。
+    await paceLlmStream(page, 60);
+    await boot(page, '这是一段足够长的流式回复内容。'.repeat(40), { schedulesSeed: [] });
+    await page.locator('[data-dock-btn="chat"]').click();
+    const input = page.getByPlaceholder(/自然语言描述/);
+    await expect(input).toBeVisible({ timeout: 3000 });
+    await page.waitForFunction(async () => {
+      const mod = await import('/src/features/chat/stores/chat.ts') as typeof import('../src/features/chat/stores/chat');
+      const state = mod.useChatStore.getState();
+      return !!state.activeConversationId && state.activeConversationId in state.byTab;
+    });
+    await input.fill('写一段长回答');
+    await input.press('Enter');
+
+    const sendButton = page.locator('.chat-send-button');
+    await expect(sendButton).toHaveAttribute('aria-label', '停止生成', { timeout: 5000 });
+    // 等第一部分正文到达再中断，此时回答里已经有可复制的内容。
+    await expect(page.locator('.ai-block-answer')).toContainText('流式回复内容', { timeout: 5000 });
+    await sendButton.click();
+    await expect(sendButton).toHaveAttribute('aria-label', '发送', { timeout: 5000 });
+
+    await page.getByTestId('chat-answer-copy').click();
+    expect(await clipboardText(page)).toContain('流式回复内容');
   });
 
   test('opening the AI assistant leaves command input available', async ({ page }) => {
