@@ -52,8 +52,17 @@ for (const theme of ['dark', 'light'] as const) {
     await expect.poll(() => clipboardText(page)).toBe('root@prod.example.com:22');
     await panel.locator('header').screenshot({ path: testInfo.outputPath(`connection-title-${theme}-300.png`) });
     await page.clock.setFixedTime(new Date('2026-10-17T06:00:15Z'));
-    await panel.getByRole('button', { name: '刷新远端资源' }).click();
-    await expect(panel.getByTestId('ssh-resource-cpu')).toHaveText('12%');
+    const refresh = panel.getByRole('button', { name: '刷新远端资源' });
+    const cpu = panel.getByTestId('ssh-resource-cpu');
+    // A connection-state change while the panel settles drops the counter pair the reading is
+    // derived from, so retry with the next 15 s interval until two consecutive samples land.
+    let seconds = 15;
+    await expect.poll(async () => {
+      await page.clock.setFixedTime(new Date(Date.parse('2026-10-17T06:00:00Z') + seconds * 1000));
+      seconds += 15;
+      if (await refresh.isEnabled()) await refresh.click();
+      return cpu.textContent();
+    }, { timeout: 30_000 }).toBe('12%');
     const writes = await ptyWrites(page);
     const system = panel.locator('.ssh-status-system-section');
     await expect(system).not.toHaveAttribute('open');

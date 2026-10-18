@@ -74,8 +74,12 @@ test.describe('命令历史（↑/↓ 翻历史）', () => {
     const input = page.getByPlaceholder(/输入命令/);
     await expect(input).toBeVisible({ timeout: 5000 });
 
-    // 本地历史从 search_history 水合（mock 预置 3 条）
-    await page.waitForTimeout(500);
+    // 输入历史按当前终端读取：先在该终端执行两条命令，供前缀召回
+    for (const command of ['git status', 'git log']) {
+      await input.fill(command);
+      await input.press('Enter');
+      await expect(page.locator('.command-block-command').filter({ hasText: command })).toBeVisible();
+    }
     await input.fill('git st');
     await input.press('ArrowUp');
     await expect(input).toHaveValue('git status');

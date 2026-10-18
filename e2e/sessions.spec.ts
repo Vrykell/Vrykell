@@ -53,10 +53,12 @@ test.describe('会话历史管理', () => {
     await expect(page.getByText('旧的调试会话')).toBeVisible();
     const record = page.getByTestId('history-session-hist-1');
     const remove = page.getByTestId('session-menu-hist-1');
+    const quickActions = record.locator('.history-row-quick-actions');
     await expect(remove).toHaveCSS('opacity', '0');
+    await expect(quickActions).toHaveCSS('opacity', '0');
     await record.focus();
     await expect(remove).toHaveCSS('opacity', '1');
-    await expect(record.locator('.history-row-status')).toHaveCSS('opacity', '1');
+    await expect(quickActions).toHaveCSS('opacity', '1');
     await remove.click();
     await page.getByRole('menuitem', { name: '删除此会话', exact: true }).click();
     await expect(page.getByText('旧的调试会话')).toHaveCount(0);

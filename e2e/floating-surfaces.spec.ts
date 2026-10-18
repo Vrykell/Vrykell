@@ -7,14 +7,12 @@ async function surfaceStyle(surface: Locator) {
   return surface.evaluate(el => {
     const style = getComputedStyle(el);
     const probe = document.createElement('div');
-    probe.style.background = 'var(--elevated)';
-    probe.style.border = '1px solid var(--border)';
+    probe.style.background = 'var(--menu-bg)';
     el.append(probe);
     const palette = getComputedStyle(probe);
     const result = {
       background: style.backgroundColor, expectedBackground: palette.backgroundColor,
-      border: style.borderColor, expectedBorder: palette.borderColor,
-      radius: style.borderRadius, shadow: style.boxShadow,
+      borderWidth: style.borderTopWidth, radius: style.borderRadius, shadow: style.boxShadow,
     };
     probe.remove();
     return result;
@@ -24,7 +22,8 @@ async function surfaceStyle(surface: Locator) {
 async function assertSurface(surface: Locator, dialog = false) {
   const style = await surfaceStyle(surface);
   expect(style.background).toBe(style.expectedBackground);
-  expect(style.border).toBe(style.expectedBorder);
+  // Floating surfaces separate with an outer shadow instead of a border.
+  expect(style.borderWidth).toBe('0px');
   expect(style.radius).toBe(dialog ? '14px' : '10px');
   expect(style.shadow).not.toBe('none');
 }

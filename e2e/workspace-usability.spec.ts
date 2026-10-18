@@ -77,9 +77,10 @@ test('terminal error notifications follow the active gray theme and can be close
     const notification = page.getByRole('status').filter({ hasText: '复制失败' });
     await expect(notification).toBeVisible();
     await notification.hover();
-    await expect(notification).toHaveCSS('background-color', await resolvedColor(page, '--elevated'));
+    await expect(notification).toHaveCSS('background-color', await resolvedColor(page, '--menu-bg'));
     await expect(notification).toHaveCSS('border-radius', '10px');
-    await expect(notification).toHaveCSS('border-color', await resolvedColor(page, '--border'));
+    // Floating surfaces separate with an outer shadow instead of a border.
+    await expect(notification).toHaveCSS('border-width', '0px');
     await page.screenshot({ path: `ux-audit.local/after-notification-${theme}.png` });
     await notification.getByRole('button', { name: '关闭通知' }).click();
     await expect(notification).toBeHidden();
@@ -333,7 +334,7 @@ test('panel headings close their own content without affecting the other side', 
 test('dragging a navigation action preserves panel placement and order', async ({ page }) => {
   await page.locator('[data-dock-btn="files"]').dragTo(page.locator('[data-dock-btn="ssh"]'));
   const ids = await page.getByRole('navigation', { name: '工作区导航' }).locator('[data-dock-btn]').evaluateAll(elements => elements.map(el => el.getAttribute('data-dock-btn')));
-  expect(ids).toEqual(['tabs', 'files', 'ssh']);
+  expect(ids).toEqual(['tabs', 'files', 'ssh', 'command-history']);
   await page.locator('[data-dock-btn="files"]').click();
   await expect(page.getByText('notes.txt')).toBeVisible();
   await expect(page.getByTestId('tab-search')).toBeHidden();

@@ -2,7 +2,14 @@ import { test, expect, type Locator, type Page } from '@playwright/test';
 import { setupTauriMock, memoryFact } from './tauri-mock';
 import { gotoSetting } from './settings';
 
-const channels = (color: string) => color.match(/\d+(?:\.\d+)?/g)!.slice(0, 3).map(Number);
+/** Chromium serializes color-mix() results as `color(srgb r g b)` with 0..1 channels. */
+const channels = (color: string) => {
+  const values = color.match(/\d+(?:\.\d+)?/g)!.slice(0, 3).map(Number);
+  return color.startsWith('color(') ? values.map(value => value * 255) : values;
+};
+/** Transparent ancestors are skipped while looking for the panel behind a field. */
+const transparent = (color: string) => color === 'transparent' || color === 'rgba(0, 0, 0, 0)'
+  || /\s\/\s*0(?:\.0+)?\)$/.test(color) || (/^rgba\(/.test(color) && /,\s*0(?:\.0+)?\)$/.test(color));
 const luminance = (color: string) => channels(color).map(value => {
   const normalized = value / 255;
   return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
@@ -29,22 +36,23 @@ async function expectFieldHierarchy(field: Locator, editable = true) {
   await expect(field).toBeVisible();
   const colors = await field.evaluate(element => {
     const style = getComputedStyle(element);
+    const chain: string[] = [];
     let ancestor = element.parentElement;
-    let panel = 'rgba(0, 0, 0, 0)';
-    while (ancestor && panel === 'rgba(0, 0, 0, 0)') {
-      panel = getComputedStyle(ancestor).backgroundColor;
+    while (ancestor && chain.length < 12) {
+      chain.push(getComputedStyle(ancestor).backgroundColor);
       ancestor = ancestor.parentElement;
     }
-    return { field: style.backgroundColor, panel, text: style.color };
+    return { field: style.backgroundColor, chain, text: style.color };
   });
+  const panel = colors.chain.find(color => !transparent(color)) ?? 'rgba(0, 0, 0, 0)';
   const fieldRgb = channels(colors.field);
-  const panelRgb = channels(colors.panel);
+  const panelRgb = channels(panel);
   expect(new Set(fieldRgb).size).toBe(1);
   if (editable) {
-    expect(luminance(colors.field)).toBeGreaterThan(luminance(colors.panel));
+    expect(luminance(colors.field)).toBeGreaterThan(luminance(panel));
     expect(Math.max(...fieldRgb.map((value, index) => value - panelRgb[index]))).toBeLessThanOrEqual(36);
   } else {
-    expect(colors.field).toBe(colors.panel);
+    expect(colors.field).toBe(panel);
   }
   const values = [luminance(colors.field), luminance(colors.text)];
   expect((Math.max(...values) + 0.05) / (Math.min(...values) + 0.05)).toBeGreaterThanOrEqual(4.5);
