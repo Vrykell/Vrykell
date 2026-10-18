@@ -208,7 +208,7 @@ export default function HarnessPage() {
         <div data-testid="harness-presets" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {HARNESS_PRESETS.map((preset) => (
             <OutlineButton key={preset.name} data-testid={`harness-preset-${preset.name}`}
-              data-tip={`${preset.command} ${preset.args.join(' ')}`} data-tip-description={preset.hint}
+              data-tip={`${preset.command} ${preset.args.join(' ')}`} data-tip-description={t(preset.hint)}
               onClick={() => { setTouched(true); setList((current) => upsertPreset(current ?? [], preset)); }}>
               <HarnessBadge name={preset.name} size={19} /> {preset.name}
             </OutlineButton>

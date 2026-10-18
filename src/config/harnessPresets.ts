@@ -6,30 +6,29 @@
  * and a wrong command line shows up immediately in "test connection" instead of failing silently.
  * Update an entry when the upstream invocation changes, and keep the appended hint short.
  */
+import type { I18nKey } from '@i18n';
+
 export interface HarnessPreset {
   name: string;
   command: string;
   args: string[];
   /** How to get the program, shown next to the preset. */
-  hint: string;
+  hint: I18nKey;
 }
 
 export const HARNESS_PRESETS: HarnessPreset[] = [
-  // Verified on this machine: this one answers the handshake, so it is the first thing to try.
-  { name: 'Claude Code', command: 'npx', args: ['-y', '@zed-industries/claude-code-acp'], hint: 'npx（已实测可握手）' },
-  { name: 'Codex', command: 'npx', args: ['-y', '@agentclientprotocol/codex-acp'], hint: 'npx' },
-  { name: 'Gemini CLI', command: 'npx', args: ['-y', '@google/gemini-cli', '--experimental-acp'], hint: 'npx' },
-  // Verified on this machine: `opencode acp` starts the protocol server directly.
-  { name: 'OpenCode', command: 'opencode', args: ['acp'], hint: '需要先安装 opencode（npm i -g opencode-ai）' },
-  // Verified on this machine: `--acp` starts the agent in ACP mode.
-  { name: 'Qwen Code', command: 'qwen', args: ['--acp'], hint: '需要先安装 qwen（npm i -g @qwen-code/qwen-code）' },
-  { name: 'Cursor', command: 'cursor-agent', args: ['acp'], hint: '需要先安装 cursor-agent' },
-  // Verified on this machine: the `acp` tool group serves the protocol.
-  { name: 'OpenClaw', command: 'openclaw', args: ['acp'], hint: '需要先安装 openclaw' },
-  { name: 'Kiro CLI', command: 'kiro-cli', args: ['acp'], hint: '需要先安装 kiro-cli' },
-  { name: 'Kimi CLI', command: 'kimi', args: ['acp'], hint: '需要先安装 kimi-cli' },
-  { name: 'Goose', command: 'goose', args: ['acp'], hint: '需要先安装 goose' },
-  { name: 'Pi', command: 'npx', args: ['-y', 'pi-acp'], hint: 'npx' },
+  // Verified end to end: handshake, session and a whole turn (2026-10).
+  { name: 'Claude Code', command: 'npx', args: ['-y', '@zed-industries/claude-code-acp'], hint: 'Run with npx; answers a whole turn.' },
+  { name: 'Codex', command: 'npx', args: ['-y', '@agentclientprotocol/codex-acp'], hint: 'Run with npx; answers a whole turn, the first one may take a while.' },
+  { name: 'Gemini CLI', command: 'npx', args: ['-y', '@google/gemini-cli', '--experimental-acp'], hint: 'Run with npx; needs a Google account or an API key.' },
+  { name: 'OpenCode', command: 'opencode', args: ['acp'], hint: 'Requires opencode (npm i -g opencode-ai) and a one-time opencode auth login.' },
+  { name: 'Qwen Code', command: 'qwen', args: ['--acp'], hint: 'Requires qwen (npm i -g @qwen-code/qwen-code); answers a whole turn.' },
+  { name: 'Cursor', command: 'cursor-agent', args: ['acp'], hint: 'Requires cursor-agent.' },
+  { name: 'OpenClaw', command: 'openclaw', args: ['acp'], hint: 'Requires openclaw.' },
+  { name: 'Kiro CLI', command: 'kiro-cli', args: ['acp'], hint: 'Requires kiro-cli.' },
+  { name: 'Kimi CLI', command: 'kimi', args: ['acp'], hint: 'Requires kimi.' },
+  { name: 'Goose', command: 'goose', args: ['acp'], hint: 'Requires goose.' },
+  { name: 'Pi', command: 'npx', args: ['-y', 'pi-acp'], hint: 'Run with npx; configure pi in a terminal first.' },
 ];
 
 export interface HarnessEntry {
