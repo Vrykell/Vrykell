@@ -104,7 +104,7 @@ describe('Select', () => {
     const trigger = screen.getByRole('combobox');
     vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue({ x: 950, y: 720, top: 720, bottom: 750, left: 950, right: 1060, width: 110, height: 30, toJSON: () => ({}) });
     await userEvent.setup().click(trigger);
-    const menu = screen.getByRole('listbox');
+    const menu = screen.getByRole('listbox').parentElement!;
     expect(menu.parentElement).toBe(document.body);
     expect(menu).toHaveAttribute('data-placement', 'top');
     expect(parseFloat(menu.style.left)).toBeLessThan(950);
@@ -129,5 +129,25 @@ describe('Select', () => {
     await userEvent.setup().click(trigger);
     expect(screen.getByRole('option', { name: '蓝色' }).querySelector('span.ui-select-swatch')).toHaveStyle({ background: '#0A84FF' });
     expect(screen.getByRole('option', { name: '绿色' }).querySelector('span.ui-select-swatch')).not.toBeNull();
+  });
+
+  it('renders a trailing action outside the listbox and runs it from pointer or keyboard', async () => {
+    const onSelect = vi.fn();
+    render(<Select aria-label="终端" value="low" options={options} onChange={vi.fn()} action={{ label: '新建标签页', onSelect }} />);
+    const user = userEvent.setup();
+    const trigger = screen.getByRole('combobox');
+    await user.click(trigger);
+    const action = screen.getByRole('button', { name: '新建标签页' });
+    // The action is not a value: it stays outside the listbox and never carries a selection.
+    expect(screen.getByRole('listbox').contains(action)).toBe(false);
+    await user.click(action);
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+    // The arrow keys reach it after the last enabled option, and Enter runs it.
+    await user.click(trigger);
+    await user.keyboard('{ArrowUp}{Enter}');
+    expect(onSelect).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 });

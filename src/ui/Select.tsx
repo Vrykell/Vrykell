@@ -1,6 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { iconSizes, Check, ChevronDown } from '@ui/icons';
+import { iconSizes, Check, ChevronDown, Plus } from '@ui/icons';
 import './Select.css';
 
 export interface SelectOption<Value extends string | number> {
@@ -11,6 +11,12 @@ export interface SelectOption<Value extends string | number> {
   disabled?: boolean;
   /** Optional colour swatch rendered before the label. */
   swatch?: string;
+}
+
+/** Trailing action pinned below the options (e.g. "New tab"); the arrow keys reach it. */
+interface SelectAction {
+  label: string;
+  onSelect: () => void;
 }
 
 interface SelectProps<Value extends string | number> {
@@ -26,11 +32,12 @@ interface SelectProps<Value extends string | number> {
   disabled?: boolean;
   placeholder?: string;
   style?: CSSProperties;
+  action?: SelectAction;
 }
 
 /** A controlled select with a themed, viewport-aware listbox. */
 export default function Select<Value extends string | number>({
-  value, options, onChange, disabled = false, placeholder = '请选择', style, id,
+  value, options, onChange, disabled = false, placeholder = '请选择', style, id, action,
   'aria-label': label, 'aria-describedby': description, 'data-testid': testId,
   'data-tip': tip, 'data-tip-description': tipDescription,
 }: SelectProps<Value>) {
@@ -46,7 +53,9 @@ export default function Select<Value extends string | number>({
   const enabled = options.map((option, index) => option.disabled ? -1 : index).filter(index => index >= 0);
   const unavailable = disabled || enabled.length === 0;
   const expanded = open && !unavailable;
-  const activeIndex = enabled.includes(active) ? active : enabled[0];
+  const actionIndex = action ? options.length : -1;
+  const navigable = actionIndex >= 0 ? [...enabled, actionIndex] : enabled;
+  const activeIndex = navigable.includes(active) ? active : enabled[0] ?? actionIndex;
 
   const show = (last = false) => {
     if (unavailable) return;
@@ -55,6 +64,12 @@ export default function Select<Value extends string | number>({
     setOpen(true);
   };
   const choose = (index: number) => {
+    if (action && index === actionIndex) {
+      setOpen(false);
+      trigger.current?.focus();
+      action.onSelect();
+      return;
+    }
     const option = options[index];
     if (!option || option.disabled) return;
     setOpen(false);
@@ -127,8 +142,8 @@ export default function Select<Value extends string | number>({
       if (key === 'Home') setActive(enabled[0]);
       else if (key === 'End') setActive(enabled[enabled.length - 1]);
       else if (expanded) {
-        const current = enabled.indexOf(activeIndex);
-        setActive(enabled[(current + (key === 'ArrowDown' ? 1 : -1) + enabled.length) % enabled.length]);
+        const current = navigable.indexOf(activeIndex);
+        setActive(navigable[(current + (key === 'ArrowDown' ? 1 : -1) + navigable.length) % navigable.length]);
       }
     } else if (key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
       event.preventDefault();
@@ -154,17 +169,26 @@ export default function Select<Value extends string | number>({
       <span className="ui-select-value">{options[selected]?.triggerLabel ?? options[selected]?.label ?? placeholder}</span>
       <ChevronDown size={iconSizes.compact} aria-hidden="true" className="ui-select-chevron" />
     </button>
-    {expanded && createPortal(<div ref={menu} id={listId} role="listbox" aria-label={label}
+    {expanded && createPortal(<div ref={menu}
       className="workspace-floating ui-select-menu" style={position} data-placement={placement}
       onPointerDown={event => event.preventDefault()}>
-      {options.map((option, index) => <div key={option.value} id={`${listId}-${index}`} role="option"
-        aria-selected={index === selected} aria-disabled={option.disabled || undefined}
-        className="ui-select-option" data-active={index === activeIndex}
-        onPointerMove={() => { if (!option.disabled) setActive(index); }} onClick={() => choose(index)}>
-        {option.swatch && <span className="ui-select-swatch" aria-hidden="true" style={{ background: option.swatch }} />}
-        <span className="ui-select-option-label">{option.label}</span>
-        {index === selected && <Check size={iconSizes.compact} aria-hidden="true" className="ui-select-check" />}
-      </div>)}
+      <div id={listId} role="listbox" aria-label={label} className="ui-select-options">
+        {options.map((option, index) => <div key={option.value} id={`${listId}-${index}`} role="option"
+          aria-selected={index === selected} aria-disabled={option.disabled || undefined}
+          className="ui-select-option" data-active={index === activeIndex}
+          onPointerMove={() => { if (!option.disabled) setActive(index); }} onClick={() => choose(index)}>
+          {option.swatch && <span className="ui-select-swatch" aria-hidden="true" style={{ background: option.swatch }} />}
+          <span className="ui-select-option-label">{option.label}</span>
+          {index === selected && <Check size={iconSizes.compact} aria-hidden="true" className="ui-select-check" />}
+        </div>)}
+      </div>
+      {action && <button type="button" id={`${listId}-${actionIndex}`} className="ui-select-action"
+        data-active={activeIndex === actionIndex}
+        onPointerMove={() => setActive(actionIndex)}
+        onClick={() => choose(actionIndex)}>
+        <Plus size={iconSizes.compact} aria-hidden="true" />
+        <span>{action.label}</span>
+      </button>}
     </div>, document.body)}
   </>;
 }
