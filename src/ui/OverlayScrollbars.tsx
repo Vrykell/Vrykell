@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { t } from '@i18n';
 import OverlayScrollbar from './OverlayScrollbar';
 
-const candidates = 'textarea, [style*="overflow"], .scroll-region, .settings-content, .ui-select-menu, .directory-picker-list, .global-search-body, .md pre, .md table';
+const candidates = 'textarea, [style*="overflow"], .scroll-region, .settings-content, .ui-select-options, .directory-picker-list, .global-search-body, .md pre, .md table';
 interface Surface { element: HTMLElement; ref: RefObject<HTMLElement>; host: HTMLElement; container: HTMLElement; id: string; horizontal: boolean; vertical: boolean; }
 
 /** Stacking context that owns the content, so a popup track cannot escape above other overlays. */
