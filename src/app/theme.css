@@ -1235,15 +1235,16 @@ button.state-icon-button { color: var(--icon-color); }
 /* Optical nudge: the text's visual centre sits above its line box centre. */
 .provider-key-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-sizing: border-box; transform: translateY(-1px); }
 .provider-key-dot[data-empty] { background: transparent; border: 1px solid var(--border-strong); }
-/* Rows of the centred provider menu: a grey resting surface, a brighter hover, and the shown
-   provider lifted further so the check is not the only cue. */
-.provider-option-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: 0; border-radius: 8px; background: var(--field-bg); color: var(--text-primary); font: var(--fw-medium) var(--fs-caption) var(--font-ui); cursor: pointer; text-align: left; margin-bottom: 2px; transition: background var(--dur-fast) var(--ease); }
-.provider-option-row:hover { background: color-mix(in srgb, var(--field-bg) 88%, var(--text-primary)); }
-.provider-option-row[data-selected="true"] { background: color-mix(in srgb, var(--field-bg) 74%, var(--text-primary)); font-weight: var(--fw-semibold); }
+/* Rows of the centred provider menu: flat at rest, a soft highlight on hover, and the shown
+   provider lifted onto the grey field surface so the check is not the only cue. The `button.`
+   prefix outranks the app-wide `button:not([data-subtle])` chrome. */
+button.provider-option-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text-primary); font: var(--fw-medium) var(--fs-caption) var(--font-ui); cursor: pointer; text-align: left; margin-bottom: 2px; transition: background var(--dur-fast) var(--ease); }
+button.provider-option-row:hover { background: var(--hover); }
+button.provider-option-row[data-selected="true"] { background: var(--field-bg); font-weight: var(--fw-semibold); }
 .provider-option-mark { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 8px; background: var(--block); flex-shrink: 0; }
 .provider-option-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.provider-option-add { color: var(--text-secondary); }
-.provider-option-add:hover { color: var(--text-primary); }
+button.provider-option-add { color: var(--text-secondary); }
+button.provider-option-add:hover { color: var(--text-primary); }
 .settings-preset-cell { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text-secondary); font: var(--fw-medium) var(--fs-caption) var(--font-ui); cursor: pointer; text-align: left; min-width: 0; transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
 .settings-preset-cell:hover { color: var(--text-primary); border-color: var(--border-strong); }
 .settings-preset-cell span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
