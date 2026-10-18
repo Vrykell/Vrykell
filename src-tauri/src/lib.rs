@@ -41,6 +41,9 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             platform::context_menu::handle_secondary_launch(app, args);
         }))
+        // A webview page load keeps this process alive: terminate the previous page's
+        // PTY sessions before the new page can spawn its own.
+        .plugin(terminal::pty::lifecycle_plugin())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -149,6 +152,7 @@ pub fn run() {
             agent::mcp::mcp_list_all_tools,
             agent::mcp::mcp_call_tool,
             terminal::pty::pty_spawn,
+            terminal::pty::pty_close_all,
             diagnostics::diagnostics_set_auto_save,
             diagnostics::diagnostics_export,
             diagnostics::diagnostics_log_directory,
@@ -269,8 +273,11 @@ pub fn run() {
         .expect("error while building tauri application");
 
     // 退出时不再归档 active 会话：保留「上次打开未关闭的标签」供下次启动恢复。
-    app.run(|_app_handle, event| {
+    app.run(|app_handle, event| {
         if matches!(event, tauri::RunEvent::Exit) {
+            // Do not rely on the operating system closing handles: terminate every
+            // PTY child explicitly before the process exits.
+            terminal::pty::close_all_sessions(app_handle);
             if let Err(error) = diagnostics::flush_logs() { eprintln!("[diagnostics] {error}"); }
         }
     });

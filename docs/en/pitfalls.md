@@ -577,6 +577,9 @@ Fitting that clears the renderer before resizing causes an additional blank fram
 - Collect the descendants first, then kill, to avoid the parent dying first and the children being re-parented under a different parent and thus missed.
 ### 14.6 the Output pending Buffer Trapping the Last Segment When a Session Closes (`pty.rs:353`)
 - Output not yet flushed within the batching window (e.g. the cmd/PowerShell prompt) must be force-flushed, or "the last line never appears".
+### 14.7 A Full Page Reload Leaving the Previous PTYs Alive (page lifecycle cleanup)
+- A page reload or webview recreation does not restart the Rust process: the previous sessions stay in `PtyState`, the new page never learns their ids, and the React unmount cleanup never runs. The shell, its console host and both worker threads stay alive, and their output keeps being broadcast to the new page.
+- **Fix**: the main window's `on_page_load` hook and the frontend startup each call `pty_close_all`, and `RunEvent::Exit` clears once more; closing a session sets a `closed` flag, signals the foreground process group before terminating the process tree, and waits with a bounded timeout.
 
 ---
 

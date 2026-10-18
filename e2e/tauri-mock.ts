@@ -490,6 +490,8 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'pty_close':
             closes.push({ id: args.id });
             return undefined;
+          case 'pty_close_all':
+            return 0;
           case 'plugin:clipboard-manager|write_text':
             clipboardText = args.text as string;
             (window as unknown as Record<string, string>).__CLIPBOARD_TEXT__ = clipboardText;

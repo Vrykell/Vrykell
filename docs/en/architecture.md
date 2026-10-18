@@ -264,7 +264,7 @@ zustand, split by domain (`src/features/*/stores/`):
 
 | Directory/File | Responsibility |
 |------|------|
-| `terminal/pty.rs` | `portable-pty` session lifecycle, commands registered as `pty_spawn/write/resize/close`, events `pty-output`/`pty-exit` (includes StreamDecoder + scan.rs wiring; when TERM/COLORTERM are empty at GUI launch, supplies `xterm-256color` + truecolor) |
+| `terminal/pty.rs` | `portable-pty` session lifecycle, commands registered as `pty_spawn/write/resize/close`; a page reload or app exit sweeps all sessions through `pty_close_all` and the `on_page_load` hook; events `pty-output`/`pty-exit` (includes StreamDecoder + scan.rs wiring; when TERM/COLORTERM are empty at GUI launch, supplies `xterm-256color` + truecolor) |
 | `terminal/scan.rs` | Rust StreamScanner (synchronous byte-stream scanning, see §5.1) |
 | `terminal/shell_integration.rs` | zsh (ZDOTDIR) / bash (--rcfile) / PowerShell injection of the OSC 133/7 shell integration script |
 | `terminal/shells.rs` | shell type detection and list_shells |

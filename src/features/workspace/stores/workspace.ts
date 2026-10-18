@@ -11,6 +11,7 @@ import {
 } from '@platform/api/group';
 import type { BackendGroupEntry } from '@platform/api/types';
 import { useBlockStore } from '@features/terminal/stores/blocks';
+import { useInputStore } from '@features/terminal/stores/input';
 import { useChatStore } from '@features/chat/stores/chat';
 import { useAgentSettings } from '@features/agent/stores/agentSettings';
 import { defaultOpenModeForShell } from '@features/agent/stores/agentSettings';
@@ -323,6 +324,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       for (const term of layoutLeaves(closed.layout)) {
         useBlockStore.getState().dropTab(term.id);
         useTerminalStore.getState().dropTab(term.id);
+        useInputStore.getState().dropPane(term.id);
         useWorkspaceStore.getState().dropTerminalCwd(term.id);
         useWorkspaceStore.getState().setProgramTitle(term.id, '');
       }
@@ -482,6 +484,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     // 清理被移除终端的 per-terminal 残留（blocks/PTY 记录/cwd）
     useBlockStore.getState().dropTab(terminalId);
     useTerminalStore.getState().dropTab(terminalId);
+    useInputStore.getState().dropPane(terminalId);
     ws.dropTerminalCwd(terminalId);
     ws.setProgramTitle(terminalId, '');
     useTerminalStore.getState().setFocusedPane(firstLeaf(next).id);
@@ -681,6 +684,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       for (const term of layoutLeaves(t.layout)) {
         useBlockStore.getState().dropTab(term.id);
         useTerminalStore.getState().dropTab(term.id);
+        useInputStore.getState().dropPane(term.id);
         useWorkspaceStore.getState().dropTerminalCwd(term.id);
         useWorkspaceStore.getState().setProgramTitle(term.id, '');
       }

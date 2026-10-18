@@ -64,6 +64,9 @@ const pendingUiCommands = sessionRegistry.pendingUiCommands;
 const widthSyncs = sessionRegistry.widthSyncs;
 const PENDING_COMMAND_TTL_MS = 30_000;
 
+/** Bound the startup buffer so a stale session flooding output cannot grow it forever. */
+const PRE_SESSION_MAX_BATCHES = 512;
+
 /** 清除指定 tab 的全部输出块；无存活 session 时退化为清 store。 */
 export function clearSessionBlocks(tabId: string): void {
   const c = sessionControllers.get(tabId);
@@ -225,7 +228,6 @@ export function useTerminalSession(
     const startupAbort = new AbortController();
     // spawn 完成前的初始输出缓冲（shell 启动提示符）：拿到 sessionId 后回放，避免丢失
     let preSession: { id: string; events: DispatchEvent[] }[] = [];
-    const unlisteners: UnlistenFn[] = [];
     const pendingUnlisteners: Promise<UnlistenFn>[] = [];
     let focusTimer: ReturnType<typeof setTimeout> | null = null;
     const close = async () => {
@@ -491,13 +493,16 @@ export function useTerminalSession(
     pendingUnlisteners.push(
       onPtyOutput((id, events) => {
         if (disposed || stopped) return;
+        // Sessions from a previous page can still exist in the backend: drop their
+        // output before building any string so a stale TUI cannot cost this pane work.
+        if (sessionId !== null && id !== sessionId) return;
         // The request for win32-input-mode arrives in the session output; the
         // matching key encoding happens at the input side.
         const output = events
           .filter((event): event is Extract<DispatchEvent, { kind: 'data' }> => event.kind === 'data')
           .map((event) => event.text)
           .join('');
-        if (output && (sessionId === null || id === sessionId)) {
+        if (output) {
           // Questions the program expects the terminal to answer; a line here shows what
           // a session is waiting on without recording the output itself.
           const queries = querySequences(output);
@@ -505,13 +510,11 @@ export function useTerminalSession(
         }
         if (sessionId === null) {
           // 尚未拿到 sessionId：先缓冲，等 spawn 完成后回放
-          preSession.push({ id, events });
+          if (preSession.length < PRE_SESSION_MAX_BATCHES) preSession.push({ id, events });
           return;
         }
-        if (id === sessionId) {
-          controller.ioLog.received(events);
-          handleOutput(events);
-        }
+        controller.ioLog.received(events);
+        handleOutput(events);
       }),
     );
 
@@ -520,8 +523,10 @@ export function useTerminalSession(
         if (disposed || stopped) return;
         if (isTerminalDebugEnabled()) terminalDebug('pty-exit', { id, sessionId, code });
         if (id === sessionId) {
-          // The PTY is gone: input still queued would only fail chunk by chunk.
+          // The PTY is gone: input still queued would only fail chunk by chunk, and a
+          // block that was executing can never complete its shell integration now.
           cancelTerminalInput(id);
+          controller.interruptActive();
           sessionId = null;
           stopped = true;
           useTerminalStore.getState().clearSession(paneId, id);
@@ -928,8 +933,8 @@ export function useTerminalSession(
       document.removeEventListener('visibilitychange', onVisibilityChange);
       if (widthSyncs.get(paneId) === applyWidth) widthSyncs.delete(paneId);
       if (sessionControllers.get(paneId) === controller) sessionControllers.delete(paneId);
+      pendingUiCommands.delete(paneId);
       controller.dispose();
-      unlisteners.forEach((u) => u());
       pendingUnlisteners.forEach((p) => p.then((u) => u()).catch(() => {}));
       if (sessionId) {
         // Queued input can no longer reach a session that is closing: drop it before the PTY goes.

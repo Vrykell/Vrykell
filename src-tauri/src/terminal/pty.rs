@@ -3,7 +3,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter, Manager, State};
 use uuid::Uuid;
@@ -11,6 +11,19 @@ use uuid::Uuid;
 use crate::terminal::{debug, shell_integration};
 use crate::terminal::io_window::{OutputStats, ReaderWindow};
 use crate::terminal::scan::{ScanEvent, StreamScanner};
+
+/// How long a normal close waits for a session to exit before it is force-killed.
+const CLOSE_DEADLINE: std::time::Duration = std::time::Duration::from_millis(2000);
+/// The whole process-wide sweep (page reload, app exit) shares this budget.
+const CLOSE_ALL_DEADLINE: std::time::Duration = std::time::Duration::from_millis(500);
+/// Natural exits should already be reaped; this only guards a stale wait.
+const REAP_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(1000);
+
+/// A poisoned lock must never stop process cleanup halfway: the child still has to be
+/// terminated even when another thread panicked while holding the session state.
+fn lock_unpoisoned<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
 
 /// 流式 UTF-8 解码器：跨 read 边界缓冲不完整的多字节序列。
 pub struct StreamDecoder {
@@ -63,14 +76,132 @@ pub struct PtySession {
     writer: Arc<Mutex<Box<dyn Write + Send>>>,
     child: Box<dyn Child + Send + Sync>,
     input_pending: Arc<AtomicBool>,
+    /// Set by the close path so the reader coordinator stops even when its reader
+    /// handle stays open after the process tree was terminated.
+    closed: Arc<AtomicBool>,
 }
 
 fn session_has_exited(session: &Arc<Mutex<PtySession>>) -> bool {
-    session.lock().ok().and_then(|mut state| state.child.try_wait().ok()).flatten().is_some()
+    lock_unpoisoned(session).child.try_wait().ok().flatten().is_some()
 }
 
 #[derive(Default)]
 pub struct PtyState(pub Mutex<HashMap<String, Arc<Mutex<PtySession>>>>);
+
+/// Wait for a child without ever blocking past `timeout`; a stopped foreground
+/// program must not hold a close command, the startup sweep or the app exit open.
+fn wait_child_bounded(child: &mut dyn Child, timeout: std::time::Duration) -> Option<i32> {
+    let deadline = std::time::Instant::now() + timeout;
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return Some(status.exit_code() as i32),
+            Ok(None) => {
+                if std::time::Instant::now() >= deadline { return None; }
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            Err(_) => return None,
+        }
+    }
+}
+
+/// Terminate a child and make sure it is reaped; used when a spawn cannot be
+/// completed and no session owns the handles yet.
+fn kill_child_and_reap(child: &mut dyn Child) {
+    kill_child_tree(child);
+    if wait_child_bounded(child, CLOSE_ALL_DEADLINE).is_none() {
+        force_kill_child(child);
+        let _ = wait_child_bounded(child, CLOSE_ALL_DEADLINE);
+    }
+}
+
+/// Last resort for a session that ignored the graceful signals.
+#[cfg(unix)]
+fn force_kill_child(child: &mut dyn Child) {
+    if let Some(pid) = child.process_id() {
+        unsafe { libc::kill(pid as i32, libc::SIGKILL); }
+    }
+}
+
+#[cfg(not(unix))]
+fn force_kill_child(child: &mut dyn Child) {
+    let _ = child.kill();
+}
+
+/// Closing the pane must reach the foreground job as well, not only the shell:
+/// without it a program that ignores the shell's hangup keeps the PTY alive.
+#[cfg(unix)]
+fn signal_foreground_close(session: &PtySession) {
+    let Some(fd) = session.master.as_raw_fd() else { return };
+    let pgid = unsafe { libc::tcgetpgrp(fd) };
+    if pgid <= 0 || Some(pgid as u32) == session.child.process_id() { return; }
+    unsafe {
+        libc::kill(-pgid, libc::SIGHUP);
+        libc::kill(-pgid, libc::SIGTERM);
+    }
+}
+
+/// Escalation for a foreground job that ignored the graceful signals.
+#[cfg(unix)]
+fn force_kill_foreground(session: &PtySession) {
+    let Some(fd) = session.master.as_raw_fd() else { return };
+    let pgid = unsafe { libc::tcgetpgrp(fd) };
+    if pgid > 0 {
+        unsafe { libc::kill(-pgid, libc::SIGKILL); }
+    }
+}
+
+#[cfg(not(unix))]
+fn force_kill_foreground(_session: &PtySession) {}
+
+/// Terminate one session and reap it within `deadline`. Every close path goes
+/// through here so a failed state lookup can never leave an unreachable child.
+fn close_session(session: &Arc<Mutex<PtySession>>, deadline: std::time::Instant) {
+    let mut state = lock_unpoisoned(session);
+    state.closed.store(true, Ordering::Release);
+    #[cfg(unix)]
+    signal_foreground_close(&state);
+    kill_child_tree(&mut *state.child);
+    if std::time::Instant::now() >= deadline { return; }
+    if wait_child_bounded(&mut *state.child, deadline.saturating_duration_since(std::time::Instant::now())).is_some() {
+        return;
+    }
+    force_kill_foreground(&state);
+    force_kill_child(&mut *state.child);
+    let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+    let _ = wait_child_bounded(&mut *state.child, remaining);
+}
+
+/// Remove one session by id and close it. Used when the output channel is gone:
+/// a session that can no longer reach a window must not be left running.
+fn close_session_by_id(app: &AppHandle, id: &str) {
+    let session = lock_unpoisoned(&app.state::<PtyState>().0).remove(id);
+    if let Some(session) = session {
+        close_session(&session, std::time::Instant::now() + CLOSE_DEADLINE);
+    }
+    lock_unpoisoned(&app.state::<KillState>().0).remove(id);
+}
+
+/// Terminate a batch of sessions within one shared deadline.
+fn close_sessions(sessions: Vec<Arc<Mutex<PtySession>>>, deadline: std::time::Instant) {
+    for session in sessions {
+        close_session(&session, deadline);
+    }
+}
+
+/// Close every session owned by this process. Called on webview page loads and on
+/// app exit, where the frontend can no longer reach the old session ids.
+pub fn close_all_sessions<R: tauri::Runtime>(app: &AppHandle<R>) {
+    let sessions: Vec<Arc<Mutex<PtySession>>> = {
+        let state = app.state::<PtyState>();
+        let mut map = lock_unpoisoned(&state.0);
+        map.drain().map(|(_, session)| session).collect()
+    };
+    if debug::enabled() && !sessions.is_empty() {
+        debug::write("close-all", format!("sessions={}", sessions.len()));
+    }
+    close_sessions(sessions, std::time::Instant::now() + CLOSE_ALL_DEADLINE);
+    lock_unpoisoned(&app.state::<KillState>().0).clear();
+}
 
 #[derive(Clone, Serialize)]
 struct PtyOutput {
@@ -410,10 +541,25 @@ fn spawn_pty(
     // text as garbage. Provide a UTF-8 locale when none is configured.
     #[cfg(unix)]
     merge_locale_env(&mut cmd);
-    let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
+    let mut child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
     drop(pair.slave);
-    let reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
-    let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
+    // A failure between spawn and session registration must not leave a shell with
+    // no handle: kill and reap it before reporting the error.
+    let reader = match pair.master.try_clone_reader() {
+        Ok(reader) => reader,
+        Err(error) => {
+            kill_child_and_reap(&mut *child);
+            return Err(error.to_string());
+        }
+    };
+    let writer = match pair.master.take_writer() {
+        Ok(writer) => writer,
+        Err(error) => {
+            drop(reader);
+            kill_child_and_reap(&mut *child);
+            return Err(error.to_string());
+        }
+    };
     Ok((format!("pty-{}", Uuid::new_v4()), pair.master, reader, writer, child))
 }
 
@@ -457,6 +603,7 @@ pub async fn pty_spawn(
             .await
             .map_err(|e| e.to_string())??;
     let input_pending = Arc::new(AtomicBool::new(false));
+    let closed = Arc::new(AtomicBool::new(false));
     if debug::enabled() {
         debug::write(
             "spawn",
@@ -479,12 +626,19 @@ pub async fn pty_spawn(
             ),
         );
     }
-    state.0.lock().map_err(|e| e.to_string())?.insert(
+    lock_unpoisoned(&state.0).insert(
         id.clone(),
-        Arc::new(Mutex::new(PtySession { master, writer: Arc::new(Mutex::new(writer)), child, input_pending: input_pending.clone() })),
+        Arc::new(Mutex::new(PtySession {
+            master,
+            writer: Arc::new(Mutex::new(writer)),
+            child,
+            input_pending: input_pending.clone(),
+            closed: closed.clone(),
+        })),
     );
 
     let tid = id.clone();
+    let closed_flag = closed;
     std::thread::spawn(move || {
         // 阻塞 read 放独立线程；主循环用 recv_timeout 实现「空闲超时冲刷」。
         // 否则最后一段输出（如 cmd/PowerShell 的提示符）会卡在 pending 里，
@@ -519,6 +673,17 @@ pub async fn pty_spawn(
         let mut batch = super::output_batch::OutputBatchWindow::new(std::time::Instant::now());
         let mut window = ReaderWindow::new(std::time::Instant::now());
         loop {
+            // The close path removed this session: stop the coordinator even though a
+            // detached descendant may keep the reader handle open indefinitely.
+            if closed_flag.load(Ordering::Acquire) {
+                if let Some(line) = window.finish(std::time::Instant::now(), &tid) {
+                    debug::write("pty-io", line);
+                }
+                if debug::enabled() {
+                    debug::write("reader-end", format!("id={} reason=closed", tid));
+                }
+                break;
+            }
             match rx.recv_timeout(batch.wait_timeout(std::time::Instant::now())) {
                 Ok(ReadMsg::Data(bytes)) => {
                     let now = std::time::Instant::now();
@@ -592,10 +757,12 @@ pub async fn pty_spawn(
                     if let Some(line) = window.idle(now, &tid) {
                         debug::write("read-idle", line);
                     }
-                    // A retained console handle can keep its reader open after the child exits.
-                    let session = app.state::<PtyState>().0.lock().ok().and_then(|all| all.get(&tid).cloned());
-                    if session.as_ref().is_some_and(session_has_exited) {
-                        if debug::enabled() { debug::write("reader-end", format!("id={} reason=child-exit", tid)); }
+                    // A retained console handle can keep its reader open after the child exits,
+                    // and a session removed elsewhere means this coordinator is the last owner.
+                    let session = lock_unpoisoned(&app.state::<PtyState>().0).get(&tid).cloned();
+                    if session.is_none() || session.as_ref().is_some_and(session_has_exited) {
+                        let reason = if session.is_none() { "closed" } else { "child-exit" };
+                        if debug::enabled() { debug::write("reader-end", format!("id={} reason={}", tid, reason)); }
                         let code = reap_session(&app, &tid);
                         let _ = app.emit("pty-exit", PtyExit { id: tid.clone(), code });
                         break;
@@ -648,8 +815,9 @@ fn flush_output(
     let events = std::mem::take(pending);
     *pending_bytes = 0;
     if app.emit("pty-output", PtyOutput { id: id.to_string(), events }).is_err() {
-        // 窗口已关闭：清掉 session，避免残留
-        reap_session(app, id);
+        // The window is gone: a session that can no longer reach any listener must be
+        // terminated, not left running behind an id nobody owns.
+        close_session_by_id(app, id);
     }
     Some(stats)
 }
@@ -667,7 +835,7 @@ pub async fn pty_write(state: State<'_, PtyState>, id: String, data: String) -> 
     // 只从全局表取 Arc 句柄，不持锁做 IO——写 PTY 可能因前台进程不读 stdin 而阻塞，
     // 若持全局锁会冻结其它会话的 resize/signal/close。
     let session = {
-        let sessions = state.0.lock().map_err(|e| e.to_string())?;
+        let sessions = lock_unpoisoned(&state.0);
         sessions.get(&id).cloned().ok_or("session not found")?
     };
     // Blocking IO: run it on a blocking thread, and take only the writer lock.
@@ -693,11 +861,11 @@ pub async fn pty_write(state: State<'_, PtyState>, id: String, data: String) -> 
 /// button included, so force-quitting the app becomes the only way out.
 fn write_session(session: &Arc<Mutex<PtySession>>, data: &[u8]) -> Result<(), String> {
     let (writer, input_pending) = {
-        let state = session.lock().map_err(|e| e.to_string())?;
+        let state = lock_unpoisoned(session);
         (state.writer.clone(), state.input_pending.clone())
     };
     input_pending.store(true, Ordering::Release);
-    let mut writer = writer.lock().map_err(|e| e.to_string())?;
+    let mut writer = lock_unpoisoned(&writer);
     writer.write_all(data).and_then(|()| writer.flush()).map_err(|e| e.to_string())
 }
 
@@ -713,7 +881,7 @@ pub async fn pty_resize(state: State<'_, PtyState>, id: String, cols: u16, rows:
         debug::write("resize", format!("id={} cols={} rows={}", id, cols, rows));
     }
     let session = {
-        let sessions = state.0.lock().map_err(|e| e.to_string())?;
+        let sessions = lock_unpoisoned(&state.0);
         sessions.get(&id).cloned().ok_or("session not found")?
     };
     // Resizing the pseudo console can block on its own: run it on a blocking thread so the
@@ -726,7 +894,7 @@ pub async fn pty_resize(state: State<'_, PtyState>, id: String, cols: u16, rows:
 /// Resize a session's PTY. It takes only the session lock and never touches the writer, so a
 /// stuck write cannot delay it.
 fn resize_session(session: &Arc<Mutex<PtySession>>, cols: u16, rows: u16) -> Result<(), String> {
-    let state = session.lock().map_err(|e| e.to_string())?;
+    let state = lock_unpoisoned(session);
     state
         .master
         .resize(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
@@ -735,53 +903,79 @@ fn resize_session(session: &Arc<Mutex<PtySession>>, cols: u16, rows: u16) -> Res
 
 #[tauri::command]
 pub async fn pty_close(state: State<'_, PtyState>, kill: State<'_, KillState>, id: String) -> Result<(), String> {
-    let session = {
-        let mut sessions = state.0.lock().map_err(|e| e.to_string())?;
-        sessions.remove(&id)
-    };
-    // After removing it from the table we hold the only Arc: the kill must be followed by wait
-    // to reap the child, otherwise it stays a zombie. On Windows the whole process tree is
-    // terminated as well, so a foreground app does not keep running as an orphan.
-    // Kill and wait are blocking: run them on a blocking thread, never on the main thread.
-    tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
-        if let Some(session) = session {
-            let mut s = session.lock().map_err(|e| e.to_string())?;
-            kill_child_tree(&mut *s.child);
-            let _ = s.child.wait();
-        }
-        Ok(())
-    })
-    .await
-    .map_err(|e| e.to_string())??;
-    // 同步清理「结束升级」状态，避免长时间使用后无限增长
-    if let Ok(mut attempts) = kill.0.lock() {
-        attempts.remove(&id);
+    // Keep the session in the table until it is really closed: a failure before the
+    // kill must leave a reachable handle, not an unreachable running child.
+    let session = lock_unpoisoned(&state.0).get(&id).cloned();
+    // Killing, waiting and the escalation all block: run them on a blocking thread,
+    // never on the main thread. `close_session` also terminates the process tree on
+    // Windows and signals the foreground group on Unix.
+    if let Some(session) = session {
+        tauri::async_runtime::spawn_blocking(move || {
+            close_session(&session, std::time::Instant::now() + CLOSE_DEADLINE);
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+        lock_unpoisoned(&state.0).remove(&id);
     }
+    // 同步清理「结束升级」状态，避免长时间使用后无限增长
+    lock_unpoisoned(&kill.0).remove(&id);
     Ok(())
 }
 
-/// 会话退出后的收敛：从状态表移除并 wait 回收子进程，释放 master/writer fd。
-/// 由读线程在读到 EOF 或出错时调用。
+/// Close every session at once. The page-load hook and the frontend startup call
+/// this so a reload cannot leave the previous page's PTYs running invisibly.
+#[tauri::command]
+pub async fn pty_close_all(state: State<'_, PtyState>, kill: State<'_, KillState>) -> Result<usize, String> {
+    let sessions: Vec<Arc<Mutex<PtySession>>> = {
+        let mut map = lock_unpoisoned(&state.0);
+        map.drain().map(|(_, session)| session).collect()
+    };
+    let count = sessions.len();
+    if !sessions.is_empty() {
+        tauri::async_runtime::spawn_blocking(move || {
+            close_sessions(sessions, std::time::Instant::now() + CLOSE_ALL_DEADLINE);
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+    }
+    lock_unpoisoned(&kill.0).clear();
+    Ok(count)
+}
+
+/// Tauri page lifecycle hook: reloading the main webview keeps this process alive,
+/// so the sessions of the page that is going away have to be terminated here.
+pub fn lifecycle_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
+    tauri::plugin::Builder::<R>::new("terminal-lifecycle")
+        .on_page_load(|webview, payload| {
+            if webview.label() != "main" || payload.event() != tauri::webview::PageLoadEvent::Started {
+                return;
+            }
+            debug::write("page-load", format!("label={} event=started", webview.label()));
+            close_all_sessions(webview.app_handle());
+        })
+        .build()
+}
+
+/// 会话退出后的收敛：从状态表移除并回收子进程，释放 master/writer fd。
+/// 由读线程在读到 EOF 或出错时调用；等待有上限，避免残留句柄把关闭顶死。
 /// Returns the child exit code so the session can tell a clean exit from a dropped connection.
 fn reap_session(app: &AppHandle, id: &str) -> Option<i32> {
-    let session = app
-        .state::<PtyState>()
-        .0
-        .lock()
-        .ok()
-        .and_then(|mut m| m.remove(id));
+    let session = lock_unpoisoned(&app.state::<PtyState>().0).remove(id);
     let mut code = None;
     if let Some(session) = session {
-        if let Ok(mut s) = session.lock() {
-            if let Ok(status) = s.child.wait() {
-                code = Some(status.exit_code() as i32);
-            }
+        let mut state = lock_unpoisoned(&session);
+        state.closed.store(true, Ordering::Release);
+        code = wait_child_bounded(&mut *state.child, REAP_TIMEOUT);
+        if code.is_none() {
+            // The child is gone from the table but not reaped: force it so no zombie
+            // or stopped process keeps the session alive.
+            force_kill_foreground(&state);
+            force_kill_child(&mut *state.child);
+            let _ = wait_child_bounded(&mut *state.child, CLOSE_ALL_DEADLINE);
         }
     }
     // 同步清理该会话的「结束升级」状态，避免长时间使用后无限增长
-    if let Ok(mut kill) = app.state::<KillState>().0.lock() {
-        kill.remove(id);
-    }
+    lock_unpoisoned(&app.state::<KillState>().0).remove(id);
     code
 }
 
@@ -816,10 +1010,18 @@ fn signal_fg_process_group(
 
 /// 结束子进程；Windows 上只 TerminateProcess 根 shell 会留下孤儿前台应用，
 /// 因此先按进程树整棵终结，再补一发 child.kill() 兜底（根进程已在树内，幂等）。
+/// Unix 上 SIGHUP 之后补 SIGTERM：忽略挂断信号的 shell 仍能被终止。
 fn kill_child_tree(child: &mut dyn Child) {
     #[cfg(windows)]
     if let Some(pid) = child.process_id() {
         let _ = terminate_process_tree(pid, true);
+    }
+    #[cfg(unix)]
+    if let Some(pid) = child.process_id() {
+        unsafe {
+            libc::kill(pid as i32, libc::SIGHUP);
+            libc::kill(pid as i32, libc::SIGTERM);
+        }
     }
     let _ = child.kill();
 }
@@ -927,13 +1129,13 @@ pub async fn pty_kill_foreground(
     id: String,
 ) -> Result<String, String> {
     let session = {
-        let sessions = state.0.lock().map_err(|e| e.to_string())?;
+        let sessions = lock_unpoisoned(&state.0);
         sessions.get(&id).cloned().ok_or("session not found")?
     };
 
     let now = std::time::Instant::now();
     let escalate = {
-        let mut attempts = kill.0.lock().map_err(|e| e.to_string())?;
+        let mut attempts = lock_unpoisoned(&kill.0);
         let esc = should_escalate(attempts.get(&id).map(|t| now.duration_since(*t)));
         attempts.insert(id, now);
         esc
@@ -943,7 +1145,7 @@ pub async fn pty_kill_foreground(
     // blocking thread so the main thread (the UI) never waits - otherwise the stop button itself
     // wedges and force-quitting the app becomes the only way out.
     tauri::async_runtime::spawn_blocking(move || {
-        let mut session = session.lock().map_err(|e| e.to_string())?;
+        let mut session = lock_unpoisoned(&session);
         kill_foreground_impl(&mut session, escalate)
     })
     .await
@@ -1207,6 +1409,54 @@ mod tests {
         assert!(out.contains("spawn-pty-ok"), "no echo, got: {out:?}");
     }
 
+    /// Closing must terminate and reap the child even though the close path keeps the
+    /// session reachable until the kill happened, and it must flag the session as closed.
+    #[test]
+    fn close_session_terminates_and_reaps_child() {
+        let (_id, master, reader, writer, child) =
+            spawn_pty(80, 24, None, None, None, None).expect("spawn_pty");
+        let closed = Arc::new(AtomicBool::new(false));
+        let session = Arc::new(Mutex::new(PtySession {
+            master,
+            writer: Arc::new(Mutex::new(writer)),
+            child,
+            input_pending: Arc::new(AtomicBool::new(false)),
+            closed: closed.clone(),
+        }));
+        drop(reader);
+        close_session(&session, std::time::Instant::now() + std::time::Duration::from_secs(5));
+        assert!(closed.load(Ordering::Acquire), "close_session must mark the session closed");
+        let mut state = lock_unpoisoned(&session);
+        assert!(state.child.try_wait().ok().flatten().is_some(), "child must be reaped after close");
+    }
+
+    /// The process-wide sweep must terminate every session in the batch.
+    #[test]
+    fn close_sessions_terminates_every_child() {
+        let mut sessions = Vec::new();
+        let mut refs = Vec::new();
+        for _ in 0..2 {
+            let (_id, master, reader, writer, child) =
+                spawn_pty(80, 24, None, None, None, None).expect("spawn_pty");
+            drop(reader);
+            let session = Arc::new(Mutex::new(PtySession {
+                master,
+                writer: Arc::new(Mutex::new(writer)),
+                child,
+                input_pending: Arc::new(AtomicBool::new(false)),
+                closed: Arc::new(AtomicBool::new(false)),
+            }));
+            refs.push(session.clone());
+            sessions.push(session);
+        }
+        close_sessions(sessions, std::time::Instant::now() + std::time::Duration::from_secs(5));
+        for session in &refs {
+            let mut state = lock_unpoisoned(session);
+            assert!(state.closed.load(Ordering::Acquire), "sweep must flag the session closed");
+            assert!(state.child.try_wait().ok().flatten().is_some(), "every child must be reaped");
+        }
+    }
+
     /// With no UTF-8 locale in the test process (the GUI-launch situation), the spawned shell must
     /// really receive the injected UTF-8 LC_CTYPE.
     #[cfg(unix)]
@@ -1274,6 +1524,7 @@ mod tests {
             writer: Arc::new(Mutex::new(writer)),
             child,
             input_pending: Arc::new(AtomicBool::new(false)),
+            closed: Arc::new(AtomicBool::new(false)),
         }));
 
         // 8 MiB into a process that never reads stdin: `write_all` blocks once the pipe fills up.
@@ -1523,7 +1774,7 @@ mod cmd_interaction_tests {
         command.args(["/d", "/c", "exit", "7"]);
         let child = pair.slave.spawn_command(command).unwrap();
         let writer = pair.master.take_writer().unwrap();
-        let session = Arc::new(Mutex::new(PtySession { master: pair.master, writer: Arc::new(Mutex::new(writer)), child, input_pending: Arc::new(AtomicBool::new(false)) }));
+        let session = Arc::new(Mutex::new(PtySession { master: pair.master, writer: Arc::new(Mutex::new(writer)), child, input_pending: Arc::new(AtomicBool::new(false)), closed: Arc::new(AtomicBool::new(false)) }));
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
         while !session_has_exited(&session) && std::time::Instant::now() < deadline {
             std::thread::sleep(std::time::Duration::from_millis(20));

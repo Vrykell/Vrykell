@@ -264,7 +264,7 @@ zustand，按域拆分（`src/features/*/stores/`）：
 
 | 目录/文件 | 职责 |
 |------|------|
-| `terminal/pty.rs` | `portable-pty` 会话生命周期，命令注册 `pty_spawn/write/resize/close`，事件 `pty-output`/`pty-exit`（含 StreamDecoder + scan.rs 接线；GUI 启动 TERM/COLORTERM 为空时补 `xterm-256color` + truecolor） |
+| `terminal/pty.rs` | `portable-pty` 会话生命周期，命令注册 `pty_spawn/write/resize/close`，页面重载或应用退出时由 `pty_close_all` 与 `on_page_load` 钩子统一收敛会话；事件 `pty-output`/`pty-exit`（含 StreamDecoder + scan.rs 接线；GUI 启动 TERM/COLORTERM 为空时补 `xterm-256color` + truecolor） |
 | `terminal/scan.rs` | Rust StreamScanner（字节流同步扫描，见 §5.1） |
 | `terminal/shell_integration.rs` | zsh（ZDOTDIR）/ bash（--rcfile）/ PowerShell 注入 OSC 133/7 的 shell integration 脚本 |
 | `terminal/shells.rs` | shell 类型探测与 list_shells |
