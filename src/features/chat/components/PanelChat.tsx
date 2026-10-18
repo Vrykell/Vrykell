@@ -8,7 +8,8 @@ import { IconButton } from '@ui/IconButton';
 import { ArrowDown, ArrowUp, History, Plus, SlidersHorizontal, Sparkles, Square, Zap } from '@ui/icons';
 import { useAttachmentComposer } from '@features/agent';
 import { useSessionStore } from '@features/workspace';
-import { leaves } from '@features/workspace/model/windowLayout';
+import { leaves, type TerminalSpec } from '@features/workspace/model/windowLayout';
+import NewTabModal from '@features/workspace/components/NewTabModal';
 import { useTerminalStore } from '@features/terminal';
 import { useChatStore, type ChatMessage } from '../stores/chat';
 import { EMPTY_COMPOSER_DRAFT, useComposerDrafts } from '../stores/composerDrafts';
@@ -23,6 +24,7 @@ import { useChatComposer } from '../hooks/useChatComposer';
 import { environmentForPane, showExecutionTerminal } from '../services/conversationContext';
 import { useIconColorStore } from '@config/iconColors';
 import { firstTerminalOf, isSessionTab, tabIconColor } from '@features/workspace';
+import type { ShellType } from '@platform/shells';
 import type { AttachmentMeta } from '@features/agent/model/attachments';
 
 const EMPTY_MESSAGES: ChatMessage[] = [];
@@ -57,6 +59,7 @@ export default function PanelChat() {
   const iconColors = useIconColorStore(state => state.colors);
   const terminalCwds = useSessionStore(state => state.terminalCwds);
   const [renaming, setRenaming] = useState(false);
+  const [newTabOpen, setNewTabOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsTrigger = useRef<HTMLButtonElement>(null);
@@ -104,9 +107,13 @@ export default function PanelChat() {
       ...available,
     ];
   }, [tabs, sessions, startupStates, terminalCwds, environment, iconColors]);
-  /** The picker's own shortcut: a fresh terminal tab bound to this conversation. */
-  const createTerminalTab = () => {
-    const tabId = useSessionStore.getState().addTab({ kind: 'local' });
+  /** Create the terminal the new-tab panel returned and bind this conversation to it. */
+  const createTerminalTab = (spec: TerminalSpec) => {
+    const store = useSessionStore.getState();
+    const tabId = spec.kind === 'ssh' && spec.ssh
+      ? store.addTab({ kind: 'ssh', ssh: spec.ssh })
+      // The panel only ever returns a real shell id here; TerminalSpec keeps the field loose.
+      : store.addTab({ shellType: spec.shellType as ShellType | undefined });
     const tab = useSessionStore.getState().tabs.find(item => item.id === tabId);
     const paneId = tab && isSessionTab(tab) ? firstTerminalOf(tab)?.id : undefined;
     if (paneId) useChatStore.getState().setEnvironment(activeId, environmentForPane(paneId));
@@ -185,7 +192,7 @@ export default function PanelChat() {
         <Select aria-label={t('Select execution environment')} data-testid="chat-execution-target"
           data-tip-description={environmentOptions.find(option => option.value === (environment?.paneId ?? ''))?.description}
           value={environment?.paneId ?? ''} options={environmentOptions} disabled={!ready || sendingTab === activeId}
-          action={{ label: t('New tab'), onSelect: createTerminalTab }}
+          action={{ label: t('New tab'), onSelect: () => setNewTabOpen(true) }}
           onChange={paneId => useChatStore.getState().setEnvironment(activeId, paneId ? environmentForPane(paneId) : null)} />
       </div>
       <div className="chat-setting-links">
@@ -295,5 +302,6 @@ export default function PanelChat() {
           if (addPastedText(event.clipboardData.getData('text/plain'))) event.preventDefault();
         }} />
     </ChatComposerShell>
+    {newTabOpen && <NewTabModal open onClose={() => setNewTabOpen(false)} onPick={createTerminalTab} />}
   </div>;
 }

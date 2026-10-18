@@ -13,6 +13,10 @@ vi.mock('@platform/api/conversation', () => ({
   listConversationMessages: vi.fn().mockResolvedValue([]), appendConversationMessage: vi.fn().mockResolvedValue(undefined),
   deleteConversation: vi.fn().mockResolvedValue(undefined), deleteConversationMessage: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock('@platform/shells', async importOriginal => ({
+  ...(await importOriginal<typeof import('@platform/shells')>()),
+  getAvailableShells: vi.fn().mockResolvedValue([{ id: 'bash', label: 'Bash', default: true }]),
+}));
 const workspace = useSessionStore.getState();
 const terminal = useTerminalStore.getState();
 const chat = useChatStore.getState();
@@ -141,12 +145,17 @@ it('switches and clears the target through conversation settings without losing 
   expect(input).toHaveValue('Keep this draft');
 });
 
-it('creates a terminal tab from the picker and binds it to the conversation', () => {
+it('opens the new-tab panel from the picker and binds the terminal it creates', async () => {
   render(<PanelChat />);
   openSettings();
   fireEvent.click(screen.getByRole('combobox', { name: '选择执行终端' }));
   fireEvent.click(screen.getByRole('button', { name: '新建标签页' }));
+  // The action opens the panel; the tab exists only after a type is picked there.
   expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  const dialog = screen.getByRole('dialog', { name: '新建标签页' });
+  expect(useSessionStore.getState().tabs).toHaveLength(1);
+  fireEvent.click(await within(dialog).findByTestId('new-tab-option-shell:bash'));
+  expect(screen.queryByRole('dialog', { name: '新建标签页' })).not.toBeInTheDocument();
   const created = useSessionStore.getState().tabs.find(tab => tab.id !== 'chat-tab');
   expect(created).toBeDefined();
   const createdPane = firstTerminalOf(created!)?.id;

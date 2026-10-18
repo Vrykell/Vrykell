@@ -68,7 +68,7 @@ test('the execution environment stays fixed and a closed terminal stays disconne
   await expect(page.getByText('终端已断开，选择终端后可继续执行。')).toBeVisible();
 });
 
-test('the picker creates a terminal tab and binds it to the conversation', async ({ page }) => {
+test('the picker opens the new-tab panel and binds the terminal it creates', async ({ page }) => {
   await boot(page);
   await ensureChatSettingsOpen(page);
   const target = page.getByRole('combobox', { name: '选择执行终端' });
@@ -77,7 +77,8 @@ test('the picker creates a terminal tab and binds it to the conversation', async
   const tabsBefore = await page.locator('[data-tab-kind="session"]').count();
   await target.click();
   await page.locator('.ui-select-menu').getByRole('button', { name: '新建标签页' }).click();
-  // A session tab joined the workspace and the conversation runs in it now.
+  // The panel comes first; picking a type creates the tab and binds it to the conversation.
+  await page.getByRole('button', { name: /Bash/ }).click();
   await expect(page.locator('[data-tab-kind="session"]')).toHaveCount(tabsBefore + 1);
   await expect(target).not.toContainText('仅讨论');
   await expect(page.getByTestId('chat-conversation-context')).toBeVisible();

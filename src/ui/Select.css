@@ -21,8 +21,7 @@
 .ui-select-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Optional swatch for colour options; the value keeps the remaining width. */
 .ui-select-swatch { width: 14px; height: 14px; border-radius: 4px; border: 0; flex-shrink: 0; }
-/* Dropdown rows mark each colour with a dot so the option list reads as a palette. */
-.ui-select-option .ui-select-swatch { border-radius: 50%; }
+/* Dropdown rows share the trigger's rounded-square swatch. */
 .ui-select-chevron { flex-shrink: 0; color: var(--text-muted); transition: transform var(--dur-fast) var(--ease); }
 .ui-select[aria-expanded="true"] .ui-select-chevron { transform: rotate(180deg); }
 .ui-select-menu { position: fixed; z-index: 10000; display: flex; flex-direction: column; padding: 4px; }
@@ -61,7 +60,8 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background var(--dur-fast) var(--ease);
+  transition: color var(--dur-fast) var(--ease);
 }
 .ui-select-action > svg { flex-shrink: 0; color: var(--text-muted); }
-.ui-select-action[data-active="true"] { background: var(--hover); color: var(--text-primary); }
+/* Quiet feedback only: the action never paints a highlight background. */
+.ui-select-action:is(:hover, [data-active="true"]) { color: var(--text-primary); }
