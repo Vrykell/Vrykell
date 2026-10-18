@@ -1,9 +1,9 @@
 /**
  * ProviderDialog — the centred menu behind the provider button.
  *
- * One row per provider (brand mark, name, key dot, a check on the one the page shows) and an
- * add-provider action at its end, so switching and adding live in the same place instead of a
- * form control on the page.
+ * One row per provider (a neutral tile with the brand mark, the name, the key dot and a check on
+ * the one the page shows) and an add-provider row of the same shape at its end, so switching and
+ * adding live in one place instead of a form control on the page.
  */
 import { t } from '@i18n';
 import { OutlineButton } from '@ui/OutlineButton';
@@ -47,7 +47,7 @@ export default function ProviderDialog({ open, rows, selectedId, flags, onSelect
                 onClose();
               }}
             >
-              <span style={{ display: 'inline-flex', color: modelHue(row.kind, '', row.baseUrl) }}>
+              <span className="provider-option-mark" style={{ color: modelHue(row.kind, '', row.baseUrl) }}>
                 <Mark size={18} aria-hidden="true" />
               </span>
               <span className="provider-option-name">{row.name || providerLabel(row.kind)}</span>
@@ -56,22 +56,23 @@ export default function ProviderDialog({ open, rows, selectedId, flags, onSelect
                 data-empty={providerHasKey(row.id, flags) ? undefined : 'true'}
                 aria-hidden="true"
               />
-              {selected && <Check size={14} aria-hidden="true" style={{ color: 'var(--text-muted)' }} />}
+              {selected && <Check size={14} aria-hidden="true" style={{ color: 'var(--text-primary)' }} />}
             </button>
           );
         })}
+        <button
+          type="button"
+          className="provider-option-row provider-option-add"
+          data-testid="provider-dialog-add"
+          onClick={() => {
+            onClose();
+            onAddProvider();
+          }}
+        >
+          <span className="provider-option-mark"><Plus size={14} aria-hidden="true" /></span>
+          <span className="provider-option-name">{t('Add provider')}</span>
+        </button>
       </div>
-      <OutlineButton
-        data-subtle
-        data-testid="provider-dialog-add"
-        onClick={() => {
-          onClose();
-          onAddProvider();
-        }}
-        style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-      >
-        <Plus size={12} /> {t('Add provider')}
-      </OutlineButton>
     </SettingsDialog>
   );
 }

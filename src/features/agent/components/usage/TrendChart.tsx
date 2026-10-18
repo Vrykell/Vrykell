@@ -106,7 +106,7 @@ export default function TrendChart({ buckets, unit, rangeLabel }: {
               onClick={() => setMetric(option)}
               style={{
                 padding: '3px 10px', border: 0, borderRadius: 'var(--radius-inner)',
-                background: metric === option ? 'color-mix(in srgb, var(--primary-action) 60%, transparent)' : 'transparent',
+                background: metric === option ? 'var(--surface)' : 'transparent',
                 color: metric === option ? 'var(--text-primary)' : 'var(--text-secondary)',
                 font: `${'var(--fs-caption)'} var(--font-ui)`, cursor: 'pointer',
                 transition: 'background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease)',

@@ -9,7 +9,7 @@ import { useMemo, useRef, useState } from 'react';
 import { IconButton } from '@ui/IconButton';
 import ContextMenu from '@ui/ContextMenu';
 import ConfirmDialog from '@ui/ConfirmDialog';
-import { ChevronDown, Ellipsis } from '@ui/icons';
+import { Ellipsis } from '@ui/icons';
 import { t } from '@i18n';
 import { selectProvider, useAiConfigStore, type ModelProfile } from '@features/agent';
 import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
@@ -124,7 +124,6 @@ export function AiModelPage() {
                   data-empty={providerHasKey(selected.id, aiCfg) ? undefined : 'true'}
                   aria-hidden="true"
                 />
-                <ChevronDown size={12} aria-hidden="true" style={{ color: 'var(--text-muted)' }} />
               </button>
               {/* Actions on the selected provider. */}
               <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
