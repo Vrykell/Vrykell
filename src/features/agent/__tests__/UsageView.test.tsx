@@ -263,6 +263,28 @@ describe('UsageView', () => {
     expect(screen.getByTestId('usage-record-count')).toBeInTheDocument();
   });
 
+  it('lists each ACP server in its own tab of the records card', () => {
+    seedSonnetTurn();
+    const usage = useUsageStore.getState();
+    usage.acpUsage('Claude Code', { used: 12_000, size: 200_000, cost: 0.0042, currency: 'USD' });
+    usage.acpTurn('Claude Code');
+    usage.acpToolCall('Claude Code');
+    render(<UsageView />);
+
+    // ACP 不再是独立卡片：没有页签外的行，切到 ACP 页签才看到
+    expect(screen.queryByTestId('usage-acp-row')).toBeNull();
+    fireEvent.click(screen.getByTestId('usage-tab-acp'));
+
+    const row = screen.getByTestId('usage-acp-row');
+    expect(row).toHaveAttribute('data-source', 'Claude Code');
+    expect(row).toHaveTextContent('Claude Code');
+    const cells = within(row).getAllByRole('cell');
+    expect(cells[1]).toHaveTextContent('1');
+    expect(cells[2]).toHaveTextContent('1');
+    expect(cells[3]).toHaveTextContent('1.2万/20万');
+    expect(cells[4]).toHaveTextContent('0.0042 USD');
+  });
+
   it('clears the records and confirms it', () => {
     seedSonnetTurn();
     render(<UsageView />);

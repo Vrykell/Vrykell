@@ -147,10 +147,14 @@ test.describe('usage statistics page', () => {
     await expect(page.getByTestId('usage-range')).toHaveCount(0);
     await expect(page.getByTestId('usage-record-count')).toHaveCount(0);
 
-    // 回到全部来源：token 视图回来，ACP 区块以汇总行出现
+    // 回到全部来源：token 视图回来，ACP 在记录卡片里占一个页签（不再是独立卡片）
     await page.getByTestId('usage-source-all').click();
     await expect(page.getByTestId('usage-metrics')).toBeVisible();
-    await expect(page.getByTestId('usage-acp')).toContainText('Fake ACP');
-    await expect(page.getByTestId('usage-acp')).toContainText('1 轮 · 1 次工具调用');
+    await expect(page.getByTestId('usage-acp-row')).toHaveCount(0);
+    await page.getByTestId('usage-tab-acp').click();
+    const acpRow = page.getByTestId('usage-acp-row');
+    await expect(acpRow).toHaveAttribute('data-source', 'Fake ACP');
+    await expect(acpRow).toContainText('1.2万/20万');
+    await expect(acpRow).toContainText('0.0042 USD');
   });
 });
