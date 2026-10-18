@@ -2,14 +2,14 @@ import { useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '@i18n';
 import { IconBtn } from './UiBtn';
-import { TextButton } from './TextButton';
+import { OutlineButton } from './OutlineButton';
 import { X, iconSizes } from './icons';
 import { useDialogKeyboard } from './useDialogKeyboard';
 
 /**
  * Centered tools share a backdrop, bounded content and focus management.
  * `closePlacement` keeps one close action: the heading icon by default, or a
- * labeled footer button for informational panels.
+ * labeled action in the right-aligned footer for informational panels.
  */
 export default function ToolDialog({ label, children, onClose, onSubmit, initialFocus, busy = false, width = 440, closePlacement = 'heading' }: {
   label: string; children: ReactNode; onClose: () => void; onSubmit?: () => void;
@@ -25,7 +25,7 @@ export default function ToolDialog({ label, children, onClose, onSubmit, initial
       </div>
       <div className="tool-dialog-body scroll-region">{children}</div>
       {closePlacement === 'footer' && <footer className="tool-dialog-footer">
-        <TextButton disabled={busy} onClick={onClose}>{t('Close')}</TextButton>
+        <OutlineButton disabled={busy} onClick={onClose}>{t('Close')}</OutlineButton>
       </footer>}
     </div>
   </div>, document.body);
