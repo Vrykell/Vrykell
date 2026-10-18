@@ -51,6 +51,11 @@ ssh2 = { version = "0.9", features = ["vendored-openssl"] }
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
+[dev-dependencies]
+# `test-util` brings the paused clock, so a test can prove that a turn lasting minutes is waited
+# for instead of being cut off at a request budget.
+tokio = { version = "1", features = ["test-util"] }
+
 [target.'cfg(windows)'.dependencies]
 # DPAPI for the local secret store: only the current user can unseal the values.
 windows-sys = { version = "0.60", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }

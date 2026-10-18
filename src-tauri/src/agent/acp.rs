@@ -28,12 +28,18 @@ use tokio::sync::{mpsc, oneshot};
 /// Protocol major version this client speaks.
 pub const PROTOCOL_VERSION: u64 = 1;
 
-/// How long a request may take before the caller is told it will never finish.
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
-
 /// The first request of a connection also pays for the program's start-up — and for `npx` presets,
 /// a one-time package download — so it gets a much longer budget than the rest.
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(180);
+
+/// Creating a session may load the agent's own configuration; the handshake already paid for the
+/// program's start-up, so this only has to be generous.
+const SESSION_TIMEOUT: Duration = Duration::from_secs(120);
+
+/// A turn stays open until the agent stops it: real turns run for minutes (thinking, tool calls)
+/// and the stop button — not a clock — is what ends one early. The budget is a safety net for an
+/// agent that never answers at all.
+const TURN_TIMEOUT: Duration = Duration::from_secs(60 * 60);
 
 /// A readable line from a JSON-RPC error: the message it carries, which is what a user can act on.
 /// Agents put their own error objects under `data`, so the raw value is only the last resort.
@@ -306,13 +312,10 @@ impl AcpClient {
         self.out.send(line).map_err(|_| "the harness connection is closed".to_string())
     }
 
-    /// A request that waits for its own answer, bounded by [`REQUEST_TIMEOUT`].
-    pub async fn request(&self, method: &str, params: Value) -> Result<Value, String> {
-        self.request_with_timeout(method, params, REQUEST_TIMEOUT).await
-    }
-
-    /// The same, with an explicit budget: the handshake pays for the program's start-up.
-    pub async fn request_with_timeout(&self, method: &str, params: Value, budget: Duration) -> Result<Value, String> {
+    /// A request that waits for its own answer. Every caller names its budget: how long an answer
+    /// takes differs by method, and a budget shorter than the work turns a slow turn into a
+    /// failure the user cannot explain.
+    pub async fn request(&self, method: &str, params: Value, budget: Duration) -> Result<Value, String> {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let (tx, rx) = oneshot::channel();
         {
@@ -345,7 +348,7 @@ impl AcpClient {
 
     /// Negotiate versions and capabilities. The result carries what the agent can do.
     pub async fn initialize(&self, client_name: &str, client_version: &str) -> Result<Value, String> {
-        self.request_with_timeout(
+        self.request(
             "initialize",
             json!({
                 "protocolVersion": PROTOCOL_VERSION,
@@ -359,7 +362,9 @@ impl AcpClient {
 
     /// Create a session in a working directory and answer with its id.
     pub async fn new_session(&self, cwd: &str) -> Result<String, String> {
-        let result = self.request("session/new", json!({ "cwd": cwd, "mcpServers": [] })).await?;
+        let result = self
+            .request("session/new", json!({ "cwd": cwd, "mcpServers": [] }), SESSION_TIMEOUT)
+            .await?;
         result
             .get("sessionId")
             .and_then(Value::as_str)
@@ -370,7 +375,11 @@ impl AcpClient {
     /// Send a prompt and wait for the stop reason; the turn's content arrives as notifications.
     pub async fn prompt(&self, session_id: &str, prompt: Value) -> Result<String, String> {
         let result = self
-            .request("session/prompt", json!({ "sessionId": session_id, "prompt": prompt }))
+            .request(
+                "session/prompt",
+                json!({ "sessionId": session_id, "prompt": prompt }),
+                TURN_TIMEOUT,
+            )
             .await?;
         Ok(result
             .get("stopReason")
@@ -967,6 +976,67 @@ mod tests {
             "an unsupported request must be refused, not ignored"
         );
         drop(client);
+    }
+
+    /// One newline-delimited message from the agent side of the pipe; `None` once it closes.
+    async fn read_line(pipe: &mut tokio::io::DuplexStream) -> Option<Value> {
+        let mut line = String::new();
+        let mut byte = [0u8; 1];
+        loop {
+            match pipe.read(&mut byte).await {
+                Ok(0) | Err(_) => return None,
+                Ok(_) => {
+                    if byte[0] == b'\n' {
+                        break;
+                    }
+                    line.push(byte[0] as char);
+                }
+            }
+        }
+        serde_json::from_str::<Value>(&line).ok()
+    }
+
+    /// An agent that answers the handshake and the session at once but takes `turn` before it
+    /// answers the prompt — a model that thinks and calls tools, in other words.
+    async fn slow_agent(mut pipe: tokio::io::DuplexStream, turn: Duration) {
+        while let Some(message) = read_line(&mut pipe).await {
+            let id = message.get("id").cloned();
+            match message.get("method").and_then(Value::as_str).unwrap_or("") {
+                "initialize" => {
+                    let reply = json!({ "jsonrpc": "2.0", "id": id, "result": { "protocolVersion": 1 } });
+                    let _ = pipe.write_all(format!("{reply}\n").as_bytes()).await;
+                }
+                "session/new" => {
+                    let reply = json!({ "jsonrpc": "2.0", "id": id, "result": { "sessionId": "sess_1" } });
+                    let _ = pipe.write_all(format!("{reply}\n").as_bytes()).await;
+                }
+                "session/prompt" => {
+                    tokio::time::sleep(turn).await;
+                    let reply = json!({ "jsonrpc": "2.0", "id": id, "result": { "stopReason": "end_turn" } });
+                    let _ = pipe.write_all(format!("{reply}\n").as_bytes()).await;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn waits_out_a_turn_that_runs_longer_than_a_request_budget() {
+        // Real turns run for minutes: with the clock paused, this agent takes 45 s to answer the
+        // prompt, and the client must still be waiting rather than reporting a timeout.
+        let (ours, theirs) = tokio::io::duplex(8192);
+        let (read, write) = tokio::io::split(ours);
+        let client = AcpClient::over(read, write, Arc::new(|_| None));
+        let agent = tokio::spawn(slow_agent(theirs, Duration::from_secs(45)));
+
+        client.initialize("vrykell", "0.1.0").await.expect("handshake");
+        let session = client.new_session("/tmp/project").await.expect("session");
+        let stop = client
+            .prompt(&session, json!([{ "type": "text", "text": "hi" }]))
+            .await
+            .expect("a slow turn is still a turn");
+        assert_eq!(stop, "end_turn");
+        agent.abort();
     }
 
     #[tokio::test]
