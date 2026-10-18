@@ -23,11 +23,21 @@ import RemoteFiles from '@features/ssh/components/RemoteFiles';
 import { useSessionStore } from '@features/workspace';
 import { useTerminalStore } from '@features/terminal';
 import { leaf } from '@features/workspace/model/windowLayout';
+import { useEditorPreferences } from '@config/editor';
 
 const conn = { id: 'ssh-1', name: 'server', host: 'server', user: 'test', authMethod: 'key' as const, password: '' };
 const sshPane = (id: string, connectionId = 'ssh-1') => leaf({ id, kind: 'ssh', ssh: { name: 'server', host: 'server', connectionId } });
 
+it('opens remote text with the built-in editor when selected', () => {
+  useEditorPreferences.setState({ remoteOpenMode: 'editor' });
+  const open = vi.spyOn(useSessionStore.getState(), 'openEditorFile').mockReturnValue('editor');
+  render(<RemoteFiles conn={conn} />); fireEvent.click(screen.getByRole('button', { name: 'Open remote file' }));
+  expect(open).toHaveBeenCalledWith({ path: '/home/test/config.txt', connectionId: conn.id });
+  expect(mocks.write).not.toHaveBeenCalled();
+});
+
 beforeEach(() => {
+  useEditorPreferences.setState({ remoteOpenMode: 'terminal' });
   vi.clearAllMocks();
   mocks.write.mockResolvedValue(undefined);
   mocks.upload.mockResolvedValue(undefined);

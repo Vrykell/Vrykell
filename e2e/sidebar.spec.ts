@@ -80,15 +80,15 @@ test.describe('文件面板', () => {
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/Documents');
   });
 
-  test('路径栏输入文件路径用系统默认应用打开，目录路径仍然导航', async ({ page }) => {
+  test('path bar opens files in the embedded editor and keeps directory navigation', async ({ page }) => {
     const tree = page.getByTestId('local-file-tree');
     const bar = page.getByTestId('crumb-bar');
     await bar.locator('[data-tip="单击编辑路径，回车跳转"]').click();
     await page.getByTestId('path-input').fill('/home/e2e/notes.txt');
     await page.getByTestId('path-input').press('Enter');
 
-    // The system app receives the file path; the panel keeps its view and shows no read error
-    await expect.poll(() => openedPaths(page)).toContain('/home/e2e/notes.txt');
+    await expect(page.getByTestId('file-editor')).toBeVisible();
+    await expect(page.getByTestId('file-editor').locator('.folder-path')).toContainText('/home/e2e/notes.txt');
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
     await expect(page.getByRole('alert')).toHaveCount(0);
 

@@ -82,7 +82,7 @@ function itemFor(key: FileMenuItemKey, ctx: FileMenuContext): ContextMenuItem | 
     case 'open-tab':
       return single ? { label: '在新标签页中打开', onClick: () => handlers.onOpenTab?.(single) } : null;
     case 'open-editor':
-      return single ? { label: '使用终端编辑器打开', onClick: () => handlers.onOpenEditor?.(single) } : null;
+      return single ? { label: t('Open with preferred editor'), onClick: () => handlers.onOpenEditor?.(single) } : null;
     case 'open-system':
       return single ? { label: '使用系统默认应用打开', onClick: () => handlers.onOpenSystem?.(single) } : null;
     case 'open-with':

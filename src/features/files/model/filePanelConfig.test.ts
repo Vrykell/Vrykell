@@ -35,7 +35,7 @@ describe('filePanelConfig menus', () => {
     expect(local.menus.rowMulti).not.toContain('properties');
     expect(ssh.menus.rowMulti).not.toContain('properties');
 
-    expect(local.pathBarFile).toBe('system-app');
+    expect(local.pathBarFile).toBe('editor');
     expect(ssh.pathBarFile).toBe('editor');
   });
 

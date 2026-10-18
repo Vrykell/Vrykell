@@ -4,6 +4,7 @@ import { emitPtyOutput, fsOps, ptyWrites, setupTauriMock } from './tauri-mock';
 test.beforeEach(async ({ page }) => {
   await setupTauriMock(page);
   await page.addInitScript(() => {
+    localStorage.setItem('vrykell-editor-preferences', JSON.stringify({ state: { localOpenMode: 'terminal' }, version: 0 }));
     const bridge = (window as unknown as {
       __TAURI_INTERNALS__: { invoke: (command: string, args: Record<string, unknown>) => Promise<unknown> };
     }).__TAURI_INTERNALS__;
@@ -38,7 +39,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 for (const method of ['double-click', 'context-menu'] as const) {
-  test(`opening a nested file via ${method} preserves the tree and scroll`, async ({ page }) => {
+  test(`opening a nested file in the preferred terminal via ${method} preserves the tree and scroll`, async ({ page }) => {
     const tree = page.getByTestId('local-file-tree');
     await emitPtyOutput(page, '\x1b]7;file://host/home/e2e/elsewhere\x07');
     await expect(page.locator('.directory-picker-trigger:visible')).toHaveAttribute('data-tip', '/home/e2e/elsewhere');
@@ -56,7 +57,7 @@ for (const method of ['double-click', 'context-menu'] as const) {
     if (method === 'double-click') await file.dblclick();
     else {
       await file.click({ button: 'right' });
-      await page.getByRole('button', { name: '使用终端编辑器打开', exact: true }).click();
+      await page.getByRole('button', { name: '使用首选编辑器打开', exact: true }).click();
     }
     await expect.poll(() => ptyWrites(page)).toContain('vim /home/e2e/project/branch-30/nested-notes.txt\n');
     await expect(page.locator('[data-tab-row-id]').filter({ hasText: 'nested-notes.txt' }).locator('[data-shell-mark="zsh"]')).toHaveCount(1);
