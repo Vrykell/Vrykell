@@ -505,6 +505,8 @@ const zh: Record<string, string> = {
   '{{count}} tool calls': '{{count}} 次工具调用',
   'Context window in use': '上下文窗口占用',
   'Add or connect a server': '添加或连接服务器',
+  'Search servers…': '搜索服务器…',
+  'No matching servers': '没有匹配的服务器',
   "Test connection": "测试连接",
   "No harness configured. Add one to ~/.vrykell/harnesses.json.": "还没有配置 harness：在 ~/.vrykell/harnesses.json 里添加一条（可手改）。",
   "This harness is disabled.": "这个 harness 已停用。",

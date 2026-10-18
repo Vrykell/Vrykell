@@ -14,7 +14,7 @@ test('the sidebar ACP button opens the launcher without crashing the tab bar', a
   await expect(page.getByTestId('tab-acp-btn')).toBeVisible();
   await page.getByTestId('tab-acp-btn').click();
   await expect(page.getByTestId('acp-launcher')).toBeVisible();
-  await page.getByTestId('acp-launcher-close').click();
+  await page.keyboard.press('Escape');
   await expect(page.getByTestId('acp-launcher')).toHaveCount(0);
 });
 

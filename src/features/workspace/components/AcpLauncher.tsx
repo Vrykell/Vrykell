@@ -1,16 +1,16 @@
 /**
- * AcpLauncher — the floating panel behind the sidebar's ACP button.
+ * AcpLauncher — the centred picker behind the sidebar's ACP button.
  *
- * One row per configured server (the agent's own mark, the name, the command line and whether the
- * program is on PATH); picking one opens its session tab. Configuration belongs to the ACP settings
- * page, so this panel only starts what is already configured.
+ * Shaped like the new-tab panel: a title, a search field and a flat list of servers (the agent's
+ * own mark, the name, the command line and whether the program is on PATH). Picking one opens its
+ * session tab; configuration lives on the ACP settings page, so this panel only starts what is
+ * already configured.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { t } from '@i18n';
-import { IconButton } from '@ui/IconButton';
-import { X } from '@ui/icons';
-import { useDialogKeyboard } from '@ui/useDialogKeyboard';
-import HarnessBadge from '@features/agent/components/HarnessBadge';
+import { iconSizes, Search } from '@ui/icons';
+import { TextInput } from '@ui/TextInput';
+import { harnessMark } from '@features/agent/components/HarnessBadge';
 import { useSessionStore } from '@features/workspace';
 import { acpHarnesses } from '@platform/api/acp';
 import { invoke } from '@platform/diagnostics';
@@ -25,11 +25,15 @@ interface LauncherEntry {
 export default function AcpLauncher({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [list, setList] = useState<LauncherEntry[] | null>(null);
   const [installed, setInstalled] = useState<Record<string, boolean>>({});
-  const dialog = useRef<HTMLDivElement>(null);
-  useDialogKeyboard(dialog, open, { onClose });
+  const [query, setQuery] = useState('');
+  const [selected, setSelected] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
+    setQuery('');
+    setSelected(0);
+    requestAnimationFrame(() => inputRef.current?.focus());
     void acpHarnesses()
       .then((entries) => setList(entries.map((entry) => ({
         name: entry.name, command: entry.command, args: entry.args, enabled: entry.enabled,
@@ -48,88 +52,143 @@ export default function AcpLauncher({ open, onClose }: { open: boolean; onClose:
     }
   }, [open, list, installed]);
 
+  const ready = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return (list ?? []).filter((entry) => !needle
+      || `${entry.name} ${entry.command} ${entry.args.join(' ')}`.toLowerCase().includes(needle));
+  }, [list, query]);
+
+  useEffect(() => setSelected(0), [query]);
+
+  const start = (entry: LauncherEntry) => {
+    useSessionStore.getState().openHarnessTab(entry.name);
+    onClose();
+  };
+
+  const handleKey = (event: React.KeyboardEvent) => {
+    if (event.key === 'Escape') onClose();
+    else if (event.key === 'ArrowDown') { event.preventDefault(); setSelected((value) => Math.min(value + 1, ready.length - 1)); }
+    else if (event.key === 'ArrowUp') { event.preventDefault(); setSelected((value) => Math.max(value - 1, 0)); }
+    else if (event.key === 'Enter') {
+      event.preventDefault();
+      const entry = ready[selected];
+      if (entry && entry.enabled && installed[entry.command.trim()] !== false) start(entry);
+    }
+  };
+
   if (!open) return null;
 
   return (
     <div
-      data-testid="acp-launcher"
       style={{
-        position: 'fixed', inset: 0, zIndex: 9997,
+        position: 'fixed', inset: 0, zIndex: 9996,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: 'var(--overlay)', animation: 'overlayIn 0.18s var(--ease)',
       }}
       onClick={onClose}
     >
       <div
-        ref={dialog}
-        tabIndex={-1}
+        data-testid="acp-launcher"
         className="workspace-floating workspace-floating-dialog"
         role="dialog"
         aria-modal="true"
         aria-label={t('ACP')}
-        onClick={(event) => event.stopPropagation()}
         style={{
-          width: 440, maxWidth: 'calc(100vw - 40px)', maxHeight: 'calc(100vh - 80px)', overflowY: 'auto',
-          padding: 14, display: 'flex', flexDirection: 'column', gap: 4,
+          width: 420, maxWidth: 'calc(100vw - 40px)', maxHeight: '70vh',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
           animation: 'modalIn 0.22s var(--ease-out)',
         }}
+        onClick={(event) => event.stopPropagation()}
+        onKeyDown={handleKey}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-          <span style={{ fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)' }}>
-            {t('ACP')}
-          </span>
-          <span style={{ marginLeft: 'auto', display: 'inline-flex' }}>
-            <IconButton compact data-testid="acp-launcher-close" aria-label={t('Close')} data-tip={t('Close')} onClick={onClose}>
-              <X size={14} />
-            </IconButton>
-          </span>
+        <div style={{
+          padding: '12px 16px 4px', fontSize: 'calc(13px * var(--ui-font-scale))',
+          fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)',
+        }}>
+          {t('ACP')}
         </div>
-        {list?.length === 0 && (
-          <span data-testid="acp-launcher-none" style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
-            {t('No harness configured yet. Start from a preset below.')}
-          </span>
-        )}
-        {list?.map((entry) => {
-          const missing = installed[entry.command.trim()] === false;
-          return (
-            <button
-              key={entry.name}
-              type="button"
-              className="acp-row"
-              data-testid={`acp-launcher-${entry.name}`}
-              disabled={!entry.enabled || missing}
-              onClick={() => {
-                useSessionStore.getState().openHarnessTab(entry.name);
-                onClose();
+
+        <div style={{ padding: '8px 16px' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: 'var(--field-bg)', borderRadius: 'var(--radius-inner)', padding: '0 8px', height: 28,
+          }}>
+            <Search size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+            <TextInput
+              ref={inputRef}
+              value={query}
+              data-testid="acp-launcher-search"
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t('Search servers…')}
+              style={{
+                flex: 1, background: 'transparent', border: 'none', outline: 'none',
+                fontSize: 'calc(13px * var(--ui-font-scale))', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
               }}
-            >
-              <HarnessBadge name={entry.name} size={26} />
-              <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+            />
+          </div>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '4px 8px 10px' }}>
+          {ready.length === 0 ? (
+            <div data-testid="acp-launcher-none" style={{
+              padding: 20, textAlign: 'center', color: 'var(--text-muted)',
+              fontSize: 'calc(12px * var(--ui-font-scale))',
+            }}>
+              {t('No matching servers')}
+            </div>
+          ) : ready.map((entry, index) => {
+            const missing = installed[entry.command.trim()] === false;
+            const usable = entry.enabled && !missing;
+            const Mark = harnessMark(entry.name);
+            return (
+              <button
+                key={entry.name}
+                type="button"
+                data-testid={`acp-launcher-${entry.name}`}
+                disabled={!usable}
+                onClick={() => start(entry)}
+                onMouseEnter={() => setSelected(index)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  width: '100%', textAlign: 'left', padding: '8px 10px',
+                  border: 'none', borderRadius: 'var(--radius-inner)',
+                  background: index === selected ? 'var(--hover)' : 'transparent',
+                  color: 'var(--text-primary)', cursor: usable ? 'pointer' : 'default',
+                  fontSize: 'calc(13px * var(--ui-font-scale))', opacity: entry.enabled ? 1 : 0.6,
+                }}
+              >
                 <span style={{
-                  display: 'block', color: 'var(--text-primary)', fontWeight: 'var(--fw-semibold)',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  width: 24, height: 24, borderRadius: 5,
+                  color: 'var(--text-secondary)', flexShrink: 0,
                 }}>
-                  {entry.name}
+                  <Mark size={iconSizes.row} />
+                </span>
+                <span style={{ flex: 1, overflow: 'hidden' }}>
+                  <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {entry.name}
+                  </span>
+                  <span style={{
+                    display: 'block', fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {entry.command} {entry.args.join(' ')}
+                  </span>
                 </span>
                 <span style={{
-                  display: 'block', color: 'var(--text-muted)', fontSize: 'var(--fs-micro)',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  color: missing ? 'var(--error)' : entry.enabled ? 'var(--success)' : 'var(--text-muted)',
+                  fontSize: 'calc(11px * var(--ui-font-scale))', flexShrink: 0,
                 }}>
-                  {entry.command} {entry.args.join(' ')}
+                  {missing ? t('Not installed on PATH') : entry.enabled ? t('Ready') : t('Disabled')}
                 </span>
-              </span>
-              <span style={{
-                color: missing ? 'var(--error)' : entry.enabled ? 'var(--success)' : 'var(--text-muted)',
-                fontSize: 'var(--fs-micro)', flexShrink: 0,
-              }}>
-                {missing ? t('Not installed on PATH') : entry.enabled ? t('Ready') : t('Disabled')}
-              </span>
-            </button>
-          );
-        })}
-        <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-micro)', marginTop: 6 }}>
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ padding: '0 16px 12px', color: 'var(--text-muted)', fontSize: 'var(--fs-micro)' }}>
           {t('Servers are added, edited and enabled on the ACP settings page; this surface only starts and probes them.')}
-        </span>
+        </div>
       </div>
     </div>
   );
