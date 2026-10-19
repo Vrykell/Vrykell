@@ -2,7 +2,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800" fill="none">
   <title>Vrykell — Geometric Flat App Icon</title>
   <desc>Hand-constructed flat brand mark: three geometric components with two clipped color insets. The 800x620 artwork is centered on a square canvas so the same source drives the desktop icon bundle and the browser favicon. No raster, filters, tracing, glow, or strokes.</desc>
-  <!-- Regenerate with `npm run tauri -- icon src-tauri/icons/icon.svg`; keep only the desktop outputs and mirror the source to public/app-icon.svg. -->
+  <!-- Regenerate with: npm run tauri icon src-tauri/icons/icon.svg - keep only the desktop outputs and mirror the source to public/app-icon.svg. -->
 
   <!-- The three module outlines are the single sources of truth for the silhouettes. -->
   <defs>
