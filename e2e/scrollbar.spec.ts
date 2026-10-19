@@ -210,3 +210,39 @@ test('settings and long chat transcripts share visible themed scrollbars', async
   await expect.poll(() => transcript.evaluate(element => element.scrollHeight - element.clientHeight)).toBeGreaterThan(100);
   await page.screenshot({ path: test.info().outputPath('chat-scrollbar.png') });
 });
+
+test('overlay scrollbar thumbs appear only while their surface is hovered', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  await gotoSetting(page, '模型行为');
+  await page.setViewportSize({ width: 1240, height: 500 });
+  const settings = page.locator('.settings-content');
+  await expect(settings).toHaveClass(/overlay-scroll-target/);
+  await expect.poll(() => settings.evaluate(element => element.scrollHeight - element.clientHeight)).toBeGreaterThan(100);
+  const id = await settings.getAttribute('id');
+  const bar = page.locator(`[role="scrollbar"][aria-controls="${id}"][aria-orientation="vertical"]`);
+  await page.mouse.move(4, 4);
+  await expect(bar).toHaveCSS('opacity', '0');
+  await settings.hover();
+  await expect(bar).toHaveCSS('opacity', '1');
+  await page.mouse.move(4, 4);
+  await expect(bar).toHaveCSS('opacity', '0');
+});
+
+test('native scrollbar thumbs appear only while their surface is hovered', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  await page.addStyleTag({ content: '#native-scroll-probe { position: fixed; top: 20px; left: 20px; width: 120px; height: 80px; overflow-y: auto; z-index: 100000; }' });
+  await page.evaluate(() => {
+    const probe = document.createElement('div');
+    probe.id = 'native-scroll-probe';
+    probe.innerHTML = Array.from({ length: 40 }, (_, row) => `<div>row ${row}</div>`).join('');
+    document.body.append(probe);
+  });
+  const probe = page.locator('#native-scroll-probe');
+  const thumbColor = () => probe.evaluate(element => getComputedStyle(element, '::-webkit-scrollbar-thumb').backgroundColor);
+  await page.mouse.move(4, 4);
+  await expect.poll(thumbColor).toBe('rgba(0, 0, 0, 0)');
+  await probe.hover();
+  await expect.poll(thumbColor).not.toBe('rgba(0, 0, 0, 0)');
+});

@@ -971,7 +971,9 @@ input.text-input-field:disabled { opacity: 0.55; }
 .md .katex { color: var(--text-primary); font-synthesis: none; letter-spacing: normal; word-spacing: normal; word-break: normal; overflow-wrap: normal; }
 .md .katex-display > .katex { font-size: max(1.25em, 16px); }
 
-/* Overflowing content shares a compact themed scrollbar in both directions. */
+/* Overflowing content shares a compact themed scrollbar in both directions. Scrollbar thumbs stay
+   invisible until the pointer enters the surface that owns them, so inactive panes keep a clean
+   edge while the lane, wheel, trackpad and keyboard scrolling remain available. */
 ::-webkit-scrollbar { width: var(--scrollbar-size); height: var(--scrollbar-size); }
 ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
 ::-webkit-scrollbar-track:vertical { margin-block: 4px; }
@@ -984,16 +986,18 @@ input.text-input-field:disabled { opacity: 0.55; }
 .xterm .xterm-viewport { scrollbar-width: none; }
 .xterm .xterm-viewport::-webkit-scrollbar { display: none; }
 ::-webkit-scrollbar-thumb {
-  background-color: var(--scrollbar-thumb);
+  background-color: transparent;
   background-clip: padding-box;
   border: 2px solid transparent;
   border-radius: 999px;
   min-height: 28px;
   min-width: 28px;
 }
+*:hover::-webkit-scrollbar-thumb { background-color: var(--scrollbar-thumb); }
 ::-webkit-scrollbar-thumb:hover, ::-webkit-scrollbar-thumb:active { background-color: var(--scrollbar-thumb-hover); }
 @supports not selector(::-webkit-scrollbar) {
-  * { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
+  * { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+  *:hover { scrollbar-color: var(--scrollbar-thumb) transparent; }
 }
 /* Overlay tracks leave the full content width available. */
 .scroll-region, .settings-content { scrollbar-gutter: auto; }
@@ -1008,7 +1012,8 @@ input.text-input-field:disabled { opacity: 0.55; }
 .terminal-block-scroll { scrollbar-gutter: auto; scrollbar-width: none; }
 .terminal-block-scroll::-webkit-scrollbar { display: none; }
 [data-scroll-overlay-layer] { position: absolute; top: 0; left: 0; width: 0; height: 0; overflow: visible; pointer-events: none; }
-.overlay-scrollbar { position: absolute; top: 0; bottom: 0; right: 0; width: 10px; z-index: 1; background: transparent; touch-action: none; user-select: none; pointer-events: auto; }
+.overlay-scrollbar { position: absolute; top: 0; bottom: 0; right: 0; width: 10px; z-index: 1; background: transparent; touch-action: none; user-select: none; pointer-events: auto; opacity: 0; transition: opacity var(--dur-fast) var(--ease); }
+.overlay-scrollbar[data-visible="true"], .overlay-scrollbar:hover, .overlay-scrollbar:focus-visible, .overlay-scrollbar[data-dragging="true"] { opacity: 1; }
 .overlay-scrollbar-track { position: absolute; inset: var(--scrollbar-inset) 0; pointer-events: none; }
 .overlay-scrollbar-thumb { width: 6px; margin: 0 2px; border-radius: 999px; background: var(--scrollbar-thumb); pointer-events: auto; }
 .overlay-scroll-target { scrollbar-width: none; scrollbar-gutter: auto; }

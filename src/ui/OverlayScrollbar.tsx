@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject, type PointerEvent, type CSSProperties } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject, type PointerEvent, type CSSProperties } from 'react';
 import { scrollbarGeometry, scrollbarOffset } from './scrollbarGeometry';
 
 const TRACK_INSET = 4;
@@ -17,7 +17,9 @@ interface Props {
 export default function OverlayScrollbar({ scrollRef, controlsId, label, horizontal = false, floating = false, layerHost }: Props) {
   const [geometry, setGeometry] = useState(() => scrollbarGeometry(0, 0, 0));
   const drag = useRef<{ pointer: number; offset: number } | null>(null);
+  const bar = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const [placement, setPlacement] = useState<CSSProperties>({});
   const readGeometry = (scroll: HTMLElement) => scrollbarGeometry(
     horizontal ? scroll.clientWidth : scroll.clientHeight,
@@ -107,6 +109,39 @@ export default function OverlayScrollbar({ scrollRef, controlsId, label, horizon
     };
   }, [scrollRef, horizontal, floating, layerHost]);
 
+  const conceal = useCallback((next: EventTarget | null) => {
+    if (next instanceof Node && (scrollRef.current?.contains(next) || bar.current?.contains(next))) return;
+    setHovered(false);
+  }, [scrollRef]);
+
+  useEffect(() => {
+    const scroll = scrollRef.current;
+    if (!scroll) return;
+    const reveal = () => setHovered(true);
+    const leave = (event: globalThis.PointerEvent) => conceal(event.relatedTarget);
+    scroll.addEventListener('pointerenter', reveal);
+    scroll.addEventListener('pointerleave', leave);
+    // Content can start overflowing while the pointer is already inside the surface.
+    if (scroll.matches(':hover')) setHovered(true);
+    return () => {
+      scroll.removeEventListener('pointerenter', reveal);
+      scroll.removeEventListener('pointerleave', leave);
+    };
+  }, [scrollRef, conceal]);
+
+  useEffect(() => {
+    const element = bar.current;
+    if (!element) return;
+    const reveal = () => setHovered(true);
+    const leave = (event: globalThis.PointerEvent) => conceal(event.relatedTarget);
+    element.addEventListener('pointerenter', reveal);
+    element.addEventListener('pointerleave', leave);
+    return () => {
+      element.removeEventListener('pointerenter', reveal);
+      element.removeEventListener('pointerleave', leave);
+    };
+  }, [geometry.maximum, conceal]);
+
   const move = (event: PointerEvent<HTMLDivElement>, offset: number) => {
     const scroll = scrollRef.current;
     if (!scroll) return;
@@ -119,11 +154,13 @@ export default function OverlayScrollbar({ scrollRef, controlsId, label, horizon
 
   if (geometry.maximum === 0) return null;
   return <div
+    ref={bar}
     className="overlay-scrollbar"
     data-horizontal={horizontal}
     style={{ ...placement, '--scrollbar-inset': `${TRACK_INSET}px` } as CSSProperties}
     data-no-drag
     data-dragging={dragging}
+    data-visible={hovered || dragging ? 'true' : 'false'}
     role="scrollbar"
     tabIndex={floating ? -1 : 0}
     aria-label={label}
