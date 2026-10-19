@@ -11,6 +11,7 @@ export interface ListReorderDrag {
   kind: string;
   height?: number;
   width?: number;
+  origin?: { top: number; offsetX: number; minLeft: number; maxLeft: number };
 }
 
 export interface ListReorderTarget {
@@ -33,6 +34,10 @@ interface ListReorderState {
 
 function sameTarget(a: ListReorderTarget | null, b: ListReorderTarget | null): boolean {
   return a === b || (!!a && !!b && a.itemId === b.itemId && a.after === b.after && a.zoneId === b.zoneId);
+}
+
+function horizontalPreviewLeft(x: number, origin: NonNullable<ListReorderDrag['origin']>): number {
+  return Math.max(origin.minLeft, Math.min(origin.maxLeft, x - origin.offsetX));
 }
 
 /**
@@ -105,26 +110,104 @@ export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical' 
     const source = target.closest<HTMLElement>('[data-reorder-handle]') ?? event.currentTarget;
     const container = event.currentTarget.dataset.reorderMeasure === 'container' ? event.currentTarget.closest<HTMLElement>('[data-reorder-container]') : null;
     const bounds = (container ?? event.currentTarget).getBoundingClientRect();
-    const dimensions = bounds.height > 0 ? { height: bounds.height, ...(axis === 'horizontal' ? { width: bounds.width } : {}) } : {};
+    const sourceList = event.currentTarget.closest<HTMLElement>('[data-reorder-list]');
+    const listBounds = sourceList?.getBoundingClientRect() ?? bounds;
+    const scrollLeft = sourceList?.scrollLeft ?? 0;
+    const dimensions: Pick<ListReorderDrag, 'height' | 'width' | 'origin'> = bounds.height > 0 ? { height: bounds.height, ...(axis === 'horizontal' ? {
+      width: bounds.width,
+      origin: { top: bounds.top, offsetX: event.clientX - bounds.left, minLeft: listBounds.left, maxLeft: Math.max(listBounds.left, listBounds.right - bounds.width) },
+    } : {}) } : {};
     const { pointerId, clientX, clientY } = event;
+    const match = (dragKind: string, itemKind: string) =>
+      (acceptsRef.current ?? ((drag: string, over: string) => drag === over))(dragKind, itemKind);
+    const horizontalRows = axis === 'horizontal' && sourceList ? Array.from(sourceList.querySelectorAll<HTMLElement>('[data-reorder-item]'))
+      .filter(row => !row.closest('[hidden]') && match(item.kind, row.dataset.reorderKind ?? ''))
+      .map(row => ({ id: row.dataset.reorderItem!, bounds: row.getBoundingClientRect() })) : [];
+    const sourceIndex = horizontalRows.findIndex(row => row.id === item.id);
+    const slotWidth = bounds.width + (sourceList ? parseFloat(getComputedStyle(sourceList).columnGap) || 0 : 0);
+    const horizontalSlots = horizontalRows.flatMap((row, index) => row.id === item.id ? [] : [{
+      id: row.id, width: row.bounds.width,
+      left: row.bounds.left - listBounds.left + scrollLeft - (index > sourceIndex ? slotWidth : 0),
+    }]);
+    let insertionIndex = sourceIndex;
+    let currentList = sourceList;
     let started = false;
     let canceled = false;
+    let pointer = { x: clientX, y: clientY };
+    let direction = 0;
+    let scrollFrame: number | undefined;
+    let scrollTime: number | undefined;
     let clickTimer: ReturnType<typeof setTimeout> | undefined;
     source.setPointerCapture?.(pointerId);
 
-    const match = (dragKind: string, itemKind: string) =>
-      (acceptsRef.current ?? ((drag: string, over: string) => drag === over))(dragKind, itemKind);
-    const preview = (x: number, y: number) => {
-      useListReorder.getState().movePointer(x, y);
-      const list = axis === 'horizontal' ? Array.from(document.querySelectorAll<HTMLElement>('[data-reorder-list]')).find(element => element.dataset.reorderList === listId) : null;
+    const findHorizontalList = () => axis === 'horizontal' ? Array.from(document.querySelectorAll<HTMLElement>('[data-reorder-list]')).find(element => element.dataset.reorderList === listId) : null;
+    const updateTarget = (x: number, y: number) => {
+      const list = findHorizontalList();
       if (axis === 'horizontal' && list) {
+        if (list !== currentList) { list.scrollLeft = scrollLeft; currentList = list; }
         const bounds = list.getBoundingClientRect();
-        if (x > bounds.right - 28) list.scrollLeft += 20;
-        else if (x < bounds.left + 28) list.scrollLeft -= 20;
+        if (dimensions.origin && sourceIndex >= 0) {
+          // Compare the moving edges against stable slots, independent of the pointer's grab offset and the rendered gap.
+          const left = horizontalPreviewLeft(x, dimensions.origin) - bounds.left + list.scrollLeft;
+          const right = left + slotWidth;
+          while (insertionIndex > 0) {
+            const previous = horizontalSlots[insertionIndex - 1]!;
+            if (left >= previous.left + previous.width / 2 - 2) break;
+            insertionIndex -= 1;
+          }
+          while (insertionIndex < horizontalSlots.length) {
+            const next = horizontalSlots[insertionIndex]!;
+            if (right <= next.left + slotWidth + next.width / 2 + 2) break;
+            insertionIndex += 1;
+          }
+          const next = horizontalSlots[insertionIndex]; const last = horizontalSlots[horizontalSlots.length - 1];
+          useListReorder.getState().hover(next ? { itemId: next.id, after: false } : last ? { itemId: last.id, after: true } : null);
+          return;
+        }
       }
       const target = locateTarget(listId, item.kind, match, x, y, axis);
       if (target === undefined) return;
       useListReorder.getState().hover(target);
+    };
+    const stopScrolling = () => {
+      if (scrollFrame !== undefined) cancelAnimationFrame(scrollFrame);
+      scrollFrame = undefined;
+      scrollTime = undefined;
+    };
+    const scrollVelocity = (list: HTMLElement) => {
+      if (!dimensions.origin || !direction) return 0;
+      const bounds = list.getBoundingClientRect();
+      const left = pointer.x - dimensions.origin.offsetX;
+      const distance = direction > 0 ? bounds.right - left - (dimensions.width ?? 0) : left - bounds.left;
+      return direction * 720 * Math.max(0, Math.min(1, (28 - distance) / 28));
+    };
+    const scheduleScrolling = () => {
+      const list = findHorizontalList();
+      const velocity = list ? scrollVelocity(list) : 0;
+      const limit = list ? Math.max(0, list.scrollWidth - list.clientWidth) : 0;
+      if (!list || !velocity || (velocity < 0 ? list.scrollLeft <= 0 : list.scrollLeft >= limit)) {
+        stopScrolling();
+        return;
+      }
+      if (scrollFrame === undefined) scrollFrame = requestAnimationFrame(scroll);
+    };
+    const scroll = (time: number) => {
+      scrollFrame = undefined;
+      const list = findHorizontalList();
+      if (!list || !started || canceled) { stopScrolling(); return; }
+      const elapsed = scrollTime === undefined ? 16 : Math.min(32, time - scrollTime);
+      scrollTime = time;
+      list.scrollLeft = Math.max(0, Math.min(list.scrollWidth - list.clientWidth, list.scrollLeft + scrollVelocity(list) * elapsed / 1000));
+      // Scrolling changes the drop slot even while the pointer remains stationary.
+      updateTarget(pointer.x, pointer.y);
+      scheduleScrolling();
+    };
+    const preview = (x: number, y: number) => {
+      if (x !== pointer.x) direction = Math.sign(x - pointer.x);
+      pointer = { x, y };
+      useListReorder.getState().movePointer(x, y);
+      updateTarget(x, y);
+      scheduleScrolling();
     };
     const move = (next: PointerEvent) => {
       if (next.pointerId !== pointerId || canceled) return;
@@ -146,6 +229,7 @@ export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical' 
     };
     const removeClick = () => window.removeEventListener('click', suppressClick, true);
     const clean = () => {
+      stopScrolling();
       window.removeEventListener('pointermove', move, true);
       window.removeEventListener('pointerup', up, true);
       window.removeEventListener('pointercancel', cancel, true);
@@ -174,6 +258,7 @@ export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical' 
         next.preventDefault();
         next.stopImmediatePropagation();
         canceled = true;
+        stopScrolling();
         useListReorder.getState().end();
         // Keep capture until release so cancellation cannot turn into a row click.
       }
@@ -206,10 +291,14 @@ export function ListReorderZonePlaceholder({ listId, zoneId }: { listId: string;
   return show ? <div className="sidebar-reorder-placeholder" style={height ? { height } : undefined} data-reorder-placeholder={zoneId} aria-hidden="true" /> : null;
 }
 
-/** Small icon tile follows the pointer without intercepting drop targets. */
-export function ListReorderPreview({ listId, children }: { listId: string; children: (drag: ListReorderDrag) => ReactNode }) {
+/** A preview follows the pointer without intercepting drop targets. */
+export function ListReorderPreview({ listId, variant = 'icon', children }: { listId: string; variant?: 'icon' | 'item'; children: (drag: ListReorderDrag) => ReactNode }) {
   const drag = useListReorder(state => state.drag?.listId === listId ? state.drag : null);
   const position = useListReorder(state => state.position);
   if (!drag || !position) return null;
-  return createPortal(<div className="sidebar-reorder-preview" aria-hidden="true" style={{ left: position.x, top: position.y }}>{children(drag)}</div>, document.body);
+  const style = variant === 'item' && drag.origin ? {
+    left: horizontalPreviewLeft(position.x, drag.origin),
+    top: drag.origin.top, width: drag.width, height: drag.height,
+  } : { left: position.x, top: position.y };
+  return createPortal(<div className={variant === 'item' ? 'list-reorder-item-preview' : 'sidebar-reorder-preview'} data-reorder-preview={variant} aria-hidden="true" inert style={style}>{children(drag)}</div>, document.body);
 }

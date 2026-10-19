@@ -27,7 +27,9 @@ export default function EditorWorkspace({ children }: { children: ReactNode }) {
   const documents = useEditorDocuments(state => state.documents);
   const page = tabs.find(tab => tab.id === activeId && tab.kind === 'editor');
   const files = tabs.filter(tab => tab.kind === 'editor').flatMap(tab => tab.files.map(file => ({ file, pageId: tab.id })));
-  const keys = JSON.stringify(files.map(item => editorFileKey(item.file)));
+  // Keep editor hosts attached when only the navigation order changes.
+  const panes = [...files].sort((a, b) => editorFileKey(a.file).localeCompare(editorFileKey(b.file)));
+  const keys = JSON.stringify(panes.map(item => editorFileKey(item.file)));
   const [closing, setClosing] = useState<{ files: EditorFile[]; complete: () => void } | null>(null);
   const [saving, setSaving] = useState(false); const [closeError, setCloseError] = useState('');
   useEffect(() => { useSessionStore.getState().configureEditorTabs(mode); }, [mode]);
@@ -65,7 +67,7 @@ export default function EditorWorkspace({ children }: { children: ReactNode }) {
   }) : [];
   return <>
     <div className="editor-content-host" style={{ display: page ? 'none' : 'flex' }} inert={!!page}>{children}</div>
-    {files.map(({ file, pageId }) => <DocumentPane key={editorFileKey(file)} file={file} tabs={fileTabs} active={pageId === activeId && page?.kind === 'editor' && editorFileKey(page.selected) === editorFileKey(file)} />)}
+    {panes.map(({ file, pageId }) => <DocumentPane key={editorFileKey(file)} file={file} tabs={fileTabs} active={pageId === activeId && page?.kind === 'editor' && editorFileKey(page.selected) === editorFileKey(file)} />)}
     {closing && <ToolDialog label={t('Unsaved changes')} onClose={() => { if (!saving) setClosing(null); }} busy={saving} width={520}>
       <div className="editor-close-dialog"><p>{t('Save your changes before closing?')}</p><div className="editor-file-list">{closing.files.filter(file => isDocumentDirty(documents[editorFileKey(file)])).map(file => <span key={editorFileKey(file)}>{file.path}</span>)}</div>
         {closeError && <ErrorBox title={t('Could not save files')} details={closeError} />}
@@ -87,7 +89,7 @@ function DocumentPane({ file, active, tabs }: { file: EditorFile; active: boolea
   const terminal = () => { void openInTerminal(file).catch(reason => useToastStore.getState().addToast(String(reason), 'error')); };
   const Icon = fileIcon(file.path);
   return <section className="editor-pane" data-testid={active ? 'file-editor' : undefined} style={{ display: active ? 'flex' : 'none' }} inert={!active}>
-    <FolderTabs items={active ? tabs : []} selected={editorFileKey(file)} label={t('Open files')} className="editor-tabs"
+    <FolderTabs items={active ? tabs : []} selected={editorFileKey(file)} label={t('Open files')} listId="editor-files" className="editor-tabs"
       onSelect={key => { const item = useSessionStore.getState().tabs.flatMap(tab => tab.kind === 'editor' ? tab.files : []).find(item => editorFileKey(item) === key); if (item) useSessionStore.getState().openEditorFile(item); }}
       onClose={key => { const item = useSessionStore.getState().tabs.flatMap(tab => tab.kind === 'editor' ? tab.files : []).find(item => editorFileKey(item) === key); if (item) useSessionStore.getState().closeEditorFile(item); }}
       onMove={(...args) => useSessionStore.getState().moveEditorFile(...args)} toolbar={<EditorActions items={[

@@ -262,7 +262,7 @@ test('switches diff page modes without losing open comparisons', async ({ page }
   await expect(page.getByRole('tablist', { name: '已打开的差异' }).getByRole('tab')).toHaveCount(2);
 });
 
-test('scrolls comparison tabs horizontally with the wheel', async ({ page }) => {
+test('scrolls comparison tabs with the wheel and keeps scrolling while a dragged tab rests at the edge', async ({ page }) => {
   const panel = page.getByTestId('git-panel');
   const paths = Array.from({ length: 6 }, (_, index) => `src/long-comparison-file-${index}.ts`);
   await page.evaluate(paths => localStorage.setItem('mock-git-snapshot', JSON.stringify({ root: '/home/e2e/project', branch: 'main', entries: paths.map(path => ({ path, previousPath: null, indexStatus: ' ', worktreeStatus: 'M' })) })), paths);
@@ -272,6 +272,17 @@ test('scrolls comparison tabs horizontally with the wheel', async ({ page }) => 
   await strip.evaluate(element => { element.scrollLeft = 0; });
   await strip.hover(); await page.mouse.wheel(0, 240);
   await expect.poll(() => strip.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+  await panel.getByTestId(`git-unstaged-${paths[0]}`).click();
+  const source = (await strip.getByRole('tab').first().boundingBox())!;
+  const bounds = (await strip.boundingBox())!;
+  await page.mouse.move(source.x + 20, source.y + source.height / 2); await page.mouse.down();
+  await page.mouse.move(bounds.x + bounds.width - 4, source.y + source.height / 2, { steps: 8 });
+  const initial = await strip.evaluate(element => element.scrollLeft);
+  await expect.poll(() => strip.evaluate(element => element.scrollLeft)).toBeGreaterThan(initial + 80);
+  await expect.poll(() => strip.evaluate(element => element.scrollWidth - element.clientWidth - element.scrollLeft)).toBeLessThanOrEqual(1);
+  await page.mouse.up();
+  await expect(strip.getByRole('tab').last()).toContainText('long-comparison-file-0');
+  await expect(strip.getByRole('tab').last()).toHaveAttribute('aria-selected', 'true');
 });
 
 test('reorders comparison tabs and moves secondary actions into the compact menu', async ({ page }) => {
@@ -283,11 +294,62 @@ test('reorders comparison tabs and moves secondary actions into the compact menu
   await page.mouse.move(target.x + 10, target.y + target.height / 2, { steps: 12 }); await page.mouse.up();
   await expect(strip.getByRole('tab').first()).toContainText('已暂存');
   await expect(strip.getByRole('tab').first()).toHaveAttribute('aria-selected', 'true');
+  const other = strip.getByRole('tab').nth(1);
+  const press = (await other.boundingBox())!;
+  await page.mouse.move(press.x + 20, press.y + press.height / 2); await page.mouse.down();
+  await expect(other).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('git-diff-review').locator('.folder-path')).toContainText('暂存区 → 工作文件');
+  await page.mouse.move(press.x + 30, press.y + press.height / 2, { steps: 3 });
+  await expect(page.locator('[data-reorder-preview="item"]')).toHaveCount(1);
+  await expect(page.locator('[data-reorder-preview="item"] .folder-tab')).toHaveAttribute('data-active', 'true');
+  await page.keyboard.press('Escape'); await page.mouse.up();
+  await strip.getByRole('tab').first().click();
   await page.setViewportSize({ width: 760, height: 800 }); const review = page.getByTestId('git-diff-review');
+  const selected = (await strip.getByRole('tab').first().boundingBox())!;
+  await page.mouse.move(selected.x + 24, selected.y + selected.height / 2); await page.mouse.down();
+  await page.mouse.move(selected.x + 36, selected.y + selected.height / 2, { steps: 4 });
+  await expect(strip.locator('[data-reorder-placeholder]')).toBeVisible();
+  await expect(strip.locator('.folder-tab:not([data-reorder-dragging="true"])').getByRole('tab')).toBeInViewport();
+  await expect(page.locator('[data-reorder-preview="item"]')).toContainText('已暂存');
+  await page.keyboard.press('Escape'); await page.mouse.up();
+  await expect(strip.getByRole('tab').first()).toHaveAttribute('aria-selected', 'true');
   await expect(review.getByRole('combobox', { name: '差异布局' })).not.toBeVisible();
   await review.getByRole('button', { name: '更多编辑器操作' }).click();
   await expect(page.getByRole('menu').getByRole('menuitemradio', { name: '单栏对比', exact: true })).toBeVisible();
   await page.getByRole('menu').getByRole('button', { name: '刷新差异', exact: true }).click();
+});
+
+test('moving the selected comparison backward keeps its editor hosts attached', async ({ page }) => {
+  const panel = page.getByTestId('git-panel');
+  await panel.getByTestId('git-unstaged-src/main.ts').click();
+  await expect(page.getByTestId('git-diff-review').locator('.monaco-diff-editor')).toBeVisible();
+  await panel.getByTestId('git-staged-src/main.ts').click();
+  await expect(page.getByTestId('git-diff-review').locator('.monaco-diff-editor')).toBeVisible();
+  const strip = page.getByRole('tablist', { name: '已打开的差异' });
+  await strip.getByRole('tab').first().click();
+  const continuity = await page.getByTestId('git-diff-review').evaluateHandle(async element => {
+    const path = '/src/ui/code/runtime.ts';
+    const { editorApi } = await import(path) as typeof import('../src/ui/code/runtime');
+    const state = { detached: 0 };
+    const observer = new MutationObserver(records => {
+      for (const record of records) for (const node of record.removedNodes) if (node === element) state.detached += 1;
+    });
+    observer.observe(element.parentElement!, { childList: true });
+    return { state, observer, editorApi, models: editorApi.editor.getModels(), views: editorApi.editor.getEditors() };
+  });
+  const source = (await strip.getByRole('tab').first().boundingBox())!;
+  const target = (await strip.getByRole('tab').nth(1).boundingBox())!;
+  await page.mouse.move(source.x + 20, source.y + source.height / 2); await page.mouse.down();
+  await page.mouse.move(target.x + target.width - 8, target.y + target.height / 2, { steps: 12 }); await page.mouse.up();
+  await expect(strip.getByRole('tab').last()).toHaveAttribute('aria-selected', 'true');
+  const result = await continuity.evaluate(async snapshot => {
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve())); snapshot.observer.disconnect();
+    const models = snapshot.editorApi.editor.getModels(); const views = snapshot.editorApi.editor.getEditors();
+    return { ...snapshot.state, sameModels: models.length === snapshot.models.length && snapshot.models.every(model => models.includes(model)),
+      sameViews: views.length === snapshot.views.length && snapshot.views.every(view => views.includes(view)) };
+  });
+  await continuity.dispose();
+  expect(result).toEqual({ detached: 0, sameModels: true, sameViews: true });
 });
 
 test('shows rounded groups, a collapsible file tree and selectable worktrees', async ({ page }, info) => {

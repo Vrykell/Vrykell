@@ -73,28 +73,203 @@ test('reorders connected file tabs and keeps compact actions above the text', as
   await page.mouse.move(source.x + 28, source.y + source.height / 2); await page.mouse.down();
   await page.mouse.move(target.x + 10, target.y + target.height / 2, { steps: 12 });
   const slot = page.locator('[data-reorder-placeholder]'); await expect(slot).toBeVisible();
-  expect(await slot.evaluate(element => {
-    const style = getComputedStyle(element);
-    return [style.borderTopLeftRadius, style.borderBottomLeftRadius, style.borderBottomRightRadius].map(parseFloat).every(radius => radius > 0);
-  })).toBe(true);
+  expect(await slot.evaluate(element => getComputedStyle(element).borderStyle)).toBe('none');
+  const preview = page.locator('[data-reorder-preview="item"]');
+  await expect(preview).toBeVisible(); await expect(preview).toContainText('new file.ts');
+  const previewBounds = (await preview.boundingBox())!;
+  expect(previewBounds.height).toBe(34);
+  expect(previewBounds.y).toBe(source.y - 3);
   await page.mouse.up();
   await expect(strip.getByRole('tab').first()).toContainText('new file.ts');
   await expect(strip.getByRole('tab').first()).toHaveAttribute('aria-selected', 'true');
   const header = page.getByTestId('file-editor').locator('.folder-header');
   expect((await header.boundingBox())!.height).toBeLessThanOrEqual(34);
-  expect((await strip.getByRole('tab').first().boundingBox())!.x - (await strip.boundingBox())!.x).toBeGreaterThanOrEqual(12);
-  const inactive = strip.getByRole('tab').nth(1).locator('..'); await inactive.hover();
-  expect(await inactive.evaluate(element => parseFloat(getComputedStyle(element).borderBottomLeftRadius))).toBeGreaterThan(0);
+  const first = strip.locator('.folder-tab').first();
+  expect((await first.boundingBox())!.x).toBe((await strip.boundingBox())!.x);
+  expect(await first.evaluate(element => getComputedStyle(element, '::before').content)).toBe('none');
+  const inactive = strip.locator('.folder-tab').nth(1); await inactive.hover();
+  const hover = (await inactive.locator('.folder-tab-content').boundingBox())!; const row = (await inactive.boundingBox())!;
+  expect(hover.y).toBeGreaterThan(row.y); expect(hover.y + hover.height).toBeLessThan(row.y + row.height);
+  expect(await inactive.locator('.folder-tab-content').evaluate(element => parseFloat(getComputedStyle(element).borderBottomLeftRadius))).toBeGreaterThan(0);
   expect(await inactive.evaluate(element => getComputedStyle(element, '::before').content)).toBe('none');
   const editor = page.getByTestId('file-editor');
   for (const width of [1240, 760]) {
     await page.setViewportSize({ width, height: 800 });
     const path = (await editor.locator('.folder-path').boundingBox())!; const body = (await editor.locator('.code-editor-frame').boundingBox())!;
     expect(path.height).toBeLessThanOrEqual(26); expect(path.y + path.height).toBeLessThanOrEqual(body.y + 1);
-    expect(await strip.getByRole('tab').first().locator('..').evaluate(element => getComputedStyle(element).backgroundColor)).toBe(await editor.locator('.code-editor-frame').evaluate(element => getComputedStyle(element).backgroundColor));
+    expect(await strip.locator('.folder-tab[data-active="true"]').evaluate(element => getComputedStyle(element).backgroundColor)).toBe(await editor.locator('.code-editor-frame').evaluate(element => getComputedStyle(element).backgroundColor));
     await page.screenshot({ path: info.outputPath(`folder-tabs-${width}.png`) });
   }
   await expect(editor.getByRole('button', { name: '在终端中打开', exact: true })).not.toBeVisible();
   await editor.getByRole('button', { name: '更多编辑器操作' }).click();
   await expect(page.getByRole('menu').getByRole('button', { name: '在终端中打开', exact: true })).toBeVisible();
 });
+
+test('dragging the selected first file leaves the remaining tabs visible in a narrow strip', async ({ page }, info) => {
+  const longPath = 'src/selected-first-document-with-a-long-name.ts';
+  await page.evaluate(path => localStorage.setItem('mock-git-snapshot', JSON.stringify({
+    root: '/home/e2e/project', branch: 'main', entries: [path, 'second.ts'].map(path => ({ path, previousPath: null, indexStatus: ' ', worktreeStatus: 'M' })),
+  })), longPath);
+  await page.getByRole('button', { name: '刷新变更' }).click();
+  await openWorking(page, longPath); await openWorking(page, 'second.ts'); await openWorking(page, longPath);
+  await page.setViewportSize({ width: 760, height: 800 });
+  const strip = page.getByRole('tablist', { name: '已打开的文件' });
+  const first = strip.getByRole('tab').first(); const second = strip.getByRole('tab', { name: 'second.ts', exact: true });
+  await expect(first).toHaveAttribute('aria-selected', 'true');
+  const source = (await first.boundingBox())!;
+  await page.mouse.move(source.x + 24, source.y + source.height / 2); await page.mouse.down();
+  await page.mouse.move(source.x + 36, source.y + source.height / 2, { steps: 4 });
+  const slot = strip.locator('[data-reorder-placeholder]'); await expect(slot).toBeVisible();
+  await expect(second).toBeInViewport();
+  const preview = page.locator('[data-reorder-preview="item"]');
+  await expect(preview).toContainText('selected-first-document');
+  const start = (await preview.boundingBox())!;
+  await page.mouse.move(source.x + 66, source.y + source.height / 2 + 12, { steps: 4 });
+  const moved = (await preview.boundingBox())!;
+  expect(moved.x).toBeGreaterThan(start.x); expect(moved.y).toBe(start.y);
+  const destination = (await slot.boundingBox())!; const remaining = (await second.boundingBox())!;
+  expect(remaining.x - destination.x - destination.width).toBeLessThan(12);
+  await page.screenshot({ path: info.outputPath('selected-first-file-drag.png') });
+  await page.keyboard.press('Escape'); await page.mouse.up();
+  await expect(strip.getByRole('tab')).toHaveCount(2);
+  await expect(first).toHaveAttribute('aria-selected', 'true');
+  await expect(first).toContainText('selected-first-document');
+  await expect(preview).toHaveCount(0);
+});
+
+for (const direction of ['left', 'right']) {
+  test(`selects on press and exchanges unequal tabs to the ${direction} after half an overlap`, async ({ page }, info) => {
+    const middle = 'src/document-with-a-much-longer-name-than-its-neighbors.ts';
+    const paths = ['first.ts', middle, 'last.ts'];
+    await page.evaluate(paths => localStorage.setItem('mock-git-snapshot', JSON.stringify({
+      root: '/home/e2e/project', branch: 'main', entries: paths.map(path => ({ path, previousPath: null, indexStatus: ' ', worktreeStatus: 'M' })),
+    })), paths);
+    await page.getByRole('button', { name: '刷新变更' }).click();
+    for (const path of paths) await openWorking(page, path);
+    await openWorking(page, direction === 'left' ? paths[0]! : paths[2]!);
+    const strip = page.getByRole('tablist', { name: '已打开的文件' });
+    const source = strip.getByRole('tab', { name: middle.split('/').pop()!, exact: true });
+    const sourceRow = (await strip.locator('.folder-tab').nth(1).boundingBox())!;
+    const button = (await source.boundingBox())!;
+    const grabX = direction === 'left' ? button.x + button.width - 4 : button.x + 4;
+    const y = button.y + button.height / 2;
+    await expect(source).toHaveAttribute('aria-selected', 'false');
+    await page.mouse.move(grabX, y); await page.mouse.down();
+    await expect(source).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByTestId('file-editor').locator('.folder-path')).toContainText(middle);
+    await expect(page.locator('[data-reorder-preview]')).toHaveCount(0);
+    const neighborName = direction === 'left' ? paths[0]! : paths[2]!;
+    const neighbor = strip.getByRole('tab', { name: neighborName, exact: true });
+    const neighborRow = await neighbor.evaluate(element => {
+      const bounds = element.closest('.folder-tab')!.getBoundingClientRect(); return { x: bounds.x, width: bounds.width };
+    });
+    const offset = grabX - sourceRow.x;
+    const destination = neighborRow.x + neighborRow.width / 2 + (direction === 'left' ? -4 : 4 - sourceRow.width) + offset;
+    await page.mouse.move(grabX + (direction === 'left' ? -8 : 8), y, { steps: 2 });
+    const preview = page.locator('[data-reorder-preview="item"]');
+    await expect(preview).toHaveCount(1);
+    await expect(preview.locator('.folder-tab')).toHaveAttribute('data-active', 'true');
+    await page.mouse.move(destination, y, { steps: 6 });
+    const neighborX = () => neighbor.evaluate(element => element.closest('.folder-tab')!.getBoundingClientRect().x);
+    const shiftedX = neighborRow.x + (direction === 'left' ? sourceRow.width : -sourceRow.width);
+    await expect.poll(neighborX).toBeCloseTo(shiftedX, 1);
+    await page.mouse.move(grabX, y, { steps: 6 });
+    await expect.poll(neighborX).toBeCloseTo(neighborRow.x, 1);
+    await page.mouse.move(destination, y, { steps: 6 });
+    await expect.poll(neighborX).toBeCloseTo(shiftedX, 1);
+    await page.screenshot({ path: info.outputPath(`half-overlap-${direction}.png`) });
+    await page.mouse.up();
+    await expect(strip.getByRole('tab').nth(direction === 'left' ? 0 : 2)).toContainText('document-with-a-much-longer-name');
+    await expect(source).toHaveAttribute('aria-selected', 'true');
+    await expect(preview).toHaveCount(0);
+  });
+}
+
+test('moving the selected document backward never detaches or reloads its editor', async ({ page }) => {
+  await openWorking(page); await openWorking(page, 'new file.ts', 'untracked');
+  const strip = page.getByRole('tablist', { name: '已打开的文件' });
+  await strip.getByRole('tab').first().click();
+  await replaceText(page, 'unsaved draft survives tab reordering');
+  const continuity = await page.getByTestId('file-editor').evaluateHandle(async element => {
+    const path = '/src/ui/code/runtime.ts';
+    const { editorApi } = await import(path) as typeof import('../src/ui/code/runtime');
+    const state = { detached: 0, reads: 0 };
+    const observer = new MutationObserver(records => {
+      for (const record of records) for (const node of record.removedNodes) if (node === element) state.detached += 1;
+    });
+    observer.observe(element.parentElement!, { childList: true });
+    const internals = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, ...args: unknown[]) => Promise<unknown> } }).__TAURI_INTERNALS__;
+    const invoke = internals.invoke;
+    internals.invoke = new Proxy(invoke, { apply(target, receiver, args: unknown[]) {
+      if (args[0] === 'editor_read_file') state.reads += 1;
+      return Reflect.apply(target, receiver, args);
+    } });
+    return { state, observer, internals, invoke, editorApi, models: editorApi.editor.getModels(), views: editorApi.editor.getEditors() };
+  });
+  const source = (await strip.getByRole('tab').first().boundingBox())!;
+  const target = (await strip.getByRole('tab').nth(1).boundingBox())!;
+  await page.mouse.move(source.x + 20, source.y + source.height / 2); await page.mouse.down();
+  await page.mouse.move(target.x + target.width - 8, target.y + target.height / 2, { steps: 12 }); await page.mouse.up();
+  await expect(strip.getByRole('tab').last()).toContainText('main.ts');
+  await expect(strip.getByRole('tab').last()).toHaveAttribute('aria-selected', 'true');
+  const result = await continuity.evaluate(async snapshot => {
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    snapshot.observer.disconnect(); snapshot.internals.invoke = snapshot.invoke;
+    const models = snapshot.editorApi.editor.getModels(); const views = snapshot.editorApi.editor.getEditors();
+    return { ...snapshot.state, sameModels: models.length === snapshot.models.length && snapshot.models.every(model => models.includes(model)),
+      sameViews: views.length === snapshot.views.length && snapshot.views.every(view => views.includes(view)) };
+  });
+  await continuity.dispose();
+  expect(result).toEqual({ detached: 0, reads: 0, sameModels: true, sameViews: true });
+  await expect(page.getByTestId('file-editor').locator('.view-lines')).toContainText('unsaved draft survives tab reordering');
+  await page.getByTestId('file-editor').locator('textarea.inputarea').focus(); await page.keyboard.press('Control+z');
+  await expect(page.getByTestId('file-editor').locator('.view-lines')).not.toContainText('unsaved draft survives tab reordering');
+});
+
+for (const width of [1240, 760]) {
+  test(`dragging file tabs scrolls both strip edges with a stationary pointer at width ${width}`, async ({ page }, info) => {
+    await page.setViewportSize({ width, height: 800 });
+    const paths = Array.from({ length: 6 }, (_, index) => `src/drag-scroll-document-${index}-with-long-name.ts`);
+    await page.evaluate(paths => localStorage.setItem('mock-git-snapshot', JSON.stringify({
+      root: '/home/e2e/project', branch: 'main', entries: paths.map(path => ({ path, previousPath: null, indexStatus: ' ', worktreeStatus: 'M' })),
+    })), paths);
+    await page.getByRole('button', { name: '刷新变更' }).click();
+    for (const path of paths) await openWorking(page, path);
+    await openWorking(page, paths[0]);
+    const strip = page.getByRole('tablist', { name: '已打开的文件' });
+    const bounds = (await strip.boundingBox())!;
+    const source = (await strip.getByRole('tab').first().boundingBox())!;
+    const row = (await strip.locator('.folder-tab').first().boundingBox())!;
+    const y = source.y + source.height / 2; const offset = source.x + 20 - row.x;
+    await page.mouse.move(source.x + 20, y); await page.mouse.down();
+    await page.mouse.move(bounds.x + bounds.width - 4, y, { steps: 8 });
+    const initial = await strip.evaluate(element => element.scrollLeft);
+    await expect.poll(() => strip.evaluate(element => element.scrollLeft)).toBeGreaterThan(initial + 80);
+    const progress = await strip.evaluate(element => element.scrollLeft);
+    await expect.poll(() => strip.evaluate(element => element.scrollLeft)).toBeGreaterThan(progress + 80);
+    await page.mouse.move(bounds.x + (bounds.width - row.width) / 2 + offset, y, { steps: 4 });
+    const drift = await strip.evaluate(async element => {
+      const start = element.scrollLeft;
+      for (let frame = 0; frame < 12; frame++) await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      return element.scrollLeft - start;
+    });
+    expect(Math.abs(drift)).toBeLessThan(1);
+    await page.mouse.move(bounds.x + bounds.width - 4, y, { steps: 4 });
+    await expect.poll(() => strip.evaluate(element => element.scrollWidth - element.clientWidth - element.scrollLeft)).toBeLessThanOrEqual(1);
+    await page.screenshot({ path: info.outputPath(`drag-scroll-right-${width}.png`) });
+    await page.mouse.up();
+    await expect(strip.getByRole('tab').last()).toContainText('drag-scroll-document-0');
+    await expect(strip.getByRole('tab').last()).toHaveAttribute('aria-selected', 'true');
+    const last = (await strip.getByRole('tab').last().boundingBox())!;
+    await page.mouse.move(last.x + 20, y); await page.mouse.down();
+    await page.mouse.move(bounds.x + 4, y, { steps: 8 });
+    const end = await strip.evaluate(element => element.scrollLeft);
+    await expect.poll(() => strip.evaluate(element => element.scrollLeft)).toBeLessThan(end - 80);
+    await expect.poll(() => strip.evaluate(element => element.scrollLeft)).toBe(0);
+    await page.screenshot({ path: info.outputPath(`drag-scroll-left-${width}.png`) });
+    await page.mouse.up();
+    await expect(strip.getByRole('tab').first()).toContainText('drag-scroll-document-0');
+    await expect(strip.getByRole('tab').first()).toHaveAttribute('aria-selected', 'true');
+    await expect(strip.getByRole('tab')).toHaveCount(paths.length);
+  });
+}

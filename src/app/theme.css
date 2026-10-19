@@ -405,6 +405,7 @@ button.state-icon-button[aria-pressed="true"]:hover { background: var(--selectio
   width: 40px; height: 26px; display: flex; align-items: center; justify-content: center;
   background: var(--chrome-field); border-radius: 8px; box-shadow: var(--shadow-md);
 }
+.list-reorder-item-preview { position: fixed; z-index: 2000; pointer-events: none; }
 /* Custom right-side layouts reserve enough space for every navigation action. */
 .workspace-title-actions:has(.workspace-right-navigation[data-compact="true"]) { gap: 4px; }
 button.activity-button {

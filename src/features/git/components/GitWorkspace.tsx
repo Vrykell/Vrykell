@@ -24,6 +24,8 @@ export default function GitWorkspace({ children }: { children: ReactNode }) {
   const mode = useGitPreferences(state => state.diffMode);
   const page = tabs.find(tab => tab.id === activeId && tab.kind === 'git-diff');
   const comparisons = tabs.filter(tab => tab.kind === 'git-diff').flatMap(tab => (tab.comparisons ?? [{ id: tab.id, selection: tab.selection }]).map(item => ({ ...item, pageId: tab.id })));
+  // Keep comparison hosts attached when only the navigation order changes.
+  const panes = [...comparisons].sort((a, b) => a.id.localeCompare(b.id));
   useEffect(() => { useSessionStore.getState().configureGitDiffTabs(mode); }, [mode]);
   const comparisonTabs: FolderTab[] = mode === 'single' ? comparisons.map(comparison => {
     const Icon = fileIcon(comparison.selection.path);
@@ -31,7 +33,7 @@ export default function GitWorkspace({ children }: { children: ReactNode }) {
   }) : [];
   return <>
     <div className="git-terminal-host" style={{ display: show ? 'none' : 'flex' }} inert={show}>{children}</div>
-    {comparisons.map(item => <GitComparison key={item.id} tabId={item.id} selection={item.selection} tabs={comparisonTabs} active={item.pageId === page?.id && !!selection && gitComparisonKey(item.selection) === gitComparisonKey(selection)} />)}
+    {panes.map(item => <GitComparison key={item.id} tabId={item.id} selection={item.selection} tabs={comparisonTabs} active={item.pageId === page?.id && !!selection && gitComparisonKey(item.selection) === gitComparisonKey(selection)} />)}
   </>;
 }
 
@@ -74,7 +76,7 @@ function GitComparison({ selection, active, tabId, tabs }: { selection: GitSelec
   const backLabel = t(editorOwner ? 'Back to editor' : 'Back to terminal');
   const Icon = fileIcon(selection.path);
   const toolbar = (navigation?: ReactNode, navigate?: (direction: 'previous' | 'next') => void) => <>
-    <FolderTabs items={active ? tabs : []} selected={tabId} label={t('Open comparisons')} className="git-review-tabs" headerClassName="git-review-toolbar"
+    <FolderTabs items={active ? tabs : []} selected={tabId} label={t('Open comparisons')} listId="git-comparisons" className="git-review-tabs" headerClassName="git-review-toolbar"
       onSelect={id => useSessionStore.getState().activateGitComparison(id)} onClose={id => useSessionStore.getState().closeGitComparison(id)}
       onMove={(...args) => useSessionStore.getState().moveGitComparison(...args)} toolbar={<EditorActions items={[
         { label: backLabel, onClick: back }, { label: t('Side by side'), checked: layout === 'split', onClick: () => setLayout('split') },

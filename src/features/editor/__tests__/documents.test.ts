@@ -5,6 +5,14 @@ import { editorFileKey } from '@core/editor';
 vi.mock('@platform/api/editor', () => ({ readEditorFile: vi.fn(), saveEditorFile: vi.fn() }));
 const file = { path: '/repo/file.ts' }; const key = editorFileKey(file);
 beforeEach(() => { vi.resetAllMocks(); useEditorDocuments.setState({ documents: {} }); vi.mocked(readEditorFile).mockResolvedValue({ kind: 'text', text: 'base', revision: 'v1' }); });
+it('reuses an open document without reloading or replacing its unsaved buffer', async () => {
+  const store = useEditorDocuments.getState(); await store.load(file); store.edit(file, 'unsaved draft');
+  const document = useEditorDocuments.getState().documents[key];
+  await store.load({ ...file });
+  expect(readEditorFile).toHaveBeenCalledTimes(1);
+  expect(useEditorDocuments.getState().documents[key]).toBe(document);
+  expect(useEditorDocuments.getState().documents[key]!.value).toBe('unsaved draft');
+});
 it('keeps newer edits typed while a save is pending and saves against the loaded revision', async () => {
   const store = useEditorDocuments.getState(); await store.load(file); store.edit(file, 'saved');
   let resolve!: (revision: string) => void;
