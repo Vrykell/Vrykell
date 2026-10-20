@@ -34,7 +34,8 @@ export type FileOpsTarget = { kind: 'local' } | { kind: 'ssh'; connectionId: str
 /** 文件操作接口：重名避让、可回退删除等语义由实现与后端保证。 */
 export interface FileOps {
   /** Optional optimized traversal on the target's file channel. */
-  search?(root: string, query: string, signal: AbortSignal): Promise<{ entries: FsEntry[]; truncated: boolean; skipped: number }>;
+  search?(root: string, query: string, signal: AbortSignal,
+    onProgress?: (result: { entries: FsEntry[]; truncated: boolean; skipped: number }) => void): Promise<{ entries: FsEntry[]; truncated: boolean; skipped: number }>;
   /** Single-path metadata: the path bar detects files with it and the properties dialog reads it. */
   stat(path: string): Promise<FileStat>;
   /** 列出目录；dir 为 null 时用目标的默认起始目录（远端会返回解析后的 base）。 */

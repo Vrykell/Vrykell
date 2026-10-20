@@ -3,6 +3,10 @@ use ignore::WalkBuilder;
 use regex::RegexBuilder;
 use serde::Serialize;
 use std::fs;
+use std::sync::{atomic::{AtomicBool, Ordering}, Arc, LazyLock, Mutex};
+
+static FILE_SEARCHES: LazyLock<Mutex<std::collections::HashMap<String, Arc<AtomicBool>>>> =
+    LazyLock::new(|| Mutex::new(std::collections::HashMap::new()));
 
 /// 文件匹配结果
 #[derive(Clone, Serialize, Debug)]
@@ -26,6 +30,8 @@ fn search_files_sync(
     search_content: bool,
     root: Option<String>,
     roots: Option<Vec<String>>,
+    cancelled: &AtomicBool,
+    mut on_progress: impl FnMut(&[FileMatch]),
 ) -> Vec<FileMatch> {
     // 合并 root 和 roots 参数
     let search_roots: Vec<String> = if let Some(roots) = roots {
@@ -50,9 +56,11 @@ fn search_files_sync(
 
     let mut seen = std::collections::HashSet::new();
     let mut results: Vec<FileMatch> = Vec::new();
+    let mut published = 0;
+    let mut last_publish = std::time::Instant::now();
 
     for search_root in &search_roots {
-        if results.len() >= max_results {
+        if results.len() >= max_results || cancelled.load(Ordering::Relaxed) {
             break;
         }
 
@@ -62,7 +70,7 @@ fn search_files_sync(
             .build();
 
         for entry in walker {
-            if results.len() >= max_results {
+            if results.len() >= max_results || cancelled.load(Ordering::Relaxed) {
                 break;
             }
 
@@ -118,6 +126,16 @@ fn search_files_sync(
                     match_type: match_type.to_string(),
                     content_snippet,
                 });
+                if published == 0 || results.len() - published >= 20 || last_publish.elapsed() >= std::time::Duration::from_millis(100) {
+                    on_progress(&results);
+                    published = results.len();
+                    last_publish = std::time::Instant::now();
+                }
+            }
+            if results.len() != published && last_publish.elapsed() >= std::time::Duration::from_millis(100) {
+                on_progress(&results);
+                published = results.len();
+                last_publish = std::time::Instant::now();
             }
         }
     }
@@ -129,18 +147,39 @@ fn search_files_sync(
 
 #[tauri::command]
 pub async fn search_files(
+    webview: tauri::Webview,
     query: String,
     max_results: usize,
     search_content: bool,
     root: Option<String>,
     roots: Option<Vec<String>>,
+    request_id: Option<String>,
+    on_progress: Option<tauri::ipc::JavaScriptChannelId>,
 ) -> Vec<FileMatch> {
+    let on_progress: Option<tauri::ipc::Channel<Vec<FileMatch>>> = on_progress.map(|channel| channel.channel_on(webview));
+    let cancelled = Arc::new(AtomicBool::new(false));
+    if let Some(id) = &request_id {
+        if let Ok(mut searches) = FILE_SEARCHES.lock() { searches.insert(id.clone(), cancelled.clone()); }
+    }
     // 整树遍历 + 内容读取是重 IO，移出主线程（同步 command 会冻结 UI）
-    tauri::async_runtime::spawn_blocking(move || {
-        search_files_sync(query, max_results, search_content, root, roots)
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        search_files_sync(query, max_results, search_content, root, roots, &cancelled, |matches| {
+            if let Some(channel) = &on_progress { let _ = channel.send(matches.to_vec()); }
+        })
     })
     .await
-    .unwrap_or_default()
+    .unwrap_or_default();
+    if let Some(id) = &request_id {
+        if let Ok(mut searches) = FILE_SEARCHES.lock() { searches.remove(id); }
+    }
+    result
+}
+
+#[tauri::command]
+pub fn search_files_cancel(request_id: String) {
+    if let Ok(searches) = FILE_SEARCHES.lock() {
+        if let Some(cancelled) = searches.get(&request_id) { cancelled.store(true, Ordering::Relaxed); }
+    }
 }
 
 /// 用 regex 在文本文件中搜索，返回匹配行上下文（最多 100 字符）
@@ -236,4 +275,25 @@ pub fn search_sessions(
 ) -> Result<Vec<SessionEntry>, String> {
     let db = state.0.lock().map_err(|e| e.to_string())?;
     db.search_sessions(&query, max_results)
+}
+
+#[cfg(test)]
+mod progressive_tests {
+    use super::*;
+
+    #[test]
+    fn publishes_the_first_match_before_finishing_and_honors_cancellation() {
+        let root = std::env::temp_dir().join(format!("search-progress-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&root).unwrap();
+        for index in 0..30 { fs::write(root.join(format!("match-{index}.txt")), b"sample").unwrap(); }
+        let cancelled = AtomicBool::new(false);
+        let mut batches = Vec::new();
+        let results = search_files_sync("match-".into(), 50, false, Some(root.to_string_lossy().into()), None, &cancelled, |matches| {
+            batches.push(matches.len());
+            cancelled.store(true, Ordering::Relaxed);
+        });
+        assert_eq!(batches, vec![1]);
+        assert_eq!(results.len(), 1);
+        fs::remove_dir_all(root).unwrap();
+    }
 }

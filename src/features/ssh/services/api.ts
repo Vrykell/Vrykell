@@ -1,4 +1,5 @@
 import { t } from '@i18n';
+import { Channel } from '@tauri-apps/api/core';
 import { invoke } from '@platform/diagnostics';
 import type { FsEntry, FileStat } from '@platform/api/types';
 import type { SshAuthenticationTarget, SshOptions } from '@core/ssh';
@@ -197,14 +198,17 @@ export function sshForgetSessionAuth(id: string): Promise<void> {
 }
 
 /** Search through one file channel and cancel obsolete requests. */
-export async function sshSearchFiles(id: string, path: string, query: string, signal: AbortSignal):
+export async function sshSearchFiles(id: string, path: string, query: string, signal: AbortSignal,
+  onProgress?: (result: { entries: FsEntry[]; truncated: boolean; skipped: number }) => void):
   Promise<{ entries: FsEntry[]; truncated: boolean; skipped: number }> {
   const requestId = crypto.randomUUID();
   const cancel = () => { void invoke('ssh_search_cancel', { requestId }).catch(() => {}); };
   if (signal.aborted) return { entries: [], truncated: false, skipped: 0 };
+  const progress = new Channel<{ entries: FsEntry[]; truncated: boolean; skipped: number }>();
+  progress.onmessage = result => { if (!signal.aborted) onProgress?.(result); };
   signal.addEventListener('abort', cancel, { once: true });
-  try { return await invoke('ssh_search', { id, path, text: query, requestId }); }
-  finally { signal.removeEventListener('abort', cancel); }
+  try { return await invoke('ssh_search', { id, path, text: query, requestId, onProgress: progress }); }
+  finally { signal.removeEventListener('abort', cancel); progress.onmessage = () => {}; }
 }
 
 /** 下载远程文件到本地临时目录，返回本地路径（用于系统默认应用打开）。 */

@@ -70,9 +70,10 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
   }, [open, setHighlightQuery]);
 
   const close = useCallback(() => {
+    search('');
     setHighlightQuery('');
     onClose();
-  }, [onClose, setHighlightQuery]);
+  }, [onClose, search, setHighlightQuery]);
 
   const handleInput = useCallback(
     (value: string) => {

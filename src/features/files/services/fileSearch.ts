@@ -14,7 +14,7 @@ export async function searchFiles(ops: Pick<FileOps, 'list' | 'search'>, root: s
   const result: FileSearchResult = { entries: [], truncated: false, skipped: 0 };
   if (!needle) return result;
   if (signal.aborted) return result;
-  if (ops.search) return ops.search(root, query, signal);
+  if (ops.search) return ops.search(root, query, signal, onProgress);
   const queue = [{ path: root, depth: 0 }];
   const seen = new Set<string>();
   let scanned = 0;

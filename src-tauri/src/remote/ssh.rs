@@ -212,7 +212,7 @@ pub struct SshListResponse {
     pub base: String,
 }
 
-#[derive(Serialize, Default)]
+#[derive(Clone, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SshSearchResponse {
     entries: Vec<SshFsEntry>,
@@ -221,7 +221,8 @@ pub struct SshSearchResponse {
 }
 
 /// Search file names through a single authenticated channel with bounded work.
-fn ssh_search_sync(conn: &SshConnection, root: &str, query: &str, cancelled: &std::sync::atomic::AtomicBool) -> Result<SshSearchResponse, String> {
+fn ssh_search_sync(conn: &SshConnection, root: &str, query: &str, cancelled: &std::sync::atomic::AtomicBool,
+    mut on_progress: impl FnMut(&SshSearchResponse)) -> Result<SshSearchResponse, String> {
     use std::sync::atomic::Ordering;
     let mut result = SshSearchResponse::default();
     let needle = query.trim().to_lowercase();
@@ -236,6 +237,8 @@ fn ssh_search_sync(conn: &SshConnection, root: &str, query: &str, cancelled: &st
     let mut visited = std::collections::HashSet::new();
     let mut scanned = 0usize;
     let started = std::time::Instant::now();
+    let mut published = 0;
+    let mut last_publish = started;
     while let Some((directory, depth)) = queue.pop_front() {
         if cancelled.load(Ordering::Relaxed) { break; }
         if visited.len() >= 500 || scanned >= 20000 || result.entries.len() >= 200 || started.elapsed() >= Duration::from_secs(20) {
@@ -258,11 +261,21 @@ fn ssh_search_sync(conn: &SshConnection, root: &str, query: &str, cancelled: &st
             let path = crate::platform::path::join(&directory, &name);
             if name.to_lowercase().contains(&needle) {
                 result.entries.push(SshFsEntry { name, path: path.clone(), is_dir: stat.is_dir() });
+                if published == 0 || result.entries.len() - published >= 20 || last_publish.elapsed() >= Duration::from_millis(100) {
+                    on_progress(&result);
+                    published = result.entries.len();
+                    last_publish = std::time::Instant::now();
+                }
             }
             if stat.is_dir() {
                 if depth < 12 && queue.len() < 500 { queue.push_back((path, depth + 1)); }
                 else { result.truncated = true; }
             }
+        }
+        if result.entries.len() != published {
+            on_progress(&result);
+            published = result.entries.len();
+            last_publish = std::time::Instant::now();
         }
     }
     Ok(result)
@@ -758,11 +771,15 @@ pub async fn ssh_stat(
 }
 
 #[tauri::command]
-pub async fn ssh_search(state: State<'_, HistoryState>, id: String, path: String, text: String, request_id: String) -> Result<SshSearchResponse, String> {
+pub async fn ssh_search(webview: tauri::Webview, state: State<'_, HistoryState>, id: String, path: String, text: String, request_id: String,
+    on_progress: Option<tauri::ipc::JavaScriptChannelId>) -> Result<SshSearchResponse, String> {
+    let on_progress: Option<tauri::ipc::Channel<SshSearchResponse>> = on_progress.map(|channel| channel.channel_on(webview));
     let conn = state.0.lock().map_err(|e| e.to_string())?.get_ssh_connection(&id)?;
     let cancelled = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     FILE_SEARCHES.lock().map_err(|e| e.to_string())?.insert(request_id.clone(), cancelled.clone());
-    let result = tauri::async_runtime::spawn_blocking(move || ssh_search_sync(&conn, &path, &text, &cancelled)).await;
+    let result = tauri::async_runtime::spawn_blocking(move || ssh_search_sync(&conn, &path, &text, &cancelled, |result| {
+        if let Some(channel) = &on_progress { let _ = channel.send(result.clone()); }
+    })).await;
     if let Ok(mut requests) = FILE_SEARCHES.lock() { requests.remove(&request_id); }
     result.map_err(|e| e.to_string())?
 }
