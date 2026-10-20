@@ -31,7 +31,7 @@
   --preview-dark-canvas: #202020;
   --preview-dark-sidebar: #1C1C1C;
   --preview-dark-line: #4B4E52;
-  --chrome-translucent-bg: rgba(0, 0, 0, 0.3);
+  --chrome-translucent-bg: rgba(0, 0, 0, 0.6);
 
   --hairline: inset 0 1px 0 var(--border);
   --hairline-soft: inset 0 1px 0 var(--border);

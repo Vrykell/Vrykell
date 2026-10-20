@@ -59,7 +59,7 @@ test('settings cover the content card and toggle back to the unchanged workspace
       background: style.backgroundImage,
     };
   });
-  expect(chrome).toEqual({ color: 'rgba(0, 0, 0, 0.3)', background: 'none' });
+  expect(chrome).toEqual({ color: 'rgba(0, 0, 0, 0.6)', background: 'none' });
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await expect(page.locator('.workspace-titlebar')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await page.screenshot({ path: info.outputPath('sampled-palette-workspace.png') });
