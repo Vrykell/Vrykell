@@ -168,13 +168,11 @@ pub struct AcpClient {
     pending: Pending,
     /// Notifications the agent sent (`session/update` and friends), in arrival order. Behind a
     /// mutex so the event pump and a request can run side by side.
-    #[allow(dead_code)] // drained by the session UI in phase 1
     events: tokio::sync::Mutex<mpsc::UnboundedReceiver<Value>>,
     /// Held so the child is killed when the client is dropped (`kill_on_drop`).
     _child: Option<Child>,
 }
 
-#[allow(dead_code)] // `new_session`, `prompt`, `cancel` and `next_event` are called by the session UI in phase 1
 impl AcpClient {
     /// Speak ACP over any readable/writable pair. Tests drive this with an in-memory duplex.
     pub fn over<R, W>(reader: R, writer: W, permission: PermissionHandler) -> Self
