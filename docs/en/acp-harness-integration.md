@@ -1,8 +1,9 @@
 # Connecting external harnesses (Agent Client Protocol)
 
-> Status: **design (not implemented)**. Protocol basis: Agent Client Protocol **v1**
+> Status: **implemented (2026-10)**. Protocol basis: Agent Client Protocol **v1**
 > (agentclientprotocol.com), checked against the official specification in 2026-10 for method
-> names, capability fields and message shapes.
+> names, capability fields and message shapes. `fs/*` and `terminal/*` delegation are not claimed,
+> per the decision in §11.
 > Readers: whoever implements this, plus reviewers who need the boundaries and the trade-offs.
 
 ## 1. Goals
@@ -208,9 +209,9 @@ Following the checklist in `security-model.md`, these are hard requirements when
 | Phase | Content | Status |
 | --- | --- | --- |
 | **P0 protocol** | `agent/acp.rs`: ndjson codec, request correlation, notification fan-out, cancellation, `initialize` / `session/new` / `session/prompt` / `session/cancel` / permission answers; harness config (`~/.vrykell/harnesses.json`, editable by hand) plus the `acp_handshake` probe | ✅ **Implemented (2026-10-14)**: cargo tests drive a scripted fake agent over an in-memory transport (`tokio::io::duplex`), covering the handshake (and asserting we do **not** advertise fs or terminal), a prompt turn's streamed notifications, a permission request answered with a selected option, cancellation being a notification, and an unanswerable request receiving a JSON-RPC error instead of silence. The `fs` and `terminal` handlers belong to P2, so those capabilities are not claimed yet |
-| **P1 visible** | workspace harness tab, settings group (which also writes the config), event → ChatMessage/ToolRun mapping, stop | ◐ **The visible half is implemented (2026-10-14)**: a new `harness` workspace tab (one per harness), a settings group "External harnesses" (lists the command line each harness would run, plus test connection and connect), `session/update` folded by `harnessTranscript` into the existing `ChatMessage[]` and rendered by the same `AiBlock`, with composer and stop button wired. **Still to do**: an e2e with a fake agent pushing events, the approval card for harness permissions (P2), and trimming the per-message actions for harness sessions |
-| **P2 safety** | permission → approval card (shape grant, deadline), `fs/*` through the policy, native confirmation for dangerous commands | cargo (policy reuse), vitest (permission mapping), e2e (dangerous command asks natively, an unanswered card is denied) |
-| **P3 experience** | `session/load` restore, display-only modes, notices/plans, context-usage bar, usage-page `source` | unit tests per layer plus e2e |
+| **P1 visible** | workspace harness tab, settings group (which also writes the config), event → ChatMessage/ToolRun mapping, stop | ✅ **Implemented (2026-10)**: a `harness` workspace tab (one per harness), an "ACP" settings group (lists the command line each harness would run, plus test connection and connect), `session/update` folded by `harnessTranscript` into the existing `ChatMessage[]` and rendered by the same `AiBlock`, composer and stop button wired, and the approval card connected (shape grant plus deadline). `e2e/harness-session.spec.ts` pushes streamed events from a fake agent and covers both the allow and the deny path |
+| **P2 safety** | permission → approval card (shape grant, deadline), `fs/*` through the policy, native confirmation for dangerous commands | ✅ **Approval card implemented (2026-10)**; `fs/*` and `terminal/*` are **not claimed**, per the decision in §11: every harness verified here (Claude Code, Codex, Qwen, OpenCode) brings its own file and terminal tools, and claiming unverified delegation only makes the working paths fragile. When a harness actually needs them, the workspace-scoped policy and dangerous-command confirmation land with that harness |
+| **P3 experience** | `session/load` restore, display-only modes, notices/plans, context-usage bar, usage-page `source` | ✅ **Implemented (2026-10)**: `session/load` restore (the replayed notifications travel back with the open result and are folded in order), mode/model/config selectors that switch (beyond the planned display-only view), a plan card, context use, slash commands in the composer, and the ACP tab plus source filter on the usage page |
 | **P4 optional** | `terminal/*` delegation (commands through our PTY, full danger-rule coverage), MCP passthrough, elicitation | as needed |
 
 ## 11. Open decisions
