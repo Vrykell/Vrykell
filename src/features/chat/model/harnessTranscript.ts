@@ -95,14 +95,21 @@ function upsertTool(messages: ChatMessage[], run: ToolRun): ChatMessage[] {
 }
 
 /**
+ * The update object of a `session/update` notification. The notification arrives whole
+ * (jsonrpc/method/params) and some agents hand the params object itself; accepting both is what
+ * keeps a live session from silently staying empty.
+ */
+export function harnessUpdate(payload: Record<string, unknown>): Record<string, unknown> {
+  const params = ((payload.params ?? payload) ?? {}) as Record<string, unknown>;
+  return (params.update ?? {}) as Record<string, unknown>;
+}
+
+/**
  * Fold one `session/update` payload into the transcript. Unknown variants are ignored: the protocol
  * grows, and a newer agent must not break the view.
  */
 export function applyHarnessUpdate(messages: ChatMessage[], payload: Record<string, unknown>): ChatMessage[] {
-  // The agent's notification arrives whole (jsonrpc/method/params) and some agents hand the params
-  // object itself; accepting both is what keeps a live transcript from silently staying empty.
-  const params = ((payload.params ?? payload) ?? {}) as Record<string, unknown>;
-  const update = (params.update ?? {}) as Record<string, unknown>;
+  const update = harnessUpdate(payload);
   const kind = update.sessionUpdate;
   switch (kind) {
     case 'user_message_chunk': {

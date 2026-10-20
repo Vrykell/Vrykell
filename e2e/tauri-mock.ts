@@ -1176,9 +1176,33 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
                 protocolVersion: 1,
                 agentInfo: { name: 'fake-acp', title: 'Fake ACP agent', version: '0.1.0' },
                 agentCapabilities: {},
-                authMethods: [],
+                authMethods: [{ id: 'fake-login', name: 'Log in', description: 'Run `fake login` in the terminal' }],
               },
+              modes: {
+                currentModeId: 'default',
+                availableModes: [
+                  { id: 'default', name: 'Default', description: 'Ask before changing anything' },
+                  { id: 'plan', name: 'Plan', description: 'Analyze only, do not modify files' },
+                ],
+              },
+              models: {
+                currentModelId: 'm1',
+                availableModels: [
+                  { modelId: 'm1', name: 'Model One', description: 'The fast one' },
+                  { modelId: 'm2', name: 'Model Two', description: 'The careful one' },
+                ],
+              },
+              configOptions: null,
             };
+          case 'acp_set_mode':
+            acpCalls.push(`acp_set_mode:${String(args.modeId ?? '')}`);
+            return undefined;
+          case 'acp_set_model':
+            acpCalls.push(`acp_set_model:${String(args.modelId ?? '')}`);
+            return undefined;
+          case 'acp_set_config_option':
+            acpCalls.push(`acp_set_config_option:${String(args.configId ?? '')}=${String(args.value ?? '')}`);
+            return null;
           case 'acp_prompt':
           case 'acp_cancel':
           case 'acp_close':

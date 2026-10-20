@@ -8,12 +8,20 @@
 import { create } from 'zustand';
 import { t } from '@i18n';
 import type { ChatMessage } from '@features/chat';
-import { applyHarnessUpdate } from '@features/chat/model/harnessTranscript';
+import { applyHarnessUpdate, harnessUpdate } from '@features/chat/model/harnessTranscript';
 import {
-  acpAnswerPermission, acpCancel, acpClose, acpOpen, acpPrompt, onAcpSession,
-  type AcpSessionEvent, type AgentDescription,
+  acpAnswerPermission, acpCancel, acpClose, acpOpen, acpPrompt, acpSetConfigOption, acpSetMode, acpSetModel,
+  onAcpSession,
+  type AcpConfigOption, type AcpSessionEvent, type AcpSessionModes, type AcpSessionModels, type AgentDescription,
 } from '@platform/api/acp';
 import { useUsageStore } from '@features/agent/stores/usage';
+
+/** One step of the plan an agent publishes while it works. */
+export interface HarnessPlanEntry {
+  content: string;
+  status?: string;
+  priority?: string;
+}
 
 export interface HarnessSession {
   harness: string;
@@ -27,6 +35,16 @@ export interface HarnessSession {
   error: string | null;
   /** The last thing worth telling the user (a refused permission, a stop reason, ...). */
   note: string | null;
+  /** The modes the agent offers (legacy mode API; new agents publish them as config options). */
+  modes: AcpSessionModes | null;
+  /** The models the agent offers (legacy model API, still what the current adapters answer). */
+  models: AcpSessionModels | null;
+  /** Session-level selectors in the protocol's newer shape. */
+  configOptions: AcpConfigOption[] | null;
+  /** The plan the agent last published, if it publishes one. */
+  plan: HarnessPlanEntry[];
+  /** The context window in use, as the agent last reported it. */
+  context: { used: number; size: number } | null;
   /** A permission request waiting for the user, rendered as a card in the transcript. */
   permission: {
     toolCallId: string;
@@ -45,6 +63,12 @@ interface HarnessStore {
   prompt: (tabId: string, text: string) => Promise<void>;
   cancel: (tabId: string) => Promise<void>;
   close: (tabId: string) => Promise<void>;
+  /** Switch the session mode (legacy mode API). */
+  setMode: (tabId: string, modeId: string) => Promise<void>;
+  /** Switch the session model (legacy model API). */
+  setModel: (tabId: string, modelId: string) => Promise<void>;
+  /** Set a session config option; the answer carries the complete configuration state. */
+  setConfigOption: (tabId: string, configId: string, value: string | boolean) => Promise<void>;
   /** Answer the waiting permission request; `null` refuses it. `generation` is the card's own, so a
    *  click that lands after a newer request replaced the card cannot answer the wrong one. */
   answerPermission: (tabId: string, generation: number, optionId: string | null) => Promise<void>;
@@ -52,7 +76,9 @@ interface HarnessStore {
 }
 
 const fresh = (harness: string): HarnessSession => ({
-  harness, sessionId: null, agent: null, messages: [], pending: false, opening: false, error: null, note: null, permission: null, permissionGeneration: 0,
+  harness, sessionId: null, agent: null, messages: [], pending: false, opening: false, error: null, note: null,
+  modes: null, models: null, configOptions: null, plan: [], context: null,
+  permission: null, permissionGeneration: 0,
 });
 
 /** sessionId → tabId, so an event finds its page. */
@@ -98,6 +124,7 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
       }
       patch(tabId, (current) => ({
         ...current, opening: false, sessionId: result.sessionId, agent: result.agent, error: null,
+        modes: result.modes ?? null, models: result.models ?? null, configOptions: result.configOptions ?? null,
       }));
     } catch (error) {
       patch(tabId, (session) => ({ ...session, opening: false, error: String((error as Error)?.message ?? error) }));
@@ -125,6 +152,48 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
       await acpCancel(session.sessionId);
     } catch (error) {
       patch(tabId, (current) => ({ ...current, note: String((error as Error)?.message ?? error) }));
+    }
+  },
+
+  setMode: async (tabId, modeId) => {
+    const session = get().byTab[tabId];
+    if (!session?.sessionId) return;
+    try {
+      await acpSetMode(session.sessionId, modeId);
+      // The agent may also send a current_mode_update; writing the value here keeps the control
+      // responsive even for agents that stay quiet.
+      patch(tabId, (current) => current.modes
+        ? { ...current, modes: { ...current.modes, currentModeId: modeId } }
+        : current);
+    } catch (error) {
+      patch(tabId, (current) => ({ ...current, error: String((error as Error)?.message ?? error) }));
+    }
+  },
+
+  setModel: async (tabId, modelId) => {
+    const session = get().byTab[tabId];
+    if (!session?.sessionId) return;
+    try {
+      await acpSetModel(session.sessionId, modelId);
+      patch(tabId, (current) => current.models
+        ? { ...current, models: { ...current.models, currentModelId: modelId } }
+        : current);
+    } catch (error) {
+      patch(tabId, (current) => ({ ...current, error: String((error as Error)?.message ?? error) }));
+    }
+  },
+
+  setConfigOption: async (tabId, configId, value) => {
+    const session = get().byTab[tabId];
+    if (!session?.sessionId) return;
+    try {
+      const configOptions = await acpSetConfigOption(session.sessionId, configId, value);
+      patch(tabId, (current) => ({
+        ...current,
+        configOptions: Array.isArray(configOptions) ? configOptions : current.configOptions,
+      }));
+    } catch (error) {
+      patch(tabId, (current) => ({ ...current, error: String((error as Error)?.message ?? error) }));
     }
   },
 
@@ -165,8 +234,23 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     if (session) recordAcpEvent(session.harness, event);
     patch(tabId, (session) => {
       switch (event.kind) {
-        case 'update':
-          return { ...session, messages: applyHarnessUpdate(session.messages, event.payload) };
+        case 'update': {
+          const update = harnessUpdate(event.payload);
+          const kind = String(update.sessionUpdate ?? '');
+          const next: HarnessSession = { ...session, messages: applyHarnessUpdate(session.messages, event.payload) };
+          // Session state the agent pushes outside the transcript: the active mode, a whole new
+          // configuration, its plan, and how much of the context window is in use.
+          if (kind === 'current_mode_update' && next.modes) {
+            next.modes = { ...next.modes, currentModeId: String(update.currentModeId ?? next.modes.currentModeId) };
+          } else if (kind === 'config_option_update' && Array.isArray(update.configOptions)) {
+            next.configOptions = update.configOptions as AcpConfigOption[];
+          } else if (kind === 'plan' && Array.isArray(update.entries)) {
+            next.plan = update.entries as HarnessPlanEntry[];
+          } else if (kind === 'usage_update') {
+            next.context = { used: Number(update.used ?? 0), size: Number(update.size ?? 0) };
+          }
+          return next;
+        }
         case 'stop': {
           const reason = String(event.payload.stopReason ?? '');
           const note = reason === 'cancelled'
@@ -220,9 +304,7 @@ function recordAcpEvent(source: string, event: AcpSessionEvent) {
   // The notification arrives whole (jsonrpc/method/params) and some agents hand the params object
   // itself, so the update sits under `params.update` or `update` — the same shapes the transcript
   // folding accepts.
-  const payload = (event.payload ?? {}) as Record<string, unknown>;
-  const params = (payload.params ?? payload) as Record<string, unknown>;
-  const update = (params.update ?? {}) as Record<string, unknown>;
+  const update = harnessUpdate(event.payload);
   const kind = String(update.sessionUpdate ?? '');
   if (kind === 'tool_call') {
     usage.acpToolCall(source);

@@ -43,6 +43,14 @@ test.describe('harness session', () => {
     // 回归：严格模式下 effect 会被跑两遍，但会话只能开一次
     await expect(page.getByTestId('harness-page')).toBeVisible();
 
+    // The agent's modes and models arrive with the session and become quiet controls.
+    await expect(page.getByTestId('harness-selector-mode')).toContainText('Default');
+    await expect(page.getByTestId('harness-selector-model')).toContainText('Model One');
+    await page.getByTestId('harness-selector-mode').click();
+    await page.getByRole('option', { name: /Plan/ }).click();
+    await expect(page.getByTestId('harness-selector-mode')).toContainText('Plan');
+    await expect.poll(() => acpCalls(page)).toContain('acp_set_mode:plan');
+
     // The agent's streamed output lands in the transcript.
     await emitAcpSession(page, acpUpdate(SESSION, {
       sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Working on it.' },
@@ -80,5 +88,21 @@ await expect(page.getByTestId('harness-page')).toContainText('Working on it.');
       { toolCallId: 'call_1', optionId: 'allow-once' },
       { toolCallId: 'call_2', optionId: null },
     ]);
+
+    // The plan and the context window the agent publishes belong to the session view.
+    await emitAcpSession(page, acpUpdate(SESSION, {
+      sessionUpdate: 'plan',
+      entries: [
+        { content: 'Read the failing test', status: 'completed' },
+        { content: 'Fix the parser', status: 'in_progress' },
+      ],
+    }));
+    await emitAcpSession(page, acpUpdate(SESSION, { sessionUpdate: 'usage_update', used: 12_000, size: 200_000 }));
+    await expect(page.getByTestId('harness-plan')).toContainText('Fix the parser');
+    await expect(page.getByTestId('harness-context')).toHaveText('1.2万/20万');
+
+    // A mode the agent switches on its own also moves the control.
+    await emitAcpSession(page, acpUpdate(SESSION, { sessionUpdate: 'current_mode_update', currentModeId: 'default' }));
+    await expect(page.getByTestId('harness-selector-mode')).toContainText('Default');
   });
 });

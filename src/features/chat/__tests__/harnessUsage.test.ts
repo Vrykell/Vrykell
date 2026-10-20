@@ -14,8 +14,27 @@ vi.mock('@platform/api/acp', () => ({
   acpAnswerPermission: vi.fn(async () => undefined),
   acpCancel: vi.fn(async () => undefined),
   acpClose: vi.fn(async () => undefined),
-  acpOpen: vi.fn(async () => ({ sessionId: 's1', agent: { agentInfo: { name: 'Fake' } } })),
+  acpOpen: vi.fn(async () => ({
+    sessionId: 's1',
+    harness: 'Claude Code',
+    agent: { agentInfo: { name: 'Fake' } },
+    modes: {
+      currentModeId: 'default',
+      availableModes: [
+        { id: 'default', name: 'Default' },
+        { id: 'plan', name: 'Plan' },
+      ],
+    },
+    models: {
+      currentModelId: 'm1',
+      availableModels: [{ modelId: 'm1', name: 'Model One' }, { modelId: 'm2', name: 'Model Two' }],
+    },
+    configOptions: null,
+  })),
   acpPrompt: vi.fn(async () => undefined),
+  acpSetConfigOption: vi.fn(async () => null),
+  acpSetMode: vi.fn(async () => undefined),
+  acpSetModel: vi.fn(async () => undefined),
   onAcpSession: vi.fn(async () => () => {}),
 }));
 

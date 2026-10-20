@@ -13,11 +13,96 @@ import { IconButton } from '@ui/IconButton';
 import ErrorBox from '@ui/ErrorBox';
 import { TextArea } from '@ui/TextInput';
 import KeyHint from '@ui/KeyHint';
+import { formatCompact } from '@features/agent/model/usageStats';
 import { useActiveWorkspace } from '@features/workspace';
 import { toExchanges } from '@features/chat/model/exchanges';
 import AiBlock from '@features/chat/components/AiBlock';
 import ChatComposerShell from './ChatComposerShell';
-import { bindHarnessEvents, useHarnessStore } from '../stores/harness';
+import HarnessSelector, { type HarnessSelectorOption } from './HarnessSelector';
+import { bindHarnessEvents, useHarnessStore, type HarnessSession } from '../stores/harness';
+import type { AcpConfigGroup, AcpConfigValue } from '@platform/api/acp';
+
+/** One control in the composer's status row. */
+interface SessionSelector {
+  key: string;
+  label: string;
+  value: string;
+  options: HarnessSelectorOption[];
+  apply: (value: string) => void;
+}
+
+/** Config options first (the protocol's newer shape), then the older mode and model fields. */
+function sessionSelectors(session: HarnessSession, tabId: string): SessionSelector[] {
+  const store = useHarnessStore.getState();
+  const selectors: SessionSelector[] = [];
+  const configs = session.configOptions ?? [];
+  for (const option of configs) {
+    if (option.type !== 'select') continue;
+    const options = flattenConfigOptions(option.options ?? []);
+    if (options.length === 0) continue;
+    selectors.push({
+      key: `config-${option.id}`,
+      label: option.name,
+      value: String(option.currentValue),
+      options,
+      apply: (value) => void store.setConfigOption(tabId, option.id, value),
+    });
+  }
+  const hasMode = configs.some((option) => option.category === 'mode');
+  if (!hasMode && session.modes) {
+    selectors.push({
+      key: 'mode',
+      label: t('Mode'),
+      value: session.modes.currentModeId,
+      options: session.modes.availableModes.map((mode) => ({
+        value: mode.id, label: mode.name, description: mode.description,
+      })),
+      apply: (value) => void store.setMode(tabId, value),
+    });
+  }
+  const hasModel = configs.some((option) => option.category === 'model');
+  if (!hasModel && session.models) {
+    selectors.push({
+      key: 'model',
+      label: t('Model'),
+      value: session.models.currentModelId,
+      options: session.models.availableModels.map((model) => ({
+        value: model.modelId, label: model.name || model.modelId, description: model.description ?? undefined,
+      })),
+      apply: (value) => void store.setModel(tabId, value),
+    });
+  }
+  return selectors;
+}
+
+/** Grouped select values flatten into one list; the group names add nothing to a short menu. */
+function flattenConfigOptions(options: Array<AcpConfigValue | AcpConfigGroup>): HarnessSelectorOption[] {
+  return options.flatMap((entry) => ('group' in entry && Array.isArray(entry.options)
+    ? entry.options.map((value) => ({ value: value.value, label: value.name, description: value.description }))
+    : [{
+        value: (entry as AcpConfigValue).value,
+        label: (entry as AcpConfigValue).name,
+        description: (entry as AcpConfigValue).description,
+      }]));
+}
+
+/** The login instructions an agent published, shown when a turn fails because it is not signed in. */
+function authHints(agent: HarnessSession['agent']): string[] {
+  const methods = agent?.authMethods;
+  if (!Array.isArray(methods)) return [];
+  return methods
+    .map((method) => {
+      const entry = (method ?? {}) as Record<string, unknown>;
+      const description = typeof entry.description === 'string' ? entry.description.trim() : '';
+      return description || (typeof entry.name === 'string' ? entry.name.trim() : '');
+    })
+    .filter((text) => text.length > 0);
+}
+
+/** The context window in use, as the agent last reported it. */
+function contextLabel(context: { used: number; size: number }): string {
+  return context.size > 0 ? `${formatCompact(context.used)}/${formatCompact(context.size)}` : formatCompact(context.used);
+}
 
 /**
  * HarnessView — the workspace page of one external harness session.
@@ -52,6 +137,9 @@ export default function HarnessView({ tabId, harness, cwd }: { tabId: string; ha
   const agent = session?.agent?.agentInfo;
   const exchanges = toExchanges(session?.messages ?? []);
   const canSend = Boolean(session?.sessionId) && !session?.pending && text.trim().length > 0;
+  const selectors = session ? sessionSelectors(session, tabId) : [];
+  const hints = authHints(session?.agent ?? null);
+  const plan = session?.plan ?? [];
 
   useEffect(() => {
     const body = bodyRef.current;
@@ -73,12 +161,38 @@ export default function HarnessView({ tabId, harness, cwd }: { tabId: string; ha
           {t('Opening the harness session…')}
         </p>}
         {session?.error && <ErrorBox compact>{session.error}</ErrorBox>}
+        {/* A failed turn is often just a missing login: the agent said how to sign in at handshake. */}
+        {session?.error && hints.length > 0 && (
+          <p data-testid="harness-auth-hint" style={{ margin: '2px 4px 8px', color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
+            {t('Log in to this agent first:')} {hints.join(' · ')}
+          </p>
+        )}
         {session?.note && <p data-testid="harness-note" style={{ margin: '6px 4px', color: 'var(--text-muted)', fontSize: 'var(--fs-micro)' }}>
           {session.note}
         </p>}
         {exchanges.map((exchange) => (
           <AiBlock key={exchange.id} exchange={exchange} presentation="conversation" />
         ))}
+        {/* The plan the agent publishes while it works, in the order it sent it. */}
+        {plan.length > 0 && (
+          <div data-testid="harness-plan" style={{
+            margin: '10px 4px', padding: '8px 10px', border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-inner)', background: 'var(--surface)',
+          }}>
+            <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-caption)', marginBottom: 4 }}>{t('Plan')}</div>
+            {plan.map((entry, index) => (
+              <div key={index} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '2px 0' }}>
+                <span className="harness-plan-mark" aria-hidden="true"
+                  data-state={entry.status === 'completed' ? 'done' : entry.status === 'in_progress' ? 'active' : 'todo'} />
+                <span style={{
+                  fontSize: 'var(--fs-label)', lineHeight: 1.5,
+                  color: entry.status === 'completed' ? 'var(--text-muted)' : 'var(--text-primary)',
+                  textDecoration: entry.status === 'completed' ? 'line-through' : undefined,
+                }}>{entry.content}</span>
+              </div>
+            ))}
+          </div>
+        )}
         {/* The approval card sits at the end of the transcript, where the turn is: it reuses the
             app's own approval styling, and its buttons are the options the harness offered. */}
         {session?.permission && (
@@ -107,6 +221,15 @@ export default function HarnessView({ tabId, harness, cwd }: { tabId: string; ha
         </span>}
         hints={<><KeyHint shortcut="Enter" />{t('Send')}</>}
         status={<>
+          {selectors.map((selector) => (
+            <HarnessSelector key={selector.key} testId={`harness-selector-${selector.key}`} label={selector.label}
+              value={selector.value} options={selector.options} onChange={selector.apply} />
+          ))}
+          {session?.context && (session.context.used > 0 || session.context.size > 0) && (
+            <span data-testid="harness-context" className="harness-context" data-tip={t('Context window in use')}>
+              {contextLabel(session.context)}
+            </span>
+          )}
           {session?.opening && <span data-testid="harness-opening" style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
             {t('Connecting…')}
           </span>}

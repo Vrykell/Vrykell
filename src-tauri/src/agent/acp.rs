@@ -36,6 +36,10 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(180);
 /// program's start-up, so this only has to be generous.
 const SESSION_TIMEOUT: Duration = Duration::from_secs(120);
 
+/// Switching a mode, a model or another session option is a small request, but the agent may
+/// reload a model when it happens.
+const CONFIG_TIMEOUT: Duration = Duration::from_secs(60);
+
 /// A turn stays open until the agent stops it: real turns run for minutes (thinking, tool calls)
 /// and the stop button — not a clock — is what ends one early. The budget is a safety net for an
 /// agent that never answers at all.
@@ -360,16 +364,51 @@ impl AcpClient {
         .await
     }
 
-    /// Create a session in a working directory and answer with its id.
-    pub async fn new_session(&self, cwd: &str) -> Result<String, String> {
+    /// Create a session in a working directory and answer with the agent's whole session result —
+    /// the id plus whatever state it publishes (modes, models, config options).
+    pub async fn new_session(&self, cwd: &str) -> Result<Value, String> {
         let result = self
             .request("session/new", json!({ "cwd": cwd, "mcpServers": [] }), SESSION_TIMEOUT)
             .await?;
-        result
-            .get("sessionId")
-            .and_then(Value::as_str)
-            .map(str::to_string)
-            .ok_or_else(|| "the agent created no session".to_string())
+        if result.get("sessionId").and_then(Value::as_str).is_none() {
+            return Err("the agent created no session".to_string());
+        }
+        Ok(result)
+    }
+
+    /// Switch the session mode (the legacy mode API; agents with config options expose it there).
+    pub async fn set_mode(&self, session_id: &str, mode_id: &str) -> Result<(), String> {
+        self.request(
+            "session/set_mode",
+            json!({ "sessionId": session_id, "modeId": mode_id }),
+            CONFIG_TIMEOUT,
+        )
+        .await
+        .map(|_| ())
+    }
+
+    /// Switch the session model: the older model API, which the agents still accept next to
+    /// `session/set_config_option`.
+    pub async fn set_model(&self, session_id: &str, model_id: &str) -> Result<(), String> {
+        self.request(
+            "session/set_model",
+            json!({ "sessionId": session_id, "modelId": model_id }),
+            CONFIG_TIMEOUT,
+        )
+        .await
+        .map(|_| ())
+    }
+
+    /// Set one session config option; the answer carries the complete configuration state.
+    pub async fn set_config_option(&self, session_id: &str, config_id: &str, value: Value) -> Result<Value, String> {
+        let result = self
+            .request(
+                "session/set_config_option",
+                json!({ "sessionId": session_id, "configId": config_id, "value": value }),
+                CONFIG_TIMEOUT,
+            )
+            .await?;
+        Ok(result.get("configOptions").cloned().unwrap_or(Value::Null))
     }
 
     /// Send a prompt and wait for the stop reason; the turn's content arrives as notifications.
@@ -689,12 +728,17 @@ pub async fn acp_open<R: tauri::Runtime>(
         .new_session(&session_cwd)
         .await
         .map_err(|e| format!("harness could not open a session: {e}"))?;
+    let session_id = session
+        .get("sessionId")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string();
 
     // Pump the agent's notifications for as long as the session lives.
     let pump_app = app.clone();
     let pump_name = harness.name.clone();
     let mut saw_update = false;
-    let pump_session = session.clone();
+    let pump_session = session_id.clone();
     let pump_client = Arc::downgrade(&client);
     tokio::spawn(async move {
         loop {
@@ -718,13 +762,49 @@ pub async fn acp_open<R: tauri::Runtime>(
         }
     });
 
-    state.insert(session.clone(), client);
-    note("acp-open-ok", json!({ "name": harness.name, "sessionId": session, "cwd": session_cwd }));
+    state.insert(session_id.clone(), client);
+    note("acp-open-ok", json!({ "name": harness.name, "sessionId": session_id, "cwd": session_cwd }));
+    // The session's own state travels with the id: the page shows the modes, models and config
+    // options the agent published, and needs them before the first turn.
     Ok(json!({
-        "sessionId": session,
+        "sessionId": session_id,
         "harness": harness.name,
         "agent": describe_agent(&info),
+        "modes": session.get("modes").cloned().unwrap_or(Value::Null),
+        "models": session.get("models").cloned().unwrap_or(Value::Null),
+        "configOptions": session.get("configOptions").cloned().unwrap_or(Value::Null),
     }))
+}
+
+/// Switch the session mode (legacy mode API; agents that publish config options get those instead).
+#[tauri::command]
+pub async fn acp_set_mode(
+    state: tauri::State<'_, AcpRuntime>,
+    session_id: String,
+    mode_id: String,
+) -> Result<(), String> {
+    state.get(&session_id)?.set_mode(&session_id, &mode_id).await
+}
+
+/// Switch the session model (legacy model API; see `acp_set_config_option` for the newer one).
+#[tauri::command]
+pub async fn acp_set_model(
+    state: tauri::State<'_, AcpRuntime>,
+    session_id: String,
+    model_id: String,
+) -> Result<(), String> {
+    state.get(&session_id)?.set_model(&session_id, &model_id).await
+}
+
+/// Set one session config option and answer with the complete configuration state the agent returns.
+#[tauri::command]
+pub async fn acp_set_config_option(
+    state: tauri::State<'_, AcpRuntime>,
+    session_id: String,
+    config_id: String,
+    value: Value,
+) -> Result<Value, String> {
+    state.get(&session_id)?.set_config_option(&session_id, &config_id, value).await
 }
 
 /// Send a prompt. The turn runs in the background; its content and stop reason arrive as events.
@@ -838,7 +918,35 @@ mod tests {
                     let _ = pipe.write_all(format!("{reply}\n").as_bytes()).await;
                 }
                 "session/new" => {
-                    let reply = json!({ "jsonrpc": "2.0", "id": id, "result": { "sessionId": "sess_1" } });
+                    let reply = json!({ "jsonrpc": "2.0", "id": id, "result": {
+                        "sessionId": "sess_1",
+                        "modes": {
+                            "currentModeId": "default",
+                            "availableModes": [
+                                { "id": "default", "name": "Default" },
+                                { "id": "plan", "name": "Plan" }
+                            ]
+                        },
+                        "models": {
+                            "currentModelId": "m1",
+                            "availableModels": [{ "modelId": "m1", "name": "Model One" }]
+                        }
+                    } });
+                    let _ = pipe.write_all(format!("{reply}\n").as_bytes()).await;
+                }
+                "session/set_mode" | "session/set_model" => {
+                    let reply = json!({ "jsonrpc": "2.0", "id": id, "result": {} });
+                    let _ = pipe.write_all(format!("{reply}\n").as_bytes()).await;
+                }
+                "session/set_config_option" => {
+                    // The answer carries the complete state, as the specification requires.
+                    let reply = json!({ "jsonrpc": "2.0", "id": id, "result": {
+                        "configOptions": [{
+                            "id": "mode", "name": "Mode", "type": "select",
+                            "category": "mode", "currentValue": "plan",
+                            "options": [{ "value": "plan", "name": "Plan" }]
+                        }]
+                    } });
                     let _ = pipe.write_all(format!("{reply}\n").as_bytes()).await;
                 }
                 "session/prompt" => {
@@ -914,9 +1022,10 @@ mod tests {
         assert_eq!(caps.get("terminal"), Some(&json!(false)));
 
         let session = client.new_session("/tmp/project").await.expect("session");
-        assert_eq!(session, "sess_1");
+        assert_eq!(session.get("sessionId"), Some(&json!("sess_1")));
+        let session_id = session.get("sessionId").and_then(Value::as_str).unwrap().to_string();
 
-        let turn = client.prompt(&session, json!([{ "type": "text", "text": "hi" }]));
+        let turn = client.prompt(&session_id, json!([{ "type": "text", "text": "hi" }]));
         let stop = tokio::join!(turn, async {
             // The two chunks arrive while the turn is open.
             let first = client.next_event().await.expect("chunk");
@@ -1031,11 +1140,44 @@ mod tests {
 
         client.initialize("vrykell", "0.1.0").await.expect("handshake");
         let session = client.new_session("/tmp/project").await.expect("session");
+        let session_id = session.get("sessionId").and_then(Value::as_str).unwrap().to_string();
         let stop = client
-            .prompt(&session, json!([{ "type": "text", "text": "hi" }]))
+            .prompt(&session_id, json!([{ "type": "text", "text": "hi" }]))
             .await
             .expect("a slow turn is still a turn");
         assert_eq!(stop, "end_turn");
+        agent.abort();
+    }
+
+    #[tokio::test]
+    async fn the_session_publishes_its_selectors_and_the_client_can_change_them() {
+        let seen: Arc<Mutex<Vec<Value>>> = Arc::new(Mutex::new(Vec::new()));
+        let (client, agent) = client_pair(seen.clone(), Arc::new(|_| None));
+        client.initialize("vrykell", "0.1.0").await.expect("handshake");
+
+        // The session result is the whole state: id plus the modes and models the agent offers.
+        let session = client.new_session("/tmp/project").await.expect("session");
+        assert_eq!(session.pointer("/modes/currentModeId"), Some(&json!("default")));
+        assert_eq!(session.pointer("/models/currentModelId"), Some(&json!("m1")));
+        let id = session.get("sessionId").and_then(Value::as_str).unwrap();
+
+        client.set_mode(id, "plan").await.expect("mode");
+        client.set_model(id, "m2").await.expect("model");
+        let options = client.set_config_option(id, "mode", json!("plan")).await.expect("config");
+        assert_eq!(options.pointer("/0/currentValue"), Some(&json!("plan")));
+
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        let sent = seen.lock().unwrap();
+        let params = |method: &str| {
+            sent.iter()
+                .find(|message| message.get("method") == Some(&json!(method)))
+                .and_then(|message| message.get("params").cloned())
+                .unwrap_or(Value::Null)
+        };
+        assert_eq!(params("session/set_mode").get("modeId"), Some(&json!("plan")));
+        assert_eq!(params("session/set_model").get("modelId"), Some(&json!("m2")));
+        assert_eq!(params("session/set_config_option").get("configId"), Some(&json!("mode")));
+        drop(sent);
         agent.abort();
     }
 

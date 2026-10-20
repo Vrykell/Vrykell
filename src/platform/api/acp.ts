@@ -31,10 +31,61 @@ export interface AgentDescription {
   authMethods: unknown;
 }
 
+export interface AcpSessionMode {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+/** The modes an agent offers (the older mode API, which the current adapters still answer). */
+export interface AcpSessionModes {
+  currentModeId: string;
+  availableModes: AcpSessionMode[];
+}
+
+export interface AcpModelInfo {
+  modelId: string;
+  name?: string;
+  description?: string | null;
+}
+
+/** The models an agent offers (the older model API). */
+export interface AcpSessionModels {
+  currentModelId: string;
+  availableModels: AcpModelInfo[];
+}
+
+export interface AcpConfigValue {
+  value: string;
+  name: string;
+  description?: string;
+}
+
+export interface AcpConfigGroup {
+  group: string;
+  name: string;
+  options: AcpConfigValue[];
+}
+
+/** One session-level selector (mode, model, reasoning level, ...) in the protocol's newer shape. */
+export interface AcpConfigOption {
+  id: string;
+  name: string;
+  description?: string;
+  category?: string;
+  type?: string;
+  currentValue: string | boolean;
+  options?: Array<AcpConfigValue | AcpConfigGroup>;
+}
+
 export interface HarnessOpenResult {
   sessionId: string;
   harness: string;
   agent: AgentDescription;
+  /** Session state the agent published with the session; null when it publishes none. */
+  modes: AcpSessionModes | null;
+  models: AcpSessionModels | null;
+  configOptions: AcpConfigOption[] | null;
 }
 
 /** What the backend pushes while a session lives. */
@@ -60,6 +111,16 @@ export const acpPrompt = (sessionId: string, text: string) => invoke<void>('acp_
 
 /** Ask the agent to stop the current turn. */
 export const acpCancel = (sessionId: string) => invoke<void>('acp_cancel', { sessionId });
+
+/** Switch the session mode (legacy mode API). */
+export const acpSetMode = (sessionId: string, modeId: string) => invoke<void>('acp_set_mode', { sessionId, modeId });
+
+/** Switch the session model (legacy model API). */
+export const acpSetModel = (sessionId: string, modelId: string) => invoke<void>('acp_set_model', { sessionId, modelId });
+
+/** Set one session config option; the answer is the complete configuration state. */
+export const acpSetConfigOption = (sessionId: string, configId: string, value: string | boolean) =>
+  invoke<AcpConfigOption[] | null>('acp_set_config_option', { sessionId, configId, value });
 
 /** Answer a permission request: an option the agent offered, or `null` for the protocol's cancel. */
 export const acpAnswerPermission = (sessionId: string, toolCallId: string, optionId: string | null) =>

@@ -624,6 +624,17 @@ button.window-control-button {
 .chat-input-status [data-testid="pill-name"]:focus-visible { border-radius: 8px; }
 .chat-input-status .chat-mode-trigger { padding: 0 4px; white-space: nowrap; }
 .ai-chat-panel .chat-input-status > button.chat-send-button { border-radius: 50%; background: var(--primary-button-bg); color: var(--primary-button-text); }
+
+/* Session controls in the harness composer: quiet chips, like the panel's mode and model. */
+.harness-selector { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 200px; height: 22px; padding: 0 6px; border: 0; border-radius: 6px; background: transparent; color: var(--text-primary); font: var(--fw-regular) var(--fs-micro) var(--font-ui); cursor: pointer; transition: background var(--dur-fast) var(--ease); }
+.harness-selector:hover, .harness-selector[aria-expanded="true"] { background: var(--hover); }
+.harness-selector-label { flex-shrink: 0; color: var(--text-muted); white-space: nowrap; }
+.harness-selector-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.harness-selector > svg { flex-shrink: 0; color: var(--text-muted); }
+.harness-context { color: var(--text-muted); font-size: var(--fs-micro); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.harness-plan-mark { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 7px; background: var(--border-strong); }
+.harness-plan-mark[data-state="active"] { background: var(--accent); }
+.harness-plan-mark[data-state="done"] { background: var(--text-muted); }
 button.primary-button, button.user-primary-action.text-control { background: var(--primary-button-bg); color: var(--primary-button-text); border-color: transparent; }
 .ai-chat-panel .chat-input-status > button.chat-send-button:is(:hover, :focus):not(:disabled), button.primary-button:is(:hover, :focus):not(:disabled), button.user-primary-action.text-control:is(:hover, :focus):not(:disabled) { --primary-button-bg: var(--primary-button-hover-bg); background: var(--primary-button-bg); }
 @container (max-width: 300px) {
