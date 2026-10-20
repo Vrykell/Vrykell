@@ -1,8 +1,9 @@
 import UploadManager from '../components/UploadManager';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import DownloadManager from '../components/DownloadManager';
 import { transferPercent, type TransferJob } from '../services/transfers';
+import type { DownloadEntry } from '../services/downloads';
 
 const mocks = vi.hoisted(() => ({ list: vi.fn(), control: vi.fn(), clear: vi.fn(), remove: vi.fn(), history: vi.fn(), historyRemove: vi.fn() }));
 vi.mock('../services/transfers', async () => ({ ...await vi.importActual<typeof import('../services/transfers')>('../services/transfers'), transfersList: mocks.list, transfersControl: mocks.control, transfersClear: mocks.clear, transfersDelete: mocks.remove }));
@@ -98,4 +99,84 @@ it('keeps history failures visible when transfer polling succeeds', async () => 
   render(<DownloadManager onBack={() => {}} />);
   expect(await screen.findByText('Error: History unavailable')).toBeVisible();
   expect(screen.getByRole('button', { name: '重试' })).toBeVisible();
+});
+
+it('waits for both task and download history responses before showing an empty state', async () => {
+  let finishJobs!: (jobs: TransferJob[]) => void;
+  let finishHistory!: (entries: DownloadEntry[]) => void;
+  mocks.list.mockReturnValue(new Promise<TransferJob[]>(resolve => { finishJobs = resolve; }));
+  mocks.history.mockReturnValue(new Promise<DownloadEntry[]>(resolve => { finishHistory = resolve; }));
+  const onBack = vi.fn();
+  render(<DownloadManager onBack={onBack} />);
+  expect(screen.getByRole('status')).toHaveTextContent('正在加载传输记录');
+  expect(screen.queryByText('暂无传输记录')).not.toBeInTheDocument();
+  await act(async () => finishJobs([]));
+  expect(screen.getByRole('status')).toHaveTextContent('正在加载传输记录');
+  await act(async () => finishHistory([]));
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  expect(screen.getByText('暂无传输记录')).toBeVisible();
+  expect(screen.getByText(/在远程文件面板下载文件或文件夹后/)).toBeVisible();
+  fireEvent.click(screen.getAllByRole('button', { name: '返回文件浏览' })[1]);
+  expect(onBack).toHaveBeenCalledOnce();
+});
+
+it('groups tasks by status, keeps newest records first and exposes transfer endpoints', async () => {
+  mocks.list.mockResolvedValue([
+    { ...job, id: 'old', name: 'old.bin' },
+    { ...job, id: 'failed', name: 'failed.bin', status: 'failed', error: 'Permission denied' },
+    { ...job, id: 'done', name: 'done.bin', status: 'completed' },
+    { ...job, id: 'new', name: 'new.bin', createdAt: 2 },
+    { ...job, id: 'download', name: 'download.bin', direction: 'download' },
+  ]);
+  render(<UploadManager onBack={() => {}} />);
+  const ongoing = await screen.findByRole('region', { name: '进行中' });
+  expect(within(ongoing).getAllByRole('article').map(card => card.getAttribute('aria-label'))).toEqual(['new.bin', 'old.bin']);
+  expect(within(screen.getByRole('region', { name: '已停止' })).getByRole('article', { name: 'failed.bin' })).toBeVisible();
+  expect(within(screen.getByRole('region', { name: '已完成' })).getByRole('article', { name: 'done.bin' })).toBeVisible();
+  expect(screen.queryByText('download.bin')).not.toBeInTheDocument();
+  const newest = within(screen.getByRole('article', { name: 'new.bin' }));
+  expect(newest.getByText('Server')).toBeVisible();
+  expect(newest.getAllByRole('definition').map(path => path.textContent)).toEqual(['/local/large.bin', '/remote/large.bin']);
+  expect(newest.getByText('10 B/s')).toBeVisible();
+  expect(newest.getByText('约剩余 5 秒')).toBeVisible();
+  expect(screen.getByRole('alert')).toHaveTextContent('Permission denied');
+});
+
+it('merges legacy download records into the same completed group without duplicates', async () => {
+  const entry: DownloadEntry = { id: 8, name: 'large.bin', localPath: '/local/large.bin', remotePath: '/remote/large.bin', connectionName: 'Server', isDir: false, size: 100, downloadedAt: 2 };
+  mocks.history.mockResolvedValue([entry, { ...entry, id: 9, name: 'older.zip', localPath: '/local/older.zip', remotePath: '/remote/older.zip', downloadedAt: 1 }]);
+  mocks.list.mockResolvedValue([{ ...job, direction: 'download', status: 'completed', bytes: 100, createdAt: 3 }]);
+  render(<DownloadManager onBack={() => {}} />);
+  const complete = await screen.findByRole('region', { name: '已完成' });
+  await waitFor(() => expect(within(complete).getAllByRole('article')).toHaveLength(2));
+  expect(screen.getAllByText('large.bin')).toHaveLength(1);
+  expect(within(screen.getByRole('article', { name: 'large.bin' })).getAllByRole('definition').map(path => path.textContent)).toEqual(['/remote/large.bin', '/local/large.bin']);
+  mocks.list.mockResolvedValue([]);
+  mocks.history.mockResolvedValue([{ ...entry, id: 9, name: 'older.zip', localPath: '/local/older.zip', remotePath: '/remote/older.zip', downloadedAt: 1 }]);
+  fireEvent.click(screen.getByTestId('transfer-delete-upload-1'));
+  await waitFor(() => expect(screen.queryByText('large.bin')).not.toBeInTheDocument());
+  expect(await screen.findByText('older.zip')).toBeVisible();
+  expect(mocks.history).toHaveBeenCalledTimes(2);
+});
+
+it('disables task actions while an operation is pending and restores them after failure', async () => {
+  let rejectControl!: (reason: Error) => void;
+  mocks.control.mockReturnValue(new Promise<void>((_, reject) => { rejectControl = reject; }));
+  render(<UploadManager onBack={() => {}} />);
+  fireEvent.click(await screen.findByRole('button', { name: '暂停' }));
+  const card = screen.getByRole('article', { name: 'large.bin' });
+  expect(card).toHaveAttribute('aria-busy', 'true');
+  for (const button of within(card).getAllByRole('button')) expect(button).toBeDisabled();
+  await act(async () => rejectControl(new Error('Connection lost')));
+  expect(card).toHaveAttribute('aria-busy', 'false');
+  expect(screen.getByRole('button', { name: '暂停' })).toBeEnabled();
+});
+
+it('describes transfer preparation without inventing a percentage or remaining time', async () => {
+  mocks.list.mockResolvedValue([{ ...job, bytes: 0, total: 0, speed: 0 }]);
+  render(<UploadManager onBack={() => {}} />);
+  expect(await screen.findByText('正在准备传输…')).toBeVisible();
+  expect(screen.queryByText('0%')).not.toBeInTheDocument();
+  expect(screen.queryByText(/约剩余/)).not.toBeInTheDocument();
+  expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
 });
