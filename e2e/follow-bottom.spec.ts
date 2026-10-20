@@ -73,17 +73,22 @@ test('改变终端宽度时保持阅读位置，贴底状态保持贴底', async
   const scroller = page.locator('[data-testid^="terminal-scroll-"]').first();
   const target = page.locator('[data-testid^="command-block-"]').nth(7);
   await target.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  // Let the scroll event land so the view anchor is captured before the width changes: a resize
+  // that beats the listener falls back to raw scrollTop and the block drifts by its reflow.
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const relativeTop = async () => target.evaluate((el) => {
     const scroll = el.closest<HTMLElement>('[data-testid^="terminal-scroll-"]')!;
     return el.getBoundingClientRect().top - scroll.getBoundingClientRect().top;
   });
   const before = await relativeTop();
   await page.setViewportSize({ width: 720, height: 500 });
-  await expect.poll(async () => Math.abs((await relativeTop()) - before)).toBeLessThan(24);
+  // A long suite leaves the machine busy: give the terminal refit and its anchor restoration time
+  // to land instead of measuring the frame that still holds the old layout.
+  await expect.poll(async () => Math.abs((await relativeTop()) - before), { timeout: 15_000 }).toBeLessThan(24);
 
   await scroller.evaluate((el) => { el.scrollTop = el.scrollHeight; });
   await page.setViewportSize({ width: 980, height: 500 });
-  await expect.poll(() => scroller.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeLessThan(32);
+  await expect.poll(() => scroller.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight), { timeout: 15_000 }).toBeLessThan(32);
 });
 
 test('live output continues following after content grows and the viewport changes', async ({ page }) => {

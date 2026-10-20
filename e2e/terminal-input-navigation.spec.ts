@@ -175,9 +175,20 @@ test('horizontal overlay tracks retain content height and support keyboard and d
   await bar.focus();
   await bar.press('End');
   await expect.poll(() => surface.evaluate(element => element.scrollLeft)).toBe(600);
+  // The track is placed over the surface's right edge; a frame that still holds an older placement
+  // would send the pointer somewhere else, so wait for it to line up before using its geometry.
+  await expect.poll(async () => {
+    const box = await bar.boundingBox();
+    const right = await surface.evaluate(element => element.getBoundingClientRect().right);
+    return box !== null && Math.abs(box.x + box.width - right) < 2;
+  }).toBe(true);
+  // Thumbs reveal on hover (the overlay keeps its track invisible until the surface is entered).
+  await surface.hover();
+  await expect(bar).toHaveAttribute('data-visible', 'true');
   const thumb = (await bar.locator('.overlay-scrollbar-thumb').boundingBox())!;
-  await page.mouse.move(thumb.x + thumb.width / 2, thumb.y + thumb.height / 2);
+  await page.mouse.move(thumb.x + thumb.width / 2, thumb.y + thumb.height / 2, { steps: 3 });
   await page.mouse.down();
+  await expect(bar).toHaveAttribute('data-dragging', 'true');
   await page.mouse.move(thumb.x - 80, thumb.y + thumb.height / 2, { steps: 6 });
   await page.mouse.up();
   await expect.poll(() => surface.evaluate(element => element.scrollLeft)).toBeLessThan(400);
