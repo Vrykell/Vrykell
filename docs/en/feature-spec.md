@@ -423,12 +423,12 @@ Surface roles use the following default levels. Nested cards and readouts do not
 
 | Role | Dark | Light |
 |---|---|---|
-| Page background | `#1E1E1E` | `#E8E8E8` |
-| Sidebars and settings navigation | `#242424` | `#EFEFEF` |
-| Window frame and activity rail | `#303030` | `#F5F5F5` |
-| Panels, cards and readouts | `#2B2B2B` | `#F5F5F5` |
-| Floating dialogs and menus | `#313131` | `#FAFAFA` |
-| Editable fields and composers | `#3B3B3B` | `#FFFFFF` |
+| Page background | `#161616` | `#E8E8E8` |
+| Sidebars and settings navigation | `#1C1C1C` | `#EFEFEF` |
+| Window frame and activity rail | `#262626` | `#F5F5F5` |
+| Panels, cards and readouts | `#222222` | `#F5F5F5` |
+| Floating dialogs and menus | `#292929` | `#FAFAFA` |
+| Editable fields and composers | `#2E2E2E` | `#FFFFFF` |
 
 Global search places only the query in a lighter field, with inset spacing on all sides. Scope, clear and close controls stay flat; recent scope labels and footer shortcuts do not add nested cards. Keyboard focus uses a subtle fill on actions and options rather than a bright edge. Rename fields and split-pane dividers retain their resting border.
 
