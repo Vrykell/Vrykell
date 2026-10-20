@@ -13,13 +13,12 @@
 .git-file-status[data-kind="conflicts"] { color: var(--error); }
 .git-empty { padding: 24px 16px; color: var(--text-muted); text-align: center; font-size: var(--fs-caption); line-height: 1.6; }
 .git-terminal-host { flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
-.git-review { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--canvas); }
+.git-review { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--xterm-bg); }
 .git-review .code-diff-frame { border-radius: 0; clip-path: inset(0); }
 .git-diff-navigation { display: inline-flex; align-items: center; flex-shrink: 0; gap: 2px; }
 .git-review-toolbar .ui-select { max-width: 126px; }
 .git-commit-area { display: flex; flex-direction: column; gap: 8px; padding: 0 10px 12px; flex-shrink: 0; max-height: 52%; overflow-y: auto; }
 .git-message-field { position: relative; display: flex; border-radius: var(--radius-inner); background: var(--field-bg); border: 1px solid var(--border); }
-.git-message-field:focus-within { border-color: var(--focus-ring); }
 .git-message-field textarea { display: block; resize: vertical; width: 100%; min-height: 76px; max-height: 180px; padding: 9px 34px 9px 10px; border: none; outline: none; background: transparent; color: var(--text-primary); font: var(--fs-caption)/1.5 var(--font-ui); }
 .git-message-field > button { position: absolute; right: 4px; top: 4px; }
 .git-commit-buttons { display: flex; align-items: stretch; gap: 0; border-radius: 6px; overflow: hidden; background: var(--primary-button-bg); flex-shrink: 0; }

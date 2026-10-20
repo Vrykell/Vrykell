@@ -62,3 +62,34 @@ it('publishes a clean branch without an upstream and avoids a staging hint on cl
   expect(screen.getByRole('button', { name: '发布分支' })).toBeEnabled();
   expect(screen.queryByText('暂存变更后即可提交。')).toBeNull();
 });
+
+it('keeps synchronization busy until the operation finishes and restores the button after failure', async () => {
+  let reject: (reason: Error) => void = () => {};
+  vi.mocked(operateGit).mockImplementation(() => new Promise((_, fail) => { reject = fail; }));
+  render(<GitCommit target={target} snapshot={{ ...snapshot, entries: [], upstream: 'origin/main', ahead: 1 }} refresh={() => {}} />);
+  fireEvent.click(screen.getByRole('button', { name: '同步更改 ↑1' }));
+  const syncing = screen.getByRole('button', { name: '正在同步… ↑1' });
+  expect(syncing).toHaveAttribute('aria-busy', 'true');
+  expect(syncing).toBeDisabled();
+  await act(async () => reject(new Error('Network unavailable')));
+  const retry = await screen.findByRole('button', { name: '同步更改 ↑1' });
+  expect(retry).toHaveAttribute('aria-busy', 'false');
+  expect(retry).toBeEnabled();
+  expect(screen.getByText('版本库操作失败')).toBeVisible();
+});
+
+it('keeps feedback for a complete turn when synchronization finishes immediately', async () => {
+  vi.useFakeTimers();
+  try {
+    vi.mocked(operateGit).mockResolvedValue(undefined);
+    const clean = { ...snapshot, entries: [], upstream: 'origin/main', ahead: 1 };
+    const { rerender } = render(<GitCommit target={target} snapshot={clean} refresh={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: '同步更改 ↑1' }));
+    await act(async () => {});
+    rerender(<GitCommit target={target} snapshot={{ ...clean, ahead: 0 }} refresh={() => {}} />);
+    await act(async () => { await vi.advanceTimersByTimeAsync(799); });
+    expect(screen.getByRole('button', { name: '正在同步…' })).toHaveAttribute('aria-busy', 'true');
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(screen.getByRole('button', { name: '已是最新' })).toHaveAttribute('aria-busy', 'false');
+  } finally { vi.useRealTimers(); }
+});

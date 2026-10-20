@@ -92,6 +92,9 @@ test('generates an editable commit message and runs commit and remote operations
   await panel.getByRole('button', { name: '生成提交信息' }).click();
   const message = panel.getByRole('textbox', { name: '提交信息' });
   await expect(message).toHaveValue('feat: add source control', { timeout: 15000 });
+  const restingBorder = await message.evaluate(element => getComputedStyle(element.parentElement!).borderColor);
+  await message.focus();
+  expect(await message.evaluate(element => getComputedStyle(element.parentElement!).borderColor)).toBe(restingBorder);
   await message.fill('feat: review source control');
   await message.press('Control+Enter');
   await expect(message).toHaveValue('');
@@ -151,7 +154,25 @@ test('uses one joined button and adapts clean repositories to synchronization an
   const right = (await group.getByRole('button', { name: '提交操作' }).boundingBox())!;
   expect(Math.abs(left.x + left.width - right.x)).toBeLessThan(1);
   expect(left.height).toBe(right.height);
+  await page.evaluate(() => {
+    const runtime = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: { operation?: string }) => Promise<unknown> } }).__TAURI_INTERNALS__;
+    const invoke = runtime.invoke;
+    runtime.invoke = async (command, args) => {
+      if (command === 'git_operate' && args?.operation === 'sync') await new Promise<void>(resolve => {
+        (window as unknown as { finishSync: () => void }).finishSync = resolve;
+      });
+      return invoke(command, args);
+    };
+  });
   await primary.click();
+  const synchronizing = group.getByRole('button', { name: '正在同步… ↓1 ↑2' });
+  await expect(synchronizing).toHaveAttribute('aria-busy', 'true');
+  await expect(synchronizing).toBeDisabled();
+  await expect(synchronizing.locator('svg')).toHaveCSS('animation-name', 'spin');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(synchronizing.locator('svg')).toHaveCSS('animation-name', 'none');
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.evaluate(() => (window as unknown as { finishSync: () => void }).finishSync());
   await expect(group.getByRole('button', { name: '已是最新' })).toBeDisabled();
   await page.evaluate(value => localStorage.setItem('mock-git-snapshot', JSON.stringify(value)), { ...clean, upstream: null, ahead: 0, behind: 0 });
   await panel.getByRole('button', { name: '刷新变更' }).click();
@@ -212,9 +233,8 @@ test('opens the composer branch menu, switches a clean branch and preserves comm
 
 test('keeps Git usable in settings and saves a prompt for the remembered workspace', async ({ page }) => {
   const panel = page.getByTestId('git-panel');
-  await panel.getByRole('button', { name: '更多版本控制操作' }).click();
-  await page.getByRole('button', { name: '版本控制设置', exact: true }).click();
-  await expect(page.getByRole('combobox', { name: '差异页面' })).toBeVisible();
+  await page.getByRole('button', { name: '设置', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: '差异页面' })).toHaveCount(0);
   await expect(panel.getByTestId('git-staged-src/main.ts')).toBeVisible();
   await panel.getByRole('button', { name: '更多版本控制操作' }).click();
   await page.getByRole('button', { name: '此工作区的 AI 提交提示词…' }).click();
@@ -237,27 +257,25 @@ test('keeps Git usable in settings and saves a prompt for the remembered workspa
   const untracked = panel.getByTestId('git-untracked-new file.ts');
   await untracked.hover(); await untracked.getByRole('button', { name: '暂存文件' }).click();
   await expect(panel.getByTestId('git-staged-new file.ts')).toBeVisible();
-  await expect(page.getByRole('combobox', { name: '差异页面' })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: '差异页面' })).toHaveCount(0);
 });
 
-test('switches diff page modes without losing open comparisons', async ({ page }) => {
+test('forces one comparison page despite a saved multi-page preference', async ({ page }) => {
+  await page.evaluate(() => localStorage.setItem('vrykell-git-preferences', JSON.stringify({ state: { diffMode: 'multiple' }, version: 0 })));
+  await page.reload();
+  if (!await page.getByTestId('git-panel').isVisible()) await page.getByRole('button', { name: '版本控制', exact: true }).click();
   const panel = page.getByTestId('git-panel');
   await panel.getByTestId('git-unstaged-src/main.ts').click();
   await panel.getByTestId('git-staged-src/main.ts').click();
   await expect(page.getByRole('tablist', { name: '已打开的差异' }).getByRole('tab')).toHaveCount(2);
-  await expect(page.locator('[data-tab-row-id]').filter({ hasText: '文件差异' })).toHaveCount(1);
-  await panel.getByRole('button', { name: '更多版本控制操作' }).click();
-  await page.getByRole('button', { name: '版本控制设置', exact: true }).click();
-  await page.getByRole('combobox', { name: '差异页面' }).click();
-  await page.getByRole('option', { name: '多页，不使用差异标签' }).click();
-  await expect(page.locator('[data-tab-row-id]').filter({ hasText: 'main.ts' })).toHaveCount(2);
-  await panel.getByTestId('git-staged-src/main.ts').click();
-  await expect(page.getByTestId('git-diff-review')).toBeVisible();
-  await expect(page.getByRole('tablist', { name: '已打开的差异' })).toHaveCount(0);
-  await panel.getByRole('button', { name: '更多版本控制操作' }).click();
-  await page.getByRole('button', { name: '版本控制设置', exact: true }).click();
-  await page.getByRole('combobox', { name: '差异页面' }).click();
-  await page.getByRole('option', { name: '单页，使用差异标签' }).click();
+  expect(await page.evaluate(async () => {
+    const path = '/src/features/workspace/stores/workspace.ts';
+    const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
+    return useWorkspaceStore.getState().tabs.filter(tab => tab.kind === 'git-diff').length;
+  })).toBe(1);
+  await page.getByRole('button', { name: '设置', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: '差异页面' })).toHaveCount(0);
+  await expect(page.locator('.settings-navigation').getByRole('button', { name: '版本控制', exact: true })).toHaveCount(0);
   await panel.getByTestId('git-staged-src/main.ts').click();
   await expect(page.getByRole('tablist', { name: '已打开的差异' }).getByRole('tab')).toHaveCount(2);
 });
