@@ -59,7 +59,7 @@ function isValidLayout(data: unknown): data is PersistedLayout {
 }
 
 const DEFAULTS: PersistedLayout = {
-  leftZone: ['tabs', 'ssh', 'files', 'git', 'command-history'], rightZone: ['chat', 'settings'],
+  leftZone: ['tabs', 'ssh', 'files', 'git', 'command-history'], rightZone: ['chat'],
   // Start with the session list; auxiliary panels open on demand.
   leftPanels: ['tabs'], rightPanels: [],
   panelWidths: {},
@@ -79,9 +79,12 @@ function loadLayout(): PersistedLayout {
     return DEFAULTS;
   }
   // Preserve saved placement, repair duplicate entries, and add missing actions.
+  // The settings page action is pinned below the left sidebar, so older layouts drop it.
+  const leftZone = [...new Set(parsed.leftZone)].filter(id => id !== 'settings');
+  const rightZone = [...new Set(parsed.rightZone)].filter(id => id !== 'settings' && !leftZone.includes(id));
   const layout: PersistedLayout = {
-    leftZone: [...new Set(parsed.leftZone)],
-    rightZone: [...new Set(parsed.rightZone)].filter(id => !parsed.leftZone.includes(id)),
+    leftZone,
+    rightZone,
     leftPanels: [...parsed.leftPanels],
     rightPanels: [...parsed.rightPanels],
     panelWidths: { ...parsed.panelWidths },
@@ -94,7 +97,7 @@ function loadLayout(): PersistedLayout {
     }
   }
   const known = new Set([...layout.leftZone, ...layout.rightZone]);
-  const missing = VALID_IDS.filter((id) => !known.has(id));
+  const missing = PANEL_IDS.filter((id) => !known.has(id));
   if (missing.length > 0) {
     layout.leftZone.push(...missing.filter(id => DEFAULTS.leftZone.includes(id)));
     layout.rightZone.push(...missing.filter(id => !DEFAULTS.leftZone.includes(id)));

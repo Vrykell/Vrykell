@@ -374,9 +374,11 @@ button.state-icon-button[aria-pressed="true"]:hover { background: var(--selectio
 .workspace-side-panel[data-side="right"] { border-radius: 0 var(--radius-block) var(--radius-block) 0; overflow: visible; }
 .workspace-activity-bar {
   width: var(--workspace-activity-width); flex-shrink: 0; display: flex; flex-direction: column;
+  align-self: stretch; height: 100%; position: relative;
   padding: 10px 6px; background: var(--chrome-bg);
 }
-.workspace-activity-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.workspace-activity-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1 1 auto; }
+.workspace-activity-footer { flex-shrink: 0; margin-top: auto; display: flex; justify-content: center; padding-top: 8px; }
 .workspace-right-navigation { min-width: 0; display: flex; align-items: center; border-radius: 8px; }
 .workspace-right-navigation[data-dragging="true"]:not(:has(.workspace-navigation-slot[data-moving="false"], .workspace-navigation-placeholder)) { min-width: 36px; min-height: 36px; }
 .workspace-right-actions { display: flex; align-items: center; gap: 4px; }

@@ -13,15 +13,12 @@ export default function DockNavigation({ side }: { side: DockSide }) {
   const settingsActive = useSessionStore(state => state.tabs.some(tab => tab.id === state.activeId && tab.kind === 'settings'));
   const dragging = useNavigationDrag(state => state.id);
   const target = useNavigationDrag(state => state.target);
-  const ids = zone;
+  // The settings page action is pinned below the left toolbar instead of this draggable zone.
+  const ids = zone.filter(id => id !== 'settings');
   const compact = side === 'right' && ids.length > 1;
 
   const startDrag = useNavigationButtonDrag();
   const open = (id: string) => {
-    if (id === 'settings') {
-      useSessionStore.getState().openSettingsTab();
-      return;
-    }
     const dock = useDockStore.getState();
     if (sshStatusOwner && (side === 'right' || window.innerWidth <= 860)) {
       dismissSshStatus();
@@ -44,7 +41,7 @@ export default function DockNavigation({ side }: { side: DockSide }) {
       <div className={side === 'left' ? 'workspace-activity-actions' : 'workspace-right-actions'}>
         {ids.map(id => {
           const index = zone.indexOf(id);
-          const active = id === 'settings' ? settingsActive : panels.includes(id) && !(sshStatusOwner && (side === 'right' || window.innerWidth <= 860));
+          const active = panels.includes(id) && !(sshStatusOwner && (side === 'right' || window.innerWidth <= 860));
           const showPlaceholder = !!dragging && !target?.openPanel && target?.side === side && target.index === index;
           return (
             <Fragment key={id}>
@@ -55,8 +52,14 @@ export default function DockNavigation({ side }: { side: DockSide }) {
             </Fragment>
           );
         })}
-        {!!dragging && !target?.openPanel && target?.side === side && target.index >= zone.length && <div className="workspace-navigation-placeholder" data-dock-placeholder={target.index} aria-hidden="true" />}
+        {!!dragging && !target?.openPanel && target?.side === side && target.index >= ids.length && <div className="workspace-navigation-placeholder" data-dock-placeholder={target.index} aria-hidden="true" />}
       </div>
+      {side === 'left' && (
+        <div className="workspace-activity-footer">
+          <DockButton panelId="settings" side="left" fixed active={settingsActive}
+            onClick={() => useSessionStore.getState().openSettingsTab()} />
+        </div>
+      )}
       {side === 'left' && <NavigationDragPreview />}
     </nav>
   );

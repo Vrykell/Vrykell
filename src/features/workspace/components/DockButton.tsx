@@ -9,11 +9,13 @@ interface DockButtonProps {
   panelId: string;
   active: boolean;
   side?: DockSide;
+  /** Fixed actions sit outside the draggable zones and cannot be reordered. */
+  fixed?: boolean;
   onClick?: () => void;
   onPointerDown?: (e: PointerEvent<HTMLButtonElement>) => void;
 }
 
-export default function DockButton({ panelId, active, onClick, onPointerDown }: DockButtonProps) {
+export default function DockButton({ panelId, active, fixed = false, onClick, onPointerDown }: DockButtonProps) {
   const { t } = useT();
   const def = NAVIGATION_DEFS[panelId];
   if (!def) return null;
@@ -32,6 +34,7 @@ export default function DockButton({ panelId, active, onClick, onPointerDown }: 
         'data-tip-shortcut': panelId === 'settings' ? `${isMacOS ? 'Meta' : 'Control'}+,` : undefined,
         'aria-label': label,
         'aria-pressed': active,
+        'data-dock-fixed': fixed ? 'true' : undefined,
         className: panelId === 'settings' ? 'activity-button workspace-settings' : 'activity-button',
         draggable: false,
         onPointerDown,
