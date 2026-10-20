@@ -14,6 +14,8 @@
 
 export type ToolRunState = 'approval-pending' | 'running' | 'done' | 'error' | 'denied';
 
+export const DEFAULT_TOOL_COMMAND_TIMEOUT_MS = 120_000;
+
 export interface ToolRun {
   toolCallId: string;
   toolName: string; // 'run_command' | 'read_file' | ...

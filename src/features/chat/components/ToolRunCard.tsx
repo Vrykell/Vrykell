@@ -1,45 +1,54 @@
 import { useState } from 'react';
 import { t, type I18nKey } from '@i18n';
-import { Brain, ChevronRight, FileText, Folder, Globe, Pencil, Search, TerminalPrompt, Wrench } from '@ui/icons';
+import { Brain, Check, ChevronRight, FileText, Folder, Globe, Pencil, RefreshCw, Search, TerminalPrompt, Wrench, X } from '@ui/icons';
 import ErrorBox from '@ui/ErrorBox';
 import ToolOutput from './ToolOutput';
 import BlockOutput from '@features/terminal/components/BlockOutput';
 import { useBlockStore, useTerminalStore } from '@features/terminal';
 import { agentControl } from '@features/agent/services/agentControl';
-import { resolveApproval } from '@features/agent';
+import ToolApproval from './ToolApproval';
+import type { ChatEnvironment } from '../model/conversation';
 import { showExecutionTerminal } from '../services/conversationContext';
 import type { ToolRun, ToolRunState } from '@features/agent/model/messageParts';
 
-const STATE_CHIP: Record<ToolRunState, { label: I18nKey; color: string }> = {
-  running: { label: 'Running', color: 'var(--accent-warm)' },
-  'approval-pending': { label: 'Awaiting approval', color: 'var(--accent-warm)' },
-  done: { label: 'Succeeded', color: 'var(--success)' },
-  error: { label: 'Failed', color: 'var(--error)' },
-  denied: { label: 'Denied', color: 'var(--text-muted)' },
+const STATE_LABEL: Record<ToolRunState, I18nKey> = {
+  running: 'Running',
+  'approval-pending': 'Awaiting approval',
+  done: 'Completed',
+  error: 'Failed',
+  denied: 'Denied',
 };
-
-/** Quiet outcomes add no text: a finished row shows the exit code, a failure its error box,
- *  so only work in progress and blocked work need a state word. */
-const STATES_WITH_CHIP: ToolRunState[] = ['running', 'approval-pending', 'denied'];
 
 function str(value: unknown): string { return typeof value === 'string' ? value : ''; }
 
-function summarize(run: ToolRun): { icon: React.ReactNode; text: string } {
+function summarize(run: ToolRun): { icon: React.ReactNode; label: string; text: string } {
   const input = run.input;
   const size = { size: 15 };
   switch (run.toolName) {
-    case 'run_command': return { icon: <TerminalPrompt {...size} />, text: str(input.command) };
-    case 'read_file': return { icon: <FileText {...size} />, text: t('Read {{path}}', { path: str(input.path) }) };
-    case 'edit_file': return { icon: <Pencil {...size} />, text: t('Edit {{path}}', { path: str(input.path) }) };
-    case 'write_file': return { icon: <Pencil {...size} />, text: t('Write {{path}}', { path: str(input.path) }) };
-    case 'search_files': return { icon: <Search {...size} />, text: t('Search {{query}}', { query: str(input.query) }) };
-    case 'list_dir': return { icon: <Folder {...size} />, text: t('List {{path}}', { path: str(input.path) }) };
+    case 'run_command': return { icon: <TerminalPrompt {...size} />, label: t('Run command'), text: str(input.command) };
+    case 'terminal_keys': return { icon: <TerminalPrompt {...size} />, label: t('Send terminal input'), text: str(input.text) || str(input.keys) };
+    case 'read_terminal': return { icon: <TerminalPrompt {...size} />, label: t('Read terminal'), text: '' };
+    case 'read_file': return { icon: <FileText {...size} />, label: t('Read file'), text: str(input.path) };
+    case 'edit_file': return { icon: <Pencil {...size} />, label: t('Edit file'), text: str(input.path) };
+    case 'write_file': return { icon: <Pencil {...size} />, label: t('Write file'), text: str(input.path) };
+    case 'search_files': return { icon: <Search {...size} />, label: t('Search files'), text: str(input.query) };
+    case 'list_dir': return { icon: <Folder {...size} />, label: t('List directory'), text: str(input.path) };
     case 'web_search':
-    case 'google_search': return { icon: <Globe {...size} />, text: t('Web search {{query}}', { query: str(input.query) }).trim() };
-    case 'web_fetch': return { icon: <Globe {...size} />, text: t('Fetch {{url}}', { url: str(input.url) }) };
-    case 'think': return { icon: <Brain {...size} />, text: t('Thinking process') };
-    default: return { icon: <Wrench {...size} />, text: run.toolName };
+    case 'google_search': return { icon: <Globe {...size} />, label: t('Web search'), text: str(input.query) };
+    case 'web_fetch': return { icon: <Globe {...size} />, label: t('Fetch page'), text: str(input.url) };
+    case 'think': return { icon: <Brain {...size} />, label: t('Thinking process'), text: '' };
+    default: return { icon: <Wrench {...size} />, label: run.toolName, text: str(input.command) || str(input.path) || str(input.query) || str(input.url) };
   }
+}
+
+function commandExitCode(run: ToolRun): number | undefined {
+  if (run.toolName !== 'run_command' || !run.output) return undefined;
+  try {
+    const value: unknown = JSON.parse(run.output);
+    if (typeof value !== 'object' || value === null) return undefined;
+    const code = (value as Record<string, unknown>).exitCode;
+    return typeof code === 'number' && Number.isFinite(code) ? code : undefined;
+  } catch { return undefined; }
 }
 
 /** Output body shown when a row is expanded; a structured command result carries its own field. */
@@ -48,7 +57,8 @@ function expandBody(run: ToolRun): string {
     try {
       const value: unknown = JSON.parse(run.output);
       if (typeof value === 'object' && value !== null) {
-        return str((value as Record<string, unknown>).output);
+        const output = (value as Record<string, unknown>).output;
+        if (typeof output === 'string') return output;
       }
     } catch { /* Unstructured output is displayed verbatim. */ }
   }
@@ -73,44 +83,49 @@ function CommandOutputBlock({ run, paneId, framed }: { run: ToolRun; paneId?: st
 }
 
 /**
- * Tool status, approval and output share one flat row in the exchange.
+ * Tool status, approval, input and output share one disclosure card in the exchange.
  * `framed` marks the chat panel presentation, where expanded output sits inside the
  * shared code-block frame and therefore drops its own terminal surface.
  */
-export default function ToolRunCard({ run, paneId, framed = false }: { run: ToolRun; paneId?: string; framed?: boolean }) {
+export default function ToolRunCard({ run, paneId, framed = false, conversationId, environment }: { run: ToolRun; paneId?: string; framed?: boolean; conversationId?: string; environment?: ChatEnvironment }) {
   // A failure starts expanded so a broken call is readable at a glance; an explicit toggle
   // wins from then on, which also lets the row be collapsed again. The toggle is recorded with
   // the state it was made in, so a run that fails after being collapsed reopens its error.
   const [toggled, setToggled] = useState<{ state: ToolRunState; open: boolean } | null>(null);
   const sessions = useTerminalStore(state => state.sessions);
-  const { icon, text } = summarize(run);
-  const chip = STATE_CHIP[run.state];
+  const { icon, label, text } = summarize(run);
+  const exitCode = commandExitCode(run);
+  const status = exitCode !== undefined && (run.state === 'done' || run.state === 'error')
+    ? t('Exit code {{code}}', { code: exitCode }) : t(STATE_LABEL[run.state]);
   const body = expandBody(run);
   const isCommand = run.toolName === 'run_command';
+  const pending = run.state === 'approval-pending';
   const failed = run.state === 'error';
   const open = toggled?.state === run.state ? toggled.open : failed;
-  const expandable = isCommand || body.length > 0 || failed;
+  const input = JSON.stringify(run.input, null, 2);
+  const expandable = isCommand || Object.keys(run.input).length > 0 || body.length > 0 || failed;
   const truncated = body.length > 6000;
-  return <div className="ai-tool-card" data-tool-state={run.state}>
-    <button type="button" data-subtle className="ai-tool-summary" aria-expanded={open} disabled={!expandable}
+  return <div className="ai-tool-card" data-tool-state={run.state} data-open={open}>
+    <button type="button" data-subtle className="ai-tool-summary" aria-label={[label, text, status].filter(Boolean).join(' ')} aria-expanded={open} disabled={!expandable || pending}
       onClick={() => setToggled({ state: run.state, open: !open })}>
-      {icon}<span className="ai-tool-description">{text}</span>
-      {STATES_WITH_CHIP.includes(run.state) && <span style={{ color: chip.color }}>{t(chip.label)}</span>}
-      {expandable && <ChevronRight size={14} style={{ transform: open ? 'rotate(90deg)' : undefined }} />}
+      {icon}<span className="ai-tool-label">{label}</span><span className="ai-tool-description" data-tip={pending ? undefined : text || undefined}>{pending ? '' : text}</span>
+      <span className="ai-tool-state" data-state={run.state}>
+        {run.state === 'done' ? <Check size={12} /> : run.state === 'running' ? <RefreshCw size={12} className="reload-spin" />
+          : (failed || run.state === 'denied') ? <X size={12} /> : null}{status}
+      </span>
+      {expandable && !pending && <ChevronRight size={14} style={{ transform: open ? 'rotate(90deg)' : undefined }} />}
     </button>
-    {run.state === 'approval-pending' && <div className="ai-tool-approval">
-      {run.danger && <div>{run.danger}</div>}
-      <div className="ai-tool-approval-actions">
-        <button type="button" onClick={() => resolveApproval(run.toolCallId, 'once')}>{t('Allow once')}</button>
-        <button type="button" onClick={() => resolveApproval(run.toolCallId, 'session')}>{t('Allow for this conversation')}</button>
-        <button type="button" onClick={() => resolveApproval(run.toolCallId, 'deny')}>{t('Deny')}</button>
-      </div>
+    {pending && <ToolApproval run={run} paneId={paneId} conversationId={conversationId} environment={environment} />}
+    {open && <div className="ai-tool-details">
+      <div className="ai-tool-section-label">{t('Tool input')}</div>
+      <pre className="ai-tool-input" data-selectable>{input}</pre>
+      <div className="ai-tool-section-label">{t('Tool output')}</div>
+      {failed ? <ErrorBox compact details={body || undefined}>{run.error || t('Tool execution failed')}</ErrorBox>
+        : isCommand ? <CommandOutputBlock run={run} paneId={paneId} framed={framed} />
+          : <ToolOutput framed={framed} text={body}>
+            <pre className="ai-tool-output" data-selectable>{truncated ? `${t('Only the end of the output is shown')}\n` : ''}{body.slice(-6000) || t('No output')}</pre>
+          </ToolOutput>}
     </div>}
-    {failed && open && <ErrorBox compact details={body || undefined}>{run.error || t('Tool execution failed')}</ErrorBox>}
-    {open && !failed && (isCommand ? <CommandOutputBlock run={run} paneId={paneId} framed={framed} />
-      : <ToolOutput framed={framed} text={body}>
-        <pre className="ai-tool-output" data-selectable>{truncated ? `${t('Only the end of the output is shown')}\n` : ''}{body.slice(-6000)}</pre>
-      </ToolOutput>)}
     {isCommand && paneId && sessions[paneId] && (open || run.state === 'approval-pending') && <button type="button" data-subtle
       className="ai-tool-terminal-link" onClick={() => showExecutionTerminal(paneId)}>{t('View terminal')}</button>}
   </div>;

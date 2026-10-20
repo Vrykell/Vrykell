@@ -125,6 +125,27 @@ describe('gate 三层判定', () => {
     ]);
   });
 
+  it('retains the reviewed command in the execution outcome and visible tool state', async () => {
+    reset();
+    const updates: Array<unknown> = [];
+    const waiting = gate('run_command', { command: 'ls' }, 'edited', { tabId: 't1', setToolState: (_id, state, extra) => updates.push({ state, extra }) });
+    resolveApproval('edited', 'once', 'pwd');
+    expect(await waiting).toEqual({ proceed: true, command: 'pwd' });
+    expect(updates[updates.length - 1]).toEqual({ state: 'running', extra: { input: { command: 'pwd' }, danger: undefined } });
+  });
+
+  it('refuses an empty edited command without granting future session access', async () => {
+    reset();
+    const ctx = mkCtx();
+    const first = gate('run_command', { command: 'ls' }, 'blank', ctx);
+    resolveApproval('blank', 'session', '  ');
+    expect(await first).toMatchObject({ proceed: false, result: { denied: true } });
+    const second = gate('run_command', { command: 'pwd' }, 'retry', ctx);
+    expect(ctx.states[ctx.states.length - 1]?.state).toBe('approval-pending');
+    resolveApproval('retry', 'deny');
+    await second;
+  });
+
   it('「本会话允许」：第二次调用不再询问', async () => {
     reset();
     const ctx = mkCtx();

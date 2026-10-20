@@ -22,6 +22,7 @@ import type { ToolRunState } from '@features/agent/model/messageParts';
 import { untrustedSkillFor, setSkillState } from '@features/agent/services/skills';
 import { dangerousCommandReason } from '@features/agent/model/dangerousCommands';
 import { sensitivePathReason } from '@features/agent/model/sensitivePaths';
+import { t } from '@i18n';
 
 export { dangerousCommandReason };
 export { sensitivePathReason };
@@ -44,7 +45,7 @@ export interface ToolContext {
   /** 会话 id（= 工作区 tabId），会话授权的命名空间；缺省时禁用会话授权 */
   tabId?: string;
   /** 审批状态回写（agentStream 接到后 upsert ToolRun） */
-  setToolState?: (toolCallId: string, state: ToolRunState, extra?: { danger?: string }) => void;
+  setToolState?: (toolCallId: string, state: ToolRunState, extra?: { danger?: string; input?: Record<string, unknown> }) => void;
 }
 
 /** 全部受管工具（设置页表格也用它渲染，新增工具别漏） */
@@ -143,21 +144,22 @@ export function clearSessionGrants(tabId?: string) {
 
 // ── 审批桥 ──
 
-const pending = new Map<string, (d: ApprovalDecision) => void>();
+type ApprovalResolution = { decision: ApprovalDecision; command?: string };
+const pending = new Map<string, (result: ApprovalResolution) => void>();
 
-function requestApproval(toolCallId: string): Promise<ApprovalDecision> {
+function requestApproval(toolCallId: string): Promise<ApprovalResolution> {
   return new Promise((resolve) => pending.set(toolCallId, resolve));
 }
 
 /** 审批卡按钮入口。unknown toolCallId 静默忽略（可能已被 stop 兜底清掉） */
-export function resolveApproval(toolCallId: string, decision: ApprovalDecision) {
-  pending.get(toolCallId)?.(decision);
+export function resolveApproval(toolCallId: string, decision: ApprovalDecision, command?: string) {
+  pending.get(toolCallId)?.({ decision, command });
   pending.delete(toolCallId);
 }
 
 /** 中止/断流时兜底：所有挂起审批一律按拒绝放行，防 execute 悬挂 */
 export function denyAllPending() {
-  for (const resolve of pending.values()) resolve('deny');
+  for (const resolve of pending.values()) resolve({ decision: 'deny' });
   pending.clear();
 }
 
@@ -179,7 +181,7 @@ export async function ensureTrustedSkill(
   ctx.setToolState(toolCallId, 'approval-pending', {
     danger: `信任技能「${skillName}」后可访问其文件与脚本`,
   });
-  const decision = await requestApproval(toolCallId);
+  const { decision } = await requestApproval(toolCallId);
   if (decision === 'deny') {
     ctx.setToolState(toolCallId, 'denied');
     return { proceed: false, error: `未信任技能「${skillName}」，已拒绝访问` };
@@ -208,7 +210,7 @@ export async function ensureSkillAccess(
 
 // ── 门控 ──
 
-type GateOutcome = { proceed: true } | { proceed: false; result: GateResult };
+type GateOutcome = { proceed: true; command?: string } | { proceed: false; result: GateResult };
 
 /**
  * 工具 execute 的第一行。返回 proceed:false 时直接把 result 作为工具结果返回
@@ -247,13 +249,23 @@ export async function gate(
   }
   const forcedReason = danger ?? sensitive;
   ctx.setToolState(toolCallId, 'approval-pending', forcedReason ? { danger: forcedReason } : undefined);
-  const decision = await requestApproval(toolCallId);
+  const { decision, command } = await requestApproval(toolCallId);
   if (decision === 'deny') {
     ctx.setToolState(toolCallId, 'denied', danger ? { danger } : undefined);
     return {
       proceed: false,
       result: { ok: false, denied: true, error: '用户拒绝了本次操作' },
     };
+  }
+  if (toolName === 'run_command' && command !== undefined) {
+    if (!command.trim()) {
+      ctx.setToolState(toolCallId, 'denied');
+      return { proceed: false, result: { ok: false, denied: true, error: t('Enter a command before running it.') } };
+    }
+    const editedDanger = dangerousCommandReason(command);
+    if (decision === 'session') grantSession(ctx.tabId, toolName);
+    ctx.setToolState(toolCallId, 'running', { input: { ...input, command }, danger: editedDanger ?? undefined });
+    return { proceed: true, command };
   }
   if (decision === 'session') grantSession(ctx.tabId, toolName);
   ctx.setToolState(toolCallId, 'running', danger ? { danger } : undefined);

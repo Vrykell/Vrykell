@@ -197,7 +197,7 @@ export default function PanelChat() {
       </div>
       <div className="chat-setting-links">
         {environment && !!sessions[environment.paneId] && <button type="button" data-subtle onClick={() => showExecutionTerminal(environment.paneId)}>{t('View terminal')}</button>}
-        <button type="button" data-subtle onClick={() => useSessionStore.getState().openSettingsTab()}>{t('Open settings')}</button>
+        <button type="button" data-subtle onClick={() => useSessionStore.getState().openSettings()}>{t('Open settings')}</button>
       </div>
     </section>}
     {environment && <div className="chat-conversation-context" data-testid="chat-conversation-context">

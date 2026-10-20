@@ -18,6 +18,7 @@ import {
   type ShellCommandCompletion,
 } from '@features/terminal';
 import { agentControl } from '@features/agent/services/agentControl';
+import { DEFAULT_TOOL_COMMAND_TIMEOUT_MS } from '../model/messageParts';
 
 export interface RunCommandResult {
   ok: boolean;
@@ -31,7 +32,6 @@ export interface RunCommandResult {
 
 const OUTPUT_CAP = 8192;
 const BLOCK_GRACE_MS = 1500;
-const DEFAULT_TIMEOUT_MS = 120_000;
 
 function tail(s: string): string {
   return s.length > OUTPUT_CAP ? s.slice(-OUTPUT_CAP) : s;
@@ -62,7 +62,7 @@ export async function runCommandAndWait(
     };
   }
 
-  const timeoutMs = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const timeoutMs = opts?.timeoutMs ?? DEFAULT_TOOL_COMMAND_TIMEOUT_MS;
   // 认领基准时刻：写入前的已存在的「pending 提示符块」正是本命令未来的家
   // （提示符绘制时 133;A 就建了块），所以不能用「新块」判认领 —— 用
   // startedAt >= t0（preexec 时刻）才覆盖「旧 pending 块转 executing」路径。

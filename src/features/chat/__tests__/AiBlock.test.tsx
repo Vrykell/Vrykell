@@ -66,12 +66,23 @@ it('keeps question selection separate from explicit reply collapse', () => {
   expect(screen.getByText('configuration')).toBeInTheDocument();
 });
 
+it.each(['', ' \n '])('keeps an attachment-only message without an empty text bubble (%j)', content => {
+  const { container } = render(<AiBlock conversationId="conversation" presentation="conversation" exchange={{ ...exchange,
+    question: { ...exchange.question!, content, attachments: [{ id: 'paste', kind: 'paste', name: 'Pasted log', mime: 'text/plain', size: 5, textContent: 'hello' }] },
+  }} />);
+  expect(container.querySelector('.ai-block-question')).toBeNull();
+  expect(screen.queryByTestId('chat-question-copy')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Pasted log' }));
+  expect(screen.getByText('hello')).toBeVisible();
+  expect(screen.getByText('configuration')).toBeVisible();
+});
+
 it('keeps approval actions and failures visible without timeline nodes', () => {
   const { container } = render(<AiBlock conversationId="conversation" exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [
     { kind: 'tool', tool: { toolCallId: 'approval', toolName: 'run_command', input: { command: 'npm run build' }, state: 'approval-pending', startedAt: 1 } },
     { kind: 'tool', tool: { toolCallId: 'failure', toolName: 'read_file', input: { path: '/project/missing' }, state: 'error', startedAt: 1, error: 'Missing file' } },
   ] } }} />);
-  expect(screen.getByRole('button', { name: '允许一次' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '运行' })).toBeInTheDocument();
   expect(screen.getByRole('alert')).toHaveTextContent('Missing file');
   expect(container.querySelectorAll('.ai-tool-card')).toHaveLength(2);
   expect(container.querySelector('[style*="position: absolute"]')).toBeNull();

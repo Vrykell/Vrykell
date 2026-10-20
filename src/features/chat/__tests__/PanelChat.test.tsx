@@ -70,7 +70,7 @@ it('allows discussion without implicitly binding the focused terminal', () => {
 it('keeps the same draft and title when the workspace switches to settings', () => {
   render(<PanelChat />);
   fireEvent.change(screen.getByPlaceholderText('自然语言描述你想做什么…'), { target: { value: 'Unfinished question' } });
-  act(() => useSessionStore.setState({ activeId: 'settings', tabs: [{ id: 'settings', title: 'Settings', kind: 'settings' }] }));
+  act(() => useSessionStore.getState().openSettings());
   expect(screen.getByPlaceholderText('自然语言描述你想做什么…')).toHaveValue('Unfinished question');
   expect(screen.getByText('Build issue')).toBeInTheDocument();
 });
