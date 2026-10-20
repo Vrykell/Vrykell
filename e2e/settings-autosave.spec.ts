@@ -39,7 +39,7 @@ test('model text waits for a pause and the last write carries the whole row', as
 });
 
 test('switching pages flushes pending text and scopes local and remote editors separately', async ({ page }) => {
-  await gotoSetting(page, '记忆');
+  await gotoSetting(page, '内存');
   await page.getByPlaceholder(/持久知识/).fill('切换页面前的内容');
   await page.locator('aside').getByRole('button', { name: '模型配置', exact: true }).click();
   await expect.poll(() => memoryFact(page)).toBe('切换页面前的内容');

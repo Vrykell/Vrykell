@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
 
 test.describe('记忆设置页', () => {
   test('加载 FACT 与流水；编辑保存；清空', async ({ page }) => {
-    await gotoSetting(page, '记忆');
+    await gotoSetting(page, '内存');
     const ta = page.locator('section').getByPlaceholder(/持久知识/);
     await expect(ta).toHaveValue(/用户偏好：优先用 Rust/);
     await expect(page.getByText('近期流水')).toBeVisible();

@@ -48,7 +48,7 @@ for (const theme of ['dark', 'light'] as const) {
     const report: Record<string, string[]> = {};
     const body = page.locator('.settings-page-body');
     report['主题'] = await auditOutlinedActions(page, body, gray);
-    for (const label of ['块外观', '字体与显示', '主题文件', '子代理', '定时任务', '记忆', '技能', 'MCP 服务器', '模型配置', 'Windows 右键菜单', '日志与诊断']) {
+    for (const label of ['块外观', '字体与显示', '主题文件', '子代理', '定时任务', '内存', '技能', 'MCP 服务器', '模型配置', 'Windows 右键菜单', '日志与诊断']) {
       await page.locator('aside').getByRole('button', { name: label, exact: true }).click();
       report[label] = await auditOutlinedActions(page, body, gray);
     }

@@ -18,7 +18,7 @@ import { Minus, Plus, RefreshCw, Settings } from '@ui/icons';
 import HarnessBadge from '@features/agent/components/HarnessBadge';
 import HarnessDialog from '@features/settings/components/HarnessDialog';
 import { invoke } from '@platform/diagnostics';
-import { useSessionStore } from '@features/workspace';
+import { useSessionStore, useUiStore } from '@features/workspace';
 import { acpHandshake, acpHarnessSave, acpHarnesses, type AgentDescription } from '@platform/api/acp';
 import { HARNESS_PRESETS, harnessProblems, upsertPreset, type HarnessEntry } from '@config/harnessPresets';
 
@@ -165,7 +165,12 @@ export default function HarnessPage() {
                 </span>
               </span>
               <button data-subtle data-testid={`harness-connect-${index}`} disabled={!harness.enabled}
-                onClick={() => useSessionStore.getState().openHarnessTab(harness.name)} style={{
+                onClick={() => {
+                  // Settings render as a workspace screen over the tabs: leaving it open would hide
+                  // the session this button just opened.
+                  useUiStore.getState().setSettingsOpen(false);
+                  useSessionStore.getState().openHarnessTab(harness.name);
+                }} style={{
                   padding: '5px 12px', border: 0, borderRadius: 'var(--radius-inner)', flexShrink: 0,
                   cursor: harness.enabled ? 'pointer' : 'default',
                   background: harness.enabled ? 'var(--primary-button-bg)' : 'transparent',

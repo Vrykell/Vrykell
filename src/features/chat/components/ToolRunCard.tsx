@@ -37,7 +37,7 @@ function summarize(run: ToolRun): { icon: React.ReactNode; label: string; text: 
     case 'google_search': return { icon: <Globe {...size} />, label: t('Web search'), text: str(input.query) };
     case 'web_fetch': return { icon: <Globe {...size} />, label: t('Fetch page'), text: str(input.url) };
     case 'think': return { icon: <Brain {...size} />, label: t('Thinking process'), text: '' };
-    default: return { icon: <Wrench {...size} />, label: run.toolName, text: str(input.command) || str(input.path) || str(input.query) || str(input.url) };
+    default: return { icon: <Wrench {...size} />, label: run.toolName, text: str(input.command) || str(input.path) || str(input.query) || str(input.url) || str(input.title) };
   }
 }
 

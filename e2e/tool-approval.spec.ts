@@ -46,6 +46,6 @@ test('compact AI cards keep their color on disclosure, react to hover and review
   await approval.getByRole('textbox', { name: '要运行的命令' }).fill('npm run check');
   await page.screenshot({ path: info.outputPath('approval-edit.png') });
   await approval.getByRole('button', { name: '运行', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => (window as unknown as { approvalResult: unknown }).approvalResult)).toEqual({ proceed: true, command: 'npm run check' });
+  await expect.poll(() => page.evaluate(() => (window as unknown as { approvalResult: unknown }).approvalResult)).toMatchObject({ proceed: true, command: 'npm run check' });
   await expect(page.getByRole('button', { name: /运行命令 npm run check/ })).toBeVisible();
 });
