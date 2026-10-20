@@ -74,9 +74,17 @@ for (const theme of ['深色', '浅色']) {
     for (const name of ['模型配置', '网络搜索', 'MCP 服务器', '记忆', '子代理', '本地编辑器', '远程编辑器']) {
       await navigation.getByRole('button', { name, exact: true }).click();
       const wrong = await page.locator('.settings-content input:not([type="checkbox"]), .settings-content textarea').evaluateAll(elements => elements
-        .filter(element => getComputedStyle(element).fontFamily !== 'Arial, sans-serif').map(element => element.getAttribute('placeholder')));
+        // A URL field is deliberately monospace; the rule is about UI text.
+        .filter(element => {
+          const family = getComputedStyle(element).fontFamily;
+          return family !== 'Arial, sans-serif' && !/mono/i.test(family);
+        })
+        .map(element => element.getAttribute('placeholder')));
       expect(wrong).toEqual([]);
     }
+    // The API address keeps its monospace face on purpose.
+    await navigation.getByRole('button', { name: '模型配置', exact: true }).click();
+    await expect(page.getByTestId('provider-endpoint-input')).toHaveCSS('font-family', /mono/i);
     await page.setViewportSize({ width: 600, height: 760 });
     const content = page.locator('.settings-content');
     const before = (await content.boundingBox())!;

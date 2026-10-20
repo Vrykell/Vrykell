@@ -3,26 +3,19 @@ import { setupTauriMock, themeConfig } from './tauri-mock';
 import { gotoSetting } from './settings';
 import { focusedPane, hoverPlacementZone } from './placement';
 
-test('model header controls align with the input while save feedback lives in the page header', async ({ page }) => {
+test('settings save feedback lives in the page header while field titles stay regular', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await gotoSetting(page, '模型配置');
-  for (const header of await page.locator('.settings-model-header').all()) {
-    const input = (await header.locator('input').boundingBox())!;
-    for (const control of await header.locator(':scope > span, :scope > button').all()) {
-      const box = (await control.boundingBox())!;
-      expect(Math.abs(box.y + box.height / 2 - input.y - input.height / 2)).toBeLessThan(1);
-    }
-    // The settings page reports saves itself, so the header keeps no inline status.
-    await expect(header.getByRole('status')).toHaveCount(0);
-    await expect(header.locator('input')).toHaveCSS('font-weight', '400');
-  }
-  const name = page.locator('.settings-model-header input').first();
-  await name.fill('模型 A');
-  await name.press('Enter');
+  // The model page's fields save on their own; the header reports the save and no field keeps an
+  // inline status of its own while the page reports.
+  const endpoint = page.getByTestId('provider-endpoint-input');
+  await expect(endpoint).toBeVisible();
+  await endpoint.fill('https://gateway.example/v1');
+  await endpoint.press('Enter');
   await expect(page.locator('.settings-page-header').getByRole('status')).toHaveText('已保存');
-  // This theme resolves --fw-medium to the regular weight, so field titles are not
-  // bolder than the inputs they label.
+  // This theme resolves --fw-medium to the regular weight, so field titles are not bolder than
+  // the inputs they label.
   await expect(page.locator('.settings-field').first().locator(':scope > div').first()).toHaveCSS('font-weight', '400');
   await page.screenshot({ path: test.info().outputPath('model-alignment.png') });
 });

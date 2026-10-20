@@ -183,7 +183,7 @@ test('settings and terminal use the same color hierarchy in both themes', async 
   const background = async (selector: string) => page.locator(selector).evaluate(el => getComputedStyle(el).backgroundColor);
   const terminalBg = await background('main');
   await gotoSetting(page, '模型配置');
-  await expect(page.locator('input[type="password"]')).toBeVisible();
+  await expect(page.getByTestId('provider-switch')).toBeVisible();
   expect(await background('.settings-content')).toBe(terminalBg);
   expect(await background('.settings-navigation')).not.toBe(terminalBg);
   const darkFrame = await background('.workspace-titlebar');

@@ -7,17 +7,16 @@ test('saved custom Anthropic address is used by the next chat request', async ({
   await mockAnthropic(page, '地址设置已生效');
   await page.goto('/');
   await gotoSetting(page, '模型配置');
+  // The provider switcher starts on Anthropic; its address applies to every model under it.
   await page.getByTestId('provider-endpoint-input').fill('https://gateway.example/v1');
   await page.getByTestId('provider-endpoint-input').press('Enter');
-  await page.getByTestId('model-settings').first().click();
-  await page.getByRole('combobox', { name: /提供方/ }).click();
-  await page.getByRole('option', { name: 'Anthropic', exact: true }).click();
-  await page.keyboard.press('Escape');
-  await page.getByTestId('model-row').first().getByRole('button', { name: '设为当前' }).click();
   await page.getByTestId('provider-key-add').click();
   await page.getByTestId('key-dialog-input').fill('test-placeholder-key');
   await page.getByTestId('key-dialog-save').click();
   await expect(page.getByTestId('provider-key-value')).toBeVisible();
+  // The provider's ⋯ menu makes one of its models the current one.
+  await page.locator('.settings-content').getByLabel('更多操作').click();
+  await page.getByRole('menu').getByText('设为当前').click();
   const previousCalls = (await searchCalls(page)).length;
   await page.keyboard.press('Meta+1');
   await page.locator('[data-dock-btn="chat"]').click();
