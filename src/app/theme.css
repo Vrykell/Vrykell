@@ -1256,6 +1256,9 @@ button.terminal-chip:disabled:hover { background: var(--hover); }
 .pinned-command[data-collapsed="true"]::after { display: none; }
 .pinned-command[data-running="true"] { padding-top: 6px; padding-bottom: 6px; }
 .pinned-command[data-running="true"] .command-block-info { margin-bottom: 0; }
+.pinned-command[data-running="true"] .pinned-command-toggle-slot { right: calc(4 * var(--control-size-compact)); width: auto; }
+.pinned-command[data-running="true"][data-collapsed="true"] { height: auto; min-height: 24px; padding-top: 0; padding-bottom: 0; background: var(--xterm-bg); }
+.pinned-command[data-running="true"][data-collapsed="true"] .command-block-info { min-height: 24px; }
 .command-block-running { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--accent-warm); animation: pulse 1.5s ease-in-out infinite; }
 
 

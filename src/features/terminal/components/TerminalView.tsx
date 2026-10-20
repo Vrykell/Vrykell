@@ -590,7 +590,7 @@ function PaneBlockList({ paneId, insetLeft = 8, insetRight = 8 }: { paneId: stri
           <PaneEmptyHint paneId={paneId} />
         </div>
       </div>
-      {pinned && pinnedBlock && <PinnedCommand key={pinned.id} block={pinnedBlock} paneId={paneId}
+      {pinned && pinnedBlock && <PinnedCommand block={pinnedBlock} paneId={paneId}
         remaining={pinned.remaining} insetLeft={insetLeft} insetRight={insetRight} scrollRef={scrollRef}
         collapsed={titleCollapsed} onToggle={() => updateTypography({ commandTitleCollapsed: !titleCollapsed })} />}
       <OverlayScrollbar scrollRef={scrollRef} controlsId={scrollId} label={t('Scroll command history')} />

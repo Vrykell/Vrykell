@@ -12,14 +12,12 @@ import { configureTerminalInput } from '@features/terminal/model/terminalInput';
 
 import { memo, useState, useEffect, useRef } from 'react';
 import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
-import {
-  Ellipsis, CircleX, Maximize2, Square, Zap,
-} from '@ui/icons';
+import { Ellipsis } from '@ui/icons';
 import { useTerminalStore } from '@features/terminal';
 import AiBlock from '@features/chat/components/AiBlock';
 import { ptyResize } from '@platform/pty';
-import { STATUS_ACTION_ICON_SIZE, StatusActionButton, TerminalStatusBar } from './TerminalStatusBar';
-import { TerminalRedrawButton } from './TerminalRedrawButton';
+import { STATUS_ACTION_ICON_SIZE } from './TerminalStatusBar';
+import RunningCommandBar from './RunningCommandBar';
 import { getCellMetrics } from '@utils/termMetrics';
 import { getExecutingTerm, resizeExecutingTerm, syncTermWidth } from '@features/terminal/hooks/useTerminalSession';
 import { isTerminalDebugEnabled, terminalDebug } from '@features/terminal/services/terminalDebug';
@@ -29,7 +27,6 @@ import BlockOutput from '@features/terminal/components/BlockOutput';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 import { useTerminalBlockFlow } from '@features/terminal/hooks/useTerminalBlockFlow';
 import type { BlockMenuAnchor } from '@features/terminal/hooks/useTerminalBlockFlow';
-import { useTuiControls } from '@features/terminal/hooks/useTuiControls';
 import { hasVisibleContent as hasVisibleBlockContent } from '@features/terminal/model/blockVisibility';
 import { captureTerminalPaste, copyTerminalSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
 import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
@@ -257,8 +254,6 @@ function RunningItem({
   highlightQuery: string;
   dividerBefore: boolean;
 }) {
-  const { sendCtrlC, killApp, killArmed, enterFullScreen } = useTuiControls(tabId);
-
   const [outputReady, setOutputReady] = useState(false);
   useEffect(() => {
     const timer = setTimeout(() => setOutputReady(true), 120);
@@ -284,18 +279,7 @@ function RunningItem({
         paddingRight: insetRight + COMMAND_BLOCK_CONTENT_PADDING,
       }}
     >
-      <TerminalStatusBar
-        cwd={block.cwd}
-        startedAt={block.startedAt}
-        gitBranch={block.gitBranch}
-        agent={block.agent ? <Zap size={14} className="command-status-agent" aria-label={t('AI execution')} /> : undefined}
-        actions={<>
-          <TerminalRedrawButton paneId={tabId} />
-          <StatusActionButton title={t('Interrupt command')} shortcut="Control+C" onClick={sendCtrlC} label={<Square size={STATUS_ACTION_ICON_SIZE} />} />
-          <StatusActionButton title={killArmed ? t('Force quit foreground process') : t('Quit foreground process')} onClick={killApp} label={<CircleX size={STATUS_ACTION_ICON_SIZE} />} />
-          <StatusActionButton title={t('Enter fullscreen interaction')} onClick={enterFullScreen} label={<Maximize2 size={STATUS_ACTION_ICON_SIZE} />} />
-        </>}
-      />
+      <RunningCommandBar block={block} paneId={tabId} />
       <div data-selectable className="command-block-command" style={{ fontFamily: TERMINAL_FONT_FAMILY }}>
         {highlightQuery ? <HighlightSpan text={block.command} query={highlightQuery} /> : coloredCommand}
       </div>

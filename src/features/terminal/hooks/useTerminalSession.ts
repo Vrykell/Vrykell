@@ -772,7 +772,11 @@ export function useTerminalSession(
           : BLOCK_CONTENT_INSET_PX);
       // A hidden or not-yet-laid-out host has no measurable width; retry after mount.
       if (screenPx <= 0) return term.cols;
-      return Math.max(2, Math.min(term.cols, Math.floor(screenPx / domCellWidth())));
+      // The visible block owns its grid. The hidden main terminal can retain a smaller
+      // column count or different font metrics after layout and font changes.
+      const outputTerm = controller.executingTerm?.term;
+      const advance = host && outputTerm?.element ? getCellMetrics(outputTerm).width : domCellWidth();
+      return Math.max(2, Math.floor(screenPx / advance));
     };
 
     /** PTY row count for the current scene; manual fullscreen uses the host height. */
@@ -787,13 +791,12 @@ export function useTerminalSession(
 
     let widthRaf = 0;
     let deferredPtySize: { cols: number; rows: number } | null = null;
-    // The local grid keeps following the pointer, but a held layout drag tells the remote PTY
-    // nothing until the pointer is released: every SIGWINCH makes the remote redraw its prompt,
-    // so a per-step notification moves the visible content on each column and leaves reprint
-    // artifacts in the scrollback. The final size is sent once the drag ends.
+    // Idle prompts defer layout-drag notifications to avoid repeated prompt redraws.
+    // Running programs receive coalesced sizes during the drag so they can reflow immediately.
     const requestPtySize = (cols: number, rows: number) => {
       if (!sessionId) return;
-      if (isLayoutResizeDragActive()) { deferredPtySize = { cols, rows }; return; }
+      if (isLayoutResizeDragActive() && !controller.executingTerm) { deferredPtySize = { cols, rows }; return; }
+      deferredPtySize = null;
       resizeQueue.request(cols, rows);
     };
     const applyWidth = () => {
@@ -830,6 +833,13 @@ export function useTerminalSession(
         if (cols <= 0 || rows <= 0) return;
         requestPtySize(cols, rows);
         controller.resize(cols, rows);
+        if (isTerminalDebugEnabled()) {
+          const output = controller.executingTerm;
+          if (output) terminalDebug('running-terminal-width', { paneId, cols, rows, mainCols: term.cols,
+            mainHostWidth: el.clientWidth, mainHostHeight: el.clientHeight,
+            blockCols: output.term.cols, cellWidth: getCellMetrics(output.term).width,
+            screenWidth: output.el.querySelector('.xterm-screen')?.getBoundingClientRect().width });
+        }
       });
     };
     widthSyncs.set(paneId, applyWidth);

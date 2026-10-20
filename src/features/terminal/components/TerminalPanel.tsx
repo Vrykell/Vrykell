@@ -188,14 +188,15 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
   return <div style={{ width: '100%', height: '100%', position: 'relative' }}>
     {connectionInput && showToolbar && toolbarHost && createPortal(toolbar, toolbarHost)}
     {!connectionInput && <div ref={ref} style={{ position: 'absolute', inset: 0, minHeight: 0, background: 'transparent', paddingLeft: 8 }} />}
-    {connectionInput && <div data-testid="ssh-connection-input" style={{ position: 'absolute', inset: 0, display: interactive ? 'flex' : 'none', flexDirection: 'column', gap: 8 }}>
+    {/* Keep the sizing host measurable while block output owns the visible pane. */}
+    {connectionInput && <div data-testid="ssh-connection-input" inert={!interactive} aria-hidden={!interactive || undefined} style={{ position: 'absolute', inset: 0, display: 'flex', visibility: interactive ? 'visible' : 'hidden', flexDirection: 'column', gap: 8 }}>
       {showToolbar && !toolbarHost && toolbar}
       {/* 终端区常驻：xterm 宿主必须一直在，否则重连时没有宿主可挂载；断开后宿主隐藏、原因直接印在屏幕上 */}
       <div role="textbox" aria-label="SSH 交互终端" aria-multiline="true"
         aria-disabled={inputDisabled || secret} tabIndex={inputDisabled || secret ? -1 : 0}
         onFocus={focusTerminal} onMouseDown={focusTerminal} style={{ flex: 1, minHeight: 0, position: 'relative', overflowX: 'hidden', overflowY: 'auto', outline: 'none', cursor: 'text' }}>
         {/* 密码框开着（secret）时屏幕只读，点它也不会把输入交给终端 */}
-        <div ref={ref} data-testid={showSnapshot ? undefined : 'ssh-terminal-screen'} style={{ position: 'absolute', inset: 0, overflowX: 'hidden', overflowY: 'auto', visibility: showSnapshot || disconnected ? 'hidden' : 'visible', pointerEvents: showSnapshot || disconnected || secret ? 'none' : 'auto', paddingLeft: 8 }} />
+        <div ref={ref} data-testid={showSnapshot ? undefined : 'ssh-terminal-screen'} style={{ position: 'absolute', inset: 0, overflowX: 'hidden', overflowY: 'auto', visibility: !interactive || showSnapshot || disconnected ? 'hidden' : 'visible', pointerEvents: !interactive || showSnapshot || disconnected || secret ? 'none' : 'auto', paddingLeft: 8 }} />
           {/* data-selectable：页面整体禁选，但屏幕内容必须能选中，否则连不上时无法复制报错。
               Rows advance at the renderer's own cell width and never scroll sideways; a
               horizontal scrollbar would steal height and make the terminal bounce. */}

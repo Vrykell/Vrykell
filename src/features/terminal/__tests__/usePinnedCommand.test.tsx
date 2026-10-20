@@ -19,7 +19,7 @@ function fixture() {
     flow.appendChild(block);
     const rect = vi.spyOn(block, 'getBoundingClientRect').mockReturnValue(bounds(top, bottom));
     const header = vi.spyOn(title, 'getBoundingClientRect').mockReturnValue(bounds(top, titleBottom));
-    return { rect, header };
+    return { block, rect, header };
   };
   return { scroll, add };
 }
@@ -28,6 +28,20 @@ beforeEach(() => vi.stubGlobal('ResizeObserver', class { observe() {} disconnect
 afterEach(() => vi.unstubAllGlobals());
 
 describe('viewport command header', () => {
+  it('pins running controls as soon as their status row leaves view, even while the command is visible', () => {
+    const { scroll, add } = fixture();
+    const item = add('running', 20, 900, 150);
+    item.block.dataset.running = 'true';
+    const row = document.createElement('div');
+    row.className = 'command-block-info';
+    item.block.prepend(row);
+    const rowBounds = vi.spyOn(row, 'getBoundingClientRect').mockReturnValue(bounds(20, 90));
+    expect(measurePinnedCommand(scroll)).toEqual({ id: 'running', remaining: 800 });
+    rowBounds.mockReturnValue(bounds(90, 110));
+    expect(measurePinnedCommand(scroll)).toBeNull();
+    item.rect.mockReturnValue(bounds(-400, 80));
+    expect(measurePinnedCommand(scroll)).toBeNull();
+  });
   it('waits until the original title leaves view and follows the block crossing the top', () => {
     const { scroll, add } = fixture();
     const first = add('first', 50, 450, 130);
