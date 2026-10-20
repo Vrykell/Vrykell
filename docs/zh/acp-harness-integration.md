@@ -105,10 +105,10 @@ ACP v1 只提供 **`usage_update`**：会话上下文 `used`/`size`（token）+ 
 
 ## 7. 工作区与设置
 
-- 新标签 kind `harness`；入口：新建标签菜单「连接 harness…」+ 全局搜索「harness」；图标取 harness 定义里的条目（默认 Bot）。
-- 会话内：停止按钮 = `session/cancel`；`plan` 更新第一版放在工具卡上方的折叠行（复用思考折叠的样式）；`notice` 走 Toast。
-- 设置页新增「外部 harness」分组（放在「子代理」之后）：名称 / 命令 / 参数（每行一个）/ 环境变量 / 工作目录策略 / 启用；持久化到 `~/.vrykell/harnesses.json`（与 `mcp.json` 同款：单文件、camelCase、可手改）。
-- 每个 harness 提供「测试连接」：只跑 `initialize` 并显示协商结果（协议版本、能力）——这是第一版唯一会真正拉起进程的入口，用来验证配置。
+- 新标签 kind `harness`（每个 harness 单例）；入口是侧栏标签栏的 **ACP 按钮 → 启动器**（标题 + 搜索 + 平铺列表，↑↓/Enter/Esc）；标签图标取该智能体自己的标。
+- 会话内：停止按钮 = `session/cancel`；输入框底部的模式 / 模型 / 配置选择器分别调用 `session/set_mode`、`session/set_model`、`session/set_config_option`；`plan` 更新渲染成对话流末尾的「计划」卡片（已完成划线、进行中高亮）；上下文占用显示在输入框状态行；输入 `/` 列出该 agent 自报的斜杠命令，`available_commands_update` 到达时整份替换。
+- 设置页新增「ACP」分组：服务器列表（连接 / 测试 / 编辑 / 删除）加预设；添加与编辑走中央浮层，持久化到 `~/.vrykell/harnesses.json`（与 `mcp.json` 同款：单文件、camelCase、可手改）。
+- 每个服务器提供「测试连接」：只跑 `initialize` 并显示协商结果（协议版本、能力）。
 
 ## 8. 安全边界（必须说清）
 
@@ -148,10 +148,10 @@ ACP v1 只提供 **`usage_update`**：会话上下文 `used`/`size`（token）+ 
 | **P3 体验** | `session/load` 恢复、模式只读展示、notice/plan、上下文用量条、用量页 `source` | ✅ **已实现（2026-10）**：`session/load` 恢复（重放通知随打开结果回传、按序折叠）、模式/模型/配置选择器（可切换，超出原计划的只读展示）、`plan` 卡片、上下文占用、输入框斜杠命令、用量页 ACP 页签与来源筛选 |
 | **P4 可选** | `terminal/*` 委托（命令经我们的 PTY，危险规则全覆盖）、MCP 透传、elicitation | 视需要 |
 
-## 11. 待定决策
+## 11. 已定决策（2026-10）
 
-1. 第一版是否声明 `fs.writeTextFile`？（建议：声明，理由见 §3/§5）
-2. 第一版是否声明 `terminal`？（建议：先不声明，代价是 harness 的命令我们看不到）
-3. 用量口径是否接受「harness 来源只显示上下文占用/成本」？
-4. harness 配置单开 `~/.vrykell/harnesses.json`，还是并进 `config.json`？
-5. 入口（新建标签 + 全局搜索）与设置分组位置是否合适？
+1. **不声明 `fs.readTextFile` / `fs.writeTextFile`**：已实测的 harness 都自带文件与终端工具，委托能力没有用武之地；等某个 harness 真的需要时再按 §9 的策略补齐并针对它实测。
+2. **不声明 `terminal`**：同上，代价是 harness 的命令我们看不到（它本来就在自己的进程里执行）。
+3. **接受**「harness 来源只显示上下文占用/成本」：用量页有 ACP 页签，选中单个服务器时整页只显示这些数字。
+4. **单开 `~/.vrykell/harnesses.json`**，与 `mcp.json` 同款，可手改。
+5. **入口改为侧栏 ACP 按钮 + 启动器**；设置分组名为「ACP」，不再叫「外部 harness」。

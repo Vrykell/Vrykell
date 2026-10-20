@@ -144,17 +144,18 @@ token counts through `_meta`, we can pick them up (`_meta.vrykell` is our extens
 
 ## 7. Workspace and settings
 
-- A new tab kind `harness`; entry points: the new-tab menu ("Connect a harness…") and global search
-  ("harness"); the icon comes from the harness definition, defaulting to a bot glyph.
-- Inside a session: the stop button sends `session/cancel`; `plan` updates render as a collapsible
-  row above the tool cards (reusing the thinking disclosure); `notice` updates raise a toast.
-- A new settings group, "External harnesses" (after "Subagents"): name, command, arguments (one per
-  line), environment variables, working-directory policy, enabled. Persisted to
-  `~/.vrykell/harnesses.json` in the same shape as `mcp.json` (single file, camelCase, editable by
-  hand).
-- Each harness gets a "Test connection" action that only runs `initialize` and reports the negotiated
-  protocol version and capabilities — the one place in the first version that really starts a
-  process, and the way to validate a configuration.
+- A new tab kind `harness` (one per harness); the entry point is the sidebar tab bar's **ACP
+  button → launcher** (title, search, flat list, ↑↓/Enter/Esc); the tab icon is the agent's own mark.
+- Inside a session: the stop button sends `session/cancel`; the mode, model and config selectors in
+  the composer call `session/set_mode`, `session/set_model` and `session/set_config_option`; `plan`
+  updates render as a plan card at the end of the transcript (completed struck through, in progress
+  highlighted); context use sits in the composer status row; typing `/` lists the agent's own slash
+  commands, replaced as a whole when `available_commands_update` arrives.
+- A new settings group "ACP": the server list (connect, test, edit, remove) plus presets; adding and
+  editing happen in centred dialogs and persist to `~/.vrykell/harnesses.json` (single file,
+  camelCase, hand-editable).
+- Every server offers "test connection": it only runs `initialize` and reports the negotiated result
+  (protocol version, capabilities).
 
 ## 8. Security boundary (stated plainly)
 
@@ -214,11 +215,15 @@ Following the checklist in `security-model.md`, these are hard requirements when
 | **P3 experience** | `session/load` restore, display-only modes, notices/plans, context-usage bar, usage-page `source` | ✅ **Implemented (2026-10)**: `session/load` restore (the replayed notifications travel back with the open result and are folded in order), mode/model/config selectors that switch (beyond the planned display-only view), a plan card, context use, slash commands in the composer, and the ACP tab plus source filter on the usage page |
 | **P4 optional** | `terminal/*` delegation (commands through our PTY, full danger-rule coverage), MCP passthrough, elicitation | as needed |
 
-## 11. Open decisions
+## 11. Decisions taken (2026-10)
 
-1. Advertise `fs.writeTextFile` in the first version? (Recommendation: yes — §3/§5.)
-2. Advertise `terminal` in the first version? (Recommendation: not yet; the cost is not seeing the
-   harness's commands.)
-3. Is the usage stance acceptable — a harness source showing context usage and cost only?
-4. A separate `~/.vrykell/harnesses.json`, or folded into `config.json`?
-5. Are the entry points (new tab plus global search) and the settings group placement right?
+1. **Do not claim `fs.readTextFile` / `fs.writeTextFile`**: every harness verified here brings its
+   own file and terminal tools, so delegation has no user yet; when one does need it, the policy in
+   §9 lands with that harness and its tests.
+2. **Do not claim `terminal`**: same reasoning; the cost is not seeing the harness's commands (it
+   runs them in its own process either way).
+3. **Accept** the usage stance — a harness source shows context use and cost only. The usage page has
+   an ACP tab, and selecting one server turns the page into those numbers alone.
+4. **A separate `~/.vrykell/harnesses.json`**, same shape as `mcp.json` and hand-editable.
+5. **The entry point is the sidebar ACP button and its launcher**; the settings group is called
+   "ACP", not "External harnesses".
