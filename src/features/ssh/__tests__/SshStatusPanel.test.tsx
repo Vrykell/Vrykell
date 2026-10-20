@@ -77,6 +77,20 @@ describe('SSH status panel', () => {
     expect(screen.getByText('49% 空闲')).toBeInTheDocument();
   });
 
+  it('keeps the CPU baseline when the phase moves between connected states', async () => {
+    const view = render(<SshStatusPanel target={target} state={connected} active />);
+    open();
+    await screen.findByText('Linux 6.8');
+    // The first sample only establishes the baseline.
+    expect(screen.getByTestId('ssh-resource-cpu')).toHaveTextContent('不可用');
+    // A session may report 'interactive' after 'connected'; the baseline must survive that, or the
+    // next reading has nothing to subtract and stays unavailable for a whole polling cycle.
+    view.rerender(<SshStatusPanel target={target} state={{ ...connected, phase: 'interactive' }} active />);
+    mocks.collect.mockResolvedValueOnce({ ...sample, cpuTotal: 1200, cpuIdle: 800 });
+    fireEvent.click(screen.getByRole('button', { name: '刷新远端资源' }));
+    await waitFor(() => expect(screen.getByTestId('ssh-resource-cpu')).toHaveTextContent('50%'));
+  });
+
   it('keeps a detail row for every resource when its measurements are unavailable', async () => {
     mocks.collect.mockResolvedValueOnce({ ...sample, cpuTotal: null, cpuIdle: null, memoryTotal: null, memoryAvailable: null, diskUsed: null, diskTotal: null });
     render(<SshStatusPanel target={target} state={connected} active />);

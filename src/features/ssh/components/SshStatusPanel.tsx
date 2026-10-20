@@ -112,13 +112,18 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
   const address = `${target.user ? `${target.user}@` : ''}${host}:${target.port ?? 22}`;
   const unsupported = !target.connectionId ? t('Save this connection to monitor remote resources.') : target.jumpHost && target.jumpHost.toLowerCase() !== 'none' ? t('Resource monitoring is unavailable for jump hosts.') : null;
 
+  // A phase change inside the connected states (connected ↔ interactive) must not throw away the
+  // CPU baseline: the next sample would have nothing to subtract and the reading would stay
+  // unavailable for a whole polling cycle. Only leaving the connected state invalidates the data.
   useEffect(() => {
     const time = Date.now();
     setConnectedAt(connected ? time : null);
-    setSampleValid(false);
-    previous.current = null;
-    trafficPrevious.current = null;
-  }, [state.phase, connected]);
+    if (!connected) {
+      setSampleValid(false);
+      previous.current = null;
+      trafficPrevious.current = null;
+    }
+  }, [connected]);
 
   useEffect(() => {
     setSample(null); setCpu(null); setUpdatedAt(null); setSampleValid(false);
