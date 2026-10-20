@@ -6,7 +6,7 @@ vi.mock('@features/terminal/services/terminalRepaint', () => ({ redrawTerminal: 
 import { useGlobalShortcuts } from '../useGlobalShortcuts';
 import { useUiStore } from '@features/workspace';
 
-beforeEach(() => redraw.mockClear());
+beforeEach(() => { redraw.mockClear(); useUiStore.setState({ settingsOpen: false, paletteOpen: false, globalSearchOpen: false }); });
 it('opens the palette before a focused terminal can consume the shortcut', () => {
   useUiStore.getState().setPaletteOpen(false);
   const { unmount } = renderHook(useGlobalShortcuts);
@@ -46,4 +46,23 @@ it('preserves Ctrl+R and composition keys and ignores shortcut autorepeat', () =
     { key: 'R', ctrlKey: true, shiftKey: true, altKey: true },
   ]) fireEvent.keyDown(window, options);
   expect(redraw).not.toHaveBeenCalled();
+});
+
+it('closes settings on Escape while preserving nested overlays and composition', () => {
+  renderHook(useGlobalShortcuts);
+  useUiStore.setState({ settingsOpen: true, globalSearchOpen: true });
+  fireEvent.keyDown(window, { key: 'Escape' });
+  expect(useUiStore.getState().settingsOpen).toBe(true);
+  useUiStore.setState({ globalSearchOpen: false });
+  fireEvent.keyDown(window, { key: 'Escape', isComposing: true });
+  expect(useUiStore.getState().settingsOpen).toBe(true);
+  fireEvent.keyDown(window, { key: 'Escape' });
+  expect(useUiStore.getState().settingsOpen).toBe(false);
+});
+
+it('closes settings before switching to a numbered terminal tab', () => {
+  renderHook(useGlobalShortcuts);
+  useUiStore.setState({ settingsOpen: true });
+  fireEvent.keyDown(window, { key: '1', ctrlKey: true });
+  expect(useUiStore.getState().settingsOpen).toBe(false);
 });

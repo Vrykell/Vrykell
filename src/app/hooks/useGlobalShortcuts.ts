@@ -46,6 +46,21 @@ export function useGlobalShortcuts() {
     const preventNativeContextMenu = (e: MouseEvent) => e.preventDefault();
 
     const handler = (e: KeyboardEvent) => {
+      if (useUiStore.getState().settingsOpen) {
+        if (e.isComposing || e.keyCode === 229) return;
+        if (e.key === 'Escape' || ((e.metaKey || e.ctrlKey) && e.key === 'w')) {
+          const ui = useUiStore.getState();
+          if (!ui.paletteOpen && !ui.globalSearchOpen && !document.querySelector('[role="menu"], [role="listbox"]')) {
+            e.preventDefault();
+            useUiStore.getState().setSettingsOpen(false);
+          }
+          return;
+        }
+        if ((e.metaKey || e.ctrlKey) && /^[1-9]$/.test(e.key)) {
+          useUiStore.getState().setSettingsOpen(false);
+        }
+        if (!((e.metaKey || e.ctrlKey) && e.key === 'f')) return;
+      }
       // Escape: 当键盘路由到终端且不在 TUI 全屏场景时，切回输入栏
       // （场景判定走 scenes —— altScreenActive 仅手动全屏，真 vim 里 Esc 必须进 PTY）
       if (e.key === 'Escape' && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
@@ -119,7 +134,7 @@ export function useGlobalShortcuts() {
         else ws.closeFocusedTerminal();
       } else if (e.key === ',') {
         e.preventDefault();
-        useSessionStore.getState().openSettingsTab();
+        useSessionStore.getState().openSettings();
       } else if (/^[1-9]$/.test(e.key)) {
         const tab = ws.tabs[parseInt(e.key, 10) - 1];
         if (tab) {

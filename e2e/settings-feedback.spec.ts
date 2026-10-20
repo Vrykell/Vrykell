@@ -13,10 +13,12 @@ test('settings navigation has static headings and save feedback appears once the
   await expect(rows.locator('svg')).toHaveCount(23);
   await expect(nav).toHaveCSS('width', '224px');
   for (const row of await rows.all()) expect((await row.boundingBox())!.height).toBe(32);
+  const rowHeight = (await rows.first().boundingBox())!.height;
   await page.locator('[data-dock-btn="files"]').click();
   const fileRow = page.locator('[data-file-row="true"]').first();
   await expect(fileRow).toBeVisible();
-  expect((await rows.first().boundingBox())!.height).toBe((await fileRow.boundingBox())!.height);
+  expect(rowHeight).toBe((await fileRow.boundingBox())!.height);
+  await gotoSetting(page, '模型配置');
   await expect(page.getByRole('status')).toHaveCount(0);
   await page.getByPlaceholder('模型名称').first().fill('One summary');
   await page.getByPlaceholder('服务地址 (Base URL)').first().fill('https://example.test/v1');

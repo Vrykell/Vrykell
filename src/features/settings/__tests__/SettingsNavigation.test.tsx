@@ -1,4 +1,3 @@
-import { useCallback, useRef, useState } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it } from 'vitest';
 import SettingsNavigation from '../components/SettingsNavigation';
@@ -6,47 +5,29 @@ import { useSettingsNavigation } from '../hooks/useSettingsNavigation';
 import { useSettingsNavigationStore } from '../stores/navigation';
 
 function Navigation() {
-  const [open, setOpen] = useState(false);
-  const trigger = useRef<HTMLButtonElement>(null);
-  const close = useCallback(() => setOpen(false), []);
-  const navigation = useSettingsNavigation();
-  return <div data-testid="layout" data-open={open}>
-    <button ref={trigger} onClick={() => setOpen(true)}>Open directory</button>
-    <SettingsNavigation navigation={navigation} open={open} onClose={close} trigger={trigger} />
-    <button>Content control</button>
-  </div>;
+  return <SettingsNavigation navigation={useSettingsNavigation()} />;
 }
+
 afterEach(() => { cleanup(); useSettingsNavigationStore.setState({ selected: 'ai-model' }); });
 
-it('shows the full directory without a local search and returns focus after selecting a page', () => {
+it('keeps the complete directory visible after selecting a page', () => {
   render(<Navigation />);
+  const directory = screen.getByRole('complementary', { name: '设置目录' });
+  expect(directory.querySelectorAll('.sidebar-row')).toHaveLength(23);
+  expect(screen.getByRole('button', { name: '语言' })).toBeVisible();
   expect(screen.queryByRole('textbox')).toBeNull();
-  const trigger = screen.getByText('Open directory');
-  fireEvent.click(trigger);
-  expect(screen.getByRole('button', { name: '模型配置' })).toHaveFocus();
-  expect(screen.getByRole('complementary', { name: '设置目录' }).querySelectorAll('.sidebar-row')).toHaveLength(23);
-  expect(screen.getByRole('button', { name: '版本控制' })).toBeVisible();
-  expect(screen.getByRole('button', { name: '历史命令' })).toBeVisible();
-  expect(screen.getByRole('button', { name: '块外观' })).toBeVisible();
-  expect(screen.getByRole('button', { name: '字体与显示' })).toBeVisible();
-  expect(screen.getByRole('button', { name: '主题文件' })).toBeVisible();
-  fireEvent.keyDown(screen.getByRole('button', { name: '模型行为' }), { key: 'Enter' });
+  expect(screen.queryByRole('button', { name: '版本控制' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: '模型行为' }));
   expect(useSettingsNavigationStore.getState().selected).toBe('ai-behavior');
-  expect(screen.getByTestId('layout')).toHaveAttribute('data-open', 'false');
-  expect(trigger).toHaveFocus();
+  expect(screen.getByRole('button', { name: '模型行为' })).toHaveAttribute('aria-current', 'page');
+  expect(directory).toBeVisible();
 });
 
-it('dismisses on Escape, outside press and keyboard focus leaving the directory', () => {
+it('supports keyboard selection without folding the directory', () => {
   render(<Navigation />);
-  const trigger = screen.getByText('Open directory');
-  fireEvent.click(trigger);
-  fireEvent.keyDown(window, { key: 'Escape' });
-  expect(trigger).toHaveFocus();
-  expect(screen.getByTestId('layout')).toHaveAttribute('data-open', 'false');
-  fireEvent.click(trigger);
-  fireEvent.pointerDown(screen.getByText('Content control'));
-  expect(screen.getByTestId('layout')).toHaveAttribute('data-open', 'false');
-  fireEvent.click(trigger);
-  fireEvent.blur(screen.getByRole('button', { name: '模型配置' }), { relatedTarget: screen.getByText('Content control') });
-  expect(screen.getByTestId('layout')).toHaveAttribute('data-open', 'false');
+  fireEvent.keyDown(screen.getByRole('button', { name: '语言' }), { key: 'Enter' });
+  expect(useSettingsNavigationStore.getState().selected).toBe('application-language');
+  fireEvent.keyDown(screen.getByRole('button', { name: '字体与显示' }), { key: ' ' });
+  expect(screen.getByRole('button', { name: '字体与显示' })).toHaveAttribute('aria-current', 'page');
+  expect(screen.getByRole('complementary', { name: '设置目录' })).toBeVisible();
 });

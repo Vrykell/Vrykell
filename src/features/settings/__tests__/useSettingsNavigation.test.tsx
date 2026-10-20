@@ -9,7 +9,7 @@ beforeEach(() => useSettingsNavigationStore.setState({ selected: 'ai-model' }));
 afterEach(() => vi.restoreAllMocks());
 
 it('opens the globally indexed page before mounting and updates an existing settings view', () => {
-  const open = vi.spyOn(useSessionStore.getState(), 'openSettingsTab').mockImplementation(() => {});
+  const open = vi.spyOn(useSessionStore.getState(), 'openSettings').mockImplementation(() => {});
   getSettings().find(setting => setting.id === 'theme')!.onSelect();
   const { result } = renderHook(() => useSettingsNavigation());
   expect(result.current.selected).toBe('appearance-theme');
@@ -38,8 +38,7 @@ it('splits the appearance theme page into theme, blocks, typography and files', 
     ['appearance-files', '主题文件'],
   ]);
 });
-it('opens the diff page preference through the global settings index', () => {
-  vi.spyOn(useSessionStore.getState(), 'openSettingsTab').mockImplementation(() => {});
-  getSettings().find(setting => setting.id === 'git-diff-pages')!.onSelect();
-  expect(useSettingsNavigationStore.getState()).toMatchObject({ selected: 'source-control', targetField: '差异页面' });
+it('omits obsolete editor and comparison page preferences from settings search', () => {
+  expect(getSettings().find(setting => setting.id === 'git-diff-pages')).toBeUndefined();
+  expect(getSettings().find(setting => setting.id === 'embedded-editor-pages')).toBeUndefined();
 });

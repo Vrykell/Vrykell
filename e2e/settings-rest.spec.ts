@@ -25,7 +25,7 @@ test.describe('主题设置页', () => {
       .toBe('dark');
   });
 
-  test('主题模式三个选项并排，跟随系统的圆点显示系统配色', async ({ page }) => {
+  test('主题模式三个预览并排并跟随系统配色', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'dark' });
     await gotoSetting(page, '主题');
     const group = page.getByRole('radiogroup', { name: '主题模式' });
@@ -35,11 +35,9 @@ test.describe('主题设置页', () => {
     const tops = await group.getByRole('radio')
       .evaluateAll(elements => elements.map(element => Math.round(element.getBoundingClientRect().top)));
     expect(new Set(tops).size).toBe(1);
-    // The follow-system dot paints the resolved scheme and follows a system change.
-    const dot = group.getByRole('radio', { name: '跟随系统', exact: true }).locator('.settings-radio-dot');
-    const dark = await dot.evaluate(element => getComputedStyle(element).backgroundColor);
+    await expect(group.locator('.theme-mode-preview')).toHaveCount(3);
     await page.emulateMedia({ colorScheme: 'light' });
-    await expect.poll(() => dot.evaluate(element => getComputedStyle(element).backgroundColor)).not.toBe(dark);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   });
 
   test('不透明度滑块更新后端配置与百分比显示', async ({ page }) => {
@@ -102,14 +100,14 @@ test.describe('快捷键说明页', () => {
     // Shortcut badges follow the platform modifier the app advertises.
     const mod = await page.evaluate(() => /Mac/.test(navigator.userAgent) ? 'Meta' : 'Control');
     await expect(page.getByLabel(`${mod}+T`, { exact: true })).toBeVisible();
-    await expect(page.getByRole('main').getByLabel(`${mod}+F`, { exact: true })).toBeVisible();
+    await expect(page.locator('.settings-screen').getByLabel(`${mod}+F`, { exact: true })).toBeVisible();
   });
 });
 
 test.describe('网络搜索页', () => {
   test('搜索方式显示与 Tavily Key 保存/清除', async ({ page }) => {
-    await gotoSetting(page, '网络搜索');
-    await expect(page.getByText('DuckDuckGo 兜底', { exact: true })).toBeVisible();
+    await gotoSetting(page, '联网搜索');
+    await expect(page.getByText('备用搜索', { exact: true })).toBeVisible();
     await expect(page.getByText('未配置', { exact: true })).toBeVisible();
 
     const keyField = fieldOf(page, 'Tavily API Key');
@@ -127,7 +125,7 @@ test.describe('网络搜索页', () => {
 
 test.describe('模型权限页', () => {
   test('工具权限分级切换持久化', async ({ page }) => {
-    await gotoSetting(page, '模型权限');
+    await gotoSetting(page, '工具权限');
     // 执行终端命令 → 禁止
     const runRow = rowOf(page, '执行终端命令');
     await runRow.getByRole('combobox', { name: '执行终端命令 权限' }).click();
@@ -143,7 +141,7 @@ test.describe('模型权限页', () => {
   });
 
   test('清空会话授权按钮提示成功', async ({ page }) => {
-    await gotoSetting(page, '模型权限');
+    await gotoSetting(page, '工具权限');
     await page.getByRole('button', { name: '清空会话授权' }).click();
     await expect(page.getByText('已清空全部会话授权')).toBeVisible();
   });

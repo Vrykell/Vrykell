@@ -1,7 +1,7 @@
 import { TextInput } from '@ui/TextInput';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { iconSizes,
-  Plus, History, Settings, Sparkles, GitBranch,
+  Plus, History, Sparkles, GitBranch,
   ChevronRight, Pencil, Archive, Folder, Trash2, X,
  } from '@ui/icons';
 import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, useTabDisplayTitle, tabIconKey, tabIconColor, type Tab, type TabGroup } from '@features/workspace';
@@ -301,7 +301,6 @@ export default function PanelTabs() {
           const Icon = drag.kind === 'group' ? Folder
             : tab?.kind === 'history' ? History
               : tab?.kind === 'ai-history' ? Sparkles
-              : tab?.kind === 'settings' ? Settings
               : first?.kind === 'ssh' ? SshIcon
                 : shellIconFor(first?.kind === 'local' ? first.shellType ?? defaultShellType : undefined);
           return <Icon size={iconSizes.row} style={{ color: tab && isSessionTab(tab)
@@ -567,7 +566,6 @@ function TabRow({
     : tab.kind === 'git-diff' ? tab.comparisons ? GitBranch : fileIcon(tab.selection.path)
     : tab.kind === 'editor' ? fileIcon(tab.selected.path)
     : tab.kind === 'ai-history' ? Sparkles
-      : tab.kind === 'settings' ? Settings
       : isSsh ? SshIcon
         : shellIconFor(first?.kind === 'local' ? first.shellType ?? defaultShellType : undefined);
   const iconColors = useIconColorStore(state => state.colors);

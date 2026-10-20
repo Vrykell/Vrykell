@@ -28,9 +28,9 @@ describe('responsive panel space', () => {
     expect(useDockStore.getState().leftPanels).toEqual(['tabs']);
     expect(useDockStore.getState().rightPanels).toEqual(['chat']);
   });
-  it('gives the gap reclaimed from the docked sidebar back to the terminal columns', () => {
-    // 912px fits exactly when both sidebars touch the content.
-    Object.defineProperty(window, 'innerWidth', { value: 912 });
+  it('reserves the right frame gap with or without an open sidebar', () => {
+    // The right frame gap, both panels and the terminal fit at this boundary.
+    Object.defineProperty(window, 'innerWidth', { value: 908 });
     useDockStore.getState().openPanel('chat');
     expect(useDockStore.getState().leftPanels).toEqual(['tabs']);
     expect(useDockStore.getState().rightPanels).toEqual(['chat']);

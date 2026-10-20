@@ -9,11 +9,13 @@ import { resolveDisplayTitle } from '@features/workspace/model/sessionTitle';
 import { useTerminalStore } from '@features/terminal/stores/terminal';
 import { useInputStore } from '@features/terminal/stores/input';
 import { leaf, firstLeaf } from '@features/workspace/model/windowLayout';
+import { useUiStore } from './ui';
 
 const initial = useWorkspaceStore.getState();
 
 describe('workspace store', () => {
   beforeEach(() => {
+    useUiStore.setState({ settingsOpen: false });
     useWorkspaceStore.setState(initial, true);
     // 模拟 App 启动：无恢复会话时创建默认终端（store 本身不再内置初始标签）
     useWorkspaceStore.getState().addTab({});
@@ -70,18 +72,20 @@ describe('workspace store', () => {
   it('keeps an active settings page when the last background session closes', () => {
     const ws = useWorkspaceStore.getState();
     const sessionId = ws.tabs[0]!.id;
-    ws.openSettingsTab();
+    ws.openSettings();
     ws.closeTab(sessionId);
 
     const state = useWorkspaceStore.getState();
     expect(state.tabs.some(isSessionTab)).toBe(false);
-    expect(state.activeId).toBe(state.tabs.find(tab => tab.kind === 'settings')!.id);
+    expect(state.tabs).toHaveLength(0);
+    expect(state.activeId).toBe('');
+    expect(useUiStore.getState().settingsOpen).toBe(true);
   });
 
   it('reorders singleton pages with loose sessions without persisting or grouping them', () => {
     const ws = useWorkspaceStore.getState();
     const session = ws.tabs[0]!.id;
-    const settings = ws.addTab({ kind: 'settings' });
+    const settings = ws.addTab({ kind: 'ai-history' });
     const history = ws.addTab({ kind: 'history' });
     invokeMock.mockClear();
     ws.moveTab(history, null, 0);
@@ -131,7 +135,7 @@ describe('workspace store', () => {
     expect(s.tabs).toHaveLength(2);
   });
 
-  it.each(['history', 'ai-history', 'settings'] as const)('keeps %s singleton through direct creation and duplication', kind => {
+  it.each(['history', 'ai-history'] as const)('keeps %s singleton through direct creation and duplication', kind => {
     const ws = useWorkspaceStore.getState();
     const id = ws.addTab({ kind });
     ws.activate(ws.tabs[0]!.id);
@@ -170,7 +174,7 @@ describe('workspace store', () => {
   it('keeps the remaining singleton active when no terminal sessions are open', () => {
     useWorkspaceStore.setState({ tabs: [], activeId: '' });
     const ws = useWorkspaceStore.getState();
-    const settings = ws.addTab({ kind: 'settings' });
+    const settings = ws.addTab({ kind: 'ai-history' });
     const history = ws.addTab({ kind: 'history' });
     ws.closeTab(history);
     expect(useWorkspaceStore.getState().activeId).toBe(settings);
@@ -303,16 +307,14 @@ describe('workspace store 扩展', () => {
     invokeMock.mockImplementation(() => Promise.reject(new Error('no backend')));
   });
 
-  it('openSettingsTab 新建并复用', () => {
+  it('opens settings without creating a tab or changing the active session', () => {
     const ws = useWorkspaceStore.getState();
-    ws.openSettingsTab();
-    let s = useWorkspaceStore.getState();
-    expect(s.tabs).toHaveLength(2);
-    expect(s.tabs[1]!.kind).toBe('settings');
-    expect(s.tabs[1]!.title).toBe('设置');
-    s.openSettingsTab();
-    s = useWorkspaceStore.getState();
-    expect(s.tabs).toHaveLength(2);
+    const before = ws.activeId;
+    ws.openSettings();
+    ws.openSettings();
+    expect(useWorkspaceStore.getState().tabs).toHaveLength(1);
+    expect(useWorkspaceStore.getState().activeId).toBe(before);
+    expect(useUiStore.getState().settingsOpen).toBe(true);
   });
 
   it('activate 切换活跃并把聚焦回落到该窗口第一个终端', () => {
@@ -503,7 +505,9 @@ describe('workspace store 扩展', () => {
     expect(getFocusedCwd()).toBe('/spec');
     ws.setTerminalCwd(`${a}#0`, '/runtime');
     expect(getFocusedCwd()).toBe('/runtime');
-    ws.openSettingsTab();
+    ws.openSettings();
+    expect(getFocusedCwd()).toBe('/runtime');
+    ws.openHistoryTab();
     expect(getFocusedCwd()).toBeUndefined();
   });
 

@@ -38,7 +38,6 @@ import { usePinnedCommand } from '../hooks/usePinnedCommand';
 import TerminalPanel from '@features/terminal/components/TerminalPanel';
 import { SessionHistoryView } from '@features/session-history';
 import AiHistoryView from '@features/chat/components/AiHistoryView';
-import SettingsView from '@features/settings/pages/SettingsView';
 import ContextMenu, { type ContextMenuItem } from '@ui/ContextMenu';
 import ErrorBox from '@ui/ErrorBox';
 import { TextButton } from '@ui/TextButton';
@@ -114,10 +113,10 @@ export default function TerminalView() {
             />
           );
         }
-        if (tab.id !== activeId) return null; // history/settings 无 PTY，无需保活
+        if (tab.id !== activeId) return null;
         if (tab.kind === 'git-diff' || tab.kind === 'editor') return null;
         return tab.kind === 'history' ? <SessionHistoryView key={tab.id} />
-          : tab.kind === 'ai-history' ? <AiHistoryView key={tab.id} /> : <SettingsView key={tab.id} />;
+          : <AiHistoryView key={tab.id} />;
       })}
 
       {/* Manual fullscreen host for a running block, with room for the toolbar. */}

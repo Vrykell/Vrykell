@@ -56,7 +56,7 @@ registerCommand({ id: 'new-tab', label: '新建标签页', desc: '创建新的�
 registerCommand({ id: 'close-tab', label: '关闭当前标签页', desc: '关闭活跃标签页', keys: '⌘W', keywords: ['close', 'tab'], action: () => useSessionStore.getState().closeTab(getActiveId()) });
 registerCommand({ id: 'undo-close-tab', label: '恢复关闭的标签页', desc: '撤销关闭标签操作', keys: '⌘⇧T', keywords: ['undo', 'tab', 'restore'], action: () => useSessionStore.getState().undoCloseTab() });
 registerCommand({ id: 'toggle-files', label: '切换文件面板', desc: '按导航布局显示或隐藏文件管理面板', keywords: ['files', 'panel'], action: () => useDockStore.getState().togglePanel('left', 'files') });
-registerCommand({ id: 'open-settings', label: '打开设置', desc: '配置 API Key、模型与编辑器', keys: '⌘,', keywords: ['settings', 'config', 'api'], action: () => useSessionStore.getState().openSettingsTab() });
+registerCommand({ id: 'open-settings', label: '打开设置', desc: '配置 API Key、模型与编辑器', keys: '⌘,', keywords: ['settings', 'config', 'api'], action: () => useSessionStore.getState().openSettings() });
 registerCommand({ id: 'clear-blocks', label: '清除输出块', desc: '清空当前标签的所有命令块', keywords: ['clear', 'reset'], action: () => clearSessionBlocks(getActiveId()) });
 registerCommand({ id: 'redraw-terminal', label: t('Redraw terminal'), desc: t('Refresh the terminal display while keeping the running session'), keys: isMacOS ? 'Meta+Shift+R' : 'Control+Shift+R', keywords: ['redraw', 'repaint', 'refresh', 'terminal'], action: () => redrawTerminal() });
 registerCommand({ id: 'toggle-terminal-debug', label: '切换终端诊断日志', desc: '开关 PTY、Shell 集成和会话状态日志', keywords: ['terminal', 'debug', 'log', 'pty'], action: () => {

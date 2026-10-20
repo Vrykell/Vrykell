@@ -2,10 +2,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useDockStore } from '../stores/dock';
 import DockNavigation from '../components/DockNavigation';
-import { useSessionStore, useNavigationDrag, leaf } from '@features/workspace';
+import { useSessionStore, useUiStore, useNavigationDrag, leaf } from '@features/workspace';
 import { useAuxiliarySidebarStore } from '../stores/auxiliarySidebar';
 
 beforeEach(() => {
+  useUiStore.setState({ settingsOpen: false });
   useNavigationDrag.getState().end();
   useAuxiliarySidebarStore.setState({ sshStatusOwner: null, dismissRequest: 0 });
   useSessionStore.setState({ activeId: 'session', tabs: [{ id: 'session', title: '终端', kind: 'session', layout: leaf({ id: 'terminal', kind: 'local' }) }] });
@@ -43,11 +44,21 @@ describe('shared navigation buttons', () => {
     expect(settings).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(settings);
     expect(settings).toHaveAttribute('aria-pressed', 'true');
-    expect(useSessionStore.getState().tabs.filter(tab => tab.kind === 'settings')).toHaveLength(1);
+    expect(useUiStore.getState().settingsOpen).toBe(true);
+    expect(useSessionStore.getState().tabs).toHaveLength(1);
     fireEvent.click(settings);
-    expect(useSessionStore.getState().tabs.filter(tab => tab.kind === 'settings')).toHaveLength(1);
+    expect(settings).toHaveAttribute('aria-pressed', 'false');
+    expect(useUiStore.getState().settingsOpen).toBe(false);
+    expect(useSessionStore.getState().activeId).toBe('session');
     expect(useDockStore.getState().leftPanels).toEqual(['tabs']);
     expect(useDockStore.getState().rightPanels).toEqual([]);
+  });
+  it('closes settings when another outer navigation action is selected', () => {
+    useUiStore.setState({ settingsOpen: true });
+    render(<DockNavigation side="left" />);
+    fireEvent.click(screen.getByRole('button', { name: '标签' }));
+    expect(useUiStore.getState().settingsOpen).toBe(false);
+    expect(useDockStore.getState().leftPanels).toEqual(['tabs']);
   });
   it('returns to the existing right panel when its navigation button is clicked', () => {
     useDockStore.setState({ rightPanels: ['chat'] });

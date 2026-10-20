@@ -11,8 +11,10 @@ for (const theme of ['深色', '浅色']) {
     await page.goto('/');
     await gotoSetting(page, '主题');
     await page.getByRole('radio', { name: theme, exact: true }).click();
+    await page.getByRole('button', { name: '设置', exact: true }).click();
     await ensureTabsOpen(page);
-    const settings = page.locator('[data-tab-kind="settings"]');
+    await page.getByTestId('tab-history-btn').click();
+    const settings = page.locator('[data-tab-kind="history"]');
     await settings.click({ button: 'right' });
     await expect(page.getByRole('menuitemradio')).toHaveCount(0);
     await expect(settings.locator('.sidebar-row-icon svg')).toHaveAttribute('style', /color: var\(--text-primary\)/);
@@ -33,8 +35,14 @@ for (const theme of ['深色', '浅色']) {
     await expect(header.locator('[data-group-icon]')).toHaveAttribute('data-group-icon', 'closed');
     await header.press('Enter');
     await member.click({ button: 'right' });
+    const violet = await member.evaluate(element => {
+      const probe = document.createElement('span'); element.append(probe);
+      probe.style.color = 'var(--cmd-pipe)';
+      const color = getComputedStyle(probe).color; probe.remove(); return color;
+    });
+    await expect(page.getByRole('menuitemradio', { name: '紫色', exact: true })).toHaveCSS('background-color', violet);
     await page.getByRole('menuitemradio', { name: '紫色', exact: true }).click();
-    await expect(member.locator('.sidebar-row-icon svg')).not.toHaveCSS('color', original);
+    await expect(member.locator('.sidebar-row-icon svg')).toHaveCSS('color', violet);
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('vrykell-icon-colors')!).state.colors['page:settings'])).toBeUndefined();
     await page.screenshot({ path: testInfo.outputPath('terminal-only-icon-colors.png'), animations: 'disabled' });
     await member.click({ button: 'right' });

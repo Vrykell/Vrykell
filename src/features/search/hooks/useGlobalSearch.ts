@@ -149,7 +149,7 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
           const data = result.data as SettingResultData;
           const setting = getSettings().find(item => item.id === data.settingId);
           if (setting) setting.onSelect();
-          else useSessionStore.getState().openSettingsTab();
+          else useSessionStore.getState().openSettings();
           break;
         }
         case 'action': {

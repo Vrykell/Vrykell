@@ -9,8 +9,6 @@ import { t } from '@i18n';
 import { useGitPreferences } from '@config/git';
 import GitCommitPrompt from './GitCommitPrompt';
 import GitReferenceDialog, { referenceActionLabel } from './GitReferenceDialog';
-import { useSessionStore } from '@features/workspace';
-import { useSettingsNavigationStore } from '@features/settings';
 
 export default function GitRepositoryActions({ target, snapshot, refresh, showWorktrees }: {
   target: GitTarget | null; snapshot: GitSnapshot | null; refresh: () => void; showWorktrees?: () => void;
@@ -42,9 +40,6 @@ export default function GitRepositoryActions({ target, snapshot, refresh, showWo
       ...(showWorktrees ? [{ label: t('Linked worktrees'), group: 'view' as const, onClick: showWorktrees }] : []),
       { label: t('AI commit prompt for this workspace…'), group: 'edit', disabled: !target,
         onClick: () => { if (target) setPrompt({ ...target }); } },
-      { label: t('Source control settings'), group: 'view', onClick: () => {
-        useSettingsNavigationStore.getState().setSelected('source-control'); useSessionStore.getState().openSettingsTab();
-      } },
     ]} />}
     {prompt && <GitCommitPrompt target={prompt} onClose={() => setPrompt(null)} />}
     {reference && <GitReferenceDialog {...reference} refresh={refresh} onClose={() => setReference(null)} />}

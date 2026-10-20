@@ -53,7 +53,21 @@ for (const density of [1, 1.25, 2]) {
         await row.hover(); await row.getByRole('button', { name: '打开工作文件' }).click();
         const editor = page.getByTestId('file-editor');
         await expect(editor.locator('.monaco-editor')).toBeVisible({ timeout: 15_000 });
-        expect(await editor.locator('.folder-tab').first().evaluate(element => getComputedStyle(element, '::before').content)).toBe('none');
+        expect(await editor.locator('.folder-tab').first().evaluate(element => getComputedStyle(element, '::before').content)).toBe('""');
+        await expectJoinedCorners(page, editor, info.outputPath('editor-first-tab-corners.png'));
+        const more = editor.getByRole('button', { name: '更多编辑器操作' });
+        const selectedColor = await editor.locator('.folder-tab[data-active="true"]').evaluate(element => getComputedStyle(element).backgroundColor);
+        await expect(more).toHaveCSS('background-color', selectedColor);
+        expect((await more.boundingBox())!.x + (await more.boundingBox())!.width).toBeLessThan((await editor.locator('.folder-tab').first().boundingBox())!.x);
+        await more.hover(); await expect(more).toHaveCSS('background-color', selectedColor);
+        await more.click(); await expect(more).toHaveCSS('background-color', selectedColor);
+        await expect(more.locator('svg')).toHaveCSS('transform', 'matrix(-1, 0, 0, -1, 0, 0)');
+        await more.click();
+        await expect(more).toHaveAttribute('aria-expanded', 'false');
+        await expect(more.locator('svg')).toHaveCSS('transform', 'none');
+        await more.click();
+        await page.keyboard.press('Escape');
+        await expect(more.locator('svg')).toHaveCSS('transform', 'none');
         const secondFile = page.getByTestId('git-untracked-new file.ts');
         await secondFile.hover(); await secondFile.getByRole('button', { name: '打开工作文件' }).click();
         for (const width of [1240, 760]) {
@@ -65,6 +79,7 @@ for (const density of [1, 1.25, 2]) {
         await page.getByTestId('git-staged-src/main.ts').click();
         const review = page.getByTestId('git-diff-review');
         await expect(review.locator('.monaco-diff-editor')).toBeVisible({ timeout: 15_000 });
+        await expect(review.getByRole('button', { name: '更多编辑器操作' })).toHaveCSS('background-color', selectedColor);
         for (const width of [1240, 760]) {
           await page.setViewportSize({ width, height: 800 });
           await expectJoinedCorners(page, review, info.outputPath(`comparison-corners-${width}.png`));

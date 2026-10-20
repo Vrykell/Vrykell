@@ -1,9 +1,8 @@
 import { useTerminalDefaults } from '@config/terminalDefaults';
 import { create } from 'zustand';
+import { useUiStore } from './ui';
 import { gitComparisonKey, type GitSelection, type GitComparison } from '@core/git';
-import { useGitPreferences, type GitDiffMode } from '@config/git';
 import { editorFileKey, interceptEditorClose, type EditorFile } from '@core/editor';
-import { useEditorPreferences, type EditorPageMode } from '@config/editor';
 import type { SshOptions } from '@core/ssh';
 import { useToastStore } from '@ui/Toast';
 import { t } from '@i18n';
@@ -33,7 +32,7 @@ import {
 
 export type { TitleSource };
 
-export type TabKind = 'session' | 'history' | 'ai-history' | 'settings' | 'git-diff' | 'editor';
+export type TabKind = 'session' | 'history' | 'ai-history' | 'git-diff' | 'editor';
 
 /** SSH 会话目标（终端类型=ssh 时的专属字段） */
 export interface SshTabTarget extends SshOptions {
@@ -62,8 +61,7 @@ export type Tab =
   | (TabBase & { kind: 'history' })
   | (TabBase & { kind: 'ai-history' })
   | (TabBase & { kind: 'git-diff'; selection: GitSelection; comparisons?: GitComparison[] })
-  | (TabBase & { kind: 'editor'; files: EditorFile[]; selected: EditorFile; pageMode?: EditorPageMode })
-  | (TabBase & { kind: 'settings' });
+  | (TabBase & { kind: 'editor'; files: EditorFile[]; selected: EditorFile });
 
 export interface TabGroup {
   id: string;
@@ -74,8 +72,8 @@ export interface TabGroup {
 export interface AddTabOptions {
   cwd?: string;
   title?: string;
-  /** Defaults to local; history and settings kinds create workspace pages. */
-  kind?: 'local' | 'ssh' | 'history' | 'ai-history' | 'settings';
+  /** Defaults to local; history kinds create workspace pages. */
+  kind?: 'local' | 'ssh' | 'history' | 'ai-history';
   shellType?: ShellType;
   /** SSH 连接目标（kind='ssh' 时） */
   ssh?: SshTabTarget;
@@ -145,7 +143,6 @@ const nextTabId = () => `t${ID_PREFIX}-${counter++}`;
 const DEFAULT_TITLE = '终端';
 const HISTORY_TITLE = '会话历史';
 const AI_HISTORY_TITLE = t('AI conversation history');
-const SETTINGS_TITLE = '设置';
 
 interface WorkspaceState {
   tabs: Tab[];
@@ -158,16 +155,16 @@ interface WorkspaceState {
   /** Open the singleton AI conversation history page. */
   openAiHistoryTab: () => void;
   /** 新建/复用设置标签页 */
-  openSettingsTab: () => void;
+  openSettings: () => void;
   openGitDiff: (selection: GitSelection) => string;
   openEditorFile: (file: EditorFile) => string;
   closeEditorFile: (file: EditorFile, force?: boolean) => void;
   moveEditorFile: (key: string, over: string, after: boolean) => void;
   moveGitComparison: (id: string, over: string, after: boolean) => void;
-  configureEditorTabs: (mode: EditorPageMode) => void;
+  configureEditorTabs: () => void;
   activateGitComparison: (id: string) => void;
   closeGitComparison: (id: string) => void;
-  configureGitDiffTabs: (mode: GitDiffMode) => void;
+  configureGitDiffTabs: () => void;
   closeTab: (id: string, force?: boolean) => void;
   activate: (id: string) => void;
   /** Name the tab from the first user message (fills the default title or upgrades a command title). */
@@ -233,7 +230,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   programTitles: {},
   addTab: (opts) => {
     const o = opts ?? {};
-    if (o.kind === 'history' || o.kind === 'ai-history' || o.kind === 'settings') {
+    if (o.kind === 'history' || o.kind === 'ai-history') {
       const existing = get().tabs.find(tab => tab.kind === o.kind);
       if (existing) {
         get().activate(existing.id);
@@ -265,8 +262,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       tab = { id, title: HISTORY_TITLE, kind: 'history', titleSource: 'manual' };
     } else if (o.kind === 'ai-history') {
       tab = { id, title: AI_HISTORY_TITLE, kind: 'ai-history', titleSource: 'manual' };
-    } else if (o.kind === 'settings') {
-      tab = { id, title: SETTINGS_TITLE, kind: 'settings', titleSource: 'manual' };
     } else {
       const preference = useTerminalDefaults.getState().shell;
       const shellType = o.shellType ?? (preference === 'system' ? undefined : preference);
@@ -309,16 +304,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
   openAiHistoryTab: () => { get().addTab({ kind: 'ai-history' }); },
   openEditorFile: file => {
-    const mode = useEditorPreferences.getState().pageMode;
-    get().configureEditorTabs(mode);
-    const existing = get().tabs.find(tab => tab.kind === 'editor' && (mode === 'single' || tab.files.some(item => editorFileKey(item) === editorFileKey(file))));
+    get().configureEditorTabs();
+    const existing = get().tabs.find(tab => tab.kind === 'editor');
     if (existing?.kind === 'editor') {
       const selected = existing.files.find(item => editorFileKey(item) === editorFileKey(file)) ?? file;
       set(state => ({ tabs: state.tabs.map(tab => tab.id === existing.id ? { ...existing, files: existing.files.includes(selected) ? existing.files : [...existing.files, selected], selected } : tab) }));
       get().activate(existing.id); return existing.id;
     }
     const id = nextTabId();
-    set(state => ({ tabs: [...state.tabs, { id, kind: 'editor', title: mode === 'single' ? t('File editor') : file.path.split('/').pop() || file.path, files: [file], selected: file, pageMode: mode }] }));
+    set(state => ({ tabs: [...state.tabs, { id, kind: 'editor', title: t('File editor'), files: [file], selected: file }] }));
     get().activate(id); return id;
   },
   closeEditorFile: (file, force = false) => {
@@ -354,18 +348,26 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return { ...tab, comparisons };
     }) }));
   },
-  configureEditorTabs: mode => {
+  configureEditorTabs: () => {
     const state = get(); const pages = state.tabs.filter(tab => tab.kind === 'editor');
-    if (!pages.length || (mode === 'single' ? pages.length === 1 && pages[0]!.pageMode === mode : pages.every(tab => tab.files.length === 1 && tab.pageMode === mode))) return;
+    if (!pages.length || (pages.length === 1 && pages[0]!.title === t('File editor'))) return;
     const selected = pages.find(tab => tab.id === state.activeId)?.selected ?? pages[0]!.selected;
-    const files = pages.flatMap(tab => tab.files);
-    const replacements: Tab[] = mode === 'single' ? [{ ...pages[0]!, files, selected, title: t('File editor'), pageMode: mode }]
-      : files.map(file => ({ id: pages.find(tab => editorFileKey(tab.selected) === editorFileKey(file))?.id ?? nextTabId(), kind: 'editor', files: [file], selected: file, title: file.path.split('/').pop() || file.path, pageMode: mode }));
-    set({ tabs: state.tabs.flatMap(tab => tab.id === pages[0]!.id ? replacements : tab.kind === 'editor' ? [] : [tab]),
-      activeId: pages.some(tab => tab.id === state.activeId) ? replacements.find(tab => tab.kind === 'editor' && editorFileKey(tab.selected) === editorFileKey(selected))!.id : state.activeId });
+    const files = [...new Map(pages.flatMap(tab => tab.files).map(file => [editorFileKey(file), file])).values()];
+    const page = { ...pages[0]!, files, selected, title: t('File editor') };
+    const owners = new Set(pages.map(tab => tab.id));
+    const retarget = (selection: GitSelection): GitSelection => selection.paneId && owners.has(selection.paneId)
+      ? { ...selection, paneId: page.id } : selection;
+    const retargetReview = (tab: Tab): Tab => tab.kind === 'git-diff' ? { ...tab, selection: retarget(tab.selection),
+      comparisons: tab.comparisons?.map(item => {
+        const selection = retarget(item.selection);
+        return selection === item.selection ? item : { ...item, selection };
+      }) } : tab;
+    set({ tabs: state.tabs.flatMap<Tab>(tab => tab.id === page.id ? [page] : tab.kind === 'editor' ? [] : [retargetReview(tab)]),
+      activeId: pages.some(tab => tab.id === state.activeId) ? page.id : state.activeId,
+      lastClosed: state.lastClosed ? retargetReview(state.lastClosed) : null });
   },
   openGitDiff: (selection) => {
-    get().configureGitDiffTabs(useGitPreferences.getState().diffMode);
+    get().configureGitDiffTabs();
     const singleton = get().tabs.find(tab => tab.kind === 'git-diff' && tab.comparisons);
     if (singleton?.kind === 'git-diff' && singleton.comparisons) {
       const existing = singleton.comparisons.find(item => gitComparisonKey(item.selection) === gitComparisonKey(selection));
@@ -374,16 +376,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       get().activate(singleton.id);
       return singleton.id;
     }
-    const existing = get().tabs.find(tab => tab.kind === 'git-diff'
-      && tab.selection.target.cwd === selection.target.cwd
-      && tab.selection.target.connectionId === selection.target.connectionId
-      && tab.selection.path === selection.path && tab.selection.scope === selection.scope);
-    if (existing) { get().activate(existing.id); return existing.id; }
     const id = nextTabId();
-    const name = selection.path.split('/').pop() || selection.path;
-    const single = useGitPreferences.getState().diffMode === 'single';
-    set(state => ({ tabs: [...state.tabs, { id, title: single ? t('File comparisons') : `${name} · ${t(selection.scope === 'staged' ? 'Staged changes' : 'File comparison')}`, kind: 'git-diff', selection,
-      ...(single ? { comparisons: [{ id, selection }] } : {}) }], activeId: id }));
+    set(state => ({ tabs: [...state.tabs, { id, title: t('File comparisons'), kind: 'git-diff', selection,
+      comparisons: [{ id, selection }] }], activeId: id }));
     useTerminalStore.getState().setAltScreenActive(false);
     return id;
   },
@@ -406,27 +401,21 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set(state => ({ tabs: state.tabs.map(tab => tab.id === page.id ? { ...page, comparisons, selection } : tab),
       lastClosed: { ...page, id: closed.id, selection: closed.selection, comparisons: undefined } }));
   },
-  configureGitDiffTabs: mode => {
+  configureGitDiffTabs: () => {
     const state = get();
     const pages = state.tabs.filter(tab => tab.kind === 'git-diff');
-    if (!pages.length || (mode === 'single' ? pages.length === 1 && !!pages[0]!.comparisons : pages.every(tab => !tab.comparisons))) return;
-    const comparisons = pages.flatMap(tab => tab.comparisons ?? [{ id: tab.id, selection: tab.selection }]);
+    if (!pages.length || (pages.length === 1 && !!pages[0]!.comparisons)) return;
+    const comparisons = [...new Map(pages.flatMap(tab => tab.comparisons ?? [{ id: tab.id, selection: tab.selection }])
+      .map(item => [gitComparisonKey(item.selection), item])).values()];
     const selectedPage = pages.find(tab => tab.id === state.activeId) ?? pages[0]!;
     const selected = comparisons.find(item => gitComparisonKey(item.selection) === gitComparisonKey(selectedPage.selection))!;
-    const replacements: Tab[] = mode === 'single' ? [{ ...pages[0]!, title: t('File comparisons'), comparisons, selection: selected.selection }]
-      : comparisons.map(item => ({ id: item.id, kind: 'git-diff', selection: item.selection,
-        title: `${item.selection.path.split('/').pop()} · ${t(item.selection.scope === 'staged' ? 'Staged changes' : 'File comparison')}` }));
+    const replacements: Tab[] = [{ ...pages[0]!, title: t('File comparisons'), comparisons, selection: selected.selection }];
     const firstId = pages[0]!.id;
     set({ tabs: state.tabs.flatMap(tab => tab.id === firstId ? replacements : tab.kind === 'git-diff' ? [] : [tab]),
-      activeId: pages.some(tab => tab.id === state.activeId) ? mode === 'single' ? firstId : selected.id : state.activeId });
+      activeId: pages.some(tab => tab.id === state.activeId) ? firstId : state.activeId });
   },
-  openSettingsTab: () => {
-    const existing = get().tabs.find((t) => t.kind === 'settings');
-    if (existing) {
-      get().activate(existing.id);
-      return;
-    }
-    get().addTab({ kind: 'settings' });
+  openSettings: () => {
+    useUiStore.getState().setSettingsOpen(true);
   },
   closeTab: (id, force = false) => {
     const { tabs, activeId } = get();
@@ -472,8 +461,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       get().addTab({ kind: 'history' });
     } else if (closed.kind === 'ai-history') {
       get().addTab({ kind: 'ai-history' });
-    } else if (closed.kind === 'settings') {
-      get().addTab({ kind: 'settings' });
     } else if (closed.kind === 'git-diff') {
       for (const item of closed.comparisons ?? [{ selection: closed.selection }]) get().openGitDiff(item.selection);
       get().openGitDiff(closed.selection);

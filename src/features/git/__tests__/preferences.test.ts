@@ -3,7 +3,15 @@ import { DEFAULT_COMMIT_PROMPT, gitCommitPrompt, useGitPreferences } from '@conf
 import { useGitContextStore } from '../stores/context';
 import { horizontalWheelDelta } from '@ui/hooks/useHorizontalWheel';
 
-beforeEach(() => { useGitPreferences.setState({ commitPrompts: {}, diffMode: 'single', changesView: 'list' }); useGitContextStore.setState({ recent: null, sourceKey: '' }); });
+beforeEach(() => { useGitPreferences.setState({ commitPrompts: {}, changesView: 'list' }); useGitContextStore.setState({ recent: null, sourceKey: '' }); });
+
+it('ignores a saved multi-page mode while retaining repository preferences', async () => {
+  localStorage.setItem('vrykell-git-preferences', JSON.stringify({ state: { diffMode: 'multiple', changesView: 'tree', commitPrompts: { '["","/repo"]': 'Keep this prompt' } }, version: 0 }));
+  await useGitPreferences.persist.rehydrate();
+  expect(useGitPreferences.getState()).not.toHaveProperty('diffMode');
+  expect(useGitPreferences.getState().changesView).toBe('tree');
+  expect(gitCommitPrompt({ cwd: '/repo' })).toBe('Keep this prompt');
+});
 it('remembers prompts per repository and saved connection and resets to the default', () => {
   const local = { cwd: '/repo' }; const remote = { cwd: '/repo', connectionId: 'ssh' };
   useGitPreferences.getState().setCommitPrompt(local, 'Use concise subjects');

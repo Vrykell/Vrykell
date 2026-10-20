@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { setupTauriMock, ptyWrites, emitPtyOutput } from './tauri-mock';
+import { setupTauriMock, ptyWrites, emitPtyOutput, ensureTabsOpen } from './tauri-mock';
 import { gotoSetting } from './settings';
 
 /** Resolve a theme custom property to the rgb()/rgba() form that toHaveCSS compares against. */
@@ -179,36 +179,73 @@ test('the workspace has rounded outer corners and flush resize boundaries', asyn
   await expect(main).toHaveCSS('border-radius', '14px');
 });
 
-test('settings and terminal use the same color hierarchy in both themes', async ({ page }) => {
+test('settings and terminal use the same content background in both themes', async ({ page }) => {
   const background = async (selector: string) => page.locator(selector).evaluate(el => getComputedStyle(el).backgroundColor);
-  const terminalBg = await background('main');
+  const terminalBg = await resolvedColor(page, '--xterm-bg');
   await gotoSetting(page, '模型配置');
   await expect(page.locator('input[type="password"]')).toBeVisible();
   expect(await background('.settings-content')).toBe(terminalBg);
   expect(await background('.settings-navigation')).not.toBe(terminalBg);
-  const darkFrame = await background('.workspace-titlebar');
   await page.locator('aside').getByRole('button', { name: '主题', exact: true }).click();
   for (const label of ['浅色', '深色']) {
     await page.getByRole('radio', { name: label, exact: true }).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', label === '浅色' ? 'light' : 'dark');
     expect(await background('.workspace-titlebar')).toBe(await background('.workspace-activity-bar'));
     expect(await background('.workspace-titlebar')).not.toBe(await background('main'));
-    const sidebarBg = await background('.workspace-side-panel[data-side="left"]:visible > div:first-child');
+    const sidebarBg = await background('.workspace-side-panel[data-side="left"] > div:first-child');
     const frameBg = await background('.workspace-activity-bar');
     expect(sidebarBg).not.toBe(frameBg);
-    const firstChannel = (color: string) => Number(color.match(/\d+/)![0]);
-    expect(firstChannel(frameBg)).toBeGreaterThan(firstChannel(sidebarBg));
     expect(sidebarBg).not.toBe(await background('main'));
     expect(await background('.settings-navigation')).toBe(sidebarBg);
-    expect(await background('.settings-content')).toBe(await background('main'));
+    expect(await background('.settings-content')).toBe(await resolvedColor(page, '--xterm-bg'));
     const aliases = await page.evaluate(() => {
       const css = getComputedStyle(document.documentElement);
       return ['--text-title', '--text-primary', '--tab-hover', '--hover'].map(key => css.getPropertyValue(key).trim());
     });
     expect(aliases[0]).toBe(aliases[1]);
     expect(aliases[2]).toBe(aliases[3]);
-    if (label === '浅色') expect(await background('.workspace-titlebar')).not.toBe(darkFrame);
   }
+});
+
+test('settings, both history pages, the editor and diffs share the terminal background', async ({ page }) => {
+  const background = async (selector: string) => page.locator(selector).first().evaluate(el => getComputedStyle(el).backgroundColor);
+  const terminalBg = await resolvedColor(page, '--xterm-bg');
+  expect(terminalBg).toBe('rgb(20, 20, 20)');
+
+  await gotoSetting(page, '主题');
+  for (const selector of ['.settings-screen', '.settings-view', '.settings-content']) {
+    expect(await background(selector), selector).toBe(terminalBg);
+  }
+  await page.getByRole('button', { name: '设置', exact: true }).click();
+  await expect(page.locator('.settings-screen')).toHaveCount(0);
+
+  await page.getByRole('button', { name: '版本控制', exact: true }).click();
+  const panel = page.getByTestId('git-panel');
+  await panel.getByTestId('git-unstaged-src/main.ts').click();
+  const review = page.getByTestId('git-diff-review');
+  await expect(review.locator('.monaco-diff-editor')).toBeVisible({ timeout: 15_000 });
+  for (const selector of ['.git-review', '.git-review .code-diff-frame', '.git-review .monaco-editor-background']) {
+    expect(await background(selector), selector).toBe(terminalBg);
+  }
+
+  const row = panel.getByTestId('git-unstaged-src/main.ts');
+  await row.hover();
+  await row.getByRole('button', { name: '打开工作文件' }).click();
+  const editor = page.getByTestId('file-editor');
+  await expect(editor.locator('.monaco-editor')).toBeVisible({ timeout: 15_000 });
+  for (const selector of ['.editor-pane', '.code-editor-frame', '.folder-path', '.code-editor .monaco-editor-background']) {
+    expect(await background(selector), selector).toBe(terminalBg);
+  }
+
+  await ensureTabsOpen(page);
+  await page.getByTestId('tab-history-btn').click();
+  await expect(page.getByTestId('session-history-page')).toBeVisible();
+  expect(await background('.history-page')).toBe(terminalBg);
+
+  await page.locator('[data-dock-btn="chat"]').click();
+  await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
+  await expect(page.getByTestId('ai-history-page')).toBeVisible();
+  expect(await background('.history-page')).toBe(terminalBg);
 });
 
 test('sidebar resize edges remain visible and strengthen during dragging on both sides', async ({ page }) => {

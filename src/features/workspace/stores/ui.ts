@@ -14,6 +14,8 @@ interface MovePlacement {
 }
 
 interface UiState {
+  settingsOpen: boolean;
+  setSettingsOpen: (open: boolean) => void;
   paletteOpen: boolean;
   setPaletteOpen: (open: boolean) => void;
   globalSearchOpen: boolean;
@@ -33,6 +35,8 @@ interface UiState {
 }
 
 export const useUiStore = create<UiState>((set) => ({
+  settingsOpen: false,
+  setSettingsOpen: settingsOpen => set({ settingsOpen }),
   paletteOpen: false,
   setPaletteOpen: (open) => set({ paletteOpen: open }),
   globalSearchOpen: false,

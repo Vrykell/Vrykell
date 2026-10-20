@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { t } from '@i18n';
 import { gitComparisonKey, type GitDiff, type GitSelection } from '@core/git';
-import { useGitPreferences } from '@config/git';
 import { getGitDiff } from '@platform/api/git';
 import { useGitReview, useGitSelection } from '../index';
 import { useSessionStore, terminalsOf } from '@features/workspace';
@@ -13,7 +12,6 @@ import ReloadButton from '@ui/ReloadButton';
 import { iconSizes } from '@ui/icons';
 import Select from '@ui/Select';
 import FolderTabs, { type FolderTab } from '@ui/FolderTabs';
-import EditorActions from '@ui/EditorActions';
 import './git.css';
 
 export default function GitWorkspace({ children }: { children: ReactNode }) {
@@ -21,16 +19,16 @@ export default function GitWorkspace({ children }: { children: ReactNode }) {
   const tabs = useSessionStore(state => state.tabs);
   const activeId = useSessionStore(state => state.activeId);
   const show = !!selection;
-  const mode = useGitPreferences(state => state.diffMode);
   const page = tabs.find(tab => tab.id === activeId && tab.kind === 'git-diff');
   const comparisons = tabs.filter(tab => tab.kind === 'git-diff').flatMap(tab => (tab.comparisons ?? [{ id: tab.id, selection: tab.selection }]).map(item => ({ ...item, pageId: tab.id })));
   // Keep comparison hosts attached when only the navigation order changes.
   const panes = [...comparisons].sort((a, b) => a.id.localeCompare(b.id));
-  useEffect(() => { useSessionStore.getState().configureGitDiffTabs(mode); }, [mode]);
-  const comparisonTabs: FolderTab[] = mode === 'single' ? comparisons.map(comparison => {
+  const pageCount = tabs.filter(tab => tab.kind === 'git-diff').length;
+  useEffect(() => { useSessionStore.getState().configureGitDiffTabs(); }, [pageCount]);
+  const comparisonTabs: FolderTab[] = comparisons.map(comparison => {
     const Icon = fileIcon(comparison.selection.path);
     return { id: comparison.id, label: `${comparison.selection.path.split('/').pop()} · ${t(comparison.selection.scope === 'staged' ? 'Staged changes' : 'File comparison')}`, icon: <Icon size={iconSizes.compact} />, tip: `${comparison.selection.target.cwd}/${comparison.selection.path}`, closeLabel: t('Close comparison {{path}}', { path: comparison.selection.path }) };
-  }) : [];
+  });
   return <>
     <div className="git-terminal-host" style={{ display: show ? 'none' : 'flex' }} inert={show}>{children}</div>
     {panes.map(item => <GitComparison key={item.id} tabId={item.id} selection={item.selection} tabs={comparisonTabs} active={item.pageId === page?.id && !!selection && gitComparisonKey(item.selection) === gitComparisonKey(selection)} />)}
@@ -78,16 +76,16 @@ function GitComparison({ selection, active, tabId, tabs }: { selection: GitSelec
   const toolbar = (navigation?: ReactNode, navigate?: (direction: 'previous' | 'next') => void) => <>
     <FolderTabs items={active ? tabs : []} selected={tabId} label={t('Open comparisons')} listId="git-comparisons" className="git-review-tabs" headerClassName="git-review-toolbar"
       onSelect={id => useSessionStore.getState().activateGitComparison(id)} onClose={id => useSessionStore.getState().closeGitComparison(id)}
-      onMove={(...args) => useSessionStore.getState().moveGitComparison(...args)} toolbar={<EditorActions items={[
+      onMove={(...args) => useSessionStore.getState().moveGitComparison(...args)} menuItems={[
         { label: backLabel, onClick: back }, { label: t('Side by side'), checked: layout === 'split', onClick: () => setLayout('split') },
         { label: t('Inline comparison'), checked: layout === 'inline', onClick: () => setLayout('inline') },
         { label: t('Previous change'), disabled: !navigate, onClick: () => navigate?.('previous') },
         { label: t('Next change'), disabled: !navigate, onClick: () => navigate?.('next') }, { label: t('Refresh comparison'), onClick: refresh },
-      ]}>
+      ]} toolbar={<>
         <span className="folder-action-secondary"><Select aria-label={t('Comparison layout')} value={layout} onChange={setLayout} options={[{ value: 'split', label: t('Side by side') }, { value: 'inline', label: t('Inline comparison') }]} /></span>
         <span className="git-diff-navigation folder-action-secondary">{navigation}</span>
         <span className="folder-action-secondary"><ReloadButton compact label={t('Refresh comparison')} onReload={refresh} /></span>
-      </EditorActions>} />
+      </>} />
     <div className="folder-path" data-tip={selection.path}><Icon size={12} /><span>{selection.path}</span><span className="folder-path-scope">{comparison[2]}</span></div>
   </>;
   const notice = selection.scope === 'conflicts' ? <ErrorBox compact tone="info">{t('Resolve conflicts in your editor or terminal; this view compares the two conflict sides.')}</ErrorBox> : null;
