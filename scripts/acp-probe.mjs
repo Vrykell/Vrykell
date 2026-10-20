@@ -113,6 +113,8 @@ function handle(message) {
     if (kind === 'agent_message_chunk') log('text   ' + String(update.content?.text ?? '').slice(0, 200));
     else if (kind === 'agent_thought_chunk') log('think  ' + String(update.content?.text ?? '').slice(0, 120));
     else if (kind === 'tool_call') log('tool   ' + String(update.title ?? update.toolCallId ?? ''));
+    else if (kind === 'plan') log(`plan   ${(update.entries ?? []).length} entries: ` + (update.entries ?? []).map((entry) => `${entry.status}:${String(entry.content ?? '').slice(0, 40)}`).join(' | '));
+    else if (kind === 'available_commands_update') log(`cmds   ${(update.availableCommands ?? []).length}`);
     else if (kind === 'usage_update') log(`usage  used=${update.used} size=${update.size}` + (update.cost ? ` cost=${update.cost.amount} ${update.cost.currency}` : ''));
     else if (kind) log('update ' + kind);
     sawOutput = true;
@@ -155,7 +157,13 @@ try {
 
   const session = await request('session/new', { cwd, mcpServers: [] });
   const sessionId = session?.sessionId ?? '';
-  log(`session ${sessionId}`);
+  const modes = session?.modes
+    ? ` modes=${(session.modes.availableModes ?? []).map((mode) => mode.id).join(',')} current=${session.modes.currentModeId}`
+    : '';
+  const models = session?.models
+    ? ` models=${(session.models.availableModels ?? []).map((model) => model.modelId ?? model.id).join(',')} current=${session.models.currentModelId}`
+    : '';
+  log(`session ${sessionId}${modes}${models}`);
 
   const started = Date.now();
   const stop = await request('session/prompt', { sessionId, prompt: [{ type: 'text', text: prompt }] });
