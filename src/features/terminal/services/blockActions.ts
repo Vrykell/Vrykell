@@ -1,5 +1,5 @@
 import { writeClipboardText } from '@platform/clipboard';
-import { ptyWrite } from '@platform/pty';
+import { writeTerminalCommand } from './commandSubmission';
 import { useTerminalStore } from '@features/terminal/stores/terminal';
 import { useToastStore } from '@ui/Toast';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
@@ -23,7 +23,7 @@ export async function rerunBlockCommand(paneId: string, command: string): Promis
     return;
   }
   try {
-    await ptyWrite(sessionId, command + '\n');
+    await writeTerminalCommand(paneId, sessionId, command);
     terminalDebug('block-rerun', { paneId, length: command.length });
   } catch (error) {
     terminalDebug('block-rerun-error', { paneId, error: String(error) });

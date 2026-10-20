@@ -32,7 +32,7 @@ import { defaultOpenModeForShell } from '@features/agent/stores/agentSettings';
 import { t } from '@i18n';
 import { SessionController } from '@features/terminal/services/pipeline/sessionController';
 import { blockTerminalFor, recoverTerminalSurfaces } from '@features/terminal/services/terminalRepaint';
-import { copyTerminalSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
+import { captureTerminalPaste, copyTerminalSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
 import { cancelTerminalInput, writeTerminalInput } from '@features/terminal/services/terminalWriteQueue';
 import { querySequences } from '@features/terminal/model/terminalQueries';
 import { getCellMetrics } from '@utils/termMetrics';
@@ -200,6 +200,7 @@ export function useTerminalSession(
     loadWebglRenderer(term, useTypographyStore.getState().terminalRenderer);
     term.open(el);
     configureTerminalInput(term);
+    captureTerminalPaste(term, paneId);
     let frameRaf = 0;
     // The connection frame is captured when output arrives; a pure resize changes the
     // terminal's column count without writing, so it is refreshed on layout changes too to

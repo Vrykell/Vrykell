@@ -12,12 +12,14 @@ export interface PaneInput {
   aiMode: boolean;
   commandDraft?: string;
   aiDraft?: string;
+  focusRequest?: number;
 }
 
 interface InputState {
   byPane: Record<string, PaneInput>;
   setText: (paneId: string, text: string) => void;
   setAiMode: (paneId: string, aiMode: boolean) => void;
+  stageText: (paneId: string, text: string) => void;
   clearText: (paneId: string) => void;
   dropPane: (paneId: string) => void;
 }
@@ -26,6 +28,17 @@ const EMPTY: PaneInput = { text: '', aiMode: false };
 
 export const useInputStore = create<InputState>((set) => ({
   byPane: {},
+
+  stageText: (paneId, text) => set(s => {
+    const current = s.byPane[paneId] ?? EMPTY;
+    const draft = current.aiMode ? current.commandDraft ?? '' : current.text;
+    return { byPane: { ...s.byPane, [paneId]: {
+      ...current, aiMode: false,
+      ...(current.aiMode ? { aiDraft: current.text } : {}),
+      text: draft ? `${draft}${draft.endsWith('\n') ? '' : '\n'}${text}` : text,
+      focusRequest: (current.focusRequest ?? 0) + 1,
+    } } };
+  }),
 
   setText: (paneId, text) =>
     set((s) => ({

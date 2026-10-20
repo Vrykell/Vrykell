@@ -1,14 +1,14 @@
 import { isValidElement, useState, type ReactNode, type ReactElement } from 'react';
 import { t } from '@i18n';
-import { ptyWrite } from '@platform/pty';
 import { useToastStore } from '@ui/Toast';
+import { TextButton } from '@ui/TextButton';
 import { Play, Copy, Check, iconSizes } from '@ui/icons';
 import { useTerminalStore } from '@features/terminal';
 
 const SHELL_LANGS = new Set(['bash', 'sh', 'zsh', 'shell']);
 
 function extractCode(children: ReactNode): { lang: string; text: string } | null {
-  // ReactMarkdown 的 pre 唯一子节点是 <code className="language-x">text</code>
+  // Fenced content arrives as a single code element with an optional language class.
   if (!isValidElement(children)) return null;
   const code = children as ReactElement<{ className?: string; children?: ReactNode }>;
   const lang = (code.props.className ?? '').replace('language-', '');
@@ -16,7 +16,7 @@ function extractCode(children: ReactNode): { lang: string; text: string } | null
   return { lang, text };
 }
 
-/** 复制文本到剪贴板（navigator.clipboard 优先，WKWebView 受限时回退 execCommand）。 */
+/** Copy literal text, with a fallback for restricted clipboard access. */
 async function copyText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
@@ -54,67 +54,39 @@ export default function CommandBlock({ children, paneId }: { children?: ReactNod
   };
 
   return (
-    <div style={{
-      position: 'relative',
-      background: 'var(--block)',
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--radius-inner)',
-      margin: '0.45em 0',
-      overflow: 'hidden',
-    }}>
+    <div className="md-code-block">
       {code && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 6,
-          padding: '3px 10px',
-          borderBottom: '1px solid var(--border)',
-          background: 'var(--command-block-bg)',
-        }}>
-          <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
+        <div className="md-code-block-header">
+          <span className="md-code-block-language">
             {code.lang || 'code'}
           </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+          <div className="md-code-block-actions">
             {isShell && paneId !== null && (
-              <button
+              <TextButton className="primary-button md-code-block-action"
                 disabled={paneId !== undefined && !sessionId}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  fontSize: 'calc(11px * var(--ui-font-scale))',
-                  padding: '2px 10px',
-                  background: 'var(--accent-dim)',
-                  border: '1px solid var(--accent-blue-dim)',
-                  color: 'var(--accent)',
-                }}
                 onClick={() => {
-                  if (paneId === undefined) runInTerminal(code.text.trim());
-                  else if (sessionId) void ptyWrite(sessionId, `${code.text.trim()}\n`).catch(() => {
+                  const text = code.text.trim();
+                  void runInTerminal(text, paneId ?? undefined).catch(() => {
                     useToastStore.getState().addToast(t('Could not run the command in the selected terminal'), 'error');
                   });
+                  if (/[\r\n]/.test(text)) useToastStore.getState().addToast(t('Script added to command input. Press Enter to run.'), 'info');
                 }}
               >
                 <Play size={10} /> {t('Run in terminal')}
-              </button>
+              </TextButton>
             )}
-            {/* 复制按钮固定在右上角（最右侧） */}
-            <button
+            <TextButton className="md-code-block-action"
               data-testid="code-copy-btn"
               data-tip={t(copied ? 'Copied' : 'Copy code')}
               onClick={() => void copy()}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', border: 'none',
-                background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
-              }}
             >
               {copied ? <Check size={iconSizes.copy} style={{ color: 'var(--success)' }} /> : <Copy size={iconSizes.copy} />}
               {t(copied ? 'Copied' : 'Copy')}
-            </button>
+            </TextButton>
           </div>
         </div>
       )}
-      <pre style={{ margin: 0, padding: '10px 12px', whiteSpace: 'pre', overflowX: 'auto' }}>
+      <pre>
         {children}
       </pre>
     </div>

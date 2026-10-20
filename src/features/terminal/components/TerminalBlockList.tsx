@@ -31,7 +31,7 @@ import { useTerminalBlockFlow } from '@features/terminal/hooks/useTerminalBlockF
 import type { BlockMenuAnchor } from '@features/terminal/hooks/useTerminalBlockFlow';
 import { useTuiControls } from '@features/terminal/hooks/useTuiControls';
 import { hasVisibleContent as hasVisibleBlockContent } from '@features/terminal/model/blockVisibility';
-import { copyTerminalSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
+import { captureTerminalPaste, copyTerminalSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
 import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
 import { measureRunningTerminalRows } from '../model/runningTerminalRows';
 import { repaintTerminal } from '../model/terminalResize';
@@ -355,6 +355,7 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
     });
     applyTerminalRenderer(term, useTypographyStore.getState().terminalRenderer);
     configureTerminalInput(term);
+    const releasePaste = captureTerminalPaste(term, tabId);
     if (isTerminalDebugEnabled()) {
       terminalDebug('running-terminal-mounted', {
         tabId,
@@ -519,6 +520,7 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
     document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
+      releasePaste();
       if (w.__vrykellTerms?.get(`block:${tabId}`) === term) {
         w.__vrykellTerms.delete(`block:${tabId}`);
       }

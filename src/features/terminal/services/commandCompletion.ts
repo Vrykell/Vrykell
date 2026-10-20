@@ -1,5 +1,6 @@
 import { termInstances } from '../stores/terminal';
 import type { IMarker } from '@xterm/xterm';
+import { posixScriptCommand } from '../model/commandSubmission';
 
 export interface ShellCommandCompletion {
   wrap: (command: string) => string;
@@ -45,7 +46,7 @@ export function watchShellCommandCompletion(paneId: string): ShellCommandComplet
   });
   return {
     // Keep execution and status capture in one shell statement, before prompt hooks can run.
-    wrap: command => `printf '\\033]777;${token};start\\007'; eval '${command.replace(/'/g, "'\\''")}'; printf '\\033]777;${token};%s\\007' "$?"\n`,
+    wrap: command => `printf '\\033]777;${token};start\\007'; ${posixScriptCommand(command)}; printf '\\033]777;${token};%s\\007' "$?"\n`,
     result: () => completed,
     subscribe: listener => { listeners.add(listener); return () => { listeners.delete(listener); }; },
     dispose: () => { handler.dispose(); startMarker?.dispose(); listeners.clear(); },

@@ -1,8 +1,10 @@
 import { create } from 'zustand';
-import { ptyWrite } from '@platform/pty';
+import { terminalCommandPayload, writeTerminalCommand } from '../services/commandSubmission';
+import { writeTerminalInput } from '../services/terminalWriteQueue';
 import { useWorkspaceStore, isSessionTab } from '@features/workspace/stores/workspace';
 import { leaves as layoutLeaves, firstLeaf } from '@features/workspace/model/windowLayout';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
+import { useInputStore } from './input';
 import { applyTerminalRenderer } from '@features/terminal/model/xtermRenderer';
 import { useTypographyStore } from '@config/typography';
 import type { Terminal } from '@xterm/xterm';
@@ -146,7 +148,8 @@ interface TerminalState {
   /** 关 tab 时删除该 tab 的 session/dims/scene，避免 per-tab 残留 */
   dropTab: (tabId: string) => void;
   toggle: () => void;
-  runInTerminal: (command: string) => void;
+  stageCommand: (paneId: string, command: string) => void;
+  runInTerminal: (command: string, paneId?: string) => Promise<void>;
   /** 外部写入输入栏（搜索点击历史命令等），InputEditor 消费后自动清空 */
   pendingInput: string;
   setPendingInput: (text: string) => void;
@@ -180,10 +183,10 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     });
     if (queued.length > 0) {
       const data = queued
-        .map((command) => (command.endsWith('\n') ? command : command + '\n'))
+        .map(command => terminalCommandPayload(tabId, command))
         .join('');
       terminalDebug('queued-command-flush', { tabId, sessionId, count: queued.length, chars: data.length });
-      ptyWrite(sessionId, data)
+      writeTerminalInput(sessionId, data)
         .then(() => terminalDebug('queued-command-write-complete', { tabId, sessionId, chars: data.length }))
         .catch((error) => terminalDebug('queued-command-write-error', {
           tabId,
@@ -203,7 +206,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   queueCommand: (tabId, command) => {
     const sessionId = get().sessions[tabId];
     if (sessionId) {
-      ptyWrite(sessionId, command.endsWith('\n') ? command : command + '\n').catch(() => {});
+      writeTerminalCommand(tabId, sessionId, command).catch(() => {});
       return;
     }
     if (!command.trim()) return;
@@ -242,13 +245,26 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
         altScreenActive: scene === 'altScreen' ? false : (sessionsRemainInAltScreen ? s.altScreenActive : false) };
     }),
   toggle: () => set((s) => ({ visible: !s.visible })),
-  runInTerminal: (command) => {
-    // 写入聚焦终端的 PTY
-    const target = getFocusedTerminalId();
+  stageCommand: (paneId, command) => {
+    const workspace = useWorkspaceStore.getState();
+    const owner = workspace.tabs.find(tab => isSessionTab(tab) && layoutLeaves(tab.layout).some(pane => pane.id === paneId));
+    if (owner && owner.id !== workspace.activeId) workspace.activate(owner.id);
+    set({ visible: true, focusedPaneId: paneId, keyboardTarget: 'input' });
+    useInputStore.getState().stageText(paneId, command.replace(/\r\n|\r/g, '\n'));
+    terminalDebug('terminal-script-staged', { paneId, chars: command.length });
+  },
+  runInTerminal: async (command, paneId) => {
+    const target = paneId ?? getFocusedTerminalId();
+    const text = command.trim();
+    if (!text) return;
+    if (/[\r\n]/.test(text)) {
+      get().stageCommand(target, text);
+      return;
+    }
     const sessionId = get().sessions[target];
     set({ visible: true });
     if (!sessionId) return;
-    ptyWrite(sessionId, command.endsWith('\n') ? command : command + '\n').catch(() => {});
+    await writeTerminalCommand(target, sessionId, text);
   },
   pendingInput: '',
   setPendingInput: (text) => set({ pendingInput: text }),

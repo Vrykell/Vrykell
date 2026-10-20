@@ -36,6 +36,8 @@ it('keeps the output tail when the command scrolls its starting marker out of th
 
 it('quotes command literals without altering their content', () => {
   const { completion } = setup();
-  expect(completion.wrap("echo 'hello'; false\n")).toContain("eval 'echo '\\''hello'\\''; false\n'");
+  const payload = completion.wrap("echo 'hello'; false\necho next");
+  expect(payload.trimEnd()).not.toContain('\n');
+  expect(payload).toContain("'echo '\\''hello'\\''; false' 'echo next'");
   completion.dispose();
 });

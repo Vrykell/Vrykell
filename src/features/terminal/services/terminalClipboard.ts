@@ -6,9 +6,8 @@ import { t } from '@i18n';
 import { useToastStore } from '@ui/Toast';
 import { terminalDebug } from './terminalDebug';
 import { writeTerminalInput } from './terminalWriteQueue';
+import { useBlockStore } from '@features/terminal/stores/blocks';
 
-/** Pastes with more lines than this are confirmed before they reach the PTY. */
-const PASTE_CONFIRM_LINES = 5;
 /** Pastes longer than this many characters are confirmed even when the program handles pastes. */
 const PASTE_CONFIRM_CHARS = 64 * 1024;
 
@@ -24,7 +23,7 @@ export function pasteLineCount(text: string): number {
  */
 export function pasteConfirmReason(text: string, bracketedPaste: boolean): PasteConfirmReason | null {
   if (text.length > PASTE_CONFIRM_CHARS) return 'size';
-  if (!bracketedPaste && pasteLineCount(text) > PASTE_CONFIRM_LINES) return 'lines';
+  if (!bracketedPaste && /[\r\n]/.test(text)) return 'lines';
   return null;
 }
 
@@ -63,8 +62,8 @@ export async function copyTerminalSelection(term: Terminal | null | undefined): 
  * Paste text through the active terminal so it can apply bracketed-paste mode and normalize line
  * endings. When the clipboard holds an image, the native paste key is written straight to the PTY
  * instead — the foreground process reads the image itself, and the key must not be transformed into
- * pasted text. Text without a registered terminal instance also falls back to a PTY write. A large
- * or multi-line paste asks first; the answer decides whether anything reaches the PTY at all.
+ * pasted text. Multiline scripts at the block prompt are staged in the command input. Other
+ * multiline pastes require bracketed-paste support or confirmation before reaching the PTY.
  */
 export async function pasteClipboardIntoTerminal(paneId: string): Promise<boolean> {
   const sessionId = useTerminalStore.getState().sessions[paneId];
@@ -83,28 +82,55 @@ export async function pasteClipboardIntoTerminal(paneId: string): Promise<boolea
     return false;
   }
   if (!text) return false;
-  // An image travels as the native paste *key*, not as pasted text: paste() applies the pasted-text
-  // transformations (bracketed-paste wrapping, line-ending normalization), so a foreground program
-  // that enabled bracketed paste would receive a literal control character instead of the key that
-  // asks it to take the clipboard image. A key goes to the PTY as-is; text keeps the terminal path.
-  const term = image ? null : getPaneTerminal(paneId);
-  if (!image) {
-    const reason = pasteConfirmReason(text, term?.modes.bracketedPasteMode ?? false);
-    if (reason) {
-      const confirmed = await requestPasteConfirm({ reason, lines: pasteLineCount(text), chars: text.length });
-      terminalDebug('terminal-clipboard-paste-confirm', { paneId, reason, confirmed });
-      if (!confirmed) return false;
-    }
-  }
-  if (term) {
-    term.paste(text);
-    return true;
-  }
+  if (!image) return pasteTextIntoTerminal(paneId, text);
   try {
+    // Image paste is a native key, never a pasted text payload.
     await writeTerminalInput(sessionId, text);
     return true;
   } catch {
     useToastStore.getState().addToast(t('terminal.clipboard.pasteFailed'), 'error');
     return false;
   }
+}
+
+/** Route native paste events and clipboard shortcuts through the same multiline policy. */
+export async function pasteTextIntoTerminal(paneId: string, text: string): Promise<boolean> {
+  const state = useTerminalStore.getState();
+  const sessionId = state.sessions[paneId];
+  if (!sessionId || !text) return false;
+  const running = (useBlockStore.getState().byTab[paneId] ?? []).some(block => block.status === 'executing');
+  if (state.scenes[paneId] === 'blockList' && !running && /[\r\n]/.test(text)) {
+    state.stageCommand(paneId, text);
+    return true;
+  }
+  const term = getPaneTerminal(paneId);
+  const reason = pasteConfirmReason(text, term?.modes.bracketedPasteMode ?? false);
+  if (reason) {
+    const confirmed = await requestPasteConfirm({ reason, lines: pasteLineCount(text), chars: text.length });
+    terminalDebug('terminal-clipboard-paste-confirm', { paneId, reason, confirmed });
+    if (!confirmed) return false;
+  }
+  // A dialog may outlive its original session or foreground terminal.
+  if (useTerminalStore.getState().sessions[paneId] !== sessionId || getPaneTerminal(paneId) !== term) return false;
+  try {
+    if (term) term.paste(text);
+    else await writeTerminalInput(sessionId, text);
+    return true;
+  } catch {
+    useToastStore.getState().addToast(t('terminal.clipboard.pasteFailed'), 'error');
+    return false;
+  }
+}
+
+/** Capture browser paste before the terminal's native handler can write embedded newlines. */
+export function captureTerminalPaste(term: Terminal, paneId: string): () => void {
+  const element = term.element;
+  const onPaste = (event: ClipboardEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.clipboardData?.files.length) void pasteClipboardIntoTerminal(paneId);
+    else void pasteTextIntoTerminal(paneId, event.clipboardData?.getData('text/plain') ?? '');
+  };
+  element?.addEventListener('paste', onPaste, { capture: true });
+  return () => element?.removeEventListener('paste', onPaste, { capture: true });
 }

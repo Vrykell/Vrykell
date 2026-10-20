@@ -7,11 +7,13 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import Markdown from '@features/chat/components/Markdown';
 import { useTerminalStore } from '@features/terminal/stores/terminal';
+import { useInputStore } from '@features/terminal/stores/input';
 import { useSessionStore } from '@features/workspace';
 
 describe('CommandBlock', () => {
   beforeEach(() => {
     invokeMock.mockClear();
+    useInputStore.setState({ byPane: {} });
     // 模拟启动后存在活跃标签（store 不再内置初始标签）
     useSessionStore.getState().addTab({});
     const tabId = useSessionStore.getState().activeId;
@@ -37,9 +39,31 @@ describe('CommandBlock', () => {
     expect(screen.getByTestId('code-copy-btn')).toBeInTheDocument();
   });
 
+  it('stages a multiline script in its selected terminal without writing to either PTY', () => {
+    useTerminalStore.setState({ sessions: { selected: 'selected-pty', focused: 'focused-pty' }, focusedPaneId: 'focused' });
+    useInputStore.getState().setText('focused', 'unrelated draft');
+    render(<Markdown content={'```bash\ncat <<\'END\' > sample.txt\nscript line\nEND\necho done\n```'} paneId="selected" />);
+    fireEvent.click(screen.getByText('在终端运行'));
+    expect(invokeMock.mock.calls.filter(call => call[0] === 'pty_write')).toEqual([]);
+    expect(useInputStore.getState().byPane.selected?.text).toBe("cat <<'END' > sample.txt\nscript line\nEND\necho done");
+    expect(useInputStore.getState().byPane.focused?.text).toBe('unrelated draft');
+    expect(useTerminalStore.getState().focusedPaneId).toBe('selected');
+  });
+
   it('python 代码块没有运行按钮', () => {
     render(<Markdown content={'```python\nprint(1)\n```'} />);
     expect(screen.queryByText('在终端运行')).toBeNull();
+  });
+
+  it('labels an untyped code block and copies its literal text', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    render(<Markdown content={'```\n17:32:10  400\n```'} />);
+    expect(screen.getByText('code')).toBeInTheDocument();
+    expect(screen.queryByText('在终端运行')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('code-copy-btn'));
+    expect(writeText).toHaveBeenCalledWith('17:32:10  400\n');
+    await screen.findByText('已复制');
   });
 
   it('代码块带复制按钮，点击复制内容并切换为已复制', async () => {

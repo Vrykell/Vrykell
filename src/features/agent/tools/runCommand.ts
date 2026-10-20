@@ -5,7 +5,7 @@
  * Cancellation and timeout stop waiting without terminating the terminal process.
  */
 
-import { ptyWrite } from '@platform/pty';
+import { writeTerminalCommand } from '@features/terminal/services/commandSubmission';
 import { t } from '@i18n';
 import { executionPaneSpec } from '../services/executionTarget';
 import { diagnostic } from '@platform/diagnostics';
@@ -74,7 +74,7 @@ export async function runCommandAndWait(
   agentControl.acquire(paneId);
   diagnostic('agent-command-start', { paneId, completionMode: completion ? 'marker' : 'block' });
   try {
-    await ptyWrite(sessionId, completion ? completion.wrap(command) : command.endsWith('\n') ? command : command + '\n');
+    await writeTerminalCommand(paneId, sessionId, completion ? completion.wrap(command) : command);
     const result = await waitForCompletion(paneId, command, t0, opts?.toolCallId, opts?.signal, timeoutMs, completion);
     diagnostic('agent-command-completion', { paneId, completed: result.completed ?? false, ok: result.ok, exitCode: result.exitCode, outputChars: result.output.length });
     return result;
