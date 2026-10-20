@@ -42,6 +42,7 @@ import { Key24Regular } from '@fluentui/react-icons/headless/svg/key';
 import { Lightbulb24Regular } from '@fluentui/react-icons/headless/svg/lightbulb';
 import { HardDrive24Regular } from '@fluentui/react-icons/headless/svg/hard-drive';
 import { History16Regular, History24Regular } from '@fluentui/react-icons/headless/svg/history';
+import { Save24Regular } from '@fluentui/react-icons/headless/svg/save';
 import { Navigation24Regular } from '@fluentui/react-icons/headless/svg/navigation';
 import { Image24Regular } from '@fluentui/react-icons/headless/svg/image';
 import { Info24Regular } from '@fluentui/react-icons/headless/svg/info';
@@ -86,6 +87,7 @@ import { Wrench24Regular } from '@fluentui/react-icons/headless/svg/wrench';
 import { Dismiss24Regular } from '@fluentui/react-icons/headless/svg/dismiss';
 import { DismissCircle24Regular } from '@fluentui/react-icons/headless/svg/dismiss-circle';
 import { Flash24Regular } from '@fluentui/react-icons/headless/svg/flash';
+import { TextFont24Regular } from '@fluentui/react-icons/headless/svg/text-font';
 
 export type AppIconProps = Omit<FluentIconsProps, 'ref'> & { size?: number | string };
 export type AppIcon = ForwardRefExoticComponent<AppIconProps & RefAttributes<SVGSVGElement>>;
@@ -177,6 +179,7 @@ export const Play = createAppIcon(Play24Regular);
 export const Plug = createAppIcon(PlugConnected24Regular);
 export const Plus = createAppIcon(Add24Regular);
 export const RefreshCw = createAppIcon(ArrowSync24Regular);
+export const Save = createAppIcon(Save24Regular);
 export const RotateCcw = createAppIcon(ArrowCounterclockwise24Regular);
 export const RotateCw = createAppIcon(ArrowClockwise24Regular);
 export const Search = createAppIcon(Search24Regular);
@@ -198,6 +201,7 @@ export const Pin = createAppIcon(Pin24Regular);
 export const PinOff = createAppIcon(PinOff24Regular);
 export const Store = createAppIcon(BuildingShop24Regular);
 export const Sun = createAppIcon(WeatherSunny24Regular);
+export const TextFont = createAppIcon(TextFont24Regular);
 /** Shared console frame, prompt and cursor for terminal and command surfaces. */
 export const TerminalPrompt: AppIcon = forwardRef<SVGSVGElement, AppIconProps>(function TerminalPrompt({ size = 24, color = 'currentColor', style, title, ...props }, ref) {
   const label = props['aria-label'] ?? title;

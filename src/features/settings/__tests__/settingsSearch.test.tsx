@@ -21,10 +21,26 @@ it('opens and focuses the matching field even on an existing page', () => {
   vi.spyOn(useSessionStore.getState(), 'openSettingsTab').mockImplementation(() => {});
   render(<><Field title="终端字号"><button>Size</button></Field><Field title="应用不透明度"><input aria-label="Opacity" /></Field></>);
   act(() => getSettings().find(setting => setting.id === 'terminal-font')!.onSelect());
-  expect(useSettingsNavigationStore.getState().selected).toBe('appearance-theme');
+  expect(useSettingsNavigationStore.getState().selected).toBe('appearance-typography');
   expect(screen.getByRole('button', { name: 'Size' })).toHaveFocus();
   expect(screen.getByRole('button').closest('.settings-field')).not.toHaveAttribute('data-search-target');
   act(() => getSettings().find(setting => setting.id === 'opacity')!.onSelect());
+  expect(useSettingsNavigationStore.getState().selected).toBe('appearance-theme');
   expect(screen.getByLabelText('Opacity')).toHaveFocus();
   expect(screen.getByLabelText('Opacity').closest('.settings-field')).not.toHaveAttribute('data-search-target');
+});
+
+it('routes the split appearance settings to their owning pages', () => {
+  vi.spyOn(useSessionStore.getState(), 'openSettingsTab').mockImplementation(() => {});
+  const targets: [string, string][] = [
+    ['theme', 'appearance-theme'],
+    ['wallpaper', 'appearance-theme'],
+    ['command-highlighting', 'appearance-typography'],
+    ['terminal-font-weight', 'appearance-typography'],
+    ['theme-import', 'appearance-files'],
+  ];
+  for (const [id, page] of targets) {
+    act(() => getSettings().find(setting => setting.id === id)!.onSelect());
+    expect(useSettingsNavigationStore.getState().selected, id).toBe(page);
+  }
 });

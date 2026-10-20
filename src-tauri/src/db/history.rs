@@ -97,18 +97,6 @@ impl HistoryDb {
         Ok(result)
     }
 
-    /// 获取命令统计：按执行次数降序，返回 top N
-    pub fn stats(&self, top_n: usize) -> Result<Vec<HistoryEntry>, String> {
-        let mut stmt = self
-            .conn()
-            .prepare("SELECT id, command, cwd, exit_code, timestamp, run_count FROM history ORDER BY run_count DESC LIMIT ?1")
-            .map_err(|e| e.to_string())?;
-        let rows = stmt
-            .query_map(params![top_n as i64], map_entry)
-            .map_err(|e| e.to_string())?;
-        Ok(rows.filter_map(|r| r.ok()).collect())
-    }
-
     /// 清空命令历史（与前端 in-memory 缓存一致，消除双写漂移）。
     pub fn clear_history(&self) -> Result<(), String> {
         self.conn()

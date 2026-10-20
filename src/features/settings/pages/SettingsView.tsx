@@ -22,15 +22,20 @@ import { McpPage } from '@features/settings/pages/mcpPage';
 import { TerminalOpenPage } from '@features/settings/pages/terminalOpenPage';
 import { CommandHistoryPage } from './commandHistoryPage';
 import { ThemePage } from '@features/settings/pages/themePage';
+import { BlockAppearancePage } from '@features/settings/pages/blockAppearancePage';
+import { ThemeFilesPage } from '@features/settings/pages/themeFilesPage';
 import { ShortcutPage } from '@features/settings/pages/shortcutPage';
 import { useSettingsNavigation } from '@features/settings/hooks/useSettingsNavigation';
 import AutoSaveInput from '../components/AutoSaveInput';
 import SaveStatus from '../components/SaveStatus';
 import SettingsNavigation from '../components/SettingsNavigation';
+import FontSettings from '../components/FontSettings';
 import { SettingsSaveProvider, useSettingsSave } from '../components/SettingsSaveProvider';
 import { StartupPage } from './startupPage';
 import { LogsPage } from './logsPage';
 import { ContextMenuPage } from './contextMenuPage';
+import { SourceControlPage } from './sourceControlPage';
+import EditorOpeningPreferences from '../components/EditorOpeningPreferences';
 
 /** 权限页工具中文名（与 messageParts 的 TOOL_LABEL 保持同步） */
 const PERM_TOOL_LABEL: Record<ToolName, string> = {
@@ -96,6 +101,7 @@ function SettingsContent() {
     switch (selected) {
       case 'file-operations': return <FileOperationsPage />;
       case 'startup': return <StartupPage />;
+      case 'source-control': return <SourceControlPage />;
       case 'logs': return <LogsPage />;
       case 'context-menu': return <ContextMenuPage />;
       case 'ai-model':
@@ -239,6 +245,7 @@ function SettingsContent() {
       case 'editor-local':
         return (
           <SettingsGroup title={t('Opening files')}>
+            <EditorOpeningPreferences remote={false} />
             <Field title="默认编辑命令" description={t("Use {file} for the path or __system__ for the default app. Unavailable editors fall back to vim, nano or vi.")}>
               <AutoSaveInput
                 key="local-editor"
@@ -262,6 +269,7 @@ function SettingsContent() {
       case 'editor-remote':
         return (
           <SettingsGroup title={t('Opening files')}>
+            <EditorOpeningPreferences remote />
             <Field title="默认编辑命令" description={t("Run this editor over SSH. Use {file} for the remote path.")}>
               <AutoSaveInput
                 key="remote-editor"
@@ -284,6 +292,15 @@ function SettingsContent() {
 
       case 'appearance-theme':
         return <ThemePage />;
+
+      case 'appearance-blocks':
+        return <BlockAppearancePage />;
+
+      case 'appearance-typography':
+        return <FontSettings />;
+
+      case 'appearance-files':
+        return <ThemeFilesPage />;
 
       case 'shortcuts':
         return <ShortcutPage />;

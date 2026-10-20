@@ -30,7 +30,7 @@ export function flushDiagnostics(): Promise<void> {
     writeQueue = writeQueue.then(async () => {
       for (let offset = 0; offset < batch.length; offset += 64) {
         try {
-          await rawInvoke('terminal_debug_records', { records: batch.slice(offset, offset + 64) });
+          await rawInvoke('diagnostics_records', { records: batch.slice(offset, offset + 64) });
         } catch (error) {
           useDiagnosticSettings.setState({ error: `日志写入失败：${redactText(String(error))}` });
         }
@@ -82,6 +82,35 @@ export function diagnostic(event: string, detail: unknown = {}, level: Diagnosti
 
 export function diagnosticSnapshot(): DiagnosticRecord[] { return [...records]; }
 
+/** Frame gaps at or above this are a main-thread stall the user feels as lag. */
+export const FRAME_STALL_MS = 250;
+/** Gaps this large are the window not producing frames at all (hidden or occluded). */
+export const FRAME_PAUSE_MS = 5000;
+
+/**
+ * Record one animation-frame gap of the application window. The watchdog below reports what the
+ * user feels as lag - a frozen main thread freezes every frame - and keeps the two causes apart:
+ * a stall while the window is on screen, versus the window being paused (no frames at all) while
+ * it was hidden. The probe stays silent below {@link FRAME_STALL_MS} so ordinary frames cost
+ * nothing.
+ */
+export function reportFrameGap(gapMs: number): void {
+  if (gapMs < FRAME_STALL_MS) return;
+  diagnostic(gapMs >= FRAME_PAUSE_MS ? 'frame-pause' : 'frame-stall', {
+    gapMs: Math.round(gapMs),
+    visibility: document.visibilityState,
+    hasFocus: document.hasFocus(),
+  });
+}
+
+/** Record the window gaining or losing focus, together with the visibility the platform reports. */
+export function reportWindowFocus(focused: boolean): void {
+  diagnostic(focused ? 'window-focus' : 'window-blur', {
+    visibility: document.visibilityState,
+    hasFocus: document.hasFocus(),
+  });
+}
+
 export async function setDiagnosticAutoSave(enabled: boolean): Promise<void> {
   autoSaveRevision += 1;
   useDiagnosticSettings.setState({ saving: true, error: null });
@@ -130,9 +159,22 @@ export function initializeDiagnostics(): void {
     diagnostic('visibility-change', { state: document.visibilityState });
     if (document.visibilityState === 'hidden') void flushDiagnostics();
   });
+  window.addEventListener('focus', () => reportWindowFocus(true));
+  window.addEventListener('blur', () => reportWindowFocus(false));
+  // The frame watchdog: a gap between frames is the most direct reading of the lag the user
+  // feels, and it attributes nothing to a subsystem, so it also covers causes the terminal
+  // pipeline does not know about.
+  let lastFrameAt = performance.now();
+  const watchFrame = () => {
+    const now = performance.now();
+    reportFrameGap(now - lastFrameAt);
+    lastFrameAt = now;
+    window.requestAnimationFrame(watchFrame);
+  };
+  window.requestAnimationFrame(watchFrame);
   window.addEventListener('pagehide', () => { void flushDiagnostics(); });
   const initialSettingsRevision = autoSaveRevision;
-  void rawInvoke<boolean>('terminal_debug_status').then(autoSave => {
+  void rawInvoke<boolean>('diagnostics_auto_save').then(autoSave => {
     if (initialSettingsRevision !== autoSaveRevision) return;
     useDiagnosticSettings.setState({ autoSave: autoSave === true });
     diagnostic('diagnostics-ready', { autoSave: autoSave === true }, 'info');
@@ -142,4 +184,14 @@ export function initializeDiagnostics(): void {
 export async function exportDiagnostics(path: string): Promise<void> {
   await flushDiagnostics();
   await rawInvoke('diagnostics_export', { path, frontend: diagnosticSnapshot(), context: { userAgent: navigator.userAgent, viewport: { width: innerWidth, height: innerHeight }, devicePixelRatio, build: import.meta.env.MODE } });
+}
+
+/** Absolute path of the directory that holds the hourly log segments. */
+export function diagnosticsLogDirectory(): Promise<string> {
+  return rawInvoke<string>('diagnostics_log_directory');
+}
+
+/** Absolute path of the current log segment file. */
+export function diagnosticsLogPath(): Promise<string> {
+  return rawInvoke<string>('diagnostics_log_path');
 }

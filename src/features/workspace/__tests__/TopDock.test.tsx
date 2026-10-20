@@ -34,7 +34,7 @@ beforeEach(() => {
   native.stop.mockClear();
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   useSessionStore.setState({ tabs: [], activeId: undefined });
-  useDockStore.setState({ rightZone: ['settings'], rightPanels: [] });
+  useDockStore.setState({ rightZone: ['chat'], rightPanels: [] });
   useUiStore.setState({ globalSearchOpen: false });
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });

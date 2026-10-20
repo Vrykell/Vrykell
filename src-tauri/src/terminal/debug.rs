@@ -1,4 +1,4 @@
-use serde_json::{json, Value};
+use serde_json::json;
 use std::path::PathBuf;
 use tauri::AppHandle;
 
@@ -12,31 +12,4 @@ pub fn write(event: &str, detail: impl std::fmt::Display) {
     if let Err(error) = crate::diagnostics::record(event, json!({ "message": detail.to_string() })) {
         eprintln!("[diagnostics] {error}");
     }
-}
-
-#[tauri::command]
-pub fn terminal_debug_set(enabled: bool) -> Result<bool, String> {
-    crate::diagnostics::diagnostics_set_auto_save(enabled)
-}
-
-#[tauri::command]
-pub fn terminal_debug_status() -> bool { crate::diagnostics::auto_save() }
-
-#[tauri::command]
-pub fn terminal_debug_record(event: String, detail: Value) -> Result<(), String> {
-    crate::diagnostics::record(&event, detail)
-}
-
-#[tauri::command]
-pub fn terminal_debug_records(records: Vec<Value>) -> Result<(), String> {
-    for record in records {
-        let event = record.get("event").and_then(Value::as_str).unwrap_or("frontend-event").to_owned();
-        crate::diagnostics::record(&event, record)?;
-    }
-    Ok(())
-}
-
-#[tauri::command]
-pub fn terminal_debug_log_path(app: AppHandle) -> Result<String, String> {
-    initialize(&app).map(|path| path.to_string_lossy().into_owned())
 }

@@ -67,7 +67,7 @@ App
 
 `TerminalView`（`src/features/terminal/components/TerminalView.tsx`）是终端主表面，内部由 SessionController 的**场景状态**驱动（见 §6）。
 
-左侧导航栏与右上方导航区共用 `DockNavigation`，支持同侧排序与跨侧移动。`dock.ts` 中的 `leftZone` / `rightZone` 同时决定按钮顺序和侧栏位置；打开的侧栏随按钮移动，关闭的侧栏保持关闭。布局通过 `dock-layout-v4` 持久化，加载时保留自定义位置、去重并补齐缺失按钮。拖动中的来源与插入位置由 `navigationDrag.ts` 临时维护，不写入设置。设置入口同样支持拖动，默认在右侧；`NAVIGATION_DEFS` 包含侧栏和页面动作，`PANEL_DEFS` 仅包含真实侧栏。点击设置入口打开或激活唯一的设置页，不创建设置侧栏。窗口控制按钮保持固定。
+左侧导航栏与右上方导航区共用 `DockNavigation`，支持同侧排序与跨侧移动。`dock.ts` 中的 `leftZone` / `rightZone` 同时决定按钮顺序和侧栏位置；打开的侧栏随按钮移动，关闭的侧栏保持关闭。布局通过 `dock-layout-v4` 持久化，加载时保留自定义位置、去重并补齐缺失按钮。拖动中的来源与插入位置由 `navigationDrag.ts` 临时维护，不写入设置。设置入口固定在左侧功能栏底部，不参与拖动或排序；`NAVIGATION_DEFS` 包含侧栏和页面动作，`PANEL_DEFS` 仅包含真实侧栏。点击设置入口打开或激活唯一的设置页，不创建设置侧栏。窗口控制按钮保持固定。
 
 导航按钮由 `useNavigationButtonDrag` 通过 Pointer Events 拖动，移动超过 6px 后才开始。来源按钮保留挂载但移出排列，图标通过 `NavigationDragPreview` 跟随指针；目标位置插入 32px 实际占位，其他按钮重新排列让位。占位区域保留对应插入索引，避免让位后重复命中导致落点跳动；按钮之间的间隙按邻近位置计算。预览不修改布局或持久化，松手才提交，取消时恢复原排列。禁止使用 HTML5 Drag and Drop：Windows 桌面窗口的原生文件拖放会拦截这些事件，浏览器预览无法直接验证该行为。保留原生文件拖入；导航按钮及右上方操作区不标记为窗口拖动区域。Esc、失焦、pointercancel 和卸载取消拖动；松手产生的 click 不触发面板切换。交互测试会禁用 HTML 拖放事件，确认指针拖动独立工作。
 
@@ -264,7 +264,7 @@ zustand，按域拆分（`src/features/*/stores/`）：
 
 | 目录/文件 | 职责 |
 |------|------|
-| `terminal/pty.rs` | `portable-pty` 会话生命周期，命令注册 `pty_spawn/write/resize/close`，事件 `pty-output`/`pty-exit`（含 StreamDecoder + scan.rs 接线；GUI 启动 TERM/COLORTERM 为空时补 `xterm-256color` + truecolor） |
+| `terminal/pty.rs` | `portable-pty` 会话生命周期，命令注册 `pty_spawn/write/resize/close`，页面重载或应用退出时由 `pty_close_all` 与 `on_page_load` 钩子统一收敛会话；事件 `pty-output`/`pty-exit`（含 StreamDecoder + scan.rs 接线；GUI 启动 TERM/COLORTERM 为空时补 `xterm-256color` + truecolor） |
 | `terminal/scan.rs` | Rust StreamScanner（字节流同步扫描，见 §5.1） |
 | `terminal/shell_integration.rs` | zsh（ZDOTDIR）/ bash（--rcfile）/ PowerShell 注入 OSC 133/7 的 shell integration 脚本 |
 | `terminal/shells.rs` | shell 类型探测与 list_shells |
@@ -353,7 +353,7 @@ T4   渲染帧
 | `src/features/agent/services/skills.ts` / `src/features/agent/services/mcp.ts` | Skills / MCP 工具装配 |
 | `src/features/chat/components/PanelChat.tsx` | 全局 AI 对话面板（dock 侧栏） |
 | `src/features/chat/components/AiBlock.tsx` / `ToolRunCard.tsx` | 对话问答块 / 工具状态卡片 |
-| `src/features/settings/` | 设置页（AI 行为/模型/MCP/Skills/快捷键/终端打开模式/主题） |
+| `src/features/settings/` | 设置页（AI 行为/模型/MCP/Skills/快捷键/终端打开模式/外观：主题、块外观、字体与显示、主题文件） |
 | `src-tauri/src/agent/` | AI 流/配置/记忆/Skills/MCP/调度/web 抓取后端 |
 | `src-tauri/src/remote/ssh.rs` | SSH/SFTP（主机指纹 TOFU、密码认证） |
 
@@ -463,7 +463,7 @@ chat store send → agentStream（AI SDK streamText）
 | 层 | 内容 |
 |---|---|
 | 设计 tokens（`src/config/theme/tokens.ts`） | 亮/暗两套 CSS 变量（`--canvas/--text-primary/--border/...`），`applyTheme` 首帧同步写入防 FOUC |
-| 外观主题（`src/features/settings/model/terminalTheme.ts` + Rust `theme.rs`） | 壁纸（data URL，背景层固定铺满 zIndex 0）+ 应用不透明度（有壁纸才生效）+ 主题导入/导出 JSON |
+| 外观主题（`src/features/settings/model/terminalTheme.ts` + Rust `theme.rs`） | 壁纸（data URL，背景层固定铺满 zIndex 0）+ 应用不透明度（有壁纸才生效；挂载在 body 的浮层经根变量继承同一数值）+ 主题导入/导出 JSON |
 
 - 配置持久化在 Rust 侧（`theme_config` 命令，JSON 文件），启动先 `applyCachedWallpaper()` 再异步 `load()`。
 - 终端配色（ANSI 调色板）在 `src/features/terminal/model/blockTypes.ts`，独立于设计 token。

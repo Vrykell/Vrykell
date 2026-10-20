@@ -38,23 +38,3 @@ pub fn write_files(paths: &[String], mode: ClipMode) -> Result<(), String> {
         Err("当前平台不支持系统文件剪贴板".to_string())
     }
 }
-
-/// Read the file paths currently on the system clipboard (empty when it holds no files).
-pub fn read_files() -> Vec<String> {
-    #[cfg(target_os = "windows")]
-    {
-        windows::read()
-    }
-    #[cfg(target_os = "macos")]
-    {
-        macos::read()
-    }
-    #[cfg(target_os = "linux")]
-    {
-        linux::read()
-    }
-    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-    {
-        Vec::new()
-    }
-}

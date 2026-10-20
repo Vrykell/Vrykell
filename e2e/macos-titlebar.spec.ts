@@ -18,16 +18,14 @@ for (const width of [720, 1240]) {
     await expect(page.locator('.workspace-title')).toHaveCSS('padding-left', '92px');
     const search = (await page.getByTestId('global-search-trigger').boundingBox())!;
     const title = (await page.locator('.workspace-title span').boundingBox())!;
-    const settings = (await page.locator('[data-dock-btn="settings"]').boundingBox())!;
     const ai = (await page.locator('[data-dock-btn="chat"]').boundingBox())!;
     expect(title.x).toBe(92);
     expect(title.width).toBeGreaterThan(0);
     expect(title.x + title.width).toBeLessThan(search.x);
     expect(Math.abs(search.x + search.width / 2 - width / 2)).toBeLessThan(1);
     expect(search.x + search.width).toBeLessThan(ai.x);
-    expect(width - settings.x - settings.width).toBe(16);
-    expect(settings.x - ai.x - ai.width).toBe(8);
-    expect(settings.y + settings.height / 2).toBe(24);
+    expect(width - ai.x - ai.width).toBe(16);
+    expect(ai.y + ai.height / 2).toBe(24);
     expect(search.y + search.height / 2).toBe(24);
     const dragHit = await page.evaluate(() => document.elementFromPoint(80, 24)?.hasAttribute('data-tauri-drag-region'));
     expect(dragHit).toBe(true);

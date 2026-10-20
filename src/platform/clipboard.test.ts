@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { hasClipboardImage, readClipboardFiles, readClipboardText, writeClipboardFiles, writeClipboardText } from '@platform/clipboard';
+import { hasClipboardImage, readClipboardText, writeClipboardFiles, writeClipboardText } from '@platform/clipboard';
 
 const nativeWriteText = vi.hoisted(() => vi.fn());
 const nativeReadText = vi.hoisted(() => vi.fn());
@@ -138,15 +138,5 @@ describe('file clipboard', () => {
     await writeClipboardFiles(['/a'], 'copy');
 
     expect(invokeMock).not.toHaveBeenCalled();
-  });
-
-  it('reads the system file list on desktop and nothing otherwise', async () => {
-    await expect(readClipboardFiles()).resolves.toEqual([]);
-
-    (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {};
-    invokeMock.mockResolvedValue(['/a']);
-
-    await expect(readClipboardFiles()).resolves.toEqual(['/a']);
-    expect(invokeMock).toHaveBeenCalledWith('clipboard_read_files');
   });
 });

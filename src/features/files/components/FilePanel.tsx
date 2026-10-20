@@ -385,9 +385,7 @@ export default function FilePanel({
     openBlankMenu(event);
   };
 
-  const openHint = config.open === 'remote-editor'
-    ? '单击选中，双击在终端里编辑'
-    : '单击选中，双击在终端编辑器中打开';
+  const openHint = t('Click to select; double-click to open with your preferred editor.');
 
   return (
     <div style={{

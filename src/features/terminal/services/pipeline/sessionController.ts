@@ -733,6 +733,16 @@ export class SessionController {
     this.sinks.onBlocksChanged();
   }
 
+  /** A session ended before its command reported completion: close the active block. */
+  interruptActive(): void {
+    const ab = this.activeBlock;
+    if (ab?.status !== 'executing') return;
+    if (isTerminalDebugEnabled()) {
+      terminalDebug('block-interrupted', { tabId: this.tabId, blockId: ab.id, reason: 'session-exit' });
+    }
+    this.finishBlock(ab, null, 'interrupted');
+  }
+
   /** 清空全部 block（用户「清除输出块」）。controller 是真相源，必须在此清，
    *  否则下一次 onBlocksChanged 会把 store 里清掉的 block 整体回填。 */
   clear(): void {

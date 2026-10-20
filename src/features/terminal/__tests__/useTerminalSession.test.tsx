@@ -97,6 +97,7 @@ import { leaf } from '@features/workspace/model/windowLayout';
 import { useTypographyStore } from '@config/typography';
 import { onPtyOutput as mockedOnPtyOutput, ptySpawn as mockedPtySpawn, ptyWrite, ptyClose } from '@platform/pty';
 import { prepareSshHost } from '@features/ssh/services/hostTrust';
+import { diagnosticSnapshot } from '@platform/diagnostics';
 
 /** 设置一个本地终端 tab，指定打开模式（classic / block） */
 function setTab(openMode: 'classic' | 'block') {
@@ -150,6 +151,20 @@ describe('useTerminalSession', () => {
   it('configures a 10px native scrollbar so fitting uses the same width', () => {
     render(<TestHarness tabId="t1" onReady={() => {}} />);
     expect(terminalInitOptions[0]?.scrollbar).toEqual({ width: 10, overviewRuler: { showTopBorder: false, showBottomBorder: false } });
+  });
+
+  it('records the window return with the renderer state of each surface', async () => {
+    render(<TestHarness tabId="t1" onReady={() => {}} />);
+    const before = diagnosticSnapshot().length;
+    await act(async () => {
+      window.dispatchEvent(new Event('blur'));
+      window.dispatchEvent(new Event('focus'));
+    });
+    const returns = diagnosticSnapshot().slice(before).filter(record => record.event === 'terminal-window-return');
+    expect(returns).toHaveLength(1);
+    // The record answers what the terminal came back as: a missing WebGL addon here means the
+    // pane silently stepped down to the DOM renderer while the window was away.
+    expect(returns[0]!.detail).toMatchObject({ paneId: 't1', awayMs: expect.any(Number), webgl: expect.any(Boolean) });
   });
 
   it('re-applies the settled font options so a late-loaded face re-measures the terminal grid', async () => {

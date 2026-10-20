@@ -10,6 +10,7 @@ import { fileOpenWith, fileRevealInDir, type FsEntry } from '@platform/api/fs';
 import FilePanel from '@features/files/components/FilePanel';
 import DownloadManager from '@features/files/components/DownloadManager';
 import { openFile } from '@features/files/services/fileOpen';
+import { openPreferredFile } from '../services/openPreferredFile';
 import { useWorkspaceDirsStore } from '@features/files/services/workspaceDirs';
 import { useLocalPathStore } from '@features/files/services/localPath';
 import type { FileOpsTarget } from '@features/files/model/fileOps';
@@ -34,14 +35,15 @@ const LOCAL_TARGET: FileOpsTarget = { kind: 'local' };
  * 两者共用同一套 FilePanel + useFileBrowser，只有执行目标（target）不同。
  */
 export default function PanelFiles() {
-  const { focusedSpec } = useActiveWorkspace();
+  const { focusedSpec, activeTab } = useActiveWorkspace();
+  const connectionId = activeTab?.kind === 'editor' ? activeTab.selected.connectionId : focusedSpec?.ssh?.connectionId;
   const sshConnections = useSshStore((s) => s.connections);
   const sshLoaded = useSshStore((s) => s.loaded);
   const filesOpen = useDockStore(s => (s.leftPanels.includes('files') || s.rightPanels.includes('files')) && !s.collapsedPanels.includes('files'));
   useEffect(() => { ensureSshLoaded(); }, []);
 
-  if (sshLoaded && focusedSpec?.kind === 'ssh' && focusedSpec.ssh?.connectionId) {
-    const conn = sshConnections.find((c) => c.id === focusedSpec.ssh!.connectionId);
+  if (sshLoaded && connectionId) {
+    const conn = sshConnections.find((c) => c.id === connectionId);
     if (conn) return <RemoteFiles key={conn.id} conn={conn} enabled={filesOpen} />;
   }
   return <LocalFiles />;
@@ -56,7 +58,7 @@ function LocalFiles() {
   // Navigation stays decoupled from the terminal afterwards.
   const { focusedPaneId: focused, activeCwd, sessions } = useActiveWorkspace();
 
-  /** Open a local file with the system default application (menu item and path bar). */
+  /** Open a local file with the system default application. */
   const openWithSystemApp = (path: string) => {
     void openPath(path).catch((error) =>
       useToastStore.getState().addToast(`${t('Could not open the file')}: ${String((error as Error)?.message ?? error)}`, 'error'));
@@ -101,7 +103,7 @@ function LocalFiles() {
       initialResolved={rememberedPath !== null}
       onPathChange={(next) => useLocalPathStore.getState().remember(next)}
       terminalCwd={activeCwd ?? null}
-      openEntry={(entry) => void openFileInTerminal(entry)}
+      openEntry={(entry) => void openPreferredFile({ path: entry.path }, () => openFileInTerminal(entry))}
       onSyncToTerminal={(dir) => {
         const sid = sessions[focused];
         if (!sid) {
@@ -135,7 +137,7 @@ function LocalFiles() {
         )
       )}
       handlers={{
-        onOpenEditor: (entry) => void openFileInTerminal(entry),
+        onOpenEditor: (entry) => void openPreferredFile({ path: entry.path }, () => openFileInTerminal(entry)),
         onOpenSystem: (entry) => openWithSystemApp(entry.path),
         onOpenWith: (entry) => void fileOpenWith(entry.path).catch((error) =>
           useToastStore.getState().addToast(String((error as Error)?.message ?? error), 'error')),

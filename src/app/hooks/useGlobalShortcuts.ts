@@ -46,7 +46,6 @@ export function useGlobalShortcuts() {
     const preventNativeContextMenu = (e: MouseEvent) => e.preventDefault();
 
     const handler = (e: KeyboardEvent) => {
-
       // Escape: 当键盘路由到终端且不在 TUI 全屏场景时，切回输入栏
       // （场景判定走 scenes —— altScreenActive 仅手动全屏，真 vim 里 Esc 必须进 PTY）
       if (e.key === 'Escape' && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
@@ -113,7 +112,11 @@ export function useGlobalShortcuts() {
         ws.splitFocusedDirect('col');
       } else if (e.key === 'w') {
         e.preventDefault();
-        ws.closeFocusedTerminal();
+        const tab = ws.tabs.find(value => value.id === ws.activeId);
+        if (tab?.kind === 'git-diff') ws.closeGitComparison(tab.comparisons?.find(item => item.selection === tab.selection)?.id ?? tab.id);
+        else if (tab?.kind === 'editor') ws.closeEditorFile(tab.selected);
+        else if (tab && !isSessionTab(tab)) ws.closeTab(tab.id);
+        else ws.closeFocusedTerminal();
       } else if (e.key === ',') {
         e.preventDefault();
         useSessionStore.getState().openSettingsTab();

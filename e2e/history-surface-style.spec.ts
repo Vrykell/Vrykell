@@ -14,6 +14,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.goto('/');
     await gotoSetting(page, '主题');
     await page.getByRole('radio', { name: theme === 'dark' ? '深色' : '浅色', exact: true }).click();
+    await page.locator('aside').getByRole('button', { name: '字体与显示', exact: true }).click();
     const settingsCard = page.locator('.settings-group-panel').first();
     await expect(settingsCard).toHaveCSS('border-top-width', '0px');
     expect(await settingsCard.evaluate(element => getComputedStyle(element).boxShadow)).not.toBe('none');
@@ -22,8 +23,10 @@ for (const theme of ['dark', 'light'] as const) {
     await font.click();
     const listbox = page.getByRole('listbox', { name: '页面字号' });
     await expect(listbox).toHaveCSS('border-top-width', '0px');
-    expect(await listbox.evaluate(element => getComputedStyle(element).boxShadow)).not.toContain('inset');
-    expect(await listbox.evaluate(element => {
+    const surface = page.locator('.ui-select-menu');
+    await expect(surface).toHaveCSS('border-top-width', '0px');
+    expect(await surface.evaluate(element => getComputedStyle(element).boxShadow)).not.toContain('inset');
+    expect(await surface.evaluate(element => {
       const tone = (color: string) => {
         const channels = (color.match(/[0-9.]+/g) ?? []).slice(0, 3).map(Number);
         return channels.reduce((sum, channel) => sum + channel, 0) / (color.startsWith('color(') ? 1 : 255);

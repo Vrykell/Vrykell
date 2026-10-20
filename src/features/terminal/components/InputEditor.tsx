@@ -6,7 +6,7 @@ import { TextButton } from '@ui/TextButton';
 /** Pane-scoped composer with separate input and context-chip rows. */
 
 import { iconSizes,
-  ArrowDown, DollarSign, Columns2, GitBranch, X, Sparkles,
+  ArrowDown, DollarSign, Columns2, X, Sparkles,
  } from '@ui/icons';
 import { useUiStore } from '@features/workspace';
 import { useSessionStore } from '@features/workspace';
@@ -19,6 +19,7 @@ import { terminalDebug } from '@features/terminal/services/terminalDebug';
 import DirectoryPicker from './DirectoryPicker';
 import CommandSyntax from './CommandSyntax';
 import CompletionControl from './CompletionControl';
+import { GitStatusButton } from '@features/git';
 import { useTypographyStore } from '@config/typography';
 import { useRef, useLayoutEffect, useCallback, type ReactNode } from 'react';
 
@@ -267,7 +268,7 @@ export default function InputEditor({
           {onSessionStatusClick ? <TextButton ref={onSessionStatusReady} className="terminal-chip" aria-expanded={sessionStatusOpen ?? false} data-testid="ssh-status-toggle" aria-label={t('SSH status')} data-tip={t(sessionStatusOpen ? 'Close SSH status' : 'Open SSH status')} onClick={onSessionStatusClick}><ShellIndicator compact connected={hasSession} focused={isFocused} label={terminalLabel} /></TextButton> : <ShellIndicator connected={hasSession} focused={isFocused} label={terminalLabel} />}
           <DirectoryPicker paneId={paneId} dir={tabCwd} />
           {recentGitBranch && (
-            <GitBranchLabel branch={recentGitBranch} />
+            <GitStatusButton branch={recentGitBranch} paneId={paneId} />
           )}
           <div style={{ flex: 1, minWidth: 0 }} />
           <TextButton className="terminal-ask-ai" aria-label={t('Ask AI')} data-tip={t('Ask AI')} onClick={askAi}>
@@ -285,7 +286,6 @@ export default function InputEditor({
     </div>
   );
 }
-
 /** Composer actions use the shared themed target. */
 function InputActionBtn({ title, onClick, children }: {
   title: string;
@@ -307,22 +307,6 @@ export function CurrentDir({ dir }: { dir?: string }) {
     : '~/project';
   return (
     <span className="terminal-chip terminal-directory" data-tip={path}>
-      {label}
-    </span>
-  );
-}
-
-// ── Git 分支标签 ──
-
-function GitBranchLabel({ branch }: { branch: string }) {
-  const label = branch.length > 22 ? branch.slice(0, 21) + '…' : branch;
-  return (
-    <span
-      className="terminal-chip terminal-branch"
-      data-tip={branch}
-      style={{ color: 'var(--text-primary)' }}
-    >
-      <GitBranch size={10} style={{ opacity: 0.6, color: 'var(--xterm-blue)' }} />
       {label}
     </span>
   );

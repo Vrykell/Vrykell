@@ -110,9 +110,3 @@ export async function writeClipboardFiles(paths: string[], mode: 'copy' | 'cut')
   if (!isDesktopRuntime() || paths.length === 0) return;
   await invoke('clipboard_write_files', { paths, mode });
 }
-
-/** Read the file paths currently on the system clipboard (empty outside the desktop runtime). */
-export async function readClipboardFiles(): Promise<string[]> {
-  if (!isDesktopRuntime()) return [];
-  return invoke<string[]>('clipboard_read_files');
-}

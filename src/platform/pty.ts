@@ -48,6 +48,11 @@ export function ptyClose(id: string): Promise<void> {
   return invoke('pty_close', { id });
 }
 
+/** Terminate every PTY session of this process (page reload / startup sweep). */
+export function ptyCloseAll(): Promise<number> {
+  return invoke('pty_close_all');
+}
+
 export function onPtyOutput(cb: (id: string, events: DispatchEvent[]) => void): Promise<UnlistenFn> {
   return listen<{ id: string; events: DispatchEvent[] }>('pty-output', (e) =>
     cb(e.payload.id, e.payload.events),

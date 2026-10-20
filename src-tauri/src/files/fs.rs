@@ -37,37 +37,6 @@ pub async fn fs_list(path: Option<String>) -> Result<Vec<FsEntry>, String> {
         .map_err(|e| e.to_string())?
 }
 
-/// 列出文件系统根：Windows 返回存在的盘符（C:、D:…），Unix 返回 `/`。
-/// 供文件面板「盘符 / 根」导航——否则只能看 HOME，看不到整个盘。
-#[tauri::command]
-pub fn fs_roots() -> Result<Vec<FsEntry>, String> {
-    let mut entries = Vec::new();
-    #[cfg(target_os = "windows")]
-    {
-        for letter in b'A'..=b'Z' {
-            let drive = format!("{}:\\", letter as char);
-            if std::path::Path::new(&drive).exists() {
-                entries.push(FsEntry {
-                    name: format!("{}:", letter as char),
-                    path: drive,
-                    is_dir: true,
-                    is_symlink: false,
-                });
-            }
-        }
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        entries.push(FsEntry {
-            name: "/".into(),
-            path: "/".into(),
-            is_dir: true,
-            is_symlink: false,
-        });
-    }
-    Ok(entries)
-}
-
 /// 磁盘条目（「此电脑」视图小卡片展示用）：名称 + 路径 + 容量。
 #[derive(Clone, Serialize)]
 pub struct DiskEntry {
@@ -184,6 +153,16 @@ pub fn fs_home() -> Result<String, String> {
         .map(|p| p.to_string_lossy().to_string())
         .or_else(|| std::env::var("HOME").ok())
         .ok_or_else(|| "无法定位用户主目录".to_string())
+}
+
+/// Whether a program resolves on this machine's PATH. The ACP settings and launcher use it to tell
+/// a preset whose program is missing from one that is ready, before the user presses anything.
+#[tauri::command]
+pub async fn which_cmd(cmd: String) -> Result<bool, String> {
+    // Resolution starts a login shell, which blocks; keep it off the event loop.
+    tokio::task::spawn_blocking(move || which_cmd_sync(cmd))
+        .await
+        .map_err(|error| format!("could not look up the command: {error}"))?
 }
 
 /// Metadata for one path, used by the path bar (file vs directory) and the
@@ -637,14 +616,6 @@ pub(crate) fn which_cmd_sync(cmd: String) -> Result<bool, String> {
         .output()
         .map_err(|e| e.to_string())?;
     Ok(out.status.success())
-}
-
-#[tauri::command]
-pub async fn which_cmd(cmd: String) -> Result<bool, String> {
-    // spawn 登录 shell（zshrc 重时 50-500ms）移出 async runtime worker，避免占用调度线程
-    tauri::async_runtime::spawn_blocking(move || which_cmd_sync(cmd))
-        .await
-        .map_err(|e| e.to_string())?
 }
 
 // ── Agent 文件工具（M2）：读 / 写 / 精确编辑 / 搜索 ──

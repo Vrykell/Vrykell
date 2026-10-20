@@ -3,7 +3,7 @@ import { setupTauriMock } from './tauri-mock';
 
 const button = (page: Page, id: string) => page.locator(`[data-dock-btn="${id}"]`);
 const zone = (page: Page, side: string) => page.locator(`[data-dock-zone="${side}"]`);
-const order = (page: Page, side: string) => zone(page, side).locator('[data-dock-btn]').evaluateAll(elements => elements.map(element => element.getAttribute('data-dock-btn')));
+const order = (page: Page, side: string) => zone(page, side).locator('[data-dock-btn]:not([data-dock-fixed])').evaluateAll(elements => elements.map(element => element.getAttribute('data-dock-btn')));
 const panel = (page: Page, side: string) => page.locator(`.workspace-side-panel[data-side="${side}"]:visible`);
 
 async function dragToEmptyRight(page: Page, id: string) {
@@ -32,18 +32,18 @@ test.beforeEach(async ({ page }) => {
 
 test('both navigation areas reorder, preserve open panels, and retain their layout after reload', async ({ page }) => {
   await button(page, 'files').dragTo(button(page, 'ssh'), { targetPosition: { x: 16, y: 4 } });
-  expect(await order(page, 'left')).toEqual(['tabs', 'files', 'ssh', 'command-history']);
+  expect(await order(page, 'left')).toEqual(['tabs', 'files', 'ssh', 'git', 'command-history']);
   await button(page, 'tabs').dragTo(button(page, 'command-history'), { targetPosition: { x: 16, y: 28 } });
-  expect(await order(page, 'left')).toEqual(['files', 'ssh', 'command-history', 'tabs']);
+  expect(await order(page, 'left')).toEqual(['files', 'ssh', 'git', 'command-history', 'tabs']);
   await expect(page.getByTestId('tab-search')).toBeVisible();
   await button(page, 'files').dragTo(button(page, 'chat'), { targetPosition: { x: 4, y: 16 } });
   await button(page, 'ssh').dragTo(button(page, 'chat'), { targetPosition: { x: 4, y: 16 } });
-  expect(await order(page, 'right')).toEqual(['files', 'ssh', 'chat', 'settings']);
+  expect(await order(page, 'right')).toEqual(['files', 'ssh', 'chat']);
   await button(page, 'files').dragTo(button(page, 'chat'), { targetPosition: { x: 28, y: 16 } });
-  expect(await order(page, 'right')).toEqual(['ssh', 'chat', 'files', 'settings']);
+  expect(await order(page, 'right')).toEqual(['ssh', 'chat', 'files']);
   await page.reload();
-  expect(await order(page, 'left')).toEqual(['command-history', 'tabs']);
-  expect(await order(page, 'right')).toEqual(['ssh', 'chat', 'files', 'settings']);
+  expect(await order(page, 'left')).toEqual(['git', 'command-history', 'tabs']);
+  expect(await order(page, 'right')).toEqual(['ssh', 'chat', 'files']);
   await button(page, 'files').click();
   await expect(panel(page, 'right').getByText('notes.txt')).toBeVisible();
   await expect(page.getByTestId('tab-search')).toBeVisible();
@@ -71,11 +71,10 @@ test('open sidebars follow their actions in both directions and keep the AI draf
   await expect(panel(page, 'left').getByPlaceholder(/自然语言描述/)).toHaveValue('保持此草稿');
   await page.reload();
   await expect(panel(page, 'left').getByPlaceholder(/自然语言描述/)).toBeVisible();
-  expect(await order(page, 'left')).toEqual(['chat', 'tabs', 'ssh', 'command-history']);
+  expect(await order(page, 'left')).toEqual(['chat', 'tabs', 'ssh', 'git', 'command-history']);
 });
 
 test('empty sides accept drops, every button fits a narrow window, and outside drops are canceled', async ({ page }) => {
-  await button(page, 'settings').dragTo(button(page, 'tabs'), { targetPosition: { x: 16, y: 4 } });
   await button(page, 'chat').dragTo(button(page, 'tabs'), { targetPosition: { x: 16, y: 4 } });
   expect(await order(page, 'right')).toEqual([]);
   await dragToEmptyRight(page, 'files');
@@ -83,11 +82,11 @@ test('empty sides accept drops, every button fits a narrow window, and outside d
   await button(page, 'tabs').dragTo(button(page, 'files'), { targetPosition: { x: 4, y: 16 } });
   await button(page, 'ssh').dragTo(button(page, 'files'), { targetPosition: { x: 4, y: 16 } });
   await button(page, 'chat').dragTo(button(page, 'files'), { targetPosition: { x: 4, y: 16 } });
-  await button(page, 'settings').dragTo(button(page, 'files'), { targetPosition: { x: 4, y: 16 } });
   await button(page, 'command-history').dragTo(button(page, 'files'), { targetPosition: { x: 4, y: 16 } });
+  await button(page, 'git').dragTo(button(page, 'files'), { targetPosition: { x: 4, y: 16 } });
   expect(await order(page, 'left')).toEqual([]);
   await page.setViewportSize({ width: 720, height: 500 });
-  for (const id of ['tabs', 'ssh', 'chat', 'files', 'command-history', 'settings']) {
+  for (const id of ['tabs', 'ssh', 'chat', 'files', 'git', 'command-history', 'settings']) {
     const bounds = (await button(page, id).boundingBox())!;
     expect(bounds.x).toBeGreaterThanOrEqual(0);
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(720);
@@ -112,8 +111,8 @@ test('pointer drag cancellation preserves the layout and normal clicks still wor
   await expect(zone(page, 'right')).toHaveAttribute('data-drop-active', 'true');
   await page.keyboard.press('Escape');
   await page.mouse.up();
-  expect(await order(page, 'left')).toEqual(['tabs', 'ssh', 'files', 'command-history']);
-  expect(await order(page, 'right')).toEqual(['chat', 'settings']);
+  expect(await order(page, 'left')).toEqual(['tabs', 'ssh', 'files', 'git', 'command-history']);
+  expect(await order(page, 'right')).toEqual(['chat']);
   await expect(page.locator('[data-dock-zone][data-dragging="true"]')).toHaveCount(0);
   await expect(button(page, 'files')).toHaveAttribute('aria-pressed', 'false');
   await button(page, 'files').click();
@@ -125,7 +124,7 @@ test('search stays centered after adding right-side actions and resizing the win
   const search = page.getByTestId('global-search-trigger');
   const originalWidth = (await search.boundingBox())!.width;
   await button(page, 'ssh').dragTo(button(page, 'chat'), { targetPosition: { x: 4, y: 16 } });
-  expect(await order(page, 'right')).toEqual(['ssh', 'chat', 'settings']);
+  expect(await order(page, 'right')).toEqual(['ssh', 'chat']);
   const assertGeometry = async (width: number) => {
     await expect.poll(async () => {
       const rect = (await search.boundingBox())!;
@@ -153,33 +152,41 @@ test('search stays centered after adding right-side actions and resizing the win
   await assertGeometry(1550);
 });
 
-test('settings reorders on either side, survives reload, and opens one settings page', async ({ page }) => {
-  await button(page, 'settings').dragTo(button(page, 'chat'), { targetPosition: { x: 4, y: 16 } });
-  expect(await order(page, 'right')).toEqual(['settings', 'chat']);
-  await button(page, 'settings').dragTo(button(page, 'tabs'), { targetPosition: { x: 16, y: 4 } });
-  expect(await order(page, 'left')).toEqual(['settings', 'tabs', 'ssh', 'files', 'command-history']);
-  await expect(button(page, 'settings')).toHaveCount(1);
-  await page.reload();
-  expect(await order(page, 'left')).toEqual(['settings', 'tabs', 'ssh', 'files', 'command-history']);
-  await button(page, 'settings').click();
+test('settings stays fixed below the left toolbar and opens one settings page', async ({ page }) => {
+  const settings = button(page, 'settings');
+  await expect(settings).toHaveCount(1);
+  await expect(settings).toHaveAttribute('data-dock-fixed', 'true');
+  await expect(settings).toHaveAttribute('aria-pressed', 'false');
+  const lastAction = (await zone(page, 'left').locator('[data-dock-btn]:not([data-dock-fixed])').last().boundingBox())!;
+  const fixedBox = (await settings.boundingBox())!;
+  expect(fixedBox.y).toBeGreaterThan(lastAction.y + lastAction.height);
+  const zones = await page.evaluate(() => {
+    const raw = localStorage.getItem('dock-layout-v4');
+    const layout = raw ? JSON.parse(raw) as { leftZone?: string[]; rightZone?: string[] } : null;
+    return { left: layout?.leftZone ?? [], right: layout?.rightZone ?? [] };
+  });
+  expect(zones.left).not.toContain('settings');
+  expect(zones.right).not.toContain('settings');
+
+  await settings.click();
   await expect(page.locator('.settings-view')).toBeVisible();
-  await expect(button(page, 'settings')).toHaveAttribute('aria-pressed', 'true');
-  await button(page, 'settings').click();
+  await expect(settings).toHaveAttribute('aria-pressed', 'true');
+  await settings.click();
   await expect(page.locator('.settings-view')).toHaveCount(1);
   await page.keyboard.press('Meta+1');
   await expect(page.locator('.settings-view')).toBeHidden();
-  await button(page, 'settings').dragTo(button(page, 'files'), { targetPosition: { x: 16, y: 28 } });
-  expect(await order(page, 'left')).toEqual(['tabs', 'ssh', 'files', 'settings', 'command-history']);
-  await button(page, 'settings').dragTo(button(page, 'chat'), { targetPosition: { x: 28, y: 16 } });
-  expect(await order(page, 'right')).toEqual(['chat', 'settings']);
+
   await page.reload();
-  await button(page, 'settings').click();
+  const reloaded = button(page, 'settings');
+  await expect(reloaded).toHaveAttribute('data-dock-fixed', 'true');
+  await expect(reloaded).toHaveAttribute('aria-pressed', 'false');
+  await reloaded.click();
   await expect(page.locator('.settings-view')).toBeVisible();
-  await expect(button(page, 'settings')).toHaveCount(1);
+  await expect(reloaded).toHaveAttribute('aria-pressed', 'true');
   await page.setViewportSize({ width: 720, height: 500 });
-  const box = (await button(page, 'settings').boundingBox())!;
+  const box = (await reloaded.boundingBox())!;
   expect(box.x + box.width).toBeLessThanOrEqual(720);
-  await page.screenshot({ path: test.info().outputPath('draggable-settings.png') });
+  await page.screenshot({ path: test.info().outputPath('fixed-settings.png') });
 });
 
 test('buttons make room for a stable full-size gap before the layout is saved', async ({ page }) => {
@@ -206,24 +213,22 @@ test('buttons make room for a stable full-size gap before the layout is saved', 
   }
   await page.screenshot({ path: test.info().outputPath('left-insertion-gap.png') });
   await page.mouse.up();
-  expect(await order(page, 'left')).toEqual(['files', 'tabs', 'ssh', 'command-history']);
+  expect(await order(page, 'left')).toEqual(['files', 'tabs', 'ssh', 'git', 'command-history']);
   await expect(page.locator('[data-dock-placeholder]')).toHaveCount(0);
   await expect(page.locator('.workspace-navigation-drag-preview')).toHaveCount(0);
 
-  const settingsBefore = (await button(page, 'settings').boundingBox())!;
   const chatBefore = (await button(page, 'chat').boundingBox())!;
   const source = (await button(page, 'ssh').boundingBox())!;
   const savedAgain = await page.evaluate(() => localStorage.getItem('dock-layout-v4'));
   await page.mouse.move(source.x + 16, source.y + 16);
   await page.mouse.down();
-  await page.mouse.move(settingsBefore.x + 4, settingsBefore.y + 16, { steps: 8 });
+  await page.mouse.move(chatBefore.x + chatBefore.width - 4, chatBefore.y + 16, { steps: 8 });
   const rightGap = zone(page, 'right').locator('[data-dock-placeholder="1"]');
   await expect(rightGap).toBeVisible();
   const rightSpacing = await zone(page, 'right').locator('.workspace-right-actions')
     .evaluate(element => Number.parseFloat(getComputedStyle(element).columnGap));
   const rightBox = (await rightGap.boundingBox())!;
   expect((await button(page, 'chat').boundingBox())!.x).toBe(chatBefore.x - rightBox.width - rightSpacing);
-  expect((await button(page, 'settings').boundingBox())!.x).toBe(settingsBefore.x);
   await page.mouse.move(rightBox.x + 16, rightBox.y + 16);
   await expect(rightGap).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('right-insertion-gap.png') });
@@ -232,7 +237,7 @@ test('buttons make room for a stable full-size gap before the layout is saved', 
   await expect(page.locator('[data-dock-placeholder]')).toHaveCount(0);
   await expect(page.locator('.workspace-navigation-drag-preview')).toHaveCount(0);
   expect((await button(page, 'chat').boundingBox())!.x).toBe(chatBefore.x);
-  expect(await order(page, 'right')).toEqual(['chat', 'settings']);
+  expect(await order(page, 'right')).toEqual(['chat']);
   expect(await page.evaluate(() => localStorage.getItem('dock-layout-v4'))).toBe(savedAgain);
 });
 

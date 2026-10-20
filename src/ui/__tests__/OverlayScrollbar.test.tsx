@@ -40,6 +40,23 @@ it('appears on overflow and updates its accessible position after content resizi
   expect(screen.queryByRole('scrollbar')).toBeNull();
 });
 
+it('reveals only while the pointer is over the surface or its track', () => {
+  const { scroll } = surface(200, 1000);
+  const bar = screen.getByRole('scrollbar');
+  expect(bar).toHaveAttribute('data-visible', 'false');
+  fireEvent.pointerEnter(scroll);
+  expect(bar).toHaveAttribute('data-visible', 'true');
+  // Crossing from the content onto the track keeps the thumb visible.
+  fireEvent.pointerLeave(scroll, { relatedTarget: bar });
+  expect(bar).toHaveAttribute('data-visible', 'true');
+  fireEvent.pointerLeave(bar);
+  expect(bar).toHaveAttribute('data-visible', 'false');
+  fireEvent.pointerEnter(bar);
+  expect(bar).toHaveAttribute('data-visible', 'true');
+  fireEvent.pointerLeave(bar);
+  expect(bar).toHaveAttribute('data-visible', 'false');
+});
+
 it('navigates history by keyboard and forwards wheel input over the transparent track', () => {
   const { scroll } = surface(200, 1000, 400);
   const bar = screen.getByRole('scrollbar');

@@ -74,4 +74,12 @@ describe('ErrorBox', () => {
 
     await waitFor(() => expect(writeClipboardTextMock).toHaveBeenCalledWith('raw diagnostic'));
   });
+  it('dismisses an error from its heading and shows a later distinct error', () => {
+    const dismiss = vi.fn();
+    const { rerender } = render(<ErrorBox title="Failed" details="First failure" onDismiss={dismiss} />);
+    fireEvent.click(screen.getByRole('button', { name: '关闭错误提示' }));
+    expect(screen.queryByRole('alert')).toBeNull(); expect(dismiss).toHaveBeenCalledOnce();
+    rerender(<ErrorBox title="Failed" details="Second failure" />);
+    expect(screen.getByRole('alert')).toBeVisible();
+  });
 });

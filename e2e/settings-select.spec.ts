@@ -5,7 +5,7 @@ import { gotoSetting } from './settings';
 test('settings dropdown supports keyboard selection, cancellation and theme colors', async ({ page, browserName }) => {
   await setupTauriMock(page);
   await page.goto('/');
-  await gotoSetting(page, '主题');
+  await gotoSetting(page, '字体与显示');
   await expect(page.locator('.settings-content select')).toHaveCount(0);
   const trigger = page.getByRole('combobox', { name: '页面字号' });
   await trigger.press('ArrowDown');
@@ -21,14 +21,17 @@ test('settings dropdown supports keyboard selection, cancellation and theme colo
   await trigger.press('Enter');
   await expect(trigger).toHaveText('14px');
   await trigger.click();
-  await page.getByRole('radio', { name: '深色', exact: true }).click();
+  await page.locator('.settings-page-header h1').click();
   await expect(menu).toHaveCount(0);
   await page.getByRole('button', { name: '恢复默认字体设置' }).click();
   await expect(menu).toHaveCount(0);
   await expect(trigger).toHaveText('13px');
   const colors: string[] = [];
+  const surface = page.locator('.ui-select-menu');
   for (const theme of ['深色', '浅色']) {
+    await page.locator('aside').getByRole('button', { name: '主题', exact: true }).click();
     await page.getByRole('radio', { name: theme, exact: true }).click();
+    await page.locator('aside').getByRole('button', { name: '字体与显示', exact: true }).click();
     await trigger.click();
     // The floating surface carries the background; the listbox inside only scrolls.
     const surface = page.locator('.ui-select-menu');
@@ -56,7 +59,7 @@ test('settings dropdown supports keyboard selection, cancellation and theme colo
 test('long dropdown stays within a small viewport and scrolls to keyboard selection', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
-  await gotoSetting(page, '主题');
+  await gotoSetting(page, '字体与显示');
   await page.setViewportSize({ width: 680, height: 520 });
   const trigger = page.getByRole('combobox', { name: '终端字号' });
   await trigger.click();

@@ -79,8 +79,8 @@ test('terminal error notifications follow the active gray theme and can be close
     await notification.hover();
     await expect(notification).toHaveCSS('background-color', await resolvedColor(page, '--menu-bg'));
     await expect(notification).toHaveCSS('border-radius', '10px');
-    // The floating recipe separates by shadow alone, so there is no ring to color.
-    await expect(notification).toHaveCSS('border-top-width', '0px');
+    // Floating surfaces separate with an outer shadow instead of a border.
+    await expect(notification).toHaveCSS('border-width', '0px');
     await page.screenshot({ path: `ux-audit.local/after-notification-${theme}.png` });
     await notification.getByRole('button', { name: '关闭通知' }).click();
     await expect(notification).toBeHidden();
@@ -318,8 +318,8 @@ test('navigation controls only the adjacent sidebar and AI has an independent en
   await page.locator('[data-dock-btn="tabs"]').click();
   await expect(page.getByTestId('tab-search')).toBeVisible();
   await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
-  await expect(page.getByRole('navigation', { name: '工作区导航' }).getByRole('button', { name: '设置', exact: true })).toHaveCount(0);
-  await expect(page.locator('header').getByRole('button', { name: '设置', exact: true })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: '工作区导航' }).getByRole('button', { name: '设置', exact: true })).toHaveAttribute('data-dock-fixed', 'true');
+  await expect(page.locator('header').getByRole('button', { name: '设置', exact: true })).toHaveCount(0);
 });
 
 test('panel headings close their own content without affecting the other side', async ({ page }) => {
@@ -333,8 +333,8 @@ test('panel headings close their own content without affecting the other side', 
 
 test('dragging a navigation action preserves panel placement and order', async ({ page }) => {
   await page.locator('[data-dock-btn="files"]').dragTo(page.locator('[data-dock-btn="ssh"]'));
-  const ids = await page.getByRole('navigation', { name: '工作区导航' }).locator('[data-dock-btn]').evaluateAll(elements => elements.map(el => el.getAttribute('data-dock-btn')));
-  expect(ids).toEqual(['tabs', 'files', 'ssh', 'command-history']);
+  const ids = await page.getByRole('navigation', { name: '工作区导航' }).locator('[data-dock-btn]:not([data-dock-fixed])').evaluateAll(elements => elements.map(el => el.getAttribute('data-dock-btn')));
+  expect(ids).toEqual(['tabs', 'files', 'ssh', 'git', 'command-history']);
   await page.locator('[data-dock-btn="files"]').click();
   await expect(page.getByText('notes.txt')).toBeVisible();
   await expect(page.getByTestId('tab-search')).toBeHidden();

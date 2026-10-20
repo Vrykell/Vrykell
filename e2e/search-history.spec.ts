@@ -74,10 +74,12 @@ test.describe('命令历史（↑/↓ 翻历史）', () => {
     const input = page.getByPlaceholder(/输入命令/);
     await expect(input).toBeVisible({ timeout: 5000 });
 
-    // 召回范围是本窗格执行过的命令（不再用应用级历史）：先执行一条，再按前缀翻阅。
-    await input.fill('git status');
-    await input.press('Enter');
-    await expect(page.locator('.command-block-command').filter({ hasText: 'git status' })).toBeVisible();
+    // 输入历史按当前终端读取：先在该终端执行两条命令，供前缀召回
+    for (const command of ['git status', 'git log']) {
+      await input.fill(command);
+      await input.press('Enter');
+      await expect(page.locator('.command-block-command').filter({ hasText: command })).toBeVisible();
+    }
     await input.fill('git st');
     await input.press('ArrowUp');
     await expect(input).toHaveValue('git status');

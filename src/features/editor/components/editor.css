@@ -1,0 +1,7 @@
+.editor-content-host, .editor-pane { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.editor-pane { background: var(--canvas); }
+.editor-pane .code-editor-frame { border-radius: 0; clip-path: none; }
+.editor-close-dialog { display: flex; flex-direction: column; gap: 12px; }
+.editor-close-dialog p { margin: 0; color: var(--text-secondary); }
+.editor-file-list { display: flex; flex-direction: column; gap: 4px; overflow-wrap: anywhere; font: var(--fs-caption)/1.5 var(--font-mono); color: var(--text-muted); }
+.editor-close-dialog footer { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }

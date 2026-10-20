@@ -39,7 +39,7 @@ app → features → platform / core / ui / config / utils
 - `ui` 不包含业务状态；交互行为放入对应 Feature 的 Hook。
 - IPC 调用集中在 `platform` 或 Feature 的 `services`。
 
-`npm run check:architecture` 负责检查旧目录、反向依赖和视图层直接访问 Store。
+`npm run check:architecture` 负责检查旧目录、反向依赖、视图层直接访问 Store，以及前端 IPC 命令与 Rust 注册表（`generate_handler!`）的一致性。
 
 ## 应用启动约定
 

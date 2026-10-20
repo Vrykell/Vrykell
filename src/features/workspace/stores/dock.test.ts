@@ -144,8 +144,8 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
     localStorage.removeItem('dock-layout-v4');
     localStorage.removeItem('dock-layout-v3');
     const store = await freshStore();
-    expect(store.getState().leftZone).toEqual(['tabs', 'ssh', 'files', 'command-history']);
-    expect(store.getState().rightZone).toEqual(['chat', 'settings']);
+    expect(store.getState().leftZone).toEqual(['tabs', 'ssh', 'files', 'git', 'command-history']);
+    expect(store.getState().rightZone).toEqual(['chat']);
     expect(store.getState().leftPanels).toEqual(['tabs']);
     expect(store.getState().rightPanels).toEqual([]);
   });
@@ -155,7 +155,7 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
     localStorage.setItem('dock-layout-v4', 'not-json');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const store = await freshStore();
-    expect(store.getState().leftZone).toEqual(['tabs', 'ssh', 'files', 'command-history']);
+    expect(store.getState().leftZone).toEqual(['tabs', 'ssh', 'files', 'git', 'command-history']);
     expect(store.getState().leftPanels).toEqual(['tabs']);
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
@@ -170,8 +170,8 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
     }));
     const store = await freshStore();
     const s = store.getState();
-    expect(s.leftZone).toEqual(['tabs', 'files', 'ssh', 'command-history']);
-    expect(s.rightZone).toEqual(['chat', 'settings']);
+    expect(s.leftZone).toEqual(['tabs', 'files', 'ssh', 'command-history', 'git']);
+    expect(s.rightZone).toEqual(['chat']);
   });
 
   it('面板顺序对齐按钮顺序', async () => {
@@ -185,23 +185,16 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
     expect(store.getState().leftPanels).toEqual(['tabs']);
   });
 
-  it('persists settings placement without treating its page action as a sidebar', async () => {
+  it('drops the settings page action when restoring older layouts', async () => {
     localStorage.setItem('dock-layout-v4', JSON.stringify({
-      leftZone: ['files', 'tabs', 'ssh'], rightZone: ['chat'],
+      leftZone: ['settings', 'files', 'tabs', 'ssh'], rightZone: ['chat', 'settings'],
       leftPanels: ['files'], rightPanels: ['chat'], panelWidths: {}, widthPreset: 'compact',
     }));
     const store = await freshStore();
-    expect(store.getState().rightZone).toEqual(['chat', 'settings']);
+    expect(store.getState().leftZone).toEqual(['files', 'tabs', 'ssh', 'command-history', 'git']);
+    expect(store.getState().rightZone).toEqual(['chat']);
     store.getState().moveButton('settings', 'left', 0);
-    store.getState().togglePanel('left', 'settings');
-    store.getState().openPanel('settings');
-    expect(store.getState().leftPanels).toEqual(['files']);
-    expect(store.getState().rightPanels).toEqual(['chat']);
-    const reloaded = await freshStore();
-    expect(reloaded.getState().leftZone).toEqual(['settings', 'files', 'tabs', 'ssh', 'command-history']);
-    expect(reloaded.getState().rightZone).toEqual(['chat']);
-    reloaded.getState().moveButton('settings', 'right', 0);
-    expect((await freshStore()).getState().rightZone).toEqual(['settings', 'chat']);
+    expect(store.getState().leftZone).toEqual(['files', 'tabs', 'ssh', 'command-history', 'git']);
   });
 
   it('appends to the same side when no insertion index is specified', () => {
@@ -250,8 +243,8 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
       widthPreset: 'compact',
     }));
     const store = await freshStore();
-    expect(store.getState().leftZone).toEqual(['chat', 'ssh', 'tabs', 'command-history']);
-    expect(store.getState().rightZone).toEqual(['files', 'settings']);
+    expect(store.getState().leftZone).toEqual(['chat', 'ssh', 'tabs', 'command-history', 'git']);
+    expect(store.getState().rightZone).toEqual(['files']);
     expect(store.getState().leftPanels).toEqual(['chat']);
     expect(store.getState().rightPanels).toEqual(['files']);
     expect(store.getState().panelWidths).toEqual({ chat: 350, files: 280 });
@@ -266,8 +259,8 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
     }));
     const store = await freshStore();
     const s = store.getState();
-    expect(s.leftZone).toEqual(['tabs', 'ssh', 'command-history']);
-    expect(s.rightZone).toEqual(['files', 'chat', 'settings']);
+    expect(s.leftZone).toEqual(['tabs', 'ssh', 'command-history', 'git']);
+    expect(s.rightZone).toEqual(['files', 'chat']);
     expect(s.leftPanels).toEqual(['tabs']);
     expect(s.rightPanels).toEqual([]);
     expect(s.panelWidths).toEqual({ tabs: 180, files: 200 });
@@ -296,9 +289,9 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
     }));
     const store = await freshStore();
     const s = store.getState();
-    // 已移除的面板被丢弃，其余位置保留；缺失的按钮按默认补齐
-    expect(s.leftZone).toEqual(['tabs', 'ssh', 'command-history']);
-    expect(s.rightZone).toEqual(['files', 'chat', 'settings']);
+    // 已移除的面板被丢弃，其余位置保留；缺失的按钮按默认补齐（设置入口固定在左下，不参与布局）
+    expect(s.leftZone).toEqual(['tabs', 'ssh', 'command-history', 'git']);
+    expect(s.rightZone).toEqual(['files', 'chat']);
     expect(s.leftPanels).toEqual([]);
     expect(s.rightPanels).toEqual(['files']);
     expect(s.panelWidths).toEqual({ usage: 400 });
@@ -310,8 +303,8 @@ describe('dock loadLayout（localStorage 种子 + 模块重载）', () => {
       leftPanels: ['files'], rightPanels: ['chat'], panelWidths: {}, widthPreset: 'compact',
     }));
     const store = await freshStore();
-    expect(store.getState().leftZone).toEqual(['chat', 'command-history']);
-    expect(store.getState().rightZone).toEqual(['files', 'tabs', 'ssh', 'settings']);
+    expect(store.getState().leftZone).toEqual(['chat', 'command-history', 'git']);
+    expect(store.getState().rightZone).toEqual(['files', 'tabs', 'ssh']);
     expect(store.getState().leftPanels).toEqual(['chat']);
     expect(store.getState().rightPanels).toEqual(['files']);
   });

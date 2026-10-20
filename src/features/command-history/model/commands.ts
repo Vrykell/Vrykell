@@ -26,13 +26,15 @@ export function isExcluded(item: CommandItem, preferences: HistoryCommandPrefere
     ? item.command.trimStart().startsWith(rule.value)
     : item.command.trimStart().split(/\s+/)[0] === rule.value);
 }
-export function projectItems(history: HistoryCommandEntry[], preferences: HistoryCommandPreferences, query: string, status: string, cwd?: string, sort: CommandSort = 'recent', organizedOnly = false) {
+/** `shell` keeps only commands recorded in that shell, i.e. the ones a terminal in the same environment can execute. */
+export function projectItems(history: HistoryCommandEntry[], preferences: HistoryCommandPreferences, query: string, status: string, cwd?: string, sort: CommandSort = 'recent', organizedOnly = false, shell?: string) {
   const search = query.trim().toLowerCase();
   const favoriteKeys = new Set(preferences.favorites.map(commandKey));
   const groupedKeys = new Set(preferences.groups?.flatMap(group => group.commandKeys));
   const matchingGroupKeys = new Set(preferences.groups?.filter(group => group.name.toLowerCase().includes(search)).flatMap(group => group.commandKeys));
   const order = new Map(preferences.historyOrder?.map((key, index) => [key, index]));
   const match = (item: CommandItem) => (!cwd || normalizeCommandPath(item.cwd) === normalizeCommandPath(cwd))
+    && (!shell || item.shell === shell)
     && (status === 'all' || item.status === status)
     && (!organizedOnly || favoriteKeys.has(commandKey(item)) || groupedKeys.has(commandKey(item)))
     && (`${item.name} ${item.command} ${item.cwd}`.toLowerCase().includes(search) || matchingGroupKeys.has(commandKey(item)));

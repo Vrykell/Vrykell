@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { SquareStack, Folder, Server, Sparkles, Settings, Terminal, type AppIcon } from '@ui/icons';
+import { SquareStack, Folder, Server, Sparkles, Settings, Terminal, GitBranch, type AppIcon } from '@ui/icons';
 import { t } from '@i18n';
 import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
 import { useWorkspaceStore, isSessionTab } from '@features/workspace/stores/workspace';
@@ -21,6 +21,7 @@ export const PANEL_DEFS: Record<string, PanelDef> = {
   ssh:   { id: 'ssh',   icon: Server, label: 'SSH', width: 208 },
   chat:  { id: 'chat',  icon: Sparkles, label: 'AI', width: 320 },
   'command-history': { id: 'command-history', icon: Terminal, label: t('Command history'), width: 300 },
+  git: { id: 'git', icon: GitBranch, label: t('Source control'), width: 280 },
 };
 
 export type DockSide = 'left' | 'right';
@@ -76,7 +77,7 @@ function normalizeLayout(data: unknown): PersistedLayout | null {
 }
 
 const DEFAULTS: PersistedLayout = {
-  leftZone: ['tabs', 'ssh', 'files', 'command-history'], rightZone: ['chat', 'settings'],
+  leftZone: ['tabs', 'ssh', 'files', 'git', 'command-history'], rightZone: ['chat'],
   // Start with the session list; auxiliary panels open on demand.
   leftPanels: ['tabs'], rightPanels: [],
   panelWidths: {},
@@ -97,10 +98,13 @@ function loadLayout(): PersistedLayout {
     return DEFAULTS;
   }
   const widthPreset = (parsed as { widthPreset?: unknown } | null)?.widthPreset;
-  // Preserve saved placement, repair duplicate entries, and add missing actions.
+  // Preserve saved placement, repair duplicate entries, and add missing actions. The settings page
+  // action is pinned below the left sidebar, so older layouts drop it.
+  const leftZone = [...new Set(normalized.leftZone)].filter(id => id !== 'settings');
+  const rightZone = [...new Set(normalized.rightZone)].filter(id => id !== 'settings' && !leftZone.includes(id));
   const layout: PersistedLayout = {
-    leftZone: [...new Set(normalized.leftZone)],
-    rightZone: [...new Set(normalized.rightZone)].filter(id => !normalized.leftZone.includes(id)),
+    leftZone,
+    rightZone,
     leftPanels: [...normalized.leftPanels],
     rightPanels: [...normalized.rightPanels],
     panelWidths: { ...normalized.panelWidths },
@@ -113,7 +117,7 @@ function loadLayout(): PersistedLayout {
     }
   }
   const known = new Set([...layout.leftZone, ...layout.rightZone]);
-  const missing = VALID_IDS.filter((id) => !known.has(id));
+  const missing = PANEL_IDS.filter((id) => !known.has(id));
   if (missing.length > 0) {
     layout.leftZone.push(...missing.filter(id => DEFAULTS.leftZone.includes(id)));
     layout.rightZone.push(...missing.filter(id => !DEFAULTS.leftZone.includes(id)));

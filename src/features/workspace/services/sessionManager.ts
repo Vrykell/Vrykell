@@ -119,6 +119,11 @@ export async function setCwd(tabId: string, cwd: string): Promise<void> {
 
 /** 关闭会话（关闭标签页时调用 — 标记为 historical） */
 export async function close(tabId: string): Promise<void> {
+  const pending = layoutTimers.get(tabId);
+  if (pending) {
+    clearTimeout(pending);
+    layoutTimers.delete(tabId);
+  }
   try {
     await archiveSession(tabId, Date.now());
   } catch (e) {

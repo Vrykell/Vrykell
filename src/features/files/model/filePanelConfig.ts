@@ -129,7 +129,7 @@ export function filePanelConfigFor(target: FileOpsTarget): FilePanelConfig {
     },
     drag: { downloadBeforeNativeDrag: false, externalDropMode: 'move', cleanupSourceAfterNativeDrag: true },
     open: 'terminal-editor',
-    pathBarFile: 'system-app',
+    pathBarFile: 'editor',
     syncToTerminal: true,
     rootLabel: '此电脑',
     rootPath: null,

@@ -6,4 +6,5 @@ export * from '@features/agent/stores/usage';
 export { useAttachmentComposer } from '@features/agent/hooks/useAttachmentComposer';
 export { useUsageStats } from '@features/agent/hooks/useUsageStats';
 export { default as PermissionModeButton } from '@features/agent/components/PermissionModeButton';
+export { createChatModel } from './services/provider';
 export { default as UsageView } from '@features/agent/components/UsageView';

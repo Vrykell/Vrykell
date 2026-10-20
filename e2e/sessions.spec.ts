@@ -53,9 +53,12 @@ test.describe('会话历史管理', () => {
     await expect(page.getByText('旧的调试会话')).toBeVisible();
     const record = page.getByTestId('history-session-hist-1');
     const remove = page.getByTestId('session-menu-hist-1');
+    const quickActions = record.locator('.history-row-quick-actions');
     await expect(remove).toHaveCSS('opacity', '0');
+    await expect(quickActions).toHaveCSS('opacity', '0');
     await record.focus();
     await expect(remove).toHaveCSS('opacity', '1');
+    await expect(quickActions).toHaveCSS('opacity', '1');
     await remove.click();
     await page.getByRole('menuitem', { name: '删除此会话', exact: true }).click();
     await expect(page.getByText('旧的调试会话')).toHaveCount(0);
@@ -88,14 +91,14 @@ test.describe('会话历史管理', () => {
 });
 
 test.describe('文件双击打开', () => {
-  test('双击文件默认新建标签页并用终端编辑器打开', async ({ page }) => {
+  test('双击文件默认在编辑器页打开，而不是写入终端', async ({ page }) => {
     await page.locator('[data-dock-btn="files"]').click();
     await expect(page.getByText('notes.txt')).toBeVisible();
     await page.getByText('notes.txt').dblclick();
-    // 新建标签页（标题为文件名）
-    await ensureTabsOpen(page);
-    await expect(page.locator('[data-testid^="tab-row-"]', { hasText: 'notes.txt' })).toHaveCount(1);
-    // 编辑器命令写入 PTY
-    await expect.poll(() => ptyWrites(page)).toContain('vim /home/e2e/notes.txt\n');
+    // The default preference is the built-in editor: the file opens in an editor page and no vim
+    // command reaches the terminal.
+    await expect(page.getByTestId('file-editor')).toBeVisible();
+    await expect(page.getByTestId('file-editor').locator('.monaco-editor')).toBeVisible({ timeout: 15_000 });
+    expect((await ptyWrites(page)).some(call => call.includes('vim'))).toBe(false);
   });
 });

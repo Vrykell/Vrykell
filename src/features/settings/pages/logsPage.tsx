@@ -3,7 +3,7 @@ import { t } from '@i18n';
 import { useState } from 'react';
 import { save } from '@tauri-apps/plugin-dialog';
 import { openPath } from '@tauri-apps/plugin-opener';
-import { invoke, exportDiagnostics, setDiagnosticAutoSave, useDiagnosticSettings } from '@platform/diagnostics';
+import { diagnosticsLogDirectory, exportDiagnostics, setDiagnosticAutoSave, useDiagnosticSettings } from '@platform/diagnostics';
 import ErrorBox from '@ui/ErrorBox';
 import { SettingsGroup, Field } from '../components/ui';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
@@ -33,7 +33,7 @@ export function LogsPage() {
       {message && <ErrorBox compact tone={message.tone} testId="logs-export-status" style={{ marginTop: 8 }}>{message.text}</ErrorBox>}
     </Field>
     <Field title="日志存储" description={t('Files rotate at 5 MB. Keep the current file and two backups.')}>
-      <OutlineButton onClick={() => { void invoke<string>('diagnostics_log_directory').then(async path => { setDirectory(path); await openPath(path); }).catch(cause => setMessage({ text: `打开日志目录失败：${String(cause)}`, tone: 'error' })); }}>打开日志目录</OutlineButton>
+      <OutlineButton onClick={() => { void diagnosticsLogDirectory().then(async path => { setDirectory(path); await openPath(path); }).catch(cause => setMessage({ text: `打开日志目录失败：${String(cause)}`, tone: 'error' })); }}>打开日志目录</OutlineButton>
       {directory && <p style={{ color: 'var(--text-muted)', overflowWrap: 'anywhere' }}>{directory}</p>}
     </Field>
   </SettingsGroup>;

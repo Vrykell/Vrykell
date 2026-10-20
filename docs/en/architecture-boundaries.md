@@ -41,4 +41,4 @@ Hooks are responsible for the React lifecycle and interaction orchestration, not
 
 Every newly added Hook needs at least one unit test; when it involves user paths such as keyboard, drag-and-drop, popups, or async recovery, Playwright E2E coverage is also required.
 
-`npm run check:architecture` checks for legacy directories, reverse dependencies from lower layers, and view-layer Store penetration.
+`npm run check:architecture` checks for legacy directories, reverse dependencies from lower layers, view-layer Store penetration, and that every frontend IPC command exists in the Rust registry (`generate_handler!`).

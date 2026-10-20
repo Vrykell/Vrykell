@@ -7,7 +7,8 @@ import {
 } from '@features/workspace/stores/workspace';
 import { resolveDisplayTitle } from '@features/workspace/model/sessionTitle';
 import { useTerminalStore } from '@features/terminal/stores/terminal';
-import { leaf } from '@features/workspace/model/windowLayout';
+import { useInputStore } from '@features/terminal/stores/input';
+import { leaf, firstLeaf } from '@features/workspace/model/windowLayout';
 
 const initial = useWorkspaceStore.getState();
 
@@ -55,6 +56,15 @@ describe('workspace store', () => {
     const s = useWorkspaceStore.getState();
     expect(s.tabs).toHaveLength(0);
     expect(s.activeId).toBe('');
+  });
+
+  it('closeTab 同时清理每终端输入草稿', () => {
+    const ws = useWorkspaceStore.getState();
+    const tab = ws.tabs.find(isSessionTab)!;
+    const paneId = firstLeaf(tab.layout).id;
+    useInputStore.getState().setText(paneId, 'stale draft');
+    ws.closeTab(tab.id);
+    expect(useInputStore.getState().byPane[paneId]).toBeUndefined();
   });
 
   it('keeps an active settings page when the last background session closes', () => {

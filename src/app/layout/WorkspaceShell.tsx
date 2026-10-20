@@ -9,10 +9,14 @@ import { ACTIVITY_BAR_WIDTH, PANEL_DEFS, WORKSPACE_GAP, workspaceFrameWidth } fr
 import { useSshStatusOwner } from '@features/workspace/hooks/useAuxiliarySidebar';
 import SshAuthenticationDialog from '@features/ssh/components/SshAuthenticationDialog';
 import { useSshAuthenticationLifetime } from '@features/ssh/hooks/useSessionAuthentication';
+import GitWorkspace from '@features/git/components/GitWorkspace';
+import { useGitContext } from '@features/git/hooks/useGitContext';
+import EditorWorkspace from '@features/editor/components/EditorWorkspace';
 
 /** Compose navigation, auxiliary panels and the terminal workspace. */
 export default function WorkspaceShell() {
   useSshAuthenticationLifetime();
+  useGitContext();
   const frameWidth = useDockStore(workspaceFrameWidth);
   const sshStatusOwner = useSshStatusOwner();
   const leftPanelWidth = useDockStore(state => state.leftPanels.reduce((total, id) => total + (state.collapsedPanels.includes(id) ? 0 : state.panelWidths[id] || PANEL_DEFS[id]?.width || 0), 0));
@@ -36,7 +40,7 @@ export default function WorkspaceShell() {
         <ActivityBar />
         <SidePanel side="left" />
         <main className="workspace-main" style={{ flex: 1, minWidth: terminalMinWidth, display: 'flex', flexDirection: 'column' }}>
-          <TerminalView />
+          <EditorWorkspace><GitWorkspace><TerminalView /></GitWorkspace></EditorWorkspace>
         </main>
         <SidePanel side="right" />
         <div id="ssh-status-sidebar-host" className="workspace-ssh-status-slot" />

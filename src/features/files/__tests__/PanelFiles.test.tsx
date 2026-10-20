@@ -4,6 +4,7 @@ import PanelFiles from '../components/PanelFiles';
 import { useSessionStore } from '@features/workspace';
 import { ptyWrite } from '@platform/pty';
 import { useLocalPathStore } from '@features/files/services/localPath';
+import { useEditorPreferences } from '@config/editor';
 
 vi.mock('@features/workspace/hooks/useActiveWorkspace', () => ({ useActiveWorkspace: () => ({ focusedSpec: null, focusedPaneId: '', activeCwd: '/tmp', sessions: {} }) }));
 vi.mock('@features/files/components/FilePanel', () => ({
@@ -29,11 +30,19 @@ vi.mock('@features/ssh', () => ({ ensureSshLoaded: vi.fn(), useSshStore: (select
 afterEach(() => { cleanup(); vi.restoreAllMocks(); useLocalPathStore.setState({ remembered: null }); });
 
 it('opens files in the real default shell and retains that shell on the new tab', async () => {
+  useEditorPreferences.setState({ localOpenMode: 'terminal' });
   const addTab = vi.spyOn(useSessionStore.getState(), 'addTab').mockReturnValue('file-tab');
   render(<PanelFiles />);
   fireEvent.click(screen.getByRole('button', { name: 'Open file' }));
   await waitFor(() => expect(ptyWrite).toHaveBeenCalledWith('file-session', 'vim /tmp/config.ini\n'));
   expect(addTab).toHaveBeenCalledWith({ cwd: '/tmp', title: 'config.ini', shellType: 'bash' });
+});
+
+it('opens a file in the built-in editor by default without sending terminal input', () => {
+  useEditorPreferences.setState({ localOpenMode: 'editor' });
+  const open = vi.spyOn(useSessionStore.getState(), 'openEditorFile').mockReturnValue('editor');
+  render(<PanelFiles />); fireEvent.click(screen.getByRole('button', { name: 'Open file' }));
+  expect(open).toHaveBeenCalledWith({ path: '/tmp/config.ini' });
 });
 
 it('本地面板：无记忆时用终端 cwd 起始，导航后记住目录，重挂载恢复', () => {

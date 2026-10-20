@@ -28,12 +28,12 @@ test('saved custom Anthropic address is used by the next chat request', async ({
   expect(calls.map(call => call.args.url)).toEqual(calls.map(() => 'https://gateway.example/v1/messages'));
 });
 
-test('theme page font settings apply globally and are absent from other settings pages', async ({ page }) => {
+test('typography settings apply globally and are absent from other settings pages', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await expect.poll(async () => (await ptyResizes(page)).length).toBeGreaterThan(0);
   const originalColumns = (await ptyResizes(page)).at(-1)!.cols;
-  await gotoSetting(page, '主题');
+  await gotoSetting(page, '字体与显示');
   const fonts = page.getByLabel('字号设置');
   await fonts.getByRole('combobox', { name: '页面字号' }).click();
   await page.getByRole('option', { name: '15px', exact: true }).click();
@@ -44,8 +44,8 @@ test('theme page font settings apply globally and are absent from other settings
   await page.getByRole('option', { name: 'DOM（边缘更干净）', exact: true }).click();
   await expect(fonts.getByRole('combobox', { name: '终端渲染器' })).toHaveText('DOM（边缘更干净）');
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('vrykell-typography')!).state.terminalRenderer)).toBe('dom');
-  await expect(page.getByRole('radio', { name: '深色', exact: true })).toHaveAttribute('aria-checked', 'true');
-  await expect(page.locator('aside').getByRole('button', { name: '主题', exact: true })).toHaveCSS('font-size', '15px');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.locator('aside').getByRole('button', { name: '字体与显示', exact: true })).toHaveCSS('font-size', '15px');
   await page.keyboard.press('Meta+1');
   await expect.poll(async () => (await ptyResizes(page)).at(-1)!.cols).toBeLessThan(originalColumns);
   const input = page.getByPlaceholder(/输入命令/);
@@ -60,13 +60,14 @@ test('theme page font settings apply globally and are absent from other settings
   await expect(fonts).toHaveCount(0);
   await page.locator('aside').getByRole('button', { name: '模型行为', exact: true }).click();
   await expect(fonts).toHaveCount(0);
-  await page.locator('aside').getByRole('button', { name: '主题', exact: true }).click();
+  await page.locator('aside').getByRole('button', { name: '字体与显示', exact: true }).click();
   await expect(fonts.getByRole('combobox', { name: '页面字号' })).toHaveText('15px');
   await expect(fonts.getByRole('combobox', { name: '终端字号' })).toHaveText('16px');
   await fonts.getByRole('button', { name: '恢复默认字体设置' }).click();
   await expect(fonts.getByRole('combobox', { name: '终端字号' })).toHaveText('14px');
   await expect(fonts.getByRole('combobox', { name: '终端渲染器' })).toHaveText('WebGL（默认）');
   await page.screenshot({ path: test.info().outputPath('settings.png') });
+  await page.locator('aside').getByRole('button', { name: '主题', exact: true }).click();
   await page.getByRole('radio', { name: '浅色', exact: true }).click();
   await page.screenshot({ path: test.info().outputPath('settings-light.png') });
 });

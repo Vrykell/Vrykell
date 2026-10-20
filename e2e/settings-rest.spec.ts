@@ -56,9 +56,11 @@ test.describe('主题设置页', () => {
     await expect(page.getByText('50%')).toBeVisible({ timeout: 3000 });
     expect((await themeConfig(page)).opacity).toBeCloseTo(0.5, 1);
   });
+});
 
+test.describe('主题文件设置页', () => {
   test('配置文件路径显示与重新加载不报错', async ({ page }) => {
-    await gotoSetting(page, '主题');
+    await gotoSetting(page, '主题文件');
     await expect(page.getByText('/home/e2e/.vrykell/theme.json')).toBeVisible();
     await page.getByRole('button', { name: /重新加载/ }).click();
     await page.getByRole('button', { name: /导出主题/ }).click();

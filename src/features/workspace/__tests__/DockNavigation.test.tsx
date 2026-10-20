@@ -10,7 +10,7 @@ beforeEach(() => {
   useAuxiliarySidebarStore.setState({ sshStatusOwner: null, dismissRequest: 0 });
   useSessionStore.setState({ activeId: 'session', tabs: [{ id: 'session', title: '终端', kind: 'session', layout: leaf({ id: 'terminal', kind: 'local' }) }] });
   useDockStore.setState({
-  leftZone: ['tabs', 'ssh', 'files'], rightZone: ['chat', 'settings'],
+  leftZone: ['tabs', 'ssh', 'files'], rightZone: ['chat'],
   leftPanels: ['tabs'], rightPanels: [], collapsedPanels: [], panelWidths: {},
   });
 });
@@ -33,11 +33,14 @@ describe('shared navigation buttons', () => {
     expect(ai).toHaveAttribute('data-tip', '关闭AI 助手');
     expect(useDockStore.getState().rightPanels).toEqual(['chat']);
   });
-  it('opens the settings page from its moved action without replacing a sidebar', () => {
-    useDockStore.getState().moveButton('settings', 'left', 0);
+  it('pins settings below the left toolbar without adding it to the drag zones', () => {
     render(<><DockNavigation side="left" /><DockNavigation side="right" /></>);
     const settings = screen.getByRole('button', { name: '设置' });
     expect(settings.closest('[data-dock-zone]')).toHaveAttribute('data-dock-zone', 'left');
+    expect(settings).toHaveAttribute('data-dock-fixed', 'true');
+    expect(useDockStore.getState().leftZone).not.toContain('settings');
+    expect(useDockStore.getState().rightZone).toEqual(['chat']);
+    expect(settings).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(settings);
     expect(settings).toHaveAttribute('aria-pressed', 'true');
     expect(useSessionStore.getState().tabs.filter(tab => tab.kind === 'settings')).toHaveLength(1);

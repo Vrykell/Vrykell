@@ -67,7 +67,7 @@ App
 
 `TerminalView` (`src/features/terminal/components/TerminalView.tsx`) is the main terminal surface, driven internally by the SessionController's **scene state** (see §6).
 
-The left navigation bar and the top-right navigation zone share `DockNavigation`, supporting reordering within one side and moving across sides. `leftZone` / `rightZone` in `dock.ts` determine both button order and sidebar position; open sidebars move with their button, and closed sidebars stay closed. The layout is persisted via `dock-layout-v4`; on load, custom positions are retained, duplicates are removed, and missing buttons are filled in. The drag source and insertion position are maintained temporarily by `navigationDrag.ts` and are not written to settings. The settings entry also supports dragging and defaults to the right side; `NAVIGATION_DEFS` contains sidebars and page actions, while `PANEL_DEFS` contains only real sidebars. Clicking the settings entry opens or activates the single settings page without creating a settings sidebar. Window control buttons stay fixed.
+The left navigation bar and the top-right navigation zone share `DockNavigation`, supporting reordering within one side and moving across sides. `leftZone` / `rightZone` in `dock.ts` determine both button order and sidebar position; open sidebars move with their button, and closed sidebars stay closed. The layout is persisted via `dock-layout-v4`; on load, custom positions are retained, duplicates are removed, and missing buttons are filled in. The drag source and insertion position are maintained temporarily by `navigationDrag.ts` and are not written to settings. The settings entry is fixed below the left toolbar and does not participate in dragging or ordering; `NAVIGATION_DEFS` contains sidebars and page actions, while `PANEL_DEFS` contains only real sidebars. Clicking the settings entry opens or activates the single settings page without creating a settings sidebar. Window control buttons stay fixed.
 
 Navigation buttons are dragged via Pointer Events by `useNavigationButtonDrag`, starting only after the pointer moves more than 6px. The source button remains mounted but is removed from the arrangement, and its icon follows the pointer via `NavigationDragPreview`; a real 32px placeholder is inserted at the target position and the other buttons rearrange to make room. The placeholder region retains the corresponding insertion index, preventing the drop point from jumping due to repeated hits after the rearrangement; the gaps between buttons are computed from the neighboring positions. The preview does not modify the layout or persist anything; the commit happens only on release, and the original arrangement is restored on cancel. HTML5 Drag and Drop is forbidden: native file drag-and-drop in Windows desktop windows intercepts these events, and browser preview cannot verify that behavior directly. Native file drop-in is retained; navigation buttons and the top-right action zone are not marked as window drag regions. Esc, blur, pointercancel, and unmount cancel the drag; the click produced on release does not trigger a panel switch. Interaction tests disable HTML drag-and-drop events to confirm that pointer dragging works independently.
 
@@ -264,7 +264,7 @@ zustand, split by domain (`src/features/*/stores/`):
 
 | Directory/File | Responsibility |
 |------|------|
-| `terminal/pty.rs` | `portable-pty` session lifecycle, commands registered as `pty_spawn/write/resize/close`, events `pty-output`/`pty-exit` (includes StreamDecoder + scan.rs wiring; when TERM/COLORTERM are empty at GUI launch, supplies `xterm-256color` + truecolor) |
+| `terminal/pty.rs` | `portable-pty` session lifecycle, commands registered as `pty_spawn/write/resize/close`; a page reload or app exit sweeps all sessions through `pty_close_all` and the `on_page_load` hook; events `pty-output`/`pty-exit` (includes StreamDecoder + scan.rs wiring; when TERM/COLORTERM are empty at GUI launch, supplies `xterm-256color` + truecolor) |
 | `terminal/scan.rs` | Rust StreamScanner (synchronous byte-stream scanning, see §5.1) |
 | `terminal/shell_integration.rs` | zsh (ZDOTDIR) / bash (--rcfile) / PowerShell injection of the OSC 133/7 shell integration script |
 | `terminal/shells.rs` | shell type detection and list_shells |
@@ -353,7 +353,7 @@ With auto-save enabled, records go to `diagnostics-<YYYYMMDDTHH>.jsonl` in the l
 | `src/features/agent/services/skills.ts` / `src/features/agent/services/mcp.ts` | Skills / MCP tool assembly |
 | `src/features/chat/components/PanelChat.tsx` | global AI chat panel (dock sidebar) |
 | `src/features/chat/components/AiBlock.tsx` / `ToolRunCard.tsx` | conversation exchange card / tool status card |
-| `src/features/settings/` | settings page (AI behavior/model/MCP/Skills/shortcuts/terminal open mode/theme) |
+| `src/features/settings/` | settings page (AI behavior/model/MCP/Skills/shortcuts/terminal open mode/appearance: theme, block appearance, typography, theme files) |
 | `src-tauri/src/agent/` | AI stream/config/memory/Skills/MCP/scheduling/web scraping backend |
 | `src-tauri/src/remote/ssh.rs` | SSH/SFTP (host fingerprint TOFU, password authentication) |
 
@@ -463,7 +463,7 @@ The theme has two layers:
 | Layer | Contents |
 |---|---|
 | Design tokens (`src/config/theme/tokens.ts`) | Two sets of CSS variables, light/dark (`--canvas/--text-primary/--border/...`); `applyTheme` writes them synchronously on the first frame to prevent FOUC |
-| Appearance theme (`src/features/settings/model/terminalTheme.ts` + Rust `theme.rs`) | wallpaper (data URL, a background layer fixed to fill at zIndex 0) + app opacity (only takes effect when a wallpaper exists) + theme import/export JSON |
+| Appearance theme (`src/features/settings/model/terminalTheme.ts` + Rust `theme.rs`) | wallpaper (data URL, a background layer fixed to fill at zIndex 0) + app opacity (only takes effect when a wallpaper exists; surfaces portaled to the document body inherit the same value through a root variable) + theme import/export JSON |
 
 - Configuration is persisted on the Rust side (`theme_config` command, JSON file); on startup `applyCachedWallpaper()` runs first, then `load()` asynchronously.
 - Terminal colors (ANSI palette) are in `src/features/terminal/model/blockTypes.ts`, independent of the design tokens.

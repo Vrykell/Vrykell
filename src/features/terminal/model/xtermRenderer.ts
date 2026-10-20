@@ -52,6 +52,9 @@ export function loadWebglRenderer(term: Terminal, preference: TerminalRenderer =
   try {
     const addon = new WebglAddon();
     addon.onContextLoss(() => {
+      // A lost context is a silent step down to the DOM renderer unless something re-attaches
+      // later; the marker keeps the loss itself in the record, apart from an ordinary release.
+      terminalDebug('terminal-webgl-context-lost', { released: releasedContexts, attached: Boolean(term.element) });
       disposeWebglRenderer(term, addon);
     });
     webglAddons.set(term, addon);
@@ -60,6 +63,11 @@ export function loadWebglRenderer(term: Terminal, preference: TerminalRenderer =
     // No WebGL here: stay on the default DOM renderer.
     webglAddons.delete(term);
   }
+}
+
+/** Whether the terminal currently draws through the WebGL addon; false means the DOM renderer. */
+export function hasWebglRenderer(term: Terminal): boolean {
+  return webglAddons.has(term);
 }
 
 /** Apply a changed preference to an already open terminal: DOM drops the addon, WebGL loads it. */

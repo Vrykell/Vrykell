@@ -56,15 +56,6 @@ export interface BackendFileMatch {
   content_snippet: string | null;
 }
 
-// ── 搜索上下文 ──
-export interface BackendSearchContext {
-  cwd: string;
-  home: string;
-  shell: string;
-  git_branch: string | null;
-  project_name: string | null;
-}
-
 /** Rust blocks 表 JOIN sessions 返回 */
 export interface BackendBlockEntry {
   /** Absent on older backend responses. */

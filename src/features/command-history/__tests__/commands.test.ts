@@ -78,4 +78,16 @@ describe('project commands', () => {
     expect(projectItems(history, preferences, '', 'all', '/work/app').history).toHaveLength(0);
     expect(commandKey(history[0]!)).not.toBe(commandKey({ ...history[0]!, shell: 'pwsh' }));
   });
+  it('keeps only commands recorded in the given shell when the environment filter is on', () => {
+    const history = [entry('bash', 'npm run build'), entry('pwsh', 'Get-ChildItem', '/work/app', 'pwsh')];
+    const preferences = emptyPreferences();
+    preferences.favorites = [{ ...history[1]!, id: 'favorite', name: 'PowerShell listing' }];
+    expect(projectItems(history, preferences, '', 'all', undefined, 'recent', false, 'bash').history.map(item => item.id)).toEqual(['bash']);
+    expect(projectItems(history, preferences, '', 'all', undefined, 'recent', false, 'bash').favorites).toEqual([]);
+    expect(projectItems(history, preferences, '', 'all', undefined, 'recent', false, 'pwsh').history).toEqual([]);
+    expect(projectItems(history, preferences, '', 'all', undefined, 'recent', false, 'pwsh').favorites.map(item => item.name)).toEqual(['PowerShell listing']);
+    const unfiltered = projectItems(history, preferences, '', 'all');
+    expect(unfiltered.history.map(item => item.id)).toEqual(['bash']);
+    expect(unfiltered.favorites.map(item => item.name)).toEqual(['PowerShell listing']);
+  });
 });

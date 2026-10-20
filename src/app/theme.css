@@ -130,11 +130,16 @@ input, textarea, [contenteditable="true"] { caret-color: var(--text-caret); }
 @keyframes app-tooltip-in { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .app-tooltip { animation: none; } }
 
+/* Portaled surfaces mount under the document body, outside the window element that carries the
+   application opacity, so the surface mirrors the value itself; a wrapper would have to own a
+   stacking level to stay above the window, which a bare portal container does not have. */
+body > :not(#root) { --app-portal-opacity: var(--app-opacity, 1); }
 /* Floating surfaces use the workspace palette and an outer shadow for separation. */
 .workspace-floating {
   background: var(--menu-bg); color: var(--text-primary);
   border: 0; border-radius: 10px;
   box-shadow: var(--shadow-md); font: calc(12px * var(--ui-font-scale))/1.5 var(--font-ui);
+  opacity: var(--app-portal-opacity, 1);
 }
 .workspace-floating-dialog { border-radius: var(--radius-block); box-shadow: var(--shadow-lg); }
 .tool-dialog-overlay { position: fixed; inset: 0; z-index: 9996; display: flex; align-items: center; justify-content: center; background: var(--overlay); animation: overlayIn 180ms var(--ease); }
@@ -369,9 +374,11 @@ button.state-icon-button[aria-pressed="true"]:hover { background: var(--selectio
 .workspace-side-panel[data-side="right"] { border-radius: 0 var(--radius-block) var(--radius-block) 0; overflow: visible; }
 .workspace-activity-bar {
   width: var(--workspace-activity-width); flex-shrink: 0; display: flex; flex-direction: column;
+  align-self: stretch; height: 100%; position: relative;
   padding: 10px 6px; background: var(--chrome-bg);
 }
-.workspace-activity-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.workspace-activity-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1 1 auto; }
+.workspace-activity-footer { flex-shrink: 0; margin-top: auto; display: flex; justify-content: center; padding-top: 8px; }
 .workspace-right-navigation { min-width: 0; display: flex; align-items: center; border-radius: 8px; }
 .workspace-right-navigation[data-dragging="true"]:not(:has(.workspace-navigation-slot[data-moving="false"], .workspace-navigation-placeholder)) { min-width: 36px; min-height: 36px; }
 .workspace-right-actions { display: flex; align-items: center; gap: 4px; }
@@ -400,6 +407,7 @@ button.state-icon-button[aria-pressed="true"]:hover { background: var(--selectio
   width: 40px; height: 26px; display: flex; align-items: center; justify-content: center;
   background: var(--chrome-field); border-radius: 8px; box-shadow: var(--shadow-md);
 }
+.list-reorder-item-preview { position: fixed; z-index: 2000; pointer-events: none; }
 /* Custom right-side layouts reserve enough space for every navigation action. */
 .workspace-title-actions:has(.workspace-right-navigation[data-compact="true"]) { gap: 4px; }
 button.activity-button {
@@ -465,6 +473,7 @@ input.ssh-auth-response::-webkit-strong-password-auto-fill-button { display: non
 .directory-picker :is(.directory-picker-parent, [role="option"]):is(:hover, :focus-visible), .directory-picker-list button[aria-selected="true"] { background: var(--hover); }
 .directory-picker p { margin: 0; padding: 8px 10px; color: var(--text-muted); }
 .terminal-branch { min-width: 0; max-width: 22%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.terminal-branch > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .terminal-pane { container-type: inline-size; }
 @container (max-width: 520px) {
   .terminal-ask-ai.text-control { width: var(--control-size); padding: 0; }
@@ -998,7 +1007,9 @@ input.text-input-field:disabled { opacity: 0.55; }
 .md .katex { color: var(--text-primary); font-synthesis: none; letter-spacing: normal; word-spacing: normal; word-break: normal; overflow-wrap: normal; }
 .md .katex-display > .katex { font-size: max(1.25em, 16px); }
 
-/* Overflowing content shares a compact themed scrollbar in both directions. */
+/* Overflowing content shares a compact themed scrollbar in both directions. Scrollbar thumbs stay
+   invisible until the pointer enters the surface that owns them, so inactive panes keep a clean
+   edge while the lane, wheel, trackpad and keyboard scrolling remain available. */
 ::-webkit-scrollbar { width: var(--scrollbar-size); height: var(--scrollbar-size); }
 ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
 ::-webkit-scrollbar-track:vertical { margin-block: 4px; }
@@ -1011,16 +1022,18 @@ input.text-input-field:disabled { opacity: 0.55; }
 .xterm .xterm-viewport { scrollbar-width: none; }
 .xterm .xterm-viewport::-webkit-scrollbar { display: none; }
 ::-webkit-scrollbar-thumb {
-  background-color: var(--scrollbar-thumb);
+  background-color: transparent;
   background-clip: padding-box;
   border: 2px solid transparent;
   border-radius: 999px;
   min-height: 28px;
   min-width: 28px;
 }
+*:hover::-webkit-scrollbar-thumb { background-color: var(--scrollbar-thumb); }
 ::-webkit-scrollbar-thumb:hover, ::-webkit-scrollbar-thumb:active { background-color: var(--scrollbar-thumb-hover); }
 @supports not selector(::-webkit-scrollbar) {
-  * { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
+  * { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+  *:hover { scrollbar-color: var(--scrollbar-thumb) transparent; }
 }
 /* Overlay tracks leave the full content width available. */
 .scroll-region, .settings-content { scrollbar-gutter: auto; }
@@ -1035,7 +1048,8 @@ input.text-input-field:disabled { opacity: 0.55; }
 .terminal-block-scroll { scrollbar-gutter: auto; scrollbar-width: none; }
 .terminal-block-scroll::-webkit-scrollbar { display: none; }
 [data-scroll-overlay-layer] { position: absolute; top: 0; left: 0; width: 0; height: 0; overflow: visible; pointer-events: none; }
-.overlay-scrollbar { position: absolute; top: 0; bottom: 0; right: 0; width: 10px; z-index: 1; background: transparent; touch-action: none; user-select: none; pointer-events: auto; }
+.overlay-scrollbar { position: absolute; top: 0; bottom: 0; right: 0; width: 10px; z-index: 1; background: transparent; touch-action: none; user-select: none; pointer-events: auto; opacity: 0; transition: opacity var(--dur-fast) var(--ease); }
+.overlay-scrollbar[data-visible="true"], .overlay-scrollbar:hover, .overlay-scrollbar:focus-visible, .overlay-scrollbar[data-dragging="true"] { opacity: 1; }
 .overlay-scrollbar-track { position: absolute; inset: var(--scrollbar-inset) 0; pointer-events: none; }
 .overlay-scrollbar-thumb { width: 6px; margin: 0 2px; border-radius: 999px; background: var(--scrollbar-thumb); pointer-events: auto; }
 .overlay-scroll-target { scrollbar-width: none; scrollbar-gutter: auto; }
@@ -1068,7 +1082,7 @@ input.text-input-field:disabled { opacity: 0.55; }
 
 @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes toastOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(8px); } }
-@keyframes modalIn { from { opacity: 0; transform: translateY(-8px) scale(0.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes modalIn { from { opacity: 0; transform: translateY(-8px) scale(0.985); } to { opacity: var(--app-portal-opacity, 1); transform: translateY(0) scale(1); } }
 @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 @keyframes cursor-blink { 50% { opacity: 0; } }

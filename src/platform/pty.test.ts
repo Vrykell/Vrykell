@@ -7,7 +7,7 @@ const { invokeMock, listenMock } = vi.hoisted(() => ({
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 vi.mock('@tauri-apps/api/event', () => ({ listen: listenMock }));
 
-import { ptySpawn, ptyWrite, ptyResize, ptyClose, onPtyOutput } from '@platform/pty';
+import { ptySpawn, ptyWrite, ptyResize, ptyClose, ptyCloseAll, onPtyOutput } from '@platform/pty';
 
 describe('pty IPC wrapper', () => {
   beforeEach(() => { invokeMock.mockReset(); listenMock.mockReset(); });
@@ -49,6 +49,12 @@ describe('pty IPC wrapper', () => {
     expect(invokeMock).toHaveBeenNthCalledWith(1, 'pty_write', { id: 's', data: 'ls\n' });
     expect(invokeMock).toHaveBeenNthCalledWith(2, 'pty_resize', { id: 's', cols: 100, rows: 30 });
     expect(invokeMock).toHaveBeenNthCalledWith(3, 'pty_close', { id: 's' });
+  });
+
+  it('pty_close_all 返回关闭的会话数', async () => {
+    invokeMock.mockResolvedValue(2);
+    await expect(ptyCloseAll()).resolves.toBe(2);
+    expect(invokeMock).toHaveBeenCalledWith('pty_close_all');
   });
 
   it('onPtyOutput 解包 payload', async () => {

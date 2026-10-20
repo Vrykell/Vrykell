@@ -41,4 +41,4 @@ Hook 负责 React 生命周期和交互编排，不负责渲染布局。组件�
 
 每个新增 Hook 至少需要一个单元测试；涉及键盘、拖拽、弹窗、异步恢复等用户路径时，还需要 Playwright E2E 覆盖。
 
-`npm run check:architecture` 会检查旧目录、低层反向依赖和视图层 Store 穿透。
+`npm run check:architecture` 会检查旧目录、低层反向依赖、视图层 Store 穿透，以及前端 IPC 命令与 Rust 注册表（`generate_handler!`）的一致性。

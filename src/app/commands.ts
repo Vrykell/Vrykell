@@ -1,6 +1,6 @@
 import { useSessionStore } from '@features/workspace';
 import { useUiStore, useDockStore } from '@features/workspace';
-import { invoke } from '@platform/diagnostics';
+import { diagnosticsLogPath } from '@platform/diagnostics';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { clearSessionBlocks } from '@features/terminal/hooks/useTerminalSession';
 import { isTerminalDebugEnabled, setTerminalDebugEnabled } from '@features/terminal/services/terminalDebug';
@@ -64,7 +64,7 @@ registerCommand({ id: 'toggle-terminal-debug', label: '切换终端诊断日志'
   useToastStore.getState().addToast(`终端诊断日志已${enabled ? '开启' : '关闭'}`, 'info');
 } });
 registerCommand({ id: 'open-terminal-debug-log', label: '打开终端诊断日志', desc: '查看 PTY、Shell 集成和会话状态记录', keywords: ['terminal', 'debug', 'log', 'pty'], action: () => {
-  void invoke<string>('terminal_debug_log_path')
+  void diagnosticsLogPath()
     .then((path) => openPath(path))
     .catch(() => useToastStore.getState().addToast('无法打开终端诊断日志', 'error'));
 } });

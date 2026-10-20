@@ -4,7 +4,7 @@ import { gotoSetting } from './settings';
 
 test('command coloring is optional, persists and leaves native input editing intact', async ({ page }) => {
   await setupTauriMock(page); await page.goto('/');
-  await gotoSetting(page, '打开方式');
+  await gotoSetting(page, '字体与显示');
   const toggle = page.locator('.settings-field').filter({ has: page.getByText('命令语法高亮', { exact: true }) }).getByRole('switch');
   await expect(toggle).toHaveAttribute('aria-checked', 'false');
   await toggle.click();
@@ -52,7 +52,7 @@ test('command coloring is optional, persists and leaves native input editing int
   await page.reload();
   await input.fill('echo persisted');
   await expect(page.locator('.command-input-overlay [data-kind="command"]')).toHaveText('echo');
-  await gotoSetting(page, '打开方式');
+  await gotoSetting(page, '字体与显示');
   await expect(toggle).toHaveAttribute('aria-checked', 'true');
   await toggle.click();
   await page.keyboard.press('Meta+1');
@@ -62,9 +62,8 @@ test('command coloring is optional, persists and leaves native input editing int
   await expect(page.locator('.command-block-command [data-kind]')).toHaveCount(0);
   await gotoSetting(page, '主题');
   await page.getByRole('radio', { name: '浅色', exact: true }).click();
-  // The caret follows the theme wherever text is typed; the palette input is the plainest probe.
-  await page.getByTestId('global-search-trigger').click();
-  await expect(page.getByRole('dialog', { name: '全局搜索' }).getByRole('textbox')).toHaveCSS('caret-color', 'rgb(0, 111, 219)');
+  await page.keyboard.press('Meta+1');
+  await expect(page.getByPlaceholder(/输入命令/)).toHaveCSS('caret-color', 'rgb(0, 111, 219)');
 });
 
 test('completion stays anchored while typing and its acceptance keys persist', async ({ page }) => {
@@ -121,7 +120,7 @@ test('completion stays anchored while typing and its acceptance keys persist', a
 
 test('the colored input mirror stays aligned while multiline content overflows the capped height', async ({ page }) => {
   await setupTauriMock(page); await page.goto('/');
-  await gotoSetting(page, '打开方式');
+  await gotoSetting(page, '字体与显示');
   const toggle = page.locator('.settings-field').filter({ has: page.getByText('命令语法高亮', { exact: true }) }).getByRole('switch');
   await toggle.click();
   await page.keyboard.press('Meta+1');

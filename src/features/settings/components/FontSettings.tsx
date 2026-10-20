@@ -2,7 +2,7 @@ import { OutlineButton } from '@ui/OutlineButton';
 import { TERMINAL_FONT_PRESETS, useTypographyStore } from '@config/typography';
 import Select from '@ui/Select';
 import { t } from '@i18n';
-import { SettingsGroup, Field } from './ui';
+import { SettingsGroup, Field, Toggle } from './ui';
 import { useSettingsSave } from './SettingsSaveProvider';
 
 const pageSizes = Array.from({ length: 9 }, (_, index) => ({ value: index + 10, label: `${index + 10}px` }));
@@ -11,7 +11,7 @@ const weights = Array.from({ length: 17 }, (_, index) => ({ value: 100 + index *
 const lineHeights = Array.from({ length: 7 }, (_, index) => ({ value: Number((1 + index / 10).toFixed(1)), label: `${(1 + index / 10).toFixed(1)}×` }));
 
 export default function FontSettings() {
-  const { uiFontSize, terminalFontSize, chatFontSize, terminalRenderer, terminalFontPreset, terminalFontWeight, terminalLineHeight, update, reset } = useTypographyStore();
+  const { uiFontSize, terminalFontSize, chatFontSize, terminalRenderer, terminalFontPreset, terminalFontWeight, terminalLineHeight, commandHighlighting, update, reset } = useTypographyStore();
   const { save } = useSettingsSave();
   const rendererOptions = [
     { value: 'webgl' as const, label: t('settings.font.rendererWebgl') },
@@ -50,6 +50,10 @@ export default function FontSettings() {
         <div className="settings-font-row">
           <Select aria-label={t('settings.font.rendererTitle')} value={terminalRenderer} options={rendererOptions} onChange={terminalRenderer => { void save(() => update({ terminalRenderer })); }} style={{ width: 190 }} />
         </div>
+      </Field>
+      <Field title={t('Command syntax highlighting')} description={t('Color commands, arguments and shell operators.')}>
+        <Toggle label={t('Command syntax highlighting')} on={commandHighlighting}
+          onChange={commandHighlighting => { void save(() => update({ commandHighlighting })); }} />
       </Field>
     </SettingsGroup>
     <SettingsGroup title={t('Preview')}>

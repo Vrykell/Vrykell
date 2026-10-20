@@ -58,7 +58,7 @@
 29. `src/ui/` — generic UI components with no business semantics.
 30. `src/features/chat/` — AI conversation rendering (AiBlock, ModelPill, ToolRunCard, Markdown, PanelChat).
 31. `src/features/agent/` — AI agent logic (agentStream, tools, permissions, Skills, MCP, context, memory, scheduling, smart titles).
-32. `src/features/settings/` — settings pages (behavior/model/MCP/Skills/shortcuts/terminal open mode/theme).
+32. `src/features/settings/` — settings pages (behavior/model/MCP/Skills/shortcuts/terminal open mode/appearance: theme, block appearance, typography, theme files).
 33. `src/platform/` and `src/utils/` — Tauri IPC, PTY, runtime adapters and pure helper functions. Business services belong to their feature.
 34. `src/features/ssh/` `src/features/files/` `src/features/search/` `src/config/theme/` — SSH / local files / global search / design tokens.
 35. `e2e/` — Playwright E2E tests; `tauri-mock.ts` provides the Tauri + Anthropic mock. The suite's dev-server port comes from `PW_PORT` (default 1421): parallel worktrees each pick their own port so one run never shuts down another run's server (which shows up as a wall of `ERR_CONNECTION_REFUSED`).

@@ -340,6 +340,24 @@ it('shows only starred or grouped commands while retaining status filtering', as
   expect(screen.getByText(t('No matching commands'))).toBeVisible();
 });
 
+it('filters to commands recorded in the current shell environment and restores them from the card', async () => {
+  saved.favorites = [{ id: 'system-favorite', name: 'System shell list', command: 'dir', cwd: '/app', shell: 'system' }];
+  render(<PanelCommandHistory />);
+  const favorite = await screen.findByTestId('command-history-system-favorite');
+  fireEvent.click(screen.getByRole('button', { name: t('Filter commands') }));
+  const filterMenu = screen.getByTestId('command-history-filter-menu');
+  expect(within(filterMenu).getByRole('button', { name: t('All environments') })).toHaveAttribute('aria-pressed', 'true');
+  fireEvent.click(within(filterMenu).getByRole('button', { name: t('Same environment only') }));
+  expect(favorite).not.toBeInTheDocument();
+  expect(screen.getByTestId('command-history-build')).toBeVisible();
+  fireEvent.keyDown(document, { key: 'Escape' });
+  const card = screen.getByTestId('command-history-filter-environment');
+  expect(card).toHaveTextContent(t('Same environment only'));
+  fireEvent.click(within(card).getByRole('button', { name: t('Remove filter: {{filter}}', { filter: t('Same environment only') }) }));
+  expect(screen.getByTestId('command-history-system-favorite')).toBeVisible();
+  expect(screen.queryByTestId('command-history-filter-environment')).toBeNull();
+});
+
 it('expands matching custom groups for search and shows independently removable filter cards', async () => {
   saved.groups = [{ id: 'release', name: 'Release', commandKeys: [commandKey({ shell: 'bash', cwd: '/app', command: 'npm run build' })] }];
   render(<PanelCommandHistory />);

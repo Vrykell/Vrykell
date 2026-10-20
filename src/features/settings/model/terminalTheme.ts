@@ -35,6 +35,11 @@ const DEFAULT_CONFIG: TerminalThemeConfig = {
   vars: {},
 };
 
+/** Absolute path of the theme file (`~/.vrykell/theme.json`). */
+export function getThemePath(): Promise<string> {
+  return invoke<string>('get_theme_path');
+}
+
 // 壁纸 asset URL 的 localStorage 缓存：URL 很小，启动时同步应用，壁纸直接经 asset 协议读本地文件
 const WALLPAPER_CACHE_KEY = 'vrykell-wallpaper-url';
 

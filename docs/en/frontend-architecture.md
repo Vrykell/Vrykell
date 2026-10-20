@@ -39,7 +39,7 @@ app → features → platform / core / ui / config / utils
 - `ui` contains no business state; interactive behavior goes into the corresponding Feature's Hook.
 - IPC calls are concentrated in `platform` or the Feature's `services`.
 
-`npm run check:architecture` is responsible for checking legacy directories, reverse dependencies, and direct Store access from the view layer.
+`npm run check:architecture` is responsible for checking legacy directories, reverse dependencies, direct Store access from the view layer, and the consistency between frontend IPC commands and the Rust registry (`generate_handler!`).
 
 ## Application Startup Conventions
 

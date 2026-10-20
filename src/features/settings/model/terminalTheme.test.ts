@@ -10,7 +10,7 @@ const { invokeMock, convertFileSrcMock } = vi.hoisted(() => ({
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock, convertFileSrc: convertFileSrcMock }));
 
 import {
-  useTerminalThemeStore, applyCachedWallpaper, reapplyXtermTheme, applyTerminalTheme,
+  useTerminalThemeStore, applyCachedWallpaper, reapplyXtermTheme, applyTerminalTheme, getThemePath,
 } from '@features/settings/model/terminalTheme';
 
 const baseConfig = { opacity: 1, backgroundImage: null, vars: {} };
@@ -85,6 +85,12 @@ describe('terminalTheme store', () => {
     await useTerminalThemeStore.getState().importFrom('/tmp/t.json');
     expect(invokeMock).toHaveBeenCalledWith('theme_import', { path: '/tmp/t.json' });
     expect(useTerminalThemeStore.getState().wallpaperDataUrl).toBe('asset:///imp.jpg');
+  });
+
+  it('getThemePath：返回后端主题文件路径', async () => {
+    invokeMock.mockResolvedValueOnce('/home/me/.vrykell/theme.json');
+    await expect(getThemePath()).resolves.toBe('/home/me/.vrykell/theme.json');
+    expect(invokeMock).toHaveBeenLastCalledWith('get_theme_path');
   });
 
   it('applyCachedWallpaper：有缓存时同步应用', () => {

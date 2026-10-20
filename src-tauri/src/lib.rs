@@ -15,11 +15,6 @@ use db::HistoryState;
 use std::sync::Mutex;
 use tauri::Manager;
 
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg(target_os = "macos")]
@@ -41,6 +36,9 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             platform::context_menu::handle_secondary_launch(app, args);
         }))
+        // A webview page load keeps this process alive: terminate the previous page's
+        // PTY sessions before the new page can spawn its own.
+        .plugin(terminal::pty::lifecycle_plugin())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -92,7 +90,18 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            greet,
+            commands::git::git_snapshot,
+            commands::git::git_diff,
+            commands::git::git_change_file,
+            commands::git::git_operate,
+            commands::git::git_commit_context,
+            commands::git::git_branches,
+            commands::git::git_worktrees,
+            commands::git::git_references,
+            commands::git::git_edit_reference,
+            commands::editor::editor_read_file,
+            commands::editor::editor_save_file,
+            commands::git::git_switch_branch,
             commands::command_history::command_history_record,
             commands::command_history::command_history_list,
             commands::command_history::command_history_mutate,
@@ -169,14 +178,13 @@ pub fn run() {
             agent::permissions::tool_policy_set_level,
             agent::permissions::tool_policy_clear_session_grants,
             terminal::pty::pty_spawn,
+            terminal::pty::pty_close_all,
             diagnostics::diagnostics_set_auto_save,
+            diagnostics::diagnostics_auto_save,
+            diagnostics::diagnostics_records,
+            diagnostics::diagnostics_log_path,
             diagnostics::diagnostics_export,
             diagnostics::diagnostics_log_directory,
-            terminal::debug::terminal_debug_set,
-            terminal::debug::terminal_debug_status,
-            terminal::debug::terminal_debug_record,
-            terminal::debug::terminal_debug_records,
-            terminal::debug::terminal_debug_log_path,
             terminal::shells::list_shells,
             remote::ssh_config::ssh_config_candidates,
             remote::ssh::ssh_connections_list,
@@ -209,9 +217,9 @@ pub fn run() {
             terminal::pty::pty_close,
             terminal::pty::pty_kill_foreground,
             files::fs::fs_list,
-            files::fs::fs_roots,
             files::fs::fs_disks,
             files::fs::fs_home,
+            files::fs::which_cmd,
             files::fs::fs_stat,
             files::fs::fs_rename,
             files::fs::fs_create_file,
@@ -221,7 +229,6 @@ pub fn run() {
             files::fs::fs_stage_delete,
             files::fs::fs_restore_staged,
             files::fs::fs_purge_staged,
-            files::fs::which_cmd,
             files::fs::read_file_text,
             files::fs::write_file_text,
             files::fs::edit_file_text,
@@ -245,9 +252,7 @@ pub fn run() {
             files::file_open::file_open_with,
             commands::search::search_files,
             commands::search::search_history,
-            commands::search::get_search_context,
             commands::search::record_history,
-            commands::search::history_stats,
             commands::search::clear_history,
             commands::search::search_blocks,
             commands::search::search_sessions,
@@ -295,14 +300,16 @@ pub fn run() {
             commands::download::downloads_delete,
             commands::download::downloads_discard,
             commands::clipboard::clipboard_write_files,
-            commands::clipboard::clipboard_read_files,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
     // 退出时不再归档 active 会话：保留「上次打开未关闭的标签」供下次启动恢复。
-    app.run(|_app_handle, event| {
+    app.run(|app_handle, event| {
         if matches!(event, tauri::RunEvent::Exit) {
+            // Do not rely on the operating system closing handles: terminate every
+            // PTY child explicitly before the process exits.
+            terminal::pty::close_all_sessions(app_handle);
             if let Err(error) = diagnostics::flush_logs() { eprintln!("[diagnostics] {error}"); }
         }
     });

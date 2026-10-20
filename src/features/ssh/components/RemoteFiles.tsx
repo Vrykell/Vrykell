@@ -7,6 +7,7 @@ import FilePanel from '@features/files/components/FilePanel';
 import DownloadManager from '@features/files/components/DownloadManager';
 import { fileOpsFor, type FileOpsTarget } from '@features/files/model/fileOps';
 import { loadConfig, remoteOpenCommand } from '@features/files/services/fileOpen';
+import { openPreferredFile } from '@features/files';
 import { describeFileServiceFailure } from '@features/ssh/model/fileServiceState';
 import { useRemotePathStore, sshPaneIdFor, shellQuote } from '@features/ssh/utils/remotePath';
 import { useTerminalStore, termInstances } from '@features/terminal';
@@ -60,7 +61,7 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
 
   /** Open a remote file in the terminal associated with this file panel. */
   const remoteEdit = (entry: FsEntry) => {
-    writeTerminalCommand(remoteOpenCommand(loadConfig(), entry.path), 'edit');
+    void openPreferredFile({ path: entry.path, connectionId: conn.id }, () => writeTerminalCommand(remoteOpenCommand(loadConfig(), entry.path), 'edit'));
   };
 
   /** 上传（菜单与系统拖入共用）：逐个上传并汇总结果 */

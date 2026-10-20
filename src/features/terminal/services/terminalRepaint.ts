@@ -52,13 +52,16 @@ export type TerminalSurfaceResetReason = 'manual' | 'window-restore';
  * is what makes it the escape hatch for a renderer that misbehaves.
  */
 function resetTerminalSurfaces(reason: TerminalSurfaceResetReason, paneId?: string): void {
+  const startedAt = performance.now();
   const preference = useTypographyStore.getState().terminalRenderer;
   let rendererRebuilds = 0;
+  const rebuildStartedAt = performance.now();
   for (const term of paneId ? paneTerminals(paneId) : []) {
     applyTerminalRenderer(term, 'dom');
     applyTerminalRenderer(term, preference);
     rendererRebuilds += 1;
   }
+  const rebuildMs = performance.now() - rebuildStartedAt;
   const terminals = liveTerminals();
   if (!paneId) {
     // A window that comes back may have lost GPU contexts while it was hidden: re-attach the
@@ -66,14 +69,30 @@ function resetTerminalSurfaces(reason: TerminalSurfaceResetReason, paneId?: stri
     for (const term of terminals) applyTerminalRenderer(term, preference);
   }
   // One wipe of the shared atlas, then every surface rebuilds from its buffer.
+  const wipeStartedAt = performance.now();
   terminals[0]?.clearTextureAtlas?.();
+  const wipeMs = performance.now() - wipeStartedAt;
+  const repaintStartedAt = performance.now();
   for (const term of terminals) repaintTerminal(term);
+  const repaintMs = performance.now() - repaintStartedAt;
   terminalDebug('terminal-atlas-reset', {
     reason,
     paneId: paneId ?? null,
     rendererRebuilds,
     terminals: terminals.length,
+    // The synchronous part is only a slice of the cost: after the wipe every renderer rebuilds
+    // its glyph model and re-uploads the cleared pages on its next frames, which the frame
+    // watchdog measures as a stall after this record.
+    syncMs: roundMs(performance.now() - startedAt),
+    rebuildMs: roundMs(rebuildMs),
+    wipeMs: roundMs(wipeMs),
+    repaintMs: roundMs(repaintMs),
   });
+}
+
+/** Milliseconds with one decimal, the unit the other terminal timing records use. */
+function roundMs(value: number): number {
+  return Math.round(value * 10) / 10;
 }
 
 let resetQueued = false;

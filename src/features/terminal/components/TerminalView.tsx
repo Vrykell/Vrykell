@@ -117,6 +117,7 @@ export default function TerminalView() {
           );
         }
         if (tab.id !== activeId) return null; // history/settings/usage 无 PTY，无需保活
+        if (tab.kind === 'git-diff' || tab.kind === 'editor') return null;
         return tab.kind === 'history' ? <SessionHistoryView key={tab.id} />
           : tab.kind === 'ai-history' ? <AiHistoryView key={tab.id} />
             : tab.kind === 'usage' ? <UsageView key={tab.id} />

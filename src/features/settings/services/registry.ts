@@ -1,5 +1,7 @@
 import { useTerminalDefaults } from '@config/terminalDefaults';
 import { useCommandHistorySettings } from '@config/commandHistory';
+import { useGitPreferences } from '@config/git';
+import { useEditorPreferences } from '@config/editor';
 import { t } from '@i18n';
 import { TOOL_NAMES, usePermissions, useAgentSettings, useUsageStore, type ToolName, type AgentSettings } from '@features/agent';
 import { summarize, totalTokens, formatTokens } from '@features/agent/model/usageStats';
@@ -43,10 +45,13 @@ function registerField(id: string, page: PageId, label: string, description: str
 
 registerField('local-file-undo', 'file-operations', 'Local file undo', 'File operations');
 registerField('remote-file-undo', 'file-operations', 'Remote file undo', 'File operations');
+registerField('git-diff-pages', 'source-control', 'Diff pages', 'Source control', () => useGitPreferences.getState().diffMode);
+registerField('preferred-file-editor', 'editor-local', 'Preferred file editor', 'Opening files', () => useEditorPreferences.getState().localOpenMode);
+registerField('embedded-editor-pages', 'editor-local', 'Editor pages', 'Opening files', () => useEditorPreferences.getState().pageMode);
 registerField("startup", "startup", "Open on startup", "Restore sessions or open a default terminal", () => useStartupSettings.getState().mode);
 registerField('history-run-target', 'command-history', 'Command execution target', 'Choose where commands run from the history panel.', () => useCommandHistorySettings.getState().runIn);
 registerField('history-double-click', 'command-history', 'Double-click command', 'Double-click inserts the command by default. Execution follows the selected target.', () => useCommandHistorySettings.getState().doubleClick);
-registerField('command-highlighting', 'terminal-open', 'Command syntax highlighting', 'Color commands, arguments and shell operators.', () => String(useTypographyStore.getState().commandHighlighting));
+registerField('command-highlighting', 'appearance-typography', 'Command syntax highlighting', 'Color commands, arguments and shell operators.', () => String(useTypographyStore.getState().commandHighlighting));
 registerField("logs", "logs", "Save diagnostic logs automatically", "Diagnostic logging and errors");
 registerField('context-menu', 'context-menu', 'Windows context menu', 'Open in Vrykell', undefined, 'Open in Vrykell');
 registerField("export-logs", "logs", "Export logs", "Diagnostic archive");
@@ -79,14 +84,14 @@ registerField("remote-extensions", "editor-remote", "Remote extension commands",
 registerField("theme", "appearance-theme", "Theme", "Dark and light appearance", () => document.documentElement.dataset.theme ?? "dark");
 registerField("opacity", "appearance-theme", "Application opacity", "Background transparency");
 registerField("wallpaper", "appearance-theme", "Application background image", "Wallpaper");
-registerField("theme-import", "appearance-theme", "Import / export theme", "Theme JSON");
-registerField("ui-font", "appearance-theme", "settings.font.pageTitle", "settings.font.pageTitle", () => String(useTypographyStore.getState().uiFontSize));
-registerField("terminal-font", "appearance-theme", "settings.font.terminalTitle", "settings.font.terminalTitle", () => String(useTypographyStore.getState().terminalFontSize));
-registerField('chat-font', 'appearance-theme', 'AI chat font size', 'Adjust text size in the AI chat panel. Changes are saved and applied immediately.', () => String(useTypographyStore.getState().chatFontSize));
-registerField('terminal-font-family', 'appearance-theme', 'Terminal font family', 'Use a font installed on your system; unavailable families use the fallback fonts.', () => useTypographyStore.getState().terminalFontPreset);
-registerField('terminal-font-weight', 'appearance-theme', 'Terminal font weight', 'Variable fonts support fine weight adjustments; static fonts use the nearest installed weight.', () => String(useTypographyStore.getState().terminalFontWeight));
-registerField('terminal-line-spacing', 'appearance-theme', 'Terminal line spacing', 'Adjust line spacing for terminal input, live output and command history.', () => String(useTypographyStore.getState().terminalLineHeight));
-registerField("terminal-renderer", "appearance-theme", "settings.font.rendererTitle", "settings.font.rendererTitle", () => String(useTypographyStore.getState().terminalRenderer));
+registerField("theme-import", "appearance-files", "Import / export theme", "Theme JSON");
+registerField("ui-font", "appearance-typography", "settings.font.pageTitle", "settings.font.pageTitle", () => String(useTypographyStore.getState().uiFontSize));
+registerField("terminal-font", "appearance-typography", "settings.font.terminalTitle", "settings.font.terminalTitle", () => String(useTypographyStore.getState().terminalFontSize));
+registerField('chat-font', 'appearance-typography', 'AI chat font size', 'Adjust text size in the AI chat panel. Changes are saved and applied immediately.', () => String(useTypographyStore.getState().chatFontSize));
+registerField('terminal-font-family', 'appearance-typography', 'Terminal font family', 'Use a font installed on your system; unavailable families use the fallback fonts.', () => useTypographyStore.getState().terminalFontPreset);
+registerField('terminal-font-weight', 'appearance-typography', 'Terminal font weight', 'Variable fonts support fine weight adjustments; static fonts use the nearest installed weight.', () => String(useTypographyStore.getState().terminalFontWeight));
+registerField('terminal-line-spacing', 'appearance-typography', 'Terminal line spacing', 'Adjust line spacing for terminal input, live output and command history.', () => String(useTypographyStore.getState().terminalLineHeight));
+registerField("terminal-renderer", "appearance-typography", "settings.font.rendererTitle", "settings.font.rendererTitle", () => String(useTypographyStore.getState().terminalRenderer));
 
 function globalValue(key: keyof AgentSettings): string {
   const value = useAgentSettings.getState().global[key];

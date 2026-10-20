@@ -20,11 +20,26 @@ it('opens the globally indexed page before mounting and updates an existing sett
 
 it('keeps all pages available and clears field targets when choosing a page', () => {
   const { result } = renderHook(() => useSettingsNavigation());
-  expect(result.current.groups.flatMap(group => group.items)).toHaveLength(20);
+  expect(result.current.groups.flatMap(group => group.items)).toHaveLength(24);
   act(() => useSettingsNavigationStore.getState().openField('ai-perms', 'Permissions'));
   act(() => result.current.setSelected('terminal-open'));
   expect(result.current.selected).toBe('terminal-open');
   expect(result.current.activeLabel).toBe('打开方式');
   expect(useSettingsNavigationStore.getState().targetField).toBeNull();
   expect(result.current.groups).toHaveLength(6);
+});
+it('splits the appearance theme page into theme, blocks, typography and files', () => {
+  const { result } = renderHook(() => useSettingsNavigation());
+  const appearance = result.current.groups.find(group => group.id === 'appearance')!;
+  expect(appearance.items.map(item => [item.id, item.label])).toEqual([
+    ['appearance-theme', '主题'],
+    ['appearance-blocks', '块外观'],
+    ['appearance-typography', '字体与显示'],
+    ['appearance-files', '主题文件'],
+  ]);
+});
+it('opens the diff page preference through the global settings index', () => {
+  vi.spyOn(useSessionStore.getState(), 'openSettingsTab').mockImplementation(() => {});
+  getSettings().find(setting => setting.id === 'git-diff-pages')!.onSelect();
+  expect(useSettingsNavigationStore.getState()).toMatchObject({ selected: 'source-control', targetField: '差异页面' });
 });
