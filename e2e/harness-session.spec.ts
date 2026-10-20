@@ -104,5 +104,20 @@ await expect(page.getByTestId('harness-page')).toContainText('Working on it.');
     // A mode the agent switches on its own also moves the control.
     await emitAcpSession(page, acpUpdate(SESSION, { sessionUpdate: 'current_mode_update', currentModeId: 'default' }));
     await expect(page.getByTestId('harness-selector-mode')).toContainText('Default');
+
+    // Slash commands the agent advertises are one keystroke away.
+    await emitAcpSession(page, acpUpdate(SESSION, {
+      sessionUpdate: 'available_commands_update',
+      availableCommands: [{ name: 'web', description: 'Search the web', input: { hint: 'query to search for' } }],
+    }));
+    await page.getByTestId('harness-composer').fill('/');
+    await expect(page.getByTestId('harness-commands')).toContainText('/web');
+    await page.getByTestId('harness-composer').press('Enter');
+    await expect(page.getByTestId('harness-composer')).toHaveValue('/web ');
+
+    // A new session drops the conversation and opens a fresh one in the same directory.
+    await page.getByTestId('harness-new-session').click();
+    await expect.poll(async () => (await acpCalls(page)).filter((call) => call.startsWith('acp_open'))).toHaveLength(2);
+    await expect(page.getByTestId('harness-plan')).toHaveCount(0);
   });
 });

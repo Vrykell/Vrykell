@@ -81,11 +81,15 @@ export interface AcpConfigOption {
 export interface HarnessOpenResult {
   sessionId: string;
   harness: string;
+  /** The directory the session was actually opened in (an empty request falls back to the app's). */
+  cwd: string;
   agent: AgentDescription;
   /** Session state the agent published with the session; null when it publishes none. */
   modes: AcpSessionModes | null;
   models: AcpSessionModels | null;
   configOptions: AcpConfigOption[] | null;
+  /** The conversation an agent replayed for a loaded session, in arrival order. */
+  replayed?: AcpSessionEvent[];
 }
 
 /** What the backend pushes while a session lives. */
@@ -103,8 +107,10 @@ export const acpHarnessSave = (harnesses: HarnessConfig[]) => invoke<void>('acp_
 /** Start a configured harness, negotiate, and let it go again: the "test connection" action. */
 export const acpHandshake = (name: string) => invoke<AgentDescription>('acp_handshake', { name });
 
-/** Start a harness and open a session in `cwd` (`cwd` empty means the app's own working directory). */
-export const acpOpen = (name: string, cwd: string) => invoke<HarnessOpenResult>('acp_open', { name, cwd });
+/** Start a harness and open a session in `cwd` (`cwd` empty means the app's own working directory).
+ *  Passing `resumeSessionId` reopens that session and replays its conversation instead. */
+export const acpOpen = (name: string, cwd: string, resumeSessionId?: string) =>
+  invoke<HarnessOpenResult>('acp_open', { name, cwd, resumeSessionId: resumeSessionId ?? null });
 
 /** Send a prompt; the turn's content and its stop reason arrive as events. */
 export const acpPrompt = (sessionId: string, text: string) => invoke<void>('acp_prompt', { sessionId, text });

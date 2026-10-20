@@ -632,6 +632,14 @@ button.window-control-button {
 .harness-selector-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .harness-selector > svg { flex-shrink: 0; color: var(--text-muted); }
 .harness-context { color: var(--text-muted); font-size: var(--fs-micro); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Slash commands above the input: the agent's own list, filtered as the command is typed. */
+.harness-commands { display: flex; flex-direction: column; gap: 2px; margin: 0 0 6px; padding: 4px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--surface); max-height: 220px; overflow-y: auto; }
+.harness-command { display: flex; align-items: baseline; gap: 8px; padding: 4px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--text-primary); text-align: left; cursor: pointer; font: var(--fw-regular) var(--fs-label) var(--font-ui); }
+.harness-command[data-active="true"] { background: var(--hover); }
+.harness-command-name { flex-shrink: 0; font-family: var(--font-mono); color: var(--text-primary); }
+.harness-command-copy { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; color: var(--text-secondary); font-size: var(--fs-caption); }
+.harness-command-copy > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.harness-command-copy small { color: var(--text-muted); font-size: var(--fs-micro); white-space: nowrap; }
 .harness-plan-mark { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 7px; background: var(--border-strong); }
 .harness-plan-mark[data-state="active"] { background: var(--accent); }
 .harness-plan-mark[data-state="done"] { background: var(--text-muted); }

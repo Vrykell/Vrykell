@@ -15,6 +15,7 @@ import {
   type AcpConfigOption, type AcpSessionEvent, type AcpSessionModes, type AcpSessionModels, type AgentDescription,
 } from '@platform/api/acp';
 import { useUsageStore } from '@features/agent/stores/usage';
+import { useHarnessSessionRefs } from './harnessSessions';
 
 /** One step of the plan an agent publishes while it works. */
 export interface HarnessPlanEntry {
@@ -23,9 +24,19 @@ export interface HarnessPlanEntry {
   priority?: string;
 }
 
+/** One slash command the agent advertises for this session. */
+export interface HarnessCommand {
+  name: string;
+  description: string;
+  /** The input the command expects, shown while it is being typed. */
+  hint?: string;
+}
+
 export interface HarnessSession {
   harness: string;
   sessionId: string | null;
+  /** The directory the session runs in; a restart reopens there. */
+  cwd: string;
   agent: AgentDescription | null;
   messages: ChatMessage[];
   /** A turn is in flight: the composer offers stop instead of send. */
@@ -45,6 +56,8 @@ export interface HarnessSession {
   plan: HarnessPlanEntry[];
   /** The context window in use, as the agent last reported it. */
   context: { used: number; size: number } | null;
+  /** Slash commands the agent advertised for this session. */
+  commands: HarnessCommand[];
   /** A permission request waiting for the user, rendered as a card in the transcript. */
   permission: {
     toolCallId: string;
@@ -60,6 +73,8 @@ export interface HarnessSession {
 interface HarnessStore {
   byTab: Record<string, HarnessSession>;
   open: (tabId: string, harness: string, cwd: string) => Promise<void>;
+  /** End the current session and open a fresh one in the same directory. */
+  restart: (tabId: string) => Promise<void>;
   prompt: (tabId: string, text: string) => Promise<void>;
   cancel: (tabId: string) => Promise<void>;
   close: (tabId: string) => Promise<void>;
@@ -76,8 +91,8 @@ interface HarnessStore {
 }
 
 const fresh = (harness: string): HarnessSession => ({
-  harness, sessionId: null, agent: null, messages: [], pending: false, opening: false, error: null, note: null,
-  modes: null, models: null, configOptions: null, plan: [], context: null,
+  harness, sessionId: null, cwd: '', agent: null, messages: [], pending: false, opening: false, error: null, note: null,
+  modes: null, models: null, configOptions: null, plan: [], context: null, commands: [],
   permission: null, permissionGeneration: 0,
 });
 
@@ -111,8 +126,16 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     }
     patch(tabId, (session) => ({ ...session, opening: true, error: null }));
     try {
-      const result = await acpOpen(harness, cwd);
+      // Resume the harness's last conversation when we remember one from the same directory; the
+      // agent replays it and the replay travels back with the open result. A stale reference (a
+      // deleted session, another directory) falls back to a new session inside the backend.
+      const stored = useHarnessSessionRefs.getState().refs[harness];
+      const resume = stored && (!cwd || stored.cwd === cwd) ? stored.sessionId : undefined;
+      const result = await acpOpen(harness, cwd, resume);
       tabOfSession.set(result.sessionId, tabId);
+      useHarnessSessionRefs.getState().remember(harness, {
+        sessionId: result.sessionId, cwd: result.cwd || cwd, at: Date.now(),
+      });
       const known = get().byTab[tabId];
       if (!known) {
         // The tab was closed while this open was in flight: do not resurrect it, and do not leave a
@@ -122,13 +145,31 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
         tabOfSession.delete(result.sessionId);
         return;
       }
-      patch(tabId, (current) => ({
-        ...current, opening: false, sessionId: result.sessionId, agent: result.agent, error: null,
+      const replayed = result.replayed ?? [];
+      patch(tabId, (current) => replayEvents({
+        ...current, opening: false, sessionId: result.sessionId, cwd: result.cwd || cwd,
+        agent: result.agent, error: null,
         modes: result.modes ?? null, models: result.models ?? null, configOptions: result.configOptions ?? null,
-      }));
+        note: replayed.length > 0 ? t('Resumed the previous conversation.') : current.note,
+      }, replayed));
     } catch (error) {
       patch(tabId, (session) => ({ ...session, opening: false, error: String((error as Error)?.message ?? error) }));
     }
+  },
+
+  restart: async (tabId) => {
+    const session = get().byTab[tabId];
+    if (!session) return;
+    const { harness, cwd } = session;
+    // A restart is how the user says "forget that conversation": the reference goes first, or the
+    // open below would load it straight back.
+    useHarnessSessionRefs.getState().forget(harness);
+    if (session.sessionId) {
+      tabOfSession.delete(session.sessionId);
+      await acpClose(session.sessionId).catch(() => undefined);
+    }
+    set((state) => ({ byTab: { ...state.byTab, [tabId]: fresh(harness) } }));
+    await get().open(tabId, harness, cwd);
   },
 
   prompt: async (tabId, text) => {
@@ -230,63 +271,83 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     const tabId = tabOfSession.get(event.sessionId);
     if (!tabId) return;
     const session = get().byTab[tabId];
-    // The usage panel counts what the ACP servers report about their own sessions.
+    // The usage panel counts what the ACP servers report about their own sessions. A loaded
+    // conversation arrives through `replayEvents`, which must not count it a second time.
     if (session) recordAcpEvent(session.harness, event);
-    patch(tabId, (session) => {
-      switch (event.kind) {
-        case 'update': {
-          const update = harnessUpdate(event.payload);
-          const kind = String(update.sessionUpdate ?? '');
-          const next: HarnessSession = { ...session, messages: applyHarnessUpdate(session.messages, event.payload) };
-          // Session state the agent pushes outside the transcript: the active mode, a whole new
-          // configuration, its plan, and how much of the context window is in use.
-          if (kind === 'current_mode_update' && next.modes) {
-            next.modes = { ...next.modes, currentModeId: String(update.currentModeId ?? next.modes.currentModeId) };
-          } else if (kind === 'config_option_update' && Array.isArray(update.configOptions)) {
-            next.configOptions = update.configOptions as AcpConfigOption[];
-          } else if (kind === 'plan' && Array.isArray(update.entries)) {
-            next.plan = update.entries as HarnessPlanEntry[];
-          } else if (kind === 'usage_update') {
-            next.context = { used: Number(update.used ?? 0), size: Number(update.size ?? 0) };
-          }
-          return next;
-        }
-        case 'stop': {
-          const reason = String(event.payload.stopReason ?? '');
-          const note = reason === 'cancelled'
-            ? t('Harness stopped.')
-            : reason && reason !== 'end_turn' ? t('The harness stopped the turn: {{reason}}', { reason }) : null;
-          return { ...session, pending: false, note };
-        }
-        case 'error':
-          return { ...session, pending: false, error: String(event.payload.message ?? t('The harness failed.')) };
-        case 'permission': {
-          // The card waits for the user; the backend holds the agent until the answer comes back.
-          const toolCall = (event.payload.toolCall ?? {}) as Record<string, unknown>;
-          const toolCallId = String(toolCall.toolCallId ?? '');
-          if (!toolCallId) return session;
-          const options = Array.isArray(event.payload.options) ? event.payload.options : [];
-          return {
-            ...session,
-            note: null,
-            permissionGeneration: session.permissionGeneration + 1,
-            permission: {
-              toolCallId,
-              generation: session.permissionGeneration + 1,
-              title: String(toolCall.title ?? toolCallId),
-              options: options.map((option) => {
-                const entry = (option ?? {}) as Record<string, unknown>;
-                return { optionId: String(entry.optionId ?? ''), name: String(entry.name ?? entry.optionId ?? '') };
-              }).filter((option) => option.optionId),
-            },
-          };
-        }
-        default:
-          return session;
-      }
-    });
+    patch(tabId, (current) => foldSessionEvent(current, event));
   },
 }));
+
+/** What one event does to the session view; shared by the live stream and a replayed history. */
+function foldSessionEvent(session: HarnessSession, event: AcpSessionEvent): HarnessSession {
+  switch (event.kind) {
+    case 'update': {
+      const update = harnessUpdate(event.payload);
+      const kind = String(update.sessionUpdate ?? '');
+      const next: HarnessSession = { ...session, messages: applyHarnessUpdate(session.messages, event.payload) };
+      // Session state the agent pushes outside the transcript: the active mode, a whole new
+      // configuration, its plan, its slash commands, and the context window in use.
+      if (kind === 'current_mode_update' && next.modes) {
+        next.modes = { ...next.modes, currentModeId: String(update.currentModeId ?? next.modes.currentModeId) };
+      } else if (kind === 'config_option_update' && Array.isArray(update.configOptions)) {
+        next.configOptions = update.configOptions as AcpConfigOption[];
+      } else if (kind === 'plan' && Array.isArray(update.entries)) {
+        next.plan = update.entries as HarnessPlanEntry[];
+      } else if (kind === 'usage_update') {
+        next.context = { used: Number(update.used ?? 0), size: Number(update.size ?? 0) };
+      } else if (kind === 'available_commands_update' && Array.isArray(update.availableCommands)) {
+        next.commands = (update.availableCommands as Array<Record<string, unknown>>)
+          .map((command) => {
+            const input = (command.input ?? {}) as Record<string, unknown>;
+            return {
+              name: String(command.name ?? ''),
+              description: String(command.description ?? ''),
+              hint: typeof input.hint === 'string' ? input.hint : undefined,
+            };
+          })
+          .filter((command) => command.name.length > 0);
+      }
+      return next;
+    }
+    case 'stop': {
+      const reason = String(event.payload.stopReason ?? '');
+      const note = reason === 'cancelled'
+        ? t('Harness stopped.')
+        : reason && reason !== 'end_turn' ? t('The harness stopped the turn: {{reason}}', { reason }) : null;
+      return { ...session, pending: false, note };
+    }
+    case 'error':
+      return { ...session, pending: false, error: String(event.payload.message ?? t('The harness failed.')) };
+    case 'permission': {
+      // The card waits for the user; the backend holds the agent until the answer comes back.
+      const toolCall = (event.payload.toolCall ?? {}) as Record<string, unknown>;
+      const toolCallId = String(toolCall.toolCallId ?? '');
+      if (!toolCallId) return session;
+      const options = Array.isArray(event.payload.options) ? event.payload.options : [];
+      return {
+        ...session,
+        note: null,
+        permissionGeneration: session.permissionGeneration + 1,
+        permission: {
+          toolCallId,
+          generation: session.permissionGeneration + 1,
+          title: String(toolCall.title ?? toolCallId),
+          options: options.map((option) => {
+            const entry = (option ?? {}) as Record<string, unknown>;
+            return { optionId: String(entry.optionId ?? ''), name: String(entry.name ?? entry.optionId ?? '') };
+          }).filter((option) => option.optionId),
+        },
+      };
+    }
+    default:
+      return session;
+  }
+}
+
+/** Fold the history a loaded session replayed, in order. */
+function replayEvents(session: HarnessSession, events: AcpSessionEvent[]): HarnessSession {
+  return events.reduce((current, event) => foldSessionEvent(current, event), session);
+}
 
 /**
  * Feed the usage panel from the ACP event stream.

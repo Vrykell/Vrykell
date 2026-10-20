@@ -1167,11 +1167,18 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'acp_harnesses':
             acpCalls.push('acp_harnesses');
             return [{ name: 'Fake ACP', command: 'node', args: ['scripts/fake-acp-agent.mjs'], env: {}, cwd: '', enabled: true }];
-          case 'acp_open':
-            acpCalls.push(`acp_open:${String(args.name ?? '')}`);
+          case 'acp_open': {
+            const resuming = Boolean(args.resumeSessionId);
+            acpCalls.push(resuming ? `acp_open:${String(args.name ?? '')}:resume` : `acp_open:${String(args.name ?? '')}`);
+            const replay = (text: string, sessionUpdate: string) => ({
+              sessionId: 'sess_e2e',
+              kind: 'update',
+              payload: { params: { sessionId: 'sess_e2e', update: { sessionUpdate, content: { type: 'text', text } } } },
+            });
             return {
               sessionId: 'sess_e2e',
               harness: 'Fake ACP',
+              cwd: String(args.cwd ?? ''),
               agent: {
                 protocolVersion: 1,
                 agentInfo: { name: 'fake-acp', title: 'Fake ACP agent', version: '0.1.0' },
@@ -1193,7 +1200,11 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
                 ],
               },
               configOptions: null,
+              replayed: resuming
+                ? [replay('earlier question', 'user_message_chunk'), replay('earlier answer', 'agent_message_chunk')]
+                : [],
             };
+          }
           case 'acp_set_mode':
             acpCalls.push(`acp_set_mode:${String(args.modeId ?? '')}`);
             return undefined;

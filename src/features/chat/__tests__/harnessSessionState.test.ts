@@ -7,7 +7,8 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useHarnessStore } from '@features/chat/stores/harness';
-import { acpSetConfigOption, acpSetMode, acpSetModel } from '@platform/api/acp';
+import { useHarnessSessionRefs } from '@features/chat/stores/harnessSessions';
+import { acpOpen, acpSetConfigOption, acpSetMode, acpSetModel } from '@platform/api/acp';
 
 vi.mock('@platform/api/acp', () => ({
   acpAnswerPermission: vi.fn(async () => undefined),
@@ -16,6 +17,7 @@ vi.mock('@platform/api/acp', () => ({
   acpOpen: vi.fn(async () => ({
     sessionId: 's1',
     harness: 'Claude Code',
+    cwd: '/tmp/project',
     agent: { agentInfo: { name: 'Fake' } },
     modes: {
       currentModeId: 'default',
@@ -29,6 +31,7 @@ vi.mock('@platform/api/acp', () => ({
       availableModels: [{ modelId: 'm1', name: 'Model One' }, { modelId: 'm2', name: 'Model Two' }],
     },
     configOptions: null,
+    replayed: [],
   })),
   acpPrompt: vi.fn(async () => undefined),
   acpSetConfigOption: vi.fn(async () => [
@@ -54,8 +57,10 @@ beforeEach(async () => {
   vi.mocked(acpSetMode).mockClear();
   vi.mocked(acpSetModel).mockClear();
   vi.mocked(acpSetConfigOption).mockClear();
+  vi.mocked(acpOpen).mockClear();
   useHarnessStore.setState({ byTab: {} });
-  await useHarnessStore.getState().open(TAB, 'Claude Code', '');
+  useHarnessSessionRefs.setState({ refs: {} });
+  await useHarnessStore.getState().open(TAB, 'Claude Code', '/tmp/project');
 });
 
 describe('harness session state', () => {
@@ -100,5 +105,61 @@ describe('harness session state', () => {
 
     expect(current().error).toContain('mode not found');
     expect(current().modes?.currentModeId).toBe('default');
+  });
+
+  it('resumes the remembered session and folds the replayed conversation', async () => {
+    useHarnessSessionRefs.setState({
+      refs: { 'Claude Code': { sessionId: 'older', cwd: '/tmp/project', at: 1 } },
+    });
+    const update = (text: string, sessionUpdate: string) => ({
+      sessionId: 'older',
+      kind: 'update' as const,
+      payload: { params: { sessionId: 'older', update: { sessionUpdate, content: { type: 'text', text } } } },
+    });
+    vi.mocked(acpOpen).mockResolvedValueOnce({
+      sessionId: 'older',
+      harness: 'Claude Code',
+      cwd: '/tmp/project',
+      agent: { protocolVersion: 1, agentInfo: { name: 'Fake' }, agentCapabilities: null, authMethods: [] },
+      modes: null,
+      models: null,
+      configOptions: null,
+      replayed: [
+        update('earlier question', 'user_message_chunk'),
+        update('earlier answer', 'agent_message_chunk'),
+      ],
+    });
+    useHarnessStore.setState({ byTab: {} });
+    await useHarnessStore.getState().open(TAB, 'Claude Code', '/tmp/project');
+
+    expect(acpOpen).toHaveBeenCalledWith('Claude Code', '/tmp/project', 'older');
+    const transcript = JSON.stringify(current().messages);
+    expect(transcript).toContain('earlier question');
+    expect(transcript).toContain('earlier answer');
+    expect(current().note).toBe('已恢复上次的对话。');
+    expect(useHarnessSessionRefs.getState().refs['Claude Code']?.sessionId).toBe('older');
+  });
+
+  it('starts a fresh session on request and forgets the old one', async () => {
+    expect(useHarnessSessionRefs.getState().refs['Claude Code']?.sessionId).toBe('s1');
+    await useHarnessStore.getState().restart(TAB);
+
+    // The reference is dropped before the reopen, so it cannot load the old conversation back.
+    expect(acpOpen).toHaveBeenLastCalledWith('Claude Code', '/tmp/project', undefined);
+  });
+
+  it('keeps the slash commands the agent advertises', () => {
+    useHarnessStore.getState().applyEvent(notification({
+      sessionUpdate: 'available_commands_update',
+      availableCommands: [
+        { name: 'web', description: 'Search the web', input: { hint: 'query' } },
+        { name: 'test', description: 'Run tests' },
+      ],
+    }) as never);
+
+    expect(current().commands).toEqual([
+      { name: 'web', description: 'Search the web', hint: 'query' },
+      { name: 'test', description: 'Run tests', hint: undefined },
+    ]);
   });
 });

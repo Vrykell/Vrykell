@@ -376,6 +376,27 @@ impl AcpClient {
         Ok(result)
     }
 
+    /// Reopen an existing session. The agent replays the conversation as notifications before it
+    /// answers, so the caller must drain [`Self::drain_events`] right afterwards.
+    pub async fn load_session(&self, session_id: &str, cwd: &str) -> Result<Value, String> {
+        self.request(
+            "session/load",
+            json!({ "sessionId": session_id, "cwd": cwd, "mcpServers": [] }),
+            SESSION_TIMEOUT,
+        )
+        .await
+    }
+
+    /// Everything the agent has sent and nobody has read yet, in arrival order.
+    pub async fn drain_events(&self) -> Vec<Value> {
+        let mut events = self.events.lock().await;
+        let mut drained = Vec::new();
+        while let Ok(message) = events.try_recv() {
+            drained.push(message);
+        }
+        drained
+    }
+
     /// Switch the session mode (the legacy mode API; agents with config options expose it there).
     pub async fn set_mode(&self, session_id: &str, mode_id: &str) -> Result<(), String> {
         self.request(
@@ -661,16 +682,21 @@ fn emit<R: tauri::Runtime>(app: &tauri::AppHandle<R>, event: AcpEvent) {
     let _ = tauri::Emitter::emit(app, EVENT, event);
 }
 
-/// Start a harness, open a session in `cwd`, and pump its notifications to the frontend.
+/// Start a harness and open a session in `cwd` (or reopen `resume_session_id`), then pump its
+/// notifications to the frontend.
 #[tauri::command]
 pub async fn acp_open<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
     state: tauri::State<'_, AcpRuntime>,
     name: String,
     cwd: String,
+    resume_session_id: Option<String>,
 ) -> Result<Value, String> {
     let config = HarnessFile::load();
-    note("acp-open", json!({ "name": name, "cwd": cwd, "configured": config.harnesses.len() }));
+    note("acp-open", json!({
+        "name": name, "cwd": cwd, "configured": config.harnesses.len(),
+        "resume": resume_session_id.is_some(),
+    }));
     let harness = config
         .find_enabled(&name)
         .ok_or_else(|| format!("no enabled harness named {name}"))?
@@ -724,15 +750,48 @@ pub async fn acp_open<R: tauri::Runtime>(
     } else {
         cwd.clone()
     };
-    let session = client
-        .new_session(&session_cwd)
-        .await
-        .map_err(|e| format!("harness could not open a session: {e}"))?;
-    let session_id = session
-        .get("sessionId")
-        .and_then(Value::as_str)
-        .unwrap_or_default()
-        .to_string();
+    // Reopen the previous conversation when the page asks for it and the agent can: `session/load`
+    // replays the history as notifications, which are drained with the result because the page only
+    // learns the session id when this call returns. A failed load falls back to a new session — a
+    // stale id (a deleted session, another directory) must not lock the user out.
+    let can_load = info
+        .pointer("/agentCapabilities/loadSession")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let resume = resume_session_id.filter(|id| !id.trim().is_empty());
+    let (session, session_id, replayed) = match resume {
+        Some(id) if can_load => match client.load_session(&id, &session_cwd).await {
+            Ok(loaded) => {
+                // Everything the agent replayed is already queued in arrival order; the pump starts
+                // after this, so nothing can slip between the drain and the subscription.
+                let replayed: Vec<AcpEvent> = client
+                    .drain_events()
+                    .await
+                    .into_iter()
+                    .map(|message| AcpEvent { session_id: id.clone(), kind: "update".to_string(), payload: message })
+                    .collect();
+                note("acp-load-ok", json!({ "name": harness.name, "sessionId": id, "replayed": replayed.len() }));
+                (loaded, id, replayed)
+            }
+            Err(error) => {
+                note("acp-load-failed", json!({ "name": harness.name, "error": error }));
+                let session = client
+                    .new_session(&session_cwd)
+                    .await
+                    .map_err(|e| format!("harness could not open a session: {e}"))?;
+                let id = session.get("sessionId").and_then(Value::as_str).unwrap_or_default().to_string();
+                (session, id, Vec::new())
+            }
+        },
+        _ => {
+            let session = client
+                .new_session(&session_cwd)
+                .await
+                .map_err(|e| format!("harness could not open a session: {e}"))?;
+            let id = session.get("sessionId").and_then(Value::as_str).unwrap_or_default().to_string();
+            (session, id, Vec::new())
+        }
+    };
 
     // Pump the agent's notifications for as long as the session lives.
     let pump_app = app.clone();
@@ -769,10 +828,12 @@ pub async fn acp_open<R: tauri::Runtime>(
     Ok(json!({
         "sessionId": session_id,
         "harness": harness.name,
+        "cwd": session_cwd,
         "agent": describe_agent(&info),
         "modes": session.get("modes").cloned().unwrap_or(Value::Null),
         "models": session.get("models").cloned().unwrap_or(Value::Null),
         "configOptions": session.get("configOptions").cloned().unwrap_or(Value::Null),
+        "replayed": replayed,
     }))
 }
 
@@ -931,6 +992,21 @@ mod tests {
                             "currentModelId": "m1",
                             "availableModels": [{ "modelId": "m1", "name": "Model One" }]
                         }
+                    } });
+                    let _ = pipe.write_all(format!("{reply}\n").as_bytes()).await;
+                }
+                "session/load" => {
+                    // The protocol replays the conversation before it answers the load.
+                    let update = json!({
+                        "jsonrpc": "2.0", "method": "session/update",
+                        "params": { "sessionId": "sess_1", "update": {
+                            "sessionUpdate": "agent_message_chunk",
+                            "content": { "type": "text", "text": "earlier" }
+                        } }
+                    });
+                    let _ = pipe.write_all(format!("{update}\n").as_bytes()).await;
+                    let reply = json!({ "jsonrpc": "2.0", "id": id, "result": {
+                        "modes": { "currentModeId": "plan", "availableModes": [{ "id": "plan", "name": "Plan" }] }
                     } });
                     let _ = pipe.write_all(format!("{reply}\n").as_bytes()).await;
                 }
@@ -1146,6 +1222,29 @@ mod tests {
             .await
             .expect("a slow turn is still a turn");
         assert_eq!(stop, "end_turn");
+        agent.abort();
+    }
+
+    #[tokio::test]
+    async fn loading_a_session_returns_its_state_and_the_replayed_history() {
+        let seen: Arc<Mutex<Vec<Value>>> = Arc::new(Mutex::new(Vec::new()));
+        let (client, agent) = client_pair(seen.clone(), Arc::new(|_| None));
+        client.initialize("vrykell", "0.1.0").await.expect("handshake");
+
+        let loaded = client.load_session("sess_1", "/tmp/project").await.expect("load");
+        assert_eq!(loaded.pointer("/modes/currentModeId"), Some(&json!("plan")));
+
+        // The replay is queued in arrival order and drained by the caller that opens the page.
+        let replayed = client.drain_events().await;
+        assert_eq!(replayed.len(), 1);
+        assert_eq!(
+            replayed[0].pointer("/params/update/content/text").and_then(Value::as_str),
+            Some("earlier")
+        );
+        assert_eq!(
+            seen.lock().unwrap().iter().filter(|message| message.get("method") == Some(&json!("session/load"))).count(),
+            1
+        );
         agent.abort();
     }
 

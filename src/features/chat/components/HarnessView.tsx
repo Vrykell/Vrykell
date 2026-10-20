@@ -8,7 +8,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { t } from '@i18n';
-import { ArrowUp, Bot, Square } from '@ui/icons';
+import { ArrowUp, Bot, Plus, Square, iconSizes } from '@ui/icons';
 import { IconButton } from '@ui/IconButton';
 import ErrorBox from '@ui/ErrorBox';
 import { TextArea } from '@ui/TextInput';
@@ -120,6 +120,10 @@ export default function HarnessView({ tabId, harness, cwd }: { tabId: string; ha
   const { activeCwd } = useActiveWorkspace();
   const [text, setText] = useState('');
   const bodyRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  /** Escape hides the command list for the current text without touching what was typed. */
+  const [commandDismissed, setCommandDismissed] = useState(false);
+  const [commandIndex, setCommandIndex] = useState(0);
   /** Opening must happen once at a time per tab: React's double-invoked effects spawned two sessions.
    *  The guard is released when the attempt settles, so a remount (which an unmount cleanup closed)
    *  can open again. */
@@ -140,6 +144,20 @@ export default function HarnessView({ tabId, harness, cwd }: { tabId: string; ha
   const selectors = session ? sessionSelectors(session, tabId) : [];
   const hints = authHints(session?.agent ?? null);
   const plan = session?.plan ?? [];
+
+  // Slash commands: while the first word is still being typed, the agent's own commands are one
+  // press away. Picking one only fills the composer; the command runs when the prompt is sent.
+  const slash = /^\/([^\s]*)$/.exec(text);
+  const matches = slash && !commandDismissed
+    ? (session?.commands ?? []).filter((command) => command.name.toLowerCase().includes(slash[1]!.toLowerCase())).slice(0, 8)
+    : [];
+  const activeCommand = Math.min(commandIndex, Math.max(0, matches.length - 1));
+
+  const pickCommand = (name: string) => {
+    setText(`/${name} `);
+    setCommandIndex(0);
+    composerRef.current?.focus();
+  };
 
   useEffect(() => {
     const body = bodyRef.current;
@@ -220,7 +238,29 @@ export default function HarnessView({ tabId, harness, cwd }: { tabId: string; ha
           {harness}{agent ? ` · ${agent.title || agent.name || ''}` : ''}
         </span>}
         hints={<><KeyHint shortcut="Enter" />{t('Send')}</>}
+        tray={matches.length > 0 ? (
+          <div data-testid="harness-commands" role="listbox" aria-label={t('Slash commands')} className="harness-commands">
+            {matches.map((command, index) => (
+              <button key={command.name} type="button" data-subtle role="option"
+                aria-selected={index === activeCommand} data-active={index === activeCommand}
+                className="harness-command" data-testid={`harness-command-${command.name}`}
+                onMouseDown={(event) => event.preventDefault()} onPointerMove={() => setCommandIndex(index)}
+                onClick={() => pickCommand(command.name)}>
+                <span className="harness-command-name">/{command.name}</span>
+                <span className="harness-command-copy">
+                  <span>{command.description}</span>
+                  {command.hint && <small>{command.hint}</small>}
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : undefined}
         status={<>
+          <IconButton compact aria-label={t('New session')} data-tip={t('New session')} data-testid="harness-new-session"
+            disabled={!session?.sessionId || session.pending}
+            onClick={() => void useHarnessStore.getState().restart(tabId)}>
+            <Plus size={iconSizes.compact} />
+          </IconButton>
           {selectors.map((selector) => (
             <HarnessSelector key={selector.key} testId={`harness-selector-${selector.key}`} label={selector.label}
               value={selector.value} options={selector.options} onChange={selector.apply} />
@@ -246,9 +286,27 @@ export default function HarnessView({ tabId, harness, cwd }: { tabId: string; ha
         </>}
       >
         <Bot size={20} aria-hidden="true" className="chat-composer-lead" />
-        <TextArea data-testid="harness-composer" data-chat-composer value={text}
+        <TextArea ref={composerRef} data-testid="harness-composer" data-chat-composer value={text}
           placeholder={t('Describe what you want to do…')} rows={1}
-          onChange={(event) => setText(event.target.value)} onKeyDown={(event) => {
+          onChange={(event) => { setText(event.target.value); setCommandDismissed(false); setCommandIndex(0); }}
+          onKeyDown={(event) => {
+            if (matches.length > 0) {
+              if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                setCommandIndex((index) => (index + (event.key === 'ArrowDown' ? 1 : -1) + matches.length) % matches.length);
+                return;
+              }
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                setCommandDismissed(true);
+                return;
+              }
+              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                pickCommand(matches[activeCommand]!.name);
+                return;
+              }
+            }
             if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
               event.preventDefault();
               submit();
