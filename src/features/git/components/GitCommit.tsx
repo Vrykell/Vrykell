@@ -5,6 +5,7 @@ import { preferredGitRemote, runGitOperation } from '../services/operations';
 import { generateCommitMessage } from '../services/commitMessage';
 import { TextArea } from '@ui/TextInput';
 import { IconButton } from '@ui/IconButton';
+import { useReloadFeedback } from '@ui/useReloadFeedback';
 import { Check, ChevronDown, Sparkles, RefreshCw, Upload, iconSizes } from '@ui/icons';
 import { primaryGitAction } from '../model/primaryAction';
 import ErrorBox from '@ui/ErrorBox';
@@ -21,16 +22,19 @@ export default function GitCommit({ target, snapshot, refresh }: { target: GitTa
   useEffect(() => () => controller.current?.abort(), []);
   const staged = snapshot.entries.filter(entry => entry.indexStatus !== ' ' && entry.indexStatus !== '?' && entry.indexStatus !== 'U').length;
   const conflicts = snapshot.entries.some(entry => entry.indexStatus === 'U' || entry.worktreeStatus === 'U' || ['AA', 'DD'].includes(entry.indexStatus + entry.worktreeStatus));
-  const canCommit = !!message.trim() && staged > 0 && !conflicts && !busy && snapshot.operation !== 'rebase';
+  const operate = (operation: GitOperation, push = false) => runGitOperation(target, operation, { message, remote: preferredGitRemote(snapshot), push, refresh });
+  const syncFeedback = useReloadFeedback(() => operate('sync'));
+  const synchronizing = busy === 'sync' || syncFeedback.busy;
+  const actionBusy = !!busy || syncFeedback.busy;
+  const canCommit = !!message.trim() && staged > 0 && !conflicts && !actionBusy && snapshot.operation !== 'rebase';
   const remotes = snapshot.remotes ?? [];
-  const primary = primaryGitAction(snapshot);
-  const primaryEnabled = !busy && (primary === 'commit' ? canCommit : primary === 'publish' || primary === 'sync');
+  const primary = synchronizing ? 'sync' : primaryGitAction(snapshot);
+  const primaryEnabled = !actionBusy && (primary === 'commit' ? canCommit : primary === 'publish' || primary === 'sync');
   const primaryLabel = primary === 'commit' ? t(busy === 'commit' ? 'Committing…' : 'Commit')
     : primary === 'publish' ? t('Publish branch')
-      : primary === 'sync' ? `${t(busy === 'sync' ? 'Synchronizing…' : 'Sync changes')}${snapshot.behind ? ` ↓${snapshot.behind}` : ''}${snapshot.ahead ? ` ↑${snapshot.ahead}` : ''}`
+      : primary === 'sync' ? `${t(synchronizing ? 'Synchronizing…' : 'Sync changes')}${snapshot.behind ? ` ↓${snapshot.behind}` : ''}${snapshot.ahead ? ` ↑${snapshot.ahead}` : ''}`
         : t(primary === 'current' ? 'Up to date' : 'Working tree clean');
   const PrimaryIcon = primary === 'sync' ? RefreshCw : primary === 'publish' ? Upload : Check;
-  const operate = (operation: GitOperation, push = false) => runGitOperation(target, operation, { message, remote: preferredGitRemote(snapshot), push, refresh });
   const generate = async () => {
     const store = useGitOperations.getState();
     if (!store.begin(key, 'generate')) return;
@@ -48,11 +52,11 @@ export default function GitCommit({ target, snapshot, refresh }: { target: GitTa
         onChange={event => useGitOperations.getState().draft(key, event.target.value)}
         onKeyDown={event => { if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && !event.nativeEvent.isComposing && canCommit) { event.preventDefault(); event.stopPropagation(); void operate('commit'); } }} />
       <IconButton compact aria-label={t('Generate commit message')} data-tip={t('Summarize staged changes with the configured AI model')}
-        disabled={!!busy || !staged || conflicts} onClick={() => { void generate(); }}><Sparkles size={iconSizes.compact} /></IconButton>
+        disabled={actionBusy || !staged || conflicts} onClick={() => { void generate(); }}><Sparkles size={iconSizes.compact} /></IconButton>
     </div>
     <div className="git-commit-buttons" role="group" aria-label={t('Repository actions')}>
-      <button className="primary-button git-commit-primary" disabled={!primaryEnabled} onClick={() => { void operate(primary === 'sync' ? 'sync' : primary === 'publish' ? 'push' : 'commit'); }}><PrimaryIcon size={iconSizes.compact} />{primaryLabel}</button>
-      <IconButton className="git-commit-options" aria-label={t('Commit actions')} aria-haspopup="menu" aria-expanded={!!menu} disabled={!!busy}
+      <button className="primary-button git-commit-primary" aria-busy={synchronizing} disabled={!primaryEnabled} onClick={() => { if (primary === 'sync') void syncFeedback.run(); else void operate(primary === 'publish' ? 'push' : 'commit'); }}><PrimaryIcon size={iconSizes.compact} className={synchronizing ? 'reload-spin' : undefined} />{primaryLabel}</button>
+      <IconButton className="git-commit-options" aria-label={t('Commit actions')} aria-haspopup="menu" aria-expanded={!!menu} disabled={actionBusy}
         onClick={event => { const trigger = event.currentTarget; const rect = trigger.getBoundingClientRect(); setMenu({ x: rect.left, y: rect.bottom, trigger }); }}><ChevronDown size={iconSizes.compact} /></IconButton>
     </div>
     {!staged && primary === 'commit' && <span className="git-commit-hint">{t('Stage changes to include them in your commit.')}</span>}
@@ -63,7 +67,7 @@ export default function GitCommit({ target, snapshot, refresh }: { target: GitTa
     {menu && <ContextMenu anchor={menu} label={t('Commit actions')} onClose={() => setMenu(null)} items={[
       { label: t('Commit'), disabled: !canCommit, onClick: () => { void operate('commit'); } },
       { label: t('Commit and push'), disabled: !canCommit || !remotes.length || snapshot.detached, onClick: () => { void operate('commit', true); } },
-      { label: t('Sync changes'), disabled: !!busy || snapshot.entries.length > 0 || !snapshot.upstream || snapshot.detached, onClick: () => { void operate('sync'); } },
+      { label: t('Sync changes'), disabled: actionBusy || snapshot.entries.length > 0 || !snapshot.upstream || snapshot.detached, onClick: () => { void syncFeedback.run(); } },
     ]} />}
   </div>;
 }

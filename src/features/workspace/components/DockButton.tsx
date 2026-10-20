@@ -26,7 +26,7 @@ export default function DockButton({ panelId, active, fixed = false, onClick, on
 
   return (
     <ToolbarBtn
-      title={panelId === 'settings' ? t('Open settings') : t('{{action}} {{panel}}', { action, panel: label })}
+      title={panelId === 'settings' ? t(active ? 'Close settings' : 'Open settings') : t('{{action}} {{panel}}', { action, panel: label })}
       active={active}
       onClick={onClick}
       attrs={{

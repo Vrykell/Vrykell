@@ -1,20 +1,18 @@
-/**
- * blockTypes — 256 色调色板和 CSS 颜色工具。
- */
+/** Indexed terminal colors and CSS theme references. */
+import { paletteToCssVars, themes } from '@config/theme/tokens';
 
-// ── 256 色调色板 ──
+const DEFAULT_VARS = paletteToCssVars(themes.dark);
+function themeColor(name: string): string {
+  return `var(${name}, ${DEFAULT_VARS[name]})`;
+}
 
-// 使用 CSS 变量而不是写死颜色，保证已完成的命令块与实时 xterm 共用主题。
+// Completed blocks and live output share both variables and palette fallbacks.
 const ANSI_16 = [
-  'var(--xterm-black, #1B1F24)', 'var(--xterm-red, #F28B82)',
-  'var(--xterm-green, #A8D5A2)', 'var(--xterm-yellow, #E6C98A)',
-  'var(--xterm-blue, #8DB7E8)', 'var(--xterm-magenta, #C5A4D8)',
-  'var(--xterm-cyan, #8FCFD0)', 'var(--xterm-white, #D6D9E0)',
-  'var(--xterm-bright-black, #66707C)', 'var(--xterm-bright-red, #FF9A92)',
-  'var(--xterm-bright-green, #BFE8B7)', 'var(--xterm-bright-yellow, #F2DFA3)',
-  'var(--xterm-bright-blue, #A9CCF5)', 'var(--xterm-bright-magenta, #D7B7E8)',
-  'var(--xterm-bright-cyan, #B0E4E1)', 'var(--xterm-bright-white, #F3F5F8)',
-];
+  '--xterm-black', '--xterm-red', '--xterm-green', '--xterm-yellow',
+  '--xterm-blue', '--xterm-magenta', '--xterm-cyan', '--xterm-white',
+  '--xterm-bright-black', '--xterm-bright-red', '--xterm-bright-green', '--xterm-bright-yellow',
+  '--xterm-bright-blue', '--xterm-bright-magenta', '--xterm-bright-cyan', '--xterm-bright-white',
+].map(themeColor);
 
 function buildColorCube(): string[] {
   const colors: string[] = [];
@@ -43,13 +41,13 @@ function buildGrayscale(): string[] {
 
 export const PALETTE: string[] = [...ANSI_16, ...buildColorCube(), ...buildGrayscale()];
 
-/** 调色板索引 → CSS 颜色 */
+/** Resolve a palette index to its CSS color. */
 export function indexToCss(index: number): string {
   if (index >= 0 && index < PALETTE.length) return PALETTE[index]!;
-  if (index === 256) return 'var(--xterm-foreground, #D6D9E0)';
-  if (index === 257) return 'var(--xterm-bg, #111417)';
-  if (index === 258) return 'var(--xterm-cursor, #C9D1DB)';
+  if (index === 256) return themeColor('--xterm-foreground');
+  if (index === 257) return themeColor('--xterm-bg');
+  if (index === 258) return themeColor('--xterm-cursor');
   if (index >= 259 && index <= 266) return PALETTE[index - 259]!;
-  if (index === 267 || index === 268) return 'var(--xterm-foreground, #D6D9E0)';
-  return 'var(--xterm-bright-white, #F3F5F8)';
+  if (index === 267 || index === 268) return themeColor('--xterm-foreground');
+  return themeColor('--xterm-bright-white');
 }

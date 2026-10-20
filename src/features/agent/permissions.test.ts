@@ -107,6 +107,37 @@ describe('gate', () => {
     ]);
   });
 
+  it('retains the reviewed command in the execution outcome and visible tool state', async () => {
+    reset();
+    setToolAuthorizer(async () => ASK);
+    setToolApprover(async () => allow('lease-e'));
+    const updates: Array<unknown> = [];
+    const waiting = gate('run_command', { command: 'ls' }, 'edited', {
+      tabId: 't1',
+      setToolState: (_id, state, extra) => updates.push({ state, extra }),
+    });
+    await vi.waitFor(() => expect(updates.length).toBeGreaterThan(0));
+    resolveApproval('edited', 'once', 'pwd');
+    expect(await waiting).toEqual({ proceed: true, lease: 'lease-e', command: 'pwd' });
+    expect(updates[updates.length - 1]).toEqual({ state: 'running', extra: { input: { command: 'pwd' } } });
+  });
+
+  it('refuses an empty edited command without granting future session access', async () => {
+    reset();
+    setToolAuthorizer(async () => ASK);
+    setToolApprover(async () => allow());
+    const ctx = mkCtx();
+    const first = gate('run_command', { command: 'ls' }, 'blank', ctx);
+    await vi.waitFor(() => expect(ctx.states.some((entry) => entry.state === 'approval-pending')).toBe(true));
+    resolveApproval('blank', 'session', '  ');
+    expect(await first).toMatchObject({ proceed: false, result: { denied: true } });
+    // The refusal minted no session grant, so the next call still asks.
+    const second = gate('run_command', { command: 'pwd' }, 'retry', ctx);
+    await vi.waitFor(() => expect(ctx.states[ctx.states.length - 1]?.state).toBe('approval-pending'));
+    resolveApproval('retry', 'deny');
+    await second;
+  });
+
   it('授权后端不可用：失败关闭', async () => {
     reset();
     setToolAuthorizer(async () => {

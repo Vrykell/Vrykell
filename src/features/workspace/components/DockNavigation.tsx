@@ -1,4 +1,4 @@
-import { useDockStore, useSessionStore, useNavigationDrag, useNavigationButtonDrag, type DockSide } from '@features/workspace';
+import { useDockStore, useSessionStore, useUiStore, useNavigationDrag, useNavigationButtonDrag, type DockSide } from '@features/workspace';
 import DockButton from './DockButton';
 import { useToastStore } from '@ui/Toast';
 import NavigationDragPreview from './NavigationDragPreview';
@@ -10,7 +10,7 @@ export default function DockNavigation({ side }: { side: DockSide }) {
   const zone = useDockStore(state => side === 'left' ? state.leftZone : state.rightZone);
   const panels = useDockStore(state => side === 'left' ? state.leftPanels : state.rightPanels);
   const sshStatusOwner = useSshStatusOwner();
-  const settingsActive = useSessionStore(state => state.tabs.some(tab => tab.id === state.activeId && tab.kind === 'settings'));
+  const settingsActive = useUiStore(state => state.settingsOpen);
   const dragging = useNavigationDrag(state => state.id);
   const target = useNavigationDrag(state => state.target);
   // The settings page action is pinned below the left toolbar instead of this draggable zone.
@@ -19,6 +19,7 @@ export default function DockNavigation({ side }: { side: DockSide }) {
 
   const startDrag = useNavigationButtonDrag();
   const open = (id: string) => {
+    useUiStore.getState().setSettingsOpen(false);
     const dock = useDockStore.getState();
     if (sshStatusOwner && (side === 'right' || window.innerWidth <= 860)) {
       dismissSshStatus();
@@ -26,6 +27,7 @@ export default function DockNavigation({ side }: { side: DockSide }) {
       return;
     }
     const wasOpen = dock.leftPanels.includes(id) || dock.rightPanels.includes(id);
+    if (settingsActive && wasOpen) return;
     dock.togglePanel(side, id);
     const next = useDockStore.getState();
     if (!wasOpen && !next.leftPanels.includes(id) && !next.rightPanels.includes(id)) {
@@ -57,7 +59,7 @@ export default function DockNavigation({ side }: { side: DockSide }) {
       {side === 'left' && (
         <div className="workspace-activity-footer">
           <DockButton panelId="settings" side="left" fixed active={settingsActive}
-            onClick={() => useSessionStore.getState().openSettingsTab()} />
+            onClick={() => settingsActive ? useUiStore.getState().setSettingsOpen(false) : useSessionStore.getState().openSettings()} />
         </div>
       )}
       {side === 'left' && <NavigationDragPreview />}

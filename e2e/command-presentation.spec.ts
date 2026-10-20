@@ -8,10 +8,10 @@ test('command coloring is optional, persists and leaves native input editing int
   const toggle = page.locator('.settings-field').filter({ has: page.getByText('命令语法高亮', { exact: true }) }).getByRole('switch');
   await expect(toggle).toHaveAttribute('aria-checked', 'false');
   await toggle.click();
-  await page.keyboard.press('Meta+1');
+  await page.getByRole('button', { name: '设置', exact: true }).click();
   const input = page.getByPlaceholder(/输入命令/);
   await input.fill('echo "hello 中文" --flag | cat ./file');
-  await expect(input).toHaveCSS('caret-color', 'rgb(77, 163, 255)');
+  await expect(input).toHaveCSS('caret-color', 'rgb(80, 192, 255)');
   const overlay = page.locator('.command-input-overlay');
   await expect(overlay.locator('[data-kind="command"]')).toHaveCount(2);
   await expect(overlay.locator('[data-kind="string"]')).toHaveText('"hello 中文"');
@@ -21,7 +21,13 @@ test('command coloring is optional, persists and leaves native input editing int
   await expect(overlay.locator('[data-kind="number"]')).toHaveText('30');
   await expect(overlay.locator('[data-kind="variable"]')).toHaveText(['LANG=zh_CN', '$HOME']);
   await expect(overlay.locator('[data-kind="path"]')).toHaveText('./配置.json');
-  await expect(overlay.locator('[data-kind="command"]').first()).toHaveCSS('color', 'rgb(179, 245, 109)');
+  await expect(overlay.locator('[data-kind="command"]').first()).toHaveCSS('color', 'rgb(48, 209, 88)');
+  await expect(overlay.locator('[data-kind="argument"]').first()).toHaveCSS('color', 'rgb(64, 156, 255)');
+  await expect(overlay.locator('[data-kind="flag"]').first()).toHaveCSS('color', 'rgb(50, 191, 255)');
+  await expect(overlay.locator('[data-kind="number"]').first()).toHaveCSS('color', 'rgb(245, 196, 0)');
+  await expect(overlay.locator('[data-kind="variable"]').first()).toHaveCSS('color', 'rgb(224, 102, 255)');
+  await expect(overlay.locator('[data-kind="path"]').first()).toHaveCSS('color', 'rgb(0, 207, 165)');
+  await page.screenshot({ path: test.info().outputPath('vivid-command-syntax.png') });
   await input.fill('echo "hello 中文" --flag | cat ./file');
   await input.press('Enter');
   const block = page.locator('.command-block-command').filter({ hasText: 'echo "hello 中文"' });
@@ -55,14 +61,14 @@ test('command coloring is optional, persists and leaves native input editing int
   await gotoSetting(page, '字体与显示');
   await expect(toggle).toHaveAttribute('aria-checked', 'true');
   await toggle.click();
-  await page.keyboard.press('Meta+1');
+  await page.getByRole('button', { name: '设置', exact: true }).click();
   await input.fill('echo plain');
   await expect(page.locator('.command-input-overlay')).toHaveCount(0);
   await input.press('Enter');
   await expect(page.locator('.command-block-command [data-kind]')).toHaveCount(0);
   await gotoSetting(page, '主题');
   await page.getByRole('radio', { name: '浅色', exact: true }).click();
-  await page.keyboard.press('Meta+1');
+  await page.getByRole('button', { name: '设置', exact: true }).click();
   await expect(page.getByPlaceholder(/输入命令/)).toHaveCSS('caret-color', 'rgb(0, 111, 219)');
 });
 
@@ -123,7 +129,7 @@ test('the colored input mirror stays aligned while multiline content overflows t
   await gotoSetting(page, '字体与显示');
   const toggle = page.locator('.settings-field').filter({ has: page.getByText('命令语法高亮', { exact: true }) }).getByRole('switch');
   await toggle.click();
-  await page.keyboard.press('Meta+1');
+  await page.getByRole('button', { name: '设置', exact: true }).click();
   const input = page.getByPlaceholder(/输入命令/);
   await input.focus();
   for (let index = 0; index < 6; index += 1) await page.keyboard.press('Shift+Enter');

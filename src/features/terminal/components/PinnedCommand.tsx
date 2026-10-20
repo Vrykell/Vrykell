@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { t } from '@i18n';
 import { IconButton } from '@ui/IconButton';
 import { ChevronDown, Ellipsis } from '@ui/icons';
@@ -9,6 +9,7 @@ import BlockMenu from './BlockMenu';
 import type { BlockMenuAnchor } from '../hooks/useTerminalBlockFlow';
 import CommandStatus from './CommandStatus';
 import CommandSyntax from './CommandSyntax';
+import RunningCommandBar from './RunningCommandBar';
 
 /** A viewport title is independent of output expansion and scroll position. */
 export default function PinnedCommand({ block, paneId, remaining, insetLeft, insetRight, scrollRef, collapsed, onToggle }: {
@@ -20,9 +21,10 @@ export default function PinnedCommand({ block, paneId, remaining, insetLeft, ins
   const [anchor, setAnchor] = useState<BlockMenuAnchor | null>(null);
   const closeMenu = useCallback(() => setAnchor(null), []);
   const [height, setHeight] = useState(0);
-  const [now, setNow] = useState(Date.now());
   const ref = useRef<HTMLDivElement>(null);
   const colored = useTypographyStore(state => state.commandHighlighting);
+  const running = block.status === 'executing';
+  useLayoutEffect(() => setAnchor(null), [block.id]);
   useEffect(() => {
     const element = ref.current;
     const scroll = scrollRef?.current;
@@ -41,7 +43,7 @@ export default function PinnedCommand({ block, paneId, remaining, insetLeft, ins
     element.addEventListener('wheel', wheel, { passive: false });
     return () => element.removeEventListener('wheel', wheel);
   }, [scrollRef]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = ref.current;
     if (!element) return;
     const measure = () => setHeight(element.getBoundingClientRect().height);
@@ -49,16 +51,11 @@ export default function PinnedCommand({ block, paneId, remaining, insetLeft, ins
     observer.observe(element);
     measure();
     return () => observer.disconnect();
-  }, []);
-  useEffect(() => {
-    if (block.status !== 'executing') return;
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [block.status]);
-  const duration = block.startedAt === null ? null : (block.endedAt ?? now) - block.startedAt;
+  }, [block.id, collapsed, running]);
+  const duration = block.startedAt === null ? null : (block.endedAt ?? Date.now()) - block.startedAt;
   return <div className="pinned-command-clip">
     <div ref={ref} className="pinned-command command-block" data-testid="pinned-command"
-      data-collapsed={collapsed} data-failed={block.exitCode !== null && block.exitCode !== 0}
+      data-collapsed={collapsed} data-running={running} data-failed={block.exitCode !== null && block.exitCode !== 0}
       data-menu-open={!!anchor} role="region" aria-label={t('Current command')}
       style={{ paddingLeft: insetLeft + COMMAND_BLOCK_CONTENT_PADDING,
         paddingRight: insetRight + COMMAND_BLOCK_CONTENT_PADDING,
@@ -68,7 +65,7 @@ export default function PinnedCommand({ block, paneId, remaining, insetLeft, ins
         event.stopPropagation();
         setAnchor({ kind: 'pointer', x: event.clientX, y: event.clientY });
       }}>
-      {!collapsed && <>
+      {running ? <RunningCommandBar block={block} paneId={paneId} pinned collapsed={collapsed} /> : !collapsed && <>
         <div data-selectable className="command-block-info">
           {block.cwd && <span className="command-block-cwd" data-tip={block.cwd}>{block.cwd}</span>}
           <CommandStatus exitCode={block.exitCode} duration={duration} agent={block.agent} />

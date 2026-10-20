@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { ChangeEvent, KeyboardEvent } from 'react';
-import { ptyWrite } from '@platform/pty';
+import { writeTerminalCommand } from '../services/commandSubmission';
+import { useToastStore } from '@ui/Toast';
+import { t } from '@i18n';
 import { askAboutTerminal } from '@features/chat/services/conversationContext';
 import { useInputStore, useTerminalStore, selectPaneInput } from '@features/terminal';
 import { engageFollow } from './useFollowBottom';
@@ -30,6 +32,12 @@ export function useInputEditorController({ paneId, focused, isLongRunning, onEnd
   const text = input.aiMode ? input.commandDraft ?? '' : input.text;
   const setText = useCallback((value: string) => useInputStore.getState().setText(paneId, value), [paneId]);
   useAutoSizeTextarea(inputRef, text, 120, visible);
+  useEffect(() => {
+    if (!input.focusRequest || !visible || !isFocused) return;
+    inputRef.current?.focus();
+    const end = inputRef.current?.value.length ?? 0;
+    inputRef.current?.setSelectionRange(end, end);
+  }, [input.focusRequest, visible, isFocused]);
 
   useEffect(() => {
     // Restore existing command drafts and move legacy AI drafts into the independent composer.
@@ -70,12 +78,16 @@ export function useInputEditorController({ paneId, focused, isLongRunning, onEnd
     const sessionId = sessions[paneId];
     terminalDebug('command-submit', { paneId, commandChars: command.length, sessionReady: Boolean(sessionId) });
     if (sessionId) {
-      const payload = command ? `${command}\n` : `${latest.text}\n`;
+      const payload = command || `${latest.text}\n`;
       if (!command) appendTerminalBlankLines(paneId, (payload.match(/\n/g) ?? []).length);
       terminalDebug('pty-write-request', { sessionId, chars: payload.length });
-      void ptyWrite(sessionId, payload)
+      void writeTerminalCommand(paneId, sessionId, payload)
         .then(() => terminalDebug('pty-write-complete', { sessionId, chars: payload.length }))
-        .catch(error => terminalDebug('pty-write-error', { sessionId, errorType: error instanceof Error ? error.name : typeof error }));
+        .catch(error => {
+          terminalDebug('pty-write-error', { sessionId, errorType: error instanceof Error ? error.name : typeof error });
+          if (!useInputStore.getState().byPane[paneId]?.text) useInputStore.getState().setText(paneId, latest.text);
+          useToastStore.getState().addToast(t('Could not run the command in the selected terminal'), 'error');
+        });
     } else useTerminalStore.getState().queueCommand(paneId, command);
     engageFollow(paneId);
   }, [paneId, sessions, resetHeight, resetHistNav]);

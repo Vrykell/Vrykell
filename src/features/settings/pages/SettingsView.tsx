@@ -1,9 +1,7 @@
 import { FileOperationsPage } from './fileOperationsPage';
 import { OutlineButton } from '@ui/OutlineButton';
 import { t } from '@i18n';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { IconButton } from '@ui/IconButton';
-import { Navigation, iconSizes } from '@ui/icons';
+import { useEffect, useState, type ReactNode } from 'react';
 import { loadConfig, saveConfig, type FileOpenConfig } from '@features/files/services/fileOpen';
 import { refreshAiConfig, setTavilyKey, clearTavilyKey, useAiConfigStore } from '@features/agent';
 import SkillsSettings from '@features/settings/pages/SkillsSettings';
@@ -34,28 +32,28 @@ import { SettingsSaveProvider, useSettingsSave } from '../components/SettingsSav
 import { StartupPage } from './startupPage';
 import { LogsPage } from './logsPage';
 import { ContextMenuPage } from './contextMenuPage';
-import { SourceControlPage } from './sourceControlPage';
 import EditorOpeningPreferences from '../components/EditorOpeningPreferences';
+import { LanguagePage } from './languagePage';
 
-/** 权限页工具中文名（与 messageParts 的 TOOL_LABEL 保持同步） */
+/** Permission tool labels use the shared translation catalog. */
 const PERM_TOOL_LABEL: Record<ToolName, string> = {
-  run_command: '执行终端命令',
-  read_file: '读取文件',
-  write_file: '写入文件',
-  edit_file: '修改文件',
-  list_dir: '列目录',
-  search_files: '搜索文件',
-  web_search: '联网搜索',
-  web_fetch: '抓取网页',
-  web_crawl: '爬取多个网页',
-  read_terminal: '读取终端画面',
-  terminal_keys: '向终端发送按键',
-  use_skill: '调用技能',
-  install_skill: '安装技能',
-  mcp: 'MCP 服务器工具',
-  memory: '写入记忆',
-  schedule: '管理定时任务',
-  subagent: '委派子代理',
+  run_command: "Run terminal command",
+  read_file: "Read file",
+  write_file: "Write file",
+  edit_file: "Edit file",
+  list_dir: "List directory",
+  search_files: "Search files",
+  web_search: "Web search",
+  web_fetch: "Fetch web page",
+  web_crawl: "Crawl web pages",
+  read_terminal: "Read terminal screen",
+  terminal_keys: "Send terminal keys",
+  use_skill: "Use skill",
+  install_skill: "Install skill",
+  mcp: "MCP server tools",
+  memory: "Write memory",
+  schedule: "Manage scheduled tasks",
+  subagent: "Delegate subagent",
 };
 
 /** Offered approval deadlines: long enough to walk back, short enough to free the turn. */
@@ -70,24 +68,21 @@ function SettingsContent() {
   const { save, status, retry } = useSettingsSave();
   const navigation = useSettingsNavigation();
   const { selected, activeLabel } = navigation;
-  const [navigationOpen, setNavigationOpen] = useState(false);
-  const navigationTrigger = useRef<HTMLButtonElement>(null);
-  const closeNavigation = useCallback(() => setNavigationOpen(false), []);
 
-  // 文件打开配置（localStorage）
+  // File opening preferences are stored locally.
   const [fileCfg, setFileCfg] = useState<FileOpenConfig>(() => loadConfig());
   const updateFileCfg = (patch: Partial<FileOpenConfig>) => {
     const next = { ...loadConfig(), ...patch };
-    if (!saveConfig(next)) throw new Error('配置写入失败');
+    if (!saveConfig(next)) throw new Error(t("Configuration could not be saved"));
     setFileCfg(next);
   };
 
-  // AI 配置（Rust 后端；store 镜像供响应式订阅，key 只写不回显）
+  // The configuration store mirrors backend state without exposing credentials.
   const aiCfg = useAiConfigStore();
   const toast = (msg: string, type: 'info' | 'success' | 'error') =>
     useToastStore.getState().addToast(msg, type);
 
-  // AI 权限（M3）：持久化默认级别 + 内存会话授权
+  // Default permission levels are persisted; session grants remain in memory.
   const permLevels = usePermissions((s) => s.levels);
   const setPermLevel = usePermissions((s) => s.setLevel);
   const approvalTimeoutSeconds = usePermissions((s) => s.approvalTimeoutSeconds);
@@ -99,9 +94,9 @@ function SettingsContent() {
 
   const renderPage = (): ReactNode => {
     switch (selected) {
+      case 'application-language': return <LanguagePage />;
       case 'file-operations': return <FileOperationsPage />;
       case 'startup': return <StartupPage />;
-      case 'source-control': return <SourceControlPage />;
       case 'logs': return <LogsPage />;
       case 'context-menu': return <ContextMenuPage />;
       case 'ai-model':
@@ -113,13 +108,13 @@ function SettingsContent() {
       case 'ai-web': {
         const mode =
           aiCfg.provider !== 'openai-compatible'
-            ? '服务商原生搜索'
+            ? t("Provider search")
             : aiCfg.hasTavilyKey
               ? 'Tavily'
-              : 'DuckDuckGo 兜底';
+              : t("Fallback search");
         return (
           <SettingsGroup title={t('Search services')}>
-            <Field title="当前搜索方式" description={t('Web search works without configuration.')}>
+            <Field title={t("Current search method")} description={t('Web search works without configuration.')}>
               <span style={{
                 fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', borderRadius: 4,
                 color: 'var(--text-secondary)', background: 'var(--hover)',
@@ -134,18 +129,18 @@ function SettingsContent() {
                   color: aiCfg.hasTavilyKey ? 'var(--success)' : 'var(--text-muted)',
                   background: aiCfg.hasTavilyKey ? 'var(--success-bg)' : 'var(--hover)',
                 }}>
-                  {aiCfg.hasTavilyKey ? '已配置' : '未配置'}
+                  {aiCfg.hasTavilyKey ? t("Configured") : t("Not configured")}
                 </span>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <AutoSaveInput
                   type="password"
                   value=""
-                  placeholder={aiCfg.hasTavilyKey ? '输入以覆盖，留空不改动' : '输入 Tavily API Key'}
+                  placeholder={aiCfg.hasTavilyKey ? t("Enter to replace; leave empty to keep the current value") : t("Enter Tavily API Key")}
                   onCommit={key => setTavilyKey(key)}
                   clearAfterSave
-                  onClear={aiCfg.hasTavilyKey ? async () => { await clearTavilyKey(); toast('已清除 Tavily Key', 'success'); } : undefined}
-                  validate={key => key.trim() ? undefined : '留空不改动'}
+                  onClear={aiCfg.hasTavilyKey ? async () => { await clearTavilyKey(); toast(t("Tavily key cleared"), 'success'); } : undefined}
+                  validate={key => key.trim() ? undefined : t("Leave empty to keep the current value")}
                   style={{ flex: 1 }}
                 />
               </div>
@@ -159,7 +154,7 @@ function SettingsContent() {
           <SettingsGroup title={t('Tool access')}>
             <Field
               layout="stacked"
-              title="工具权限"
+              title={t("Tool permissions")}
               description={t("Choose which tools may run. Dangerous commands always require approval.")}
             >
               <div className="settings-option-list">
@@ -168,15 +163,15 @@ function SettingsContent() {
                   return (
                     <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ flex: 1, fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-primary)' }}>
-                        {PERM_TOOL_LABEL[name]}
+                        {t(PERM_TOOL_LABEL[name])}
                       </span>
                       <Select
-                        aria-label={`${PERM_TOOL_LABEL[name]} 权限`}
+                        aria-label={t('Permissions for {{tool}}', { tool: t(PERM_TOOL_LABEL[name]) })}
                         options={(
                           [
-                            ['allow', '允许'],
-                            ['ask', '每次询问'],
-                            ['deny', '禁止'],
+                            ['allow', t("Allow")],
+                            ['ask', t("Ask every time")],
+                            ['deny', t('Disallow')],
                           ] as const
                         ).map(([v, label]) => ({ value: v, label }))}
                         value={lv}
@@ -203,17 +198,17 @@ function SettingsContent() {
               />
             </Field>
             <Field
-              title="会话授权"
+              title={t("Session grants")}
               description={t("Temporary tool approvals expire on restart or when cleared.")}
             >
               <OutlineButton
 
                 onClick={() => {
                   clearSessionGrants();
-                  toast('已清空全部会话授权', 'success');
+                  toast(t("Session grants cleared"), 'success');
                 }}
               >
-                清空会话授权
+                {t('Clear session grants')}
               </OutlineButton>
             </Field>
           </SettingsGroup>
@@ -246,21 +241,21 @@ function SettingsContent() {
         return (
           <SettingsGroup title={t('Opening files')}>
             <EditorOpeningPreferences remote={false} />
-            <Field title="默认编辑命令" description={t("Use {file} for the path or __system__ for the default app. Unavailable editors fall back to vim, nano or vi.")}>
+            <Field title={t("Default editing command")} description={t("Use {file} for the path or __system__ for the default app. Unavailable editors fall back to vim, nano or vi.")}>
               <AutoSaveInput
                 key="local-editor"
                 testId="editor-local-command"
                 value={fileCfg.defaultEditor}
-                placeholder="例如 edit {file}，或 __system__"
+                placeholder={t("Example: edit {file}, or __system__")}
                 onCommit={defaultEditor => updateFileCfg({ defaultEditor })}
               />
             </Field>
-            <Field layout="stacked" title="按扩展名打开" description={t("Set an opening command per extension, using {file} or __system__.")}>
+            <Field layout="stacked" title={t("Open by extension")} description={t("Set an opening command per extension, using {file} or __system__.")}>
               <TemplateListEditor
                 key="local-templates"
                 value={fileCfg.templates}
                 onChange={(templates) => updateFileCfg({ templates })}
-                placeholder="如 code、__system__"
+                placeholder={t("Example: code or __system__")}
               />
             </Field>
           </SettingsGroup>
@@ -270,21 +265,21 @@ function SettingsContent() {
         return (
           <SettingsGroup title={t('Opening files')}>
             <EditorOpeningPreferences remote />
-            <Field title="默认编辑命令" description={t("Run this editor over SSH. Use {file} for the remote path.")}>
+            <Field title={t("Default editing command")} description={t("Run this editor over SSH. Use {file} for the remote path.")}>
               <AutoSaveInput
                 key="remote-editor"
                 testId="editor-remote-command"
                 value={fileCfg.remoteEditor}
-                placeholder="例如 vim {file}"
+                placeholder={t("Example: vim {file}")}
                 onCommit={remoteEditor => updateFileCfg({ remoteEditor })}
               />
             </Field>
-            <Field layout="stacked" title="按扩展名打开" description={t("Set an opening command per remote extension, using {file} for the path.")}>
+            <Field layout="stacked" title={t("Open by extension")} description={t("Set an opening command per remote extension, using {file} for the path.")}>
               <TemplateListEditor
                 key="remote-templates"
                 value={fileCfg.remoteTemplates}
                 onChange={(remoteTemplates) => updateFileCfg({ remoteTemplates })}
-                placeholder="如 nvim、less"
+                placeholder={t("Example: nvim or less")}
               />
             </Field>
           </SettingsGroup>
@@ -313,20 +308,15 @@ function SettingsContent() {
   return (
     <div className="settings-view" style={{
       flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row',
-      background: 'var(--canvas)', userSelect: 'none',
+      background: 'var(--xterm-bg)', userSelect: 'none',
     }}>
-      <div className="settings-layout" data-navigation-open={navigationOpen}>
-        {navigationOpen && <div className="settings-navigation-backdrop" aria-hidden="true" />}
-        <SettingsNavigation navigation={navigation} open={navigationOpen} onClose={closeNavigation} trigger={navigationTrigger} />
+      <div className="settings-layout">
+        <SettingsNavigation navigation={navigation} />
 
         {/* Content retains a readable width before falling back to horizontal scrolling. */}
         <section className="settings-content">
           <header className="settings-page-header">
             <div className="settings-page-heading">
-              <IconButton ref={navigationTrigger} className="settings-navigation-toggle" compact
-                aria-label={t('Show settings navigation')} data-tip={t('Show settings navigation')}
-                aria-expanded={navigationOpen} aria-controls="settings-navigation"
-                onClick={() => setNavigationOpen(value => !value)}><Navigation size={iconSizes.control} /></IconButton>
               <h1>{activeLabel}</h1>
             </div>
             <div className="settings-save-hint">

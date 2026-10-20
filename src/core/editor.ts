@@ -1,6 +1,6 @@
 export interface EditorFile { path: string; connectionId?: string }
 export const editorFileKey = (file: EditorFile) => JSON.stringify([file.connectionId ?? '', file.path]);
-export interface EditorContent { kind: 'text' | 'binary' | 'tooLarge'; text: string; revision: string }
+export interface EditorContent { kind: 'text' | 'binary' | 'tooLarge'; text: string; revision: string; readOnly?: boolean; permissionDenied?: boolean }
 
 type CloseGuard = (files: EditorFile[], complete: () => void) => boolean;
 let closeGuard: CloseGuard | undefined;

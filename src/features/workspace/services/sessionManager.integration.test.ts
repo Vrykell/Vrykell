@@ -176,7 +176,7 @@ describe('addTab 持久化 kind + payload', () => {
       return undefined;
     });
     useWorkspaceStore.getState().addTab({ kind: 'history' });
-    useWorkspaceStore.getState().addTab({ kind: 'settings' });
+    useWorkspaceStore.getState().openSettings();
     expect(calls.find((c) => c.cmd === 'create_session')).toBeUndefined();
   });
 });

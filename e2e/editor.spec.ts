@@ -14,6 +14,39 @@ async function replaceText(page: Page, text: string) {
   const input = page.getByTestId('file-editor').locator('textarea.inputarea'); await input.focus(); await page.keyboard.press('Control+a'); await page.keyboard.insertText(text);
 }
 
+test('identifies read-only files, blocks normal edits and offers explicit administrator opening', async ({ page }, info) => {
+  await page.evaluate(() => {
+    const host = window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> }; __ELEVATED_FILE__?: unknown; __EDITOR_SAVE_COUNT__?: number; __WRITABLE__?: boolean };
+    const original = host.__TAURI_INTERNALS__.invoke;
+    host.__TAURI_INTERNALS__.invoke = async (command, args) => {
+      if (command === 'editor_open_elevated') { host.__ELEVATED_FILE__ = args?.target; return; }
+      if (command === 'editor_save_file') host.__EDITOR_SAVE_COUNT__ = (host.__EDITOR_SAVE_COUNT__ ?? 0) + 1;
+      const result = await original(command, args);
+      if (command === 'editor_read_file') return { ...(result as Record<string, unknown>), readOnly: !host.__WRITABLE__, permissionDenied: !host.__WRITABLE__ };
+      return result;
+    };
+  });
+  await openWorking(page);
+  const editor = page.getByTestId('file-editor');
+  await expect(editor.locator('.editor-readonly-label')).toHaveText('只读');
+  await expect(editor.getByText(/当前用户无权读取或写入此文件/)).toBeVisible();
+  const before = await editor.locator('.view-lines').innerText();
+  await replaceText(page, 'blocked edit');
+  await page.keyboard.press('Control+s');
+  expect(await editor.locator('.view-lines').innerText()).toBe(before);
+  expect(await page.evaluate(() => (window as unknown as { __EDITOR_SAVE_COUNT__?: number }).__EDITOR_SAVE_COUNT__ ?? 0)).toBe(0);
+  await expect(editor.getByRole('button', { name: '保存文件', exact: true })).toBeDisabled();
+  for (const width of [1240, 760]) { await page.setViewportSize({ width, height: 800 }); await page.screenshot({ path: info.outputPath(`readonly-${width}.png`) }); }
+  await editor.getByRole('button', { name: '以管理员权限打开', exact: true }).click();
+  expect(await page.evaluate(() => (window as unknown as { __ELEVATED_FILE__?: unknown }).__ELEVATED_FILE__)).toMatchObject({ path: '/home/e2e/project/src/main.ts' });
+  await page.evaluate(() => { (window as unknown as { __WRITABLE__: boolean }).__WRITABLE__ = true; });
+  await editor.getByRole('button', { name: '更多编辑器操作' }).click();
+  await page.getByRole('menu').getByRole('button', { name: '重新加载文件', exact: true }).click();
+  await expect(editor.locator('.editor-readonly-label')).toHaveCount(0);
+  await replaceText(page, 'allowed after reload');
+  await expect(editor.locator('.view-lines')).toContainText('allowed after reload');
+});
+
 test('opens text in the built-in editor, saves it and guards unsaved closes', async ({ page }, info) => {
   await openWorking(page);
   const editor = page.getByTestId('file-editor'); await replaceText(page, 'export const value = "saved";');
@@ -41,19 +74,30 @@ test('retains drafts on disk conflicts and requires confirmation before reload',
   await expect(editor.locator('.view-lines')).toContainText('external text');
 });
 
-test('switches editor page modes without losing open buffers and offers terminal preference', async ({ page }) => {
+test('keeps files in a single page despite a legacy preference and offers terminal opening', async ({ page }) => {
+  await page.evaluate(() => localStorage.setItem('vrykell-editor-preferences', JSON.stringify({ state: { pageMode: 'multiple' }, version: 0 })));
+  await page.reload();
+  if (!await page.getByTestId('git-panel').isVisible()) await page.getByRole('button', { name: '版本控制', exact: true }).click();
   await openWorking(page); await replaceText(page, 'keep this buffer');
   await openWorking(page, 'new file.ts', 'untracked');
   await expect(page.getByRole('tablist', { name: '已打开的文件' }).getByRole('tab')).toHaveCount(2);
   await page.getByRole('button', { name: '设置', exact: true }).click();
   await page.getByRole('button', { name: '本地编辑器', exact: true }).click();
-  await page.getByRole('combobox', { name: '编辑器页面' }).click(); await page.getByRole('option', { name: '多页，每个文件独立打开' }).click();
-  await openWorking(page); await expect(page.getByRole('tablist', { name: '已打开的文件' })).toHaveCount(0);
-  await expect(page.getByTestId('file-editor').locator('.view-lines')).toContainText('keep this buffer');
-  await page.getByRole('button', { name: '设置', exact: true }).click(); await page.getByRole('button', { name: '本地编辑器', exact: true }).click();
-  await page.getByRole('combobox', { name: '编辑器页面' }).click(); await page.getByRole('option', { name: '单页，使用文件标签' }).click();
+  await expect(page.getByRole('combobox', { name: '编辑器页面' })).toHaveCount(0);
+  await page.getByRole('button', { name: '远程编辑器', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: '编辑器页面' })).toHaveCount(0);
+  await page.getByRole('button', { name: '本地编辑器', exact: true }).click();
   await page.getByRole('combobox', { name: '首选文件编辑器' }).click(); await page.getByRole('option', { name: '终端编辑器', exact: true }).click();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('vrykell-editor-preferences')!).state.localOpenMode)).toBe('terminal');
+  await page.evaluate(async () => {
+    const path = '/src/features/workspace/stores/workspace.ts';
+    const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
+    const editor = useWorkspaceStore.getState().tabs.find(tab => tab.kind === 'editor');
+    if (editor) useWorkspaceStore.getState().activate(editor.id);
+  });
+  await page.getByRole('tab', { name: 'main.ts •', exact: true }).click();
+  await expect(page.getByTestId('file-editor').locator('.view-lines')).toContainText('keep this buffer');
+  await expect(page.getByRole('tablist', { name: '已打开的文件' }).getByRole('tab')).toHaveCount(2);
 });
 
 test('returns from a comparison to its editor and explains binary files', async ({ page }) => {
@@ -85,8 +129,8 @@ test('reorders connected file tabs and keeps compact actions above the text', as
   const header = page.getByTestId('file-editor').locator('.folder-header');
   expect((await header.boundingBox())!.height).toBeLessThanOrEqual(34);
   const first = strip.locator('.folder-tab').first();
-  expect((await first.boundingBox())!.x).toBe((await strip.boundingBox())!.x);
-  expect(await first.evaluate(element => getComputedStyle(element, '::before').content)).toBe('none');
+  expect((await first.boundingBox())!.x).toBe((await strip.boundingBox())!.x + 10);
+  expect(await first.evaluate(element => getComputedStyle(element, '::before').content)).toBe('""');
   const inactive = strip.locator('.folder-tab').nth(1); await inactive.hover();
   const hover = (await inactive.locator('.folder-tab-content').boundingBox())!; const row = (await inactive.boundingBox())!;
   expect(hover.y).toBeGreaterThan(row.y); expect(hover.y + hover.height).toBeLessThan(row.y + row.height);
@@ -123,6 +167,8 @@ test('dragging the selected first file leaves the remaining tabs visible in a na
   await expect(second).toBeInViewport();
   const preview = page.locator('[data-reorder-preview="item"]');
   await expect(preview).toContainText('selected-first-document');
+  await expect(preview.locator('.folder-tab')).toHaveCSS('background-color', await strip.locator('.folder-tab[data-active="true"]').evaluate(element => getComputedStyle(element).backgroundColor));
+  expect(await preview.locator('.folder-tab').evaluate(element => getComputedStyle(element, '::before').content)).toBe('""');
   const start = (await preview.boundingBox())!;
   await page.mouse.move(source.x + 66, source.y + source.height / 2 + 12, { steps: 4 });
   const moved = (await preview.boundingBox())!;

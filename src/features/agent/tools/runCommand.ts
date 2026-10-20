@@ -5,7 +5,7 @@
  * Cancellation and timeout stop waiting without terminating the terminal process.
  */
 
-import { ptyWrite } from '@platform/pty';
+import { writeTerminalCommand } from '@features/terminal/services/commandSubmission';
 import { t } from '@i18n';
 import { executionPaneSpec } from '../services/executionTarget';
 import { diagnostic } from '@platform/diagnostics';
@@ -18,6 +18,7 @@ import {
   type ShellCommandCompletion,
 } from '@features/terminal';
 import { agentControl } from '@features/agent/services/agentControl';
+import { DEFAULT_TOOL_COMMAND_TIMEOUT_MS } from '../model/messageParts';
 
 export interface RunCommandResult {
   ok: boolean;
@@ -33,7 +34,6 @@ const OUTPUT_CAP = 8192;
 /** Head kept when output has to be shortened: command echo, paths and early lines live there. */
 const OUTPUT_HEAD = 2048;
 const BLOCK_GRACE_MS = 1500;
-const DEFAULT_TIMEOUT_MS = 120_000;
 
 function tail(s: string): string {
   return s.length > OUTPUT_CAP ? s.slice(-OUTPUT_CAP) : s;
@@ -75,7 +75,7 @@ export async function runCommandAndWait(
     };
   }
 
-  const timeoutMs = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const timeoutMs = opts?.timeoutMs ?? DEFAULT_TOOL_COMMAND_TIMEOUT_MS;
   // 认领基准时刻：写入前的已存在的「pending 提示符块」正是本命令未来的家
   // （提示符绘制时 133;A 就建了块），所以不能用「新块」判认领 —— 用
   // startedAt >= t0（preexec 时刻）才覆盖「旧 pending 块转 executing」路径。
@@ -87,7 +87,7 @@ export async function runCommandAndWait(
   agentControl.acquire(paneId);
   diagnostic('agent-command-start', { paneId, completionMode: completion ? 'marker' : 'block' });
   try {
-    await ptyWrite(sessionId, completion ? completion.wrap(command) : command.endsWith('\n') ? command : command + '\n');
+    await writeTerminalCommand(paneId, sessionId, completion ? completion.wrap(command) : command);
     const result = await waitForCompletion(paneId, command, t0, opts?.toolCallId, opts?.signal, timeoutMs, completion);
     diagnostic('agent-command-completion', { paneId, completed: result.completed ?? false, ok: result.ok, exitCode: result.exitCode, outputChars: result.output.length });
     return result;

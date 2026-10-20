@@ -17,14 +17,14 @@ export function resourceTrendSegments(samples: readonly ResourceSample[], endTim
   let points: string[] = [];
   recent.forEach((sample, index) => {
     if (index > 0 && sample.time - recent[index - 1].time > 45_000) {
-      segments.push(points.join(' '));
+      if (points.length > 1) segments.push(points.join(' '));
       points = [];
     }
     const x = 2 + (sample.time - endTime + windowMs) / windowMs * 276;
     const y = 74 - Math.max(0, Math.min(maximum, sample.value)) / maximum * 68;
     points.push(`${x.toFixed(1)},${y.toFixed(1)}`);
   });
-  if (points.length) segments.push(points.join(' '));
+  if (points.length > 1) segments.push(points.join(' '));
   return segments;
 }
 
@@ -42,10 +42,10 @@ export default function SshResourceChart({ samples = [], series, endTime, label,
       {[36.5, 71, 105.5, 140, 174.5, 209, 243.5].map(x => <line key={`x-${x}`} className="ssh-resource-chart-grid" x1={x} x2={x} y1="6" y2="74" vectorEffect="non-scaling-stroke" />)}
       {lines.map(line => <g key={line.label} data-series={line.label} style={{ color: line.color }}>{line.segments.map((points, index) => {
         const positions = points.split(' ');
-        return positions.length > 1 ? <g key={index}>
+        return <g key={index}>
           <polygon className="ssh-resource-chart-area" points={`${positions[0].split(',')[0]},74 ${points} ${positions[positions.length - 1].split(',')[0]},74`} />
           <polyline points={points} fill="none" vectorEffect="non-scaling-stroke" />
-        </g> : <circle key={index} cx={positions[0].split(',')[0]} cy={positions[0].split(',')[1]} r="2" />;
+        </g>;
       })}</g>)}
     </svg>
     {empty && <span className="ssh-resource-chart-empty">{t('Waiting for samples…')}</span>}

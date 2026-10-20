@@ -23,9 +23,9 @@ beforeEach(() => {
   useSessionStore.setState({
     tabs: [
       { id: 'local', title: 'Shell', kind: 'session', layout: { type: 'leaf', terminal: { id: 'local#0', kind: 'local', shellType: 'bash' } } },
-      { id: 'settings', title: 'Settings', kind: 'settings' },
+      { id: 'ai-history', title: 'Conversations', kind: 'ai-history' },
       { id: 'history', title: 'History', kind: 'history' },
-    ], activeId: 'settings', groups: [], loadGroups: vi.fn().mockResolvedValue(undefined),
+    ], activeId: 'ai-history', groups: [], loadGroups: vi.fn().mockResolvedValue(undefined),
   });
 });
 
@@ -57,19 +57,19 @@ it('colors terminal icons from their context menu without activating the tab', (
   expect(palette.closest('.context-menu-footer')).not.toBeNull();
   fireEvent.click(palette.querySelector('[data-color="violet"]')!);
   expect(row.querySelector('svg')!.style.color).toBe('var(--group-violet)');
-  expect(useSessionStore.getState().activeId).toBe('settings');
+  expect(useSessionStore.getState().activeId).toBe('ai-history');
   fireEvent.contextMenu(row);
   fireEvent.click(screen.getByTestId('tab-icon-color-auto'));
   expect(row.querySelector('svg')!.style.color).toBe('var(--shell-bash-accent)');
 });
 
-it.each(['settings', 'history'])('leaves the %s icon on its theme color without a palette', id => {
-  useIconColorStore.setState({ colors: { 'page:settings': 'coral', 'page:history': 'coral' } });
+it.each(['ai-history', 'history'])('leaves the %s icon on its theme color without a palette', id => {
+  useIconColorStore.setState({ colors: { 'page:ai-history': 'coral', 'page:history': 'coral' } });
   render(<PanelTabs />);
   const row = screen.getByTestId(`tab-row-${id}`);
   fireEvent.contextMenu(row);
   expect(screen.queryByRole('group', { name: '图标颜色' })).toBeNull();
-  expect(row.querySelector('svg')!.style.color).toBe(id === 'settings' ? 'var(--text-primary)' : 'var(--text-secondary)');
+  expect(row.querySelector('svg')!.style.color).toBe(id === 'ai-history' ? 'var(--text-primary)' : 'var(--text-secondary)');
 });
 afterEach(() => { cleanup(); useListReorder.getState().end(); useSessionStore.setState(snapshot, true); });
 
@@ -102,9 +102,9 @@ it('creates ungrouped tabs from the panel button and keeps only the group button
 
 it('lists singleton pages alongside sessions and switches or closes them', () => {
   render(<PanelTabs />);
-  const settings = screen.getByTestId('tab-row-settings');
+  const settings = screen.getByTestId('tab-row-ai-history');
   const history = screen.getByTestId('tab-row-history');
-  expect(settings).toHaveAttribute('data-reorder-item', 'settings');
+  expect(settings).toHaveAttribute('data-reorder-item', 'ai-history');
   expect(history).toHaveAttribute('data-reorder-kind', 'loose-tab');
   fireEvent.click(history);
   expect(useSessionStore.getState().activeId).toBe('history');
@@ -113,20 +113,20 @@ it('lists singleton pages alongside sessions and switches or closes them', () =>
   fireEvent.contextMenu(settings);
   expect(screen.queryByText('复制会话')).toBeNull();
   fireEvent.click(screen.getByText('关闭标签'));
-  expect(useSessionStore.getState().tabs.some(tab => tab.kind === 'settings')).toBe(false);
+  expect(useSessionStore.getState().tabs.some(tab => tab.kind === 'ai-history')).toBe(false);
 });
 
 it('filters singleton pages without hiding other rows', () => {
   const { container } = render(<PanelTabs />);
   const icon = screen.getByTestId('tab-row-local').querySelector('svg')!;
   expect(icon).toHaveAttribute('data-shell-mark', 'bash');
-  expect(screen.getByTestId('tab-row-settings')).toBeVisible();
+  expect(screen.getByTestId('tab-row-ai-history')).toBeVisible();
   expect(screen.getByTestId('tab-row-history')).toBeVisible();
   act(() => useSessionStore.getState().activate('local'));
   expect(icon.style.color).toBe('var(--shell-bash-accent)');
   fireEvent.change(screen.getByTestId('tab-search'), { target: { value: 'History' } });
   expect(screen.getByTestId('tab-row-history')).toBeVisible();
-  expect(screen.queryByTestId('tab-row-settings')).toBeNull();
+  expect(screen.queryByTestId('tab-row-ai-history')).toBeNull();
   expect(container.querySelectorAll('[data-tab-row-id]')).toHaveLength(1);
 });
 
@@ -205,7 +205,7 @@ it('opens the panel menu on a blank-area right click even while the native menu 
     expect(screen.queryByText('AI 自动分组')).toBeNull();
 
     // A row keeps its own menu: it stops propagation, so no second panel menu appears.
-    fireEvent.contextMenu(screen.getByTestId('tab-row-settings'));
+    fireEvent.contextMenu(screen.getByTestId('tab-row-ai-history'));
     expect(screen.getByText('关闭标签')).toBeVisible();
     expect(screen.getAllByRole('menu')).toHaveLength(1);
   } finally {

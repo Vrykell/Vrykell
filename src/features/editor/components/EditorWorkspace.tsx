@@ -1,6 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { editorFileKey, registerEditorCloseGuard, type EditorFile } from '@core/editor';
-import { useEditorPreferences } from '@config/editor';
 import { useSessionStore } from '@features/workspace';
 import { fileIcon, openInTerminal } from '@features/files';
 import CodeEditor from '@ui/CodeEditor';
@@ -8,9 +7,9 @@ import { IconButton } from '@ui/IconButton';
 import ReloadButton from '@ui/ReloadButton';
 import { TextButton } from '@ui/TextButton';
 import { OutlineButton } from '@ui/OutlineButton';
-import { Save, iconSizes } from '@ui/icons';
+import { Lock, Save, iconSizes } from '@ui/icons';
+import { isWindows } from '@platform/runtime';
 import FolderTabs, { type FolderTab } from '@ui/FolderTabs';
-import EditorActions from '@ui/EditorActions';
 import ToolDialog from '@ui/ToolDialog';
 import ConfirmDialog from '@ui/ConfirmDialog';
 import ErrorBox from '@ui/ErrorBox';
@@ -23,7 +22,6 @@ import './editor.css';
 
 export default function EditorWorkspace({ children }: { children: ReactNode }) {
   const tabs = useSessionStore(state => state.tabs); const activeId = useSessionStore(state => state.activeId);
-  const mode = useEditorPreferences(state => state.pageMode);
   const documents = useEditorDocuments(state => state.documents);
   const page = tabs.find(tab => tab.id === activeId && tab.kind === 'editor');
   const files = tabs.filter(tab => tab.kind === 'editor').flatMap(tab => tab.files.map(file => ({ file, pageId: tab.id })));
@@ -32,7 +30,8 @@ export default function EditorWorkspace({ children }: { children: ReactNode }) {
   const keys = JSON.stringify(panes.map(item => editorFileKey(item.file)));
   const [closing, setClosing] = useState<{ files: EditorFile[]; complete: () => void } | null>(null);
   const [saving, setSaving] = useState(false); const [closeError, setCloseError] = useState('');
-  useEffect(() => { useSessionStore.getState().configureEditorTabs(mode); }, [mode]);
+  const pageCount = tabs.filter(tab => tab.kind === 'editor').length;
+  useEffect(() => { useSessionStore.getState().configureEditorTabs(); }, [pageCount]);
   useEffect(() => { useEditorDocuments.getState().drop(new Set(JSON.parse(keys) as string[])); }, [keys]);
   useEffect(() => registerEditorCloseGuard((requested, complete) => {
     if (!requested.some(file => isDocumentDirty(useEditorDocuments.getState().documents[editorFileKey(file)]))) return false;
@@ -61,10 +60,10 @@ export default function EditorWorkspace({ children }: { children: ReactNode }) {
     if (results.every(Boolean)) { closing.complete(); setClosing(null); }
     else setCloseError(t('Some files could not be saved. Your unsaved changes are kept.'));
   };
-  const fileTabs: FolderTab[] = mode === 'single' ? files.map(({ file }) => {
+  const fileTabs: FolderTab[] = files.map(({ file }) => {
     const Icon = fileIcon(file.path); const key = editorFileKey(file);
     return { id: key, label: `${file.path.split('/').pop()}${isDocumentDirty(documents[key]) ? ' •' : ''}`, tip: file.path, icon: <Icon size={iconSizes.compact} />, closeLabel: t('Close file {{path}}', { path: file.path }) };
-  }) : [];
+  });
   return <>
     <div className="editor-content-host" style={{ display: page ? 'none' : 'flex' }} inert={!!page}>{children}</div>
     {panes.map(({ file, pageId }) => <DocumentPane key={editorFileKey(file)} file={file} tabs={fileTabs} active={pageId === activeId && page?.kind === 'editor' && editorFileKey(page.selected) === editorFileKey(file)} />)}
@@ -87,24 +86,30 @@ function DocumentPane({ file, active, tabs }: { file: EditorFile; active: boolea
   const save = () => { void useEditorDocuments.getState().save(file); };
   const reloadFile = () => { if (dirty) setReload(true); else void load(); };
   const terminal = () => { void openInTerminal(file).catch(reason => useToastStore.getState().addToast(String(reason), 'error')); };
+  const elevatedLabel = t(!file.connectionId && isWindows ? 'Open as administrator' : 'Open with sudo in terminal');
+  const elevated = () => { void openInTerminal(file, true).catch(reason => useToastStore.getState().addToast(String(reason), 'error')); };
   const Icon = fileIcon(file.path);
   return <section className="editor-pane" data-testid={active ? 'file-editor' : undefined} style={{ display: active ? 'flex' : 'none' }} inert={!active}>
     <FolderTabs items={active ? tabs : []} selected={editorFileKey(file)} label={t('Open files')} listId="editor-files" className="editor-tabs"
       onSelect={key => { const item = useSessionStore.getState().tabs.flatMap(tab => tab.kind === 'editor' ? tab.files : []).find(item => editorFileKey(item) === key); if (item) useSessionStore.getState().openEditorFile(item); }}
       onClose={key => { const item = useSessionStore.getState().tabs.flatMap(tab => tab.kind === 'editor' ? tab.files : []).find(item => editorFileKey(item) === key); if (item) useSessionStore.getState().closeEditorFile(item); }}
-      onMove={(...args) => useSessionStore.getState().moveEditorFile(...args)} toolbar={<EditorActions items={[
-        { label: t('Save file'), disabled: !dirty || document?.saving || document?.loading, onClick: save },
+      onMove={(...args) => useSessionStore.getState().moveEditorFile(...args)} menuItems={[
+        { label: t('Save file'), disabled: document?.readOnly || !dirty || document?.saving || document?.loading, onClick: save },
         { label: t('Reload file'), disabled: document?.saving, onClick: reloadFile }, { label: t('Open in terminal'), onClick: terminal },
-      ]}>
-        <IconButton compact aria-label={t('Save file')} data-tip={t('Save file (Ctrl/Cmd+S)')} disabled={!dirty || document?.saving || document?.loading} onClick={save}><Save size={iconSizes.control} /></IconButton>
+        { label: elevatedLabel, onClick: elevated },
+      ]} toolbar={<>
+        <IconButton compact aria-label={t('Save file')} data-tip={t('Save file (Ctrl/Cmd+S)')} disabled={document?.readOnly || !dirty || document?.saving || document?.loading} onClick={save}><Save size={iconSizes.control} /></IconButton>
         <span className="folder-action-secondary"><ReloadButton compact label={t('Reload file')} busy={document?.loading} disabled={document?.saving} onReload={reloadFile} /></span>
         <TextButton className="folder-action-secondary" onClick={terminal}>{t('Open in terminal')}</TextButton>
-      </EditorActions>} />
-    <div className="folder-path" data-tip={file.path}><Icon size={12} /><span>{file.path}{dirty ? ' •' : ''}</span></div>
+      </>} />
+    <div className="folder-path" data-tip={file.path}><Icon size={12} /><span>{file.path}{dirty ? ' •' : ''}</span>{document?.readOnly && <span className="editor-readonly-label"><Lock size={12} />{t('Read-only')}</span>}</div>
+    {document?.readOnly && !document.loading && <ErrorBox tone="info" compact dismissible={false} actions={<TextButton onClick={elevated}>{elevatedLabel}</TextButton>}>
+      {t(document.permissionDenied ? 'Your current user cannot access or write this file. Open it with elevated permissions to edit.' : 'This file is read-only. Editing and saving are disabled.')}
+    </ErrorBox>}
     {document?.error && <ErrorBox title={t('Could not read or save file')} details={document.error} />}
     {(!document || document.loading) && <div className="code-diff-status" role="status">{t('Loading file…')}</div>}
     {document && !document.loading && document.kind !== 'text' && <div className="code-diff-status">{t(document.kind === 'binary' ? 'This file is binary or is not UTF-8. Open it with another editor.' : 'This file is too large for the embedded editor.')}</div>}
-    {document && !document.loading && !!document.revision && document.kind === 'text' && <CodeEditor path={file.path} value={document.value} active={active} onChange={value => useEditorDocuments.getState().edit(file, value)} onSave={() => { void useEditorDocuments.getState().save(file); }} />}
+    {document && !document.loading && !!document.revision && document.kind === 'text' && <CodeEditor path={file.path} value={document.value} active={active} readOnly={document.readOnly} onChange={value => useEditorDocuments.getState().edit(file, value)} onSave={() => { void useEditorDocuments.getState().save(file); }} />}
     <ConfirmDialog open={reload} title={t('Reload file')} message={t('Reload this file and discard your unsaved changes?')} confirmLabel={t('Reload')} cancelLabel={t('Cancel')} onCancel={() => setReload(false)} onConfirm={() => { setReload(false); void load(); }} />
   </section>;
 }

@@ -184,12 +184,12 @@ function currentTerminalMinWidth(): number {
   return tab && isSessionTab(tab) ? minTerminalWidth(tab.layout) : MIN_PANE_SIZE;
 }
 
-export const ACTIVITY_BAR_WIDTH = 44;
+export const ACTIVITY_BAR_WIDTH = 40;
 export const WORKSPACE_GAP = 8;
 
-/** Left navigation touches the content; only a closed sidebar leaves an inset. */
-export function workspaceFrameWidth(s: Pick<DockState, 'leftPanels'>): number {
-  return WORKSPACE_GAP * (s.leftPanels.length ? 1 : 2);
+/** Every content card starts at the activity rail and keeps a right frame inset. */
+export function workspaceFrameWidth(_s: Pick<DockState, 'leftPanels'>): number {
+  return WORKSPACE_GAP;
 }
 
 /** Reserve useful command space and close the older side when both do not fit. */

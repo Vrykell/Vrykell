@@ -8,8 +8,8 @@ import type { ExecutionContext } from './execution';
 import { useSettingsNavigationStore } from '@features/settings/stores/navigation';
 
 export const copyCommand = (command: string) => writeClipboardText(command);
-export const openCommandSettings = () => { useSettingsNavigationStore.getState().setSelected('command-history'); useSessionStore.getState().openSettingsTab(); };
-export const openCommandModelSettings = () => { useSettingsNavigationStore.getState().setSelected('ai-model'); useSessionStore.getState().openSettingsTab(); };
+export const openCommandSettings = () => { useSettingsNavigationStore.getState().setSelected('command-history'); useSessionStore.getState().openSettings(); };
+export const openCommandModelSettings = () => { useSettingsNavigationStore.getState().setSelected('ai-model'); useSessionStore.getState().openSettings(); };
 export async function importLegacyCommands(context: ExecutionContext): Promise<HistoryCommandEntry[]> {
   const rows = await searchHistory('', 1000);
   return rows.filter(row => isWithin(row.cwd, context.root)).map(row => ({ id: String(row.id), ...commandEnvironment(context.spec),

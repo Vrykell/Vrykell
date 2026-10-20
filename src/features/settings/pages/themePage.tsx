@@ -10,7 +10,7 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { useTheme } from '@app/providers/ThemeProvider';
 import { useTerminalThemeStore } from '@features/settings/model/terminalTheme';
 import { useToastStore } from '@ui/Toast';
-import { SettingsGroup, Field } from '@features/settings/components/ui';
+import { SettingsGroup, Field, Toggle } from '@features/settings/components/ui';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
 import { isWallpaperImage, wallpaperExtensions } from '../services/wallpaper';
 
@@ -59,7 +59,7 @@ export function ThemePage() {
   return (
     <SettingsGroup title={t('Appearance')}>
       <Field title={t('Theme mode')} description={t('Choose a light or dark appearance.')}>
-        <div className="settings-radio-group" role="radiogroup" aria-label={t('Theme mode')}>
+        <div className="theme-mode-choices" role="radiogroup" aria-label={t('Theme mode')}>
           {THEME_PREFERENCES.map(option => {
             const active = preference === option.value;
             return (
@@ -68,17 +68,20 @@ export function ThemePage() {
                 type="button"
                 role="radio"
                 aria-checked={active}
-                className="settings-radio"
-                data-on={active || undefined}
+                className="theme-mode-choice"
+                data-mode={option.value}
                 onClick={() => { void save(() => setMode(option.value)); }}
               >
-                <span className="settings-radio-dot" aria-hidden="true"
-                  data-system={option.value === 'system' && preference === 'system' ? 'true' : undefined} />
-                {t(option.label)}
+                <span className="theme-mode-preview" aria-hidden="true"><span className="theme-preview-navigation" /><span className="theme-preview-lines"><i /><i /><i /></span></span>
+                <span>{t(option.label)}</span>
               </button>
             );
           })}
         </div>
+      </Field>
+
+      <Field title={t('Desktop material')} description={t('Use a translucent black window frame. Content stays opaque.')}>
+        <Toggle label={t('Desktop material')} on={config.desktopTint ?? true} onChange={desktopTint => themeUpdate({ desktopTint })} />
       </Field>
 
       <Field title={t('Application opacity')} description={t('Lower opacity reveals more of the wallpaper.')}>

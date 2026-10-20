@@ -28,6 +28,7 @@ test.describe('应用布局', () => {
     for (const width of [1240, 720]) {
       await page.setViewportSize({ width, height: 800 });
       const titlebar = await page.locator('.workspace-titlebar').boundingBox();
+      expect(titlebar!.height).toBe(42);
       for (const id of ['window-minimize', 'window-maximize', 'window-close']) {
         const button = page.getByTestId(id);
         const rect = await button.boundingBox();

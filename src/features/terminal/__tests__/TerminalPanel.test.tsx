@@ -31,6 +31,21 @@ function chooseInputMode(mode: '密码输入' | '直接输入') {
 }
 
 describe('SSH connection input', () => {
+  it('keeps the hidden sizing host laid out without exposing authentication controls in block mode', () => {
+    useTerminalStore.setState({ sessions: { p: 'session' }, scenes: { p: 'blockList' } });
+    const view = render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput showToolbar={false} />);
+    const surface = screen.getByTestId('ssh-connection-input');
+    expect(surface).toHaveStyle({ display: 'flex', visibility: 'hidden' });
+    expect(surface).toHaveAttribute('inert');
+    expect(surface).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.queryByRole('textbox', { name: 'SSH 交互终端' })).not.toBeInTheDocument();
+    useTerminalStore.setState({ scenes: { p: 'classic' } });
+    view.rerender(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput showToolbar={false} />);
+    expect(surface).toBeVisible();
+    expect(surface).not.toHaveAttribute('inert');
+    expect(surface).not.toHaveAttribute('aria-hidden');
+  });
+
   it('opens status from the connection card and exposes a themed hover hint', () => {
     const toggle = vi.fn();
     const ready = vi.fn();

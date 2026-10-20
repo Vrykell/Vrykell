@@ -8,7 +8,7 @@ export interface SearchSource {
   id: ResultType;
   label: string;
   icon: AppIcon;
-  search: (query: string) => Promise<SearchResult[]>;
+  search: (query: string, options?: { signal: AbortSignal; onProgress: (results: SearchResult[]) => void }) => Promise<SearchResult[]>;
 }
 
 // ── 搜索结果 ──

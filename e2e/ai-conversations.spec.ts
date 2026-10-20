@@ -214,10 +214,14 @@ test('tool activity stays available within the plain conversation flow', async (
     radius: getComputedStyle(element).borderRadius,
     borderTop: getComputedStyle(element).borderTopStyle,
   }));
-  // Rows stay flat with no divider lines above or below each tool call.
-  expect(presentation).toEqual({ background: 'rgba(0, 0, 0, 0)', radius: '0px', borderTop: 'none' });
+  expect(presentation).toMatchObject({ radius: '14px', borderTop: 'solid' });
+  expect(presentation.background).not.toBe('rgba(0, 0, 0, 0)');
+  await expect(rows.first().locator('.ai-tool-label')).toHaveText('运行命令');
+  await expect(rows.first().locator('.ai-tool-state')).toHaveText('退出码 0');
   // Expanded output reuses the markdown code-block frame instead of a hairline.
   await rows.first().locator('.ai-tool-summary').click();
+  await expect(rows.first().locator('.ai-tool-input')).toContainText('hostname; uname -a');
+  await expect(rows.first().locator('.ai-tool-section-label')).toHaveText(['输入', '输出']);
   const output = rows.first().locator('.ai-tool-output');
   await expect(output).toBeVisible();
   const frame = await output.evaluate(element => ({

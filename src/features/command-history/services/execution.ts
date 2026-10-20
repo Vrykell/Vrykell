@@ -1,6 +1,6 @@
 import { commandEnvironment } from '@core/commandHistory';
 import { t } from '@i18n';
-import { ptyWrite } from '@platform/pty';
+import { writeTerminalCommand } from '@features/terminal/services/commandSubmission';
 import { getAvailableShells, SHELL_TYPES, type ShellType } from '@platform/shells';
 import { useSessionStore } from '@features/workspace';
 import type { TerminalSpec } from '@features/workspace/model/windowLayout';
@@ -67,6 +67,6 @@ export async function runHistoryCommand(context: ExecutionContext, item: Command
   submitting.add(paneId);
   try {
     setPendingTerminalCommand(paneId, item.command);
-    await ptyWrite(useTerminalStore.getState().sessions[paneId]!, `${item.command}\n`);
+    await writeTerminalCommand(paneId, useTerminalStore.getState().sessions[paneId]!, item.command);
   } finally { setTimeout(() => submitting.delete(paneId), 500); }
 }

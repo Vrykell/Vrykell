@@ -19,13 +19,13 @@ async function dragBefore(page: Page, source: string, target: string) {
 
 test('closing the last tab leaves the workspace empty and closing background sessions preserves the active page', async ({ page }) => {
   await boot(page);
-  await page.keyboard.press('Meta+,');
-  const settings = page.locator('[data-tab-kind="settings"]');
+  await page.getByTestId('tab-history-btn').click();
+  const settings = page.locator('[data-tab-kind="history"]');
   const session = page.locator('[data-tab-kind="session"]');
   await session.hover();
   await session.getByRole('button', { name: '关闭标签', exact: true }).click();
   await expect(settings).toBeVisible();
-  await expect(page.getByTestId('session-filter-input')).toHaveCount(0);
+  await expect(page.getByTestId('session-filter-input')).toBeVisible();
   await settings.getByRole('button', { name: '关闭标签', exact: true }).click();
   await expect(page.locator('[data-tab-row-id]')).toHaveCount(0);
   await expect(page.getByText('无匹配会话')).toHaveCount(0);
@@ -45,7 +45,7 @@ test('singleton pages reorder with loose sessions but never enter a group', asyn
     const grouped = ws.tabs[0]!.id;
     const loose = ws.addTab({ title: 'Loose terminal' });
     const group = await ws.createGroupForTab(grouped, 'Group');
-    const settings = ws.addTab({ kind: 'settings' });
+    const settings = ws.addTab({ kind: 'ai-history' });
     const history = ws.addTab({ kind: 'history' });
     return { grouped, loose, group, settings, history };
   });
@@ -61,7 +61,7 @@ test('singleton pages reorder with loose sessions but never enter a group', asyn
   await expect(page.locator(`[data-group-id="${ids.group}"] [data-reorder-placeholder]`)).toHaveCount(0);
   await page.mouse.up();
   await expect(page.locator(`[data-tab-row-id="${ids.settings}"]`)).toHaveAttribute('data-tab-group', '');
-  await expect(page.locator('[data-tab-kind="settings"]')).toHaveCount(1);
+  await expect(page.locator('[data-tab-kind="ai-history"]')).toHaveCount(1);
   await expect(page.locator('[data-tab-kind="history"]')).toHaveCount(1);
 });
 

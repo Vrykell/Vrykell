@@ -70,11 +70,12 @@ describe('SSH status panel', () => {
     expect(screen.getByTestId('ssh-resource-disk')).toHaveTextContent('30%');
     expect(screen.getByText('50% 空闲')).toHaveClass('ssh-status-metric-caption');
     expect(document.querySelectorAll('.ssh-status-metric-caption')).toHaveLength(3);
-    expect(screen.getByRole('img', { name: '资源使用率趋势' }).querySelector('[data-series="CPU"] circle')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '资源使用率趋势' }).querySelector('[data-series="CPU"] circle')).not.toBeInTheDocument();
     mocks.collect.mockResolvedValueOnce({ ...sample, cpuTotal: 1400, cpuIdle: 899 });
     fireEvent.click(screen.getByRole('button', { name: '刷新远端资源' }));
     await waitFor(() => expect(screen.getByTestId('ssh-resource-cpu')).toHaveTextContent('51%'));
     expect(screen.getByText('49% 空闲')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '资源使用率趋势' }).querySelector('[data-series="CPU"] polyline')).toBeInTheDocument();
   });
 
   it('keeps the CPU baseline when the phase moves between connected states', async () => {
@@ -340,12 +341,14 @@ describe('SSH status panel', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
     expect(mocks.collect).toHaveBeenCalledTimes(2);
     expect(screen.getByTestId('ssh-resource-cpu')).toHaveTextContent('12%');
-    const points = chart.querySelector('[data-series="CPU"] circle')!.getAttribute('cx');
+    expect(chart.querySelector('[data-series="CPU"] circle')).not.toBeInTheDocument();
+    expect(chart.querySelector('[data-series="CPU"] polyline')).not.toBeInTheDocument();
+    const points = chart.querySelector('[data-series="内存"] polyline')!.getAttribute('points');
     const frame = chart.closest('.ssh-resource-chart')!;
     expect(frame).toHaveAttribute('data-end-time', '15000');
     await act(async () => { await vi.advanceTimersByTimeAsync(5_000); });
     expect(frame).toHaveAttribute('data-end-time', '15000');
-    expect(chart.querySelector('[data-series="CPU"] circle')).toHaveAttribute('cx', points);
+    expect(chart.querySelector('[data-series="内存"] polyline')).toHaveAttribute('points', points);
     await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
     expect(mocks.collect).toHaveBeenCalledTimes(3);
     expect(chart.querySelector('[data-series="CPU"] polyline')!.getAttribute('points')!.split(' ')).toHaveLength(2);

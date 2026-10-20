@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FC } from 'react';
 import { iconSizes, X  } from '@ui/icons';
-import { useDockStore, PANEL_DEFS, MIN_PANEL_WIDTH, useNavigationButtonDrag, useNavigationDrag, type DockSide } from '@features/workspace';
+import { useDockStore, useUiStore, PANEL_DEFS, MIN_PANEL_WIDTH, useNavigationButtonDrag, useNavigationDrag, type DockSide } from '@features/workspace';
 import ResizeHandle from '@ui/ResizeHandle';
 import PanelTabs from '@features/workspace/components/PanelTabs';
 import PanelFiles from '@features/files/components/PanelFiles';
@@ -47,6 +47,7 @@ export default function SidePanel({ side }: SidePanelProps) {
 }
 
 function SinglePanel({ side, panelId, visible }: { side: DockSide; panelId: string; visible: boolean }) {
+  const settingsOpen = useUiStore(state => state.settingsOpen);
   const startDrag = useNavigationButtonDrag();
   const dragging = useNavigationDrag(state => state.id === panelId);
   const setPanelWidth = useDockStore((s) => s.setPanelWidth);
@@ -89,7 +90,7 @@ function SinglePanel({ side, panelId, visible }: { side: DockSide; panelId: stri
   if (!def || !PanelContent) return null;
 
   return (
-    <div className="workspace-side-panel" role="complementary" aria-label={`${panelId === 'chat' ? 'AI 助手' : def.label}面板`} data-side={side} data-visible={visible ? 'true' : 'false'} style={{
+    <div className="workspace-side-panel" role="complementary" inert={settingsOpen} aria-hidden={settingsOpen || undefined} aria-label={`${panelId === 'chat' ? 'AI 助手' : def.label}面板`} data-side={side} data-visible={visible ? 'true' : 'false'} style={{
       display: visible ? 'block' : 'none',
       position: 'relative',
       flexShrink: 0,
@@ -118,7 +119,7 @@ function SinglePanel({ side, panelId, visible }: { side: DockSide; panelId: stri
       </div>
 
       {/* Keep the resize edge mounted during collapse so dragging back restores the panel. */}
-      <ResizeHandle axis="x" edge={isLeft ? 'right' : 'left'} onDelta={handleDelta} onUp={handleCommit} testId={`resize-handle-${panelId}`} />
+      <ResizeHandle axis="x" edge={isLeft ? 'right' : 'left'} lineThickness={2} onDelta={handleDelta} onUp={handleCommit} testId={`resize-handle-${panelId}`} />
     </div>
   );
 }

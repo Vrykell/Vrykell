@@ -1,0 +1,38 @@
+.transfer-manager { display: flex; flex-direction: column; height: 100%; min-width: 0; min-height: 0; color: var(--text-primary); font-size: var(--fs-caption); }
+.sidebar-heading.transfer-manager-heading { justify-content: flex-start; gap: 6px; min-height: 36px; flex-shrink: 0; padding: 2px 8px; }
+.transfer-manager-heading > span { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.transfer-manager-body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 4px 8px 12px; }
+.transfer-manager-body > [role="alert"] { margin-bottom: 12px; overflow-wrap: anywhere; }
+.transfer-group + .transfer-group { margin-top: 16px; }
+.transfer-group h3 { display: flex; align-items: center; gap: 6px; margin: 0 2px 8px; color: var(--text-secondary); font-size: var(--fs-caption); font-weight: var(--fw-medium); }
+.transfer-group h3 > span { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.transfer-record { --progress-color: var(--group-blue); display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--surface); transition: border-color 140ms var(--ease); }
+.transfer-record + .transfer-record { margin-top: 8px; }
+.transfer-record:is(:hover, :focus-within) { border-color: var(--border-strong); }
+.transfer-record[data-status="paused"], .transfer-record[data-status="interrupted"] { --progress-color: var(--warning); }
+.transfer-record[data-status="failed"] { --progress-color: var(--error-light); }
+.transfer-record[data-status="cancelled"] { --progress-color: var(--text-muted); }
+.transfer-record-title { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: var(--fs-label); font-weight: var(--fw-semibold); }
+.transfer-record-title > svg { color: var(--text-secondary); }
+.transfer-file-name, .transfer-connection > span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.transfer-connection { display: flex; align-items: center; gap: 6px; min-width: 0; margin-top: -4px; color: var(--text-secondary); }
+.transfer-paths { display: flex; flex-direction: column; gap: 4px; margin: 0; }
+.transfer-paths > div { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.transfer-paths dt { flex-shrink: 0; color: var(--text-muted); }
+.transfer-paths dd { flex: 1; min-width: 0; margin: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--text-secondary); font-family: var(--font-mono); font-size: var(--fs-micro); }
+.transfer-progress-heading, .transfer-metrics { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.transfer-status { display: inline-flex; align-items: center; gap: 5px; }
+.transfer-status > i { width: 5px; height: 5px; flex-shrink: 0; border-radius: 50%; background: var(--progress-color); }
+.transfer-status > svg { color: var(--success); }
+.transfer-percent { color: var(--text-primary); }
+.transfer-metrics { margin-top: -2px; font-size: var(--fs-micro); }
+.transfer-eta { margin-top: -4px; color: var(--text-muted); font-size: var(--fs-micro); }
+.transfer-record-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
+.transfer-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.transfer-controls > .outline-button { min-height: 28px; padding: 3px 8px; }
+.transfer-date { min-width: 0; color: var(--text-muted); font-size: var(--fs-micro); }
+.transfer-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }
+.transfer-actions .transfer-action { flex: 0 0 auto; }
+.transfer-empty { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 32px 8px; color: var(--text-muted); text-align: center; line-height: 1.6; }
+.transfer-empty > strong { color: var(--text-secondary); font-size: var(--fs-label); font-weight: var(--fw-medium); }
+.transfer-empty > p { margin: 0; max-width: 28em; font-size: var(--fs-caption); }

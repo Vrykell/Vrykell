@@ -184,6 +184,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     tabId: ctx?.tabId,
     setToolState: (toolCallId, state: ToolRunState, extra) => {
       const c = calls.get(toolCallId);
+      if (c && extra?.input) c.input = extra.input;
       emitTool?.({
         toolCallId,
         toolName: c?.toolName ?? 'unknown',

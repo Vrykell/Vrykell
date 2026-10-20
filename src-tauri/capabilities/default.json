@@ -37,6 +37,8 @@
     "core:webview:allow-create-webview-window",
     "core:window:allow-unminimize",
     "core:window:allow-show",
-    "core:window:allow-set-focus"
+    "core:window:allow-set-focus",
+    "core:window:allow-set-effects",
+    "core:window:allow-set-theme"
   ]
 }

@@ -1,7 +1,7 @@
 import { TextInput } from '@ui/TextInput';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { iconSizes,
-  Plus, History, Settings, Sparkles, DataUsage, Bot, GitBranch,
+  Plus, History, Sparkles, DataUsage, Bot, GitBranch,
   ChevronRight, Pencil, Archive, Folder, Trash2, X,
  } from '@ui/icons';
 import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, useTabDisplayTitle, tabIconKey, tabIconColor, type Tab, type TabGroup } from '@features/workspace';
@@ -308,7 +308,6 @@ export default function PanelTabs() {
           const Icon = drag.kind === 'group' ? Folder
             : tab?.kind === 'history' ? History
               : tab?.kind === 'ai-history' ? Sparkles
-              : tab?.kind === 'settings' ? Settings
               : tab?.kind === 'usage' ? DataUsage
               : first?.kind === 'ssh' ? SshIcon
                 : shellIconFor(first?.kind === 'local' ? first.shellType ?? defaultShellType : undefined);
@@ -575,7 +574,6 @@ function TabRow({
     : tab.kind === 'git-diff' ? tab.comparisons ? GitBranch : fileIcon(tab.selection.path)
     : tab.kind === 'editor' ? fileIcon(tab.selected.path)
     : tab.kind === 'ai-history' ? Sparkles
-      : tab.kind === 'settings' ? Settings
       : tab.kind === 'usage' ? DataUsage
       : tab.kind === 'harness' ? harnessMark(tab.harness)
       : isSsh ? SshIcon

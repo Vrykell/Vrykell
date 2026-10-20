@@ -1,5 +1,5 @@
 .code-diff { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; }
-.code-diff-frame { position: relative; flex: 1; min-height: 0; min-width: 0; overflow: hidden; border-radius: var(--radius-block); clip-path: inset(0 round var(--radius-block)); isolation: isolate; background: var(--canvas); }
+.code-diff-frame { position: relative; flex: 1; min-height: 0; min-width: 0; overflow: hidden; border-radius: var(--radius-block); clip-path: inset(0 round var(--radius-block)); isolation: isolate; background: var(--xterm-bg); }
 .code-diff-host { position: absolute; inset: 0; overflow: hidden; }
 .code-diff .monaco-diff-editor .editor.original, .code-diff .monaco-diff-editor .editor.modified { overflow: hidden; }
 .code-diff .monaco-diff-editor .editor { box-shadow: none; border: 0; }
@@ -8,7 +8,7 @@
 .code-diff .monaco-editor .scroll-decoration, .code-editor .monaco-editor .scroll-decoration { display: none; }
 .code-diff-frame, .code-editor-frame { border: 0; box-shadow: none; }
 .code-editor { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
-.code-editor-frame { position: relative; flex: 1; min-width: 0; min-height: 0; overflow: hidden; border-radius: var(--radius-block); clip-path: inset(0 round var(--radius-block)); background: var(--canvas); }
+.code-editor-frame { position: relative; flex: 1; min-width: 0; min-height: 0; overflow: hidden; border-radius: var(--radius-block); clip-path: inset(0 round var(--radius-block)); background: var(--xterm-bg); }
 .code-editor .decorationsOverviewRuler, .code-editor .monaco-scrollable-element > .shadow { display: none; }
 .code-diff .current-line, .code-editor .current-line { border: 0 !important; }
 .code-diff-status { padding: 24px 16px; color: var(--text-muted); text-align: center; font-size: var(--fs-caption); line-height: 1.6; }

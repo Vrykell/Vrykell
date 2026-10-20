@@ -58,8 +58,8 @@ export interface ToolContext {
   shellType?: string | null;
   /** 会话 id（= 工作区 tabId），审批卡的落点 */
   tabId?: string;
-  /** 审批状态回写（agentStream 接到后 upsert ToolRun）；shape 用于卡片上的「本会话允许这一种」 */
-  setToolState?: (toolCallId: string, state: ToolRunState, extra?: { danger?: string; shape?: string }) => void;
+  /** 审批状态回写（agentStream 接到后 upsert ToolRun）；shape 用于卡片上的「本会话允许这一种」，input 携带编辑后的命令 */
+  setToolState?: (toolCallId: string, state: ToolRunState, extra?: { danger?: string; shape?: string; input?: Record<string, unknown> }) => void;
 }
 
 /** 全部受管工具（设置页表格也用它渲染，新增工具别漏） */
@@ -193,14 +193,15 @@ export function levelOf(tool: string): ToolLevel {
 
 // ── 审批桥 ──
 
-const pending = new Map<string, (d: ApprovalDecision) => void>();
+type ApprovalResolution = { decision: ApprovalDecision; command?: string };
+const pending = new Map<string, (result: ApprovalResolution) => void>();
 
 /**
  * Waits for the card's answer, but not forever: nobody may be in front of the app (a scheduled
  * turn, a locked screen), and a promise that never settles would hold the turn — and with it the
  * single send slot — for good. The deadline denies the call and says so in the transcript.
  */
-function requestApproval(toolCallId: string): Promise<ApprovalDecision> {
+function requestApproval(toolCallId: string): Promise<ApprovalResolution> {
   return new Promise((resolve) => {
     const minutes = Math.max(1, Math.round(approvalTimeoutMs() / 60_000));
     const timer = window.setTimeout(() => {
@@ -210,24 +211,24 @@ function requestApproval(toolCallId: string): Promise<ApprovalDecision> {
         t('No answer within {{minutes}} minutes, so the request was denied automatically.', { minutes }),
         'warning',
       );
-      resolve('timeout');
+      resolve({ decision: 'timeout' });
     }, approvalTimeoutMs());
-    pending.set(toolCallId, (decision) => {
+    pending.set(toolCallId, (result) => {
       window.clearTimeout(timer);
-      resolve(decision);
+      resolve(result);
     });
   });
 }
 
 /** 审批卡按钮入口。unknown toolCallId 静默忽略（可能已被 stop 兜底清掉） */
-export function resolveApproval(toolCallId: string, decision: ApprovalDecision) {
-  pending.get(toolCallId)?.(decision);
+export function resolveApproval(toolCallId: string, decision: ApprovalDecision, command?: string) {
+  pending.get(toolCallId)?.({ decision, command });
   pending.delete(toolCallId);
 }
 
 /** 中止/断流时兜底：所有挂起审批一律按拒绝放行，防 execute 悬挂 */
 export function denyAllPending() {
-  for (const resolve of pending.values()) resolve('deny');
+  for (const resolve of pending.values()) resolve({ decision: 'deny' });
   pending.clear();
 }
 
@@ -275,7 +276,7 @@ export async function ensureTrustedSkill(
   ctx.setToolState(toolCallId, 'approval-pending', {
     danger: `信任技能「${skillName}」后可访问其文件与脚本`,
   });
-  const decision = await requestApproval(toolCallId);
+  const { decision } = await requestApproval(toolCallId);
   if (decision === 'timeout') {
     ctx.setToolState(toolCallId, 'denied');
     return {
@@ -340,7 +341,9 @@ export function setToolApprover(next: ToolApprover | null) {
   approver = next ?? backendApprover;
 }
 
-export type GateOutcome = { proceed: true; lease?: string } | { proceed: false; result: GateResult };
+export type GateOutcome =
+  | { proceed: true; lease?: string; command?: string }
+  | { proceed: false; result: GateResult };
 
 function denied(reason: string | undefined, fallback: string): GateOutcome {
   return { proceed: false, result: { ok: false, denied: true, error: reason ?? fallback } };
@@ -395,7 +398,7 @@ export async function gate(
   const cardExtra = { ...(reason ? { danger: reason } : {}), ...(shape ? { shape } : {}) };
   ctx.setToolState(toolCallId, 'approval-pending', Object.keys(cardExtra).length > 0 ? cardExtra : undefined);
   const choice = await requestApproval(toolCallId);
-  if (choice === 'timeout') {
+  if (choice.decision === 'timeout') {
     // Nobody answered: deny and say why, so the transcript explains the step that never ran.
     const note = t('No answer within {{minutes}} minutes, so the request was denied automatically.', {
       minutes: approvalTimeoutMinutes(),
@@ -403,11 +406,51 @@ export async function gate(
     ctx.setToolState(toolCallId, 'denied', { danger: note });
     return denied(undefined, note);
   }
-  if (choice === 'deny') {
+  if (choice.decision === 'deny') {
     ctx.setToolState(toolCallId, 'denied', reason ? { danger: reason } : undefined);
     return denied(undefined, '用户拒绝了本次操作');
   }
-  const approved = await approver(toolName, command, input, choice).catch((error: unknown) => {
+  // The card may edit a command before running it: the edited text is re-authorized (a dangerous
+  // edit still gets the native confirmation), bound into the lease as the approved arguments, and
+  // executed instead of the original.
+  const edited = toolName === 'run_command' && choice.command !== undefined && choice.command !== input.command
+    ? choice.command
+    : undefined;
+  if (edited !== undefined && !edited.trim()) {
+    ctx.setToolState(toolCallId, 'denied');
+    return denied(undefined, t('Enter a command before running it.'));
+  }
+  const approvedInput = edited !== undefined ? { ...input, command: edited } : input;
+  if (edited !== undefined) {
+    try {
+      const recheck = await authorizer({
+        tool: toolName,
+        command,
+        args: approvedInput,
+        shell: ctx.shellType ?? null,
+        mode,
+        reasonHint: t('This operation can change your system or reach your credentials.'),
+        timeoutSecs: Math.round(approvalTimeoutMs() / 1000),
+      });
+      if (recheck.decision === 'deny') {
+        const blocked = reasonText(recheck.reason) || reason;
+        ctx.setToolState(toolCallId, 'denied', blocked ? { danger: blocked } : undefined);
+        return denied(blocked, '操作被拒绝');
+      }
+    } catch (error) {
+      // Fail closed: without an authorization for the edited text it must not run.
+      console.warn('[permissions] Authorization unavailable:', error);
+      return denied(undefined, '无法获取授权（后端不可用），操作已拒绝');
+    }
+  }
+  const approved = await approver(
+    toolName,
+    command,
+    approvedInput,
+    // A shape derived from the original arguments cannot cover an edited command; the narrowest
+    // grant for an edit is this one call.
+    edited !== undefined && choice.decision === 'shape' ? 'once' : choice.decision,
+  ).catch((error: unknown) => {
     console.warn('[permissions] Could not record the approval:', error);
     return { decision: 'deny' } as ToolDecision;
   });
@@ -415,8 +458,16 @@ export async function gate(
     ctx.setToolState(toolCallId, 'denied', reason ? { danger: reason } : undefined);
     return denied(reason, '审批未能完成，操作已拒绝');
   }
-  if (choice === 'session') noteSessionGrant(toolName);
-  if (choice === 'shape' && shape) noteShapeGrant(shape);
-  ctx.setToolState(toolCallId, 'running', reason ? { danger: reason } : undefined);
-  return { proceed: true, ...(approved.lease ? { lease: approved.lease } : {}) };
+  if (choice.decision === 'session') noteSessionGrant(toolName);
+  if (choice.decision === 'shape' && shape && edited === undefined) noteShapeGrant(shape);
+  const runningExtra = {
+    ...(reason ? { danger: reason } : {}),
+    ...(edited !== undefined ? { input: approvedInput } : {}),
+  };
+  ctx.setToolState(toolCallId, 'running', Object.keys(runningExtra).length > 0 ? runningExtra : undefined);
+  return {
+    proceed: true,
+    ...(approved.lease ? { lease: approved.lease } : {}),
+    ...(edited !== undefined ? { command: edited } : {}),
+  };
 }

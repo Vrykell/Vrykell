@@ -67,10 +67,10 @@ vi.mock('@features/agent', () => ({
 }));
 
 describe('useInputEditorController', () => {
-  it('submits repeat Enter events using the current cleared draft', () => {
+  it('submits repeat Enter events using the current cleared draft', async () => {
     const { result } = renderHook(() => useInputEditorController({ paneId: 'pane-1' }));
     const execute = result.current.execute;
-    act(() => { execute(); execute(); execute(); });
+    await act(async () => { execute(); execute(); execute(); });
     expect(mocks.ptyWrite.mock.calls.map(call => call[1])).toEqual(['git status\n', '\n', '\n']);
   });
   it('preserves a draft consisting of standalone newline characters', () => {
@@ -132,6 +132,24 @@ describe('useInputEditorController', () => {
     expect(mocks.ptyWrite).toHaveBeenCalledWith('pty-1', 'git status\n');
     expect(mocks.engageFollow).toHaveBeenCalledWith('pane-1');
     expect(useInputStore.getState().byPane['pane-1']?.text).toBe('');
+  });
+
+  it('submits a multiline script as one shell statement without losing its source draft', async () => {
+    const script = "cat <<'TEXT'\nline with 'quotes'\nTEXT\nprintf done";
+    useInputStore.getState().setText('pane-1', script);
+    const { result } = renderHook(() => useInputEditorController({ paneId: 'pane-1' }));
+    await act(async () => result.current.execute());
+    const payload = mocks.ptyWrite.mock.calls[0]![1] as string;
+    expect(payload.trimEnd()).not.toContain('\n');
+    expect(payload).toContain('eval "$(printf');
+    expect(payload).toContain("line with '\\''quotes'\\''");
+  });
+
+  it('restores the script draft if the terminal write fails', async () => {
+    mocks.ptyWrite.mockRejectedValueOnce(new Error('closed'));
+    const { result } = renderHook(() => useInputEditorController({ paneId: 'pane-1' }));
+    await act(async () => result.current.execute());
+    expect(useInputStore.getState().byPane['pane-1']?.text).toBe('git status');
   });
 
   it('routes Enter to the same command submission controller', () => {

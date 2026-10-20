@@ -38,7 +38,6 @@ import { usePinnedCommand } from '../hooks/usePinnedCommand';
 import TerminalPanel from '@features/terminal/components/TerminalPanel';
 import { SessionHistoryView } from '@features/session-history';
 import AiHistoryView from '@features/chat/components/AiHistoryView';
-import SettingsView from '@features/settings/pages/SettingsView';
 import ContextMenu, { type ContextMenuItem } from '@ui/ContextMenu';
 import ErrorBox from '@ui/ErrorBox';
 import { TextButton } from '@ui/TextButton';
@@ -122,7 +121,7 @@ export default function TerminalView() {
           : tab.kind === 'ai-history' ? <AiHistoryView key={tab.id} />
             : tab.kind === 'usage' ? <UsageView key={tab.id} />
               : tab.kind === 'harness' ? <HarnessView key={tab.id} tabId={tab.id} harness={tab.harness} cwd={tab.cwd} />
-                  : <SettingsView key={tab.id} />;
+                : null;
       })}
 
       {/* Manual fullscreen host for a running block, with room for the toolbar. */}
@@ -596,7 +595,7 @@ function PaneBlockList({ paneId, insetLeft = 8, insetRight = 8 }: { paneId: stri
           <PaneEmptyHint paneId={paneId} />
         </div>
       </div>
-      {pinned && pinnedBlock && <PinnedCommand key={pinned.id} block={pinnedBlock} paneId={paneId}
+      {pinned && pinnedBlock && <PinnedCommand block={pinnedBlock} paneId={paneId}
         remaining={pinned.remaining} insetLeft={insetLeft} insetRight={insetRight} scrollRef={scrollRef}
         collapsed={titleCollapsed} onToggle={() => updateTypography({ commandTitleCollapsed: !titleCollapsed })} />}
       <OverlayScrollbar scrollRef={scrollRef} controlsId={scrollId} label={t('Scroll command history')} />

@@ -10,7 +10,7 @@ export function measurePinnedCommand(scroll: HTMLElement): PinnedCommand | null 
     const bounds = item.getBoundingClientRect();
     if (bounds.top >= viewport.top) break;
     if (bounds.bottom <= viewport.top) continue;
-    const title = item.querySelector<HTMLElement>('.command-block-command');
+    const title = item.querySelector<HTMLElement>(item.dataset.running === 'true' ? '.command-block-info' : '.command-block-command');
     if (!title || title.getBoundingClientRect().bottom > viewport.top) return null;
     return { id: item.dataset.commandBlockId!, remaining: bounds.bottom - viewport.top };
   }

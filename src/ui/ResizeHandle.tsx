@@ -12,6 +12,7 @@ interface ResizeHandleProps {
   testId?: string;
   label?: string;
   onReset?: () => void;
+  lineThickness?: number;
 }
 
 /** Grab strip thickness (px). The strip stays transparent; only its hairline is painted. */
@@ -33,7 +34,7 @@ const LINE_THICKNESS = 1;
  * document-level listeners must keep working until the button is released so the user
  * can drag back out of the collapse.
  */
-export default function ResizeHandle({ axis, edge = 'right', onDelta, onUp, testId, label, onReset }: ResizeHandleProps) {
+export default function ResizeHandle({ axis, edge = 'right', onDelta, onUp, testId, label, onReset, lineThickness = LINE_THICKNESS }: ResizeHandleProps) {
   const startRef = useRef<{ clientX: number; clientY: number } | null>(null);
   const cleanupRef = useRef<() => void>(() => {});
   const lineRef = useRef<HTMLDivElement>(null);
@@ -124,8 +125,8 @@ export default function ResizeHandle({ axis, edge = 'right', onDelta, onUp, test
           backgroundColor: 'var(--resize-divider)',
           transition: 'background-color var(--dur) var(--ease)',
           ...(isX
-            ? { left: 'calc(50% - 0.5px)', top: 0, bottom: 0, width: LINE_THICKNESS }
-            : { top: 'calc(50% - 0.5px)', left: 0, right: 0, height: LINE_THICKNESS }),
+            ? { left: `calc(50% - ${lineThickness / 2}px)`, top: 0, bottom: 0, width: lineThickness }
+            : { top: `calc(50% - ${lineThickness / 2}px)`, left: 0, right: 0, height: lineThickness }),
         }}
       />
     </div>

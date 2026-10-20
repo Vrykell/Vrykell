@@ -9,8 +9,8 @@ describe('terminal block palette', () => {
   });
 
   it('默认前景、背景和光标映射到同一套终端变量', () => {
-    expect(indexToCss(256)).toBe('var(--xterm-foreground, #D6D9E0)');
-    expect(indexToCss(257)).toBe('var(--xterm-bg, #111417)');
-    expect(indexToCss(258)).toBe('var(--xterm-cursor, #C9D1DB)');
+    expect(indexToCss(256)).toBe('var(--xterm-foreground, #E9EBED)');
+    expect(indexToCss(257)).toBe('var(--xterm-bg, #141414)');
+    expect(indexToCss(258)).toBe('var(--xterm-cursor, #E9EBED)');
   });
 });

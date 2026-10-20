@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '@i18n';
-import { Brain, ChevronDown, Ellipsis, Pencil, RefreshCw, Sparkles, Trash2 } from '@ui/icons';
+import { Brain, ChevronRight, Ellipsis, Pencil, RefreshCw, Sparkles, Trash2 } from '@ui/icons';
 import { IconButton } from '@ui/IconButton';
 import ContextMenu, { type ContextMenuItem } from '@ui/ContextMenu';
 import ErrorBox from '@ui/ErrorBox';
@@ -83,13 +83,13 @@ export default function AiBlock({ exchange, conversationId, presentation = 'bloc
       <span className="command-block-actions ai-block-actions">
         {answer && <IconButton compact aria-expanded={!collapsed} aria-label={t(collapsed ? 'Expand reply' : 'Collapse reply')}
           data-tip={t(collapsed ? 'Expand reply' : 'Collapse reply')} onClick={() => setCollapsed(!collapsed)}>
-          <ChevronDown size={14} style={{ transform: collapsed ? undefined : 'rotate(180deg)', transition: 'transform 0.12s ease' }} />
+          <ChevronRight size={14} style={{ transform: collapsed ? undefined : 'rotate(90deg)' }} />
         </IconButton>}
         {moreButton}
       </span>
     </div>}
-    {question && <div className={plain ? 'ai-block-question' : 'command-block-command ai-block-question'} data-selectable>{question.content}</div>}
-    {plain && question && <div className="chat-question-meta">
+    {!!question?.content.trim() && <div className={plain ? 'ai-block-question' : 'command-block-command ai-block-question'} data-selectable>{question.content}</div>}
+    {plain && !!question?.content.trim() && <div className="chat-question-meta">
       <span>{formatMessageTime(question.createdAt)}</span>
       <CopyButton className="chat-question-copy" testId="chat-question-copy" text={question.content}
         label={t('Copy message')} style={{ width: 20, height: 20 }} />
@@ -100,7 +100,7 @@ export default function AiBlock({ exchange, conversationId, presentation = 'bloc
     {answer && expanded && <div className={plain ? 'ai-block-answer' : 'command-block-output ai-block-answer'} data-selectable>
       {answer.reasoning && <ThinkingBlock text={answer.reasoning} streaming={answer.pending ?? false} />}
       {parts ? parts.map((part, index) => part.kind === 'tool'
-        ? <ToolRunCard key={part.tool.toolCallId} run={part.tool} paneId={answer.paneId ?? exchange.paneId} framed={plain} />
+        ? <ToolRunCard key={part.tool.toolCallId} run={part.tool} paneId={answer.paneId ?? exchange.paneId} framed={plain} conversationId={ownerConversation} environment={answer.environment ?? question?.environment ?? undefined} />
         : part.text ? <div key={index} className="md"><SafeMarkdown content={part.text} paneId={executionPane} />
           {answer.pending && index === parts.length - 1 && <PendingCursor />}</div> : null)
         : answer.content ? <div className="md"><SafeMarkdown content={answer.content} paneId={executionPane} />{answer.pending && <PendingCursor />}</div> : null}
@@ -145,15 +145,14 @@ export default function AiBlock({ exchange, conversationId, presentation = 'bloc
 function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }) {
   const [open, setOpen] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
-  const preview = text.split('\n').find(line => line.trim()) ?? '';
   useEffect(() => {
     if (open && streaming && bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
   }, [text, open, streaming]);
-  return <div className="ai-thinking ai-tool-card">
+  return <div className="ai-thinking ai-tool-card" data-open={open}>
     <button type="button" data-subtle className="ai-tool-summary" aria-expanded={open} onClick={() => setOpen(!open)}>
       <Brain size={15} aria-hidden="true" />
-      <span className="ai-tool-description"><span>{t('Thinking process')}</span>{!open && <span className="ai-thinking-preview">{preview}</span>}</span>
-      <ChevronDown size={14} aria-hidden="true" style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 0.12s ease' }} />
+      <span className="ai-tool-description">{t('Thinking process')}</span>
+      <ChevronRight size={14} aria-hidden="true" style={{ transform: open ? 'rotate(90deg)' : undefined }} />
     </button>
     {open && <div ref={bodyRef} className="ai-thinking-body md"><SafeMarkdown content={text} paneId={null} /></div>}
   </div>;

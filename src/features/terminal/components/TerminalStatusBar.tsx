@@ -16,7 +16,7 @@ export const STATUS_ACTION_ICON_SIZE = 16;
 export function TerminalStatusBar({ cwd, startedAt, label, gitBranch, agent, actions, alwaysShowActions, style }: {
   cwd?: string;
   startedAt?: number | null;
-  label?: string;
+  label?: ReactNode;
   gitBranch?: string;
   agent?: ReactNode;
   actions?: ReactNode;

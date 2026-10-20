@@ -17,7 +17,7 @@ for (const mode of ['block', 'classic'] as const) {
       const nav = page.locator('aside');
       await nav.getByRole('button', { name: '主题', exact: true }).click();
       await page.getByRole('radio', { name: theme, exact: true }).click();
-      await page.keyboard.press('Meta+1');
+      await page.getByRole('button', { name: '设置', exact: true }).click();
       await expect(pane).toBeVisible();
       const expected = await page.evaluate(() => {
         const color = getComputedStyle(document.documentElement).getPropertyValue('--xterm-bg').trim();
@@ -25,7 +25,7 @@ for (const mode of ['block', 'classic'] as const) {
       });
       await expect(pane).toHaveCSS('background-color', expected);
       const cursor = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--xterm-cursor').trim());
-      expect(cursor).toBe(theme === '深色' ? '#ECEFF4' : '#2E3742');
+      expect(cursor).toBe(theme === '深色' ? '#E9EBED' : '#2E3742');
       if (mode === 'block') {
         await expect(page.locator('[data-testid^="terminal-scroll-"]').first()).toHaveCSS('background-color', expected);
         await expect(page.locator('.terminal-composer').locator('..')).toHaveCSS('background-color', expected);

@@ -172,7 +172,7 @@ test('settings stays fixed below the left toolbar and opens one settings page', 
   await expect(page.locator('.settings-view')).toBeVisible();
   await expect(settings).toHaveAttribute('aria-pressed', 'true');
   await settings.click();
-  await expect(page.locator('.settings-view')).toHaveCount(1);
+  await expect(page.locator('.settings-view')).toHaveCount(0);
   await page.keyboard.press('Meta+1');
   await expect(page.locator('.settings-view')).toBeHidden();
 

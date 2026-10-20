@@ -66,16 +66,27 @@ it('keeps question selection separate from explicit reply collapse', () => {
   expect(screen.getByText('configuration')).toBeInTheDocument();
 });
 
-it('flips the disclosure chevron 180° instead of pointing it sideways', () => {
+it('rotates the disclosure chevron a quarter turn instead of pointing it sideways', () => {
   useChatStore.setState({ sendingTab: null });
   const { container } = render(<AiBlock exchange={exchange} conversationId="conversation" />);
   const arrow = () => container.querySelector('.ai-block-actions svg') as SVGElement;
   // 展开时朝上（▴ = 朝下的箭头翻 180°），收起时朝下（▾）——AI 面板的展开箭头统一这一套
-  expect(arrow().style.transform).toBe('rotate(180deg)');
+  expect(arrow().style.transform).toBe('rotate(90deg)');
   fireEvent.click(screen.getByRole('button', { name: '收起回答' }));
   expect(arrow().style.transform).toBe('');
   fireEvent.click(screen.getByRole('button', { name: '展开回答' }));
-  expect(arrow().style.transform).toBe('rotate(180deg)');
+  expect(arrow().style.transform).toBe('rotate(90deg)');
+});
+
+it.each(['', ' \n '])('keeps an attachment-only message without an empty text bubble (%j)', content => {
+  const { container } = render(<AiBlock conversationId="conversation" presentation="conversation" exchange={{ ...exchange,
+    question: { ...exchange.question!, content, attachments: [{ id: 'paste', kind: 'paste', name: 'Pasted log', mime: 'text/plain', size: 5, textContent: 'hello' }] },
+  }} />);
+  expect(container.querySelector('.ai-block-question')).toBeNull();
+  expect(screen.queryByTestId('chat-question-copy')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Pasted log' }));
+  expect(screen.getByText('hello')).toBeVisible();
+  expect(screen.getByText('configuration')).toBeVisible();
 });
 
 it('keeps approval actions and failures visible without timeline nodes', () => {
@@ -83,7 +94,7 @@ it('keeps approval actions and failures visible without timeline nodes', () => {
     { kind: 'tool', tool: { toolCallId: 'approval', toolName: 'run_command', input: { command: 'npm run build' }, state: 'approval-pending', startedAt: 1 } },
     { kind: 'tool', tool: { toolCallId: 'failure', toolName: 'read_file', input: { path: '/project/missing' }, state: 'error', startedAt: 1, error: 'Missing file' } },
   ] } }} />);
-  expect(screen.getByRole('button', { name: '允许一次' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '运行' })).toBeInTheDocument();
   expect(screen.getByRole('alert')).toHaveTextContent('Missing file');
   expect(container.querySelectorAll('.ai-tool-card')).toHaveLength(2);
   expect(container.querySelector('[style*="position: absolute"]')).toBeNull();
@@ -102,7 +113,7 @@ it('collapses a failure through the row toggle after showing it by default', () 
   };
   expect(summary()).toHaveAttribute('aria-expanded', 'true');
   // ... the disclosure arrow is flipped up while expanded (the row's last icon) ...
-  expect(arrow().style.transform).toBe('rotate(180deg)');
+  expect(arrow().style.transform).toBe('rotate(90deg)');
   // ... and collapsing it hides the failure again and points the arrow down.
   fireEvent.click(summary());
   expect(screen.queryByRole('alert')).toBeNull();
@@ -222,10 +233,12 @@ it('labels the narrowest approval with the shape and keeps the wider one out of 
   render(<AiBlock conversationId="conversation" exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [
     { kind: 'tool', tool: { toolCallId: 'shape', toolName: 'run_command', input: { command: 'npm run build' }, state: 'approval-pending', startedAt: 1, shape: 'npm run' } },
   ] } }} />);
-  expect(screen.getByTestId('tool-allow-shape')).toHaveTextContent('本会话允许「npm run」');
-  // The whole-tool approval would be wider than what the card shows, so it is not offered.
-  expect(screen.queryByRole('button', { name: '本会话允许' })).toBeNull();
-  expect(screen.getByRole('button', { name: '允许一次' })).toBeInTheDocument();
+  // The narrowest grant lives in the approval options menu; while a shape exists the whole-tool
+  // session grant is not offered there.
+  fireEvent.click(screen.getByRole('button', { name: '审批选项' }));
+  expect(screen.getByRole('menuitem', { name: '本会话允许「npm run」' })).toBeInTheDocument();
+  expect(screen.queryByRole('menuitem', { name: '本会话允许' })).toBeNull();
+  expect(screen.getByRole('button', { name: '运行' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '拒绝' })).toBeInTheDocument();
 });
 

@@ -1,32 +1,27 @@
 import { expect, test } from '@playwright/test';
 import { ensureTabsOpen, setupTauriMock } from './tauri-mock';
 
-test('settings and history are visible singleton tabs with switching, filtering and closing', async ({ page }) => {
-  await setupTauriMock(page);
-  await page.goto('/');
+test('settings stay outside the tab list while history remains a reusable tab', async ({ page }) => {
+  await setupTauriMock(page); await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await ensureTabsOpen(page);
+  const before = await page.locator('[data-tab-row-id]').count();
   await page.keyboard.press('Meta+,');
-  const settings = page.locator('[data-tab-kind="settings"]');
-  await expect(settings).toHaveCount(1);
-  await expect(settings).toBeVisible();
+  await expect(page.locator('.settings-screen')).toBeVisible();
+  await expect(page.locator('[data-tab-kind="settings"]')).toHaveCount(0);
   await page.keyboard.press('Meta+,');
-  await expect(settings).toHaveCount(1);
+  await expect(page.locator('.settings-screen')).toBeVisible();
+  await page.getByRole('button', { name: '关闭设置', exact: true }).click();
+  await expect(page.locator('[data-tab-row-id]')).toHaveCount(before);
   await page.getByTestId('tab-history-btn').click();
   const history = page.locator('[data-tab-kind="history"]');
-  await expect(history).toHaveCount(1);
   await expect(history).toBeVisible();
   await page.getByTestId('tab-history-btn').click();
   await expect(history).toHaveCount(1);
-  await settings.click();
-  await expect(page.locator('aside')).toBeVisible();
-  await settings.click({ button: 'right' });
+  await history.click({ button: 'right' });
   await expect(page.getByRole('button', { name: '复制会话', exact: true })).toHaveCount(0);
   await page.keyboard.press('Escape');
-  await history.click();
-  await expect(page.getByTestId('session-filter-input')).toBeVisible();
-  await page.getByTestId('tab-search').fill('设置');
-  await expect(settings).toBeVisible();
+  await page.getByTestId('tab-search').fill('history-unmatched');
   await expect(history).toHaveCount(0);
   await page.getByTestId('tab-search').fill('');
   await history.getByRole('button', { name: '关闭标签', exact: true }).click();

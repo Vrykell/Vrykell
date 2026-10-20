@@ -1,24 +1,35 @@
 import { invoke } from '@platform/diagnostics';
+import { Channel } from '@tauri-apps/api/core';
 import { normPath } from '@platform/path';
 import type {
   BackendHistoryEntry, BackendFileMatch, BackendBlockEntry, BackendSessionEntry,
 } from '@platform/api/types';
 
 /** 搜索文件系统；搜索根与结果路径在边界处归一化。 */
-export function searchFiles(
+export async function searchFiles(
   query: string,
   maxResults = 50,
   searchContent = false,
   root?: string,
   roots?: string[],
+  options?: { signal: AbortSignal; onProgress: (matches: BackendFileMatch[]) => void },
 ): Promise<BackendFileMatch[]> {
-  return invoke<BackendFileMatch[]>('search_files', {
+  if (options?.signal.aborted) return [];
+  const normalize = (matches: BackendFileMatch[]) => matches.map(match => ({ ...match, path: normPath(match.path) }));
+  const requestId = options ? crypto.randomUUID() : undefined;
+  const progress = options ? new Channel<BackendFileMatch[]>() : undefined;
+  if (progress) progress.onmessage = matches => { if (!options?.signal.aborted) options?.onProgress(normalize(matches)); };
+  const cancel = () => { void invoke('search_files_cancel', { requestId }).catch(() => {}); };
+  options?.signal.addEventListener('abort', cancel, { once: true });
+  try { return normalize(await invoke<BackendFileMatch[]>('search_files', {
     query,
     maxResults,
     searchContent,
     root: root == null ? null : normPath(root),
     roots: roots == null ? null : roots.map(normPath),
-  }).then((matches) => matches.map((match) => ({ ...match, path: normPath(match.path) })));
+    ...(progress ? { requestId, onProgress: progress } : {}),
+  })); }
+  finally { options?.signal.removeEventListener('abort', cancel); if (progress) progress.onmessage = () => {}; }
 }
 
 /** 搜索命令历史 */

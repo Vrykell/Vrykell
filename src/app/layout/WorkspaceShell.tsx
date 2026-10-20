@@ -1,5 +1,6 @@
 import { useEffect, type CSSProperties } from 'react';
-import { selectActiveSessionTab, useSessionStore, useDockStore } from '@features/workspace';
+import { selectActiveSessionTab, useSessionStore, useDockStore, useUiStore } from '@features/workspace';
+import SettingsScreen from '@features/settings/components/SettingsScreen';
 import { MIN_PANE_SIZE, minTerminalWidth } from '@features/workspace/model/windowLayout';
 import TopDock from '@features/workspace/components/TopDock';
 import SidePanel from '@features/workspace/components/SidePanel';
@@ -17,6 +18,7 @@ import EditorWorkspace from '@features/editor/components/EditorWorkspace';
 export default function WorkspaceShell() {
   useSshAuthenticationLifetime();
   useGitContext();
+  const settingsOpen = useUiStore(state => state.settingsOpen);
   const frameWidth = useDockStore(workspaceFrameWidth);
   const sshStatusOwner = useSshStatusOwner();
   const leftPanelWidth = useDockStore(state => state.leftPanels.reduce((total, id) => total + (state.collapsedPanels.includes(id) ? 0 : state.panelWidths[id] || PANEL_DEFS[id]?.width || 0), 0));
@@ -36,14 +38,17 @@ export default function WorkspaceShell() {
     <>
       <TopDock />
       <SshAuthenticationDialog />
-      <div className="workspace-body" style={{ '--workspace-frame-width': `${frameWidth}px`, '--workspace-terminal-min-width': `${Math.max(360, terminalMinWidth)}px`, '--workspace-left-panel-width': `${leftPanelWidth}px`, '--workspace-activity-width': `${ACTIVITY_BAR_WIDTH}px`, '--workspace-gap': `${WORKSPACE_GAP}px` } as CSSProperties}>
+      <div className="workspace-body" data-settings-open={settingsOpen || undefined} style={{ '--workspace-frame-width': `${frameWidth}px`, '--workspace-terminal-min-width': `${Math.max(360, terminalMinWidth)}px`, '--workspace-left-panel-width': `${leftPanelWidth}px`, '--workspace-activity-width': `${ACTIVITY_BAR_WIDTH}px`, '--workspace-gap': `${WORKSPACE_GAP}px` } as CSSProperties}>
         <ActivityBar />
         <SidePanel side="left" />
-        <main className="workspace-main" style={{ flex: 1, minWidth: terminalMinWidth, display: 'flex', flexDirection: 'column' }}>
-          <EditorWorkspace><GitWorkspace><TerminalView /></GitWorkspace></EditorWorkspace>
+        <main className="workspace-main" inert={settingsOpen} aria-hidden={settingsOpen || undefined} style={{ flex: 1, minWidth: terminalMinWidth, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+          <div className="workspace-content-host">
+            <EditorWorkspace><GitWorkspace><TerminalView /></GitWorkspace></EditorWorkspace>
+          </div>
         </main>
         <SidePanel side="right" />
-        <div id="ssh-status-sidebar-host" className="workspace-ssh-status-slot" />
+        <div id="ssh-status-sidebar-host" className="workspace-ssh-status-slot" inert={settingsOpen} aria-hidden={settingsOpen || undefined} />
+        {settingsOpen && <SettingsScreen />}
       </div>
     </>
   );

@@ -40,24 +40,16 @@ for (const theme of ['深色', '浅色']) {
     await restored.click({ button: 'right' });
     await page.getByTestId('tab-icon-color-auto').click();
     await expect(restored.locator('.sidebar-row-icon svg')).toHaveCSS('color', original);
-    const settings = page.locator('[data-tab-kind="settings"]');
-    await page.keyboard.press('Meta+,');
-    await settings.click({ button: 'right' });
-    await expect(menu.getByRole('group', { name: '图标颜色' })).toHaveCount(0);
-    await page.keyboard.press('Escape');
-    const icon = settings.locator('.sidebar-row-icon svg');
-    await expect(icon).toHaveAttribute('style', /color: var\(--text-primary\)/);
-    await expect(settings.locator('.sidebar-row-icon')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await page.getByTestId('tab-history-btn').click();
     await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
     const marks = await page.locator('[data-tab-kind]:not([data-tab-kind="session"]) .sidebar-row-icon svg').evaluateAll(elements =>
       elements.map(element => [...element.querySelectorAll('path')].map(path => path.getAttribute('d')).join(' ')));
-    expect(new Set(marks).size).toBe(3);
-    await settings.click();
+    expect(new Set(marks).size).toBe(2);
+    await page.locator('[data-tab-kind="history"]').click();
     await page.screenshot({ path: testInfo.outputPath('singleton-icons.png'), animations: 'disabled' });
   });
 
-  test(`settings text, hover hints and collapsed navigation remain consistent in ${theme}`, async ({ page }, testInfo) => {
+  test(`settings text, hover hints and permanent navigation remain consistent in ${theme}`, async ({ page }, testInfo) => {
     await setupTauriMock(page);
     await page.goto('/');
     await gotoSetting(page, '主题');
@@ -71,7 +63,7 @@ for (const theme of ['深色', '浅色']) {
     await page.mouse.move(0, 0);
     await navigation.getByRole('button', { name: '模型行为', exact: true }).hover();
     await expect(page.getByTestId('app-tooltip')).toHaveCSS('font-family', 'Arial, sans-serif');
-    for (const name of ['模型配置', '网络搜索', 'MCP 服务器', '记忆', '子代理', '本地编辑器', '远程编辑器']) {
+    for (const name of ['模型配置', '联网搜索', 'MCP 服务器', '内存', '子代理', '本地编辑器', '远程编辑器']) {
       await navigation.getByRole('button', { name, exact: true }).click();
       const wrong = await page.locator('.settings-content input:not([type="checkbox"]), .settings-content textarea').evaluateAll(elements => elements
         // A URL field is deliberately monospace; the rule is about UI text.
@@ -87,23 +79,10 @@ for (const theme of ['深色', '浅色']) {
     await expect(page.getByTestId('provider-endpoint-input')).toHaveCSS('font-family', /mono/i);
     await page.setViewportSize({ width: 600, height: 760 });
     const content = page.locator('.settings-content');
-    const before = (await content.boundingBox())!;
-    const trigger = page.getByRole('button', { name: '展开设置目录', exact: true });
-    await expect(navigation).toBeHidden();
-    await trigger.click();
     await expect(navigation).toBeVisible();
-    const after = (await content.boundingBox())!;
-    expect(after.y).toBe(before.y);
-    expect(after.height).toBe(before.height);
-    expect(after.width).toBe(before.width);
-    const bounds = (await navigation.boundingBox())!;
-    expect(bounds.x + bounds.width).toBeLessThanOrEqual(600);
-    await page.keyboard.press('Escape');
-    await expect(navigation).toBeHidden();
-    await expect(trigger).toBeFocused();
-    await trigger.click();
+    await expect(page.locator('.settings-navigation-toggle')).toHaveCount(0);
     await navigation.getByRole('button', { name: '模型配置', exact: true }).click();
-    await expect(navigation).toBeHidden();
+    await expect(navigation).toBeVisible();
     await content.evaluate(element => { element.scrollTop = 0; });
     await page.screenshot({ path: testInfo.outputPath('collapsed-settings-navigation.png'), animations: 'disabled' });
     await page.getByTestId('global-search-trigger').click();

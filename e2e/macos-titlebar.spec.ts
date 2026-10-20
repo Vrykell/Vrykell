@@ -25,9 +25,10 @@ for (const width of [720, 1240]) {
     expect(Math.abs(search.x + search.width / 2 - width / 2)).toBeLessThan(1);
     expect(search.x + search.width).toBeLessThan(ai.x);
     expect(width - ai.x - ai.width).toBe(16);
-    expect(ai.y + ai.height / 2).toBe(24);
-    expect(search.y + search.height / 2).toBe(24);
-    const dragHit = await page.evaluate(() => document.elementFromPoint(80, 24)?.hasAttribute('data-tauri-drag-region'));
+    await expect(header).toHaveCSS('height', '42px');
+    expect(ai.y + ai.height / 2).toBe(21);
+    expect(search.y + search.height / 2).toBe(21);
+    const dragHit = await page.evaluate(() => document.elementFromPoint(80, 21)?.hasAttribute('data-tauri-drag-region'));
     expect(dragHit).toBe(true);
     await page.screenshot({ path: test.info().outputPath(`macos-titlebar-${width}.png`), animations: 'disabled' });
     await page.getByTestId('global-search-trigger').click();

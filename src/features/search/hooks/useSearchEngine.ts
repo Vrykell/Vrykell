@@ -47,8 +47,12 @@ export function useSearchEngine() {
   });
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestIdRef = useRef(0);
+  const controllerRef = useRef<AbortController | null>(null);
 
   const search = useCallback((query: string) => {
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
     // 生成新的请求 ID（用于竞态处理）
     requestIdRef.current += 1;
     const reqId = requestIdRef.current;
@@ -88,7 +92,16 @@ export function useSearchEngine() {
         .filter((s) => enabled.has(s.id))
         .map(async (s) => {
           try {
-            const results = await s.search(parseSearchQuery(query).term);
+            const results = await s.search(parseSearchQuery(query).term, {
+              signal: controller.signal,
+              onProgress: results => {
+                if (reqId !== requestIdRef.current || controller.signal.aborted) return;
+                setState(prev => {
+                  const updated = { ...prev.sources, [s.id]: { loading: true, results } };
+                  return { ...prev, sources: updated, allResults: Object.values(updated).flatMap(source => source.results) };
+                });
+              },
+            });
             // 竞态检查：如果请求 ID 已变，丢弃结果
             if (reqId !== requestIdRef.current) return;
             setState((prev) => {
@@ -119,6 +132,7 @@ export function useSearchEngine() {
   useEffect(() => {
     return () => {
       requestIdRef.current += 1;
+      controllerRef.current?.abort();
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, []);

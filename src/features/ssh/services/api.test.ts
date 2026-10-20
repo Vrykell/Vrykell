@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
-vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
+vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock, Channel: class { onmessage = (_result: unknown) => {}; } }));
 
 import {
   validateSshConnection,
@@ -18,10 +18,28 @@ import {
   sshTrustHostKey,
   sshAuthenticateSession,
   sshNetworkProbe,
+  sshSearchFiles,
 } from '@features/ssh/services/api';
 import { diagnosticSnapshot } from '@platform/diagnostics';
 
 describe('sshApi', () => {
+  it('streams file matches before completion and cancels stale requests', async () => {
+    let finish!: (result: { entries: never[]; truncated: boolean; skipped: number }) => void;
+    invokeMock.mockImplementation(command => command === 'ssh_search' ? new Promise(resolve => { finish = resolve; }) : Promise.resolve());
+    const controller = new AbortController();
+    const progress = vi.fn();
+    const pending = sshSearchFiles('s1', '/project', 'log', controller.signal, progress);
+    const args = invokeMock.mock.calls.find(([command]) => command === 'ssh_search')![1] as { requestId: string; onProgress: { onmessage: (result: unknown) => void } };
+    const first = { entries: [{ name: 'early.log', path: '/project/early.log', is_dir: false }], truncated: false, skipped: 0 };
+    args.onProgress.onmessage(first);
+    expect(progress).toHaveBeenCalledWith(first);
+    controller.abort();
+    expect(invokeMock).toHaveBeenCalledWith('ssh_search_cancel', { requestId: args.requestId });
+    args.onProgress.onmessage(first);
+    expect(progress).toHaveBeenCalledOnce();
+    finish({ entries: [], truncated: false, skipped: 0 });
+    await pending;
+  });
   it('probes only the supplied TCP endpoint without sending credentials', async () => {
     invokeMock.mockResolvedValue({ dnsMs: 1, attempts: [] });
     await sshNetworkProbe('::1', 2222);

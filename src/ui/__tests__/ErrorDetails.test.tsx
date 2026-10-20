@@ -43,6 +43,13 @@ describe('ErrorDetails', () => {
     expect(screen.getByRole('button', { name: '组件堆栈' })).toHaveAttribute('aria-expanded', 'true');
   });
 
+  it('uses the neutral field surface instead of a customizable command block color', () => {
+    render(<ErrorDetails title="技术详情" text="Error: boom" />);
+    const header = screen.getByRole('button', { name: '技术详情' }).parentElement!;
+    expect(header).toHaveStyle({ background: 'var(--field-bg)' });
+    expect(header.style.background).not.toContain('--command-block-bg');
+  });
+
   it('copies the raw text and shows the copied state', async () => {
     render(<ErrorDetails title="组件堆栈" text="at Crash" copyTestId="details-copy" />);
 

@@ -1,56 +1,53 @@
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import zh from '@i18n/zh';
+import en from '@i18n/en';
+import { resolveLocale, useLanguagePreferences, type Locale } from './preferences';
+export { useLanguagePreferences, resolveLocale } from './preferences';
+export type { Locale, LanguagePreference } from './preferences';
 
-// ── 类型 ──
-
-export type Locale = 'zh';
 export type I18nKey = keyof typeof zh;
 
-// ── 翻译注册表 ──
-
-const messages: Record<Locale, Record<I18nKey, string>> = { zh };
-
-// ── 插值辅助 ──
-
-function interpolate(s: string, vars?: Record<string, string | number>): string {
-  if (!vars) return s;
-  let result = s;
-  for (const [k, v] of Object.entries(vars)) {
-    result = result.replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), String(v));
-  }
+function interpolate(text: string, vars?: Record<string, string | number>): string {
+  if (!vars) return text;
+  let result = text;
+  for (const [key, value] of Object.entries(vars)) result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), String(value));
   return result;
 }
 
-// ── Context ──
-
-interface I18nCtx {
-  locale: Locale;
-  t: (key: I18nKey, vars?: Record<string, string | number>) => string;
+function translate(locale: Locale, key: I18nKey, vars?: Record<string, string | number>): string {
+  return interpolate((locale === 'zh' ? zh[key] : en[key]) ?? key, vars);
 }
 
-const Ctx = createContext<I18nCtx>({
-  locale: 'zh',
-  t: (key, vars) => interpolate(messages.zh[key] ?? key, vars),
-});
-
-// ── Provider ──
-
-export function I18nProvider({ locale = 'zh', children }: { locale?: Locale; children: ReactNode }) {
-  const t = (key: I18nKey, vars?: Record<string, string | number>) => {
-    const s = (messages[locale]?.[key]) ?? messages.zh[key] ?? key;
-    return interpolate(s, vars);
-  };
-  return <Ctx.Provider value={{ locale, t }}>{children}</Ctx.Provider>;
-}
-
-// ── Hook ──
-
-export function useT() {
-  const { t, locale } = useContext(Ctx);
-  return { t, locale };
-}
-
-/** 组件外（store / callback）使用的翻译函数，默认中文。 */
 export function t(key: I18nKey, vars?: Record<string, string | number>): string {
-  return interpolate(messages.zh[key] ?? key, vars);
+  return translate(resolveLocale(useLanguagePreferences.getState().preference), key, vars);
 }
+
+const englishLabels = new Map(Object.entries(zh).flatMap(([key, value]) => {
+  const label = en[key] ?? (/^[a-z][\w]*\.[\w.]+$/.test(key) ? undefined : key);
+  return label ? [[value, label] as const] : [];
+}));
+
+/** Resolve existing catalog-backed labels supplied by stored UI definitions. */
+export function localizeLabel(text: string | undefined): string | undefined {
+  return text && resolveLocale(useLanguagePreferences.getState().preference) === 'en' ? englishLabels.get(text) ?? text : text;
+}
+
+const Ctx = createContext({ locale: 'zh' as Locale, t });
+
+/** Language changes update the interface without remounting sessions or editors. */
+export function I18nProvider({ locale: override, children }: { locale?: Locale; children: ReactNode }) {
+  const preference = useLanguagePreferences(state => state.preference);
+  const [, updateSystem] = useState(0);
+  const locale = override ?? resolveLocale(preference);
+  useEffect(() => {
+    const language = () => updateSystem(value => value + 1);
+    const storage = (event: StorageEvent) => { if (event.key === 'vrykell-language') void useLanguagePreferences.persist.rehydrate(); };
+    window.addEventListener('languagechange', language);
+    window.addEventListener('storage', storage);
+    return () => { window.removeEventListener('languagechange', language); window.removeEventListener('storage', storage); };
+  }, []);
+  useEffect(() => { document.documentElement.lang = locale === 'zh' ? 'zh-CN' : 'en'; }, [locale]);
+  return <Ctx.Provider value={{ locale, t: (key, vars) => translate(locale, key, vars) }}>{children}</Ctx.Provider>;
+}
+
+export function useT() { return useContext(Ctx); }

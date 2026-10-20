@@ -42,7 +42,7 @@ test.describe('侧栏列表拖拽排序', () => {
         const second = store.addTab({ title: 'Grouped second' });
         const groupId = await store.createGroupForTab(first, 'Regression group');
         useWorkspaceStore.getState().moveTab(second, groupId, 1);
-        if (withSingleton) store.openSettingsTab();
+        if (withSingleton) store.openHistoryTab();
         return { first, groupId };
       }, singleton);
       const source = page.getByTestId(`tab-row-${first}`);

@@ -24,7 +24,7 @@ export function createSshFileOps(connectionId: string): FileOps {
   };
 
   return {
-    search: (root, query, signal) => sshSearchFiles(connectionId, root, query, signal),
+    search: (root, query, signal, onProgress) => sshSearchFiles(connectionId, root, query, signal, onProgress),
     stat: (path) => sshStat(connectionId, path),
     list: (dir) => sshFsList(connectionId, dir ?? undefined)
       .then((response) => ({

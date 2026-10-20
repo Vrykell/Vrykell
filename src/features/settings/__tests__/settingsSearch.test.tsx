@@ -4,8 +4,9 @@ import { getSettings, searchSettings } from '../services/registry';
 import { useSettingsNavigationStore } from '../stores/navigation';
 import { useSessionStore } from '@features/workspace';
 import { Field } from '../components/ui';
+import { useLanguagePreferences } from '@i18n';
 
-afterEach(() => { cleanup(); vi.restoreAllMocks(); useSettingsNavigationStore.getState().setSelected('ai-model'); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); useSettingsNavigationStore.getState().setSelected('ai-model'); useLanguagePreferences.setState({ preference: 'zh' }); });
 
 it('indexes individual settings beyond page names', () => {
   expect(getSettings().length).toBeGreaterThan(30);
@@ -17,8 +18,15 @@ it('indexes individual settings beyond page names', () => {
   expect(searchSettings('应用不透明度').map(setting => setting.id)).toEqual(['opacity']);
 });
 
+it('updates indexed labels when switching language in either direction', () => {
+  useLanguagePreferences.getState().setPreference('en');
+  expect(searchSettings('Application language')[0]?.label).toBe('Application language');
+  useLanguagePreferences.getState().setPreference('zh');
+  expect(searchSettings('界面语言')[0]?.label).toBe('界面语言');
+});
+
 it('opens and focuses the matching field even on an existing page', () => {
-  vi.spyOn(useSessionStore.getState(), 'openSettingsTab').mockImplementation(() => {});
+  vi.spyOn(useSessionStore.getState(), 'openSettings').mockImplementation(() => {});
   render(<><Field title="终端字号"><button>Size</button></Field><Field title="应用不透明度"><input aria-label="Opacity" /></Field></>);
   act(() => getSettings().find(setting => setting.id === 'terminal-font')!.onSelect());
   expect(useSettingsNavigationStore.getState().selected).toBe('appearance-typography');
@@ -31,7 +39,7 @@ it('opens and focuses the matching field even on an existing page', () => {
 });
 
 it('routes the split appearance settings to their owning pages', () => {
-  vi.spyOn(useSessionStore.getState(), 'openSettingsTab').mockImplementation(() => {});
+  vi.spyOn(useSessionStore.getState(), 'openSettings').mockImplementation(() => {});
   const targets: [string, string][] = [
     ['theme', 'appearance-theme'],
     ['wallpaper', 'appearance-theme'],

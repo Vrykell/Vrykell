@@ -44,3 +44,24 @@ it('ignores pending reads and saves from a file closed and opened again', async 
   resolveSave('old saved'); await saving;
   expect(useEditorDocuments.getState().documents[key]).toMatchObject({ value: 'base', text: 'base', revision: 'v1' });
 });
+
+it('prevents editing and saving read-only files and refreshes permissions on reload', async () => {
+  vi.mocked(readEditorFile).mockResolvedValueOnce({ kind: 'text', text: 'protected', revision: 'v1', readOnly: true, permissionDenied: true });
+  const store = useEditorDocuments.getState();
+  await store.load(file);
+  store.edit(file, 'blocked edit');
+  expect(useEditorDocuments.getState().documents[key].value).toBe('protected');
+  expect(await store.save(file)).toBe(false);
+  expect(saveEditorFile).not.toHaveBeenCalled();
+  vi.mocked(readEditorFile).mockResolvedValueOnce({ kind: 'text', text: 'protected', revision: 'v1', readOnly: false, permissionDenied: false });
+  await store.load(file, true);
+  store.edit(file, 'allowed edit');
+  expect(useEditorDocuments.getState().documents[key].value).toBe('allowed edit');
+});
+
+it('keeps unsaved text when permissions are lost after opening', async () => {
+  const store = useEditorDocuments.getState(); await store.load(file); store.edit(file, 'kept draft');
+  vi.mocked(saveEditorFile).mockRejectedValueOnce('EDITOR_PERMISSION_DENIED: Write denied');
+  expect(await store.save(file)).toBe(false);
+  expect(useEditorDocuments.getState().documents[key]).toMatchObject({ value: 'kept draft', readOnly: true, permissionDenied: true });
+});

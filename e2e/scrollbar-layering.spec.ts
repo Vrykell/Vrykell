@@ -12,8 +12,8 @@ test('page scrollbars stay below an open dialog and become usable again after cl
   const id = await navigation.getAttribute('id');
   const rail = page.locator(`[role="scrollbar"][aria-controls="${id}"]`);
   await expect(rail).toBeVisible();
-  await page.getByTestId('tab-new-btn').click();
-  const dialog = page.getByRole('dialog', { name: '新建标签页' });
+  await page.keyboard.press('Meta+p');
+  const dialog = page.getByRole('dialog', { name: '命令面板' });
   await expect(dialog).toBeVisible();
   await expect(dialog).toHaveCSS('opacity', '1');
   await expect.poll(() => dialog.evaluate(element => getComputedStyle(element.parentElement!).opacity)).toBe('1');
@@ -24,10 +24,10 @@ test('page scrollbars stay below an open dialog and become usable again after cl
       inside: bar.x >= popup.x && bar.right <= popup.right && popup.y >= bar.y && popup.bottom <= bar.bottom };
   }, id);
   expect(point.inside).toBe(true);
-  await expect.poll(() => page.evaluate(point => document.elementFromPoint(point.x, point.y)?.closest('[role="dialog"]')?.getAttribute('aria-label'), point)).toBe('新建标签页');
+  await expect.poll(() => page.evaluate(point => document.elementFromPoint(point.x, point.y)?.closest('[role="dialog"]')?.getAttribute('aria-label'), point)).toBe('命令面板');
   await page.mouse.move(point.x, point.y);
   await page.screenshot({ path: test.info().outputPath('dialog-over-settings-scrollbar.png') });
-  await dialog.getByPlaceholder('搜索标签页类型…').press('Escape');
+  await dialog.locator('..').click({ position: { x: 5, y: 5 } });
   await expect(dialog).toBeHidden();
   await expect.poll(() => page.evaluate(point => document.elementFromPoint(point.x, point.y)?.closest('[role="scrollbar"]')?.getAttribute('aria-controls'), point)).toBe(id);
   await page.mouse.move(point.x, point.y);

@@ -1,8 +1,7 @@
 import { useTerminalDefaults } from '@config/terminalDefaults';
 import { useCommandHistorySettings } from '@config/commandHistory';
-import { useGitPreferences } from '@config/git';
 import { useEditorPreferences } from '@config/editor';
-import { t } from '@i18n';
+import { t, localizeLabel, useLanguagePreferences } from '@i18n';
 import { TOOL_NAMES, usePermissions, useAgentSettings, useUsageStore, type ToolName, type AgentSettings } from '@features/agent';
 import { summarize, totalTokens, formatTokens } from '@features/agent/model/usageStats';
 import { SHELL_TYPES, shellTypeLabel } from '@platform/shells';
@@ -29,25 +28,24 @@ const settings: SettingDef[] = [];
 export function registerSetting(setting: SettingDef): void {
   if (!settings.some(item => item.id === setting.id)) settings.push(setting);
 }
-export function getSettings(): SettingDef[] { return settings; }
+export function getSettings(): SettingDef[] { return settings.map(setting => ({ ...setting, label: localizeLabel(setting.label)!, desc: localizeLabel(setting.desc)! })); }
 export function searchSettings(query: string): SettingDef[] {
   const words = query.trim().toLowerCase().split(/\s+/);
-  return settings.filter(setting => words.every(word => `${setting.label} ${setting.desc} ${(setting.keywords ?? []).join(" ")}`.toLowerCase().includes(word)));
+  return getSettings().filter(setting => words.every(word => `${setting.label} ${setting.desc} ${(setting.keywords ?? []).join(" ")}`.toLowerCase().includes(word)));
 }
 
-function registerField(id: string, page: PageId, label: string, description: string, value: () => string = () => '', target = label, control?: string, aliases: string[] = []): void {
-  registerSetting({ id, page, label: t(label), desc: t(description), keywords: [label, description, ...aliases, ...aliases.map(alias => t(alias))], getValue: value, onSelect: () => {
-    useSettingsNavigationStore.getState().openField(page, t(target), control);
-    useSessionStore.getState().openSettingsTab();
+function registerField(id: string, page: PageId, label: string, description: string, value: () => string = () => '', target = label, control?: string | (() => string), aliases: string[] = []): void {
+  registerSetting({ id, page, get label() { return t(label); }, get desc() { return t(description); }, keywords: [label, description, ...aliases, ...aliases.map(alias => t(alias))], getValue: value, onSelect: () => {
+    useSettingsNavigationStore.getState().openField(page, t(target), typeof control === 'function' ? control() : control);
+    useSessionStore.getState().openSettings();
     terminalDebug('settings-navigation', { page, settingId: id });
   } });
 }
 
 registerField('local-file-undo', 'file-operations', 'Local file undo', 'File operations');
+registerField('application-language', 'application-language', 'Application language', 'Choose the interface language. Changes apply immediately.', () => useLanguagePreferences.getState().preference);
 registerField('remote-file-undo', 'file-operations', 'Remote file undo', 'File operations');
-registerField('git-diff-pages', 'source-control', 'Diff pages', 'Source control', () => useGitPreferences.getState().diffMode);
 registerField('preferred-file-editor', 'editor-local', 'Preferred file editor', 'Opening files', () => useEditorPreferences.getState().localOpenMode);
-registerField('embedded-editor-pages', 'editor-local', 'Editor pages', 'Opening files', () => useEditorPreferences.getState().pageMode);
 registerField("startup", "startup", "Open on startup", "Restore sessions or open a default terminal", () => useStartupSettings.getState().mode);
 registerField('history-run-target', 'command-history', 'Command execution target', 'Choose where commands run from the history panel.', () => useCommandHistorySettings.getState().runIn);
 registerField('history-double-click', 'command-history', 'Double-click command', 'Double-click inserts the command by default. Execution follows the selected target.', () => useCommandHistorySettings.getState().doubleClick);
@@ -103,31 +101,31 @@ for (const shell of SHELL_TYPES) {
     () => useAgentSettings.getState().global.openModeByShell[shell], 'settings.openMode.title', t('settings.openMode.aria', { shell: shellTypeLabel(shell) }));
 }
 registerField('open-mode-ssh', 'terminal-open', 'SSH open mode', 'settings.openMode.description',
-  () => useAgentSettings.getState().global.sshOpenMode, 'settings.openMode.title', t('settings.openMode.sshAria'));
+  () => useAgentSettings.getState().global.sshOpenMode, 'settings.openMode.title', () => t('settings.openMode.sshAria'));
 
 const permissionLabels: Record<ToolName, string> = {
-  "run_command": "Run terminal commands",
-  "read_file": "Read files",
-  "write_file": "Write files",
-  "edit_file": "Edit files",
-  "list_dir": "List directories",
+  "run_command": "Run terminal command",
+  "read_file": "Read file",
+  "write_file": "Write file",
+  "edit_file": "Edit file",
+  "list_dir": "List directory",
   "search_files": "Search files",
-  "web_search": "Search the web",
-  "web_fetch": "Fetch web pages",
+  "web_search": "Web search",
+  "web_fetch": "Fetch web page",
   "web_crawl": "Crawl web pages",
-  "read_terminal": "Read terminal output",
+  "read_terminal": "Read terminal screen",
   "terminal_keys": "Send terminal keys",
-  "use_skill": "Use skills",
-  "install_skill": "Install skills",
+  "use_skill": "Use skill",
+  "install_skill": "Install skill",
   "mcp": "MCP server tools",
   "memory": "Write memory",
-  "schedule": "Manage schedules",
-  "subagent": "Delegate subagents"
+  "schedule": "Manage scheduled tasks",
+  "subagent": "Delegate subagent"
 };
 for (const tool of TOOL_NAMES) {
   const label = permissionLabels[tool];
   registerField(`permission-${tool}`, 'ai-perms', label, 'Tool permissions',
-    () => usePermissions.getState().levels[tool] ?? 'ask', 'Tool permissions', t('{{tool}} permission', { tool: t(label) }));
+    () => usePermissions.getState().levels[tool] ?? 'ask', 'Tool permissions', () => t('Permissions for {{tool}}', { tool: t(label) }));
 }
 
 // Token usage opens the side panel instead of a settings page, so the entry carries its
@@ -153,6 +151,6 @@ registerSetting({
   getValue: () => t('Add or connect a server'),
   onSelect: () => {
     useSettingsNavigationStore.getState().openField('ai-harness', t('ACP'));
-    useSessionStore.getState().openSettingsTab();
+    useSessionStore.getState().openSettings();
   },
 });

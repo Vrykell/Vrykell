@@ -23,17 +23,17 @@ export const useEditorDocuments = create<{
       if (get().documents[key]?.request === request) set(state => ({ documents: { ...state.documents, [key]: { ...state.documents[key]!, ...content, value: content.text, loading: false } } }));
     } catch (reason) { if (get().documents[key]?.request === request) set(state => ({ documents: { ...state.documents, [key]: { ...state.documents[key]!, loading: false, error: String(reason) } } })); }
   },
-  edit: (file, value) => { const key = editorFileKey(file); set(state => ({ documents: { ...state.documents, [key]: { ...state.documents[key]!, value } } })); },
+  edit: (file, value) => { const key = editorFileKey(file); if (get().documents[key]?.readOnly) return; set(state => ({ documents: { ...state.documents, [key]: { ...state.documents[key]!, value } } })); },
   save: async file => {
     const key = editorFileKey(file); const document = get().documents[key];
-    if (!document || document.loading || document.saving || document.kind !== 'text' || !document.revision) return false;
+    if (!document || document.readOnly || document.loading || document.saving || document.kind !== 'text' || !document.revision) return false;
     if (!isDocumentDirty(document)) return true;
     set(state => ({ documents: { ...state.documents, [key]: { ...document, saving: true, error: '' } } }));
     try {
       const revision = await saveEditorFile(file, document.value, document.revision);
       if (get().documents[key]?.request === document.request) set(state => ({ documents: { ...state.documents, [key]: { ...state.documents[key]!, revision, text: document.value, saving: false } } }));
       return !isDocumentDirty(get().documents[key]);
-    } catch (reason) { if (get().documents[key]?.request === document.request) set(state => ({ documents: { ...state.documents, [key]: { ...state.documents[key]!, saving: false, error: String(reason) } } })); return false; }
+    } catch (reason) { if (get().documents[key]?.request === document.request) set(state => ({ documents: { ...state.documents, [key]: { ...state.documents[key]!, saving: false, error: String(reason), ...(String(reason).includes('EDITOR_PERMISSION_DENIED:') ? { readOnly: true, permissionDenied: true } : {}) } } })); return false; }
   },
   drop: keys => set(state => ({ documents: Object.fromEntries(Object.entries(state.documents).filter(([key]) => keys.has(key))) })),
 }));

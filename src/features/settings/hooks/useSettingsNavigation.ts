@@ -18,53 +18,53 @@ export interface SettingGroup {
 
 export const SETTINGS_GROUPS: SettingGroup[] = [
   {
-    id: 'application', label: '应用',
+    id: 'application', label: 'Application',
     items: [
-      { id: 'startup', icon: History, label: '启动' },
-      { id: 'logs', icon: FileText, label: '日志与诊断' },
-      { id: 'file-operations', icon: Folder, label: t('File operations') },
-      { id: 'source-control', icon: FileCode, label: t('Source control') },
-      { id: 'context-menu', icon: Folder, label: t('Windows context menu') },
+      { id: 'application-language', icon: Globe, label: 'Language' },
+      { id: 'startup', icon: History, label: 'Startup' },
+      { id: 'logs', icon: FileText, label: 'Logs and diagnostics' },
+      { id: 'file-operations', icon: Folder, label: 'File operations' },
+      { id: 'context-menu', icon: Folder, label: 'Windows context menu' },
     ],
   },
   {
-    id: 'ai', label: 'AI 模型',
+    id: 'ai', label: 'AI models',
     items: [
-      { id: 'ai-model', icon: BrainCircuit, label: '模型配置' },
-      { id: 'ai-behavior', icon: Settings, label: '模型行为' },
-      { id: 'ai-perms', icon: ShieldCheck, label: '模型权限' },
-      { id: 'ai-web', icon: Globe, label: '网络搜索' },
-      { id: 'ai-skill', icon: Folder, label: '技能' },
-      { id: 'ai-mcp', icon: Plug, label: 'MCP 服务器' },
-      { id: 'ai-memory', icon: FileText, label: '记忆' },
-      { id: 'ai-agents', icon: Bot, label: '子代理' },
-      { id: 'ai-schedules', icon: RefreshCw, label: '定时任务' },
-      { id: 'ai-harness', icon: Bot, label: t('ACP') },
+      { id: 'ai-model', icon: BrainCircuit, label: 'Model configuration' },
+      { id: 'ai-behavior', icon: Settings, label: 'Model behavior' },
+      { id: 'ai-perms', icon: ShieldCheck, label: 'Tool permissions' },
+      { id: 'ai-web', icon: Globe, label: 'Web search' },
+      { id: 'ai-skill', icon: Folder, label: 'Skills' },
+      { id: 'ai-mcp', icon: Plug, label: 'MCP servers' },
+      { id: 'ai-memory', icon: FileText, label: 'Memory' },
+      { id: 'ai-agents', icon: Bot, label: 'Subagents' },
+      { id: 'ai-schedules', icon: RefreshCw, label: 'Schedules' },
+      { id: 'ai-harness', icon: Bot, label: 'ACP' },
     ],
   },
   {
-    id: 'terminal', label: '终端',
-    items: [{ id: 'terminal-open', icon: SquareTerminal, label: '打开方式' }, { id: 'command-history', icon: SquareTerminal, label: t('Command history') }],
+    id: 'terminal', label: 'Terminal',
+    items: [{ id: 'terminal-open', icon: SquareTerminal, label: 'Opening mode' }, { id: 'command-history', icon: SquareTerminal, label: 'Command history' }],
   },
   {
-    id: 'editor', label: '编辑器',
+    id: 'editor', label: 'Editor',
     items: [
-      { id: 'editor-local', icon: FileCode, label: '本地编辑器' },
-      { id: 'editor-remote', icon: FileCode, label: '远程编辑器' },
+      { id: 'editor-local', icon: FileCode, label: 'Local editor' },
+      { id: 'editor-remote', icon: FileCode, label: 'Remote editor' },
     ],
   },
   {
-    id: 'appearance', label: '外观',
+    id: 'appearance', label: 'Appearance',
     items: [
-      { id: 'appearance-theme', icon: Sun, label: t('Theme') },
-      { id: 'appearance-blocks', icon: Palette, label: t('Block appearance') },
-      { id: 'appearance-typography', icon: TextFont, label: t('Typography') },
-      { id: 'appearance-files', icon: FileText, label: t('Theme files') },
+      { id: 'appearance-theme', icon: Sun, label: 'Theme' },
+      { id: 'appearance-blocks', icon: Palette, label: 'Block appearance' },
+      { id: 'appearance-typography', icon: TextFont, label: 'Typography' },
+      { id: 'appearance-files', icon: FileText, label: 'Theme files' },
     ],
   },
   {
-    id: 'shortcuts', label: '快捷键',
-    items: [{ id: 'shortcuts', icon: Keyboard, label: '快捷键说明' }],
+    id: 'shortcuts', label: 'Shortcuts',
+    items: [{ id: 'shortcuts', icon: Keyboard, label: 'Keyboard shortcuts' }],
   },
 ];
 
@@ -72,6 +72,7 @@ export const SETTINGS_GROUPS: SettingGroup[] = [
 export function useSettingsNavigation() {
   const selected = useSettingsNavigationStore(state => state.selected);
   const setSelected = useSettingsNavigationStore(state => state.setSelected);
-  const activeLabel = SETTINGS_GROUPS.flatMap(group => group.items).find(item => item.id === selected)?.label ?? t('Settings');
-  return { selected, setSelected, activeLabel, groups: SETTINGS_GROUPS };
+  const groups = SETTINGS_GROUPS.map(group => ({ ...group, label: t(group.label), items: group.items.map(item => ({ ...item, label: t(item.label) })) }));
+  const activeLabel = groups.flatMap(group => group.items).find(item => item.id === selected)?.label ?? t('Settings');
+  return { selected, setSelected, activeLabel, groups };
 }

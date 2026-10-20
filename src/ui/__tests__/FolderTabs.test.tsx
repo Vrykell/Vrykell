@@ -84,3 +84,21 @@ it('retains document activation without pointer events', () => {
   fireEvent.click(tabs[1]!, { detail: 0 });
   expect(onSelect).toHaveBeenCalledWith('second');
 });
+
+it('opens document actions before the first tab without changing the selection', () => {
+  const action = vi.fn(); const onSelect = vi.fn();
+  render(<FolderTabs items={items} selected="first" label="Open documents" toolbar={null}
+    menuItems={[{ label: 'Reload document', onClick: action }]} onSelect={onSelect} onClose={vi.fn()} onMove={vi.fn()} />);
+  const trigger = screen.getByRole('button', { name: '更多编辑器操作' });
+  expect(trigger.compareDocumentPosition(screen.getAllByRole('tab')[0]!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  fireEvent.click(trigger);
+  expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  fireEvent.click(trigger);
+  expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  expect(screen.queryByRole('menu')).toBeNull();
+  fireEvent.click(trigger);
+  fireEvent.click(screen.getByRole('button', { name: 'Reload document' }));
+  expect(action).toHaveBeenCalledOnce();
+  expect(onSelect).not.toHaveBeenCalled();
+  expect(screen.getAllByRole('tab')[0]).toHaveAttribute('aria-selected', 'true');
+});

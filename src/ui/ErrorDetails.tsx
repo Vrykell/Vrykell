@@ -49,7 +49,7 @@ export default function ErrorDetails({
     }}>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
-        padding: '2px 3px 2px 2px', background: 'var(--command-block-bg)',
+        padding: '2px 3px 2px 2px', background: 'var(--field-bg)',
         borderBottom: open ? '1px solid var(--border)' : 'none',
       }}>
         <button

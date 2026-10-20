@@ -8,3 +8,4 @@ async function request<T>(operation: string, action: () => Promise<T>): Promise<
 }
 export const readEditorFile = (target: EditorFile): Promise<EditorContent> => request('read', () => invoke('editor_read_file', { target }));
 export const saveEditorFile = (target: EditorFile, text: string, expected: string): Promise<string> => request('save', () => invoke('editor_save_file', { target, text, expected }));
+export const openElevatedEditorFile = (target: EditorFile): Promise<void> => request('open-elevated', () => invoke('editor_open_elevated', { target }));

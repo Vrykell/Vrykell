@@ -24,6 +24,9 @@ pub struct ThemeState(pub Mutex<ThemeConfig>);
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ThemeConfig {
+    /// Blend desktop color into the outer navigation frame.
+    #[serde(default = "default_desktop_tint")]
+    pub desktop_tint: bool,
     /// Application opacity, 0.5..=1.0.
     #[serde(default = "default_opacity")]
     pub opacity: f32,
@@ -39,9 +42,14 @@ fn default_opacity() -> f32 {
     DEFAULT_OPACITY
 }
 
+fn default_desktop_tint() -> bool {
+    true
+}
+
 impl Default for ThemeConfig {
     fn default() -> Self {
         Self {
+            desktop_tint: default_desktop_tint(),
             opacity: default_opacity(),
             background_image: None,
             vars: HashMap::new(),
@@ -211,6 +219,7 @@ mod tests {
     #[test]
     fn normalize_clamps_opacity() {
         let mut cfg = ThemeConfig {
+            desktop_tint: true,
             opacity: 1.5,
             background_image: None,
             vars: HashMap::new(),
@@ -239,6 +248,7 @@ mod tests {
     #[test]
     fn theme_json_roundtrip_camel_case() {
         let cfg = ThemeConfig {
+            desktop_tint: false,
             opacity: 0.8,
             background_image: Some("/tmp/bg.png".to_string()),
             vars: HashMap::from([("--canvas".to_string(), "#101010".to_string())]),
@@ -247,8 +257,15 @@ mod tests {
         // camelCase 序列化：backgroundImage
         assert!(s.contains("\"backgroundImage\":\"/tmp/bg.png\""));
         let back: ThemeConfig = serde_json::from_str(&s).unwrap();
+        assert!(!back.desktop_tint);
         assert_eq!(back.background_image.as_deref(), Some("/tmp/bg.png"));
         assert_eq!(back.vars.get("--canvas").map(String::as_str), Some("#101010"));
+    }
+
+    #[test]
+    fn older_themes_enable_desktop_color_by_default() {
+        let cfg: ThemeConfig = serde_json::from_str(r#"{"opacity":1.0,"vars":{}}"#).unwrap();
+        assert!(cfg.desktop_tint);
     }
 
     #[test]

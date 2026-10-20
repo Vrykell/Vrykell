@@ -2,13 +2,11 @@ import { expect, type Page } from '@playwright/test';
 
 /** Open settings and wait for the static navigation. */
 export async function openSettings(page: Page): Promise<void> {
-  // Wait for shortcut listeners before opening settings.
-  await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
-  await page.keyboard.press('Meta+,');
-  await expect(page.locator('.settings-view')).toBeVisible({ timeout: 5000 });
-  if (!(await page.locator('.settings-navigation').isVisible())) {
-    await page.getByRole('button', { name: '展开设置目录', exact: true }).click();
+  if (!(await page.locator('.settings-view').isVisible())) {
+    await page.getByRole('button', { name: '设置', exact: true }).click();
   }
+  await expect(page.locator('.settings-view')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('.settings-navigation')).toBeVisible();
 }
 
 /** Select a settings page by its navigation label. */

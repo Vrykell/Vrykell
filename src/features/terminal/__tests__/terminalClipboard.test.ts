@@ -28,8 +28,12 @@ import {
   pasteClipboardIntoTerminal,
   pasteConfirmReason,
   pasteLineCount,
+  pasteTextIntoTerminal,
+  captureTerminalPaste,
 } from '@features/terminal/services/terminalClipboard';
 import { termInstances, useTerminalStore } from '@features/terminal/stores/terminal';
+import { useInputStore } from '@features/terminal/stores/input';
+import { useBlockStore } from '@features/terminal/stores/blocks';
 
 function fakeTerm(selection: string): Terminal {
   return { getSelection: () => selection } as unknown as Terminal;
@@ -40,7 +44,7 @@ function pasteAwareTerm(bracketedPaste = false): { term: Terminal; paste: Return
   return { term: { paste, modes: { bracketedPasteMode: bracketedPaste } } as unknown as Terminal, paste };
 }
 
-/** Seven lines, the way a text editor counts them: one more than a paste carries without asking. */
+/** A representative seven-line paste, including its trailing newline. */
 const LONG_PASTE = 'one\ntwo\nthree\nfour\nfive\nsix\n';
 
 describe('terminalClipboard', () => {
@@ -53,6 +57,8 @@ describe('terminalClipboard', () => {
     toasts.length = 0;
     useTerminalStore.setState({ sessions: {}, scenes: {}, altScreenActive: false });
     termInstances.clear();
+    useInputStore.setState({ byPane: {} });
+    useBlockStore.setState({ byTab: {} });
     vi.spyOn(window, 'getSelection').mockReturnValue(null);
   });
 
@@ -87,8 +93,7 @@ describe('terminalClipboard', () => {
     await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(true);
     expect(paste).toHaveBeenCalledWith('line one\nline two\n');
     expect(ptyWriteMock).not.toHaveBeenCalled();
-    // Three lines stay below the confirmation threshold.
-    expect(requestConfirmMock).not.toHaveBeenCalled();
+    expect(requestConfirmMock).toHaveBeenCalledWith({ reason: 'lines', lines: 3, chars: 18 });
   });
 
   it('uses the running block terminal for paste modes and the main terminal only for a real alternate buffer', async () => {
@@ -97,9 +102,9 @@ describe('terminalClipboard', () => {
     const block = pasteAwareTerm();
     termInstances.set('p1', main.term);
     termInstances.set('block:p1', block.term);
-    readTextMock.mockResolvedValue('line one\nline two');
+    readTextMock.mockResolvedValue('one line');
     await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(true);
-    expect(block.paste).toHaveBeenCalledWith('line one\nline two');
+    expect(block.paste).toHaveBeenCalledWith('one line');
     expect(main.paste).not.toHaveBeenCalled();
 
     // A manual fullscreen keeps the running block as the interactive surface.
@@ -119,8 +124,7 @@ describe('terminalClipboard', () => {
     readTextMock.mockResolvedValue('echo pasted\n');
     await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(true);
     expect(ptyWriteMock).toHaveBeenCalledWith('sess-1', 'echo pasted\n');
-    // The fallback path is gated the same way: a single line never asks.
-    expect(requestConfirmMock).not.toHaveBeenCalled();
+    expect(requestConfirmMock).toHaveBeenCalledWith({ reason: 'lines', lines: 2, chars: 12 });
   });
 
   it('asks before a multi-line paste when the program did not request bracketed paste', async () => {
@@ -151,6 +155,45 @@ describe('terminalClipboard', () => {
     await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(false);
     expect(paste).not.toHaveBeenCalled();
     expect(ptyWriteMock).not.toHaveBeenCalled();
+  });
+
+  it('stages a short script at an idle block prompt and retains its trailing newline', async () => {
+    useTerminalStore.setState({ sessions: { p1: 'sess-1' }, scenes: { p1: 'blockList' } });
+    await expect(pasteTextIntoTerminal('p1', 'echo one\r\necho two\r\n')).resolves.toBe(true);
+    expect(useInputStore.getState().byPane.p1?.text).toBe('echo one\necho two\n');
+    expect(ptyWriteMock).not.toHaveBeenCalled();
+    expect(requestConfirmMock).not.toHaveBeenCalled();
+  });
+
+  it('drops a confirmed paste if the target session was replaced while the dialog was open', async () => {
+    useTerminalStore.setState({ sessions: { p1: 'sess-1' } });
+    requestConfirmMock.mockImplementation(async () => {
+      useTerminalStore.setState({ sessions: { p1: 'replacement' } });
+      return true;
+    });
+    await expect(pasteTextIntoTerminal('p1', 'echo one\necho two')).resolves.toBe(false);
+    expect(ptyWriteMock).not.toHaveBeenCalled();
+  });
+
+  it('captures native paste events before the default handler and removes the capture on cleanup', async () => {
+    useTerminalStore.setState({ sessions: { p1: 'sess-1' } });
+    requestConfirmMock.mockResolvedValue(false);
+    const element = document.createElement('div');
+    const textarea = document.createElement('textarea');
+    element.append(textarea);
+    const native = vi.fn();
+    textarea.addEventListener('paste', native);
+    const cleanup = captureTerminalPaste({ element } as unknown as Terminal, 'p1');
+    const event = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'clipboardData', { value: { files: [], getData: () => 'one\ntwo' } });
+    textarea.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(native).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(requestConfirmMock).toHaveBeenCalled());
+    expect(ptyWriteMock).not.toHaveBeenCalled();
+    cleanup();
+    textarea.dispatchEvent(new Event('paste', { bubbles: true }));
+    expect(native).toHaveBeenCalledOnce();
   });
 
   it('pastes several lines without asking when the program enabled bracketed paste', async () => {
@@ -243,8 +286,12 @@ describe('paste confirmation rules', () => {
     expect(pasteLineCount('one\r\ntwo')).toBe(2);
   });
 
-  it('asks from six lines up when the target did not request bracketed paste', () => {
-    expect(pasteConfirmReason('one\ntwo\nthree\nfour', false)).toBeNull();
+  it('asks for every embedded or trailing newline without bracketed paste', () => {
+    expect(pasteConfirmReason('one', false)).toBeNull();
+    expect(pasteConfirmReason('one\ntwo', false)).toBe('lines');
+    expect(pasteConfirmReason('one\n', false)).toBe('lines');
+    expect(pasteConfirmReason('one\rtwo', false)).toBe('lines');
+    expect(pasteConfirmReason('one\ntwo\nthree\nfour', false)).toBe('lines');
     expect(pasteConfirmReason('one\ntwo\nthree\nfour\nfive\n', false)).toBe('lines');
     expect(pasteConfirmReason('one\ntwo\nthree\nfour\nfive\n', true)).toBeNull();
   });

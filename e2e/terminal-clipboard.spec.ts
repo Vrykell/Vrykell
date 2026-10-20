@@ -53,6 +53,9 @@ test('运行中块 Ctrl+V 把剪贴板内容写入 PTY', async ({ page }) => {
 
   const before = (await ptyWrites(page)).length;
   await host.locator('.xterm-helper-textarea').press('Control+v');
+  await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+  expect((await ptyWrites(page)).slice(before)).toEqual([]);
+  await page.getByTestId('confirm-ok').click();
   // The terminal paste path normalizes line endings to CR before the PTY write.
   await expect.poll(async () => (await ptyWrites(page)).slice(before)).toContain('echo pasted\r');
 });

@@ -13,6 +13,7 @@ import { useBalancedTitlebar } from '../hooks/useBalancedTitlebar';
 export default function TopDock() {
   const activeTab = useSessionStore(s => s.tabs.find(tab => tab.id === s.activeId));
   const displayTitle = useTabDisplayTitle(activeTab);
+  const settingsOpen = useUiStore(state => state.settingsOpen);
   const [fullscreen, setFullscreen] = useState(false);
   const headerRef = useRef<HTMLElement>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
@@ -41,7 +42,7 @@ export default function TopDock() {
     // attribute blocks dragging for the whole path.
     <header ref={headerRef} className="workspace-titlebar" data-platform={isMacOS ? 'macos' : 'other'} data-fullscreen={fullscreen} data-tauri-drag-region>
       <div data-tauri-drag-region className="workspace-title">
-        <span data-tauri-drag-region>{displayTitle || t('Terminal workspace')}</span>
+        <span data-tauri-drag-region>{settingsOpen ? t('Settings') : displayTitle || t('Terminal workspace')}</span>
       </div>
       <button data-subtle data-testid="global-search-trigger" className="workspace-search"
         onClick={() => useUiStore.getState().setGlobalSearchOpen(true)}>

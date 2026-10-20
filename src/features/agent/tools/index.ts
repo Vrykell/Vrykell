@@ -56,12 +56,14 @@ export function buildTools(ctx: ToolContext) {
       inputSchema: z.object({
         command: z.string().describe('要执行的完整 shell 命令（单行）'),
       }),
-      execute: async ({ command }, { abortSignal, toolCallId }) => {
-        const g = await gate('run_command', { command }, toolCallId, ctx);
+      execute: async (input, { abortSignal, toolCallId }) => {
+        const g = await gate('run_command', input, toolCallId, ctx);
         if (!g.proceed) return g.result;
+        const command = g.command ?? input.command;
         const t = await ensureSkillAccess(command, toolCallId, ctx);
         if (!t.proceed) return { ok: false, denied: true, error: t.error };
-        return runCommandAndWait(command, { signal: abortSignal ?? ctx.signal, toolCallId, paneId: ctx.paneId });
+        const result = await runCommandAndWait(command, { signal: abortSignal ?? ctx.signal, toolCallId, paneId: ctx.paneId });
+        return g.command === undefined ? result : { ...result, command };
       },
     }),
     ...buildFileTools(ctx),
