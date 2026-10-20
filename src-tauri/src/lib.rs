@@ -219,6 +219,7 @@ pub fn run() {
             files::file_open::file_open_with,
             commands::search::search_files,
             commands::search::search_files_cancel,
+            commands::editor::editor_open_elevated,
             commands::search::search_history,
             commands::search::record_history,
             commands::search::clear_history,

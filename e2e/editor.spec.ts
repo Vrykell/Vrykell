@@ -14,6 +14,39 @@ async function replaceText(page: Page, text: string) {
   const input = page.getByTestId('file-editor').locator('textarea.inputarea'); await input.focus(); await page.keyboard.press('Control+a'); await page.keyboard.insertText(text);
 }
 
+test('identifies read-only files, blocks normal edits and offers explicit administrator opening', async ({ page }, info) => {
+  await page.evaluate(() => {
+    const host = window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> }; __ELEVATED_FILE__?: unknown; __EDITOR_SAVE_COUNT__?: number; __WRITABLE__?: boolean };
+    const original = host.__TAURI_INTERNALS__.invoke;
+    host.__TAURI_INTERNALS__.invoke = async (command, args) => {
+      if (command === 'editor_open_elevated') { host.__ELEVATED_FILE__ = args?.target; return; }
+      if (command === 'editor_save_file') host.__EDITOR_SAVE_COUNT__ = (host.__EDITOR_SAVE_COUNT__ ?? 0) + 1;
+      const result = await original(command, args);
+      if (command === 'editor_read_file') return { ...(result as Record<string, unknown>), readOnly: !host.__WRITABLE__, permissionDenied: !host.__WRITABLE__ };
+      return result;
+    };
+  });
+  await openWorking(page);
+  const editor = page.getByTestId('file-editor');
+  await expect(editor.locator('.editor-readonly-label')).toHaveText('只读');
+  await expect(editor.getByText(/当前用户无权读取或写入此文件/)).toBeVisible();
+  const before = await editor.locator('.view-lines').innerText();
+  await replaceText(page, 'blocked edit');
+  await page.keyboard.press('Control+s');
+  expect(await editor.locator('.view-lines').innerText()).toBe(before);
+  expect(await page.evaluate(() => (window as unknown as { __EDITOR_SAVE_COUNT__?: number }).__EDITOR_SAVE_COUNT__ ?? 0)).toBe(0);
+  await expect(editor.getByRole('button', { name: '保存文件', exact: true })).toBeDisabled();
+  for (const width of [1240, 760]) { await page.setViewportSize({ width, height: 800 }); await page.screenshot({ path: info.outputPath(`readonly-${width}.png`) }); }
+  await editor.getByRole('button', { name: '以管理员权限打开', exact: true }).click();
+  expect(await page.evaluate(() => (window as unknown as { __ELEVATED_FILE__?: unknown }).__ELEVATED_FILE__)).toMatchObject({ path: '/home/e2e/project/src/main.ts' });
+  await page.evaluate(() => { (window as unknown as { __WRITABLE__: boolean }).__WRITABLE__ = true; });
+  await editor.getByRole('button', { name: '更多编辑器操作' }).click();
+  await page.getByRole('menu').getByRole('button', { name: '重新加载文件', exact: true }).click();
+  await expect(editor.locator('.editor-readonly-label')).toHaveCount(0);
+  await replaceText(page, 'allowed after reload');
+  await expect(editor.locator('.view-lines')).toContainText('allowed after reload');
+});
+
 test('opens text in the built-in editor, saves it and guards unsaved closes', async ({ page }, info) => {
   await openWorking(page);
   const editor = page.getByTestId('file-editor'); await replaceText(page, 'export const value = "saved";');
