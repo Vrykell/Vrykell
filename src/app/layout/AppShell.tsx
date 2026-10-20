@@ -6,12 +6,17 @@ import type { TerminalSpec } from '@features/workspace/model/windowLayout';
 import WorkspaceShell from '@app/layout/WorkspaceShell';
 import ApplicationOverlays from '@app/layout/ApplicationOverlays';
 import OverlayScrollbars from '@ui/OverlayScrollbars';
+import { useTheme } from '@app/providers/ThemeProvider';
+import { syncWindowMaterial } from '@platform/windowChrome';
 
 /** Paint the window surface, workspace, and application overlays. */
 export default function AppShell() {
   const wallpaperDataUrl = useTerminalThemeStore((state) => state.wallpaperDataUrl);
   const appOpacity = useTerminalThemeStore((state) => state.config.opacity);
+  const desktopTint = useTerminalThemeStore(state => state.config.desktopTint ?? true);
+  const { mode } = useTheme();
   const effectiveOpacity = wallpaperDataUrl ? appOpacity : 1;
+  useEffect(() => { void syncWindowMaterial(desktopTint, mode); }, [desktopTint, mode]);
 
   const handleSplitPick = useCallback((spec: TerminalSpec) => {
     useUiStore.getState().closeSplitPicker();
@@ -35,7 +40,7 @@ export default function AppShell() {
           position: 'fixed',
           inset: 0,
           zIndex: 0,
-          backgroundColor: 'var(--chrome-bg)',
+          backgroundColor: desktopTint ? 'transparent' : 'var(--chrome-bg)',
           backgroundImage: wallpaperDataUrl ? `url("${wallpaperDataUrl}")` : 'none',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
@@ -44,6 +49,8 @@ export default function AppShell() {
       />
       <div
         className="application-window"
+        data-desktop-tint={desktopTint}
+        data-wallpaper={wallpaperDataUrl ? 'true' : 'false'}
         data-platform={isMacOS ? 'macos' : isWindows ? 'windows' : 'other'}
         style={{
           position: 'relative',
@@ -52,11 +59,12 @@ export default function AppShell() {
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          background: 'var(--chrome-bg)',
+          background: 'transparent',
           color: 'var(--text-primary)',
           opacity: effectiveOpacity,
         }}
       >
+        <div className="application-chrome" aria-hidden="true" />
         <WorkspaceShell />
         <ApplicationOverlays onPickSplit={handleSplitPick} />
         <OverlayScrollbars />

@@ -43,10 +43,10 @@ function color(style: CSSStyleDeclaration, property: string): string | undefined
 export function applyCodeTheme() {
   const style = getComputedStyle(document.documentElement);
   const definitions: Record<string, string> = {
-    'editor.background': '--canvas', 'editor.foreground': '--text-primary',
+    'editor.background': '--xterm-bg', 'editor.foreground': '--text-primary',
     'editorLineNumber.foreground': '--text-muted', 'editorLineNumber.activeForeground': '--text-primary',
     'editor.selectionBackground': '--selection-bg', 'editor.inactiveSelectionBackground': '--selection-bg',
-    'editorGutter.background': '--canvas', 'editorWidget.background': '--elevated',
+    'editorGutter.background': '--xterm-bg', 'editorWidget.background': '--elevated',
     'editorWidget.border': '--border', 'editor.lineHighlightBackground': '--surface',
     'editorCursor.foreground': '--text-primary', 'editor.findMatchBackground': '--search-highlight-bg',
     'diffEditor.insertedTextBackground': '--success-bg', 'diffEditor.removedTextBackground': '--error-bg',

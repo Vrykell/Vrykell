@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { readXtermTheme } from '@features/terminal/model/xtermTheme';
+import { themes } from '@config/theme/tokens';
 
 beforeEach(() => {
   document.documentElement.removeAttribute('style');
@@ -24,11 +25,13 @@ describe('readXtermTheme', () => {
     expect(theme.brightRed).toBe('#FF9A92');
   });
 
-  it('缺少变量时使用可读的深色终端回退值', () => {
+  it('uses the shared palette when CSS variables are unavailable', () => {
     const theme = readXtermTheme();
-    expect(theme.background).toBe('#111417');
-    expect(theme.foreground).toBe('#D6D9E0');
-    expect(theme.blue).toBe('#8DB7E8');
-    expect(theme.brightWhite).toBe('#F3F5F8');
+    expect(theme.background).toBe(themes.dark.xtermBg);
+    expect(theme.foreground).toBe(themes.dark.xtermForeground);
+    expect(theme.cursor).toBe(themes.dark.xtermCursor);
+    expect(theme.blue).toBe(themes.dark.xtermBlue);
+    expect(theme.brightWhite).toBe(themes.dark.xtermBrightWhite);
+    expect(theme.scrollbarSliderBackground).toBe(themes.dark.scrollbarThumb);
   });
 });

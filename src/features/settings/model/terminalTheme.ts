@@ -21,6 +21,8 @@ import { readXtermTheme } from '@features/terminal/model/xtermTheme';
 import { syncWindowFrame } from '@platform/windowChrome';
 
 export interface TerminalThemeConfig {
+  /** Native desktop color is visible only through the outer navigation frame. */
+  desktopTint?: boolean;
   /** Application opacity, 0.5..=1 (1 = fully opaque). */
   opacity: number;
   /** 应用壁纸本地绝对路径；null = 纯色背景 */
@@ -30,6 +32,7 @@ export interface TerminalThemeConfig {
 }
 
 const DEFAULT_CONFIG: TerminalThemeConfig = {
+  desktopTint: true,
   opacity: 1,
   backgroundImage: null,
   vars: {},

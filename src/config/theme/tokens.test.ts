@@ -38,11 +38,28 @@ describe('toRgba', () => {
   });
 });
 
-describe('默认调色板（中性灰色）', () => {
-  it.each(['dark', 'light'] as const)('%s primary actions keep the same blue independently of message bubbles', mode => {
-    expect(themes[mode].primaryAction).toBe(themes.dark.accentUser);
-    expect(paletteToCssVars(themes[mode])['--primary-action']).toBe(themes.dark.primaryAction);
-    if (mode === 'light') expect(themes[mode].primaryAction).not.toBe(themes[mode].accentUser);
+describe('default blue palette', () => {
+  it('uses the sampled neutral surfaces and blue action from the appearance reference', () => {
+    expect(themes.dark).toMatchObject({
+      canvas: '#202020', sidebarBg: '#1C1C1C', xtermBg: '#141414', surface: '#282828',
+      fieldBg: '#2C2C2C', selectionBg: '#183C57', accent: '#50C0FF', primaryAction: '#183C57',
+    });
+  });
+  it.each(['dark', 'light'] as const)('%s reuses the neutral card and field colors for content blocks', mode => {
+    const palette = themes[mode];
+    expect(palette.block).toBe(palette.surface);
+    expect(palette.commandBlockBg).toBe(palette.surface);
+    expect(palette.aiBlockBg).toBe(palette.surface);
+    expect(palette.codeBg).toBe(palette.fieldBg);
+  });
+  it.each(['dark', 'light'] as const)('%s uses one green family across status, icons, groups and terminal output', mode => {
+    const palette = themes[mode];
+    const green = mode === 'dark' ? '#30D158' : '#167C32';
+    for (const color of [palette.success, palette.shellConnected, palette.shellBashAccent, palette.groupGreen, palette.xtermGreen, palette.xtermBrightGreen, palette.cmdProgram]) expect(color).toBe(green);
+  });
+  it.each(['dark', 'light'] as const)('%s primary actions use the unified action blue', mode => {
+    expect(themes[mode].primaryAction).toBe('#183C57');
+    expect(paletteToCssVars(themes[mode])['--primary-action']).toBe(themes[mode].primaryAction);
   });
   it.each(['dark', 'light'] as const)('%s keeps blue text carets separate from terminal cursors', mode => {
     const cursor = themes[mode].textCaret;
@@ -50,7 +67,7 @@ describe('默认调色板（中性灰色）', () => {
     expect(channels[2]).toBeGreaterThan(channels[1]!);
     expect(channels[1]).toBeGreaterThan(channels[0]!);
     expect(paletteToCssVars(themes[mode])['--text-caret']).toBe(cursor);
-    expect(paletteToCssVars(themes[mode])['--xterm-cursor']).toBe(mode === 'dark' ? '#ECEFF4' : '#2E3742');
+    expect(paletteToCssVars(themes[mode])['--xterm-cursor']).toBe(mode === 'dark' ? '#E9EBED' : '#2E3742');
   });
   it.each(['dark', 'light'] as const)('%s command colors stay legible on input and output backgrounds', mode => {
     const palette = themes[mode];
@@ -70,12 +87,30 @@ describe('默认调色板（中性灰色）', () => {
     }
     expect(paletteToCssVars(palette)['--cmd-program']).toBe(palette.cmdProgram);
   });
+  it.each(['dark', 'light'] as const)('%s syntax colors retain strong color rather than pale tints', mode => {
+    const palette = themes[mode];
+    for (const color of [palette.cmdProgram, palette.cmdArgument, palette.cmdNumber, palette.cmdVariable,
+      palette.cmdFlag, palette.cmdPath, palette.cmdPipe, palette.cmdRedirect, palette.cmdString]) {
+      const channels = [1, 3, 5].map(offset => parseInt(color.slice(offset, offset + 2), 16));
+      const maximum = Math.max(...channels);
+      expect((maximum - Math.min(...channels)) / maximum).toBeGreaterThanOrEqual(0.55);
+    }
+  });
+  it.each(['dark', 'light'] as const)('%s shares accent families between syntax and color pickers', mode => {
+    const palette = themes[mode];
+    expect(palette.groupBlue).toBe(palette.cmdArgument);
+    expect(palette.groupGreen).toBe(palette.cmdProgram);
+    expect(palette.groupViolet).toBe(palette.cmdPipe);
+    expect(palette.groupAmber).toBe(palette.cmdNumber);
+    expect(palette.groupCyan).toBe(palette.cmdPath);
+    expect(palette.groupOrange).toBe(palette.cmdString);
+  });
   it('dark 与 light 均存在', () => {
     expect(themes.dark).toBeDefined();
     expect(themes.light).toBeDefined();
   });
 
-  it.each(['dark', 'light'] as const)('%s uses neutral interactive accents', (mode) => {
+  it.each(['dark', 'light'] as const)('%s uses blue interactive accents and a distinct warm accent', (mode) => {
     const accent = themes[mode].accent;
     expect(accent.startsWith('#')).toBe(true);
     const [r, g, b] = [
@@ -83,20 +118,19 @@ describe('默认调色板（中性灰色）', () => {
       parseInt(accent.slice(3, 5), 16),
       parseInt(accent.slice(5, 7), 16),
     ];
-    expect(r).toBe(g);
-    expect(g).toBe(b);
+    expect(b).toBeGreaterThan(g);
+    expect(g).toBeGreaterThan(r);
     const warm = themes[mode].accentWarm;
-    expect(warm.slice(1, 3)).toBe(warm.slice(3, 5));
-    expect(warm.slice(3, 5)).toBe(warm.slice(5, 7));
+    expect(parseInt(warm.slice(1, 3), 16)).toBeGreaterThan(parseInt(warm.slice(5, 7), 16));
   });
 
-  it.each(['dark', 'light'] as const)('%s keeps editable fields lighter than panels with a restrained brightness step', mode => {
+  it.each(['dark', 'light'] as const)('%s keeps editable fields distinct from panels with a restrained brightness step', mode => {
     const panel = themes[mode].surface;
     const field = themes[mode].fieldBg;
     const primary = themes[mode].textPrimary;
     const channel = (hex: string) => parseInt(hex.slice(1, 3), 16);
-    expect(channel(field)).toBeGreaterThan(channel(panel));
-    expect(channel(field) - channel(panel)).toBeLessThanOrEqual(24);
+    expect(channel(field)).not.toBe(channel(panel));
+    expect(Math.abs(channel(field) - channel(panel))).toBeLessThanOrEqual(24);
     const luminance = (hex: string) => {
       const value = channel(hex) / 255;
       return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
@@ -105,17 +139,13 @@ describe('默认调色板（中性灰色）', () => {
     expect((Math.max(...values) + 0.05) / (Math.min(...values) + 0.05)).toBeGreaterThanOrEqual(4.5);
   });
 
-  it.each(['dark', 'light'] as const)('%s orders surfaces by role and reuses levels for matching roles', mode => {
+  it.each(['dark', 'light'] as const)('%s separates navigation and content surfaces', mode => {
     const palette = themes[mode];
-    const levels = [palette.canvas, palette.sidebarBg, palette.surface, palette.elevated, palette.fieldBg]
-      .map(color => parseInt(color.slice(1, 3), 16));
-    for (let index = 1; index < levels.length; index++) {
-      expect(levels[index]).toBeGreaterThan(levels[index - 1]);
-    }
-    expect(parseInt(palette.chromeBg.slice(1, 3), 16)).toBeGreaterThan(parseInt(palette.sidebarBg.slice(1, 3), 16));
-    expect(parseInt(palette.chromeBg.slice(1, 3), 16)).toBeLessThan(parseInt(palette.fieldBg.slice(1, 3), 16));
-    expect(palette.block).toBe(palette.surface);
-    expect(palette.chromeField).toBe(palette.fieldBg);
+    expect(palette.chromeBg).not.toBe(palette.sidebarBg);
+    expect(palette.sidebarBg).not.toBe(palette.canvas);
+    expect(palette.canvas).not.toBe(palette.surface);
+    expect(palette.fieldBg).not.toBe(palette.surface);
+    expect(palette.chromeField).not.toBe(palette.chromeBg);
   });
 
   it('dark field hover increases brightness instead of exposing the darker panel underneath', () => {
@@ -124,14 +154,14 @@ describe('默认调色板（中性灰色）', () => {
   });
 
   it('dark 语义色保留（成功/错误/警告）', () => {
-    expect(themes.dark.success).toBe('#89D185');
+    expect(themes.dark.success).toBe('#30D158');
     expect(themes.dark.error).toBe('#F14C4C');
-    expect(themes.dark.warning).toBe('#CCA700');
+    expect(themes.dark.warning).toBe('#D5AD54');
   });
 
   it('终端表面与应用外壳分层，并提供完整 ANSI 色板', () => {
     expect(themes.dark.xtermBg).not.toBe(themes.dark.canvas);
-    expect(themes.dark.xtermForeground).toBe('#ECEFF4');
+    expect(themes.dark.xtermForeground).toBe('#E9EBED');
     expect(themes.dark.xtermBlue).toBe('#8DB7E8');
     expect(themes.dark.xtermBrightRed).toBe('#FF9A92');
   });
@@ -172,12 +202,12 @@ describe('paletteToCssVars', () => {
     }
   });
 
-  it.each(['dark', 'light'] as const)('%s uses neutral grays and separates navigation from the lighter frame', (mode) => {
+  it.each(['dark', 'light'] as const)('%s uses a cool frame and separates navigation from content', (mode) => {
     const vars = paletteToCssVars(themes[mode]);
     for (const key of ['--chrome-bg', '--sidebar-bg', '--chrome-field', '--selection-bg', '--canvas', '--surface', '--field-bg', '--block', '--elevated', '--border', '--border-strong', '--text-primary', '--text-secondary', '--text-muted', '--xterm-bg']) {
       expect(vars[key]).toMatch(/^#[0-9a-f]{6}$/i);
       const channels = [1, 3, 5].map(offset => parseInt(vars[key].slice(offset, offset + 2), 16));
-      expect(new Set(channels).size).toBe(1);
+      expect(channels[2]).toBeGreaterThanOrEqual(channels[0]!);
     }
     expect(vars['--sidebar-bg']).not.toBe(vars['--chrome-bg']);
     expect(vars['--sidebar-bg']).not.toBe(vars['--canvas']);
@@ -187,7 +217,7 @@ describe('paletteToCssVars', () => {
     expect(vars['--chrome-bg']).toBeTruthy();
     expect(vars['--chrome-field']).toBeTruthy();
     expect(vars['--selection-bg']).toBeTruthy();
-    expect(vars['--chrome-bg']).not.toBe(vars['--canvas']);
+    expect(vars['--sidebar-bg']).not.toBe(vars['--canvas']);
     expect(vars['--chrome-field']).not.toBe(vars['--chrome-bg']);
     expect(vars['--surface']).not.toBe(vars['--canvas']);
   });

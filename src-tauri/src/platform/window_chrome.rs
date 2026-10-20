@@ -8,7 +8,7 @@
 //! runs without the native frame (`shadow: false`): the webview covers the whole window and
 //! its content is clipped by the rounded corners the window explicitly asks for.
 //!
-//! The border the compositor paints along the window edge is colored with the window surface
+//! The border the compositor paints along the window edge uses the shared neutral gray border
 //! through [`apply_window_frame`]; the frontend resolves that color from the theme. The
 //! `DWMWA_COLOR_NONE` sentinel is not used: some Windows builds render it as a dark fallback
 //! line instead of removing the border.

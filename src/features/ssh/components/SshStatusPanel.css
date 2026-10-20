@@ -48,10 +48,9 @@ button.ssh-status-reconnect.text-control:not(:disabled):is(:hover, :focus-visibl
 .ssh-resource-chart-plot { position: relative; height: 160px; min-width: 0; }
 .ssh-resource-chart svg { display: block; width: 100%; height: 100%; overflow: hidden; color: var(--chart-blue); }
 .ssh-resource-chart polyline { stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
-.ssh-resource-chart circle { fill: currentColor; }
 .ssh-resource-chart .ssh-resource-chart-area { fill: currentColor; opacity: .08; }
 .ssh-resource-chart-frame { stroke: var(--border-strong); stroke-width: 1; }
-.ssh-resource-chart-grid { stroke: var(--border); stroke-width: 1; opacity: .6; }
+.ssh-resource-chart-grid { stroke: var(--chart-grid); stroke-width: 1; }
 .ssh-resource-chart-axis { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-width: 0; color: var(--text-muted); font-size: var(--fs-micro); line-height: 1.2; }
 .ssh-resource-chart-caption { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--text-secondary); }
 .ssh-resource-chart-axis > span:last-child { flex-shrink: 0; white-space: nowrap; font-variant-numeric: tabular-nums; }

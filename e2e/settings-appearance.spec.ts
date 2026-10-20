@@ -81,7 +81,7 @@ test('a block colour row shows a swatch and name, matching swatches in the menu,
   await expect(color).not.toContainText('#');
 });
 
-test('the three block types never offer the same colour', async ({ page }) => {
+test('block color choices reuse the shared palette without duplicates in one menu', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await gotoSetting(page, '块外观');
@@ -89,13 +89,25 @@ test('the three block types never offer the same colour', async ({ page }) => {
   for (const title of ['AI 对话块', '终端命令块', '失败命令块']) {
     const color = blockField(page, title).getByRole('combobox');
     await color.click();
-    palettes.push(...await page.getByRole('option').evaluateAll(elements =>
-      elements.map(element => element.querySelector<HTMLElement>('.ui-select-swatch')?.style.background ?? '')));
+    const swatches = await page.getByRole('option').evaluateAll(elements =>
+      elements.map(element => element.querySelector<HTMLElement>('.ui-select-swatch')?.style.background ?? ''));
+    expect(new Set(swatches).size).toBe(swatches.length);
+    palettes.push(...swatches);
     await color.press('Escape');
   }
   expect(palettes.length).toBeGreaterThan(0);
   expect(palettes.every(swatch => swatch.length > 0)).toBe(true);
-  expect(new Set(palettes).size).toBe(palettes.length);
+  const shared = await page.evaluate(() => {
+    const probe = document.createElement('span'); document.body.append(probe);
+    const values = ['--group-blue', '--group-green', '--group-violet', '--group-amber', '--group-cyan',
+      '--group-rose', '--group-orange', '--group-coral', '--cmd-flag', '--text-muted', '--text-secondary',
+      '--text-caret', '--border-strong', '--error-light'].map(name => {
+      probe.style.background = `var(${name})`;
+      return getComputedStyle(probe).backgroundColor;
+    });
+    probe.remove(); return values;
+  });
+  expect(palettes.every(swatch => shared.includes(swatch))).toBe(true);
 });
 
 test('the rail keeps the picked colour while the background stays a tint of it', async ({ page }) => {
@@ -114,10 +126,10 @@ test('the rail keeps the picked colour while the background stays a tint of it',
   await field.getByRole('combobox').click();
   await page.getByRole('option', { name: /青色/ }).click();
 
-  // #61DCCB: the rail is solid, the background is the same hue at low alpha.
-  await expect.poll(() => readColors(page, 'probe-ai-block').then(colors => colors.rail)).toEqual([97, 220, 203, 1]);
+  // The shared cyan stays solid on the rail and translucent behind the content.
+  await expect.poll(() => readColors(page, 'probe-ai-block').then(colors => colors.rail)).toEqual([0, 207, 165, 1]);
   const painted = await readColors(page, 'probe-ai-block');
-  expect(painted.background.slice(0, 3)).toEqual([97, 220, 203]);
+  expect(painted.background.slice(0, 3)).toEqual([0, 207, 165]);
   expect(painted.background[3]).toBeGreaterThan(0.15);
   expect(painted.background[3]).toBeLessThan(0.3);
 

@@ -42,6 +42,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.getByRole('button', { name: '设置', exact: true }).click();
     await page.locator('aside').getByRole('button', { name: '主题', exact: true }).click();
     await page.getByRole('radio', { name: theme === 'light' ? '浅色' : '深色', exact: true }).click();
+    await page.getByRole('button', { name: '设置', exact: true }).click();
     await page.locator('[data-dock-btn="ssh"]').click();
     await page.getByTestId('ssh-row-ssh-1').dblclick();
     await page.getByTestId('ssh-status-toggle').last().click();
@@ -108,7 +109,7 @@ for (const theme of ['dark', 'light'] as const) {
         return Array.from(context.getImageData(0, 0, 1, 1).data).slice(0, 3).reduce((sum, value) => sum + value, 0);
       };
       const probe = document.createElement('span'); element.append(probe);
-      const baselines = ['--resource-accent', '--group-violet', '--group-amber', '--group-cyan', '--group-violet'];
+      const baselines = ['--cmd-argument', '--cmd-pipe', '--cmd-number', '--cmd-path', '--cmd-pipe'];
       const lines = [...element.querySelectorAll('.ssh-status-resource-summary [data-series]'), ...element.querySelectorAll('.ssh-network-rates [data-series]')];
       const values = lines.map((line, index) => {
         probe.style.color = `var(${baselines[index]})`;
@@ -117,7 +118,7 @@ for (const theme of ['dark', 'light'] as const) {
       probe.remove(); return values;
     });
     expect(tones).toHaveLength(5);
-    for (const tone of tones) expect(tone.actual).toBeLessThan(tone.baseline);
+    for (const tone of tones) expect(tone.actual).toBe(tone.baseline);
     for (const plot of [chart, traffic]) {
       const bounds = await plot.evaluate(element => {
         const chart = element.closest('.ssh-resource-chart')!;
@@ -261,12 +262,13 @@ test('resource plots append samples automatically and never drift while waiting 
   const initialCalls = await calls();
   const chart = panel.getByRole('img', { name: '资源使用率趋势' });
   const frame = chart.locator('xpath=../..');
-  const pointCount = () => chart.locator('[data-series]').nth(1).evaluate(element => element.querySelectorAll('circle').length + [...element.querySelectorAll('polyline')].reduce((count, line) => count + line.getAttribute('points')!.split(' ').length, 0));
-  const initialPoints = await pointCount();
+  const pointCount = () => chart.locator('[data-series]').nth(1).evaluate(element => [...element.querySelectorAll('polyline')].reduce((count, line) => count + line.getAttribute('points')!.split(' ').length, 0));
+  await expect(chart.locator('circle')).toHaveCount(0);
+  expect(await pointCount()).toBe(0);
   for (const additional of [1, 2, 3]) {
     await page.clock.fastForward(15_000);
     await expect.poll(calls).toBe(initialCalls + additional);
-    await expect.poll(pointCount).toBe(initialPoints + additional);
+    await expect.poll(pointCount).toBe(1 + additional);
     await expect(panel.getByRole('button', { name: '刷新远端资源' })).toBeEnabled();
   }
   expect((await chart.locator('[data-series="CPU"] polyline').getAttribute('points'))!.split(' ').length).toBeGreaterThanOrEqual(2);

@@ -1,11 +1,10 @@
 /**
  * Named accents offered for block backgrounds and rails.
  *
- * Each block type owns a disjoint palette — cool for AI, neutral for command
- * output, warm for failures — so the three never read as the same colour.
- * Fixed hex values keep the swatch, the label and the stored theme variable in
- * agreement; `name` doubles as an i18n key.
+ * Cool, neutral and warm preset groups reuse the central theme palette.
+ * Explicit color choices remain stored as fixed values; names are catalog keys.
  */
+import { themes } from '@config/theme/tokens';
 export type BlockColorGroup = 'ai' | 'command' | 'failed';
 
 export interface BlockColorPreset {
@@ -15,22 +14,22 @@ export interface BlockColorPreset {
 
 export const BLOCK_COLOR_PRESETS: Record<BlockColorGroup, readonly BlockColorPreset[]> = {
   ai: [
-    { name: 'Blue', value: '#0A84FF' },
-    { name: 'Sky', value: '#4DA3FF' },
-    { name: 'Teal', value: '#61DCCB' },
-    { name: 'Indigo', value: '#7C7CFF' },
+    { name: 'Blue', value: themes.dark.groupBlue },
+    { name: 'Sky', value: themes.dark.cmdFlag },
+    { name: 'Teal', value: themes.dark.groupCyan },
+    { name: 'Indigo', value: themes.dark.groupViolet },
   ],
   command: [
-    { name: 'Gray', value: '#8B8F98' },
-    { name: 'Green', value: '#6CE6A6' },
-    { name: 'Sand', value: '#D6C08C' },
-    { name: 'Slate', value: '#6E8899' },
+    { name: 'Gray', value: themes.dark.textMuted },
+    { name: 'Green', value: themes.dark.groupGreen },
+    { name: 'Sand', value: themes.dark.groupAmber },
+    { name: 'Slate', value: themes.dark.textSecondary },
   ],
   failed: [
-    { name: 'Red', value: '#F48771' },
-    { name: 'Orange', value: '#FFA657' },
-    { name: 'Rose', value: '#F07C9A' },
-    { name: 'Amber', value: '#E0B33C' },
+    { name: 'Red', value: themes.dark.groupCoral },
+    { name: 'Orange', value: themes.dark.groupOrange },
+    { name: 'Rose', value: themes.dark.groupRose },
+    { name: 'Amber', value: themes.dark.groupAmber },
   ],
 };
 
