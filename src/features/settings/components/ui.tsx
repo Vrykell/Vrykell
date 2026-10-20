@@ -1,5 +1,5 @@
 import { OutlineButton } from '@ui/OutlineButton';
-import { t } from '@i18n';
+import { t, localizeLabel } from '@i18n';
 import { IconButton } from '@ui/IconButton';
 import { useSettingsNavigationStore } from '../stores/navigation';
 import { TextInput } from '@ui/TextInput';
@@ -18,7 +18,7 @@ export { inputStyle } from './formStyles';
 export function SettingsGroup({ title, children }: { title: string; children: ReactNode }) {
   const id = useId();
   return <div className="settings-group" role="group" aria-labelledby={id}>
-    <h2 id={id} className="settings-group-title">{title}</h2>
+    <h2 id={id} className="settings-group-title">{localizeLabel(title)}</h2>
     <div className="settings-group-panel">{children}</div>
   </div>;
 }
@@ -38,9 +38,9 @@ export function Field({ title, description, children, layout = 'row' }: {
   }, [target, title, control, request]);
   return (
     <div ref={ref} className="settings-field" data-setting-title={title} data-layout={layout}>
-      <div className="settings-field-title">{title}</div>
+      <div className="settings-field-title">{localizeLabel(title)}</div>
       {description && (
-        <div className="settings-description">{description}</div>
+        <div className="settings-description">{typeof description === 'string' ? localizeLabel(description) : description}</div>
       )}
       <div className="settings-field-control">{children}</div>
     </div>
@@ -70,7 +70,7 @@ export function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boo
           background: on ? 'var(--primary-button-text)' : 'var(--text-muted)',
         }}
       />
-    </button><span aria-hidden="true">{on ? '已开启' : '已关闭'}</span></span>
+    </button><span aria-hidden="true">{t(on ? 'On' : 'Off')}</span></span>
   );
 }
 

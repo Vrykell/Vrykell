@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { t } from '@i18n';
+import { t, useT } from '@i18n';
 import { createToolWindowClient } from '@platform/toolWindows';
 import { refreshAiConfig } from '@features/agent/stores/aiConfig';
 import AutoGroupDialog from '@features/agent/components/AutoGroupDialog';
@@ -16,6 +16,7 @@ type Input = { kind: 'grouping'; input: { items: GroupingItem[]; kind: string } 
 
 /** Tool windows initialize only their editor and model configuration, without terminal startup. */
 export default function ToolWindowApp({ token }: { token: string }) {
+  useT();
   const [session, setSession] = useState<{ input: Input; client: Awaited<ReturnType<typeof createToolWindowClient>> } | null>(null);
   const [error, setError] = useState('');
   useEffect(() => {

@@ -1,4 +1,5 @@
 import { forwardRef, type ComponentPropsWithoutRef } from 'react';
+import { localizeLabel } from '@i18n';
 
 /** Preserve literal input across native text services without changing composition events. */
 export const literalInputProps = {
@@ -10,13 +11,13 @@ export const literalInputProps = {
 
 export const TextInput = forwardRef<HTMLInputElement, ComponentPropsWithoutRef<'input'> & { variant?: 'plain' | 'field' }>(
   function TextInput({ variant = 'plain', className, ...props }, ref) {
-    return <input {...props} {...literalInputProps} ref={ref} className={variant === 'field' ? `text-input-field ${className ?? ''}` : className} />;
+    return <input {...props} placeholder={localizeLabel(props.placeholder)} aria-label={localizeLabel(props['aria-label'])} {...literalInputProps} ref={ref} className={variant === 'field' ? `text-input-field ${className ?? ''}` : className} />;
   },
 );
 
 export const TextArea = forwardRef<HTMLTextAreaElement, ComponentPropsWithoutRef<'textarea'>>(
   function TextArea(props, ref) {
-    return <textarea {...props} {...literalInputProps} ref={ref} />;
+    return <textarea {...props} placeholder={localizeLabel(props.placeholder)} aria-label={localizeLabel(props['aria-label'])} {...literalInputProps} ref={ref} />;
   },
 );
 
