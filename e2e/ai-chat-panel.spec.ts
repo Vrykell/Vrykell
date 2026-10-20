@@ -94,7 +94,7 @@ test.describe('AI 对话面板', () => {
     await page.getByRole('option').filter({ hasNotText: '仅讨论' }).first().click();
     await input.fill('跑构建');
     await input.press('Enter');
-    await expect(page.getByRole('button', { name: '允许一次' })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('button', { name: '运行', exact: true })).toBeVisible({ timeout: 10000 });
 
     // Stop while the reply holds no answer text: only the tool has been produced.
     await page.locator('.chat-send-button').click();
