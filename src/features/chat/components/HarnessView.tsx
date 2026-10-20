@@ -124,18 +124,12 @@ export default function HarnessView({ tabId, harness, cwd }: { tabId: string; ha
   /** Escape hides the command list for the current text without touching what was typed. */
   const [commandDismissed, setCommandDismissed] = useState(false);
   const [commandIndex, setCommandIndex] = useState(0);
-  /** Opening must happen once at a time per tab: React's double-invoked effects spawned two sessions.
-   *  The guard is released when the attempt settles, so a remount (which an unmount cleanup closed)
-   *  can open again. */
-  const opening = useRef<string | null>(null);
-
   useEffect(() => { bindHarnessEvents(); }, []);
+  /** The store refuses a second open for a tab that is already opening, so a re-rendered effect or a
+   *  double click can only ever start one agent process. */
   useEffect(() => {
-    if (session || opening.current === tabId) return;
-    opening.current = tabId;
-    void useHarnessStore.getState().open(tabId, harness, cwd ?? activeCwd ?? '').finally(() => {
-      if (opening.current === tabId) opening.current = null;
-    });
+    if (session) return;
+    void useHarnessStore.getState().open(tabId, harness, cwd ?? activeCwd ?? '');
   }, [tabId, harness, session, activeCwd, cwd]);
 
   const agent = session?.agent?.agentInfo;

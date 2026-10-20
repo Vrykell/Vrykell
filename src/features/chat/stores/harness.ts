@@ -121,6 +121,9 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
   byTab: {},
 
   open: async (tabId, harness, cwd) => {
+    // One open per tab: a second click on restart (or a remount racing the first attempt) would
+    // otherwise start a second agent process that nothing would ever close.
+    if (get().byTab[tabId]?.opening) return;
     if (!(tabId in get().byTab)) {
       set((state) => ({ byTab: { ...state.byTab, [tabId]: fresh(harness) } }));
     }
@@ -159,7 +162,8 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
 
   restart: async (tabId) => {
     const session = get().byTab[tabId];
-    if (!session) return;
+    // An open that is still running owns the tab; restarting under it would race two agent processes.
+    if (!session || session.opening) return;
     const { harness, cwd } = session;
     // A restart is how the user says "forget that conversation": the reference goes first, or the
     // open below would load it straight back.

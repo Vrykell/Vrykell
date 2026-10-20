@@ -40,6 +40,10 @@ const SESSION_TIMEOUT: Duration = Duration::from_secs(120);
 /// reload a model when it happens.
 const CONFIG_TIMEOUT: Duration = Duration::from_secs(60);
 
+/// Reopening a session replays its whole conversation before the agent answers, and a long history
+/// takes as long as it takes.
+const LOAD_TIMEOUT: Duration = Duration::from_secs(300);
+
 /// A turn stays open until the agent stops it: real turns run for minutes (thinking, tool calls)
 /// and the stop button — not a clock — is what ends one early. The budget is a safety net for an
 /// agent that never answers at all.
@@ -382,7 +386,7 @@ impl AcpClient {
         self.request(
             "session/load",
             json!({ "sessionId": session_id, "cwd": cwd, "mcpServers": [] }),
-            SESSION_TIMEOUT,
+            LOAD_TIMEOUT,
         )
         .await
     }
@@ -682,6 +686,40 @@ fn emit<R: tauri::Runtime>(app: &tauri::AppHandle<R>, event: AcpEvent) {
     let _ = tauri::Emitter::emit(app, EVENT, event);
 }
 
+/// Open a session, resuming `resume` when the agent can. A failed load falls back to a new session:
+/// a stale id (a deleted session, another directory) must not lock the user out. The replay of a
+/// loaded session is drained here, in arrival order, because the page only learns the id when the
+/// command returns.
+async fn open_session(
+    client: &AcpClient,
+    name: &str,
+    cwd: &str,
+    resume: Option<&str>,
+    can_load: bool,
+) -> Result<(Value, String, Vec<AcpEvent>), String> {
+    if let (Some(id), true) = (resume, can_load) {
+        match client.load_session(id, cwd).await {
+            Ok(loaded) => {
+                let replayed: Vec<AcpEvent> = client
+                    .drain_events()
+                    .await
+                    .into_iter()
+                    .map(|message| AcpEvent { session_id: id.to_string(), kind: "update".to_string(), payload: message })
+                    .collect();
+                note("acp-load-ok", json!({ "name": name, "sessionId": id, "replayed": replayed.len() }));
+                return Ok((loaded, id.to_string(), replayed));
+            }
+            Err(error) => note("acp-load-failed", json!({ "name": name, "error": error })),
+        }
+    }
+    let session = client
+        .new_session(cwd)
+        .await
+        .map_err(|e| format!("harness could not open a session: {e}"))?;
+    let id = session.get("sessionId").and_then(Value::as_str).unwrap_or_default().to_string();
+    Ok((session, id, Vec::new()))
+}
+
 /// Start a harness and open a session in `cwd` (or reopen `resume_session_id`), then pump its
 /// notifications to the frontend.
 #[tauri::command]
@@ -759,39 +797,8 @@ pub async fn acp_open<R: tauri::Runtime>(
         .and_then(Value::as_bool)
         .unwrap_or(false);
     let resume = resume_session_id.filter(|id| !id.trim().is_empty());
-    let (session, session_id, replayed) = match resume {
-        Some(id) if can_load => match client.load_session(&id, &session_cwd).await {
-            Ok(loaded) => {
-                // Everything the agent replayed is already queued in arrival order; the pump starts
-                // after this, so nothing can slip between the drain and the subscription.
-                let replayed: Vec<AcpEvent> = client
-                    .drain_events()
-                    .await
-                    .into_iter()
-                    .map(|message| AcpEvent { session_id: id.clone(), kind: "update".to_string(), payload: message })
-                    .collect();
-                note("acp-load-ok", json!({ "name": harness.name, "sessionId": id, "replayed": replayed.len() }));
-                (loaded, id, replayed)
-            }
-            Err(error) => {
-                note("acp-load-failed", json!({ "name": harness.name, "error": error }));
-                let session = client
-                    .new_session(&session_cwd)
-                    .await
-                    .map_err(|e| format!("harness could not open a session: {e}"))?;
-                let id = session.get("sessionId").and_then(Value::as_str).unwrap_or_default().to_string();
-                (session, id, Vec::new())
-            }
-        },
-        _ => {
-            let session = client
-                .new_session(&session_cwd)
-                .await
-                .map_err(|e| format!("harness could not open a session: {e}"))?;
-            let id = session.get("sessionId").and_then(Value::as_str).unwrap_or_default().to_string();
-            (session, id, Vec::new())
-        }
-    };
+    let (session, session_id, replayed) =
+        open_session(&client, &harness.name, &session_cwd, resume.as_deref(), can_load).await?;
 
     // Pump the agent's notifications for as long as the session lives.
     let pump_app = app.clone();
@@ -1245,6 +1252,44 @@ mod tests {
             seen.lock().unwrap().iter().filter(|message| message.get("method") == Some(&json!("session/load"))).count(),
             1
         );
+        agent.abort();
+    }
+
+    #[tokio::test]
+    async fn a_failed_or_unsupported_load_falls_back_to_a_new_session() {
+        let (ours, theirs) = tokio::io::duplex(8192);
+        let (read, write) = tokio::io::split(ours);
+        let client = AcpClient::over(read, write, Arc::new(|_| None));
+        let agent = tokio::spawn(async move {
+            let mut pipe = theirs;
+            while let Some(message) = read_line(&mut pipe).await {
+                let id = message.get("id").cloned();
+                let reply = match message.get("method").and_then(Value::as_str).unwrap_or("") {
+                    "session/load" => json!({
+                        "jsonrpc": "2.0", "id": id,
+                        "error": { "code": -32602, "message": "no such session" }
+                    }),
+                    "session/new" => json!({ "jsonrpc": "2.0", "id": id, "result": { "sessionId": "fresh" } }),
+                    _ => json!({ "jsonrpc": "2.0", "id": id, "result": {} }),
+                };
+                let _ = pipe.write_all(format!("{reply}\n").as_bytes()).await;
+            }
+        });
+
+        // The agent supports loading but the id is stale: a new session opens instead of failing.
+        let (session, id, replayed) = open_session(&client, "Fake", "/tmp/project", Some("stale"), true)
+            .await
+            .expect("fallback");
+        assert_eq!(id, "fresh");
+        assert_eq!(session.get("sessionId").and_then(Value::as_str), Some("fresh"));
+        assert!(replayed.is_empty());
+
+        // An agent that cannot load skips the attempt entirely.
+        let (_, id, replayed) = open_session(&client, "Fake", "/tmp/project", Some("stale"), false)
+            .await
+            .expect("new session");
+        assert_eq!(id, "fresh");
+        assert!(replayed.is_empty());
         agent.abort();
     }
 

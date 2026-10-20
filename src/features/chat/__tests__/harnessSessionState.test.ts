@@ -162,4 +162,29 @@ describe('harness session state', () => {
       { name: 'test', description: 'Run tests', hint: undefined },
     ]);
   });
+
+  it('never starts a second agent while an open is still running', async () => {
+    vi.mocked(acpOpen).mockClear();
+    let release: (() => void) | undefined;
+    vi.mocked(acpOpen).mockImplementationOnce(() => new Promise((resolve) => {
+      release = () => resolve({
+        sessionId: 's1',
+        harness: 'Claude Code',
+        cwd: '/tmp/project',
+        agent: { protocolVersion: 1, agentInfo: { name: 'Fake' }, agentCapabilities: null, authMethods: [] },
+        modes: null,
+        models: null,
+        configOptions: null,
+        replayed: [],
+      });
+    }));
+    useHarnessStore.setState({ byTab: {} });
+
+    const first = useHarnessStore.getState().open(TAB, 'Claude Code', '/tmp/project');
+    const second = useHarnessStore.getState().open(TAB, 'Claude Code', '/tmp/project');
+    release!();
+    await Promise.all([first, second]);
+
+    expect(acpOpen).toHaveBeenCalledTimes(1);
+  });
 });
