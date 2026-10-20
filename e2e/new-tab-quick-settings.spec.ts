@@ -13,10 +13,15 @@ test.describe('新建标签类型快捷配置', () => {
     await expect(page.getByRole('menuitemradio', { name: '经典模式' })).toBeFocused();
     for (const width of [1240, 600]) {
       await page.setViewportSize({ width, height: 800 });
-      for (const menu of await page.getByRole('menu').all()) {
-        const bounds = (await menu.boundingBox())!;
-        expect(bounds.x).toBeGreaterThanOrEqual(8); expect(bounds.x + bounds.width).toBeLessThanOrEqual(width - 8);
-      }
+      // Open menus reposition from a resize listener; wait until each one fits the new width
+      // instead of measuring the frame that still holds the old position.
+      await expect.poll(async () => {
+        for (const menu of await page.getByRole('menu').all()) {
+          const bounds = (await menu.boundingBox())!;
+          if (bounds.x < 8 || bounds.x + bounds.width > width - 8) return false;
+        }
+        return true;
+      }).toBe(true);
       await page.screenshot({ path: info.outputPath(`nested-settings-${width}.png`) });
     }
     await page.keyboard.press('ArrowLeft');

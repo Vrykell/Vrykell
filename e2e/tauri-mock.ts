@@ -1,4 +1,4 @@
-import type { BrowserContext, Page } from '@playwright/test';
+import { expect, type BrowserContext, type Page } from '@playwright/test';
 
 export interface TauriMockOptions {
   /** Use each terminal's requested directory for its initial prompt. */
@@ -1878,10 +1878,12 @@ export async function expectAnyTermContains(page: Page, text: string, timeout = 
 /** 确保会话列表面板打开，兼容默认布局与按需打开状态。 */
 export async function ensureTabsOpen(page: Page): Promise<void> {
   const search = page.locator('[data-testid="tab-search"]');
-  if (!(await search.isVisible().catch(() => false))) {
-    await page.locator('[data-dock-btn="tabs"]').click();
-  }
-  await search.waitFor({ state: 'visible' });
+  // The dock button toggles the panel, so a check-then-click can close a panel that was still
+  // painting; retry until the search box is actually on screen instead of trusting one check.
+  await expect(async () => {
+    if (!(await search.isVisible().catch(() => false))) await page.locator('[data-dock-btn="tabs"]').click();
+    await expect(search).toBeVisible({ timeout: 750 });
+  }).toPass({ timeout: 8_000 });
 }
 
 /** Expand the conversation configuration without changing the message draft. */

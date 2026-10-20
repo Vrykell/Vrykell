@@ -56,6 +56,14 @@ test('a code block track cannot leave the chat transcript over the composer', as
   // With the block's bottom edge 20px below the transcript, the whole track band is clipped: the
   // point it would occupy belongs to the composer, and no track may answer for it.
   await alignBlockBottom(20);
+  // The overlay scrollbar reacts to the scroll event on a later task, so wait for its state to
+  // settle before measuring the hit test; a persistent track still fails the assertions below.
+  await expect.poll(() => page.evaluate(() => {
+    const scroll = document.querySelector<HTMLElement>('.chat-transcript')!;
+    const surface = scroll.querySelector<HTMLElement>('.md pre')!;
+    const bar = document.querySelector<HTMLElement>(`[role="scrollbar"][aria-controls="${surface.id}"][aria-orientation="horizontal"]`);
+    return bar ? getComputedStyle(bar).display : 'missing';
+  })).toBe('none');
   const escape = await page.evaluate(() => {
     const scroll = document.querySelector<HTMLElement>('.chat-transcript')!;
     const surface = scroll.querySelector<HTMLElement>('.md pre')!;
