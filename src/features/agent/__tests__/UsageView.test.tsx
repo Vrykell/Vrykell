@@ -285,6 +285,19 @@ describe('UsageView', () => {
     expect(cells[4]).toHaveTextContent('0.0042 USD');
   });
 
+  it('falls back to all sources when the selected one disappears', () => {
+    useUsageStore.getState().acpTurn('Claude Code');
+    render(<UsageView />);
+
+    fireEvent.click(screen.getByTestId('usage-source-Claude Code'));
+    expect(screen.getByTestId('usage-acp-turns')).toHaveTextContent('1');
+
+    // Clearing removes the server's record, so the selected source no longer exists.
+    fireEvent.click(screen.getByTestId('usage-clear'));
+    expect(screen.getByTestId('usage-source-all')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('usage-metrics')).toBeInTheDocument();
+  });
+
   it('clears the records and confirms it', () => {
     seedSonnetTurn();
     render(<UsageView />);

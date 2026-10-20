@@ -6,7 +6,7 @@
  * first), and the two aggregate tables. Views read this hook instead of the store
  * (architecture rule).
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   modelBreakdown,
   providerBreakdown,
@@ -55,6 +55,18 @@ export function useUsageStats() {
     () => [...new Set(inRange.map((record) => record.model))].sort((a, b) => a.localeCompare(b)),
     [inRange],
   );
+  // A filter whose value no longer exists — every record cleared, or the range moved past it — would
+  // otherwise leave the page showing nothing with no visible way back. Falling back to "all" keeps
+  // the control and the view in step.
+  useEffect(() => {
+    if (source && !sourceOptions.includes(source)) setSource(ALL_FILTER);
+  }, [source, sourceOptions]);
+  useEffect(() => {
+    if (provider && !providerOptions.includes(provider)) setProvider(ALL_FILTER);
+  }, [provider, providerOptions]);
+  useEffect(() => {
+    if (model && !modelOptions.includes(model)) setModel(ALL_FILTER);
+  }, [model, modelOptions]);
   const providerRows = useMemo(() => providerBreakdown(filtered), [filtered]);
   const modelRows = useMemo(() => modelBreakdown(filtered), [filtered]);
   /** Request log: newest first. */
