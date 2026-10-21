@@ -201,14 +201,40 @@ fn config_path() -> PathBuf {
         .join("config.json")
 }
 
+/// Copy a legacy credential without removing its source until every destination is safe.
+fn migrate_family_key(
+    config: &mut AiConfigInner,
+    kind: &str,
+    value: &str,
+    mut read: impl FnMut(&str) -> Option<String>,
+    mut write: impl FnMut(&str, &str) -> Result<(), String>,
+) -> (bool, bool) {
+    let ids: std::collections::HashSet<_> = config.models.iter()
+        .filter(|model| model.provider == kind)
+        .map(|model| provider_identity(&model.provider, &model.base_url)).collect();
+    let mut complete = !ids.is_empty();
+    let mut changed = false;
+    for id in ids {
+        if read(&id).is_some() || write(&id, value).is_ok() {
+            if !config.provider_keys.contains(&id) {
+                config.provider_keys.push(id);
+                changed = true;
+            }
+        } else {
+            complete = false;
+        }
+    }
+    (changed, complete)
+}
+
 impl AiConfig {
-    /// 启动时从磁盘加载（文件缺失或损坏时回退默认），并把 key 从文件迁移到平台密钥存储。
+    /// Load configuration and migrate credentials through the platform store.
     pub fn load() -> Self {
         let mut inner = std::fs::read_to_string(config_path())
             .ok()
             .and_then(|s| serde_json::from_str::<AiConfigInner>(&s).ok())
             .unwrap_or_default();
-        // 旧版把 key 明文写在 config.json；先搬进平台存储，再从存储统一读回。
+        // Keep the original file if any credential could not be sealed.
         let legacy = [
             (SECRET_OPENAI, inner.api_key.take()),
             (SECRET_ANTHROPIC, inner.anthropic_key.take()),
@@ -229,8 +255,7 @@ impl AiConfig {
             }
         }
         inner.normalize();
-        // 旧版按家族共用一把 key（`ai.openai` 等）：搬成按 provider 各存各的，
-        // 家族键覆盖该家族现有的每个端点，随后删除老账户名。
+        // Split shared credentials into endpoint accounts, retaining the source on partial failure.
         let family_keys = [
             ("openai-compatible", crate::secret::get_secret(SECRET_OPENAI)),
             ("anthropic", crate::secret::get_secret(SECRET_ANTHROPIC)),
@@ -239,23 +264,10 @@ impl AiConfig {
         let mut family_migrated = false;
         for (kind, value) in family_keys {
             let Some(value) = value else { continue };
-            let mut carried = false;
-            for model in &inner.models {
-                if model.provider != kind {
-                    continue;
-                }
-                let id = provider_identity(&model.provider, &model.base_url);
-                if read_provider_key(&id).is_none()
-                    && crate::secret::set_secret(&provider_secret_name(&id), &value).is_ok()
-                {
-                    if !inner.provider_keys.iter().any(|entry| entry == &id) {
-                        inner.provider_keys.push(id);
-                    }
-                    family_migrated = true;
-                }
-                carried = true;
-            }
-            if carried {
+            let (changed, complete) = migrate_family_key(&mut inner, kind, &value, read_provider_key,
+                |id, key| crate::secret::set_secret(&provider_secret_name(id), key));
+            family_migrated |= changed;
+            if complete {
                 crate::secret::delete_secret(match kind {
                     "anthropic" => SECRET_ANTHROPIC,
                     "gemini" => SECRET_GEMINI,
@@ -265,8 +277,8 @@ impl AiConfig {
         }
         inner.tavily_key = crate::secret::get_secret(SECRET_TAVILY);
         let cfg = AiConfig(Mutex::new(inner));
-        // 只有全部搬迁成功才重写文件：否则明文 key 会随重写一起消失。
-        if (migrated && sealed_all) || family_migrated {
+        // A failed plaintext migration must not be erased by an unrelated successful migration.
+        if sealed_all && (migrated || family_migrated) {
             cfg.save();
         }
         cfg
@@ -420,22 +432,21 @@ pub fn set_active_model(state: State<'_, AiConfig>, id: String) {
     });
 }
 
-/// 按 provider（身份 = `kind|生效端点`）设置 key：密钥只进平台密钥存储，配置文件只记身份。
+/// Persist an endpoint credential before marking it configured.
 #[tauri::command]
-pub fn set_provider_key(state: State<'_, AiConfig>, provider_id: String, key: String) {
+pub fn set_provider_key(state: State<'_, AiConfig>, provider_id: String, key: String) -> Result<(), String> {
     let k = key.trim().to_string();
     if k.is_empty() {
-        return;
+        return Err("provider-key-empty".to_string());
     }
-    if let Err(error) = crate::secret::set_secret(&provider_secret_name(&provider_id), &k) {
-        eprintln!("[ai] 保存 API Key 失败：{error}");
-        return;
-    }
+    crate::secret::set_secret(&provider_secret_name(&provider_id), &k)
+        .map_err(|_| "provider-key-write-failed".to_string())?;
     set_field(&state, |c| {
         if !c.provider_keys.iter().any(|id| id == &provider_id) {
             c.provider_keys.push(provider_id.clone());
         }
     });
+    Ok(())
 }
 
 #[tauri::command]
@@ -955,6 +966,27 @@ mod config_tests {
         assert_eq!(inner.anthropic_key.as_deref(), Some("sk-ant"));
         assert_eq!(inner.gemini_key.as_deref(), Some("g"));
         assert_eq!(inner.tavily_key.as_deref(), Some("t"));
+    }
+
+    #[test]
+    fn legacy_credentials_are_retained_until_every_endpoint_is_migrated() {
+        let mut config = AiConfigInner::default();
+        config.normalize();
+        let kind = config.models[0].provider.clone();
+        let mut second = config.models[0].clone();
+        second.id = "second".into();
+        second.base_url = "https://other.example/v1".into();
+        config.models.push(second);
+        let (_, complete) = migrate_family_key(&mut config, &kind, "old", |_| None,
+            |id, _| if id.contains("other.example") { Err("unavailable".into()) } else { Ok(()) });
+        assert!(!complete, "a partial write must retain the source credential");
+        assert_eq!(config.provider_keys.len(), 1);
+        let (changed, complete) = migrate_family_key(&mut config, &kind, "old", |_| Some("existing".into()),
+            |_, _| panic!("existing endpoint credentials must not be replaced"));
+        assert!(changed && complete);
+        assert_eq!(config.provider_keys.len(), 2);
+        let (_, complete) = migrate_family_key(&mut config, "unused", "old", |_| None, |_, _| Ok(()));
+        assert!(!complete, "an unused source must not be removed");
     }
 }
 

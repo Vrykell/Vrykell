@@ -1784,6 +1784,21 @@ const zh: Record<string, string> = {
   'Linked worktrees': '关联的工作区',
   'Back to editor': '返回编辑器',
   'Stage the resolution of {{path}}? Check that conflict markers have been removed and the file contains the intended result.': '暂存 {{path}} 的冲突解决结果？请先确认已移除冲突标记，且文件内容符合预期。',
+  'Could not save the API key. Your previous key is unchanged.': '无法保存 API 密钥，原有密钥未改变。',
+  'Could not save servers. Your changes are kept. Try again.': '无法保存服务器，已保留你的修改，请重试。',
+  'Could not load servers': '无法加载服务器',
+  'One argument per line. Spaces are kept.': '每行一个参数，保留参数中的空格。',
+  'Configure servers': '配置服务器',
+  'Close session {{name}}': '关闭会话 {{name}}',
+  'Connect a server': '连接服务器',
+  'Choose project folder': '选择项目文件夹',
+  'Could not choose a project folder.': '无法选择项目文件夹。',
+  'Close ACP sessions?': '关闭 ACP 会话？',
+  'Closing stops active work and discards unsent drafts.': '关闭会停止正在进行的任务，并丢弃未发送的草稿。',
+  'Close sessions': '关闭会话',
+  'Default project folder': '默认项目文件夹',
+  'Connection failed': '连接失败',
+  'Could not close the agent session.': '无法关闭代理会话。',
 };
 
 export default zh;

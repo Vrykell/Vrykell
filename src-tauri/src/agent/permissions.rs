@@ -296,10 +296,10 @@ struct Lease {
 struct PolicyState {
     levels: HashMap<String, Level>,
     /// Approvals for the rest of the session ("allow for this conversation").
-    session_grants: HashSet<String>,
+    session_grants: HashSet<(String, String)>,
     /// Command shapes approved for the rest of the session ("always allow `npm run`"). Danger and
     /// credential checks run before these are consulted, so a grant never widens those.
-    shape_grants: HashSet<String>,
+    shape_grants: HashSet<(String, String)>,
     leases: HashMap<String, Lease>,
 }
 
@@ -377,15 +377,24 @@ impl ToolPolicy {
         Ok(())
     }
 
-    fn grant_session(&self, tool: &str) -> Result<(), String> {
+    fn grant_session(&self, conversation: &str, tool: &str) -> Result<(), String> {
+        if conversation.trim().is_empty() { return Err("A conversation is required for temporary approval".to_string()); }
         let mut state = self.0.lock().map_err(|e| e.to_string())?;
-        state.session_grants.insert(tool.to_string());
+        state.session_grants.insert((conversation.to_string(), tool.to_string()));
         Ok(())
     }
 
-    fn grant_shape(&self, shape: &str) -> Result<(), String> {
+    fn grant_shape(&self, conversation: &str, shape: &str) -> Result<(), String> {
+        if conversation.trim().is_empty() { return Err("A conversation is required for temporary approval".to_string()); }
         let mut state = self.0.lock().map_err(|e| e.to_string())?;
-        state.shape_grants.insert(shape.to_string());
+        state.shape_grants.insert((conversation.to_string(), shape.to_string()));
+        Ok(())
+    }
+
+    fn clear_grants(&self, conversation: Option<&str>) -> Result<(), String> {
+        let mut state = self.0.lock().map_err(|e| e.to_string())?;
+        state.session_grants.retain(|(owner, _)| conversation.is_some_and(|id| id != owner));
+        state.shape_grants.retain(|(owner, _)| conversation.is_some_and(|id| id != owner));
         Ok(())
     }
 
@@ -453,6 +462,8 @@ impl ToolDecision {
 #[serde(rename_all = "camelCase")]
 pub struct AuthorizeRequest {
     pub tool: String,
+    #[serde(default)]
+    pub conversation_id: Option<String>,
     /// Gated command this call will run (read_file_text, fs_search, ...). The lease is bound to
     /// it plus `args`; without it the tool has no gated command and the lease is bound to the
     /// tool name alone.
@@ -628,6 +639,7 @@ fn plain_decision(
     tool: &str,
     shape: Option<String>,
     mode: Option<&str>,
+    conversation: Option<&str>,
 ) -> (bool, Option<String>) {
     // The UI shortcut modulates plain calls only: deny still denies, and a reason above always
     // went through the native confirmation.
@@ -642,10 +654,10 @@ fn plain_decision(
         .0
         .lock()
         .map(|s| {
-            s.session_grants.contains(tool)
+            conversation.is_some_and(|id| s.session_grants.contains(&(id.to_string(), tool.to_string()))
                 || shape
                     .as_ref()
-                    .is_some_and(|shape| s.shape_grants.contains(shape))
+                    .is_some_and(|shape| s.shape_grants.contains(&(id.to_string(), shape.clone()))))
         })
         .unwrap_or(false);
     (level == Level::Allow || granted, shape)
@@ -686,7 +698,7 @@ pub async fn authorize_tool_call(
             }
         },
         None => {
-            let (allowed, shape) = plain_decision(&state, tool, shape, request.mode.as_deref());
+            let (allowed, shape) = plain_decision(&state, tool, shape, request.mode.as_deref(), request.conversation_id.as_deref());
             if allowed {
                 Ok(ToolDecision::allow(None, state.issue(&command, &request.args)?))
             } else {
@@ -704,18 +716,19 @@ pub fn approve_tool_call(
     command: Option<String>,
     args: Value,
     scope: Option<String>,
+    conversation_id: Option<String>,
 ) -> Result<ToolDecision, String> {
     if state.level_of(&tool) == Level::Deny {
         return Ok(ToolDecision::deny(Some("policy.denied".to_string())));
     }
     if scope.as_deref() == Some("session") {
-        state.grant_session(&tool)?;
+        state.grant_session(conversation_id.as_deref().unwrap_or_default(), &tool)?;
     }
     if scope.as_deref() == Some("shape") {
         // A shape approval only ever covers what the card labelled; without a derivable shape
         // there is nothing to grant, and asking again would loop, so the call is denied.
         match command_shape(&tool, &args) {
-            Some(shape) => state.grant_shape(&shape)?,
+            Some(shape) => state.grant_shape(conversation_id.as_deref().unwrap_or_default(), &shape)?,
             None => return Ok(ToolDecision::deny(Some("policy.denied".to_string()))),
         }
     }
@@ -784,12 +797,8 @@ pub fn tool_policy_set_level(
 }
 
 #[tauri::command]
-pub fn tool_policy_clear_session_grants(state: tauri::State<'_, ToolPolicy>) -> Result<(), String> {
-    let mut guard = state.0.lock().map_err(|e| e.to_string())?;
-    guard.session_grants.clear();
-    // Shapes are session approvals too, so clearing one clears both.
-    guard.shape_grants.clear();
-    Ok(())
+pub fn tool_policy_clear_session_grants(state: tauri::State<'_, ToolPolicy>, conversation_id: Option<String>) -> Result<(), String> {
+    state.clear_grants(conversation_id.as_deref())
 }
 
 #[cfg(test)]
@@ -862,6 +871,7 @@ mod tests {
                 "run_command",
                 command_shape("run_command", &json!({ "command": command })),
                 mode,
+                Some("conversation-a"),
             )
         };
         // `run_command` ships at ask, and the shape travels back for the card to label.
@@ -869,7 +879,7 @@ mod tests {
         assert!(!allowed);
         assert_eq!(shape.as_deref(), Some("npm run"));
 
-        p.grant_shape("npm run").expect("grant");
+        p.grant_shape("conversation-a", "npm run").expect("grant");
         assert!(decide("npm run test", None).0, "the approved kind runs on its own");
         assert!(!decide("npm publish", None).0, "another kind still asks");
 
@@ -880,9 +890,26 @@ mod tests {
 
         // The whole-tool approval from the card still covers everything the tool does, and it
         // outlives the shortcut that was active when it was granted.
-        p.grant_session("run_command").expect("grant");
+        p.grant_session("conversation-a", "run_command").expect("grant");
         assert!(decide("npm publish", None).0);
         assert!(decide("npm publish", Some("strict")).0);
+    }
+
+    #[test]
+    fn temporary_approvals_are_scoped_and_revoked_per_conversation() {
+        let p = policy();
+        p.grant_shape("a", "npm run").unwrap();
+        p.grant_session("b", "write_file").unwrap();
+        let decide = |owner, tool, shape| plain_decision(&p, tool, shape, None, owner).0;
+        assert!(decide(Some("a"), "run_command", Some("npm run".to_string())));
+        assert!(!decide(Some("b"), "run_command", Some("npm run".to_string())));
+        assert!(!decide(None, "run_command", Some("npm run".to_string())));
+        p.clear_grants(Some("a")).unwrap();
+        assert!(!decide(Some("a"), "run_command", Some("npm run".to_string())));
+        assert!(decide(Some("b"), "write_file", None));
+        p.clear_grants(None).unwrap();
+        assert!(!decide(Some("b"), "write_file", None));
+        assert!(p.grant_session("", "run_command").is_err());
     }
 
     #[test]

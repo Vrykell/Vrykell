@@ -232,30 +232,14 @@ export function denyAllPending() {
   pending.clear();
 }
 
-/** 设置页「清空本会话授权」：后端持有会话授权，清空即撤销 */
-export function clearSessionGrants() {
-  // The mirror only holds what the card granted; without it there is nothing to revoke, and
-  // skipping the round trip keeps callers that run on every tab close cheap.
-  if (sessionGrantTools.size === 0 && sessionGrantShapes.size === 0) return;
-  sessionGrantTools.clear();
-  sessionGrantShapes.clear();
-  void clearToolSessionGrants().catch((error: unknown) => {
+/** Revoke one conversation, or all temporary approvals from settings. */
+const grantedConversations = new Set<string>();
+export function clearSessionGrants(conversationId?: string) {
+  if (conversationId && !grantedConversations.delete(conversationId)) return;
+  if (!conversationId) grantedConversations.clear();
+  void clearToolSessionGrants(conversationId).catch((error: unknown) => {
     console.warn('[permissions] Could not clear session grants:', error);
   });
-}
-
-/** Session approvals the card granted, mirrored so revoking them stays a local decision. */
-const sessionGrantTools = new Set<string>();
-
-/** Command shapes the card approved for this session, mirrored for the same reason. */
-const sessionGrantShapes = new Set<string>();
-
-function noteSessionGrant(tool: string) {
-  sessionGrantTools.add(tool);
-}
-
-function noteShapeGrant(shape: string) {
-  sessionGrantShapes.add(shape);
 }
 
 /**
@@ -323,11 +307,12 @@ export type ToolApprover = (
   command: string | undefined,
   args: Record<string, unknown>,
   scope: 'once' | 'session' | 'shape',
+  conversationId?: string,
 ) => Promise<ToolDecision>;
 
 const backendAuthorizer: ToolAuthorizer = (request) => authorizeToolCall(request);
-const backendApprover: ToolApprover = (tool, command, args, scope) =>
-  approveToolCall(tool, command, args, scope);
+const backendApprover: ToolApprover = (tool, command, args, scope, conversationId) =>
+  approveToolCall(tool, command, args, scope, conversationId);
 
 let authorizer: ToolAuthorizer = backendAuthorizer;
 let approver: ToolApprover = backendApprover;
@@ -366,6 +351,7 @@ export async function gate(
   try {
     decision = await authorizer({
       tool: toolName,
+      conversationId: ctx.tabId,
       command,
       args: input,
       shell: ctx.shellType ?? null,
@@ -425,6 +411,7 @@ export async function gate(
     try {
       const recheck = await authorizer({
         tool: toolName,
+        conversationId: ctx.tabId,
         command,
         args: approvedInput,
         shell: ctx.shellType ?? null,
@@ -450,6 +437,7 @@ export async function gate(
     // A shape derived from the original arguments cannot cover an edited command; the narrowest
     // grant for an edit is this one call.
     edited !== undefined && choice.decision === 'shape' ? 'once' : choice.decision,
+    ctx.tabId,
   ).catch((error: unknown) => {
     console.warn('[permissions] Could not record the approval:', error);
     return { decision: 'deny' } as ToolDecision;
@@ -458,8 +446,7 @@ export async function gate(
     ctx.setToolState(toolCallId, 'denied', reason ? { danger: reason } : undefined);
     return denied(reason, '审批未能完成，操作已拒绝');
   }
-  if (choice.decision === 'session') noteSessionGrant(toolName);
-  if (choice.decision === 'shape' && shape && edited === undefined) noteShapeGrant(shape);
+  if (ctx.tabId && choice.decision !== 'once') grantedConversations.add(ctx.tabId);
   const runningExtra = {
     ...(reason ? { danger: reason } : {}),
     ...(edited !== undefined ? { input: approvedInput } : {}),

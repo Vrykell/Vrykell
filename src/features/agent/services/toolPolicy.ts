@@ -23,6 +23,7 @@ export interface ToolDecision {
 
 export interface AuthorizeRequest {
   tool: string;
+  conversationId?: string;
   /** Gated command this call runs (read_file_text, fs_search, ...); defaults to the tool name. */
   command?: string;
   args: Record<string, unknown>;
@@ -44,11 +45,13 @@ export const approveToolCall = (
   command: string | undefined,
   args: Record<string, unknown>,
   scope: 'once' | 'session' | 'shape',
-) => invoke<ToolDecision>('approve_tool_call', { tool, command: command ?? null, args, scope });
+  conversationId?: string,
+) => invoke<ToolDecision>('approve_tool_call', { tool, command: command ?? null, args, scope, conversationId: conversationId ?? null });
 
 export const loadToolPolicy = () => invoke<Record<string, ToolLevel>>('tool_policy_get');
 
 export const setToolPolicyLevel = (tool: string, level: ToolLevel) =>
   invoke<void>('tool_policy_set_level', { tool, level });
 
-export const clearToolSessionGrants = () => invoke<void>('tool_policy_clear_session_grants');
+export const clearToolSessionGrants = (conversationId?: string) =>
+  invoke<void>('tool_policy_clear_session_grants', { conversationId: conversationId ?? null });

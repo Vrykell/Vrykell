@@ -1,4 +1,5 @@
 import { invoke } from '@platform/diagnostics';
+import { t } from '@i18n';
 import { listen } from '@tauri-apps/api/event';
 import { create } from 'zustand';
 import { safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
@@ -186,7 +187,11 @@ export function selectProvider(id: string | null): void {
 export async function setProviderKey(provider: string, key: string): Promise<void> {
   const k = key.trim();
   if (!k) return;
-  await invoke('set_provider_key', { providerId: provider, key: k });
+  try {
+    await invoke('set_provider_key', { providerId: provider, key: k });
+  } catch {
+    throw new Error(t('Could not save the API key. Your previous key is unchanged.'));
+  }
   const keys = useAiConfigStore.getState().providerKeys;
   if (!keys.includes(provider)) useAiConfigStore.setState({ providerKeys: [...keys, provider] });
 }
