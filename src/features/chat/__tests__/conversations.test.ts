@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useChatStore, sendToChat, setDefaultStream, type StreamFn } from '../stores/chat';
 import { useComposerDrafts } from '../stores/composerDrafts';
 import { useWorkspaceStore } from '@features/workspace/stores/workspace';
-import { useTerminalStore } from '@features/terminal';
+import { useTerminalStore, useBlockStore } from '@features/terminal';
 import { leaf } from '@features/workspace/model/windowLayout';
 import * as api from '@platform/api/conversation';
 import { askAboutTerminal } from '../services/conversationContext';
@@ -18,6 +18,7 @@ const chat = useChatStore.getState();
 const workspace = useWorkspaceStore.getState();
 const terminal = useTerminalStore.getState();
 const drafts = useComposerDrafts.getState();
+const blocks = useBlockStore.getState();
 const environment = { paneId: 'a#0', label: 'Build terminal', kind: 'local' as const, cwd: '/project' };
 const reference: TerminalReference = { id: 'block-1', paneId: 'a#0', label: 'Source terminal', command: 'npm run build', output: 'Failed to compile', cwd: '/project', exitCode: 1, createdAt: 1 };
 
@@ -35,9 +36,24 @@ beforeEach(() => {
 afterEach(() => {
   useChatStore.setState(chat, true); useWorkspaceStore.setState(workspace, true);
   useTerminalStore.setState(terminal, true); useComposerDrafts.setState(drafts, true);
+  useBlockStore.setState(blocks, true);
 });
 
 describe('independent conversations', () => {
+  it('keeps the full current command result in both the reference and submitted history', async () => {
+    const command = `printf ${'argument '.repeat(400)}END_COMMAND`;
+    const output = `BEGIN_OUTPUT:${'line 😀\n'.repeat(900)}:FINAL_ERROR`;
+    useBlockStore.setState({ byTab: { 'a#0': [{ id: 'full', command, outputText: output, outputHtml: '', outputRaw: output,
+      status: 'done', exitCode: 1, startedAt: 1, endedAt: 2, wasLongRunning: false, linesTruncated: 0 }] } });
+    const id = askAboutTerminal('a#0');
+    const references = useComposerDrafts.getState().byTab[id]?.references ?? [];
+    expect(references[0]).toMatchObject({ command, output });
+    const stream: StreamFn = async messages => {
+      expect(messages[0].content).toContain(command);
+      expect(messages[0].content).toContain(output);
+    };
+    await useChatStore.getState().send('Analyze the full result', { conversationId: id, references, streamFn: stream });
+  });
   it('keeps automated work in a separate background conversation', async () => {
     const selected = useChatStore.getState().createConversation();
     sendToChat('Scheduled task');

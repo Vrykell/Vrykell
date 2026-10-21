@@ -54,12 +54,13 @@ describe('command action menu', () => {
     expect(close).toHaveBeenCalledOnce();
   });
 
-  it('stages a bounded snapshot for review without automatically submitting it', () => {
-    open('x'.repeat(3000));
+  it('stages the complete snapshot for review without automatically submitting it', () => {
+    const output = `BEGIN:${'output 😀 '.repeat(800)}:FINAL_ERROR`;
+    open(output);
     fireEvent.click(screen.getByRole('menuitem', { name: '发给 AI 分析' }));
     expect(mocks.send).not.toHaveBeenCalled();
     const id = useChatStore.getState().activeConversationId;
-    expect(useComposerDrafts.getState().byTab[id]?.references?.[0]).toMatchObject({ paneId: 'pane', command: 'git status', output: 'x'.repeat(2000), exitCode: 0 });
+    expect(useComposerDrafts.getState().byTab[id]?.references?.[0]).toMatchObject({ paneId: 'pane', command: 'git status', output, exitCode: 0 });
   });
 
   it('clears only the selected pane and displays elapsed time starting at zero', () => {

@@ -44,7 +44,7 @@ export function askAboutTerminal(paneId: string, reference?: TerminalReference, 
   const environment = environmentForPane(paneId);
   if (!reference && !text) {
     const block = useBlockStore.getState().byTab[paneId]?.slice().reverse().find(item => !!item.command || !!item.outputText);
-    const output = (block?.outputText || getRecentOutputFor(paneId)).slice(0, 2000);
+    const output = block?.outputText || getRecentOutputFor(paneId);
     if (block || output) reference = {
       id: block?.id ?? `snapshot-${paneId}-${Date.now()}`, paneId, label: environment?.label ?? t('Terminal output'),
       command: block?.command ?? '', output, cwd: block?.cwd ?? environment?.cwd,

@@ -89,7 +89,7 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
   }, [paneId, block.command]);
 
   const sendToAI = useCallback(() => {
-    const output = getOutputText().slice(0, 2000);
+    const output = getOutputText();
     askAboutTerminal(paneId, {
       id: block.id, paneId, label: t('Terminal output'), command: block.command, output,
       cwd: block.cwd, exitCode: block.exitCode, createdAt: block.startedAt ?? Date.now(),
