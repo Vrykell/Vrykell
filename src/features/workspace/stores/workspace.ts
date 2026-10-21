@@ -411,7 +411,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const id = nextTabId();
     set(state => ({ tabs: [...state.tabs, { id, title: t('File comparisons'), kind: 'git-diff', selection,
       comparisons: [{ id, selection }] }], activeId: id }));
-    useTerminalStore.getState().setAltScreenActive(false);
     return id;
   },
   activateGitComparison: id => {
@@ -528,17 +527,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (focused?.kind === 'local') set({ lastLocalPaneId: focused.id });
     useUiStore.getState().setSettingsOpen(false);
     set({ activeId: id });
-    // 切 tab：重置手动全屏标志（全屏宿主/块终端全屏只属于当前活跃 tab，
-    // 保活后旧 tab 仍挂载，标志残留会让隐藏 tab 的 RunningTerm 误进全屏宿主）
-    if (id !== prev) useTerminalStore.getState().setAltScreenActive(false);
-    // 聚焦回落到该窗口的第一个终端（切窗口后不残留上个窗口的终端聚焦）
+    // Restore a manually fullscreened pane before falling back to the first pane.
     const tab = get().tabs.find((t) => t.id === id);
     if (tab) {
       const area = workspaceAreaForKind(tab.kind);
       useWorkspaceNavigation.getState().selectArea(area);
       useWorkspaceNavigation.getState().rememberTab(area, id);
     }
-    useTerminalStore.getState().setFocusedPane(tab && isSessionTab(tab) ? firstLeaf(tab.layout).id : id);
+    const terminal = useTerminalStore.getState();
+    const pane = tab && isSessionTab(tab) ? layoutLeaves(tab.layout).find(item => terminal.manualFullscreen[item.id]) ?? firstLeaf(tab.layout) : null;
+    terminal.setFocusedPane(pane?.id ?? id);
   },
   titleFromMessage: (id, text) => {
     const tab = get().tabs.find((t) => t.id === id);
@@ -873,4 +871,7 @@ useWorkspaceStore.subscribe((state, previous) => {
   const area = workspaceAreaForKind(tab.kind);
   useWorkspaceNavigation.getState().selectArea(area);
   useWorkspaceNavigation.getState().rememberTab(area, tab.id);
+  const terminal = useTerminalStore.getState();
+  const pane = isSessionTab(tab) ? layoutLeaves(tab.layout).find(item => terminal.manualFullscreen[item.id]) ?? firstLeaf(tab.layout) : null;
+  terminal.setFocusedPane(pane?.id ?? tab.id);
 });

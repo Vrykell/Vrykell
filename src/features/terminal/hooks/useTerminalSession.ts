@@ -103,11 +103,6 @@ export function getExecutingTerm(tabId: string) {
   return sessionControllers.get(tabId)?.executingTerm ?? null;
 }
 
-/** Keep manual fullscreen resizing on the controller's buffer tracking path. */
-export function resizeExecutingTerm(tabId: string, cols: number, rows: number): void {
-  sessionControllers.get(tabId)?.resize(cols, rows);
-}
-
 /** Scene-aware resize driver; block output follows the available command-list width. */
 
 /** 触发指定 tab 重新校核 PTY/块终端宽度（无 session 时 no-op） */
@@ -341,13 +336,12 @@ export function useTerminalSession(
         if (focusTimer) clearTimeout(focusTimer);
         currentScene = scene;
         useTerminalStore.getState().setScene(paneId, scene);
-        // Actual alternate-buffer mode is rendered by the main xterm, so a manual fullscreen of
-        // the block terminal must give the surface back: its overlay would keep covering the live
-        // TUI with a block terminal that receives no output while the alt screen owns the pane.
-        if (scene === 'altScreen' && useTerminalStore.getState().altScreenActive) {
-          useTerminalStore.getState().setAltScreenActive(false);
+        // Controller transitions reclaim this pane's surface from manual presentation. A real
+        // alternate buffer must never sit behind a stale overlay of the running block terminal.
+        if (useTerminalStore.getState().manualFullscreen[paneId]) {
+          useTerminalStore.getState().setManualFullscreen(paneId, false);
           if (isTerminalDebugEnabled()) {
-            terminalDebug('manual-fullscreen-cancelled', { paneId, reason: 'alternate-screen' });
+            terminalDebug('manual-fullscreen-cancelled', { paneId, reason: scene });
           }
         }
         if (useSessionStore.getState().activeId !== tabId || useWorkspaceNavigation.getState().area !== 'terminal' || useUiStore.getState().settingsOpen) return;
@@ -393,9 +387,9 @@ export function useTerminalSession(
         sessionManager.record(tabId, paneId, block, 'complete');
         // Return a manually fullscreened running block to the block list when it ends.
         const ts = useTerminalStore.getState();
-        if (ts.scenes[paneId] === 'altScreen') {
+        if (ts.manualFullscreen[paneId]) {
           ts.setScene(paneId, 'blockList');
-          ts.setAltScreenActive(false);
+          ts.setManualFullscreen(paneId, false);
         }
       },
       takePendingUiCommand: () => {
@@ -727,17 +721,16 @@ export function useTerminalSession(
     /** 实测字符宽（渲染服务内部尺寸，与 RunningTerm 的 cellHeight 同源） */
     const cellWidth = (): number => getCellMetrics(term).width;
 
-    /** 实测行高（渲染服务内部尺寸，与 RunningTerm 的 cellHeight 同源） */
-    const cellHeight = (): number => getCellMetrics(term).height;
-
     /**
      * Return the manual fullscreen host size, or null when it is inactive.
      */
     const fullscreenHostSize = (): { w: number; h: number } | null => {
-      const fsHost = document.querySelector<HTMLElement>('[data-testid="tui-fullscreen"]');
+      if (!useTerminalStore.getState().manualFullscreen[paneId]) return null;
+      const fsHost = document.querySelector<HTMLElement>(`[data-testid="tui-fullscreen"][data-pane-id="${paneId}"]`);
       if (!fsHost) return null;
-      const padTop = parseFloat(fsHost.style.paddingTop) || 0;
-      return { w: fsHost.clientWidth, h: fsHost.clientHeight - padTop };
+      const style = getComputedStyle(fsHost);
+      return { w: fsHost.clientWidth - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0),
+        h: fsHost.clientHeight - (parseFloat(style.paddingTop) || 0) - (parseFloat(style.paddingBottom) || 0) };
     };
 
     let cachedDomCellWidth = 0;
@@ -750,14 +743,12 @@ export function useTerminalSession(
 
     /** PTY column count leaves room for browser fallback glyphs in completed snapshots. */
     const effectiveCols = (): number => {
-      // Manual fullscreen changes the store scene without changing the controller scene.
-      // Read the store value here to keep sizing on the fullscreen branch.
       const scene = useTerminalStore.getState().scenes[paneId] ?? currentScene;
-      // Measure the manual fullscreen host with xterm's cell width so the canvas fills it.
-      if (scene === 'altScreen') {
+      if (useTerminalStore.getState().manualFullscreen[paneId]) {
         const fs = fullscreenHostSize();
-        if (fs && fs.w > 0) return Math.max(2, Math.floor(fs.w / cellWidth()));
-        return term.cols;
+        const output = controller.executingTerm?.term ?? term;
+        if (fs && fs.w > 0) return Math.max(2, Math.floor(fs.w / getCellMetrics(output).width));
+        return output.cols;
       }
       if (scene !== 'blockList') return term.cols;
       // Measure a mounted output host to account for its padding and scrollbars.
@@ -781,10 +772,11 @@ export function useTerminalSession(
 
     /** PTY row count for the current scene; manual fullscreen uses the host height. */
     const effectiveRows = (): number => {
-      const scene = useTerminalStore.getState().scenes[paneId] ?? currentScene;
-      if (scene === 'altScreen') {
+      if (useTerminalStore.getState().manualFullscreen[paneId]) {
         const fs = fullscreenHostSize();
-        if (fs && fs.h > 0) return Math.max(1, Math.floor(fs.h / cellHeight()));
+        const output = controller.executingTerm?.term ?? term;
+        if (fs && fs.h > 0) return Math.max(1, Math.floor(fs.h / getCellMetrics(output).height));
+        return output.rows;
       }
       return term.rows;
     };
@@ -819,11 +811,11 @@ export function useTerminalSession(
             screenOffsetX: screen ? screen.left - host.left : null, screenWidth: screen?.width,
             cellWidth: getCellMetrics(term).width, devicePixelRatio: window.devicePixelRatio });
         }
-        useTerminalStore.getState().setDims(paneId, term.cols, term.rows);
         const scene = useTerminalStore.getState().scenes[paneId] ?? currentScene;
-        if (scene === 'altScreen') {
-          // 全屏是纯 xterm 画布：让 fit 使用渲染器实测尺寸，避免字体回退后的
-          // 私有 cellWidth 与 canvas 实际 cell 不一致。
+        const manual = !!useTerminalStore.getState().manualFullscreen[paneId];
+        if (!manual) useTerminalStore.getState().setDims(paneId, term.cols, term.rows);
+        if (scene === 'altScreen' && !manual) {
+          // A real alternate buffer uses the main terminal's measured grid.
           requestPtySize(term.cols, term.rows);
           controller.resize(term.cols, term.rows);
           return;
@@ -831,6 +823,11 @@ export function useTerminalSession(
         const cols = effectiveCols();
         const rows = effectiveRows();
         if (cols <= 0 || rows <= 0) return;
+        if (manual) useTerminalStore.getState().setDims(paneId, cols, rows);
+        if (useTerminalStore.getState().manualFullscreen[paneId] && controller.executingTerm
+          && (controller.executingTerm.term.cols !== cols || controller.executingTerm.term.rows !== rows)) {
+          terminalDebug('manual-fullscreen-resize', { paneId, cols, rows });
+        }
         requestPtySize(cols, rows);
         controller.resize(cols, rows);
         if (isTerminalDebugEnabled()) {

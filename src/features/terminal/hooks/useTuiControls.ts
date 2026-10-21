@@ -4,11 +4,11 @@ import { killForeground, ESCALATE_WINDOW_MS } from '@utils/killForeground';
 import { useToastStore } from '@ui/Toast';
 import { useBlockStore, useTerminalStore, selectBlocks } from '@features/terminal';
 
-/** 管理 TUI 场景顶部工具条的交互和场景切换。 */
+/** Keep toolbar actions and manual presentation state scoped to their owning pane. */
 export function useTuiControls(tabId: string) {
-  const setAltScreenActive = useTerminalStore((state) => state.setAltScreenActive);
+  const setManualFullscreen = useTerminalStore((state) => state.setManualFullscreen);
   const setScene = useTerminalStore((state) => state.setScene);
-  const altScreenActive = useTerminalStore((state) => state.altScreenActive);
+  const manualFullscreen = useTerminalStore((state) => !!state.manualFullscreen[tabId]);
   const sessions = useTerminalStore((state) => state.sessions);
   const blocks = useBlockStore(selectBlocks(tabId));
   const [killArmed, setKillArmed] = useState(false);
@@ -48,17 +48,18 @@ export function useTuiControls(tabId: string) {
   }, [sessions, tabId]);
 
   const exitFullScreen = useCallback(() => {
-    setAltScreenActive(false);
+    setManualFullscreen(tabId, false);
     setScene(tabId, 'blockList');
-  }, [setAltScreenActive, setScene, tabId]);
+  }, [setManualFullscreen, setScene, tabId]);
 
   const enterFullScreen = useCallback(() => {
+    useTerminalStore.getState().setFocusedPane(tabId);
     setScene(tabId, 'altScreen');
-    setAltScreenActive(true);
-  }, [setAltScreenActive, setScene, tabId]);
+    setManualFullscreen(tabId, true);
+  }, [setManualFullscreen, setScene, tabId]);
 
   return {
-    altScreenActive,
+    manualFullscreen,
     runningCommand,
     runningCwd: runningBlock?.cwd,
     runningStartedAt: runningBlock?.startedAt ?? null,

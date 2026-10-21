@@ -8,12 +8,15 @@ const mocked = vi.hoisted(() => ({
   extensions: [] as string[],
   loseContext: vi.fn(),
   debug: vi.fn(),
+  canvas: undefined as HTMLCanvasElement | undefined,
 }));
 
 vi.mock('@xterm/addon-webgl', () => ({
   WebglAddon: class {
     // Mirrors the private renderer handle the terminal surface adapter reaches for.
     readonly _renderer = {
+      _canvas: mocked.canvas,
+      dimensions: { device: { canvas: { width: 100, height: 40 } } },
       _gl: {
         getExtension: (name: string) => {
           mocked.extensions.push(name);
@@ -39,6 +42,8 @@ vi.mock('@features/terminal/services/terminalDebug', () => ({ terminalDebug: moc
 import { applyTerminalRenderer, hasWebglRenderer, loadWebglRenderer, releaseTerminalRenderer } from '../xtermRenderer';
 
 function reset(): void {
+  mocked.canvas?.remove();
+  mocked.canvas = undefined;
   mocked.handlers.length = 0;
   mocked.disposed = 0;
   mocked.fail = false;
@@ -47,9 +52,12 @@ function reset(): void {
   mocked.debug.mockClear();
 }
 
-function fakeTerminal(): { term: Terminal; loadAddon: ReturnType<typeof vi.fn> } {
+function fakeTerminal() {
   const loadAddon = vi.fn();
-  return { term: { loadAddon } as unknown as Terminal, loadAddon };
+  const renders = new Set<() => void>();
+  return { term: { loadAddon, rows: 24, refresh: vi.fn(), onRender: (handler: () => void) => {
+    renders.add(handler); return { dispose: () => renders.delete(handler) };
+  } } as unknown as Terminal, loadAddon, render: () => { for (const handler of renders) handler(); } };
 }
 
 describe('loadWebglRenderer', () => {
@@ -102,6 +110,48 @@ describe('loadWebglRenderer', () => {
 
 describe('WebGL context lifetime', () => {
   beforeEach(reset);
+
+  it('checks deferred activation when a plugin is loaded before the terminal opens', () => {
+    const { term, loadAddon, render } = fakeTerminal();
+    loadWebglRenderer(term);
+    const canvas = document.createElement('canvas'); canvas.width = 80; canvas.height = 32;
+    document.body.appendChild(canvas); mocked.canvas = canvas;
+    const addon = loadAddon.mock.calls[0][0] as { _renderer: { _canvas?: HTMLCanvasElement } };
+    addon._renderer._canvas = canvas;
+    render();
+    expect(hasWebglRenderer(term)).toBe(false);
+    expect(term.refresh).toHaveBeenCalledWith(0, 23);
+    expect(mocked.disposed).toBe(1);
+  });
+
+  it('retains the buffer with a DOM fallback when backing pixels disagree with the GPU grid', async () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 100; canvas.height = 40; document.body.appendChild(canvas); mocked.canvas = canvas;
+    const { term, loadAddon } = fakeTerminal();
+    loadWebglRenderer(term);
+    canvas.width = 80;
+    await vi.waitFor(() => expect(hasWebglRenderer(term)).toBe(false));
+    expect(term.refresh).toHaveBeenCalledWith(0, 23);
+    expect(mocked.debug).toHaveBeenCalledWith('terminal-renderer-fallback', expect.objectContaining({ reason: 'backing-size', width: 80, expectedWidth: 100 }));
+    applyTerminalRenderer(term, 'webgl');
+    expect(loadAddon).toHaveBeenCalledTimes(1);
+    applyTerminalRenderer(term, 'dom'); applyTerminalRenderer(term, 'webgl');
+    expect(loadAddon).toHaveBeenCalledTimes(2);
+    releaseTerminalRenderer(term);
+  });
+
+  it('allows a device-pixel rounding difference and stops observing a released renderer', async () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 100; canvas.height = 40; document.body.appendChild(canvas); mocked.canvas = canvas;
+    const { term } = fakeTerminal();
+    loadWebglRenderer(term); canvas.width = 99;
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(hasWebglRenderer(term)).toBe(true);
+    releaseTerminalRenderer(term); canvas.width = 50;
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(mocked.disposed).toBe(1);
+    expect(term.refresh).not.toHaveBeenCalled();
+  });
 
   it('hands the GPU context back when the renderer is dropped', () => {
     const { term } = fakeTerminal();

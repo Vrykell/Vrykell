@@ -15,11 +15,10 @@ import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
 import { Ellipsis } from '@ui/icons';
 import { useTerminalStore } from '@features/terminal';
 import AiBlock from '@features/chat/components/AiBlock';
-import { ptyResize } from '@platform/pty';
 import { STATUS_ACTION_ICON_SIZE } from './TerminalStatusBar';
 import RunningCommandBar from './RunningCommandBar';
 import { getCellMetrics } from '@utils/termMetrics';
-import { getExecutingTerm, resizeExecutingTerm, syncTermWidth } from '@features/terminal/hooks/useTerminalSession';
+import { getExecutingTerm, syncTermWidth } from '@features/terminal/hooks/useTerminalSession';
 import { isTerminalDebugEnabled, terminalDebug } from '@features/terminal/services/terminalDebug';
 import { recoverTerminalSurfaces } from '@features/terminal/services/terminalRepaint';
 import BlockMenu from '@features/terminal/components/BlockMenu';
@@ -32,7 +31,8 @@ import { captureTerminalPaste, copyTerminalSelection, pasteClipboardIntoTerminal
 import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
 import { measureRunningTerminalRows } from '../model/runningTerminalRows';
 import { repaintTerminal } from '../model/terminalResize';
-import { useSessionStore } from '@features/workspace';
+import { useSessionStore, useUiStore, useWorkspaceNavigation } from '@features/workspace';
+import { leaves } from '@features/workspace/model/windowLayout';
 
 interface Props {
   tabId: string;
@@ -299,10 +299,16 @@ function RunningItem({
 function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const occupiedRowsRef = useRef(1);
-  // Move the live terminal into the fullscreen host when manually activated.
-  const tuiFs = useTerminalStore(
-    (s) => s.altScreenActive && (s.scenes[tabId] ?? 'classic') === 'altScreen',
-  );
+  const requested = useTerminalStore(state => !!state.manualFullscreen[tabId]);
+  const focused = useTerminalStore(state => state.focusedPaneId === tabId);
+  const activePane = useSessionStore(state => {
+    const tab = state.tabs.find(item => item.id === state.activeId);
+    return tab?.kind === 'session' && leaves(tab.layout).some(pane => pane.id === tabId);
+  });
+  const terminalArea = useWorkspaceNavigation(state => state.area === 'terminal');
+  const settingsOpen = useUiStore(state => state.settingsOpen);
+  // Inactive panes retain their presentation preference without claiming another pane's host.
+  const tuiFs = requested && focused && activePane && terminalArea && !settingsOpen;
 
   useEffect(() => {
     const handle = getExecutingTerm(tabId);
@@ -314,7 +320,7 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
     }
     const { term, el } = handle;
     const host = tuiFs
-      ? document.querySelector<HTMLElement>('[data-testid="tui-fullscreen"]')
+      ? document.querySelector<HTMLElement>(`[data-testid="tui-fullscreen"][data-pane-id="${tabId}"]`)
       : hostRef.current;
     if (!host) {
       if (isTerminalDebugEnabled()) {
@@ -398,24 +404,10 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
     };
 
     let renderSub: { dispose(): void } | null = null;
-    const resizeFullscreen = () => {
-      const screen = el.querySelector<HTMLElement>('.xterm-screen');
-      if (!screen || term.cols <= 0 || term.rows <= 0) return;
-      const rect = screen.getBoundingClientRect();
-      const cellW = rect.width / term.cols;
-      const cellH = rect.height / term.rows;
-      if (cellW <= 0 || cellH <= 0) return;
-      const cols = Math.max(2, Math.floor(host.clientWidth / cellW));
-      const rows = Math.max(1, Math.floor(host.clientHeight / cellH));
-      if (cols === term.cols && rows === term.rows) return;
-      resizeExecutingTerm(tabId, cols, rows);
-      const sid = useTerminalStore.getState().sessions[tabId];
-      if (sid) ptyResize(sid, cols, rows).catch(() => {});
-    };
     if (tuiFs) {
-      el.style.height = '100%'; // 全屏：不裁剪，完整行数可见
-      term.focus(); // 主 xterm 已隐藏，键盘落点交给块终端
-      requestAnimationFrame(resizeFullscreen);
+      el.style.height = '100%';
+      term.focus();
+      syncTermWidth(tabId);
     } else {
       updateHeight();
       renderSub = term.onRender(updateHeight);
@@ -462,7 +454,7 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
     // Recheck terminal columns when the host width changes, including its first layout.
     let lastHostWidth = -1;
     const widthRo = new ResizeObserver(() => {
-      if (tuiFs) resizeFullscreen();
+      if (tuiFs) syncTermWidth(tabId);
       else if (host.clientWidth > 0 && host.clientWidth !== lastHostWidth) {
         lastHostWidth = host.clientWidth;
         syncTermWidth(tabId);

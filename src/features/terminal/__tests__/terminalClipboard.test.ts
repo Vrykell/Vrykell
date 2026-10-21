@@ -55,7 +55,7 @@ describe('terminalClipboard', () => {
     hasImageMock.mockReset().mockResolvedValue(false);
     requestConfirmMock.mockReset().mockResolvedValue(true);
     toasts.length = 0;
-    useTerminalStore.setState({ sessions: {}, scenes: {}, altScreenActive: false });
+    useTerminalStore.setState({ sessions: {}, scenes: {}, manualFullscreen: {} });
     termInstances.clear();
     useInputStore.setState({ byPane: {} });
     useBlockStore.setState({ byTab: {} });
@@ -97,7 +97,7 @@ describe('terminalClipboard', () => {
   });
 
   it('uses the running block terminal for paste modes and the main terminal only for a real alternate buffer', async () => {
-    useTerminalStore.setState({ sessions: { p1: 'sess-1' }, scenes: { p1: 'blockList' }, altScreenActive: false });
+    useTerminalStore.setState({ sessions: { p1: 'sess-1' }, scenes: { p1: 'blockList' }, manualFullscreen: {} });
     const main = pasteAwareTerm();
     const block = pasteAwareTerm();
     termInstances.set('p1', main.term);
@@ -108,13 +108,13 @@ describe('terminalClipboard', () => {
     expect(main.paste).not.toHaveBeenCalled();
 
     // A manual fullscreen keeps the running block as the interactive surface.
-    useTerminalStore.setState({ scenes: { p1: 'altScreen' }, altScreenActive: true });
+    useTerminalStore.setState({ scenes: { p1: 'altScreen' }, manualFullscreen: { p1: true } });
     await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(true);
     expect(block.paste).toHaveBeenCalledTimes(2);
     expect(main.paste).not.toHaveBeenCalled();
 
     // Only a real alternate buffer hands the pane back to the main terminal.
-    useTerminalStore.setState({ altScreenActive: false });
+    useTerminalStore.setState({ manualFullscreen: { other: true } });
     await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(true);
     expect(main.paste).toHaveBeenCalledTimes(1);
   });

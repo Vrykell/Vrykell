@@ -59,7 +59,6 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
   const setFocusedPane = useTerminalStore((s) => s.setFocusedPane);
   const focusedPaneId = useTerminalStore((s) => s.focusedPaneId);
   const sessions = useTerminalStore((s) => s.sessions);
-  const altScreenActive = useTerminalStore((s) => s.altScreenActive);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; sshActions?: ContextMenuItem[]; fullscreen?: boolean } | null>(null);
 
   const activeTab = tabs.find((t) => t.id === activeId);
@@ -77,7 +76,8 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
   const fullscreenMenu = ctxMenu?.fullscreen === true;
   // A real alternate screen renders the TUI on the main terminal and shows its banner in
   // the pane, so those toolbar actions join the pane menu as well.
-  const tuiInPane = focusedScene === 'altScreen' && !altScreenActive;
+  const manualFullscreen = useTerminalStore(s => !!s.manualFullscreen[focusedTermId]);
+  const tuiInPane = focusedScene === 'altScreen' && !manualFullscreen;
   const hasRunningCommand = (focusedScene === 'blockList' || tuiInPane) && focusedBlocks.some((block) => block.status === 'executing');
   const runningActions = useRunningCommandActions(focusedTermId, fullscreenMenu ? 'fullscreen' : tuiInPane ? 'altScreen' : 'block');
   const copySelection = () => { void copyTerminalSelection(getPaneTerminal(focusedTermId)); };
@@ -128,9 +128,10 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
       })}
 
       {/* Manual fullscreen host for a running block, with room for the toolbar. */}
-      {active && altScreenActive && (
+      {active && manualFullscreen && (
         <div
           data-testid="tui-fullscreen"
+          data-pane-id={focusedTermId}
           onContextMenu={(event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -422,13 +423,13 @@ function TerminalPane(props: {
   const [enteredBlockMode, setEnteredBlockMode] = useState(false);
   useEffect(() => { setEnteredBlockMode(false); }, [terminal.ssh?.connectionId, terminal.ssh?.host, terminal.openMode]);
   useEffect(() => { if (scene === 'blockList') setEnteredBlockMode(true); }, [scene]);
-  const altScreenActive = useTerminalStore((s) => s.altScreenActive);
+  const manualFullscreen = useTerminalStore(s => !!s.manualFullscreen[terminal.id]);
   // An SSH pane's classic scene is its connection/auth surface; the pane's chat
   // history stays out of the way so that surface owns the pane.
   const showChatHistory = showsPaneChatHistory(scene, terminal.kind);
   // Real alternate buffers use the main xterm; manual fullscreen uses the live block terminal.
   const disconnectedBlock = terminal.kind === 'ssh' && terminal.openMode === 'block' && enteredBlockMode && sshState.phase === 'disconnected';
-  const showXterm = !disconnectedBlock && (scene === 'classic' || (scene === 'altScreen' && !altScreenActive));
+  const showXterm = !disconnectedBlock && (scene === 'classic' || (scene === 'altScreen' && !manualFullscreen));
   const showBlocks = scene === 'blockList' || disconnectedBlock;
   const blockPresentation = terminal.kind === 'ssh' && terminal.openMode === 'block' && (scene === 'blockList' || (scene === 'altScreen' && enteredBlockMode) || disconnectedBlock);
   const reconnectSsh = async () => { await reconnectAction.current?.(); };
@@ -485,7 +486,7 @@ function TerminalPane(props: {
           sessionNotice={blockPresentation && sshState.phase === 'disconnected' ? <ErrorBox compact tone="info" style={{ margin: '0 8px 8px' }} actions={<TextButton onClick={() => { void reconnectSsh().catch(reason => useToastStore.getState().addToast(String(reason), 'error')); }}>{t('Reconnect SSH session')}</TextButton>}>{t('Disconnected')}</ErrorBox> : undefined}
         />
       )}
-      {scene === 'altScreen' && !altScreenActive && <TuiBanner tabId={terminal.id} />}
+      {scene === 'altScreen' && !manualFullscreen && <TuiBanner tabId={terminal.id} />}
     </div>
   );
 
@@ -527,7 +528,7 @@ function TerminalPane(props: {
 
 function TuiBanner({ tabId }: { tabId: string }) {
   const {
-    altScreenActive,
+    manualFullscreen,
     runningCommand,
     runningCwd,
     runningStartedAt,
@@ -548,7 +549,7 @@ function TuiBanner({ tabId }: { tabId: string }) {
           <TerminalRedrawButton paneId={tabId} />
           <StatusActionButton title={t('Interrupt command')} shortcut="Control+C" onClick={sendCtrlC} label={<Square size={STATUS_ACTION_ICON_SIZE} />} />
           <StatusActionButton title={killArmed ? t('Force quit foreground process') : t('Quit foreground process')} onClick={killApp} label={<CircleX size={STATUS_ACTION_ICON_SIZE} />} />
-          {altScreenActive && <StatusActionButton title={t('Exit fullscreen')} onClick={exitFullScreen} label={<Minimize2 size={STATUS_ACTION_ICON_SIZE} />} />}
+          {manualFullscreen && <StatusActionButton title={t('Exit fullscreen')} onClick={exitFullScreen} label={<Minimize2 size={STATUS_ACTION_ICON_SIZE} />} />}
         </>}
       />
     </div>

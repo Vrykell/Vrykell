@@ -64,7 +64,7 @@ export function useGlobalShortcuts() {
         if (!((e.metaKey || e.ctrlKey) && e.key === 'f')) return;
       }
       // Escape: 当键盘路由到终端且不在 TUI 全屏场景时，切回输入栏
-      // （场景判定走 scenes —— altScreenActive 仅手动全屏，真 vim 里 Esc 必须进 PTY）
+      // Scene ownership determines input routing; an alternate-screen application receives Escape.
       if (e.key === 'Escape' && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
         const ts = useTerminalStore.getState();
         const scene = ts.scenes[getFocusedTerminalId()] ?? 'classic';

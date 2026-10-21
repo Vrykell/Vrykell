@@ -90,7 +90,7 @@ export function getTerminalScreen(paneId: string): TerminalScreen | null {
   const ts = useTerminalStore.getState();
   const scene = ts.scenes[paneId] ?? 'classic';
   const dims = ts.dims[paneId] ?? { cols: 80, rows: 24 };
-  const term = termInstances.get(paneId);
+  const term = ts.manualFullscreen[paneId] ? termInstances.get(`block:${paneId}`) ?? termInstances.get(paneId) : termInstances.get(paneId);
   if (!term) return null;
   const buf = term.buffer.active;
   const cols = term.cols || dims.cols;
@@ -128,9 +128,9 @@ interface TerminalState {
   /** tabId → 终端尺寸（状态栏展示用） */
   dims: Record<string, { cols: number; rows: number }>;
   visible: boolean;
-  /** Whether the user manually fullscreened a running block terminal. */
-  altScreenActive: boolean;
-  setAltScreenActive: (active: boolean) => void;
+  /** Manual fullscreen belongs to its pane, independently of the controller's alternate buffer. */
+  manualFullscreen: Record<string, boolean>;
+  setManualFullscreen: (paneId: string, active: boolean) => void;
   /** 键盘路由目标：'input' → InputEditor, 'terminal' → xterm.js */
   keyboardTarget: 'input' | 'terminal';
   setKeyboardTarget: (t: 'input' | 'terminal') => void;
@@ -162,9 +162,15 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   pendingCommands: {},
   dims: {},
   visible: true,
-  altScreenActive: false,
+  manualFullscreen: {},
   scenes: {} as Record<string, Scene>,
-  setAltScreenActive: (active) => set({ altScreenActive: active }),
+  setManualFullscreen: (paneId, active) => set(state => {
+    if (!!state.manualFullscreen[paneId] === active) return state;
+    const manualFullscreen = { ...state.manualFullscreen };
+    if (active) manualFullscreen[paneId] = true; else delete manualFullscreen[paneId];
+    terminalDebug('manual-fullscreen-state', { paneId, active });
+    return { manualFullscreen };
+  }),
   keyboardTarget: 'input',
   setKeyboardTarget: (t) => set({ keyboardTarget: t }),
   focusedPaneId: null,
@@ -222,27 +228,27 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     set((s) => s.dims[tabId]?.cols === cols && s.dims[tabId]?.rows === rows ? s : { dims: { ...s.dims, [tabId]: { cols, rows } } }),
   dropTab: (tabId) =>
     set((s) => {
-      const scene = s.scenes[tabId];
       if (
         !(tabId in s.sessions)
         && !(tabId in s.pendingCommands)
         && !(tabId in s.dims)
         && !(tabId in s.scenes)
         && !(tabId in s.startupStates)
+        && !(tabId in s.manualFullscreen)
       ) return s;
       const sessions = { ...s.sessions };
       const pendingCommands = { ...s.pendingCommands };
       const dims = { ...s.dims };
       const scenes = { ...s.scenes };
       const startupStates = { ...s.startupStates };
+      const manualFullscreen = { ...s.manualFullscreen };
       delete sessions[tabId];
       delete pendingCommands[tabId];
       delete dims[tabId];
       delete scenes[tabId];
       delete startupStates[tabId];
-      const sessionsRemainInAltScreen = Object.keys(scenes).some((id) => scenes[id] === 'altScreen');
-      return { sessions, pendingCommands, dims, scenes, startupStates,
-        altScreenActive: scene === 'altScreen' ? false : (sessionsRemainInAltScreen ? s.altScreenActive : false) };
+      delete manualFullscreen[tabId];
+      return { sessions, pendingCommands, dims, scenes, startupStates, manualFullscreen };
     }),
   toggle: () => set((s) => ({ visible: !s.visible })),
   stageCommand: (paneId, command) => {

@@ -141,7 +141,7 @@ describe('useTerminalSession', () => {
       pendingCommands: {},
       dims: {},
       scenes: {},
-      altScreenActive: false,
+      manualFullscreen: {},
       keyboardTarget: 'input',
     });
     useBlockStore.setState({ byTab: {} });
@@ -280,12 +280,14 @@ describe('useTerminalSession', () => {
     // The user fullscreened the running block terminal; the foreground program then switches to
     // the alternate buffer, whose live screen is drawn by the main xterm.
     useTerminalStore.getState().setScene('t1', 'altScreen');
-    useTerminalStore.getState().setAltScreenActive(true);
+    useTerminalStore.getState().setManualFullscreen('t1', true);
+    useTerminalStore.getState().setManualFullscreen('background-pane', true);
 
     ptyOutputHandlers[0]!('sess-x', [{ kind: 'altEnter', raw: '\x1b[?1049h' }]);
 
     expect(useTerminalStore.getState().scenes.t1).toBe('altScreen');
-    expect(useTerminalStore.getState().altScreenActive).toBe(false);
+    expect(useTerminalStore.getState().manualFullscreen.t1).toBeUndefined();
+    expect(useTerminalStore.getState().manualFullscreen['background-pane']).toBe(true);
   });
 
   it('keeps SSH block authentication interactive until the remote prompt arrives', async () => {

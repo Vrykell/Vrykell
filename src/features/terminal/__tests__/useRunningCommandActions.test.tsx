@@ -34,7 +34,7 @@ describe('useRunningCommandActions', () => {
     mocks.ptyWrite.mockReset().mockResolvedValue(undefined);
     mocks.killForeground.mockReset().mockResolvedValue('term');
     mocks.redrawTerminal.mockReset();
-    useTerminalStore.setState({ sessions: { 'pane-1': 'session-1' }, scenes: { 'pane-1': 'blockList' }, altScreenActive: false });
+    useTerminalStore.setState({ sessions: { 'pane-1': 'session-1' }, scenes: { 'pane-1': 'blockList' }, manualFullscreen: {} });
     useBlockStore.setState({ byTab: { 'pane-1': [block({ status: 'executing', cwd: '/work' })] } });
   });
 
@@ -53,7 +53,7 @@ describe('useRunningCommandActions', () => {
     expect(mocks.redrawTerminal).toHaveBeenCalledExactlyOnceWith('pane-1');
 
     act(() => result.current[3]!.onClick?.());
-    expect(useTerminalStore.getState().altScreenActive).toBe(true);
+    expect(useTerminalStore.getState().manualFullscreen['pane-1']).toBe(true);
     expect(useTerminalStore.getState().scenes['pane-1']).toBe('altScreen');
   });
 
@@ -70,18 +70,18 @@ describe('useRunningCommandActions', () => {
   });
 
   it('offers the fullscreen exit on the fullscreen surface and leaves it', () => {
-    useTerminalStore.setState({ scenes: { 'pane-1': 'altScreen' }, altScreenActive: true });
+    useTerminalStore.setState({ scenes: { 'pane-1': 'altScreen' }, manualFullscreen: { 'pane-1': true } });
     const { result } = renderHook(() => useRunningCommandActions('pane-1', 'fullscreen'));
 
     expect(result.current.map((item) => item.label)).toEqual(['重绘终端', '终止命令', '结束前台应用', '退出全屏']);
 
     act(() => result.current[3]!.onClick?.());
-    expect(useTerminalStore.getState().altScreenActive).toBe(false);
+    expect(useTerminalStore.getState().manualFullscreen['pane-1']).toBeUndefined();
     expect(useTerminalStore.getState().scenes['pane-1']).toBe('blockList');
   });
 
   it('keeps a real alternate-screen TUI to the banner actions without a fullscreen toggle', () => {
-    useTerminalStore.setState({ scenes: { 'pane-1': 'altScreen' }, altScreenActive: false });
+    useTerminalStore.setState({ scenes: { 'pane-1': 'altScreen' }, manualFullscreen: {} });
     const { result } = renderHook(() => useRunningCommandActions('pane-1', 'altScreen'));
 
     expect(result.current.map((item) => item.label)).toEqual(['重绘终端', '终止命令', '结束前台应用']);

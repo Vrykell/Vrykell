@@ -5,6 +5,8 @@ import { terminalDebug } from '../services/terminalDebug';
 
 /** Live WebGL addons, so a preference change can be applied to an existing terminal. */
 const webglAddons = new WeakMap<Terminal, WebglAddon>();
+const geometryStops = new WeakMap<WebglAddon, () => void>();
+const incompatibleDensity = new WeakMap<Terminal, number>();
 
 /** How many GPU contexts the app has handed back, for the diagnostics record. */
 let releasedContexts = 0;
@@ -21,6 +23,8 @@ let releasedContexts = 0;
  * gone is left alone.
  */
 function disposeWebglRenderer(term: Terminal, addon: WebglAddon): void {
+  geometryStops.get(addon)?.();
+  geometryStops.delete(addon);
   webglAddons.delete(term);
   // Read the context before dispose tears the renderer down.
   const gl = (addon as unknown as { _renderer?: { _gl?: WebGL2RenderingContext } })._renderer?._gl;
@@ -48,7 +52,7 @@ function disposeWebglRenderer(term: Terminal, addon: WebglAddon): void {
  * skips the addon entirely, which some GPU drivers need to keep selection edges clean.
  */
 export function loadWebglRenderer(term: Terminal, preference: TerminalRenderer = 'webgl'): void {
-  if (preference === 'dom') return;
+  if (preference === 'dom' || incompatibleDensity.get(term) === window.devicePixelRatio) return;
   try {
     const addon = new WebglAddon();
     addon.onContextLoss(() => {
@@ -59,6 +63,35 @@ export function loadWebglRenderer(term: Terminal, preference: TerminalRenderer =
     });
     webglAddons.set(term, addon);
     term.loadAddon(addon);
+    // Some embedded surfaces report CSS pixels through the device-pixel observer. Its resize
+    // then clears and crops the backing canvas against a larger GPU viewport. Keep the parsed
+    // buffer and use the DOM renderer when those dimensions disagree beyond pixel rounding.
+    let renderSub: { dispose(): void } | undefined;
+    const watchGeometry = () => {
+      const renderer = (addon as unknown as { _renderer?: { _canvas?: HTMLCanvasElement;
+        dimensions?: { device: { canvas: { width: number; height: number } } } } })._renderer;
+      const canvas = renderer?._canvas;
+      if (!canvas) return;
+      renderSub?.dispose();
+      const validate = () => {
+        const expected = renderer?.dimensions?.device.canvas;
+        if (!canvas.isConnected || !expected || expected.width <= 0 || expected.height <= 0
+          || (Math.abs(canvas.width - expected.width) <= 1 && Math.abs(canvas.height - expected.height) <= 1)) return;
+        incompatibleDensity.set(term, window.devicePixelRatio);
+        terminalDebug('terminal-renderer-fallback', { reason: 'backing-size', density: window.devicePixelRatio,
+          width: canvas.width, height: canvas.height, expectedWidth: expected.width, expectedHeight: expected.height });
+        disposeWebglRenderer(term, addon);
+        term.refresh(0, term.rows - 1);
+      };
+      const observer = new MutationObserver(validate);
+      observer.observe(canvas, { attributes: true, attributeFilter: ['width', 'height'] });
+      geometryStops.set(addon, () => { renderSub?.dispose(); observer.disconnect(); });
+      validate();
+    };
+    // A plugin loaded before open activates later, so install the check on its first render too.
+    renderSub = term.onRender?.(watchGeometry);
+    geometryStops.set(addon, () => renderSub?.dispose());
+    watchGeometry();
   } catch {
     // No WebGL here: stay on the default DOM renderer.
     webglAddons.delete(term);
@@ -74,6 +107,7 @@ export function hasWebglRenderer(term: Terminal): boolean {
 export function applyTerminalRenderer(term: Terminal, preference: TerminalRenderer): void {
   const addon = webglAddons.get(term);
   if (preference === 'dom') {
+    incompatibleDensity.delete(term);
     if (addon) disposeWebglRenderer(term, addon);
     return;
   }
