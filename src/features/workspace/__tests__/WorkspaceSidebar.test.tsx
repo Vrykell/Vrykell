@@ -12,6 +12,8 @@ it('keeps history next to collapse, one footer destination, and no collapsed rai
   const { container } = render(<WorkspaceSidebar />);
   expect(screen.getByTestId('workspace-history').nextElementSibling).toBe(screen.getByTestId('workspace-sidebar-toggle'));
   expect(container.querySelectorAll('.workspace-sidebar-footer .sidebar-row')).toHaveLength(1);
+  expect(screen.getByTestId('workspace-settings')).toHaveAttribute('data-tip', '打开设置');
+  expect(screen.getByTestId('workspace-settings')).toHaveAttribute('data-tip-shortcut', 'Control+,');
   expect(screen.getByTestId('workspace-area-terminal').querySelector('.sidebar-row-content')).toHaveStyle({ minHeight: '32px' });
   fireEvent.click(screen.getByTestId('workspace-sidebar-toggle'));
   expect(screen.getByTestId('workspace-sidebar')).toHaveAttribute('inert');

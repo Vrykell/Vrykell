@@ -1,0 +1,264 @@
+
+> vrykell@0.1.0 test:e2e
+> playwright test e2e/acp-launcher.spec.ts e2e/block-width.spec.ts e2e/file-transfers.spec.ts e2e/scrollbar-layering.spec.ts e2e/shared-controls.spec.ts e2e/ssh-status.spec.ts e2e/tabs.spec.ts e2e/manual-fullscreen-regressions.spec.ts e2e/native-window-close.spec.ts e2e/analysis-completeness.spec.ts e2e/running-term.spec.ts e2e/resize-stability.spec.ts e2e/terminal-ime-restore.spec.ts e2e/terminal-clipboard.spec.ts e2e/terminal-background.spec.ts e2e/running-block-layout.spec.ts e2e/ssh-auth.spec.ts e2e/workspace-surface-refinements.spec.ts e2e/workspace-navigation.spec.ts --reporter=line
+
+
+[1A[2K[WebServer] (node:31972) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 106 tests using 1 worker
+
+
+
+[1A[2K(node:66800) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:66800) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1A[2K[1/106] acp-launcher.spec.ts:10:1 › the sidebar ACP button reuses a singleton workspace with an inline server picker
+[1A[2K[2/106] acp-launcher.spec.ts:22:1 › picking a server opens its session tab and closes the panel
+[1A[2K[3/106] analysis-completeness.spec.ts:4:1 › command analysis retains the complete command and output through the model request
+[1A[2K[4/106] block-width.spec.ts:4:1 › maximized command output uses the available columns without a fixed 80-column limit
+[1A[2K[5/106] block-width.spec.ts:23:1 › output longer than the viewport stays complete without a false truncation notice
+[1A[2K[6/106] block-width.spec.ts:54:1 › long box-drawing rows reflow to the available columns without horizontal scrolling
+[1A[2Kblock-width.spec.ts:54:1 › long box-drawing rows reflow to the available columns without horizontal scrolling
+WIDTH-DIAG {
+  "cols": 400,
+  "gridRows": 12,
+  "visualLines": 12,
+  "clientWidth": 1000,
+  "charWidth": 8,
+  "capacityChars": 125,
+  "lineHeightPx": 16,
+  "innerWidth": 1240,
+  "scrollWidth": 1000
+}
+
+[1A[2K[7/106] block-width.spec.ts:130:1 › resizing a running block resizes both PTY and terminal buffer, then restores its width
+[1A[2K  1) block-width.spec.ts:130:1 › resizing a running block resizes both PTY and terminal buffer, then restores its width 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32m125[39m
+    Received: [31m151[39m
+
+    Call Log:
+    - Timeout 5000ms exceeded while waiting on the predicate
+
+      158 |   expect(await host.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+      159 |   await page.setViewportSize({ width: 1240, height: 800 });
+    > 160 |   await expect.poll(() => terminal().then(value => value.cols)).toBe(before.cols);
+          |   ^
+      161 |   await expect.poll(() => terminal().then(value => value.rows)).toBe(before.rows);
+      162 | });
+      163 |
+
+        at D:\projects\typescript\Vrykell\e2e\block-width.spec.ts:160:3
+
+
+[1A[2K(node:28544) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+
+
+[1A[2K(node:28544) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1A[2K[8/106] block-width.spec.ts:164:1 › opening the assistant resizes the PTY and wraps completed output without horizontal scrolling
+[1A[2K[9/106] block-width.spec.ts:194:1 › line-editor repaint does not add a prompt or inherited blank rows to command output
+[1A[2K[10/106] block-width.spec.ts:208:1 › 运行中卡片：PTY/块终端宽度跟随卡片内容宽（右缘不裁剪）
+[1A[2K[11/106] block-width.spec.ts:253:1 › 运行中输出与完成快照保持相同字符宽度
+[1A[2K[12/106] block-width.spec.ts:290:1 › 命令块分隔线延伸到终端左右边缘
+[1A[2K[13/106] file-transfers.spec.ts:5:1 › manages uploads across panel navigation and reload in narrow and wide layouts
+[1A[2K[14/106] file-transfers.spec.ts:59:1 › deletes a paused record so its incomplete data does not outlive it
+[1A[2K[15/106] file-transfers.spec.ts:87:1 › persists undo opt-outs and confirms deletion without claiming it can be undone
+[1A[2K[16/106] file-transfers.spec.ts:113:5 › upload cards show complete task context without clipping in dark narrow and wide panels
+[1A[2K[17/106] file-transfers.spec.ts:113:5 › download cards show complete task context without clipping in dark narrow and wide panels
+[1A[2K[18/106] file-transfers.spec.ts:113:5 › upload cards show complete task context without clipping in light narrow and wide panels
+[1A[2K[19/106] file-transfers.spec.ts:113:5 › download cards show complete task context without clipping in light narrow and wide panels
+[1A[2K[20/106] file-transfers.spec.ts:196:1 › empty transfer pages explain where to start and return to file browsing
+[1A[2K[21/106] manual-fullscreen-regressions.spec.ts:44:3 › fullscreen at scale 1 › returning to a manual fullscreen command restores its painted surface and input
+[1A[2K[22/106] manual-fullscreen-regressions.spec.ts:82:39 › fullscreen at scale 1 › manual fullscreen keeps one stable grid during continuous width changes
+[1A[2K[23/106] manual-fullscreen-regressions.spec.ts:82:39 › fullscreen at scale 1 › alternate fullscreen keeps one stable grid during continuous width changes
+[1A[2K[24/106] manual-fullscreen-regressions.spec.ts:44:3 › fullscreen at scale 1.25 › returning to a manual fullscreen command restores its painted surface and input
+[1A[2K[25/106] manual-fullscreen-regressions.spec.ts:82:39 › fullscreen at scale 1.25 › manual fullscreen keeps one stable grid during continuous width changes
+[1A[2K[26/106] manual-fullscreen-regressions.spec.ts:82:39 › fullscreen at scale 1.25 › alternate fullscreen keeps one stable grid during continuous width changes
+[1A[2K[27/106] native-window-close.spec.ts:15:46 › a clean titlebar close completes through the configured native capability
+[1A[2K[28/106] native-window-close.spec.ts:15:46 › a clean system close completes through the configured native capability
+[1A[2K[29/106] native-window-close.spec.ts:20:54 › a native close preserves the unsaved-document discard flow
+[1A[2K[WebServer] 00:13:37 [vite] (client) Failed to load source map for D:/projects/typescript/Vrykell/node_modules/monaco-editor/esm/vs/base/common/marked/marked.js.
+
+[WebServer] Error: An error occurred while trying to read the map file at marked.umd.js.map
+[WebServer] Error: ENOENT: no such file or directory, open 'D:\projects\typescript\Vrykell\node_modules\monaco-editor\esm\vs\base\common\marked\marked.umd.js.map'
+[WebServer]     at async open (node:internal/fs/promises:637:25)
+[WebServer]     at async Object.readFile (node:internal/fs/promises:1269:14)
+[WebServer]     at async extractSourcemapFromFile (file:///D:/projects/typescript/Vrykell/node_modules/vite/dist/node/chunks/config.js:8066:65)
+[WebServer]     at async loadAndTransform (file:///D:/projects/typescript/Vrykell/node_modules/vite/dist/node/chunks/config.js:22717:22)
+[1A[2K[30/106] native-window-close.spec.ts:20:54 › a native close preserves the unsaved-document save flow
+[1A[2K[31/106] native-window-close.spec.ts:20:54 › a native close preserves the unsaved-document failure flow
+[1A[2K[32/106] resize-stability.spec.ts:5:3 › classic dom keeps its text origin stable through continuous resizing
+[1A[2K[33/106] resize-stability.spec.ts:5:3 › classic webgl keeps its text origin stable through continuous resizing
+[1A[2K[34/106] resize-stability.spec.ts:35:1 › a held divider drag keeps the local grid live and notifies the remote once, on release
+[1A[2K[35/106] resize-stability.spec.ts:63:1 › short commands complete without mounting a temporary live output canvas
+[1A[2K[36/106] running-block-layout.spec.ts:38:3 › running layout at 1x › SSH live output reflows while the authentication screen is hidden
+[1A[2K[37/106] running-block-layout.spec.ts:68:3 › running layout at 1x › window width changes resize the live grid and PTY without additional output
+[1A[2K[38/106] running-block-layout.spec.ts:82:3 › running layout at 1x › a held sidebar drag delivers the running program its new size before release
+[1A[2K[39/106] running-block-layout.spec.ts:106:3 › running layout at 1x › running controls pin at the viewport top even with collapsed titles and remain usable
+[1A[2K[40/106] running-block-layout.spec.ts:38:3 › running layout at 1.25x › SSH live output reflows while the authentication screen is hidden
+[1A[2K[41/106] running-block-layout.spec.ts:68:3 › running layout at 1.25x › window width changes resize the live grid and PTY without additional output
+[1A[2K[42/106] running-block-layout.spec.ts:82:3 › running layout at 1.25x › a held sidebar drag delivers the running program its new size before release
+[1A[2K[43/106] running-block-layout.spec.ts:106:3 › running layout at 1.25x › running controls pin at the viewport top even with collapsed titles and remain usable
+[1A[2K[44/106] running-term.spec.ts:29:1 › 运行中 block 挂载可见 xterm，输出实时渲染，完成后换成快照
+[1A[2K[45/106] running-term.spec.ts:48:1 › running block redraw preserves its output and process without sending PTY input
+[1A[2K[46/106] running-term.spec.ts:77:1 › 已有历史命令时，运行中的输出会持续保持在可见区域
+[1A[2K[47/106] running-term.spec.ts:99:1 › 重新加载会话模块后仍能取得运行中的活终端
+[1A[2K[48/106] running-term.spec.ts:113:1 › 运行中焦点落在块内活 xterm 的 textarea（而非隐藏主 xterm）
+[1A[2K[49/106] running-term.spec.ts:132:1 › 手动全屏：块内活终端搬进全屏宿主，退出后搬回卡片
+[1A[2K[50/106] running-term.spec.ts:174:1 › 全屏终端右键菜单提供快捷操作与复制/粘贴
+[1A[2K[51/106] running-term.spec.ts:219:1 › 手动全屏中进入真 alt 屏：让出可见面，显示主 xterm 的 TUI
+[1A[2K[52/106] running-term.spec.ts:237:1 › 真 alt 屏 TUI 的窗格右键菜单提供顶栏快捷操作
+[1A[2K[53/106] running-term.spec.ts:261:1 › 运行中块接管滚轮：xterm 回溯时不滚动外层命令历史
+[1A[2K[54/106] running-term.spec.ts:303:1 › 运行块挂载前到达的输出不破坏首次滚轮回溯
+[1A[2K[55/106] running-term.spec.ts:351:1 › 块终端与页面同色且无圆角，裁剪仍落在 el
+[1A[2K[56/106] scrollbar-layering.spec.ts:5:1 › page scrollbars stay below an open dialog and become usable again after closing
+[1A[2K[57/106] scrollbar-layering.spec.ts:38:1 › a code block track cannot leave the chat transcript over the composer
+[1A[2K[58/106] shared-controls.spec.ts:5:1 › composer controls share permission state, theme overrides and concise hover hints
+[1A[2K[59/106] shared-controls.spec.ts:39:1 › settings use concise explanations and icon badges for completion keys
+[1A[2K[60/106] shared-controls.spec.ts:49:1 › edge tooltips keep their label and shortcut on one line in a narrow window
+[1A[2K[61/106] ssh-auth.spec.ts:8:3 › SSH block commands render ls and pwd output with preexec=true
+[1A[2K[62/106] ssh-auth.spec.ts:8:3 › SSH block commands render ls and pwd output with preexec=false
+[1A[2K[63/106] ssh-auth.spec.ts:44:1 › the connection screen keeps no scrollbar of its own
+[1A[2K[64/106] ssh-auth.spec.ts:55:1 › the connection screen snaps its character cells to whole pixels
+[1A[2K[65/106] ssh-auth.spec.ts:70:1 › SSH authentication snapshots and disconnected output follow the terminal typography
+[1A[2K[66/106] ssh-auth.spec.ts:102:1 › native SSH recordings distinguish an empty directory from missing command output
+[1A[2K[67/106] ssh-auth.spec.ts:124:1 › first SSH connection confirms its fingerprint and accepts authentication input
+[1A[2K[68/106] ssh-auth.spec.ts:155:1 › canceling authentication closes the PTY and leaves no editable password field
+[1A[2K[69/106] ssh-auth.spec.ts:180:1 › a logged-in SSH command does not retain the previous password prompt
+[1A[2K[70/106] ssh-auth.spec.ts:192:1 › SSH block mode remains directly interactive when the remote server has no shell integration
+[1A[2K[71/106] ssh-auth.spec.ts:228:1 › SSH block mode restores its xterm host when a command opens an alternate-screen app
+[1A[2K[72/106] ssh-auth.spec.ts:250:1 › canceling host trust does not spawn SSH or record a key
+[1A[2K[73/106] ssh-auth.spec.ts:259:1 › changed host keys fail without asking to overwrite trust
+[1A[2K[74/106] ssh-auth.spec.ts:267:1 › 认证输入条在终端区内左右对称（不再被 8px 左边距推右）
+[1A[2K[75/106] ssh-status.spec.ts:15:1 › the docked status panel follows the light theme and keeps event history collapsible
+[1A[2K[76/106] ssh-status.spec.ts:36:1 › the conditional sidebar preserves terminal width and restores the auxiliary panel
+[1A[2K[77/106] ssh-status.spec.ts:66:1 › SSH status uses real session state and does not write probes into the terminal
+[1A[2K[78/106] ssh-status.spec.ts:155:1 › dragging the status edge folds the panel and releasing below the minimum closes it
+[1A[2K[79/106] ssh-status.spec.ts:193:1 › the status panel grows past the former fixed ceiling while the terminal keeps its minimum width
+[1A[2K[80/106] ssh-status.spec.ts:214:1 › resource failures retain samples and pause can be resumed
+[1A[2K[81/106] ssh-status.spec.ts:249:1 › command password prompts preserve the connected state, duration and monitoring
+[1A[2K[82/106] ssh-status.spec.ts:274:1 › deleted profiles report unavailable instead of remaining in a connecting state
+[1A[2K[83/106] ssh-status.spec.ts:295:1 › block mode has no top toolbar and opens status from the existing host chip
+[1A[2K  2) ssh-status.spec.ts:295:1 › block mode has no top toolbar and opens status from the existing host chip 
+
+    Error: [31mTimed out 5000ms waiting for [39m[2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m()[22m
+
+    Locator: getByTestId('workspace-sidebar')
+    Expected: visible
+    Received: hidden
+    Call log:
+      [2m- expect.toBeVisible with timeout 5000ms[22m
+    [2m  - waiting for getByTestId('workspace-sidebar')[22m
+    [2m  -   locator resolved to <aside inert="" aria-hidden="true" data-collapsed="true" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "hidden"[22m
+    [2m  -   locator resolved to <aside inert="" aria-hidden="true" data-collapsed="true" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "hidden"[22m
+    [2m  -   locator resolved to <aside inert="" aria-hidden="true" data-collapsed="true" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "hidden"[22m
+    [2m  -   locator resolved to <aside inert="" aria-hidden="true" data-collapsed="true" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "hidden"[22m
+    [2m  -   locator resolved to <aside inert="" aria-hidden="true" data-collapsed="true" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "hidden"[22m
+    [2m  -   locator resolved to <aside inert="" aria-hidden="true" data-collapsed="true" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "hidden"[22m
+    [2m  -   locator resolved to <aside inert="" aria-hidden="true" data-collapsed="true" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "hidden"[22m
+    [2m  -   locator resolved to <aside inert="" aria-hidden="true" data-collapsed="true" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "hidden"[22m
+    [2m  -   locator resolved to <aside inert="" aria-hidden="true" data-collapsed="true" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "hidden"[22m
+
+
+      326 |   await page.screenshot({ path: 'test-results/ssh-block-status-narrow.png' });
+      327 |   await panel.getByRole('button', { name: '关闭 SSH 状态' }).click();
+    > 328 |   await expect(page.getByTestId('workspace-sidebar')).toBeVisible();
+          |                                                       ^
+      329 |   await entry.click();
+      330 |   await expect(page.getByTestId('workspace-sidebar')).toBeVisible();
+      331 |   await page.setViewportSize({ width: 1240, height: 800 });
+
+        at D:\projects\typescript\Vrykell\e2e\ssh-status.spec.ts:328:55
+
+
+[1A[2K(node:78524) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:78524) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[84/106] tabs.spec.ts:9:3 › 多标签工作区 › terminal instances isolate output while the assistant retains its independent conversation
+[1A[2K  3) tabs.spec.ts:9:3 › 多标签工作区 › terminal instances isolate output while the assistant retains its independent conversation 
+
+    Error: expect.toBeVisible: Error: strict mode violation: getByTestId('ai-surface-side').getByText('第一标签的问题', { exact: true }) resolved to 2 elements:
+        1) <button type="button" data-tip="重命名对话" data-subtle="true" aria-label="重命名对话" class="chat-conversation-title">第一标签的问题</button> aka getByLabel('重命名对话')
+        2) <div data-selectable="true" class="ai-block-question">第一标签的问题</div> aka locator('#overlay-scroll-surface-3').getByText('第一标签的问题')
+
+    Call log:
+      [2m- expect.toBeVisible with timeout 5000ms[22m
+    [2m  - waiting for getByTestId('ai-surface-side').getByText('第一标签的问题', { exact: true })[22m
+
+
+      34 |     await expect(output).toBeHidden();
+      35 |     const assistant = page.getByTestId('ai-surface-side');
+    > 36 |     await expect(assistant.getByText('第一标签的问题', { exact: true })).toBeVisible();
+         |                                                                   ^
+      37 |     await expect(assistant.getByText('回复一', { exact: true })).toBeVisible();
+      38 |
+      39 |     await page.locator(`[data-tab-row-id="${original}"]`).click();
+
+        at D:\projects\typescript\Vrykell\e2e\tabs.spec.ts:36:67
+
+
+[1A[2K(node:41488) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+
+
+[1A[2K(node:41488) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1A[2K[85/106] tabs.spec.ts:44:3 › 多标签工作区 › 关闭标签后激活相邻标签
+[1A[2K[86/106] terminal-background.spec.ts:5:3 › block terminal uses the same background in both themes and custom overrides
+[1A[2K[87/106] terminal-background.spec.ts:5:3 › classic terminal uses the same background in both themes and custom overrides
+[1A[2K[88/106] terminal-clipboard.spec.ts:36:1 › 终端右键菜单提供复制/粘贴并标注 Ctrl+C/V
+[1A[2K[89/106] terminal-clipboard.spec.ts:48:1 › 运行中块 Ctrl+V 把剪贴板内容写入 PTY
+[1A[2K[90/106] terminal-clipboard.spec.ts:63:1 › 会话请求 win32-input-mode 后 Ctrl+C 仍然复制而不是发按键记录
+[1A[2K[91/106] terminal-clipboard.spec.ts:78:1 › 运行中块 Ctrl+Shift+C 把选区写入剪贴板
+[1A[2K[92/106] terminal-clipboard.spec.ts:91:1 › 有选区时 Ctrl+C 复制而不是把中断发进终端
+[1A[2K[93/106] terminal-ime-restore.spec.ts:17:1 › native candidate confirmation sends committed text once without preedit or Enter
+[1A[2K[94/106] terminal-ime-restore.spec.ts:42:1 › native punctuation after composition does not replay the previous commit
+[1A[2K[95/106] terminal-ime-restore.spec.ts:68:1 › an active preedit keeps a caret after the composition text
+[1A[2K[96/106] terminal-ime-restore.spec.ts:116:1 › returning to a static TUI repaints its canvas without new PTY output
+[1A[2K[97/106] terminal-ime-restore.spec.ts:168:1 › redraw shortcut, toolbar and palette preserve the TUI without sending PTY input
+[1A[2K[98/106] workspace-navigation.spec.ts:10:1 › uses a full-height sidebar and keeps terminals alive across empty workspaces
+[1A[2K[99/106] workspace-navigation.spec.ts:47:1 › moves the same native conversation and composer between main and side
+[1A[2K[100/106] workspace-navigation.spec.ts:67:1 › keeps native and connected sessions in one AI strip without closing either on navigation
+[1A[2K[101/106] workspace-navigation.spec.ts:93:1 › collapses colored terminal groups while preserving the active session and actions
+[1A[2K[102/106] workspace-navigation.spec.ts:116:1 › routes every auxiliary panel to the right and keeps the workspace full height
+[1A[2K[103/106] workspace-navigation.spec.ts:132:1 › new, close and numeric shortcuts follow the workspace and the focused side conversation
+[1A[2K[104/106] workspace-surface-refinements.spec.ts:5:35 › acrylic is confined to navigation and region edges stay square in 深色
+[1A[2K[105/106] workspace-surface-refinements.spec.ts:5:35 › acrylic is confined to navigation and region edges stay square in 浅色
+[1A[2K[106/106] workspace-surface-refinements.spec.ts:26:1 › terminal dragging carries the complete tab and closing preview never closes the session
+[1A[2K  Slow test file: ssh-status.spec.ts (30.0s)
+  Slow test file: running-term.spec.ts (26.6s)
+  Slow test file: manual-fullscreen-regressions.spec.ts (26.0s)
+  Slow test file: ssh-auth.spec.ts (24.8s)
+  Slow test file: file-transfers.spec.ts (24.1s)
+  Consider splitting slow test files to speed up parallel execution
+  3 failed
+    block-width.spec.ts:130:1 › resizing a running block resizes both PTY and terminal buffer, then restores its width 
+    ssh-status.spec.ts:295:1 › block mode has no top toolbar and opens status from the existing host chip 
+    tabs.spec.ts:9:3 › 多标签工作区 › terminal instances isolate output while the assistant retains its independent conversation 
+  103 passed (4.5m)

@@ -45,7 +45,7 @@ export default function WorkspaceSidebar() {
     </nav>
     <div className="workspace-sidebar-tools" />
     <div className="workspace-sidebar-footer">
-      <SidebarItem compact title={t('Settings')} icon={<Settings size={iconSizes.row} />} active={settingsOpen} dataAttributes={{ 'data-dock-btn': 'settings', 'data-dock-fixed': 'true', role: 'button', 'aria-label': t('Settings'), 'aria-pressed': String(settingsOpen), 'data-tip-shortcut': `${isMacOS ? 'Meta' : 'Control'}+,` }} testId="workspace-settings" tabIndex={0}
+      <SidebarItem compact title={t('Settings')} tooltip={t('Open settings')} icon={<Settings size={iconSizes.row} />} active={settingsOpen} dataAttributes={{ 'data-dock-btn': 'settings', 'data-dock-fixed': 'true', role: 'button', 'aria-label': t('Settings'), 'aria-pressed': String(settingsOpen), 'data-tip-shortcut': `${isMacOS ? 'Meta' : 'Control'}+,` }} testId="workspace-settings" tabIndex={0}
         onClick={() => useUiStore.getState().setSettingsOpen(!settingsOpen)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); useUiStore.getState().setSettingsOpen(!settingsOpen); } }} />
     </div>
     <NavigationDragPreview />

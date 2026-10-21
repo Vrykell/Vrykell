@@ -50,6 +50,7 @@ test('edge tooltips keep their label and shortcut on one line in a narrow window
   await page.setViewportSize({ width: 500, height: 800 });
   await setupTauriMock(page);
   await page.goto('/');
+  await page.getByTestId('workspace-sidebar-expand').click();
   await page.getByRole('button', { name: '设置', exact: true }).hover();
   const tooltip = page.getByTestId('app-tooltip');
   await expect(tooltip).toBeVisible();

@@ -6,7 +6,7 @@ test('page scrollbars stay below an open dialog and become usable again after cl
   await setupTauriMock(page);
   await page.goto('/');
   await gotoSetting(page, '打开方式');
-  await page.setViewportSize({ width: 900, height: 680 });
+  await page.setViewportSize({ width: 760, height: 680 });
   const navigation = page.locator('.settings-navigation .scroll-region');
   await expect(navigation).toHaveClass(/overlay-scroll-target/);
   const id = await navigation.getAttribute('id');

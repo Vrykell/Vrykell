@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
+import { openSettings } from './settings';
 
 test('manages uploads across panel navigation and reload in narrow and wide layouts', async ({ page }) => {
   await setupTauriMock(page);
@@ -86,7 +87,7 @@ test('deletes a paused record so its incomplete data does not outlive it', async
 test('persists undo opt-outs and confirms deletion without claiming it can be undone', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
-  await page.locator('[data-dock-btn="settings"]').click();
+  await openSettings(page);
   await page.getByRole('button', { name: '文件操作', exact: true }).click();
   await page.getByRole('switch', { name: '本地文件撤销' }).click();
   await page.getByRole('switch', { name: '远程文件撤销' }).click();
@@ -95,11 +96,11 @@ test('persists undo opt-outs and confirms deletion without claiming it can be un
   await page.screenshot({ path: test.info().outputPath('undo-settings-narrow.png') });
   await page.reload();
   await page.setViewportSize({ width: 1240, height: 800 });
-  await page.locator('[data-dock-btn="settings"]').click();
+  await openSettings(page);
   await page.getByRole('button', { name: '文件操作', exact: true }).click();
   await expect(page.getByRole('switch', { name: '本地文件撤销' })).toHaveAttribute('aria-checked', 'false');
   await expect(page.getByRole('switch', { name: '远程文件撤销' })).toHaveAttribute('aria-checked', 'false');
-  await page.locator('[data-dock-btn="settings"]').click();
+  await page.getByRole('button', { name: '关闭设置', exact: true }).click();
   await page.locator('[data-dock-btn="files"]').click();
   const row = page.getByTestId('local-file-tree').locator('[data-path="/home/e2e/notes.txt"]');
   await row.click({ button: 'right' });

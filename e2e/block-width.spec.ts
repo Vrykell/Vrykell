@@ -138,7 +138,7 @@ test('resizing a running block resizes both PTY and terminal buffer, then restor
     const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
     return Object.values(useTerminalStore.getState().startupStates).includes('ready');
   });
-  await emitPtyOutput(page, `\x1b]133;E;${btoa('running-output')}\x07\x1b]133;C\x07${'x'.repeat(300)}\r\n`);
+  await emitPtyOutput(page, `\x1b]133;E;${btoa('running-output')}\x07\x1b]133;C\x07${'x'.repeat(600)}\r\n`);
   const host = page.getByTestId('running-term');
   await expect(host.locator('.xterm')).toBeVisible();
   const terminal = () => page.evaluate(() => {
@@ -147,7 +147,7 @@ test('resizing a running block resizes both PTY and terminal buffer, then restor
     const lines = Array.from({ length: term.buffer.active.length }, (_, row) => term.buffer.active.getLine(row)?.translateToString(true) ?? '').filter(Boolean);
     return { cols: term.cols, rows: lines.length, text: lines.join('') };
   });
-  await expect.poll(() => terminal().then(value => value.text)).toBe('x'.repeat(300));
+  await expect.poll(() => terminal().then(value => value.text)).toBe('x'.repeat(600));
   const before = await terminal();
   await page.setViewportSize({ width: 850, height: 800 });
   await expect.poll(() => terminal().then(value => value.cols)).toBeLessThan(before.cols);
@@ -157,6 +157,7 @@ test('resizing a running block resizes both PTY and terminal buffer, then restor
   expect(narrow.text).toBe(before.text);
   expect(await host.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
   await page.setViewportSize({ width: 1240, height: 800 });
+  await page.getByTestId('workspace-sidebar-expand').click();
   await expect.poll(() => terminal().then(value => value.cols)).toBe(before.cols);
   await expect.poll(() => terminal().then(value => value.rows)).toBe(before.rows);
 });

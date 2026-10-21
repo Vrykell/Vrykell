@@ -8,7 +8,7 @@ async function expectDockedStatus(page: Page) {
   const status = (await panel.boundingBox())!;
   expect(content.x + content.width).toBeLessThanOrEqual(status.x + 1);
   expect(content.width).toBeGreaterThanOrEqual(320);
-  expect(status.y).toBeCloseTo((await pane.boundingBox())!.y, 0);
+  expect(status.y).toBeCloseTo((await page.locator('.workspace-titlebar').boundingBox())!.y + (await page.locator('.workspace-titlebar').boundingBox())!.height, 0);
   expect(await pane.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
 }
 
@@ -83,7 +83,7 @@ test('SSH status uses real session state and does not write probes into the term
   const panel = page.getByTestId('ssh-status-panel');
   await expect(rightPanel).toBeHidden();
   await expect(page.locator('#ssh-status-sidebar-host header')).toContainText('root@prod.example.com:22');
-  await expect.poll(async () => Math.round((await panel.boundingBox())!.y - (await page.locator('.terminal-pane:visible').last().boundingBox())!.y)).toBe(0);
+  await expect.poll(async () => Math.round((await panel.boundingBox())!.y - (await page.locator('.workspace-body').boundingBox())!.y)).toBe(0);
   await expect(page.getByTestId('ssh-session-toolbar')).toHaveCount(1);
   expect(await page.getByTestId('ssh-connection-input').getByTestId('ssh-session-toolbar').count()).toBe(0);
   await expect(panel).toContainText('Linux 6.8');
@@ -311,7 +311,7 @@ test('block mode has no top toolbar and opens status from the existing host chip
   await entry.click();
   const panel = page.getByTestId('ssh-status-panel');
   await expect(panel).toContainText('Linux 6.8');
-  await expect.poll(async () => Math.round((await panel.boundingBox())!.y - (await pane.boundingBox())!.y)).toBe(0);
+  await expect.poll(async () => Math.round((await panel.boundingBox())!.y - (await page.locator('.workspace-body').boundingBox())!.y)).toBe(0);
   await expectDockedStatus(page);
   const editor = pane.locator('[data-terminal-input]');
   const editorBox = (await editor.boundingBox())!;
@@ -325,10 +325,12 @@ test('block mode has no top toolbar and opens status from the existing host chip
   expect((await panel.boundingBox())!.width).toBeGreaterThanOrEqual(240);
   await page.screenshot({ path: 'test-results/ssh-block-status-narrow.png' });
   await panel.getByRole('button', { name: '关闭 SSH 状态' }).click();
-  await expect(page.getByTestId('workspace-sidebar')).toBeVisible();
+  await expect(page.getByTestId('workspace-sidebar')).toBeHidden();
   await entry.click();
-  await expect(page.getByTestId('workspace-sidebar')).toBeVisible();
+  await expect(page.getByTestId('workspace-sidebar')).toBeHidden();
   await page.setViewportSize({ width: 1240, height: 800 });
+  await expect(page.getByTestId('workspace-sidebar')).toHaveAttribute('data-collapsed', 'true');
+  await page.getByTestId('workspace-sidebar-expand').click();
   await expect(page.getByTestId('workspace-sidebar')).toHaveAttribute('data-collapsed', 'false');
   await panel.getByRole('button', { name: '关闭 SSH 状态' }).click();
   await expect(entry).toBeFocused();

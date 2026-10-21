@@ -543,6 +543,13 @@ The embedded runtime is pinned for older web views. Dependency upgrades must ver
 
 ## Input, search and file access refinements
 
+Runtime regression checklist, 2026-10-21:
+
+- Manual fullscreen is owned by a pane. Switching terminals preserves the running process and restores its painted output and keyboard focus; closing another pane or entering an alternate buffer cannot clear an unrelated pane's preference.
+- Fullscreen resizing has one scene-aware size driver for the output grid and PTY, excluding the toolbar. Continuous width changes keep a fixed text origin and row count. A backing canvas inconsistent with the GPU viewport falls back to DOM rendering without losing the parsed buffer; unit and 1x/1.25x browser tests cover this path and visible pixels.
+- Sending a command block for analysis retains its entire available command and output in the reference and model request, including content beyond 2000 characters and trailing error markers.
+- Titlebar and system window close requests complete through the configured native capability. Clean, save, discard, cancel and failed-save paths are covered; failed writes retain unsaved content.
+
 | Area | Expected behavior | Verification |
 | --- | --- | --- |
 | Script input | AI code actions put multiline scripts into the selected terminal's command draft without writing to the PTY. Existing command and discussion drafts remain intact; Enter explicitly submits. Multiline paste at an idle block prompt uses the same draft path. Explicit multiline execution transports one physical input line and reconstructs the script in the current shell, preserving heredocs, quotes, indentation, Unicode, variables, functions, cwd and exit status. This prevents stdin-reading programs from consuming subsequent script lines and host Enter normalization from changing source text. Input, AI execution, history, rerun and queued commands share this submission path; a failed write restores the draft. Native paste events and clipboard shortcuts share the confirmation policy; a replaced session cannot receive a stale confirmed paste | CommandBlock, submission, completion, composer, input store and terminalClipboard unit tests; terminal-script-input and terminal-paste browser tests. multiline-execution reproduces raw multiline loss in a real interactive Linux pseudoterminal, executes payloads from local and remote composers, and verifies script semantics in the installed shells |

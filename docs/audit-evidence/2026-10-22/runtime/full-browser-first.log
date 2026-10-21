@@ -1,0 +1,1256 @@
+
+> vrykell@0.1.0 test:e2e
+> playwright test --reporter=line
+
+
+[1A[2K[WebServer] (node:75228) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 637 tests using 1 worker
+
+
+
+[1A[2K(node:40264) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:40264) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1A[2K[1/637] acp-launcher.spec.ts:10:1 › the sidebar ACP button reuses a singleton workspace with an inline server picker
+[1A[2K  1) acp-launcher.spec.ts:10:1 › the sidebar ACP button reuses a singleton workspace with an inline server picker 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: page.goto: Test timeout of 30000ms exceeded.
+    Call log:
+      [2m- navigating to "http://127.0.0.1:1421/", waiting until "load"[22m
+
+
+      10 | test('the sidebar ACP button reuses a singleton workspace with an inline server picker', async ({ page }) => {
+      11 |   await setupTauriMock(page);
+    > 12 |   await page.goto('/');
+         |              ^
+      13 |   await page.waitForTimeout(600);
+      14 |   await expect(page.getByTestId('tab-acp-btn')).toBeVisible();
+      15 |   await page.getByTestId('workspace-area-ai').click();
+
+        at D:\projects\typescript\Vrykell\e2e\acp-launcher.spec.ts:12:14
+
+
+
+[1A[2K(node:39108) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:39108) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1A[2K[2/637] acp-launcher.spec.ts:22:1 › picking a server opens its session tab and closes the panel
+[1A[2K[3/637] acp-workspace.spec.ts:17:1 › retains drafts and reading positions across workspace and internal session switches
+[1A[2K[4/637] acp-workspace.spec.ts:41:1 › follows streamed replies, pauses for reading and offers a return to the latest reply
+[1A[2K[5/637] acp-workspace.spec.ts:64:1 › opens the focused pane directory instead of the first split pane
+[1A[2K[6/637] acp-workspace.spec.ts:84:1 › asks another conversation even after a matching command shape was approved
+[1A[2K[7/637] acp-workspace.spec.ts:106:1 › keeps failed server edits, saves argument boundaries and persists before leaving settings
+[1A[2K[8/637] acp-workspace.spec.ts:138:1 › protects active work and only closes sessions after explicit confirmation
+[1A[2K[9/637] acp-workspace.spec.ts:153:1 › search navigation leaves settings and server dialogs retain keyboard focus
+[1A[2K[10/637] acp-workspace.spec.ts:170:1 › keeps connected session controls usable in narrow and wide layouts
+[1A[2K[11/637] agent-extras.spec.ts:14:3 › 记忆设置页 › 加载 FACT 与流水；编辑保存；清空
+[1A[2K[12/637] agent-extras.spec.ts:35:3 › 子代理设置页 › 列表渲染；添加/编辑/删除
+[1A[2K[13/637] agent-extras.spec.ts:58:3 › 定时任务设置页 › 列表渲染；添加/保存/启停/删除
+[1A[2K[14/637] ai-chat-panel.spec.ts:25:3 › AI 对话面板 › opening the panel does not move focus into the chat composer
+[1A[2K[15/637] ai-chat-panel.spec.ts:34:3 › AI 对话面板 › conversation settings start with discussion and the composer keeps attachment controls
+[1A[2K[16/637] ai-chat-panel.spec.ts:45:3 › AI 对话面板 › 打开面板发送消息，流式渲染回复
+[1A[2K[17/637] ai-chat-panel.spec.ts:55:3 › AI 对话面板 › 停止生成：中断后收尾回到发送按钮（读取器不再永久挂起）
+[1A[2K[18/637] ai-chat-panel.spec.ts:82:3 › AI 对话面板 › 复制被终止的回复：还没有正文时复制工具日志，而不是空串
+[1A[2K[19/637] ai-chat-panel.spec.ts:106:3 › AI 对话面板 › 复制被终止的回复：停止后复制按钮给出已经收到的正文
+[1A[2K[20/637] ai-chat-panel.spec.ts:132:3 › AI 对话面板 › opening the AI assistant leaves command input available
+[1A[2K[21/637] ai-chat-panel.spec.ts:142:3 › AI 对话面板 › 模型选择窗口：搜索过滤 + 能力标签过滤 + 点击选中
+[1A[2K[22/637] ai-chat-panel.spec.ts:179:3 › AI 对话面板 › 模型选择窗口：思考强度只在模型配置页调整
+[1A[2K[23/637] ai-chat-panel.spec.ts:195:3 › AI 对话面板 › the unified chat and approval menu persists model and permission choices
+[1A[2K[24/637] ai-conversations.spec.ts:14:1 › conversation drafts survive terminal navigation, settings and closing the final terminal
+[1A[2K[25/637] ai-conversations.spec.ts:30:1 › history owns separate drafts and messages and restores them after reload
+[1A[2K[26/637] ai-conversations.spec.ts:53:1 › the execution environment stays fixed and a closed terminal stays disconnected
+[1A[2K[27/637] ai-conversations.spec.ts:71:1 › the picker opens the new-tab panel and binds the terminal it creates
+[1A[2K[28/637] ai-conversations.spec.ts:87:1 › rename and delete manage conversation history independently of terminals
+[1A[2K[29/637] ai-conversations.spec.ts:114:1 › command analysis stages a reference before sending and never changes terminal input
+[1A[2K[30/637] ai-conversations.spec.ts:137:3 › plain conversation answers remain readable in dark
+[1A[2K[31/637] ai-conversations.spec.ts:137:3 › plain conversation answers remain readable in light
+[1A[2K[32/637] ai-conversations.spec.ts:187:1 › tool activity stays available within the plain conversation flow
+[1A[2K[33/637] ai-conversations.spec.ts:262:1 › reading earlier content pauses automatic scroll until the user returns to the latest reply
+[1A[2K[34/637] ai-conversations.spec.ts:276:1 › pausing and resuming the follow never shifts the transcript layout
+[1A[2K[35/637] ai-conversations.spec.ts:304:1 › a small scroll while the reply streams keeps the reading position
+[1A[2K[36/637] ai-status-bar.spec.ts:4:1 › AI controls belong to the conversation while terminal input stays in command mode
+[1A[2K[37/637] ai-status-bar.spec.ts:18:1 › pasted image attachments can be sent without a text question
+[1A[2K[38/637] ai-status-bar.spec.ts:37:1 › the conversation model picker stays available after leaving settings
+[1A[2K[39/637] analysis-completeness.spec.ts:4:1 › command analysis retains the complete command and output through the model request
+[1A[2K[40/637] approval-shape.spec.ts:17:3 › shape approvals › approves one kind of command for the session instead of the whole tool
+[1A[2K[41/637] approval-timeout.spec.ts:9:3 › approval timeout › a card nobody answers is denied, explained and lets the next turn start
+[1A[2K[42/637] block-selection.spec.ts:4:1 › 命令块头部（路径等）与命令行可被鼠标选中复制
+[1A[2K[43/637] block-width.spec.ts:4:1 › maximized command output uses the available columns without a fixed 80-column limit
+[1A[2K[44/637] block-width.spec.ts:23:1 › output longer than the viewport stays complete without a false truncation notice
+[1A[2K[45/637] block-width.spec.ts:54:1 › long box-drawing rows reflow to the available columns without horizontal scrolling
+[1A[2Kblock-width.spec.ts:54:1 › long box-drawing rows reflow to the available columns without horizontal scrolling
+WIDTH-DIAG {
+  "cols": 400,
+  "gridRows": 12,
+  "visualLines": 12,
+  "clientWidth": 1000,
+  "charWidth": 8,
+  "capacityChars": 125,
+  "lineHeightPx": 16,
+  "innerWidth": 1240,
+  "scrollWidth": 1000
+}
+
+[1A[2K[46/637] block-width.spec.ts:130:1 › resizing a running block resizes both PTY and terminal buffer, then restores its width
+[1A[2K  2) block-width.spec.ts:130:1 › resizing a running block resizes both PTY and terminal buffer, then restores its width 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeGreaterThan[2m([22m[32mexpected[39m[2m)[22m
+
+    Expected: > [32m3[39m
+    Received:   [31m3[39m
+
+      154 |   const narrow = await terminal();
+      155 |   await expect.poll(() => ptyResizes(page).then(resizes => resizes.at(-1)?.cols)).toBe(narrow.cols);
+    > 156 |   expect(narrow.rows).toBeGreaterThan(before.rows);
+          |                       ^
+      157 |   expect(narrow.text).toBe(before.text);
+      158 |   expect(await host.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+      159 |   await page.setViewportSize({ width: 1240, height: 800 });
+
+        at D:\projects\typescript\Vrykell\e2e\block-width.spec.ts:156:23
+
+
+[1A[2K(node:44236) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+
+
+[1A[2K(node:44236) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1A[2K[47/637] block-width.spec.ts:164:1 › opening the assistant resizes the PTY and wraps completed output without horizontal scrolling
+[1A[2K[48/637] block-width.spec.ts:194:1 › line-editor repaint does not add a prompt or inherited blank rows to command output
+[1A[2K[49/637] block-width.spec.ts:208:1 › 运行中卡片：PTY/块终端宽度跟随卡片内容宽（右缘不裁剪）
+[1A[2K[50/637] block-width.spec.ts:253:1 › 运行中输出与完成快照保持相同字符宽度
+[1A[2K[51/637] block-width.spec.ts:290:1 › 命令块分隔线延伸到终端左右边缘
+[1A[2K[52/637] blocks.spec.ts:5:3 › 命令块（OSC 133） › 终端运行命令后 block UI 可见
+[1A[2K[53/637] blocks.spec.ts:22:3 › 命令块（OSC 133） › 无 OSC 133 时：块模式暂存输出；经典打开模式直出 xterm
+[1A[2K[54/637] blocks.spec.ts:49:3 › 命令块（OSC 133） › 进出 altScreen 显示 TUI banner
+[1A[2K[55/637] blocks.spec.ts:125:3 › 命令块（OSC 133） › 与其它 DEC 私有模式合写的 alt 序列仍按全屏 TUI 处理
+[1A[2K[56/637] blocks.spec.ts:156:3 › 命令块（OSC 133） › altScreen 中滚轮降级为方向键发给 PTY
+[1A[2K[57/637] blocks.spec.ts:194:3 › 命令块（OSC 133） › 全局搜索 Cmd+F 打开居中弹窗并聚焦
+[1A[2K[58/637] blocks.spec.ts:211:3 › 命令块（OSC 133） › 全局搜索筛选面板点击不崩溃
+[1A[2K[59/637] blocks.spec.ts:226:3 › 命令块（OSC 133） › 底部命令输入栏可见
+[1A[2K[60/637] blocks.spec.ts:233:3 › 命令块（OSC 133） › Cmd+P 打开命令面板
+[1A[2K[61/637] blocks.spec.ts:243:3 › 命令块（OSC 133） › Cmd+W 打开命令面板不冲突（p 和 w 区分）
+[1A[2K[62/637] blocks.spec.ts:258:3 › 命令块（OSC 133） › 完成块快照的行高等于画布实测单元格高度
+[1A[2K[63/637] chat-composer-layout.spec.ts:15:1 › model focus background leaves space around its name and arrow
+[1A[2K[64/637] chat-composer-layout.spec.ts:34:1 › model shape, approval hover and attachment chip hover share one visual language
+[1A[2K[65/637] chat-composer-layout.spec.ts:70:1 › long terminal names and directories fit at the minimum width with larger UI text
+[1A[2K[66/637] chat-composer-layout.spec.ts:112:1 › AI composer uses the original terminal composer height with a small blue send button
+[1A[2K[67/637] chat-composer-layout.spec.ts:131:1 › footer matches attachment, approval, model and send order without wrapping at narrow and wide sizes
+[1A[2K[68/637] chat-composer-layout.spec.ts:198:1 › sidebar resize leaves enough width for the terminal controls
+[1A[2K[69/637] chat-composer-layout.spec.ts:209:3 › composer preserves the spacious reference layout in 深色
+[1A[2K[70/637] chat-composer-layout.spec.ts:209:3 › composer preserves the spacious reference layout in 浅色
+[1A[2K[71/637] chat-links.spec.ts:8:1 › a reply link leaves for the system browser instead of taking the window
+[1A[2K[72/637] chat.spec.ts:5:3 › chat 对话链路（内联 AI 模式） › AI 模式发送消息后流式渲染 AI 回复
+[1A[2K[73/637] chat.spec.ts:25:3 › chat 对话链路（内联 AI 模式） › AI 回复包含文本内容
+[1A[2K[74/637] chat.spec.ts:40:3 › chat 对话链路（内联 AI 模式） › 首条消息自动命名标签
+[1A[2K[75/637] chat.spec.ts:54:3 › chat 对话链路（内联 AI 模式） › 发送中输入禁用，完成后恢复
+[1A[2K[76/637] clipboard-files.spec.ts:5:1 › 复制与剪切文件行会把真实路径写入系统剪贴板
+[1A[2K[77/637] command-block-actions.spec.ts:5:3 › 命令块操作全链路 › commands and output keep their geometry while context remains visible and hover reveals only more
+[1A[2K[78/637] command-block-actions.spec.ts:59:3 › 命令块操作全链路 › 命令块右键菜单出现在鼠标点击位置
+[1A[2K[79/637] command-block-actions.spec.ts:86:3 › 命令块操作全链路 › 运行命令后复制命令和输出，并通过同一面板重新运行
+[1A[2K[80/637] command-block-actions.spec.ts:121:3 › 命令块操作全链路 › 通过更多菜单复制输出并清除当前面板的命令块
+[1A[2K[81/637] command-block-actions.spec.ts:146:1 › narrow panes preserve context above multiline commands and all output
+[1A[2K[82/637] command-block-actions.spec.ts:175:1 › long commands truncate in the action menu header instead of widening the menu
+[1A[2K[83/637] command-block-actions.spec.ts:197:1 › the more menu stages a command snapshot for AI analysis while preserving terminal output
+[1A[2K[84/637] command-block-actions.spec.ts:218:1 › two-row command output matches the compact context and spacing proportions
+[1A[2K[85/637] command-block-rails.spec.ts:8:5 › error rails at 1x pixel density › adjacent failures have a continuous rail across dividers, ending before success
+[1A[2K[86/637] command-block-rails.spec.ts:8:5 › error rails at 2x pixel density › adjacent failures have a continuous rail across dividers, ending before success
+[1A[2K[87/637] command-block.spec.ts:5:3 › 命令块链路 › bash 代码块显示运行按钮，点击后写入 PTY 并回显
+[1A[2K[88/637] command-block.spec.ts:32:3 › 命令块链路 › python 代码块不显示运行按钮
+[1A[2K[89/637] command-block.spec.ts:49:3 › code and table surfaces share the neutral palette in dark
+[1A[2K[90/637] command-block.spec.ts:49:3 › code and table surfaces share the neutral palette in light
+[1A[2K[91/637] command-history.spec.ts:45:1 › uses purposeful sorting submenus and direct settings in wide and narrow history panels
+[1A[2K[92/637] command-history.spec.ts:73:1 › refreshes the library from the actions menu and the blank list background
+[1A[2K[93/637] command-history.spec.ts:101:1 › browses, fills, favorites, renames and restores hidden project commands across reloads
+[1A[2K[94/637] command-history.spec.ts:132:1 › filters history, generates and revises AI drafts, and offers a choice of execution terminal
+[1A[2K[95/637] command-history.spec.ts:174:1 › filters commands to the current terminal environment and restores them from the card
+[1A[2K[96/637] command-history.spec.ts:200:1 › keeps SSH and local history separate and fits wide and narrow sidebars
+[1A[2K[97/637] command-history.spec.ts:223:1 › keeps command rows compact, reveals details without execution and expands searched favorites
+[1A[2K[98/637] command-history.spec.ts:254:1 › remembers folded sections and groups across reloads while saving them after search
+[1A[2K[99/637] command-history.spec.ts:278:1 › sorts by frequency across reloads and displays full long commands in a narrow sidebar
+[1A[2K[100/637] command-history.spec.ts:310:1 › persists command groups, colors and membership through edits and group deletion
+[1A[2K[101/637] command-history.spec.ts:365:1 › drags commands and groups, filters collected commands and remembers inspector height
+[1A[2K[102/637] command-history.spec.ts:422:1 › centers project tools and fits hover and filter controls at narrow widths
+[1A[2K[103/637] command-history.spec.ts:468:1 › keeps favorite-only commands when dragged into history and fits collected filters at minimum width
+[1A[2K[104/637] command-history.spec.ts:499:1 › removes filter cards independently in wide and minimum-width layouts
+[1A[2K[105/637] command-history.spec.ts:538:1 › creates groups at the front from ungrouped command menus and page actions across reloads
+[1A[2K[106/637] command-history.spec.ts:578:1 › matches drag slot height, hides child controls, keeps ungrouped commands fixed and remembers collapsed details
+[1A[2K[107/637] command-history.spec.ts:634:1 › previews and applies AI grouping in command history and session tabs without executing commands
+[1A[2K[108/637] command-history.spec.ts:673:1 › retains an independent tool through drag, minimize, restore and pin changes, then closes and recreates it
+[1A[2K[109/637] command-history.spec.ts:738:1 › keeps native AI window actions visible in small layouts and reports malformed grouping without mutating history
+[1A[2K[110/637] command-history.spec.ts:769:1 › continues generation while minimized and aborts a pending request before explicit window destruction
+[1A[2K[111/637] command-presentation.spec.ts:5:1 › command coloring is optional, persists and leaves native input editing intact
+[1A[2K[112/637] command-presentation.spec.ts:75:1 › completion stays anchored while typing and its acceptance keys persist
+[1A[2K[113/637] command-presentation.spec.ts:127:1 › the colored input mirror stays aligned while multiline content overflows the capped height
+[1A[2K[114/637] command-presentation.spec.ts:159:1 › a long completion suffix cannot push the typed word out of the visible mirror line
+[1A[2K[115/637] composer-resize.spec.ts:17:1 › AI composer recovers its compact height after narrowing, widening and reopening
+[1A[2K[116/637] composer-resize.spec.ts:45:1 › terminal composer restores its height when the window width returns
+[1A[2K[117/637] context-menu-exclusivity.spec.ts:4:1 › unrelated context menus replace each other, including programmatic right clicks
+[1A[2K[118/637] context-menu.spec.ts:5:1 › settings require certificate trust and manage registration explicitly
+[1A[2K[119/637] context-menu.spec.ts:21:1 › a shell launch opens exactly one terminal at the requested path even with empty startup mode
+[1A[2K[120/637] context-menu.spec.ts:34:1 › a shell launch forwarded to the running window opens a tab instead of a second window
+[1A[2K[121/637] context-menu.spec.ts:50:1 › a launch forwarded before the window listened still opens its tab
+[1A[2K[122/637] context-menu.spec.ts:56:1 › Windows leaves corner clipping to the compositor and fills the control edges
+[1A[2K[123/637] cwd-restore.spec.ts:4:1 › restores the saved directory of a legacy local terminal session
+[1A[2K[124/637] directory-chip-layout.spec.ts:4:1 › directory chips center their icon and label at narrow widths and larger UI sizes
+[1A[2K[125/637] editor.spec.ts:17:1 › identifies read-only files, blocks normal edits and offers explicit administrator opening
+[1A[2K[WebServer] 23:41:52 [vite] (client) Failed to load source map for D:/projects/typescript/Vrykell/node_modules/monaco-editor/esm/vs/base/common/marked/marked.js.
+[WebServer] Error: An error occurred while trying to read the map file at marked.umd.js.map
+[WebServer] Error: ENOENT: no such file or directory, open 'D:\projects\typescript\Vrykell\node_modules\monaco-editor\esm\vs\base\common\marked\marked.umd.js.map'
+[WebServer]     at async open (node:internal/fs/promises:637:25)
+[WebServer]     at async Object.readFile (node:internal/fs/promises:1269:14)
+[WebServer]     at async extractSourcemapFromFile (file:///D:/projects/typescript/Vrykell/node_modules/vite/dist/node/chunks/config.js:8066:65)
+[WebServer]     at async loadAndTransform (file:///D:/projects/typescript/Vrykell/node_modules/vite/dist/node/chunks/config.js:22717:22)
+
+[1A[2K[126/637] editor.spec.ts:50:1 › opens text in the built-in editor, saves it and guards unsaved closes
+[1A[2K[127/637] editor.spec.ts:66:1 › retains drafts on disk conflicts and requires confirmation before reload
+[1A[2K[128/637] editor.spec.ts:77:1 › keeps files in a single page despite a legacy preference and offers terminal opening
+[1A[2K[129/637] editor.spec.ts:103:1 › returns from a comparison to its editor and explains binary files
+[1A[2K[130/637] editor.spec.ts:113:1 › reorders connected file tabs and keeps compact actions above the text
+[1A[2K[131/637] editor.spec.ts:153:1 › dragging the selected first file leaves the remaining tabs visible in a narrow strip
+[1A[2K[132/637] editor.spec.ts:188:3 › selects on press and exchanges unequal tabs to the left after half an overlap
+[1A[2K[133/637] editor.spec.ts:188:3 › selects on press and exchanges unequal tabs to the right after half an overlap
+[1A[2K[134/637] editor.spec.ts:235:1 › moving the selected document backward never detaches or reloads its editor
+[1A[2K[135/637] editor.spec.ts:277:3 › dragging file tabs scrolls both strip edges with a stationary pointer at width 1240
+[1A[2K[136/637] editor.spec.ts:277:3 › dragging file tabs scrolls both strip edges with a stationary pointer at width 760
+[1A[2K[137/637] field-surfaces.spec.ts:62:3 › editable fields are lighter than panels and readouts stay quiet in 深色
+[1A[2K[138/637] field-surfaces.spec.ts:62:3 › editable fields are lighter than panels and readouts stay quiet in 浅色
+[1A[2K[139/637] file-editor-navigation.spec.ts:42:3 › opening a nested file in the preferred terminal via double-click preserves the tree and scroll
+[1A[2K[140/637] file-editor-navigation.spec.ts:42:3 › opening a nested file in the preferred terminal via context-menu preserves the tree and scroll
+[1A[2K[141/637] file-editor-navigation.spec.ts:83:1 › going back restores the previous view selection and scroll
+[1A[2K[142/637] file-editor-navigation.spec.ts:103:1 › dragging onto a file row drops into that file parent folder
+[1A[2K[143/637] file-editor-navigation.spec.ts:128:1 › going back returns to the previous view, not the parent folder
+[1A[2K[144/637] file-editor-navigation.spec.ts:146:1 › the visit trail jumps to visited directories and never replays an abandoned branch
+[1A[2K[145/637] file-transfers.spec.ts:4:1 › manages uploads across panel navigation and reload in narrow and wide layouts
+[1A[2K[146/637] file-transfers.spec.ts:58:1 › deletes a paused record so its incomplete data does not outlive it
+[1A[2K[147/637] file-transfers.spec.ts:86:1 › persists undo opt-outs and confirms deletion without claiming it can be undone
+[1A[2K  3) file-transfers.spec.ts:86:1 › persists undo opt-outs and confirms deletion without claiming it can be undone 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      [2m- waiting for locator('[data-dock-btn="settings"]')[22m
+    [2m  -   locator resolved to <div tabindex="0" role="button" aria-label="设置" class="sidebar-row" data-active="false" aria-pressed="false" data-dock-fixed="true" data-dock-btn="settings" data-tip-shortcut="Control+," data-testid="workspace-settings">…</div>[22m
+    [2m  - attempting click action[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #1[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #2[22m
+    [2m  -   waiting 20ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #3[22m
+    [2m  -   waiting 100ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #4[22m
+    [2m  -   waiting 100ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #5[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #6[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #7[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #8[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #9[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #10[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #11[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #12[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #13[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #14[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #15[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #16[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #17[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #18[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #19[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #20[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #21[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #22[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #23[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #24[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #25[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #26[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #27[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #28[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #29[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #30[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #31[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #32[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #33[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #34[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #35[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #36[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #37[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #38[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #39[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #40[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #41[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #42[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #43[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #44[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #45[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #46[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #47[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #48[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #49[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #50[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #51[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #52[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #53[22m
+    [2m  -   waiting 500ms[22m
+    [2m  -   waiting for element to be visible, enabled and stable[22m
+    [2m  -   element is not visible[22m
+    [2m  - retrying click action, attempt #54[22m
+    [2m  -   waiting 500ms[22m
+
+
+       96 |   await page.reload();
+       97 |   await page.setViewportSize({ width: 1240, height: 800 });
+    >  98 |   await page.locator('[data-dock-btn="settings"]').click();
+          |                                                    ^
+       99 |   await page.getByRole('button', { name: '文件操作', exact: true }).click();
+      100 |   await expect(page.getByRole('switch', { name: '本地文件撤销' })).toHaveAttribute('aria-checked', 'false');
+      101 |   await expect(page.getByRole('switch', { name: '远程文件撤销' })).toHaveAttribute('aria-checked', 'false');
+
+        at D:\projects\typescript\Vrykell\e2e\file-transfers.spec.ts:98:52
+
+
+
+
+[1A[2K(node:54124) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[1A[2K(node:54124) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[1A[2K[148/637] file-transfers.spec.ts:112:5 › upload cards show complete task context without clipping in dark narrow and wide panels
+[1A[2K[149/637] file-transfers.spec.ts:112:5 › download cards show complete task context without clipping in dark narrow and wide panels
+[1A[2K[150/637] file-transfers.spec.ts:112:5 › upload cards show complete task context without clipping in light narrow and wide panels
+[1A[2K[151/637] file-transfers.spec.ts:112:5 › download cards show complete task context without clipping in light narrow and wide panels
+[1A[2K[152/637] file-transfers.spec.ts:195:1 › empty transfer pages explain where to start and return to file browsing
+[1A[2K[153/637] file-tree-empty.spec.ts:5:1 › 展开空文件夹不显示空提示，箭头保留可再次收起
+[1A[2K[154/637] file-tree-empty.spec.ts:33:1 › 连点展开箭头不会进入目录
+[1A[2K[155/637] file-tree-empty.spec.ts:51:1 › 目录展开较慢时才出现加载提示
+[1A[2K[156/637] floating-surfaces.spec.ts:56:3 › dialogs, menus and pickers share the workspace surfaces in 深色
+[1A[2K[157/637] floating-surfaces.spec.ts:56:3 › dialogs, menus and pickers share the workspace surfaces in 浅色
+[1A[2K[158/637] floating-surfaces.spec.ts:112:1 › portaled menus and pickers mirror the application opacity
+[1A[2K[159/637] folder-tab-corners.spec.ts:46:7 › folder tab corners in dark mode at 1x density › file and comparison tabs join the content without gaps or square protrusions
+[1A[2K[160/637] folder-tab-corners.spec.ts:46:7 › folder tab corners in light mode at 1x density › file and comparison tabs join the content without gaps or square protrusions
+[1A[2K[161/637] folder-tab-corners.spec.ts:46:7 › folder tab corners in dark mode at 1.25x density › file and comparison tabs join the content without gaps or square protrusions
+[1A[2K[162/637] folder-tab-corners.spec.ts:46:7 › folder tab corners in light mode at 1.25x density › file and comparison tabs join the content without gaps or square protrusions
+[1A[2K[163/637] folder-tab-corners.spec.ts:46:7 › folder tab corners in dark mode at 2x density › file and comparison tabs join the content without gaps or square protrusions
+[1A[2K[164/637] folder-tab-corners.spec.ts:46:7 › folder tab corners in light mode at 2x density › file and comparison tabs join the content without gaps or square protrusions
+[1A[2K[165/637] follow-bottom.spec.ts:20:1 › 用户上滚后运行新命令，应重新贴底
+[1A[2Kfollow-bottom.spec.ts:20:1 › 用户上滚后运行新命令，应重新贴底
+gap after scroll up: 300, after new cmd: 0
+
+[1A[2K[166/637] follow-bottom.spec.ts:55:1 › 改变终端宽度时保持阅读位置，贴底状态保持贴底
+[1A[2K[167/637] follow-bottom.spec.ts:94:1 › live output continues following after content grows and the viewport changes
+[1A[2K[168/637] follow-bottom.spec.ts:159:1 › short commands preserve real wrapped history geometry without a reverse scroll frame
+[1A[2K[169/637] git-panel.spec.ts:21:1 › reviews both sides of a partially staged file and preserves the terminal
+[1A[2K[170/637] git-panel.spec.ts:76:1 › keeps comparisons as workspace tabs and returns to the running terminal
+[1A[2K[171/637] git-panel.spec.ts:91:1 › generates an editable commit message and runs commit and remote operations
+[1A[2K[172/637] git-panel.spec.ts:126:1 › stages and unstages complete files and filters paths
+[1A[2K[173/637] git-panel.spec.ts:137:1 › shows binary, conflict, empty and failure states
+[1A[2K[174/637] git-panel.spec.ts:152:1 › uses one joined button and adapts clean repositories to synchronization and publication
+[1A[2K[175/637] git-panel.spec.ts:192:1 › offers hover actions and confirms discards without touching staged changes
+[1A[2K[176/637] git-panel.spec.ts:209:1 › opens the composer branch menu, switches a clean branch and preserves command drafts
+[1A[2K[177/637] git-panel.spec.ts:241:1 › keeps Git usable in settings and saves a prompt for the remembered workspace
+[1A[2K[178/637] git-panel.spec.ts:272:1 › forces one comparison page despite a saved multi-page preference
+[1A[2K[179/637] git-panel.spec.ts:293:1 › scrolls comparison tabs with the wheel and keeps scrolling while a dragged tab rests at the edge
+[1A[2K[180/637] git-panel.spec.ts:316:1 › reorders comparison tabs and moves secondary actions into the compact menu
+[1A[2K[181/637] git-panel.spec.ts:351:1 › moving the selected comparison backward keeps its editor hosts attached
+[1A[2K[182/637] git-panel.spec.ts:384:1 › shows rounded groups, a collapsible file tree and selectable worktrees
+[1A[2K[183/637] git-panel.spec.ts:412:1 › uses reload feedback and dismisses operation errors from the heading
+[1A[2K[184/637] git-panel.spec.ts:425:1 › manages branches and tags and exposes conflict recovery
+[1A[2K[185/637] git-panel.spec.ts:469:1 › stages a reviewed conflict resolution only after confirmation
+[1A[2K[186/637] harness-session.spec.ts:31:3 › harness session › streams the harness output and answers its permission request
+[1A[2K[187/637] history-grouping.spec.ts:42:1 › session grouping separates remote directories and combines connection filtering with record sorting
+[1A[2K[188/637] history-grouping.spec.ts:108:1 › AI history groups by working directory and conversation type and uses settings card colors
+[1A[2K[189/637] history-grouping.spec.ts:182:1 › session date basis survives title sorting, regrouping and reopening
+[1A[2K[190/637] history-grouping.spec.ts:217:1 › AI remote directory grouping retains the selected date basis and search after reload
+[1A[2K[191/637] history-grouping.spec.ts:266:1 › card metadata stays outside the collapse button at normal and maximum UI font sizes
+[1A[2K[192/637] history-operations.spec.ts:56:1 › group names, notes, colors and collapse choices survive reload without changing automatic membership
+[1A[2K[193/637] history-operations.spec.ts:124:1 › filtered group deletion protects locked records across regrouping and restore processes only matching sessions
+[1A[2K[194/637] history-operations.spec.ts:155:1 › AI group copy and deletion use the filtered set while retaining locked and unrelated conversations
+[1A[2K[195/637] history-original-groups.spec.ts:21:1 › original groups remain intact across classifications, filters and persisted renaming
+[1A[2K[196/637] history-original-groups.spec.ts:50:1 › filtered and whole-group restores retain original membership and order after closing each tab
+[1A[2K[197/637] history-surface-style.spec.ts:6:3 › settings and history have clean edges and bottom color choices in dark
+[1A[2K[198/637] history-surface-style.spec.ts:6:3 › settings and history have clean edges and bottom color choices in light
+[1A[2K[199/637] history-visual-details.spec.ts:11:3 › history details use clear actions, single-line headers and scoped menus in dark
+[1A[2K[200/637] history-visual-details.spec.ts:11:3 › history details use clear actions, single-line headers and scoped menus in light
+[1A[2K[201/637] history-visual-details.spec.ts:144:1 › quick controls restore one original member with the keyboard and delete without restoring
+[1A[2K[202/637] icons.spec.ts:5:1 › small action buttons have readable targets and tab close works from the keyboard
+[1A[2K[203/637] icons.spec.ts:33:1 › workspace icons remain readable and fit inside their controls
+[1A[2K[204/637] icons.spec.ts:76:1 › workspace and settings use the same themed icon family in both themes
+[1A[2K[205/637] icons.spec.ts:109:1 › pickers, tabs and SSH connections retain colored shell marks
+[1A[2K[206/637] input-chips.spec.ts:4:1 › input chips share the quiet no-border gray style
+[1A[2K[207/637] input-chips.spec.ts:29:1 › clickable chips clear the gray fill on hover and expose their pressed state
+[1A[2K[208/637] layout.spec.ts:10:3 › 应用布局 › TopDock 功能区：标签/资源按钮 + 设置入口
+[1A[2K[209/637] layout.spec.ts:20:3 › 应用布局 › Windows/Linux 使用应用内窗口控制按钮
+[1A[2K[210/637] layout.spec.ts:64:3 › 应用布局 › 文件面板：点击资源按钮后显示目录和文件
+[1A[2K[211/637] layout.spec.ts:71:3 › 应用布局 › 终端区：xterm 挂载且有底部输入栏
+[1A[2K[212/637] layout.spec.ts:77:3 › 应用布局 › 底部输入栏支持 AI 模式切换
+[1A[2K[213/637] layout.spec.ts:84:3 › 应用布局 › 标签面板：打开面板 → 新建标签 → 切换
+[1A[2K[214/637] layout.spec.ts:99:3 › 应用布局 › 文档级滚动已锁定 — html/body overflow 裁剪
+[1A[2K[215/637] literal-input.spec.ts:4:1 › all text surfaces retain literal input and settings search focuses an individual control
+[1A[2K[216/637] literal-input.spec.ts:39:1 › classic terminal input helpers remain invisible and selected cells have no ruler seam after resizing
+[1A[2K[217/637] macos-feedback-refinements.spec.ts:6:1 › settings save feedback lives in the page header while field titles stay regular
+[1A[2K[218/637] macos-feedback-refinements.spec.ts:23:1 › wallpaper picker filters images and rejects both documents and renamed invalid images
+[1A[2K[219/637] macos-feedback-refinements.spec.ts:80:1 › the full panel preview accepts release and shares its surface with split placement
+[1A[2K[220/637] macos-titlebar.spec.ts:13:3 › native controls, title, search and actions have room at 720px
+[1A[2K[221/637] macos-titlebar.spec.ts:13:3 › native controls, title, search and actions have room at 1240px
+[1A[2K[222/637] macos-titlebar.spec.ts:44:1 › fullscreen releases the traffic-light space and restores it on exit
+[1A[2K[223/637] manual-fullscreen-regressions.spec.ts:44:3 › fullscreen at scale 1 › returning to a manual fullscreen command restores its painted surface and input
+[1A[2K[224/637] manual-fullscreen-regressions.spec.ts:82:39 › fullscreen at scale 1 › manual fullscreen keeps one stable grid during continuous width changes
+[1A[2K[225/637] manual-fullscreen-regressions.spec.ts:82:39 › fullscreen at scale 1 › alternate fullscreen keeps one stable grid during continuous width changes
+[1A[2K[226/637] manual-fullscreen-regressions.spec.ts:44:3 › fullscreen at scale 1.25 › returning to a manual fullscreen command restores its painted surface and input
+[1A[2K[227/637] manual-fullscreen-regressions.spec.ts:82:39 › fullscreen at scale 1.25 › manual fullscreen keeps one stable grid during continuous width changes
+[1A[2K[228/637] manual-fullscreen-regressions.spec.ts:82:39 › fullscreen at scale 1.25 › alternate fullscreen keeps one stable grid during continuous width changes
+[1A[2K  4) manual-fullscreen-regressions.spec.ts:82:39 › fullscreen at scale 1.25 › alternate fullscreen keeps one stable grid during continuous width changes 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeGreaterThan[2m([22m[32mexpected[39m[2m)[22m
+
+    Expected: > [32m5[39m
+    Received:   [31m0[39m
+
+    Call Log:
+    - Timeout 5000ms exceeded while waiting on the predicate
+
+      85 |     const box = (await screen.boundingBox())!;
+      86 |     const clip = { x: box.x, y: box.y, width: 80, height: 16 };
+    > 87 |     await expect.poll(async () => greenPixels(page, await page.screenshot({ clip, animations: 'disabled' }))).toBeGreaterThan(5);
+         |     ^
+      88 |     const pixels = await page.screenshot({ clip, animations: 'disabled' });
+      89 |     const readings: { cols: number; rows: number; offset: number; width: number }[] = [];
+      90 |     await page.evaluate(manual => {
+
+        at D:\projects\typescript\Vrykell\e2e\manual-fullscreen-regressions.spec.ts:87:5
+
+
+
+[1A[2K(node:18612) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[1A[2K(node:18612) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[1A[2K[229/637] markdown-math.spec.ts:21:3 › display math retains tall glyphs and both ends of wide formulas at 1 display scale
+[1A[2K[230/637] markdown-math.spec.ts:21:3 › display math retains tall glyphs and both ends of wide formulas at 1.25 display scale
+[1A[2K[231/637] markdown-math.spec.ts:21:3 › display math retains tall glyphs and both ends of wide formulas at 1.5 display scale
+[1A[2K[232/637] mcp.spec.ts:15:3 › MCP 设置页 › deleting during an automatic rename waits for the save and removes the renamed server
+[1A[2K[233/637] mcp.spec.ts:32:3 › MCP 设置页 › 已保存服务器：连接状态徽标与工具数
+[1A[2K[234/637] mcp.spec.ts:40:3 › MCP 设置页 › 添加服务器：空名校验 / 缺 command 校验 / 保存落库
+[1A[2K[235/637] mcp.spec.ts:72:3 › MCP 设置页 › 草稿可取消；连接/断开/启停/删除
+[1A[2K[236/637] multiline-execution.spec.ts:51:1 › a real Linux PTY reproduces raw multiline loss and executes a complete submission
+[1A[2K[237/637] multiline-execution.spec.ts:66:52 › local composer submits a complete script that runs in a real Linux PTY
+[1A[2K[238/637] multiline-execution.spec.ts:66:52 › remote composer submits a complete script that runs in a real Linux PTY
+[1A[2K[239/637] multiline-execution.spec.ts:98:1 › multiline Bash execution preserves heredocs, state and the final exit status
+[1A[2K[240/637] multiline-execution.spec.ts:110:1 › multiline native shell execution retains variables and functions
+[1A[2K[241/637] native-window-close.spec.ts:15:46 › a clean titlebar close completes through the configured native capability
+[1A[2K[242/637] native-window-close.spec.ts:15:46 › a clean system close completes through the configured native capability
+[1A[2K[243/637] native-window-close.spec.ts:20:54 › a native close preserves the unsaved-document discard flow
+[1A[2K[244/637] native-window-close.spec.ts:20:54 › a native close preserves the unsaved-document save flow
+[1A[2K[245/637] native-window-close.spec.ts:20:54 › a native close preserves the unsaved-document failure flow
+[1A[2K[246/637] navigation-drag.spec.ts:18:1 › auxiliary actions reorder horizontally and retain their order and open panel after reload
+[1A[2K[247/637] navigation-drag.spec.ts:29:1 › reordering and hiding the assistant keep its conversation draft and right placement
+[1A[2K[248/637] navigation-drag.spec.ts:43:1 › narrow windows keep all fixed and auxiliary controls inside the application
+[1A[2K[249/637] navigation-drag.spec.ts:65:1 › Escape cancels the preview without toggling or saving a panel
+[1A[2K[250/637] navigation-drag.spec.ts:78:1 › search stays centered within the right titlebar and never overlaps actions
+[1A[2K[251/637] navigation-drag.spec.ts:93:1 › settings is fixed at the foot of the full-height sidebar and remains keyboard accessible
+[1A[2K[252/637] navigation-drag.spec.ts:105:1 › a toolbar drag reserves a stable shared insertion gap before saving
+[1A[2K[253/637] navigation-drag.spec.ts:122:1 › panel headings retain their appearance and only offer a right-edge placement target
+[1A[2K[254/637] new-tab-quick-settings.spec.ts:5:3 › 新建标签类型快捷配置 › restored default shell icons follow the resolved default and nested settings stay on screen
+[1A[2K[255/637] new-tab-quick-settings.spec.ts:39:3 › 新建标签类型快捷配置 › 右击终端类型切换打开模式并影响新标签
+[1A[2K[256/637] new-tab-quick-settings.spec.ts:68:3 › 新建标签类型快捷配置 › 右击终端类型设为默认终端
+[1A[2K[257/637] new-tab-quick-settings.spec.ts:78:3 › 新建标签类型快捷配置 › 右击 SSH 连接切换快捷开关并打开编辑弹窗
+[1A[2K[258/637] new-tab-quick-settings.spec.ts:109:3 › 新建标签类型快捷配置 › 右击 SSH 连接删除需二次确认
+[1A[2K[259/637] outlined-buttons.spec.ts:41:3 › outlined actions share hover and focus feedback in dark
+[1A[2K[260/637] outlined-buttons.spec.ts:41:3 › outlined actions share hover and focus feedback in light
+[1A[2K[261/637] pane-move.spec.ts:5:1 › a single pane ignores reordering gestures and remains ready for splitting
+[1A[2K[262/637] pane-move.spec.ts:30:1 › 拖动终端重排：运行中块的 PTY 保活（不重挂、命令不退出）
+[1A[2K[263/637] pane-move.spec.ts:68:1 › 更换位置：悬停目标落点后点击即可移动窗格
+[1A[2K[264/637] pane-move.spec.ts:91:1 › 更换位置在只有一个终端时提示并保持原状
+[1A[2K[265/637] panel-header.spec.ts:8:1 › group header count stays on a single line while the header is hovered
+[1A[2K[266/637] panel-header.spec.ts:31:1 › group actions and colors open from the chip without squeezing its title
+[1A[2K[267/637] panel-header.spec.ts:67:1 › tab rename input stays inside its row
+[1A[2K[268/637] pinned-command.spec.ts:4:1 › viewport command follows history, collapses independently and keeps hover colors stable
+[1A[2K[269/637] pinned-command.spec.ts:108:1 › remembers the collapsed viewport title across launches
+[1A[2K[270/637] pinned-command.spec.ts:147:1 › collapsed titles never flash while scrolling across history and live output
+[1A[2K[271/637] placement-previews.spec.ts:12:49 › panel and split previews share a nearly opaque surface in dark mode
+[1A[2K[272/637] placement-previews.spec.ts:12:49 › panel and split previews share a nearly opaque surface in light mode
+[1A[2K[273/637] product-loop.spec.ts:4:1 › AI 草稿和附件按会话保留，关闭面板后仍能继续发送
+[1A[2K[274/637] product-loop.spec.ts:48:1 › failed directory navigation retains the view and can be retried
+[1A[2K[275/637] progressive-files-and-output.spec.ts:5:3 › global file search displays early matches and discards cancelled batches
+[1A[2K[276/637] progressive-files-and-output.spec.ts:5:3 › remote file search displays early matches and discards cancelled batches
+[1A[2K[277/637] progressive-files-and-output.spec.ts:64:1 › a running log uses its visible host width even when the hidden terminal has a different grid
+[1A[2K[278/637] progressive-files-and-output.spec.ts:102:1 › sending only a pasted attachment renders the attachment without an empty question bubble
+[1A[2K[279/637] progressive-files-and-output.spec.ts:123:1 › a remote permission-limited file offers a separate elevated editing terminal
+[1A[2K[280/637] real-vi.spec.ts:18:1 › real vi receives normal-mode, insertion and Escape commands from classic mode
+[1A[2K[281/637] real-vi.spec.ts:18:1 › real vi receives normal-mode, insertion and Escape commands from block mode
+[1A[2K[282/637] reload-feedback.spec.ts:5:1 › theme reload spins until loading completes and honors reduced motion
+[1A[2K[283/637] reload-feedback.spec.ts:34:1 › terminal context chips retain spacing without separator dots
+[1A[2K[284/637] reorder.spec.ts:33:5 › 侧栏列表拖拽排序 › dragging out of a group uses the empty ungrouped area
+[1A[2K[285/637] reorder.spec.ts:33:5 › 侧栏列表拖拽排序 › dragging out of a group uses the empty ungrouped area with singleton pages
+[1A[2K[286/637] reorder.spec.ts:68:3 › 侧栏列表拖拽排序 › SSH 连接：拖动时源行让位并出现虚线占位，落下后顺序持久化
+[1A[2K[287/637] reorder.spec.ts:97:3 › 侧栏列表拖拽排序 › 标签页：拖动让位 + 占位，落下后标签顺序更新
+[1A[2K[288/637] reorder.spec.ts:120:3 › 侧栏列表拖拽排序 › 标签拖入分组与组内换序：空位都出现在组内
+[1A[2K[289/637] resize-stability.spec.ts:5:3 › classic dom keeps its text origin stable through continuous resizing
+[1A[2K[290/637] resize-stability.spec.ts:5:3 › classic webgl keeps its text origin stable through continuous resizing
+[1A[2K[291/637] resize-stability.spec.ts:35:1 › a held divider drag keeps the local grid live and notifies the remote once, on release
+[1A[2K[292/637] resize-stability.spec.ts:63:1 › short commands complete without mounting a temporary live output canvas
+[1A[2K[293/637] resource-display.spec.ts:38:3 › resource history and text readings stay together at narrow and wide widths in dark mode
+[1A[2K[294/637] resource-display.spec.ts:38:3 › resource history and text readings stay together at narrow and wide widths in light mode
+[1A[2K[295/637] resource-display.spec.ts:196:1 › resource text stays aligned with mixed percentage widths and larger UI text
+[1A[2K[296/637] resource-display.spec.ts:252:1 › resource plots append samples automatically and never drift while waiting for data
+[1A[2K[297/637] resource-display.spec.ts:299:1 › automatic probes respect pause and visibility and retain actionable failures
+[1A[2K[298/637] running-block-layout.spec.ts:38:3 › running layout at 1x › SSH live output reflows while the authentication screen is hidden
+[1A[2K[299/637] running-block-layout.spec.ts:68:3 › running layout at 1x › window width changes resize the live grid and PTY without additional output
+[1A[2K[300/637] running-block-layout.spec.ts:82:3 › running layout at 1x › a held sidebar drag delivers the running program its new size before release
+[1A[2K[301/637] running-block-layout.spec.ts:106:3 › running layout at 1x › running controls pin at the viewport top even with collapsed titles and remain usable
+[1A[2K[302/637] running-block-layout.spec.ts:38:3 › running layout at 1.25x › SSH live output reflows while the authentication screen is hidden
+[1A[2K[303/637] running-block-layout.spec.ts:68:3 › running layout at 1.25x › window width changes resize the live grid and PTY without additional output
+[1A[2K[304/637] running-block-layout.spec.ts:82:3 › running layout at 1.25x › a held sidebar drag delivers the running program its new size before release
+[1A[2K[305/637] running-block-layout.spec.ts:106:3 › running layout at 1.25x › running controls pin at the viewport top even with collapsed titles and remain usable
+[1A[2K[306/637] running-cursor.spec.ts:10:1 › 运行中块在命令输入框获得焦点后仍保持实心光标
+[1A[2K[307/637] running-term.spec.ts:29:1 › 运行中 block 挂载可见 xterm，输出实时渲染，完成后换成快照
+[1A[2K[308/637] running-term.spec.ts:48:1 › running block redraw preserves its output and process without sending PTY input
+[1A[2K[309/637] running-term.spec.ts:77:1 › 已有历史命令时，运行中的输出会持续保持在可见区域
+[1A[2K[310/637] running-term.spec.ts:99:1 › 重新加载会话模块后仍能取得运行中的活终端
+[1A[2K[311/637] running-term.spec.ts:113:1 › 运行中焦点落在块内活 xterm 的 textarea（而非隐藏主 xterm）
+[1A[2K[312/637] running-term.spec.ts:132:1 › 手动全屏：块内活终端搬进全屏宿主，退出后搬回卡片
+[1A[2K[313/637] running-term.spec.ts:174:1 › 全屏终端右键菜单提供快捷操作与复制/粘贴
+[1A[2K[314/637] running-term.spec.ts:219:1 › 手动全屏中进入真 alt 屏：让出可见面，显示主 xterm 的 TUI
+[1A[2K[315/637] running-term.spec.ts:237:1 › 真 alt 屏 TUI 的窗格右键菜单提供顶栏快捷操作
+[1A[2K[316/637] running-term.spec.ts:261:1 › 运行中块接管滚轮：xterm 回溯时不滚动外层命令历史
+[1A[2K[317/637] running-term.spec.ts:303:1 › 运行块挂载前到达的输出不破坏首次滚轮回溯
+[1A[2K[318/637] running-term.spec.ts:351:1 › 块终端与页面同色且无圆角，裁剪仍落在 el
+[1A[2K[319/637] running-terminal-usability.spec.ts:18:1 › 运行中命令块以图标显示统一尺寸的操作按钮
+[1A[2K[320/637] running-terminal-usability.spec.ts:54:1 › 运行中块右键菜单前置工具栏快捷操作并可直接触发
+[1A[2K[321/637] running-terminal-usability.spec.ts:81:1 › 运行中块不再叠加第二个 xterm 滚动条
+[1A[2K[322/637] running-terminal-usability.spec.ts:88:1 › 运行块在重画为更小帧后收敛高度，不再留下整屏黑尾
+[1A[2K[323/637] running-terminal-usability.spec.ts:100:1 › 重绘循环的中间态不会让运行块高度来回跳
+[1A[2K[324/637] running-terminal-usability.spec.ts:126:1 › split repaint frames during typing do not shrink the running terminal or resend its size
+[1A[2K[325/637] scrollbar-layering.spec.ts:5:1 › page scrollbars stay below an open dialog and become usable again after closing
+[1A[2K  5) scrollbar-layering.spec.ts:5:1 › page scrollbars stay below an open dialog and become usable again after closing 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32mtrue[39m
+    Received: [31mfalse[39m
+
+      24 |       inside: bar.x >= popup.x && bar.right <= popup.right && popup.y >= bar.y && popup.bottom <= bar.bottom };
+      25 |   }, id);
+    > 26 |   expect(point.inside).toBe(true);
+         |                        ^
+      27 |   await expect.poll(() => page.evaluate(point => document.elementFromPoint(point.x, point.y)?.closest('[role="dialog"]')?.getAttribute('aria-label'), point)).toBe('命令面板');
+      28 |   await page.mouse.move(point.x, point.y);
+      29 |   await page.screenshot({ path: test.info().outputPath('dialog-over-settings-scrollbar.png') });
+
+        at D:\projects\typescript\Vrykell\e2e\scrollbar-layering.spec.ts:26:24
+
+
+
+
+[1A[2K(node:78244) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1A[2K(node:78244) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[326/637] scrollbar-layering.spec.ts:38:1 › a code block track cannot leave the chat transcript over the composer
+[1A[2K[327/637] scrollbar.spec.ts:27:3 › block backgrounds and dividers remain visible beneath the scrollbar track in dark
+[1A[2K[328/637] scrollbar.spec.ts:76:3 › block history exposes a draggable scrollbar without changing output width in dark
+[1A[2K[329/637] scrollbar.spec.ts:27:3 › block backgrounds and dividers remain visible beneath the scrollbar track in light
+[1A[2K[330/637] scrollbar.spec.ts:76:3 › block history exposes a draggable scrollbar without changing output width in light
+[1A[2K[331/637] scrollbar.spec.ts:119:1 › completed wide output follows the window width without a horizontal scrollbar
+[1A[2K[332/637] scrollbar.spec.ts:142:1 › classic terminal retains its native themed scrollbar and drag navigation
+[1A[2K[333/637] scrollbar.spec.ts:191:1 › settings and long chat transcripts share visible themed scrollbars
+[1A[2K[334/637] scrollbar.spec.ts:214:1 › overlay scrollbar thumbs appear only while their surface is hovered
+[1A[2K[335/637] scrollbar.spec.ts:232:1 › native scrollbar thumbs appear only while their surface is hovered
+[1A[2K[336/637] search-history.spec.ts:8:3 › 重新生成标题（标签右键菜单） › AI 模式发消息后右键重新生成标题
+[1A[2K[337/637] search-history.spec.ts:38:3 › 全局搜索（Cmd+F） › setting results open their matching page on first and subsequent visits
+[1A[2K[338/637] search-history.spec.ts:50:3 › 全局搜索（Cmd+F） › 搜索触发各来源后端并渲染结果
+[1A[2K[339/637] search-history.spec.ts:71:3 › 命令历史（↑/↓ 翻历史） › 前缀过滤翻历史与还原草稿
+[1A[2K[340/637] search-palette.spec.ts:6:3 › search palette and colored shell marks fit the workspace in 深色
+[1A[2K[341/637] search-palette.spec.ts:6:3 › search palette and colored shell marks fit the workspace in 浅色
+[1A[2K[342/637] search-palette.spec.ts:78:1 › search and its scope menu fit a narrow, short viewport
+[1A[2K[343/637] search-palette.spec.ts:96:1 › prefixes scope results temporarily and settings search focuses individual controls
+[1A[2K[344/637] session-cwd.spec.ts:4:1 › restored command paths retain their own directory and new records include cwd
+[1A[2K[345/637] sessions.spec.ts:15:3 › 会话历史管理 › 启动时自动恢复上次活跃会话
+[1A[2K[346/637] sessions.spec.ts:22:3 › 会话历史管理 › 筛选：搜索框 + 筛选菜单过滤会话，状态同会话内记忆
+[1A[2K[347/637] sessions.spec.ts:51:3 › 会话历史管理 › 历史会话可删除
+[1A[2K[348/637] sessions.spec.ts:68:3 › 会话历史管理 › 恢复历史会话连带恢复命令块
+[1A[2K[349/637] sessions.spec.ts:80:3 › 会话历史管理 › restoring one session from an archived group keeps it visible in the tab list
+[1A[2K[350/637] sessions.spec.ts:94:3 › 文件双击打开 › 双击文件默认在编辑器页打开，而不是写入终端
+[1A[2K[351/637] settings-appearance.spec.ts:36:1 › appearance offers light, dark and follow system as one radio group
+[1A[2K[352/637] settings-appearance.spec.ts:48:1 › follow system tracks the operating system appearance
+[1A[2K[353/637] settings-appearance.spec.ts:64:1 › a block colour row shows a swatch and name, matching swatches in the menu, and the switch to its left
+[1A[2K[354/637] settings-appearance.spec.ts:84:1 › block color choices reuse the shared palette without duplicates in one menu
+[1A[2K[355/637] settings-appearance.spec.ts:113:1 › the rail keeps the picked colour while the background stays a tint of it
+[1A[2K[356/637] settings-autosave.spec.ts:10:1 › numeric feedback shows the actual saved value after bounds and rounding
+[1A[2K[357/637] settings-autosave.spec.ts:23:1 › model text waits for a pause and the last write carries the whole row
+[1A[2K[358/637] settings-autosave.spec.ts:41:1 › switching pages flushes pending text and scopes local and remote editors separately
+[1A[2K[359/637] settings-autosave.spec.ts:57:1 › save failures keep the draft visible and allow retry
+[1A[2K[360/637] settings-behavior.spec.ts:18:3 › 模型行为页 › Agent 模式切换后持久化，深度思考移至模型配置
+[1A[2K[361/637] settings-behavior.spec.ts:40:3 › 模型行为页 › 思考强度切换为低并持久化
+[1A[2K[362/637] settings-behavior.spec.ts:51:3 › 模型行为页 › 上下文策略切到窗口
+[1A[2K[363/637] settings-behavior.spec.ts:59:3 › 模型行为页 › 系统提示词编辑持久化
+[1A[2K[364/637] settings-behavior.spec.ts:68:3 › 模型行为页 › 每模型覆盖：模型选择条选中模型后覆盖全局，可重置
+[1A[2K[365/637] settings-behavior.spec.ts:88:3 › 模型行为页 › 智能会话标题开关关闭
+[1A[2K[366/637] settings-feedback.spec.ts:5:1 › settings navigation has static headings and save feedback appears once then disappears
+[1A[2K[367/637] settings-layout.spec.ts:6:3 › grouped settings align controls and adapt to narrow columns in 深色
+[1A[2K[368/637] settings-layout.spec.ts:6:3 › grouped settings align controls and adapt to narrow columns in 浅色
+[1A[2K[369/637] settings-model.spec.ts:21:3 › 模型配置页 › 服务商按钮：默认选中、中央浮层切换、添加动作与 ⋯ 菜单三项
+[1A[2K[370/637] settings-model.spec.ts:47:3 › 模型配置页 › ⋯ 删除服务商：先确认，移除其模型行；只剩一个时拒绝
+[1A[2K[371/637] settings-model.spec.ts:63:3 › 模型配置页 › API Key：按服务商各存各的，掩码显示、查看/复制/清除、保存恢复
+[1A[2K[372/637] settings-model.spec.ts:104:3 › 模型配置页 › 端点与连接：预览行、检测、同步模型
+[1A[2K[373/637] settings-model.spec.ts:119:3 › 模型配置页 › 模型列表：按服务商过滤，设为当前、添加/改名/删除
+[1A[2K[374/637] settings-model.spec.ts:169:3 › 模型配置页 › 添加服务商：同一浮层内切到预设网格，返回键可回到列表
+[1A[2K[375/637] settings-model.spec.ts:193:3 › 模型配置页 › 服务商选择跨重载保持（lastSelectedProvider）
+[1A[2K[376/637] settings-responsive.spec.ts:6:3 › settings keep their directory and close control available in 深色
+[1A[2K[377/637] settings-responsive.spec.ts:6:3 › settings keep their directory and close control available in 浅色
+[1A[2K[378/637] settings-responsive.spec.ts:31:1 › settings cover the auxiliary panel and preserve the workspace layout
+[1A[2K[379/637] settings-rest.spec.ts:14:3 › 主题设置页 › 深色/浅色切换更新 data-theme
+[1A[2K[380/637] settings-rest.spec.ts:28:3 › 主题设置页 › 主题模式三个预览并排并跟随系统配色
+[1A[2K[381/637] settings-rest.spec.ts:43:3 › 主题设置页 › 不透明度滑块更新后端配置与百分比显示
+[1A[2K[382/637] settings-rest.spec.ts:60:3 › 主题文件设置页 › 配置文件路径显示与重新加载不报错
+[1A[2K[383/637] settings-rest.spec.ts:69:3 › 打开方式设置页 › 各 shell 默认块模式，切经典模式持久化
+[1A[2K[384/637] settings-rest.spec.ts:82:3 › 打开方式设置页 › SSH 打开方式：默认经典，可切换块模式并持久化
+[1A[2K[385/637] settings-rest.spec.ts:95:3 › 快捷键说明页 › 列出全部快捷键
+[1A[2K[386/637] settings-rest.spec.ts:108:3 › 网络搜索页 › 搜索方式显示与 Tavily Key 保存/清除
+[1A[2K[387/637] settings-rest.spec.ts:127:3 › 模型权限页 › 工具权限分级切换持久化
+[1A[2K[388/637] settings-rest.spec.ts:143:3 › 模型权限页 › 清空会话授权按钮提示成功
+[1A[2K[389/637] settings-select.spec.ts:5:1 › settings dropdown supports keyboard selection, cancellation and theme colors
+[1A[2K[390/637] settings-select.spec.ts:59:1 › long dropdown stays within a small viewport and scrolls to keyboard selection
+[1A[2K[391/637] settings-startup-diagnostics.spec.ts:5:1 › startup preference is discoverable and persists the selected mode
+[1A[2K[392/637] settings-startup-diagnostics.spec.ts:16:1 › detailed log export works with disk logging disabled by default
+[1A[2K[393/637] settings-startup-diagnostics.spec.ts:29:1 › closing the final tab leaves an empty workspace without a stale reconnect view
+[1A[2K[394/637] settings-usability.spec.ts:5:1 › saved custom Anthropic address is used by the next chat request
+[1A[2K[395/637] settings-usability.spec.ts:31:1 › typography settings apply globally and are absent from other settings pages
+[1A[2K[396/637] settings-usability.spec.ts:75:1 › chat mode dropdown persists per model and replaces the two header toggles
+[1A[2K[397/637] settings-usability.spec.ts:122:1 › CMD stored in legacy block mode opens an interactive classic terminal
+[1A[2K[398/637] settings-window.spec.ts:5:1 › settings cover the content card and toggle back to the unchanged workspace
+[1A[2K[399/637] settings-window.spec.ts:78:1 › language and appearance choices apply immediately and persist
+[1A[2K[400/637] settings-window.spec.ts:115:1 › wallpaper mode darkens the sidebar backdrop while preserving the UI layout
+[1A[2K[401/637] shared-controls.spec.ts:5:1 › composer controls share permission state, theme overrides and concise hover hints
+[1A[2K[402/637] shared-controls.spec.ts:39:1 › settings use concise explanations and icon badges for completion keys
+[1A[2K[403/637] shared-controls.spec.ts:49:1 › edge tooltips keep their label and shortcut on one line in a narrow window
+[1A[2K  6) shared-controls.spec.ts:49:1 › edge tooltips keep their label and shortcut on one line in a narrow window 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: locator.hover: Test timeout of 30000ms exceeded.
+    Call log:
+      [2m- waiting for getByRole('button', { name: '设置', exact: true })[22m
+
+
+      51 |   await setupTauriMock(page);
+      52 |   await page.goto('/');
+    > 53 |   await page.getByRole('button', { name: '设置', exact: true }).hover();
+         |                                                               ^
+      54 |   const tooltip = page.getByTestId('app-tooltip');
+      55 |   await expect(tooltip).toBeVisible();
+      56 |   await expect(tooltip.locator('.app-tooltip-copy > span')).toHaveText('打开设置');
+
+        at D:\projects\typescript\Vrykell\e2e\shared-controls.spec.ts:53:63
+
+
+[1A[2K(node:31840) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+
+[1A[2K(node:31840) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[1A[2K[404/637] shortcuts.spec.ts:11:3 › 全局快捷键 › Cmd+T 新建标签，Cmd+W 关闭标签
+[1A[2K[405/637] shortcuts.spec.ts:29:3 › 全局快捷键 › Cmd+数字切换标签
+[1A[2K[406/637] shortcuts.spec.ts:41:3 › 全局快捷键 › Cmd+F 打开全局搜索并聚焦
+[1A[2K[407/637] shortcuts.spec.ts:50:3 › 全局快捷键 › Cmd+, 打开设置页
+[1A[2K[408/637] shortcuts.spec.ts:56:3 › 全局快捷键 › Cmd+P 打开命令面板
+[1A[2K[409/637] shortcuts.spec.ts:66:3 › 全局快捷键 › 页面缩放快捷键和滚轮不会改变字号或页面比例
+[1A[2K[410/637] shortcuts.spec.ts:86:3 › 全局快捷键 › 点击 TopDock 搜索触发器打开居中搜索窗
+[1A[2K[411/637] sidebar-dividers.spec.ts:70:5 › sidebar dividers at 1x › held sidebar drag stays uniform beside pinned titles, editors and comparisons
+[1A[2K[412/637] sidebar-dividers.spec.ts:70:5 › sidebar dividers at 1.25x › held sidebar drag stays uniform beside pinned titles, editors and comparisons
+[1A[2K[413/637] sidebar-dividers.spec.ts:70:5 › sidebar dividers at 1.5x › held sidebar drag stays uniform beside pinned titles, editors and comparisons
+[1A[2K[414/637] sidebar-dividers.spec.ts:70:5 › sidebar dividers at 2x › held sidebar drag stays uniform beside pinned titles, editors and comparisons
+[1A[2K[415/637] sidebar.spec.ts:13:3 › 文件面板 › 单击文件仅选中且面板保持打开
+[1A[2K[416/637] sidebar.spec.ts:21:3 › 文件面板 › 单击选中目录，双击进入；展开由箭头按钮控制
+[1A[2K[417/637] sidebar.spec.ts:36:3 › 文件面板 › 上下键切换选中行，Enter 进入目录
+[1A[2K[418/637] sidebar.spec.ts:53:3 › 文件面板 › 面包屑可编辑：点击路径全选，回车跳转，Esc 或失焦取消
+[1A[2K[419/637] sidebar.spec.ts:83:3 › 文件面板 › path bar opens files in the embedded editor and keeps directory navigation
+[1A[2K[420/637] sidebar.spec.ts:102:3 › 文件面板 › 右键属性显示文件基本信息
+[1A[2K[421/637] sidebar.spec.ts:125:3 › 文件面板 › 更多菜单：只提供本地可用操作，可从当前文件夹新建标签页
+[1A[2K[422/637] sidebar.spec.ts:151:3 › 文件面板 › 下载管理往返后文件树停留在原目录（会话内记忆），而不是回到终端 cwd
+[1A[2K[423/637] sidebar.spec.ts:164:3 › 文件面板 › 更多菜单：切换到当前终端文件目录把面板重新定位回终端 cwd
+[1A[2K[424/637] sidebar.spec.ts:178:3 › 文件面板 › Ctrl 加选多行并在右键菜单批量操作
+[1A[2K[425/637] sidebar.spec.ts:196:3 › 文件面板 › 粘贴目标：右键文件夹进该文件夹，右键文件进其同级目录，Ctrl+V 进当前目录
+[1A[2K[426/637] sidebar.spec.ts:230:3 › 文件面板 › 删除后可连续回退：历史栈支持多次回退
+[1A[2K[427/637] sidebar.spec.ts:261:3 › 文件面板 › 拖拽文件到文件夹：悬停高亮并移动
+[1A[2K[428/637] sidebar.spec.ts:279:3 › 文件面板 › 此电脑视图：磁盘以小卡片展示（含容量），点击进入
+[1A[2K[429/637] sidebar.spec.ts:292:3 › 文件面板 › 关闭面板再重新打开
+[1A[2K[430/637] sidebar.spec.ts:301:3 › 文件面板 › 拖拽到最小宽度立即折叠；松手前可反悔拖回
+[1A[2K[431/637] sidebar.spec.ts:344:3 › 文件面板 › 拖动折叠后反向拖回：面板内部状态不丢失（未重新加载）
+[1A[2K[432/637] sidebar.spec.ts:373:3 › 文件面板 › 删除文件需二次确认，确认后调用后端删除（回收站）
+[1A[2K[433/637] sidebar.spec.ts:383:3 › 文件面板 › 重命名为侧栏内联编辑，回车后确认
+[1A[2K[434/637] sidebar.spec.ts:399:3 › 文件面板 › 空白处右键菜单与 ⋯ 菜单列出同一套操作
+[1A[2K[435/637] sidebar.spec.ts:420:3 › 文件面板 › refresh re-reads the current directory from both panel menus
+[1A[2K[436/637] sidebar.spec.ts:447:3 › 文件面板 › 右键新建按落点决定目录，建好立即重命名，重名自动加序号且回退用真实路径
+[1A[2K[437/637] sidebar.spec.ts:481:3 › 文件面板 › 新建与复制粘贴都能回退（回退新建 / 回退粘贴）
+[1A[2K[438/637] sidebar.spec.ts:505:3 › 文件面板 › 右键文件夹新建文件：落在文件夹内、立即重命名，提交后子列表可见
+[1A[2K[439/637] sidebar.spec.ts:521:3 › 文件面板 › 新建同名项时后端避让加序号，仍会立即进入重命名
+[1A[2K[440/637] sidebar.spec.ts:537:3 › 文件面板 › 右键行与更多菜单都能在系统文件管理器中定位
+[1A[2K[441/637] sidebar.spec.ts:553:3 › 文件面板 › 更多菜单可直接在当前文件夹新建文件/文件夹
+[1A[2K[442/637] sidebar.spec.ts:569:3 › 文件面板 › 复制同名文件到当前目录：自动加序号并在提示中说明
+[1A[2K[443/637] sidebar.spec.ts:580:3 › 文件面板 › 本地面板的菜单不含远程专有项
+[1A[2K[444/637] singleton-tabs.spec.ts:4:1 › settings stay outside the tab list while history remains a reusable tab
+[1A[2K[445/637] singleton-tabs.spec.ts:33:1 › local and SSH tabs retain colored tiles before and after activation
+[1A[2K[446/637] skills.spec.ts:21:3 › 技能设置页 › 技能列表：徽标（信任/禁用/含脚本/来源）与文件数
+[1A[2K[447/637] skills.spec.ts:33:3 › 技能设置页 › 信任 / 启用按钮：调用 set_skill_state 并刷新徽标
+[1A[2K[448/637] skills.spec.ts:45:3 › 技能设置页 › 详情面板：文件树 + SKILL.md + 返回
+[1A[2K[449/637] skills.spec.ts:58:3 › 技能设置页 › 详情面板文件树：点击脚本文件显示内容
+[1A[2K[450/637] skills.spec.ts:65:3 › 技能设置页 › 删除技能：确认后移除并提示
+[1A[2K[451/637] skills.spec.ts:74:3 › 技能设置页 › 技能市场：浏览仓库 → 安装 → 已安装标记
+[1A[2K[452/637] skills.spec.ts:98:3 › 技能设置页 › URL 导入：批量安装远程技能
+[1A[2K[453/637] skills.spec.ts:108:3 › 技能设置页 › 安全提示条可关闭
+[1A[2K[454/637] split.spec.ts:16:3 › 窗口分裂（二叉分裂树 + 落点选择） › horizontal panes retain usable width after divider dragging and sidebar resize
+[1A[2K[455/637] split.spec.ts:38:3 › 窗口分裂（二叉分裂树 + 落点选择） › ⌘D 进入落点选择，点右半屏分裂出两个终端
+[1A[2K[456/637] split.spec.ts:61:3 › 窗口分裂（二叉分裂树 + 落点选择） › 新建终端（新窗口）不自动加入当前窗口布局
+[1A[2K[457/637] split.spec.ts:70:3 › 窗口分裂（二叉分裂树 + 落点选择） › ⌘] / ⌘[ 在当前窗口的终端间切换焦点
+[1A[2K[458/637] split.spec.ts:84:3 › 窗口分裂（二叉分裂树 + 落点选择） › ⌥⌘D 选类型后进入落点选择，分裂出混搭终端
+[1A[2K[459/637] split.spec.ts:94:3 › 窗口分裂（二叉分裂树 + 落点选择） › 分裂到 4 个终端后不再分裂
+[1A[2K[460/637] ssh-auth.spec.ts:8:3 › SSH block commands render ls and pwd output with preexec=true
+[1A[2K[461/637] ssh-auth.spec.ts:8:3 › SSH block commands render ls and pwd output with preexec=false
+[1A[2K[462/637] ssh-auth.spec.ts:44:1 › the connection screen keeps no scrollbar of its own
+[1A[2K[463/637] ssh-auth.spec.ts:55:1 › the connection screen snaps its character cells to whole pixels
+[1A[2K[464/637] ssh-auth.spec.ts:70:1 › SSH authentication snapshots and disconnected output follow the terminal typography
+[1A[2K[465/637] ssh-auth.spec.ts:102:1 › native SSH recordings distinguish an empty directory from missing command output
+[1A[2K[466/637] ssh-auth.spec.ts:124:1 › first SSH connection confirms its fingerprint and accepts authentication input
+[1A[2K[467/637] ssh-auth.spec.ts:155:1 › canceling authentication closes the PTY and leaves no editable password field
+[1A[2K[468/637] ssh-auth.spec.ts:180:1 › a logged-in SSH command does not retain the previous password prompt
+[1A[2K[469/637] ssh-auth.spec.ts:192:1 › SSH block mode remains directly interactive when the remote server has no shell integration
+[1A[2K[470/637] ssh-auth.spec.ts:228:1 › SSH block mode restores its xterm host when a command opens an alternate-screen app
+[1A[2K[471/637] ssh-auth.spec.ts:250:1 › canceling host trust does not spawn SSH or record a key
+[1A[2K[472/637] ssh-auth.spec.ts:259:1 › changed host keys fail without asking to overwrite trust
+[1A[2K[473/637] ssh-auth.spec.ts:267:1 › 认证输入条在终端区内左右对称（不再被 8px 左边距推右）
+[1A[2K[474/637] ssh-configuration.spec.ts:4:1 › GUI forwarding and text mode preserve rules, copy text, and save and connect
+[1A[2K[475/637] ssh-configuration.spec.ts:35:1 › partial import failures stay in place and retry only failed hosts
+[1A[2K[476/637] ssh-configuration.spec.ts:64:1 › pending automatic reconnect has a visible countdown and can be stopped
+[1A[2K[477/637] ssh-connection-surface.spec.ts:12:1 › the frozen authentication frame follows a pane resize instead of scrolling horizontally
+[1A[2K[478/637] ssh-connection-surface.spec.ts:34:1 › the authentication row uses a compact reveal toggle and the blue send action
+[1A[2K[479/637] ssh-cursor.spec.ts:9:1 › an interactive SSH screen keeps the shared block cursor
+[1A[2K[480/637] ssh-file-open.spec.ts:4:1 › remote file double click opens and saves in the embedded editor
+[1A[2K[481/637] ssh-file-open.spec.ts:36:1 › remote path bar respects the terminal editor preference and preserves the directory
+[1A[2K[482/637] ssh-file-service.spec.ts:4:1 › terminal connection does not force the file panel open; unavailable files have a recovery path
+[1A[2K[483/637] ssh-file-service.spec.ts:39:4 › file handshake failure is described independently of the terminal connection
+[1A[2K[484/637] ssh-file-service.spec.ts:39:4 › file saved authentication failure is described independently of the terminal connection
+[1A[2K[485/637] ssh-form-preservation.spec.ts:4:1 › 连接表单保持适中尺寸，最小窗口下按钮依然完整可见
+[1A[2K[486/637] ssh-form-preservation.spec.ts:55:3 › 新建 SSH 连接时点击遮罩关闭表单，取消按钮仍可关闭
+[1A[2K[487/637] ssh-form-preservation.spec.ts:55:3 › 编辑 SSH 连接时点击遮罩关闭表单，取消按钮仍可关闭
+[1A[2K[488/637] ssh-icon-colors.spec.ts:6:3 › saved SSH colors supply terminal defaults and preserve explicit overrides in 深色
+[1A[2K[489/637] ssh-icon-colors.spec.ts:6:3 › saved SSH colors supply terminal defaults and preserve explicit overrides in 浅色
+[1A[2K[490/637] ssh-import-forwarding.spec.ts:10:1 › 导入 SSH 配置里的主机别名，转发与自动重连随连接保存
+[1A[2K[491/637] ssh-import-forwarding.spec.ts:52:1 › 非法端口转发在保存时被拒绝
+[1A[2K[492/637] ssh-import-forwarding.spec.ts:71:1 › SSH forwards reach the terminal, drops retry and remote exits stay closed
+[1A[2K[493/637] ssh-import-forwarding.spec.ts:103:1 › SSH multiline paste honours the active bracketed paste mode
+[1A[2K[494/637] ssh-import-forwarding.spec.ts:129:1 › running SSH blocks paste with their own bracketed mode
+[1A[2K[495/637] ssh-import-forwarding.spec.ts:155:1 › an explicitly disabled jump remains direct after saving and connecting
+[1A[2K[496/637] ssh-interaction.spec.ts:4:1 › quick connection completes interactive authentication, navigation and reconnect
+[1A[2K[497/637] ssh-interaction.spec.ts:53:1 › advanced saved options are retained when editing and passed to the terminal
+[1A[2K[498/637] ssh-session-auth.spec.ts:4:1 › temporary authentication recovers files and resources together without changing the terminal or saved profile
+[1A[2K[499/637] ssh-session-auth.spec.ts:58:1 › cancelling service authentication keeps the terminal connected
+[1A[2K[500/637] ssh-status.spec.ts:15:1 › the docked status panel follows the light theme and keeps event history collapsible
+[1A[2K  7) ssh-status.spec.ts:15:1 › the docked status panel follows the light theme and keeps event history collapsible 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeCloseTo[2m([22m[32mexpected[39m[2m, [22mprecision[2m)[22m
+
+    Expected: [32m76[39m
+    Received: [31m42[39m
+
+    Expected precision:    0
+    Expected difference: < [32m0.5[39m
+    Received difference:   [31m34[39m
+
+       9 |   expect(content.x + content.width).toBeLessThanOrEqual(status.x + 1);
+      10 |   expect(content.width).toBeGreaterThanOrEqual(320);
+    > 11 |   expect(status.y).toBeCloseTo((await pane.boundingBox())!.y, 0);
+         |                    ^
+      12 |   expect(await pane.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+      13 | }
+      14 |
+
+        at expectDockedStatus (D:\projects\typescript\Vrykell\e2e\ssh-status.spec.ts:11:20)
+        at D:\projects\typescript\Vrykell\e2e\ssh-status.spec.ts:27:3
+
+
+[1A[2K(node:77004) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:77004) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[1A[2K[501/637] ssh-status.spec.ts:36:1 › the conditional sidebar preserves terminal width and restores the auxiliary panel
+[1A[2K  8) ssh-status.spec.ts:36:1 › the conditional sidebar preserves terminal width and restores the auxiliary panel 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeCloseTo[2m([22m[32mexpected[39m[2m, [22mprecision[2m)[22m
+
+    Expected: [32m76[39m
+    Received: [31m42[39m
+
+    Expected precision:    0
+    Expected difference: < [32m0.5[39m
+    Received difference:   [31m34[39m
+
+       9 |   expect(content.x + content.width).toBeLessThanOrEqual(status.x + 1);
+      10 |   expect(content.width).toBeGreaterThanOrEqual(320);
+    > 11 |   expect(status.y).toBeCloseTo((await pane.boundingBox())!.y, 0);
+         |                    ^
+      12 |   expect(await pane.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+      13 | }
+      14 |
+
+        at expectDockedStatus (D:\projects\typescript\Vrykell\e2e\ssh-status.spec.ts:11:20)
+        at D:\projects\typescript\Vrykell\e2e\ssh-status.spec.ts:57:3
+
+
+
+
+[1A[2K(node:24856) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:24856) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1A[2K[502/637] ssh-status.spec.ts:66:1 › SSH status uses real session state and does not write probes into the terminal
+[1A[2K  9) ssh-status.spec.ts:66:1 › SSH status uses real session state and does not write probes into the terminal 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32m0[39m
+    Received: [31m-34[39m
+
+    Call Log:
+    - Timeout 5000ms exceeded while waiting on the predicate
+
+      84 |   await expect(rightPanel).toBeHidden();
+      85 |   await expect(page.locator('#ssh-status-sidebar-host header')).toContainText('root@prod.example.com:22');
+    > 86 |   await expect.poll(async () => Math.round((await panel.boundingBox())!.y - (await page.locator('.terminal-pane:visible').last().boundingBox())!.y)).toBe(0);
+         |   ^
+      87 |   await expect(page.getByTestId('ssh-session-toolbar')).toHaveCount(1);
+      88 |   expect(await page.getByTestId('ssh-connection-input').getByTestId('ssh-session-toolbar').count()).toBe(0);
+      89 |   await expect(panel).toContainText('Linux 6.8');
+
+        at D:\projects\typescript\Vrykell\e2e\ssh-status.spec.ts:86:3
+
+
+
+
+[1A[2K(node:14900) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1A[2K(node:14900) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[503/637] ssh-status.spec.ts:155:1 › dragging the status edge folds the panel and releasing below the minimum closes it
+[1A[2K[504/637] ssh-status.spec.ts:193:1 › the status panel grows past the former fixed ceiling while the terminal keeps its minimum width
+[1A[2K[505/637] ssh-status.spec.ts:214:1 › resource failures retain samples and pause can be resumed
+[1A[2K[506/637] ssh-status.spec.ts:249:1 › command password prompts preserve the connected state, duration and monitoring
+[1A[2K[507/637] ssh-status.spec.ts:274:1 › deleted profiles report unavailable instead of remaining in a connecting state
+[1A[2K[508/637] ssh-status.spec.ts:295:1 › block mode has no top toolbar and opens status from the existing host chip
+[1A[2K  10) ssh-status.spec.ts:295:1 › block mode has no top toolbar and opens status from the existing host chip 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32m0[39m
+    Received: [31m-34[39m
+
+    Call Log:
+    - Timeout 5000ms exceeded while waiting on the predicate
+
+      312 |   const panel = page.getByTestId('ssh-status-panel');
+      313 |   await expect(panel).toContainText('Linux 6.8');
+    > 314 |   await expect.poll(async () => Math.round((await panel.boundingBox())!.y - (await pane.boundingBox())!.y)).toBe(0);
+          |   ^
+      315 |   await expectDockedStatus(page);
+      316 |   const editor = pane.locator('[data-terminal-input]');
+      317 |   const editorBox = (await editor.boundingBox())!;
+
+        at D:\projects\typescript\Vrykell\e2e\ssh-status.spec.ts:314:3
+
+
+
+[1A[2K(node:18852) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:18852) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[1A[2K[509/637] ssh.spec.ts:13:3 › SSH 远程连接管理侧栏 › Enter on an edit button opens the form without connecting
+[1A[2K[510/637] ssh.spec.ts:22:3 › SSH 远程连接管理侧栏 › SSH resources retain shared sidebar rows while terminal instances use horizontal tabs
+[1A[2K[511/637] ssh.spec.ts:46:3 › SSH 远程连接管理侧栏 › 顶栏：搜索 + 编辑 + 新建按钮
+[1A[2K[512/637] ssh.spec.ts:52:3 › SSH 远程连接管理侧栏 › 展示已有连接并支持按名字搜索
+[1A[2K[513/637] ssh.spec.ts:60:3 › SSH 远程连接管理侧栏 › 双击连接新建活跃会话标签页，按需打开文件面板
+[1A[2K[514/637] ssh.spec.ts:71:3 › SSH 远程连接管理侧栏 › 新建连接：填写表单并保存
+[1A[2K[515/637] ssh.spec.ts:80:3 › SSH 远程连接管理侧栏 › 编辑选中连接并删除
+[1A[2K[516/637] ssh.spec.ts:89:3 › SSH 远程连接管理侧栏 › 测试连接：成功与失败提示
+[1A[2K[517/637] ssh.spec.ts:99:3 › SSH 远程连接管理侧栏 › 远程目录可下载，下载管理可定位到文件管理器
+[1A[2K[518/637] ssh.spec.ts:120:3 › SSH 远程连接管理侧栏 › 远程面板：右键属性显示远端元数据且没有创建时间
+[1A[2K[519/637] ssh.spec.ts:140:3 › SSH 远程连接管理侧栏 › 远程面板：单击选中、Ctrl 加选、双击进入、回退还原视图与选中
+[1A[2K[520/637] ssh.spec.ts:182:3 › SSH 远程连接管理侧栏 › 远程面板：面包屑可编辑跳转，删除可从更多菜单回退
+[1A[2K[521/637] ssh.spec.ts:209:3 › SSH 远程连接管理侧栏 › 远程面板：右键新建按落点决定目录，拖入同名文件避让后回退用真实路径
+[1A[2K[522/637] ssh.spec.ts:248:3 › SSH 远程连接管理侧栏 › 远程面板：点击面包屑根目录回到根目录，而不是重新解析主目录
+[1A[2K[523/637] ssh.spec.ts:262:3 › SSH 远程连接管理侧栏 › 远程面板：展开箭头懒加载子项，菜单只显示远程可用项
+[1A[2K[524/637] stdin-forward.spec.ts:29:1 › 运行中 block：键盘经 xterm 原生路径进 PTY（含退格，End 保留）
+[1A[2K[525/637] stdin-forward.spec.ts:53:1 › 运行中 block：中文 IME 提交文本经 xterm 转发
+[1A[2K[526/637] stdin-forward.spec.ts:68:1 › 运行中 block：焦点空闲时自动收归 xterm（IME 首键即有组合落点）
+[1A[2K[527/637] surface-consistency.spec.ts:16:3 › settings pages and editor focus stay consistent in 深色
+[1A[2K[528/637] surface-consistency.spec.ts:54:3 › inline editors and split dividers keep resting edges in 深色
+[1A[2K[529/637] surface-consistency.spec.ts:104:3 › search has inset query fields and flat controls in 深色
+[1A[2K[530/637] surface-consistency.spec.ts:16:3 › settings pages and editor focus stay consistent in 浅色
+[1A[2K[531/637] surface-consistency.spec.ts:54:3 › inline editors and split dividers keep resting edges in 浅色
+[1A[2K[532/637] surface-consistency.spec.ts:104:3 › search has inset query fields and flat controls in 浅色
+[1A[2K[533/637] surface-refinements.spec.ts:6:3 › tab icon colors persist and follow execution targets in 深色
+[1A[2K[534/637] surface-refinements.spec.ts:53:3 › settings text, hover hints and permanent navigation remain consistent in 深色
+[1A[2K[535/637] surface-refinements.spec.ts:6:3 › tab icon colors persist and follow execution targets in 浅色
+[1A[2K[536/637] surface-refinements.spec.ts:53:3 › settings text, hover hints and permanent navigation remain consistent in 浅色
+[1A[2K[537/637] tab-management.spec.ts:13:3 › 标签页管理侧栏 › 顶栏依次为搜索框、历史按钮、新建按钮
+[1A[2K[538/637] tab-management.spec.ts:19:3 › 标签页管理侧栏 › 搜索框按名字过滤活跃会话
+[1A[2K[539/637] tab-management.spec.ts:32:3 › 标签页管理侧栏 › 点击新建直接弹出类型选择弹窗、支持搜索过滤并创建
+[1A[2K[540/637] tab-management.spec.ts:51:3 › 标签页管理侧栏 › 历史按钮新建会话历史查看标签页
+[1A[2K[541/637] tab-management.spec.ts:58:3 › 标签页管理侧栏 › 标签右键菜单靠近窗口边缘时仍完整显示
+[1A[2K[542/637] tab-management.spec.ts:82:3 › 标签页管理侧栏 › 标签列表空白处右键打开面板菜单
+[1A[2K[543/637] tab-management.spec.ts:96:3 › 标签页管理侧栏 › 顶部 + 新建的标签进入未分组，只有分组 + 才进分组
+[1A[2K[544/637] tab-management.spec.ts:128:3 › 标签页管理侧栏 › keeps inactive horizontal tab close actions accessible
+[1A[2K[545/637] tab-title.spec.ts:9:3 › 终端标题 › 运行中程序设置的窗口标题显示在标题栏，程序结束后还原
+[1A[2K[546/637] tab-title.spec.ts:34:3 › 终端标题 › 复制的会话仍响应前台程序设置的窗口标题
+[1A[2K[547/637] tabs.spec.ts:9:3 › 多标签工作区 › 新建标签、切换、对话隔离
+[1A[2K  11) tabs.spec.ts:9:3 › 多标签工作区 › 新建标签、切换、对话隔离 ─────────────────────────────────────────────────────
+
+    Error: [31mTimed out 5000ms waiting for [39m[2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m()[22m
+
+    Locator: locator('text=第一标签的问题').first()
+    Expected: visible
+    Received: hidden
+    Call log:
+      [2m- expect.toBeVisible with timeout 5000ms[22m
+    [2m  - waiting for locator('text=第一标签的问题').first()[22m
+    [2m  -   locator resolved to <span>第一标签的问题</span>[22m
+    [2m  -   unexpected value "hidden"[22m
+    [2m  -   locator resolved to <span>第一标签的问题</span>[22m
+    [2m  -   unexpected value "hidden"[22m
+    [2m  -   locator resolved to <span>第一标签的问题</span>[22m
+    [2m  -   unexpected value "hidden"[22m
+    [2m  -   locator resolved to <span>第一标签的问题</span>[22m
+    [2m  -   unexpected value "hidden"[22m
+    [2m  -   locator resolved to <span>第一标签的问题</span>[22m
+    [2m  -   unexpected value "hidden"[22m
+    [2m  -   locator resolved to <span>第一标签的问题</span>[22m
+    [2m  -   unexpected value "hidden"[22m
+    [2m  -   locator resolved to <span>第一标签的问题</span>[22m
+    [2m  -   unexpected value "hidden"[22m
+    [2m  -   locator resolved to <span>第一标签的问题</span>[22m
+    [2m  -   unexpected value "hidden"[22m
+    [2m  -   locator resolved to <span>第一标签的问题</span>[22m
+    [2m  -   unexpected value "hidden"[22m
+
+
+      22 |     // 打开标签面板验证两个标签存在
+      23 |     await ensureTabsOpen(page);
+    > 24 |     await expect(page.locator('text=第一标签的问题').first()).toBeVisible();
+         |                                                        ^
+      25 |     await expect(page.getByText('终端').first()).toBeVisible();
+      26 |
+      27 |     // 切回标签 1
+
+        at D:\projects\typescript\Vrykell\e2e\tabs.spec.ts:24:56
+
+
+[1A[2K(node:53472) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:53472) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[1A[2K[548/637] tabs.spec.ts:32:3 › 多标签工作区 › 关闭标签后激活相邻标签
+[1A[2K[549/637] terminal-background.spec.ts:5:3 › block terminal uses the same background in both themes and custom overrides
+[1A[2K[550/637] terminal-background.spec.ts:5:3 › classic terminal uses the same background in both themes and custom overrides
+[1A[2K[551/637] terminal-clipboard.spec.ts:36:1 › 终端右键菜单提供复制/粘贴并标注 Ctrl+C/V
+[1A[2K[552/637] terminal-clipboard.spec.ts:48:1 › 运行中块 Ctrl+V 把剪贴板内容写入 PTY
+[1A[2K[553/637] terminal-clipboard.spec.ts:63:1 › 会话请求 win32-input-mode 后 Ctrl+C 仍然复制而不是发按键记录
+[1A[2K[554/637] terminal-clipboard.spec.ts:78:1 › 运行中块 Ctrl+Shift+C 把选区写入剪贴板
+[1A[2K[555/637] terminal-clipboard.spec.ts:91:1 › 有选区时 Ctrl+C 复制而不是把中断发进终端
+[1A[2K[556/637] terminal-ime-restore.spec.ts:17:1 › native candidate confirmation sends committed text once without preedit or Enter
+[1A[2K[557/637] terminal-ime-restore.spec.ts:42:1 › native punctuation after composition does not replay the previous commit
+[1A[2K[558/637] terminal-ime-restore.spec.ts:68:1 › an active preedit keeps a caret after the composition text
+[1A[2K[559/637] terminal-ime-restore.spec.ts:116:1 › returning to a static TUI repaints its canvas without new PTY output
+[1A[2K[560/637] terminal-ime-restore.spec.ts:168:1 › redraw shortcut, toolbar and palette preserve the TUI without sending PTY input
+[1A[2K[561/637] terminal-input-navigation.spec.ts:18:1 › empty and repeat Enter submissions keep normal directory blocks with no output
+[1A[2K[562/637] terminal-input-navigation.spec.ts:38:1 › up and down recall only the commands of the current terminal
+[1A[2K[563/637] terminal-input-navigation.spec.ts:74:1 › cwd menu searches folders, changes directories, and preserves the command draft
+[1A[2K[564/637] terminal-input-navigation.spec.ts:108:1 › AI entry shares the command control size and the outer border follows window corners
+[1A[2K[565/637] terminal-input-navigation.spec.ts:128:1 › overflow menus retain transparent overlay tracks while dragging and clicking
+[1A[2K[566/637] terminal-input-navigation.spec.ts:157:1 › horizontal overlay tracks retain content height and support keyboard and drag navigation
+[1A[2K[567/637] terminal-input-navigation.spec.ts:197:1 › latest-output arrow resumes following during a foreground command
+[1A[2K[568/637] terminal-input-navigation.spec.ts:215:1 › font family, weight and spacing update existing terminal history and persist
+[1A[2K[569/637] terminal-paste-focus.spec.ts:26:1 › returning to TUI focuses its input and image paste reaches the foreground process
+[1A[2K[570/637] terminal-paste-focus.spec.ts:43:1 › returning to a running block focuses it immediately and keeps normal text paste
+[1A[2K[571/637] terminal-paste-focus.spec.ts:56:1 › returning to an idle session focuses command input
+[1A[2K[572/637] terminal-paste-focus.spec.ts:61:1 › opening chat does not autofocus it, and switching sessions still focuses terminal input
+[1A[2K[573/637] terminal-paste-large.spec.ts:33:1 › 经典场景多行粘贴先确认：取消不写入，确认后按行尾归一化写入
+[1A[2K[574/637] terminal-paste-large.spec.ts:56:1 › 前台程序开启 bracketed paste 后多行粘贴不再确认且保持包裹
+[1A[2K[575/637] terminal-paste-large.spec.ts:72:1 › 超过 64K 字符的粘贴先确认，确认后分块送达完整内容
+[1A[2K[576/637] terminal-paste-large.spec.ts:92:1 › 运行中块的多行粘贴同样先确认
+[1A[2K[577/637] terminal-performance.spec.ts:4:1 › large command history stays readable and input reaches the terminal promptly
+[1A[2Kterminal-performance.spec.ts:4:1 › large command history stays readable and input reaches the terminal promptly
+TERMINAL-PERFORMANCE {"mountMs":1052.6000000238419,"blocks":200,"appendMs":194,"inputMedianMs":77,"inputWorstMs":90,"scrollHeight":492682}
+
+[1A[2K[578/637] terminal-performance.spec.ts:57:1 › continuous classic output does not extract HTML frames or delay native keyboard input
+[1A[2Kterminal-performance.spec.ts:57:1 › continuous classic output does not extract HTML frames or delay native keyboard input
+TERMINAL-STREAM-PERFORMANCE {"elapsedMs":312.60000002384186,"maximumInputFrameMs":75.30000001192093,"keys":12}
+
+[1A[2K[579/637] terminal-ready-fallback.spec.ts:18:1 › a shell without the ready marker still receives the file-open command
+[1A[2K[580/637] terminal-ready-fallback.spec.ts:31:1 › a ready-marked shell keeps the fast path
+[1A[2K[581/637] terminal-references.spec.ts:6:3 › terminal references start expanded and share tool presentation in 深色
+[1A[2K[582/637] terminal-references.spec.ts:6:3 › terminal references start expanded and share tool presentation in 浅色
+[1A[2K[583/637] terminal-script-input.spec.ts:6:1 › an AI multiline script enters its terminal draft and runs only after an explicit Enter
+[1A[2K[584/637] terminal-script-input.spec.ts:32:1 › pasting a multiline script from the idle terminal menu preserves it without execution
+[1A[2K[585/637] terminal-script-input.spec.ts:46:1 › a native paste with even one trailing newline asks before writing to an unprotected process
+[1A[2K[586/637] terminal-script-input.spec.ts:68:1 › the native window border follows the neutral gray theme border
+[1A[2K[587/637] terminal-visibility.spec.ts:15:1 › 切回标签时重新绘制被隐藏的终端画面
+[1A[2K[588/637] titlebar-drag.spec.ts:23:3 › titlebar exposes drag handles between the controls at 1240px
+[1A[2K[589/637] titlebar-drag.spec.ts:23:3 › titlebar exposes drag handles between the controls at 720px
+[1A[2K[590/637] tool-approval.spec.ts:4:1 › compact AI cards keep their color on disclosure, react to hover and review edited commands
+[1A[2K[591/637] usage-page.spec.ts:31:3 › usage statistics page › opens from conversation settings and accounts for one turn
+[1A[2K[592/637] usage-page.spec.ts:119:3 › usage statistics page › shows only the ACP numbers when a server is the selected source
+[1A[2K[593/637] webview-policy.spec.ts:4:1 › locks page scale and suppresses the native WebView context menu
+[1A[2K[594/637] window-controls.spec.ts:22:1 › window controls drop the hover surface after a pointer click
+[1A[2K[595/637] window-controls.spec.ts:37:1 › window controls keep the surface for visible keyboard focus
+[1A[2K[596/637] window-frame.spec.ts:11:1 › the native window frame follows the neutral border color
+[1A[2K[597/637] workspace-ai-utilities.spec.ts:4:1 › an unavailable side dock keeps the same conversation visible in the main workspace
+[1A[2K[598/637] workspace-ai-utilities.spec.ts:18:1 › main utility pages and docked conversations keep separate shortcut scopes
+[1A[2K[599/637] workspace-ai-utilities.spec.ts:45:1 › hidden terminal splits do not reserve the resource or code workspace width
+[1A[2K[600/637] workspace-history-refinements.spec.ts:20:1 › closing the last tab leaves the workspace empty and closing background sessions preserves the active page
+[1A[2K[601/637] workspace-history-refinements.spec.ts:39:1 › terminal history reorders with loose sessions while AI history stays in its workspace
+[1A[2K[602/637] workspace-history-refinements.spec.ts:70:1 › failed commands remain in history but do not become completion suggestions
+[1A[2K[603/637] workspace-history-refinements.spec.ts:99:1 › session startup-mode filters combine with sorting and survive reopening
+[1A[2K[604/637] workspace-icon-tiles.spec.ts:6:3 › only terminal tabs expose icon colors while group actions remain available in 深色
+[1A[2K[605/637] workspace-icon-tiles.spec.ts:6:3 › only terminal tabs expose icon colors while group actions remain available in 浅色
+[1A[2K[606/637] workspace-navigation.spec.ts:10:1 › uses a full-height sidebar and keeps terminals alive across empty workspaces
+[1A[2K[607/637] workspace-navigation.spec.ts:47:1 › moves the same native conversation and composer between main and side
+[1A[2K[608/637] workspace-navigation.spec.ts:67:1 › keeps native and connected sessions in one AI strip without closing either on navigation
+[1A[2K[609/637] workspace-navigation.spec.ts:93:1 › collapses colored terminal groups while preserving the active session and actions
+[1A[2K[610/637] workspace-navigation.spec.ts:116:1 › routes every auxiliary panel to the right and keeps the workspace full height
+[1A[2K[611/637] workspace-navigation.spec.ts:132:1 › new, close and numeric shortcuts follow the workspace and the focused side conversation
+[1A[2K[612/637] workspace-refinements.spec.ts:5:1 › prefix cards replace the scope picker and persist on recent searches
+[1A[2K[613/637] workspace-refinements.spec.ts:30:1 › default terminal applies to new tabs and survives reload
+[1A[2K[614/637] workspace-refinements.spec.ts:54:1 › nearby content edges preview and open the dragged panel on release
+[1A[2K[615/637] workspace-refinements.spec.ts:75:1 › deleted SSH profiles recover without a connecting trap and classic history omits command counts
+[1A[2K[616/637] workspace-refinements.spec.ts:104:1 › command menus use semantic groups and historical output shares the terminal background
+[1A[2K[617/637] workspace-surface-refinements.spec.ts:5:35 › acrylic is confined to navigation and region edges stay square in 深色
+[1A[2K[618/637] workspace-surface-refinements.spec.ts:5:35 › acrylic is confined to navigation and region edges stay square in 浅色
+[1A[2K[619/637] workspace-surface-refinements.spec.ts:26:1 › terminal dragging carries the complete tab and closing preview never closes the session
+[1A[2K[620/637] workspace-usability.spec.ts:23:1 › global search stays centered without covering actions or the title in both page types
+[1A[2K[621/637] workspace-usability.spec.ts:50:1 › Windows working directories show their drive prefix without the URI slash
+[1A[2K[622/637] workspace-usability.spec.ts:57:1 › terminal error notifications follow the active gray theme and can be closed
+[1A[2K[623/637] workspace-usability.spec.ts:97:1 › navigation supports Enter and Space and shows its active state
+[1A[2K[624/637] workspace-usability.spec.ts:109:1 › navigation switches panels without losing their local state
+[1A[2K[625/637] workspace-usability.spec.ts:120:1 › the full-height navigation and titlebar separate workspace and auxiliary content
+[1A[2K[626/637] workspace-usability.spec.ts:151:1 › workspace regions have square corners and flush resize boundaries
+[1A[2K[627/637] workspace-usability.spec.ts:178:1 › settings and terminal use the same content background in both themes
+[1A[2K[628/637] workspace-usability.spec.ts:205:1 › settings, both history pages, the editor and diffs share the terminal background
+[1A[2K[629/637] workspace-usability.spec.ts:246:1 › auxiliary resize edges remain visible and strengthen during dragging
+[1A[2K[630/637] workspace-usability.spec.ts:274:1 › narrow layouts preserve command space and fit the toolbar
+[1A[2K[631/637] workspace-usability.spec.ts:294:1 › AI drafts stay separate when opening the AI assistant
+[1A[2K[632/637] workspace-usability.spec.ts:307:1 › separate command and AI drafts survive repeated switches
+[1A[2K[633/637] workspace-usability.spec.ts:316:1 › split placement previews the hovered slot and closes with Escape
+[1A[2K[634/637] workspace-usability.spec.ts:328:1 › split placement closes when it loses focus
+[1A[2K[635/637] workspace-usability.spec.ts:343:1 › auxiliary navigation shares the right side and AI preserves the main workspace
+[1A[2K[636/637] workspace-usability.spec.ts:360:1 › panel headings close auxiliary content without hiding the workspace
+[1A[2K[637/637] workspace-usability.spec.ts:370:1 › dragging a navigation action preserves panel placement and order
+[1A[2K  Slow test file: command-history.spec.ts (1.3m)
+  Slow test file: outlined-buttons.spec.ts (1.2m)
+  Slow test file: editor.spec.ts (1.1m)
+  Slow test file: sidebar.spec.ts (55.2s)
+  Slow test file: git-panel.spec.ts (54.0s)
+  Consider splitting slow test files to speed up parallel execution
+  11 failed
+    acp-launcher.spec.ts:10:1 › the sidebar ACP button reuses a singleton workspace with an inline server picker 
+    block-width.spec.ts:130:1 › resizing a running block resizes both PTY and terminal buffer, then restores its width 
+    file-transfers.spec.ts:86:1 › persists undo opt-outs and confirms deletion without claiming it can be undone 
+    manual-fullscreen-regressions.spec.ts:82:39 › fullscreen at scale 1.25 › alternate fullscreen keeps one stable grid during continuous width changes 
+    scrollbar-layering.spec.ts:5:1 › page scrollbars stay below an open dialog and become usable again after closing 
+    shared-controls.spec.ts:49:1 › edge tooltips keep their label and shortcut on one line in a narrow window 
+    ssh-status.spec.ts:15:1 › the docked status panel follows the light theme and keeps event history collapsible 
+    ssh-status.spec.ts:36:1 › the conditional sidebar preserves terminal width and restores the auxiliary panel 
+    ssh-status.spec.ts:66:1 › SSH status uses real session state and does not write probes into the terminal 
+    ssh-status.spec.ts:295:1 › block mode has no top toolbar and opens status from the existing host chip 
+    tabs.spec.ts:9:3 › 多标签工作区 › 新建标签、切换、对话隔离 ───────────────────────────────────────────────────────
+  2 skipped
+  624 passed (30.8m)
