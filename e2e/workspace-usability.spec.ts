@@ -23,10 +23,16 @@ test.beforeEach(async ({ page }) => {
 test('global search stays centered without covering actions or the title in both page types', async ({ page }) => {
   for (const width of [600, 720, 900, 1240, 1550]) {
     await page.setViewportSize({ width, height: 800 });
+    await expect.poll(async () => {
+      const search = (await page.getByTestId('global-search-trigger').boundingBox())!;
+      const bar = (await page.locator('.workspace-titlebar').boundingBox())!;
+      return Math.abs(search.x + search.width / 2 - bar.x - bar.width / 2);
+    }).toBeLessThan(1);
     const search = await page.getByTestId('global-search-trigger').boundingBox();
     const actions = await page.locator('.workspace-title-actions').boundingBox();
     const title = await page.locator('.workspace-title').boundingBox();
-    expect(Math.abs(search!.x + search!.width / 2 - width / 2)).toBeLessThan(1);
+    const bar = (await page.locator('.workspace-titlebar').boundingBox())!;
+    expect(Math.abs(search!.x + search!.width / 2 - (bar.x + bar.width / 2))).toBeLessThan(1);
     expect(search!.x).toBeGreaterThanOrEqual(title!.x + title!.width);
     expect(search!.x + search!.width).toBeLessThanOrEqual(actions!.x);
     if (await page.evaluate(() => /Mac/.test(navigator.userAgent))) {
@@ -37,7 +43,8 @@ test('global search stays centered without covering actions or the title in both
   }
   await page.getByRole('button', { name: '设置', exact: true }).click();
   const search = await page.getByTestId('global-search-trigger').boundingBox();
-  expect(Math.abs(search!.x + search!.width / 2 - 1550 / 2)).toBeLessThan(1);
+  const bar = (await page.locator('.workspace-titlebar').boundingBox())!;
+  expect(Math.abs(search!.x + search!.width / 2 - (bar.x + bar.width / 2))).toBeLessThan(1);
 });
 
 test('Windows working directories show their drive prefix without the URI slash', async ({ page }) => {
@@ -88,18 +95,19 @@ test('terminal error notifications follow the active gray theme and can be close
 });
 
 test('navigation supports Enter and Space and shows its active state', async ({ page }) => {
-  const nav = page.getByRole('navigation', { name: '工作区导航' });
-  const tabs = nav.getByRole('button', { name: '标签', exact: true });
-  await expect(tabs).toHaveAttribute('aria-pressed', 'true');
-  await tabs.focus();
-  await tabs.press('Enter');
-  await expect(page.getByTestId('tab-search')).toBeHidden();
-  await expect(tabs).toHaveAttribute('aria-pressed', 'false');
-  await tabs.press('Space');
-  await expect(page.getByTestId('tab-search')).toBeVisible();
+  const terminal = page.getByTestId('workspace-area-terminal');
+  const code = page.getByTestId('workspace-area-code');
+  await expect(terminal).toHaveAttribute('aria-current', 'page');
+  await code.focus(); await code.press('Enter');
+  await expect(page.getByTestId('code-workspace-empty')).toBeVisible();
+  await expect(code).toHaveAttribute('aria-current', 'page');
+  await terminal.focus(); await terminal.press('Space');
+  await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
+  await expect(terminal).toHaveAttribute('aria-current', 'page');
 });
 
 test('navigation switches panels without losing their local state', async ({ page }) => {
+  await ensureTabsOpen(page);
   await page.getByTestId('tab-search').fill('测试筛选');
   await page.locator('[data-dock-btn="ssh"]').click();
   await expect(page.getByTestId('ssh-search')).toBeVisible();
@@ -109,33 +117,31 @@ test('navigation switches panels without losing their local state', async ({ pag
   await expect(page.getByTestId('ssh-search')).toBeHidden();
 });
 
-test('the lighter titlebar and activity frame separate sidebars from content', async ({ page }) => {
-  const nav = page.getByRole('navigation', { name: '工作区导航' });
-  const panel = page.locator('.workspace-side-panel[data-side="left"]:visible');
-  expect((await nav.boundingBox())!.width).toBe(44);
-  expect((await panel.boundingBox())!.width).toBe(180);
-  const active = nav.locator('[aria-pressed="true"]');
+test('the full-height navigation and titlebar separate workspace and auxiliary content', async ({ page }) => {
+  await page.locator('[data-dock-btn="files"]').click();
+  const nav = page.getByTestId('workspace-sidebar');
+  const panel = page.locator('.workspace-side-panel[data-side="right"]:visible');
+  expect(await nav.boundingBox()).toMatchObject({ x: 0, y: 0, width: 208, height: 800 });
+  expect((await panel.boundingBox())!.width).toBe(200);
+  const active = nav.locator('[aria-current="page"]');
   expect(await active.evaluate(el => getComputedStyle(el, '::before').content)).toBe('none');
   await expect(active).toHaveCSS('border-top-style', 'none');
   await expect(page.locator('.workspace-titlebar')).toHaveCSS('border-bottom-style', 'none');
   await expect(panel.locator('.workspace-panel-heading')).toHaveCSS('border-bottom-style', 'none');
-  await expect(panel).toHaveCSS('border-right-style', 'none');
-  const row = page.locator('[data-tab-row-id]').first();
-  await expect(row).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  await expect(row.locator(':scope > div > span').first()).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(panel).toHaveCSS('border-left-style', 'none');
   const panelBg = await panel.locator(':scope > div').first().evaluate(el => getComputedStyle(el).backgroundColor);
-  expect(panelBg).not.toBe(await nav.evaluate(el => getComputedStyle(el).backgroundColor));
+  expect(panelBg).toBe(await nav.evaluate(el => getComputedStyle(el).backgroundColor));
   expect(panelBg).toBe(await resolvedColor(page, '--sidebar-bg'));
-  await expect(nav).toHaveCSS('background-color', await page.locator('.workspace-titlebar').evaluate(el => getComputedStyle(el).backgroundColor));
   const contentBg = await page.locator('main').evaluate(el => getComputedStyle(el).backgroundColor);
   expect(panelBg).not.toBe(contentBg);
   expect(contentBg).not.toBe(await nav.evaluate(el => getComputedStyle(el).backgroundColor));
   const mainRect = await page.locator('main').boundingBox();
   expect(mainRect!.y).toBeGreaterThan(0);
   expect(mainRect!.y + mainRect!.height).toBeLessThan(800);
-  for (const id of ['files', 'ssh', 'tabs']) {
+  for (const id of ['files', 'git', 'command-history']) {
+    if (await page.locator(`[data-dock-btn="${id}"]`).getAttribute('aria-pressed') === 'true') await page.locator(`[data-dock-btn="${id}"]`).click();
     await page.locator(`[data-dock-btn="${id}"]`).click();
-    await expect(page.locator('.workspace-side-panel[data-side="left"]:visible > div:first-child')).toHaveCSS('background-color', panelBg);
+    await expect(page.locator('.workspace-side-panel[data-side="right"]:visible > div:first-child')).toHaveCSS('background-color', panelBg);
   }
   await page.locator('[data-dock-btn="chat"]').click();
   await expect(page.locator('.workspace-side-panel[data-side="right"]:visible > div:first-child')).toHaveCSS('background-color', panelBg);
@@ -144,17 +150,8 @@ test('the lighter titlebar and activity frame separate sidebars from content', a
 
 test('the workspace has rounded outer corners and flush resize boundaries', async ({ page }) => {
   const main = page.locator('main');
-  const leftPanel = page.locator('.workspace-side-panel[data-side="left"]:visible');
-  await expect(leftPanel).toHaveCSS('border-radius', '14px 0px 0px 14px');
-  await expect(leftPanel.locator(':scope > div').first()).toHaveCSS('border-radius', '14px 0px 0px 14px');
-  await expect(leftPanel).toHaveCSS('overflow', 'visible');
-  // The sidebar touches the terminal; its shared edge stays square.
-  await expect(main).toHaveCSS('border-top-left-radius', '0px');
-  const leftBox = (await leftPanel.boundingBox())!;
-  expect((await main.boundingBox())!.x).toBe(leftBox.x + leftBox.width);
-  const leftHandle = (await page.getByTestId('resize-handle-tabs').boundingBox())!;
-  expect(leftHandle.x).toBe(leftBox.x + leftBox.width - 4);
-  await expect(main).toHaveCSS('border-top-right-radius', '14px');
+  await expect(main).toHaveCSS('border-radius', '14px');
+  expect((await main.boundingBox())!.x).toBe(208);
 
   await page.locator('[data-dock-btn="chat"]').click();
   const rightPanel = page.locator('.workspace-side-panel[data-side="right"]:visible');
@@ -168,11 +165,10 @@ test('the workspace has rounded outer corners and flush resize boundaries', asyn
   const panelBox = (await rightPanel.boundingBox())!;
   expect(Math.abs(panelBox.x - (mainBox.x + mainBox.width))).toBeLessThan(0.5);
   const line = page.getByTestId('resize-handle-chat').locator('[data-resize-line]');
-  await expect(line).toHaveCSS('width', '1px');
+  await expect(line).toHaveCSS('width', '2px');
   await expect(line).toHaveCSS('background-color', await resolvedColor(page, '--resize-divider'));
   const lineBox = (await line.boundingBox())!;
   expect(Math.abs(lineBox.x + lineBox.width / 2 - (mainBox.x + mainBox.width))).toBeLessThan(0.5);
-  await page.locator('[data-dock-btn="tabs"]').click();
   await expect(main).toHaveCSS('border-top-left-radius', '14px');
   await expect(main).toHaveCSS('border-bottom-left-radius', '14px');
   await page.locator('[data-dock-btn="chat"]').click();
@@ -180,6 +176,7 @@ test('the workspace has rounded outer corners and flush resize boundaries', asyn
 });
 
 test('settings and terminal use the same content background in both themes', async ({ page }) => {
+  await page.locator('[data-dock-btn="files"]').click();
   const background = async (selector: string) => page.locator(selector).evaluate(el => getComputedStyle(el).backgroundColor);
   const terminalBg = await resolvedColor(page, '--xterm-bg');
   await gotoSetting(page, '模型配置');
@@ -190,11 +187,9 @@ test('settings and terminal use the same content background in both themes', asy
   for (const label of ['浅色', '深色']) {
     await page.getByRole('radio', { name: label, exact: true }).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', label === '浅色' ? 'light' : 'dark');
-    expect(await background('.workspace-titlebar')).toBe(await background('.workspace-activity-bar'));
     expect(await background('.workspace-titlebar')).not.toBe(await background('main'));
-    const sidebarBg = await background('.workspace-side-panel[data-side="left"] > div:first-child');
-    const frameBg = await background('.workspace-activity-bar');
-    expect(sidebarBg).not.toBe(frameBg);
+    const sidebarBg = await background('.workspace-side-panel[data-side="right"] > div:first-child');
+    expect(sidebarBg).toBe(await background('.workspace-sidebar'));
     expect(sidebarBg).not.toBe(await background('main'));
     expect(await background('.settings-navigation')).toBe(sidebarBg);
     expect(await background('.settings-content')).toBe(await resolvedColor(page, '--xterm-bg'));
@@ -248,9 +243,9 @@ test('settings, both history pages, the editor and diffs share the terminal back
   expect(await background('.history-page')).toBe(terminalBg);
 });
 
-test('sidebar resize edges remain visible and strengthen during dragging on both sides', async ({ page }) => {
-  await page.locator('[data-dock-btn="chat"]').click();
-  for (const id of ['tabs', 'chat']) {
+test('auxiliary resize edges remain visible and strengthen during dragging', async ({ page }) => {
+  for (const id of ['files', 'chat']) {
+    await page.locator(`[data-dock-btn="${id}"]`).click();
     const handle = page.getByTestId(`resize-handle-${id}`);
     const line = handle.locator('[data-resize-line]');
     const borderColor = await resolvedColor(page, '--resize-divider');
@@ -266,8 +261,8 @@ test('sidebar resize edges remain visible and strengthen during dragging on both
     await page.mouse.move(x, y);
     await expect(line).toHaveCSS('background-color', activeColor);
     await page.mouse.down();
-    await page.mouse.move(x + (id === 'tabs' ? 40 : -40), y);
-    await page.mouse.move(x + (id === 'tabs' ? 40 : -40), y + 80);
+    await page.mouse.move(x - 40, y);
+    await page.mouse.move(x - 40, y + 80);
     await expect(line).toHaveCSS('background-color', activeColor);
     expect((await panel.boundingBox())!.width).toBe(before + 40);
     await page.mouse.up();
@@ -281,10 +276,10 @@ test('narrow layouts preserve command space and fit the toolbar', async ({ page 
   await page.locator('[data-dock-btn="files"]').click();
   await page.locator('[data-dock-btn="ssh"]').click();
   await expect(page.getByTestId('ssh-search')).toBeVisible();
-  await expect(page.getByText('notes.txt')).toBeHidden();
+  await expect(page.getByText('notes.txt')).toBeVisible();
   const main = await page.locator('main').boundingBox();
   expect(main!.width).toBeGreaterThanOrEqual(360);
-  await expect(page.locator('[data-tip="关闭当前终端"]')).toBeInViewport();
+  await expect(page.getByTestId('workspace-area-terminal')).toBeInViewport();
   const overlap = await page.evaluate(() => {
     const search = document.querySelector('[data-testid="global-search-trigger"]')!.getBoundingClientRect();
     const ai = document.querySelector('[data-dock-btn="chat"]')!.getBoundingClientRect();
@@ -342,38 +337,42 @@ test('split placement closes when it loses focus', async ({ page }) => {
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
 });
 
-test('navigation controls only the adjacent sidebar and AI has an independent entrance', async ({ page }) => {
-  await expect(page.locator('[data-dock-btn="chat"]')).toHaveAttribute('data-tip', /打开AI 助手/);
+test('auxiliary navigation shares the right side and AI preserves the main workspace', async ({ page }) => {
+  await expect(page.locator('[data-dock-btn="chat"]')).toHaveAttribute('data-tip', /打开AI/);
   await page.locator('[data-dock-btn="files"]').click();
   await expect(page.getByText('notes.txt')).toBeVisible();
   await expect(page.getByTestId('tab-search')).toBeHidden();
-  await expect(page.locator('.workspace-side-panel[data-side="left"]:visible')).toHaveCount(1);
-  await expect(page.locator('.workspace-side-panel[data-side="right"]:visible')).toHaveCount(0);
+  await expect(page.locator('.workspace-side-panel[data-side="left"]:visible')).toHaveCount(0);
+  await expect(page.locator('.workspace-side-panel[data-side="right"]:visible')).toHaveCount(1);
   await page.locator('[data-dock-btn="chat"]').click();
   await expect(page.locator('.workspace-side-panel[data-side="right"]:visible')).toHaveCount(1);
-  await expect(page.getByText('notes.txt')).toBeVisible();
+  await expect(page.getByText('notes.txt')).toBeHidden();
   await page.locator('[data-dock-btn="tabs"]').click();
-  await expect(page.getByTestId('tab-search')).toBeVisible();
-  await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
-  await expect(page.getByRole('navigation', { name: '工作区导航' }).getByRole('button', { name: '设置', exact: true })).toHaveAttribute('data-dock-fixed', 'true');
+  await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
+  await expect(page.locator('[data-chat-composer]:visible')).toBeVisible();
+  await expect(page.getByTestId('workspace-settings')).toHaveAttribute('data-dock-fixed', 'true');
   await expect(page.locator('header').getByRole('button', { name: '设置', exact: true })).toHaveCount(0);
 });
 
-test('panel headings close their own content without affecting the other side', async ({ page }) => {
+test('panel headings close auxiliary content without hiding the workspace', async ({ page }) => {
   await page.locator('[data-dock-btn="chat"]').click();
-  await page.getByRole('button', { name: '关闭AI 助手面板', exact: true }).click();
-  await expect(page.getByPlaceholder(/自然语言描述/)).toBeHidden();
-  await expect(page.getByTestId('tab-search')).toBeVisible();
-  await page.getByRole('button', { name: '关闭标签面板', exact: true }).click();
-  await expect(page.getByTestId('tab-search')).toBeHidden();
+  await page.getByRole('button', { name: '关闭AI面板', exact: true }).click();
+  await expect(page.locator('[data-chat-composer]')).toBeHidden();
+  await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
+  await page.locator('[data-dock-btn="files"]').click();
+  await page.getByRole('button', { name: '关闭资源面板', exact: true }).click();
+  await expect(page.getByTestId('workspace-instance-bar')).toBeVisible();
 });
 
 test('dragging a navigation action preserves panel placement and order', async ({ page }) => {
-  await page.locator('[data-dock-btn="files"]').dragTo(page.locator('[data-dock-btn="ssh"]'));
-  const ids = await page.getByRole('navigation', { name: '工作区导航' }).locator('[data-dock-btn]:not([data-dock-fixed])').evaluateAll(elements => elements.map(el => el.getAttribute('data-dock-btn')));
-  expect(ids).toEqual(['tabs', 'files', 'ssh', 'git', 'command-history']);
+  const source = (await page.locator('[data-dock-btn="files"]').boundingBox())!;
+  const target = (await page.locator('[data-dock-btn="git"]').boundingBox())!;
+  await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2); await page.mouse.down();
+  await page.mouse.move(target.x + target.width - 2, target.y + target.height / 2, { steps: 8 }); await page.mouse.up();
+  const ids = await page.getByRole('navigation', { name: '辅助面板' }).locator('[data-dock-btn]').evaluateAll(elements => elements.map(el => el.getAttribute('data-dock-btn')));
+  expect(ids).toEqual(['git', 'files', 'command-history', 'chat']);
   await page.locator('[data-dock-btn="files"]').click();
   await expect(page.getByText('notes.txt')).toBeVisible();
   await expect(page.getByTestId('tab-search')).toBeHidden();
-  await expect(page.locator('.workspace-side-panel[data-side="left"]:visible')).toHaveCount(1);
+  await expect(page.locator('.workspace-side-panel[data-side="right"]:visible')).toHaveCount(1);
 });

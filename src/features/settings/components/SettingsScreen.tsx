@@ -1,15 +1,15 @@
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { useUiStore } from '@features/workspace';
 import { IconButton } from '@ui/IconButton';
 import { X, iconSizes } from '@ui/icons';
 import { t } from '@i18n';
 import SettingsView from '../pages/SettingsView';
 
-/** Settings cover the content card while the outer activity rail remains available. */
+/** Settings cover the content card while functional navigation remains available. */
 export default function SettingsScreen() {
   const ref = useRef<HTMLDivElement>(null);
   const close = () => useUiStore.getState().setSettingsOpen(false);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     ref.current?.querySelector<HTMLElement>('[aria-current="page"]')?.focus();
     return () => { if (previous?.isConnected) previous.focus(); };

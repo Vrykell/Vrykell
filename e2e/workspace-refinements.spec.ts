@@ -35,6 +35,7 @@ test('default terminal applies to new tabs and survives reload', async ({ page }
   await page.getByRole('option', { name: 'Bash', exact: true }).click();
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vrykell-terminal-defaults') ?? '{}').state?.shell)).toBe('bash');
   await page.screenshot({ path: test.info().outputPath('default-terminal.png') });
+  await page.getByRole('button', { name: '关闭设置', exact: true }).click();
   await page.keyboard.press('Meta+t');
   await expect.poll(() => page.evaluate(async () => {
     const path = '/src/features/workspace/stores/workspace.ts';
@@ -43,7 +44,7 @@ test('default terminal applies to new tabs and survives reload', async ({ page }
     const tab = state.tabs.find(tab => tab.id === state.activeId);
     return tab?.kind === 'session' && tab.layout.type === 'leaf' ? tab.layout.terminal.shellType : '';
   })).toBe('bash');
-  await expect(page.locator('[data-tab-row-id] [data-shell-mark="bash"]').first()).toHaveCSS('width', '20px');
+  await expect(page.locator('[data-tab-row-id] [data-shell-mark="bash"]').first()).toHaveCSS('width', '16px');
   await page.reload();
   await page.keyboard.press('Meta+t');
   await expect(page.getByPlaceholder(/输入命令/).last()).toBeVisible();
@@ -60,7 +61,7 @@ test('nearby content edges preview and open the dragged panel on release', async
   await page.mouse.down();
   await page.mouse.move(body.x + 100, y, { steps: 5 });
   const preview = page.getByTestId('panel-drop-preview');
-  await expect(preview).toHaveAttribute('data-side', 'left');
+  await expect(preview).toHaveCount(0);
   await page.mouse.move(body.x + body.width / 2, y, { steps: 3 });
   await expect(preview).toHaveCount(0);
   await page.mouse.move(body.x + body.width - 70, y, { steps: 5 });

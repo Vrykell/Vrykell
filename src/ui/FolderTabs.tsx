@@ -1,13 +1,14 @@
-import { Fragment, useEffect, useId, useRef, type ReactNode } from 'react';
+import { Fragment, useId, useRef, type ReactNode } from 'react';
 import { IconButton } from './IconButton';
 import EditorActions from './EditorActions';
 import type { ContextMenuItem } from './ContextMenu';
 import { X } from './icons';
 import { ListReorderPlaceholder, ListReorderPreview, useListReorder, useListReorderDrag } from './listReorder';
 import { useHorizontalWheel } from './hooks/useHorizontalWheel';
+import { useActiveTabVisibility } from './hooks/useActiveTabVisibility';
 import './FolderTabs.css';
 
-export interface FolderTab { id: string; label: string; icon: ReactNode; tip: string; closeLabel: string }
+export interface FolderTab { id: string; label: string; icon: ReactNode; tip: string; closeLabel: string; closeTestId?: string; dataAttributes?: Record<string, string> }
 
 /** Connected document tabs share dragging, wheel navigation and reserved toolbar space. */
 export default function FolderTabs({ items, selected, label, listId, className = '', headerClassName = '', toolbar, menuItems, onSelect, onClose, onMove }: {
@@ -20,14 +21,14 @@ export default function FolderTabs({ items, selected, label, listId, className =
   const dragId = useListReorder(state => state.drag?.listId === id ? state.drag.id : null);
   const start = useListReorderDrag({ listId: id, axis: 'horizontal', onDrop: (drag, target) => { if (target?.itemId) onMove(drag.id, target.itemId, !!target.after); } });
   useHorizontalWheel(strip, items.length > 0);
-  useEffect(() => { strip.current?.querySelector('[aria-selected="true"]')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' }); }, [selected, items.length]);
+  useActiveTabVisibility(strip, '.folder-tab[data-active="true"]', `${selected}:${items.length}`);
   const remaining = items.filter(item => item.id !== dragId); const last = remaining[remaining.length - 1]?.id;
   return <header className={`folder-header ${headerClassName}`}>
     {menuItems && <div className="folder-more"><EditorActions items={menuItems} /></div>}
     {items.length > 0 ? <div ref={strip} className={`folder-tab-list ${className}`} role="tablist" aria-label={label} data-reorder-list={id}>
       {items.map(item => <Fragment key={item.id}>
         <ListReorderPlaceholder listId={id} itemId={item.id} />
-        <div className="folder-tab" data-active={selected === item.id} data-reorder-item={item.id} data-reorder-kind="document" data-reorder-dragging={dragId === item.id ? 'true' : undefined} onPointerDown={event => {
+        <div {...item.dataAttributes} className="folder-tab" data-active={selected === item.id} data-reorder-item={item.id} data-reorder-kind="document" data-reorder-dragging={dragId === item.id ? 'true' : undefined} onPointerDown={event => {
           if (event.button !== 0 || event.isPrimary === false || (event.target as Element).closest('[data-no-drag]')) return;
           start(event, { id: item.id, kind: 'document' });
           if (selected !== item.id) onSelect(item.id);
@@ -47,11 +48,11 @@ export default function FolderTabs({ items, selected, label, listId, className =
   </header>;
 }
 
-function FolderTabContent({ item, selected, onSelect, onClose }: {
+export function FolderTabContent({ item, selected, onSelect, onClose }: {
   item: FolderTab; selected: boolean; onSelect?: (id: string) => void; onClose?: (id: string) => void;
 }) {
   return <div className="folder-tab-content">
     <button role="tab" data-reorder-handle aria-selected={selected} data-tip={item.tip} onClick={() => { if (!selected) onSelect?.(item.id); }}>{item.icon}<span>{item.label}</span></button>
-    <IconButton compact data-no-drag aria-label={item.closeLabel} onClick={() => onClose?.(item.id)}><X size={14} /></IconButton>
+    <IconButton compact data-no-drag data-testid={item.closeTestId} aria-label={item.closeLabel} onClick={() => onClose?.(item.id)}><X size={14} /></IconButton>
   </div>;
 }

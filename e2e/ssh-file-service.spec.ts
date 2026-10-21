@@ -18,7 +18,7 @@ test('terminal connection does not force the file panel open; unavailable files 
   await page.goto('/');
   await page.locator('[data-dock-btn="ssh"]').click();
   await page.getByTestId('ssh-row-ssh-1').dblclick();
-  await expect(page.getByTestId('ssh-search')).toBeVisible();
+  await expect(page.getByTestId('workspace-area-terminal')).toHaveAttribute('aria-current', 'page');
   await expect(page.locator('[data-dock-btn="files"]')).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByRole('button', { name: '断开连接', exact: true })).toBeEnabled();
   await page.locator('[data-dock-btn="files"]').click();

@@ -1,5 +1,5 @@
 import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react';
-import { useDockStore, PANEL_DEFS, ACTIVITY_BAR_WIDTH } from '../stores/dock';
+import { useDockStore, PANEL_DEFS } from '../stores/dock';
 import { useNavigationDrag, type NavigationDropTarget } from '../stores/navigationDrag';
 import { panelPlacementRects } from '../model/navigationPlacement';
 
@@ -7,20 +7,19 @@ function locateTarget(x: number, y: number, id: string): NavigationDropTarget | 
   const hit = document.elementFromPoint(x, y);
   const area = hit?.closest<HTMLElement>('[data-dock-zone]');
   const side = area?.dataset.dockZone;
-  if (!area || (side !== 'left' && side !== 'right')) {
+  if (!area || side !== 'right') {
     if (!PANEL_DEFS[id]) return null;
     const body = document.querySelector<HTMLElement>('.workspace-body')?.getBoundingClientRect();
-    if (!body || y < body.top || y > body.bottom || x < body.left + ACTIVITY_BAR_WIDTH || x > body.right) return null;
+    if (!body || y < body.top || y > body.bottom || x < body.left || x > body.right) return null;
     const dock = useDockStore.getState();
     const regions = panelPlacementRects(body, dock.panelWidths[id] ?? PANEL_DEFS[id]!.width);
-    const destination = x <= regions.left.left + regions.left.width ? 'left'
-      : x >= regions.right.left ? 'right' : null;
+    const destination = x >= regions.right.left ? 'right' : null;
     if (!destination) return null;
-    const zone = destination === 'left' ? dock.leftZone : dock.rightZone;
+    const zone = dock.rightZone;
     return { side: destination, index: zone.includes(id) ? zone.indexOf(id) : zone.length, openPanel: true };
   }
   const dock = useDockStore.getState();
-  const zone = side === 'left' ? dock.leftZone : dock.rightZone;
+  const zone = dock.rightZone;
   const placeholder = hit?.closest<HTMLElement>('[data-dock-placeholder]');
   if (placeholder && area.contains(placeholder)) return { side, index: Number(placeholder.dataset.dockPlaceholder) };
   const slot = hit?.closest<HTMLElement>('[data-dock-slot]');
@@ -28,7 +27,7 @@ function locateTarget(x: number, y: number, id: string): NavigationDropTarget | 
     // Gaps between controls belong to the next insertion boundary, not the end.
     for (const candidate of area.querySelectorAll<HTMLElement>('[data-dock-slot]:not([data-moving="true"])')) {
       const rect = candidate.getBoundingClientRect();
-      if ((side === 'left' ? y < rect.top + rect.height / 2 : x < rect.left + rect.width / 2)) {
+      if (x < rect.left + rect.width / 2) {
         return { side, index: zone.indexOf(candidate.dataset.dockSlot!) };
       }
     }
@@ -36,7 +35,7 @@ function locateTarget(x: number, y: number, id: string): NavigationDropTarget | 
   }
   const index = zone.indexOf(slot.dataset.dockSlot!);
   const rect = slot.getBoundingClientRect();
-  const after = side === 'left' ? y > rect.top + rect.height / 2 : x > rect.left + rect.width / 2;
+  const after = x > rect.left + rect.width / 2;
   return { side, index: index + (after ? 1 : 0) };
 }
 

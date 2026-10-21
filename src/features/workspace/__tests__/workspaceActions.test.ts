@@ -1,0 +1,77 @@
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+vi.mock('@platform/diagnostics', () => ({ invoke: vi.fn(async () => undefined), diagnostic: vi.fn() }));
+vi.mock('@platform/api/fs', async original => ({ ...await original<typeof import('@platform/api/fs')>(), pickPath: vi.fn() }));
+import { pickPath } from '@platform/api/fs';
+import { editorFileKey } from '@core/editor';
+import { useWorkspaceStore } from '../stores/workspace';
+import { useWorkspaceNavigation } from '../stores/navigation';
+import { useAiWorkspace, useChatStore } from '@features/chat';
+import { activateWorkspaceInstance, focusedWorkspaceArea, newWorkspaceItem, openWorkspaceFile } from '../services/workspaceActions';
+import { closeWorkspaceItem } from '../services/closeWorkspaceItem';
+
+const snapshot = useWorkspaceStore.getState();
+beforeEach(() => {
+  useWorkspaceStore.setState({ tabs: [], activeId: '', groups: [] });
+  useWorkspaceNavigation.setState({ area: 'terminal', collapsed: false, codeOrder: [], aiPlacement: 'main' });
+  useAiWorkspace.setState({ nativeTabs: [], selected: '', order: [] });
+});
+afterEach(() => { useWorkspaceStore.setState(snapshot, true); document.body.replaceChildren(); vi.clearAllMocks(); });
+
+it('opens a selected file in the code workspace and leaves a cancelled picker untouched', async () => {
+  vi.mocked(pickPath).mockResolvedValueOnce([]);
+  await openWorkspaceFile(); expect(useWorkspaceStore.getState().tabs).toEqual([]);
+  vi.mocked(pickPath).mockResolvedValueOnce(['/repo/file.ts']);
+  await openWorkspaceFile();
+  expect(useWorkspaceStore.getState().tabs[0]).toMatchObject({ kind: 'editor', selected: { path: '/repo/file.ts' } });
+  expect(useWorkspaceNavigation.getState().area).toBe('code');
+});
+it('selects files and comparisons using their mixed strip order', () => {
+  const state = useWorkspaceStore.getState();
+  const file = { path: '/repo/file.ts' };
+  state.openEditorFile(file);
+  state.openGitDiff({ paneId: 'terminal', target: { cwd: '/repo' }, path: 'file.ts', scope: 'unstaged' });
+  const comparison = useWorkspaceStore.getState().tabs.find(tab => tab.kind === 'git-diff')!;
+  if (comparison.kind !== 'git-diff') throw new Error('Expected comparison');
+  const id = comparison.comparisons?.[0].id ?? comparison.id;
+  useWorkspaceNavigation.setState({ codeOrder: [`diff:${id}`, `file:${editorFileKey(file)}`] });
+  expect(activateWorkspaceInstance(1)).toBe(true);
+  expect(useWorkspaceStore.getState().tabs.find(tab => tab.id === useWorkspaceStore.getState().activeId)?.kind).toBe('editor');
+  expect(activateWorkspaceInstance(0)).toBe(true);
+  expect(useWorkspaceStore.getState().activeId).toBe(comparison.id);
+  expect(activateWorkspaceInstance(8)).toBe(false);
+});
+it('selects terminal groups in visual order and expands the selected collapsed group', () => {
+  useWorkspaceStore.setState({ tabs: [
+    { id: 'loose', kind: 'session', title: 'Loose', layout: { type: 'leaf', terminal: { id: 'loose#0', kind: 'local' } } },
+    { id: 'grouped', kind: 'session', title: 'Grouped', groupId: 'group', layout: { type: 'leaf', terminal: { id: 'grouped#0', kind: 'local' } } },
+  ], activeId: 'loose', groups: [{ id: 'group', title: 'Group', collapsed: true }] });
+  expect(activateWorkspaceInstance(0)).toBe(true);
+  expect(useWorkspaceStore.getState().activeId).toBe('grouped');
+  expect(useWorkspaceStore.getState().groups[0].collapsed).toBe(false);
+});
+it('creates AI conversations in the focused side surface without replacing the main workspace', () => {
+  useWorkspaceNavigation.setState({ area: 'terminal', aiPlacement: 'side' });
+  const surface = document.createElement('div'); surface.dataset.testid = 'ai-surface-side';
+  const input = document.createElement('input'); surface.appendChild(input); document.body.appendChild(surface); input.focus();
+  expect(focusedWorkspaceArea()).toBe('ai');
+  newWorkspaceItem();
+  expect(useWorkspaceNavigation.getState().area).toBe('terminal');
+  expect(useAiWorkspace.getState().nativeTabs).toEqual([useChatStore.getState().activeConversationId]);
+  expect(useWorkspaceStore.getState().tabs).toEqual([]);
+});
+
+it('switches only main utility pages while the AI session group is docked elsewhere', () => {
+  const workspace = useWorkspaceStore.getState();
+  workspace.openHarnessTab();
+  useAiWorkspace.getState().openNative(useChatStore.getState().createConversation());
+  workspace.openUsageTab(); workspace.openAiHistoryTab();
+  useWorkspaceNavigation.setState({ aiPlacement: 'side' });
+  expect(activateWorkspaceInstance(0)).toBe(true);
+  expect(useWorkspaceStore.getState().tabs.find(tab => tab.id === useWorkspaceStore.getState().activeId)?.kind).toBe('usage');
+  expect(useWorkspaceNavigation.getState().aiPlacement).toBe('side');
+  expect(activateWorkspaceInstance(2)).toBe(false);
+  const harness = useWorkspaceStore.getState().tabs.find(tab => tab.kind === 'harness')!;
+  useWorkspaceStore.getState().activate(harness.id);
+  closeWorkspaceItem();
+  expect(useAiWorkspace.getState().nativeTabs).toHaveLength(1);
+});

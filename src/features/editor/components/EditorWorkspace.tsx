@@ -1,15 +1,18 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { editorFileKey, registerEditorCloseGuard, type EditorFile } from '@core/editor';
-import { useSessionStore } from '@features/workspace';
+import { useSessionStore, useWorkspaceNavigation } from '@features/workspace';
 import { fileIcon, openInTerminal } from '@features/files';
 import CodeEditor from '@ui/CodeEditor';
 import { IconButton } from '@ui/IconButton';
 import ReloadButton from '@ui/ReloadButton';
 import { TextButton } from '@ui/TextButton';
 import { OutlineButton } from '@ui/OutlineButton';
-import { Lock, Save, iconSizes } from '@ui/icons';
+import { Lock, Save, Plus, iconSizes } from '@ui/icons';
 import { isWindows } from '@platform/runtime';
-import FolderTabs, { type FolderTab } from '@ui/FolderTabs';
+import FolderTabs from '@ui/FolderTabs';
+import WorkspaceHeader from '@ui/WorkspaceHeader';
+import { useCodeWorkspaceTabs } from '@features/workspace/hooks/useCodeWorkspaceTabs';
+import { openWorkspaceFile } from '@features/workspace/services/workspaceActions';
 import ToolDialog from '@ui/ToolDialog';
 import ConfirmDialog from '@ui/ConfirmDialog';
 import ErrorBox from '@ui/ErrorBox';
@@ -23,7 +26,8 @@ import './editor.css';
 export default function EditorWorkspace({ children }: { children: ReactNode }) {
   const tabs = useSessionStore(state => state.tabs); const activeId = useSessionStore(state => state.activeId);
   const documents = useEditorDocuments(state => state.documents);
-  const page = tabs.find(tab => tab.id === activeId && tab.kind === 'editor');
+  const area = useWorkspaceNavigation(state => state.area);
+  const page = area === 'code' ? tabs.find(tab => tab.id === activeId && tab.kind === 'editor') : undefined;
   const files = tabs.filter(tab => tab.kind === 'editor').flatMap(tab => tab.files.map(file => ({ file, pageId: tab.id })));
   // Keep editor hosts attached when only the navigation order changes.
   const panes = [...files].sort((a, b) => editorFileKey(a.file).localeCompare(editorFileKey(b.file)));
@@ -60,13 +64,9 @@ export default function EditorWorkspace({ children }: { children: ReactNode }) {
     if (results.every(Boolean)) { closing.complete(); setClosing(null); }
     else setCloseError(t('Some files could not be saved. Your unsaved changes are kept.'));
   };
-  const fileTabs: FolderTab[] = files.map(({ file }) => {
-    const Icon = fileIcon(file.path); const key = editorFileKey(file);
-    return { id: key, label: `${file.path.split('/').pop()}${isDocumentDirty(documents[key]) ? ' •' : ''}`, tip: file.path, icon: <Icon size={iconSizes.compact} />, closeLabel: t('Close file {{path}}', { path: file.path }) };
-  });
   return <>
     <div className="editor-content-host" style={{ display: page ? 'none' : 'flex' }} inert={!!page}>{children}</div>
-    {panes.map(({ file, pageId }) => <DocumentPane key={editorFileKey(file)} file={file} tabs={fileTabs} active={pageId === activeId && page?.kind === 'editor' && editorFileKey(page.selected) === editorFileKey(file)} />)}
+    {panes.map(({ file, pageId }) => <DocumentPane key={editorFileKey(file)} file={file} active={pageId === activeId && page?.kind === 'editor' && editorFileKey(page.selected) === editorFileKey(file)} />)}
     {closing && <ToolDialog label={t('Unsaved changes')} onClose={() => { if (!saving) setClosing(null); }} busy={saving} width={520}>
       <div className="editor-close-dialog"><p>{t('Save your changes before closing?')}</p><div className="editor-file-list">{closing.files.filter(file => isDocumentDirty(documents[editorFileKey(file)])).map(file => <span key={editorFileKey(file)}>{file.path}</span>)}</div>
         {closeError && <ErrorBox title={t('Could not save files')} details={closeError} />}
@@ -77,7 +77,8 @@ export default function EditorWorkspace({ children }: { children: ReactNode }) {
   </>;
 }
 
-function DocumentPane({ file, active, tabs }: { file: EditorFile; active: boolean; tabs: FolderTab[] }) {
+function DocumentPane({ file, active }: { file: EditorFile; active: boolean }) {
+  const codeTabs = useCodeWorkspaceTabs();
   const document = useEditorDocuments(state => state.documents[editorFileKey(file)]);
   const [reload, setReload] = useState(false);
   useEffect(() => { void useEditorDocuments.getState().load(file); }, [file.path, file.connectionId]);
@@ -90,18 +91,18 @@ function DocumentPane({ file, active, tabs }: { file: EditorFile; active: boolea
   const elevated = () => { void openInTerminal(file, true).catch(reason => useToastStore.getState().addToast(String(reason), 'error')); };
   const Icon = fileIcon(file.path);
   return <section className="editor-pane" data-testid={active ? 'file-editor' : undefined} style={{ display: active ? 'flex' : 'none' }} inert={!active}>
-    <FolderTabs items={active ? tabs : []} selected={editorFileKey(file)} label={t('Open files')} listId="editor-files" className="editor-tabs"
-      onSelect={key => { const item = useSessionStore.getState().tabs.flatMap(tab => tab.kind === 'editor' ? tab.files : []).find(item => editorFileKey(item) === key); if (item) useSessionStore.getState().openEditorFile(item); }}
-      onClose={key => { const item = useSessionStore.getState().tabs.flatMap(tab => tab.kind === 'editor' ? tab.files : []).find(item => editorFileKey(item) === key); if (item) useSessionStore.getState().closeEditorFile(item); }}
-      onMove={(...args) => useSessionStore.getState().moveEditorFile(...args)} menuItems={[
+    <WorkspaceHeader active={active}><FolderTabs items={active ? codeTabs.items : []} selected={`file:${editorFileKey(file)}`} label={t('Open files and comparisons')} listId="code-documents" className="editor-tabs"
+      onSelect={codeTabs.onSelect} onClose={codeTabs.onClose}
+      onMove={codeTabs.onMove} menuItems={[
         { label: t('Save file'), disabled: document?.readOnly || !dirty || document?.saving || document?.loading, onClick: save },
         { label: t('Reload file'), disabled: document?.saving, onClick: reloadFile }, { label: t('Open in terminal'), onClick: terminal },
         { label: elevatedLabel, onClick: elevated },
       ]} toolbar={<>
+        <IconButton compact aria-label={t('Open file')} data-tip={t('Open file')} onClick={() => void openWorkspaceFile()}><Plus size={iconSizes.control} /></IconButton>
         <IconButton compact aria-label={t('Save file')} data-tip={t('Save file (Ctrl/Cmd+S)')} disabled={document?.readOnly || !dirty || document?.saving || document?.loading} onClick={save}><Save size={iconSizes.control} /></IconButton>
         <span className="folder-action-secondary"><ReloadButton compact label={t('Reload file')} busy={document?.loading} disabled={document?.saving} onReload={reloadFile} /></span>
         <TextButton className="folder-action-secondary" onClick={terminal}>{t('Open in terminal')}</TextButton>
-      </>} />
+      </>} /></WorkspaceHeader>
     <div className="folder-path" data-tip={file.path}><Icon size={12} /><span>{file.path}{dirty ? ' •' : ''}</span>{document?.readOnly && <span className="editor-readonly-label"><Lock size={12} />{t('Read-only')}</span>}</div>
     {document?.readOnly && !document.loading && <ErrorBox tone="info" compact dismissible={false} actions={<TextButton onClick={elevated}>{elevatedLabel}</TextButton>}>
       {t(document.permissionDenied ? 'Your current user cannot access or write this file. Open it with elevated permissions to edit.' : 'This file is read-only. Editing and saving are disabled.')}

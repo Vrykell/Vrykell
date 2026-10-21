@@ -16,8 +16,9 @@ for (const theme of ['深色', '浅色']) {
       await expect(page.getByRole('button', { name: '关闭设置', exact: true })).toBeVisible();
       await expect(page.locator('.settings-navigation-toggle, .settings-navigation-backdrop')).toHaveCount(0);
       const settings = (await page.locator('.settings-screen').boundingBox())!;
-      expect(settings.x).toBe(40);
-      expect(settings.width).toBe(width - 48);
+      const sidebarWidth = width <= 900 ? 48 : 208;
+      expect(settings.x).toBe(sidebarWidth);
+      expect(settings.width).toBe(width - sidebarWidth - 8);
       expect((await nav.boundingBox())!.width).toBeGreaterThanOrEqual(180);
       await page.screenshot({ path: info.outputPath(`settings-${width}.png`), animations: 'disabled' });
     }
@@ -27,18 +28,18 @@ for (const theme of ['深色', '浅色']) {
   });
 }
 
-test('settings cover both auxiliary panels and preserve their workspace layout', async ({ page }) => {
+test('settings cover the auxiliary panel and preserve the workspace layout', async ({ page }) => {
   await setupTauriMock(page); await page.goto('/');
   await page.locator('[data-dock-btn="chat"]').click();
   const input = page.locator('[data-terminal-input]').first();
   await input.fill('preserved draft');
   const before = await page.locator('.workspace-main').boundingBox();
   await gotoSetting(page, '模型行为');
-  await expect(page.locator('.workspace-side-panel[data-visible="true"]')).toHaveCount(2);
+  await expect(page.locator('.workspace-side-panel[data-visible="true"]')).toHaveCount(1);
   for (const panel of await page.locator('.workspace-side-panel[data-visible="true"]').all()) {
     await expect(panel).toBeHidden(); await expect(panel).toHaveAttribute('inert', '');
   }
-  expect((await page.locator('.settings-screen').boundingBox())!.width).toBe(1192);
+  expect((await page.locator('.settings-screen').boundingBox())!.width).toBe(1024);
   await page.getByRole('button', { name: '关闭设置', exact: true }).click();
   expect(await page.locator('.workspace-main').boundingBox()).toEqual(before);
   await expect(input).toHaveValue('preserved draft');

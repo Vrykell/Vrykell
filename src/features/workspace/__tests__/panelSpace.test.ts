@@ -1,54 +1,30 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { useDockStore } from '@features/workspace/stores/dock';
+import { afterEach, beforeEach, expect, it } from 'vitest';
+import { useDockStore } from '../stores/dock';
+import { useWorkspaceNavigation } from '../stores/navigation';
 
-describe('responsive panel space', () => {
-  const originalWidth = window.innerWidth;
-  const snapshot = useDockStore.getState();
-  beforeEach(() => {
-    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1000 });
-    useDockStore.setState({ leftZone: ['tabs', 'ssh', 'files'], rightZone: ['chat'], leftPanels: ['tabs'], rightPanels: [], panelWidths: {}, collapsedPanels: [] });
-  });
-  afterEach(() => {
-    Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalWidth });
-    useDockStore.setState(snapshot, true);
-  });
+const originalWidth = window.innerWidth;
+const snapshot = useDockStore.getState();
+beforeEach(() => {
+  useWorkspaceNavigation.setState({ collapsed: false, area: 'code' });
+  useDockStore.setState({ leftZone: [], rightZone: ['files', 'chat'], leftPanels: [], rightPanels: [], panelWidths: {}, collapsedPanels: [] });
+});
+afterEach(() => { Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalWidth }); useDockStore.setState(snapshot, true); });
 
-  it('replaces a navigation panel instead of opening both', () => {
-    useDockStore.getState().openPanel('ssh');
-    expect(useDockStore.getState().leftPanels).toEqual(['ssh']);
-  });
-  it('keeps both sides when command space remains usable', () => {
-    useDockStore.getState().openPanel('chat');
-    expect(useDockStore.getState().leftPanels).toEqual(['tabs']);
-    expect(useDockStore.getState().rightPanels).toEqual(['chat']);
-  });
-  it('fits session navigation and the assistant at a compact desktop width', () => {
-    Object.defineProperty(window, 'innerWidth', { value: 940 });
-    useDockStore.getState().openPanel('chat');
-    expect(useDockStore.getState().leftPanels).toEqual(['tabs']);
-    expect(useDockStore.getState().rightPanels).toEqual(['chat']);
-  });
-  it('reserves the right frame gap with or without an open sidebar', () => {
-    // The right frame gap, both panels and the terminal fit at this boundary.
-    Object.defineProperty(window, 'innerWidth', { value: 908 });
-    useDockStore.getState().openPanel('chat');
-    expect(useDockStore.getState().leftPanels).toEqual(['tabs']);
-    expect(useDockStore.getState().rightPanels).toEqual(['chat']);
-  });
-  it('keeps the newly opened side in a narrow window', () => {
-    Object.defineProperty(window, 'innerWidth', { value: 720 });
-    useDockStore.getState().openPanel('chat');
-    expect(useDockStore.getState().leftPanels).toEqual([]);
-    expect(useDockStore.getState().rightPanels).toEqual(['chat']);
-    useDockStore.getState().openPanel('tabs');
-    expect(useDockStore.getState().rightPanels).toEqual([]);
-    expect(useDockStore.getState().leftPanels).toEqual(['tabs']);
-  });
-  it('reconciles panels after resizing without hiding an open AI composer', () => {
-    useDockStore.getState().openPanel('chat');
-    Object.defineProperty(window, 'innerWidth', { value: 720 });
-    useDockStore.getState().reconcilePanelSpace();
-    expect(useDockStore.getState().rightPanels).toEqual(['chat']);
-    expect(useDockStore.getState().leftPanels).toEqual([]);
-  });
+it.each([1240, 940, 908, 760, 600])('keeps a usable right panel at width %s', width => {
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
+  useDockStore.getState().openPanel('chat');
+  expect(useDockStore.getState().rightPanels).toEqual(['chat']);
+  expect(useDockStore.getState().leftPanels).toEqual([]);
+});
+it('closes the panel when neither the rail nor a usable terminal can fit', () => {
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 560 });
+  useDockStore.getState().openPanel('chat');
+  expect(useDockStore.getState().rightPanels).toEqual([]);
+});
+it('reconciles a shrinking window without opening another panel', () => {
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1240 });
+  useDockStore.getState().openPanel('chat');
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 760 });
+  useDockStore.getState().reconcilePanelSpace();
+  expect(useDockStore.getState().rightPanels).toEqual(['chat']);
 });

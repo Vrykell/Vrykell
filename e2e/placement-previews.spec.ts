@@ -16,7 +16,7 @@ for (const theme of ['dark', 'light'] as const) test(`panel and split previews s
   const button = (await page.locator('[data-dock-btn="files"]').boundingBox())!;
   const body = (await page.locator('.workspace-body').boundingBox())!;
   await page.mouse.move(button.x + 16, button.y + 16); await page.mouse.down();
-  await page.mouse.move(body.x + 90, body.y + 250, { steps: 8 });
+  await page.mouse.move(body.x + body.width - 90, body.y + 250, { steps: 8 });
   const panel = page.getByTestId('panel-drop-preview'); await expect(panel).toBeVisible();
   await expect.poll(() => opacity(panel)).toBeGreaterThanOrEqual(0.95);
   const panelColor = await panel.evaluate(element => getComputedStyle(element).backgroundColor);

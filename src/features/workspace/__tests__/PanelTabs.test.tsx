@@ -6,6 +6,7 @@ import { useListReorder } from '@ui/listReorder';
 import { useIconColorStore } from '@config/iconColors';
 import { useTerminalDefaults } from '@config/terminalDefaults';
 import { getAvailableShells } from '@platform/shells';
+import { useWorkspaceNavigation } from '../stores/navigation';
 
 vi.mock('@platform/shells', async original => ({ ...await original<typeof import('@platform/shells')>(), getAvailableShells: vi.fn().mockResolvedValue([
   { id: 'zsh', label: 'Zsh', default: true }, { id: 'bash', label: 'Bash', default: false },
@@ -20,6 +21,7 @@ const snapshot = useSessionStore.getState();
 beforeEach(() => {
   useTerminalDefaults.setState({ shell: 'system' });
   useIconColorStore.setState({ colors: {} });
+  useWorkspaceNavigation.setState({ groupColors: {} });
   useSessionStore.setState({
     tabs: [
       { id: 'local', title: 'Shell', kind: 'session', layout: { type: 'leaf', terminal: { id: 'local#0', kind: 'local', shellType: 'bash' } } },
@@ -63,7 +65,7 @@ it('colors terminal icons from their context menu without activating the tab', (
   expect(row.querySelector('svg')!.style.color).toBe('var(--shell-bash-accent)');
 });
 
-it.each(['ai-history', 'history'])('leaves the %s icon on its theme color without a palette', id => {
+it.each(['history'])('leaves the %s icon on its theme color without a palette', id => {
   useIconColorStore.setState({ colors: { 'page:ai-history': 'coral', 'page:history': 'coral' } });
   render(<PanelTabs />);
   const row = screen.getByTestId(`tab-row-${id}`);
@@ -95,35 +97,43 @@ it('creates ungrouped tabs from the panel button and keeps only the group button
   expect(screen.getByTestId('new-tab-modal')).toHaveAttribute('data-open', 'true');
   expect(screen.getByTestId('new-tab-modal')).toHaveAttribute('data-group', '');
 
-  // The group's own + keeps the new tab inside that group.
-  fireEvent.click(screen.getByRole('button', { name: '在此分组新建终端' }));
+  fireEvent.contextMenu(screen.getByTestId('group-header-group-a'));
+  fireEvent.click(screen.getByText('在此分组新建终端'));
   expect(screen.getByTestId('new-tab-modal')).toHaveAttribute('data-group', 'group-a');
 });
 
-it('lists singleton pages alongside sessions and switches or closes them', () => {
+it('keeps terminal history in the terminal strip and excludes AI pages', () => {
   render(<PanelTabs />);
-  const settings = screen.getByTestId('tab-row-ai-history');
+  expect(screen.queryByTestId('tab-row-ai-history')).toBeNull();
   const history = screen.getByTestId('tab-row-history');
-  expect(settings).toHaveAttribute('data-reorder-item', 'ai-history');
   expect(history).toHaveAttribute('data-reorder-kind', 'loose-tab');
   fireEvent.click(history);
   expect(useSessionStore.getState().activeId).toBe('history');
-  fireEvent.doubleClick(settings);
-  expect(settings.querySelector('input')).toBeNull();
-  fireEvent.contextMenu(settings);
+  fireEvent.doubleClick(history);
+  expect(history.querySelector('input')).toBeNull();
+  fireEvent.contextMenu(history);
   expect(screen.queryByText('复制会话')).toBeNull();
   fireEvent.click(screen.getByText('关闭标签'));
-  expect(useSessionStore.getState().tabs.some(tab => tab.kind === 'ai-history')).toBe(false);
+  expect(useSessionStore.getState().tabs.some(tab => tab.kind === 'history')).toBe(false);
+});
+
+it('prevents pointer activation from moving focus onto a nested tab button', () => {
+  render(<PanelTabs />);
+  const row = screen.getByTestId('tab-row-local');
+  expect(fireEvent.pointerDown(row.querySelector('[role="tab"]')!, { button: 0, isPrimary: true })).toBe(false);
+  expect(useSessionStore.getState().activeId).toBe('local');
+  expect(fireEvent.pointerDown(screen.getByTestId('tab-close-local'), { button: 0, isPrimary: true })).toBe(true);
 });
 
 it('filters singleton pages without hiding other rows', () => {
   const { container } = render(<PanelTabs />);
   const icon = screen.getByTestId('tab-row-local').querySelector('svg')!;
   expect(icon).toHaveAttribute('data-shell-mark', 'bash');
-  expect(screen.getByTestId('tab-row-ai-history')).toBeVisible();
+  expect(screen.queryByTestId('tab-row-ai-history')).toBeNull();
   expect(screen.getByTestId('tab-row-history')).toBeVisible();
   act(() => useSessionStore.getState().activate('local'));
   expect(icon.style.color).toBe('var(--shell-bash-accent)');
+  fireEvent.click(screen.getByTestId('tab-search-toggle'));
   fireEvent.change(screen.getByTestId('tab-search'), { target: { value: 'History' } });
   expect(screen.getByTestId('tab-row-history')).toBeVisible();
   expect(screen.queryByTestId('tab-row-ai-history')).toBeNull();
@@ -136,9 +146,8 @@ it('keeps group rows intact through renaming and reordering', () => {
     { id: 'group-b', title: 'Second', collapsed: false },
   ] });
   render(<PanelTabs />);
-  const firstIcon = screen.getByTestId('group-header-group-a').querySelector('[data-group-icon]')!;
-  expect(firstIcon).toHaveStyle({ width: '24px', height: '24px', color: 'var(--text-secondary)' });
-  expect(firstIcon).toHaveAttribute('data-group-icon', 'open');
+  expect(screen.getByTestId('group-title-group-a')).toHaveTextContent('First');
+  expect(screen.getByTestId('group-header-group-a')).toHaveAttribute('aria-expanded', 'true');
   act(() => useSessionStore.setState({ groups: [
     { id: 'group-b', title: 'Second', collapsed: false },
     { id: 'group-a', title: 'Renamed', collapsed: false },
@@ -146,7 +155,7 @@ it('keeps group rows intact through renaming and reordering', () => {
   expect(screen.getByTestId('group-header-group-a')).toHaveTextContent('Renamed');
 });
 
-it('keeps group actions keyboard-accessible without group colors or member inheritance', () => {
+it('keeps group actions and color controls keyboard-accessible without changing member icons', () => {
   useSessionStore.setState(state => ({
     tabs: state.tabs.map(tab => tab.kind === 'session' ? { ...tab, groupId: 'group-a' } : tab),
     groups: [{ id: 'group-a', title: 'Group', collapsed: false }],
@@ -156,9 +165,10 @@ it('keeps group actions keyboard-accessible without group colors or member inher
   const header = screen.getByTestId('group-header-group-a');
   const member = screen.getByTestId('tab-row-local');
   fireEvent.keyDown(header, { key: 'F10', shiftKey: true });
-  expect(screen.queryByRole('menuitemradio')).toBeNull();
-  fireEvent.keyDown(window, { key: 'Escape' });
-  expect(header.querySelector('[data-group-icon]')).toHaveStyle({ color: 'var(--text-secondary)' });
+  const palette = screen.getByRole('group', { name: '分组颜色' });
+  expect(palette.closest('.context-menu-footer')).not.toBeNull();
+  fireEvent.click(screen.getByRole('menuitemradio', { name: '紫色' }));
+  expect(useWorkspaceNavigation.getState().groupColors['group-a']).toBe('violet');
   expect(member.querySelector('svg')!.style.color).toBe('var(--shell-bash-accent)');
   expect(useSessionStore.getState().groups[0].collapsed).toBe(false);
   expect(header).toHaveFocus();
@@ -179,6 +189,7 @@ it('keeps a filtered nonempty group protected by the archive confirmation', () =
     groups: [{ id: 'group-a', title: 'Group', collapsed: false }], archiveGroup, deleteGroup,
   }));
   render(<PanelTabs />);
+  fireEvent.click(screen.getByTestId('tab-search-toggle'));
   fireEvent.change(screen.getByTestId('tab-search'), { target: { value: 'History' } });
   fireEvent.contextMenu(screen.getByTestId('group-header-group-a'));
   fireEvent.click(screen.getByText('归档分组'));
@@ -205,7 +216,7 @@ it('opens the panel menu on a blank-area right click even while the native menu 
     expect(screen.queryByText('AI 自动分组')).toBeNull();
 
     // A row keeps its own menu: it stops propagation, so no second panel menu appears.
-    fireEvent.contextMenu(screen.getByTestId('tab-row-ai-history'));
+    fireEvent.contextMenu(screen.getByTestId('tab-row-history'));
     expect(screen.getByText('关闭标签')).toBeVisible();
     expect(screen.getAllByRole('menu')).toHaveLength(1);
   } finally {
@@ -221,10 +232,9 @@ it('keeps an empty session drop zone expandable and previews grouped tabs outsid
   }));
   const { container } = render(<PanelTabs />);
   const zone = container.querySelector<HTMLElement>('[data-reorder-zone="ungrouped"]')!;
-  expect(zone.style.flex).toBe('1 0 auto');
-  expect(zone.style.minHeight).toBe('44px');
-  expect(zone.closest<HTMLElement>('[data-reorder-list]')!.style.display).toBe('flex');
-  expect(zone.querySelectorAll('[data-reorder-item]')).toHaveLength(2);
+  expect(zone).toHaveClass('terminal-ungrouped-tabs');
+  expect(zone.closest('[data-reorder-list]')).toHaveClass('terminal-tab-list');
+  expect(zone.querySelectorAll('[data-reorder-item]')).toHaveLength(1);
   act(() => {
     useListReorder.getState().start({ listId: 'session-tabs', id: 'local', kind: 'tab' }, { x: 10, y: 500 });
     useListReorder.getState().hover({ itemId: 'history', after: true });

@@ -1,6 +1,26 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { useTranscriptFollow } from '../hooks/useTranscriptFollow';
+
+it('cancels a pending return to latest when the reader pauses to inspect content', () => {
+  vi.useFakeTimers();
+  try {
+    let follow: ReturnType<typeof useTranscriptFollow>;
+    function Transcript() {
+      follow = useTranscriptFollow('reading', 0);
+      return <div data-testid="reading" ref={follow.scrollRef} onScroll={follow.onScroll} />;
+    }
+    render(<Transcript />);
+    const body = screen.getByTestId('reading');
+    Object.defineProperties(body, { scrollHeight: { value: 1000 }, clientHeight: { value: 200 } });
+    body.scrollTop = 800; fireEvent.scroll(body);
+    act(() => follow!.pauseFollow());
+    body.scrollTop = 300;
+    act(() => vi.advanceTimersByTime(200));
+    expect(body.scrollTop).toBe(300);
+    expect(follow!.following).toBe(false);
+  } finally { vi.useRealTimers(); }
+});
 
 it('follows incremental output while retaining a paused reading position across hidden pages', () => {
   let follow: ReturnType<typeof useTranscriptFollow>;

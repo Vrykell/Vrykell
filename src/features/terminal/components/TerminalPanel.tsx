@@ -16,6 +16,7 @@ import { secretResponsePrompt, secretResponseWasRejected } from '../model/termin
 import { t } from '@i18n';
 import { isTerminalDebugEnabled, terminalDebug } from '../services/terminalDebug';
 import type { SshSessionStatus } from '@core/ssh';
+import { useSessionStore, useUiStore, useWorkspaceNavigation } from '@features/workspace';
 
 /** Render an interactive SSH session with xterm so screen contents and cursor stay in sync. */
 interface TerminalPanelProps {
@@ -55,6 +56,9 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
   const cancellingRef = useRef(false);
   const responseRef = useRef<HTMLInputElement>(null);
   const sessionId = useTerminalStore(s => s.sessions[paneId]);
+  const activeTab = useSessionStore(state => state.activeId === tabId);
+  const terminalArea = useWorkspaceNavigation(state => state.area === 'terminal');
+  const settingsOpen = useUiStore(state => state.settingsOpen);
   const scene = useTerminalStore(s => s.scenes[paneId] ?? 'classic');
   const interactive = connectionInput && (scene !== 'blockList' || cancellation !== 'idle');
   const text = frame?.plainText ?? '';
@@ -70,10 +74,10 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
     ref.current?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus();
   };
   useEffect(() => {
-    if (!interactive || !sessionId) return;
+    if (!interactive || !sessionId || !activeTab || !terminalArea || settingsOpen) return;
     if (secret) responseRef.current?.focus();
     else ref.current?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus();
-  }, [interactive, sessionId, secret, ref]);
+  }, [interactive, sessionId, secret, ref, activeTab, terminalArea, settingsOpen]);
 
   const cancelAuthentication = async () => {
     if (!sessionId || cancellingRef.current) return;

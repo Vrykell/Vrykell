@@ -34,6 +34,7 @@ it('shares command glyphs and output framing with tool calls', () => {
   expect(headers[0].querySelector('svg')!.innerHTML).toBe(headers[1].querySelector('svg')!.innerHTML);
   expect(container.querySelector('.chat-reference .ai-tool-frame')).toHaveAttribute('data-framed', 'true');
   expect(container.querySelector('.chat-reference .ai-tool-output')).toHaveTextContent('Built successfully');
+  expect(container.querySelector('.chat-reference-body')).toHaveClass('ai-tool-details');
   expect(screen.getByText('退出码：0')).toBeVisible();
   expect(screen.getByTestId('reference-output-copy-one')).toBeInTheDocument();
 });

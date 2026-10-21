@@ -1,8 +1,8 @@
 import { TextInput } from '@ui/TextInput';
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { iconSizes,
-  Plus, History, Sparkles, DataUsage, Bot, GitBranch,
-  ChevronRight, Pencil, Archive, Folder, Trash2, X,
+  Plus, History, Sparkles, DataUsage, Bot,
+  Folder, Search,
  } from '@ui/icons';
 import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, useTabDisplayTitle, tabIconKey, tabIconColor, type Tab, type TabGroup } from '@features/workspace';
 import { useIconColorStore } from '@config/iconColors';
@@ -10,37 +10,37 @@ import { HistoryColorChoices } from '@ui/HistoryColorPalette';
 import { regenerateTitle } from '@features/agent/services/title';
 import { useToastStore } from '@ui/Toast';
 import { IconBtn } from '@ui/UiBtn';
-import SidebarToolbar from '@ui/SidebarToolbar';
-import { shellTypeLabel, type ShellType } from '@platform/shells';
+import type { ShellType } from '@platform/shells';
 import { useDefaultShellType } from '../hooks/useDefaultShellType';
 import NewTabModal from '@features/workspace/components/NewTabModal';
 import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/ContextMenu';
-import SidebarItem from '@ui/sidebarItem';
+import { FolderTabContent } from '@ui/FolderTabs';
+import { useHorizontalWheel } from '@ui/hooks/useHorizontalWheel';
+import { useActiveTabVisibility } from '@ui/hooks/useActiveTabVisibility';
+import { historyGroupColor } from '@ui/historyGroupColor';
+import { useWorkspaceNavigation } from '../stores/navigation';
+import WorkspaceHeader from '@ui/WorkspaceHeader';
 import { SshIcon, shellIconFor } from '@ui/shellIcons';
 import {
   ListReorderPlaceholder, ListReorderPreview, ListReorderZonePlaceholder,
   useListReorder, useListReorderDrag, type ListReorderDrag, type ListReorderTarget,
 } from '@ui/listReorder';
 import { t } from '@i18n';
-import { fileIcon } from '@features/files';
 import type { GroupingProposal } from '@features/agent/services/autoGrouping';
 import { useToolWindow } from '@ui/hooks/useToolWindow';
 import { applySessionGrouping } from '../services/autoGrouping';
 
-/**
- * Session navigation with filtering, grouping, renaming and drag ordering.
- *
- * Rows render through the shared SidebarItem (same component as the SSH list)
- * and reordering uses the shared placeholder pattern: the dragged row leaves
- * its slot for a dashed gap that marks where it will land.
- */
+/** Terminal navigation shares document tab styling and the common reorder placeholders. */
 
 /** One reorder list spans group headers and every tab row. */
 const LIST_ID = 'session-tabs';
 /** Zone id of the loose (ungrouped) area. */
 const UNGROUPED_ZONE = 'ungrouped';
 
-export default function PanelTabs() {
+export default function PanelTabs({ active = true }: { active?: boolean }) {
+  const strip = useRef<HTMLDivElement>(null);
+  useHorizontalWheel(strip, true);
+  const [searchOpen, setSearchOpen] = useState(false);
   const defaultShellType = useDefaultShellType();
   const tabs = useSessionStore((s) => s.tabs);
   const iconColors = useIconColorStore(state => state.colors);
@@ -74,6 +74,7 @@ export default function PanelTabs() {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; tabId: string } | null>(null);
 
   useEffect(() => { loadGroups(); }, [loadGroups]);
+  useActiveTabVisibility(strip, '[data-active="true"], [data-header-selected="true"]', `${activeId}:${tabs.length}:${JSON.stringify(groups)}`);
 
   function commitDrop(drag: ListReorderDrag, target: ListReorderTarget | null) {
     const ws = useSessionStore.getState();
@@ -115,20 +116,21 @@ export default function PanelTabs() {
     }
   }
 
-  const startDrag = useListReorderDrag({ listId: LIST_ID, onDrop: commitDrop,
+  const startDrag = useListReorderDrag({ listId: LIST_ID, axis: 'horizontal', grouped: true, onDrop: commitDrop,
     accepts: (dragKind, itemKind) => dragKind === 'group' ? itemKind === 'group'
       : itemKind === 'loose-tab' || (dragKind === 'tab' && itemKind === 'tab'),
   });
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return tabs;
-    return tabs.filter((t) => t.title.toLowerCase().includes(q));
+    const terminalTabs = tabs.filter(tab => tab.kind === 'session' || tab.kind === 'history');
+    if (!q) return terminalTabs;
+    return terminalTabs.filter((t) => t.title.toLowerCase().includes(q));
   }, [tabs, query]);
 
   const groupTabs = (gid: string) => filtered.filter((t) => isSessionTab(t) && t.groupId === gid);
   const ungroupedTabs = filtered.filter((tab) => !isSessionTab(tab) || !tab.groupId);
-  // 拖走的那行不参与「末尾占位」的判定（同 GroupSection）
+  // The dragged row does not participate in the final insertion boundary.
   const draggedTabId = useListReorder((s) => (s.drag && s.drag.kind !== 'group' ? s.drag.id : undefined));
   const remainingUngrouped = ungroupedTabs.filter((tab) => tab.id !== draggedTabId);
   const lastUngroupedId = remainingUngrouped[remainingUngrouped.length - 1]?.id;
@@ -137,34 +139,34 @@ export default function PanelTabs() {
   const ctxItems: ContextMenuItem[] = ctxMenu && ctxTab
     ? [
         ...(isSessionTab(ctxTab) && !ctxTab.groupId ? [{
-          label: '新建分组', group: 'organize' as const,
+          label: t('Create tab group'), group: 'organize' as const,
           onClick: () => {
-            // 建组后立即进入重命名（自动聚焦名称输入框）
+            // Creating a group immediately focuses its name input.
             void createGroupForTab(ctxTab.id).then((gid) => {
               if (!gid) return;
               const g = useSessionStore.getState().groups.find((x) => x.id === gid);
               setRenamingGroupId(gid);
-              setRenamingGroupTitle(g?.title ?? '新分组');
+              setRenamingGroupTitle(g?.title ?? t('New group'));
             });
           },
         }] : []),
-        // 组内标签的菜单补上出路：拖到「未分组」区之外，也能显式移出分组
+        // Grouped tabs also offer an explicit way back to the loose area.
         ...(isSessionTab(ctxTab) && ctxTab.groupId ? [{
-          label: '移出分组', group: 'organize' as const,
+          label: t('Remove from tab group'), group: 'organize' as const,
           onClick: () => {
             const scope = tabs.filter((t) => t.id !== ctxTab.id && (!isSessionTab(t) || !t.groupId));
             useSessionStore.getState().moveTab(ctxTab.id, null, scope.length);
           },
         }] : []),
         ...(isSessionTab(ctxTab) ? [
-          { label: '重命名', group: 'edit' as const, onClick: () => { setEditId(ctxTab.id); setEditTitle(ctxTab.title); } },
-          { label: '重新生成标题', group: 'edit' as const, onClick: () => {
-            useToastStore.getState().addToast('正在重新生成标题…', 'info');
+          { label: t('Rename tab'), group: 'edit' as const, onClick: () => { setEditId(ctxTab.id); setEditTitle(ctxTab.title); } },
+          { label: t('Regenerate tab title'), group: 'edit' as const, onClick: () => {
+            useToastStore.getState().addToast(t('Regenerating tab title…'), 'info');
             void regenerateTitle(ctxTab.id).then((ok) => {
-              if (ok) useToastStore.getState().addToast('标题已更新', 'success');
+              if (ok) useToastStore.getState().addToast(t('Tab title updated'), 'success');
             });
           } },
-          { label: '复制会话', group: 'primary' as const, onClick: () => duplicateTab(ctxTab.id) },
+          { label: t('Duplicate session'), group: 'primary' as const, onClick: () => duplicateTab(ctxTab.id) },
         ] : []),
         { label: t('AI auto-group'), group: 'organize', disabled: !tabs.some(isSessionTab), onClick: openGrouping },
         { label: t('Close this tab'), danger: true, onClick: () => closeTab(ctxTab.id) },
@@ -172,31 +174,30 @@ export default function PanelTabs() {
     : [];
 
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', height: '100%',
-      userSelect: 'none', background: 'transparent',
-    }}>
-      <SidebarToolbar search={{ value: query, onChange: event => setQuery(event.target.value), placeholder: t('Search session titles…'), 'data-testid': 'tab-search' }}>
-        <IconBtn title="会话历史" data-testid="tab-history-btn" onClick={openHistoryTab}>
+    <WorkspaceHeader active={active}><div className="folder-header terminal-instance-header">
+      <div className="folder-actions terminal-tab-tools">
+        <IconBtn title={t('Search session titles…')} data-testid="tab-search-toggle" onClick={() => { setSearchOpen(!searchOpen); setQuery(''); }}><Search size={iconSizes.control} /></IconBtn>
+        {searchOpen && <TextInput autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder={t('Search session titles…')} data-testid="tab-search" className="terminal-tab-search" />}
+        <IconBtn title={t('Session history')} data-testid="tab-history-btn" onClick={openHistoryTab}>
           <History size={iconSizes.control} />
         </IconBtn>
         <IconBtn title={t('ACP')} data-testid="tab-acp-btn" onClick={() => useSessionStore.getState().openHarnessTab()}>
           <Bot size={iconSizes.control} />
         </IconBtn>
         {/* The panel button always creates ungrouped tabs; only a group's own + assigns that group. */}
-        <IconBtn title="新建终端" data-testid="tab-new-btn" onClick={() => { setModalGroupId(undefined); setModalOpen(true); }}>
+        <IconBtn title={t('Create terminal')} data-testid="tab-new-btn" onClick={() => { setModalGroupId(undefined); setModalOpen(true); }}>
           <Plus size={iconSizes.control} />
         </IconBtn>
-      </SidebarToolbar>
+      </div>
 
-      {/* 列表：分组头与标签行同属一个重排列表 */}
-      <div data-reorder-list={LIST_ID} className="scroll-region" onContextMenu={event => {
+      {/* Group chips and instance tabs share one reorder list. */}
+      <div ref={strip} data-reorder-list={LIST_ID} className="folder-tab-list terminal-tab-list" role="tablist" aria-label={t('Terminal sessions')} onContextMenu={event => {
         // The webview policy cancels every native context menu before React runs, so
         // `defaultPrevented` is always true here; nested menus stop propagation instead.
         event.preventDefault();
         setPanelMenu({ x: event.clientX, y: event.clientY, trigger: event.currentTarget });
       }}
-        style={{ flex: 1, overflowY: 'auto', padding: '0 0 8px', display: 'flex', flexDirection: 'column' }}>
+        >
         {groups.map((g) => (
           <Fragment key={g.id}>
             <ListReorderPlaceholder listId={LIST_ID} itemId={g.id} />
@@ -219,10 +220,11 @@ export default function PanelTabs() {
               onToggleCollapse={() => toggleGroupCollapse(g.id)}
               onStartRenameGroup={() => { setRenamingGroupId(g.id); setRenamingGroupTitle(g.title); }}
               onCommitRenameGroup={() => { if (renamingGroupId) renameGroup(renamingGroupId, renamingGroupTitle); setRenamingGroupId(null); }}
+              onCancelRenameGroup={() => setRenamingGroupId(null)}
               onDeleteGroup={() => {
                 const hasTabs = tabs.some(tab => isSessionTab(tab) && tab.groupId === g.id);
                 if (!hasTabs) { void deleteGroup(g.id, false); return; }
-                const ok = window.confirm(`归档分组「${g.title}」？组内标签将关闭并移入会话历史。`);
+                const ok = window.confirm(t('Archive group "{{name}}"? Its tabs will close and move to session history.', { name: g.title }));
                 if (!ok) return;
                 void archiveGroup(g.id);
               }}
@@ -233,7 +235,7 @@ export default function PanelTabs() {
               onAutoGroup={openGrouping}
             />
             <ListReorderPlaceholder listId={LIST_ID} itemId={g.id} after />
-            {/* 收起/空分组没有可插入的行：悬停分组头时在组末尾占位（追加进组） */}
+            {/* Empty and collapsed groups accept appends at the group boundary. */}
             {(g.collapsed || groupTabs(g.id).length === 0) && (
               <ListReorderZonePlaceholder listId={LIST_ID} zoneId={g.id} />
             )}
@@ -245,11 +247,8 @@ export default function PanelTabs() {
           <div
             data-reorder-zone={UNGROUPED_ZONE}
             data-reorder-kind="loose-tab"
-            style={{ marginTop: groups.length > 0 ? 6 : 0, display: 'flex', flexDirection: 'column', gap: 2, flex: '1 0 auto', minHeight: 44 }}
+            className="terminal-ungrouped-tabs"
           >
-            {groups.length > 0 && (
-              <div style={{ padding: '0 8px 2px', fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>未分组</div>
-            )}
             {ungroupedTabs.map((t) => (
               <Fragment key={t.id}>
                 <ListReorderPlaceholder listId={LIST_ID} itemId={t.id} />
@@ -277,11 +276,11 @@ export default function PanelTabs() {
         )}
 
         {filtered.length === 0 && query.trim().length > 0 && (
-          <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>无匹配会话</div>
+          <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>{t('No matching terminal sessions')}</div>
         )}
       </div>
 
-      {/* 右键菜单 */}
+      {/* Instance actions reuse the shared context menu. */}
       {ctxMenu && ctxItems.length > 0 && (
         <ContextMenu
           anchor={{ x: ctxMenu.x, y: ctxMenu.y }}
@@ -316,12 +315,11 @@ export default function PanelTabs() {
       {panelMenu && <ContextMenu anchor={panelMenu} onClose={() => setPanelMenu(null)} items={[
         { label: t('AI auto-group'), disabled: !tabs.some(isSessionTab), onClick: openGrouping },
       ]} />}
-    </div>
+    </div></WorkspaceHeader>
   );
 }
 
-// ── 分组 section ──
-
+/** A colored group chip owns contiguous terminal tabs and their shared drop zone. */
 function GroupSection(props: {
   defaultShellType?: ShellType;
   group: TabGroup;
@@ -329,10 +327,10 @@ function GroupSection(props: {
   activeId: string;
   editId: string | null;
   editTitle: string;
-  setEditTitle: (v: string) => void;
+  setEditTitle: (value: string) => void;
   renamingGroupId: string | null;
   renamingGroupTitle: string;
-  setRenamingGroupTitle: (v: string) => void;
+  setRenamingGroupTitle: (value: string) => void;
   onActivate: (id: string) => void;
   onClose: (id: string) => void;
   onStartEdit: (id: string, title: string) => void;
@@ -341,208 +339,80 @@ function GroupSection(props: {
   onToggleCollapse: () => void;
   onStartRenameGroup: () => void;
   onCommitRenameGroup: () => void;
+  onCancelRenameGroup: () => void;
   onDeleteGroup: () => void;
-  onPointerDownTab: (e: React.PointerEvent<HTMLElement>, tabId: string) => void;
-  onPointerDownGroup: (e: React.PointerEvent<HTMLElement>) => void;
-  onContextMenuTab: (e: React.MouseEvent, tabId: string) => void;
+  onPointerDownTab: (event: React.PointerEvent<HTMLElement>, id: string) => void;
+  onPointerDownGroup: (event: React.PointerEvent<HTMLElement>) => void;
+  onContextMenuTab: (event: React.MouseEvent, id: string) => void;
   onAddTab: () => void;
   onAutoGroup: () => void;
 }) {
   const { group, tabs, activeId } = props;
   const [menu, setMenu] = useState<MenuAnchor | null>(null);
-  const collapsed = group.collapsed;
+  const colorOverride = useWorkspaceNavigation(state => state.groupColors[group.id]);
+  const color = colorOverride ?? historyGroupColor(group.id);
   const empty = useSessionStore(state => !state.tabs.some(tab => isSessionTab(tab) && tab.groupId === group.id));
-  const anyMemberActive = tabs.some((t) => t.id === activeId);
-  const dragging = useListReorder((s) => s.drag?.listId === LIST_ID && s.drag.id === group.id);
-  // 末尾占位对应当前可见的最后一行（拖走的那行不参与，否则拖末行时占位对不上）
-  const draggedTabId = useListReorder((s) => (s.drag?.kind === 'tab' ? s.drag.id : undefined));
-  const remainingTabs = tabs.filter((t) => t.id !== draggedTabId);
-  const lastTabId = remainingTabs[remainingTabs.length - 1]?.id;
-  return (
-    <div style={{ marginBottom: 4, flexShrink: 0 }}>
-      {/* Group containers stay transparent so selection belongs to a single row. */}
-      <div
-        className="tab-group-container"
-        data-reorder-container=""
-        data-reorder-dragging={dragging ? 'true' : undefined}
-        data-group-id={group.id}
-        data-group-active={anyMemberActive ? 'true' : 'false'}
-        data-reorder-zone={group.id}
-        data-reorder-kind="tab"
-        style={{ margin: 0, overflow: 'hidden' }}
-      >
-        {/* 分组头：图标徽章 + 名称 + 副标题 + 折叠 chevron */}
-        <div
-          className="tab-group-header"
-          data-reorder-measure="container"
-          data-group-header-id={group.id}
-          data-header-selected={(collapsed && anyMemberActive) ? 'true' : 'false'}
-          data-renaming={props.renamingGroupId === group.id ? 'true' : undefined}
-          data-testid={`group-header-${group.id}`}
-          data-reorder-item={group.id}
-          data-reorder-kind="group"
-          data-reorder-dragging={dragging ? 'true' : undefined}
-          tabIndex={0}
-          role="button"
-          aria-expanded={!collapsed}
-          aria-label={group.title}
-          onContextMenu={event => {
-            event.preventDefault(); event.stopPropagation();
-            setMenu({ x: event.clientX, y: event.clientY, trigger: event.currentTarget });
-          }}
+  const active = tabs.some(tab => tab.id === activeId);
+  const dragging = useListReorder(state => state.drag?.listId === LIST_ID && state.drag.id === group.id);
+  const draggedTab = useListReorder(state => state.drag?.listId === LIST_ID ? state.drag.id : undefined);
+  const remaining = tabs.filter(tab => tab.id !== draggedTab);
+  const last = remaining[remaining.length - 1]?.id;
+  return <div className="terminal-tab-group" data-group-color={color} style={{ '--terminal-group-color': color === 'neutral' ? 'var(--text-secondary)' : `var(--group-${color})` } as React.CSSProperties}>
+    <div className="tab-group-container" data-reorder-container="" data-reorder-dragging={dragging ? 'true' : undefined}
+      data-group-id={group.id} data-group-active={active} data-reorder-zone={group.id} data-reorder-kind="tab">
+      <div className="tab-group-header" data-reorder-measure="container" data-group-header-id={group.id}
+        data-header-selected={group.collapsed && active ? 'true' : 'false'} data-renaming={props.renamingGroupId === group.id || undefined}
+        data-testid={`group-header-${group.id}`} data-reorder-item={group.id} data-reorder-kind="group"
+        data-reorder-dragging={dragging ? 'true' : undefined} tabIndex={0} role="button" aria-expanded={!group.collapsed} aria-label={group.title}
+        onContextMenu={event => { event.preventDefault(); event.stopPropagation(); setMenu({ x: event.clientX, y: event.clientY, trigger: event.currentTarget }); }}
+        onKeyDown={event => {
+          if (event.target !== event.currentTarget) return;
+          if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); props.onToggleCollapse(); }
+          if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+            event.preventDefault(); const rect = event.currentTarget.getBoundingClientRect();
+            setMenu({ x: rect.left, y: rect.bottom, trigger: event.currentTarget });
+          }
+        }}
+        onClick={() => { if (!props.renamingGroupId) props.onToggleCollapse(); }}
+        onDoubleClick={() => { if (props.renamingGroupId !== group.id) props.onStartRenameGroup(); }}
+        onPointerDown={props.onPointerDownGroup} data-tip={t('Collapse or expand group · Double-click to rename · Drag to reorder')}>
+        {props.renamingGroupId === group.id ? <TextInput autoFocus value={props.renamingGroupTitle}
+          onChange={event => props.setRenamingGroupTitle(event.target.value)} onFocus={event => event.currentTarget.select()}
+          onClick={event => event.stopPropagation()} onBlur={props.onCommitRenameGroup}
           onKeyDown={event => {
-            if (event.target !== event.currentTarget) return;
-            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); props.onToggleCollapse(); }
-            if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
-              event.preventDefault();
-              const rect = event.currentTarget.getBoundingClientRect();
-              setMenu({ x: rect.left, y: rect.bottom, trigger: event.currentTarget });
-            }
-          }}
-          onClick={() => { if (!props.renamingGroupId) props.onToggleCollapse(); }}
-          onDoubleClick={() => {
-            // 双击重命名（两次 click 已把折叠状态抵消回原样）
-            if (props.renamingGroupId !== group.id) props.onStartRenameGroup();
-          }}
-          onPointerDown={props.onPointerDownGroup}
-          data-tip="点击折叠/展开 · 双击重命名 · 拖拽排序"
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '6px 8px', minHeight: 40, cursor: 'pointer',
-          }}
-        >
-          <span aria-hidden="true" data-group-icon={collapsed ? 'closed' : 'open'} style={{
-            width: 24, height: 24, borderRadius: 6, flexShrink: 0,
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            background: 'var(--hover)', color: 'var(--text-secondary)',
-          }}><Folder size={iconSizes.row} /></span>
-          {props.renamingGroupId === group.id ? (
-            <TextInput
-              autoFocus
-              value={props.renamingGroupTitle}
-              onChange={(e) => props.setRenamingGroupTitle(e.target.value)}
-              onFocus={(e) => e.currentTarget.select()}
-              onClick={(e) => e.stopPropagation()}
-              onBlur={props.onCommitRenameGroup}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') props.onCommitRenameGroup();
-                else if (e.key === 'Escape') props.setRenamingGroupTitle(group.title);
-              }}
-              style={{
-                flex: 1, minWidth: 0, background: 'var(--field-bg)', border: '1px solid var(--border)',
-                borderRadius: 3, padding: '1px 4px', fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)',
-                color: 'var(--text-primary)', outline: 'none',
-              }}
-            />
-          ) : (
-            <span data-testid={`group-title-${group.id}`} className="tab-group-title" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <span style={{
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                fontSize: 'calc(13px * var(--ui-font-scale))', lineHeight: '18px', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)',
-              }}>
-                {group.title}
-              </span>
-              <span data-testid={`group-count-${group.id}`} style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 'calc(10.5px * var(--ui-font-scale))', color: 'var(--text-muted)', lineHeight: '14px' }}>
-                {t('panel.tabGroup.count', { n: tabs.length })}
-              </span>
-            </span>
-          )}
-          <GroupActions
-            empty={empty}
-            onAdd={props.onAddTab}
-            onRename={props.onStartRenameGroup}
-            onDelete={props.onDeleteGroup}
-          />
-          <ChevronRight
-            size={iconSizes.compact}
-            style={{
-              color: 'var(--text-muted)', flexShrink: 0,
-              transition: 'transform 0.12s ease', transform: collapsed ? 'none' : 'rotate(90deg)',
-            }}
-          />
-        </div>
-
-        {/* 展开：组内标签与自由标签同尺寸，靠左缩进 12px 体现层级 */}
-        {!collapsed && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 0 4px' }}>
-            {tabs.map((t) => (
-              <Fragment key={t.id}>
-                {/* 组内每行都有落点占位：拖进分组或组内换序都能看到预期的空位 */}
-                <ListReorderPlaceholder listId={LIST_ID} itemId={t.id} />
-                <div style={{ padding: '0 4px 0 12px' }}>
-                  <TabRow
-                    defaultShellType={props.defaultShellType}
-                    tab={t}
-                    active={t.id === activeId}
-                    editing={props.editId === t.id}
-                    editTitle={props.editTitle}
-                    setEditTitle={props.setEditTitle}
-                    onActivate={() => props.onActivate(t.id)}
-                    onClose={() => props.onClose(t.id)}
-                    onStartEdit={() => props.onStartEdit(t.id, t.title)}
-                    onCommitEdit={props.onCommitEdit}
-                    onCancelEdit={props.onCancelEdit}
-                    onPointerDown={(e) => props.onPointerDownTab(e, t.id)}
-                    onContextMenu={(e) => props.onContextMenuTab(e, t.id)}
-                  />
-                </div>
-              </Fragment>
-            ))}
-            {lastTabId && <ListReorderPlaceholder listId={LIST_ID} itemId={lastTabId} after />}
-          </div>
-        )}
+            event.stopPropagation();
+            if (event.key === 'Enter') props.onCommitRenameGroup();
+            if (event.key === 'Escape') props.onCancelRenameGroup();
+          }} /> : <span className="terminal-group-chip" data-testid={`group-title-${group.id}`}>
+            <span>{group.title}</span>
+            {group.collapsed && <span data-testid={`group-count-${group.id}`}>{tabs.length}</span>}
+          </span>}
       </div>
-      {menu && <ContextMenu anchor={menu} label={t('Group actions')} onClose={() => setMenu(null)} items={[
-        { label: t('AI auto-group'), onClick: props.onAutoGroup },
-        { label: t('Add terminal to group'), onClick: props.onAddTab },
-        { label: t('Rename tab group'), group: 'edit', onClick: props.onStartRenameGroup },
-        { label: t(collapsed ? 'Expand group' : 'Collapse group'), group: 'view', onClick: props.onToggleCollapse },
-        { label: t(empty ? 'Delete empty group' : 'Archive tab group'), danger: empty, group: 'danger', onClick: props.onDeleteGroup },
-      ]} />}
+      {!group.collapsed && tabs.map(tab => <Fragment key={tab.id}>
+        <ListReorderPlaceholder listId={LIST_ID} itemId={tab.id} />
+        <TabRow defaultShellType={props.defaultShellType} tab={tab} active={tab.id === activeId}
+          editing={props.editId === tab.id} editTitle={props.editTitle} setEditTitle={props.setEditTitle}
+          onActivate={() => props.onActivate(tab.id)} onClose={() => props.onClose(tab.id)}
+          onStartEdit={() => props.onStartEdit(tab.id, tab.title)} onCommitEdit={props.onCommitEdit} onCancelEdit={props.onCancelEdit}
+          onPointerDown={event => props.onPointerDownTab(event, tab.id)} onContextMenu={event => props.onContextMenuTab(event, tab.id)} />
+      </Fragment>)}
+      {!group.collapsed && last && <ListReorderPlaceholder listId={LIST_ID} itemId={last} after />}
     </div>
-  );
+    {menu && <ContextMenu anchor={menu} label={t('Group actions')} onClose={() => setMenu(null)} items={[
+      { label: t('AI auto-group'), onClick: props.onAutoGroup },
+      { label: t('Add terminal to group'), onClick: props.onAddTab },
+      { label: t('Rename tab group'), group: 'edit', onClick: props.onStartRenameGroup },
+      { label: t(group.collapsed ? 'Expand group' : 'Collapse group'), group: 'view', onClick: props.onToggleCollapse },
+      { label: t(empty ? 'Delete empty group' : 'Archive tab group'), danger: empty, group: 'danger', onClick: props.onDeleteGroup },
+    ]} footer={<>
+      <div className="history-menu-color-label">{t('Group color')}</div>
+      <HistoryColorChoices menu value={colorOverride ?? null} testId="terminal-group-color" onSelect={value => {
+        menu.trigger?.focus();
+        useWorkspaceNavigation.getState().setGroupColor(group.id, value); setMenu(null);
+      }} />
+    </>} />}
+  </div>;
 }
-
-function GroupActions({ onAdd, onRename, onDelete, empty }: {
-  onAdd: () => void;
-  onRename: () => void;
-  onDelete: () => void;
-  empty: boolean;
-}) {
-  return (
-    <span className="group-actions" style={{ display: 'inline-flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
-      <button data-subtle data-no-drag data-tip="在此分组新建终端" aria-label="在此分组新建终端"
-        onClick={(e) => { e.stopPropagation(); onAdd(); }}
-        style={actionStyle}
-        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}>
-        <Plus size={iconSizes.compact} />
-      </button>
-      <button data-subtle data-no-drag data-tip="重命名分组" aria-label="重命名分组"
-        onClick={(e) => { e.stopPropagation(); onRename(); }}
-        style={actionStyle}
-        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}>
-        <Pencil size={iconSizes.compact} />
-      </button>
-      <button data-subtle data-no-drag data-tip={empty ? '删除分组' : '归档分组（移入会话历史）'} aria-label={empty ? '删除分组' : '归档分组（移入会话历史）'}
-        onClick={(e) => { e.stopPropagation(); onDelete(); }}
-        style={actionStyle}
-        onMouseEnter={(e) => { e.currentTarget.style.color = empty ? 'var(--error-light)' : 'var(--text-secondary)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}>
-        {empty ? <Trash2 size={iconSizes.compact} /> : <Archive size={iconSizes.compact} />}
-      </button>
-    </span>
-  );
-}
-
-const actionStyle: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-  width: 28, height: 28, padding: 0, border: 'none', borderRadius: 4,
-  background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
-};
-
-// ── 标签行 ──
 
 function TabRow({
   tab, active, editing, editTitle, setEditTitle, defaultShellType,
@@ -553,85 +423,44 @@ function TabRow({
   active: boolean;
   editing: boolean;
   editTitle: string;
-  setEditTitle: (v: string) => void;
+  setEditTitle: (value: string) => void;
   onActivate: () => void;
   onClose: () => void;
   onStartEdit: () => void;
   onCommitEdit: () => void;
   onCancelEdit: () => void;
-  onPointerDown: (e: React.PointerEvent<HTMLElement>) => void;
-  onContextMenu: (e: React.MouseEvent) => void;
+  onPointerDown: (event: React.PointerEvent<HTMLElement>) => void;
+  onContextMenu: (event: React.MouseEvent) => void;
 }) {
   const first = firstTerminalOf(tab);
   const terms = terminalsOf(tab);
   const displayTitle = useTabDisplayTitle(tab);
-  const isSsh = first?.kind === 'ssh';
   const Icon = tab.kind === 'history' ? History
-    : tab.kind === 'git-diff' ? tab.comparisons ? GitBranch : fileIcon(tab.selection.path)
-    : tab.kind === 'editor' ? fileIcon(tab.selected.path)
-    : tab.kind === 'ai-history' ? Sparkles
-      : tab.kind === 'usage' ? DataUsage
-      : tab.kind === 'harness' ? Bot
-      : isSsh ? SshIcon
-        : shellIconFor(first?.kind === 'local' ? first.shellType ?? defaultShellType : undefined);
-  const iconColors = useIconColorStore(state => state.colors);
-  const iconColor = tabIconColor(tab, iconColors);
-  const typeSummary = terms.map((t) =>
-    t.kind === 'ssh' ? (t.ssh?.name || t.ssh?.host || 'SSH') : (t.shellType ? shellTypeLabel(t.shellType) : '本地'),
-  ).join(' + ');
-
-  return (
-    <SidebarItem
-      active={active}
-      icon={<Icon size={iconSizes.row} aria-hidden="true"
-        style={{ color: iconColor ?? (isSessionTab(tab) ? undefined : active ? 'var(--text-primary)' : 'var(--text-secondary)') }} />}
-      title={displayTitle}
-      tooltip={displayTitle}
-      testId={`tab-row-${tab.id}`}
-      reorderItemId={tab.id}
-      reorderListId={LIST_ID}
-      reorderKind={isSessionTab(tab) && tab.groupId ? 'tab' : 'loose-tab'}
-      dataAttributes={{
-        'data-tab-row-id': tab.id,
-        'data-tab-kind': tab.kind,
-        'data-tab-group': isSessionTab(tab) ? (tab.groupId ?? '') : '',
-      }}
-      onClick={onActivate}
-      onDoubleClick={onStartEdit}
-      onContextMenu={onContextMenu}
-      onPointerDown={onPointerDown}
-      renameInput={editing ? (
-        <TextInput
-          className="inline-rename-input"
-          autoFocus
-          value={editTitle}
-          onChange={(e) => setEditTitle(e.target.value)}
-          onFocus={(e) => e.currentTarget.select()}
-          onBlur={onCommitEdit}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') onCommitEdit();
-            else if (e.key === 'Escape') onCancelEdit();
-          }}
-          onClick={(e) => e.stopPropagation()}
-        />
-      ) : undefined}
-      badge={tab.kind === 'session' && terms.length > 1 ? (
-        <span
-          data-tip={typeSummary}
-          style={{ display: 'inline-flex', alignItems: 'center', height: 16, padding: '0 6px', flexShrink: 0, lineHeight: '14px' }}
-        >
-          <span style={{ fontSize: 'calc(10px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-            {terms.length}
-          </span>
-        </span>
-      ) : undefined}
-      action={{
-        icon: <X size={iconSizes.control} />,
-        label: '关闭标签',
-        title: '关闭标签',
-        testId: `tab-close-${tab.id}`,
-        onClick: onClose,
-      }}
-    />
-  );
+    : first?.kind === 'ssh' ? SshIcon
+      : shellIconFor(first?.kind === 'local' ? first.shellType ?? defaultShellType : undefined);
+  const colors = useIconColorStore(state => state.colors);
+  const dragging = useListReorder(state => state.drag?.listId === LIST_ID && state.drag.id === tab.id);
+  return <div className="folder-tab terminal-instance-tab" data-active={active} data-testid={`tab-row-${tab.id}`}
+    data-tab-row-id={tab.id} data-tab-kind={tab.kind} data-tab-group={isSessionTab(tab) ? tab.groupId ?? '' : ''}
+    data-reorder-item={tab.id} data-reorder-kind={isSessionTab(tab) && tab.groupId ? 'tab' : 'loose-tab'}
+    data-reorder-dragging={dragging ? 'true' : undefined} onPointerDown={event => {
+      if (event.button !== 0 || event.isPrimary === false || (event.target as Element).closest('[data-no-drag], input')) return;
+      onPointerDown(event);
+      // Preserve the session input focus when pressing a tab's nested button.
+      event.preventDefault();
+      if (!active) onActivate();
+    }}
+    onClick={event => { if (!(event.target as Element).closest('button, input')) onActivate(); }}
+    onDoubleClick={onStartEdit} onContextMenu={onContextMenu}>
+    {editing ? <TextInput className="inline-rename-input" autoFocus value={editTitle}
+      onChange={event => setEditTitle(event.target.value)} onFocus={event => event.currentTarget.select()}
+      onBlur={onCommitEdit} onKeyDown={event => {
+        if (event.key === 'Enter') onCommitEdit(); else if (event.key === 'Escape') onCancelEdit();
+      }} onClick={event => event.stopPropagation()} /> : <FolderTabContent item={{
+        id: tab.id, label: displayTitle, tip: displayTitle,
+        icon: <Icon size={iconSizes.compact} style={{ color: tabIconColor(tab, colors) ?? (isSessionTab(tab) ? undefined : active ? 'var(--text-primary)' : 'var(--text-secondary)') }} />,
+        closeLabel: t('Close this tab'), closeTestId: `tab-close-${tab.id}`,
+      }} selected={active} onSelect={onActivate} onClose={onClose} />}
+    {tab.kind === 'session' && terms.length > 1 && <span className="terminal-split-count">{terms.length}</span>}
+  </div>;
 }

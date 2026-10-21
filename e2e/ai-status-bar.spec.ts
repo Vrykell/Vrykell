@@ -34,11 +34,13 @@ test('pasted image attachments can be sent without a text question', async ({ pa
   await expect(page.getByText('I can see the image.', { exact: true })).toBeVisible();
 });
 
-test('the conversation model picker stays available while settings are active', async ({ page }) => {
+test('the conversation model picker stays available after leaving settings', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await page.locator('[data-dock-btn="chat"]').click();
   await page.getByRole('button', { name: '设置', exact: true }).click();
+  await expect(page.locator('.settings-screen')).toBeVisible();
+  await page.getByRole('button', { name: '关闭设置', exact: true }).click();
   await ensureChatSettingsOpen(page);
   await page.locator('.ai-chat-panel [data-tip="切换模型"]').click();
   await expect(page.getByRole('dialog', { name: '选择模型' })).toBeVisible();

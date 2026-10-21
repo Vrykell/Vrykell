@@ -117,21 +117,22 @@ test.describe('标签页管理侧栏', () => {
 
     // 分组自带的 + 才把新标签加入该分组
     await group.locator('[data-group-header-id]').hover();
-    await group.getByRole('button', { name: '在此分组新建终端' }).click();
+    await group.locator('[data-group-header-id]').click({ button: 'right' });
+    await page.getByRole('button', { name: '在此分组新建终端' }).click();
     await page.getByTestId('new-tab-option-shell:zsh').click();
     await expect(page.locator('[data-tab-row-id]')).toHaveCount(before.length + 2);
     const inGroup = (await ids()).find((id) => id !== added && !before.includes(id))!;
     await expect(group.locator(`[data-testid="tab-row-${inGroup}"]`)).toHaveCount(1);
   });
 
-  test('非活跃标签悬停时才显示关闭按钮', async ({ page }) => {
+  test('keeps inactive horizontal tab close actions accessible', async ({ page }) => {
     await page.keyboard.press('Meta+t');
     const rows = page.locator('[data-testid^="tab-row-"]');
     await expect(rows).toHaveCount(2);
-    // 第一个标签（初始）已非活跃，其关闭按钮透明
+    // Shared horizontal tabs retain an accessible close action.
     const firstRow = rows.first();
     const close = firstRow.locator('[data-testid^="tab-close-"]');
-    await expect(close).toHaveCSS('opacity', '0');
+    await expect(close).toBeVisible();
     // 悬停行后出现
     await firstRow.hover();
     await expect(close).toHaveCSS('opacity', '1');

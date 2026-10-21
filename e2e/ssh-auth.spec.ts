@@ -125,7 +125,7 @@ test('first SSH connection confirms its fingerprint and accepts authentication i
   await openSsh(page, 'unknown');
   const surface = page.getByTestId('ssh-connection-input');
   await expect(surface).toBeVisible();
-  await expect(page.getByTestId('ssh-search')).toBeVisible();
+  await expect(page.getByTestId('workspace-area-terminal')).toHaveAttribute('aria-current', 'page');
   const dialogs = await ipcRecords(page, '__SSH_DIALOGS__');
   expect(dialogs).toHaveLength(1);
   expect(dialogs[0]?.message).toContain('SHA256:e2e-verified-key');

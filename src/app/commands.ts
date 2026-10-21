@@ -8,6 +8,8 @@ import { useToastStore } from '@ui/Toast';
 import { redrawTerminal } from '@features/terminal/services/terminalRepaint';
 import { t } from '@i18n';
 import { isMacOS } from '@platform/runtime';
+import { closeWorkspaceItem } from '@features/workspace/services/closeWorkspaceItem';
+import { newWorkspaceItem } from '@features/workspace/services/workspaceActions';
 
 /** 应用命令定义 — 被 CommandPalette 和全局搜索共用 */
 export interface AppCommand {
@@ -52,8 +54,8 @@ function getActiveId() {
   return useSessionStore.getState().activeId;
 }
 
-registerCommand({ id: 'new-tab', label: '新建标签页', desc: '创建新的终端标签页', keys: '⌘T', keywords: ['tab', 'new'], action: () => useSessionStore.getState().addTab() });
-registerCommand({ id: 'close-tab', label: '关闭当前标签页', desc: '关闭活跃标签页', keys: '⌘W', keywords: ['close', 'tab'], action: () => useSessionStore.getState().closeTab(getActiveId()) });
+registerCommand({ id: 'new-tab', label: t('New tab'), desc: t('Create an instance in the current workspace'), keys: '⌘T', keywords: ['tab', 'new'], action: () => newWorkspaceItem() });
+registerCommand({ id: 'close-tab', label: '关闭当前标签页', desc: '关闭活跃标签页', keys: '⌘W', keywords: ['close', 'tab'], action: () => closeWorkspaceItem() });
 registerCommand({ id: 'undo-close-tab', label: '恢复关闭的标签页', desc: '撤销关闭标签操作', keys: '⌘⇧T', keywords: ['undo', 'tab', 'restore'], action: () => useSessionStore.getState().undoCloseTab() });
 registerCommand({ id: 'toggle-files', label: '切换文件面板', desc: '按导航布局显示或隐藏文件管理面板', keywords: ['files', 'panel'], action: () => useDockStore.getState().togglePanel('left', 'files') });
 registerCommand({ id: 'open-settings', label: '打开设置', desc: '配置 API Key、模型与编辑器', keys: '⌘,', keywords: ['settings', 'config', 'api'], action: () => useSessionStore.getState().openSettings() });

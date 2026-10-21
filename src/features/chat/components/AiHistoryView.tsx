@@ -12,6 +12,7 @@ import SidebarItem from '@ui/sidebarItem';
 import { historyDirectory } from '@utils/historyDirectory';
 import ErrorBox from '@ui/ErrorBox';
 import { useDockStore } from '@features/workspace';
+import { useAiWorkspace } from '../stores/aiWorkspace';
 import type { Conversation } from '../model/conversation';
 import {
   DEFAULT_CONVERSATION_HISTORY_FILTER,
@@ -124,11 +125,12 @@ export default function AiHistoryView() {
   );
   const noteKey = (id: string) => historyRecordKey('conversation', id);
   const open = (id: string) => {
+      useAiWorkspace.getState().openNative(id);
     void useChatStore.getState().selectConversation(id);
     useDockStore.getState().openPanel('chat');
   };
   const create = () => {
-    useChatStore.getState().createConversation();
+      useAiWorkspace.getState().openNative(useChatStore.getState().createConversation());
     useDockStore.getState().openPanel('chat');
   };
   const remove = async (id: string) => {

@@ -46,6 +46,7 @@ for (const theme of ['深色', '浅色']) {
     await expect(sent.locator('.ai-tool-output')).toHaveText('Build succeeded');
     const tool = page.locator('.chat-exchange .ai-tool-card:not(.chat-reference):not(.ai-thinking)');
     await tool.locator('.ai-tool-summary').click();
+    await page.mouse.move(0, 0);
     expect(await sent.locator('.ai-tool-summary > svg').first().innerHTML()).toBe(await tool.locator('.ai-tool-summary > svg').first().innerHTML());
     await expect(sent).toHaveCSS('background-color', await tool.evaluate(element => getComputedStyle(element).backgroundColor));
     await expect(sent).toHaveCSS('border-radius', await tool.evaluate(element => getComputedStyle(element).borderRadius));

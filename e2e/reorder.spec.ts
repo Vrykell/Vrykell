@@ -9,8 +9,9 @@ async function startDragRow(page: Page, sourceTestId: string, targetTestId: stri
   const steps = 6;
   for (let i = 1; i <= steps; i++) {
     const target = (await page.getByTestId(targetTestId).boundingBox())!;
-    const toX = target.x + 40;
-    const toY = target.y + target.height * ratio;
+    const horizontal = sourceTestId.startsWith('tab-row-');
+    const toX = target.x + (horizontal ? target.width * ratio : 40);
+    const toY = target.y + target.height * (horizontal ? 0.5 : ratio);
     await page.mouse.move(
       from.x + 40 + (toX - (from.x + 40)) * (i / steps),
       from.y + from.height / 2 + (toY - (from.y + from.height / 2)) * (i / steps),
@@ -53,9 +54,9 @@ test.describe('侧栏列表拖拽排序', () => {
       const heading = (await loose.boundingBox())!;
       await page.mouse.move(from.x + 40, from.y + from.height / 2);
       await page.mouse.down();
-      await page.mouse.move(viewport.x + 40, heading.y + 5, { steps: 5 });
-      for (const y of [viewport.y + viewport.height - 120, viewport.y + viewport.height - 20]) {
-        await page.mouse.move(viewport.x + 40, y, { steps: 5 });
+      await page.mouse.move(heading.x + 8, viewport.y + viewport.height / 2, { steps: 5 });
+      for (const x of [heading.x + 12, Math.min(heading.x + heading.width - 8, viewport.x + viewport.width - 8)]) {
+        await page.mouse.move(x, viewport.y + viewport.height / 2, { steps: 5 });
         await expect(loose.locator('[data-reorder-placeholder]')).toHaveCount(1);
         await expect(list.locator(`[data-group-id="${groupId}"] [data-reorder-placeholder]`)).toHaveCount(0);
       }

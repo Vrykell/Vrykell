@@ -21,11 +21,11 @@ test('the frozen authentication frame follows a pane resize instead of scrolling
   await expect.poll(async () => frame.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(16);
   await expect(frame).toContainText("password:");
   // Widening the dock panel narrows the pane without a window resize; the frame follows it too.
-  await page.locator('[data-dock-btn="tabs"]').click();
-  const handle = (await page.getByTestId('resize-handle-tabs').boundingBox())!;
+  await page.locator('[data-dock-btn="files"]').click();
+  const handle = (await page.getByTestId('resize-handle-files').boundingBox())!;
   await page.mouse.move(handle.x + handle.width / 2, handle.y + 120);
   await page.mouse.down();
-  await page.mouse.move(handle.x + handle.width / 2 + 120, handle.y + 120, { steps: 4 });
+  await page.mouse.move(handle.x + handle.width / 2 - 120, handle.y + 120, { steps: 4 });
   await page.mouse.up();
   await expect.poll(async () => frame.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(16);
   await page.screenshot({ path: 'test-results/ssh-auth-snapshot-resized.png' });

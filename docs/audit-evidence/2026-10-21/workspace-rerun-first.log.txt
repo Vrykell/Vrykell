@@ -1,0 +1,215 @@
+
+> vrykell@0.1.0 test:e2e
+> playwright test sidebar.spec.ts running-block-layout.spec.ts surface-refinements.spec.ts terminal-paste-focus.spec.ts terminal-references.spec.ts usage-page.spec.ts workspace-history-refinements.spec.ts --reporter=line
+
+
+[1A[2K[WebServer] (node:49232) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 53 tests using 1 worker
+
+
+
+[1A[2K(node:71756) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[1A[2K(node:71756) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[1A[2K[1/53] running-block-layout.spec.ts:38:3 › running layout at 1x › SSH live output reflows while the authentication screen is hidden
+[1A[2K[2/53] running-block-layout.spec.ts:68:3 › running layout at 1x › window width changes resize the live grid and PTY without additional output
+[1A[2K[3/53] running-block-layout.spec.ts:82:3 › running layout at 1x › a held sidebar drag delivers the running program its new size before release
+[1A[2K[4/53] running-block-layout.spec.ts:106:3 › running layout at 1x › running controls pin at the viewport top even with collapsed titles and remain usable
+[1A[2K[5/53] running-block-layout.spec.ts:38:3 › running layout at 1.25x › SSH live output reflows while the authentication screen is hidden
+[1A[2K[6/53] running-block-layout.spec.ts:68:3 › running layout at 1.25x › window width changes resize the live grid and PTY without additional output
+[1A[2K[7/53] running-block-layout.spec.ts:82:3 › running layout at 1.25x › a held sidebar drag delivers the running program its new size before release
+[1A[2K[8/53] running-block-layout.spec.ts:106:3 › running layout at 1.25x › running controls pin at the viewport top even with collapsed titles and remain usable
+[1A[2K[9/53] sidebar.spec.ts:13:3 › 文件面板 › 单击文件仅选中且面板保持打开
+[1A[2K[10/53] sidebar.spec.ts:21:3 › 文件面板 › 单击选中目录，双击进入；展开由箭头按钮控制
+[1A[2K[11/53] sidebar.spec.ts:36:3 › 文件面板 › 上下键切换选中行，Enter 进入目录
+[1A[2K[12/53] sidebar.spec.ts:53:3 › 文件面板 › 面包屑可编辑：点击路径全选，回车跳转，Esc 或失焦取消
+[1A[2K[13/53] sidebar.spec.ts:83:3 › 文件面板 › path bar opens files in the embedded editor and keeps directory navigation
+[1A[2K[14/53] sidebar.spec.ts:102:3 › 文件面板 › 右键属性显示文件基本信息
+
+[1A[2K[WebServer] 18:57:01 [vite] (client) Failed to load source map for D:/projects/typescript/Vrykell/node_modules/monaco-editor/esm/vs/base/common/marked/marked.js.
+[WebServer] Error: An error occurred while trying to read the map file at marked.umd.js.map
+[WebServer] Error: ENOENT: no such file or directory, open 'D:\projects\typescript\Vrykell\node_modules\monaco-editor\esm\vs\base\common\marked\marked.umd.js.map'
+[WebServer]     at async open (node:internal/fs/promises:637:25)
+[WebServer]     at async Object.readFile (node:internal/fs/promises:1269:14)
+[WebServer]     at async extractSourcemapFromFile (file:///D:/projects/typescript/Vrykell/node_modules/vite/dist/node/chunks/config.js:8066:65)
+[WebServer]     at async loadAndTransform (file:///D:/projects/typescript/Vrykell/node_modules/vite/dist/node/chunks/config.js:22717:22)
+[1A[2K[15/53] sidebar.spec.ts:125:3 › 文件面板 › 更多菜单：只提供本地可用操作，可从当前文件夹新建标签页
+[1A[2K[16/53] sidebar.spec.ts:151:3 › 文件面板 › 下载管理往返后文件树停留在原目录（会话内记忆），而不是回到终端 cwd
+[1A[2K[17/53] sidebar.spec.ts:164:3 › 文件面板 › 更多菜单：切换到当前终端文件目录把面板重新定位回终端 cwd
+[1A[2K[18/53] sidebar.spec.ts:178:3 › 文件面板 › Ctrl 加选多行并在右键菜单批量操作
+[1A[2K[19/53] sidebar.spec.ts:196:3 › 文件面板 › 粘贴目标：右键文件夹进该文件夹，右键文件进其同级目录，Ctrl+V 进当前目录
+[1A[2K  1) sidebar.spec.ts:196:3 › 文件面板 › 粘贴目标：右键文件夹进该文件夹，右键文件进其同级目录，Ctrl+V 进当前目录 ────────────────────────
+
+    Error: [31mTimed out 5000ms waiting for [39m[2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m()[22m
+
+    Locator: getByRole('button', { name: '粘贴', exact: true })
+    Expected: visible
+    Received: <element(s) not found>
+    Call log:
+      [2m- expect.toBeVisible with timeout 5000ms[22m
+    [2m  - waiting for getByRole('button', { name: '粘贴', exact: true })[22m
+
+
+      219 |     }, { x: box!.x + 40, y: box!.y + box!.height - 20 })), contentType: 'application/json' });
+      220 |     await page.mouse.click(box!.x + 40, box!.y + box!.height - 20, { button: 'right' });
+    > 221 |     await expect(page.getByRole('button', { name: '粘贴', exact: true })).toBeVisible();
+          |                                                                         ^
+      222 |     await page.keyboard.press('Escape');
+      223 |
+      224 |     // Ctrl+V：粘贴到当前目录
+
+        at D:\projects\typescript\Vrykell\e2e\sidebar.spec.ts:221:73
+
+
+
+
+[1A[2K(node:66224) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1A[2K(node:66224) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[20/53] sidebar.spec.ts:231:3 › 文件面板 › 删除后可连续回退：历史栈支持多次回退
+[1A[2K[21/53] sidebar.spec.ts:262:3 › 文件面板 › 拖拽文件到文件夹：悬停高亮并移动
+[1A[2K[22/53] sidebar.spec.ts:280:3 › 文件面板 › 此电脑视图：磁盘以小卡片展示（含容量），点击进入
+[1A[2K[23/53] sidebar.spec.ts:293:3 › 文件面板 › 关闭面板再重新打开
+[1A[2K[24/53] sidebar.spec.ts:302:3 › 文件面板 › 拖拽到最小宽度立即折叠；松手前可反悔拖回
+[1A[2K[25/53] sidebar.spec.ts:345:3 › 文件面板 › 拖动折叠后反向拖回：面板内部状态不丢失（未重新加载）
+[1A[2K[26/53] sidebar.spec.ts:374:3 › 文件面板 › 删除文件需二次确认，确认后调用后端删除（回收站）
+[1A[2K[27/53] sidebar.spec.ts:384:3 › 文件面板 › 重命名为侧栏内联编辑，回车后确认
+[1A[2K[28/53] sidebar.spec.ts:400:3 › 文件面板 › 空白处右键菜单与 ⋯ 菜单列出同一套操作
+[1A[2K[29/53] sidebar.spec.ts:421:3 › 文件面板 › refresh re-reads the current directory from both panel menus
+[1A[2K[30/53] sidebar.spec.ts:448:3 › 文件面板 › 右键新建按落点决定目录，建好立即重命名，重名自动加序号且回退用真实路径
+[1A[2K[31/53] sidebar.spec.ts:482:3 › 文件面板 › 新建与复制粘贴都能回退（回退新建 / 回退粘贴）
+[1A[2K[32/53] sidebar.spec.ts:506:3 › 文件面板 › 右键文件夹新建文件：落在文件夹内、立即重命名，提交后子列表可见
+[1A[2K[33/53] sidebar.spec.ts:522:3 › 文件面板 › 新建同名项时后端避让加序号，仍会立即进入重命名
+[1A[2K[34/53] sidebar.spec.ts:538:3 › 文件面板 › 右键行与更多菜单都能在系统文件管理器中定位
+[1A[2K[35/53] sidebar.spec.ts:554:3 › 文件面板 › 更多菜单可直接在当前文件夹新建文件/文件夹
+[1A[2K[36/53] sidebar.spec.ts:570:3 › 文件面板 › 复制同名文件到当前目录：自动加序号并在提示中说明
+[1A[2K[37/53] sidebar.spec.ts:581:3 › 文件面板 › 本地面板的菜单不含远程专有项
+[1A[2K[38/53] surface-refinements.spec.ts:6:3 › tab icon colors persist and follow execution targets in 深色
+[1A[2K[39/53] surface-refinements.spec.ts:53:3 › settings text, hover hints and permanent navigation remain consistent in 深色
+[1A[2K[40/53] surface-refinements.spec.ts:6:3 › tab icon colors persist and follow execution targets in 浅色
+[1A[2K[41/53] surface-refinements.spec.ts:53:3 › settings text, hover hints and permanent navigation remain consistent in 浅色
+[1A[2K[42/53] terminal-paste-focus.spec.ts:26:1 › returning to TUI focuses its input and image paste reaches the foreground process
+[1A[2K[43/53] terminal-paste-focus.spec.ts:43:1 › returning to a running block focuses it immediately and keeps normal text paste
+[1A[2K[44/53] terminal-paste-focus.spec.ts:56:1 › returning to an idle session focuses command input
+[1A[2K[45/53] terminal-paste-focus.spec.ts:61:1 › opening chat does not autofocus it, and switching sessions still focuses terminal input
+[1A[2K[46/53] terminal-references.spec.ts:6:3 › terminal references start expanded and share tool presentation in 深色
+[1A[2K  2) terminal-references.spec.ts:6:3 › terminal references start expanded and share tool presentation in 深色 
+
+    Error: [31mTimed out 5000ms waiting for [39m[2mexpect([22m[31mlocator[39m[2m).[22mtoHaveCSS[2m([22m[32mexpected[39m[2m)[22m
+
+    Locator: locator('.chat-exchange .chat-reference').locator('.ai-tool-output > [data-selectable]')
+    Expected string: [32m"1[7m2[27mpx"[39m
+    Received string: [31m"1[7m4[27mpx"[39m
+    Call log:
+      [2m- expect.toHaveCSS with timeout 5000ms[22m
+    [2m  - waiting for locator('.chat-exchange .chat-reference').locator('.ai-tool-output > [data-selectable]')[22m
+    [2m  -   locator resolved to <div data-selectable="true">Build succeeded</div>[22m
+    [2m  -   unexpected value "14px"[22m
+    [2m  -   locator resolved to <div data-selectable="true">Build succeeded</div>[22m
+    [2m  -   unexpected value "14px"[22m
+    [2m  -   locator resolved to <div data-selectable="true">Build succeeded</div>[22m
+    [2m  -   unexpected value "14px"[22m
+    [2m  -   locator resolved to <div data-selectable="true">Build succeeded</div>[22m
+    [2m  -   unexpected value "14px"[22m
+    [2m  -   locator resolved to <div data-selectable="true">Build succeeded</div>[22m
+    [2m  -   unexpected value "14px"[22m
+    [2m  -   locator resolved to <div data-selectable="true">Build succeeded</div>[22m
+    [2m  -   unexpected value "14px"[22m
+    [2m  -   locator resolved to <div data-selectable="true">Build succeeded</div>[22m
+    [2m  -   unexpected value "14px"[22m
+    [2m  -   locator resolved to <div data-selectable="true">Build succeeded</div>[22m
+    [2m  -   unexpected value "14px"[22m
+    [2m  -   locator resolved to <div data-selectable="true">Build succeeded</div>[22m
+    [2m  -   unexpected value "14px"[22m
+
+
+      70 |     }
+      71 |     for (const property of ['font-family', 'font-size', 'line-height'] as const) {
+    > 72 |       await expect(sent.locator('.ai-tool-output > [data-selectable]')).toHaveCSS(property,
+         |                                                                         ^
+      73 |         await tool.locator('.ai-tool-output > [data-selectable]').evaluate((element, key) => getComputedStyle(element).getPropertyValue(key), property));
+      74 |     }
+      75 |     await expect.poll(() => page.locator('.ai-chat-panel').evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+
+        at D:\projects\typescript\Vrykell\e2e\terminal-references.spec.ts:72:73
+
+
+[1A[2K(node:34336) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:34336) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[47/53] terminal-references.spec.ts:6:3 › terminal references start expanded and share tool presentation in 浅色
+[1A[2K  3) terminal-references.spec.ts:6:3 › terminal references start expanded and share tool presentation in 浅色 
+
+    Error: [31mTimed out 5000ms waiting for [39m[2mexpect([22m[31mlocator[39m[2m).[22mtoHaveCSS[2m([22m[32mexpected[39m[2m)[22m
+
+    Locator: locator('.chat-exchange .chat-reference').locator('.ai-tool-output > [data-selectable]')
+    Expected string: [32m"1[7m2[27mpx"[39m
+    Received string: [31m"1[7m4[27mpx"[39m
+    Call log:
+      [2m- expect.toHaveCSS with timeout 5000ms[22m
+    [2m  - waiting for locator('.chat-exchange .chat-reference').locator('.ai-tool-output > [data-selectable]')[22m
+    [2m  -   locator resolved to <div data-selectable="true">Build succeeded</div>[22m
+    [2m  -   unexpected value "14px"[22m
+    [2m  -   locator resolved to <div data-selectable="true">Build succeeded</div>[22m
+    [2m  -   unexpected value "14px"[22m
+    [2m  -   locator resolved to <div data-selectable="true">Build succeeded</div>[22m
+    [2m  -   unexpected value "14px"[22m
+    [2m  -   locator resolved to <div data-selectable="true">Build succeeded</div>[22m
+    [2m  -   unexpected value "14px"[22m
+    [2m  -   locator resolved to <div data-selectable="true">Build succeeded</div>[22m
+    [2m  -   unexpected value "14px"[22m
+    [2m  -   locator resolved to <div data-selectable="true">Build succeeded</div>[22m
+    [2m  -   unexpected value "14px"[22m
+    [2m  -   locator resolved to <div data-selectable="true">Build succeeded</div>[22m
+    [2m  -   unexpected value "14px"[22m
+    [2m  -   locator resolved to <div data-selectable="true">Build succeeded</div>[22m
+    [2m  -   unexpected value "14px"[22m
+    [2m  -   locator resolved to <div data-selectable="true">Build succeeded</div>[22m
+    [2m  -   unexpected value "14px"[22m
+
+
+      70 |     }
+      71 |     for (const property of ['font-family', 'font-size', 'line-height'] as const) {
+    > 72 |       await expect(sent.locator('.ai-tool-output > [data-selectable]')).toHaveCSS(property,
+         |                                                                         ^
+      73 |         await tool.locator('.ai-tool-output > [data-selectable]').evaluate((element, key) => getComputedStyle(element).getPropertyValue(key), property));
+      74 |     }
+      75 |     await expect.poll(() => page.locator('.ai-chat-panel').evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+
+        at D:\projects\typescript\Vrykell\e2e\terminal-references.spec.ts:72:73
+
+
+[1A[2K(node:71988) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:71988) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[48/53] usage-page.spec.ts:31:3 › usage statistics page › opens from conversation settings and accounts for one turn
+[1A[2K[49/53] usage-page.spec.ts:119:3 › usage statistics page › shows only the ACP numbers when a server is the selected source
+[1A[2K[50/53] workspace-history-refinements.spec.ts:20:1 › closing the last tab leaves the workspace empty and closing background sessions preserves the active page
+[1A[2K[51/53] workspace-history-refinements.spec.ts:39:1 › terminal history reorders with loose sessions while AI history stays in its workspace
+[1A[2K[52/53] workspace-history-refinements.spec.ts:70:1 › failed commands remain in history but do not become completion suggestions
+[1A[2K[53/53] workspace-history-refinements.spec.ts:99:1 › session startup-mode filters combine with sorting and survive reopening
+[1A[2K  Slow test file: running-block-layout.spec.ts (29.6s)
+  Consider splitting slow test files to speed up parallel execution
+  3 failed
+    sidebar.spec.ts:196:3 › 文件面板 › 粘贴目标：右键文件夹进该文件夹，右键文件进其同级目录，Ctrl+V 进当前目录 ─────────────────────────
+    terminal-references.spec.ts:6:3 › terminal references start expanded and share tool presentation in 深色 
+    terminal-references.spec.ts:6:3 › terminal references start expanded and share tool presentation in 浅色 
+  50 passed (2.3m)

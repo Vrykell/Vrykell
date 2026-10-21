@@ -1,6 +1,7 @@
 import { useTerminalDefaults } from '@config/terminalDefaults';
 import { create } from 'zustand';
 import { useUiStore } from './ui';
+import { useWorkspaceNavigation, workspaceAreaForKind } from './navigation';
 import { gitComparisonKey, type GitSelection, type GitComparison } from '@core/git';
 import { editorFileKey, interceptEditorClose, type EditorFile } from '@core/editor';
 import type { SshOptions } from '@core/ssh';
@@ -278,7 +279,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     } else if (o.kind === 'usage') {
       tab = { id, title: USAGE_TITLE, kind: 'usage', titleSource: 'manual' };
     } else if (o.kind === 'harness') {
-      tab = { id, title: t('ACP'), kind: 'harness', titleSource: 'manual' };
+      tab = { id, title: t('AI workspace'), kind: 'harness', titleSource: 'manual' };
     } else {
       const preference = useTerminalDefaults.getState().shell;
       const shellType = o.shellType ?? (preference === 'system' ? undefined : preference);
@@ -322,6 +323,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   openAiHistoryTab: () => { get().addTab({ kind: 'ai-history' }); },
   openUsageTab: () => { useUiStore.getState().setSettingsOpen(false); get().addTab({ kind: 'usage' }); },
   openHarnessTab: (name, cwd) => {
+    useWorkspaceNavigation.getState().setAiPlacement('main');
     // Capture the focused local context before switching to the singleton page.
     const state = get();
     const active = state.tabs.find((tab) => tab.id === state.activeId);
@@ -458,7 +460,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
     if (closed.kind === 'editor' && !force && interceptEditorClose(closed.files, () => get().closeTab(id, true))) return;
     const next = tabs.filter((t) => t.id !== id);
-    const nextActiveId = activeId === id ? next[Math.max(0, idx - 1)]?.id ?? '' : activeId;
+    const neighbor = [...tabs.slice(0, idx).reverse(), ...tabs.slice(idx + 1)].find(tab => workspaceAreaForKind(tab.kind) === workspaceAreaForKind(closed.kind));
+    const nextActiveId = activeId === id ? neighbor?.id ?? '' : activeId;
     set({
       tabs: next,
       activeId: nextActiveId,
@@ -530,6 +533,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (id !== prev) useTerminalStore.getState().setAltScreenActive(false);
     // 聚焦回落到该窗口的第一个终端（切窗口后不残留上个窗口的终端聚焦）
     const tab = get().tabs.find((t) => t.id === id);
+    if (tab) {
+      const area = workspaceAreaForKind(tab.kind);
+      useWorkspaceNavigation.getState().selectArea(area);
+      useWorkspaceNavigation.getState().rememberTab(area, id);
+    }
     useTerminalStore.getState().setFocusedPane(tab && isSessionTab(tab) ? firstLeaf(tab.layout).id : id);
   },
   titleFromMessage: (id, text) => {
@@ -857,3 +865,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     useToastStore.getState().addToast('分组已归档到会话历史', 'success');
   },
 }));
+
+useWorkspaceStore.subscribe((state, previous) => {
+  if (state.activeId === previous.activeId) return;
+  const tab = state.tabs.find(item => item.id === state.activeId);
+  if (!tab) return;
+  const area = workspaceAreaForKind(tab.kind);
+  useWorkspaceNavigation.getState().selectArea(area);
+  useWorkspaceNavigation.getState().rememberTab(area, tab.id);
+});

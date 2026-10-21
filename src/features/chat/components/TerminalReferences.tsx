@@ -33,7 +33,7 @@ export default function TerminalReferences({ references, onRemove, framed = true
           {onRemove && <IconButton compact aria-label={t('Remove reference')} data-tip={t('Remove reference')}
             onClick={() => onRemove(reference.id)}><X size={12} /></IconButton>}
         </div>
-        {open && <div className="chat-reference-body">
+        {open && <div className="chat-reference-body ai-tool-details">
           <div className="chat-reference-meta"><span>{reference.label}</span>
             {reference.cwd && <span>{reference.cwd}</span>}
             {reference.exitCode != null && <span>{t('Exit code: {{code}}', { code: reference.exitCode })}</span>}

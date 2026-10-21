@@ -35,7 +35,7 @@ test('closing the final tab leaves an empty workspace without a stale reconnect 
   await initialTab.locator('[data-testid^="tab-close-"]').click();
   // The last tab closes to the empty workspace: the history page is not opened for it (TB10).
   await expect(page.locator('[data-tab-row-id]')).toHaveCount(0);
-  await expect(page.getByText('会话历史', { exact: true })).toHaveCount(0);
+  await expect(page.getByTestId('session-history-page')).toHaveCount(0);
   await page.locator('[data-dock-btn="ssh"]').click();
   await page.getByTestId('ssh-row-ssh-1').dblclick();
   await expect(page.getByTestId('ssh-connection-input')).toBeVisible();

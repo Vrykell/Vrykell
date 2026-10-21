@@ -33,20 +33,20 @@ test('the docked status panel follows the light theme and keeps event history co
   await page.screenshot({ path: 'test-results/ssh-status-light.png' });
 });
 
-test('the conditional sidebar preserves terminal width with session list and AI open', async ({ page }) => {
+test('the conditional sidebar preserves terminal width and restores the auxiliary panel', async ({ page }) => {
   await setupTauriMock(page);
   await page.setViewportSize({ width: 1550, height: 1000 });
   await page.goto('/');
   await page.locator('[data-dock-btn="ssh"]').click();
   await page.getByTestId('ssh-row-ssh-1').dblclick();
-  await page.locator('[data-dock-btn="tabs"]').click();
-  const tabs = page.locator('.workspace-side-panel[data-side="left"][data-visible="true"]');
-  const handle = (await page.getByTestId('resize-handle-tabs').boundingBox())!;
+  await page.locator('[data-dock-btn="files"]').click();
+  const files = page.locator('.workspace-side-panel[data-side="right"][data-visible="true"]');
+  const handle = (await page.getByTestId('resize-handle-files').boundingBox())!;
   await page.mouse.move(handle.x + handle.width / 2, handle.y + 120);
   await page.mouse.down();
-  await page.mouse.move(handle.x + handle.width / 2 + 190, handle.y + 120, { steps: 6 });
+  await page.mouse.move(handle.x + handle.width / 2 - 170, handle.y + 120, { steps: 6 });
   await page.mouse.up();
-  await expect.poll(async () => Math.round((await tabs.boundingBox())!.width)).toBe(370);
+  await expect.poll(async () => Math.round((await files.boundingBox())!.width)).toBe(370);
   await page.locator('[data-dock-btn="chat"]').click();
   const chat = page.locator('.workspace-side-panel[data-side="right"][data-visible="true"]');
   await expect(chat).toBeVisible();
@@ -59,7 +59,8 @@ test('the conditional sidebar preserves terminal width with session list and AI 
   await page.screenshot({ path: 'test-results/ssh-status-conditional-sidebar.png' });
   await panel.getByRole('button', { name: '关闭 SSH 状态' }).click();
   await expect(chat).toBeVisible();
-  await expect.poll(async () => Math.round((await tabs.boundingBox())!.width)).toBe(370);
+  await page.locator('[data-dock-btn="files"]').click();
+  await expect.poll(async () => Math.round((await files.boundingBox())!.width)).toBe(370);
 });
 
 test('SSH status uses real session state and does not write probes into the terminal', async ({ page }) => {
@@ -320,15 +321,15 @@ test('block mode has no top toolbar and opens status from the existing host chip
   await page.setViewportSize({ width: 720, height: 800 });
   await expectDockedStatus(page);
   await expect(editor).toBeInViewport();
-  await expect(page.locator('.workspace-side-panel[data-side="left"][data-visible="true"]')).toBeHidden();
+  await expect(page.getByTestId('workspace-sidebar')).toHaveAttribute('data-collapsed', 'true');
   expect((await panel.boundingBox())!.width).toBeGreaterThanOrEqual(240);
   await page.screenshot({ path: 'test-results/ssh-block-status-narrow.png' });
   await panel.getByRole('button', { name: '关闭 SSH 状态' }).click();
-  await expect(page.locator('.workspace-side-panel[data-side="left"][data-visible="true"]')).toBeVisible();
+  await expect(page.getByTestId('workspace-sidebar')).toBeVisible();
   await entry.click();
-  await expect(page.locator('.workspace-side-panel[data-side="left"][data-visible="true"]')).toBeHidden();
+  await expect(page.getByTestId('workspace-sidebar')).toBeVisible();
   await page.setViewportSize({ width: 1240, height: 800 });
-  await expect(page.locator('.workspace-side-panel[data-side="left"][data-visible="true"]')).toBeVisible();
+  await expect(page.getByTestId('workspace-sidebar')).toHaveAttribute('data-collapsed', 'false');
   await panel.getByRole('button', { name: '关闭 SSH 状态' }).click();
   await expect(entry).toBeFocused();
   await entry.click();

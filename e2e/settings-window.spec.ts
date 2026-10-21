@@ -8,27 +8,26 @@ test('settings cover the content card and toggle back to the unchanged workspace
   const input = page.locator('[data-terminal-input]').first();
   await expect(input).toBeVisible();
   await input.fill('keep this command draft');
-  const rail = page.locator('.workspace-activity-bar');
+  const rail = page.getByTestId('workspace-sidebar');
   const railBefore = await rail.boundingBox();
-  expect(railBefore!.width).toBe(40);
+  expect(railBefore!.width).toBe(208);
   const verifyButtonCenters = async () => {
     const bounds = (await rail.boundingBox())!;
-    for (const button of await rail.getByRole('button').all()) {
+    for (const button of await rail.locator('.sidebar-row[role="button"]').all()) {
       const box = (await button.boundingBox())!;
-      expect(box.x + box.width / 2).toBe(bounds.x + bounds.width / 2);
+      expect(Math.abs(box.x + box.width / 2 - bounds.x - bounds.width / 2)).toBeLessThanOrEqual(0.5);
     }
   };
   await verifyButtonCenters();
-  const cardLeft = (await page.locator('.workspace-side-panel[data-side="left"][data-visible="true"]').boundingBox())!.x;
   await page.getByRole('button', { name: '设置', exact: true }).click();
   const settings = page.getByRole('region', { name: '设置', exact: true });
   for (const width of [1240, 720]) {
     await page.setViewportSize({ width, height: 800 });
     await expect(settings).toBeVisible();
-    expect((await rail.boundingBox())!.width).toBe(railBefore!.width);
+    const sidebarWidth = width <= 900 ? 48 : 208;
+    expect((await rail.boundingBox())!.width).toBe(sidebarWidth);
     await verifyButtonCenters();
-    expect((await settings.boundingBox())!.x).toBe(cardLeft);
-    expect(await settings.boundingBox()).toEqual({ x: 40, y: 42, width: width - 48, height: 750 });
+    expect(await settings.boundingBox()).toEqual({ x: sidebarWidth, y: 42, width: width - sidebarWidth - 8, height: 750 });
     const close = settings.getByRole('button', { name: '关闭设置', exact: true });
     await expect(close).toBeVisible();
     await expect(close).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
@@ -45,7 +44,7 @@ test('settings cover the content card and toggle back to the unchanged workspace
   await expect(input).toHaveValue('keep this command draft');
   await page.setViewportSize({ width: 1240, height: 800 });
   await page.locator('[data-dock-btn="chat"]').click();
-  await expect(page.locator('.workspace-side-panel[data-side="left"][data-visible="true"]')).toBeVisible();
+  await expect(page.locator('.workspace-side-panel[data-side="left"][data-visible="true"]')).toHaveCount(0);
   await expect(page.locator('.workspace-side-panel[data-side="right"][data-visible="true"]')).toBeVisible();
   const sampledColors = await page.locator('html').evaluate(element => {
     const style = getComputedStyle(element);
@@ -115,6 +114,11 @@ test('wallpaper mode darkens the sidebar backdrop while preserving the UI layout
   await setupTauriMock(page);
   await page.goto('/');
   await gotoSetting(page, '主题');
+  await page.waitForFunction(async () => {
+    const path = '/src/features/settings/model/terminalTheme.ts';
+    const { useTerminalThemeStore } = await import(path) as typeof import('../src/features/settings/model/terminalTheme');
+    return useTerminalThemeStore.getState().loaded;
+  });
   await page.evaluate(async () => {
     const path = '/src/features/settings/model/terminalTheme.ts';
     const { useTerminalThemeStore } = await import(path) as typeof import('../src/features/settings/model/terminalTheme');

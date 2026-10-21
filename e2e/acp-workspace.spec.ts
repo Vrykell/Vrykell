@@ -3,7 +3,7 @@ import { setupTauriMock, emitAcpSession, acpUpdate, acpCalls } from './tauri-moc
 
 const current = (page: Page) => page.locator('[data-testid="harness-page"]:visible');
 async function connect(page: Page) {
-  await page.getByTestId('tab-acp-btn').click();
+  await page.getByTestId('workspace-area-ai').click();
   await page.getByTestId('acp-launcher-Fake ACP').click();
   await expect(current(page).getByTestId('harness-send')).toBeVisible();
 }
@@ -24,18 +24,18 @@ test('retains drafts and reading positions across workspace and internal session
   await expect.poll(() => body.evaluate(el => el.scrollHeight)).toBeGreaterThan(1000);
   await body.evaluate(el => { el.scrollTop = 300; });
   await expect.poll(() => body.evaluate(el => el.scrollTop)).toBe(300);
-  await page.locator('[data-tab-kind="session"]').first().click();
-  await page.getByTestId('tab-acp-btn').click();
+  await page.getByTestId('workspace-area-terminal').click();
+  await page.getByTestId('workspace-area-ai').click();
   await expect(current(page).getByTestId('harness-composer')).toHaveValue('unfinished draft');
   await expect.poll(() => body.evaluate(el => el.scrollTop)).toBe(300);
   await current(page).getByTestId('harness-new-session').click();
-  const sessions = page.getByRole('tablist', { name: 'ACP 会话' }).getByRole('tab');
+  const sessions = page.getByRole('tablist', { name: 'AI 会话' }).getByRole('tab');
   await expect(sessions).toHaveCount(2);
   await expect(current(page).getByTestId('harness-composer')).toHaveValue('');
   await sessions.first().click();
   await expect(current(page).getByTestId('harness-composer')).toHaveValue('unfinished draft');
   await expect.poll(() => body.evaluate(el => el.scrollTop)).toBe(300);
-  await expect(page.locator('[data-tab-kind="harness"]')).toHaveCount(1);
+  await expect(page.getByTestId('workspace-area-ai')).toHaveCount(1);
 });
 
 test('follows streamed replies, pauses for reading and offers a return to the latest reply', async ({ page }) => {
@@ -104,7 +104,7 @@ test('asks another conversation even after a matching command shape was approved
 });
 
 test('keeps failed server edits, saves argument boundaries and persists before leaving settings', async ({ page }) => {
-  await page.getByTestId('tab-acp-btn').click();
+  await page.getByTestId('workspace-area-ai').click();
   await expect(page.getByTestId('acp-launcher-Fake ACP')).toBeVisible();
   await page.evaluate(() => {
     const runtime = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__;
@@ -139,14 +139,14 @@ test('protects active work and only closes sessions after explicit confirmation'
   await connect(page);
   await current(page).getByTestId('harness-composer').fill('A long task');
   await current(page).getByTestId('harness-send').click();
-  const close = page.locator('[data-tab-kind="harness"]').getByRole('button', { name: '关闭标签', exact: true });
+  const close = page.getByTestId('workspace-instance-bar').getByRole('button', { name: '关闭会话 Fake ACP', exact: true });
   await close.click();
   await expect(page.getByTestId('confirm-dialog')).toContainText('关闭会停止正在进行的任务');
   await page.getByTestId('confirm-cancel').click();
   expect(await acpCalls(page)).not.toContain('acp_close:sess_e2e');
   await close.click();
   await page.getByTestId('confirm-ok').click();
-  await expect(page.locator('[data-tab-kind="harness"]')).toHaveCount(0);
+  await expect(current(page)).toHaveCount(0);
   await expect.poll(() => acpCalls(page)).toContain('acp_close:sess_e2e');
 });
 
@@ -171,7 +171,7 @@ test('keeps connected session controls usable in narrow and wide layouts', async
   await connect(page);
   for (const width of [1240, 760]) {
     await page.setViewportSize({ width, height: 800 });
-    await expect(page.getByRole('tablist', { name: 'ACP 会话' })).toBeVisible();
+    await expect(page.getByRole('tablist', { name: 'AI 会话' })).toBeVisible();
     await expect(current(page).getByTestId('harness-composer')).toBeVisible();
     await page.screenshot({ path: info.outputPath(`acp-workspace-${width}.png`) });
   }

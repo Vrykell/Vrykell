@@ -12,7 +12,7 @@ for (const theme of ['深色', '浅色']) {
     const row = page.locator('[data-tab-kind="session"]').first();
     const id = (await row.getAttribute('data-tab-row-id'))!;
     await row.click();
-    const original = await row.locator('.sidebar-row-icon svg').evaluate(element => getComputedStyle(element).color);
+    const original = await row.locator('[role="tab"] svg').evaluate(element => getComputedStyle(element).color);
     await row.click({ button: 'right' });
     const menu = page.getByRole('menu', { name: '操作菜单' });
     const close = menu.getByRole('button', { name: '关闭标签', exact: true });
@@ -21,8 +21,8 @@ for (const theme of ['深色', '浅色']) {
     await expect(menu.getByRole('group', { name: '图标颜色' })).toBeVisible();
     await expect(menu.getByRole('menuitem', { name: '图标颜色', exact: true })).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath('tab-color-footer.png') });
-    await page.getByRole('menuitemradio', { name: '紫色', exact: true }).click();
-    const selected = await row.locator('.sidebar-row-icon svg').evaluate(element => getComputedStyle(element).color);
+    await page.getByRole('menuitemradio', { name: '蓝色', exact: true }).click();
+    const selected = await row.locator('[role="tab"] svg').evaluate(element => getComputedStyle(element).color);
     expect(selected).not.toBe(original);
     await page.locator('[data-dock-btn="chat"]').click();
     await page.getByRole('button', { name: '会话设置', exact: true }).click();
@@ -36,15 +36,16 @@ for (const theme of ['深色', '浅色']) {
     await page.reload();
     await ensureTabsOpen(page);
     const restored = page.getByTestId(`tab-row-${id}`);
-    await expect(restored.locator('.sidebar-row-icon svg')).toHaveCSS('color', selected);
+    await expect(restored.locator('[role="tab"] svg')).toHaveCSS('color', selected);
     await restored.click({ button: 'right' });
     await page.getByTestId('tab-icon-color-auto').click();
-    await expect(restored.locator('.sidebar-row-icon svg')).toHaveCSS('color', original);
+    await expect(restored.locator('[role="tab"] svg')).toHaveCSS('color', original);
     await page.getByTestId('tab-history-btn').click();
     await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
-    const marks = await page.locator('[data-tab-kind]:not([data-tab-kind="session"]) .sidebar-row-icon svg').evaluateAll(elements =>
+    const marks = await page.locator('[data-tab-kind]:not([data-tab-kind="session"]) [role="tab"] svg').evaluateAll(elements =>
       elements.map(element => [...element.querySelectorAll('path')].map(path => path.getAttribute('d')).join(' ')));
     expect(new Set(marks).size).toBe(2);
+    await page.getByTestId('workspace-area-terminal').click();
     await page.locator('[data-tab-kind="history"]').click();
     await page.screenshot({ path: testInfo.outputPath('singleton-icons.png'), animations: 'disabled' });
   });

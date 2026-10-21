@@ -8,6 +8,11 @@ import { setupTauriMock, mockAnthropic, ensureChatSettingsOpen, emitAcpSession, 
 
 /** Opens the usage page from the AI panel's conversation settings, reusing the panel when visible. */
 async function openUsagePage(page: import('@playwright/test').Page) {
+  if (await page.getByTestId('harness-page').isVisible()) {
+    await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '用量统计', exact: true }).click();
+    await expect(page.getByTestId('usage-page')).toBeVisible();
+    return;
+  }
   const trigger = page.getByRole('button', { name: '会话设置', exact: true });
   if (!(await trigger.isVisible().catch(() => false))) await page.locator('[data-dock-btn="chat"]').click();
   await ensureChatSettingsOpen(page);

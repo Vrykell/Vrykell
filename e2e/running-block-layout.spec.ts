@@ -50,12 +50,12 @@ for (const density of [1, 1.25]) test.describe(`running layout at ${density}x`, 
       if (width === 760 || width === 1500) await page.screenshot({ path: info.outputPath(`ssh-running-${width}.png`) });
     }
     const before = await grid(page);
-    await page.locator('[data-dock-btn="tabs"]').click();
-    const handle = (await page.getByTestId('resize-handle-tabs').boundingBox())!;
+    await page.locator('[data-dock-btn="files"]').click();
+    const handle = (await page.getByTestId('resize-handle-files').boundingBox())!;
     await page.mouse.move(handle.x + handle.width / 2, handle.y + 140);
     await page.mouse.down();
     try {
-      await page.mouse.move(handle.x + handle.width / 2 + 110, handle.y + 140, { steps: 12 });
+      await page.mouse.move(handle.x + handle.width / 2 - 110, handle.y + 140, { steps: 12 });
       await expect(async () => {
         const size = await grid(page);
         expect(size.cols).toBeLessThan(before.cols);
@@ -82,11 +82,12 @@ for (const density of [1, 1.25]) test.describe(`running layout at ${density}x`, 
   test('a held sidebar drag delivers the running program its new size before release', async ({ page }) => {
     await openRunning(page);
     const before = await grid(page);
-    const handle = (await page.getByTestId('resize-handle-tabs').boundingBox())!;
+    await page.locator('[data-dock-btn="files"]').click();
+    const handle = (await page.getByTestId('resize-handle-files').boundingBox())!;
     await page.mouse.move(handle.x + handle.width / 2, handle.y + 140);
     await page.mouse.down();
     try {
-      await page.mouse.move(handle.x + handle.width / 2 + 110, handle.y + 140, { steps: 12 });
+      await page.mouse.move(handle.x + handle.width / 2 - 110, handle.y + 140, { steps: 12 });
       await expect(async () => {
         const size = await grid(page);
         expect(size.cols).toBeLessThan(before.cols);
@@ -114,6 +115,11 @@ for (const density of [1, 1.25]) test.describe(`running layout at ${density}x`, 
     const pinned = page.getByTestId('pinned-command');
     for (const width of [1240, 760]) {
       await page.setViewportSize({ width, height: 700 });
+      await expect(async () => {
+        const size = await grid(page);
+        expect((await ptyResizes(page)).at(-1)).toMatchObject({ cols: size.cols, rows: size.rows });
+        expect(size.width).toBeLessThanOrEqual(size.available + 1);
+      }).toPass();
       await scroll.evaluate(element => { element.scrollTop = 0; });
       await expect(pinned).toHaveCount(0);
       await scroll.evaluate(element => {

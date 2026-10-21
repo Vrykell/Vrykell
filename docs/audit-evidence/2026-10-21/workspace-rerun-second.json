@@ -1,0 +1,219 @@
+{
+  "config": {
+    "configFile": "D:\\projects\\typescript\\Vrykell\\playwright.config.ts",
+    "rootDir": "D:/projects/typescript/Vrykell/e2e",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "line"
+      ],
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 15000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "D:/projects/typescript/Vrykell/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "",
+        "name": "",
+        "testDir": "D:/projects/typescript/Vrykell/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "version": "1.48.2",
+    "workers": 1,
+    "webServer": {
+      "command": "npm run dev -- --port 1421 --host 127.0.0.1",
+      "url": "http://127.0.0.1:1421",
+      "reuseExistingServer": false,
+      "timeout": 60000
+    }
+  },
+  "suites": [
+    {
+      "title": "sidebar.spec.ts",
+      "file": "sidebar.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "文件面板",
+          "file": "sidebar.spec.ts",
+          "line": 12,
+          "column": 6,
+          "specs": [
+            {
+              "title": "粘贴目标：右键文件夹进该文件夹，右键文件进其同级目录，Ctrl+V 进当前目录",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "status": "failed",
+                      "duration": 11851,
+                      "error": {
+                        "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: getByRole('button', { name: '粘贴', exact: true })\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n  \u001b[2m- expect.toBeVisible with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('button', { name: '粘贴', exact: true })\u001b[22m\n",
+                        "stack": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: getByRole('button', { name: '粘贴', exact: true })\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n  \u001b[2m- expect.toBeVisible with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('button', { name: '粘贴', exact: true })\u001b[22m\n\n    at D:\\projects\\typescript\\Vrykell\\e2e\\sidebar.spec.ts:221:73",
+                        "location": {
+                          "file": "D:\\projects\\typescript\\Vrykell\\e2e\\sidebar.spec.ts",
+                          "column": 73,
+                          "line": 221
+                        },
+                        "snippet": "  219 |     }, { x: box!.x + 40, y: box!.y + box!.height - 20 })), contentType: 'application/json' });\n  220 |     await page.mouse.click(box!.x + 40, box!.y + box!.height - 20, { button: 'right' });\n> 221 |     await expect(page.getByRole('button', { name: '粘贴', exact: true })).toBeVisible();\n      |                                                                         ^\n  222 |     await page.keyboard.press('Escape');\n  223 |\n  224 |     // Ctrl+V：粘贴到当前目录"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "D:\\projects\\typescript\\Vrykell\\e2e\\sidebar.spec.ts",
+                            "column": 73,
+                            "line": 221
+                          },
+                          "message": "Error: \u001b[31mTimed out 5000ms waiting for \u001b[39m\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m()\u001b[22m\n\nLocator: getByRole('button', { name: '粘贴', exact: true })\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n  \u001b[2m- expect.toBeVisible with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('button', { name: '粘贴', exact: true })\u001b[22m\n\n\n  219 |     }, { x: box!.x + 40, y: box!.y + box!.height - 20 })), contentType: 'application/json' });\n  220 |     await page.mouse.click(box!.x + 40, box!.y + box!.height - 20, { button: 'right' });\n> 221 |     await expect(page.getByRole('button', { name: '粘贴', exact: true })).toBeVisible();\n      |                                                                         ^\n  222 |     await page.keyboard.press('Escape');\n  223 |\n  224 |     // Ctrl+V：粘贴到当前目录\n\n    at D:\\projects\\typescript\\Vrykell\\e2e\\sidebar.spec.ts:221:73"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-21T10:59:05.607Z",
+                      "attachments": [
+                        {
+                          "name": "blank-context-target",
+                          "contentType": "application/json",
+                          "body": "eyJ0YWciOiJTUEFOIiwidGV4dCI6IuW3suWkjeWItiAxIOmhue+8iOWQjOWQjeW3suiHquWKqOWKoOW6j+WPt++8iSIsInRyZWUiOmZhbHNlLCJyb3ciOmZhbHNlfQ=="
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "D:\\projects\\typescript\\Vrykell\\e2e\\sidebar.spec.ts",
+                        "column": 73,
+                        "line": 221
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "19544871d9648c30f4b7-3c6d3a17b9ff0bbbb542",
+              "file": "sidebar.spec.ts",
+              "line": 196,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "terminal-references.spec.ts",
+      "file": "terminal-references.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "terminal references start expanded and share tool presentation in 深色",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "status": "passed",
+                  "duration": 2214,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-21T10:59:18.511Z",
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "131384e495bc73d8d9b9-2e6794a7c14281035ef9",
+          "file": "terminal-references.spec.ts",
+          "line": 6,
+          "column": 3
+        },
+        {
+          "title": "terminal references start expanded and share tool presentation in 浅色",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "status": "passed",
+                  "duration": 2123,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-21T10:59:21.071Z",
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "131384e495bc73d8d9b9-d38f992294c1a9b2fce8",
+          "file": "terminal-references.spec.ts",
+          "line": 6,
+          "column": 3
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-21T10:59:04.050Z",
+    "duration": 20556.997,
+    "expected": 2,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

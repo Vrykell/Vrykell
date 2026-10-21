@@ -45,10 +45,8 @@ test('local and SSH tabs retain colored tiles before and after activation', asyn
     const row = page.locator('[data-tab-row-id]').filter({ hasText: label });
     const icon = row.locator('svg').first();
     await expect(icon).toHaveAttribute('data-shell-mark', mark);
-    const badge = icon.locator('..');
-    await expect(badge).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-    await expect(badge).toHaveCSS('width', '20px');
-    await expect(badge).toHaveCSS('height', '20px');
+    await expect(icon).toHaveCSS('width', '16px');
+    await expect(icon).toHaveCSS('height', '16px');
     await expect(icon).toHaveAttribute('style', new RegExp(`color: var\\(--shell-${mark}-accent\\)`));
     const color = await icon.evaluate(element => getComputedStyle(element).color);
     await row.click();

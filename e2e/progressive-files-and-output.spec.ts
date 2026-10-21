@@ -138,7 +138,7 @@ test('a remote permission-limited file offers a separate elevated editing termin
   });
   const editor = page.getByTestId('file-editor');
   await expect(editor.locator('.editor-readonly-label')).toHaveText('只读');
-  await expect(editor.getByRole('button', { name: '保存文件', exact: true })).toBeDisabled();
+  await expect(page.getByTestId('workspace-instance-bar').getByRole('button', { name: '保存文件', exact: true })).toBeDisabled();
   const before = (await ptyWrites(page)).length;
   await editor.getByRole('button', { name: '使用 sudo 在终端编辑', exact: true }).click();
   await expect.poll(async () => (await ptyWrites(page)).slice(before).join('')).toContain("sudoedit -- '/etc/config.conf'\n");

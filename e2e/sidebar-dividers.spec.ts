@@ -19,14 +19,15 @@ async function pinCommandTitle(page: Page) {
 }
 
 async function expectUniformDrag(page: Page, mode: string, width: number) {
-  for (const id of ['tabs', 'chat']) {
+  for (const id of ['files', 'chat']) {
+    if (!await page.getByTestId(`resize-handle-${id}`).isVisible()) await page.locator(`[data-dock-btn="${id}"]`).click();
     const handle = page.getByTestId(`resize-handle-${id}`);
     const bounds = (await handle.boundingBox())!;
-    const grabX = bounds.x + bounds.width / 2 + (id === 'tabs' ? -2 : 2);
+    const grabX = bounds.x + bounds.width / 2 + 2;
     const panelWidth = (await handle.locator('..').boundingBox())!.width;
     await page.mouse.move(grabX, bounds.y + 20);
     await page.mouse.down();
-    await page.mouse.move(grabX + (id === 'tabs' ? 35 : -35), bounds.y + 150, { steps: 4 });
+    await page.mouse.move(grabX - 35, bounds.y + 150, { steps: 4 });
     const dragBounds = (await handle.boundingBox())!;
     expect((await handle.locator('..').boundingBox())!.width).toBe(panelWidth + 35);
     const line = handle.locator('[data-resize-line]');
@@ -87,7 +88,7 @@ for (const density of [1, 1.25, 1.5, 2]) {
             await row.click();
             await expect(page.getByTestId('git-diff-review').locator('.monaco-diff-editor')).toBeVisible();
           }
-          await page.locator('[data-dock-btn="tabs"]').click();
+          await page.locator('[data-dock-btn="chat"]').click();
         }
         for (const width of [1240, 960]) {
           await page.setViewportSize({ width, height: 800 });

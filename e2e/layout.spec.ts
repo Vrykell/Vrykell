@@ -12,9 +12,9 @@ test.describe('应用布局', () => {
     await expect(page.locator('[data-dock-btn="tabs"]')).toBeVisible();
     await expect(page.locator('[data-dock-btn="files"]')).toBeVisible();
     await expect(page.locator('[data-dock-btn="settings"]')).toBeVisible();
-    await expect(page.locator('[data-testid="tab-search"]')).toBeVisible();
+    await expect(page.getByTestId('tab-search-toggle')).toBeVisible();
     await expect(page.getByText('Documents')).toHaveCount(0);
-    await expect(page.locator('[data-testid="ssh-search"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="ssh-search"]')).toBeHidden();
   });
 
   test('Windows/Linux 使用应用内窗口控制按钮', async ({ page }) => {

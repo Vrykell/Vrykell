@@ -16,7 +16,7 @@ import OverlayScrollbar from '@ui/OverlayScrollbar';
 import { CircleX, Minimize2, Square } from '@ui/icons';
 import { STATUS_ACTION_ICON_SIZE, StatusActionButton, TerminalStatusBar } from '@features/terminal/components/TerminalStatusBar';
 import { MoveDragLayer, PlacementOverlay } from './TerminalPlacementOverlay';
-import { useSessionStore, type Tab } from '@features/workspace';
+import { useSessionStore, useWorkspaceNavigation, type Tab } from '@features/workspace';
 import { useTerminalStore, useInputStore } from '@features/terminal';
 import { useUiStore, useDockDragStore } from '@features/workspace';
 import { useBlockStore, selectBlocks } from '@features/terminal';
@@ -42,7 +42,7 @@ import ContextMenu, { type ContextMenuItem } from '@ui/ContextMenu';
 import ErrorBox from '@ui/ErrorBox';
 import { TextButton } from '@ui/TextButton';
 import UsageView from '@features/agent/components/UsageView';
-import HarnessWorkspace from '@features/chat/components/HarnessWorkspace';
+import AiWorkspaceSurface from '@features/chat/components/AiWorkspaceSurface';
 import { useTerminalLayoutActions } from '@features/terminal/hooks/useTerminalLayoutActions';
 import { useTuiControls } from '@features/terminal/hooks/useTuiControls';
 import { copyTerminalSelection, getPaneTerminal, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
@@ -52,7 +52,7 @@ import { TerminalRedrawButton } from './TerminalRedrawButton';
 import SshStatusPanel from '@features/ssh/components/SshStatusPanel';
 import type { SshSessionStatus } from '@core/ssh';
 
-export default function TerminalView() {
+export default function TerminalView({ active = true }: { active?: boolean }) {
   const tabs = useSessionStore((s) => s.tabs);
   const activeId = useSessionStore((s) => s.activeId);
   const setSession = useTerminalStore((s) => s.setSession);
@@ -108,7 +108,7 @@ export default function TerminalView() {
             <SessionTabView
               key={tab.id}
               tab={tab}
-              active={tab.id === activeId}
+              active={active && tab.id === activeId}
               setSession={setSession}
               setFocusedPane={setFocusedPane}
               onPaneContextMenu={(e, sshActions) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, sshActions }); }}
@@ -117,7 +117,7 @@ export default function TerminalView() {
         }
         if (tab.kind === 'harness') return <div key={tab.id} inert={tab.id !== activeId}
           style={{ display: tab.id === activeId ? 'flex' : 'none', flex: 1, minHeight: 0, minWidth: 0 }}>
-          <HarnessWorkspace active={tab.id === activeId} />
+          <AiWorkspaceSurface placement="main" />
         </div>;
         if (tab.id !== activeId) return null;
         if (tab.kind === 'git-diff' || tab.kind === 'editor') return null;
@@ -128,7 +128,7 @@ export default function TerminalView() {
       })}
 
       {/* Manual fullscreen host for a running block, with room for the toolbar. */}
-      {altScreenActive && (
+      {active && altScreenActive && (
         <div
           data-testid="tui-fullscreen"
           onContextMenu={(event) => {
@@ -417,6 +417,7 @@ function TerminalPane(props: {
   const registerDisconnect = useCallback((action: (() => Promise<void>) | null) => { disconnectAction.current = action; }, []);
   const registerReconnect = useCallback((action: (() => Promise<void>) | null) => { reconnectAction.current = action; }, []);
   const activeTabId = useSessionStore(s => s.activeId);
+  const terminalArea = useWorkspaceNavigation(state => state.area === 'terminal');
   const scene = useTerminalStore((s) => s.scenes[terminal.id] ?? 'classic');
   const [enteredBlockMode, setEnteredBlockMode] = useState(false);
   useEffect(() => { setEnteredBlockMode(false); }, [terminal.ssh?.connectionId, terminal.ssh?.host, terminal.openMode]);
@@ -511,7 +512,7 @@ function TerminalPane(props: {
     >
       {terminal.kind === 'ssh' && terminal.ssh ? <SshStatusPanel
         key={`${terminal.ssh.connectionId ?? ''}:${terminal.ssh.host}:${terminal.ssh.port ?? 22}`}
-        paneId={terminal.id} target={terminal.ssh} state={sshState} active={activeTabId === windowId} focused={focused}
+        paneId={terminal.id} target={terminal.ssh} state={sshState} active={terminalArea && activeTabId === windowId} focused={focused}
         width={sshStatusWidth} onWidthChange={setSshStatusWidth}
         onToolbarReady={setSshToolbarHost} compact={blockPresentation}
         statusTrigger={sshStatusTrigger} openRequest={sshStatusOpenRequest}

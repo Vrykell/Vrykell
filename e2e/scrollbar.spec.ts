@@ -130,7 +130,7 @@ test('completed wide output follows the window width without a horizontal scroll
   const output = page.locator('[data-testid^="command-block-"] [data-selectable]').last();
   await expect(output).toContainText('wide-column');
   const height = await output.evaluate(element => element.clientHeight);
-  await page.setViewportSize({ width: 850, height: 800 });
+  await page.setViewportSize({ width: 720, height: 800 });
   await output.scrollIntoViewIfNeeded();
   await expect.poll(() => output.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
   await expect.poll(() => output.evaluate(element => element.clientHeight)).toBeGreaterThan(height);

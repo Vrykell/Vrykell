@@ -13,9 +13,12 @@ async function expectConnectionTitle(panel: Locator) {
   await expect(overview.getByRole('button', { name: '复制连接地址' })).toHaveAttribute('data-compact', 'true');
   const spacing = await overview.evaluate(element => {
     const heading = getComputedStyle(element);
-    const sidebar = getComputedStyle(document.querySelector('.workspace-panel-heading')!);
+    const reference = document.createElement('div'); reference.className = 'workspace-panel-heading';
+    element.parentElement!.appendChild(reference);
+    const sidebar = getComputedStyle(reference);
     const keys = ['minHeight', 'paddingTop', 'paddingBottom', 'paddingLeft', 'paddingRight', 'fontSize'] as const;
-    return keys.map(key => [heading[key], sidebar[key]]);
+    const result = keys.map(key => [heading[key], sidebar[key]]);
+    reference.remove(); return result;
   });
   for (const [actual, expected] of spacing) expect(actual).toBe(expected);
   await overview.scrollIntoViewIfNeeded();

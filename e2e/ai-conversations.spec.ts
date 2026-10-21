@@ -103,9 +103,10 @@ test('rename and delete manage conversation history independently of terminals',
   await page.getByRole('menuitem', { name: '删除对话', exact: true }).click();
   await expect(row).toHaveCount(0);
   await expect(page.locator('[data-tab-kind="session"]')).toHaveCount(1);
-  await page.locator('[data-tab-kind="session"]').click();
+  await page.getByTestId('workspace-area-terminal').click();
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
   await page.reload();
+  if (!await page.getByRole('button', { name: 'AI 对话历史' }).isVisible()) await page.locator('[data-dock-btn="chat"]').click();
   await page.getByRole('button', { name: 'AI 对话历史' }).click();
   await expect(page.locator('.ai-history-list').getByText('Build investigation')).toHaveCount(0);
 });

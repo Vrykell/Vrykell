@@ -20,11 +20,12 @@ for (const renderer of ['dom', 'webgl']) {
       measurements.push(await screen.evaluate(element => {
         const host = element.closest('.terminal-pane')!;
         return { offset: element.getBoundingClientRect().left - host.getBoundingClientRect().left,
-          width: element.getBoundingClientRect().width };
+          width: element.getBoundingClientRect().width,
+          sidebar: document.querySelector('[data-testid="workspace-sidebar"]')!.getBoundingClientRect().width };
       }));
     }
     expect(Math.max(...measurements.map(item => item.offset)) - Math.min(...measurements.map(item => item.offset))).toBeLessThanOrEqual(.5);
-    for (let index = 1; index < measurements.length; index++) expect(measurements[index]!.width).toBeLessThanOrEqual(measurements[index - 1]!.width);
+    for (let index = 1; index < measurements.length; index++) expect(measurements[index]!.width + measurements[index]!.sidebar).toBeLessThanOrEqual(measurements[index - 1]!.width + measurements[index - 1]!.sidebar);
     const resizes = await ptyResizes(page);
     for (let index = 1; index < resizes.length; index++) expect(resizes[index]).not.toEqual(resizes[index - 1]);
     await page.screenshot({ path: test.info().outputPath(`resize-${renderer}.png`), animations: 'disabled' });
@@ -39,8 +40,8 @@ test('a held divider drag keeps the local grid live and notifies the remote once
   await page.goto('/');
   const screen = page.locator('.xterm-screen').first();
   await expect(screen).toBeVisible();
-  const handleLocator = page.getByTestId('resize-handle-tabs');
-  if (!(await handleLocator.isVisible())) await page.locator('[data-dock-btn="tabs"]').click();
+  const handleLocator = page.getByTestId('resize-handle-files');
+  await page.locator('[data-dock-btn="files"]').click();
   await expect(handleLocator).toBeVisible();
   const handle = (await handleLocator.boundingBox())!;
   const widthBefore = (await screen.boundingBox())!.width;
@@ -48,7 +49,7 @@ test('a held divider drag keeps the local grid live and notifies the remote once
   await page.mouse.move(handle.x + handle.width / 2, handle.y + 140);
   await page.mouse.down();
   for (const delta of [20, 40, 60, 80]) {
-    await page.mouse.move(handle.x + handle.width / 2 + delta, handle.y + 140, { steps: 3 });
+    await page.mouse.move(handle.x + handle.width / 2 - delta, handle.y + 140, { steps: 3 });
     await page.waitForTimeout(50);
   }
   // The local grid follows the pointer live; nothing has reached the remote PTY yet.

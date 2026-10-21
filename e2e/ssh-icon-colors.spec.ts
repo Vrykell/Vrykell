@@ -22,7 +22,7 @@ for (const theme of ['深色', '浅色']) {
     await connection.dblclick();
     await ensureTabsOpen(page);
     const tab = page.locator('[data-tab-kind="session"]').filter({ hasText: '生产服务器' });
-    const tabIcon = tab.locator('.sidebar-row-icon svg');
+    const tabIcon = tab.locator('[role="tab"] svg');
     await expect(tabIcon).toHaveCSS('color', selected);
     await page.locator('[data-dock-btn="ssh"]').click();
     await page.locator('[data-dock-btn="chat"]').click();

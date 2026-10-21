@@ -4,7 +4,7 @@ import { setupTauriMock, ensureTabsOpen } from './tauri-mock';
 test.describe('新建标签类型快捷配置', () => {
   test('restored default shell icons follow the resolved default and nested settings stay on screen', async ({ page }, info) => {
     await ensureTabsOpen(page);
-    const restored = page.locator('[data-tab-kind="session"]').first().locator('.sidebar-row-icon svg');
+    const restored = page.locator('[data-tab-kind="session"]').first().locator('[role="tab"] svg');
     await expect(restored).toHaveAttribute('data-shell-mark', 'zsh');
     await page.getByTestId('tab-new-btn').click();
     await page.getByTestId('new-tab-option-shell:bash').click({ button: 'right' });

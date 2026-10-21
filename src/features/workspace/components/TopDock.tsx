@@ -2,7 +2,7 @@ import KeyHint from '@ui/KeyHint';
 import { useEffect, useRef, useState } from 'react';
 import { iconSizes, Search } from '@ui/icons';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { useSessionStore, useTabDisplayTitle, useUiStore } from '@features/workspace';
+import { useSessionStore, useTabDisplayTitle, useUiStore, useWorkspaceNavigation, workspaceAreaForKind } from '@features/workspace';
 import DockNavigation from './DockNavigation';
 import WindowControls from '@features/workspace/components/WindowControls';
 import { isMacOS } from '@platform/runtime';
@@ -14,6 +14,8 @@ export default function TopDock() {
   const activeTab = useSessionStore(s => s.tabs.find(tab => tab.id === s.activeId));
   const displayTitle = useTabDisplayTitle(activeTab);
   const settingsOpen = useUiStore(state => state.settingsOpen);
+  const area = useWorkspaceNavigation(state => state.area);
+  const workspaceTitle = t(area === 'code' ? 'Code workspace' : area === 'ai' ? 'AI workspace' : area === 'ssh' ? 'SSH hosts' : 'Terminal workspace');
   const [fullscreen, setFullscreen] = useState(false);
   const headerRef = useRef<HTMLElement>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
@@ -42,7 +44,7 @@ export default function TopDock() {
     // attribute blocks dragging for the whole path.
     <header ref={headerRef} className="workspace-titlebar" data-platform={isMacOS ? 'macos' : 'other'} data-fullscreen={fullscreen} data-tauri-drag-region>
       <div data-tauri-drag-region className="workspace-title">
-        <span data-tauri-drag-region>{settingsOpen ? t('Settings') : displayTitle || t('Terminal workspace')}</span>
+        <span data-tauri-drag-region>{settingsOpen ? t('Settings') : activeTab && workspaceAreaForKind(activeTab.kind) === area ? displayTitle : workspaceTitle}</span>
       </div>
       <button data-subtle data-testid="global-search-trigger" className="workspace-search"
         onClick={() => useUiStore.getState().setGlobalSearchOpen(true)}>

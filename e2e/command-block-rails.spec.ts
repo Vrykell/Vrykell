@@ -37,6 +37,10 @@ for (const scale of [1, 2]) {
       const firstBounds = (await first.boundingBox())!;
       const lastBounds = (await lastFailure.boundingBox())!;
       const successBounds = (await success.boundingBox())!;
+      const paintedTop = await first.evaluate(element => {
+        const main = element.closest('main')!;
+        return Math.max(element.getBoundingClientRect().top, main.getBoundingClientRect().top + parseFloat(getComputedStyle(main).borderTopLeftRadius));
+      });
       expect(lastBounds.y + lastBounds.height).toBe(successBounds.y);
       const errorColor = await first.evaluate(element => getComputedStyle(element).getPropertyValue('--status-error').trim());
       const screenshot = await flow.screenshot({ path: test.info().outputPath('continuous-error-rails.png') });
@@ -64,7 +68,7 @@ for (const scale of [1, 2]) {
       }, {
         png: screenshot.toString('base64'), density: scale, errorColor,
         x: firstBounds.x - flowBounds.x + 1.5,
-        top: firstBounds.y - flowBounds.y,
+        top: paintedTop - flowBounds.y,
         bottom: lastBounds.y + lastBounds.height - flowBounds.y,
         successY: successBounds.y + successBounds.height / 2 - flowBounds.y,
       });

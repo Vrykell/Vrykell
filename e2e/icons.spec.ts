@@ -10,9 +10,9 @@ test('small action buttons have readable targets and tab close works from the ke
     expect(bounds!.width).toBeGreaterThanOrEqual(minimum);
     expect(bounds!.height).toBeGreaterThanOrEqual(minimum);
   };
-  await size(page.getByTestId('tab-new-btn'));
-  await size(page.getByTestId('tab-history-btn'));
-  await size(page.getByRole('button', { name: '关闭标签面板', exact: true }));
+  await size(page.getByTestId('tab-new-btn'), 28);
+  await size(page.getByTestId('tab-history-btn'), 28);
+  await size(page.getByTestId('workspace-sidebar-toggle'), 28);
   await size(page.getByRole('button', { name: '设置', exact: true }));
   await page.getByTestId('tab-new-btn').click();
   await page.getByText('Zsh', { exact: true }).click();
@@ -42,13 +42,13 @@ test('workspace icons remain readable and fit inside their controls', async ({ p
   const checkFits = async (icon: Locator) => {
     expect(await icon.evaluate(svg => {
       const glyph = svg.getBoundingClientRect();
-      const button = svg.closest('button')!.getBoundingClientRect();
+      const button = svg.closest('button, [role="button"]')!.getBoundingClientRect();
       return glyph.left >= button.left && glyph.top >= button.top &&
         glyph.right <= button.right && glyph.bottom <= button.bottom;
     })).toBe(true);
   };
   const nav = page.locator('[data-dock-btn="tabs"] svg');
-  await checkSize(nav, 24);
+  await checkSize(nav, 20);
   await checkFits(nav);
   const aiButton = page.locator('[data-dock-btn="chat"]');
   await expect(aiButton).toHaveClass(/\bactivity-button\b/);
@@ -56,12 +56,12 @@ test('workspace icons remain readable and fit inside their controls', async ({ p
   await checkSize(aiButton.locator('svg'), 24);
   await checkFits(aiButton.locator('svg'));
   expect(await aiButton.boundingBox()).toMatchObject({ width: 32, height: 32 });
-  await checkSize(page.locator('[data-tab-row-id] svg').first(), 20);
+  await checkSize(page.locator('[data-tab-row-id] svg').first(), 16);
   const search = page.getByTestId('global-search-trigger').locator('svg').first();
   await checkSize(search, 18);
   await checkFits(search);
-  const settings = page.locator('.workspace-settings svg');
-  await checkSize(settings, 24);
+  const settings = page.getByTestId('workspace-settings').locator('svg');
+  await checkSize(settings, 20);
   await checkFits(settings);
   await page.locator('[data-dock-btn="ssh"]').click();
   await checkSize(page.getByTestId('ssh-row-ssh-1').locator('svg').first(), 20);
@@ -76,7 +76,7 @@ test('workspace icons remain readable and fit inside their controls', async ({ p
 test('workspace and settings use the same themed icon family in both themes', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
-  const nav = page.locator('[data-dock-btn="tabs"] svg');
+  const nav = page.getByTestId('workspace-area-code').locator('svg');
   await expect(nav).toHaveAttribute('data-fui-icon');
   await expect(nav).toHaveAttribute('fill', 'currentColor');
   await gotoSetting(page, '字体与显示');

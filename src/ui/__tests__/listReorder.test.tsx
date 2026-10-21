@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ListReorderPlaceholder,
   ListReorderPreview,
+  ListReorderZonePlaceholder,
   useListReorder,
   useListReorderDrag,
   type ListReorderDrag,
@@ -60,6 +61,14 @@ function Harness({ onDrop, listId = 'demo', axis }: {
   );
 }
 
+function GroupedHarness({ onDrop }: { onDrop: (drag: ListReorderDrag, target: ListReorderTarget | null) => void }) {
+  const start = useListReorderDrag({ listId: 'groups', onDrop, axis: 'horizontal', grouped: true });
+  return <div data-reorder-list="groups">
+    <div data-reorder-zone="filled" data-reorder-kind="demo"><DemoRow id="a" start={start} /></div>
+    <div data-testid="empty-zone" data-reorder-zone="empty" data-reorder-kind="demo"><ListReorderZonePlaceholder listId="groups" zoneId="empty" /></div>
+  </div>;
+}
+
 /** Start dragging row-a and move the pointer to the given viewport y. */
 function dragTo(y: number) {
   const rows = ['a', 'b', 'c'].map((id) => screen.getByTestId(`row-${id}`));
@@ -104,6 +113,18 @@ function horizontalScrollHarness(direction: 'left' | 'right') {
 describe('list reorder', () => {
   beforeEach(() => {
     useListReorder.getState().end();
+  });
+  it('moves horizontal items into an empty group with a full-width stable placeholder', () => {
+    const onDrop = vi.fn(); render(<GroupedHarness onDrop={onDrop} />);
+    const row = screen.getByTestId('row-a'); const zone = screen.getByTestId('empty-zone');
+    vi.spyOn(row, 'getBoundingClientRect').mockReturnValue(rowRect(0));
+    Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: vi.fn(() => zone.querySelector('[data-reorder-placeholder]') ?? zone) });
+    fireEvent.pointerDown(row, { pointerId: 1, button: 0, isPrimary: true, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 200, clientY: 10 });
+    expect(useListReorder.getState().target).toEqual({ zoneId: 'empty' });
+    expect(zone.firstChild).toHaveStyle({ width: '120px', height: '40px' });
+    fireEvent.pointerUp(window, { pointerId: 1, clientX: 210, clientY: 10 });
+    expect(onDrop).toHaveBeenCalledWith(expect.objectContaining({ id: 'a' }), { zoneId: 'empty' });
   });
   it('uses horizontal midpoints and preserves the dragged tab width', () => {
     const onDrop = vi.fn(); render(<Harness onDrop={onDrop} axis="horizontal" />);

@@ -24,10 +24,11 @@ test('AI 草稿和附件按会话保留，关闭面板后仍能继续发送', as
   await input.fill('第二个对话的草稿');
   await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
   await page.locator('.ai-history-list [data-testid^="conversation-row-"]').last().click();
+  await ensureTabsOpen(page);
   await page.getByTestId('tab-row-t1').click();
   await expect(input).toHaveValue('终端一的草稿');
   await expect(page.locator('[data-tip="移除附件"]')).toHaveCount(1);
-  await page.getByRole('button', { name: '关闭AI 助手面板', exact: true }).click();
+  await page.getByRole('button', { name: '关闭AI面板', exact: true }).click();
   await page.getByRole('button', { name: 'AI 助手', exact: true }).click();
   await expect(input).toHaveValue('终端一的草稿');
   await expect(page.locator('[data-tip="移除附件"]')).toHaveCount(1);

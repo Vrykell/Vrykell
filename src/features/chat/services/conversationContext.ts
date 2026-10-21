@@ -7,6 +7,7 @@ import { focusSessionInput } from '@features/terminal/services/terminalFocus';
 import { shellTypeLabel } from '@platform/shells';
 import { useChatStore } from '../stores/chat';
 import { useComposerDrafts } from '../stores/composerDrafts';
+import { useAiWorkspace } from '../stores/aiWorkspace';
 import type { ChatEnvironment, TerminalReference } from '../model/conversation';
 
 export function environmentForPane(paneId: string): ChatEnvironment | null {
@@ -54,6 +55,7 @@ export function askAboutTerminal(paneId: string, reference?: TerminalReference, 
   const id = current && (!current.environment || current.environment.paneId === paneId)
     ? current.id : chat.createConversation();
   void chat.selectConversation(id);
+  useAiWorkspace.getState().openNative(id);
   const drafts = useComposerDrafts.getState();
   if (reference) {
     const previous = drafts.byTab[id]?.references ?? [];

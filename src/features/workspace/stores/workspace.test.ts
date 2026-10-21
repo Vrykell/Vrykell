@@ -185,13 +185,13 @@ describe('workspace store', () => {
     expect(resolveDisplayTitle(copy.title, copy.titleSource, '')).toBe('手动标题 副本');
   });
 
-  it('keeps the remaining singleton active when no terminal sessions are open', () => {
+  it('keeps an empty functional workspace without activating a page in another area', () => {
     useWorkspaceStore.setState({ tabs: [], activeId: '' });
     const ws = useWorkspaceStore.getState();
     const settings = ws.addTab({ kind: 'ai-history' });
     const history = ws.addTab({ kind: 'history' });
     ws.closeTab(history);
-    expect(useWorkspaceStore.getState().activeId).toBe(settings);
+    expect(useWorkspaceStore.getState().activeId).toBe('');
     const reopened = ws.addTab({ kind: 'history' });
     ws.activate(settings);
     ws.closeTab(reopened);

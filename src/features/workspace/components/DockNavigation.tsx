@@ -1,68 +1,52 @@
-import { useDockStore, useSessionStore, useUiStore, useNavigationDrag, useNavigationButtonDrag, type DockSide } from '@features/workspace';
-import DockButton from './DockButton';
-import { useToastStore } from '@ui/Toast';
-import NavigationDragPreview from './NavigationDragPreview';
 import { Fragment } from 'react';
+import { t } from '@i18n';
+import { useDockStore, useUiStore, useNavigationDrag, useNavigationButtonDrag, type DockSide } from '@features/workspace';
+import { useAiWorkspace, useChatStore } from '@features/chat';
+import { useToastStore } from '@ui/Toast';
 import { dismissSshStatus, useSshStatusOwner } from '../hooks/useAuxiliarySidebar';
+import DockButton from './DockButton';
 
-/** Navigation order and sidebar placement share one persisted source of truth. */
+/** Auxiliary actions share one ordered right-hand dock. */
 export default function DockNavigation({ side }: { side: DockSide }) {
-  const zone = useDockStore(state => side === 'left' ? state.leftZone : state.rightZone);
-  const panels = useDockStore(state => side === 'left' ? state.leftPanels : state.rightPanels);
+  const zone = useDockStore(state => state.rightZone);
+  const panels = useDockStore(state => state.rightPanels);
   const sshStatusOwner = useSshStatusOwner();
   const settingsActive = useUiStore(state => state.settingsOpen);
   const dragging = useNavigationDrag(state => state.id);
   const target = useNavigationDrag(state => state.target);
-  // The settings page action is pinned below the left toolbar instead of this draggable zone.
-  const ids = zone.filter(id => id !== 'settings');
-  const compact = side === 'right' && ids.length > 1;
-
   const startDrag = useNavigationButtonDrag();
   const open = (id: string) => {
     useUiStore.getState().setSettingsOpen(false);
     const dock = useDockStore.getState();
-    if (sshStatusOwner && (side === 'right' || window.innerWidth <= 860)) {
-      dismissSshStatus();
-      dock.openPanel(id);
-      return;
+    if (id === 'chat') {
+      if (!useAiWorkspace.getState().nativeTabs.length && !useAiWorkspace.getState().selected) {
+        void useChatStore.getState().loadConversations().then(() => {
+          const conversationId = useChatStore.getState().activeConversationId;
+          if (conversationId) useAiWorkspace.getState().openNative(conversationId);
+        });
+      }
     }
-    const wasOpen = dock.leftPanels.includes(id) || dock.rightPanels.includes(id);
+    if (sshStatusOwner) { dismissSshStatus(); dock.openPanel(id); return; }
+    const wasOpen = dock.rightPanels.includes(id);
     if (settingsActive && wasOpen) return;
-    dock.togglePanel(side, id);
-    const next = useDockStore.getState();
-    if (!wasOpen && !next.leftPanels.includes(id) && !next.rightPanels.includes(id)) {
-      useToastStore.getState().addToast('窗口空间不足，请加宽窗口或减少分屏', 'info');
+    dock.togglePanel('right', id);
+    if (!wasOpen && !useDockStore.getState().rightPanels.includes(id)) {
+      useToastStore.getState().addToast(t('Not enough space. Widen the window or reduce terminal splits.'), 'info');
     }
   };
-
-  return (
-    <nav className={side === 'left' ? 'workspace-activity-bar' : 'workspace-right-navigation'}
-      aria-label={side === 'left' ? '工作区导航' : '右侧面板导航'}
-      data-dock-zone={side} data-dragging={!!dragging} data-compact={compact}
-      data-drop-active={!!dragging && target?.side === side}>
-      <div className={side === 'left' ? 'workspace-activity-actions' : 'workspace-right-actions'}>
-        {ids.map(id => {
-          const index = zone.indexOf(id);
-          const active = panels.includes(id) && !(sshStatusOwner && (side === 'right' || window.innerWidth <= 860));
-          const showPlaceholder = !!dragging && !target?.openPanel && target?.side === side && target.index === index;
-          return (
-            <Fragment key={id}>
-              {showPlaceholder && <div className="workspace-navigation-placeholder" data-dock-placeholder={target.index} aria-hidden="true" />}
-              <div className="workspace-navigation-slot" data-dock-slot={id} data-moving={dragging === id}>
-                <DockButton panelId={id} side={side} active={active} onClick={() => open(id)} onPointerDown={event => startDrag(event, id)} />
-              </div>
-            </Fragment>
-          );
-        })}
-        {!!dragging && !target?.openPanel && target?.side === side && target.index >= ids.length && <div className="workspace-navigation-placeholder" data-dock-placeholder={target.index} aria-hidden="true" />}
-      </div>
-      {side === 'left' && (
-        <div className="workspace-activity-footer">
-          <DockButton panelId="settings" side="left" fixed active={settingsActive}
-            onClick={() => settingsActive ? useUiStore.getState().setSettingsOpen(false) : useSessionStore.getState().openSettings()} />
+  if (side !== 'right') return null;
+  return <nav className="workspace-right-navigation" aria-label={t('Auxiliary panels')} data-dock-zone="right"
+    data-dragging={!!dragging} data-compact={zone.length > 1} data-drop-active={!!dragging && target?.side === 'right'}>
+    <div className="workspace-right-actions">
+      {zone.map((id, index) => <Fragment key={id}>
+        {!!dragging && !target?.openPanel && target?.side === 'right' && target.index === index
+          && <div className="workspace-navigation-placeholder" data-dock-placeholder={index} aria-hidden="true" />}
+        <div className="workspace-navigation-slot" data-dock-slot={id} data-moving={dragging === id}>
+          <DockButton panelId={id} side="right" active={panels.includes(id) && !sshStatusOwner} onClick={() => open(id)} onPointerDown={event => startDrag(event, id)} />
         </div>
-      )}
-      {side === 'left' && <NavigationDragPreview />}
-    </nav>
-  );
+      </Fragment>)}
+      {!!dragging && !target?.openPanel && target?.side === 'right' && target.index >= zone.length
+        && <div className="workspace-navigation-placeholder" data-dock-placeholder={target.index} aria-hidden="true" />}
+    </div>
+  </nav>;
 }

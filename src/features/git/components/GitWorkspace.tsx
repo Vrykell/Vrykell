@@ -3,21 +3,26 @@ import { t } from '@i18n';
 import { gitComparisonKey, type GitDiff, type GitSelection } from '@core/git';
 import { getGitDiff } from '@platform/api/git';
 import { useGitReview, useGitSelection } from '../index';
-import { useSessionStore, terminalsOf } from '@features/workspace';
+import { useSessionStore, terminalsOf, useWorkspaceNavigation } from '@features/workspace';
 import { fileIcon } from '@features/files';
 import CodeDiff from '@ui/CodeDiff';
 import ErrorBox from '@ui/ErrorBox';
 import { TextButton } from '@ui/TextButton';
 import ReloadButton from '@ui/ReloadButton';
-import { iconSizes } from '@ui/icons';
 import Select from '@ui/Select';
-import FolderTabs, { type FolderTab } from '@ui/FolderTabs';
+import FolderTabs from '@ui/FolderTabs';
+import WorkspaceHeader from '@ui/WorkspaceHeader';
+import { useCodeWorkspaceTabs } from '@features/workspace/hooks/useCodeWorkspaceTabs';
+import { openWorkspaceFile } from '@features/workspace/services/workspaceActions';
+import { IconButton } from '@ui/IconButton';
+import { Plus, iconSizes } from '@ui/icons';
 import './git.css';
 
 export default function GitWorkspace({ children }: { children: ReactNode }) {
   const selection = useGitSelection();
   const tabs = useSessionStore(state => state.tabs);
   const activeId = useSessionStore(state => state.activeId);
+  const area = useWorkspaceNavigation(state => state.area);
   const show = !!selection;
   const page = tabs.find(tab => tab.id === activeId && tab.kind === 'git-diff');
   const comparisons = tabs.filter(tab => tab.kind === 'git-diff').flatMap(tab => (tab.comparisons ?? [{ id: tab.id, selection: tab.selection }]).map(item => ({ ...item, pageId: tab.id })));
@@ -25,17 +30,14 @@ export default function GitWorkspace({ children }: { children: ReactNode }) {
   const panes = [...comparisons].sort((a, b) => a.id.localeCompare(b.id));
   const pageCount = tabs.filter(tab => tab.kind === 'git-diff').length;
   useEffect(() => { useSessionStore.getState().configureGitDiffTabs(); }, [pageCount]);
-  const comparisonTabs: FolderTab[] = comparisons.map(comparison => {
-    const Icon = fileIcon(comparison.selection.path);
-    return { id: comparison.id, label: `${comparison.selection.path.split('/').pop()} · ${t(comparison.selection.scope === 'staged' ? 'Staged changes' : 'File comparison')}`, icon: <Icon size={iconSizes.compact} />, tip: `${comparison.selection.target.cwd}/${comparison.selection.path}`, closeLabel: t('Close comparison {{path}}', { path: comparison.selection.path }) };
-  });
   return <>
     <div className="git-terminal-host" style={{ display: show ? 'none' : 'flex' }} inert={show}>{children}</div>
-    {panes.map(item => <GitComparison key={item.id} tabId={item.id} selection={item.selection} tabs={comparisonTabs} active={item.pageId === page?.id && !!selection && gitComparisonKey(item.selection) === gitComparisonKey(selection)} />)}
+    {panes.map(item => <GitComparison key={item.id} tabId={item.id} selection={item.selection} active={area === 'code' && item.pageId === page?.id && !!selection && gitComparisonKey(item.selection) === gitComparisonKey(selection)} />)}
   </>;
 }
 
-function GitComparison({ selection, active, tabId, tabs }: { selection: GitSelection; active: boolean; tabId: string; tabs: FolderTab[] }) {
+function GitComparison({ selection, active, tabId }: { selection: GitSelection; active: boolean; tabId: string }) {
+  const codeTabs = useCodeWorkspaceTabs();
   const revision = useGitReview(state => state.revision);
   const [diff, setDiff] = useState<GitDiff | null>(null);
   const [error, setError] = useState('');
@@ -74,18 +76,19 @@ function GitComparison({ selection, active, tabId, tabs }: { selection: GitSelec
   const backLabel = t(editorOwner ? 'Back to editor' : 'Back to terminal');
   const Icon = fileIcon(selection.path);
   const toolbar = (navigation?: ReactNode, navigate?: (direction: 'previous' | 'next') => void) => <>
-    <FolderTabs items={active ? tabs : []} selected={tabId} label={t('Open comparisons')} listId="git-comparisons" className="git-review-tabs" headerClassName="git-review-toolbar"
-      onSelect={id => useSessionStore.getState().activateGitComparison(id)} onClose={id => useSessionStore.getState().closeGitComparison(id)}
-      onMove={(...args) => useSessionStore.getState().moveGitComparison(...args)} menuItems={[
+    <WorkspaceHeader active={active}><FolderTabs items={active ? codeTabs.items : []} selected={`diff:${tabId}`} label={t('Open files and comparisons')} listId="code-documents" className="git-review-tabs" headerClassName="git-review-toolbar"
+      onSelect={codeTabs.onSelect} onClose={codeTabs.onClose}
+      onMove={codeTabs.onMove} menuItems={[
         { label: backLabel, onClick: back }, { label: t('Side by side'), checked: layout === 'split', onClick: () => setLayout('split') },
         { label: t('Inline comparison'), checked: layout === 'inline', onClick: () => setLayout('inline') },
         { label: t('Previous change'), disabled: !navigate, onClick: () => navigate?.('previous') },
         { label: t('Next change'), disabled: !navigate, onClick: () => navigate?.('next') }, { label: t('Refresh comparison'), onClick: refresh },
       ]} toolbar={<>
+        <IconButton compact aria-label={t('Open file')} data-tip={t('Open file')} onClick={() => void openWorkspaceFile()}><Plus size={iconSizes.control} /></IconButton>
         <span className="folder-action-secondary"><Select aria-label={t('Comparison layout')} value={layout} onChange={setLayout} options={[{ value: 'split', label: t('Side by side') }, { value: 'inline', label: t('Inline comparison') }]} /></span>
         <span className="git-diff-navigation folder-action-secondary">{navigation}</span>
         <span className="folder-action-secondary"><ReloadButton compact label={t('Refresh comparison')} onReload={refresh} /></span>
-      </>} />
+      </>} /></WorkspaceHeader>
     <div className="folder-path" data-tip={selection.path}><Icon size={12} /><span>{selection.path}</span><span className="folder-path-scope">{comparison[2]}</span></div>
   </>;
   const notice = selection.scope === 'conflicts' ? <ErrorBox compact tone="info">{t('Resolve conflicts in your editor or terminal; this view compares the two conflict sides.')}</ErrorBox> : null;

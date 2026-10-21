@@ -16,7 +16,7 @@ export function useTranscriptFollow(id: string, revision: unknown, active = true
   const lastTop = useRef(0);
   const settle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const positions = useRef(new Map<string, { top: number; following: boolean }>());
-  const pauseFollow = () => { followRef.current = false; setFollowing(false); };
+  const pauseFollow = () => { clearTimeout(settle.current); followRef.current = false; setFollowing(false); };
   const jumpToLatest = () => {
     followRef.current = true;
     setFollowing(true);

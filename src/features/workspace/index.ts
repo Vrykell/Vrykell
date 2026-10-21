@@ -59,3 +59,4 @@ export {
 export { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
 export { useTabDisplayTitle } from '@features/workspace/hooks/useTabDisplayTitle';
 export { tabIconKey, tabIconColor } from './model/tabAppearance';
+export { useWorkspaceNavigation, orderedWorkspaceIds, workspaceAreaForKind } from './stores/navigation';

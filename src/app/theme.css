@@ -104,6 +104,7 @@
 .application-window[data-desktop-tint="false"] .application-chrome { background: var(--chrome-bg); }
 /* Wallpaper mode darkens only the backdrop behind sidebars; text and controls keep their opacity. */
 .application-window[data-wallpaper="true"] .settings-navigation,
+.application-window[data-wallpaper="true"] .workspace-sidebar,
 .application-window[data-wallpaper="true"] .workspace-side-panel[data-visible="true"] > div {
   backdrop-filter: brightness(0.55) saturate(0.88);
   -webkit-backdrop-filter: brightness(0.55) saturate(0.88);
@@ -388,23 +389,8 @@ button.state-icon-button[aria-pressed="true"]:hover { background: var(--selectio
 .workspace-ssh-status-slot:empty { display: none; }
 /* A folded status panel shrinks to nothing; keep its resize edge unclipped so it can be dragged back out. */
 .workspace-body:has(> .workspace-ssh-status-slot > .ssh-status-frame[data-folded]) > .workspace-ssh-status-slot { overflow: visible; }
-@media (max-width: 860px) {
-  .workspace-body:has(> .workspace-ssh-status-slot:not(:empty)) { --workspace-left-panel-width: 0px !important; --workspace-frame-width: 8px !important; }
-  .workspace-body:has(> .workspace-ssh-status-slot:not(:empty)) > .workspace-side-panel[data-side="left"] { display: none !important; }
-  .workspace-body:has(> .workspace-ssh-status-slot:not(:empty)) .workspace-main { border-top-left-radius: var(--radius-block) !important; border-bottom-left-radius: var(--radius-block) !important; }
-}
-.workspace-body:has(.workspace-side-panel[data-side="left"][data-visible="true"]) .workspace-main { margin-left: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; }
-/* Round the outer navigation edge while the shared resize boundary stays flush. */
-.workspace-side-panel[data-side="left"] { border-radius: var(--radius-block) 0 0 var(--radius-block); overflow: visible; }
 /* Right sidebar docks flush onto the terminal: no gap, just the resize hairline, rounded outer edge. */
 .workspace-side-panel[data-side="right"] { border-radius: 0 var(--radius-block) var(--radius-block) 0; overflow: visible; }
-.workspace-activity-bar {
-  width: var(--workspace-activity-width); min-width: var(--workspace-activity-width); max-width: var(--workspace-activity-width); flex: 0 0 var(--workspace-activity-width); display: flex; flex-direction: column;
-  align-self: stretch; height: 100%; position: relative;
-  padding: 10px 4px; background: transparent;
-}
-.workspace-activity-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1 1 auto; }
-.workspace-activity-footer { flex-shrink: 0; margin-top: auto; display: flex; justify-content: center; padding-top: 8px; }
 .workspace-right-navigation { min-width: 0; display: flex; align-items: center; border-radius: 8px; }
 .workspace-right-navigation[data-dragging="true"]:not(:has(.workspace-navigation-slot[data-moving="false"], .workspace-navigation-placeholder)) { min-width: 36px; min-height: 36px; }
 .workspace-right-actions { display: flex; align-items: center; gap: 4px; }

@@ -297,7 +297,7 @@ test('sorts by frequency across reloads and displays full long commands in a nar
   const handle = (await page.getByTestId('resize-handle-command-history').boundingBox())!;
   await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
   await page.mouse.down();
-  await page.mouse.move(handle.x + handle.width / 2 + 240 - previous.width, handle.y + handle.height / 2, { steps: 8 });
+  await page.mouse.move(handle.x + handle.width / 2 - 240 + previous.width, handle.y + handle.height / 2, { steps: 8 });
   await page.mouse.up();
   const row = page.getByTestId('command-history-long-command');
   await row.focus();
@@ -487,7 +487,7 @@ test('keeps favorite-only commands when dragged into history and fits collected 
   const previous = (await sidebar.boundingBox())!;
   const handle = (await page.getByTestId('resize-handle-command-history').boundingBox())!;
   await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2); await page.mouse.down();
-  await page.mouse.move(handle.x + handle.width / 2 + 184 - previous.width, handle.y + handle.height / 2, { steps: 8 }); await page.mouse.up();
+  await page.mouse.move(handle.x + handle.width / 2 - 184 + previous.width, handle.y + handle.height / 2, { steps: 8 }); await page.mouse.up();
   const favorites = panel.getByTestId('command-group-favorites');
   expect(await favorites.getByRole('button', { name: '收起星标命令', exact: true }).locator('span').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
   await expect(panel.getByTestId('command-history-filter-status')).toContainText('成功');
@@ -512,7 +512,7 @@ test('removes filter cards independently in wide and minimum-width layouts', asy
   const previous = (await sidebar.boundingBox())!;
   const handle = (await page.getByTestId('resize-handle-command-history').boundingBox())!;
   await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2); await page.mouse.down();
-  await page.mouse.move(handle.x + handle.width / 2 + 184 - previous.width, handle.y + handle.height / 2, { steps: 8 }); await page.mouse.up();
+  await page.mouse.move(handle.x + handle.width / 2 - 184 + previous.width, handle.y + handle.height / 2, { steps: 8 }); await page.mouse.up();
   for (const card of await cards.locator(':scope > span').all()) {
     expect(await card.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
     await expect(card.getByRole('button')).toBeVisible();

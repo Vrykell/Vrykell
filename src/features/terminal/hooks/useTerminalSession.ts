@@ -24,7 +24,7 @@ import { useHistoryStore } from '@features/terminal/stores/history';
 import { captureHistoryCommand } from '@features/command-history/services/recording';
 import { isTerminalDebugEnabled, terminalDebug } from '@features/terminal/services/terminalDebug';
 import { readXtermTheme } from '@features/terminal/model/xtermTheme';
-import { useSessionStore } from '@features/workspace';
+import { useSessionStore, useUiStore, useWorkspaceNavigation } from '@features/workspace';
 import { leaves as layoutLeaves } from '@features/workspace/model/windowLayout';
 import * as sessionManager from '@features/workspace/services/sessionManager';
 import { agentControl } from '@features/agent/services/agentControl';
@@ -350,14 +350,14 @@ export function useTerminalSession(
             terminalDebug('manual-fullscreen-cancelled', { paneId, reason: 'alternate-screen' });
           }
         }
-        if (useSessionStore.getState().activeId !== tabId) return;
+        if (useSessionStore.getState().activeId !== tabId || useWorkspaceNavigation.getState().area !== 'terminal' || useUiStore.getState().settingsOpen) return;
         if (scene === 'blockList') {
           term.reset(); // 清掉 classic 残留
           useTerminalStore.getState().setKeyboardTarget('input');
         } else {
           useTerminalStore.getState().setKeyboardTarget('terminal');
           focusTimer = setTimeout(() => {
-            if (disposed || currentScene !== scene || useSessionStore.getState().activeId !== tabId) return;
+            if (disposed || currentScene !== scene || useSessionStore.getState().activeId !== tabId || useWorkspaceNavigation.getState().area !== 'terminal' || useUiStore.getState().settingsOpen || document.activeElement?.closest('.ai-workspace-surface')) return;
             term.focus();
             const textarea = term.element?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea');
             if (isTerminalDebugEnabled()) {
@@ -612,7 +612,7 @@ export function useTerminalSession(
         preSession = [];
         onReadyRef.current(id);
         setStatus('ready');
-        if (currentScene === 'classic' && useSessionStore.getState().activeId === tabId && !(spec?.kind === 'ssh' && blockEnabled && connectionOutputRef.current)) {
+        if (currentScene === 'classic' && useSessionStore.getState().activeId === tabId && useWorkspaceNavigation.getState().area === 'terminal' && !useUiStore.getState().settingsOpen && !document.activeElement?.closest('.ai-workspace-surface') && !(spec?.kind === 'ssh' && blockEnabled && connectionOutputRef.current)) {
           term.focus();
         }
         // PTY 就绪后按真实布局尺寸重校

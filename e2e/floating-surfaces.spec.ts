@@ -98,6 +98,7 @@ for (const theme of ['深色', '浅色']) {
     await expect(models).toBeHidden();
     await assertSurface(page.getByRole('status').filter({ hasText: '已切换到' }));
     await page.locator('[data-dock-btn="chat"]').click();
+    await page.getByTestId('workspace-area-terminal').click();
     await page.getByRole('button', { name: '询问 AI', exact: true }).click();
     await ensureChatSettingsOpen(page);
     await page.getByRole('button', { name: '对话与审批模式' }).click();

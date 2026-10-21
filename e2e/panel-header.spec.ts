@@ -22,12 +22,13 @@ test('group header count stays on a single line while the header is hovered', as
   await expect(group).toBeVisible();
   // Hovering reveals the group action buttons.
   await group.locator('.tab-group-header').hover();
+  await group.locator('.tab-group-header').click();
   const count = page.getByTestId(/^group-count-/).first();
   await expect(count).toHaveCSS('white-space', 'nowrap');
   expect(await count.evaluate((element) => element.getClientRects().length)).toBe(1);
 });
 
-test('group actions overlay the header end instead of squeezing the title', async ({ page }) => {
+test('group actions and colors open from the chip without squeezing its title', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
@@ -52,21 +53,15 @@ test('group actions overlay the header end instead of squeezing the title', asyn
   // The action buttons must not take title space: revealing them changes nothing.
   expect(hovered).toBeGreaterThanOrEqual(resting - 1);
 
-  const rename = group.getByRole('button', { name: '重命名分组' });
+  await header.click({ button: 'right' });
+  const menu = page.getByRole('menu', { name: '分组操作' });
+  const rename = menu.getByRole('button', { name: '重命名分组' });
   await expect(rename).toBeVisible();
-  const renameBox = (await rename.boundingBox())!;
-  const headerBox = (await header.boundingBox())!;
-  expect(renameBox.x + renameBox.width).toBeLessThanOrEqual(headerBox.x + headerBox.width);
-
-  // The floating buttons carry no surface of their own: a tinted container would double the
-  // translucent hover background into a lighter block.
-  const actions = group.locator('.group-actions');
-  await expect(actions).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  await expect(actions).toHaveCSS('background-image', 'none');
-  // The title hands its content width to the buttons and ellipsizes instead of running under them.
-  const titleText = group.locator('.tab-group-title span').first();
-  expect(await titleText.evaluate((element) => element.clientWidth <= element.scrollWidth)).toBe(true);
-  expect(await titleText.evaluate((element) => element.clientWidth)).toBeLessThan(resting);
+  const palette = menu.getByRole('menuitemradio').first();
+  expect((await palette.boundingBox())!.y).toBeGreaterThan((await rename.boundingBox())!.y);
+  expect((await title.boundingBox())!.width).toBe(resting);
+  await page.keyboard.press('Escape');
+  await expect(header).toBeFocused();
 });
 
 test('tab rename input stays inside its row', async ({ page }) => {

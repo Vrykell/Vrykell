@@ -78,6 +78,7 @@ not pretend to protect "the renderer itself" or "the programs the user installs"
 
 ## 6. History
 
+- Workspace navigation, 2026-10-21: main/side AI placement moves one existing content host within the same webview. It does not duplicate a session, add a renderer, interpret HTML, or change IPC, capabilities, CSP, resource scope or approval ownership. File opening uses the existing native picker and path-grant chain. ACP close guards and process cleanup remain on the original close path; transcript and dock movement are covered by unit and browser regressions.
 - Integration fixes, 2026-10-21: temporary tool and command-shape grants are scoped to conversation identity throughout approval, authorization and revocation. Requests without an identity cannot reuse grants, and revoking one conversation leaves others intact. Danger rules, native confirmation and single-use execution leases retain the existing authorization chain.
 - ACP runtime connections use local IDs for isolation; remote session IDs are used only for protocol requests and resume records. Closing an established connection stops its process tree, I/O tasks and waiting requests; probes and failed opens also clean up. Configuration read failures do not return an empty list. Diagnostics record metadata without directories or raw protocol errors. Credential migration retains legacy values until all target writes succeed. This change adds no IPC commands, capabilities or CSP scope.
 - `8ddffb1`: authorization decided in Rust, single-use leases

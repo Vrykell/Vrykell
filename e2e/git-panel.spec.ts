@@ -26,20 +26,20 @@ test('reviews both sides of a partially staged file and preserves the terminal',
   await expect(review.locator('.monaco-diff-editor')).toBeVisible({ timeout: 15_000 });
   await expect(review.locator('.folder-path').getByText('暂存区 → 工作文件', { exact: true })).toBeVisible();
   await expect(review.getByTestId('code-diff')).toHaveAttribute('data-layout', 'inline');
-  await expect(review.locator('.git-review-toolbar')).toHaveCount(1);
+  await expect(page.getByTestId('workspace-instance-bar').locator('.git-review-toolbar')).toHaveCount(1);
   await expect(review.locator('.code-diff-frame')).toHaveCSS('clip-path', /inset/);
   await expect(review.locator('.decorationsOverviewRuler').first()).not.toBeVisible();
   await expect(review.getByText('暂存区 → 工作文件', { exact: true })).toHaveCount(1);
   await expect(review.locator('.modified .view-lines:not(.line-delete)')).toContainText('working');
   await panel.getByTestId('git-staged-src/main.ts').click();
   await expect(review.locator('.folder-path').getByText('HEAD → 暂存区', { exact: true })).toBeVisible();
-  await expect(page.getByRole('tablist', { name: '已打开的差异' }).getByRole('tab')).toHaveCount(2);
+  await expect(page.getByRole('tablist', { name: '已打开的文件与比较' }).getByRole('tab')).toHaveCount(2);
   await expect(review.locator('.modified .view-lines:not(.line-delete)')).toContainText('staged');
   await expect(review.locator('.char-insert').first()).toBeVisible();
-  await review.getByRole('combobox', { name: '差异布局' }).click();
+  await page.getByTestId('workspace-instance-bar').getByRole('combobox', { name: '差异布局' }).click();
   await page.getByRole('option', { name: '单栏对比' }).click();
-  await expect(review.getByRole('combobox', { name: '差异布局' })).toContainText('单栏对比');
-  await review.getByRole('combobox', { name: '差异布局' }).click();
+  await expect(page.getByTestId('workspace-instance-bar').getByRole('combobox', { name: '差异布局' })).toContainText('单栏对比');
+  await page.getByTestId('workspace-instance-bar').getByRole('combobox', { name: '差异布局' }).click();
   await page.getByRole('option', { name: '左右对比' }).click();
   for (const width of [1240, 760]) {
     await page.setViewportSize({ width, height: 800 });
@@ -62,22 +62,26 @@ test('reviews both sides of a partially staged file and preserves the terminal',
   await expect(review.getByRole('textbox', { name: '查找', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
   await page.keyboard.press('Control+w');
-  await expect(page.getByRole('tablist', { name: '已打开的差异' }).getByRole('tab')).toHaveCount(1);
+  await expect(page.getByRole('tablist', { name: '已打开的文件与比较' }).getByRole('tab')).toHaveCount(1);
   await page.keyboard.press('Control+w');
   await expect(review).toHaveCount(0);
+  await expect(page.getByTestId('code-workspace-empty')).toBeVisible();
+  await page.getByTestId('workspace-area-terminal').click();
   await expect(page.locator('[data-terminal-input]').first()).toBeVisible();
 });
 
 test('keeps comparisons as workspace tabs and returns to the running terminal', async ({ page }) => {
   const panel = page.getByTestId('git-panel');
   await panel.getByTestId('git-unstaged-src/main.ts').click();
-  await page.getByTestId('git-diff-review').getByRole('button', { name: '更多编辑器操作' }).click();
+  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '更多编辑器操作' }).click();
   await page.getByRole('button', { name: '返回终端', exact: true }).click();
   await expect(page.locator('[data-terminal-input]').first()).toBeVisible();
   await panel.getByTestId('git-unstaged-src/main.ts').click();
-  await expect(page.getByRole('tablist', { name: '已打开的差异' }).getByRole('tab')).toHaveCount(1);
+  await expect(page.getByRole('tablist', { name: '已打开的文件与比较' }).getByRole('tab')).toHaveCount(1);
   await page.getByRole('button', { name: '关闭差异 src/main.ts' }).click();
   await expect(page.getByTestId('git-diff-review')).toHaveCount(0);
+  await expect(page.getByTestId('code-workspace-empty')).toBeVisible();
+  await page.getByTestId('workspace-area-terminal').click();
   await expect(page.locator('[data-terminal-input]').first()).toBeVisible();
 });
 
@@ -235,6 +239,8 @@ test('keeps Git usable in settings and saves a prompt for the remembered workspa
   const panel = page.getByTestId('git-panel');
   await page.getByRole('button', { name: '设置', exact: true }).click();
   await expect(page.getByRole('combobox', { name: '差异页面' })).toHaveCount(0);
+  await expect(panel.getByTestId('git-staged-src/main.ts')).toBeHidden();
+  await page.getByRole('button', { name: '关闭设置', exact: true }).click();
   await expect(panel.getByTestId('git-staged-src/main.ts')).toBeVisible();
   await panel.getByRole('button', { name: '更多版本控制操作' }).click();
   await page.getByRole('button', { name: '此工作区的 AI 提交提示词…' }).click();
@@ -267,7 +273,7 @@ test('forces one comparison page despite a saved multi-page preference', async (
   const panel = page.getByTestId('git-panel');
   await panel.getByTestId('git-unstaged-src/main.ts').click();
   await panel.getByTestId('git-staged-src/main.ts').click();
-  await expect(page.getByRole('tablist', { name: '已打开的差异' }).getByRole('tab')).toHaveCount(2);
+  await expect(page.getByRole('tablist', { name: '已打开的文件与比较' }).getByRole('tab')).toHaveCount(2);
   expect(await page.evaluate(async () => {
     const path = '/src/features/workspace/stores/workspace.ts';
     const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
@@ -276,8 +282,9 @@ test('forces one comparison page despite a saved multi-page preference', async (
   await page.getByRole('button', { name: '设置', exact: true }).click();
   await expect(page.getByRole('combobox', { name: '差异页面' })).toHaveCount(0);
   await expect(page.locator('.settings-navigation').getByRole('button', { name: '版本控制', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '关闭设置', exact: true }).click();
   await panel.getByTestId('git-staged-src/main.ts').click();
-  await expect(page.getByRole('tablist', { name: '已打开的差异' }).getByRole('tab')).toHaveCount(2);
+  await expect(page.getByRole('tablist', { name: '已打开的文件与比较' }).getByRole('tab')).toHaveCount(2);
 });
 
 test('scrolls comparison tabs with the wheel and keeps scrolling while a dragged tab rests at the edge', async ({ page }) => {
@@ -286,7 +293,7 @@ test('scrolls comparison tabs with the wheel and keeps scrolling while a dragged
   await page.evaluate(paths => localStorage.setItem('mock-git-snapshot', JSON.stringify({ root: '/home/e2e/project', branch: 'main', entries: paths.map(path => ({ path, previousPath: null, indexStatus: ' ', worktreeStatus: 'M' })) })), paths);
   await panel.getByRole('button', { name: '刷新变更' }).click();
   for (const path of paths) await panel.getByTestId(`git-unstaged-${path}`).click();
-  const strip = page.getByRole('tablist', { name: '已打开的差异' });
+  const strip = page.getByRole('tablist', { name: '已打开的文件与比较' });
   await strip.evaluate(element => { element.scrollLeft = 0; });
   await strip.hover(); await page.mouse.wheel(0, 240);
   await expect.poll(() => strip.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
@@ -306,7 +313,7 @@ test('scrolls comparison tabs with the wheel and keeps scrolling while a dragged
 test('reorders comparison tabs and moves secondary actions into the compact menu', async ({ page }) => {
   const panel = page.getByTestId('git-panel');
   await panel.getByTestId('git-unstaged-src/main.ts').click(); await panel.getByTestId('git-staged-src/main.ts').click();
-  const strip = page.getByRole('tablist', { name: '已打开的差异' });
+  const strip = page.getByRole('tablist', { name: '已打开的文件与比较' });
   const source = (await strip.getByRole('tab').nth(1).boundingBox())!; const target = (await strip.getByRole('tab').first().boundingBox())!;
   await page.mouse.move(source.x + 24, source.y + source.height / 2); await page.mouse.down();
   await page.mouse.move(target.x + 10, target.y + target.height / 2, { steps: 12 }); await page.mouse.up();
@@ -331,8 +338,9 @@ test('reorders comparison tabs and moves secondary actions into the compact menu
   await expect(page.locator('[data-reorder-preview="item"]')).toContainText('已暂存');
   await page.keyboard.press('Escape'); await page.mouse.up();
   await expect(strip.getByRole('tab').first()).toHaveAttribute('aria-selected', 'true');
-  await expect(review.getByRole('combobox', { name: '差异布局' })).not.toBeVisible();
-  await review.getByRole('button', { name: '更多编辑器操作' }).click();
+  await page.setViewportSize({ width: 560, height: 800 });
+  await expect(page.getByTestId('workspace-instance-bar').getByRole('combobox', { name: '差异布局' })).not.toBeVisible();
+  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '更多编辑器操作' }).click();
   await expect(page.getByRole('menu').getByRole('menuitemradio', { name: '单栏对比', exact: true })).toBeVisible();
   await page.getByRole('menu').getByRole('button', { name: '刷新差异', exact: true }).click();
 });
@@ -343,7 +351,7 @@ test('moving the selected comparison backward keeps its editor hosts attached', 
   await expect(page.getByTestId('git-diff-review').locator('.monaco-diff-editor')).toBeVisible();
   await panel.getByTestId('git-staged-src/main.ts').click();
   await expect(page.getByTestId('git-diff-review').locator('.monaco-diff-editor')).toBeVisible();
-  const strip = page.getByRole('tablist', { name: '已打开的差异' });
+  const strip = page.getByRole('tablist', { name: '已打开的文件与比较' });
   await strip.getByRole('tab').first().click();
   const continuity = await page.getByTestId('git-diff-review').evaluateHandle(async element => {
     const path = '/src/ui/code/runtime.ts';

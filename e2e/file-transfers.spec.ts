@@ -35,7 +35,7 @@ test('manages uploads across panel navigation and reload in narrow and wide layo
   if (!handle) throw new Error('File panel resize handle is unavailable');
   const x = handle.x + handle.width / 2, y = handle.y + handle.height / 2;
   await page.mouse.move(x, y); await page.mouse.down();
-  await page.mouse.move(x + 220, y, { steps: 8 }); await page.mouse.up();
+  await page.mouse.move(x - 220, y, { steps: 8 }); await page.mouse.up();
   await page.screenshot({ path: test.info().outputPath('transfers-wide.png') });
   const resized = await page.getByTestId('resize-handle-files').boundingBox();
   if (!resized) throw new Error('File panel resize handle is unavailable');
@@ -165,7 +165,7 @@ for (const theme of ['dark', 'light'] as const) {
         const before = (await manager.boundingBox())!;
         await page.mouse.move(handle.x + handle.width / 2, handle.y + 60);
         await page.mouse.down();
-        await page.mouse.move(handle.x + handle.width / 2 + width - before.width, handle.y + 60, { steps: 8 });
+        await page.mouse.move(handle.x + handle.width / 2 - width + before.width, handle.y + 60, { steps: 8 });
         await page.mouse.up();
         await expect.poll(async () => Math.round((await manager.boundingBox())!.width)).toBe(width);
         expect(await manager.locator('.transfer-manager-body').evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);

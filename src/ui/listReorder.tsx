@@ -86,9 +86,11 @@ function locateTarget(
 }
 
 /** Pointer gesture shared by horizontal and vertical lists. */
-export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical' }: {
+export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical', grouped = false }: {
   listId: string;
   axis?: 'vertical' | 'horizontal';
+  /** Resolve horizontal destinations within their group or empty drop zone. */
+  grouped?: boolean;
   /** Item-kind matcher; defaults to "same kind only". */
   accepts?: (dragKind: string, itemKind: string) => boolean;
   onDrop: (drag: ListReorderDrag, target: ListReorderTarget | null) => void;
@@ -146,7 +148,7 @@ export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical' 
       if (axis === 'horizontal' && list) {
         if (list !== currentList) { list.scrollLeft = scrollLeft; currentList = list; }
         const bounds = list.getBoundingClientRect();
-        if (dimensions.origin && sourceIndex >= 0) {
+        if (!grouped && dimensions.origin && sourceIndex >= 0) {
           // Compare the moving edges against stable slots, independent of the pointer's grab offset and the rendered gap.
           const left = horizontalPreviewLeft(x, dimensions.origin) - bounds.left + list.scrollLeft;
           const right = left + slotWidth;
@@ -287,8 +289,8 @@ export function ListReorderPlaceholder({ listId, itemId, after = false }: { list
 /** Empty and collapsed groups remain available as append destinations. */
 export function ListReorderZonePlaceholder({ listId, zoneId }: { listId: string; zoneId: string }) {
   const show = useListReorder(state => !!state.drag && state.drag.listId === listId && state.target?.zoneId === zoneId);
-  const height = useListReorder(state => state.drag?.height);
-  return show ? <div className="sidebar-reorder-placeholder" style={height ? { height } : undefined} data-reorder-placeholder={zoneId} aria-hidden="true" /> : null;
+  const height = useListReorder(state => state.drag?.height); const width = useListReorder(state => state.drag?.width);
+  return show ? <div className="sidebar-reorder-placeholder" style={height ? { height, ...(width ? { width } : {}) } : undefined} data-reorder-placeholder={zoneId} aria-hidden="true" /> : null;
 }
 
 /** A preview follows the pointer without intercepting drop targets. */

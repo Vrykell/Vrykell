@@ -19,7 +19,7 @@ test.describe('SSH 远程连接管理侧栏', () => {
     const spawns = await page.evaluate(() => (window as unknown as Record<string, { ssh?: unknown }[]>).__PTY_SPAWNS__);
     expect(spawns.filter(s => s.ssh)).toHaveLength(0);
   });
-  test('SSH rows match the current session tab style', async ({ page }) => {
+  test('SSH resources retain shared sidebar rows while terminal instances use horizontal tabs', async ({ page }) => {
     const row = page.getByTestId('ssh-row-ssh-1');
     await row.click();
     const selectionColor = await page.evaluate(() => {
@@ -37,9 +37,11 @@ test.describe('SSH 远程连接管理侧栏', () => {
       return { outerPadding: getComputedStyle(el).padding, padding: style.padding, radius: style.borderRadius, height: inner.getBoundingClientRect().height, background: style.backgroundColor, gap: style.gap, icon: inner.querySelector('svg')?.getBoundingClientRect().width };
     });
     const sshStyle = await rowStyle('[data-testid="ssh-row-ssh-1"]');
+    expect(sshStyle).toMatchObject({ outerPadding: '2px 6px', padding: '8px 10px', radius: '8px', gap: '8px', icon: 20 });
     await expect(row).toHaveAttribute('data-tip', /root@prod.example.com:22/);
     await ensureTabsOpen(page);
-    expect(await rowStyle('[data-tab-row-id]')).toEqual(sshStyle);
+    await expect(page.locator('[data-tab-row-id]').first()).toHaveClass(/folder-tab/);
+    await expect(page.locator('[data-tab-row-id] [role="tab"] svg').first()).toHaveCSS('width', '16px');
   });
   test('顶栏：搜索 + 编辑 + 新建按钮', async ({ page }) => {
     await expect(page.locator('[data-testid="ssh-search"]')).toBeVisible();

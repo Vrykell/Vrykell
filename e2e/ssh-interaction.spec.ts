@@ -44,8 +44,8 @@ test('quick connection completes interactive authentication, navigation and reco
   expect(state.writes).toContain('q');
   expect(state.spawns).toHaveLength(2);
   expect(state.spawns[0].ssh).toMatchObject({ host: 'chat.example.com', shellIntegration: false });
-  // The SSH panel stays open after a quick connection: the saved list keeps its seeded row and
-  // never gains the ad-hoc connection.
+  // Returning to host resources preserves the saved list without adding a temporary connection.
+  await page.getByTestId('workspace-area-ssh').click();
   await expect(page.locator('[data-testid^="ssh-row-"]', { hasText: '生产服务器' })).toBeVisible();
   await expect(page.locator('[data-testid^="ssh-row-"]', { hasText: 'chat.example.com' })).toHaveCount(0);
 });

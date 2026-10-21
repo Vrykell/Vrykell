@@ -4,6 +4,8 @@ import { useTerminalStore, getFocusedTerminalId } from '@features/terminal';
 import { countLeaves, leaves } from '@features/workspace/model/windowLayout';
 import { useUiStore } from '@features/workspace';
 import { redrawTerminal } from '@features/terminal/services/terminalRepaint';
+import { closeWorkspaceItem } from '@features/workspace/services/closeWorkspaceItem';
+import { activateWorkspaceInstance, focusedWorkspaceArea, newWorkspaceItem } from '@features/workspace/services/workspaceActions';
 
 /**
  * 全局快捷键：
@@ -92,7 +94,7 @@ export function useGlobalShortcuts() {
       if (e.metaKey && !e.ctrlKey && !e.shiftKey && (e.key === ']' || e.key === '[')) {
         const ws = useSessionStore.getState();
         const tab = ws.tabs.find((t) => t.id === ws.activeId);
-        if (tab && isSessionTab(tab) && countLeaves(tab.layout) >= 2) {
+        if (focusedWorkspaceArea() === 'terminal' && tab && isSessionTab(tab) && countLeaves(tab.layout) >= 2) {
           e.preventDefault();
           const ids = leaves(tab.layout).map((t) => t.id);
           const cur = getFocusedTerminalId();
@@ -106,7 +108,7 @@ export function useGlobalShortcuts() {
       }
 
       // ⌥⌘D：选择类型后再分裂（混搭 local/ssh）
-      if (e.metaKey && e.altKey && !e.ctrlKey && e.key === 'd') {
+      if (focusedWorkspaceArea() === 'terminal' && e.metaKey && e.altKey && !e.ctrlKey && e.key === 'd') {
         e.preventDefault();
         useUiStore.getState().openSplitPicker();
         return;
@@ -116,31 +118,23 @@ export function useGlobalShortcuts() {
       const ws = useSessionStore.getState();
       if (e.key === 't') {
         e.preventDefault();
-        ws.addTab();
-      } else if (e.key === 'd') {
+        newWorkspaceItem();
+      } else if (e.key === 'd' && focusedWorkspaceArea() === 'terminal') {
         // Cmd+D 分裂：进入落点选择（新终端继承类型）
         e.preventDefault();
         useUiStore.getState().beginSplit(null);
-      } else if (e.key === 'D') {
+      } else if (e.key === 'D' && focusedWorkspaceArea() === 'terminal') {
         // Cmd+Shift+D：直接上下分裂（跳过落点选择）
         e.preventDefault();
         ws.splitFocusedDirect('col');
       } else if (e.key === 'w') {
         e.preventDefault();
-        const tab = ws.tabs.find(value => value.id === ws.activeId);
-        if (tab?.kind === 'git-diff') ws.closeGitComparison(tab.comparisons?.find(item => item.selection === tab.selection)?.id ?? tab.id);
-        else if (tab?.kind === 'editor') ws.closeEditorFile(tab.selected);
-        else if (tab && !isSessionTab(tab)) ws.closeTab(tab.id);
-        else ws.closeFocusedTerminal();
+        closeWorkspaceItem();
       } else if (e.key === ',') {
         e.preventDefault();
         useSessionStore.getState().openSettings();
       } else if (/^[1-9]$/.test(e.key)) {
-        const tab = ws.tabs[parseInt(e.key, 10) - 1];
-        if (tab) {
-          e.preventDefault();
-          ws.activate(tab.id);
-        }
+        if (activateWorkspaceInstance(parseInt(e.key, 10) - 1)) e.preventDefault();
       }
     };
     window.addEventListener('keydown', preventZoomKeys, true);

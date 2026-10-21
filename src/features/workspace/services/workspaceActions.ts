@@ -1,0 +1,78 @@
+import { editorFileKey } from '@core/editor';
+import { t } from '@i18n';
+import { pickPath } from '@platform/api/fs';
+import { useToastStore } from '@ui/Toast';
+import { useAiWorkspace, useChatStore } from '@features/chat';
+import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
+import { useWorkspaceStore } from '../stores/workspace';
+import { orderedWorkspaceIds, useWorkspaceNavigation, workspaceAreaForKind, type WorkspaceArea } from '../stores/navigation';
+
+export function sideAiHasFocus(element: Element | null = document.activeElement): boolean {
+  return useWorkspaceNavigation.getState().aiPlacement === 'side' && !!element?.closest('[data-testid="ai-surface-side"]');
+}
+
+export function focusedWorkspaceArea(): WorkspaceArea {
+  return sideAiHasFocus() ? 'ai' : useWorkspaceNavigation.getState().area;
+}
+
+export async function openWorkspaceFile() {
+  try {
+    const [path] = await pickPath('file');
+    if (path) useWorkspaceStore.getState().openEditorFile({ path });
+  } catch (reason) { useToastStore.getState().addToast(t('Could not open file: {{error}}', { error: String(reason) }), 'error'); }
+}
+
+export function newWorkspaceItem() {
+  const area = focusedWorkspaceArea();
+  if (area === 'terminal') useWorkspaceStore.getState().addTab();
+  else if (area === 'code') void openWorkspaceFile();
+  else if (area === 'ai') {
+    const side = sideAiHasFocus();
+    useAiWorkspace.getState().openNative(useChatStore.getState().createConversation());
+    if (!side) useWorkspaceStore.getState().openHarnessTab();
+  }
+}
+
+/** Numeric selection follows the displayed group and mixed-document order. */
+export function activateWorkspaceInstance(index: number): boolean {
+  const workspace = useWorkspaceStore.getState();
+  const navigation = useWorkspaceNavigation.getState();
+  const area = focusedWorkspaceArea();
+  if (area === 'terminal') {
+    const tabs = [...workspace.groups.flatMap(group => workspace.tabs.filter(tab => tab.kind === 'session' && tab.groupId === group.id)),
+      ...workspace.tabs.filter(tab => workspaceAreaForKind(tab.kind) === 'terminal' && (tab.kind !== 'session' || !tab.groupId || !workspace.groups.some(group => group.id === tab.groupId)))];
+    const tab = tabs[index];
+    if (!tab) return false;
+    if (tab.kind === 'session' && tab.groupId && workspace.groups.some(group => group.id === tab.groupId && group.collapsed)) workspace.toggleGroupCollapse(tab.groupId);
+    workspace.activate(tab.id); return true;
+  }
+  if (area === 'code') {
+    const entries = workspace.tabs.flatMap(tab => {
+      if (tab.kind === 'editor') return tab.files.map(file => ({ id: `file:${editorFileKey(file)}`, activate: () => workspace.openEditorFile(file) }));
+      if (tab.kind === 'git-diff') return (tab.comparisons ?? [{ id: tab.id, selection: tab.selection }]).map(item => ({ id: `diff:${item.id}`, activate: () => workspace.activateGitComparison(item.id) }));
+      return [];
+    });
+    const id = orderedWorkspaceIds(entries.map(item => item.id), navigation.codeOrder)[index];
+    const entry = entries.find(item => item.id === id);
+    if (!entry) return false;
+    entry.activate(); return true;
+  }
+  if (area === 'ai') {
+    const ai = useAiWorkspace.getState();
+    const connections = useHarnessWorkspace.getState();
+    const side = sideAiHasFocus();
+    const sessionsVisible = side || navigation.aiPlacement === 'main';
+    const ids = [...(sessionsVisible ? ai.nativeTabs.filter(id => useChatStore.getState().conversations.some(item => item.id === id)).map(id => `chat:${id}`) : []),
+      ...(sessionsVisible ? connections.connections.map(item => `acp:${item.id}`) : []), ...(!side ? workspace.tabs.filter(tab => tab.kind === 'usage' || tab.kind === 'ai-history').map(tab => `page:${tab.id}`) : [])];
+    const id = orderedWorkspaceIds(ids, ai.order)[index];
+    if (!id) return false;
+    if (id.startsWith('page:')) workspace.activate(id.slice(5));
+    else {
+      ai.select(id);
+      if (id.startsWith('chat:')) void useChatStore.getState().selectConversation(id.slice(5)); else connections.select(id.slice(4));
+      if (!side) workspace.openHarnessTab();
+    }
+    return true;
+  }
+  return false;
+}

@@ -31,7 +31,7 @@ import ChatComposerShell from './ChatComposerShell';
 const EMPTY_MESSAGES: ChatMessage[] = [];
 
 /** Conversation navigation, references and execution stay independent of terminal focus. */
-export default function PanelChat() {
+export default function PanelChat({ active = true, workspace = false }: { active?: boolean; workspace?: boolean }) {
   const activeId = useChatStore(state => state.activeConversationId);
   const conversations = useChatStore(state => state.conversations);
   const messages = useChatStore(state => state.byTab[activeId] ?? EMPTY_MESSAGES);
@@ -52,7 +52,7 @@ export default function PanelChat() {
   const [title, setTitle] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsTrigger = useRef<HTMLButtonElement>(null);
-  const { scrollRef, following, jumpToLatest, onScroll, onWheel, onTouchMove } = useTranscriptFollow(activeId, messages);
+  const { scrollRef, following, pauseFollow, jumpToLatest, onScroll, onWheel, onTouchMove } = useTranscriptFollow(activeId, messages, active);
   const draft = useChatStore(state => state.draftTabId === activeId ? state.draft : '');
   const composerDraft = useComposerDrafts(state => state.byTab[activeId] ?? EMPTY_COMPOSER_DRAFT);
   const references = composerDraft.references ?? [];
@@ -128,8 +128,8 @@ export default function PanelChat() {
         </button>}
       <IconButton compact aria-label={t('AI conversation history')} data-tip={t('AI conversation history')}
         onClick={() => useSessionStore.getState().openAiHistoryTab()}><History size={16} /></IconButton>
-      <IconButton compact aria-label={t('New conversation')} data-tip={t('New conversation')}
-        onClick={() => useChatStore.getState().createConversation()}><Plus size={16} /></IconButton>
+      {!workspace && <IconButton compact aria-label={t('New conversation')} data-tip={t('New conversation')}
+        onClick={() => useChatStore.getState().createConversation()}><Plus size={16} /></IconButton>}
       <IconButton ref={settingsTrigger} compact aria-label={t('Conversation settings')} data-tip={t('Conversation settings')}
         aria-expanded={settingsOpen} aria-controls="chat-conversation-settings" onClick={() => setSettingsOpen(!settingsOpen)}>
         <SlidersHorizontal size={16} />
@@ -175,7 +175,8 @@ export default function PanelChat() {
         scroll input pauses the follow, even one too small to leave the "near the bottom"
         window, while a nested scroller that consumes the wheel leaves it alone. */}
     <div className="chat-transcript-wrap" style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-    <div ref={scrollRef} className="chat-transcript scroll-region" onScroll={onScroll} onWheel={onWheel} onTouchMove={onTouchMove}>
+    <div ref={scrollRef} className="chat-transcript scroll-region" onScroll={onScroll} onWheel={onWheel} onTouchMove={onTouchMove}
+      onClickCapture={event => { if ((event.target as Element).closest('button[aria-expanded]')) pauseFollow(); }}>
       <div>
         {exchanges.length ? exchanges.map(exchange => <AiBlock key={exchange.id} exchange={exchange} conversationId={activeId} presentation="conversation" />)
           : <div className="chat-empty"><Sparkles size={26} /><strong>{t('What would you like to work on?')}</strong>

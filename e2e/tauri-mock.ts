@@ -1972,13 +1972,10 @@ export async function expectAnyTermContains(page: Page, text: string, timeout = 
 
 /** 确保会话列表面板打开，兼容默认布局与按需打开状态。 */
 export async function ensureTabsOpen(page: Page): Promise<void> {
-  const search = page.locator('[data-testid="tab-search"]');
-  // The dock button toggles the panel, so a check-then-click can close a panel that was still
-  // painting; retry until the search box is actually on screen instead of trusting one check.
-  await expect(async () => {
-    if (!(await search.isVisible().catch(() => false))) await page.locator('[data-dock-btn="tabs"]').click();
-    await expect(search).toBeVisible({ timeout: 750 });
-  }).toPass({ timeout: 8_000 });
+  await page.getByTestId('workspace-area-terminal').click();
+  const search = page.getByTestId('tab-search');
+  if (!(await search.isVisible())) await page.getByTestId('tab-search-toggle').click();
+  await expect(search).toBeVisible();
 }
 
 /** Expand the conversation configuration without changing the message draft. */

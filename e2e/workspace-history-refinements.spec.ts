@@ -14,7 +14,7 @@ async function dragBefore(page: Page, source: string, target: string) {
   await page.mouse.down();
   await page.mouse.move(from.x + 40, from.y + from.height / 2 + 8);
   const to = (await page.locator(`[data-tab-row-id="${target}"]`).boundingBox())!;
-  await page.mouse.move(to.x + 40, to.y + 4, { steps: 6 });
+  await page.mouse.move(to.x + 8, to.y + to.height / 2, { steps: 6 });
 }
 
 test('closing the last tab leaves the workspace empty and closing background sessions preserves the active page', async ({ page }) => {
@@ -36,7 +36,7 @@ test('closing the last tab leaves the workspace empty and closing background ses
   await expect(page.getByTestId('session-filter-input')).toBeVisible();
 });
 
-test('singleton pages reorder with loose sessions but never enter a group', async ({ page }) => {
+test('terminal history reorders with loose sessions while AI history stays in its workspace', async ({ page }) => {
   await boot(page);
   const ids = await page.evaluate(async () => {
     const path = '/src/features/workspace/stores/workspace.ts';
@@ -45,10 +45,12 @@ test('singleton pages reorder with loose sessions but never enter a group', asyn
     const grouped = ws.tabs[0]!.id;
     const loose = ws.addTab({ title: 'Loose terminal' });
     const group = await ws.createGroupForTab(grouped, 'Group');
-    const settings = ws.addTab({ kind: 'ai-history' });
-    const history = ws.addTab({ kind: 'history' });
+    const settings = ws.addTab({ kind: 'history' });
+    const history = ws.addTab({ title: 'Second loose terminal' });
+    ws.addTab({ kind: 'ai-history' });
     return { grouped, loose, group, settings, history };
   });
+  await ensureTabsOpen(page);
   await dragBefore(page, ids.settings, ids.loose);
   await expect(page.locator('[data-reorder-placeholder]')).toHaveCount(1);
   await page.mouse.up();

@@ -35,12 +35,12 @@ test('identifies read-only files, blocks normal edits and offers explicit admini
   await page.keyboard.press('Control+s');
   expect(await editor.locator('.view-lines').innerText()).toBe(before);
   expect(await page.evaluate(() => (window as unknown as { __EDITOR_SAVE_COUNT__?: number }).__EDITOR_SAVE_COUNT__ ?? 0)).toBe(0);
-  await expect(editor.getByRole('button', { name: '保存文件', exact: true })).toBeDisabled();
+  await expect(page.getByTestId('workspace-instance-bar').getByRole('button', { name: '保存文件', exact: true })).toBeDisabled();
   for (const width of [1240, 760]) { await page.setViewportSize({ width, height: 800 }); await page.screenshot({ path: info.outputPath(`readonly-${width}.png`) }); }
   await editor.getByRole('button', { name: '以管理员权限打开', exact: true }).click();
   expect(await page.evaluate(() => (window as unknown as { __ELEVATED_FILE__?: unknown }).__ELEVATED_FILE__)).toMatchObject({ path: '/home/e2e/project/src/main.ts' });
   await page.evaluate(() => { (window as unknown as { __WRITABLE__: boolean }).__WRITABLE__ = true; });
-  await editor.getByRole('button', { name: '更多编辑器操作' }).click();
+  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '更多编辑器操作' }).click();
   await page.getByRole('menu').getByRole('button', { name: '重新加载文件', exact: true }).click();
   await expect(editor.locator('.editor-readonly-label')).toHaveCount(0);
   await replaceText(page, 'allowed after reload');
@@ -50,9 +50,9 @@ test('identifies read-only files, blocks normal edits and offers explicit admini
 test('opens text in the built-in editor, saves it and guards unsaved closes', async ({ page }, info) => {
   await openWorking(page);
   const editor = page.getByTestId('file-editor'); await replaceText(page, 'export const value = "saved";');
-  await expect(editor.getByRole('button', { name: '保存文件', exact: true })).toBeEnabled();
+  await expect(page.getByTestId('workspace-instance-bar').getByRole('button', { name: '保存文件', exact: true })).toBeEnabled();
   await page.keyboard.press('Control+s');
-  await expect(editor.getByRole('button', { name: '保存文件', exact: true })).toBeDisabled();
+  await expect(page.getByTestId('workspace-instance-bar').getByRole('button', { name: '保存文件', exact: true })).toBeDisabled();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('mock-editor-files')!)['["","/home/e2e/project/src/main.ts"]'])).toContain('saved');
   for (const width of [1240, 760]) { await page.setViewportSize({ width, height: 800 }); await page.screenshot({ path: info.outputPath(`editor-${width}.png`) }); }
   await replaceText(page, 'unsaved draft'); await page.keyboard.press('Control+w');
@@ -68,9 +68,9 @@ test('retains drafts on disk conflicts and requires confirmation before reload',
   await page.evaluate(() => localStorage.setItem('mock-editor-files', JSON.stringify({ '["","/home/e2e/project/src/main.ts"]': 'external text' })));
   await page.keyboard.press('Control+s'); await expect(editor.getByRole('alert')).toBeVisible();
   await expect(editor.locator('.view-lines')).toContainText('local draft');
-  await editor.getByRole('button', { name: '重新加载文件' }).click(); await page.getByTestId('confirm-cancel').click();
+  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '重新加载文件' }).click(); await page.getByTestId('confirm-cancel').click();
   await expect(editor.locator('.view-lines')).toContainText('local draft');
-  await editor.getByRole('button', { name: '重新加载文件' }).click(); await page.getByTestId('confirm-ok').click();
+  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '重新加载文件' }).click(); await page.getByTestId('confirm-ok').click();
   await expect(editor.locator('.view-lines')).toContainText('external text');
 });
 
@@ -80,7 +80,7 @@ test('keeps files in a single page despite a legacy preference and offers termin
   if (!await page.getByTestId('git-panel').isVisible()) await page.getByRole('button', { name: '版本控制', exact: true }).click();
   await openWorking(page); await replaceText(page, 'keep this buffer');
   await openWorking(page, 'new file.ts', 'untracked');
-  await expect(page.getByRole('tablist', { name: '已打开的文件' }).getByRole('tab')).toHaveCount(2);
+  await expect(page.getByRole('tablist', { name: '已打开的文件与比较' }).getByRole('tab')).toHaveCount(2);
   await page.getByRole('button', { name: '设置', exact: true }).click();
   await page.getByRole('button', { name: '本地编辑器', exact: true }).click();
   await expect(page.getByRole('combobox', { name: '编辑器页面' })).toHaveCount(0);
@@ -97,13 +97,13 @@ test('keeps files in a single page despite a legacy preference and offers termin
   });
   await page.getByRole('tab', { name: 'main.ts •', exact: true }).click();
   await expect(page.getByTestId('file-editor').locator('.view-lines')).toContainText('keep this buffer');
-  await expect(page.getByRole('tablist', { name: '已打开的文件' }).getByRole('tab')).toHaveCount(2);
+  await expect(page.getByRole('tablist', { name: '已打开的文件与比较' }).getByRole('tab')).toHaveCount(2);
 });
 
 test('returns from a comparison to its editor and explains binary files', async ({ page }) => {
   await openWorking(page);
   await page.getByTestId('git-unstaged-src/main.ts').click();
-  await page.getByTestId('git-diff-review').getByRole('button', { name: '更多编辑器操作' }).click();
+  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '更多编辑器操作' }).click();
   await page.getByRole('button', { name: '返回编辑器', exact: true }).click();
   await expect(page.getByTestId('file-editor')).toBeVisible();
   const image = page.getByTestId('git-unstaged-image.png'); await image.hover(); await image.getByRole('button', { name: '打开工作文件' }).click();
@@ -112,7 +112,7 @@ test('returns from a comparison to its editor and explains binary files', async 
 
 test('reorders connected file tabs and keeps compact actions above the text', async ({ page }, info) => {
   await openWorking(page); await openWorking(page, 'new file.ts', 'untracked');
-  const strip = page.getByRole('tablist', { name: '已打开的文件' });
+  const strip = page.getByRole('tablist', { name: '已打开的文件与比较' });
   const source = (await strip.getByRole('tab').nth(1).boundingBox())!; const target = (await strip.getByRole('tab').first().boundingBox())!;
   await page.mouse.move(source.x + 28, source.y + source.height / 2); await page.mouse.down();
   await page.mouse.move(target.x + 10, target.y + target.height / 2, { steps: 12 });
@@ -126,7 +126,7 @@ test('reorders connected file tabs and keeps compact actions above the text', as
   await page.mouse.up();
   await expect(strip.getByRole('tab').first()).toContainText('new file.ts');
   await expect(strip.getByRole('tab').first()).toHaveAttribute('aria-selected', 'true');
-  const header = page.getByTestId('file-editor').locator('.folder-header');
+  const header = page.getByTestId('workspace-instance-bar').locator('.folder-header');
   expect((await header.boundingBox())!.height).toBeLessThanOrEqual(34);
   const first = strip.locator('.folder-tab').first();
   expect((await first.boundingBox())!.x).toBe((await strip.boundingBox())!.x + 10);
@@ -144,8 +144,9 @@ test('reorders connected file tabs and keeps compact actions above the text', as
     expect(await strip.locator('.folder-tab[data-active="true"]').evaluate(element => getComputedStyle(element).backgroundColor)).toBe(await editor.locator('.code-editor-frame').evaluate(element => getComputedStyle(element).backgroundColor));
     await page.screenshot({ path: info.outputPath(`folder-tabs-${width}.png`) });
   }
-  await expect(editor.getByRole('button', { name: '在终端中打开', exact: true })).not.toBeVisible();
-  await editor.getByRole('button', { name: '更多编辑器操作' }).click();
+  await page.setViewportSize({ width: 560, height: 800 });
+  await expect(page.getByTestId('workspace-instance-bar').getByRole('button', { name: '在终端中打开', exact: true })).not.toBeVisible();
+  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '更多编辑器操作' }).click();
   await expect(page.getByRole('menu').getByRole('button', { name: '在终端中打开', exact: true })).toBeVisible();
 });
 
@@ -157,7 +158,7 @@ test('dragging the selected first file leaves the remaining tabs visible in a na
   await page.getByRole('button', { name: '刷新变更' }).click();
   await openWorking(page, longPath); await openWorking(page, 'second.ts'); await openWorking(page, longPath);
   await page.setViewportSize({ width: 760, height: 800 });
-  const strip = page.getByRole('tablist', { name: '已打开的文件' });
+  const strip = page.getByRole('tablist', { name: '已打开的文件与比较' });
   const first = strip.getByRole('tab').first(); const second = strip.getByRole('tab', { name: 'second.ts', exact: true });
   await expect(first).toHaveAttribute('aria-selected', 'true');
   const source = (await first.boundingBox())!;
@@ -193,7 +194,7 @@ for (const direction of ['left', 'right']) {
     await page.getByRole('button', { name: '刷新变更' }).click();
     for (const path of paths) await openWorking(page, path);
     await openWorking(page, direction === 'left' ? paths[0]! : paths[2]!);
-    const strip = page.getByRole('tablist', { name: '已打开的文件' });
+    const strip = page.getByRole('tablist', { name: '已打开的文件与比较' });
     const source = strip.getByRole('tab', { name: middle.split('/').pop()!, exact: true });
     const sourceRow = (await strip.locator('.folder-tab').nth(1).boundingBox())!;
     const button = (await source.boundingBox())!;
@@ -233,7 +234,7 @@ for (const direction of ['left', 'right']) {
 
 test('moving the selected document backward never detaches or reloads its editor', async ({ page }) => {
   await openWorking(page); await openWorking(page, 'new file.ts', 'untracked');
-  const strip = page.getByRole('tablist', { name: '已打开的文件' });
+  const strip = page.getByRole('tablist', { name: '已打开的文件与比较' });
   await strip.getByRole('tab').first().click();
   await replaceText(page, 'unsaved draft survives tab reordering');
   const continuity = await page.getByTestId('file-editor').evaluateHandle(async element => {
@@ -282,7 +283,7 @@ for (const width of [1240, 760]) {
     await page.getByRole('button', { name: '刷新变更' }).click();
     for (const path of paths) await openWorking(page, path);
     await openWorking(page, paths[0]);
-    const strip = page.getByRole('tablist', { name: '已打开的文件' });
+    const strip = page.getByRole('tablist', { name: '已打开的文件与比较' });
     const bounds = (await strip.boundingBox())!;
     const source = (await strip.getByRole('tab').first().boundingBox())!;
     const row = (await strip.locator('.folder-tab').first().boundingBox())!;

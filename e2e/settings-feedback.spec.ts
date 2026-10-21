@@ -5,7 +5,7 @@ import { gotoSetting } from './settings';
 test('settings navigation has static headings and save feedback appears once then disappears', async ({ page }) => {
   await setupTauriMock(page); await page.goto('/');
   await gotoSetting(page, '模型配置');
-  const nav = page.locator('aside');
+  const nav = page.locator('.settings-navigation');
   await expect(nav.locator('.settings-nav-heading')).toHaveCount(6);
   const rows = nav.locator('.settings-navigation-list').getByRole('button');
   await expect(rows).toHaveCount(24);

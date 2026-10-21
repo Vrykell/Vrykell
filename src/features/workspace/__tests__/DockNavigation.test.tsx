@@ -1,92 +1,58 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
-import { useDockStore } from '../stores/dock';
+import { afterEach, beforeEach, expect, it } from 'vitest';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { useDockStore, useUiStore, useNavigationDrag } from '@features/workspace';
 import DockNavigation from '../components/DockNavigation';
-import { useSessionStore, useUiStore, useNavigationDrag, leaf } from '@features/workspace';
+import NavigationDragPreview from '../components/NavigationDragPreview';
 import { useAuxiliarySidebarStore } from '../stores/auxiliarySidebar';
 
 beforeEach(() => {
   useUiStore.setState({ settingsOpen: false });
   useNavigationDrag.getState().end();
   useAuxiliarySidebarStore.setState({ sshStatusOwner: null, dismissRequest: 0 });
-  useSessionStore.setState({ activeId: 'session', tabs: [{ id: 'session', title: '终端', kind: 'session', layout: leaf({ id: 'terminal', kind: 'local' }) }] });
-  useDockStore.setState({
-  leftZone: ['tabs', 'ssh', 'files'], rightZone: ['chat'],
-  leftPanels: ['tabs'], rightPanels: [], collapsedPanels: [], panelWidths: {},
-  });
+  useDockStore.setState({ leftZone: [], rightZone: ['files', 'git', 'chat'], leftPanels: [], rightPanels: [], collapsedPanels: [], panelWidths: {} });
 });
-afterEach(() => act(() => useNavigationDrag.getState().end()));
+afterEach(() => { cleanup(); act(() => useNavigationDrag.getState().end()); });
 
-describe('shared navigation buttons', () => {
-  it('renders the AI action with the same icon-only control as the other actions', () => {
-    render(<><DockNavigation side="left" /><DockNavigation side="right" /></>);
-    for (const button of screen.getAllByRole('button')) {
-      expect(button).toHaveClass('activity-button');
-      expect(button).toHaveClass('icon-button');
-      expect(button.textContent).toBe('');
-      expect(button.querySelector('svg')).toHaveAttribute('width', '24');
-      expect(button).toHaveAttribute('draggable', 'false');
-    }
-    const ai = screen.getByRole('button', { name: 'AI 助手' });
-    expect(ai).toHaveAttribute('data-tip', '打开AI 助手');
-    fireEvent.click(ai);
-    expect(ai).toHaveAttribute('aria-pressed', 'true');
-    expect(ai).toHaveAttribute('data-tip', '关闭AI 助手');
-    expect(useDockStore.getState().rightPanels).toEqual(['chat']);
-  });
-  it('pins settings below the left toolbar without adding it to the drag zones', () => {
-    render(<><DockNavigation side="left" /><DockNavigation side="right" /></>);
-    const settings = screen.getByRole('button', { name: '设置' });
-    expect(settings.closest('[data-dock-zone]')).toHaveAttribute('data-dock-zone', 'left');
-    expect(settings).toHaveAttribute('data-dock-fixed', 'true');
-    expect(useDockStore.getState().leftZone).not.toContain('settings');
-    expect(useDockStore.getState().rightZone).toEqual(['chat']);
-    expect(settings).toHaveAttribute('aria-pressed', 'false');
-    fireEvent.click(settings);
-    expect(settings).toHaveAttribute('aria-pressed', 'true');
-    expect(useUiStore.getState().settingsOpen).toBe(true);
-    expect(useSessionStore.getState().tabs).toHaveLength(1);
-    fireEvent.click(settings);
-    expect(settings).toHaveAttribute('aria-pressed', 'false');
-    expect(useUiStore.getState().settingsOpen).toBe(false);
-    expect(useSessionStore.getState().activeId).toBe('session');
-    expect(useDockStore.getState().leftPanels).toEqual(['tabs']);
-    expect(useDockStore.getState().rightPanels).toEqual([]);
-  });
-  it('closes settings when another outer navigation action is selected', () => {
-    useUiStore.setState({ settingsOpen: true });
-    render(<DockNavigation side="left" />);
-    fireEvent.click(screen.getByRole('button', { name: '标签' }));
-    expect(useUiStore.getState().settingsOpen).toBe(false);
-    expect(useDockStore.getState().leftPanels).toEqual(['tabs']);
-  });
-  it('returns to the existing right panel when its navigation button is clicked', () => {
-    useDockStore.setState({ rightPanels: ['chat'] });
-    render(<DockNavigation side="right" />);
-    const ai = screen.getByRole('button', { name: 'AI 助手' });
-    act(() => useAuxiliarySidebarStore.getState().showSshStatus('ssh-pane'));
-    expect(ai).toHaveAttribute('aria-pressed', 'false');
-    fireEvent.click(ai);
-    expect(useAuxiliarySidebarStore.getState().sshStatusOwner).toBeNull();
-    expect(useDockStore.getState().rightPanels).toEqual(['chat']);
-    expect(ai).toHaveAttribute('aria-pressed', 'true');
-  });
-  it('reserves a full insertion slot and restores the original layout on cancellation', () => {
-    render(<><DockNavigation side="left" /><DockNavigation side="right" /></>);
-    const saved = localStorage.getItem('dock-layout-v4');
-    act(() => {
-      useNavigationDrag.getState().start('files', { x: 500, y: 24 });
-      useNavigationDrag.getState().hover('right', 0);
-    });
-    const placeholder = document.querySelector('[data-dock-placeholder="0"]')!;
-    expect(placeholder.nextElementSibling).toHaveAttribute('data-dock-slot', 'chat');
-    expect(document.querySelector('[data-dock-slot="files"]')).toHaveAttribute('data-moving', 'true');
-    expect(document.querySelector('.workspace-navigation-drag-preview')).toHaveStyle({ left: '500px', top: '24px' });
-    expect(useDockStore.getState().leftZone).toEqual(['tabs', 'ssh', 'files']);
-    expect(localStorage.getItem('dock-layout-v4')).toBe(saved);
-    act(() => useNavigationDrag.getState().end());
-    expect(document.querySelector('[data-dock-placeholder]')).toBeNull();
-    expect(document.querySelector('.workspace-navigation-drag-preview')).toBeNull();
-    expect(document.querySelector('[data-dock-slot="files"]')).toHaveAttribute('data-moving', 'false');
-  });
+it('renders auxiliary controls together with shared icon geometry', () => {
+  render(<DockNavigation side="right" />);
+  for (const button of screen.getAllByRole('button')) {
+    expect(button).toHaveClass('activity-button', 'icon-button');
+    expect(button.querySelector('svg')).toHaveAttribute('width', '24');
+    expect(button).toHaveAttribute('draggable', 'false');
+  }
+  expect(screen.queryByRole('button', { name: '设置' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: '资源' }));
+  expect(useDockStore.getState().rightPanels).toEqual(['files']);
+});
+it('exits settings through an auxiliary action without changing the workspace', () => {
+  useUiStore.setState({ settingsOpen: true });
+  render(<DockNavigation side="right" />);
+  fireEvent.click(screen.getByRole('button', { name: '资源' }));
+  expect(useUiStore.getState().settingsOpen).toBe(false);
+  expect(useDockStore.getState().rightPanels).toEqual(['files']);
+});
+it('dismisses the status sidebar when selecting the assistant', () => {
+  useDockStore.setState({ rightPanels: ['chat'] });
+  render(<DockNavigation side="right" />);
+  act(() => useAuxiliarySidebarStore.getState().showSshStatus('ssh-pane'));
+  const ai = screen.getByRole('button', { name: 'AI 助手' });
+  expect(ai).toHaveAttribute('aria-pressed', 'false');
+  fireEvent.click(ai);
+  expect(useAuxiliarySidebarStore.getState().sshStatusOwner).toBeNull();
+  expect(ai).toHaveAttribute('aria-pressed', 'true');
+});
+it('reserves an insertion slot without saving until a drag completes', () => {
+  render(<><DockNavigation side="right" /><NavigationDragPreview /></>);
+  const saved = localStorage.getItem('dock-layout-v5');
+  act(() => { useNavigationDrag.getState().start('files', { x: 500, y: 24 }); useNavigationDrag.getState().hover('right', 2); });
+  const placeholder = document.querySelector('[data-dock-placeholder="2"]')!;
+  expect(placeholder.nextElementSibling).toHaveAttribute('data-dock-slot', 'chat');
+  expect(document.querySelector('.workspace-navigation-drag-preview')).toHaveStyle({ left: '500px', top: '24px' });
+  expect(localStorage.getItem('dock-layout-v5')).toBe(saved);
+  act(() => useNavigationDrag.getState().end());
+  expect(document.querySelector('[data-dock-placeholder]')).toBeNull();
+});
+it('does not render an auxiliary navigation on the left', () => {
+  const { container } = render(<DockNavigation side="left" />);
+  expect(container).toBeEmptyDOMElement();
 });

@@ -6,7 +6,7 @@ test('maximized command output uses the available columns without a fixed 80-col
   await page.goto('/');
   await expect(page.locator('[data-testid^="terminal-scroll-"]').first()).toBeVisible();
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
-  await page.getByRole('button', { name: '关闭标签面板' }).click();
+  await page.getByTestId('workspace-sidebar-toggle').click();
   await page.setViewportSize({ width: 1550, height: 1000 });
   await expect.poll(async () => (await ptyResizes(page)).at(-1)?.cols ?? 0).toBeGreaterThan(160);
   const cols = (await ptyResizes(page)).at(-1)!.cols;
