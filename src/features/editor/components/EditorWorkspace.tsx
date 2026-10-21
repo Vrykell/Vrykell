@@ -7,7 +7,7 @@ import { IconButton } from '@ui/IconButton';
 import ReloadButton from '@ui/ReloadButton';
 import { TextButton } from '@ui/TextButton';
 import { OutlineButton } from '@ui/OutlineButton';
-import { Lock, Save, Plus, iconSizes } from '@ui/icons';
+import { Save, Plus, iconSizes } from '@ui/icons';
 import { isWindows } from '@platform/runtime';
 import FolderTabs from '@ui/FolderTabs';
 import WorkspaceHeader from '@ui/WorkspaceHeader';
@@ -20,6 +20,7 @@ import { useToastStore } from '@ui/Toast';
 import { t } from '@i18n';
 import { useNativeCloseGuard } from '../hooks/useNativeCloseGuard';
 import { isDocumentDirty, useEditorDocuments } from '../stores/documents';
+import ReadOnlyFileAccess from './ReadOnlyFileAccess';
 import './editor.css';
 
 export default function EditorWorkspace({ children }: { children: ReactNode }) {
@@ -91,10 +92,7 @@ function DocumentPane({ file, active }: { file: EditorFile; active: boolean }) {
         <span className="folder-action-secondary"><ReloadButton compact label={t('Reload file')} busy={document?.loading} disabled={document?.saving} onReload={reloadFile} /></span>
         <TextButton className="folder-action-secondary" onClick={terminal}>{t('Open in terminal')}</TextButton>
       </>} /></WorkspaceHeader>
-    <div className="folder-path" data-tip={file.path}><Icon size={12} /><span>{file.path}{dirty ? ' •' : ''}</span>{document?.readOnly && <span className="editor-readonly-label"><Lock size={12} />{t('Read-only')}</span>}</div>
-    {document?.readOnly && !document.loading && <ErrorBox tone="info" compact dismissible={false} actions={<TextButton onClick={elevated}>{elevatedLabel}</TextButton>}>
-      {t(document.permissionDenied ? 'Your current user cannot access or write this file. Open it with elevated permissions to edit.' : 'This file is read-only. Editing and saving are disabled.')}
-    </ErrorBox>}
+    <div className="folder-path" data-tip={file.path}><Icon size={12} /><span>{file.path}{dirty ? ' •' : ''}</span>{document?.readOnly && <ReadOnlyFileAccess file={file} permissionDenied={document.permissionDenied} active={active} />}</div>
     {document?.error && <ErrorBox title={t('Could not read or save file')} details={document.error} />}
     {(!document || document.loading) && <div className="code-diff-status" role="status">{t('Loading file…')}</div>}
     {document && !document.loading && document.kind !== 'text' && <div className="code-diff-status">{t(document.kind === 'binary' ? 'This file is binary or is not UTF-8. Open it with another editor.' : 'This file is too large for the embedded editor.')}</div>}

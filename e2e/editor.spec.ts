@@ -29,15 +29,28 @@ test('identifies read-only files, blocks normal edits and offers explicit admini
   await openWorking(page);
   const editor = page.getByTestId('file-editor');
   await expect(editor.locator('.editor-readonly-label')).toHaveText('只读');
-  await expect(editor.getByText(/当前用户无权读取或写入此文件/)).toBeVisible();
+  await expect(editor.getByText(/当前用户无权读取或写入此文件/)).toHaveCount(0);
+  await expect(page.getByRole('menu', { name: '文件权限' })).toHaveCount(0);
   const before = await editor.locator('.view-lines').innerText();
   await replaceText(page, 'blocked edit');
   await page.keyboard.press('Control+s');
   expect(await editor.locator('.view-lines').innerText()).toBe(before);
   expect(await page.evaluate(() => (window as unknown as { __EDITOR_SAVE_COUNT__?: number }).__EDITOR_SAVE_COUNT__ ?? 0)).toBe(0);
   await expect(page.getByTestId('workspace-instance-bar').getByRole('button', { name: '保存文件', exact: true })).toBeDisabled();
-  for (const width of [1240, 760]) { await page.setViewportSize({ width, height: 800 }); await page.screenshot({ path: info.outputPath(`readonly-${width}.png`) }); }
-  await editor.getByRole('button', { name: '以管理员权限打开', exact: true }).click();
+  for (const width of [1240, 760]) {
+    await page.setViewportSize({ width, height: 800 });
+    await editor.getByRole('button', { name: '只读', exact: true }).click();
+    const access = page.getByRole('menu', { name: '文件权限' });
+    await expect(access.getByText(/当前用户无权读取或写入此文件/)).toBeVisible();
+    const bounds = (await access.boundingBox())!;
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
+    await page.screenshot({ path: info.outputPath(`readonly-${width}.png`) });
+    await page.keyboard.press('Escape');
+    await expect(editor.getByRole('button', { name: '只读', exact: true })).toBeFocused();
+  }
+  await editor.getByRole('button', { name: '只读', exact: true }).click();
+  await page.getByRole('menu', { name: '文件权限' }).getByRole('button', { name: '以管理员权限打开', exact: true }).click();
   expect(await page.evaluate(() => (window as unknown as { __ELEVATED_FILE__?: unknown }).__ELEVATED_FILE__)).toMatchObject({ path: '/home/e2e/project/src/main.ts' });
   await page.evaluate(() => { (window as unknown as { __WRITABLE__: boolean }).__WRITABLE__ = true; });
   await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '更多编辑器操作' }).click();

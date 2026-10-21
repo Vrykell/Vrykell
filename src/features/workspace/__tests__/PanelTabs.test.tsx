@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import PanelTabs from '../components/PanelTabs';
 import { useSessionStore } from '../model/session/store';
@@ -102,6 +102,30 @@ it('creates ungrouped tabs from the panel button and keeps only the group button
   expect(screen.getByTestId('new-tab-modal')).toHaveAttribute('data-group', 'group-a');
 });
 
+it('creates the default local terminal immediately and keeps the picker on the separate arrow', () => {
+  useTerminalDefaults.setState({ shell: 'bash' });
+  render(<PanelTabs />);
+  fireEvent.click(screen.getByTestId('tab-new-default'));
+  const tabs = useSessionStore.getState().tabs;
+  const tab = tabs[tabs.length - 1];
+  expect(tab?.kind).toBe('session');
+  if (tab?.kind !== 'session' || tab.layout.type !== 'leaf') throw new Error('Expected a terminal');
+  expect(tab.layout.terminal).toMatchObject({ kind: 'local', shellType: 'bash' });
+  expect(tab.groupId).toBeUndefined();
+  expect(screen.getByTestId('new-tab-modal')).toHaveAttribute('data-open', 'false');
+  fireEvent.click(screen.getByTestId('tab-new-btn'));
+  expect(screen.getByTestId('new-tab-modal')).toHaveAttribute('data-open', 'true');
+});
+
+it('exposes terminal actions through the leading menu and styles the search as a shared field', async () => {
+  render(<PanelTabs />);
+  fireEvent.click(screen.getByRole('button', { name: '更多终端操作' }));
+  const menu = screen.getByRole('menu', { name: '更多终端操作' });
+  expect(menu).toHaveTextContent('新建终端选项');
+  await act(async () => { fireEvent.click(within(menu).getByRole('button', { name: '搜索会话…' })); });
+  expect(screen.getByTestId('tab-search')).toHaveClass('text-input-field');
+});
+
 it('keeps terminal history in the terminal strip and excludes AI pages', () => {
   render(<PanelTabs />);
   expect(screen.queryByTestId('tab-row-ai-history')).toBeNull();
@@ -153,6 +177,32 @@ it('keeps group rows intact through renaming and reordering', () => {
     { id: 'group-a', title: 'Renamed', collapsed: false },
   ] }));
   expect(screen.getByTestId('group-header-group-a')).toHaveTextContent('Renamed');
+});
+
+it('renames groups in a styled menu input, commits on dismissal and cancels on Escape', async () => {
+  const renameGroup = vi.fn();
+  useSessionStore.setState({ groups: [{ id: 'work', title: 'Work', collapsed: false }], renameGroup });
+  render(<PanelTabs />);
+  const header = screen.getByTestId('group-header-work');
+  expect(header).toHaveClass('folder-tab');
+  fireEvent.doubleClick(header);
+  expect(header.querySelector('input')).toBeNull();
+  expect(screen.queryByRole('textbox', { name: '分组名称' })).toBeNull();
+  fireEvent.contextMenu(header);
+  const input = screen.getByRole('textbox', { name: '分组名称' });
+  expect(input).toHaveClass('text-input-field');
+  expect(input).toHaveFocus();
+  fireEvent.change(input, { target: { value: 'Cancelled' } });
+  fireEvent.keyDown(input, { key: 'Escape' });
+  expect(renameGroup).not.toHaveBeenCalled();
+  fireEvent.contextMenu(header);
+  fireEvent.change(screen.getByRole('textbox', { name: '分组名称' }), { target: { value: 'Production' } });
+  fireEvent.keyDown(screen.getByRole('textbox', { name: '分组名称' }), { key: 'Enter' });
+  expect(renameGroup).toHaveBeenCalledExactlyOnceWith('work', 'Production');
+  fireEvent.contextMenu(header);
+  fireEvent.change(screen.getByRole('textbox', { name: '分组名称' }), { target: { value: 'On blur' } });
+  await act(async () => { fireEvent.pointerDown(document.body); });
+  expect(renameGroup).toHaveBeenLastCalledWith('work', 'On blur');
 });
 
 it('keeps group actions and color controls keyboard-accessible without changing member icons', () => {

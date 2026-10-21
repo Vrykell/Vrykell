@@ -4,6 +4,22 @@ import { describe, expect, it, vi } from 'vitest';
 import ContextMenu from '../ContextMenu';
 
 describe('independent action menus', () => {
+  it('keeps header text editing keys local and distinguishes cancellation from committing dismissal', () => {
+    const close = vi.fn(); const cancel = vi.fn();
+    render(<ContextMenu anchor={{ x: 0, y: 0 }} header={<input aria-label="Group name" defaultValue="Work" />} onClose={close} onCancel={cancel}
+      items={[{ label: 'Archive', onClick: () => {} }]} />);
+    const input = screen.getByRole('textbox', { name: 'Group name' });
+    expect(input).toHaveFocus();
+    expect(fireEvent.keyDown(input, { key: 'Home' })).toBe(true);
+    expect(fireEvent.keyDown(input, { key: 'ArrowLeft' })).toBe(true);
+    expect(fireEvent.keyDown(input, { key: 'Tab' })).toBe(true);
+    expect(close).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(close).not.toHaveBeenCalled();
+    fireEvent.pointerDown(document.body);
+    expect(close).toHaveBeenCalledOnce();
+  });
   it('opens nested settings by pointer or keyboard and closes one level at a time', () => {
     const apply = vi.fn(); const close = vi.fn();
     render(<ContextMenu anchor={{ x: 0, y: 0 }} itemRole="menuitem" onClose={close} items={[

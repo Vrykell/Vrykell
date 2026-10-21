@@ -15,7 +15,8 @@ test('group header count stays on a single line while the header is hovered', as
   const first = (await tabIds(page))[0]!;
   await page.getByTestId(`tab-row-${first}`).click({ button: 'right' });
   await page.getByRole('button', { name: '新建分组', exact: true }).click();
-  // Creating a group starts inline rename; commit it so the header shows its count again.
+  // Creating a group opens its name field in the action menu.
+  await expect(page.getByRole('textbox', { name: '分组名称' })).toBeFocused();
   await page.keyboard.press('Enter');
 
   const group = page.locator('[data-group-id]').first();
@@ -55,10 +56,10 @@ test('group actions and colors open from the chip without squeezing its title', 
 
   await header.click({ button: 'right' });
   const menu = page.getByRole('menu', { name: '分组操作' });
-  const rename = menu.getByRole('button', { name: '重命名分组' });
+  const rename = menu.getByRole('textbox', { name: '分组名称' });
   await expect(rename).toBeVisible();
   const palette = menu.getByRole('menuitemradio').first();
-  expect((await palette.boundingBox())!.y).toBeGreaterThan((await rename.boundingBox())!.y);
+  expect((await palette.boundingBox())!.y).toBeGreaterThan((await menu.getByRole('button', { name: '归档分组' }).boundingBox())!.y);
   expect((await title.boundingBox())!.width).toBe(resting);
   await page.keyboard.press('Escape');
   await expect(header).toBeFocused();

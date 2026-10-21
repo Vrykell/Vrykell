@@ -20,12 +20,12 @@ export interface ContextMenuItem {
 }
 interface Props {
   anchor: MenuAnchor; items: ContextMenuItem[]; onClose: () => void;
-  label?: string; description?: string; itemRole?: 'menuitem'; footer?: ReactNode;
+  label?: string; description?: string; itemRole?: 'menuitem'; header?: ReactNode; footer?: ReactNode; onCancel?: () => void;
 }
 interface OpenSubmenu { item: ContextMenuItem; trigger: HTMLButtonElement; focus: boolean }
 
 /** One menu tree owns outside presses and keyboard focus, including all nested surfaces. */
-export default function ContextMenu({ anchor, items, onClose, label = t('Action menu'), description, itemRole, footer }: Props) {
+export default function ContextMenu({ anchor, items, onClose, label = t('Action menu'), description, itemRole, header, footer, onCancel }: Props) {
   const tree = useRef<HTMLDivElement>(null);
   const [path, setPath] = useState<OpenSubmenu[]>([]);
   const id = useId();
@@ -38,11 +38,11 @@ export default function ContextMenu({ anchor, items, onClose, label = t('Action 
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       event.preventDefault(); event.stopPropagation();
-      if (path.length) closeLevel(); else { anchor.trigger?.focus(); onClose(); }
+      if (path.length) closeLevel(); else { anchor.trigger?.focus(); (onCancel ?? onClose)(); }
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [path.length, anchor.trigger, onClose]);
+  }, [path.length, anchor.trigger, onClose, onCancel]);
   const open = (level: number, item: ContextMenuItem, trigger: HTMLButtonElement, focus: boolean) => {
     setPath(previous => [...previous.slice(0, level), { item, trigger, focus }]);
   };
@@ -54,6 +54,7 @@ export default function ContextMenu({ anchor, items, onClose, label = t('Action 
     }} onOpen={(item, trigger) => open(level, item, trigger, true)} />;
   return createPortal(<div ref={tree}>
     <MenuSurface anchor={anchor} label={label} focus onClose={close}>
+      {header && <div className="context-menu-header">{header}</div>}
       {description && <div className="context-menu-description">{description}</div>}
       {rows(items, 0)}
       {footer && <><div role="separator" className="context-menu-separator" /><div className="context-menu-footer">{footer}</div></>}
@@ -73,10 +74,11 @@ function MenuSurface({ anchor, submenuOf, label, focus, children, onClose, onBac
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const position = useFloatingPanelPosition(ref, anchor, submenuOf);
-  useLayoutEffect(() => { if (focus) ref.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus(); }, [focus]);
+  useLayoutEffect(() => { if (focus) ref.current?.querySelector<HTMLElement>('input:not(:disabled), button:not(:disabled)')?.focus(); }, [focus]);
   return <div ref={ref} id={id} role="menu" aria-label={label} className="workspace-floating context-menu-surface"
     onContextMenu={event => { event.preventDefault(); event.stopPropagation(); }}
     onKeyDown={event => {
+      if (event.target instanceof Element && event.target.matches('input, textarea, [contenteditable="true"]')) { event.stopPropagation(); return; }
       if (event.key === 'Enter' || event.key === ' ') { event.stopPropagation(); return; }
       if (event.key === 'Tab') { onClose(); return; }
       if (event.key === 'ArrowLeft' && onBack) { event.preventDefault(); event.stopPropagation(); onBack(); return; }

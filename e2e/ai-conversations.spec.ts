@@ -58,7 +58,7 @@ test('the execution environment stays fixed and a closed terminal stays disconne
   const chip = page.getByTestId('chat-execution-target');
   await expect(chip).toBeVisible();
   const selected = await chip.textContent();
-  await page.getByRole('button', { name: '新建终端', exact: true }).click();
+  await page.getByTestId('tab-new-btn').click();
   await page.getByRole('button', { name: /Bash/ }).click();
   await expect(chip).toHaveText(selected!);
   await ensureTabsOpen(page);

@@ -76,7 +76,7 @@ for (const target of ['local', 'remote'] as const) test(`${target} composer subm
       useTerminalStore.getState().stageCommand(getFocusedTerminalId(), script);
     }, script);
   } else {
-    await page.getByRole('button', { name: '新建终端', exact: true }).click();
+    await page.getByTestId('tab-new-btn').click();
     await page.getByRole('button', { name: /Bash/ }).click();
   }
   const input = page.locator('[data-terminal-input]:visible');

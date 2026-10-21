@@ -78,6 +78,8 @@ not pretend to protect "the renderer itself" or "the programs the user installs"
 
 ## 6. History
 
+- File access menu, 2026-10-22: the read-only path control opens the shared action menu; elevation still requires a separate explicit click and uses the existing native administrator or terminal editing path. Opening the menu performs no file write or elevation. Read-only/save guards and credential handling remain unchanged; no new IPC, capability, CSP or resource scope is added.
+
 - Interface materials, 2026-10-22: platform selection uses the existing native window-effects permission. Unsupported systems use the themed opaque fallback. This adds no IPC command, capability, CSP relaxation, external content, filesystem access or authorization path; preview masks and blur operate only on existing UI surfaces.
 
 - Native close, 2026-10-21: the main window adds `core:window:allow-destroy` because the registered close callback completes an approved close through the native destroy operation. Unsaved documents still prevent the request until saving or discarding succeeds; cancelling and failed saves retain the window and draft. No own IPC commands, CSP relaxation or resource scope changes are introduced. Browser mocks read the actual capability list and cover titlebar and system close requests.

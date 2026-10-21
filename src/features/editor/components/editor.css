@@ -1,7 +1,7 @@
 .editor-content-host, .editor-pane { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
 .editor-content-host, .editor-pane { background: var(--xterm-bg); }
 .editor-pane .code-editor-frame { border-radius: 0; clip-path: none; }
-.editor-readonly-label { display: inline-flex; align-items: center; gap: 4px; color: var(--warning); }
+button.editor-readonly-label { display: inline-flex; align-items: center; flex-shrink: 0; gap: 4px; height: 20px; min-height: 0; padding: 0 4px; font-size: inherit; color: var(--warning); }
 .editor-pane > [role="status"] { flex-wrap: wrap; }
 .editor-close-dialog { display: flex; flex-direction: column; gap: 12px; }
 .editor-close-dialog p { margin: 0; color: var(--text-secondary); }

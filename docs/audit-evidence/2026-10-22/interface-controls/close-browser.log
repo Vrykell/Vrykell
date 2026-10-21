@@ -1,0 +1,21 @@
+
+> vrykell@0.1.0 test:e2e
+> playwright test e2e/product-loop.spec.ts e2e/workspace-usability.spec.ts --grep AI 草稿|panel headings close --reporter=line
+
+
+[1A[2K[WebServer] (node:49356) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 2 tests using 1 worker
+
+
+
+[1A[2K(node:17984) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:17984) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1A[2K[1/2] product-loop.spec.ts:4:1 › AI 草稿和附件按会话保留，关闭面板后仍能继续发送
+[1A[2K[2/2] workspace-usability.spec.ts:360:1 › panel headings close auxiliary content without hiding the workspace
+[1A[2K  2 passed (13.0s)

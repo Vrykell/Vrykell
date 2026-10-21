@@ -1353,6 +1353,7 @@ button.provider-option-add:hover { color: var(--text-primary); }
 .context-menu-footer { padding: 8px; }
 .history-menu-color-label { margin-bottom: 8px; color: var(--text-muted); font-size: var(--fs-caption); }
 .context-menu-description { max-width: 220px; padding: 6px 12px; color: var(--text-muted); font-size: var(--fs-micro); line-height: 1.5; overflow-wrap: anywhere; }
+.context-menu-header { padding: 4px; }
 .workspace-floating-row:disabled:is(:hover, :focus-visible) { background: transparent; }
 
 .ssh-recovery-action { height: var(--control-size); padding: 0 12px; color: var(--text-primary); }

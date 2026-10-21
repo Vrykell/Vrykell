@@ -13,11 +13,12 @@
 .folder-tab { position: relative; display: flex; align-items: center; flex-shrink: 0; box-sizing: border-box; max-width: 280px; padding: 3px 4px; color: var(--text-muted); border-radius: var(--radius-inner) var(--radius-inner) 0 0; }
 .folder-tab[data-active="true"] { background: var(--xterm-bg); color: var(--text-primary); }
 .folder-tab[data-active="true"] { z-index: 1; }
+.folder-tab[data-group-card="true"] { background: var(--xterm-bg); z-index: 1; }
 .folder-tab[data-reorder-dragging="true"] { position: absolute; }
 /* Overlap the tab by one pixel so fractional device scales cannot expose a seam. */
-.folder-tab[data-active="true"]::before, .folder-tab[data-active="true"]::after { content: ''; position: absolute; bottom: 0; width: 11px; height: 10px; pointer-events: none; background: var(--xterm-bg); }
-.folder-tab[data-active="true"]::before { left: -10px; mask-image: radial-gradient(circle at top left, transparent 9.5px, var(--xterm-bg) 10px); -webkit-mask-image: radial-gradient(circle at top left, transparent 9.5px, var(--xterm-bg) 10px); }
-.folder-tab[data-active="true"]::after { right: -10px; mask-image: radial-gradient(circle at top right, transparent 9.5px, var(--xterm-bg) 10px); -webkit-mask-image: radial-gradient(circle at top right, transparent 9.5px, var(--xterm-bg) 10px); }
+.folder-tab:is([data-active="true"], [data-group-card="true"])::before, .folder-tab:is([data-active="true"], [data-group-card="true"])::after { content: ''; position: absolute; bottom: 0; width: 11px; height: 10px; pointer-events: none; background: var(--xterm-bg); }
+.folder-tab:is([data-active="true"], [data-group-card="true"])::before { left: -10px; mask-image: radial-gradient(circle at top left, transparent 9.5px, var(--xterm-bg) 10px); -webkit-mask-image: radial-gradient(circle at top left, transparent 9.5px, var(--xterm-bg) 10px); }
+.folder-tab:is([data-active="true"], [data-group-card="true"])::after { right: -10px; mask-image: radial-gradient(circle at top right, transparent 9.5px, var(--xterm-bg) 10px); -webkit-mask-image: radial-gradient(circle at top right, transparent 9.5px, var(--xterm-bg) 10px); }
 .folder-tab-content { display: flex; align-items: center; min-width: 0; border-radius: 6px; }
 .folder-tab:not([data-active="true"]):hover > .folder-tab-content { background: var(--hover); }
 .folder-tab-content > button[role="tab"] { display: flex; align-items: center; gap: 8px; min-width: 0; height: 28px; padding: 0 6px; border: 0; border-radius: 0; background: transparent; color: inherit; font: var(--fs-caption)/1.5 var(--font-ui); cursor: pointer; touch-action: none; }

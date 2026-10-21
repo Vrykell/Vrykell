@@ -1,0 +1,149 @@
+
+> vrykell@0.1.0 test:e2e
+> playwright test e2e/terminal-toolbar-refinements.spec.ts e2e/editor.spec.ts e2e/panel-header.spec.ts e2e/tab-management.spec.ts e2e/new-tab-quick-settings.spec.ts e2e/field-surfaces.spec.ts e2e/icons.spec.ts e2e/layout.spec.ts e2e/shortcuts.spec.ts e2e/ai-conversations.spec.ts e2e/multiline-execution.spec.ts e2e/terminal-script-input.spec.ts e2e/product-loop.spec.ts e2e/folder-tab-corners.spec.ts e2e/workspace-surface-refinements.spec.ts e2e/workspace-navigation.spec.ts --reporter=line
+
+
+[1A[2K[WebServer] (node:76348) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 88 tests using 1 worker
+
+
+
+[1A[2K(node:36976) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:36976) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1A[2K[1/88] ai-conversations.spec.ts:14:1 › conversation drafts survive terminal navigation, settings and closing the final terminal
+[1A[2K[2/88] ai-conversations.spec.ts:30:1 › history owns separate drafts and messages and restores them after reload
+[1A[2K[3/88] ai-conversations.spec.ts:53:1 › the execution environment stays fixed and a closed terminal stays disconnected
+[1A[2K[4/88] ai-conversations.spec.ts:71:1 › the picker opens the new-tab panel and binds the terminal it creates
+[1A[2K[5/88] ai-conversations.spec.ts:87:1 › rename and delete manage conversation history independently of terminals
+[1A[2K[6/88] ai-conversations.spec.ts:114:1 › command analysis stages a reference before sending and never changes terminal input
+[1A[2K[7/88] ai-conversations.spec.ts:137:3 › plain conversation answers remain readable in dark
+[1A[2K[8/88] ai-conversations.spec.ts:137:3 › plain conversation answers remain readable in light
+[1A[2K[9/88] ai-conversations.spec.ts:187:1 › tool activity stays available within the plain conversation flow
+[1A[2K[10/88] ai-conversations.spec.ts:262:1 › reading earlier content pauses automatic scroll until the user returns to the latest reply
+[1A[2K[11/88] ai-conversations.spec.ts:276:1 › pausing and resuming the follow never shifts the transcript layout
+[1A[2K[12/88] ai-conversations.spec.ts:304:1 › a small scroll while the reply streams keeps the reading position
+[1A[2K[13/88] editor.spec.ts:17:1 › identifies read-only files, blocks normal edits and offers explicit administrator opening
+
+[1A[2K[WebServer] 01:10:41 [vite] (client) Failed to load source map for D:/projects/typescript/Vrykell/node_modules/monaco-editor/esm/vs/base/common/marked/marked.js.
+[WebServer] Error: An error occurred while trying to read the map file at marked.umd.js.map
+[WebServer] Error: ENOENT: no such file or directory, open 'D:\projects\typescript\Vrykell\node_modules\monaco-editor\esm\vs\base\common\marked\marked.umd.js.map'
+[WebServer]     at async open (node:internal/fs/promises:637:25)
+[WebServer]     at async Object.readFile (node:internal/fs/promises:1269:14)
+[WebServer]     at async extractSourcemapFromFile (file:///D:/projects/typescript/Vrykell/node_modules/vite/dist/node/chunks/config.js:8066:65)
+[WebServer]     at async loadAndTransform (file:///D:/projects/typescript/Vrykell/node_modules/vite/dist/node/chunks/config.js:22717:22)
+[1A[2K[14/88] editor.spec.ts:63:1 › opens text in the built-in editor, saves it and guards unsaved closes
+[1A[2K[15/88] editor.spec.ts:79:1 › retains drafts on disk conflicts and requires confirmation before reload
+[1A[2K[16/88] editor.spec.ts:90:1 › keeps files in a single page despite a legacy preference and offers terminal opening
+[1A[2K[17/88] editor.spec.ts:116:1 › returns from a comparison to its editor and explains binary files
+[1A[2K[18/88] editor.spec.ts:126:1 › reorders connected file tabs and keeps compact actions above the text
+[1A[2K[19/88] editor.spec.ts:166:1 › dragging the selected first file leaves the remaining tabs visible in a narrow strip
+[1A[2K[20/88] editor.spec.ts:201:3 › selects on press and exchanges unequal tabs to the left after half an overlap
+[1A[2K[21/88] editor.spec.ts:201:3 › selects on press and exchanges unequal tabs to the right after half an overlap
+[1A[2K[22/88] editor.spec.ts:248:1 › moving the selected document backward never detaches or reloads its editor
+[1A[2K[23/88] editor.spec.ts:290:3 › dragging file tabs scrolls both strip edges with a stationary pointer at width 1240
+[1A[2K[24/88] editor.spec.ts:290:3 › dragging file tabs scrolls both strip edges with a stationary pointer at width 760
+[1A[2K[25/88] field-surfaces.spec.ts:62:3 › editable fields are lighter than panels and readouts stay quiet in 深色
+[1A[2K[26/88] field-surfaces.spec.ts:62:3 › editable fields are lighter than panels and readouts stay quiet in 浅色
+[1A[2K[27/88] folder-tab-corners.spec.ts:46:7 › folder tab corners in dark mode at 1x density › file and comparison tabs join the content without gaps or square protrusions
+[1A[2K[28/88] folder-tab-corners.spec.ts:46:7 › folder tab corners in light mode at 1x density › file and comparison tabs join the content without gaps or square protrusions
+[1A[2K[29/88] folder-tab-corners.spec.ts:46:7 › folder tab corners in dark mode at 1.25x density › file and comparison tabs join the content without gaps or square protrusions
+[1A[2K[30/88] folder-tab-corners.spec.ts:46:7 › folder tab corners in light mode at 1.25x density › file and comparison tabs join the content without gaps or square protrusions
+[1A[2K[31/88] folder-tab-corners.spec.ts:46:7 › folder tab corners in dark mode at 2x density › file and comparison tabs join the content without gaps or square protrusions
+[1A[2K[32/88] folder-tab-corners.spec.ts:46:7 › folder tab corners in light mode at 2x density › file and comparison tabs join the content without gaps or square protrusions
+[1A[2K[33/88] icons.spec.ts:5:1 › small action buttons have readable targets and tab close works from the keyboard
+[1A[2K[34/88] icons.spec.ts:33:1 › workspace icons remain readable and fit inside their controls
+[1A[2K[35/88] icons.spec.ts:76:1 › workspace and settings use the same themed icon family in both themes
+[1A[2K[36/88] icons.spec.ts:109:1 › pickers, tabs and SSH connections retain colored shell marks
+[1A[2K[37/88] layout.spec.ts:10:3 › 应用布局 › TopDock 功能区：标签/资源按钮 + 设置入口
+[1A[2K[38/88] layout.spec.ts:20:3 › 应用布局 › Windows/Linux 使用应用内窗口控制按钮
+[1A[2K[39/88] layout.spec.ts:64:3 › 应用布局 › 文件面板：点击资源按钮后显示目录和文件
+[1A[2K[40/88] layout.spec.ts:71:3 › 应用布局 › 终端区：xterm 挂载且有底部输入栏
+[1A[2K[41/88] layout.spec.ts:77:3 › 应用布局 › 底部输入栏支持 AI 模式切换
+[1A[2K[42/88] layout.spec.ts:84:3 › 应用布局 › 标签面板：打开面板 → 新建标签 → 切换
+[1A[2K[43/88] layout.spec.ts:99:3 › 应用布局 › 文档级滚动已锁定 — html/body overflow 裁剪
+[1A[2K[44/88] multiline-execution.spec.ts:51:1 › a real Linux PTY reproduces raw multiline loss and executes a complete submission
+[1A[2K[45/88] multiline-execution.spec.ts:66:52 › local composer submits a complete script that runs in a real Linux PTY
+[1A[2K[46/88] multiline-execution.spec.ts:66:52 › remote composer submits a complete script that runs in a real Linux PTY
+[1A[2K[47/88] multiline-execution.spec.ts:98:1 › multiline Bash execution preserves heredocs, state and the final exit status
+[1A[2K[48/88] multiline-execution.spec.ts:110:1 › multiline native shell execution retains variables and functions
+[1A[2K[49/88] new-tab-quick-settings.spec.ts:5:3 › 新建标签类型快捷配置 › restored default shell icons follow the resolved default and nested settings stay on screen
+[1A[2K[50/88] new-tab-quick-settings.spec.ts:39:3 › 新建标签类型快捷配置 › 右击终端类型切换打开模式并影响新标签
+[1A[2K[51/88] new-tab-quick-settings.spec.ts:68:3 › 新建标签类型快捷配置 › 右击终端类型设为默认终端
+[1A[2K[52/88] new-tab-quick-settings.spec.ts:78:3 › 新建标签类型快捷配置 › 右击 SSH 连接切换快捷开关并打开编辑弹窗
+[1A[2K[53/88] new-tab-quick-settings.spec.ts:109:3 › 新建标签类型快捷配置 › 右击 SSH 连接删除需二次确认
+[1A[2K[54/88] panel-header.spec.ts:8:1 › group header count stays on a single line while the header is hovered
+[1A[2K[55/88] panel-header.spec.ts:32:1 › group actions and colors open from the chip without squeezing its title
+[1A[2K[56/88] panel-header.spec.ts:68:1 › tab rename input stays inside its row
+[1A[2K[57/88] product-loop.spec.ts:4:1 › AI 草稿和附件按会话保留，关闭面板后仍能继续发送
+[1A[2K  1) product-loop.spec.ts:4:1 › AI 草稿和附件按会话保留，关闭面板后仍能继续发送 ──────────────────────────────────────────
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      [2m- waiting for getByRole('button', { name: '关闭AI面板', exact: true })[22m
+
+
+      29 |   await expect(input).toHaveValue('终端一的草稿');
+      30 |   await expect(page.locator('[data-tip="移除附件"]')).toHaveCount(1);
+    > 31 |   await page.getByRole('button', { name: '关闭AI面板', exact: true }).click();
+         |                                                                   ^
+      32 |   await page.getByRole('button', { name: 'AI 助手', exact: true }).click();
+      33 |   await expect(input).toHaveValue('终端一的草稿');
+      34 |   await expect(page.locator('[data-tip="移除附件"]')).toHaveCount(1);
+
+        at D:\projects\typescript\Vrykell\e2e\product-loop.spec.ts:31:67
+
+
+
+
+[1A[2K(node:76868) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1A[2K(node:76868) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[58/88] product-loop.spec.ts:48:1 › failed directory navigation retains the view and can be retried
+[1A[2K[59/88] shortcuts.spec.ts:11:3 › 全局快捷键 › Cmd+T 新建标签，Cmd+W 关闭标签
+[1A[2K[60/88] shortcuts.spec.ts:29:3 › 全局快捷键 › Cmd+数字切换标签
+[1A[2K[61/88] shortcuts.spec.ts:41:3 › 全局快捷键 › Cmd+F 打开全局搜索并聚焦
+[1A[2K[62/88] shortcuts.spec.ts:50:3 › 全局快捷键 › Cmd+, 打开设置页
+[1A[2K[63/88] shortcuts.spec.ts:56:3 › 全局快捷键 › Cmd+P 打开命令面板
+[1A[2K[64/88] shortcuts.spec.ts:66:3 › 全局快捷键 › 页面缩放快捷键和滚轮不会改变字号或页面比例
+[1A[2K[65/88] shortcuts.spec.ts:86:3 › 全局快捷键 › 点击 TopDock 搜索触发器打开居中搜索窗
+[1A[2K[66/88] tab-management.spec.ts:13:3 › 标签页管理侧栏 › 顶栏依次为搜索框、历史按钮、新建按钮
+[1A[2K[67/88] tab-management.spec.ts:19:3 › 标签页管理侧栏 › 搜索框按名字过滤活跃会话
+[1A[2K[68/88] tab-management.spec.ts:32:3 › 标签页管理侧栏 › 点击新建直接弹出类型选择弹窗、支持搜索过滤并创建
+[1A[2K[69/88] tab-management.spec.ts:51:3 › 标签页管理侧栏 › 历史按钮新建会话历史查看标签页
+[1A[2K[70/88] tab-management.spec.ts:58:3 › 标签页管理侧栏 › 标签右键菜单靠近窗口边缘时仍完整显示
+[1A[2K[71/88] tab-management.spec.ts:82:3 › 标签页管理侧栏 › 标签列表空白处右键打开面板菜单
+[1A[2K[72/88] tab-management.spec.ts:96:3 › 标签页管理侧栏 › 顶部 + 新建的标签进入未分组，只有分组 + 才进分组
+[1A[2K[73/88] tab-management.spec.ts:128:3 › 标签页管理侧栏 › keeps inactive horizontal tab close actions accessible
+[1A[2K[74/88] terminal-script-input.spec.ts:6:1 › an AI multiline script enters its terminal draft and runs only after an explicit Enter
+[1A[2K[75/88] terminal-script-input.spec.ts:32:1 › pasting a multiline script from the idle terminal menu preserves it without execution
+[1A[2K[76/88] terminal-script-input.spec.ts:46:1 › a native paste with even one trailing newline asks before writing to an unprotected process
+[1A[2K[77/88] terminal-script-input.spec.ts:68:1 › the native window border follows the neutral gray theme border
+[1A[2K[78/88] terminal-toolbar-refinements.spec.ts:4:40 › terminal split creation and group menu remain usable in dark
+[1A[2K[79/88] terminal-toolbar-refinements.spec.ts:4:40 › terminal split creation and group menu remain usable in light
+[1A[2K[80/88] workspace-navigation.spec.ts:10:1 › uses a full-height sidebar and keeps terminals alive across empty workspaces
+[1A[2K[81/88] workspace-navigation.spec.ts:47:1 › moves the same native conversation and composer between main and side
+[1A[2K[82/88] workspace-navigation.spec.ts:67:1 › keeps native and connected sessions in one AI strip without closing either on navigation
+[1A[2K[83/88] workspace-navigation.spec.ts:93:1 › collapses colored terminal groups while preserving the active session and actions
+[1A[2K[84/88] workspace-navigation.spec.ts:116:1 › routes every auxiliary panel to the right and keeps the workspace full height
+[1A[2K[85/88] workspace-navigation.spec.ts:132:1 › new, close and numeric shortcuts follow the workspace and the focused side conversation
+[1A[2K[86/88] workspace-surface-refinements.spec.ts:5:35 › acrylic is confined to navigation and region edges stay square in 深色
+[1A[2K[87/88] workspace-surface-refinements.spec.ts:5:35 › acrylic is confined to navigation and region edges stay square in 浅色
+[1A[2K[88/88] workspace-surface-refinements.spec.ts:27:1 › terminal dragging carries the complete tab and closing preview never closes the session
+[1A[2K  Slow test file: editor.spec.ts (51.3s)
+  Slow test file: ai-conversations.spec.ts (38.5s)
+  Slow test file: folder-tab-corners.spec.ts (27.9s)
+  Consider splitting slow test files to speed up parallel execution
+  1 failed
+    product-loop.spec.ts:4:1 › AI 草稿和附件按会话保留，关闭面板后仍能继续发送 ───────────────────────────────────────────
+  87 passed (4.3m)

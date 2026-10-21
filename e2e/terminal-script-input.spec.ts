@@ -8,7 +8,7 @@ test('an AI multiline script enters its terminal draft and runs only after an ex
   await mockAnthropic(page, `\`\`\`bash\n${script}\n\`\`\``);
   await setupTauriMock(page);
   await page.goto('/');
-  await page.getByRole('button', { name: '新建终端', exact: true }).click();
+  await page.getByTestId('tab-new-btn').click();
   await page.getByRole('button', { name: /Bash/ }).click();
   await page.locator('[data-dock-btn="chat"]').click();
   await ensureChatSettingsOpen(page);

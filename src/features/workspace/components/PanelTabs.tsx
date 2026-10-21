@@ -1,7 +1,7 @@
 import { TextInput } from '@ui/TextInput';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { iconSizes,
-  Plus, History, Bot, Search,
+  Plus, History, Bot, Search, ChevronDown,
  } from '@ui/icons';
 import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, useTabDisplayTitle, tabIconKey, tabIconColor, type Tab, type TabGroup } from '@features/workspace';
 import { useIconColorStore } from '@config/iconColors';
@@ -70,7 +70,6 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalGroupId, setModalGroupId] = useState<string | undefined>(undefined);
   const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null);
-  const [renamingGroupTitle, setRenamingGroupTitle] = useState('');
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; tabId: string } | null>(null);
 
   useEffect(() => { loadGroups(); }, [loadGroups]);
@@ -144,9 +143,7 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
             // Creating a group immediately focuses its name input.
             void createGroupForTab(ctxTab.id).then((gid) => {
               if (!gid) return;
-              const g = useSessionStore.getState().groups.find((x) => x.id === gid);
               setRenamingGroupId(gid);
-              setRenamingGroupTitle(g?.title ?? t('New group'));
             });
           },
         }] : []),
@@ -175,9 +172,17 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
 
   return (
     <WorkspaceHeader active={active}><div className="folder-header terminal-instance-header">
+      <div className="folder-more"><EditorActions label={t('More terminal actions')} items={[
+        { label: t('Create terminal'), onClick: () => { useSessionStore.getState().addTab(); } },
+        { label: t('New terminal options'), onClick: () => { setModalGroupId(undefined); setModalOpen(true); } },
+        { label: t('Session history'), onClick: openHistoryTab },
+        { label: t('ACP'), onClick: () => useSessionStore.getState().openHarnessTab() },
+        { label: t('Search session titles…'), onClick: () => setSearchOpen(true) },
+        { label: t('AI auto-group'), disabled: !tabs.some(isSessionTab), onClick: openGrouping },
+      ]} /></div>
       <div className="folder-actions terminal-tab-tools">
         <IconBtn title={t('Search session titles…')} data-testid="tab-search-toggle" onClick={() => { setSearchOpen(!searchOpen); setQuery(''); }}><Search size={iconSizes.control} /></IconBtn>
-        {searchOpen && <TextInput autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder={t('Search session titles…')} data-testid="tab-search" className="terminal-tab-search" />}
+        {searchOpen && <TextInput variant="field" autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder={t('Search session titles…')} data-testid="tab-search" className="terminal-tab-search" />}
         <span className="folder-action-secondary terminal-secondary-actions"><IconBtn title={t('Session history')} data-testid="tab-history-btn" onClick={openHistoryTab}>
           <History size={iconSizes.control} />
         </IconBtn>
@@ -185,14 +190,10 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
           <Bot size={iconSizes.control} />
         </IconBtn>
         </span>
-        <span className="terminal-overflow-actions"><EditorActions items={[
-          { label: t('Session history'), onClick: openHistoryTab },
-          { label: t('ACP'), onClick: () => useSessionStore.getState().openHarnessTab() },
-        ]} /></span>
-        {/* The panel button always creates ungrouped tabs; only a group's own + assigns that group. */}
-        <IconBtn title={t('Create terminal')} data-testid="tab-new-btn" onClick={() => { setModalGroupId(undefined); setModalOpen(true); }}>
-          <Plus size={iconSizes.control} />
-        </IconBtn>
+        <span className="terminal-new-controls">
+          <IconBtn title={t('Create terminal')} data-testid="tab-new-default" onClick={() => { useSessionStore.getState().addTab(); }}><Plus size={iconSizes.control} /></IconBtn>
+          <IconBtn title={t('New terminal options')} data-testid="tab-new-btn" aria-haspopup="dialog" onClick={() => { setModalGroupId(undefined); setModalOpen(true); }}><ChevronDown size={iconSizes.control} /></IconBtn>
+        </span>
       </div>
 
       {/* Group chips and instance tabs share one reorder list. */}
@@ -215,16 +216,13 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
               editTitle={editTitle}
               setEditTitle={setEditTitle}
               renamingGroupId={renamingGroupId}
-              renamingGroupTitle={renamingGroupTitle}
-              setRenamingGroupTitle={setRenamingGroupTitle}
               onActivate={activate}
               onClose={closeTab}
               onStartEdit={(id, title) => { setEditId(id); setEditTitle(title); }}
               onCommitEdit={() => { if (editId) renameTab(editId, editTitle); setEditId(null); }}
               onCancelEdit={() => setEditId(null)}
               onToggleCollapse={() => toggleGroupCollapse(g.id)}
-              onStartRenameGroup={() => { setRenamingGroupId(g.id); setRenamingGroupTitle(g.title); }}
-              onCommitRenameGroup={() => { if (renamingGroupId) renameGroup(renamingGroupId, renamingGroupTitle); setRenamingGroupId(null); }}
+              onRenameGroup={title => renameGroup(g.id, title)}
               onCancelRenameGroup={() => setRenamingGroupId(null)}
               onDeleteGroup={() => {
                 const hasTabs = tabs.some(tab => isSessionTab(tab) && tab.groupId === g.id);
@@ -345,16 +343,13 @@ function GroupSection(props: {
   editTitle: string;
   setEditTitle: (value: string) => void;
   renamingGroupId: string | null;
-  renamingGroupTitle: string;
-  setRenamingGroupTitle: (value: string) => void;
   onActivate: (id: string) => void;
   onClose: (id: string) => void;
   onStartEdit: (id: string, title: string) => void;
   onCommitEdit: () => void;
   onCancelEdit: () => void;
   onToggleCollapse: () => void;
-  onStartRenameGroup: () => void;
-  onCommitRenameGroup: () => void;
+  onRenameGroup: (title: string) => void;
   onCancelRenameGroup: () => void;
   onDeleteGroup: () => void;
   onPointerDownTab: (event: React.PointerEvent<HTMLElement>, id: string) => void;
@@ -365,6 +360,20 @@ function GroupSection(props: {
 }) {
   const { group, tabs, activeId } = props;
   const [menu, setMenu] = useState<MenuAnchor | null>(null);
+  const [name, setName] = useState(group.title);
+  const header = useRef<HTMLDivElement>(null);
+  const openMenu = (anchor: MenuAnchor) => { setName(group.title); setMenu(anchor); };
+  const closeMenu = () => {
+    const title = name.trim();
+    if (title && title !== group.title) props.onRenameGroup(title);
+    setMenu(null);
+  };
+  useEffect(() => {
+    if (props.renamingGroupId !== group.id || !header.current) return;
+    const trigger = header.current; const bounds = trigger.getBoundingClientRect();
+    setName(group.title); setMenu({ x: bounds.left, y: bounds.bottom, trigger });
+    props.onCancelRenameGroup();
+  }, [props.renamingGroupId, group.id, group.title, props.onCancelRenameGroup]);
   const colorOverride = useWorkspaceNavigation(state => state.groupColors[group.id]);
   const color = colorOverride ?? historyGroupColor(group.id);
   const empty = useSessionStore(state => !state.tabs.some(tab => isSessionTab(tab) && tab.groupId === group.id));
@@ -376,33 +385,25 @@ function GroupSection(props: {
   return <div className="terminal-tab-group" data-group-color={color} style={{ '--terminal-group-color': color === 'neutral' ? 'var(--text-secondary)' : `var(--group-${color})` } as React.CSSProperties}>
     <div className="tab-group-container" data-reorder-container="" data-reorder-dragging={dragging ? 'true' : undefined}
       data-group-id={group.id} data-group-active={active} data-reorder-zone={group.id} data-reorder-kind="tab">
-      <div className="tab-group-header" data-reorder-measure="container" data-group-header-id={group.id}
-        data-header-selected={group.collapsed && active ? 'true' : 'false'} data-renaming={props.renamingGroupId === group.id || undefined}
+      <div ref={header} className="folder-tab tab-group-header" data-group-card="true" data-reorder-measure="container" data-group-header-id={group.id}
+        data-header-selected={group.collapsed && active ? 'true' : 'false'}
         data-testid={`group-header-${group.id}`} data-reorder-item={group.id} data-reorder-kind="group"
         data-reorder-dragging={dragging ? 'true' : undefined} tabIndex={0} role="button" aria-expanded={!group.collapsed} aria-label={group.title}
-        onContextMenu={event => { event.preventDefault(); event.stopPropagation(); setMenu({ x: event.clientX, y: event.clientY, trigger: event.currentTarget }); }}
+        onContextMenu={event => { event.preventDefault(); event.stopPropagation(); openMenu({ x: event.clientX, y: event.clientY, trigger: event.currentTarget }); }}
         onKeyDown={event => {
           if (event.target !== event.currentTarget) return;
           if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); props.onToggleCollapse(); }
           if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
             event.preventDefault(); const rect = event.currentTarget.getBoundingClientRect();
-            setMenu({ x: rect.left, y: rect.bottom, trigger: event.currentTarget });
+            openMenu({ x: rect.left, y: rect.bottom, trigger: event.currentTarget });
           }
         }}
-        onClick={() => { if (!props.renamingGroupId) props.onToggleCollapse(); }}
-        onDoubleClick={() => { if (props.renamingGroupId !== group.id) props.onStartRenameGroup(); }}
-        onPointerDown={props.onPointerDownGroup} data-tip={t('Collapse or expand group · Double-click to rename · Drag to reorder')}>
-        {props.renamingGroupId === group.id ? <TextInput autoFocus value={props.renamingGroupTitle}
-          onChange={event => props.setRenamingGroupTitle(event.target.value)} onFocus={event => event.currentTarget.select()}
-          onClick={event => event.stopPropagation()} onBlur={props.onCommitRenameGroup}
-          onKeyDown={event => {
-            event.stopPropagation();
-            if (event.key === 'Enter') props.onCommitRenameGroup();
-            if (event.key === 'Escape') props.onCancelRenameGroup();
-          }} /> : <span className="terminal-group-chip" data-testid={`group-title-${group.id}`}>
+        onClick={props.onToggleCollapse}
+        onPointerDown={props.onPointerDownGroup} data-tip={t('Collapse or expand group · Right-click to rename · Drag to reorder')}>
+        <span className="terminal-group-chip" data-testid={`group-title-${group.id}`}>
             <span>{group.title}</span>
             {group.collapsed && <span data-testid={`group-count-${group.id}`}>{tabs.length}</span>}
-          </span>}
+          </span>
       </div>
       {!group.collapsed && tabs.map(tab => <Fragment key={tab.id}>
         <ListReorderPlaceholder listId={LIST_ID} itemId={tab.id} />
@@ -414,17 +415,18 @@ function GroupSection(props: {
       </Fragment>)}
       {!group.collapsed && last && <ListReorderPlaceholder listId={LIST_ID} itemId={last} after />}
     </div>
-    {menu && <ContextMenu anchor={menu} label={t('Group actions')} onClose={() => setMenu(null)} items={[
+    {menu && <ContextMenu anchor={menu} label={t('Group actions')} onClose={closeMenu} onCancel={() => setMenu(null)}
+      header={<TextInput variant="field" aria-label={t('Group title')} value={name} onChange={event => setName(event.target.value)}
+        onFocus={event => event.currentTarget.select()} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); closeMenu(); menu.trigger?.focus(); } }} />} items={[
       { label: t('AI auto-group'), onClick: props.onAutoGroup },
       { label: t('Add terminal to group'), onClick: props.onAddTab },
-      { label: t('Rename tab group'), group: 'edit', onClick: props.onStartRenameGroup },
       { label: t(group.collapsed ? 'Expand group' : 'Collapse group'), group: 'view', onClick: props.onToggleCollapse },
       { label: t(empty ? 'Delete empty group' : 'Archive tab group'), danger: empty, group: 'danger', onClick: props.onDeleteGroup },
     ]} footer={<>
       <div className="history-menu-color-label">{t('Group color')}</div>
       <HistoryColorChoices menu value={colorOverride ?? null} testId="terminal-group-color" onSelect={value => {
         menu.trigger?.focus();
-        useWorkspaceNavigation.getState().setGroupColor(group.id, value); setMenu(null);
+        useWorkspaceNavigation.getState().setGroupColor(group.id, value); closeMenu();
       }} />
     </>} />}
   </div>;

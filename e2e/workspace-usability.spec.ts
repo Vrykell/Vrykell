@@ -359,7 +359,7 @@ test('auxiliary navigation shares the right side and AI preserves the main works
 
 test('panel headings close auxiliary content without hiding the workspace', async ({ page }) => {
   await page.locator('[data-dock-btn="chat"]').click();
-  await page.getByRole('button', { name: '关闭AI面板', exact: true }).click();
+  await page.getByRole('button', { name: '关闭AI 助手面板', exact: true }).click();
   await expect(page.locator('[data-chat-composer]')).toBeHidden();
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await page.locator('[data-dock-btn="files"]').click();
