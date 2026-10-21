@@ -18,12 +18,12 @@ import ConfirmDialog from '@ui/ConfirmDialog';
 import ErrorBox from '@ui/ErrorBox';
 import { useToastStore } from '@ui/Toast';
 import { t } from '@i18n';
-import { getCurrentWindow } from '@tauri-apps/api/window';
-import { interceptEditorClose } from '@core/editor';
+import { useNativeCloseGuard } from '../hooks/useNativeCloseGuard';
 import { isDocumentDirty, useEditorDocuments } from '../stores/documents';
 import './editor.css';
 
 export default function EditorWorkspace({ children }: { children: ReactNode }) {
+  useNativeCloseGuard();
   const tabs = useSessionStore(state => state.tabs); const activeId = useSessionStore(state => state.activeId);
   const documents = useEditorDocuments(state => state.documents);
   const area = useWorkspaceNavigation(state => state.area);
@@ -44,18 +44,6 @@ export default function EditorWorkspace({ children }: { children: ReactNode }) {
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => { if (Object.values(useEditorDocuments.getState().documents).some(isDocumentDirty)) { event.preventDefault(); event.returnValue = ''; } };
     window.addEventListener('beforeunload', beforeUnload); return () => window.removeEventListener('beforeunload', beforeUnload);
-  }, []);
-  useEffect(() => {
-    let disposed = false; let stop: (() => void) | undefined; let approved = false;
-    try {
-      const appWindow = getCurrentWindow();
-      void appWindow.onCloseRequested(event => {
-        if (approved) { approved = false; return; }
-        const open = useSessionStore.getState().tabs.flatMap(tab => tab.kind === 'editor' ? tab.files : []);
-        if (interceptEditorClose(open, () => { approved = true; void appWindow.close(); })) event.preventDefault();
-      }).then(unlisten => { if (disposed) unlisten(); else stop = unlisten; }).catch(() => {});
-    } catch { /* Browser previews do not own a native window. */ }
-    return () => { disposed = true; stop?.(); };
   }, []);
   const saveClose = async () => {
     if (!closing || saving) return; setSaving(true); setCloseError('');

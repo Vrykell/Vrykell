@@ -1,4 +1,7 @@
 import { expect, type BrowserContext, type Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+
+const mainCapability = JSON.parse(readFileSync(new URL('../src-tauri/capabilities/default.json', import.meta.url), 'utf8')) as { permissions: (string | Record<string, unknown>)[] };
 
 export interface TauriMockOptions {
   /** Use each terminal's requested directory for its initial prompt. */
@@ -60,7 +63,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
     { name: '旧脚本技能', description: '遗留技能，含脚本', source: 'market', trusted: false, enabled: false, hasScripts: true, modified: true, files: ['SKILL.md', 'scripts/run.sh', 'references/说明.md'], dir: '/home/e2e/.vrykell/skills/旧脚本技能', prompt: '运行 scripts/run.sh 完成工作。' },
   ];
   await page.addInitScript(
-    ({ enableIntegration, enableReadyMarker, models, active, skillsSeed, scheduleSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession, launchDirectory, pendingDirs, menuSeed, terminalDirectories }) => {
+    ({ enableIntegration, enableReadyMarker, models, active, skillsSeed, scheduleSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession, launchDirectory, pendingDirs, menuSeed, terminalDirectories, mainPermissions }) => {
     const menu = { supported: true, available: true, enabled: false, stale: false, certificateTrusted: false, certificateThumbprint: 'E2E-CERTIFICATE', ...menuSeed };
     const menuActions: string[] = [];
     (window as unknown as { __MENU_ACTIONS__: string[] }).__MENU_ACTIONS__ = menuActions;
@@ -1637,13 +1640,15 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           }
           case 'plugin:window|close':
             windowOps.push({ command: cmd, label: args.label as string });
-            if (windowToken) emit('tauri://close-requested', null);
-            else for (const popup of toolPopups.values()) popup.close();
+            if (eventListeners.has('tauri://close-requested')) emit('tauri://close-requested', null);
+            else if (!windowToken) for (const popup of toolPopups.values()) popup.close();
             return undefined;
           case 'plugin:window|destroy':
+            if (!windowToken && !mainPermissions.includes('core:window:allow-destroy')) throw new Error('Window destroy is not allowed');
             windowOps.push({ command: cmd, label: args.label as string,
               value: (window as unknown as { __LLM_ABORTED__?: Set<string> }).__LLM_ABORTED__?.size ?? 0 });
             if (windowToken) { sendTool({ label: windowLabel, event: 'tauri://destroyed', payload: { aborted: (window as unknown as { __LLM_ABORTED__?: Set<string> }).__LLM_ABORTED__?.size ?? 0 } }); setTimeout(() => window.close(), 0); }
+            else for (const popup of toolPopups.values()) popup.close();
             return undefined;
           case 'plugin:window|minimize':
             nativeMinimized = true;
@@ -1686,7 +1691,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
       },
     };
     localStorage.setItem('vrykell-api-key', 'sk-e2e-fake');
-  }, { enableIntegration: integration, enableReadyMarker: opts.shellReadyMarker !== false, models: seedModels, active: seedActive, skillsSeed: seedSkills, scheduleSeed: seedSchedules, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true, sshPreexec: opts.sshPreexec ?? true, groupedHistoricalSession: opts.groupedHistoricalSession ?? false, launchDirectory: opts.launchDirectory, pendingDirs: opts.pendingLaunchDirectories ?? [], menuSeed: opts.contextMenu, terminalDirectories: opts.terminalDirectories ?? false });
+  }, { enableIntegration: integration, enableReadyMarker: opts.shellReadyMarker !== false, models: seedModels, active: seedActive, skillsSeed: seedSkills, scheduleSeed: seedSchedules, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true, sshPreexec: opts.sshPreexec ?? true, groupedHistoricalSession: opts.groupedHistoricalSession ?? false, launchDirectory: opts.launchDirectory, pendingDirs: opts.pendingLaunchDirectories ?? [], menuSeed: opts.contextMenu, terminalDirectories: opts.terminalDirectories ?? false, mainPermissions: mainCapability.permissions.filter((permission): permission is string => typeof permission === 'string') });
 }
 
 /** 预置 AI 回复文本：mock 的 ai_stream 会按 chunk 流式 emit ai-chunk 事件。
