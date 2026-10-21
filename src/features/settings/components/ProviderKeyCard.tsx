@@ -12,7 +12,7 @@ import { useEffect, useState } from 'react';
 import { t } from '@i18n';
 import { IconButton } from '@ui/IconButton';
 import { OutlineButton } from '@ui/OutlineButton';
-import { Copy, Eye, EyeOff, Key, Pencil, Trash2 } from '@ui/icons';
+import { Copy, Eye, EyeOff, Key, Pencil, Trash2, iconSizes } from '@ui/icons';
 import { writeClipboardText } from '@platform/clipboard';
 import {
   clearProviderKey, providerFetchModels, providerKeyHint, providerKeyReveal,
@@ -111,23 +111,23 @@ export default function ProviderKeyCard({ row, toast, keyEditRequest = 0 }: {
                 {revealed ?? hint ?? '••••••••'}
               </span>
               <span className="settings-key-actions">
-                <IconButton compact data-testid="provider-key-reveal"
+                <IconButton data-testid="provider-key-reveal"
                   aria-label={t(revealed !== null ? 'Hide API key' : 'Reveal API key')}
                   data-tip={t(revealed !== null ? 'Hide API key' : 'Reveal API key')}
                   onClick={() => void toggleReveal()}>
-                  {revealed !== null ? <EyeOff size={14} /> : <Eye size={14} />}
+                  {revealed !== null ? <EyeOff size={iconSizes.control} /> : <Eye size={iconSizes.control} />}
                 </IconButton>
-                <IconButton compact data-testid="provider-key-copy"
+                <IconButton data-testid="provider-key-copy"
                   aria-label={t('Copy API key')} data-tip={t('Copy API key')} onClick={() => void copy()}>
-                  <Copy size={14} />
+                  <Copy size={iconSizes.control} />
                 </IconButton>
-                <IconButton compact data-testid="provider-key-replace"
+                <IconButton data-testid="provider-key-replace"
                   aria-label={t('Edit API key')} data-tip={t('Edit API key')} onClick={() => setDialogOpen(true)}>
-                  <Pencil size={14} />
+                  <Pencil size={iconSizes.control} />
                 </IconButton>
-                <IconButton compact tone="danger" data-testid="provider-key-clear"
+                <IconButton tone="danger" data-testid="provider-key-clear"
                   aria-label={t('Clear API key')} data-tip={t('Clear API key')} onClick={() => void clear()}>
-                  <Trash2 size={14} />
+                  <Trash2 size={iconSizes.control} />
                 </IconButton>
               </span>
             </div>

@@ -3,6 +3,7 @@ import { afterEach, expect, it } from 'vitest';
 import SettingsNavigation from '../components/SettingsNavigation';
 import { useSettingsNavigation } from '../hooks/useSettingsNavigation';
 import { useSettingsNavigationStore } from '../stores/navigation';
+import { isWindows } from '@platform/runtime';
 
 function Navigation() {
   return <SettingsNavigation navigation={useSettingsNavigation()} />;
@@ -13,7 +14,7 @@ afterEach(() => { cleanup(); useSettingsNavigationStore.setState({ selected: 'ai
 it('keeps the complete directory visible after selecting a page', () => {
   render(<Navigation />);
   const directory = screen.getByRole('complementary', { name: '设置目录' });
-  expect(directory.querySelectorAll('.sidebar-row')).toHaveLength(24);
+  expect(directory.querySelectorAll('.sidebar-row')).toHaveLength(isWindows ? 24 : 23);
   expect(screen.getByRole('button', { name: '语言' })).toBeVisible();
   expect(screen.queryByRole('textbox')).toBeNull();
   expect(screen.queryByRole('button', { name: '版本控制' })).toBeNull();

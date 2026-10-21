@@ -40,7 +40,7 @@ export default function ProviderEndpointCard({ row }: { row: ProviderRow<ModelPr
             style={{ flex: 1, fontFamily: 'var(--font-mono)' }}
           />
           <CopyButton testId="provider-endpoint-copy" text={row.baseUrl}
-            label={t('Copy API address')} iconSize={14} style={{ width: 28, height: 28 }} />
+            label={t('Copy API address')} iconSize={16} style={{ width: 32, height: 32 }} />
         </div>
         <div
           data-testid="provider-endpoint-preview"

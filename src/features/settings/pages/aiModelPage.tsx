@@ -9,7 +9,7 @@ import { useMemo, useRef, useState } from 'react';
 import { IconButton } from '@ui/IconButton';
 import ContextMenu from '@ui/ContextMenu';
 import ConfirmDialog from '@ui/ConfirmDialog';
-import { Ellipsis } from '@ui/icons';
+import { Ellipsis, iconSizes } from '@ui/icons';
 import { t } from '@i18n';
 import { selectProvider, useAiConfigStore, type ModelProfile } from '@features/agent';
 import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
@@ -126,7 +126,6 @@ export function AiModelPage() {
               {/* Actions on the selected provider. */}
               <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
                 <IconButton
-                  compact
                   data-tip={t('More actions')}
                   aria-label={t('More actions')}
                   onClick={(event) => {
@@ -134,7 +133,7 @@ export function AiModelPage() {
                     setMenu({ x: rect.left, y: rect.bottom + 4 });
                   }}
                 >
-                  <Ellipsis size={14} />
+                  <Ellipsis size={iconSizes.control} />
                 </IconButton>
               </span>
             </div>

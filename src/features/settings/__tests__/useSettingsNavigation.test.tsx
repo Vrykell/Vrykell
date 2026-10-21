@@ -4,6 +4,7 @@ import { useSettingsNavigation } from '../hooks/useSettingsNavigation';
 import { useSettingsNavigationStore } from '../stores/navigation';
 import { getSettings } from '../services/registry';
 import { useSessionStore } from '@features/workspace';
+import { isWindows } from '@platform/runtime';
 
 beforeEach(() => useSettingsNavigationStore.setState({ selected: 'ai-model' }));
 afterEach(() => vi.restoreAllMocks());
@@ -20,7 +21,7 @@ it('opens the globally indexed page before mounting and updates an existing sett
 
 it('keeps all pages available and clears field targets when choosing a page', () => {
   const { result } = renderHook(() => useSettingsNavigation());
-  expect(result.current.groups.flatMap(group => group.items)).toHaveLength(24);
+  expect(result.current.groups.flatMap(group => group.items)).toHaveLength(isWindows ? 24 : 23);
   act(() => useSettingsNavigationStore.getState().openField('ai-perms', 'Permissions'));
   act(() => result.current.setSelected('terminal-open'));
   expect(result.current.selected).toBe('terminal-open');

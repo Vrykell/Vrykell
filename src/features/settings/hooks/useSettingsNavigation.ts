@@ -1,5 +1,6 @@
 import { BrainCircuit, FileCode, Keyboard, Settings, SquareTerminal, History, FileText, ShieldCheck, Globe, Folder, Plug, Bot, RefreshCw, Sun, Palette, TextFont } from '@ui/icons';
 import type { PageId } from '../model/navigation';
+import { isSettingsPageAvailable } from '../model/navigation';
 import { t } from '@i18n';
 import { useSettingsNavigationStore } from '../stores/navigation';
 export type { PageId } from '../model/navigation';
@@ -70,9 +71,9 @@ export const SETTINGS_GROUPS: SettingGroup[] = [
 
 /** Keep the active settings page in sync with external navigation. */
 export function useSettingsNavigation() {
-  const selected = useSettingsNavigationStore(state => state.selected);
+  const selected = useSettingsNavigationStore(state => isSettingsPageAvailable(state.selected) ? state.selected : 'application-language');
   const setSelected = useSettingsNavigationStore(state => state.setSelected);
-  const groups = SETTINGS_GROUPS.map(group => ({ ...group, label: t(group.label), items: group.items.map(item => ({ ...item, label: t(item.label) })) }));
+  const groups = SETTINGS_GROUPS.map(group => ({ ...group, label: t(group.label), items: group.items.filter(item => isSettingsPageAvailable(item.id)).map(item => ({ ...item, label: t(item.label) })) }));
   const activeLabel = groups.flatMap(group => group.items).find(item => item.id === selected)?.label ?? t('Settings');
   return { selected, setSelected, activeLabel, groups };
 }

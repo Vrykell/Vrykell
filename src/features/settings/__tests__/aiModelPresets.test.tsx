@@ -5,7 +5,7 @@
  * endpoint and a model id, and a second click on the same preset lands on that row instead of
  * stacking duplicates.
  */
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AiModelPage } from '@features/settings/pages/aiModelPage';
 import { useAiConfigStore } from '@features/agent';
@@ -33,6 +33,21 @@ beforeEach(() => {
 });
 
 describe('AiModelPage presets', () => {
+  it('uses shared sync feedback and suppresses duplicate endpoint requests', async () => {
+    let finish!: (models: string[]) => void;
+    invokeMock.mockImplementation((command: string) => command === 'provider_fetch_models'
+      ? new Promise<string[]>(resolve => { finish = resolve; }) : Promise.resolve({}));
+    render(<AiModelPage />);
+    const sync = await screen.findByTestId('model-sync');
+    fireEvent.click(sync);
+    expect(sync).toHaveAttribute('aria-busy', 'true');
+    expect(sync).toBeDisabled();
+    fireEvent.click(sync);
+    expect(invokeMock.mock.calls.filter(([command]) => command === 'provider_fetch_models')).toHaveLength(1);
+    await act(async () => { finish(['extra-model']); });
+    await waitFor(() => expect(useAiConfigStore.getState().models.some(model => model.model === 'extra-model')).toBe(true));
+    await waitFor(() => expect(sync).toHaveAttribute('aria-busy', 'false'), { timeout: 2000 });
+  });
   it('fills a new model row from the preset and makes it active', async () => {
     render(<AiModelPage />);
 

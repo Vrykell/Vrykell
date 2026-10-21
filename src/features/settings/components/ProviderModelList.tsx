@@ -9,10 +9,10 @@
 import { useMemo, useState } from 'react';
 import { t } from '@i18n';
 import { IconButton } from '@ui/IconButton';
-import { OutlineButton } from '@ui/OutlineButton';
+import ReloadButton from '@ui/ReloadButton';
 import { TextInput } from '@ui/TextInput';
 import ConfirmDialog from '@ui/ConfirmDialog';
-import { ChevronDown, Eye, Filter, Globe, Lightbulb, Minus, Plus, RefreshCw, Search, Settings, Wrench, X, type AppIcon } from '@ui/icons';
+import { ChevronDown, Eye, Filter, Globe, Lightbulb, Minus, Plus, Search, Settings, Wrench, X, iconSizes, type AppIcon } from '@ui/icons';
 import { detectCapabilities, type ModelCapability } from '@features/agent/model/capabilities';
 import { modelHue, modelMark } from '@features/agent/components/modelIcon';
 import { providerFetchModels, useAiConfigStore, type ModelProfile } from '@features/agent';
@@ -83,13 +83,13 @@ function ModelRow({ model, active, onRemove }: {
           </span>
         </span>
         <CapabilityChips profile={model} />
-        <IconButton compact data-testid="model-settings" aria-expanded={editing}
+        <IconButton data-testid="model-settings" aria-expanded={editing}
           aria-label={t('Model settings')} data-tip={t('Model settings')} onClick={() => setEditing(true)}>
-          <Settings size={14} />
+          <Settings size={iconSizes.control} />
         </IconButton>
-        <IconButton compact tone="danger" data-testid="model-remove"
+        <IconButton tone="danger" data-testid="model-remove"
           aria-label={t('Delete model')} data-tip={t('Delete model')} onClick={onRemove}>
-          <Minus size={14} />
+          <Minus size={iconSizes.control} />
         </IconButton>
       </div>
       <ModelSettingsDialog open={editing} model={model} onClose={() => setEditing(false)} />
@@ -174,27 +174,24 @@ export default function ProviderModelList({ row, toast }: {
         description={t('Configure models and choose the active one. Models from the same provider share an API key.')}
       >
         <div data-testid="model-list-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8 }}>
-          <IconButton compact data-testid="model-collapse-all" disabled={models.length === 0}
+          <IconButton data-testid="model-collapse-all" disabled={models.length === 0}
             aria-label={t(allCollapsed ? 'Expand all groups' : 'Collapse all groups')}
             data-tip={t(allCollapsed ? 'Expand all groups' : 'Collapse all groups')} onClick={toggleAll}>
-            <ChevronDown size={14} style={{ transform: allCollapsed ? undefined : 'rotate(180deg)', transition: 'transform 0.12s var(--ease)' }} />
+            <ChevronDown size={iconSizes.control} style={{ transform: allCollapsed ? undefined : 'rotate(180deg)', transition: 'transform 0.12s var(--ease)' }} />
           </IconButton>
-          <IconButton compact data-testid="model-search-toggle" aria-expanded={searchOpen}
+          <IconButton data-testid="model-search-toggle" aria-expanded={searchOpen}
             aria-label={t('Search models')} data-tip={t('Search models')}
             onClick={() => { setSearchOpen(value => !value); if (searchOpen) setQuery(''); }}>
-            <Search size={14} />
+            <Search size={iconSizes.control} />
           </IconButton>
-          <IconButton compact data-testid="model-filter-toggle" aria-expanded={filterOpen}
+          <IconButton data-testid="model-filter-toggle" aria-expanded={filterOpen}
             aria-label={t('Filter models')} data-tip={t('Filter models')} onClick={() => setFilterOpen(value => !value)}>
-            <Filter size={14} />
+            <Filter size={iconSizes.control} />
           </IconButton>
           <span style={{ flex: 1 }} />
-          <OutlineButton data-testid="model-sync" disabled={syncing} onClick={() => void sync()}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            <RefreshCw size={12} /> {syncing ? t('Syncing…') : t('Sync models')}
-          </OutlineButton>
-          <IconButton compact data-testid="model-add" aria-label={t('Add model')} data-tip={t('Add model')} onClick={() => setAddOpen(true)}>
-            <Plus size={14} />
+          <ReloadButton testId="model-sync" busy={syncing} label={t('Sync models')} onReload={sync} />
+          <IconButton data-testid="model-add" aria-label={t('Add model')} data-tip={t('Add model')} onClick={() => setAddOpen(true)}>
+            <Plus size={iconSizes.control} />
           </IconButton>
         </div>
         {searchOpen && (

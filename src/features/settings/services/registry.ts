@@ -12,6 +12,7 @@ import { useSessionStore } from '@features/workspace';
 import { useTypographyStore } from '@config/typography';
 import { useSettingsNavigationStore } from '../stores/navigation';
 import type { PageId } from '../model/navigation';
+import { isSettingsPageAvailable } from '../model/navigation';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 
 export interface SettingDef {
@@ -28,7 +29,7 @@ const settings: SettingDef[] = [];
 export function registerSetting(setting: SettingDef): void {
   if (!settings.some(item => item.id === setting.id)) settings.push(setting);
 }
-export function getSettings(): SettingDef[] { return settings.map(setting => ({ ...setting, label: localizeLabel(setting.label)!, desc: localizeLabel(setting.desc)! })); }
+export function getSettings(): SettingDef[] { return settings.filter(setting => isSettingsPageAvailable(setting.page)).map(setting => ({ ...setting, label: localizeLabel(setting.label)!, desc: localizeLabel(setting.desc)! })); }
 export function searchSettings(query: string): SettingDef[] {
   const words = query.trim().toLowerCase().split(/\s+/);
   return getSettings().filter(setting => words.every(word => `${setting.label} ${setting.desc} ${(setting.keywords ?? []).join(" ")}`.toLowerCase().includes(word)));
